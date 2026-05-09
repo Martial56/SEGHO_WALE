@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SEGHO-WALE — Connexion</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family:'Sora',sans-serif;
+  min-height:100vh;
+  background: linear-gradient(135deg, #071e28 0%, #0f4358 50%, #1a6d8c 100%);
+  display:flex; align-items:center; justify-content:center;
+}
+.login-card {
+  background: rgba(255,255,255,0.05);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 24px;
+  padding: 48px;
+  width: 420px;
+  box-shadow: 0 40px 80px rgba(0,0,0,0.4);
+  animation: fadeIn 0.4s ease;
+}
+@keyframes fadeIn { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+.logo { text-align:center; margin-bottom:36px; }
+.logo-icon { font-size:52px; display:block; margin-bottom:14px; }
+.logo h1 { color:#fff; font-size:28px; font-weight:800; letter-spacing:-0.5px; }
+.logo p { color:rgba(255,255,255,0.45); font-size:12.5px; margin-top:6px; line-height:1.5; }
+.form-group { margin-bottom:20px; }
+label { display:block; color:rgba(255,255,255,0.65); font-size:12px; font-weight:600; margin-bottom:8px; letter-spacing:0.3px; text-transform:uppercase; }
+input[type=text], input[type=password] {
+  width:100%; padding:14px 18px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius:12px; color:#fff; font-family:'Sora',sans-serif; font-size:15px;
+  transition: border-color 0.2s, background 0.2s;
+  outline: none;
+}
+input[type=text]:focus, input[type=password]:focus {
+  border-color: #34a8cc; background: rgba(255,255,255,0.12);
+  box-shadow: 0 0 0 3px rgba(52,168,204,0.15);
+}
+input::placeholder { color:rgba(255,255,255,0.25); }
+.btn-login {
+  width:100%; padding:16px;
+  background: linear-gradient(135deg, #2188ab, #34a8cc);
+  border:none; border-radius:12px; color:#fff;
+  font-family:'Sora',sans-serif; font-size:15px; font-weight:700;
+  cursor:pointer; transition: transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 4px 20px rgba(33,136,171,0.4);
+  margin-top:8px;
+}
+.btn-login:hover { transform:translateY(-2px); box-shadow:0 8px 30px rgba(33,136,171,0.5); }
+.btn-login:active { transform:translateY(0); }
+.error-box {
+  background:rgba(232,69,69,0.12);
+  border:1px solid rgba(232,69,69,0.3);
+  border-radius:10px; padding:12px 16px;
+  margin-bottom:20px; color:#ff9090; font-size:13px;
+  display:flex; align-items:center; gap:8px;
+}
+.footer-note { text-align:center; margin-top:24px; color:rgba(255,255,255,0.2); font-size:11px; }
+</style>
+</head>
+<body>
+<div class="login-card">
+  <div class="logo">
+    <span class="logo-icon">🏥</span>
+    <h1>SEGHO-WALE</h1>
+    <p>Centre Médico-Social WALÉ<br>Yamoussoukro, Côte d'Ivoire</p>
+  </div>
+
+  {% if error %}
+  <div class="error-box">⚠️ {{ error }}</div>
+  {% endif %}
+
+  <form method="post" action="{% url 'login' %}">
+    {% csrf_token %}
+    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+    <div class="form-group">
+      <label>Identifiant</label>
+      <input type="text" name="username" placeholder="Votre identifiant" autofocus autocomplete="username">
+    </div>
+    <div class="form-group">
+      <label>Mot de passe</label>
+      <input type="password" name="password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button type="submit" class="btn-login">Se connecter →</button>
+  </form>
+
+  <div class="footer-note">SEGHO-WALE v1.0 · Accès réservé au personnel autorisé</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,97 @@
+{% extends 'laboratoire/base.html' %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-left">
+        <h1>🧪 Gestion du Laboratoire</h1>
+        <p>Gestion des analyses biologiques et examens d'imagerie</p>
+    </div>
+    <div class="page-header-right">
+        <a href="/admin/laboratoire/analyselaboratoire/add/" class="btn btn-primary">
+            <span>+</span> Nouvelle analyse
+        </a>
+    </div>
+</div>
+
+<div style="display: flex; gap: 16px; margin-bottom: 24px;">
+    <input type="text" placeholder="Rechercher par patient ou type d'analyse..." style="flex: 1; padding: 10px 14px; border: 1px solid rgba(0,0,0,0.12); border-radius: 8px; font-size: 14px;">
+    <select style="padding: 10px 14px; border: 1px solid rgba(0,0,0,0.12); border-radius: 8px; font-size: 14px;">
+        <option>Tous les statuts</option>
+        <option>Reçu</option>
+        <option>En analyse</option>
+        <option>Résultats prêts</option>
+        <option>Livré</option>
+    </select>
+</div>
+
+<div class="grid">
+    <div class="card">
+        <p class="card-meta">Analyses en cours</p>
+        <div class="card-stat">{{ stats.en_cours }}</div>
+    </div>
+    <div class="card">
+        <p class="card-meta">Résultats à remettre</p>
+        <div class="card-stat" style="color: var(--amber);">{{ stats.resultats_prets }}</div>
+    </div>
+    <div class="card">
+        <p class="card-meta">Analyses ce mois</p>
+        <div class="card-stat">{{ stats.analyses_mois }}</div>
+    </div>
+    <div class="card">
+        <p class="card-meta">Délai moyen (jours)</p>
+        <div class="card-stat">{{ stats.delai_moyen }}</div>
+    </div>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>Code Analyse</th>
+                <th>Patient</th>
+                <th>Type d'Analyse</th>
+                <th>Date Reçu</th>
+                <th>Délai prévu</th>
+                <th>Statut</th>
+                <th>Résultats</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for analyse in page_obj %}
+            <tr>
+                <td>{{ analyse.code_analyse }}</td>
+                <td>{{ analyse.patient.nom }} {{ analyse.patient.prenoms }}</td>
+                <td>{{ analyse.type_analyse }}</td>
+                <td>{{ analyse.date_reception|date:"d/m/Y" }}</td>
+                <td>{{ analyse.delai_prevu }} jours</td>
+                <td>
+                    <span class="badge badge-{% if analyse.statut == 'resultats_prets' %}success{% elif analyse.statut == 'en_analyse' %}warning{% else %}primary{% endif %}">
+                        {{ analyse.get_statut_display }}
+                    </span>
+                </td>
+                <td>
+                    {% if analyse.resultats %}
+                        <span class="badge badge-success">Disponible</span>
+                    {% else %}
+                        <span class="badge badge-secondary">En attente</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="/admin/laboratoire/analyselaboratoire/{{ analyse.id }}/change/" class="btn btn-secondary btn-small">Voir</a>
+                    <a href="/admin/laboratoire/analyselaboratoire/{{ analyse.id }}/change/" class="btn btn-primary btn-small">Modifier</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="8" style="text-align: center; padding: 40px; color: rgba(0,0,0,0.4);">
+                    Aucune analyse enregistrée
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% include 'includes/pagination.html' %}
+{% endblock %}

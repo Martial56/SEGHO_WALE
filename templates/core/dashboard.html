@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SEGHO-WALE — Tableau de bord</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+:root {
+  --teal-950: #071e28; --teal-900: #0d3040; --teal-800: #0f4358;
+  --teal-700: #145770; --teal-600: #1a6d8c; --teal-500: #2188ab;
+  --teal-400: #34a8cc; --teal-300: #6ecae3; --teal-200: #aae1f2;
+  --teal-100: #d6f3fb; --teal-50:  #eef9fd;
+  --text-main: #0d3040;
+  --text-muted: #8aafbf;
+  --card-bg:   #ffffff;
+  --card-hover: #f4fbff;
+  --border:    rgba(0,0,0,0.07);
+  --radius:    20px;
+}
+
+html, body {
+  height: 100%;
+  font-family: 'Sora', sans-serif;
+}
+
+body {
+  background: #f0fafa;
+  min-height: 100vh;
+  color: var(--text-main);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ══════════════════════ TOPBAR ══════════════════════ */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 36px;
+  background: #ffffff;
+  border-bottom: 1px solid rgba(0,0,0,0.07);
+  position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+}
+
+.brand {
+  display: flex; align-items: center; gap: 14px;
+}
+.brand-logo {
+  width: 46px; height: 46px; border-radius: 14px;
+  background: linear-gradient(135deg, var(--teal-600), var(--teal-400));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; flex-shrink: 0;
+  box-shadow: 0 4px 16px rgba(33,136,171,0.25);
+}
+.brand-text h1 {
+  font-size: 17px; font-weight: 800; letter-spacing: -0.3px; color: var(--teal-900);
+}
+.brand-text p {
+  font-size: 11px; color: var(--text-muted); margin-top: 1px;
+}
+
+.topbar-right {
+  display: flex; align-items: center; gap: 20px;
+}
+
+.top-clock {
+  text-align: right;
+  font-size: 12px; color: var(--text-muted);
+  line-height: 1.6;
+}
+.top-clock .time {
+  font-size: 18px; font-weight: 700; color: var(--teal-700);
+  font-variant-numeric: tabular-nums;
+}
+
+.top-alerts {
+  display: flex; gap: 8px;
+}
+.top-alert-badge {
+  background: #fff;
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 30px;
+  padding: 5px 12px;
+  font-size: 11px; font-weight: 600;
+  display: flex; align-items: center; gap: 6px;
+  color: var(--teal-700); text-decoration: none;
+  transition: all 0.15s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+.top-alert-badge:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,0.08); }
+.top-alert-badge .dot {
+  width: 16px; height: 16px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 800; color: #fff; flex-shrink: 0;
+}
+.dot-rose   { background: #e84545; }
+.dot-amber  { background: #e89a1a; }
+.dot-teal   { background: #2d99db; }
+
+.user-chip {
+  display: flex; align-items: center; gap: 10px;
+  background: #f7fcff;
+  border: 1px solid rgba(33,136,171,0.12);
+  border-radius: 30px;
+  padding: 6px 14px 6px 7px;
+}
+.user-avatar {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--teal-600), var(--teal-400));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 800; color: #fff; flex-shrink: 0;
+}
+.user-info .uname { font-size: 13px; font-weight: 600; color: var(--teal-900); }
+.user-info .urole { font-size: 10px; color: var(--text-muted); }
+
+.btn-logout {
+  background: rgba(33,136,171,0.08);
+  border: none;
+  border-radius: 10px;
+  color: var(--teal-800);
+  padding: 7px 14px;
+  font-size: 12px; font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex; align-items: center; gap: 6px;
+}
+.btn-logout:hover { background: rgba(33,136,171,0.18); color: var(--teal-950); }
+
+/* ══════════════════════ STATS BAR ══════════════════════ */
+.stats-strip {
+  display: flex; gap: 0;
+  background: #ffffff;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+  overflow-x: auto;
+  scrollbar-width: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+}
+.stats-strip::-webkit-scrollbar { display: none; }
+.stat-chip {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 24px;
+  border-right: 1px solid rgba(0,0,0,0.06);
+  white-space: nowrap; flex-shrink: 0;
+}
+.stat-chip:last-child { border-right: none; }
+.stat-chip-icon { font-size: 18px; }
+.stat-chip-val { font-size: 20px; font-weight: 800; color: var(--teal-900); line-height: 1; }
+.stat-chip-lbl { font-size: 10px; color: var(--text-muted); font-weight: 500; margin-top: 1px; }
+
+/* ══════════════════════ CONTENT ══════════════════════ */
+.content {
+  flex: 1;
+  padding: 36px 40px;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.section-label {
+  font-size: 11px; font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 1.2px;
+  margin-bottom: 20px;
+  display: flex; align-items: center; gap: 10px;
+}
+.section-label::after {
+  content: ''; flex: 1; height: 1px;
+  background: linear-gradient(to right, rgba(0,0,0,0.1), transparent);
+}
+
+/* ══════════════════════ MODULES GRID ══════════════════════ */
+.modules-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 18px;
+  margin-bottom: 40px;
+}
+
+.module-card {
+  background: #ffffff;
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: var(--radius);
+  padding: 24px 12px 18px;
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  text-decoration: none; color: var(--text-main);
+  transition: all 0.2s ease;
+  cursor: pointer;
+  position: relative; overflow: hidden;
+  animation: fadeUp 0.4s ease both;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+}
+.module-card:hover {
+  background: #f4fbff;
+  transform: translateY(-5px);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.1);
+  border-color: rgba(33,136,171,0.2);
+}
+
+.module-icon-box {
+  width: 72px; height: 72px; border-radius: 20px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 30px;
+  transition: transform 0.2s;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+}
+.module-card:hover .module-icon-box { transform: scale(1.08); }
+
+.module-name {
+  font-size: 12px; font-weight: 700;
+  color: var(--teal-800);
+  text-align: center; line-height: 1.3;
+}
+.module-sub {
+  font-size: 10px; color: var(--text-muted);
+  text-align: center; font-weight: 500;
+}
+
+/* Icon background colors */
+.ic-teal    { background: linear-gradient(135deg, #0e8fae, #2bb5d8); }
+.ic-green   { background: linear-gradient(135deg, #0d8a52, #16c977); }
+.ic-violet  { background: linear-gradient(135deg, #5c3fb0, #8e6adc); }
+.ic-amber   { background: linear-gradient(135deg, #c27a10, #e8a82a); }
+.ic-rose    { background: linear-gradient(135deg, #b82020, #e84545); }
+.ic-sky     { background: linear-gradient(135deg, #1a6eb0, #2d99db); }
+.ic-coral   { background: linear-gradient(135deg, #b83c1e, #e66144); }
+.ic-indigo  { background: linear-gradient(135deg, #2d3eb0, #4b61db); }
+.ic-teal2   { background: linear-gradient(135deg, #0a7a5a, #14b88a); }
+.ic-plum    { background: linear-gradient(135deg, #7b2d8c, #c060d8); }
+.ic-slate   { background: linear-gradient(135deg, #3a4a60, #5a6e8a); }
+.ic-pink    { background: linear-gradient(135deg, #9b2068, #d44090); }
+
+/* ══════════════════════ BOTTOM PANELS ══════════════════════ */
+.bottom-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.panel {
+  background: #ffffff;
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: var(--radius);
+  overflow: hidden;
+  animation: fadeUp 0.5s ease both;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+}
+.panel-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.panel-title { font-size: 13px; font-weight: 700; color: var(--teal-800); display:flex;align-items:center;gap:8px; }
+.panel-link { font-size: 11px; color: var(--teal-500); text-decoration: none; font-weight: 600; transition: color 0.15s; }
+.panel-link:hover { text-decoration: underline; }
+
+/* RDV items */
+.rdv-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 20px;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+  transition: background 0.15s;
+}
+.rdv-item:last-child { border-bottom: none; }
+.rdv-item:hover { background: var(--teal-50); }
+.rdv-time {
+  width: 46px; text-align: center; flex-shrink: 0;
+  font-size: 12px; font-weight: 700; color: var(--teal-600);
+  background: var(--teal-50);
+  border-radius: 8px; padding: 4px 3px;
+}
+.rdv-avatar {
+  width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--teal-500), var(--teal-300));
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 12px; font-weight: 700;
+}
+.rdv-info { flex: 1; min-width: 0; }
+.rdv-name { font-size: 12px; font-weight: 600; color: var(--teal-900); white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.rdv-doctor { font-size: 10px; color: var(--text-muted); }
+.rdv-badge { font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 20px; flex-shrink: 0; }
+.badge-planifie { background: #e8f4fd; color: #1a6d8c; }
+.badge-confirme { background: #e3f9ee; color: #0d8a52; }
+
+/* Consultation items */
+.cons-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 20px;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+  transition: background 0.15s;
+}
+.cons-item:last-child { border-bottom: none; }
+.cons-item:hover { background: #fafbfc; }
+.cons-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.cons-dot.en_cours { background: #e89a1a; box-shadow: 0 0 0 3px rgba(232,154,26,0.2); }
+.cons-dot.termine  { background: #16a96b; }
+.cons-info { flex: 1; }
+.cons-patient { font-size: 12px; font-weight: 600; color: var(--teal-900); }
+.cons-meta { font-size: 10px; color: var(--text-muted); margin-top: 1px; }
+.cons-num { font-size: 10px; color: var(--teal-400); font-weight: 700; font-family: monospace; }
+
+/* Empty state */
+.empty-state {
+  padding: 36px 20px; text-align: center;
+  color: var(--text-muted); font-size: 13px;
+}
+.empty-icon { font-size: 32px; margin-bottom: 10px; display: block; opacity: 0.5; }
+
+/* Animations */
+@keyframes fadeUp {
+  from { opacity:0; transform: translateY(20px); }
+  to   { opacity:1; transform: translateY(0); }
+}
+.module-card:nth-child(1)  { animation-delay:0.03s; }
+.module-card:nth-child(2)  { animation-delay:0.06s; }
+.module-card:nth-child(3)  { animation-delay:0.09s; }
+.module-card:nth-child(4)  { animation-delay:0.12s; }
+.module-card:nth-child(5)  { animation-delay:0.15s; }
+.module-card:nth-child(6)  { animation-delay:0.18s; }
+.module-card:nth-child(7)  { animation-delay:0.21s; }
+.module-card:nth-child(8)  { animation-delay:0.24s; }
+.module-card:nth-child(9)  { animation-delay:0.27s; }
+.module-card:nth-child(10) { animation-delay:0.30s; }
+.module-card:nth-child(11) { animation-delay:0.33s; }
+.module-card:nth-child(12) { animation-delay:0.36s; }
+.module-card:nth-child(13) { animation-delay:0.39s; }
+.module-card:nth-child(14) { animation-delay:0.42s; }
+.module-card:nth-child(15) { animation-delay:0.45s; }
+.module-card:nth-child(16) { animation-delay:0.48s; }
+.module-card:nth-child(17) { animation-delay:0.51s; }
+.module-card:nth-child(18) { animation-delay:0.54s; }
+.module-card:nth-child(19) { animation-delay:0.57s; }
+.module-card:nth-child(20) { animation-delay:0.60s; }
+.module-card:nth-child(21) { animation-delay:0.63s; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+
+/* Responsive */
+@media (max-width: 1280px) { .modules-grid { grid-template-columns: repeat(5, 1fr); } }
+@media (max-width: 1024px) {
+  .modules-grid { grid-template-columns: repeat(4, 1fr); }
+  .bottom-grid  { grid-template-columns: 1fr; }
+  .content { padding: 24px 20px; }
+}
+@media (max-width: 768px) {
+  .modules-grid { grid-template-columns: repeat(3, 1fr); }
+  .topbar { padding: 12px 16px; }
+  .top-alerts { display: none; }
+  .stats-strip .stat-chip { padding: 10px 16px; }
+}
+@media (max-width: 480px) {
+  .modules-grid { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════ TOPBAR ══════════════ -->
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-logo">🏥</div>
+    <div class="brand-text">
+      <h1>SEGHO-WALE</h1>
+      <p>Centre Médico-Social WALÉ &mdash; Yamoussoukro</p>
+    </div>
+  </div>
+
+  <div class="topbar-right">
+
+    <!-- Alertes rapides -->
+    <div class="top-alerts">
+      {% if stats.medicaments_alerte > 0 %}
+      <a href="{% url 'pharmacie_list' %}" class="top-alert-badge">
+        <span class="dot dot-amber">{{ stats.medicaments_alerte }}</span>
+        Stock alerte
+      </a>
+      {% endif %}
+      {% if stats.factures_impayees > 0 %}
+      <a href="{% url 'facturation_list' %}" class="top-alert-badge">
+        <span class="dot dot-rose">{{ stats.factures_impayees }}</span>
+        Impayées
+      </a>
+      {% endif %}
+      {% if stats.analyses_pending > 0 %}
+      <a href="{% url 'laboratoire_list' %}" class="top-alert-badge">
+        <span class="dot dot-teal">{{ stats.analyses_pending }}</span>
+        Labo
+      </a>
+      {% endif %}
+    </div>
+
+    <!-- Horloge -->
+    <div class="top-clock">
+      <div class="time" id="live-time">--:--:--</div>
+      <div>{% now "l j F Y" %}</div>
+    </div>
+
+    <!-- Utilisateur -->
+    <div class="user-chip">
+      <div class="user-avatar">{{ user.username|first|upper }}</div>
+      <div class="user-info">
+        <div class="uname">{{ user.get_full_name|default:user.username }}</div>
+        <div class="urole">{% if user.is_superuser %}Administrateur{% else %}Utilisateur{% endif %}</div>
+      </div>
+    </div>
+
+    <form method="post" action="{% url 'logout' %}" style="margin:0;">
+      {% csrf_token %}
+      <button type="submit" class="btn-logout">⏏ Déconnexion</button>
+    </form>
+  </div>
+</header>
+
+<!-- ══════════════ STATS STRIP ══════════════ 
+<div class="stats-strip">
+  <div class="stat-chip">
+    <span class="stat-chip-icon">👤</span>
+    <div>
+      <div class="stat-chip-val">{{ stats.patients_total }}</div>
+      <div class="stat-chip-lbl">Patients &mdash; +{{ stats.patients_today }} auj.</div>
+    </div>
+  </div>
+  <div class="stat-chip">
+    <span class="stat-chip-icon">📅</span>
+    <div>
+      <div class="stat-chip-val">{{ stats.rdv_today }}</div>
+      <div class="stat-chip-lbl">RDV aujourd'hui</div>
+    </div>
+  </div>
+  <div class="stat-chip">
+    <span class="stat-chip-icon">🩺</span>
+    <div>
+      <div class="stat-chip-val">{{ stats.consultations_today }}</div>
+      <div class="stat-chip-lbl">Consultations auj.</div>
+    </div>
+  </div>
+  <div class="stat-chip">
+    <span class="stat-chip-icon">🛏️</span>
+    <div>
+      <div class="stat-chip-val">{{ stats.hospitalisations }}</div>
+      <div class="stat-chip-lbl">Hospitalisés</div>
+    </div>
+  </div>
+  <div class="stat-chip">
+    <span class="stat-chip-icon">💊</span>
+    <div>
+      <div class="stat-chip-val">{{ stats.medicaments_alerte }}</div>
+      <div class="stat-chip-lbl">Alertes pharmacie</div>
+    </div>
+  </div>
+  <div class="stat-chip">
+    <span class="stat-chip-icon">🧾</span>
+    <div>
+      <div class="stat-chip-val">{{ stats.factures_impayees }}</div>
+      <div class="stat-chip-lbl">Factures impayées</div>
+    </div>
+  </div>
+  <div class="stat-chip">
+    <span class="stat-chip-icon">👥</span>
+    <div>
+      <div class="stat-chip-val">{{ stats.employes_actifs }}</div>
+      <div class="stat-chip-lbl">Employés actifs</div>
+    </div>
+  </div>
+</div>-->
+
+<!-- ══════════════ CONTENT ══════════════ -->
+<div class="content">
+
+  <!-- ACCÈS RAPIDE AUX MODULES 
+  <div class="section-label">Accès rapide aux modules</div>-->
+
+  <!-- MODULES GRID -->
+  <div class="modules-grid">
+
+    <a href="{% url 'patients_list' %}" class="module-card">
+      <div class="module-icon-box ic-teal">👤</div>
+      <div class="module-name">Patients</div>
+      <div class="module-sub">{{ stats.patients_total }} enregistrés</div>
+    </a>
+
+    <a href="{% url 'medecins_list' %}" class="module-card">
+      <div class="module-icon-box ic-sky">👨‍⚕️</div>
+      <div class="module-name">Docteurs</div>
+      <div class="module-sub">Corps médical</div>
+    </a>
+
+    <a href="/admin/medecins/service/" class="module-card">
+      <div class="module-icon-box ic-teal2">🏥</div>
+      <div class="module-name">Services</div>
+      <div class="module-sub">Unités de soins</div>
+    </a>
+
+    <a href="/admin/pharmacie/medicament/" class="module-card">
+      <div class="module-icon-box ic-rose">💊</div>
+      <div class="module-name">Médicaments</div>
+      <div class="module-sub">Catalogue</div>
+    </a>
+
+    <a href="/admin/patients/rendezvous/" class="module-card">
+      <div class="module-icon-box ic-green">📅</div>
+      <div class="module-name">Rendez-vous</div>
+      <div class="module-sub">{{ stats.rdv_today }} du jour</div>
+    </a>
+
+    <a href="/admin/consultations/ordonnance/" class="module-card">
+      <div class="module-icon-box ic-violet">📋</div>
+      <div class="module-name">Ordonnances</div>
+      <div class="module-sub">Prescriptions</div>
+    </a>
+
+    <a href="{% url 'hospitalisation_list' %}" class="module-card">
+      <div class="module-icon-box ic-coral">🛏️</div>
+      <div class="module-name">Hospitalisation</div>
+      <div class="module-sub">{{ stats.hospitalisations }} en cours</div>
+    </a>
+
+    <a href="{% url 'consultations_list' %}" class="module-card">
+      <div class="module-icon-box ic-amber">🩺</div>
+      <div class="module-name">Soins</div>
+      <div class="module-sub">{{ stats.consultations_today }} aujourd'hui</div>
+    </a>
+
+    <a href="{% url 'laboratoire_list' %}" class="module-card">
+      <div class="module-icon-box ic-indigo">🔬</div>
+      <div class="module-name">Laboratoire</div>
+      <div class="module-sub">{{ stats.analyses_pending }} en attente</div>
+    </a>
+
+    <a href="{% url 'pharmacie_list' %}" class="module-card">
+      <div class="module-icon-box ic-pink">⚕️</div>
+      <div class="module-name">Pharmacie</div>
+      <div class="module-sub">{% if stats.medicaments_alerte > 0 %}⚠️ {{ stats.medicaments_alerte }} alertes{% else %}Stock OK{% endif %}</div>
+    </a>
+
+    <a href="/admin/patients/assurance/" class="module-card">
+      <div class="module-icon-box ic-sky">🛡️</div>
+      <div class="module-name">Assurance</div>
+      <div class="module-sub">Couvertures santé</div>
+    </a>
+
+    <a href="{% url 'facturation_list' %}" class="module-card">
+      <div class="module-icon-box ic-teal">📊</div>
+      <div class="module-name">Comptabilité</div>
+      <div class="module-sub">{% if stats.factures_impayees > 0 %}{{ stats.factures_impayees }} impayée(s){% else %}À jour{% endif %}</div>
+    </a>
+
+    <a href="/admin/consultations/consultation/?specialite=gynecologie" class="module-card">
+      <div class="module-icon-box ic-plum">♀️</div>
+      <div class="module-name">Gynécologie</div>
+      <div class="module-sub">Consultations spécialisées</div>
+    </a>
+
+    <a href="/admin/patients/rendezvous/" class="module-card">
+      <div class="module-icon-box ic-green">🗓️</div>
+      <div class="module-name">Planning</div>
+      <div class="module-sub">Agenda & planification</div>
+    </a>
+
+    <a href="/admin/pharmacie/commandepharmacies/" class="module-card">
+      <div class="module-icon-box ic-amber">🛒</div>
+      <div class="module-name">Achats</div>
+      <div class="module-sub">Commandes fournisseurs</div>
+    </a>
+
+    <a href="/admin/pharmacie/lotmedicament/" class="module-card">
+      <div class="module-icon-box ic-coral">📦</div>
+      <div class="module-name">Stock</div>
+      <div class="module-sub">Gestion des stocks</div>
+    </a>
+
+    <a href="{% url 'ressources_humaines_list' %}" class="module-card">
+      <div class="module-icon-box ic-teal2">👥</div>
+      <div class="module-name">Employés</div>
+      <div class="module-sub">{{ stats.employes_actifs }} actifs</div>
+    </a>
+
+    <a href="/admin/ressources_humaines/evaluationemploye/" class="module-card">
+      <div class="module-icon-box ic-amber">⭐</div>
+      <div class="module-name">Évaluation</div>
+      <div class="module-sub">Performance du personnel</div>
+    </a>
+
+    <a href="/admin/ressources_humaines/presence/" class="module-card">
+      <div class="module-icon-box ic-violet">✅</div>
+      <div class="module-name">Présence</div>
+      <div class="module-sub">Pointage & assiduité</div>
+    </a>
+
+    <a href="/admin/ressources_humaines/conge/" class="module-card">
+      <div class="module-icon-box ic-sky">🏖️</div>
+      <div class="module-name">Congés</div>
+      <div class="module-sub">Demandes & planification</div>
+    </a>
+
+    <a href="/admin/" class="module-card">
+      <div class="module-icon-box ic-slate">⚙️</div>
+      <div class="module-name">Paramètres</div>
+      <div class="module-sub">Administration</div>
+    </a>
+
+  </div>
+
+  <!-- ══════════════ BOTTOM PANELS ══════════════ 
+  <div class="section-label">Vue d'ensemble du jour</div>
+  <div class="bottom-grid">-->
+
+    <!-- RDV DU JOUR 
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">📅 Rendez-vous &mdash; {{ today|date:"d/m/Y" }}</div>
+        <a href="{% url 'consultations_list' %}" class="panel-link">Voir tout →</a>
+      </div>
+      {% if rdv_auj %}
+        {% for rdv in rdv_auj %}
+        <div class="rdv-item">
+          <div class="rdv-time">{{ rdv.date_heure|time:"H:i" }}</div>
+          <div class="rdv-avatar">{{ rdv.patient.nom|first|upper }}</div>
+          <div class="rdv-info">
+            <div class="rdv-name">{{ rdv.patient.nom }} {{ rdv.patient.prenoms }}</div>
+            <div class="rdv-doctor">{% if rdv.medecin %}Dr {{ rdv.medecin.nom }}{% else %}Non assigné{% endif %} &middot; {{ rdv.get_type_rdv_display }}</div>
+          </div>
+          <span class="rdv-badge badge-{{ rdv.statut }}">{{ rdv.get_statut_display }}</span>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="empty-state">
+          <span class="empty-icon">📭</span>
+          Aucun rendez-vous planifié aujourd'hui
+        </div>
+      {% endif %}
+    </div>-->
+
+    <!-- DERNIÈRES CONSULTATIONS 
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">🩺 Dernières consultations</div>
+        <a href="{% url 'consultations_list' %}" class="panel-link">Voir tout →</a>
+      </div>
+      {% if last_cons %}
+        {% for c in last_cons %}
+        <div class="cons-item">
+          <div class="cons-dot {{ c.statut }}"></div>
+          <div class="cons-info">
+            <div class="cons-patient">{{ c.patient.nom }} {{ c.patient.prenoms }}</div>
+            <div class="cons-meta">{% if c.medecin %}Dr {{ c.medecin.nom }} &middot; {% endif %}{{ c.date_heure|date:"d/m/Y H:i" }}</div>
+          </div>
+          <span class="cons-num">{{ c.numero }}</span>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="empty-state">
+          <span class="empty-icon">🩺</span>
+          Aucune consultation enregistrée
+        </div>
+      {% endif %}
+    </div>-->
+
+  </div>
+</div><!-- /content -->
+
+<script>
+function updateTime() {
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const el = document.getElementById('live-time');
+  if (el) el.textContent = pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+}
+updateTime();
+setInterval(updateTime, 1000);
+</script>
+</body>
+</html>

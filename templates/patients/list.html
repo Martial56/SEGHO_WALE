@@ -1,0 +1,88 @@
+{% extends 'patients/base.html' %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-left">
+        <h1>👥 Gestion des Patients</h1>
+        <p>Liste complète des patients enregistrés</p>
+    </div>
+    <div class="page-header-right">
+        <a href="/admin/patients/patient/add/" class="btn btn-primary">
+            <span>+</span> Nouveau patient
+        </a>
+        <a href="#" class="btn btn-secondary">
+            <span>📥</span> Importer
+        </a>
+    </div>
+</div>
+
+<div style="display: flex; gap: 16px; margin-bottom: 24px;">
+    <input type="text" placeholder="Rechercher par nom, prénom ou ID..." style="flex: 1; padding: 10px 14px; border: 1px solid rgba(0,0,0,0.12); border-radius: 8px; font-size: 14px;">
+    <select style="padding: 10px 14px; border: 1px solid rgba(0,0,0,0.12); border-radius: 8px; font-size: 14px;">
+        <option>Tous les statuts</option>
+        <option>Actif</option>
+        <option>Inactif</option>
+    </select>
+</div>
+
+<div class="grid">
+    <div class="card">
+        <p class="card-meta">Total de patients</p>
+        <div class="card-stat">{{ stats.total }}</div>
+    </div>
+    <div class="card">
+        <p class="card-meta">Patients actifs</p>
+        <div class="card-stat">{{ stats.actifs }}</div>
+    </div>
+    <div class="card">
+        <p class="card-meta">Nouveaux (30 jours)</p>
+        <div class="card-stat">{{ stats.nouveaux_30j }}</div>
+    </div>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>Code Patient</th>
+                <th>Nom Complet</th>
+                <th>Âge</th>
+                <th>Genre</th>
+                <th>Téléphone</th>
+                <th>Statut</th>
+                <th>Date d'inscription</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for patient in page_obj %}
+            <tr>
+                <td>{{ patient.code_patient }}</td>
+                <td>{{ patient.nom }} {{ patient.prenoms }}</td>
+                <td>{{ patient.age }}</td>
+                <td>{{ patient.get_genre_display }}</td>
+                <td>{{ patient.telephone }}</td>
+                <td>
+                    <span class="badge badge-{% if patient.actif %}success{% else %}danger{% endif %}">
+                        {% if patient.actif %}Actif{% else %}Inactif{% endif %}
+                    </span>
+                </td>
+                <td>{{ patient.date_creation|date:"d/m/Y" }}</td>
+                <td>
+                    <a href="/admin/patients/patient/{{ patient.id }}/change/" class="btn btn-secondary btn-small">Voir</a>
+                    <a href="/admin/patients/patient/{{ patient.id }}/change/" class="btn btn-primary btn-small">Modifier</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="8" style="text-align: center; padding: 40px; color: rgba(0,0,0,0.4);">
+                    Aucun patient enregistré
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% include 'includes/pagination.html' %}
+{% endblock %}

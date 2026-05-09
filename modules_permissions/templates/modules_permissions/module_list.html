@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Liste des Modules</title>
+    <link rel="stylesheet" href="{% static 'modules_permissions/css/modules.css' %}">
+</head>
+<body>
+    <h1>Liste des Modules</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Nom du Module</th>
+                <th>Description</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for module in modules %}
+            <tr>
+                <td>{{ module.id }}</td>
+                <td>{{ module.name }}</td>
+                <td>{{ module.description }}</td>
+                <td>
+                    <a href="{% url 'module_detail' module.id %}">Détails</a>
+                    <a href="{% url 'edit_module' module.id %}">Modifier</a>
+                    <a href="{% url 'delete_module' module.id %}">Supprimer</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="4">Aucun module disponible.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <a href="{% url 'create_module' %}">Ajouter un Nouveau Module</a>
+</body>
+</html>

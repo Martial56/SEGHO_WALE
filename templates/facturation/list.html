@@ -1,0 +1,94 @@
+{% extends 'facturation/base.html' %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-left">
+        <h1>💰 Gestion de la Facturation</h1>
+        <p>Gestion des factures et paiements</p>
+    </div>
+    <div class="page-header-right">
+        <a href="/admin/facturation/facture/add/" class="btn btn-primary">
+            <span>+</span> Nouvelle facture
+        </a>
+        <a href="#" class="btn btn-secondary">
+            <span>📊</span> Rapport
+        </a>
+    </div>
+</div>
+
+<div style="display: flex; gap: 16px; margin-bottom: 24px;">
+    <input type="text" placeholder="Rechercher par numéro de facture ou patient..." style="flex: 1; padding: 10px 14px; border: 1px solid rgba(0,0,0,0.12); border-radius: 8px; font-size: 14px;">
+    <select style="padding: 10px 14px; border: 1px solid rgba(0,0,0,0.12); border-radius: 8px; font-size: 14px;">
+        <option>Tous les statuts</option>
+        <option>Émise</option>
+        <option>Partielle</option>
+        <option>Payée</option>
+        <option>Annulée</option>
+    </select>
+</div>
+
+<div class="grid">
+    <div class="card">
+        <p class="card-meta">Montant total facturé</p>
+        <div class="card-stat">{{ stats.montant_total }} CFA</div>
+    </div>
+    <div class="card">
+        <p class="card-meta">Montant reçu</p>
+        <div class="card-stat" style="color: var(--green);">{{ stats.montant_recu }} CFA</div>
+    </div>
+    <div class="card">
+        <p class="card-meta">Montant en attente</p>
+        <div class="card-stat" style="color: var(--amber);">{{ stats.montant_attente }} CFA</div>
+    </div>
+    <div class="card">
+        <p class="card-meta">Taux de recouvrement</p>
+        <div class="card-stat">{{ stats.taux_recouvrement }}%</div>
+    </div>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>Numéro Facture</th>
+                <th>Patient</th>
+                <th>Date Émission</th>
+                <th>Montant Total</th>
+                <th>Montant Payé</th>
+                <th>Montant Dû</th>
+                <th>Statut</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for facture in page_obj %}
+            <tr>
+                <td>{{ facture.numero_facture }}</td>
+                <td>{{ facture.patient.nom }} {{ facture.patient.prenoms }}</td>
+                <td>{{ facture.date_emission|date:"d/m/Y" }}</td>
+                <td>{{ facture.montant_total }} CFA</td>
+                <td>{{ facture.montant_paye }} CFA</td>
+                <td>{{ facture.montant_restant }} CFA</td>
+                <td>
+                    <span class="badge badge-{% if facture.statut == 'payee' %}success{% elif facture.statut == 'partielle' %}warning{% else %}primary{% endif %}">
+                        {{ facture.get_statut_display }}
+                    </span>
+                </td>
+                <td>
+                    <a href="/admin/facturation/facture/{{ facture.id }}/change/" class="btn btn-secondary btn-small">Voir</a>
+                    <a href="/admin/facturation/facture/{{ facture.id }}/change/" class="btn btn-primary btn-small">Modifier</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="8" style="text-align: center; padding: 40px; color: rgba(0,0,0,0.4);">
+                    Aucune facture enregistrée
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% include 'includes/pagination.html' %}
+{% endblock %}

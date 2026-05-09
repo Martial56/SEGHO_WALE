@@ -1,0 +1,97 @@
+{% extends 'pharmacie/base.html' %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-left">
+        <h1>⚗️ Gestion de la Pharmacie</h1>
+        <p>Gestion des médicaments, stocks et prescriptions</p>
+    </div>
+    <div class="page-header-right">
+        <a href="/admin/pharmacie/medicament/add/" class="btn btn-primary">
+            <span>+</span> Nouveau médicament
+        </a>
+        <a href="/admin/pharmacie/commandepharmacies/add/" class="btn btn-secondary">
+            <span>📦</span> Nouvelle commande
+        </a>
+    </div>
+</div>
+
+<div style="display: flex; gap: 16px; margin-bottom: 24px;">
+    <input type="text" placeholder="Rechercher par nom de médicament..." style="flex: 1; padding: 10px 14px; border: 1px solid rgba(0,0,0,0.12); border-radius: 8px; font-size: 14px;">
+    <select style="padding: 10px 14px; border: 1px solid rgba(0,0,0,0.12); border-radius: 8px; font-size: 14px;">
+        <option>Tous les statuts de stock</option>
+        <option>En stock</option>
+        <option>Stock faible</option>
+        <option>Rupture</option>
+    </select>
+</div>
+
+<div class="grid">
+    <div class="card">
+        <p class="card-meta">Total de médicaments</p>
+        <div class="card-stat">{{ stats.total_medicaments }}</div>
+    </div>
+    <div class="card">
+        <p class="card-meta">Valeur du stock</p>
+        <div class="card-stat">{{ stats.valeur_stock }} CFA</div>
+    </div>
+    <div class="card">
+        <p class="card-meta">Articles en rupture</p>
+        <div class="card-stat" style="color: var(--rose);">{{ stats.ruptures }}</div>
+    </div>
+    <div class="card">
+        <p class="card-meta">Commandes en attente</p>
+        <div class="card-stat" style="color: var(--amber);">{{ stats.commandes_attente }}</div>
+    </div>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>Référence</th>
+                <th>Médicament</th>
+                <th>Catégorie</th>
+                <th>Stock Actuel</th>
+                <th>Stock Minimum</th>
+                <th>Prix Unitaire</th>
+                <th>Statut</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for medicament in page_obj %}
+            <tr>
+                <td>{{ medicament.reference }}</td>
+                <td>{{ medicament.nom }}</td>
+                <td>{{ medicament.categorie }}</td>
+                <td>{{ medicament.stock_actuel }}</td>
+                <td>{{ medicament.stock_alerte }}</td>
+                <td>{{ medicament.prix_unitaire }} CFA</td>
+                <td>
+                    {% if medicament.stock_actuel <= medicament.stock_alerte %}
+                        <span class="badge badge-danger">Rupture</span>
+                    {% elif medicament.stock_actuel <= medicament.stock_alerte|add:10 %}
+                        <span class="badge badge-warning">Faible</span>
+                    {% else %}
+                        <span class="badge badge-success">En stock</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="/admin/pharmacie/medicament/{{ medicament.id }}/change/" class="btn btn-secondary btn-small">Voir</a>
+                    <a href="/admin/pharmacie/medicament/{{ medicament.id }}/change/" class="btn btn-primary btn-small">Modifier</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="8" style="text-align: center; padding: 40px; color: rgba(0,0,0,0.4);">
+                    Aucun médicament enregistré
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% include 'includes/pagination.html' %}
+{% endblock %}

@@ -1,0 +1,99 @@
+<div class="sidebar">
+    <div class="sidebar-logo">
+        <div class="logo-icon">🏥</div>
+        <h1>SEGHO-WALE</h1>
+        <p>WALÉ</p>
+    </div>
+
+    <nav class="sidebar-nav">
+        <a href="{% url 'dashboard' %}" class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+            <span style="font-size: 18px;">📊</span> Tableau de bord
+        </a>
+
+        {% if 'patients' in user_module_codes or request.user.is_superuser %}
+        <a href="{% url 'patients_list' %}" class="{% if 'patients' in request.path %}active{% endif %}">
+            <span style="font-size: 18px;">👥</span> Patients
+        </a>
+        {% endif %}
+
+        {% if 'medecins' in user_module_codes or request.user.is_superuser %}
+        <a href="{% url 'medecins_list' %}" class="{% if 'medecins' in request.path %}active{% endif %}">
+            <span style="font-size: 18px;">👨‍⚕️</span> Médecins
+        </a>
+        {% endif %}
+
+        {% if 'consultations' in user_module_codes or request.user.is_superuser %}
+        <a href="{% url 'consultations_list' %}" class="{% if 'consultations' in request.path %}active{% endif %}">
+            <span style="font-size: 18px;">💊</span> Consultations
+        </a>
+        {% endif %}
+
+        {% if 'pharmacie' in user_module_codes or request.user.is_superuser %}
+        <a href="{% url 'pharmacie_list' %}" class="{% if 'pharmacie' in request.path %}active{% endif %}">
+            <span style="font-size: 18px;">⚗️</span> Pharmacie
+        </a>
+        {% endif %}
+
+        {% if 'laboratoire' in user_module_codes or request.user.is_superuser %}
+        <a href="{% url 'laboratoire_list' %}" class="{% if 'laboratoire' in request.path %}active{% endif %}">
+            <span style="font-size: 18px;">🧪</span> Laboratoire
+        </a>
+        {% endif %}
+
+        {% if 'hospitalisation' in user_module_codes or request.user.is_superuser %}
+        <a href="{% url 'hospitalisation_list' %}" class="{% if 'hospitalisation' in request.path %}active{% endif %}">
+            <span style="font-size: 18px;">🛏️</span> Hospitalisation
+        </a>
+        {% endif %}
+
+        {% if 'facturation' in user_module_codes or request.user.is_superuser %}
+        <a href="{% url 'facturation_list' %}" class="{% if 'facturation' in request.path %}active{% endif %}">
+            <span style="font-size: 18px;">💰</span> Facturation
+        </a>
+        {% endif %}
+
+        {% if 'caisse' in user_module_codes or request.user.is_superuser %}
+        <a href="{% url 'caisse_list' %}" class="{% if 'caisse' in request.path %}active{% endif %}">
+            <span style="font-size: 18px;">💵</span> Caisse
+        </a>
+        {% endif %}
+
+        {% if 'ressources_humaines' in user_module_codes or request.user.is_superuser %}
+        <a href="{% url 'ressources_humaines_list' %}" class="{% if 'ressources-humaines' in request.path %}active{% endif %}">
+            <span style="font-size: 18px;">👤</span> Ressources Humaines
+        </a>
+        {% endif %}
+
+        {% if 'rapports' in user_module_codes or request.user.is_superuser %}
+        <a href="{% url 'rapports_list' %}" class="{% if 'rapports' in request.path %}active{% endif %}">
+            <span style="font-size: 18px;">📋</span> Rapports
+        </a>
+        {% endif %}
+
+        {% if request.user.is_staff %}
+        <a href="/admin/" class="{% if '/admin/' in request.path %}active{% endif %}">
+            <span style="font-size: 18px;">⚙️</span> Administration
+        </a>
+        {% endif %}
+    </nav>
+
+    <div class="sidebar-user">
+        <div style="display: flex; gap: 12px; align-items: center;">
+            <div class="user-avatar">{{ request.user.first_name|first|upper }}</div>
+            <div class="sidebar-user-info">
+                <div class="name">{{ request.user.first_name }} {{ request.user.last_name }}</div>
+                <div class="role">
+                    {% if request.user.is_superuser %}Administrateur
+                    {% elif request.user.groups.all %}{{ request.user.groups.first.name }}
+                    {% else %}Utilisateur{% endif %}
+                </div>
+            </div>
+        </div>
+        <form action="{% url 'logout' %}" method="post" style="margin-top: 12px;">
+            {% csrf_token %}
+            <button type="submit" style="width: 100%; padding: 8px; background: rgba(255,255,255,0.1); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; transition: background 0.2s;">
+                Déconnexion
+            </button>
+        </form>
+    </div>
+</div>
