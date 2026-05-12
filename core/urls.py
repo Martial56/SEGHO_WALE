@@ -1,14 +1,16 @@
 from django.urls import path
 from . import views
+from medecins import views as medecins_views
 
 urlpatterns = [
     path('', views.dashboard, name='dashboard'),
     path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),
-    
+
     # URLs des modules
     path('patients/', views.patients_list, name='patients_list'),
-    path('medecins/', views.medecins_list, name='medecins_list'),
+    path('medecins/', medecins_views.medecin_list, name='medecins_list'),
+    path('medecins/<int:pk>/', medecins_views.medecin_detail, name='medecin_detail'),
     path('consultations/', views.consultations_list, name='consultations_list'),
     path('pharmacie/', views.pharmacie_list, name='pharmacie_list'),
     path('laboratoire/', views.laboratoire_list, name='laboratoire_list'),
