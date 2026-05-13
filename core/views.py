@@ -64,6 +64,7 @@ def dashboard(request):
 
     # Modules accessibles pour cet utilisateur
     user_modules = get_user_modules(request.user)
+    accessible_codes = set(user_modules.values_list('code', flat=True))
 
     return render(request, 'core/dashboard.html', {
         'stats': stats,
@@ -72,6 +73,7 @@ def dashboard(request):
         'today': today,
         'user': request.user,
         'user_modules': user_modules,
+        'accessible_codes': accessible_codes,
     })
 
 

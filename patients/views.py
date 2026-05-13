@@ -45,6 +45,7 @@ def patient_list(request):
         'statut': statut,
         'sexe': sexe,
         'total_filtre': qs.count(),
+        'breadcrumb': [{'title': 'Patients'}],
     })
 
 
