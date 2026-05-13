@@ -1,0 +1,605 @@
+{% extends 'patients/base.html' %}
+
+{% block topbar_title %}{{ titre }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ── Control panel ── */
+    .control-panel {
+        background: #fff;
+        border-bottom: 1px solid rgba(0,0,0,0.08);
+        position: sticky;
+        top: 0;
+        z-index: 100;
+    }
+    .cp-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 24px;
+        gap: 12px;
+    }
+    .cp-breadcrumb {
+        display: flex; align-items: center; gap: 6px;
+        font-size: 14px; font-weight: 600;
+    }
+    .cp-breadcrumb a { color: var(--teal-600); text-decoration: none; font-weight: 600; }
+    .cp-breadcrumb a:hover { color: var(--teal-500); }
+    .cp-breadcrumb .sep { color: #bbb; font-weight: 400; }
+    .cp-breadcrumb .current { color: rgba(0,0,0,0.45); font-weight: 500; }
+
+    .cp-save-group { display: flex; gap: 8px; align-items: center; }
+    .btn-save {
+        background: var(--teal-500); color: #fff;
+        border: none; border-radius: 6px;
+        padding: 8px 20px; font-size: 13px; font-weight: 700;
+        cursor: pointer; font-family: 'Sora', sans-serif;
+        transition: background 0.15s;
+    }
+    .btn-save:hover { background: var(--teal-600); }
+    .btn-discard {
+        background: transparent; color: rgba(0,0,0,0.55);
+        border: 1px solid rgba(0,0,0,0.15); border-radius: 6px;
+        padding: 8px 16px; font-size: 13px; font-weight: 600;
+        cursor: pointer; font-family: 'Sora', sans-serif;
+        text-decoration: none; transition: all 0.15s;
+    }
+    .btn-discard:hover { border-color: var(--rose); color: var(--rose); }
+
+    /* ── Action buttons row ── */
+    .cp-actions {
+        display: flex; align-items: center; gap: 6px;
+        padding: 0 24px 10px;
+        flex-wrap: wrap;
+    }
+    .btn-action {
+        background: #f5f8fa; color: var(--teal-900);
+        border: 1px solid rgba(0,0,0,0.12); border-radius: 6px;
+        padding: 6px 14px; font-size: 12px; font-weight: 700;
+        cursor: pointer; font-family: 'Sora', sans-serif;
+        text-transform: uppercase; letter-spacing: 0.04em;
+        transition: all 0.15s;
+    }
+    .btn-action:hover { background: #e8f4fa; border-color: var(--teal-300); color: var(--teal-700); }
+    .btn-action.danger:hover { background: #fff0f0; border-color: #fca5a5; color: var(--rose); }
+
+    /* ── Status bar ── */
+    .status-bar {
+        display: flex; align-items: stretch;
+        background: #f9fafb;
+        border-top: 1px solid rgba(0,0,0,0.07);
+        overflow: hidden;
+    }
+    .status-step {
+        flex: 1; display: flex; align-items: center; justify-content: center;
+        gap: 6px;
+        padding: 9px 8px;
+        font-size: 11px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.07em; color: rgba(0,0,0,0.35);
+        border-right: 1px solid rgba(0,0,0,0.07);
+        cursor: default; position: relative;
+        transition: background 0.15s;
+    }
+    .status-step:last-child { border-right: none; }
+    .status-step.active { background: var(--teal-500); color: #fff; }
+    .status-step.done { color: var(--teal-600); background: var(--teal-50); }
+    .status-step .step-dot {
+        width: 7px; height: 7px; border-radius: 50%;
+        background: currentColor; opacity: 0.5; flex-shrink: 0;
+    }
+    .status-step.active .step-dot { opacity: 1; background: rgba(255,255,255,0.8); }
+
+    /* ── Form body ── */
+    .form-body { background: #fff; padding: 28px 28px 0; }
+
+    /* ── Two-column main layout ── */
+    .form-main-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 32px 48px;
+        padding-bottom: 28px;
+        border-bottom: 1px solid rgba(0,0,0,0.07);
+    }
+
+    /* ── Field group / row ── */
+    .field-group { display: flex; flex-direction: column; gap: 16px; }
+    .field-row {
+        display: grid;
+        grid-template-columns: 160px 1fr;
+        align-items: center;
+        gap: 12px;
+        min-height: 34px;
+    }
+    .field-row.align-top { align-items: flex-start; padding-top: 4px; }
+    .field-row label {
+        font-size: 13px; font-weight: 600;
+        color: rgba(0,0,0,0.55);
+        text-align: right;
+    }
+    .field-row .required-star { color: var(--rose); margin-left: 2px; }
+    .field-row .field-error {
+        font-size: 11px; color: var(--rose); margin-top: 2px;
+        grid-column: 2;
+    }
+
+    /* ── Input styles ── */
+    .field-ul {
+        width: 100%;
+        background: transparent;
+        border: none;
+        border-bottom: 1.5px solid #d1dde3;
+        border-radius: 0;
+        padding: 5px 2px;
+        font-size: 13px;
+        color: var(--teal-900);
+        transition: border-color .2s;
+        box-shadow: none;
+        outline: none;
+        font-family: 'Sora', sans-serif;
+    }
+    .field-ul:focus { border-bottom-color: var(--teal-500); }
+    .field-ul::placeholder { color: #bfcdd4; }
+    .field-ul[readonly] { color: rgba(0,0,0,0.45); cursor: default; }
+    select.field-ul {
+        appearance: none; -webkit-appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23839aaa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 4px center;
+        padding-right: 20px;
+        cursor: pointer;
+        background-color: transparent;
+    }
+    textarea.field-ul { resize: vertical; border: 1.5px solid #d1dde3; border-radius: 6px; padding: 8px 10px; }
+    textarea.field-ul:focus { border-color: var(--teal-500); }
+
+    /* ── Patient autocomplete ── */
+    .patient-ac { position: relative; }
+    .ac-dropdown {
+        display: none;
+        position: absolute;
+        top: calc(100% + 2px); left: 0; right: 0;
+        background: #fff;
+        border: 1px solid rgba(0,0,0,0.13);
+        border-radius: 8px;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.10);
+        z-index: 300;
+        max-height: 240px;
+        overflow-y: auto;
+    }
+    .ac-item {
+        padding: 8px 12px;
+        font-size: 13px;
+        cursor: pointer;
+        color: var(--teal-900);
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+        line-height: 1.4;
+    }
+    .ac-item:last-child { border-bottom: none; }
+    .ac-item:hover, .ac-item.focused { background: var(--teal-50); }
+    .ac-mark { font-weight: 700; color: var(--teal-600); }
+    .ac-empty {
+        padding: 10px 14px;
+        font-size: 12px; color: rgba(0,0,0,0.35);
+        font-style: italic;
+    }
+
+    /* ── Read-only display fields ── */
+    .field-display {
+        font-size: 13px;
+        color: rgba(0,0,0,0.45);
+        padding: 5px 2px;
+        border-bottom: 1.5px dashed #e2eaee;
+        min-height: 28px;
+        display: flex; align-items: center;
+    }
+    .field-display.placeholder { color: #bfcdd4; font-style: italic; }
+
+    /* ── Timing section ── */
+    .timing-section {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 24px 40px;
+        padding: 24px 0;
+        border-bottom: 1px solid rgba(0,0,0,0.07);
+    }
+    .timing-card {
+        display: flex; flex-direction: column; gap: 6px;
+    }
+    .timing-label {
+        font-size: 11px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.06em; color: rgba(0,0,0,0.35);
+    }
+    .timing-value {
+        font-size: 22px; font-weight: 700;
+        color: var(--teal-700);
+        font-variant-numeric: tabular-nums;
+        letter-spacing: 0.02em;
+    }
+    .timing-value.zero { color: rgba(0,0,0,0.2); }
+
+    /* ── Tabs ── */
+    .form-tabs-section { margin-top: 0; }
+    .tab-nav {
+        display: flex; gap: 0;
+        border-bottom: 2px solid rgba(0,0,0,0.07);
+    }
+    .tab-btn {
+        padding: 12px 20px;
+        font-size: 13px; font-weight: 600;
+        color: rgba(0,0,0,0.45);
+        background: none; border: none;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -2px;
+        cursor: pointer;
+        font-family: 'Sora', sans-serif;
+        transition: all 0.15s;
+        white-space: nowrap;
+    }
+    .tab-btn:hover { color: var(--teal-600); }
+    .tab-btn.active { color: var(--teal-600); border-bottom-color: var(--teal-500); }
+    .tab-pane { display: none; padding: 24px 0; }
+    .tab-pane.active { display: block; }
+
+    /* ── Alert ── */
+    .alert-form-error {
+        display: flex; gap: 10px; align-items: flex-start;
+        background: #fff0f0; border: 1px solid #fca5a5; color: #b91c1c;
+        border-radius: 8px; padding: 12px 16px; margin: 16px 24px 0; font-size: 13px;
+    }
+
+    @media (max-width: 900px) {
+        .form-main-grid { grid-template-columns: 1fr; gap: 0; }
+        .timing-section { grid-template-columns: 1fr 1fr; }
+        .field-row { grid-template-columns: 120px 1fr; }
+    }
+    @media (max-width: 600px) {
+        .field-row { grid-template-columns: 1fr; }
+        .field-row label { text-align: left; }
+        .cp-top { flex-wrap: wrap; }
+        .status-bar { flex-wrap: wrap; }
+        .timing-section { grid-template-columns: 1fr; }
+    }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+
+{% if form.non_field_errors %}
+<div class="alert-form-error">
+    <span>⚠</span>
+    <div>{% for e in form.non_field_errors %}<div>{{ e }}</div>{% endfor %}</div>
+</div>
+{% endif %}
+
+<form method="post" novalidate id="rdv-form">
+{% csrf_token %}
+
+<!-- ══════════════ PANNEAU DE CONTRÔLE ══════════════ -->
+<div class="control-panel">
+
+    <div class="cp-top">
+        <div class="cp-breadcrumb">
+            <a href="{% url 'patients:rdv_global' %}">Rendez-vous</a>
+            <span class="sep">/</span>
+            <span class="current">Nouveau</span>
+        </div>
+        <div class="cp-save-group">
+            <button type="submit" class="btn-save">Sauvegarder</button>
+            <a href="{% url 'patients:rdv_global' %}" class="btn-discard">Ignorer</a>
+        </div>
+    </div>
+
+    <div class="cp-actions">
+        <button type="submit" name="_action" value="confirmer" class="btn-action">Confirmer</button>
+        <button type="button" class="btn-action" onclick="window.print()">Imprimer</button>
+        <button type="submit" name="_action" value="annuler" class="btn-action danger">Annuler</button>
+    </div>
+
+    <div class="status-bar" id="status-bar">
+        <div class="status-step" data-step="planifie"><span class="step-dot"></span> Planifié</div>
+        <div class="status-step" data-step="confirme"><span class="step-dot"></span> Confirmé</div>
+        <div class="status-step" data-step="termine"><span class="step-dot"></span> Terminé</div>
+        <div class="status-step" data-step="annule"><span class="step-dot"></span> Annulé</div>
+        <div class="status-step" data-step="absent"><span class="step-dot"></span> Absent</div>
+    </div>
+</div>
+
+<!-- ══════════════ CORPS DU FORMULAIRE ══════════════ -->
+<div class="form-body">
+
+    <!-- Deux colonnes principales -->
+    <div class="form-main-grid">
+
+        <!-- Colonne gauche -->
+        <div class="field-group">
+
+            <!-- Patient -->
+            <div>
+                <div class="field-row">
+                    <label>Patient <span class="required-star">*</span></label>
+                    <div class="patient-ac" id="patient-ac">
+                        <input type="text" id="patient-search" class="field-ul"
+                               placeholder="Saisir le nom du patient…" autocomplete="off">
+                        <div class="ac-dropdown" id="ac-dropdown"></div>
+                        <div style="display:none;">{{ form.patient }}</div>
+                    </div>
+                </div>
+                {% if form.patient.errors %}
+                <div class="field-row"><span></span><div class="field-error">{{ form.patient.errors.0 }}</div></div>
+                {% endif %}
+            </div>
+
+            <!-- Âge (auto) -->
+            <div class="field-row">
+                <label>Âge</label>
+                <div class="field-display placeholder" id="patient-age">—</div>
+            </div>
+
+            <!-- Téléphone (auto) -->
+            <div class="field-row">
+                <label>Téléphone</label>
+                <div class="field-display placeholder" id="patient-tel">—</div>
+            </div>
+
+            <!-- Code de confirmation -->
+            <div class="field-row">
+                <label>Code de confirmation</label>
+                <div class="field-display placeholder" id="code-confirmation">
+                    {% if rdv and rdv.code_confirmation %}{{ rdv.code_confirmation }}{% else %}Généré après facturation{% endif %}
+                </div>
+            </div>
+
+            <!-- Département -->
+            <div class="field-row">
+                <label for="{{ form.departement.id_for_label }}">Département</label>
+                {{ form.departement }}
+            </div>
+
+            <!-- Médecin -->
+            <div class="field-row">
+                <label for="{{ form.medecin.id_for_label }}">Médecin</label>
+                {{ form.medecin }}
+            </div>
+
+        </div>
+
+        <!-- Colonne droite -->
+        <div class="field-group">
+
+            <!-- Date et heure -->
+            <div>
+                <div class="field-row">
+                    <label for="{{ form.date_heure.id_for_label }}">
+                        Date et heure <span class="required-star">*</span>
+                    </label>
+                    {{ form.date_heure }}
+                </div>
+                {% if form.date_heure.errors %}
+                <div class="field-row"><span></span><div class="field-error">{{ form.date_heure.errors.0 }}</div></div>
+                {% endif %}
+            </div>
+
+            <!-- Durée -->
+            <div class="field-row">
+                <label for="{{ form.duree_minutes.id_for_label }}">Durée</label>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    {{ form.duree_minutes }}
+                    <span style="font-size:12px;color:rgba(0,0,0,0.4);font-weight:600;">minutes</span>
+                </div>
+            </div>
+
+            <!-- Date de création -->
+            <div class="field-row">
+                <label>Date de création</label>
+                <div class="field-display">
+                    {% if rdv %}{{ rdv.date_creation|date:"d/m/Y H:i" }}{% else %}<span style="font-style:italic;color:#bfcdd4;">Aujourd'hui</span>{% endif %}
+                </div>
+            </div>
+
+            <!-- Date de validité -->
+            <div class="field-row">
+                <label>Date de validité</label>
+                <div class="field-display" id="date-validite">
+                    {% if rdv %}<span>{{ rdv.date_validite|date:"d/m/Y" }}</span>{% else %}<span style="font-style:italic;color:#bfcdd4;">J + 14 jours</span>{% endif %}
+                </div>
+            </div>
+
+            <!-- Type de consultation -->
+            <div class="field-row">
+                <label for="{{ form.type_rdv.id_for_label }}">Type</label>
+                {{ form.type_rdv }}
+            </div>
+
+            <!-- Statut -->
+            <div class="field-row">
+                <label for="{{ form.statut.id_for_label }}">Statut</label>
+                {{ form.statut }}
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ══════════════ CHRONOMÈTRES ══════════════ -->
+    <div class="timing-section">
+        <div class="timing-card">
+            <div class="timing-label">Temps de constante</div>
+            <div class="timing-value zero" id="t-constante">
+                {% if rdv %}{% with h=rdv.temps_constante_minutes|divisibleby:60 %}{{ rdv.temps_constante_minutes|floatformat:0 }}{% endwith %}{% else %}00:00{% endif %}
+            </div>
+            <div style="font-size:11px;color:rgba(0,0,0,0.3);">Création → Prise de constante</div>
+        </div>
+        <div class="timing-card">
+            <div class="timing-label">Temps d'attente</div>
+            <div class="timing-value zero" id="t-attente">
+                {% if rdv and rdv.temps_attente_minutes %}{{ rdv.temps_attente_minutes }}{% else %}00:00{% endif %}
+            </div>
+            <div style="font-size:11px;color:rgba(0,0,0,0.3);">Constante → Réception médecin</div>
+        </div>
+        <div class="timing-card">
+            <div class="timing-label">Temps de consultation</div>
+            <div class="timing-value zero" id="t-consult">
+                {% if rdv and rdv.temps_consultation_minutes %}{{ rdv.temps_consultation_minutes }}{% else %}00:00{% endif %}
+            </div>
+            <div style="font-size:11px;color:rgba(0,0,0,0.3);">Durée de la consultation</div>
+        </div>
+    </div>
+
+    <!-- ══════════════ ONGLETS ══════════════ -->
+    <div class="form-tabs-section">
+        <div class="tab-nav">
+            <button type="button" class="tab-btn active" data-tab="tab-motif">Motif de la visite</button>
+            <button type="button" class="tab-btn" data-tab="tab-notes">Notes internes</button>
+        </div>
+        <div class="tab-pane active" id="tab-motif">{{ form.motif }}</div>
+        <div class="tab-pane" id="tab-notes">{{ form.notes }}</div>
+    </div>
+
+</div><!-- /.form-body -->
+</form>
+
+<script>
+(function () {
+    /* ── Statut → barre de workflow ── */
+    var statut  = document.getElementById('{{ form.statut.id_for_label }}');
+    var bar     = document.getElementById('status-bar');
+    var steps   = ['planifie', 'confirme', 'termine', 'annule', 'absent'];
+
+    function highlightStatus(val) {
+        bar.querySelectorAll('.status-step').forEach(function (el) {
+            el.classList.remove('active', 'done');
+        });
+        var idx = steps.indexOf(val);
+        steps.forEach(function (s, i) {
+            var el = bar.querySelector('[data-step="' + s + '"]');
+            if (!el) return;
+            if (i < idx)  el.classList.add('done');
+            if (i === idx) el.classList.add('active');
+        });
+    }
+    if (statut) {
+        highlightStatus(statut.value);
+        statut.addEventListener('change', function () { highlightStatus(this.value); });
+    }
+
+    /* ── Onglets ── */
+    document.querySelectorAll('.tab-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            document.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
+            document.querySelectorAll('.tab-pane').forEach(function (p) { p.classList.remove('active'); });
+            btn.classList.add('active');
+            document.getElementById(btn.dataset.tab).classList.add('active');
+        });
+    });
+
+    /* ── Autocomplete patient ── */
+    var patientSelect = document.getElementById('id_patient');
+    var searchInput   = document.getElementById('patient-search');
+    var dropdown      = document.getElementById('ac-dropdown');
+    var options       = patientSelect ? Array.from(patientSelect.options).filter(function(o){ return o.value; }) : [];
+    var focusedIdx    = -1;
+
+    function highlight(text, q) {
+        if (!q) return text;
+        var i = text.toLowerCase().indexOf(q.toLowerCase());
+        if (i < 0) return text;
+        return text.slice(0, i) +
+               '<mark class="ac-mark">' + text.slice(i, i + q.length) + '</mark>' +
+               text.slice(i + q.length);
+    }
+
+    function renderDropdown(q) {
+        dropdown.innerHTML = '';
+        focusedIdx = -1;
+        if (!q) { dropdown.style.display = 'none'; return; }
+        var matches = options.filter(function(o){ return o.text.toLowerCase().includes(q.toLowerCase()); }).slice(0, 15);
+        if (!matches.length) {
+            dropdown.innerHTML = '<div class="ac-empty">Aucun patient trouvé</div>';
+            dropdown.style.display = 'block';
+            return;
+        }
+        matches.forEach(function(opt) {
+            var div = document.createElement('div');
+            div.className = 'ac-item';
+            div.dataset.val = opt.value;
+            div.innerHTML = highlight(opt.text, q);
+            div.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                selectPatient(opt.value, opt.text);
+            });
+            dropdown.appendChild(div);
+        });
+        dropdown.style.display = 'block';
+    }
+
+    function selectPatient(val, text) {
+        patientSelect.value = val;
+        searchInput.value = text;
+        dropdown.style.display = 'none';
+        fetchPatientInfo(val);
+    }
+
+    function moveFocus(dir) {
+        var items = dropdown.querySelectorAll('.ac-item');
+        if (!items.length) return;
+        focusedIdx = Math.max(0, Math.min(focusedIdx + dir, items.length - 1));
+        items.forEach(function(el, i){ el.classList.toggle('focused', i === focusedIdx); });
+        items[focusedIdx].scrollIntoView({ block: 'nearest' });
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener('input', function(){ renderDropdown(this.value); });
+        searchInput.addEventListener('keydown', function(e) {
+            if (e.key === 'ArrowDown')  { e.preventDefault(); moveFocus(1); }
+            else if (e.key === 'ArrowUp')   { e.preventDefault(); moveFocus(-1); }
+            else if (e.key === 'Enter') {
+                var items = dropdown.querySelectorAll('.ac-item');
+                if (focusedIdx >= 0 && items[focusedIdx]) {
+                    e.preventDefault();
+                    items[focusedIdx].dispatchEvent(new MouseEvent('mousedown'));
+                }
+            }
+            else if (e.key === 'Escape') { dropdown.style.display = 'none'; }
+        });
+        searchInput.addEventListener('blur', function(){ setTimeout(function(){ dropdown.style.display = 'none'; }, 180); });
+        /* Pré-remplir si édition */
+        if (patientSelect && patientSelect.value) {
+            var sel = patientSelect.options[patientSelect.selectedIndex];
+            if (sel) searchInput.value = sel.text;
+        }
+    }
+
+    /* ── Info patient (âge + téléphone) ── */
+    function fetchPatientInfo(pk) {
+        if (!pk) { setPlaceholder('patient-age', '—'); setPlaceholder('patient-tel', '—'); return; }
+        fetch('{% url "patients:patient_info" 0 %}'.replace('/0/', '/' + pk + '/'))
+            .then(function(r){ return r.json(); })
+            .then(function(d) {
+                var ageEl = document.getElementById('patient-age');
+                var telEl = document.getElementById('patient-tel');
+                ageEl.textContent = d.age + ' ans';
+                ageEl.classList.remove('placeholder');
+                telEl.textContent = d.telephone || '—';
+                telEl.classList.remove('placeholder');
+            });
+    }
+
+    function setPlaceholder(id, text) {
+        var el = document.getElementById(id);
+        if (el) { el.textContent = text; el.classList.add('placeholder'); }
+    }
+
+    if (patientSelect && patientSelect.value) fetchPatientInfo(patientSelect.value);
+
+    /* ── Chronomètres : colorier si non-zéro ── */
+    ['t-constante', 't-attente', 't-consult'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el && el.textContent.trim() !== '00:00') {
+            el.classList.remove('zero');
+        }
+    });
+})();
+</script>
+
+{% endblock %}
