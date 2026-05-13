@@ -1,0 +1,391 @@
+{% load static %}{% load django_browser_reload %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Services — SEGHO-WALE</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --teal-900:#0d3040; --teal-800:#0f4358; --teal-700:#145770;
+  --teal-600:#1a6d8c; --teal-500:#2188ab; --teal-400:#34a8cc;
+  --teal-300:#6ecae3; --teal-100:#d6f3fb; --teal-50:#eef9fd;
+  --text-main:#0d3040; --text-muted:#8aafbf;
+  --border:rgba(0,0,0,0.07); --radius:16px;
+}
+html,body { height:100%; font-family:'Sora',sans-serif; background:#f0fafa; color:var(--text-main); }
+
+/* ── TOPBAR ── */
+.topbar {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:12px 32px; background:#fff;
+  border-bottom:1px solid var(--border);
+  box-shadow:0 2px 10px rgba(0,0,0,0.05);
+  position:sticky; top:0; z-index:100;
+}
+.topbar-left { display:flex; align-items:center; gap:16px; }
+.back-btn {
+  display:flex; align-items:center; gap:6px;
+  text-decoration:none; color:var(--teal-600);
+  font-size:13px; font-weight:600;
+  padding:6px 12px; border-radius:8px;
+  transition:background 0.15s;
+}
+.back-btn:hover { background:var(--teal-50); }
+.page-title { font-size:20px; font-weight:800; color:var(--teal-900); }
+.breadcrumb { font-size:12px; color:var(--text-muted); margin-top:2px; }
+
+.topbar-right { display:flex; align-items:center; gap:10px; }
+.btn-create {
+  display:flex; align-items:center; gap:6px;
+  background:var(--teal-600); color:#fff;
+  border:none; border-radius:10px;
+  padding:9px 18px; font-size:13px; font-weight:700;
+  cursor:pointer; text-decoration:none;
+  transition:background 0.15s;
+}
+.btn-create:hover { background:var(--teal-700); }
+
+/* ── BARRE FILTRES ── */
+.filter-bar {
+  background:#fff; border-bottom:1px solid var(--border);
+  padding:12px 32px;
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+}
+.search-box {
+  display:flex; align-items:center; gap:8px;
+  background:#f4fbff; border:1px solid rgba(33,136,171,0.15);
+  border-radius:10px; padding:7px 12px; flex:1; max-width:320px;
+}
+.search-box svg { color:var(--text-muted); flex-shrink:0; }
+.search-box input {
+  border:none; background:transparent; outline:none;
+  font-family:'Sora',sans-serif; font-size:13px; color:var(--text-main); width:100%;
+}
+.filter-select {
+  border:1px solid rgba(33,136,171,0.15);
+  border-radius:10px; padding:7px 12px;
+  font-family:'Sora',sans-serif; font-size:12px;
+  color:var(--text-main); background:#fff; cursor:pointer; outline:none;
+}
+.filter-select:focus { border-color:var(--teal-400); }
+.btn-filter {
+  padding:7px 14px; border-radius:10px; font-size:12px; font-weight:600;
+  border:1px solid var(--border); background:#fff; cursor:pointer; color:var(--teal-700);
+  display:flex; align-items:center; gap:6px; transition:all 0.15s;
+}
+.btn-filter:hover { background:var(--teal-50); border-color:var(--teal-300); }
+.btn-filter.active { background:var(--teal-600); color:#fff; border-color:var(--teal-600); }
+
+/* vue toggle */
+.vue-toggle { display:flex; gap:0; border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+.vue-btn {
+  padding:7px 12px; background:#fff; border:none; cursor:pointer;
+  color:var(--text-muted); transition:all 0.15s; display:flex; align-items:center;
+}
+.vue-btn.active { background:var(--teal-600); color:#fff; }
+
+/* info bar */
+.info-bar {
+  padding:10px 32px; display:flex; align-items:center; justify-content:space-between;
+  font-size:12px; color:var(--text-muted);
+}
+.info-bar strong { color:var(--teal-700); }
+
+/* ── KANBAN GRID ── */
+.kanban-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(220px, 1fr));
+  gap:16px; padding:20px 32px;
+}
+.kcard {
+  background:#fff; border:1px solid var(--border); border-radius:var(--radius);
+  overflow:hidden; text-decoration:none; color:var(--text-main);
+  transition:all 0.2s; display:flex; flex-direction:column;
+  box-shadow:0 2px 8px rgba(0,0,0,0.04);
+}
+.kcard:hover { transform:translateY(-3px); box-shadow:0 8px 24px rgba(0,0,0,0.1); border-color:rgba(33,136,171,0.2); }
+.kcard-img {
+  height:120px; background:linear-gradient(135deg,var(--teal-600),var(--teal-400));
+  display:flex; align-items:center; justify-content:center; position:relative;
+}
+.kcard-img img { width:100%; height:100%; object-fit:cover; }
+.kcard-img .icon-placeholder { font-size:40px; opacity:0.9; }
+.kcard-badge {
+  position:absolute; top:8px; right:8px;
+  font-size:9px; font-weight:800; padding:3px 7px; border-radius:20px;
+  background:rgba(255,255,255,0.9); color:var(--teal-700);
+}
+.kcard-badge.inactif { background:rgba(0,0,0,0.15); color:#fff; }
+.kcard-body { padding:14px; flex:1; }
+.kcard-ref { font-size:10px; color:var(--text-muted); font-weight:600; font-family:monospace; margin-bottom:4px; }
+.kcard-nom { font-size:13px; font-weight:700; color:var(--teal-900); line-height:1.3; margin-bottom:6px; }
+.kcard-cat {
+  display:inline-block; font-size:10px; font-weight:700;
+  padding:2px 8px; border-radius:20px;
+  background:var(--teal-50); color:var(--teal-600);
+  margin-bottom:6px;
+}
+.kcard-price { font-size:14px; font-weight:800; color:var(--teal-700); }
+.kcard-price span { font-size:10px; font-weight:500; color:var(--text-muted); }
+
+/* ── TABLE LISTE ── */
+.list-wrap { padding:16px 32px; }
+.list-table { width:100%; border-collapse:collapse; background:#fff; border-radius:var(--radius); overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.04); }
+.list-table th {
+  padding:12px 16px; text-align:left; font-size:11px; font-weight:700;
+  color:var(--text-muted); text-transform:uppercase; letter-spacing:0.8px;
+  background:#f8fcff; border-bottom:1px solid var(--border);
+}
+.list-table td { padding:11px 16px; font-size:13px; border-bottom:1px solid rgba(0,0,0,0.04); }
+.list-table tr:last-child td { border-bottom:none; }
+.list-table tr:hover td { background:var(--teal-50); }
+.list-table a { text-decoration:none; color:var(--text-main); display:block; }
+.badge-cat {
+  display:inline-block; font-size:10px; font-weight:700;
+  padding:2px 8px; border-radius:20px;
+  background:var(--teal-50); color:var(--teal-600);
+}
+.badge-actif { background:#e3f9ee; color:#0d8a52; font-size:10px; font-weight:700; padding:2px 8px; border-radius:20px; }
+.badge-inactif { background:#fdf0f0; color:#c0392b; font-size:10px; font-weight:700; padding:2px 8px; border-radius:20px; }
+
+/* ── PAGINATION ── */
+.pagination { display:flex; align-items:center; gap:6px; padding:16px 32px; justify-content:center; }
+.page-link {
+  width:34px; height:34px; border-radius:8px; border:1px solid var(--border);
+  background:#fff; display:flex; align-items:center; justify-content:center;
+  font-size:12px; font-weight:600; color:var(--teal-700); text-decoration:none;
+  transition:all 0.15s;
+}
+.page-link:hover, .page-link.active { background:var(--teal-600); color:#fff; border-color:var(--teal-600); }
+
+/* ── EMPTY STATE ── */
+.empty { text-align:center; padding:80px 20px; color:var(--text-muted); }
+.empty-icon { font-size:48px; margin-bottom:16px; display:block; opacity:0.4; }
+.empty h3 { font-size:16px; font-weight:700; margin-bottom:8px; color:var(--teal-800); }
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<header class="topbar">
+  <div class="topbar-left">
+    <a href="/" class="back-btn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      Accueil
+    </a>
+    <div>
+      <div class="page-title">Services</div>
+      <div class="breadcrumb">Articles &amp; Services médicaux</div>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <a href="{% url 'services:create' %}" class="btn-create">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      CRÉER
+    </a>
+  </div>
+</header>
+
+<!-- BARRE FILTRES -->
+<form method="get" id="filter-form">
+  <input type="hidden" name="vue" id="vue-input" value="{{ vue }}">
+  <div class="filter-bar">
+    <!-- Recherche -->
+    <div class="search-box">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" name="q" value="{{ q }}" placeholder="Rechercher par nom, référence, code-barres…" onchange="this.form.submit()">
+    </div>
+
+    <!-- Filtre catégorie -->
+    <select name="categorie" class="filter-select" onchange="this.form.submit()">
+      <option value="">Toutes catégories</option>
+      {% for cat in categories %}
+      <option value="{{ cat.pk }}" {% if categorie_id == cat.pk|stringformat:"s" %}selected{% endif %}>
+        {{ cat.code }} — {{ cat.nom }}
+      </option>
+      {% endfor %}
+    </select>
+
+    <!-- Filtre type produit -->
+    <select name="type_produit" class="filter-select" onchange="this.form.submit()">
+      <option value="">Tous types</option>
+      {% for val, label in type_produit_choices %}
+      <option value="{{ val }}" {% if type_produit == val %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+
+    <!-- Filtre statut -->
+    <select name="statut" class="filter-select" onchange="this.form.submit()">
+      <option value="">Tous statuts</option>
+      <option value="actif" {% if statut == "actif" %}selected{% endif %}>Actifs</option>
+      <option value="inactif" {% if statut == "inactif" %}selected{% endif %}>Inactifs</option>
+    </select>
+
+    {% if q or categorie_id or type_produit or statut %}
+    <a href="{% url 'services:list' %}" class="btn-filter">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      Effacer
+    </a>
+    {% endif %}
+
+    <div style="flex:1"></div>
+
+    <!-- Bascule vue -->
+    <div class="vue-toggle">
+      <button type="button" class="vue-btn {% if vue == 'kanban' %}active{% endif %}" onclick="setVue('kanban')" title="Vue Kanban">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      </button>
+      <button type="button" class="vue-btn {% if vue == 'liste' %}active{% endif %}" onclick="setVue('liste')" title="Vue Liste">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      </button>
+    </div>
+  </div>
+</form>
+
+<!-- INFO BAR -->
+<div class="info-bar">
+  <span>
+    <strong>{{ total }}</strong> article{% if total > 1 %}s{% endif %}
+    {% if page_obj.paginator.num_pages > 1 %}
+    — page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+    {% endif %}
+  </span>
+  <span>
+    {% if q %}<strong>« {{ q }} »</strong>{% endif %}
+  </span>
+</div>
+
+<!-- ── VUE KANBAN ── -->
+{% if vue == 'kanban' %}
+  {% if page_obj.object_list %}
+  <div class="kanban-grid">
+    {% for art in page_obj %}
+    <a href="{% url 'services:detail' art.pk %}" class="kcard">
+      <div class="kcard-img">
+        {% if art.photo %}
+          <img src="{{ art.photo.url }}" alt="{{ art.nom }}">
+        {% else %}
+          <span class="icon-placeholder">
+            {% if art.type_produit_hospitalier == 'medicament' %}💊
+            {% elif art.type_produit_hospitalier == 'examen' %}🔬
+            {% elif art.type_produit_hospitalier == 'service' %}🩺
+            {% elif art.type_produit_hospitalier == 'equipement' %}🏥
+            {% else %}📦{% endif %}
+          </span>
+        {% endif %}
+        <span class="kcard-badge {% if not art.actif %}inactif{% endif %}">
+          {% if art.actif %}Actif{% else %}Inactif{% endif %}
+        </span>
+      </div>
+      <div class="kcard-body">
+        {% if art.reference_interne %}
+        <div class="kcard-ref">{{ art.reference_interne }}</div>
+        {% endif %}
+        <div class="kcard-nom">{{ art.nom }}</div>
+        {% if art.categorie %}
+        <div class="kcard-cat">{{ art.categorie.code }}</div>
+        {% endif %}
+        <div class="kcard-price">
+          {{ art.prix_vente|floatformat:0 }} <span>CFA</span>
+        </div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty">
+    <span class="empty-icon">📦</span>
+    <h3>Aucun article trouvé</h3>
+    <p>Essayez de modifier vos filtres ou <a href="{% url 'services:create' %}" style="color:var(--teal-600);font-weight:700;">créez un nouvel article</a>.</p>
+  </div>
+  {% endif %}
+
+<!-- ── VUE LISTE ── -->
+{% else %}
+  {% if page_obj.object_list %}
+  <div class="list-wrap">
+    <table class="list-table">
+      <thead>
+        <tr>
+          <th>Référence</th>
+          <th>Désignation</th>
+          <th>Catégorie</th>
+          <th>Type</th>
+          <th style="text-align:right">Prix de vente</th>
+          <th>Statut</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for art in page_obj %}
+        <tr>
+          <td>
+            <a href="{% url 'services:detail' art.pk %}">
+              <span style="font-family:monospace;font-size:11px;color:var(--teal-500);">{{ art.reference_interne|default:"—" }}</span>
+            </a>
+          </td>
+          <td>
+            <a href="{% url 'services:detail' art.pk %}" style="font-weight:600;color:var(--teal-900);">{{ art.nom }}</a>
+          </td>
+          <td>
+            {% if art.categorie %}
+            <span class="badge-cat">{{ art.categorie.code }} — {{ art.categorie.nom }}</span>
+            {% else %}—{% endif %}
+          </td>
+          <td style="font-size:12px;color:var(--text-muted);">{{ art.get_type_produit_hospitalier_display|default:"—" }}</td>
+          <td style="text-align:right;font-weight:700;color:var(--teal-700);">{{ art.prix_vente|floatformat:0 }} CFA</td>
+          <td>
+            {% if art.actif %}
+            <span class="badge-actif">Actif</span>
+            {% else %}
+            <span class="badge-inactif">Inactif</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">
+    <span class="empty-icon">📦</span>
+    <h3>Aucun article trouvé</h3>
+    <p>Essayez de modifier vos filtres ou <a href="{% url 'services:create' %}" style="color:var(--teal-600);font-weight:700;">créez un nouvel article</a>.</p>
+  </div>
+  {% endif %}
+{% endif %}
+
+<!-- PAGINATION -->
+{% if page_obj.paginator.num_pages > 1 %}
+<div class="pagination">
+  {% if page_obj.has_previous %}
+  <a href="?page={{ page_obj.previous_page_number }}&q={{ q }}&categorie={{ categorie_id }}&type_produit={{ type_produit }}&statut={{ statut }}&vue={{ vue }}" class="page-link">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+  </a>
+  {% endif %}
+  {% for num in page_obj.paginator.page_range %}
+    {% if num == page_obj.number %}
+    <span class="page-link active">{{ num }}</span>
+    {% elif num >= page_obj.number|add:"-3" and num <= page_obj.number|add:"3" %}
+    <a href="?page={{ num }}&q={{ q }}&categorie={{ categorie_id }}&type_produit={{ type_produit }}&statut={{ statut }}&vue={{ vue }}" class="page-link">{{ num }}</a>
+    {% endif %}
+  {% endfor %}
+  {% if page_obj.has_next %}
+  <a href="?page={{ page_obj.next_page_number }}&q={{ q }}&categorie={{ categorie_id }}&type_produit={{ type_produit }}&statut={{ statut }}&vue={{ vue }}" class="page-link">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+  </a>
+  {% endif %}
+</div>
+{% endif %}
+
+<script>
+function setVue(v) {
+  document.getElementById('vue-input').value = v;
+  document.getElementById('filter-form').submit();
+}
+</script>
+{% django_browser_reload_script %}
+</body>
+</html>
