@@ -1,0 +1,203 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ ordonnance.numero }} — SEGHO-WALE{% endblock %}
+{% block topbar_title %}Ordonnance {{ ordonnance.numero }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.action-bar {
+  display:flex; align-items:center; gap:12px;
+  background:#fff; padding:14px 24px;
+  border-radius:12px; margin-bottom:20px;
+  box-shadow:var(--shadow-sm); flex-wrap:wrap;
+}
+.action-bar .spacer { flex:1; }
+.status-flow { display:flex; align-items:center; }
+.status-step {
+  padding:6px 18px; font-size:12px; font-weight:700;
+  border:2px solid rgba(0,0,0,0.12); color:rgba(0,0,0,0.4);
+  background:#f8f8f8; letter-spacing:0.3px;
+}
+.status-step:first-child { border-radius:8px 0 0 8px; }
+.status-step:last-child  { border-radius:0 8px 8px 0; border-left:none; }
+.status-step.active { background:var(--teal-600); color:#fff; border-color:var(--teal-600); }
+
+.detail-card { background:#fff; border-radius:12px; box-shadow:var(--shadow-sm); overflow:hidden; margin-bottom:16px; }
+.detail-section { padding:24px; }
+.detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:0 40px; }
+.detail-field { margin-bottom:18px; }
+.detail-field .lbl { font-size:11px; font-weight:700; color:rgba(0,0,0,0.45); text-transform:uppercase; letter-spacing:0.3px; margin-bottom:5px; }
+.detail-field .val { font-size:14px; color:var(--teal-900); font-weight:500; }
+.detail-field .val.empty { color:rgba(0,0,0,0.3); font-style:italic; }
+
+.tabs { border-bottom:2px solid rgba(0,0,0,0.08); padding:0 24px; background:#fff; display:flex; }
+.tab-btn { padding:12px 20px; font-size:14px; font-weight:600; color:rgba(0,0,0,0.45); border:none; background:none; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-2px; transition:all 0.2s; }
+.tab-btn.active { color:var(--teal-600); border-bottom-color:var(--teal-600); }
+.tab-pane { display:none; padding:20px 24px; }
+.tab-pane.active { display:block; }
+
+.lignes-table { width:100%; border-collapse:collapse; }
+.lignes-table th { padding:10px; font-size:11px; font-weight:700; text-transform:uppercase; color:rgba(0,0,0,0.5); border-bottom:2px solid rgba(0,0,0,0.08); text-align:left; }
+.lignes-table td { padding:12px 10px; border-bottom:1px solid rgba(0,0,0,0.05); font-size:14px; }
+.lignes-table .qte-totale { font-weight:700; color:var(--teal-700); }
+.badge-brouillon { background:rgba(232,154,26,0.15); color:#9a6600; }
+.badge-prescrit  { background:rgba(22,169,107,0.15); color:#0d6b44; }
+
+/* Styles dark mode gérés globalement dans base.html */
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="breadcrumb">
+  {% for item in breadcrumb %}
+    {% if item.url %}<a href="{{ item.url }}">{{ item.title }}</a><span>/</span>
+    {% else %}<span>{{ item.title }}</span>{% endif %}
+  {% endfor %}
+</nav>
+{% endblock %}
+
+{% block content %}
+
+<!-- Barre d'actions -->
+<div class="action-bar">
+  <a href="{% url 'ordonnances_list' %}" class="btn btn-secondary">← Retour</a>
+  {% if ordonnance.statut == 'brouillon' %}
+  <a href="{% url 'ordonnance_edit' ordonnance.pk %}" class="btn btn-primary">Modifier</a>
+  <form method="post" action="{% url 'ordonnance_prescrire' ordonnance.pk %}" style="margin:0;">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-success">✓ Confirmer — Prescrire</button>
+  </form>
+  {% endif %}
+  <div class="spacer"></div>
+  <div class="status-flow">
+    <span class="status-step {% if ordonnance.statut == 'brouillon' %}active{% endif %}">BROUILLON</span>
+    <span class="status-step {% if ordonnance.statut == 'prescrit' %}active{% endif %}">PRESCRIT</span>
+  </div>
+</div>
+
+<!-- Corps -->
+<div class="detail-card">
+  <div class="detail-section">
+    <div class="detail-grid">
+      <div>
+        <div class="detail-field">
+          <div class="lbl">Patient</div>
+          <div class="val">{% if ordonnance.patient %}{{ ordonnance.patient.nom }} {{ ordonnance.patient.prenoms }}{% else %}<span class="empty">Non renseigné</span>{% endif %}</div>
+        </div>
+        <div class="detail-field">
+          <div class="lbl">Docteur prescripteur</div>
+          <div class="val">{% if ordonnance.medecin %}{{ ordonnance.medecin }}{% else %}<span class="empty">Non renseigné</span>{% endif %}</div>
+        </div>
+        <div class="detail-field">
+          <div class="lbl">Groupe de médicaments</div>
+          <div class="val">{% if ordonnance.groupe_medicaments %}{{ ordonnance.groupe_medicaments }}{% else %}<span class="empty">—</span>{% endif %}</div>
+        </div>
+        <div class="detail-field">
+          <div class="lbl">Ancienne ordonnance</div>
+          <div class="val">{% if ordonnance.ancienne_ordonnance %}{{ ordonnance.ancienne_ordonnance.numero }}{% else %}<span class="empty">—</span>{% endif %}</div>
+        </div>
+      </div>
+      <div>
+        <div class="detail-field">
+          <div class="lbl">Maladies</div>
+          <div class="val">{% if ordonnance.maladie %}{{ ordonnance.maladie }}{% else %}<span class="empty">—</span>{% endif %}</div>
+        </div>
+        <div class="detail-field">
+          <div class="lbl">Date d'ordonnance</div>
+          <div class="val">{{ ordonnance.date_ordonnance|date:"d/m/Y H:i" }}</div>
+        </div>
+        <div class="detail-field">
+          <div class="lbl">Avertissement de grossesse</div>
+          <div class="val">{% if ordonnance.avertissement_grossesse %}Oui{% else %}Non{% endif %}</div>
+        </div>
+        <div class="detail-field">
+          <div class="lbl">Type d'ordonnance</div>
+          <div class="val">{{ ordonnance.get_type_ordonnance_display }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="lignes">Lignes d'ordonnance</button>
+    <button class="tab-btn" data-tab="infos">Informations générales</button>
+  </div>
+
+  <!-- Lignes -->
+  <div class="tab-pane active" id="tab-lignes">
+    {% if lignes %}
+    <table class="lignes-table">
+      <thead>
+        <tr>
+          <th>Médicament</th>
+          <th>Quantité</th>
+          <th>Unité de dosage</th>
+          <th>Qté / jour</th>
+          <th>Jours</th>
+          <th>Qté totale</th>
+          <th>Commentaire</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ligne in lignes %}
+        <tr>
+          <td>{% if ligne.medicament %}{{ ligne.medicament }}{% else %}{{ ligne.medicament_libre|default:"—" }}{% endif %}</td>
+          <td>{{ ligne.quantite }}</td>
+          <td>{{ ligne.unite_dosage|default:"—" }}</td>
+          <td>{{ ligne.qte_par_jour|default:"—" }}</td>
+          <td>{{ ligne.jours|default:"—" }}</td>
+          <td class="qte-totale">{% if ligne.qte_totale %}{{ ligne.qte_totale }}{% else %}—{% endif %}</td>
+          <td>{{ ligne.commentaire|default:"—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p style="color:rgba(0,0,0,0.4);font-style:italic;padding:12px 0;">Aucune ligne d'ordonnance.</p>
+    {% endif %}
+  </div>
+
+  <!-- Infos générales -->
+  <div class="tab-pane" id="tab-infos">
+    <div class="detail-grid">
+      <div>
+        <div class="detail-field"><div class="lbl">Rendez-vous</div><div class="val">{% if ordonnance.rendez_vous %}{{ ordonnance.rendez_vous }}{% else %}<span class="empty">—</span>{% endif %}</div></div>
+        <div class="detail-field"><div class="lbl">Facture</div><div class="val">{% if ordonnance.facture %}{{ ordonnance.facture }}{% else %}<span class="empty">—</span>{% endif %}</div></div>
+        <div class="detail-field"><div class="lbl">Cueillettes</div><div class="val">{% if ordonnance.cueillettes %}{{ ordonnance.cueillettes }}{% else %}<span class="empty">—</span>{% endif %}</div></div>
+        <div class="detail-field"><div class="lbl">Livré</div><div class="val">{% if ordonnance.livre %}Oui{% else %}Non{% endif %}</div></div>
+        <div class="detail-field"><div class="lbl">Hospitalisation</div><div class="val">{% if ordonnance.hospitalisation %}{{ ordonnance.hospitalisation }}{% else %}<span class="empty">—</span>{% endif %}</div></div>
+      </div>
+      <div>
+        <div class="detail-field"><div class="lbl">Police d'assurance</div><div class="val">{% if ordonnance.police_assurance %}{{ ordonnance.police_assurance }}{% else %}<span class="empty">—</span>{% endif %}</div></div>
+        <div class="detail-field"><div class="lbl">Compagnie d'assurance</div><div class="val">{% if ordonnance.compagnie_assurance %}{{ ordonnance.compagnie_assurance }}{% else %}<span class="empty">—</span>{% endif %}</div></div>
+        <div class="detail-field"><div class="lbl">Réclamation</div><div class="val">{% if ordonnance.reclamation %}{{ ordonnance.reclamation }}{% else %}<span class="empty">—</span>{% endif %}</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notes -->
+  {% if ordonnance.notes %}
+  <div class="detail-section" style="border-top:1px solid rgba(0,0,0,0.06);">
+    <div class="detail-field">
+      <div class="lbl">Notes d'ordonnance</div>
+      <div class="val">{{ ordonnance.notes }}</div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+</script>
+{% endblock %}

@@ -1,5 +1,6 @@
 from django.contrib import admin
-from .models import Consultation, Constante, Ordonnance, LigneOrdonnance, ExamenDemande, Diagnostic, DiagnosticCIM
+from .models import Consultation, Constante, ExamenDemande, Diagnostic, DiagnosticCIM
+from ordonnances.admin import OrdonnanceInline
 
 
 class ConstanteInline(admin.StackedInline):
@@ -10,11 +11,6 @@ class ConstanteInline(admin.StackedInline):
 class DiagnosticInline(admin.TabularInline):
     model = Diagnostic
     extra = 1
-
-
-class OrdonnanceInline(admin.TabularInline):
-    model = Ordonnance
-    extra = 0
 
 
 @admin.register(Consultation)
@@ -30,10 +26,3 @@ class ConsultationAdmin(admin.ModelAdmin):
 class DiagnosticCIMAdmin(admin.ModelAdmin):
     list_display = ['code', 'libelle', 'categorie']
     search_fields = ['code', 'libelle']
-
-
-@admin.register(Ordonnance)
-class OrdonnanceAdmin(admin.ModelAdmin):
-    list_display = ['numero', 'consultation', 'date_emission', 'type_ordonnance', 'statut']
-    list_filter = ['statut', 'type_ordonnance']
-    readonly_fields = ['numero']

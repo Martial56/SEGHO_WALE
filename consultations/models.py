@@ -69,38 +69,6 @@ class Diagnostic(models.Model):
     def __str__(self): return self.libelle_libre or str(self.cim)
 
 
-class Ordonnance(models.Model):
-    STATUT = [('emise','Émise'),('delivree','Délivrée'),('partielle','Partielle'),('expiree','Expirée')]
-
-    numero = models.CharField(max_length=20, unique=True, editable=False)
-    consultation = models.ForeignKey(Consultation, on_delete=models.CASCADE, related_name='ordonnances')
-    date_emission = models.DateTimeField(auto_now_add=True)
-    date_expiration = models.DateField(null=True, blank=True)
-    statut = models.CharField(max_length=20, choices=STATUT, default='emise')
-    notes = models.TextField(blank=True)
-    type_ordonnance = models.CharField(max_length=20, choices=[('interne','Interne'),('externe','Externe')], default='interne')
-
-    def save(self, *args, **kwargs):
-        if not self.numero:
-            from django.utils import timezone
-            annee = timezone.now().year
-            count = Ordonnance.objects.filter(date_emission__year=annee).count() + 1
-            self.numero = f"ORD{annee}{count:06d}"
-        super().save(*args, **kwargs)
-
-    def __str__(self): return f"Ordonnance {self.numero}"
-    class Meta: verbose_name = "Ordonnance"
-
-
-class LigneOrdonnance(models.Model):
-    ordonnance = models.ForeignKey(Ordonnance, on_delete=models.CASCADE, related_name='lignes')
-    medicament = models.ForeignKey('pharmacie.Medicament', on_delete=models.SET_NULL, null=True, blank=True)
-    medicament_libre = models.CharField(max_length=200, blank=True)
-    posologie = models.CharField(max_length=500)
-    duree = models.CharField(max_length=100, blank=True)
-    quantite = models.IntegerField(default=1)
-    notes = models.TextField(blank=True)
-
 
 class ExamenDemande(models.Model):
     STATUT = [('demande','Demandé'),('en_cours','En cours'),('resultat','Résultat disponible'),('valide','Validé')]

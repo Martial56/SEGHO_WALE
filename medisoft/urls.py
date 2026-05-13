@@ -7,8 +7,12 @@ admin.site.site_header = "SEGHO-WALE — Centre Médico-Social WALÉ"
 admin.site.site_title = "SEGHO-WALE Admin"
 admin.site.index_title = "Tableau de bord"
 
+# Admin réservé aux superusers uniquement
+admin.site.__class__.has_permission = lambda self, request: request.user.is_active and request.user.is_superuser
+
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('ordonnances/', include('ordonnances.urls')),
     path('', include('core.urls')),
 ]
 

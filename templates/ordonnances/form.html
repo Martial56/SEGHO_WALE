@@ -1,0 +1,368 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ titre }} — SEGHO-WALE{% endblock %}
+{% block topbar_title %}{{ titre }}{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── Barre d'actions ── */
+.action-bar {
+  display:flex; align-items:center; gap:12px;
+  background:#fff; padding:14px 24px;
+  border-radius:12px; margin-bottom:20px;
+  box-shadow:var(--shadow-sm);
+  flex-wrap:wrap;
+}
+.action-bar .spacer { flex:1; }
+.status-flow { display:flex; align-items:center; gap:0; }
+.status-step {
+  padding:6px 18px; font-size:12px; font-weight:700;
+  border:2px solid rgba(0,0,0,0.12); color:rgba(0,0,0,0.4);
+  background:#f8f8f8; letter-spacing:0.3px;
+}
+.status-step:first-child { border-radius:8px 0 0 8px; }
+.status-step:last-child  { border-radius:0 8px 8px 0; border-left:none; }
+.status-step.active { background:var(--teal-600); color:#fff; border-color:var(--teal-600); }
+
+/* ── Formulaire principal ── */
+.form-card {
+  background:#fff; border-radius:12px;
+  box-shadow:var(--shadow-sm); overflow:hidden;
+  margin-bottom:16px;
+}
+.form-section { padding:24px; }
+.form-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:0 32px; }
+.form-group { margin-bottom:16px; }
+.form-group label {
+  display:block; font-size:12px; font-weight:600;
+  color:rgba(0,0,0,0.55); margin-bottom:6px;
+  text-transform:uppercase; letter-spacing:0.3px;
+}
+.form-input, .form-group select, .form-group input, .form-group textarea {
+  width:100%; padding:9px 12px;
+  border:1px solid rgba(0,0,0,0.12); border-radius:8px;
+  font-family:'Sora',sans-serif; font-size:14px;
+  color:var(--teal-900); background:#fff;
+  transition:border-color 0.2s, box-shadow 0.2s;
+}
+.form-input:focus, .form-group select:focus,
+.form-group input:focus, .form-group textarea:focus {
+  outline:none; border-color:var(--teal-500);
+  box-shadow:0 0 0 3px rgba(33,136,171,0.1);
+}
+.form-check { display:flex; align-items:center; gap:10px; padding:10px 0; }
+.form-check input[type=checkbox] { width:18px; height:18px; cursor:pointer; }
+.form-check label { font-size:14px; font-weight:500; color:var(--teal-900); margin:0; }
+
+/* ── Tabs ── */
+.tabs { border-bottom:2px solid rgba(0,0,0,0.08); padding:0 24px; background:#fff; display:flex; gap:0; }
+.tab-btn {
+  padding:12px 20px; font-size:14px; font-weight:600;
+  color:rgba(0,0,0,0.45); border:none; background:none;
+  cursor:pointer; border-bottom:2px solid transparent;
+  margin-bottom:-2px; transition:all 0.2s;
+}
+.tab-btn.active { color:var(--teal-600); border-bottom-color:var(--teal-600); }
+.tab-pane { display:none; padding:20px 24px; }
+.tab-pane.active { display:block; }
+
+/* ── Formset lignes ── */
+.lignes-table { width:100%; border-collapse:collapse; }
+.lignes-table th {
+  padding:10px 10px; font-size:11px; font-weight:700;
+  text-transform:uppercase; color:rgba(0,0,0,0.5);
+  border-bottom:2px solid rgba(0,0,0,0.08); text-align:left;
+}
+.lignes-table td { padding:6px 8px; border-bottom:1px solid rgba(0,0,0,0.05); vertical-align:middle; }
+.lignes-table input, .lignes-table select {
+  width:100%; padding:7px 9px;
+  border:1px solid rgba(0,0,0,0.1); border-radius:6px;
+  font-family:'Sora',sans-serif; font-size:13px;
+}
+.lignes-table .qte-totale { font-weight:700; color:var(--teal-700); text-align:center; }
+.btn-add-line {
+  margin-top:12px; background:rgba(33,136,171,0.08);
+  color:var(--teal-700); border:1px dashed rgba(33,136,171,0.3);
+}
+.btn-del-line { background:rgba(232,69,69,0.1); color:var(--rose); border:none; border-radius:6px; padding:5px 10px; cursor:pointer; }
+.errorlist { color:var(--rose); font-size:12px; margin-top:4px; list-style:none; }
+.field-error input, .field-error select, .field-error textarea { border-color:var(--rose) !important; }
+
+/* Bannière d'erreur globale */
+.error-banner {
+  background:rgba(232,69,69,0.1); border:1px solid rgba(232,69,69,0.35);
+  border-radius:10px; padding:14px 18px; margin-bottom:16px;
+  display:flex; gap:12px; align-items:flex-start;
+}
+.error-banner-icon { font-size:18px; line-height:1; flex-shrink:0; }
+.error-banner-body { flex:1; }
+.error-banner-title { font-weight:700; color:var(--rose); font-size:14px; margin-bottom:6px; }
+.error-banner-list { list-style:none; margin:0; padding:0; font-size:13px; color:var(--rose); }
+.error-banner-list li { margin-bottom:2px; }
+
+/* Styles dark mode gérés globalement dans base.html */
+html[data-theme="dark"] .error-banner { background:rgba(232,69,69,0.15); border-color:rgba(232,69,69,0.4); }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="breadcrumb">
+  {% for item in breadcrumb %}
+    {% if item.url %}<a href="{{ item.url }}">{{ item.title }}</a><span>/</span>
+    {% else %}<span>{{ item.title }}</span>{% endif %}
+  {% endfor %}
+</nav>
+{% endblock %}
+
+{% block content %}
+<form method="post" id="ord-form">
+{% csrf_token %}
+{{ formset.management_form }}
+
+<!-- Barre d'actions -->
+<div class="action-bar">
+  <button type="submit" class="btn btn-primary">Sauvegarder</button>
+  <a href="{% if ordonnance %}{% url 'ordonnance_detail' ordonnance.pk %}{% else %}{% url 'ordonnances_list' %}{% endif %}"
+     class="btn btn-secondary">Annuler</a>
+  <div class="spacer"></div>
+  {% if ordonnance %}
+  <div class="status-flow">
+    <span class="status-step {% if ordonnance.statut == 'brouillon' %}active{% endif %}">BROUILLON</span>
+    <span class="status-step {% if ordonnance.statut == 'prescrit' %}active{% endif %}">PRESCRIT</span>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Bannière d'erreur globale -->
+{% with has_errors=form.errors %}
+{% if has_errors or formset.errors %}
+<div class="error-banner">
+  <span class="error-banner-icon">⚠</span>
+  <div class="error-banner-body">
+    <div class="error-banner-title">Le formulaire contient des erreurs — veuillez les corriger avant de sauvegarder.</div>
+    <ul class="error-banner-list">
+      {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+      {% for field in form %}{% if field.errors %}{% for error in field.errors %}<li><strong>{{ field.label }} :</strong> {{ error }}</li>{% endfor %}{% endif %}{% endfor %}
+      {% for ligne_errors in formset.errors %}{% for field, errors in ligne_errors.items %}{% for error in errors %}<li><strong>Ligne — {{ field }} :</strong> {{ error }}</li>{% endfor %}{% endfor %}{% endfor %}
+    </ul>
+  </div>
+</div>
+{% endif %}
+{% endwith %}
+
+<!-- Corps principal -->
+<div class="form-card">
+  <div class="form-section">
+    <div class="form-grid-2">
+      <!-- Colonne gauche -->
+      <div>
+        <div class="form-group{% if form.patient.errors %} field-error{% endif %}">
+          <label>{{ form.patient.label }}</label>
+          {{ form.patient }}
+          {% if form.patient.errors %}<ul class="errorlist">{% for e in form.patient.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+        <div class="form-group{% if form.medecin.errors %} field-error{% endif %}">
+          <label>{{ form.medecin.label }}</label>
+          {{ form.medecin }}
+          {% if form.medecin.errors %}<ul class="errorlist">{% for e in form.medecin.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+        <div class="form-group{% if form.groupe_medicaments.errors %} field-error{% endif %}">
+          <label>{{ form.groupe_medicaments.label }}</label>
+          {{ form.groupe_medicaments }}
+          {% if form.groupe_medicaments.errors %}<ul class="errorlist">{% for e in form.groupe_medicaments.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+        <div class="form-group{% if form.consultation.errors %} field-error{% endif %}">
+          <label>{{ form.consultation.label }}</label>
+          {{ form.consultation }}
+          {% if form.consultation.errors %}<ul class="errorlist">{% for e in form.consultation.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+        <div class="form-group{% if form.ancienne_ordonnance.errors %} field-error{% endif %}">
+          <label>{{ form.ancienne_ordonnance.label }}</label>
+          {{ form.ancienne_ordonnance }}
+          {% if form.ancienne_ordonnance.errors %}<ul class="errorlist">{% for e in form.ancienne_ordonnance.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+      </div>
+      <!-- Colonne droite -->
+      <div>
+        <div class="form-group{% if form.maladie.errors %} field-error{% endif %}">
+          <label>{{ form.maladie.label }}</label>
+          {{ form.maladie }}
+          {% if form.maladie.errors %}<ul class="errorlist">{% for e in form.maladie.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+        <div class="form-group{% if form.date_ordonnance.errors %} field-error{% endif %}">
+          <label>{{ form.date_ordonnance.label }}</label>
+          {{ form.date_ordonnance }}
+          {% if form.date_ordonnance.errors %}<ul class="errorlist">{% for e in form.date_ordonnance.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+        <div class="form-check">
+          {{ form.avertissement_grossesse }}
+          <label for="{{ form.avertissement_grossesse.id_for_label }}">{{ form.avertissement_grossesse.label }}</label>
+        </div>
+        <div class="form-group{% if form.type_ordonnance.errors %} field-error{% endif %}">
+          <label>{{ form.type_ordonnance.label }}</label>
+          {{ form.type_ordonnance }}
+          {% if form.type_ordonnance.errors %}<ul class="errorlist">{% for e in form.type_ordonnance.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button type="button" class="tab-btn active" data-tab="lignes">Lignes d'ordonnance</button>
+    <button type="button" class="tab-btn" data-tab="infos">Informations générales</button>
+  </div>
+
+  <!-- Tab : Lignes d'ordonnance -->
+  <div class="tab-pane active" id="tab-lignes">
+    <table class="lignes-table" id="lignes-table">
+      <thead>
+        <tr>
+          <th style="width:22%">Médicament (catalogue)</th>
+          <th style="width:18%">Médicament (saisie libre)</th>
+          <th style="width:8%">Qté</th>
+          <th style="width:12%">Unité de dosage</th>
+          <th style="width:8%">Qté/jour</th>
+          <th style="width:6%">Jours</th>
+          <th style="width:8%">Qté totale</th>
+          <th style="width:14%">Commentaire</th>
+          <th style="width:4%"></th>
+        </tr>
+      </thead>
+      <tbody id="lignes-body">
+        {% for ligne_form in formset %}
+        <tr class="ligne-row">
+          <td>{{ ligne_form.medicament }}</td>
+          <td>{{ ligne_form.medicament_libre }}</td>
+          <td>{{ ligne_form.quantite }}</td>
+          <td>{{ ligne_form.unite_dosage }}</td>
+          <td class="qte-par-jour">{{ ligne_form.qte_par_jour }}</td>
+          <td class="jours-cell">{{ ligne_form.jours }}</td>
+          <td class="qte-totale">—</td>
+          <td>{{ ligne_form.commentaire }}</td>
+          <td>
+            {% if ligne_form.instance.pk %}{{ ligne_form.DELETE }}{% endif %}
+            <button type="button" class="btn-del-line" onclick="removeLigne(this)">✕</button>
+          </td>
+          {% for hidden in ligne_form.hidden_fields %}{{ hidden }}{% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <button type="button" class="btn btn-add-line" id="add-ligne">+ Ajouter une ligne</button>
+  </div>
+
+  <!-- Tab : Informations générales -->
+  <div class="tab-pane" id="tab-infos">
+    <div class="form-grid-2">
+      <div>
+        <div class="form-group{% if form.rendez_vous.errors %} field-error{% endif %}">
+          <label>{{ form.rendez_vous.label }}</label>{{ form.rendez_vous }}
+          {% if form.rendez_vous.errors %}<ul class="errorlist">{% for e in form.rendez_vous.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+        <div class="form-group{% if form.facture.errors %} field-error{% endif %}">
+          <label>{{ form.facture.label }}</label>{{ form.facture }}
+          {% if form.facture.errors %}<ul class="errorlist">{% for e in form.facture.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+        <div class="form-group{% if form.cueillettes.errors %} field-error{% endif %}">
+          <label>{{ form.cueillettes.label }}</label>{{ form.cueillettes }}
+          {% if form.cueillettes.errors %}<ul class="errorlist">{% for e in form.cueillettes.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+        <div class="form-check">{{ form.livre }}<label for="{{ form.livre.id_for_label }}">{{ form.livre.label }}</label></div>
+        <div class="form-group{% if form.hospitalisation.errors %} field-error{% endif %}">
+          <label>{{ form.hospitalisation.label }}</label>{{ form.hospitalisation }}
+          {% if form.hospitalisation.errors %}<ul class="errorlist">{% for e in form.hospitalisation.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+      </div>
+      <div>
+        <div class="form-group{% if form.police_assurance.errors %} field-error{% endif %}">
+          <label>{{ form.police_assurance.label }}</label>{{ form.police_assurance }}
+          {% if form.police_assurance.errors %}<ul class="errorlist">{% for e in form.police_assurance.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+        <div class="form-group{% if form.compagnie_assurance.errors %} field-error{% endif %}">
+          <label>{{ form.compagnie_assurance.label }}</label>{{ form.compagnie_assurance }}
+          {% if form.compagnie_assurance.errors %}<ul class="errorlist">{% for e in form.compagnie_assurance.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+        <div class="form-group{% if form.reclamation.errors %} field-error{% endif %}">
+          <label>{{ form.reclamation.label }}</label>{{ form.reclamation }}
+          {% if form.reclamation.errors %}<ul class="errorlist">{% for e in form.reclamation.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notes -->
+  <div class="form-section" style="border-top:1px solid rgba(0,0,0,0.06);">
+    <div class="form-group{% if form.notes.errors %} field-error{% endif %}">
+      <label>{{ form.notes.label }}</label>
+      {{ form.notes }}
+      {% if form.notes.errors %}<ul class="errorlist">{% for e in form.notes.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+    </div>
+  </div>
+</div>
+
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── Tabs ──
+function activateTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  const btn = document.querySelector(`.tab-btn[data-tab="${name}"]`);
+  const pane = document.getElementById('tab-' + name);
+  if (btn) btn.classList.add('active');
+  if (pane) pane.classList.add('active');
+}
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => activateTab(btn.dataset.tab));
+});
+// Si erreur dans l'onglet "infos", l'ouvrir automatiquement
+(function() {
+  const infosPane = document.getElementById('tab-infos');
+  if (infosPane && infosPane.querySelector('.errorlist')) activateTab('infos');
+})();
+
+// ── Qté totale auto-calculée ──
+function updateQteTotale(row) {
+  const qpj = parseFloat(row.querySelector('.qte-par-jour input')?.value) || 0;
+  const j   = parseFloat(row.querySelector('.jours-cell input')?.value) || 0;
+  const cell = row.querySelector('.qte-totale');
+  if (cell) cell.textContent = (qpj && j) ? (qpj * j).toFixed(1) : '—';
+}
+
+document.getElementById('lignes-body').addEventListener('input', e => {
+  const row = e.target.closest('tr');
+  if (row) updateQteTotale(row);
+});
+document.querySelectorAll('.ligne-row').forEach(updateQteTotale);
+
+// ── Ajout dynamique de lignes ──
+const totalForms = document.querySelector('[name="{{ formset.prefix }}-TOTAL_FORMS"]');
+document.getElementById('add-ligne').addEventListener('click', () => {
+  const tbody = document.getElementById('lignes-body');
+  const rows  = tbody.querySelectorAll('.ligne-row');
+  const idx   = rows.length;
+  const tmpl  = rows[0].cloneNode(true);
+
+  tmpl.querySelectorAll('input, select').forEach(el => {
+    el.name  = el.name.replace(/-\d+-/, `-${idx}-`);
+    el.id    = el.id.replace(/-\d+-/, `-${idx}-`);
+    if (el.type !== 'checkbox') el.value = '';
+    else el.checked = false;
+  });
+  tmpl.querySelector('.qte-totale').textContent = '—';
+  tbody.appendChild(tmpl);
+  totalForms.value = idx + 1;
+});
+
+function removeLigne(btn) {
+  const row = btn.closest('tr');
+  const del = row.querySelector('input[type=checkbox][name*=DELETE]');
+  if (del) { del.checked = true; row.style.display = 'none'; }
+  else row.remove();
+}
+</script>
+{% endblock %}

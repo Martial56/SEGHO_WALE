@@ -5,6 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}SEGHO-WALE{% endblock %}</title>
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=Lora:ital,wght@0,600;1,400&display=swap" rel="stylesheet">
+    <script>
+      /* Appliquer le thème avant le rendu pour éviter le flash */
+      if (localStorage.getItem('segho-theme') === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    </script>
     <style>
         /* ═══════════════════════════════════════
            TOKENS & RESET
@@ -63,7 +69,7 @@
         .topbar-right {
             display: flex;
             align-items: center;
-            gap: 24px;
+            gap: 16px;
         }
         .topbar-action {
             background: none;
@@ -73,9 +79,49 @@
             font-size: 20px;
             transition: color 0.2s;
         }
-        .topbar-action:hover {
-            color: var(--teal-500);
+        .topbar-action:hover { color: var(--teal-500); }
+
+        /* Icon buttons */
+        .icon-btn {
+            width: 36px; height: 36px; border-radius: 10px; border: none;
+            background: transparent; color: var(--teal-600);
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: all 0.15s; position: relative; flex-shrink: 0;
         }
+        .icon-btn:hover { background: rgba(33,136,171,0.08); color: var(--teal-700); }
+        .icon-btn .notif-dot {
+            position: absolute; top: 6px; right: 6px;
+            width: 7px; height: 7px; border-radius: 50%;
+            background: #e84545; border: 2px solid #fff; pointer-events: none;
+        }
+
+        /* User chip */
+        .user-chip {
+            display: flex; align-items: center; gap: 10px;
+            background: #f7fcff; border: 1px solid rgba(33,136,171,0.12);
+            border-radius: 30px; padding: 5px 12px 5px 6px;
+        }
+        .user-avatar {
+            width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+            background: linear-gradient(135deg, var(--teal-600), var(--teal-400));
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px; font-weight: 800; color: #fff;
+        }
+        .user-info .uname { font-size: 13px; font-weight: 600; color: var(--teal-900); line-height:1.2; }
+        .user-info .urole { font-size: 10px; color: rgba(0,0,0,0.45); }
+
+        /* Clock */
+        .top-clock { text-align:right; font-size:11px; color:rgba(0,0,0,0.45); line-height:1.5; }
+        .top-clock .time { font-size:17px; font-weight:700; color:var(--teal-700); font-variant-numeric:tabular-nums; display:block; }
+
+        /* Logout btn */
+        .btn-logout {
+            background: rgba(33,136,171,0.08); border: none; border-radius: 10px;
+            color: var(--teal-800); width: 34px; height: 34px; padding: 0;
+            cursor: pointer; transition: all 0.15s;
+            display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        }
+        .btn-logout:hover { background: rgba(232,69,69,0.1); color: #c0392b; }
 
         .content {
             flex: 1;
@@ -372,12 +418,223 @@
                 width: 100%;
             }
         }
+
+        /* ═══════════════════════════════════════
+           DARK THEME
+        ═══════════════════════════════════════ */
+        html[data-theme="dark"] body {
+            background: #071e28;
+            color: #cce8f4;
+        }
+        html[data-theme="dark"] .topbar {
+            background: #091d2e;
+            border-bottom-color: rgba(255,255,255,0.06);
+        }
+        html[data-theme="dark"] .topbar-title { color: #cce8f4; }
+        html[data-theme="dark"] .topbar-action { color: #4a8aaa; }
+        html[data-theme="dark"] .topbar-action:hover { color: #6ecae3; }
+        html[data-theme="dark"] .icon-btn { color: #4a7a90; }
+        html[data-theme="dark"] .icon-btn:hover { background: rgba(33,136,171,0.12); color: #cce8f4; }
+        html[data-theme="dark"] .icon-btn .notif-dot { border-color: #091d2e; }
+        html[data-theme="dark"] .user-chip { background: rgba(33,136,171,0.12); border-color: rgba(33,136,171,0.2); }
+        html[data-theme="dark"] .user-info .uname { color: #cce8f4; }
+        html[data-theme="dark"] .user-info .urole { color: rgba(255,255,255,0.35); }
+        html[data-theme="dark"] .top-clock .time { color: var(--teal-300); }
+        html[data-theme="dark"] .top-clock { color: rgba(255,255,255,0.35); }
+        html[data-theme="dark"] .btn-logout { background: rgba(33,136,171,0.12); color: #7aaec7; }
+        html[data-theme="dark"] .btn-logout:hover { background: rgba(232,69,69,0.15); color: #e87070; }
+
+        html[data-theme="dark"] .breadcrumb span { color: rgba(255,255,255,0.3); }
+        html[data-theme="dark"] .breadcrumb a { color: var(--teal-400); }
+
+        html[data-theme="dark"] .page-header-left h1 { color: #cce8f4; }
+        html[data-theme="dark"] .page-header-left p  { color: rgba(255,255,255,0.4); }
+
+        html[data-theme="dark"] .table-container { background: #0d2035; }
+        html[data-theme="dark"] thead { background: rgba(255,255,255,0.03); border-bottom-color: rgba(255,255,255,0.08); }
+        html[data-theme="dark"] th { color: #7aaec7; }
+        html[data-theme="dark"] td { border-bottom-color: rgba(255,255,255,0.04); color: #b8dff0; }
+        html[data-theme="dark"] tbody tr:hover { background: rgba(33,136,171,0.06); }
+
+        html[data-theme="dark"] .card { background: #0d2035; }
+        html[data-theme="dark"] .card-title { color: #cce8f4; }
+        html[data-theme="dark"] .card-meta { color: rgba(255,255,255,0.4); }
+
+        html[data-theme="dark"] .btn-secondary { background: rgba(255,255,255,0.08); color: #cce8f4; }
+        html[data-theme="dark"] .btn-secondary:hover { background: rgba(255,255,255,0.12); }
+
+        html[data-theme="dark"] .alert-success { background: rgba(22,169,107,0.12); color: #6eddb0; }
+        html[data-theme="dark"] .alert-error   { background: rgba(232,69,69,0.12);  color: #f09090; }
+        html[data-theme="dark"] .alert-warning { background: rgba(232,154,26,0.12); color: #f0c070; }
+        html[data-theme="dark"] .alert-info    { background: rgba(45,153,219,0.12); color: #80c8ef; }
+
+        html[data-theme="dark"] .form-group label { color: rgba(255,255,255,0.55); }
+        html[data-theme="dark"] .form-group input,
+        html[data-theme="dark"] .form-group textarea,
+        html[data-theme="dark"] .form-group select {
+            background: #091d2e;
+            border-color: rgba(255,255,255,0.1);
+            color: #cce8f4;
+        }
+        html[data-theme="dark"] .form-group input:focus,
+        html[data-theme="dark"] .form-group textarea:focus,
+        html[data-theme="dark"] .form-group select:focus {
+            border-color: var(--teal-400);
+            box-shadow: 0 0 0 3px rgba(33,136,171,0.2);
+        }
+
+        /* ── Composants réutilisables (dark) ─────────────────────────────────
+           Ces styles couvrent les classes communes à tous les modules
+           (action-bar, form-card, tabs, lignes-table, status-step, etc.)
+           Inutile de les répéter dans chaque template. */
+
+        /* Barre d'actions */
+        html[data-theme="dark"] .action-bar { background: #0d2035; }
+
+        /* Status flow */
+        html[data-theme="dark"] .status-step { background: #091d2e; border-color: rgba(255,255,255,0.1); color: rgba(255,255,255,0.3); }
+        html[data-theme="dark"] .status-step.active { background: var(--teal-600); color: #fff; border-color: var(--teal-600); }
+
+        /* Cartes formulaire / détail */
+        html[data-theme="dark"] .form-card,
+        html[data-theme="dark"] .detail-card { background: #0d2035; }
+        html[data-theme="dark"] .form-section,
+        html[data-theme="dark"] .detail-section { border-top-color: rgba(255,255,255,0.06) !important; }
+
+        /* Labels formulaire (surcharge fine) */
+        html[data-theme="dark"] .form-group label,
+        html[data-theme="dark"] .detail-field .lbl { color: rgba(255,255,255,0.45); text-transform: uppercase; }
+        html[data-theme="dark"] .detail-field .val { color: #cce8f4; }
+        html[data-theme="dark"] .detail-field .val.empty { color: rgba(255,255,255,0.2); }
+        html[data-theme="dark"] .form-check label { color: #cce8f4; }
+
+        /* Inputs inline (form-input et variantes hors .form-group) */
+        html[data-theme="dark"] .form-input { background: #091d2e; border-color: rgba(255,255,255,0.1); color: #cce8f4; }
+        html[data-theme="dark"] .form-input:focus { border-color: var(--teal-400); box-shadow: 0 0 0 3px rgba(33,136,171,0.2); }
+
+        /* Onglets */
+        html[data-theme="dark"] .tabs { background: #0d2035; border-bottom-color: rgba(255,255,255,0.06); }
+        html[data-theme="dark"] .tab-btn { color: rgba(255,255,255,0.35); background: none; }
+        html[data-theme="dark"] .tab-btn.active { color: var(--teal-300); border-bottom-color: var(--teal-300); }
+        html[data-theme="dark"] .tab-pane { background: #0d2035; }
+
+        /* Tableau de lignes (formset) */
+        html[data-theme="dark"] .lignes-table th { color: rgba(255,255,255,0.4); border-bottom-color: rgba(255,255,255,0.08); }
+        html[data-theme="dark"] .lignes-table td { border-bottom-color: rgba(255,255,255,0.04); color: #b8dff0; }
+        html[data-theme="dark"] .lignes-table input,
+        html[data-theme="dark"] .lignes-table select { background: #091d2e; border-color: rgba(255,255,255,0.1); color: #cce8f4; }
+        html[data-theme="dark"] .lignes-table .qte-totale,
+        html[data-theme="dark"] .qte-totale-cell { color: var(--teal-300); }
+        html[data-theme="dark"] .btn-add-line { background: rgba(33,136,171,0.1); color: var(--teal-300); border-color: rgba(33,136,171,0.3); }
+        html[data-theme="dark"] .btn-del-line { background: rgba(232,69,69,0.15); color: #f09090; }
+
+        /* Stats */
+        html[data-theme="dark"] .stat-box { background: #0d2035; }
+        html[data-theme="dark"] .stat-box .val { color: var(--teal-300); }
+        html[data-theme="dark"] .stat-box .lbl { color: rgba(255,255,255,0.4); }
+
+        /* Barre de recherche / filtres */
+        html[data-theme="dark"] .toolbar input,
+        html[data-theme="dark"] .toolbar select { background: #0d2035; border-color: rgba(255,255,255,0.1); color: #cce8f4; font-family: 'Sora', sans-serif; }
+
+        /* Badges statut */
+        html[data-theme="dark"] .badge-brouillon { background: rgba(232,154,26,0.2);  color: #f0c060; }
+        html[data-theme="dark"] .badge-prescrit  { background: rgba(22,169,107,0.2);  color: #6eddb0; }
+        html[data-theme="dark"] .badge-code      { background: rgba(33,136,171,0.2);  color: var(--teal-300); }
+
+        /* Titres de section */
+        html[data-theme="dark"] .section-title { color: var(--teal-300); border-bottom-color: rgba(255,255,255,0.06); }
+
+        /* Dropdown configuration */
+        html[data-theme="dark"] #config-dropdown { background: #0d2035; border-color: rgba(255,255,255,0.08); }
+        html[data-theme="dark"] #config-dropdown a { color: #cce8f4; border-bottom-color: rgba(255,255,255,0.06); }
+        html[data-theme="dark"] #config-dropdown a:hover { background: rgba(33,136,171,0.1); }
+
+        /* ── fin composants réutilisables ─────────────────────────────────── */
+
+        /* Toggle button */
+        .theme-toggle {
+            background: none; border: none;
+            color: var(--teal-600); cursor: pointer;
+            font-size: 18px; padding: 4px 8px;
+            border-radius: 8px; transition: all 0.15s;
+            display: flex; align-items: center;
+        }
+        .theme-toggle:hover { background: rgba(33,136,171,0.1); color: var(--teal-400); }
+        .theme-toggle .icon-sun  { display:block; }
+        .theme-toggle .icon-moon { display:none; }
+        html[data-theme="dark"] .theme-toggle .icon-sun  { display:none; }
+        html[data-theme="dark"] .theme-toggle .icon-moon { display:block; }
+        html[data-theme="dark"] .theme-toggle { color: var(--teal-300); }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
 <body>
     <div class="main">
-        {% include 'includes/topbar.html' %}
+        <div class="topbar">
+        <div class="topbar-left">
+            <a href="/" style="text-decoration:none;display:flex;align-items:center;gap:10px;flex-shrink:0;">
+                <span style="font-size:20px;">🏥</span>
+                <span style="font-size:13px;font-weight:800;color:var(--teal-600);letter-spacing:-0.2px;">SEGHO-WALE</span>
+            </a>
+            <span style="width:1px;height:22px;background:rgba(0,0,0,0.1);display:block;flex-shrink:0;margin:0 4px;"></span>
+            <div class="topbar-title">{% block topbar_title %}{% endblock %}</div>
+        </div>
+        <div class="topbar-right">
+            <!-- Messagerie -->
+            <button class="icon-btn" title="Messagerie">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+            </button>
+
+            <!-- Notifications -->
+            <button class="icon-btn" title="Notifications">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                </svg>
+            </button>
+
+            <!-- Thème -->
+            <button class="theme-toggle" id="theme-toggle" title="Thème sombre / clair">
+                <svg class="icon-sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="5"/>
+                    <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                    <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                </svg>
+                <svg class="icon-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                </svg>
+            </button>
+
+            <!-- Utilisateur -->
+            {% if user.is_authenticated %}
+            <div class="user-chip">
+                <div class="user-avatar">{{ user.username|first|upper }}</div>
+                <div class="user-info">
+                    <div class="uname">{{ user.get_full_name|default:user.username }}</div>
+                    <div class="urole">{% if user.is_superuser %}Administrateur{% elif user.is_staff %}Staff{% else %}Utilisateur{% endif %}</div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    <script>
+    // Thème
+    (function() {
+        var btn = document.getElementById('theme-toggle');
+        if (!btn) return;
+        btn.addEventListener('click', function() {
+            var html = document.documentElement;
+            var isDark = html.getAttribute('data-theme') === 'dark';
+            if (isDark) { html.removeAttribute('data-theme'); localStorage.setItem('segho-theme', 'light'); }
+            else { html.setAttribute('data-theme', 'dark'); localStorage.setItem('segho-theme', 'dark'); }
+        });
+    })();
+    </script>
         
         <div class="content">
             {% if messages %}

@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Maladies — SEGHO-WALE{% endblock %}
+{% block topbar_title %}Maladies{% endblock %}
+
+{% block extra_css %}
+<style>
+.toolbar { display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap; align-items:center; }
+.toolbar input {
+  padding:9px 14px; border:1px solid rgba(0,0,0,0.12); border-radius:8px;
+  font-size:14px; font-family:'Sora',sans-serif; flex:1; min-width:200px;
+}
+.action-btns { display:flex; gap:6px; }
+.badge-code {
+  background:rgba(33,136,171,0.12); color:var(--teal-700);
+  padding:3px 10px; border-radius:20px; font-size:12px; font-weight:700;
+  font-family:monospace;
+}
+/* Styles dark mode gérés globalement dans base.html */
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="breadcrumb">
+  {% for item in breadcrumb %}
+    {% if item.url %}<a href="{{ item.url }}">{{ item.title }}</a><span>/</span>
+    {% else %}<span>{{ item.title }}</span>{% endif %}
+  {% endfor %}
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-left">
+    <h1>Maladies</h1>
+    <p>Référentiel des maladies et diagnostics</p>
+  </div>
+  <div class="page-header-right">
+    <a href="{% url 'ordonnances_list' %}" class="btn btn-secondary">← Ordonnances</a>
+    <a href="{% url 'maladie_create' %}" class="btn btn-primary">+ Nouvelle maladie</a>
+  </div>
+</div>
+
+<form method="get" class="toolbar">
+  <input type="text" name="q" value="{{ q }}" placeholder="Rechercher par nom ou code CIM-10...">
+  <button type="submit" class="btn btn-secondary">Filtrer</button>
+  <a href="{% url 'maladie_list' %}" class="btn btn-secondary">Réinitialiser</a>
+</form>
+
+<div class="table-container">
+  <table>
+    <thead>
+      <tr>
+        <th>Code CIM-10</th>
+        <th>Nom de la maladie</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for maladie in maladies %}
+      <tr>
+        <td>{% if maladie.code %}<span class="badge-code">{{ maladie.code }}</span>{% else %}—{% endif %}</td>
+        <td><strong>{{ maladie.nom }}</strong></td>
+        <td>
+          <div class="action-btns">
+            <a href="{% url 'maladie_edit' maladie.pk %}" class="btn btn-primary btn-small">Modifier</a>
+            {% if perms.ordonnances.delete_maladie %}
+            <form method="post" action="{% url 'maladie_delete' maladie.pk %}" style="margin:0;"
+                  onsubmit="return confirm('Supprimer la maladie « {{ maladie.nom }} » ?');">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-danger btn-small">Supprimer</button>
+            </form>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="3" style="text-align:center;padding:48px;color:rgba(0,0,0,0.4);">
+          Aucune maladie enregistrée
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

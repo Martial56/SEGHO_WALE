@@ -1,0 +1,204 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ titre }} — SEGHO-WALE{% endblock %}
+{% block topbar_title %}{{ titre }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.action-bar {
+  display:flex; align-items:center; gap:12px;
+  background:#fff; padding:14px 24px;
+  border-radius:12px; margin-bottom:20px;
+  box-shadow:var(--shadow-sm);
+}
+.form-card {
+  background:#fff; border-radius:12px;
+  box-shadow:var(--shadow-sm); overflow:hidden; margin-bottom:16px;
+}
+.form-section { padding:24px 28px; }
+.form-grid-3 { display:grid; grid-template-columns:2fr 1fr 1fr; gap:0 28px; }
+.form-group { margin-bottom:16px; }
+.form-group label {
+  display:block; font-size:12px; font-weight:600;
+  color:rgba(0,0,0,0.55); margin-bottom:6px;
+  text-transform:uppercase; letter-spacing:0.3px;
+}
+.form-input, .form-group select, .form-group input[type=text],
+.form-group input[type=number] {
+  width:100%; padding:9px 12px;
+  border:1px solid rgba(0,0,0,0.12); border-radius:8px;
+  font-family:'Sora',sans-serif; font-size:14px;
+  color:var(--teal-900); background:#fff;
+  transition:border-color 0.2s, box-shadow 0.2s;
+}
+.form-input:focus, .form-group select:focus,
+.form-group input:focus { outline:none; border-color:var(--teal-500); box-shadow:0 0 0 3px rgba(33,136,171,0.1); }
+
+.section-title {
+  font-size:13px; font-weight:700; color:var(--teal-700);
+  text-transform:uppercase; letter-spacing:0.5px;
+  padding:16px 28px 12px; border-bottom:2px solid rgba(0,0,0,0.06);
+}
+
+/* Lignes table */
+.lignes-table { width:100%; border-collapse:collapse; }
+.lignes-table th {
+  padding:10px 8px; font-size:11px; font-weight:700;
+  text-transform:uppercase; color:rgba(0,0,0,0.5);
+  border-bottom:2px solid rgba(0,0,0,0.08); text-align:left;
+}
+.lignes-table td { padding:5px 6px; border-bottom:1px solid rgba(0,0,0,0.05); vertical-align:middle; }
+.lignes-table input[type=text], .lignes-table input[type=number], .lignes-table select {
+  width:100%; padding:7px 9px; border:1px solid rgba(0,0,0,0.1); border-radius:6px;
+  font-family:'Sora',sans-serif; font-size:12px;
+}
+.lignes-table input[type=checkbox] { width:18px; height:18px; cursor:pointer; }
+.qte-totale-cell { font-weight:700; color:var(--teal-700); text-align:center; font-size:13px; }
+.btn-del-line { background:rgba(232,69,69,0.1); color:var(--rose); border:none; border-radius:6px; padding:5px 9px; cursor:pointer; font-size:12px; }
+.btn-add-line { margin:12px 28px; background:rgba(33,136,171,0.08); color:var(--teal-700); border:1px dashed rgba(33,136,171,0.3); }
+.errorlist { color:var(--rose); font-size:12px; margin-top:4px; list-style:none; }
+.lignes-wrap { padding:0 28px 16px; overflow-x:auto; }
+
+/* Styles dark mode gérés globalement dans base.html */
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="breadcrumb">
+  {% for item in breadcrumb %}
+    {% if item.url %}<a href="{{ item.url }}">{{ item.title }}</a><span>/</span>
+    {% else %}<span>{{ item.title }}</span>{% endif %}
+  {% endfor %}
+</nav>
+{% endblock %}
+
+{% block content %}
+<form method="post" id="groupe-form">
+{% csrf_token %}
+{{ formset.management_form }}
+
+<div class="action-bar">
+  <button type="submit" class="btn btn-primary">Sauvegarder</button>
+  <a href="{% url 'groupe_medicaments_list' %}" class="btn btn-secondary">Annuler</a>
+  {% if groupe and perms.ordonnances.delete_groupemedicaments %}
+  <form method="post" action="{% url 'groupe_medicaments_delete' groupe.pk %}" style="margin:0;"
+        onsubmit="return confirm('Supprimer ce groupe et toutes ses lignes ?');">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-danger">Supprimer</button>
+  </form>
+  {% endif %}
+</div>
+
+<div class="form-card">
+  <div class="form-section">
+    <div class="form-grid-3">
+      <div class="form-group">
+        <label>{{ form.nom.label }}</label>
+        {{ form.nom }}
+        {% if form.nom.errors %}<ul class="errorlist">{% for e in form.nom.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+      </div>
+      <div class="form-group">
+        <label>{{ form.medecin.label }}</label>
+        {{ form.medecin }}
+      </div>
+      <div class="form-group">
+        <label>{{ form.limite.label }}</label>
+        {{ form.limite }}
+      </div>
+    </div>
+    <div class="form-group">
+      <label>{{ form.maladie.label }}</label>
+      {{ form.maladie }}
+    </div>
+  </div>
+
+  <div class="section-title">Médicaments du groupe</div>
+
+  <div class="lignes-wrap">
+    <table class="lignes-table" id="lignes-table">
+      <thead>
+        <tr>
+          <th style="width:18%">Médicament (catalogue)</th>
+          <th style="width:15%">Médicament (libre)</th>
+          <th style="width:5%;text-align:center">Autorisé</th>
+          <th style="width:14%">Fréquence posologique</th>
+          <th style="width:8%">Dosage</th>
+          <th style="width:10%">Unité de dosage</th>
+          <th style="width:7%">Qté/jour</th>
+          <th style="width:5%">Jours</th>
+          <th style="width:7%">Qté totale</th>
+          <th style="width:11%">Commentaire</th>
+          <th style="width:4%"></th>
+        </tr>
+      </thead>
+      <tbody id="lignes-body">
+        {% for lf in formset %}
+        <tr class="ligne-row">
+          <td>{{ lf.medicament }}</td>
+          <td>{{ lf.medicament_libre }}</td>
+          <td style="text-align:center">{{ lf.autorise }}</td>
+          <td>{{ lf.frequence_posologique }}</td>
+          <td class="dosage-cell">{{ lf.dosage }}</td>
+          <td>{{ lf.unite_dosage }}</td>
+          <td class="qpj-cell">{{ lf.qte_par_jour }}</td>
+          <td class="jours-cell">{{ lf.jours }}</td>
+          <td class="qte-totale-cell">—</td>
+          <td>{{ lf.commentaire }}</td>
+          <td>
+            {% if lf.instance.pk %}{{ lf.DELETE }}{% endif %}
+            <button type="button" class="btn-del-line" onclick="removeLigne(this)">✕</button>
+          </td>
+          {% for hidden in lf.hidden_fields %}{{ hidden }}{% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <button type="button" class="btn btn-add-line" id="add-ligne">+ Ajouter une ligne</button>
+</div>
+
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Qté totale = qté/jour × jours
+function updateQteTotale(row) {
+  const qpj = parseFloat(row.querySelector('.qpj-cell input')?.value) || 0;
+  const j   = parseFloat(row.querySelector('.jours-cell input')?.value) || 0;
+  const cell = row.querySelector('.qte-totale-cell');
+  if (cell) cell.textContent = (qpj && j) ? (qpj * j).toFixed(1) : '—';
+}
+document.getElementById('lignes-body').addEventListener('input', e => {
+  const row = e.target.closest('tr');
+  if (row) updateQteTotale(row);
+});
+document.querySelectorAll('.ligne-row').forEach(updateQteTotale);
+
+// Ajout de ligne
+const totalForms = document.querySelector('[name="{{ formset.prefix }}-TOTAL_FORMS"]');
+document.getElementById('add-ligne').addEventListener('click', () => {
+  const tbody = document.getElementById('lignes-body');
+  const rows  = tbody.querySelectorAll('.ligne-row');
+  const idx   = rows.length;
+  const tmpl  = rows[0].cloneNode(true);
+  tmpl.querySelectorAll('input, select').forEach(el => {
+    el.name = el.name.replace(/-\d+-/, `-${idx}-`);
+    el.id   = el.id.replace(/-\d+-/, `-${idx}-`);
+    if (el.type === 'checkbox') el.checked = el.name.includes('autorise');
+    else el.value = '';
+  });
+  tmpl.querySelector('.qte-totale-cell').textContent = '—';
+  tbody.appendChild(tmpl);
+  totalForms.value = idx + 1;
+});
+
+function removeLigne(btn) {
+  const row = btn.closest('tr');
+  const del = row.querySelector('input[type=checkbox][name*=DELETE]');
+  if (del) { del.checked = true; row.style.display = 'none'; }
+  else row.remove();
+}
+</script>
+{% endblock %}

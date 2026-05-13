@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ titre }} — SEGHO-WALE{% endblock %}
+{% block topbar_title %}{{ titre }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.action-bar {
+  display:flex; align-items:center; gap:12px;
+  background:#fff; padding:14px 24px; border-radius:12px;
+  margin-bottom:20px; box-shadow:var(--shadow-sm);
+}
+.form-card { background:#fff; border-radius:12px; box-shadow:var(--shadow-sm); margin-bottom:16px; max-width:560px; }
+.form-section { padding:28px 32px; }
+.form-group { margin-bottom:18px; }
+.form-group label {
+  display:block; font-size:12px; font-weight:600;
+  color:rgba(0,0,0,0.55); margin-bottom:6px;
+  text-transform:uppercase; letter-spacing:0.3px;
+}
+.form-input, .form-group input {
+  width:100%; padding:9px 12px; border:1px solid rgba(0,0,0,0.12);
+  border-radius:8px; font-family:'Sora',sans-serif; font-size:14px;
+  color:var(--teal-900); background:#fff;
+  transition:border-color 0.2s, box-shadow 0.2s;
+}
+.form-input:focus, .form-group input:focus {
+  outline:none; border-color:var(--teal-500); box-shadow:0 0 0 3px rgba(33,136,171,0.1);
+}
+.errorlist { color:var(--rose); font-size:12px; margin-top:4px; list-style:none; }
+.field-hint { font-size:11px; color:rgba(0,0,0,0.4); margin-top:4px; }
+
+/* Styles dark mode gérés globalement dans base.html */
+html[data-theme="dark"] .field-hint { color:rgba(255,255,255,0.3); }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="breadcrumb">
+  {% for item in breadcrumb %}
+    {% if item.url %}<a href="{{ item.url }}">{{ item.title }}</a><span>/</span>
+    {% else %}<span>{{ item.title }}</span>{% endif %}
+  {% endfor %}
+</nav>
+{% endblock %}
+
+{% block content %}
+<form method="post">
+{% csrf_token %}
+
+<div class="action-bar">
+  <button type="submit" class="btn btn-primary">Sauvegarder</button>
+  <a href="{% url 'maladie_list' %}" class="btn btn-secondary">Annuler</a>
+</div>
+
+<div class="form-card">
+  <div class="form-section">
+    <div class="form-group">
+      <label>{{ form.nom.label }}</label>
+      {{ form.nom }}
+      {% if form.nom.errors %}<ul class="errorlist">{% for e in form.nom.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+    </div>
+    <div class="form-group">
+      <label>{{ form.code.label }}</label>
+      {{ form.code }}
+      <div class="field-hint">Code de classification CIM-10 (ex : J06.9, I10…). Optionnel.</div>
+      {% if form.code.errors %}<ul class="errorlist">{% for e in form.code.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+    </div>
+  </div>
+</div>
+
+</form>
+{% endblock %}
