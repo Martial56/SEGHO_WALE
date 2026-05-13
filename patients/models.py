@@ -66,16 +66,30 @@ class Patient(models.Model):
 class RendezVous(models.Model):
     STATUT = [('planifie','Planifié'),('confirme','Confirmé'),('termine','Terminé'),('annule','Annulé'),('absent','Absent')]
     TYPE = [('consultation','Consultation'),('controle','Contrôle'),('urgence','Urgence'),('examen','Examen'),('vaccination','Vaccination')]
+    DEPARTEMENT = [
+        ('medecine_generale', 'Médecine générale'),
+        ('gynecologie_cpn', 'Gynécologie / CPN'),
+    ]
 
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='rendez_vous')
     medecin = models.ForeignKey('medecins.Medecin', on_delete=models.SET_NULL, null=True, related_name='rendez_vous')
+    departement = models.CharField(max_length=30, choices=DEPARTEMENT, blank=True, default='')
     date_heure = models.DateTimeField()
     duree_minutes = models.IntegerField(default=30)
     type_rdv = models.CharField(max_length=20, choices=TYPE, default='consultation')
     motif = models.TextField(blank=True)
     statut = models.CharField(max_length=20, choices=STATUT, default='planifie')
     notes = models.TextField(blank=True)
+    code_confirmation = models.CharField(max_length=30, blank=True, default='')
+    temps_constante_minutes = models.IntegerField(default=0)
+    temps_attente_minutes = models.IntegerField(default=0)
+    temps_consultation_minutes = models.IntegerField(default=0)
     date_creation = models.DateTimeField(auto_now_add=True)
+
+    @property
+    def date_validite(self):
+        from datetime import timedelta
+        return (self.date_creation + timedelta(days=14)).date()
 
     def __str__(self): return f"RDV {self.patient} - {self.date_heure.strftime('%d/%m/%Y %H:%M')}"
     class Meta:
