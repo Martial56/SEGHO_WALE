@@ -1,0 +1,297 @@
+{% extends 'patients/base.html' %}
+
+{% block topbar_title %}Rendez-vous{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ── Toolbar ── */
+    .rdv-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+    .rdv-toolbar-left  { display: flex; align-items: center; gap: 10px; flex: 1; flex-wrap: wrap; }
+    .rdv-toolbar-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+    /* ── Quick filter pills ── */
+    .quick-pills { display: flex; gap: 6px; }
+    .quick-pill {
+        padding: 7px 16px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 600;
+        border: 1.5px solid rgba(0,0,0,0.1);
+        background: #fff;
+        color: var(--teal-800);
+        text-decoration: none;
+        cursor: pointer;
+        transition: all 0.15s;
+        white-space: nowrap;
+        box-shadow: var(--shadow-sm);
+    }
+    .quick-pill:hover { border-color: var(--teal-400); color: var(--teal-600); }
+    .quick-pill.active { background: var(--teal-500); color: #fff; border-color: var(--teal-500); }
+
+    /* ── Date range ── */
+    .date-range-form {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: #fff;
+        border: 1px solid rgba(0,0,0,0.12);
+        border-radius: 10px;
+        padding: 6px 12px;
+        box-shadow: var(--shadow-sm);
+    }
+    .date-range-form input[type="date"] {
+        border: none;
+        font-family: 'Sora', sans-serif;
+        font-size: 13px;
+        color: var(--teal-800);
+        outline: none;
+        background: transparent;
+        cursor: pointer;
+    }
+    .date-range-sep { color: rgba(0,0,0,0.3); font-size: 13px; font-weight: 600; padding: 0 4px; }
+    .date-range-form .btn-filter {
+        border: none;
+        background: var(--teal-500);
+        color: #fff;
+        border-radius: 6px;
+        padding: 5px 14px;
+        font-family: 'Sora', sans-serif;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+    .date-range-form .btn-filter:hover { background: var(--teal-600); }
+
+    /* ── Status select ── */
+    .rdv-select {
+        padding: 8px 12px;
+        border: 1px solid rgba(0,0,0,0.12);
+        border-radius: 10px;
+        font-family: 'Sora', sans-serif;
+        font-size: 13px;
+        background: #fff;
+        color: var(--teal-900);
+        cursor: pointer;
+        box-shadow: var(--shadow-sm);
+    }
+    .rdv-select:focus { outline: none; border-color: var(--teal-400); }
+
+    /* ── Stats strip ── */
+    .stats-strip {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+    .stat-pill {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: #fff;
+        border-radius: 10px;
+        padding: 10px 20px;
+        box-shadow: var(--shadow-sm);
+        font-size: 13px;
+    }
+    .stat-pill .sp-val { font-size: 22px; font-weight: 800; }
+    .stat-pill .sp-lbl { color: rgba(0,0,0,0.5); }
+    .sp-total    { color: var(--teal-600); }
+    .sp-planifie { color: var(--amber); }
+    .sp-confirme { color: var(--sky); }
+    .sp-termine  { color: var(--green); }
+    .sp-absent   { color: rgba(0,0,0,0.35); }
+
+    /* ── Status badges ── */
+    .rdv-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+    .rdv-badge.planifie { background: rgba(232,154,26,0.12); color: var(--amber); }
+    .rdv-badge.confirme { background: rgba(45,153,219,0.12); color: var(--sky); }
+    .rdv-badge.termine  { background: rgba(22,169,107,0.12); color: var(--green); }
+    .rdv-badge.annule   { background: rgba(232,69,69,0.1);   color: var(--rose); }
+    .rdv-badge.absent   { background: rgba(0,0,0,0.06);      color: rgba(0,0,0,0.4); }
+
+    /* ── Type badge ── */
+    .type-badge {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 6px;
+        font-size: 11px;
+        font-weight: 600;
+        background: var(--teal-50);
+        color: var(--teal-700);
+        white-space: nowrap;
+        border: 1px solid var(--teal-200);
+    }
+
+    /* ── Patient cell ── */
+    .patient-cell { display: flex; align-items: center; gap: 10px; }
+    .patient-avatar {
+        width: 36px; height: 36px; border-radius: 50%;
+        background: var(--teal-100); display: flex; align-items: center;
+        justify-content: center; font-size: 14px; font-weight: 700;
+        color: var(--teal-700); flex-shrink: 0;
+    }
+    .patient-name { font-weight: 600; font-size: 14px; color: var(--teal-900); line-height: 1.3; }
+    .patient-sub  { font-size: 12px; color: rgba(0,0,0,0.45); margin-top: 2px; }
+
+    /* ── Empty state ── */
+    .empty-state {
+        text-align: center; padding: 64px 20px; color: rgba(0,0,0,0.4);
+    }
+    .empty-state .es-icon { font-size: 56px; margin-bottom: 16px; }
+    .empty-state h3 { font-size: 18px; font-weight: 700; color: var(--teal-900); margin-bottom: 8px; }
+
+    @media (max-width: 768px) {
+        .rdv-toolbar { flex-direction: column; align-items: stretch; }
+        .date-range-form { flex-wrap: wrap; }
+        .stats-strip { gap: 8px; }
+        .patient-sub { display: none; }
+    }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="breadcrumb">
+    <a href="/">Accueil</a>
+    <span>/</span>
+    <span>Rendez-vous</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── En-tête ── -->
+<div class="page-header">
+    <div class="page-header-left">
+        <h1>Rendez-vous</h1>
+        <p>{{ stats.total }} rendez-vous sur la période sélectionnée</p>
+        <div style="margin-top: 10px;">
+            <a href="{% url 'patients:rdv_create' %}" class="btn btn-primary">+ Créer</a>
+        </div>
+    </div>
+    <!-- ── Barre de filtres ── -->
+    <form method="get" id="filter-form">
+    <div class="rdv-toolbar">
+        <div class="rdv-toolbar-left">
+
+            <!-- Raccourcis de période -->
+            <div class="quick-pills">
+                <a href="?date_debut={{ today }}&date_fin={{ today }}"
+                class="quick-pill {% if is_today and not pas_fini and not statut_filter %}active{% endif %}">
+                    Aujourd'hui
+                </a>
+                <a href="?date_debut={{ today }}&date_fin={{ today }}&pas_fini=1"
+                class="quick-pill {% if is_today and pas_fini %}active{% endif %}">
+                    Pas fini
+                </a>
+            </div>
+
+            <!-- Filtre par statut -->
+            <select name="statut" class="rdv-select" onchange="document.getElementById('filter-form').submit()">
+                <option value="">Tous les statuts</option>
+                <option value="planifie" {% if statut_filter == 'planifie' %}selected{% endif %}>Planifié</option>
+                <option value="confirme" {% if statut_filter == 'confirme' %}selected{% endif %}>Confirmé</option>
+                <option value="termine"  {% if statut_filter == 'termine'  %}selected{% endif %}>Terminé</option>
+                <option value="annule"   {% if statut_filter == 'annule'   %}selected{% endif %}>Annulé</option>
+                <option value="absent"   {% if statut_filter == 'absent'   %}selected{% endif %}>Absent</option>
+            </select>
+
+            {% if statut_filter or pas_fini %}
+            <a href="?date_debut={{ date_debut }}&date_fin={{ date_fin }}" class="btn btn-secondary btn-small">✕ Effacer</a>
+            {% endif %}
+
+        </div>
+
+        <!-- Sélecteur de plage de dates -->
+        <div class="rdv-toolbar-right">
+            <div class="date-range-form">
+                <input type="date" name="date_debut" value="{{ date_debut }}">
+                <span class="date-range-sep">→</span>
+                <input type="date" name="date_fin" value="{{ date_fin }}">
+                <button type="submit" class="btn-filter">Filtrer</button>
+            </div>
+        </div>
+    </div>
+    </form>
+</div>
+
+<!-- ── Tableau ── -->
+{% if rdv_list %}
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>Patient</th>
+                <th>Date / Heure</th>
+                <th>Médecin</th>
+                <th>Type</th>
+                <th>Motif</th>
+                <th>Durée</th>
+                <th>Statut</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for rdv in rdv_list %}
+            <tr style="cursor: pointer;" onclick="window.location='{% url 'patients:detail' rdv.patient.id %}'">
+                <td>
+                    <div class="patient-cell">
+                        <div class="patient-avatar">{{ rdv.patient.nom|first|upper }}</div>
+                        <div>
+                            <div class="patient-name">{{ rdv.patient.nom }} {{ rdv.patient.prenoms }}</div>
+                            <div class="patient-sub">
+                                {{ rdv.patient.age }} ans &middot;
+                                {% if rdv.patient.sexe == 'F' %}Femme{% else %}Homme{% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    <div style="font-weight: 600; font-size: 14px;">{{ rdv.date_heure|date:"d/m/Y" }}</div>
+                    <div style="font-size: 12px; color: rgba(0,0,0,0.5);">{{ rdv.date_heure|date:"H:i" }}</div>
+                </td>
+                <td style="font-size: 13px;">
+                    {% if rdv.medecin %}{{ rdv.medecin }}{% else %}<span style="color:rgba(0,0,0,0.3);">—</span>{% endif %}
+                </td>
+                <td><span class="type-badge">{{ rdv.get_type_rdv_display }}</span></td>
+                <td style="font-size: 13px; color: rgba(0,0,0,0.65); max-width: 220px;">
+                    {{ rdv.motif|truncatechars:45|default:"—" }}
+                </td>
+                <td style="font-size: 13px; white-space: nowrap; color: rgba(0,0,0,0.6);">{{ rdv.duree_minutes }} min</td>
+                <td>
+                    <span class="rdv-badge {{ rdv.statut }}">{{ rdv.get_statut_display }}</span>
+                </td>
+                <td onclick="event.stopPropagation()">
+                    <a href="{% url 'patients:detail' rdv.patient.id %}" class="btn btn-secondary btn-small">Voir</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="empty-state">
+    <div class="es-icon">📅</div>
+    <h3>Aucun rendez-vous trouvé</h3>
+    <p>
+        {% if statut_filter or pas_fini %}Modifiez vos filtres ou{% else %}Aucun rendez-vous pour cette période —{% endif %}
+        <a href="{% url 'patients:rdv_create' %}" style="color: var(--teal-500);">créer un rendez-vous</a>.
+    </p>
+</div>
+{% endif %}
+
+{% endblock %}

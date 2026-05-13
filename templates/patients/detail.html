@@ -1,0 +1,437 @@
+{% extends 'patients/base.html' %}
+
+{% block topbar_title %}{{ patient.nom }} {{ patient.prenoms }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ── Action bar ── */
+    .action-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 0;
+        background: #fff;
+        border-radius: var(--radius) var(--radius) 0 0;
+        padding: 14px 24px;
+        border-bottom: 1px solid rgba(0,0,0,0.07);
+        flex-wrap: wrap;
+    }
+    .action-bar-left  { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .action-bar-right { display: flex; align-items: center; gap: 10px; }
+    .nav-counter {
+        font-size: 13px;
+        color: rgba(0,0,0,0.45);
+        display: flex; align-items: center; gap: 4px;
+    }
+    .nav-arrow {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 28px; height: 28px; border-radius: 6px;
+        border: 1px solid rgba(0,0,0,0.12); background: #fff;
+        color: var(--teal-700); text-decoration: none; font-size: 14px;
+        transition: all 0.15s;
+    }
+    .nav-arrow:hover { background: var(--teal-50); border-color: var(--teal-300); }
+    .nav-arrow.disabled { opacity: 0.3; pointer-events: none; }
+    .status-dot {
+        width: 10px; height: 10px; border-radius: 50%; display: inline-block;
+    }
+    .status-dot.actif   { background: var(--green); }
+    .status-dot.inactif { background: var(--rose); }
+
+    /* ── Stats bar ── */
+    .stats-bar {
+        display: flex;
+        background: #fff;
+        border-bottom: 1px solid rgba(0,0,0,0.07);
+        overflow-x: auto;
+        padding: 0 8px;
+    }
+    .stat-tab {
+        display: flex; flex-direction: column; align-items: center;
+        padding: 10px 20px; gap: 2px; cursor: pointer;
+        border-bottom: 2px solid transparent;
+        transition: all 0.15s; white-space: nowrap; text-decoration: none;
+        min-width: 90px;
+    }
+    .stat-tab:hover { background: rgba(0,0,0,0.03); border-bottom-color: var(--teal-300); }
+    .stat-tab .st-val {
+        font-size: 17px; font-weight: 800; color: var(--teal-700);
+        line-height: 1;
+    }
+    .stat-tab .st-lbl {
+        font-size: 11px; color: rgba(0,0,0,0.45); text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+    .stat-tab.zero .st-val { color: rgba(0,0,0,0.25); }
+
+    /* ── Patient header card ── */
+    .patient-header {
+        background: #fff;
+        padding: 28px 28px 20px;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 24px;
+        border-bottom: 1px solid rgba(0,0,0,0.06);
+    }
+    .ph-identity h1 {
+        font-size: 26px; font-weight: 800; color: var(--teal-950);
+        margin-bottom: 6px; letter-spacing: -0.3px;
+    }
+    .ph-code {
+        display: inline-flex; align-items: center; gap: 6px;
+        background: var(--teal-50); border: 1px solid var(--teal-200);
+        color: var(--teal-700); padding: 4px 12px; border-radius: 20px;
+        font-size: 12px; font-weight: 700; font-family: monospace;
+        margin-bottom: 16px;
+    }
+    .ph-fields {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px 32px;
+        margin-top: 8px;
+    }
+    .ph-field { display: flex; flex-direction: column; gap: 1px; }
+    .ph-field .pf-label {
+        font-size: 11px; font-weight: 600; color: rgba(0,0,0,0.4);
+        text-transform: uppercase; letter-spacing: 0.3px;
+    }
+    .ph-field .pf-value {
+        font-size: 14px; font-weight: 500; color: var(--teal-950);
+    }
+    .ph-field .pf-value.empty { color: rgba(0,0,0,0.25); font-style: italic; font-weight: 400; }
+
+    /* ── Photo ── */
+    .ph-photo {
+        width: 110px; height: 110px; border-radius: 14px;
+        overflow: hidden; border: 2px solid rgba(0,0,0,0.08);
+        background: #eef3f6; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center;
+    }
+    .ph-photo img { width: 100%; height: 100%; object-fit: cover; }
+    .ph-photo-placeholder { font-size: 48px; color: #b0c4ce; }
+
+    /* ── Tabs ── */
+    .detail-card {
+        background: #fff;
+        border-radius: 0 0 var(--radius) var(--radius);
+        overflow: hidden;
+        box-shadow: var(--shadow-sm);
+    }
+    .tab-nav {
+        display: flex;
+        border-bottom: 1px solid rgba(0,0,0,0.08);
+        padding: 0 20px;
+        overflow-x: auto;
+        gap: 0;
+    }
+    .tab-btn {
+        padding: 14px 20px; font-size: 13px; font-weight: 600;
+        color: rgba(0,0,0,0.45); border: none; background: none;
+        border-bottom: 2px solid transparent; cursor: pointer;
+        white-space: nowrap; transition: all 0.15s; margin-bottom: -1px;
+    }
+    .tab-btn.active { color: var(--teal-600); border-bottom-color: var(--teal-500); }
+    .tab-btn:hover:not(.active) { color: var(--teal-800); }
+
+    .tab-panel { display: none; padding: 28px; }
+    .tab-panel.active { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+    .tab-panel.active.single { grid-template-columns: 1fr; }
+
+    /* ── Field groups in tabs ── */
+    .detail-field {
+        display: flex; flex-direction: column; gap: 2px;
+        padding-bottom: 14px; border-bottom: 1px solid rgba(0,0,0,0.05);
+        margin-bottom: 2px;
+    }
+    .detail-field:last-child { border-bottom: none; }
+    .df-label {
+        font-size: 11px; font-weight: 700; color: rgba(0,0,0,0.38);
+        text-transform: uppercase; letter-spacing: 0.4px;
+    }
+    .df-value {
+        font-size: 14px; color: var(--teal-950); font-weight: 500;
+        white-space: pre-line;
+    }
+    .df-value.empty { color: rgba(0,0,0,0.25); font-style: italic; font-weight: 400; }
+
+    /* ── Assurance card ── */
+    .assurance-card {
+        background: var(--teal-50); border: 1px solid var(--teal-200);
+        border-radius: 12px; padding: 16px 20px; display: flex;
+        align-items: flex-start; gap: 16px;
+    }
+    .assurance-icon { font-size: 28px; flex-shrink: 0; }
+    .assurance-info .ai-nom { font-size: 15px; font-weight: 700; color: var(--teal-800); }
+    .assurance-info .ai-num { font-size: 12px; color: var(--teal-600); margin-top: 4px; }
+
+    @media (max-width: 768px) {
+        .patient-header { grid-template-columns: 1fr; }
+        .ph-fields { grid-template-columns: 1fr; }
+        .tab-panel.active { grid-template-columns: 1fr; }
+        .ph-photo { width: 80px; height: 80px; }
+    }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="breadcrumb">
+    <a href="/">Accueil</a>
+    <span>/</span>
+    <a href="{% url 'patients:list' %}">Patients</a>
+    <span>/</span>
+    <span>{{ patient.nom }} {{ patient.prenoms }}</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+
+<!-- ══ Barre d'actions ══ -->
+<div class="action-bar">
+    <div class="action-bar-left">
+        <a href="{% url 'patients:edit' patient.pk %}" class="btn btn-primary">Modifier</a>
+        <a href="{% url 'patients:create' %}" class="btn btn-secondary">Nouveau patient</a>
+        <span class="status-dot {% if patient.actif %}actif{% else %}inactif{% endif %}"></span>
+        <span style="font-size:13px; color:rgba(0,0,0,0.5);">
+            {% if patient.actif %}Actif{% else %}Inactif{% endif %}
+        </span>
+    </div>
+    <div class="action-bar-right">
+        <span class="nav-counter">
+            {{ position }} / {{ total }}
+        </span>
+        {% if prev_pk %}
+            <a href="{% url 'patients:detail' prev_pk %}" class="nav-arrow" title="Précédent">&#8249;</a>
+        {% else %}
+            <span class="nav-arrow disabled">&#8249;</span>
+        {% endif %}
+        {% if next_pk %}
+            <a href="{% url 'patients:detail' next_pk %}" class="nav-arrow" title="Suivant">&#8250;</a>
+        {% else %}
+            <span class="nav-arrow disabled">&#8250;</span>
+        {% endif %}
+    </div>
+</div>
+
+<!-- ══ Barre de stats ══ -->
+<div class="stats-bar">
+    <a href="{% url 'patients:rdv_list' patient.pk %}" class="stat-tab {% if rdv_count == 0 %}zero{% endif %}"><!-- patients:rdv_list -->
+        <span class="st-val">{{ rdv_count }}</span>
+        <span class="st-lbl">Rendez-vous</span>
+    </a>
+    <a href="{% url 'patients:consultation_list' patient.pk %}" class="stat-tab {% if consultation_count == 0 %}zero{% endif %}">
+        <span class="st-val">{{ consultation_count }}</span>
+        <span class="st-lbl">Soins</span>
+    </a>
+    <a href="{% url 'patients:ordonnance_list' patient.pk %}" class="stat-tab {% if ordonnance_count == 0 %}zero{% endif %}">
+        <span class="st-val">{{ ordonnance_count }}</span>
+        <span class="st-lbl">Ordonnances</span>
+    </a>
+    <a href="{% url 'patients:hospitalisation_list' patient.pk %}" class="stat-tab {% if hospitalisation_count == 0 %}zero{% endif %}">
+        <span class="st-val">{{ hospitalisation_count }}</span>
+        <span class="st-lbl">Hospitalisations</span>
+    </a>
+    <a href="{% url 'patients:demande_examens_list' patient.pk %}" class="stat-tab {% if demande_examens_count == 0 %}zero{% endif %}">
+        <span class="st-val">{{ demande_examens_count }}</span>
+        <span class="st-lbl">Demande d'examens labo</span>
+    </a>
+    <a href="{% url 'patients:resultat_examens_list' patient.pk %}" class="stat-tab {% if resultat_examens_count == 0 %}zero{% endif %}">
+        <span class="st-val">{{ resultat_examens_count }}</span>
+        <span class="st-lbl">Résultats d'examens labo</span>
+    </a>
+</div>
+
+<!-- ══ Carte principale ══ -->
+<div class="detail-card">
+
+    <!-- En-tête patient -->
+    <div class="patient-header">
+        <div class="ph-identity">
+            <h1>{{ patient.nom }} {{ patient.prenoms }}</h1>
+            <div class="ph-code">{{ patient.code_patient }}</div>
+
+            <div class="ph-fields">
+                <div class="ph-field">
+                    <span class="pf-label">Genre</span>
+                    <span class="pf-value">{{ patient.get_sexe_display }}</span>
+                </div>
+                <div class="ph-field">
+                    <span class="pf-label">Date de naissance</span>
+                    <span class="pf-value">{{ patient.date_naissance|date:"d/m/Y" }}</span>
+                </div>
+                <div class="ph-field">
+                    <span class="pf-label">Âge</span>
+                    <span class="pf-value">{{ patient.age }} ans</span>
+                </div>
+                <div class="ph-field">
+                    <span class="pf-label">Téléphone</span>
+                    <span class="pf-value {% if not patient.telephone %}empty{% endif %}">
+                        {{ patient.telephone|default:"—" }}
+                    </span>
+                </div>
+                <div class="ph-field">
+                    <span class="pf-label">Groupe sanguin</span>
+                    <span class="pf-value {% if not patient.groupe_sanguin %}empty{% endif %}">
+                        {{ patient.groupe_sanguin|default:"Inconnu" }}
+                    </span>
+                </div>
+                <div class="ph-field">
+                    <span class="pf-label">Nationalité</span>
+                    <span class="pf-value">{{ patient.nationalite }}</span>
+                </div>
+                <div class="ph-field">
+                    <span class="pf-label">À contacter en urgence</span>
+                    <span class="pf-value {% if not patient.contact_urgence_nom %}empty{% endif %}">
+                        {% if patient.contact_urgence_nom %}
+                            {{ patient.contact_urgence_nom }}
+                            {% if patient.contact_urgence_telephone %} — {{ patient.contact_urgence_telephone }}{% endif %}
+                        {% else %}—{% endif %}
+                    </span>
+                </div>
+                <div class="ph-field">
+                    <span class="pf-label">Enregistré le</span>
+                    <span class="pf-value">{{ patient.date_creation|date:"d/m/Y" }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="ph-photo">
+            {% if patient.photo %}
+                <img src="{{ patient.photo.url }}" alt="{{ patient.nom }}">
+            {% else %}
+                <span class="ph-photo-placeholder">
+                    {% if patient.sexe == 'F' %}&#9792;{% else %}&#9794;{% endif %}
+                </span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Onglets -->
+    <div class="tab-nav">
+        <button class="tab-btn active" onclick="showTab('general', this)">Informations générales</button>
+        <button class="tab-btn" onclick="showTab('medical', this)">Médical</button>
+        <button class="tab-btn" onclick="showTab('assurance', this)">Assurance</button>
+        <button class="tab-btn" onclick="showTab('urgence', this)">Urgence</button>
+    </div>
+
+    <!-- Onglet : Informations générales -->
+    <div id="tab-general" class="tab-panel active">
+        <div>
+            <div class="detail-field">
+                <span class="df-label">Adresse</span>
+                <span class="df-value {% if not patient.adresse %}empty{% endif %}">{{ patient.adresse|default:"—" }}</span>
+            </div>
+            <div class="detail-field">
+                <span class="df-label">Ville</span>
+                <span class="df-value">{{ patient.ville }}</span>
+            </div>
+            <div class="detail-field">
+                <span class="df-label">Email</span>
+                <span class="df-value {% if not patient.email %}empty{% endif %}">
+                    {% if patient.email %}<a href="mailto:{{ patient.email }}" style="color:var(--teal-500);">{{ patient.email }}</a>{% else %}—{% endif %}
+                </span>
+            </div>
+            <div class="detail-field">
+                <span class="df-label">Lieu de naissance</span>
+                <span class="df-value {% if not patient.lieu_naissance %}empty{% endif %}">{{ patient.lieu_naissance|default:"—" }}</span>
+            </div>
+        </div>
+        <div>
+            <div class="detail-field">
+                <span class="df-label">Téléphone principal</span>
+                <span class="df-value">{{ patient.telephone }}</span>
+            </div>
+            <div class="detail-field">
+                <span class="df-label">Téléphone secondaire</span>
+                <span class="df-value {% if not patient.telephone2 %}empty{% endif %}">{{ patient.telephone2|default:"—" }}</span>
+            </div>
+            <div class="detail-field">
+                <span class="df-label">Profession</span>
+                <span class="df-value {% if not patient.profession %}empty{% endif %}">{{ patient.profession|default:"—" }}</span>
+            </div>
+            <div class="detail-field">
+                <span class="df-label">Dernière modification</span>
+                <span class="df-value">{{ patient.date_modification|date:"d/m/Y à H:i" }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Onglet : Médical -->
+    <div id="tab-medical" class="tab-panel">
+        <div>
+            <div class="detail-field">
+                <span class="df-label">Groupe sanguin</span>
+                <span class="df-value {% if not patient.groupe_sanguin %}empty{% endif %}">
+                    {% if patient.groupe_sanguin %}
+                        <span style="font-size:16px; font-weight:800; color:var(--rose);">{{ patient.groupe_sanguin }}</span>
+                    {% else %}Inconnu{% endif %}
+                </span>
+            </div>
+            <div class="detail-field">
+                <span class="df-label">Allergies connues</span>
+                <span class="df-value {% if not patient.allergies %}empty{% endif %}">{{ patient.allergies|default:"Aucune allergie connue" }}</span>
+            </div>
+        </div>
+        <div>
+            <div class="detail-field">
+                <span class="df-label">Antécédents médicaux</span>
+                <span class="df-value {% if not patient.antecedents %}empty{% endif %}">{{ patient.antecedents|default:"Aucun antécédent renseigné" }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Onglet : Assurance -->
+    <div id="tab-assurance" class="tab-panel single">
+        {% if patient.assurance %}
+        <div class="assurance-card">
+            <div class="assurance-icon">🛡</div>
+            <div class="assurance-info">
+                <div class="ai-nom">{{ patient.assurance.nom }}</div>
+                <div class="ai-num">
+                    {% if patient.numero_assurance %}N° {{ patient.numero_assurance }}{% endif %}
+                    {% if patient.date_expiration_assurance %}
+                        &nbsp;·&nbsp; Expire le {{ patient.date_expiration_assurance|date:"d/m/Y" }}
+                    {% endif %}
+                </div>
+                <div style="margin-top:8px; font-size:13px; color:rgba(0,0,0,0.5);">
+                    Taux de prise en charge : <strong>{{ patient.assurance.taux_prise_en_charge }}%</strong>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div style="padding: 40px; text-align:center; color:rgba(0,0,0,0.35);">
+            <div style="font-size:40px; margin-bottom:12px;">🛡</div>
+            <div style="font-weight:600;">Aucune assurance enregistrée</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Onglet : Urgence -->
+    <div id="tab-urgence" class="tab-panel">
+        <div>
+            <div class="detail-field">
+                <span class="df-label">Nom du contact d'urgence</span>
+                <span class="df-value {% if not patient.contact_urgence_nom %}empty{% endif %}">{{ patient.contact_urgence_nom|default:"—" }}</span>
+            </div>
+        </div>
+        <div>
+            <div class="detail-field">
+                <span class="df-label">Téléphone d'urgence</span>
+                <span class="df-value {% if not patient.contact_urgence_telephone %}empty{% endif %}">{{ patient.contact_urgence_telephone|default:"—" }}</span>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function showTab(name, btn) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    btn.classList.add('active');
+}
+</script>
+{% endblock %}

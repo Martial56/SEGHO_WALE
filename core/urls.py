@@ -7,7 +7,6 @@ urlpatterns = [
     path('logout/', views.logout_view, name='logout'),
     
     # URLs des modules
-    path('patients/', views.patients_list, name='patients_list'),
     path('medecins/', views.medecins_list, name='medecins_list'),
     path('consultations/', views.consultations_list, name='consultations_list'),
     path('pharmacie/', views.pharmacie_list, name='pharmacie_list'),

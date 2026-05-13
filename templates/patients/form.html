@@ -1,0 +1,531 @@
+{% extends 'patients/base.html' %}
+
+{% block topbar_title %}{{ titre }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ── Underline inputs (définis dans forms.py via class="field-ul") ── */
+    .field-ul {
+        width: 100%;
+        background: transparent;
+        border-top: none;
+        border-left: none;
+        border-right: none;
+        border-bottom: 1.5px solid #d1dde3;
+        border-radius: 0;
+        padding: 7px 2px;
+        font-size: 13px;
+        color: var(--text-primary);
+        transition: border-color .2s;
+        box-shadow: none;
+        outline: none;
+    }
+    .field-ul:focus {
+        border-bottom-color: var(--teal-500);
+        box-shadow: none;
+        outline: none;
+    }
+    .field-ul.error { border-bottom-color: var(--rose); }
+    .field-ul::placeholder { color: #bfcdd4; }
+
+    /* Textarea underline */
+    textarea.field-ul {
+        resize: vertical;
+        border-bottom-width: 1.5px;
+        padding: 6px 2px;
+    }
+
+    /* Select underline */
+    select.field-ul {
+        appearance: none;
+        -webkit-appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23839aaa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 4px center;
+        padding-right: 22px;
+        cursor: pointer;
+    }
+
+    /* Large name input (class="field-ul field-ul-name" dans forms.py) */
+    .field-ul-name {
+        font-size: 26px;
+        font-weight: 700;
+        color: var(--teal-900);
+        border-bottom-width: 2px;
+        padding: 4px 0 6px;
+        margin-bottom: 6px;
+    }
+    .field-ul-name::placeholder { color: #c5d4d8; font-weight: 600; }
+
+    /* Medium prenoms input */
+    .field-ul-prenom {
+        font-size: 16px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        padding: 3px 0 5px;
+    }
+    .field-ul-prenom::placeholder { color: #c5d4d8; }
+
+    /* ── Labels ── */
+    .field-label {
+        display: block;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: .05em;
+        margin-bottom: 4px;
+    }
+    .required-star { color: var(--rose); margin-left: 2px; }
+    .field-error { font-size: 12px; color: var(--rose); margin-top: 3px; }
+
+    /* ── Action bar ── */
+    .action-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 16px;
+        gap: 12px;
+    }
+    .action-bar-breadcrumb {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        font-weight: 600;
+    }
+    .action-bar-breadcrumb a { color: var(--teal-700); text-decoration: none; }
+    .action-bar-breadcrumb .sep { color: #bbb; }
+    .action-bar-breadcrumb .current { color: var(--text-secondary); font-weight: 500; }
+    .action-bar-buttons { display: flex; gap: 8px; }
+
+    /* ── Header card ── */
+    .patient-header-card {
+        background: #fff;
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-sm);
+        margin-bottom: 0;
+        overflow: hidden;
+    }
+
+    /* Name + photo */
+    .patient-identity-row {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        padding: 24px 28px 0;
+        gap: 24px;
+    }
+    .patient-name-block { flex: 1; min-width: 0; }
+
+    /* Photo */
+    .patient-photo-block {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+    }
+    .photo-large {
+        width: 96px;
+        height: 96px;
+        border-radius: 14px;
+        object-fit: cover;
+        border: 2px solid rgba(0,0,0,0.08);
+    }
+    .photo-placeholder {
+        width: 96px;
+        height: 96px;
+        border-radius: 14px;
+        background: #f0f4f6;
+        border: 2px dashed #c8d8e0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 32px;
+        color: #9aaab5;
+    }
+    .photo-label-btn {
+        font-size: 12px;
+        color: var(--teal-600);
+        cursor: pointer;
+        text-decoration: underline;
+        background: none;
+        border: none;
+        padding: 0;
+    }
+
+    /* Meta fields row */
+    .patient-meta-row {
+        display: grid;
+        grid-template-columns: auto 1fr 1fr 1fr;
+        gap: 24px;
+        padding: 20px 28px;
+        border-bottom: 1px solid rgba(0,0,0,0.07);
+    }
+    .code-badge {
+        display: inline-flex;
+        align-items: center;
+        background: var(--teal-50);
+        border: 1px solid var(--teal-200);
+        color: var(--teal-700);
+        padding: 7px 14px;
+        border-radius: 8px;
+        font-weight: 700;
+        font-size: 14px;
+        font-family: monospace;
+        white-space: nowrap;
+    }
+    .code-badge.auto {
+        color: #aaa;
+        border-color: #e0e0e0;
+        background: #f8f8f8;
+        font-style: italic;
+        font-weight: 400;
+        font-family: inherit;
+        font-size: 13px;
+    }
+    .age-display {
+        font-size: 14px;
+        color: var(--text-secondary);
+        padding: 7px 0;
+        font-weight: 500;
+        border-bottom: 1.5px solid transparent;
+    }
+
+    /* Extra row (urgence + nationalité) */
+    .patient-extra-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 24px;
+        padding: 16px 28px 22px;
+    }
+
+    /* ── Tabs ── */
+    .tabs-wrapper {
+        background: #fff;
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-sm);
+        margin-top: 16px;
+        overflow: hidden;
+    }
+    .tabs-nav {
+        display: flex;
+        border-bottom: 2px solid #e8edf0;
+        padding: 0 20px;
+    }
+    .tab-btn {
+        padding: 14px 20px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-muted);
+        background: none;
+        border: none;
+        border-bottom: 3px solid transparent;
+        margin-bottom: -2px;
+        cursor: pointer;
+        transition: color .15s, border-color .15s;
+        white-space: nowrap;
+    }
+    .tab-btn:hover { color: var(--teal-700); }
+    .tab-btn.active { color: var(--teal-700); border-bottom-color: var(--teal-500); }
+    .tab-panel { display: none; padding: 26px 28px; }
+    .tab-panel.active { display: block; }
+
+    /* Tab grids */
+    .tab-two-col {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 32px;
+        margin-bottom: 24px;
+    }
+    .tab-three-col {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 24px;
+    }
+    .form-field { margin-bottom: 18px; }
+    .form-field:last-child { margin-bottom: 0; }
+
+    /* Bottom actions */
+    .form-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+        padding: 18px 0 6px;
+    }
+
+    /* Alert */
+    .alert-error {
+        display: flex;
+        gap: 10px;
+        background: #fff0f0;
+        border: 1px solid #fca5a5;
+        color: #b91c1c;
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin-bottom: 16px;
+        font-size: 13px;
+    }
+
+    @media (max-width: 768px) {
+        .patient-meta-row { grid-template-columns: 1fr 1fr; }
+        .patient-extra-row { grid-template-columns: 1fr; }
+        .tab-two-col { grid-template-columns: 1fr; gap: 0; }
+        .tab-three-col { grid-template-columns: 1fr; }
+        .field-ul-name { font-size: 20px; }
+    }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+
+{% if form.non_field_errors %}
+<div class="alert-error">
+    <span>⚠</span>
+    <div>{% for e in form.non_field_errors %}<div>{{ e }}</div>{% endfor %}</div>
+</div>
+{% endif %}
+
+<form method="post" enctype="multipart/form-data" novalidate>
+{% csrf_token %}
+
+<!-- ── Action bar ── -->
+<div class="action-bar">
+    <div class="action-bar-breadcrumb">
+        <a href="{% url 'patients:list' %}">Patient</a>
+        <span class="sep">/</span>
+        <span class="current">{% if edit %}{{ patient.code_patient }}{% else %}Nouveau{% endif %}</span>
+    </div>
+    
+</div>
+
+<!-- ── Header card ── -->
+<div class="patient-header-card">
+
+    <!-- Nom + Photo -->
+    <div class="patient-identity-row">
+        <div class="patient-name-block">
+            {{ form.nom }}
+            {% if form.nom.errors %}<div class="field-error">{{ form.nom.errors.0 }}</div>{% endif %}
+            {{ form.prenoms }}
+            {% if form.prenoms.errors %}<div class="field-error">{{ form.prenoms.errors.0 }}</div>{% endif %}
+        </div>
+
+        <div class="patient-photo-block">
+            {% if edit and patient.photo %}
+                <img src="{{ patient.photo.url }}" alt="Photo" class="photo-large" id="photo-preview">
+            {% else %}
+                <div class="photo-placeholder" id="photo-placeholder">📷</div>
+                <img src="" alt="Photo" class="photo-large" id="photo-preview" style="display:none;">
+            {% endif %}
+            <label for="{{ form.photo.id_for_label }}" class="photo-label-btn">
+                {% if edit and patient.photo %}Changer la photo{% else %}Ajouter une photo{% endif %}
+            </label>
+            {{ form.photo }}
+        </div>
+    </div>
+
+    <!-- Code / Genre / Date naissance / Âge -->
+    <div class="patient-meta-row">
+        <div>
+            <span class="field-label">Code d'identification</span>
+            {% if edit %}
+                <div class="code-badge">{{ patient.code_patient }}</div>
+            {% else %}
+                <div class="code-badge auto">Automatique</div>
+            {% endif %}
+        </div>
+        <div>
+            <label class="field-label" for="{{ form.sexe.id_for_label }}">
+                Genre <span class="required-star">*</span>
+            </label>
+            {{ form.sexe }}
+            {% if form.sexe.errors %}<div class="field-error">{{ form.sexe.errors.0 }}</div>{% endif %}
+        </div>
+        <div>
+            <label class="field-label" for="{{ form.date_naissance.id_for_label }}">
+                Date de naissance <span class="required-star">*</span>
+            </label>
+            {{ form.date_naissance }}
+            {% if form.date_naissance.errors %}<div class="field-error">{{ form.date_naissance.errors.0 }}</div>{% endif %}
+        </div>
+        <div>
+            <span class="field-label">Âge</span>
+            <div class="age-display" id="age-display">—</div>
+        </div>
+    </div>
+
+    <!-- Contact d'urgence + Nationalité -->
+    <div class="patient-extra-row">
+        <div class="form-field">
+            <label class="field-label" for="{{ form.contact_urgence_nom.id_for_label }}">À contacter d'urgence</label>
+            {{ form.contact_urgence_nom }}
+        </div>
+        <div class="form-field">
+            <label class="field-label" for="{{ form.contact_urgence_telephone.id_for_label }}">Téléphone d'urgence</label>
+            {{ form.contact_urgence_telephone }}
+        </div>
+        <div class="form-field">
+            <label class="field-label" for="{{ form.nationalite.id_for_label }}">Nationalité</label>
+            {{ form.nationalite }}
+        </div>
+    </div>
+
+</div><!-- /patient-header-card -->
+
+<!-- ── Tabs ── -->
+<div class="tabs-wrapper">
+    <div class="tabs-nav">
+        <button type="button" class="tab-btn active" data-tab="general">Informations générales</button>
+        <button type="button" class="tab-btn" data-tab="medical">Médical</button>
+        <button type="button" class="tab-btn" data-tab="assurance">Assurance</button>
+    </div>
+
+    <!-- Tab : Informations générales -->
+    <div class="tab-panel active" id="tab-general">
+        <div class="tab-two-col">
+            <div>
+                <div class="form-field">
+                    <label class="field-label" for="{{ form.adresse.id_for_label }}">Adresse</label>
+                    {{ form.adresse }}
+                </div>
+                <div class="form-field">
+                    <label class="field-label" for="{{ form.ville.id_for_label }}">Ville</label>
+                    {{ form.ville }}
+                </div>
+            </div>
+            <div>
+                <div class="form-field">
+                    <label class="field-label" for="{{ form.telephone.id_for_label }}">
+                        Téléphone <span class="required-star">*</span>
+                    </label>
+                    {{ form.telephone }}
+                    {% if form.telephone.errors %}<div class="field-error">{{ form.telephone.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="form-field">
+                    <label class="field-label" for="{{ form.telephone2.id_for_label }}">Mobile</label>
+                    {{ form.telephone2 }}
+                </div>
+                <div class="form-field">
+                    <label class="field-label" for="{{ form.email.id_for_label }}">Courriel</label>
+                    {{ form.email }}
+                    {% if form.email.errors %}<div class="field-error">{{ form.email.errors.0 }}</div>{% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-three-col">
+            <div class="form-field">
+                <label class="field-label" for="{{ form.profession.id_for_label }}">Profession</label>
+                {{ form.profession }}
+            </div>
+            <div class="form-field">
+                <label class="field-label" for="{{ form.lieu_naissance.id_for_label }}">Lieu de naissance</label>
+                {{ form.lieu_naissance }}
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab : Médical -->
+    <div class="tab-panel" id="tab-medical">
+        <div class="form-field" style="max-width: 220px; margin-bottom: 24px;">
+            <label class="field-label" for="{{ form.groupe_sanguin.id_for_label }}">Groupe sanguin</label>
+            {{ form.groupe_sanguin }}
+        </div>
+        <div class="tab-two-col">
+            <div class="form-field">
+                <label class="field-label" for="{{ form.allergies.id_for_label }}">Allergies connues</label>
+                {{ form.allergies }}
+            </div>
+            <div class="form-field">
+                <label class="field-label" for="{{ form.antecedents.id_for_label }}">Antécédents médicaux</label>
+                {{ form.antecedents }}
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab : Assurance -->
+    <div class="tab-panel" id="tab-assurance">
+        <div class="tab-three-col">
+            <div class="form-field">
+                <label class="field-label" for="{{ form.assurance.id_for_label }}">Organisme d'assurance</label>
+                {{ form.assurance }}
+            </div>
+            <div class="form-field">
+                <label class="field-label" for="{{ form.numero_assurance.id_for_label }}">Numéro d'assuré</label>
+                {{ form.numero_assurance }}
+            </div>
+            <div class="form-field">
+                <label class="field-label" for="{{ form.date_expiration_assurance.id_for_label }}">Date d'expiration</label>
+                {{ form.date_expiration_assurance }}
+            </div>
+        </div>
+    </div>
+</div><!-- /tabs-wrapper -->
+
+<!-- ── Bottom actions ── -->
+<div class="form-actions">
+    {% if edit %}
+        <a href="{% url 'patients:detail' patient.pk %}" class="btn btn-secondary">Annuler</a>
+    {% else %}
+        <a href="{% url 'patients:list' %}" class="btn btn-secondary">Annuler</a>
+    {% endif %}
+    <button type="submit" class="btn btn-primary">
+        {% if edit %}Enregistrer les modifications{% else %}Créer le dossier patient{% endif %}
+    </button>
+</div>
+
+</form>
+
+<script>
+(function () {
+    /* ── Tabs ── */
+    document.querySelectorAll('.tab-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            document.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
+            document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('active'); });
+            btn.classList.add('active');
+            document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+        });
+    });
+
+    /* ── Âge calculé automatiquement ── */
+    var dateInput = document.getElementById('{{ form.date_naissance.id_for_label }}');
+    var ageDisplay = document.getElementById('age-display');
+    function updateAge() {
+        if (!dateInput || !dateInput.value) { if (ageDisplay) ageDisplay.textContent = '—'; return; }
+        var birth = new Date(dateInput.value);
+        var today = new Date();
+        var age = today.getFullYear() - birth.getFullYear();
+        var m = today.getMonth() - birth.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+        if (age < 0) { ageDisplay.textContent = '—'; return; }
+        ageDisplay.textContent = age === 0
+            ? ((today.getFullYear() - birth.getFullYear()) * 12 + today.getMonth() - birth.getMonth()) + ' mois'
+            : age + ' ans';
+    }
+    if (dateInput) { dateInput.addEventListener('change', updateAge); updateAge(); }
+
+    /* ── Aperçu photo ── */
+    var photoInput = document.getElementById('{{ form.photo.id_for_label }}');
+    if (photoInput) {
+        photoInput.style.display = 'none';
+        photoInput.addEventListener('change', function () {
+            var file = this.files[0];
+            if (!file) return;
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                var placeholder = document.getElementById('photo-placeholder');
+                var preview = document.getElementById('photo-preview');
+                if (placeholder) placeholder.style.display = 'none';
+                if (preview) { preview.src = e.target.result; preview.style.display = 'block'; }
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+})();
+</script>
+{% endblock %}

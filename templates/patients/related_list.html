@@ -1,0 +1,369 @@
+{% extends 'patients/base.html' %}
+
+{% block topbar_title %}{{ patient.nom }} {{ patient.prenoms }} — {{ titre }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .rl-header {
+        background: #fff;
+        border-radius: var(--radius) var(--radius) 0 0;
+        padding: 20px 28px 0;
+        border-bottom: 1px solid rgba(0,0,0,0.07);
+    }
+    .rl-patient-strip {
+        display: flex; align-items: center; gap: 12px;
+        padding-bottom: 16px;
+    }
+    .rl-patient-strip .ph-code {
+        display: inline-flex; align-items: center; gap: 6px;
+        background: var(--teal-50); border: 1px solid var(--teal-200);
+        color: var(--teal-700); padding: 3px 10px; border-radius: 20px;
+        font-size: 12px; font-weight: 700; font-family: monospace;
+    }
+    .rl-patient-name {
+        font-size: 17px; font-weight: 800; color: var(--teal-950);
+    }
+    .rl-tab-nav {
+        display: flex; gap: 0; overflow-x: auto;
+    }
+    .rl-tab {
+        padding: 12px 18px; font-size: 13px; font-weight: 600;
+        color: rgba(0,0,0,0.45); text-decoration: none;
+        border-bottom: 2px solid transparent;
+        white-space: nowrap; transition: all 0.15s;
+    }
+    .rl-tab:hover { color: var(--teal-800); }
+    .rl-tab.active { color: var(--teal-600); border-bottom-color: var(--teal-500); }
+
+    .rl-body {
+        background: #fff;
+        border-radius: 0 0 var(--radius) var(--radius);
+        box-shadow: var(--shadow-sm);
+        overflow: hidden;
+    }
+    .rl-toolbar {
+        padding: 16px 24px;
+        display: flex; align-items: center; justify-content: space-between;
+        border-bottom: 1px solid rgba(0,0,0,0.06);
+    }
+    .rl-count {
+        font-size: 13px; color: rgba(0,0,0,0.45);
+    }
+    .rl-count strong { color: var(--teal-700); }
+
+    /* Table */
+    .data-table { width: 100%; border-collapse: collapse; }
+    .data-table th {
+        text-align: left; padding: 10px 16px;
+        font-size: 11px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.4px; color: rgba(0,0,0,0.4);
+        background: #f8fbfd; border-bottom: 1px solid rgba(0,0,0,0.07);
+    }
+    .data-table td {
+        padding: 13px 16px; font-size: 13px; color: var(--teal-900);
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+        vertical-align: middle;
+    }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr:hover td { background: #f8fbfd; }
+
+    /* Badges statut */
+    .badge {
+        display: inline-block; padding: 3px 10px; border-radius: 20px;
+        font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px;
+    }
+    .badge-planifie  { background: #e8f4fd; color: var(--sky); }
+    .badge-confirme  { background: #e6f7ef; color: var(--green); }
+    .badge-termine   { background: #eef9fd; color: var(--teal-600); }
+    .badge-annule    { background: #fde8e8; color: var(--rose); }
+    .badge-absent    { background: #fef3e0; color: var(--amber); }
+    .badge-encours   { background: #fef3e0; color: var(--amber); }
+    .badge-emise     { background: #e8f4fd; color: var(--sky); }
+    .badge-delivree  { background: #e6f7ef; color: var(--green); }
+    .badge-partielle { background: #fef3e0; color: var(--amber); }
+    .badge-expiree   { background: #fde8e8; color: var(--rose); }
+    .badge-admis     { background: #e8f4fd; color: var(--sky); }
+    .badge-ensoins   { background: #fef3e0; color: var(--amber); }
+    .badge-sorti     { background: #eef9fd; color: var(--teal-600); }
+    .badge-transfere { background: #ede8fd; color: var(--violet); }
+    .badge-decede    { background: #fde8e8; color: var(--rose); }
+    .badge-recu      { background: #f8fbfd; color: rgba(0,0,0,0.4); }
+    .badge-enanalyse { background: #fef3e0; color: var(--amber); }
+    .badge-resultat  { background: #e8f4fd; color: var(--sky); }
+    .badge-valide    { background: #e6f7ef; color: var(--green); }
+    .badge-envoye    { background: #eef9fd; color: var(--teal-600); }
+    .badge-urgent    { background: #fde8e8; color: var(--rose); }
+
+    .empty-state {
+        text-align: center; padding: 60px 24px;
+        color: rgba(0,0,0,0.35);
+    }
+    .empty-state .es-icon { font-size: 42px; margin-bottom: 14px; }
+    .empty-state .es-msg { font-size: 15px; font-weight: 600; }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="breadcrumb">
+    <a href="/">Accueil</a>
+    <span>/</span>
+    <a href="{% url 'patients:list' %}">Patients</a>
+    <span>/</span>
+    <a href="{% url 'patients:detail' patient.pk %}">{{ patient.nom }} {{ patient.prenoms }}</a>
+    <span>/</span>
+    <span>{{ titre }}</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+
+<!-- En-tête avec navigation par onglets -->
+<div class="rl-header">
+    <div class="rl-patient-strip">
+        <span class="rl-patient-name">{{ patient.nom }} {{ patient.prenoms }}</span>
+        <span class="ph-code">{{ patient.code_patient }}</span>
+        <a href="{% url 'patients:detail' patient.pk %}" class="btn btn-secondary btn-small">← Dossier</a>
+    </div>
+    <div class="rl-tab-nav">
+        <a href="{% url 'patients:rdv_list' patient.pk %}"
+           class="rl-tab {% if view_type == 'rdv' %}active{% endif %}">Rendez-vous</a>
+        <a href="{% url 'patients:consultation_list' patient.pk %}"
+           class="rl-tab {% if view_type == 'consultation' %}active{% endif %}">Consultations</a>
+        <a href="{% url 'patients:ordonnance_list' patient.pk %}"
+           class="rl-tab {% if view_type == 'ordonnance' %}active{% endif %}">Ordonnances</a>
+        <a href="{% url 'patients:hospitalisation_list' patient.pk %}"
+           class="rl-tab {% if view_type == 'hospitalisation' %}active{% endif %}">Hospitalisations</a>
+        <a href="{% url 'patients:demande_examens_list' patient.pk %}"
+           class="rl-tab {% if view_type == 'demande_examens' %}active{% endif %}">Demandes examens</a>
+        <a href="{% url 'patients:resultat_examens_list' patient.pk %}"
+           class="rl-tab {% if view_type == 'resultat_examens' %}active{% endif %}">Résultats examens</a>
+    </div>
+</div>
+
+<!-- Corps -->
+<div class="rl-body">
+    <div class="rl-toolbar">
+        <span class="rl-count"><strong>{{ items|length }}</strong> {{ titre|lower }}</span>
+        <a href="{% url 'patients:rdv_create'%}" class="btn btn-secondary btn-small">créer un rendez-vous</a>
+    </div>
+
+    {% if items %}
+
+    {% if view_type == 'rdv' %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Date / heure</th>
+                <th>Type</th>
+                <th>Motif</th>
+                <th>Médecin</th>
+                <th>Statut</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for rdv in items %}
+            <tr>
+                <td>{{ rdv.date_heure|date:"d/m/Y à H:i" }}</td>
+                <td>{{ rdv.get_type_rdv_display }}</td>
+                <td>{{ rdv.motif|truncatechars:60 }}</td>
+                <td>{% if rdv.medecin %}{{ rdv.medecin }}{% else %}<span style="color:rgba(0,0,0,0.3)">—</span>{% endif %}</td>
+                <td>
+                    {% with s=rdv.statut %}
+                    <span class="badge badge-{{ s|lower|cut:' '|cut:'é'|cut:'è' }}
+                        {% if s == 'planifié' %}badge-planifie
+                        {% elif s == 'confirmé' %}badge-confirme
+                        {% elif s == 'terminé' %}badge-termine
+                        {% elif s == 'annulé' %}badge-annule
+                        {% elif s == 'absent' %}badge-absent
+                        {% endif %}">{{ rdv.get_statut_display }}</span>
+                    {% endwith %}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    {% elif view_type == 'consultation' %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>N°</th>
+                <th>Date / heure</th>
+                <th>Motif</th>
+                <th>Médecin</th>
+                <th>Statut</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for c in items %}
+            <tr>
+                <td><code style="font-size:12px; color:var(--teal-600);">{{ c.numero }}</code></td>
+                <td>{{ c.date_heure|date:"d/m/Y à H:i" }}</td>
+                <td>{{ c.motif|truncatechars:60 }}</td>
+                <td>{% if c.medecin %}{{ c.medecin }}{% else %}<span style="color:rgba(0,0,0,0.3)">—</span>{% endif %}</td>
+                <td>
+                    <span class="badge
+                        {% if c.statut == 'en_cours' %}badge-encours
+                        {% elif c.statut == 'terminé' %}badge-termine
+                        {% elif c.statut == 'annulé' %}badge-annule
+                        {% endif %}">{{ c.get_statut_display }}</span>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    {% elif view_type == 'ordonnance' %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>N°</th>
+                <th>Date émission</th>
+                <th>Type</th>
+                <th>Consultation</th>
+                <th>Expiration</th>
+                <th>Statut</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for o in items %}
+            <tr>
+                <td><code style="font-size:12px; color:var(--teal-600);">{{ o.numero }}</code></td>
+                <td>{{ o.date_emission|date:"d/m/Y" }}</td>
+                <td>{{ o.get_type_ordonnance_display }}</td>
+                <td><code style="font-size:12px; color:rgba(0,0,0,0.4);">{{ o.consultation.numero }}</code></td>
+                <td>{% if o.date_expiration %}{{ o.date_expiration|date:"d/m/Y" }}{% else %}<span style="color:rgba(0,0,0,0.3)">—</span>{% endif %}</td>
+                <td>
+                    <span class="badge
+                        {% if o.statut == 'émise' %}badge-emise
+                        {% elif o.statut == 'délivrée' %}badge-delivree
+                        {% elif o.statut == 'partielle' %}badge-partielle
+                        {% elif o.statut == 'expirée' %}badge-expiree
+                        {% endif %}">{{ o.get_statut_display }}</span>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    {% elif view_type == 'hospitalisation' %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>N°</th>
+                <th>Admission</th>
+                <th>Motif</th>
+                <th>Chambre</th>
+                <th>Médecin traitant</th>
+                <th>Sortie</th>
+                <th>Statut</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for h in items %}
+            <tr>
+                <td><code style="font-size:12px; color:var(--teal-600);">{{ h.numero }}</code></td>
+                <td>{{ h.date_admission|date:"d/m/Y" }}</td>
+                <td>{{ h.motif_admission|truncatechars:50 }}</td>
+                <td>{% if h.chambre %}{{ h.chambre }}{% else %}<span style="color:rgba(0,0,0,0.3)">—</span>{% endif %}</td>
+                <td>{% if h.medecin_traitant %}{{ h.medecin_traitant }}{% else %}<span style="color:rgba(0,0,0,0.3)">—</span>{% endif %}</td>
+                <td>{% if h.date_sortie_effective %}{{ h.date_sortie_effective|date:"d/m/Y" }}{% else %}<span style="color:rgba(0,0,0,0.3)">—</span>{% endif %}</td>
+                <td>
+                    <span class="badge
+                        {% if h.statut == 'admis' %}badge-admis
+                        {% elif h.statut == 'en_soins' %}badge-ensoins
+                        {% elif h.statut == 'sorti' %}badge-sorti
+                        {% elif h.statut == 'transféré' %}badge-transfere
+                        {% elif h.statut == 'décédé' %}badge-decede
+                        {% endif %}">{{ h.get_statut_display }}</span>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    {% elif view_type == 'demande_examens' %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>N°</th>
+                <th>Date prélèvement</th>
+                <th>Type d'examen</th>
+                <th>Urgent</th>
+                <th>Statut</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for a in items %}
+            <tr>
+                <td><code style="font-size:12px; color:var(--teal-600);">{{ a.numero }}</code></td>
+                <td>{{ a.date_prelevement|date:"d/m/Y à H:i" }}</td>
+                <td>{{ a.type_examen }}</td>
+                <td>
+                    {% if a.urgent %}
+                        <span class="badge badge-urgent">Urgent</span>
+                    {% else %}
+                        <span style="color:rgba(0,0,0,0.3)">—</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <span class="badge
+                        {% if a.statut == 'reçu' %}badge-recu
+                        {% elif a.statut == 'en_analyse' %}badge-enanalyse
+                        {% elif a.statut == 'résultat' %}badge-resultat
+                        {% elif a.statut == 'validé' %}badge-valide
+                        {% elif a.statut == 'envoyé' %}badge-envoye
+                        {% endif %}">{{ a.get_statut_display }}</span>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    {% elif view_type == 'resultat_examens' %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>N°</th>
+                <th>Date résultat</th>
+                <th>Type d'examen</th>
+                <th>Urgent</th>
+                <th>Statut</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for a in items %}
+            <tr>
+                <td><code style="font-size:12px; color:var(--teal-600);">{{ a.numero }}</code></td>
+                <td>{{ a.date_resultat|date:"d/m/Y à H:i"|default:"—" }}</td>
+                <td>{{ a.type_examen }}</td>
+                <td>
+                    {% if a.urgent %}
+                        <span class="badge badge-urgent">Urgent</span>
+                    {% else %}
+                        <span style="color:rgba(0,0,0,0.3)">—</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <span class="badge
+                        {% if a.statut == 'résultat' %}badge-resultat
+                        {% elif a.statut == 'validé' %}badge-valide
+                        {% elif a.statut == 'envoyé' %}badge-envoye
+                        {% endif %}">{{ a.get_statut_display }}</span>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    {% endif %}
+
+    {% else %}
+    <div class="empty-state">
+        <div class="es-icon">📋</div>
+        <div class="es-msg">Aucun enregistrement trouvé</div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}
