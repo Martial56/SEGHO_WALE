@@ -1,0 +1,536 @@
+{% extends 'medecins/base.html' %}
+
+{% block topbar_title %}{{ titre }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ── Underline inputs ── */
+    .field-ul {
+        width: 100%;
+        background: transparent;
+        border: none;
+        border-bottom: 1.5px solid #d1dde3;
+        border-radius: 0;
+        padding: 7px 2px;
+        font-size: 13px;
+        color: var(--text-primary);
+        transition: border-color .2s;
+        outline: none;
+    }
+    .field-ul:focus { border-bottom-color: var(--teal-500); }
+    .field-ul.error { border-bottom-color: var(--rose); }
+    .field-ul::placeholder { color: #bfcdd4; }
+    textarea.field-ul { resize: vertical; border-bottom-width: 1.5px; padding: 6px 2px; }
+    select.field-ul {
+        appearance: none; -webkit-appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23839aaa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 4px center;
+        padding-right: 22px;
+        cursor: pointer;
+    }
+    .field-ul-name {
+        font-size: 26px; font-weight: 700; color: var(--teal-900);
+        border-bottom-width: 2px; padding: 4px 0 6px; margin-bottom: 6px;
+    }
+    .field-ul-name::placeholder { color: #c5d4d8; font-weight: 600; }
+    .field-ul-prenom {
+        font-size: 16px; font-weight: 500; color: var(--text-secondary); padding: 3px 0 5px;
+    }
+    .field-ul-prenom::placeholder { color: #c5d4d8; }
+
+    /* ── Labels ── */
+    .field-label {
+        display: block; font-size: 11px; font-weight: 700;
+        color: var(--text-muted); text-transform: uppercase;
+        letter-spacing: .05em; margin-bottom: 4px;
+    }
+    .required-star { color: var(--rose); margin-left: 2px; }
+    .field-error { font-size: 12px; color: var(--rose); margin-top: 3px; }
+
+    /* ── Action bar ── */
+    .action-bar {
+        display: flex; align-items: center; justify-content: space-between;
+        margin-bottom: 16px; gap: 12px;
+    }
+    .action-bar-breadcrumb {
+        display: flex; align-items: center; gap: 6px;
+        font-size: 13px; font-weight: 600;
+    }
+    .action-bar-breadcrumb a { color: var(--teal-700); text-decoration: none; }
+    .action-bar-breadcrumb .sep { color: #bbb; }
+    .action-bar-breadcrumb .current { color: var(--text-secondary); font-weight: 500; }
+    .action-bar-buttons { display: flex; gap: 8px; }
+
+    /* ── Smart buttons (edit mode) ── */
+    .smart-buttons {
+        display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px;
+    }
+    .smart-btn {
+        display: inline-flex; flex-direction: column; align-items: center;
+        padding: 8px 16px; background: #fff; border: 1px solid rgba(0,0,0,0.1);
+        border-radius: 8px; box-shadow: var(--shadow-sm); cursor: pointer;
+        text-decoration: none; transition: box-shadow .15s, border-color .15s;
+        min-width: 80px;
+    }
+    .smart-btn:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.12); border-color: var(--teal-300); }
+    .smart-btn .sb-count { font-size: 18px; font-weight: 800; color: var(--teal-700); line-height: 1; }
+    .smart-btn .sb-label { font-size: 11px; color: var(--text-muted); margin-top: 2px; font-weight: 500; white-space: nowrap; }
+
+    /* ── Header card ── */
+    .medecin-header-card {
+        background: #fff; border-radius: var(--radius);
+        box-shadow: var(--shadow-sm); margin-bottom: 0; overflow: hidden;
+    }
+    .medecin-identity-row {
+        display: flex; align-items: flex-start; justify-content: space-between;
+        padding: 24px 28px 0; gap: 24px;
+    }
+    .medecin-name-block { flex: 1; min-width: 0; }
+
+    /* Photo */
+    .medecin-photo-block {
+        display: flex; flex-direction: column; align-items: center;
+        gap: 8px; flex-shrink: 0;
+    }
+    .photo-large {
+        width: 96px; height: 96px; border-radius: 14px;
+        object-fit: cover; border: 2px solid rgba(0,0,0,0.08);
+    }
+    .photo-placeholder {
+        width: 96px; height: 96px; border-radius: 14px;
+        background: #f0f4f6; border: 2px dashed #c8d8e0;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 32px; color: #9aaab5;
+    }
+    .photo-label-btn {
+        font-size: 12px; color: var(--teal-600); cursor: pointer;
+        text-decoration: underline; background: none; border: none; padding: 0;
+    }
+
+    /* Meta row (code + fonction) */
+    .medecin-meta-row {
+        display: grid; grid-template-columns: auto 1fr 1fr;
+        gap: 24px; padding: 20px 28px;
+        border-bottom: 1px solid rgba(0,0,0,0.07);
+    }
+    .code-badge {
+        display: inline-flex; align-items: center;
+        background: var(--teal-50); border: 1px solid var(--teal-200);
+        color: var(--teal-700); padding: 7px 14px; border-radius: 8px;
+        font-weight: 700; font-size: 14px; font-family: monospace; white-space: nowrap;
+    }
+    .code-badge.auto {
+        color: #aaa; border-color: #e0e0e0; background: #f8f8f8;
+        font-style: italic; font-weight: 400; font-family: inherit; font-size: 13px;
+    }
+
+    /* Grille champs principaux */
+    .medecin-main-grid {
+        display: grid; grid-template-columns: 1fr 1fr;
+        gap: 0; padding: 20px 28px 24px;
+    }
+    .medecin-left-col { padding-right: 28px; border-right: 1px solid rgba(0,0,0,0.06); }
+    .medecin-right-col { padding-left: 28px; }
+    .form-field { margin-bottom: 18px; }
+    .form-field:last-child { margin-bottom: 0; }
+
+    /* Checkbox stylé */
+    .checkbox-field {
+        display: flex; align-items: center; gap: 10px;
+        padding: 10px 0;
+    }
+    .checkbox-field input[type="checkbox"] {
+        width: 18px; height: 18px; cursor: pointer;
+        accent-color: var(--teal-500);
+    }
+    .checkbox-field label { font-size: 13px; font-weight: 500; cursor: pointer; }
+
+    /* Départements checkboxes chips */
+    .dept-chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 0; }
+    .dept-chip {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 5px 12px; border-radius: 20px; cursor: pointer;
+        font-size: 12px; font-weight: 600;
+        border: 1.5px solid #d1dde3;
+        transition: border-color .15s, background .15s;
+    }
+    .dept-chip:hover { border-color: var(--teal-400); }
+    .dept-chip input[type="checkbox"] { display: none; }
+    .dept-chip.checked {
+        background: var(--teal-50); border-color: var(--teal-500); color: var(--teal-700);
+    }
+
+    /* ── Tabs ── */
+    .tabs-wrapper {
+        background: #fff; border-radius: var(--radius);
+        box-shadow: var(--shadow-sm); margin-top: 16px; overflow: hidden;
+    }
+    .tabs-nav {
+        display: flex; border-bottom: 2px solid #e8edf0; padding: 0 20px;
+    }
+    .tab-btn {
+        padding: 14px 20px; font-size: 13px; font-weight: 600;
+        color: var(--text-muted); background: none; border: none;
+        border-bottom: 3px solid transparent; margin-bottom: -2px;
+        cursor: pointer; transition: color .15s, border-color .15s;
+    }
+    .tab-btn:hover { color: var(--teal-700); }
+    .tab-btn.active { color: var(--teal-700); border-bottom-color: var(--teal-500); }
+    .tab-panel { display: none; padding: 26px 28px; }
+    .tab-panel.active { display: block; }
+    .tab-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+
+    /* Bottom actions */
+    .form-actions {
+        display: flex; gap: 10px; justify-content: flex-end; padding: 18px 0 6px;
+    }
+
+    /* Alert */
+    .alert-error {
+        display: flex; gap: 10px; background: #fff0f0;
+        border: 1px solid #fca5a5; color: #b91c1c;
+        border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; font-size: 13px;
+    }
+
+    @media (max-width: 768px) {
+        .medecin-meta-row { grid-template-columns: 1fr 1fr; }
+        .medecin-main-grid { grid-template-columns: 1fr; }
+        .medecin-left-col { padding-right: 0; border-right: none; border-bottom: 1px solid rgba(0,0,0,0.06); padding-bottom: 20px; margin-bottom: 20px; }
+        .medecin-right-col { padding-left: 0; }
+        .tab-two-col { grid-template-columns: 1fr; gap: 0; }
+        .field-ul-name { font-size: 20px; }
+    }
+
+    /* ── Thème sombre ── */
+    html[data-theme="dark"] .medecin-header-card,
+    html[data-theme="dark"] .tabs-wrapper,
+    html[data-theme="dark"] .smart-btn { background: #0d2035; }
+    html[data-theme="dark"] .smart-btn { border-color: rgba(255,255,255,0.08); }
+    html[data-theme="dark"] .smart-btn .sb-count { color: var(--teal-300); }
+    html[data-theme="dark"] .smart-btn .sb-label { color: rgba(255,255,255,0.4); }
+    html[data-theme="dark"] .medecin-meta-row { border-bottom-color: rgba(255,255,255,0.06); }
+    html[data-theme="dark"] .medecin-left-col { border-right-color: rgba(255,255,255,0.06); }
+    html[data-theme="dark"] .tabs-nav { border-bottom-color: rgba(255,255,255,0.06); }
+    html[data-theme="dark"] .tab-btn { color: rgba(255,255,255,0.35); }
+    html[data-theme="dark"] .tab-btn:hover { color: var(--teal-300); }
+    html[data-theme="dark"] .tab-btn.active { color: var(--teal-300); border-bottom-color: var(--teal-300); }
+    html[data-theme="dark"] .field-ul { border-bottom-color: rgba(255,255,255,0.15); color: #cce8f4; }
+    html[data-theme="dark"] .field-ul:focus { border-bottom-color: var(--teal-400); }
+    html[data-theme="dark"] .field-ul::placeholder { color: rgba(255,255,255,0.2); }
+    html[data-theme="dark"] select.field-ul {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236ecae3' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    }
+    html[data-theme="dark"] .field-ul-name { color: #cce8f4; }
+    html[data-theme="dark"] .field-ul-prenom { color: rgba(255,255,255,0.55); }
+    html[data-theme="dark"] .field-label { color: rgba(255,255,255,0.4); }
+    html[data-theme="dark"] .code-badge { background: rgba(33,136,171,0.15); border-color: rgba(33,136,171,0.3); color: var(--teal-300); }
+    html[data-theme="dark"] .code-badge.auto { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.08); color: rgba(255,255,255,0.25); }
+    html[data-theme="dark"] .photo-placeholder { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.12); color: rgba(255,255,255,0.25); }
+    html[data-theme="dark"] .photo-label-btn { color: var(--teal-300); }
+    html[data-theme="dark"] .photo-large { border-color: rgba(255,255,255,0.12); }
+    html[data-theme="dark"] .dept-chip { border-color: rgba(255,255,255,0.15); color: rgba(255,255,255,0.6); }
+    html[data-theme="dark"] .dept-chip.checked { background: rgba(20,184,166,0.15); border-color: var(--teal-400); color: var(--teal-300); }
+    html[data-theme="dark"] .alert-error { background: rgba(232,69,69,0.1); border-color: rgba(232,69,69,0.25); color: #f09090; }
+    html[data-theme="dark"] .checkbox-field label { color: rgba(255,255,255,0.7); }
+    html[data-theme="dark"] .action-bar-breadcrumb a { color: var(--teal-400); }
+    html[data-theme="dark"] .action-bar-breadcrumb .sep,
+    html[data-theme="dark"] .action-bar-breadcrumb .current { color: rgba(255,255,255,0.35); }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="breadcrumb">
+    <a href="{% url 'dashboard' %}">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z"/><polyline points="9 21 9 12 15 12 15 21"/></svg>Accueil
+    </a>
+    <span class="breadcrumb-sep">›</span>
+    <a href="{% url 'medecins:list' %}">Médecins</a>
+    <span class="breadcrumb-sep">›</span>
+    <span>{% if edit %}{{ medecin.code }}{% else %}Nouveau{% endif %}</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+
+{% if form.errors %}
+<div class="alert-error">
+    <span>⚠</span>
+    <div>
+        {% if form.non_field_errors %}
+            {% for e in form.non_field_errors %}<div>{{ e }}</div>{% endfor %}
+        {% else %}
+            <div>Certains champs contiennent des erreurs. Veuillez les corriger avant d'enregistrer.</div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<form method="post" enctype="multipart/form-data" novalidate>
+{% csrf_token %}
+
+<!-- ── Action bar ── -->
+<div class="action-bar">
+    <div class="action-bar-breadcrumb">
+        <a href="{% url 'medecins:list' %}">Médecin</a>
+        <span class="sep">/</span>
+        <span class="current">{% if edit %}{{ medecin.code }}{% else %}Nouveau{% endif %}</span>
+    </div>
+    <div class="action-bar-buttons">
+        {% if edit %}
+            <a href="{% url 'medecins:detail' medecin.pk %}" class="btn btn-secondary">Ignorer</a>
+        {% else %}
+            <a href="{% url 'medecins:list' %}" class="btn btn-secondary">Ignorer</a>
+        {% endif %}
+        <button type="submit" class="btn btn-primary">
+            {% if edit %}Sauvegarder{% else %}Créer le médecin{% endif %}
+        </button>
+    </div>
+</div>
+
+<!-- ── Smart buttons (mode édition seulement) ── -->
+{% if edit %}
+<div class="smart-buttons">
+    <a href="#" class="smart-btn">
+        <span class="sb-count">{{ rdv_count }}</span>
+        <span class="sb-label">Rendez-vous</span>
+    </a>
+    <a href="#" class="smart-btn">
+        <span class="sb-count">{{ ordonnance_count }}</span>
+        <span class="sb-label">Ordonnances</span>
+    </a>
+    <a href="#" class="smart-btn">
+        <span class="sb-count">{{ hospitalisation_count }}</span>
+        <span class="sb-label">Hospitalisations</span>
+    </a>
+    <a href="#" class="smart-btn">
+        <span class="sb-count">{{ demande_lab_count }}</span>
+        <span class="sb-label">Demandes de lab</span>
+    </a>
+    <a href="#" class="smart-btn">
+        <span class="sb-count">{{ resultat_lab_count }}</span>
+        <span class="sb-label">Résultats de lab</span>
+    </a>
+</div>
+{% endif %}
+
+<!-- ── Header card ── -->
+<div class="medecin-header-card">
+
+    <!-- Nom + Photo -->
+    <div class="medecin-identity-row">
+        <div class="medecin-name-block">
+            <label class="field-label" for="{{ form.nom.id_for_label }}" style="margin-bottom:2px;">Nom <span class="required-star">*</span></label>
+            {{ form.nom }}
+            {% if form.nom.errors %}<div class="field-error">{{ form.nom.errors.0 }}</div>{% endif %}
+            {{ form.prenoms }}
+            {% if form.prenoms.errors %}<div class="field-error">{{ form.prenoms.errors.0 }}</div>{% endif %}
+        </div>
+        <div class="medecin-photo-block">
+            {% if edit and medecin.photo %}
+                <img src="{{ medecin.photo.url }}" alt="Photo" class="photo-large" id="photo-preview">
+            {% else %}
+                <div class="photo-placeholder" id="photo-placeholder">📷</div>
+                <img src="" alt="" class="photo-large" id="photo-preview" style="display:none;">
+            {% endif %}
+            <label for="{{ form.photo.id_for_label }}" class="photo-label-btn">
+                {% if edit and medecin.photo %}Changer la photo{% else %}Ajouter une photo{% endif %}
+            </label>
+            {{ form.photo }}
+        </div>
+    </div>
+
+    <!-- Code + Fonction + Diplôme -->
+    <div class="medecin-meta-row">
+        <div>
+            <span class="field-label">ID du médecin</span>
+            {% if edit %}
+                <div class="code-badge">{{ medecin.code }}</div>
+            {% else %}
+                <div class="code-badge auto">Automatique</div>
+            {% endif %}
+        </div>
+        <div class="form-field" style="margin-bottom:0;">
+            <label class="field-label" for="{{ form.fonction.id_for_label }}">Fonction / Titre</label>
+            {{ form.fonction }}
+            {% if form.fonction.errors %}<div class="field-error">{{ form.fonction.errors.0 }}</div>{% endif %}
+        </div>
+        <div class="form-field" style="margin-bottom:0;">
+            <label class="field-label" for="{{ form.diplome.id_for_label }}">Éducation</label>
+            {{ form.diplome }}
+        </div>
+    </div>
+
+    <!-- Grille principale -->
+    <div class="medecin-main-grid">
+
+        <!-- Colonne gauche -->
+        <div class="medecin-left-col">
+            <div class="form-field">
+                <label class="field-label" for="{{ form.specialite.id_for_label }}">Spécialité</label>
+                {{ form.specialite }}
+            </div>
+            <div class="form-field">
+                <label class="field-label" for="{{ form.ordre_medecin.id_for_label }}">Numéro d'ordre</label>
+                {{ form.ordre_medecin }}
+            </div>
+            <div class="form-field">
+                <label class="field-label" for="{{ form.service_consultation.id_for_label }}">Service de consultation</label>
+                {{ form.service_consultation }}
+            </div>
+            <div class="form-field">
+                <label class="field-label" for="{{ form.service_suivi.id_for_label }}">Service de suivi</label>
+                {{ form.service_suivi }}
+            </div>
+            <div class="form-field">
+                <label class="field-label" for="{{ form.duree_consultation.id_for_label }}">Durée de consultation par défaut (min) <span class="required-star">*</span></label>
+                {{ form.duree_consultation }}
+            </div>
+            <div class="checkbox-field">
+                {{ form.chirurgien_principal }}
+                <label for="{{ form.chirurgien_principal.id_for_label }}">Chirurgien principal</label>
+            </div>
+        </div>
+
+        <!-- Colonne droite -->
+        <div class="medecin-right-col">
+            <div class="form-field">
+                <label class="field-label">Départements</label>
+                <div class="dept-chips" id="dept-chips">
+                    {% for choice in form.departements %}
+                    <label class="dept-chip{% if choice.data.selected %} checked{% endif %}" id="chip-{{ choice.data.value }}">
+                        {{ choice.tag }}
+                        {{ choice.choice_label }}
+                    </label>
+                    {% empty %}
+                    <span style="font-size:13px;color:var(--text-muted);font-style:italic;">Aucun département configuré</span>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="checkbox-field" style="padding:8px 0;">
+                {{ form.employe_societe }}
+                <label for="{{ form.employe_societe.id_for_label }}">Employé de la société</label>
+            </div>
+            <div class="form-field">
+                <label class="field-label" for="{{ form.actif.id_for_label }}">Statut</label>
+                <div class="checkbox-field" style="padding:0;">
+                    {{ form.actif }}
+                    <label for="{{ form.actif.id_for_label }}">Médecin actif</label>
+                </div>
+            </div>
+        </div>
+    </div>
+</div><!-- /medecin-header-card -->
+
+<!-- ── Tabs ── -->
+<div class="tabs-wrapper">
+    <div class="tabs-nav">
+        <button type="button" class="tab-btn active" data-tab="contact">Informations générales</button>
+        <button type="button" class="tab-btn" data-tab="compte">Infos personnelles</button>
+    </div>
+
+    <!-- Tab : Informations générales -->
+    <div class="tab-panel active" id="tab-contact">
+        <div class="tab-two-col">
+            <div>
+                <div class="form-field">
+                    <label class="field-label" for="{{ form.adresse.id_for_label }}">Adresse</label>
+                    {{ form.adresse }}
+                </div>
+            </div>
+            <div>
+                <div class="form-field">
+                    <label class="field-label" for="{{ form.telephone.id_for_label }}">Téléphone</label>
+                    {{ form.telephone }}
+                </div>
+                <div class="form-field">
+                    <label class="field-label" for="{{ form.mobile.id_for_label }}">Mobile</label>
+                    {{ form.mobile }}
+                </div>
+                <div class="form-field">
+                    <label class="field-label" for="{{ form.email.id_for_label }}">Courriel</label>
+                    {{ form.email }}
+                    {% if form.email.errors %}<div class="field-error">{{ form.email.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="form-field">
+                    <label class="field-label" for="{{ form.tva_numero_fiscal.id_for_label }}">TVA / Numéro fiscal</label>
+                    {{ form.tva_numero_fiscal }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab : Infos personnelles -->
+    <div class="tab-panel" id="tab-compte">
+        <div class="form-field" style="max-width:400px;">
+            <label class="field-label" for="{{ form.signature.id_for_label }}">Signature</label>
+            {% if form.instance.pk and form.instance.signature %}
+                <div style="margin-bottom:10px;">
+                    <img src="{{ form.instance.signature.url }}" alt="Signature"
+                         style="max-height:80px;border:1px solid rgba(0,0,0,.1);border-radius:6px;padding:4px;">
+                </div>
+            {% endif %}
+            {{ form.signature }}
+        </div>
+    </div>
+</div><!-- /tabs-wrapper -->
+
+<!-- ── Bottom actions ── -->
+<!-- <div class="form-actions">
+    {% if edit %}
+        <a href="{% url 'medecins:detail' medecin.pk %}" class="btn btn-secondary">Annuler</a>
+    {% else %}
+        <a href="{% url 'medecins:list' %}" class="btn btn-secondary">Annuler</a>
+    {% endif %}
+    <button type="submit" class="btn btn-primary">
+        {% if edit %}Enregistrer les modifications{% else %}Créer le médecin{% endif %}
+    </button>
+</div> -->
+
+</form>
+
+<script>
+(function () {
+    /* ── Tabs ── */
+    document.querySelectorAll('.tab-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            document.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
+            document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('active'); });
+            btn.classList.add('active');
+            document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+        });
+    });
+
+    /* ── Chips départements ── */
+    document.querySelectorAll('.dept-chip').forEach(function (chip) {
+        var cb = chip.querySelector('input[type="checkbox"]');
+        function sync() {
+            chip.classList.toggle('checked', cb.checked);
+        }
+        sync();
+        chip.addEventListener('click', function () {
+            cb.checked = !cb.checked;
+            sync();
+        });
+    });
+
+    /* ── Aperçu photo ── */
+    var photoInput = document.getElementById('{{ form.photo.id_for_label }}');
+    if (photoInput) {
+        photoInput.style.display = 'none';
+        photoInput.addEventListener('change', function () {
+            var file = this.files[0];
+            if (!file) return;
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                var ph = document.getElementById('photo-placeholder');
+                var pv = document.getElementById('photo-preview');
+                if (ph) ph.style.display = 'none';
+                if (pv) { pv.src = e.target.result; pv.style.display = 'block'; }
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+})();
+</script>
+{% endblock %}

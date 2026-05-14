@@ -39,6 +39,11 @@ class Patient(models.Model):
     date_expiration_assurance = models.DateField(null=True, blank=True)
     contact_urgence_nom = models.CharField(max_length=200, blank=True)
     contact_urgence_telephone = models.CharField(max_length=20, blank=True)
+    medecin_referent = models.ForeignKey(
+        'medecins.DocteurReferent', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='patients',
+        verbose_name='Médecin référent'
+    )
     date_creation = models.DateTimeField(auto_now_add=True)
     date_modification = models.DateTimeField(auto_now=True)
     actif = models.BooleanField(default=True)

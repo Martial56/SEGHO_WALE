@@ -3,6 +3,134 @@
 
 {% block topbar_title %}Médecins{% endblock %}
 
-{% block breadcrumb %}
-    {% include 'includes/breadcrumb.html' %}
+{% block module_navbar %}
+<style>
+.module-nav {
+    background: var(--teal-700);
+    display: flex;
+    align-items: center;
+    padding: 0 32px;
+    height: 44px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.18);
+    position: relative;
+    z-index: 200;
+}
+.module-nav-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #fff;
+    font-weight: 700;
+    font-size: 14px;
+    padding-right: 20px;
+    border-right: 1px solid rgba(255,255,255,0.2);
+    margin-right: 4px;
+    flex-shrink: 0;
+}
+.module-nav-links {
+    display: flex;
+    align-items: center;
+    height: 100%;
+}
+.module-nav-link {
+    color: rgba(255,255,255,0.82);
+    text-decoration: none;
+    padding: 0 16px;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    font-size: 13px;
+    font-weight: 500;
+    border: none;
+    background: none;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
+    font-family: 'Sora', sans-serif;
+    gap: 5px;
+}
+.module-nav-link:hover { background: rgba(255,255,255,0.12); color: #fff; }
+.module-nav-link.active { background: rgba(0,0,0,0.25); color: #fff; font-weight: 600; }
+.module-nav-dropdown { position: relative; height: 100%; display: flex; align-items: center; }
+.module-nav-dropdown-menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + 2px);
+    left: 0;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.14);
+    min-width: 190px;
+    z-index: 9999;
+    overflow: hidden;
+    border: 1px solid rgba(0,0,0,0.08);
+}
+.module-nav-dropdown-menu.open { display: block; }
+.module-nav-dropdown-menu a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 16px;
+    font-size: 13px;
+    color: var(--teal-900);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+    transition: background 0.12s;
+    font-family: 'Sora', sans-serif;
+}
+.module-nav-dropdown-menu a:last-child { border-bottom: none; }
+.module-nav-dropdown-menu a:hover { background: var(--teal-50); color: var(--teal-700); }
+.module-nav-dropdown-menu a .menu-icon { font-size: 15px; }
+html[data-theme="dark"] .module-nav { background: #0a1e2e; border-bottom: 1px solid rgba(255,255,255,0.06); }
+html[data-theme="dark"] .module-nav-brand { border-right-color: rgba(255,255,255,0.1); }
+html[data-theme="dark"] .module-nav-dropdown-menu { background: #0d2035; border-color: rgba(255,255,255,0.08); }
+html[data-theme="dark"] .module-nav-dropdown-menu a { color: #cce8f4; border-bottom-color: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .module-nav-dropdown-menu a:hover { background: rgba(33,136,171,0.1); color: var(--teal-200); }
+</style>
+<nav class="module-nav">
+    <div class="module-nav-brand">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M12 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/>
+            <path d="M12 8v5"/>
+            <path d="M9 13H6a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2h-3"/>
+            <circle cx="12" cy="19" r="1"/>
+        </svg>
+        Docteur
+    </div>
+    <div class="module-nav-links">
+        <a href="{% url 'medecins:list' %}" class="module-nav-link {% if active_menu == 'docteurs' or not active_menu %}active{% endif %}">Docteur</a>
+        <a href="{% url 'medecins:referent_list' %}" class="module-nav-link {% if active_menu == 'referents' %}active{% endif %}">Docteurs référent</a>
+        <div class="module-nav-dropdown">
+            <button class="module-nav-link module-nav-dropdown-toggle {% if active_menu == 'config' %}active{% endif %}"
+                    type="button" onclick="toggleModuleDropdown(event, this)">
+                Configuration
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="module-nav-dropdown-menu" id="module-config-dropdown">
+                <a href="{% url 'medecins:specialites' %}"><span class="menu-icon">🏷️</span> Spécialités</a>
+                <a href="{% url 'medecins:departements' %}"><span class="menu-icon">🏢</span> Départements</a>
+                <a href="{% url 'medecins:diplomes' %}"><span class="menu-icon">🎓</span> Diplômes</a>
+            </div>
+        </div>
+    </div>
+</nav>
+<script>
+function toggleModuleDropdown(e, btn) {
+    e.stopPropagation();
+    var menu = document.getElementById('module-config-dropdown');
+    var isOpen = menu.classList.contains('open');
+    menu.classList.toggle('open');
+    if (!isOpen) {
+        function closeOnOutside(ev) {
+            if (!btn.closest('.module-nav-dropdown').contains(ev.target)) {
+                menu.classList.remove('open');
+                document.removeEventListener('click', closeOnOutside);
+            }
+        }
+        setTimeout(function() { document.addEventListener('click', closeOnOutside); }, 0);
+    }
+}
+</script>
 {% endblock %}
+
+{% block breadcrumb %}{% endblock %}

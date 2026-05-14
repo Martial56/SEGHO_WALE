@@ -6,9 +6,7 @@ urlpatterns = [
     path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),
 
-    # URLs des modules
-    path('patients/', include('patients.urls')),
-    path('medecins/', views.medecins_list, name='medecins_list'),
+    # URLs des modules (patients et medecins sont gérés dans medisoft/urls.py)
     path('consultations/', views.consultations_list, name='consultations_list'),
     path('pharmacie/', views.pharmacie_list, name='pharmacie_list'),
     path('laboratoire/', views.laboratoire_list, name='laboratoire_list'),

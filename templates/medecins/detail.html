@@ -4,408 +4,424 @@
 
 {% block extra_css %}
 <style>
-    .profil-header {
-        background: linear-gradient(135deg, var(--teal-800) 0%, var(--teal-500) 100%);
-        border-radius: var(--radius);
-        padding: 32px;
-        display: flex;
-        align-items: center;
-        gap: 28px;
-        margin-bottom: 28px;
-        color: #fff;
+    /* ── Action bar ── */
+    .action-bar {
+        display: flex; align-items: center; justify-content: space-between;
+        margin-bottom: 16px; gap: 12px;
     }
-    .profil-avatar {
-        width: 100px;
-        height: 100px;
-        border-radius: 50%;
-        object-fit: cover;
-        border: 4px solid rgba(255,255,255,0.3);
-        flex-shrink: 0;
+    .action-bar-left { display: flex; align-items: center; gap: 10px; }
+    .nav-arrow {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 32px; height: 32px; border-radius: 8px; border: 1px solid rgba(0,0,0,0.1);
+        background: #fff; color: var(--text-primary); text-decoration: none;
+        font-size: 16px; box-shadow: var(--shadow-sm); transition: opacity .15s;
     }
-    .profil-avatar-placeholder {
-        width: 100px;
-        height: 100px;
-        border-radius: 50%;
-        background: rgba(255,255,255,0.2);
-        border: 4px solid rgba(255,255,255,0.3);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 48px;
-        flex-shrink: 0;
-    }
-    .profil-code {
-        background: rgba(255,255,255,0.2);
-        font-size: 12px;
-        font-weight: 700;
-        padding: 3px 10px;
-        border-radius: 8px;
-        letter-spacing: 0.5px;
-        display: inline-block;
-        margin-bottom: 8px;
-    }
-    .profil-name {
-        font-size: 26px;
-        font-weight: 800;
-        line-height: 1.2;
-        margin-bottom: 4px;
-    }
-    .profil-fonction {
-        font-size: 14px;
-        color: rgba(255,255,255,0.75);
-        margin-bottom: 12px;
-    }
-    .profil-badges {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-    }
-    .profil-badge {
-        background: rgba(255,255,255,0.18);
-        border: 1px solid rgba(255,255,255,0.25);
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 12px;
-        font-weight: 600;
-    }
-    .profil-actions {
-        margin-left: auto;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        flex-shrink: 0;
-    }
-    .profil-actions .btn {
-        min-width: 140px;
-        justify-content: center;
-    }
+    .nav-arrow:hover { opacity: .75; }
+    .nav-arrow.disabled { opacity: .3; pointer-events: none; }
+    .nav-position { font-size: 12px; color: var(--text-muted); font-weight: 600; }
 
-    /* Compteurs stats */
-    .stats-row {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 16px;
-        margin-bottom: 28px;
+    /* ── Smart buttons ── */
+    .smart-buttons { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+    .smart-btn {
+        display: inline-flex; flex-direction: column; align-items: center;
+        padding: 8px 16px; background: #fff; border: 1px solid rgba(0,0,0,0.1);
+        border-radius: 8px; box-shadow: var(--shadow-sm); cursor: pointer;
+        text-decoration: none; transition: box-shadow .15s, border-color .15s; min-width: 80px;
     }
-    @media (max-width: 1100px) {
-        .stats-row { grid-template-columns: repeat(4, 1fr); }
-    }
-    .stat-box {
-        background: #fff;
-        border-radius: var(--radius);
-        padding: 20px 24px;
-        box-shadow: var(--shadow-sm);
-        text-align: center;
-        border-top: 3px solid transparent;
-    }
-    .stat-box.rdv        { border-color: var(--sky); }
-    .stat-box.consult    { border-color: var(--green); }
-    .stat-box.ordo       { border-color: var(--violet); }
-    .stat-box.hospit     { border-color: var(--amber); }
-    .stat-box.traitement { border-color: #0891b2; }
-    .stat-box.chirurgie  { border-color: #dc2626; }
-    .stat-box.demandelab { border-color: #7c3aed; }
-    .stat-box.resultatlab{ border-color: #059669; }
-    .stat-box .stat-number {
-        font-size: 32px;
-        font-weight: 800;
-        margin-bottom: 4px;
-    }
-    .stat-box.rdv        .stat-number { color: var(--sky); }
-    .stat-box.consult    .stat-number { color: var(--green); }
-    .stat-box.ordo       .stat-number { color: var(--violet); }
-    .stat-box.hospit     .stat-number { color: var(--amber); }
-    .stat-box.traitement .stat-number { color: #0891b2; }
-    .stat-box.chirurgie  .stat-number { color: #dc2626; }
-    .stat-box.demandelab .stat-number { color: #7c3aed; }
-    .stat-box.resultatlab .stat-number{ color: #059669; }
-    .stat-box .stat-label {
-        font-size: 12px;
-        color: rgba(0,0,0,0.5);
-        text-transform: uppercase;
-        letter-spacing: 0.3px;
-        font-weight: 600;
-    }
+    .smart-btn:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.12); border-color: var(--teal-300); }
+    .smart-btn .sb-count { font-size: 18px; font-weight: 800; color: var(--teal-700); line-height: 1; }
+    .smart-btn .sb-label { font-size: 11px; color: var(--text-muted); margin-top: 2px; font-weight: 500; white-space: nowrap; }
 
-    /* Sections info */
-    .info-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 20px;
-        margin-bottom: 20px;
-    }
-    .info-section {
+    /* ── Header card ── */
+    .medecin-header-card {
         background: #fff;
         border-radius: var(--radius);
         box-shadow: var(--shadow-sm);
+        margin-bottom: 0;
         overflow: hidden;
     }
-    .info-section-title {
-        background: rgba(0,0,0,0.03);
-        border-bottom: 1px solid rgba(0,0,0,0.06);
-        padding: 14px 20px;
-        font-size: 13px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.4px;
-        color: var(--teal-700);
+
+    /* Identity row : photo + nom */
+    .medecin-identity-row {
+        display: flex; align-items: flex-start; justify-content: space-between;
+        padding: 24px 28px 0; gap: 24px;
     }
-    .info-section-body {
-        padding: 20px;
-        display: flex;
-        flex-direction: column;
-        gap: 14px;
+    .medecin-name-block { flex: 1; min-width: 0; }
+    .medecin-name {
+        font-size: 26px; font-weight: 800; color: var(--teal-900);
+        line-height: 1.2; margin-bottom: 6px;
     }
-    .info-row {
-        display: flex;
-        gap: 12px;
+    .medecin-fonction { font-size: 15px; color: var(--text-secondary); font-weight: 500; }
+
+    /* Photo */
+    .medecin-photo-block {
+        display: flex; flex-direction: column; align-items: center; gap: 8px; flex-shrink: 0;
     }
-    .info-row .info-label {
-        font-size: 12px;
-        font-weight: 600;
-        color: rgba(0,0,0,0.45);
-        text-transform: uppercase;
-        letter-spacing: 0.3px;
-        min-width: 140px;
-        flex-shrink: 0;
-        padding-top: 2px;
+    .medecin-photo {
+        width: 96px; height: 96px; border-radius: 14px;
+        object-fit: cover; border: 2px solid rgba(0,0,0,0.08);
     }
-    .info-row .info-value {
-        font-size: 14px;
-        color: var(--teal-900);
-        font-weight: 500;
-    }
-    .info-row .info-value .tag {
-        display: inline-block;
-        background: var(--teal-50);
-        color: var(--teal-700);
-        border: 1px solid var(--teal-200);
-        font-size: 12px;
-        font-weight: 600;
-        padding: 2px 10px;
-        border-radius: 6px;
-        margin: 2px;
-    }
-    .info-empty {
-        color: rgba(0,0,0,0.3);
-        font-style: italic;
-        font-size: 13px;
+    .medecin-photo-placeholder {
+        width: 96px; height: 96px; border-radius: 14px;
+        background: #f0f4f6; border: 2px dashed #c8d8e0;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 36px; color: #9aaab5;
     }
 
-    /* Diplômes */
-    .diplomes-section {
-        background: #fff;
-        border-radius: var(--radius);
-        box-shadow: var(--shadow-sm);
-        overflow: hidden;
-        margin-bottom: 20px;
+    /* Meta row */
+    .medecin-meta-row {
+        display: grid; grid-template-columns: auto 1fr 1fr 1fr;
+        gap: 24px; padding: 20px 28px;
+        border-bottom: 1px solid rgba(0,0,0,0.07);
     }
-    .diplome-item {
-        display: flex;
-        align-items: flex-start;
-        gap: 14px;
-        padding: 16px 20px;
-        border-bottom: 1px solid rgba(0,0,0,0.05);
+    .code-badge {
+        display: inline-flex; align-items: center;
+        background: var(--teal-50); border: 1px solid var(--teal-200);
+        color: var(--teal-700); padding: 7px 14px; border-radius: 8px;
+        font-weight: 700; font-size: 14px; font-family: monospace; white-space: nowrap;
     }
-    .diplome-item:last-child { border-bottom: none; }
-    .diplome-icon {
-        width: 40px;
-        height: 40px;
-        background: rgba(123,87,194,0.1);
-        border-radius: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 20px;
-        flex-shrink: 0;
+    .status-badge {
+        display: inline-flex; align-items: center; gap: 5px;
+        padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;
     }
-    .diplome-titre { font-size: 14px; font-weight: 700; color: var(--teal-900); }
-    .diplome-meta  { font-size: 12px; color: rgba(0,0,0,0.45); margin-top: 2px; }
+    .status-badge.actif { background: #dcfce7; color: #166534; }
+    .status-badge.inactif { background: #fee2e2; color: #991b1b; }
+
+    /* Field label (read-only display) */
+    .field-label {
+        display: block; font-size: 11px; font-weight: 700; color: var(--text-muted);
+        text-transform: uppercase; letter-spacing: .05em; margin-bottom: 4px;
+    }
+    .field-value {
+        font-size: 13px; color: var(--text-primary); font-weight: 500;
+        padding: 7px 2px; border-bottom: 1.5px solid #d1dde3; min-height: 34px;
+    }
+    .field-value.empty { color: rgba(0,0,0,0.3); font-style: italic; }
+
+    /* ── Tabs ── */
+    .tabs-wrapper {
+        background: #fff; border-radius: var(--radius);
+        box-shadow: var(--shadow-sm); margin-top: 16px; overflow: hidden;
+    }
+    .tabs-nav {
+        display: flex; border-bottom: 2px solid #e8edf0; padding: 0 20px;
+    }
+    .tab-btn {
+        padding: 14px 20px; font-size: 13px; font-weight: 600; color: var(--text-muted);
+        background: none; border: none; border-bottom: 3px solid transparent;
+        margin-bottom: -2px; cursor: pointer; transition: color .15s, border-color .15s;
+        white-space: nowrap; font-family: 'Sora', sans-serif;
+    }
+    .tab-btn:hover { color: var(--teal-700); }
+    .tab-btn.active { color: var(--teal-700); border-bottom-color: var(--teal-500); }
+    .tab-panel { display: none; padding: 26px 28px; }
+    .tab-panel.active { display: block; }
+
+    /* Tab grids */
+    .tab-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-bottom: 24px; }
+    .tab-three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; }
+    .form-field { margin-bottom: 18px; }
+    .form-field:last-child { margin-bottom: 0; }
+
+    /* Tags */
+    .tag {
+        display: inline-block; background: var(--teal-50); color: var(--teal-700);
+        border: 1px solid var(--teal-200); font-size: 11px; font-weight: 600;
+        padding: 2px 8px; border-radius: 6px; margin: 2px;
+    }
+
+    /* ── Edit button zone ── */
+    .medecin-edit-zone {
+        padding: 16px 28px 20px;
+        display: flex; justify-content: flex-end; gap: 8px;
+    }
 
     @media (max-width: 900px) {
-        .stats-row   { grid-template-columns: repeat(2, 1fr); }
-        .info-grid   { grid-template-columns: 1fr; }
-        .profil-header { flex-direction: column; text-align: center; }
-        .profil-actions { margin-left: 0; width: 100%; flex-direction: row; justify-content: center; }
+        .medecin-meta-row { grid-template-columns: 1fr 1fr; }
+        .tab-two-col { grid-template-columns: 1fr; gap: 0; }
+        .tab-three-col { grid-template-columns: 1fr; }
+        .medecin-name { font-size: 20px; }
     }
+
+    /* ── Thème sombre ── */
+    html[data-theme="dark"] .nav-arrow { background: #0d2035; border-color: rgba(255,255,255,0.08); }
+    html[data-theme="dark"] .smart-btn { background: #0d2035; border-color: rgba(255,255,255,0.08); }
+    html[data-theme="dark"] .smart-btn .sb-count { color: var(--teal-300); }
+    html[data-theme="dark"] .smart-btn .sb-label { color: rgba(255,255,255,0.4); }
+    html[data-theme="dark"] .medecin-header-card,
+    html[data-theme="dark"] .tabs-wrapper { background: #0d2035; }
+    html[data-theme="dark"] .medecin-meta-row { border-bottom-color: rgba(255,255,255,0.06); }
+    html[data-theme="dark"] .medecin-name { color: #cce8f4; }
+    html[data-theme="dark"] .medecin-fonction { color: rgba(255,255,255,0.55); }
+    html[data-theme="dark"] .code-badge { background: rgba(33,136,171,0.15); border-color: rgba(33,136,171,0.3); color: var(--teal-300); }
+    html[data-theme="dark"] .field-label { color: rgba(255,255,255,0.4); }
+    html[data-theme="dark"] .field-value { color: #cce8f4; border-bottom-color: rgba(255,255,255,0.12); }
+    html[data-theme="dark"] .field-value.empty { color: rgba(255,255,255,0.25); }
+    html[data-theme="dark"] .tabs-nav { border-bottom-color: rgba(255,255,255,0.06); }
+    html[data-theme="dark"] .tab-btn { color: rgba(255,255,255,0.35); }
+    html[data-theme="dark"] .tab-btn:hover { color: var(--teal-300); }
+    html[data-theme="dark"] .tab-btn.active { color: var(--teal-300); border-bottom-color: var(--teal-300); }
+    html[data-theme="dark"] .tag { background: rgba(20,184,166,0.12); border-color: rgba(20,184,166,0.25); color: var(--teal-300); }
+    html[data-theme="dark"] .medecin-photo-placeholder { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.12); color: rgba(255,255,255,0.25); }
 </style>
 {% endblock %}
 
+{% block breadcrumb %}
+<nav class="breadcrumb">
+    <a href="{% url 'dashboard' %}">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z"/><polyline points="9 21 9 12 15 12 15 21"/></svg>Accueil
+    </a>
+    <span class="breadcrumb-sep">›</span>
+    <a href="{% url 'medecins:list' %}">Médecins</a>
+    <span class="breadcrumb-sep">›</span>
+    <span>{{ medecin.code|default:medecin.nom }}</span>
+</nav>
+{% endblock %}
+
 {% block content %}
-<!-- {% include 'includes/breadcrumb.html' %} -->
 
-<!-- En-tête profil -->
-<div class="profil-header">
-    {% if medecin.photo %}
-        <img src="{{ medecin.photo.url }}" alt="Photo" class="profil-avatar">
-    {% else %}
-        <div class="profil-avatar-placeholder">👤</div>
-    {% endif %}
-    <div>
-        <span class="profil-code">{{ medecin.code }}</span>
-        <div class="profil-name">Dr {{ medecin.nom }} {{ medecin.prenoms }}</div>
-        {% if medecin.fonction %}
-        <div class="profil-fonction">{{ medecin.fonction }}</div>
+<!-- Action bar -->
+<div class="action-bar">
+    <div class="action-bar-left">
+        <a href="{% url 'medecins:list' %}" class="nav-arrow" title="Retour à la liste">←</a>
+        {% if prev_pk %}
+            <a href="{% url 'medecins:detail' prev_pk %}" class="nav-arrow" title="Précédent">‹</a>
+        {% else %}
+            <span class="nav-arrow disabled">‹</span>
         {% endif %}
-        <div class="profil-badges">
-            {% if medecin.specialite %}
-            <span class="profil-badge">🩺 {{ medecin.specialite.nom }}</span>
+        {% if next_pk %}
+            <a href="{% url 'medecins:detail' next_pk %}" class="nav-arrow" title="Suivant">›</a>
+        {% else %}
+            <span class="nav-arrow disabled">›</span>
+        {% endif %}
+        <span class="nav-position">{{ position }} / {{ total }}</span>
+    </div>
+    <a href="{% url 'medecins:edit' medecin.pk %}" class="btn btn-primary">✏️ Modifier</a>
+</div>
+
+<!-- Smart buttons -->
+<div class="smart-buttons">
+    <a href="#" class="smart-btn">
+        <span class="sb-count">{{ rdv_count }}</span>
+        <span class="sb-label">Rendez-vous</span>
+    </a>
+    <a href="#" class="smart-btn">
+        <span class="sb-count">{{ ordonnance_count }}</span>
+        <span class="sb-label">Ordonnances</span>
+    </a>
+    <a href="#" class="smart-btn">
+        <span class="sb-count">{{ hospitalisation_count }}</span>
+        <span class="sb-label">Hospitalisations</span>
+    </a>
+    <a href="#" class="smart-btn">
+        <span class="sb-count">{{ demande_lab_count }}</span>
+        <span class="sb-label">Demandes labo</span>
+    </a>
+    <a href="#" class="smart-btn">
+        <span class="sb-count">{{ resultat_lab_count }}</span>
+        <span class="sb-label">Résultats labo</span>
+    </a>
+</div>
+
+<!-- Header card -->
+<div class="medecin-header-card">
+
+    <!-- Photo + Nom -->
+    <div class="medecin-identity-row">
+        <div class="medecin-name-block">
+            <div class="medecin-name">Dr {{ medecin.nom }} {{ medecin.prenoms }}</div>
+            {% if medecin.fonction %}
+                <div class="medecin-fonction">{{ medecin.fonction }}</div>
             {% endif %}
-            {% if medecin.chirurgien_principal %}
-            <span class="profil-badge">✂️ Chirurgien principal</span>
-            {% endif %}
-            {% if medecin.actif %}
-            <span class="profil-badge" style="background:rgba(22,169,107,0.3);">● Actif</span>
+        </div>
+        <div class="medecin-photo-block">
+            {% if medecin.photo %}
+                <img src="{{ medecin.photo.url }}" alt="Photo" class="medecin-photo">
             {% else %}
-            <span class="profil-badge" style="background:rgba(232,69,69,0.3);">● Archivé</span>
+                <div class="medecin-photo-placeholder">👤</div>
             {% endif %}
         </div>
     </div>
-    <div class="profil-actions">
-        <a href="/admin/medecins/medecin/{{ medecin.pk }}/change/" class="btn btn-primary">✏️ Modifier</a>
-        <a href="/medecins/" class="btn btn-secondary" style="background:rgba(255,255,255,0.2);color:#fff;">← Retour liste</a>
-    </div>
-</div>
 
-<!-- Compteurs -->
-<div class="stats-row">
-    <div class="stat-box rdv">
-        <div class="stat-number">{{ stats.rdv }}</div>
-        <div class="stat-label">Rendez-vous</div>
-    </div>
-    <div class="stat-box consult">
-        <div class="stat-number">{{ stats.consultations }}</div>
-        <div class="stat-label">Consultations</div>
-    </div>
-    <div class="stat-box ordo">
-        <div class="stat-number">{{ stats.ordonnances }}</div>
-        <div class="stat-label">Ordonnances</div>
-    </div>
-    <div class="stat-box hospit">
-        <div class="stat-number">{{ stats.hospitalisations }}</div>
-        <div class="stat-label">Hospitalisations</div>
-    </div>
-    <div class="stat-box traitement">
-        <div class="stat-number">{{ stats.traitements }}</div>
-        <div class="stat-label">Traitements</div>
-    </div>
-    <div class="stat-box chirurgie">
-        <div class="stat-number">{{ stats.chirurgie }}</div>
-        <div class="stat-label">Chirurgie</div>
-    </div>
-    <div class="stat-box demandelab">
-        <div class="stat-number">{{ stats.demandes_lab }}</div>
-        <div class="stat-label">Demande de lab</div>
-    </div>
-    <div class="stat-box resultatlab">
-        <div class="stat-number">{{ stats.resultats_lab }}</div>
-        <div class="stat-label">Résultat de lab</div>
-    </div>
-</div>
-
-<!-- Infos principales -->
-<div class="info-grid">
-    <!-- Informations médicales -->
-    <div class="info-section">
-        <div class="info-section-title">🏥 Informations médicales</div>
-        <div class="info-section-body">
-            <div class="info-row">
-                <span class="info-label">Spécialité</span>
-                <span class="info-value">{{ medecin.specialite|default:'—' }}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Départements</span>
-                <span class="info-value">
-                    {% for sv in medecin.departements.all %}
-                        <span class="tag">{{ sv.nom }}</span>
-                    {% empty %}
-                        <span class="info-empty">Non renseigné</span>
-                    {% endfor %}
-                </span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Service consultation</span>
-                <span class="info-value">{{ medecin.service_consultation|default:'—' }}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Service suivi</span>
-                <span class="info-value">{{ medecin.service_suivi|default:'—' }}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Durée consultation</span>
-                <span class="info-value">{{ medecin.duree_consultation }} min</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">N° Ordre médecins</span>
-                <span class="info-value">{{ medecin.ordre_medecin|default:'—' }}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Chirurgien principal</span>
-                <span class="info-value">{% if medecin.chirurgien_principal %}✅ Oui{% else %}Non{% endif %}</span>
-            </div>
-        </div>
-    </div>
-
-    <!-- Informations personnelles -->
-    <div class="info-section">
-        <div class="info-section-title">👤 Informations personnelles</div>
-        <div class="info-section-body">
-            <div class="info-row">
-                <span class="info-label">Téléphone</span>
-                <span class="info-value">{{ medecin.telephone|default:'—' }}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Mobile</span>
-                <span class="info-value">{{ medecin.mobile|default:'—' }}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Email</span>
-                <span class="info-value">
-                    {% if medecin.email %}
-                        <a href="mailto:{{ medecin.email }}" style="color: var(--teal-500);">{{ medecin.email }}</a>
-                    {% else %}—{% endif %}
-                </span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Adresse</span>
-                <span class="info-value">{{ medecin.adresse|default:'—' }}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">TVA / N° fiscal</span>
-                <span class="info-value">{{ medecin.tva_numero_fiscal|default:'—' }}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Compte utilisateur</span>
-                <span class="info-value">
-                    {% if medecin.user %}{{ medecin.user.username }}{% else %}<span class="info-empty">Aucun</span>{% endif %}
-                </span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Enregistré le</span>
-                <span class="info-value">{{ medecin.date_creation|date:"d/m/Y" }}</span>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Diplômes -->
-<div class="diplomes-section">
-    <div class="info-section-title" style="padding: 14px 20px;">🎓 Diplômes obtenus</div>
-    {% for md in medecin.diplomes.all %}
-    <div class="diplome-item">
-        <div class="diplome-icon">🎓</div>
+    <!-- Code / Spécialité / Statut / Chirurgien -->
+    <div class="medecin-meta-row">
         <div>
-            <div class="diplome-titre">{{ md.diplome.titre }}</div>
-            <div class="diplome-meta">
-                {% if md.institution %}{{ md.institution }}{% endif %}
-                {% if md.annee_obtention %} — {{ md.annee_obtention }}{% endif %}
+            <span class="field-label">Code</span>
+            <div class="code-badge">{{ medecin.code|default:"—" }}</div>
+        </div>
+        <div>
+            <span class="field-label">Spécialité</span>
+            <div class="field-value {% if not medecin.specialite %}empty{% endif %}">
+                {{ medecin.specialite|default:"Non renseigné" }}
+            </div>
+        </div>
+        <div>
+            <span class="field-label">Statut</span>
+            <div style="padding-top:4px;">
+                {% if medecin.actif %}
+                    <span class="status-badge actif">● Actif</span>
+                {% else %}
+                    <span class="status-badge inactif">● Inactif</span>
+                {% endif %}
+            </div>
+        </div>
+        <div>
+            <span class="field-label">Durée consultation</span>
+            <div class="field-value">{{ medecin.duree_consultation }} min</div>
+        </div>
+    </div>
+
+</div><!-- /medecin-header-card -->
+
+<!-- Tabs -->
+<div class="tabs-wrapper">
+    <div class="tabs-nav">
+        <button type="button" class="tab-btn active" data-tab="medical">Informations médicales</button>
+        <button type="button" class="tab-btn" data-tab="contact">Contact & Personnel</button>
+        <button type="button" class="tab-btn" data-tab="admin">Administratif</button>
+    </div>
+
+    <!-- Tab : Informations médicales -->
+    <div class="tab-panel active" id="tab-medical">
+        <div class="tab-two-col">
+            <div>
+                <div class="form-field">
+                    <span class="field-label">Diplôme / Éducation</span>
+                    <div class="field-value {% if not medecin.diplome %}empty{% endif %}">
+                        {{ medecin.diplome|default:"Non renseigné" }}
+                    </div>
+                </div>
+                <div class="form-field">
+                    <span class="field-label">N° Ordre des médecins</span>
+                    <div class="field-value {% if not medecin.ordre_medecin %}empty{% endif %}">
+                        {{ medecin.ordre_medecin|default:"Non renseigné" }}
+                    </div>
+                </div>
+                <div class="form-field">
+                    <span class="field-label">Chirurgien principal</span>
+                    <div class="field-value">
+                        {% if medecin.chirurgien_principal %}✅ Oui{% else %}Non{% endif %}
+                    </div>
+                </div>
+            </div>
+            <div>
+                <div class="form-field">
+                    <span class="field-label">Départements</span>
+                    <div class="field-value" style="border-bottom:none;padding-top:2px;">
+                        {% for d in medecin.departements.all %}
+                            <span class="tag">{{ d.nom }}</span>
+                        {% empty %}
+                            <span class="empty" style="color:rgba(0,0,0,0.3);font-style:italic;">Non renseigné</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="form-field">
+                    <span class="field-label">Service de consultation</span>
+                    <div class="field-value {% if not medecin.service_consultation %}empty{% endif %}">
+                        {{ medecin.service_consultation|default:"Non renseigné" }}
+                    </div>
+                </div>
+                <div class="form-field">
+                    <span class="field-label">Service de suivi</span>
+                    <div class="field-value {% if not medecin.service_suivi %}empty{% endif %}">
+                        {{ medecin.service_suivi|default:"Non renseigné" }}
+                    </div>
+                </div>
             </div>
         </div>
     </div>
-    {% empty %}
-    <div style="padding: 32px 20px; text-align: center; color: rgba(0,0,0,0.35); font-size: 13px; font-style: italic;">
-        Aucun diplôme enregistré
+
+    <!-- Tab : Contact & Personnel -->
+    <div class="tab-panel" id="tab-contact">
+        <div class="tab-two-col">
+            <div>
+                <div class="form-field">
+                    <span class="field-label">Téléphone</span>
+                    <div class="field-value {% if not medecin.telephone %}empty{% endif %}">
+                        {{ medecin.telephone|default:"Non renseigné" }}
+                    </div>
+                </div>
+                <div class="form-field">
+                    <span class="field-label">Mobile</span>
+                    <div class="field-value {% if not medecin.mobile %}empty{% endif %}">
+                        {{ medecin.mobile|default:"Non renseigné" }}
+                    </div>
+                </div>
+                <div class="form-field">
+                    <span class="field-label">Courriel</span>
+                    <div class="field-value {% if not medecin.email %}empty{% endif %}">
+                        {% if medecin.email %}
+                            <a href="mailto:{{ medecin.email }}" style="color:var(--teal-500);">{{ medecin.email }}</a>
+                        {% else %}Non renseigné{% endif %}
+                    </div>
+                </div>
+            </div>
+            <div>
+                <div class="form-field">
+                    <span class="field-label">Adresse</span>
+                    <div class="field-value {% if not medecin.adresse %}empty{% endif %}">
+                        {{ medecin.adresse|default:"Non renseigné" }}
+                    </div>
+                </div>
+                <div class="form-field">
+                    <span class="field-label">Taux honoraire</span>
+                    <div class="field-value">
+                        {% if medecin.taux_honoraire %}{{ medecin.taux_honoraire|floatformat:0 }} FCFA{% else %}<span style="color:rgba(0,0,0,0.3);font-style:italic;">Non renseigné</span>{% endif %}
+                    </div>
+                </div>
+                <div class="form-field">
+                    <span class="field-label">TVA / N° fiscal</span>
+                    <div class="field-value {% if not medecin.tva_numero_fiscal %}empty{% endif %}">
+                        {{ medecin.tva_numero_fiscal|default:"Non renseigné" }}
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-    {% endfor %}
-</div>
+
+    <!-- Tab : Administratif -->
+    <div class="tab-panel" id="tab-admin">
+        <div class="tab-three-col">
+            <div class="form-field">
+                <span class="field-label">Matricule</span>
+                <div class="field-value {% if not medecin.matricule %}empty{% endif %}">
+                    {{ medecin.matricule|default:"Non renseigné" }}
+                </div>
+            </div>
+            <div class="form-field">
+                <span class="field-label">Employé de la société</span>
+                <div class="field-value">
+                    {% if medecin.employe_societe %}Oui{% else %}Non{% endif %}
+                </div>
+            </div>
+            <div class="form-field">
+                <span class="field-label">Compte utilisateur</span>
+                <div class="field-value {% if not medecin.user %}empty{% endif %}">
+                    {% if medecin.user %}{{ medecin.user.get_full_name|default:medecin.user.username }}{% else %}Aucun{% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="tab-two-col" style="margin-top:0;">
+            <div class="form-field">
+                <span class="field-label">Enregistré le</span>
+                <div class="field-value">{{ medecin.date_creation|date:"d/m/Y" }}</div>
+            </div>
+        </div>
+    </div>
+
+</div><!-- /tabs-wrapper -->
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelectorAll('.tab-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+        document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
+        btn.classList.add('active');
+        document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    });
+});
+</script>
 {% endblock %}

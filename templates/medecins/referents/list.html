@@ -1,0 +1,162 @@
+{% extends 'medecins/base.html' %}
+
+{% block extra_css %}
+<style>
+.ref-header { display:flex; align-items:center; gap:14px; margin-bottom:16px; flex-wrap:wrap; }
+.ref-header h1 { font-size:22px; font-weight:800; color:var(--teal-900); margin:0; flex-shrink:0; }
+.ref-search-wrap { flex:1; max-width:360px; position:relative; }
+.ref-search-wrap svg { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:rgba(0,0,0,0.35); pointer-events:none; }
+.ref-search { width:100%; padding:7px 12px 7px 34px; border:1px solid rgba(0,0,0,0.12); border-radius:8px; font-size:13px; font-family:'Sora',sans-serif; outline:none; transition:border-color .2s,box-shadow .2s; }
+.ref-search:focus { border-color:var(--teal-400); box-shadow:0 0 0 3px rgba(33,136,171,0.1); }
+.btn-creer { background:var(--teal-600); color:#fff; border:none; border-radius:8px; padding:8px 20px; font-size:13px; font-weight:700; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:6px; transition:background .15s; flex-shrink:0; font-family:'Sora',sans-serif; }
+.btn-creer:hover { background:var(--teal-700); }
+
+.filter-toolbar { display:flex; align-items:center; gap:4px; padding:8px 16px; background:#fff; border:1px solid rgba(0,0,0,0.08); border-radius:10px; margin-bottom:16px; flex-wrap:wrap; }
+.filter-panel { display:none; background:#fff; border:1px solid rgba(0,0,0,0.08); border-radius:10px; padding:14px 20px; margin-bottom:16px; gap:12px; align-items:center; flex-wrap:wrap; }
+.filter-panel.open { display:flex; }
+.filter-btn { display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border:none; border-radius:6px; background:none; font-size:12px; font-weight:600; color:rgba(0,0,0,0.55); cursor:pointer; transition:background .12s,color .12s; font-family:'Sora',sans-serif; }
+.filter-btn:hover,.filter-btn.active { background:rgba(33,136,171,0.1); color:var(--teal-700); }
+.filter-sep { width:1px; height:18px; background:rgba(0,0,0,0.1); flex-shrink:0; margin:0 4px; }
+.filter-count { margin-left:auto; font-size:12px; color:rgba(0,0,0,0.45); font-weight:600; padding:0 4px; }
+.filter-panel select { border:1px solid rgba(0,0,0,0.12); border-radius:7px; padding:6px 10px; font-size:13px; font-family:'Sora',sans-serif; outline:none; cursor:pointer; background:#fff; }
+.filter-panel select:focus { border-color:var(--teal-400); }
+.filter-panel .btn-filter-apply { background:var(--teal-500); color:#fff; border:none; border-radius:7px; padding:6px 16px; font-size:13px; font-weight:600; cursor:pointer; font-family:'Sora',sans-serif; }
+.filter-panel .btn-filter-clear { background:rgba(0,0,0,0.07); color:rgba(0,0,0,0.6); border:none; border-radius:7px; padding:6px 14px; font-size:13px; font-weight:600; cursor:pointer; text-decoration:none; font-family:'Sora',sans-serif; }
+
+.ref-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:14px; }
+.ref-card { background:#fff; border:1px solid rgba(0,0,0,0.09); border-radius:10px; padding:18px 16px 14px; text-decoration:none; color:inherit; display:flex; flex-direction:column; align-items:flex-start; gap:10px; cursor:pointer; transition:box-shadow .15s,border-color .15s,transform .1s; position:relative; }
+.ref-card:hover { box-shadow:0 4px 16px rgba(0,0,0,0.12); border-color:rgba(33,136,171,0.3); transform:translateY(-1px); }
+.ref-avatar { width:72px; height:72px; border-radius:50%; background:#e5e7eb; display:flex; align-items:flex-end; justify-content:center; overflow:hidden; align-self:center; border:2px solid rgba(0,0,0,0.06); }
+.ref-avatar img { width:72px; height:72px; border-radius:50%; object-fit:cover; border:2px solid rgba(33,136,171,0.15); }
+.ref-body { width:100%; }
+.ref-name { font-weight:700; font-size:13px; color:var(--teal-900); line-height:1.3; margin-bottom:3px; }
+.ref-code { font-size:11px; color:rgba(0,0,0,0.45); font-family:monospace; margin-bottom:6px; }
+.ref-info { font-size:12px; color:rgba(0,0,0,0.55); display:flex; align-items:flex-start; gap:5px; margin-bottom:3px; line-height:1.4; }
+.ref-info::before { content:'•'; color:var(--teal-400); flex-shrink:0; }
+.badge-inactif { position:absolute; top:10px; right:10px; background:#fee2e2; color:#991b1b; font-size:10px; font-weight:700; padding:2px 7px; border-radius:20px; }
+
+.empty-state { text-align:center; padding:60px 20px; color:rgba(0,0,0,0.4); }
+.empty-state .es-icon { font-size:48px; display:block; margin-bottom:14px; }
+.empty-state p { font-size:14px; margin-bottom:16px; }
+
+/* dark */
+html[data-theme="dark"] .ref-header h1 { color:#cce8f4; }
+html[data-theme="dark"] .ref-search { background:#0d2035; border-color:rgba(255,255,255,0.1); color:#cce8f4; }
+html[data-theme="dark"] .filter-toolbar, html[data-theme="dark"] .filter-panel { background:#0d2035; border-color:rgba(255,255,255,0.07); }
+html[data-theme="dark"] .filter-btn { color:rgba(255,255,255,0.45); }
+html[data-theme="dark"] .filter-btn:hover, html[data-theme="dark"] .filter-btn.active { background:rgba(33,136,171,0.15); color:var(--teal-300); }
+html[data-theme="dark"] .filter-count { color:rgba(255,255,255,0.35); }
+html[data-theme="dark"] .ref-card { background:#0d2035; border-color:rgba(255,255,255,0.08); }
+html[data-theme="dark"] .ref-card:hover { border-color:rgba(33,136,171,0.4); }
+html[data-theme="dark"] .ref-name { color:#cce8f4; }
+html[data-theme="dark"] .ref-code { color:rgba(255,255,255,0.35); }
+html[data-theme="dark"] .ref-info { color:rgba(255,255,255,0.5); }
+html[data-theme="dark"] .filter-panel { background:#0d2035; border-color:rgba(255,255,255,0.07); }
+html[data-theme="dark"] .filter-panel select { background:#091d2e; border-color:rgba(255,255,255,0.1); color:#cce8f4; }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="breadcrumb">
+    <a href="{% url 'dashboard' %}">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z"/><polyline points="9 21 9 12 15 12 15 21"/></svg>Accueil
+    </a>
+    <span class="breadcrumb-sep">›</span>
+    <span>Docteurs référent</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+
+<form method="get" id="ref-form">
+<div class="ref-header">
+    <h1>Docteurs référent</h1>
+    <div class="ref-search-wrap">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" name="q" value="{{ q }}" placeholder="Rechercher…" class="ref-search" id="ref-q">
+    </div>
+    <a href="{% url 'medecins:referent_create' %}" class="btn-creer">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        CRÉER
+    </a>
+</div>
+
+<div class="filter-toolbar">
+    <button type="button" class="filter-btn {% if q or specialite_id or statut %}active{% endif %}" onclick="toggleFilters()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+        Filtres{% if q or specialite_id or statut %} (actifs){% endif %}
+    </button>
+    <div class="filter-sep"></div>
+    <span class="filter-count">{{ total_filtre }} / {{ stats.total }}</span>
+</div>
+
+<div class="filter-panel {% if q or specialite_id or statut %}open{% endif %}" id="filter-panel">
+    <select name="specialite">
+        <option value="">Toutes les spécialités</option>
+        {% for sp in specialites %}
+        <option value="{{ sp.pk }}" {% if specialite_id == sp.pk|stringformat:"s" %}selected{% endif %}>{{ sp.nom }}</option>
+        {% endfor %}
+    </select>
+    <select name="statut">
+        <option value="">Tous les statuts</option>
+        <option value="actif"   {% if statut == 'actif'   %}selected{% endif %}>Actif</option>
+        <option value="inactif" {% if statut == 'inactif' %}selected{% endif %}>Inactif</option>
+    </select>
+    <button type="submit" class="btn-filter-apply">Filtrer</button>
+    {% if q or specialite_id or statut %}
+    <a href="{% url 'medecins:referent_list' %}" class="btn-filter-clear">✕ Effacer</a>
+    {% endif %}
+</div>
+</form>
+
+{% if total_filtre > 0 %}
+<div class="ref-grid">
+    {% for r in page_obj %}
+    <a href="{% url 'medecins:referent_detail' r.pk %}" class="ref-card">
+        {% if not r.actif %}<span class="badge-inactif">Inactif</span>{% endif %}
+        {% if r.photo %}
+            <img src="{{ r.photo.url }}" alt="" class="ref-avatar" style="border-radius:50%;width:72px;height:72px;object-fit:cover;align-self:center;">
+        {% else %}
+            <div class="ref-avatar">
+                <svg width="52" height="52" viewBox="0 0 80 80" fill="none"><circle cx="40" cy="28" r="18" fill="currentColor" opacity=".35"/><ellipse cx="40" cy="80" rx="32" ry="24" fill="currentColor" opacity=".25"/></svg>
+            </div>
+        {% endif %}
+        <div class="ref-body">
+            <div class="ref-name">{{ r.nom }} {{ r.prenoms }}</div>
+            <div class="ref-code">{{ r.code }}</div>
+            {% if r.specialite %}<div class="ref-info">{{ r.specialite }}</div>{% endif %}
+            {% if r.etablissement %}<div class="ref-info">{{ r.etablissement }}</div>{% endif %}
+        </div>
+    </a>
+    {% endfor %}
+</div>
+
+{% include 'includes/pagination.html' %}
+
+{% else %}
+<div class="empty-state">
+    <span class="es-icon">🩺</span>
+    {% if q or specialite_id or statut %}
+        <p>Aucun docteur référent ne correspond à votre recherche.</p>
+        <a href="{% url 'medecins:referent_list' %}" class="btn-creer">✕ Effacer les filtres</a>
+    {% else %}
+        <p>Aucun docteur référent enregistré pour le moment.</p>
+        <a href="{% url 'medecins:referent_create' %}" class="btn-creer">+ Ajouter un référent</a>
+    {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleFilters() {
+    document.getElementById('filter-panel').classList.toggle('open');
+}
+var searchTimer;
+document.getElementById('ref-q').addEventListener('input', function() {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(function() { document.getElementById('ref-form').submit(); }, 450);
+});
+</script>
+{% endblock %}

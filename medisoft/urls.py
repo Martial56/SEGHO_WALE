@@ -13,6 +13,7 @@ admin.site.__class__.has_permission = lambda self, request: request.user.is_acti
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('patients/', include('patients.urls')),
+    path('medecins/', include('medecins.urls')),
     path('ordonnances/', include('ordonnances.urls')),
     path('services/', include('services.urls')),
     path('', include('core.urls')),

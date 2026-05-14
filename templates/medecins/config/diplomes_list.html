@@ -1,0 +1,228 @@
+{% extends 'medecins/base.html' %}
+
+{% block extra_css %}
+<style>
+    .config-header {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 18px;
+        flex-wrap: wrap;
+    }
+
+    .config-header h1 {
+        font-size: 20px;
+        font-weight: 800;
+        color: var(--teal-900);
+        margin: 0;
+    }
+
+    .config-search {
+        padding: 7px 12px;
+        border: 1px solid rgba(0, 0, 0, 0.12);
+        border-radius: 8px;
+        font-size: 13px;
+        font-family: 'Sora', sans-serif;
+        outline: none;
+        min-width: 220px;
+    }
+
+    .config-search:focus {
+        border-color: var(--teal-400);
+    }
+
+    .btn-creer {
+        background: var(--teal-600);
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        padding: 8px 20px;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-family: 'Sora', sans-serif;
+    }
+
+    .btn-creer:hover {
+        background: var(--teal-700);
+    }
+
+    .config-count {
+        margin-left: auto;
+        font-size: 12px;
+        color: rgba(0, 0, 0, 0.45);
+        font-weight: 600;
+    }
+
+    .config-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #fff;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.07);
+    }
+
+    .config-table thead th {
+        background: #f8fafb;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        color: rgba(0, 0, 0, 0.45);
+        padding: 11px 16px;
+        text-align: left;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.07);
+    }
+
+    .config-table tbody td {
+        padding: 12px 16px;
+        font-size: 13px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+        vertical-align: middle;
+        color: var(--teal-900);
+    }
+
+    .config-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    .config-table tbody tr { cursor: pointer; }
+
+    .config-table tbody tr:hover {
+        background: rgba(33, 136, 171, 0.03);
+    }
+
+    .btn-edit {
+        padding: 4px 12px;
+        font-size: 12px;
+        border-radius: 6px;
+        border: 1px solid var(--teal-300);
+        color: var(--teal-700);
+        text-decoration: none;
+        font-weight: 600;
+        display: inline-block;
+    }
+
+    .btn-edit:hover {
+        background: var(--teal-50);
+    }
+
+    .breadcrumb-cfg {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        margin-bottom: 18px;
+        flex-wrap: wrap;
+    }
+
+    .breadcrumb-cfg a {
+        color: var(--teal-500);
+        text-decoration: none;
+        padding: 2px 5px;
+        border-radius: 4px;
+    }
+
+    .breadcrumb-cfg a:hover {
+        background: rgba(33, 136, 171, .08);
+    }
+
+    .breadcrumb-cfg span {
+        color: rgba(0, 0, 0, 0.35);
+    }
+
+    html[data-theme="dark"] .config-header h1 {
+        color: #cce8f4;
+    }
+
+    html[data-theme="dark"] .config-table {
+        background: #0d2035;
+    }
+
+    html[data-theme="dark"] .config-table thead th {
+        background: rgba(255, 255, 255, .03);
+        color: rgba(255, 255, 255, .35);
+        border-bottom-color: rgba(255, 255, 255, .07);
+    }
+
+    html[data-theme="dark"] .config-table tbody td {
+        border-bottom-color: rgba(255, 255, 255, .04);
+        color: #cce8f4;
+    }
+
+    html[data-theme="dark"] .config-table tbody tr:hover {
+        background: rgba(33, 136, 171, .06);
+    }
+
+    html[data-theme="dark"] .config-search {
+        background: #0d2035;
+        border-color: rgba(255, 255, 255, .1);
+        color: #cce8f4;
+    }
+
+    html[data-theme="dark"] .config-count {
+        color: rgba(255, 255, 255, .35);
+    }
+
+    html[data-theme="dark"] .breadcrumb-cfg a {
+        color: var(--teal-300);
+    }
+
+    html[data-theme="dark"] .breadcrumb-cfg span {
+        color: rgba(255, 255, 255, .3);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="breadcrumb-cfg">
+    <a href="{% url 'medecins:list' %}">Docteur</a>
+    <span>›</span>
+    <span>Configuration</span>
+    <span>›</span>
+    <span>Diplômes</span>
+</div>
+
+<form method="get">
+    <div class="config-header">
+        <h1>🎓 Diplômes</h1>
+        <input type="text" name="q" value="{{ q }}" placeholder="Rechercher…" class="config-search">
+        <a href="{% url 'medecins:diplome_create' %}" class="btn-creer">+ CRÉER</a>
+        <span class="config-count">{{ total_filtre }} / {{ total }}</span>
+    </div>
+</form>
+
+{% if total_filtre > 0 %}
+<table class="config-table">
+    <thead>
+        <tr>
+            <th>Titre</th>
+            <th>Description</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for dip in page_obj %}
+        <tr onclick="window.location='{% url 'medecins:diplome_edit' dip.pk %}'">
+            <td style="font-weight:600;">{{ dip.titre }}</td>
+            <td style="color:rgba(0,0,0,.5);font-size:12px;">{{ dip.description|default:"—"|truncatechars:80 }}</td>
+            <td><a href="{% url 'medecins:diplome_edit' dip.pk %}" onclick="event.stopPropagation()" class="btn-edit">Modifier</a></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% include 'includes/pagination.html' %}
+{% else %}
+<div style="text-align:center;padding:50px 20px;color:rgba(0,0,0,.4);">
+    <div style="font-size:40px;margin-bottom:12px;">🎓</div>
+    {% if q %}<p>Aucun diplôme ne correspond à « {{ q }} ».</p>
+    {% else %}<p>Aucun diplôme enregistré.</p>
+    <a href="{% url 'medecins:diplome_create' %}" class="btn-creer" style="margin-top:14px;">+ Ajouter un diplôme</a>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

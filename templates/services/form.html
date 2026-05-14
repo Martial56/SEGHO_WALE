@@ -1,1267 +1,1144 @@
-{% load static %}{% load django_browser_reload %}
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{% if is_new %}Nouveau service{% else %}{{ article.nom }}{% endif %} — SEGHO-WALE</title>
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+{% extends 'services/base.html' %}
+{% load static %}
+
+{% block topbar_title %}{% if is_new %}Nouveau service{% else %}{{ article.nom|truncatechars:40 }}{% endif %}{% endblock %}
+
+{% block extra_css %}
 <style>
-*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
-:root {
-  --teal-900:#0d3040; --teal-800:#0f4358; --teal-700:#145770;
-  --teal-600:#1a6d8c; --teal-500:#2188ab; --teal-400:#34a8cc;
-  --teal-300:#6ecae3; --teal-100:#d6f3fb; --teal-50:#eef9fd;
-  --text-main:#0d3040; --text-muted:#8aafbf;
-  --border:rgba(0,0,0,0.08); --radius:14px;
-}
-html,body { font-family:'Sora',sans-serif; background:#f0fafa; color:var(--text-main); min-height:100vh; }
+    /* ── Underline inputs ── */
+    .field-ul {
+        width: 100%;
+        background: transparent;
+        border-top: none;
+        border-left: none;
+        border-right: none;
+        border-bottom: 1.5px solid #d1dde3;
+        border-radius: 0;
+        padding: 7px 2px;
+        font-size: 13px;
+        color: var(--text-primary);
+        transition: border-color .2s;
+        box-shadow: none;
+        outline: none;
+    }
+    .field-ul:focus { border-bottom-color: var(--teal-500); box-shadow: none; outline: none; }
+    .field-ul.error { border-bottom-color: var(--rose); }
+    .field-ul::placeholder { color: #bfcdd4; }
 
-/* ── TOPBAR ── */
-.topbar {
-  display:flex; align-items:center; justify-content:space-between;
-  padding:11px 32px; background:#fff;
-  border-bottom:1px solid var(--border);
-  box-shadow:0 2px 10px rgba(0,0,0,0.05);
-  position:sticky; top:0; z-index:200;
-}
-.topbar-left { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-muted); }
-.topbar-left a { color:var(--teal-600); text-decoration:none; font-weight:600; }
-.topbar-left a:hover { text-decoration:underline; }
-.topbar-left .sep { color:var(--border); }
-.topbar-left .current { color:var(--text-main); font-weight:700; }
-.topbar-right { display:flex; align-items:center; gap:8px; }
+    textarea.field-ul { resize: vertical; border-bottom-width: 1.5px; padding: 6px 2px; min-height: 70px; }
 
-.btn-save {
-  background:var(--teal-600); color:#fff; border:none; border-radius:9px;
-  padding:9px 22px; font-size:13px; font-weight:700; cursor:pointer;
-  display:flex; align-items:center; gap:6px; transition:background 0.15s;
-}
-.btn-save:hover { background:var(--teal-700); }
-.btn-cancel {
-  background:#fff; color:var(--text-muted); border:1px solid var(--border);
-  border-radius:9px; padding:9px 18px; font-size:13px; font-weight:600;
-  cursor:pointer; text-decoration:none; transition:all 0.15s;
-}
-.btn-cancel:hover { border-color:var(--teal-300); color:var(--teal-700); }
+    select.field-ul {
+        appearance: none; -webkit-appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23839aaa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+        background-repeat: no-repeat; background-position: right 4px center; padding-right: 22px; cursor: pointer;
+    }
 
-/* ── STAT COUNTERS (haut du formulaire) ── */
-.stat-counters {
-  display:flex; gap:0; background:#fff;
-  border-bottom:1px solid var(--border);
-  overflow-x:auto; scrollbar-width:none;
-}
-.stat-counters::-webkit-scrollbar { display:none; }
-.stat-counter {
-  display:flex; align-items:center; gap:8px;
-  padding:10px 22px; border-right:1px solid var(--border);
-  white-space:nowrap; flex-shrink:0; text-decoration:none;
-  color:var(--teal-600); font-size:12px; font-weight:600;
-  transition:background 0.15s; cursor:pointer;
-}
-.stat-counter:last-child { border-right:none; }
-.stat-counter:hover { background:var(--teal-50); }
-.stat-counter .num { font-size:18px; font-weight:800; color:var(--teal-700); line-height:1; }
-.stat-counter svg { color:var(--teal-400); }
+    /* Grand input nom */
+    .field-ul-name {
+        font-size: 26px; font-weight: 700; color: var(--teal-900);
+        border-bottom-width: 2px; padding: 4px 0 6px; margin-bottom: 6px;
+    }
+    .field-ul-name::placeholder { color: #c5d4d8; font-weight: 600; }
 
-/* ── LAYOUT PRINCIPAL ── */
-.main-layout {
-  max-width:1380px; 
-  margin:2px 2px; 
-  padding:0 4px;
-}
+    /* Référence interne sous le nom */
+    .field-ul-ref {
+        font-size: 13px; font-weight: 400; color: var(--text-secondary);
+        padding: 3px 0 5px; width: 240px;
+    }
+    .field-ul-ref::placeholder { color: #c5d4d8; }
 
-/* ── CARD HEADER (nom + photo + checkboxes) ── */
-.card {
-  background:#fff; border:1px solid var(--border);
-  border-radius:var(--radius); margin-bottom:4px;
-  box-shadow:0 2px 10px rgba(0,0,0,0.04);
-}
-.card-header {
-  padding:20px 28px; border-bottom:1px solid var(--border);
-  display:flex; gap:20px; align-items:flex-start;
-}
-.favori-btn {
-  background:none; border:none; cursor:pointer; padding:4px;
-  color:#ccc; font-size:22px; transition:color 0.15s; flex-shrink:0;
-  margin-top:6px;
-}
-.favori-btn.active, .favori-btn:hover { color:#f0b429; }
-.header-nom { flex:1; }
-.header-nom label { font-size:11px; font-weight:700; color:#e84545; text-transform:uppercase; letter-spacing:0.5px; }
-.nom-input {
-  width:100%; border:none; border-bottom:2px solid var(--teal-400);
-  font-size:22px; font-weight:700; color:var(--teal-900);
-  font-family:'Sora',sans-serif; padding:6px 0; background:transparent;
-  outline:none; placeholder:rgba(0,0,0,0.2);
-}
-.nom-input:focus { border-bottom-color:var(--teal-600); }
-.nom-input::placeholder { color:#ccc; font-weight:400; }
-.ref-row { margin-top:10px; display:flex; align-items:center; gap:16px; }
-.ref-input {
-  border:none; border-bottom:1px solid #e0e0e0; font-size:13px;
-  font-family:'Sora',sans-serif; padding:4px 0; color:var(--text-muted);
-  background:transparent; outline:none; width:200px;
-}
-.ref-input:focus { border-bottom-color:var(--teal-400); }
-.checkboxes { display:flex; gap:20px; margin-top:12px; }
-.cb-label { display:flex; align-items:center; gap:7px; font-size:13px; font-weight:500; cursor:pointer; }
-.cb-label input[type=checkbox] { width:16px; height:16px; accent-color:var(--teal-600); cursor:pointer; }
+    /* ── Labels ── */
+    .field-label {
+        display: block; font-size: 11px; font-weight: 700;
+        color: var(--text-muted); text-transform: uppercase;
+        letter-spacing: .05em; margin-bottom: 4px;
+    }
+    .required-star { color: var(--rose); margin-left: 2px; }
+    .field-error { font-size: 12px; color: var(--rose); margin-top: 3px; }
 
-/* Photo upload */
-.photo-box {
-  width:90px; height:90px; border-radius:12px; flex-shrink:0;
-  border:2px dashed var(--teal-300); background:var(--teal-50);
-  display:flex; flex-direction:column; align-items:center; justify-content:center;
-  cursor:pointer; overflow:hidden; position:relative; transition:border-color 0.15s;
-}
-.photo-box:hover { border-color:var(--teal-500); }
-.photo-box img { width:100%; height:100%; object-fit:cover; position:absolute; }
-.photo-box svg { color:var(--teal-400); }
-.photo-box span { font-size:9px; color:var(--text-muted); margin-top:4px; }
-.photo-box input { position:absolute; inset:0; opacity:0; cursor:pointer; }
+    /* ── Action bar ── */
+    .action-bar {
+        display: flex; align-items: center; justify-content: space-between;
+        margin-bottom: 16px; gap: 12px;
+    }
+    .action-bar-breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
+    .action-bar-breadcrumb a { color: var(--teal-700); text-decoration: none; }
+    .action-bar-breadcrumb .sep { color: #bbb; }
+    .action-bar-breadcrumb .current { color: var(--text-secondary); font-weight: 500; }
+    .action-bar-buttons { display: flex; gap: 8px; }
 
-/* ── TABS ── */
-.tabs-wrap { border-bottom:1px solid var(--border); padding:0 28px; display:flex; gap:0; overflow-x:auto; scrollbar-width:none; }
-.tabs-wrap::-webkit-scrollbar { display:none; }
-.tab-btn {
-  padding:13px 18px; font-size:13px; font-weight:600;
-  color:var(--text-muted); border:none; background:none; cursor:pointer;
-  border-bottom:3px solid transparent; white-space:nowrap;
-  transition:all 0.15s; margin-bottom:-1px;
-}
-.tab-btn:hover { color:var(--teal-700); }
-.tab-btn.active { color:var(--teal-700); border-bottom-color:var(--teal-600); }
+    /* ── Header card ── */
+    .service-header-card {
+        background: #fff; border-radius: var(--radius);
+        box-shadow: var(--shadow-sm); margin-bottom: 0; overflow: hidden;
+    }
+    .service-identity-row {
+        display: flex; align-items: flex-start; justify-content: space-between;
+        padding: 24px 28px 20px; gap: 24px;
+    }
+    .service-name-block { flex: 1; min-width: 0; }
 
-/* ── TAB PANELS ── */
-.tab-panel { display:none; padding:0; }
-.tab-panel.active { display:block; }
+    /* Favori inline */
+    .favori-star {
+        background: none; border: none; font-size: 20px; cursor: pointer;
+        color: #ccc; padding: 0 6px 0 0; vertical-align: middle;
+        transition: color .15s; line-height: 1;
+    }
+    .favori-star.active, .favori-star:hover { color: #f0b429; }
 
-/* ── LAYOUT 2 COLONNES DANS CHAQUE ONGLET ── */
-.tab-2col {
-  display:grid; grid-template-columns:1fr 1fr;
-  border-top:1px solid rgba(0,0,0,0.06);
-}
-.tab-col { padding:8px 28px 20px; }
-.tab-col + .tab-col { border-left:1px solid rgba(0,0,0,0.06); }
+    /* Checkboxes en-tête */
+    .service-checks { display: flex; gap: 20px; margin-top: 10px; }
+    .cb-label {
+        display: flex; align-items: center; gap: 7px;
+        font-size: 13px; font-weight: 500; cursor: pointer; color: var(--text-primary);
+    }
+    .cb-label input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--teal-600); cursor: pointer; }
 
-/* ── LIGNE : label | champ ── */
-.f-row {
-  display:flex; align-items:flex-start;
-  padding:9px 0; gap:12px;
-}
-.f-row + .f-row { border-top:none; }
-.f-label {
-  min-width:185px; max-width:185px;
-  font-size:13px; font-weight:600;
-  color:var(--text-main); padding-top:5px;
-  line-height:1.4;
-}
-.f-input { flex:1; }
+    /* Photo */
+    .service-photo-block { display: flex; flex-direction: column; align-items: center; gap: 8px; flex-shrink: 0; }
+    .photo-large { width: 96px; height: 96px; border-radius: 14px; object-fit: cover; border: 2px solid rgba(0,0,0,0.08); }
+    .photo-placeholder {
+        width: 96px; height: 96px; border-radius: 14px; background: #f0f4f6;
+        border: 2px dashed #c8d8e0; display: flex; align-items: center;
+        justify-content: center; font-size: 32px; color: #9aaab5;
+    }
+    .photo-label-btn { font-size: 12px; color: var(--teal-600); cursor: pointer; text-decoration: underline; background: none; border: none; padding: 0; }
 
-/* ── CHAMP PLAT — underline seulement ── */
-.fc {
-  border:none;
-  border-bottom:1px solid #c8d8e0;
-  border-radius:0; background:transparent;
-  padding:4px 2px; font-size:13px;
-  width:100%; outline:none;
-  font-family:'Sora',sans-serif; color:var(--text-main);
-  transition:border-bottom-color 0.15s;
-}
-.fc:focus { border-bottom-color:var(--teal-500); }
-.fc::placeholder { color:#bbb; }
-select.fc { cursor:pointer; }
-textarea.fc { resize:vertical; min-height:70px; padding-top:6px; }
-.fc-pair { display:flex; gap:8px; }
-.fc-pair .fc { flex:1; }
+    /* ── Tabs ── */
+    .tabs-wrapper { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow-sm); margin-top: 16px; overflow: hidden; }
+    .tabs-nav {
+        display: flex; border-bottom: 2px solid #e8edf0; padding: 0 20px;
+        overflow-x: auto; scrollbar-width: none;
+    }
+    .tabs-nav::-webkit-scrollbar { display: none; }
+    .tab-btn {
+        padding: 14px 18px; font-size: 13px; font-weight: 600;
+        color: var(--text-muted); background: none; border: none;
+        border-bottom: 3px solid transparent; margin-bottom: -2px;
+        cursor: pointer; transition: color .15s, border-color .15s; white-space: nowrap;
+    }
+    .tab-btn:hover { color: var(--teal-700); }
+    .tab-btn.active { color: var(--teal-700); border-bottom-color: var(--teal-500); }
+    .tab-panel { display: none; padding: 26px 28px; }
+    .tab-panel.active { display: block; }
 
-/* Checkbox flat */
-.f-check { display:flex; align-items:center; gap:8px; padding-top:5px; font-size:13px; cursor:pointer; }
-.f-check input { width:15px; height:15px; accent-color:var(--teal-600); cursor:pointer; }
+    /* Tab grids */
+    .tab-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+    .form-field { margin-bottom: 18px; }
+    .form-field:last-child { margin-bottom: 0; }
 
-/* Radio flat */
-.f-radios { display:flex; flex-direction:column; gap:7px; padding-top:4px; }
-.f-radio { display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer; }
-.f-radio input { width:15px; height:15px; accent-color:var(--teal-600); }
+    /* Section title */
+    .tab-section-title {
+        font-size: 11px; font-weight: 700; color: var(--text-muted);
+        text-transform: uppercase; letter-spacing: .05em;
+        margin: 20px 0 12px; display: block;
+    }
+    .tab-section-title:first-child { margin-top: 0; }
 
-/* Titre de section dans l'onglet */
-.tab-section-title {
-  font-size:12px; color:var(--text-muted);
-  padding:14px 28px 2px; font-weight:600;
-  letter-spacing:0.2px;
-}
+    /* Prix inline */
+    .prix-inline { display: flex; align-items: center; gap: 8px; }
+    .prix-inline .field-ul { flex: 1; }
+    .prix-inline .unit { font-size: 12px; font-weight: 700; color: var(--text-muted); }
 
-/* Ligne pleine largeur (indications, remarques…) */
-.tab-full { padding:0 28px 16px; }
-.tab-full .f-row { border-top:1px solid rgba(0,0,0,0.05); }
+    /* Radio group */
+    .radio-group { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+    .radio-label { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; color: var(--text-primary); }
+    .radio-label input { accent-color: var(--teal-600); }
 
-/* CFA suffix */
-.fc-cfa { display:flex; align-items:flex-end; gap:6px; }
-.fc-cfa .fc { flex:1; }
-.fc-cfa span { font-size:12px; font-weight:700; color:var(--text-muted); padding-bottom:5px; }
+    /* Checkbox row */
+    .cb-row { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; color: var(--text-primary); margin-bottom: 6px; }
+    .cb-row input { width: 15px; height: 15px; accent-color: var(--teal-600); }
 
-/* ── INLINE TABLES ── */
-.inline-wrap { padding:0 28px 16px; }
-.inline-table { width:100%; border-collapse:collapse; }
-.inline-table th {
-  padding:9px 12px; font-size:11px; font-weight:700; color:var(--text-muted);
-  text-transform:uppercase; letter-spacing:0.6px; text-align:left;
-  background:#f8fcff; border-bottom:1px solid var(--border);
-}
-.inline-table td { padding:8px 10px; border-bottom:1px solid rgba(0,0,0,0.04); vertical-align:middle; }
-.inline-table tr:last-child td { border-bottom:none; }
-.inline-table input, .inline-table select {
-  border:none; border-bottom:1px solid #c8d8e0; border-radius:0;
-  padding:4px 2px; font-size:12px; font-family:'Sora',sans-serif;
-  width:100%; outline:none; background:transparent;
-}
-.inline-table input:focus, .inline-table select:focus { border-bottom-color:var(--teal-500); }
-.inline-table input[type=checkbox] { width:auto; border:none; }
-.btn-add-line {
-  display:inline-flex; align-items:center; gap:6px;
-  color:var(--teal-600); font-size:12px; font-weight:700;
-  background:none; border:none; cursor:pointer; padding:10px 0 4px;
-  transition:color 0.15s;
-}
-.btn-add-line:hover { color:var(--teal-800); }
-.btn-del-line {
-  background:none; border:none; cursor:pointer; color:#ccc;
-  padding:4px; border-radius:4px; transition:color 0.15s; line-height:1;
-}
-.btn-del-line:hover { color:#e84545; }
+    /* Note grise */
+    .note-grise { font-size: 12px; color: #8aafbf; margin: 6px 0 14px; font-style: italic; line-height: 1.5; }
 
-/* Messages */
-.alert { padding:12px 20px; border-radius:10px; margin-bottom:16px; font-size:13px; }
-.alert-success { background:#e3f9ee; color:#0d7a42; border:1px solid #b8efd3; }
-.alert-error { background:#fdf0f0; color:#c0392b; border:1px solid #f5c6cb; }
+    /* ── Tableaux inline ── */
+    .inline-table { width: 100%; border-collapse: collapse; }
+    .inline-table th {
+        padding: 9px 12px; font-size: 11px; font-weight: 700; color: var(--text-muted);
+        text-transform: uppercase; letter-spacing: 0.6px; text-align: left;
+        background: #f8fcff; border-bottom: 1px solid rgba(0,0,0,0.08);
+    }
+    .inline-table td { padding: 8px 10px; border-bottom: 1px solid rgba(0,0,0,0.04); vertical-align: middle; }
+    .inline-table tr:last-child td { border-bottom: none; }
+    .btn-add-line {
+        display: inline-flex; align-items: center; gap: 6px;
+        color: var(--teal-600); font-size: 12px; font-weight: 700;
+        background: none; border: none; cursor: pointer; padding: 10px 0 4px;
+        transition: color 0.15s;
+    }
+    .btn-add-line:hover { color: var(--teal-800); }
+    .btn-del-line {
+        background: none; border: none; cursor: pointer; color: #ccc;
+        padding: 4px; border-radius: 4px; transition: color 0.15s; line-height: 1;
+    }
+    .btn-del-line:hover { color: var(--rose); }
 
-/* ── FORM CONTROLS (onglets) ── */
-.form-control {
-  width:100%; padding:8px 12px;
-  border:1px solid #c8d8e0; border-radius:8px;
-  background:#fff; font-size:13px;
-  font-family:'Sora',sans-serif; color:var(--text-main);
-  outline:none; transition:border-color 0.15s, box-shadow 0.15s;
-}
-.form-control:focus {
-  border-color:var(--teal-500);
-  box-shadow:0 0 0 3px rgba(33,136,171,0.1);
-}
-.form-control::placeholder { color:#bbb; }
-textarea.form-control { resize:vertical; min-height:80px; padding-top:8px; }
-.form-control-sm { padding:6px 10px; font-size:12px; }
-select.form-control { cursor:pointer; appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238aafbf' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 10px center; padding-right:32px; }
+    /* Avertissement variantes */
+    .variante-warning { font-size: 11px; color: #8aafbf; margin-top: 12px; }
 
-/* Form layout */
-.form-label { display:block; font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:5px; }
-.form-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px 24px; padding:20px 28px; }
-.form-grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
-.form-section { padding:0 28px 16px; }
-.form-section-title { font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:12px; padding:16px 0 0; display:block; }
-.form-group.full { grid-column:1/-1; }
-.prix-inline { display:flex; align-items:center; gap:8px; }
-.prix-inline .form-control { flex:1; }
-.prix-inline > span { font-size:12px; font-weight:700; color:var(--text-muted); white-space:nowrap; }
-.radio-group { display:flex; flex-direction:column; gap:6px; margin-top:4px; }
-.radio-label { display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer; }
-.radio-label input { accent-color:var(--teal-600); }
-.cb-row { display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer; }
-.cb-row input { accent-color:var(--teal-600); width:15px; height:15px; }
-.inline-section { padding:16px 28px; }
+    /* Bottom actions */
+    .form-actions { display: flex; gap: 10px; justify-content: flex-end; padding: 18px 0 6px; }
 
-/* ── SEARCHABLE SELECT ── */
-.ss-wrapper { position:relative; width:100%; }
-.ss-btn {
-  width:100%; padding:8px 12px;
-  border:1px solid #c8d8e0; border-radius:8px;
-  background:#fff; cursor:pointer;
-  font-size:13px; font-family:'Sora',sans-serif; color:#bbb;
-  text-align:left; display:flex; align-items:center; justify-content:space-between;
-  user-select:none; transition:border-color 0.15s;
-}
-.ss-btn.ss-val { color:var(--text-main); }
-.ss-btn:hover, .ss-wrapper.open .ss-btn { border-color:var(--teal-400); outline:none; }
-.ss-caret { font-size:10px; color:var(--text-muted); flex-shrink:0; margin-left:8px; transition:transform 0.15s; }
-.ss-wrapper.open .ss-caret { transform:rotate(180deg); }
-.ss-dropdown {
-  display:none; position:absolute; top:calc(100% + 4px); left:0;
-  width:100%; min-width:200px; background:#fff;
-  border:1px solid #c8d8e0; border-radius:10px;
-  box-shadow:0 8px 28px rgba(0,0,0,0.12); z-index:400; overflow:hidden;
-}
-.ss-wrapper.open .ss-dropdown { display:block; }
-.ss-search {
-  width:100%; padding:8px 12px; border:none; border-bottom:1px solid #eee;
-  outline:none; font-family:'Sora',sans-serif; font-size:13px; background:#f8fcff;
-}
-.ss-list { max-height:220px; overflow-y:auto; }
-.ss-item { padding:8px 12px; cursor:pointer; font-size:13px; color:var(--text-main); transition:background 0.1s; }
-.ss-item:hover { background:var(--teal-50); color:var(--teal-700); }
-.ss-item.ss-empty-opt { color:#bbb; }
-.ss-item.ss-selected { background:var(--teal-50); color:var(--teal-700); font-weight:600; }
-.ss-no-results { padding:10px 12px; font-size:12px; color:var(--text-muted); text-align:center; font-style:italic; }
+    @media (max-width: 768px) {
+        .tab-two-col { grid-template-columns: 1fr; gap: 0; }
+        .field-ul-name { font-size: 20px; }
+        .service-checks { flex-wrap: wrap; gap: 12px; }
+    }
+
+    /* ── Thème sombre ── */
+    html[data-theme="dark"] .service-header-card,
+    html[data-theme="dark"] .tabs-wrapper { background: #0d2035; }
+    html[data-theme="dark"] .tabs-nav { border-bottom-color: rgba(255,255,255,0.06); }
+    html[data-theme="dark"] .tab-btn { color: rgba(255,255,255,0.35); }
+    html[data-theme="dark"] .tab-btn:hover { color: var(--teal-300); }
+    html[data-theme="dark"] .tab-btn.active { color: var(--teal-300); border-bottom-color: var(--teal-300); }
+
+    html[data-theme="dark"] .field-ul { border-bottom-color: rgba(255,255,255,0.15); color: #cce8f4; }
+    html[data-theme="dark"] .field-ul:focus { border-bottom-color: var(--teal-400); }
+    html[data-theme="dark"] .field-ul::placeholder { color: rgba(255,255,255,0.2); }
+    html[data-theme="dark"] select.field-ul {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236ecae3' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    }
+    html[data-theme="dark"] .field-ul-name { color: #cce8f4; }
+    html[data-theme="dark"] .field-ul-ref { color: rgba(255,255,255,0.55); }
+    html[data-theme="dark"] .field-label { color: rgba(255,255,255,0.4); }
+    html[data-theme="dark"] .tab-section-title { color: rgba(255,255,255,0.35); }
+    html[data-theme="dark"] .cb-label { color: #cce8f4; }
+    html[data-theme="dark"] .cb-row { color: #cce8f4; }
+    html[data-theme="dark"] .radio-label { color: #cce8f4; }
+    html[data-theme="dark"] .prix-inline .unit { color: rgba(255,255,255,0.3); }
+    html[data-theme="dark"] .note-grise { color: rgba(255,255,255,0.25); }
+    html[data-theme="dark"] .favori-star { color: rgba(255,255,255,0.15); }
+    html[data-theme="dark"] .favori-star.active { color: #f0b429; }
+    html[data-theme="dark"] .photo-placeholder { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.12); color: rgba(255,255,255,0.25); }
+    html[data-theme="dark"] .photo-label-btn { color: var(--teal-300); }
+    html[data-theme="dark"] .photo-large { border-color: rgba(255,255,255,0.12); }
+    html[data-theme="dark"] .action-bar-breadcrumb a { color: var(--teal-400); }
+    html[data-theme="dark"] .action-bar-breadcrumb .sep,
+    html[data-theme="dark"] .action-bar-breadcrumb .current { color: rgba(255,255,255,0.35); }
+    html[data-theme="dark"] .inline-table th { background: rgba(255,255,255,0.03); border-bottom-color: rgba(255,255,255,0.08); color: rgba(255,255,255,0.4); }
+    html[data-theme="dark"] .inline-table td { border-bottom-color: rgba(255,255,255,0.04); }
+    html[data-theme="dark"] .btn-del-line { color: rgba(255,255,255,0.2); }
+    html[data-theme="dark"] .btn-del-line:hover { color: #f09090; }
+    html[data-theme="dark"] .btn-add-line { color: var(--teal-300); }
+    html[data-theme="dark"] .btn-add-line:hover { color: var(--teal-200); }
+    html[data-theme="dark"] .variante-warning { color: rgba(255,255,255,0.25); }
+    html[data-theme="dark"] #modal-box { background: #0d2035; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+
+    /* ── Searchable Select ── */
+    .ss-wrap { position: relative; }
+    .ss-dropdown {
+        display: none;
+        position: absolute;
+        top: calc(100% + 2px); left: 0; right: 0;
+        background: #fff;
+        border: 1px solid rgba(0,0,0,0.12);
+        border-radius: 8px;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.10);
+        z-index: 400;
+        max-height: 220px;
+        overflow-y: auto;
+    }
+    .ss-opt {
+        padding: 8px 12px; font-size: 13px; cursor: pointer;
+        color: var(--teal-900); border-bottom: 1px solid rgba(0,0,0,0.04);
+    }
+    .ss-opt:last-child { border-bottom: none; }
+    .ss-opt:hover { background: var(--teal-50); }
+    .ss-opt.ss-selected { font-weight: 700; color: var(--teal-600); }
+    .ss-opt.ss-none { color: #bfcdd4; font-style: italic; }
+    .ss-no-result { padding: 9px 12px; font-size: 12px; color: #aaa; font-style: italic; }
+    html[data-theme="dark"] .ss-dropdown { background: #0d2035; border-color: rgba(255,255,255,0.12); }
+    html[data-theme="dark"] .ss-opt { color: #cce8f4; border-bottom-color: rgba(255,255,255,0.04); }
+    html[data-theme="dark"] .ss-opt:hover { background: rgba(33,136,171,0.15); }
+    html[data-theme="dark"] .ss-opt.ss-selected { color: var(--teal-300); }
+    html[data-theme="dark"] .ss-opt.ss-none { color: rgba(255,255,255,0.2); }
 </style>
-</head>
-<body>
+{% endblock %}
 
-<!-- MESSAGES -->
-{% if messages %}
-<div style="padding:12px 32px;">
-  {% for msg in messages %}
-  <div class="alert alert-{{ msg.tags }}">{{ msg }}</div>
-  {% endfor %}
-</div>
-{% endif %}
-
-<!-- TOPBAR -->
-<header class="topbar">
-  <div class="topbar-left">
+{% block breadcrumb %}
+<nav class="breadcrumb">
+    <a href="{% url 'dashboard' %}"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z"/><polyline points="9 21 9 12 15 12 15 21"/></svg>Accueil</a>
+    <span class="breadcrumb-sep">›</span>
     <a href="{% url 'services:list' %}">Services</a>
-    <span class="sep">/</span>
-    <span class="current">{% if is_new %}Nouveau{% else %}{{ article.nom|truncatechars:40 }}{% endif %}</span>
-  </div>
-  <div class="topbar-right">
-    <a href="{% url 'services:list' %}" class="btn-cancel">IGNORER</a>
-    <button type="submit" form="article-form" class="btn-save">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-      SAUVEGARDER
-    </button>
-  </div>
-</header>
+    <span class="breadcrumb-sep">›</span>
+    <span>{% if is_new %}Nouveau{% else %}{{ article.nom|truncatechars:40 }}{% endif %}</span>
+</nav>
+{% endblock %}
 
-<!-- STAT COUNTERS -->
-<div class="stat-counters">
-  {% if not is_new %}
-  <a href="{% url 'services:regles_prix' article.pk %}" class="stat-counter">
-  {% else %}
-  <div class="stat-counter">
-  {% endif %}
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-    <div>
-      <div class="num">{% if not is_new %}{{ regles|length }}{% else %}0{% endif %}</div>
-      <div>Règle de prix</div>
-    </div>
-  {% if not is_new %}</a>{% else %}</div>{% endif %}
+{% block content %}
 
-  <div class="stat-counter">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-    <div style="display:flex;align-items:baseline;gap:4px;">
-      <div><span style="font-size:10px;color:var(--text-muted);">In:</span> <span class="num" style="font-size:15px;">0</span></div>
-      <div><span style="font-size:10px;color:var(--text-muted);">Out:</span> <span class="num" style="font-size:15px;">0</span></div>
-    </div>
-  </div>
+<form method="post" enctype="multipart/form-data" id="article-form" novalidate>
+{% csrf_token %}
 
-  <div class="stat-counter">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-    <div>
-      <div class="num">{% if not is_new %}{{ lignes_variantes|length }}{% else %}0{% endif %}</div>
-      <div>Stratégies de rangement</div>
+<!-- ── Action bar ── -->
+<div class="action-bar">
+    <div class="action-bar-breadcrumb">
+        <a href="{% url 'services:list' %}">Services</a>
+        <span class="sep">/</span>
+        <span class="current">{% if is_new %}Nouveau{% else %}{{ article.nom|truncatechars:35 }}{% endif %}</span>
     </div>
-  </div>
-
-  <div class="stat-counter">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
-    <div>
-      <div class="num">{% if not is_new %}{{ lignes_conditionnements|length }}{% else %}0{% endif %}</div>
-      <div>Capacités de Stockage</div>
+    <div class="action-bar-buttons">
+        {% if is_new %}
+            <a href="{% url 'services:list' %}" class="btn btn-secondary">Annuler</a>
+        {% else %}
+            <a href="{% url 'services:detail' article.pk %}" class="btn btn-secondary">Annuler</a>
+        {% endif %}
+        <button type="submit" class="btn btn-primary">
+            {% if is_new %}Créer l'article{% else %}Enregistrer les modifications{% endif %}
+        </button>
     </div>
-  </div>
-
-  <div class="stat-counter">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-    <div>
-      <div class="num">0,00</div>
-      <div>Unités Achetées</div>
-    </div>
-  </div>
-
-  <div class="stat-counter">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-    <div>
-      <div class="num">0,00</div>
-      <div>Unités Vendues</div>
-    </div>
-  </div>
 </div>
 
-<!-- FORMULAIRE PRINCIPAL -->
-<form method="post" enctype="multipart/form-data" id="article-form">
-{% csrf_token %}
-<div class="main-layout">
-
-  <div class="card">
-
-    <!-- EN-TÊTE : NOM + PHOTO -->
-    <div class="card-header">
-      <!-- Étoile favori -->
-      <button type="button" class="favori-btn {% if article and article.favori %}active{% endif %}" id="favori-btn" title="Ajouter aux favoris">★</button>
-      <input type="hidden" name="favori" id="favori-input" value="{% if article and article.favori %}on{% endif %}">
-
-      <div class="header-nom">
-        <label>Nom de l'article</label>
-        <input type="text" name="nom" class="nom-input"
-               placeholder="par ex. Consultation adulte, Paracétamol 500mg…"
-               value="{% if article %}{{ article.nom }}{% endif %}" required>
-        <div class="ref-row">
-          <input type="text" name="reference_interne" class="ref-input"
-                 placeholder="Référence interne (ex: CS_CSAD)"
-                 value="{% if article %}{{ article.reference_interne }}{% endif %}">
-          <span style="font-size:11px;color:var(--text-muted);">FR</span>
+<!-- ── Header card ── -->
+<div class="service-header-card">
+    <div class="service-identity-row">
+        <div class="service-name-block">
+            <div style="margin-bottom:4px;">
+                <button type="button" class="favori-star {% if article and article.favori %}active{% endif %}" id="favori-btn">★</button>
+                <input type="hidden" name="favori" id="favori-input" value="{% if article and article.favori %}on{% endif %}">
+                <span class="field-label" style="display:inline;text-transform:none;font-size:12px;color:var(--rose);font-weight:600;letter-spacing:0;">Nom de l'article</span>
+            </div>
+            <input type="text" name="nom" class="field-ul field-ul-name"
+                   placeholder="par ex. Cheese Burger"
+                   value="{% if article %}{{ article.nom }}{% endif %}" required>
+            <input type="text" name="reference_interne" class="field-ul field-ul-ref"
+                   placeholder="Référence interne…"
+                   value="{% if article %}{{ article.reference_interne }}{% endif %}">
+            <div class="service-checks">
+                <label class="cb-label">
+                    <input type="checkbox" name="peut_etre_vendu" {% if not article or article.peut_etre_vendu %}checked{% endif %}>
+                    Peut être vendu
+                </label>
+                <label class="cb-label">
+                    <input type="checkbox" name="peut_etre_achete" {% if not article or article.peut_etre_achete %}checked{% endif %}>
+                    Peut être acheté
+                </label>
+            </div>
         </div>
-        <div class="checkboxes">
-          <label class="cb-label">
-            <input type="checkbox" name="peut_etre_vendu" {% if not article or article.peut_etre_vendu %}checked{% endif %}>
-            Peut être vendu
-          </label>
-          <label class="cb-label">
-            <input type="checkbox" name="peut_etre_achete" {% if not article or article.peut_etre_achete %}checked{% endif %}>
-            Peut être acheté
-          </label>
-          <label class="cb-label">
-            <input type="checkbox" name="actif" {% if not article or article.actif %}checked{% endif %}>
-            Actif
-          </label>
-        </div>
-      </div>
 
-      <!-- Photo -->
-      <div class="photo-box" onclick="document.getElementById('photo-input').click()">
-        {% if article and article.photo %}
-          <img src="{{ article.photo.url }}" id="photo-preview">
-        {% else %}
-          <img id="photo-preview" style="display:none">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-          <span>Photo</span>
-        {% endif %}
-        <input type="file" name="photo" id="photo-input" accept="image/*" style="display:none" onchange="previewPhoto(this)">
-      </div>
+        <div class="service-photo-block">
+            {% if article and article.photo %}
+                <img src="{{ article.photo.url }}" alt="Photo" class="photo-large" id="photo-preview">
+            {% else %}
+                <div class="photo-placeholder" id="photo-placeholder">🖼</div>
+                <img src="" alt="Photo" class="photo-large" id="photo-preview" style="display:none;">
+            {% endif %}
+            <label for="photo-input" class="photo-label-btn">
+                {% if article and article.photo %}Changer{% else %}Ajouter une photo{% endif %}
+            </label>
+            <input type="file" name="photo" id="photo-input" accept="image/*" style="display:none">
+        </div>
+    </div>
+</div><!-- /service-header-card -->
+
+<!-- ── Tabs ── -->
+<div class="tabs-wrapper">
+    <div class="tabs-nav">
+        <button type="button" class="tab-btn active" data-tab="tab-medic">Détails du médicament</button>
+        <button type="button" class="tab-btn" data-tab="tab-info">Information Générale</button>
+        <button type="button" class="tab-btn" data-tab="tab-variantes">Attributs et Variantes</button>
+        <button type="button" class="tab-btn" data-tab="tab-vente">Vente</button>
+        <button type="button" class="tab-btn" data-tab="tab-achats">Achats</button>
+        <button type="button" class="tab-btn" data-tab="tab-stock">Stock</button>
+        <button type="button" class="tab-btn" data-tab="tab-compta">Comptabilité</button>
     </div>
 
-    <!-- ONGLETS -->
-    <div class="tabs-wrap">
-      <button type="button" class="tab-btn active" data-tab="tab-medic">Détails du médicament</button>
-      <button type="button" class="tab-btn" data-tab="tab-info">Information Générale</button>
-      <button type="button" class="tab-btn" data-tab="tab-variantes">Attributs et Variantes</button>
-      <button type="button" class="tab-btn" data-tab="tab-vente">Vente</button>
-      <button type="button" class="tab-btn" data-tab="tab-achats">Achats</button>
-      <button type="button" class="tab-btn" data-tab="tab-stock">Stock</button>
-      <button type="button" class="tab-btn" data-tab="tab-compta">Comptabilité</button>
-    </div>
-
-    <!-- ═══ ONGLET 1 : DÉTAILS DU MÉDICAMENT ═══ -->
+    <!-- ═══ ONGLET 1 : Détails du médicament ═══ -->
     <div class="tab-panel active" id="tab-medic">
-      <div class="form-grid">
-        <div class="form-group">
-          <label class="form-label">Forme</label>
-          <select name="forme" class="form-control">
-            <option value="">—</option>
-            {% for val, label in forme_choices %}
-            <option value="{{ val }}" {% if article and article.forme == val %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-          </select>
+        <div class="tab-two-col">
+            <!-- Colonne gauche -->
+            <div>
+                <div class="form-field">
+                    <label class="field-label">Forme</label>
+                    <select name="forme" class="field-ul">
+                        <option value="">—</option>
+                        {% for val, label in forme_choices %}
+                        <option value="{{ val }}" {% if article and article.forme == val %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label class="field-label">Voie d'administration</label>
+                    <select name="voie_administration" class="field-ul">
+                        <option value="">—</option>
+                        {% for val, label in voie_choices %}
+                        <option value="{{ val }}" {% if article and article.voie_administration == val %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label class="field-label">Dosage</label>
+                    <div style="display:flex;gap:8px;">
+                        <input type="text" name="dosage" class="field-ul" placeholder="ex : 500"
+                               value="{% if article %}{{ article.dosage }}{% endif %}" style="flex:2;">
+                        <input type="text" name="dosage_unite" class="field-ul" placeholder="mg / ml"
+                               value="{% if article %}{{ article.dosage_unite }}{% endif %}" style="flex:1;">
+                    </div>
+                </div>
+                <div class="form-field">
+                    <label class="cb-row">
+                        <input type="checkbox" name="quantite_prescription_manuelle"
+                               {% if article and article.quantite_prescription_manuelle %}checked{% endif %}>
+                        Quantité de prescription manuelle
+                    </label>
+                </div>
+            </div>
+            <!-- Colonne droite -->
+            <div>
+                <div class="form-field">
+                    <label class="field-label">Fréquence</label>
+                    <input type="text" name="frequence" class="field-ul"
+                           placeholder="ex : 3 fois / jour"
+                           value="{% if article %}{{ article.frequence }}{% endif %}">
+                </div>
+                <div class="form-field">
+                    <label class="field-label">Composant actif</label>
+                    <input type="text" name="composant_actif" class="field-ul"
+                           value="{% if article %}{{ article.composant_actif }}{% endif %}">
+                </div>
+                <div class="form-field">
+                    <label class="field-label">Effet thérapeutique</label>
+                    <input type="text" name="effet_therapeutique" class="field-ul"
+                           value="{% if article %}{{ article.effet_therapeutique }}{% endif %}">
+                </div>
+                <div class="form-field">
+                    <label class="field-label">Effets indésirables</label>
+                    <input type="text" name="effets_indesirables" class="field-ul"
+                           value="{% if article %}{{ article.effets_indesirables }}{% endif %}">
+                </div>
+            </div>
         </div>
-        <div class="form-group">
-          <label class="form-label">Fréquence</label>
-          <input type="text" name="frequence" class="form-control"
-                 placeholder="ex: 3 fois/jour"
-                 value="{% if article %}{{ article.frequence }}{% endif %}">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Voie d'administration</label>
-          <select name="voie_administration" class="form-control">
-            <option value="">—</option>
-            {% for val, label in voie_choices %}
-            <option value="{{ val }}" {% if article and article.voie_administration == val %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Composant actif</label>
-          <input type="text" name="composant_actif" class="form-control"
-                 value="{% if article %}{{ article.composant_actif }}{% endif %}">
-        </div>
-        <div class="form-group">
-          <label class="fornormalement lorsquon clique sur ceux ci on est diriger vers dautres interface mais apres on va gerer cela 
-pour le moment modifie un peu les champs la pour quil soit exactement comme sur les captures tu vois les bordures des champs et plus le truc des carrés comme des tableaux
-jai aussi oublier les champs quon clique pour voir les listes on doit pouvoir ecrire pour que sa fasse des filtres au cas ou les listes sont longuesm-label">Dosage</label>
-          <div style="display:flex;gap:8px;">
-            <input type="text" name="dosage" class="form-control" placeholder="ex: 500"
-                   value="{% if article %}{{ article.dosage }}{% endif %}" style="flex:2;">
-            <input type="text" name="dosage_unite" class="form-control" placeholder="mg / ml"
-                   value="{% if article %}{{ article.dosage_unite }}{% endif %}" style="flex:1;">
-          </div>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Effet thérapeutique</label>
-          <input type="text" name="effet_therapeutique" class="form-control"
-                 value="{% if article %}{{ article.effet_therapeutique }}{% endif %}">
-        </div>
-        <div class="form-group" style="align-self:center;">
-          <label class="cb-row">
-            <input type="checkbox" name="quantite_prescription_manuelle"
-                   {% if article and article.quantite_prescription_manuelle %}checked{% endif %}>
-            Quantité de prescription manuelle
-          </label>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Effets indésirables</label>
-          <input type="text" name="effets_indesirables" class="form-control"
-                 value="{% if article %}{{ article.effets_indesirables }}{% endif %}">
-        </div>
-      </div>
 
-      <!-- Fabricant -->
-      <div class="form-section" style="margin-top:24px;">
-        <div class="form-section-title">Détails sur le fabricant (compagnie pharmaceutique)</div>
-        <div class="form-grid">
-          <div class="form-group">
-            <label class="form-label">Compagnie pharmaceutique</label>
-            <select name="compagnie_pharmaceutique" class="form-control">
-              <option value="">—</option>
-              {% for cp in compagnies %}
-              <option value="{{ cp.pk }}" {% if article and article.compagnie_pharmaceutique_id == cp.pk %}selected{% endif %}>{{ cp.nom }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Code produit</label>
-            <input type="text" name="code_produit" class="form-control"
-                   value="{% if article %}{{ article.code_produit }}{% endif %}">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Nom du produit</label>
-            <input type="text" name="nom_produit_fabricant" class="form-control"
-                   value="{% if article %}{{ article.nom_produit_fabricant }}{% endif %}">
-          </div>
-          <div class="form-group">
-            <label class="form-label">URL du produit</label>
-            <input type="url" name="url_produit" class="form-control"
-                   value="{% if article %}{{ article.url_produit }}{% endif %}">
-          </div>
+        <!-- Fabricant -->
+        <span class="tab-section-title">Détails sur le fabricant (compagnie pharmaceutique)</span>
+        <div class="tab-two-col">
+            <div>
+                <div class="form-field">
+                    <label class="field-label">Compagnie pharmaceutique</label>
+                    <select name="compagnie_pharmaceutique" class="field-ul">
+                        <option value="">—</option>
+                        {% for cp in compagnies %}
+                        <option value="{{ cp.pk }}" {% if article and article.compagnie_pharmaceutique_id == cp.pk %}selected{% endif %}>{{ cp.nom }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label class="field-label">Nom du produit</label>
+                    <input type="text" name="nom_produit_fabricant" class="field-ul"
+                           value="{% if article %}{{ article.nom_produit_fabricant }}{% endif %}">
+                </div>
+            </div>
+            <div>
+                <div class="form-field">
+                    <label class="field-label">Code produit</label>
+                    <input type="text" name="code_produit" class="field-ul"
+                           value="{% if article %}{{ article.code_produit }}{% endif %}">
+                </div>
+                <div class="form-field">
+                    <label class="field-label">URL du produit</label>
+                    <input type="url" name="url_produit" class="field-ul"
+                           value="{% if article %}{{ article.url_produit }}{% endif %}">
+                </div>
+            </div>
         </div>
-      </div>
 
-      <!-- Grossesse -->
-      <div class="form-section">
-        <div class="form-section-title">Grossesse</div>
-        <div class="form-grid">
-          <div class="form-group">
-            <label class="cb-row">
-              <input type="checkbox" name="avertissement_grossesse"
-                     {% if article and article.avertissement_grossesse %}checked{% endif %}>
-              Avertissement de grossesse
-            </label>
-          </div>
-          <div class="form-group">
-            <label class="cb-row">
-              <input type="checkbox" name="avertissement_lactation"
-                     {% if article and article.avertissement_lactation %}checked{% endif %}>
-              Avertissement de lactation
-            </label>
-          </div>
+        <!-- Grossesse -->
+        <span class="tab-section-title">Grossesse</span>
+        <div class="tab-two-col" style="margin-bottom:20px;">
+            <div class="form-field">
+                <label class="cb-row">
+                    <input type="checkbox" name="avertissement_grossesse"
+                           {% if article and article.avertissement_grossesse %}checked{% endif %}>
+                    Avertissement de grossesse
+                </label>
+            </div>
+            <div class="form-field">
+                <label class="cb-row">
+                    <input type="checkbox" name="avertissement_lactation"
+                           {% if article and article.avertissement_lactation %}checked{% endif %}>
+                    Avertissement de lactation
+                </label>
+            </div>
         </div>
-      </div>
 
-      <div class="form-grid">
-        <div class="form-group full">
-          <label class="form-label">Indications</label>
-          <textarea name="indications" class="form-control">{% if article %}{{ article.indications }}{% endif %}</textarea>
+        <div class="form-field">
+            <label class="field-label">Indications</label>
+            <textarea name="indications" class="field-ul">{% if article %}{{ article.indications }}{% endif %}</textarea>
         </div>
-        <div class="form-group full">
-          <label class="form-label">Remarques</label>
-          <textarea name="remarques" class="form-control">{% if article %}{{ article.remarques }}{% endif %}</textarea>
+        <div class="form-field" style="margin-top:16px;">
+            <label class="field-label">Remarques</label>
+            <textarea name="remarques" class="field-ul">{% if article %}{{ article.remarques }}{% endif %}</textarea>
         </div>
-      </div>
     </div>
 
-    <!-- ═══ ONGLET 2 : INFORMATION GÉNÉRALE ═══ -->
+    <!-- ═══ ONGLET 2 : Information Générale ═══ -->
     <div class="tab-panel" id="tab-info">
-      <div class="form-grid">
-        <div>
-          <div class="form-group" style="margin-bottom:16px;">
-            <label class="form-label">Type d'article</label>
-            <select name="type_article" class="form-control">
-              {% for val, label in type_article_choices %}
-              <option value="{{ val }}" {% if article and article.type_article == val %}selected{% elif not article and val == 'consommable' %}selected{% endif %}>{{ label }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="form-group" style="margin-bottom:16px;">
-            <label class="form-label">Type de produit hospitalier</label>
-            <select name="type_produit_hospitalier" class="form-control">
-              <option value="">—</option>
-              {% for val, label in type_produit_choices %}
-              <option value="{{ val }}" {% if article and article.type_produit_hospitalier == val %}selected{% endif %}>{{ label }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="form-group" style="margin-bottom:16px;">
-            <label class="form-label">Politique de facturation</label>
-            <select name="politique_facturation" class="form-control">
-              {% for val, label in politique_fact_choices %}
-              <option value="{{ val }}" {% if article and article.politique_facturation == val %}selected{% endif %}>{{ label }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Re-facturer les dépenses</label>
-            <div class="radio-group">
-              {% for val, label in refacturer_choices %}
-              <label class="radio-label">
-                <input type="radio" name="refacturer_depenses" value="{{ val }}"
-                       {% if article and article.refacturer_depenses == val %}checked{% elif not article and val == 'non' %}checked{% endif %}>
-                {{ label }}
-              </label>
-              {% endfor %}
+        <div class="tab-two-col">
+            <!-- Colonne gauche -->
+            <div>
+                <div class="form-field">
+                    <label class="field-label">Type d'article</label>
+                    <select name="type_article" class="field-ul">
+                        {% for val, label in type_article_choices %}
+                        <option value="{{ val }}" {% if article and article.type_article == val %}selected{% elif not article and val == 'consommable' %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label class="field-label">Type de produit hospitalier</label>
+                    <select name="type_produit_hospitalier" class="field-ul">
+                        <option value="">—</option>
+                        {% for val, label in type_produit_choices %}
+                        <option value="{{ val }}" {% if article and article.type_produit_hospitalier == val %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label class="field-label">Politique de facturation</label>
+                    <select name="politique_facturation" class="field-ul">
+                        {% for val, label in politique_fact_choices %}
+                        <option value="{{ val }}" {% if article and article.politique_facturation == val %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label class="field-label">Re-facturer les dépenses</label>
+                    <div class="radio-group">
+                        {% for val, label in refacturer_choices %}
+                        <label class="radio-label">
+                            <input type="radio" name="refacturer_depenses" value="{{ val }}"
+                                   {% if article and article.refacturer_depenses == val %}checked{% elif not article and val == 'non' %}checked{% endif %}>
+                            {{ label }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                <p class="note-grise">Les consommables sont des produits physiques dont vous ne gérez pas le niveau de stock : ils sont toujours disponibles. Vous pouvez les facturer avant qu'ils ne soient livrés.</p>
+                <div class="form-field">
+                    <label class="field-label">Unité de mesure</label>
+                    <select name="unite_mesure" class="field-ul">
+                        <option value="Unités" {% if not article or article.unite_mesure == 'Unités' %}selected{% endif %}>Unités</option>
+                        <option value="kg" {% if article and article.unite_mesure == 'kg' %}selected{% endif %}>kg</option>
+                        <option value="g" {% if article and article.unite_mesure == 'g' %}selected{% endif %}>g</option>
+                        <option value="L" {% if article and article.unite_mesure == 'L' %}selected{% endif %}>L</option>
+                        <option value="ml" {% if article and article.unite_mesure == 'ml' %}selected{% endif %}>ml</option>
+                        <option value="mg" {% if article and article.unite_mesure == 'mg' %}selected{% endif %}>mg</option>
+                        <option value="comprimé" {% if article and article.unite_mesure == 'comprimé' %}selected{% endif %}>Comprimé</option>
+                        {% if article and article.unite_mesure not in 'Unités,kg,g,L,ml,mg,comprimé' %}
+                        <option value="{{ article.unite_mesure }}" selected>{{ article.unite_mesure }}</option>
+                        {% endif %}
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label class="field-label">Unité d'achat</label>
+                    <select name="unite_achat" class="field-ul">
+                        <option value="Unités" {% if not article or article.unite_achat == 'Unités' %}selected{% endif %}>Unités</option>
+                        <option value="kg" {% if article and article.unite_achat == 'kg' %}selected{% endif %}>kg</option>
+                        <option value="g" {% if article and article.unite_achat == 'g' %}selected{% endif %}>g</option>
+                        <option value="L" {% if article and article.unite_achat == 'L' %}selected{% endif %}>L</option>
+                        <option value="ml" {% if article and article.unite_achat == 'ml' %}selected{% endif %}>ml</option>
+                        <option value="mg" {% if article and article.unite_achat == 'mg' %}selected{% endif %}>mg</option>
+                        <option value="comprimé" {% if article and article.unite_achat == 'comprimé' %}selected{% endif %}>Comprimé</option>
+                        {% if article and article.unite_achat not in 'Unités,kg,g,L,ml,mg,comprimé' %}
+                        <option value="{{ article.unite_achat }}" selected>{{ article.unite_achat }}</option>
+                        {% endif %}
+                    </select>
+                </div>
             </div>
-          </div>
-          <div class="form-grid" style="margin-top:16px;">
-            <div class="form-group">
-              <label class="form-label">Unité de mesure</label>
-              <input type="text" name="unite_mesure" class="form-control"
-                     value="{% if article %}{{ article.unite_mesure }}{% else %}Unités{% endif %}">
+            <!-- Colonne droite -->
+            <div>
+                <div class="form-field">
+                    <label class="field-label">Prix de vente (CFA)</label>
+                    <div class="prix-inline">
+                        <input type="number" name="prix_vente" class="field-ul" min="0" step="1"
+                               value="{% if article %}{{ article.prix_vente }}{% else %}0{% endif %}">
+                        <span class="unit">CFA</span>
+                    </div>
+                </div>
+                <div class="form-field">
+                    <label class="field-label">Taxes à la vente</label>
+                    <input type="text" name="taxes_vente" class="field-ul"
+                           value="{% if article %}{{ article.taxes_vente }}{% endif %}">
+                </div>
+                <div class="form-field">
+                    <label class="field-label">Coût</label>
+                    <input type="number" name="cout" class="field-ul" min="0" step="1"
+                           value="{% if article %}{{ article.cout }}{% else %}0{% endif %}">
+                </div>
+                <div class="form-field">
+                    <label class="field-label">Catégorie d'article</label>
+                    <select name="categorie" class="field-ul">
+                        <option value="">—</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat.pk }}" {% if article and article.categorie_id == cat.pk %}selected{% endif %}>{{ cat.code }} — {{ cat.nom }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label class="field-label">Référence interne</label>
+                    <input type="text" name="reference_interne_display" class="field-ul"
+                           value="{% if article %}{{ article.reference_interne }}{% endif %}"
+                           disabled style="opacity:0.55;cursor:not-allowed;">
+                </div>
+                <div class="form-field">
+                    <label class="field-label">Code-barres</label>
+                    <input type="text" name="code_barres" class="field-ul"
+                           value="{% if article %}{{ article.code_barres }}{% endif %}">
+                </div>
+                <div class="form-field">
+                    <label class="field-label">Famille</label>
+                    <select name="famille" class="field-ul">
+                        <option value="">—</option>
+                        {% for fam in familles %}
+                        <option value="{{ fam.pk }}" {% if article and article.famille_id == fam.pk %}selected{% endif %}>{{ fam.nom }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
             </div>
-            <div class="form-group">
-              <label class="form-label">Unité d'achat</label>
-              <input type="text" name="unite_achat" class="form-control"
-                     value="{% if article %}{{ article.unite_achat }}{% else %}Unités{% endif %}">
-            </div>
-          </div>
         </div>
 
-        <div>
-          <div class="form-group" style="margin-bottom:16px;">
-            <label class="form-label">Prix de vente (CFA)</label>
-            <div class="prix-inline">
-              <input type="number" name="prix_vente" class="form-control" min="0" step="1"
-                     value="{% if article %}{{ article.prix_vente }}{% else %}0{% endif %}">
-              <span>CFA</span>
-            </div>
-          </div>
-          <div class="form-group" style="margin-bottom:16px;">
-            <label class="form-label">Taxes à la vente</label>
-            <input type="text" name="taxes_vente" class="form-control"
-                   value="{% if article %}{{ article.taxes_vente }}{% endif %}">
-          </div>
-          <div class="form-group" style="margin-bottom:16px;">
-            <label class="form-label">Coût</label>
-            <input type="number" name="cout" class="form-control" min="0" step="1"
-                   value="{% if article %}{{ article.cout }}{% else %}0{% endif %}">
-          </div>
-          <div class="form-group" style="margin-bottom:16px;">
-            <label class="form-label">Catégorie d'article</label>
-            <select name="categorie" class="form-control">
-              <option value="">—</option>
-              {% for cat in categories %}
-              <option value="{{ cat.pk }}" {% if article and article.categorie_id == cat.pk %}selected{% endif %}>{{ cat.code }} — {{ cat.nom }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="form-group" style="margin-bottom:16px;">
-            <label class="form-label">Référence interne</label>
-            <input type="text" name="reference_interne_2" class="form-control"
-                   value="{% if article %}{{ article.reference_interne }}{% endif %}" disabled
-                   style="background:#f8f8f8;color:var(--text-muted);">
-          </div>
-          <div class="form-group" style="margin-bottom:16px;">
-            <label class="form-label">Code-barres</label>
-            <input type="text" name="code_barres" class="form-control"
-                   value="{% if article %}{{ article.code_barres }}{% endif %}">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Famille</label>
-            <select name="famille" class="form-control">
-              <option value="">—</option>
-              {% for fam in familles %}
-              <option value="{{ fam.pk }}" {% if article and article.famille_id == fam.pk %}selected{% endif %}>{{ fam.nom }}</option>
-              {% endfor %}
-            </select>
-          </div>
+        <div class="form-field" style="margin-top:24px;">
+            <label class="field-label">Notes internes</label>
+            <textarea name="notes_internes" class="field-ul" style="min-height:80px;">{% if article %}{{ article.notes_internes }}{% endif %}</textarea>
         </div>
-      </div>
-
-      <div class="form-group full" style="margin-top:20px;">
-        <label class="form-label">Notes internes</label>
-        <textarea name="notes_internes" class="form-control" style="min-height:80px;">{% if article %}{{ article.notes_internes }}{% endif %}</textarea>
-      </div>
     </div>
 
-    <!-- ═══ ONGLET 3 : ATTRIBUTS ET VARIANTES ═══ -->
+    <!-- ═══ ONGLET 3 : Attributs et Variantes ═══ -->
     <div class="tab-panel" id="tab-variantes">
-      {% if not is_new %}
-      <div class="inline-section">
-        <table class="inline-table" id="variantes-table">
-          <thead>
-            <tr>
-              <th>Caractéristique</th>
-              <th>Valeurs</th>
-              <th width="40"></th>
-            </tr>
-          </thead>
-          <tbody id="variantes-body">
-            {% for v in lignes_variantes %}
-            <tr data-id="{{ v.pk }}">
-              <td>{{ v.caracteristique }}</td>
-              <td>{{ v.valeurs }}</td>
-              <td>
-                <button type="button" class="btn-del-line" onclick="deleteLigne('variante', {{ v.pk }}, this)">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                </button>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
+        <table class="inline-table">
+            <thead>
+                <tr>
+                    <th>Caractéristique</th>
+                    <th>Valeurs</th>
+                    <th width="40"></th>
+                </tr>
+            </thead>
+            <tbody id="variantes-body">
+                {% for v in lignes_variantes %}
+                <tr data-id="{{ v.pk }}">
+                    <td>{{ v.caracteristique }}</td>
+                    <td>{{ v.valeurs }}</td>
+                    <td>
+                        <button type="button" class="btn-del-line" onclick="deleteLigne('variante', '{{ v.pk }}', this)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
         </table>
         <button type="button" class="btn-add-line" onclick="showAddVariante()">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Ajouter une ligne
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Ajouter une ligne
         </button>
-      </div>
-      <p style="margin-top:16px;font-size:11px;color:var(--text-muted);">
-        <strong>Avertissement :</strong> l'ajout ou la suppression des attributs supprimeront et recréeront des variantes existantes.
-      </p>
-      {% else %}
-      <p style="color:var(--text-muted);font-size:13px;padding:20px 0;">Sauvegardez d'abord l'article pour ajouter des attributs et variantes.</p>
-      {% endif %}
+        <p class="variante-warning"><strong>Avertissement :</strong> l'ajout ou la suppression des attributs supprimeront et recréeront des variantes existantes et entraîneront la perte de leurs éventuelles personnalisations.</p>
     </div>
 
-    <!-- ═══ ONGLET 4 : VENTE ═══ -->
+    <!-- ═══ ONGLET 4 : Vente ═══ -->
     <div class="tab-panel" id="tab-vente">
-      <div class="form-section-title">Ventes additionnelles et croisées</div>
-      <p style="font-size:12px;color:var(--text-muted);margin-bottom:20px;">— (fonctionnalité à venir)</p>
-      <div class="form-group">
-        <label class="form-label">Description vente</label>
-        <textarea name="description_vente" class="form-control" style="min-height:120px;">{% if article %}{{ article.description_vente }}{% endif %}</textarea>
-      </div>
+        <span class="tab-section-title">Ventes additionnelles et croisées</span>
+        <div class="form-field">
+            <label class="field-label">Description vente</label>
+            <textarea name="description_vente" class="field-ul" style="min-height:120px;">{% if article %}{{ article.description_vente }}{% endif %}</textarea>
+        </div>
     </div>
 
-    <!-- ═══ ONGLET 5 : ACHATS ═══ -->
+    <!-- ═══ ONGLET 5 : Achats ═══ -->
     <div class="tab-panel" id="tab-achats">
-      {% if not is_new %}
-      <div class="inline-section" style="margin-bottom:24px;">
-        <table class="inline-table">
-          <thead>
-            <tr>
-              <th>Fournisseur</th>
-              <th>Nom article fourn.</th>
-              <th>Référence fourn.</th>
-              <th>Qté min</th>
-              <th>Unité</th>
-              <th>Prix (CFA)</th>
-              <th>Délai (j)</th>
-              <th width="40"></th>
-            </tr>
-          </thead>
-          <tbody id="fournisseurs-body">
-            {% for lf in lignes_fournisseurs %}
-            <tr data-id="{{ lf.pk }}">
-              <td>{{ lf.fournisseur.nom }}</td>
-              <td>{{ lf.nom_article_fournisseur|default:"—" }}</td>
-              <td>{{ lf.reference_fournisseur|default:"—" }}</td>
-              <td>{{ lf.quantite_min }}</td>
-              <td>{{ lf.unite_mesure }}</td>
-              <td>{{ lf.prix|floatformat:0 }}</td>
-              <td>{{ lf.delai_livraison }}</td>
-              <td>
-                <button type="button" class="btn-del-line" onclick="deleteLigne('fournisseur', {{ lf.pk }}, this)">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                </button>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
+        <table class="inline-table" style="margin-bottom:6px;">
+            <thead>
+                <tr>
+                    <th>Fournisseur</th>
+                    <th>Nom de l'article fourn.</th>
+                    <th>Référence fourn.</th>
+                    <th>Date de début</th>
+                    <th>Date de fin</th>
+                    <th>Quantité</th>
+                    <th>Unité de mesure</th>
+                    <th>Prix</th>
+                    <th>Délai de livraison</th>
+                    <th width="40"></th>
+                </tr>
+            </thead>
+            <tbody id="fournisseurs-body">
+                {% for lf in lignes_fournisseurs %}
+                <tr data-id="{{ lf.pk }}">
+                    <td>{{ lf.fournisseur.nom }}</td>
+                    <td>{{ lf.nom_article_fournisseur|default:"—" }}</td>
+                    <td>{{ lf.reference_fournisseur|default:"—" }}</td>
+                    <td>{{ lf.date_debut|default:"—" }}</td>
+                    <td>{{ lf.date_fin|default:"—" }}</td>
+                    <td>{{ lf.quantite_min }}</td>
+                    <td>{{ lf.unite_mesure }}</td>
+                    <td>{{ lf.prix|floatformat:0 }}</td>
+                    <td>{{ lf.delai_livraison }}</td>
+                    <td>
+                        <button type="button" class="btn-del-line" onclick="deleteLigne('fournisseur', '{{ lf.pk }}', this)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
         </table>
         <button type="button" class="btn-add-line" onclick="showAddFournisseur()">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Ajouter une ligne
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Ajouter une ligne
         </button>
-      </div>
-      {% else %}
-      <p style="color:var(--text-muted);font-size:13px;margin-bottom:20px;">Sauvegardez d'abord l'article pour ajouter des fournisseurs.</p>
-      {% endif %}
 
-      <div class="form-section-title">Factures fournisseurs</div>
-      <div class="form-grid">
-        <div class="form-group">
-          <label class="form-label">Taxes fournisseur</label>
-          <input type="text" name="taxes_fournisseur" class="form-control"
-                 placeholder="ex: TVA 18%"
-                 value="{% if article %}{{ article.taxes_fournisseur }}{% endif %}">
+        <span class="tab-section-title">Factures fournisseurs</span>
+        <div class="tab-two-col">
+            <div>
+                <div class="form-field">
+                    <label class="field-label">Taxes fournisseur</label>
+                    <input type="text" name="taxes_fournisseur" class="field-ul"
+                           placeholder="ex : TVA 18%"
+                           value="{% if article %}{{ article.taxes_fournisseur }}{% endif %}">
+                </div>
+                <div class="form-field">
+                    <label class="field-label">Politique de contrôle</label>
+                    <div class="radio-group">
+                        {% for val, label in politique_controle_choices %}
+                        <label class="radio-label">
+                            <input type="radio" name="politique_controle" value="{{ val }}"
+                                   {% if article and article.politique_controle == val %}checked{% elif not article and val == 'qtes_recues' %}checked{% endif %}>
+                            {{ label }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            <div></div>
         </div>
-        <div class="form-group">
-          <label class="form-label">Politique de contrôle</label>
-          <div class="radio-group">
-            {% for val, label in politique_controle_choices %}
-            <label class="radio-label">
-              <input type="radio" name="politique_controle" value="{{ val }}"
-                     {% if article and article.politique_controle == val %}checked{% elif not article and val == 'qtes_recues' %}checked{% endif %}>
-              {{ label }}
-            </label>
-            {% endfor %}
-          </div>
+
+        <div class="form-field" style="margin-top:16px;">
+            <label class="field-label">Description achat</label>
+            <textarea name="description_achat" class="field-ul" style="min-height:80px;">{% if article %}{{ article.description_achat }}{% endif %}</textarea>
         </div>
-      </div>
-      <div class="form-group" style="margin-top:16px;">
-        <label class="form-label">Description achat</label>
-        <textarea name="description_achat" class="form-control">{% if article %}{{ article.description_achat }}{% endif %}</textarea>
-      </div>
     </div>
 
-    <!-- ═══ ONGLET 6 : STOCK ═══ -->
+    <!-- ═══ ONGLET 6 : Stock ═══ -->
     <div class="tab-panel" id="tab-stock">
-      <div class="form-grid">
-        <div class="form-section">
-          <div class="form-section-title">Opérations</div>
-          <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Routes de réapprovisionnement (configurable)</p>
-          <label class="cb-row" style="margin-bottom:8px;">
-            <input type="checkbox" checked disabled> Acheter
-          </label>
+        <div class="tab-two-col" style="margin-bottom:24px;">
+            <!-- Opérations -->
+            <div>
+                <span class="tab-section-title">Opérations</span>
+                <div style="margin-bottom:4px;">
+                    <label class="field-label" style="margin-bottom:8px;">Routes</label>
+                    <label class="cb-row">
+                        <input type="checkbox" checked disabled>
+                        Acheter
+                    </label>
+                </div>
+            </div>
+            <!-- Logistique -->
+            <div>
+                <span class="tab-section-title">Logistique</span>
+                <div class="form-field">
+                    <label class="field-label">Responsable</label>
+                    <select name="responsable" class="field-ul">
+                        <option value="">—</option>
+                        {% for u in users %}
+                        <option value="{{ u.pk }}" {% if article and article.responsable_id == u.pk %}selected{% endif %}>
+                            {{ u.get_full_name|default:u.username }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label class="field-label">Poids</label>
+                    <div class="prix-inline">
+                        <input type="number" name="poids" class="field-ul" min="0" step="0.001"
+                               value="{% if article %}{{ article.poids }}{% else %}0{% endif %}">
+                    </div>
+                </div>
+                <div class="form-field">
+                    <label class="field-label">Volume</label>
+                    <input type="number" name="volume" class="field-ul" min="0" step="0.001"
+                           value="{% if article %}{{ article.volume }}{% else %}0{% endif %}">
+                </div>
+                <div class="form-field">
+                    <label class="field-label">Délai de livraison au client</label>
+                    <div class="prix-inline">
+                        <input type="number" name="delai_livraison_client" class="field-ul" min="0" step="0.1"
+                               value="{% if article %}{{ article.delai_livraison_client }}{% else %}0{% endif %}">
+                        <span class="unit">jours</span>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="form-section">
-          <div class="form-section-title">Logistique</div>
-          <div class="form-group" style="margin-bottom:12px;">
-            <label class="form-label">Responsable</label>
-            <select name="responsable" class="form-control">
-              <option value="">—</option>
-              {% for u in users %}
-              <option value="{{ u.pk }}" {% if article and article.responsable_id == u.pk %}selected{% endif %}>
-                {{ u.get_full_name|default:u.username }}
-              </option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="form-grid-3">
-            <div class="form-group">
-              <label class="form-label">Poids (kg)</label>
-              <input type="number" name="poids" class="form-control form-control-sm" min="0" step="0.001"
-                     value="{% if article %}{{ article.poids }}{% else %}0{% endif %}">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Volume (m³)</label>
-              <input type="number" name="volume" class="form-control form-control-sm" min="0" step="0.001"
-                     value="{% if article %}{{ article.volume }}{% else %}0{% endif %}">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Délai livraison client (j)</label>
-              <input type="number" name="delai_livraison_client" class="form-control form-control-sm" min="0" step="0.1"
-                     value="{% if article %}{{ article.delai_livraison_client }}{% else %}0{% endif %}">
-            </div>
-          </div>
-        </div>
-      </div>
 
-      <!-- Conditionnements -->
-      <div class="form-section" style="margin-top:8px;">
-        <div class="form-section-title">Conditionnement</div>
-        {% if not is_new %}
-        <table class="inline-table">
-          <thead>
-            <tr>
-              <th>Conditionnement</th>
-              <th>Quantité contenue</th>
-              <th>Unité de mesure</th>
-              <th>Ventes</th>
-              <th>Achats</th>
-              <th width="40"></th>
-            </tr>
-          </thead>
-          <tbody id="conditionnements-body">
-            {% for c in lignes_conditionnements %}
-            <tr data-id="{{ c.pk }}">
-              <td>{{ c.conditionnement }}</td>
-              <td>{{ c.quantite }}</td>
-              <td>{{ c.unite_mesure }}</td>
-              <td>{% if c.pour_vente %}✓{% endif %}</td>
-              <td>{% if c.pour_achat %}✓{% endif %}</td>
-              <td>
-                <button type="button" class="btn-del-line" onclick="deleteLigne('conditionnement', {{ c.pk }}, this)">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                </button>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
+        <!-- Conditionnements -->
+        <span class="tab-section-title">Conditionnement</span>
+        <table class="inline-table" style="margin-bottom:6px;">
+            <thead>
+                <tr>
+                    <th>Conditionnement</th>
+                    <th>Quantité contenue</th>
+                    <th>Unité de mesure</th>
+                    <th>Ventes</th>
+                    <th>Achats</th>
+                    <th width="40"></th>
+                </tr>
+            </thead>
+            <tbody id="conditionnements-body">
+                {% for c in lignes_conditionnements %}
+                <tr data-id="{{ c.pk }}">
+                    <td>{{ c.conditionnement }}</td>
+                    <td>{{ c.quantite }}</td>
+                    <td>{{ c.unite_mesure }}</td>
+                    <td>{% if c.pour_vente %}✓{% endif %}</td>
+                    <td>{% if c.pour_achat %}✓{% endif %}</td>
+                    <td>
+                        <button type="button" class="btn-del-line" onclick="deleteLigne('conditionnement', '{{ c.pk }}', this)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
         </table>
         <button type="button" class="btn-add-line" onclick="showAddConditionnement()">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Ajouter une ligne
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Ajouter une ligne
         </button>
-        {% else %}
-        <p style="color:var(--text-muted);font-size:13px;">Sauvegardez d'abord l'article pour ajouter des conditionnements.</p>
-        {% endif %}
-      </div>
 
-      <div class="form-grid" style="margin-top:16px;">
-        <div class="form-group">
-          <label class="form-label">Description pour les réceptions</label>
-          <textarea name="description_reception" class="form-control">{% if article %}{{ article.description_reception }}{% endif %}</textarea>
+        <div class="tab-two-col" style="margin-top:24px;">
+            <div class="form-field">
+                <label class="field-label">Description pour les réceptions</label>
+                <textarea name="description_reception" class="field-ul">{% if article %}{{ article.description_reception }}{% endif %}</textarea>
+            </div>
+            <div class="form-field">
+                <label class="field-label">Description pour les bons de livraison</label>
+                <textarea name="description_livraison" class="field-ul">{% if article %}{{ article.description_livraison }}{% endif %}</textarea>
+            </div>
         </div>
-        <div class="form-group">
-          <label class="form-label">Description pour les bons de livraison</label>
-          <textarea name="description_livraison" class="form-control">{% if article %}{{ article.description_livraison }}{% endif %}</textarea>
+        <div class="form-field" style="margin-top:16px;">
+            <label class="field-label">Description pour les transferts internes</label>
+            <textarea name="description_transfert" class="field-ul">{% if article %}{{ article.description_transfert }}{% endif %}</textarea>
         </div>
-        <div class="form-group full">
-          <label class="form-label">Description pour les transferts internes</label>
-          <textarea name="description_transfert" class="form-control">{% if article %}{{ article.description_transfert }}{% endif %}</textarea>
-        </div>
-      </div>
     </div>
 
-    <!-- ═══ ONGLET 7 : COMPTABILITÉ ═══ -->
+    <!-- ═══ ONGLET 7 : Comptabilité ═══ -->
     <div class="tab-panel" id="tab-compta">
-      <div class="form-grid">
-        <div>
-          <div class="form-section-title">Créances</div>
-          <div class="form-group">
-            <label class="form-label">Compte de revenus</label>
-            <input type="text" name="compte_revenus" class="form-control"
-                   placeholder="ex: 706000"
-                   value="{% if article %}{{ article.compte_revenus }}{% endif %}">
-          </div>
+        <div class="tab-two-col">
+            <div>
+                <span class="tab-section-title">Créances</span>
+                <div class="form-field">
+                    <label class="field-label">Compte de revenus</label>
+                    <input type="text" name="compte_revenus" class="field-ul"
+                           placeholder="ex : 706000"
+                           value="{% if article %}{{ article.compte_revenus }}{% endif %}">
+                </div>
+            </div>
+            <div>
+                <span class="tab-section-title">Dettes</span>
+                <div class="form-field">
+                    <label class="field-label">Compte de charges</label>
+                    <input type="text" name="compte_charges" class="field-ul"
+                           placeholder="ex : 600000"
+                           value="{% if article %}{{ article.compte_charges }}{% endif %}">
+                </div>
+                <div class="form-field">
+                    <label class="field-label">Compte d'écart de prix</label>
+                    <input type="text" name="compte_ecart_prix" class="field-ul"
+                           placeholder="ex : 603000"
+                           value="{% if article %}{{ article.compte_ecart_prix }}{% endif %}">
+                </div>
+            </div>
         </div>
-        <div>
-          <div class="form-section-title">Dettes</div>
-          <div class="form-group" style="margin-bottom:12px;">
-            <label class="form-label">Compte de charges</label>
-            <input type="text" name="compte_charges" class="form-control"
-                   placeholder="ex: 600000"
-                   value="{% if article %}{{ article.compte_charges }}{% endif %}">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Compte d'écart de prix</label>
-            <input type="text" name="compte_ecart_prix" class="form-control"
-                   placeholder="ex: 603000"
-                   value="{% if article %}{{ article.compte_ecart_prix }}{% endif %}">
-          </div>
-        </div>
-      </div>
     </div>
 
-  </div><!-- /card -->
-</div><!-- /main-layout -->
+</div><!-- /tabs-wrapper -->
+
+
 </form>
 
-<!-- ── MODALES D'AJOUT DE LIGNES ── -->
+<!-- ── Modales ── -->
 <div id="modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:500;align-items:center;justify-content:center;">
-  <div id="modal-box" style="background:#fff;border-radius:16px;padding:28px;min-width:480px;max-width:600px;box-shadow:0 20px 60px rgba(0,0,0,0.2);">
-    <div id="modal-content"></div>
-  </div>
+    <div id="modal-box" style="background:#fff;border-radius:16px;padding:28px;min-width:480px;max-width:600px;box-shadow:0 20px 60px rgba(0,0,0,0.2);">
+        <div id="modal-content"></div>
+    </div>
 </div>
 
 <script>
 const ARTICLE_ID = "{% if article %}{{ article.pk }}{% else %}{% endif %}";
 const CSRF = "{{ csrf_token }}";
 
-// ── TABS ──
-document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById(btn.dataset.tab).classList.add('active');
-  });
+/* ── Tabs ── */
+document.querySelectorAll('.tab-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+        document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
+        btn.classList.add('active');
+        document.getElementById(btn.dataset.tab).classList.add('active');
+    });
 });
 
-// ── FAVORI ──
-const favoriBtn = document.getElementById('favori-btn');
-const favoriInput = document.getElementById('favori-input');
+/* ── Favori ── */
+var favoriBtn = document.getElementById('favori-btn');
+var favoriInput = document.getElementById('favori-input');
 if (favoriBtn) {
-  favoriBtn.addEventListener('click', () => {
-    favoriBtn.classList.toggle('active');
-    favoriInput.value = favoriBtn.classList.contains('active') ? 'on' : '';
-  });
+    favoriBtn.addEventListener('click', function() {
+        favoriBtn.classList.toggle('active');
+        favoriInput.value = favoriBtn.classList.contains('active') ? 'on' : '';
+    });
 }
 
-// ── PHOTO PREVIEW ──
-function previewPhoto(input) {
-  if (input.files && input.files[0]) {
-    const reader = new FileReader();
-    reader.onload = e => {
-      const img = document.getElementById('photo-preview');
-      img.src = e.target.result;
-      img.style.display = 'block';
-    };
-    reader.readAsDataURL(input.files[0]);
-  }
+/* ── Aperçu photo ── */
+var photoInput = document.getElementById('photo-input');
+if (photoInput) {
+    photoInput.addEventListener('change', function() {
+        var file = this.files[0];
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            var placeholder = document.getElementById('photo-placeholder');
+            var preview = document.getElementById('photo-preview');
+            if (placeholder) placeholder.style.display = 'none';
+            if (preview) { preview.src = e.target.result; preview.style.display = 'block'; }
+        };
+        reader.readAsDataURL(file);
+    });
 }
 
-// ── MODAL ──
+/* ── Modal ── */
 function showModal(html) {
-  document.getElementById('modal-content').innerHTML = html;
-  const overlay = document.getElementById('modal-overlay');
-  overlay.style.display = 'flex';
+    document.getElementById('modal-content').innerHTML = html;
+    document.getElementById('modal-overlay').style.display = 'flex';
 }
 function closeModal() {
-  document.getElementById('modal-overlay').style.display = 'none';
+    document.getElementById('modal-overlay').style.display = 'none';
 }
-document.getElementById('modal-overlay').addEventListener('click', e => {
-  if (e.target === document.getElementById('modal-overlay')) closeModal();
+document.getElementById('modal-overlay').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
 });
 
-// ── DELETE LIGNE (AJAX) ──
+function getModalColors() {
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    var inp = dark
+        ? 'width:100%;padding:8px 2px;border:none;border-bottom:1px solid rgba(255,255,255,0.15);background:transparent;font-size:13px;margin-top:4px;color:#cce8f4;outline:none;'
+        : 'width:100%;padding:8px 2px;border:none;border-bottom:1px solid #d1dde3;background:transparent;font-size:13px;margin-top:4px;color:var(--teal-900);outline:none;';
+    var cancel = dark
+        ? 'padding:8px 16px;border:1px solid rgba(255,255,255,0.1);border-radius:8px;background:rgba(255,255,255,0.06);color:#a0c8e0;cursor:pointer;'
+        : 'padding:8px 16px;border:1px solid #d1dde3;border-radius:8px;background:#fff;cursor:pointer;';
+    return { inp: inp, cancel: cancel };
+}
+
+/* ── Supprimer ligne (AJAX) ── */
 function deleteLigne(model, pk, btn) {
-  if (!confirm('Supprimer cette ligne ?')) return;
-  fetch(`/services/ajax/delete-ligne/${model}/${pk}/`, {
-    method: 'POST',
-    headers: {'X-CSRFToken': CSRF}
-  }).then(r => r.json()).then(data => {
-    if (data.ok) btn.closest('tr').remove();
-  });
+    if (!confirm('Supprimer cette ligne ?')) return;
+    fetch('/services/ajax/delete-ligne/' + model + '/' + pk + '/', {
+        method: 'POST', headers: { 'X-CSRFToken': CSRF }
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.ok) btn.closest('tr').remove();
+    });
 }
 
-// ── ADD FOURNISSEUR ──
+/* ── Ajouter fournisseur ── */
 function showAddFournisseur() {
-  showModal(`
-    <h3 style="margin-bottom:16px;font-size:15px;color:var(--teal-900);">Ajouter un fournisseur</h3>
-    <div style="display:grid;gap:12px;">
-      <div>
-        <label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;">Fournisseur *</label>
-        <select id="f-fournisseur" style="width:100%;padding:8px 10px;border:1px solid #e0e8f0;border-radius:8px;font-family:Sora,sans-serif;margin-top:4px;">
-          <option value="">— Choisir —</option>
-          {% for f in fournisseurs %}<option value="{{ f.pk }}">{{ f.nom }}</option>{% endfor %}
-        </select>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <div>
-          <label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;">Nom article fourn.</label>
-          <input id="f-nom" type="text" style="width:100%;padding:8px 10px;border:1px solid #e0e8f0;border-radius:8px;font-family:Sora,sans-serif;margin-top:4px;">
-        </div>
-        <div>
-          <label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;">Référence fourn.</label>
-          <input id="f-ref" type="text" style="width:100%;padding:8px 10px;border:1px solid #e0e8f0;border-radius:8px;font-family:Sora,sans-serif;margin-top:4px;">
-        </div>
-        <div>
-          <label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;">Prix (CFA)</label>
-          <input id="f-prix" type="number" value="0" style="width:100%;padding:8px 10px;border:1px solid #e0e8f0;border-radius:8px;font-family:Sora,sans-serif;margin-top:4px;">
-        </div>
-        <div>
-          <label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;">Délai livraison (j)</label>
-          <input id="f-delai" type="number" value="0" style="width:100%;padding:8px 10px;border:1px solid #e0e8f0;border-radius:8px;font-family:Sora,sans-serif;margin-top:4px;">
-        </div>
-      </div>
-    </div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;">
-      <button onclick="closeModal()" style="padding:8px 16px;border:1px solid #e0e8f0;border-radius:8px;background:#fff;cursor:pointer;font-family:Sora,sans-serif;">Annuler</button>
-      <button onclick="saveFournisseur()" style="padding:8px 18px;background:var(--teal-600);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-family:Sora,sans-serif;">Ajouter</button>
-    </div>
-  `);
+    if (!ARTICLE_ID) {
+        showModal('<p style="font-size:14px;color:#8aafbf;text-align:center;padding:16px 0;">Enregistrez d\'abord l\'article avant d\'ajouter des fournisseurs.</p><div style="text-align:center;margin-top:12px;"><button onclick="closeModal()" style="padding:8px 20px;background:var(--teal-600);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;">OK</button></div>');
+        return;
+    }
+    var c = getModalColors();
+    showModal(
+        '<h3 style="margin-bottom:16px;font-size:15px;">Ajouter un fournisseur</h3>' +
+        '<div style="display:grid;gap:12px;">' +
+        '<div><label style="font-size:11px;font-weight:700;color:#8aafbf;text-transform:uppercase;">Fournisseur *</label>' +
+        '<select id="f-four" style="' + c.inp + '"><option value="">— Choisir —</option>' +
+        '{% for f in fournisseurs %}<option value="{{ f.pk }}">{{ f.nom }}</option>{% endfor %}' +
+        '</select></div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
+        '<div><label style="font-size:11px;font-weight:700;color:#8aafbf;text-transform:uppercase;">Nom article fourn.</label><input id="f-nom" type="text" style="' + c.inp + '"></div>' +
+        '<div><label style="font-size:11px;font-weight:700;color:#8aafbf;text-transform:uppercase;">Référence fourn.</label><input id="f-ref" type="text" style="' + c.inp + '"></div>' +
+        '<div><label style="font-size:11px;font-weight:700;color:#8aafbf;text-transform:uppercase;">Prix (CFA)</label><input id="f-prix" type="number" value="0" style="' + c.inp + '"></div>' +
+        '<div><label style="font-size:11px;font-weight:700;color:#8aafbf;text-transform:uppercase;">Délai livraison (j)</label><input id="f-delai" type="number" value="0" style="' + c.inp + '"></div>' +
+        '</div></div>' +
+        '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;">' +
+        '<button onclick="closeModal()" style="' + c.cancel + '">Annuler</button>' +
+        '<button onclick="saveFournisseur()" style="padding:8px 18px;background:var(--teal-600);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;">Ajouter</button>' +
+        '</div>'
+    );
 }
-
 function saveFournisseur() {
-  const fd = new FormData();
-  fd.append('article_id', ARTICLE_ID);
-  fd.append('fournisseur', document.getElementById('f-fournisseur').value);
-  fd.append('nom_article_fournisseur', document.getElementById('f-nom').value);
-  fd.append('reference_fournisseur', document.getElementById('f-ref').value);
-  fd.append('prix', document.getElementById('f-prix').value);
-  fd.append('delai_livraison', document.getElementById('f-delai').value);
-  fetch('/services/ajax/fournisseur-ligne/', {method:'POST', headers:{'X-CSRFToken':CSRF}, body:fd})
-    .then(r => r.json()).then(data => {
-      if (data.id) {
-        const tbody = document.getElementById('fournisseurs-body');
-        tbody.insertAdjacentHTML('beforeend', `
-          <tr data-id="${data.id}">
-            <td>${data.fournisseur}</td><td>—</td><td>—</td><td>1</td><td>Unités</td>
-            <td>${data.prix}</td><td>0</td>
-            <td><button type="button" class="btn-del-line" onclick="deleteLigne('fournisseur',${data.id},this)">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button></td>
-          </tr>`);
-        closeModal();
-      }
-    });
-}
-
-// ── ADD CONDITIONNEMENT ──
-function showAddConditionnement() {
-  showModal(`
-    <h3 style="margin-bottom:16px;font-size:15px;color:var(--teal-900);">Ajouter un conditionnement</h3>
-    <div style="display:grid;gap:12px;">
-      <div>
-        <label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;">Conditionnement *</label>
-        <input id="c-cond" type="text" placeholder="ex: Boîte de 30" style="width:100%;padding:8px 10px;border:1px solid #e0e8f0;border-radius:8px;font-family:Sora,sans-serif;margin-top:4px;">
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <div>
-          <label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;">Quantité contenue</label>
-          <input id="c-qte" type="number" value="1" style="width:100%;padding:8px 10px;border:1px solid #e0e8f0;border-radius:8px;font-family:Sora,sans-serif;margin-top:4px;">
-        </div>
-        <div>
-          <label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;">Unité de mesure</label>
-          <input id="c-unite" type="text" value="Unités" style="width:100%;padding:8px 10px;border:1px solid #e0e8f0;border-radius:8px;font-family:Sora,sans-serif;margin-top:4px;">
-        </div>
-      </div>
-      <div style="display:flex;gap:20px;">
-        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
-          <input id="c-vente" type="checkbox" checked style="accent-color:var(--teal-600);"> Ventes
-        </label>
-        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
-          <input id="c-achat" type="checkbox" checked style="accent-color:var(--teal-600);"> Achats
-        </label>
-      </div>
-    </div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;">
-      <button onclick="closeModal()" style="padding:8px 16px;border:1px solid #e0e8f0;border-radius:8px;background:#fff;cursor:pointer;font-family:Sora,sans-serif;">Annuler</button>
-      <button onclick="saveConditionnement()" style="padding:8px 18px;background:var(--teal-600);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-family:Sora,sans-serif;">Ajouter</button>
-    </div>
-  `);
-}
-
-function saveConditionnement() {
-  const fd = new FormData();
-  fd.append('article_id', ARTICLE_ID);
-  fd.append('conditionnement', document.getElementById('c-cond').value);
-  fd.append('quantite', document.getElementById('c-qte').value);
-  fd.append('unite_mesure', document.getElementById('c-unite').value);
-  if (document.getElementById('c-vente').checked) fd.append('pour_vente', 'on');
-  if (document.getElementById('c-achat').checked) fd.append('pour_achat', 'on');
-  fetch('/services/ajax/conditionn-ligne/', {method:'POST', headers:{'X-CSRFToken':CSRF}, body:fd})
-    .then(r => r.json()).then(data => {
-      if (data.id) {
-        const tbody = document.getElementById('conditionnements-body');
-        tbody.insertAdjacentHTML('beforeend', `
-          <tr data-id="${data.id}">
-            <td>${data.conditionnement}</td><td>1</td><td>Unités</td><td>✓</td><td>✓</td>
-            <td><button type="button" class="btn-del-line" onclick="deleteLigne('conditionnement',${data.id},this)">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button></td>
-          </tr>`);
-        closeModal();
-      }
-    });
-}
-
-// ── ADD VARIANTE ──
-function showAddVariante() {
-  showModal(`
-    <h3 style="margin-bottom:16px;font-size:15px;color:var(--teal-900);">Ajouter un attribut</h3>
-    <div style="display:grid;gap:12px;">
-      <div>
-        <label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;">Caractéristique *</label>
-        <input id="v-carac" type="text" placeholder="ex: Dosage" style="width:100%;padding:8px 10px;border:1px solid #e0e8f0;border-radius:8px;font-family:Sora,sans-serif;margin-top:4px;">
-      </div>
-      <div>
-        <label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;">Valeurs</label>
-        <input id="v-val" type="text" placeholder="ex: 250mg, 500mg, 1g" style="width:100%;padding:8px 10px;border:1px solid #e0e8f0;border-radius:8px;font-family:Sora,sans-serif;margin-top:4px;">
-      </div>
-    </div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;">
-      <button onclick="closeModal()" style="padding:8px 16px;border:1px solid #e0e8f0;border-radius:8px;background:#fff;cursor:pointer;font-family:Sora,sans-serif;">Annuler</button>
-      <button onclick="saveVariante()" style="padding:8px 18px;background:var(--teal-600);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-family:Sora,sans-serif;">Ajouter</button>
-    </div>
-  `);
-}
-
-function saveVariante() {
-  const fd = new FormData();
-  fd.append('article_id', ARTICLE_ID);
-  fd.append('caracteristique', document.getElementById('v-carac').value);
-  fd.append('valeurs', document.getElementById('v-val').value);
-  fetch('/services/ajax/variante-ligne/', {method:'POST', headers:{'X-CSRFToken':CSRF}, body:fd})
-    .then(r => r.json()).then(data => {
-      if (data.id) {
-        const tbody = document.getElementById('variantes-body');
-        tbody.insertAdjacentHTML('beforeend', `
-          <tr data-id="${data.id}">
-            <td>${data.caracteristique}</td><td>—</td>
-            <td><button type="button" class="btn-del-line" onclick="deleteLigne('variante',${data.id},this)">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button></td>
-          </tr>`);
-        closeModal();
-      }
-    });
-}
-
-// ── SEARCHABLE SELECT ──
-function initSearchableSelects(root) {
-  (root || document).querySelectorAll('select.form-control').forEach(sel => {
-    if (sel.closest('.ss-wrapper')) return;
-
-    const wrapper = document.createElement('div');
-    wrapper.className = 'ss-wrapper';
-    sel.parentNode.insertBefore(wrapper, sel);
-    wrapper.appendChild(sel);
-    sel.style.display = 'none';
-
-    const selectedOpt = sel.options[sel.selectedIndex];
-    const hasValue = selectedOpt && selectedOpt.value !== '';
-
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'ss-btn' + (hasValue ? ' ss-val' : '');
-    btn.innerHTML = `<span class="ss-btn-text">${selectedOpt ? selectedOpt.text : '—'}</span><span class="ss-caret">▾</span>`;
-    wrapper.insertBefore(btn, sel);
-
-    const dropdown = document.createElement('div');
-    dropdown.className = 'ss-dropdown';
-
-    const searchInput = document.createElement('input');
-    searchInput.className = 'ss-search';
-    searchInput.placeholder = 'Rechercher…';
-    searchInput.autocomplete = 'off';
-    dropdown.appendChild(searchInput);
-
-    const list = document.createElement('div');
-    list.className = 'ss-list';
-
-    function buildList(q) {
-      list.innerHTML = '';
-      const lq = (q || '').toLowerCase();
-      let count = 0;
-      Array.from(sel.options).forEach(opt => {
-        if (lq && !opt.text.toLowerCase().includes(lq)) return;
-        const item = document.createElement('div');
-        item.className = 'ss-item' +
-          (opt.value === '' ? ' ss-empty-opt' : '') +
-          (opt.value === sel.value ? ' ss-selected' : '');
-        item.textContent = opt.text;
-        item.dataset.value = opt.value;
-        item.addEventListener('mousedown', e => {
-          e.preventDefault();
-          sel.value = opt.value;
-          btn.querySelector('.ss-btn-text').textContent = opt.text;
-          btn.className = 'ss-btn' + (opt.value !== '' ? ' ss-val' : '');
-          closeDropdown();
-          sel.dispatchEvent(new Event('change', {bubbles: true}));
+    var fd = new FormData();
+    fd.append('article_id', ARTICLE_ID);
+    fd.append('fournisseur', document.getElementById('f-four').value);
+    fd.append('nom_article_fournisseur', document.getElementById('f-nom').value);
+    fd.append('reference_fournisseur', document.getElementById('f-ref').value);
+    fd.append('prix', document.getElementById('f-prix').value);
+    fd.append('delai_livraison', document.getElementById('f-delai').value);
+    fetch('/services/ajax/fournisseur-ligne/', { method: 'POST', headers: { 'X-CSRFToken': CSRF }, body: fd })
+        .then(function(r) { return r.json(); }).then(function(d) {
+            if (d.id) {
+                document.getElementById('fournisseurs-body').insertAdjacentHTML('beforeend',
+                    '<tr data-id="' + d.id + '"><td>' + d.fournisseur + '</td><td>—</td><td>—</td><td>—</td><td>—</td><td>1</td><td>Unités</td><td>' + d.prix + '</td><td>0</td>' +
+                    '<td><button type="button" class="btn-del-line" onclick="deleteLigne(\'fournisseur\',' + d.id + ',this)">' +
+                    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+                    '</button></td></tr>'
+                );
+                closeModal();
+            }
         });
-        list.appendChild(item);
-        count++;
-      });
-      if (count === 0) {
-        const noRes = document.createElement('div');
-        noRes.className = 'ss-no-results';
-        noRes.textContent = 'Aucun résultat';
-        list.appendChild(noRes);
-      }
+}
+
+/* ── Ajouter conditionnement ── */
+function showAddConditionnement() {
+    if (!ARTICLE_ID) {
+        showModal('<p style="font-size:14px;color:#8aafbf;text-align:center;padding:16px 0;">Enregistrez d\'abord l\'article avant d\'ajouter des conditionnements.</p><div style="text-align:center;margin-top:12px;"><button onclick="closeModal()" style="padding:8px 20px;background:var(--teal-600);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;">OK</button></div>');
+        return;
+    }
+    var c = getModalColors();
+    showModal(
+        '<h3 style="margin-bottom:16px;font-size:15px;">Ajouter un conditionnement</h3>' +
+        '<div style="display:grid;gap:12px;">' +
+        '<div><label style="font-size:11px;font-weight:700;color:#8aafbf;text-transform:uppercase;">Conditionnement *</label>' +
+        '<input id="c-cond" type="text" placeholder="ex : Boîte de 30" style="' + c.inp + '"></div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
+        '<div><label style="font-size:11px;font-weight:700;color:#8aafbf;text-transform:uppercase;">Quantité contenue</label><input id="c-qte" type="number" value="1" style="' + c.inp + '"></div>' +
+        '<div><label style="font-size:11px;font-weight:700;color:#8aafbf;text-transform:uppercase;">Unité de mesure</label><input id="c-unite" type="text" value="Unités" style="' + c.inp + '"></div>' +
+        '</div>' +
+        '<div style="display:flex;gap:20px;">' +
+        '<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input id="c-vente" type="checkbox" checked style="accent-color:var(--teal-600);"> Ventes</label>' +
+        '<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input id="c-achat" type="checkbox" checked style="accent-color:var(--teal-600);"> Achats</label>' +
+        '</div></div>' +
+        '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;">' +
+        '<button onclick="closeModal()" style="' + c.cancel + '">Annuler</button>' +
+        '<button onclick="saveConditionnement()" style="padding:8px 18px;background:var(--teal-600);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;">Ajouter</button>' +
+        '</div>'
+    );
+}
+function saveConditionnement() {
+    var fd = new FormData();
+    fd.append('article_id', ARTICLE_ID);
+    fd.append('conditionnement', document.getElementById('c-cond').value);
+    fd.append('quantite', document.getElementById('c-qte').value);
+    fd.append('unite_mesure', document.getElementById('c-unite').value);
+    if (document.getElementById('c-vente').checked) fd.append('pour_vente', 'on');
+    if (document.getElementById('c-achat').checked) fd.append('pour_achat', 'on');
+    fetch('/services/ajax/conditionn-ligne/', { method: 'POST', headers: { 'X-CSRFToken': CSRF }, body: fd })
+        .then(function(r) { return r.json(); }).then(function(d) {
+            if (d.id) {
+                document.getElementById('conditionnements-body').insertAdjacentHTML('beforeend',
+                    '<tr data-id="' + d.id + '"><td>' + d.conditionnement + '</td><td>1</td><td>Unités</td><td>✓</td><td>✓</td>' +
+                    '<td><button type="button" class="btn-del-line" onclick="deleteLigne(\'conditionnement\',' + d.id + ',this)">' +
+                    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+                    '</button></td></tr>'
+                );
+                closeModal();
+            }
+        });
+}
+
+/* ── Ajouter variante ── */
+function showAddVariante() {
+    if (!ARTICLE_ID) {
+        showModal('<p style="font-size:14px;color:#8aafbf;text-align:center;padding:16px 0;">Enregistrez d\'abord l\'article avant d\'ajouter des attributs.</p><div style="text-align:center;margin-top:12px;"><button onclick="closeModal()" style="padding:8px 20px;background:var(--teal-600);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;">OK</button></div>');
+        return;
+    }
+    var c = getModalColors();
+    showModal(
+        '<h3 style="margin-bottom:16px;font-size:15px;">Ajouter un attribut</h3>' +
+        '<div style="display:grid;gap:12px;">' +
+        '<div><label style="font-size:11px;font-weight:700;color:#8aafbf;text-transform:uppercase;">Caractéristique *</label>' +
+        '<input id="v-carac" type="text" placeholder="ex : Dosage" style="' + c.inp + '"></div>' +
+        '<div><label style="font-size:11px;font-weight:700;color:#8aafbf;text-transform:uppercase;">Valeurs</label>' +
+        '<input id="v-val" type="text" placeholder="ex : 250mg, 500mg, 1g" style="' + c.inp + '"></div>' +
+        '</div>' +
+        '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;">' +
+        '<button onclick="closeModal()" style="' + c.cancel + '">Annuler</button>' +
+        '<button onclick="saveVariante()" style="padding:8px 18px;background:var(--teal-600);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;">Ajouter</button>' +
+        '</div>'
+    );
+}
+function saveVariante() {
+    var fd = new FormData();
+    fd.append('article_id', ARTICLE_ID);
+    fd.append('caracteristique', document.getElementById('v-carac').value);
+    fd.append('valeurs', document.getElementById('v-val').value);
+    fetch('/services/ajax/variante-ligne/', { method: 'POST', headers: { 'X-CSRFToken': CSRF }, body: fd })
+        .then(function(r) { return r.json(); }).then(function(d) {
+            if (d.id) {
+                document.getElementById('variantes-body').insertAdjacentHTML('beforeend',
+                    '<tr data-id="' + d.id + '"><td>' + d.caracteristique + '</td><td>—</td>' +
+                    '<td><button type="button" class="btn-del-line" onclick="deleteLigne(\'variante\',' + d.id + ',this)">' +
+                    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+                    '</button></td></tr>'
+                );
+                closeModal();
+            }
+        });
+}
+
+/* ── Searchable Select ── */
+function makeSearchable(sel) {
+    var wrap = document.createElement('div');
+    wrap.className = 'ss-wrap';
+    sel.parentNode.insertBefore(wrap, sel);
+    wrap.appendChild(sel);
+    sel.style.cssText = 'position:absolute;opacity:0;pointer-events:none;width:0;height:0;';
+
+    var inp = document.createElement('input');
+    inp.type = 'text';
+    inp.className = 'field-ul';
+    inp.autocomplete = 'off';
+    inp.placeholder = '—';
+
+    var dd = document.createElement('div');
+    dd.className = 'ss-dropdown';
+
+    wrap.appendChild(inp);
+    wrap.appendChild(dd);
+
+    function getSelectedText() {
+        var opt = sel.options[sel.selectedIndex];
+        return (opt && opt.value) ? opt.text : '';
+    }
+    inp.value = getSelectedText();
+
+    function buildDropdown(filter) {
+        dd.innerHTML = '';
+        var f = (filter || '').toLowerCase();
+        var count = 0;
+        Array.from(sel.options).forEach(function(opt) {
+            var txt = opt.text;
+            if (!opt.value) txt = '—';
+            if (f && opt.value && txt.toLowerCase().indexOf(f) < 0) return;
+            var item = document.createElement('div');
+            item.className = 'ss-opt' + (opt.selected ? ' ss-selected' : '') + (!opt.value ? ' ss-none' : '');
+            item.textContent = txt;
+            item.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                sel.value = opt.value;
+                inp.value = opt.value ? opt.text : '';
+                dd.style.display = 'none';
+            });
+            dd.appendChild(item);
+            count++;
+        });
+        if (!count) {
+            var none = document.createElement('div');
+            none.className = 'ss-no-result';
+            none.textContent = 'Aucun résultat';
+            dd.appendChild(none);
+        }
+        dd.style.display = 'block';
     }
 
-    dropdown.appendChild(list);
-    wrapper.appendChild(dropdown);
-
-    btn.addEventListener('click', e => {
-      e.stopPropagation();
-      const isOpen = wrapper.classList.contains('open');
-      document.querySelectorAll('.ss-wrapper.open').forEach(w => w.classList.remove('open'));
-      if (!isOpen) {
-        wrapper.classList.add('open');
-        searchInput.value = '';
-        buildList('');
-        setTimeout(() => searchInput.focus(), 40);
-      }
+    inp.addEventListener('focus', function() { buildDropdown(''); });
+    inp.addEventListener('input', function() { buildDropdown(this.value); });
+    inp.addEventListener('blur', function() {
+        setTimeout(function() {
+            dd.style.display = 'none';
+            /* Restaurer l'affichage si l'utilisateur a tapé quelque chose d'invalide */
+            inp.value = getSelectedText();
+        }, 200);
     });
-
-    searchInput.addEventListener('input', () => buildList(searchInput.value));
-    searchInput.addEventListener('click', e => e.stopPropagation());
-
-    function closeDropdown() { wrapper.classList.remove('open'); }
-    document.addEventListener('click', closeDropdown);
-  });
 }
 
-document.addEventListener('DOMContentLoaded', () => initSearchableSelects());
+document.querySelectorAll('select.field-ul').forEach(makeSearchable);
 </script>
-{% django_browser_reload_script %}
-</body>
-</html>
+{% endblock %}

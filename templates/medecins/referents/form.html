@@ -1,0 +1,832 @@
+{% extends 'medecins/base.html' %}
+
+{% block topbar_title %}{{ titre }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .field-ul {
+        width: 100%;
+        background: transparent;
+        border: none;
+        border-bottom: 1.5px solid #d1dde3;
+        border-radius: 0;
+        padding: 7px 2px;
+        font-size: 13px;
+        color: var(--text-primary);
+        transition: border-color .2s;
+        outline: none;
+    }
+    .field-ul:focus { border-bottom-color: var(--teal-500); }
+    .field-ul.error { border-bottom-color: var(--rose); }
+    .field-ul::placeholder { color: #bfcdd4; }
+    textarea.field-ul { resize: vertical; border-bottom-width: 1.5px; padding: 6px 2px; }
+    select.field-ul {
+        appearance: none; -webkit-appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23839aaa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+        background-repeat: no-repeat; background-position: right 4px center;
+        padding-right: 22px; cursor: pointer;
+    }
+    .field-ul-name {
+        font-size: 26px; font-weight: 700; color: var(--teal-900);
+        border-bottom-width: 2px; padding: 4px 0 6px; margin-bottom: 6px;
+    }
+    .field-ul-name::placeholder { color: #c5d4d8; font-weight: 600; }
+    .field-ul-prenom { font-size: 16px; font-weight: 500; color: var(--text-secondary); padding: 3px 0 5px; }
+    .field-ul-prenom::placeholder { color: #c5d4d8; }
+    .field-label {
+        display: block; font-size: 11px; font-weight: 700; color: var(--text-muted);
+        text-transform: uppercase; letter-spacing: .05em; margin-bottom: 4px;
+    }
+    .field-error { font-size: 12px; color: var(--rose); margin-top: 3px; }
+
+    /* Action bar */
+    .action-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 12px; }
+    .action-bar-breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
+    .action-bar-breadcrumb a { color: var(--teal-700); text-decoration: none; }
+    .action-bar-breadcrumb .sep { color: #bbb; }
+    .action-bar-breadcrumb .current { color: var(--text-secondary); font-weight: 500; }
+    .action-bar-buttons { display: flex; gap: 8px; }
+
+    /* Smart buttons */
+    .smart-buttons { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+    .smart-btn {
+        display: inline-flex; flex-direction: column; align-items: center;
+        padding: 8px 16px; background: #fff; border: 1px solid rgba(0,0,0,.1);
+        border-radius: 8px; box-shadow: var(--shadow-sm); cursor: pointer;
+        text-decoration: none; transition: box-shadow .15s, border-color .15s; min-width: 80px;
+    }
+    .smart-btn:hover { box-shadow: 0 2px 8px rgba(0,0,0,.12); border-color: var(--teal-300); }
+    .smart-btn .sb-count { font-size: 18px; font-weight: 800; color: var(--teal-700); line-height: 1; }
+    .smart-btn .sb-label { font-size: 11px; color: var(--text-muted); margin-top: 2px; font-weight: 500; white-space: nowrap; }
+
+    /* Header card */
+    .ref-header-card { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow-sm); overflow: hidden; }
+    .ref-identity-row { display: flex; align-items: flex-start; justify-content: space-between; padding: 24px 28px 0; gap: 24px; }
+    .ref-name-block { flex: 1; min-width: 0; }
+    .ref-type-row { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; }
+    .ref-type-row label { font-size: 13px; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 5px; cursor: pointer; }
+    .ref-type-row input[type="radio"] { accent-color: var(--teal-500); width: 15px; height: 15px; }
+
+    /* Photo */
+    .ref-photo-block { display: flex; flex-direction: column; align-items: center; gap: 8px; flex-shrink: 0; }
+    .photo-large { width: 96px; height: 96px; border-radius: 14px; object-fit: cover; border: 2px solid rgba(0,0,0,.08); }
+    .photo-placeholder {
+        width: 96px; height: 96px; border-radius: 14px; background: #f0f4f6;
+        border: 2px dashed #c8d8e0; display: flex; align-items: center;
+        justify-content: center; font-size: 32px; color: #9aaab5;
+    }
+    .photo-label-btn { font-size: 12px; color: var(--teal-600); cursor: pointer; text-decoration: underline; background: none; border: none; padding: 0; }
+
+    /* Meta row */
+    .ref-meta-row {
+        display: grid; grid-template-columns: auto 1fr;
+        gap: 24px; padding: 20px 28px;
+        border-bottom: 1px solid rgba(0,0,0,.07);
+    }
+    .code-badge {
+        display: inline-flex; align-items: center; background: var(--teal-50);
+        border: 1px solid var(--teal-200); color: var(--teal-700);
+        padding: 7px 14px; border-radius: 8px; font-weight: 700;
+        font-size: 14px; font-family: monospace; white-space: nowrap;
+    }
+    .code-badge.auto { color: #aaa; border-color: #e0e0e0; background: #f8f8f8; font-style: italic; font-weight: 400; font-family: inherit; font-size: 13px; }
+
+    /* Main grid */
+    .ref-main-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; padding: 20px 28px 24px; }
+    .ref-left-col { padding-right: 28px; border-right: 1px solid rgba(0,0,0,.06); }
+    .ref-right-col { padding-left: 28px; }
+    .form-field { margin-bottom: 18px; }
+    .form-field:last-child { margin-bottom: 0; }
+
+    /* Langue row (input + globe btn) */
+    .langue-row { display: flex; align-items: center; gap: 6px; }
+    .langue-row .field-ul { flex: 1; }
+    .globe-btn {
+        flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%;
+        border: 1.5px solid #c8d8e0; background: #f4f8fb;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; transition: border-color .15s, background .15s;
+        color: #7a9aaa;
+    }
+    .globe-btn:hover { border-color: var(--teal-400); background: var(--teal-50); color: var(--teal-600); }
+
+    /* Étiquettes */
+    .etiquettes-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+    .etiquette-tag {
+        display: inline-flex; align-items: center; gap: 5px;
+        padding: 3px 10px; border-radius: 20px; font-size: 12px;
+        font-weight: 600; background: var(--teal-50); color: var(--teal-700);
+        border: 1px solid var(--teal-200); cursor: pointer; user-select: none;
+    }
+    .etiquette-tag.selected { background: var(--teal-500); color: #fff; border-color: var(--teal-600); }
+    .etiquettes-hidden-checks { display: none; }
+    .etiquettes-empty { font-size: 12px; color: var(--text-muted); font-style: italic; }
+
+    /* Checkbox field */
+    .checkbox-field { display: flex; align-items: center; gap: 10px; padding: 10px 0; }
+    .checkbox-field input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; accent-color: var(--teal-500); }
+    .checkbox-field label { font-size: 13px; font-weight: 500; cursor: pointer; }
+
+    /* Tabs */
+    .tabs-wrapper { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow-sm); margin-top: 16px; overflow: hidden; }
+    .tabs-nav { display: flex; border-bottom: 2px solid #e8edf0; padding: 0 20px; overflow-x: auto; }
+    .tab-btn {
+        padding: 14px 20px; font-size: 13px; font-weight: 600; color: var(--text-muted);
+        background: none; border: none; border-bottom: 3px solid transparent;
+        margin-bottom: -2px; cursor: pointer; transition: color .15s, border-color .15s;
+        white-space: nowrap;
+    }
+    .tab-btn:hover { color: var(--teal-700); }
+    .tab-btn.active { color: var(--teal-700); border-bottom-color: var(--teal-500); }
+    .tab-panel { display: none; padding: 26px 28px; }
+    .tab-panel.active { display: block; }
+    .tab-empty { font-size: 13px; color: var(--text-muted); font-style: italic; text-align: center; padding: 24px 0; }
+
+    /* Tab 2-col */
+    .tab-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+    .tab-section-title {
+        font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .07em;
+        color: var(--text-muted); margin-bottom: 14px; margin-top: 20px; padding-bottom: 6px;
+        border-bottom: 1px solid rgba(0,0,0,.06);
+    }
+    .tab-section-title:first-child { margin-top: 0; }
+
+    /* Contacts inline table */
+    .contacts-table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
+    .contacts-table th {
+        font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;
+        letter-spacing: .05em; padding: 0 8px 8px; text-align: left; border-bottom: 1px solid rgba(0,0,0,.07);
+    }
+    .contacts-table td { padding: 8px 8px 0; vertical-align: top; }
+    .contacts-table .del-cell { width: 32px; vertical-align: middle; padding-top: 8px; }
+    .btn-del-row {
+        width: 26px; height: 26px; border-radius: 50%; border: none; background: none;
+        color: #aaa; cursor: pointer; display: flex; align-items: center; justify-content: center;
+        transition: color .15s, background .15s;
+    }
+    .btn-del-row:hover { color: var(--rose); background: #fff0f0; }
+    .contact-row-deleted { opacity: .35; }
+    .btn-add-contact {
+        display: inline-flex; align-items: center; gap: 6px; margin-top: 14px;
+        font-size: 13px; font-weight: 600; color: var(--teal-600);
+        background: none; border: none; cursor: pointer; padding: 0;
+        text-decoration: none; transition: color .15s;
+    }
+    .btn-add-contact:hover { color: var(--teal-800); }
+    .btn-add-contact svg { flex-shrink: 0; }
+
+    /* Comptabilité table */
+    .compta-table { width: 100%; border-collapse: collapse; }
+    .compta-table th {
+        font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;
+        letter-spacing: .05em; padding: 0 12px 8px; text-align: left; border-bottom: 1px solid rgba(0,0,0,.07);
+    }
+    .compta-table td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid rgba(0,0,0,.04); }
+    .compta-table td:last-child { width: 32px; color: #aaa; }
+    .compta-empty { font-size: 13px; color: var(--text-muted); font-style: italic; padding: 12px 0; }
+    .btn-ajouter-ligne {
+        display: inline-flex; align-items: center; gap: 5px; margin-top: 10px;
+        font-size: 13px; font-weight: 600; color: var(--teal-600);
+        background: none; border: none; cursor: pointer; padding: 0; text-decoration: none;
+    }
+    .btn-ajouter-ligne:hover { color: var(--teal-800); }
+    .voir-details { display: block; margin-top: 20px; font-size: 13px; font-weight: 600; color: var(--teal-600); text-decoration: none; }
+    .voir-details:hover { color: var(--teal-800); text-decoration: underline; }
+    .compte-row { display: flex; align-items: center; gap: 8px; }
+    .compte-row .field-ul { flex: 1; }
+    .ext-link-btn {
+        flex-shrink: 0; width: 26px; height: 26px; border-radius: 6px;
+        border: 1.5px solid #c8d8e0; background: #f4f8fb;
+        display: flex; align-items: center; justify-content: center;
+        color: #7a9aaa; cursor: pointer; transition: border-color .15s;
+    }
+    .ext-link-btn:hover { border-color: var(--teal-400); color: var(--teal-600); }
+
+    /* Patient section dans Info hôpital */
+    .patient-section-row {
+        display: flex; align-items: center; justify-content: space-between;
+        margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid rgba(0,0,0,.07);
+    }
+    .patient-section-label { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+
+    html[data-theme="dark"] .tab-section-title { border-bottom-color: rgba(255,255,255,.06); color: rgba(255,255,255,.35); }
+    html[data-theme="dark"] .contacts-table th { border-bottom-color: rgba(255,255,255,.06); }
+    html[data-theme="dark"] .compta-table th { border-bottom-color: rgba(255,255,255,.06); }
+    html[data-theme="dark"] .compta-table td { border-bottom-color: rgba(255,255,255,.04); }
+    html[data-theme="dark"] .patient-section-row { border-bottom-color: rgba(255,255,255,.06); }
+    html[data-theme="dark"] .btn-add-contact, html[data-theme="dark"] .btn-ajouter-ligne, html[data-theme="dark"] .voir-details { color: var(--teal-400); }
+    html[data-theme="dark"] .ext-link-btn { border-color: rgba(255,255,255,.15); background: rgba(255,255,255,.04); color: rgba(255,255,255,.35); }
+
+    .alert-error {
+        display: flex; gap: 10px; background: #fff0f0; border: 1px solid #fca5a5;
+        color: #b91c1c; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; font-size: 13px;
+    }
+
+    @media (max-width:768px) {
+        .ref-main-grid { grid-template-columns: 1fr; }
+        .ref-left-col { padding-right: 0; border-right: none; border-bottom: 1px solid rgba(0,0,0,.06); padding-bottom: 20px; margin-bottom: 20px; }
+        .ref-right-col { padding-left: 0; }
+        .field-ul-name { font-size: 20px; }
+    }
+
+    /* Dark mode */
+    html[data-theme="dark"] .ref-header-card,
+    html[data-theme="dark"] .tabs-wrapper { background: #0d2035; }
+    html[data-theme="dark"] .smart-btn { background: #0d2035; border-color: rgba(255,255,255,.08); }
+    html[data-theme="dark"] .smart-btn .sb-count { color: var(--teal-300); }
+    html[data-theme="dark"] .smart-btn .sb-label { color: rgba(255,255,255,.4); }
+    html[data-theme="dark"] .ref-meta-row { border-bottom-color: rgba(255,255,255,.06); }
+    html[data-theme="dark"] .ref-left-col { border-right-color: rgba(255,255,255,.06); }
+    html[data-theme="dark"] .tabs-nav { border-bottom-color: rgba(255,255,255,.06); }
+    html[data-theme="dark"] .tab-btn { color: rgba(255,255,255,.35); }
+    html[data-theme="dark"] .tab-btn:hover { color: var(--teal-300); }
+    html[data-theme="dark"] .tab-btn.active { color: var(--teal-300); border-bottom-color: var(--teal-300); }
+    html[data-theme="dark"] .field-ul { border-bottom-color: rgba(255,255,255,.15); color: #cce8f4; }
+    html[data-theme="dark"] .field-ul:focus { border-bottom-color: var(--teal-400); }
+    html[data-theme="dark"] .field-ul::placeholder { color: rgba(255,255,255,.2); }
+    html[data-theme="dark"] .field-ul-name { color: #cce8f4; }
+    html[data-theme="dark"] .field-ul-prenom { color: rgba(255,255,255,.55); }
+    html[data-theme="dark"] .field-label { color: rgba(255,255,255,.4); }
+    html[data-theme="dark"] .code-badge { background: rgba(33,136,171,.15); border-color: rgba(33,136,171,.3); color: var(--teal-300); }
+    html[data-theme="dark"] .code-badge.auto { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.08); color: rgba(255,255,255,.25); }
+    html[data-theme="dark"] .photo-placeholder { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.12); color: rgba(255,255,255,.25); }
+    html[data-theme="dark"] .photo-label-btn { color: var(--teal-300); }
+    html[data-theme="dark"] .photo-large { border-color: rgba(255,255,255,.12); }
+    html[data-theme="dark"] .alert-error { background: rgba(232,69,69,.1); border-color: rgba(232,69,69,.25); color: #f09090; }
+    html[data-theme="dark"] .checkbox-field label { color: rgba(255,255,255,.7); }
+    html[data-theme="dark"] .ref-type-row label { color: rgba(255,255,255,.7); }
+    html[data-theme="dark"] .action-bar-breadcrumb a { color: var(--teal-400); }
+    html[data-theme="dark"] .action-bar-breadcrumb .sep,
+    html[data-theme="dark"] .action-bar-breadcrumb .current { color: rgba(255,255,255,.35); }
+    html[data-theme="dark"] .globe-btn { border-color: rgba(255,255,255,.15); background: rgba(255,255,255,.04); color: rgba(255,255,255,.4); }
+    html[data-theme="dark"] .globe-btn:hover { border-color: var(--teal-400); background: rgba(33,136,171,.15); color: var(--teal-300); }
+    html[data-theme="dark"] .etiquette-tag { background: rgba(33,136,171,.12); color: var(--teal-300); border-color: rgba(33,136,171,.25); }
+    html[data-theme="dark"] .etiquette-tag.selected { background: var(--teal-600); color: #fff; border-color: var(--teal-500); }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="breadcrumb">
+    <a href="{% url 'dashboard' %}">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24"
+            stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px">
+            <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z" />
+            <polyline points="9 21 9 12 15 12 15 21" />
+        </svg>Accueil
+    </a>
+    <span class="breadcrumb-sep">›</span>
+    <a href="{% url 'medecins:referent_list' %}">Docteurs référent</a>
+    <span class="breadcrumb-sep">›</span>
+    <span>{% if edit %}{{ referent.code }}{% else %}Nouveau{% endif %}</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+
+{% if form.non_field_errors %}
+<div class="alert-error">
+    <span>⚠</span>
+    <div>{% for e in form.non_field_errors %}<div>{{ e }}</div>{% endfor %}</div>
+</div>
+{% endif %}
+
+<form method="post" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+
+    <!-- Action bar -->
+    <div class="action-bar">
+        <div class="action-bar-breadcrumb">
+            <a href="{% url 'medecins:referent_list' %}">Docteurs référent</a>
+            <span class="sep">/</span>
+            <span class="current">{% if edit %}{{ referent.code }}{% else %}Nouveau{% endif %}</span>
+        </div>
+        <div class="action-bar-buttons">
+            {% if edit %}
+            <a href="{% url 'medecins:referent_detail' referent.pk %}" class="btn btn-secondary">Ignorer</a>
+            {% else %}
+            <a href="{% url 'medecins:referent_list' %}" class="btn btn-secondary">Ignorer</a>
+            {% endif %}
+            <button type="submit" class="btn btn-primary">
+                {% if edit %}Sauvegarder{% else %}Créer le référent{% endif %}
+            </button>
+        </div>
+    </div>
+
+    <!-- Smart buttons (mode édition uniquement) -->
+    {% if edit %}
+    <div class="smart-buttons">
+        <a href="{% url 'medecins:referent_detail' referent.pk %}" class="smart-btn">
+            <span class="sb-count">{{ referent.patients.count }}</span>
+            <span class="sb-label">Patients référés</span>
+        </a>
+    </div>
+    {% endif %}
+
+    <!-- Carte principale -->
+    <div class="ref-header-card">
+
+        <!-- Type + Nom + Photo -->
+        <div class="ref-identity-row">
+            <div class="ref-name-block">
+                <div class="ref-type-row">
+                    {% for radio in form.type_contact %}
+                    <label>{{ radio.tag }} {{ radio.choice_label }}</label>
+                    {% endfor %}
+                </div>
+                <label class="field-label" for="{{ form.nom.id_for_label }}" style="margin-bottom:2px;">Nom / Raison sociale <span class="required-star">*</span></label>
+                {{ form.nom }}
+                {% if form.nom.errors %}<div class="field-error">{{ form.nom.errors.0 }}</div>{% endif %}
+                <div id="prenoms-wrapper">
+                    {{ form.prenoms }}
+                    {% if form.prenoms.errors %}<div class="field-error">{{ form.prenoms.errors.0 }}</div>{% endif %}
+                </div>
+            </div>
+            <div class="ref-photo-block">
+                {% if edit and referent.photo %}
+                <img src="{{ referent.photo.url }}" alt="Photo" class="photo-large" id="photo-preview">
+                {% else %}
+                <div class="photo-placeholder" id="photo-placeholder">📷</div>
+                <img src="" alt="" class="photo-large" id="photo-preview" style="display:none;">
+                {% endif %}
+                <label for="{{ form.photo.id_for_label }}" class="photo-label-btn">
+                    {% if edit and referent.photo %}Changer la photo{% else %}Ajouter une photo{% endif %}
+                </label>
+                {{ form.photo }}
+            </div>
+        </div>
+
+        <!-- Code + Poste Occupé -->
+        <div class="ref-meta-row">
+            <div>
+                <span class="field-label">ID référent</span>
+                {% if edit %}
+                <div class="code-badge">{{ referent.code }}</div>
+                {% else %}
+                <div class="code-badge auto">Automatique</div>
+                {% endif %}
+            </div>
+            <div class="form-field" style="margin-bottom:0;" id="poste-meta-wrapper">
+                <label class="field-label" for="{{ form.poste_occupe.id_for_label }}">Poste Occupé</label>
+                {{ form.poste_occupe }}
+            </div>
+        </div>
+
+        <!-- Grille principale -->
+        <div class="ref-main-grid">
+
+            <!-- Colonne gauche -->
+            <div class="ref-left-col">
+                <!-- Individu : Spécialité + Établissement + TVA -->
+                <div id="left-individu">
+                    <div class="form-field">
+                        <label class="field-label" for="{{ form.specialite.id_for_label }}">Spécialité</label>
+                        {{ form.specialite }}
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label" for="{{ form.etablissement.id_for_label }}">Établissement</label>
+                        {{ form.etablissement }}
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label" for="{{ form.tva.id_for_label }}">TVA</label>
+                        {{ form.tva }}
+                    </div>
+                </div>
+                <!-- Société : Adresse + TVA -->
+                <div id="left-societe" style="display:none;">
+                    <div class="form-field">
+                        <label class="field-label" for="{{ form.adresse.id_for_label }}">Adresse</label>
+                        {{ form.adresse }}
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label" for="{{ form.tva.id_for_label }}">TVA</label>
+                        {{ form.tva }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Colonne droite -->
+            <div class="ref-right-col">
+                <!-- Poste Occupé — Individu seulement -->
+                <div class="form-field" id="poste-wrapper">
+                    <label class="field-label" for="{{ form.poste_occupe.id_for_label }}">Poste Occupé</label>
+                    {{ form.poste_occupe }}
+                </div>
+                <div class="form-field">
+                    <label class="field-label" for="{{ form.telephone.id_for_label }}">Téléphone</label>
+                    {{ form.telephone }}
+                </div>
+                <div class="form-field">
+                    <label class="field-label" for="{{ form.mobile.id_for_label }}">Mobile</label>
+                    {{ form.mobile }}
+                </div>
+                <div class="form-field">
+                    <label class="field-label" for="{{ form.email.id_for_label }}">Courriel</label>
+                    {{ form.email }}
+                    {% if form.email.errors %}<div class="field-error">{{ form.email.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="form-field">
+                    <label class="field-label" for="{{ form.site_web.id_for_label }}">Site Web</label>
+                    {{ form.site_web }}
+                    {% if form.site_web.errors %}<div class="field-error">{{ form.site_web.errors.0 }}</div>{% endif %}
+                </div>
+                <!-- Titre — Individu seulement -->
+                <div class="form-field" id="titre-wrapper">
+                    <label class="field-label" for="{{ form.titre.id_for_label }}">Titre</label>
+                    {{ form.titre }}
+                </div>
+                <!-- Langue -->
+                <div class="form-field">
+                    <label class="field-label" for="{{ form.langue.id_for_label }}">Langue</label>
+                    <div class="langue-row">
+                        {{ form.langue }}
+                        <button type="button" class="globe-btn" title="Langue" tabindex="-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="none"
+                                viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <!-- Étiquettes -->
+                <div class="form-field">
+                    <label class="field-label">Étiquettes</label>
+                    <div class="etiquettes-hidden-checks" id="etiquettes-checks">
+                        {{ form.etiquettes }}
+                    </div>
+                    <div class="etiquettes-list" id="etiquettes-tags">
+                        {% for choice in form.etiquettes %}
+                        <span class="etiquette-tag{% if choice.data.selected %} selected{% endif %}"
+                              data-value="{{ choice.data.value }}">
+                            {{ choice.choice_label }}
+                        </span>
+                        {% empty %}
+                        <span class="etiquettes-empty">Aucune étiquette disponible</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Onglets -->
+    <div class="tabs-wrapper">
+        <div class="tabs-nav">
+            <button type="button" class="tab-btn active" data-tab="adresse">Contacts &amp; Adresses</button>
+            <button type="button" class="tab-btn" data-tab="hopital">Info de l'hôpital</button>
+            <button type="button" class="tab-btn" data-tab="ventes">Ventes &amp; Achats</button>
+            <button type="button" class="tab-btn" data-tab="compta">Comptabilité</button>
+            <button type="button" class="tab-btn" data-tab="notes">Notes internes</button>
+        </div>
+
+        <!-- ── Contacts & Adresses ── -->
+        <div class="tab-panel active" id="tab-adresse">
+            {{ contact_fs.management_form }}
+            <table class="contacts-table" id="contacts-table">
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Nom</th>
+                        <th>Téléphone</th>
+                        <th>Courriel</th>
+                        <th>Adresse</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="contacts-tbody">
+                    {% for cf in contact_fs %}
+                    <tr class="contact-row" id="contact-row-{{ forloop.counter0 }}">
+                        <td>{{ cf.type_adresse }}{{ cf.id }}</td>
+                        <td>{{ cf.nom }}</td>
+                        <td>{{ cf.telephone }}</td>
+                        <td>{{ cf.email }}</td>
+                        <td>{{ cf.adresse }}</td>
+                        <td class="del-cell">
+                            {% if cf.instance.pk %}
+                            <label style="display:none;">{{ cf.DELETE }}</label>
+                            <button type="button" class="btn-del-row"
+                                    onclick="deleteContactRow(this, '{{ forloop.counter0 }}')"
+                                    title="Supprimer">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
+                                </svg>
+                            </button>
+                            {% else %}
+                            <button type="button" class="btn-del-row"
+                                    onclick="removeContactRow('contact-row-{{ forloop.counter0 }}')"
+                                    title="Retirer">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                                </svg>
+                            </button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <button type="button" class="btn-add-contact" id="btn-add-contact">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none"
+                    viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                Ajouter
+            </button>
+
+            <div class="form-field" style="margin-top:20px;border-top:1px solid rgba(0,0,0,.06);padding-top:16px;">
+                <div class="checkbox-field" style="padding:0;">
+                    {{ form.actif }}
+                    <label for="{{ form.actif.id_for_label }}">Référent actif</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Info de l'hôpital ── -->
+        <div class="tab-panel" id="tab-hopital">
+            <!-- Section Patient -->
+            <div class="patient-section-row">
+                <span class="patient-section-label">Patient</span>
+                {% if edit %}
+                <a href="{% url 'patients:create' %}?referent={{ referent.pk }}"
+                   class="btn btn-primary" style="font-size:12px;padding:7px 14px;">
+                    CRÉER UN PATIENT
+                </a>
+                {% endif %}
+            </div>
+            <div style="max-width:520px;">
+                <div class="form-field">
+                    <label class="field-label" for="{{ form.medecin_interne.id_for_label }}">Docteur référent</label>
+                    {{ form.medecin_interne }}
+                </div>
+                <div class="checkbox-field" style="margin-top:4px;">
+                    {{ form.est_referent }}
+                    <label for="{{ form.est_referent.id_for_label }}">Est le médecin référent</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Ventes & Achats ── -->
+        <div class="tab-panel" id="tab-ventes">
+            <div class="tab-two-col">
+                <!-- Gauche : Vente + Information fiscale -->
+                <div>
+                    <div class="tab-section-title">Vente</div>
+                    <div class="form-field">
+                        <label class="field-label">Vendeur</label>
+                        <input type="text" class="field-ul" disabled placeholder="—">
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">Conditions de paiement</label>
+                        <input type="text" class="field-ul" disabled placeholder="—">
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">Liste de prix</label>
+                        <input type="text" class="field-ul" disabled placeholder="—">
+                    </div>
+                    <div class="tab-section-title">Information fiscale</div>
+                    <div class="form-field">
+                        <label class="field-label" for="{{ form.tva.id_for_label }}">Position fiscale / TVA</label>
+                        {{ form.tva }}
+                    </div>
+                </div>
+                <!-- Droite : Achats + Divers -->
+                <div>
+                    <div class="tab-section-title">Achats</div>
+                    <div class="form-field">
+                        <label class="field-label">Conditions de paiement</label>
+                        <input type="text" class="field-ul" disabled placeholder="—">
+                    </div>
+                    <div class="checkbox-field">
+                        <input type="checkbox" disabled>
+                        <label style="color:var(--text-muted);">Rappel de Réception</label>
+                    </div>
+                    <div class="tab-section-title">Divers</div>
+                    <div class="form-field">
+                        <label class="field-label" for="{{ form.reference_externe.id_for_label }}">Référence</label>
+                        {{ form.reference_externe }}
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label" for="{{ form.site_web.id_for_label }}">Site Web</label>
+                        {{ form.site_web }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Comptabilité ── -->
+        <div class="tab-panel" id="tab-compta">
+            <div class="tab-two-col">
+                <!-- Gauche : Comptes bancaires -->
+                <div>
+                    <div class="tab-section-title">Comptes bancaires</div>
+                    <table class="compta-table">
+                        <thead>
+                            <tr>
+                                <th>Banque</th>
+                                <th>Numéro de compte</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td colspan="3" class="compta-empty">Aucun compte bancaire</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <button type="button" class="btn-ajouter-ligne" disabled>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                        Ajouter une ligne
+                    </button>
+                    <a href="#" class="voir-details">Voir les détails des comptes</a>
+                </div>
+                <!-- Droite : Écritures comptables -->
+                <div>
+                    <div class="tab-section-title">Écritures comptables</div>
+                    <div class="form-field">
+                        <label class="field-label" for="{{ form.compte_client.id_for_label }}">Compte client</label>
+                        <div class="compte-row">
+                            {{ form.compte_client }}
+                            <button type="button" class="ext-link-btn" title="Détails" tabindex="-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                                    <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label" for="{{ form.compte_fournisseur.id_for_label }}">Compte fournisseur</label>
+                        <div class="compte-row">
+                            {{ form.compte_fournisseur }}
+                            <button type="button" class="ext-link-btn" title="Détails" tabindex="-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                                    <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Notes internes ── -->
+        <div class="tab-panel" id="tab-notes">
+            <div class="form-field">
+                {{ form.notes }}
+            </div>
+        </div>
+    </div>
+
+</form>
+
+<script>
+(function () {
+    /* ── Onglets ── */
+    document.querySelectorAll('.tab-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            document.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
+            document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('active'); });
+            btn.classList.add('active');
+            document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+        });
+    });
+
+    /* ── Toggle Individu / Société ── */
+    var radios = document.querySelectorAll('input[name="{{ form.type_contact.html_name }}"]');
+
+    function applyType(type) {
+        var isIndividu = type === 'individu';
+
+        /* Prénom(s) */
+        var prenomsWrapper = document.getElementById('prenoms-wrapper');
+        if (prenomsWrapper) prenomsWrapper.style.display = isIndividu ? '' : 'none';
+
+        /* Poste Occupé dans meta-row : masqué (on utilise seulement la version dans la grille) */
+        var posteMeta = document.getElementById('poste-meta-wrapper');
+        if (posteMeta) posteMeta.style.display = 'none';
+
+        /* Poste + Titre (droite) */
+        var posteWrapper = document.getElementById('poste-wrapper');
+        if (posteWrapper) posteWrapper.style.display = isIndividu ? '' : 'none';
+        var titreWrapper = document.getElementById('titre-wrapper');
+        if (titreWrapper) titreWrapper.style.display = isIndividu ? '' : 'none';
+
+        /* Colonne gauche */
+        var leftIndividu = document.getElementById('left-individu');
+        var leftSociete = document.getElementById('left-societe');
+        if (leftIndividu) leftIndividu.style.display = isIndividu ? '' : 'none';
+        if (leftSociete) leftSociete.style.display = isIndividu ? 'none' : '';
+
+        /* Adresse dans l'onglet Contacts */
+        var tabAdresseIndividu = document.getElementById('tab-adresse-individu');
+        if (tabAdresseIndividu) tabAdresseIndividu.style.display = isIndividu ? '' : 'none';
+    }
+
+    radios.forEach(function (radio) {
+        radio.addEventListener('change', function () { applyType(this.value); });
+    });
+
+    /* Initialisation au chargement */
+    var checked = document.querySelector('input[name="{{ form.type_contact.html_name }}"]:checked');
+    if (checked) applyType(checked.value);
+
+    /* Cacher toujours le champ Poste dans meta-row (dupliqué dans la grille) */
+    var posteMeta = document.getElementById('poste-meta-wrapper');
+    if (posteMeta) posteMeta.style.display = 'none';
+
+    /* ── Étiquettes cliquables ── */
+    var tagsContainer = document.getElementById('etiquettes-tags');
+    var checksContainer = document.getElementById('etiquettes-checks');
+    if (tagsContainer && checksContainer) {
+        tagsContainer.querySelectorAll('.etiquette-tag').forEach(function (tag) {
+            tag.addEventListener('click', function () {
+                var val = tag.dataset.value;
+                var checkbox = checksContainer.querySelector('input[value="' + val + '"]');
+                if (!checkbox) return;
+                checkbox.checked = !checkbox.checked;
+                tag.classList.toggle('selected', checkbox.checked);
+            });
+        });
+        /* Sync état initial */
+        checksContainer.querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
+            var tag = tagsContainer.querySelector('.etiquette-tag[data-value="' + cb.value + '"]');
+            if (tag) tag.classList.toggle('selected', cb.checked);
+        });
+    }
+
+    /* ── Preview photo ── */
+    var photoInput = document.getElementById('{{ form.photo.id_for_label }}');
+    if (photoInput) {
+        photoInput.style.display = 'none';
+        photoInput.addEventListener('change', function () {
+            var file = this.files[0];
+            if (!file) return;
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                var ph = document.getElementById('photo-placeholder');
+                var pv = document.getElementById('photo-preview');
+                if (ph) ph.style.display = 'none';
+                if (pv) { pv.src = e.target.result; pv.style.display = 'block'; }
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    /* ── Formset Contacts inline ── */
+    var totalForms = document.getElementById('id_contacts_adresses-TOTAL_FORMS');
+    var emptyTemplate = null;
+
+    function buildEmptyRow(index) {
+        var prefix = 'contacts_adresses-' + index;
+        var tr = document.createElement('tr');
+        tr.className = 'contact-row';
+        tr.id = 'contact-row-' + index;
+        tr.innerHTML =
+            '<td><select name="' + prefix + '-type_adresse" class="field-ul">' +
+            '<option value="contact">Contact</option>' +
+            '<option value="facturation">Adresse de facturation</option>' +
+            '<option value="livraison">Adresse de livraison</option>' +
+            '<option value="autre">Autre adresse</option>' +
+            '</select>' +
+            '<input type="hidden" name="' + prefix + '-id" value=""></td>' +
+            '<td><input type="text" name="' + prefix + '-nom" class="field-ul" placeholder="Nom"></td>' +
+            '<td><input type="text" name="' + prefix + '-telephone" class="field-ul" placeholder="+225…"></td>' +
+            '<td><input type="email" name="' + prefix + '-email" class="field-ul" placeholder="email@…"></td>' +
+            '<td><textarea name="' + prefix + '-adresse" class="field-ul" rows="1" placeholder="Adresse…"></textarea></td>' +
+            '<td class="del-cell"><button type="button" class="btn-del-row" onclick="removeContactRow(\'contact-row-' + index + '\')" title="Retirer">' +
+            '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">' +
+            '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></td>';
+        return tr;
+    }
+
+    document.getElementById('btn-add-contact').addEventListener('click', function () {
+        var idx = parseInt(totalForms.value);
+        var tbody = document.getElementById('contacts-tbody');
+        tbody.appendChild(buildEmptyRow(idx));
+        totalForms.value = idx + 1;
+    });
+
+    window.removeContactRow = function (rowId) {
+        var row = document.getElementById(rowId);
+        if (row) { row.remove(); }
+    };
+
+    window.deleteContactRow = function (btn, idx) {
+        var row = document.getElementById('contact-row-' + idx);
+        if (!row) return;
+        var delInput = row.querySelector('input[name$="-DELETE"]');
+        if (delInput) { delInput.checked = true; }
+        row.classList.add('contact-row-deleted');
+        btn.style.display = 'none';
+    };
+})();
+</script>
+{% endblock %}

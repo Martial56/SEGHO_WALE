@@ -2,6 +2,22 @@ from django.db import models
 from django.contrib.auth.models import User
 
 
+class UniteMesure(models.Model):
+    CATEGORIE_CHOICES = [
+        ('volume', 'Volume'), ('masse', 'Masse'), ('quantite', 'Quantité'),
+        ('conditionnement', 'Conditionnement'), ('autre', 'Autre'),
+    ]
+    nom = models.CharField(max_length=100, unique=True, verbose_name="Nom")
+    code = models.CharField(max_length=20, unique=True, verbose_name="Abréviation")
+    categorie = models.CharField(max_length=20, choices=CATEGORIE_CHOICES, default='quantite', verbose_name="Catégorie")
+
+    def __str__(self): return f"{self.nom} ({self.code})"
+    class Meta:
+        verbose_name = "Unité de mesure"
+        verbose_name_plural = "Unités de mesure"
+        ordering = ['nom']
+
+
 class CategorieArticle(models.Model):
     code = models.CharField(max_length=10, unique=True)
     nom = models.CharField(max_length=100)
