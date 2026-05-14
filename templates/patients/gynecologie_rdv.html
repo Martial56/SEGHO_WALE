@@ -1,10 +1,9 @@
 {% extends 'patients/base.html' %}
 
-{% block topbar_title %}Rendez-vous{% endblock %}
+{% block topbar_title %}Gynécologie / CPN — Rendez-vous{% endblock %}
 
 {% block extra_css %}
 <style>
-    /* ── Toolbar ── */
     .rdv-toolbar {
         display: flex;
         align-items: center;
@@ -16,7 +15,6 @@
     .rdv-toolbar-left  { display: flex; align-items: center; gap: 10px; flex: 1; flex-wrap: wrap; }
     .rdv-toolbar-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 
-    /* ── Quick filter pills ── */
     .quick-pills { display: flex; gap: 6px; }
     .quick-pill {
         padding: 7px 16px;
@@ -35,7 +33,6 @@
     .quick-pill:hover { border-color: var(--teal-400); color: var(--teal-600); }
     .quick-pill.active { background: var(--teal-500); color: #fff; border-color: var(--teal-500); }
 
-    /* ── Date range ── */
     .date-range-form {
         display: flex;
         align-items: center;
@@ -70,7 +67,6 @@
     }
     .date-range-form .btn-filter:hover { background: var(--teal-600); }
 
-    /* ── Status select ── */
     .rdv-select {
         padding: 8px 12px;
         border: 1px solid rgba(0,0,0,0.12);
@@ -84,7 +80,21 @@
     }
     .rdv-select:focus { outline: none; border-color: var(--teal-400); }
 
-    /* ── Stats strip ── */
+    /* Module badge */
+    .module-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        background: #fdf0f5;
+        border: 1px solid #f9c8db;
+        color: #b5336a;
+        border-radius: 20px;
+        padding: 4px 12px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+    }
+
     .stats-strip {
         display: flex;
         gap: 12px;
@@ -109,7 +119,6 @@
     .sp-termine  { color: var(--green); }
     .sp-absent   { color: rgba(0,0,0,0.35); }
 
-    /* ── Status badges ── */
     .rdv-badge {
         display: inline-block;
         padding: 4px 12px;
@@ -124,7 +133,6 @@
     .rdv-badge.annule   { background: rgba(232,69,69,0.1);   color: var(--rose); }
     .rdv-badge.absent   { background: rgba(0,0,0,0.06);      color: rgba(0,0,0,0.4); }
 
-    /* ── Type badge ── */
     .type-badge {
         display: inline-block;
         padding: 3px 10px;
@@ -137,23 +145,41 @@
         border: 1px solid var(--teal-200);
     }
 
-    /* ── Patient cell ── */
     .patient-cell { display: flex; align-items: center; gap: 10px; }
     .patient-avatar {
         width: 36px; height: 36px; border-radius: 50%;
-        background: var(--teal-100); display: flex; align-items: center;
+        background: #fdf0f5; display: flex; align-items: center;
         justify-content: center; font-size: 14px; font-weight: 700;
-        color: var(--teal-700); flex-shrink: 0;
+        color: #b5336a; flex-shrink: 0;
     }
     .patient-name { font-weight: 600; font-size: 14px; color: var(--teal-900); line-height: 1.3; }
     .patient-sub  { font-size: 12px; color: rgba(0,0,0,0.45); margin-top: 2px; }
 
-    /* ── Empty state ── */
     .empty-state {
         text-align: center; padding: 64px 20px; color: rgba(0,0,0,0.4);
     }
     .empty-state .es-icon { font-size: 56px; margin-bottom: 16px; }
     .empty-state h3 { font-size: 18px; font-weight: 700; color: var(--teal-900); margin-bottom: 8px; }
+
+    .nav-tabs-gyne {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 20px;
+    }
+    .nav-tab-gyne {
+        padding: 8px 18px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        text-decoration: none;
+        color: rgba(0,0,0,0.55);
+        background: #fff;
+        border: 1px solid rgba(0,0,0,0.1);
+        box-shadow: var(--shadow-sm);
+        transition: all 0.15s;
+    }
+    .nav-tab-gyne:hover { border-color: #f9c8db; color: #b5336a; }
+    .nav-tab-gyne.active { background: #fdf0f5; border-color: #f9c8db; color: #b5336a; }
 
     @media (max-width: 768px) {
         .rdv-toolbar { flex-direction: column; align-items: stretch; }
@@ -168,39 +194,48 @@
 <nav class="breadcrumb">
     <a href="{% url 'dashboard' %}"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z"/><polyline points="9 21 9 12 15 12 15 21"/></svg>Accueil</a>
     <span class="breadcrumb-sep">›</span>
+    <a href="{% url 'patients:gynecologie_rdv' %}">Gynécologie / CPN</a>
+    <span class="breadcrumb-sep">›</span>
     <span>Rendez-vous</span>
 </nav>
 {% endblock %}
 
 {% block content %}
 
-<!-- ── En-tête ── -->
+<!-- Navigation interne du module -->
+<div class="nav-tabs-gyne">
+    <a href="{% url 'patients:gynecologie_rdv' %}" class="nav-tab-gyne active">♀ Rendez-vous</a>
+    <a href="{% url 'patients:gynecologie_patients' %}" class="nav-tab-gyne">Patientes</a>
+</div>
+
+<!-- En-tête -->
 <div class="page-header">
     <div class="page-header-left">
-        <h1>Rendez-vous</h1>
+        <h1 style="display:flex;align-items:center;gap:10px;">
+            Gynécologie / CPN
+            <span class="module-badge">♀ Rendez-vous</span>
+        </h1>
         <p>{{ stats.total }} rendez-vous sur la période sélectionnée</p>
         <div style="margin-top: 10px;">
-            <a href="{% url 'patients:rdv_create' %}" class="btn btn-primary">+ Créer</a>
+            <a href="{% url 'patients:rdv_create' %}" class="btn btn-primary">+ Créer un rendez-vous</a>
         </div>
     </div>
-    <!-- ── Barre de filtres ── -->
+
     <form method="get" id="filter-form">
     <div class="rdv-toolbar">
         <div class="rdv-toolbar-left">
 
-            <!-- Raccourcis de période -->
             <div class="quick-pills">
                 <a href="?date_debut={{ today }}&date_fin={{ today }}"
-                class="quick-pill {% if is_today and not pas_fini and not statut_filter %}active{% endif %}">
+                   class="quick-pill {% if is_today and not pas_fini and not statut_filter %}active{% endif %}">
                     Aujourd'hui
                 </a>
                 <a href="?date_debut={{ today }}&date_fin={{ today }}&pas_fini=1"
-                class="quick-pill {% if is_today and pas_fini %}active{% endif %}">
+                   class="quick-pill {% if is_today and pas_fini %}active{% endif %}">
                     Pas fini
                 </a>
             </div>
 
-            <!-- Filtre par statut -->
             <select name="statut" class="rdv-select" onchange="document.getElementById('filter-form').submit()">
                 <option value="">Tous les statuts</option>
                 <option value="planifie" {% if statut_filter == 'planifie' %}selected{% endif %}>Planifié</option>
@@ -216,7 +251,6 @@
 
         </div>
 
-        <!-- Sélecteur de plage de dates -->
         <div class="rdv-toolbar-right">
             <div class="date-range-form">
                 <input type="date" name="date_debut" value="{{ date_debut }}">
@@ -229,13 +263,13 @@
     </form>
 </div>
 
-<!-- ── Tableau ── -->
+<!-- Tableau -->
 {% if rdv_list %}
 <div class="table-container">
     <table>
         <thead>
             <tr>
-                <th>Patient</th>
+                <th>Patiente</th>
                 <th>Date / Heure</th>
                 <th>Médecin</th>
                 <th>Type</th>
@@ -285,11 +319,12 @@
 </div>
 {% else %}
 <div class="empty-state">
-    <div class="es-icon">📅</div>
-    <h3>Aucun rendez-vous trouvé</h3>
+    <div class="es-icon">♀</div>
+    <h3>Aucun rendez-vous Gynécologie / CPN trouvé</h3>
     <p>
         {% if statut_filter or pas_fini %}Modifiez vos filtres ou{% else %}Aucun rendez-vous pour cette période —{% endif %}
-        <a href="{% url 'patients:rdv_create' %}" style="color: var(--teal-500);">créer un rendez-vous</a>.
+        <a href="{% url 'patients:rdv_create' %}" style="color: var(--teal-500);">créer un rendez-vous</a>
+        et sélectionner le département <strong>Gynécologie / CPN</strong>.
     </p>
 </div>
 {% endif %}

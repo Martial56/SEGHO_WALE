@@ -103,11 +103,12 @@ class PatientForm(forms.ModelForm):
 class RendezVousForm(forms.ModelForm):
     class Meta:
         model = RendezVous
-        fields = ['patient', 'departement', 'medecin', 'date_heure', 'duree_minutes', 'type_rdv', 'motif', 'statut', 'notes']
+        fields = ['patient', 'departement', 'medecin', 'service', 'date_heure', 'duree_minutes', 'motif', 'statut', 'notes']
         widgets = {
             'patient': forms.Select(attrs={'class': _ul, 'id': 'id_patient'}),
             'departement': forms.Select(attrs={'class': _ul}),
             'medecin': forms.Select(attrs={'class': _ul}),
+            'service': forms.Select(attrs={'class': _ul}),
             'date_heure': forms.DateTimeInput(
                 attrs={'class': _ul, 'type': 'datetime-local'},
                 format='%Y-%m-%dT%H:%M',
@@ -115,7 +116,6 @@ class RendezVousForm(forms.ModelForm):
             'duree_minutes': forms.NumberInput(attrs={
                 'class': _ul, 'min': '5', 'step': '5', 'placeholder': '30',
             }),
-            'type_rdv': forms.Select(attrs={'class': _ul}),
             'statut': forms.Select(attrs={'class': _ul}),
             'motif': forms.Textarea(attrs={
                 'class': _ul, 'rows': 3, 'placeholder': 'Motif de la visite...',
@@ -126,9 +126,13 @@ class RendezVousForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        from medecins.models import Service
         super().__init__(*args, **kwargs)
-        self.fields['patient'].queryset = Patient.objects.filter(actif=True).order_by('nom', 'prenoms')
+        self.fields['patient'].queryset = Patient.objects.all().order_by('nom', 'prenoms')
         self.fields['medecin'].empty_label = '— Aucun médecin —'
         self.fields['medecin'].required = False
         self.fields['departement'].empty_label = '— Choisir un département —'
         self.fields['departement'].required = False
+        self.fields['service'].queryset = Service.objects.filter(actif=True).order_by('nom')
+        self.fields['service'].empty_label = '— Choisir un service —'
+        self.fields['service'].required = False

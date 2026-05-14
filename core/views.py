@@ -1,7 +1,8 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
+from django.contrib import messages
 from django.utils import timezone
 from django.db.models import F
 
@@ -236,3 +237,89 @@ def rapports_list(request):
     }
     breadcrumb = [{'title': 'Accueil', 'url': '/'}, {'title': 'Rapports'}]
     return render(request, 'rapports/list.html', {'page_obj': page_obj, 'stats': stats, 'breadcrumb': breadcrumb})
+
+
+@login_required(login_url='login')
+def facture_create(request):
+    from facturation.models import Facture, LigneFacture, Acte
+    from facturation.forms import FactureForm
+    from patients.models import Patient, RendezVous
+
+    patient_pk = request.GET.get('patient') or request.POST.get('patient_id')
+    patient = get_object_or_404(Patient, pk=patient_pk) if patient_pk else None
+    actes = Acte.objects.filter(actif=True).order_by('categorie', 'libelle')
+
+    # Pré-remplissage depuis le RDV
+    rdv_obj = None
+    rdv_pk = request.GET.get('rdv') or request.POST.get('rdv_id')
+    if rdv_pk:
+        try:
+            rdv_obj = RendezVous.objects.get(pk=rdv_pk)
+        except RendezVous.DoesNotExist:
+            pass
+
+    initial_type_facture = 'consultation' if rdv_obj else ''
+    initial_ligne_libelle = rdv_obj.service.nom if (rdv_obj and rdv_obj.service) else ''
+
+    if request.method == 'POST':
+        form = FactureForm(request.POST)
+        if not patient:
+            messages.error(request, 'Patient introuvable.')
+            return redirect('facturation_list')
+        if form.is_valid():
+            facture = form.save(commit=False)
+            facture.patient = patient
+            facture.cree_par = request.user
+            facture.save()
+
+            total = 0
+            i = 0
+            while True:
+                libelle = request.POST.get(f'ligne_libelle_{i}')
+                if libelle is None:
+                    break
+                if libelle.strip():
+                    try:
+                        qte = float(request.POST.get(f'ligne_qte_{i}', 1) or 1)
+                        prix = float(request.POST.get(f'ligne_prix_{i}', 0) or 0)
+                        remise = float(request.POST.get(f'ligne_remise_{i}', 0) or 0)
+                    except ValueError:
+                        qte, prix, remise = 1, 0, 0
+                    ligne = LigneFacture(
+                        facture=facture,
+                        libelle=libelle.strip(),
+                        quantite=qte,
+                        prix_unitaire=prix,
+                        remise=remise,
+                    )
+                    acte_id = request.POST.get(f'ligne_acte_{i}')
+                    if acte_id:
+                        try:
+                            ligne.acte_id = int(acte_id)
+                        except ValueError:
+                            pass
+                    ligne.save()
+                    total += qte * prix * (1 - remise / 100)
+                i += 1
+
+            facture.montant_total = total
+            facture.save()
+
+            messages.success(request, f'Facture {facture.numero} créée avec succès.')
+            return redirect('facturation_list')
+    else:
+        initial = {'type_facture': initial_type_facture} if initial_type_facture else {}
+        form = FactureForm(initial=initial)
+
+    return render(request, 'facturation/create_facture.html', {
+        'form': form,
+        'patient': patient,
+        'actes': actes,
+        'rdv': rdv_obj,
+        'initial_ligne_libelle': initial_ligne_libelle,
+        'breadcrumb': [
+            {'title': 'Accueil', 'url': '/'},
+            {'title': 'Facturation', 'url': '/facturation/'},
+            {'title': 'Nouvelle facture'},
+        ],
+    })

@@ -1,0 +1,503 @@
+{% extends 'facturation/base.html' %}
+
+{% block topbar_title %}Nouvelle facture{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── Control panel ── */
+.control-panel {
+    background: #fff;
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+    position: sticky; top: 0; z-index: 100;
+}
+.cp-top {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 24px; gap: 12px;
+}
+.cp-breadcrumb {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 14px; font-weight: 600;
+}
+.cp-breadcrumb a { color: var(--teal-600); text-decoration: none; font-weight: 600; }
+.cp-breadcrumb a:hover { color: var(--teal-500); }
+.cp-breadcrumb .sep { color: #bbb; font-weight: 400; }
+.cp-breadcrumb .current { color: rgba(0,0,0,0.45); font-weight: 500; }
+.cp-save-group { display: flex; gap: 8px; align-items: center; }
+.btn-save {
+    background: var(--teal-500); color: #fff;
+    border: none; border-radius: 6px;
+    padding: 8px 20px; font-size: 13px; font-weight: 700;
+    cursor: pointer; font-family: inherit; transition: background 0.15s;
+}
+.btn-save:hover { background: var(--teal-600); }
+.btn-discard {
+    background: transparent; color: rgba(0,0,0,0.55);
+    border: 1px solid rgba(0,0,0,0.15); border-radius: 6px;
+    padding: 8px 16px; font-size: 13px; font-weight: 600;
+    cursor: pointer; font-family: inherit;
+    text-decoration: none; transition: all 0.15s;
+}
+.btn-discard:hover { border-color: #e84545; color: #e84545; }
+
+/* ── Form body ── */
+.form-body { background: #fff; padding: 28px; }
+
+/* ── Patient card ── */
+.patient-card {
+    background: linear-gradient(135deg, #f0faff, #e6f7ff);
+    border: 1px solid rgba(33,136,171,0.2);
+    border-radius: 14px;
+    padding: 20px 24px;
+    margin-bottom: 28px;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 16px;
+    align-items: center;
+}
+.patient-avatar {
+    width: 64px; height: 64px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--teal-600), var(--teal-400));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; font-weight: 800; color: #fff; flex-shrink: 0;
+    overflow: hidden;
+}
+.patient-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.patient-info-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px 24px;
+}
+.pi-item { display: flex; flex-direction: column; gap: 2px; }
+.pi-label { font-size: 10px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.06em; color: rgba(0,0,0,0.35); }
+.pi-value { font-size: 13px; font-weight: 600; color: var(--teal-900); }
+.pi-code { font-family: monospace; font-size: 12px; color: var(--teal-600); }
+
+/* ── Main grid ── */
+.form-main-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px 48px;
+    padding-bottom: 28px;
+    border-bottom: 1px solid rgba(0,0,0,0.07);
+    margin-bottom: 28px;
+}
+.field-group { display: flex; flex-direction: column; gap: 16px; }
+.field-row {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    align-items: center;
+    gap: 12px; min-height: 34px;
+}
+.field-row label {
+    font-size: 13px; font-weight: 600;
+    color: rgba(0,0,0,0.55); text-align: right;
+}
+.required-star { color: #e84545; margin-left: 2px; }
+.field-error { font-size: 11px; color: #e84545; margin-top: 2px; grid-column: 2; }
+
+/* ── Input underline style ── */
+.field-ul {
+    width: 100%; background: transparent;
+    border: none; border-bottom: 1.5px solid #d1dde3; border-radius: 0;
+    padding: 5px 2px; font-size: 13px; color: var(--teal-900);
+    transition: border-color .2s; outline: none; font-family: inherit;
+}
+.field-ul:focus { border-bottom-color: var(--teal-500); }
+.field-ul::placeholder { color: #bfcdd4; }
+select.field-ul {
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23839aaa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 4px center;
+    padding-right: 20px; cursor: pointer; background-color: transparent;
+}
+textarea.field-ul {
+    resize: vertical; border: 1.5px solid #d1dde3;
+    border-radius: 6px; padding: 8px 10px;
+}
+textarea.field-ul:focus { border-color: var(--teal-500); }
+
+/* ── Lignes table ── */
+.section-title {
+    font-size: 12px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: rgba(0,0,0,0.35);
+    margin-bottom: 14px; display: flex; align-items: center; gap: 10px;
+}
+.section-title::after {
+    content: ''; flex: 1; height: 1px;
+    background: linear-gradient(to right, rgba(0,0,0,0.1), transparent);
+}
+.lignes-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.lignes-table thead th {
+    padding: 8px 10px; text-align: left;
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.05em; color: rgba(0,0,0,0.4);
+    border-bottom: 2px solid rgba(0,0,0,0.07);
+}
+.lignes-table tbody td { padding: 6px 6px; vertical-align: middle; }
+.lignes-table tbody tr:hover td { background: #f8fbfd; }
+.lignes-table input, .lignes-table select {
+    width: 100%; padding: 5px 6px;
+    border: none; border-bottom: 1.5px solid #d1dde3; border-radius: 0;
+    font-size: 12px; font-family: inherit; background: transparent;
+    outline: none; color: var(--teal-900);
+}
+.lignes-table input:focus, .lignes-table select:focus {
+    border-bottom-color: var(--teal-500);
+}
+.lignes-table .col-libelle { min-width: 200px; }
+.lignes-table .col-acte    { width: 160px; }
+.lignes-table .col-qte     { width: 70px; }
+.lignes-table .col-prix    { width: 110px; }
+.lignes-table .col-remise  { width: 80px; }
+.lignes-table .col-total   { width: 110px; font-weight: 600; color: var(--teal-700); text-align: right; }
+.lignes-table .col-del     { width: 36px; text-align: center; }
+.btn-del-ligne {
+    background: none; border: none; cursor: pointer;
+    color: rgba(0,0,0,0.25); padding: 4px; border-radius: 4px;
+    transition: all 0.15s; font-size: 15px;
+}
+.btn-del-ligne:hover { color: #e84545; background: #fff0f0; }
+.btn-add-ligne {
+    display: inline-flex; align-items: center; gap: 6px;
+    margin-top: 10px; background: none; border: 1.5px dashed rgba(0,0,0,0.15);
+    border-radius: 8px; padding: 7px 16px; font-size: 13px; font-weight: 600;
+    color: var(--teal-600); cursor: pointer; font-family: inherit;
+    transition: all 0.15s;
+}
+.btn-add-ligne:hover { border-color: var(--teal-400); background: #f0faff; }
+
+/* ── Totaux ── */
+.totaux-wrap {
+    display: flex; justify-content: flex-end; margin-top: 20px;
+}
+.totaux-box {
+    background: #f8fbfd; border: 1px solid rgba(0,0,0,0.07);
+    border-radius: 10px; padding: 16px 20px; min-width: 280px;
+}
+.totaux-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 5px 0; font-size: 13px; color: rgba(0,0,0,0.55);
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+.totaux-row:last-child { border-bottom: none; }
+.totaux-row.grand-total {
+    font-size: 15px; font-weight: 800;
+    color: var(--teal-900); margin-top: 6px; padding-top: 10px;
+    border-top: 2px solid rgba(0,0,0,0.08); border-bottom: none;
+}
+.totaux-row span:last-child { font-weight: 700; color: var(--teal-700); }
+.totaux-row.grand-total span:last-child { color: var(--teal-600); font-size: 18px; }
+
+@media (max-width: 900px) {
+    .form-main-grid { grid-template-columns: 1fr; gap: 0; }
+    .patient-info-grid { grid-template-columns: 1fr 1fr; }
+    .field-row { grid-template-columns: 120px 1fr; }
+}
+@media (max-width: 600px) {
+    .field-row { grid-template-columns: 1fr; }
+    .field-row label { text-align: left; }
+    .patient-card { grid-template-columns: 1fr; }
+    .patient-info-grid { grid-template-columns: 1fr; }
+}
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="breadcrumb">
+    <a href="{% url 'dashboard' %}">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24"
+             stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px">
+            <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z"/>
+            <polyline points="9 21 9 12 15 12 15 21"/>
+        </svg>Accueil
+    </a>
+    <span class="breadcrumb-sep">›</span>
+    <a href="{% url 'facturation_list' %}">Facturation</a>
+    <span class="breadcrumb-sep">›</span>
+    <span>Nouvelle facture</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+
+<form method="post" id="facture-form" novalidate>
+{% csrf_token %}
+<input type="hidden" name="patient_id" value="{{ patient.pk }}">
+{% if rdv %}<input type="hidden" name="rdv_id" value="{{ rdv.pk }}">{% endif %}
+
+<!-- ══════════ PANNEAU DE CONTRÔLE ══════════ -->
+<div class="control-panel">
+    <div class="cp-top">
+        <div class="cp-breadcrumb">
+            <a href="{% url 'facturation_list' %}">Facturation</a>
+            <span class="sep">/</span>
+            <span class="current">Nouvelle facture</span>
+        </div>
+        <div class="cp-save-group">
+            <button type="submit" class="btn-save">Enregistrer la facture</button>
+            <a href="{% url 'facturation_list' %}" class="btn-discard">Annuler</a>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════ CORPS ══════════ -->
+<div class="form-body">
+
+    {% if not patient %}
+    <div style="background:#fff0f0;border:1px solid #fca5a5;color:#b91c1c;border-radius:8px;padding:14px 18px;margin-bottom:20px;font-size:13px;">
+        ⚠ Aucun patient sélectionné. Veuillez revenir à la liste et choisir un patient.
+    </div>
+    {% endif %}
+
+    <!-- ── Coordonnées patient ── -->
+    {% if patient %}
+    <div class="patient-card">
+        <div class="patient-avatar">
+            {% if patient.photo %}
+                <img src="{{ patient.photo.url }}" alt="{{ patient.nom }}">
+            {% else %}
+                {{ patient.nom|slice:":1"|upper }}{{ patient.prenoms|slice:":1"|upper }}
+            {% endif %}
+        </div>
+        <div>
+            <div style="font-size:16px;font-weight:800;color:var(--teal-900);margin-bottom:10px;">
+                {{ patient.nom }} {{ patient.prenoms }}
+            </div>
+            <div class="patient-info-grid">
+                <div class="pi-item">
+                    <span class="pi-label">Code patient</span>
+                    <span class="pi-value pi-code">{{ patient.code_patient }}</span>
+                </div>
+                <div class="pi-item">
+                    <span class="pi-label">Âge</span>
+                    <span class="pi-value">{{ patient.age }} ans</span>
+                </div>
+                <div class="pi-item">
+                    <span class="pi-label">Sexe</span>
+                    <span class="pi-value">{{ patient.get_sexe_display }}</span>
+                </div>
+                <div class="pi-item">
+                    <span class="pi-label">Téléphone</span>
+                    <span class="pi-value">{{ patient.telephone }}</span>
+                </div>
+                <div class="pi-item">
+                    <span class="pi-label">Adresse</span>
+                    <span class="pi-value">{{ patient.adresse|default:patient.ville|default:"—" }}</span>
+                </div>
+                <div class="pi-item">
+                    <span class="pi-label">Assurance</span>
+                    <span class="pi-value">
+                        {% if patient.assurance %}{{ patient.assurance.nom }}{% else %}—{% endif %}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ── Informations facture ── -->
+    <div class="form-main-grid">
+        <div class="field-group">
+
+            <div class="field-row">
+                <label for="{{ form.type_facture.id_for_label }}">
+                    Type <span class="required-star">*</span>
+                </label>
+                {{ form.type_facture }}
+            </div>
+            {% if form.type_facture.errors %}
+            <div class="field-row"><span></span><div class="field-error">{{ form.type_facture.errors.0 }}</div></div>
+            {% endif %}
+
+            <div class="field-row">
+                <label for="{{ form.statut.id_for_label }}">Statut</label>
+                {{ form.statut }}
+            </div>
+
+            <div class="field-row">
+                <label for="{{ form.date_echeance.id_for_label }}">Date d'échéance</label>
+                {{ form.date_echeance }}
+            </div>
+
+        </div>
+
+        <div class="field-group">
+
+            <div class="field-row">
+                <label for="{{ form.montant_assurance.id_for_label }}">Part assurance (CFA)</label>
+                {{ form.montant_assurance }}
+            </div>
+
+            <div class="field-row">
+                <label for="{{ form.ticket_moderateur.id_for_label }}">Ticket modérateur (CFA)</label>
+                {{ form.ticket_moderateur }}
+            </div>
+
+            <div class="field-row" style="align-items:flex-start;padding-top:4px;">
+                <label for="{{ form.notes.id_for_label }}">Notes</label>
+                {{ form.notes }}
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ══════════ LIGNES DE FACTURE ══════════ -->
+    <div class="section-title">Prestations / Actes</div>
+
+    <div style="overflow-x:auto;">
+        <table class="lignes-table" id="lignes-table">
+            <thead>
+                <tr>
+                    <th class="col-libelle">Désignation <span class="required-star">*</span></th>
+                    <th class="col-acte">Acte catalogue</th>
+                    <th class="col-qte">Qté</th>
+                    <th class="col-prix">Prix unit. (CFA)</th>
+                    <th class="col-remise">Remise %</th>
+                    <th class="col-total">Total (CFA)</th>
+                    <th class="col-del"></th>
+                </tr>
+            </thead>
+            <tbody id="lignes-body">
+                <!-- ligne initiale -->
+                <tr class="ligne-row">
+                    <td class="col-libelle"><input type="text" name="ligne_libelle_0" placeholder="Ex : Consultation générale…" value="{{ initial_ligne_libelle }}"></td>
+                    <td class="col-acte">
+                        <select name="ligne_acte_0" onchange="fillFromActe(this, 0)">
+                            <option value="">— Choisir —</option>
+                            {% for acte in actes %}
+                            <option value="{{ acte.pk }}" data-prix="{{ acte.prix }}" data-libelle="{{ acte.libelle }}">
+                                {{ acte.libelle }} ({{ acte.prix }} CFA)
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </td>
+                    <td class="col-qte"><input type="number" name="ligne_qte_0" value="1" min="0.01" step="0.01" oninput="recalcRow(0)"></td>
+                    <td class="col-prix"><input type="number" name="ligne_prix_0" value="0" min="0" step="1" oninput="recalcRow(0)"></td>
+                    <td class="col-remise"><input type="number" name="ligne_remise_0" value="0" min="0" max="100" step="0.01" oninput="recalcRow(0)"></td>
+                    <td class="col-total" id="total-0">0</td>
+                    <td class="col-del"><button type="button" class="btn-del-ligne" onclick="removeLigne(this)">×</button></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <button type="button" class="btn-add-ligne" onclick="addLigne()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24"
+             stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Ajouter une ligne
+    </button>
+
+    <!-- ── Totaux ── -->
+    <div class="totaux-wrap">
+        <div class="totaux-box">
+            <div class="totaux-row">
+                <span>Sous-total HT</span>
+                <span id="disp-subtotal">0 CFA</span>
+            </div>
+            <div class="totaux-row">
+                <span>Part assurance</span>
+                <span id="disp-assurance">0 CFA</span>
+            </div>
+            <div class="totaux-row">
+                <span>Ticket modérateur</span>
+                <span id="disp-ticket">0 CFA</span>
+            </div>
+            <div class="totaux-row grand-total">
+                <span>Total à payer</span>
+                <span id="disp-total">0 CFA</span>
+            </div>
+        </div>
+    </div>
+
+</div><!-- /.form-body -->
+</form>
+
+<script>
+(function () {
+    var lineCount = 1;
+
+    function fmt(n) {
+        return Number(n).toLocaleString('fr-FR') + ' CFA';
+    }
+
+    window.recalcRow = function (idx) {
+        var qte   = parseFloat(document.querySelector('[name="ligne_qte_'   + idx + '"]').value) || 0;
+        var prix  = parseFloat(document.querySelector('[name="ligne_prix_'  + idx + '"]').value) || 0;
+        var rem   = parseFloat(document.querySelector('[name="ligne_remise_'+ idx + '"]').value) || 0;
+        var total = qte * prix * (1 - rem / 100);
+        var el = document.getElementById('total-' + idx);
+        if (el) el.textContent = fmt(total);
+        recalcTotaux();
+    };
+
+    window.recalcTotaux = function () {
+        var subtotal = 0;
+        document.querySelectorAll('[name^="ligne_qte_"]').forEach(function (qteEl) {
+            var idx   = qteEl.name.replace('ligne_qte_', '');
+            var qte   = parseFloat(qteEl.value) || 0;
+            var prix  = parseFloat((document.querySelector('[name="ligne_prix_'  + idx + '"]') || {}).value) || 0;
+            var rem   = parseFloat((document.querySelector('[name="ligne_remise_'+ idx + '"]') || {}).value) || 0;
+            subtotal += qte * prix * (1 - rem / 100);
+        });
+
+        var assurance = parseFloat(document.getElementById('{{ form.montant_assurance.id_for_label }}').value) || 0;
+        var ticket    = parseFloat(document.getElementById('{{ form.ticket_moderateur.id_for_label }}').value)  || 0;
+
+        document.getElementById('disp-subtotal').textContent  = fmt(subtotal);
+        document.getElementById('disp-assurance').textContent = fmt(assurance);
+        document.getElementById('disp-ticket').textContent    = fmt(ticket);
+        document.getElementById('disp-total').textContent     = fmt(subtotal);
+    };
+
+    window.fillFromActe = function (sel, idx) {
+        var opt = sel.options[sel.selectedIndex];
+        if (!opt || !opt.value) return;
+        var libInput  = document.querySelector('[name="ligne_libelle_' + idx + '"]');
+        var prixInput = document.querySelector('[name="ligne_prix_'   + idx + '"]');
+        if (libInput && !libInput.value) libInput.value = opt.dataset.libelle || '';
+        if (prixInput) { prixInput.value = opt.dataset.prix || 0; }
+        recalcRow(idx);
+    };
+
+    window.addLigne = function () {
+        var idx  = lineCount++;
+        var body = document.getElementById('lignes-body');
+        var tr   = document.createElement('tr');
+        tr.className = 'ligne-row';
+
+        var acteOptions = '<option value="">— Choisir —</option>';
+        {% for acte in actes %}
+        acteOptions += '<option value="{{ acte.pk }}" data-prix="{{ acte.prix }}" data-libelle="{{ acte.libelle|escapejs }}">{{ acte.libelle|escapejs }} ({{ acte.prix }} CFA)</option>';
+        {% endfor %}
+
+        tr.innerHTML =
+            '<td class="col-libelle"><input type="text" name="ligne_libelle_' + idx + '" placeholder="Désignation…"></td>' +
+            '<td class="col-acte"><select name="ligne_acte_' + idx + '" onchange="fillFromActe(this,' + idx + ')">' + acteOptions + '</select></td>' +
+            '<td class="col-qte"><input type="number" name="ligne_qte_' + idx + '" value="1" min="0.01" step="0.01" oninput="recalcRow(' + idx + ')"></td>' +
+            '<td class="col-prix"><input type="number" name="ligne_prix_' + idx + '" value="0" min="0" step="1" oninput="recalcRow(' + idx + ')"></td>' +
+            '<td class="col-remise"><input type="number" name="ligne_remise_' + idx + '" value="0" min="0" max="100" step="0.01" oninput="recalcRow(' + idx + ')"></td>' +
+            '<td class="col-total" id="total-' + idx + '">0 CFA</td>' +
+            '<td class="col-del"><button type="button" class="btn-del-ligne" onclick="removeLigne(this)">×</button></td>';
+        body.appendChild(tr);
+    };
+
+    window.removeLigne = function (btn) {
+        var row = btn.closest('tr');
+        if (document.querySelectorAll('.ligne-row').length > 1) {
+            row.remove();
+            recalcTotaux();
+        }
+    };
+
+    /* Recalc when assurance/ticket change */
+    var assEl = document.getElementById('{{ form.montant_assurance.id_for_label }}');
+    var tickEl = document.getElementById('{{ form.ticket_moderateur.id_for_label }}');
+    if (assEl)  assEl.addEventListener('input', recalcTotaux);
+    if (tickEl) tickEl.addEventListener('input', recalcTotaux);
+
+    recalcTotaux();
+})();
+</script>
+
+{% endblock %}

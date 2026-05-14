@@ -5,9 +5,13 @@ app_name = 'patients'
 
 urlpatterns = [
     path('', views.patient_list, name='list'),
+    path('gynecologie/', views.gynecologie_patient_list, name='gynecologie_patients'),
+    path('gynecologie/rendez-vous/', views.gynecologie_rdv_list, name='gynecologie_rdv'),
     path('rendez-vous/', views.rdv_global_list, name='rdv_global'),
     path('rendez-vous/nouveau/', views.rdv_create, name='rdv_create'),
+    path('rendez-vous/<int:pk>/modifier/', views.rdv_edit, name='rdv_edit'),
     path('<int:pk>/info/', views.patient_info_json, name='patient_info'),
+    path('recherche/', views.patient_search_json, name='patient_search'),
     path('nouveau/', views.patient_create, name='create'),
     path('<int:pk>/', views.patient_detail, name='detail'),
     path('<int:pk>/modifier/', views.patient_edit, name='edit'),

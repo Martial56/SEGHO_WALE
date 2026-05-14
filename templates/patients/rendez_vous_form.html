@@ -62,6 +62,8 @@
     }
     .btn-action:hover { background: #e8f4fa; border-color: var(--teal-300); color: var(--teal-700); }
     .btn-action.danger:hover { background: #fff0f0; border-color: #fca5a5; color: var(--rose); }
+    .btn-action:disabled { opacity: 0.38; cursor: not-allowed; background: #f5f8fa; border-color: rgba(0,0,0,0.08); color: rgba(0,0,0,0.3); }
+    .btn-action:disabled:hover { background: #f5f8fa; border-color: rgba(0,0,0,0.08); color: rgba(0,0,0,0.3); }
 
     /* ── Status bar ── */
     .status-bar {
@@ -268,7 +270,7 @@
     <span class="breadcrumb-sep">›</span>
     <a href="{% url 'patients:rdv_global' %}">Rendez-vous</a>
     <span class="breadcrumb-sep">›</span>
-    <span>Nouveau</span>
+    <span>{% if rdv %}{{ rdv.patient.nom }} {{ rdv.patient.prenoms }}{% else %}Nouveau{% endif %}</span>
 </nav>
 {% endblock %}
 
@@ -291,17 +293,19 @@
         <div class="cp-breadcrumb">
             <a href="{% url 'patients:rdv_global' %}">Rendez-vous</a>
             <span class="sep">/</span>
-            <span class="current">Nouveau</span>
+            <span class="current">{% if rdv %}{{ rdv.patient.nom }} {{ rdv.patient.prenoms }}{% else %}Nouveau{% endif %}</span>
         </div>
         <div class="cp-save-group">
-            <button type="submit" class="btn-save">Sauvegarder</button>
+            <button type="submit" class="btn-save">{% if rdv %}Enregistrer{% else %}Sauvegarder et facturer{% endif %}</button>
             <a href="{% url 'patients:rdv_global' %}" class="btn-discard">Ignorer</a>
         </div>
     </div>
 
     <div class="cp-actions">
-        <button type="submit" name="_action" value="confirmer" class="btn-action">Confirmer</button>
+        <button type="submit" name="_action" value="confirmer" class="btn-action"
+            {% if not facture_payee %}disabled title="Le rendez-vous doit avoir une facture payée pour être confirmé"{% endif %}>Confirmer</button>
         <button type="button" class="btn-action" onclick="window.print()">Imprimer</button>
+        <button type="submit" name="_action" value="créer une facture" class="btn-action">Créer une facture</button>
         <button type="submit" name="_action" value="annuler" class="btn-action danger">Annuler</button>
     </div>
 
@@ -327,12 +331,19 @@
             <div>
                 <div class="field-row">
                     <label>Patient <span class="required-star">*</span></label>
+                    {% if rdv %}
+                        <div class="field-display" style="font-weight:600;color:var(--teal-900);">
+                            {{ rdv.patient.nom }} {{ rdv.patient.prenoms }}
+                        </div>
+                        <input type="hidden" name="patient" id="id_patient" value="{{ rdv.patient.pk }}">
+                    {% else %}
                     <div class="patient-ac" id="patient-ac">
                         <input type="text" id="patient-search" class="field-ul"
-                               placeholder="Saisir le nom du patient…" autocomplete="off">
+                               placeholder="Nom, prénom, code ou téléphone…" autocomplete="off">
                         <div class="ac-dropdown" id="ac-dropdown"></div>
-                        <div style="display:none;">{{ form.patient }}</div>
+                        <input type="hidden" name="patient" id="id_patient" value="{{ form.patient.value|default:'' }}">
                     </div>
+                    {% endif %}
                 </div>
                 {% if form.patient.errors %}
                 <div class="field-row"><span></span><div class="field-error">{{ form.patient.errors.0 }}</div></div>
@@ -354,10 +365,12 @@
             <!-- Code de confirmation -->
             <div class="field-row">
                 <label>Code de confirmation</label>
-                <div class="field-display placeholder" id="code-confirmation">
-                    {% if rdv and rdv.code_confirmation %}{{ rdv.code_confirmation }}{% else %}Généré après facturation{% endif %}
+                <div class="field-display {% if not rdv or not rdv.code_confirmation %}placeholder{% endif %}" id="code-confirmation">
+                    {% if rdv and rdv.code_confirmation %}{{ rdv.code_confirmation }}{% else %}Sélectionnez un patient…{% endif %}
                 </div>
             </div>
+            <input type="hidden" name="code_confirmation" id="id_code_confirmation"
+                   value="{% if rdv %}{{ rdv.code_confirmation }}{% endif %}">
 
             <!-- Département -->
             <div class="field-row">
@@ -398,13 +411,13 @@
                 </div>
             </div>
 
-            <!-- Date de création -->
+            <!-- Date de création 
             <div class="field-row">
                 <label>Date de création</label>
                 <div class="field-display">
                     {% if rdv %}{{ rdv.date_creation|date:"d/m/Y H:i" }}{% else %}<span style="font-style:italic;color:#bfcdd4;">Aujourd'hui</span>{% endif %}
                 </div>
-            </div>
+            </div>-->
 
             <!-- Date de validité -->
             <div class="field-row">
@@ -414,10 +427,18 @@
                 </div>
             </div>
 
-            <!-- Type de consultation -->
+            <!-- Service -->
             <div class="field-row">
-                <label for="{{ form.type_rdv.id_for_label }}">Type</label>
-                {{ form.type_rdv }}
+                <label for="{{ form.service.id_for_label }}">
+                    Service <span class="required-star">*</span>
+                </label>
+                {{ form.service }}
+            </div>
+            <div class="field-row">
+                <span></span>
+                <div style="font-size:11px;color:rgba(0,0,0,0.35);font-style:italic;">
+                    Sera repris comme désignation dans la facture
+                </div>
             </div>
 
             <!-- Statut -->
@@ -501,12 +522,25 @@
         });
     });
 
-    /* ── Autocomplete patient ── */
-    var patientSelect = document.getElementById('id_patient');
-    var searchInput   = document.getElementById('patient-search');
-    var dropdown      = document.getElementById('ac-dropdown');
-    var options       = patientSelect ? Array.from(patientSelect.options).filter(function(o){ return o.value; }) : [];
-    var focusedIdx    = -1;
+    /* ── Autocomplete patient (AJAX) ── */
+    var patientHidden    = document.getElementById('id_patient');
+    var codeHidden       = document.getElementById('id_code_confirmation');
+    var codeDisplay      = document.getElementById('code-confirmation');
+    var searchInput      = document.getElementById('patient-search');
+    var dropdown         = document.getElementById('ac-dropdown');
+    var focusedIdx       = -1;
+    var searchTimer      = null;
+    var SEARCH_URL       = '{% url "patients:patient_search" %}';
+    var INFO_URL         = '{% url "patients:patient_info" 0 %}';
+
+    function generateConfirmCode() {
+        var now = new Date();
+        var pad = function(n) { return String(n).padStart(2, '0'); };
+        var d = String(now.getFullYear()).slice(-2) + pad(now.getMonth()+1) + pad(now.getDate());
+        var t = pad(now.getHours()) + pad(now.getMinutes());
+        var r = Math.floor(Math.random() * 9000 + 1000);
+        return 'RDV' + d + '-' + t + r;
+    }
 
     function highlight(text, q) {
         if (!q) return text;
@@ -517,35 +551,51 @@
                text.slice(i + q.length);
     }
 
-    function renderDropdown(q) {
+    function renderResults(results, q) {
         dropdown.innerHTML = '';
         focusedIdx = -1;
-        if (!q) { dropdown.style.display = 'none'; return; }
-        var matches = options.filter(function(o){ return o.text.toLowerCase().includes(q.toLowerCase()); }).slice(0, 15);
-        if (!matches.length) {
+        if (!results.length) {
             dropdown.innerHTML = '<div class="ac-empty">Aucun patient trouvé</div>';
             dropdown.style.display = 'block';
             return;
         }
-        matches.forEach(function(opt) {
+        results.forEach(function(p) {
             var div = document.createElement('div');
             div.className = 'ac-item';
-            div.dataset.val = opt.value;
-            div.innerHTML = highlight(opt.text, q);
+            div.innerHTML =
+                '<strong>' + highlight(p.nom_complet, q) + '</strong>' +
+                '<br><span style="font-size:11px;color:rgba(0,0,0,0.4);">' +
+                highlight(p.code, q) +
+                (p.telephone ? ' · ' + highlight(p.telephone, q) : '') +
+                '</span>';
             div.addEventListener('mousedown', function(e) {
                 e.preventDefault();
-                selectPatient(opt.value, opt.text);
+                selectPatient(p.id, p.nom_complet);
             });
             dropdown.appendChild(div);
         });
         dropdown.style.display = 'block';
     }
 
-    function selectPatient(val, text) {
-        patientSelect.value = val;
-        searchInput.value = text;
+    function doSearch(q) {
+        if (!q) { dropdown.style.display = 'none'; return; }
+        fetch(SEARCH_URL + '?q=' + encodeURIComponent(q))
+            .then(function(r){ return r.json(); })
+            .then(function(d){ renderResults(d.results, q); });
+    }
+
+    function selectPatient(id, nom) {
+        patientHidden.value = id;
+        searchInput.value   = nom;
         dropdown.style.display = 'none';
-        fetchPatientInfo(val);
+        fetchPatientInfo(id);
+        /* Générer le code de confirmation si pas déjà présent */
+        if (!codeHidden.value) {
+            var code = generateConfirmCode();
+            codeHidden.value = code;
+            codeDisplay.textContent = code;
+            codeDisplay.classList.remove('placeholder');
+        }
     }
 
     function moveFocus(dir) {
@@ -557,7 +607,18 @@
     }
 
     if (searchInput) {
-        searchInput.addEventListener('input', function(){ renderDropdown(this.value); });
+        searchInput.addEventListener('input', function() {
+            clearTimeout(searchTimer);
+            var q = this.value.trim();
+            patientHidden.value = '';
+            /* Réinitialiser le code si le patient est désélectionné */
+            if (!q) {
+                codeHidden.value = '';
+                codeDisplay.textContent = 'Sélectionnez un patient…';
+                codeDisplay.classList.add('placeholder');
+            }
+            searchTimer = setTimeout(function(){ doSearch(q); }, 220);
+        });
         searchInput.addEventListener('keydown', function(e) {
             if (e.key === 'ArrowDown')  { e.preventDefault(); moveFocus(1); }
             else if (e.key === 'ArrowUp')   { e.preventDefault(); moveFocus(-1); }
@@ -570,18 +631,28 @@
             }
             else if (e.key === 'Escape') { dropdown.style.display = 'none'; }
         });
-        searchInput.addEventListener('blur', function(){ setTimeout(function(){ dropdown.style.display = 'none'; }, 180); });
-        /* Pré-remplir si édition */
-        if (patientSelect && patientSelect.value) {
-            var sel = patientSelect.options[patientSelect.selectedIndex];
-            if (sel) searchInput.value = sel.text;
+        searchInput.addEventListener('blur', function(){
+            setTimeout(function(){ dropdown.style.display = 'none'; }, 200);
+        });
+
+        /* Pré-remplir si patient passé en paramètre (mode création uniquement) */
+        {% if patient_prefill and not rdv %}
+        searchInput.value = '{{ patient_prefill.nom }} {{ patient_prefill.prenoms }}';
+        patientHidden.value = '{{ patient_prefill.pk }}';
+        fetchPatientInfo('{{ patient_prefill.pk }}');
+        if (!codeHidden.value) {
+            var code = generateConfirmCode();
+            codeHidden.value = code;
+            codeDisplay.textContent = code;
+            codeDisplay.classList.remove('placeholder');
         }
+        {% endif %}
     }
 
     /* ── Info patient (âge + téléphone) ── */
     function fetchPatientInfo(pk) {
         if (!pk) { setPlaceholder('patient-age', '—'); setPlaceholder('patient-tel', '—'); return; }
-        fetch('{% url "patients:patient_info" 0 %}'.replace('/0/', '/' + pk + '/'))
+        fetch(INFO_URL.replace('/0/', '/' + pk + '/'))
             .then(function(r){ return r.json(); })
             .then(function(d) {
                 var ageEl = document.getElementById('patient-age');
@@ -598,7 +669,42 @@
         if (el) { el.textContent = text; el.classList.add('placeholder'); }
     }
 
-    if (patientSelect && patientSelect.value) fetchPatientInfo(patientSelect.value);
+    if (patientHidden && patientHidden.value) fetchPatientInfo(patientHidden.value);
+
+    /* En mode édition : générer le code si absent */
+    {% if rdv and not rdv.code_confirmation %}
+    if (!codeHidden.value) {
+        var editCode = generateConfirmCode();
+        codeHidden.value = editCode;
+        codeDisplay.textContent = editCode;
+        codeDisplay.classList.remove('placeholder');
+    }
+    {% endif %}
+
+    /* ── Date de validité = date_heure + 14 jours ── */
+    var dateHeureInput = document.getElementById('{{ form.date_heure.id_for_label }}');
+    var dateValiditeEl = document.getElementById('date-validite');
+
+    function updateDateValidite() {
+        if (!dateHeureInput || !dateValiditeEl) return;
+        var val = dateHeureInput.value;
+        if (!val) {
+            dateValiditeEl.innerHTML = '<span style="font-style:italic;color:#bfcdd4;">J + 14 jours</span>';
+            return;
+        }
+        var d = new Date(val);
+        if (isNaN(d.getTime())) return;
+        d.setDate(d.getDate() + 14);
+        var dd = String(d.getDate()).padStart(2, '0');
+        var mm = String(d.getMonth() + 1).padStart(2, '0');
+        dateValiditeEl.textContent = dd + '/' + mm + '/' + d.getFullYear();
+    }
+
+    if (dateHeureInput) {
+        dateHeureInput.addEventListener('input', updateDateValidite);
+        dateHeureInput.addEventListener('change', updateDateValidite);
+        updateDateValidite();
+    }
 
     /* ── Chronomètres : colorier si non-zéro ── */
     ['t-constante', 't-attente', 't-consult'].forEach(function (id) {

@@ -65,7 +65,6 @@ class Patient(models.Model):
 
 class RendezVous(models.Model):
     STATUT = [('planifie','Planifié'),('confirme','Confirmé'),('termine','Terminé'),('annule','Annulé'),('absent','Absent')]
-    TYPE = [('consultation','Consultation'),('controle','Contrôle'),('urgence','Urgence'),('examen','Examen'),('vaccination','Vaccination')]
     DEPARTEMENT = [
         ('medecine_generale', 'Médecine générale'),
         ('gynecologie_cpn', 'Gynécologie / CPN'),
@@ -74,9 +73,9 @@ class RendezVous(models.Model):
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='rendez_vous')
     medecin = models.ForeignKey('medecins.Medecin', on_delete=models.SET_NULL, null=True, related_name='rendez_vous')
     departement = models.CharField(max_length=30, choices=DEPARTEMENT, blank=True, default='')
+    service = models.ForeignKey('medecins.Service', on_delete=models.SET_NULL, null=True, blank=True, related_name='rendez_vous')
     date_heure = models.DateTimeField()
     duree_minutes = models.IntegerField(default=30)
-    type_rdv = models.CharField(max_length=20, choices=TYPE, default='consultation')
     motif = models.TextField(blank=True)
     statut = models.CharField(max_length=20, choices=STATUT, default='planifie')
     notes = models.TextField(blank=True)

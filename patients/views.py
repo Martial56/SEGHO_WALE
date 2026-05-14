@@ -192,22 +192,195 @@ def patient_info_json(request, pk):
 
 
 @login_required
+def patient_search_json(request):
+    q = request.GET.get('q', '').strip()
+    if len(q) < 1:
+        return JsonResponse({'results': []})
+    qs = Patient.objects.filter(
+        Q(nom__icontains=q) | Q(prenoms__icontains=q) |
+        Q(code_patient__icontains=q) | Q(telephone__icontains=q)
+    ).order_by('nom', 'prenoms')[:20]
+    results = [
+        {
+            'id': p.pk,
+            'nom_complet': f"{p.nom} {p.prenoms}",
+            'code': p.code_patient,
+            'telephone': p.telephone or '',
+            'actif': p.actif,
+        }
+        for p in qs
+    ]
+    return JsonResponse({'results': results})
+
+
+@login_required
 def rdv_create(request):
     if request.method == 'POST':
         form = RendezVousForm(request.POST)
+        patient_obj = None
         if form.is_valid():
-            rdv = form.save()
+            rdv = form.save(commit=False)
+            code = request.POST.get('code_confirmation', '').strip()
+            if code:
+                rdv.code_confirmation = code
+            rdv.save()
             messages.success(
                 request,
                 f'Rendez-vous créé pour {rdv.patient.nom} {rdv.patient.prenoms} '
                 f'le {rdv.date_heure.strftime("%d/%m/%Y à %H:%M")}.'
             )
+            action = request.POST.get('_action', '')
+            if action == 'annuler':
+                return redirect('patients:rdv_global')
+            from django.urls import reverse
+            return redirect(reverse('facture_create') + f'?patient={rdv.patient.pk}&rdv={rdv.pk}')
+    else:
+        initial = {'date_heure': timezone.now().strftime('%Y-%m-%dT%H:%M')}
+        patient_pk = request.GET.get('patient')
+        patient_obj = None
+        if patient_pk:
+            patient_obj = get_object_or_404(Patient, pk=patient_pk)
+            initial['patient'] = patient_obj.pk
+        form = RendezVousForm(initial=initial)
+    return render(request, 'patients/rendez_vous_form.html', {
+        'form':            form,
+        'titre':           'Nouveau rendez-vous',
+        'patient_prefill': patient_obj,
+    })
+
+
+@login_required
+def rdv_edit(request, pk):
+    rdv = get_object_or_404(RendezVous, pk=pk)
+
+    try:
+        from facturation.models import Facture
+        facture_payee = Facture.objects.filter(patient=rdv.patient, statut='payee').exists()
+    except Exception:
+        facture_payee = False
+
+    if request.method == 'POST':
+        action = request.POST.get('_action', '')
+
+        if action == 'confirmer':
+            if facture_payee:
+                rdv.statut = 'confirme'
+                rdv.save(update_fields=['statut'])
+                messages.success(request, 'Rendez-vous confirmé.')
+            else:
+                messages.error(request, 'Une facture payée est requise pour confirmer ce rendez-vous.')
+            return redirect('patients:rdv_global')
+
+        if action == 'annuler':
+            rdv.statut = 'annule'
+            rdv.save(update_fields=['statut'])
+            messages.success(request, 'Rendez-vous annulé.')
+            return redirect('patients:rdv_global')
+
+        form = RendezVousForm(request.POST, instance=rdv)
+        if form.is_valid():
+            rdv = form.save(commit=False)
+            code = request.POST.get('code_confirmation', '').strip()
+            if code:
+                rdv.code_confirmation = code
+            rdv.save()
+            messages.success(request, 'Rendez-vous modifié.')
+            if action == 'créer une facture':
+                from django.urls import reverse
+                return redirect(reverse('facture_create') + f'?patient={rdv.patient.pk}&rdv={rdv.pk}')
             return redirect('patients:rdv_global')
     else:
-        form = RendezVousForm(initial={'date_heure': timezone.now().strftime('%Y-%m-%dT%H:%M')})
+        form = RendezVousForm(instance=rdv)
+
     return render(request, 'patients/rendez_vous_form.html', {
-        'form':  form,
-        'titre': 'Nouveau rendez-vous',
+        'form':          form,
+        'rdv':           rdv,
+        'titre':         f'Rendez-vous — {rdv.patient.nom} {rdv.patient.prenoms}',
+        'patient_prefill': rdv.patient,
+        'facture_payee': facture_payee,
+    })
+
+
+@login_required
+def gynecologie_rdv_list(request):
+    from datetime import date, datetime as dt
+
+    today = date.today()
+    date_debut_str = request.GET.get('date_debut', today.isoformat())
+    date_fin_str   = request.GET.get('date_fin',   today.isoformat())
+    statut_filter  = request.GET.get('statut', '')
+    pas_fini       = request.GET.get('pas_fini', '')
+
+    try:
+        d1 = dt.strptime(date_debut_str, '%Y-%m-%d').date()
+        d2 = dt.strptime(date_fin_str,   '%Y-%m-%d').date()
+    except ValueError:
+        d1 = d2 = today
+
+    qs = RendezVous.objects.select_related('patient', 'medecin').filter(
+        departement='gynecologie_cpn',
+        date_heure__date__gte=d1,
+        date_heure__date__lte=d2,
+    ).order_by('date_heure')
+
+    if pas_fini:
+        qs = qs.filter(statut__in=['planifie', 'confirme'])
+    elif statut_filter:
+        qs = qs.filter(statut=statut_filter)
+
+    base_qs = RendezVous.objects.filter(
+        departement='gynecologie_cpn',
+        date_heure__date__gte=d1,
+        date_heure__date__lte=d2,
+    )
+    stats = {
+        'total':     base_qs.count(),
+        'planifies': base_qs.filter(statut='planifie').count(),
+        'confirmes': base_qs.filter(statut='confirme').count(),
+        'termines':  base_qs.filter(statut='termine').count(),
+        'absents':   base_qs.filter(statut__in=['annule', 'absent']).count(),
+    }
+
+    return render(request, 'patients/gynecologie_rdv.html', {
+        'rdv_list':      qs,
+        'stats':         stats,
+        'date_debut':    d1.isoformat(),
+        'date_fin':      d2.isoformat(),
+        'statut_filter': statut_filter,
+        'pas_fini':      pas_fini,
+        'today':         today.isoformat(),
+        'is_today':      d1 == today and d2 == today,
+    })
+
+
+@login_required
+def gynecologie_patient_list(request):
+    gyne_ids = RendezVous.objects.filter(
+        departement='gynecologie_cpn'
+    ).values_list('patient_id', flat=True).distinct()
+
+    qs = Patient.objects.filter(pk__in=gyne_ids)
+    total_gyne = qs.count()
+
+    q    = request.GET.get('q', '').strip()
+    sexe = request.GET.get('sexe', '')
+
+    if q:
+        qs = qs.filter(
+            Q(nom__icontains=q) | Q(prenoms__icontains=q) |
+            Q(code_patient__icontains=q) | Q(telephone__icontains=q)
+        )
+    if sexe in ('M', 'F'):
+        qs = qs.filter(sexe=sexe)
+
+    paginator = Paginator(qs, 40)
+    page_obj  = paginator.get_page(request.GET.get('page'))
+    return render(request, 'patients/gynecologie_list.html', {
+        'page_obj':      page_obj,
+        'total_filtre':  qs.count(),
+        'total_gyne':    total_gyne,
+        'q':             q,
+        'sexe':          sexe,
     })
 
 
