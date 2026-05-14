@@ -1,0 +1,627 @@
+{% extends 'gynecologie/base.html' %}
+{% load static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<style>
+  .topbar, .breadcrumb { display: none !important; }
+  .content { padding: 0 !important; overflow-x: hidden; }
+</style>
+{% endblock %}
+
+{% block content %}
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap');
+
+  :root {
+    --primary:      #714B67;
+    --nav-bg:       #714B67;
+    --accent:       #017E84;
+    --bg:           #f9f9f9;
+    --surface:      #ffffff;
+    --border:       #d9d9d9;
+    --text:         #212529;
+    --text-muted:   #6c757d;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Roboto', sans-serif; background: var(--bg) !important; color: var(--text); }
+  html { background: var(--bg) !important; }
+
+  /* ── DARK MODE ── */
+  html[data-theme="dark"] { --bg:#181c28; --surface:#21283a; --border:#2d3550; --text:#c5d4e2; --text-muted:#6c85a0; }
+  html[data-theme="dark"] .o-list tbody tr:hover { background: rgba(113,75,103,0.2); }
+  html[data-theme="dark"] .o-list thead th { background: var(--surface); }
+  html[data-theme="dark"] .o-list thead th:hover { background: #28304a; }
+  html[data-theme="dark"] .o-search-input { color: var(--text); }
+  html[data-theme="dark"] .o-search-bar { border-bottom-color: #3a4a62; }
+  html[data-theme="dark"] .o-ctrl-btn { color: var(--text-muted); }
+  html[data-theme="dark"] .o-ctrl-btn:hover { background: #28304a; color: var(--text); border-color: var(--border); }
+  html[data-theme="dark"] .o-pag-btn { background: var(--surface); border-color: var(--border); color: var(--text-muted); }
+  html[data-theme="dark"] .o-view-btn { background: var(--surface); color: var(--text-muted); }
+  html[data-theme="dark"] .o-view-btns { border-color: var(--border); }
+  html[data-theme="dark"] .o-ctrl-sep { background: var(--border); }
+  html[data-theme="dark"] .o-subheader { background: var(--surface); border-bottom-color: var(--border); }
+  html[data-theme="dark"] .o-empty-state { background: var(--bg); }
+
+  /* NAV */
+  .o-nav {
+    background: var(--nav-bg); display: flex; align-items: center;
+    height: 46px; padding: 0 10px; position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+  }
+  .o-nav-grid {
+    width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+    color: rgba(255,255,255,0.75); font-size: 17px; cursor: pointer;
+    border-radius: 4px; margin-right: 4px; transition: background 0.15s; text-decoration: none;
+  }
+  .o-nav-grid:hover { background: rgba(255,255,255,0.12); color: #fff; }
+  .o-nav-brand { font-size: 15px; font-weight: 500; color: #fff; margin-right: 2px; padding: 0 8px; white-space: nowrap; }
+  .o-nav-link {
+    color: rgba(255,255,255,0.78); text-decoration: none; font-size: 13px;
+    padding: 0 12px; height: 46px; display: flex; align-items: center;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, background 0.15s, border-color 0.15s; white-space: nowrap;
+  }
+  .o-nav-link:hover, .o-nav-link.active { color: #fff; background: rgba(255,255,255,0.09); border-bottom-color: #fff; }
+  .o-nav-right { display: flex; align-items: center; gap: 2px; margin-left: auto; }
+  .o-nav-icon { width: 28px; height: 28px; border-radius: 4px; border: none; background: transparent; color: rgba(255,255,255,0.75); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s; }
+  .o-nav-icon:hover { background: rgba(255,255,255,0.12); color: #fff; }
+  .o-nav-icon .icon-sun { display: block; } .o-nav-icon .icon-moon { display: none; }
+  html[data-theme="dark"] .o-nav-icon .icon-sun { display: none; }
+  html[data-theme="dark"] .o-nav-icon .icon-moon { display: block; }
+  .o-nav-clock { text-align: right; font-size: 10px; color: rgba(255,255,255,0.6); line-height: 1.4; padding: 0 6px; white-space: nowrap; }
+  .o-nav-time { font-size: 13px; font-weight: 600; color: #fff; display: block; }
+  .o-nav-user { display: flex; align-items: center; gap: 5px; padding: 3px 8px 3px 3px; border-radius: 20px; background: rgba(255,255,255,0.1); margin: 0 3px; }
+  .o-nav-avatar { width: 22px; height: 22px; border-radius: 50%; background: rgba(255,255,255,0.25); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #fff; flex-shrink: 0; }
+  .o-nav-uname { font-size: 11px; font-weight: 500; color: #fff; line-height: 1.2; }
+  .o-nav-urole { font-size: 9.5px; color: rgba(255,255,255,0.65); }
+  .o-nav-logout { width: 28px; height: 28px; border-radius: 4px; border: none; background: transparent; color: rgba(255,255,255,0.75); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s; }
+  .o-nav-logout:hover { background: rgba(232,69,69,0.3); color: #fff; }
+
+  /* SUBHEADER */
+  .o-subheader {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 6px 16px; display: flex; flex-direction: column; gap: 5px;
+    position: fixed; top: 46px; left: 0; right: 0; z-index: 190;
+  }
+  .o-subheader-row { display: flex; align-items: center; gap: 8px; }
+  .o-subheader-row-right { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .o-page-title { font-size: 17px; font-weight: 400; color: var(--text); }
+  .o-btn-create {
+    background: #017E84; color: #fff; border: none; padding: 5px 14px; border-radius: 4px;
+    font-size: 12.5px; font-weight: 500; font-family: 'Roboto', sans-serif; cursor: pointer;
+    text-decoration: none; display: inline-flex; align-items: center;
+    letter-spacing: 0.5px; transition: background 0.15s;
+  }
+  .o-btn-create:hover { background: #015f64; }
+  .o-btn-excel {
+    width: 28px; height: 28px; border: 1px solid #d0e9d1; border-radius: 4px;
+    background: #f0faf0; color: #217346; font-size: 15px;
+    display: inline-flex; align-items: center; justify-content: center;
+    text-decoration: none; transition: background 0.15s, border-color 0.15s;
+  }
+  .o-btn-excel:hover { background: #217346; color: #fff; border-color: #217346; }
+  .o-search-bar {
+    display: flex; align-items: center; border: none; border-bottom: 1px solid #bbb;
+    background: transparent; min-height: 28px; padding: 2px 4px; gap: 4px; width: 320px;
+  }
+  .o-search-input {
+    border: none; outline: none; font-size: 12px; font-family: 'Roboto', sans-serif;
+    color: var(--text); flex: 1; background: transparent;
+  }
+  .o-search-btn { background: none; border: none; cursor: pointer; color: #888; font-size: 13px; padding: 2px; }
+  .o-ctrl-btn {
+    background: none; border: 1px solid transparent; border-radius: 4px;
+    padding: 4px 8px; font-size: 12px; font-family: 'Roboto', sans-serif;
+    color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 4px;
+    transition: border-color 0.15s, color 0.15s, background 0.15s; white-space: nowrap;
+  }
+  .o-ctrl-btn:hover { border-color: var(--border); color: var(--text); background: #f3f3f3; }
+  .o-ctrl-sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }
+  .o-pagination { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+  .o-pag-btn {
+    width: 24px; height: 24px; border: 1px solid var(--border); border-radius: 3px;
+    background: var(--surface); display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted); text-decoration: none; font-size: 12px;
+    transition: background 0.15s, color 0.15s;
+  }
+  .o-pag-btn:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .o-pag-btn.disabled { opacity: 0.35; pointer-events: none; }
+  .o-view-btns { display: flex; border: 1px solid var(--border); border-radius: 3px; overflow: hidden; }
+  .o-view-btn {
+    width: 26px; height: 24px; border: none; background: var(--surface);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted); font-size: 13px; cursor: pointer;
+    transition: background 0.15s, color 0.15s; text-decoration: none;
+  }
+  .o-view-btn:not(:last-child) { border-right: 1px solid var(--border); }
+  .o-view-btn.active, .o-view-btn:hover { background: var(--primary); color: #fff; }
+
+  /* GROUP DROPDOWN */
+  .f-group-wrap { position: relative; }
+  .f-group-panel {
+    display: none; position: absolute; top: calc(100% + 8px); left: 0; z-index: 300;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,0.13);
+    min-width: 220px; padding: 8px 0; max-height: 360px; overflow-y: auto;
+  }
+  .f-group-panel.open { display: block; }
+  .f-group-section {
+    padding: 6px 14px 3px; font-size: 10.5px; font-weight: 600;
+    color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .f-group-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 16px; font-size: 12.5px; color: var(--text);
+    cursor: pointer; text-decoration: none; transition: background 0.1s;
+    white-space: nowrap;
+  }
+  .f-group-item:hover { background: #f5f0fa; color: var(--primary); }
+  .f-group-item.active { background: #ede7f6; color: var(--primary); font-weight: 500; }
+  .f-group-sep { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+  /* Group header row in table */
+  .o-list tbody tr.grp-header td {
+    background: #f5f0fa; color: var(--primary); font-weight: 600;
+    font-size: 12px; padding: 5px 12px; border-bottom: 1px solid #d4c8e0;
+  }
+  .grp-count {
+    display: inline-block; background: var(--primary); color: #fff;
+    border-radius: 10px; font-size: 10px; font-weight: 500;
+    padding: 1px 7px; margin-left: 8px;
+  }
+
+  /* FILTER DROPDOWN */
+  .f-filter-wrap { position: relative; }
+  .f-filter-panel {
+    display: none; position: absolute; top: calc(100% + 8px); left: 0; z-index: 300;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,0.13);
+    min-width: 300px; padding: 16px;
+  }
+  .f-filter-panel.open { display: block; }
+  .f-filter-title { font-size: 11.5px; font-weight: 600; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+  .f-filter-option {
+    display: flex; align-items: center; gap: 8px; padding: 7px 10px;
+    border-radius: 4px; cursor: pointer; font-size: 13px; color: var(--text);
+    border: 1px solid transparent; margin-bottom: 4px; transition: all 0.12s;
+  }
+  .f-filter-option:hover { background: #f5f0fa; border-color: #d4c8e0; }
+  .f-filter-option input[type="radio"] { accent-color: var(--primary); width: 15px; height: 15px; }
+  .f-filter-option.selected { background: #f0e8f4; border-color: var(--primary); }
+  .f-date-group {
+    display: none; margin-top: 8px; padding: 10px 12px;
+    background: #fafafa; border-radius: 4px; border: 1px solid var(--border);
+  }
+  .f-date-group.visible { display: block; }
+  .f-date-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .f-date-row:last-child { margin-bottom: 0; }
+  .f-date-row label { font-size: 11.5px; color: var(--text-muted); min-width: 36px; }
+  .f-date-input {
+    flex: 1; border: none; border-bottom: 1px solid #bbb;
+    font-size: 12.5px; font-family: 'Roboto', sans-serif; color: var(--text);
+    background: transparent; padding: 3px 2px; outline: none;
+  }
+  .f-date-input:focus { border-bottom-color: var(--primary); }
+  .f-filter-actions { display: flex; gap: 8px; margin-top: 14px; }
+  .f-apply-btn {
+    flex: 1; background: var(--primary); color: #fff; border: none;
+    padding: 6px 0; border-radius: 4px; font-size: 12.5px; font-weight: 500;
+    font-family: 'Roboto', sans-serif; cursor: pointer; transition: background 0.15s;
+  }
+  .f-apply-btn:hover { background: var(--primary-dark); }
+  .f-clear-btn {
+    background: none; border: 1px solid var(--border); color: var(--text-muted);
+    padding: 6px 14px; border-radius: 4px; font-size: 12.5px;
+    font-family: 'Roboto', sans-serif; cursor: pointer; text-decoration: none;
+    display: inline-flex; align-items: center; transition: all 0.12s;
+  }
+  .f-clear-btn:hover { border-color: #999; color: var(--text); }
+  .f-active-tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: #ede7f6; color: var(--primary); border: 1px solid #c8b0d8;
+    border-radius: 3px; padding: 1px 8px; font-size: 11.5px; font-weight: 500;
+  }
+  .f-active-tag a { color: #999; text-decoration: none; font-size: 14px; margin-left: 2px; }
+  .f-active-tag a:hover { color: #333; }
+
+  /* TABLE */
+  .o-list-wrap { overflow-x: auto; background: var(--surface); border-top: 1px solid var(--border); }
+  .o-list { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .o-list thead { background: #fafafa; border-bottom: 2px solid #e0e0e0; }
+  .o-list thead th {
+    padding: 8px 12px; font-weight: 500; font-size: 11px;
+    color: var(--text-muted); text-align: left; white-space: nowrap;
+    text-transform: uppercase; letter-spacing: 0.3px;
+    border-right: 1px solid #f0f0f0; position: relative;
+  }
+  .o-list thead th:last-child { border-right: none; }
+  .o-col-resize {
+    position: absolute; right: 0; top: 0; bottom: 0; width: 5px;
+    cursor: col-resize; user-select: none; background: transparent; z-index: 2;
+  }
+  .o-col-resize:hover, .o-col-resize.active { background: var(--accent); opacity: 0.45; }
+  .o-list tbody tr { border-bottom: 1px solid #f0f0f0; transition: background 0.1s; cursor: pointer; }
+  .o-list tbody tr:hover { background: #f5f0fa; }
+  .o-list tbody td {
+    padding: 7px 12px; color: var(--text); vertical-align: middle;
+    white-space: nowrap; border-right: 1px solid #f8f8f8;
+  }
+  .o-list tbody td:last-child { border-right: none; }
+  .td-code { color: var(--accent); font-weight: 500; }
+  .td-name { max-width: 180px; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+  .td-doctor { max-width: 150px; overflow: hidden; text-overflow: ellipsis; color: var(--text-muted); font-size: 12px; }
+  .td-center { text-align: center; }
+  .o-badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+  .badge-vivant  { background: #e8f5e9; color: #2e7d32; }
+  .badge-mort_ne { background: #fce4ec; color: #b71c1c; }
+  .o-cb { width: 16px; height: 16px; cursor: pointer; accent-color: var(--primary); }
+  .th-cb, .td-cb { width: 40px; text-align: center; }
+
+  /* EMPTY STATE */
+  .o-empty-state {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 80px 20px; background: var(--bg);
+  }
+  .o-empty-illustration {
+    width: 90px; height: 90px; border-radius: 50%;
+    background: linear-gradient(135deg, #714B67 0%, #a97fbf 100%);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 20px; position: relative;
+  }
+  .o-empty-illustration::before {
+    content: ''; position: absolute;
+    width: 62px; height: 76px; border-radius: 6px;
+    background: #fff; top: 7px; left: 14px;
+    box-shadow: 2px 2px 6px rgba(0,0,0,0.15);
+  }
+  .o-empty-illustration::after {
+    content: '☺'; position: absolute;
+    font-size: 28px; top: 18px; left: 22px; z-index: 1;
+    color: var(--primary);
+  }
+  .o-empty-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+  .o-empty-sub { font-size: 12.5px; color: var(--text-muted); }
+</style>
+
+<!-- NAV -->
+<nav class="o-nav">
+  <a href="{% url 'dashboard' %}" class="o-nav-grid"><i class="bi bi-grid-3x3-gap-fill"></i></a>
+  <span class="o-nav-brand">Gynécologie</span>
+  <a href="{% url 'gynecologie_list' %}" class="o-nav-link">Les patients</a>
+  <a href="{% url 'gynecologie_rdv' %}" class="o-nav-link">Rendez-vous</a>
+  <a href="{% url 'gynecologie_naissances' %}" class="o-nav-link active">Registre des naissances</a>
+  <a href="#" class="o-nav-link">Rapports</a>
+  {% include 'gynecologie/_nav_right.html' %}
+</nav>
+
+<!-- SUBHEADER -->
+<div class="o-subheader">
+  <div class="o-subheader-row">
+    <span class="o-page-title">Registre des naissances</span>
+    <div class="o-subheader-row-right">
+      <form method="get" style="display:flex;align-items:center;">
+        <div class="o-search-bar">
+          <input class="o-search-input" type="text" name="q"
+                 value="{{ request.GET.q }}" placeholder="Rechercher une naissance…">
+          <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <div class="o-subheader-row">
+    <a href="{% url 'gynecologie_naissance_create' %}" class="o-btn-create">CRÉER</a>
+    <a href="?export=excel{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if filter_type %}&filter_type={{ filter_type }}{% endif %}{% if date_precise %}&date_precise={{ date_precise }}{% endif %}{% if date_debut %}&date_debut={{ date_debut }}{% endif %}{% if date_fin %}&date_fin={{ date_fin }}{% endif %}{% if filtre_statut %}&filtre_statut={{ filtre_statut }}{% endif %}{% if group_by %}&group_by={{ group_by }}{% endif %}" class="o-btn-excel" title="Exporter en Excel"><i class="bi bi-download"></i></a>
+    <div class="o-subheader-row-right">
+
+      <!-- ── FILTRE DROPDOWN ── -->
+      <div class="f-filter-wrap" id="filterWrap">
+        <button type="button" class="o-ctrl-btn {% if filter_type %}active{% endif %}"
+                id="filterToggle" onclick="toggleFilter(event)">
+          <i class="bi bi-funnel{% if filter_type %}-fill{% endif %}"></i> Filtres
+          {% if filter_type %}<span style="background:var(--primary);color:#fff;border-radius:50%;width:14px;height:14px;font-size:9px;display:inline-flex;align-items:center;justify-content:center;margin-left:2px;">1</span>{% endif %}
+        </button>
+
+        <div class="f-filter-panel {% if filter_type %}open{% endif %}" id="filterPanel">
+          <div class="f-filter-title">Filtrer par date</div>
+
+          <label class="f-filter-option {% if filter_type == 'mois' %}selected{% endif %}" onclick="selectFilter('mois')">
+            <input type="radio" name="ftype" value="mois" {% if filter_type == 'mois' %}checked{% endif %}>
+            <i class="bi bi-calendar-month"></i> Mois en cours
+          </label>
+
+          <label class="f-filter-option {% if filter_type == 'date' %}selected{% endif %}" onclick="selectFilter('date')">
+            <input type="radio" name="ftype" value="date" {% if filter_type == 'date' %}checked{% endif %}>
+            <i class="bi bi-calendar-day"></i> Date précise
+          </label>
+          <div class="f-date-group {% if filter_type == 'date' %}visible{% endif %}" id="grp-date">
+            <div class="f-date-row">
+              <label>Date</label>
+              <input type="date" class="f-date-input" id="fp-date" value="{{ date_precise }}">
+            </div>
+          </div>
+
+          <label class="f-filter-option {% if filter_type == 'plage' %}selected{% endif %}" onclick="selectFilter('plage')">
+            <input type="radio" name="ftype" value="plage" {% if filter_type == 'plage' %}checked{% endif %}>
+            <i class="bi bi-calendar-range"></i> Plage de dates
+          </label>
+          <div class="f-date-group {% if filter_type == 'plage' %}visible{% endif %}" id="grp-plage">
+            <div class="f-date-row">
+              <label>Du</label>
+              <input type="date" class="f-date-input" id="fp-debut" value="{{ date_debut }}">
+            </div>
+            <div class="f-date-row">
+              <label>Au</label>
+              <input type="date" class="f-date-input" id="fp-fin" value="{{ date_fin }}">
+            </div>
+          </div>
+
+          <hr class="f-group-sep" style="margin:10px 0 6px;">
+          <div class="f-filter-title" style="margin-bottom:6px;">Statut de naissance</div>
+          <div style="display:flex;gap:6px;margin-bottom:4px;">
+            <label class="f-filter-option {% if filtre_statut == 'vivant' %}selected{% endif %}"
+                   style="flex:1;justify-content:center;"
+                   onclick="selectStatut('vivant')">
+              <input type="radio" name="fstatut" value="vivant" {% if filtre_statut == 'vivant' %}checked{% endif %}>
+              <span style="color:#2e7d32;">● Vivant</span>
+            </label>
+            <label class="f-filter-option {% if filtre_statut == 'mort_ne' %}selected{% endif %}"
+                   style="flex:1;justify-content:center;"
+                   onclick="selectStatut('mort_ne')">
+              <input type="radio" name="fstatut" value="mort_ne" {% if filtre_statut == 'mort_ne' %}checked{% endif %}>
+              <span style="color:#b71c1c;">● Mort-né</span>
+            </label>
+          </div>
+
+          <div class="f-filter-actions">
+            <button type="button" class="f-apply-btn" onclick="applyFilter()">Appliquer</button>
+            <a href="?{% if request.GET.q %}q={{ request.GET.q }}{% endif %}" class="f-clear-btn">Effacer</a>
+          </div>
+        </div>
+      </div>
+
+      {% if filter_type or filtre_statut %}
+      {% if filter_type %}
+      <span class="f-active-tag">
+        {% if filter_type == 'mois' %}Mois en cours
+        {% elif filter_type == 'date' %}{{ date_precise }}
+        {% elif filter_type == 'plage' %}{{ date_debut }} → {{ date_fin }}
+        {% endif %}
+        <a href="?{% if request.GET.q %}q={{ request.GET.q }}{% endif %}{% if filtre_statut %}&filtre_statut={{ filtre_statut }}{% endif %}">×</a>
+      </span>
+      {% endif %}
+      {% if filtre_statut %}
+      <span class="f-active-tag">
+        {% if filtre_statut == 'vivant' %}<span style="color:#2e7d32;">● Vivant{% else %}<span style="color:#b71c1c;">● Mort-né{% endif %}</span>
+        <a href="?{% if request.GET.q %}q={{ request.GET.q }}{% endif %}{% if filter_type %}&filter_type={{ filter_type }}{% if date_precise %}&date_precise={{ date_precise }}{% endif %}{% if date_debut %}&date_debut={{ date_debut }}{% endif %}{% if date_fin %}&date_fin={{ date_fin }}{% endif %}{% endif %}">×</a>
+      </span>
+      {% endif %}
+      {% endif %}
+
+      <!-- ── REGROUPER PAR ── -->
+      <div class="f-group-wrap" id="groupWrap">
+        <button type="button" class="o-ctrl-btn {% if group_by %}active{% endif %}"
+                id="groupToggle" onclick="toggleGroup(event)">
+          <i class="bi bi-list-ul"></i> Regrouper par
+          {% if group_by %}<span style="background:var(--primary);color:#fff;border-radius:50%;width:14px;height:14px;font-size:9px;display:inline-flex;align-items:center;justify-content:center;margin-left:2px;">1</span>{% endif %}
+        </button>
+        <div class="f-group-panel" id="groupPanel">
+          <div class="f-group-section">Création</div>
+          <a class="f-group-item {% if group_by == 'annee' %}active{% endif %}"    href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}group_by=annee">Année</a>
+          <a class="f-group-item {% if group_by == 'trimestre' %}active{% endif %}" href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}group_by=trimestre">Trimestre</a>
+          <a class="f-group-item {% if group_by == 'mois' %}active{% endif %}"     href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}group_by=mois">Mois</a>
+          <a class="f-group-item {% if group_by == 'semaine' %}active{% endif %}"  href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}group_by=semaine">Semaine</a>
+          <a class="f-group-item {% if group_by == 'jour' %}active{% endif %}"     href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}group_by=jour">Jour</a>
+          <hr class="f-group-sep">
+          <div class="f-group-section">Autre</div>
+          <a class="f-group-item {% if group_by == 'cree_le' %}active{% endif %}"       href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}group_by=cree_le">Créé le</a>
+          <a class="f-group-item {% if group_by == 'mere' %}active{% endif %}"          href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}group_by=mere">Nom de la mère</a>
+          <a class="f-group-item {% if group_by == 'medecin' %}active{% endif %}"       href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}group_by=medecin">Médecin</a>
+          <a class="f-group-item {% if group_by == 'mode' %}active{% endif %}"          href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}group_by=mode">Type de livraison</a>
+          <a class="f-group-item {% if group_by == 'statut' %}active{% endif %}"        href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}group_by=statut">Statut</a>
+          <a class="f-group-item {% if group_by == 'genre' %}active{% endif %}"         href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}group_by=genre">Genre</a>
+          <a class="f-group-item {% if group_by == 'groupe_sanguin' %}active{% endif %}" href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}group_by=groupe_sanguin">Groupe sanguin</a>
+          <a class="f-group-item {% if group_by == 'lieu' %}active{% endif %}"          href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}group_by=lieu">Lieu de naissance</a>
+          <a class="f-group-item {% if group_by == 'parite' %}active{% endif %}"        href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}group_by=parite">Parité</a>
+          <a class="f-group-item {% if group_by == 'education' %}active{% endif %}"     href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}group_by=education">Éducation du patient</a>
+          {% if group_by %}<hr class="f-group-sep">
+          <a class="f-group-item" style="color:#c62828;" href="?{% if request.GET.q %}q={{ request.GET.q }}{% endif %}">✕ Supprimer le regroupement</a>{% endif %}
+        </div>
+      </div>
+      <button class="o-ctrl-btn"><i class="bi bi-star"></i> Favoris</button>
+      <div class="o-ctrl-sep"></div>
+      <div class="o-pagination">
+        <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
+        <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
+           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-left"></i>
+        </a>
+        <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
+           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-right"></i>
+        </a>
+      </div>
+      <div class="o-ctrl-sep"></div>
+      <div class="o-view-btns">
+        <button class="o-view-btn active"><i class="bi bi-list-task"></i></button>
+        <button class="o-view-btn"><i class="bi bi-calendar3"></i></button>
+        <button class="o-view-btn"><i class="bi bi-grid"></i></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CONTENU -->
+{% if page_obj.paginator.count %}
+<div class="o-list-wrap" style="margin-top: 119px;">
+  <table class="o-list">
+    <thead>
+      <tr>
+        <th class="th-cb"><input type="checkbox" class="o-cb" id="chk-all"></th>
+        <th>Numéro</th>
+        <th>Mère</th>
+        <th>Date d'accouchement</th>
+        <th>Médecin</th>
+        <th>Mode</th>
+        <th>Nom de l'enfant</th>
+        <th class="td-center">Sexe enfant</th>
+        <th class="td-center">Poids (g)</th>
+        <th class="td-center">Taille (cm)</th>
+        <th class="td-center">Apgar 1'</th>
+        <th class="td-center">Apgar 5'</th>
+        <th>Statut</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% if grouped_data %}
+        {% for grp_key, grp_rows in grouped_data %}
+        <tr class="grp-header">
+          <td colspan="13">{{ grp_key }}<span class="grp-count">{{ grp_rows|length }}</span></td>
+        </tr>
+        {% for n in grp_rows %}
+        <tr onclick="window.location='/admin/patients/naissance/{{ n.pk }}/change/'">
+          <td class="td-cb"><input type="checkbox" class="o-cb" onclick="event.stopPropagation()"></td>
+          <td class="td-code">{{ n.numero }}</td>
+          <td class="td-name">{{ n.mere.nom|upper }} {{ n.mere.prenoms }}</td>
+          <td>{{ n.date_accouchement|date:"d/m/Y H:i" }}</td>
+          <td class="td-doctor">{% if n.medecin %}{{ n.medecin }}{% else %}—{% endif %}</td>
+          <td>{{ n.get_mode_accouchement_display }}</td>
+          <td>{% if n.nom_enfant %}{{ n.nom_enfant }} {{ n.prenoms_enfant }}{% else %}—{% endif %}</td>
+          <td class="td-center">{% if n.sexe_enfant == 'F' %}Féminin{% elif n.sexe_enfant == 'M' %}Masculin{% else %}—{% endif %}</td>
+          <td class="td-center">{% if n.poids_naissance %}{{ n.poids_naissance }}{% else %}—{% endif %}</td>
+          <td class="td-center">{% if n.taille_naissance %}{{ n.taille_naissance }}{% else %}—{% endif %}</td>
+          <td class="td-center">{% if n.apgar_1min is not None %}{{ n.apgar_1min }}{% else %}—{% endif %}</td>
+          <td class="td-center">{% if n.apgar_5min is not None %}{{ n.apgar_5min }}{% else %}—{% endif %}</td>
+          <td><span class="o-badge badge-{{ n.statut }}">{{ n.get_statut_display }}</span></td>
+        </tr>
+        {% endfor %}
+        {% endfor %}
+      {% else %}
+        {% for n in page_obj %}
+        <tr onclick="window.location='/admin/patients/naissance/{{ n.pk }}/change/'">
+          <td class="td-cb"><input type="checkbox" class="o-cb" onclick="event.stopPropagation()"></td>
+          <td class="td-code">{{ n.numero }}</td>
+          <td class="td-name">{{ n.mere.nom|upper }} {{ n.mere.prenoms }}</td>
+          <td>{{ n.date_accouchement|date:"d/m/Y H:i" }}</td>
+          <td class="td-doctor">{% if n.medecin %}{{ n.medecin }}{% else %}—{% endif %}</td>
+          <td>{{ n.get_mode_accouchement_display }}</td>
+          <td>{% if n.nom_enfant %}{{ n.nom_enfant }} {{ n.prenoms_enfant }}{% else %}—{% endif %}</td>
+          <td class="td-center">{% if n.sexe_enfant == 'F' %}Féminin{% elif n.sexe_enfant == 'M' %}Masculin{% else %}—{% endif %}</td>
+          <td class="td-center">{% if n.poids_naissance %}{{ n.poids_naissance }}{% else %}—{% endif %}</td>
+          <td class="td-center">{% if n.taille_naissance %}{{ n.taille_naissance }}{% else %}—{% endif %}</td>
+          <td class="td-center">{% if n.apgar_1min is not None %}{{ n.apgar_1min }}{% else %}—{% endif %}</td>
+          <td class="td-center">{% if n.apgar_5min is not None %}{{ n.apgar_5min }}{% else %}—{% endif %}</td>
+          <td><span class="o-badge badge-{{ n.statut }}">{{ n.get_statut_display }}</span></td>
+        </tr>
+        {% endfor %}
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="o-empty-state">
+  <div class="o-empty-illustration"></div>
+  <div class="o-empty-title">Aucun Enregistrement Trouvé</div>
+  <div class="o-empty-sub">Cliquez sur CRÉER pour ajouter un nouvel enregistrement.</div>
+</div>
+{% endif %}
+
+<script>
+  /* Checkbox global */
+  const chkAll = document.getElementById('chk-all');
+  if (chkAll) chkAll.addEventListener('change', function() {
+    document.querySelectorAll('.o-cb:not(#chk-all)').forEach(cb => cb.checked = this.checked);
+  });
+
+  /* Filter dropdown */
+  /* Group dropdown */
+  function toggleGroup(e) {
+    e.stopPropagation();
+    document.getElementById('groupPanel').classList.toggle('open');
+    document.getElementById('filterPanel').classList.remove('open');
+  }
+  document.addEventListener('click', function(e) {
+    if (!document.getElementById('groupWrap').contains(e.target))
+      document.getElementById('groupPanel').classList.remove('open');
+  });
+
+  function toggleFilter(e) {
+    e.stopPropagation();
+    document.getElementById('filterPanel').classList.toggle('open');
+    document.getElementById('groupPanel').classList.remove('open');
+  }
+  document.addEventListener('click', function(e) {
+    if (!document.getElementById('filterWrap').contains(e.target))
+      document.getElementById('filterPanel').classList.remove('open');
+  });
+
+  function selectFilter(type) {
+    document.querySelectorAll('.f-filter-option').forEach(el => el.classList.remove('selected'));
+    document.querySelectorAll('.f-date-group').forEach(el => el.classList.remove('visible'));
+    event.currentTarget.classList.add('selected');
+    if (type === 'date')  document.getElementById('grp-date').classList.add('visible');
+    if (type === 'plage') document.getElementById('grp-plage').classList.add('visible');
+  }
+
+  function selectStatut(val) {
+    document.querySelectorAll('.f-filter-option').forEach(el => {
+      if (el.querySelector('input[name="fstatut"]')) el.classList.remove('selected');
+    });
+    event.currentTarget.classList.add('selected');
+  }
+
+  function applyFilter() {
+    const params = new URLSearchParams();
+    const q = '{{ request.GET.q|escapejs }}';
+    if (q) params.set('q', q);
+
+    const typeChecked = document.querySelector('input[name="ftype"]:checked');
+    if (typeChecked) {
+      const type = typeChecked.value;
+      params.set('filter_type', type);
+      if (type === 'date') {
+        const d = document.getElementById('fp-date').value;
+        if (d) params.set('date_precise', d);
+      } else if (type === 'plage') {
+        const d1 = document.getElementById('fp-debut').value;
+        const d2 = document.getElementById('fp-fin').value;
+        if (d1) params.set('date_debut', d1);
+        if (d2) params.set('date_fin', d2);
+      }
+    }
+
+    const statutChecked = document.querySelector('input[name="fstatut"]:checked');
+    if (statutChecked) params.set('filtre_statut', statutChecked.value);
+
+    window.location.href = '?' + params.toString();
+  }
+  // Horloge nav
+  (function(){function t(){var e=document.getElementById('gyn-live-time');if(e)e.textContent=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});}t();setInterval(t,1000);})();
+  // Thème nav
+  var gtt=document.getElementById('gyn-theme-toggle');
+  if(gtt)gtt.addEventListener('click',function(){var h=document.documentElement,d=h.getAttribute('data-theme')==='dark';if(d){h.removeAttribute('data-theme');localStorage.setItem('segho-theme','light');}else{h.setAttribute('data-theme','dark');localStorage.setItem('segho-theme','dark');}});
+
+  // Colonnes redimensionnables
+  function initResizableCols(table) {
+    var ths = table.querySelectorAll('thead th');
+    ths.forEach(function(th) {
+      if (th.classList.contains('th-cb')) return;
+      var h = document.createElement('div');
+      h.className = 'o-col-resize';
+      th.appendChild(h);
+      h.addEventListener('mousedown', function(e) {
+        e.preventDefault(); e.stopPropagation();
+        var startX = e.pageX, startW = th.offsetWidth;
+        h.classList.add('active');
+        ths.forEach(function(t) { t.style.width = t.offsetWidth + 'px'; });
+        table.style.tableLayout = 'fixed';
+        function onMove(e) { th.style.width = Math.max(40, startW + e.pageX - startX) + 'px'; }
+        function onUp() { h.classList.remove('active'); document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); }
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      });
+    });
+  }
+  document.querySelectorAll('.o-list').forEach(initResizableCols);
+</script>
+{% endblock %}

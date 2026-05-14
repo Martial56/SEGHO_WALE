@@ -1,0 +1,310 @@
+{% extends 'gynecologie/base.html' %}
+{% load static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<style>
+  .topbar, .breadcrumb { display: none !important; }
+  .content { padding: 0 !important; overflow-x: hidden; }
+</style>
+{% endblock %}
+
+{% block content %}
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap');
+
+  :root {
+    --primary:       #714B67;
+    --primary-dark:  #5c3d55;
+    --nav-bg:        #714B67;
+    --accent:        #017E84;
+    --bg:            #f9f9f9;
+    --surface:       #ffffff;
+    --border:        #d9d9d9;
+    --text:          #212529;
+    --text-muted:    #6c757d;
+    --shadow-card:   0 1px 2px rgba(0,0,0,0.08);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Roboto', sans-serif; background: var(--bg) !important; color: var(--text); }
+  html { background: var(--bg) !important; }
+
+  /* ── DARK MODE ── */
+  html[data-theme="dark"] { --bg:#181c28; --surface:#21283a; --border:#2d3550; --text:#c5d4e2; --text-muted:#6c85a0; }
+  html[data-theme="dark"] .o-card { background: var(--surface); border-color: var(--border); }
+  html[data-theme="dark"] .o-card:hover { border-color: #4a5a78; }
+  html[data-theme="dark"] .o-card-name { color: var(--text); }
+  html[data-theme="dark"] .o-search-input { color: var(--text); }
+  html[data-theme="dark"] .o-search-bar { border-bottom-color: #3a4a62; }
+  html[data-theme="dark"] .o-ctrl-btn { color: var(--text-muted); }
+  html[data-theme="dark"] .o-ctrl-btn:hover { background: #28304a; color: var(--text); border-color: var(--border); }
+  html[data-theme="dark"] .o-pag-btn { background: var(--surface); border-color: var(--border); color: var(--text-muted); }
+  html[data-theme="dark"] .o-view-btn { background: var(--surface); color: var(--text-muted); }
+  html[data-theme="dark"] .o-view-btns { border-color: var(--border); }
+  html[data-theme="dark"] .o-ctrl-sep { background: var(--border); }
+  html[data-theme="dark"] .o-subheader { background: var(--surface); border-bottom-color: var(--border); }
+
+  /* NAV */
+  .o-nav {
+    background: var(--nav-bg); display: flex; align-items: center;
+    height: 46px; padding: 0 10px; position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+  }
+  .o-nav-grid {
+    width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+    color: rgba(255,255,255,0.75); font-size: 17px; cursor: pointer;
+    border-radius: 4px; margin-right: 4px; transition: background 0.15s; text-decoration: none;
+  }
+  .o-nav-grid:hover { background: rgba(255,255,255,0.12); color: #fff; }
+  .o-nav-brand { font-size: 15px; font-weight: 500; color: #fff; margin-right: 2px; padding: 0 8px; white-space: nowrap; }
+  .o-nav-link {
+    color: rgba(255,255,255,0.78); text-decoration: none; font-size: 13px;
+    padding: 0 12px; height: 46px; display: flex; align-items: center;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, background 0.15s, border-color 0.15s; white-space: nowrap;
+  }
+  .o-nav-link:hover, .o-nav-link.active { color: #fff; background: rgba(255,255,255,0.09); border-bottom-color: #fff; }
+  .o-nav-right { display: flex; align-items: center; gap: 2px; margin-left: auto; }
+  .o-nav-icon { width: 28px; height: 28px; border-radius: 4px; border: none; background: transparent; color: rgba(255,255,255,0.75); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s; }
+  .o-nav-icon:hover { background: rgba(255,255,255,0.12); color: #fff; }
+  .o-nav-icon .icon-sun { display: block; } .o-nav-icon .icon-moon { display: none; }
+  html[data-theme="dark"] .o-nav-icon .icon-sun { display: none; }
+  html[data-theme="dark"] .o-nav-icon .icon-moon { display: block; }
+  .o-nav-clock { text-align: right; font-size: 10px; color: rgba(255,255,255,0.6); line-height: 1.4; padding: 0 6px; white-space: nowrap; }
+  .o-nav-time { font-size: 13px; font-weight: 600; color: #fff; display: block; }
+  .o-nav-user { display: flex; align-items: center; gap: 5px; padding: 3px 8px 3px 3px; border-radius: 20px; background: rgba(255,255,255,0.1); margin: 0 3px; }
+  .o-nav-avatar { width: 22px; height: 22px; border-radius: 50%; background: rgba(255,255,255,0.25); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #fff; flex-shrink: 0; }
+  .o-nav-uname { font-size: 11px; font-weight: 500; color: #fff; line-height: 1.2; }
+  .o-nav-urole { font-size: 9.5px; color: rgba(255,255,255,0.65); }
+  .o-nav-logout { width: 28px; height: 28px; border-radius: 4px; border: none; background: transparent; color: rgba(255,255,255,0.75); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s; }
+  .o-nav-logout:hover { background: rgba(232,69,69,0.3); color: #fff; }
+
+  /* ══ SUBHEADER ══ */
+  .o-subheader {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 6px 16px;
+    display: flex; flex-direction: column; gap: 5px;
+    position: fixed; top: 46px; left: 0; right: 0; z-index: 190;
+  }
+  .o-subheader-row { display: flex; align-items: center; gap: 8px; }
+  .o-subheader-row-right { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .o-page-title { font-size: 17px; font-weight: 400; color: var(--text); }
+  .o-btn-create {
+    background: #017E84; color: #fff; border: none;
+    padding: 5px 14px; border-radius: 4px;
+    font-size: 12.5px; font-weight: 500;
+    font-family: 'Roboto', sans-serif; cursor: pointer;
+    text-decoration: none; display: inline-flex; align-items: center;
+    letter-spacing: 0.5px; transition: background 0.15s;
+  }
+  .o-btn-create:hover { background: #015f64; }
+  .o-search-bar {
+    display: flex; align-items: center;
+    border: none; border-bottom: 1px solid #bbb;
+    background: transparent; min-height: 28px;
+    padding: 2px 4px; gap: 4px; width: 320px;
+  }
+  .o-filter-tag {
+    display: inline-flex; align-items: center; gap: 3px;
+    background: #e8f4f5; color: #017E84;
+    border: 1px solid #b2d8db; border-radius: 3px;
+    padding: 1px 6px; font-size: 11.5px; font-weight: 500; white-space: nowrap;
+  }
+  .o-filter-tag .ti { font-size: 9px; color: #555; }
+  .o-filter-tag a { color: #888; text-decoration: none; font-size: 14px; line-height: 1; margin-left: 2px; }
+  .o-filter-tag a:hover { color: #333; }
+  .o-search-input {
+    border: none; outline: none; font-size: 12px;
+    font-family: 'Roboto', sans-serif; color: var(--text);
+    flex: 1; min-width: 60px; background: transparent;
+  }
+  .o-search-btn { background: none; border: none; cursor: pointer; color: #888; font-size: 13px; padding: 2px; }
+
+  .o-ctrl-right { display: flex; align-items: center; gap: 3px; margin-left: auto; flex-shrink: 0; }
+  .o-ctrl-btn {
+    background: none; border: 1px solid transparent; border-radius: 4px;
+    padding: 4px 8px; font-size: 12px; font-family: 'Roboto', sans-serif;
+    color: var(--text-muted); cursor: pointer;
+    display: flex; align-items: center; gap: 4px;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+    white-space: nowrap;
+  }
+  .o-ctrl-btn:hover { border-color: var(--border); color: var(--text); background: #f3f3f3; }
+  .o-ctrl-sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }
+
+  .o-pagination { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+  .o-pag-btn {
+    width: 24px; height: 24px; border: 1px solid var(--border); border-radius: 3px;
+    background: var(--surface); display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted); text-decoration: none; font-size: 12px; cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .o-pag-btn:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .o-pag-btn.disabled { opacity: 0.35; pointer-events: none; }
+
+  .o-view-btns { display: flex; border: 1px solid var(--border); border-radius: 3px; overflow: hidden; }
+  .o-view-btn {
+    width: 26px; height: 24px; border: none; background: var(--surface);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted); font-size: 13px; cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .o-view-btn:not(:last-child) { border-right: 1px solid var(--border); }
+  .o-view-btn.active, .o-view-btn:hover { background: var(--primary); color: #fff; }
+
+  /* ══ KANBAN — 5 colonnes ══ */
+  .o-kanban {
+    padding: 12px 16px;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    background: var(--bg);
+  }
+
+  /* ── CARD ── */
+  .o-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 10px 10px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+    transition: box-shadow 0.15s, border-color 0.15s;
+    box-shadow: var(--shadow-card);
+  }
+  .o-card:hover { box-shadow: 0 3px 10px rgba(0,0,0,0.13); border-color: #bbb; }
+
+  /* Avatar gris silhouette identique Odoo */
+  .o-avatar {
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    background: #d5d5d5;
+    flex-shrink: 0;
+    display: flex; align-items: flex-end; justify-content: center;
+    overflow: hidden;
+  }
+  .o-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .o-avatar svg { width: 30px; fill: #999; margin-bottom: -1px; }
+
+  .o-card-body { flex: 1; min-width: 0; }
+  .o-card-name {
+    font-size: 12.5px; font-weight: 500; color: var(--text);
+    margin-bottom: 2px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .o-card-meta { font-size: 11px; color: var(--text-muted); line-height: 1.7; }
+  .o-card-meta span { color: var(--text); }
+
+  /* ── EMPTY ── */
+  .o-empty {
+    grid-column: 1/-1; text-align: center;
+    padding: 60px 20px; color: var(--text-muted); font-size: 13px;
+  }
+
+  /* ══ RESPONSIVE ══ */
+  @media (max-width: 1200px) { .o-kanban { grid-template-columns: repeat(4, 1fr); } }
+  @media (max-width: 960px)  { .o-kanban { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 640px)  {
+    .o-kanban { grid-template-columns: repeat(2, 1fr); }
+    .o-nav-link:not(.active) { display: none; }
+  }
+  @media (max-width: 400px)  { .o-kanban { grid-template-columns: 1fr; } }
+</style>
+
+<!-- ══ NAV ══ -->
+<nav class="o-nav">
+  <a href="{% url 'dashboard' %}" class="o-nav-grid"><i class="bi bi-grid-3x3-gap-fill"></i></a>
+  <span class="o-nav-brand">Gynécologie</span>
+  <a href="{% url 'gynecologie_list' %}" class="o-nav-link active">Les patients</a>
+  <a href="{% url 'gynecologie_rdv' %}" class="o-nav-link">Rendez-vous</a>
+  <a href="{% url 'gynecologie_naissances' %}" class="o-nav-link">Registre des naissances</a>
+  <a href="#" class="o-nav-link">Rapports</a>
+  {% include 'gynecologie/_nav_right.html' %}
+</nav>
+
+<!-- ══ SUBHEADER ══ -->
+<div class="o-subheader">
+  <!-- Ligne 1 : titre + recherche -->
+  <div class="o-subheader-row">
+    <span class="o-page-title">Patient</span>
+    <div class="o-subheader-row-right">
+      <form method="get" style="display:flex;align-items:center;">
+        <div class="o-search-bar">
+          <input class="o-search-input" type="text" name="q"
+                 value="{{ request.GET.q }}" placeholder="Rechercher un patient…">
+          <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <!-- Ligne 2 : créer + contrôles -->
+  <div class="o-subheader-row">
+    <div class="o-subheader-row-right">
+      <button class="o-ctrl-btn"><i class="bi bi-funnel"></i> Filtres</button>
+      <button class="o-ctrl-btn"><i class="bi bi-list-ul"></i> Regrouper par</button>
+      <button class="o-ctrl-btn"><i class="bi bi-star"></i> Favoris</button>
+      <div class="o-ctrl-sep"></div>
+      <div class="o-pagination">
+        <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
+        <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
+           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-left"></i>
+        </a>
+        <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
+           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-right"></i>
+        </a>
+      </div>
+      <div class="o-ctrl-sep"></div>
+      <div class="o-view-btns">
+        <button class="o-view-btn active"><i class="bi bi-grid"></i></button>
+        <button class="o-view-btn"><i class="bi bi-list-ul"></i></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ KANBAN GRID ══ -->
+<div class="o-kanban" style="margin-top: 119px;">
+  {% for patient in page_obj %}
+  <a class="o-card" href="/admin/patients/patient/{{ patient.pk }}/change/">
+    <div class="o-avatar">
+      {% if patient.photo %}
+        <img src="{{ patient.photo.url }}" alt="{{ patient.nom }}">
+      {% else %}
+        <svg viewBox="0 0 24 26" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 13c3.3 0 6-2.7 6-6S15.3 1 12 1 6 3.7 6 7s2.7 6 6 6zm0 2c-4 0-12 2-12 6v3h24v-3c0-4-8-6-12-6z"/>
+        </svg>
+      {% endif %}
+    </div>
+    <div class="o-card-body">
+      <div class="o-card-name">{{ patient.nom|upper }} {{ patient.prenoms }}</div>
+      <div class="o-card-meta">
+        Code: <span>{{ patient.code_patient }}</span><br>
+        Âge: <span>
+          {% if patient.date_naissance %}{{ patient.age }}Ans{% else %}—{% endif %}
+        </span><br>
+        Genre: <span>{% if patient.sexe == 'F' %}Femme{% elif patient.sexe == 'M' %}Homme{% else %}—{% endif %}</span>
+      </div>
+    </div>
+  </a>
+  {% empty %}
+  <div class="o-empty">
+    <i class="bi bi-people" style="font-size:36px;display:block;margin-bottom:10px;"></i>
+    Aucun patient trouvé.
+  </div>
+  {% endfor %}
+</div>
+
+<script>
+  (function(){function t(){var e=document.getElementById('gyn-live-time');if(e)e.textContent=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});}t();setInterval(t,1000);})();
+  var gtt=document.getElementById('gyn-theme-toggle');
+  if(gtt)gtt.addEventListener('click',function(){var h=document.documentElement,d=h.getAttribute('data-theme')==='dark';if(d){h.removeAttribute('data-theme');localStorage.setItem('segho-theme','light');}else{h.setAttribute('data-theme','dark');localStorage.setItem('segho-theme','dark');}});
+</script>
+
+{% endblock %}

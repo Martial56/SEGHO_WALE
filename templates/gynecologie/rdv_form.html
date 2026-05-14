@@ -1,0 +1,994 @@
+﻿{% extends 'gynecologie/base.html' %}
+{% load static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<style>
+  .topbar, .breadcrumb { display: none !important; }
+  .content { padding: 0 !important; overflow-x: hidden; }
+</style>
+{% endblock %}
+
+{% block content %}
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap');
+  :root {
+    --primary:    #714B67;
+    --nav-bg:     #714B67;
+    --accent:     #017E84;
+    --bg:         #f5f7f8;
+    --surface:    #ffffff;
+    --border:     #d9d9d9;
+    --text:       #212529;
+    --text-muted: #6c757d;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Roboto', sans-serif; background: var(--bg) !important; color: var(--text); }
+  html { background: var(--bg) !important; }
+
+  /* ── DARK MODE ── */
+  html[data-theme="dark"] { --bg:#181c28; --surface:#21283a; --border:#2d3550; --text:#c5d4e2; --text-muted:#6c85a0; }
+  html[data-theme="dark"] .f-header { background: var(--surface); border-bottom-color: var(--border); }
+  html[data-theme="dark"] .f-pipeline-bar { background: var(--surface); border-bottom-color: var(--border); }
+  html[data-theme="dark"] .f-actions-bar { background: var(--surface); border-bottom-color: var(--border); }
+  html[data-theme="dark"] .f-card { background: var(--surface); box-shadow: 0 1px 4px rgba(0,0,0,0.3); }
+  html[data-theme="dark"] .f-field { border-bottom-color: #2a3448; }
+  html[data-theme="dark"] .f-input, html[data-theme="dark"] select.f-input, html[data-theme="dark"] textarea.f-input { background: transparent; color: var(--text); }
+  html[data-theme="dark"] .f-tabs { border-bottom-color: var(--border); background: var(--surface); }
+  html[data-theme="dark"] .f-tab { color: var(--text-muted); }
+  html[data-theme="dark"] .f-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+  html[data-theme="dark"] .f-tab-pane { background: var(--surface); }
+  html[data-theme="dark"] .f-activity { background: #1c2438; border-left-color: var(--border); }
+  html[data-theme="dark"] .f-btn-outline { background: var(--surface); color: var(--text); border-color: var(--border); }
+  html[data-theme="dark"] .f-btn-ghost { color: var(--text-muted); }
+  html[data-theme="dark"] .f-btn-ghost:hover { background: #28304a; color: var(--text); }
+  html[data-theme="dark"] .f-step { color: var(--text-muted); }
+  html[data-theme="dark"] .f-step:not(.active):hover { background: #28304a; }
+
+  /* ── NAV ── */
+  .o-nav {
+    background: var(--nav-bg); display: flex; align-items: center;
+    height: 46px; padding: 0 10px; position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+  }
+  .o-nav-grid {
+    width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+    color: rgba(255,255,255,0.75); font-size: 17px; cursor: pointer;
+    border-radius: 4px; margin-right: 4px; transition: background 0.15s; text-decoration: none;
+  }
+  .o-nav-grid:hover { background: rgba(255,255,255,0.12); color: #fff; }
+  .o-nav-brand { font-size: 15px; font-weight: 500; color: #fff; margin-right: 2px; padding: 0 8px; white-space: nowrap; }
+  .o-nav-link {
+    color: rgba(255,255,255,0.78); text-decoration: none; font-size: 13px;
+    padding: 0 12px; height: 46px; display: flex; align-items: center;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, background 0.15s, border-color 0.15s; white-space: nowrap;
+  }
+  .o-nav-link:hover, .o-nav-link.active { color: #fff; background: rgba(255,255,255,0.09); border-bottom-color: #fff; }
+  .o-nav-right { display: flex; align-items: center; gap: 2px; margin-left: auto; }
+  .o-nav-icon { width: 28px; height: 28px; border-radius: 4px; border: none; background: transparent; color: rgba(255,255,255,0.75); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s; }
+  .o-nav-icon:hover { background: rgba(255,255,255,0.12); color: #fff; }
+  .o-nav-icon .icon-sun { display: block; } .o-nav-icon .icon-moon { display: none; }
+  html[data-theme="dark"] .o-nav-icon .icon-sun { display: none; }
+  html[data-theme="dark"] .o-nav-icon .icon-moon { display: block; }
+  .o-nav-clock { text-align: right; font-size: 10px; color: rgba(255,255,255,0.6); line-height: 1.4; padding: 0 6px; white-space: nowrap; }
+  .o-nav-time { font-size: 13px; font-weight: 600; color: #fff; display: block; }
+  .o-nav-user { display: flex; align-items: center; gap: 5px; padding: 3px 8px 3px 3px; border-radius: 20px; background: rgba(255,255,255,0.1); margin: 0 3px; }
+  .o-nav-avatar { width: 22px; height: 22px; border-radius: 50%; background: rgba(255,255,255,0.25); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #fff; flex-shrink: 0; }
+  .o-nav-uname { font-size: 11px; font-weight: 500; color: #fff; line-height: 1.2; }
+  .o-nav-urole { font-size: 9.5px; color: rgba(255,255,255,0.65); }
+  .o-nav-logout { width: 28px; height: 28px; border-radius: 4px; border: none; background: transparent; color: rgba(255,255,255,0.75); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s; }
+  .o-nav-logout:hover { background: rgba(232,69,69,0.3); color: #fff; }
+
+  /* ── FORM HEADER ── */
+  .f-header {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 6px 16px; display: flex; align-items: center; gap: 6px; min-height: 44px;
+    position: fixed; top: 46px; left: 0; right: 0; z-index: 190;
+  }
+  .f-header-title {
+    font-size: 13px; color: var(--text-muted);
+  }
+  .f-header-title span { color: var(--text); font-weight: 500; }
+  .f-btn {
+    padding: 4px 14px; border-radius: 4px; font-size: 12.5px; font-weight: 500;
+    font-family: 'Roboto', sans-serif; cursor: pointer; border: 1px solid transparent;
+    text-decoration: none; display: inline-flex; align-items: center; gap: 5px;
+    transition: all 0.15s; white-space: nowrap;
+  }
+  .f-btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .f-btn-primary:hover { background: #5c3d55; }
+  .f-btn-outline { background: #fff; color: var(--text); border-color: var(--border); }
+  .f-btn-outline:hover { background: #f5f0fa; border-color: var(--primary); color: var(--primary); }
+  .f-btn-ghost { background: none; color: var(--text-muted); border-color: transparent; }
+  .f-btn-ghost:hover { background: #f3f3f3; color: var(--text); }
+  .f-btn-save { background: #017E84; color: #fff; border-color: #017E84; }
+  .f-btn-save:hover { background: #015f64; }
+  .f-spacer { flex: 1; }
+  .f-nav-info { font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 4px; }
+  .f-nav-btn {
+    width: 24px; height: 24px; border: 1px solid var(--border); border-radius: 3px;
+    background: var(--surface); display: inline-flex; align-items: center; justify-content: center;
+    color: var(--text-muted); text-decoration: none; font-size: 12px;
+    transition: background 0.15s, color 0.15s;
+  }
+  .f-nav-btn:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .f-nav-btn.disabled { opacity: 0.35; pointer-events: none; }
+
+  /* ── STATUS PIPELINE ── */
+  .f-pipeline-bar {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    display: flex; align-items: stretch; min-height: 34px;
+    position: fixed; top: 90px; left: 0; right: 0; z-index: 180;
+  }
+  .f-pipeline { display: flex; align-items: stretch; margin-left: auto; }
+  .f-step {
+    padding: 0 18px; font-size: 11.5px; color: var(--text-muted);
+    display: flex; align-items: center; cursor: pointer;
+    border: none; background: none; font-family: 'Roboto', sans-serif; font-weight: 500;
+    transition: color 0.15s, background 0.15s; white-space: nowrap; letter-spacing: 0.3px;
+  }
+  .f-step:hover { color: var(--text); background: #f5f0fa; }
+  .f-step.active {
+    background: var(--primary); color: #fff;
+    clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%, 10px 50%);
+    padding: 0 22px;
+  }
+  .f-step.active:first-child {
+    clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%);
+  }
+  .f-step.done { color: var(--primary); }
+
+  /* ── ACTION BUTTONS ROW ── */
+  .f-actions-bar {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 5px 16px; display: flex; align-items: center; gap: 4px;
+    position: fixed; top: 124px; left: 0; right: 0; z-index: 170;
+  }
+  .f-action-btn {
+    padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: 400;
+    font-family: 'Roboto', sans-serif; cursor: pointer;
+    border: 1px solid var(--border); background: #fff; color: var(--text);
+    display: inline-flex; align-items: center; gap: 5px;
+    transition: background 0.15s, border-color 0.15s; text-decoration: none;
+  }
+  .f-action-btn:hover { background: #f5f0fa; border-color: var(--primary); color: var(--primary); }
+
+  /* ── LAYOUT ── */
+  .f-layout {
+    display: flex; align-items: flex-start; gap: 0;
+    padding: 16px; margin-top: 160px; min-height: calc(100vh - 160px);
+  }
+  .f-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+  .f-aside { width: 300px; flex-shrink: 0; margin-left: 14px; }
+
+  /* ── FORM CARD ── */
+  .f-card {
+    background: var(--surface); border-radius: 8px; overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.09);
+  }
+  .f-card-top {
+    display: flex; align-items: flex-start; gap: 20px; padding: 20px 24px 14px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .f-code-block { flex: 1; }
+  .f-code-large {
+    font-size: 28px; font-weight: 300; color: var(--text); letter-spacing: 0.5px;
+    line-height: 1;
+  }
+  .f-code-sub { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+  .f-photo-box {
+    width: 80px; height: 80px; border: 2px dashed var(--border); border-radius: 4px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: #bbb; font-size: 22px; cursor: pointer; background: #fafafa;
+    transition: border-color 0.15s;
+  }
+  .f-photo-box:hover { border-color: var(--primary); color: var(--primary); }
+  .f-photo-box span { font-size: 9px; margin-top: 2px; }
+
+  .f-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 0 40px; padding: 0 24px 16px; }
+  .f-field {
+    display: flex; flex-direction: column; gap: 4px;
+    padding: 10px 0; border-bottom: 1px solid #f0f0f0;
+  }
+  .f-label {
+    font-size: 11px; font-weight: 700; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .f-val { font-size: 12.5px; color: var(--text); }
+  .f-val.link { color: var(--accent); font-weight: 500; text-decoration: none; cursor: pointer; }
+  .f-val.link:hover { text-decoration: underline; }
+  .f-input {
+    width: 100%; border: none; outline: none;
+    font-size: 12.5px; font-family: 'Roboto', sans-serif;
+    color: var(--text); background: transparent; padding: 4px 0;
+  }
+  .f-input[readonly] { color: var(--text-muted); }
+  .f-select {
+    width: 100%; border: none; outline: none;
+    font-size: 12.5px; font-family: 'Roboto', sans-serif;
+    color: var(--text); background: transparent; padding: 4px 0;
+    cursor: pointer; appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23999'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 4px center;
+  }
+  .f-textarea {
+    width: 100%; border: none; outline: none;
+    font-size: 12.5px; font-family: 'Roboto', sans-serif;
+    color: var(--text); background: transparent; resize: none; padding: 4px 0;
+    min-height: 44px;
+  }
+  .f-check { accent-color: var(--primary); width: 14px; height: 14px; cursor: pointer; }
+
+  /* ── TABS ── */
+  .f-tabs-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+  .f-tabs { display: flex; border-bottom: 1px solid var(--border); overflow-x: auto; }
+  .f-tab {
+    padding: 8px 14px; font-size: 12.5px; color: var(--text-muted);
+    border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap;
+    background: none; border-top: none; border-left: none; border-right: none;
+    font-family: 'Roboto', sans-serif; flex-shrink: 0;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .f-tab:hover { color: var(--text); }
+  .f-tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 500; border-bottom-width: 3px; }
+  .f-tab-panel { display: none; padding: 14px 24px 18px; }
+  .f-tab-panel.active { display: block; }
+  .f-tab-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 36px; }
+  .f-tab-field {
+    display: flex; flex-direction: column; gap: 3px;
+    padding: 6px 0; border-bottom: 1px solid #f3f3f3;
+  }
+  .f-tab-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .f-tab-input {
+    border: none; outline: none;
+    font-size: 12.5px; font-family: 'Roboto', sans-serif; color: var(--text);
+    background: transparent; padding: 3px 0;
+  }
+  .f-tab-textarea {
+    border: none; outline: none;
+    font-size: 12.5px; font-family: 'Roboto', sans-serif; color: var(--text);
+    background: transparent; resize: none; padding: 3px 0; min-height: 54px;
+  }
+  .f-tab-check-row {
+    display: flex; align-items: center; gap: 8px; padding: 6px 0;
+    font-size: 12.5px; color: var(--text);
+  }
+
+  /* ── TAB EXTRAS ── */
+  .f-tab-notice {
+    background: #f0f7ff; border-left: 3px solid #1565c0; border-radius: 0 3px 3px 0;
+    padding: 7px 12px; font-size: 12px; color: #1565c0; margin-bottom: 14px;
+  }
+  .f-tab-notice a { color: #1565c0; font-weight: 600; }
+  .f-tab-section-title {
+    font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase;
+    letter-spacing: 0.5px; padding: 12px 0 4px; margin-top: 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  .f-tab-val { font-size: 12.5px; color: var(--text); padding: 2px 0; font-weight: 500; }
+  .f-tab-val .unit { font-weight: 400; color: var(--text-muted); margin-left: 3px; }
+  .f-tab-val.empty { color: var(--text-muted); font-weight: 400; }
+  .f-tab-pain { display: flex; align-items: center; gap: 8px; }
+  .f-tab-pain-val { font-size: 13px; font-weight: 600; color: var(--text); }
+  .f-tab-pain-help {
+    width: 16px; height: 16px; border-radius: 50%; background: #d0e8f0; border: none;
+    color: #1565c0; font-size: 10px; font-weight: 700; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .f-tab-pain-label { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
+  .f-tab-sep { border: none; border-top: 1px solid var(--border); margin: 14px 0 10px; }
+  .f-tab-resp-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #e8f5e9; color: #2e7d32; border-radius: 20px;
+    padding: 2px 10px; font-size: 12px; font-weight: 500;
+  }
+  .f-tab-resp-dot { width: 7px; height: 7px; border-radius: 50%; background: #2e7d32; }
+  .f-tab-user-chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 12.5px; font-weight: 500; color: var(--text);
+  }
+  .f-tab-user-av {
+    width: 24px; height: 24px; border-radius: 50%; background: #2e7d32;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 10px; font-weight: 700; flex-shrink: 0;
+  }
+  html[data-theme="dark"] .f-tab-notice { background: rgba(21,101,192,0.12); color: #90c8f8; border-left-color: #90c8f8; }
+  html[data-theme="dark"] .f-tab-notice a { color: #90c8f8; }
+  html[data-theme="dark"] .f-tab-field { border-bottom-color: #2a3448; }
+  html[data-theme="dark"] .f-tab-input, html[data-theme="dark"] .f-tab-textarea { color: var(--text); }
+  html[data-theme="dark"] .f-tab-sep { border-top-color: var(--border); }
+
+  /* ── ASIDE ACTIVITY ── */
+  .f-activity { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+  .f-activity-head {
+    padding: 10px 14px; font-size: 11px; font-weight: 500; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #f3f3f3;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .f-activity-list { max-height: 480px; overflow-y: auto; }
+  .f-activity-item {
+    display: flex; gap: 10px; padding: 10px 14px;
+    border-bottom: 1px solid #f9f9f9;
+  }
+  .f-avatar {
+    width: 30px; height: 30px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600; color: #fff; flex-shrink: 0;
+  }
+  .f-avatar-purple { background: var(--primary); }
+  .f-avatar-green  { background: #2e7d32; }
+  .f-avatar-teal   { background: #017E84; }
+  .f-activity-body { flex: 1; }
+  .f-activity-who { font-size: 12px; font-weight: 500; color: var(--text); }
+  .f-activity-time { font-size: 11px; color: var(--text-muted); }
+  .f-activity-change {
+    font-size: 11.5px; color: var(--text-muted); margin-top: 3px;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .f-activity-change i { font-size: 11px; }
+
+  /* Statut badges */
+  .s-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 500; }
+  .s-planifie     { background: #e3f2fd; color: #1565c0; }
+  .s-confirme     { background: #e8f5e9; color: #2e7d32; }
+  .s-en_attente   { background: #fff8e1; color: #f57f17; }
+  .s-en_consultation { background: #ede7f6; color: #4527a0; }
+  .s-termine      { background: #f3e5f5; color: #6a1b9a; }
+  .s-annule       { background: #fce4ec; color: #b71c1c; }
+  .s-absent       { background: #fff3e0; color: #e65100; }
+
+  .f-date-range {
+    display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text); width: 100%;
+  }
+  .f-date-arrow { color: var(--text-muted); font-size: 11px; }
+
+  /* CPN badge */
+  .f-cpn-badge {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
+    background: #e8f5e9; color: #2e7d32; border-radius: 12px; font-size: 11.5px; font-weight: 500;
+  }
+</style>
+
+<form method="post" id="rdv-form" data-is-new="{{ is_new|yesno:'1,0' }}">
+{% csrf_token %}
+
+<!-- NAV -->
+<nav class="o-nav">
+  <a href="{% url 'dashboard' %}" class="o-nav-grid"><i class="bi bi-grid-3x3-gap-fill"></i></a>
+  <span class="o-nav-brand">Gynécologie</span>
+  <a href="{% url 'gynecologie_list' %}" class="o-nav-link">Les patients</a>
+  <a href="{% url 'gynecologie_rdv' %}" class="o-nav-link active">Rendez-vous</a>
+  <a href="{% url 'gynecologie_naissances' %}" class="o-nav-link">Registre des naissances</a>
+  <a href="#" class="o-nav-link">Rapports</a>
+  {% include 'gynecologie/_nav_right.html' %}
+</nav>
+
+<!-- HEADER -->
+<div class="f-header">
+  <div class="f-header-title">
+    Rendez-vous / <span>{% if is_new %}Nouveau{% elif rdv.code_rdv %}{{ rdv.code_rdv }}{% else %}{{ rdv.patient.code_patient }}{% endif %}</span>
+  </div>
+
+  {% if not is_new %}
+  <button type="button" class="f-btn f-btn-primary" onclick="toggleEdit()"><i class="bi bi-pencil"></i> MODIFIER</button>
+  {% endif %}
+  <a href="{% url 'gynecologie_rdv_create' %}" class="f-btn f-btn-outline"><i class="bi bi-plus"></i> CRÉER</a>
+
+  <div class="f-spacer"></div>
+
+  <button type="button" class="f-btn f-btn-ghost" onclick="window.print()"><i class="bi bi-printer"></i> Imprimer</button>
+  <div style="position:relative;">
+    <button type="button" class="f-btn f-btn-ghost" id="action-toggle"><i class="bi bi-gear"></i> Action <i class="bi bi-chevron-down" style="font-size:10px;"></i></button>
+    <div id="action-menu" style="display:none;position:absolute;right:0;top:100%;z-index:300;background:#fff;border:1px solid var(--border);border-radius:4px;min-width:160px;box-shadow:0 4px 12px rgba(0,0,0,0.1);">
+      {% if not is_new %}
+      <a href="/admin/patients/rendezvous/{{ rdv.pk }}/change/" target="_blank"
+         style="display:block;padding:8px 14px;font-size:12.5px;color:var(--text);text-decoration:none;">
+        <i class="bi bi-box-arrow-up-right"></i> Voir dans l'admin
+      </a>
+      {% endif %}
+      <button type="button" onclick="document.getElementById('action-menu').style.display='none';"
+        style="display:block;width:100%;text-align:left;padding:8px 14px;font-size:12.5px;color:#b71c1c;background:none;border:none;cursor:pointer;">
+        <i class="bi bi-trash"></i> Supprimer
+      </button>
+    </div>
+  </div>
+
+  {% if not is_new %}
+  <div class="f-nav-info">
+    <span>{{ nav_pos }} / {{ nav_total }}</span>
+    <a class="f-nav-btn {% if not nav_prev %}disabled{% endif %}"
+       href="{% if nav_prev %}{% url 'gynecologie_rdv_detail' nav_prev %}{% else %}#{% endif %}">
+      <i class="bi bi-chevron-left"></i>
+    </a>
+    <a class="f-nav-btn {% if not nav_next %}disabled{% endif %}"
+       href="{% if nav_next %}{% url 'gynecologie_rdv_detail' nav_next %}{% else %}#{% endif %}">
+      <i class="bi bi-chevron-right"></i>
+    </a>
+  </div>
+  {% endif %}
+</div>
+
+<!-- STATUS PIPELINE -->
+<div class="f-pipeline-bar">
+  <div class="f-pipeline">
+    {% with s=rdv.statut|default:'planifie' %}
+    <button type="submit" name="action" value="planifie"
+      class="f-step {% if s == 'planifie' %}active{% elif s != 'planifie' %}done{% endif %}">
+      BROUILLON
+    </button>
+    <button type="submit" name="action" value="confirme"
+      class="f-step {% if s == 'confirme' %}active{% elif s == 'en_attente' or s == 'en_consultation' or s == 'termine' %}done{% endif %}">
+      CONFIRMER
+    </button>
+    <button type="submit" name="action" value="en_attente"
+      class="f-step {% if s == 'en_attente' %}active{% elif s == 'en_consultation' or s == 'termine' %}done{% endif %}">
+      EN ATTENTE
+    </button>
+    <button type="submit" name="action" value="en_consultation"
+      class="f-step {% if s == 'en_consultation' %}active{% elif s == 'termine' %}done{% endif %}">
+      EN CONSULTATION
+    </button>
+    <button type="submit" name="action" value="termine"
+      class="f-step {% if s == 'termine' %}active{% endif %}">
+      TERMINÉ
+    </button>
+    {% endwith %}
+  </div>
+</div>
+
+<!-- ACTION BUTTONS -->
+<div class="f-actions-bar">
+  <button type="button" class="f-action-btn"><i class="bi bi-file-medical"></i> Ordonnance</button>
+  <button type="button" class="f-action-btn"><i class="bi bi-receipt"></i> Voir la facture</button>
+  <button type="button" class="f-action-btn"><i class="bi bi-files"></i> Aperçu des documents</button>
+  <div style="margin-left:auto;display:flex;align-items:center;gap:6px;">
+    <button type="submit" name="action" value="save" class="f-btn f-btn-save" id="save-btn" style="display:none;">
+      <i class="bi bi-check-lg"></i> SAUVEGARDER
+    </button>
+    {% if is_new %}
+    <button type="button" class="f-btn f-btn-ghost" id="discard-btn" style="display:none;" data-href="{% url 'gynecologie_rdv' %}" onclick="window.location=this.dataset.href">
+      IGNORER
+    </button>
+    {% else %}
+    <button type="button" class="f-btn f-btn-ghost" id="discard-btn" style="display:none;" onclick="toggleEdit()">
+      IGNORER
+    </button>
+    {% endif %}
+  </div>
+</div>
+
+{% if error %}
+<div style="background:#fce4ec;color:#b71c1c;padding:7px 16px;font-size:12.5px;border-bottom:1px solid #f8b4c4;">
+  <i class="bi bi-exclamation-triangle-fill"></i> {{ error }}
+</div>
+{% endif %}
+
+<!-- BODY -->
+<div class="f-layout">
+  <div class="f-main">
+
+    <!-- MAIN CARD -->
+    <div class="f-card">
+      <!-- Top: code + photo -->
+      <div class="f-card-top">
+        <div class="f-code-block">
+          <div class="f-code-large">
+            {% if is_new %}Nouveau{% elif rdv.code_rdv %}{{ rdv.code_rdv }}{% else %}—{% endif %}
+          </div>
+          {% if not is_new %}
+          <div class="f-code-sub">
+            Créé le {{ rdv.date_creation|date:"d/m/Y H:i" }}
+            &nbsp;·&nbsp;
+            <span class="s-badge s-{{ rdv.statut }}">{{ rdv.get_statut_display }}</span>
+          </div>
+          {% endif %}
+        </div>
+        <div class="f-photo-box" title="Ajouter une photo">
+          <i class="bi bi-camera"></i>
+          <span>Photo</span>
+        </div>
+      </div>
+
+      <!-- Fields grid -->
+      <div class="f-fields">
+
+        <!-- Colonne gauche -->
+        <div>
+          <div class="f-field">
+            <label class="f-label">Patient</label>
+            <select name="patient" class="f-select editable" required id="patient-select"><option value="" disabled selected hidden></option>              {% for p in patients %}
+              <option value="{{ p.pk }}"
+                data-age="{{ p.age }}"
+                data-code="{{ p.code_patient }}"
+                {% if rdv and rdv.patient_id == p.pk %}selected{% endif %}>
+                {{ p.nom|upper }} {{ p.prenoms }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="f-field">
+            <span class="f-label">Âge</span>
+            <span class="f-val" id="age-display">
+              {% if rdv and rdv.patient %}{{ rdv.patient.age }} Ans{% else %}—{% endif %}
+            </span>
+          </div>
+          <div class="f-field">
+            <span class="f-label">Numéro</span>
+            <span class="f-val">
+              {% if rdv %}{{ rdv.pk|stringformat:"010d" }}{% else %}—{% endif %}
+            </span>
+          </div>
+          <div class="f-field">
+            <label class="f-label">Code de confirmation</label>
+            <input type="text" name="code_confirmation" class="f-input editable"
+              value="{% if rdv %}{{ rdv.code_confirmation }}{% endif %}">
+          </div>
+          <div class="f-field">
+            <label class="f-label">Département</label>
+            <select name="departement" class="f-select editable"><option value="" disabled selected hidden></option>
+              <option value="gynecologie_cpn" {% if rdv and rdv.departement == 'gynecologie_cpn' %}selected{% endif %}>GYNECOLOGIE/CPN</option>
+              <option value="medecine_generale" {% if rdv and rdv.departement == 'medecine_generale' %}selected{% endif %}>MÉDECINE GÉNÉRALE</option>
+            </select>
+          </div>
+          <div class="f-field">
+            <label class="f-label">Docteur</label>
+            <select name="medecin" class="f-select editable"><option value="" disabled selected hidden></option>              {% for m in medecins %}
+              <option value="{{ m.pk }}" {% if rdv and rdv.medecin_id == m.pk %}selected{% endif %}>{{ m }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="f-field">
+            <label class="f-label">Salle de consultation</label>
+            <input type="text" name="salle_consultation" class="f-input editable"
+              value="{% if rdv %}{{ rdv.salle_consultation }}{% endif %}">
+          </div>
+          <div class="f-field">
+            <label class="f-label">Date de suivi</label>
+            <input type="datetime-local" name="date_suivi" class="f-input editable"
+              value="{% if rdv and rdv.date_suivi %}{{ rdv.date_suivi|date:'Y-m-d' }}T{{ rdv.date_suivi|date:'H:i' }}{% endif %}">
+          </div>
+        </div>
+
+        <!-- Colonne droite -->
+        <div>
+          <div class="f-field">
+            <label class="f-label">Date</label>
+            <div class="f-date-range">
+              <input type="datetime-local" name="date_heure" class="f-input editable" required
+                style="min-width:0;flex:1;"
+                value="{% if rdv %}{{ rdv.date_heure|date:'Y-m-d' }}T{{ rdv.date_heure|date:'H:i' }}{% endif %}">
+              {% if rdv %}
+              <span class="f-date-arrow">→</span>
+              <span style="font-size:12px;color:var(--text-muted);white-space:nowrap;">
+                {{ rdv.date_heure|date:"d/m/Y" }}
+                {% with end_min=rdv.duree_minutes %}
+                {% if end_min %}+ {{ end_min }} min{% endif %}
+                {% endwith %}
+              </span>
+              {% endif %}
+            </div>
+          </div>
+          <div class="f-field">
+            <label class="f-label">Durée</label>
+            <input type="number" name="duree_minutes" class="f-input editable" min="5" step="5"
+              value="{% if rdv %}{{ rdv.duree_minutes }}{% else %}30{% endif %}">
+            {% if rdv %}<span style="font-size:11px;color:var(--text-muted);white-space:nowrap;">→ {{ rdv.duree_display }}</span>{% endif %}
+          </div>
+          <div class="f-field">
+            <span class="f-label">Date de validité</span>
+            <span class="f-val">
+              {% if rdv %}{{ rdv.date_validite|date:"d/m/Y" }}{% else %}—{% endif %}
+            </span>
+          </div>
+          <div class="f-field">
+            <label class="f-label">Type de consultation</label>
+            <select name="type_rdv" class="f-select editable"><option value="" disabled selected hidden></option>
+              <option value="consultation" {% if rdv and rdv.type_rdv == 'consultation' %}selected{% endif %}>[CS] CONSULTATION</option>
+              <option value="controle" {% if rdv and rdv.type_rdv == 'controle' %}selected{% endif %}>[CS-CPN] CONSULTATION PRÉNATALE</option>
+              <option value="urgence" {% if rdv and rdv.type_rdv == 'urgence' %}selected{% endif %}>[URG] URGENCE</option>
+              <option value="examen" {% if rdv and rdv.type_rdv == 'examen' %}selected{% endif %}>[EXA] EXAMEN</option>
+              <option value="vaccination" {% if rdv and rdv.type_rdv == 'vaccination' %}selected{% endif %}>[VAC] VACCINATION</option>
+            </select>
+          </div>
+          <div class="f-field">
+            <label class="f-label">Niveau d'urgence</label>
+            <select name="niveau_urgence" class="f-select editable"><option value="" disabled selected hidden></option>
+              <option value="normal" {% if rdv and rdv.niveau_urgence == 'normal' %}selected{% endif %}>Normal</option>
+              <option value="urgent" {% if rdv and rdv.niveau_urgence == 'urgent' %}selected{% endif %}>Urgent</option>
+              <option value="tres_urgent" {% if rdv and rdv.niveau_urgence == 'tres_urgent' %}selected{% endif %}>Très urgent</option>
+            </select>
+          </div>
+          <div class="f-field">
+            <label class="f-label">Temps d'attente</label>
+            <input type="number" name="temps_attente_minutes" class="f-input editable" min="0"
+              value="{% if rdv %}{{ rdv.temps_attente_minutes }}{% else %}0{% endif %}">
+            {% if rdv %}<span style="font-size:11px;color:var(--text-muted);white-space:nowrap;">{{ rdv.temps_attente_display }}</span>{% endif %}
+          </div>
+          <div class="f-field">
+            <label class="f-label">Temps de consultation</label>
+            <input type="number" name="temps_consultation_minutes" class="f-input editable" min="0"
+              value="{% if rdv %}{{ rdv.temps_consultation_minutes }}{% else %}0{% endif %}">
+            {% if rdv %}<span style="font-size:11px;color:var(--text-muted);white-space:nowrap;">{{ rdv.temps_consultation_display }}</span>{% endif %}
+          </div>
+        </div>
+
+      </div><!-- /f-fields -->
+    </div><!-- /f-card -->
+
+    <!-- TABS -->
+    <div class="f-tabs-wrap">
+      <div class="f-tabs">
+        <button type="button" class="f-tab active" data-tab="infos">Informations générales</button>
+        <button type="button" class="f-tab" data-tab="clinique">Évaluation clinique</button>
+        <button type="button" class="f-tab" data-tab="cpn">Consultation prénatale</button>
+        <button type="button" class="f-tab" data-tab="accouchement">Accouchement</button>
+        <button type="button" class="f-tab" data-tab="postnatale">Consultation postnatale</button>
+        <button type="button" class="f-tab" data-tab="curative">Consultation curative</button>
+        <button type="button" class="f-tab" data-tab="autres">Autres informations</button>
+      </div>
+
+      <!-- Informations générales -->
+      <div class="f-tab-panel active" id="tab-infos">
+        <div class="f-tab-grid">
+          <div>
+            <div class="f-tab-field">
+              <label class="f-tab-label">Maladies</label>
+              <input type="text" name="maladies" class="f-tab-input editable"
+                value="{% if rdv %}{{ rdv.maladies }}{% endif %}">
+            </div>
+            <div class="f-tab-field">
+              <label class="f-tab-label">Docteur Jr. responsable</label>
+              <select name="docteur_jr" class="f-tab-input f-select editable"><option value="" disabled selected hidden></option>                {% for m in medecins %}
+                <option value="{{ m.pk }}" {% if rdv and rdv.docteur_jr_id == m.pk %}selected{% endif %}>{{ m }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="f-tab-field">
+              <label class="f-tab-label">Principales plaintes</label>
+              <textarea name="principales_plaintes" class="f-tab-textarea editable"
+                rows="3">{% if rdv %}{{ rdv.principales_plaintes }}{% endif %}</textarea>
+            </div>
+            <div class="f-tab-field">
+              <label class="f-tab-label">Antécédents de la maladie actuelle</label>
+              <textarea name="antecedents_maladie" class="f-tab-textarea editable"
+                rows="3">{% if rdv %}{{ rdv.antecedents_maladie }}{% endif %}</textarea>
+            </div>
+            <div class="f-tab-field">
+              <label class="f-tab-label">Historique passée</label>
+              <textarea name="historique_passee" class="f-tab-textarea editable"
+                rows="3">{% if rdv %}{{ rdv.historique_passee }}{% endif %}</textarea>
+            </div>
+          </div>
+          <div>
+            <div class="f-tab-check-row">
+              <input type="checkbox" name="rdv_exterieur" id="rdv-ext" class="f-check editable"
+                {% if rdv and rdv.rdv_exterieur %}checked{% endif %}>
+              <label for="rdv-ext" style="font-size:12.5px;cursor:pointer;">Rendez-vous extérieur</label>
+            </div>
+            <div class="f-tab-field" style="margin-top:8px;">
+              <label class="f-tab-label">Motif / Notes</label>
+              <textarea name="notes" class="f-tab-textarea editable"
+                rows="4">{% if rdv %}{{ rdv.notes }}{% endif %}</textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Évaluation clinique -->
+      <div class="f-tab-panel" id="tab-clinique">
+        {% if rdv and rdv.patient %}
+        <div class="f-tab-notice">
+          REMARQUE : les détails sont affichés en fonction de l'évaluation du patient.
+          {% with last=rdv.patient.consultations.last %}{% if last %} Dernière consultation : <a href="/admin/consultations/consultation/{{ last.pk }}/change/">{{ last.code_consultation }}</a>{% endif %}{% endwith %}
+        </div>
+        {% endif %}
+        <div class="f-tab-grid">
+          <!-- Colonne gauche -->
+          <div>
+            <div class="f-tab-field">
+              <label class="f-tab-label">Poids</label>
+              <div class="f-tab-val">
+                {% with c=rdv.patient.consultations.last %}{% if c and c.poids %}<span>{{ c.poids }}</span><span class="unit">kg</span>{% else %}<span class="empty">—</span>{% endif %}{% endwith %}
+              </div>
+            </div>
+            <div class="f-tab-field">
+              <label class="f-tab-label">Taille</label>
+              <div class="f-tab-val">
+                {% with c=rdv.patient.consultations.last %}{% if c and c.taille %}<span>{{ c.taille }}</span><span class="unit">m</span>{% else %}<span class="empty">—</span>{% endif %}{% endwith %}
+              </div>
+            </div>
+            <div class="f-tab-field">
+              <label class="f-tab-label">Température</label>
+              <div class="f-tab-val">
+                {% with c=rdv.patient.consultations.last %}{% if c and c.temperature %}<span>{{ c.temperature }}</span><span class="unit">°C</span>{% else %}<span class="empty">—</span>{% endif %}{% endwith %}
+              </div>
+            </div>
+            <div class="f-tab-field">
+              <label class="f-tab-label">Pouls</label>
+              <div class="f-tab-val">
+                {% with c=rdv.patient.consultations.last %}{% if c and c.pouls %}<span>{{ c.pouls }}</span><span class="unit">bpm</span>{% else %}<span class="empty">—</span>{% endif %}{% endwith %}
+              </div>
+            </div>
+            <div class="f-tab-field">
+              <label class="f-tab-label">TA Bras gauche (mmHg)</label>
+              <div class="f-tab-val">
+                {% with c=rdv.patient.consultations.last %}{% if c and c.tension_systolique %}<span>{{ c.tension_systolique }}/{{ c.tension_diastolique }}</span>{% else %}<span class="empty">—</span>{% endif %}{% endwith %}
+              </div>
+            </div>
+            <div class="f-tab-field">
+              <label class="f-tab-label" style="color:#ccc;">TA Bras droit (mmHg)</label>
+              <div class="f-tab-val empty">—</div>
+            </div>
+            <div class="f-tab-field">
+              <label class="f-tab-label">Indice de masse corporelle</label>
+              <div class="f-tab-val">
+                {% with c=rdv.patient.consultations.last %}{% if c and c.imc %}<span>{{ c.imc }}</span>{% else %}<span class="empty">—</span>{% endif %}{% endwith %}
+              </div>
+            </div>
+            <div class="f-tab-section-title">Niveau de douleur</div>
+            <div class="f-tab-field">
+              <label class="f-tab-label">Niveau de douleur</label>
+              <div class="f-tab-pain">
+                <span class="f-tab-pain-val">0</span>
+                <button type="button" class="f-tab-pain-help" title="0 = Sans douleur, 10 = Douleur insupportable">?</button>
+              </div>
+              <div class="f-tab-pain-label">Sans douleur.</div>
+            </div>
+          </div>
+          <!-- Colonne droite -->
+          <div>
+            <div class="f-tab-field">
+              <label class="f-tab-label">Fréquence respiratoire</label>
+              <div class="f-tab-val">
+                {% with c=rdv.patient.consultations.last %}{% if c and c.frequence_respiratoire %}<span>{{ c.frequence_respiratoire }}</span><span class="unit">cpm</span>{% else %}<span class="empty">—</span>{% endif %}{% endwith %}
+              </div>
+            </div>
+            <div class="f-tab-field">
+              <label class="f-tab-label">PA systolique / diastolique</label>
+              <div class="f-tab-val">
+                {% with c=rdv.patient.consultations.last %}{% if c and c.tension_systolique %}<span>{{ c.tension_systolique }}/{{ c.tension_diastolique }}</span>{% else %}<span class="empty">—</span>{% endif %}{% endwith %}
+              </div>
+            </div>
+            <div class="f-tab-field">
+              <label class="f-tab-label">Saturation d'O2</label>
+              <div class="f-tab-val">
+                {% with c=rdv.patient.consultations.last %}{% if c and c.saturation_o2 %}<span>{{ c.saturation_o2 }}</span><span class="unit">%</span>{% else %}<span class="empty">—</span>{% endif %}{% endwith %}
+              </div>
+            </div>
+            <div class="f-tab-field">
+              <label class="f-tab-label">Glycémie aléatoire</label>
+              <div class="f-tab-val">
+                {% with c=rdv.patient.consultations.last %}{% if c and c.glycemie %}<span>{{ c.glycemie }}</span><span class="unit">mg/dl</span>{% else %}<span class="empty">—</span>{% endif %}{% endwith %}
+              </div>
+            </div>
+            <div class="f-tab-field">
+              <label class="f-tab-label">Albumine</label>
+              <div class="f-tab-val empty">—</div>
+            </div>
+            <div class="f-tab-field">
+              <label class="f-tab-label" style="color:#ccc;">Périmètre Brachial (cm)</label>
+              <div class="f-tab-val empty">—</div>
+            </div>
+            <div class="f-tab-field">
+              <label class="f-tab-label">Indice de masse corporelle Statut</label>
+              <div class="f-tab-val empty">—</div>
+            </div>
+          </div>
+        </div>
+        <hr class="f-tab-sep">
+        <div class="f-tab-section-title">Laboratoire</div>
+        <div style="padding:10px 0;color:var(--text-muted);font-size:12px;font-style:italic;">Aucun résultat de laboratoire.</div>
+        <hr class="f-tab-sep">
+        <div class="f-tab-section-title">Radiologique</div>
+        <div style="padding:10px 0;color:var(--text-muted);font-size:12px;font-style:italic;">Aucun résultat radiologique.</div>
+      </div>
+      <!-- Consultation prénatale -->
+      <div class="f-tab-panel" id="tab-cpn">
+        <p style="color:var(--text-muted);font-size:12.5px;">Aucune consultation prénatale enregistrée.</p>
+      </div>
+      <!-- Accouchement -->
+      <div class="f-tab-panel" id="tab-accouchement">
+        <p style="color:var(--text-muted);font-size:12.5px;">Aucune information d'accouchement.</p>
+      </div>
+      <!-- Consultation postnatale -->
+      <div class="f-tab-panel" id="tab-postnatale">
+        <p style="color:var(--text-muted);font-size:12.5px;">Aucune consultation postnatale.</p>
+      </div>
+      <!-- Consultation curative -->
+      <div class="f-tab-panel" id="tab-curative">
+        <p style="color:var(--text-muted);font-size:12.5px;">Aucune consultation curative.</p>
+      </div>
+      <!-- Autres informations -->
+      <div class="f-tab-panel" id="tab-autres">
+        <div class="f-tab-grid">
+          <!-- Colonne gauche -->
+          <div>
+            <div class="f-tab-field">
+              <label class="f-tab-label">Docteur référent</label>
+              <select name="docteur_referent" class="f-tab-input f-select editable"><option value="" disabled selected hidden></option>                {% for m in medecins %}
+                <option value="{{ m.pk }}" {% if rdv and rdv.docteur_jr_id == m.pk %}selected{% endif %}>{{ m }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="f-tab-field">
+              <label class="f-tab-label">Police d'assurance</label>
+              <input type="text" name="police_assurance" class="f-tab-input editable"
+                value="{% if rdv %}{{ rdv.police_assurance|default:'' }}{% endif %}">
+            </div>
+            <div class="f-tab-field">
+              <label class="f-tab-label">Compagnie d'assurance</label>
+              <input type="text" name="compagnie_assurance" class="f-tab-input editable"
+                value="{% if rdv %}{{ rdv.compagnie_assurance|default:'' }}{% endif %}">
+            </div>
+            <div class="f-tab-field">
+              <label class="f-tab-label">Réclamation</label>
+              <input type="text" name="reclamation" class="f-tab-input editable"
+                value="{% if rdv %}{{ rdv.reclamation|default:'' }}{% endif %}">
+            </div>
+          </div>
+          <!-- Colonne droite -->
+          <div>
+            <div class="f-tab-field">
+              <label class="f-tab-label">Liste de prix</label>
+              <input type="text" name="liste_prix" class="f-tab-input editable"
+                value="{% if rdv %}{{ rdv.liste_prix|default:'' }}{% endif %}">
+            </div>
+            <div class="f-tab-field">
+              <label class="f-tab-label">Responsable</label>
+              <div class="f-tab-user-chip">
+                <div class="f-tab-user-av">{{ request.user.username|first|upper }}</div>
+                <span>{{ request.user.get_full_name|default:request.user.username }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <hr class="f-tab-sep">
+        <div class="f-tab-section-title">Remarques</div>
+        <div class="f-tab-field" style="border-bottom:none;">
+          <textarea name="remarques" class="f-tab-textarea editable"
+            rows="4">{% if rdv %}{{ rdv.remarques|default:'' }}{% endif %}</textarea>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /f-main -->
+
+  <!-- ASIDE ACTIVITY -->
+  <div class="f-aside">
+    <div class="f-activity">
+      <div class="f-activity-head">
+        <span>Activité</span>
+        {% if not is_new %}
+        <span style="font-size:11px;">{{ rdv.date_creation|date:"d/m/Y" }}</span>
+        {% endif %}
+      </div>
+      <div class="f-activity-list">
+        {% if rdv %}
+          <!-- Current status indicator -->
+          <div class="f-activity-item">
+            <div class="f-avatar f-avatar-purple">{{ request.user.username|first|upper }}</div>
+            <div class="f-activity-body">
+              <div class="f-activity-who">{{ request.user.get_full_name|default:request.user.username }}</div>
+              <div class="f-activity-time">{{ rdv.date_creation|date:"d/m/Y H:i" }}</div>
+              <div class="f-activity-change">
+                <i class="bi bi-dot" style="color:var(--primary);"></i>
+                Rendez-vous créé(e)
+              </div>
+            </div>
+          </div>
+          {% if rdv.statut != 'planifie' %}
+          <div class="f-activity-item">
+            <div class="f-avatar f-avatar-teal">{{ request.user.username|first|upper }}</div>
+            <div class="f-activity-body">
+              <div class="f-activity-who">{{ request.user.get_full_name|default:request.user.username }}</div>
+              <div class="f-activity-time">Mis à jour</div>
+              <div class="f-activity-change">
+                <i class="bi bi-arrow-right"></i>
+                État :
+                <strong>{{ rdv.get_statut_display }}</strong>
+              </div>
+            </div>
+          </div>
+          {% endif %}
+          {% if rdv.medecin %}
+          <div class="f-activity-item">
+            <div class="f-avatar f-avatar-green">{{ rdv.medecin.nom|first|upper }}</div>
+            <div class="f-activity-body">
+              <div class="f-activity-who">{{ rdv.medecin }}</div>
+              <div class="f-activity-time">Médecin assigné</div>
+              <div class="f-activity-change">
+                <i class="bi bi-person-check"></i>
+                Docteur : <strong>{{ rdv.medecin }}</strong>
+              </div>
+            </div>
+          </div>
+          {% endif %}
+          {% if rdv.statut == 'termine' %}
+          <div class="f-activity-item">
+            <div class="f-avatar f-avatar-green">T</div>
+            <div class="f-activity-body">
+              <div class="f-activity-who">Consultation terminée</div>
+              <div class="f-activity-time">
+                Durée : {{ rdv.duree_display }}
+                &nbsp;·&nbsp; Attente : {{ rdv.temps_attente_display }}
+              </div>
+            </div>
+          </div>
+          {% endif %}
+        {% else %}
+          <div style="padding:14px;color:var(--text-muted);font-size:12px;">
+            L'activité apparaîtra après la création du dossier.
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div><!-- /f-layout -->
+
+</form>
+
+<script>
+// Tabs
+document.querySelectorAll('.f-tab').forEach(function(tab) {
+  tab.addEventListener('click', function() {
+    var id = this.dataset.tab;
+    document.querySelectorAll('.f-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.f-tab-panel').forEach(p => p.classList.remove('active'));
+    this.classList.add('active');
+    document.getElementById('tab-' + id).classList.add('active');
+  });
+});
+
+// Toggle edit mode (for detail view)
+var editMode = document.getElementById('rdv-form').dataset.isNew === '1';
+function applyEditMode() {
+  var editables = document.querySelectorAll('.editable');
+  editables.forEach(function(el) {
+    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+      el.disabled = !editMode;
+      el.style.borderBottomColor = editMode ? '' : 'transparent';
+      el.style.cursor = editMode ? '' : 'default';
+    } else if (el.tagName === 'SELECT') {
+      el.disabled = !editMode;
+      el.style.cursor = editMode ? 'pointer' : 'default';
+      el.style.backgroundImage = editMode ? '' : 'none';
+    }
+  });
+  var saveBtn = document.getElementById('save-btn');
+  var discardBtn = document.getElementById('discard-btn');
+  var modifyBtn = document.getElementById('modify-btn');
+  if (saveBtn) saveBtn.style.display = editMode ? 'inline-flex' : 'none';
+  if (discardBtn) discardBtn.style.display = editMode ? 'inline-flex' : 'none';
+}
+function toggleEdit() {
+  editMode = !editMode;
+  applyEditMode();
+}
+applyEditMode();
+
+// Auto-fill age when patient changes
+document.getElementById('patient-select').addEventListener('change', function() {
+  var opt = this.options[this.selectedIndex];
+  var age = opt.dataset.age;
+  var ageEl = document.getElementById('age-display');
+  if (ageEl) ageEl.textContent = age ? age + ' Ans' : '—';
+});
+
+// Action menu toggle
+document.getElementById('action-toggle').addEventListener('click', function(e) {
+  e.stopPropagation();
+  var menu = document.getElementById('action-menu');
+  menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+});
+document.addEventListener('click', function() {
+  var menu = document.getElementById('action-menu');
+  if (menu) menu.style.display = 'none';
+});
+  // Horloge nav
+  (function(){function t(){var e=document.getElementById('gyn-live-time');if(e)e.textContent=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});}t();setInterval(t,1000);})();
+  // Thème nav
+  var gtt=document.getElementById('gyn-theme-toggle');
+  if(gtt)gtt.addEventListener('click',function(){var h=document.documentElement,d=h.getAttribute('data-theme')==='dark';if(d){h.removeAttribute('data-theme');localStorage.setItem('segho-theme','light');}else{h.setAttribute('data-theme','dark');localStorage.setItem('segho-theme','dark');}});
+</script>
+{% endblock %}

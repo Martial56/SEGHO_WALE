@@ -1,0 +1,625 @@
+{% extends 'gynecologie/base.html' %}
+{% load static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<style>
+  .topbar, .breadcrumb { display: none !important; }
+  .content { padding: 0 !important; overflow-x: hidden; }
+</style>
+{% endblock %}
+
+{% block content %}
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap');
+
+  :root {
+    --primary:      #714B67;
+    --primary-dark: #5c3d55;
+    --nav-bg:       #714B67;
+    --accent:       #017E84;
+    --bg:           #f9f9f9;
+    --surface:      #ffffff;
+    --border:       #d9d9d9;
+    --text:         #212529;
+    --text-muted:   #6c757d;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Roboto', sans-serif; background: var(--bg) !important; color: var(--text); }
+  html { background: var(--bg) !important; }
+
+  /* ── DARK MODE ── */
+  html[data-theme="dark"] { --bg:#181c28; --surface:#21283a; --border:#2d3550; --text:#c5d4e2; --text-muted:#6c85a0; }
+  html[data-theme="dark"] .o-list tbody tr:hover { background: rgba(113,75,103,0.2); }
+  html[data-theme="dark"] .o-list thead th:hover { background: #28304a; }
+  html[data-theme="dark"] .o-list thead th { background: var(--surface); }
+  html[data-theme="dark"] .o-search-input { color: var(--text); }
+  html[data-theme="dark"] .o-search-bar { border-bottom-color: #3a4a62; }
+  html[data-theme="dark"] .o-ctrl-btn { color: var(--text-muted); }
+  html[data-theme="dark"] .o-ctrl-btn:hover { background: #28304a; color: var(--text); border-color: var(--border); }
+  html[data-theme="dark"] .o-pag-btn { background: var(--surface); border-color: var(--border); color: var(--text-muted); }
+  html[data-theme="dark"] .o-view-btn { background: var(--surface); color: var(--text-muted); border-color: var(--border); }
+  html[data-theme="dark"] .o-view-btns { border-color: var(--border); }
+  html[data-theme="dark"] .o-ctrl-sep { background: var(--border); }
+  html[data-theme="dark"] .o-empty-state { background: var(--bg); }
+  html[data-theme="dark"] .o-empty-illo { background: linear-gradient(135deg, #5a3d55 0%, #7a5888 100%); }
+
+  /* ══ NAV ══ */
+  .o-nav {
+    background: var(--nav-bg); display: flex; align-items: center;
+    height: 46px; padding: 0 10px; position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+  }
+  .o-nav-grid {
+    width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+    color: rgba(255,255,255,0.75); font-size: 17px; cursor: pointer;
+    border-radius: 4px; margin-right: 4px; transition: background 0.15s; text-decoration: none;
+  }
+  .o-nav-grid:hover { background: rgba(255,255,255,0.12); color: #fff; }
+  .o-nav-brand { font-size: 15px; font-weight: 500; color: #fff; margin-right: 2px; padding: 0 8px; white-space: nowrap; }
+  .o-nav-link {
+    color: rgba(255,255,255,0.78); text-decoration: none; font-size: 13px;
+    padding: 0 12px; height: 46px; display: flex; align-items: center;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, background 0.15s, border-color 0.15s; white-space: nowrap;
+  }
+  .o-nav-link:hover, .o-nav-link.active { color: #fff; background: rgba(255,255,255,0.09); border-bottom-color: #fff; }
+  .o-nav-right { display: flex; align-items: center; gap: 2px; margin-left: auto; }
+  .o-nav-icon { width: 28px; height: 28px; border-radius: 4px; border: none; background: transparent; color: rgba(255,255,255,0.75); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s; }
+  .o-nav-icon:hover { background: rgba(255,255,255,0.12); color: #fff; }
+  .o-nav-icon .icon-sun { display: block; } .o-nav-icon .icon-moon { display: none; }
+  html[data-theme="dark"] .o-nav-icon .icon-sun { display: none; }
+  html[data-theme="dark"] .o-nav-icon .icon-moon { display: block; }
+  .o-nav-clock { text-align: right; font-size: 10px; color: rgba(255,255,255,0.6); line-height: 1.4; padding: 0 6px; white-space: nowrap; }
+  .o-nav-time { font-size: 13px; font-weight: 600; color: #fff; display: block; }
+  .o-nav-user { display: flex; align-items: center; gap: 5px; padding: 3px 8px 3px 3px; border-radius: 20px; background: rgba(255,255,255,0.1); margin: 0 3px; }
+  .o-nav-avatar { width: 22px; height: 22px; border-radius: 50%; background: rgba(255,255,255,0.25); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #fff; flex-shrink: 0; }
+  .o-nav-uname { font-size: 11px; font-weight: 500; color: #fff; line-height: 1.2; }
+  .o-nav-urole { font-size: 9.5px; color: rgba(255,255,255,0.65); }
+  .o-nav-logout { width: 28px; height: 28px; border-radius: 4px; border: none; background: transparent; color: rgba(255,255,255,0.75); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s; }
+  .o-nav-logout:hover { background: rgba(232,69,69,0.3); color: #fff; }
+
+  /* ══ SUBHEADER ══ */
+  .o-subheader {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 6px 16px; display: flex; flex-direction: column; gap: 5px;
+    position: fixed; top: 46px; left: 0; right: 0; z-index: 190;
+  }
+  .o-subheader-row { display: flex; align-items: center; gap: 8px; }
+  .o-subheader-row-right { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .o-page-title { font-size: 17px; font-weight: 400; color: var(--text); }
+  .o-btn-create {
+    background: #017E84; color: #fff; border: none; padding: 5px 14px; border-radius: 4px;
+    font-size: 12.5px; font-weight: 500; font-family: 'Roboto', sans-serif; cursor: pointer;
+    text-decoration: none; display: inline-flex; align-items: center;
+    letter-spacing: 0.5px; transition: background 0.15s;
+  }
+  .o-btn-create:hover { background: #015f64; }
+  .o-btn-excel {
+    width: 28px; height: 28px; border: 1px solid #d0e9d1; border-radius: 4px;
+    background: #f0faf0; color: #217346; font-size: 15px;
+    display: inline-flex; align-items: center; justify-content: center;
+    text-decoration: none; transition: background 0.15s, border-color 0.15s;
+  }
+  .o-btn-excel:hover { background: #217346; color: #fff; border-color: #217346; }
+  .o-search-bar {
+    display: flex; align-items: center; border: none; border-bottom: 1px solid #bbb;
+    background: transparent; min-height: 28px; padding: 2px 4px; gap: 4px; width: 320px;
+  }
+  .o-search-input {
+    border: none; outline: none; font-size: 12px; font-family: 'Roboto', sans-serif;
+    color: var(--text); flex: 1; min-width: 60px; background: transparent;
+  }
+  .o-search-btn { background: none; border: none; cursor: pointer; color: #888; font-size: 13px; padding: 2px; }
+  .o-ctrl-btn {
+    background: none; border: 1px solid transparent; border-radius: 4px;
+    padding: 4px 8px; font-size: 12px; font-family: 'Roboto', sans-serif;
+    color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 4px;
+    transition: border-color 0.15s, color 0.15s, background 0.15s; white-space: nowrap;
+  }
+  .o-ctrl-btn:hover { border-color: var(--border); color: var(--text); background: #f3f3f3; }
+  .o-ctrl-sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }
+  .o-pagination { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+  .o-pag-btn {
+    width: 24px; height: 24px; border: 1px solid var(--border); border-radius: 3px;
+    background: var(--surface); display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted); text-decoration: none; font-size: 12px;
+    transition: background 0.15s, color 0.15s;
+  }
+  .o-pag-btn:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .o-pag-btn.disabled { opacity: 0.35; pointer-events: none; }
+  .o-view-btns { display: flex; border: 1px solid var(--border); border-radius: 3px; overflow: hidden; }
+  .o-view-btn {
+    width: 26px; height: 24px; border: none; background: var(--surface);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted); font-size: 13px; cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .o-view-btn:not(:last-child) { border-right: 1px solid var(--border); }
+  .o-view-btn.active, .o-view-btn:hover { background: var(--primary); color: #fff; }
+
+  /* ══ LIST TABLE ══ */
+  .o-list-wrap {
+    position: fixed; top: 119px; left: 0; right: 0; bottom: 0;
+    overflow-x: auto; overflow-y: auto; background: var(--surface);
+  }
+  .o-list-wrap.has-tags { top: 143px; }
+  .o-list { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
+  .o-list thead th {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 6px 10px; font-weight: 500; font-size: 11.5px;
+    color: var(--text-muted); text-align: left;
+    position: sticky; top: 0; z-index: 10; cursor: pointer; user-select: none;
+  }
+  .o-list thead th:hover { background: #f5f5f5; }
+  .o-list thead th.th-center { text-align: center; }
+  .o-col-resize {
+    position: absolute; right: 0; top: 0; bottom: 0; width: 5px;
+    cursor: col-resize; user-select: none; background: transparent; z-index: 2;
+  }
+  .o-col-resize:hover, .o-col-resize.active { background: var(--accent); opacity: 0.45; }
+  .o-list tbody tr { border-bottom: 1px solid #f0f0f0; transition: background 0.1s; cursor: pointer; }
+  .o-list tbody tr:hover { background: #f5f0fa; }
+  .o-list tbody td { padding: 5px 10px; color: var(--text); vertical-align: middle; }
+  .o-list tbody td.td-center { text-align: center; }
+  .o-list tbody td.td-muted { color: #ddd; text-align: center; font-size: 10px; }
+  .o-list tbody td.td-code { color: var(--accent); font-weight: 500; font-size: 12px; }
+  .o-list tbody td.td-name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+  .o-list tbody td.td-doctor { max-width: 130px; overflow: hidden; text-overflow: ellipsis; color: var(--text-muted); }
+  .td-age-hit { font-weight: 600; color: var(--primary); }
+
+  /* Statut badges */
+  .o-badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 500; white-space: nowrap; }
+  .badge-planifie        { background: #e3f2fd; color: #1565c0; }
+  .badge-confirme        { background: #e8f5e9; color: #2e7d32; }
+  .badge-en_attente      { background: #fff8e1; color: #f57f17; }
+  .badge-en_consultation { background: #e8f4f5; color: #017E84; }
+  .badge-termine         { background: #ede7f6; color: #4527a0; }
+  .badge-annule          { background: #fce4ec; color: #b71c1c; }
+  .badge-absent          { background: #fff3e0; color: #e65100; }
+
+  /* Checkbox col */
+  .o-cb { width: 16px; height: 16px; cursor: pointer; accent-color: var(--primary); }
+  .th-cb, .td-cb { width: 36px; text-align: center; }
+
+  /* Empty state */
+  .o-empty-state {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 80px 20px; background: var(--bg);
+  }
+  .o-empty-illo {
+    width: 88px; height: 88px; border-radius: 50%;
+    background: linear-gradient(135deg, #714B67 0%, #a97fbf 100%);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 20px; position: relative;
+  }
+  .o-empty-illo svg { color: #fff; opacity: 0.9; }
+  .o-empty-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+  .o-empty-sub { font-size: 12.5px; color: var(--text-muted); margin-bottom: 20px; }
+  .o-empty-btn {
+    background: #017E84; color: #fff; border: none; padding: 7px 20px; border-radius: 4px;
+    font-size: 12.5px; font-weight: 500; font-family: 'Roboto', sans-serif;
+    cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+    transition: background 0.15s;
+  }
+  .o-empty-btn:hover { background: #015f64; }
+
+  /* ══ DROPDOWNS (Filtres / Regrouper par) ══ */
+  .o-dd-wrap { position: relative; }
+  .o-dd-panel {
+    display: none; position: absolute; top: calc(100% + 6px); left: 0; z-index: 500;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; box-shadow: 0 6px 24px rgba(0,0,0,0.13);
+    min-width: 230px; padding: 5px 0;
+  }
+  .o-dd-panel.open { display: block; }
+  .o-dd-section {
+    padding: 6px 14px 3px; font-size: 10px; font-weight: 600;
+    color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .o-dd-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 14px; font-size: 12.5px; color: var(--text);
+    cursor: pointer; text-decoration: none; transition: background 0.1s;
+    white-space: nowrap; gap: 10px; position: relative;
+  }
+  .o-dd-item:hover { background: #f5f0fa; color: var(--primary); }
+  .o-dd-item.active { background: #ede7f6; color: var(--primary); font-weight: 500; }
+  .o-dd-item .o-dd-arr { font-size: 10px; color: var(--text-muted); flex-shrink: 0; }
+  .o-dd-sep { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+  .o-dd-sub {
+    display: none; position: absolute; left: 100%; top: -5px; z-index: 501;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; box-shadow: 0 6px 24px rgba(0,0,0,0.13);
+    min-width: 160px; padding: 5px 0;
+  }
+  .o-dd-item:hover > .o-dd-sub { display: block; }
+  .o-dd-sub .o-dd-item { font-size: 12px; }
+
+  /* Active filter tag */
+  .o-active-filters { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+  .o-filter-tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: #ede7f6; color: var(--primary); border: 1px solid #c8b0d8;
+    border-radius: 3px; padding: 1px 8px; font-size: 11.5px; font-weight: 500;
+  }
+  .o-filter-tag button {
+    background: none; border: none; cursor: pointer; color: #999;
+    font-size: 14px; line-height: 1; padding: 0; margin-left: 2px;
+  }
+  .o-filter-tag button:hover { color: #333; }
+
+  /* Date block inside filter dropdown */
+  .o-dd-date-block { padding: 8px 14px 10px; }
+  .o-dd-date-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .o-dd-date-row label { font-size: 11.5px; color: var(--text-muted); min-width: 18px; }
+  .o-dd-date-input {
+    flex: 1; border: none; border-bottom: 1px solid #bbb; background: transparent;
+    font-size: 12px; font-family: 'Roboto', sans-serif; color: var(--text);
+    padding: 2px 2px; outline: none;
+  }
+  .o-dd-date-input:focus { border-bottom-color: var(--primary); }
+  .o-dd-date-actions { display: flex; gap: 6px; margin-top: 10px; }
+  .o-dd-apply-btn {
+    flex: 1; background: var(--primary); color: #fff; border: none; border-radius: 3px;
+    padding: 5px 0; font-size: 12px; font-weight: 500; font-family: 'Roboto', sans-serif;
+    cursor: pointer; transition: background 0.15s;
+  }
+  .o-dd-apply-btn:hover { background: #5c3d55; }
+  .o-dd-clear-btn {
+    background: none; border: 1px solid var(--border); border-radius: 3px;
+    padding: 5px 10px; font-size: 11.5px; color: var(--text-muted);
+    cursor: pointer; text-decoration: none; display: inline-flex; align-items: center;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .o-dd-clear-btn:hover { border-color: #999; color: var(--text); }
+
+  html[data-theme="dark"] .o-dd-panel, html[data-theme="dark"] .o-dd-sub { background: var(--surface); border-color: var(--border); }
+  html[data-theme="dark"] .o-dd-item:hover { background: rgba(113,75,103,0.2); color: #c5d4e2; }
+  html[data-theme="dark"] .o-dd-item.active { background: rgba(113,75,103,0.3); color: #d0b8d8; }
+  html[data-theme="dark"] .o-filter-tag { background: rgba(113,75,103,0.25); border-color: rgba(113,75,103,0.5); color: #d0b8d8; }
+  html[data-theme="dark"] .o-dd-date-input { border-bottom-color: #3a4a62; color: var(--text); }
+  html[data-theme="dark"] .o-dd-clear-btn { border-color: var(--border); color: var(--text-muted); }
+</style>
+
+<!-- ══ NAV ══ -->
+<nav class="o-nav">
+  <a href="{% url 'dashboard' %}" class="o-nav-grid"><i class="bi bi-grid-3x3-gap-fill"></i></a>
+  <span class="o-nav-brand">Gynécologie</span>
+  <a href="{% url 'gynecologie_list' %}" class="o-nav-link">Les patients</a>
+  <a href="{% url 'gynecologie_rdv' %}" class="o-nav-link active">Rendez-vous</a>
+  <a href="{% url 'gynecologie_naissances' %}" class="o-nav-link">Registre des naissances</a>
+  <a href="#" class="o-nav-link">Rapports</a>
+  {% include 'gynecologie/_nav_right.html' %}
+</nav>
+
+<!-- ══ SUBHEADER ══ -->
+<div class="o-subheader">
+  <div class="o-subheader-row">
+    <span class="o-page-title">Rendez-vous</span>
+    <div class="o-subheader-row-right">
+      <form method="get" style="display:flex;align-items:center;">
+        <div class="o-search-bar">
+          <input class="o-search-input" type="text" name="q"
+                 value="{{ request.GET.q }}" placeholder="Rechercher un patient…">
+          <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <div class="o-subheader-row">
+    <a href="{% url 'gynecologie_rdv_create' %}" class="o-btn-create">CRÉER</a>
+    <a href="?export=excel{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}" class="o-btn-excel" title="Exporter en Excel"><i class="bi bi-download"></i></a>
+    <div class="o-subheader-row-right">
+
+      <!-- ── Filtres ── -->
+      <div class="o-dd-wrap">
+        <button class="o-ctrl-btn {% if request.GET.filter %}active{% endif %}" id="btn-filtres" onclick="toggleDd('dd-filtres',this)">
+          <i class="bi bi-funnel{% if request.GET.filter %}-fill{% endif %}"></i> Filtres{% if request.GET.filter %} <span style="background:var(--primary);color:#fff;border-radius:10px;font-size:10px;padding:0 5px;">1</span>{% endif %}
+        </button>
+        <div class="o-dd-panel" id="dd-filtres">
+          <div class="o-dd-section">Périodes</div>
+          <a class="o-dd-item {% if request.GET.filter == 'today' %}active{% endif %}" href="?filter=today{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Aujourd'hui</a>
+          <hr class="o-dd-sep">
+          <div class="o-dd-section">Mes rendez-vous</div>
+          <a class="o-dd-item {% if request.GET.filter == 'mine' %}active{% endif %}" href="?filter=mine{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Mes rendez-vous</a>
+          <hr class="o-dd-sep">
+          <div class="o-dd-section">Statut</div>
+          <a class="o-dd-item {% if request.GET.filter == 'urgent' %}active{% endif %}" href="?filter=urgent{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Rendez-vous urgent</a>
+          <a class="o-dd-item {% if request.GET.filter == 'urgence_medicale' %}active{% endif %}" href="?filter=urgence_medicale{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Urgence médicale</a>
+          <a class="o-dd-item {% if request.GET.filter == 'consultation' %}active{% endif %}" href="?filter=consultation{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Rendez-vous de consultation</a>
+          <a class="o-dd-item {% if request.GET.filter == 'suivi' %}active{% endif %}" href="?filter=suivi{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Suivi rendez-vous</a>
+          <a class="o-dd-item {% if request.GET.filter == 'not_done' %}active{% endif %}" href="?filter=not_done{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Pas fini</a>
+          <hr class="o-dd-sep">
+          <div class="o-dd-section">Par date</div>
+          <div class="o-dd-date-block">
+            <div class="o-dd-date-row">
+              <label>De</label>
+              <input type="date" id="filter-date-from" class="o-dd-date-input" value="{{ request.GET.date_from }}">
+            </div>
+            <div class="o-dd-date-row">
+              <label>À</label>
+              <input type="date" id="filter-date-to" class="o-dd-date-input" value="{{ request.GET.date_to }}">
+            </div>
+            <div class="o-dd-date-actions">
+              <button type="button" class="o-dd-apply-btn" onclick="applyDateFilter()">Appliquer</button>
+              {% if request.GET.date_from or request.GET.date_to %}
+              <a class="o-dd-clear-btn" href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.filter %}filter={{ request.GET.filter }}&{% endif %}{% if request.GET.group %}group={{ request.GET.group }}{% endif %}">Effacer</a>
+              {% endif %}
+            </div>
+          </div>
+          <hr class="o-dd-sep">
+          <a class="o-dd-item" href="#">Ajouter un filtre personnalisé <span class="o-dd-arr">›</span></a>
+        </div>
+      </div>
+
+      <!-- ── Regrouper par ── -->
+      <div class="o-dd-wrap">
+        <button class="o-ctrl-btn {% if request.GET.group %}active{% endif %}" id="btn-group" onclick="toggleDd('dd-group',this)">
+          <i class="bi bi-list-ul"></i> Regrouper par{% if request.GET.group %} <span style="background:var(--primary);color:#fff;border-radius:10px;font-size:10px;padding:0 5px;">1</span>{% endif %}
+        </button>
+        <div class="o-dd-panel" id="dd-group">
+          <div class="o-dd-section">Regrouper par</div>
+          <a class="o-dd-item {% if request.GET.group == 'age' %}active{% endif %}" href="?group=age{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Age du patient</a>
+          <a class="o-dd-item {% if request.GET.group == 'sexe' %}active{% endif %}" href="?group=sexe{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Sexe</a>
+          <a class="o-dd-item {% if request.GET.group == 'type_visite' %}active{% endif %}" href="?group=type_visite{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Type de visite</a>
+          <a class="o-dd-item {% if request.GET.group == 'type_rdv' %}active{% endif %}" href="?group=type_rdv{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Type de consultation</a>
+          <a class="o-dd-item {% if request.GET.group == 'diagnostic' %}active{% endif %}" href="?group=diagnostic{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Diagnostic retenu / Autres pathologies associées</a>
+          <a class="o-dd-item {% if request.GET.group == 'patient' %}active{% endif %}" href="?group=patient{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Patient</a>
+          <a class="o-dd-item {% if request.GET.group == 'medecin' %}active{% endif %}" href="?group=medecin{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Rendez-vous du docteur</a>
+          <div class="o-dd-item" style="position:relative;">
+            Date <span class="o-dd-arr">›</span>
+            <div class="o-dd-sub">
+              <a class="o-dd-item {% if request.GET.group == 'date_jour' %}active{% endif %}" href="?group=date_jour{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Jour</a>
+              <a class="o-dd-item {% if request.GET.group == 'date_semaine' %}active{% endif %}" href="?group=date_semaine{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Semaine</a>
+              <a class="o-dd-item {% if request.GET.group == 'date_mois' %}active{% endif %}" href="?group=date_mois{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Mois</a>
+              <a class="o-dd-item {% if request.GET.group == 'date_trimestre' %}active{% endif %}" href="?group=date_trimestre{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Trimestre</a>
+              <a class="o-dd-item {% if request.GET.group == 'date_annee' %}active{% endif %}" href="?group=date_annee{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Année</a>
+            </div>
+          </div>
+          <a class="o-dd-item {% if request.GET.group == 'statut' %}active{% endif %}" href="?group=statut{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">État</a>
+          <a class="o-dd-item {% if request.GET.group == 'departement' %}active{% endif %}" href="?group=departement{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Département</a>
+          <a class="o-dd-item {% if request.GET.group == 'referent' %}active{% endif %}" href="?group=referent{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Docteur référent</a>
+          <hr class="o-dd-sep">
+          <a class="o-dd-item {% if request.GET.group == 'assurance' %}active{% endif %}" href="?group=assurance{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Compagnie d'assurance</a>
+          <a class="o-dd-item {% if request.GET.group == 'police' %}active{% endif %}" href="?group=police{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Police d'assurance</a>
+          <hr class="o-dd-sep">
+          <a class="o-dd-item" href="#">Ajouter un groupe personnalisé <span class="o-dd-arr">›</span></a>
+          {% if request.GET.group %}
+          <hr class="o-dd-sep">
+          <a class="o-dd-item" href="?{% if request.GET.q %}q={{ request.GET.q }}{% endif %}" style="color:#b71c1c;">
+            <i class="bi bi-x-circle" style="font-size:11px;"></i> Supprimer le regroupement
+          </a>
+          {% endif %}
+        </div>
+      </div>
+
+      <button class="o-ctrl-btn"><i class="bi bi-star"></i> Favoris</button>
+      <div class="o-ctrl-sep"></div>
+      <div class="o-pagination">
+        <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
+        <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
+           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-left"></i>
+        </a>
+        <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
+           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-right"></i>
+        </a>
+      </div>
+      <div class="o-ctrl-sep"></div>
+      <div class="o-view-btns">
+        <a href="{% url 'gynecologie_list' %}" class="o-view-btn"><i class="bi bi-grid"></i></a>
+        <button class="o-view-btn active"><i class="bi bi-list-ul"></i></button>
+      </div>
+    </div>
+  </div>
+  {% if request.GET.filter or request.GET.group or request.GET.date_from or request.GET.date_to %}
+  <div class="o-subheader-row" style="padding-top:0;gap:6px;flex-wrap:wrap;">
+    {% if request.GET.filter %}
+    <div class="o-active-filters">
+      <span style="font-size:11px;color:var(--text-muted);margin-right:2px;">Filtre :</span>
+      <span class="o-filter-tag">
+        {% if request.GET.filter == 'today' %}Aujourd'hui
+        {% elif request.GET.filter == 'mine' %}Mes rendez-vous
+        {% elif request.GET.filter == 'urgent' %}Rendez-vous urgent
+        {% elif request.GET.filter == 'urgence_medicale' %}Urgence médicale
+        {% elif request.GET.filter == 'consultation' %}Rendez-vous de consultation
+        {% elif request.GET.filter == 'suivi' %}Suivi rendez-vous
+        {% elif request.GET.filter == 'not_done' %}Pas fini
+        {% else %}{{ request.GET.filter }}{% endif %}
+        <button onclick="window.location='?{% if request.GET.q %}q={{ request.GET.q }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}'" title="Supprimer">×</button>
+      </span>
+    </div>
+    {% endif %}
+    {% if request.GET.date_from or request.GET.date_to %}
+    <div class="o-active-filters">
+      <span style="font-size:11px;color:var(--text-muted);margin-right:2px;">Date :</span>
+      <span class="o-filter-tag">
+        {% if request.GET.date_from and request.GET.date_to %}{{ request.GET.date_from }} → {{ request.GET.date_to }}
+        {% elif request.GET.date_from %}À partir du {{ request.GET.date_from }}
+        {% else %}Jusqu'au {{ request.GET.date_to }}{% endif %}
+        <button onclick="window.location='?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.filter %}filter={{ request.GET.filter }}&{% endif %}{% if request.GET.group %}group={{ request.GET.group }}{% endif %}'" title="Supprimer">×</button>
+      </span>
+    </div>
+    {% endif %}
+    {% if request.GET.group %}
+    <div class="o-active-filters">
+      <span style="font-size:11px;color:var(--text-muted);margin-right:2px;">Groupé par :</span>
+      <span class="o-filter-tag">
+        {% if request.GET.group == 'age' %}Age du patient
+        {% elif request.GET.group == 'sexe' %}Sexe
+        {% elif request.GET.group == 'type_visite' %}Type de visite
+        {% elif request.GET.group == 'type_rdv' %}Type de consultation
+        {% elif request.GET.group == 'medecin' %}Médecin
+        {% elif request.GET.group == 'statut' %}État
+        {% elif request.GET.group == 'departement' %}Département
+        {% elif request.GET.group == 'date_jour' %}Date — Jour
+        {% elif request.GET.group == 'date_semaine' %}Date — Semaine
+        {% elif request.GET.group == 'date_mois' %}Date — Mois
+        {% elif request.GET.group == 'date_annee' %}Date — Année
+        {% else %}{{ request.GET.group }}{% endif %}
+        <button onclick="window.location='?{% if request.GET.q %}q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}'" title="Supprimer">×</button>
+      </span>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<!-- ══ TABLE ══ -->
+<div class="o-list-wrap {% if request.GET.filter or request.GET.group %}has-tags{% endif %}">
+
+  {% if page_obj %}
+  <table class="o-list">
+    <thead>
+      <tr>
+        <th class="th-cb"><input type="checkbox" class="o-cb" id="chk-all"></th>
+        <th>Code RDV</th>
+        <th>Patient</th>
+        <th>Date</th>
+        <th>Médecin</th>
+        <th>Type</th>
+        <th>Motif</th>
+        <th>Âge</th>
+        <th>Genre</th>
+        <th class="th-center">0-11 Mois</th>
+        <th class="th-center">1-4 Ans</th>
+        <th class="th-center">5-9 Ans</th>
+        <th class="th-center">10-14 Ans</th>
+        <th class="th-center">15-19 Ans</th>
+        <th class="th-center">20-24 Ans</th>
+        <th class="th-center">25-49 Ans</th>
+        <th class="th-center">50 Ans et +</th>
+        <th>État</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for rdv in page_obj %}
+      {% with age=rdv.patient.age %}
+      <tr class="rdv-row" data-url="{% url 'gynecologie_rdv_detail' rdv.pk %}">
+        <td class="td-cb"><input type="checkbox" class="o-cb" onclick="event.stopPropagation()"></td>
+        <td class="td-code">{{ rdv.code_rdv|default:rdv.patient.code_patient }}</td>
+        <td class="td-name">{{ rdv.patient.nom|upper }} {{ rdv.patient.prenoms }}</td>
+        <td>{{ rdv.date_heure|date:"d/m/Y H:i" }}</td>
+        <td class="td-doctor">{% if rdv.medecin %}{{ rdv.medecin }}{% else %}<span style="color:#ddd">—</span>{% endif %}</td>
+        <td>{{ rdv.get_type_rdv_display }}</td>
+        <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;color:var(--text-muted);">{{ rdv.motif|truncatechars:35 }}</td>
+        <td>{% if rdv.patient.date_naissance %}{{ age }} ans{% else %}<span style="color:#ddd">—</span>{% endif %}</td>
+        <td>{% if rdv.patient.sexe == 'F' %}F{% elif rdv.patient.sexe == 'M' %}M{% else %}<span style="color:#ddd">—</span>{% endif %}</td>
+        <td class="{% if age is not None and age < 1 %}td-age-hit{% else %}td-muted{% endif %}">{% if age is not None and age < 1 %}✓{% else %}·{% endif %}</td>
+        <td class="{% if age is not None and age >= 1 and age <= 4 %}td-age-hit{% else %}td-muted{% endif %}">{% if age is not None and age >= 1 and age <= 4 %}✓{% else %}·{% endif %}</td>
+        <td class="{% if age is not None and age >= 5 and age <= 9 %}td-age-hit{% else %}td-muted{% endif %}">{% if age is not None and age >= 5 and age <= 9 %}✓{% else %}·{% endif %}</td>
+        <td class="{% if age is not None and age >= 10 and age <= 14 %}td-age-hit{% else %}td-muted{% endif %}">{% if age is not None and age >= 10 and age <= 14 %}✓{% else %}·{% endif %}</td>
+        <td class="{% if age is not None and age >= 15 and age <= 19 %}td-age-hit{% else %}td-muted{% endif %}">{% if age is not None and age >= 15 and age <= 19 %}✓{% else %}·{% endif %}</td>
+        <td class="{% if age is not None and age >= 20 and age <= 24 %}td-age-hit{% else %}td-muted{% endif %}">{% if age is not None and age >= 20 and age <= 24 %}✓{% else %}·{% endif %}</td>
+        <td class="{% if age is not None and age >= 25 and age <= 49 %}td-age-hit{% else %}td-muted{% endif %}">{% if age is not None and age >= 25 and age <= 49 %}✓{% else %}·{% endif %}</td>
+        <td class="{% if age is not None and age >= 50 %}td-age-hit{% else %}td-muted{% endif %}">{% if age is not None and age >= 50 %}✓{% else %}·{% endif %}</td>
+        <td><span class="o-badge badge-{{ rdv.statut }}">{{ rdv.get_statut_display }}</span></td>
+      </tr>
+      {% endwith %}
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="o-empty-state">
+    <div class="o-empty-illo">
+      <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+        <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+        <line x1="3" y1="10" x2="21" y2="10"/>
+        <line x1="9" y1="15" x2="15" y2="15"/>
+      </svg>
+    </div>
+    <div class="o-empty-title">Aucun rendez-vous{% if request.GET.q %} pour "{{ request.GET.q }}"{% endif %}</div>
+    <div class="o-empty-sub">{% if request.GET.q %}Essayez avec un autre terme de recherche.{% else %}Créez le premier rendez-vous gynécologique.{% endif %}</div>
+    {% if not request.GET.q %}
+    <a href="{% url 'gynecologie_rdv_create' %}" class="o-empty-btn">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      CRÉER UN RENDEZ-VOUS
+    </a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<script>
+  var chkAll = document.getElementById('chk-all');
+  if (chkAll) chkAll.addEventListener('change', function() {
+    document.querySelectorAll('.o-cb:not(#chk-all)').forEach(cb => cb.checked = this.checked);
+  });
+
+  document.querySelectorAll('.rdv-row').forEach(function(row) {
+    var clicks = 0, timer = null;
+    row.addEventListener('click', function(e) {
+      if (e.target.type === 'checkbox') return;
+      clicks++;
+      if (clicks === 1) {
+        timer = setTimeout(function() { clicks = 0; }, 400);
+      } else {
+        clearTimeout(timer);
+        clicks = 0;
+        window.location = row.dataset.url;
+      }
+    });
+  });
+
+  // Horloge nav
+  (function(){function t(){var e=document.getElementById('gyn-live-time');if(e)e.textContent=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});}t();setInterval(t,1000);})();
+  // Thème nav
+  var gtt=document.getElementById('gyn-theme-toggle');
+  if(gtt)gtt.addEventListener('click',function(){var h=document.documentElement,d=h.getAttribute('data-theme')==='dark';if(d){h.removeAttribute('data-theme');localStorage.setItem('segho-theme','light');}else{h.setAttribute('data-theme','dark');localStorage.setItem('segho-theme','dark');}});
+
+  // Filtre par date
+  function applyDateFilter() {
+    var from = document.getElementById('filter-date-from').value;
+    var to   = document.getElementById('filter-date-to').value;
+    if (!from && !to) return;
+    var params = new URLSearchParams(window.location.search);
+    if (from) params.set('date_from', from); else params.delete('date_from');
+    if (to)   params.set('date_to',   to);   else params.delete('date_to');
+    window.location = '?' + params.toString();
+  }
+  // Fermer dropdown avec Entrée dans les champs date
+  ['filter-date-from','filter-date-to'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('keydown', function(e){ if(e.key==='Enter') applyDateFilter(); });
+  });
+
+  // Dropdowns Filtres / Regrouper par
+  function toggleDd(id, btn) {
+    var panel = document.getElementById(id);
+    var isOpen = panel.classList.contains('open');
+    document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
+    if (!isOpen) panel.classList.add('open');
+  }
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.o-dd-wrap')) {
+      document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
+    }
+  });
+
+  // Colonnes redimensionnables
+  function initResizableCols(table) {
+    var ths = table.querySelectorAll('thead th');
+    ths.forEach(function(th) {
+      if (th.classList.contains('th-cb')) return;
+      var h = document.createElement('div');
+      h.className = 'o-col-resize';
+      th.appendChild(h);
+      h.addEventListener('mousedown', function(e) {
+        e.preventDefault(); e.stopPropagation();
+        var startX = e.pageX, startW = th.offsetWidth;
+        h.classList.add('active');
+        ths.forEach(function(t) { t.style.width = t.offsetWidth + 'px'; });
+        table.style.tableLayout = 'fixed';
+        function onMove(e) { th.style.width = Math.max(40, startW + e.pageX - startX) + 'px'; }
+        function onUp() { h.classList.remove('active'); document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); }
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      });
+    });
+  }
+  document.querySelectorAll('.o-list').forEach(initResizableCols);
+</script>
+{% endblock %}
