@@ -235,7 +235,7 @@ textarea.field-ul:focus { border-color: var(--teal-500); }
             <span class="current">Nouvelle facture</span>
         </div>
         <div class="cp-save-group">
-            <button type="submit" class="btn-save">Enregistrer la facture</button>
+            <button type="button" class="btn-save" onclick="openPaymentModal()">Enregistrer la facture</button>
             <a href="{% url 'facturation_list' %}" class="btn-discard">Annuler</a>
         </div>
     </div>
@@ -413,6 +413,119 @@ textarea.field-ul:focus { border-color: var(--teal-500); }
 </div><!-- /.form-body -->
 </form>
 
+<!-- ══════════ MODALE PAIEMENT ══════════ -->
+<div id="payment-modal-overlay"
+     style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45);
+            z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:#fff; border-radius:12px; padding:28px 32px;
+                width:600px; max-width:95vw; box-shadow:0 24px 64px rgba(0,0,0,0.22);">
+
+        <!-- En-tête -->
+        <div style="display:flex; justify-content:space-between; align-items:center;
+                    padding-bottom:16px; border-bottom:1px solid rgba(0,0,0,0.08); margin-bottom:22px;">
+            <span style="font-size:15px; font-weight:700; color:#1a1a1a;">Enregistrer un paiement</span>
+            <button type="button" onclick="closePaymentModal()"
+                    style="background:none; border:none; font-size:22px; line-height:1;
+                           color:#999; cursor:pointer; padding:0 4px;">&times;</button>
+        </div>
+
+        <!-- Grille champs -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:18px 32px;">
+
+            <div>
+                <label style="font-size:11px; font-weight:700; text-transform:uppercase;
+                               letter-spacing:.06em; color:rgba(0,0,0,0.4); display:block; margin-bottom:6px;">Journal</label>
+                <select id="pay-journal"
+                        style="width:100%; background:transparent; border:none;
+                               border-bottom:1.5px solid #d1dde3; padding:5px 2px;
+                               font-size:13px; font-family:inherit; outline:none; color:#1a3a4a;">
+                    {% for caisse in caisses %}
+                    <option value="{{ caisse.pk }}">{{ caisse.nom|upper }}</option>
+                    {% empty %}
+                    <option value="">CAISSE ACCUEIL</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label style="font-size:11px; font-weight:700; text-transform:uppercase;
+                               letter-spacing:.06em; color:rgba(0,0,0,0.4); display:block; margin-bottom:6px;">Montant</label>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <input type="number" id="pay-montant" min="0" step="1"
+                           style="flex:1; background:transparent; border:none;
+                                  border-bottom:1.5px solid #d1dde3; padding:5px 2px;
+                                  font-size:13px; font-family:inherit; outline:none; color:#1a3a4a;">
+                    <span style="font-size:12px; color:#999; flex-shrink:0;">CFA</span>
+                </div>
+            </div>
+
+            <div>
+                <label style="font-size:11px; font-weight:700; text-transform:uppercase;
+                               letter-spacing:.06em; color:rgba(0,0,0,0.4); display:block; margin-bottom:6px;">Compte bancaire du bénéficiaire</label>
+                <select id="pay-compte"
+                        style="width:100%; background:transparent; border:none;
+                               border-bottom:1.5px solid #d1dde3; padding:5px 2px;
+                               font-size:13px; font-family:inherit; outline:none; color:#1a3a4a;">
+                    <option value=""></option>
+                </select>
+            </div>
+
+            <div>
+                <label style="font-size:11px; font-weight:700; text-transform:uppercase;
+                               letter-spacing:.06em; color:rgba(0,0,0,0.4); display:block; margin-bottom:6px;">Date de règlement</label>
+                <input type="date" id="pay-date"
+                       style="width:100%; background:transparent; border:none;
+                              border-bottom:1.5px solid #d1dde3; padding:5px 2px;
+                              font-size:13px; font-family:inherit; outline:none; color:#1a3a4a;">
+            </div>
+
+            <div>
+                <label style="font-size:11px; font-weight:700; text-transform:uppercase;
+                               letter-spacing:.06em; color:rgba(0,0,0,0.4); display:block; margin-bottom:6px;">Mode de paiement</label>
+                <select id="pay-mode"
+                        style="width:100%; background:transparent; border:none;
+                               border-bottom:1.5px solid #d1dde3; padding:5px 2px;
+                               font-size:13px; font-family:inherit; outline:none; color:#1a3a4a;">
+                    <option value="especes">Espèces</option>
+                    <option value="mobile_money">Mobile Money</option>
+                    <option value="cheque">Chèque</option>
+                    <option value="virement">Virement</option>
+                    <option value="assurance">Assurance</option>
+                </select>
+            </div>
+
+            <div>
+                <label style="font-size:11px; font-weight:700; text-transform:uppercase;
+                               letter-spacing:.06em; color:rgba(0,0,0,0.4); display:block; margin-bottom:6px;">Mémo</label>
+                <input type="text" id="pay-memo"
+                       style="width:100%; background:transparent; border:none;
+                              border-bottom:1.5px solid #d1dde3; padding:5px 2px;
+                              font-size:13px; font-family:inherit; outline:none; color:#1a3a4a;">
+            </div>
+
+        </div>
+
+        <!-- Boutons -->
+        <div style="display:flex; gap:12px; margin-top:28px;">
+            <button type="button" onclick="submitWithPayment()"
+                    style="background:#0d9488; color:#fff; border:none; border-radius:6px;
+                           padding:10px 24px; font-size:13px; font-weight:700;
+                           cursor:pointer; font-family:inherit; letter-spacing:.04em;">
+                CRÉER UN PAIEMENT
+            </button>
+            <button type="button" onclick="closePaymentModal()"
+                    style="background:transparent; color:rgba(0,0,0,0.55);
+                           border:1px solid rgba(0,0,0,0.15); border-radius:6px;
+                           padding:10px 20px; font-size:13px; font-weight:600;
+                           cursor:pointer; font-family:inherit;">
+                ANNULER
+            </button>
+        </div>
+
+    </div>
+</div>
+<input type="hidden" id="raw-total" value="0">
+
 <script>
 (function () {
     var lineCount = 1;
@@ -448,6 +561,7 @@ textarea.field-ul:focus { border-color: var(--teal-500); }
         document.getElementById('disp-assurance').textContent = fmt(assurance);
         document.getElementById('disp-ticket').textContent    = fmt(ticket);
         document.getElementById('disp-total').textContent     = fmt(subtotal);
+        document.getElementById('raw-total').value = Math.round(subtotal);
     };
 
     window.fillFromActe = function (sel, idx) {
@@ -497,6 +611,48 @@ textarea.field-ul:focus { border-color: var(--teal-500); }
     if (tickEl) tickEl.addEventListener('input', recalcTotaux);
 
     recalcTotaux();
+
+    window.openPaymentModal = function () {
+        var total = parseInt(document.getElementById('raw-total').value, 10) || 0;
+        document.getElementById('pay-montant').value = total;
+
+        var now = new Date();
+        var yyyy = now.getFullYear();
+        var mm   = String(now.getMonth() + 1).padStart(2, '0');
+        var dd   = String(now.getDate()).padStart(2, '0');
+        document.getElementById('pay-date').value = yyyy + '-' + mm + '-' + dd;
+
+        var seq = String(now.getFullYear()).slice(2) + String(now.getMonth() + 1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') + String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0');
+        document.getElementById('pay-memo').value = 'VTES/' + yyyy + '/' + seq;
+
+        var overlay = document.getElementById('payment-modal-overlay');
+        overlay.style.display = 'flex';
+    };
+
+    window.closePaymentModal = function () {
+        document.getElementById('payment-modal-overlay').style.display = 'none';
+    };
+
+    window.submitWithPayment = function () {
+        var form = document.getElementById('facture-form');
+
+        function addHidden(name, value) {
+            var inp = document.createElement('input');
+            inp.type = 'hidden'; inp.name = name; inp.value = value;
+            form.appendChild(inp);
+        }
+
+        addHidden('pay_montant', document.getElementById('pay-montant').value);
+        addHidden('pay_mode',    document.getElementById('pay-mode').value);
+        addHidden('pay_memo',    document.getElementById('pay-memo').value);
+        addHidden('pay_compte',  document.getElementById('pay-compte').value);
+
+        form.submit();
+    };
+
+    document.getElementById('payment-modal-overlay').addEventListener('click', function (e) {
+        if (e.target === this) closePaymentModal();
+    });
 })();
 </script>
 

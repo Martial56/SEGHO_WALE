@@ -241,13 +241,16 @@ def rapports_list(request):
 
 @login_required(login_url='login')
 def facture_create(request):
-    from facturation.models import Facture, LigneFacture, Acte
+    from facturation.models import Facture, LigneFacture, Acte, Paiement
     from facturation.forms import FactureForm
     from patients.models import Patient, RendezVous
+    from caisse.models import Caisse
+    from django.urls import reverse
 
     patient_pk = request.GET.get('patient') or request.POST.get('patient_id')
     patient = get_object_or_404(Patient, pk=patient_pk) if patient_pk else None
     actes = Acte.objects.filter(actif=True).order_by('categorie', 'libelle')
+    caisses = Caisse.objects.filter(actif=True).order_by('nom')
 
     # Pré-remplissage depuis le RDV
     rdv_obj = None
@@ -305,7 +308,34 @@ def facture_create(request):
             facture.montant_total = total
             facture.save()
 
+            # Enregistrement du paiement si soumis via la modale
+            pay_montant_raw = request.POST.get('pay_montant', '').strip()
+            if pay_montant_raw:
+                try:
+                    pay_montant = float(pay_montant_raw)
+                except ValueError:
+                    pay_montant = 0
+                if pay_montant > 0:
+                    mode = request.POST.get('pay_mode', 'especes')
+                    memo = request.POST.get('pay_memo', '')
+                    compte = request.POST.get('pay_compte', '')
+                    reference = compte if compte else memo
+                    paiement = Paiement(
+                        facture=facture,
+                        montant=pay_montant,
+                        mode_paiement=mode,
+                        reference=reference,
+                        notes=memo,
+                        recu_par=request.user,
+                    )
+                    paiement.save()
+                    facture.montant_paye = pay_montant
+                    facture.statut = 'payee' if pay_montant >= total else 'partielle'
+                    facture.save()
+
             messages.success(request, f'Facture {facture.numero} créée avec succès.')
+            if rdv_pk:
+                return redirect(reverse('patients:rdv_edit', kwargs={'pk': rdv_pk}))
             return redirect('facturation_list')
     else:
         initial = {'type_facture': initial_type_facture} if initial_type_facture else {}
@@ -315,6 +345,7 @@ def facture_create(request):
         'form': form,
         'patient': patient,
         'actes': actes,
+        'caisses': caisses,
         'rdv': rdv_obj,
         'initial_ligne_libelle': initial_ligne_libelle,
         'breadcrumb': [
