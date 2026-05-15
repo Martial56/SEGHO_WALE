@@ -3,6 +3,70 @@
 
 {% block topbar_title %}Gynécologie{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<style>
+/* Variables CSS manquantes dans base.html */
+:root {
+    --surface: #fff;
+    --border: #e8edf2;
+    --text: #0d3040;
+    --text-muted: rgba(0,0,0,0.45);
+    --bg: #f0f6fa;
+    --gyn-nav-h: 44px;
+}
+html[data-theme="dark"] {
+    --surface: #132033;
+    --border: #243044;
+    --text: #d4e6f5;
+    --text-muted: rgba(255,255,255,0.45);
+    --bg: #0b1929;
+}
+/* Layout borné : .content scroll en interne → position sticky fonctionne */
+.main { height: 100vh; overflow: hidden; }
+.content { min-height: 0; padding-top: 0; overflow-x: hidden; }
+
+.gyn-nav {
+    background: #fff;
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+    margin: 0 -32px 0;
+    padding: 0 32px;
+    display: flex;
+    align-items: stretch;
+    height: var(--gyn-nav-h);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    position: sticky; top: 0; z-index: 250;
+}
+.gyn-nav-link {
+    padding: 11px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: rgba(0,0,0,0.5);
+    text-decoration: none;
+    border-bottom: 2px solid transparent;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: color 0.15s, border-color 0.15s;
+    white-space: nowrap;
+}
+.gyn-nav-link:hover { color: var(--teal-600); }
+.gyn-nav-link.active { color: var(--teal-600); border-bottom-color: var(--teal-500); font-weight: 600; }
+html[data-theme="dark"] .gyn-nav { background: #091d2e; border-bottom-color: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .gyn-nav-link { color: rgba(255,255,255,0.4); }
+html[data-theme="dark"] .gyn-nav-link:hover { color: var(--teal-300); }
+html[data-theme="dark"] .gyn-nav-link.active { color: var(--teal-300); border-bottom-color: var(--teal-400); }
+/* Empêcher le tableau d'étirer toute la page horizontalement */
+.main { min-width: 0; }
+{% block extra_gyn_css %}{% endblock %}
+</style>
+{% endblock %}
+
 {% block breadcrumb %}
-    {% include 'includes/breadcrumb.html' %}
+<nav class="gyn-nav">
+    <a href="{% url 'gynecologie_list' %}" class="gyn-nav-link {% block nav_patients %}{% endblock %}">Les patients</a>
+    <a href="{% url 'gynecologie_rdv' %}" class="gyn-nav-link {% block nav_rdv %}{% endblock %}">Rendez-vous</a>
+    <a href="{% url 'gynecologie_naissances' %}" class="gyn-nav-link {% block nav_naissances %}{% endblock %}">Registre des naissances</a>
+    <a href="#" class="gyn-nav-link">Rapports</a>
+</nav>
 {% endblock %}

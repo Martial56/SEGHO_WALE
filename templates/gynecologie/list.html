@@ -1,37 +1,17 @@
 {% extends 'gynecologie/base.html' %}
 {% load static %}
-
-{% block extra_css %}
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-<style>
-  .topbar, .breadcrumb { display: none !important; }
-  .content { padding: 0 !important; overflow-x: hidden; }
-</style>
-{% endblock %}
+{% block nav_patients %}active{% endblock %}
 
 {% block content %}
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap');
-
   :root {
-    --primary:       #714B67;
-    --primary-dark:  #5c3d55;
-    --nav-bg:        #714B67;
-    --accent:        #017E84;
-    --bg:            #f9f9f9;
-    --surface:       #ffffff;
-    --border:        #d9d9d9;
-    --text:          #212529;
-    --text-muted:    #6c757d;
+    --accent:        var(--teal-500);
     --shadow-card:   0 1px 2px rgba(0,0,0,0.08);
   }
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Roboto', sans-serif; background: var(--bg) !important; color: var(--text); }
-  html { background: var(--bg) !important; }
 
   /* ── DARK MODE ── */
-  html[data-theme="dark"] { --bg:#181c28; --surface:#21283a; --border:#2d3550; --text:#c5d4e2; --text-muted:#6c85a0; }
   html[data-theme="dark"] .o-card { background: var(--surface); border-color: var(--border); }
   html[data-theme="dark"] .o-card:hover { border-color: #4a5a78; }
   html[data-theme="dark"] .o-card-name { color: var(--text); }
@@ -44,40 +24,33 @@
   html[data-theme="dark"] .o-view-btns { border-color: var(--border); }
   html[data-theme="dark"] .o-ctrl-sep { background: var(--border); }
   html[data-theme="dark"] .o-subheader { background: var(--surface); border-bottom-color: var(--border); }
+  html[data-theme="dark"] .o-dd-panel { background: #1a2535; border-color: #2e3f58; }
+  html[data-theme="dark"] .o-dd-item:hover { background: rgba(33,136,171,0.2); color: #c5d4e2; }
+  html[data-theme="dark"] .o-dd-item.active { background: rgba(33,136,171,0.3); color: var(--teal-300); }
+  html[data-theme="dark"] .o-filter-tag { background: rgba(33,136,171,0.25); border-color: rgba(33,136,171,0.5); color: var(--teal-300); }
 
-  /* NAV */
-  .o-nav {
-    background: var(--nav-bg); display: flex; align-items: center;
-    height: 46px; padding: 0 10px; position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+  /* ══ DROPDOWNS ══ */
+  .o-dd-wrap { position: relative; }
+  .o-dd-panel {
+    display: none; position: fixed; z-index: 9999;
+    background: #fff; border: 1px solid #dde3ec;
+    border-radius: 6px; box-shadow: 0 8px 28px rgba(0,0,0,0.16);
+    min-width: 210px; padding: 5px 0;
   }
-  .o-nav-grid {
-    width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
-    color: rgba(255,255,255,0.75); font-size: 17px; cursor: pointer;
-    border-radius: 4px; margin-right: 4px; transition: background 0.15s; text-decoration: none;
+  .o-dd-panel.open { display: block; }
+  .o-dd-section {
+    padding: 6px 14px 3px; font-size: 10px; font-weight: 600;
+    color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;
   }
-  .o-nav-grid:hover { background: rgba(255,255,255,0.12); color: #fff; }
-  .o-nav-brand { font-size: 15px; font-weight: 500; color: #fff; margin-right: 2px; padding: 0 8px; white-space: nowrap; }
-  .o-nav-link {
-    color: rgba(255,255,255,0.78); text-decoration: none; font-size: 13px;
-    padding: 0 12px; height: 46px; display: flex; align-items: center;
-    border-bottom: 2px solid transparent;
-    transition: color 0.15s, background 0.15s, border-color 0.15s; white-space: nowrap;
+  .o-dd-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 14px; font-size: 12.5px; color: var(--text);
+    cursor: pointer; text-decoration: none; transition: background 0.1s;
+    white-space: nowrap; gap: 10px;
   }
-  .o-nav-link:hover, .o-nav-link.active { color: #fff; background: rgba(255,255,255,0.09); border-bottom-color: #fff; }
-  .o-nav-right { display: flex; align-items: center; gap: 2px; margin-left: auto; }
-  .o-nav-icon { width: 28px; height: 28px; border-radius: 4px; border: none; background: transparent; color: rgba(255,255,255,0.75); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s; }
-  .o-nav-icon:hover { background: rgba(255,255,255,0.12); color: #fff; }
-  .o-nav-icon .icon-sun { display: block; } .o-nav-icon .icon-moon { display: none; }
-  html[data-theme="dark"] .o-nav-icon .icon-sun { display: none; }
-  html[data-theme="dark"] .o-nav-icon .icon-moon { display: block; }
-  .o-nav-clock { text-align: right; font-size: 10px; color: rgba(255,255,255,0.6); line-height: 1.4; padding: 0 6px; white-space: nowrap; }
-  .o-nav-time { font-size: 13px; font-weight: 600; color: #fff; display: block; }
-  .o-nav-user { display: flex; align-items: center; gap: 5px; padding: 3px 8px 3px 3px; border-radius: 20px; background: rgba(255,255,255,0.1); margin: 0 3px; }
-  .o-nav-avatar { width: 22px; height: 22px; border-radius: 50%; background: rgba(255,255,255,0.25); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #fff; flex-shrink: 0; }
-  .o-nav-uname { font-size: 11px; font-weight: 500; color: #fff; line-height: 1.2; }
-  .o-nav-urole { font-size: 9.5px; color: rgba(255,255,255,0.65); }
-  .o-nav-logout { width: 28px; height: 28px; border-radius: 4px; border: none; background: transparent; color: rgba(255,255,255,0.75); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s; }
-  .o-nav-logout:hover { background: rgba(232,69,69,0.3); color: #fff; }
+  .o-dd-item:hover { background: var(--teal-50); color: var(--teal-600); }
+  .o-dd-item.active { background: #ede7f6; color: var(--teal-600); font-weight: 500; }
+  .o-dd-sep { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
 
   /* ══ SUBHEADER ══ */
   .o-subheader {
@@ -85,20 +58,22 @@
     border-bottom: 1px solid var(--border);
     padding: 6px 16px;
     display: flex; flex-direction: column; gap: 5px;
-    position: fixed; top: 46px; left: 0; right: 0; z-index: 190;
+    position: sticky; top: var(--gyn-nav-h);
+    z-index: 190;
+    margin: 0 -32px 16px;
   }
   .o-subheader-row { display: flex; align-items: center; gap: 8px; }
   .o-subheader-row-right { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .o-page-title { font-size: 17px; font-weight: 400; color: var(--text); }
   .o-btn-create {
-    background: #017E84; color: #fff; border: none;
+    background: var(--teal-500); color: #fff; border: none;
     padding: 5px 14px; border-radius: 4px;
     font-size: 12.5px; font-weight: 500;
-    font-family: 'Roboto', sans-serif; cursor: pointer;
+    cursor: pointer;
     text-decoration: none; display: inline-flex; align-items: center;
     letter-spacing: 0.5px; transition: background 0.15s;
   }
-  .o-btn-create:hover { background: #015f64; }
+  .o-btn-create:hover { background: var(--teal-600); }
   .o-search-bar {
     display: flex; align-items: center;
     border: none; border-bottom: 1px solid #bbb;
@@ -107,7 +82,7 @@
   }
   .o-filter-tag {
     display: inline-flex; align-items: center; gap: 3px;
-    background: #e8f4f5; color: #017E84;
+    background: var(--teal-50); color: var(--teal-600);
     border: 1px solid #b2d8db; border-radius: 3px;
     padding: 1px 6px; font-size: 11.5px; font-weight: 500; white-space: nowrap;
   }
@@ -116,7 +91,7 @@
   .o-filter-tag a:hover { color: #333; }
   .o-search-input {
     border: none; outline: none; font-size: 12px;
-    font-family: 'Roboto', sans-serif; color: var(--text);
+    color: var(--text);
     flex: 1; min-width: 60px; background: transparent;
   }
   .o-search-btn { background: none; border: none; cursor: pointer; color: #888; font-size: 13px; padding: 2px; }
@@ -124,7 +99,7 @@
   .o-ctrl-right { display: flex; align-items: center; gap: 3px; margin-left: auto; flex-shrink: 0; }
   .o-ctrl-btn {
     background: none; border: 1px solid transparent; border-radius: 4px;
-    padding: 4px 8px; font-size: 12px; font-family: 'Roboto', sans-serif;
+    padding: 4px 8px; font-size: 12px;
     color: var(--text-muted); cursor: pointer;
     display: flex; align-items: center; gap: 4px;
     transition: border-color 0.15s, color 0.15s, background 0.15s;
@@ -140,7 +115,7 @@
     color: var(--text-muted); text-decoration: none; font-size: 12px; cursor: pointer;
     transition: background 0.15s, color 0.15s;
   }
-  .o-pag-btn:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .o-pag-btn:hover { background: var(--teal-600); color: #fff; border-color: var(--teal-600); }
   .o-pag-btn.disabled { opacity: 0.35; pointer-events: none; }
 
   .o-view-btns { display: flex; border: 1px solid var(--border); border-radius: 3px; overflow: hidden; }
@@ -151,7 +126,7 @@
     transition: background 0.15s, color 0.15s;
   }
   .o-view-btn:not(:last-child) { border-right: 1px solid var(--border); }
-  .o-view-btn.active, .o-view-btn:hover { background: var(--primary); color: #fff; }
+  .o-view-btn.active, .o-view-btn:hover { background: var(--teal-600); color: #fff; }
 
   /* ══ KANBAN — 5 colonnes ══ */
   .o-kanban {
@@ -159,7 +134,7 @@
     display: grid;
     grid-template-columns: repeat(5, 1fr);
     gap: 8px;
-    background: var(--bg);
+    margin: 0 -32px;
   }
 
   /* ── CARD ── */
@@ -209,23 +184,9 @@
   /* ══ RESPONSIVE ══ */
   @media (max-width: 1200px) { .o-kanban { grid-template-columns: repeat(4, 1fr); } }
   @media (max-width: 960px)  { .o-kanban { grid-template-columns: repeat(3, 1fr); } }
-  @media (max-width: 640px)  {
-    .o-kanban { grid-template-columns: repeat(2, 1fr); }
-    .o-nav-link:not(.active) { display: none; }
-  }
+  @media (max-width: 640px)  { .o-kanban { grid-template-columns: repeat(2, 1fr); } }
   @media (max-width: 400px)  { .o-kanban { grid-template-columns: 1fr; } }
 </style>
-
-<!-- ══ NAV ══ -->
-<nav class="o-nav">
-  <a href="{% url 'dashboard' %}" class="o-nav-grid"><i class="bi bi-grid-3x3-gap-fill"></i></a>
-  <span class="o-nav-brand">Gynécologie</span>
-  <a href="{% url 'gynecologie_list' %}" class="o-nav-link active">Les patients</a>
-  <a href="{% url 'gynecologie_rdv' %}" class="o-nav-link">Rendez-vous</a>
-  <a href="{% url 'gynecologie_naissances' %}" class="o-nav-link">Registre des naissances</a>
-  <a href="#" class="o-nav-link">Rapports</a>
-  {% include 'gynecologie/_nav_right.html' %}
-</nav>
 
 <!-- ══ SUBHEADER ══ -->
 <div class="o-subheader">
@@ -242,35 +203,102 @@
       </form>
     </div>
   </div>
-  <!-- Ligne 2 : créer + contrôles -->
+  <!-- Ligne 2 : filtres + contrôles -->
   <div class="o-subheader-row">
     <div class="o-subheader-row-right">
-      <button class="o-ctrl-btn"><i class="bi bi-funnel"></i> Filtres</button>
-      <button class="o-ctrl-btn"><i class="bi bi-list-ul"></i> Regrouper par</button>
+
+      <!-- ── Filtres ── -->
+      <div class="o-dd-wrap">
+        <button class="o-ctrl-btn {% if request.GET.filter %}active{% endif %}" id="btn-filtres" onclick="toggleDd('dd-filtres',this)">
+          <i class="bi bi-funnel{% if request.GET.filter %}-fill{% endif %}"></i> Filtres{% if request.GET.filter %} <span style="background:var(--teal-600);color:#fff;border-radius:10px;font-size:10px;padding:0 5px;">1</span>{% endif %}
+        </button>
+        <div class="o-dd-panel" id="dd-filtres">
+          <div class="o-dd-section">Genre</div>
+          <a class="o-dd-item {% if request.GET.filter == 'femme' %}active{% endif %}" href="?filter=femme{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}">Femme</a>
+          <a class="o-dd-item {% if request.GET.filter == 'homme' %}active{% endif %}" href="?filter=homme{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}">Homme</a>
+          <hr class="o-dd-sep">
+          <div class="o-dd-section">Tranche d'âge</div>
+          <a class="o-dd-item {% if request.GET.filter == 'mineur' %}active{% endif %}" href="?filter=mineur{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}">Mineur (moins de 18 ans)</a>
+          <a class="o-dd-item {% if request.GET.filter == 'adulte' %}active{% endif %}" href="?filter=adulte{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}">Adulte (18 – 60 ans)</a>
+          <a class="o-dd-item {% if request.GET.filter == 'senior' %}active{% endif %}" href="?filter=senior{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}">Senior (plus de 60 ans)</a>
+          {% if request.GET.filter %}
+          <hr class="o-dd-sep">
+          <a class="o-dd-item" href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.group %}group={{ request.GET.group }}{% endif %}" style="color:#b71c1c;">
+            <i class="bi bi-x-circle" style="font-size:11px;"></i> Supprimer le filtre
+          </a>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- ── Regrouper par ── -->
+      <div class="o-dd-wrap">
+        <button class="o-ctrl-btn {% if request.GET.group %}active{% endif %}" id="btn-group" onclick="toggleDd('dd-group',this)">
+          <i class="bi bi-list-ul"></i> Regrouper par{% if request.GET.group %} <span style="background:var(--teal-600);color:#fff;border-radius:10px;font-size:10px;padding:0 5px;">1</span>{% endif %}
+        </button>
+        <div class="o-dd-panel" id="dd-group">
+          <div class="o-dd-section">Regrouper par</div>
+          <a class="o-dd-item {% if request.GET.group == 'sexe' %}active{% endif %}" href="?group=sexe{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}">Genre</a>
+          <a class="o-dd-item {% if request.GET.group == 'age' %}active{% endif %}" href="?group=age{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}">Âge</a>
+          {% if request.GET.group %}
+          <hr class="o-dd-sep">
+          <a class="o-dd-item" href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.filter %}filter={{ request.GET.filter }}{% endif %}" style="color:#b71c1c;">
+            <i class="bi bi-x-circle" style="font-size:11px;"></i> Supprimer le regroupement
+          </a>
+          {% endif %}
+        </div>
+      </div>
+
       <button class="o-ctrl-btn"><i class="bi bi-star"></i> Favoris</button>
       <div class="o-ctrl-sep"></div>
       <div class="o-pagination">
         <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
         <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
-           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% else %}#{% endif %}">
+           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}{% else %}#{% endif %}">
           <i class="bi bi-chevron-left"></i>
         </a>
         <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
-           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% else %}#{% endif %}">
+           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}{% else %}#{% endif %}">
           <i class="bi bi-chevron-right"></i>
         </a>
       </div>
       <div class="o-ctrl-sep"></div>
       <div class="o-view-btns">
         <button class="o-view-btn active"><i class="bi bi-grid"></i></button>
-        <button class="o-view-btn"><i class="bi bi-list-ul"></i></button>
+        <a href="{% url 'gynecologie_rdv' %}" class="o-view-btn"><i class="bi bi-list-ul"></i></a>
       </div>
     </div>
   </div>
+
+  <!-- Ligne 3 : tags filtres actifs -->
+  {% if request.GET.filter or request.GET.group %}
+  <div class="o-subheader-row" style="padding-top:0;gap:6px;flex-wrap:wrap;">
+    {% if request.GET.filter %}
+    <span style="font-size:11px;color:var(--text-muted);">Filtre :</span>
+    <span class="o-filter-tag">
+      {% if request.GET.filter == 'femme' %}Femme
+      {% elif request.GET.filter == 'homme' %}Homme
+      {% elif request.GET.filter == 'mineur' %}Mineur (< 18 ans)
+      {% elif request.GET.filter == 'adulte' %}Adulte (18–60 ans)
+      {% elif request.GET.filter == 'senior' %}Senior (> 60 ans)
+      {% else %}{{ request.GET.filter }}{% endif %}
+      <a href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.group %}group={{ request.GET.group }}{% endif %}" title="Supprimer">×</a>
+    </span>
+    {% endif %}
+    {% if request.GET.group %}
+    <span style="font-size:11px;color:var(--text-muted);">Groupé par :</span>
+    <span class="o-filter-tag">
+      {% if request.GET.group == 'sexe' %}Genre
+      {% elif request.GET.group == 'age' %}Âge
+      {% else %}{{ request.GET.group }}{% endif %}
+      <a href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.filter %}filter={{ request.GET.filter }}{% endif %}" title="Supprimer">×</a>
+    </span>
+    {% endif %}
+  </div>
+  {% endif %}
 </div>
 
 <!-- ══ KANBAN GRID ══ -->
-<div class="o-kanban" style="margin-top: 119px;">
+<div class="o-kanban">
   {% for patient in page_obj %}
   <a class="o-card" href="/admin/patients/patient/{{ patient.pk }}/change/">
     <div class="o-avatar">
@@ -302,9 +330,31 @@
 </div>
 
 <script>
-  (function(){function t(){var e=document.getElementById('gyn-live-time');if(e)e.textContent=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});}t();setInterval(t,1000);})();
-  var gtt=document.getElementById('gyn-theme-toggle');
-  if(gtt)gtt.addEventListener('click',function(){var h=document.documentElement,d=h.getAttribute('data-theme')==='dark';if(d){h.removeAttribute('data-theme');localStorage.setItem('segho-theme','light');}else{h.setAttribute('data-theme','dark');localStorage.setItem('segho-theme','dark');}});
+  function toggleDd(id, btn) {
+    var panel = document.getElementById(id);
+    var isOpen = panel.classList.contains('open');
+    document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
+    if (!isOpen) {
+      var rect = btn.getBoundingClientRect();
+      panel.style.top = (rect.bottom + 4) + 'px';
+      panel.style.left = rect.left + 'px';
+      panel.style.right = 'auto';
+      panel.classList.add('open');
+      var pr = panel.getBoundingClientRect();
+      if (pr.right > window.innerWidth - 8) {
+        panel.style.left = 'auto';
+        panel.style.right = (window.innerWidth - rect.right) + 'px';
+      }
+    }
+  }
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.o-dd-wrap')) {
+      document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
+    }
+  });
+  document.addEventListener('scroll', function() {
+    document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
+  }, true);
 </script>
 
 {% endblock %}

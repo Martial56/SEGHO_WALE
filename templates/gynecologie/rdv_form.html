@@ -1,33 +1,15 @@
 ﻿{% extends 'gynecologie/base.html' %}
 {% load static %}
-
-{% block extra_css %}
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-<style>
-  .topbar, .breadcrumb { display: none !important; }
-  .content { padding: 0 !important; overflow-x: hidden; }
-</style>
-{% endblock %}
+{% block nav_rdv %}active{% endblock %}
 
 {% block content %}
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap');
   :root {
-    --primary:    #714B67;
-    --nav-bg:     #714B67;
-    --accent:     #017E84;
-    --bg:         #f5f7f8;
-    --surface:    #ffffff;
-    --border:     #d9d9d9;
-    --text:       #212529;
-    --text-muted: #6c757d;
+    --accent: var(--teal-500);
   }
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Roboto', sans-serif; background: var(--bg) !important; color: var(--text); }
-  html { background: var(--bg) !important; }
 
   /* ── DARK MODE ── */
-  html[data-theme="dark"] { --bg:#181c28; --surface:#21283a; --border:#2d3550; --text:#c5d4e2; --text-muted:#6c85a0; }
   html[data-theme="dark"] .f-header { background: var(--surface); border-bottom-color: var(--border); }
   html[data-theme="dark"] .f-pipeline-bar { background: var(--surface); border-bottom-color: var(--border); }
   html[data-theme="dark"] .f-actions-bar { background: var(--surface); border-bottom-color: var(--border); }
@@ -36,7 +18,7 @@
   html[data-theme="dark"] .f-input, html[data-theme="dark"] select.f-input, html[data-theme="dark"] textarea.f-input { background: transparent; color: var(--text); }
   html[data-theme="dark"] .f-tabs { border-bottom-color: var(--border); background: var(--surface); }
   html[data-theme="dark"] .f-tab { color: var(--text-muted); }
-  html[data-theme="dark"] .f-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+  html[data-theme="dark"] .f-tab.active { color: var(--teal-400); border-bottom-color: var(--teal-400); }
   html[data-theme="dark"] .f-tab-pane { background: var(--surface); }
   html[data-theme="dark"] .f-activity { background: #1c2438; border-left-color: var(--border); }
   html[data-theme="dark"] .f-btn-outline { background: var(--surface); color: var(--text); border-color: var(--border); }
@@ -45,45 +27,12 @@
   html[data-theme="dark"] .f-step { color: var(--text-muted); }
   html[data-theme="dark"] .f-step:not(.active):hover { background: #28304a; }
 
-  /* ── NAV ── */
-  .o-nav {
-    background: var(--nav-bg); display: flex; align-items: center;
-    height: 46px; padding: 0 10px; position: fixed; top: 0; left: 0; right: 0; z-index: 200;
-  }
-  .o-nav-grid {
-    width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
-    color: rgba(255,255,255,0.75); font-size: 17px; cursor: pointer;
-    border-radius: 4px; margin-right: 4px; transition: background 0.15s; text-decoration: none;
-  }
-  .o-nav-grid:hover { background: rgba(255,255,255,0.12); color: #fff; }
-  .o-nav-brand { font-size: 15px; font-weight: 500; color: #fff; margin-right: 2px; padding: 0 8px; white-space: nowrap; }
-  .o-nav-link {
-    color: rgba(255,255,255,0.78); text-decoration: none; font-size: 13px;
-    padding: 0 12px; height: 46px; display: flex; align-items: center;
-    border-bottom: 2px solid transparent;
-    transition: color 0.15s, background 0.15s, border-color 0.15s; white-space: nowrap;
-  }
-  .o-nav-link:hover, .o-nav-link.active { color: #fff; background: rgba(255,255,255,0.09); border-bottom-color: #fff; }
-  .o-nav-right { display: flex; align-items: center; gap: 2px; margin-left: auto; }
-  .o-nav-icon { width: 28px; height: 28px; border-radius: 4px; border: none; background: transparent; color: rgba(255,255,255,0.75); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s; }
-  .o-nav-icon:hover { background: rgba(255,255,255,0.12); color: #fff; }
-  .o-nav-icon .icon-sun { display: block; } .o-nav-icon .icon-moon { display: none; }
-  html[data-theme="dark"] .o-nav-icon .icon-sun { display: none; }
-  html[data-theme="dark"] .o-nav-icon .icon-moon { display: block; }
-  .o-nav-clock { text-align: right; font-size: 10px; color: rgba(255,255,255,0.6); line-height: 1.4; padding: 0 6px; white-space: nowrap; }
-  .o-nav-time { font-size: 13px; font-weight: 600; color: #fff; display: block; }
-  .o-nav-user { display: flex; align-items: center; gap: 5px; padding: 3px 8px 3px 3px; border-radius: 20px; background: rgba(255,255,255,0.1); margin: 0 3px; }
-  .o-nav-avatar { width: 22px; height: 22px; border-radius: 50%; background: rgba(255,255,255,0.25); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #fff; flex-shrink: 0; }
-  .o-nav-uname { font-size: 11px; font-weight: 500; color: #fff; line-height: 1.2; }
-  .o-nav-urole { font-size: 9.5px; color: rgba(255,255,255,0.65); }
-  .o-nav-logout { width: 28px; height: 28px; border-radius: 4px; border: none; background: transparent; color: rgba(255,255,255,0.75); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s; }
-  .o-nav-logout:hover { background: rgba(232,69,69,0.3); color: #fff; }
-
   /* ── FORM HEADER ── */
   .f-header {
     background: var(--surface); border-bottom: 1px solid var(--border);
     padding: 6px 16px; display: flex; align-items: center; gap: 6px; min-height: 44px;
-    position: fixed; top: 46px; left: 0; right: 0; z-index: 190;
+    margin: 0 -32px 0;
+    position: sticky; top: var(--gyn-nav-h); z-index: 200;
   }
   .f-header-title {
     font-size: 13px; color: var(--text-muted);
@@ -91,18 +40,18 @@
   .f-header-title span { color: var(--text); font-weight: 500; }
   .f-btn {
     padding: 4px 14px; border-radius: 4px; font-size: 12.5px; font-weight: 500;
-    font-family: 'Roboto', sans-serif; cursor: pointer; border: 1px solid transparent;
+    cursor: pointer; border: 1px solid transparent;
     text-decoration: none; display: inline-flex; align-items: center; gap: 5px;
     transition: all 0.15s; white-space: nowrap;
   }
-  .f-btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
-  .f-btn-primary:hover { background: #5c3d55; }
+  .f-btn-primary { background: var(--teal-600); color: #fff; border-color: var(--teal-600); }
+  .f-btn-primary:hover { background: var(--teal-700); }
   .f-btn-outline { background: #fff; color: var(--text); border-color: var(--border); }
-  .f-btn-outline:hover { background: #f5f0fa; border-color: var(--primary); color: var(--primary); }
+  .f-btn-outline:hover { background: var(--teal-50); border-color: var(--teal-600); color: var(--teal-600); }
   .f-btn-ghost { background: none; color: var(--text-muted); border-color: transparent; }
   .f-btn-ghost:hover { background: #f3f3f3; color: var(--text); }
-  .f-btn-save { background: #017E84; color: #fff; border-color: #017E84; }
-  .f-btn-save:hover { background: #015f64; }
+  .f-btn-save { background: var(--teal-500); color: #fff; border-color: var(--teal-500); }
+  .f-btn-save:hover { background: var(--teal-600); }
   .f-spacer { flex: 1; }
   .f-nav-info { font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 4px; }
   .f-nav-btn {
@@ -111,52 +60,52 @@
     color: var(--text-muted); text-decoration: none; font-size: 12px;
     transition: background 0.15s, color 0.15s;
   }
-  .f-nav-btn:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .f-nav-btn:hover { background: var(--teal-600); color: #fff; border-color: var(--teal-600); }
   .f-nav-btn.disabled { opacity: 0.35; pointer-events: none; }
 
   /* ── STATUS PIPELINE ── */
   .f-pipeline-bar {
     background: var(--surface); border-bottom: 1px solid var(--border);
     display: flex; align-items: stretch; min-height: 34px;
-    position: fixed; top: 90px; left: 0; right: 0; z-index: 180;
+    margin: 0 -32px;
   }
   .f-pipeline { display: flex; align-items: stretch; margin-left: auto; }
   .f-step {
     padding: 0 18px; font-size: 11.5px; color: var(--text-muted);
     display: flex; align-items: center; cursor: pointer;
-    border: none; background: none; font-family: 'Roboto', sans-serif; font-weight: 500;
+    border: none; background: none; font-weight: 500;
     transition: color 0.15s, background 0.15s; white-space: nowrap; letter-spacing: 0.3px;
   }
-  .f-step:hover { color: var(--text); background: #f5f0fa; }
+  .f-step:hover { color: var(--text); background: var(--teal-50); }
   .f-step.active {
-    background: var(--primary); color: #fff;
+    background: var(--teal-600); color: #fff;
     clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%, 10px 50%);
     padding: 0 22px;
   }
   .f-step.active:first-child {
     clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%);
   }
-  .f-step.done { color: var(--primary); }
+  .f-step.done { color: var(--teal-600); }
 
   /* ── ACTION BUTTONS ROW ── */
   .f-actions-bar {
     background: var(--surface); border-bottom: 1px solid var(--border);
     padding: 5px 16px; display: flex; align-items: center; gap: 4px;
-    position: fixed; top: 124px; left: 0; right: 0; z-index: 170;
+    margin: 0 -32px;
   }
   .f-action-btn {
     padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: 400;
-    font-family: 'Roboto', sans-serif; cursor: pointer;
+    cursor: pointer;
     border: 1px solid var(--border); background: #fff; color: var(--text);
     display: inline-flex; align-items: center; gap: 5px;
     transition: background 0.15s, border-color 0.15s; text-decoration: none;
   }
-  .f-action-btn:hover { background: #f5f0fa; border-color: var(--primary); color: var(--primary); }
+  .f-action-btn:hover { background: var(--teal-50); border-color: var(--teal-600); color: var(--teal-600); }
 
   /* ── LAYOUT ── */
   .f-layout {
     display: flex; align-items: flex-start; gap: 0;
-    padding: 16px; margin-top: 160px; min-height: calc(100vh - 160px);
+    padding: 16px 0; margin-top: 0; min-height: calc(100vh - 200px);
   }
   .f-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
   .f-aside { width: 300px; flex-shrink: 0; margin-left: 14px; }
@@ -182,7 +131,7 @@
     color: #bbb; font-size: 22px; cursor: pointer; background: #fafafa;
     transition: border-color 0.15s;
   }
-  .f-photo-box:hover { border-color: var(--primary); color: var(--primary); }
+  .f-photo-box:hover { border-color: var(--teal-600); color: var(--teal-600); }
   .f-photo-box span { font-size: 9px; margin-top: 2px; }
 
   .f-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 0 40px; padding: 0 24px 16px; }
@@ -191,7 +140,7 @@
     padding: 10px 0; border-bottom: 1px solid #f0f0f0;
   }
   .f-label {
-    font-size: 11px; font-weight: 700; color: var(--text-muted);
+    font-size: 11px; font-weight: 700; color: #111;
     text-transform: uppercase; letter-spacing: 0.05em;
   }
   .f-val { font-size: 12.5px; color: var(--text); }
@@ -199,13 +148,13 @@
   .f-val.link:hover { text-decoration: underline; }
   .f-input {
     width: 100%; border: none; outline: none;
-    font-size: 12.5px; font-family: 'Roboto', sans-serif;
+    font-size: 12.5px;
     color: var(--text); background: transparent; padding: 4px 0;
   }
   .f-input[readonly] { color: var(--text-muted); }
   .f-select {
     width: 100%; border: none; outline: none;
-    font-size: 12.5px; font-family: 'Roboto', sans-serif;
+    font-size: 12.5px;
     color: var(--text); background: transparent; padding: 4px 0;
     cursor: pointer; appearance: none; -webkit-appearance: none;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23999'/%3E%3C/svg%3E");
@@ -213,11 +162,11 @@
   }
   .f-textarea {
     width: 100%; border: none; outline: none;
-    font-size: 12.5px; font-family: 'Roboto', sans-serif;
+    font-size: 12.5px;
     color: var(--text); background: transparent; resize: none; padding: 4px 0;
     min-height: 44px;
   }
-  .f-check { accent-color: var(--primary); width: 14px; height: 14px; cursor: pointer; }
+  .f-check { accent-color: var(--teal-600); width: 14px; height: 14px; cursor: pointer; }
 
   /* ── TABS ── */
   .f-tabs-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
@@ -226,11 +175,11 @@
     padding: 8px 14px; font-size: 12.5px; color: var(--text-muted);
     border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap;
     background: none; border-top: none; border-left: none; border-right: none;
-    font-family: 'Roboto', sans-serif; flex-shrink: 0;
+    flex-shrink: 0;
     transition: color 0.15s, border-color 0.15s;
   }
   .f-tab:hover { color: var(--text); }
-  .f-tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 500; border-bottom-width: 3px; }
+  .f-tab.active { color: var(--teal-600); border-bottom-color: var(--teal-600); font-weight: 500; border-bottom-width: 3px; }
   .f-tab-panel { display: none; padding: 14px 24px 18px; }
   .f-tab-panel.active { display: block; }
   .f-tab-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 36px; }
@@ -238,15 +187,15 @@
     display: flex; flex-direction: column; gap: 3px;
     padding: 6px 0; border-bottom: 1px solid #f3f3f3;
   }
-  .f-tab-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .f-tab-label { font-size: 11px; font-weight: 700; color: #111; text-transform: uppercase; letter-spacing: 0.05em; }
   .f-tab-input {
     border: none; outline: none;
-    font-size: 12.5px; font-family: 'Roboto', sans-serif; color: var(--text);
+    font-size: 12.5px; color: var(--text);
     background: transparent; padding: 3px 0;
   }
   .f-tab-textarea {
     border: none; outline: none;
-    font-size: 12.5px; font-family: 'Roboto', sans-serif; color: var(--text);
+    font-size: 12.5px; color: var(--text);
     background: transparent; resize: none; padding: 3px 0; min-height: 54px;
   }
   .f-tab-check-row {
@@ -292,6 +241,8 @@
     display: flex; align-items: center; justify-content: center;
     color: #fff; font-size: 10px; font-weight: 700; flex-shrink: 0;
   }
+  html[data-theme="dark"] .f-label { color: var(--text); }
+  html[data-theme="dark"] .f-tab-label { color: var(--text); }
   html[data-theme="dark"] .f-tab-notice { background: rgba(21,101,192,0.12); color: #90c8f8; border-left-color: #90c8f8; }
   html[data-theme="dark"] .f-tab-notice a { color: #90c8f8; }
   html[data-theme="dark"] .f-tab-field { border-bottom-color: #2a3448; }
@@ -315,9 +266,9 @@
     display: flex; align-items: center; justify-content: center;
     font-size: 12px; font-weight: 600; color: #fff; flex-shrink: 0;
   }
-  .f-avatar-purple { background: var(--primary); }
+  .f-avatar-purple { background: var(--teal-600); }
   .f-avatar-green  { background: #2e7d32; }
-  .f-avatar-teal   { background: #017E84; }
+  .f-avatar-teal   { background: var(--teal-500); }
   .f-activity-body { flex: 1; }
   .f-activity-who { font-size: 12px; font-weight: 500; color: var(--text); }
   .f-activity-time { font-size: 11px; color: var(--text-muted); }
@@ -347,21 +298,42 @@
     display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
     background: #e8f5e9; color: #2e7d32; border-radius: 12px; font-size: 11.5px; font-weight: 500;
   }
+
+  /* ── CPN FORM ── */
+  .cpn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 56px; }
+  .cpn-section { font-size: 10.5px; font-weight: 700; color: rgba(0,0,0,0.4); text-transform: uppercase; letter-spacing: 0.5px; padding: 18px 0 7px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+  .cpn-sub { font-size: 11.5px; font-weight: 600; color: rgba(0,0,0,0.5); padding: 12px 0 4px; }
+  .cpn-row { display: grid; grid-template-columns: 210px 1fr; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid #f0f0f0; min-height: 34px; }
+  .cpn-lbl { font-size: 12.5px; font-weight: 500; color: #111; line-height: 1.4; }
+  .cpn-val { display: flex; align-items: center; gap: 6px; }
+  .cpn-inp { border: none; outline: none; font-size: 12.5px; color: var(--text); background: transparent; padding: 3px 0; width: 100%; }
+  .cpn-sel { border: none; outline: none; font-size: 12.5px; color: var(--text); background: transparent; padding: 3px 0; width: 100%; cursor: pointer; appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23999'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 4px center; }
+  .cpn-unit { font-size: 11px; color: var(--text-muted); white-space: nowrap; flex-shrink: 0; }
+  .cpn-radios { display: flex; align-items: center; gap: 14px; }
+  .cpn-radios label { display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--text); cursor: pointer; white-space: nowrap; }
+  .cpn-sep { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+  html[data-theme="dark"] .cpn-lbl { color: var(--text); }
+  html[data-theme="dark"] .cpn-section { color: rgba(255,255,255,0.3); border-bottom-color: var(--border); }
+  html[data-theme="dark"] .cpn-sub { color: rgba(255,255,255,0.3); }
+  html[data-theme="dark"] .cpn-row { border-bottom-color: #2a3448; }
+  html[data-theme="dark"] .cpn-inp, html[data-theme="dark"] .cpn-sel { color: var(--text); }
+  html[data-theme="dark"] .cpn-radios label { color: var(--text); }
+
+  /* ── APGAR TABLE ── */
+  .acc-apgar { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-bottom: 4px; }
+  .acc-apgar thead th { font-size: 11px; font-weight: 600; color: var(--text-muted); text-align: center; padding: 3px 10px 6px; }
+  .acc-apgar thead th:first-child { text-align: left; padding-left: 0; }
+  .acc-apgar tbody td { padding: 5px 10px; border-bottom: 1px solid #f0f0f0; font-size: 12.5px; color: var(--text); }
+  .acc-apgar tbody td:first-child { font-weight: 500; color: #111; padding-left: 0; }
+  .acc-apgar tbody td:not(:first-child) { text-align: center; }
+  .acc-apgar input { width: 52px; border: none; border-bottom: 1px solid #ddd; outline: none; font-size: 12.5px; text-align: center; background: transparent; padding: 2px 0; color: var(--text); }
+  html[data-theme="dark"] .acc-apgar tbody td { border-bottom-color: #2a3448; }
+  html[data-theme="dark"] .acc-apgar tbody td:first-child { color: var(--text); }
+  html[data-theme="dark"] .acc-apgar input { border-bottom-color: #3a4a62; color: var(--text); }
 </style>
 
 <form method="post" id="rdv-form" data-is-new="{{ is_new|yesno:'1,0' }}">
 {% csrf_token %}
-
-<!-- NAV -->
-<nav class="o-nav">
-  <a href="{% url 'dashboard' %}" class="o-nav-grid"><i class="bi bi-grid-3x3-gap-fill"></i></a>
-  <span class="o-nav-brand">Gynécologie</span>
-  <a href="{% url 'gynecologie_list' %}" class="o-nav-link">Les patients</a>
-  <a href="{% url 'gynecologie_rdv' %}" class="o-nav-link active">Rendez-vous</a>
-  <a href="{% url 'gynecologie_naissances' %}" class="o-nav-link">Registre des naissances</a>
-  <a href="#" class="o-nav-link">Rapports</a>
-  {% include 'gynecologie/_nav_right.html' %}
-</nav>
 
 <!-- HEADER -->
 <div class="f-header">
@@ -784,19 +756,527 @@
       </div>
       <!-- Consultation prénatale -->
       <div class="f-tab-panel" id="tab-cpn">
-        <p style="color:var(--text-muted);font-size:12.5px;">Aucune consultation prénatale enregistrée.</p>
+        <div class="cpn-grid">
+
+          <!-- ══ COLONNE GAUCHE ══ -->
+          <div class="cpn-col">
+            <div class="cpn-section">Données administratives</div>
+            <div class="cpn-row"><span class="cpn-lbl">Type de visite</span><select name="cpn_type_visite" class="cpn-sel editable"><option value=""></option><option value="1ere">1ère visite</option><option value="suivi">Visite de suivi</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Mode d'entrée</span><select name="cpn_mode_entree" class="cpn-sel editable"><option value=""></option><option value="spontane">Spontané</option><option value="refere">Référé</option><option value="transfere">Transféré</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Report numéro gestante précédent</span><input type="text" name="cpn_report_numero" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Numéro gestante de la visite</span><input type="text" name="cpn_numero_gestante" class="cpn-inp editable"></div>
+
+            <hr class="cpn-sep">
+            <div class="cpn-sub">Constantes physiques : <a href="#" style="color:var(--teal-600);font-size:12.5px;text-decoration:none;margin-left:8px;font-style:normal;">Créer</a></div>
+            <div class="cpn-row"><span class="cpn-lbl">Poids</span><div class="cpn-val"><input type="number" name="cpn_poids" class="cpn-inp editable" step="0.01" value="0.00" style="max-width:90px;"><span class="cpn-unit">kg</span></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Taille</span><div class="cpn-val"><input type="number" name="cpn_taille" class="cpn-inp editable" step="0.01" value="0.00" style="max-width:90px;"><span class="cpn-unit">m</span></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Température</span><div class="cpn-val"><input type="number" name="cpn_temperature" class="cpn-inp editable" step="0.01" value="0.00" style="max-width:90px;"><span class="cpn-unit">°C</span></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Pouls</span><div class="cpn-val"><input type="number" name="cpn_pouls" class="cpn-inp editable" value="0" style="max-width:90px;"><span class="cpn-unit">bpm</span></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Fréquence respiratoire</span><div class="cpn-val"><input type="number" name="cpn_freq_resp" class="cpn-inp editable" value="0" style="max-width:90px;"><span class="cpn-unit">cpm</span></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Périmètre Brachial</span><input type="number" name="cpn_perimetre_brachial" class="cpn-inp editable" step="0.01" value="0.00"></div>
+            <div class="cpn-row"><span class="cpn-lbl">IMC</span><input type="number" name="cpn_imc" class="cpn-inp editable" step="0.01" value="0.00"></div>
+            <div class="cpn-row"><span class="cpn-lbl">TA Bras gauche (mmHg)</span><input type="text" name="cpn_ta_gauche" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">TA Bras droit (mmHg)</span><input type="text" name="cpn_ta_droit" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Périmètre Brachial (cm)</span><input type="text" name="cpn_perimetre_brachial_cm" class="cpn-inp editable"></div>
+
+            <hr class="cpn-sep">
+            <div class="cpn-row"><span class="cpn-lbl">Statut VAT</span><select name="cpn_statut_vat" class="cpn-sel editable"><option value=""></option><option value="0">Non vaccinée</option><option value="1">VAT1</option><option value="2">VAT2</option><option value="3">VAT3</option><option value="4">VAT4</option><option value="5">VAT5</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Date du VAT 1</span><input type="date" name="cpn_date_vat1" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Date du VAT 2</span><input type="date" name="cpn_date_vat2" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Date VAT rappel</span><input type="date" name="cpn_date_vat_rappel" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Statut VIH à l'accueil</span><select name="cpn_statut_vih_accueil" class="cpn-sel editable"><option value="inconnu">Inconnu</option><option value="negatif">Négatif</option><option value="positif">Positif</option></select></div>
+
+            <div class="cpn-section">Examens et conduites à tenir</div>
+            <div class="cpn-sub">Examen général :</div>
+            <div class="cpn-row"><span class="cpn-lbl">Conjonctives</span><input type="text" name="cpn_conjonctives" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Seins</span><input type="text" name="cpn_seins" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Vergetures</span><input type="text" name="cpn_vergetures" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Varices</span><input type="text" name="cpn_varices" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Œdèmes</span><input type="text" name="cpn_oedemes" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Autres</span><input type="text" name="cpn_examen_general_autres" class="cpn-inp editable"></div>
+
+            <div class="cpn-sub">Examen obstétrical :</div>
+            <div class="cpn-row"><span class="cpn-lbl">P.O.</span><input type="text" name="cpn_po" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">H.U.</span><input type="text" name="cpn_hu" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Age gestationnel</span><input type="text" name="cpn_age_gestationnel" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Présentation</span><input type="text" name="cpn_presentation" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">T.V.</span><input type="text" name="cpn_tv" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Pathologies associées</span><input type="text" name="cpn_pathologies_associees" class="cpn-inp editable"></div>
+
+            <hr class="cpn-sep" style="margin:8px 0;">
+            <div class="cpn-row"><span class="cpn-lbl">Anémie Clinique</span><div class="cpn-radios"><label><input type="radio" name="cpn_anemie" value="oui" class="editable"> Oui</label><label><input type="radio" name="cpn_anemie" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Etat nutritionnel</span><select name="cpn_etat_nutritionnel" class="cpn-sel editable"><option value=""></option><option value="bon">Bon</option><option value="moyen">Moyen</option><option value="mauvais">Mauvais</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Conseil PF</span><input type="checkbox" name="cpn_conseil_pf" value="1" class="editable" style="width:15px;height:15px;accent-color:var(--teal-600);"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Méthode souhaitée</span><select name="cpn_methode_souhaitee" class="cpn-sel editable"><option value=""></option><option value="condom">Condom</option><option value="pilule">Pilule</option><option value="diu">DIU</option><option value="injectable">Injectable</option><option value="implant">Implant</option><option value="sterilisation">Stérilisation</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Résultat consultation</span><div class="cpn-radios"><label><input type="radio" name="cpn_resultat_consultation" value="normale" class="editable"> Gross. normale</label><label><input type="radio" name="cpn_resultat_consultation" value="risque" class="editable"> Gross. à risque</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Conseil santé sexuelle et reproductive</span><select name="cpn_conseil_sante_sexuelle" class="cpn-sel editable"><option value=""></option><option value="oui">Oui</option><option value="non">Non</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Examens échographiques ou radiologiques</span><input type="text" name="cpn_examens_echo" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Conseil nutritionnel</span><div class="cpn-radios"><label><input type="radio" name="cpn_conseil_nutritionnel" value="oui" class="editable"> Oui</label><label><input type="radio" name="cpn_conseil_nutritionnel" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Service nutritionnel</span><div class="cpn-radios"><label><input type="radio" name="cpn_service_nutritionnel" value="oui" class="editable"> Oui</label><label><input type="radio" name="cpn_service_nutritionnel" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Autres médicaments</span><input type="text" name="cpn_autres_medicaments" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Date du prochain RDV</span><input type="date" name="cpn_date_prochain_rdv" class="cpn-inp editable"></div>
+
+            <div class="cpn-section">Prescription</div>
+            <div class="cpn-row"><span class="cpn-lbl">Fer</span><div class="cpn-radios"><label><input type="radio" name="cpn_fer" value="oui" class="editable"> Oui</label><label><input type="radio" name="cpn_fer" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">FOLATES</span><div class="cpn-radios"><label><input type="radio" name="cpn_folates" value="oui" class="editable"> Oui</label><label><input type="radio" name="cpn_folates" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">SP1</span><div class="cpn-radios"><label><input type="radio" name="cpn_sp1" value="oui" class="editable"> Oui</label><label><input type="radio" name="cpn_sp1" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">SP2</span><div class="cpn-radios"><label><input type="radio" name="cpn_sp2" value="oui" class="editable"> Oui</label><label><input type="radio" name="cpn_sp2" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">SP3</span><div class="cpn-radios"><label><input type="radio" name="cpn_sp3" value="oui" class="editable"> Oui</label><label><input type="radio" name="cpn_sp3" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">SP4</span><div class="cpn-radios"><label><input type="radio" name="cpn_sp4" value="oui" class="editable"> Oui</label><label><input type="radio" name="cpn_sp4" value="non" class="editable"> Non</label></div></div>
+          </div><!-- /col gauche -->
+
+          <!-- ══ COLONNE DROITE ══ -->
+          <div class="cpn-col">
+            <div class="cpn-section">Antécédents</div>
+            <div class="cpn-row"><span class="cpn-lbl">HTA</span><div class="cpn-radios"><label><input type="radio" name="cpn_atcd_hta" value="oui" class="editable"> Oui</label><label><input type="radio" name="cpn_atcd_hta" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Diabète</span><div class="cpn-radios"><label><input type="radio" name="cpn_atcd_diabete" value="oui" class="editable"> Oui</label><label><input type="radio" name="cpn_atcd_diabete" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Chirurgicaux</span><input type="text" name="cpn_atcd_chirurgicaux" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Gynéco-obstétricaux</span><input type="text" name="cpn_atcd_gyneco" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Gestité</span><input type="number" name="cpn_gestite" class="cpn-inp editable" value="0" min="0"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Parité</span><input type="number" name="cpn_parite" class="cpn-inp editable" value="0" min="0"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Enfants vivants</span><input type="number" name="cpn_enfants_vivants" class="cpn-inp editable" value="0" min="0"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Enfants décédés</span><input type="number" name="cpn_enfants_decedes" class="cpn-inp editable" value="0" min="0"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Césariennes</span><input type="number" name="cpn_cesariennes" class="cpn-inp editable" value="0" min="0"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Avortements</span><input type="number" name="cpn_avortements" class="cpn-inp editable" value="0" min="0"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Toxémie gravidique</span><input type="text" name="cpn_toxemie" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">D.D.R.</span><input type="date" name="cpn_ddr" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">BDCF</span><input type="text" name="cpn_bdcf" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Terme prévu le</span><input type="date" name="cpn_terme_prevu" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Date de la dernière CPN</span><input type="date" name="cpn_date_derniere_cpn" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Semaines d'aménorrhée</span><input type="number" name="cpn_semaines_amenorrhee" class="cpn-inp editable" min="0"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Proposition de test VIH</span><select name="cpn_proposition_test_vih" class="cpn-sel editable"><option value=""></option><option value="propose">Proposé</option><option value="accepte">Accepté</option><option value="refuse">Refusé</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Retesting</span><div class="cpn-radios"><label><input type="radio" name="cpn_retesting" value="oui" class="editable"> Oui</label><label><input type="radio" name="cpn_retesting" value="non" class="editable"> Non</label><label><input type="radio" name="cpn_retesting" value="na" class="editable"> NA</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Numéro de dépistage</span><input type="text" name="cpn_numero_depistage" class="cpn-inp editable"></div>
+
+            <hr class="cpn-sep">
+            <div class="cpn-sub">Examens biologiques :</div>
+            <div class="cpn-row"><span class="cpn-lbl">Group sanguin Rhésus</span><input type="text" name="cpn_groupe_sanguin" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Taux d'hémoglobine</span><input type="text" name="cpn_taux_hemoglobine" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Électrophorèse et l'hémoglobine</span><input type="text" name="cpn_electrophorese" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Albumine</span><div class="cpn-radios"><label><input type="radio" name="cpn_albumine" value="negatif" class="editable"> Négatif</label><label><input type="radio" name="cpn_albumine" value="positif" class="editable"> Positif</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Sucre</span><div class="cpn-radios"><label><input type="radio" name="cpn_sucre" value="negatif" class="editable"> Négatif</label><label><input type="radio" name="cpn_sucre" value="positif" class="editable"> Positif</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Nitrite dans l'urine/ECBU</span><div class="cpn-radios"><label><input type="radio" name="cpn_nitrite" value="negatif" class="editable"> Négatif</label><label><input type="radio" name="cpn_nitrite" value="positif" class="editable"> Positif</label></div></div>
+
+            <hr class="cpn-sep" style="margin:8px 0;">
+            <div class="cpn-row"><span class="cpn-lbl">Examen glycémie demandé</span><div class="cpn-radios"><label><input type="radio" name="cpn_glycemie_demande" value="oui" class="editable"> Oui</label><label><input type="radio" name="cpn_glycemie_demande" value="non" class="editable"> Non</label><label><input type="radio" name="cpn_glycemie_demande" value="na" class="editable"> NA</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Résultat reçu</span><div class="cpn-radios"><label><input type="radio" name="cpn_glycemie_res_recu" value="oui" class="editable"> Oui</label><label><input type="radio" name="cpn_glycemie_res_recu" value="non" class="editable"> Non</label><label><input type="radio" name="cpn_glycemie_res_recu" value="na" class="editable"> NA</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Résultat glycémie</span><input type="text" name="cpn_resultat_glycemie" class="cpn-inp editable"></div>
+
+            <hr class="cpn-sep" style="margin:8px 0;">
+            <div class="cpn-row"><span class="cpn-lbl">Test Syphilis demandé</span><div class="cpn-radios"><label><input type="radio" name="cpn_syphilis_demande" value="oui" class="editable"> Oui</label><label><input type="radio" name="cpn_syphilis_demande" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Résultat reçu</span><div class="cpn-radios"><label><input type="radio" name="cpn_syphilis_res_recu" value="oui" class="editable"> Oui</label><label><input type="radio" name="cpn_syphilis_res_recu" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Résultat Syphilis</span><div class="cpn-radios"><label><input type="radio" name="cpn_resultat_syphilis" value="negatif" class="editable"> Négatif</label><label><input type="radio" name="cpn_resultat_syphilis" value="positif" class="editable"> Positif</label><label><input type="radio" name="cpn_resultat_syphilis" value="na" class="editable"> NA</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Sérologie toxoplasmose</span><input type="text" name="cpn_serologie_toxo" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Sérologie Rubéole</span><input type="text" name="cpn_serologie_rubeole" class="cpn-inp editable"></div>
+
+            <hr class="cpn-sep" style="margin:8px 0;">
+            <div class="cpn-row"><span class="cpn-lbl">Examen AgHBs demandé</span><div class="cpn-radios"><label><input type="radio" name="cpn_aghbs_demande" value="oui" class="editable"> Oui</label><label><input type="radio" name="cpn_aghbs_demande" value="non" class="editable"> Non</label><label><input type="radio" name="cpn_aghbs_demande" value="na" class="editable"> NA</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Résultat reçu</span><div class="cpn-radios"><label><input type="radio" name="cpn_aghbs_res_recu" value="oui" class="editable"> Oui</label><label><input type="radio" name="cpn_aghbs_res_recu" value="non" class="editable"> Non</label><label><input type="radio" name="cpn_aghbs_res_recu" value="na" class="editable"> NA</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Résultat AgHBs</span><div class="cpn-radios"><label><input type="radio" name="cpn_resultat_aghbs" value="negatif" class="editable"> Négatif</label><label><input type="radio" name="cpn_resultat_aghbs" value="positif" class="editable"> Positif</label><label><input type="radio" name="cpn_resultat_aghbs" value="na" class="editable"> NA</label></div></div>
+
+            <hr class="cpn-sep" style="margin:8px 0;">
+            <div class="cpn-row"><span class="cpn-lbl">Résultat du test VIH</span><div class="cpn-radios"><label><input type="radio" name="cpn_resultat_vih" value="negatif" class="editable"> Négatif</label><label><input type="radio" name="cpn_resultat_vih" value="positif" class="editable"> Positif</label><label><input type="radio" name="cpn_resultat_vih" value="na" class="editable"> NA</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Annonce du résultat</span><div class="cpn-radios"><label><input type="radio" name="cpn_annonce_resultat" value="oui" class="editable"> Oui</label><label><input type="radio" name="cpn_annonce_resultat" value="non" class="editable"> Non</label><label><input type="radio" name="cpn_annonce_resultat" value="na" class="editable"> NA</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Dépistage VIH du conjoint</span><div class="cpn-radios"><label><input type="radio" name="cpn_depistage_conjoint" value="oui" class="editable"> Oui</label><label><input type="radio" name="cpn_depistage_conjoint" value="non" class="editable"> Non</label><label><input type="radio" name="cpn_depistage_conjoint" value="na" class="editable"> NA</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Statut sérologique du conjoint</span><div class="cpn-radios"><label><input type="radio" name="cpn_statut_sero_conjoint" value="negatif" class="editable"> Négatif</label><label><input type="radio" name="cpn_statut_sero_conjoint" value="positif" class="editable"> Positif</label><label><input type="radio" name="cpn_statut_sero_conjoint" value="na" class="editable"> NA</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Prélèvement pour la charge virale</span><div class="cpn-radios"><label><input type="radio" name="cpn_prelevement_charge_virale" value="oui" class="editable"> Oui</label><label><input type="radio" name="cpn_prelevement_charge_virale" value="non" class="editable"> Non</label><label><input type="radio" name="cpn_prelevement_charge_virale" value="na" class="editable"> NA</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Charge virale ≤ à 1000 copies/ml</span><div class="cpn-radios"><label><input type="radio" name="cpn_charge_virale" value="oui" class="editable"> Oui</label><label><input type="radio" name="cpn_charge_virale" value="non" class="editable"> Non</label><label><input type="radio" name="cpn_charge_virale" value="na" class="editable"> NA</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Autres examens biologiques</span><input type="text" name="cpn_autres_examens_bio" class="cpn-inp editable"></div>
+
+            <div class="cpn-section">Prescription</div>
+            <div class="cpn-row"><span class="cpn-lbl">SP5 & Plus</span><div class="cpn-radios"><label><input type="radio" name="cpn_sp5" value="oui" class="editable"> Oui</label><label><input type="radio" name="cpn_sp5" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Fluor</span><div class="cpn-radios"><label><input type="radio" name="cpn_fluor" value="oui" class="editable"> Oui</label><label><input type="radio" name="cpn_fluor" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">MILDA</span><div class="cpn-radios"><label><input type="radio" name="cpn_milda" value="oui" class="editable"> Oui</label><label><input type="radio" name="cpn_milda" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Déparasitant</span><div class="cpn-radios"><label><input type="radio" name="cpn_deparasitant" value="oui" class="editable"> Oui</label><label><input type="radio" name="cpn_deparasitant" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">CTX</span><div class="cpn-radios"><label><input type="radio" name="cpn_ctx" value="oui" class="editable"> Oui</label><label><input type="radio" name="cpn_ctx" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Initiation ARV</span><div class="cpn-radios"><label><input type="radio" name="cpn_initiation_arv" value="oui" class="editable"> Oui</label><label><input type="radio" name="cpn_initiation_arv" value="non" class="editable"> Non</label></div></div>
+          </div><!-- /col droite -->
+
+        </div><!-- /cpn-grid -->
+
+        <!-- Remarques pleine largeur -->
+        <hr class="cpn-sep">
+        <div style="padding:4px 0 8px;">
+          <div class="cpn-sub" style="padding:0 0 6px;">Remarques</div>
+          <textarea name="cpn_remarques" class="f-tab-textarea editable" rows="3" placeholder="Remarques..."></textarea>
+        </div>
       </div>
       <!-- Accouchement -->
       <div class="f-tab-panel" id="tab-accouchement">
-        <p style="color:var(--text-muted);font-size:12.5px;">Aucune information d'accouchement.</p>
+        <div class="cpn-grid">
+
+          <!-- ══ COLONNE GAUCHE ══ -->
+          <div class="cpn-col">
+            <div class="cpn-section">Arrivée</div>
+            <div class="cpn-row"><span class="cpn-lbl">Date</span><input type="date" name="acc_date_arrivee" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Motif d'admission</span><input type="text" name="acc_motif_admission" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">En travail</span><div class="cpn-radios"><label><input type="radio" name="acc_en_travail" value="oui" class="editable"> Oui</label><label><input type="radio" name="acc_en_travail" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Contractions</span><input type="text" name="acc_contractions" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Poche des eaux intacte</span><div class="cpn-radios"><label><input type="radio" name="acc_poche_eaux" value="oui" class="editable"> Oui</label><label><input type="radio" name="acc_poche_eaux" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Aspect du liquide amniotique</span><input type="text" name="acc_aspect_liquide" class="cpn-inp editable"></div>
+
+            <div class="cpn-section">Antécédents médicaux</div>
+            <div class="cpn-row"><span class="cpn-lbl">HTA</span><div class="cpn-radios"><label><input type="radio" name="acc_atcd_hta" value="oui" class="editable"> Oui</label><label><input type="radio" name="acc_atcd_hta" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Diabète</span><div class="cpn-radios"><label><input type="radio" name="acc_atcd_diabete" value="oui" class="editable"> Oui</label><label><input type="radio" name="acc_atcd_diabete" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Autres</span><input type="text" name="acc_atcd_autres" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Lieu d'accouchement</span><select name="acc_lieu_accouchement" class="cpn-sel editable"><option value=""></option><option value="cs">Centre de santé</option><option value="hopital">Hôpital</option><option value="domicile">Domicile</option><option value="en_route">En route</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Chirurgicaux</span><input type="text" name="acc_atcd_chirurgicaux" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Gestité</span><input type="number" name="acc_gestite" class="cpn-inp editable" value="0" min="0"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Gémellité</span><input type="number" name="acc_gemelite" class="cpn-inp editable" value="0" min="0"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Enfants vivants</span><input type="number" name="acc_enfants_vivants" class="cpn-inp editable" value="0" min="0"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Césariennes</span><input type="number" name="acc_cesariennes" class="cpn-inp editable" value="0" min="0"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Parité</span><input type="number" name="acc_parite" class="cpn-inp editable" value="0" min="0"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Prématurité</span><input type="number" name="acc_prematurite" class="cpn-inp editable" value="0" min="0"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Enfants décédés</span><input type="number" name="acc_enfants_decedes" class="cpn-inp editable" value="0" min="0"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Avortements</span><input type="number" name="acc_avortements" class="cpn-inp editable" value="0" min="0"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Toxémie gravidique</span><input type="text" name="acc_toxemie" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Statut VIH à l'accueil</span><select name="acc_statut_vih_accueil" class="cpn-sel editable"><option value="inconnu">Inconnu</option><option value="negatif">Négatif</option><option value="positif">Positif</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Retesting</span><select name="acc_retesting" class="cpn-sel editable"><option value=""></option><option value="oui">Oui</option><option value="non">Non</option><option value="na">NA</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Numéro PEC</span><input type="text" name="acc_numero_pec" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Sous ARV</span><div class="cpn-radios"><label><input type="radio" name="acc_sous_arv" value="oui" class="editable"> Oui</label><label><input type="radio" name="acc_sous_arv" value="non" class="editable"> Non</label></div></div>
+
+            <div class="cpn-section">P.M.I.</div>
+            <div class="cpn-row"><span class="cpn-lbl">Age de la grossesse à la 1ère CPN</span><input type="number" name="acc_age_grossesse_cpn" class="cpn-inp editable" value="0" min="0"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Nombre de CPN</span><input type="number" name="acc_nombre_cpn" class="cpn-inp editable" value="0" min="0"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Statut vaccinal VAT</span><select name="acc_statut_vat" class="cpn-sel editable"><option value=""></option><option value="0">Non vaccinée</option><option value="1">VAT1</option><option value="2">VAT2</option><option value="3">VAT3</option><option value="4">VAT4</option><option value="5">VAT5</option></select></div>
+
+            <div class="cpn-section">Service de planification familial</div>
+            <div class="cpn-row"><span class="cpn-lbl">Conseil PF-PPI</span><input type="checkbox" name="acc_conseil_pf_ppi" value="1" class="editable" style="width:15px;height:15px;accent-color:var(--teal-600);"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Initiation ARV</span><select name="acc_initiation_arv_pf" class="cpn-sel editable"><option value=""></option><option value="oui">Oui</option><option value="non">Non</option></select></div>
+
+            <hr class="cpn-sep">
+            <div class="cpn-sub">Informations cliniques et examen obstétrical : <a href="#" style="color:var(--teal-600);font-size:12.5px;text-decoration:none;margin-left:8px;">Créer</a></div>
+            <div class="cpn-row"><span class="cpn-lbl">Poids</span><div class="cpn-val"><input type="number" name="acc_poids" class="cpn-inp editable" step="0.01" value="0.00" style="max-width:90px;"><span class="cpn-unit">kg</span></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Taille</span><div class="cpn-val"><input type="number" name="acc_taille" class="cpn-inp editable" step="0.01" value="0.00" style="max-width:90px;"><span class="cpn-unit">m</span></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Température</span><div class="cpn-val"><input type="number" name="acc_temperature" class="cpn-inp editable" step="0.01" value="0.00" style="max-width:90px;"><span class="cpn-unit">°C</span></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Pouls</span><div class="cpn-val"><input type="number" name="acc_pouls" class="cpn-inp editable" value="0" style="max-width:90px;"><span class="cpn-unit">bpm</span></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Fréquence respiratoire</span><div class="cpn-val"><input type="number" name="acc_freq_resp" class="cpn-inp editable" value="0" style="max-width:90px;"><span class="cpn-unit">cpm</span></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">IMC</span><input type="number" name="acc_imc" class="cpn-inp editable" step="0.01" value="0.00"></div>
+            <div class="cpn-row"><span class="cpn-lbl">TA Bras gauche (mmHg)</span><input type="text" name="acc_ta_gauche" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">TA Bras droit (mmHg)</span><input type="text" name="acc_ta_droit" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Périmètre Brachial (cm)</span><input type="text" name="acc_perimetre_brachial" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Groupe Rhésus</span><input type="text" name="acc_groupe_rhesus" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">D.D.R.</span><input type="date" name="acc_ddr" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">TP</span><input type="date" name="acc_tp" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">H.U.</span><input type="text" name="acc_hu" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">P.O.</span><input type="text" name="acc_po" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Présentation</span><input type="text" name="acc_presentation" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">R.C.F.</span><input type="text" name="acc_rcf" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Œdèmes</span><input type="text" name="acc_oedemes" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Excision</span><input type="text" name="acc_excision" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Varices</span><input type="text" name="acc_varices" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Bassin</span><input type="text" name="acc_bassin" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Conjonctives</span><input type="text" name="acc_conjonctives" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">T.V.</span><input type="text" name="acc_tv" class="cpn-inp editable"></div>
+
+            <div class="cpn-section">Offre de service VIH</div>
+            <div class="cpn-row"><span class="cpn-lbl">Proposition de test VIH</span><div class="cpn-radios"><label><input type="radio" name="acc_proposition_vih" value="oui" class="editable"> Oui</label><label><input type="radio" name="acc_proposition_vih" value="non" class="editable"> Non</label><label><input type="radio" name="acc_proposition_vih" value="na" class="editable"> NA</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Numéro de dépistage</span><input type="text" name="acc_numero_depistage" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Résultat du test VIH</span><div class="cpn-radios"><label><input type="radio" name="acc_resultat_vih" value="negatif" class="editable"> Négatif</label><label><input type="radio" name="acc_resultat_vih" value="positif" class="editable"> Positif</label><label><input type="radio" name="acc_resultat_vih" value="na" class="editable"> NA</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Annonce du résultat</span><div class="cpn-radios"><label><input type="radio" name="acc_annonce_resultat" value="oui" class="editable"> Oui</label><label><input type="radio" name="acc_annonce_resultat" value="non" class="editable"> Non</label><label><input type="radio" name="acc_annonce_resultat" value="na" class="editable"> NA</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Initiation ARV</span><div class="cpn-radios"><label><input type="radio" name="acc_initiation_arv_vih" value="oui" class="editable"> Oui</label><label><input type="radio" name="acc_initiation_arv_vih" value="non" class="editable"> Non</label><label><input type="radio" name="acc_initiation_arv_vih" value="na" class="editable"> NA</label></div></div>
+
+            <div class="cpn-section">Sortie de la mère</div>
+            <div class="cpn-row"><span class="cpn-lbl">Date de sortie</span><input type="date" name="acc_date_sortie" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Mode de sortie</span><select name="acc_mode_sortie" class="cpn-sel editable"><option value=""></option><option value="gueri">Guéri</option><option value="transfere">Transféré</option><option value="decede">Décédé</option><option value="contre_avis">Contre avis médical</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Heure de départ effectif</span><input type="time" name="acc_heure_depart" class="cpn-inp editable" value="00:00"></div>
+          </div><!-- /col gauche -->
+
+          <!-- ══ COLONNE DROITE ══ -->
+          <div class="cpn-col">
+            <div class="cpn-section">L'Enfant</div>
+            <div class="cpn-row"><span class="cpn-lbl">Sexe</span><div class="cpn-radios"><label><input type="radio" name="acc_enfant_sexe" value="m" class="editable"> Masculin</label><label><input type="radio" name="acc_enfant_sexe" value="f" class="editable"> Féminin</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Poids</span><input type="number" name="acc_enfant_poids" class="cpn-inp editable" step="0.01" value="0.00"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Taille du bébé</span><input type="number" name="acc_enfant_taille" class="cpn-inp editable" step="0.01" value="0.00"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Périmètre crânien</span><input type="number" name="acc_enfant_perimetre_cranien" class="cpn-inp editable" step="0.01" value="0.00"></div>
+            <div style="padding:10px 0 6px;">
+              <span class="cpn-lbl" style="display:block;margin-bottom:8px;">Indice d'Apgar</span>
+              <table class="acc-apgar">
+                <thead><tr><th></th><th>1mn</th><th>5mn</th></tr></thead>
+                <tbody>
+                  <tr><td>Cœur</td><td><input type="number" name="acc_apgar_coeur_1mn" class="editable" value="0" min="0" max="2"></td><td><input type="number" name="acc_apgar_coeur_5mn" class="editable" value="0" min="0" max="2"></td></tr>
+                  <tr><td>Respiration</td><td><input type="number" name="acc_apgar_resp_1mn" class="editable" value="0" min="0" max="2"></td><td><input type="number" name="acc_apgar_resp_5mn" class="editable" value="0" min="0" max="2"></td></tr>
+                  <tr><td>Tonus</td><td><input type="number" name="acc_apgar_tonus_1mn" class="editable" value="0" min="0" max="2"></td><td><input type="number" name="acc_apgar_tonus_5mn" class="editable" value="0" min="0" max="2"></td></tr>
+                  <tr><td>Couleur</td><td><input type="number" name="acc_apgar_couleur_1mn" class="editable" value="0" min="0" max="2"></td><td><input type="number" name="acc_apgar_couleur_5mn" class="editable" value="0" min="0" max="2"></td></tr>
+                  <tr><td>Réflexes</td><td><input type="number" name="acc_apgar_reflexes_1mn" class="editable" value="0" min="0" max="2"></td><td><input type="number" name="acc_apgar_reflexes_5mn" class="editable" value="0" min="0" max="2"></td></tr>
+                  <tr><td><strong>Total</strong></td><td><input type="number" name="acc_apgar_total_1mn" class="editable" value="0" min="0" max="10"></td><td><input type="number" name="acc_apgar_total_5mn" class="editable" value="0" min="0" max="10"></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="cpn-row"><span class="cpn-lbl">Etat du nouveau-né</span><select name="acc_etat_nouveau_ne" class="cpn-sel editable"><option value=""></option><option value="vivant">Vivant</option><option value="mort_ne">Mort-né</option><option value="macere">Macéré</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Fiche de déclaration de naissance renseigné</span><select name="acc_fiche_naissance_renseignee" class="cpn-sel editable"><option value=""></option><option value="oui">Oui</option><option value="non">Non</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Malformation</span><div class="cpn-radios"><label><input type="radio" name="acc_malformation" value="oui" class="editable"> Oui</label><label><input type="radio" name="acc_malformation" value="non" class="editable" checked> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Allaitement</span><input type="text" name="acc_allaitement" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Date et heure de mise au sein</span><input type="datetime-local" name="acc_date_heure_sein" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Conseils pour l'allaitement exclusif</span><input type="checkbox" name="acc_conseils_allaitement" value="1" class="editable" style="width:15px;height:15px;accent-color:var(--teal-600);"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Soins Mère Kangourou</span><div class="cpn-radios"><label><input type="radio" name="acc_soins_kangourou" value="oui" class="editable"> Oui</label><label><input type="radio" name="acc_soins_kangourou" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Traitement</span><select name="acc_traitement" class="cpn-sel editable"><option value=""></option><option value="oui">Oui</option><option value="non">Non</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Prophylaxie ARV</span><div class="cpn-radios"><label><input type="radio" name="acc_prophylaxie_arv" value="oui" class="editable"> Oui</label><label><input type="radio" name="acc_prophylaxie_arv" value="non" class="editable"> Non</label><label><input type="radio" name="acc_prophylaxie_arv" value="na" class="editable"> Non Applicable</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Evacuation du nouveau-né</span><div class="cpn-radios"><label><input type="radio" name="acc_evacuation_nn" value="oui" class="editable"> Oui</label><label><input type="radio" name="acc_evacuation_nn" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Décédé à la maternité</span><input type="checkbox" name="acc_decede_maternite" value="1" class="editable" style="width:15px;height:15px;accent-color:var(--teal-600);"></div>
+
+            <div class="cpn-section">Réanimation du nouveau-né</div>
+            <div class="cpn-row"><span class="cpn-lbl">A-t-il respiré/pleuré dans la 1ère minute</span><div class="cpn-radios"><label><input type="radio" name="acc_respire_1min" value="oui" class="editable"> Oui</label><label><input type="radio" name="acc_respire_1min" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Autres médicaments administrés</span><input type="text" name="acc_autres_medicaments" class="cpn-inp editable"></div>
+
+            <div class="cpn-section">Accouchement et délivrance</div>
+            <div class="cpn-row"><span class="cpn-lbl">Mode d'accouchement</span><div class="cpn-radios"><label><input type="radio" name="acc_mode_accouchement" value="voie_basse" class="editable"> Voie Basse</label><label><input type="radio" name="acc_mode_accouchement" value="cesarienne" class="editable"> Césarienne</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Type d'avortement</span><div class="cpn-radios"><label><input type="radio" name="acc_type_avortement" value="spontane" class="editable"> Spontané</label><label><input type="radio" name="acc_type_avortement" value="provoque" class="editable"> Provoqué</label><label><input type="radio" name="acc_type_avortement" value="aucun" class="editable"> Aucun</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Mode d'expulsion</span><input type="text" name="acc_mode_expulsion" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Mode de délivrance</span><div class="cpn-radios"><label><input type="radio" name="acc_mode_delivrance" value="tcc" class="editable"> TCC</label><label><input type="radio" name="acc_mode_delivrance" value="normale" class="editable"> Normale</label><label><input type="radio" name="acc_mode_delivrance" value="artificielle" class="editable"> Artificielle</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Délivrance à</span><input type="text" name="acc_delivrance_a" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Heure</span><input type="time" name="acc_heure_delivrance" class="cpn-inp editable" value="00:00"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Poids de la placenta</span><input type="number" name="acc_poids_placenta" class="cpn-inp editable" step="0.01" value="0.00"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Examen</span><input type="text" name="acc_examen" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Membranes</span><input type="text" name="acc_membranes" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Particularité</span><input type="text" name="acc_particularite" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Nombre de V.O</span><input type="number" name="acc_nombre_vo" class="cpn-inp editable" value="0" min="0"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Révision utérine</span><input type="checkbox" name="acc_revision_uterine" value="1" class="editable" style="width:15px;height:15px;accent-color:var(--teal-600);"></div>
+            <div class="cpn-row"><span class="cpn-lbl">IMC</span><input type="number" name="acc_imc_post" class="cpn-inp editable" step="0.01" value="0.00"></div>
+            <div class="cpn-row"><span class="cpn-lbl">TA Bras gauche (mmHg)</span><input type="text" name="acc_ta_gauche_post" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">TA Bras droit (mmHg)</span><input type="text" name="acc_ta_droit_post" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Périmètre Brachial (cm)</span><input type="text" name="acc_perimetre_brachial_post" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Pouls après accouchement</span><input type="number" name="acc_pouls_post" class="cpn-inp editable" step="0.01" value="0.00"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Etat des conjonctives</span><input type="text" name="acc_etat_conjonctives" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Globe utérin</span><input type="text" name="acc_globe_uterin" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Saignements vulvaires</span><input type="text" name="acc_saignements_vulvaires" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Complications obstétricales</span><div class="cpn-radios"><label><input type="radio" name="acc_complications_obst" value="oui" class="editable"> Oui</label><label><input type="radio" name="acc_complications_obst" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Prise en charge des HPPI</span><select name="acc_prise_en_charge_hppi" class="cpn-sel editable"><option value=""></option><option value="oui">Oui</option><option value="non">Non</option></select></div>
+
+            <div class="cpn-section">Ordonnances</div>
+            <div style="padding:6px 0 10px;">
+              <div class="cpn-lbl" style="margin-bottom:5px;">Actes</div>
+              <textarea name="acc_actes" class="f-tab-textarea editable" rows="3" placeholder="Actes..."></textarea>
+            </div>
+            <div style="padding:6px 0 10px;">
+              <div class="cpn-lbl" style="margin-bottom:5px;">Ordonnance de sortie de la mère</div>
+              <textarea name="acc_ordo_mere" class="f-tab-textarea editable" rows="3" placeholder="Ordonnance mère..."></textarea>
+            </div>
+            <div style="padding:6px 0 10px;">
+              <div class="cpn-lbl" style="margin-bottom:5px;">Ordonnance de sortie de l'enfant</div>
+              <textarea name="acc_ordo_enfant" class="f-tab-textarea editable" rows="3" placeholder="Ordonnance enfant..."></textarea>
+            </div>
+
+            <div class="cpn-section">Sortie (suite)</div>
+            <div class="cpn-row"><span class="cpn-lbl">Fiche de déclaration de naissance</span><div class="cpn-radios"><label><input type="radio" name="acc_fiche_declaration" value="oui" class="editable"> Oui</label><label><input type="radio" name="acc_fiche_declaration" value="non" class="editable"> Non</label><label><input type="radio" name="acc_fiche_declaration" value="na" class="editable"> NA</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">RDV pour la consultation postnatale</span><input type="date" name="acc_rdv_postnatale" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Responsable de l'accouchement</span><select name="acc_responsable" class="cpn-sel editable"><option value=""></option>{% for m in medecins %}<option value="{{ m.pk }}">{{ m }}</option>{% endfor %}</select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Supplémentation en vitamine A</span><input type="checkbox" name="acc_vitamine_a" value="1" class="editable" style="width:15px;height:15px;accent-color:var(--teal-600);"></div>
+          </div><!-- /col droite -->
+
+        </div><!-- /cpn-grid -->
+
+        <!-- Remarques pleine largeur -->
+        <hr class="cpn-sep">
+        <div style="padding:4px 0 8px;">
+          <div class="cpn-sub" style="padding:0 0 6px;">Remarques</div>
+          <textarea name="acc_remarques" class="f-tab-textarea editable" rows="3" placeholder="Remarques..."></textarea>
+        </div>
       </div>
       <!-- Consultation postnatale -->
       <div class="f-tab-panel" id="tab-postnatale">
-        <p style="color:var(--text-muted);font-size:12.5px;">Aucune consultation postnatale.</p>
+        <div class="cpn-grid">
+
+          <!-- ══ COLONNE GAUCHE ══ -->
+          <div class="cpn-col">
+            <div class="cpn-section">Données administratives</div>
+            <div class="cpn-row"><span class="cpn-lbl">Mode d'entrée</span><select name="cposo_mode_entree" class="cpn-sel editable"><option value=""></option><option value="spontane">Spontané</option><option value="refere">Référé</option><option value="transfere">Transféré</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Report N° Gestante</span><input type="text" name="cposo_report_numero" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Type de consultation postnatale</span><select name="cposo_type_consultation" class="cpn-sel editable"><option value=""></option><option value="j3">J3</option><option value="j7">J7</option><option value="j28">J28</option><option value="j42">J42</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Autre à préciser</span><input type="text" name="cposo_autre_preciser" class="cpn-inp editable"></div>
+
+            <hr class="cpn-sep" style="margin:10px 0;">
+            <div class="cpn-row"><span class="cpn-lbl">Statut VAT</span><select name="cposo_statut_vat" class="cpn-sel editable"><option value=""></option><option value="0">Non vaccinée</option><option value="1">VAT1</option><option value="2">VAT2</option><option value="3">VAT3</option><option value="4">VAT4</option><option value="5">VAT5</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Date du VAT 1</span><input type="date" name="cposo_date_vat1" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Date du VAT 2</span><input type="date" name="cposo_date_vat2" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Date VAT rappel</span><input type="date" name="cposo_date_vat_rappel" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Conseil PF-PPI</span><input type="checkbox" name="cposo_conseil_pf_ppi" value="1" class="editable" style="width:15px;height:15px;accent-color:var(--teal-600);"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Conseil PF-PP tardif</span><input type="checkbox" name="cposo_conseil_pf_pp_tardif" value="1" class="editable" style="width:15px;height:15px;accent-color:var(--teal-600);"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Conseil PF-PP prolongé</span><input type="checkbox" name="cposo_conseil_pf_pp_prolonge" value="1" class="editable" style="width:15px;height:15px;accent-color:var(--teal-600);"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Méthode adoptée</span><select name="cposo_methode_adoptee" class="cpn-sel editable"><option value=""></option><option value="condom">Condom</option><option value="pilule">Pilule</option><option value="diu">DIU</option><option value="injectable">Injectable</option><option value="implant">Implant</option><option value="sterilisation">Stérilisation</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Statut VIH à l'accueil</span><select name="cposo_statut_vih_accueil" class="cpn-sel editable"><option value="inconnu">Inconnu</option><option value="negatif">Négatif</option><option value="positif">Positif</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Traitement ARV</span><div class="cpn-radios"><label><input type="radio" name="cposo_traitement_arv" value="oui" class="editable"> Oui</label><label><input type="radio" name="cposo_traitement_arv" value="non" class="editable"> Non</label></div></div>
+
+            <hr class="cpn-sep">
+            <div class="cpn-sub">Examen de la patiente : <a href="#" style="color:var(--teal-600);font-size:12.5px;text-decoration:none;margin-left:8px;">Créer</a></div>
+            <div class="cpn-row"><span class="cpn-lbl">Poids</span><div class="cpn-val"><input type="number" name="cposo_poids" class="cpn-inp editable" step="0.01" value="0.00" style="max-width:90px;"><span class="cpn-unit">kg</span></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Taille</span><div class="cpn-val"><input type="number" name="cposo_taille" class="cpn-inp editable" step="0.01" value="0.00" style="max-width:90px;"><span class="cpn-unit">m</span></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Température</span><div class="cpn-val"><input type="number" name="cposo_temperature" class="cpn-inp editable" step="0.01" value="0.00" style="max-width:90px;"><span class="cpn-unit">°C</span></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Pouls</span><div class="cpn-val"><input type="number" name="cposo_pouls" class="cpn-inp editable" value="0" style="max-width:90px;"><span class="cpn-unit">bpm</span></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Fréquence respiratoire</span><div class="cpn-val"><input type="number" name="cposo_freq_resp" class="cpn-inp editable" value="0" style="max-width:90px;"><span class="cpn-unit">cpm</span></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">IMC</span><input type="number" name="cposo_imc" class="cpn-inp editable" step="0.01" value="0.00"></div>
+            <div class="cpn-row"><span class="cpn-lbl">TA Bras gauche (mmHg)</span><input type="text" name="cposo_ta_gauche" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">TA Bras droit (mmHg)</span><input type="text" name="cposo_ta_droit" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Périmètre Brachial (cm)</span><input type="text" name="cposo_perimetre_brachial" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">PB</span><input type="text" name="cposo_pb" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Œdèmes</span><input type="text" name="cposo_oedemes" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Varices</span><input type="text" name="cposo_varices" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Etat des conjonctives</span><input type="text" name="cposo_etat_conjonctives" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Conscience</span><input type="text" name="cposo_conscience" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Seins</span><input type="text" name="cposo_seins" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Abdomen</span><input type="text" name="cposo_abdomen" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Globe utérin</span><input type="text" name="cposo_globe_uterin" class="cpn-inp editable"></div>
+            <div class="cpn-sub" style="padding-top:10px;">Examen du périnée</div>
+            <div class="cpn-row"><span class="cpn-lbl">Vulve</span><input type="text" name="cposo_vulve" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Utérus</span><input type="text" name="cposo_uterus" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Vessie</span><input type="text" name="cposo_vessie" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Lochies</span><input type="text" name="cposo_lochies" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Examen au spéculum</span><input type="text" name="cposo_examen_speculum" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Test à l'acide acétique</span><input type="text" name="cposo_test_acide_acetique" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">T.V.</span><input type="text" name="cposo_tv" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Enfants vivants</span><div class="cpn-radios"><label><input type="radio" name="cposo_enfants_vivants_r" value="oui" class="editable"> Oui</label><label><input type="radio" name="cposo_enfants_vivants_r" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Enfant à jour de ses vaccins</span><div class="cpn-radios"><label><input type="radio" name="cposo_enfant_vaccins" value="oui" class="editable"> Oui</label><label><input type="radio" name="cposo_enfant_vaccins" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Femme allaitante</span><div class="cpn-radios"><label><input type="radio" name="cposo_femme_allaitante" value="oui" class="editable"> Oui</label><label><input type="radio" name="cposo_femme_allaitante" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Allaitement exclusif</span><div class="cpn-radios"><label><input type="radio" name="cposo_allaitement_exclusif" value="oui" class="editable"> Oui</label><label><input type="radio" name="cposo_allaitement_exclusif" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Autres types d'allaitement</span><input type="text" name="cposo_autres_allaitement" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Conseil en alimentation de la mère</span><div class="cpn-radios"><label><input type="radio" name="cposo_conseil_alim_mere" value="oui" class="editable"> Oui</label><label><input type="radio" name="cposo_conseil_alim_mere" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Conseil en alimentation de l'enfant</span><div class="cpn-radios"><label><input type="radio" name="cposo_conseil_alim_enfant" value="oui" class="editable"> Oui</label><label><input type="radio" name="cposo_conseil_alim_enfant" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Etat nutritionnel</span><select name="cposo_etat_nutritionnel" class="cpn-sel editable"><option value=""></option><option value="bon">Bon</option><option value="moyen">Moyen</option><option value="mauvais">Mauvais</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Retour de couches</span><div class="cpn-radios"><label><input type="radio" name="cposo_retour_couches" value="oui" class="editable"> Oui</label><label><input type="radio" name="cposo_retour_couches" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Date de retour</span><input type="date" name="cposo_date_retour" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Pathologies associées</span><input type="text" name="cposo_pathologies_associees" class="cpn-inp editable"></div>
+          </div><!-- /col gauche -->
+
+          <!-- ══ COLONNE DROITE ══ -->
+          <div class="cpn-col">
+            <div class="cpn-section">Antécédents</div>
+            <div class="cpn-row"><span class="cpn-lbl">HTA</span><div class="cpn-radios"><label><input type="radio" name="cposo_atcd_hta" value="oui" class="editable"> Oui</label><label><input type="radio" name="cposo_atcd_hta" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Diabète</span><div class="cpn-radios"><label><input type="radio" name="cposo_atcd_diabete" value="oui" class="editable"> Oui</label><label><input type="radio" name="cposo_atcd_diabete" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Autres</span><input type="text" name="cposo_atcd_autres" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Chirurgicaux</span><input type="text" name="cposo_atcd_chirurgicaux" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Obstétricaux</span><input type="text" name="cposo_atcd_obstetricaux" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Gestité</span><input type="number" name="cposo_gestite" class="cpn-inp editable" value="0" min="0"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Parité</span><input type="number" name="cposo_parite" class="cpn-inp editable" value="0" min="0"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Enfants vivants</span><input type="number" name="cposo_enfants_vivants_nb" class="cpn-inp editable" value="0" min="0"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Enfants décédés</span><input type="number" name="cposo_enfants_decedes" class="cpn-inp editable" value="0" min="0"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Césariennes</span><input type="number" name="cposo_cesariennes" class="cpn-inp editable" value="0" min="0"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Avortements</span><input type="number" name="cposo_avortements" class="cpn-inp editable" value="0" min="0"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Toxémie gravidique</span><input type="text" name="cposo_toxemie" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Date de l'accouchement</span><input type="date" name="cposo_date_accouchement" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Lieu d'accouchement</span><select name="cposo_lieu_accouchement" class="cpn-sel editable"><option value="etablissement">En établissement de soins</option><option value="domicile">Domicile</option><option value="en_route">En route</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Mode d'accouchement</span><div class="cpn-radios"><label><input type="radio" name="cposo_mode_accouchement" value="voie_basse" class="editable"> Voie Basse</label><label><input type="radio" name="cposo_mode_accouchement" value="cesarienne" class="editable"> Césarienne</label></div></div>
+
+            <div class="cpn-section">Conduite à tenir</div>
+            <div class="cpn-row"><span class="cpn-lbl">Proposition de test VIH</span><div class="cpn-radios"><label><input type="radio" name="cposo_proposition_vih" value="oui" class="editable"> Oui</label><label><input type="radio" name="cposo_proposition_vih" value="non" class="editable"> Non</label><label><input type="radio" name="cposo_proposition_vih" value="na" class="editable"> NA</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Numéro de Dépistage VIH</span><input type="text" name="cposo_numero_depistage" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Retesting</span><div class="cpn-radios"><label><input type="radio" name="cposo_retesting" value="oui" class="editable"> Oui</label><label><input type="radio" name="cposo_retesting" value="non" class="editable"> Non</label><label><input type="radio" name="cposo_retesting" value="na" class="editable"> NA</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Résultat du test VIH</span><select name="cposo_resultat_vih" class="cpn-sel editable"><option value=""></option><option value="negatif">Négatif</option><option value="positif">Positif</option><option value="na">NA</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Annonce du résultat</span><div class="cpn-radios"><label><input type="radio" name="cposo_annonce_resultat" value="oui" class="editable"> Oui</label><label><input type="radio" name="cposo_annonce_resultat" value="non" class="editable"> Non</label><label><input type="radio" name="cposo_annonce_resultat" value="na" class="editable"> NA</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Prophylaxie ARV pour l'enfant</span><div class="cpn-radios"><label><input type="radio" name="cposo_prophylaxie_arv_enfant" value="oui" class="editable"> Oui</label><label><input type="radio" name="cposo_prophylaxie_arv_enfant" value="non" class="editable"> Non</label><label><input type="radio" name="cposo_prophylaxie_arv_enfant" value="na" class="editable"> Non Applicable</label></div></div>
+
+            <div class="cpn-sub">Examens biologiques :</div>
+            <div class="cpn-row"><span class="cpn-lbl">Analyse d'urine</span><input type="checkbox" name="cposo_analyse_urine" value="1" class="editable" style="width:15px;height:15px;accent-color:var(--teal-600);"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Albumine</span><div class="cpn-radios"><label><input type="radio" name="cposo_albumine" value="negatif" class="editable"> Négatif</label><label><input type="radio" name="cposo_albumine" value="positif" class="editable"> Positif</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Sucre</span><div class="cpn-radios"><label><input type="radio" name="cposo_sucre" value="negatif" class="editable"> Négatif</label><label><input type="radio" name="cposo_sucre" value="positif" class="editable"> Positif</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Analyse de sang</span><input type="checkbox" name="cposo_analyse_sang" value="1" class="editable" style="width:15px;height:15px;accent-color:var(--teal-600);"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Glycémie</span><input type="text" name="cposo_glycemie" class="cpn-inp editable"></div>
+
+            <hr class="cpn-sep" style="margin:10px 0;">
+            <div class="cpn-row"><span class="cpn-lbl">Conseil PF-PPI</span><input type="checkbox" name="cposo_conseil_pf_ppi2" value="1" class="editable" style="width:15px;height:15px;accent-color:var(--teal-600);"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Conseil PF-PP tardif</span><input type="checkbox" name="cposo_conseil_pf_pp_tardif2" value="1" class="editable" style="width:15px;height:15px;accent-color:var(--teal-600);"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Acceptation de méthodes contraceptives</span><select name="cposo_acceptation_contraceptives" class="cpn-sel editable"><option value=""></option><option value="condom">Condom</option><option value="pilule">Pilule</option><option value="diu">DIU</option><option value="injectable">Injectable</option><option value="implant">Implant</option><option value="sterilisation">Stérilisation</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Prescriptions</span><select name="cposo_prescriptions" class="cpn-sel editable"><option value=""></option><option value="oui">Oui</option><option value="non">Non</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Initiation ARV</span><div class="cpn-radios"><label><input type="radio" name="cposo_initiation_arv" value="oui" class="editable"> Oui</label><label><input type="radio" name="cposo_initiation_arv" value="non" class="editable"> Non</label><label><input type="radio" name="cposo_initiation_arv" value="na" class="editable"> NA</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Service nutritionnel</span><div class="cpn-radios"><label><input type="radio" name="cposo_service_nutritionnel" value="oui" class="editable"> Oui</label><label><input type="radio" name="cposo_service_nutritionnel" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Autres médicaments</span><input type="text" name="cposo_autres_medicaments" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Observations</span><input type="text" name="cposo_observations" class="cpn-inp editable"></div>
+
+            <hr class="cpn-sep" style="margin:16px 0;">
+            <div class="cpn-row"><span class="cpn-lbl">Résultat consultation</span><select name="cposo_resultat_consultation" class="cpn-sel editable"><option value=""></option><option value="normale">Normale</option><option value="complications">Complications</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Préciser</span><input type="text" name="cposo_resultat_preciser" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Mode de sortie</span><select name="cposo_mode_sortie" class="cpn-sel editable"><option value=""></option><option value="gueri">Guéri</option><option value="transfere">Transféré</option><option value="decede">Décédé</option><option value="contre_avis">Contre avis médical</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Date du prochain RDV</span><input type="date" name="cposo_date_prochain_rdv" class="cpn-inp editable"></div>
+          </div><!-- /col droite -->
+
+        </div><!-- /cpn-grid -->
+
+        <!-- Remarques pleine largeur -->
+        <hr class="cpn-sep">
+        <div style="padding:4px 0 8px;">
+          <div class="cpn-sub" style="padding:0 0 6px;">Remarques</div>
+          <textarea name="cposo_remarques" class="f-tab-textarea editable" rows="3" placeholder="Remarques..."></textarea>
+        </div>
       </div>
       <!-- Consultation curative -->
       <div class="f-tab-panel" id="tab-curative">
-        <p style="color:var(--text-muted);font-size:12.5px;">Aucune consultation curative.</p>
+        <div class="cpn-grid">
+
+          <!-- ══ COLONNE GAUCHE ══ -->
+          <div class="cpn-col">
+            <div class="cpn-section">Données administratives</div>
+            <div class="cpn-row"><span class="cpn-lbl">Mode d'entrée</span><select name="cur_mode_entree" class="cpn-sel editable"><option value=""></option><option value="spontane">Spontané</option><option value="refere">Référé</option><option value="transfere">Transféré</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Type de population</span><select name="cur_type_population" class="cpn-sel editable"><option value=""></option><option value="enfant">Enfant</option><option value="adulte">Adulte</option><option value="femme_enceinte">Femme enceinte</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Type de visite curative</span><select name="cur_type_visite" class="cpn-sel editable"><option value=""></option><option value="1ere">1ère visite</option><option value="suivi">Visite de suivi</option></select></div>
+
+            <hr class="cpn-sep">
+            <div class="cpn-sub">Examens cliniques et constantes : <a href="#" style="color:var(--teal-600);font-size:12.5px;text-decoration:none;margin-left:8px;">Créer</a></div>
+            <div class="cpn-row"><span class="cpn-lbl">Poids</span><div class="cpn-val"><input type="number" name="cur_poids" class="cpn-inp editable" step="0.01" value="0.00" style="max-width:90px;"><span class="cpn-unit">kg</span></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Taille</span><div class="cpn-val"><input type="number" name="cur_taille" class="cpn-inp editable" step="0.01" value="0.00" style="max-width:90px;"><span class="cpn-unit">m</span></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Température</span><div class="cpn-val"><input type="number" name="cur_temperature" class="cpn-inp editable" step="0.01" value="0.00" style="max-width:90px;"><span class="cpn-unit">°C</span></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Pouls</span><div class="cpn-val"><input type="number" name="cur_pouls" class="cpn-inp editable" value="0" style="max-width:90px;"><span class="cpn-unit">bpm</span></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Fréquence respiratoire</span><div class="cpn-val"><input type="number" name="cur_freq_resp" class="cpn-inp editable" value="0" style="max-width:90px;"><span class="cpn-unit">cpm</span></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Motif de consultation</span><input type="text" name="cur_motif_consultation" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">IMC</span><input type="number" name="cur_imc" class="cpn-inp editable" step="0.01" value="0.00"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Zscore</span><input type="number" name="cur_zscore" class="cpn-inp editable" step="0.01" value="0.00"></div>
+            <div class="cpn-row"><span class="cpn-lbl">TA Bras gauche (mmHg)</span><input type="text" name="cur_ta_gauche" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">TA Bras droit (mmHg)</span><input type="text" name="cur_ta_droit" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Périmètre crânien</span><input type="number" name="cur_perimetre_cranien" class="cpn-inp editable" step="0.01" value="0.00"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Périmètre Brachial (cm)</span><input type="text" name="cur_perimetre_brachial" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Recherche de la tuberculose</span><div class="cpn-radios"><label><input type="radio" name="cur_tuberculose" value="oui" class="editable"> Oui</label><label><input type="radio" name="cur_tuberculose" value="non" class="editable"> Non</label><label><input type="radio" name="cur_tuberculose" value="na" class="editable"> NA</label></div></div>
+            <div style="padding:7px 0; border-bottom:1px solid #f0f0f0;">
+              <span class="cpn-lbl" style="display:block;margin-bottom:5px;">Examen physique</span>
+              <textarea name="cur_examen_physique" class="f-tab-textarea editable" rows="3" placeholder="Examen physique..."></textarea>
+            </div>
+            <div class="cpn-row"><span class="cpn-lbl">Diagnostic retenu / Autres pathologies associées</span><select name="cur_diagnostic" class="cpn-sel editable"><option value=""></option><option value="paludisme">Paludisme</option><option value="ira">IRA</option><option value="diarrhee">Diarrhée</option><option value="malnutrition">Malnutrition</option><option value="autre">Autre</option></select></div>
+
+            <div class="cpn-section">Conduite à tenir et traitement</div>
+            <div style="padding:7px 0; border-bottom:1px solid #f0f0f0;">
+              <span class="cpn-lbl" style="display:block;margin-bottom:5px;">Traitement</span>
+              <textarea name="cur_traitement" class="f-tab-textarea editable" rows="3" placeholder="Traitement..."></textarea>
+            </div>
+            <div class="cpn-row"><span class="cpn-lbl">Conseil santé sexuelle et reproductive</span><div class="cpn-radios"><label><input type="radio" name="cur_conseil_sante_sexuelle" value="oui" class="editable"> Oui</label><label><input type="radio" name="cur_conseil_sante_sexuelle" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Issue de la consultation</span><select name="cur_issue_consultation" class="cpn-sel editable"><option value=""></option><option value="guerison">Guérison</option><option value="amelioration">Amélioration</option><option value="reference">Référence</option><option value="deces">Décès</option></select></div>
+          </div><!-- /col gauche -->
+
+          <!-- ══ COLONNE DROITE ══ -->
+          <div class="cpn-col">
+            <div class="cpn-section">Antécédents et autres informations</div>
+            <div class="cpn-sub" style="padding-top:4px;">Traitement antérieur/en cours</div>
+            <div class="cpn-row"><span class="cpn-lbl">HTA</span><div class="cpn-radios"><label><input type="radio" name="cur_atcd_hta" value="oui" class="editable"> Oui</label><label><input type="radio" name="cur_atcd_hta" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Diabète</span><div class="cpn-radios"><label><input type="radio" name="cur_atcd_diabete" value="oui" class="editable"> Oui</label><label><input type="radio" name="cur_atcd_diabete" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Autres</span><input type="text" name="cur_atcd_autres" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Chirurgicaux</span><input type="text" name="cur_atcd_chirurgicaux" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Obstétricaux</span><input type="text" name="cur_atcd_obstetricaux" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">D.D.R.</span><input type="date" name="cur_ddr" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Grossesse en cours</span><div class="cpn-radios"><label><input type="radio" name="cur_grossesse_en_cours" value="oui" class="editable"> Oui</label><label><input type="radio" name="cur_grossesse_en_cours" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Tabac</span><div class="cpn-radios"><label><input type="radio" name="cur_tabac" value="oui" class="editable"> Oui</label><label><input type="radio" name="cur_tabac" value="non" class="editable"> Non</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Alcool</span><div class="cpn-radios"><label><input type="radio" name="cur_alcool" value="oui" class="editable"> Oui</label><label><input type="radio" name="cur_alcool" value="non" class="editable"> Non</label></div></div>
+
+            <div class="cpn-section">Examens complémentaires</div>
+            <div class="cpn-row"><span class="cpn-lbl">TDR Paludisme</span><select name="cur_tdr_paludisme" class="cpn-sel editable"><option value=""></option><option value="negatif">Négatif</option><option value="positif">Positif</option><option value="non_fait">Non fait</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Goutte épaisse</span><select name="cur_goutte_epaisse" class="cpn-sel editable"><option value=""></option><option value="negatif">Négatif</option><option value="positif">Positif</option><option value="non_fait">Non fait</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">MILDA enfant 12 à 59 mois Eligible</span><div class="cpn-radios"><label><input type="radio" name="cur_milda_eligible" value="oui" class="editable"> Oui</label><label><input type="radio" name="cur_milda_eligible" value="non" class="editable"> Non</label><label><input type="radio" name="cur_milda_eligible" value="na" class="editable"> NA</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Remise MILDA 12 à 59 mois</span><div class="cpn-radios"><label><input type="radio" name="cur_remise_milda" value="oui" class="editable"> Oui</label><label><input type="radio" name="cur_remise_milda" value="non" class="editable"> Non</label><label><input type="radio" name="cur_remise_milda" value="na" class="editable"> NA</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">CDIP proposé</span><div class="cpn-radios"><label><input type="radio" name="cur_cdip_propose" value="oui" class="editable"> Oui</label><label><input type="radio" name="cur_cdip_propose" value="non" class="editable"> Non</label><label><input type="radio" name="cur_cdip_propose" value="na" class="editable"> NA</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">CDIP réalisé</span><div class="cpn-radios"><label><input type="radio" name="cur_cdip_realise" value="oui" class="editable"> Oui</label><label><input type="radio" name="cur_cdip_realise" value="non" class="editable"> Non</label><label><input type="radio" name="cur_cdip_realise" value="na" class="editable"> NA</label></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Code dépistage client</span><input type="text" name="cur_code_depistage" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Glycémie</span><input type="text" name="cur_glycemie" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Autres Examens</span><input type="text" name="cur_autres_examens" class="cpn-inp editable"></div>
+
+            <hr class="cpn-sep" style="margin:16px 0;">
+            <div class="cpn-row"><span class="cpn-lbl">Durée M.O</span><input type="time" name="cur_duree_mo" class="cpn-inp editable" value="00:00"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Date et heure de début M.O</span><input type="datetime-local" name="cur_date_debut_mo" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Date et heure de fin</span><input type="datetime-local" name="cur_date_fin_mo" class="cpn-inp editable"></div>
+          </div><!-- /col droite -->
+
+        </div><!-- /cpn-grid -->
+
+        <!-- Remarques pleine largeur -->
+        <hr class="cpn-sep">
+        <div style="padding:4px 0 8px;">
+          <div class="cpn-sub" style="padding:0 0 6px;">Remarques</div>
+          <textarea name="cur_remarques" class="f-tab-textarea editable" rows="3" placeholder="Remarques..."></textarea>
+        </div>
       </div>
       <!-- Autres informations -->
       <div class="f-tab-panel" id="tab-autres">
@@ -871,7 +1351,7 @@
               <div class="f-activity-who">{{ request.user.get_full_name|default:request.user.username }}</div>
               <div class="f-activity-time">{{ rdv.date_creation|date:"d/m/Y H:i" }}</div>
               <div class="f-activity-change">
-                <i class="bi bi-dot" style="color:var(--primary);"></i>
+                <i class="bi bi-dot" style="color:var(--teal-600);"></i>
                 Rendez-vous créé(e)
               </div>
             </div>
@@ -985,10 +1465,5 @@ document.addEventListener('click', function() {
   var menu = document.getElementById('action-menu');
   if (menu) menu.style.display = 'none';
 });
-  // Horloge nav
-  (function(){function t(){var e=document.getElementById('gyn-live-time');if(e)e.textContent=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});}t();setInterval(t,1000);})();
-  // Thème nav
-  var gtt=document.getElementById('gyn-theme-toggle');
-  if(gtt)gtt.addEventListener('click',function(){var h=document.documentElement,d=h.getAttribute('data-theme')==='dark';if(d){h.removeAttribute('data-theme');localStorage.setItem('segho-theme','light');}else{h.setAttribute('data-theme','dark');localStorage.setItem('segho-theme','dark');}});
 </script>
 {% endblock %}

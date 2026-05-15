@@ -3,7 +3,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.utils import timezone
-from django.db.models import F
+from django.db.models import F, Q
 
 
 def login_view(request):
@@ -643,8 +643,14 @@ def gynecologie_rdv(request):
     from patients.models import RendezVous
     from django.core.paginator import Paginator
     from django.db.models import Q
+    from datetime import date as _date
 
-    q = request.GET.get('q', '').strip()
+    q          = request.GET.get('q', '').strip()
+    filter_val = request.GET.get('filter', '')
+    group_val  = request.GET.get('group', '')
+    date_from  = request.GET.get('date_from', '').strip()
+    date_to    = request.GET.get('date_to', '').strip()
+
     rdvs = RendezVous.objects.filter(
         Q(departement='gynecologie_cpn') |
         Q(medecin__specialite__nom__icontains='gyn')
@@ -656,6 +662,50 @@ def gynecologie_rdv(request):
             Q(patient__prenoms__icontains=q) |
             Q(patient__code_patient__icontains=q)
         )
+
+    # --- Filtre rapide ---
+    if filter_val == 'today':
+        rdvs = rdvs.filter(date_heure__date=_date.today())
+    elif filter_val == 'mine':
+        rdvs = rdvs.filter(medecin__user=request.user)
+    elif filter_val == 'urgent':
+        rdvs = rdvs.filter(niveau_urgence__in=['urgent', 'tres_urgent'])
+    elif filter_val == 'urgence_medicale':
+        rdvs = rdvs.filter(type_rdv='urgence')
+    elif filter_val == 'consultation':
+        rdvs = rdvs.filter(type_rdv='consultation')
+    elif filter_val == 'suivi':
+        rdvs = rdvs.filter(type_rdv='controle')
+    elif filter_val == 'not_done':
+        rdvs = rdvs.exclude(statut__in=['termine', 'annule', 'absent'])
+
+    # --- Plage de dates ---
+    if date_from:
+        try:
+            rdvs = rdvs.filter(date_heure__date__gte=date_from)
+        except (ValueError, TypeError):
+            pass
+    if date_to:
+        try:
+            rdvs = rdvs.filter(date_heure__date__lte=date_to)
+        except (ValueError, TypeError):
+            pass
+
+    # --- Tri selon regroupement ---
+    if group_val in ('date_jour', 'date_semaine', 'date_mois', 'date_trimestre', 'date_annee'):
+        rdvs = rdvs.order_by('date_heure')
+    elif group_val == 'statut':
+        rdvs = rdvs.order_by('statut', '-date_heure')
+    elif group_val in ('medecin', 'referent'):
+        rdvs = rdvs.order_by('medecin', '-date_heure')
+    elif group_val == 'type_rdv':
+        rdvs = rdvs.order_by('type_rdv', '-date_heure')
+    elif group_val == 'patient':
+        rdvs = rdvs.order_by('patient__nom', 'patient__prenoms')
+    elif group_val == 'sexe':
+        rdvs = rdvs.order_by('patient__sexe', '-date_heure')
+    elif group_val == 'age':
+        rdvs = rdvs.order_by('patient__date_naissance')
 
     paginator = Paginator(rdvs, 80)
     page_number = request.GET.get('page')
@@ -670,22 +720,49 @@ def gynecologie_rdv(request):
 
 @login_required(login_url='login')
 def gynecologie_list(request):
-    from consultations.models import Consultation
+    from patients.models import Patient
     from django.core.paginator import Paginator
+    from datetime import date as _date
 
-    today = timezone.now().date()
-    consultations = Consultation.objects.filter(
-        medecin__specialite__nom__icontains='gyn'
-    ).select_related('patient', 'medecin').order_by('-date_heure')
+    q          = request.GET.get('q', '').strip()
+    filter_val = request.GET.get('filter', '')
+    group_val  = request.GET.get('group', '')
 
-    paginator = Paginator(consultations, 25)
+    patients = Patient.objects.filter(
+        rendez_vous__departement='gynecologie_cpn'
+    ).distinct().order_by('nom', 'prenoms')
+
+    if q:
+        patients = patients.filter(
+            Q(nom__icontains=q) | Q(prenoms__icontains=q) | Q(code_patient__icontains=q)
+        )
+
+    # --- Filtres patients ---
+    today = _date.today()
+    if filter_val == 'femme':
+        patients = patients.filter(sexe='F')
+    elif filter_val == 'homme':
+        patients = patients.filter(sexe='M')
+    elif filter_val == 'mineur':
+        cutoff = today.replace(year=today.year - 18)
+        patients = patients.filter(date_naissance__gt=cutoff)
+    elif filter_val == 'adulte':
+        cutoff_18 = today.replace(year=today.year - 18)
+        cutoff_60 = today.replace(year=today.year - 60)
+        patients = patients.filter(date_naissance__lte=cutoff_18, date_naissance__gt=cutoff_60)
+    elif filter_val == 'senior':
+        cutoff = today.replace(year=today.year - 60)
+        patients = patients.filter(date_naissance__lte=cutoff)
+
+    # --- Tri selon regroupement ---
+    if group_val == 'sexe':
+        patients = patients.order_by('sexe', 'nom', 'prenoms')
+    elif group_val == 'age':
+        patients = patients.order_by('date_naissance')
+
+    paginator = Paginator(patients, 25)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
-    stats = {
-        'aujourdhui': consultations.filter(date_heure__date=today).count(),
-        'ce_mois': consultations.filter(date_heure__month=today.month, date_heure__year=today.year).count(),
-        'total': consultations.count(),
-    }
     breadcrumb = [{'title': 'Accueil', 'url': '/'}, {'title': 'Gynécologie'}]
-    return render(request, 'gynecologie/list.html', {'page_obj': page_obj, 'stats': stats, 'breadcrumb': breadcrumb})
+    return render(request, 'gynecologie/list.html', {'page_obj': page_obj, 'breadcrumb': breadcrumb})

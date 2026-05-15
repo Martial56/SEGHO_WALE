@@ -1,36 +1,17 @@
 {% extends 'gynecologie/base.html' %}
 {% load static %}
-
-{% block extra_css %}
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-<style>
-  .topbar, .breadcrumb { display: none !important; }
-  .content { padding: 0 !important; overflow-x: hidden; }
-</style>
-{% endblock %}
+{% block nav_naissances %}active{% endblock %}
 
 {% block content %}
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap');
-
   :root {
-    --primary:      #714B67;
-    --nav-bg:       #714B67;
-    --accent:       #017E84;
-    --bg:           #f9f9f9;
-    --surface:      #ffffff;
-    --border:       #d9d9d9;
-    --text:         #212529;
-    --text-muted:   #6c757d;
+    --accent: var(--teal-500);
   }
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Roboto', sans-serif; background: var(--bg) !important; color: var(--text); }
-  html { background: var(--bg) !important; }
 
   /* ── DARK MODE ── */
-  html[data-theme="dark"] { --bg:#181c28; --surface:#21283a; --border:#2d3550; --text:#c5d4e2; --text-muted:#6c85a0; }
-  html[data-theme="dark"] .o-list tbody tr:hover { background: rgba(113,75,103,0.2); }
+  html[data-theme="dark"] .o-list tbody tr:hover { background: rgba(33,136,171,0.2); }
   html[data-theme="dark"] .o-list thead th { background: var(--surface); }
   html[data-theme="dark"] .o-list thead th:hover { background: #28304a; }
   html[data-theme="dark"] .o-search-input { color: var(--text); }
@@ -43,57 +24,25 @@
   html[data-theme="dark"] .o-ctrl-sep { background: var(--border); }
   html[data-theme="dark"] .o-subheader { background: var(--surface); border-bottom-color: var(--border); }
   html[data-theme="dark"] .o-empty-state { background: var(--bg); }
-
-  /* NAV */
-  .o-nav {
-    background: var(--nav-bg); display: flex; align-items: center;
-    height: 46px; padding: 0 10px; position: fixed; top: 0; left: 0; right: 0; z-index: 200;
-  }
-  .o-nav-grid {
-    width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
-    color: rgba(255,255,255,0.75); font-size: 17px; cursor: pointer;
-    border-radius: 4px; margin-right: 4px; transition: background 0.15s; text-decoration: none;
-  }
-  .o-nav-grid:hover { background: rgba(255,255,255,0.12); color: #fff; }
-  .o-nav-brand { font-size: 15px; font-weight: 500; color: #fff; margin-right: 2px; padding: 0 8px; white-space: nowrap; }
-  .o-nav-link {
-    color: rgba(255,255,255,0.78); text-decoration: none; font-size: 13px;
-    padding: 0 12px; height: 46px; display: flex; align-items: center;
-    border-bottom: 2px solid transparent;
-    transition: color 0.15s, background 0.15s, border-color 0.15s; white-space: nowrap;
-  }
-  .o-nav-link:hover, .o-nav-link.active { color: #fff; background: rgba(255,255,255,0.09); border-bottom-color: #fff; }
-  .o-nav-right { display: flex; align-items: center; gap: 2px; margin-left: auto; }
-  .o-nav-icon { width: 28px; height: 28px; border-radius: 4px; border: none; background: transparent; color: rgba(255,255,255,0.75); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s; }
-  .o-nav-icon:hover { background: rgba(255,255,255,0.12); color: #fff; }
-  .o-nav-icon .icon-sun { display: block; } .o-nav-icon .icon-moon { display: none; }
-  html[data-theme="dark"] .o-nav-icon .icon-sun { display: none; }
-  html[data-theme="dark"] .o-nav-icon .icon-moon { display: block; }
-  .o-nav-clock { text-align: right; font-size: 10px; color: rgba(255,255,255,0.6); line-height: 1.4; padding: 0 6px; white-space: nowrap; }
-  .o-nav-time { font-size: 13px; font-weight: 600; color: #fff; display: block; }
-  .o-nav-user { display: flex; align-items: center; gap: 5px; padding: 3px 8px 3px 3px; border-radius: 20px; background: rgba(255,255,255,0.1); margin: 0 3px; }
-  .o-nav-avatar { width: 22px; height: 22px; border-radius: 50%; background: rgba(255,255,255,0.25); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #fff; flex-shrink: 0; }
-  .o-nav-uname { font-size: 11px; font-weight: 500; color: #fff; line-height: 1.2; }
-  .o-nav-urole { font-size: 9.5px; color: rgba(255,255,255,0.65); }
-  .o-nav-logout { width: 28px; height: 28px; border-radius: 4px; border: none; background: transparent; color: rgba(255,255,255,0.75); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s; }
-  .o-nav-logout:hover { background: rgba(232,69,69,0.3); color: #fff; }
+  html[data-theme="dark"] .f-group-panel, html[data-theme="dark"] .f-filter-panel { background: #1a2535; border-color: #2e3f58; }
 
   /* SUBHEADER */
   .o-subheader {
     background: var(--surface); border-bottom: 1px solid var(--border);
     padding: 6px 16px; display: flex; flex-direction: column; gap: 5px;
-    position: fixed; top: 46px; left: 0; right: 0; z-index: 190;
+    position: sticky; top: var(--gyn-nav-h); z-index: 190;
+    margin: 0 -32px 16px;
   }
   .o-subheader-row { display: flex; align-items: center; gap: 8px; }
   .o-subheader-row-right { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .o-page-title { font-size: 17px; font-weight: 400; color: var(--text); }
   .o-btn-create {
-    background: #017E84; color: #fff; border: none; padding: 5px 14px; border-radius: 4px;
-    font-size: 12.5px; font-weight: 500; font-family: 'Roboto', sans-serif; cursor: pointer;
+    background: var(--teal-500); color: #fff; border: none; padding: 5px 14px; border-radius: 4px;
+    font-size: 12.5px; font-weight: 500; cursor: pointer;
     text-decoration: none; display: inline-flex; align-items: center;
     letter-spacing: 0.5px; transition: background 0.15s;
   }
-  .o-btn-create:hover { background: #015f64; }
+  .o-btn-create:hover { background: var(--teal-600); }
   .o-btn-excel {
     width: 28px; height: 28px; border: 1px solid #d0e9d1; border-radius: 4px;
     background: #f0faf0; color: #217346; font-size: 15px;
@@ -106,13 +55,13 @@
     background: transparent; min-height: 28px; padding: 2px 4px; gap: 4px; width: 320px;
   }
   .o-search-input {
-    border: none; outline: none; font-size: 12px; font-family: 'Roboto', sans-serif;
+    border: none; outline: none; font-size: 12px;
     color: var(--text); flex: 1; background: transparent;
   }
   .o-search-btn { background: none; border: none; cursor: pointer; color: #888; font-size: 13px; padding: 2px; }
   .o-ctrl-btn {
     background: none; border: 1px solid transparent; border-radius: 4px;
-    padding: 4px 8px; font-size: 12px; font-family: 'Roboto', sans-serif;
+    padding: 4px 8px; font-size: 12px;
     color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 4px;
     transition: border-color 0.15s, color 0.15s, background 0.15s; white-space: nowrap;
   }
@@ -125,7 +74,7 @@
     color: var(--text-muted); text-decoration: none; font-size: 12px;
     transition: background 0.15s, color 0.15s;
   }
-  .o-pag-btn:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .o-pag-btn:hover { background: var(--teal-600); color: #fff; border-color: var(--teal-600); }
   .o-pag-btn.disabled { opacity: 0.35; pointer-events: none; }
   .o-view-btns { display: flex; border: 1px solid var(--border); border-radius: 3px; overflow: hidden; }
   .o-view-btn {
@@ -135,14 +84,14 @@
     transition: background 0.15s, color 0.15s; text-decoration: none;
   }
   .o-view-btn:not(:last-child) { border-right: 1px solid var(--border); }
-  .o-view-btn.active, .o-view-btn:hover { background: var(--primary); color: #fff; }
+  .o-view-btn.active, .o-view-btn:hover { background: var(--teal-600); color: #fff; }
 
   /* GROUP DROPDOWN */
   .f-group-wrap { position: relative; }
   .f-group-panel {
-    display: none; position: absolute; top: calc(100% + 8px); left: 0; z-index: 300;
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,0.13);
+    display: none; position: fixed; z-index: 9999;
+    background: #fff; border: 1px solid #dde3ec;
+    border-radius: 6px; box-shadow: 0 8px 28px rgba(0,0,0,0.16);
     min-width: 220px; padding: 8px 0; max-height: 360px; overflow-y: auto;
   }
   .f-group-panel.open { display: block; }
@@ -156,16 +105,16 @@
     cursor: pointer; text-decoration: none; transition: background 0.1s;
     white-space: nowrap;
   }
-  .f-group-item:hover { background: #f5f0fa; color: var(--primary); }
-  .f-group-item.active { background: #ede7f6; color: var(--primary); font-weight: 500; }
+  .f-group-item:hover { background: var(--teal-50); color: var(--teal-600); }
+  .f-group-item.active { background: var(--teal-50); color: var(--teal-600); font-weight: 500; }
   .f-group-sep { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
   /* Group header row in table */
   .o-list tbody tr.grp-header td {
-    background: #f5f0fa; color: var(--primary); font-weight: 600;
-    font-size: 12px; padding: 5px 12px; border-bottom: 1px solid #d4c8e0;
+    background: var(--teal-50); color: var(--teal-600); font-weight: 600;
+    font-size: 12px; padding: 5px 12px; border-bottom: 1px solid #b2d8db;
   }
   .grp-count {
-    display: inline-block; background: var(--primary); color: #fff;
+    display: inline-block; background: var(--teal-600); color: #fff;
     border-radius: 10px; font-size: 10px; font-weight: 500;
     padding: 1px 7px; margin-left: 8px;
   }
@@ -173,9 +122,9 @@
   /* FILTER DROPDOWN */
   .f-filter-wrap { position: relative; }
   .f-filter-panel {
-    display: none; position: absolute; top: calc(100% + 8px); left: 0; z-index: 300;
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,0.13);
+    display: none; position: fixed; z-index: 9999;
+    background: #fff; border: 1px solid #dde3ec;
+    border-radius: 6px; box-shadow: 0 8px 28px rgba(0,0,0,0.16);
     min-width: 300px; padding: 16px;
   }
   .f-filter-panel.open { display: block; }
@@ -186,9 +135,9 @@
     border-radius: 4px; cursor: pointer; font-size: 13px; color: var(--text);
     border: 1px solid transparent; margin-bottom: 4px; transition: all 0.12s;
   }
-  .f-filter-option:hover { background: #f5f0fa; border-color: #d4c8e0; }
-  .f-filter-option input[type="radio"] { accent-color: var(--primary); width: 15px; height: 15px; }
-  .f-filter-option.selected { background: #f0e8f4; border-color: var(--primary); }
+  .f-filter-option:hover { background: var(--teal-50); border-color: #b2d8db; }
+  .f-filter-option input[type="radio"] { accent-color: var(--teal-600); width: 15px; height: 15px; }
+  .f-filter-option.selected { background: var(--teal-50); border-color: var(--teal-600); }
   .f-date-group {
     display: none; margin-top: 8px; padding: 10px 12px;
     background: #fafafa; border-radius: 4px; border: 1px solid var(--border);
@@ -199,34 +148,34 @@
   .f-date-row label { font-size: 11.5px; color: var(--text-muted); min-width: 36px; }
   .f-date-input {
     flex: 1; border: none; border-bottom: 1px solid #bbb;
-    font-size: 12.5px; font-family: 'Roboto', sans-serif; color: var(--text);
+    font-size: 12.5px; color: var(--text);
     background: transparent; padding: 3px 2px; outline: none;
   }
-  .f-date-input:focus { border-bottom-color: var(--primary); }
+  .f-date-input:focus { border-bottom-color: var(--teal-600); }
   .f-filter-actions { display: flex; gap: 8px; margin-top: 14px; }
   .f-apply-btn {
-    flex: 1; background: var(--primary); color: #fff; border: none;
+    flex: 1; background: var(--teal-600); color: #fff; border: none;
     padding: 6px 0; border-radius: 4px; font-size: 12.5px; font-weight: 500;
-    font-family: 'Roboto', sans-serif; cursor: pointer; transition: background 0.15s;
+    cursor: pointer; transition: background 0.15s;
   }
-  .f-apply-btn:hover { background: var(--primary-dark); }
+  .f-apply-btn:hover { background: var(--teal-700); }
   .f-clear-btn {
     background: none; border: 1px solid var(--border); color: var(--text-muted);
     padding: 6px 14px; border-radius: 4px; font-size: 12.5px;
-    font-family: 'Roboto', sans-serif; cursor: pointer; text-decoration: none;
+    cursor: pointer; text-decoration: none;
     display: inline-flex; align-items: center; transition: all 0.12s;
   }
   .f-clear-btn:hover { border-color: #999; color: var(--text); }
   .f-active-tag {
     display: inline-flex; align-items: center; gap: 4px;
-    background: #ede7f6; color: var(--primary); border: 1px solid #c8b0d8;
+    background: var(--teal-50); color: var(--teal-600); border: 1px solid #b2d8db;
     border-radius: 3px; padding: 1px 8px; font-size: 11.5px; font-weight: 500;
   }
   .f-active-tag a { color: #999; text-decoration: none; font-size: 14px; margin-left: 2px; }
   .f-active-tag a:hover { color: #333; }
 
   /* TABLE */
-  .o-list-wrap { overflow-x: auto; background: var(--surface); border-top: 1px solid var(--border); }
+  .o-list-wrap { overflow-x: auto; background: var(--surface); border-top: 1px solid var(--border); margin: 0 -32px; }
   .o-list { width: 100%; border-collapse: collapse; font-size: 12.5px; }
   .o-list thead { background: #fafafa; border-bottom: 2px solid #e0e0e0; }
   .o-list thead th {
@@ -242,7 +191,7 @@
   }
   .o-col-resize:hover, .o-col-resize.active { background: var(--accent); opacity: 0.45; }
   .o-list tbody tr { border-bottom: 1px solid #f0f0f0; transition: background 0.1s; cursor: pointer; }
-  .o-list tbody tr:hover { background: #f5f0fa; }
+  .o-list tbody tr:hover { background: var(--teal-50); }
   .o-list tbody td {
     padding: 7px 12px; color: var(--text); vertical-align: middle;
     white-space: nowrap; border-right: 1px solid #f8f8f8;
@@ -255,17 +204,62 @@
   .o-badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 500; }
   .badge-vivant  { background: #e8f5e9; color: #2e7d32; }
   .badge-mort_ne { background: #fce4ec; color: #b71c1c; }
-  .o-cb { width: 16px; height: 16px; cursor: pointer; accent-color: var(--primary); }
+  .o-cb { width: 16px; height: 16px; cursor: pointer; accent-color: var(--teal-600); }
   .th-cb, .td-cb { width: 40px; text-align: center; }
+
+  /* GRID VIEW */
+  .o-grid-view {
+    padding: 12px 16px; margin: 0 -32px;
+    display: none;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 8px;
+  }
+  .o-grid-view.active { display: grid; }
+  .o-gcard {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
+    padding: 10px 12px; text-decoration: none; color: inherit;
+    display: flex; flex-direction: column; gap: 4px;
+    transition: box-shadow 0.15s, border-color 0.15s;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.07);
+  }
+  .o-gcard:hover { box-shadow: 0 3px 10px rgba(0,0,0,0.13); border-color: #bbb; }
+  .o-gcard-title { font-size: 12.5px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .o-gcard-sub { font-size: 11.5px; color: var(--text-muted); line-height: 1.7; }
+  .o-gcard-sub b { color: var(--text); }
+  html[data-theme="dark"] .o-gcard { background: var(--surface); border-color: var(--border); }
+
+  /* CALENDAR VIEW */
+  .o-cal-view { display: none; padding: 12px 16px; margin: 0 -32px; }
+  .o-cal-view.active { display: block; }
+  .o-cal-hdr { display: flex; align-items: center; justify-content: space-between; padding: 0 0 14px; }
+  .o-cal-title-txt { font-size: 15px; font-weight: 500; color: var(--text); }
+  .o-cal-nav {
+    background: none; border: 1px solid var(--border); border-radius: 4px;
+    width: 28px; height: 28px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted); font-size: 13px; transition: background 0.15s;
+  }
+  .o-cal-nav:hover { background: var(--teal-50); color: var(--teal-600); border-color: var(--teal-600); }
+  .o-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+  .o-cal-dow { background: #f5f5f5; text-align: center; padding: 6px 4px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; }
+  .o-cal-day { background: var(--surface); min-height: 72px; padding: 5px 6px; }
+  .o-cal-day.empty { background: #fafafa; }
+  .o-cal-day.is-today .o-cal-dn { background: var(--teal-600); color: #fff; border-radius: 50%; }
+  .o-cal-dn { width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; color: var(--text-muted); font-weight: 500; }
+  .o-cal-evt { font-size: 10.5px; margin-top: 2px; background: var(--teal-50); color: var(--teal-600); border-radius: 2px; padding: 1px 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; line-height: 1.5; }
+  .o-cal-evt:hover { background: var(--teal-600); color: #fff; }
+  .o-cal-more { font-size: 10px; font-weight: 600; color: var(--teal-600); margin-top: 2px; }
+  html[data-theme="dark"] .o-cal-dow { background: #1e2d3d; }
+  html[data-theme="dark"] .o-cal-day.empty { background: #151e2a; }
 
   /* EMPTY STATE */
   .o-empty-state {
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    padding: 80px 20px; background: var(--bg);
+    padding: 80px 20px;
   }
   .o-empty-illustration {
     width: 90px; height: 90px; border-radius: 50%;
-    background: linear-gradient(135deg, #714B67 0%, #a97fbf 100%);
+    background: linear-gradient(135deg, var(--teal-600) 0%, var(--teal-400) 100%);
     display: flex; align-items: center; justify-content: center;
     margin-bottom: 20px; position: relative;
   }
@@ -278,22 +272,11 @@
   .o-empty-illustration::after {
     content: '☺'; position: absolute;
     font-size: 28px; top: 18px; left: 22px; z-index: 1;
-    color: var(--primary);
+    color: var(--teal-600);
   }
   .o-empty-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
   .o-empty-sub { font-size: 12.5px; color: var(--text-muted); }
 </style>
-
-<!-- NAV -->
-<nav class="o-nav">
-  <a href="{% url 'dashboard' %}" class="o-nav-grid"><i class="bi bi-grid-3x3-gap-fill"></i></a>
-  <span class="o-nav-brand">Gynécologie</span>
-  <a href="{% url 'gynecologie_list' %}" class="o-nav-link">Les patients</a>
-  <a href="{% url 'gynecologie_rdv' %}" class="o-nav-link">Rendez-vous</a>
-  <a href="{% url 'gynecologie_naissances' %}" class="o-nav-link active">Registre des naissances</a>
-  <a href="#" class="o-nav-link">Rapports</a>
-  {% include 'gynecologie/_nav_right.html' %}
-</nav>
 
 <!-- SUBHEADER -->
 <div class="o-subheader">
@@ -319,7 +302,7 @@
         <button type="button" class="o-ctrl-btn {% if filter_type %}active{% endif %}"
                 id="filterToggle" onclick="toggleFilter(event)">
           <i class="bi bi-funnel{% if filter_type %}-fill{% endif %}"></i> Filtres
-          {% if filter_type %}<span style="background:var(--primary);color:#fff;border-radius:50%;width:14px;height:14px;font-size:9px;display:inline-flex;align-items:center;justify-content:center;margin-left:2px;">1</span>{% endif %}
+          {% if filter_type %}<span style="background:var(--teal-600);color:#fff;border-radius:50%;width:14px;height:14px;font-size:9px;display:inline-flex;align-items:center;justify-content:center;margin-left:2px;">1</span>{% endif %}
         </button>
 
         <div class="f-filter-panel {% if filter_type %}open{% endif %}" id="filterPanel">
@@ -403,7 +386,7 @@
         <button type="button" class="o-ctrl-btn {% if group_by %}active{% endif %}"
                 id="groupToggle" onclick="toggleGroup(event)">
           <i class="bi bi-list-ul"></i> Regrouper par
-          {% if group_by %}<span style="background:var(--primary);color:#fff;border-radius:50%;width:14px;height:14px;font-size:9px;display:inline-flex;align-items:center;justify-content:center;margin-left:2px;">1</span>{% endif %}
+          {% if group_by %}<span style="background:var(--teal-600);color:#fff;border-radius:50%;width:14px;height:14px;font-size:9px;display:inline-flex;align-items:center;justify-content:center;margin-left:2px;">1</span>{% endif %}
         </button>
         <div class="f-group-panel" id="groupPanel">
           <div class="f-group-section">Création</div>
@@ -443,9 +426,9 @@
       </div>
       <div class="o-ctrl-sep"></div>
       <div class="o-view-btns">
-        <button class="o-view-btn active"><i class="bi bi-list-task"></i></button>
-        <button class="o-view-btn"><i class="bi bi-calendar3"></i></button>
-        <button class="o-view-btn"><i class="bi bi-grid"></i></button>
+        <button class="o-view-btn" data-v="list"     onclick="setView('list')"    title="Liste"><i class="bi bi-list-task"></i></button>
+        <button class="o-view-btn" data-v="calendar" onclick="setView('calendar')" title="Calendrier"><i class="bi bi-calendar3"></i></button>
+        <button class="o-view-btn" data-v="grid"     onclick="setView('grid')"    title="Grille"><i class="bi bi-grid"></i></button>
       </div>
     </div>
   </div>
@@ -453,7 +436,9 @@
 
 <!-- CONTENU -->
 {% if page_obj.paginator.count %}
-<div class="o-list-wrap" style="margin-top: 119px;">
+<div id="o-grid-view" class="o-grid-view"></div>
+<div id="o-cal-view"  class="o-cal-view"></div>
+<div class="o-list-wrap" id="o-list-wrap">
   <table class="o-list">
     <thead>
       <tr>
@@ -533,12 +518,155 @@
     document.querySelectorAll('.o-cb:not(#chk-all)').forEach(cb => cb.checked = this.checked);
   });
 
+  /* ─── VIEW SWITCHING ─── */
+  var _gridBuilt = false, _calBuilt = false;
+  var _calYear, _calMonth;
+  var calBirthMap = {};
+
+  function setView(v) {
+    localStorage.setItem('naissance_view', v);
+    document.querySelectorAll('.o-view-btn[data-v]').forEach(function(b) {
+      b.classList.toggle('active', b.dataset.v === v);
+    });
+    var listEl = document.getElementById('o-list-wrap');
+    var gridEl = document.getElementById('o-grid-view');
+    var calEl  = document.getElementById('o-cal-view');
+    if (listEl) listEl.style.display = v === 'list' ? '' : 'none';
+    if (gridEl) { gridEl.classList.toggle('active', v === 'grid'); }
+    if (calEl)  { calEl.classList.toggle('active',  v === 'calendar'); }
+    if (v === 'grid'     && !_gridBuilt) { buildGrid();     _gridBuilt = true; }
+    if (v === 'calendar' && !_calBuilt)  { buildCalendar(); _calBuilt  = true; }
+  }
+
+  function _rowData() {
+    var rows = [];
+    document.querySelectorAll('.o-list tbody tr:not(.grp-header)').forEach(function(row) {
+      var cells = row.querySelectorAll('td');
+      if (cells.length < 6) return;
+      var oc  = row.getAttribute('onclick') || '';
+      var m   = oc.match(/'([^']+)'/);
+      rows.push({
+        code:   cells[1].textContent.trim(),
+        mere:   cells[2].textContent.trim(),
+        date:   cells[3].textContent.trim(),
+        medecin:cells[4].textContent.trim(),
+        mode:   cells[5].textContent.trim(),
+        enfant: cells[6] ? cells[6].textContent.trim() : '—',
+        sexe:   cells[7] ? cells[7].textContent.trim() : '—',
+        badge:  cells[12] ? cells[12].innerHTML : '',
+        url:    m ? m[1] : '#',
+      });
+    });
+    return rows;
+  }
+
+  function buildGrid() {
+    var grid = document.getElementById('o-grid-view');
+    var rows = _rowData();
+    if (!rows.length) {
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:60px;color:var(--text-muted);">Aucun enregistrement.</div>';
+      return;
+    }
+    grid.innerHTML = rows.map(function(r) {
+      return '<a class="o-gcard" href="' + r.url + '">' +
+        '<div class="o-gcard-title">' + r.mere + '</div>' +
+        '<div class="o-gcard-sub">' +
+          '<b>' + r.code + '</b> &nbsp;·&nbsp; ' + (r.date.split(' ')[0] || r.date) + '<br>' +
+          (r.enfant !== '—' ? 'Enfant&nbsp;: <b>' + r.enfant + '</b> (' + r.sexe + ')<br>' : '') +
+          (r.medecin !== '—' ? 'Dr&nbsp;: ' + r.medecin + '<br>' : '') +
+          (r.mode ? 'Mode&nbsp;: ' + r.mode : '') +
+        '</div>' +
+        (r.badge ? '<div style="margin-top:5px;">' + r.badge + '</div>' : '') +
+      '</a>';
+    }).join('');
+  }
+
+  function buildCalendar() {
+    calBirthMap = {};
+    _rowData().forEach(function(r) {
+      var parts = (r.date.split(' ')[0] || '').split('/');
+      if (parts.length !== 3) return;
+      var key = parts[2] + '-' + parts[1] + '-' + parts[0];
+      if (!calBirthMap[key]) calBirthMap[key] = [];
+      calBirthMap[key].push(r);
+    });
+    var now = new Date();
+    _calYear  = now.getFullYear();
+    _calMonth = now.getMonth();
+    var keys = Object.keys(calBirthMap).sort();
+    if (keys.length) { var d = new Date(keys[0]); _calYear = d.getFullYear(); _calMonth = d.getMonth(); }
+    renderCalendar(_calYear, _calMonth);
+  }
+
+  function renderCalendar(year, month) {
+    var cal = document.getElementById('o-cal-view');
+    var mNames = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+    var dNames = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+    var first  = new Date(year, month, 1);
+    var last   = new Date(year, month + 1, 0);
+    var today  = new Date();
+    var startDow = (first.getDay() + 6) % 7;
+
+    var h = '<div class="o-cal-hdr">' +
+      '<button class="o-cal-nav" onclick="calNav(-1)"><i class="bi bi-chevron-left"></i></button>' +
+      '<div class="o-cal-title-txt">' + mNames[month] + ' ' + year + '</div>' +
+      '<button class="o-cal-nav" onclick="calNav(1)"><i class="bi bi-chevron-right"></i></button>' +
+    '</div><div class="o-cal-grid">';
+    dNames.forEach(function(d) { h += '<div class="o-cal-dow">' + d + '</div>'; });
+    for (var i = 0; i < startDow; i++) h += '<div class="o-cal-day empty"></div>';
+    for (var d = 1; d <= last.getDate(); d++) {
+      var mm  = String(month + 1).padStart(2, '0');
+      var dd  = String(d).padStart(2, '0');
+      var key = year + '-' + mm + '-' + dd;
+      var isToday = year === today.getFullYear() && month === today.getMonth() && d === today.getDate();
+      h += '<div class="o-cal-day' + (isToday ? ' is-today' : '') + '">';
+      h += '<div class="o-cal-dn">' + d + '</div>';
+      if (calBirthMap[key]) {
+        var evs = calBirthMap[key];
+        h += '<div class="o-cal-evt" onclick="window.location=\'' + evs[0].url + '\'" title="' + evs[0].mere + '">' + evs[0].mere + '</div>';
+        if (evs.length > 1) h += '<div class="o-cal-more">+' + (evs.length - 1) + ' naissance' + (evs.length - 1 > 1 ? 's' : '') + '</div>';
+      }
+      h += '</div>';
+    }
+    var rem = (startDow + last.getDate()) % 7;
+    if (rem) for (var i = rem; i < 7; i++) h += '<div class="o-cal-day empty"></div>';
+    h += '</div>';
+    cal.innerHTML = h;
+  }
+
+  function calNav(dir) {
+    _calMonth += dir;
+    if (_calMonth < 0)  { _calMonth = 11; _calYear--; }
+    if (_calMonth > 11) { _calMonth = 0;  _calYear++; }
+    renderCalendar(_calYear, _calMonth);
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    var v = localStorage.getItem('naissance_view') || 'list';
+    setView(v);
+  });
+
   /* Filter dropdown */
   /* Group dropdown */
+  function _positionPanel(panel, btn) {
+    var rect = btn.getBoundingClientRect();
+    panel.style.top = (rect.bottom + 4) + 'px';
+    panel.style.left = rect.left + 'px';
+    panel.style.right = 'auto';
+    var pr = panel.getBoundingClientRect();
+    if (pr.right > window.innerWidth - 8) {
+      panel.style.left = 'auto';
+      panel.style.right = (window.innerWidth - rect.right) + 'px';
+    }
+  }
+
   function toggleGroup(e) {
     e.stopPropagation();
-    document.getElementById('groupPanel').classList.toggle('open');
+    var panel = document.getElementById('groupPanel');
+    var isOpen = panel.classList.contains('open');
     document.getElementById('filterPanel').classList.remove('open');
+    if (!isOpen) { _positionPanel(panel, e.currentTarget); panel.classList.add('open'); }
+    else { panel.classList.remove('open'); }
   }
   document.addEventListener('click', function(e) {
     if (!document.getElementById('groupWrap').contains(e.target))
@@ -547,12 +675,28 @@
 
   function toggleFilter(e) {
     e.stopPropagation();
-    document.getElementById('filterPanel').classList.toggle('open');
+    var panel = document.getElementById('filterPanel');
+    var isOpen = panel.classList.contains('open');
     document.getElementById('groupPanel').classList.remove('open');
+    if (!isOpen) { _positionPanel(panel, e.currentTarget); panel.classList.add('open'); }
+    else { panel.classList.remove('open'); }
   }
   document.addEventListener('click', function(e) {
     if (!document.getElementById('filterWrap').contains(e.target))
       document.getElementById('filterPanel').classList.remove('open');
+  });
+
+  document.addEventListener('scroll', function() {
+    document.getElementById('groupPanel').classList.remove('open');
+    document.getElementById('filterPanel').classList.remove('open');
+  }, true);
+
+  // Positionner le panel filtre s'il est ouvert au chargement (filtre actif)
+  document.addEventListener('DOMContentLoaded', function() {
+    var fp = document.getElementById('filterPanel');
+    if (fp && fp.classList.contains('open')) {
+      _positionPanel(fp, document.getElementById('filterToggle'));
+    }
   });
 
   function selectFilter(type) {
@@ -595,11 +739,6 @@
 
     window.location.href = '?' + params.toString();
   }
-  // Horloge nav
-  (function(){function t(){var e=document.getElementById('gyn-live-time');if(e)e.textContent=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});}t();setInterval(t,1000);})();
-  // Thème nav
-  var gtt=document.getElementById('gyn-theme-toggle');
-  if(gtt)gtt.addEventListener('click',function(){var h=document.documentElement,d=h.getAttribute('data-theme')==='dark';if(d){h.removeAttribute('data-theme');localStorage.setItem('segho-theme','light');}else{h.setAttribute('data-theme','dark');localStorage.setItem('segho-theme','dark');}});
 
   // Colonnes redimensionnables
   function initResizableCols(table) {
