@@ -36,16 +36,21 @@ class Constante(models.Model):
     temperature = models.DecimalField(max_digits=4, decimal_places=1, null=True, blank=True)
     tension_systolique = models.IntegerField(null=True, blank=True)
     tension_diastolique = models.IntegerField(null=True, blank=True)
+    tension_systolique_droite = models.IntegerField(null=True, blank=True)
+    tension_diastolique_droite = models.IntegerField(null=True, blank=True)
     pouls = models.IntegerField(null=True, blank=True)
+    frequence_respiratoire = models.IntegerField(null=True, blank=True)
     saturation_oxygene = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     glycemie = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    albumine = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    perimetre_brachial = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True)
+    niveau_douleur = models.IntegerField(null=True, blank=True)
     date_saisie = models.DateTimeField(auto_now_add=True)
 
     @property
     def imc(self):
         if self.poids and self.taille and self.taille > 0:
-            taille_m = float(self.taille) / 100
-            return round(float(self.poids) / (taille_m ** 2), 2)
+            return round(float(self.poids) / (float(self.taille) ** 2), 2)
         return None
 
 

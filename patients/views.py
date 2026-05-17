@@ -246,6 +246,9 @@ def rdv_create(request):
         'form':            form,
         'titre':           'Nouveau rendez-vous',
         'patient_prefill': patient_obj,
+        'is_new':          True,
+        'consultation':    None,
+        'constante':       None,
     })
 
 
@@ -259,8 +262,62 @@ def rdv_edit(request, pk):
     except Exception:
         facture_payee = False
 
+    # Consultation + constante liées à ce RDV
+    consultation = None
+    constante = None
+    try:
+        consultation = rdv.consultation
+        try:
+            constante = consultation.constantes
+        except Exception:
+            pass
+    except Exception:
+        pass
+
     if request.method == 'POST':
         action = request.POST.get('_action', '')
+
+        if action == 'save_eval':
+            _eval_map = {
+                'eval_poids': 'poids',
+                'eval_taille': 'taille',
+                'eval_temperature': 'temperature',
+                'eval_tension_systolique': 'tension_systolique',
+                'eval_tension_diastolique': 'tension_diastolique',
+                'eval_tension_systolique_droite': 'tension_systolique_droite',
+                'eval_tension_diastolique_droite': 'tension_diastolique_droite',
+                'eval_pouls': 'pouls',
+                'eval_frequence_respiratoire': 'frequence_respiratoire',
+                'eval_saturation_oxygene': 'saturation_oxygene',
+                'eval_glycemie': 'glycemie',
+                'eval_albumine': 'albumine',
+                'eval_perimetre_brachial': 'perimetre_brachial',
+                'eval_niveau_douleur': 'niveau_douleur',
+            }
+            from consultations.models import Consultation as Consult, Constante as Const
+            try:
+                consult_obj = rdv.consultation
+            except Exception:
+                consult_obj = None
+            if consult_obj is None:
+                consult_obj = Consult.objects.create(
+                    patient=rdv.patient,
+                    medecin=rdv.medecin,
+                    rendez_vous=rdv,
+                    motif=rdv.motif or 'Évaluation clinique',
+                    cree_par=request.user,
+                )
+            const_obj, _ = Const.objects.get_or_create(consultation=consult_obj)
+            for post_key, model_field in _eval_map.items():
+                val = request.POST.get(post_key, '').strip()
+                if val != '':
+                    # Valeur soumise : mettre à jour
+                    setattr(const_obj, model_field, val)
+                # Valeur vide : conserver la valeur existante (ne pas écraser)
+            const_obj.save()
+            messages.success(request, 'Évaluation enregistrée.')
+            from django.urls import reverse
+            return redirect(reverse('patients:rdv_edit', kwargs={'pk': rdv.pk}))
 
         if action == 'confirmer':
             if facture_payee:
@@ -269,6 +326,26 @@ def rdv_edit(request, pk):
                 messages.success(request, 'Rendez-vous confirmé.')
             else:
                 messages.error(request, 'Une facture payée est requise pour confirmer ce rendez-vous.')
+            return redirect('patients:rdv_global')
+
+        if action == 'en_attente':
+            rdv.statut = 'en_attente'
+            rdv.save(update_fields=['statut'])
+            messages.success(request, 'Rendez-vous mis en attente de consultation.')
+            from django.urls import reverse
+            return redirect(reverse('patients:rdv_edit', kwargs={'pk': rdv.pk}))
+
+        if action == 'en_consultation':
+            rdv.statut = 'en_consultation'
+            rdv.save(update_fields=['statut'])
+            messages.success(request, 'Consultation démarrée.')
+            from django.urls import reverse
+            return redirect(reverse('patients:rdv_edit', kwargs={'pk': rdv.pk}))
+
+        if action == 'terminer':
+            rdv.statut = 'termine'
+            rdv.save(update_fields=['statut'])
+            messages.success(request, 'Consultation terminée.')
             return redirect('patients:rdv_global')
 
         if action == 'annuler':
@@ -284,6 +361,44 @@ def rdv_edit(request, pk):
             if code:
                 rdv.code_confirmation = code
             rdv.save()
+
+            # Sauvegarder l'évaluation clinique si des champs sont remplis
+            _eval_map = {
+                'eval_poids': 'poids',
+                'eval_taille': 'taille',
+                'eval_temperature': 'temperature',
+                'eval_tension_systolique': 'tension_systolique',
+                'eval_tension_diastolique': 'tension_diastolique',
+                'eval_tension_systolique_droite': 'tension_systolique_droite',
+                'eval_tension_diastolique_droite': 'tension_diastolique_droite',
+                'eval_pouls': 'pouls',
+                'eval_frequence_respiratoire': 'frequence_respiratoire',
+                'eval_saturation_oxygene': 'saturation_oxygene',
+                'eval_glycemie': 'glycemie',
+                'eval_albumine': 'albumine',
+                'eval_perimetre_brachial': 'perimetre_brachial',
+            }
+            if any(request.POST.get(k, '').strip() for k in _eval_map):
+                from consultations.models import Consultation as Consult, Constante as Const
+                try:
+                    consult_obj = rdv.consultation
+                except Exception:
+                    consult_obj = None
+                if consult_obj is None:
+                    consult_obj = Consult.objects.create(
+                        patient=rdv.patient,
+                        medecin=rdv.medecin,
+                        rendez_vous=rdv,
+                        motif=rdv.motif or 'Évaluation clinique',
+                        cree_par=request.user,
+                    )
+                const_obj, _ = Const.objects.get_or_create(consultation=consult_obj)
+                for post_key, model_field in _eval_map.items():
+                    val = request.POST.get(post_key, '').strip()
+                    if val != '':
+                        setattr(const_obj, model_field, val)
+                const_obj.save()
+
             messages.success(request, 'Rendez-vous modifié.')
             if action == 'créer une facture':
                 from django.urls import reverse
@@ -298,6 +413,9 @@ def rdv_edit(request, pk):
         'titre':         f'Rendez-vous — {rdv.patient.nom} {rdv.patient.prenoms}',
         'patient_prefill': rdv.patient,
         'facture_payee': facture_payee,
+        'is_new':        False,
+        'consultation':  consultation,
+        'constante':     constante,
     })
 
 
