@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand
-from services.models import CategorieArticle, UniteMesure, ArticleService
+from services.models import CategorieArticle, UniteMesure, Articleservice
 
 
 CATEGORIES = [
@@ -11,7 +11,7 @@ CATEGORIES = [
     ('EX', 'Examens Biologiques',      'Analyses biologiques et de laboratoire'),
     ('MD', 'Médicaments',              'Médicaments et produits pharmaceutiques'),
     ('MO', 'Mise en Observation',      'Hospitalisation en observation courte durée'),
-    ('MT', 'Maternité',                'Prestations maternité, accouchement et suivi prénatal'),
+    ('MT', 'Maternité',                'services maternité, accouchement et suivi prénatal'),
     ('RD', 'Radiologies',              'Examens radiologiques et imagerie médicale'),
     ('SN', 'Soins',                    'Actes de soins infirmiers et médicaux divers'),
     ('VC', 'Vaccins',                  'Vaccinations et immunisations'),
@@ -231,7 +231,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         if options['clear']:
-            ArticleService.objects.all().delete()
+            Articleservice.objects.all().delete()
             self.stdout.write(self.style.WARNING('Articles supprimés.'))
 
         # 1. Catégories
@@ -256,13 +256,13 @@ class Command(BaseCommand):
             )
         self.stdout.write(self.style.SUCCESS(f'  {len(UNITES)} unités OK'))
 
-        # 3. Articles / Services
-        self.stdout.write('→ Articles / Services...')
+        # 3. Articles / services
+        self.stdout.write('→ Articles / services...')
         created_count = 0
         updated_count = 0
         for nom, ref, prix, cat_code, type_art, type_prod in ARTICLES:
             cat = cat_map.get(cat_code)
-            obj, created = ArticleService.objects.get_or_create(
+            obj, created = Articleservice.objects.get_or_create(
                 reference_interne=ref,
                 defaults={
                     'nom': nom,

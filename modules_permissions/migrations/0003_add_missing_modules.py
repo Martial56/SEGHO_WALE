@@ -3,7 +3,7 @@ from django.db import migrations
 NEW_MODULES = [
     {'code': 'rendezvous',  'name': 'Rendez-vous',  'icon': '📅', 'url_name': 'admin:patients_rendezvous_changelist',                    'order':  2},
     {'code': 'assurance',   'name': 'Assurance',    'icon': '🛡️', 'url_name': 'admin:patients_assurance_changelist',                     'order':  3},
-    {'code': 'services',    'name': 'Services',     'icon': '🏥', 'url_name': 'admin:medecins_service_changelist',                       'order':  5},
+    {'code': 'services',    'name': 'services',     'icon': '🏥', 'url_name': 'admin:medecins_service_changelist',                       'order':  5},
     {'code': 'ordonnances', 'name': 'Ordonnances',  'icon': '📋', 'url_name': 'admin:consultations_ordonnance_changelist',               'order':  7},
     {'code': 'gynecologie', 'name': 'Gynécologie',  'icon': '♀️', 'url_name': 'admin:consultations_consultation_changelist',            'order':  8},
     {'code': 'medicaments', 'name': 'Médicaments',  'icon': '💊', 'url_name': 'admin:pharmacie_medicament_changelist',                   'order': 12},

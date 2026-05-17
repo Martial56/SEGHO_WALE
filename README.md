@@ -18,7 +18,7 @@ medisoft/
 │   └── models.py           → Patient, Assurance, RendezVous
 │
 ├── medecins/               # 👨‍⚕️ Gestion du personnel médical
-│   └── models.py           → Medecin, Specialite, Service
+│   └── models.py           → Medecin, Specialite, service
 │
 ├── consultations/          # 🩺 Consultations & dossiers médicaux
 │   └── models.py           → Consultation, Constante, Diagnostic,
@@ -101,7 +101,7 @@ python manage.py runserver
 
 ### 2. 👨‍⚕️ Gestion Médicale (`medecins`, `consultations`)
 - Fichier médecin avec spécialité, honoraires
-- Organisation en **Services** (Consultations, Gynéco, Pédiatrie, Labo, Pharmacie...)
+- Organisation en **services** (Consultations, Gynéco, Pédiatrie, Labo, Pharmacie...)
 - **Dossier médical** : anamnèse, constantes (poids, taille, TA, température, SpO2, IMC calculé auto)
 - **Diagnostics CIM-10** avec choix principal/associé/différentiel
 - **Ordonnances** internes et externes avec lignes de médicaments

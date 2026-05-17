@@ -79,7 +79,7 @@
 
     /* Meta row */
     .ref-meta-row {
-        display: grid; grid-template-columns: auto 1fr;
+        display: grid; grid-template-columns: auto auto 1fr;
         gap: 24px; padding: 20px 28px;
         border-bottom: 1px solid rgba(0,0,0,.07);
     }
@@ -365,6 +365,10 @@
                 <div class="code-badge auto">Automatique</div>
                 {% endif %}
             </div>
+            <div class="form-field" style="margin-bottom:0;" id="genre-meta-wrapper">
+                <label class="field-label" for="{{ form.genre.id_for_label }}">Genre</label>
+                {{ form.genre }}
+            </div>
             <div class="form-field" style="margin-bottom:0;" id="poste-meta-wrapper">
                 <label class="field-label" for="{{ form.poste_occupe.id_for_label }}">Poste Occupé</label>
                 {{ form.poste_occupe }}
@@ -482,6 +486,11 @@
         <!-- ── Contacts & Adresses ── -->
         <div class="tab-panel active" id="tab-adresse">
             {{ contact_fs.management_form }}
+            <select id="type-adresse-template" style="display:none;" aria-hidden="true">
+                {% for value, label in contact_fs.empty_form.fields.type_adresse.choices %}
+                <option value="{{ value }}">{{ label }}</option>
+                {% endfor %}
+            </select>
             <table class="contacts-table" id="contacts-table">
                 <thead>
                     <tr>
@@ -786,15 +795,13 @@
 
     function buildEmptyRow(index) {
         var prefix = 'contacts_adresses-' + index;
+        var typeOptions = document.getElementById('type-adresse-template').innerHTML;
         var tr = document.createElement('tr');
         tr.className = 'contact-row';
         tr.id = 'contact-row-' + index;
         tr.innerHTML =
             '<td><select name="' + prefix + '-type_adresse" class="field-ul">' +
-            '<option value="contact">Contact</option>' +
-            '<option value="facturation">Adresse de facturation</option>' +
-            '<option value="livraison">Adresse de livraison</option>' +
-            '<option value="autre">Autre adresse</option>' +
+            typeOptions +
             '</select>' +
             '<input type="hidden" name="' + prefix + '-id" value=""></td>' +
             '<td><input type="text" name="' + prefix + '-nom" class="field-ul" placeholder="Nom"></td>' +

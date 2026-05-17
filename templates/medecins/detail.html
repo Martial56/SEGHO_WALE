@@ -6,31 +6,124 @@
 <style>
     /* ── Action bar ── */
     .action-bar {
-        display: flex; align-items: center; justify-content: space-between;
-        margin-bottom: 16px; gap: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 0;
+        background: #fff;
+        border-radius: var(--radius) var(--radius) 0 0;
+        padding: 14px 24px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.07);
+        flex-wrap: wrap;
     }
-    .action-bar-left { display: flex; align-items: center; gap: 10px; }
-    .nav-arrow {
-        display: inline-flex; align-items: center; justify-content: center;
-        width: 32px; height: 32px; border-radius: 8px; border: 1px solid rgba(0,0,0,0.1);
-        background: #fff; color: var(--text-primary); text-decoration: none;
-        font-size: 16px; box-shadow: var(--shadow-sm); transition: opacity .15s;
-    }
-    .nav-arrow:hover { opacity: .75; }
-    .nav-arrow.disabled { opacity: .3; pointer-events: none; }
-    .nav-position { font-size: 12px; color: var(--text-muted); font-weight: 600; }
 
-    /* ── Smart buttons ── */
-    .smart-buttons { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
-    .smart-btn {
-        display: inline-flex; flex-direction: column; align-items: center;
-        padding: 8px 16px; background: #fff; border: 1px solid rgba(0,0,0,0.1);
-        border-radius: 8px; box-shadow: var(--shadow-sm); cursor: pointer;
-        text-decoration: none; transition: box-shadow .15s, border-color .15s; min-width: 80px;
+    .action-bar-left {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
     }
-    .smart-btn:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.12); border-color: var(--teal-300); }
-    .smart-btn .sb-count { font-size: 18px; font-weight: 800; color: var(--teal-700); line-height: 1; }
-    .smart-btn .sb-label { font-size: 11px; color: var(--text-muted); margin-top: 2px; font-weight: 500; white-space: nowrap; }
+
+    .action-bar-right {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .nav-counter {
+        font-size: 13px;
+        color: rgba(0, 0, 0, 0.45);
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .nav-arrow {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
+        border: 1px solid rgba(0, 0, 0, 0.12);
+        background: #fff;
+        color: var(--teal-700);
+        text-decoration: none;
+        font-size: 14px;
+        transition: all 0.15s;
+    }
+
+    .nav-arrow:hover {
+        background: var(--teal-50);
+        border-color: var(--teal-300);
+    }
+
+    .nav-arrow.disabled {
+        opacity: 0.3;
+        pointer-events: none;
+    }
+
+    .status-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+
+    .status-dot.actif {
+        background: var(--green);
+    }
+
+    .status-dot.inactif {
+        background: var(--rose);
+    }
+
+    /* ── Stats bar ── */
+    .stats-bar {
+        display: flex;
+        background: #fff;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.07);
+        overflow-x: auto;
+        padding: 0 8px;
+    }
+
+    .stat-tab {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 10px 20px;
+        gap: 2px;
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        transition: all 0.15s;
+        white-space: nowrap;
+        text-decoration: none;
+        min-width: 90px;
+    }
+
+    .stat-tab:hover {
+        background: rgba(0, 0, 0, 0.03);
+        border-bottom-color: var(--teal-300);
+    }
+
+    .stat-tab .st-val {
+        font-size: 17px;
+        font-weight: 800;
+        color: var(--teal-700);
+        line-height: 1;
+    }
+
+    .stat-tab .st-lbl {
+        font-size: 11px;
+        color: rgba(0, 0, 0, 0.45);
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+
+    .stat-tab.zero .st-val {
+        color: rgba(0, 0, 0, 0.25);
+    }
 
     /* ── Header card ── */
     .medecin-header-card {
@@ -43,133 +136,334 @@
 
     /* Identity row : photo + nom */
     .medecin-identity-row {
-        display: flex; align-items: flex-start; justify-content: space-between;
-        padding: 24px 28px 0; gap: 24px;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        padding: 24px 28px 0;
+        gap: 24px;
     }
-    .medecin-name-block { flex: 1; min-width: 0; }
+
+    .medecin-name-block {
+        flex: 1;
+        min-width: 0;
+    }
+
     .medecin-name {
-        font-size: 26px; font-weight: 800; color: var(--teal-900);
-        line-height: 1.2; margin-bottom: 6px;
+        font-size: 26px;
+        font-weight: 800;
+        color: var(--teal-900);
+        line-height: 1.2;
+        margin-bottom: 6px;
     }
-    .medecin-fonction { font-size: 15px; color: var(--text-secondary); font-weight: 500; }
+
+    .medecin-fonction {
+        font-size: 15px;
+        color: var(--text-secondary);
+        font-weight: 500;
+    }
 
     /* Photo */
     .medecin-photo-block {
-        display: flex; flex-direction: column; align-items: center; gap: 8px; flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
     }
+
     .medecin-photo {
-        width: 96px; height: 96px; border-radius: 14px;
-        object-fit: cover; border: 2px solid rgba(0,0,0,0.08);
+        width: 96px;
+        height: 96px;
+        border-radius: 14px;
+        object-fit: cover;
+        border: 2px solid rgba(0, 0, 0, 0.08);
     }
+
     .medecin-photo-placeholder {
-        width: 96px; height: 96px; border-radius: 14px;
-        background: #f0f4f6; border: 2px dashed #c8d8e0;
-        display: flex; align-items: center; justify-content: center;
-        font-size: 36px; color: #9aaab5;
+        width: 96px;
+        height: 96px;
+        border-radius: 14px;
+        background: #f0f4f6;
+        border: 2px dashed #c8d8e0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 36px;
+        color: #9aaab5;
     }
 
     /* Meta row */
     .medecin-meta-row {
-        display: grid; grid-template-columns: auto 1fr 1fr 1fr;
-        gap: 24px; padding: 20px 28px;
-        border-bottom: 1px solid rgba(0,0,0,0.07);
+        display: grid;
+        grid-template-columns: auto 1fr 1fr 1fr;
+        gap: 24px;
+        padding: 20px 28px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.07);
     }
+
     .code-badge {
-        display: inline-flex; align-items: center;
-        background: var(--teal-50); border: 1px solid var(--teal-200);
-        color: var(--teal-700); padding: 7px 14px; border-radius: 8px;
-        font-weight: 700; font-size: 14px; font-family: monospace; white-space: nowrap;
+        display: inline-flex;
+        align-items: center;
+        background: var(--teal-50);
+        border: 1px solid var(--teal-200);
+        color: var(--teal-700);
+        padding: 7px 14px;
+        border-radius: 8px;
+        font-weight: 700;
+        font-size: 14px;
+        font-family: monospace;
+        white-space: nowrap;
     }
+
     .status-badge {
-        display: inline-flex; align-items: center; gap: 5px;
-        padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 700;
     }
-    .status-badge.actif { background: #dcfce7; color: #166534; }
-    .status-badge.inactif { background: #fee2e2; color: #991b1b; }
+
+    .status-badge.actif {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .status-badge.inactif {
+        background: #fee2e2;
+        color: #991b1b;
+    }
 
     /* Field label (read-only display) */
     .field-label {
-        display: block; font-size: 11px; font-weight: 700; color: var(--text-muted);
-        text-transform: uppercase; letter-spacing: .05em; margin-bottom: 4px;
+        display: block;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: .05em;
+        margin-bottom: 4px;
     }
+
     .field-value {
-        font-size: 13px; color: var(--text-primary); font-weight: 500;
-        padding: 7px 2px; border-bottom: 1.5px solid #d1dde3; min-height: 34px;
+        font-size: 13px;
+        color: var(--text-primary);
+        font-weight: 500;
+        padding: 7px 2px;
+        border-bottom: 1.5px solid #d1dde3;
+        min-height: 34px;
     }
-    .field-value.empty { color: rgba(0,0,0,0.3); font-style: italic; }
+
+    .field-value.empty {
+        color: rgba(0, 0, 0, 0.3);
+        font-style: italic;
+    }
 
     /* ── Tabs ── */
     .tabs-wrapper {
-        background: #fff; border-radius: var(--radius);
-        box-shadow: var(--shadow-sm); margin-top: 16px; overflow: hidden;
+        background: #fff;
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-sm);
+        margin-top: 16px;
+        overflow: hidden;
     }
+
     .tabs-nav {
-        display: flex; border-bottom: 2px solid #e8edf0; padding: 0 20px;
+        display: flex;
+        border-bottom: 2px solid #e8edf0;
+        padding: 0 20px;
     }
+
     .tab-btn {
-        padding: 14px 20px; font-size: 13px; font-weight: 600; color: var(--text-muted);
-        background: none; border: none; border-bottom: 3px solid transparent;
-        margin-bottom: -2px; cursor: pointer; transition: color .15s, border-color .15s;
-        white-space: nowrap; font-family: 'Sora', sans-serif;
+        padding: 14px 20px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-muted);
+        background: none;
+        border: none;
+        border-bottom: 3px solid transparent;
+        margin-bottom: -2px;
+        cursor: pointer;
+        transition: color .15s, border-color .15s;
+        white-space: nowrap;
+        font-family: 'Sora', sans-serif;
     }
-    .tab-btn:hover { color: var(--teal-700); }
-    .tab-btn.active { color: var(--teal-700); border-bottom-color: var(--teal-500); }
-    .tab-panel { display: none; padding: 26px 28px; }
-    .tab-panel.active { display: block; }
+
+    .tab-btn:hover {
+        color: var(--teal-700);
+    }
+
+    .tab-btn.active {
+        color: var(--teal-700);
+        border-bottom-color: var(--teal-500);
+    }
+
+    .tab-panel {
+        display: none;
+        padding: 26px 28px;
+    }
+
+    .tab-panel.active {
+        display: block;
+    }
 
     /* Tab grids */
-    .tab-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-bottom: 24px; }
-    .tab-three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; }
-    .form-field { margin-bottom: 18px; }
-    .form-field:last-child { margin-bottom: 0; }
+    .tab-two-col {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 32px;
+        margin-bottom: 24px;
+    }
+
+    .tab-three-col {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 24px;
+    }
+
+    .form-field {
+        margin-bottom: 18px;
+    }
+
+    .form-field:last-child {
+        margin-bottom: 0;
+    }
 
     /* Tags */
     .tag {
-        display: inline-block; background: var(--teal-50); color: var(--teal-700);
-        border: 1px solid var(--teal-200); font-size: 11px; font-weight: 600;
-        padding: 2px 8px; border-radius: 6px; margin: 2px;
+        display: inline-block;
+        background: var(--teal-50);
+        color: var(--teal-700);
+        border: 1px solid var(--teal-200);
+        font-size: 11px;
+        font-weight: 600;
+        padding: 2px 8px;
+        border-radius: 6px;
+        margin: 2px;
     }
 
     /* ── Edit button zone ── */
     .medecin-edit-zone {
         padding: 16px 28px 20px;
-        display: flex; justify-content: flex-end; gap: 8px;
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
     }
 
     @media (max-width: 900px) {
-        .medecin-meta-row { grid-template-columns: 1fr 1fr; }
-        .tab-two-col { grid-template-columns: 1fr; gap: 0; }
-        .tab-three-col { grid-template-columns: 1fr; }
-        .medecin-name { font-size: 20px; }
+        .medecin-meta-row {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .tab-two-col {
+            grid-template-columns: 1fr;
+            gap: 0;
+        }
+
+        .tab-three-col {
+            grid-template-columns: 1fr;
+        }
+
+        .medecin-name {
+            font-size: 20px;
+        }
     }
 
     /* ── Thème sombre ── */
-    html[data-theme="dark"] .nav-arrow { background: #0d2035; border-color: rgba(255,255,255,0.08); }
-    html[data-theme="dark"] .smart-btn { background: #0d2035; border-color: rgba(255,255,255,0.08); }
-    html[data-theme="dark"] .smart-btn .sb-count { color: var(--teal-300); }
-    html[data-theme="dark"] .smart-btn .sb-label { color: rgba(255,255,255,0.4); }
+    html[data-theme="dark"] .nav-arrow {
+        background: #0d2035;
+        border-color: rgba(255, 255, 255, 0.08);
+    }
+
+    html[data-theme="dark"] .smart-btn {
+        background: #0d2035;
+        border-color: rgba(255, 255, 255, 0.08);
+    }
+
+    html[data-theme="dark"] .smart-btn .sb-count {
+        color: var(--teal-300);
+    }
+
+    html[data-theme="dark"] .smart-btn .sb-label {
+        color: rgba(255, 255, 255, 0.4);
+    }
+
     html[data-theme="dark"] .medecin-header-card,
-    html[data-theme="dark"] .tabs-wrapper { background: #0d2035; }
-    html[data-theme="dark"] .medecin-meta-row { border-bottom-color: rgba(255,255,255,0.06); }
-    html[data-theme="dark"] .medecin-name { color: #cce8f4; }
-    html[data-theme="dark"] .medecin-fonction { color: rgba(255,255,255,0.55); }
-    html[data-theme="dark"] .code-badge { background: rgba(33,136,171,0.15); border-color: rgba(33,136,171,0.3); color: var(--teal-300); }
-    html[data-theme="dark"] .field-label { color: rgba(255,255,255,0.4); }
-    html[data-theme="dark"] .field-value { color: #cce8f4; border-bottom-color: rgba(255,255,255,0.12); }
-    html[data-theme="dark"] .field-value.empty { color: rgba(255,255,255,0.25); }
-    html[data-theme="dark"] .tabs-nav { border-bottom-color: rgba(255,255,255,0.06); }
-    html[data-theme="dark"] .tab-btn { color: rgba(255,255,255,0.35); }
-    html[data-theme="dark"] .tab-btn:hover { color: var(--teal-300); }
-    html[data-theme="dark"] .tab-btn.active { color: var(--teal-300); border-bottom-color: var(--teal-300); }
-    html[data-theme="dark"] .tag { background: rgba(20,184,166,0.12); border-color: rgba(20,184,166,0.25); color: var(--teal-300); }
-    html[data-theme="dark"] .medecin-photo-placeholder { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.12); color: rgba(255,255,255,0.25); }
+    html[data-theme="dark"] .tabs-wrapper {
+        background: #0d2035;
+    }
+
+    html[data-theme="dark"] .medecin-meta-row {
+        border-bottom-color: rgba(255, 255, 255, 0.06);
+    }
+
+    html[data-theme="dark"] .medecin-name {
+        color: #cce8f4;
+    }
+
+    html[data-theme="dark"] .medecin-fonction {
+        color: rgba(255, 255, 255, 0.55);
+    }
+
+    html[data-theme="dark"] .code-badge {
+        background: rgba(33, 136, 171, 0.15);
+        border-color: rgba(33, 136, 171, 0.3);
+        color: var(--teal-300);
+    }
+
+    html[data-theme="dark"] .field-label {
+        color: rgba(255, 255, 255, 0.4);
+    }
+
+    html[data-theme="dark"] .field-value {
+        color: #cce8f4;
+        border-bottom-color: rgba(255, 255, 255, 0.12);
+    }
+
+    html[data-theme="dark"] .field-value.empty {
+        color: rgba(255, 255, 255, 0.25);
+    }
+
+    html[data-theme="dark"] .tabs-nav {
+        border-bottom-color: rgba(255, 255, 255, 0.06);
+    }
+
+    html[data-theme="dark"] .tab-btn {
+        color: rgba(255, 255, 255, 0.35);
+    }
+
+    html[data-theme="dark"] .tab-btn:hover {
+        color: var(--teal-300);
+    }
+
+    html[data-theme="dark"] .tab-btn.active {
+        color: var(--teal-300);
+        border-bottom-color: var(--teal-300);
+    }
+
+    html[data-theme="dark"] .tag {
+        background: rgba(20, 184, 166, 0.12);
+        border-color: rgba(20, 184, 166, 0.25);
+        color: var(--teal-300);
+    }
+
+    html[data-theme="dark"] .medecin-photo-placeholder {
+        background: rgba(255, 255, 255, 0.04);
+        border-color: rgba(255, 255, 255, 0.12);
+        color: rgba(255, 255, 255, 0.25);
+    }
 </style>
 {% endblock %}
 
 {% block breadcrumb %}
 <nav class="breadcrumb">
     <a href="{% url 'dashboard' %}">
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z"/><polyline points="9 21 9 12 15 12 15 21"/></svg>Accueil
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24"
+            stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px">
+            <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z" />
+            <polyline points="9 21 9 12 15 12 15 21" />
+        </svg>Accueil
     </a>
     <span class="breadcrumb-sep">›</span>
     <a href="{% url 'medecins:list' %}">Médecins</a>
@@ -183,43 +477,63 @@
 <!-- Action bar -->
 <div class="action-bar">
     <div class="action-bar-left">
-        <a href="{% url 'medecins:list' %}" class="nav-arrow" title="Retour à la liste">←</a>
+        <a href="{% url 'medecins:edit' medecin.pk %}" class="btn btn-primary">Modifier</a>
+        <a href="{% url 'medecins:create' %}" class="btn btn-secondary">Nouveau médecin</a>
+        <span class="status-dot {% if medecin.actif %}actif{% else %}inactif{% endif %}"></span>
+        <span style="font-size:13px; color:rgba(0,0,0,0.5);">{% if medecin.actif %}Actif{% else %}Inactif{% endif
+            %}</span>
+    </div>
+    <div class="action-bar-right">
+        <span class="nav-counter">{{ position }} / {{ total }}</span>
         {% if prev_pk %}
-            <a href="{% url 'medecins:detail' prev_pk %}" class="nav-arrow" title="Précédent">‹</a>
+        <a href="{% url 'medecins:detail' prev_pk %}" class="nav-arrow" title="Précédent">&#8249;</a>
         {% else %}
-            <span class="nav-arrow disabled">‹</span>
+        <span class="nav-arrow disabled">&#8249;</span>
         {% endif %}
         {% if next_pk %}
-            <a href="{% url 'medecins:detail' next_pk %}" class="nav-arrow" title="Suivant">›</a>
+        <a href="{% url 'medecins:detail' next_pk %}" class="nav-arrow" title="Suivant">&#8250;</a>
         {% else %}
-            <span class="nav-arrow disabled">›</span>
+        <span class="nav-arrow disabled">&#8250;</span>
         {% endif %}
-        <span class="nav-position">{{ position }} / {{ total }}</span>
     </div>
-    <a href="{% url 'medecins:edit' medecin.pk %}" class="btn btn-primary">✏️ Modifier</a>
 </div>
 
-<!-- Smart buttons -->
-<div class="smart-buttons">
-    <a href="#" class="smart-btn">
-        <span class="sb-count">{{ rdv_count }}</span>
-        <span class="sb-label">Rendez-vous</span>
+<!-- Stats bar -->
+<div class="stats-bar">
+    <a href="{% url 'medecins:medecin_activite' medecin.pk 'rdv' %}"
+        class="stat-tab {% if rdv_count == 0 %}zero{% endif %}">
+        <span class="st-val">{{ rdv_count }}</span>
+        <span class="st-lbl">Rendez-vous</span>
     </a>
-    <a href="#" class="smart-btn">
-        <span class="sb-count">{{ ordonnance_count }}</span>
-        <span class="sb-label">Ordonnances</span>
+    <a href="{% url 'medecins:medecin_activite' medecin.pk 'consultation' %}"
+        class="stat-tab {% if consultation_count == 0 %}zero{% endif %}">
+        <span class="st-val">{{ consultation_count }}</span>
+        <span class="st-lbl">Consultations</span>
     </a>
-    <a href="#" class="smart-btn">
-        <span class="sb-count">{{ hospitalisation_count }}</span>
-        <span class="sb-label">Hospitalisations</span>
+    <a href="{% url 'medecins:medecin_activite' medecin.pk 'ordonnance' %}"
+        class="stat-tab {% if ordonnance_count == 0 %}zero{% endif %}">
+        <span class="st-val">{{ ordonnance_count }}</span>
+        <span class="st-lbl">Ordonnances</span>
     </a>
-    <a href="#" class="smart-btn">
-        <span class="sb-count">{{ demande_lab_count }}</span>
-        <span class="sb-label">Demandes labo</span>
+    <a href="{% url 'medecins:medecin_activite' medecin.pk 'hospitalisation' %}"
+        class="stat-tab {% if hospitalisation_count == 0 %}zero{% endif %}">
+        <span class="st-val">{{ hospitalisation_count }}</span>
+        <span class="st-lbl">Hospitalisations</span>
     </a>
-    <a href="#" class="smart-btn">
-        <span class="sb-count">{{ resultat_lab_count }}</span>
-        <span class="sb-label">Résultats labo</span>
+    <a href="{% url 'medecins:medecin_activite' medecin.pk 'demande_examens' %}"
+        class="stat-tab {% if demande_lab_count == 0 %}zero{% endif %}">
+        <span class="st-val">{{ demande_lab_count }}</span>
+        <span class="st-lbl">Demandes labo</span>
+    </a>
+    <a href="{% url 'medecins:medecin_activite' medecin.pk 'resultat_examens' %}"
+        class="stat-tab {% if resultat_lab_count == 0 %}zero{% endif %}">
+        <span class="st-val">{{ resultat_lab_count }}</span>
+        <span class="st-lbl">Résultats labo</span>
+    </a>
+    <a href="{% url 'medecins:medecin_activite' medecin.pk 'referents' %}"
+        class="stat-tab {% if referent_count == 0 %}zero{% endif %}">
+        <span class="st-val">{{ referent_count }}</span>
+        <span class="st-lbl">Référents associés</span>
     </a>
 </div>
 
@@ -231,14 +545,14 @@
         <div class="medecin-name-block">
             <div class="medecin-name">Dr {{ medecin.nom }} {{ medecin.prenoms }}</div>
             {% if medecin.fonction %}
-                <div class="medecin-fonction">{{ medecin.fonction }}</div>
+            <div class="medecin-fonction">{{ medecin.fonction }}</div>
             {% endif %}
         </div>
         <div class="medecin-photo-block">
             {% if medecin.photo %}
-                <img src="{{ medecin.photo.url }}" alt="Photo" class="medecin-photo">
+            <img src="{{ medecin.photo.url }}" alt="Photo" class="medecin-photo">
             {% else %}
-                <div class="medecin-photo-placeholder">👤</div>
+            <div class="medecin-photo-placeholder">👤</div>
             {% endif %}
         </div>
     </div>
@@ -259,9 +573,9 @@
             <span class="field-label">Statut</span>
             <div style="padding-top:4px;">
                 {% if medecin.actif %}
-                    <span class="status-badge actif">● Actif</span>
+                <span class="status-badge actif">● Actif</span>
                 {% else %}
-                    <span class="status-badge inactif">● Inactif</span>
+                <span class="status-badge inactif">● Inactif</span>
                 {% endif %}
             </div>
         </div>
@@ -309,20 +623,20 @@
                     <span class="field-label">Départements</span>
                     <div class="field-value" style="border-bottom:none;padding-top:2px;">
                         {% for d in medecin.departements.all %}
-                            <span class="tag">{{ d.nom }}</span>
+                        <span class="tag">{{ d.nom }}</span>
                         {% empty %}
-                            <span class="empty" style="color:rgba(0,0,0,0.3);font-style:italic;">Non renseigné</span>
+                        <span class="empty" style="color:rgba(0,0,0,0.3);font-style:italic;">Non renseigné</span>
                         {% endfor %}
                     </div>
                 </div>
                 <div class="form-field">
-                    <span class="field-label">Service de consultation</span>
+                    <span class="field-label">service de consultation</span>
                     <div class="field-value {% if not medecin.service_consultation %}empty{% endif %}">
                         {{ medecin.service_consultation|default:"Non renseigné" }}
                     </div>
                 </div>
                 <div class="form-field">
-                    <span class="field-label">Service de suivi</span>
+                    <span class="field-label">service de suivi</span>
                     <div class="field-value {% if not medecin.service_suivi %}empty{% endif %}">
                         {{ medecin.service_suivi|default:"Non renseigné" }}
                     </div>
@@ -351,7 +665,7 @@
                     <span class="field-label">Courriel</span>
                     <div class="field-value {% if not medecin.email %}empty{% endif %}">
                         {% if medecin.email %}
-                            <a href="mailto:{{ medecin.email }}" style="color:var(--teal-500);">{{ medecin.email }}</a>
+                        <a href="mailto:{{ medecin.email }}" style="color:var(--teal-500);">{{ medecin.email }}</a>
                         {% else %}Non renseigné{% endif %}
                     </div>
                 </div>
@@ -366,7 +680,8 @@
                 <div class="form-field">
                     <span class="field-label">Taux honoraire</span>
                     <div class="field-value">
-                        {% if medecin.taux_honoraire %}{{ medecin.taux_honoraire|floatformat:0 }} FCFA{% else %}<span style="color:rgba(0,0,0,0.3);font-style:italic;">Non renseigné</span>{% endif %}
+                        {% if medecin.taux_honoraire %}{{ medecin.taux_honoraire|floatformat:0 }} FCFA{% else %}<span
+                            style="color:rgba(0,0,0,0.3);font-style:italic;">Non renseigné</span>{% endif %}
                     </div>
                 </div>
                 <div class="form-field">
@@ -415,13 +730,13 @@
 
 {% block extra_js %}
 <script>
-document.querySelectorAll('.tab-btn').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-        document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
-        document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
-        btn.classList.add('active');
-        document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    document.querySelectorAll('.tab-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            document.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
+            document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('active'); });
+            btn.classList.add('active');
+            document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+        });
     });
-});
 </script>
 {% endblock %}

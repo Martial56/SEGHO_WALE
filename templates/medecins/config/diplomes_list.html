@@ -2,227 +2,445 @@
 
 {% block extra_css %}
 <style>
-    .config-header {
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        margin-bottom: 18px;
-        flex-wrap: wrap;
-    }
+.config-header { display:flex; align-items:center; gap:14px; margin-bottom:18px; flex-wrap:wrap; }
+.config-header h1 { font-size:20px; font-weight:800; color:var(--teal-900); margin:0; }
+.config-search {
+  padding:7px 12px; border:1px solid rgba(0,0,0,0.12);
+  border-radius:8px; font-size:13px; font-family:'Sora',sans-serif; outline:none; min-width:220px;
+}
+.config-search:focus { border-color:var(--teal-400); }
+.btn-creer {
+  background:var(--teal-600); color:#fff; border:none; border-radius:8px;
+  padding:8px 20px; font-size:13px; font-weight:700; cursor:pointer;
+  text-decoration:none; display:inline-flex; align-items:center; gap:6px;
+  font-family:'Sora',sans-serif; transition:background .15s;
+}
+.btn-creer:hover { background:var(--teal-700); }
+.config-count { margin-left:auto; font-size:12px; color:rgba(0,0,0,0.45); font-weight:600; }
 
-    .config-header h1 {
-        font-size: 20px;
-        font-weight: 800;
-        color: var(--teal-900);
-        margin: 0;
-    }
+/* Vue toggle */
+.vue-toggle { display:flex; gap:0; border:1px solid rgba(0,0,0,0.07); border-radius:8px; overflow:hidden; }
+.vue-btn {
+  padding:7px 12px; background:#fff; border:none; cursor:pointer;
+  color:#8aafbf; transition:all .15s; display:flex; align-items:center;
+}
+.vue-btn.active { background:var(--teal-600); color:#fff; }
 
-    .config-search {
-        padding: 7px 12px;
-        border: 1px solid rgba(0, 0, 0, 0.12);
-        border-radius: 8px;
-        font-size: 13px;
-        font-family: 'Sora', sans-serif;
-        outline: none;
-        min-width: 220px;
-    }
+/* Bulk bar */
+.bulk-bar {
+  display:none; align-items:center; gap:12px;
+  background:#fff3cd; border:1px solid #ffc107; border-radius:10px;
+  padding:10px 16px; margin-bottom:12px;
+  font-size:13px; font-weight:600; color:#856404;
+}
+.bulk-bar.visible { display:flex; }
+.btn-bulk-delete {
+  display:flex; align-items:center; gap:6px;
+  padding:6px 14px; background:#dc2626; color:#fff;
+  border:none; border-radius:8px; font-size:12px; font-weight:700;
+  cursor:pointer; font-family:'Sora',sans-serif; transition:background .15s;
+}
+.btn-bulk-delete:hover { background:#b91c1c; }
+.btn-bulk-cancel {
+  padding:6px 12px; background:transparent; border:1px solid rgba(0,0,0,.15);
+  border-radius:8px; font-size:12px; font-weight:600; cursor:pointer;
+  font-family:'Sora',sans-serif; color:#856404;
+}
 
-    .config-search:focus {
-        border-color: var(--teal-400);
-    }
+/* Table */
+.config-table { width:100%; border-collapse:collapse; background:#fff; border-radius:10px; overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,0.07); }
+.config-table thead th {
+  background:#f8fafb; font-size:11px; font-weight:700; text-transform:uppercase;
+  letter-spacing:.04em; color:rgba(0,0,0,0.45); padding:11px 16px;
+  text-align:left; border-bottom:1px solid rgba(0,0,0,0.07);
+}
+.config-table thead th.th-check { width:36px; padding:11px 8px 11px 16px; }
+.config-table tbody td { padding:12px 16px; font-size:13px; border-bottom:1px solid rgba(0,0,0,0.04); vertical-align:middle; color:var(--teal-900); }
+.config-table tbody td.td-check { padding:12px 8px 12px 16px; }
+.config-table tbody tr:last-child td { border-bottom:none; }
+.config-table tbody tr { cursor:pointer; }
+.config-table tbody tr:hover { background:rgba(33,136,171,0.03); }
+.config-table tbody tr.selected { background:rgba(33,136,171,0.06); }
+.row-check, .th-select-all { width:16px; height:16px; cursor:pointer; accent-color:var(--teal-600); }
 
-    .btn-creer {
-        background: var(--teal-600);
-        color: #fff;
-        border: none;
-        border-radius: 8px;
-        padding: 8px 20px;
-        font-size: 13px;
-        font-weight: 700;
-        cursor: pointer;
-        text-decoration: none;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        font-family: 'Sora', sans-serif;
-    }
+/* Grille */
+.grid-items { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:14px; }
+.gcard {
+  background:#fff; border:1px solid rgba(0,0,0,0.07); border-radius:12px;
+  padding:18px; cursor:pointer; transition:all .2s; position:relative;
+  box-shadow:0 2px 8px rgba(0,0,0,0.04); display:block;
+}
+.gcard:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(0,0,0,0.09); border-color:rgba(33,136,171,0.2); }
+.gcard-select { position:absolute; top:10px; right:10px; width:16px; height:16px; cursor:pointer; accent-color:var(--teal-600); }
+.gcard-nom { font-size:14px; font-weight:700; color:var(--teal-900); margin-bottom:6px; }
+.gcard-desc { font-size:12px; color:#8aafbf; line-height:1.4; }
 
-    .btn-creer:hover {
-        background: var(--teal-700);
-    }
+/* Breadcrumb */
+.breadcrumb-cfg { display:flex; align-items:center; gap:6px; font-size:13px; margin-bottom:18px; flex-wrap:wrap; }
+.breadcrumb-cfg a { color:var(--teal-500); text-decoration:none; padding:2px 5px; border-radius:4px; }
+.breadcrumb-cfg a:hover { background:rgba(33,136,171,.08); }
+.breadcrumb-cfg span { color:rgba(0,0,0,0.35); }
 
-    .config-count {
-        margin-left: auto;
-        font-size: 12px;
-        color: rgba(0, 0, 0, 0.45);
-        font-weight: 600;
-    }
+/* Modal */
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:9000; align-items:center; justify-content:center; }
+.modal-overlay.open { display:flex; }
+.modal-box { background:#fff; border-radius:14px; padding:32px; max-width:420px; width:90%; box-shadow:0 20px 60px rgba(0,0,0,0.2); text-align:center; }
+.modal-icon { font-size:40px; margin-bottom:12px; }
+.modal-title { font-size:17px; font-weight:800; color:var(--teal-900); margin-bottom:8px; }
+.modal-msg { font-size:13px; color:rgba(0,0,0,0.55); margin-bottom:24px; line-height:1.5; }
+.modal-msg strong { color:var(--teal-800); }
+.modal-actions { display:flex; gap:10px; justify-content:center; }
+.btn-modal-cancel { padding:9px 22px; border-radius:8px; border:1px solid rgba(0,0,0,.12); background:#fff; color:rgba(0,0,0,.6); font-size:13px; font-weight:600; cursor:pointer; font-family:'Sora',sans-serif; }
+.btn-modal-confirm { padding:9px 22px; border-radius:8px; border:none; background:#dc2626; color:#fff; font-size:13px; font-weight:700; cursor:pointer; font-family:'Sora',sans-serif; transition:background .15s; }
+.btn-modal-confirm:hover { background:#b91c1c; }
 
-    .config-table {
-        width: 100%;
-        border-collapse: collapse;
-        background: #fff;
-        border-radius: 10px;
-        overflow: hidden;
-        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.07);
-    }
-
-    .config-table thead th {
-        background: #f8fafb;
-        font-size: 11px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: .04em;
-        color: rgba(0, 0, 0, 0.45);
-        padding: 11px 16px;
-        text-align: left;
-        border-bottom: 1px solid rgba(0, 0, 0, 0.07);
-    }
-
-    .config-table tbody td {
-        padding: 12px 16px;
-        font-size: 13px;
-        border-bottom: 1px solid rgba(0, 0, 0, 0.04);
-        vertical-align: middle;
-        color: var(--teal-900);
-    }
-
-    .config-table tbody tr:last-child td {
-        border-bottom: none;
-    }
-
-    .config-table tbody tr { cursor: pointer; }
-
-    .config-table tbody tr:hover {
-        background: rgba(33, 136, 171, 0.03);
-    }
-
-    .btn-edit {
-        padding: 4px 12px;
-        font-size: 12px;
-        border-radius: 6px;
-        border: 1px solid var(--teal-300);
-        color: var(--teal-700);
-        text-decoration: none;
-        font-weight: 600;
-        display: inline-block;
-    }
-
-    .btn-edit:hover {
-        background: var(--teal-50);
-    }
-
-    .breadcrumb-cfg {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 13px;
-        margin-bottom: 18px;
-        flex-wrap: wrap;
-    }
-
-    .breadcrumb-cfg a {
-        color: var(--teal-500);
-        text-decoration: none;
-        padding: 2px 5px;
-        border-radius: 4px;
-    }
-
-    .breadcrumb-cfg a:hover {
-        background: rgba(33, 136, 171, .08);
-    }
-
-    .breadcrumb-cfg span {
-        color: rgba(0, 0, 0, 0.35);
-    }
-
-    html[data-theme="dark"] .config-header h1 {
-        color: #cce8f4;
-    }
-
-    html[data-theme="dark"] .config-table {
-        background: #0d2035;
-    }
-
-    html[data-theme="dark"] .config-table thead th {
-        background: rgba(255, 255, 255, .03);
-        color: rgba(255, 255, 255, .35);
-        border-bottom-color: rgba(255, 255, 255, .07);
-    }
-
-    html[data-theme="dark"] .config-table tbody td {
-        border-bottom-color: rgba(255, 255, 255, .04);
-        color: #cce8f4;
-    }
-
-    html[data-theme="dark"] .config-table tbody tr:hover {
-        background: rgba(33, 136, 171, .06);
-    }
-
-    html[data-theme="dark"] .config-search {
-        background: #0d2035;
-        border-color: rgba(255, 255, 255, .1);
-        color: #cce8f4;
-    }
-
-    html[data-theme="dark"] .config-count {
-        color: rgba(255, 255, 255, .35);
-    }
-
-    html[data-theme="dark"] .breadcrumb-cfg a {
-        color: var(--teal-300);
-    }
-
-    html[data-theme="dark"] .breadcrumb-cfg span {
-        color: rgba(255, 255, 255, .3);
-    }
+/* Dark */
+html[data-theme="dark"] .config-header h1 { color:#cce8f4; }
+html[data-theme="dark"] .config-table { background:#0d2035; }
+html[data-theme="dark"] .config-table thead th { background:rgba(255,255,255,.03); color:rgba(255,255,255,.35); border-bottom-color:rgba(255,255,255,.07); }
+html[data-theme="dark"] .config-table tbody td { border-bottom-color:rgba(255,255,255,.04); color:#cce8f4; }
+html[data-theme="dark"] .config-table tbody tr:hover { background:rgba(33,136,171,.06); }
+html[data-theme="dark"] .config-table tbody tr.selected { background:rgba(33,136,171,.12); }
+html[data-theme="dark"] .config-search { background:#0d2035; border-color:rgba(255,255,255,.1); color:#cce8f4; }
+html[data-theme="dark"] .config-count { color:rgba(255,255,255,.35); }
+html[data-theme="dark"] .vue-toggle { background:rgba(255,255,255,.06); border-color:rgba(255,255,255,.1); }
+html[data-theme="dark"] .vue-btn { background:transparent; color:rgba(255,255,255,.35); }
+html[data-theme="dark"] .vue-btn.active { background:rgba(33,136,171,.25); color:var(--teal-300); }
+html[data-theme="dark"] .gcard { background:#0d2035; border-color:rgba(255,255,255,.06); }
+html[data-theme="dark"] .gcard-nom { color:#cce8f4; }
+html[data-theme="dark"] .gcard-desc { color:rgba(255,255,255,.35); }
+html[data-theme="dark"] .bulk-bar { background:rgba(255,193,7,.1); border-color:rgba(255,193,7,.3); color:#fbbf24; }
+html[data-theme="dark"] .btn-bulk-cancel { border-color:rgba(255,255,255,.15); color:#fbbf24; }
+html[data-theme="dark"] .modal-box { background:#0d2035; }
+html[data-theme="dark"] .modal-title { color:#cce8f4; }
+html[data-theme="dark"] .modal-msg { color:rgba(255,255,255,.5); }
+html[data-theme="dark"] .modal-msg strong { color:#cce8f4; }
+html[data-theme="dark"] .btn-modal-cancel { background:#091d2e; border-color:rgba(255,255,255,.1); color:rgba(255,255,255,.6); }
+html[data-theme="dark"] .breadcrumb-cfg a { color:var(--teal-300); }
+html[data-theme="dark"] .breadcrumb-cfg span { color:rgba(255,255,255,.3); }
+/* ── Info Drawer ── */
+.info-drawer { position:fixed; top:0; right:-420px; width:400px; height:100vh; background:#fff; z-index:8000; transition:right .3s ease; box-shadow:-4px 0 24px rgba(0,0,0,.15); display:flex; flex-direction:column; overflow:hidden; }
+.info-drawer.open { right:0; }
+.drawer-backdrop { display:none; position:fixed; inset:0; background:rgba(0,0,0,.3); z-index:7999; }
+.drawer-backdrop.open { display:block; }
+.drawer-header { display:flex; align-items:center; justify-content:space-between; padding:20px 24px; border-bottom:1px solid rgba(0,0,0,.08); background:#f8fcff; flex-shrink:0; }
+.drawer-title { font-size:15px; font-weight:800; color:var(--teal-900); flex:1; min-width:0; word-break:break-word; }
+.drawer-close { width:28px; height:28px; border-radius:6px; border:none; background:transparent; cursor:pointer; display:flex; align-items:center; justify-content:center; color:rgba(0,0,0,.4); font-size:20px; line-height:1; flex-shrink:0; }
+.drawer-close:hover { background:rgba(0,0,0,.07); }
+.drawer-body { flex:1; overflow-y:auto; padding:20px 24px; }
+.drawer-field { margin-bottom:18px; }
+.drawer-field-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:rgba(0,0,0,.4); margin-bottom:4px; }
+.drawer-field-value { font-size:14px; color:var(--teal-900); font-weight:500; }
+.drawer-footer { padding:16px 24px; border-top:1px solid rgba(0,0,0,.08); display:flex; gap:10px; justify-content:flex-end; flex-shrink:0; }
+.btn-drawer-close { padding:8px 18px; border-radius:8px; border:1px solid rgba(0,0,0,.12); background:#fff; color:rgba(0,0,0,.6); font-size:13px; font-weight:600; cursor:pointer; font-family:'Sora',sans-serif; }
+.btn-drawer-edit { padding:8px 18px; border-radius:8px; border:none; background:var(--teal-600); color:#fff; font-size:13px; font-weight:700; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:6px; font-family:'Sora',sans-serif; }
+.btn-drawer-edit:hover { background:var(--teal-700); }
+/* ── 3-dots col picker ── */
+.table-header-bar { display:flex; align-items:center; justify-content:flex-end; padding:0 0 8px; gap:8px; }
+.col-picker-btn { position:relative; display:flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:8px; border:1px solid rgba(0,0,0,.08); background:#fff; cursor:pointer; color:#8aafbf; transition:all .15s; }
+.col-picker-btn:hover { background:var(--teal-50); border-color:var(--teal-300); color:var(--teal-700); }
+.col-picker-dropdown { display:none; position:absolute; top:calc(100% + 6px); right:0; background:#fff; border:1px solid rgba(0,0,0,.1); border-radius:12px; padding:8px 0; min-width:180px; z-index:200; box-shadow:0 8px 24px rgba(0,0,0,.12); }
+.col-picker-dropdown.open { display:block; }
+.col-picker-title { font-size:10px; font-weight:700; color:#8aafbf; text-transform:uppercase; letter-spacing:.06em; padding:6px 16px 8px; }
+.col-picker-item { display:flex; align-items:center; gap:10px; padding:8px 16px; cursor:pointer; font-size:13px; color:var(--teal-900); transition:background .1s; user-select:none; }
+.col-picker-item:hover { background:var(--teal-50); }
+.col-picker-item input[type="checkbox"] { width:14px; height:14px; accent-color:var(--teal-600); }
+/* Dark */
+html[data-theme="dark"] .info-drawer { background:#0d2035; }
+html[data-theme="dark"] .drawer-header { background:rgba(255,255,255,.03); border-bottom-color:rgba(255,255,255,.08); }
+html[data-theme="dark"] .drawer-title { color:#cce8f4; }
+html[data-theme="dark"] .drawer-close { color:rgba(255,255,255,.4); }
+html[data-theme="dark"] .drawer-close:hover { background:rgba(255,255,255,.07); }
+html[data-theme="dark"] .drawer-field-label { color:rgba(255,255,255,.35); }
+html[data-theme="dark"] .drawer-field-value { color:#cce8f4; }
+html[data-theme="dark"] .drawer-footer { border-top-color:rgba(255,255,255,.08); }
+html[data-theme="dark"] .btn-drawer-close { background:#091d2e; border-color:rgba(255,255,255,.1); color:rgba(255,255,255,.6); }
+html[data-theme="dark"] .col-picker-btn { background:#091d2e; border-color:rgba(255,255,255,.1); color:rgba(255,255,255,.35); }
+html[data-theme="dark"] .col-picker-btn:hover { background:rgba(33,136,171,.15); color:var(--teal-300); }
+html[data-theme="dark"] .col-picker-dropdown { background:#0d2035; border-color:rgba(255,255,255,.1); }
+html[data-theme="dark"] .col-picker-item { color:#cce8f4; }
+html[data-theme="dark"] .col-picker-item:hover { background:rgba(33,136,171,.1); }
+html[data-theme="dark"] .col-picker-title { color:rgba(255,255,255,.35); }
 </style>
 {% endblock %}
 
 {% block content %}
+<!-- Fil d'Ariane -->
 <div class="breadcrumb-cfg">
-    <a href="{% url 'medecins:list' %}">Docteur</a>
-    <span>›</span>
-    <span>Configuration</span>
-    <span>›</span>
-    <span>Diplômes</span>
+  <a href="{% url 'medecins:list' %}">Docteur</a>
+  <span>›</span>
+  <span>Configuration</span>
+  <span>›</span>
+  <span>Diplômes</span>
 </div>
 
-<form method="get">
-    <div class="config-header">
-        <h1>🎓 Diplômes</h1>
-        <input type="text" name="q" value="{{ q }}" placeholder="Rechercher…" class="config-search">
-        <a href="{% url 'medecins:diplome_create' %}" class="btn-creer">+ CRÉER</a>
-        <span class="config-count">{{ total_filtre }} / {{ total }}</span>
+<!-- En-tête -->
+<form method="get" id="filter-form">
+  <div class="config-header">
+    <h1>🎓 Diplômes</h1>
+    <input type="text" name="q" value="{{ q }}" placeholder="Rechercher…" class="config-search" onchange="this.form.submit()">
+    <a href="{% url 'medecins:diplome_create' %}" class="btn-creer">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      CRÉER
+    </a>
+    <span class="config-count">{{ total_filtre }} / {{ total }}</span>
+    <div class="vue-toggle" style="margin-left:4px;">
+      <button type="button" class="vue-btn" id="btn-grille" onclick="setVue('grille')" title="Vue Grille">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      </button>
+      <button type="button" class="vue-btn" id="btn-liste" onclick="setVue('liste')" title="Vue Liste">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      </button>
     </div>
+  </div>
 </form>
 
+<!-- Barre bulk -->
+<div class="bulk-bar" id="bulk-bar">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+  <span id="bulk-count">0</span> élément(s) sélectionné(s)
+  <button type="button" class="btn-bulk-delete" onclick="openBulkModal()">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+    Supprimer la sélection
+  </button>
+  <button type="button" class="btn-bulk-cancel" onclick="clearSelection()">Annuler</button>
+</div>
+
 {% if total_filtre > 0 %}
-<table class="config-table">
+
+<!-- VUE GRILLE -->
+<div class="grid-items" id="view-grille" style="display:none;">
+  {% for dip in page_obj %}
+  <div class="gcard" onclick="if(event.target.type!=='checkbox'){openDrawer(this)}"
+       data-title="{{ dip.titre }}"
+       data-edit-url="{% url 'medecins:diplome_edit' dip.pk %}"
+       data-f-titre="{{ dip.titre }}"
+       data-f-desc="{{ dip.description|default:'—' }}">
+    <input type="checkbox" class="gcard-select row-check" value="{{ dip.pk }}" onclick="event.stopPropagation()" onchange="onCheckChange()">
+    <div class="gcard-nom">{{ dip.titre }}</div>
+    {% if dip.description %}
+    <div class="gcard-desc">{{ dip.description|truncatechars:70 }}</div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+<!-- VUE LISTE -->
+<div id="view-liste">
+  <div class="table-header-bar">
+    <div style="position:relative;">
+      <button type="button" class="col-picker-btn" id="col-picker-toggle" title="Afficher/masquer des colonnes">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="19" r="1.5" fill="currentColor"/></svg>
+      </button>
+      <div class="col-picker-dropdown" id="col-picker-dropdown">
+        <div class="col-picker-title">Colonnes visibles</div>
+        <label class="col-picker-item"><input type="checkbox" data-col="col-dip-titre" checked> Titre</label>
+        <label class="col-picker-item"><input type="checkbox" data-col="col-dip-desc" checked> Description</label>
+      </div>
+    </div>
+  </div>
+  <table class="config-table">
     <thead>
-        <tr>
-            <th>Titre</th>
-            <th>Description</th>
-            <th>Actions</th>
-        </tr>
+      <tr>
+        <th class="th-check">
+          <input type="checkbox" class="th-select-all" id="select-all" onchange="toggleAll(this)">
+        </th>
+        <th class="col-dip-titre">Titre</th>
+        <th class="col-dip-desc">Description</th>
+      </tr>
     </thead>
     <tbody>
-        {% for dip in page_obj %}
-        <tr onclick="window.location='{% url 'medecins:diplome_edit' dip.pk %}'">
-            <td style="font-weight:600;">{{ dip.titre }}</td>
-            <td style="color:rgba(0,0,0,.5);font-size:12px;">{{ dip.description|default:"—"|truncatechars:80 }}</td>
-            <td><a href="{% url 'medecins:diplome_edit' dip.pk %}" onclick="event.stopPropagation()" class="btn-edit">Modifier</a></td>
-        </tr>
-        {% endfor %}
+      {% for dip in page_obj %}
+      <tr onclick="if(event.target.type!=='checkbox'){openDrawer(this)}"
+          data-title="{{ dip.titre }}"
+          data-edit-url="{% url 'medecins:diplome_edit' dip.pk %}"
+          data-f-titre="{{ dip.titre }}"
+          data-f-desc="{{ dip.description|default:'—' }}"
+          style="cursor:pointer">
+        <td class="td-check" onclick="event.stopPropagation()">
+          <input type="checkbox" class="row-check" value="{{ dip.pk }}" onchange="onCheckChange()">
+        </td>
+        <td class="col-dip-titre" style="font-weight:600;">{{ dip.titre }}</td>
+        <td class="col-dip-desc" style="color:rgba(0,0,0,.5);font-size:12px;">{{ dip.description|default:"—"|truncatechars:80 }}</td>
+      </tr>
+      {% endfor %}
     </tbody>
-</table>
+  </table>
+</div>
+
 {% include 'includes/pagination.html' %}
+
 {% else %}
-<div style="text-align:center;padding:50px 20px;color:rgba(0,0,0,.4);">
-    <div style="font-size:40px;margin-bottom:12px;">🎓</div>
-    {% if q %}<p>Aucun diplôme ne correspond à « {{ q }} ».</p>
-    {% else %}<p>Aucun diplôme enregistré.</p>
-    <a href="{% url 'medecins:diplome_create' %}" class="btn-creer" style="margin-top:14px;">+ Ajouter un diplôme</a>{% endif %}
+<div style="text-align:center;padding:60px 20px;color:rgba(0,0,0,.4);">
+  <div style="font-size:40px;margin-bottom:14px;">🎓</div>
+  {% if q %}
+  <p style="font-size:14px;">Aucun diplôme ne correspond à « {{ q }} ».</p>
+  <a href="{% url 'medecins:diplomes' %}" class="btn-creer" style="margin-top:14px;">✕ Effacer</a>
+  {% else %}
+  <p style="font-size:14px;">Aucun diplôme enregistré.</p>
+  <a href="{% url 'medecins:diplome_create' %}" class="btn-creer" style="margin-top:14px;">+ Ajouter un diplôme</a>
+  {% endif %}
 </div>
 {% endif %}
+
+<!-- Modal bulk delete -->
+<div class="modal-overlay" id="bulk-delete-modal">
+  <div class="modal-box">
+    <div class="modal-icon">🗑️</div>
+    <div class="modal-title">Confirmer la suppression</div>
+    <div class="modal-msg">
+      Vous allez supprimer <strong id="modal-count">0</strong> diplôme(s).<br>
+      <span style="font-size:12px;color:rgba(0,0,0,.4);">Cette action est irréversible.</span>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn-modal-cancel" onclick="closeBulkModal()">Annuler</button>
+      <button type="button" class="btn-modal-confirm" onclick="executeBulkDelete()">Supprimer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Info Drawer -->
+<div class="info-drawer" id="info-drawer">
+  <div class="drawer-header">
+    <span class="drawer-title" id="drawer-title">—</span>
+    <button class="drawer-close" onclick="closeDrawer()" title="Fermer">&#x2715;</button>
+  </div>
+  <div class="drawer-body" id="drawer-body"></div>
+  <div class="drawer-footer">
+    <button class="btn-drawer-close" onclick="closeDrawer()">Fermer</button>
+    <a class="btn-drawer-edit" id="drawer-edit-btn" href="#">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      Modifier
+    </a>
+  </div>
+</div>
+<div class="drawer-backdrop" id="drawer-backdrop" onclick="closeDrawer()"></div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const BULK_URL = "{% url 'medecins:diplome_bulk_delete' %}";
+const CSRF_TOKEN = "{{ csrf_token }}";
+const LS_KEY = 'diplomes_vue';
+
+/* --- Vue toggle (localStorage) --- */
+function setVue(v) {
+  localStorage.setItem(LS_KEY, v);
+  applyVue(v);
+}
+function applyVue(v) {
+  var grille = document.getElementById('view-grille');
+  var liste  = document.getElementById('view-liste');
+  var btnG   = document.getElementById('btn-grille');
+  var btnL   = document.getElementById('btn-liste');
+  if (!grille || !liste) return;
+  if (v === 'grille') {
+    grille.style.display = 'grid';
+    liste.style.display  = 'none';
+    btnG.classList.add('active');
+    btnL.classList.remove('active');
+  } else {
+    grille.style.display = 'none';
+    liste.style.display  = 'block';
+    btnG.classList.remove('active');
+    btnL.classList.add('active');
+  }
+  onCheckChange();
+}
+document.addEventListener('DOMContentLoaded', function() {
+  applyVue(localStorage.getItem(LS_KEY) || 'liste');
+});
+
+/* --- Sélection --- */
+function onCheckChange() {
+  var checks = document.querySelectorAll('.row-check:checked');
+  var count  = checks.length;
+  document.getElementById('bulk-count').textContent = count;
+  document.getElementById('bulk-bar').classList.toggle('visible', count > 0);
+  document.querySelectorAll('.row-check').forEach(function(cb) {
+    var row = cb.closest('tr');
+    if (row) row.classList.toggle('selected', cb.checked);
+  });
+  var all = document.getElementById('select-all');
+  if (all) {
+    var total = document.querySelectorAll('.row-check').length;
+    all.indeterminate = count > 0 && count < total;
+    all.checked = count === total && total > 0;
+  }
+}
+function toggleAll(master) {
+  document.querySelectorAll('.row-check').forEach(function(cb) { cb.checked = master.checked; });
+  onCheckChange();
+}
+function clearSelection() {
+  document.querySelectorAll('.row-check, #select-all').forEach(function(cb) { cb.checked = false; });
+  onCheckChange();
+}
+
+/* --- Modal bulk delete --- */
+function openBulkModal() {
+  document.getElementById('modal-count').textContent = document.querySelectorAll('.row-check:checked').length;
+  document.getElementById('bulk-delete-modal').classList.add('open');
+}
+function closeBulkModal() { document.getElementById('bulk-delete-modal').classList.remove('open'); }
+function executeBulkDelete() {
+  var ids = Array.from(document.querySelectorAll('.row-check:checked')).map(function(cb) { return cb.value; });
+  if (!ids.length) return;
+  var formData = new FormData();
+  formData.append('csrfmiddlewaretoken', CSRF_TOKEN);
+  ids.forEach(function(id) { formData.append('ids[]', id); });
+  fetch(BULK_URL, { method:'POST', body:formData })
+    .then(function(r) { return r.json(); })
+    .then(function(data) { if (data.ok) window.location.reload(); })
+    .catch(function() { closeBulkModal(); });
+}
+document.getElementById('bulk-delete-modal').addEventListener('click', function(e) { if (e.target === this) closeBulkModal(); });
+
+/* ── Info Drawer ── */
+const COL_STORAGE_KEY = 'diplomes_cols';
+var DRAWER_FIELDS = [{attr:'f-titre',label:'Titre'},{attr:'f-desc',label:'Description'}];
+function openDrawer(el) {
+  document.getElementById('drawer-title').textContent = el.getAttribute('data-title') || '—';
+  document.getElementById('drawer-edit-btn').href = el.getAttribute('data-edit-url') || '#';
+  var html = '';
+  DRAWER_FIELDS.forEach(function(f) {
+    var val = el.getAttribute('data-' + f.attr) || '—';
+    html += '<div class="drawer-field"><div class="drawer-field-label">' + f.label + '</div><div class="drawer-field-value">' + (val || '—') + '</div></div>';
+  });
+  document.getElementById('drawer-body').innerHTML = html;
+  document.getElementById('info-drawer').classList.add('open');
+  document.getElementById('drawer-backdrop').classList.add('open');
+}
+function closeDrawer() {
+  document.getElementById('info-drawer').classList.remove('open');
+  document.getElementById('drawer-backdrop').classList.remove('open');
+}
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeDrawer(); });
+
+/* ── 3-dots col picker ── */
+(function() {
+  var pickerBtn = document.getElementById('col-picker-toggle');
+  var pickerDD = document.getElementById('col-picker-dropdown');
+  if (!pickerBtn || !pickerDD) return;
+  pickerBtn.addEventListener('click', function(e) { e.stopPropagation(); pickerDD.classList.toggle('open'); });
+  document.addEventListener('click', function() { pickerDD.classList.remove('open'); });
+  pickerDD.addEventListener('click', function(e) { e.stopPropagation(); });
+  var saved = JSON.parse(localStorage.getItem(COL_STORAGE_KEY) || 'null');
+  pickerDD.querySelectorAll('input[type="checkbox"]').forEach(function(cb) {
+    var col = cb.dataset.col;
+    if (saved) cb.checked = saved.indexOf(col) !== -1;
+    applyCol(col, cb.checked);
+    cb.addEventListener('change', function() { applyCol(col, cb.checked); saveCols(); });
+  });
+  function applyCol(col, visible) {
+    document.querySelectorAll('.' + col).forEach(function(el) { el.style.display = visible ? '' : 'none'; });
+  }
+  function saveCols() {
+    var vis = [];
+    pickerDD.querySelectorAll('input[type="checkbox"]').forEach(function(cb) { if (cb.checked) vis.push(cb.dataset.col); });
+    localStorage.setItem(COL_STORAGE_KEY, JSON.stringify(vis));
+  }
+})();
+</script>
 {% endblock %}

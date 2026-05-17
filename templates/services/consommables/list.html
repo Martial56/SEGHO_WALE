@@ -1,0 +1,960 @@
+{% extends 'services/base.html' %}
+{% load static %}
+
+{% block module_navbar %}{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block extra_css %}
+{% include 'services/includes/layout_css.html' %}
+<style>
+  /* ── TABLE CONSOMMABLES ── */
+  .o-list-wrap {
+    background: var(--bg);
+    overflow-x: auto;
+  }
+
+  .o-list-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--surface);
+  }
+
+  .o-list-table th {
+    padding: 8px 14px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    white-space: nowrap;
+    position: relative;
+    user-select: none;
+  }
+
+  .o-list-table td {
+    padding: 9px 14px;
+    font-size: 13px;
+    border-bottom: 1px solid #f0f0f0;
+    color: var(--text);
+  }
+
+  .o-list-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .o-list-table tbody tr:hover td {
+    background: #f4f9fb;
+  }
+
+  .o-list-table tbody tr {
+    cursor: pointer;
+  }
+
+  html[data-theme="dark"] .o-list-table {
+    background: var(--surface);
+  }
+
+  html[data-theme="dark"] .o-list-table th {
+    background: var(--surface);
+    border-bottom-color: var(--border);
+    color: var(--text-muted);
+  }
+
+  html[data-theme="dark"] .o-list-table td {
+    border-bottom-color: #2d3550;
+    color: var(--text);
+  }
+
+  html[data-theme="dark"] .o-list-table tbody tr:hover td {
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  /* ── KANBAN CONSOMMABLES ── */
+  .o-kanban {
+    padding: 12px 16px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    background: var(--bg);
+  }
+
+  .o-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 10px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    cursor: pointer;
+    transition: box-shadow 0.15s, border-color 0.15s;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  }
+
+  .o-card:hover {
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.13);
+    border-color: #bbb;
+  }
+
+  .o-avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: #d5d5d5;
+    flex-shrink: 0;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .o-avatar svg {
+    width: 28px;
+    fill: #999;
+    margin-bottom: -1px;
+  }
+
+  .o-card-body {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .o-card-name {
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .o-card-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.7;
+  }
+
+  .o-card-meta .val {
+    color: var(--text);
+  }
+
+  html[data-theme="dark"] .o-card {
+    background: var(--surface);
+    border-color: var(--border);
+  }
+
+  html[data-theme="dark"] .o-card:hover {
+    border-color: #4a5a78;
+  }
+
+  html[data-theme="dark"] .o-card-name {
+    color: var(--text);
+  }
+
+  html[data-theme="dark"] .o-avatar {
+    background: #3a4a5e;
+  }
+
+  html[data-theme="dark"] .o-avatar svg {
+    fill: #6c85a0;
+  }
+
+  /* ── BADGES ── */
+  .badge-actif {
+    display: inline-block;
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 20px;
+    background: #e3f9ee;
+    color: #0d8a52;
+    font-weight: 600;
+  }
+
+  .badge-inactif {
+    display: inline-block;
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 20px;
+    background: #fdf0f0;
+    color: #c0392b;
+    font-weight: 600;
+  }
+
+  .badge-cat {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 20px;
+    background: #e6f2f5;
+    color: var(--primary);
+  }
+
+  .badge-stock-low {
+    background: #fff7ed;
+    color: #c2410c;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    display: inline-block;
+  }
+
+  html[data-theme="dark"] .badge-actif {
+    background: rgba(22, 169, 107, 0.2);
+    color: #6eddb0;
+  }
+
+  html[data-theme="dark"] .badge-inactif {
+    background: rgba(232, 69, 69, 0.2);
+    color: #f09090;
+  }
+
+  html[data-theme="dark"] .badge-cat {
+    background: rgba(33, 136, 171, 0.15);
+    color: #7ecae0;
+  }
+
+  html[data-theme="dark"] .badge-stock-low {
+    background: rgba(194, 65, 12, 0.2);
+    color: #fb923c;
+  }
+
+  /* ── SÉLECTEUR COLONNES ── */
+  .col-picker-th {
+    width: 30px;
+    text-align: center;
+    padding: 0 2px;
+    position: relative;
+  }
+
+  .col-picker-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 15px;
+    padding: 2px 5px;
+    border-radius: 3px;
+    line-height: 1;
+    font-weight: 700;
+    letter-spacing: -1px;
+  }
+
+  .col-picker-btn:hover {
+    background: rgba(0, 0, 0, 0.06);
+    color: var(--text);
+  }
+
+  .col-picker-menu {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: calc(100% + 2px);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+    z-index: 500;
+    min-width: 160px;
+    padding: 6px 0;
+  }
+
+  .col-picker-menu.open {
+    display: block;
+  }
+
+  .col-picker-menu label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    font-size: 13px;
+    color: var(--text);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .col-picker-menu label:hover {
+    background: rgba(0, 0, 0, 0.03);
+  }
+
+  html[data-theme="dark"] .col-picker-menu {
+    background: var(--surface);
+    border-color: var(--border);
+  }
+
+  html[data-theme="dark"] .col-picker-menu label {
+    color: var(--text);
+  }
+
+  html[data-theme="dark"] .col-picker-menu label:hover {
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  /* ── BULK BAR ── */
+  .bulk-bar {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #856404;
+  }
+
+  .bulk-bar.visible {
+    display: flex;
+  }
+
+  .btn-bulk-delete {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    background: #dc2626;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .btn-bulk-delete:hover {
+    background: #b91c1c;
+  }
+
+  .btn-bulk-cancel {
+    padding: 5px 10px;
+    background: transparent;
+    border: 1px solid rgba(0, 0, 0, .15);
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    color: #856404;
+  }
+
+  html[data-theme="dark"] .bulk-bar {
+    background: rgba(255, 193, 7, .1);
+    border-color: rgba(255, 193, 7, .3);
+    color: #fbbf24;
+  }
+
+  html[data-theme="dark"] .btn-bulk-cancel {
+    border-color: rgba(255, 255, 255, .15);
+    color: #fbbf24;
+  }
+
+  /* ── MODAL ── */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 9000;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .modal-overlay.open {
+    display: flex;
+  }
+
+  .modal-box {
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 28px;
+    max-width: 400px;
+    width: 90%;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+    text-align: center;
+  }
+
+  .modal-icon {
+    font-size: 36px;
+    margin-bottom: 10px;
+  }
+
+  .modal-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+
+  .modal-msg {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+    line-height: 1.5;
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+  }
+
+  .btn-modal-cancel {
+    padding: 8px 20px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .btn-modal-confirm {
+    padding: 8px 20px;
+    border-radius: 4px;
+    border: none;
+    background: #dc2626;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .btn-modal-confirm:hover {
+    background: #b91c1c;
+  }
+
+  /* ── INFO DRAWER ── */
+  .info-drawer {
+    position: fixed;
+    top: 0;
+    right: -440px;
+    width: 420px;
+    height: 100vh;
+    background: var(--surface);
+    z-index: 8000;
+    transition: right .3s ease;
+    box-shadow: -4px 0 24px rgba(0, 0, 0, .15);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .info-drawer.open {
+    right: 0;
+  }
+
+  .drawer-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .3);
+    z-index: 7999;
+  }
+
+  .drawer-backdrop.open {
+    display: block;
+  }
+
+  .drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .drawer-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    flex: 1;
+    min-width: 0;
+    word-break: break-word;
+  }
+
+  .drawer-close {
+    width: 26px;
+    height: 26px;
+    border-radius: 4px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 18px;
+  }
+
+  .drawer-close:hover {
+    background: rgba(0, 0, 0, .06);
+  }
+
+  .drawer-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 18px 20px;
+  }
+
+  .drawer-field {
+    margin-bottom: 16px;
+  }
+
+  .drawer-field-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+
+  .drawer-field-value {
+    font-size: 14px;
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .drawer-footer {
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    flex-shrink: 0;
+  }
+
+  .btn-drawer-close {
+    padding: 7px 16px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .btn-drawer-edit {
+    padding: 7px 16px;
+    border-radius: 4px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    border: none;
+  }
+
+  .btn-drawer-edit:hover {
+    background: var(--primary);
+  }
+
+  html[data-theme="dark"] .info-drawer {
+    background: var(--surface);
+  }
+
+  html[data-theme="dark"] .drawer-title {
+    color: var(--text);
+  }
+
+  html[data-theme="dark"] .drawer-field-value {
+    color: var(--text);
+  }
+
+  @media (max-width:1000px) {
+    .o-kanban {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  @media (max-width:680px) {
+    .o-kanban {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (max-width:420px) {
+    .o-kanban {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="page-wrap">
+
+  {% include 'services/includes/nav.html' %}
+
+  <!-- ══ SUBHEADER ══ -->
+  <div class="o-subheader" id="subheader">
+    <div class="o-subheader-row">
+      <span class="o-page-title">Consommables <span class="o-page-count">{{ total }}</span></span>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+        <form method="get" id="filter-form" style="display:flex;align-items:center;">
+          <input type="hidden" name="vue" id="vue-input" value="{{ vue }}">
+          <input type="hidden" name="categorie" id="fi-cat" value="{{ categorie_id }}">
+          <input type="hidden" name="statut" id="fi-statut" value="{{ statut }}">
+          <div class="o-search-bar">
+            <input class="o-search-input" type="text" name="q" value="{{ q }}" placeholder="Rechercher un consommable…">
+            <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <div class="o-subheader-row">
+      <a href="{% url 'services:consommable_create' %}" class="o-btn-create">
+        <i class="bi bi-plus-lg"></i> Créer
+      </a>
+      {% if q or categorie_id or statut %}
+      <a href="{% url 'services:consommables' %}" class="o-ctrl-btn">
+        <i class="bi bi-x"></i> Effacer
+      </a>
+      {% endif %}
+      {% if q %}<span class="o-filter-tag">{{ q }} <a
+          href="?{% if categorie_id %}categorie={{ categorie_id }}&{% endif %}{% if statut %}statut={{ statut }}&{% endif %}vue={{ vue }}">×</a></span>{% endif %}
+      {% if statut %}<span class="o-filter-tag">{% if statut == 'actif' %}Actifs{% else %}Inactifs{% endif %} <a
+          href="?{% if q %}q={{ q }}&{% endif %}{% if categorie_id %}categorie={{ categorie_id }}&{% endif %}vue={{ vue }}">×</a></span>{% endif %}
+
+      <div style="flex:1;"></div>
+      <div class="o-ctrl-sep"></div>
+      <!-- Filtre catégorie inline -->
+      <select id="sel-cat"
+        style="font-size:12px;border:1px solid var(--border);border-radius:4px;padding:3px 8px;background:var(--surface);color:var(--text);cursor:pointer;"
+        onchange="applyFilters()">
+        <option value="">Toutes catégories</option>
+        {% for cat in categories %}
+        <option value="{{ cat.pk }}" {% if categorie_id == cat.pk|stringformat:"s" %}selected{% endif %}>{{ cat.nom }}
+        </option>
+        {% endfor %}
+      </select>
+      <select id="sel-statut"
+        style="font-size:12px;border:1px solid var(--border);border-radius:4px;padding:3px 8px;background:var(--surface);color:var(--text);cursor:pointer;"
+        onchange="applyFilters()">
+        <option value="">Tous statuts</option>
+        <option value="actif" {% if statut == "actif" %}selected{% endif %}>Actifs</option>
+        <option value="inactif" {% if statut == "inactif" %}selected{% endif %}>Inactifs</option>
+      </select>
+      <div class="o-ctrl-sep"></div>
+      <div class="o-view-btns">
+        <button type="button" class="o-view-btn {% if vue != 'grille' %}active{% endif %}" onclick="setVue('liste')"
+          title="Vue Liste">
+          <i class="bi bi-list-ul"></i>
+        </button>
+        <button type="button" class="o-view-btn {% if vue == 'grille' %}active{% endif %}" onclick="setVue('grille')"
+          title="Vue Kanban">
+          <i class="bi bi-grid"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ BARRE SÉLECTION BULK ══ -->
+  <div class="bulk-bar" id="bulk-bar">
+    <i class="bi bi-check2-square"></i>
+    <span id="bulk-count">0</span> élément(s) sélectionné(s)
+    <button type="button" class="btn-bulk-delete" onclick="openBulkModal()">
+      <i class="bi bi-trash"></i> Supprimer
+    </button>
+    <button type="button" class="btn-bulk-cancel" onclick="clearSelection()">Annuler</button>
+  </div>
+
+  <div id="list-result">
+  {% if vue == 'grille' %}
+  <!-- ── VUE KANBAN ── -->
+  <div class="o-kanban" id="main-content">
+    {% for c in page_obj %}
+    <div class="o-card" onclick="if(event.target.type!=='checkbox'){openDrawer(this)}" data-title="{{ c.nom }}"
+      data-edit-url="{% url 'services:consommable_edit' c.pk %}" data-f-code="{{ c.code }}" data-f-nom="{{ c.nom }}"
+      data-f-cat="{% if c.categorie %}{{ c.categorie.nom }}{% else %}—{% endif %}"
+      data-f-unite="{% if c.unite_mesure %}{{ c.unite_mesure.nom }}{% else %}—{% endif %}"
+      data-f-achat="{{ c.prix_achat|floatformat:0 }} CFA" data-f-vente="{{ c.prix_vente|floatformat:0 }} CFA"
+      data-f-stock="{{ c.quantite_stock }}" data-f-statut="{% if c.actif %}Actif{% else %}Inactif{% endif %}">
+      <div class="o-avatar">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path
+            d="M20 7h-4V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2H4a1 1 0 0 0-1 1v11a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8a1 1 0 0 0-1-1z" />
+        </svg>
+      </div>
+      <div class="o-card-body">
+        <div class="o-card-name">{{ c.nom }}</div>
+        <div class="o-card-meta">
+          <span style="font-family:monospace;font-size:10px;">{{ c.code }}</span><br>
+          {% if c.categorie %}<span class="val">{{ c.categorie.code }}</span><br>{% endif %}
+          <span class="val">{{ c.prix_vente|floatformat:0 }} CFA</span>
+          &nbsp;
+          {% if c.actif %}<span class="badge-actif">Actif</span>{% else %}<span class="badge-inactif">Inactif</span>{% endif %}
+        </div>
+      </div>
+    </div>
+    {% empty %}
+    <div class="o-empty" style="grid-column:1/-1">
+      <i class="bi bi-box-seam"></i>
+      Aucun consommable trouvé.<br>
+      <a href="{% url 'services:consommable_create' %}"
+        style="color:var(--accent);font-weight:600;margin-top:8px;display:inline-block;">Créer un premier
+        consommable</a>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <!-- ── VUE LISTE ── -->
+  <div class="o-list-wrap" id="main-content">
+    {% if page_obj.object_list %}
+    <table class="o-list-table" id="cons-table">
+      <thead>
+        <tr id="col-header-row">
+          <th style="width:36px;padding:8px 8px 8px 14px;">
+            <input type="checkbox" id="select-all"
+              style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent);" onchange="toggleAll(this)">
+          </th>
+          <th class="col-code sortable" data-col-idx="1"><span class="col-label">Code</span><span
+              class="sort-icon"></span>
+            <div class="col-resizer"></div>
+          </th>
+          <th class="col-nom sortable" data-col-idx="2"><span class="col-label">Désignation</span><span
+              class="sort-icon"></span>
+            <div class="col-resizer"></div>
+          </th>
+          <th class="col-cat sortable" data-col-idx="3"><span class="col-label">Catégorie</span><span
+              class="sort-icon"></span>
+            <div class="col-resizer"></div>
+          </th>
+          <th class="col-unite sortable" data-col-idx="4" style="display:none"><span class="col-label">Unité</span><span
+              class="sort-icon"></span>
+            <div class="col-resizer"></div>
+          </th>
+          <th class="col-achat sortable" data-col-idx="5" style="display:none;text-align:right"><span
+              class="col-label">Prix achat</span><span class="sort-icon"></span>
+            <div class="col-resizer"></div>
+          </th>
+          <th class="col-vente sortable" data-col-idx="6" style="text-align:right"><span class="col-label">Prix
+              vente</span><span class="sort-icon"></span>
+            <div class="col-resizer"></div>
+          </th>
+          <th class="col-stock sortable" data-col-idx="7" style="text-align:right"><span
+              class="col-label">Stock</span><span class="sort-icon"></span>
+            <div class="col-resizer"></div>
+          </th>
+          <th class="col-statut sortable" data-col-idx="8"><span class="col-label">Statut</span><span
+              class="sort-icon"></span>
+            <div class="col-resizer"></div>
+          </th>
+          <th class="col-picker-th">
+            <button class="col-picker-btn" id="col-picker-btn" title="Colonnes visibles"><i
+                class="bi bi-three-dots-vertical"></i></button>
+            <div class="col-picker-menu" id="col-picker-menu">
+              <label><input type="checkbox" data-col-cls="col-code" checked> Code</label>
+              <label><input type="checkbox" data-col-cls="col-nom" checked> Désignation</label>
+              <label><input type="checkbox" data-col-cls="col-cat" checked> Catégorie</label>
+              <label><input type="checkbox" data-col-cls="col-unite"> Unité</label>
+              <label><input type="checkbox" data-col-cls="col-achat"> Prix achat</label>
+              <label><input type="checkbox" data-col-cls="col-vente" checked> Prix vente</label>
+              <label><input type="checkbox" data-col-cls="col-stock" checked> Stock</label>
+              <label><input type="checkbox" data-col-cls="col-statut" checked> Statut</label>
+            </div>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in page_obj %}
+        <tr data-pk="{{ c.pk }}" onclick="if(event.target.type!=='checkbox'){openDrawer(this)}" data-title="{{ c.nom }}"
+          data-edit-url="{% url 'services:consommable_edit' c.pk %}" data-f-code="{{ c.code }}" data-f-nom="{{ c.nom }}"
+          data-f-cat="{% if c.categorie %}{{ c.categorie.nom }}{% else %}—{% endif %}"
+          data-f-unite="{% if c.unite_mesure %}{{ c.unite_mesure.nom }}{% else %}—{% endif %}"
+          data-f-achat="{{ c.prix_achat|floatformat:0 }} CFA" data-f-vente="{{ c.prix_vente|floatformat:0 }} CFA"
+          data-f-stock="{{ c.quantite_stock }}" data-f-statut="{% if c.actif %}Actif{% else %}Inactif{% endif %}">
+          <td style="padding:9px 8px 9px 14px;" onclick="event.stopPropagation()">
+            <input type="checkbox" class="row-check" value="{{ c.pk }}"
+              style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent);" onchange="onCheckChange()">
+          </td>
+          <td class="col-code"><span style="font-family:monospace;font-size:11px;color:var(--text-muted);">{{ c.code
+              }}</span></td>
+          <td class="col-nom" style="font-weight:500;">{{ c.nom }}</td>
+          <td class="col-cat">{% if c.categorie %}<span class="badge-cat">{{ c.categorie.code }}</span>{% else %}—{% endif %}</td>
+          <td class="col-unite" style="display:none;font-size:12px;">{% if c.unite_mesure %}{{ c.unite_mesure.nom }}{% else %}—{% endif %}</td>
+          <td class="col-achat" style="display:none;text-align:right;font-size:12px;">{{ c.prix_achat|floatformat:0 }}
+            CFA</td>
+          <td class="col-vente" style="text-align:right;font-weight:700;color:var(--primary);">{{ c.prix_vente|floatformat:0 }} CFA</td>
+          <td class="col-stock" style="text-align:right;">
+            {% if c.quantite_alerte and c.quantite_stock <= c.quantite_alerte %} <span class="badge-stock-low">{{ c.quantite_stock }}</span>
+              {% else %}{{ c.quantite_stock }}{% endif %}
+          </td>
+          <td class="col-statut">{% if c.actif %}<span class="badge-actif">Actif</span>{% else %}<span
+              class="badge-inactif">Inactif</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div class="o-pagination-bottom">
+      <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
+      <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
+        href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}&q={{ q }}&categorie={{ categorie_id }}&statut={{ statut }}&vue={{ vue }}{% else %}#{% endif %}">
+        <i class="bi bi-chevron-left"></i>
+      </a>
+      <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
+        href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}&q={{ q }}&categorie={{ categorie_id }}&statut={{ statut }}&vue={{ vue }}{% else %}#{% endif %}">
+        <i class="bi bi-chevron-right"></i>
+      </a>
+    </div>
+    {% else %}
+    <div class="o-empty" style="padding:60px 20px;">
+      <i class="bi bi-box-seam"></i>
+      Aucun consommable trouvé.<br>
+      <a href="{% url 'services:consommable_create' %}"
+        style="color:var(--accent);font-weight:600;margin-top:8px;display:inline-block;">Créer un premier
+        consommable</a>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+  </div><!-- /.list-result -->
+
+  <!-- ══ MODAL SUPPRESSION ══ -->
+  <div class="modal-overlay" id="bulk-delete-modal">
+    <div class="modal-box">
+      <div class="modal-icon">🗑️</div>
+      <div class="modal-title">Confirmer la suppression</div>
+      <div class="modal-msg">Vous allez supprimer <strong id="modal-count">0</strong> consommable(s).<br>
+        <span style="font-size:12px;color:var(--text-muted);">Cette action est irréversible.</span>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-modal-cancel" onclick="closeBulkModal()">Annuler</button>
+        <button type="button" class="btn-modal-confirm" onclick="executeBulkDelete()">Supprimer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ INFO DRAWER ══ -->
+  <div class="info-drawer" id="info-drawer">
+    <div class="drawer-header">
+      <span class="drawer-title" id="drawer-title">—</span>
+      <button class="drawer-close" onclick="closeDrawer()">&#x2715;</button>
+    </div>
+    <div class="drawer-body" id="drawer-body"></div>
+    <div class="drawer-footer">
+      <button class="btn-drawer-close" onclick="closeDrawer()">Fermer</button>
+      <a class="btn-drawer-edit" id="drawer-edit-btn" href="#">
+        <i class="bi bi-pencil"></i> Modifier
+      </a>
+    </div>
+  </div>
+  <div class="drawer-backdrop" id="drawer-backdrop" onclick="closeDrawer()"></div>
+
+</div><!-- /#page-wrap -->
+
+<script>
+  const BULK_URL = "{% url 'services:consommable_bulk_delete' %}";
+  const CSRF_TOKEN = "{{ csrf_token }}";
+
+  var DRAWER_FIELDS = [
+    { attr: 'f-code', label: 'Code' },
+    { attr: 'f-nom', label: 'Désignation' },
+    { attr: 'f-cat', label: 'Catégorie' },
+    { attr: 'f-unite', label: 'Unité de mesure' },
+    { attr: 'f-achat', label: "Prix d'achat" },
+    { attr: 'f-vente', label: 'Prix de vente' },
+    { attr: 'f-stock', label: 'Stock actuel' },
+    { attr: 'f-statut', label: 'Statut' },
+  ];
+
+  function setVue(v) {
+    document.getElementById('vue-input').value = v;
+    window.liveLoad();
+  }
+  function applyFilters() {
+    document.getElementById('fi-cat').value = document.getElementById('sel-cat').value;
+    document.getElementById('fi-statut').value = document.getElementById('sel-statut').value;
+    window.liveLoad();
+  }
+
+  /* ── Drawer ── */
+  function openDrawer(el) {
+    document.getElementById('drawer-title').textContent = el.getAttribute('data-title') || '—';
+    document.getElementById('drawer-edit-btn').href = el.getAttribute('data-edit-url') || '#';
+    var html = '';
+    DRAWER_FIELDS.forEach(function (f) {
+      var val = el.getAttribute('data-' + f.attr) || '—';
+      html += '<div class="drawer-field"><div class="drawer-field-label">' + f.label + '</div><div class="drawer-field-value">' + val + '</div></div>';
+    });
+    document.getElementById('drawer-body').innerHTML = html;
+    document.getElementById('info-drawer').classList.add('open');
+    document.getElementById('drawer-backdrop').classList.add('open');
+  }
+  function closeDrawer() {
+    document.getElementById('info-drawer').classList.remove('open');
+    document.getElementById('drawer-backdrop').classList.remove('open');
+  }
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeDrawer(); });
+
+  /* ── Recherche auto debounce ── */
+  (function () {
+    var inp = document.querySelector('.o-search-input');
+    if (!inp) return;
+    var timer;
+    inp.addEventListener('input', function () {
+      clearTimeout(timer);
+      timer = setTimeout(window.liveLoad, 350);
+    });
+  })();
+
+  /* ── Sélection cases ── */
+  function onCheckChange() {
+    var checks = document.querySelectorAll('.row-check:checked');
+    var count = checks.length;
+    document.getElementById('bulk-count').textContent = count;
+    document.getElementById('bulk-bar').classList.toggle('visible', count > 0);
+    document.querySelectorAll('.row-check').forEach(function (cb) {
+      var row = cb.closest('tr');
+      if (row) row.style.background = cb.checked ? 'rgba(33,136,171,0.06)' : '';
+    });
+    var all = document.getElementById('select-all');
+    if (all) {
+      var total = document.querySelectorAll('.row-check').length;
+      all.indeterminate = count > 0 && count < total;
+      all.checked = count === total && total > 0;
+    }
+  }
+  function toggleAll(master) {
+    document.querySelectorAll('.row-check').forEach(function (cb) { cb.checked = master.checked; });
+    onCheckChange();
+  }
+  function clearSelection() {
+    document.querySelectorAll('.row-check, #select-all').forEach(function (cb) { cb.checked = false; });
+    onCheckChange();
+  }
+
+  /* ── Bulk delete ── */
+  function openBulkModal() {
+    document.getElementById('modal-count').textContent = document.querySelectorAll('.row-check:checked').length;
+    document.getElementById('bulk-delete-modal').classList.add('open');
+  }
+  function closeBulkModal() { document.getElementById('bulk-delete-modal').classList.remove('open'); }
+  function executeBulkDelete() {
+    var ids = Array.from(document.querySelectorAll('.row-check:checked')).map(function (cb) { return cb.value; });
+    if (!ids.length) return;
+    var fd = new FormData();
+    fd.append('csrfmiddlewaretoken', CSRF_TOKEN);
+    ids.forEach(function (id) { fd.append('ids[]', id); });
+    fetch(BULK_URL, { method: 'POST', body: fd })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { if (d.ok) window.location.reload(); })
+      .catch(function () { closeBulkModal(); });
+  }
+  document.getElementById('bulk-delete-modal').addEventListener('click', function (e) { if (e.target === this) closeBulkModal(); });
+
+</script>
+{% include 'services/includes/list_live_js.html' %}
+{% include 'services/includes/sort_resize_js.html' %}
+{% endblock %}

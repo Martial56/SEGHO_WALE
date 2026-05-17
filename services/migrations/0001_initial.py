@@ -56,7 +56,7 @@ class Migration(migrations.Migration):
             },
         ),
         migrations.CreateModel(
-            name='ArticleService',
+            name='Articleservice',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('nom', models.CharField(max_length=300, verbose_name="Nom de l'article")),
@@ -81,8 +81,8 @@ class Migration(migrations.Migration):
                 ('avertissement_lactation', models.BooleanField(default=False, verbose_name='Avertissement de lactation')),
                 ('indications', models.TextField(blank=True, verbose_name='Indications')),
                 ('remarques', models.TextField(blank=True, verbose_name='Remarques')),
-                ('type_article', models.CharField(choices=[('consommable', 'Consommable'), ('stockable', 'Peut être stocké'), ('service', 'Service'), ('autre', 'Autre')], default='consommable', max_length=20, verbose_name="Type d'article")),
-                ('type_produit_hospitalier', models.CharField(blank=True, choices=[('medicament', 'Médicament'), ('consommable', 'Consommable médical'), ('equipement', 'Équipement'), ('service', 'Service médical'), ('examen', 'Examen / Analyse'), ('autre', 'Autre')], max_length=20, verbose_name='Type de produit hospitalier')),
+                ('type_article', models.CharField(choices=[('consommable', 'Consommable'), ('stockable', 'Peut être stocké'), ('service', 'service'), ('autre', 'Autre')], default='consommable', max_length=20, verbose_name="Type d'article")),
+                ('type_produit_hospitalier', models.CharField(blank=True, choices=[('medicament', 'Médicament'), ('consommable', 'Consommable médical'), ('equipement', 'Équipement'), ('service', 'service médical'), ('examen', 'Examen / Analyse'), ('autre', 'Autre')], max_length=20, verbose_name='Type de produit hospitalier')),
                 ('politique_facturation', models.CharField(choices=[('qtes_commandees', 'Quantités commandées'), ('qtes_livrees', 'Quantités livrées')], default='qtes_commandees', max_length=20, verbose_name='Politique de facturation')),
                 ('refacturer_depenses', models.CharField(choices=[('non', 'Non'), ('au_cout', 'Au coût'), ('prix_vente', 'Prix de vente')], default='non', max_length=20, verbose_name='Re-facturer les dépenses')),
                 ('unite_mesure', models.CharField(default='Unités', max_length=50, verbose_name='Unité de mesure')),
@@ -115,8 +115,8 @@ class Migration(migrations.Migration):
                 ('famille', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='services.famillearticle', verbose_name='Famille')),
             ],
             options={
-                'verbose_name': 'Article / Service',
-                'verbose_name_plural': 'Articles / Services',
+                'verbose_name': 'Article / service',
+                'verbose_name_plural': 'Articles / services',
                 'ordering': ['nom'],
             },
         ),

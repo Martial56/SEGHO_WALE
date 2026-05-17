@@ -12,7 +12,7 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AlterModelOptions(
             name='service',
-            options={'ordering': ['type_service', 'nom'], 'verbose_name': 'Service', 'verbose_name_plural': 'Services'},
+            options={'ordering': ['type_service', 'nom'], 'verbose_name': 'service', 'verbose_name_plural': 'services'},
         ),
         migrations.AddField(
             model_name='service',

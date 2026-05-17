@@ -48,7 +48,7 @@ class Migration(migrations.Migration):
             },
         ),
         migrations.CreateModel(
-            name='Service',
+            name='service',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('nom', models.CharField(max_length=100)),
@@ -58,7 +58,7 @@ class Migration(migrations.Migration):
                 ('chef_service', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='medecins.medecin')),
             ],
             options={
-                'verbose_name': 'Service',
+                'verbose_name': 'service',
             },
         ),
     ]

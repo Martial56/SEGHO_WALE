@@ -7,6 +7,7 @@ urlpatterns = [
     path('', views.patient_list, name='list'),
     path('rendez-vous/', views.rdv_global_list, name='rdv_global'),
     path('rendez-vous/nouveau/', views.rdv_create, name='rdv_create'),
+    path('supprimer-selection/', views.patient_bulk_delete, name='patient_bulk_delete'),
     path('<int:pk>/info/', views.patient_info_json, name='patient_info'),
     path('nouveau/', views.patient_create, name='create'),
     path('<int:pk>/', views.patient_detail, name='detail'),

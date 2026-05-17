@@ -56,10 +56,12 @@ def medecin_detail(request, pk):
     medecin = get_object_or_404(Medecin, pk=pk)
 
     rdv_count = 0
+    consultation_count = 0
     ordonnance_count = 0
     hospitalisation_count = 0
     demande_lab_count = 0
     resultat_lab_count = 0
+    referent_count = medecin.referents_associes.count()
 
     try:
         rdv_count = medecin.rendez_vous.count()
@@ -67,7 +69,8 @@ def medecin_detail(request, pk):
         pass
 
     try:
-        from consultations.models import Ordonnance
+        from consultations.models import Consultation, Ordonnance
+        consultation_count = Consultation.objects.filter(medecin=medecin).count()
         ordonnance_count = Ordonnance.objects.filter(consultation__medecin=medecin).count()
     except Exception:
         pass
@@ -101,10 +104,12 @@ def medecin_detail(request, pk):
     return render(request, 'medecins/detail.html', {
         'medecin': medecin,
         'rdv_count': rdv_count,
+        'consultation_count': consultation_count,
         'ordonnance_count': ordonnance_count,
         'hospitalisation_count': hospitalisation_count,
         'demande_lab_count': demande_lab_count,
         'resultat_lab_count': resultat_lab_count,
+        'referent_count': referent_count,
         'total': len(ids),
         'position': position,
         'prev_pk': prev_pk,
@@ -338,6 +343,7 @@ def referent_list(request):
 def referent_detail(request, pk):
     referent = get_object_or_404(DocteurReferent, pk=pk)
     patients_count = referent.patients.count()
+    contacts_count = referent.contacts_adresses.count()
 
     ids = list(DocteurReferent.objects.order_by('nom', 'prenoms').values_list('pk', flat=True))
     try:
@@ -352,6 +358,7 @@ def referent_detail(request, pk):
     return render(request, 'medecins/referents/detail.html', {
         'referent': referent,
         'patients_count': patients_count,
+        'contacts_count': contacts_count,
         'patients': referent.patients.all()[:10],
         'total': len(ids),
         'position': position,
@@ -461,3 +468,193 @@ def diplome_edit(request, pk):
         'obj': obj,
         'active_menu': 'config',
     })
+
+
+# ── Listes liées — Médecin ───────────────────────────────────────────────────
+
+@login_required
+def medecin_related_list(request, pk, view_type):
+    medecin = get_object_or_404(Medecin, pk=pk)
+
+    TITRES = {
+        'rdv':             'Rendez-vous',
+        'consultation':    'Consultations',
+        'ordonnance':      'Ordonnances',
+        'hospitalisation': 'Hospitalisations',
+        'demande_examens': "Demandes d'examens",
+        'resultat_examens':"Résultats d'examens",
+        'referents':       'Référents associés',
+    }
+    if view_type not in TITRES:
+        return redirect('medecins:detail', pk=pk)
+
+    items = []
+    if view_type == 'rdv':
+        try:
+            items = medecin.rendez_vous.select_related('patient').order_by('-date_heure')
+        except Exception:
+            pass
+    elif view_type == 'consultation':
+        try:
+            from consultations.models import Consultation
+            items = Consultation.objects.filter(medecin=medecin).select_related('patient').order_by('-date_heure')
+        except Exception:
+            pass
+    elif view_type == 'ordonnance':
+        try:
+            from consultations.models import Ordonnance
+            items = Ordonnance.objects.filter(
+                consultation__medecin=medecin
+            ).select_related('consultation__patient').order_by('-date_emission')
+        except Exception:
+            pass
+    elif view_type == 'hospitalisation':
+        try:
+            from hospitalisation.models import Hospitalisation
+            items = Hospitalisation.objects.filter(
+                medecin_traitant=medecin
+            ).select_related('patient').order_by('-date_admission')
+        except Exception:
+            pass
+    elif view_type == 'demande_examens':
+        try:
+            from laboratoire.models import AnalyseLaboratoire
+            items = AnalyseLaboratoire.objects.filter(
+                medecin_prescripteur=medecin
+            ).select_related('patient').order_by('-date_prelevement')
+        except Exception:
+            pass
+    elif view_type == 'resultat_examens':
+        try:
+            from laboratoire.models import AnalyseLaboratoire
+            items = AnalyseLaboratoire.objects.filter(
+                medecin_prescripteur=medecin,
+                statut__in=['résultat', 'validé', 'envoyé']
+            ).select_related('patient').order_by('-date_resultat')
+        except Exception:
+            pass
+    elif view_type == 'referents':
+        items = medecin.referents_associes.select_related('specialite').order_by('nom')
+
+    # Compteurs pour les smart buttons
+    rdv_count = consultation_count = ordonnance_count = 0
+    hospitalisation_count = demande_lab_count = resultat_lab_count = 0
+    referent_count = medecin.referents_associes.count()
+    try:
+        rdv_count = medecin.rendez_vous.count()
+    except Exception:
+        pass
+    try:
+        from consultations.models import Consultation, Ordonnance
+        consultation_count = Consultation.objects.filter(medecin=medecin).count()
+        ordonnance_count = Ordonnance.objects.filter(consultation__medecin=medecin).count()
+    except Exception:
+        pass
+    try:
+        from hospitalisation.models import Hospitalisation
+        hospitalisation_count = Hospitalisation.objects.filter(medecin_traitant=medecin).count()
+    except Exception:
+        pass
+    try:
+        from laboratoire.models import AnalyseLaboratoire
+        demande_lab_count = AnalyseLaboratoire.objects.filter(medecin_prescripteur=medecin).count()
+        resultat_lab_count = AnalyseLaboratoire.objects.filter(
+            medecin_prescripteur=medecin, statut__in=['résultat', 'validé', 'envoyé']
+        ).count()
+    except Exception:
+        pass
+
+    return render(request, 'medecins/related_list.html', {
+        'medecin':              medecin,
+        'items':                items,
+        'titre':                TITRES[view_type],
+        'view_type':            view_type,
+        'rdv_count':            rdv_count,
+        'consultation_count':   consultation_count,
+        'ordonnance_count':     ordonnance_count,
+        'hospitalisation_count':hospitalisation_count,
+        'demande_lab_count':    demande_lab_count,
+        'resultat_lab_count':   resultat_lab_count,
+        'referent_count':       referent_count,
+    })
+
+
+# ── Listes liées — Docteur Référent ─────────────────────────────────────────
+
+@login_required
+def referent_related_list(request, pk, view_type):
+    referent = get_object_or_404(DocteurReferent, pk=pk)
+
+    TITRES = {
+        'patients': 'Patients référés',
+        'contacts': 'Contacts & Adresses',
+    }
+    if view_type not in TITRES:
+        return redirect('medecins:referent_detail', pk=pk)
+
+    items = []
+    if view_type == 'patients':
+        items = referent.patients.all().order_by('nom', 'prenoms')
+    elif view_type == 'contacts':
+        items = referent.contacts_adresses.all()
+
+    return render(request, 'medecins/referents/related_list.html', {
+        'referent':        referent,
+        'items':           items,
+        'titre':           TITRES[view_type],
+        'view_type':       view_type,
+        'patients_count':  referent.patients.count(),
+        'contacts_count':  referent.contacts_adresses.count(),
+        'active_menu':     'referents',
+    })
+
+
+# ── Suppressions en masse ────────────────────────────────────────────────────
+
+from django.views.decorators.http import require_POST
+from django.http import JsonResponse as _JsonResponse
+
+@login_required
+@require_POST
+def medecin_bulk_delete(request):
+    ids = request.POST.getlist('ids[]')
+    if ids:
+        count, _ = Medecin.objects.filter(pk__in=ids).delete()
+        return _JsonResponse({'ok': True, 'count': count})
+    return _JsonResponse({'ok': False}, status=400)
+
+@login_required
+@require_POST
+def referent_bulk_delete(request):
+    ids = request.POST.getlist('ids[]')
+    if ids:
+        count, _ = DocteurReferent.objects.filter(pk__in=ids).delete()
+        return _JsonResponse({'ok': True, 'count': count})
+    return _JsonResponse({'ok': False}, status=400)
+
+@login_required
+@require_POST
+def specialite_bulk_delete(request):
+    ids = request.POST.getlist('ids[]')
+    if ids:
+        count, _ = Specialite.objects.filter(pk__in=ids).delete()
+        return _JsonResponse({'ok': True, 'count': count})
+    return _JsonResponse({'ok': False}, status=400)
+
+@login_required
+@require_POST
+def departement_bulk_delete(request):
+    ids = request.POST.getlist('ids[]')
+    if ids:
+        count, _ = Departement.objects.filter(pk__in=ids).delete()
+        return _JsonResponse({'ok': True, 'count': count})
+    return _JsonResponse({'ok': False}, status=400)
+
+@login_required
+@require_POST
+def diplome_bulk_delete(request):
+    ids = request.POST.getlist('ids[]')
+    if ids:
+        count, _ = Diplome.objects.filter(pk__in=ids).delete()
+        return _JsonResponse({'ok': True, 'count': count})
+    return _JsonResponse({'ok': False}, status=400)

@@ -27,7 +27,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AlterModelOptions(
             name='service',
-            options={'ordering': ['categorie_article', 'nom'], 'verbose_name': 'Service médical', 'verbose_name_plural': 'Services médicaux'},
+            options={'ordering': ['categorie_article', 'nom'], 'verbose_name': 'service médical', 'verbose_name_plural': 'services médicaux'},
         ),
         migrations.RenameField(
             model_name='service',
@@ -69,7 +69,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='service',
             name='type_article',
-            field=models.CharField(choices=[('service', 'Service'), ('consommable', 'Consommable')], default='service', max_length=20, verbose_name='Type'),
+            field=models.CharField(choices=[('service', 'service'), ('consommable', 'Consommable')], default='service', max_length=20, verbose_name='Type'),
         ),
         migrations.AddField(
             model_name='service',

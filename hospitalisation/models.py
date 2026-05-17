@@ -7,7 +7,7 @@ class Chambre(models.Model):
 
     numero = models.CharField(max_length=20, unique=True)
     type_chambre = models.CharField(max_length=20, choices=TYPE, default='simple')
-    service = models.ForeignKey('medecins.Service', on_delete=models.SET_NULL, null=True, blank=True)
+    service = models.ForeignKey('services.Articleservice', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="service")
     capacite = models.IntegerField(default=1)
     prix_jour = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     disponible = models.BooleanField(default=True)

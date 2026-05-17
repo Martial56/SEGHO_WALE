@@ -42,7 +42,7 @@ def dashboard(request):
     today = timezone.now().date()
 
     stats = {
-        'patients_total': Patient.objects.filter(actif=True).count(),
+        'patients_total': Patient.objects.count(),
         'patients_today': Patient.objects.filter(date_creation__date=today).count(),
         'consultations_today': Consultation.objects.filter(date_heure__date=today).count(),
         'rdv_today': RendezVous.objects.filter(date_heure__date=today).count(),

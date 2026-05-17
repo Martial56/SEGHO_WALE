@@ -43,7 +43,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AlterModelOptions(
             name='service',
-            options={'verbose_name': 'Service'},
+            options={'verbose_name': 'service'},
         ),
         migrations.AlterModelOptions(
             name='specialite',

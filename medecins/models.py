@@ -38,24 +38,15 @@ class Departement(models.Model):
         ordering = ['nom']
 
 
-class Service(models.Model):
-    nom = models.CharField(max_length=100)
-    code = models.CharField(max_length=20, blank=True, null=True, unique=True)
-    description = models.TextField(blank=True)
-    actif = models.BooleanField(default=True)
-
-    def __str__(self): return self.nom
-    class Meta:
-        verbose_name = "Service"
-        ordering = ['nom']
-
-
 class Medecin(models.Model):
+    GENRE_CHOICES = [('', '—'), ('M', 'Masculin'), ('F', 'Féminin')]
+
     user = models.OneToOneField(User, on_delete=models.SET_NULL, null=True, blank=True)
     code = models.CharField(max_length=20, unique=True, blank=True, null=True)
     matricule = models.CharField(max_length=20, unique=True, blank=True, null=True)
     nom = models.CharField(max_length=100)
     prenoms = models.CharField(max_length=200)
+    genre = models.CharField(max_length=1, choices=GENRE_CHOICES, blank=True, default='', verbose_name='Genre')
     photo = models.ImageField(upload_to='medecins/photos/', blank=True, null=True)
     diplome = models.ForeignKey(Diplome, on_delete=models.SET_NULL, null=True, blank=True,
                                 verbose_name='Éducation')
@@ -63,11 +54,11 @@ class Medecin(models.Model):
     departements = models.ManyToManyField(Departement, blank=True, related_name='medecins',
                                           verbose_name='Départements')
     service_consultation = models.ForeignKey(
-        Service, on_delete=models.SET_NULL, null=True, blank=True,
-        related_name='medecins_consultation', verbose_name='Service de consultation')
+        'services.Articleservice', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='medecins_consultation', verbose_name='service de consultation')
     service_suivi = models.ForeignKey(
-        Service, on_delete=models.SET_NULL, null=True, blank=True,
-        related_name='medecins_suivi', verbose_name='Service de suivi')
+        'services.Articleservice', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='medecins_suivi', verbose_name='service de suivi')
     fonction = models.CharField(max_length=100, blank=True, verbose_name='Fonction / Titre')
     telephone = models.CharField(max_length=20, blank=True)
     mobile = models.CharField(max_length=20, blank=True)
@@ -111,6 +102,7 @@ class Etiquette(models.Model):
 
 class DocteurReferent(models.Model):
     TYPE_CHOICES = [('individu', 'Individu'), ('societe', 'Société')]
+    GENRE_CHOICES = [('', '—'), ('M', 'Masculin'), ('F', 'Féminin')]
     TITRE_CHOICES = [
         ('', '—'),
         ('dr', 'Dr'),
@@ -127,6 +119,7 @@ class DocteurReferent(models.Model):
                              verbose_name='Titre')
     nom = models.CharField(max_length=100)
     prenoms = models.CharField(max_length=200, blank=True, verbose_name='Prénom(s)')
+    genre = models.CharField(max_length=1, choices=GENRE_CHOICES, blank=True, default='', verbose_name='Genre')
     photo = models.ImageField(upload_to='medecins/referents/', blank=True, null=True)
     poste_occupe = models.CharField(max_length=100, blank=True, verbose_name='Poste Occupé')
     specialite = models.ForeignKey(Specialite, on_delete=models.SET_NULL, null=True, blank=True,

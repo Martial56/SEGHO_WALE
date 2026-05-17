@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 class Poste(models.Model):
     nom = models.CharField(max_length=100)
     code = models.CharField(max_length=20, unique=True)
-    service = models.ForeignKey('medecins.Service', on_delete=models.SET_NULL, null=True, blank=True)
+    service = models.ForeignKey('services.Articleservice', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="service")
     def __str__(self): return self.nom
     class Meta: verbose_name = "Poste"
 

@@ -1,7 +1,7 @@
 from django.contrib import admin
 from .models import (
     UniteMesure, CategorieArticle, FamilleArticle, CompagniePharma,
-    ArticleService, LigneFournisseurArticle, ConditionnementArticle,
+    Articleservice, LigneFournisseurArticle, ConditionnementArticle,
     VarianteAttributArticle, ReglePrix,
 )
 
@@ -53,8 +53,8 @@ class ReglePrixInline(admin.TabularInline):
     extra = 0
 
 
-@admin.register(ArticleService)
-class ArticleServiceAdmin(admin.ModelAdmin):
+@admin.register(Articleservice)
+class ArticleserviceAdmin(admin.ModelAdmin):
     list_display = ('reference_interne', 'nom', 'categorie', 'type_produit_hospitalier', 'prix_vente', 'actif')
     list_filter = ('actif', 'categorie', 'type_produit_hospitalier', 'type_article')
     search_fields = ('nom', 'reference_interne', 'code_barres')

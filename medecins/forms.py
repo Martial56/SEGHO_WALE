@@ -1,7 +1,7 @@
 from django import forms
 from django.forms import inlineformset_factory
-from .models import (Medecin, Specialite, Diplome, Departement, Service,
-                     DocteurReferent, Etiquette, ContactAdresse)
+from .models import Medecin, Specialite, Diplome, Departement, DocteurReferent, Etiquette, ContactAdresse
+from services.models import Articleservice
 
 
 class SpecialiteForm(forms.ModelForm):
@@ -47,6 +47,7 @@ class MedecinForm(forms.ModelForm):
         widgets = {
             'nom': forms.TextInput(attrs={'class': _ul_name, 'placeholder': 'Nom'}),
             'prenoms': forms.TextInput(attrs={'class': _ul_prenom, 'placeholder': 'Prénom(s)'}),
+            'genre': forms.Select(attrs={'class': _ul}),
             'fonction': forms.TextInput(attrs={'class': _ul, 'placeholder': 'Ex : Directeur Médical'}),
             'diplome': forms.Select(attrs={'class': _ul}),
             'specialite': forms.Select(attrs={'class': _ul}),
@@ -76,10 +77,10 @@ class MedecinForm(forms.ModelForm):
         self.fields['diplome'].required = False
         self.fields['departements'].queryset = Departement.objects.filter(actif=True)
         self.fields['departements'].required = False
-        self.fields['service_consultation'].queryset = Service.objects.filter(actif=True)
+        self.fields['service_consultation'].queryset = Articleservice.objects.filter(actif=True).order_by('nom')
         self.fields['service_consultation'].empty_label = '— Choisir un service —'
         self.fields['service_consultation'].required = False
-        self.fields['service_suivi'].queryset = Service.objects.filter(actif=True)
+        self.fields['service_suivi'].queryset = Articleservice.objects.filter(actif=True).order_by('nom')
         self.fields['service_suivi'].empty_label = '— Choisir un service —'
         self.fields['service_suivi'].required = False
         self.fields['user'].required = False
@@ -102,6 +103,7 @@ class DocteurReferentForm(forms.ModelForm):
             'titre': forms.Select(attrs={'class': _ul}),
             'nom': forms.TextInput(attrs={'class': _ul_name, 'placeholder': 'Nom / Raison sociale'}),
             'prenoms': forms.TextInput(attrs={'class': _ul_prenom, 'placeholder': 'Prénom(s)'}),
+            'genre': forms.Select(attrs={'class': _ul}),
             'poste_occupe': forms.TextInput(attrs={'class': _ul, 'placeholder': 'Ex : Directeur Médical'}),
             'specialite': forms.Select(attrs={'class': _ul}),
             'etablissement': forms.TextInput(attrs={'class': _ul, 'placeholder': 'Hôpital / Clinique'}),

@@ -307,3 +307,17 @@ def patient_resultat_examens_list(request, pk):
         'titre': "Résultats d'examens de laboratoire",
         'items': items,
     })
+
+
+# ── Suppression en masse ─────────────────────────────────────────────────────
+
+from django.views.decorators.http import require_POST
+
+@login_required
+@require_POST
+def patient_bulk_delete(request):
+    ids = request.POST.getlist('ids[]')
+    if ids:
+        count, _ = Patient.objects.filter(pk__in=ids).delete()
+        return JsonResponse({'ok': True, 'count': count})
+    return JsonResponse({'ok': False}, status=400)

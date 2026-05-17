@@ -41,7 +41,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AlterModelOptions(
             name='service',
-            options={'ordering': ['nom'], 'verbose_name': 'Service'},
+            options={'ordering': ['nom'], 'verbose_name': 'service'},
         ),
         migrations.AlterModelOptions(
             name='specialite',
@@ -89,12 +89,12 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='medecin',
             name='service_consultation',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='medecins_consultation', to='medecins.service', verbose_name='Service de consultation'),
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='medecins_consultation', to='medecins.service', verbose_name='service de consultation'),
         ),
         migrations.AddField(
             model_name='medecin',
             name='service_suivi',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='medecins_suivi', to='medecins.service', verbose_name='Service de suivi'),
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='medecins_suivi', to='medecins.service', verbose_name='service de suivi'),
         ),
         migrations.AddField(
             model_name='medecin',
