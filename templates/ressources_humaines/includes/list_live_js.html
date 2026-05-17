@@ -1,0 +1,127 @@
+<style>
+#list-result { transition: opacity 0.15s ease; }
+</style>
+<script>
+/* ════════════════════════════════════════════════════════
+   liveLoad(overrides?)
+   Charge la page courante avec les filtres actifs via fetch,
+   remplace #list-result sans rechargement complet.
+
+   Émet l'événement custom « liveload:complete » sur document
+   après chaque remplacement réussi — utile pour ré-initialiser
+   des composants (vue kanban/liste, col-picker…).
+
+   overrides : objet de paramètres à forcer (ex: {vue:'grille', page:'2'})
+   ════════════════════════════════════════════════════════ */
+(function () {
+
+  window.liveLoad = function (overrides) {
+    var form = document.getElementById('filter-form');
+    var params = new URLSearchParams(window.location.search);
+
+    /* Lire toutes les valeurs actuelles du formulaire */
+    if (form) {
+      new FormData(form).forEach(function (v, k) {
+        if (v !== '') params.set(k, v);
+        else params.delete(k);
+      });
+    }
+
+    /* Appliquer les overrides */
+    if (overrides && typeof overrides === 'object') {
+      Object.keys(overrides).forEach(function (k) {
+        var v = overrides[k];
+        if (v !== null && v !== undefined && v !== '') params.set(k, String(v));
+        else params.delete(k);
+      });
+    }
+
+    /* Réinitialiser la page sauf override explicite */
+    if (!overrides || overrides.page === undefined) {
+      params.set('page', '1');
+    }
+
+    var url = '?' + params.toString();
+
+    /* Indicateur de chargement */
+    var result = document.getElementById('list-result');
+    if (result) result.style.opacity = '0.4';
+
+    fetch(url)
+      .then(function (r) { return r.text(); })
+      .then(function (html) {
+        var doc = new DOMParser().parseFromString(html, 'text/html');
+        var newResult = doc.getElementById('list-result');
+        var oldResult = document.getElementById('list-result');
+        if (newResult && oldResult) {
+          newResult.style.opacity = '';
+          oldResult.replaceWith(newResult);
+        }
+        history.replaceState({}, '', url);
+        /* Réinitialiser la sélection bulk */
+        var bar = document.getElementById('bulk-bar');
+        var cnt = document.getElementById('bulk-count');
+        if (bar) bar.classList.remove('visible');
+        if (cnt) cnt.textContent = '0';
+        var all = document.getElementById('select-all');
+        if (all) { all.checked = false; all.indeterminate = false; }
+        /* Notifier les composants dépendants */
+        document.dispatchEvent(new CustomEvent('liveload:complete', { detail: { url: url } }));
+      })
+      .catch(function () {
+        var c = document.getElementById('list-result');
+        if (c) c.style.opacity = '';
+      });
+  };
+
+  /* ── Pagination dynamique (intercepte .o-pag-btn dans #list-result) ── */
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest('#list-result .o-pag-btn');
+    if (!a || a.classList.contains('disabled')) return;
+    var href = a.getAttribute('href');
+    if (!href || href === '#') return;
+    e.preventDefault();
+    var qs = href.includes('?') ? href.split('?')[1] : '';
+    var p = new URLSearchParams(qs);
+    window.liveLoad({ page: p.get('page') || '1' });
+  });
+
+  /* ── Col-picker délégation (data-col-cls) ── */
+  document.addEventListener('change', function (e) {
+    var cb = e.target.closest('#col-picker-menu input[data-col-cls]');
+    if (!cb) return;
+    document.querySelectorAll('.' + cb.dataset.colCls).forEach(function (el) {
+      el.style.display = cb.checked ? '' : 'none';
+    });
+  });
+
+  /* ── Col-picker délégation (data-col-idx → td[data-col]) ── */
+  document.addEventListener('change', function (e) {
+    var cb = e.target.closest('#col-picker-menu input[data-col-idx]');
+    if (!cb) return;
+    var idx = cb.dataset.colIdx;
+    var table = document.querySelector('.o-list-table');
+    if (!table) return;
+    var th = table.querySelector('th[data-col="' + idx + '"]');
+    if (th) th.style.display = cb.checked ? '' : 'none';
+    table.querySelectorAll('td[data-col="' + idx + '"]').forEach(function (td) {
+      td.style.display = cb.checked ? '' : 'none';
+    });
+  });
+
+  /* ── Col-picker bouton (délégation) ── */
+  document.addEventListener('click', function (e) {
+    var menu = document.getElementById('col-picker-menu');
+    if (!menu) return;
+    if (e.target.closest('#col-picker-btn')) {
+      e.stopPropagation();
+      menu.classList.toggle('open');
+      return;
+    }
+    if (!e.target.closest('#col-picker-menu')) {
+      menu.classList.remove('open');
+    }
+  });
+
+})();
+</script>

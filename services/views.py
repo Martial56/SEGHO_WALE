@@ -208,6 +208,14 @@ def service_form(request, pk=None):
 
 
 @login_required
+def service_detail(request, pk):
+    article = get_object_or_404(Articleservice, pk=pk)
+    return render(request, 'services/detail.html', {
+        'article': article,
+    })
+
+
+@login_required
 def regles_prix(request, pk):
     article = get_object_or_404(Articleservice, pk=pk)
     regles = article.regles_prix.all()
@@ -279,7 +287,7 @@ def consommable_edit(request, pk):
         if form.is_valid():
             form.save()
             messages.success(request, f'Consommable « {obj.nom} » mis à jour.')
-            return redirect('services:consommables')
+            return redirect('services:consommable_detail', pk=obj.pk)
     else:
         form = ConsommableForm(instance=obj)
     return render(request, 'services/consommables/form.html', {
@@ -288,6 +296,12 @@ def consommable_edit(request, pk):
         'titre': f'Modifier — {obj.nom}',
         'edit': True,
     })
+
+
+@login_required
+def consommable_detail(request, pk):
+    obj = get_object_or_404(Consommable, pk=pk)
+    return render(request, 'services/consommables/detail.html', {'obj': obj})
 
 
 @login_required
@@ -386,7 +400,7 @@ def categorie_edit(request, pk):
         if form.is_valid():
             form.save()
             messages.success(request, f'Catégorie « {obj.nom} » mise à jour.')
-            return redirect('services:categories')
+            return redirect('services:categorie_detail', pk=obj.pk)
     else:
         form = CategorieArticleForm(instance=obj)
     return render(request, 'services/categories/form.html', {
@@ -395,6 +409,12 @@ def categorie_edit(request, pk):
         'titre': f'Modifier — {obj.nom}',
         'edit': True,
     })
+
+
+@login_required
+def categorie_detail(request, pk):
+    obj = get_object_or_404(CategorieArticle, pk=pk)
+    return render(request, 'services/categories/detail.html', {'obj': obj})
 
 
 @login_required
@@ -458,7 +478,7 @@ def unite_edit(request, pk):
         if form.is_valid():
             form.save()
             messages.success(request, f'Unité « {obj.nom} » mise à jour.')
-            return redirect('services:unites')
+            return redirect('services:unite_detail', pk=obj.pk)
     else:
         form = UniteMesureForm(instance=obj)
     return render(request, 'services/unites/form.html', {
@@ -467,6 +487,12 @@ def unite_edit(request, pk):
         'titre': f'Modifier — {obj.nom}',
         'edit': True,
     })
+
+
+@login_required
+def unite_detail(request, pk):
+    obj = get_object_or_404(UniteMesure, pk=pk)
+    return render(request, 'services/unites/detail.html', {'obj': obj})
 
 
 @login_required
@@ -516,6 +542,12 @@ def categorie_unite_create(request):
 
 
 @login_required
+def categorie_unite_detail(request, pk):
+    obj = get_object_or_404(CategorieUniteMesure, pk=pk)
+    return render(request, 'services/unites/categories/detail.html', {'obj': obj})
+
+
+@login_required
 def categorie_unite_edit(request, pk):
     obj = get_object_or_404(CategorieUniteMesure, pk=pk)
     if request.method == 'POST':
@@ -523,7 +555,7 @@ def categorie_unite_edit(request, pk):
         if form.is_valid():
             form.save()
             messages.success(request, f'Catégorie « {obj.nom} » mise à jour.')
-            return redirect('services:categories_unites')
+            return redirect('services:categorie_unite_detail', pk=obj.pk)
     else:
         form = CategorieUniteMesureForm(instance=obj)
     return render(request, 'services/unites/categories/form.html', {
@@ -600,7 +632,7 @@ def type_edit(request, pk):
         if form.is_valid():
             form.save()
             messages.success(request, f'Type « {obj.nom} » mis à jour.')
-            return redirect('services:types')
+            return redirect('services:type_detail', pk=obj.pk)
     else:
         form = TypeserviceForm(instance=obj)
     return render(request, 'services/types/form.html', {
@@ -609,6 +641,12 @@ def type_edit(request, pk):
         'titre': f'Modifier — {obj.nom}',
         'edit': True,
     })
+
+
+@login_required
+def type_detail(request, pk):
+    obj = get_object_or_404(Typeservice, pk=pk)
+    return render(request, 'services/types/detail.html', {'obj': obj})
 
 
 @login_required

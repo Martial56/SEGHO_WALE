@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('medecins', '0010_docteurreferent'),
+        ('employe', '0001_initial'),
         ('patients', '0002_rendezvous_code_confirmation_rendezvous_departement_and_more'),
     ]
 
@@ -15,6 +15,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='patient',
             name='medecin_referent',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='patients', to='medecins.docteurreferent', verbose_name='Médecin référent'),
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='patients', to='employe.docteurreferent', verbose_name='Médecin référent'),
         ),
     ]

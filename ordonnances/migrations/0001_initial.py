@@ -13,7 +13,7 @@ class Migration(migrations.Migration):
         ('consultations', '0002_remove_ordonnance_consultation_and_more'),
         ('facturation', '0001_initial'),
         ('hospitalisation', '0001_initial'),
-        ('medecins', '0006_categoriearticle_typearticle_unitemesure_and_more'),
+        ('employe', '0001_initial'),
         ('patients', '0001_initial'),
         ('pharmacie', '0001_initial'),
     ]
@@ -25,7 +25,7 @@ class Migration(migrations.Migration):
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('nom', models.CharField(max_length=300, verbose_name='Nom du groupe')),
                 ('maladies', models.CharField(blank=True, max_length=500, verbose_name='Maladies')),
-                ('medecin', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='medecins.medecin', verbose_name='Docteur')),
+                ('medecin', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='employe.employe', verbose_name='Docteur')),
             ],
             options={
                 'verbose_name': 'Groupe de médicaments',
@@ -53,7 +53,7 @@ class Migration(migrations.Migration):
                 ('facture', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='facturation.facture', verbose_name='Facture')),
                 ('groupe_medicaments', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='ordonnances.groupemedicaments', verbose_name='Groupe de médicaments')),
                 ('hospitalisation', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='hospitalisation.hospitalisation', verbose_name='Hospitalisation')),
-                ('medecin', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='ordonnances', to='medecins.medecin', verbose_name='Docteur prescripteur')),
+                ('medecin', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='ordonnances', to='employe.employe', verbose_name='Docteur prescripteur')),
                 ('patient', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='ordonnances', to='patients.patient', verbose_name='Patient')),
                 ('police_assurance', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='patients.assurance', verbose_name="Police d'assurance")),
                 ('rendez_vous', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='patients.rendezvous', verbose_name='Rendez-vous')),

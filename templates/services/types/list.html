@@ -4,7 +4,7 @@
 {% block breadcrumb %}{% endblock %}
 
 {% block extra_css %}
-{% include 'services/includes/layout_css.html' %}
+{{ block.super }}
 <style>
   /* ── TABLE ── */
   .o-list-wrap {
@@ -350,150 +350,6 @@
     background: #b91c1c;
   }
 
-  /* ── INFO DRAWER ── */
-  .info-drawer {
-    position: fixed;
-    top: 0;
-    right: -440px;
-    width: 420px;
-    height: 100vh;
-    background: var(--surface);
-    z-index: 8000;
-    transition: right .3s ease;
-    box-shadow: -4px 0 24px rgba(0, 0, 0, .15);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  .info-drawer.open {
-    right: 0;
-  }
-
-  .drawer-backdrop {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, .3);
-    z-index: 7999;
-  }
-
-  .drawer-backdrop.open {
-    display: block;
-  }
-
-  .drawer-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 18px 20px;
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
-  }
-
-  .drawer-title {
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--text);
-    flex: 1;
-    min-width: 0;
-    word-break: break-word;
-  }
-
-  .drawer-close {
-    width: 26px;
-    height: 26px;
-    border-radius: 4px;
-    border: none;
-    background: transparent;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-muted);
-    font-size: 18px;
-  }
-
-  .drawer-close:hover {
-    background: rgba(0, 0, 0, .06);
-  }
-
-  .drawer-body {
-    flex: 1;
-    overflow-y: auto;
-    padding: 18px 20px;
-  }
-
-  .drawer-field {
-    margin-bottom: 16px;
-  }
-
-  .drawer-field-label {
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: .5px;
-    color: var(--text-muted);
-    margin-bottom: 4px;
-  }
-
-  .drawer-field-value {
-    font-size: 14px;
-    color: var(--text);
-    font-weight: 500;
-  }
-
-  .drawer-footer {
-    padding: 14px 20px;
-    border-top: 1px solid var(--border);
-    display: flex;
-    gap: 10px;
-    justify-content: flex-end;
-    flex-shrink: 0;
-  }
-
-  .btn-drawer-close {
-    padding: 7px 16px;
-    border-radius: 4px;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--text-muted);
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-
-  .btn-drawer-edit {
-    padding: 7px 16px;
-    border-radius: 4px;
-    background: var(--accent);
-    color: #fff;
-    font-size: 13px;
-    font-weight: 700;
-    cursor: pointer;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    border: none;
-  }
-
-  .btn-drawer-edit:hover {
-    background: var(--primary);
-  }
-
-  html[data-theme="dark"] .info-drawer {
-    background: var(--surface);
-  }
-
-  html[data-theme="dark"] .drawer-title {
-    color: var(--text);
-  }
-
-  html[data-theme="dark"] .drawer-field-value {
-    color: var(--text);
-  }
-
   @media (max-width:1000px) {
     .o-kanban {
       grid-template-columns: repeat(3, 1fr);
@@ -573,10 +429,7 @@
   <!-- ── VUE GRILLE ── -->
   <div class="o-kanban" id="main-content">
     {% for obj in page_obj %}
-    <div class="o-card" onclick="if(event.target.type!=='checkbox'){openDrawer(this)}" data-title="{{ obj.nom }}"
-      data-edit-url="{% url 'services:type_edit' obj.pk %}" data-f-nom="{{ obj.nom }}"
-      data-f-statut="{% if obj.actif %}Actif{% else %}Inactif{% endif %}"
-      data-f-services="{{ obj.articles.count }} service{{ obj.articles.count|pluralize }}">
+    <div class="o-card" onclick="window.location='{% url 'services:type_detail' obj.pk %}'">
       <div class="o-card-name">{{ obj.nom }}</div>
       <div class="o-card-meta">
         {% if obj.actif %}<span class="badge-actif">Actif</span>{% else %}<span class="badge-inactif">Inactif</span>{% endif %}
@@ -621,10 +474,7 @@
       </thead>
       <tbody>
         {% for obj in page_obj %}
-        <tr onclick="if(event.target.type!=='checkbox'){openDrawer(this)}" data-title="{{ obj.nom }}"
-          data-edit-url="{% url 'services:type_edit' obj.pk %}" data-f-nom="{{ obj.nom }}"
-          data-f-statut="{% if obj.actif %}Actif{% else %}Inactif{% endif %}"
-          data-f-services="{{ obj.articles.count }} service{{ obj.articles.count|pluralize }}">
+        <tr onclick="if(event.target.type!=='checkbox'){window.location='{% url 'services:type_detail' obj.pk %}'}">
           <td style="padding:9px 8px 9px 14px;" onclick="event.stopPropagation()">
             <input type="checkbox" class="row-check" value="{{ obj.pk }}"
               style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent);" onchange="onCheckChange()">
@@ -682,21 +532,6 @@
     </div>
   </div>
 
-  <!-- ══ INFO DRAWER ══ -->
-  <div class="info-drawer" id="info-drawer">
-    <div class="drawer-header">
-      <span class="drawer-title" id="drawer-title">—</span>
-      <button class="drawer-close" onclick="closeDrawer()">&#x2715;</button>
-    </div>
-    <div class="drawer-body" id="drawer-body"></div>
-    <div class="drawer-footer">
-      <button class="btn-drawer-close" onclick="closeDrawer()">Fermer</button>
-      <a class="btn-drawer-edit" id="drawer-edit-btn" href="#">
-        <i class="bi bi-pencil"></i> Modifier
-      </a>
-    </div>
-  </div>
-  <div class="drawer-backdrop" id="drawer-backdrop" onclick="closeDrawer()"></div>
 
 </div><!-- /#page-wrap -->
 
@@ -704,33 +539,10 @@
   const BULK_URL = "{% url 'services:type_bulk_delete' %}";
   const CSRF_TOKEN = "{{ csrf_token }}";
 
-  var DRAWER_FIELDS = [
-    { attr: 'f-nom', label: 'Nom' },
-    { attr: 'f-statut', label: 'Statut' },
-    { attr: 'f-services', label: 'Nb services' },
-  ];
-
   function setVue(v) {
     document.getElementById('vue-input').value = v;
     window.liveLoad();
   }
-  function openDrawer(el) {
-    document.getElementById('drawer-title').textContent = el.getAttribute('data-title') || '—';
-    document.getElementById('drawer-edit-btn').href = el.getAttribute('data-edit-url') || '#';
-    var html = '';
-    DRAWER_FIELDS.forEach(function (f) {
-      var val = el.getAttribute('data-' + f.attr) || '—';
-      html += '<div class="drawer-field"><div class="drawer-field-label">' + f.label + '</div><div class="drawer-field-value">' + val + '</div></div>';
-    });
-    document.getElementById('drawer-body').innerHTML = html;
-    document.getElementById('info-drawer').classList.add('open');
-    document.getElementById('drawer-backdrop').classList.add('open');
-  }
-  function closeDrawer() {
-    document.getElementById('info-drawer').classList.remove('open');
-    document.getElementById('drawer-backdrop').classList.remove('open');
-  }
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeDrawer(); });
 
   (function () {
     var inp = document.querySelector('.o-search-input');

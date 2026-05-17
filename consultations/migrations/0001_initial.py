@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('medecins', '0001_initial'),
+        ('employe', '0001_initial'),
         ('patients', '0001_initial'),
         ('pharmacie', '0001_initial'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
@@ -39,7 +39,7 @@ class Migration(migrations.Migration):
                 ('anamnese', models.TextField(blank=True)),
                 ('statut', models.CharField(choices=[('en_cours', 'En cours'), ('termine', 'Terminé'), ('annule', 'Annulé')], default='en_cours', max_length=20)),
                 ('cree_par', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, to=settings.AUTH_USER_MODEL)),
-                ('medecin', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='consultations', to='medecins.medecin')),
+                ('medecin', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='consultations', to='employe.employe')),
                 ('patient', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='consultations', to='patients.patient')),
                 ('rendez_vous', models.OneToOneField(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='patients.rendezvous')),
             ],

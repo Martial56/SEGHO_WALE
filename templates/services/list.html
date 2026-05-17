@@ -5,7 +5,7 @@
 {% block breadcrumb %}{% endblock %}
 
 {% block extra_css %}
-{% include 'services/includes/layout_css.html' %}
+{{ block.super }}
 <style>
   /* ── DARK MODE — composants spécifiques liste ── */
 
@@ -378,140 +378,6 @@
     font-size: 12px; color: var(--text-muted);
   }
 
-  /* ── INFO DRAWER ── */
-  .info-drawer {
-    position: fixed;
-    top: 0;
-    right: -440px;
-    width: 420px;
-    height: 100vh;
-    background: var(--surface);
-    z-index: 8000;
-    transition: right .3s ease;
-    box-shadow: -4px 0 24px rgba(0, 0, 0, .15);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  .info-drawer.open {
-    right: 0;
-  }
-
-  .drawer-backdrop {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, .3);
-    z-index: 7999;
-  }
-
-  .drawer-backdrop.open {
-    display: block;
-  }
-
-  .drawer-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 18px 20px;
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
-  }
-
-  .drawer-title {
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--text);
-    flex: 1;
-    min-width: 0;
-    word-break: break-word;
-  }
-
-  .drawer-close {
-    width: 26px;
-    height: 26px;
-    border-radius: 4px;
-    border: none;
-    background: transparent;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-muted);
-    font-size: 18px;
-  }
-
-  .drawer-close:hover {
-    background: rgba(0, 0, 0, .06);
-  }
-
-  .drawer-body {
-    flex: 1;
-    overflow-y: auto;
-    padding: 18px 20px;
-  }
-
-  .drawer-field {
-    margin-bottom: 16px;
-  }
-
-  .drawer-field-label {
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: .5px;
-    color: var(--text-muted);
-    margin-bottom: 4px;
-  }
-
-  .drawer-field-value {
-    font-size: 14px;
-    color: var(--text);
-    font-weight: 500;
-  }
-
-  .drawer-footer {
-    padding: 14px 20px;
-    border-top: 1px solid var(--border);
-    display: flex;
-    gap: 10px;
-    justify-content: flex-end;
-    flex-shrink: 0;
-  }
-
-  .btn-drawer-close {
-    padding: 7px 16px;
-    border-radius: 4px;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--text-muted);
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    font-family: 'Roboto', sans-serif;
-  }
-
-  .btn-drawer-view {
-    padding: 7px 16px;
-    border-radius: 4px;
-    background: var(--accent);
-    color: #fff;
-    font-size: 13px;
-    font-weight: 700;
-    cursor: pointer;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-family: 'Roboto', sans-serif;
-    border: none;
-  }
-
-  .btn-drawer-view:hover {
-    background: var(--primary);
-  }
-
   /* ── RESPONSIVE ── */
   @media (max-width:1300px) {
     .o-kanban {
@@ -636,13 +502,7 @@
 <div class="o-kanban" id="main-content">
   {% for art in page_obj %}
   <div class="o-card-wrap">
-    <div class="o-card" onclick="openDrawer(this)" data-title="{{ art.nom }}"
-      data-detail-url="{% url 'services:detail' art.pk %}" data-f-ref="{{ art.reference_interne|default:'—' }}"
-      data-f-nom="{{ art.nom }}"
-      data-f-cat="{% if art.categorie %}{{ art.categorie.code }} — {{ art.categorie.nom }}{% else %}—{% endif %}"
-      data-f-type="{{ art.get_type_produit_hospitalier_display|default:'—' }}"
-      data-f-prix="{{ art.prix_vente|floatformat:0 }} CFA"
-      data-f-statut="{% if art.actif %}Actif{% else %}Inactif{% endif %}">
+    <div class="o-card" data-url="{% url 'services:detail' art.pk %}" onclick="window.location=this.dataset.url" style="cursor:pointer;">
       <div class="o-avatar">
         {% if art.photo %}
         <img src="{{ art.photo.url }}" alt="{{ art.nom }}">
@@ -703,13 +563,7 @@
     </thead>
     <tbody>
       {% for art in page_obj %}
-      <tr onclick="openDrawer(this)" data-title="{{ art.nom }}"
-        data-detail-url="{% url 'services:detail' art.pk %}" data-f-ref="{{ art.reference_interne|default:'—' }}"
-        data-f-nom="{{ art.nom }}"
-        data-f-cat="{% if art.categorie %}{{ art.categorie.code }} — {{ art.categorie.nom }}{% else %}—{% endif %}"
-        data-f-type="{{ art.get_type_produit_hospitalier_display|default:'—' }}"
-        data-f-prix="{{ art.prix_vente|floatformat:0 }} CFA"
-        data-f-statut="{% if art.actif %}Actif{% else %}Inactif{% endif %}">
+      <tr data-url="{% url 'services:detail' art.pk %}" onclick="window.location=this.dataset.url" style="cursor:pointer;">
         <td style="font-weight:500;" data-col="0">{{ art.nom }}</td>
         <td data-col="1"><span style="font-family:monospace;font-size:11px;color:var(--text-muted);">{{ art.reference_interne|default:"—" }}</span></td>
         <td data-col="2">
@@ -747,43 +601,14 @@
 {% endif %}
 </div><!-- /.list-result -->
 
-<!-- ══ INFO DRAWER ══ -->
-<div class="info-drawer" id="info-drawer">
-  <div class="drawer-header">
-    <span class="drawer-title" id="drawer-title">—</span>
-    <button class="drawer-close" onclick="closeDrawer()">&#x2715;</button>
-  </div>
-  <div class="drawer-body" id="drawer-body"></div>
-  <div class="drawer-footer">
-    <button class="btn-drawer-close" onclick="closeDrawer()">Fermer</button>
-    <a class="btn-drawer-view" id="drawer-view-btn" href="#">Voir / Modifier</a>
-  </div>
-</div>
-<div class="drawer-backdrop" id="drawer-backdrop" onclick="closeDrawer()"></div>
-
-
 {% include 'services/includes/list_live_js.html' %}
 
 <script>
-  /* ── Thème ── */
-  (function () {
-    var btn = document.getElementById('svc-theme-toggle');
-    if (!btn) return;
-    btn.addEventListener('click', function () {
-      var h = document.documentElement;
-      var dark = h.getAttribute('data-theme') === 'dark';
-      if (dark) { h.removeAttribute('data-theme'); localStorage.setItem('segho-theme', 'light'); }
-      else { h.setAttribute('data-theme', 'dark'); localStorage.setItem('segho-theme', 'dark'); }
-    });
-  })();
-
   /* ── Décalage page sous le topbar fixe ── */
   function adjustOffsets() {
     var topbar = document.querySelector('.topbar');
     var wrap = document.getElementById('page-wrap');
-    if (topbar && wrap) {
-      wrap.style.paddingTop = topbar.offsetHeight + 'px';
-    }
+    if (topbar && wrap) wrap.style.paddingTop = topbar.offsetHeight + 'px';
   }
   adjustOffsets();
   window.addEventListener('resize', adjustOffsets);
@@ -806,33 +631,6 @@
     document.getElementById('fi-statut').value = document.getElementById('sel-statut').value;
     window.liveLoad();
   }
-
-  /* ── Info Drawer ── */
-  var DRAWER_FIELDS = [
-    { attr: 'f-ref', label: 'Référence' },
-    { attr: 'f-nom', label: 'Désignation' },
-    { attr: 'f-cat', label: 'Catégorie' },
-    { attr: 'f-type', label: 'Type' },
-    { attr: 'f-prix', label: 'Prix de vente' },
-    { attr: 'f-statut', label: 'Statut' },
-  ];
-  function openDrawer(el) {
-    document.getElementById('drawer-title').textContent = el.getAttribute('data-title') || '—';
-    document.getElementById('drawer-view-btn').href = el.getAttribute('data-detail-url') || '#';
-    var html = '';
-    DRAWER_FIELDS.forEach(function (f) {
-      var val = el.getAttribute('data-' + f.attr) || '—';
-      html += '<div class="drawer-field"><div class="drawer-field-label">' + f.label + '</div><div class="drawer-field-value">' + val + '</div></div>';
-    });
-    document.getElementById('drawer-body').innerHTML = html;
-    document.getElementById('info-drawer').classList.add('open');
-    document.getElementById('drawer-backdrop').classList.add('open');
-  }
-  function closeDrawer() {
-    document.getElementById('info-drawer').classList.remove('open');
-    document.getElementById('drawer-backdrop').classList.remove('open');
-  }
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeDrawer(); });
 
   /* ── Recherche automatique (debounce 400ms) ── */
   (function () {

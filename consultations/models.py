@@ -7,7 +7,7 @@ class Consultation(models.Model):
 
     numero = models.CharField(max_length=20, unique=True, editable=False)
     patient = models.ForeignKey('patients.Patient', on_delete=models.CASCADE, related_name='consultations')
-    medecin = models.ForeignKey('medecins.Medecin', on_delete=models.SET_NULL, null=True, related_name='consultations')
+    medecin = models.ForeignKey('employe.Employe', on_delete=models.SET_NULL, null=True, related_name='consultations')
     rendez_vous = models.OneToOneField('patients.RendezVous', on_delete=models.SET_NULL, null=True, blank=True)
     date_heure = models.DateTimeField(auto_now_add=True)
     motif = models.TextField()

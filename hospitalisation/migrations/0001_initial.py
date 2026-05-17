@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('medecins', '0001_initial'),
+        ('employe', '0001_initial'),
         ('patients', '0001_initial'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
@@ -26,7 +26,7 @@ class Migration(migrations.Migration):
                 ('prix_jour', models.DecimalField(decimal_places=2, default=0, max_digits=10)),
                 ('disponible', models.BooleanField(default=True)),
                 ('description', models.TextField(blank=True)),
-                ('service', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='medecins.service')),
+                ('service', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='services.articleservice')),
             ],
             options={
                 'verbose_name': 'Chambre',
@@ -48,7 +48,7 @@ class Migration(migrations.Migration):
                 ('notes', models.TextField(blank=True)),
                 ('chambre', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, to='hospitalisation.chambre')),
                 ('cree_par', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, to=settings.AUTH_USER_MODEL)),
-                ('medecin_traitant', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, to='medecins.medecin')),
+                ('medecin_traitant', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, to='employe.employe')),
                 ('patient', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='hospitalisations', to='patients.patient')),
             ],
             options={
@@ -65,7 +65,7 @@ class Migration(migrations.Migration):
                 ('evolution', models.TextField(blank=True)),
                 ('prescriptions', models.TextField(blank=True)),
                 ('constantes', models.JSONField(blank=True, default=dict)),
-                ('medecin', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, to='medecins.medecin')),
+                ('medecin', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, to='employe.employe')),
                 ('hospitalisation', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='fiches_visite', to='hospitalisation.hospitalisation')),
             ],
             options={
@@ -82,7 +82,7 @@ class Migration(migrations.Migration):
                 ('date_creation', models.DateTimeField(auto_now_add=True)),
                 ('actif', models.BooleanField(default=True)),
                 ('hospitalisation', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='protocoles', to='hospitalisation.hospitalisation')),
-                ('medecin', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, to='medecins.medecin')),
+                ('medecin', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, to='employe.employe')),
             ],
             options={
                 'verbose_name': 'Protocole hospitalisation',

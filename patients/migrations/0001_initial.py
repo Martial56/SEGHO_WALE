@@ -9,7 +9,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('medecins', '0001_initial'),
+        ('employe', '0001_initial'),
     ]
 
     operations = [
@@ -73,7 +73,7 @@ class Migration(migrations.Migration):
                 ('statut', models.CharField(choices=[('planifie', 'Planifié'), ('confirme', 'Confirmé'), ('termine', 'Terminé'), ('annule', 'Annulé'), ('absent', 'Absent')], default='planifie', max_length=20)),
                 ('notes', models.TextField(blank=True)),
                 ('date_creation', models.DateTimeField(auto_now_add=True)),
-                ('medecin', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='rendez_vous', to='medecins.medecin')),
+                ('medecin', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='rendez_vous', to='employe.employe')),
                 ('patient', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='rendez_vous', to='patients.patient')),
             ],
             options={
