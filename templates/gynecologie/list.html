@@ -12,9 +12,10 @@
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   /* ── DARK MODE ── */
-  html[data-theme="dark"] .o-card { background: var(--surface); border-color: var(--border); }
-  html[data-theme="dark"] .o-card:hover { border-color: #4a5a78; }
-  html[data-theme="dark"] .o-card-name { color: var(--text); }
+  html[data-theme="dark"] .pk-card { background: #0d2035; border-color: rgba(255,255,255,0.1); }
+  html[data-theme="dark"] .pk-name { color: #cce8f4; }
+  html[data-theme="dark"] .pk-meta { color: rgba(255,255,255,0.45); }
+  html[data-theme="dark"] .pk-avatar { background: #1a3a50; }
   html[data-theme="dark"] .o-search-input { color: var(--text); }
   html[data-theme="dark"] .o-search-bar { border-bottom-color: #3a4a62; }
   html[data-theme="dark"] .o-ctrl-btn { color: var(--text-muted); }
@@ -91,15 +92,15 @@
   .o-filter-tag a:hover { color: #333; }
   .o-search-input {
     border: none; outline: none; font-size: 12px;
-    color: var(--text);
+    color: var(--text); font-family: inherit;
     flex: 1; min-width: 60px; background: transparent;
   }
-  .o-search-btn { background: none; border: none; cursor: pointer; color: #888; font-size: 13px; padding: 2px; }
+  .o-search-btn { background: none; border: none; cursor: pointer; color: #888; font-size: 13px; padding: 2px; font-family: inherit; }
 
   .o-ctrl-right { display: flex; align-items: center; gap: 3px; margin-left: auto; flex-shrink: 0; }
   .o-ctrl-btn {
     background: none; border: 1px solid transparent; border-radius: 4px;
-    padding: 4px 8px; font-size: 12px;
+    padding: 4px 8px; font-size: 12px; font-family: inherit;
     color: var(--text-muted); cursor: pointer;
     display: flex; align-items: center; gap: 4px;
     transition: border-color 0.15s, color 0.15s, background 0.15s;
@@ -138,42 +139,58 @@
   }
 
   /* ── CARD ── */
-  .o-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    padding: 10px 10px;
+  .pk-card {
+    background: #fff;
+    border-radius: 0;
+    overflow: hidden;
     display: flex;
-    align-items: flex-start;
-    gap: 10px;
+    flex-direction: row;
+    align-items: stretch;
+    text-align: left;
     text-decoration: none;
     color: inherit;
+    border: 1px solid #e0e0e0;
+    transition: box-shadow .15s;
     cursor: pointer;
-    transition: box-shadow 0.15s, border-color 0.15s;
-    box-shadow: var(--shadow-card);
   }
-  .o-card:hover { box-shadow: 0 3px 10px rgba(0,0,0,0.13); border-color: #bbb; }
-
-  /* Avatar gris silhouette identique Odoo */
-  .o-avatar {
-    width: 42px; height: 42px;
-    border-radius: 50%;
-    background: #d5d5d5;
-    flex-shrink: 0;
-    display: flex; align-items: flex-end; justify-content: center;
+  .pk-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
+  .pk-avatar {
+    width: 72px;
+    min-width: 72px;
+    background: #f0f0f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     overflow: hidden;
+    flex-shrink: 0;
   }
-  .o-avatar img { width: 100%; height: 100%; object-fit: cover; }
-  .o-avatar svg { width: 30px; fill: #999; margin-bottom: -1px; }
-
-  .o-card-body { flex: 1; min-width: 0; }
-  .o-card-name {
-    font-size: 12.5px; font-weight: 500; color: var(--text);
-    margin-bottom: 2px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  .pk-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .pk-info {
+    flex: 1;
+    padding: 8px 8px 8px 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
   }
-  .o-card-meta { font-size: 11px; color: var(--text-muted); line-height: 1.7; }
-  .o-card-meta span { color: var(--text); }
+  .pk-name {
+    font-size: 11px;
+    font-weight: 700;
+    color: #111;
+    text-transform: uppercase;
+    line-height: 1.3;
+    margin-bottom: 4px;
+    word-break: break-word;
+  }
+  .pk-meta {
+    font-size: 9px;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 2px 5px;
+    align-items: baseline;
+  }
+  .pk-meta .pk-lbl { color: #888; white-space: nowrap; }
+  .pk-meta .pk-val { color: #444; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   /* ── EMPTY ── */
   .o-empty {
@@ -300,24 +317,23 @@
 <!-- ══ KANBAN GRID ══ -->
 <div class="o-kanban">
   {% for patient in page_obj %}
-  <a class="o-card" href="/admin/patients/patient/{{ patient.pk }}/change/">
-    <div class="o-avatar">
+  <a class="pk-card" href="/admin/patients/patient/{{ patient.pk }}/change/">
+    <div class="pk-avatar">
       {% if patient.photo %}
         <img src="{{ patient.photo.url }}" alt="{{ patient.nom }}">
       {% else %}
-        <svg viewBox="0 0 24 26" xmlns="http://www.w3.org/2000/svg">
-          <path d="M12 13c3.3 0 6-2.7 6-6S15.3 1 12 1 6 3.7 6 7s2.7 6 6 6zm0 2c-4 0-12 2-12 6v3h24v-3c0-4-8-6-12-6z"/>
+        <svg xmlns="http://www.w3.org/2000/svg" width="72" height="82" viewBox="0 0 24 24" fill="rgba(0,0,0,0.28)">
+          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
         </svg>
       {% endif %}
     </div>
-    <div class="o-card-body">
-      <div class="o-card-name">{{ patient.nom|upper }} {{ patient.prenoms }}</div>
-      <div class="o-card-meta">
-        Code: <span>{{ patient.code_patient }}</span><br>
-        Âge: <span>
-          {% if patient.date_naissance %}{{ patient.age }}Ans{% else %}—{% endif %}
-        </span><br>
-        Genre: <span>{% if patient.sexe == 'F' %}Femme{% elif patient.sexe == 'M' %}Homme{% else %}—{% endif %}</span>
+    <div class="pk-info">
+      <div class="pk-name">{{ patient.nom }} {{ patient.prenoms }}</div>
+      <div class="pk-meta">
+        <span class="pk-lbl">Code:</span><span class="pk-val">{{ patient.code_patient }}</span>
+        <span class="pk-lbl">Âge:</span><span class="pk-val">{% if patient.date_naissance %}{{ patient.age }} ans{% else %}—{% endif %}</span>
+        <span class="pk-lbl">Genre:</span><span class="pk-val">{% if patient.sexe == 'F' %}Femme{% elif patient.sexe == 'M' %}Homme{% else %}—{% endif %}</span>
+        <span class="pk-lbl">Téléphone:</span><span class="pk-val">{{ patient.telephone }}</span>
       </div>
     </div>
   </a>
