@@ -1,0 +1,469 @@
+{% extends 'soins/base.html' %}
+{% load static %}
+
+{% block module_navbar %}{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+  /* ── DARK MODE ── */
+  html[data-theme="dark"] .o-list-table { background: var(--surface); }
+  html[data-theme="dark"] .o-list-table th { background: var(--surface); border-bottom-color: var(--border); color: var(--text-muted); }
+  html[data-theme="dark"] .o-list-table td { border-bottom-color: #2d3550; color: var(--text); }
+  html[data-theme="dark"] .o-list-table tbody tr:hover td { background: rgba(255,255,255,.04); }
+  html[data-theme="dark"] .filters-panel { background: #1a2133; border-bottom-color: var(--border); }
+  html[data-theme="dark"] .filter-select { background: var(--surface); border-color: var(--border); color: var(--text); }
+
+  /* ── PANEL FILTRES ── */
+  .filters-panel {
+    display: none; gap: 8px; flex-wrap: wrap; align-items: center;
+    padding: 8px 16px; background: #f2faf6; border-bottom: 1px solid var(--border);
+  }
+  .filters-panel.open { display: flex; }
+
+  .filter-select {
+    border: 1px solid var(--border); border-radius: 4px; padding: 4px 10px;
+    font-family: 'Roboto', sans-serif; font-size: 12px; color: var(--text);
+    background: var(--surface); cursor: pointer; outline: none;
+  }
+  .filter-select:focus { border-color: var(--accent); }
+
+  /* ── TABLE ── */
+  .o-list-wrap { background: var(--bg); overflow-x: auto; }
+
+  .o-list-table {
+    width: 100%; border-collapse: collapse; background: var(--surface);
+    table-layout: fixed;
+  }
+
+  .o-list-table th {
+    padding: 7px 6px; text-align: left; font-size: 10.5px; font-weight: 600;
+    color: var(--text-muted); border-bottom: 1px solid var(--border);
+    background: var(--surface); white-space: nowrap; overflow: hidden;
+  }
+
+  .o-list-table td {
+    padding: 7px 6px; font-size: 11.5px; border-bottom: 1px solid #f0f0f0; color: var(--text);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  .o-list-table tr:last-child td { border-bottom: none; }
+  .o-list-table tbody tr:hover td { background: #f2faf6; }
+  .o-list-table tbody tr { cursor: pointer; }
+
+  /* ── BADGES STATUT ── */
+  .badge-statut {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 10px; font-weight: 600; padding: 2px 8px 2px 6px;
+    border-radius: 20px; white-space: nowrap;
+  }
+  .badge-statut::before {
+    content: ''; flex-shrink: 0; width: 5px; height: 5px; border-radius: 50%;
+  }
+  .badge-brouillon { background: #f3f4f6; color: #6b7280; }
+  .badge-brouillon::before { background: #9ca3af; }
+  .badge-en-cours  { background: #fff8e1; color: #b07d00; }
+  .badge-en-cours::before  { background: #d99c2b; }
+  .badge-termine   { background: #e3f5ef; color: #1a5c4a; }
+  .badge-termine::before   { background: #2ca870; }
+  .badge-annule    { background: #fdf0f0; color: #c0392b; }
+  .badge-annule::before    { background: #c0392b; }
+
+  html[data-theme="dark"] .badge-brouillon { background: rgba(107,114,128,.2);  color: #d1d5db; }
+  html[data-theme="dark"] .badge-brouillon::before { background: #9ca3af; }
+  html[data-theme="dark"] .badge-en-cours  { background: rgba(176,125,0,.2);    color: #e2c16a; }
+  html[data-theme="dark"] .badge-en-cours::before  { background: #e2c16a; }
+  html[data-theme="dark"] .badge-termine   { background: rgba(26,92,74,.25);    color: #6eddb0; }
+  html[data-theme="dark"] .badge-termine::before   { background: #6eddb0; }
+  html[data-theme="dark"] .badge-annule    { background: rgba(232,69,69,.2);    color: #f09090; }
+  html[data-theme="dark"] .badge-annule::before    { background: #f09090; }
+
+  /* ── BADGE BICOLORE : en cours + payé → à terminer ── */
+  .badge-paye-terminer {
+    display: inline-flex; overflow: hidden; border-radius: 20px;
+    font-size: 10px; font-weight: 700; cursor: pointer;
+    border: none; padding: 0; background: none; line-height: 1;
+  }
+  .badge-paye-terminer:hover .part-terme { filter: brightness(.92); }
+  .badge-paye-terminer:hover .part-cours { filter: brightness(.92); }
+  .badge-paye-terminer .part-terme {
+    background: #e3f5ef; color: #1a5c4a;
+    padding: 3px 7px; display: flex; align-items: center;
+  }
+  .badge-paye-terminer .part-cours {
+    background: #fff8e1; color: #b07d00;
+    padding: 3px 7px; display: flex; align-items: center;
+  }
+  html[data-theme="dark"] .badge-paye-terminer .part-terme { background: rgba(26,92,74,.3); color: #6eddb0; }
+  html[data-theme="dark"] .badge-paye-terminer .part-cours { background: rgba(176,125,0,.25); color: #e2c16a; }
+
+  /* ── COLONNES TRANCHE D'ÂGE (désactivées) ── */
+  /*
+  .o-list-table th.col-age-group,
+  .o-list-table td.col-age-group {
+    text-align: center; width: 40px; min-width: 40px; padding: 7px 3px;
+    font-size: 10px; color: var(--text-muted);
+  }
+  .o-list-table td.col-age-group .age-flag-1 {
+    display: inline-block; background: #e3f5ef; color: #1a5c4a;
+    font-weight: 700; border-radius: 3px; padding: 1px 6px; font-size: 11px;
+  }
+  .o-list-table td.col-age-group .age-flag-0 { opacity: .35; }
+  html[data-theme="dark"] .o-list-table td.col-age-group .age-flag-1 {
+    background: rgba(26,92,74,.25); color: #6eddb0;
+  }
+  */
+
+  /* ── COL PICKER ── */
+  .col-picker-th { width: 28px; text-align: center; padding: 0 2px; position: relative; }
+  .col-picker-btn {
+    background: none; border: none; cursor: pointer;
+    color: var(--text-muted); font-size: 15px; padding: 2px 5px;
+    border-radius: 3px; line-height: 1; font-weight: 700; letter-spacing: -1px;
+  }
+  .col-picker-btn:hover { background: rgba(0,0,0,.06); color: var(--text); }
+  .col-picker-menu {
+    display: none; position: fixed;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,.12);
+    z-index: 1000; min-width: 180px; padding: 6px 0;
+    max-height: 380px; overflow-y: auto;
+  }
+  .col-picker-menu.open { display: block; }
+  .col-picker-menu label {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 14px; font-size: 13px; color: var(--text);
+    cursor: pointer; white-space: nowrap;
+  }
+  .col-picker-menu label:hover { background: rgba(0,0,0,.03); }
+  html[data-theme="dark"] .col-picker-menu { background: var(--surface); border-color: var(--border); }
+  html[data-theme="dark"] .col-picker-menu label { color: var(--text); }
+  html[data-theme="dark"] .col-picker-menu label:hover { background: rgba(255,255,255,.04); }
+
+  /* ── STATS ── */
+  .stats-row {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 0;
+    border-bottom: 1px solid var(--border); background: var(--surface);
+  }
+
+  .stat-box {
+    padding: 12px 18px; border-right: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px;
+  }
+
+  .stat-box:last-child { border-right: none; }
+
+  .stat-icon {
+    width: 36px; height: 36px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; flex-shrink: 0;
+  }
+
+  .stat-icon.green { background: #e3f5ef; color: #1a5c4a; }
+  .stat-icon.yellow { background: #fff8e1; color: #b07d00; }
+  .stat-icon.blue { background: #e6f2f5; color: #145770; }
+  .stat-icon.gray { background: #f0f0f0; color: #555; }
+
+  html[data-theme="dark"] .stat-box { border-right-color: var(--border); }
+  html[data-theme="dark"] .stats-row { background: var(--surface); border-bottom-color: var(--border); }
+  html[data-theme="dark"] .stat-icon.green { background: rgba(26,92,74,.25); color: #6eddb0; }
+  html[data-theme="dark"] .stat-icon.yellow { background: rgba(176,125,0,.2); color: #e2c16a; }
+  html[data-theme="dark"] .stat-icon.blue { background: rgba(20,87,112,.2); color: #7ecae0; }
+  html[data-theme="dark"] .stat-icon.gray { background: #2a3548; color: #8a9ab0; }
+
+  .stat-label { font-size: 11px; color: var(--text-muted); margin-bottom: 2px; }
+  .stat-value { font-size: 22px; font-weight: 700; color: var(--text); line-height: 1.1; }
+
+  @media (max-width: 800px) {
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
+    .stat-box:nth-child(2) { border-right: none; }
+    .stat-box:nth-child(3) { border-right: 1px solid var(--border); }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="page-wrap">
+
+{% include 'soins/includes/nav.html' %}
+
+<!-- ══ SUBHEADER ══ -->
+<div class="o-subheader" id="subheader">
+
+  <!-- Ligne 1 : titre + recherche -->
+  <div class="o-subheader-row">
+    <span class="o-page-title">Soins infirmiers <span class="o-page-count">{{ total }}</span></span>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+      <form method="get" id="filter-form" style="display:flex;align-items:center;">
+        <input type="hidden" name="statut" id="fi-statut" value="{{ statut }}">
+        <input type="hidden" name="date" id="fi-date" value="{{ date_filtre }}">
+        <div class="o-search-bar">
+          <input class="o-search-input" id="search-input" type="text" name="q" value="{{ q }}"
+            placeholder="Rechercher patient, agent, numéro…">
+          <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Ligne 2 : créer + contrôles -->
+  <div class="o-subheader-row">
+    <a href="{% url 'soins:create' %}" class="o-btn-create">
+      <i class="bi bi-plus-lg"></i> Nouveau soin
+    </a>
+
+    <button type="button" class="o-ctrl-btn {% if statut or date_filtre %}active{% endif %}"
+      id="btn-filtres" onclick="toggleFilters()">
+      <i class="bi bi-funnel"></i> Filtres
+    </button>
+
+    {% if q or statut or date_filtre %}
+    <a href="{% url 'soins:list' %}" class="o-ctrl-btn">
+      <i class="bi bi-x"></i> Effacer
+    </a>
+    {% endif %}
+    {% if q %}<span class="o-filter-tag">{{ q }} <a href="?{% if statut %}statut={{ statut }}&{% endif %}{% if date_filtre %}date={{ date_filtre }}{% endif %}">×</a></span>{% endif %}
+    {% if statut %}<span class="o-filter-tag">{% if statut == 'en_cours' %}En cours{% elif statut == 'termine' %}Terminé{% else %}Annulé{% endif %} <a href="?{% if q %}q={{ q }}&{% endif %}{% if date_filtre %}date={{ date_filtre }}{% endif %}">×</a></span>{% endif %}
+    {% if date_filtre %}<span class="o-filter-tag">{{ date_filtre }} <a href="?{% if q %}q={{ q }}&{% endif %}{% if statut %}statut={{ statut }}{% endif %}">×</a></span>{% endif %}
+
+    <div style="flex:1;"></div>
+    <div class="o-ctrl-sep"></div>
+  </div>
+</div>
+
+<!-- ══ PANEL FILTRES ══ -->
+<div class="filters-panel {% if statut or date_filtre %}open{% endif %}" id="filters-panel">
+  <select id="sel-statut" class="filter-select" onchange="applyFilters()">
+    <option value="">Tous les statuts</option>
+    <option value="brouillon" {% if statut == 'brouillon' %}selected{% endif %}>Brouillon</option>
+    <option value="en_cours"  {% if statut == 'en_cours'  %}selected{% endif %}>En cours</option>
+    <option value="termine"   {% if statut == 'termine'   %}selected{% endif %}>Terminé</option>
+    <option value="annule"    {% if statut == 'annule'    %}selected{% endif %}>Annulé</option>
+  </select>
+  <input type="date" id="sel-date" class="filter-select" value="{{ date_filtre }}" onchange="applyFilters()"
+    style="font-size:12px;">
+</div>
+
+<!-- ══ STATS ══ -->
+<div class="stats-row">
+  <div class="stat-box">
+    <div class="stat-icon green"><i class="bi bi-calendar-check"></i></div>
+    <div>
+      <div class="stat-label">Aujourd'hui</div>
+      <div class="stat-value">{{ stats.aujourdhui }}</div>
+    </div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-icon blue"><i class="bi bi-calendar-month"></i></div>
+    <div>
+      <div class="stat-label">Ce mois</div>
+      <div class="stat-value">{{ stats.ce_mois }}</div>
+    </div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-icon yellow"><i class="bi bi-hourglass-split"></i></div>
+    <div>
+      <div class="stat-label">En cours</div>
+      <div class="stat-value">{{ stats.en_cours }}</div>
+    </div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-icon gray"><i class="bi bi-check2-all"></i></div>
+    <div>
+      <div class="stat-label">Terminés</div>
+      <div class="stat-value">{{ stats.termines }}</div>
+    </div>
+  </div>
+</div>
+
+<div id="list-result">
+<!-- ══ TABLEAU ══ -->
+<div class="o-list-wrap">
+  {% if page_obj.object_list %}
+  <table class="o-list-table">
+    <thead>
+      <tr id="col-header-row">
+        <th class="sortable-col" data-col="0" style="width:85px"><span class="col-label">Nom</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
+        <th class="sortable-col" data-col="1" style="width:130px"><span class="col-label">Patient</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
+
+        <th class="sortable-col" data-col="4" style="width:110px"><span class="col-label">Infirmier</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
+        <th class="sortable-col" data-col="5" style="width:85px"><span class="col-label">Département</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
+        <th class="sortable-col" data-col="6" style="width:105px"><span class="col-label">Date</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
+        <th class="sortable-col" data-col="7" style="width:36px;text-align:center;"><span class="col-label">Sexe</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
+        <th class="sortable-col" data-col="8" style="width:42px;text-align:center;"><span class="col-label">Âge</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
+        <!--
+        <th class="col-age-group sortable-col" data-col="9" style="width:40px"><span class="col-label">0-11 Mois</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
+        <th class="col-age-group sortable-col" data-col="10" style="width:40px"><span class="col-label">1-4 Ans</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
+        <th class="col-age-group sortable-col" data-col="11" style="width:40px"><span class="col-label">5-9 Ans</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
+        <th class="col-age-group sortable-col" data-col="12" style="width:40px"><span class="col-label">10-14 Ans</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
+        <th class="col-age-group sortable-col" data-col="13" style="width:40px"><span class="col-label">15-19 Ans</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
+        <th class="col-age-group sortable-col" data-col="14" style="width:40px"><span class="col-label">20-24 Ans</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
+        <th class="col-age-group sortable-col" data-col="15" style="width:40px"><span class="col-label">25-49 Ans</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
+        <th class="col-age-group sortable-col" data-col="16" style="width:40px"><span class="col-label">50+ Ans</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
+        -->
+        <th class="sortable-col" data-col="17" style="width:72px"><span class="col-label">État</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
+        <th class="col-picker-th">
+          <button class="col-picker-btn" id="col-picker-btn" title="Colonnes visibles"><i class="bi bi-three-dots-vertical"></i></button>
+          <div class="col-picker-menu" id="col-picker-menu">
+            <label><input type="checkbox" data-col-idx="0" checked> Nom</label>
+            <label><input type="checkbox" data-col-idx="1" checked> Patient</label>
+
+            <label><input type="checkbox" data-col-idx="4" checked> Infirmier</label>
+            <label><input type="checkbox" data-col-idx="5" checked> Département</label>
+            <label><input type="checkbox" data-col-idx="6" checked> Date</label>
+            <label><input type="checkbox" data-col-idx="7" checked> Sexe</label>
+            <label><input type="checkbox" data-col-idx="8" checked> Âge</label>
+            <!--
+            <label><input type="checkbox" data-col-idx="9" checked> 0-11 Mois</label>
+            <label><input type="checkbox" data-col-idx="10" checked> 1-4 Ans</label>
+            <label><input type="checkbox" data-col-idx="11" checked> 5-9 Ans</label>
+            <label><input type="checkbox" data-col-idx="12" checked> 10-14 Ans</label>
+            <label><input type="checkbox" data-col-idx="13" checked> 15-19 Ans</label>
+            <label><input type="checkbox" data-col-idx="14" checked> 20-24 Ans</label>
+            <label><input type="checkbox" data-col-idx="15" checked> 25-49 Ans</label>
+            <label><input type="checkbox" data-col-idx="16" checked> 50+ Ans</label>
+            -->
+            <label><input type="checkbox" data-col-idx="17" checked> État</label>
+          </div>
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for soin in page_obj %}
+      {% with t=soin.patient.tranche_age %}
+      <tr data-url="{% url 'soins:detail' soin.pk %}" onclick="window.location=this.dataset.url">
+        <td data-col="0">
+          <span style="font-family:monospace;font-size:11.5px;font-weight:500;color:var(--accent);">{{ soin.nom|default:soin.numero }}</span>
+        </td>
+        <td data-col="1" style="font-weight:500;">{{ soin.patient.nom }} {{ soin.patient.prenoms }}</td>
+
+        <td data-col="4" style="color:var(--text-muted);font-size:12px;">
+          {% if soin.infirmier %}{{ soin.infirmier.nom }} {{ soin.infirmier.prenoms }}{% else %}<span style="opacity:.4;">—</span>{% endif %}
+        </td>
+        <td data-col="5" style="font-size:12px;color:var(--text-muted);">{{ soin.departement.nom|default:"—" }}</td>
+        <td data-col="6" style="font-size:12px;white-space:nowrap;">{{ soin.date_heure|date:"d/m/Y H:i" }}</td>
+        <td data-col="7" style="text-align:center;font-size:12px;color:var(--text-muted);">{{ soin.patient.sexe }}</td>
+        <td data-col="8" style="text-align:center;font-size:12px;white-space:nowrap;">{{ soin.patient.age_display }}</td>
+        {% comment %}
+        <td data-col="9"  class="col-age-group">{% if t == 'mois_0_11' %}<span class="age-flag-1">1</span>{% else %}<span class="age-flag-0">0</span>{% endif %}</td>
+        <td data-col="10" class="col-age-group">{% if t == 'ans_1_4'   %}<span class="age-flag-1">1</span>{% else %}<span class="age-flag-0">0</span>{% endif %}</td>
+        <td data-col="11" class="col-age-group">{% if t == 'ans_5_9'   %}<span class="age-flag-1">1</span>{% else %}<span class="age-flag-0">0</span>{% endif %}</td>
+        <td data-col="12" class="col-age-group">{% if t == 'ans_10_14' %}<span class="age-flag-1">1</span>{% else %}<span class="age-flag-0">0</span>{% endif %}</td>
+        <td data-col="13" class="col-age-group">{% if t == 'ans_15_19' %}<span class="age-flag-1">1</span>{% else %}<span class="age-flag-0">0</span>{% endif %}</td>
+        <td data-col="14" class="col-age-group">{% if t == 'ans_20_24' %}<span class="age-flag-1">1</span>{% else %}<span class="age-flag-0">0</span>{% endif %}</td>
+        <td data-col="15" class="col-age-group">{% if t == 'ans_25_49' %}<span class="age-flag-1">1</span>{% else %}<span class="age-flag-0">0</span>{% endif %}</td>
+        <td data-col="16" class="col-age-group">{% if t == 'ans_50_plus' %}<span class="age-flag-1">1</span>{% else %}<span class="age-flag-0">0</span>{% endif %}</td>
+        {% endcomment %}
+        <td data-col="17">
+          {% if soin.statut == 'brouillon' %}
+            <span class="badge-statut badge-brouillon">Brouillon</span>
+          {% elif soin.statut == 'en_cours' and soin.est_paye %}
+            <form method="post" action="{% url 'soins:terminer' soin.pk %}"
+              onclick="event.stopPropagation()" style="display:inline;">
+              {% csrf_token %}
+              <button type="submit" class="badge-paye-terminer" title="Payé — cliquer pour terminer">
+                <span class="part-terme">Term</span>
+                <span class="part-cours">Cours</span>
+              </button>
+            </form>
+          {% elif soin.statut == 'en_cours' %}
+            <span class="badge-statut badge-en-cours">En cours</span>
+          {% elif soin.statut == 'termine' %}
+            <span class="badge-statut badge-termine">Terminé</span>
+          {% elif soin.statut == 'annule' %}
+            <span class="badge-statut badge-annule">Annulé</span>
+          {% endif %}
+        </td>
+        <td></td>
+      </tr>
+      {% endwith %}
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="o-pagination-bottom">
+    <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
+    <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
+      href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}&q={{ q }}&statut={{ statut }}&date={{ date_filtre }}{% else %}#{% endif %}">
+      <i class="bi bi-chevron-left"></i>
+    </a>
+    <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
+      href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}&q={{ q }}&statut={{ statut }}&date={{ date_filtre }}{% else %}#{% endif %}">
+      <i class="bi bi-chevron-right"></i>
+    </a>
+  </div>
+  {% else %}
+  <div class="o-empty">
+    <i class="bi bi-bandaid"></i>
+    Aucun soin trouvé.<br>
+    <a href="{% url 'soins:create' %}"
+      style="color:var(--accent);font-weight:600;margin-top:8px;display:inline-block;">Enregistrer un premier soin</a>
+  </div>
+  {% endif %}
+</div>
+</div><!-- /#list-result -->
+
+{% include 'soins/includes/list_live_js.html' %}
+
+<script>
+// @ts-nocheck
+  function adjustOffsets() {
+    var topbar = document.querySelector('.topbar');
+    var wrap = document.getElementById('page-wrap');
+    if (topbar && wrap) wrap.style.paddingTop = topbar.offsetHeight + 'px';
+  }
+  adjustOffsets();
+  window.addEventListener('resize', adjustOffsets);
+
+  function toggleFilters() {
+    var p = document.getElementById('filters-panel');
+    if (p) p.classList.toggle('open');
+    document.getElementById('btn-filtres').classList.toggle('active', p.classList.contains('open'));
+  }
+
+  function applyFilters() {
+    document.getElementById('fi-statut').value = document.getElementById('sel-statut').value;
+    document.getElementById('fi-date').value = document.getElementById('sel-date').value;
+    window.liveLoad();
+  }
+
+  /* Recherche auto (debounce 400ms) */
+  (function () {
+    var inp = document.getElementById('search-input');
+    if (!inp) return;
+    var timer;
+    inp.addEventListener('input', function () {
+      clearTimeout(timer);
+      timer = setTimeout(window.liveLoad, 400);
+    });
+  })();
+
+  /* Redimensionnement colonnes */
+  (function () {
+    var table = document.querySelector('.o-list-table');
+    if (!table) return;
+    var dragging = null, startX, startW;
+    table.querySelectorAll('th .col-resizer').forEach(function (handle) {
+      handle.addEventListener('mousedown', function (e) {
+        dragging = handle.parentElement;
+        startX = e.clientX;
+        startW = dragging.offsetWidth;
+        handle.classList.add('resizing');
+        e.preventDefault();
+      });
+    });
+    document.addEventListener('mousemove', function (e) {
+      if (!dragging) return;
+      dragging.style.width = Math.max(60, startW + (e.clientX - startX)) + 'px';
+    });
+    document.addEventListener('mouseup', function () {
+      if (dragging) {
+        dragging.querySelector('.col-resizer').classList.remove('resizing');
+        dragging = null;
+      }
+    });
+  })();
+</script>
+
+</div><!-- /#page-wrap -->
+{% endblock %}

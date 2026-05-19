@@ -10,7 +10,6 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('consultations', '0001_initial'),
         ('patients', '0001_initial'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
@@ -40,7 +39,6 @@ class Migration(migrations.Migration):
                 ('statut', models.CharField(choices=[('recu', 'Reçu'), ('en_analyse', 'En analyse'), ('resultat', 'Résultat'), ('valide', 'Validé'), ('envoye', 'Envoyé')], default='recu', max_length=20)),
                 ('commentaire', models.TextField(blank=True)),
                 ('urgent', models.BooleanField(default=False)),
-                ('examen_demande', models.OneToOneField(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='consultations.examendemande')),
                 ('patient', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='analyses', to='patients.patient')),
                 ('technicien', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='analyses_tech', to=settings.AUTH_USER_MODEL)),
                 ('validateur', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='analyses_val', to=settings.AUTH_USER_MODEL)),
@@ -64,7 +62,6 @@ class Migration(migrations.Migration):
                 ('conclusion', models.TextField(blank=True)),
                 ('image', models.FileField(blank=True, null=True, upload_to='imagerie/')),
                 ('urgent', models.BooleanField(default=False)),
-                ('examen_demande', models.OneToOneField(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='consultations.examendemande')),
                 ('patient', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='imageries', to='patients.patient')),
                 ('radiologue', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, to=settings.AUTH_USER_MODEL)),
             ],

@@ -31,12 +31,12 @@ def logout_view(request):
 @login_required(login_url='login')
 def dashboard(request):
     from patients.models import Patient, RendezVous
-    from consultations.models import Consultation
+    from soins.models import Soin
     from hospitalisation.models import Hospitalisation
     from pharmacie.models import Medicament
     from facturation.models import Facture
     from laboratoire.models import AnalyseLaboratoire
-    from ressources_humaines.models import Employe
+    from employe.models import Employe
     from modules_permissions.models import get_user_modules
 
     today = timezone.now().date()
@@ -44,13 +44,14 @@ def dashboard(request):
     stats = {
         'patients_total': Patient.objects.count(),
         'patients_today': Patient.objects.filter(date_creation__date=today).count(),
-        'consultations_today': Consultation.objects.filter(date_heure__date=today).count(),
+        'soins_today': Soin.objects.filter(date_heure__date=today).count(),
         'rdv_today': RendezVous.objects.filter(date_heure__date=today).count(),
         'hospitalisations': Hospitalisation.objects.filter(statut__in=['admis', 'en_soins']).count(),
         'analyses_pending': AnalyseLaboratoire.objects.filter(statut__in=['recu', 'en_analyse']).count(),
-        'factures_impayees': Facture.objects.filter(statut__in=['emise', 'partielle']).count(),
+        # 'factures_impayees': Facture.objects.filter(statut__in=['emise', 'partielle']).count(),
+        'factures_impayees': 0,
         'medicaments_alerte': Medicament.objects.filter(stock_actuel__lte=F('stock_alerte')).count(),
-        'employes_actifs': Employe.objects.filter(statut='actif').count(),
+        'employes_actifs': Employe.objects.filter(actif=True).count(),
     }
 
     rdv_auj = RendezVous.objects.filter(
@@ -58,18 +59,17 @@ def dashboard(request):
         statut__in=['planifie', 'confirme']
     ).select_related('patient', 'medecin').order_by('date_heure')[:8]
 
-    last_cons = Consultation.objects.select_related(
-        'patient', 'medecin'
+    last_soins = Soin.objects.select_related(
+        'patient', 'infirmier'
     ).order_by('-date_heure')[:6]
 
-    # Modules accessibles pour cet utilisateur
     user_modules = get_user_modules(request.user)
     accessible_codes = set(user_modules.values_list('code', flat=True))
 
     return render(request, 'core/dashboard.html', {
         'stats': stats,
         'rdv_auj': rdv_auj,
-        'last_cons': last_cons,
+        'last_soins': last_soins,
         'today': today,
         'user': request.user,
         'user_modules': user_modules,
@@ -99,36 +99,35 @@ def patients_list(request):
 
 @login_required(login_url='login')
 def medecins_list(request):
-    from medecins.models import Medecin
+    from employe.models import Employe
     from django.core.paginator import Paginator
 
-    medecins = Medecin.objects.all().order_by('nom')
+    medecins = Employe.objects.filter(est_medecin=True).order_by('nom')
     paginator = Paginator(medecins, 25)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-    stats = {'total': Medecin.objects.count(), 'consultations_mois': 0, 'disponibles': Medecin.objects.count()}
+    stats = {'total': medecins.count(), 'consultations_mois': 0, 'disponibles': medecins.filter(actif=True).count()}
     breadcrumb = [{'title': 'Accueil', 'url': '/'}, {'title': 'Médecins'}]
-    return render(request, 'medecins/list.html', {'page_obj': page_obj, 'stats': stats, 'breadcrumb': breadcrumb})
+    return render(request, 'employe/list.html', {'page_obj': page_obj, 'stats': stats, 'breadcrumb': breadcrumb})
 
 
 @login_required(login_url='login')
-def consultations_list(request):
-    from consultations.models import Consultation
+def soins_list(request):
+    from soins.models import Soin
     from django.core.paginator import Paginator
 
-    consultations = Consultation.objects.all().order_by('-date_heure')
-    paginator = Paginator(consultations, 25)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    soins = Soin.objects.select_related('patient', 'infirmier').order_by('-date_heure')
+    paginator = Paginator(soins, 25)
+    page_obj = paginator.get_page(request.GET.get('page'))
     today = timezone.now().date()
     stats = {
-        'aujourdhui': Consultation.objects.filter(date_heure__date=today).count(),
-        'ce_mois': Consultation.objects.filter(date_heure__month=today.month, date_heure__year=today.year).count(),
-        'rdv_venir': 0,
-        'diagnostic_rate': 0,
+        'aujourdhui': Soin.objects.filter(date_heure__date=today).count(),
+        'ce_mois': Soin.objects.filter(date_heure__month=today.month, date_heure__year=today.year).count(),
+        'en_cours': Soin.objects.filter(statut='courant').count(),
+        'termines': Soin.objects.filter(statut='complete').count(),
     }
-    breadcrumb = [{'title': 'Accueil', 'url': '/'}, {'title': 'Consultations'}]
-    return render(request, 'consultations/list.html', {'page_obj': page_obj, 'stats': stats, 'breadcrumb': breadcrumb})
+    breadcrumb = [{'title': 'Accueil', 'url': '/'}, {'title': 'Soins'}]
+    return render(request, 'soins/list.html', {'page_obj': page_obj, 'stats': stats, 'breadcrumb': breadcrumb})
 
 
 @login_required(login_url='login')
@@ -150,14 +149,14 @@ def laboratoire_list(request):
     from laboratoire.models import AnalyseLaboratoire
     from django.core.paginator import Paginator
 
-    analyses = AnalyseLaboratoire.objects.all().order_by('-date_reception')
+    analyses = AnalyseLaboratoire.objects.all().order_by('-date_prelevement')
     paginator = Paginator(analyses, 25)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     stats = {
         'en_cours': AnalyseLaboratoire.objects.filter(statut__in=['recu', 'en_analyse']).count(),
-        'resultats_prets': AnalyseLaboratoire.objects.filter(statut='resultats_prets').count(),
-        'analyses_mois': AnalyseLaboratoire.objects.filter(date_reception__month=timezone.now().month).count(),
+        'resultats_prets': AnalyseLaboratoire.objects.filter(statut='resultat').count(),
+        'analyses_mois': AnalyseLaboratoire.objects.filter(date_prelevement__month=timezone.now().month).count(),
         'delai_moyen': 0,
     }
     breadcrumb = [{'title': 'Accueil', 'url': '/'}, {'title': 'Laboratoire'}]
@@ -194,10 +193,10 @@ def facturation_list(request):
 
 @login_required(login_url='login')
 def caisse_list(request):
-    from caisse.models import Session
+    from caisse.models import SessionCaisse
     from django.core.paginator import Paginator
 
-    sessions = Session.objects.all().order_by('-date_ouverture')
+    sessions = SessionCaisse.objects.all().order_by('-date_ouverture')
     paginator = Paginator(sessions, 25)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
@@ -206,33 +205,20 @@ def caisse_list(request):
     return render(request, 'caisse/list.html', {'page_obj': page_obj, 'stats': stats, 'breadcrumb': breadcrumb})
 
 
-@login_required(login_url='login')
-def ressources_humaines_list(request):
-    from ressources_humaines.models import Employe
-    from django.core.paginator import Paginator
-
-    employes = Employe.objects.all().order_by('nom')
-    paginator = Paginator(employes, 25)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    stats = {'total_employes': Employe.objects.count(), 'employes_actifs': Employe.objects.filter(actif=True).count(), 'conges_attente': 0, 'taux_presence': 0}
-    breadcrumb = [{'title': 'Accueil', 'url': '/'}, {'title': 'Ressources Humaines'}]
-    return render(request, 'ressources_humaines/list.html', {'page_obj': page_obj, 'stats': stats, 'breadcrumb': breadcrumb})
-
 
 @login_required(login_url='login')
 def rapports_list(request):
-    from rapports.models import Rapport
+    from rapports.models import RapportMedical
     from django.core.paginator import Paginator
 
-    rapports = Rapport.objects.all().order_by('-date_creation')
+    rapports = RapportMedical.objects.all().order_by('-date_creation')
     paginator = Paginator(rapports, 25)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     stats = {
-        'total_rapports': Rapport.objects.count(),
-        'rapports_mois': Rapport.objects.filter(date_creation__month=timezone.now().month).count(),
-        'rapports_attente': Rapport.objects.filter(statut='en_attente').count(),
+        'total_rapports': RapportMedical.objects.count(),
+        'rapports_mois': RapportMedical.objects.filter(date_creation__month=timezone.now().month).count(),
+        'rapports_attente': RapportMedical.objects.filter(valide=False).count(),
     }
     breadcrumb = [{'title': 'Accueil', 'url': '/'}, {'title': 'Rapports'}]
     return render(request, 'rapports/list.html', {'page_obj': page_obj, 'stats': stats, 'breadcrumb': breadcrumb})

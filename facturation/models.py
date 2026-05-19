@@ -19,7 +19,6 @@ class Facture(models.Model):
 
     numero = models.CharField(max_length=20, unique=True, editable=False)
     patient = models.ForeignKey('patients.Patient', on_delete=models.CASCADE, related_name='factures')
-    consultation = models.ForeignKey('consultations.Consultation', on_delete=models.SET_NULL, null=True, blank=True)
     hospitalisation = models.ForeignKey('hospitalisation.Hospitalisation', on_delete=models.SET_NULL, null=True, blank=True)
     type_facture = models.CharField(max_length=20, choices=TYPE, default='consultation')
     date_emission = models.DateTimeField(auto_now_add=True)

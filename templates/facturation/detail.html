@@ -1,0 +1,516 @@
+{% extends 'facturation/base.html' %}
+
+{% block topbar_title %}Facture {{ facture.numero }}{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── Control panel ── */
+.control-panel {
+    background: #fff;
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+    position: sticky; top: 0; z-index: 100;
+}
+.cp-top {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 24px; gap: 12px;
+}
+.cp-breadcrumb {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 14px; font-weight: 600;
+}
+.cp-breadcrumb a { color: var(--teal-600); text-decoration: none; font-weight: 600; }
+.cp-breadcrumb a:hover { color: var(--teal-500); }
+.cp-breadcrumb .sep { color: #bbb; font-weight: 400; }
+.cp-breadcrumb .current { color: rgba(0,0,0,0.45); font-weight: 500; }
+.cp-actions { display: flex; gap: 8px; align-items: center; }
+
+.btn-validate {
+    background: #16a34a; color: #fff;
+    border: none; border-radius: 6px;
+    padding: 8px 20px; font-size: 13px; font-weight: 700;
+    cursor: pointer; font-family: inherit; transition: background 0.15s;
+    display: inline-flex; align-items: center; gap: 6px;
+}
+.btn-validate:hover { background: #15803d; }
+
+.btn-edit {
+    background: var(--teal-500); color: #fff;
+    border: none; border-radius: 6px;
+    padding: 8px 20px; font-size: 13px; font-weight: 700;
+    cursor: pointer; font-family: inherit;
+    text-decoration: none; transition: background 0.15s;
+    display: inline-flex; align-items: center; gap: 6px;
+}
+.btn-edit:hover { background: var(--teal-600); color: #fff; }
+
+.btn-cancel {
+    background: transparent; color: #dc2626;
+    border: 1px solid #fca5a5; border-radius: 6px;
+    padding: 8px 16px; font-size: 13px; font-weight: 600;
+    cursor: pointer; font-family: inherit; transition: all 0.15s;
+    display: inline-flex; align-items: center; gap: 6px;
+}
+.btn-cancel:hover { background: #fff0f0; border-color: #dc2626; }
+
+.btn-back {
+    background: transparent; color: rgba(0,0,0,0.55);
+    border: 1px solid rgba(0,0,0,0.15); border-radius: 6px;
+    padding: 8px 16px; font-size: 13px; font-weight: 600;
+    cursor: pointer; font-family: inherit;
+    text-decoration: none; transition: all 0.15s;
+    display: inline-flex; align-items: center; gap: 6px;
+}
+.btn-back:hover { border-color: rgba(0,0,0,0.3); color: rgba(0,0,0,0.75); }
+
+.brouillon-banner {
+    background: #fffbeb; border: 1px solid #fde68a;
+    border-radius: 8px; padding: 10px 16px; margin-bottom: 20px;
+    font-size: 13px; color: #92400e; font-weight: 500;
+    display: flex; align-items: center; gap: 8px;
+}
+
+/* ── Body ── */
+.detail-body { background: #fff; padding: 28px; }
+
+/* ── Facture header ── */
+.facture-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 28px; padding-bottom: 20px;
+    border-bottom: 1px solid rgba(0,0,0,0.07);
+}
+.facture-numero {
+    font-size: 22px; font-weight: 800; color: var(--teal-900);
+    font-family: monospace; letter-spacing: 0.05em;
+}
+.facture-meta { font-size: 12px; color: rgba(0,0,0,0.4); margin-top: 4px; }
+
+.badge {
+    display: inline-flex; align-items: center;
+    padding: 5px 14px; border-radius: 20px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+.badge-success  { background: #d1fae5; color: #065f46; }
+.badge-warning  { background: #fef3c7; color: #92400e; }
+.badge-primary  { background: #dbeafe; color: #1e40af; }
+.badge-default  { background: #f1f5f9; color: #475569; }
+.badge-danger   { background: #fee2e2; color: #991b1b; }
+
+/* ── Patient card ── */
+.patient-card {
+    background: linear-gradient(135deg, #f0faff, #e6f7ff);
+    border: 1px solid rgba(33,136,171,0.2);
+    border-radius: 14px;
+    padding: 20px 24px;
+    margin-bottom: 28px;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 16px;
+    align-items: center;
+}
+.patient-avatar {
+    width: 64px; height: 64px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--teal-600), var(--teal-400));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; font-weight: 800; color: #fff; flex-shrink: 0;
+    overflow: hidden;
+}
+.patient-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.patient-info-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px 24px;
+}
+.pi-item { display: flex; flex-direction: column; gap: 2px; }
+.pi-label { font-size: 10px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.06em; color: rgba(0,0,0,0.35); }
+.pi-value { font-size: 13px; font-weight: 600; color: var(--teal-900); }
+.pi-code  { font-family: monospace; font-size: 12px; color: var(--teal-600); }
+
+/* ── Info grid read-only ── */
+.info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 48px;
+    padding-bottom: 28px;
+    border-bottom: 1px solid rgba(0,0,0,0.07);
+    margin-bottom: 28px;
+}
+.info-row {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 0;
+    border-bottom: 1px solid rgba(0,0,0,0.04);
+}
+.info-label {
+    font-size: 12px; font-weight: 600;
+    color: rgba(0,0,0,0.4); text-align: right;
+    text-transform: uppercase; letter-spacing: 0.04em;
+}
+.info-value {
+    font-size: 13px; font-weight: 600; color: var(--teal-900);
+}
+.info-notes {
+    font-size: 13px; color: rgba(0,0,0,0.55);
+    font-style: italic; line-height: 1.5;
+}
+
+/* ── Section title ── */
+.section-title {
+    font-size: 12px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: rgba(0,0,0,0.35);
+    margin-bottom: 14px; display: flex; align-items: center; gap: 10px;
+}
+.section-title::after {
+    content: ''; flex: 1; height: 1px;
+    background: linear-gradient(to right, rgba(0,0,0,0.1), transparent);
+}
+
+/* ── Lignes table ── */
+.lignes-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.lignes-table thead th {
+    padding: 8px 10px; text-align: left;
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.05em; color: rgba(0,0,0,0.4);
+    border-bottom: 2px solid rgba(0,0,0,0.07);
+}
+.lignes-table tbody td {
+    padding: 10px 10px; vertical-align: middle;
+    border-bottom: 1px solid rgba(0,0,0,0.04);
+}
+.lignes-table tbody tr:last-child td { border-bottom: none; }
+.col-total { text-align: right; font-weight: 700; color: var(--teal-700); }
+.col-remise { text-align: center; }
+.col-qte    { text-align: center; }
+
+/* ── Totaux ── */
+.totaux-wrap { display: flex; justify-content: flex-end; margin-top: 20px; }
+.totaux-box {
+    background: #f8fbfd; border: 1px solid rgba(0,0,0,0.07);
+    border-radius: 10px; padding: 16px 20px; min-width: 280px;
+}
+.totaux-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 5px 0; font-size: 13px; color: rgba(0,0,0,0.55);
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+.totaux-row:last-child { border-bottom: none; }
+.totaux-row.grand-total {
+    font-size: 15px; font-weight: 800;
+    color: var(--teal-900); margin-top: 6px; padding-top: 10px;
+    border-top: 2px solid rgba(0,0,0,0.08); border-bottom: none;
+}
+.totaux-row span:last-child { font-weight: 700; color: var(--teal-700); }
+.totaux-row.grand-total span:last-child { color: var(--teal-600); font-size: 18px; }
+
+/* ── Paiements ── */
+.paiements-section { margin-top: 36px; }
+.paiements-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 14px; }
+.paiements-table thead th {
+    padding: 8px 10px; text-align: left;
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.05em; color: rgba(0,0,0,0.4);
+    border-bottom: 2px solid rgba(0,0,0,0.07);
+}
+.paiements-table tbody td {
+    padding: 10px 10px; vertical-align: middle;
+    border-bottom: 1px solid rgba(0,0,0,0.04); color: var(--teal-900);
+}
+.paiements-table tbody tr:last-child td { border-bottom: none; }
+.paiements-empty {
+    text-align: center; padding: 28px; color: rgba(0,0,0,0.3);
+    font-style: italic; font-size: 13px;
+}
+
+/* ── Solde alerte ── */
+.solde-banner {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px; border-radius: 8px; margin-top: 16px;
+    font-size: 13px; font-weight: 600;
+}
+.solde-banner.impaye  { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+.solde-banner.solde   { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+.solde-amount { font-size: 18px; font-weight: 800; }
+
+@media (max-width: 900px) {
+    .info-grid { grid-template-columns: 1fr; gap: 0; }
+    .patient-info-grid { grid-template-columns: 1fr 1fr; }
+    .patient-card { grid-template-columns: auto 1fr; }
+}
+@media (max-width: 600px) {
+    .patient-card { grid-template-columns: 1fr; }
+    .patient-info-grid { grid-template-columns: 1fr; }
+    .info-row { grid-template-columns: 1fr; }
+    .info-label { text-align: left; }
+}
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="breadcrumb">
+    <a href="{% url 'dashboard' %}">Accueil</a>
+    <span class="breadcrumb-sep">›</span>
+    <a href="{% url 'facturation_list' %}">Facturation</a>
+    <span class="breadcrumb-sep">›</span>
+    <span>{{ facture.numero }}</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+
+<!-- ══════════ PANNEAU DE CONTRÔLE ══════════ -->
+<div class="control-panel">
+    <div class="cp-top">
+        <div class="cp-breadcrumb">
+            <a href="{% url 'facturation_list' %}">Facturation</a>
+            <span class="sep">/</span>
+            <span class="current">{{ facture.numero }}</span>
+        </div>
+        <div class="cp-actions">
+            {% if facture.statut == 'brouillon' %}
+                <!-- Valider -->
+                <form method="post" action="{% url 'facture_valider' pk=facture.pk %}" style="display:inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn-validate">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                        Valider la facture
+                    </button>
+                </form>
+                <!-- Modifier -->
+                <a href="{% url 'facture_edit' pk=facture.pk %}" class="btn-edit">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                    Modifier
+                </a>
+                <!-- Annuler (supprime le brouillon) -->
+                <form method="post" action="{% url 'facture_annuler' pk=facture.pk %}" style="display:inline;"
+                      onsubmit="return confirm('Supprimer ce brouillon de facture ?');">
+                    {% csrf_token %}
+                    {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
+                    <button type="submit" class="btn-cancel">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                        Annuler
+                    </button>
+                </form>
+            {% else %}
+                <!-- Modifier -->
+                <a href="{% url 'facture_edit' pk=facture.pk %}" class="btn-edit">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                    Modifier
+                </a>
+                <!-- Retour -->
+                <a href="{% url 'facturation_list' %}" class="btn-back">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                    Retour
+                </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- ══════════ CORPS ══════════ -->
+<div class="detail-body">
+
+    {% if facture.statut == 'brouillon' %}
+    <div class="brouillon-banner">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Cette facture est en <strong>brouillon</strong>. Vérifiez les informations, puis cliquez sur <strong>Valider la facture</strong> pour l'émettre, ou <strong>Modifier</strong> pour ajuster les lignes.
+    </div>
+    {% endif %}
+
+    <!-- ── En-tête facture ── -->
+    <div class="facture-header">
+        <div>
+            <div class="facture-numero">{{ facture.numero }}</div>
+            <div class="facture-meta">
+                Émise le {{ facture.date_emission|date:"d/m/Y à H:i" }}
+                {% if facture.cree_par %} · par {{ facture.cree_par.get_full_name|default:facture.cree_par.username }}{% endif %}
+            </div>
+        </div>
+        <span class="badge badge-{% if facture.statut == 'payee' %}success{% elif facture.statut == 'partielle' %}warning{% elif facture.statut == 'annulee' %}danger{% elif facture.statut == 'emise' %}primary{% else %}default{% endif %}">
+            {{ facture.get_statut_display }}
+        </span>
+    </div>
+
+    <!-- ── Carte patient ── -->
+    <div class="patient-card">
+        <div class="patient-avatar">
+            {% if facture.patient.photo %}
+                <img src="{{ facture.patient.photo.url }}" alt="{{ facture.patient.nom }}">
+            {% else %}
+                {{ facture.patient.nom|slice:":1"|upper }}{{ facture.patient.prenoms|slice:":1"|upper }}
+            {% endif %}
+        </div>
+        <div>
+            <div style="font-size:16px;font-weight:800;color:var(--teal-900);margin-bottom:10px;">
+                {{ facture.patient.nom }} {{ facture.patient.prenoms }}
+            </div>
+            <div class="patient-info-grid">
+                <div class="pi-item">
+                    <span class="pi-label">Code patient</span>
+                    <span class="pi-value pi-code">{{ facture.patient.code_patient }}</span>
+                </div>
+                <div class="pi-item">
+                    <span class="pi-label">Âge</span>
+                    <span class="pi-value">{{ facture.patient.age }} ans</span>
+                </div>
+                <div class="pi-item">
+                    <span class="pi-label">Sexe</span>
+                    <span class="pi-value">{{ facture.patient.get_sexe_display }}</span>
+                </div>
+                <div class="pi-item">
+                    <span class="pi-label">Téléphone</span>
+                    <span class="pi-value">{{ facture.patient.telephone|default:"—" }}</span>
+                </div>
+                <div class="pi-item">
+                    <span class="pi-label">Adresse</span>
+                    <span class="pi-value">{{ facture.patient.adresse|default:facture.patient.ville|default:"—" }}</span>
+                </div>
+                <div class="pi-item">
+                    <span class="pi-label">Assurance</span>
+                    <span class="pi-value">
+                        {% if facture.patient.assurance %}{{ facture.patient.assurance.nom }}{% else %}—{% endif %}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Informations facture ── -->
+    <div class="info-grid">
+        <div>
+            <div class="info-row">
+                <span class="info-label">Type</span>
+                <span class="info-value">{{ facture.get_type_facture_display }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Statut</span>
+                <span class="info-value">{{ facture.get_statut_display }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Date d'échéance</span>
+                <span class="info-value">{{ facture.date_echeance|date:"d/m/Y"|default:"—" }}</span>
+            </div>
+        </div>
+        <div>
+            <div class="info-row">
+                <span class="info-label">Part assurance</span>
+                <span class="info-value">{{ facture.montant_assurance|floatformat:0 }} CFA</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Ticket modérateur</span>
+                <span class="info-value">{{ facture.ticket_moderateur|floatformat:0 }} CFA</span>
+            </div>
+            <div class="info-row" style="align-items:flex-start;padding-top:10px;">
+                <span class="info-label" style="padding-top:2px;">Notes</span>
+                <span class="info-value info-notes">{{ facture.notes|default:"—" }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════ LIGNES DE FACTURE ══════════ -->
+    <div class="section-title">Prestations / Actes</div>
+
+    <div style="overflow-x:auto;">
+        <table class="lignes-table">
+            <thead>
+                <tr>
+                    <th>Désignation</th>
+                    <th class="col-qte">Qté</th>
+                    <th style="text-align:right;">Prix unit. (CFA)</th>
+                    <th class="col-remise">Remise %</th>
+                    <th class="col-total">Total (CFA)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ligne in lignes %}
+                <tr>
+                    <td>{{ ligne.libelle }}</td>
+                    <td class="col-qte">{{ ligne.quantite|floatformat:"-2" }}</td>
+                    <td style="text-align:right;">{{ ligne.prix_unitaire|floatformat:0 }}</td>
+                    <td class="col-remise">{% if ligne.remise %}{{ ligne.remise|floatformat:0 }} %{% else %}—{% endif %}</td>
+                    <td class="col-total">{{ ligne.montant_ligne|floatformat:0 }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" style="text-align:center;padding:28px;color:rgba(0,0,0,0.3);font-style:italic;">
+                        Aucune ligne enregistrée
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ── Totaux ── -->
+    <div class="totaux-wrap">
+        <div class="totaux-box">
+            <div class="totaux-row">
+                <span>Sous-total HT</span>
+                <span>{{ facture.montant_total|floatformat:0 }} CFA</span>
+            </div>
+            <div class="totaux-row">
+                <span>Part assurance</span>
+                <span>{{ facture.montant_assurance|floatformat:0 }} CFA</span>
+            </div>
+            <div class="totaux-row">
+                <span>Ticket modérateur</span>
+                <span>{{ facture.ticket_moderateur|floatformat:0 }} CFA</span>
+            </div>
+            <div class="totaux-row grand-total">
+                <span>Total à payer</span>
+                <span>{{ facture.montant_total|floatformat:0 }} CFA</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════ PAIEMENTS ══════════ -->
+    <div class="paiements-section">
+        <div class="section-title">Paiements enregistrés</div>
+
+        <!-- Bannière solde -->
+        {% if facture.solde_restant > 0 %}
+        <div class="solde-banner impaye">
+            <span>Solde restant dû</span>
+            <span class="solde-amount">{{ facture.solde_restant|floatformat:0 }} CFA</span>
+        </div>
+        {% else %}
+        <div class="solde-banner solde">
+            <span>Facture entièrement réglée</span>
+            <span class="solde-amount">{{ facture.montant_paye|floatformat:0 }} CFA reçus</span>
+        </div>
+        {% endif %}
+
+        <table class="paiements-table">
+            <thead>
+                <tr>
+                    <th>N° Paiement</th>
+                    <th>Date</th>
+                    <th>Mode</th>
+                    <th>Référence</th>
+                    <th style="text-align:right;">Montant (CFA)</th>
+                    <th>Reçu par</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in paiements %}
+                <tr>
+                    <td style="font-family:monospace;font-size:12px;color:var(--teal-600);">{{ p.numero }}</td>
+                    <td>{{ p.date_paiement|date:"d/m/Y H:i" }}</td>
+                    <td>{{ p.get_mode_paiement_display }}</td>
+                    <td>{{ p.reference|default:"—" }}</td>
+                    <td style="text-align:right;font-weight:700;">{{ p.montant|floatformat:0 }}</td>
+                    <td>{{ p.recu_par.get_full_name|default:p.recu_par.username|default:"—" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="paiements-empty">Aucun paiement enregistré</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div><!-- /.detail-body -->
+{% endblock %}

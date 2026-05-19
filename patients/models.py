@@ -62,6 +62,47 @@ class Patient(models.Model):
         t = date.today()
         return t.year - self.date_naissance.year - ((t.month, t.day) < (self.date_naissance.month, self.date_naissance.day))
 
+    @property
+    def age_en_mois(self):
+        from datetime import date
+        today = date.today()
+        mois = (today.year - self.date_naissance.year) * 12 + (today.month - self.date_naissance.month)
+        if today.day < self.date_naissance.day:
+            mois -= 1
+        return max(0, mois)
+
+    @property
+    def age_display(self):
+        import calendar as cal
+        from datetime import date
+        today = date.today()
+        mois_total = self.age_en_mois
+        if mois_total >= 60:
+            return f"{self.age}Ans"
+        ans = mois_total // 12
+        mois = mois_total % 12
+        if today.day >= self.date_naissance.day:
+            jours = today.day - self.date_naissance.day
+        else:
+            prev_month = today.month - 1 if today.month > 1 else 12
+            prev_year = today.year if today.month > 1 else today.year - 1
+            jours = cal.monthrange(prev_year, prev_month)[1] - self.date_naissance.day + today.day
+        return f"{ans}Ans{mois}Mois{jours}Jours"
+
+    @property
+    def tranche_age(self):
+        mois = self.age_en_mois
+        if mois < 12:
+            return 'mois_0_11'
+        a = self.age
+        if a <= 4:  return 'ans_1_4'
+        if a <= 9:  return 'ans_5_9'
+        if a <= 14: return 'ans_10_14'
+        if a <= 19: return 'ans_15_19'
+        if a <= 24: return 'ans_20_24'
+        if a <= 49: return 'ans_25_49'
+        return 'ans_50_plus'
+
     def __str__(self): return f"{self.nom} {self.prenoms} ({self.code_patient})"
     class Meta:
         verbose_name = "Patient"

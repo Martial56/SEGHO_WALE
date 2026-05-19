@@ -24,7 +24,7 @@ def employe_list(request):
                 'active_menu': 'employes',
             })
 
-    qs = Employe.objects.select_related('specialite').all()
+    qs = Employe.objects.select_related('specialite').filter(stagiaire_societe=False)
     stats = {
         'total': qs.count(),
         'actifs': qs.filter(actif=True).count(),
@@ -90,9 +90,10 @@ def employe_detail(request, pk):
         pass
 
     try:
-        from consultations.models import Consultation, Ordonnance
-        consultation_count = Consultation.objects.filter(medecin=employe).count()
-        ordonnance_count = Ordonnance.objects.filter(consultation__medecin=employe).count()
+        from soins.models import Soin
+        from ordonnances.models import Ordonnance
+        consultation_count = Soin.objects.filter(infirmier=employe).count()
+        ordonnance_count = Ordonnance.objects.filter(medecin=employe).count()
     except Exception:
         pass
 
@@ -107,7 +108,7 @@ def employe_detail(request, pk):
         demande_lab_count = AnalyseLaboratoire.objects.filter(medecin_prescripteur=employe).count()
         resultat_lab_count = AnalyseLaboratoire.objects.filter(
             medecin_prescripteur=employe,
-            statut__in=['résultat', 'validé', 'envoyé']
+            statut__in=['resultat', 'valide', 'envoye']
         ).count()
     except Exception:
         pass
@@ -316,8 +317,8 @@ def employe_edit(request, pk):
     except Exception:
         pass
     try:
-        from consultations.models import Ordonnance
-        ordonnance_count = Ordonnance.objects.filter(consultation__medecin=employe).count()
+        from ordonnances.models import Ordonnance
+        ordonnance_count = Ordonnance.objects.filter(medecin=employe).count()
     except Exception:
         pass
     try:
@@ -330,7 +331,7 @@ def employe_edit(request, pk):
         demande_lab_count = AnalyseLaboratoire.objects.filter(medecin_prescripteur=employe).count()
         resultat_lab_count = AnalyseLaboratoire.objects.filter(
             medecin_prescripteur=employe,
-            statut__in=['résultat', 'validé', 'envoyé']
+            statut__in=['resultat', 'valide', 'envoye']
         ).count()
     except Exception:
         pass
@@ -612,16 +613,16 @@ def employe_related_list(request, pk, view_type):
             pass
     elif view_type == 'consultation':
         try:
-            from consultations.models import Consultation
-            items = Consultation.objects.filter(medecin=employe).select_related('patient').order_by('-date_heure')
+            from soins.models import Soin
+            items = Soin.objects.filter(infirmier=employe).select_related('patient').order_by('-date_heure')
         except Exception:
             pass
     elif view_type == 'ordonnance':
         try:
-            from consultations.models import Ordonnance
+            from ordonnances.models import Ordonnance
             items = Ordonnance.objects.filter(
-                consultation__medecin=employe
-            ).select_related('consultation__patient').order_by('-date_emission')
+                medecin=employe
+            ).select_related('patient').order_by('-date_ordonnance')
         except Exception:
             pass
     elif view_type == 'hospitalisation':
@@ -645,7 +646,7 @@ def employe_related_list(request, pk, view_type):
             from laboratoire.models import AnalyseLaboratoire
             items = AnalyseLaboratoire.objects.filter(
                 medecin_prescripteur=employe,
-                statut__in=['résultat', 'validé', 'envoyé']
+                statut__in=['resultat', 'valide', 'envoye']
             ).select_related('patient').order_by('-date_resultat')
         except Exception:
             pass
@@ -656,9 +657,10 @@ def employe_related_list(request, pk, view_type):
     except Exception:
         pass
     try:
-        from consultations.models import Consultation, Ordonnance
-        consultation_count = Consultation.objects.filter(medecin=employe).count()
-        ordonnance_count = Ordonnance.objects.filter(consultation__medecin=employe).count()
+        from soins.models import Soin
+        from ordonnances.models import Ordonnance
+        consultation_count = Soin.objects.filter(infirmier=employe).count()
+        ordonnance_count = Ordonnance.objects.filter(medecin=employe).count()
     except Exception:
         pass
     try:
@@ -670,7 +672,7 @@ def employe_related_list(request, pk, view_type):
         from laboratoire.models import AnalyseLaboratoire
         demande_lab_count = AnalyseLaboratoire.objects.filter(medecin_prescripteur=employe).count()
         resultat_lab_count = AnalyseLaboratoire.objects.filter(
-            medecin_prescripteur=employe, statut__in=['résultat', 'validé', 'envoyé']
+            medecin_prescripteur=employe, statut__in=['resultat', 'valide', 'envoye']
         ).count()
     except Exception:
         pass

@@ -1,0 +1,680 @@
+{% extends 'personnel/base.html' %}
+
+{% block topbar_title %}{{ titre }}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'services/includes/form_css.html' %}
+{% include 'services/includes/article_form_css.html' %}
+{% include 'personnel/includes/form_css.html' %}
+{% endblock %}
+
+{% block module_navbar %}{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+<div id="page-wrap">
+
+{% include 'personnel/includes/nav.html' %}
+
+<div class="o-subheader" id="subheader">
+  <div class="o-subheader-row">
+    <a href="{% if edit %}{% url 'personnel:detail' employe.pk %}{% else %}{% url 'personnel:list' %}{% endif %}" class="o-ctrl-btn" style="padding:3px 7px;">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <span style="font-size:13.5px;color:var(--text-muted);">
+      <a href="{% url 'personnel:list' %}" style="color:var(--accent);text-decoration:none;font-weight:500;">Personnel</a>
+      {% if edit %}
+      <span style="margin:0 5px;opacity:.4;">/</span>
+      <a href="{% url 'personnel:detail' employe.pk %}" style="color:var(--accent);text-decoration:none;font-weight:500;">{{ employe.code }}</a>
+      {% endif %}
+      <span style="margin:0 5px;opacity:.4;">/</span>
+      <span style="color:var(--text);">{% if edit %}Modifier{% else %}Nouveau membre{% endif %}</span>
+    </span>
+    <div style="flex:1;"></div>
+  </div>
+</div>
+
+<div class="f-page-body">
+
+{% if form.errors %}
+<div class="alert-error">
+  <span>⚠</span>
+  <div>
+    {% if form.non_field_errors %}
+    {% for e in form.non_field_errors %}<div>{{ e }}</div>{% endfor %}
+    {% else %}
+    <div>Certains champs contiennent des erreurs. Veuillez les corriger avant d'enregistrer.</div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<form method="post" enctype="multipart/form-data" novalidate>
+{% csrf_token %}
+
+<!-- ── EN-TÊTE EMPLOYÉ ── -->
+<div class="art-header">
+  <div class="art-identity-row">
+
+    <!-- Photo -->
+    <div class="med-photo-zone">
+      <label for="{{ form.photo.id_for_label }}" class="med-photo-label">
+        <div class="med-photo-avatar">
+          {% if edit and employe.photo %}
+          <img src="{{ employe.photo.url }}" alt="Photo" class="med-photo-img" id="photo-preview">
+          {% else %}
+          <div class="med-photo-icon" id="photo-placeholder">
+            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.3">
+              <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+            </svg>
+          </div>
+          <img src="" alt="" class="med-photo-img" id="photo-preview" style="display:none;">
+          {% endif %}
+          <div class="med-photo-overlay">
+            <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+              <circle cx="12" cy="13" r="4"/>
+            </svg>
+          </div>
+        </div>
+        <span class="med-photo-badge">
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
+        </span>
+      </label>
+      {{ form.photo }}
+    </div>
+
+    <!-- Nom / Prénoms -->
+    <div class="art-name-block">
+      <label class="field-label">Nom <span class="f-required">*</span></label>
+      {{ form.nom }}
+      {% if form.nom.errors %}<div class="f-error">{{ form.nom.errors.0 }}</div>{% endif %}
+      {{ form.prenoms }}
+      {% if form.prenoms.errors %}<div class="f-error">{{ form.prenoms.errors.0 }}</div>{% endif %}
+    </div>
+
+  </div><!-- /art-identity-row -->
+
+  <!-- Meta row -->
+  <div class="med-meta-row">
+    <div>
+      <span class="field-label">Code</span>
+      {% if edit %}
+      <div class="med-code-badge">{{ employe.code }}</div>
+      {% else %}
+      <div class="med-code-badge auto">Automatique</div>
+      {% endif %}
+    </div>
+    <div class="f-field" style="margin-bottom:0;">
+      <label class="field-label" for="{{ form.matricule.id_for_label }}">Matricule</label>
+      {% if is_admin or not edit %}
+        {{ form.matricule }}
+      {% else %}
+        <div class="field-readonly-val">{{ employe.matricule|default:"—" }}</div>
+      {% endif %}
+    </div>
+    <div class="f-field" style="margin-bottom:0;">
+      <label class="field-label" for="{{ form.genre.id_for_label }}">Genre</label>
+      {% if is_admin or not edit %}
+        {{ form.genre }}
+      {% else %}
+        <div class="field-readonly-val">{{ employe.get_genre_display|default:"—" }}</div>
+      {% endif %}
+    </div>
+    <div class="f-field" style="margin-bottom:0;">
+      <label class="field-label">Statut</label>
+      {% if is_admin %}
+      <div style="display:flex;align-items:center;gap:10px;padding-top:6px;">
+        <label class="toggle-sw">
+          {{ form.actif }}
+          <span class="toggle-slider"></span>
+        </label>
+        <span style="font-size:13px;font-weight:500;color:var(--text-muted);">Actif</span>
+      </div>
+      {% else %}
+      <span class="badge badge-{% if employe.actif %}success{% else %}danger{% endif %}" style="margin-top:6px;display:inline-block;">
+        {% if employe.actif %}Actif{% else %}Inactif{% endif %}
+      </span>
+      {% endif %}
+    </div>
+    {% if is_admin %}
+    <div class="f-field" style="margin-bottom:0;">
+      <label class="field-label">Est Médecin</label>
+      <div style="display:flex;align-items:center;gap:10px;padding-top:6px;">
+        <label class="toggle-sw">
+          {{ form.est_medecin }}
+          <span class="toggle-slider"></span>
+        </label>
+        <span style="font-size:13px;font-weight:500;color:var(--text-muted);">Médecin</span>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+</div><!-- /art-header -->
+
+<!-- ── ONGLETS ── -->
+<div class="art-tabs">
+  <div class="art-tabs-nav">
+    <button type="button" class="art-tab-btn active" data-tab="tab-perso">Informations personnelles</button>
+    <button type="button" class="art-tab-btn" data-tab="tab-acces">Compte d'accès</button>
+  </div>
+
+  <!-- ═══ ONGLET 1 : Informations personnelles ═══ -->
+  <div class="art-tab-panel active" id="tab-perso">
+    <div class="f-two-col">
+      <div>
+        <div class="f-field">
+          <label class="field-label" for="{{ form.date_naissance.id_for_label }}">Date de naissance</label>
+          {% if is_admin or is_own_profile or not edit %}
+            {{ form.date_naissance }}
+          {% else %}
+            <div class="field-readonly-val">{{ employe.date_naissance|date:"d/m/Y"|default:"—" }}</div>
+          {% endif %}
+        </div>
+        <div class="f-field">
+          <label class="field-label" for="{{ form.lieu_naissance.id_for_label }}">Lieu de naissance</label>
+          {% if is_admin or is_own_profile or not edit %}
+            {{ form.lieu_naissance }}
+          {% else %}
+            <div class="field-readonly-val">{{ employe.lieu_naissance|default:"—" }}</div>
+          {% endif %}
+        </div>
+        <div class="f-field">
+          <label class="field-label" for="{{ form.nationalite.id_for_label }}">Nationalité</label>
+          {% if is_admin or is_own_profile or not edit %}
+            {{ form.nationalite }}
+          {% else %}
+            <div class="field-readonly-val">{{ employe.nationalite|default:"—" }}</div>
+          {% endif %}
+        </div>
+        <div class="f-field">
+          <label class="field-label" for="{{ form.adresse.id_for_label }}">Lieu d'habitation</label>
+          {{ form.adresse }}
+        </div>
+        <div class="f-field">
+          <label class="field-label">Départements</label>
+          {% if is_admin or not edit %}
+          <div class="dept-chips" style="margin-top:6px;">
+            {% for choice in form.departements %}
+            <label class="dept-chip{% if choice.data.selected %} checked{% endif %}">
+              {{ choice.tag }}
+              {{ choice.choice_label }}
+            </label>
+            {% empty %}
+            <span style="font-size:13px;color:var(--text-muted);font-style:italic;">Aucun département configuré</span>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="field-readonly-val">
+            {% for dep in employe.departements.all %}{{ dep.nom }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      <div>
+        <div class="f-field">
+          <label class="field-label" for="{{ form.telephone.id_for_label }}">Téléphone</label>
+          {{ form.telephone }}
+        </div>
+        <div class="f-field">
+          <label class="field-label" for="{{ form.mobile.id_for_label }}">Mobile</label>
+          {{ form.mobile }}
+        </div>
+        <div class="f-field">
+          <label class="field-label" for="{{ form.email.id_for_label }}">Email professionnel</label>
+          {{ form.email }}
+          {% if form.email.errors %}<div class="f-error">{{ form.email.errors.0 }}</div>{% endif %}
+        </div>
+        <div class="f-field">
+          <label class="field-label" for="{{ form.fonction.id_for_label }}">Fonction / Poste</label>
+          {% if is_admin or not edit %}
+            {{ form.fonction }}
+          {% else %}
+            <div class="field-readonly-val">{{ employe.fonction|default:"—" }}</div>
+          {% endif %}
+        </div>
+        {% if is_admin or not edit %}
+        <div class="f-field" style="padding-top:6px;">
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <label class="toggle-sw">
+                {{ form.employe_societe }}
+                <span class="toggle-slider"></span>
+              </label>
+              <span style="font-size:13px;font-weight:500;">Employé de la société</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <label class="toggle-sw">
+                {{ form.stagiaire_societe }}
+                <span class="toggle-slider"></span>
+              </label>
+              <span style="font-size:13px;font-weight:500;">Stagiaire de la société</span>
+            </div>
+          </div>
+        </div>
+        {% else %}
+        <div class="f-field">
+          <label class="field-label">Employé de la société</label>
+          <div class="field-readonly-val">{% if employe.employe_societe %}Oui{% else %}Non{% endif %}</div>
+        </div>
+        <div class="f-field">
+          <label class="field-label">Stagiaire de la société</label>
+          <div class="field-readonly-val">{% if employe.stagiaire_societe %}Oui{% else %}Non{% endif %}</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- ── Rôle médical ── -->
+    {% if is_admin %}
+    <div class="role-section" id="role-medical-section">
+      <p class="role-section-title">Rôle médical</p>
+      <div style="max-width:560px;margin-bottom:4px;">
+        <div class="switch-row" id="referent-row">
+          <div class="switch-info">
+            <div class="switch-label"><span>🔗</span> Est Médecin Référent</div>
+            <div class="switch-desc">Médecin assurant le suivi de patients hors établissement</div>
+          </div>
+          <label class="toggle-sw">
+            {{ form.est_referent }}
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+      <div class="medecin-fields-block" id="medecin-fields">
+        <div class="f-two-col">
+          <div>
+            <div class="f-field">
+              <label class="field-label" for="{{ form.specialite.id_for_label }}">Spécialité</label>
+              {{ form.specialite }}
+            </div>
+            <div class="f-field">
+              <label class="field-label" for="{{ form.ordre_medecin.id_for_label }}">Numéro d'ordre</label>
+              {{ form.ordre_medecin }}
+            </div>
+            <div class="f-field">
+              <label class="field-label" for="{{ form.duree_consultation.id_for_label }}">Durée de consultation (min)</label>
+              {{ form.duree_consultation }}
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 0;">
+              <label class="toggle-sw">
+                {{ form.chirurgien_principal }}
+                <span class="toggle-slider"></span>
+              </label>
+              <span style="font-size:13px;font-weight:500;">Chirurgien principal</span>
+            </div>
+          </div>
+          <div>
+            <div class="f-field">
+              <label class="field-label" for="{{ form.service_consultation.id_for_label }}">Service de consultation</label>
+              {{ form.service_consultation }}
+            </div>
+            <div class="f-field">
+              <label class="field-label" for="{{ form.service_suivi.id_for_label }}">Service de suivi</label>
+              {{ form.service_suivi }}
+            </div>
+            <div class="f-field">
+              <label class="field-label" for="{{ form.signature.id_for_label }}">Signature</label>
+              <label class="signature-zone" for="{{ form.signature.id_for_label }}">
+                {% if edit and employe.signature %}
+                <div class="signature-current" id="signature-preview-wrap">
+                  <img src="{{ employe.signature.url }}" alt="Signature" id="signature-preview">
+                  <span class="signature-current-label">Signature actuelle</span>
+                </div>
+                {% else %}
+                <div class="signature-current" id="signature-preview-wrap" style="display:none;">
+                  <img src="" alt="" id="signature-preview">
+                  <span class="signature-current-label">Aperçu</span>
+                </div>
+                {% endif %}
+                <div class="signature-upload-btn">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="17 8 12 3 7 8"/>
+                    <line x1="12" y1="3" x2="12" y2="15"/>
+                  </svg>
+                  <span>{% if edit and employe.signature %}Changer la signature{% else %}Importer une signature{% endif %}</span>
+                </div>
+              </label>
+              {{ form.signature }}
+            </div>
+          </div>
+        </div>
+        <div class="referent-fields-block" id="referent-fields">
+          <p class="role-section-title">Informations référent</p>
+          <div class="f-two-col">
+            <div>
+              <div class="f-field">
+                <label class="field-label" for="{{ form.titre.id_for_label }}">Titre professionnel</label>
+                {{ form.titre }}
+              </div>
+              <div class="f-field">
+                <label class="field-label" for="{{ form.etablissement.id_for_label }}">Établissement</label>
+                {{ form.etablissement }}
+              </div>
+            </div>
+            <div>
+              <div class="f-field">
+                <label class="field-label" for="{{ form.langue.id_for_label }}">Langue</label>
+                {{ form.langue }}
+              </div>
+              <div class="f-field">
+                <label class="field-label" for="{{ form.notes_internes.id_for_label }}">Notes internes</label>
+                {{ form.notes_internes }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% elif can_edit_all %}
+    {# Médecin modifiant son propre profil : section médicale toujours visible et modifiable #}
+    <div class="role-section">
+      <p class="role-section-title">Rôle médical</p>
+      <div style="max-width:560px;margin-bottom:4px;">
+        <div class="switch-row">
+          <div class="switch-info">
+            <div class="switch-label"><span>🔗</span> Est Médecin Référent</div>
+            <div class="switch-desc">Médecin assurant le suivi de patients hors établissement</div>
+          </div>
+          <label class="toggle-sw">
+            {{ form.est_referent }}
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+      <div class="medecin-fields-block">
+        <div class="f-two-col">
+          <div>
+            <div class="f-field">
+              <label class="field-label" for="{{ form.specialite.id_for_label }}">Spécialité</label>
+              {{ form.specialite }}
+            </div>
+            <div class="f-field">
+              <label class="field-label" for="{{ form.ordre_medecin.id_for_label }}">Numéro d'ordre</label>
+              {{ form.ordre_medecin }}
+            </div>
+            <div class="f-field">
+              <label class="field-label" for="{{ form.duree_consultation.id_for_label }}">Durée de consultation (min)</label>
+              {{ form.duree_consultation }}
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 0;">
+              <label class="toggle-sw">
+                {{ form.chirurgien_principal }}
+                <span class="toggle-slider"></span>
+              </label>
+              <span style="font-size:13px;font-weight:500;">Chirurgien principal</span>
+            </div>
+          </div>
+          <div>
+            <div class="f-field">
+              <label class="field-label" for="{{ form.service_consultation.id_for_label }}">Service de consultation</label>
+              {{ form.service_consultation }}
+            </div>
+            <div class="f-field">
+              <label class="field-label" for="{{ form.service_suivi.id_for_label }}">Service de suivi</label>
+              {{ form.service_suivi }}
+            </div>
+            <div class="f-field">
+              <label class="field-label" for="{{ form.signature.id_for_label }}">Signature</label>
+              <label class="signature-zone" for="{{ form.signature.id_for_label }}">
+                {% if edit and employe.signature %}
+                <div class="signature-current" id="signature-preview-wrap">
+                  <img src="{{ employe.signature.url }}" alt="Signature" id="signature-preview">
+                  <span class="signature-current-label">Signature actuelle</span>
+                </div>
+                {% else %}
+                <div class="signature-current" id="signature-preview-wrap" style="display:none;">
+                  <img src="" alt="" id="signature-preview">
+                  <span class="signature-current-label">Aperçu</span>
+                </div>
+                {% endif %}
+                <div class="signature-upload-btn">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="17 8 12 3 7 8"/>
+                    <line x1="12" y1="3" x2="12" y2="15"/>
+                  </svg>
+                  <span>{% if edit and employe.signature %}Changer la signature{% else %}Importer une signature{% endif %}</span>
+                </div>
+              </label>
+              {{ form.signature }}
+            </div>
+          </div>
+        </div>
+        <div class="referent-fields-block" id="referent-fields">
+          <p class="role-section-title">Informations référent</p>
+          <div class="f-two-col">
+            <div>
+              <div class="f-field">
+                <label class="field-label" for="{{ form.titre.id_for_label }}">Titre professionnel</label>
+                {{ form.titre }}
+              </div>
+              <div class="f-field">
+                <label class="field-label" for="{{ form.etablissement.id_for_label }}">Établissement</label>
+                {{ form.etablissement }}
+              </div>
+            </div>
+            <div>
+              <div class="f-field">
+                <label class="field-label" for="{{ form.langue.id_for_label }}">Langue</label>
+                {{ form.langue }}
+              </div>
+              <div class="f-field">
+                <label class="field-label" for="{{ form.notes_internes.id_for_label }}">Notes internes</label>
+                {{ form.notes_internes }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% elif can_see_medical and edit and employe.est_medecin %}
+    {# Cas lecture seule : utilisateur médecin mais non propriétaire du profil #}
+    <div class="role-section">
+      <p class="role-section-title">Rôle médical</p>
+      <div class="f-two-col">
+        <div>
+          <div class="f-field">
+            <label class="field-label">Spécialité</label>
+            <div class="field-readonly-val">{{ employe.specialite|default:"—" }}</div>
+          </div>
+          <div class="f-field">
+            <label class="field-label">Numéro d'ordre</label>
+            <div class="field-readonly-val">{{ employe.ordre_medecin|default:"—" }}</div>
+          </div>
+        </div>
+        <div>
+          <div class="f-field">
+            <label class="field-label">Durée de consultation</label>
+            <div class="field-readonly-val">{{ employe.duree_consultation }} min</div>
+          </div>
+          <div class="f-field">
+            <label class="field-label">Établissement</label>
+            <div class="field-readonly-val">{{ employe.etablissement|default:"—" }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div><!-- /tab-perso -->
+
+  <!-- ═══ ONGLET 2 : Compte d'accès ═══ -->
+  <div class="art-tab-panel" id="tab-acces">
+
+    <div class="f-field" style="max-width:340px;margin-bottom:28px;">
+      <label class="field-label" for="{{ form.username.id_for_label }}">Identifiant d'accès</label>
+      {% if is_admin or not edit %}
+        {{ form.username }}
+        {% if form.username.errors %}<div class="f-error">{{ form.username.errors.0 }}</div>{% endif %}
+      {% else %}
+        <div class="field-readonly-val">{{ employe.user.username|default:"—" }}</div>
+      {% endif %}
+    </div>
+
+    {% if not edit %}
+    <div class="f-field" style="max-width:340px;">
+      <label class="field-label" for="{{ form.password.id_for_label }}">
+        Mot de passe <span style="font-weight:400;text-transform:none;font-size:11px;">(optionnel)</span>
+      </label>
+      {{ form.password }}
+      <div class="account-note">Si laissé vide, le compte sera créé sans mot de passe.</div>
+    </div>
+
+    {% else %}
+    {% if is_admin or is_own_profile %}
+    <div style="border:1px solid var(--border);border-radius:10px;padding:20px 24px;max-width:480px;">
+      <p style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin:0 0 18px;">Changer le mot de passe</p>
+      <div class="f-field">
+        <label class="field-label" for="{{ form.current_password.id_for_label }}">Mot de passe actuel</label>
+        {{ form.current_password }}
+      </div>
+      <div class="f-field">
+        <label class="field-label" for="{{ form.new_password.id_for_label }}">Nouveau mot de passe</label>
+        {{ form.new_password }}
+      </div>
+      <div class="f-field" style="margin-bottom:0;">
+        <label class="field-label" for="{{ form.confirm_password.id_for_label }}">Confirmer le nouveau mot de passe</label>
+        {{ form.confirm_password }}
+      </div>
+    </div>
+    {% endif %}
+    {% endif %}
+
+  </div><!-- /tab-acces -->
+
+</div><!-- /art-tabs -->
+
+<!-- ── PIED DE FORMULAIRE ── -->
+<div class="art-form-footer">
+  {% if edit %}
+  <a href="{% url 'personnel:detail' employe.pk %}" class="o-btn-secondary">Annuler</a>
+  {% else %}
+  <a href="{% url 'personnel:list' %}" class="o-btn-secondary">Annuler</a>
+  {% endif %}
+  <button type="submit" class="o-btn-create">
+    <i class="bi bi-check-lg"></i>
+    {% if edit %}Enregistrer les modifications{% else %}Ajouter au personnel{% endif %}
+  </button>
+</div>
+
+</form>
+
+</div><!-- /.f-page-body -->
+
+</div><!-- /#page-wrap -->
+
+<script>
+(function () {
+  /* ── Onglets ── */
+  document.querySelectorAll('.art-tab-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.art-tab-btn').forEach(function (b) { b.classList.remove('active'); });
+      document.querySelectorAll('.art-tab-panel').forEach(function (p) { p.classList.remove('active'); });
+      btn.classList.add('active');
+      var panel = document.getElementById(btn.dataset.tab);
+      if (panel) panel.classList.add('active');
+    });
+  });
+
+  /* ── Aperçu photo ── */
+  var photoInput = document.getElementById('{{ form.photo.id_for_label }}');
+  if (photoInput) {
+    photoInput.style.display = 'none';
+    photoInput.addEventListener('change', function () {
+      var file = this.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function (e) {
+        var ph = document.getElementById('photo-placeholder');
+        var pv = document.getElementById('photo-preview');
+        if (ph) ph.style.display = 'none';
+        if (pv) { pv.src = e.target.result; pv.style.display = 'block'; pv.className = 'med-photo-img'; }
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  /* ── Chips départements ── */
+  document.querySelectorAll('.dept-chip').forEach(function (chip) {
+    var cb = chip.querySelector('input[type="checkbox"]');
+    function sync() { chip.classList.toggle('checked', cb.checked); }
+    sync();
+    chip.addEventListener('click', function () { cb.checked = !cb.checked; sync(); });
+  });
+
+  /* ── Aperçu signature ── */
+  var sigInput = document.getElementById('{{ form.signature.id_for_label }}');
+  if (sigInput) {
+    sigInput.style.display = 'none';
+    sigInput.addEventListener('change', function () {
+      var file = this.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function (e) {
+        var wrap = document.getElementById('signature-preview-wrap');
+        var img = document.getElementById('signature-preview');
+        if (img) { img.src = e.target.result; }
+        if (wrap) { wrap.style.display = 'flex'; }
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  /* ── Toggles Est Médecin / Est Référent ── */
+  var estMedecin = document.getElementById('{{ form.est_medecin.id_for_label }}');
+  var estReferent = document.getElementById('{{ form.est_referent.id_for_label }}');
+  var medecinFields = document.getElementById('medecin-fields');
+  var referentFields = document.getElementById('referent-fields');
+  var referentRow = document.getElementById('referent-row');
+  var roleMedicalSection = document.getElementById('role-medical-section');
+
+  function syncMedecin() {
+    var on = estMedecin && estMedecin.checked;
+    if (roleMedicalSection) roleMedicalSection.style.display = on ? '' : 'none';
+    if (medecinFields) medecinFields.style.display = on ? 'block' : 'none';
+    if (referentRow) referentRow.style.display = on ? '' : 'none';
+    if (!on && estReferent) { estReferent.checked = false; syncReferent(); }
+  }
+
+  function syncReferent() {
+    var on = estReferent && estReferent.checked;
+    if (referentFields) referentFields.style.display = on ? 'block' : 'none';
+  }
+
+  if (estMedecin) estMedecin.addEventListener('change', syncMedecin);
+  if (estReferent) estReferent.addEventListener('change', syncReferent);
+  syncMedecin();
+  syncReferent();
+
+  /* ── Si erreurs dans un onglet non actif, l'activer ── */
+  var tabMap = {
+    'tab-perso': ['{{ form.email.id_for_label }}', '{{ form.nom.id_for_label }}', '{{ form.prenoms.id_for_label }}'],
+    'tab-acces': ['{{ form.username.id_for_label }}']
+  };
+  var hasError = document.querySelector('.f-error');
+  if (hasError) {
+    var errField = hasError.previousElementSibling;
+    if (errField) {
+      var fieldId = errField.id;
+      for (var tab in tabMap) {
+        if (tabMap[tab].indexOf(fieldId) !== -1) {
+          document.querySelectorAll('.art-tab-btn').forEach(function (b) { b.classList.remove('active'); });
+          document.querySelectorAll('.art-tab-panel').forEach(function (p) { p.classList.remove('active'); });
+          var activeBtn = document.querySelector('.art-tab-btn[data-tab="' + tab + '"]');
+          var activePanel = document.getElementById(tab);
+          if (activeBtn) activeBtn.classList.add('active');
+          if (activePanel) activePanel.classList.add('active');
+          break;
+        }
+      }
+    }
+  }
+})();
+</script>
+{% endblock %}

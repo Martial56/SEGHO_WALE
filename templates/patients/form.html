@@ -576,13 +576,17 @@
         if (!dateInput || !dateInput.value) { if (ageDisplay) ageDisplay.textContent = '—'; return; }
         var birth = new Date(dateInput.value);
         var today = new Date();
-        var age = today.getFullYear() - birth.getFullYear();
-        var m = today.getMonth() - birth.getMonth();
-        if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
-        if (age < 0) { ageDisplay.textContent = '—'; return; }
-        ageDisplay.textContent = age === 0
-            ? ((today.getFullYear() - birth.getFullYear()) * 12 + today.getMonth() - birth.getMonth()) + ' mois'
-            : age + ' ans';
+        if (birth > today) { ageDisplay.textContent = '—'; return; }
+        var mois = (today.getFullYear() - birth.getFullYear()) * 12 + (today.getMonth() - birth.getMonth());
+        if (today.getDate() < birth.getDate()) mois--;
+        if (mois < 0) { ageDisplay.textContent = '—'; return; }
+        if (mois < 12) {
+            ageDisplay.textContent = mois + ' mois';
+        } else {
+            var ans = today.getFullYear() - birth.getFullYear();
+            if (today.getMonth() < birth.getMonth() || (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate())) ans--;
+            ageDisplay.textContent = ans + ' ans';
+        }
     }
     if (dateInput) { dateInput.addEventListener('change', updateAge); updateAge(); }
 

@@ -85,6 +85,7 @@ class Employe(models.Model):
     chirurgien_principal = models.BooleanField(default=False)
     taux_honoraire = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     employe_societe = models.BooleanField(default=True, verbose_name='Employé de la société')
+    stagiaire_societe = models.BooleanField(default=False, verbose_name='Stagiaire de la société')
     signature = models.ImageField(upload_to='medecins/signatures/', blank=True, null=True,
                                   verbose_name='Signature')
     etablissement = models.CharField(max_length=200, blank=True, verbose_name='Établissement')

@@ -54,12 +54,12 @@ def patient_detail(request, pk):
     patient = get_object_or_404(Patient, pk=pk)
 
     rdv_count = patient.rendez_vous.count()
-    consultation_count = patient.consultations.count()
+    soin_count = patient.soins.count()
     facture_count = patient.factures.count()
 
     try:
-        from consultations.models import Ordonnance
-        ordonnance_count = Ordonnance.objects.filter(consultation__patient=patient).count()
+        from ordonnances.models import Ordonnance
+        ordonnance_count = Ordonnance.objects.filter(patient=patient).count()
     except Exception:
         ordonnance_count = 0
 
@@ -73,7 +73,7 @@ def patient_detail(request, pk):
         from laboratoire.models import AnalyseLaboratoire
         demande_examens_count = AnalyseLaboratoire.objects.filter(patient=patient).count()
         resultat_examens_count = AnalyseLaboratoire.objects.filter(
-            patient=patient, statut__in=['résultat', 'validé', 'envoyé']
+            patient=patient, statut__in=['resultat', 'valide', 'envoye']
         ).count()
     except Exception:
         demande_examens_count = 0
@@ -93,7 +93,7 @@ def patient_detail(request, pk):
     return render(request, 'patients/detail.html', {
         'patient': patient,
         'rdv_count': rdv_count,
-        'consultation_count': consultation_count,
+        'soin_count': soin_count,
         'facture_count': facture_count,
         'ordonnance_count': ordonnance_count,
         'hospitalisation_count': hospitalisation_count,
@@ -227,14 +227,14 @@ def patient_rdv_list(request, pk):
 def patient_consultation_list(request, pk):
     patient = get_object_or_404(Patient, pk=pk)
     try:
-        from consultations.models import Consultation
-        items = Consultation.objects.filter(patient=patient).select_related('medecin').order_by('-date_heure')
+        from soins.models import Soin
+        items = Soin.objects.filter(patient=patient).select_related('infirmier').order_by('-date_heure')
     except Exception:
         items = []
     return render(request, 'patients/related_list.html', {
         'patient': patient,
-        'view_type': 'consultation',
-        'titre': 'Consultations',
+        'view_type': 'soin',
+        'titre': 'Soins',
         'items': items,
     })
 
@@ -243,10 +243,10 @@ def patient_consultation_list(request, pk):
 def patient_ordonnance_list(request, pk):
     patient = get_object_or_404(Patient, pk=pk)
     try:
-        from consultations.models import Ordonnance
+        from ordonnances.models import Ordonnance
         items = Ordonnance.objects.filter(
-            consultation__patient=patient
-        ).select_related('consultation').order_by('-date_emission')
+            patient=patient
+        ).order_by('-date_ordonnance')
     except Exception:
         items = []
     return render(request, 'patients/related_list.html', {
@@ -297,7 +297,7 @@ def patient_resultat_examens_list(request, pk):
     try:
         from laboratoire.models import AnalyseLaboratoire
         items = AnalyseLaboratoire.objects.filter(
-            patient=patient, statut__in=['résultat', 'validé', 'envoyé']
+            patient=patient, statut__in=['resultat', 'valide', 'envoye']
         ).order_by('-date_resultat')
     except Exception:
         items = []

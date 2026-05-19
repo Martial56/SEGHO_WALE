@@ -51,17 +51,18 @@ body {
   display: flex; align-items: center; gap: 14px;
 }
 .brand-logo {
-  width: 46px; height: 46px; border-radius: 14px;
-  background: linear-gradient(135deg, var(--teal-600), var(--teal-400));
-  display: flex; align-items: center; justify-content: center;
-  font-size: 22px; flex-shrink: 0;
-  box-shadow: 0 4px 16px rgba(33,136,171,0.25);
+  width: 50px; height: 50px; flex-shrink: 0;
+  object-fit: contain;
+  /* filter: brightness(1.1) drop-shadow(0 0 8px rgba(33,136,171,0.45)); */
+}
+html[data-theme="dark"] .brand-logo {
+  /* filter: brightness(1.2) drop-shadow(0 0 10px rgba(52,168,204,0.6)); */
 }
 .brand-text h1 {
   font-size: 17px; font-weight: 800; letter-spacing: -0.3px; color: var(--teal-900);
 }
 .brand-text p {
-  font-size: 11px; color: var(--text-muted); margin-top: 1px;
+  font-size: 10px; color: var(--text-muted); margin-top: 1px; line-height: 1.4;
 }
 
 .topbar-right {
@@ -425,10 +426,10 @@ html[data-theme="dark"] #theme-toggle .icon-moon { display: block; }
 <!-- ══════════════ TOPBAR ══════════════ -->
 <header class="topbar">
   <div class="brand">
-    <div class="brand-logo">🏥</div>
+    <img src="{% static 'img/logo.png' %}" alt="SEGHO-WALE" class="brand-logo">
     <div class="brand-text">
       <h1>SEGHO-WALE</h1>
-      <p>Centre Médico-Social WALÉ &mdash; Yamoussoukro</p>
+      <p>Système Electronique de Gestion Hospitalière de WALÉ &mdash; Yamoussoukro</p>
     </div>
   </div>
 
@@ -469,7 +470,7 @@ html[data-theme="dark"] #theme-toggle .icon-moon { display: block; }
         <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
         <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
       </svg>
-      {% if stats.medicaments_alerte > 0 or stats.factures_impayees > 0 or stats.analyses_pending > 0 %}
+      {% if stats.medicaments_alerte > 0 or stats.analyses_pending > 0 %}
       <span class="notif-dot"></span>
       {% endif %}
     </button>
@@ -536,8 +537,8 @@ html[data-theme="dark"] #theme-toggle .icon-moon { display: block; }
   <div class="stat-chip">
     <span class="stat-chip-icon">🩺</span>
     <div>
-      <div class="stat-chip-val">{{ stats.consultations_today }}</div>
-      <div class="stat-chip-lbl">Consultations auj.</div>
+      <div class="stat-chip-val">{{ stats.soins_today }}</div>
+      <div class="stat-chip-lbl">Soins auj.</div>
     </div>
   </div>
   <div class="stat-chip">
@@ -552,13 +553,6 @@ html[data-theme="dark"] #theme-toggle .icon-moon { display: block; }
     <div>
       <div class="stat-chip-val">{{ stats.medicaments_alerte }}</div>
       <div class="stat-chip-lbl">Alertes pharmacie</div>
-    </div>
-  </div>
-  <div class="stat-chip">
-    <span class="stat-chip-icon">🧾</span>
-    <div>
-      <div class="stat-chip-val">{{ stats.factures_impayees }}</div>
-      <div class="stat-chip-lbl">Factures impayées</div>
     </div>
   </div>
   <div class="stat-chip">
@@ -649,13 +643,13 @@ html[data-theme="dark"] #theme-toggle .icon-moon { display: block; }
     </a>
     {% endif %}
 
-    {% if 'consultations' in accessible_codes %}
-    <a href="{% url 'consultations_list' %}" class="module-card">
+    {% if 'soins' in accessible_codes %}
+    <a href="{% url 'soins:list' %}" class="module-card">
       <div class="module-icon-box ic-amber" style="padding:0;overflow:hidden;">
         <img src="{% static 'img/soin.png' %}" alt="Soins" style="width:95%;height:95%;object-fit:cover;border-radius:50%;">
       </div>
       <div class="module-name">Soins</div>
-      <div class="module-sub">{{ stats.consultations_today }} aujourd'hui</div>
+      <div class="module-sub">{{ stats.soins_today }} aujourd'hui</div>
     </a>
     {% endif %}
 
@@ -695,17 +689,17 @@ html[data-theme="dark"] #theme-toggle .icon-moon { display: block; }
         <img src="{% static 'img/compp.png' %}" alt="Comptabilité" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
       </div>
       <div class="module-name">Comptabilité</div>
-      <div class="module-sub">{% if stats.factures_impayees > 0 %}{{ stats.factures_impayees }} impayée(s){% else %}À jour{% endif %}</div>
+      <div class="module-sub">Facturation</div>
     </a>
     {% endif %}
 
     {% if 'gynecologie' in accessible_codes %}
-    <a href="/admin/consultations/consultation/?specialite=gynecologie" class="module-card">
+    <a href="/admin/soins/soin/" class="module-card">
       <div class="module-icon-box ic-plum" style="padding:0;overflow:hidden;">
         <img src="{% static 'img/gyn.png' %}" alt="Gynécologie" style="width:103%;height:103%;object-fit:cover;border-radius:50%;">
       </div>
       <div class="module-name">Gynécologie</div>
-      <div class="module-sub">Consultations spécialisées</div>
+      <div class="module-sub">Soins spécialisés</div>
     </a>
     {% endif %}
 
@@ -739,41 +733,13 @@ html[data-theme="dark"] #theme-toggle .icon-moon { display: block; }
     </a>
     {% endif %}
 
-    {% if 'ressources_humaines' in accessible_codes %}
-    <a href="{% url 'ressources_humaines_list' %}" class="module-card">
+    {% if 'personnel' in accessible_codes %}
+    <a href="{% url 'personnel:list' %}" class="module-card">
       <div class="module-icon-box ic-teal2" style="padding:0;overflow:hidden;">
         <img src="{% static 'img/emp.png' %}" alt="Personnel" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
       </div>
       <div class="module-name">Personnel</div>
       <div class="module-sub">{{ stats.employes_actifs }} actifs</div>
-    </a>
-    {% endif %}
-
-    {% if 'evaluation' in accessible_codes %}
-    <a href="/admin/ressources_humaines/evaluationemploye/" class="module-card">
-      <div class="module-icon-box ic-amber">⭐</div>
-      <div class="module-name">Évaluation</div>
-      <div class="module-sub">Performance du personnel</div>
-    </a>
-    {% endif %}
-
-    {% if 'presence' in accessible_codes %}
-    <a href="/admin/ressources_humaines/presence/" class="module-card">
-      <div class="module-icon-box ic-violet" style="padding:0;overflow:hidden;">
-        <img src="{% static 'img/pres.png' %}" alt="Présence" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
-      </div>
-      <div class="module-name">Présence</div>
-      <div class="module-sub">Pointage & assiduité</div>
-    </a>
-    {% endif %}
-
-    {% if 'conges' in accessible_codes %}
-    <a href="/admin/ressources_humaines/conge/" class="module-card">
-      <div class="module-icon-box ic-sky" style="padding:0;overflow:hidden;">
-        <img src="{% static 'img/detendre.png' %}" alt="Congés" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
-      </div>
-      <div class="module-name">Congés</div>
-      <div class="module-sub">Demandes & planification</div>
     </a>
     {% endif %}
 
@@ -797,7 +763,7 @@ html[data-theme="dark"] #theme-toggle .icon-moon { display: block; }
     <div class="panel">
       <div class="panel-header">
         <div class="panel-title">📅 Rendez-vous &mdash; {{ today|date:"d/m/Y" }}</div>
-        <a href="{% url 'consultations_list' %}" class="panel-link">Voir tout →</a>
+        <a href="{% url 'soins:list' %}" class="panel-link">Voir tout →</a>
       </div>
       {% if rdv_auj %}
         {% for rdv in rdv_auj %}
@@ -819,27 +785,27 @@ html[data-theme="dark"] #theme-toggle .icon-moon { display: block; }
       {% endif %}
     </div>-->
 
-    <!-- DERNIÈRES CONSULTATIONS 
+    <!-- DERNIERS SOINS
     <div class="panel">
       <div class="panel-header">
-        <div class="panel-title">🩺 Dernières consultations</div>
-        <a href="{% url 'consultations_list' %}" class="panel-link">Voir tout →</a>
+        <div class="panel-title">🩺 Derniers soins</div>
+        <a href="{% url 'soins:list' %}" class="panel-link">Voir tout →</a>
       </div>
-      {% if last_cons %}
-        {% for c in last_cons %}
+      {% if last_soins %}
+        {% for s in last_soins %}
         <div class="cons-item">
-          <div class="cons-dot {{ c.statut }}"></div>
+          <div class="cons-dot {{ s.statut }}"></div>
           <div class="cons-info">
-            <div class="cons-patient">{{ c.patient.nom }} {{ c.patient.prenoms }}</div>
-            <div class="cons-meta">{% if c.medecin %}Dr {{ c.medecin.nom }} &middot; {% endif %}{{ c.date_heure|date:"d/m/Y H:i" }}</div>
+            <div class="cons-patient">{{ s.patient.nom }} {{ s.patient.prenom }}</div>
+            <div class="cons-meta">{% if s.infirmier %}{{ s.infirmier.nom }} &middot; {% endif %}{{ s.date_heure|date:"d/m/Y H:i" }}</div>
           </div>
-          <span class="cons-num">{{ c.numero }}</span>
+          <span class="cons-num">{{ s.numero }}</span>
         </div>
         {% endfor %}
       {% else %}
         <div class="empty-state">
           <span class="empty-icon">🩺</span>
-          Aucune consultation enregistrée
+          Aucun soin enregistré
         </div>
       {% endif %}
     </div>-->

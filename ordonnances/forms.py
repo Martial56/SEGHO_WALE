@@ -57,7 +57,7 @@ class OrdonnanceForm(forms.ModelForm):
     class Meta:
         model = Ordonnance
         fields = [
-            'patient', 'medecin', 'consultation', 'groupe_medicaments',
+            'patient', 'medecin', 'groupe_medicaments',
             'ancienne_ordonnance', 'maladie', 'date_ordonnance',
             'avertissement_grossesse', 'type_ordonnance', 'notes',
             'rendez_vous', 'facture', 'cueillettes', 'livre',

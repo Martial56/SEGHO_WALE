@@ -17,11 +17,11 @@ class AnalyseLaboratoire(models.Model):
 
     numero = models.CharField(max_length=20, unique=True, editable=False)
     patient = models.ForeignKey('patients.Patient', on_delete=models.CASCADE, related_name='analyses')
-    examen_demande = models.OneToOneField('consultations.ExamenDemande', on_delete=models.SET_NULL, null=True, blank=True)
     type_examen = models.ForeignKey(TypeExamen, on_delete=models.SET_NULL, null=True)
     date_prelevement = models.DateTimeField(auto_now_add=True)
     date_resultat = models.DateTimeField(null=True, blank=True)
     statut = models.CharField(max_length=20, choices=STATUT, default='recu')
+    medecin_prescripteur = models.ForeignKey('employe.Employe', on_delete=models.SET_NULL, null=True, blank=True, related_name='analyses_prescrites', verbose_name='Médecin prescripteur')
     technicien = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='analyses_tech')
     validateur = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='analyses_val')
     commentaire = models.TextField(blank=True)
@@ -60,7 +60,6 @@ class ExamenImagerie(models.Model):
 
     numero = models.CharField(max_length=20, unique=True, editable=False)
     patient = models.ForeignKey('patients.Patient', on_delete=models.CASCADE, related_name='imageries')
-    examen_demande = models.OneToOneField('consultations.ExamenDemande', on_delete=models.SET_NULL, null=True, blank=True)
     type_imagerie = models.CharField(max_length=20, choices=TYPE)
     zone_examinee = models.CharField(max_length=200)
     date_examen = models.DateTimeField(auto_now_add=True)

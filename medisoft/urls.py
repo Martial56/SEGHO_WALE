@@ -14,9 +14,10 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('patients/', include('patients.urls')),
     path('employes/', include('employe.urls')),
+    path('personnel/', include('personnel.urls')),
     path('ordonnances/', include('ordonnances.urls')),
+    path('soins/', include('soins.urls')),
     path('services/', include('services.urls')),
-    path('rh/', include('ressources_humaines.urls')),
     path('', include('core.urls')),
 ]
 

@@ -7,7 +7,7 @@
         <p>Gestion des factures et paiements</p>
     </div>
     <div class="page-header-right">
-        <a href="/admin/facturation/facture/add/" class="btn btn-primary">
+        <a href="{% url 'facturation_create' %}" class="btn btn-primary">
             <span>+</span> Nouvelle facture
         </a>
         <a href="#" class="btn btn-secondary">
@@ -63,20 +63,20 @@
         <tbody>
             {% for facture in page_obj %}
             <tr>
-                <td>{{ facture.numero_facture }}</td>
+                <td>{{ facture.numero }}</td>
                 <td>{{ facture.patient.nom }} {{ facture.patient.prenoms }}</td>
                 <td>{{ facture.date_emission|date:"d/m/Y" }}</td>
-                <td>{{ facture.montant_total }} CFA</td>
-                <td>{{ facture.montant_paye }} CFA</td>
-                <td>{{ facture.montant_restant }} CFA</td>
+                <td>{{ facture.montant_total|floatformat:0 }} CFA</td>
+                <td>{{ facture.montant_paye|floatformat:0 }} CFA</td>
+                <td>{{ facture.solde_restant|floatformat:0 }} CFA</td>
                 <td>
-                    <span class="badge badge-{% if facture.statut == 'payee' %}success{% elif facture.statut == 'partielle' %}warning{% else %}primary{% endif %}">
+                    <span class="badge badge-{% if facture.statut == 'payee' %}success{% elif facture.statut == 'partielle' %}warning{% elif facture.statut == 'annulee' %}danger{% else %}primary{% endif %}">
                         {{ facture.get_statut_display }}
                     </span>
                 </td>
                 <td>
-                    <a href="/admin/facturation/facture/{{ facture.id }}/change/" class="btn btn-secondary btn-small">Voir</a>
-                    <a href="/admin/facturation/facture/{{ facture.id }}/change/" class="btn btn-primary btn-small">Modifier</a>
+                    <a href="{% url 'facture_detail' pk=facture.pk %}" class="btn btn-secondary btn-small">Voir</a>
+                    <a href="{% url 'facture_edit' pk=facture.pk %}" class="btn btn-primary btn-small">Modifier</a>
                 </td>
             </tr>
             {% empty %}

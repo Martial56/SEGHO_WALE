@@ -10,7 +10,6 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('consultations', '0001_initial'),
         ('hospitalisation', '0001_initial'),
         ('patients', '0001_initial'),
         ('pharmacie', '0001_initial'),
@@ -46,7 +45,6 @@ class Migration(migrations.Migration):
                 ('montant_paye', models.DecimalField(decimal_places=2, default=0, max_digits=15)),
                 ('statut', models.CharField(choices=[('brouillon', 'Brouillon'), ('emise', 'Émise'), ('payee', 'Payée'), ('partielle', 'Partielle'), ('annulee', 'Annulée')], default='brouillon', max_length=20)),
                 ('notes', models.TextField(blank=True)),
-                ('consultation', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='consultations.consultation')),
                 ('cree_par', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, to=settings.AUTH_USER_MODEL)),
                 ('hospitalisation', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='hospitalisation.hospitalisation')),
                 ('patient', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='factures', to='patients.patient')),

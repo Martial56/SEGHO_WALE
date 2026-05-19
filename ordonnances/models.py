@@ -80,10 +80,6 @@ class Ordonnance(models.Model):
         'employe.Employe', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='ordonnances', verbose_name="Docteur prescripteur"
     )
-    consultation = models.ForeignKey(
-        'consultations.Consultation', on_delete=models.SET_NULL, null=True, blank=True,
-        related_name='ordonnances', verbose_name="Consultation"
-    )
     groupe_medicaments = models.ForeignKey(
         GroupeMedicaments, on_delete=models.SET_NULL, null=True, blank=True,
         verbose_name="Groupe de médicaments"

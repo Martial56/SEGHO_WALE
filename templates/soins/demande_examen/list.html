@@ -1,0 +1,98 @@
+{% extends 'soins/base.html' %}
+{% block breadcrumb %}{% endblock %}
+{% block module_navbar %}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+  .dex-page { padding: 12px 20px 48px; }
+  .dex-topbar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+  .dex-table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .dex-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .dex-table th { padding: 9px 14px; text-align: left; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; background: var(--bg); border-bottom: 2px solid var(--border); }
+  .dex-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--text); }
+  .dex-table tbody tr:last-child td { border-bottom: none; }
+  .dex-table tbody tr:hover td { background: rgba(0,0,0,.02); }
+  .dex-table a { color: var(--accent); text-decoration: none; font-weight: 500; }
+  .dex-table a:hover { text-decoration: underline; }
+  .dex-empty { padding: 40px; text-align: center; color: var(--text-muted); font-size: 13px; }
+  .dex-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+  .dex-chip::before { content:''; width:5px; height:5px; border-radius:50%; flex-shrink:0; }
+  .chip-recu       { background:#f0fdf4; color:#16a34a; }   .chip-recu::before       { background:#22c55e; }
+  .chip-en_analyse { background:#fff7ed; color:#ea580c; }   .chip-en_analyse::before { background:#f97316; }
+  .chip-resultat   { background:#eff6ff; color:#1d4ed8; }   .chip-resultat::before   { background:#3b82f6; }
+  .chip-valide     { background:#faf5ff; color:#7c3aed; }   .chip-valide::before     { background:#8b5cf6; }
+  .chip-envoye     { background:#f0fdf4; color:#15803d; }   .chip-envoye::before     { background:#16a34a; }
+  .btn-new { background: var(--accent); color: #fff; border: none; padding: 7px 14px; border-radius: 4px; font-size: 12px; font-weight: 600; font-family: 'Roboto', sans-serif; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; text-decoration: none; }
+  .btn-new:hover { filter: brightness(1.1); }
+  .urgent-badge { display: inline-flex; align-items: center; gap: 3px; padding: 1px 7px; background: #fef2f2; color: #dc2626; border-radius: 10px; font-size: 10px; font-weight: 700; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="page-wrap">
+{% include 'soins/includes/nav.html' %}
+
+<div class="o-subheader" id="subheader">
+  <div class="o-subheader-row">
+    <a href="{% url 'soins:list' %}" class="o-ctrl-btn" style="padding:3px 7px;"><i class="bi bi-arrow-left"></i></a>
+    <span style="font-size:13px;color:var(--text-muted);">
+      <a href="{% url 'soins:list' %}" style="color:var(--accent);text-decoration:none;font-weight:500;">Soins</a>
+      <span style="margin:0 5px;opacity:.4;">/</span>
+      <span style="color:var(--text);">Analyses labo{% if patient %} — {{ patient.nom }} {{ patient.prenoms }}{% endif %}</span>
+    </span>
+    <div style="margin-left:auto;">
+      <a href="{% url 'soins:demande_examen_create' %}{% if patient_id %}?patient_id={{ patient_id }}{% endif %}" class="btn-new">
+        <i class="bi bi-plus-lg"></i> Nouvelle demande
+      </a>
+    </div>
+  </div>
+</div>
+
+<div class="dex-page">
+  <div class="dex-table-wrap">
+    {% if analyses %}
+    <table class="dex-table">
+      <thead>
+        <tr>
+          <th>Numéro</th>
+          <th>Patient</th>
+          <th>Examen</th>
+          <th>Date</th>
+          <th>Prescripteur</th>
+          <th>Statut</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in analyses %}
+        <tr>
+          <td>
+            <a href="{% url 'soins:demande_examen_detail' a.pk %}">{{ a.numero }}</a>
+            {% if a.urgent %}<span class="urgent-badge"><i class="bi bi-exclamation-triangle-fill"></i> URGENT</span>{% endif %}
+          </td>
+          <td>{{ a.patient.nom }} {{ a.patient.prenoms }}</td>
+          <td>{% if a.type_examen %}{{ a.type_examen.nom }}{% else %}<span style="color:var(--text-muted);">—</span>{% endif %}</td>
+          <td style="white-space:nowrap;">{{ a.date_prelevement|date:"d/m/Y H:i" }}</td>
+          <td>{% if a.medecin_prescripteur %}{{ a.medecin_prescripteur.nom }} {{ a.medecin_prescripteur.prenoms }}{% else %}<span style="color:var(--text-muted);">—</span>{% endif %}</td>
+          <td><span class="dex-chip chip-{{ a.statut }}">{{ a.get_statut_display }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="dex-empty">
+      <i class="bi bi-clipboard2-x" style="font-size:32px;opacity:.3;display:block;margin-bottom:8px;"></i>
+      Aucune analyse de laboratoire.
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+(function(){
+  function adj(){ var tb=document.querySelector('.topbar'),wp=document.getElementById('page-wrap'); if(tb&&wp) wp.style.paddingTop=tb.offsetHeight+'px'; }
+  adj(); window.addEventListener('resize',adj);
+})();
+</script>
+</div>
+{% endblock %}
