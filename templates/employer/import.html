@@ -1,0 +1,460 @@
+﻿{% extends 'employer/base.html' %}
+{% load i18n %}
+
+{% block topbar_title %}Import employés{% endblock %}
+{% block rh_nav_import %}active{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+/* ── Subheader ── */
+.rh-subheader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 32px;
+  margin: 0 -32px;
+  flex-wrap: wrap;
+  position: sticky;
+  top: calc(var(--topbar-h) + 44px);
+  z-index: 100;
+  background: #f0f6fa;
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+html[data-theme="dark"] .rh-subheader {
+  background: #071e28;
+  border-bottom-color: rgba(255,255,255,0.05);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+@media (max-width: 1024px) {
+  .rh-subheader { margin: 0 -20px; padding-left: 20px; padding-right: 20px; }
+}
+.rh-subheader h1 {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--rh-900);
+  letter-spacing: -0.3px;
+}
+html[data-theme="dark"] .rh-subheader h1 { color: var(--rh-text); }
+
+/* ── Centered import card layout ── */
+.rh-import-wrap {
+  max-width: 640px;
+  margin: 28px auto 0;
+}
+
+/* ── Instruction block ── */
+.rh-import-intro {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px 18px;
+  background: var(--rh-50);
+  border: 1px solid var(--rh-100);
+  border-radius: 10px;
+  margin-bottom: 20px;
+}
+html[data-theme="dark"] .rh-import-intro { background: rgba(74,114,54,0.1); border-color: var(--rh-border); }
+.rh-import-intro-icon {
+  font-size: 24px;
+  color: var(--rh-500);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.rh-import-intro p {
+  font-size: 13.5px;
+  color: var(--rh-text);
+  line-height: 1.6;
+  margin: 0;
+}
+html[data-theme="dark"] .rh-import-intro p { color: var(--rh-text); }
+.rh-import-intro strong { color: var(--rh-700); }
+html[data-theme="dark"] .rh-import-intro strong { color: var(--rh-300); }
+
+/* ── Template download button ── */
+.btn-rh-template {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 18px;
+  border: 1.5px dashed var(--rh-400);
+  color: var(--rh-600);
+  background: transparent;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  font-family: 'Sora', sans-serif;
+  cursor: pointer;
+}
+.btn-rh-template:hover { background: var(--rh-50); border-color: var(--rh-600); color: var(--rh-700); }
+html[data-theme="dark"] .btn-rh-template { border-color: var(--rh-500); color: var(--rh-300); }
+html[data-theme="dark"] .btn-rh-template:hover { background: rgba(74,114,54,0.12); border-color: var(--rh-400); color: var(--rh-200); }
+.btn-rh-template small { font-size: 10.5px; font-weight: 400; color: var(--rh-muted); }
+html[data-theme="dark"] .btn-rh-template small { color: rgba(255,255,255,0.3); }
+
+/* ── File input zone ── */
+.rh-file-zone {
+  position: relative;
+  border: 2px dashed var(--rh-200);
+  border-radius: 10px;
+  padding: 28px 20px;
+  text-align: center;
+  background: var(--rh-50);
+  transition: border-color 0.18s, background 0.18s;
+  cursor: pointer;
+}
+.rh-file-zone:hover,
+.rh-file-zone.dragover {
+  border-color: var(--rh-500);
+  background: var(--rh-100);
+}
+html[data-theme="dark"] .rh-file-zone {
+  border-color: var(--rh-border);
+  background: rgba(74,114,54,0.06);
+}
+html[data-theme="dark"] .rh-file-zone:hover,
+html[data-theme="dark"] .rh-file-zone.dragover {
+  border-color: var(--rh-400);
+  background: rgba(74,114,54,0.12);
+}
+.rh-file-zone input[type="file"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  font-size: 0;
+}
+.rh-file-zone-icon {
+  font-size: 36px;
+  color: var(--rh-300);
+  display: block;
+  margin-bottom: 8px;
+  pointer-events: none;
+}
+html[data-theme="dark"] .rh-file-zone-icon { color: var(--rh-500); }
+.rh-file-zone-label {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--rh-700);
+  pointer-events: none;
+  display: block;
+}
+html[data-theme="dark"] .rh-file-zone-label { color: var(--rh-300); }
+.rh-file-zone-hint {
+  font-size: 12px;
+  color: var(--rh-muted);
+  pointer-events: none;
+  margin-top: 4px;
+  display: block;
+}
+.rh-file-selected-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--rh-600);
+  margin-top: 8px;
+  display: none;
+}
+html[data-theme="dark"] .rh-file-selected-name { color: var(--rh-300); }
+
+/* ── Columns reference table ── */
+.rh-col-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.rh-col-table thead {
+  background: var(--rh-50);
+}
+html[data-theme="dark"] .rh-col-table thead { background: rgba(74,114,54,0.1); }
+.rh-col-table th {
+  padding: 9px 14px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--rh-800);
+  letter-spacing: 0.3px;
+  border-bottom: 2px solid var(--rh-100);
+}
+html[data-theme="dark"] .rh-col-table th { color: var(--rh-300); border-bottom-color: var(--rh-border); }
+.rh-col-table td {
+  padding: 9px 14px;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+  font-size: 13px;
+  color: var(--rh-text);
+  vertical-align: middle;
+}
+html[data-theme="dark"] .rh-col-table td { border-bottom-color: rgba(255,255,255,0.04); color: var(--rh-text); }
+.rh-col-table tbody tr:hover { background: rgba(74,114,54,0.03); }
+html[data-theme="dark"] .rh-col-table tbody tr:hover { background: rgba(74,114,54,0.07); }
+.rh-col-table tbody tr:last-child td { border-bottom: none; }
+
+.rh-col-letter {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px;
+  border-radius: 6px;
+  background: var(--rh-100);
+  color: var(--rh-700);
+  font-weight: 800;
+  font-size: 12px;
+  font-family: monospace;
+}
+html[data-theme="dark"] .rh-col-letter { background: rgba(74,114,54,0.2); color: var(--rh-300); }
+
+.badge-required {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: rgba(232,69,69,0.1);
+  color: #c0392b;
+  border: 1px solid rgba(232,69,69,0.2);
+}
+html[data-theme="dark"] .badge-required { background: rgba(232,69,69,0.15); color: #f09090; border-color: rgba(232,69,69,0.25); }
+
+.badge-optional {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: rgba(0,0,0,0.05);
+  color: rgba(0,0,0,0.4);
+  border: 1px solid rgba(0,0,0,0.08);
+}
+html[data-theme="dark"] .badge-optional { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.35); border-color: rgba(255,255,255,0.1); }
+
+.rh-col-example {
+  font-size: 11.5px;
+  color: var(--rh-muted);
+  font-style: italic;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Subheader -->
+<div class="rh-subheader">
+  <h1>
+    <i class="bi bi-upload" style="color:var(--rh-500); font-size:19px; margin-right:6px;"></i>
+    Import employés
+  </h1>
+</div>
+
+<div class="rh-import-wrap">
+
+  <!-- ── Intro card ── -->
+  <div class="rh-card">
+    <div class="rh-card-header">
+      <div class="rh-card-title">
+        <i class="bi bi-file-earmark-spreadsheet" style="color:var(--rh-500);"></i>
+        Importer depuis Excel
+      </div>
+    </div>
+    <div class="rh-card-body">
+
+      <div class="rh-import-intro">
+        <i class="bi bi-info-circle-fill rh-import-intro-icon"></i>
+        <p>
+          Importez vos employés depuis un fichier <strong>Excel (.xlsx)</strong>.
+          Assurez-vous que votre fichier respecte la structure de colonnes indiquée ci-dessous.
+          La première ligne doit être une ligne d'en-tête (elle sera ignorée).
+        </p>
+      </div>
+
+      <!-- Download template -->
+      <div style="margin-bottom: 22px;">
+        <a href="#" class="btn-rh-template" title="Modèle Excel disponible prochainement">
+          <i class="bi bi-download"></i>
+          Télécharger le modèle Excel
+          <small>(Disponible prochainement)</small>
+        </a>
+      </div>
+
+      <!-- Upload form -->
+      {% if can_manage %}
+      <form method="post" enctype="multipart/form-data" novalidate id="importForm">
+        {% csrf_token %}
+
+        <label class="rh-label" for="import-file">
+          Fichier Excel <span style="color:var(--rose);">*</span>
+        </label>
+        <div class="rh-file-zone" id="fileZone">
+          <input type="file"
+                 name="fichier"
+                 id="import-file"
+                 accept=".xlsx,.xls"
+                 required
+                 aria-label="Sélectionner un fichier Excel">
+          <i class="bi bi-file-earmark-spreadsheet rh-file-zone-icon"></i>
+          <span class="rh-file-zone-label">Cliquez ou déposez votre fichier ici</span>
+          <span class="rh-file-zone-hint">Format accepté : .xlsx, .xls — max 10 Mo</span>
+          <div class="rh-file-selected-name" id="selectedFileName">
+            <i class="bi bi-check-circle-fill" style="color:var(--green);"></i>
+            <span id="fileName"></span>
+          </div>
+        </div>
+
+        <div style="margin-top: 18px; text-align: right;">
+          <button type="submit" class="btn-rh" id="importBtn">
+            <i class="bi bi-cloud-upload"></i> Importer
+          </button>
+        </div>
+      </form>
+      {% else %}
+      <div style="padding:14px 18px; background:rgba(232,154,26,0.1); border-left:4px solid var(--amber); border-radius:8px; font-size:13.5px; color:#6b4a0f;">
+        <i class="bi bi-lock-fill" style="margin-right:6px;"></i>
+        Vous n'avez pas les permissions nécessaires pour importer des employés.
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+
+  <!-- ── Columns reference ── -->
+  <div class="rh-card">
+    <div class="rh-card-header">
+      <div class="rh-card-title">
+        <i class="bi bi-table" style="color:var(--rh-500);"></i>
+        Structure attendue du fichier
+      </div>
+    </div>
+    <div class="rh-card-body" style="padding: 0;">
+      <table class="rh-col-table">
+        <thead>
+          <tr>
+            <th style="width:70px;">Colonne</th>
+            <th>Champ</th>
+            <th>Contrainte</th>
+            <th>Exemple / Valeurs acceptées</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="rh-col-letter">A</span></td>
+            <td style="font-weight:600;">Nom</td>
+            <td><span class="badge-required">Obligatoire</span></td>
+            <td class="rh-col-example">KONÉ, DIABATÉ…</td>
+          </tr>
+          <tr>
+            <td><span class="rh-col-letter">B</span></td>
+            <td style="font-weight:600;">Prénoms</td>
+            <td><span class="badge-required">Obligatoire</span></td>
+            <td class="rh-col-example">Aminata, Jean-Baptiste…</td>
+          </tr>
+          <tr>
+            <td><span class="rh-col-letter">C</span></td>
+            <td style="font-weight:600;">Date d'embauche</td>
+            <td><span class="badge-required">Obligatoire</span></td>
+            <td class="rh-col-example">Format <code style="font-size:11.5px; background:rgba(0,0,0,0.06); padding:1px 5px; border-radius:4px;">AAAA-MM-JJ</code> — ex. 2024-01-15</td>
+          </tr>
+          <tr>
+            <td><span class="rh-col-letter">D</span></td>
+            <td style="font-weight:600;">Service</td>
+            <td><span class="badge-optional">Optionnel</span></td>
+            <td class="rh-col-example">Nom exact du service (ex. Maternité, Laboratoire…)</td>
+          </tr>
+          <tr>
+            <td><span class="rh-col-letter">E</span></td>
+            <td style="font-weight:600;">Type de contrat</td>
+            <td><span class="badge-optional">Optionnel</span></td>
+            <td class="rh-col-example">
+              <code style="font-size:11px; background:rgba(0,0,0,0.06); padding:1px 4px; border-radius:3px;">Vacataire</code>
+              <code style="font-size:11px; background:rgba(0,0,0,0.06); padding:1px 4px; border-radius:3px;">CDD</code>
+              <code style="font-size:11px; background:rgba(0,0,0,0.06); padding:1px 4px; border-radius:3px;">CDI</code>
+              <code style="font-size:11px; background:rgba(0,0,0,0.06); padding:1px 4px; border-radius:3px;">Contractuel</code>
+              <code style="font-size:11px; background:rgba(0,0,0,0.06); padding:1px 4px; border-radius:3px;">Prestataire</code>
+              <code style="font-size:11px; background:rgba(0,0,0,0.06); padding:1px 4px; border-radius:3px;">Autre</code>
+            </td>
+          </tr>
+          <tr>
+            <td><span class="rh-col-letter">F</span></td>
+            <td style="font-weight:600;">Statut</td>
+            <td><span class="badge-optional">Optionnel</span></td>
+            <td class="rh-col-example">
+              <code style="font-size:11px; background:rgba(0,0,0,0.06); padding:1px 4px; border-radius:3px;">actif</code>
+              <code style="font-size:11px; background:rgba(0,0,0,0.06); padding:1px 4px; border-radius:3px;">suspendu</code>
+              <code style="font-size:11px; background:rgba(0,0,0,0.06); padding:1px 4px; border-radius:3px;">quitte</code>
+              (défaut : actif)
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── Tips ── -->
+  <div style="padding: 13px 16px; background: var(--rh-50); border: 1px solid var(--rh-100); border-radius: 8px; font-size:12.5px; color: var(--rh-700); margin-top: 4px; margin-bottom: 20px; line-height: 1.6;">
+    <i class="bi bi-lightbulb-fill" style="color:var(--amber); margin-right:6px;"></i>
+    <strong>Conseils :</strong> La première ligne est considérée comme l'en-tête et sera ignorée.
+    Les services et types de contrat inexistants seront ignorés (vérifiez l'orthographe exacte).
+    En cas d'erreur, un rapport vous indiquera les lignes problématiques.
+  </div>
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var fileInput = document.getElementById('import-file');
+  var fileZone  = document.getElementById('fileZone');
+  var nameWrap  = document.getElementById('selectedFileName');
+  var nameSpan  = document.getElementById('fileName');
+  var form      = document.getElementById('importForm');
+  var importBtn = document.getElementById('importBtn');
+
+  if (!fileInput) return;
+
+  function updateFileName(file) {
+    if (file && nameWrap && nameSpan) {
+      nameSpan.textContent = file.name + ' (' + (file.size / 1024).toFixed(1) + ' Ko)';
+      nameWrap.style.display = 'block';
+    }
+  }
+
+  fileInput.addEventListener('change', function () {
+    if (this.files && this.files[0]) updateFileName(this.files[0]);
+  });
+
+  if (fileZone) {
+    fileZone.addEventListener('dragover', function (e) {
+      e.preventDefault();
+      fileZone.classList.add('dragover');
+    });
+    fileZone.addEventListener('dragleave', function () {
+      fileZone.classList.remove('dragover');
+    });
+    fileZone.addEventListener('drop', function (e) {
+      e.preventDefault();
+      fileZone.classList.remove('dragover');
+      var files = e.dataTransfer.files;
+      if (files && files[0]) {
+        fileInput.files = files;
+        updateFileName(files[0]);
+      }
+    });
+  }
+
+  if (form && importBtn) {
+    form.addEventListener('submit', function () {
+      importBtn.disabled = true;
+      importBtn.innerHTML = '<i class="bi bi-arrow-repeat" style="animation:spin 0.8s linear infinite;display:inline-block;"></i> Import en cours…';
+    });
+  }
+})();
+</script>
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+{% endblock %}

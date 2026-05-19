@@ -14,14 +14,17 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'patients',
     'medecins',
-    'consultations',
+    'consultations.apps.ConsultationsConfig',
     'pharmacie',
     'laboratoire',
     'hospitalisation',
     'facturation',
     'caisse',
-    'ressources_humaines',
+    'employer',
+    'conges',
+    'presence',
     'rapports',
+    'planning',
     'core',
     'modules_permissions',
 ]
@@ -49,6 +52,8 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'modules_permissions.context_processors.user_modules',
+                'planning.context_processors.planning_alertes_ctx',
+                'employer.context_processors.alertes_contrat',
             ],
         },
     },
@@ -81,3 +86,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/login/'
+
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+DEFAULT_FROM_EMAIL = 'planning@cms-wale.ci'

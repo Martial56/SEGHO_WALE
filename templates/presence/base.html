@@ -1,0 +1,138 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block topbar_title %}Présence{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<style>
+:root {
+  --pr-900: #1b2e13; --pr-800: #2a4219; --pr-700: #3a5924;
+  --pr-600: #4a6741; --pr-500: #5e8050; --pr-400: #7a9b68;
+  --pr-300: #9ab88a; --pr-200: #bcd5a8; --pr-100: #d8eac4;
+  --pr-50:  #eef5e4;
+  --pr-surface: #fff;
+  --pr-border:  rgba(74,103,65,0.14);
+  --pr-text:    #0d2a3f;
+  --pr-muted:   rgba(0,0,0,0.45);
+}
+html[data-theme="dark"] {
+  --pr-50:      #0a1e2e; --pr-100:     #102839;
+  --pr-surface: #0d1a08; --pr-border:  rgba(154,184,138,0.2);
+  --pr-text:    #b8daf3; --pr-muted:   rgba(255,255,255,0.4);
+}
+
+/* ── Nav ── */
+.pr-nav {
+  background: var(--pr-surface); border-bottom: 1px solid rgba(0,0,0,0.07);
+  margin: -32px -32px 0; padding: 0 32px;
+  display: flex; align-items: stretch; height: 44px;
+  box-shadow: 0 1px 3px rgba(74,103,65,0.07);
+  position: sticky; top: var(--topbar-h); z-index: 250; gap: 2px;
+}
+.pr-nav-link {
+  padding: 11px 16px; font-size: 13px; font-weight: 500;
+  color: var(--pr-muted); text-decoration: none;
+  border-bottom: 2px solid transparent;
+  display: inline-flex; align-items: center; gap: 6px;
+  transition: color .15s, border-color .15s; white-space: nowrap; margin-bottom: -1px;
+}
+.pr-nav-link:hover  { color: var(--pr-600); }
+.pr-nav-link.active { color: var(--pr-600); border-bottom-color: var(--pr-500); font-weight: 600; }
+
+/* ── Boutons ── */
+.btn-pr {
+  background: var(--pr-600); color: #fff; border: none; border-radius: 7px;
+  padding: 8px 18px; font-size: 13px; font-weight: 600; cursor: pointer;
+  text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+  transition: background .15s; font-family: 'Sora', sans-serif;
+}
+.btn-pr:hover { background: var(--pr-700); color: #fff; }
+.btn-pr-outline {
+  border: 1.5px solid var(--pr-600); color: var(--pr-600); background: transparent;
+  border-radius: 7px; padding: 7px 16px; font-size: 13px; font-weight: 600;
+  cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+  transition: background .15s, color .15s; font-family: 'Sora', sans-serif;
+}
+.btn-pr-outline:hover { background: var(--pr-600); color: #fff; }
+.btn-pr-sm {
+  border: 1px solid var(--pr-400); color: var(--pr-600); background: transparent;
+  border-radius: 5px; padding: 4px 10px; font-size: 12px; font-weight: 500;
+  cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;
+  transition: background .15s, color .15s; font-family: 'Sora', sans-serif;
+}
+.btn-pr-sm:hover { background: var(--pr-600); color: #fff; }
+
+/* ── Card ── */
+.pr-card {
+  background: var(--pr-surface); border-radius: 12px;
+  box-shadow: var(--shadow-sm); overflow: hidden; margin-bottom: 20px;
+}
+.pr-card-header {
+  padding: 14px 20px; border-bottom: 1px solid var(--pr-border);
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.pr-card-title {
+  font-size: 14px; font-weight: 700; color: var(--pr-text);
+  display: flex; align-items: center; gap: 8px;
+  border-left: 3px solid var(--pr-600); padding-left: 10px;
+}
+.pr-card-body { padding: 20px; }
+
+/* ── Input ── */
+.pr-input {
+  width: 100%; padding: 8px 11px;
+  border: 1.5px solid rgba(0,0,0,0.12); border-radius: 7px;
+  font-family: 'Sora', sans-serif; font-size: 13px; color: var(--pr-text);
+  background: #fff; transition: border-color .18s, box-shadow .18s;
+}
+.pr-input:focus {
+  outline: none; border-color: var(--pr-600);
+  box-shadow: 0 0 0 3px rgba(74,103,65,0.1);
+}
+.pr-label {
+  display: block; font-size: 11px; font-weight: 700; color: rgba(0,0,0,.45);
+  text-transform: uppercase; letter-spacing: .4px; margin-bottom: 4px;
+}
+
+/* ── Subheader ── */
+.pr-subheader {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 14px 32px; margin: 0 -32px; flex-wrap: wrap;
+  position: sticky; top: calc(var(--topbar-h) + 44px); z-index: 100;
+  background: #f0f5ec; border-bottom: 1px solid rgba(0,0,0,.05);
+  box-shadow: 0 2px 8px rgba(0,0,0,.04);
+}
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="pr-nav">
+  {% if can_manage %}
+  <a href="{% url 'presence_registre' %}"
+     class="pr-nav-link {% block pr_nav_registre %}{% endblock %}">
+    <i class="bi bi-clipboard-check"></i> Registre du jour
+  </a>
+  <a href="{% url 'presence_recap' %}"
+     class="pr-nav-link {% block pr_nav_recap %}{% endblock %}">
+    <i class="bi bi-calendar3"></i> Récap mensuel
+  </a>
+  <a href="{% url 'presence_stats' %}"
+     class="pr-nav-link {% block pr_nav_stats %}{% endblock %}">
+    <i class="bi bi-bar-chart-line"></i> Statistiques
+  </a>
+  <a href="{% url 'presence_rapport' %}"
+     class="pr-nav-link {% block pr_nav_rapport %}{% endblock %}">
+    <i class="bi bi-file-earmark-text"></i> Rapport
+  </a>
+  <a href="{% url 'presence_pointage' %}" target="_blank"
+     class="pr-nav-link" style="margin-left:auto;">
+    <i class="bi bi-qr-code-scan"></i> Kiosque pointage
+  </a>
+  {% else %}
+  <a href="{% url 'presence_pointage' %}" target="_blank" class="pr-nav-link">
+    <i class="bi bi-qr-code-scan"></i> Kiosque pointage
+  </a>
+  {% endif %}
+</nav>
+{% endblock %}

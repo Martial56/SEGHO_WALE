@@ -86,6 +86,19 @@
     clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%);
   }
   .f-step.done { color: var(--teal-600); }
+  .f-step.active.step-annule { background: #c62828; }
+  .f-step.active.step-absent { background: #e65100; }
+  .f-step-sep { width: 1px; background: var(--border); margin: 6px 0; align-self: stretch; }
+
+  /* Toast statut */
+  #pipeline-toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(60px);
+    background: #1a6b8a; color: #fff; padding: 9px 22px; border-radius: 6px;
+    font-size: 13px; font-weight: 500; z-index: 9999; opacity: 0;
+    transition: opacity 0.25s, transform 0.25s; pointer-events: none; white-space: nowrap;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.22);
+  }
+  #pipeline-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
   /* ── ACTION BUTTONS ROW ── */
   .f-actions-bar {
@@ -381,11 +394,12 @@
 </div>
 
 <!-- STATUS PIPELINE -->
-<div class="f-pipeline-bar">
+{% if not is_new %}
+{% with s=rdv.statut %}
+<div class="f-pipeline-bar" data-current="{{ s }}">
   <div class="f-pipeline">
-    {% with s=rdv.statut|default:'planifie' %}
     <button type="submit" name="action" value="planifie"
-      class="f-step {% if s == 'planifie' %}active{% elif s != 'planifie' %}done{% endif %}">
+      class="f-step {% if s == 'planifie' %}active{% elif s == 'confirme' or s == 'en_attente' or s == 'en_consultation' or s == 'termine' %}done{% endif %}">
       BROUILLON
     </button>
     <button type="submit" name="action" value="confirme"
@@ -404,15 +418,43 @@
       class="f-step {% if s == 'termine' %}active{% endif %}">
       TERMINÉ
     </button>
-    {% endwith %}
+
+    <div class="f-step-sep"></div>
+
+    <button type="submit" name="action" value="annule"
+      class="f-step step-annule {% if s == 'annule' %}active{% endif %}"
+      title="Marquer comme annulé"
+      onclick="return confirm('Marquer ce rendez-vous comme ANNULÉ ?')">
+      ANNULÉ
+    </button>
+    <button type="submit" name="action" value="absent"
+      class="f-step step-absent {% if s == 'absent' %}active{% endif %}"
+      title="Marquer le patient absent"
+      onclick="return confirm('Marquer le patient comme ABSENT ?')">
+      ABSENT
+    </button>
   </div>
 </div>
+{% endwith %}
+{% endif %}
+
+{% if not is_new and request.GET.status_changed %}
+<div id="pipeline-toast">Statut mis à jour : {{ rdv.get_statut_display }}</div>
+{% endif %}
 
 <!-- ACTION BUTTONS -->
 <div class="f-actions-bar">
   <button type="button" class="f-action-btn"><i class="bi bi-file-medical"></i> Ordonnance</button>
   <button type="button" class="f-action-btn"><i class="bi bi-receipt"></i> Voir la facture</button>
   <button type="button" class="f-action-btn"><i class="bi bi-files"></i> Aperçu des documents</button>
+  {% if not is_new and rdv.statut == 'planifie' or not is_new and rdv.statut == 'confirme' %}
+  <button type="submit" name="action" value="en_attente"
+    class="f-action-btn"
+    style="background:#e8f5e9;color:#2e7d32;border-color:#a5d6a7;font-weight:600;"
+    title="Le patient est arrivé — passer en file d'attente">
+    <i class="bi bi-person-check"></i> Check-in patient
+  </button>
+  {% endif %}
   <div style="margin-left:auto;display:flex;align-items:center;gap:6px;">
     <button type="submit" name="action" value="save" class="f-btn f-btn-save" id="save-btn" style="display:none;">
       <i class="bi bi-check-lg"></i> SAUVEGARDER
@@ -761,7 +803,7 @@
           <!-- ══ COLONNE GAUCHE ══ -->
           <div class="cpn-col">
             <div class="cpn-section">Données administratives</div>
-            <div class="cpn-row"><span class="cpn-lbl">Type de visite</span><select name="cpn_type_visite" class="cpn-sel editable"><option value=""></option><option value="1ere">1ère visite</option><option value="suivi">Visite de suivi</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Type de visite</span><select name="cpn_type_visite" class="cpn-sel editable"><option value=""></option><option value="cpn1" {% if rdv and rdv.type_visite_cpn == 'cpn1' %}selected{% endif %}>CPN 1</option><option value="cpn1_at" {% if rdv and rdv.type_visite_cpn == 'cpn1_at' %}selected{% endif %}>CPN 1 – Autre trimestre</option><option value="cpn2" {% if rdv and rdv.type_visite_cpn == 'cpn2' %}selected{% endif %}>CPN 2</option><option value="cpn2_at" {% if rdv and rdv.type_visite_cpn == 'cpn2_at' %}selected{% endif %}>CPN 2 – Autre trimestre</option><option value="cpn3" {% if rdv and rdv.type_visite_cpn == 'cpn3' %}selected{% endif %}>CPN 3</option><option value="cpn3_at" {% if rdv and rdv.type_visite_cpn == 'cpn3_at' %}selected{% endif %}>CPN 3 – Autre trimestre</option><option value="cpn4" {% if rdv and rdv.type_visite_cpn == 'cpn4' %}selected{% endif %}>CPN 4</option><option value="cpn4_at" {% if rdv and rdv.type_visite_cpn == 'cpn4_at' %}selected{% endif %}>CPN 4 – Autre trimestre</option><option value="cpn5plus" {% if rdv and rdv.type_visite_cpn == 'cpn5plus' %}selected{% endif %}>CPN 5 et plus</option><option value="autre" {% if rdv and rdv.type_visite_cpn == 'autre' %}selected{% endif %}>Autre</option></select></div>
             <div class="cpn-row"><span class="cpn-lbl">Mode d'entrée</span><select name="cpn_mode_entree" class="cpn-sel editable"><option value=""></option><option value="spontane">Spontané</option><option value="refere">Référé</option><option value="transfere">Transféré</option></select></div>
             <div class="cpn-row"><span class="cpn-lbl">Report numéro gestante précédent</span><input type="text" name="cpn_report_numero" class="cpn-inp editable"></div>
             <div class="cpn-row"><span class="cpn-lbl">Numéro gestante de la visite</span><input type="text" name="cpn_numero_gestante" class="cpn-inp editable"></div>
@@ -844,7 +886,8 @@
             <div class="cpn-row"><span class="cpn-lbl">Terme prévu le</span><input type="date" name="cpn_terme_prevu" class="cpn-inp editable"></div>
             <div class="cpn-row"><span class="cpn-lbl">Date de la dernière CPN</span><input type="date" name="cpn_date_derniere_cpn" class="cpn-inp editable"></div>
             <div class="cpn-row"><span class="cpn-lbl">Semaines d'aménorrhée</span><input type="number" name="cpn_semaines_amenorrhee" class="cpn-inp editable" min="0"></div>
-            <div class="cpn-row"><span class="cpn-lbl">Proposition de test VIH</span><select name="cpn_proposition_test_vih" class="cpn-sel editable"><option value=""></option><option value="propose">Proposé</option><option value="accepte">Accepté</option><option value="refuse">Refusé</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Statut VIH à l'accueil</span><select name="cpn_statut_vih_accueil" class="cpn-sel editable"><option value=""></option><option value="negative">Négative</option><option value="positive">Positive</option><option value="inconnu">Inconnu</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Proposition de test VIH</span><div class="cpn-radios"><label><input type="radio" name="cpn_proposition_test_vih" value="oui" class="editable"> Oui</label><label><input type="radio" name="cpn_proposition_test_vih" value="non" class="editable"> Non</label><label><input type="radio" name="cpn_proposition_test_vih" value="na" class="editable"> NA</label></div></div>
             <div class="cpn-row"><span class="cpn-lbl">Retesting</span><div class="cpn-radios"><label><input type="radio" name="cpn_retesting" value="oui" class="editable"> Oui</label><label><input type="radio" name="cpn_retesting" value="non" class="editable"> Non</label><label><input type="radio" name="cpn_retesting" value="na" class="editable"> NA</label></div></div>
             <div class="cpn-row"><span class="cpn-lbl">Numéro de dépistage</span><input type="text" name="cpn_numero_depistage" class="cpn-inp editable"></div>
 
@@ -1454,6 +1497,15 @@ document.getElementById('patient-select').addEventListener('change', function() 
   var ageEl = document.getElementById('age-display');
   if (ageEl) ageEl.textContent = age ? age + ' Ans' : '—';
 });
+
+// Toast statut pipeline
+(function() {
+  var t = document.getElementById('pipeline-toast');
+  if (t) {
+    setTimeout(function() { t.classList.add('show'); }, 80);
+    setTimeout(function() { t.classList.remove('show'); }, 3000);
+  }
+})();
 
 // Action menu toggle
 document.getElementById('action-toggle').addEventListener('click', function(e) {

@@ -247,7 +247,7 @@
         </thead>
         <tbody>
             {% for rdv in rdv_list %}
-            <tr style="cursor: pointer;" onclick="window.location='{% url 'patients:detail' rdv.patient.id %}'">
+            <tr class="rdv-row" style="cursor: pointer;" data-url="{% url 'patients:rdv_edit' rdv.pk %}">
                 <td>
                     <div class="patient-cell">
                         <div class="patient-avatar">{{ rdv.patient.nom|first|upper }}</div>
@@ -276,7 +276,7 @@
                     <span class="rdv-badge {{ rdv.statut }}">{{ rdv.get_statut_display }}</span>
                 </td>
                 <td onclick="event.stopPropagation()">
-                    <a href="{% url 'patients:detail' rdv.patient.id %}" class="btn btn-secondary btn-small">Voir</a>
+                    <a href="{% url 'patients:rdv_edit' rdv.pk %}" class="btn btn-secondary btn-small">Modifier</a>
                 </td>
             </tr>
             {% endfor %}
@@ -293,5 +293,14 @@
     </p>
 </div>
 {% endif %}
+
+<script>
+document.querySelectorAll('tr.rdv-row').forEach(function(row) {
+    row.addEventListener('click', function(e) {
+        if (e.target.closest('[onclick]') || e.target.closest('a') || e.target.closest('button')) return;
+        window.location = row.dataset.url;
+    });
+});
+</script>
 
 {% endblock %}

@@ -1,0 +1,211 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block topbar_title %}Planning{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<style>
+/* ── Palette logo (vert forêt) ── */
+:root {
+  --pl-900: #2b3e22;
+  --pl-800: #364e2b;
+  --pl-700: #445f35;
+  --pl-600: #4a6741;   /* couleur principale du logo */
+  --pl-500: #5e8050;
+  --pl-400: #7a9b68;
+  --pl-300: #9ab88a;
+  --pl-200: #c4d9b6;
+  --pl-100: #deecd4;
+  --pl-50:  #f0f7eb;
+
+  --surface: #fff; --border: #e4eadf; --text: #2b3e22;
+  --text-muted: rgba(0,0,0,0.45); --bg: #f4f8f1;
+}
+html[data-theme="dark"] {
+  --pl-50: #1a2715; --pl-100: #223320;
+  --surface: #152010; --border: #2a3d25; --text: #d4e8c8;
+  --text-muted: rgba(255,255,255,0.45); --bg: #0e1a0b;
+}
+.main { height: 100vh; overflow: hidden; }
+.content { min-height: 0; padding-top: 0; overflow-x: hidden; }
+
+.pl-nav {
+  background: #fff; border-bottom: 1px solid rgba(0,0,0,0.08);
+  margin: 0 -32px; padding: 0 32px;
+  display: flex; align-items: stretch; height: 44px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  position: sticky; top: 0; z-index: 250;
+}
+.pl-nav-link {
+  padding: 11px 16px; font-size: 13px; font-weight: 500;
+  color: rgba(0,0,0,0.5); text-decoration: none;
+  border-bottom: 2px solid transparent;
+  display: inline-flex; align-items: center; gap: 6px;
+  transition: color 0.15s, border-color 0.15s; white-space: nowrap;
+}
+.pl-nav-link:hover { color: var(--pl-600); }
+.pl-nav-link.active { color: var(--pl-600); border-bottom-color: var(--pl-500); font-weight: 600; }
+html[data-theme="dark"] .pl-nav { background: #0e1a0b; border-bottom-color: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .pl-nav-link { color: rgba(255,255,255,0.4); }
+html[data-theme="dark"] .pl-nav-link.active { color: var(--pl-300); border-bottom-color: var(--pl-400); }
+
+/* ── Boutons communs ── */
+.btn-primary {
+  background: var(--pl-600); color: #fff; border: none; border-radius: 6px;
+  padding: 7px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+  text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+  transition: background 0.15s;
+}
+.btn-primary:hover { background: var(--pl-700); color: #fff; }
+
+.btn-outline {
+  border: 1px solid var(--pl-600); color: var(--pl-600); background: transparent;
+  border-radius: 6px; padding: 7px 14px; font-size: 13px; font-weight: 500;
+  text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+  transition: background 0.15s, color 0.15s; cursor: pointer;
+}
+.btn-outline:hover { background: var(--pl-600); color: #fff; }
+
+.btn-secondary {
+  border: 1px solid var(--border); color: var(--text); background: var(--surface);
+  border-radius: 6px; padding: 7px 14px; font-size: 13px; font-weight: 500;
+  text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+  transition: background 0.15s; cursor: pointer;
+}
+.btn-secondary:hover { background: var(--pl-50); color: var(--pl-700); }
+
+.btn-outline-sm {
+  border: 1px solid var(--pl-600); color: var(--pl-600); background: transparent;
+  border-radius: 5px; padding: 4px 10px; font-size: 12px; font-weight: 500;
+  text-decoration: none; display: inline-flex; align-items: center; gap: 4px;
+  transition: background 0.15s, color 0.15s;
+}
+.btn-outline-sm:hover { background: var(--pl-600); color: #fff; }
+
+.btn-danger-sm {
+  border: 1px solid #c0392b; color: #c0392b; background: transparent;
+  border-radius: 5px; padding: 4px 10px; font-size: 12px; font-weight: 500;
+  cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
+  transition: background 0.15s, color 0.15s;
+}
+.btn-danger-sm:hover { background: #c0392b; color: #fff; }
+
+/* ── Alerte semaines manquantes ── */
+.pl-nav-alerte-wrap {
+  margin-left: auto; display: flex; align-items: center;
+  position: relative; padding: 0 4px;
+}
+.pl-alerte-btn {
+  background: none; border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  height: 44px; padding: 0 8px; position: relative; color: #f9a825;
+  font-size: 17px; transition: color 0.15s;
+}
+.pl-alerte-btn:hover { color: #e65100; }
+.pl-alerte-badge {
+  position: absolute; top: 8px; right: 3px;
+  background: #e65100; color: #fff; border-radius: 10px;
+  font-size: 10px; font-weight: 700; min-width: 16px; height: 16px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 3px; line-height: 1;
+}
+.pl-alerte-popup {
+  display: none; position: absolute; top: calc(100% + 4px); right: 0;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 9px; box-shadow: 0 8px 28px rgba(0,0,0,0.14);
+  min-width: 290px; z-index: 600; overflow: hidden;
+}
+.pl-alerte-popup.open { display: block; }
+.pl-alerte-popup-head {
+  padding: 10px 14px 8px; font-size: 11px; font-weight: 700;
+  color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 7px;
+}
+.pl-alerte-popup-head i { color: #f9a825; font-size: 13px; }
+.pl-alerte-popup-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; font-size: 12.5px; color: var(--text);
+  border-bottom: 1px solid var(--border);
+}
+.pl-alerte-popup-item:last-child { border-bottom: none; }
+.pl-alerte-popup-item i { color: #f9a825; flex-shrink: 0; font-size: 14px; }
+.pl-alerte-popup-item span { flex: 1; line-height: 1.35; }
+.pl-alerte-popup-item a {
+  color: var(--pl-600); font-size: 11.5px; font-weight: 600;
+  text-decoration: none; padding: 3px 9px; border-radius: 4px;
+  border: 1px solid var(--pl-300); white-space: nowrap;
+  transition: background 0.12s;
+}
+.pl-alerte-popup-item a:hover { background: var(--pl-50); }
+html[data-theme="dark"] .pl-alerte-btn { color: #ffd180; }
+html[data-theme="dark"] .pl-alerte-btn:hover { color: #ffab40; }
+
+{% block extra_planning_css %}{% endblock %}
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="pl-nav">
+  <a href="{% url 'planning_list' %}" class="pl-nav-link {% block nav_list %}{% endblock %}">
+    <i class="bi bi-list-ul"></i> Liste
+  </a>
+  <a href="{% url 'planning_mensuel' %}" class="pl-nav-link {% block nav_mensuel %}{% endblock %}">
+    <i class="bi bi-calendar3"></i> Mensuel
+  </a>
+  <a href="{% url 'planning_par_medecin' %}" class="pl-nav-link {% block nav_medecin %}{% endblock %}">
+    <i class="bi bi-person-lines-fill"></i> Par médecin
+  </a>
+  <a href="{% url 'planning_stats' %}" class="pl-nav-link {% block nav_stats %}{% endblock %}">
+    <i class="bi bi-bar-chart-line"></i> Statistiques
+  </a>
+  <a href="{% url 'planning_bureaux' %}" class="pl-nav-link {% block nav_bureaux %}{% endblock %}">
+    <i class="bi bi-building"></i> Bureaux
+  </a>
+  <a href="{% url 'planning_nouveau' %}" class="pl-nav-link {% block nav_nouveau %}{% endblock %}">
+    <i class="bi bi-plus-lg"></i> Nouveau
+  </a>
+
+  {% if planning_alertes %}
+  <div class="pl-nav-alerte-wrap">
+    <button type="button" class="pl-alerte-btn" id="planningAlerteBtn"
+            title="{{ planning_alertes|length }} semaine{% if planning_alertes|length > 1 %}s{% endif %} sans planning publié">
+      <i class="bi bi-exclamation-triangle-fill"></i>
+      <span class="pl-alerte-badge">{{ planning_alertes|length }}</span>
+    </button>
+    <div class="pl-alerte-popup" id="planningAlertePopup">
+      <div class="pl-alerte-popup-head">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        Semaines sans planning publié
+      </div>
+      {% for a in planning_alertes %}
+      <div class="pl-alerte-popup-item">
+        <i class="bi bi-calendar-x"></i>
+        <span>{{ a.label }}</span>
+        {% if pl_can_manage %}
+        <a href="{% url 'planning_nouveau' %}">Créer</a>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</nav>
+
+<script>
+(function() {
+  var btn   = document.getElementById('planningAlerteBtn');
+  var popup = document.getElementById('planningAlertePopup');
+  if (!btn || !popup) return;
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    popup.classList.toggle('open');
+  });
+  document.addEventListener('click', function(e) {
+    if (!popup.contains(e.target) && e.target !== btn) {
+      popup.classList.remove('open');
+    }
+  });
+})();
+</script>
+{% endblock %}

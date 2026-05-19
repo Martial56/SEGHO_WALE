@@ -71,6 +71,18 @@ class RendezVous(models.Model):
         ('gynecologie_cpn', 'Gynécologie / CPN'),
     ]
     URGENCE = [('normal', 'Normal'), ('urgent', 'Urgent'), ('tres_urgent', 'Très urgent')]
+    TYPE_VISITE_CPN = [
+        ('cpn1',    'CPN 1'),
+        ('cpn1_at', 'CPN 1 – Autre trimestre'),
+        ('cpn2',    'CPN 2'),
+        ('cpn2_at', 'CPN 2 – Autre trimestre'),
+        ('cpn3',    'CPN 3'),
+        ('cpn3_at', 'CPN 3 – Autre trimestre'),
+        ('cpn4',    'CPN 4'),
+        ('cpn4_at',  'CPN 4 – Autre trimestre'),
+        ('cpn5plus', 'CPN 5 et plus'),
+        ('autre',    'Autre'),
+    ]
 
     code_rdv = models.CharField(max_length=20, blank=True, default='', verbose_name='Code RDV')
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='rendez_vous')
@@ -82,6 +94,7 @@ class RendezVous(models.Model):
     date_suivi = models.DateTimeField(null=True, blank=True, verbose_name='Date de suivi')
     duree_minutes = models.IntegerField(default=30)
     type_rdv = models.CharField(max_length=20, choices=TYPE, default='consultation')
+    type_visite_cpn = models.CharField(max_length=10, choices=TYPE_VISITE_CPN, blank=True, default='', verbose_name='Type de visite CPN')
     niveau_urgence = models.CharField(max_length=20, choices=URGENCE, default='normal', verbose_name="Niveau d'urgence")
     motif = models.TextField(blank=True)
     statut = models.CharField(max_length=20, choices=STATUT, default='planifie')

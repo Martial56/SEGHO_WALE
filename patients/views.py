@@ -212,6 +212,25 @@ def rdv_create(request):
 
 
 @login_required
+def rdv_edit(request, pk):
+    from patients.models import RendezVous as RV
+    rdv = get_object_or_404(RV, pk=pk)
+    if request.method == 'POST':
+        form = RendezVousForm(request.POST, instance=rdv)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Rendez-vous mis à jour.')
+            return redirect('patients:rdv_global')
+    else:
+        form = RendezVousForm(instance=rdv)
+    return render(request, 'patients/rendez_vous_form.html', {
+        'form':  form,
+        'titre': f'Modifier le rendez-vous',
+        'rdv':   rdv,
+    })
+
+
+@login_required
 def patient_rdv_list(request, pk):
     patient = get_object_or_404(Patient, pk=pk)
     items = patient.rendez_vous.select_related('medecin').order_by('-date_heure')

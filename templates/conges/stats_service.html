@@ -1,0 +1,133 @@
+{% extends 'conges/base.html' %}
+
+{% block topbar_title %}Statistiques services — {{ year }}{% endblock %}
+{% block cg_nav_stats %}active{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+.stat-card{background:var(--cg-surface);border-radius:12px;box-shadow:var(--shadow-sm);padding:20px 24px;display:flex;flex-direction:column;gap:4px;}
+.stat-card .s-val{font-size:28px;font-weight:800;color:var(--cg-600);}
+.stat-card .s-lbl{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--cg-muted);}
+.taux-green{color:#16a96b;font-weight:700;}
+.taux-amber{color:#e89a1a;font-weight:700;}
+.taux-red  {color:#e84545;font-weight:700;}
+.bar-h{height:18px;background:var(--cg-400);border-radius:4px;display:inline-block;min-width:2px;transition:width .3s;}
+html[data-theme="dark"] .stat-card{background:var(--cg-surface);}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Subheader -->
+<div class="cg-subheader">
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <a href="?year={{ annee_prev }}" class="btn-cg-outline" style="padding:7px 13px;">
+      <i class="bi bi-chevron-left"></i>
+    </a>
+    <div>
+      <h1 style="font-size:20px;font-weight:800;color:var(--cg-900);margin:0;">
+        <i class="bi bi-graph-up" style="color:var(--cg-600);"></i> Statistiques par service
+      </h1>
+      <div style="font-size:12px;color:var(--cg-muted);">Année {{ year }}</div>
+    </div>
+    <a href="?year={{ annee_next }}" class="btn-cg-outline" style="padding:7px 13px;">
+      <i class="bi bi-chevron-right"></i>
+    </a>
+  </div>
+</div>
+
+<!-- Cartes résumé -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-top:24px;">
+  <div class="stat-card">
+    <div class="s-val">{{ stats_services|length }}</div>
+    <div class="s-lbl">Services actifs</div>
+  </div>
+  {% with total_conges=stats_services|length %}
+  {% endwith %}
+  <div class="stat-card">
+    <div class="s-val">
+      {% with tot=0 %}
+      {{ stats_services|length }}
+      {% endwith %}
+    </div>
+    <div class="s-lbl">Total demandes</div>
+  </div>
+  <div class="stat-card">
+    <div class="s-val" style="color:#e84545;">
+      {% for s in stats_services %}{% if s.taux > 15 %}1{% endif %}{% endfor %}
+    </div>
+    <div class="s-lbl">Services absentéisme &gt; 15%</div>
+  </div>
+</div>
+
+<!-- Tableau par service -->
+<div class="cg-card" style="margin-top:24px;">
+  <div class="cg-card-header">
+    <div class="cg-card-title"><i class="bi bi-building"></i> Détail par service</div>
+  </div>
+  <div style="overflow-x:auto;">
+    <table class="cg-table" style="width:100%;border-collapse:collapse;">
+      <thead style="background:rgba(74,114,54,.06);border-bottom:2px solid var(--cg-border);">
+        <tr>
+          <th style="padding:12px 16px;text-align:left;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--cg-text);">Service</th>
+          <th style="padding:12px 16px;text-align:right;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--cg-text);">Employés</th>
+          <th style="padding:12px 16px;text-align:right;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--cg-text);">Nb congés</th>
+          <th style="padding:12px 16px;text-align:right;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--cg-text);">Jours pris</th>
+          <th style="padding:12px 16px;text-align:right;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--cg-text);">Taux absentéisme</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in stats_services %}
+        <tr style="border-bottom:1px solid var(--cg-border);">
+          <td style="padding:13px 16px;font-weight:600;color:var(--cg-text);">{{ s.service.nom }}</td>
+          <td style="padding:13px 16px;text-align:right;color:var(--cg-muted);">{{ s.nb_employes }}</td>
+          <td style="padding:13px 16px;text-align:right;color:var(--cg-text);font-weight:600;">{{ s.nb_conges }}</td>
+          <td style="padding:13px 16px;text-align:right;color:var(--cg-text);font-weight:600;">{{ s.total_jours }} j</td>
+          <td style="padding:13px 16px;text-align:right;">
+            <span class="{% if s.taux > 15 %}taux-red{% elif s.taux >= 10 %}taux-amber{% else %}taux-green{% endif %}">
+              {{ s.taux }}%
+            </span>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="5" style="padding:40px;text-align:center;color:var(--cg-muted);">Aucune donnée pour {{ year }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Répartition mensuelle (graphique CSS) -->
+<div class="cg-card" style="margin-top:20px;">
+  <div class="cg-card-header">
+    <div class="cg-card-title"><i class="bi bi-bar-chart-fill"></i> Congés par mois ({{ year }})</div>
+  </div>
+  <div class="cg-card-body">
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      {% for rm in repartition_mensuelle %}
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:80px;font-size:12px;font-weight:600;color:var(--cg-muted);text-align:right;flex-shrink:0;">{{ rm.mois }}</div>
+        <div style="flex:1;display:flex;align-items:center;gap:8px;">
+          {% if max_mois > 0 %}
+          <div class="bar-h" style="width:{% widthratio rm.nb max_mois 300 %}px;"></div>
+          {% endif %}
+          <span style="font-size:12.5px;font-weight:700;color:var(--cg-text);">{{ rm.nb }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <div style="margin-top:12px;font-size:11px;color:var(--cg-muted);">Nombre de demandes approuvées par mois de début de congé</div>
+  </div>
+</div>
+
+<!-- Légende taux -->
+<div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;">
+  <span style="font-size:12px;color:#16a96b;font-weight:600;"><i class="bi bi-circle-fill" style="font-size:8px;"></i> Taux &lt; 10% — normal</span>
+  <span style="font-size:12px;color:#e89a1a;font-weight:600;"><i class="bi bi-circle-fill" style="font-size:8px;"></i> Taux 10–15% — attention</span>
+  <span style="font-size:12px;color:#e84545;font-weight:600;"><i class="bi bi-circle-fill" style="font-size:8px;"></i> Taux &gt; 15% — critique</span>
+</div>
+
+{% endblock %}

@@ -1,0 +1,133 @@
+{% extends 'planning/base.html' %}
+{% load i18n %}
+
+{% block nav_medecin %}active{% endblock %}
+
+{% block extra_planning_css %}
+.pl-search-bar {
+  position: sticky; top: 44px; z-index: 180;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 12px 0; margin: 0 -32px 20px;
+}
+.pl-search-inner {
+  display: flex; align-items: center; gap: 10px; padding: 0 32px;
+}
+.pl-search-inner h1 { font-size: 17px; font-weight: 700; color: var(--text); margin: 0 auto 0 0; }
+.search-input-wrap { display: flex; gap: 8px; align-items: center; }
+.search-input-wrap input[type="text"] {
+  padding: 8px 14px; border: 1px solid var(--border); border-radius: 6px;
+  font-size: 13px; background: var(--bg); color: var(--text);
+  width: 280px; outline: none; transition: border-color 0.15s;
+}
+.search-input-wrap input[type="text"]:focus { border-color: var(--pl-600); }
+
+.pl-result-header {
+  font-size: 13px; color: var(--text-muted); margin-bottom: 14px;
+}
+.pl-result-header strong { color: var(--pl-700); }
+
+.pl-aff-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.pl-aff-table thead th {
+  background: var(--pl-700); color: #fff; padding: 9px 14px;
+  font-weight: 600; font-size: 12px; text-align: left;
+}
+.pl-aff-table tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+.pl-aff-table tbody tr:hover { background: var(--pl-50); }
+.pl-aff-table tbody td { padding: 10px 14px; vertical-align: middle; color: var(--text); }
+
+.badge-publie  { display:inline-flex;align-items:center;gap:4px;background:var(--pl-100);color:var(--pl-800);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600; }
+.badge-brouillon { display:inline-flex;align-items:center;gap:4px;background:#fff3cd;color:#856404;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600; }
+html[data-theme="dark"] .badge-brouillon { background: #3d2e00; color: #ffd666; }
+
+.pl-empty { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+.pl-empty i { font-size: 48px; display: block; margin-bottom: 12px; color: var(--pl-300); }
+
+datalist option { font-size: 13px; }
+{% endblock %}
+
+{% block content %}
+<div class="pl-search-bar">
+  <div class="pl-search-inner">
+    <h1><i class="bi bi-person-lines-fill" style="color:var(--pl-600);margin-right:8px;"></i>Planning par médecin / personnel</h1>
+    <form method="get" class="search-input-wrap">
+      <input type="text" name="nom" value="{{ nom }}"
+             placeholder="Nom du médecin ou personnel…"
+             list="personnel-list" autocomplete="off">
+      <datalist id="personnel-list">
+        {% for p in personnel_list %}<option value="{{ p }}">{% endfor %}
+      </datalist>
+      <button type="submit" class="btn-primary">
+        <i class="bi bi-search"></i> Rechercher
+      </button>
+      {% if nom %}
+      <a href="?" class="btn-secondary" style="padding:8px 12px;">
+        <i class="bi bi-x-lg"></i>
+      </a>
+      {% endif %}
+    </form>
+  </div>
+</div>
+
+{% if nom %}
+  {% if affectations %}
+    <p class="pl-result-header">
+      <strong>{{ affectations|length }}</strong> affectation{{ affectations|length|pluralize }}
+      trouvée{{ affectations|length|pluralize }} pour <strong>« {{ nom }} »</strong>
+    </p>
+    <div style="overflow-x:auto;">
+      <table class="pl-aff-table">
+        <thead>
+          <tr>
+            <th>Semaine</th>
+            <th>Période</th>
+            <th>Jour</th>
+            <th>Bureau</th>
+            <th>Plage</th>
+            <th>État</th>
+            <th>Voir</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for aff in affectations %}
+          <tr>
+            <td><strong>S{{ aff.planning.semaine_debut|date:"W" }} — {{ aff.planning.semaine_debut|date:"Y" }}</strong></td>
+            <td>{{ aff.planning.semaine_debut|date:"d/m" }} – {{ aff.planning.semaine_fin|date:"d/m/Y" }}</td>
+            <td>{% if aff.jour == 0 %}Lundi
+              {% elif aff.jour == 1 %}Mardi
+              {% elif aff.jour == 2 %}Mercredi
+              {% elif aff.jour == 3 %}Jeudi
+              {% elif aff.jour == 4 %}Vendredi
+              {% elif aff.jour == 5 %}Samedi{% endif %}
+            </td>
+            <td>{{ aff.plage.bureau.nom }}</td>
+            <td>{{ aff.plage.code }}</td>
+            <td>
+              {% if aff.planning.publie %}
+                <span class="badge-publie"><i class="bi bi-check-circle-fill"></i> Publié</span>
+              {% else %}
+                <span class="badge-brouillon"><i class="bi bi-pencil"></i> Brouillon</span>
+              {% endif %}
+            </td>
+            <td>
+              <a href="{% url 'planning_detail' aff.planning.pk %}" class="btn-outline-sm">
+                <i class="bi bi-eye"></i> Voir
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="pl-empty">
+      <i class="bi bi-person-x"></i>
+      <p>Aucune affectation trouvée pour <strong>« {{ nom }} »</strong>.</p>
+    </div>
+  {% endif %}
+{% else %}
+  <div class="pl-empty">
+    <i class="bi bi-person-lines-fill"></i>
+    <p>Saisissez un nom pour rechercher les affectations d'un médecin ou d'un membre du personnel.</p>
+  </div>
+{% endif %}
+{% endblock %}

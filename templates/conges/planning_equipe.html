@@ -1,0 +1,130 @@
+{% extends 'conges/base.html' %}
+
+{% block topbar_title %}Planning équipe — {{ nom_mois }} {{ year }}{% endblock %}
+{% block cg_nav_planning %}active{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+.planning-table{width:100%;border-collapse:collapse;font-size:11.5px;}
+.planning-table th,.planning-table td{padding:5px 4px;border:1px solid var(--cg-border);white-space:nowrap;}
+.planning-table thead th{background:var(--cg-50);font-weight:700;text-align:center;color:var(--cg-text);font-size:10.5px;}
+.planning-table .emp-col{min-width:130px;max-width:160px;text-align:left !important;padding-left:10px !important;font-weight:600;color:var(--cg-text);position:sticky;left:0;background:var(--cg-surface);z-index:2;}
+.planning-table thead .emp-col{background:var(--cg-50);z-index:3;}
+.cell-present{background:#f0faf5;text-align:center;}
+.cell-conge{background:rgba(74,114,54,.15);text-align:center;cursor:default;}
+.cell-non-ouvre{background:rgba(0,0,0,.04);text-align:center;}
+.cell-today{outline:2px solid var(--cg-600);outline-offset:-2px;}
+.cell-dot{display:inline-block;width:10px;height:10px;border-radius:50%;}
+.cell-dot-present{background:#16a96b;}
+.cell-dot-conge{background:var(--cg-600);font-size:9px;color:#fff;width:14px;height:14px;line-height:14px;text-align:center;border-radius:3px;font-weight:700;}
+.cell-dot-non-ouvre{background:rgba(0,0,0,.12);}
+.th-weekend{color:var(--rose);background:rgba(232,69,69,.04) !important;}
+.th-ferie{color:var(--amber);background:rgba(232,154,26,.06) !important;}
+html[data-theme="dark"] .planning-table thead th{background:var(--cg-100);}
+html[data-theme="dark"] .planning-table .emp-col{background:var(--cg-surface);}
+html[data-theme="dark"] .planning-table thead .emp-col{background:var(--cg-100);}
+html[data-theme="dark"] .cell-present{background:rgba(22,169,107,.06);}
+html[data-theme="dark"] .cell-conge{background:rgba(74,114,54,.25);}
+html[data-theme="dark"] .cell-non-ouvre{background:rgba(255,255,255,.03);}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Subheader -->
+<div class="cg-subheader">
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <a href="?year={{ prev_year }}&mois={{ prev_mois }}{% if service_sel %}&service={{ service_sel.pk }}{% endif %}" class="btn-cg-outline" style="padding:7px 13px;">
+      <i class="bi bi-chevron-left"></i>
+    </a>
+    <div>
+      <h1 style="font-size:20px;font-weight:800;color:var(--cg-900);margin:0;">
+        <i class="bi bi-people-fill" style="color:var(--cg-600);"></i> Planning équipe
+      </h1>
+      <div style="font-size:12px;color:var(--cg-muted);">{{ nom_mois }} {{ year }}</div>
+    </div>
+    <a href="?year={{ next_year }}&mois={{ next_mois }}{% if service_sel %}&service={{ service_sel.pk }}{% endif %}" class="btn-cg-outline" style="padding:7px 13px;">
+      <i class="bi bi-chevron-right"></i>
+    </a>
+  </div>
+  <!-- Filtre service -->
+  <form method="get" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+    <input type="hidden" name="year" value="{{ year }}">
+    <input type="hidden" name="mois" value="{{ mois }}">
+    <select name="service" class="cg-input" style="width:auto;min-width:160px;" onchange="this.form.submit()">
+      <option value="">Tous les services</option>
+      {% for svc in services %}
+      <option value="{{ svc.pk }}" {% if service_sel and service_sel.pk == svc.pk %}selected{% endif %}>{{ svc.nom }}</option>
+      {% endfor %}
+    </select>
+  </form>
+</div>
+
+<!-- Grille planning -->
+<div style="overflow-x:auto;margin-top:24px;">
+  {% if planning_grid %}
+  <table class="planning-table">
+    <thead>
+      <tr>
+        <th class="emp-col">Employé</th>
+        {% for day in days %}
+        <th class="{% if day.weekend or day.ferie %}{% if day.weekend %}th-weekend{% else %}th-ferie{% endif %}{% endif %} {% if day.today %}cell-today{% endif %}" title="{% if day.ferie %}Jour férié{% elif day.weekend %}Week-end{% endif %}">
+          <div>{{ day.num }}</div>
+          <div style="font-size:9px;opacity:.7;">{{ day.date|date:"D"|slice:":2"|upper }}</div>
+        </th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in planning_grid %}
+      <tr>
+        <td class="emp-col">
+          <div style="font-size:12px;font-weight:700;color:var(--cg-text);">{{ row.employe.nom }}</div>
+          <div style="font-size:10px;color:var(--cg-muted);">{{ row.employe.prenoms|truncatechars:12 }}</div>
+        </td>
+        {% for cell in row.cells %}
+        <td class="cell-{{ cell.type }} {% for day in days %}{% if forloop.counter == forloop.parentloop.counter and day.today %}cell-today{% endif %}{% endfor %}"
+          {% if cell.type == 'conge' %}title="{{ cell.label }}"{% endif %}>
+          {% if cell.type == 'conge' %}
+          <span class="cell-dot cell-dot-conge">C</span>
+          {% elif cell.type == 'present' %}
+          <span class="cell-dot cell-dot-present"></span>
+          {% else %}
+          <span class="cell-dot cell-dot-non-ouvre"></span>
+          {% endif %}
+        </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="padding:50px;text-align:center;color:var(--cg-muted);">
+    <i class="bi bi-people" style="font-size:36px;display:block;margin-bottom:12px;opacity:.3;"></i>
+    <p>Aucun employé trouvé pour ce filtre.</p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Légende -->
+<div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:16px;padding:12px 16px;background:var(--cg-surface);border-radius:10px;box-shadow:var(--shadow-sm);">
+  <div style="display:flex;align-items:center;gap:7px;">
+    <span class="cell-dot cell-dot-present"></span>
+    <span style="font-size:12px;color:var(--cg-muted);">Présent (jour ouvré)</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:7px;">
+    <span class="cell-dot cell-dot-conge" style="font-size:8px;width:12px;height:12px;line-height:12px;">C</span>
+    <span style="font-size:12px;color:var(--cg-muted);">En congé (survoler pour le type)</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:7px;">
+    <span class="cell-dot cell-dot-non-ouvre"></span>
+    <span style="font-size:12px;color:var(--cg-muted);">Week-end / Jour férié</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:7px;">
+    <span style="display:inline-block;width:12px;height:12px;outline:2px solid var(--cg-600);border-radius:2px;"></span>
+    <span style="font-size:12px;color:var(--cg-muted);">Aujourd'hui</span>
+  </div>
+</div>
+
+{% endblock %}

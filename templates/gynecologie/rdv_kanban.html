@@ -1,0 +1,152 @@
+{% extends 'gynecologie/base.html' %}
+{% load static %}
+
+{% block nav_rdv %}active{% endblock %}
+{% block content %}
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+
+  .kb-header {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 8px 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    position: sticky; top: var(--gyn-nav-h); z-index: 190;
+    margin: 0 -32px 0;
+  }
+  .kb-title { font-size: 16px; font-weight: 400; color: var(--text); margin-right: auto; }
+  .kb-date-nav { display: flex; align-items: center; gap: 8px; }
+  .kb-nav-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--text); text-decoration: none; font-size: 14px;
+    transition: background 0.15s;
+  }
+  .kb-nav-btn:hover { background: var(--teal-50); color: var(--teal-600); }
+  .kb-date-label { font-size: 13px; font-weight: 600; color: var(--text); min-width: 110px; text-align: center; }
+  .kb-today-btn {
+    padding: 3px 10px; border: 1px solid var(--border); border-radius: 4px;
+    background: var(--surface); color: var(--text-muted); font-size: 11.5px;
+    cursor: pointer; text-decoration: none;
+  }
+  .kb-today-btn:hover { background: var(--teal-50); color: var(--teal-600); }
+  .kb-total { font-size: 11px; color: var(--text-muted); }
+  .kb-list-link {
+    font-size: 12px; color: var(--text-muted); text-decoration: none;
+    display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px;
+    border: 1px solid var(--border); border-radius: 4px;
+  }
+  .kb-list-link:hover { background: var(--teal-50); color: var(--teal-600); }
+
+  .kb-board {
+    display: flex; gap: 12px; padding: 16px 0;
+    overflow-x: auto; align-items: flex-start;
+  }
+  .kb-col {
+    flex: 0 0 220px; min-width: 0;
+    background: #f5f7fa; border-radius: 10px;
+    display: flex; flex-direction: column; overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .kb-col-header {
+    padding: 9px 12px; display: flex; align-items: center; gap: 7px;
+    border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  .kb-col-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .kb-col-title { font-size: 12px; font-weight: 700; flex: 1; }
+  .kb-col-count {
+    font-size: 10.5px; font-weight: 700; min-width: 20px; height: 20px;
+    border-radius: 10px; display: inline-flex; align-items: center; justify-content: center;
+    padding: 0 6px;
+  }
+  .kb-cards {
+    padding: 8px; display: flex; flex-direction: column; gap: 7px;
+    min-height: 60px; flex: 1;
+    overflow-y: auto; max-height: calc(100vh - var(--gyn-nav-h) - 130px);
+  }
+  .kb-card {
+    background: var(--surface); border-radius: 7px; padding: 10px 11px;
+    border: 1px solid var(--border); cursor: pointer;
+    transition: box-shadow 0.15s, transform 0.1s;
+    text-decoration: none; display: block; color: inherit;
+  }
+  .kb-card:hover { box-shadow: 0 3px 10px rgba(0,0,0,0.12); transform: translateY(-1px); }
+  .kb-card-name { font-size: 12.5px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .kb-card-row {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 11px; color: var(--text-muted); margin-bottom: 2px;
+  }
+  .kb-card-row i { font-size: 10px; flex-shrink: 0; }
+  .kb-card-badge {
+    display: inline-block; font-size: 10px; font-weight: 600;
+    padding: 1px 6px; border-radius: 9px; margin-top: 5px;
+    background: #e8f5e9; color: #2e7d32;
+  }
+  .kb-card-badge.t-urgence     { background: #fce4ec; color: #b71c1c; }
+  .kb-card-badge.t-controle    { background: #e3f2fd; color: #1565c0; }
+  .kb-card-badge.t-examen      { background: #fff3e0; color: #e65100; }
+  .kb-card-badge.t-vaccination { background: #e8eaf6; color: #283593; }
+  .kb-empty { padding: 18px 8px; text-align: center; color: #ccc; font-size: 11px; }
+</style>
+
+<!-- ══ EN-TÊTE ══ -->
+<div class="kb-header">
+  <span class="kb-title"><i class="bi bi-kanban" style="color:var(--teal-600);margin-right:6px;"></i>Vue Kanban — RDV Gynécologie</span>
+  <div class="kb-date-nav">
+    <a class="kb-nav-btn" href="?date={{ prev_date|date:'Y-m-d' }}" title="Jour précédent"><i class="bi bi-chevron-left"></i></a>
+    <span class="kb-date-label">{{ cur_date|date:"d/m/Y" }}</span>
+    <a class="kb-nav-btn" href="?date={{ next_date|date:'Y-m-d' }}" title="Jour suivant"><i class="bi bi-chevron-right"></i></a>
+    {% if cur_date != today %}
+    <a class="kb-today-btn" href="?">Aujourd'hui</a>
+    {% endif %}
+  </div>
+  <span class="kb-total">{{ total }} RDV</span>
+  <a class="kb-list-link" href="{% url 'gynecologie_rdv' %}?filter=today">
+    <i class="bi bi-list-ul"></i> Vue liste
+  </a>
+  <a class="kb-list-link" href="{% url 'gynecologie_rdv_create' %}">
+    <i class="bi bi-plus-lg" style="color:var(--teal-600);"></i> Nouveau RDV
+  </a>
+</div>
+
+<!-- ══ TABLEAU KANBAN ══ -->
+<div class="kb-board">
+  {% for col in columns %}
+  <div class="kb-col">
+    <div class="kb-col-header" style="background:{{ col.bg }};">
+      <span class="kb-col-dot" style="background:{{ col.color }};"></span>
+      <span class="kb-col-title" style="color:{{ col.color }};">{{ col.label }}</span>
+      <span class="kb-col-count" style="background:rgba(0,0,0,0.1);color:{{ col.color }};">{{ col.count }}</span>
+    </div>
+    <div class="kb-cards">
+      {% for rdv in col.rdvs %}
+      <a class="kb-card" href="{% url 'gynecologie_rdv_detail' rdv.pk %}">
+        <div class="kb-card-name">{{ rdv.patient.nom|upper }} {{ rdv.patient.prenoms }}</div>
+        <div class="kb-card-row">
+          <i class="bi bi-clock"></i>
+          {{ rdv.date_heure|date:"H:i" }}{% if rdv.patient.date_naissance %}&nbsp;·&nbsp;{{ rdv.patient.age }} ans{% endif %}
+        </div>
+        {% if rdv.medecin %}
+        <div class="kb-card-row">
+          <i class="bi bi-person-badge"></i>
+          {{ rdv.medecin }}
+        </div>
+        {% endif %}
+        {% if rdv.motif %}
+        <div class="kb-card-row">
+          <i class="bi bi-chat-left-text"></i>
+          {{ rdv.motif|truncatechars:38 }}
+        </div>
+        {% endif %}
+        <span class="kb-card-badge t-{{ rdv.type_rdv }}">{{ rdv.get_type_rdv_display }}</span>
+        {% if rdv.type_visite_cpn %}
+        <span class="kb-card-badge t-controle" style="margin-left:3px;">{{ rdv.get_type_visite_cpn_display }}</span>
+        {% endif %}
+      </a>
+      {% empty %}
+      <div class="kb-empty"><i class="bi bi-calendar-x" style="font-size:20px;display:block;margin-bottom:4px;"></i>Aucun</div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,365 @@
+{% extends 'planning/base.html' %}
+{% load i18n static %}
+
+{% block nav_list %}active{% endblock %}
+
+{% block extra_planning_css %}
+.pl-nav-week {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 0 6px; margin-bottom: 4px;
+}
+.pl-nav-week-center { text-align: center; flex: 1; }
+.pl-nav-week-center h2 { font-size: 17px; font-weight: 700; color: var(--text); margin: 0 0 2px 0; }
+.pl-nav-week-center .subtitle { font-size: 13px; color: var(--text-muted); }
+.btn-nav-week {
+  border: 1px solid var(--border); background: var(--surface); color: var(--text-muted);
+  border-radius: 6px; padding: 6px 12px; font-size: 13px; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 5px; transition: background 0.12s;
+}
+.btn-nav-week:hover { background: var(--pl-50); color: var(--pl-700); border-color: var(--pl-300); }
+.btn-nav-week.disabled { opacity: 0.35; pointer-events: none; }
+
+.pl-title-block {
+  position: sticky; top: 44px; z-index: 180;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 8px 0 0; margin: 0 -32px 14px;
+}
+.pl-actions {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 0 12px 0; flex-wrap: wrap;
+}
+.pl-table-wrap { overflow-x: auto; }
+.pl-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.pl-table th {
+  background: var(--pl-700); color: #fff; padding: 7px 10px;
+  font-weight: 600; font-size: 11px; text-align: center;
+}
+.pl-table .td-bureau {
+  background: var(--pl-100); color: var(--text); font-weight: 700;
+  font-size: 12px; padding: 6px 10px; border: 1px solid var(--pl-200);
+  vertical-align: middle; text-align: center;
+}
+.pl-table .td-shift {
+  background: var(--bg); color: var(--text-muted); font-size: 11px; font-weight: 600;
+  padding: 6px 8px; border: 1px solid var(--border); text-align: center; min-width: 45px;
+}
+.pl-table .td-cell {
+  padding: 5px 8px; border: 1px solid var(--border); font-size: 12px;
+  min-width: 110px; vertical-align: middle; color: var(--text);
+}
+.pl-table tbody tr:nth-child(odd) .td-cell { background: var(--pl-50); }
+/* Recherche rapide */
+.pl-search-wrap {
+  display: flex; align-items: center; gap: 6px;
+  border: 1px solid var(--border); border-radius: 20px;
+  padding: 4px 12px; background: var(--surface); margin-left: auto;
+  transition: border-color 0.15s;
+}
+.pl-search-wrap:focus-within { border-color: var(--pl-500); }
+.pl-search-wrap i { color: var(--text-muted); font-size: 13px; }
+.pl-search-input {
+  border: none; background: transparent; outline: none;
+  font-size: 12.5px; color: var(--text); font-family: inherit;
+  width: 160px;
+}
+.pl-search-input::placeholder { color: var(--text-muted); }
+.td-cell.search-match { background: #fffde7 !important; outline: 1px solid #f9a825; }
+html[data-theme="dark"] .td-cell.search-match { background: #2a2600 !important; outline-color: #f9a825; }
+.td-cell.search-dim { opacity: 0.2; }
+
+/* Note indicateur (vue lecture) */
+.cell-note-ind {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 14px; height: 14px; margin-left: 4px; vertical-align: middle;
+  color: var(--pl-600); font-size: 11px; cursor: help; flex-shrink: 0;
+  position: relative;
+}
+
+.pl-signature {
+  text-align: right; margin-top: 24px; padding-right: 10px;
+}
+.pl-signature .sig-label {
+  font-size: 11px; color: var(--text-muted); text-transform: uppercase;
+  letter-spacing: 0.04em; margin-bottom: 4px;
+}
+.pl-signature .sig-name { font-size: 13px; font-weight: 700; color: var(--text); }
+
+/* Historique */
+.pl-history {
+  margin-top: 28px; border-top: 1px solid var(--border); padding-top: 18px;
+}
+.pl-history h3 {
+  font-size: 13px; font-weight: 700; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.04em; margin: 0 0 12px 0;
+}
+.pl-history-item {
+  display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.pl-history-item:last-child { border-bottom: none; }
+.pl-history-meta { min-width: 160px; color: var(--text-muted); }
+.pl-history-resume { color: var(--text); word-break: break-word; }
+
+/* Modal dupliquer */
+.pl-modal-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+  z-index: 900; align-items: center; justify-content: center;
+}
+.pl-modal-overlay.open { display: flex; }
+.pl-modal {
+  background: var(--surface); border-radius: 10px; padding: 28px 28px 24px;
+  width: 360px; max-width: 95vw; box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+}
+.pl-modal h3 { font-size: 15px; font-weight: 700; color: var(--text); margin: 0 0 16px 0; }
+.pl-modal label { font-size: 12px; font-weight: 600; color: var(--text-muted);
+  display: block; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.04em; }
+.pl-modal input[type="date"] {
+  width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px;
+  font-size: 13px; background: var(--bg); color: var(--text); box-sizing: border-box;
+  margin-bottom: 18px; outline: none;
+}
+.pl-modal input[type="date"]:focus { border-color: var(--pl-600); }
+.pl-modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+/* ── En-tête réservé à l'impression ─────────────────────────────────────── */
+.print-header { display: none; }
+
+@media print {
+  /* Masquer les éléments de l'interface */
+  .pl-nav, .pl-actions, .pl-title-block, .pl-nav-week,
+  nav, #top-bar, .topbar, .sidebar, .sidebar-wrapper,
+  .topbar-wrapper, #sidebar, .pl-history, .pl-modal-overlay { display: none !important; }
+
+  /* Afficher l'en-tête print */
+  .print-header { display: block; margin-bottom: 14px; }
+  .print-header-inner {
+    display: flex; align-items: center; gap: 14px;
+    padding-bottom: 10px; border-bottom: 2.5px solid #445f35;
+  }
+  .print-header-logo { height: 64px; width: auto; flex-shrink: 0; }
+  .print-header-center { flex: 1; }
+  .print-header-org {
+    font-size: 15px; font-weight: 800; color: #2b3e22;
+    text-transform: uppercase; letter-spacing: 0.06em; line-height: 1.2;
+  }
+  .print-header-subtitle {
+    font-size: 9.5px; color: #666; margin-top: 1px; letter-spacing: 0.03em;
+  }
+  .print-header-doc {
+    font-size: 12px; font-weight: 700; color: #445f35;
+    margin-top: 5px; text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .print-header-right { text-align: right; flex-shrink: 0; }
+  .print-header-week-label {
+    font-size: 9px; color: #999; text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .print-header-week-dates {
+    font-size: 13px; font-weight: 700; color: #2b3e22; white-space: nowrap;
+  }
+  .print-header-week-num {
+    font-size: 10px; color: #666; margin-top: 2px;
+  }
+
+  /* Table */
+  .pl-table-wrap { overflow: visible; }
+  .pl-table { font-size: 10px; width: 100%; }
+  thead { display: table-header-group; }   /* répéter sur chaque page */
+  .pl-table th {
+    font-size: 9px; padding: 5px 6px;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    background: #445f35 !important; color: #fff !important;
+  }
+  .pl-table .td-bureau {
+    font-size: 10px; padding: 4px 6px;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    background: #deecd4 !important;
+  }
+  .pl-table .td-shift { font-size: 9px; padding: 4px 5px; }
+  .pl-table .td-cell  { font-size: 10px; padding: 4px 6px; min-width: 80px; }
+
+  .pl-signature { margin-top: 16px; }
+
+  @page { size: A4 landscape; margin: 12mm 10mm; }
+}
+{% endblock %}
+
+{% block content %}
+
+<!-- En-tête visible uniquement à l'impression -->
+<div class="print-header">
+  <div class="print-header-inner">
+    <img src="{% static 'logo.png' %}" alt="Logo WALÉ" class="print-header-logo">
+    <div class="print-header-center">
+      <div class="print-header-org">Centre Médico-Social WALÉ</div>
+      <div class="print-header-subtitle">Yamoussoukro — Côte d'Ivoire</div>
+      <div class="print-header-doc">Programme hebdomadaire des consultations</div>
+    </div>
+    <div class="print-header-right">
+      <div class="print-header-week-label">Semaine n°</div>
+      <div class="print-header-week-dates">
+        {{ planning.semaine_debut|date:"d/m/Y" }} – {{ planning.semaine_fin|date:"d/m/Y" }}
+      </div>
+      <div class="print-header-week-num">Semaine {{ planning.semaine_debut|date:"W" }} / {{ planning.semaine_debut|date:"Y" }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="pl-title-block">
+  <div class="pl-nav-week" style="padding:0 32px;">
+    <a href="{% if prev_planning %}{% url 'planning_detail' prev_planning.pk %}{% else %}#{% endif %}"
+       class="btn-nav-week {% if not prev_planning %}disabled{% endif %}">
+      <i class="bi bi-chevron-left"></i> Semaine préc.
+    </a>
+    <div class="pl-nav-week-center">
+      <h2>Programme du {{ planning.semaine_debut|date:"d/m/Y" }} au {{ planning.semaine_fin|date:"d/m/Y" }}</h2>
+      <div class="subtitle">Centre Médico-Social WALÉ</div>
+    </div>
+    <a href="{% if next_planning %}{% url 'planning_detail' next_planning.pk %}{% else %}#{% endif %}"
+       class="btn-nav-week {% if not next_planning %}disabled{% endif %}">
+      Semaine suiv. <i class="bi bi-chevron-right"></i>
+    </a>
+  </div>
+</div>
+
+<div class="pl-actions">
+  {% if can_manage and not planning.publie %}
+  <a href="{% url 'planning_modifier' planning.pk %}" class="btn-primary">
+    <i class="bi bi-pencil"></i> Modifier
+  </a>
+  {% endif %}
+  {% if can_manage %}
+  <button type="button" class="btn-secondary" onclick="openDupModal()">
+    <i class="bi bi-copy"></i> Dupliquer
+  </button>
+  {% endif %}
+  <button type="button" class="btn-secondary" onclick="window.print()">
+    <i class="bi bi-printer"></i> Imprimer
+  </button>
+  <a href="{% url 'planning_list' %}" class="btn-secondary">
+    <i class="bi bi-arrow-left"></i> Retour
+  </a>
+  <div class="pl-search-wrap">
+    <i class="bi bi-search"></i>
+    <input type="text" id="plSearch" class="pl-search-input" placeholder="Rechercher un médecin…" autocomplete="off">
+  </div>
+  {% if can_manage %}
+  <form method="post" action="{% url 'planning_publier' planning.pk %}" style="display:inline">
+    {% csrf_token %}
+    {% if planning.publie %}
+      <button type="submit" class="btn-outline">
+        <i class="bi bi-eye-slash"></i> Dépublier
+      </button>
+    {% else %}
+      <button type="submit" class="btn-primary">
+        <i class="bi bi-check-circle"></i> Publier
+      </button>
+    {% endif %}
+  </form>
+  {% if can_delete_pub %}
+  <form method="post" action="{% url 'planning_supprimer' planning.pk %}" style="display:inline"
+        onsubmit="return confirm('Supprimer définitivement ce planning ?')">
+    {% csrf_token %}
+    <button type="submit" class="btn-danger-sm" style="padding:7px 14px;font-size:13px;">
+      <i class="bi bi-trash"></i>
+    </button>
+  </form>
+  {% endif %}
+  {% endif %}
+</div>
+
+<div class="pl-table-wrap">
+  <table class="pl-table">
+    <thead>
+      <tr>
+        <th>BUREAU</th>
+        <th></th>
+        {% for jour in jours_labels %}<th>{{ jour|upper }}</th>{% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        {% if row.is_first %}
+          <td class="td-bureau" rowspan="{{ row.bureau_rowspan }}">{{ row.bureau.nom }}</td>
+        {% endif %}
+        <td class="td-shift">{{ row.plage.code }}</td>
+        {% for cell in row.cells %}
+          <td class="td-cell">
+            {{ cell.value }}
+            {% if cell.note %}
+              <span class="cell-note-ind" title="{{ cell.note }}"><i class="bi bi-sticky-fill"></i></span>
+            {% endif %}
+          </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if planning.signataire %}
+<div class="pl-signature">
+  <div class="sig-label">Directrice Médicale Adjointe</div>
+  <div class="sig-name">{{ planning.signataire }}</div>
+</div>
+{% endif %}
+
+{% if modifications %}
+<div class="pl-history">
+  <h3><i class="bi bi-clock-history"></i> Historique des modifications</h3>
+  {% for mod in modifications %}
+  <div class="pl-history-item">
+    <div class="pl-history-meta">
+      <strong>{{ mod.modifie_par.get_full_name|default:mod.modifie_par.username }}</strong><br>
+      {{ mod.modifie_le|date:"d/m/Y H:i" }}
+    </div>
+    <div class="pl-history-resume">{{ mod.resume }}</div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Modal dupliquer -->
+<div class="pl-modal-overlay" id="dupModal">
+  <div class="pl-modal">
+    <h3><i class="bi bi-copy" style="color:var(--pl-600);margin-right:6px;"></i>Dupliquer ce planning</h3>
+    <form method="post" action="{% url 'planning_dupliquer' planning.pk %}">
+      {% csrf_token %}
+      <label for="dup_date">Semaine de destination (choisir n'importe quel jour)</label>
+      <input type="date" id="dup_date" name="semaine_debut" required>
+      <div class="pl-modal-actions">
+        <button type="button" class="btn-cancel" onclick="closeDupModal()"
+                style="border:1px solid var(--border);color:var(--text-muted);background:transparent;border-radius:6px;padding:8px 14px;font-size:13px;cursor:pointer;">
+          Annuler
+        </button>
+        <button type="submit" class="btn-primary">
+          <i class="bi bi-copy"></i> Dupliquer
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openDupModal()  { document.getElementById('dupModal').classList.add('open'); }
+function closeDupModal() { document.getElementById('dupModal').classList.remove('open'); }
+document.getElementById('dupModal').addEventListener('click', function(e) {
+  if (e.target === this) closeDupModal();
+});
+
+// ── Recherche rapide ──────────────────────────────────────────────────────────
+(function() {
+  const inp = document.getElementById('plSearch');
+  if (!inp) return;
+  inp.addEventListener('input', function() {
+    const q = this.value.trim().toLowerCase();
+    document.querySelectorAll('.td-cell').forEach(td => {
+      td.classList.remove('search-match', 'search-dim');
+      if (!q) return;
+      const text = td.textContent.trim().toLowerCase();
+      td.classList.add(text.includes(q) ? 'search-match' : 'search-dim');
+    });
+  });
+})();
+</script>
+{% endblock %}

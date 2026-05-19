@@ -18,21 +18,22 @@
         ═══════════════════════════════════════ */
         *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
         :root {
-            --teal-950: #071e28; --teal-900: #0d3040; --teal-800: #0f4358;
-            --teal-700: #145770; --teal-600: #1a6d8c; --teal-500: #2188ab;
-            --teal-400: #34a8cc; --teal-300: #6ecae3; --teal-200: #aae1f2;
-            --teal-100: #d6f3fb; --teal-50: #eef9fd;
+            --teal-950: #0e1d09; --teal-900: #1b2e13; --teal-800: #2a4219;
+            --teal-700: #3a5924; --teal-600: #4a6741; --teal-500: #5e8050;
+            --teal-400: #7a9b68; --teal-300: #9ab88a; --teal-200: #bcd5a8;
+            --teal-100: #d8eac4; --teal-50:  #eef5e4;
             --green: #16a96b; --amber: #e89a1a; --rose: #e84545;
             --violet: #7b57c2; --coral: #e66144; --sky: #2d99db;
             --radius: 16px;
             --shadow-sm: 0 2px 8px rgba(0,0,0,0.08);
             --shadow-md: 0 4px 16px rgba(0,0,0,0.1);
             --shadow-lg: 0 8px 32px rgba(0,0,0,0.15);
+            --topbar-h: 70px;
         }
         html { font-size: 16px; }
         body {
             font-family: 'Sora', sans-serif;
-            background: #f0f6fa;
+            background: #f3f7ee;
             color: var(--teal-900);
             min-height: 100vh;
             display: flex;
@@ -59,6 +60,9 @@
             align-items: center;
             justify-content: space-between;
             box-shadow: var(--shadow-sm);
+            position: sticky;
+            top: 0;
+            z-index: 500;
         }
         .topbar-left {
             display: flex;
@@ -92,7 +96,7 @@
             display: flex; align-items: center; justify-content: center;
             cursor: pointer; transition: all 0.15s; position: relative; flex-shrink: 0;
         }
-        .icon-btn:hover { background: rgba(33,136,171,0.08); color: var(--teal-700); }
+        .icon-btn:hover { background: rgba(74,103,65,0.08); color: var(--teal-700); }
         .icon-btn .notif-dot {
             position: absolute; top: 6px; right: 6px;
             width: 7px; height: 7px; border-radius: 50%;
@@ -102,7 +106,7 @@
         /* User chip */
         .user-chip {
             display: flex; align-items: center; gap: 10px;
-            background: #f7fcff; border: 1px solid rgba(33,136,171,0.12);
+            background: #f4f8f0; border: 1px solid rgba(74,103,65,0.12);
             border-radius: 30px; padding: 5px 12px 5px 6px;
         }
         .user-avatar {
@@ -120,7 +124,7 @@
 
         /* Logout btn */
         .btn-logout {
-            background: rgba(33,136,171,0.08); border: none; border-radius: 10px;
+            background: rgba(74,103,65,0.08); border: none; border-radius: 10px;
             color: var(--teal-800); width: 34px; height: 34px; padding: 0;
             cursor: pointer; transition: all 0.15s;
             display: flex; align-items: center; justify-content: center; flex-shrink: 0;
@@ -130,7 +134,6 @@
         .content {
             flex: 1;
             padding: 32px;
-            overflow-y: auto;
         }
 
         /* ═══════════════════════════════════════
@@ -155,13 +158,13 @@
             transition: background .15s, color .15s;
         }
         .breadcrumb a:hover {
-            background: rgba(33,136,171,.08);
+            background: rgba(74,103,65,.08);
             color: var(--teal-600);
         }
         .breadcrumb span { color: rgba(0,0,0,0.4); }
         .breadcrumb-sep { color: rgba(0,0,0,0.25); font-size: 15px; line-height: 1; }
         html[data-theme="dark"] .breadcrumb a { color: var(--teal-300); }
-        html[data-theme="dark"] .breadcrumb a:hover { background: rgba(33,136,171,.15); color: var(--teal-200); }
+        html[data-theme="dark"] .breadcrumb a:hover { background: rgba(74,103,65,.15); color: var(--teal-200); }
         html[data-theme="dark"] .breadcrumb span,
         html[data-theme="dark"] .breadcrumb-sep { color: rgba(255,255,255,0.3); }
 
@@ -324,7 +327,7 @@
         }
 
         /* ═══════════════════════════════════════
-           ALERTS
+           ALERTS (kept for any inline usage)
         ═══════════════════════════════════════ */
         .alert {
             padding: 14px 18px;
@@ -357,6 +360,86 @@
         }
 
         /* ═══════════════════════════════════════
+           TOASTS
+        ═══════════════════════════════════════ */
+        #toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+        }
+        .toast {
+            pointer-events: all;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            min-width: 300px;
+            max-width: 420px;
+            padding: 14px 16px;
+            border-radius: 10px;
+            background: #fff;
+            box-shadow: 0 6px 24px rgba(0,0,0,0.14);
+            border-left: 4px solid #ccc;
+            font-size: 13.5px;
+            opacity: 1;
+            transform: translateX(0);
+            transition: opacity 0.35s ease, transform 0.35s ease;
+            overflow: hidden;
+            position: relative;
+        }
+        .toast.toast-hide {
+            opacity: 0;
+            transform: translateX(30px);
+        }
+        .toast-success { border-left-color: var(--green); }
+        .toast-error   { border-left-color: var(--rose); }
+        .toast-warning { border-left-color: var(--amber); }
+        .toast-info    { border-left-color: var(--sky); }
+        .toast-icon {
+            font-size: 18px;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+        .toast-success .toast-icon { color: var(--green); }
+        .toast-error   .toast-icon { color: var(--rose); }
+        .toast-warning .toast-icon { color: var(--amber); }
+        .toast-info    .toast-icon { color: var(--sky); }
+        .toast-body { flex: 1; color: var(--teal-900); line-height: 1.45; }
+        .toast-close {
+            background: none; border: none; cursor: pointer;
+            color: #999; font-size: 16px; padding: 0; line-height: 1;
+            flex-shrink: 0; margin-top: 1px;
+        }
+        .toast-close:hover { color: var(--teal-900); }
+        .toast-progress {
+            position: absolute;
+            bottom: 0; left: 0;
+            height: 3px;
+            width: 100%;
+            transform-origin: left;
+            animation: toast-shrink 4s linear forwards;
+        }
+        .toast-success .toast-progress { background: var(--green); }
+        .toast-error   .toast-progress { background: var(--rose); }
+        .toast-warning .toast-progress { background: var(--amber); }
+        .toast-info    .toast-progress { background: var(--sky); }
+        @keyframes toast-shrink {
+            from { transform: scaleX(1); }
+            to   { transform: scaleX(0); }
+        }
+        html[data-theme="dark"] .toast {
+            background: #141f0d;
+            box-shadow: 0 6px 24px rgba(0,0,0,0.4);
+        }
+        html[data-theme="dark"] .toast-body { color: #d8eac4; }
+        html[data-theme="dark"] .toast-close { color: #666; }
+        html[data-theme="dark"] .toast-close:hover { color: #e0e8e0; }
+
+        /* ═══════════════════════════════════════
            FORMS
         ═══════════════════════════════════════ */
         .form-group {
@@ -385,7 +468,7 @@
         .form-group select:focus {
             outline: none;
             border-color: var(--teal-500);
-            box-shadow: 0 0 0 3px rgba(33,136,171,0.1);
+            box-shadow: 0 0 0 3px rgba(74,103,65,0.1);
         }
 
         /* ═══════════════════════════════════════
@@ -401,7 +484,7 @@
             letter-spacing: 0.2px;
         }
         .badge-primary {
-            background: rgba(33,136,171,0.15);
+            background: rgba(74,103,65,0.15);
             color: var(--teal-600);
         }
         .badge-success {
@@ -438,44 +521,44 @@
            DARK THEME
         ═══════════════════════════════════════ */
         html[data-theme="dark"] body {
-            background: #071e28;
-            color: #cce8f4;
+            background: #0a1505;
+            color: #d0e8c0;
         }
         html[data-theme="dark"] .topbar {
-            background: #091d2e;
+            background: #0d1a08;
             border-bottom-color: rgba(255,255,255,0.06);
         }
-        html[data-theme="dark"] .topbar-title { color: #cce8f4; }
-        html[data-theme="dark"] .topbar-action { color: #4a8aaa; }
-        html[data-theme="dark"] .topbar-action:hover { color: #6ecae3; }
-        html[data-theme="dark"] .icon-btn { color: #4a7a90; }
-        html[data-theme="dark"] .icon-btn:hover { background: rgba(33,136,171,0.12); color: #cce8f4; }
-        html[data-theme="dark"] .icon-btn .notif-dot { border-color: #091d2e; }
-        html[data-theme="dark"] .user-chip { background: rgba(33,136,171,0.12); border-color: rgba(33,136,171,0.2); }
-        html[data-theme="dark"] .user-info .uname { color: #cce8f4; }
+        html[data-theme="dark"] .topbar-title { color: #d0e8c0; }
+        html[data-theme="dark"] .topbar-action { color: #7a9b68; }
+        html[data-theme="dark"] .topbar-action:hover { color: #9ab88a; }
+        html[data-theme="dark"] .icon-btn { color: #72984e; }
+        html[data-theme="dark"] .icon-btn:hover { background: rgba(74,103,65,0.15); color: #d0e8c0; }
+        html[data-theme="dark"] .icon-btn .notif-dot { border-color: #0d1a08; }
+        html[data-theme="dark"] .user-chip { background: rgba(74,103,65,0.15); border-color: rgba(74,103,65,0.25); }
+        html[data-theme="dark"] .user-info .uname { color: #d0e8c0; }
         html[data-theme="dark"] .user-info .urole { color: rgba(255,255,255,0.35); }
         html[data-theme="dark"] .top-clock .time { color: var(--teal-300); }
         html[data-theme="dark"] .top-clock { color: rgba(255,255,255,0.35); }
-        html[data-theme="dark"] .btn-logout { background: rgba(33,136,171,0.12); color: #7aaec7; }
+        html[data-theme="dark"] .btn-logout { background: rgba(74,103,65,0.15); color: #9ab88a; }
         html[data-theme="dark"] .btn-logout:hover { background: rgba(232,69,69,0.15); color: #e87070; }
 
         html[data-theme="dark"] .breadcrumb span { color: rgba(255,255,255,0.3); }
         html[data-theme="dark"] .breadcrumb a { color: var(--teal-400); }
 
-        html[data-theme="dark"] .page-header-left h1 { color: #cce8f4; }
+        html[data-theme="dark"] .page-header-left h1 { color: #d0e8c0; }
         html[data-theme="dark"] .page-header-left p  { color: rgba(255,255,255,0.4); }
 
-        html[data-theme="dark"] .table-container { background: #0d2035; }
+        html[data-theme="dark"] .table-container { background: #0d1a08; }
         html[data-theme="dark"] thead { background: rgba(255,255,255,0.03); border-bottom-color: rgba(255,255,255,0.08); }
-        html[data-theme="dark"] th { color: #7aaec7; }
-        html[data-theme="dark"] td { border-bottom-color: rgba(255,255,255,0.04); color: #b8dff0; }
-        html[data-theme="dark"] tbody tr:hover { background: rgba(33,136,171,0.06); }
+        html[data-theme="dark"] th { color: #9ab88a; }
+        html[data-theme="dark"] td { border-bottom-color: rgba(255,255,255,0.04); color: #bcd5a8; }
+        html[data-theme="dark"] tbody tr:hover { background: rgba(74,103,65,0.06); }
 
-        html[data-theme="dark"] .card { background: #0d2035; }
-        html[data-theme="dark"] .card-title { color: #cce8f4; }
+        html[data-theme="dark"] .card { background: #0d1a08; }
+        html[data-theme="dark"] .card-title { color: #d0e8c0; }
         html[data-theme="dark"] .card-meta { color: rgba(255,255,255,0.4); }
 
-        html[data-theme="dark"] .btn-secondary { background: rgba(255,255,255,0.08); color: #cce8f4; }
+        html[data-theme="dark"] .btn-secondary { background: rgba(255,255,255,0.08); color: #d0e8c0; }
         html[data-theme="dark"] .btn-secondary:hover { background: rgba(255,255,255,0.12); }
 
         html[data-theme="dark"] .alert-success { background: rgba(22,169,107,0.12); color: #6eddb0; }
@@ -487,15 +570,15 @@
         html[data-theme="dark"] .form-group input,
         html[data-theme="dark"] .form-group textarea,
         html[data-theme="dark"] .form-group select {
-            background: #091d2e;
+            background: #080f05;
             border-color: rgba(255,255,255,0.1);
-            color: #cce8f4;
+            color: #d0e8c0;
         }
         html[data-theme="dark"] .form-group input:focus,
         html[data-theme="dark"] .form-group textarea:focus,
         html[data-theme="dark"] .form-group select:focus {
             border-color: var(--teal-400);
-            box-shadow: 0 0 0 3px rgba(33,136,171,0.2);
+            box-shadow: 0 0 0 3px rgba(74,103,65,0.2);
         }
 
         /* ── Composants réutilisables (dark) ─────────────────────────────────
@@ -504,66 +587,66 @@
            Inutile de les répéter dans chaque template. */
 
         /* Barre d'actions */
-        html[data-theme="dark"] .action-bar { background: #0d2035; }
+        html[data-theme="dark"] .action-bar { background: #0d1a08; }
 
         /* Status flow */
-        html[data-theme="dark"] .status-step { background: #091d2e; border-color: rgba(255,255,255,0.1); color: rgba(255,255,255,0.3); }
+        html[data-theme="dark"] .status-step { background: #080f05; border-color: rgba(255,255,255,0.1); color: rgba(255,255,255,0.3); }
         html[data-theme="dark"] .status-step.active { background: var(--teal-600); color: #fff; border-color: var(--teal-600); }
 
         /* Cartes formulaire / détail */
         html[data-theme="dark"] .form-card,
-        html[data-theme="dark"] .detail-card { background: #0d2035; }
+        html[data-theme="dark"] .detail-card { background: #0d1a08; }
         html[data-theme="dark"] .form-section,
         html[data-theme="dark"] .detail-section { border-top-color: rgba(255,255,255,0.06) !important; }
 
         /* Labels formulaire (surcharge fine) */
         html[data-theme="dark"] .form-group label,
         html[data-theme="dark"] .detail-field .lbl { color: rgba(255,255,255,0.45); text-transform: uppercase; }
-        html[data-theme="dark"] .detail-field .val { color: #cce8f4; }
+        html[data-theme="dark"] .detail-field .val { color: #d0e8c0; }
         html[data-theme="dark"] .detail-field .val.empty { color: rgba(255,255,255,0.2); }
-        html[data-theme="dark"] .form-check label { color: #cce8f4; }
+        html[data-theme="dark"] .form-check label { color: #d0e8c0; }
 
         /* Inputs inline (form-input et variantes hors .form-group) */
-        html[data-theme="dark"] .form-input { background: #091d2e; border-color: rgba(255,255,255,0.1); color: #cce8f4; }
-        html[data-theme="dark"] .form-input:focus { border-color: var(--teal-400); box-shadow: 0 0 0 3px rgba(33,136,171,0.2); }
+        html[data-theme="dark"] .form-input { background: #080f05; border-color: rgba(255,255,255,0.1); color: #d0e8c0; }
+        html[data-theme="dark"] .form-input:focus { border-color: var(--teal-400); box-shadow: 0 0 0 3px rgba(74,103,65,0.2); }
 
         /* Onglets */
-        html[data-theme="dark"] .tabs { background: #0d2035; border-bottom-color: rgba(255,255,255,0.06); }
+        html[data-theme="dark"] .tabs { background: #0d1a08; border-bottom-color: rgba(255,255,255,0.06); }
         html[data-theme="dark"] .tab-btn { color: rgba(255,255,255,0.35); background: none; }
         html[data-theme="dark"] .tab-btn.active { color: var(--teal-300); border-bottom-color: var(--teal-300); }
-        html[data-theme="dark"] .tab-pane { background: #0d2035; }
+        html[data-theme="dark"] .tab-pane { background: #0d1a08; }
 
         /* Tableau de lignes (formset) */
         html[data-theme="dark"] .lignes-table th { color: rgba(255,255,255,0.4); border-bottom-color: rgba(255,255,255,0.08); }
-        html[data-theme="dark"] .lignes-table td { border-bottom-color: rgba(255,255,255,0.04); color: #b8dff0; }
+        html[data-theme="dark"] .lignes-table td { border-bottom-color: rgba(255,255,255,0.04); color: #bcd5a8; }
         html[data-theme="dark"] .lignes-table input,
-        html[data-theme="dark"] .lignes-table select { background: #091d2e; border-color: rgba(255,255,255,0.1); color: #cce8f4; }
+        html[data-theme="dark"] .lignes-table select { background: #080f05; border-color: rgba(255,255,255,0.1); color: #d0e8c0; }
         html[data-theme="dark"] .lignes-table .qte-totale,
         html[data-theme="dark"] .qte-totale-cell { color: var(--teal-300); }
-        html[data-theme="dark"] .btn-add-line { background: rgba(33,136,171,0.1); color: var(--teal-300); border-color: rgba(33,136,171,0.3); }
+        html[data-theme="dark"] .btn-add-line { background: rgba(74,103,65,0.1); color: var(--teal-300); border-color: rgba(74,103,65,0.3); }
         html[data-theme="dark"] .btn-del-line { background: rgba(232,69,69,0.15); color: #f09090; }
 
         /* Stats */
-        html[data-theme="dark"] .stat-box { background: #0d2035; }
+        html[data-theme="dark"] .stat-box { background: #0d1a08; }
         html[data-theme="dark"] .stat-box .val { color: var(--teal-300); }
         html[data-theme="dark"] .stat-box .lbl { color: rgba(255,255,255,0.4); }
 
         /* Barre de recherche / filtres */
         html[data-theme="dark"] .toolbar input,
-        html[data-theme="dark"] .toolbar select { background: #0d2035; border-color: rgba(255,255,255,0.1); color: #cce8f4; font-family: 'Sora', sans-serif; }
+        html[data-theme="dark"] .toolbar select { background: #0d1a08; border-color: rgba(255,255,255,0.1); color: #d0e8c0; font-family: 'Sora', sans-serif; }
 
         /* Badges statut */
         html[data-theme="dark"] .badge-brouillon { background: rgba(232,154,26,0.2);  color: #f0c060; }
         html[data-theme="dark"] .badge-prescrit  { background: rgba(22,169,107,0.2);  color: #6eddb0; }
-        html[data-theme="dark"] .badge-code      { background: rgba(33,136,171,0.2);  color: var(--teal-300); }
+        html[data-theme="dark"] .badge-code      { background: rgba(74,103,65,0.2);  color: var(--teal-300); }
 
         /* Titres de section */
         html[data-theme="dark"] .section-title { color: var(--teal-300); border-bottom-color: rgba(255,255,255,0.06); }
 
         /* Dropdown configuration */
-        html[data-theme="dark"] #config-dropdown { background: #0d2035; border-color: rgba(255,255,255,0.08); }
-        html[data-theme="dark"] #config-dropdown a { color: #cce8f4; border-bottom-color: rgba(255,255,255,0.06); }
-        html[data-theme="dark"] #config-dropdown a:hover { background: rgba(33,136,171,0.1); }
+        html[data-theme="dark"] #config-dropdown { background: #0d1a08; border-color: rgba(255,255,255,0.08); }
+        html[data-theme="dark"] #config-dropdown a { color: #d0e8c0; border-bottom-color: rgba(255,255,255,0.06); }
+        html[data-theme="dark"] #config-dropdown a:hover { background: rgba(74,103,65,0.1); }
 
         /* ── fin composants réutilisables ─────────────────────────────────── */
 
@@ -575,7 +658,7 @@
             border-radius: 8px; transition: all 0.15s;
             display: flex; align-items: center;
         }
-        .theme-toggle:hover { background: rgba(33,136,171,0.1); color: var(--teal-400); }
+        .theme-toggle:hover { background: rgba(74,103,65,0.1); color: var(--teal-400); }
         .theme-toggle .icon-sun  { display:block; }
         .theme-toggle .icon-moon { display:none; }
         html[data-theme="dark"] .theme-toggle .icon-sun  { display:none; }
@@ -589,7 +672,7 @@
         <div class="topbar">
         <div class="topbar-left">
             <a href="/" style="text-decoration:none;display:flex;align-items:center;gap:10px;flex-shrink:0;">
-                <img src="{% static 'logo.png' %}" alt="Logo WALÉ" style="width:38px;height:38px;object-fit:contain;">
+                <img src="{% static 'logo.png' %}" alt="Logo WALÉ" style="width:38px;height:38px;object-fit:contain;filter:brightness(0) saturate(100%) invert(35%) sepia(25%) saturate(700%) hue-rotate(70deg) brightness(90%);">
                 <span style="font-size:13px;font-weight:800;color:var(--teal-600);letter-spacing:-0.2px;">SEGHO-WALE</span>
             </a>
             <span style="width:1px;height:22px;background:rgba(0,0,0,0.1);display:block;flex-shrink:0;margin:0 4px;"></span>
@@ -604,12 +687,141 @@
             </button>
 
             <!-- Notifications -->
-            <button class="icon-btn" title="Notifications">
+            <div style="position:relative;" id="notif-wrapper">
+              <button class="icon-btn" id="notif-btn" title="Notifications" onclick="toggleNotifPanel(event)" style="position:relative;">
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                    <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
                 </svg>
-            </button>
+                {% if alertes_count %}
+                <span id="notif-badge" style="
+                  position:absolute;top:4px;right:4px;
+                  min-width:16px;height:16px;border-radius:8px;
+                  background:#e84545;color:#fff;
+                  font-size:9px;font-weight:800;line-height:16px;
+                  text-align:center;padding:0 3px;
+                  border:2px solid #fff;
+                  pointer-events:none;
+                ">{{ alertes_count }}</span>
+                {% endif %}
+              </button>
+
+              <!-- Panneau notifications -->
+              <div id="notif-panel" style="
+                display:none;
+                position:absolute;top:calc(100% + 10px);right:0;
+                width:340px;
+                background:#fff;
+                border:1px solid rgba(0,0,0,0.1);
+                border-radius:12px;
+                box-shadow:0 8px 32px rgba(0,0,0,0.14);
+                z-index:1000;
+                overflow:hidden;
+              ">
+                <div style="padding:12px 16px 10px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(0,0,0,0.07);">
+                  <span style="font-size:13px;font-weight:700;color:#1a3020;">Notifications</span>
+                  {% if alertes_count %}
+                  <button onclick="toutLire()" style="font-size:11px;color:#4a7236;background:none;border:none;cursor:pointer;font-weight:600;padding:2px 6px;border-radius:4px;" onmouseover="this.style.background='rgba(74,114,54,0.08)'" onmouseout="this.style.background='none'">
+                    Tout marquer lu
+                  </button>
+                  {% endif %}
+                </div>
+
+                <div id="notif-list" style="max-height:420px;overflow-y:auto;">
+                  {% if alertes_contrat %}
+                  <div style="padding:8px 16px 4px;font-size:10.5px;font-weight:800;color:rgba(0,0,0,0.35);text-transform:uppercase;letter-spacing:.5px;">
+                    Fin de contrat
+                  </div>
+                  {% for alerte in alertes_contrat %}
+                  <div id="notif-item-{{ alerte.id }}" style="padding:10px 16px;border-bottom:1px solid rgba(0,0,0,0.04);display:flex;align-items:flex-start;gap:10px;">
+                    <div style="width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;{% if alerte.echeance == '1_mois' %}background:rgba(232,69,69,0.12);{% else %}background:rgba(232,154,26,0.12);{% endif %}">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="{% if alerte.echeance == '1_mois' %}#e84545{% else %}#e89a1a{% endif %}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                      </svg>
+                    </div>
+                    <div style="flex:1;min-width:0;">
+                      <div style="font-size:12.5px;font-weight:600;color:#1a3020;line-height:1.3;">{{ alerte.employe.nom }} {{ alerte.employe.prenoms }}</div>
+                      <div style="font-size:11.5px;color:rgba(0,0,0,0.55);margin-top:2px;">
+                        Contrat — fin le <strong>{{ alerte.date_fin_contrat|date:"d/m/Y" }}</strong>
+                        {% with j=alerte.jours_restants %}
+                        <span style="margin-left:3px;padding:1px 5px;border-radius:8px;font-size:10px;font-weight:700;{% if j <= 30 %}background:rgba(232,69,69,0.12);color:#c0392b;{% else %}background:rgba(232,154,26,0.12);color:#8a5c00;{% endif %}">{{ j }}j</span>
+                        {% endwith %}
+                      </div>
+                    </div>
+                    <button onclick="marquerLue({{ alerte.id }}, this)" title="Marquer comme lu" style="background:none;border:none;cursor:pointer;color:rgba(0,0,0,0.25);padding:4px;border-radius:4px;flex-shrink:0;" onmouseover="this.style.color='#4a7236'" onmouseout="this.style.color='rgba(0,0,0,0.25)'">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    </button>
+                  </div>
+                  {% endfor %}
+                  {% endif %}
+
+                  {% if alertes_document %}
+                  <div style="padding:8px 16px 4px;font-size:10.5px;font-weight:800;color:rgba(0,0,0,0.35);text-transform:uppercase;letter-spacing:.5px;{% if alertes_contrat %}border-top:1px solid rgba(0,0,0,0.06);margin-top:4px;{% endif %}">
+                    Documents expirés
+                  </div>
+                  {% for alerte in alertes_document %}
+                  <div id="notif-doc-{{ alerte.id }}" style="padding:10px 16px;border-bottom:1px solid rgba(0,0,0,0.04);display:flex;align-items:flex-start;gap:10px;">
+                    <div style="width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;{% if alerte.echeance == '1_mois' %}background:rgba(123,87,194,0.12);{% else %}background:rgba(45,153,219,0.12);{% endif %}">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="{% if alerte.echeance == '1_mois' %}#7b57c2{% else %}#2d99db{% endif %}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="12" y1="9" x2="12.01" y2="9"/>
+                      </svg>
+                    </div>
+                    <div style="flex:1;min-width:0;">
+                      <div style="font-size:12.5px;font-weight:600;color:#1a3020;line-height:1.3;">{{ alerte.document.employe.nom }} {{ alerte.document.employe.prenoms }}</div>
+                      <div style="font-size:11.5px;color:rgba(0,0,0,0.55);margin-top:2px;">
+                        {{ alerte.document.titre }} — exp. <strong>{{ alerte.date_expiration|date:"d/m/Y" }}</strong>
+                        {% with j=alerte.jours_restants %}
+                        <span style="margin-left:3px;padding:1px 5px;border-radius:8px;font-size:10px;font-weight:700;{% if j <= 30 %}background:rgba(123,87,194,0.12);color:#5b3fa0;{% else %}background:rgba(45,153,219,0.12);color:#4a6741;{% endif %}">{{ j }}j</span>
+                        {% endwith %}
+                      </div>
+                    </div>
+                    <button onclick="marquerLueDoc({{ alerte.id }}, this)" title="Marquer comme lu" style="background:none;border:none;cursor:pointer;color:rgba(0,0,0,0.25);padding:4px;border-radius:4px;flex-shrink:0;" onmouseover="this.style.color='#4a7236'" onmouseout="this.style.color='rgba(0,0,0,0.25)'">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    </button>
+                  </div>
+                  {% endfor %}
+                  {% endif %}
+
+                  {% if notifs_conge %}
+                  <div style="padding:8px 16px 4px;font-size:10.5px;font-weight:800;color:rgba(0,0,0,0.35);text-transform:uppercase;letter-spacing:.5px;{% if alertes_contrat or alertes_document %}border-top:1px solid rgba(0,0,0,0.06);margin-top:4px;{% endif %}display:flex;align-items:center;justify-content:space-between;">
+                    <span>Congés</span>
+                    <form method="post" action="/conges/notifs/lire/" style="display:inline;">
+                      <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+                      <button type="submit" style="font-size:10px;color:#4a7236;background:none;border:none;cursor:pointer;font-weight:600;padding:1px 5px;border-radius:4px;">Tout lire</button>
+                    </form>
+                  </div>
+                  {% for notif in notifs_conge %}
+                  <div id="notif-conge-{{ notif.id }}" style="padding:10px 16px;border-bottom:1px solid rgba(0,0,0,0.04);display:flex;align-items:flex-start;gap:10px;">
+                    <div style="width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:rgba(74,114,54,0.12);">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#4a7236" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                      </svg>
+                    </div>
+                    <div style="flex:1;min-width:0;">
+                      <a href="/conges/notifs/{{ notif.id }}/lire/" style="display:block;text-decoration:none;" onclick="event.preventDefault();marquerLueConge({{ notif.id }}, '{{ notif.conge.pk }}', this)">
+                        <div style="font-size:12.5px;font-weight:600;color:#1a3020;line-height:1.3;">{{ notif.get_type_notif_display }}</div>
+                        <div style="font-size:11.5px;color:rgba(0,0,0,0.55);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ notif.message }}</div>
+                        <div style="font-size:10.5px;color:rgba(0,0,0,0.4);margin-top:2px;">{{ notif.cree_le|date:"d/m/Y à H:i" }}</div>
+                      </a>
+                    </div>
+                    <button onclick="marquerLueConge({{ notif.id }}, '{{ notif.conge.pk }}', this)" title="Marquer comme lu" style="background:none;border:none;cursor:pointer;color:rgba(0,0,0,0.25);padding:4px;border-radius:4px;flex-shrink:0;" onmouseover="this.style.color='#4a7236'" onmouseout="this.style.color='rgba(0,0,0,0.25)'">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    </button>
+                  </div>
+                  {% endfor %}
+                  {% endif %}
+
+                  {% if not alertes_contrat and not alertes_document and not notifs_conge %}
+                  <div style="padding:28px 16px;text-align:center;color:rgba(0,0,0,0.35);">
+                    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 8px;display:block;opacity:.4">
+                      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                    </svg>
+                    <div style="font-size:12px;">Aucune alerte</div>
+                  </div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
 
             <!-- Thème -->
             <button class="theme-toggle" id="theme-toggle" title="Thème sombre / clair">
@@ -652,19 +864,145 @@
     </script>
         
         <div class="content">
-            {% if messages %}
-                {% for message in messages %}
-                    <div class="alert alert-{{ message.tags|default:'info' }}">
-                        <span>{{ message }}</span>
-                    </div>
-                {% endfor %}
-            {% endif %}
-
             {% block breadcrumb %}{% endblock %}
             {% block content %}{% endblock %}
         </div>
     </div>
 
+    <!-- ══ TOAST CONTAINER ══ -->
+    <div id="toast-container"></div>
+
+    {% if messages %}
+    <script>
+    (function(){
+        var icons = {
+            success: 'bi-check-circle-fill',
+            error:   'bi-x-circle-fill',
+            warning: 'bi-exclamation-triangle-fill',
+            info:    'bi-info-circle-fill'
+        };
+        var messages = [
+            {% for message in messages %}
+            { text: "{{ message|escapejs }}", tag: "{{ message.tags|default:'info'|cut:' ' }}" }{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ];
+        var container = document.getElementById('toast-container');
+
+        function showToast(text, tag) {
+            var validTags = ['success','error','warning','info'];
+            var safeTag = validTags.indexOf(tag) !== -1 ? tag : 'info';
+            var icon = icons[safeTag] || icons.info;
+
+            var toast = document.createElement('div');
+            toast.className = 'toast toast-' + safeTag;
+            toast.innerHTML =
+                '<i class="bi ' + icon + ' toast-icon"></i>' +
+                '<span class="toast-body"></span>' +
+                '<button class="toast-close" aria-label="Fermer">&#x2715;</button>' +
+                '<span class="toast-progress"></span>';
+            toast.querySelector('.toast-body').textContent = text;
+            container.appendChild(toast);
+
+            var timer = setTimeout(function(){ dismissToast(toast); }, 4000);
+
+            toast.querySelector('.toast-close').addEventListener('click', function(){
+                clearTimeout(timer);
+                dismissToast(toast);
+            });
+        }
+
+        function dismissToast(toast) {
+            toast.classList.add('toast-hide');
+            setTimeout(function(){ if (toast.parentNode) toast.parentNode.removeChild(toast); }, 380);
+        }
+
+        messages.forEach(function(m){ showToast(m.text, m.tag); });
+    })();
+    </script>
+    {% endif %}
+
     {% block extra_js %}{% endblock %}
+
+    <script>
+    // ── Panneau notifications ──────────────────────────────────────────────────
+    function toggleNotifPanel(e) {
+        e.stopPropagation();
+        var panel = document.getElementById('notif-panel');
+        panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    }
+    document.addEventListener('click', function(e) {
+        var wrapper = document.getElementById('notif-wrapper');
+        if (wrapper && !wrapper.contains(e.target)) {
+            var panel = document.getElementById('notif-panel');
+            if (panel) panel.style.display = 'none';
+        }
+    });
+
+    function getCsrfToken() {
+        var name = 'csrftoken';
+        var cookies = document.cookie.split(';');
+        for (var i = 0; i < cookies.length; i++) {
+            var c = cookies[i].trim();
+            if (c.startsWith(name + '=')) return decodeURIComponent(c.slice(name.length + 1));
+        }
+        return '';
+    }
+
+    function marquerLue(id, btn) {
+        fetch('/ressources-humaines/alertes/' + id + '/lue/', {
+            method: 'POST',
+            headers: {'X-CSRFToken': getCsrfToken()},
+        }).then(function() {
+            var item = document.getElementById('notif-item-' + id);
+            if (item) item.remove();
+            updateBadge(-1);
+        });
+    }
+
+    function marquerLueDoc(id, btn) {
+        fetch('/ressources-humaines/alertes/doc/' + id + '/lue/', {
+            method: 'POST',
+            headers: {'X-CSRFToken': getCsrfToken()},
+        }).then(function() {
+            var item = document.getElementById('notif-doc-' + id);
+            if (item) item.remove();
+            updateBadge(-1);
+        });
+    }
+
+    function toutLire() {
+        fetch('/ressources-humaines/alertes/tout-lire/', {
+            method: 'POST',
+            headers: {'X-CSRFToken': getCsrfToken()},
+        }).then(function() {
+            var list = document.getElementById('notif-list');
+            if (list) list.innerHTML = '<div style="padding:32px 16px;text-align:center;color:rgba(0,0,0,0.35);"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 8px;display:block;opacity:.4"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><div style="font-size:12px;">Aucune alerte</div></div>';
+            var badge = document.getElementById('notif-badge');
+            if (badge) badge.remove();
+            var btn = document.querySelector('#notif-panel button[onclick="toutLire()"]');
+            if (btn) btn.remove();
+        });
+    }
+
+    function updateBadge(delta) {
+        var badge = document.getElementById('notif-badge');
+        if (!badge) return;
+        var count = parseInt(badge.textContent) + delta;
+        if (count <= 0) { badge.remove(); }
+        else { badge.textContent = count; }
+    }
+
+    function marquerLueConge(id, congeId, btn) {
+        fetch('/conges/notifs/' + id + '/lire/', {
+            method: 'POST',
+            headers: {'X-CSRFToken': getCsrfToken()},
+        }).then(function() {
+            var item = document.getElementById('notif-conge-' + id);
+            if (item) item.remove();
+            updateBadge(-1);
+            window.location.href = '/conges/' + congeId + '/';
+        });
+    }
+    </script>
 </body>
 </html>

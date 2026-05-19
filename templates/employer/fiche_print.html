@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fiche employé — {{ employe.nom_complet }}</title>
+  <style>
+    /* ═══════════════════════════════════════════════════
+       RESET & BASE
+    ═══════════════════════════════════════════════════ */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --rh-900: #1b2e13;
+      --rh-800: #27421c;
+      --rh-700: #345726;
+      --rh-600: #4a7236;
+      --rh-500: #5e8e47;
+      --rh-400: #7aaa62;
+      --rh-300: #9dc284;
+      --rh-200: #c2d9b3;
+      --rh-100: #daecd1;
+      --rh-50:  #edf6e8;
+    }
+
+    html { font-size: 13px; }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #e8e8e8;
+      color: #1a1a1a;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px 48px;
+    }
+
+    /* ═══════════════════════════════════════════════════
+       PRINT BUTTON BAR (screen only)
+    ═══════════════════════════════════════════════════ */
+    .print-bar {
+      width: 100%;
+      max-width: 780px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .btn-print {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 9px 20px;
+      background: var(--rh-600);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      transition: background 0.15s, box-shadow 0.15s;
+    }
+    .btn-print:hover { background: var(--rh-700); box-shadow: 0 4px 14px rgba(74,114,54,0.3); }
+    .btn-back {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 9px 16px;
+      background: #fff;
+      color: var(--rh-700);
+      border: 1.5px solid var(--rh-200);
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .btn-back:hover { background: var(--rh-50); border-color: var(--rh-400); }
+
+    /* ═══════════════════════════════════════════════════
+       FICHE — A4 SHEET
+    ═══════════════════════════════════════════════════ */
+    .fiche {
+      width: 780px;
+      max-width: 100%;
+      background: #fff;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.14);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    /* ── Header band ── */
+    .fiche-header {
+      background: linear-gradient(135deg, var(--rh-700), var(--rh-500));
+      color: #fff;
+      padding: 24px 32px 20px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 20px;
+    }
+    .fiche-header-left {}
+    .fiche-org-name {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: -0.2px;
+      line-height: 1.2;
+    }
+    .fiche-org-sub {
+      font-size: 11.5px;
+      opacity: 0.8;
+      margin-top: 2px;
+    }
+    .fiche-doc-label {
+      margin-top: 10px;
+      display: inline-block;
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.25);
+      padding: 3px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .fiche-header-right {
+      text-align: right;
+      flex-shrink: 0;
+    }
+    .fiche-date-label {
+      font-size: 10.5px;
+      opacity: 0.7;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .fiche-date-val {
+      font-size: 13px;
+      font-weight: 700;
+      margin-top: 2px;
+    }
+
+    /* ── Employee identity strip ── */
+    .fiche-identity {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      padding: 18px 32px;
+      background: var(--rh-50);
+      border-bottom: 2px solid var(--rh-100);
+    }
+    .fiche-avatar {
+      width: 64px; height: 64px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; font-weight: 800; color: #fff;
+    }
+    .fiche-avatar.av-actif    { background: linear-gradient(135deg, var(--rh-600), var(--rh-400)); }
+    .fiche-avatar.av-suspendu { background: linear-gradient(135deg, #d4830a, #f0a830); }
+    .fiche-avatar.av-quitte   { background: linear-gradient(135deg, #8a9298, #b0bec5); }
+    .fiche-avatar img         { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+
+    .fiche-id-info { flex: 1; }
+    .fiche-emp-name {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--rh-900);
+      letter-spacing: -0.2px;
+    }
+    .fiche-emp-mat {
+      display: inline-block;
+      font-family: monospace;
+      font-size: 12px;
+      font-weight: 700;
+      background: var(--rh-100);
+      color: var(--rh-700);
+      border: 1px solid var(--rh-200);
+      padding: 2px 12px;
+      border-radius: 20px;
+      margin-top: 5px;
+    }
+    .fiche-status-area { flex-shrink: 0; }
+    .fiche-badge-actif {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: rgba(22,169,107,0.12);
+      color: #0d7a4c;
+      border: 1px solid rgba(22,169,107,0.25);
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .fiche-badge-actif::before {
+      content: ''; width: 7px; height: 7px; border-radius: 50%;
+      background: #16a96b; flex-shrink: 0;
+    }
+    .fiche-badge-suspendu {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: rgba(232,154,26,0.12);
+      color: #8a5c00;
+      border: 1px solid rgba(232,154,26,0.25);
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .fiche-badge-suspendu::before {
+      content: ''; width: 7px; height: 7px; border-radius: 50%;
+      background: #e89a1a; flex-shrink: 0;
+    }
+    .fiche-badge-quitte {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: rgba(0,0,0,0.06);
+      color: rgba(0,0,0,0.5);
+      border: 1px solid rgba(0,0,0,0.1);
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .fiche-badge-quitte::before {
+      content: ''; width: 7px; height: 7px; border-radius: 50%;
+      background: #999; flex-shrink: 0;
+    }
+
+    /* ── Data body ── */
+    .fiche-body {
+      padding: 24px 32px;
+    }
+    .fiche-2col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0 32px;
+    }
+
+    /* ── Section ── */
+    .fiche-section {
+      margin-bottom: 22px;
+    }
+    .fiche-section-title {
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--rh-700);
+      border-bottom: 2px solid var(--rh-100);
+      padding-bottom: 6px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .fiche-section-title::before {
+      content: '';
+      display: inline-block;
+      width: 4px; height: 13px;
+      border-radius: 2px;
+      background: var(--rh-500);
+      flex-shrink: 0;
+    }
+
+    /* ── Field rows ── */
+    .fiche-field {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      padding: 5px 0;
+      border-bottom: 1px solid rgba(0,0,0,0.04);
+    }
+    .fiche-field:last-child { border-bottom: none; }
+    .fiche-field .flbl {
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      color: rgba(0,0,0,0.38);
+      width: 125px;
+      flex-shrink: 0;
+    }
+    .fiche-field .fval {
+      font-size: 12.5px;
+      color: #1a1a1a;
+      font-weight: 500;
+      flex: 1;
+    }
+    .fiche-field .fval.empty { color: rgba(0,0,0,0.28); font-style: italic; font-weight: 400; }
+
+    /* ── Salary ── */
+    .fiche-salary {
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--rh-700);
+    }
+
+    /* ── Notes ── */
+    .fiche-notes {
+      margin-top: 20px;
+      padding: 14px 16px;
+      background: #fafaf8;
+      border: 1px solid rgba(0,0,0,0.08);
+      border-left: 3px solid var(--rh-300);
+      border-radius: 6px;
+    }
+    .fiche-notes-title {
+      font-size: 10.5px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      color: var(--rh-600);
+      margin-bottom: 8px;
+    }
+    .fiche-notes-text {
+      font-size: 12.5px;
+      line-height: 1.7;
+      color: rgba(0,0,0,0.6);
+      white-space: pre-line;
+    }
+
+    /* ── Footer ── */
+    .fiche-footer {
+      margin-top: 8px;
+      padding: 12px 32px;
+      background: var(--rh-50);
+      border-top: 1px solid var(--rh-100);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .fiche-footer-left {
+      font-size: 10.5px;
+      color: rgba(0,0,0,0.45);
+      font-style: italic;
+    }
+    .fiche-footer-right {
+      font-size: 10.5px;
+      color: rgba(0,0,0,0.35);
+    }
+    .fiche-confidential {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      color: rgba(0,0,0,0.35);
+      border: 1px solid rgba(0,0,0,0.12);
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    /* ═══════════════════════════════════════════════════
+       PRINT MEDIA — hides everything except .fiche
+    ═══════════════════════════════════════════════════ */
+    @media print {
+      @page {
+        size: A4 portrait;
+        margin: 10mm 12mm 10mm;
+      }
+
+      body {
+        background: #fff;
+        padding: 0;
+        display: block;
+      }
+
+      .print-bar { display: none !important; }
+
+      .fiche {
+        box-shadow: none;
+        border-radius: 0;
+        width: 100%;
+        max-width: 100%;
+        page-break-inside: avoid;
+      }
+
+      .fiche-header {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      .fiche-identity { break-inside: avoid; }
+
+      .fiche-2col { break-inside: avoid; }
+
+      .fiche-footer {
+        position: running(footer);
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      .btn-print,
+      .btn-back { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Print button bar (screen only) ── -->
+  <div class="print-bar">
+    <a href="javascript:history.back()" class="btn-back">
+      &#8592; Retour
+    </a>
+    <button class="btn-print" onclick="window.print()">
+      &#128424; Imprimer / Enregistrer en PDF
+    </button>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       FICHE EMPLOYÉ
+  ══════════════════════════════════════ -->
+  <div class="fiche">
+
+    <!-- ── Header ── -->
+    <div class="fiche-header">
+      <div class="fiche-header-left">
+        <div class="fiche-org-name">Centre Médico-Social WALÉ</div>
+        <div class="fiche-org-sub">Direction des Ressources Humaines</div>
+        <div class="fiche-doc-label">Fiche Employé</div>
+      </div>
+      <div class="fiche-header-right">
+        <div class="fiche-date-label">Date d'impression</div>
+        <div class="fiche-date-val">{{ today|date:"d/m/Y" }}</div>
+      </div>
+    </div>
+
+    <!-- ── Employee identity strip ── -->
+    <div class="fiche-identity">
+      {% if employe.photo %}
+        <div class="fiche-avatar">
+          <img src="{{ employe.photo.url }}" alt="{{ employe.nom_complet }}">
+        </div>
+      {% else %}
+        <div class="fiche-avatar av-{{ employe.statut }}">
+          {{ employe.initiales|default:"?" }}
+        </div>
+      {% endif %}
+      <div class="fiche-id-info">
+        <div class="fiche-emp-name">{{ employe.nom_complet }}</div>
+        <div>
+          <span class="fiche-emp-mat">{{ employe.matricule }}</span>
+        </div>
+      </div>
+      <div class="fiche-status-area">
+        {% if employe.statut == 'actif' %}
+          <span class="fiche-badge-actif">Actif</span>
+        {% elif employe.statut == 'suspendu' %}
+          <span class="fiche-badge-suspendu">Suspendu</span>
+        {% else %}
+          <span class="fiche-badge-quitte">Quitté</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- ── Data sections ── -->
+    <div class="fiche-body">
+      <div class="fiche-2col">
+
+        <!-- LEFT COLUMN: Identité -->
+        <div>
+          <div class="fiche-section">
+            <div class="fiche-section-title">Identité</div>
+
+            <div class="fiche-field">
+              <span class="flbl">Nom</span>
+              <span class="fval {% if not employe.nom %}empty{% endif %}">{{ employe.nom|default:"—" }}</span>
+            </div>
+            <div class="fiche-field">
+              <span class="flbl">Prénoms</span>
+              <span class="fval {% if not employe.prenoms %}empty{% endif %}">{{ employe.prenoms|default:"—" }}</span>
+            </div>
+            <div class="fiche-field">
+              <span class="flbl">Sexe</span>
+              <span class="fval">
+                {% if employe.sexe == 'M' %}Masculin
+                {% elif employe.sexe == 'F' %}Féminin
+                {% else %}<span class="empty">—</span>{% endif %}
+              </span>
+            </div>
+            <div class="fiche-field">
+              <span class="flbl">Date naissance</span>
+              <span class="fval {% if not employe.date_naissance %}empty{% endif %}">
+                {{ employe.date_naissance|date:"d/m/Y"|default:"—" }}
+                {% if employe.age %} ({{ employe.age }} ans){% endif %}
+              </span>
+            </div>
+            <div class="fiche-field">
+              <span class="flbl">Nationalité</span>
+              <span class="fval {% if not employe.nationalite %}empty{% endif %}">{{ employe.nationalite|default:"—" }}</span>
+            </div>
+            <div class="fiche-field">
+              <span class="flbl">Sit. matrimoniale</span>
+              <span class="fval">
+                {% if employe.situation_matrimoniale == 'celibataire' %}Célibataire
+                {% elif employe.situation_matrimoniale == 'marie' %}Marié(e)
+                {% elif employe.situation_matrimoniale == 'divorce' %}Divorcé(e)
+                {% elif employe.situation_matrimoniale == 'veuf' %}Veuf/Veuve
+                {% else %}<span class="empty">—</span>{% endif %}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT COLUMN: Emploi -->
+        <div>
+          <div class="fiche-section">
+            <div class="fiche-section-title">Emploi</div>
+
+            <div class="fiche-field">
+              <span class="flbl">Service</span>
+              <span class="fval {% if not employe.service %}empty{% endif %}">{{ employe.service.nom|default:"—" }}</span>
+            </div>
+            <div class="fiche-field">
+              <span class="flbl">Fonction</span>
+              <span class="fval {% if not employe.fonction %}empty{% endif %}">{{ employe.fonction.nom|default:"—" }}</span>
+            </div>
+            <div class="fiche-field">
+              <span class="flbl">Grade</span>
+              <span class="fval {% if not employe.grade %}empty{% endif %}">{{ employe.grade.nom|default:"—" }}</span>
+            </div>
+            <div class="fiche-field">
+              <span class="flbl">Type contrat</span>
+              <span class="fval {% if not employe.type_contrat %}empty{% endif %}">{{ employe.type_contrat.nom|default:"—" }}</span>
+            </div>
+            <div class="fiche-field">
+              <span class="flbl">Date embauche</span>
+              <span class="fval {% if not employe.date_embauche %}empty{% endif %}">{{ employe.date_embauche|date:"d/m/Y"|default:"—" }}</span>
+            </div>
+            <div class="fiche-field">
+              <span class="flbl">Date fin contrat</span>
+              <span class="fval">
+                {% if employe.date_fin_contrat %}
+                  {{ employe.date_fin_contrat|date:"d/m/Y" }}
+                {% else %}
+                  <span style="color:var(--rh-600); font-weight:700;">CDI / Sans date</span>
+                {% endif %}
+              </span>
+            </div>
+            <div class="fiche-field">
+              <span class="flbl">Ancienneté</span>
+              <span class="fval">
+                {% if employe.anciennete %}
+                  {{ employe.anciennete }}
+                {% elif employe.date_embauche %}
+                  Depuis {{ employe.date_embauche|date:"d/m/Y" }}
+                {% else %}
+                  <span class="empty">—</span>
+                {% endif %}
+              </span>
+            </div>
+            <div class="fiche-field">
+              <span class="flbl">Salaire de base</span>
+              <span class="fval">
+                {% if employe.salaire_base %}
+                  <span class="fiche-salary">{{ employe.salaire_base|floatformat:0 }} FCFA</span>
+                {% else %}
+                  <span class="empty">Confidentiel</span>
+                {% endif %}
+              </span>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /fiche-2col -->
+
+      <!-- ── Notes (si présentes) ── -->
+      {% if employe.notes %}
+      <div class="fiche-notes">
+        <div class="fiche-notes-title">Notes internes</div>
+        <div class="fiche-notes-text">{{ employe.notes }}</div>
+      </div>
+      {% endif %}
+
+    </div><!-- /fiche-body -->
+
+    <!-- ── Footer ── -->
+    <div class="fiche-footer">
+      <div class="fiche-footer-left">
+        Généré le {{ today|date:"d/m/Y" }} &nbsp;·&nbsp; Centre Médico-Social WALÉ
+      </div>
+      <div class="fiche-footer-right">
+        <span class="fiche-confidential">
+          &#128274; Document confidentiel — Centre Médico-Social WALÉ
+        </span>
+      </div>
+    </div>
+
+  </div><!-- /fiche -->
+
+  <script>
+    /* Auto-trigger print dialog when the page loads from a direct print link.
+       Detected via ?print=1 query parameter to avoid triggering on normal loads. */
+    (function () {
+      if (window.location.search.indexOf('print=1') !== -1) {
+        window.addEventListener('load', function () {
+          window.print();
+        });
+      }
+    })();
+  </script>
+
+</body>
+</html>
