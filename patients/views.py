@@ -250,6 +250,7 @@ def rdv_create(request):
         'is_new':          True,
         'consultation':    None,
         'constante':       None,
+        'pathologies':     Pathologie.objects.filter(actif=True).order_by('nom'),
     })
 
 
@@ -417,6 +418,7 @@ def rdv_edit(request, pk):
         'is_new':        False,
         'consultation':  consultation,
         'constante':     constante,
+        'pathologies':   Pathologie.objects.filter(actif=True).order_by('nom'),
     })
 
 
