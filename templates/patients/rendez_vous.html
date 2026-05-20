@@ -4,167 +4,302 @@
 
 {% block extra_css %}
 <style>
-    /* ── Toolbar ── */
-    .rdv-toolbar {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 16px;
-        margin-bottom: 20px;
-        flex-wrap: wrap;
-    }
-    .rdv-toolbar-left  { display: flex; align-items: center; gap: 10px; flex: 1; flex-wrap: wrap; }
-    .rdv-toolbar-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  :root {
+    --accent: var(--teal-500);
+  }
 
-    /* ── Quick filter pills ── */
-    .quick-pills { display: flex; gap: 6px; }
-    .quick-pill {
-        padding: 7px 16px;
-        border-radius: 20px;
-        font-size: 13px;
-        font-weight: 600;
-        border: 1.5px solid rgba(0,0,0,0.1);
-        background: #fff;
-        color: var(--teal-800);
-        text-decoration: none;
-        cursor: pointer;
-        transition: all 0.15s;
-        white-space: nowrap;
-        box-shadow: var(--shadow-sm);
-    }
-    .quick-pill:hover { border-color: var(--teal-400); color: var(--teal-600); }
-    .quick-pill.active { background: var(--teal-500); color: #fff; border-color: var(--teal-500); }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    /* ── Date range ── */
-    .date-range-form {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        background: #fff;
-        border: 1px solid rgba(0,0,0,0.12);
-        border-radius: 10px;
-        padding: 6px 12px;
-        box-shadow: var(--shadow-sm);
-    }
-    .date-range-form input[type="date"] {
-        border: none;
-        font-family: 'Sora', sans-serif;
-        font-size: 13px;
-        color: var(--teal-800);
-        outline: none;
-        background: transparent;
-        cursor: pointer;
-    }
-    .date-range-sep { color: rgba(0,0,0,0.3); font-size: 13px; font-weight: 600; padding: 0 4px; }
-    .date-range-form .btn-filter {
-        border: none;
-        background: var(--teal-500);
-        color: #fff;
-        border-radius: 6px;
-        padding: 5px 14px;
-        font-family: 'Sora', sans-serif;
-        font-size: 13px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: background 0.15s;
-    }
-    .date-range-form .btn-filter:hover { background: var(--teal-600); }
+  /* ── DARK MODE ── */
+  html[data-theme="dark"] .o-list tbody tr:hover { background: rgba(33,136,171,0.2); }
+  html[data-theme="dark"] .o-list thead th:hover { background: #28304a; }
+  html[data-theme="dark"] .o-list thead th { background: var(--surface); }
+  html[data-theme="dark"] .o-search-input { color: var(--text); }
+  html[data-theme="dark"] .o-search-bar { border-bottom-color: #3a4a62; }
+  html[data-theme="dark"] .o-ctrl-btn { color: var(--text-muted); }
+  html[data-theme="dark"] .o-ctrl-btn:hover { background: #28304a; color: var(--text); border-color: var(--border); }
+  html[data-theme="dark"] .o-pag-btn { background: var(--surface); border-color: var(--border); color: var(--text-muted); }
+  html[data-theme="dark"] .o-ctrl-sep { background: var(--border); }
+  html[data-theme="dark"] .o-empty-state { background: var(--bg); }
+  html[data-theme="dark"] .o-empty-illo { background: linear-gradient(135deg, var(--teal-700) 0%, var(--teal-500) 100%); }
 
-    /* ── Status select ── */
-    .rdv-select {
-        padding: 8px 12px;
-        border: 1px solid rgba(0,0,0,0.12);
-        border-radius: 10px;
-        font-family: 'Sora', sans-serif;
-        font-size: 13px;
-        background: #fff;
-        color: var(--teal-900);
-        cursor: pointer;
-        box-shadow: var(--shadow-sm);
-    }
-    .rdv-select:focus { outline: none; border-color: var(--teal-400); }
+  /* ══ SUBHEADER ══ */
+  .o-subheader {
+    background: #fff; border-bottom: 1px solid var(--border);
+    padding: 6px 16px; display: flex; flex-direction: column; gap: 5px;
+    position: sticky; top: 0; z-index: 190;
+    margin: 0 -32px 16px;
+  }
+  .o-subheader-row { display: flex; align-items: center; gap: 8px; }
+  .o-subheader-row-right { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .o-page-title { font-size: 17px; font-weight: 400; color: var(--text); }
+  .o-btn-create {
+    background: var(--teal-500); color: #fff; border: none; padding: 5px 14px; border-radius: 4px;
+    font-size: 12.5px; font-weight: 500; cursor: pointer;
+    text-decoration: none; display: inline-flex; align-items: center;
+    letter-spacing: 0.5px; transition: background 0.15s;
+  }
+  .o-btn-create:hover { background: var(--teal-600); }
+  .o-btn-excel {
+    width: 28px; height: 28px; border: 1px solid #d0e9d1; border-radius: 4px;
+    background: #f0faf0; color: #217346; font-size: 15px;
+    display: inline-flex; align-items: center; justify-content: center;
+    text-decoration: none; transition: background 0.15s, border-color 0.15s;
+  }
+  .o-btn-excel:hover { background: #217346; color: #fff; border-color: #217346; }
+  .o-search-bar {
+    display: flex; align-items: center; border: none; border-bottom: 1px solid #bbb;
+    background: transparent; min-height: 28px; padding: 2px 4px; gap: 4px; width: 320px;
+  }
+  .o-search-input {
+    border: none; outline: none; font-size: 12px;
+    color: var(--text); flex: 1; min-width: 60px; background: transparent;
+  }
+  .o-search-btn { background: none; border: none; cursor: pointer; color: #888; font-size: 13px; padding: 2px; }
+  .o-ctrl-btn {
+    background: none; border: 1px solid transparent; border-radius: 4px;
+    padding: 4px 8px; font-size: 12px;
+    color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 4px;
+    transition: border-color 0.15s, color 0.15s, background 0.15s; white-space: nowrap;
+  }
+  .o-ctrl-btn:hover { border-color: var(--border); color: var(--text); background: #f3f3f3; }
+  .o-ctrl-sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }
+  .o-pagination { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+  .o-pag-btn {
+    width: 24px; height: 24px; border: 1px solid var(--border); border-radius: 3px;
+    background: var(--surface); display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted); text-decoration: none; font-size: 12px;
+    transition: background 0.15s, color 0.15s;
+  }
+  .o-pag-btn:hover { background: var(--teal-600); color: #fff; border-color: var(--teal-600); }
+  .o-pag-btn.disabled { opacity: 0.35; pointer-events: none; }
+  .o-view-btns { display: flex; border: 1px solid var(--border); border-radius: 3px; overflow: hidden; }
+  .o-view-btn {
+    width: 26px; height: 24px; border: none; background: var(--surface);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted); font-size: 13px; cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .o-view-btn:not(:last-child) { border-right: 1px solid var(--border); }
+  .o-view-btn.active, .o-view-btn:hover { background: var(--teal-600); color: #fff; }
 
-    /* ── Stats strip ── */
-    .stats-strip {
-        display: flex;
-        gap: 12px;
-        margin-bottom: 20px;
-        flex-wrap: wrap;
-    }
-    .stat-pill {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        background: #fff;
-        border-radius: 10px;
-        padding: 10px 20px;
-        box-shadow: var(--shadow-sm);
-        font-size: 13px;
-    }
-    .stat-pill .sp-val { font-size: 22px; font-weight: 800; }
-    .stat-pill .sp-lbl { color: rgba(0,0,0,0.5); }
-    .sp-total    { color: var(--teal-600); }
-    .sp-planifie { color: var(--amber); }
-    .sp-confirme { color: var(--sky); }
-    .sp-termine  { color: var(--green); }
-    .sp-absent   { color: rgba(0,0,0,0.35); }
+  /* ══ LIST TABLE ══ */
+  .o-list-wrap {
+    overflow-x: auto; overflow-y: auto; background: #fff;
+    margin: 0 -32px;
+  }
+  .o-list { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
+  .o-list thead th {
+    background: #f5f5f5; border-bottom: 1px solid var(--border);
+    padding: 6px 10px; font-weight: 500; font-size: 11.5px;
+    color: var(--text-muted); text-align: left;
+    position: sticky; top: 0; z-index: 2; cursor: pointer; user-select: none;
+  }
+  .o-list thead th:hover { background: #f5f5f5; }
+  .o-col-resize {
+    position: absolute; right: 0; top: 0; bottom: 0; width: 5px;
+    cursor: col-resize; user-select: none; background: transparent; z-index: 2;
+  }
+  .o-col-resize:hover, .o-col-resize.active { background: var(--accent); opacity: 0.45; }
+  .o-list tbody tr { border-bottom: 1px solid #f0f0f0; transition: background 0.1s; cursor: pointer; }
+  .o-list tbody tr:hover { background: var(--teal-50); }
+  .o-list tbody td { padding: 5px 10px; color: var(--text); vertical-align: middle; }
+  .o-list tbody td.td-center { text-align: center; }
+  .o-list tbody td.td-muted { color: #ddd; text-align: center; font-size: 10px; }
+  .o-list tbody td.td-code { color: var(--accent); font-weight: 500; font-size: 12px; }
+  .o-list tbody td.td-name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+  .o-list tbody td.td-doctor { max-width: 130px; overflow: hidden; text-overflow: ellipsis; color: var(--text-muted); }
 
-    /* ── Status badges ── */
-    .rdv-badge {
-        display: inline-block;
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 12px;
-        font-weight: 600;
-        white-space: nowrap;
-    }
-    .rdv-badge.planifie { background: rgba(232,154,26,0.12); color: var(--amber); }
-    .rdv-badge.confirme { background: rgba(45,153,219,0.12); color: var(--sky); }
-    .rdv-badge.termine  { background: rgba(22,169,107,0.12); color: var(--green); }
-    .rdv-badge.annule   { background: rgba(232,69,69,0.1);   color: var(--rose); }
-    .rdv-badge.absent   { background: rgba(0,0,0,0.06);      color: rgba(0,0,0,0.4); }
+  /* Status badges */
+  .o-badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 500; white-space: nowrap; }
+  .badge-planifie   { background: #e3f2fd; color: #1565c0; }
+  .badge-confirme   { background: #e8f5e9; color: #2e7d32; }
+  .badge-en_attente { background: #fff8e1; color: #f57f17; }
+  .badge-en_consultation { background: var(--teal-50); color: var(--teal-600); }
+  .badge-termine    { background: #ede7f6; color: #4527a0; }
+  .badge-annule     { background: #fce4ec; color: #b71c1c; }
+  .badge-absent     { background: #fff3e0; color: #e65100; }
 
-    /* ── Type badge ── */
-    .type-badge {
-        display: inline-block;
-        padding: 3px 10px;
-        border-radius: 6px;
-        font-size: 11px;
-        font-weight: 600;
-        background: var(--teal-50);
-        color: var(--teal-700);
-        white-space: nowrap;
-        border: 1px solid var(--teal-200);
-    }
+  /* Checkbox col */
+  .o-cb { width: 16px; height: 16px; cursor: pointer; accent-color: var(--teal-600); }
+  .th-cb, .td-cb { width: 36px; text-align: center; }
 
-    /* ── Patient cell ── */
-    .patient-cell { display: flex; align-items: center; gap: 10px; }
-    .patient-avatar {
-        width: 36px; height: 36px; border-radius: 50%;
-        background: var(--teal-100); display: flex; align-items: center;
-        justify-content: center; font-size: 14px; font-weight: 700;
-        color: var(--teal-700); flex-shrink: 0;
-    }
-    .patient-name { font-weight: 600; font-size: 14px; color: var(--teal-900); line-height: 1.3; }
-    .patient-sub  { font-size: 12px; color: rgba(0,0,0,0.45); margin-top: 2px; }
+  .o-list tbody td.td-diagnostic { max-width: 200px; overflow: hidden; text-overflow: ellipsis; color: var(--text-muted); }
 
-    /* ── Empty state ── */
-    .empty-state {
-        text-align: center; padding: 64px 20px; color: rgba(0,0,0,0.4);
-    }
-    .empty-state .es-icon { font-size: 56px; margin-bottom: 16px; }
-    .empty-state h3 { font-size: 18px; font-weight: 700; color: var(--teal-900); margin-bottom: 8px; }
+  /* Empty state */
+  .o-empty-state {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 80px 20px;
+  }
+  .o-empty-illo {
+    width: 88px; height: 88px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--teal-600) 0%, var(--teal-400) 100%);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 20px; position: relative;
+  }
+  .o-empty-illo svg { color: #fff; opacity: 0.9; }
+  .o-empty-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+  .o-empty-sub { font-size: 12.5px; color: var(--text-muted); margin-bottom: 20px; }
+  .o-empty-btn {
+    background: var(--teal-500); color: #fff; border: none; padding: 7px 20px; border-radius: 4px;
+    font-size: 12.5px; font-weight: 500;
+    cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+    transition: background 0.15s;
+  }
+  .o-empty-btn:hover { background: var(--teal-600); }
 
-    @media (max-width: 768px) {
-        .rdv-toolbar { flex-direction: column; align-items: stretch; }
-        .date-range-form { flex-wrap: wrap; }
-        .stats-strip { gap: 8px; }
-        .patient-sub { display: none; }
-    }
+  /* ══ DROPDOWNS (Filtres / Regrouper par) ══ */
+  .o-dd-wrap { position: relative; }
+  .o-dd-panel {
+    display: none; position: fixed; z-index: 9999;
+    background: #fff; border: 1px solid #dde3ec;
+    border-radius: 6px; box-shadow: 0 8px 28px rgba(0,0,0,0.16);
+    min-width: 230px; padding: 5px 0;
+  }
+  .o-dd-panel.open { display: block; }
+  .o-dd-section {
+    padding: 6px 14px 3px; font-size: 10px; font-weight: 600;
+    color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .o-dd-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 14px; font-size: 12.5px; color: var(--text);
+    cursor: pointer; text-decoration: none; transition: background 0.1s;
+    white-space: nowrap; gap: 10px; position: relative;
+  }
+  .o-dd-item:hover { background: var(--teal-50); color: var(--teal-600); }
+  .o-dd-item.active { background: #ede7f6; color: var(--teal-600); font-weight: 500; }
+  .o-dd-item .o-dd-arr { font-size: 10px; color: var(--text-muted); flex-shrink: 0; }
+  .o-dd-sep { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+  .o-dd-sub {
+    display: none; position: absolute; left: 100%; top: 0; z-index: 10000;
+    background: #fff; border: 1px solid #dde3ec;
+    border-radius: 6px; box-shadow: 0 8px 28px rgba(0,0,0,0.16);
+    min-width: 160px; padding: 5px 0;
+  }
+  .o-dd-item:hover > .o-dd-sub { display: block; }
+  .o-dd-sub .o-dd-item { font-size: 12px; }
+
+  /* Active filter tag */
+  .o-active-filters { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+  .o-filter-tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: var(--teal-50); color: var(--teal-600); border: 1px solid #b2d8db;
+    border-radius: 3px; padding: 1px 8px; font-size: 11.5px; font-weight: 500;
+  }
+  .o-filter-tag button {
+    background: none; border: none; cursor: pointer; color: #999;
+    font-size: 14px; line-height: 1; padding: 0; margin-left: 2px;
+  }
+  .o-filter-tag button:hover { color: #333; }
+
+  /* Date block inside filter dropdown */
+  .o-dd-date-block { padding: 8px 14px 10px; }
+  .o-dd-date-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .o-dd-date-row label { font-size: 11.5px; color: var(--text-muted); min-width: 18px; }
+  .o-dd-date-input {
+    flex: 1; border: none; border-bottom: 1px solid #bbb; background: transparent;
+    font-size: 12px; color: var(--text);
+    padding: 2px 2px; outline: none;
+  }
+  .o-dd-date-input:focus { border-bottom-color: var(--teal-600); }
+  .o-dd-date-actions { display: flex; gap: 6px; margin-top: 10px; }
+  .o-dd-apply-btn {
+    flex: 1; background: var(--teal-600); color: #fff; border: none; border-radius: 3px;
+    padding: 5px 0; font-size: 12px; font-weight: 500;
+    cursor: pointer; transition: background 0.15s;
+  }
+  .o-dd-apply-btn:hover { background: var(--teal-700); }
+  .o-dd-clear-btn {
+    background: none; border: 1px solid var(--border); border-radius: 3px;
+    padding: 5px 10px; font-size: 11.5px; color: var(--text-muted);
+    cursor: pointer; text-decoration: none; display: inline-flex; align-items: center;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .o-dd-clear-btn:hover { border-color: #999; color: var(--text); }
+
+  html[data-theme="dark"] .o-dd-panel, html[data-theme="dark"] .o-dd-sub { background: #1a2535; border-color: #2e3f58; }
+  html[data-theme="dark"] .o-dd-item:hover { background: rgba(33,136,171,0.2); color: #c5d4e2; }
+  html[data-theme="dark"] .o-dd-item.active { background: rgba(33,136,171,0.3); color: var(--teal-300); }
+  html[data-theme="dark"] .o-filter-tag { background: rgba(33,136,171,0.25); border-color: rgba(33,136,171,0.5); color: var(--teal-300); }
+  html[data-theme="dark"] .o-dd-date-input { border-bottom-color: #3a4a62; color: var(--text); }
+  html[data-theme="dark"] .o-dd-clear-btn { border-color: var(--border); color: var(--text-muted); }
+
+  /* ══ Layout pour sticky ══ */
+  .main { height: 100vh; overflow: hidden; }
+  .content { min-height: 0; padding-top: 0; overflow-x: hidden; }
+
+  /* ══ GYN NAV ══ */
+  .gyn-nav {
+    background: #fff;
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+    margin: 0 -32px 0;
+    padding: 0 32px;
+    display: flex;
+    align-items: stretch;
+    height: 44px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    position: sticky; top: 0; z-index: 250;
+  }
+  .gyn-nav-link {
+    padding: 11px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: rgba(0,0,0,0.5);
+    text-decoration: none;
+    border-bottom: 2px solid transparent;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: color 0.15s, border-color 0.15s;
+    white-space: nowrap;
+  }
+  .gyn-nav-link:hover { color: var(--teal-600); }
+  .gyn-nav-link.active { color: var(--teal-600); border-bottom-color: var(--teal-500); font-weight: 600; }
+  html[data-theme="dark"] .gyn-nav { background: #091d2e; border-bottom-color: rgba(255,255,255,0.06); }
+  html[data-theme="dark"] .gyn-nav-link { color: rgba(255,255,255,0.4); }
+  html[data-theme="dark"] .gyn-nav-link:hover { color: var(--teal-300); }
+  html[data-theme="dark"] .gyn-nav-link.active { color: var(--teal-300); border-bottom-color: var(--teal-400); }
+
+  /* ── Config dropdown ── */
+  .gyn-nav-dd { position: relative; display: inline-flex; align-items: stretch; }
+  .gyn-nav-dd-panel {
+    display: none; position: absolute; top: 100%; left: 0;
+    background: #fff; border: 1px solid #dde3ec;
+    border-radius: 6px; box-shadow: 0 8px 28px rgba(0,0,0,0.16);
+    min-width: 200px; padding: 5px 0; z-index: 9999;
+  }
+  .gyn-nav-dd:hover .gyn-nav-dd-panel,
+  .gyn-nav-dd-panel:hover { display: block; }
+  .gyn-nav-dd-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 16px; font-size: 12.5px; color: var(--text);
+    text-decoration: none; transition: background 0.1s; white-space: nowrap;
+  }
+  .gyn-nav-dd-item:hover { background: var(--teal-50); color: var(--teal-600); }
+  .gyn-nav-dd-item.active { background: #ede7f6; color: var(--teal-600); font-weight: 500; }
+  html[data-theme="dark"] .gyn-nav-dd-panel { background: #1a2535; border-color: #2e3f58; }
+  html[data-theme="dark"] .gyn-nav-dd-item { color: var(--text); }
+  html[data-theme="dark"] .gyn-nav-dd-item:hover { background: rgba(33,136,171,0.2); color: var(--teal-300); }
 </style>
 {% endblock %}
 
 {% block breadcrumb %}
+<nav class="gyn-nav">
+  <div class="gyn-nav-dd">
+    <span class="gyn-nav-link" style="cursor:pointer;">
+      Configurations <i class="bi bi-chevron-down" style="font-size:10px;"></i>
+    </span>
+    <div class="gyn-nav-dd-panel">
+      <a href="{% url 'patients:pathologie_list' %}" class="gyn-nav-dd-item">
+        <i class="bi bi-clipboard2-pulse" style="font-size:13px;"></i> Diagnostic retenu
+      </a>
+      <a href="{% url 'patients:typevisite_list' %}" class="gyn-nav-dd-item">
+        <i class="bi bi-card-list" style="font-size:13px;"></i> Type de visite
+      </a>
+    </div>
+  </div>
+</nav>
 <nav class="breadcrumb">
     <a href="{% url 'dashboard' %}"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z"/><polyline points="9 21 9 12 15 12 15 21"/></svg>Accueil</a>
     <span class="breadcrumb-sep">›</span>
@@ -174,124 +309,304 @@
 
 {% block content %}
 
-<!-- ── En-tête ── -->
-<div class="page-header">
-    <div class="page-header-left">
-        <h1>Rendez-vous</h1>
-        <p>{{ stats.total }} rendez-vous sur la période sélectionnée</p>
-        <div style="margin-top: 10px;">
-            <a href="{% url 'patients:rdv_create' %}" class="btn btn-primary">+ Créer</a>
+<!-- ══ SUBHEADER ══ -->
+<div class="o-subheader">
+  <div class="o-subheader-row">
+    <span class="o-page-title">Rendez-vous</span>
+    <div class="o-subheader-row-right">
+      <form method="get" style="display:flex;align-items:center;">
+        <div class="o-search-bar">
+          <input class="o-search-input" type="text" name="q"
+                 value="{{ request.GET.q }}" placeholder="Rechercher un patient…">
+          <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
         </div>
+      </form>
     </div>
-    <!-- ── Barre de filtres ── -->
-    <form method="get" id="filter-form">
-    <div class="rdv-toolbar">
-        <div class="rdv-toolbar-left">
+  </div>
+  <div class="o-subheader-row">
+    <a href="{% url 'patients:rdv_create' %}" class="o-btn-create">CRÉER</a>
+    <!-- <a href="?export=excel{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}" class="o-btn-excel" title="Exporter en Excel"><i class="bi bi-download"></i></a> -->
+    <div class="o-subheader-row-right">
 
-            <!-- Raccourcis de période -->
-            <div class="quick-pills">
-                <a href="?date_debut={{ today }}&date_fin={{ today }}"
-                class="quick-pill {% if is_today and not pas_fini and not statut_filter %}active{% endif %}">
-                    Aujourd'hui
-                </a>
-                <a href="?date_debut={{ today }}&date_fin={{ today }}&pas_fini=1"
-                class="quick-pill {% if is_today and pas_fini %}active{% endif %}">
-                    Pas fini
-                </a>
+      <!-- ── Filtres ── -->
+      <div class="o-dd-wrap">
+        <button class="o-ctrl-btn {% if request.GET.filter %}active{% endif %}" id="btn-filtres" onclick="toggleDd('dd-filtres',this)">
+          <i class="bi bi-funnel{% if request.GET.filter %}-fill{% endif %}"></i> Filtres{% if request.GET.filter %} <span style="background:var(--teal-600);color:#fff;border-radius:10px;font-size:10px;padding:0 5px;">1</span>{% endif %}
+        </button>
+        <div class="o-dd-panel" id="dd-filtres">
+          <div class="o-dd-section">Périodes</div>
+          <a class="o-dd-item {% if request.GET.filter == 'today' %}active{% endif %}" href="?filter=today{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Aujourd'hui</a>
+          <hr class="o-dd-sep">
+          <div class="o-dd-section">Mes rendez-vous</div>
+          <a class="o-dd-item {% if request.GET.filter == 'mine' %}active{% endif %}" href="?filter=mine{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Mes rendez-vous</a>
+          <hr class="o-dd-sep">
+          <div class="o-dd-section">Statut</div>
+          <a class="o-dd-item {% if request.GET.filter == 'planifie' %}active{% endif %}" href="?filter=planifie{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Planifié</a>
+          <a class="o-dd-item {% if request.GET.filter == 'confirme' %}active{% endif %}" href="?filter=confirme{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Confirmé</a>
+          <a class="o-dd-item {% if request.GET.filter == 'termine' %}active{% endif %}" href="?filter=termine{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Terminé</a>
+          <a class="o-dd-item {% if request.GET.filter == 'annule' %}active{% endif %}" href="?filter=annule{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Annulé</a>
+          <a class="o-dd-item {% if request.GET.filter == 'absent' %}active{% endif %}" href="?filter=absent{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Absent</a>
+          <a class="o-dd-item {% if request.GET.filter == 'not_done' %}active{% endif %}" href="?filter=not_done{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Pas fini</a>
+          <hr class="o-dd-sep">
+          <div class="o-dd-section">Par date</div>
+          <div class="o-dd-date-block">
+            <div class="o-dd-date-row">
+              <label>De</label>
+              <input type="date" id="filter-date-from" class="o-dd-date-input" value="{{ request.GET.date_from }}">
             </div>
-
-            <!-- Filtre par statut -->
-            <select name="statut" class="rdv-select" onchange="document.getElementById('filter-form').submit()">
-                <option value="">Tous les statuts</option>
-                <option value="planifie" {% if statut_filter == 'planifie' %}selected{% endif %}>Planifié</option>
-                <option value="confirme" {% if statut_filter == 'confirme' %}selected{% endif %}>Confirmé</option>
-                <option value="termine"  {% if statut_filter == 'termine'  %}selected{% endif %}>Terminé</option>
-                <option value="annule"   {% if statut_filter == 'annule'   %}selected{% endif %}>Annulé</option>
-                <option value="absent"   {% if statut_filter == 'absent'   %}selected{% endif %}>Absent</option>
-            </select>
-
-            {% if statut_filter or pas_fini %}
-            <a href="?date_debut={{ date_debut }}&date_fin={{ date_fin }}" class="btn btn-secondary btn-small">✕ Effacer</a>
-            {% endif %}
-
-        </div>
-
-        <!-- Sélecteur de plage de dates -->
-        <div class="rdv-toolbar-right">
-            <div class="date-range-form">
-                <input type="date" name="date_debut" value="{{ date_debut }}">
-                <span class="date-range-sep">→</span>
-                <input type="date" name="date_fin" value="{{ date_fin }}">
-                <button type="submit" class="btn-filter">Filtrer</button>
+            <div class="o-dd-date-row">
+              <label>À</label>
+              <input type="date" id="filter-date-to" class="o-dd-date-input" value="{{ request.GET.date_to }}">
             </div>
+            <div class="o-dd-date-actions">
+              <button type="button" class="o-dd-apply-btn" onclick="applyDateFilter()">Appliquer</button>
+              {% if request.GET.date_from or request.GET.date_to %}
+              <a class="o-dd-clear-btn" href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.filter %}filter={{ request.GET.filter }}&{% endif %}{% if request.GET.group %}group={{ request.GET.group }}{% endif %}">Effacer</a>
+              {% endif %}
+            </div>
+          </div>
+          <hr class="o-dd-sep">
+          <a class="o-dd-item" href="#">Ajouter un filtre personnalisé <span class="o-dd-arr">›</span></a>
         </div>
+      </div>
+
+      <!-- ── Regrouper par ── -->
+      <div class="o-dd-wrap">
+        <button class="o-ctrl-btn {% if request.GET.group %}active{% endif %}" id="btn-group" onclick="toggleDd('dd-group',this)">
+          <i class="bi bi-list-ul"></i> Regrouper par{% if request.GET.group %} <span style="background:var(--teal-600);color:#fff;border-radius:10px;font-size:10px;padding:0 5px;">1</span>{% endif %}
+        </button>
+        <div class="o-dd-panel" id="dd-group">
+          <div class="o-dd-section">Regrouper par</div>
+          <a class="o-dd-item {% if request.GET.group == 'age' %}active{% endif %}" href="?group=age{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Age du patient</a>
+          <a class="o-dd-item {% if request.GET.group == 'sexe' %}active{% endif %}" href="?group=sexe{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Sexe</a>
+          <a class="o-dd-item {% if request.GET.group == 'type_rdv' %}active{% endif %}" href="?group=type_rdv{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Type de consultation</a>
+          <a class="o-dd-item {% if request.GET.group == 'patient' %}active{% endif %}" href="?group=patient{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Patient</a>
+          <a class="o-dd-item {% if request.GET.group == 'medecin' %}active{% endif %}" href="?group=medecin{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Rendez-vous du docteur</a>
+          <div class="o-dd-item" style="position:relative;">
+            Date <span class="o-dd-arr">›</span>
+            <div class="o-dd-sub">
+              <a class="o-dd-item {% if request.GET.group == 'date_jour' %}active{% endif %}" href="?group=date_jour{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Jour</a>
+              <a class="o-dd-item {% if request.GET.group == 'date_semaine' %}active{% endif %}" href="?group=date_semaine{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Semaine</a>
+              <a class="o-dd-item {% if request.GET.group == 'date_mois' %}active{% endif %}" href="?group=date_mois{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Mois</a>
+              <a class="o-dd-item {% if request.GET.group == 'date_trimestre' %}active{% endif %}" href="?group=date_trimestre{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Trimestre</a>
+              <a class="o-dd-item {% if request.GET.group == 'date_annee' %}active{% endif %}" href="?group=date_annee{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Année</a>
+            </div>
+          </div>
+          <a class="o-dd-item {% if request.GET.group == 'statut' %}active{% endif %}" href="?group=statut{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">État</a>
+          <a class="o-dd-item {% if request.GET.group == 'service' %}active{% endif %}" href="?group=service{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Service</a>
+          <hr class="o-dd-sep">
+          <a class="o-dd-item" href="#">Ajouter un groupe personnalisé <span class="o-dd-arr">›</span></a>
+          {% if request.GET.group %}
+          <hr class="o-dd-sep">
+          <a class="o-dd-item" href="?{% if request.GET.q %}q={{ request.GET.q }}{% endif %}" style="color:#b71c1c;">
+            <i class="bi bi-x-circle" style="font-size:11px;"></i> Supprimer le regroupement
+          </a>
+          {% endif %}
+        </div>
+      </div>
+
+      <button class="o-ctrl-btn"><i class="bi bi-star"></i> Favoris</button>
+      <div class="o-ctrl-sep"></div>
+      <div class="o-pagination">
+        <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
+        <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
+           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-left"></i>
+        </a>
+        <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
+           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-right"></i>
+        </a>
+      </div>
+      <div class="o-ctrl-sep"></div>
+      <!-- <div class="o-view-btns">
+        <button class="o-view-btn active"><i class="bi bi-list-ul"></i></button>
+      </div> -->
     </div>
-    </form>
+  </div>
+  {% if request.GET.filter or request.GET.group or request.GET.date_from or request.GET.date_to %}
+  <div class="o-subheader-row" style="padding-top:0;gap:6px;flex-wrap:wrap;">
+    {% if request.GET.filter %}
+    <div class="o-active-filters">
+      <span style="font-size:11px;color:var(--text-muted);margin-right:2px;">Filtre :</span>
+      <span class="o-filter-tag">
+        {% if request.GET.filter == 'today' %}Aujourd'hui
+        {% elif request.GET.filter == 'mine' %}Mes rendez-vous
+        {% elif request.GET.filter == 'planifie' %}Planifié
+        {% elif request.GET.filter == 'confirme' %}Confirmé
+        {% elif request.GET.filter == 'termine' %}Terminé
+        {% elif request.GET.filter == 'annule' %}Annulé
+        {% elif request.GET.filter == 'absent' %}Absent
+        {% elif request.GET.filter == 'not_done' %}Pas fini
+        {% else %}{{ request.GET.filter }}{% endif %}
+        <button onclick="window.location='?{% if request.GET.q %}q={{ request.GET.q }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}'" title="Supprimer">×</button>
+      </span>
+    </div>
+    {% endif %}
+    {% if request.GET.date_from or request.GET.date_to %}
+    <div class="o-active-filters">
+      <span style="font-size:11px;color:var(--text-muted);margin-right:2px;">Date :</span>
+      <span class="o-filter-tag">
+        {% if request.GET.date_from and request.GET.date_to %}{{ request.GET.date_from }} → {{ request.GET.date_to }}
+        {% elif request.GET.date_from %}À partir du {{ request.GET.date_from }}
+        {% else %}Jusqu'au {{ request.GET.date_to }}{% endif %}
+        <button onclick="window.location='?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.filter %}filter={{ request.GET.filter }}&{% endif %}{% if request.GET.group %}group={{ request.GET.group }}{% endif %}'" title="Supprimer">×</button>
+      </span>
+    </div>
+    {% endif %}
+    {% if request.GET.group %}
+    <div class="o-active-filters">
+      <span style="font-size:11px;color:var(--text-muted);margin-right:2px;">Groupé par :</span>
+      <span class="o-filter-tag">
+        {% if request.GET.group == 'age' %}Age du patient
+        {% elif request.GET.group == 'sexe' %}Sexe
+        {% elif request.GET.group == 'type_rdv' %}Type de consultation
+        {% elif request.GET.group == 'medecin' %}Médecin
+        {% elif request.GET.group == 'statut' %}État
+        {% elif request.GET.group == 'service' %}Service
+        {% elif request.GET.group == 'date_jour' %}Date — Jour
+        {% elif request.GET.group == 'date_semaine' %}Date — Semaine
+        {% elif request.GET.group == 'date_mois' %}Date — Mois
+        {% elif request.GET.group == 'date_annee' %}Date — Année
+        {% else %}{{ request.GET.group }}{% endif %}
+        <button onclick="window.location='?{% if request.GET.q %}q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}'" title="Supprimer">×</button>
+      </span>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
 </div>
 
-<!-- ── Tableau ── -->
-{% if rdv_list %}
-<div class="table-container">
-    <table>
-        <thead>
-            <tr>
-                <th>Patient</th>
-                <th>Date / Heure</th>
-                <th>Médecin</th>
-                <th>Type</th>
-                <th>Motif</th>
-                <th>Durée</th>
-                <th>Statut</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for rdv in rdv_list %}
-            <tr style="cursor: pointer;" onclick="window.location='{% url 'patients:rdv_edit' rdv.pk %}'">
-                <td>
-                    <div class="patient-cell">
-                        <div class="patient-avatar">{{ rdv.patient.nom|first|upper }}</div>
-                        <div>
-                            <div class="patient-name">{{ rdv.patient.nom }} {{ rdv.patient.prenoms }}</div>
-                            <div class="patient-sub">
-                                {{ rdv.patient.age }} ans &middot;
-                                {% if rdv.patient.sexe == 'F' %}Femme{% else %}Homme{% endif %}
-                            </div>
-                        </div>
-                    </div>
-                </td>
-                <td>
-                    <div style="font-weight: 600; font-size: 14px;">{{ rdv.date_heure|date:"d/m/Y" }}</div>
-                    <div style="font-size: 12px; color: rgba(0,0,0,0.5);">{{ rdv.date_heure|date:"H:i" }}</div>
-                </td>
-                <td style="font-size: 13px;">
-                    {% if rdv.medecin %}{{ rdv.medecin }}{% else %}<span style="color:rgba(0,0,0,0.3);">—</span>{% endif %}
-                </td>
-                <td><span class="type-badge">{{ rdv.service.nom|default:"—" }}</span></td>
-                <td style="font-size: 13px; color: rgba(0,0,0,0.65); max-width: 220px;">
-                    {{ rdv.motif|truncatechars:45|default:"—" }}
-                </td>
-                <td style="font-size: 13px; white-space: nowrap; color: rgba(0,0,0,0.6);">{{ rdv.duree_minutes }} min</td>
-                <td>
-                    <span class="rdv-badge {{ rdv.statut }}">{{ rdv.get_statut_display }}</span>
-                </td>
-                <td onclick="event.stopPropagation()">
-                    <a href="{% url 'patients:rdv_edit' rdv.pk %}" class="btn btn-secondary btn-small">Voir</a>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+<!-- ══ TABLE ══ -->
+<div class="o-list-wrap">
+  {% if page_obj %}
+  <table class="o-list">
+    <thead>
+      <tr>
+        <th class="th-cb"><input type="checkbox" class="o-cb" id="chk-all"></th>
+        <th>Rendez-vous</th>
+        <th>Patient</th>
+        <th>Date</th>
+        <th>Docteur</th>
+        <th>Type de consultation</th>
+        <th>Diagnostic retenu / Autres pathologies associées</th>
+        <th>Âge</th>
+        <th>Genre</th>
+        <th>État</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for rdv in page_obj %}
+      <tr class="rdv-row" data-url="{% url 'patients:rdv_edit' rdv.pk %}">
+        <td class="td-cb"><input type="checkbox" class="o-cb" onclick="event.stopPropagation()"></td>
+        <td class="td-code">{{ rdv.code_rdv }}</td>
+        <td class="td-name">{{ rdv.patient.nom|upper }} {{ rdv.patient.prenoms }}</td>
+        <td>{{ rdv.date_heure|date:"d/m/Y H:i" }}</td>
+        <td class="td-doctor">{% if rdv.medecin %}{{ rdv.medecin }}{% else %}<span style="color:#ddd">—</span>{% endif %}</td>
+        <td>{{ rdv.get_type_rdv_display }}</td>
+        <td class="td-diagnostic">{{ rdv.maladies|truncatechars:45|default:"—" }}</td>
+        <td>{% if rdv.patient.date_naissance %}{{ rdv.patient.age }} ans{% else %}<span style="color:#ddd">—</span>{% endif %}</td>
+        <td>{% if rdv.patient.sexe == 'F' %}Femme{% elif rdv.patient.sexe == 'M' %}Homme{% else %}<span style="color:#ddd">—</span>{% endif %}</td>
+        <td><span class="o-badge badge-{{ rdv.statut }}">{{ rdv.get_statut_display }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="o-empty-state">
+    <div class="o-empty-illo">
+      <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+        <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+        <line x1="3" y1="10" x2="21" y2="10"/>
+        <line x1="9" y1="15" x2="15" y2="15"/>
+      </svg>
+    </div>
+    <div class="o-empty-title">Aucun rendez-vous{% if request.GET.q %} pour "{{ request.GET.q }}"{% endif %}</div>
+    <div class="o-empty-sub">{% if request.GET.q %}Essayez avec un autre terme de recherche.{% else %}Créez le premier rendez-vous.{% endif %}</div>
+    {% if not request.GET.q %}
+    <a href="{% url 'patients:rdv_create' %}" class="o-empty-btn">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      CRÉER UN RENDEZ-VOUS
+    </a>
+    {% endif %}
+  </div>
+  {% endif %}
 </div>
-{% else %}
-<div class="empty-state">
-    <div class="es-icon">📅</div>
-    <h3>Aucun rendez-vous trouvé</h3>
-    <p>
-        {% if statut_filter or pas_fini %}Modifiez vos filtres ou{% else %}Aucun rendez-vous pour cette période —{% endif %}
-        <a href="{% url 'patients:rdv_create' %}" style="color: var(--teal-500);">créer un rendez-vous</a>.
-    </p>
-</div>
-{% endif %}
 
+<script>
+  var chkAll = document.getElementById('chk-all');
+  if (chkAll) chkAll.addEventListener('change', function() {
+    document.querySelectorAll('.o-cb:not(#chk-all)').forEach(cb => cb.checked = this.checked);
+  });
+
+  document.querySelectorAll('.rdv-row').forEach(function(row) {
+    row.addEventListener('click', function(e) {
+      if (e.target.type === 'checkbox') return;
+      window.location = row.dataset.url;
+    });
+  });
+
+  function applyDateFilter() {
+    var from = document.getElementById('filter-date-from').value;
+    var to   = document.getElementById('filter-date-to').value;
+    if (!from && !to) return;
+    var params = new URLSearchParams(window.location.search);
+    if (from) params.set('date_from', from); else params.delete('date_from');
+    if (to)   params.set('date_to',   to);   else params.delete('date_to');
+    window.location = '?' + params.toString();
+  }
+  ['filter-date-from','filter-date-to'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('keydown', function(e){ if(e.key==='Enter') applyDateFilter(); });
+  });
+
+  function toggleDd(id, btn) {
+    var panel = document.getElementById(id);
+    var isOpen = panel.classList.contains('open');
+    document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
+    if (!isOpen) {
+      var rect = btn.getBoundingClientRect();
+      panel.style.top = (rect.bottom + 4) + 'px';
+      panel.style.left = rect.left + 'px';
+      panel.style.right = 'auto';
+      panel.classList.add('open');
+      var pr = panel.getBoundingClientRect();
+      if (pr.right > window.innerWidth - 8) {
+        panel.style.left = 'auto';
+        panel.style.right = (window.innerWidth - rect.right) + 'px';
+      }
+    }
+  }
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.o-dd-wrap')) {
+      document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
+    }
+  });
+  document.addEventListener('scroll', function() {
+    document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
+  }, true);
+
+  function initResizableCols(table) {
+    var ths = table.querySelectorAll('thead th');
+    ths.forEach(function(th) {
+      if (th.classList.contains('th-cb')) return;
+      var h = document.createElement('div');
+      h.className = 'o-col-resize';
+      th.appendChild(h);
+      h.addEventListener('mousedown', function(e) {
+        e.preventDefault(); e.stopPropagation();
+        var startX = e.pageX, startW = th.offsetWidth;
+        h.classList.add('active');
+        ths.forEach(function(t) { t.style.width = t.offsetWidth + 'px'; });
+        table.style.tableLayout = 'fixed';
+        function onMove(e) { th.style.width = Math.max(40, startW + e.pageX - startX) + 'px'; }
+        function onUp() { h.classList.remove('active'); document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); }
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      });
+    });
+  }
+  document.querySelectorAll('.o-list').forEach(initResizableCols);
+</script>
 {% endblock %}

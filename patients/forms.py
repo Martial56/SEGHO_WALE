@@ -1,5 +1,5 @@
 from django import forms
-from .models import Patient, Assurance, RendezVous
+from .models import Patient, Assurance, RendezVous, Pathologie, TypeVisite
 
 _ul = 'field-ul'          # underline (bottom border only)
 _ul_name = 'field-ul field-ul-name'
@@ -99,6 +99,31 @@ class PatientForm(forms.ModelForm):
                 'invalid': 'Valeur invalide.',
             }
 
+    def clean(self):
+        cleaned = super().clean()
+        nom            = (cleaned.get('nom') or '').strip()
+        prenoms        = (cleaned.get('prenoms') or '').strip()
+        date_naissance = cleaned.get('date_naissance')
+        telephone      = (cleaned.get('telephone') or '').strip()
+
+        if nom and prenoms and date_naissance and telephone:
+            qs = Patient.objects.filter(
+                nom__iexact=nom,
+                prenoms__iexact=prenoms,
+                date_naissance=date_naissance,
+                telephone=telephone,
+            )
+            if self.instance and self.instance.pk:
+                qs = qs.exclude(pk=self.instance.pk)
+            doublon = qs.first()
+            if doublon:
+                raise forms.ValidationError(
+                    f'Un dossier patient identique existe déjà : {doublon.code_patient} — '
+                    f'{doublon.nom} {doublon.prenoms}, né(e) le {doublon.date_naissance.strftime("%d/%m/%Y")}, '
+                    f'tél. {doublon.telephone}.'
+                )
+        return cleaned
+
 
 class RendezVousForm(forms.ModelForm):
     class Meta:
@@ -136,3 +161,41 @@ class RendezVousForm(forms.ModelForm):
         self.fields['service'].queryset = Service.objects.filter(actif=True).order_by('nom')
         self.fields['service'].empty_label = '— Choisir un service —'
         self.fields['service'].required = False
+
+
+class PathologieForm(forms.ModelForm):
+    class Meta:
+        model = Pathologie
+        fields = ['nom', 'description', 'actif']
+        widgets = {
+            'nom': forms.TextInput(attrs={
+                'class': _ul,
+                'placeholder': 'Nom de la pathologie',
+            }),
+            'description': forms.Textarea(attrs={
+                'class': _ul,
+                'rows': 3,
+                'placeholder': 'Description optionnelle...',
+            }),
+        }
+
+
+class TypeVisiteForm(forms.ModelForm):
+    class Meta:
+        model = TypeVisite
+        fields = ['nom', 'code', 'description', 'actif']
+        widgets = {
+            'nom': forms.TextInput(attrs={
+                'class': _ul,
+                'placeholder': 'Nom du type de visite',
+            }),
+            'code': forms.TextInput(attrs={
+                'class': _ul,
+                'placeholder': 'Ex: CPN01',
+            }),
+            'description': forms.Textarea(attrs={
+                'class': _ul,
+                'rows': 3,
+                'placeholder': 'Description optionnelle...',
+            }),
+        }

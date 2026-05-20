@@ -3,7 +3,24 @@
 {% block topbar_title %}{{ titre }}{% endblock %}
 
 {% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@18.2.1/build/css/intlTelInput.css">
 <style>
+    /* ── intl-tel-input ── */
+    .iti { width: 100%; display: block; }
+    .iti__selected-flag { background: transparent !important; }
+    .iti--separate-dial-code .iti__selected-flag {
+        border-right: 1px solid rgba(0,0,0,0.12);
+        padding: 0 8px 0 6px;
+    }
+    .iti--separate-dial-code input.field-ul { padding-left: 96px; }
+    .iti__country-list { font-size: 13px; }
+    html[data-theme="dark"] .iti__country-list { background: #1a2535; border-color: #2e3f58; color: #cce8f4; }
+    html[data-theme="dark"] .iti__country-list .iti__country:hover,
+    html[data-theme="dark"] .iti__country-list .iti__country.iti__highlight { background: #243044; }
+    html[data-theme="dark"] .iti__divider { border-color: #2e3f58; }
+    html[data-theme="dark"] .iti--separate-dial-code .iti__selected-flag { border-right-color: rgba(255,255,255,0.12); }
+    html[data-theme="dark"] .iti__selected-dial-code { color: #cce8f4; }
+
     /* ── Underline inputs (définis dans forms.py via class="field-ul") ── */
     .field-ul {
         width: 100%;
@@ -414,7 +431,7 @@
                     {% if form.telephone.errors %}<div class="field-error">{{ form.telephone.errors.0 }}</div>{% endif %}
                 </div>
                 <div class="form-field">
-                    <label class="field-label" for="{{ form.telephone2.id_for_label }}">Mobile</label>
+                    <label class="field-label" for="{{ form.telephone2.id_for_label }}">Téléphone 2</label>
                     {{ form.telephone2 }}
                 </div>
                 <div class="form-field">
@@ -503,8 +520,38 @@
     /* ── Âge calculé automatiquement ── */
     var dateInput = document.getElementById('{{ form.date_naissance.id_for_label }}');
     var ageDisplay = document.getElementById('age-display');
+
+    if (dateInput) {
+        var today = new Date();
+        var yyyy = today.getFullYear();
+        var mm   = String(today.getMonth() + 1).padStart(2, '0');
+        var dd   = String(today.getDate()).padStart(2, '0');
+        dateInput.min = '1900-01-01';
+        dateInput.max = yyyy + '-' + mm + '-' + dd;
+    }
+
+    function validateDateNaissance() {
+        if (!dateInput || !dateInput.value) return true;
+        var year = new Date(dateInput.value).getFullYear();
+        var errEl = dateInput.parentElement.querySelector('.date-range-error');
+        if (year < 1900 || year > new Date().getFullYear()) {
+            if (!errEl) {
+                errEl = document.createElement('div');
+                errEl.className = 'field-error date-range-error';
+                dateInput.parentElement.appendChild(errEl);
+            }
+            errEl.textContent = 'L\'année doit être comprise entre 1900 et ' + new Date().getFullYear() + '.';
+            dateInput.setCustomValidity('Année invalide');
+            return false;
+        }
+        if (errEl) errEl.remove();
+        dateInput.setCustomValidity('');
+        return true;
+    }
+
     function updateAge() {
         if (!dateInput || !dateInput.value) { if (ageDisplay) ageDisplay.textContent = '—'; return; }
+        if (!validateDateNaissance()) { if (ageDisplay) ageDisplay.textContent = '—'; return; }
         var birth = new Date(dateInput.value);
         var today = new Date();
         var age = today.getFullYear() - birth.getFullYear();
@@ -532,6 +579,57 @@
                 if (preview) { preview.src = e.target.result; preview.style.display = 'block'; }
             };
             reader.readAsDataURL(file);
+        });
+    }
+})();
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/intl-tel-input@18.2.1/build/js/intlTelInput.min.js"></script>
+<script>
+(function () {
+    var UTILS = 'https://cdn.jsdelivr.net/npm/intl-tel-input@18.2.1/build/js/utils.js';
+    var PREFERRED = ['ci','sn','ml','bf','gn','cm','tg','bj','ne','gh','ng','ma'];
+
+    function applyMaxLength(input, iti) {
+        if (!window.intlTelInputUtils) return;
+        var iso2 = iti.getSelectedCountryData().iso2;
+        try {
+            var example = intlTelInputUtils.getExampleNumber(
+                iso2, true, intlTelInputUtils.numberType.MOBILE
+            );
+            input.maxLength = example.replace(/\D/g, '').length;
+        } catch(e) {}
+    }
+
+    function initPhone(inputId) {
+        var input = document.getElementById(inputId);
+        if (!input) return null;
+        var iti = window.intlTelInput(input, {
+            initialCountry: 'ci',
+            preferredCountries: PREFERRED,
+            separateDialCode: true,
+            utilsScript: UTILS,
+        });
+        iti.promise.then(function () { applyMaxLength(input, iti); });
+        input.addEventListener('countrychange', function () { applyMaxLength(input, iti); });
+        return iti;
+    }
+
+    var itiTel1 = initPhone('{{ form.telephone.id_for_label }}');
+    var itiTel2 = initPhone('{{ form.telephone2.id_for_label }}');
+
+    /* Avant soumission : enregistrer le numéro complet au format E.164 */
+    var theForm = document.querySelector('form[method="post"]');
+    if (theForm) {
+        theForm.addEventListener('submit', function () {
+            if (itiTel1) {
+                var n1 = itiTel1.getNumber();
+                if (n1) document.getElementById('{{ form.telephone.id_for_label }}').value = n1;
+            }
+            if (itiTel2) {
+                var n2 = itiTel2.getNumber();
+                if (n2) document.getElementById('{{ form.telephone2.id_for_label }}').value = n2;
+            }
         });
     }
 })();

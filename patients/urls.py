@@ -21,4 +21,12 @@ urlpatterns = [
     path('<int:pk>/hospitalisations/', views.patient_hospitalisation_list, name='hospitalisation_list'),
     path('<int:pk>/examens-demandes/', views.patient_demande_examens_list, name='demande_examens_list'),
     path('<int:pk>/examens-resultats/', views.patient_resultat_examens_list, name='resultat_examens_list'),
+    path('pathologies/', views.pathologie_list, name='pathologie_list'),
+    path('pathologies/nouveau/', views.pathologie_create, name='pathologie_create'),
+    path('pathologies/<int:pk>/modifier/', views.pathologie_edit, name='pathologie_edit'),
+    path('pathologies/<int:pk>/supprimer/', views.pathologie_delete, name='pathologie_delete'),
+    path('types-visite/', views.typevisite_list, name='typevisite_list'),
+    path('types-visite/nouveau/', views.typevisite_create, name='typevisite_create'),
+    path('types-visite/<int:pk>/modifier/', views.typevisite_edit, name='typevisite_edit'),
+    path('types-visite/<int:pk>/supprimer/', views.typevisite_delete, name='typevisite_delete'),
 ]

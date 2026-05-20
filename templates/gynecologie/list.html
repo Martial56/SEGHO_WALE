@@ -203,17 +203,76 @@
   @media (max-width: 960px)  { .o-kanban { grid-template-columns: repeat(3, 1fr); } }
   @media (max-width: 640px)  { .o-kanban { grid-template-columns: repeat(2, 1fr); } }
   @media (max-width: 400px)  { .o-kanban { grid-template-columns: 1fr; } }
+
+  /* ── PAGINATION ── */
+  .pagination {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 28px; font-size: 13px; color: rgba(0,0,0,0.45); flex-wrap: wrap; gap: 10px;
+  }
+  .pagination-pages { display: flex; gap: 6px; }
+  .pagination-pages a,
+  .pagination-pages span {
+    min-width: 32px; height: 32px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; text-decoration: none; transition: background .2s; padding: 0 6px;
+  }
+  .pagination-pages a { background: #fff; color: var(--teal-700); box-shadow: 0 1px 4px rgba(0,0,0,0.12); }
+  .pagination-pages a:hover { background: var(--teal-50); }
+  .pagination-pages span.current { background: var(--teal-500); color: #fff; }
+  .pagination-pages span.disabled { color: rgba(0,0,0,0.2); background: rgba(0,0,0,0.04); cursor: default; }
+  html[data-theme="dark"] .pagination-pages a { background: #0d2035; color: #a0c8e0; box-shadow: none; }
+  html[data-theme="dark"] .pagination-pages a:hover { background: #0f3050; }
+
+  /* ── LIST VIEW ── */
+  #list-view { display: none; margin: 0 -32px; }
+  #list-view table { width: 100%; border-collapse: collapse; font-size: 13px; background: #fff; }
+  #list-view thead th {
+    border-bottom: 2px solid #e8edf2;
+    padding: 8px 14px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    background: #fff;
+  }
+  #list-view tbody tr {
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+    transition: background 0.1s;
+    background: #fff;
+  }
+  #list-view tbody tr:nth-child(even) { background: #fff; }
+  #list-view tbody tr:hover { background: #ddeef7; }
+  #list-view tbody td { padding: 9px 14px; color: #333; font-size: 13px; }
+  #list-view tbody td.lv-code { font-family: monospace; font-size: 12px; color: #555; white-space: nowrap; }
+  #list-view tbody td.lv-name { font-weight: 500; color: #111; }
+  #list-view tbody td.lv-muted { color: #666; }
+  html[data-theme="dark"] #list-view thead th { background: #0d2035; color: rgba(255,255,255,0.4); border-bottom-color: #243044; }
+  html[data-theme="dark"] #list-view tbody tr { border-bottom-color: #1a3050; background: #0d2035; }
+  html[data-theme="dark"] #list-view tbody tr:nth-child(even) { background: #0d2035; }
+  html[data-theme="dark"] #list-view tbody tr:hover { background: #0f3050; }
+  html[data-theme="dark"] #list-view table { background: #0d2035; }
+  html[data-theme="dark"] #list-view tbody td { color: #cce8f4; }
+  html[data-theme="dark"] #list-view tbody td.lv-muted { color: rgba(255,255,255,0.45); }
 </style>
 
 <!-- ══ SUBHEADER ══ -->
 <div class="o-subheader">
   <!-- Ligne 1 : titre + recherche -->
   <div class="o-subheader-row">
-    <span class="o-page-title">Patient</span>
+    <div style="display:flex;flex-direction:column;gap:4px;">
+      <span class="o-page-title">Patient</span>
+      <!-- <a href="{% url 'patients:create' %}" class="o-btn-create">
+        <i class="bi bi-plus" style="font-size:14px;margin-right:4px;"></i> Créer
+      </a> -->
+    </div>
     <div class="o-subheader-row-right">
       <form method="get" style="display:flex;align-items:center;">
         <div class="o-search-bar">
-          <input class="o-search-input" type="text" name="q"
+          <input class="o-search-input" type="text" name="q" id="search-q"
                  value="{{ request.GET.q }}" placeholder="Rechercher un patient…">
           <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
         </div>
@@ -280,8 +339,8 @@
       </div>
       <div class="o-ctrl-sep"></div>
       <div class="o-view-btns">
-        <button class="o-view-btn active"><i class="bi bi-grid"></i></button>
-        <a href="{% url 'gynecologie_rdv' %}" class="o-view-btn"><i class="bi bi-list-ul"></i></a>
+        <button class="o-view-btn active" id="btn-kanban" onclick="setView('kanban')"><i class="bi bi-grid"></i></button>
+        <button class="o-view-btn" id="btn-list" onclick="setView('list')"><i class="bi bi-list-ul"></i></button>
       </div>
     </div>
   </div>
@@ -314,10 +373,11 @@
   {% endif %}
 </div>
 
+
 <!-- ══ KANBAN GRID ══ -->
-<div class="o-kanban">
+<div id="kanban-view" class="o-kanban">
   {% for patient in page_obj %}
-  <a class="pk-card" href="/admin/patients/patient/{{ patient.pk }}/change/">
+  <a class="pk-card" href="{% url 'patients:detail' patient.pk %}">
     <div class="pk-avatar">
       {% if patient.photo %}
         <img src="{{ patient.photo.url }}" alt="{{ patient.nom }}">
@@ -345,32 +405,149 @@
   {% endfor %}
 </div>
 
+<!-- ══ VUE LISTE ══ -->
+<div id="list-view">
+  <table>
+    <thead>
+      <tr>
+        <th>Code d'identification</th>
+        <th>Nom et prénoms</th>
+        <th>Âge</th>
+        <th>Genre</th>
+        <th>Téléphone</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for patient in page_obj %}
+      <tr onclick="window.location='{% url 'patients:detail' patient.pk %}'">
+        <td class="lv-code">{{ patient.code_patient }}</td>
+        <td class="lv-name">{{ patient.nom }} {{ patient.prenoms }}</td>
+        <td class="lv-muted">{% if patient.date_naissance %}{{ patient.age }} ans{% else %}—{% endif %}</td>
+        <td class="lv-muted">{% if patient.sexe == 'F' %}Femme{% elif patient.sexe == 'M' %}Homme{% else %}—{% endif %}</td>
+        <td class="lv-muted">{{ patient.telephone }}</td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="5" style="text-align:center;padding:48px;color:rgba(0,0,0,0.35)">
+          Aucun patient trouvé
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- ══ PAGINATION ══ -->
+{% if page_obj.has_other_pages %}
+<div class="pagination">
+  <span>
+    Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+    &nbsp;·&nbsp; {{ page_obj.paginator.count }} résultat{{ page_obj.paginator.count|pluralize }}
+  </span>
+  <div class="pagination-pages">
+    {% if page_obj.has_previous %}
+      <a href="?page=1{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}" title="Première">«</a>
+      <a href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}">‹</a>
+    {% else %}
+      <span class="disabled">«</span>
+      <span class="disabled">‹</span>
+    {% endif %}
+    {% for num in page_obj.paginator.page_range %}
+      {% if num == page_obj.number %}
+        <span class="current">{{ num }}</span>
+      {% elif num >= page_obj.number|add:"-2" and num <= page_obj.number|add:"2" %}
+        <a href="?page={{ num }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}">{{ num }}</a>
+      {% endif %}
+    {% endfor %}
+    {% if page_obj.has_next %}
+      <a href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}">›</a>
+      <a href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}" title="Dernière">»</a>
+    {% else %}
+      <span class="disabled">›</span>
+      <span class="disabled">»</span>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
 <script>
-  function toggleDd(id, btn) {
-    var panel = document.getElementById(id);
-    var isOpen = panel.classList.contains('open');
-    document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
-    if (!isOpen) {
-      var rect = btn.getBoundingClientRect();
-      panel.style.top = (rect.bottom + 4) + 'px';
-      panel.style.left = rect.left + 'px';
-      panel.style.right = 'auto';
-      panel.classList.add('open');
-      var pr = panel.getBoundingClientRect();
-      if (pr.right > window.innerWidth - 8) {
-        panel.style.left = 'auto';
-        panel.style.right = (window.innerWidth - rect.right) + 'px';
-      }
+(function () {
+  var STORAGE_KEY = 'segho-gyn-patients-view';
+  var currentView = localStorage.getItem(STORAGE_KEY) || 'kanban';
+
+  function setView(mode) {
+    var kanban = document.getElementById('kanban-view');
+    var list   = document.getElementById('list-view');
+    var btnK   = document.getElementById('btn-kanban');
+    var btnL   = document.getElementById('btn-list');
+    if (mode === 'list') {
+      kanban.style.display = 'none';
+      list.style.display   = 'block';
+      btnK.classList.remove('active');
+      btnL.classList.add('active');
+    } else {
+      kanban.style.display = 'grid';
+      list.style.display   = 'none';
+      btnK.classList.add('active');
+      btnL.classList.remove('active');
+    }
+    currentView = mode;
+    localStorage.setItem(STORAGE_KEY, mode);
+  }
+  window.setView = setView;
+  setView(currentView);
+
+  var searchInput = document.getElementById('search-q');
+  if (searchInput) {
+    var timer;
+    searchInput.addEventListener('input', function () {
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        var params = new URLSearchParams(window.location.search);
+        params.set('q', searchInput.value);
+        params.delete('page');
+        var url = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+        fetch(url)
+          .then(function(r){ return r.text(); })
+          .then(function(html) {
+            var doc = new DOMParser().parseFromString(html, 'text/html');
+            var newKanban = doc.getElementById('kanban-view');
+            if (newKanban) document.getElementById('kanban-view').innerHTML = newKanban.innerHTML;
+            var newList = doc.getElementById('list-view');
+            if (newList) document.getElementById('list-view').innerHTML = newList.innerHTML;
+            history.pushState({}, '', url);
+            setView(currentView);
+          });
+      }, 300);
+    });
+  }
+})();
+
+function toggleDd(id, btn) {
+  var panel = document.getElementById(id);
+  var isOpen = panel.classList.contains('open');
+  document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
+  if (!isOpen) {
+    var rect = btn.getBoundingClientRect();
+    panel.style.top = (rect.bottom + 4) + 'px';
+    panel.style.left = rect.left + 'px';
+    panel.style.right = 'auto';
+    panel.classList.add('open');
+    var pr = panel.getBoundingClientRect();
+    if (pr.right > window.innerWidth - 8) {
+      panel.style.left = 'auto';
+      panel.style.right = (window.innerWidth - rect.right) + 'px';
     }
   }
-  document.addEventListener('click', function(e) {
-    if (!e.target.closest('.o-dd-wrap')) {
-      document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
-    }
-  });
-  document.addEventListener('scroll', function() {
+}
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.o-dd-wrap')) {
     document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
-  }, true);
+  }
+});
+document.addEventListener('scroll', function() {
+  document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
+}, true);
 </script>
 
 {% endblock %}

@@ -92,7 +92,7 @@
   }
   .o-list { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
   .o-list thead th {
-    background: var(--surface); border-bottom: 1px solid var(--border);
+    background: #f5f5f5; border-bottom: 1px solid var(--border);
     padding: 6px 10px; font-weight: 500; font-size: 11.5px;
     color: var(--text-muted); text-align: left;
     position: sticky; top: 0; z-index: 2; cursor: pointer; user-select: none;
@@ -242,7 +242,7 @@
   </div>
   <div class="o-subheader-row">
     <a href="{% url 'gynecologie_rdv_create' %}" class="o-btn-create">CRÉER</a>
-    <a href="?export=excel{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}" class="o-btn-excel" title="Exporter en Excel"><i class="bi bi-download"></i></a>
+    <!-- <a href="?export=excel{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}" class="o-btn-excel" title="Exporter en Excel"><i class="bi bi-download"></i></a> -->
     <div class="o-subheader-row-right">
 
       <!-- ── Filtres ── -->
@@ -342,7 +342,7 @@
       </div>
       <div class="o-ctrl-sep"></div>
       <div class="o-view-btns">
-        <a href="{% url 'gynecologie_list' %}" class="o-view-btn"><i class="bi bi-grid"></i></a>
+        <!-- <a href="{% url 'gynecologie_list' %}" class="o-view-btn"><i class="bi bi-grid"></i></a> -->
         <button class="o-view-btn active"><i class="bi bi-list-ul"></i></button>
       </div>
     </div>
@@ -408,12 +408,12 @@
     <thead>
       <tr>
         <th class="th-cb"><input type="checkbox" class="o-cb" id="chk-all"></th>
-        <th>Code RDV</th>
+        <th>Rendez-vous</th>
         <th>Patient</th>
         <th>Date</th>
-        <th>Médecin</th>
-        <th>Type</th>
-        <th>Motif</th>
+        <th>Docteur</th>
+        <th>Type de consultation</th>
+        <th>Diagnostic retenu / Autres pathologies associées</th>
         <th>Âge</th>
         <th>Genre</th>
         <th>État</th>
@@ -429,9 +429,9 @@
         <td>{{ rdv.date_heure|date:"d/m/Y H:i" }}</td>
         <td class="td-doctor">{% if rdv.medecin %}{{ rdv.medecin }}{% else %}<span style="color:#ddd">—</span>{% endif %}</td>
         <td>{{ rdv.get_type_rdv_display }}</td>
-        <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;color:var(--text-muted);">{{ rdv.motif|truncatechars:35 }}</td>
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;color:var(--text-muted);">{{ rdv.maladies|truncatechars:45|default:"—" }}</td>
         <td>{% if rdv.patient.date_naissance %}{{ age }} ans{% else %}<span style="color:#ddd">—</span>{% endif %}</td>
-        <td>{% if rdv.patient.sexe == 'F' %}F{% elif rdv.patient.sexe == 'M' %}M{% else %}<span style="color:#ddd">—</span>{% endif %}</td>
+        <td>{% if rdv.patient.sexe == 'F' %}Femme{% elif rdv.patient.sexe == 'M' %}Homme{% else %}<span style="color:#ddd">—</span>{% endif %}</td>
         <td><span class="o-badge badge-{{ rdv.statut }}">{{ rdv.get_statut_display }}</span></td>
       </tr>
       {% endwith %}
@@ -467,17 +467,9 @@
   });
 
   document.querySelectorAll('.rdv-row').forEach(function(row) {
-    var clicks = 0, timer = null;
     row.addEventListener('click', function(e) {
       if (e.target.type === 'checkbox') return;
-      clicks++;
-      if (clicks === 1) {
-        timer = setTimeout(function() { clicks = 0; }, 400);
-      } else {
-        clearTimeout(timer);
-        clicks = 0;
-        window.location = row.dataset.url;
-      }
+      window.location = row.dataset.url;
     });
   });
 

@@ -7,8 +7,8 @@ from django.http import JsonResponse
 from django.utils import timezone
 from datetime import timedelta
 
-from .models import Patient, RendezVous
-from .forms import PatientForm, RendezVousForm
+from .models import Patient, RendezVous, Pathologie, TypeVisite
+from .forms import PatientForm, RendezVousForm, PathologieForm, TypeVisiteForm
 
 
 @login_required
@@ -143,45 +143,46 @@ def rdv_global_list(request):
     from datetime import date, datetime as dt
 
     today = date.today()
-    date_debut_str = request.GET.get('date_debut', today.isoformat())
-    date_fin_str   = request.GET.get('date_fin',   today.isoformat())
-    statut_filter  = request.GET.get('statut', '')
-    pas_fini       = request.GET.get('pas_fini', '')
+    q           = request.GET.get('q', '').strip()
+    filter_val  = request.GET.get('filter', '')
+    date_from_s = request.GET.get('date_from', '')
+    date_to_s   = request.GET.get('date_to', '')
 
-    try:
-        d1 = dt.strptime(date_debut_str, '%Y-%m-%d').date()
-        d2 = dt.strptime(date_fin_str,   '%Y-%m-%d').date()
-    except ValueError:
-        d1 = d2 = today
+    qs = RendezVous.objects.select_related('patient', 'medecin').order_by('-date_heure')
 
-    qs = RendezVous.objects.select_related('patient', 'medecin').filter(
-        date_heure__date__gte=d1,
-        date_heure__date__lte=d2,
-    ).order_by('date_heure')
+    if q:
+        qs = qs.filter(
+            Q(patient__nom__icontains=q) |
+            Q(patient__prenoms__icontains=q) |
+            Q(patient__code_patient__icontains=q)
+        )
 
-    if pas_fini:
+    if date_from_s or date_to_s:
+        try:
+            if date_from_s:
+                qs = qs.filter(date_heure__date__gte=dt.strptime(date_from_s, '%Y-%m-%d').date())
+            if date_to_s:
+                qs = qs.filter(date_heure__date__lte=dt.strptime(date_to_s, '%Y-%m-%d').date())
+        except ValueError:
+            pass
+    elif filter_val == 'mine':
+        qs = qs.filter(date_heure__date=today)
+        if hasattr(request.user, 'medecin'):
+            qs = qs.filter(medecin=request.user.medecin)
+    elif filter_val in ('planifie', 'confirme', 'termine', 'annule', 'absent'):
+        qs = qs.filter(statut=filter_val)
+    elif filter_val == 'not_done':
         qs = qs.filter(statut__in=['planifie', 'confirme'])
-    elif statut_filter:
-        qs = qs.filter(statut=statut_filter)
+    else:
+        # Par défaut (filter=today ou aucun paramètre) : rendez-vous du jour
+        qs = qs.filter(date_heure__date=today)
 
-    base_qs = RendezVous.objects.filter(date_heure__date__gte=d1, date_heure__date__lte=d2)
-    stats = {
-        'total':     base_qs.count(),
-        'planifies': base_qs.filter(statut='planifie').count(),
-        'confirmes': base_qs.filter(statut='confirme').count(),
-        'termines':  base_qs.filter(statut='termine').count(),
-        'absents':   base_qs.filter(statut__in=['annule', 'absent']).count(),
-    }
+    paginator = Paginator(qs, 25)
+    page_obj  = paginator.get_page(request.GET.get('page'))
 
     return render(request, 'patients/rendez_vous.html', {
-        'rdv_list':      qs,
-        'stats':         stats,
-        'date_debut':    d1.isoformat(),
-        'date_fin':      d2.isoformat(),
-        'statut_filter': statut_filter,
-        'pas_fini':      pas_fini,
-        'today':         today.isoformat(),
-        'is_today':      d1 == today and d2 == today,
+        'page_obj': page_obj,
+        'today':    today.isoformat(),
     })
 
 
@@ -421,54 +422,55 @@ def rdv_edit(request, pk):
 
 @login_required
 def gynecologie_rdv_list(request):
-    from datetime import date, datetime as dt
+    from datetime import date as _date
 
-    today = date.today()
-    date_debut_str = request.GET.get('date_debut', today.isoformat())
-    date_fin_str   = request.GET.get('date_fin',   today.isoformat())
-    statut_filter  = request.GET.get('statut', '')
-    pas_fini       = request.GET.get('pas_fini', '')
-
-    try:
-        d1 = dt.strptime(date_debut_str, '%Y-%m-%d').date()
-        d2 = dt.strptime(date_fin_str,   '%Y-%m-%d').date()
-    except ValueError:
-        d1 = d2 = today
+    q          = request.GET.get('q', '').strip()
+    filter_val = request.GET.get('filter', '')
+    group_val  = request.GET.get('group', '')
+    date_from  = request.GET.get('date_from', '')
+    date_to    = request.GET.get('date_to', '')
 
     qs = RendezVous.objects.select_related('patient', 'medecin').filter(
-        departement='gynecologie_cpn',
-        date_heure__date__gte=d1,
-        date_heure__date__lte=d2,
-    ).order_by('date_heure')
+        departement='gynecologie_cpn'
+    ).order_by('-date_heure')
 
-    if pas_fini:
-        qs = qs.filter(statut__in=['planifie', 'confirme'])
-    elif statut_filter:
-        qs = qs.filter(statut=statut_filter)
+    if q:
+        qs = qs.filter(
+            Q(patient__nom__icontains=q) |
+            Q(patient__prenoms__icontains=q) |
+            Q(patient__code_patient__icontains=q)
+        )
 
-    base_qs = RendezVous.objects.filter(
-        departement='gynecologie_cpn',
-        date_heure__date__gte=d1,
-        date_heure__date__lte=d2,
-    )
-    stats = {
-        'total':     base_qs.count(),
-        'planifies': base_qs.filter(statut='planifie').count(),
-        'confirmes': base_qs.filter(statut='confirme').count(),
-        'termines':  base_qs.filter(statut='termine').count(),
-        'absents':   base_qs.filter(statut__in=['annule', 'absent']).count(),
-    }
+    if filter_val == 'today':
+        qs = qs.filter(date_heure__date=_date.today())
+    elif filter_val == 'mine':
+        qs = qs.filter(medecin__user=request.user)
+    elif filter_val == 'not_done':
+        qs = qs.exclude(statut__in=['termine', 'annule', 'absent'])
 
-    return render(request, 'patients/gynecologie_rdv.html', {
-        'rdv_list':      qs,
-        'stats':         stats,
-        'date_debut':    d1.isoformat(),
-        'date_fin':      d2.isoformat(),
-        'statut_filter': statut_filter,
-        'pas_fini':      pas_fini,
-        'today':         today.isoformat(),
-        'is_today':      d1 == today and d2 == today,
-    })
+    if date_from:
+        try:
+            qs = qs.filter(date_heure__date__gte=date_from)
+        except (ValueError, TypeError):
+            pass
+    if date_to:
+        try:
+            qs = qs.filter(date_heure__date__lte=date_to)
+        except (ValueError, TypeError):
+            pass
+
+    if group_val in ('date_jour', 'date_semaine', 'date_mois', 'date_annee'):
+        qs = qs.order_by('date_heure')
+    elif group_val == 'statut':
+        qs = qs.order_by('statut', '-date_heure')
+    elif group_val in ('medecin', 'referent'):
+        qs = qs.order_by('medecin', '-date_heure')
+    elif group_val == 'patient':
+        qs = qs.order_by('patient__nom', 'patient__prenoms')
+
+    paginator = Paginator(qs, 25)
+    page_obj  = paginator.get_page(request.GET.get('page'))
+    return render(request, 'gynecologie/rdv.html', {'page_obj': page_obj})
 
 
 @login_required
@@ -477,29 +479,30 @@ def gynecologie_patient_list(request):
         departement='gynecologie_cpn'
     ).values_list('patient_id', flat=True).distinct()
 
-    qs = Patient.objects.filter(pk__in=gyne_ids)
-    total_gyne = qs.count()
+    qs = Patient.objects.filter(pk__in=gyne_ids).order_by('nom', 'prenoms')
 
-    q    = request.GET.get('q', '').strip()
-    sexe = request.GET.get('sexe', '')
+    q          = request.GET.get('q', '').strip()
+    filter_val = request.GET.get('filter', '')
+    group_val  = request.GET.get('group', '')
 
     if q:
         qs = qs.filter(
             Q(nom__icontains=q) | Q(prenoms__icontains=q) |
             Q(code_patient__icontains=q) | Q(telephone__icontains=q)
         )
-    if sexe in ('M', 'F'):
-        qs = qs.filter(sexe=sexe)
+    if filter_val == 'femme':
+        qs = qs.filter(sexe='F')
+    elif filter_val == 'homme':
+        qs = qs.filter(sexe='M')
 
-    paginator = Paginator(qs, 40)
+    if group_val == 'sexe':
+        qs = qs.order_by('sexe', 'nom', 'prenoms')
+    elif group_val == 'age':
+        qs = qs.order_by('date_naissance')
+
+    paginator = Paginator(qs, 25)
     page_obj  = paginator.get_page(request.GET.get('page'))
-    return render(request, 'patients/gynecologie_list.html', {
-        'page_obj':      page_obj,
-        'total_filtre':  qs.count(),
-        'total_gyne':    total_gyne,
-        'q':             q,
-        'sexe':          sexe,
-    })
+    return render(request, 'gynecologie/list.html', {'page_obj': page_obj})
 
 
 @login_required
@@ -598,3 +601,119 @@ def patient_resultat_examens_list(request, pk):
         'titre': "Résultats d'examens de laboratoire",
         'items': items,
     })
+
+
+@login_required
+def pathologie_list(request):
+    qs = Pathologie.objects.all()
+    q  = request.GET.get('q', '').strip()
+
+    if q:
+        qs = qs.filter(nom__icontains=q)
+
+    paginator = Paginator(qs, 40)
+    page_obj  = paginator.get_page(request.GET.get('page'))
+    return render(request, 'patients/pathologie_list.html', {
+        'page_obj': page_obj,
+        'q':        q,
+        'total':    qs.count(),
+    })
+
+
+@login_required
+def pathologie_create(request):
+    if request.method == 'POST':
+        form = PathologieForm(request.POST)
+        if form.is_valid():
+            p = form.save()
+            messages.success(request, f'Pathologie "{p.nom}" enregistrée.')
+            return redirect('patients:pathologie_list')
+    else:
+        form = PathologieForm()
+    return render(request, 'patients/pathologie_form.html', {
+        'form': form, 'titre': 'Nouvelle pathologie', 'edit': False,
+    })
+
+
+@login_required
+def pathologie_edit(request, pk):
+    pathologie = get_object_or_404(Pathologie, pk=pk)
+    if request.method == 'POST':
+        form = PathologieForm(request.POST, instance=pathologie)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Pathologie mise à jour.')
+            return redirect('patients:pathologie_list')
+    else:
+        form = PathologieForm(instance=pathologie)
+    return render(request, 'patients/pathologie_form.html', {
+        'form': form, 'titre': 'Modifier la pathologie', 'edit': True, 'object': pathologie,
+    })
+
+
+@login_required
+def pathologie_delete(request, pk):
+    pathologie = get_object_or_404(Pathologie, pk=pk)
+    if request.method == 'POST':
+        nom = pathologie.nom
+        pathologie.delete()
+        messages.success(request, f'Pathologie "{nom}" supprimée.')
+    return redirect('patients:pathologie_list')
+
+
+@login_required
+def typevisite_list(request):
+    qs = TypeVisite.objects.all()
+    q  = request.GET.get('q', '').strip()
+
+    if q:
+        qs = qs.filter(Q(nom__icontains=q) | Q(code__icontains=q))
+
+    paginator = Paginator(qs, 40)
+    page_obj  = paginator.get_page(request.GET.get('page'))
+    return render(request, 'patients/typevisite_list.html', {
+        'page_obj': page_obj,
+        'q':        q,
+        'total':    qs.count(),
+    })
+
+
+@login_required
+def typevisite_create(request):
+    if request.method == 'POST':
+        form = TypeVisiteForm(request.POST)
+        if form.is_valid():
+            tv = form.save()
+            messages.success(request, f'Type de visite "{tv.nom}" enregistré.')
+            return redirect('patients:typevisite_list')
+    else:
+        form = TypeVisiteForm()
+    return render(request, 'patients/typevisite_form.html', {
+        'form': form, 'titre': 'Nouveau type de visite', 'edit': False,
+    })
+
+
+@login_required
+def typevisite_edit(request, pk):
+    tv = get_object_or_404(TypeVisite, pk=pk)
+    if request.method == 'POST':
+        form = TypeVisiteForm(request.POST, instance=tv)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Type de visite mis à jour.')
+            return redirect('patients:typevisite_list')
+    else:
+        form = TypeVisiteForm(instance=tv)
+    return render(request, 'patients/typevisite_form.html', {
+        'form': form, 'titre': 'Modifier le type de visite', 'edit': True, 'object': tv,
+    })
+
+
+@login_required
+def typevisite_delete(request, pk):
+    tv = get_object_or_404(TypeVisite, pk=pk)
+    if request.method == 'POST':
+        nom = tv.nom
+        tv.delete()
+        messages.success(request, f'Type de visite "{nom}" supprimé.')
+    return redirect('patients:typevisite_list')

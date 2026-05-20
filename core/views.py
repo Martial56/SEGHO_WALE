@@ -675,59 +675,145 @@ def _rdv_form_post(request, rdv):
 
 @login_required(login_url='login')
 def gynecologie_rdv_create(request):
-    from patients.models import Patient, RendezVous
+    from patients.forms import RendezVousForm
     from medecins.models import Medecin
 
-    patients = Patient.objects.filter(actif=True).order_by('nom')
     medecins = Medecin.objects.all().order_by('nom')
-    error = None
 
     if request.method == 'POST':
-        rdv = RendezVous()
-        err, ok = _rdv_form_post(request, rdv)
-        if ok:
-            return redirect('gynecologie_rdv_detail', pk=rdv.pk)
-        error = err
+        form = RendezVousForm(request.POST)
+        if form.is_valid():
+            rdv = form.save(commit=False)
+            code = request.POST.get('code_confirmation', '').strip()
+            if code:
+                rdv.code_confirmation = code
+            rdv.save()
+            action = request.POST.get('_action', '')
+            if action == 'annuler':
+                return redirect('gynecologie_rdv')
+            from django.urls import reverse
+            return redirect(reverse('facture_create') + f'?patient={rdv.patient.pk}&rdv={rdv.pk}')
+    else:
+        form = RendezVousForm(initial={
+            'date_heure': timezone.now().strftime('%Y-%m-%dT%H:%M'),
+            'departement': 'gynecologie_cpn',
+        })
 
-    total = _rdv_gyn_qs().count()
     breadcrumb = [
-        {'title': 'Accueil', 'url': '/'},
         {'title': 'Gynécologie', 'url': '/gynecologie/'},
         {'title': 'Rendez-vous', 'url': '/gynecologie/rdv/'},
         {'title': 'Nouveau'},
     ]
     return render(request, 'gynecologie/rdv_form.html', {
-        'patients': patients,
-        'medecins': medecins,
-        'breadcrumb': breadcrumb,
-        'error': error,
+        'form': form,
         'rdv': None,
         'is_new': True,
-        'nav_total': total,
-        'nav_pos': None,
-        'nav_prev': None,
-        'nav_next': None,
+        'patient_prefill': None,
+        'consultation': None,
+        'constante': None,
+        'facture_payee': False,
+        'medecins': medecins,
+        'breadcrumb': breadcrumb,
     })
 
 
 @login_required(login_url='login')
 def gynecologie_rdv_detail(request, pk):
-    from patients.models import Patient, RendezVous
+    from patients.forms import RendezVousForm
+    from patients.models import RendezVous
     from medecins.models import Medecin
     from django.shortcuts import get_object_or_404
 
     rdv = get_object_or_404(RendezVous, pk=pk)
-    patients = Patient.objects.filter(actif=True).order_by('nom')
     medecins = Medecin.objects.all().order_by('nom')
-    error = None
+
+    try:
+        from facturation.models import Facture
+        facture_payee = Facture.objects.filter(patient=rdv.patient, statut='payee').exists()
+    except Exception:
+        facture_payee = False
+
+    consultation = None
+    constante = None
+    try:
+        consultation = rdv.consultation
+        try:
+            constante = consultation.constantes
+        except Exception:
+            pass
+    except Exception:
+        pass
 
     if request.method == 'POST':
-        err, ok = _rdv_form_post(request, rdv)
-        if ok:
-            return redirect('gynecologie_rdv_detail', pk=rdv.pk)
-        error = err
+        action = request.POST.get('_action', '')
 
-    # Page navigation within gynécologie RDV queryset
+        if action == 'save_eval':
+            _eval_map = {
+                'eval_poids': 'poids', 'eval_taille': 'taille',
+                'eval_temperature': 'temperature',
+                'eval_tension_systolique': 'tension_systolique',
+                'eval_tension_diastolique': 'tension_diastolique',
+                'eval_tension_systolique_droite': 'tension_systolique_droite',
+                'eval_tension_diastolique_droite': 'tension_diastolique_droite',
+                'eval_pouls': 'pouls', 'eval_frequence_respiratoire': 'frequence_respiratoire',
+                'eval_saturation_oxygene': 'saturation_oxygene', 'eval_glycemie': 'glycemie',
+                'eval_albumine': 'albumine', 'eval_perimetre_brachial': 'perimetre_brachial',
+                'eval_niveau_douleur': 'niveau_douleur',
+            }
+            from consultations.models import Consultation as Consult, Constante as Const
+            try:
+                consult_obj = rdv.consultation
+            except Exception:
+                consult_obj = None
+            if consult_obj is None:
+                consult_obj = Consult.objects.create(
+                    patient=rdv.patient, medecin=rdv.medecin, rendez_vous=rdv,
+                    motif=rdv.motif or 'Évaluation clinique', cree_par=request.user,
+                )
+            const_obj, _ = Const.objects.get_or_create(consultation=consult_obj)
+            for post_key, model_field in _eval_map.items():
+                val = request.POST.get(post_key, '').strip()
+                if val != '':
+                    setattr(const_obj, model_field, val)
+            const_obj.save()
+            return redirect('gynecologie_rdv_detail', pk=rdv.pk)
+
+        if action == 'confirmer':
+            if facture_payee:
+                rdv.statut = 'confirme'
+                rdv.save(update_fields=['statut'])
+            return redirect('gynecologie_rdv')
+
+        if action in ('en_attente', 'en_consultation'):
+            rdv.statut = action
+            rdv.save(update_fields=['statut'])
+            return redirect('gynecologie_rdv_detail', pk=rdv.pk)
+
+        if action == 'terminer':
+            rdv.statut = 'termine'
+            rdv.save(update_fields=['statut'])
+            return redirect('gynecologie_rdv')
+
+        if action == 'annuler':
+            rdv.statut = 'annule'
+            rdv.save(update_fields=['statut'])
+            return redirect('gynecologie_rdv')
+
+        form = RendezVousForm(request.POST, instance=rdv)
+        if form.is_valid():
+            rdv = form.save(commit=False)
+            code = request.POST.get('code_confirmation', '').strip()
+            if code:
+                rdv.code_confirmation = code
+            rdv.save()
+            if action == 'créer une facture':
+                from django.urls import reverse
+                return redirect(reverse('facture_create') + f'?patient={rdv.patient.pk}&rdv={rdv.pk}')
+            return redirect('gynecologie_rdv')
+    else:
+        form = RendezVousForm(instance=rdv)
+
+    # Navigation précédent/suivant dans la liste gynécologie
     qs_pks = list(_rdv_gyn_qs().values_list('pk', flat=True))
     total = len(qs_pks)
     try:
@@ -739,18 +825,20 @@ def gynecologie_rdv_detail(request, pk):
         nav_pos, nav_prev, nav_next = None, None, None
 
     breadcrumb = [
-        {'title': 'Accueil', 'url': '/'},
         {'title': 'Gynécologie', 'url': '/gynecologie/'},
         {'title': 'Rendez-vous', 'url': '/gynecologie/rdv/'},
         {'title': rdv.code_rdv or rdv.patient.code_patient},
     ]
     return render(request, 'gynecologie/rdv_form.html', {
-        'patients': patients,
-        'medecins': medecins,
-        'breadcrumb': breadcrumb,
-        'error': error,
+        'form': form,
         'rdv': rdv,
         'is_new': False,
+        'patient_prefill': rdv.patient,
+        'facture_payee': facture_payee,
+        'consultation': consultation,
+        'constante': constante,
+        'medecins': medecins,
+        'breadcrumb': breadcrumb,
         'nav_total': total,
         'nav_pos': nav_pos,
         'nav_prev': nav_prev,
@@ -854,7 +942,7 @@ def gynecologie_list(request):
 
     if q:
         patients = patients.filter(
-            Q(nom__icontains=q) | Q(prenoms__icontains=q) | Q(code_patient__icontains=q)
+            Q(nom__icontains=q) | Q(prenoms__icontains=q) | Q(code_patient__icontains=q) | Q(telephone__icontains=q)
         )
 
     # --- Filtres patients ---
@@ -884,5 +972,8 @@ def gynecologie_list(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
-    breadcrumb = [{'title': 'Accueil', 'url': '/'}, {'title': 'Gynécologie'}]
+    breadcrumb = [
+        {'title': 'Gynécologie', 'url': '/gynecologie/'},
+        {'title': 'Patients'},
+    ]
     return render(request, 'gynecologie/list.html', {'page_obj': page_obj, 'breadcrumb': breadcrumb})
