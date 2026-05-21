@@ -704,6 +704,7 @@ def gynecologie_rdv_create(request):
         {'title': 'Rendez-vous', 'url': '/gynecologie/rdv/'},
         {'title': 'Nouveau'},
     ]
+    from patients.models import Pathologie
     return render(request, 'gynecologie/rdv_form.html', {
         'form': form,
         'rdv': None,
@@ -713,6 +714,7 @@ def gynecologie_rdv_create(request):
         'constante': None,
         'facture_payee': False,
         'medecins': medecins,
+        'pathologies': Pathologie.objects.filter(actif=True).order_by('nom'),
         'breadcrumb': breadcrumb,
     })
 
@@ -829,6 +831,7 @@ def gynecologie_rdv_detail(request, pk):
         {'title': 'Rendez-vous', 'url': '/gynecologie/rdv/'},
         {'title': rdv.code_rdv or rdv.patient.code_patient},
     ]
+    from patients.models import Pathologie
     return render(request, 'gynecologie/rdv_form.html', {
         'form': form,
         'rdv': rdv,
@@ -838,6 +841,7 @@ def gynecologie_rdv_detail(request, pk):
         'consultation': consultation,
         'constante': constante,
         'medecins': medecins,
+        'pathologies': Pathologie.objects.filter(actif=True).order_by('nom'),
         'breadcrumb': breadcrumb,
         'nav_total': total,
         'nav_pos': nav_pos,
