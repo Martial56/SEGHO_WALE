@@ -15,6 +15,7 @@ urlpatterns = [
     path('hospitalisation/', views.hospitalisation_list, name='hospitalisation_list'),
     path('facturation/', views.facturation_list, name='facturation_list'),
     path('facturation/nouvelle/', views.facture_create, name='facture_create'),
+    path('laboratoire/nouvelle/', views.laboratoire_create, name='laboratoire_create'),
     path('caisse/', views.caisse_list, name='caisse_list'),
     path('ressources-humaines/', views.ressources_humaines_list, name='ressources_humaines_list'),
     path('rapports/', views.rapports_list, name='rapports_list'),

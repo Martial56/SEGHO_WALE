@@ -155,14 +155,16 @@ def laboratoire_list(request):
     from laboratoire.models import AnalyseLaboratoire
     from django.core.paginator import Paginator
 
-    analyses = AnalyseLaboratoire.objects.all().order_by('-date_reception')
+    analyses = AnalyseLaboratoire.objects.select_related(
+        'patient', 'type_examen'
+    ).order_by('-date_prelevement')
     paginator = Paginator(analyses, 25)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     stats = {
         'en_cours': AnalyseLaboratoire.objects.filter(statut__in=['recu', 'en_analyse']).count(),
-        'resultats_prets': AnalyseLaboratoire.objects.filter(statut='resultats_prets').count(),
-        'analyses_mois': AnalyseLaboratoire.objects.filter(date_reception__month=timezone.now().month).count(),
+        'resultats_prets': AnalyseLaboratoire.objects.filter(statut__in=['resultat', 'valide']).count(),
+        'analyses_mois': AnalyseLaboratoire.objects.filter(date_prelevement__month=timezone.now().month).count(),
         'delai_moyen': 0,
     }
     breadcrumb = [{'title': 'Accueil', 'url': '/'}, {'title': 'Laboratoire'}]
@@ -354,6 +356,83 @@ def facture_create(request):
             {'title': 'Accueil', 'url': '/'},
             {'title': 'Facturation', 'url': '/facturation/'},
             {'title': 'Nouvelle facture'},
+        ],
+    })
+
+
+@login_required(login_url='login')
+def laboratoire_create(request):
+    from laboratoire.models import DemandeExamen, LigneDemandeExamen, TypeExamen
+    from patients.models import Patient
+    from django.contrib.auth.models import User
+    from django.utils.dateparse import parse_datetime
+
+    patient_pk = request.GET.get('patient') or request.POST.get('patient_id')
+    patient = get_object_or_404(Patient, pk=patient_pk) if patient_pk else None
+    types_examens = TypeExamen.objects.order_by('categorie', 'nom')
+    techniciens = User.objects.filter(is_active=True).order_by('last_name', 'first_name')
+
+    if request.method == 'POST':
+        if not patient:
+            messages.error(request, 'Patient requis.')
+            return redirect('laboratoire_list')
+
+        action = request.POST.get('action', 'brouillon')
+        demande = DemandeExamen(
+            patient=patient,
+            type_test=request.POST.get('type_test', ''),
+            urgent=request.POST.get('urgent') == 'on',
+            commentaire=request.POST.get('commentaire', '').strip(),
+            statut='demande' if action == 'envoyer' else 'brouillon',
+            cree_par=request.user,
+        )
+        tech_id = request.POST.get('technicien')
+        if tech_id:
+            try:
+                demande.technicien_id = int(tech_id)
+            except ValueError:
+                pass
+        raw_date = request.POST.get('date_prelevement', '').strip()
+        if raw_date:
+            demande.date_prelevement = parse_datetime(raw_date)
+        demande.save()
+
+        total = 0
+        i = 0
+        while True:
+            examen_id = request.POST.get(f'ligne_examen_{i}')
+            if examen_id is None:
+                break
+            if examen_id.strip():
+                try:
+                    te = TypeExamen.objects.get(pk=int(examen_id))
+                    prix = float(request.POST.get(f'ligne_prix_{i}', te.prix) or te.prix)
+                    LigneDemandeExamen.objects.create(
+                        demande=demande,
+                        type_examen=te,
+                        libelle=te.nom,
+                        prix=prix,
+                        instructions=request.POST.get(f'ligne_instructions_{i}', '').strip(),
+                    )
+                    total += prix
+                except (ValueError, TypeExamen.DoesNotExist):
+                    pass
+            i += 1
+
+        demande.montant_total = total
+        demande.save()
+        messages.success(request, f'Demande {demande.numero} créée avec succès.')
+        return redirect('laboratoire_list')
+
+    return render(request, 'laboratoire/create_analyse.html', {
+        'patient': patient,
+        'types_examens': types_examens,
+        'techniciens': techniciens,
+        'type_test_choices': DemandeExamen.TYPE_TEST,
+        'breadcrumb': [
+            {'title': 'Accueil', 'url': '/'},
+            {'title': 'Laboratoire', 'url': '/laboratoire/'},
+            {'title': 'Nouvelle demande'},
         ],
     })
 
@@ -875,8 +954,8 @@ def gynecologie_rdv(request):
             Q(patient__code_patient__icontains=q)
         )
 
-    # --- Filtre rapide ---
-    if filter_val == 'today':
+    # --- Filtre rapide (today par défaut si aucun filtre ni plage de dates) ---
+    if filter_val == 'today' or (not filter_val and not date_from and not date_to):
         rdvs = rdvs.filter(date_heure__date=_date.today())
     elif filter_val == 'mine':
         rdvs = rdvs.filter(medecin__user=request.user)

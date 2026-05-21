@@ -100,6 +100,9 @@
     }
     .empty-state .es-icon { font-size: 42px; margin-bottom: 14px; }
     .empty-state .es-msg { font-size: 15px; font-weight: 600; }
+
+    .data-table tbody tr[data-url] { cursor: pointer; }
+    .data-table tbody tr[data-url]:hover td { background: #eef7f5; }
 </style>
 {% endblock %}
 
@@ -162,7 +165,7 @@
         </thead>
         <tbody>
         {% for rdv in items %}
-            <tr>
+            <tr data-url="{% url 'patients:rdv_edit' rdv.pk %}">
                 <td>{{ rdv.date_heure|date:"d/m/Y à H:i" }}</td>
                 <td>{{ rdv.service.nom|default:"—" }}</td>
                 <td>{{ rdv.motif|truncatechars:60 }}</td>
@@ -196,7 +199,7 @@
         </thead>
         <tbody>
         {% for c in items %}
-            <tr>
+            <tr data-url="/admin/consultations/consultation/{{ c.pk }}/change/">
                 <td><code style="font-size:12px; color:var(--teal-600);">{{ c.numero }}</code></td>
                 <td>{{ c.date_heure|date:"d/m/Y à H:i" }}</td>
                 <td>{{ c.motif|truncatechars:60 }}</td>
@@ -227,7 +230,7 @@
         </thead>
         <tbody>
         {% for o in items %}
-            <tr>
+            <tr data-url="/admin/consultations/ordonnance/{{ o.pk }}/change/">
                 <td><code style="font-size:12px; color:var(--teal-600);">{{ o.numero }}</code></td>
                 <td>{{ o.date_emission|date:"d/m/Y" }}</td>
                 <td>{{ o.get_type_ordonnance_display }}</td>
@@ -261,7 +264,7 @@
         </thead>
         <tbody>
         {% for h in items %}
-            <tr>
+            <tr data-url="/admin/hospitalisation/hospitalisation/{{ h.pk }}/change/">
                 <td><code style="font-size:12px; color:var(--teal-600);">{{ h.numero }}</code></td>
                 <td>{{ h.date_admission|date:"d/m/Y" }}</td>
                 <td>{{ h.motif_admission|truncatechars:50 }}</td>
@@ -295,7 +298,7 @@
         </thead>
         <tbody>
         {% for a in items %}
-            <tr>
+            <tr data-url="/admin/laboratoire/analyselaboratoire/{{ a.pk }}/change/">
                 <td><code style="font-size:12px; color:var(--teal-600);">{{ a.numero }}</code></td>
                 <td>{{ a.date_prelevement|date:"d/m/Y à H:i" }}</td>
                 <td>{{ a.type_examen }}</td>
@@ -333,7 +336,7 @@
         </thead>
         <tbody>
         {% for a in items %}
-            <tr>
+            <tr data-url="/admin/laboratoire/analyselaboratoire/{{ a.pk }}/change/">
                 <td><code style="font-size:12px; color:var(--teal-600);">{{ a.numero }}</code></td>
                 <td>{{ a.date_resultat|date:"d/m/Y à H:i"|default:"—" }}</td>
                 <td>{{ a.type_examen }}</td>
@@ -366,4 +369,12 @@
     {% endif %}
 
 </div>
+
+<script>
+document.querySelectorAll('.data-table tbody tr[data-url]').forEach(function(row) {
+    row.addEventListener('click', function() {
+        window.location.href = this.dataset.url;
+    });
+});
+</script>
 {% endblock %}
