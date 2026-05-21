@@ -1,0 +1,231 @@
+{% extends 'employer/base.html' %}
+
+{% block topbar_title %}Configuration — {{ label }}s{% endblock %}
+{% block module_navbar %}{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+.cfg-wrap { display: grid; grid-template-columns: 1fr 340px; gap: 0; height: calc(100vh - 48px); }
+.cfg-list  { overflow-y: auto; border-right: 1px solid var(--border); }
+.cfg-panel { overflow-y: auto; background: var(--surface); }
+
+/* subheader */
+.cfg-subheader { display: flex; align-items: center; gap: 8px; padding: 8px 16px;
+  background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
+.cfg-title { font-size: 15px; font-weight: 600; color: var(--text); flex: 1; }
+.cfg-count { font-size: 12px; color: var(--text-muted); margin-left: 4px; }
+
+/* table */
+.cfg-table { width: 100%; border-collapse: collapse; }
+.cfg-table th { padding: 7px 14px; font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .3px; color: var(--text-muted); border-bottom: 1px solid var(--border);
+  background: var(--surface); white-space: nowrap; text-align: left; }
+.cfg-table td { padding: 9px 14px; font-size: 13px; border-bottom: 1px solid var(--border-subtle);
+  color: var(--text); vertical-align: middle; }
+.cfg-table tbody tr:hover td { background: rgba(33,136,171,.04); }
+html[data-theme="dark"] .cfg-table th { background: var(--bg-card); }
+html[data-theme="dark"] .cfg-table tbody tr:hover td { background: rgba(255,255,255,.03); }
+
+/* code badge */
+.cfg-code { font-family: monospace; font-size: 11px; background: rgba(33,136,171,.08);
+  color: var(--primary, #1a5482); padding: 2px 8px; border-radius: 4px; display: inline-block; }
+
+/* row actions */
+.cfg-actions { display: flex; gap: 4px; justify-content: flex-end; opacity: 0; transition: opacity .15s; }
+.cfg-table tbody tr:hover .cfg-actions { opacity: 1; }
+.cfg-btn-sm { border: none; border-radius: 4px; font-size: 12px; padding: 3px 8px;
+  cursor: pointer; font-family: inherit; display: inline-flex; align-items: center; gap: 4px; }
+.cfg-btn-edit { background: rgba(33,136,171,.1); color: var(--primary, #1a5482); }
+.cfg-btn-del  { background: rgba(220,53,69,.1);  color: #b02a37; }
+.cfg-btn-edit:hover { background: rgba(33,136,171,.2); }
+.cfg-btn-del:hover  { background: rgba(220,53,69,.2); }
+
+/* panel form */
+.cfg-panel-head { padding: 14px 20px; border-bottom: 1px solid var(--border);
+  font-size: 14px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px; }
+.cfg-panel-body { padding: 20px; }
+.cfg-label { display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary);
+  margin-bottom: 5px; text-transform: uppercase; letter-spacing: .3px; }
+.cfg-field { margin-bottom: 16px; }
+.cfg-check-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text); margin-bottom: 16px; }
+.cfg-submit { background: var(--primary, #1a5482); color: #fff; border: none; border-radius: 6px;
+  padding: 8px 20px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
+  display: inline-flex; align-items: center; gap: 6px; width: 100%; justify-content: center;
+  transition: background .15s; }
+.cfg-submit:hover { background: var(--primary-dark, #123d62); }
+.cfg-cancel-link { display: block; text-align: center; margin-top: 8px; font-size: 12px;
+  color: var(--text-muted); text-decoration: none; }
+.cfg-cancel-link:hover { color: var(--text); }
+
+/* delete confirm modal */
+.cfg-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4);
+  z-index: 9999; align-items: center; justify-content: center; }
+.cfg-modal.open { display: flex; }
+.cfg-modal-box { background: var(--surface); border-radius: 10px; padding: 28px 32px;
+  max-width: 380px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,.2); text-align: center; }
+.cfg-modal-title { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+.cfg-modal-text  { font-size: 13px; color: var(--text-secondary); margin-bottom: 22px; }
+.cfg-modal-actions { display: flex; gap: 10px; justify-content: center; }
+.cfg-modal-cancel { padding: 8px 20px; border: 1px solid var(--border); border-radius: 6px;
+  background: none; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--text); font-family: inherit; }
+.cfg-modal-confirm { padding: 8px 20px; border: none; border-radius: 6px;
+  background: #dc2626; color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; }
+
+/* empty */
+.cfg-empty { text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: 13px; }
+.cfg-empty i { font-size: 32px; display: block; margin-bottom: 8px; opacity: .4; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="page-wrap">
+{% include 'employer/includes/nav.html' %}
+
+<div class="cfg-wrap">
+
+  <!-- ── Liste ── -->
+  <div class="cfg-list">
+    <div class="cfg-subheader">
+      <span class="cfg-title">{{ label }}s <span class="cfg-count">{{ items|length }}</span></span>
+      <form method="get" style="display:flex;align-items:center;gap:6px;">
+        {% if edit_obj %}<input type="hidden" name="edit" value="{{ edit_obj.pk }}">{% endif %}
+        <div class="o-search-bar" style="width:200px;">
+          <input class="o-search-input" type="text" name="q" value="{{ q }}" placeholder="Rechercher…">
+          <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
+        </div>
+        {% if q %}<a href="?" class="o-ctrl-btn"><i class="bi bi-x"></i></a>{% endif %}
+      </form>
+    </div>
+
+    {% if items %}
+    <table class="cfg-table">
+      <thead>
+        <tr>
+          <th>Nom</th>
+          {% if items.0.code is not None %}<th>Code</th>{% endif %}
+          <th style="width:80px;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td>{{ item.nom }}</td>
+          {% if item.code is not None %}
+          <td>{% if item.code %}<span class="cfg-code">{{ item.code }}</span>{% else %}<span style="opacity:.35;">—</span>{% endif %}</td>
+          {% endif %}
+          <td>
+            <div class="cfg-actions">
+              <a href="?edit={{ item.pk }}{% if q %}&q={{ q }}{% endif %}" class="cfg-btn-sm cfg-btn-edit">
+                <i class="bi bi-pencil"></i>
+              </a>
+              <button type="button" class="cfg-btn-sm cfg-btn-del"
+                onclick="confirmDelete({{ item.pk }}, '{{ item.nom|escapejs }}')">
+                <i class="bi bi-trash"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="cfg-empty">
+      <i class="bi bi-inbox"></i>
+      {% if q %}Aucun résultat pour « {{ q }} ».{% else %}Aucun {{ label|lower }} configuré.{% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ── Formulaire ── -->
+  <div class="cfg-panel">
+    <div class="cfg-panel-head">
+      <i class="bi bi-{% if edit_obj %}pencil{% else %}plus-circle{% endif %}"></i>
+      {% if edit_obj %}Modifier « {{ edit_obj.nom }} »{% else %}Nouveau {{ label|lower }}{% endif %}
+    </div>
+    <div class="cfg-panel-body">
+      {% if messages %}
+        {% for msg in messages %}
+        <div style="padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:14px;
+          {% if 'error' in msg.tags %}background:rgba(220,53,69,.08);color:#b02a37;border-left:3px solid #dc2626;
+          {% else %}background:rgba(22,169,107,.08);color:#0d5b3d;border-left:3px solid #16a96b;{% endif %}">
+          {{ msg }}
+        </div>
+        {% endfor %}
+      {% endif %}
+
+      {% if from_form %}
+      <div style="padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:14px;
+        background:rgba(33,136,171,.08);color:var(--primary,#1a5482);
+        border-left:3px solid var(--primary,#1a5482);display:flex;align-items:center;gap:8px;">
+        <i class="bi bi-arrow-return-left"></i>
+        Création rapide — vous serez redirigé vers le formulaire employé après.
+      </div>
+      {% endif %}
+      <form method="post">
+        {% csrf_token %}
+        {% if edit_obj %}<input type="hidden" name="pk" value="{{ edit_obj.pk }}">{% endif %}
+        <input type="hidden" name="next" value="{{ request.GET.next }}">
+        <input type="hidden" name="created_field" value="{{ request.GET.created_field }}">
+
+        {% for field in form %}
+        {% if field.field.widget.input_type == 'checkbox' %}
+        <div class="cfg-check-row">
+          {{ field }} <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {% if field.help_text %}<small style="color:var(--text-muted);font-size:11px;display:block;">{{ field.help_text }}</small>{% endif %}
+        </div>
+        {% else %}
+        <div class="cfg-field">
+          <label class="cfg-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% if field.errors %}<span style="font-size:11px;color:#dc2626;">{{ field.errors|join:", " }}</span>{% endif %}
+        </div>
+        {% endif %}
+        {% endfor %}
+
+        <button type="submit" class="cfg-submit">
+          <i class="bi bi-check2"></i>
+          {% if edit_obj %}Enregistrer{% else %}Créer{% endif %}
+        </button>
+        {% if edit_obj %}
+        <a href="?" class="cfg-cancel-link">Annuler la modification</a>
+        {% endif %}
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal suppression -->
+<div class="cfg-modal" id="del-modal">
+  <div class="cfg-modal-box">
+    <div class="cfg-modal-title">Supprimer ?</div>
+    <div class="cfg-modal-text" id="del-modal-text"></div>
+    <div class="cfg-modal-actions">
+      <button class="cfg-modal-cancel" onclick="closeModal()">Annuler</button>
+      <form id="del-form" method="post" style="display:inline;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="delete">
+        <input type="hidden" name="pk" id="del-pk">
+        <button type="submit" class="cfg-modal-confirm">Supprimer</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+</div><!-- /page-wrap -->
+
+<script>
+function confirmDelete(pk, nom) {
+  document.getElementById('del-pk').value = pk;
+  document.getElementById('del-modal-text').textContent = 'Supprimer « ' + nom + ' » ?';
+  document.getElementById('del-modal').classList.add('open');
+}
+function closeModal() {
+  document.getElementById('del-modal').classList.remove('open');
+}
+document.getElementById('del-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+</script>
+{% endblock %}

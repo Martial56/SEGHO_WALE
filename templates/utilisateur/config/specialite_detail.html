@@ -1,0 +1,126 @@
+{% extends 'utilisateur/base.html' %}
+{% block topbar_title %}{{ obj.nom }}{% endblock %}
+{% block module_navbar %}{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+  /* ── DET STYLES ── */
+  .det-page { width:100%; padding:16px 24px 48px; }
+  .det-section { background:var(--surface); border:1px solid var(--border); border-radius:8px; margin-bottom:12px; overflow:hidden; }
+  .det-section-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.7px; color:var(--text-muted); padding:10px 20px; border-bottom:1px solid var(--border); background:var(--bg); display:flex; align-items:center; justify-content:space-between; }
+  html[data-theme="dark"] .det-section-title { background:rgba(255,255,255,.02); }
+  .det-grid { display:grid; grid-template-columns:repeat(3,1fr); }
+  .det-grid-2 { grid-template-columns:repeat(2,1fr); }
+  .det-field { padding:14px 20px; border-bottom:1px solid var(--border); border-right:1px solid var(--border); }
+  .det-field:nth-child(3n) { border-right:none; }
+  .det-grid-2 .det-field:nth-child(2n) { border-right:none; }
+  .det-field-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--text-muted); margin-bottom:4px; }
+  .det-field-value { font-size:13.5px; color:var(--text); font-weight:500; word-break:break-word; }
+  .det-field-value.muted { color:var(--text-muted); font-weight:400; font-style:italic; }
+  .det-field-full { padding:14px 20px; border-bottom:1px solid var(--border); }
+  .det-field-full:last-child { border-bottom:none; }
+  .det-btn-edit { background:var(--accent); color:#fff; border:none; padding:7px 16px; border-radius:4px; font-size:13px; font-weight:600; font-family:'Roboto',sans-serif; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:6px; transition:background .15s; white-space:nowrap; }
+  .det-btn-edit:hover { background:var(--primary); }
+  /* Utilisateurs table */
+  .emp-table { width:100%; border-collapse:collapse; }
+  .emp-table th { padding:8px 16px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--text-muted); border-bottom:1px solid var(--border); text-align:left; }
+  .emp-table td { padding:10px 16px; font-size:13px; border-bottom:1px solid var(--border); color:var(--text); }
+  .emp-table tr:last-child td { border-bottom:none; }
+  .emp-table tbody tr { cursor:pointer; transition:background .1s; }
+  .emp-table tbody tr:hover td { background:rgba(33,136,171,.04); }
+  .emp-badge { display:inline-block; font-size:11px; font-family:monospace; background:rgba(33,136,171,.08); color:var(--primary); padding:1px 7px; border-radius:4px; }
+  html[data-theme="dark"] .emp-badge { background:rgba(33,136,171,.15); color:#7ecae0; }
+  .emp-avatar { width:28px; height:28px; border-radius:6px; background:#e8eef2; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#7a9ab0; flex-shrink:0; overflow:hidden; }
+  html[data-theme="dark"] .emp-avatar { background:#2a3a50; color:#4a6a80; }
+  @media (max-width:700px) { .det-grid,.det-grid-2 { grid-template-columns:1fr; } .det-field { border-right:none !important; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="page-wrap">
+{% include 'utilisateur/includes/nav.html' %}
+
+<div class="o-subheader" id="subheader">
+  <div class="o-subheader-row">
+    <a href="{% url 'utilisateur:specialites' %}" class="o-ctrl-btn" style="padding:3px 7px;"><i class="bi bi-arrow-left"></i></a>
+    <span style="font-size:13px;color:var(--text-muted);">
+      <a href="{% url 'utilisateur:specialites' %}" style="color:var(--accent);text-decoration:none;font-weight:500;">Spécialités</a>
+      <span style="margin:0 5px;opacity:.4;">/</span>
+      <span style="color:var(--text);">{{ obj.nom }}</span>
+    </span>
+    <div style="flex:1;"></div>
+    <span style="font-size:12px;color:var(--text-muted);margin-right:4px;">{{ position }} / {{ total }}</span>
+    {% if prev_pk %}<a href="{% url 'utilisateur:specialite_detail' prev_pk %}" class="o-ctrl-btn" style="padding:3px 7px;"><i class="bi bi-chevron-left"></i></a>
+    {% else %}<span class="o-ctrl-btn" style="padding:3px 7px;opacity:.3;pointer-events:none;"><i class="bi bi-chevron-left"></i></span>{% endif %}
+    {% if next_pk %}<a href="{% url 'utilisateur:specialite_detail' next_pk %}" class="o-ctrl-btn" style="padding:3px 7px;"><i class="bi bi-chevron-right"></i></a>
+    {% else %}<span class="o-ctrl-btn" style="padding:3px 7px;opacity:.3;pointer-events:none;"><i class="bi bi-chevron-right"></i></span>{% endif %}
+    <a href="{% url 'utilisateur:specialite_edit' obj.pk %}" class="det-btn-edit"><i class="bi bi-pencil"></i> Modifier</a>
+  </div>
+</div>
+
+<div class="det-page">
+
+  <div class="det-section">
+    <div class="det-section-title">Informations</div>
+    <div class="det-grid det-grid-2">
+      <div class="det-field">
+        <div class="det-field-label">Code</div>
+        <div class="det-field-value" style="font-family:monospace;">{{ obj.code }}</div>
+      </div>
+      <div class="det-field">
+        <div class="det-field-label">Nom</div>
+        <div class="det-field-value">{{ obj.nom }}</div>
+      </div>
+    </div>
+    {% if obj.description %}
+    <div class="det-field-full">
+      <div class="det-field-label">Description</div>
+      <div class="det-field-value" style="margin-top:4px;">{{ obj.description }}</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="det-section">
+    <div class="det-section-title">
+      <span>Utilisateurs avec cette spécialité <span style="font-size:12px;font-weight:400;text-transform:none;letter-spacing:0;">({{ utilisateurs|length }})</span></span>
+    </div>
+    {% if utilisateurs %}
+    <table class="emp-table">
+      <thead>
+        <tr>
+          <th style="width:36px;"></th>
+          <th>Code</th>
+          <th>Nom</th>
+          <th>Fonction</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for emp in utilisateurs %}
+        <tr onclick="window.location='{% url 'utilisateur:detail' emp.pk %}'">
+          <td>
+            <div class="emp-avatar">
+              {% if emp.photo %}<img src="{{ emp.photo.url }}" style="width:100%;height:100%;object-fit:cover;">
+              {% else %}{{ emp.nom|first|upper }}{% endif %}
+            </div>
+          </td>
+          <td><span class="emp-badge">{{ emp.code|default:"—" }}</span></td>
+          <td style="font-weight:500;">{{ emp.nom }} {{ emp.prenoms }}</td>
+          <td style="color:var(--text-muted);font-size:12px;">{{ emp.fonction|default:"—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="padding:32px 20px;text-align:center;color:var(--text-muted);font-size:13px;font-style:italic;">Aucun utilisateur avec cette spécialité.</div>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+(function(){var t=document.querySelector('.topbar'),w=document.getElementById('page-wrap');if(t&&w)w.style.paddingTop=t.offsetHeight+'px';window.addEventListener('resize',function(){if(t&&w)w.style.paddingTop=t.offsetHeight+'px';});})();
+</script>
+</div>
+{% endblock %}

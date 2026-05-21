@@ -1,0 +1,163 @@
+{% extends 'employer/base.html' %}
+{% load i18n %}
+
+{% block topbar_title %}Annuaire{% endblock %}
+{% block module_navbar %}{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+.ann-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  padding: 16px;
+}
+
+.ann-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 14px 14px 12px;
+  display: flex; gap: 12px; align-items: flex-start;
+  transition: border-color .15s, box-shadow .15s;
+}
+.ann-card:hover { border-color: var(--accent); box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+html[data-theme="dark"] .ann-card { background: var(--surface); border-color: var(--border); }
+
+.ann-avatar {
+  width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 800; color: #fff;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+}
+.ann-avatar.has-photo { padding: 0; overflow: hidden; }
+.ann-avatar.has-photo img { width: 100%; height: 100%; object-fit: cover; }
+
+.ann-info { flex: 1; min-width: 0; }
+.ann-name { font-size: 13px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }
+.ann-role { font-size: 11.5px; color: var(--text-muted); margin-bottom: 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ann-contact { display: flex; flex-direction: column; gap: 4px; }
+.ann-contact a { font-size: 11.5px; color: var(--accent); text-decoration: none; display: flex; align-items: center; gap: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ann-contact a:hover { text-decoration: underline; color: var(--primary); }
+.ann-service-tag { display: inline-block; margin-top: 7px; font-size: 10.5px; font-weight: 700; background: #e3eef8; color: var(--primary); border: 1px solid #c5dced; padding: 2px 8px; border-radius: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+html[data-theme="dark"] .ann-service-tag { background: rgba(26,84,130,.15); color: #7ab4d8; border-color: rgba(26,84,130,.3); }
+
+.ann-section-label {
+  font-size: 11.5px; font-weight: 700; color: var(--primary);
+  text-transform: uppercase; letter-spacing: .5px;
+  margin: 0 16px 8px; padding-top: 16px;
+  display: flex; align-items: center; gap: 8px;
+}
+.ann-section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+html[data-theme="dark"] .ann-section-label { color: #7ab4d8; }
+
+.ann-count { display: inline-flex; align-items: center; background: #e3eef8; color: var(--primary); border: 1px solid #c5dced; padding: 2px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+html[data-theme="dark"] .ann-count { background: rgba(26,84,130,.2); color: #7ab4d8; border-color: rgba(26,84,130,.3); }
+
+.ann-search-input {
+  border: none; border-bottom: 1px solid #bbb; background: transparent;
+  padding: 5px 6px; font-size: 12.5px; font-family: 'Roboto', sans-serif;
+  color: var(--text); outline: none; min-width: 200px; max-width: 280px;
+}
+.ann-search-input:focus { border-bottom-color: var(--accent); }
+html[data-theme="dark"] .ann-search-input { color: var(--text); border-bottom-color: #3a4a62; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="page-wrap">
+{% include 'employer/includes/nav.html' %}
+
+<div class="o-subheader">
+  <div class="o-subheader-row">
+    <span class="o-page-title">Annuaire</span>
+    <span class="ann-count">{{ employes|length }} employé{% if employes|length != 1 %}s{% endif %}</span>
+    <div style="margin-left:auto;">
+      <form method="get" style="display:flex;align-items:center;gap:8px;">
+        <input type="search" name="q" value="{{ q|default:'' }}" placeholder="Nom, fonction…" class="ann-search-input" autocomplete="off">
+        <select name="service" class="filter-select" onchange="this.form.submit()">
+          <option value="">Tous les services / départements</option>
+          {% for svc in services %}
+          <option value="{{ svc.pk }}" {% if f_service == svc.pk|stringformat:"s" %}selected{% endif %}>{{ svc.nom }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="o-ctrl-btn"><i class="bi bi-search"></i> Filtrer</button>
+        {% if q or f_service %}
+        <a href="{% url 'employer:rh_annuaire' %}" class="o-ctrl-btn"><i class="bi bi-x"></i> Effacer</a>
+        {% endif %}
+      </form>
+    </div>
+  </div>
+</div>
+
+{% if employes %}
+  {% if f_service or q %}
+  <div class="ann-grid">
+    {% for emp in employes %}
+    <a href="{% url 'employer:rh_detail' emp.pk %}" class="ann-card" style="text-decoration:none;">
+      {% if emp.photo %}
+      <div class="ann-avatar has-photo"><img src="{{ emp.photo.url }}" alt="{{ emp.nom_complet }}"></div>
+      {% else %}
+      <div class="ann-avatar">{{ emp.initiales|default:"?" }}</div>
+      {% endif %}
+      <div class="ann-info">
+        <div class="ann-name">{{ emp.nom_complet }}</div>
+        <div class="ann-role">{{ emp.fonction.nom|default:"—" }}</div>
+        <div class="ann-contact">
+          {% if emp.telephone %}<a href="tel:{{ emp.telephone }}"><i class="bi bi-telephone-fill" style="font-size:10px;"></i>{{ emp.telephone }}</a>{% endif %}
+          {% if emp.email %}<a href="mailto:{{ emp.email }}" title="{{ emp.email }}"><i class="bi bi-envelope-fill" style="font-size:10px;"></i><span style="overflow:hidden;text-overflow:ellipsis;">{{ emp.email }}</span></a>{% endif %}
+          {% if not emp.telephone and not emp.email %}<span style="font-size:11px;color:var(--text-muted);font-style:italic;">Aucun contact renseigné</span>{% endif %}
+        </div>
+        {% if emp.service %}<span class="ann-service-tag"><i class="bi bi-building"></i> {{ emp.service.nom }}</span>{% endif %}
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  {% regroup employes by service as par_service %}
+  {% for groupe in par_service %}
+  <div class="ann-section-label">
+    <i class="bi bi-building"></i>
+    {{ groupe.grouper.nom|default:"Sans affectation" }}
+    <span style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:none;letter-spacing:0;">({{ groupe.list|length }})</span>
+  </div>
+  <div class="ann-grid" style="padding-top:0;">
+    {% for emp in groupe.list %}
+    <a href="{% url 'employer:rh_detail' emp.pk %}" class="ann-card" style="text-decoration:none;">
+      {% if emp.photo %}
+      <div class="ann-avatar has-photo"><img src="{{ emp.photo.url }}" alt="{{ emp.nom_complet }}"></div>
+      {% else %}
+      <div class="ann-avatar">{{ emp.initiales|default:"?" }}</div>
+      {% endif %}
+      <div class="ann-info">
+        <div class="ann-name">{{ emp.nom_complet }}</div>
+        <div class="ann-role">{{ emp.fonction.nom|default:"Fonction non renseignée" }}</div>
+        <div class="ann-contact">
+          {% if emp.telephone %}<a href="tel:{{ emp.telephone }}"><i class="bi bi-telephone-fill" style="font-size:10px;"></i>{{ emp.telephone }}</a>{% endif %}
+          {% if emp.email %}<a href="mailto:{{ emp.email }}" title="{{ emp.email }}"><i class="bi bi-envelope-fill" style="font-size:10px;"></i><span style="overflow:hidden;text-overflow:ellipsis;">{{ emp.email }}</span></a>{% endif %}
+          {% if not emp.telephone and not emp.email %}<span style="font-size:11px;color:var(--text-muted);font-style:italic;">Aucun contact renseigné</span>{% endif %}
+        </div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% endfor %}
+  {% endif %}
+
+{% else %}
+<div class="o-empty" style="padding:60px 20px;">
+  <i class="bi bi-people"></i>
+  Aucun employé actif trouvé{% if q or f_service %} pour ces critères{% endif %}.
+  {% if q or f_service %}
+  <br><a href="{% url 'employer:rh_annuaire' %}" class="o-ctrl-btn" style="margin-top:12px;display:inline-flex;">
+    <i class="bi bi-x-lg"></i> Effacer les filtres
+  </a>
+  {% endif %}
+</div>
+{% endif %}
+
+</div>
+{% endblock %}

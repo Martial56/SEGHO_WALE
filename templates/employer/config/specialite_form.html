@@ -1,0 +1,83 @@
+{% extends 'employer/base.html' %}
+{% block topbar_title %}{{ titre }}{% endblock %}
+{% block module_navbar %}{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'services/includes/form_css.html' %}
+<style>
+  .f-form-wrap { max-width: 600px; margin: 0 auto; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="page-wrap">
+
+{% include 'employer/includes/nav.html' %}
+
+<div class="o-subheader" id="subheader">
+  <div class="o-subheader-row">
+    <a href="{% url 'employer:specialites' %}" class="o-ctrl-btn" style="padding:3px 7px;">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <span style="font-size:13.5px;color:var(--text-muted);">
+      <a href="{% url 'employer:specialites' %}" style="color:var(--accent);text-decoration:none;font-weight:500;">Spécialités</a>
+      <span style="margin:0 5px;opacity:.4;">/</span>
+      <span style="color:var(--text);">{{ titre }}</span>
+    </span>
+  </div>
+</div>
+
+<div class="f-page-body">
+  <div class="f-form-wrap">
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      <div class="f-card">
+        <div class="f-card-head">
+          <i class="bi bi-award"></i>
+          Informations
+        </div>
+        <div class="f-card-body">
+
+          <div class="f-field">
+            <label class="field-label" for="{{ form.nom.id_for_label }}">
+              Nom <span class="f-required">*</span>
+            </label>
+            {{ form.nom }}
+            {% if form.nom.errors %}<div class="f-error">{{ form.nom.errors.0 }}</div>{% endif %}
+          </div>
+
+          <div class="f-field">
+            <label class="field-label" for="{{ form.code.id_for_label }}">
+              Code <span class="f-required">*</span>
+            </label>
+            {{ form.code }}
+            {% if form.code.errors %}<div class="f-error">{{ form.code.errors.0 }}</div>{% endif %}
+          </div>
+
+          <div class="f-field" style="margin-bottom:0;">
+            <label class="field-label" for="{{ form.description.id_for_label }}">Description</label>
+            {{ form.description }}
+            {% if form.description.errors %}<div class="f-error">{{ form.description.errors.0 }}</div>{% endif %}
+          </div>
+
+        </div>
+      </div>
+
+      <div class="f-form-footer">
+        <a href="{% url 'employer:specialites' %}" class="o-btn-secondary">Annuler</a>
+        <button type="submit" class="o-btn-create">
+          <i class="bi bi-check-lg"></i> Enregistrer
+        </button>
+      </div>
+
+    </form>
+
+  </div>
+</div>
+
+</div>
+{% endblock %}

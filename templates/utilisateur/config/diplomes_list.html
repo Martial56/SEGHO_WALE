@@ -1,0 +1,275 @@
+{% extends 'utilisateur/base.html' %}
+
+{% block topbar_title %}Diplômes{% endblock %}
+{% block module_navbar %}{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+  .o-list-wrap { background: var(--bg); overflow-x: auto; }
+  .o-list-table { width: 100%; border-collapse: collapse; background: var(--surface); }
+  .o-list-table th {
+    padding: 8px 14px; text-align: left; font-size: 11px; font-weight: 600;
+    color: var(--text-muted); border-bottom: 1px solid var(--border);
+    background: var(--surface); white-space: nowrap; position: relative; user-select: none;
+  }
+  .o-list-table td { padding: 9px 14px; font-size: 13px; border-bottom: 1px solid #f0f0f0; color: var(--text); }
+  .o-list-table tr:last-child td { border-bottom: none; }
+  .o-list-table tbody tr:hover td { background: #f4f9fb; }
+  .o-list-table tbody tr { cursor: pointer; }
+  html[data-theme="dark"] .o-list-table { background: var(--surface); }
+  html[data-theme="dark"] .o-list-table th { background: var(--surface); border-bottom-color: var(--border); color: var(--text-muted); }
+  html[data-theme="dark"] .o-list-table td { border-bottom-color: #2d3550; color: var(--text); }
+  html[data-theme="dark"] .o-list-table tbody tr:hover td { background: rgba(255,255,255,.04); }
+
+  .o-kanban { padding: 12px 16px; display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; background: var(--bg); }
+  .o-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 3px; padding: 14px;
+    cursor: pointer; transition: box-shadow .15s, border-color .15s; box-shadow: 0 1px 2px rgba(0,0,0,.08);
+  }
+  .o-card:hover { box-shadow: 0 3px 10px rgba(0,0,0,.13); border-color: #bbb; }
+  .o-card-name { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 4px; }
+  .o-card-desc { font-size: 12px; color: var(--text-muted); }
+  html[data-theme="dark"] .o-card { background: var(--surface); border-color: var(--border); }
+  html[data-theme="dark"] .o-card:hover { border-color: #4a5a78; }
+  html[data-theme="dark"] .o-card-name { color: var(--text); }
+
+  /* Col-picker */
+  .col-picker-th { width: 30px; text-align: center; padding: 0 2px; position: relative; }
+  .col-picker-btn { background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 15px; padding: 2px 5px; border-radius: 3px; line-height: 1; font-weight: 700; letter-spacing: -1px; }
+  .col-picker-btn:hover { background: rgba(0,0,0,.06); color: var(--text); }
+  .col-picker-menu { display: none; position: absolute; right: 0; top: calc(100% + 2px); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,.12); z-index: 500; min-width: 160px; padding: 6px 0; }
+  .col-picker-menu.open { display: block; }
+  .col-picker-menu label { display: flex; align-items: center; gap: 8px; padding: 6px 14px; font-size: 13px; color: var(--text); cursor: pointer; white-space: nowrap; }
+  .col-picker-menu label:hover { background: rgba(0,0,0,.03); }
+  html[data-theme="dark"] .col-picker-menu { background: var(--surface); border-color: var(--border); }
+  html[data-theme="dark"] .col-picker-menu label { color: var(--text); }
+
+  /* Bulk bar */
+  .bulk-bar { display: none; align-items: center; gap: 12px; background: #fff3cd; border: 1px solid #ffc107; padding: 8px 16px; font-size: 13px; font-weight: 600; color: #856404; }
+  .bulk-bar.visible { display: flex; }
+  .btn-bulk-delete { display: flex; align-items: center; gap: 6px; padding: 5px 12px; background: #dc2626; color: #fff; border: none; border-radius: 4px; font-size: 12px; font-weight: 700; cursor: pointer; }
+  .btn-bulk-delete:hover { background: #b91c1c; }
+  .btn-bulk-cancel { padding: 5px 10px; background: transparent; border: 1px solid rgba(0,0,0,.15); border-radius: 4px; font-size: 12px; font-weight: 600; cursor: pointer; color: #856404; }
+  html[data-theme="dark"] .bulk-bar { background: rgba(255,193,7,.1); border-color: rgba(255,193,7,.3); color: #fbbf24; }
+  html[data-theme="dark"] .btn-bulk-cancel { border-color: rgba(255,255,255,.15); color: #fbbf24; }
+
+  /* Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 9000; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal-box { background: var(--surface); border-radius: 8px; padding: 28px; max-width: 400px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,.2); text-align: center; }
+  .modal-icon { font-size: 36px; margin-bottom: 10px; }
+  .modal-title { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+  .modal-msg { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; line-height: 1.5; }
+  .modal-actions { display: flex; gap: 10px; justify-content: center; }
+  .btn-modal-cancel { padding: 8px 20px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface); color: var(--text-muted); font-size: 13px; font-weight: 600; cursor: pointer; }
+  .btn-modal-confirm { padding: 8px 20px; border-radius: 4px; border: none; background: #dc2626; color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .btn-modal-confirm:hover { background: #b91c1c; }
+
+  @media (max-width:1000px) { .o-kanban { grid-template-columns: repeat(3,1fr); } }
+  @media (max-width:680px) { .o-kanban { grid-template-columns: repeat(2,1fr); } }
+  @media (max-width:420px) { .o-kanban { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="page-wrap">
+
+{% include 'utilisateur/includes/nav.html' %}
+
+<!-- ══ SUBHEADER ══ -->
+<div class="o-subheader" id="subheader">
+  <div class="o-subheader-row">
+    <span class="o-page-title">Diplômes <span class="o-page-count">{{ total_filtre }}</span></span>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+      <form method="get" id="filter-form" style="display:flex;align-items:center;">
+        <input type="hidden" name="vue" id="vue-input" value="{{ vue|default:'liste' }}">
+        <div class="o-search-bar">
+          <input class="o-search-input" id="search-input" type="text" name="q" value="{{ q }}" placeholder="Rechercher un diplôme…">
+          <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <div class="o-subheader-row">
+    <a href="{% url 'utilisateur:diplome_create' %}" class="o-btn-create">
+      <i class="bi bi-plus-lg"></i> Créer
+    </a>
+    {% if q %}
+    <a href="{% url 'utilisateur:diplomes' %}" class="o-ctrl-btn"><i class="bi bi-x"></i> Effacer</a>
+    <span class="o-filter-tag">{{ q }} <a href="{% url 'utilisateur:diplomes' %}?vue={{ vue }}">×</a></span>
+    {% endif %}
+    <div style="flex:1;"></div>
+    <span style="font-size:12px;color:var(--text-muted);">{{ total_filtre }} / {{ total }}</span>
+    <div class="o-ctrl-sep"></div>
+    <div class="o-view-btns">
+      <button type="button" class="o-view-btn {% if vue|default:'liste' == 'liste' %}active{% endif %}" onclick="setVue('liste', this)" title="Vue Liste">
+        <i class="bi bi-list-ul"></i>
+      </button>
+      <button type="button" class="o-view-btn {% if vue == 'grille' %}active{% endif %}" onclick="setVue('grille', this)" title="Vue Grille">
+        <i class="bi bi-grid"></i>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ BARRE SÉLECTION BULK ══ -->
+<div class="bulk-bar" id="bulk-bar">
+  <i class="bi bi-check2-square"></i>
+  <span id="bulk-count">0</span> élément(s) sélectionné(s)
+  <button type="button" class="btn-bulk-delete" onclick="openBulkModal()">
+    <i class="bi bi-trash"></i> Supprimer
+  </button>
+  <button type="button" class="btn-bulk-cancel" onclick="clearSelection()">Annuler</button>
+</div>
+
+<div id="list-result">
+{% if total_filtre > 0 %}
+
+{% if vue == 'grille' %}
+<!-- ── VUE GRILLE ── -->
+<div class="o-kanban">
+  {% for dip in page_obj %}
+  <div class="o-card" onclick="window.location='{% url 'utilisateur:diplome_detail' dip.pk %}'">
+    <div class="o-card-name">{{ dip.titre }}</div>
+    {% if dip.description %}<div class="o-card-desc">{{ dip.description|truncatechars:60 }}</div>{% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<!-- ── VUE LISTE ── -->
+<div class="o-list-wrap">
+  <table class="o-list-table">
+    <thead>
+      <tr>
+        <th style="width:36px;padding:8px 8px 8px 14px;">
+          <input type="checkbox" id="select-all" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent);" onchange="toggleAll(this)">
+        </th>
+        <th class="col-titre"><span class="col-label">Titre</span><div class="col-resizer"></div></th>
+        <th class="col-desc"><span class="col-label">Description</span><div class="col-resizer"></div></th>
+        <th class="col-picker-th">
+          <button class="col-picker-btn" id="col-picker-btn" title="Colonnes visibles"><i class="bi bi-three-dots-vertical"></i></button>
+          <div class="col-picker-menu" id="col-picker-menu">
+            <label><input type="checkbox" data-col-cls="col-titre" checked> Titre</label>
+            <label><input type="checkbox" data-col-cls="col-desc" checked> Description</label>
+          </div>
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for dip in page_obj %}
+      <tr onclick="if(event.target.type!=='checkbox'){window.location='{% url 'utilisateur:diplome_detail' dip.pk %}'}">
+        <td style="padding:9px 8px 9px 14px;" onclick="event.stopPropagation()">
+          <input type="checkbox" class="row-check" value="{{ dip.pk }}" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent);" onchange="onCheckChange()">
+        </td>
+        <td class="col-titre" style="font-weight:500;">{{ dip.titre }}</td>
+        <td class="col-desc" style="font-size:12px;color:var(--text-muted);">{{ dip.description|default:"—"|truncatechars:80 }}</td>
+        <td></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="o-pagination-bottom">
+    <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
+    <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
+      href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}&q={{ q }}&vue={{ vue }}{% else %}#{% endif %}">
+      <i class="bi bi-chevron-left"></i>
+    </a>
+    <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
+      href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}&q={{ q }}&vue={{ vue }}{% else %}#{% endif %}">
+      <i class="bi bi-chevron-right"></i>
+    </a>
+  </div>
+</div>
+{% endif %}
+
+{% else %}
+<div class="o-empty" style="padding:60px 20px;">
+  <i class="bi bi-patch-check"></i>
+  {% if q %}
+  Aucun diplôme ne correspond à « {{ q }} ».<br>
+  <a href="{% url 'utilisateur:diplomes' %}" style="color:var(--accent);font-weight:600;margin-top:8px;display:inline-block;">Effacer</a>
+  {% else %}
+  Aucun diplôme enregistré.<br>
+  <a href="{% url 'utilisateur:diplome_create' %}" style="color:var(--accent);font-weight:600;margin-top:8px;display:inline-block;">Créer un diplôme</a>
+  {% endif %}
+</div>
+{% endif %}
+</div><!-- /#list-result -->
+
+<!-- ══ MODAL SUPPRESSION ══ -->
+<div class="modal-overlay" id="bulk-delete-modal">
+  <div class="modal-box">
+    <div class="modal-icon">🗑️</div>
+    <div class="modal-title">Confirmer la suppression</div>
+    <div class="modal-msg">Vous allez supprimer <strong id="modal-count">0</strong> diplôme(s).<br>
+      <span style="font-size:12px;color:var(--text-muted);">Cette action est irréversible.</span>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn-modal-cancel" onclick="closeBulkModal()">Annuler</button>
+      <button type="button" class="btn-modal-confirm" onclick="executeBulkDelete()">Supprimer</button>
+    </div>
+  </div>
+</div>
+
+</div><!-- /#page-wrap -->
+
+{% include 'services/includes/list_live_js.html' %}
+
+<script>
+const BULK_URL   = "{% url 'utilisateur:diplome_bulk_delete' %}";
+const CSRF_TOKEN = "{{ csrf_token }}";
+
+function setVue(v, btn) {
+  document.getElementById('vue-input').value = v;
+  document.querySelectorAll('.o-view-btn').forEach(function(b) { b.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  window.liveLoad();
+}
+
+(function () {
+  var inp = document.getElementById('search-input');
+  if (!inp) return;
+  var timer;
+  inp.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(window.liveLoad, 400); });
+  document.getElementById('filter-form').addEventListener('submit', function (e) { e.preventDefault(); window.liveLoad(); });
+})();
+
+function onCheckChange() {
+  var count = document.querySelectorAll('.row-check:checked').length;
+  document.getElementById('bulk-count').textContent = count;
+  document.getElementById('bulk-bar').classList.toggle('visible', count > 0);
+  var all = document.getElementById('select-all');
+  if (all) { var total = document.querySelectorAll('.row-check').length; all.indeterminate = count > 0 && count < total; all.checked = count === total && total > 0; }
+}
+function toggleAll(master) { document.querySelectorAll('.row-check').forEach(function(cb) { cb.checked = master.checked; }); onCheckChange(); }
+function clearSelection() { document.querySelectorAll('.row-check, #select-all').forEach(function(cb) { cb.checked = false; }); onCheckChange(); }
+
+function openBulkModal() {
+  document.getElementById('modal-count').textContent = document.querySelectorAll('.row-check:checked').length;
+  document.getElementById('bulk-delete-modal').classList.add('open');
+}
+function closeBulkModal() { document.getElementById('bulk-delete-modal').classList.remove('open'); }
+function executeBulkDelete() {
+  var ids = Array.from(document.querySelectorAll('.row-check:checked')).map(function(cb) { return cb.value; });
+  if (!ids.length) return;
+  var fd = new FormData(); fd.append('csrfmiddlewaretoken', CSRF_TOKEN);
+  ids.forEach(function(id) { fd.append('ids[]', id); });
+  fetch(BULK_URL, { method: 'POST', body: fd }).then(function(r) { return r.json(); }).then(function(d) { if (d.ok) window.location.reload(); }).catch(function() { closeBulkModal(); });
+}
+document.getElementById('bulk-delete-modal').addEventListener('click', function(e) { if (e.target === this) closeBulkModal(); });
+
+/* Col-picker */
+document.addEventListener('click', function(e) {
+  var menu = document.getElementById('col-picker-menu'); if (!menu) return;
+  if (e.target.closest('#col-picker-btn')) { menu.classList.toggle('open'); return; }
+  if (!e.target.closest('#col-picker-menu')) menu.classList.remove('open');
+});
+document.addEventListener('change', function(e) {
+  var cb = e.target.closest('#col-picker-menu input[data-col-cls]'); if (!cb) return;
+  document.querySelectorAll('.' + cb.dataset.colCls).forEach(function(el) { el.style.display = cb.checked ? '' : 'none'; });
+});
+</script>
+{% endblock %}

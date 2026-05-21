@@ -1,0 +1,454 @@
+{% extends 'utilisateur/base.html' %}
+
+{% block topbar_title %}{% if admin_edit %}Modifier le profil — {{ utilisateur.nom_complet }}{% else %}Modifier mon profil{% endif %}{% endblock %}
+{% block module_navbar %}{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'services/includes/form_css.html' %}
+<style>
+/* ── Onglets ── */
+.fp-tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 20px; }
+.fp-tab {
+  padding: 8px 16px; font-size: 12.5px; font-weight: 600; color: var(--text-muted);
+  cursor: pointer; border: none; background: none; border-bottom: 2px solid transparent;
+  margin-bottom: -2px; display: flex; align-items: center; gap: 6px; transition: color .12s;
+}
+.fp-tab:hover { color: var(--primary); }
+.fp-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+html[data-theme="dark"] .fp-tab.active { color: #7ab4d8; border-bottom-color: #7ab4d8; }
+
+/* ── Grille 3 colonnes ── */
+.f-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 900px) { .f-grid.cols-3 { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 600px) { .f-grid, .f-grid.cols-3 { grid-template-columns: 1fr; } }
+
+/* ── Photo de profil ── */
+.fp-photo-block { display: flex; align-items: flex-start; gap: 20px; }
+.fp-photo-avatar {
+  width: 88px; height: 88px; border-radius: 14px;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; font-weight: 800; color: #fff;
+  overflow: hidden; flex-shrink: 0;
+  position: relative; cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0,0,0,.15);
+  border: 2px solid var(--border);
+  transition: box-shadow .15s;
+}
+.fp-photo-avatar:hover { box-shadow: 0 4px 16px rgba(0,0,0,.22); }
+.fp-photo-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.fp-photo-overlay {
+  position: absolute; inset: 0; border-radius: 12px;
+  background: rgba(0,0,0,.42);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px; color: #fff;
+  opacity: 0; transition: opacity .15s;
+}
+.fp-photo-avatar:hover .fp-photo-overlay { opacity: 1; }
+.fp-photo-info { display: flex; flex-direction: column; gap: 6px; padding-top: 4px; }
+.fp-photo-label { font-size: 13px; font-weight: 600; color: var(--text); }
+.fp-photo-hint { font-size: 11.5px; color: var(--text-muted); }
+.fp-photo-input-wrap input[type="file"] { display: none; }
+
+/* ── Lecture seule ── */
+.fp-readonly {
+  padding: 6px 4px; font-size: 13px; color: var(--text-muted);
+  border-bottom: 1.5px dashed var(--border); font-style: italic;
+  display: flex; align-items: center; gap: 6px;
+}
+.fp-readonly i { font-size: 11px; }
+.fp-statut-actif    { font-size: 8px; color: #16a34a; }
+.fp-statut-suspendu { font-size: 8px; color: #b45309; }
+.fp-statut-quitte   { font-size: 8px; color: #6b7280; }
+
+/* ── Bouton Annuler ── */
+.fp-btn-cancel {
+  color: #dc2626 !important;
+  border-color: rgba(220,38,38,.25) !important;
+  background: rgba(220,38,38,.05) !important;
+}
+.fp-btn-cancel:hover {
+  background: rgba(220,38,38,.1) !important;
+  border-color: rgba(220,38,38,.45) !important;
+}
+html[data-theme="dark"] .fp-btn-cancel {
+  color: #f87171 !important;
+  border-color: rgba(248,113,113,.25) !important;
+  background: rgba(248,113,113,.07) !important;
+}
+html[data-theme="dark"] .fp-btn-cancel:hover {
+  background: rgba(248,113,113,.14) !important;
+}
+
+/* ── Bannière erreur ── */
+.fp-error {
+  background: #fee2e2; border: 1px solid #fca5a5; border-radius: 6px;
+  padding: 10px 14px; margin-bottom: 14px; font-size: 12.5px; color: #991b1b;
+  display: flex; align-items: flex-start; gap: 8px;
+}
+html[data-theme="dark"] .fp-error { background: rgba(185,28,28,.15); border-color: rgba(239,68,68,.3); color: #fca5a5; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="page-wrap">
+{% include 'utilisateur/includes/nav.html' %}
+
+<div class="o-subheader">
+  <div class="o-subheader-row">
+    <a href="{% url 'utilisateur:detail' utilisateur.pk %}" class="o-ctrl-btn" style="padding:3px 7px;">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <span class="o-page-title">{% if admin_edit %}Modifier le profil{% else %}Modifier mon profil{% endif %}</span>
+    <span style="font-size:12px;color:var(--text-muted);margin-left:4px;">— {{ utilisateur.nom_complet }}</span>
+    <div style="margin-left:auto;display:flex;gap:6px;">
+      <a href="{% url 'utilisateur:detail' utilisateur.pk %}" class="o-ctrl-btn fp-btn-cancel">Annuler</a>
+    </div>
+  </div>
+</div>
+
+<div class="f-page-body">
+
+  <!-- Onglets -->
+  <div class="fp-tabs">
+    <button type="button" class="fp-tab {% if onglet_actif == 'profil' or not onglet_actif %}active{% endif %}"
+      data-tab="profil" onclick="fpSwitchTab(this,'profil')">
+      <i class="bi bi-person-fill"></i> Mon profil
+    </button>
+    {% if utilisateur.user %}
+    <button type="button" class="fp-tab {% if onglet_actif == 'compte' %}active{% endif %}"
+      data-tab="compte" onclick="fpSwitchTab(this,'compte')">
+      <i class="bi bi-shield-lock-fill"></i> Compte d'accès
+    </button>
+    {% endif %}
+  </div>
+
+  <!-- ══ Onglet Profil ══════════════════════════════════════ -->
+  <div id="fptab-profil" {% if onglet_actif == 'compte' %}style="display:none;"{% endif %}>
+    <form method="post" enctype="multipart/form-data" id="form-profil">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="profil">
+
+      {% if form.errors %}
+      <div class="fp-error">
+        <i class="bi bi-exclamation-circle-fill" style="font-size:15px;flex-shrink:0;margin-top:1px;"></i>
+        <div>
+          <strong>Veuillez corriger les erreurs suivantes :</strong>
+          <ul style="margin:4px 0 0;padding-left:16px;">
+            {% for field in form %}{% for error in field.errors %}<li>{{ field.label }} : {{ error }}</li>{% endfor %}{% endfor %}
+            {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+          </ul>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Photo de profil -->
+      <div class="f-card">
+        <div class="f-card-head"><i class="bi bi-camera-fill"></i> Photo de profil</div>
+        <div class="f-card-body">
+          <div class="fp-photo-block">
+            <div class="fp-photo-avatar" id="photo-preview-wrap" title="Cliquer pour changer la photo">
+              {% if utilisateur.photo %}
+              <img src="{{ utilisateur.photo.url }}" alt="Photo" id="photo-preview">
+              {% else %}
+              <span id="photo-initials">{{ utilisateur.initiales }}</span>
+              {% endif %}
+              <div class="fp-photo-overlay"><i class="bi bi-camera-fill"></i></div>
+            </div>
+            <div class="fp-photo-info">
+              <span class="fp-photo-label">Photo de profil</span>
+              <span class="fp-photo-hint">JPG, PNG ou WEBP · Max 5 Mo<br>Cliquez sur l'avatar pour changer</span>
+              <div class="fp-photo-input-wrap">{{ form.photo }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Identité -->
+      <div class="f-card">
+        <div class="f-card-head"><i class="bi bi-person-badge"></i> Identité</div>
+        <div class="f-card-body">
+          <div class="f-grid cols-3" style="margin-bottom:20px;">
+            <div class="f-field">
+              <label class="field-label">Nom <span class="f-required">*</span></label>
+              {{ form.nom }}
+            </div>
+            <div class="f-field">
+              <label class="field-label">Prénoms</label>
+              {{ form.prenoms }}
+            </div>
+            <div class="f-field">
+              <label class="field-label">Sexe</label>
+              {{ form.sexe }}
+            </div>
+          </div>
+          <div class="f-grid cols-3" style="margin-bottom:20px;">
+            <div class="f-field">
+              <label class="field-label">Date de naissance</label>
+              {{ form.date_naissance }}
+            </div>
+            <div class="f-field">
+              <label class="field-label">Lieu de naissance</label>
+              {{ form.lieu_naissance }}
+            </div>
+            <div class="f-field">
+              <label class="field-label">Nationalité</label>
+              {{ form.nationalite }}
+            </div>
+          </div>
+          <div class="f-grid">
+            <div class="f-field">
+              <label class="field-label">Situation matrimoniale</label>
+              {{ form.situation_matrimoniale }}
+            </div>
+            <div class="f-field">
+              <label class="field-label">Nombre d'enfants</label>
+              {{ form.nombre_enfants }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Coordonnées -->
+      <div class="f-card">
+        <div class="f-card-head"><i class="bi bi-telephone-fill"></i> Coordonnées</div>
+        <div class="f-card-body">
+          <div class="f-grid" style="margin-bottom:20px;">
+            <div class="f-field">
+              <label class="field-label">Téléphone principal</label>
+              {{ form.telephone }}
+            </div>
+            <div class="f-field">
+              <label class="field-label">Téléphone secondaire</label>
+              {{ form.telephone2 }}
+            </div>
+          </div>
+          <div class="f-grid">
+            <div class="f-field">
+              <label class="field-label">Email professionnel</label>
+              {{ form.email }}
+            </div>
+            <div class="f-field">
+              <label class="field-label">Adresse</label>
+              {{ form.adresse }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dossier RH -->
+      <div class="f-card">
+        <div class="f-card-head">
+          {% if is_admin %}
+          <i class="bi bi-building"></i> Affectation &amp; Contrat
+          {% else %}
+          <i class="bi bi-id-card"></i> Situation contractuelle
+          <!-- <span style="font-size:11px;color:var(--text-muted);margin-left:8px;text-transform:none;font-weight:400;letter-spacing:0;">
+            informations gérées par les RH
+          </span> -->
+          {% endif %}
+        </div>
+        <div class="f-card-body">
+          {% if is_admin %}
+          {# ── Admin : champs éditables ── #}
+          <div class="f-grid cols-3" style="margin-bottom:20px;">
+            <div class="f-field">
+              <label class="field-label">Matricule</label>
+              {{ form.matricule }}
+            </div>
+            <div class="f-field">
+              <label class="field-label">Fonction</label>
+              {{ form.fonction }}
+            </div>
+            <div class="f-field">
+              <label class="field-label">Grade</label>
+              {{ form.grade }}
+            </div>
+          </div>
+          <div class="f-grid cols-3" style="margin-bottom:20px;">
+            <div class="f-field">
+              <label class="field-label">Type de contrat</label>
+              {{ form.type_contrat }}
+            </div>
+            <div class="f-field">
+              <label class="field-label">Statut <span class="f-required">*</span></label>
+              {{ form.statut }}
+            </div>
+            <div class="f-field">
+              <label class="field-label">Date d'embauche <span class="f-required">*</span></label>
+              {{ form.date_embauche }}
+            </div>
+          </div>
+          <div class="f-grid" style="margin-bottom:20px;">
+            <div class="f-field">
+              <label class="field-label">Fin de contrat</label>
+              {{ form.date_fin_contrat }}
+            </div>
+          </div>
+          <div class="f-grid cols-1">
+            <div class="f-field">
+              <label class="field-label">Notes RH internes</label>
+              {{ form.notes }}
+            </div>
+          </div>
+          {% else %}
+          {# ── Employé : lecture seule, visuellement propre ── #}
+          <div class="f-grid cols-3">
+            <div class="f-field">
+              <label class="field-label">Matricule</label>
+              <div class="fp-readonly"><i class="bi bi-tag"></i> {{ utilisateur.matricule|default:"—" }}</div>
+            </div>
+            <div class="f-field">
+              <label class="field-label">Fonction</label>
+              <div class="fp-readonly"><i class="bi bi-briefcase"></i> {{ utilisateur.fonction|default:"—" }}</div>
+            </div>
+            <div class="f-field">
+              <label class="field-label">Grade</label>
+              <div class="fp-readonly"><i class="bi bi-award"></i> {{ utilisateur.grade.nom|default:"—" }}</div>
+            </div>
+            <div class="f-field">
+              <label class="field-label">Type de contrat</label>
+              <div class="fp-readonly"><i class="bi bi-file-earmark-text"></i> {{ utilisateur.type_contrat.nom|default:"—" }}</div>
+            </div>
+            <div class="f-field">
+              <label class="field-label">Statut</label>
+              <div class="fp-readonly"><i class="bi bi-circle-fill fp-statut-{{ utilisateur.statut }}"></i> {{ utilisateur.get_statut_display }}</div>
+            </div>
+            <div class="f-field">
+              <label class="field-label">Date d'embauche</label>
+              <div class="fp-readonly"><i class="bi bi-calendar"></i> {{ utilisateur.date_embauche|date:"d/m/Y"|default:"—" }}</div>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="f-form-footer">
+        <a href="{% url 'utilisateur:detail' utilisateur.pk %}" class="o-ctrl-btn fp-btn-cancel">Annuler</a>
+        <button type="submit" class="o-btn-create">
+          <i class="bi bi-check2-circle"></i> Enregistrer les modifications
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ══ Onglet Compte ═════════════════════════════════════ -->
+  {% if utilisateur.user %}
+  <div id="fptab-compte" {% if onglet_actif != 'compte' %}style="display:none;"{% endif %}>
+
+    <!-- Informations de connexion (lecture seule) -->
+    <div class="f-card">
+      <div class="f-card-head"><i class="bi bi-person-lock"></i> Informations de connexion</div>
+      <div class="f-card-body">
+        <div class="f-grid cols-3">
+          <div class="f-field">
+            <label class="field-label">Identifiant</label>
+            <div class="fp-readonly" style="font-family:monospace;font-size:13px;">
+              <i class="bi bi-person-circle"></i> {{ utilisateur.user.username }}
+            </div>
+          </div>
+          <div class="f-field">
+            <label class="field-label">Dernière connexion</label>
+            <div class="fp-readonly">
+              <i class="bi bi-clock"></i>
+              {{ utilisateur.user.last_login|date:"d/m/Y à H:i"|default:"Jamais" }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Changement de mot de passe -->
+    <div class="f-card">
+      <div class="f-card-head"><i class="bi bi-key-fill"></i> Changer le mot de passe</div>
+      <div class="f-card-body">
+        <form method="post" id="form-password">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="password">
+
+          {% if pwd_form.errors %}
+          <div class="fp-error" style="margin-bottom:14px;">
+            <i class="bi bi-exclamation-circle-fill" style="font-size:15px;flex-shrink:0;margin-top:1px;"></i>
+            <div>
+              <strong>Erreur :</strong>
+              <ul style="margin:4px 0 0;padding-left:16px;">
+                {% for field in pwd_form %}{% for error in field.errors %}<li>{{ error }}</li>{% endfor %}{% endfor %}
+                {% for error in pwd_form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+              </ul>
+            </div>
+          </div>
+          {% endif %}
+
+          <div class="f-grid" style="max-width:520px;">
+            {% if not admin_edit %}
+            <div class="f-field span-2">
+              <label class="field-label">Mot de passe actuel <span class="f-required">*</span></label>
+              {{ pwd_form.current_password }}
+            </div>
+            {% endif %}
+            <div class="f-field">
+              <label class="field-label">Nouveau mot de passe <span class="f-required">*</span></label>
+              {{ pwd_form.new_password }}
+              <small class="f-hint">6 caractères minimum</small>
+            </div>
+            <div class="f-field">
+              <label class="field-label">Confirmer le nouveau mot de passe <span class="f-required">*</span></label>
+              {{ pwd_form.confirm_password }}
+            </div>
+          </div>
+
+          <div style="margin-top:16px;display:flex;gap:8px;">
+            <a href="{% url 'utilisateur:detail' utilisateur.pk %}" class="o-ctrl-btn fp-btn-cancel">Annuler</a>
+            <button type="submit" class="o-btn-create">
+              <i class="bi bi-shield-check"></i> Mettre à jour le mot de passe
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+  {% endif %}
+
+</div>{# fin f-page-body #}
+</div>{# fin page-wrap #}
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+// Applique field-ul aux champs password (widget Django ne le fait pas)
+document.querySelectorAll('#form-password input[type="password"]').forEach(function(el) {
+  if (!el.classList.contains('field-ul')) el.classList.add('field-ul');
+});
+// SeghoSS déjà lancé via DOMContentLoaded dans le include — on relance pour couvrir les selects cachés
+if (window.SeghoSS) SeghoSS.initAll();
+
+function fpSwitchTab(btn, tabId) {
+  document.querySelectorAll('.fp-tab').forEach(function(t) { t.classList.remove('active'); });
+  document.querySelectorAll('[id^="fptab-"]').forEach(function(c) { c.style.display = 'none'; });
+  btn.classList.add('active');
+  document.getElementById('fptab-' + tabId).style.display = 'block';
+}
+
+// Photo : clic sur avatar → file input
+var photoInput = document.querySelector('input[type="file"][name="photo"]');
+var photoWrap  = document.getElementById('photo-preview-wrap');
+if (photoInput && photoWrap) {
+  photoWrap.addEventListener('click', function() { photoInput.click(); });
+  photoInput.addEventListener('change', function() {
+    if (this.files && this.files[0]) {
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        var overlay = photoWrap.querySelector('.fp-photo-overlay');
+        photoWrap.innerHTML = '<img src="' + e.target.result + '" style="width:100%;height:100%;object-fit:cover;">';
+        if (overlay) photoWrap.appendChild(overlay);
+      };
+      reader.readAsDataURL(this.files[0]);
+    }
+  });
+}
+</script>
+{% endblock %}

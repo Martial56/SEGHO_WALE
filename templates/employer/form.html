@@ -1,0 +1,658 @@
+{% extends 'employer/base.html' %}
+{% load i18n %}
+
+{% block topbar_title %}{% if employe %}Modifier — {{ employe.nom_complet|default:employe.nom }}{% else %}Nouvel employé{% endif %}{% endblock %}
+{% block module_navbar %}{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'services/includes/form_css.html' %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@18.2.1/build/css/intlTelInput.css">
+<style>
+/* ── intl-tel-input ── */
+.iti { width: 100%; display: block; }
+.iti__selected-flag { background: transparent !important; }
+.iti--separate-dial-code .iti__selected-flag { border-right: 1px solid rgba(0,0,0,0.12); padding: 0 8px 0 6px; }
+.iti--separate-dial-code input.field-ul { padding-left: 96px; }
+.iti__country-list { font-size: 13px; }
+html[data-theme="dark"] .iti__country-list { background: #1a2535; border-color: #2e3f58; color: #cce8f4; }
+html[data-theme="dark"] .iti__country-list .iti__country:hover,
+html[data-theme="dark"] .iti__country-list .iti__country.iti__highlight { background: #243044; }
+html[data-theme="dark"] .iti__divider { border-color: #2e3f58; }
+html[data-theme="dark"] .iti--separate-dial-code .iti__selected-flag { border-right-color: rgba(255,255,255,0.12); }
+html[data-theme="dark"] .iti__selected-dial-code { color: #cce8f4; }
+</style>
+<style>
+/* grille 3 colonnes */
+.f-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 900px) { .f-grid.cols-3 { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 600px) { .f-grid.cols-3, .f-grid { grid-template-columns: 1fr; } }
+
+/* radio */
+.f-radio-group { display: flex; gap: 10px; flex-wrap: wrap; padding-top: 6px; }
+.f-radio-item { display: flex; align-items: center; gap: 7px; cursor: pointer; user-select: none; }
+.f-radio-item input[type="radio"] { width: 15px; height: 15px; cursor: pointer; accent-color: var(--primary); flex-shrink: 0; }
+.f-radio-item span { font-size: 13px; font-weight: 500; color: var(--text); }
+
+/* photo bloc */
+.f-photo-zone {
+  position: relative; width: 100px; height: 100px;
+  border-radius: 50%; cursor: pointer; flex-shrink: 0;
+  overflow: hidden;
+  border: 2.5px dashed #c5dced;
+  background: #f0f7fb;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color .2s;
+}
+.f-photo-zone:hover { border-color: var(--primary); }
+.f-photo-zone:hover .f-photo-overlay { opacity: 1; }
+.f-photo-zone img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
+.f-photo-placeholder-icon { font-size: 32px; color: #7ab4d8; }
+.f-photo-overlay {
+  position: absolute; inset: 0; border-radius: 50%;
+  background: rgba(0,0,0,.45);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; opacity: 0; transition: opacity .2s;
+}
+.f-photo-overlay i { font-size: 20px; color: #fff; }
+.f-photo-overlay span { font-size: 10px; color: rgba(255,255,255,.85); font-weight: 600; letter-spacing: .3px; }
+html[data-theme="dark"] .f-photo-zone { background: rgba(26,84,130,.15); border-color: #4a98cc; }
+html[data-theme="dark"] .f-photo-placeholder-icon { color: #6ab0d4; }
+
+/* matricule auto */
+.f-mat-auto { display: inline-block; padding: 6px 10px; border-radius: 4px; font-size: 13px; color: var(--text-muted); background: var(--bg); border: 1px solid var(--border); font-style: italic; font-family: monospace; }
+
+/* bannière erreurs */
+.f-err-banner { display: flex; align-items: flex-start; gap: 12px; background: rgba(220,38,38,.07); border: 1px solid rgba(220,38,38,.22); border-left: 4px solid #dc2626; border-radius: 6px; padding: 12px 16px; margin-bottom: 14px; font-size: 13px; color: #7a1515; }
+html[data-theme="dark"] .f-err-banner { color: #fca5a5; background: rgba(220,38,38,.1); }
+.f-err-banner > i { font-size: 17px; color: #dc2626; flex-shrink: 0; margin-top: 1px; }
+
+/* tags départements */
+.dept-tags-wrap { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 6px; }
+.dept-tag {
+  display: inline-flex; align-items: center;
+  padding: 5px 14px; border-radius: 20px;
+  border: 1.5px solid var(--border);
+  font-size: 13px; font-weight: 500; color: var(--text);
+  background: var(--surface);
+  cursor: pointer; user-select: none;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.dept-tag input[type="checkbox"] { display: none; }
+.dept-tag:hover { border-color: var(--primary); color: var(--primary); }
+.dept-tag--on { background: var(--primary); color: #fff; border-color: var(--primary); }
+html[data-theme="dark"] .dept-tag { background: #0d2035; border-color: #2a3f58; color: #c8dff0; }
+html[data-theme="dark"] .dept-tag:hover { border-color: var(--teal-400); color: var(--teal-300); }
+html[data-theme="dark"] .dept-tag--on { background: var(--teal-600); border-color: var(--teal-500); color: #fff; }
+
+/* ── Combobox création rapide ── */
+.f-combo { position: relative; }
+.f-combo-input-wrap { position: relative; }
+.f-combo-clear {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer; font-size: 16px;
+  color: var(--text-muted); line-height: 1; display: none; padding: 0 2px;
+}
+.f-combo-clear:hover { color: var(--text); }
+.f-combo.has-val .f-combo-clear { display: block; }
+.f-combo.has-val .f-combo-text { padding-right: 28px; }
+.f-combo-drop {
+  display: none; position: absolute; left: 0; right: 0; top: calc(100% + 2px);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.12); z-index: 500;
+  max-height: 200px; overflow-y: auto; list-style: none; margin: 0; padding: 4px 0;
+}
+.f-combo.open .f-combo-drop { display: block; }
+.f-combo-drop li {
+  padding: 8px 14px; font-size: 13px; cursor: pointer; color: var(--text);
+  display: flex; align-items: center; gap: 8px;
+  transition: background .1s;
+}
+.f-combo-drop li:hover, .f-combo-drop li.active { background: rgba(33,136,171,.08); }
+.f-combo-drop li.f-combo-create { color: var(--primary, #1a5482); font-weight: 600; }
+.f-combo-drop li.f-combo-create i { font-size: 14px; }
+.f-combo-drop li.f-combo-empty { color: var(--text-muted); font-style: italic; cursor: default; }
+.f-combo-drop li.f-combo-empty:hover { background: none; }
+html[data-theme="dark"] .f-combo-drop { background: #0d2035; border-color: #2a3f58; }
+html[data-theme="dark"] .f-combo-drop li:hover,
+html[data-theme="dark"] .f-combo-drop li.active { background: rgba(34,113,177,.1); }
+html[data-theme="dark"] .f-combo-drop li.f-combo-create { color: #7ab4d8; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="page-wrap">
+{% include 'employer/includes/nav.html' %}
+
+<div class="o-subheader">
+  <div class="o-subheader-row">
+    <a href="{% if employe %}{% url 'employer:rh_detail' employe.pk %}{% else %}{% url 'employer:ressources_humaines_list' %}{% endif %}" class="o-ctrl-btn" title="Annuler">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <div>
+      <span class="o-page-title">{% if employe %}Modifier — {{ employe.nom_complet|default:employe.nom }}{% else %}Nouveau dossier employé{% endif %}</span>
+      <span style="font-size:11.5px;color:var(--text-muted);margin-left:10px;">
+        {% if employe %}Matricule : <strong>{{ employe.matricule }}</strong> · Modifié le {{ employe.modifie_le|date:"d/m/Y"|default:"—" }}
+        {% else %}Remplissez le formulaire pour créer un nouveau dossier.{% endif %}
+      </span>
+    </div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+      <a href="{% if employe %}{% url 'employer:rh_detail' employe.pk %}{% else %}{% url 'employer:ressources_humaines_list' %}{% endif %}" class="o-ctrl-btn">
+        <i class="bi bi-x-lg"></i> Annuler
+      </a>
+      <button type="submit" form="rhForm" class="o-btn-create">
+        <i class="bi bi-check2-all"></i>
+        {% if employe %}Enregistrer{% else %}Créer le dossier{% endif %}
+      </button>
+    </div>
+  </div>
+</div>
+
+<form method="post" enctype="multipart/form-data" novalidate id="rhForm">
+{% csrf_token %}
+<div class="f-page-body">
+
+  {% if form.errors %}
+  <div class="f-err-banner">
+    <i class="bi bi-exclamation-triangle-fill"></i>
+    <div>
+      <strong>Erreurs de validation :</strong>
+      {% for field in form %}{% for error in field.errors %}<div>{{ field.label }} : {{ error }}</div>{% endfor %}{% endfor %}
+      {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ── Informations personnelles ─────────────────────────── -->
+  <div class="f-card">
+    <div class="f-card-head">
+      <i class="bi bi-person-fill"></i>
+      Informations personnelles
+    </div>
+    <div class="f-card-body">
+
+      <div style="display:flex;gap:20px;align-items:flex-end;margin-bottom:20px;">
+        <div style="display:flex;flex-direction:column;gap:5px;">
+          <label class="field-label">Matricule</label>
+          {% if employe %}
+            <div class="f-mat-auto">{{ employe.matricule }}</div>
+          {% else %}
+            <div class="f-mat-auto" id="mat-preview">Généré automatiquement</div>
+          {% endif %}
+        </div>
+        {% if not employe %}
+        <div style="display:flex;flex-direction:column;gap:5px;width:150px;">
+          <label class="field-label" for="id_numero_ordre">N° d'ordre</label>
+          <input type="number" id="id_numero_ordre" name="numero_ordre"
+            value="{{ form_data.numero_ordre|default:'' }}"
+            min="1" class="field-ul" placeholder="Auto"
+            style="font-family:monospace;">
+          <span class="f-hint">Laisser vide pour auto-incrémenter</span>
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="f-grid" style="margin-bottom:20px;">
+        <div class="f-field">
+          <label class="field-label" for="id_nom">Nom <span class="f-required">*</span></label>
+          <input type="text" id="id_nom" name="nom" value="{{ form_data.nom }}" class="field-ul" placeholder="Nom de famille" required maxlength="100" autocomplete="family-name">
+        </div>
+        <div class="f-field">
+          <label class="field-label" for="id_prenoms">Prénoms <span class="f-required">*</span></label>
+          <input type="text" id="id_prenoms" name="prenoms" value="{{ form_data.prenoms }}" class="field-ul" placeholder="Prénoms" required maxlength="150" autocomplete="given-name">
+        </div>
+      </div>
+
+      <div class="f-grid cols-3" style="margin-bottom:20px;">
+        <div class="f-field">
+          <label class="field-label">Sexe</label>
+          <div class="f-radio-group">
+            <label class="f-radio-item">
+              <input type="radio" name="sexe" value="M" {% if form_data.sexe == 'M' %}checked{% endif %}>
+              <span><i class="bi bi-gender-male" style="color:#2d99db;"></i> Masculin</span>
+            </label>
+            <label class="f-radio-item">
+              <input type="radio" name="sexe" value="F" {% if form_data.sexe == 'F' %}checked{% endif %}>
+              <span><i class="bi bi-gender-female" style="color:#7c4dff;"></i> Féminin</span>
+            </label>
+          </div>
+        </div>
+        <div class="f-field">
+          <label class="field-label" for="id_date_naissance">Date de naissance</label>
+          <input type="date" id="id_date_naissance" name="date_naissance" value="{{ form_data.date_naissance }}" class="field-ul" min="1900-01-01" max="{% now 'Y-m-d' %}">
+          <small id="age-display" class="f-hint"></small>
+        </div>
+        <div class="f-field">
+          <label class="field-label" for="id_lieu_naissance">Lieu de naissance</label>
+          <input type="text" id="id_lieu_naissance" name="lieu_naissance" value="{{ form_data.lieu_naissance }}" class="field-ul" placeholder="Ex. Abidjan">
+        </div>
+      </div>
+
+      <div class="f-grid cols-3" style="margin-bottom:20px;">
+        <div class="f-field">
+          <label class="field-label" for="id_nationalite">Nationalité</label>
+          <input type="text" id="id_nationalite" name="nationalite" value="{{ form_data.nationalite }}" class="field-ul" placeholder="Ivoirienne">
+        </div>
+        <div class="f-field">
+          <label class="field-label" for="id_situation_matrimoniale">Situation matrimoniale</label>
+          <select id="id_situation_matrimoniale" name="situation_matrimoniale" class="field-ul">
+            <option value="">— Sélectionner —</option>
+            <option value="celibataire" {% if form_data.situation_matrimoniale == 'celibataire' %}selected{% endif %}>Célibataire</option>
+            <option value="marie"       {% if form_data.situation_matrimoniale == 'marie'       %}selected{% endif %}>Marié(e)</option>
+            <option value="divorce"     {% if form_data.situation_matrimoniale == 'divorce'     %}selected{% endif %}>Divorcé(e)</option>
+            <option value="veuf"        {% if form_data.situation_matrimoniale == 'veuf'        %}selected{% endif %}>Veuf / Veuve</option>
+          </select>
+        </div>
+        <div class="f-field">
+          <label class="field-label" for="id_nombre_enfants">Nombre d'enfants</label>
+          <input type="number" id="id_nombre_enfants" name="nombre_enfants" min="0" max="20" value="{{ form_data.nombre_enfants }}" class="field-ul">
+        </div>
+      </div>
+
+      <div class="f-field">
+        <label class="field-label">Photo</label>
+        <label for="id_photo" class="f-photo-zone" title="Cliquer pour choisir une photo">
+          {% if employe and employe.photo %}
+            <img src="{{ employe.photo.url }}" alt="Photo" id="photo-preview">
+          {% else %}
+            <i class="bi bi-person f-photo-placeholder-icon" id="photo-placeholder"></i>
+            <img src="" alt="" id="photo-preview" style="display:none;">
+          {% endif %}
+          <div class="f-photo-overlay">
+            <i class="bi bi-camera"></i>
+            <span>{% if employe and employe.photo %}Changer{% else %}Ajouter{% endif %}</span>
+          </div>
+        </label>
+        <input type="file" id="id_photo" name="photo" accept="image/*" style="display:none;">
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Coordonnées ────────────────────────────────────────── -->
+  <div class="f-card">
+    <div class="f-card-head">
+      <i class="bi bi-telephone-fill"></i>
+      Coordonnées
+    </div>
+    <div class="f-card-body">
+      <div class="f-grid" style="margin-bottom:20px;">
+        <div class="f-field">
+          <label class="field-label" for="id_telephone">Téléphone principal</label>
+          <input type="tel" id="id_telephone" name="telephone" value="{{ form_data.telephone }}" class="field-ul" autocomplete="tel">
+        </div>
+        <div class="f-field">
+          <label class="field-label" for="id_telephone2">Téléphone 2</label>
+          <input type="tel" id="id_telephone2" name="telephone2" value="{{ form_data.telephone2 }}" class="field-ul" autocomplete="tel">
+        </div>
+      </div>
+      <div class="f-grid">
+        <div class="f-field">
+          <label class="field-label" for="id_email">Adresse email</label>
+          <input type="email" id="id_email" name="email" value="{{ form_data.email }}" class="field-ul" placeholder="exemple@hopital.ci" autocomplete="email">
+        </div>
+        <div class="f-field">
+          <label class="field-label" for="id_adresse">Adresse postale</label>
+          <textarea id="id_adresse" name="adresse" class="field-ul" rows="2" placeholder="Quartier, commune, ville…" style="min-height:52px;">{{ form_data.adresse }}</textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Situation professionnelle ─────────────────────────── -->
+  <div class="f-card">
+    <div class="f-card-head">
+      <i class="bi bi-briefcase-fill"></i>
+      Situation professionnelle
+    </div>
+    <div class="f-card-body">
+      <div class="f-field" style="margin-bottom:20px;">
+        <label class="field-label">Services / Départements</label>
+        <div class="dept-tags-wrap">
+          {% for svc in services %}
+          <label class="dept-tag {% if svc.pk in form_data.services %}dept-tag--on{% endif %}">
+            <input type="checkbox" name="services" value="{{ svc.pk }}"
+              {% if svc.pk in form_data.services %}checked{% endif %}>
+            {{ svc.nom }}
+          </label>
+          {% empty %}
+          <span style="font-size:12px;color:var(--text-muted);font-style:italic;">Aucun département configuré.</span>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="f-grid cols-3" style="margin-bottom:20px;">
+        <div class="f-field">
+          <label class="field-label">Fonction</label>
+          <div class="f-combo" data-model="fonction">
+            <div class="f-combo-input-wrap">
+              <input type="text" class="field-ul f-combo-text" autocomplete="off" placeholder="Rechercher…">
+              <button type="button" class="f-combo-clear" tabindex="-1" title="Effacer">×</button>
+            </div>
+            <input type="hidden" name="fonction" class="f-combo-val" value="{{ form_data.fonction }}">
+            <ul class="f-combo-drop"></ul>
+          </div>
+          <script type="application/json" class="f-combo-data">
+            [{% for fn in fonctions %}{"pk":{{ fn.pk }},"nom":"{{ fn.nom|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}]
+          </script>
+        </div>
+        <div class="f-field">
+          <label class="field-label">Grade</label>
+          <div class="f-combo" data-model="grade">
+            <div class="f-combo-input-wrap">
+              <input type="text" class="field-ul f-combo-text" autocomplete="off" placeholder="Rechercher…">
+              <button type="button" class="f-combo-clear" tabindex="-1" title="Effacer">×</button>
+            </div>
+            <input type="hidden" name="grade" class="f-combo-val" value="{{ form_data.grade }}">
+            <ul class="f-combo-drop"></ul>
+          </div>
+          <script type="application/json" class="f-combo-data">
+            [{% for gr in grades %}{"pk":{{ gr.pk }},"nom":"{{ gr.nom|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}]
+          </script>
+        </div>
+        <div class="f-field">
+          <label class="field-label">Type de contrat</label>
+          <div class="f-combo" data-model="type_contrat">
+            <div class="f-combo-input-wrap">
+              <input type="text" class="field-ul f-combo-text" autocomplete="off" placeholder="Rechercher…">
+              <button type="button" class="f-combo-clear" tabindex="-1" title="Effacer">×</button>
+            </div>
+            <input type="hidden" name="type_contrat" class="f-combo-val" value="{{ form_data.type_contrat }}">
+            <ul class="f-combo-drop"></ul>
+          </div>
+          <script type="application/json" class="f-combo-data">
+            [{% for tc in types_contrat %}{"pk":{{ tc.pk }},"nom":"{{ tc.nom|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}]
+          </script>
+        </div>
+      </div>
+      <div class="f-grid" style="margin-bottom:20px;">
+        <div class="f-field">
+          <label class="field-label" for="id_date_embauche">Date d'embauche <span class="f-required">*</span></label>
+          <input type="date" id="id_date_embauche" name="date_embauche" value="{{ form_data.date_embauche }}" class="field-ul" required>
+        </div>
+        <div class="f-field">
+          <label class="field-label" for="id_date_fin_contrat">Date fin de contrat</label>
+          <input type="date" id="id_date_fin_contrat" name="date_fin_contrat" value="{{ form_data.date_fin_contrat }}" class="field-ul">
+          <small class="f-hint">Laisser vide pour un CDI</small>
+        </div>
+      </div>
+      <div class="f-grid" style="margin-bottom:20px;">
+        <div class="f-field">
+          <label class="field-label" for="id_salaire_base">Salaire de base (FCFA)</label>
+          <div style="position:relative;">
+            <input type="number" id="id_salaire_base" name="salaire_base" min="0" step="1000" value="{{ form_data.salaire_base }}" class="field-ul" placeholder="Ex. 250000" style="padding-right:52px;">
+            <span style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:600;color:var(--text-muted);pointer-events:none;">FCFA</span>
+          </div>
+        </div>
+        <div class="f-field">
+          <label class="field-label" for="id_statut">Statut <span class="f-required">*</span></label>
+          <select id="id_statut" name="statut" class="field-ul" required>
+            <option value="actif"    {% if form_data.statut == 'actif'    %}selected{% endif %}>Actif</option>
+            <option value="suspendu" {% if form_data.statut == 'suspendu' %}selected{% endif %}>Suspendu</option>
+            <option value="quitte"   {% if form_data.statut == 'quitte'   %}selected{% endif %}>Quitté</option>
+          </select>
+        </div>
+      </div>
+      <div class="f-field">
+        <label class="field-label" for="id_notes">Notes internes</label>
+        <textarea id="id_notes" name="notes" class="field-ul" rows="3" placeholder="Observations, informations complémentaires…" style="min-height:72px;">{{ form_data.notes }}</textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="f-form-footer">
+    <a href="{% if employe %}{% url 'employer:rh_detail' employe.pk %}{% else %}{% url 'employer:ressources_humaines_list' %}{% endif %}" class="o-ctrl-btn">
+      <i class="bi bi-x-lg"></i> Annuler
+    </a>
+    <button type="submit" class="o-btn-create" style="padding:7px 22px;">
+      <i class="bi bi-check2-all"></i>
+      {% if employe %}Enregistrer les modifications{% else %}Créer le dossier employé{% endif %}
+    </button>
+  </div>
+
+</div>
+</form>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var dateInput  = document.getElementById('id_date_naissance');
+  var ageDisplay = document.getElementById('age-display');
+  function updateAge() {
+    if (!dateInput || !dateInput.value || !ageDisplay) return;
+    var birth = new Date(dateInput.value);
+    if (isNaN(birth)) { ageDisplay.textContent = ''; return; }
+    var today = new Date();
+    var age = today.getFullYear() - birth.getFullYear();
+    var m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+    if (age < 0) { ageDisplay.textContent = ''; return; }
+    ageDisplay.textContent = age === 0
+      ? ((today.getFullYear() - birth.getFullYear()) * 12 + today.getMonth() - birth.getMonth()) + ' mois'
+      : age + ' an' + (age > 1 ? 's' : '');
+  }
+  function validateDateNaissance() {
+    if (!dateInput || !dateInput.value) return true;
+    var annee = new Date(dateInput.value).getFullYear();
+    var today = new Date().getFullYear();
+    if (annee < 1900 || annee > today) {
+      dateInput.setCustomValidity('L\'année doit être comprise entre 1900 et ' + today + '.');
+      dateInput.style.borderColor = '#dc2626';
+    } else {
+      dateInput.setCustomValidity('');
+      dateInput.style.borderColor = '';
+    }
+  }
+  if (dateInput) {
+    dateInput.addEventListener('change', function() { validateDateNaissance(); updateAge(); });
+    dateInput.addEventListener('input',  validateDateNaissance);
+    updateAge();
+  }
+  document.getElementById('rhForm').addEventListener('submit', function(e) {
+    validateDateNaissance();
+    if (dateInput && !dateInput.checkValidity()) {
+      e.preventDefault();
+      dateInput.reportValidity();
+    }
+  });
+
+  var photoInput   = document.getElementById('id_photo');
+  var photoPreview = document.getElementById('photo-preview');
+  var photoHolder  = document.getElementById('photo-placeholder');
+  if (photoInput) {
+    photoInput.addEventListener('change', function () {
+      var file = this.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function (e) {
+        if (photoHolder)  photoHolder.style.display  = 'none';
+        if (photoPreview) { photoPreview.src = e.target.result; photoPreview.style.display = 'block'; }
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+})();
+
+document.querySelectorAll('.dept-tag').forEach(function(tag) {
+  tag.addEventListener('click', function() {
+    var cb = this.querySelector('input[type="checkbox"]');
+    this.classList.toggle('dept-tag--on', cb.checked);
+  });
+});
+
+/* ── Combobox création rapide ──────────────────────────────────────────── */
+(function () {
+  var CONFIG_URLS = {
+    'fonction':     '{% url "employer:config_fonctions" %}',
+    'grade':        '{% url "employer:config_grades" %}',
+    'type_contrat': '{% url "employer:config_types_contrat" %}'
+  };
+
+  /* ── 1. Restauration après retour de la page config ── */
+  (function restore() {
+    var params        = new URLSearchParams(window.location.search);
+    var restoredField = params.get('restored_field');
+    var restoredPk    = params.get('restored_pk');
+    var draft = sessionStorage.getItem('rh_form_draft');
+    if (!draft) return;
+    try {
+      var data = JSON.parse(draft);
+      Object.keys(data).forEach(function(key) {
+        var val = data[key];
+        if (key === 'services') {
+          document.querySelectorAll('[name="services"]').forEach(function(cb) {
+            cb.checked = val.indexOf(cb.value) !== -1;
+            var tag = cb.closest('.dept-tag');
+            if (tag) tag.classList.toggle('dept-tag--on', cb.checked);
+          });
+        } else {
+          /* radio */
+          var radio = document.querySelector('input[type="radio"][name="' + key + '"][value="' + val + '"]');
+          if (radio) { radio.checked = true; return; }
+          /* autres inputs / hidden */
+          var el = document.querySelector(
+            'input[name="' + key + '"]:not([type="checkbox"]):not([type="radio"]),' +
+            'textarea[name="' + key + '"]'
+          );
+          if (el) el.value = val;
+        }
+      });
+      /* Forcer la valeur du champ qui vient d'être créé */
+      if (restoredField && restoredPk) {
+        var hid = document.querySelector('.f-combo[data-model="' + restoredField + '"] .f-combo-val');
+        if (hid) hid.value = restoredPk;
+      }
+    } catch(e) {}
+    sessionStorage.removeItem('rh_form_draft');
+    window.history.replaceState({}, '', window.location.pathname);
+  })();
+
+  /* ── 2. Init comboboxes ── */
+  document.querySelectorAll('.f-combo').forEach(function (combo) {
+    var model       = combo.dataset.model;
+    var textInput   = combo.querySelector('.f-combo-text');
+    var hiddenInput = combo.querySelector('.f-combo-val');
+    var drop        = combo.querySelector('.f-combo-drop');
+    var clearBtn    = combo.querySelector('.f-combo-clear');
+    var dataEl      = combo.nextElementSibling;
+    var items = [];
+    try { items = JSON.parse(dataEl.textContent); } catch(e) {}
+
+    /* Afficher le label initial */
+    if (hiddenInput.value) {
+      var found = items.find(function(i) { return String(i.pk) === hiddenInput.value; });
+      if (found) { textInput.value = found.nom; combo.classList.add('has-val'); }
+    }
+
+    function render(q) {
+      drop.innerHTML = '';
+      var lq = q.trim().toLowerCase();
+      var filtered = lq ? items.filter(function(i) { return i.nom.toLowerCase().includes(lq); }) : items;
+      if (!filtered.length && !lq) {
+        drop.innerHTML = '<li class="f-combo-empty">Aucun élément. Tapez pour créer.</li>';
+        return;
+      }
+      filtered.forEach(function(item) {
+        var li = document.createElement('li');
+        li.textContent = item.nom;
+        li.addEventListener('mousedown', function(e) { e.preventDefault(); select(item.pk, item.nom); });
+        drop.appendChild(li);
+      });
+      var qt = q.trim();
+      if (qt && !filtered.some(function(i) { return i.nom.toLowerCase() === qt.toLowerCase(); })) {
+        var li = document.createElement('li');
+        li.className = 'f-combo-create';
+        li.innerHTML = '<i class="bi bi-plus-circle"></i> Créer « ' + qt + ' »';
+        li.addEventListener('mousedown', function(e) { e.preventDefault(); goCreate(qt); });
+        drop.appendChild(li);
+      }
+    }
+
+    function select(pk, nom) {
+      hiddenInput.value = pk;
+      textInput.value   = nom;
+      combo.classList.add('has-val');
+      combo.classList.remove('open');
+    }
+
+    function goCreate(nom) {
+      /* Sauvegarder l'état du formulaire */
+      var draft = {};
+      draft['services'] = [];
+      document.querySelectorAll('[name="services"]:checked').forEach(function(cb) {
+        draft['services'].push(cb.value);
+      });
+      var form = document.getElementById('rhForm');
+      new FormData(form).forEach(function(val, key) {
+        if (key === 'csrfmiddlewaretoken' || key === 'services') return;
+        draft[key] = val;
+      });
+      sessionStorage.setItem('rh_form_draft', JSON.stringify(draft));
+      /* Rediriger vers la page de configuration */
+      var params = new URLSearchParams({
+        nom: nom,
+        next: window.location.pathname,
+        created_field: model
+      });
+      window.location.href = CONFIG_URLS[model] + '?' + params.toString();
+    }
+
+    textInput.addEventListener('focus', function() { render(this.value); combo.classList.add('open'); });
+    textInput.addEventListener('input', function() {
+      hiddenInput.value = ''; combo.classList.remove('has-val');
+      render(this.value); combo.classList.add('open');
+    });
+    textInput.addEventListener('blur', function() {
+      setTimeout(function() { combo.classList.remove('open'); }, 150);
+      if (!hiddenInput.value) { textInput.value = ''; combo.classList.remove('has-val'); }
+    });
+    clearBtn.addEventListener('click', function() {
+      hiddenInput.value = ''; textInput.value = '';
+      combo.classList.remove('has-val'); textInput.focus();
+    });
+  });
+})();
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/intl-tel-input@18.2.1/build/js/intlTelInput.min.js"></script>
+<script>
+(function () {
+  var UTILS = 'https://cdn.jsdelivr.net/npm/intl-tel-input@18.2.1/build/js/utils.js';
+  var PREFERRED = ['ci','sn','ml','bf','gn','cm','tg','bj','ne','gh','ng','ma'];
+
+  function applyMaxLength(input, iti) {
+    if (!window.intlTelInputUtils) return;
+    var iso2 = iti.getSelectedCountryData().iso2;
+    try {
+      var example = intlTelInputUtils.getExampleNumber(iso2, true, intlTelInputUtils.numberType.MOBILE);
+      input.maxLength = example.replace(/\D/g, '').length;
+    } catch(e) {}
+  }
+
+  function initPhone(inputId) {
+    var input = document.getElementById(inputId);
+    if (!input) return null;
+    var iti = window.intlTelInput(input, {
+      initialCountry: 'ci',
+      preferredCountries: PREFERRED,
+      separateDialCode: true,
+      utilsScript: UTILS,
+    });
+    iti.promise.then(function () { applyMaxLength(input, iti); });
+    input.addEventListener('countrychange', function () { applyMaxLength(input, iti); });
+    return iti;
+  }
+
+  var itiTel1 = initPhone('id_telephone');
+  var itiTel2 = initPhone('id_telephone2');
+
+  document.getElementById('rhForm').addEventListener('submit', function () {
+    if (itiTel1) { var n1 = itiTel1.getNumber(); if (n1) document.getElementById('id_telephone').value = n1; }
+    if (itiTel2) { var n2 = itiTel2.getNumber(); if (n2) document.getElementById('id_telephone2').value = n2; }
+  });
+})();
+</script>
+{% endblock %}

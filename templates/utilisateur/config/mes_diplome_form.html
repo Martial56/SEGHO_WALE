@@ -1,0 +1,77 @@
+{% extends 'utilisateur/base.html' %}
+
+{% block topbar_title %}Ajouter un diplôme{% endblock %}
+{% block module_navbar %}{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'services/includes/form_css.html' %}
+{% endblock %}
+
+{% block content %}
+<div id="page-wrap">
+
+{% include 'utilisateur/includes/nav.html' %}
+
+<div class="o-subheader" id="subheader">
+  <div class="o-subheader-row">
+    <a href="{% url 'utilisateur:mes_diplomes' %}" class="o-ctrl-btn" style="padding:3px 7px;">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <span style="font-size:13.5px;color:var(--text-muted);">
+      <a href="{% url 'utilisateur:mes_diplomes' %}" style="color:var(--accent);text-decoration:none;font-weight:500;">Mes diplômes</a>
+      <span style="margin:0 5px;opacity:.4;">/</span>
+      <span style="color:var(--text);">Ajouter</span>
+    </span>
+  </div>
+</div>
+
+<div class="f-page-body" style="max-width:560px;">
+
+{% if form.errors %}
+<div class="alert-error">
+  <span>⚠</span>
+  <div>Certains champs contiennent des erreurs. Veuillez les corriger.</div>
+</div>
+{% endif %}
+
+<form method="post" novalidate>
+{% csrf_token %}
+{% if request.GET.next %}
+<input type="hidden" name="next" value="{{ request.GET.next }}">
+{% endif %}
+
+<div class="f-field">
+  <label class="field-label" for="{{ form.titre.id_for_label }}">Titre du diplôme <span class="f-required">*</span></label>
+  {{ form.titre }}
+  {% if form.titre.errors %}<div class="f-error">{{ form.titre.errors.0 }}</div>{% endif %}
+</div>
+
+<div class="f-field">
+  <label class="field-label" for="{{ form.etablissement.id_for_label }}">Établissement</label>
+  {{ form.etablissement }}
+</div>
+
+<div class="f-field">
+  <label class="field-label" for="{{ form.annee.id_for_label }}">Année d'obtention</label>
+  {{ form.annee }}
+  {% if form.annee.errors %}
+  <div class="f-error">{{ form.annee.errors.0 }}</div>
+  {% else %}
+  <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Entre 1950 et {% now "Y" %}</div>
+  {% endif %}
+</div>
+
+<div class="art-form-footer" style="margin-top:24px;">
+  <a href="{% url 'utilisateur:mes_diplomes' %}" class="o-btn-secondary">Annuler</a>
+  <button type="submit" class="o-btn-create">
+    <i class="bi bi-check-lg"></i> Enregistrer
+  </button>
+</div>
+
+</form>
+</div>
+
+</div>
+{% endblock %}

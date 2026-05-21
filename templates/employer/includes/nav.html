@@ -1,0 +1,84 @@
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<style>
+.o-nav-dropdown { position: relative; height: 38px; display: flex; align-items: center; }
+.o-nav-dropdown-menu {
+  display: none; position: absolute; top: calc(100% + 1px); left: 0;
+  background: #fff; border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.13);
+  min-width: 190px; z-index: 9999; overflow: hidden;
+  border: 1px solid rgba(0,0,0,0.08);
+}
+.o-nav-dropdown-menu.open { display: block; }
+.o-nav-dropdown-menu a {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px; font-size: 13px; color: var(--primary);
+  text-decoration: none; border-bottom: 1px solid rgba(0,0,0,0.05);
+  transition: background 0.12s;
+}
+.o-nav-dropdown-menu a:last-child { border-bottom: none; }
+.o-nav-dropdown-menu a:hover { background: rgba(26,84,130,0.06); }
+html[data-theme="dark"] .o-nav-dropdown-menu { background: #0d2035; border-color: rgba(255,255,255,0.08); }
+html[data-theme="dark"] .o-nav-dropdown-menu a { color: #cce8f4; border-bottom-color: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .o-nav-dropdown-menu a:hover { background: rgba(34,113,177,0.1); }
+</style>
+<nav class="o-nav">
+  <a href="{% url 'dashboard' %}" class="o-nav-grid" title="Accueil">
+    <i class="bi bi-grid-3x3-gap-fill"></i>
+  </a>
+  <span class="o-nav-brand">
+    <i class="bi bi-people-fill"></i>
+    Employés
+  </span>
+  <a href="{% url 'employer:rh_dashboard' %}"
+    class="o-nav-link {% if request.resolver_match.url_name == 'rh_dashboard' %}active{% endif %}">
+    Tableau de bord
+  </a>
+  <a href="{% url 'employer:ressources_humaines_list' %}"
+    class="o-nav-link {% if request.resolver_match.url_name in 'ressources_humaines_list,rh_detail,rh_modifier,rh_nouveau' %}active{% endif %}">
+    Employés
+  </a>
+  <a href="{% url 'employer:rh_annuaire' %}"
+    class="o-nav-link {% if request.resolver_match.url_name == 'rh_annuaire' %}active{% endif %}">
+    Annuaire
+  </a>
+  <a href="{% url 'employer:rh_organigramme' %}"
+    class="o-nav-link {% if request.resolver_match.url_name == 'rh_organigramme' %}active{% endif %}">
+    Organigramme
+  </a>
+  {% if request.user.is_staff %}
+  <div class="o-nav-dropdown">
+    <button type="button"
+      class="o-nav-link {% if request.resolver_match.url_name in 'specialites,specialite_detail,specialite_create,specialite_edit,departements,departement_detail,departement_create,departement_edit,diplomes,diplome_detail,diplome_create,diplome_edit' %}active{% endif %}"
+      style="background:none;border:none;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;"
+      onclick="toggleEmpNavDropdown(event, this)">
+      Configuration
+      <i class="bi bi-chevron-down" style="font-size:10px;"></i>
+    </button>
+    <div class="o-nav-dropdown-menu" id="emp-nav-config-dropdown">
+      <a href="{% url 'employer:config_fonctions' %}"><i class="bi bi-person-badge"></i> Fonctions</a>
+      <a href="{% url 'employer:config_grades' %}"><i class="bi bi-award"></i> Grades</a>
+      <a href="{% url 'employer:config_types_contrat' %}"><i class="bi bi-file-earmark-text"></i> Types de contrat</a>
+      <div style="height:1px;background:var(--border);margin:4px 0;"></div>
+      <a href="{% url 'employer:specialites' %}"><i class="bi bi-tag"></i> Spécialités</a>
+      <a href="{% url 'employer:departements' %}"><i class="bi bi-building"></i> Départements</a>
+      <a href="{% url 'employer:diplomes' %}"><i class="bi bi-mortarboard"></i> Diplômes</a>
+    </div>
+  </div>
+  {% endif %}
+</nav>
+<script>
+function toggleEmpNavDropdown(e, btn) {
+  e.stopPropagation();
+  var menu = document.getElementById('emp-nav-config-dropdown');
+  menu.classList.toggle('open');
+  if (menu.classList.contains('open')) {
+    function close(ev) {
+      if (!btn.closest('.o-nav-dropdown').contains(ev.target)) {
+        menu.classList.remove('open');
+        document.removeEventListener('click', close);
+      }
+    }
+    setTimeout(function () { document.addEventListener('click', close); }, 0);
+  }
+}
+</script>

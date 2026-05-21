@@ -1,0 +1,637 @@
+{% extends 'utilisateur/base.html' %}
+{% load static %}
+
+{% block topbar_title %}Utilisateurs{% endblock %}
+{% block module_navbar %}{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+  /* ── Stats ── */
+  .ul-stats {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    background: var(--surface); border-bottom: 1px solid var(--border);
+  }
+  .ul-stat {
+    padding: 14px 20px; border-right: 1px solid var(--border);
+    display: flex; align-items: center; gap: 14px;
+  }
+  .ul-stat:last-child { border-right: none; }
+  .ul-stat-icon {
+    width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 18px;
+  }
+  .ul-stat-icon.blue   { background: rgba(33,136,171,.1); color: var(--accent); }
+  .ul-stat-icon.yellow { background: rgba(245,158,11,.12); color: #b45309; }
+  .ul-stat-icon.gray   { background: rgba(0,0,0,.06); color: #6b7280; }
+  .ul-stat-label { font-size: 11px; color: var(--text-muted); margin-bottom: 3px; }
+  .ul-stat-value { font-size: 24px; font-weight: 700; color: var(--text); line-height: 1; }
+  html[data-theme="dark"] .ul-stats { background: var(--surface); border-bottom-color: var(--border); }
+  html[data-theme="dark"] .ul-stat  { border-right-color: var(--border); }
+  html[data-theme="dark"] .ul-stat-icon.blue   { background: rgba(33,136,171,.2); }
+  html[data-theme="dark"] .ul-stat-icon.yellow { background: rgba(245,158,11,.18); color: #fbbf24; }
+  html[data-theme="dark"] .ul-stat-icon.gray   { background: rgba(255,255,255,.06); color: #9ca3af; }
+
+  /* ── Section header ── */
+  .ul-sec-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 16px; cursor: pointer; user-select: none;
+    background: var(--bg); border-bottom: 1px solid var(--border);
+    border-top: 1px solid var(--border);
+  }
+  .ul-sec-head:first-of-type { border-top: none; }
+  .ul-sec-title { font-size: 11.5px; font-weight: 600; color: var(--text-muted); display: flex; align-items: center; gap: 8px; }
+  .ul-sec-badge { font-size: 11px; font-weight: 700; padding: 1px 9px; border-radius: 20px; line-height: 1.6; }
+  .ul-sec-badge.blue   { background: rgba(33,136,171,.1); color: var(--accent); }
+  .ul-sec-badge.orange { background: rgba(245,158,11,.12); color: #b45309; }
+  .ul-sec-badge.gray   { background: rgba(0,0,0,.07); color: #6b7280; }
+  .ul-sec-chevron { margin-left: auto; font-size: 11px; color: var(--text-muted); transition: transform .2s; }
+  .ul-sec-chevron.closed { transform: rotate(-90deg); }
+  html[data-theme="dark"] .ul-sec-head { background: rgba(255,255,255,.015); border-color: var(--border); }
+  html[data-theme="dark"] .ul-sec-badge.gray { background: rgba(255,255,255,.07); color: #9ca3af; }
+
+  /* ── Vue LISTE ── */
+  .ul-table-wrap { overflow-x: auto; background: var(--surface); }
+  .ul-table-wrap.collapsed { display: none; }
+  .ul-table { width: 100%; border-collapse: collapse; background: var(--surface); }
+  .ul-table th {
+    padding: 8px 13px; text-align: left; font-size: 10.5px; font-weight: 600;
+    color: var(--text-muted); border-bottom: 1px solid var(--border);
+    white-space: nowrap; background: var(--surface);
+  }
+  .ul-table td {
+    padding: 10px 13px; font-size: 12.5px; border-bottom: 1px solid var(--border);
+    color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 0;
+  }
+  .ul-table tr:last-child td { border-bottom: none; }
+  .ul-table tbody tr.clickable { cursor: pointer; }
+  .ul-table tbody tr.clickable:hover td { background: rgba(33,136,171,.04); }
+  html[data-theme="dark"] .ul-table th { background: var(--surface); border-bottom-color: var(--border); }
+  html[data-theme="dark"] .ul-table td { border-bottom-color: #2a3650; }
+  html[data-theme="dark"] .ul-table tbody tr.clickable:hover td { background: rgba(255,255,255,.04); }
+
+  /* ── Vue EN LIGNE (compacte) ── */
+  .ul-inline-wrap { overflow-x: auto; background: var(--surface); }
+  .ul-inline-wrap.collapsed { display: none; }
+  .ul-inline { width: 100%; border-collapse: collapse; background: var(--surface); }
+  .ul-inline td {
+    padding: 5px 13px; font-size: 12px; border-bottom: 1px solid var(--border);
+    color: var(--text); white-space: nowrap;
+  }
+  .ul-inline tr:last-child td { border-bottom: none; }
+  .ul-inline tbody tr.clickable { cursor: pointer; }
+  .ul-inline tbody tr.clickable:hover td { background: rgba(33,136,171,.04); }
+  html[data-theme="dark"] .ul-inline td { border-bottom-color: #2a3650; }
+  html[data-theme="dark"] .ul-inline tbody tr.clickable:hover td { background: rgba(255,255,255,.04); }
+
+  /* ── Vue KANBAN ── */
+  .ul-kanban-wrap { background: var(--bg); padding: 14px 16px; }
+  .ul-kanban-wrap.collapsed { display: none; }
+  .ul-kanban { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  @media (max-width:1100px) { .ul-kanban { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width:750px)  { .ul-kanban { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width:460px)  { .ul-kanban { grid-template-columns: 1fr; } }
+  .ul-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 16px 14px; cursor: pointer; transition: box-shadow .15s, border-color .15s;
+    box-shadow: 0 1px 3px rgba(0,0,0,.07); display: flex; flex-direction: column; gap: 10px;
+  }
+  .ul-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,.12); border-color: #b0c8dc; }
+  .ul-card-top { display: flex; align-items: center; gap: 10px; }
+  .ul-card-name { font-size: 13px; font-weight: 600; color: var(--text); line-height: 1.3; }
+  .ul-card-sub  { font-size: 11.5px; color: var(--text-muted); margin-top: 1px; }
+  .ul-card-foot { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+  html[data-theme="dark"] .ul-card { background: var(--surface); border-color: var(--border); }
+  html[data-theme="dark"] .ul-card:hover { border-color: #4a6a88; }
+
+  /* ── Avatar ── */
+  .ul-av {
+    width: 28px; height: 28px; border-radius: 7px; overflow: hidden; flex-shrink: 0;
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: #fff;
+  }
+  .ul-av.lg {
+    width: 38px; height: 38px; border-radius: 9px; font-size: 14px;
+  }
+  .ul-av img { width: 100%; height: 100%; object-fit: cover; }
+  .ul-av.muted { background: linear-gradient(135deg, #aab6c4, #c8d3dc); }
+
+  /* ── Badges ── */
+  .ul-badge-mat {
+    font-family: monospace; font-size: 11px; font-weight: 600;
+    background: rgba(33,136,171,.09); color: var(--accent);
+    padding: 1px 7px; border-radius: 4px; white-space: nowrap;
+  }
+  .ul-badge-user {
+    font-family: monospace; font-size: 11px;
+    background: rgba(99,102,241,.09); color: #4f46e5;
+    padding: 1px 7px; border-radius: 4px; white-space: nowrap;
+  }
+  .ul-badge-admin {
+    font-size: 10px; font-weight: 700;
+    background: #fef3c7; color: #92400e;
+    padding: 1px 6px; border-radius: 3px;
+    text-transform: uppercase; letter-spacing: .2px; white-space: nowrap;
+  }
+  .ul-badge-actif    { font-size: 11px; font-weight: 600; color: #0d8a52; white-space: nowrap; }
+  .ul-badge-suspendu { font-size: 11px; font-weight: 600; color: #b45309; white-space: nowrap; }
+  .ul-badge-quitte   { font-size: 11px; font-weight: 600; color: #6b7280; white-space: nowrap; }
+  html[data-theme="dark"] .ul-badge-mat  { background: rgba(33,136,171,.18); color: #7ecae0; }
+  html[data-theme="dark"] .ul-badge-user { background: rgba(99,102,241,.18); color: #818cf8; }
+  html[data-theme="dark"] .ul-badge-admin { background: rgba(251,191,36,.15); color: #fbbf24; }
+
+  /* ── Empty ── */
+  .ul-empty { padding: 36px 20px; text-align: center; color: var(--text-muted); font-size: 13px; background: var(--surface); }
+  .ul-empty i { font-size: 28px; display: block; margin-bottom: 10px; opacity: .35; }
+
+  @media (max-width: 700px) {
+    .ul-stats { grid-template-columns: 1fr; }
+    .ul-stat  { border-right: none; border-bottom: 1px solid var(--border); }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="page-wrap">
+{% include 'utilisateur/includes/nav.html' %}
+
+{% if no_profile %}
+<div style="display:flex;align-items:center;justify-content:center;min-height:60vh;padding:40px 20px;">
+  <div style="text-align:center;max-width:420px;">
+    <div style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--accent));display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">
+      <i class="bi bi-person-x" style="font-size:32px;color:#fff;"></i>
+    </div>
+    <h2 style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:8px;">Aucun dossier trouvé</h2>
+    <p style="font-size:13px;color:var(--text-muted);line-height:1.6;margin-bottom:24px;">
+      Votre compte utilisateur n'est pas encore lié à un dossier employé.<br>
+      Contactez l'administrateur pour régulariser votre situation.
+    </p>
+    <a href="{% url 'dashboard' %}" class="o-ctrl-btn" style="display:inline-flex;align-items:center;gap:6px;padding:8px 18px;">
+      <i class="bi bi-grid-3x3-gap-fill"></i> Retour à l'accueil
+    </a>
+  </div>
+</div>
+
+{% else %}
+
+<!-- ══ SUBHEADER ══ -->
+<div class="o-subheader" id="subheader">
+  <div class="o-subheader-row">
+    <span class="o-page-title">Utilisateurs</span>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+      <form method="get" id="filter-form" style="display:flex;align-items:center;gap:6px;">
+        <input type="hidden" name="vue" id="vue-input" value="{{ vue|default:'liste' }}">
+        <div class="o-search-bar">
+          <input class="o-search-input" id="search-input" type="text" name="q"
+            value="{{ q }}" placeholder="Nom, matricule, identifiant…">
+          <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
+        </div>
+        <button type="button" id="search-clear" class="o-ctrl-btn" style="padding:4px 7px;display:none;" onclick="clearSearch()"><i class="bi bi-x"></i> Effacer</button>
+      </form>
+      <div class="o-ctrl-sep"></div>
+      <div class="o-view-btns">
+        <button type="button" class="o-view-btn {% if vue|default:'liste' == 'liste' %}active{% endif %}"
+          onclick="setVue('liste',this)" title="Vue liste"><i class="bi bi-list-ul"></i></button>
+        <button type="button" class="o-view-btn {% if vue == 'ligne' %}active{% endif %}"
+          onclick="setVue('ligne',this)" title="Vue en ligne"><i class="bi bi-view-list"></i></button>
+        <button type="button" class="o-view-btn {% if vue == 'kanban' %}active{% endif %}"
+          onclick="setVue('kanban',this)" title="Vue kanban"><i class="bi bi-grid"></i></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ STATS ══ -->
+<div class="ul-stats">
+  <div class="ul-stat">
+    <div class="ul-stat-icon blue"><i class="bi bi-person-check-fill"></i></div>
+    <div>
+      <div class="ul-stat-label">Associés</div>
+      <div class="ul-stat-value">{{ total_associes }}</div>
+    </div>
+  </div>
+  <div class="ul-stat">
+    <div class="ul-stat-icon yellow"><i class="bi bi-person-exclamation-fill"></i></div>
+    <div>
+      <div class="ul-stat-label">Sans dossier employé</div>
+      <div class="ul-stat-value">{{ total_sans_employe }}</div>
+    </div>
+  </div>
+  <div class="ul-stat">
+    <div class="ul-stat-icon gray"><i class="bi bi-person-dash-fill"></i></div>
+    <div>
+      <div class="ul-stat-label">Employés sans compte</div>
+      <div class="ul-stat-value">{{ total_sans_compte }}</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- SECTION 1 : Employés associés à un compte -->
+<div class="ul-sec-head" onclick="toggleSec('assoc')">
+  <span class="ul-sec-title">
+    <i class="bi bi-person-check" style="color:var(--accent);"></i>
+    Employés associés à un compte
+    <span class="ul-sec-badge blue" id="badge-assoc">{{ employes_avec_compte|length }}</span>
+  </span>
+  <i class="bi bi-chevron-down ul-sec-chevron" id="chev-assoc"></i>
+</div>
+
+{% if employes_avec_compte %}
+
+  <!-- vue liste -->
+  <div class="ul-table-wrap {% if vue == 'ligne' or vue == 'kanban' %}collapsed{% endif %}" id="body-assoc-liste">
+    <table class="ul-table" style="table-layout:fixed;">
+      <colgroup>
+        <col style="width:44px;">
+        <col style="width:12%;">
+        <col style="width:22%;">
+        <col style="width:18%;">
+        <col style="width:17%;">
+        <col>
+        <col style="width:36px;">
+      </colgroup>
+      <thead><tr>
+        <th></th><th>Matricule</th><th>Nom &amp; Prénom</th>
+        <th>Fonction</th><th>Identifiant</th><th>Email</th><th></th>
+      </tr></thead>
+      <tbody>
+        {% for emp in employes_avec_compte %}
+        <tr class="clickable" data-search="{{ emp.nom|lower }} {{ emp.prenoms|lower }} {{ emp.matricule|lower }} {{ emp.user.username|lower }} {{ emp.user.email|lower|default:'' }}" onclick="window.location='{% url 'utilisateur:detail' emp.pk %}'">
+          <td style="max-width:none;overflow:visible;">
+            <div class="ul-av">{% if emp.photo %}<img src="{{ emp.photo.url }}">{% else %}{{ emp.initiales }}{% endif %}</div>
+          </td>
+          <td><span class="ul-badge-mat">{{ emp.matricule }}</span></td>
+          <td style="font-weight:500;">{{ emp.nom }} {{ emp.prenoms }}</td>
+          <td style="color:var(--text-muted);">{{ emp.fonction.nom|default:"—" }}</td>
+          <td>
+            <span class="ul-badge-user">{{ emp.user.username }}</span>
+            {% if emp.user.is_staff %}<span class="ul-badge-admin" style="margin-left:4px;">admin</span>{% endif %}
+          </td>
+          <td style="color:var(--text-muted);">{{ emp.user.email|default:"—" }}</td>
+          <td></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- vue en ligne -->
+  <div class="ul-inline-wrap {% if vue != 'ligne' %}collapsed{% endif %}" id="body-assoc-ligne">
+    <table class="ul-inline">
+      <tbody>
+        {% for emp in employes_avec_compte %}
+        <tr class="clickable" data-search="{{ emp.nom|lower }} {{ emp.prenoms|lower }} {{ emp.matricule|lower }} {{ emp.user.username|lower }} {{ emp.user.email|lower|default:'' }}" onclick="window.location='{% url 'utilisateur:detail' emp.pk %}'">
+          <td style="width:36px;padding-right:4px;">
+            <div class="ul-av">{% if emp.photo %}<img src="{{ emp.photo.url }}">{% else %}{{ emp.initiales }}{% endif %}</div>
+          </td>
+          <td style="font-weight:500;width:22%;">{{ emp.nom }} {{ emp.prenoms }}</td>
+          <td style="width:12%;"><span class="ul-badge-mat">{{ emp.matricule }}</span></td>
+          <td style="color:var(--text-muted);width:17%;">{{ emp.fonction.nom|default:"—" }}</td>
+          <td style="width:16%;"><span class="ul-badge-user">{{ emp.user.username }}</span>{% if emp.user.is_staff %}<span class="ul-badge-admin" style="margin-left:4px;">admin</span>{% endif %}</td>
+          <td style="color:var(--text-muted);">{{ emp.user.email|default:"—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- vue kanban -->
+  <div class="ul-kanban-wrap {% if vue != 'kanban' %}collapsed{% endif %}" id="body-assoc-kanban">
+    <div class="ul-kanban">
+      {% for emp in employes_avec_compte %}
+      <div class="ul-card" data-search="{{ emp.nom|lower }} {{ emp.prenoms|lower }} {{ emp.matricule|lower }} {{ emp.user.username|lower }} {{ emp.user.email|lower|default:'' }}" onclick="window.location='{% url 'utilisateur:detail' emp.pk %}'">
+        <div class="ul-card-top">
+          <div class="ul-av lg">{% if emp.photo %}<img src="{{ emp.photo.url }}">{% else %}{{ emp.initiales }}{% endif %}</div>
+          <div>
+            <div class="ul-card-name">{{ emp.nom }} {{ emp.prenoms }}</div>
+            <div class="ul-card-sub">{{ emp.fonction.nom|default:"—" }}</div>
+          </div>
+        </div>
+        <div class="ul-card-foot">
+          <span class="ul-badge-user">{{ emp.user.username }}</span>
+          {% if emp.user.is_staff %}<span class="ul-badge-admin">admin</span>{% endif %}
+        </div>
+        {% if emp.user.email %}
+        <div style="font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+          {{ emp.user.email }}
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+{% else %}
+<div class="ul-empty" id="body-assoc-liste"><i class="bi bi-person-check"></i>Aucun employé associé à un compte</div>
+{% endif %}
+<div class="ul-empty" id="empty-assoc" style="display:none;"><i class="bi bi-search"></i> Aucun résultat pour cette recherche</div>
+
+
+<!-- SECTION 2 : Comptes sans dossier employé -->
+<div class="ul-sec-head" onclick="toggleSec('sans-emp')">
+  <span class="ul-sec-title">
+    <i class="bi bi-person-exclamation" style="color:#b45309;"></i>
+    Comptes sans dossier employé
+    <span class="ul-sec-badge orange" id="badge-sans-emp">{{ utilisateurs_sans_employe|length }}</span>
+  </span>
+  <i class="bi bi-chevron-down ul-sec-chevron {% if not utilisateurs_sans_employe %}closed{% endif %}" id="chev-sans-emp"></i>
+</div>
+
+{% if utilisateurs_sans_employe %}
+
+  <!-- vue liste -->
+  <div class="ul-table-wrap {% if vue == 'ligne' or vue == 'kanban' %}collapsed{% endif %}" id="body-sans-emp-liste">
+    <table class="ul-table" style="table-layout:fixed;">
+      <colgroup>
+        <col style="width:44px;">
+        <col style="width:16%;">
+        <col style="width:22%;">
+        <col>
+        <col style="width:10%;">
+        <col style="width:16%;">
+      </colgroup>
+      <thead><tr>
+        <th></th><th>Identifiant</th><th>Nom complet</th>
+        <th>Email</th><th>Rôle</th><th>Dernière connexion</th>
+      </tr></thead>
+      <tbody>
+        {% for u in utilisateurs_sans_employe %}
+        <tr data-search="{{ u.username|lower }} {{ u.first_name|lower }} {{ u.last_name|lower }} {{ u.email|lower|default:'' }}">
+          <td style="max-width:none;overflow:visible;"><div class="ul-av muted">{{ u.username|first|upper }}</div></td>
+          <td><span class="ul-badge-user">{{ u.username }}</span></td>
+          <td style="font-weight:500;">{{ u.get_full_name|default:"—" }}</td>
+          <td style="color:var(--text-muted);">{{ u.email|default:"—" }}</td>
+          <td>{% if u.is_superuser %}<span class="ul-badge-admin">superuser</span>
+              {% elif u.is_staff %}<span class="ul-badge-admin">admin</span>
+              {% else %}<span style="font-size:11px;color:var(--text-muted);">Utilisateur</span>{% endif %}</td>
+          <td style="color:var(--text-muted);">{% if u.last_login %}{{ u.last_login|date:"d/m/Y H:i" }}{% else %}Jamais{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- vue en ligne -->
+  <div class="ul-inline-wrap {% if vue != 'ligne' %}collapsed{% endif %}" id="body-sans-emp-ligne">
+    <table class="ul-inline">
+      <tbody>
+        {% for u in utilisateurs_sans_employe %}
+        <tr data-search="{{ u.username|lower }} {{ u.first_name|lower }} {{ u.last_name|lower }} {{ u.email|lower|default:'' }}">
+          <td style="width:36px;padding-right:4px;"><div class="ul-av muted">{{ u.username|first|upper }}</div></td>
+          <td style="width:16%;"><span class="ul-badge-user">{{ u.username }}</span></td>
+          <td style="font-weight:500;width:22%;">{{ u.get_full_name|default:"—" }}</td>
+          <td style="color:var(--text-muted);">{{ u.email|default:"—" }}</td>
+          <td style="width:10%;">
+            {% if u.is_superuser %}<span class="ul-badge-admin">superuser</span>
+            {% elif u.is_staff %}<span class="ul-badge-admin">admin</span>
+            {% else %}<span style="font-size:11px;color:var(--text-muted);">Utilisateur</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- vue kanban -->
+  <div class="ul-kanban-wrap {% if vue != 'kanban' %}collapsed{% endif %}" id="body-sans-emp-kanban">
+    <div class="ul-kanban">
+      {% for u in utilisateurs_sans_employe %}
+      <div class="ul-card" data-search="{{ u.username|lower }} {{ u.first_name|lower }} {{ u.last_name|lower }} {{ u.email|lower|default:'' }}" style="cursor:default;">
+        <div class="ul-card-top">
+          <div class="ul-av lg muted">{{ u.username|first|upper }}</div>
+          <div>
+            <div class="ul-card-name">{{ u.get_full_name|default:u.username }}</div>
+            <div class="ul-card-sub"><span class="ul-badge-user">{{ u.username }}</span></div>
+          </div>
+        </div>
+        <div class="ul-card-foot">
+          {% if u.is_superuser %}<span class="ul-badge-admin">superuser</span>
+          {% elif u.is_staff %}<span class="ul-badge-admin">admin</span>
+          {% else %}<span style="font-size:11px;color:var(--text-muted);">Utilisateur</span>{% endif %}
+        </div>
+        {% if u.email %}<div style="font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ u.email }}</div>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+{% else %}
+<div class="ul-empty" id="body-sans-emp-liste"><i class="bi bi-check2-circle"></i>Tous les comptes sont liés à un dossier employé</div>
+{% endif %}
+<div class="ul-empty" id="empty-sans-emp" style="display:none;"><i class="bi bi-search"></i> Aucun résultat pour cette recherche</div>
+
+
+<!-- SECTION 3 : Employés sans compte utilisateur -->
+<div class="ul-sec-head" onclick="toggleSec('sans-compte')">
+  <span class="ul-sec-title">
+    <i class="bi bi-person-dash" style="color:#6b7280;"></i>
+    Employés sans compte utilisateur
+    <span class="ul-sec-badge gray" id="badge-sans-compte">{{ employes_sans_compte|length }}</span>
+  </span>
+  <i class="bi bi-chevron-down ul-sec-chevron {% if not employes_sans_compte %}closed{% endif %}" id="chev-sans-compte"></i>
+</div>
+
+{% if employes_sans_compte %}
+
+  <!-- vue liste -->
+  <div class="ul-table-wrap {% if vue == 'ligne' or vue == 'kanban' %}collapsed{% endif %}" id="body-sans-compte-liste">
+    <table class="ul-table" style="table-layout:fixed;">
+      <colgroup>
+        <col style="width:44px;">
+        <col style="width:12%;">
+        <col style="width:28%;">
+        <col>
+        <col style="width:11%;">
+        <col style="width:13%;">
+      </colgroup>
+      <thead><tr>
+        <th></th><th>Matricule</th><th>Nom &amp; Prénom</th>
+        <th>Fonction</th><th>Statut</th><th>Embauche</th>
+      </tr></thead>
+      <tbody>
+        {% for emp in employes_sans_compte %}
+        <tr data-search="{{ emp.nom|lower }} {{ emp.prenoms|lower }} {{ emp.matricule|lower }}">
+          <td style="max-width:none;overflow:visible;"><div class="ul-av muted">{{ emp.initiales }}</div></td>
+          <td style="font-family:monospace;font-size:11px;color:var(--text-muted);">{{ emp.matricule }}</td>
+          <td style="font-weight:500;">{{ emp.nom }} {{ emp.prenoms }}</td>
+          <td style="color:var(--text-muted);">{{ emp.fonction.nom|default:"—" }}</td>
+          <td>{% if emp.statut == 'actif' %}<span class="ul-badge-actif">● Actif</span>
+              {% elif emp.statut == 'suspendu' %}<span class="ul-badge-suspendu">● Suspendu</span>
+              {% else %}<span class="ul-badge-quitte">● Quitté</span>{% endif %}</td>
+          <td style="color:var(--text-muted);">{% if emp.date_embauche %}{{ emp.date_embauche|date:"d/m/Y" }}{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- vue en ligne -->
+  <div class="ul-inline-wrap {% if vue != 'ligne' %}collapsed{% endif %}" id="body-sans-compte-ligne">
+    <table class="ul-inline">
+      <tbody>
+        {% for emp in employes_sans_compte %}
+        <tr data-search="{{ emp.nom|lower }} {{ emp.prenoms|lower }} {{ emp.matricule|lower }}">
+          <td style="width:36px;padding-right:4px;"><div class="ul-av muted">{{ emp.initiales }}</div></td>
+          <td style="font-weight:500;width:26%;">{{ emp.nom }} {{ emp.prenoms }}</td>
+          <td style="width:12%;font-family:monospace;font-size:11px;color:var(--text-muted);">{{ emp.matricule }}</td>
+          <td style="color:var(--text-muted);">{{ emp.fonction.nom|default:"—" }}</td>
+          <td style="width:11%;">
+            {% if emp.statut == 'actif' %}<span class="ul-badge-actif">● Actif</span>
+            {% elif emp.statut == 'suspendu' %}<span class="ul-badge-suspendu">● Suspendu</span>
+            {% else %}<span class="ul-badge-quitte">● Quitté</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- vue kanban -->
+  <div class="ul-kanban-wrap {% if vue != 'kanban' %}collapsed{% endif %}" id="body-sans-compte-kanban">
+    <div class="ul-kanban">
+      {% for emp in employes_sans_compte %}
+      <div class="ul-card" data-search="{{ emp.nom|lower }} {{ emp.prenoms|lower }} {{ emp.matricule|lower }}" style="cursor:default;">
+        <div class="ul-card-top">
+          <div class="ul-av lg muted">{{ emp.initiales }}</div>
+          <div>
+            <div class="ul-card-name">{{ emp.nom }} {{ emp.prenoms }}</div>
+            <div class="ul-card-sub">{{ emp.fonction.nom|default:"—" }}</div>
+          </div>
+        </div>
+        <div class="ul-card-foot">
+          <span style="font-family:monospace;font-size:11px;color:var(--text-muted);">{{ emp.matricule }}</span>
+          {% if emp.statut == 'actif' %}<span class="ul-badge-actif">● Actif</span>
+          {% elif emp.statut == 'suspendu' %}<span class="ul-badge-suspendu">● Suspendu</span>
+          {% else %}<span class="ul-badge-quitte">● Quitté</span>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+{% else %}
+<div class="ul-empty" id="body-sans-compte-liste"><i class="bi bi-check2-circle"></i>Tous les employés ont un compte utilisateur</div>
+{% endif %}
+<div class="ul-empty" id="empty-sans-compte" style="display:none;"><i class="bi bi-search"></i> Aucun résultat pour cette recherche</div>
+
+{% endif %}
+</div>
+
+<script>
+var VUE = '{{ vue|default:"liste" }}';
+
+function setVue(v, btn) {
+  VUE = v;
+  var vi = document.getElementById('vue-input');
+  if (vi) vi.value = v;
+  document.querySelectorAll('.o-view-btn').forEach(function(b){ b.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  applyVue();
+  var url = new URL(window.location.href);
+  url.searchParams.set('vue', v);
+  history.replaceState(null, '', url.toString());
+}
+
+function applyVue() {
+  ['assoc','sans-emp','sans-compte'].forEach(function(s) {
+    var liste  = document.getElementById('body-' + s + '-liste');
+    var ligne  = document.getElementById('body-' + s + '-ligne');
+    var kanban = document.getElementById('body-' + s + '-kanban');
+    if (liste)  liste.classList.toggle('collapsed',  VUE !== 'liste');
+    if (ligne)  ligne.classList.toggle('collapsed',  VUE !== 'ligne');
+    if (kanban) kanban.classList.toggle('collapsed', VUE !== 'kanban');
+  });
+}
+
+function toggleSec(id) {
+  var chev = document.getElementById('chev-' + id);
+  ['liste','ligne','kanban'].forEach(function(v){
+    var el = document.getElementById('body-' + id + '-' + v);
+    if (el) el.classList.toggle('toggled-off');
+  });
+  var emptyDyn = document.getElementById('empty-' + id);
+  if (emptyDyn) emptyDyn.classList.toggle('toggled-off');
+  if (chev) {
+    var ref = document.getElementById('body-' + id + '-liste') || document.getElementById('empty-' + id);
+    chev.classList.toggle('closed', ref ? ref.classList.contains('toggled-off') : false);
+  }
+}
+
+function filterRows(q) {
+  q = (q || '').toLowerCase().trim();
+  var sections = [
+    { id: 'assoc',       badge: document.getElementById('badge-assoc') },
+    { id: 'sans-emp',    badge: document.getElementById('badge-sans-emp') },
+    { id: 'sans-compte', badge: document.getElementById('badge-sans-compte') }
+  ];
+  sections.forEach(function(sec) {
+    var count = 0;
+    /* Tables liste + ligne */
+    ['liste', 'ligne'].forEach(function(v) {
+      var wrap = document.getElementById('body-' + sec.id + '-' + v);
+      if (!wrap) return;
+      wrap.querySelectorAll('tr[data-search]').forEach(function(row) {
+        var match = !q || (row.getAttribute('data-search') || '').indexOf(q) >= 0;
+        row.style.display = match ? '' : 'none';
+        if (v === 'liste' && match) count++;
+      });
+    });
+    /* Kanban */
+    var kanban = document.getElementById('body-' + sec.id + '-kanban');
+    if (kanban) {
+      kanban.querySelectorAll('[data-search]').forEach(function(card) {
+        var match = !q || (card.getAttribute('data-search') || '').indexOf(q) >= 0;
+        card.style.display = match ? '' : 'none';
+      });
+    }
+    if (sec.badge) sec.badge.textContent = count;
+    var empty = document.getElementById('empty-' + sec.id);
+    if (empty) empty.style.display = (count === 0 && q) ? '' : 'none';
+  });
+}
+
+function clearSearch() {
+  var inp = document.getElementById('search-input');
+  if (inp) { inp.value = ''; inp.focus(); }
+  filterRows('');
+  document.getElementById('search-clear').style.display = 'none';
+  var url = new URL(window.location.href);
+  url.searchParams.delete('q');
+  history.replaceState(null, '', url.toString());
+}
+
+(function () {
+  var inp = document.getElementById('search-input');
+  var clr = document.getElementById('search-clear');
+  if (!inp) return;
+
+  function doFilter() {
+    var q = inp.value;
+    filterRows(q);
+    if (clr) clr.style.display = q.trim() ? 'flex' : 'none';
+    var url = new URL(window.location.href);
+    if (q.trim()) url.searchParams.set('q', q.trim());
+    else url.searchParams.delete('q');
+    history.replaceState(null, '', url.toString());
+  }
+
+  inp.addEventListener('input', doFilter);
+
+  /* Appliquer le filtre au chargement si q est dans l'URL */
+  if (inp.value.trim()) {
+    doFilter();
+  }
+})();
+</script>
+
+<style>
+  .ul-table-wrap.toggled-off,
+  .ul-inline-wrap.toggled-off,
+  .ul-kanban-wrap.toggled-off,
+  .ul-empty.toggled-off { display: none !important; }
+  tr[data-search] { }
+</style>
+{% endblock %}
