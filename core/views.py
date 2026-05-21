@@ -783,7 +783,7 @@ def gynecologie_rdv_create(request):
         {'title': 'Rendez-vous', 'url': '/gynecologie/rdv/'},
         {'title': 'Nouveau'},
     ]
-    from patients.models import Pathologie
+    from patients.models import Pathologie, TypeVisite
     return render(request, 'gynecologie/rdv_form.html', {
         'form': form,
         'rdv': None,
@@ -794,6 +794,7 @@ def gynecologie_rdv_create(request):
         'facture_payee': False,
         'medecins': medecins,
         'pathologies': Pathologie.objects.filter(actif=True).order_by('nom'),
+        'types_visite': TypeVisite.objects.filter(actif=True).order_by('nom'),
         'breadcrumb': breadcrumb,
     })
 
@@ -886,6 +887,27 @@ def gynecologie_rdv_detail(request, pk):
             code = request.POST.get('code_confirmation', '').strip()
             if code:
                 rdv.code_confirmation = code
+            from patients.models import TypeVisite
+            rdv.cpn_mode_entree = request.POST.get('cpn_mode_entree', '').strip()
+            rdv.cpn_mode_entree_autre = request.POST.get('cpn_mode_entree_autre', '').strip()
+            cpn_tv_pk = request.POST.get('cpn_type_visite', '').strip()
+            if cpn_tv_pk:
+                try:
+                    rdv.cpn_type_visite = TypeVisite.objects.get(pk=int(cpn_tv_pk))
+                except (ValueError, TypeVisite.DoesNotExist):
+                    rdv.cpn_type_visite = None
+            else:
+                rdv.cpn_type_visite = None
+            rdv.cur_mode_entree = request.POST.get('cur_mode_entree', '').strip()
+            rdv.cur_mode_entree_autre = request.POST.get('cur_mode_entree_autre', '').strip()
+            cur_tv_pk = request.POST.get('cur_type_visite', '').strip()
+            if cur_tv_pk:
+                try:
+                    rdv.cur_type_visite = TypeVisite.objects.get(pk=int(cur_tv_pk))
+                except (ValueError, TypeVisite.DoesNotExist):
+                    rdv.cur_type_visite = None
+            else:
+                rdv.cur_type_visite = None
             rdv.save()
             if action == 'créer une facture':
                 from django.urls import reverse
@@ -910,7 +932,7 @@ def gynecologie_rdv_detail(request, pk):
         {'title': 'Rendez-vous', 'url': '/gynecologie/rdv/'},
         {'title': rdv.code_rdv or rdv.patient.code_patient},
     ]
-    from patients.models import Pathologie
+    from patients.models import Pathologie, TypeVisite
     return render(request, 'gynecologie/rdv_form.html', {
         'form': form,
         'rdv': rdv,
@@ -921,6 +943,7 @@ def gynecologie_rdv_detail(request, pk):
         'constante': constante,
         'medecins': medecins,
         'pathologies': Pathologie.objects.filter(actif=True).order_by('nom'),
+        'types_visite': TypeVisite.objects.filter(actif=True).order_by('nom'),
         'breadcrumb': breadcrumb,
         'nav_total': total,
         'nav_pos': nav_pos,

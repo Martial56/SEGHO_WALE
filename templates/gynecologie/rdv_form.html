@@ -438,7 +438,7 @@
             {% elif rdv.statut == 'en_consultation' %}
                 <button type="button" class="btn-action">Pause</button>
                 <button type="button" class="btn-action btn-blue"><i class="bi bi-person-fill"></i> Créer une ordonnance</button>
-                <button type="button" class="btn-action btn-teal"><i class="bi bi-eyedropper"></i> Demande de lab</button>
+                <a href="{% url 'laboratoire_create' %}?patient={{ rdv.patient.pk }}" class="btn-action btn-teal"><i class="bi bi-eyedropper"></i> Demande de lab</a>
                 <button type="submit" name="_action" value="terminer" class="btn-action btn-dark">Consultation terminée</button>
                 <button type="submit" name="_action" value="annuler" class="btn-action btn-danger-outline">Annuler</button>
             {% endif %}
@@ -743,8 +743,9 @@
           <!-- ══ COLONNE GAUCHE ══ -->
           <div class="cpn-col">
             <div class="cpn-section">Données administratives</div>
-            <div class="cpn-row"><span class="cpn-lbl">Type de visite</span><select name="cpn_type_visite" class="cpn-sel editable"><option value=""></option><option value="1ere">1ère visite</option><option value="suivi">Visite de suivi</option></select></div>
-            <div class="cpn-row"><span class="cpn-lbl">Mode d'entrée</span><select name="cpn_mode_entree" class="cpn-sel editable"><option value=""></option><option value="spontane">Spontané</option><option value="refere">Référé</option><option value="transfere">Transféré</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Type de visite</span><select name="cpn_type_visite" class="cpn-sel editable"><option value=""></option>{% for tv in types_visite %}<option value="{{ tv.pk }}" {% if rdv and rdv.cpn_type_visite_id == tv.pk %}selected{% endif %}>{{ tv.nom }}</option>{% endfor %}</select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Mode d'entrée</span><select name="cpn_mode_entree" id="cpn_mode_entree" class="cpn-sel editable"><option value=""></option><option value="venu_lui_meme" {% if rdv and rdv.cpn_mode_entree == 'venu_lui_meme' %}selected{% endif %}>Patient venu de lui-même</option><option value="reference_centre" {% if rdv and rdv.cpn_mode_entree == 'reference_centre' %}selected{% endif %}>Référence d'un centre de santé</option><option value="refere_tradipraticien" {% if rdv and rdv.cpn_mode_entree == 'refere_tradipraticien' %}selected{% endif %}>Référé par un tradipraticien</option><option value="autre" {% if rdv and rdv.cpn_mode_entree == 'autre' %}selected{% endif %}>Autre</option></select></div>
+            <div class="cpn-row" id="cpn_mode_entree_autre_row" {% if not rdv or rdv.cpn_mode_entree != 'autre' %}style="display:none;"{% endif %}><span class="cpn-lbl">Préciser</span><input type="text" name="cpn_mode_entree_autre" class="cpn-inp editable" value="{% if rdv %}{{ rdv.cpn_mode_entree_autre|default:'' }}{% endif %}" placeholder="Préciser le mode d'entrée..."></div>
             <div class="cpn-row"><span class="cpn-lbl">Report numéro gestante précédent</span><input type="text" name="cpn_report_numero" class="cpn-inp editable"></div>
             <div class="cpn-row"><span class="cpn-lbl">Numéro gestante de la visite</span><input type="text" name="cpn_numero_gestante" class="cpn-inp editable"></div>
 
@@ -1186,10 +1187,10 @@
           <!-- ══ COLONNE GAUCHE ══ -->
           <div class="cpn-col">
             <div class="cpn-section">Données administratives</div>
-            <div class="cpn-row"><span class="cpn-lbl">Mode d'entrée</span><select name="cur_mode_entree" id="cur_mode_entree" class="cpn-sel editable" onchange="toggleCurAutreEntree(this.value)"><option value=""></option><option value="venu_lui_meme">Patient venu de lui même</option><option value="reference_centre">Référence d'un centre de santé</option><option value="refere_tradipraticien">Référé par un tradipraticien</option><option value="autre">Autre</option></select></div>
-            <div class="cpn-row" id="cur_mode_entree_autre_row" style="display:none;"><span class="cpn-lbl">Préciser</span><input type="text" name="cur_mode_entree_autre" class="cpn-inp editable" placeholder="Préciser le mode d'entrée..."></div>
+            <div class="cpn-row"><span class="cpn-lbl">Mode d'entrée</span><select name="cur_mode_entree" id="cur_mode_entree" class="cpn-sel editable"><option value=""></option><option value="venu_lui_meme" {% if rdv and rdv.cur_mode_entree == 'venu_lui_meme' %}selected{% endif %}>Patient venu de lui-même</option><option value="reference_centre" {% if rdv and rdv.cur_mode_entree == 'reference_centre' %}selected{% endif %}>Référence d'un centre de santé</option><option value="refere_tradipraticien" {% if rdv and rdv.cur_mode_entree == 'refere_tradipraticien' %}selected{% endif %}>Référé par un tradipraticien</option><option value="autre" {% if rdv and rdv.cur_mode_entree == 'autre' %}selected{% endif %}>Autre</option></select></div>
+            <div class="cpn-row" id="cur_mode_entree_autre_row" {% if not rdv or rdv.cur_mode_entree != 'autre' %}style="display:none;"{% endif %}><span class="cpn-lbl">Préciser</span><input type="text" name="cur_mode_entree_autre" class="cpn-inp editable" value="{% if rdv %}{{ rdv.cur_mode_entree_autre|default:'' }}{% endif %}" placeholder="Préciser le mode d'entrée..."></div>
             <div class="cpn-row"><span class="cpn-lbl">Type de population</span><select name="cur_type_population" class="cpn-sel editable"><option value=""></option><option value="pop_generale">Population générale</option><option value="ts">TS</option><option value="ud">UD</option><option value="hsh">HSH</option><option value="pc">PC</option><option value="autre_risque">Autre à risque</option></select></div>
-            <div class="cpn-row"><span class="cpn-lbl">Type de visite curative</span><select name="cur_type_visite" class="cpn-sel editable"><option value=""></option><option value="consultant">Consultant</option><option value="controle">Contrôle</option><option value="soins">Soins</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Type de visite curative</span><select name="cur_type_visite" class="cpn-sel editable"><option value=""></option><option value="consultant">Consultant</option><option value="controle">Contrôle</option><option value="soins">Soins</option></select></div><div class="cpn-row"><span class="cpn-lbl">Type de visite curative</span><select name="cur_type_visite" class="cpn-sel editable"><option value=""></option><option value="consultant">Consultant</option><option value="controle">Contrôle</option><option value="soins">Soins</option></select></div>
             <div class="cpn-section">Examens cliniques et constantes <!--: <a href="#" style="color:var(--teal-600);font-size:12.5px;text-decoration:none;margin-left:8px;">Créer</a>--></div>
             <div class="cpn-row"><span class="cpn-lbl">Poids</span><div class="cpn-val"><input type="text" class="cpn-inp-ro" readonly value="{{ constante.poids|default:'—' }}" style="max-width:90px;"><span class="cpn-unit">kg</span></div></div>
             <div class="cpn-row"><span class="cpn-lbl">Taille</span><div class="cpn-val"><input type="text" class="cpn-inp-ro" readonly value="{{ constante.taille|default:'—' }}" style="max-width:90px;"><span class="cpn-unit">m</span></div></div>
@@ -1639,6 +1640,15 @@
             el.classList.remove('zero');
         }
     });
+
+    /* ── Mode d'entrée CPN : afficher/masquer "Préciser" ── */
+    var _cpnModeEntree = document.getElementById('cpn_mode_entree');
+    if (_cpnModeEntree) {
+        _cpnModeEntree.addEventListener('change', function() {
+            var row = document.getElementById('cpn_mode_entree_autre_row');
+            if (row) row.style.display = (this.value === 'autre') ? '' : 'none';
+        });
+    }
 
     /* ── Mode d'entrée curatif : afficher/masquer "Préciser" ── */
     var _curModeEntree = document.getElementById('cur_mode_entree');

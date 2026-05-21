@@ -100,6 +100,26 @@ class RendezVous(models.Model):
     temps_consultation_minutes = models.IntegerField(default=0)
     date_creation = models.DateTimeField(auto_now_add=True)
 
+    MODE_ENTREE = [
+        ('venu_lui_meme', 'Patient venu de lui-même'),
+        ('reference_centre', "Référence d'un centre de santé"),
+        ('refere_tradipraticien', 'Référé par un tradipraticien'),
+        ('autre', 'Autre'),
+    ]
+    cpn_mode_entree = models.CharField(max_length=30, choices=MODE_ENTREE, blank=True, default='', verbose_name="Mode d'entrée CPN")
+    cpn_mode_entree_autre = models.CharField(max_length=200, blank=True, default='', verbose_name="Mode d'entrée CPN (préciser)")
+    cpn_type_visite = models.ForeignKey('TypeVisite', on_delete=models.SET_NULL, null=True, blank=True, related_name='rendez_vous_cpn', verbose_name='Type de visite CPN')
+
+    CUR_MODE_ENTREE = [
+        ('venu_lui_meme', 'Patient venu de lui-même'),
+        ('reference_centre', "Référence d'un centre de santé"),
+        ('refere_tradipraticien', 'Référé par un tradipraticien'),
+        ('autre', 'Autre'),
+    ]
+    cur_mode_entree = models.CharField(max_length=30, choices=CUR_MODE_ENTREE, blank=True, default='', verbose_name="Mode d'entrée curatif")
+    cur_mode_entree_autre = models.CharField(max_length=200, blank=True, default='', verbose_name="Mode d'entrée curatif (préciser)")
+    cur_type_visite = models.ForeignKey('TypeVisite', on_delete=models.SET_NULL, null=True, blank=True, related_name='rendez_vous_curatifs', verbose_name='Type de visite curative')
+
     def save(self, *args, **kwargs):
         if not self.code_rdv:
             count = RendezVous.objects.count() + 1
