@@ -177,9 +177,9 @@ def conge_list(request):
 
     stats = {
         'total':    Conge.objects.count(),
-        'attente':  Conge.objects.filter(statut__in=['demande', 'valide_service']).count(),
-        'approuve': Conge.objects.filter(statut='approuve').count(),
+        'a_venir':  Conge.objects.filter(statut='approuve').count(),
         'en_cours': Conge.objects.filter(statut='en_cours').count(),
+        'termine':  Conge.objects.filter(statut='termine').count(),
     }
 
     paginator = Paginator(qs, 25)
@@ -190,7 +190,7 @@ def conge_list(request):
         'stats':      stats,
         'employes':   _employes_eligibles().order_by('nom'),
         'types':      Conge.TYPE,
-        'statuts':    Conge.STATUT,
+        'statuts':    [(k, v) for k, v in Conge.STATUT if k not in ('demande', 'valide_service')],
         'f_statut':   f_statut,
         'f_type':     f_type,
         'f_employe':  f_employe,
@@ -241,55 +241,49 @@ def conge_nouveau(request):
                     f"selon le Code du travail ivoirien."
                 )
             else:
-                conflits = detecter_conflits(emp, d1, d2)
-                for conf in conflits:
-                    messages.warning(
-                        request,
-                        f"Chevauchement avec un congé existant : {conf.get_type_conge_display()} "
-                        f"du {conf.date_debut:%d/%m/%Y} au {conf.date_fin:%d/%m/%Y} "
-                        f"({conf.get_statut_display()})"
-                    )
-                # Alerte chevauchement d'équipe
-                alerte_ch = _check_chevauchement(emp, d1, d2)
-                if alerte_ch:
-                    messages.warning(
-                        request,
-                        f"Alerte sous-effectif : {alerte_ch['nb_absent']} employé(s) sur "
-                        f"{alerte_ch['nb_total']} du service « {alerte_ch['service']} » sont "
-                        f"déjà en congé sur cette période ({alerte_ch['pct']}% ≥ seuil {SEUIL_CHEVAUCHEMENT}%)."
-                    )
+                today = _d.today()
+                if d2 < today:
+                    statut_initial = 'termine'
+                elif d1 <= today:
+                    statut_initial = 'en_cours'
+                else:
+                    statut_initial = 'approuve'
+
                 nb_ouvres = compter_jours_ouvres(d1, d2)
                 c = Conge.objects.create(
                     employe=emp, type_conge=type_conge,
                     date_debut=d1, date_fin=d2,
-                    motif=motif, statut='demande',
+                    motif=motif, statut=statut_initial,
                     nb_jours_ouvres=nb_ouvres,
+                    approuve_par=request.user,
+                    date_approbation=timezone.now(),
                 )
-                # Historique
-                _add_historique(c, 'soumis', request.user)
-                # Notifications RH
-                type_display = c.get_type_conge_display()
-                msg = (
-                    f"Nouvelle demande de congé de {emp.nom_complet} — "
-                    f"{type_display} du {d1:%d/%m/%Y} au {d2:%d/%m/%Y}"
-                )
-                _send_notif(_rh_users(), c, 'nouvelle_demande', msg)
+                if c.type_conge in TYPES_DEDUCTIBLES:
+                    get_or_create_solde(emp, d1.year)
+                _create_presence_for_conge(c)
+                _add_historique(c, 'approuve', request.user)
 
-                messages.success(request, f"Demande de congé créée pour {emp.nom_complet}.")
+                messages.success(request, f"Congé de {emp.nom_complet} enregistré.")
                 return redirect('conge_detail', pk=c.pk)
 
     if employe_pre:
         solde = get_or_create_solde(employe_pre, _d.today().year)
 
     return render(request, 'conges/form.html', {
-        'employes':             _employes_eligibles().order_by('nom'),
-        'types':                Conge.TYPE,
-        'employe_pre':          employe_pre,
-        'can_manage':           can_manage_rh(request.user),
-        'conflits':             conflits,
-        'solde':                solde,
+        'employes':              _employes_eligibles().order_by('nom'),
+        'types':                 Conge.TYPE,
+        'employe_pre':           employe_pre,
+        'can_manage':            can_manage_rh(request.user),
+        'conflits':              conflits,
+        'solde':                 solde,
         'durees_exceptionnelles': DUREES_EXCEPTIONNELLES,
-        'types_deductibles':    list(TYPES_DEDUCTIBLES),
+        'types_deductibles':     list(TYPES_DEDUCTIBLES),
+        'post_data': {
+            'type_conge': request.POST.get('type_conge', ''),
+            'date_debut': request.POST.get('date_debut', ''),
+            'date_fin':   request.POST.get('date_fin', ''),
+            'motif':      request.POST.get('motif', ''),
+        } if request.method == 'POST' else {},
     })
 
 
@@ -429,7 +423,7 @@ def conge_annuler(request, pk):
     if not can_manage_rh(request.user):
         raise PermissionDenied
     conge = get_object_or_404(Conge, pk=pk)
-    if request.method == 'POST' and conge.statut in ('demande', 'valide_service', 'approuve'):
+    if request.method == 'POST' and conge.statut in ('approuve', 'en_cours'):
         motif_annulation = request.POST.get('motif_annulation', 'Annulé').strip()
         conge.statut = 'refuse'
         conge.commentaire_rh = motif_annulation
@@ -438,7 +432,7 @@ def conge_annuler(request, pk):
         _add_historique(conge, 'annule', request.user, motif_annulation)
         _delete_presence_for_conge(conge)
 
-        messages.success(request, "Demande de congé annulée.")
+        messages.success(request, "Congé annulé.")
     return redirect('conge_list')
 
 
@@ -660,8 +654,8 @@ def conge_fractionner(request, pk):
     if conge.conge_parent_id:
         messages.error(request, "Ce congé est déjà un fragment d'un congé parent.")
         return redirect('conge_detail', pk=pk)
-    if conge.statut not in ('demande', 'valide_service', 'approuve'):
-        messages.error(request, "Ce congé ne peut plus être fractionné dans son état actuel.")
+    if conge.statut != 'approuve':
+        messages.error(request, "Seul un congé à venir (non encore démarré) peut être fractionné.")
         return redirect('conge_detail', pk=pk)
 
     fragments_existants = conge.fragments.all()
@@ -699,13 +693,18 @@ def conge_fractionner(request, pk):
                 date_debut=d1,
                 date_fin=d2,
                 motif=f"2e période — congé fractionné (réf. #{conge.pk})",
-                statut=conge.statut,
+                statut='approuve',
                 nb_jours_ouvres=nb_ouvres,
                 conge_parent=conge,
+                approuve_par=request.user,
+                date_approbation=timezone.now(),
             )
-            _add_historique(fragment, 'soumis', request.user,
+            if fragment.type_conge in TYPES_DEDUCTIBLES:
+                get_or_create_solde(fragment.employe, d1.year)
+            _create_presence_for_conge(fragment)
+            _add_historique(fragment, 'approuve', request.user,
                             f"Fragment 2/2 du congé #{conge.pk} (fractionné Art. 25.7 CODI)")
-            _add_historique(conge, 'soumis', request.user,
+            _add_historique(conge, 'approuve', request.user,
                             f"Congé fractionné en 2 périodes — 2e période : #{fragment.pk}")
             messages.success(
                 request,
@@ -747,7 +746,7 @@ def _conges_a_venir(horizon_jours=60):
                 conge_existant = Conge.objects.filter(
                     employe=emp,
                     type_conge='annuel',
-                    statut__in=['demande', 'valide_service', 'approuve', 'en_cours'],
+                    statut__in=['approuve', 'en_cours'],
                     date_debut__year=ann.year,
                 ).first()
                 alertes.append({
@@ -771,7 +770,7 @@ def conge_dashboard(request):
     today = _d.today()
     annee = today.year
 
-    en_attente  = Conge.objects.filter(statut__in=['demande', 'valide_service']).count()
+    a_venir     = Conge.objects.filter(statut='approuve').count()
     en_cours    = Conge.objects.filter(statut='en_cours').count()
     ce_mois     = Conge.objects.filter(
         Q(date_debut__year=today.year, date_debut__month=today.month) |
@@ -788,9 +787,11 @@ def conge_dashboard(request):
         statut__in=['approuve', 'en_cours'],
     ).select_related('employe')
 
-    demandes_attente = Conge.objects.filter(
-        statut__in=['demande', 'valide_service']
-    ).order_by('date_demande').select_related('employe')[:10]
+    prochains_conges = Conge.objects.filter(
+        statut__in=['approuve', 'en_cours'],
+        date_debut__lte=today + timedelta(days=30),
+        date_fin__gte=today,
+    ).order_by('date_debut').select_related('employe')[:10]
 
     from collections import Counter
     type_qs = Conge.objects.filter(
@@ -806,12 +807,12 @@ def conge_dashboard(request):
     ]
 
     return render(request, 'conges/dashboard.html', {
-        'en_attente':          en_attente,
+        'a_venir':             a_venir,
         'en_cours':            en_cours,
         'ce_mois':             ce_mois,
         'total_jours_annee':   total_jours,
         'conges_aujourd_hui':  conges_aujourd_hui,
-        'demandes_attente':    demandes_attente,
+        'prochains_conges':    prochains_conges,
         'repartition':         repartition,
         'conges_a_venir':      _conges_a_venir(60),
         'can_manage':          can_manage_rh(request.user),
@@ -1196,6 +1197,9 @@ def conge_stats_service(request):
 
     max_mois = max((r['nb'] for r in repartition_mensuelle), default=1) or 1
 
+    total_conges        = sum(s['nb_conges'] for s in stats_services)
+    services_alerte_nb  = sum(1 for s in stats_services if s['taux'] > 15)
+
     return render(request, 'conges/stats_service.html', {
         'stats_services':       stats_services,
         'year':                 year,
@@ -1203,6 +1207,8 @@ def conge_stats_service(request):
         'annee_next':           year + 1,
         'repartition_mensuelle': repartition_mensuelle,
         'max_mois':             max_mois,
+        'total_conges':         total_conges,
+        'services_alerte_nb':   services_alerte_nb,
         'can_manage':           True,
     })
 

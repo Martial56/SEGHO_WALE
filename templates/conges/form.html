@@ -1,6 +1,6 @@
 ﻿{% extends 'conges/base.html' %}
 
-{% block topbar_title %}Nouvelle demande de congé{% endblock %}
+{% block topbar_title %}Enregistrer un congé{% endblock %}
 {% block cg_nav_nouveau %}active{% endblock %}
 
 {% block extra_css %}
@@ -41,7 +41,7 @@ html[data-theme="dark"] #cg-duree{background:rgba(74,114,54,.15);color:var(--cg-
       color:var(--cg-700);background:#fff;text-decoration:none;font-size:15px;">
       <i class="bi bi-arrow-left"></i>
     </a>
-    <span style="font-size:18px;font-weight:800;color:var(--cg-900);">Nouvelle demande de congé</span>
+    <span style="font-size:18px;font-weight:800;color:var(--cg-900);">Enregistrer un congé</span>
   </div>
 </div>
 
@@ -66,20 +66,12 @@ html[data-theme="dark"] #cg-duree{background:rgba(74,114,54,.15);color:var(--cg-
     <!-- Type -->
     <div style="margin-bottom:18px;">
       <label class="cg-label">Type de congé <span class="req" style="color:var(--rose);">*</span></label>
-      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:6px;">
+      <select name="type_conge" id="id_type_conge" class="cg-input" required onchange="onTypeChange(this.value)">
+        <option value="">— Sélectionner un type —</option>
         {% for code,label in types %}
-        <label style="
-          display:flex;align-items:center;gap:8px;padding:10px 14px;
-          border:1.5px solid var(--cg-border);border-radius:8px;cursor:pointer;
-          transition:border-color .15s,background .15s;
-          font-size:13px;color:var(--cg-text);">
-          <input type="radio" name="type_conge" value="{{ code }}" required
-                 style="accent-color:var(--cg-600);"
-                 onchange="document.querySelectorAll('.cg-type-lbl').forEach(l=>l.style.borderColor='var(--cg-border)');this.parentElement.style.borderColor='var(--cg-600)'">
-          {{ label }}
-        </label>
+        <option value="{{ code }}" {% if post_data.type_conge == code %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
-      </div>
+      </select>
     </div>
 
     <!-- Dates -->
@@ -87,12 +79,12 @@ html[data-theme="dark"] #cg-duree{background:rgba(74,114,54,.15);color:var(--cg-
       <div>
         <label class="cg-label">Date de début <span class="req" style="color:var(--rose);">*</span></label>
         <input type="date" name="date_debut" id="id_debut" class="cg-input" required
-               onchange="calcDuree()">
+               value="{{ post_data.date_debut }}" onchange="calcDuree()">
       </div>
       <div>
         <label class="cg-label">Date de fin <span class="req" style="color:var(--rose);">*</span></label>
         <input type="date" name="date_fin" id="id_fin" class="cg-input" required
-               onchange="calcDuree()">
+               value="{{ post_data.date_fin }}" onchange="calcDuree()">
       </div>
     </div>
     <div style="margin-bottom:18px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
@@ -116,36 +108,19 @@ html[data-theme="dark"] #cg-duree{background:rgba(74,114,54,.15);color:var(--cg-
       <span id="cg-legal-text"></span>
     </div>
 
-    <!-- Conflits détectés -->
-    {% if conflits %}
-    <div style="background:rgba(232,154,26,.08);border:1px solid rgba(232,154,26,.3);
-                border-radius:8px;padding:12px 16px;margin-bottom:16px;">
-      <div style="font-weight:700;color:#7a4e00;margin-bottom:6px;">
-        <i class="bi bi-exclamation-triangle-fill" style="color:#e89a1a;"></i>
-        Chevauchement détecté avec {{ conflits|length }} congé{{ conflits|length|pluralize }} existant{{ conflits|length|pluralize }}
-      </div>
-      {% for c in conflits %}
-      <div style="font-size:12.5px;color:#7a4e00;margin-top:3px;">
-        • {{ c.employe.nom_complet }} — {{ c.get_type_conge_display }}
-          du {{ c.date_debut|date:"d/m/Y" }} au {{ c.date_fin|date:"d/m/Y" }}
-          ({{ c.get_statut_display }})
-      </div>
-      {% endfor %}
-    </div>
-    {% endif %}
 
     <!-- Motif -->
     <div style="margin-bottom:24px;">
       <label class="cg-label">Motif <small style="font-weight:400;text-transform:none;">(facultatif)</small></label>
       <textarea name="motif" class="cg-input" rows="3"
                 placeholder="Précisez le motif si nécessaire…"
-                style="resize:vertical;"></textarea>
+                style="resize:vertical;">{{ post_data.motif }}</textarea>
     </div>
 
     <div style="display:flex;gap:10px;justify-content:flex-end;">
       <a href="{% url 'conge_list' %}" class="btn-cg-outline" style="padding:9px 20px;">Annuler</a>
       <button type="submit" class="btn-cg">
-        <i class="bi bi-send-fill"></i> Soumettre la demande
+        <i class="bi bi-floppy-fill"></i> Enregistrer le congé
       </button>
     </div>
   </form>
@@ -154,9 +129,8 @@ html[data-theme="dark"] #cg-duree{background:rgba(74,114,54,.15);color:var(--cg-
 {% endblock %}
 
 {% block extra_js %}
+{{ durees_exceptionnelles|json_script:"cg-durees-data" }}
 <script>
-// Table des jours fériés ivoiriens approximatifs (côté client, pour preview)
-// Pour la précision, le calcul réel se fait côté serveur.
 function isWeekend(d) { return d.getDay() === 0 || d.getDay() === 6; }
 
 function calcDuree() {
@@ -194,28 +168,17 @@ function calcDuree() {
   }
 }
 
-// Durées légales exceptionnelles
-var DUREES_LEGALES = {{ durees_exceptionnelles|safe }};
-var LABELS_TYPES = {};
-{% for code, label in types %}
-LABELS_TYPES['{{ code }}'] = '{{ label|escapejs }}';
-{% endfor %}
+var DUREES_LEGALES = JSON.parse(document.getElementById('cg-durees-data').textContent);
 
-document.addEventListener('DOMContentLoaded', function() {
-  var radios = document.querySelectorAll('input[name="type_conge"]');
-  radios.forEach(function(r) {
-    r.addEventListener('change', function() {
-      var code = this.value;
-      var note = document.getElementById('cg-legal-note');
-      var text = document.getElementById('cg-legal-text');
-      if (DUREES_LEGALES[code]) {
-        text.textContent = 'Durée légale pour ce type : ' + DUREES_LEGALES[code] + ' jour(s) selon le Code du travail ivoirien.';
-        note.style.display = 'block';
-      } else {
-        note.style.display = 'none';
-      }
-    });
-  });
-});
+function onTypeChange(code) {
+  var note = document.getElementById('cg-legal-note');
+  var text = document.getElementById('cg-legal-text');
+  if (code && DUREES_LEGALES[code]) {
+    text.textContent = 'Durée légale pour ce type : ' + DUREES_LEGALES[code] + ' jour(s) selon le Code du travail ivoirien.';
+    note.style.display = 'block';
+  } else {
+    note.style.display = 'none';
+  }
+}
 </script>
 {% endblock %}

@@ -65,12 +65,25 @@ def can_manage_rh(user):
 
 
 def _rh_selects(user):
+    ordre_cat = ['direction', 'medical', 'paramedical', 'communautaire', 'support']
+    labels_cat = dict(Fonction.CATEGORIE_CHOICES)
+    fonctions_qs = Fonction.objects.all()
+    groupes = []
+    for cat in ordre_cat:
+        items = [f for f in fonctions_qs if f.categorie == cat]
+        if items:
+            groupes.append({'label': labels_cat.get(cat, cat), 'items': items})
+    # Fonctions sans catégorie
+    autres = [f for f in fonctions_qs if f.categorie not in ordre_cat]
+    if autres:
+        groupes.append({'label': 'Autres', 'items': autres})
     return {
-        'fonctions':     Fonction.objects.all(),
-        'grades':        Grade.objects.all(),
-        'types_contrat': TypeContrat.objects.all(),
-        'services':      Service.objects.filter(actif=True).order_by('nom'),
-        'can_manage':    can_manage_rh(user),
+        'fonctions':         fonctions_qs,
+        'fonctions_groupes': groupes,
+        'grades':            Grade.objects.all(),
+        'types_contrat':     TypeContrat.objects.all(),
+        'services':          Service.objects.filter(actif=True).order_by('nom'),
+        'can_manage':        can_manage_rh(user),
     }
 
 
@@ -86,7 +99,7 @@ def _enregistrer_historique(employe, type_changement, ancienne, nouvelle, note, 
         )
 
 
-# â”€â”€ Dashboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# â"€â"€ Dashboard â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 @login_required(login_url='login')
 def rh_dashboard(request):
@@ -176,7 +189,7 @@ def rh_dashboard(request):
     })
 
 
-# â”€â”€ Liste â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# â"€â"€ Liste â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 @login_required(login_url='login')
 def employe_list(request):
@@ -217,7 +230,7 @@ def employe_list(request):
     })
 
 
-# â”€â”€ DÃ©tail â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# â"€â"€ DÃ©tail â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 @login_required(login_url='login')
 def employe_detail(request, pk):
@@ -243,7 +256,7 @@ def employe_detail(request, pk):
     })
 
 
-# â”€â”€ CrÃ©er â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# â"€â"€ CrÃ©er â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 @login_required(login_url='login')
 def employe_nouveau(request):
@@ -266,7 +279,7 @@ def employe_nouveau(request):
     })
 
 
-# â”€â”€ Modifier â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# â"€â"€ Modifier â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 @login_required(login_url='login')
 def employe_modifier(request, pk):
@@ -305,10 +318,25 @@ def _save_employe(request, employe):
     prenoms       = p.get('prenoms', '').strip()
     date_embauche = p.get('date_embauche', '').strip()
     if not nom or not prenoms:
-        messages.error(request, 'Le nom et les prÃ©noms sont obligatoires.')
+        messages.error(request, 'Le nom et les prénoms sont obligatoires.')
         return None
     if not date_embauche:
         messages.error(request, "La date d'embauche est obligatoire.")
+        return None
+    if not p.get('sexe'):
+        messages.error(request, 'Le sexe est obligatoire.')
+        return None
+    if not p.get('date_naissance'):
+        messages.error(request, 'La date de naissance est obligatoire.')
+        return None
+    if not p.get('nationalite', '').strip():
+        messages.error(request, 'La nationalité est obligatoire.')
+        return None
+    if not p.get('telephone', '').strip():
+        messages.error(request, 'Le téléphone principal est obligatoire.')
+        return None
+    if not p.get('fonction'):
+        messages.error(request, 'La fonction est obligatoire.')
         return None
 
     if employe is None:
@@ -352,7 +380,7 @@ def _save_employe(request, employe):
     return employe
 
 
-# â”€â”€ Renouvellement de contrat â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# â"€â"€ Renouvellement de contrat â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 @login_required(login_url='login')
 def employe_renouveler(request, pk):
@@ -364,7 +392,7 @@ def employe_renouveler(request, pk):
         if not nouvelle_date:
             messages.error(request, 'La nouvelle date de fin de contrat est obligatoire.')
             return redirect('rh_detail', pk=pk)
-        ancienne = employe.date_fin_contrat.strftime('%d/%m/%Y') if employe.date_fin_contrat else 'â€”'
+        ancienne = employe.date_fin_contrat.strftime('%d/%m/%Y') if employe.date_fin_contrat else 'â€"'
         employe.date_fin_contrat = nouvelle_date
         employe.save()
         # RÃ©initialiser les alertes
@@ -381,7 +409,7 @@ def employe_renouveler(request, pk):
     return redirect('rh_detail', pk=pk)
 
 
-# â”€â”€ Export Excel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# â"€â"€ Export Excel â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 @login_required(login_url='login')
 def employe_export_excel(request):
@@ -463,7 +491,7 @@ def employe_export_excel(request):
     return resp
 
 
-# â”€â”€ Export PDF (fiche individuelle) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# â"€â"€ Export PDF (fiche individuelle) â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 @login_required(login_url='login')
 def employe_fiche_pdf(request, pk):
@@ -478,7 +506,111 @@ def employe_fiche_pdf(request, pk):
     })
 
 
-# â”€â”€ Import Excel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+# ── Registre unique du personnel ──────────────────────────────────────────────
+
+@login_required(login_url='login')
+def rh_registre(request):
+    qs = Employe.objects.select_related('service', 'fonction', 'type_contrat')\
+                        .order_by('date_embauche', 'nom')
+    statut = request.GET.get('statut', '')
+    if statut:
+        qs = qs.filter(statut=statut)
+    return render(request, 'employer/registre.html', {
+        'employes': qs,
+        'statut_filtre': statut,
+        'can_manage': can_manage_rh(request.user),
+        'today': date.today(),
+    })
+
+
+@login_required(login_url='login')
+def rh_registre_export(request):
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from django.http import HttpResponse
+
+    qs = Employe.objects.select_related('service', 'fonction', 'type_contrat')\
+                        .order_by('date_embauche', 'nom')
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Registre du Personnel'
+
+    vert  = '1b4332'
+    blanc = 'FFFFFF'
+    gris  = 'F2F7EF'
+
+    entetes = [
+        'No', 'Matricule', 'Nom & Prenoms', 'Sexe', 'Date de naissance',
+        'Lieu de naissance', 'Nationalite', 'Fonction', 'Service',
+        'Type de contrat', "Date d'embauche", 'Date fin contrat', 'Statut', 'Observations',
+    ]
+    largeurs = [5, 14, 28, 8, 16, 20, 14, 22, 18, 18, 16, 16, 12, 28]
+
+    # Titre
+    ws.merge_cells('A1:N1')
+    titre = ws['A1']
+    titre.value = 'REGISTRE UNIQUE DU PERSONNEL - Centre Medico-Social WALE'
+    titre.font = Font(bold=True, size=13, color=blanc)
+    titre.fill = PatternFill('solid', fgColor=vert)
+    titre.alignment = Alignment(horizontal='center', vertical='center')
+    ws.row_dimensions[1].height = 28
+
+    # En-têtes
+    thin = Side(style='thin', color='CCCCCC')
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    for col, (label, larg) in enumerate(zip(entetes, largeurs), 1):
+        cell = ws.cell(row=2, column=col, value=label)
+        cell.font = Font(bold=True, size=10, color=blanc)
+        cell.fill = PatternFill('solid', fgColor='345726')
+        cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+        cell.border = border
+        ws.column_dimensions[cell.column_letter].width = larg
+    ws.row_dimensions[2].height = 32
+
+    fmt_date = lambda d: d.strftime('%d/%m/%Y') if d else '-'
+    statuts = {'actif': 'Actif', 'suspendu': 'Suspendu', 'quitte': 'Quitte'}
+
+    for i, emp in enumerate(qs, 1):
+        row = i + 2
+        fill = PatternFill('solid', fgColor=gris) if i % 2 == 0 else None
+        vals = [
+            i,
+            emp.matricule,
+            emp.nom + ' ' + emp.prenoms,
+            emp.get_sexe_display() if emp.sexe else '-',
+            fmt_date(emp.date_naissance),
+            emp.lieu_naissance or '-',
+            emp.nationalite or '-',
+            emp.fonction.nom if emp.fonction else '-',
+            emp.service.nom if emp.service else '-',
+            emp.type_contrat.nom if emp.type_contrat else '-',
+            fmt_date(emp.date_embauche),
+            fmt_date(emp.date_fin_contrat),
+            statuts.get(emp.statut, emp.statut),
+            emp.notes or '',
+        ]
+        for col, val in enumerate(vals, 1):
+            cell = ws.cell(row=row, column=col, value=val)
+            cell.font = Font(size=9)
+            cell.alignment = Alignment(vertical='center', wrap_text=True)
+            cell.border = border
+            if fill:
+                cell.fill = fill
+        ws.row_dimensions[row].height = 18
+
+    ws.freeze_panes = 'A3'
+
+    resp = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    resp['Content-Disposition'] = "attachment; filename='registre_personnel.xlsx'"
+    wb.save(resp)
+    return resp
+
+
+# ── Import Excel ──────────────────────────────────────────────────────────────
 
 @login_required(login_url='login')
 def employe_import(request):
@@ -547,7 +679,7 @@ def employe_import(request):
     })
 
 
-# â”€â”€ Organigramme â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# â"€â"€ Organigramme â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 @login_required(login_url='login')
 def rh_organigramme(request):
@@ -573,7 +705,7 @@ def rh_organigramme(request):
     })
 
 
-# â”€â”€ Documents â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# â"€â"€ Documents â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 @login_required(login_url='login')
 def employe_doc_upload(request, pk):
@@ -614,7 +746,7 @@ def employe_doc_delete(request, pk, doc_pk):
     return redirect('rh_detail', pk=pk)
 
 
-# â”€â”€ Informations supplÃ©mentaires â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# â"€â"€ Informations supplÃ©mentaires â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 @login_required(login_url='login')
 def employe_info_save(request, pk):
@@ -645,7 +777,7 @@ def employe_info_delete(request, pk, info_pk):
 
 
 
-# â”€â”€ Annuaire â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# â"€â"€ Annuaire â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 @login_required(login_url='login')
 def rh_annuaire(request):
@@ -668,7 +800,7 @@ def rh_annuaire(request):
     })
 
 
-# â”€â”€ Alertes contrat â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# â"€â"€ Alertes contrat â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 @login_required(login_url='login')
 def alerte_marquer_lue(request, alerte_id):
@@ -685,7 +817,7 @@ def alertes_tout_lire(request):
     return JsonResponse({'ok': True})
 
 
-# â”€â”€ Alertes document â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# â"€â"€ Alertes document â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 @login_required(login_url='login')
 def alerte_doc_lue(request, alerte_id):

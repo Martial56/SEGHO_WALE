@@ -54,6 +54,7 @@ TEMPLATES = [
                 'modules_permissions.context_processors.user_modules',
                 'planning.context_processors.planning_alertes_ctx',
                 'employer.context_processors.alertes_contrat',
+                'conges.context_processors.conge_context',
             ],
         },
     },

@@ -44,22 +44,54 @@
 }
 .grid-input:focus { background: rgba(74,103,65,0.06); outline: 1px solid var(--pl-400); border-radius: 3px; }
 
-/* Autocomplétion custom */
-.ac-wrap { position: relative; }
-.ac-dropdown {
-  position: absolute; top: 100%; left: 0; right: 0; z-index: 500;
-  background: #fff; border: 1px solid var(--pl-300); border-radius: 6px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.12); max-height: 200px; overflow-y: auto;
-  display: none;
+/* Modale de sélection médecin */
+.med-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.45); z-index: 9000;
+  align-items: center; justify-content: center;
 }
-.ac-dropdown.open { display: block; }
-.ac-item {
-  padding: 7px 10px; cursor: pointer; font-size: 12px; border-bottom: 1px solid #f0f0f0;
+.med-overlay.open { display: flex; }
+.med-modal {
+  background: #fff; border-radius: 10px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.22);
+  width: 380px; max-width: 95vw;
+  display: flex; flex-direction: column; max-height: 80vh;
 }
-.ac-item:last-child { border-bottom: none; }
-.ac-item:hover, .ac-item.active { background: var(--pl-50); }
-.ac-item .ac-name { font-weight: 600; color: var(--text); }
-.ac-item .ac-spec { font-size: 11px; color: var(--text-muted); }
+html[data-theme="dark"] .med-modal { background: #1a2717; }
+.med-modal-head {
+  padding: 14px 18px 10px; border-bottom: 1px solid var(--border);
+  font-size: 14px; font-weight: 700; color: var(--text);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.med-modal-close {
+  background: none; border: none; cursor: pointer;
+  font-size: 18px; color: var(--text-muted); line-height: 1; padding: 0;
+}
+.med-search {
+  margin: 10px 14px; padding: 8px 12px; font-size: 13px;
+  border: 1px solid var(--border); border-radius: 7px;
+  background: var(--bg); color: var(--text); outline: none;
+  box-sizing: border-box; width: calc(100% - 28px);
+}
+.med-search:focus { border-color: var(--pl-500); }
+.med-list { overflow-y: auto; flex: 1; padding: 0 0 8px; }
+.med-item {
+  padding: 9px 18px; cursor: pointer; font-size: 13px;
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.med-item:hover { background: var(--pl-50); }
+html[data-theme="dark"] .med-item:hover { background: var(--pl-100); }
+.med-item-name { font-weight: 600; color: var(--text); }
+.med-item-spec { font-size: 11px; color: var(--text-muted); }
+.med-empty { padding: 20px 18px; font-size: 13px; color: var(--text-muted); text-align: center; }
+.med-absent-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; color: #c0392b; background: #fce4ec;
+  border-radius: 20px; padding: 2px 8px; white-space: nowrap; flex-shrink: 0;
+}
+html[data-theme="dark"] .med-absent-tag { background: #3d0010; color: #ff8a80; }
+.med-item-left { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 
 /* Notes par cellule */
 .note-btn {
@@ -115,11 +147,11 @@
   color: var(--text-muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.04em;
 }
 .pl-footer .form-control {
-  padding: 8px 12px; font-size: 13px; border: 1px solid var(--border);
-  border-radius: 6px; background: var(--bg); color: var(--text);
+  padding: 8px 4px; font-size: 13px; border: none; border-bottom: 1px solid rgba(0,0,0,0.18);
+  border-radius: 0; background: transparent; color: var(--text);
   width: 100%; box-sizing: border-box; outline: none; transition: border-color 0.15s;
 }
-.pl-footer .form-control:focus { border-color: var(--pl-600); }
+.pl-footer .form-control:focus { border-bottom-color: var(--pl-600); }
 .pl-footer-actions { display: flex; gap: 10px; align-items: center; }
 .btn-cancel {
   border: 1px solid var(--border); color: var(--text-muted); background: transparent;
@@ -207,7 +239,6 @@
                          data-plage="{{ row.plage.pk }}"
                          data-jour="{{ forloop.counter0 }}"
                          data-code="{{ row.plage.code }}">
-                  <div class="ac-dropdown"></div>
                 </div>
                 <button type="button"
                         class="note-btn{% if cell.note %} note-btn-active{% endif %}"
@@ -267,8 +298,8 @@
       <label for="gabarit_nom">Nom du gabarit</label>
       <input type="text" id="gabarit_nom" name="nom" required
              placeholder="Ex : Rotation standard, Planning été..."
-             style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;
-                    font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box;
+             style="width:100%;padding:8px 4px;border:none;border-bottom:1px solid rgba(0,0,0,0.18);border-radius:0;
+                    font-size:13px;background:transparent;color:var(--text);box-sizing:border-box;
                     margin-bottom:18px;outline:none;">
       <div class="pl-modal-actions">
         <button type="button" onclick="closeModal('gabaritSaveModal')"
@@ -297,8 +328,8 @@
       <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;
                     margin-bottom:5px;text-transform:uppercase;letter-spacing:0.04em;">Gabarit</label>
       <select name="gabarit_pk" required
-              style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;
-                     font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box;
+              style="width:100%;padding:8px 4px;border:none;border-bottom:1px solid rgba(0,0,0,0.18);border-radius:0;
+                     font-size:13px;background:transparent;color:var(--text);box-sizing:border-box;
                      margin-bottom:18px;outline:none;">
         {% for g in gabarits %}
           <option value="{{ g.pk }}">{{ g.nom }} — {{ g.cree_le|date:"d/m/Y" }}</option>
@@ -315,6 +346,18 @@
         </button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- Modale sélection médecin -->
+<div class="med-overlay" id="medOverlay">
+  <div class="med-modal">
+    <div class="med-modal-head">
+      <span><i class="bi bi-person-plus-fill" style="color:var(--pl-600);margin-right:6px;"></i>Choisir un médecin</span>
+      <button class="med-modal-close" onclick="medClose()">×</button>
+    </div>
+    <input type="text" class="med-search" id="medSearch" placeholder="Rechercher…" autocomplete="off">
+    <div class="med-list" id="medList"></div>
   </div>
 </div>
 
@@ -335,78 +378,82 @@
   </div>
 </div>
 
+{{ medecins_json|json_script:"medecins-data" }}
+{{ absents_json|json_script:"absents-data" }}
 <script>
-const AC_URL  = '{% url "planning_medecins_json" %}';
-const JOURS   = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
-let acTimers  = {};
+const JOURS        = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+const ALL_MEDECINS = JSON.parse(document.getElementById('medecins-data').textContent);
+const ABSENTS      = JSON.parse(document.getElementById('absents-data').textContent);
 let ctxTarget = null;
+
+let medTargetInput = null;
+
+const medOverlay = document.getElementById('medOverlay');
+const medSearch  = document.getElementById('medSearch');
+const medList    = document.getElementById('medList');
+
+function medOpen(input) {
+  medTargetInput = input;
+  medSearch.value = '';
+  medRender('');
+  medOverlay.classList.add('open');
+  medSearch.focus();
+}
+function medClose() {
+  medOverlay.classList.remove('open');
+  medTargetInput = null;
+}
+function medRender(q) {
+  const s = q.toLowerCase().replace(/^dr\.?\s*/i, '').trim();
+  const list = s
+    ? ALL_MEDECINS.filter(m => m.label.toLowerCase().includes(s) || m.spec.toLowerCase().includes(s))
+    : ALL_MEDECINS;
+  medList.innerHTML = '';
+  if (!list.length) {
+    medList.innerHTML = '<div class="med-empty">Aucun médecin trouvé</div>';
+    return;
+  }
+  list.forEach(function(item) {
+    const d = document.createElement('div');
+    d.className = 'med-item';
+    const labelLow = item.label.toLowerCase();
+    const absent   = ABSENTS.find(function(a) { return labelLow.includes(a.key); });
+    const absentTag = absent
+      ? '<span class="med-absent-tag"><i class="bi bi-calendar-x"></i> ' + absent.type + '</span>'
+      : '';
+    d.innerHTML = '<div class="med-item-left">'
+                + '<span class="med-item-name">' + item.label + '</span>'
+                + (item.spec ? '<span class="med-item-spec">' + item.spec + '</span>' : '')
+                + '</div>'
+                + absentTag;
+    d.addEventListener('click', function() {
+      if (!medTargetInput) return;
+      const parts = medTargetInput.value.split('/').map(function(s){ return s.trim(); }).filter(Boolean);
+      if (parts.length >= 2) parts[1] = item.label;
+      else parts.push(item.label);
+      medTargetInput.value = parts.join(' / ');
+      medClose();
+      checkConflicts();
+    });
+    medList.appendChild(d);
+  });
+}
+
+medSearch.addEventListener('input', function() { medRender(this.value); });
+
+// Fermer en cliquant sur le fond
+medOverlay.addEventListener('click', function(e) {
+  if (e.target === medOverlay) medClose();
+});
 
 // ── Découpe "Dr X / Dr Y" en tableau de noms ─────────────────────────────────
 function splitNames(val) {
-  return val.split(/[\/,]/).map(s => s.trim()).filter(s => s.length > 0);
+  return val.split(/[\/,]/).map(function(s){ return s.trim(); }).filter(function(s){ return s.length > 0; });
 }
 
-// ── Autocomplétion améliorée (complète le dernier segment après /) ─────────
-document.querySelectorAll('.grid-input').forEach(input => {
-  const drop = input.parentElement.querySelector('.ac-dropdown');
-  let activeIdx = -1;
-
-  input.addEventListener('input', () => {
-    clearTimeout(acTimers[input.name]);
-    const segments = input.value.split('/');
-    const q = segments[segments.length - 1].trim();
-    if (q.length < 2) { drop.classList.remove('open'); return; }
-    acTimers[input.name] = setTimeout(() => {
-      fetch(`${AC_URL}?q=${encodeURIComponent(q)}`)
-        .then(r => r.json())
-        .then(data => {
-          drop.innerHTML = ''; activeIdx = -1;
-          if (!data.results.length) { drop.classList.remove('open'); return; }
-          data.results.forEach(item => {
-            const div = document.createElement('div');
-            div.className = 'ac-item';
-            div.innerHTML = `<div class="ac-name">${item.label}</div>${item.specialite ? `<div class="ac-spec">${item.specialite}</div>` : ''}`;
-            div.addEventListener('mousedown', e => {
-              e.preventDefault();
-              const parts = input.value.split('/');
-              parts[parts.length - 1] = ' ' + item.label;
-              input.value = parts.join('/').replace(/^\s*\//, '').trim();
-              // Normalize: "Dr X / Dr Y"
-              input.value = parts.map(s => s.trim()).filter(s => s).join(' / ');
-              drop.classList.remove('open');
-              checkConflicts();
-            });
-            drop.appendChild(div);
-          });
-          drop.classList.add('open');
-        });
-    }, 220);
-  });
-
-  input.addEventListener('keydown', e => {
-    const items = drop.querySelectorAll('.ac-item');
-    if (!drop.classList.contains('open')) return;
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      activeIdx = Math.min(activeIdx + 1, items.length - 1);
-      items.forEach((it, i) => it.classList.toggle('active', i === activeIdx));
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      activeIdx = Math.max(activeIdx - 1, 0);
-      items.forEach((it, i) => it.classList.toggle('active', i === activeIdx));
-    } else if (e.key === 'Enter' && activeIdx >= 0) {
-      e.preventDefault();
-      const parts = input.value.split('/');
-      parts[parts.length - 1] = ' ' + items[activeIdx].querySelector('.ac-name').textContent;
-      input.value = parts.map(s => s.trim()).filter(s => s).join(' / ');
-      drop.classList.remove('open');
-      checkConflicts();
-    } else if (e.key === 'Escape') {
-      drop.classList.remove('open');
-    }
-  });
-
-  input.addEventListener('blur',   () => setTimeout(() => drop.classList.remove('open'), 150));
+// ── Ouvrir la modale au clic sur une cellule ──────────────────────────────────
+document.querySelectorAll('.grid-input').forEach(function(input) {
+  input.addEventListener('click', function() { medOpen(input); });
   input.addEventListener('change', checkConflicts);
 });
 

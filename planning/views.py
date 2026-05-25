@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.contrib import messages
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.db import models
 from django.db.models import Q
 from datetime import date, timedelta
@@ -39,6 +39,74 @@ def can_delete_published(user):
     if user.is_superuser or user.is_staff:
         return True
     return user.groups.filter(name__in=PLANNING_DELETE_PUBLISHED_GROUPS).exists()
+
+
+def _medecins_json(medecins_qs):
+    return [
+        {
+            'label': f"Dr {m.nom} {m.prenoms}",
+            'spec':  m.specialite.nom if m.specialite else '',
+        }
+        for m in medecins_qs
+    ]
+
+
+def _base_ctx(request):
+    """Context variables shared by all planning views (nav alertes + permissions)."""
+    can_manage = can_manage_planning(request.user)
+    alertes = []
+    if can_manage:
+        today = date.today()
+        monday_now = today - timedelta(days=today.weekday())
+        for i in range(3, -1, -1):
+            monday = monday_now - timedelta(weeks=i)
+            has_pub = PlanningHebdomadaire.objects.filter(
+                semaine_debut=monday, publie=True
+            ).exists()
+            if not has_pub:
+                alertes.append({
+                    'label': f"Semaine du {monday.strftime('%d/%m/%Y')} "
+                             f"au {(monday + timedelta(days=5)).strftime('%d/%m/%Y')}",
+                    'monday': monday,
+                })
+    notifs_count = 0
+    if request.user.is_authenticated:
+        viewed_ids = PlanningVu.objects.filter(
+            user=request.user
+        ).values_list('planning_id', flat=True)
+        notifs_count = PlanningHebdomadaire.objects.filter(
+            publie=True
+        ).exclude(pk__in=viewed_ids).count()
+    return {
+        'planning_alertes': alertes,
+        'pl_can_manage':    can_manage,
+        'pl_notifs_count':  notifs_count,
+    }
+
+
+def _conges_semaine(semaine_debut, semaine_fin):
+    """Retourne la liste des employés en congé sur la semaine donnée."""
+    try:
+        from employer.models import Conge
+        conges = Conge.objects.filter(
+            date_debut__lte=semaine_fin,
+            date_fin__gte=semaine_debut,
+            statut__in=['approuve', 'en_cours', 'valide_service'],
+        ).select_related('employe')
+        result = []
+        seen = set()
+        for c in conges:
+            e = c.employe
+            if e.pk not in seen:
+                seen.add(e.pk)
+                result.append({
+                    'key':     e.nom.lower(),
+                    'display': f"{e.nom} {e.prenoms}",
+                    'type':    c.get_type_conge_display(),
+                })
+        return result
+    except Exception:
+        return []
 
 
 def build_grid_rows(bureaux, aff_map):
@@ -167,6 +235,7 @@ def planning_list(request):
         'semaine':              semaine,
         'can_manage':           can_manage_planning(request.user),
         'can_delete_published': can_delete_published(request.user),
+        **_base_ctx(request),
     })
 
 
@@ -197,6 +266,7 @@ def planning_nouveau(request):
     return render(request, 'planning/nouveau.html', {
         'default_date': monday.isoformat(),
         'default_signataire': PlanningConfig.get().signataire_defaut,
+        **_base_ctx(request),
     })
 
 
@@ -220,15 +290,21 @@ def planning_detail(request, pk):
         semaine_debut__gt=planning.semaine_debut
     ).order_by('semaine_debut').first()
 
+    confirm_publish = request.GET.get('confirm_publish') == '1'
+    pub_empty_days  = request.session.pop('pub_empty_days', []) if confirm_publish else []
+
     return render(request, 'planning/hebdomadaire.html', {
-        'planning':      planning,
-        'rows':          rows,
-        'jours_labels':  JOURS_LABELS,
-        'can_manage':    can_manage_planning(request.user),
-        'can_delete_pub': can_delete_published(request.user),
-        'prev_planning': prev_planning,
-        'next_planning': next_planning,
-        'modifications': planning.modifications.select_related('modifie_par')[:10],
+        'planning':        planning,
+        'rows':            rows,
+        'jours_labels':    JOURS_LABELS,
+        'can_manage':      can_manage_planning(request.user),
+        'can_delete_pub':  can_delete_published(request.user),
+        'prev_planning':   prev_planning,
+        'next_planning':   next_planning,
+        'modifications':   planning.modifications.select_related('modifie_par')[:10],
+        'confirm_publish': confirm_publish,
+        'pub_empty_days':  pub_empty_days,
+        **_base_ctx(request),
     })
 
 
@@ -244,6 +320,7 @@ def planning_modifier(request, pk):
         return redirect('planning_detail', pk=pk)
     bureaux  = get_bureaux()
     medecins = Medecin.objects.filter(actif=True).select_related('specialite').order_by('nom')
+    absents  = _conges_semaine(planning.semaine_debut, planning.semaine_fin)
 
     if request.method == 'POST':
         posted = {
@@ -259,6 +336,9 @@ def planning_modifier(request, pk):
             return render(request, 'planning/modifier.html', {
                 'planning': planning, 'rows': rows,
                 'jours_labels': JOURS_LABELS, 'medecins': medecins,
+                'medecins_json': _medecins_json(medecins),
+                'absents_json':  absents,
+                **_base_ctx(request),
             })
 
         changes = []
@@ -309,11 +389,14 @@ def planning_modifier(request, pk):
     rows     = build_grid_rows(bureaux, aff_map)
     gabarits = PlanningGabarit.objects.all()
     return render(request, 'planning/modifier.html', {
-        'planning':     planning,
-        'rows':         rows,
-        'jours_labels': JOURS_LABELS,
-        'medecins':     medecins,
-        'gabarits':     gabarits,
+        'planning':       planning,
+        'rows':           rows,
+        'jours_labels':   JOURS_LABELS,
+        'medecins':       medecins,
+        'medecins_json':  _medecins_json(medecins),
+        'absents_json':   absents,
+        'gabarits':       gabarits,
+        **_base_ctx(request),
     })
 
 
@@ -364,23 +447,72 @@ def planning_dupliquer(request, pk):
 def planning_publier(request, pk):
     if not can_manage_planning(request.user):
         raise PermissionDenied
-    if request.method == 'POST':
-        planning = get_object_or_404(PlanningHebdomadaire, pk=pk)
-        planning.publie = not planning.publie
+    if request.method != 'POST':
+        return redirect('planning_detail', pk=pk)
+
+    planning = get_object_or_404(PlanningHebdomadaire, pk=pk)
+
+    # Dépublier (toggle off)
+    if planning.publie:
+        planning.publie = False
         planning.save()
-        action = 'publié' if planning.publie else 'dépublié'
         PlanningModification.objects.create(
-            planning=planning,
-            modifie_par=request.user,
-            resume=f'Planning {action}.',
+            planning=planning, modifie_par=request.user, resume='Planning dépublié.',
         )
-        if planning.publie:
-            count = _send_publication_email(planning, request.user)
-            if count > 0:
-                messages.success(
-                    request,
-                    f'Planning publié. {count} notification(s) envoyée(s).'
-                )
+        return redirect('planning_detail', pk=pk)
+
+    # ── Règle 1 : refus si planning entièrement vide ──────────────────────────
+    filled = planning.affectations.exclude(personnel='').count()
+    if filled == 0:
+        messages.error(
+            request,
+            'Impossible de publier un planning entièrement vide. '
+            'Veuillez d\'abord saisir les affectations.'
+        )
+        return redirect('planning_detail', pk=pk)
+
+    # ── Règle 2 : jours ouvrables non fériés sans aucune affectation ──────────
+    try:
+        from employer.models import JourFerie
+        feries = set(
+            JourFerie.objects.filter(
+                date__range=(planning.semaine_debut, planning.semaine_fin)
+            ).values_list('date', flat=True)
+        )
+    except Exception:
+        feries = set()
+
+    empty_days = []
+    for j in range(6):
+        day_date = planning.semaine_debut + timedelta(days=j)
+        if day_date in feries:
+            continue
+        if not planning.affectations.exclude(personnel='').filter(jour=j).exists():
+            empty_days.append(JOURS_LABELS[j])
+
+    justification = request.POST.get('justification', '').strip()
+
+    if empty_days and not justification:
+        # Stocker les jours vides en session et redemander une justification
+        request.session['pub_empty_days'] = empty_days
+        from django.urls import reverse as _reverse
+        url = _reverse('planning_detail', args=[pk])
+        return redirect(f'{url}?confirm_publish=1')
+
+    # ── Publication ───────────────────────────────────────────────────────────
+    planning.publie = True
+    planning.save()
+    resume = 'Planning publié.'
+    if justification:
+        resume += f' Justification ({", ".join(empty_days)}) : {justification}'
+    PlanningModification.objects.create(
+        planning=planning, modifie_par=request.user, resume=resume,
+    )
+    count = _send_publication_email(planning, request.user)
+    if count > 0:
+        messages.success(request, f'Planning publié. {count} notification(s) envoyée(s).')
+    else:
+        messages.success(request, 'Planning publié avec succès.')
     return redirect('planning_detail', pk=pk)
 
 
@@ -461,6 +593,7 @@ def planning_mensuel(request):
         'next_annee': next_annee,
         'next_mois':  next_mois,
         'can_manage': can_manage_planning(request.user),
+        **_base_ctx(request),
     })
 
 
@@ -489,6 +622,7 @@ def planning_par_medecin(request):
         'affectations':   affectations,
         'personnel_list': personnel_list,
         'jours_labels':   JOURS_LABELS,
+        **_base_ctx(request),
     })
 
 
@@ -542,6 +676,19 @@ def _send_publication_email(planning, published_by):
     return len(all_emails)
 
 
+# ── Semaine en cours ──────────────────────────────────────────────────────────
+
+@login_required(login_url='login')
+def planning_courant(request):
+    today  = date.today()
+    monday = today - timedelta(days=today.weekday())
+    planning = PlanningHebdomadaire.objects.filter(semaine_debut=monday).first()
+    if planning:
+        return redirect('planning_detail', pk=planning.pk)
+    messages.info(request, "Aucun planning n'a été créé pour la semaine en cours.")
+    return redirect('planning_list')
+
+
 # ── Gestion des bureaux et plages ─────────────────────────────────────────────
 
 @login_required(login_url='login')
@@ -552,6 +699,7 @@ def planning_bureaux(request):
     return render(request, 'planning/bureaux.html', {
         'bureaux':    bureaux,
         'can_manage': True,
+        **_base_ctx(request),
     })
 
 
@@ -699,25 +847,64 @@ def planning_stats(request):
     monthly_stats = []
     for (year, month), pcts in sorted(monthly_raw.items(), reverse=True):
         monthly_stats.append({
-            'year':    year,
-            'month':   month,
+            'year':     year,
+            'month':    month,
             'mois_nom': MOIS_NOMS[month],
-            'avg_pct': round(sum(pcts) / len(pcts)),
-            'count':   len(pcts),
+            'avg_pct':  round(sum(pcts) / len(pcts)),
+            'count':    len(pcts),
         })
 
     avg_global = round(sum(s['pct'] for s in stats) / len(stats)) if stats else 0
     best  = max(stats, key=lambda s: s['pct']) if stats else None
     worst = min(stats, key=lambda s: s['pct']) if stats else None
 
+    # ── Stats par bureau ──────────────────────────────────────────────────────
+    plage_to_bureau = {}
+    for bureau in active_bureaux:
+        for plage in bureau.plages.all():
+            plage_to_bureau[plage.pk] = bureau.pk
+
+    bureau_filled = _defaultdict(int)
+    for pl in plannings_list:
+        for aff in pl.affectations.all():
+            if aff.personnel:
+                bpk = plage_to_bureau.get(aff.plage_id)
+                if bpk:
+                    bureau_filled[bpk] += 1
+
+    bureau_stats = []
+    for bureau in active_bureaux:
+        total = bureau.plages.count() * 6 * len(plannings_list)
+        filled_count = bureau_filled[bureau.pk]
+        pct = round(filled_count * 100 / total) if total else 0
+        bureau_stats.append({
+            'bureau': bureau,
+            'total':  total,
+            'filled': filled_count,
+            'pct':    pct,
+        })
+    bureau_stats.sort(key=lambda x: x['pct'], reverse=True)
+
+    # ── Top 10 médecins / personnel ───────────────────────────────────────────
+    medecin_counts = _defaultdict(int)
+    for pl in plannings_list:
+        for aff in pl.affectations.all():
+            if aff.personnel:
+                for name in split_names(aff.personnel):
+                    medecin_counts[name.strip()] += 1
+    top_medecins = sorted(medecin_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+
     return render(request, 'planning/stats.html', {
-        'stats':          stats,
-        'monthly_stats':  monthly_stats,
-        'avg_global':     avg_global,
-        'best':           best,
-        'worst':          worst,
+        'stats':           stats,
+        'monthly_stats':   monthly_stats,
+        'avg_global':      avg_global,
+        'best':            best,
+        'worst':           worst,
         'total_plannings': len(plannings_list),
-        'can_manage':     can_manage_planning(request.user),
+        'bureau_stats':    bureau_stats,
+        'top_medecins':    top_medecins,
+        'can_manage':      can_manage_planning(request.user),
+        **_base_ctx(request),
     })
 
 
@@ -777,3 +964,95 @@ def planning_gabarit_supprimer(request, gabarit_pk):
         gabarit.delete()
         messages.success(request, f'Gabarit « {nom} » supprimé.')
     return redirect('planning_bureaux')
+
+
+# ── Export Excel ──────────────────────────────────────────────────────────────
+
+@login_required(login_url='login')
+def planning_export_excel(request, pk):
+    import openpyxl
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+
+    planning = get_object_or_404(PlanningHebdomadaire, pk=pk)
+    bureaux  = get_bureaux()
+    aff_map  = {(a.plage_id, a.jour): a for a in planning.affectations.all()}
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = f"Sem. {planning.semaine_debut.strftime('%d-%m-%Y')}"
+
+    hdr_fill = PatternFill(start_color='445F35', end_color='445F35', fill_type='solid')
+    hdr_font = Font(bold=True, color='FFFFFF', size=10)
+    bur_fill = PatternFill(start_color='DEECD4', end_color='DEECD4', fill_type='solid')
+    thin     = Side(style='thin', color='CCCCCC')
+    brd      = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    num_cols = 8
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=num_cols)
+    title = ws.cell(row=1, column=1)
+    title.value = (
+        f"Centre Médico-Social WALÉ — Planning semaine du "
+        f"{planning.semaine_debut.strftime('%d/%m/%Y')} au {planning.semaine_fin.strftime('%d/%m/%Y')}"
+    )
+    title.font      = Font(bold=True, size=12, color='2B3E22')
+    title.alignment = Alignment(horizontal='center', vertical='center')
+    ws.row_dimensions[1].height = 22
+
+    headers = ['BUREAU', 'PLAGE', 'LUNDI', 'MARDI', 'MERCREDI', 'JEUDI', 'VENDREDI', 'SAMEDI']
+    for c, h in enumerate(headers, 1):
+        cell            = ws.cell(row=2, column=c, value=h)
+        cell.fill       = hdr_fill
+        cell.font       = hdr_font
+        cell.alignment  = Alignment(horizontal='center')
+        cell.border     = brd
+
+    row_num = 3
+    for bureau in bureaux:
+        plages    = list(bureau.plages.all())
+        start_row = row_num
+        for plage in plages:
+            bcell           = ws.cell(row=row_num, column=1, value=bureau.nom)
+            bcell.font      = Font(bold=True, size=10)
+            bcell.fill      = bur_fill
+            bcell.alignment = Alignment(horizontal='center', vertical='center')
+            bcell.border    = brd
+            pcell           = ws.cell(row=row_num, column=2, value=plage.code)
+            pcell.alignment = Alignment(horizontal='center')
+            pcell.border    = brd
+            for j in range(6):
+                aff          = aff_map.get((plage.pk, j))
+                cell         = ws.cell(row=row_num, column=j + 3,
+                                       value=aff.personnel if aff else '')
+                cell.alignment = Alignment(wrap_text=True, vertical='center')
+                cell.border  = brd
+            row_num += 1
+        if len(plages) > 1:
+            ws.merge_cells(
+                start_row=start_row, start_column=1,
+                end_row=row_num - 1, end_column=1,
+            )
+            ws.cell(row=start_row, column=1).alignment = Alignment(
+                horizontal='center', vertical='center'
+            )
+
+    ws.column_dimensions['A'].width = 20
+    ws.column_dimensions['B'].width = 12
+    for col_letter in ['C', 'D', 'E', 'F', 'G', 'H']:
+        ws.column_dimensions[col_letter].width = 22
+
+    if planning.signataire:
+        sig_row = row_num + 2
+        ws.cell(row=sig_row, column=7, value='Signataire :').font = Font(
+            italic=True, color='888888'
+        )
+        ws.cell(row=sig_row, column=8, value=planning.signataire).font = Font(
+            bold=True, color='2B3E22'
+        )
+
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    fname = planning.semaine_debut.strftime('%Y-%m-%d')
+    response['Content-Disposition'] = f'attachment; filename="planning_{fname}.xlsx"'
+    wb.save(response)
+    return response

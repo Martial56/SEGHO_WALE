@@ -1,0 +1,200 @@
+{% extends 'employer/base.html' %}
+
+{% block topbar_title %}Registre unique du personnel{% endblock %}
+{% block rh_nav_registre %}active{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+.reg-head {
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:14px 32px;margin:0 -32px;flex-wrap:wrap;
+  position:sticky;top:calc(var(--topbar-h) + 44px);z-index:100;
+  background:#f0f6fa;border-bottom:1px solid rgba(0,0,0,0.05);
+  box-shadow:0 2px 8px rgba(0,0,0,0.04);
+}
+html[data-theme="dark"] .reg-head{background:#071e28;border-bottom-color:rgba(255,255,255,0.05);}
+
+.reg-title{font-size:17px;font-weight:800;color:var(--rh-900);}
+html[data-theme="dark"] .reg-title{color:var(--rh-200);}
+
+.reg-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+
+.reg-filter{
+  display:flex;align-items:center;gap:6px;
+  background:var(--rh-surface);border:1px solid var(--rh-border);
+  border-radius:8px;padding:5px 12px;font-size:13px;
+}
+.reg-filter select{border:none;background:transparent;color:var(--rh-text);
+  font-size:13px;font-family:'Sora',sans-serif;outline:none;cursor:pointer;}
+html[data-theme="dark"] .reg-filter{background:var(--rh-surface);border-color:var(--rh-border);}
+html[data-theme="dark"] .reg-filter select{color:var(--rh-text);}
+
+/* ── Tableau ── */
+.reg-wrap{overflow-x:auto;margin-top:20px;border-radius:12px;
+  box-shadow:0 2px 16px rgba(27,67,50,0.08);}
+.reg-table{width:100%;border-collapse:collapse;font-size:12.5px;
+  background:var(--rh-surface);white-space:nowrap;}
+.reg-table thead tr{background:var(--rh-700);color:#fff;}
+.reg-table thead th{
+  padding:10px 12px;font-weight:700;font-size:11.5px;
+  text-transform:uppercase;letter-spacing:0.4px;text-align:left;
+  border-right:1px solid rgba(255,255,255,0.1);
+}
+.reg-table thead th:last-child{border-right:none;}
+.reg-table tbody tr{border-bottom:1px solid var(--rh-border);}
+.reg-table tbody tr:nth-child(even){background:var(--rh-50);}
+.reg-table tbody tr:hover{background:rgba(74,114,54,0.07);}
+.reg-table tbody td{padding:8px 12px;color:var(--rh-text);vertical-align:middle;}
+.reg-table tbody td.obs{white-space:normal;max-width:200px;font-size:11.5px;color:var(--rh-muted);}
+
+.reg-num{font-size:11px;color:var(--rh-muted);text-align:center;width:36px;}
+.reg-mat{font-weight:700;font-family:monospace;font-size:12px;color:var(--rh-600);}
+.reg-nom{font-weight:600;}
+.reg-date{font-variant-numeric:tabular-nums;font-size:12px;}
+
+html[data-theme="dark"] .reg-table thead tr{background:var(--rh-800);}
+html[data-theme="dark"] .reg-table tbody tr:nth-child(even){background:var(--rh-100);}
+html[data-theme="dark"] .reg-table tbody tr:hover{background:rgba(122,170,98,0.1);}
+
+/* ── Stats ── */
+.reg-stats{display:flex;gap:12px;flex-wrap:wrap;margin-top:16px;}
+.reg-stat{
+  background:var(--rh-surface);border:1px solid var(--rh-border);
+  border-radius:10px;padding:10px 18px;display:flex;flex-direction:column;gap:2px;
+  box-shadow:0 1px 4px rgba(27,67,50,0.06);
+}
+.reg-stat-val{font-size:22px;font-weight:800;color:var(--rh-700);}
+.reg-stat-lbl{font-size:11px;color:var(--rh-muted);text-transform:uppercase;letter-spacing:0.3px;}
+html[data-theme="dark"] .reg-stat{background:var(--rh-surface);border-color:var(--rh-border);}
+html[data-theme="dark"] .reg-stat-val{color:var(--rh-300);}
+
+/* ── Impression ── */
+@media print {
+  .reg-head,.rh-nav,.reg-stats,.print-hide{display:none!important;}
+  body,html{background:#fff!important;}
+  .reg-wrap{box-shadow:none;border-radius:0;overflow:visible;}
+  .reg-table{font-size:9pt;}
+  .reg-table thead tr{background:#1b4332!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .reg-table tbody tr:nth-child(even){background:#edf6e8!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  h2.reg-print-title{display:block!important;}
+  @page{size:A3 landscape;margin:10mm;}
+}
+h2.reg-print-title{display:none;font-size:14pt;text-align:center;margin-bottom:8px;}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="reg-head">
+  <div>
+    <div class="reg-title"><i class="bi bi-journal-bookmark-fill" style="color:var(--rh-600);"></i> Registre unique du personnel</div>
+    <div style="font-size:12px;color:var(--rh-muted);margin-top:2px;">
+      Conformément au Code du Travail ivoirien — {% now "d/m/Y" %}
+    </div>
+  </div>
+  <div class="reg-actions">
+    <!-- Filtre statut -->
+    <form method="get" style="display:contents;">
+      <div class="reg-filter">
+        <i class="bi bi-funnel" style="color:var(--rh-600);font-size:13px;"></i>
+        <select name="statut" onchange="this.form.submit()">
+          <option value="" {% if not statut_filtre %}selected{% endif %}>Tous les statuts</option>
+          <option value="actif"    {% if statut_filtre == 'actif' %}selected{% endif %}>Actifs</option>
+          <option value="suspendu" {% if statut_filtre == 'suspendu' %}selected{% endif %}>Suspendus</option>
+          <option value="quitte"   {% if statut_filtre == 'quitte' %}selected{% endif %}>Quittés</option>
+        </select>
+      </div>
+    </form>
+    <!-- Export Excel -->
+    <a href="{% url 'rh_registre_export' %}{% if statut_filtre %}?statut={{ statut_filtre }}{% endif %}"
+       class="btn-rh-outline print-hide">
+      <i class="bi bi-file-earmark-excel-fill" style="color:#1d7a45;"></i> Export Excel
+    </a>
+    <!-- Imprimer -->
+    <button onclick="window.print()" class="btn-rh print-hide">
+      <i class="bi bi-printer-fill"></i> Imprimer
+    </button>
+  </div>
+</div>
+
+<!-- Stats -->
+<div class="reg-stats">
+  {% with actifs=employes|length %}
+  <div class="reg-stat">
+    <span class="reg-stat-val">{{ employes|length }}</span>
+    <span class="reg-stat-lbl">{% if statut_filtre %}Filtrés{% else %}Total{% endif %}</span>
+  </div>
+  {% endwith %}
+  {% if not statut_filtre %}
+  <div class="reg-stat">
+    <span class="reg-stat-val" style="color:#0d7a4c;">
+      {{ employes|dictsort:"statut"|length }}
+    </span>
+    <span class="reg-stat-lbl">Actifs</span>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Titre impression -->
+<h2 class="reg-print-title">REGISTRE UNIQUE DU PERSONNEL — Centre Médico-Social WALÉ</h2>
+
+<!-- Tableau -->
+<div class="reg-wrap">
+  <table class="reg-table">
+    <thead>
+      <tr>
+        <th style="width:36px;text-align:center;">N°</th>
+        <th>Matricule</th>
+        <th>Nom & Prénoms</th>
+        <th>Sexe</th>
+        <th>Date de naissance</th>
+        <th>Lieu de naissance</th>
+        <th>Nationalité</th>
+        <th>Fonction</th>
+        <th>Service</th>
+        <th>Type de contrat</th>
+        <th>Date d'embauche</th>
+        <th>Date fin contrat</th>
+        <th>Statut</th>
+        <th>Observations</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for emp in employes %}
+      <tr>
+        <td class="reg-num">{{ forloop.counter }}</td>
+        <td class="reg-mat">{{ emp.matricule }}</td>
+        <td class="reg-nom">{{ emp.nom }} {{ emp.prenoms }}</td>
+        <td>{{ emp.get_sexe_display|default:"—" }}</td>
+        <td class="reg-date">{{ emp.date_naissance|date:"d/m/Y"|default:"—" }}</td>
+        <td>{{ emp.lieu_naissance|default:"—" }}</td>
+        <td>{{ emp.nationalite|default:"—" }}</td>
+        <td>{{ emp.fonction.nom|default:"—" }}</td>
+        <td>{{ emp.service.nom|default:"—" }}</td>
+        <td>{{ emp.type_contrat.nom|default:"—" }}</td>
+        <td class="reg-date">{{ emp.date_embauche|date:"d/m/Y"|default:"—" }}</td>
+        <td class="reg-date">{{ emp.date_fin_contrat|date:"d/m/Y"|default:"—" }}</td>
+        <td>
+          {% if emp.statut == 'actif' %}
+            <span class="badge-actif">Actif</span>
+          {% elif emp.statut == 'suspendu' %}
+            <span class="badge-suspendu">Suspendu</span>
+          {% else %}
+            <span class="badge-quitte">Quitté</span>
+          {% endif %}
+        </td>
+        <td class="obs">{{ emp.notes|default:""|truncatechars:60 }}</td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="14" style="text-align:center;padding:32px;color:var(--rh-muted);font-style:italic;">
+          Aucun employé trouvé
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

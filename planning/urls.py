@@ -3,6 +3,7 @@ from . import views
 
 urlpatterns = [
     path('',                        views.planning_list,          name='planning_list'),
+    path('courant/',                views.planning_courant,       name='planning_courant'),
     path('nouveau/',                views.planning_nouveau,       name='planning_nouveau'),
     path('mensuel/',                views.planning_mensuel,       name='planning_mensuel'),
     path('par-medecin/',            views.planning_par_medecin,   name='planning_par_medecin'),
@@ -19,6 +20,7 @@ urlpatterns = [
     path('<int:pk>/dupliquer/',     views.planning_dupliquer,     name='planning_dupliquer'),
     path('<int:pk>/publier/',       views.planning_publier,       name='planning_publier'),
     path('<int:pk>/supprimer/',           views.planning_supprimer,          name='planning_supprimer'),
+    path('<int:pk>/export-excel/',        views.planning_export_excel,         name='planning_export_excel'),
     path('<int:pk>/sauvegarder-gabarit/', views.planning_gabarit_sauvegarder, name='planning_gabarit_sauvegarder'),
     path('<int:pk>/appliquer-gabarit/',   views.planning_gabarit_appliquer,   name='planning_gabarit_appliquer'),
     path('gabarit/<int:gabarit_pk>/supprimer/', views.planning_gabarit_supprimer, name='planning_gabarit_supprimer'),

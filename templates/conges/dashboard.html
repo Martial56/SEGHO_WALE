@@ -47,7 +47,7 @@
   </div>
   {% if can_manage %}
   <a href="{% url 'conge_nouveau' %}" class="btn-cg">
-    <i class="bi bi-plus-lg"></i> Nouvelle demande
+    <i class="bi bi-plus-lg"></i> Enregistrer un congé
   </a>
   {% endif %}
 </div>
@@ -55,9 +55,9 @@
 <!-- KPIs -->
 <div class="cg-kpi-row">
   <div class="cg-kpi attente">
-    <div class="kpi-icon"><i class="bi bi-hourglass-split"></i></div>
-    <div class="kpi-val">{{ en_attente }}</div>
-    <div class="kpi-lbl">En attente</div>
+    <div class="kpi-icon"><i class="bi bi-calendar-event-fill"></i></div>
+    <div class="kpi-val">{{ a_venir }}</div>
+    <div class="kpi-lbl">À venir</div>
   </div>
   <div class="cg-kpi en_cours">
     <div class="kpi-icon"><i class="bi bi-play-circle-fill"></i></div>
@@ -120,18 +120,18 @@
     {% endif %}
   </div>
 
-  <!-- Demandes en attente -->
+  <!-- Prochains congés -->
   <div class="cg-card">
     <div class="cg-card-header">
-      <div class="cg-card-title"><i class="bi bi-clock-history"></i> Demandes en attente</div>
-      {% if en_attente > 0 %}
-      <span style="background:rgba(232,154,26,.15);color:#7a4e00;border:1px solid rgba(232,154,26,.3);
+      <div class="cg-card-title"><i class="bi bi-calendar-week"></i> Prochains congés (30 j)</div>
+      {% if prochains_conges %}
+      <span style="background:rgba(74,114,54,.12);color:var(--cg-700);border:1px solid var(--cg-200);
                    padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;">
-        {{ en_attente }}
+        {{ prochains_conges|length }}
       </span>
       {% endif %}
     </div>
-    {% if demandes_attente %}
+    {% if prochains_conges %}
     <div style="overflow-x:auto;">
       <table style="width:100%;border-collapse:collapse;font-size:13px;">
         <thead style="background:rgba(74,114,54,0.06);border-bottom:1px solid var(--cg-border);">
@@ -139,42 +139,35 @@
             <th style="padding:10px 16px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--cg-700);">Employé</th>
             <th style="padding:10px 16px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--cg-700);">Type</th>
             <th style="padding:10px 16px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--cg-700);">Dates</th>
-            {% if can_manage %}
             <th style="padding:10px 16px;text-align:right;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--cg-700);">Actions</th>
-            {% endif %}
           </tr>
         </thead>
         <tbody>
-          {% for c in demandes_attente %}
+          {% for c in prochains_conges %}
           <tr style="border-bottom:1px solid rgba(0,0,0,0.04);">
-            <td style="padding:10px 16px;font-weight:600;color:var(--cg-text);">{{ c.employe.nom_complet }}</td>
+            <td style="padding:10px 16px;">
+              <a href="{% url 'conge_detail' c.pk %}" style="font-weight:600;color:var(--cg-600);text-decoration:none;">
+                {{ c.employe.nom_complet }}
+              </a>
+            </td>
             <td style="padding:10px 16px;font-size:12px;color:var(--cg-muted);">{{ c.get_type_conge_display }}</td>
             <td style="padding:10px 16px;font-size:12px;white-space:nowrap;color:var(--cg-text);">
               {{ c.date_debut|date:"d/m" }} → {{ c.date_fin|date:"d/m/Y" }}
             </td>
-            {% if can_manage %}
             <td style="padding:10px 16px;text-align:right;">
               <a href="{% url 'conge_detail' c.pk %}" class="btn-cg-sm">
                 <i class="bi bi-eye"></i>
               </a>
             </td>
-            {% endif %}
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
-    {% if en_attente > 10 %}
-    <div style="padding:10px 16px;text-align:center;border-top:1px solid var(--cg-border);">
-      <a href="{% url 'conge_list' %}?statut=demande" style="font-size:12.5px;color:var(--cg-600);text-decoration:none;font-weight:600;">
-        Voir toutes les demandes ({{ en_attente }}) <i class="bi bi-arrow-right"></i>
-      </a>
-    </div>
-    {% endif %}
     {% else %}
     <div style="padding:30px;text-align:center;color:var(--cg-muted);">
-      <i class="bi bi-inbox" style="font-size:28px;display:block;margin-bottom:8px;opacity:.4;"></i>
-      <p style="font-size:13px;">Aucune demande en attente.</p>
+      <i class="bi bi-calendar-check" style="font-size:28px;display:block;margin-bottom:8px;opacity:.4;"></i>
+      <p style="font-size:13px;">Aucun congé prévu dans les 30 prochains jours.</p>
     </div>
     {% endif %}
   </div>

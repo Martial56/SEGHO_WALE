@@ -4,7 +4,8 @@
 {% block topbar_title %}Planning{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+{% load static %}
+    <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
 <style>
 /* ── Palette logo (vert forêt) ── */
 :root {
@@ -92,8 +93,11 @@ html[data-theme="dark"] .pl-nav-link.active { color: var(--pl-300); border-botto
 .btn-danger-sm:hover { background: #c0392b; color: #fff; }
 
 /* ── Alerte semaines manquantes ── */
-.pl-nav-alerte-wrap {
+.pl-nav-right-group {
   margin-left: auto; display: flex; align-items: center;
+}
+.pl-nav-alerte-wrap {
+  display: flex; align-items: center;
   position: relative; padding: 0 4px;
 }
 .pl-alerte-btn {
@@ -141,12 +145,44 @@ html[data-theme="dark"] .pl-nav-link.active { color: var(--pl-300); border-botto
 html[data-theme="dark"] .pl-alerte-btn { color: #ffd180; }
 html[data-theme="dark"] .pl-alerte-btn:hover { color: #ffab40; }
 
+/* ── Badge notifications ── */
+.pl-notif-btn {
+  background: none; border: none; cursor: pointer; text-decoration: none;
+  display: flex; align-items: center; justify-content: center;
+  height: 44px; padding: 0 8px; position: relative; color: var(--pl-600);
+  font-size: 17px; transition: color 0.15s;
+}
+.pl-notif-btn:hover { color: var(--pl-800); }
+.pl-notif-badge {
+  position: absolute; top: 8px; right: 3px;
+  background: var(--pl-600); color: #fff; border-radius: 10px;
+  font-size: 10px; font-weight: 700; min-width: 16px; height: 16px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 3px; line-height: 1;
+}
+html[data-theme="dark"] .pl-notif-btn { color: var(--pl-300); }
+
+/* ── Mobile responsive ── */
+@media (max-width: 768px) {
+  .main { height: auto !important; overflow: visible !important; }
+  .content { overflow-x: visible; padding: 0 8px !important; }
+  .pl-nav { padding: 0 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; }
+  .pl-nav-link { padding: 10px 10px; font-size: 12px; }
+  .pl-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .stats-cards { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+  .monthly-chart { gap: 6px; }
+  .monthly-bar-col { min-width: 32px; }
+}
+
 {% block extra_planning_css %}{% endblock %}
 </style>
 {% endblock %}
 
 {% block breadcrumb %}
 <nav class="pl-nav">
+  <a href="{% url 'planning_courant' %}" class="pl-nav-link {% block nav_courant %}{% endblock %}">
+    <i class="bi bi-calendar-check"></i> Cette semaine
+  </a>
   <a href="{% url 'planning_list' %}" class="pl-nav-link {% block nav_list %}{% endblock %}">
     <i class="bi bi-list-ul"></i> Liste
   </a>
@@ -159,37 +195,48 @@ html[data-theme="dark"] .pl-alerte-btn:hover { color: #ffab40; }
   <a href="{% url 'planning_stats' %}" class="pl-nav-link {% block nav_stats %}{% endblock %}">
     <i class="bi bi-bar-chart-line"></i> Statistiques
   </a>
+  {% if pl_can_manage %}
   <a href="{% url 'planning_bureaux' %}" class="pl-nav-link {% block nav_bureaux %}{% endblock %}">
     <i class="bi bi-building"></i> Bureaux
   </a>
   <a href="{% url 'planning_nouveau' %}" class="pl-nav-link {% block nav_nouveau %}{% endblock %}">
     <i class="bi bi-plus-lg"></i> Nouveau
   </a>
-
-  {% if planning_alertes %}
-  <div class="pl-nav-alerte-wrap">
-    <button type="button" class="pl-alerte-btn" id="planningAlerteBtn"
-            title="{{ planning_alertes|length }} semaine{% if planning_alertes|length > 1 %}s{% endif %} sans planning publié">
-      <i class="bi bi-exclamation-triangle-fill"></i>
-      <span class="pl-alerte-badge">{{ planning_alertes|length }}</span>
-    </button>
-    <div class="pl-alerte-popup" id="planningAlertePopup">
-      <div class="pl-alerte-popup-head">
-        <i class="bi bi-exclamation-triangle-fill"></i>
-        Semaines sans planning publié
-      </div>
-      {% for a in planning_alertes %}
-      <div class="pl-alerte-popup-item">
-        <i class="bi bi-calendar-x"></i>
-        <span>{{ a.label }}</span>
-        {% if pl_can_manage %}
-        <a href="{% url 'planning_nouveau' %}">Créer</a>
-        {% endif %}
-      </div>
-      {% endfor %}
-    </div>
-  </div>
   {% endif %}
+
+  <div class="pl-nav-right-group">
+    {% if pl_notifs_count %}
+    <a href="{% url 'planning_list' %}" class="pl-notif-btn"
+       title="{{ pl_notifs_count }} planning{% if pl_notifs_count > 1 %}s publiés{% else %} publié{% endif %} non consulté{% if pl_notifs_count > 1 %}s{% endif %}">
+      <i class="bi bi-bell-fill"></i>
+      <span class="pl-notif-badge">{{ pl_notifs_count }}</span>
+    </a>
+    {% endif %}
+    {% if planning_alertes %}
+    <div class="pl-nav-alerte-wrap">
+      <button type="button" class="pl-alerte-btn" id="planningAlerteBtn"
+              title="{{ planning_alertes|length }} semaine{% if planning_alertes|length > 1 %}s{% endif %} sans planning publié">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        <span class="pl-alerte-badge">{{ planning_alertes|length }}</span>
+      </button>
+      <div class="pl-alerte-popup" id="planningAlertePopup">
+        <div class="pl-alerte-popup-head">
+          <i class="bi bi-exclamation-triangle-fill"></i>
+          Semaines sans planning publié
+        </div>
+        {% for a in planning_alertes %}
+        <div class="pl-alerte-popup-item">
+          <i class="bi bi-calendar-x"></i>
+          <span>{{ a.label }}</span>
+          {% if pl_can_manage %}
+          <a href="{% url 'planning_nouveau' %}">Créer</a>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
 </nav>
 
 <script>

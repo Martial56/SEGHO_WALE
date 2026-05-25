@@ -5,14 +5,22 @@ from datetime import date, time
 
 
 class Fonction(models.Model):
+    CATEGORIE_CHOICES = [
+        ('direction',    'Direction & Administration'),
+        ('medical',      'Corps Médical'),
+        ('paramedical',  'Paramédical'),
+        ('communautaire','Communautaire'),
+        ('support',      'Support'),
+    ]
     nom = models.CharField(max_length=100)
     code = models.CharField(max_length=20, blank=True)
+    categorie = models.CharField(max_length=20, choices=CATEGORIE_CHOICES, blank=True, default='support')
     description = models.TextField(blank=True)
 
     def __str__(self): return self.nom
     class Meta:
         db_table = 'ressources_humaines_fonction'
-        ordering = ['nom']
+        ordering = ['categorie', 'nom']
         verbose_name = "Fonction"
         verbose_name_plural = "Fonctions"
 
@@ -348,8 +356,8 @@ class Conge(models.Model):
     STATUT = [
         ('demande',         'Demandé'),
         ('valide_service',  'Validé par le service'),
-        ('approuve',        'Approuvé'),
-        ('refuse',          'Refusé'),
+        ('approuve',        'À venir'),
+        ('refuse',          'Annulé'),
         ('en_cours',        'En cours'),
         ('termine',         'Terminé'),
     ]

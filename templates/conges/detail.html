@@ -212,7 +212,7 @@ html[data-theme="dark"] .motif-block{background:rgba(74,114,54,.1);}
     </a>
     {% endif %}
     {% endif %}
-    {% if can_manage and conge.type_conge == 'annuel' and conge.statut in 'demande valide_service approuve' and not conge.conge_parent_id %}
+    {% if can_manage and conge.type_conge == 'annuel' and conge.statut == 'approuve' and not conge.conge_parent_id %}
     <a href="{% url 'conge_fractionner' conge.pk %}" class="btn-cg-outline">
       <i class="bi bi-scissors"></i> Fractionner
     </a>
@@ -249,17 +249,9 @@ html[data-theme="dark"] .motif-block{background:rgba(74,114,54,.1);}
 {% if conge.statut != 'refuse' %}
 <div class="cg-timeline">
   {% with s=conge.statut %}
-  <div class="cg-step {% if s == 'demande' %}active{% elif s in 'valide_service,approuve,en_cours,termine' %}done{% endif %}">
-    <div class="cg-step-dot"><i class="bi bi-send-fill"></i></div>
-    <div class="cg-step-lbl">Demandé</div>
-  </div>
-  <div class="cg-step {% if s == 'valide_service' %}active{% elif s in 'approuve,en_cours,termine' %}done{% endif %}">
-    <div class="cg-step-dot"><i class="bi bi-building-check"></i></div>
-    <div class="cg-step-lbl">Validé service</div>
-  </div>
   <div class="cg-step {% if s == 'approuve' %}active{% elif s in 'en_cours,termine' %}done{% endif %}">
-    <div class="cg-step-dot"><i class="bi bi-check-lg"></i></div>
-    <div class="cg-step-lbl">Approuvé</div>
+    <div class="cg-step-dot"><i class="bi bi-floppy-fill"></i></div>
+    <div class="cg-step-lbl">Enregistré</div>
   </div>
   <div class="cg-step {% if s == 'en_cours' %}active{% elif s == 'termine' %}done{% endif %}">
     <div class="cg-step-dot"><i class="bi bi-hourglass-split"></i></div>
@@ -275,7 +267,7 @@ html[data-theme="dark"] .motif-block{background:rgba(74,114,54,.1);}
 <div style="margin-top:20px;padding:14px 18px;background:rgba(232,69,69,.07);border:1px solid rgba(232,69,69,.2);border-radius:10px;display:flex;gap:12px;align-items:center;">
   <i class="bi bi-x-circle-fill" style="color:var(--rose);font-size:22px;flex-shrink:0;"></i>
   <div>
-    <div style="font-size:14px;font-weight:700;color:#6b1f1f;">Demande refusée</div>
+    <div style="font-size:14px;font-weight:700;color:#6b1f1f;">Congé annulé</div>
     <div style="font-size:12.5px;color:rgba(107,31,31,.7);margin-top:2px;">
       {% if conge.date_approbation %}Le {{ conge.date_approbation|date:"d/m/Y" }}{% endif %}
       {% if conge.approuve_par %} par {{ conge.approuve_par }}{% endif %}
@@ -319,7 +311,7 @@ html[data-theme="dark"] .motif-block{background:rgba(74,114,54,.1);}
           <div class="val" style="font-weight:600;">{{ conge.get_type_conge_display }}</div>
         </div>
         <div class="detail-field">
-          <div class="lbl">Demandé le</div>
+          <div class="lbl">Enregistré le</div>
           <div class="val">{{ conge.date_demande|date:"d/m/Y à H:i" }}</div>
         </div>
       </div>
@@ -344,7 +336,7 @@ html[data-theme="dark"] .motif-block{background:rgba(74,114,54,.1);}
       <div class="detail-field-full" style="display:flex;align-items:center;gap:8px;padding:12px 16px;">
         <i class="bi bi-person-check-fill" style="color:var(--cg-500);font-size:15px;"></i>
         <span style="font-size:13px;color:var(--cg-muted);">
-          {% if conge.statut == 'refuse' %}Refusé{% else %}Approuvé{% endif %}
+          {% if conge.statut == 'refuse' %}Annulé{% else %}Enregistré{% endif %}
           par <strong style="color:var(--cg-text);">{{ conge.approuve_par }}</strong>
           {% if conge.date_approbation %}le {{ conge.date_approbation|date:"d/m/Y à H:i" }}{% endif %}
         </span>
@@ -357,62 +349,8 @@ html[data-theme="dark"] .motif-block{background:rgba(74,114,54,.1);}
   <!-- Colonne droite -->
   <div>
 
-    <!-- Validation Service -->
-    {% if peut_valider_service and conge.statut == 'demande' %}
-    <div class="cg-card">
-      <div class="cg-card-header">
-        <div class="cg-card-title"><i class="bi bi-building-check"></i> Validation service</div>
-      </div>
-      <div class="cg-card-body">
-        <form method="post" action="{% url 'conge_valider_service' conge.pk %}">
-          {% csrf_token %}
-          <label class="cg-label">Commentaire du chef de service <small style="font-weight:400;text-transform:none;">(facultatif)</small></label>
-          <textarea name="chef_service_commentaire" class="cg-input" rows="3"
-                    placeholder="Observations du service…"
-                    style="resize:vertical;margin-bottom:14px;"></textarea>
-          <button type="submit" class="btn-cg" style="width:100%;justify-content:center;"
-                  onclick="return confirm('Valider cette demande au niveau du service ?')">
-            <i class="bi bi-building-check"></i> Valider (service)
-          </button>
-        </form>
-      </div>
-    </div>
-    {% endif %}
-
-    <!-- Décision RH -->
-    {% if can_manage and conge.statut in 'demande,valide_service' %}
-    <div class="cg-card">
-      <div class="cg-card-header">
-        <div class="cg-card-title"><i class="bi bi-shield-check"></i> Décision RH</div>
-      </div>
-      <div class="cg-card-body">
-        <label class="cg-label">Commentaire <small style="font-weight:400;text-transform:none;">(facultatif)</small></label>
-        <textarea id="cg-comment" class="cg-input" rows="3"
-                  placeholder="Motif d'approbation ou de refus…"
-                  style="resize:vertical;margin-bottom:14px;"></textarea>
-
-        <form method="post" action="{% url 'conge_approuver' conge.pk %}" style="margin-bottom:8px;">
-          {% csrf_token %}
-          <input type="hidden" name="commentaire_rh" id="cmt-approve">
-          <button type="submit" class="btn-cg" style="width:100%;justify-content:center;"
-                  onclick="document.getElementById('cmt-approve').value=document.getElementById('cg-comment').value">
-            <i class="bi bi-check-lg"></i> Approuver
-          </button>
-        </form>
-        <form method="post" action="{% url 'conge_refuser' conge.pk %}">
-          {% csrf_token %}
-          <input type="hidden" name="commentaire_rh" id="cmt-refuse">
-          <button type="submit" class="btn-danger-sm" style="width:100%;padding:9px;justify-content:center;"
-                  onclick="document.getElementById('cmt-refuse').value=document.getElementById('cg-comment').value;return confirm('Confirmer le refus ?')">
-            <i class="bi bi-x-lg"></i> Refuser la demande
-          </button>
-        </form>
-      </div>
-    </div>
-    {% endif %}
-
     <!-- Annuler -->
-    {% if can_manage and conge.statut in 'demande,valide_service,approuve' %}
+    {% if can_manage and conge.statut in 'approuve,en_cours' %}
     <div class="cg-card">
       <div class="cg-card-header">
         <div class="cg-card-title"><i class="bi bi-slash-circle"></i> Annulation</div>
@@ -636,28 +574,6 @@ html[data-theme="dark"] .motif-block{background:rgba(74,114,54,.1);}
 {% endif %}
 {% endwith %}
 
-<!-- Infos validation service (si déjà validé) -->
-{% if conge.valide_par_service %}
-<div class="cg-card" style="margin-top:8px;">
-  <div class="cg-card-header">
-    <div class="cg-card-title"><i class="bi bi-building-check"></i> Validation service</div>
-  </div>
-  <div class="cg-card-body" style="padding:14px 20px;">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:{% if conge.chef_service_commentaire %}8px{% else %}0{% endif %};">
-      <i class="bi bi-person-check-fill" style="color:var(--sky);font-size:15px;"></i>
-      <span style="font-size:13px;color:var(--cg-muted);">
-        Validé par <strong style="color:var(--cg-text);">{{ conge.valide_par_service }}</strong>
-        {% if conge.date_validation_service %}le {{ conge.date_validation_service|date:"d/m/Y à H:i" }}{% endif %}
-      </span>
-    </div>
-    {% if conge.chef_service_commentaire %}
-    <div style="background:var(--cg-50);border-left:3px solid var(--sky);border-radius:0 8px 8px 0;padding:10px 14px;font-size:13px;color:var(--cg-text);">
-      {{ conge.chef_service_commentaire }}
-    </div>
-    {% endif %}
-  </div>
-</div>
-{% endif %}
 
 {% endblock %}
 
