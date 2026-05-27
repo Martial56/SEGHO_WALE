@@ -1,0 +1,110 @@
+{% extends 'presence/base.html' %}
+{% block topbar_title %}Récap mensuel — Présence{% endblock %}
+{% block pr_nav_recap %}active{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+.recap-row        { border-bottom: 1px solid var(--pr-100); }
+.recap-row.today  { background: rgba(26,109,140,.06); }
+.recap-row.futur  { opacity: .45; }
+.recap-row.today td.jour-cell { font-weight: 700; }
+.recap-row td.jour-cell       { font-weight: 600; color: var(--pr-text); padding: 10px 16px; }
+.recap-row td.nb-p  { padding:10px 12px; text-align:center; font-weight:600; color:#0d6e45; }
+.recap-row td.nb-a  { padding:10px 12px; text-align:center; font-weight:600; }
+.recap-row td.nb-a.has-abs { color:#c0392b; }
+.recap-row td.nb-a.no-abs  { color:var(--pr-muted); }
+.recap-row td.nb-ns { padding:10px 12px; text-align:center; color:var(--pr-muted); }
+.recap-row td.taux-cell { padding:10px 16px; }
+.recap-row td.action-cell { padding:10px 16px; text-align:right; }
+.bar-track { flex:1; background:var(--pr-100); border-radius:20px; height:8px; overflow:hidden; min-width:60px; }
+.bar-fill  { height:100%; border-radius:20px; transition:width .4s; }
+.bar-fill.good { background: var(--pr-500); }
+.bar-fill.warn { background: #e89a1a; }
+.bar-fill.bad  { background: #e84545; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="page-wrap">
+<div class="pr-subheader">
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+    <a href="?year={{ prev_year }}&month={{ prev_month }}" class="btn-pr-outline" style="padding:6px 11px;">
+      <i class="bi bi-chevron-left"></i>
+    </a>
+    <span style="font-size:15px;font-weight:700;color:var(--pr-900);min-width:140px;text-align:center;">
+      {{ mois_fr }} {{ year }}
+    </span>
+    <a href="?year={{ next_year }}&month={{ next_month }}" class="btn-pr-outline" style="padding:6px 11px;">
+      <i class="bi bi-chevron-right"></i>
+    </a>
+  </div>
+  <div style="font-size:12px;color:var(--pr-muted);">{{ emp_count }} employés actifs</div>
+</div>
+
+<div class="pr-body">
+<div class="pr-card">
+  <div class="pr-card-header">
+    <div class="pr-card-title"><i class="bi bi-calendar3"></i> Récapitulatif — {{ mois_fr }} {{ year }}</div>
+  </div>
+  <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead>
+        <tr style="background:var(--pr-100);">
+          <th style="padding:10px 16px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--pr-800);border-bottom:2px solid var(--pr-200);">Jour</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:#0d6e45;border-bottom:2px solid var(--pr-200);">Présents</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:#c0392b;border-bottom:2px solid var(--pr-200);">Absents</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--pr-muted);border-bottom:2px solid var(--pr-200);">Non saisi</th>
+          <th style="padding:10px 16px;text-align:center;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--pr-700);border-bottom:2px solid var(--pr-200);">Taux</th>
+          <th style="padding:10px 16px;text-align:right;border-bottom:2px solid var(--pr-200);"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for j in jours %}
+        <tr class="recap-row{% if j.date == today %} today{% endif %}{% if j.futur %} futur{% endif %}">
+          <td class="jour-cell">
+            {{ j.jour_fr }} {{ j.date|date:"d/m" }}
+            {% if j.date == today %}<span style="font-size:10px;color:var(--pr-600);margin-left:6px;font-weight:600;">Aujourd'hui</span>{% endif %}
+          </td>
+          <td class="nb-p">{% if not j.futur %}{{ j.nb_p }}{% else %}—{% endif %}</td>
+          <td class="nb-a {% if j.nb_a > 0 %}has-abs{% else %}no-abs{% endif %}">
+            {% if not j.futur %}{{ j.nb_a }}{% else %}—{% endif %}
+          </td>
+          <td class="nb-ns">{% if not j.futur %}{{ j.nb_ns }}{% else %}—{% endif %}</td>
+          <td class="taux-cell">
+            {% if not j.futur %}
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div class="bar-track">
+                <div class="bar-fill {% if j.taux >= 80 %}good{% elif j.taux >= 60 %}warn{% else %}bad{% endif %}"
+                     data-w="{{ j.taux }}"></div>
+              </div>
+              <span style="font-size:12px;font-weight:700;color:var(--pr-700);width:38px;">{{ j.taux }}%</span>
+            </div>
+            {% else %}—{% endif %}
+          </td>
+          <td class="action-cell">
+            {% if not j.futur %}
+            <a href="{% url 'presence:presence_registre' %}?date={{ j.date|date:'Y-m-d' }}" class="btn-pr-sm">
+              <i class="bi bi-pencil-square"></i> Saisir
+            </a>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" style="padding:40px;text-align:center;color:var(--pr-muted);">Aucune donnée.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+</div><!-- /.pr-body -->
+</div><!-- /#page-wrap -->
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelectorAll('.bar-fill[data-w]').forEach(function(el) {
+  el.style.width = el.dataset.w + '%';
+});
+</script>
+{% endblock %}

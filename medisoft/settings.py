@@ -13,8 +13,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'patients',
-    'employe',
-    'personnel',
+    'utilisateur',
     'soins',
     'ordonnances',
     'pharmacie',
@@ -26,6 +25,10 @@ INSTALLED_APPS = [
     'core',
     'modules_permissions',
     'services',
+    'employer',
+    'conges',
+    'planning',
+    'presence',
     'django_browser_reload',
 ]
 

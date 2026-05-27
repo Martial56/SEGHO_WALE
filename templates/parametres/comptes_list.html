@@ -1,0 +1,189 @@
+{% extends 'parametres/base.html' %}
+{% load static %}
+
+{% block topbar_title %}Paramètres — Comptes utilisateurs{% endblock %}
+
+{% block content %}
+<div id="page-wrap">
+{% include 'parametres/includes/nav.html' %}
+
+{% if messages %}
+{% for message in messages %}
+<div class="alert alert-{{ message.tags }}" style="margin:0;border-radius:0;font-size:13px;padding:10px 20px;border-bottom:1px solid rgba(0,0,0,.06);">
+  {{ message }}
+</div>
+{% endfor %}
+{% endif %}
+
+<!-- ══ SUBHEADER ══ -->
+<div class="o-subheader">
+  <div class="o-subheader-row">
+    <span class="o-page-title">Comptes utilisateurs</span>
+    <span class="o-page-count">({{ users|length }})</span>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+      <div class="o-search-bar">
+        <input class="o-search-input" id="search-input" type="text" placeholder="Identifiant, nom, email…">
+        <button type="button" class="o-search-btn"><i class="bi bi-search"></i></button>
+      </div>
+      <div class="o-ctrl-sep"></div>
+      <a href="{% url 'parametres:compte_create' %}" class="o-btn-create">
+        <i class="bi bi-person-plus-fill"></i> Nouveau compte
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- ══ STATS ══ -->
+<div class="pm-stats" style="grid-template-columns:repeat(4,1fr);">
+  <div class="pm-stat">
+    <div class="pm-stat-icon indigo"><i class="bi bi-people-fill"></i></div>
+    <div>
+      <div class="pm-stat-label">Total comptes</div>
+      <div class="pm-stat-value">{{ total }}</div>
+    </div>
+  </div>
+  <div class="pm-stat">
+    <div class="pm-stat-icon green"><i class="bi bi-person-check-fill"></i></div>
+    <div>
+      <div class="pm-stat-label">Actifs</div>
+      <div class="pm-stat-value">{{ total_actifs }}</div>
+    </div>
+  </div>
+  <div class="pm-stat">
+    <div class="pm-stat-icon orange"><i class="bi bi-shield-fill"></i></div>
+    <div>
+      <div class="pm-stat-label">Administrateurs</div>
+      <div class="pm-stat-value">{{ total_admins }}</div>
+    </div>
+  </div>
+  <div class="pm-stat">
+    <div class="pm-stat-icon gray"><i class="bi bi-person-exclamation"></i></div>
+    <div>
+      <div class="pm-stat-label">Sans dossier employé</div>
+      <div class="pm-stat-value">{{ total_sans_employe }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TABLE ══ -->
+{% if users %}
+<div class="o-list-wrap">
+  <table class="o-list-table" style="table-layout:auto;" id="comptes-table">
+    <thead>
+      <tr>
+        <th style="width:44px;"></th>
+        <th>Identifiant</th>
+        <th>Nom complet</th>
+        <th>Email</th>
+        <th>Groupes</th>
+        <th style="width:110px;">Dossier employé</th>
+        <th style="width:90px;">Statut</th>
+        <th style="width:90px;">Rôle</th>
+        <th style="width:60px;text-align:right;">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in users %}
+      <tr data-search="{{ u.username|lower }} {{ u.first_name|lower }} {{ u.last_name|lower }} {{ u.email|lower }}">
+        <td style="max-width:none;overflow:visible;">
+          <div class="pm-av">{{ u.username|first|upper }}</div>
+        </td>
+        <td>
+          <span style="font-family:monospace;font-size:11.5px;background:rgba(99,102,241,.09);color:#4f46e5;padding:2px 7px;border-radius:4px;">{{ u.username }}</span>
+        </td>
+        <td style="font-weight:500;">{{ u.get_full_name|default:"—" }}</td>
+        <td style="color:var(--text-muted);font-size:12px;">{{ u.email|default:"—" }}</td>
+        <td style="max-width:none;overflow:visible;white-space:normal;">
+          {% for g in u.groups.all %}
+          <span class="pm-badge indigo" style="margin:1px 2px 1px 0;">{{ g.name }}</span>
+          {% empty %}
+          <span style="font-size:11.5px;color:var(--text-muted);">—</span>
+          {% endfor %}
+        </td>
+        <td>
+          {% if u.employe %}
+          <span class="pm-badge green"><i class="bi bi-check-circle"></i> Lié</span>
+          {% else %}
+          <span class="pm-badge orange"><i class="bi bi-exclamation-circle"></i> Non lié</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if not u.is_superuser %}
+          <form method="post" action="{% url 'parametres:compte_toggle_active' u.pk %}" style="display:inline;">
+            {% csrf_token %}
+            <button type="submit"
+              style="background:none;border:none;cursor:pointer;padding:0;"
+              title="{% if u.is_active %}Désactiver ce compte{% else %}Activer ce compte{% endif %}"
+              onclick="return confirm('{% if u.is_active %}Désactiver le compte de {{ u.username }} ?{% else %}Activer le compte de {{ u.username }} ?{% endif %}')">
+              {% if u.is_active %}
+              <span class="pm-badge green"><i class="bi bi-toggle-on"></i> Actif</span>
+              {% else %}
+              <span class="pm-badge gray"><i class="bi bi-toggle-off"></i> Inactif</span>
+              {% endif %}
+            </button>
+          </form>
+          {% else %}
+          {% if u.is_active %}
+          <span class="pm-badge green"><i class="bi bi-toggle-on"></i> Actif</span>
+          {% else %}
+          <span class="pm-badge gray"><i class="bi bi-toggle-off"></i> Inactif</span>
+          {% endif %}
+          {% endif %}
+        </td>
+        <td>
+          {% if u.is_superuser %}
+          <span class="pm-badge red"><i class="bi bi-star-fill"></i> Superuser</span>
+          {% elif u.is_staff %}
+          <span class="pm-badge orange"><i class="bi bi-shield-fill"></i> Admin</span>
+          {% else %}
+          <span class="pm-badge gray"><i class="bi bi-person"></i> Utilisateur</span>
+          {% endif %}
+        </td>
+        <td style="text-align:right;max-width:none;overflow:visible;">
+          <div class="pm-actions" style="justify-content:flex-end;">
+            <a href="{% url 'parametres:compte_edit' u.pk %}" class="pm-act-btn" title="Modifier le compte">
+              <i class="bi bi-pencil"></i>
+            </a>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<div id="empty-search" style="display:none;" class="o-empty">
+  <i class="bi bi-search"></i> Aucun résultat pour cette recherche.
+</div>
+{% else %}
+<div class="o-empty">
+  <i class="bi bi-person-badge"></i>
+  Aucun compte utilisateur.
+  <div style="margin-top:14px;">
+    <a href="{% url 'parametres:compte_create' %}" class="o-btn-create">
+      <i class="bi bi-person-plus-fill"></i> Créer le premier compte
+    </a>
+  </div>
+</div>
+{% endif %}
+
+</div>
+
+<script>
+(function () {
+  var inp = document.getElementById('search-input');
+  if (!inp) return;
+  inp.addEventListener('input', function () {
+    var q = (inp.value || '').toLowerCase().trim();
+    var rows = document.querySelectorAll('#comptes-table tbody tr[data-search]');
+    var count = 0;
+    rows.forEach(function (row) {
+      var match = !q || row.getAttribute('data-search').indexOf(q) >= 0;
+      row.style.display = match ? '' : 'none';
+      if (match) count++;
+    });
+    var empty = document.getElementById('empty-search');
+    if (empty) empty.style.display = (count === 0 && q) ? '' : 'none';
+  });
+})();
+</script>
+{% endblock %}

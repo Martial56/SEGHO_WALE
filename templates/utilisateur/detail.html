@@ -167,6 +167,19 @@ html[data-theme="dark"] .compte-header { color: #7ab4d8; }
       {% if is_own_profile %}Mon profil{% else %}{{ utilisateur.nom_complet }}{% endif %}
     </span>
     <div style="margin-left:auto;display:flex;gap:6px;">
+      {% if is_staff and not utilisateur.user %}
+      <a href="{% url 'utilisateur:lier_employe' utilisateur.pk %}" class="o-ctrl-btn" style="border-color:#6366f1;color:#4f46e5;">
+        <i class="bi bi-link-45deg"></i> Lier un compte
+      </a>
+      {% endif %}
+      {% if is_staff and utilisateur.user %}
+      <form method="post" action="{% url 'utilisateur:delier_compte' utilisateur.pk %}" onsubmit="return confirm('Dissocier le compte « {{ utilisateur.user.username }} » de ce dossier ?');" style="display:inline;">
+        {% csrf_token %}
+        <button type="submit" class="o-ctrl-btn" style="border-color:#ef4444;color:#ef4444;">
+          <i class="bi bi-link"></i> Délier le compte
+        </button>
+      </form>
+      {% endif %}
       {% if is_own_profile or is_staff %}
       <a href="{% url 'utilisateur:edit' utilisateur.pk %}" class="o-btn-create">
         <i class="bi bi-pencil-fill"></i> {% if is_own_profile %}Modifier mon profil{% else %}Modifier{% endif %}
@@ -247,12 +260,12 @@ html[data-theme="dark"] .compte-header { color: #7ab4d8; }
         <i class="bi bi-person-lines-fill"></i> Mon profil
       </button>
       <button class="prof-tab" data-tab="rh" onclick="switchTab(this,'rh')">
-        <i class="bi bi-file-earmark-person"></i> Dossier RH
+        <i class="bi bi-file-earmark-person"></i> Dossier
       </button>
-      <button class="prof-tab" data-tab="documents" onclick="switchTab(this,'documents')">
+      <!-- <button class="prof-tab" data-tab="documents" onclick="switchTab(this,'documents')">
         <i class="bi bi-folder2-open"></i> Mes documents
         {% if docs_manquants %}<span style="background:#ef4444;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:4px;">{{ docs_manquants|length }}</span>{% endif %}
-      </button>
+      </button> -->
       {% if utilisateur.user %}
       <button class="prof-tab" data-tab="compte" onclick="switchTab(this,'compte')">
         <i class="bi bi-shield-lock-fill"></i> Compte

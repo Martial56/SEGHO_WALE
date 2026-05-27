@@ -365,7 +365,7 @@
         }
 
         /* ═══════════════════════════════════════
-           ALERTS
+           ALERTS (usage inline dans les templates)
         ═══════════════════════════════════════ */
         .alert {
             padding: 14px 18px;
@@ -376,26 +376,47 @@
             align-items: center;
             gap: 12px;
         }
-        .alert-success {
-            background: rgba(22,169,107,0.1);
-            color: #0d5b3d;
-            border-left: 4px solid var(--green);
+        .alert-success { background: rgba(22,169,107,0.1); color: #0d5b3d; border-left: 4px solid var(--green); }
+        .alert-error   { background: rgba(232,69,69,0.1);  color: #6b1f1f; border-left: 4px solid var(--rose); }
+        .alert-warning { background: rgba(232,154,26,0.1); color: #6b4a0f; border-left: 4px solid var(--amber); }
+        .alert-info    { background: rgba(45,153,219,0.1); color: #1a4d6d; border-left: 4px solid var(--sky); }
+
+        /* ═══════════════════════════════════════
+           TOASTS (messages Django — position fixe)
+        ═══════════════════════════════════════ */
+        .toast-container {
+            position: fixed; top: 68px; right: 20px;
+            z-index: 9999; display: flex; flex-direction: column;
+            gap: 8px; max-width: 400px; pointer-events: none;
         }
-        .alert-error {
-            background: rgba(232,69,69,0.1);
-            color: #6b1f1f;
-            border-left: 4px solid var(--rose);
+        .toast {
+            display: flex; align-items: flex-start; gap: 10px;
+            padding: 13px 14px; border-radius: 10px;
+            font-size: 13.5px; font-weight: 500; line-height: 1.4;
+            box-shadow: 0 4px 20px rgba(0,0,0,.13);
+            pointer-events: all;
+            border-left: 4px solid transparent;
+            animation: toast-in .28s ease forwards;
         }
-        .alert-warning {
-            background: rgba(232,154,26,0.1);
-            color: #6b4a0f;
-            border-left: 4px solid var(--amber);
+        .toast-icon { flex-shrink: 0; font-size: 15px; margin-top: 1px; }
+        .toast-msg  { flex: 1; }
+        .toast-close {
+            background: none; border: none; cursor: pointer;
+            font-size: 18px; line-height: 1; opacity: .45;
+            color: inherit; padding: 0; flex-shrink: 0; margin-top: -1px;
         }
-        .alert-info {
-            background: rgba(45,153,219,0.1);
-            color: #1a4d6d;
-            border-left: 4px solid var(--sky);
-        }
+        .toast-close:hover { opacity: 1; }
+        .toast-success { background: rgba(22,169,107,.1);  color: #0a5c38; border-left-color: var(--green); }
+        .toast-error   { background: rgba(220,38,38,.1);   color: #7f1d1d; border-left-color: var(--rose); }
+        .toast-warning { background: rgba(232,154,26,.1);  color: #6b4a0f; border-left-color: var(--amber); }
+        .toast-info    { background: rgba(45,153,219,.1);  color: #1a4d6d; border-left-color: var(--sky); }
+        html[data-theme="dark"] .toast-success { background: rgba(22,169,107,.15); color: #6eddb0; }
+        html[data-theme="dark"] .toast-error   { background: rgba(220,38,38,.15);  color: #fca5a5; }
+        html[data-theme="dark"] .toast-warning { background: rgba(232,154,26,.15); color: #f0c070; }
+        html[data-theme="dark"] .toast-info    { background: rgba(45,153,219,.15); color: #80c8ef; }
+        @keyframes toast-in  { from { opacity:0; transform:translateX(18px); } to { opacity:1; transform:translateX(0); } }
+        @keyframes toast-out { from { opacity:1; max-height:120px; margin-bottom:0; } to { opacity:0; max-height:0; padding-top:0; padding-bottom:0; } }
+        .toast.removing { animation: toast-out .25s ease forwards; overflow: hidden; }
 
         /* ═══════════════════════════════════════
            FORMS
@@ -723,7 +744,7 @@
                 <img src="{% static 'img/logo.png' %}" alt="SEGHO-WALE" class="topbar-logo">
                 <div style="display:flex;flex-direction:column;gap:1px;">
                     <span style="font-size:13px;font-weight:800;color:var(--teal-600);letter-spacing:-0.2px;line-height:1.2;">SEGHO-WALE</span>
-                    <span style="font-size:9px;font-weight:500;color:var(--text-muted);line-height:1.2;white-space:nowrap;">Système Electronique de Gestion Hospitalière de WALÉ &mdash; Yamoussoukro</span>
+                    <!-- <span style="font-size:9px;font-weight:500;color:var(--text-muted);line-height:1.2;white-space:nowrap;">Système Electronique de Gestion Hospitalière de WALÉ &mdash; Yamoussoukro</span> -->
                 </div>
             </a>
             <span style="width:1px;height:22px;background:rgba(0,0,0,0.1);display:block;flex-shrink:0;margin:0 4px;"></span>
@@ -787,15 +808,25 @@
     </script>
         
         {% block module_navbar %}{% endblock %}
-        <div class="content">
-            {% if messages %}
-                {% for message in messages %}
-                    <div class="alert alert-{{ message.tags|default:'info' }}">
-                        <span>{{ message }}</span>
-                    </div>
-                {% endfor %}
-            {% endif %}
 
+        {% if messages %}
+        <div class="toast-container" id="toast-container">
+          {% for message in messages %}
+          <div class="toast toast-{{ message.tags|default:'info' }}">
+            <span class="toast-icon">
+              {% if message.tags == 'success' %}<i class="bi bi-check-circle-fill"></i>
+              {% elif message.tags == 'error' %}<i class="bi bi-x-circle-fill"></i>
+              {% elif message.tags == 'warning' %}<i class="bi bi-exclamation-triangle-fill"></i>
+              {% else %}<i class="bi bi-info-circle-fill"></i>{% endif %}
+            </span>
+            <span class="toast-msg">{{ message }}</span>
+            <button class="toast-close" onclick="this.closest('.toast').remove()" aria-label="Fermer">×</button>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="content">
             {% block breadcrumb %}{% endblock %}
             {% block content %}{% endblock %}
         </div>
@@ -915,6 +946,16 @@
         }
 
         return { init: init };
+    })();
+
+    /* ── Auto-dismiss toasts ── */
+    (function(){
+      document.querySelectorAll('.toast').forEach(function(t, i){
+        setTimeout(function(){
+          t.classList.add('removing');
+          setTimeout(function(){ if (t.parentNode) t.remove(); }, 280);
+        }, 5000 + i * 400);
+      });
     })();
     </script>
 

@@ -150,6 +150,16 @@ html[data-theme="dark"] .fac-ro-table tbody tr:hover td { background: rgba(255,2
 .fac-totaux-row span:last-child { font-weight: 700; color: var(--accent); }
 .fac-totaux-row.grand-total span:last-child { font-size: 17px; }
 
+/* ── ONGLETS ── */
+.fac-tab-btn.active {
+  color: var(--accent) !important;
+  border-bottom-color: var(--accent) !important;
+  background: var(--surface) !important;
+}
+.fac-tab-btn:hover:not(.active) { color: var(--text) !important; background: rgba(0,0,0,.03) !important; }
+html[data-theme="dark"] .fac-tab-btn:hover:not(.active) { background: rgba(255,255,255,.04) !important; }
+.fac-tab-panel { padding: 0; }
+
 /* ── ALERTE SUCCÈS ── */
 .fac-alert-success {
   background: #f0fdf4; border: 1px solid #86efac; color: #166534;
@@ -203,6 +213,10 @@ html[data-theme="dark"] .fac-alert-success {
     </button>
     {% endif %}
 
+    <a href="{% url 'soins:facture_print' facture.pk %}?next={{ back_url }}" class="fac-btn" target="_blank"
+       style="text-decoration:none;background:var(--surface);border:1.5px solid var(--border);color:var(--text-muted);">
+      <i class="bi bi-printer"></i> Imprimer
+    </a>
     <a href="{{ back_url }}" class="fac-btn fac-btn-back" style="text-decoration:none;">
       <i class="bi bi-arrow-left"></i> Retour
     </a>
@@ -262,149 +276,215 @@ html[data-theme="dark"] .fac-alert-success {
 
   </div><!-- /.fac-header-card -->
 
-  <!-- ══ INFORMATIONS FACTURE ══ -->
-  <div class="fac-card">
-    <div class="fac-card-head">
-      <i class="bi bi-file-earmark-text"></i> Informations de la facture
-    </div>
-    <div class="fac-ro-grid">
-      <div class="fac-ro-field">
-        <div class="fac-ro-label">Type de facture</div>
-        <div class="fac-ro-value">{{ facture.get_type_facture_display }}</div>
-      </div>
-      <div class="fac-ro-field">
-        <div class="fac-ro-label">Statut</div>
-        <div class="fac-ro-value">
-          <span class="fac-chip fac-chip-{{ facture.statut }}" style="font-size:11px;padding:2px 9px;">
-            <span class="chip-dot"></span>{{ facture.get_statut_display }}
-          </span>
-        </div>
-      </div>
-      <div class="fac-ro-field">
-        <div class="fac-ro-label">Date d'échéance</div>
-        <div class="fac-ro-value {% if not facture.date_echeance %}muted{% endif %}">
-          {% if facture.date_echeance %}{{ facture.date_echeance|date:"d/m/Y" }}{% else %}—{% endif %}
-        </div>
-      </div>
-      <div class="fac-ro-field">
-        <div class="fac-ro-label">Part assurance</div>
-        <div class="fac-ro-value">{{ facture.montant_assurance|floatformat:0 }} CFA</div>
-      </div>
-      <div class="fac-ro-field">
-        <div class="fac-ro-label">Ticket modérateur</div>
-        <div class="fac-ro-value">{{ facture.ticket_moderateur|floatformat:0 }} CFA</div>
-      </div>
-      <div class="fac-ro-field">
-        <div class="fac-ro-label">Notes</div>
-        <div class="fac-ro-value {% if not facture.notes %}muted{% endif %}">
-          {% if facture.notes %}{{ facture.notes }}{% else %}—{% endif %}
-        </div>
-      </div>
-    </div>
-  </div>
+  <!-- ══ ONGLETS ══ -->
+  <div class="fac-card" style="overflow:hidden;">
 
-  <!-- ══ LIGNES DE FACTURE ══ -->
-  <div class="fac-card">
-    <div class="fac-card-head">
-      <i class="bi bi-list-ul"></i> Prestations / Actes
-    </div>
-    <div class="fac-table-wrap">
-      <table class="fac-ro-table">
-        <thead>
-          <tr>
-            <th>Désignation</th>
-            <th>Acte catalogue</th>
-            <th class="td-right">Qté</th>
-            <th class="td-right">Prix unit. (CFA)</th>
-            <th class="td-right">Remise %</th>
-            <th class="td-right">Total (CFA)</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for ligne in lignes %}
-          <tr>
-            <td style="font-weight:600;">{{ ligne.libelle }}</td>
-            <td>{% if ligne.acte %}{{ ligne.acte.libelle }}{% else %}<span style="color:var(--text-muted);font-style:italic;">—</span>{% endif %}</td>
-            <td class="td-right">{{ ligne.quantite|floatformat:2 }}</td>
-            <td class="td-right">{{ ligne.prix_unitaire|floatformat:0 }}</td>
-            <td class="td-right">{% if ligne.remise %}{{ ligne.remise|floatformat:2 }}%{% else %}—{% endif %}</td>
-            <td class="td-right td-accent">{{ ligne.montant_ligne|floatformat:0 }}</td>
-          </tr>
-          {% empty %}
-          <tr>
-            <td colspan="6" class="fac-empty">
-              <i class="bi bi-receipt" style="font-size:22px;display:block;margin-bottom:6px;"></i>
-              Aucune ligne de facturation
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <!-- Nav onglets -->
+    <div style="display:flex;border-bottom:1px solid var(--border);background:var(--bg);">
+      <button type="button" class="fac-tab-btn active" data-tab="tab-lignes"
+        style="padding:10px 20px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-muted);border-bottom:2px solid transparent;transition:all .15s;font-family:inherit;">
+        <i class="bi bi-list-ul"></i> Lignes de facture
+      </button>
+      <button type="button" class="fac-tab-btn" data-tab="tab-infos"
+        style="padding:10px 20px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-muted);border-bottom:2px solid transparent;transition:all .15s;font-family:inherit;">
+        <i class="bi bi-info-circle"></i> Autres informations
+      </button>
+      <button type="button" class="fac-tab-btn" data-tab="tab-paiements"
+        style="padding:10px 20px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-muted);border-bottom:2px solid transparent;transition:all .15s;font-family:inherit;">
+        <i class="bi bi-cash-coin"></i> Paiements
+        {% if paiements %}<span style="background:var(--accent);color:#fff;border-radius:10px;font-size:10px;padding:1px 6px;margin-left:4px;">{{ paiements|length }}</span>{% endif %}
+      </button>
+      <button type="button" class="fac-tab-btn" data-tab="tab-medical"
+        style="padding:10px 20px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-muted);border-bottom:2px solid transparent;transition:all .15s;font-family:inherit;">
+        <i class="bi bi-hospital"></i> Info de l'hôpital
+      </button>
     </div>
 
-    <div class="fac-totaux-wrap">
-      <div class="fac-totaux-box">
-        <div class="fac-totaux-row">
-          <span>Montant total</span>
-          <span>{{ facture.montant_total|floatformat:0 }} CFA</span>
-        </div>
-        {% if facture.montant_assurance %}
-        <div class="fac-totaux-row">
-          <span>Part assurance</span>
-          <span>{{ facture.montant_assurance|floatformat:0 }} CFA</span>
-        </div>
-        {% endif %}
-        {% if facture.ticket_moderateur %}
-        <div class="fac-totaux-row">
-          <span>Ticket modérateur</span>
-          <span>{{ facture.ticket_moderateur|floatformat:0 }} CFA</span>
-        </div>
-        {% endif %}
-        <div class="fac-totaux-row">
-          <span>Montant payé</span>
-          <span>{{ facture.montant_paye|floatformat:0 }} CFA</span>
-        </div>
-        <div class="fac-totaux-row grand-total">
-          <span>Solde restant</span>
-          <span>{{ facture.solde_restant|floatformat:0 }} CFA</span>
+    <!-- ── Onglet 1 : Lignes de facture ── -->
+    <div class="fac-tab-panel" id="tab-lignes">
+      <div class="fac-table-wrap">
+        <table class="fac-ro-table">
+          <thead>
+            <tr>
+              <th>Désignation</th>
+              <th>Acte catalogue</th>
+              <th class="td-right">Qté</th>
+              <th class="td-right">Prix unit. (CFA)</th>
+              <th class="td-right">Remise %</th>
+              <th class="td-right">Total (CFA)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for ligne in lignes %}
+            <tr>
+              <td style="font-weight:600;">{{ ligne.libelle }}</td>
+              <td>{% if ligne.acte %}{{ ligne.acte.libelle }}{% else %}<span style="color:var(--text-muted);font-style:italic;">—</span>{% endif %}</td>
+              <td class="td-right">{{ ligne.quantite|floatformat:2 }}</td>
+              <td class="td-right">{{ ligne.prix_unitaire|floatformat:0 }}</td>
+              <td class="td-right">{% if ligne.remise %}{{ ligne.remise|floatformat:2 }}%{% else %}—{% endif %}</td>
+              <td class="td-right td-accent">{{ ligne.montant_ligne|floatformat:0 }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="6" class="fac-empty">
+                <i class="bi bi-receipt" style="font-size:22px;display:block;margin-bottom:6px;"></i>
+                Aucune ligne de facturation
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="fac-totaux-wrap">
+        <div class="fac-totaux-box">
+          <div class="fac-totaux-row">
+            <span>Montant total</span>
+            <span>{{ facture.montant_total|floatformat:0 }} CFA</span>
+          </div>
+          {% if facture.montant_assurance %}
+          <div class="fac-totaux-row">
+            <span>Part assurance</span>
+            <span>{{ facture.montant_assurance|floatformat:0 }} CFA</span>
+          </div>
+          {% endif %}
+          {% if facture.ticket_moderateur %}
+          <div class="fac-totaux-row">
+            <span>Ticket modérateur</span>
+            <span>{{ facture.ticket_moderateur|floatformat:0 }} CFA</span>
+          </div>
+          {% endif %}
+          <div class="fac-totaux-row">
+            <span>Montant payé</span>
+            <span>{{ facture.montant_paye|floatformat:0 }} CFA</span>
+          </div>
+          <div class="fac-totaux-row grand-total">
+            <span>Solde restant</span>
+            <span>{{ facture.solde_restant|floatformat:0 }} CFA</span>
+          </div>
         </div>
       </div>
     </div>
 
-  </div>
+    <!-- ── Onglet 2 : Autres informations ── -->
+    <div class="fac-tab-panel" id="tab-infos" style="display:none;">
+      <div class="fac-ro-grid">
+        <div class="fac-ro-field">
+          <div class="fac-ro-label">Type de facture</div>
+          <div class="fac-ro-value">{{ facture.get_type_facture_display }}</div>
+        </div>
+        <div class="fac-ro-field">
+          <div class="fac-ro-label">Statut</div>
+          <div class="fac-ro-value">
+            <span class="fac-chip fac-chip-{{ facture.statut }}" style="font-size:11px;padding:2px 9px;">
+              <span class="chip-dot"></span>{{ facture.get_statut_display }}
+            </span>
+          </div>
+        </div>
+        <div class="fac-ro-field">
+          <div class="fac-ro-label">Date d'émission</div>
+          <div class="fac-ro-value">{{ facture.date_emission|date:"d/m/Y à H:i" }}</div>
+        </div>
+        <div class="fac-ro-field">
+          <div class="fac-ro-label">Date d'échéance</div>
+          <div class="fac-ro-value {% if not facture.date_echeance %}muted{% endif %}">
+            {% if facture.date_echeance %}{{ facture.date_echeance|date:"d/m/Y" }}{% else %}—{% endif %}
+          </div>
+        </div>
+        <div class="fac-ro-field">
+          <div class="fac-ro-label">Part assurance</div>
+          <div class="fac-ro-value">{{ facture.montant_assurance|floatformat:0 }} CFA</div>
+        </div>
+        <div class="fac-ro-field">
+          <div class="fac-ro-label">Ticket modérateur</div>
+          <div class="fac-ro-value">{{ facture.ticket_moderateur|floatformat:0 }} CFA</div>
+        </div>
+        <div class="fac-ro-field" style="{% if not facture.notes %}{% endif %}grid-column: span 3;">
+          <div class="fac-ro-label">Notes</div>
+          <div class="fac-ro-value {% if not facture.notes %}muted{% endif %}">
+            {% if facture.notes %}{{ facture.notes }}{% else %}—{% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
 
-  <!-- ══ PAIEMENTS ══ -->
-  {% if paiements %}
-  <div class="fac-card">
-    <div class="fac-card-head">
-      <i class="bi bi-cash-coin"></i> Paiements enregistrés
+    <!-- ── Onglet 3 : Paiements ── -->
+    <div class="fac-tab-panel" id="tab-paiements" style="display:none;">
+      {% if paiements %}
+      <div class="fac-table-wrap">
+        <table class="fac-ro-table">
+          <thead>
+            <tr>
+              <th>Numéro</th>
+              <th>Mode de paiement</th>
+              <th class="td-right">Montant (CFA)</th>
+              <th>Référence</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for pay in paiements %}
+            <tr>
+              <td style="font-family:monospace;font-weight:600;color:var(--accent);">{{ pay.numero }}</td>
+              <td>{{ pay.get_mode_paiement_display }}</td>
+              <td class="td-right td-accent">{{ pay.montant|floatformat:0 }}</td>
+              <td>{{ pay.reference|default:"—" }}</td>
+              <td style="white-space:nowrap;">{{ pay.date_paiement|date:"d/m/Y H:i" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="fac-empty" style="padding:32px;">
+        <i class="bi bi-cash-stack" style="font-size:26px;display:block;margin-bottom:8px;"></i>
+        Aucun paiement enregistré pour cette facture.
+      </div>
+      {% endif %}
     </div>
-    <div class="fac-table-wrap">
-      <table class="fac-ro-table">
-        <thead>
-          <tr>
-            <th>Numéro</th>
-            <th>Mode de paiement</th>
-            <th class="td-right">Montant (CFA)</th>
-            <th>Référence</th>
-            <th>Date</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for pay in paiements %}
-          <tr>
-            <td style="font-family:monospace;font-weight:600;color:var(--accent);">{{ pay.numero }}</td>
-            <td>{{ pay.get_mode_paiement_display }}</td>
-            <td class="td-right td-accent">{{ pay.montant|floatformat:0 }}</td>
-            <td>{{ pay.reference|default:"—" }}</td>
-            <td style="white-space:nowrap;">{{ pay.date_paiement|date:"d/m/Y H:i" }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+
+    <!-- ── Onglet 4 : Info de l'hôpital ── -->
+    <div class="fac-tab-panel" id="tab-medical" style="display:none;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;">
+        <div style="padding:20px 24px;border-right:1px solid var(--border);">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:14px;">Détails Généraux</div>
+          <div class="fac-ro-field" style="border:none;padding:6px 0;">
+            <div class="fac-ro-label">Type de facture d'hôpital</div>
+            <div class="fac-ro-value">{{ facture.get_type_facture_display }}</div>
+          </div>
+          <div class="fac-ro-field" style="border:none;padding:6px 0;">
+            <div class="fac-ro-label">Hospitalisation</div>
+            <div class="fac-ro-value {% if not facture.hospitalisation %}muted{% endif %}">
+              {% if facture.hospitalisation %}{{ facture.hospitalisation }}{% else %}—{% endif %}
+            </div>
+          </div>
+          <div class="fac-ro-field" style="border:none;padding:6px 0;">
+            <div class="fac-ro-label">Créée par</div>
+            <div class="fac-ro-value {% if not facture.cree_par %}muted{% endif %}">
+              {% if facture.cree_par %}{{ facture.cree_par.get_full_name|default:facture.cree_par.username }}{% else %}—{% endif %}
+            </div>
+          </div>
+        </div>
+        <div style="padding:20px 24px;">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:14px;">Détails de l'assurance</div>
+          <div class="fac-ro-field" style="border:none;padding:6px 0;">
+            <div class="fac-ro-label">Assurance patient</div>
+            <div class="fac-ro-value {% if not facture.patient.assurance %}muted{% endif %}">
+              {% if facture.patient.assurance %}{{ facture.patient.assurance.nom }}{% else %}—{% endif %}
+            </div>
+          </div>
+          <div class="fac-ro-field" style="border:none;padding:6px 0;">
+            <div class="fac-ro-label">Part assurance</div>
+            <div class="fac-ro-value">{{ facture.montant_assurance|floatformat:0 }} CFA</div>
+          </div>
+          <div class="fac-ro-field" style="border:none;padding:6px 0;">
+            <div class="fac-ro-label">Ticket modérateur</div>
+            <div class="fac-ro-value">{{ facture.ticket_moderateur|floatformat:0 }} CFA</div>
+          </div>
+        </div>
+      </div>
     </div>
-  </div>
-  {% endif %}
+
+  </div><!-- /.fac-card onglets -->
 
 </div><!-- /.fac-page -->
 
@@ -464,6 +544,18 @@ html[data-theme="dark"] .fac-alert-success {
   }
   adj(); window.addEventListener('resize',adj);
 })();
+
+/* ── Onglets ── */
+document.querySelectorAll('.fac-tab-btn').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var target = this.dataset.tab;
+    document.querySelectorAll('.fac-tab-btn').forEach(function(b){ b.classList.remove('active'); });
+    document.querySelectorAll('.fac-tab-panel').forEach(function(p){ p.style.display = 'none'; });
+    this.classList.add('active');
+    var panel = document.getElementById(target);
+    if (panel) panel.style.display = '';
+  });
+});
 </script>
 
 </div><!-- /#page-wrap -->

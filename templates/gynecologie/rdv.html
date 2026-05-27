@@ -1,0 +1,1166 @@
+{% extends 'gynecologie/base.html' %}
+{% load static %}
+{% block nav_rdv %}active{% endblock %}
+
+{% block content %}
+<style>
+  :root {
+    --accent: var(--teal-500);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* ── DARK MODE ── */
+  html[data-theme="dark"] .o-list tbody tr:hover { background: rgba(33,136,171,0.2); }
+  html[data-theme="dark"] .o-list thead th:hover { background: #28304a; }
+  html[data-theme="dark"] .o-list thead th { background: var(--surface); }
+  html[data-theme="dark"] .o-search-input { color: var(--text); }
+  html[data-theme="dark"] .o-search-bar { border-bottom-color: #3a4a62; }
+  html[data-theme="dark"] .o-ctrl-btn { color: var(--text-muted); }
+  html[data-theme="dark"] .o-ctrl-btn:hover { background: #28304a; color: var(--text); border-color: var(--border); }
+  html[data-theme="dark"] .o-pag-btn { background: var(--surface); border-color: var(--border); color: var(--text-muted); }
+  html[data-theme="dark"] .o-view-btn { background: var(--surface); color: var(--text-muted); border-color: var(--border); }
+  html[data-theme="dark"] .o-view-btns { border-color: var(--border); }
+  html[data-theme="dark"] .o-ctrl-sep { background: var(--border); }
+  html[data-theme="dark"] .o-empty-state { background: var(--bg); }
+  html[data-theme="dark"] .o-empty-illo { background: linear-gradient(135deg, var(--teal-700) 0%, var(--teal-500) 100%); }
+
+  /* ══ SUBHEADER ══ */
+  .o-subheader {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 6px 16px; display: flex; flex-direction: column; gap: 5px;
+    position: sticky; top: var(--gyn-nav-h); z-index: 190;
+    margin: 0 -32px 16px;
+  }
+  .o-subheader-row { display: flex; align-items: center; gap: 8px; }
+  .o-subheader-row-right { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .o-page-title { font-size: 17px; font-weight: 400; color: var(--text); }
+  .o-btn-create {
+    background: var(--teal-500); color: #fff; border: none; padding: 5px 14px; border-radius: 4px;
+    font-size: 12.5px; font-weight: 500; cursor: pointer;
+    text-decoration: none; display: inline-flex; align-items: center;
+    letter-spacing: 0.5px; transition: background 0.15s;
+  }
+  .o-btn-create:hover { background: var(--teal-600); }
+  .o-btn-excel {
+    width: 28px; height: 28px; border: 1px solid #d0e9d1; border-radius: 4px;
+    background: #f0faf0; color: #217346; font-size: 15px;
+    display: inline-flex; align-items: center; justify-content: center;
+    text-decoration: none; transition: background 0.15s, border-color 0.15s;
+  }
+  .o-btn-excel:hover { background: #217346; color: #fff; border-color: #217346; }
+  .o-search-bar {
+    display: flex; align-items: center; border: none; border-bottom: 1px solid #bbb;
+    background: transparent; min-height: 28px; padding: 2px 4px; gap: 4px; width: 320px;
+  }
+  .o-search-input {
+    border: none; outline: none; font-size: 12px;
+    color: var(--text); flex: 1; min-width: 60px; background: transparent;
+  }
+  .o-search-btn { background: none; border: none; cursor: pointer; color: #888; font-size: 13px; padding: 2px; }
+  .o-ctrl-btn {
+    background: none; border: 1px solid transparent; border-radius: 4px;
+    padding: 4px 8px; font-size: 12px;
+    color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 4px;
+    transition: border-color 0.15s, color 0.15s, background 0.15s; white-space: nowrap;
+  }
+  .o-ctrl-btn:hover { border-color: var(--border); color: var(--text); background: #f3f3f3; }
+  .o-ctrl-sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }
+  .o-pagination { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+  .o-pag-btn {
+    width: 24px; height: 24px; border: 1px solid var(--border); border-radius: 3px;
+    background: var(--surface); display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted); text-decoration: none; font-size: 12px;
+    transition: background 0.15s, color 0.15s;
+  }
+  .o-pag-btn:hover { background: var(--teal-600); color: #fff; border-color: var(--teal-600); }
+  .o-pag-btn.disabled { opacity: 0.35; pointer-events: none; }
+  .o-view-btns { display: flex; border: 1px solid var(--border); border-radius: 3px; overflow: hidden; }
+  .o-view-btn {
+    width: 26px; height: 24px; border: none; background: var(--surface);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted); font-size: 13px; cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .o-view-btn:not(:last-child) { border-right: 1px solid var(--border); }
+  .o-view-btn.active, .o-view-btn:hover { background: var(--teal-600); color: #fff; }
+
+  /* ══ LIST TABLE ══ */
+  .o-list-wrap {
+    overflow-x: auto; overflow-y: auto; background: var(--surface);
+    margin: 0 -32px;
+  }
+  .o-list { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
+  .o-list thead th {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 6px 10px; font-weight: 500; font-size: 11.5px;
+    color: var(--text-muted); text-align: left;
+    position: sticky; top: 0; z-index: 2; cursor: pointer; user-select: none;
+  }
+  .o-list thead th:hover { background: #f5f5f5; }
+  .o-list thead th.th-center { text-align: center; }
+  .o-col-resize {
+    position: absolute; right: 0; top: 0; bottom: 0; width: 5px;
+    cursor: col-resize; user-select: none; background: transparent; z-index: 2;
+  }
+  .o-col-resize:hover, .o-col-resize.active { background: var(--accent); opacity: 0.45; }
+  .o-list tbody tr { border-bottom: 1px solid #f0f0f0; transition: background 0.1s; cursor: pointer; }
+  .o-list tbody tr:hover { background: var(--teal-50); }
+  .o-list tbody td { padding: 5px 10px; color: var(--text); vertical-align: middle; }
+  .o-list tbody td.td-center { text-align: center; }
+  .o-list tbody td.td-muted { color: #ddd; text-align: center; font-size: 10px; }
+  .o-list tbody td.td-code { color: var(--accent); font-weight: 500; font-size: 12px; }
+  .o-list tbody td.td-name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+  .o-list tbody td.td-doctor { max-width: 130px; overflow: hidden; text-overflow: ellipsis; color: var(--text-muted); }
+  /* Statut badges */
+  .o-badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 500; white-space: nowrap; }
+  .badge-planifie        { background: #e3f2fd; color: #1565c0; }
+  .badge-confirme        { background: #e8f5e9; color: #2e7d32; }
+  .badge-en_attente      { background: #fff8e1; color: #f57f17; }
+  .badge-en_consultation { background: var(--teal-50); color: var(--teal-600); }
+  .badge-termine         { background: #ede7f6; color: #4527a0; }
+  .badge-annule          { background: #fce4ec; color: #b71c1c; }
+  .badge-absent          { background: #fff3e0; color: #e65100; }
+
+  /* Type de visite badges */
+  .ttype-badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 10.5px; font-weight: 500; white-space: nowrap; }
+  .ttype-consultation { background: #e3f2fd; color: #1565c0; }
+  .ttype-controle     { background: #e8f5e9; color: #2e7d32; }
+  .ttype-urgence      { background: #fce4ec; color: #b71c1c; }
+  .ttype-examen       { background: #fff8e1; color: #f57f17; }
+  .ttype-vaccination  { background: #f3e5f5; color: #6a1b9a; }
+
+  /* Group headers — style Odoo */
+  .o-grp-hdr { cursor: pointer; user-select: none; }
+  .o-grp-hdr td {
+    background: #f7f8fa; color: var(--text); font-size: 12.5px; font-weight: 600;
+    padding: 6px 10px; border-top: 1px solid #dde3ec; border-bottom: 1px solid #dde3ec;
+  }
+  .o-grp-hdr:hover td { background: #eef1f6; }
+  .o-grp-hdr .grp-arrow {
+    display: inline-block; width: 14px; font-size: 9px; color: var(--text-muted);
+    transition: transform 0.15s; vertical-align: middle; margin-right: 2px;
+  }
+  .o-grp-hdr.open .grp-arrow { transform: rotate(90deg); }
+  .o-grp-hdr .grp-count {
+    color: var(--text-muted); font-weight: 400; margin-left: 2px;
+  }
+  html[data-theme="dark"] .o-grp-hdr td { background: #1e2d42; border-color: #2e3f58; }
+  html[data-theme="dark"] .o-grp-hdr:hover td { background: #243450; }
+
+  /* Checkbox col */
+  .o-cb { width: 16px; height: 16px; cursor: pointer; accent-color: var(--teal-600); }
+  .th-cb, .td-cb { width: 36px; text-align: center; }
+
+  /* Empty state */
+  .o-empty-state {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 80px 20px;
+  }
+  .o-empty-illo {
+    width: 88px; height: 88px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--teal-600) 0%, var(--teal-400) 100%);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 20px; position: relative;
+  }
+  .o-empty-illo svg { color: #fff; opacity: 0.9; }
+  .o-empty-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+  .o-empty-sub { font-size: 12.5px; color: var(--text-muted); margin-bottom: 20px; }
+  .o-empty-btn {
+    background: var(--teal-500); color: #fff; border: none; padding: 7px 20px; border-radius: 4px;
+    font-size: 12.5px; font-weight: 500;
+    cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+    transition: background 0.15s;
+  }
+  .o-empty-btn:hover { background: var(--teal-600); }
+
+  /* ══ DROPDOWNS (Filtres / Regrouper par) ══ */
+  .o-dd-wrap { position: relative; }
+  .o-dd-panel {
+    display: none; position: fixed; z-index: 9999;
+    background: #fff; border: 1px solid #dde3ec;
+    border-radius: 6px; box-shadow: 0 8px 28px rgba(0,0,0,0.16);
+    min-width: 230px; padding: 5px 0;
+    overflow-y: auto; overflow-x: visible;
+  }
+  .o-dd-panel.open { display: block; }
+  .o-dd-section {
+    padding: 6px 14px 3px; font-size: 10px; font-weight: 600;
+    color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .o-dd-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 14px; font-size: 12.5px; color: var(--text);
+    cursor: pointer; text-decoration: none; transition: background 0.1s;
+    white-space: nowrap; gap: 10px; position: relative;
+  }
+  .o-dd-item:hover { background: var(--teal-50); color: var(--teal-600); }
+  .o-dd-item.active { background: #ede7f6; color: var(--teal-600); font-weight: 500; }
+  .o-dd-item .o-dd-arr { font-size: 10px; color: var(--text-muted); flex-shrink: 0; }
+  .o-dd-sep { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+  .o-dd-sub {
+    display: none; position: absolute; left: 100%; top: 0; z-index: 10000;
+    background: #fff; border: 1px solid #dde3ec;
+    border-radius: 6px; box-shadow: 0 8px 28px rgba(0,0,0,0.16);
+    min-width: 160px; padding: 5px 0;
+  }
+  .o-dd-item:hover > .o-dd-sub { display: block; }
+  .o-dd-sub .o-dd-item { font-size: 12px; }
+
+  /* Active filter tag */
+  .o-active-filters { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+  .o-filter-tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: var(--teal-50); color: var(--teal-600); border: 1px solid #b2d8db;
+    border-radius: 3px; padding: 1px 8px; font-size: 11.5px; font-weight: 500;
+  }
+  .o-filter-tag button {
+    background: none; border: none; cursor: pointer; color: #999;
+    font-size: 14px; line-height: 1; padding: 0; margin-left: 2px;
+  }
+  .o-filter-tag button:hover { color: #333; }
+
+  /* Date block inside filter dropdown */
+  .o-dd-date-block { padding: 8px 14px 10px; }
+  .o-dd-date-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .o-dd-date-row label { font-size: 11.5px; color: var(--text-muted); min-width: 18px; }
+  .o-dd-date-input {
+    flex: 1; border: none; border-bottom: 1px solid #bbb; background: transparent;
+    font-size: 12px; color: var(--text);
+    padding: 2px 2px; outline: none;
+  }
+  .o-dd-date-input:focus { border-bottom-color: var(--teal-600); }
+  .o-dd-date-actions { display: flex; gap: 6px; margin-top: 10px; }
+  .o-dd-apply-btn {
+    flex: 1; background: var(--teal-600); color: #fff; border: none; border-radius: 3px;
+    padding: 5px 0; font-size: 12px; font-weight: 500;
+    cursor: pointer; transition: background 0.15s;
+  }
+  .o-dd-apply-btn:hover { background: var(--teal-700); }
+  .o-dd-clear-btn {
+    background: none; border: 1px solid var(--border); border-radius: 3px;
+    padding: 5px 10px; font-size: 11.5px; color: var(--text-muted);
+    cursor: pointer; text-decoration: none; display: inline-flex; align-items: center;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .o-dd-clear-btn:hover { border-color: #999; color: var(--text); }
+
+  html[data-theme="dark"] .o-dd-panel, html[data-theme="dark"] .o-dd-sub { background: #1a2535; border-color: #2e3f58; }
+  html[data-theme="dark"] .o-dd-item:hover { background: rgba(33,136,171,0.2); color: #c5d4e2; }
+  html[data-theme="dark"] .o-dd-item.active { background: rgba(33,136,171,0.3); color: var(--teal-300); }
+  html[data-theme="dark"] .o-filter-tag { background: rgba(33,136,171,0.25); border-color: rgba(33,136,171,0.5); color: var(--teal-300); }
+  html[data-theme="dark"] .o-dd-date-input { border-bottom-color: #3a4a62; color: var(--text); }
+  html[data-theme="dark"] .o-dd-clear-btn { border-color: var(--border); color: var(--text-muted); }
+
+  /* ══ STATS BAR ══ */
+  .o-stats-bar { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; padding: 8px 0 2px; }
+  .o-stat-chip {
+    display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px;
+    border-radius: 20px; font-size: 11.5px; font-weight: 500; white-space: nowrap;
+    border: 1px solid transparent; cursor: default;
+  }
+  .o-stat-chip .n { font-weight: 700; font-size: 13px; }
+  .o-stat-total        { background:#f0f4f8; color:var(--text); border-color:#dde3ec; }
+  .o-stat-planifie     { background:#e3f2fd; color:#1565c0; }
+  .o-stat-confirme     { background:#e8f5e9; color:#2e7d32; }
+  .o-stat-en_attente   { background:#fff8e1; color:#f57f17; }
+  .o-stat-en_consultation { background:var(--teal-50); color:var(--teal-600); }
+  .o-stat-termine      { background:#ede7f6; color:#4527a0; }
+  .o-stat-annule       { background:#fce4ec; color:#b71c1c; }
+  .o-stat-absent       { background:#fff3e0; color:#e65100; }
+
+  /* ══ STATUS QUICK-CHANGE DROPDOWN ══ */
+  .o-status-wrap { position: relative; display: inline-block; }
+  .o-badge-btn {
+    border: none; cursor: pointer; padding: 2px 9px; border-radius: 20px;
+    font-size: 11px; font-weight: 500; white-space: nowrap; display: inline-flex; align-items: center; gap: 3px;
+  }
+  .o-badge-btn i { font-size: 8px; opacity: 0.7; }
+  .o-status-dd {
+    display: none; position: fixed; z-index: 9999;
+    background: #fff; border: 1px solid #dde3ec;
+    border-radius: 6px; box-shadow: 0 8px 28px rgba(0,0,0,0.16);
+    min-width: 185px; padding: 4px 0;
+  }
+  .o-status-dd.open { display: block; }
+  .o-status-option {
+    display: flex; align-items: center; padding: 5px 10px; gap: 7px;
+    cursor: pointer; border: none; background: none; width: 100%; text-align: left;
+    font-size: 12px; transition: background 0.1s;
+  }
+  .o-status-option:hover { background: var(--teal-50); }
+  .o-status-option.cur { font-weight: 600; }
+  html[data-theme="dark"] .o-status-dd { background: #1a2535; border-color: #2e3f58; }
+  html[data-theme="dark"] .o-status-option:hover { background: rgba(33,136,171,0.2); }
+
+  /* ══ BULK ACTION BAR ══ */
+  .o-bulk-bar {
+    display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 998;
+    background: #00838f; color: #fff; padding: 10px 24px;
+    align-items: center; gap: 10px; flex-wrap: wrap;
+    box-shadow: 0 -3px 16px rgba(0,0,0,0.18);
+  }
+  .o-bulk-bar.visible { display: flex; }
+  .o-bulk-count { font-size: 13px; font-weight: 500; margin-right: 6px; }
+  .o-bulk-label { font-size: 12px; opacity: 0.85; }
+  .o-bulk-btn {
+    background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.35);
+    color: #fff; border-radius: 4px; padding: 4px 11px; font-size: 11.5px; font-weight: 500;
+    cursor: pointer; transition: background 0.15s; white-space: nowrap;
+  }
+  .o-bulk-btn:hover { background: rgba(255,255,255,0.3); }
+  .o-bulk-btn.cancel { background: rgba(183,28,28,0.5); border-color: rgba(183,28,28,0.7); }
+  .o-bulk-btn.cancel:hover { background: rgba(183,28,28,0.75); }
+  .o-bulk-sep { width: 1px; height: 18px; background: rgba(255,255,255,0.3); flex-shrink:0; }
+
+  /* ── Tri des colonnes ── */
+  thead th.sortable { cursor: pointer; user-select: none; }
+  thead th.sortable:hover { background: var(--teal-50); }
+  .o-sort-icon { display: inline-block; margin-left: 4px; font-size: 10px; color: var(--text-muted); vertical-align: middle; }
+  thead th.sort-asc  .o-sort-icon::after { content: '▲'; color: var(--teal-600); }
+  thead th.sort-desc .o-sort-icon::after { content: '▼'; color: var(--teal-600); }
+  thead th.sortable:not(.sort-asc):not(.sort-desc) .o-sort-icon::after { content: '⇅'; }
+
+  /* ── Indicateur de retard ── */
+  tr.row-late { background: #fff8f0 !important; }
+  tr.row-late:hover { background: #fff3e0 !important; }
+  .o-late-badge {
+    display: inline-flex; align-items: center; gap: 3px;
+    background: #fff3e0; color: #e65100; border: 1px solid #ffcc80;
+    border-radius: 10px; font-size: 9.5px; font-weight: 600;
+    padding: 1px 6px; white-space: nowrap; margin-left: 5px;
+  }
+
+  /* ── Aperçu rapide (slide-in) ── */
+  .o-preview-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.22); z-index: 900;
+  }
+  .o-preview-overlay.open { display: block; }
+  .o-preview-panel {
+    position: fixed; top: 0; right: -440px; width: 420px; height: 100vh;
+    background: var(--surface); box-shadow: -4px 0 24px rgba(0,0,0,0.15);
+    z-index: 901; display: flex; flex-direction: column;
+    transition: right 0.25s cubic-bezier(0.4,0,0.2,1); overflow: hidden;
+  }
+  .o-preview-panel.open { right: 0; }
+  .preview-header {
+    display: flex; align-items: center; padding: 14px 16px;
+    border-bottom: 1px solid var(--border); gap: 10px; flex-shrink: 0;
+  }
+  .preview-title { font-size: 14px; font-weight: 600; color: var(--text); flex: 1; }
+  .preview-close {
+    background: none; border: none; cursor: pointer; font-size: 20px;
+    color: var(--text-muted); line-height: 1; padding: 2px 6px; border-radius: 4px;
+  }
+  .preview-close:hover { background: #f0f0f0; color: var(--text); }
+  .preview-body { flex: 1; overflow-y: auto; padding: 16px; }
+  .preview-field { margin-bottom: 14px; }
+  .preview-label {
+    font-size: 10.5px; color: var(--text-muted); font-weight: 600;
+    text-transform: uppercase; letter-spacing: .5px; margin-bottom: 3px;
+  }
+  .preview-value { font-size: 13px; color: var(--text); }
+  .preview-footer {
+    padding: 12px 16px; border-top: 1px solid var(--border);
+    display: flex; gap: 8px; flex-shrink: 0;
+  }
+  .preview-btn {
+    flex: 1; padding: 8px; border-radius: 6px; font-size: 12.5px; font-weight: 500;
+    cursor: pointer; border: 1px solid var(--border); background: var(--surface);
+    color: var(--text); text-align: center; text-decoration: none;
+    display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  }
+  .preview-btn.primary { background: var(--teal-600); border-color: var(--teal-600); color: #fff; }
+  .preview-btn.primary:hover { filter: brightness(0.92); }
+  .preview-btn:not(.primary):hover { background: var(--teal-50); color: var(--teal-700); }
+
+  /* ── Impression ── */
+  .o-print-btn {
+    display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px;
+    border: 1px solid var(--border); border-radius: 4px; background: var(--surface);
+    color: var(--text-muted); font-size: 11.5px; cursor: pointer; text-decoration: none;
+  }
+  .o-print-btn:hover { background: var(--teal-50); color: var(--teal-600); border-color: var(--teal-300); }
+
+  @media print {
+    .o-subheader, .o-bulk-bar, .o-preview-panel, .o-preview-overlay,
+    .o-ctrl-btn, .o-view-btns, .td-cb, .th-cb, .o-status-wrap button + div,
+    .o-btn-create, .o-btn-excel, .o-print-btn, .o-dd-wrap, .o-stats-bar,
+    nav, .o-gyn-nav, #top-bar { display: none !important; }
+    .o-subheader-row { display: none !important; }
+    body, .o-list-wrap { margin: 0; padding: 0; }
+    .o-list { width: 100%; font-size: 11px; border-collapse: collapse; }
+    .o-list th, .o-list td { border: 1px solid #ccc; padding: 4px 6px; }
+    .o-list thead th { background: #f5f5f5 !important; font-weight: 700; }
+    .o-grp-hdr td { background: #e8f5e9 !important; font-weight: 600; }
+    tr.row-late { background: #fff3e0 !important; }
+    a { color: inherit; text-decoration: none; }
+    .o-badge-btn { background: none !important; border: none !important; box-shadow: none !important; }
+  }
+</style>
+
+<!-- ══ SUBHEADER ══ -->
+<div class="o-subheader">
+  <div class="o-subheader-row">
+    <span class="o-page-title">Rendez-vous</span>
+    <div class="o-subheader-row-right">
+      <form method="get" style="display:flex;align-items:center;">
+        <div class="o-search-bar">
+          <input class="o-search-input" type="text" name="q"
+                 value="{{ request.GET.q }}" placeholder="Rechercher un patient…">
+          <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <div class="o-subheader-row">
+    <a href="{% url 'gynecologie_rdv_create' %}" class="o-btn-create">CRÉER</a>
+    <a href="?export=excel{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.type_rdv %}&type_rdv={{ request.GET.type_rdv }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}{% if request.GET.type_visite_cpn %}&type_visite_cpn={{ request.GET.type_visite_cpn }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}" class="o-btn-excel" title="Exporter en Excel"><i class="bi bi-download"></i></a>
+    <!-- ── Stats du jour ── -->
+    {% if stats_today %}
+    <div class="o-stats-bar">
+      <span class="o-stat-chip o-stat-total"><span class="n">{{ stats_today.total|default:0 }}</span> Aujourd'hui</span>
+      {% if stats_today.planifie %}<span class="o-stat-chip o-stat-planifie"><span class="n">{{ stats_today.planifie }}</span> Planifié</span>{% endif %}
+      {% if stats_today.confirme %}<span class="o-stat-chip o-stat-confirme"><span class="n">{{ stats_today.confirme }}</span> Confirmé</span>{% endif %}
+      {% if stats_today.en_attente %}<span class="o-stat-chip o-stat-en_attente"><span class="n">{{ stats_today.en_attente }}</span> En attente</span>{% endif %}
+      {% if stats_today.en_consultation %}<span class="o-stat-chip o-stat-en_consultation"><span class="n">{{ stats_today.en_consultation }}</span> En consultation</span>{% endif %}
+      {% if stats_today.termine %}<span class="o-stat-chip o-stat-termine"><span class="n">{{ stats_today.termine }}</span> Terminé</span>{% endif %}
+      {% if stats_today.absent %}<span class="o-stat-chip o-stat-absent"><span class="n">{{ stats_today.absent }}</span> Absent</span>{% endif %}
+      {% if stats_today.annule %}<span class="o-stat-chip o-stat-annule"><span class="n">{{ stats_today.annule }}</span> Annulé</span>{% endif %}
+    </div>
+    {% endif %}
+    <div class="o-subheader-row-right">
+
+      <!-- ── Filtres ── -->
+      <div class="o-dd-wrap">
+        <button class="o-ctrl-btn {% if filter_val or request.GET.type_rdv or request.GET.group == 'type_visite_cpn' %}active{% endif %}" id="btn-filtres" onclick="toggleDd('dd-filtres',this)">
+          <i class="bi bi-funnel{% if filter_val or request.GET.type_rdv or request.GET.group == 'type_visite_cpn' %}-fill{% endif %}"></i> Filtres{% if filter_val or request.GET.type_rdv or request.GET.group == 'type_visite_cpn' %} <span style="background:var(--teal-600);color:#fff;border-radius:10px;font-size:10px;padding:0 5px;">1</span>{% endif %}
+        </button>
+        <div class="o-dd-panel" id="dd-filtres">
+          <div class="o-dd-section">Périodes</div>
+          <a class="o-dd-item {% if filter_val == 'today' %}active{% endif %}" href="?filter=today{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.type_rdv %}&type_rdv={{ request.GET.type_rdv }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}{% if request.GET.type_visite_cpn %}&type_visite_cpn={{ request.GET.type_visite_cpn }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">Aujourd'hui</a>
+          <hr class="o-dd-sep">
+          <div class="o-dd-section">Mes rendez-vous</div>
+          <a class="o-dd-item {% if request.GET.filter == 'mine' %}active{% endif %}" href="?filter=mine{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.type_rdv %}&type_rdv={{ request.GET.type_rdv }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}{% if request.GET.type_visite_cpn %}&type_visite_cpn={{ request.GET.type_visite_cpn }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">Mes rendez-vous</a>
+          <hr class="o-dd-sep">
+          <div class="o-dd-section">Statut</div>
+          <a class="o-dd-item {% if request.GET.filter == 'urgent' %}active{% endif %}" href="?filter=urgent{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.type_rdv %}&type_rdv={{ request.GET.type_rdv }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}{% if request.GET.type_visite_cpn %}&type_visite_cpn={{ request.GET.type_visite_cpn }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">Rendez-vous urgent</a>
+          <a class="o-dd-item {% if request.GET.filter == 'urgence_medicale' %}active{% endif %}" href="?filter=urgence_medicale{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.type_rdv %}&type_rdv={{ request.GET.type_rdv }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}{% if request.GET.type_visite_cpn %}&type_visite_cpn={{ request.GET.type_visite_cpn }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">Urgence médicale</a>
+          <a class="o-dd-item {% if request.GET.filter == 'consultation' %}active{% endif %}" href="?filter=consultation{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.type_rdv %}&type_rdv={{ request.GET.type_rdv }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}{% if request.GET.type_visite_cpn %}&type_visite_cpn={{ request.GET.type_visite_cpn }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">Rendez-vous de consultation</a>
+          <a class="o-dd-item {% if request.GET.filter == 'suivi' %}active{% endif %}" href="?filter=suivi{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.type_rdv %}&type_rdv={{ request.GET.type_rdv }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}{% if request.GET.type_visite_cpn %}&type_visite_cpn={{ request.GET.type_visite_cpn }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">Suivi rendez-vous</a>
+          <a class="o-dd-item {% if request.GET.filter == 'not_done' %}active{% endif %}" href="?filter=not_done{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.type_rdv %}&type_rdv={{ request.GET.type_rdv }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}{% if request.GET.type_visite_cpn %}&type_visite_cpn={{ request.GET.type_visite_cpn }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">Pas fini</a>
+          <hr class="o-dd-sep">
+          <div class="o-dd-section">Type de consultation</div>
+          <a class="o-dd-item {% if request.GET.type_rdv == 'consultation' %}active{% endif %}" href="?type_rdv=consultation{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}{% if request.GET.type_visite_cpn %}&type_visite_cpn={{ request.GET.type_visite_cpn }}{% endif %}">Consultation</a>
+          <a class="o-dd-item {% if request.GET.type_rdv == 'controle' %}active{% endif %}" href="?type_rdv=controle{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}{% if request.GET.type_visite_cpn %}&type_visite_cpn={{ request.GET.type_visite_cpn }}{% endif %}">Contrôle / CPN</a>
+          <a class="o-dd-item {% if request.GET.type_rdv == 'urgence' %}active{% endif %}" href="?type_rdv=urgence{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}{% if request.GET.type_visite_cpn %}&type_visite_cpn={{ request.GET.type_visite_cpn }}{% endif %}">Urgence</a>
+          <a class="o-dd-item {% if request.GET.type_rdv == 'examen' %}active{% endif %}" href="?type_rdv=examen{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}{% if request.GET.type_visite_cpn %}&type_visite_cpn={{ request.GET.type_visite_cpn }}{% endif %}">Examen</a>
+          <a class="o-dd-item {% if request.GET.type_rdv == 'vaccination' %}active{% endif %}" href="?type_rdv=vaccination{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}{% if request.GET.type_visite_cpn %}&type_visite_cpn={{ request.GET.type_visite_cpn }}{% endif %}">Vaccination</a>
+          {% if request.GET.type_rdv %}
+          <a class="o-dd-item" href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.filter %}filter={{ request.GET.filter }}&{% endif %}{% if request.GET.group %}group={{ request.GET.group }}&{% endif %}{% if request.GET.type_visite_cpn %}type_visite_cpn={{ request.GET.type_visite_cpn }}&{% endif %}{% if request.GET.date_from %}date_from={{ request.GET.date_from }}&{% endif %}{% if request.GET.date_to %}date_to={{ request.GET.date_to }}{% endif %}" style="color:#b71c1c;font-size:11.5px;">
+            <i class="bi bi-x-circle" style="font-size:11px;"></i> Effacer
+          </a>
+          {% endif %}
+          <hr class="o-dd-sep">
+          <div class="o-dd-section">Rang CPN</div>
+          <!-- Clic principal → filtre + groupe en une seule action (style Odoo) -->
+          <div class="o-dd-item {% if request.GET.group == 'type_visite_cpn' %}active{% endif %}" style="position:relative;">
+            <a href="?group=type_visite_cpn{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.type_rdv %}&type_rdv={{ request.GET.type_rdv }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}" style="flex:1;text-decoration:none;color:inherit;">Type de visite CPN</a>
+            <span class="o-dd-arr">›</span>
+            <div class="o-dd-sub">
+              <a class="o-dd-item {% if request.GET.type_visite_cpn == 'cpn1' %}active{% endif %}" href="?group=type_visite_cpn&type_visite_cpn=cpn1{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.type_rdv %}&type_rdv={{ request.GET.type_rdv }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">CPN 1 uniquement</a>
+              <a class="o-dd-item {% if request.GET.type_visite_cpn == 'cpn2' %}active{% endif %}" href="?group=type_visite_cpn&type_visite_cpn=cpn2{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.type_rdv %}&type_rdv={{ request.GET.type_rdv }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">CPN 2 uniquement</a>
+              <a class="o-dd-item {% if request.GET.type_visite_cpn == 'cpn3' %}active{% endif %}" href="?group=type_visite_cpn&type_visite_cpn=cpn3{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.type_rdv %}&type_rdv={{ request.GET.type_rdv }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">CPN 3 uniquement</a>
+              <a class="o-dd-item {% if request.GET.type_visite_cpn == 'cpn4' %}active{% endif %}" href="?group=type_visite_cpn&type_visite_cpn=cpn4{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.type_rdv %}&type_rdv={{ request.GET.type_rdv }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">CPN 4 uniquement</a>
+              <a class="o-dd-item {% if request.GET.type_visite_cpn == 'autre' %}active{% endif %}" href="?group=type_visite_cpn&type_visite_cpn=autre{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.type_rdv %}&type_rdv={{ request.GET.type_rdv }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">Autre uniquement</a>
+            </div>
+          </div>
+          {% if request.GET.group == 'type_visite_cpn' %}
+          <a class="o-dd-item" href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.filter %}filter={{ request.GET.filter }}&{% endif %}{% if request.GET.type_rdv %}type_rdv={{ request.GET.type_rdv }}&{% endif %}{% if request.GET.date_from %}date_from={{ request.GET.date_from }}&{% endif %}{% if request.GET.date_to %}date_to={{ request.GET.date_to }}{% endif %}" style="color:#b71c1c;font-size:11.5px;">
+            <i class="bi bi-x-circle" style="font-size:11px;"></i> Effacer le groupement CPN
+          </a>
+          {% endif %}
+          <hr class="o-dd-sep">
+          <div class="o-dd-section">Par date</div>
+
+          <!-- Option 1 : date exacte -->
+          <div class="o-dd-item" onclick="toggleDateBlock('single')" style="cursor:pointer;user-select:none;">
+            <i class="bi bi-calendar-event" style="font-size:11px;"></i> Date exacte
+            <span class="o-dd-arr" id="arr-single" style="transition:transform .15s;">›</span>
+          </div>
+          <div id="block-single" class="o-dd-date-block" style="display:none;"
+               data-open="{% if request.GET.date_from and request.GET.date_from == request.GET.date_to %}1{% else %}0{% endif %}">
+            <div class="o-dd-date-row">
+              <label>Le</label>
+              <input type="date" id="filter-date-single" class="o-dd-date-input"
+                     value="{% if request.GET.date_from and request.GET.date_from == request.GET.date_to %}{{ request.GET.date_from }}{% endif %}">
+            </div>
+            <div class="o-dd-date-actions">
+              <button type="button" class="o-dd-apply-btn" onclick="applyDateSingle()">Appliquer</button>
+              {% if request.GET.date_from and request.GET.date_from == request.GET.date_to %}
+              <a class="o-dd-clear-btn" href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.filter %}filter={{ request.GET.filter }}&{% endif %}{% if request.GET.group %}group={{ request.GET.group }}&{% endif %}{% if request.GET.type_rdv %}type_rdv={{ request.GET.type_rdv }}&{% endif %}{% if request.GET.type_visite_cpn %}type_visite_cpn={{ request.GET.type_visite_cpn }}{% endif %}">Effacer</a>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Option 2 : plage de dates -->
+          <div class="o-dd-item" onclick="toggleDateBlock('range')" style="cursor:pointer;user-select:none;">
+            <i class="bi bi-calendar-range" style="font-size:11px;"></i> Plage de dates
+            <span class="o-dd-arr" id="arr-range" style="transition:transform .15s;">›</span>
+          </div>
+          <div id="block-range" class="o-dd-date-block" style="display:none;"
+               data-open="{% if request.GET.date_from or request.GET.date_to %}{% if not request.GET.date_to or request.GET.date_from != request.GET.date_to %}1{% else %}0{% endif %}{% else %}0{% endif %}">
+            <div class="o-dd-date-row">
+              <label>De</label>
+              <input type="date" id="filter-date-from" class="o-dd-date-input" value="{{ request.GET.date_from }}">
+            </div>
+            <div class="o-dd-date-row">
+              <label>À</label>
+              <input type="date" id="filter-date-to" class="o-dd-date-input" value="{{ request.GET.date_to }}">
+            </div>
+            <div class="o-dd-date-actions">
+              <button type="button" class="o-dd-apply-btn" onclick="applyDateFilter()">Appliquer</button>
+              {% if request.GET.date_from or request.GET.date_to %}
+              <a class="o-dd-clear-btn" href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.filter %}filter={{ request.GET.filter }}&{% endif %}{% if request.GET.group %}group={{ request.GET.group }}&{% endif %}{% if request.GET.type_rdv %}type_rdv={{ request.GET.type_rdv }}&{% endif %}{% if request.GET.type_visite_cpn %}type_visite_cpn={{ request.GET.type_visite_cpn }}{% endif %}">Effacer</a>
+              {% endif %}
+            </div>
+          </div>
+          <hr class="o-dd-sep">
+          <a class="o-dd-item" href="#">Ajouter un filtre personnalisé <span class="o-dd-arr">›</span></a>
+        </div>
+      </div>
+
+      <!-- ── Regrouper par ── -->
+      <div class="o-dd-wrap">
+        <button class="o-ctrl-btn {% if request.GET.group %}active{% endif %}" id="btn-group" onclick="toggleDd('dd-group',this)">
+          <i class="bi bi-list-ul"></i> Regrouper par{% if request.GET.group %} <span style="background:var(--teal-600);color:#fff;border-radius:10px;font-size:10px;padding:0 5px;">1</span>{% endif %}
+        </button>
+        <div class="o-dd-panel" id="dd-group">
+          <div class="o-dd-section">Regrouper par</div>
+          <a class="o-dd-item {% if request.GET.group == 'age' %}active{% endif %}" href="?group=age{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.type_rdv %}&type_rdv={{ request.GET.type_rdv }}{% endif %}{% if request.GET.type_visite_cpn %}&type_visite_cpn={{ request.GET.type_visite_cpn }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">Age du patient</a>
+          <a class="o-dd-item {% if request.GET.group == 'sexe' %}active{% endif %}" href="?group=sexe{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.type_rdv %}&type_rdv={{ request.GET.type_rdv }}{% endif %}{% if request.GET.type_visite_cpn %}&type_visite_cpn={{ request.GET.type_visite_cpn }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">Sexe</a>
+          <a class="o-dd-item {% if request.GET.group == 'type_visite' %}active{% endif %}" href="?group=type_visite{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.type_rdv %}&type_rdv={{ request.GET.type_rdv }}{% endif %}{% if request.GET.type_visite_cpn %}&type_visite_cpn={{ request.GET.type_visite_cpn }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">Type de visite</a>
+          <a class="o-dd-item {% if request.GET.group == 'type_rdv' %}active{% endif %}" href="?group=type_rdv{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.type_rdv %}&type_rdv={{ request.GET.type_rdv }}{% endif %}{% if request.GET.type_visite_cpn %}&type_visite_cpn={{ request.GET.type_visite_cpn }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">Type de consultation</a>
+          <a class="o-dd-item {% if request.GET.group == 'type_visite_cpn' %}active{% endif %}" href="?group=type_visite_cpn{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.type_rdv %}&type_rdv={{ request.GET.type_rdv }}{% endif %}{% if request.GET.type_visite_cpn %}&type_visite_cpn={{ request.GET.type_visite_cpn }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">Rang CPN (CPN 1, 2, 3…)</a>
+          <a class="o-dd-item {% if request.GET.group == 'diagnostic' %}active{% endif %}" href="?group=diagnostic{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.type_rdv %}&type_rdv={{ request.GET.type_rdv }}{% endif %}{% if request.GET.type_visite_cpn %}&type_visite_cpn={{ request.GET.type_visite_cpn }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">Diagnostic retenu / Autres pathologies associées</a>
+          <a class="o-dd-item {% if request.GET.group == 'patient' %}active{% endif %}" href="?group=patient{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.type_rdv %}&type_rdv={{ request.GET.type_rdv }}{% endif %}{% if request.GET.type_visite_cpn %}&type_visite_cpn={{ request.GET.type_visite_cpn }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">Patient</a>
+          <a class="o-dd-item {% if request.GET.group == 'medecin' %}active{% endif %}" href="?group=medecin{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.type_rdv %}&type_rdv={{ request.GET.type_rdv }}{% endif %}{% if request.GET.type_visite_cpn %}&type_visite_cpn={{ request.GET.type_visite_cpn }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">Rendez-vous du docteur</a>
+          <div class="o-dd-item" style="position:relative;">
+            Date <span class="o-dd-arr">›</span>
+            <div class="o-dd-sub">
+              <a class="o-dd-item {% if request.GET.group == 'date_jour' %}active{% endif %}" href="?group=date_jour{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.type_rdv %}&type_rdv={{ request.GET.type_rdv }}{% endif %}{% if request.GET.type_visite_cpn %}&type_visite_cpn={{ request.GET.type_visite_cpn }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">Jour</a>
+              <a class="o-dd-item {% if request.GET.group == 'date_semaine' %}active{% endif %}" href="?group=date_semaine{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.type_rdv %}&type_rdv={{ request.GET.type_rdv }}{% endif %}{% if request.GET.type_visite_cpn %}&type_visite_cpn={{ request.GET.type_visite_cpn }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">Semaine</a>
+              <a class="o-dd-item {% if request.GET.group == 'date_mois' %}active{% endif %}" href="?group=date_mois{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.type_rdv %}&type_rdv={{ request.GET.type_rdv }}{% endif %}{% if request.GET.type_visite_cpn %}&type_visite_cpn={{ request.GET.type_visite_cpn }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">Mois</a>
+              <a class="o-dd-item {% if request.GET.group == 'date_trimestre' %}active{% endif %}" href="?group=date_trimestre{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.type_rdv %}&type_rdv={{ request.GET.type_rdv }}{% endif %}{% if request.GET.type_visite_cpn %}&type_visite_cpn={{ request.GET.type_visite_cpn }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">Trimestre</a>
+              <a class="o-dd-item {% if request.GET.group == 'date_annee' %}active{% endif %}" href="?group=date_annee{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.type_rdv %}&type_rdv={{ request.GET.type_rdv }}{% endif %}{% if request.GET.type_visite_cpn %}&type_visite_cpn={{ request.GET.type_visite_cpn }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">Année</a>
+            </div>
+          </div>
+          <a class="o-dd-item {% if request.GET.group == 'statut' %}active{% endif %}" href="?group=statut{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.type_rdv %}&type_rdv={{ request.GET.type_rdv }}{% endif %}{% if request.GET.type_visite_cpn %}&type_visite_cpn={{ request.GET.type_visite_cpn }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">État</a>
+          <a class="o-dd-item {% if request.GET.group == 'departement' %}active{% endif %}" href="?group=departement{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.type_rdv %}&type_rdv={{ request.GET.type_rdv }}{% endif %}{% if request.GET.type_visite_cpn %}&type_visite_cpn={{ request.GET.type_visite_cpn }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">Département</a>
+          <a class="o-dd-item {% if request.GET.group == 'referent' %}active{% endif %}" href="?group=referent{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.type_rdv %}&type_rdv={{ request.GET.type_rdv }}{% endif %}{% if request.GET.type_visite_cpn %}&type_visite_cpn={{ request.GET.type_visite_cpn }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">Docteur référent</a>
+          <hr class="o-dd-sep">
+          <a class="o-dd-item {% if request.GET.group == 'assurance' %}active{% endif %}" href="?group=assurance{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.type_rdv %}&type_rdv={{ request.GET.type_rdv }}{% endif %}{% if request.GET.type_visite_cpn %}&type_visite_cpn={{ request.GET.type_visite_cpn }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">Compagnie d'assurance</a>
+          <a class="o-dd-item {% if request.GET.group == 'police' %}active{% endif %}" href="?group=police{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.type_rdv %}&type_rdv={{ request.GET.type_rdv }}{% endif %}{% if request.GET.type_visite_cpn %}&type_visite_cpn={{ request.GET.type_visite_cpn }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">Police d'assurance</a>
+          <hr class="o-dd-sep">
+          <a class="o-dd-item" href="#">Ajouter un groupe personnalisé <span class="o-dd-arr">›</span></a>
+          {% if request.GET.group %}
+          <hr class="o-dd-sep">
+          <a class="o-dd-item" href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.filter %}filter={{ request.GET.filter }}&{% endif %}{% if request.GET.type_rdv %}type_rdv={{ request.GET.type_rdv }}&{% endif %}{% if request.GET.date_from %}date_from={{ request.GET.date_from }}&{% endif %}{% if request.GET.date_to %}date_to={{ request.GET.date_to }}{% endif %}" style="color:#b71c1c;">
+            <i class="bi bi-x-circle" style="font-size:11px;"></i> Supprimer le regroupement
+          </a>
+          {% endif %}
+        </div>
+      </div>
+
+      <button class="o-ctrl-btn"><i class="bi bi-star"></i> Favoris</button>
+      <div class="o-ctrl-sep"></div>
+      <div class="o-pagination">
+        <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
+        <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
+           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.type_rdv %}&type_rdv={{ request.GET.type_rdv }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-left"></i>
+        </a>
+        <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
+           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.type_rdv %}&type_rdv={{ request.GET.type_rdv }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-right"></i>
+        </a>
+      </div>
+      <div class="o-ctrl-sep"></div>
+      <button class="o-print-btn" onclick="window.print()" title="Imprimer la liste"><i class="bi bi-printer"></i></button>
+      <div class="o-view-btns">
+        <a href="{% url 'gynecologie_list' %}" class="o-view-btn" title="Vue grille"><i class="bi bi-grid"></i></a>
+        <button class="o-view-btn active" title="Vue liste"><i class="bi bi-list-ul"></i></button>
+        <a href="{% url 'gynecologie_rdv_calendrier' %}" class="o-view-btn" title="Vue calendrier"><i class="bi bi-calendar3"></i></a>
+        <a href="{% url 'gynecologie_rdv_kanban' %}" class="o-view-btn" title="Vue Kanban"><i class="bi bi-kanban"></i></a>
+      </div>
+    </div>
+  </div>
+  {% if filter_val or request.GET.type_rdv or request.GET.group == 'type_visite_cpn' or request.GET.type_visite_cpn or request.GET.group or request.GET.date_from or request.GET.date_to %}
+  <div class="o-subheader-row" style="padding-top:0;gap:6px;flex-wrap:wrap;">
+    {% if filter_val %}
+    <div class="o-active-filters">
+      <span style="font-size:11px;color:var(--text-muted);margin-right:2px;">Filtre :</span>
+      <span class="o-filter-tag">
+        {% if filter_val == 'today' %}Aujourd'hui
+        {% elif filter_val == 'mine' %}Mes rendez-vous
+        {% elif filter_val == 'urgent' %}Rendez-vous urgent
+        {% elif filter_val == 'urgence_medicale' %}Urgence médicale
+        {% elif filter_val == 'consultation' %}Rendez-vous de consultation
+        {% elif filter_val == 'suivi' %}Suivi rendez-vous
+        {% elif filter_val == 'not_done' %}Pas fini
+        {% else %}{{ filter_val }}{% endif %}
+        <button onclick="window.location='?filter=all{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}{% if request.GET.type_rdv %}&type_rdv={{ request.GET.type_rdv }}{% endif %}{% if request.GET.type_visite_cpn %}&type_visite_cpn={{ request.GET.type_visite_cpn }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}'" title="Supprimer">×</button>
+      </span>
+    </div>
+    {% endif %}
+    {% if request.GET.type_rdv %}
+    <div class="o-active-filters">
+      <span style="font-size:11px;color:var(--text-muted);margin-right:2px;">Type de consultation :</span>
+      <span class="o-filter-tag">
+        {% if request.GET.type_rdv == 'consultation' %}Consultation
+        {% elif request.GET.type_rdv == 'controle' %}Contrôle / CPN
+        {% elif request.GET.type_rdv == 'urgence' %}Urgence
+        {% elif request.GET.type_rdv == 'examen' %}Examen
+        {% elif request.GET.type_rdv == 'vaccination' %}Vaccination
+        {% else %}{{ request.GET.type_rdv }}{% endif %}
+        <button onclick="window.location='?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.filter %}filter={{ request.GET.filter }}&{% endif %}{% if request.GET.group %}group={{ request.GET.group }}&{% endif %}{% if request.GET.type_visite_cpn %}type_visite_cpn={{ request.GET.type_visite_cpn }}&{% endif %}{% if request.GET.date_from %}date_from={{ request.GET.date_from }}&{% endif %}{% if request.GET.date_to %}date_to={{ request.GET.date_to }}{% endif %}'" title="Supprimer">×</button>
+      </span>
+    </div>
+    {% endif %}
+    {% if request.GET.group == 'type_visite_cpn' %}
+    <!-- Puce combinée filtre+groupe style Odoo -->
+    <div class="o-active-filters">
+      <span class="o-filter-tag" style="background:#e8f5e9;color:#2e7d32;border-color:#a5d6a7;">
+        <i class="bi bi-layers" style="font-size:10px;"></i>
+        Type de visite CPN{% if request.GET.type_visite_cpn %} :
+          {% if request.GET.type_visite_cpn == 'cpn1' %}CPN 1
+          {% elif request.GET.type_visite_cpn == 'cpn2' %}CPN 2
+          {% elif request.GET.type_visite_cpn == 'cpn3' %}CPN 3
+          {% elif request.GET.type_visite_cpn == 'cpn4' %}CPN 4
+          {% elif request.GET.type_visite_cpn == 'autre' %}Autre
+          {% endif %}
+        {% endif %}
+        <button onclick="window.location='?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.filter %}filter={{ request.GET.filter }}&{% endif %}{% if request.GET.type_rdv %}type_rdv={{ request.GET.type_rdv }}&{% endif %}{% if request.GET.date_from %}date_from={{ request.GET.date_from }}&{% endif %}{% if request.GET.date_to %}date_to={{ request.GET.date_to }}{% endif %}'" title="Supprimer">×</button>
+      </span>
+    </div>
+    {% elif request.GET.type_visite_cpn %}
+    <div class="o-active-filters">
+      <span class="o-filter-tag">
+        Rang CPN :
+        {% if request.GET.type_visite_cpn == 'cpn1' %}CPN 1
+        {% elif request.GET.type_visite_cpn == 'cpn2' %}CPN 2
+        {% elif request.GET.type_visite_cpn == 'cpn3' %}CPN 3
+        {% elif request.GET.type_visite_cpn == 'cpn4' %}CPN 4
+        {% elif request.GET.type_visite_cpn == 'autre' %}Autre
+        {% else %}{{ request.GET.type_visite_cpn }}{% endif %}
+        <button onclick="window.location='?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.filter %}filter={{ request.GET.filter }}&{% endif %}{% if request.GET.group %}group={{ request.GET.group }}&{% endif %}{% if request.GET.type_rdv %}type_rdv={{ request.GET.type_rdv }}&{% endif %}{% if request.GET.date_from %}date_from={{ request.GET.date_from }}&{% endif %}{% if request.GET.date_to %}date_to={{ request.GET.date_to }}{% endif %}'" title="Supprimer">×</button>
+      </span>
+    </div>
+    {% endif %}
+{% if request.GET.date_from or request.GET.date_to %}
+<div class="o-active-filters">
+  <span style="font-size:11px;color:var(--text-muted);margin-right:2px;">
+    {% if request.GET.date_from and request.GET.date_from == request.GET.date_to %}Date :{% else %}Plage :{% endif %}
+  </span>
+  <span class="o-filter-tag">
+    {% if request.GET.date_from and request.GET.date_from == request.GET.date_to %}
+      {{ request.GET.date_from }}
+    {% elif request.GET.date_from and request.GET.date_to %}
+      {{ request.GET.date_from }} → {{ request.GET.date_to }}
+    {% elif request.GET.date_from %}
+      À partir du {{ request.GET.date_from }}
+    {% else %}
+      Jusqu'au {{ request.GET.date_to }}
+    {% endif %}
+    <button onclick="window.location='?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.filter %}filter={{ request.GET.filter }}&{% endif %}{% if request.GET.type_rdv %}type_rdv={{ request.GET.type_rdv }}&{% endif %}{% if request.GET.group %}group={{ request.GET.group }}&{% endif %}{% if request.GET.type_visite_cpn %}type_visite_cpn={{ request.GET.type_visite_cpn }}{% endif %}'" title="Supprimer">×</button>
+  </span>
+</div>
+    {% endif %}
+    {% if request.GET.group and request.GET.group != 'type_visite_cpn' %}
+    <div class="o-active-filters">
+      <span style="font-size:11px;color:var(--text-muted);margin-right:2px;">Groupé par :</span>
+      <span class="o-filter-tag">
+        {% if request.GET.group == 'age' %}Age du patient
+        {% elif request.GET.group == 'sexe' %}Sexe
+        {% elif request.GET.group == 'type_visite' %}Type de visite
+        {% elif request.GET.group == 'type_rdv' %}Type de consultation
+        {% elif request.GET.group == 'medecin' %}Médecin
+        {% elif request.GET.group == 'statut' %}État
+        {% elif request.GET.group == 'departement' %}Département
+        {% elif request.GET.group == 'date_jour' %}Date — Jour
+        {% elif request.GET.group == 'date_semaine' %}Date — Semaine
+        {% elif request.GET.group == 'date_mois' %}Date — Mois
+        {% elif request.GET.group == 'date_annee' %}Date — Année
+        {% else %}{{ request.GET.group }}{% endif %}
+        <button onclick="window.location='?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.filter %}filter={{ request.GET.filter }}&{% endif %}{% if request.GET.type_rdv %}type_rdv={{ request.GET.type_rdv }}&{% endif %}{% if request.GET.date_from %}date_from={{ request.GET.date_from }}&{% endif %}{% if request.GET.date_to %}date_to={{ request.GET.date_to }}{% endif %}'" title="Supprimer">×</button>
+      </span>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<!-- ══ TABLE ══ -->
+<div class="o-list-wrap {% if request.GET.filter or request.GET.group %}has-tags{% endif %}">
+
+  {% if page_obj %}
+  <table class="o-list">
+    <thead>
+      <tr>
+        <th class="th-cb"><input type="checkbox" class="o-cb" id="chk-all"></th>
+        <th>Code RDV</th>
+        <th class="sortable {% if sort_val == 'patient' %}sort-{{ order_val }}{% endif %}" onclick="sortBy('patient')">Patient <span class="o-sort-icon"></span></th>
+        <th class="sortable {% if sort_val == 'date' %}sort-{{ order_val }}{% endif %}" onclick="sortBy('date')">Date <span class="o-sort-icon"></span></th>
+        <th class="sortable {% if sort_val == 'medecin' %}sort-{{ order_val }}{% endif %}" onclick="sortBy('medecin')">Médecin <span class="o-sort-icon"></span></th>
+        <th class="sortable {% if sort_val == 'type' %}sort-{{ order_val }}{% endif %}" onclick="sortBy('type')">Type <span class="o-sort-icon"></span></th>
+        <th>Motif</th>
+        <th class="sortable {% if sort_val == 'age' %}sort-{{ order_val }}{% endif %}" onclick="sortBy('age')">Âge <span class="o-sort-icon"></span></th>
+        <th>Genre</th>
+        <th class="sortable {% if sort_val == 'statut' %}sort-{{ order_val }}{% endif %}" onclick="sortBy('statut')">État <span class="o-sort-icon"></span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for rdv in page_obj %}
+      {% with age=rdv.patient.age %}
+      <tr class="rdv-row" data-url="{% url 'gynecologie_rdv_detail' rdv.pk %}" data-pk="{{ rdv.pk }}"
+          data-datetime="{{ rdv.date_heure|date:'Y-m-d H:i' }}" data-statut="{{ rdv.statut }}"
+          data-patient="{{ rdv.patient.nom|upper }} {{ rdv.patient.prenoms }}"
+          data-date="{{ rdv.date_heure|date:'d/m/Y H:i' }}"
+          data-medecin="{{ rdv.medecin|default:'' }}"
+          data-type="{{ rdv.get_type_rdv_display }}{% if rdv.type_visite_cpn %} — {{ rdv.get_type_visite_cpn_display }}{% endif %}"
+          data-motif="{{ rdv.motif|default:'' }}"
+          data-statut-label="{{ rdv.get_statut_display }}"
+          data-code="{{ rdv.code_rdv|default:rdv.patient.code_patient }}"
+          data-grp="{% if group_val == 'statut' %}{{ rdv.statut }}{% elif group_val == 'type_rdv' or group_val == 'type_visite' %}{{ rdv.type_rdv }}{% elif group_val == 'sexe' %}{{ rdv.patient.sexe }}{% elif group_val == 'medecin' or group_val == 'referent' %}{{ rdv.medecin|default:'—' }}{% elif group_val == 'patient' %}{{ rdv.patient.nom|upper }} {{ rdv.patient.prenoms }}{% elif group_val == 'age' %}{{ age }}{% elif group_val == 'date_jour' %}{{ rdv.date_heure|date:'Y-m-d' }}{% elif group_val == 'date_semaine' %}{{ rdv.date_heure|date:'o' }}-{{ rdv.date_heure|date:'W' }}{% elif group_val == 'date_mois' %}{{ rdv.date_heure|date:'Y-m' }}{% elif group_val == 'date_trimestre' %}{{ rdv.date_heure|date:'Y-m' }}{% elif group_val == 'date_annee' %}{{ rdv.date_heure|date:'Y' }}{% elif group_val == 'type_visite_cpn' %}{{ rdv.type_visite_cpn|default:'' }}{% elif group_val == 'departement' %}{{ rdv.departement }}{% elif group_val == 'assurance' %}{{ rdv.patient.assurance|default:'—' }}{% elif group_val == 'police' %}{{ rdv.patient.numero_assurance|default:'—' }}{% else %}{% endif %}">
+        <td class="td-cb"><input type="checkbox" class="o-cb" onclick="event.stopPropagation()"></td>
+        <td class="td-code">{{ rdv.code_rdv|default:rdv.patient.code_patient }}</td>
+        <td class="td-name">{{ rdv.patient.nom|upper }} {{ rdv.patient.prenoms }}</td>
+        <td>{{ rdv.date_heure|date:"d/m/Y H:i" }}</td>
+        <td class="td-doctor">{% if rdv.medecin %}{{ rdv.medecin }}{% else %}<span style="color:#ddd">—</span>{% endif %}</td>
+        <td><span class="ttype-badge ttype-{{ rdv.type_rdv }}">{{ rdv.get_type_rdv_display }}</span>{% if rdv.type_visite_cpn %} <span style="font-size:10.5px;color:var(--teal-600);font-weight:600;">{{ rdv.get_type_visite_cpn_display }}</span>{% endif %}</td>
+        <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;color:var(--text-muted);">{{ rdv.motif|truncatechars:35 }}</td>
+        <td>{% if rdv.patient.date_naissance %}{{ age }} ans{% else %}<span style="color:#ddd">—</span>{% endif %}</td>
+        <td>{% if rdv.patient.sexe == 'F' %}F{% elif rdv.patient.sexe == 'M' %}M{% else %}<span style="color:#ddd">—</span>{% endif %}</td>
+        <td onclick="event.stopPropagation()">
+          <div class="o-status-wrap">
+            <button type="button" class="o-badge-btn badge-{{ rdv.statut }}" onclick="toggleStatusDd(this)">
+              {{ rdv.get_statut_display }} <i class="bi bi-chevron-down"></i>
+            </button>
+            <div class="o-status-dd" id="sdd-{{ rdv.pk }}">
+              <form method="post" action="{% url 'gynecologie_rdv_set_statut' rdv.pk %}">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                {% for val, label in statut_choices %}
+                <button type="submit" name="statut" value="{{ val }}" class="o-status-option {% if rdv.statut == val %}cur{% endif %}">
+                  <span class="o-badge badge-{{ val }}" style="padding:1px 7px;font-size:10px;">{{ label }}</span>
+                </button>
+                {% endfor %}
+              </form>
+            </div>
+          </div>
+        </td>
+      </tr>
+      {% endwith %}
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="o-empty-state">
+    <div class="o-empty-illo">
+      <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+        <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+        <line x1="3" y1="10" x2="21" y2="10"/>
+        <line x1="9" y1="15" x2="15" y2="15"/>
+      </svg>
+    </div>
+    <div class="o-empty-title">Aucun rendez-vous{% if request.GET.q %} pour "{{ request.GET.q }}"{% endif %}</div>
+    <div class="o-empty-sub">{% if request.GET.q %}Essayez avec un autre terme de recherche.{% else %}Créez le premier rendez-vous gynécologique.{% endif %}</div>
+    {% if not request.GET.q %}
+    <a href="{% url 'gynecologie_rdv_create' %}" class="o-empty-btn">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      CRÉER UN RENDEZ-VOUS
+    </a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<div id="rdv-group-meta" style="display:none"
+     data-group="{{ group_val }}"
+     data-counts='{{ group_counts_json }}'></div>
+
+<script>
+  // ── Clic simple → aperçu rapide, double-clic → détail ──
+  document.querySelectorAll('.rdv-row').forEach(function(row) {
+    var clicks = 0, timer = null;
+    row.addEventListener('click', function(e) {
+      if (e.target.type === 'checkbox' || e.target.closest('.o-status-wrap')) return;
+      clicks++;
+      if (clicks === 1) {
+        timer = setTimeout(function() { clicks = 0; openPreview(row); }, 280);
+      } else {
+        clearTimeout(timer); clicks = 0; window.location = row.dataset.url;
+      }
+    });
+  });
+
+  // ── Aperçu rapide ──
+  function openPreview(row) {
+    var d = row.dataset;
+    document.getElementById('preview-title').textContent = d.code || '—';
+    document.getElementById('pv-patient').textContent  = d.patient  || '—';
+    document.getElementById('pv-date').textContent     = d.date     || '—';
+    document.getElementById('pv-medecin').textContent  = d.medecin  || '—';
+    document.getElementById('pv-type').textContent     = d.type     || '—';
+    document.getElementById('pv-motif').textContent    = d.motif    || '—';
+    document.getElementById('pv-statut').textContent   = d.statutLabel || d.statut || '—';
+    document.getElementById('pv-open-btn').href = d.url;
+    document.getElementById('preview-panel').classList.add('open');
+    document.getElementById('preview-overlay').classList.add('open');
+  }
+  function closePreview() {
+    document.getElementById('preview-panel').classList.remove('open');
+    document.getElementById('preview-overlay').classList.remove('open');
+  }
+  document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closePreview(); });
+
+  // ── Indicateur de retard ──
+  (function() {
+    var now = new Date();
+    var lateStatuts = ['planifie', 'confirme', 'en_attente'];
+    document.querySelectorAll('tr.rdv-row').forEach(function(row) {
+      var dt = row.dataset.datetime;
+      var st = row.dataset.statut;
+      if (!dt || lateStatuts.indexOf(st) === -1) return;
+      var rdvDate = new Date(dt);
+      if (rdvDate < now) {
+        row.classList.add('row-late');
+        var dateCell = row.cells[3];
+        if (dateCell) {
+          var badge = document.createElement('span');
+          badge.className = 'o-late-badge';
+          badge.innerHTML = '<i class="bi bi-clock-history" style="font-size:9px;"></i> En retard';
+          dateCell.appendChild(badge);
+        }
+      }
+    });
+  })();
+
+  // ── Tri des colonnes ──
+  function sortBy(field) {
+    var params = new URLSearchParams(window.location.search);
+    var cur = params.get('sort');
+    var ord = params.get('order') || 'asc';
+    if (cur === field) {
+      params.set('order', ord === 'asc' ? 'desc' : 'asc');
+    } else {
+      params.set('sort', field);
+      params.set('order', 'asc');
+    }
+    window.location = '?' + params.toString();
+  }
+
+  // ── Checkboxes + barre bulk ──
+  function updateBulkBar() {
+    var checked = document.querySelectorAll('.o-list tbody .o-cb:checked');
+    var bar = document.getElementById('bulk-bar');
+    if (!bar) return;
+    if (checked.length > 0) {
+      bar.classList.add('visible');
+      document.getElementById('bulk-count').textContent = checked.length;
+      var pksEl = document.getElementById('bulk-pks');
+      pksEl.innerHTML = '';
+      checked.forEach(function(cb) {
+        var pk = cb.closest('tr').dataset.pk;
+        var inp = document.createElement('input');
+        inp.type = 'hidden'; inp.name = 'pks'; inp.value = pk;
+        pksEl.appendChild(inp);
+      });
+    } else {
+      bar.classList.remove('visible');
+    }
+  }
+  function clearBulkSelection() {
+    document.querySelectorAll('.o-cb').forEach(function(cb) { cb.checked = false; });
+    updateBulkBar();
+  }
+  var chkAll = document.getElementById('chk-all');
+  if (chkAll) chkAll.addEventListener('change', function() {
+    document.querySelectorAll('.o-cb:not(#chk-all)').forEach(function(cb) { cb.checked = chkAll.checked; });
+    updateBulkBar();
+  });
+  document.querySelectorAll('.o-list tbody .o-cb').forEach(function(cb) {
+    cb.addEventListener('change', updateBulkBar);
+  });
+
+  // ── Status dropdown ──
+  function toggleStatusDd(btn) {
+    var pk = btn.closest('tr').dataset.pk;
+    var dd = document.getElementById('sdd-' + pk);
+    var isOpen = dd.classList.contains('open');
+    document.querySelectorAll('.o-status-dd.open').forEach(function(d) { d.classList.remove('open'); });
+    if (!isOpen) {
+      var rect = btn.getBoundingClientRect();
+      dd.style.top = (rect.bottom + 2) + 'px';
+      dd.style.left = rect.left + 'px';
+      dd.classList.add('open');
+      var dr = dd.getBoundingClientRect();
+      if (dr.right > window.innerWidth - 8) { dd.style.left = 'auto'; dd.style.right = (window.innerWidth - rect.right) + 'px'; }
+    }
+  }
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.o-status-wrap') && !e.target.closest('.o-dd-wrap')) {
+      document.querySelectorAll('.o-status-dd.open').forEach(function(d) { d.classList.remove('open'); });
+      document.querySelectorAll('.o-dd-panel.open').forEach(function(p) { p.classList.remove('open'); });
+    }
+  });
+
+  // ── Regroupement visuel générique ──
+  (function() {
+    var meta = document.getElementById('rdv-group-meta');
+    if (!meta || !meta.dataset.group) return;
+
+    var groupType = meta.dataset.group;
+    var tbody = document.querySelector('.o-list tbody');
+    if (!tbody) return;
+
+    var rows = Array.from(tbody.querySelectorAll('tr.rdv-row'));
+    if (rows.length === 0) return;
+
+    var counts = {};
+    try { counts = JSON.parse(meta.dataset.counts); } catch(e) {}
+
+    // Pour date_trimestre, normalise "YYYY-MM" → "YYYY-TQ"
+    function getGroupKey(raw) {
+      if (groupType === 'date_trimestre') {
+        var p = (raw || '').split('-');
+        if (p.length >= 2) return p[0] + '-T' + Math.ceil(parseInt(p[1]) / 3);
+      }
+      return raw || '';
+    }
+
+    // Libellé affiché dans l'en-tête
+    function getGroupLabel(key) {
+      var LABELS = {
+        type_visite_cpn: {cpn1:'CPN 1', cpn2:'CPN 2', cpn3:'CPN 3', cpn4:'CPN 4', autre:'Autre', '':'Non spécifié'},
+        statut:          {planifie:'Planifié', confirme:'Confirmé', en_attente:'En attente', en_consultation:'En consultation', termine:'Terminé', annule:'Annulé', absent:'Absent', '':'—'},
+        type_rdv:        {consultation:'Consultation', controle:'Contrôle / CPN', urgence:'Urgence', examen:'Examen', vaccination:'Vaccination', '':'—'},
+        type_visite:     {consultation:'Consultation', controle:'Contrôle / CPN', urgence:'Urgence', examen:'Examen', vaccination:'Vaccination', '':'—'},
+        sexe:            {F:'Féminin', M:'Masculin', '':'Non renseigné'},
+        departement:     {medecine_generale:'Médecine générale', gynecologie_cpn:'Gynécologie / CPN', '':'—'}
+      };
+      if (LABELS[groupType] && LABELS[groupType][key] !== undefined) return LABELS[groupType][key];
+
+      if (groupType === 'age')          return key ? key + ' ans' : 'Âge inconnu';
+      if (groupType === 'date_annee')   return key || '—';
+      if (groupType === 'date_jour') {
+        var p = (key || '').split('-');
+        return p.length === 3 ? p[2]+'/'+p[1]+'/'+p[0] : (key || '—');
+      }
+      if (groupType === 'date_semaine') {
+        var p = (key || '').split('-');
+        return p.length === 2 ? 'Semaine '+p[1]+' — '+p[0] : (key || '—');
+      }
+      if (groupType === 'date_mois') {
+        var MOIS = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+        var p = (key || '').split('-');
+        return p.length === 2 ? (MOIS[parseInt(p[1])-1] || p[1])+' '+p[0] : (key || '—');
+      }
+      if (groupType === 'date_trimestre') {
+        var p = (key || '').split('-T');
+        return p.length === 2 ? 'T'+p[1]+' — '+p[0] : (key || '—');
+      }
+      return key || '—';
+    }
+
+    // Construire la map des groupes (ordre d'apparition)
+    var groupMap = {}, groupOrder = [];
+    rows.forEach(function(row) {
+      var key = getGroupKey(row.dataset.grp || '');
+      if (!groupMap[key]) { groupMap[key] = []; groupOrder.push(key); }
+      groupMap[key].push(row);
+    });
+    if (groupOrder.length === 0) return;
+
+    // Reconstruire le tbody avec en-têtes dépliables
+    tbody.innerHTML = '';
+    groupOrder.forEach(function(key) {
+      var label = getGroupLabel(key);
+      var total = (counts[key] !== undefined) ? counts[key] : groupMap[key].length;
+      var grpRows = groupMap[key];
+
+      var hdr = document.createElement('tr');
+      hdr.className = 'o-grp-hdr';
+      hdr.innerHTML = '<td colspan="10"><span class="grp-arrow">&#9658;</span> ' + label + ' <span class="grp-count">('+total+')</span></td>';
+      tbody.appendChild(hdr);
+
+      grpRows.forEach(function(row) { row.style.display = 'none'; tbody.appendChild(row); });
+
+      hdr.addEventListener('click', function() {
+        var open = hdr.classList.toggle('open');
+        grpRows.forEach(function(row) { row.style.display = open ? '' : 'none'; });
+      });
+    });
+  })();
+
+  // Filtre par date
+  // Initialisation : ouvrir le bon bloc date selon l'URL actuelle
+  (function() {
+    ['block-single','block-range'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el && el.dataset.open === '1') { el.style.display = 'block'; }
+    });
+  })();
+
+  function toggleDateBlock(mode) {
+    var single = document.getElementById('block-single');
+    var range  = document.getElementById('block-range');
+    if (mode === 'single') {
+      var now = single.style.display !== 'none';
+      single.style.display = now ? 'none' : 'block';
+      range.style.display = 'none';
+    } else {
+      var now = range.style.display !== 'none';
+      range.style.display = now ? 'none' : 'block';
+      single.style.display = 'none';
+    }
+  }
+
+  function applyDateSingle() {
+    var date = document.getElementById('filter-date-single').value;
+    if (!date) return;
+    var params = new URLSearchParams(window.location.search);
+    params.set('date_from', date);
+    params.set('date_to',   date);
+    if (params.get('filter') === 'today') params.delete('filter');
+    window.location = '?' + params.toString();
+  }
+
+  function applyDateFilter() {
+    var from = document.getElementById('filter-date-from').value;
+    var to   = document.getElementById('filter-date-to').value;
+    if (!from && !to) return;
+    var params = new URLSearchParams(window.location.search);
+    if (from) params.set('date_from', from); else params.delete('date_from');
+    if (to)   params.set('date_to',   to);   else params.delete('date_to');
+    if (params.get('filter') === 'today') params.delete('filter');
+    window.location = '?' + params.toString();
+  }
+
+  // Entrée dans les champs date → valider
+  document.getElementById('filter-date-single').addEventListener('keydown', function(e){ if(e.key==='Enter') applyDateSingle(); });
+  ['filter-date-from','filter-date-to'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('keydown', function(e){ if(e.key==='Enter') applyDateFilter(); });
+  });
+
+  // Dropdowns Filtres / Regrouper par
+  function toggleDd(id, btn) {
+    var panel = document.getElementById(id);
+    var isOpen = panel.classList.contains('open');
+    document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
+    if (!isOpen) {
+      var rect = btn.getBoundingClientRect();
+      panel.style.top = (rect.bottom + 4) + 'px';
+      panel.style.left = rect.left + 'px';
+      panel.style.right = 'auto';
+      // Limiter la hauteur à l'espace disponible sous le bouton
+      panel.style.maxHeight = Math.max(200, window.innerHeight - rect.bottom - 12) + 'px';
+      panel.classList.add('open');
+      var pr = panel.getBoundingClientRect();
+      if (pr.right > window.innerWidth - 8) {
+        panel.style.left = 'auto';
+        panel.style.right = (window.innerWidth - rect.right) + 'px';
+      }
+    }
+  }
+  document.addEventListener('scroll', function(e) {
+    // Ne pas fermer si le scroll se passe à l'intérieur d'un dropdown
+    if (e.target && typeof e.target.closest === 'function' &&
+        e.target.closest('.o-dd-panel, .o-status-dd')) return;
+    document.querySelectorAll('.o-dd-panel.open, .o-status-dd.open').forEach(function(p){ p.classList.remove('open'); });
+  }, true);
+
+  // Colonnes redimensionnables
+  function initResizableCols(table) {
+    var ths = table.querySelectorAll('thead th');
+    ths.forEach(function(th) {
+      if (th.classList.contains('th-cb')) return;
+      var h = document.createElement('div');
+      h.className = 'o-col-resize';
+      th.appendChild(h);
+      h.addEventListener('mousedown', function(e) {
+        e.preventDefault(); e.stopPropagation();
+        var startX = e.pageX, startW = th.offsetWidth;
+        h.classList.add('active');
+        ths.forEach(function(t) { t.style.width = t.offsetWidth + 'px'; });
+        table.style.tableLayout = 'fixed';
+        function onMove(e) { th.style.width = Math.max(40, startW + e.pageX - startX) + 'px'; }
+        function onUp() { h.classList.remove('active'); document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); }
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      });
+    });
+  }
+  document.querySelectorAll('.o-list').forEach(initResizableCols);
+</script>
+
+<!-- ══ BARRE D'ACTIONS GROUPÉES ══ -->
+<div class="o-bulk-bar" id="bulk-bar">
+  <span class="o-bulk-count"><span id="bulk-count">0</span> sélectionné(s)</span>
+  <span class="o-bulk-sep"></span>
+  <span class="o-bulk-label">Changer le statut :</span>
+  <form method="post" action="{% url 'gynecologie_rdv_bulk' %}" id="bulk-form" style="display:contents;">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    <div id="bulk-pks" style="display:none;"></div>
+    {% for val, label in statut_choices %}
+    <button type="submit" name="action" value="{{ val }}" class="o-bulk-btn">{{ label }}</button>
+    {% endfor %}
+  </form>
+  <span class="o-bulk-sep"></span>
+  <button type="button" class="o-bulk-btn cancel" onclick="clearBulkSelection()">✕ Désélectionner</button>
+</div>
+
+<!-- ══ OVERLAY & PANNEAU D'APERÇU RAPIDE ══ -->
+<div class="o-preview-overlay" id="preview-overlay" onclick="closePreview()"></div>
+<div class="o-preview-panel" id="preview-panel">
+  <div class="preview-header">
+    <span class="preview-title" id="preview-title">—</span>
+    <button class="preview-close" onclick="closePreview()" title="Fermer">×</button>
+  </div>
+  <div class="preview-body">
+    <div class="preview-field">
+      <div class="preview-label">Patient</div>
+      <div class="preview-value" id="pv-patient">—</div>
+    </div>
+    <div class="preview-field">
+      <div class="preview-label">Date &amp; Heure</div>
+      <div class="preview-value" id="pv-date">—</div>
+    </div>
+    <div class="preview-field">
+      <div class="preview-label">Médecin</div>
+      <div class="preview-value" id="pv-medecin">—</div>
+    </div>
+    <div class="preview-field">
+      <div class="preview-label">Type de visite</div>
+      <div class="preview-value" id="pv-type">—</div>
+    </div>
+    <div class="preview-field">
+      <div class="preview-label">Motif</div>
+      <div class="preview-value" id="pv-motif" style="white-space:pre-wrap;">—</div>
+    </div>
+    <div class="preview-field">
+      <div class="preview-label">État</div>
+      <div class="preview-value" id="pv-statut">—</div>
+    </div>
+  </div>
+  <div class="preview-footer">
+    <a class="preview-btn primary" id="pv-open-btn" href="#">
+      <i class="bi bi-box-arrow-up-right"></i> Ouvrir le détail
+    </a>
+    <button class="preview-btn" onclick="closePreview()">Fermer</button>
+  </div>
+</div>
+{% endblock %}

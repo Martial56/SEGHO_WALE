@@ -1,7 +1,7 @@
 from django import forms
 from .models import Soin, ProcedureSoin, Maladie
 from patients.models import Patient, RendezVous
-from employe.models import Employe, Departement
+from employer.models import Employe, Departement
 from services.models import Articleservice
 from facturation.models import Facture
 

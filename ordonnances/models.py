@@ -18,7 +18,7 @@ class Maladie(models.Model):
 class GroupeMedicaments(models.Model):
     nom = models.CharField(max_length=300, verbose_name="Nom du groupe")
     medecin = models.ForeignKey(
-        'employe.Employe', on_delete=models.SET_NULL, null=True, blank=True,
+        'employer.Employe', on_delete=models.SET_NULL, null=True, blank=True,
         verbose_name="Docteur"
     )
     maladie = models.ForeignKey(
@@ -77,7 +77,7 @@ class Ordonnance(models.Model):
         related_name='ordonnances', verbose_name="Patient"
     )
     medecin = models.ForeignKey(
-        'employe.Employe', on_delete=models.SET_NULL, null=True, blank=True,
+        'employer.Employe', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='ordonnances', verbose_name="Docteur prescripteur"
     )
     groupe_medicaments = models.ForeignKey(

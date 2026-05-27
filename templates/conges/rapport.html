@@ -1,0 +1,230 @@
+{% extends 'conges/base.html' %}
+{% load static %}
+
+{% block topbar_title %}Rapport congés — {{ year }}{% endblock %}
+{% block cg_nav_rapport %}active{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+@media print {
+  .cg-nav,.cg-subheader,.topbar,.no-print{display:none !important;}
+  .content{padding:0 !important;}
+  body{background:#fff !important;color:#000 !important;}
+  .print-header{display:flex !important;}
+  .cg-card{box-shadow:none !important;border:1px solid #ddd !important;}
+  .cg-card-header{background:#f5f5f5 !important;}
+}
+.print-header{display:none;align-items:center;gap:16px;margin-bottom:24px;padding-bottom:16px;border-bottom:2px solid #4a7236;}
+.section-title-print{font-size:13px;font-weight:700;color:#4a7236;border-left:3px solid #4a7236;padding-left:10px;margin:20px 0 10px;text-transform:uppercase;letter-spacing:.4px;}
+.rapport-table{width:100%;border-collapse:collapse;font-size:13px;}
+.rapport-table th{padding:10px 14px;background:rgba(74,114,54,.08);font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--cg-text);border-bottom:2px solid var(--cg-border);}
+.rapport-table td{padding:10px 14px;border-bottom:1px solid var(--cg-border);color:var(--cg-text);}
+.rapport-table tbody tr:hover{background:rgba(74,114,54,.03);}
+.top-badge{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--cg-600);color:#fff;font-size:11px;font-weight:800;flex-shrink:0;}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Subheader filtres -->
+<div class="cg-subheader no-print">
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <div>
+      <h1 style="font-size:20px;font-weight:800;color:var(--cg-900);margin:0;">
+        <i class="bi bi-file-earmark-bar-graph" style="color:var(--cg-600);"></i> Rapport de congés
+      </h1>
+      <div style="font-size:12px;color:var(--cg-muted);">
+        Année {{ year }}{% if nom_mois %} — {{ nom_mois }}{% endif %}
+        {% if service_sel %} — {{ service_sel.nom }}{% endif %}
+      </div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+    <form method="get" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <input type="number" name="year" value="{{ year }}" min="2020" max="2099" class="cg-input" style="width:80px;padding:7px 10px;">
+      <select name="mois" class="cg-input" style="width:auto;">
+        <option value="">Toute l'année</option>
+        {% for m in "123456789101112"|make_list %}{% endfor %}
+        <option value="1"  {% if mois == 1  %}selected{% endif %}>Janvier</option>
+        <option value="2"  {% if mois == 2  %}selected{% endif %}>Février</option>
+        <option value="3"  {% if mois == 3  %}selected{% endif %}>Mars</option>
+        <option value="4"  {% if mois == 4  %}selected{% endif %}>Avril</option>
+        <option value="5"  {% if mois == 5  %}selected{% endif %}>Mai</option>
+        <option value="6"  {% if mois == 6  %}selected{% endif %}>Juin</option>
+        <option value="7"  {% if mois == 7  %}selected{% endif %}>Juillet</option>
+        <option value="8"  {% if mois == 8  %}selected{% endif %}>Août</option>
+        <option value="9"  {% if mois == 9  %}selected{% endif %}>Septembre</option>
+        <option value="10" {% if mois == 10 %}selected{% endif %}>Octobre</option>
+        <option value="11" {% if mois == 11 %}selected{% endif %}>Novembre</option>
+        <option value="12" {% if mois == 12 %}selected{% endif %}>Décembre</option>
+      </select>
+      <select name="service" class="cg-input" style="width:auto;min-width:130px;">
+        <option value="">Tous services</option>
+        {% for svc in services %}
+        <option value="{{ svc.pk }}" {% if service_sel and service_sel.pk == svc.pk %}selected{% endif %}>{{ svc.nom }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn-cg"><i class="bi bi-search"></i> Filtrer</button>
+    </form>
+    <a href="?year={{ year }}{% if mois %}&mois={{ mois }}{% endif %}{% if service_sel %}&service={{ service_sel.pk }}{% endif %}&export=csv" class="btn-cg-outline">
+      <i class="bi bi-download"></i> CSV
+    </a>
+    <button onclick="window.print()" class="btn-cg-outline"><i class="bi bi-printer"></i> Imprimer</button>
+  </div>
+</div>
+
+<!-- En-tête impression -->
+<div class="print-header">
+  <img src="{% static 'logo.png' %}" alt="Logo WALÉ" style="width:56px;height:56px;object-fit:contain;">
+  <div>
+    <div style="font-size:20px;font-weight:800;color:#4a7236;">Centre Médico-Social WALÉ</div>
+    <div style="font-size:13px;color:#555;">Rapport de congés — Année {{ year }}{% if nom_mois %} / {{ nom_mois }}{% endif %}{% if service_sel %} — {{ service_sel.nom }}{% endif %}</div>
+    <div style="font-size:12px;color:#888;">Généré le {{ today|date:"d/m/Y" }}</div>
+  </div>
+</div>
+
+<!-- Résumé global -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-top:24px;">
+  <div class="cg-card" style="padding:16px 20px;">
+    <div style="font-size:26px;font-weight:800;color:var(--cg-600);">{{ total_conges }}</div>
+    <div style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--cg-muted);">Total congés</div>
+  </div>
+  <div class="cg-card" style="padding:16px 20px;">
+    <div style="font-size:26px;font-weight:800;color:var(--cg-600);">{{ total_jours }}</div>
+    <div style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--cg-muted);">Jours ouvrés pris</div>
+  </div>
+  <div class="cg-card" style="padding:16px 20px;">
+    <div style="font-size:26px;font-weight:800;color:var(--cg-600);">{{ stats_type|length }}</div>
+    <div style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--cg-muted);">Types de congé utilisés</div>
+  </div>
+</div>
+
+<!-- Par type de congé -->
+<div class="cg-card" style="margin-top:20px;">
+  <div class="cg-card-header">
+    <div class="cg-card-title"><i class="bi bi-tags"></i> Répartition par type de congé</div>
+  </div>
+  <table class="rapport-table">
+    <thead>
+      <tr>
+        <th>Type de congé</th>
+        <th style="text-align:right;">Nb demandes</th>
+        <th style="text-align:right;">Jours ouvrés</th>
+        <th style="text-align:right;">Moy. jours/demande</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in stats_type %}
+      <tr>
+        <td style="font-weight:600;">{{ t.type_label }}</td>
+        <td style="text-align:right;">{{ t.nb }}</td>
+        <td style="text-align:right;font-weight:700;color:var(--cg-600);">{{ t.jours }} j</td>
+        <td style="text-align:right;color:var(--cg-muted);">
+          {% if t.nb > 0 %}{% widthratio t.jours t.nb 1 %}{% else %}0{% endif %} j
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="4" style="text-align:center;padding:30px;color:var(--cg-muted);">Aucune donnée</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Par service -->
+<div class="cg-card" style="margin-top:20px;">
+  <div class="cg-card-header">
+    <div class="cg-card-title"><i class="bi bi-building"></i> Répartition par service</div>
+  </div>
+  <table class="rapport-table">
+    <thead>
+      <tr>
+        <th>Service</th>
+        <th style="text-align:right;">Nb employés concernés</th>
+        <th style="text-align:right;">Nb congés</th>
+        <th style="text-align:right;">Jours ouvrés</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in stats_service_list %}
+      <tr>
+        <td style="font-weight:600;">{{ s.service }}</td>
+        <td style="text-align:right;color:var(--cg-muted);">{{ s.nb_employes }}</td>
+        <td style="text-align:right;">{{ s.nb }}</td>
+        <td style="text-align:right;font-weight:700;color:var(--cg-600);">{{ s.jours }} j</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="4" style="text-align:center;padding:30px;color:var(--cg-muted);">Aucune donnée</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Top 10 absences -->
+<div class="cg-card" style="margin-top:20px;">
+  <div class="cg-card-header">
+    <div class="cg-card-title"><i class="bi bi-trophy"></i> Top 10 — Employés avec le plus de jours de congé</div>
+  </div>
+  <table class="rapport-table">
+    <thead>
+      <tr>
+        <th style="width:40px;text-align:center;">#</th>
+        <th>Employé</th>
+        <th>Service</th>
+        <th style="text-align:right;">Nb congés</th>
+        <th style="text-align:right;">Jours ouvrés</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in top_absences %}
+      <tr>
+        <td style="text-align:center;"><span class="top-badge">{{ forloop.counter }}</span></td>
+        <td>
+          <div style="font-weight:600;color:var(--cg-text);">{{ item.emp.nom_complet }}</div>
+          <div style="font-size:11px;color:var(--cg-muted);font-family:monospace;">{{ item.emp.matricule }}</div>
+        </td>
+        <td style="color:var(--cg-muted);font-size:12.5px;">{{ item.emp.service.nom|default:"—" }}</td>
+        <td style="text-align:right;">{{ item.nb }}</td>
+        <td style="text-align:right;font-weight:700;color:var(--cg-600);">{{ item.jours }} j</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5" style="text-align:center;padding:30px;color:var(--cg-muted);">Aucune donnée</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Répartition mensuelle -->
+<div class="cg-card" style="margin-top:20px;">
+  <div class="cg-card-header">
+    <div class="cg-card-title"><i class="bi bi-calendar3"></i> Répartition mensuelle</div>
+  </div>
+  <table class="rapport-table">
+    <thead>
+      <tr>
+        <th>Mois</th>
+        <th style="text-align:right;">Nb congés</th>
+        <th style="text-align:right;">Jours ouvrés</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for rm in repartition_mensuelle %}
+      {% if rm.nb > 0 %}
+      <tr>
+        <td style="font-weight:600;">{{ rm.mois }}</td>
+        <td style="text-align:right;">{{ rm.nb }}</td>
+        <td style="text-align:right;color:var(--cg-600);font-weight:700;">{{ rm.jours }} j</td>
+      </tr>
+      {% endif %}
+      {% empty %}
+      <tr><td colspan="3" style="text-align:center;padding:30px;color:var(--cg-muted);">Aucune donnée</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div style="margin-top:12px;font-size:11.5px;color:var(--cg-muted);text-align:right;">
+  Rapport généré le {% now "d/m/Y à H:i" %} — Centre Médico-Social WALÉ
+</div>
+
+{% endblock %}

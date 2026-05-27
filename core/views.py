@@ -36,7 +36,7 @@ def dashboard(request):
     from pharmacie.models import Medicament
     from facturation.models import Facture
     from laboratoire.models import AnalyseLaboratoire
-    from employe.models import Employe
+    from employer.models import Employe
     from modules_permissions.models import get_user_modules
 
     today = timezone.now().date()
@@ -51,7 +51,7 @@ def dashboard(request):
         # 'factures_impayees': Facture.objects.filter(statut__in=['emise', 'partielle']).count(),
         'factures_impayees': 0,
         'medicaments_alerte': Medicament.objects.filter(stock_actuel__lte=F('stock_alerte')).count(),
-        'employes_actifs': Employe.objects.filter(actif=True).count(),
+        'employes_actifs': Employe.objects.filter(statut='actif').count(),
     }
 
     rdv_auj = RendezVous.objects.filter(
@@ -99,16 +99,16 @@ def patients_list(request):
 
 @login_required(login_url='login')
 def medecins_list(request):
-    from employe.models import Employe
+    from employer.models import Employe
     from django.core.paginator import Paginator
 
     medecins = Employe.objects.filter(est_medecin=True).order_by('nom')
     paginator = Paginator(medecins, 25)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-    stats = {'total': medecins.count(), 'consultations_mois': 0, 'disponibles': medecins.filter(actif=True).count()}
+    stats = {'total': medecins.count(), 'consultations_mois': 0, 'disponibles': medecins.filter(statut='actif').count()}
     breadcrumb = [{'title': 'Accueil', 'url': '/'}, {'title': 'Médecins'}]
-    return render(request, 'employe/list.html', {'page_obj': page_obj, 'stats': stats, 'breadcrumb': breadcrumb})
+    return render(request, 'utilisateur/list.html', {'page_obj': page_obj, 'stats': stats, 'breadcrumb': breadcrumb})
 
 
 @login_required(login_url='login')

@@ -32,10 +32,12 @@
       <span style="color:var(--text);">{% if is_new %}Nouveau soin{% else %}Modifier{% endif %}</span>
     </span>
     <div class="sh-actions">
+      {% if is_new or current_statut == 'brouillon' %}
       <button type="submit" form="soin-form" name="action" value="save" class="sh-btn-save">
         <i class="bi bi-floppy"></i>
         Sauvegarder
       </button>
+      {% endif %}
       <a href="{% if is_new %}{% url 'soins:list' %}{% else %}{% url 'soins:detail' soin.pk %}{% endif %}"
         class="sh-btn-ignore">
         <i class="bi bi-x"></i> Ignorer
@@ -63,66 +65,62 @@
   <!-- ══ EN-TÊTE ══ -->
   <div class="art-header">
 
-    <!-- 1. Barre boutons (gauche) + statuts (droite) -->
+    <!-- 1. Barre de progression statut -->
     <div class="art-status-bar">
-      <div class="art-action-btns" id="action-btns">
-
-        {% if is_new or current_statut == 'brouillon' %}
-          <button type="submit" name="action" value="confirm" class="ab-btn ab-btn-confirm"
-            id="btn-confirmer" style="display:none;">
-            <i class="bi bi-check2-circle"></i> Confirmer
-          </button>
-        {% elif current_statut == 'en_cours' %}
-          <button type="submit" name="action" value="terminé" class="ab-btn ab-btn-termine">
-            <i class="bi bi-check-circle-fill"></i> Terminé
-          </button>
-          <button type="submit" name="action" value="lab" class="ab-btn ab-btn-lab">
-            <i class="bi bi-clipboard2-pulse"></i> Demande de lab
-          </button>
-        {% endif %}
-
-        {% if request.user.is_staff %}
-        <button type="button" class="ab-btn ab-btn-invoice" id="btn-creer-facture"
-          onclick="demanderFacture()" data-is-new="{{ is_new|yesno:'1,0' }}">
-          <i class="bi bi-receipt"></i> Créer une facture <small style="opacity:.6;font-size:9px;">(ad)</small>
-        </button>
-        {% endif %}
-
-      </div>
-      <div class="art-status-chips">
-        {% for val, label in form.statut.field.choices %}
-        <span class="art-status-chip chip-{{ val }} {% if current_statut == val %}chip-active{% endif %}">
-          <span class="chip-dot"></span>{{ label }}
-        </span>
-        {% endfor %}
+      <div class="stp-stepper" id="stp-stepper" data-active="{{ current_statut }}">
+        <div class="stp-flow">
+          <div class="stp-step" data-val="brouillon">
+            <i class="bi bi-pencil stp-icon"></i>
+            <span class="stp-label">Brouillon</span>
+          </div>
+          <div class="stp-step" data-val="en_attente_de_paiement">
+            <i class="bi bi-clock stp-icon"></i>
+            <span class="stp-label">Attente paiement</span>
+          </div>
+          <div class="stp-step" data-val="en_cours">
+            <i class="bi bi-activity stp-icon"></i>
+            <span class="stp-label">En cours</span>
+          </div>
+          <div class="stp-step" data-val="termine">
+            <i class="bi bi-check2-circle stp-icon"></i>
+            <span class="stp-label">Terminé</span>
+          </div>
+        </div>
+        <div class="stp-sep"></div>
+        <div class="stp-annule" data-val="annule">
+          <i class="bi bi-x-circle stp-icon"></i>
+          <span class="stp-label">Annulé</span>
+        </div>
       </div>
     </div>
 
     <!-- 2. Navigation rapide -->
     <nav class="art-quick-nav art-quick-nav--incard">
       <div style="flex:1;"></div>
-      <div class="art-qnav-sep"></div>
-      <a href="{% url 'soins:rdv_list' %}{% if not is_new %}?patient_id={{ soin.patient.pk }}&next={% url 'soins:edit' soin.pk %}{% endif %}"
-         id="qnav-rdv-link" class="art-qnav-link">
-        <i class="bi bi-calendar-check"></i> Rendez-vous
-        <span class="qnav-count">{{ counts.rdv|default:0 }}</span>
-      </a>
-      <div class="art-qnav-sep"></div>
-      <a href="{% url 'soins:list' %}{% if not is_new %}?patient_id={{ soin.patient.pk }}{% endif %}"
-        class="art-qnav-link" target="_blank">
-        <i class="bi bi-bandaid"></i> Liste des soins
-        {% if not is_new %}<span class="qnav-count qnav-count-gray" id="count-soins-patient">—</span>{% endif %}
-      </a>
-      <div class="art-qnav-sep"></div>
-      <a href="{% url 'soins:demande_examen_list' %}{% if not is_new %}?patient_id={{ soin.patient.pk }}{% endif %}" class="art-qnav-link">
-        <i class="bi bi-clipboard2-pulse"></i> Demandes d'examen
-        <span class="qnav-count">{{ counts.examens|default:0 }}</span>
-      </a>
-      <div class="art-qnav-sep"></div>
-      <a href="#" class="art-qnav-link">
-        <i class="bi bi-graph-up"></i> Résultats de traitement
-        <span class="qnav-count qnav-count-green">{{ counts.analyses|default:0 }}</span>
-      </a>
+      <div id="qnav-patient-section" style="{% if is_new and not form.patient.value %}display:none{% else %}display:contents{% endif %}">
+        <div class="art-qnav-sep"></div>
+        <a href="{% url 'soins:rdv_list' %}{% if not is_new %}?patient_id={{ soin.patient.pk }}&next={% url 'soins:edit' soin.pk %}{% endif %}"
+           id="qnav-rdv-link" class="art-qnav-link">
+          <i class="bi bi-calendar-check"></i> Rendez-vous
+          <span class="qnav-count" id="count-rdv">{{ counts.rdv|default:0 }}</span>
+        </a>
+        <div class="art-qnav-sep"></div>
+        <a href="{% url 'soins:list' %}{% if not is_new %}?patient_id={{ soin.patient.pk }}{% endif %}"
+          id="qnav-soins-link" class="art-qnav-link" target="_blank">
+          <i class="bi bi-bandaid"></i> Liste des soins
+        </a>
+        <div class="art-qnav-sep"></div>
+        <a href="{% url 'soins:demande_examen_list' %}{% if not is_new %}?patient_id={{ soin.patient.pk }}&next={% url 'soins:edit' soin.pk %}{% endif %}"
+          id="qnav-exam-link" class="art-qnav-link">
+          <i class="bi bi-clipboard2-pulse"></i> Demandes d'examen
+          <span class="qnav-count" id="count-exam">{{ counts.examens|default:0 }}</span>
+        </a>
+        <div class="art-qnav-sep"></div>
+        <a href="#" class="art-qnav-link">
+          <i class="bi bi-graph-up"></i> Résultats de traitement
+          <span class="qnav-count qnav-count-green" id="count-result">{{ counts.analyses|default:0 }}</span>
+        </a>
+      </div>
     </nav>
 
     <!-- 3. Identité -->
@@ -196,7 +194,7 @@
                   {% endfor %}
                 </ul>
                 <div id="dep-create-hint" class="svc-create-hint" style="display:none;">
-                  <a id="dep-create-link" href="{% url 'employe:departement_create' %}" class="svc-create-link" target="_blank">
+                  <a id="dep-create-link" href="{% url 'employer:departement_create' %}" class="svc-create-link" target="_blank">
                     <i class="bi bi-plus-circle"></i>
                     Nouveau département <strong id="dep-create-term"></strong>
                   </a>
@@ -232,7 +230,7 @@
                   {% endfor %}
                 </ul>
                 <div id="inf-create-hint" class="svc-create-hint" style="display:none;">
-                  <a id="inf-create-link" href="{% url 'employe:create' %}" class="svc-create-link" target="_blank">
+                  <a id="inf-create-link" href="{% url 'employer:rh_nouveau' %}" class="svc-create-link" target="_blank">
                     <i class="bi bi-plus-circle"></i>
                     Nouvel agent <strong id="inf-create-term"></strong>
                   </a>
@@ -241,11 +239,67 @@
             </div>
           </div>
 
-          <!-- Service d'inscription — désactivé temporairement -->
+          <!-- Service d'inscription -->
+          <div>
+            <label class="art-field-label">Service d'inscription</label>
+            <input type="hidden" name="service_inscription" id="svc-insc-hidden" value="{{ form.service_inscription.value|default:'' }}">
+            <div class="svc-select" id="svc-insc-select" style="z-index:160;">
+              <div class="svc-display" id="svc-insc-display" tabindex="0">
+                {% if form.service_inscription.value %}
+                  {% for s in form.service_inscription.field.queryset %}{% if form.service_inscription.value|stringformat:"s" == s.pk|stringformat:"s" %}<span>{{ s.nom }}</span>{% endif %}{% endfor %}
+                {% else %}
+                  <span class="svc-placeholder">— Aucun service —</span>
+                {% endif %}
+                <i class="bi bi-chevron-down svc-chevron"></i>
+              </div>
+              <div class="svc-dropdown" id="svc-insc-dropdown">
+                <div class="svc-search-wrap">
+                  <i class="bi bi-search"></i>
+                  <input type="text" class="svc-search" id="svc-insc-search" placeholder="Rechercher un service…" autocomplete="off">
+                </div>
+                <ul class="svc-list" id="svc-insc-list">
+                  <li class="svc-option" data-value="">— Aucun —</li>
+                  {% for s in form.service_inscription.field.queryset %}
+                  <li class="svc-option {% if form.service_inscription.value|stringformat:"s" == s.pk|stringformat:"s" %}selected{% endif %}"
+                      data-value="{{ s.pk }}">{{ s.nom }}</li>
+                  {% endfor %}
+                </ul>
+              </div>
+            </div>
+          </div>
 
         </div>
 
-        <!-- Rendez-vous lié — désactivé temporairement -->
+        <!-- Rendez-vous lié -->
+        <div style="margin-top:14px;">
+          <label class="art-field-label" style="margin-bottom:6px;display:block;">
+            Rendez-vous lié <small style="color:var(--text-muted);font-weight:400;">(optionnel)</small>
+          </label>
+          <input type="hidden" name="rendez_vous" id="rdv-lnk-hidden" value="{{ form.rendez_vous.value|default:'' }}">
+          <div class="svc-select" id="rdv-lnk-select" style="z-index:150;">
+            <div class="svc-display" id="rdv-lnk-display" tabindex="0">
+              {% if form.rendez_vous.value %}
+                {% for rdv in form.rendez_vous.field.queryset %}{% if form.rendez_vous.value|stringformat:"s" == rdv.pk|stringformat:"s" %}<span>{{ rdv.patient.nom }} {{ rdv.patient.prenoms }} — {{ rdv.date_heure|date:"d/m/Y H:i" }}</span>{% endif %}{% endfor %}
+              {% else %}
+                <span class="svc-placeholder">— Aucun rendez-vous —</span>
+              {% endif %}
+              <i class="bi bi-chevron-down svc-chevron"></i>
+            </div>
+            <div class="svc-dropdown" id="rdv-lnk-dropdown">
+              <div class="svc-search-wrap">
+                <i class="bi bi-search"></i>
+                <input type="text" class="svc-search" id="rdv-lnk-search" placeholder="Rechercher un rendez-vous…" autocomplete="off">
+              </div>
+              <ul class="svc-list" id="rdv-lnk-list">
+                <li class="svc-option" data-value="">— Aucun —</li>
+                {% for rdv in form.rendez_vous.field.queryset %}
+                <li class="svc-option {% if form.rendez_vous.value|stringformat:"s" == rdv.pk|stringformat:"s" %}selected{% endif %}"
+                    data-value="{{ rdv.pk }}">{{ rdv.patient.nom }} {{ rdv.patient.prenoms }} — {{ rdv.date_heure|date:"d/m/Y H:i" }}{% if rdv.motif %} — {{ rdv.motif|truncatechars:40 }}{% endif %}</li>
+                {% endfor %}
+              </ul>
+            </div>
+          </div>
+        </div>
 
       </div>
 
@@ -287,11 +341,6 @@
         <span class="lignes-title">
           <i class="bi bi-table" style="color:var(--accent);"></i> Lignes de soins
         </span>
-        {% if request.user.is_staff %}
-        <button type="button" class="btn-facture-comb" id="btn-facture-comb" disabled onclick="creerFactureCombinee()">
-          <i class="bi bi-receipt-cutoff"></i> Créer une facture combinée <small style="opacity:.6;font-size:9px;">(ad)</small>
-        </button>
-        {% endif %}
       </div>
 
       <!-- Tableau lignes de soins -->
@@ -306,13 +355,12 @@
               <th>Prix (CFA)</th>
               <th>Infirmier</th>
               <th>Date</th>
-              <th>État</th>
               <th style="width:36px;"></th>
             </tr>
           </thead>
           <tbody id="lignes-body">
             <tr id="add-ligne-row">
-              <td colspan="9" style="padding:0;">
+              <td colspan="8" style="padding:0;">
                 <button type="button" class="btn-tfoot-add" onclick="ajouterLigne()">
                   <i class="bi bi-plus-lg"></i> Ajouter une ligne
                 </button>
@@ -328,6 +376,17 @@
         <textarea name="observations" class="field-ul" rows="4"
           placeholder="Observations cliniques, soins effectués…">{{ form.observations.value|default:'' }}</textarea>
       </div>
+
+      {% if is_new or current_statut == 'brouillon' %}
+      <!-- Bouton Enregistrer (passe en attente de paiement) -->
+      <div style="padding:12px 0 4px;border-top:1px solid var(--border);margin-top:12px;display:flex;justify-content:flex-end;">
+        <button type="submit" form="soin-form" name="action" value="enregistrer"
+          id="btn-enregistrer"
+          style="padding:8px 22px;background:#1a5c4a;color:#fff;border:none;border-radius:5px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:7px;font-family:'Roboto',sans-serif;">
+          <i class="bi bi-send-check"></i> Enregistrer &amp; envoyer à la caisse
+        </button>
+      </div>
+      {% endif %}
 
     </div><!-- /tab-soins-apportes -->
 
@@ -432,8 +491,12 @@
   "rdvs":       {{ rdvs_json|safe }},
   "procedures": {{ procedures_json|safe }},
   "isNew":      {% if is_new %}true{% else %}false{% endif %},
-  "rdvListUrl": "{% url 'soins:rdv_list' %}",
-  "editUrl":    "{% if not is_new %}{% url 'soins:edit' soin.pk %}{% else %}{% url 'soins:create' %}{% endif %}"
+  "rdvListUrl":       "{% url 'soins:rdv_list' %}",
+  "soinsListUrl":     "{% url 'soins:list' %}",
+  "examListUrl":      "{% url 'soins:demande_examen_list' %}",
+  "patientCountsUrl": "{% url 'soins:patient_counts' %}",
+  "editUrl":          "{% if not is_new %}{% url 'soins:edit' soin.pk %}{% else %}{% url 'soins:create' %}{% endif %}",
+  "soinNumero":       "{% if not is_new %}{{ soin.numero }}{% endif %}"
 }
 </script>
 <script>
@@ -442,12 +505,6 @@ var SERVICES = _d.services;
 var EMPLOYES = _d.employes;
 var PATIENTS = _d.patients;
 var RDV_LIST = _d.rdvs;
-var STATUTS   = [
-  {val:'brouillon', label:'Brouillon'},
-  {val:'en_cours',  label:'En cours'},
-  {val:'termine',   label:'Terminé'},
-  {val:'annule',    label:'Annulé'}
-];
 var lignesCount = 0;
 
 /* ── Fonctions utilitaires ── */
@@ -468,59 +525,18 @@ function buildSelect(name, items, labelFn, valKey, placeholder){
   return s;
 }
 
-/* ── Mise à jour bouton facture ── */
+/* ── Mise à jour bouton Enregistrer (activation si lignes présentes) ── */
 function majBtnFacture(){
-  var rows    = document.querySelectorAll('#lignes-body tr.ligne-row');
-  var btn     = document.getElementById('btn-facture-comb');
-  var btnFact = document.getElementById('btn-creer-facture');
-  var patHid  = document.getElementById('pat-hidden');
-  var hasPatient = patHid && patHid.value !== '';
-
-  /* Bouton "Créer une facture" : visible si patient sélectionné ET pas de lignes */
-  if(btnFact){
-    btnFact.style.display = (hasPatient && rows.length === 0) ? '' : 'none';
-  }
-
-  /* Bouton "Créer une facture combinée" : actif si lignes présentes */
+  var rows = document.querySelectorAll('#lignes-body tr.ligne-row');
+  var btn  = document.getElementById('btn-facture-comb');
   if(btn){
-    if(rows.length > 0){
-      btn.disabled = false;
-      btn.classList.remove('btn-facture-comb--disabled');
-    } else {
-      btn.disabled = true;
-      btn.classList.add('btn-facture-comb--disabled');
-    }
+    btn.disabled = rows.length === 0;
+    btn.classList.toggle('btn-facture-comb--disabled', rows.length === 0);
   }
-
 }
 
-/* ── Mise à jour bouton Confirmer ── */
 function majBtnConfirmer(){
-  var btn = document.getElementById('btn-confirmer');
-  if(!btn) return; /* pas en mode brouillon/nouveau */
-
-  /* 1. Champs obligatoires */
-  var patient     = document.getElementById('pat-hidden');
-  var departement = document.getElementById('dep-hidden');
-  var dateHeure   = document.querySelector('input[name="date_heure"]');
-
-  var champsOk = (
-    patient    && patient.value    !== '' &&
-    departement && departement.value !== '' &&
-    dateHeure  && dateHeure.value  !== '' && dateHeure.value !== 'T'
-  );
-
-  /* 2. Au moins une ligne ET toutes les lignes ont statut "courant" ou "terminé" */
-  var lignes = document.querySelectorAll('#lignes-body tr.ligne-row');
-  var toutesValides = lignes.length > 0;
-  lignes.forEach(function(tr){
-    var s = tr.querySelector('select[name*="[statut]"]');
-    if(!s || s.value === '' || s.value === 'brouillon' || s.value === 'annule'){
-      toutesValides = false;
-    }
-  });
-
-  btn.style.display = (champsOk && toutesValides) ? '' : 'none';
+  /* gardé pour compatibilité JS — ne fait plus rien */
 }
 
 /* ── Ajouter une ligne (initial = valeurs optionnelles pour pré-remplissage) ── */
@@ -535,12 +551,6 @@ function ajouterLigne(initial){
     function(s){ return s.nom; }, 'pk', '— Soin —');
   var infirmierSel = buildSelect('lignes['+idx+'][infirmier]', EMPLOYES,
     function(e){ return e.nom+' '+e.prenoms; }, 'pk', '— Infirmier —');
-  var statutSel = '<select name="lignes['+idx+'][statut]" class="ligne-select">';
-  STATUTS.forEach(function(st){
-    statutSel += '<option value="'+st.val+'">'+st.label+'</option>';
-  });
-  statutSel += '</select>';
-
   var tr = document.createElement('tr');
   tr.className = 'ligne-row';
   tr.dataset.idx = idx;
@@ -552,7 +562,6 @@ function ajouterLigne(initial){
     '<td><input type="text" class="ligne-inp ligne-prix" name="lignes['+idx+'][prix]" placeholder="0 CFA" readonly style="width:90px;"></td>',
     '<td>'+infirmierSel+'</td>',
     '<td><input type="date" class="ligne-inp" name="lignes['+idx+'][date]" value="'+todayVal()+'" style="width:120px;"></td>',
-    '<td>'+statutSel+'</td>',
     '<td><button type="button" class="ligne-del" onclick="supprimerLigne(this)" title="Supprimer"><i class="bi bi-trash3"></i></button></td>',
   ].join('');
 
@@ -585,10 +594,6 @@ function ajouterLigne(initial){
   if(initial.date){
     tr.querySelector('input[name="lignes['+idx+'][date]"]').value = initial.date;
   }
-  if(initial.statut){
-    tr.querySelector('select[name="lignes['+idx+'][statut]"]').value = initial.statut;
-  }
-
   /* Écouter changement de service → auto-prix */
   tr.querySelector('select[name="lignes['+idx+'][service]"]').addEventListener('change', function(){
     var pk = this.value;
@@ -604,9 +609,6 @@ function ajouterLigne(initial){
     var p = PATIENTS.find(function(x){ return String(x.pk) === String(pk); });
     tr.querySelector('.ligne-code').value = p ? p.code_patient : '';
   });
-
-  /* Écouter changement de statut → maj bouton Confirmer */
-  tr.querySelector('select[name="lignes['+idx+'][statut]"]').addEventListener('change', majBtnConfirmer);
 
   majBtnFacture();
   majBtnConfirmer();
@@ -624,20 +626,8 @@ function toggleAll(cb){
   document.querySelectorAll('input[name="lignes_sel"]').forEach(function(c){ c.checked = cb.checked; });
 }
 
-/* ── Créer une facture combinée ── */
-function creerFactureCombinee(){
-  var rows = document.querySelectorAll('#lignes-body tr.ligne-row');
-  if(!rows.length){ alert('Ajoutez au moins une ligne de soin.'); return; }
-  alert('Fonctionnalité : création de facture combinée en cours de développement.\n'+rows.length+' ligne(s) sélectionnée(s).');
-}
-
-/* ── Créer une facture (simple) ── */
-function demanderFacture(){
-  var patSel = document.getElementById('pat-hidden');
-  var patientId = patSel ? patSel.value : '';
-  if(!patientId){ alert('Veuillez sélectionner un patient avant de créer une facture.'); return; }
-  window.location.href = '{% url "facturation_create" %}?patient_id=' + patientId;
-}
+/* ── Créer une facture combinée (désactivé — flow géré par la caisse) ── */
+function creerFactureCombinee(){ }
 
 /* ── Fermeture globale au clic en dehors ── */
 document.addEventListener('click', function(e) {
@@ -647,20 +637,50 @@ document.addEventListener('click', function(e) {
   }
 });
 
-/* ── Lien "Rendez-vous" dans la nav rapide filtré par patient ── */
+/* ── Nav rapide : affichage conditionnel + liens + compteurs patient ── */
 (function(){
-  var rdvLink = document.getElementById('qnav-rdv-link');
-  var RDV_LIST_URL = _d.rdvListUrl;
-  var EDIT_URL = _d.editUrl;
-  window.majRdvLink = function(patientId) {
-    if (rdvLink) {
-      rdvLink.href = patientId
-        ? RDV_LIST_URL + '?patient_id=' + patientId + '&next=' + encodeURIComponent(EDIT_URL)
-        : RDV_LIST_URL;
+  var section   = document.getElementById('qnav-patient-section');
+  var rdvLink   = document.getElementById('qnav-rdv-link');
+  var soinsLink = document.getElementById('qnav-soins-link');
+  var examLink  = document.getElementById('qnav-exam-link');
+  var RDV_URL    = _d.rdvListUrl;
+  var SOINS_URL  = _d.soinsListUrl;
+  var EXAM_URL   = _d.examListUrl;
+  var COUNTS_URL = _d.patientCountsUrl;
+  var EDIT_URL   = _d.editUrl;
+
+  function majCompteurs(c) {
+    var el;
+    el = document.getElementById('count-rdv');    if (el) el.textContent = c.rdv      || 0;
+    el = document.getElementById('count-exam');   if (el) el.textContent = c.examens  || 0;
+    el = document.getElementById('count-result'); if (el) el.textContent = c.analyses || 0;
+  }
+
+  window.majQnavLinks = function(patientId) {
+    /* URL de retour + libellé du fil d'ariane */
+    var returnUrl  = (_d.isNew && patientId) ? EDIT_URL + '?patient_id=' + patientId : EDIT_URL;
+    var backLabel  = _d.isNew ? 'Nouveau soin' : (_d.soinNumero || 'Soin');
+
+    /* Afficher la section seulement si un patient est sélectionné */
+    if (section) section.style.display = patientId ? 'contents' : 'none';
+
+    /* Mettre à jour les hrefs */
+    if (rdvLink)   rdvLink.href   = patientId ? RDV_URL   + '?patient_id=' + patientId + '&next=' + encodeURIComponent(returnUrl) + '&back_label=' + encodeURIComponent(backLabel) : RDV_URL;
+    if (soinsLink) soinsLink.href = patientId ? SOINS_URL + '?patient_id=' + patientId : SOINS_URL;
+    if (examLink)  examLink.href  = patientId ? EXAM_URL  + '?patient_id=' + patientId + '&next=' + encodeURIComponent(returnUrl) + '&back_label=' + encodeURIComponent(backLabel) : EXAM_URL;
+
+    /* Rafraîchir les compteurs via AJAX */
+    if (patientId && COUNTS_URL) {
+      fetch(COUNTS_URL + '?patient_id=' + patientId)
+        .then(function(r) { return r.json(); })
+        .then(majCompteurs)
+        .catch(function() {});
     }
   };
+  window.majRdvLink = window.majQnavLinks;
+
   var patHid = document.getElementById('pat-hidden');
-  if (patHid && patHid.value) window.majRdvLink(patHid.value);
+  if (patHid && patHid.value) window.majQnavLinks(patHid.value);
 })();
 
 /* ── Date/heure → maj bouton Confirmer ── */
@@ -756,22 +776,24 @@ makeDrop({
   onPick: function(li) {
     majBtnFacture();
     majBtnConfirmer();
-    if (window.majRdvLink) window.majRdvLink(li.dataset.value);
+    if (window.majQnavLinks) window.majQnavLinks(li.dataset.value);
   }
 });
 makeDrop({
   prefix: 'dep',
   placeholder: '— Département —',
-  createBase: '{% url "employe:departement_create" %}',
+  createBase: '{% url "employer:departement_create" %}',
   onPick: function() { majBtnConfirmer(); }
 });
 makeDrop({
   prefix: 'inf',
   placeholder: '— Sélectionner un agent —',
-  createBase: '{% url "employe:create" %}'
+  createBase: '{% url "employer:rh_nouveau" %}'
 });
 makeDrop({ prefix: 'stm', placeholder: '— Sélectionner —' });
 makeDrop({ prefix: 'sev', placeholder: '— Sélectionner —' });
+makeDrop({ prefix: 'svc-insc', placeholder: '— Aucun service —' });
+makeDrop({ prefix: 'rdv-lnk', placeholder: '— Aucun rendez-vous —' });
 
 /* ── Offset topbar ── */
 (function(){
@@ -814,6 +836,24 @@ if (!_d.isNew) {
     existantes.forEach(function(proc){ ajouterLigne(proc); });
   })();
 }
+
+/* ── Stepper statut ── */
+(function(){
+  var bar = document.getElementById('stp-stepper');
+  if (!bar) return;
+  var active = bar.dataset.active;
+  var order = ['brouillon','en_attente_de_paiement','en_cours','termine'];
+  var activeIdx = order.indexOf(active);
+  bar.querySelectorAll('.stp-step').forEach(function(s){
+    var val = s.dataset.val;
+    var idx = order.indexOf(val);
+    if (val === active) s.classList.add('stp-active');
+    else if (activeIdx >= 0 && idx < activeIdx) s.classList.add('stp-done');
+    else s.classList.add('stp-pending');
+  });
+  var annule = bar.querySelector('.stp-annule');
+  if (annule) annule.classList.add(active === 'annule' ? 'stp-active' : 'stp-pending');
+})();
 </script>
 
 </div><!-- /#page-wrap -->

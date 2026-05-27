@@ -1,0 +1,196 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block topbar_title %}Présence{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<style>
+  /* ── Variables spécifiques présence (sur palette teal du projet) ── */
+  :root {
+    --pr-950: #071e28; --pr-900: #0d3040; --pr-800: #0f4358;
+    --pr-700: #145770; --pr-600: #1a6d8c; --pr-500: #2188ab;
+    --pr-400: #34a8cc; --pr-300: #6ecae3; --pr-200: #aae1f2;
+    --pr-100: #d6f3fb; --pr-50:  #eef9fd;
+    /* Alias utilisés par les composants partagés */
+    --primary:  #145770;
+    --accent:   #2188ab;
+    --surface:  var(--bg-elevated);
+    --text:     var(--text-base);
+    --text-muted: var(--text-secondary);
+    --pr-surface: var(--bg-elevated);
+    --pr-border:  var(--border);
+    --pr-text:    var(--text-base);
+    --pr-muted:   var(--text-secondary);
+  }
+  html[data-theme="dark"] {
+    --primary:  #0f4358;
+    --accent:   #2188ab;
+    --surface:  var(--bg-elevated);
+    --text:     var(--text-base);
+    --text-muted: var(--text-muted);
+  }
+
+  /* ── Boutons présence ── */
+  .btn-pr {
+    background: var(--accent); color: #fff; border: none; border-radius: 4px;
+    padding: 5px 14px; font-size: 12.5px; font-weight: 500; cursor: pointer;
+    text-decoration: none; display: inline-flex; align-items: center; gap: 5px;
+    transition: background .15s; font-family: 'Roboto', sans-serif; white-space: nowrap;
+  }
+  .btn-pr:hover { background: var(--primary); color: #fff; }
+
+  .btn-pr-outline {
+    border: 1px solid var(--accent); color: var(--accent); background: transparent;
+    border-radius: 4px; padding: 4px 12px; font-size: 12.5px; font-weight: 500;
+    cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 5px;
+    transition: background .15s, color .15s; font-family: 'Roboto', sans-serif;
+  }
+  .btn-pr-outline:hover { background: var(--accent); color: #fff; }
+
+  .btn-pr-sm {
+    border: 1px solid var(--pr-400); color: var(--accent); background: transparent;
+    border-radius: 4px; padding: 3px 9px; font-size: 12px; font-weight: 500;
+    cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;
+    transition: background .15s, color .15s; font-family: 'Roboto', sans-serif;
+  }
+  .btn-pr-sm:hover { background: var(--accent); color: #fff; }
+
+  /* ── Card présence ── */
+  .pr-card {
+    background: var(--surface); border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.07); overflow: hidden; margin-bottom: 16px;
+    border: 1px solid var(--border);
+  }
+  .pr-card-header {
+    padding: 10px 16px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    background: var(--surface);
+  }
+  .pr-card-title {
+    font-size: 13px; font-weight: 600; color: var(--text);
+    display: flex; align-items: center; gap: 8px;
+    border-left: 3px solid var(--accent); padding-left: 10px;
+  }
+  .pr-card-body { padding: 16px; }
+
+  /* ── Input présence ── */
+  .pr-input {
+    padding: 6px 10px; border: 1px solid var(--border); border-radius: 4px;
+    font-family: 'Roboto', sans-serif; font-size: 12.5px; color: var(--text);
+    background: var(--surface); transition: border-color .15s;
+  }
+  .pr-input:focus { outline: none; border-color: var(--accent); }
+  html[data-theme="dark"] .pr-input { background: var(--surface); border-color: var(--border); color: var(--text); }
+
+  .pr-label {
+    display: block; font-size: 11px; font-weight: 600; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: .4px; margin-bottom: 4px;
+  }
+
+  /* ── Subheader présence ── */
+  .pr-subheader {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 8px 16px; flex-wrap: wrap;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    box-shadow: 0 1px 3px rgba(0,0,0,.05);
+  }
+  html[data-theme="dark"] .pr-subheader { background: var(--surface); border-bottom-color: var(--border); }
+
+  /* Edge-to-edge (même layout que services) */
+  .content { padding: 0 !important; overflow-x: hidden; }
+  .pr-body { padding: 20px 32px; }
+</style>
+{% endblock %}
+
+{% block module_navbar %}
+<style>
+  .o-nav {
+    background: var(--surface); border-bottom: 1px solid #e0e0e0;
+    display: flex; align-items: center;
+    height: 38px; padding: 0 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.07);
+  }
+  .o-nav-grid {
+    width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+    color: rgba(0,0,0,.45); font-size: 17px; cursor: pointer;
+    border-radius: 4px; margin-right: 4px; transition: background .15s; text-decoration: none;
+  }
+  .o-nav-grid:hover { background: rgba(0,0,0,.06); color: var(--accent); }
+  .o-nav-brand {
+    font-size: 14px; font-weight: 600; color: var(--accent);
+    padding: 0 12px 0 4px; margin-right: 2px;
+    border-right: 1px solid rgba(0,0,0,.12); white-space: nowrap;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .o-nav-link {
+    color: rgba(0,0,0,.58); text-decoration: none;
+    font-size: 13px; padding: 0 12px; height: 38px;
+    display: flex; align-items: center;
+    border-bottom: 2px solid transparent;
+    transition: color .15s, background .15s, border-color .15s;
+    white-space: nowrap; margin-bottom: -1px;
+  }
+  .o-nav-link:hover { color: var(--accent); background: rgba(26,109,140,.06); }
+  .o-nav-link.active { color: var(--accent); background: rgba(26,109,140,.06); border-bottom-color: var(--accent); font-weight: 600; }
+  .o-nav-link-right { margin-left: auto; }
+  .o-nav-btn {
+    margin-left: auto; display: flex; align-items: center; gap: 5px;
+    border: 1px solid var(--accent); color: var(--accent); background: transparent;
+    border-radius: 4px; padding: 3px 10px; font-size: 12px; font-weight: 500;
+    text-decoration: none; transition: background .15s, color .15s; white-space: nowrap;
+  }
+  .o-nav-btn:hover { background: var(--accent); color: #fff; }
+  html[data-theme="dark"] .o-nav-btn { border-color: var(--accent); color: var(--accent); }
+  html[data-theme="dark"] .o-nav-btn:hover { background: var(--accent); color: #fff; }
+  html[data-theme="dark"] .o-nav { background: var(--surface); border-bottom-color: var(--border); }
+  html[data-theme="dark"] .o-nav-grid { color: rgba(255,255,255,.45); }
+  html[data-theme="dark"] .o-nav-grid:hover { background: rgba(255,255,255,.06); color: var(--accent); }
+  html[data-theme="dark"] .o-nav-brand { color: var(--accent); border-right-color: rgba(255,255,255,.12); }
+  html[data-theme="dark"] .o-nav-link { color: rgba(255,255,255,.55); }
+  html[data-theme="dark"] .o-nav-link:hover,
+  html[data-theme="dark"] .o-nav-link.active { color: var(--accent); background: rgba(26,109,140,.1); }
+</style>
+<nav class="o-nav">
+  <a href="{% url 'dashboard' %}" class="o-nav-grid" title="Accueil">
+    <i class="bi bi-grid-3x3-gap-fill"></i>
+  </a>
+  <span class="o-nav-brand">
+    <i class="bi bi-person-check-fill"></i>
+    Présence
+  </span>
+  {% if can_manage %}
+  <a href="{% url 'presence:presence_registre' %}"
+     class="o-nav-link {% block pr_nav_registre %}{% endblock %}">
+    Registre du jour
+  </a>
+  <a href="{% url 'presence:presence_recap' %}"
+     class="o-nav-link {% block pr_nav_recap %}{% endblock %}">
+    Récap mensuel
+  </a>
+  <a href="{% url 'presence:presence_stats' %}"
+     class="o-nav-link {% block pr_nav_stats %}{% endblock %}">
+    Statistiques
+  </a>
+  <a href="{% url 'presence:presence_rapport' %}"
+     class="o-nav-link {% block pr_nav_rapport %}{% endblock %}">
+    Rapport
+  </a>
+  <a href="{% url 'presence:presence_pointage' %}" target="_blank"
+     class="o-nav-btn">
+    <i class="bi bi-qr-code-scan"></i> Kiosque pointage
+  </a>
+  {% else %}
+  <a href="{% url 'presence:presence_pointage' %}" target="_blank"
+     class="o-nav-btn">
+    <i class="bi bi-qr-code-scan"></i> Kiosque pointage
+  </a>
+  {% endif %}
+</nav>
+{% endblock %}
+
+{% block breadcrumb %}{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+{% endblock %}

@@ -1,0 +1,363 @@
+{% extends 'parametres/base.html' %}
+{% load static %}
+
+{% block topbar_title %}{% if user_obj %}Modifier — {{ user_obj.username }}{% else %}Nouveau compte{% endif %}{% endblock %}
+
+{% block content %}
+<div id="page-wrap">
+{% include 'parametres/includes/nav.html' %}
+
+{% if messages %}
+{% for message in messages %}
+<div class="alert alert-{{ message.tags }}" style="margin:0;border-radius:0;font-size:13px;padding:10px 20px;border-bottom:1px solid rgba(0,0,0,.06);">
+  {{ message }}
+</div>
+{% endfor %}
+{% endif %}
+
+<!-- ══ SUBHEADER ══ -->
+<div class="o-subheader">
+  <div class="o-subheader-row">
+    <a href="{% url 'parametres:comptes' %}" class="o-ctrl-btn">
+      <i class="bi bi-arrow-left"></i> Comptes
+    </a>
+    <span class="o-ctrl-sep"></span>
+    <span class="o-page-title">
+      {% if user_obj %}
+        <div class="pm-av" style="display:inline-flex;vertical-align:middle;margin-right:6px;">{{ user_obj.username|first|upper }}</div>
+        {{ user_obj.username }}
+      {% else %}
+        Nouveau compte utilisateur
+      {% endif %}
+    </span>
+  </div>
+</div>
+
+<!-- ══ FORMULAIRE ══ -->
+<div class="pm-form-wrap">
+
+  {% if errors %}
+  <div style="display:flex;align-items:flex-start;gap:12px;background:rgba(220,38,38,.07);border:1px solid rgba(220,38,38,.22);border-left:4px solid #dc2626;border-radius:6px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#7a1515;">
+    <i class="bi bi-exclamation-triangle-fill" style="font-size:17px;color:#dc2626;flex-shrink:0;margin-top:1px;"></i>
+    <div>
+      <strong>Erreur(s) :</strong>
+      <ul style="margin:4px 0 0;padding-left:16px;">
+        {% for e in errors %}<li>{{ e }}</li>{% endfor %}
+      </ul>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if user_obj %}
+  <!-- ═══════════════ MODE EDIT : ONGLETS ═══════════════ -->
+  <div class="pm-tabs" id="pm-tabs">
+    <div class="pm-tab active" onclick="switchTab('profil', this)">
+      <i class="bi bi-person-fill"></i> Profil &amp; Groupes
+    </div>
+    <div class="pm-tab" onclick="switchTab('acces', this)">
+      <i class="bi bi-shield-fill"></i> Statut &amp; Accès
+    </div>
+    <div class="pm-tab" onclick="switchTab('password', this)">
+      <i class="bi bi-key-fill"></i> Mot de passe
+    </div>
+  </div>
+
+  <!-- Onglet 1 : Profil & Groupes -->
+  <div id="tab-profil" class="pm-tab-panel active">
+    <form method="post" action="?tab=profil">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="profil">
+
+      <div class="pm-card" style="margin-top:16px;">
+        <div class="pm-card-head"><i class="bi bi-person-lines-fill" style="color:var(--accent);"></i> Informations du profil</div>
+        <div class="pm-card-body">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+            <div class="pm-field">
+              <label for="first_name">Prénom</label>
+              <input type="text" id="first_name" name="first_name" value="{{ user_obj.first_name }}" maxlength="150" autocomplete="off">
+            </div>
+            <div class="pm-field">
+              <label for="last_name">Nom de famille</label>
+              <input type="text" id="last_name" name="last_name" value="{{ user_obj.last_name }}" maxlength="150" autocomplete="off">
+            </div>
+          </div>
+          <div class="pm-field">
+            <label for="email">Adresse email</label>
+            <input type="email" id="email" name="email" value="{{ user_obj.email }}" maxlength="254" autocomplete="off">
+          </div>
+          <div class="pm-field">
+            <label>Identifiant (username)</label>
+            <div style="font-size:13px;font-family:monospace;padding:8px 10px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text-muted);">{{ user_obj.username }}</div>
+            <div class="helptext">L'identifiant ne peut pas être modifié ici.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pm-card">
+        <div class="pm-card-head"><i class="bi bi-people-fill" style="color:var(--accent);"></i> Groupes assignés</div>
+        <div class="pm-card-body">
+          {% if all_groups %}
+          <div class="pm-group-cards">
+            {% for g in all_groups %}
+            <label class="pm-group-card {% if g.pk in user_groups %}selected{% endif %}" id="grpcard-{{ g.pk }}">
+              <input type="checkbox" name="groups" value="{{ g.pk }}"
+                {% if g.pk in user_groups %}checked{% endif %}
+                onchange="toggleGroupCard(this)">
+              <div style="width:32px;height:32px;border-radius:7px;background:rgba(99,102,241,.1);display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:14px;flex-shrink:0;">
+                <i class="bi bi-people-fill"></i>
+              </div>
+              <div>
+                <div class="pm-group-card-name">{{ g.name }}</div>
+                <div class="pm-group-card-sub">{{ g.module_count }} module{{ g.module_count|pluralize }}</div>
+              </div>
+              <div class="pm-group-card-check"></div>
+            </label>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">Aucun groupe disponible.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="pm-form-actions">
+        <a href="{% url 'parametres:comptes' %}" class="pm-btn-cancel"><i class="bi bi-x"></i> Annuler</a>
+        <button type="submit" class="pm-btn-save"><i class="bi bi-check-lg"></i> Enregistrer le profil</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Onglet 2 : Statut & Accès -->
+  <div id="tab-acces" class="pm-tab-panel">
+    <form method="post" action="?tab=acces">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="acces">
+
+      <div class="pm-card" style="margin-top:16px;">
+        <div class="pm-card-head"><i class="bi bi-shield-fill" style="color:var(--accent);"></i> Statut du compte</div>
+        <div class="pm-card-body">
+          <div class="pm-field" style="display:flex;align-items:center;justify-content:space-between;border:1px solid var(--border);border-radius:6px;padding:12px 16px;margin-bottom:10px;">
+            <div>
+              <div style="font-size:13px;font-weight:500;color:var(--text);">Compte actif</div>
+              <div style="font-size:11.5px;color:var(--text-muted);margin-top:2px;">Désactiver empêche la connexion sans supprimer le compte.</div>
+            </div>
+            <label class="pm-toggle">
+              <input type="checkbox" name="is_active" id="is_active" {% if user_obj.is_active %}checked{% endif %}
+                {% if user_obj.is_superuser %}disabled{% endif %}>
+              <span class="pm-toggle-slider"></span>
+            </label>
+          </div>
+          <div class="pm-field" style="display:flex;align-items:center;justify-content:space-between;border:1px solid var(--border);border-radius:6px;padding:12px 16px;">
+            <div>
+              <div style="font-size:13px;font-weight:500;color:var(--text);">Accès administration (is_staff)</div>
+              <div style="font-size:11.5px;color:var(--text-muted);margin-top:2px;">Permet l'accès aux pages d'administration (paramètres, etc.).</div>
+            </div>
+            <label class="pm-toggle">
+              <input type="checkbox" name="is_staff" id="is_staff" {% if user_obj.is_staff %}checked{% endif %}
+                {% if user_obj.is_superuser %}disabled{% endif %}>
+              <span class="pm-toggle-slider"></span>
+            </label>
+          </div>
+          {% if user_obj.is_superuser %}
+          <div style="background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.3);border-radius:6px;padding:10px 14px;margin-top:10px;font-size:12px;color:#854d0e;display:flex;gap:8px;align-items:center;">
+            <i class="bi bi-star-fill"></i>
+            Ce compte est superuser — son statut ne peut pas être modifié.
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="pm-card">
+        <div class="pm-card-head"><i class="bi bi-puzzle-fill" style="color:var(--accent);"></i> Modules accessibles (calculés)</div>
+        <div class="pm-card-body">
+          <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:10px;">Modules effectivement accessibles par cet utilisateur (via ses groupes).</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;">
+            {% for mod in user_modules %}
+            <span class="pm-badge indigo">{{ mod.icon }} {{ mod.name }}</span>
+            {% empty %}
+            <span style="font-size:13px;color:var(--text-muted);font-style:italic;">Aucun module accessible.</span>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <div class="pm-form-actions">
+        <a href="{% url 'parametres:comptes' %}" class="pm-btn-cancel"><i class="bi bi-x"></i> Annuler</a>
+        <button type="submit" class="pm-btn-save" {% if user_obj.is_superuser %}disabled title="Superuser non modifiable"{% endif %}>
+          <i class="bi bi-check-lg"></i> Enregistrer le statut
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Onglet 3 : Mot de passe -->
+  <div id="tab-password" class="pm-tab-panel">
+    <form method="post" action="?tab=password">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="password">
+
+      <div class="pm-card" style="margin-top:16px;">
+        <div class="pm-card-head"><i class="bi bi-key-fill" style="color:var(--accent);"></i> Changer le mot de passe</div>
+        <div class="pm-card-body">
+          <div class="pm-field">
+            <label for="password1">Nouveau mot de passe <span style="color:#dc2626;">*</span></label>
+            <input type="password" id="password1" name="password1" autocomplete="new-password" minlength="8">
+            <div class="helptext">Au moins 8 caractères.</div>
+          </div>
+          <div class="pm-field">
+            <label for="password2">Confirmer le mot de passe <span style="color:#dc2626;">*</span></label>
+            <input type="password" id="password2" name="password2" autocomplete="new-password">
+          </div>
+        </div>
+      </div>
+
+      <div class="pm-form-actions">
+        <a href="{% url 'parametres:comptes' %}" class="pm-btn-cancel"><i class="bi bi-x"></i> Annuler</a>
+        <button type="submit" class="pm-btn-save"><i class="bi bi-key-fill"></i> Changer le mot de passe</button>
+      </div>
+    </form>
+  </div>
+
+  {% else %}
+  <!-- ═══════════════ MODE CREATE ═══════════════ -->
+  <form method="post" style="margin-top:16px;">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="create">
+
+    <div class="pm-card">
+      <div class="pm-card-head"><i class="bi bi-person-plus-fill" style="color:var(--accent);"></i> Identifiants de connexion</div>
+      <div class="pm-card-body">
+        <div class="pm-field">
+          <label for="username">Identifiant (username) <span style="color:#dc2626;">*</span></label>
+          <input type="text" id="username" name="username" value="{{ form_data.username|default:'' }}"
+            placeholder="Ex : dr.konan, inf.kone…" required maxlength="150" autocomplete="off">
+          <div class="helptext">Lettres, chiffres, @/./+/-/_ uniquement.</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+          <div class="pm-field">
+            <label for="password1">Mot de passe <span style="color:#dc2626;">*</span></label>
+            <input type="password" id="password1" name="password1" required minlength="8" autocomplete="new-password">
+          </div>
+          <div class="pm-field">
+            <label for="password2">Confirmer le mot de passe <span style="color:#dc2626;">*</span></label>
+            <input type="password" id="password2" name="password2" required autocomplete="new-password">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pm-card">
+      <div class="pm-card-head"><i class="bi bi-person-lines-fill" style="color:var(--accent);"></i> Informations personnelles</div>
+      <div class="pm-card-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+          <div class="pm-field">
+            <label for="first_name">Prénom</label>
+            <input type="text" id="first_name" name="first_name" value="{{ form_data.first_name|default:'' }}" maxlength="150" autocomplete="off">
+          </div>
+          <div class="pm-field">
+            <label for="last_name">Nom de famille</label>
+            <input type="text" id="last_name" name="last_name" value="{{ form_data.last_name|default:'' }}" maxlength="150" autocomplete="off">
+          </div>
+        </div>
+        <div class="pm-field">
+          <label for="email">Adresse email</label>
+          <input type="email" id="email" name="email" value="{{ form_data.email|default:'' }}" maxlength="254" autocomplete="off">
+        </div>
+      </div>
+    </div>
+
+    <div class="pm-card">
+      <div class="pm-card-head"><i class="bi bi-people-fill" style="color:var(--accent);"></i> Groupes</div>
+      <div class="pm-card-body">
+        {% if all_groups %}
+        <div class="pm-group-cards">
+          {% for g in all_groups %}
+          <label class="pm-group-card {% if g.pk|stringformat:'s' in form_data.groups %}selected{% endif %}" id="grpcard-{{ g.pk }}">
+            <input type="checkbox" name="groups" value="{{ g.pk }}"
+              {% if g.pk|stringformat:'s' in form_data.groups %}checked{% endif %}
+              onchange="toggleGroupCard(this)">
+            <div style="width:32px;height:32px;border-radius:7px;background:rgba(99,102,241,.1);display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:14px;flex-shrink:0;">
+              <i class="bi bi-people-fill"></i>
+            </div>
+            <div>
+              <div class="pm-group-card-name">{{ g.name }}</div>
+              <div class="pm-group-card-sub">{{ g.module_count }} module{{ g.module_count|pluralize }}</div>
+            </div>
+            <div class="pm-group-card-check"></div>
+          </label>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">Aucun groupe disponible.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="pm-card">
+      <div class="pm-card-head"><i class="bi bi-shield-fill" style="color:var(--accent);"></i> Accès &amp; Statut</div>
+      <div class="pm-card-body">
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;border:1px solid var(--border);border-radius:6px;padding:12px 16px;">
+            <div>
+              <div style="font-size:13px;font-weight:500;color:var(--text);">Compte actif</div>
+              <div style="font-size:11.5px;color:var(--text-muted);margin-top:2px;">Le compte sera immédiatement utilisable.</div>
+            </div>
+            <label class="pm-toggle">
+              <input type="checkbox" name="is_active" id="is_active" checked>
+              <span class="pm-toggle-slider"></span>
+            </label>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;border:1px solid var(--border);border-radius:6px;padding:12px 16px;">
+            <div>
+              <div style="font-size:13px;font-weight:500;color:var(--text);">Accès administration (is_staff)</div>
+              <div style="font-size:11.5px;color:var(--text-muted);margin-top:2px;">Accès aux pages de gestion (paramètres, etc.).</div>
+            </div>
+            <label class="pm-toggle">
+              <input type="checkbox" name="is_staff" id="is_staff">
+              <span class="pm-toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pm-form-actions">
+      <a href="{% url 'parametres:comptes' %}" class="pm-btn-cancel"><i class="bi bi-x"></i> Annuler</a>
+      <button type="submit" class="pm-btn-save"><i class="bi bi-person-plus-fill"></i> Créer le compte</button>
+    </div>
+  </form>
+  {% endif %}
+
+</div>
+</div>
+
+<script>
+function switchTab(tabId, clickedTab) {
+  document.querySelectorAll('.pm-tab').forEach(function(t) { t.classList.remove('active'); });
+  document.querySelectorAll('.pm-tab-panel').forEach(function(p) { p.classList.remove('active'); });
+  clickedTab.classList.add('active');
+  var panel = document.getElementById('tab-' + tabId);
+  if (panel) panel.classList.add('active');
+}
+
+function toggleGroupCard(checkbox) {
+  var card = checkbox.closest('.pm-group-card');
+  card.classList.toggle('selected', checkbox.checked);
+}
+
+/* Activer l'onglet depuis l'URL */
+(function() {
+  var tab = new URLSearchParams(window.location.search).get('tab');
+  if (tab) {
+    var tabEl = document.querySelector('.pm-tab[onclick*="' + tab + '"]');
+    if (tabEl) {
+      document.querySelectorAll('.pm-tab').forEach(function(t) { t.classList.remove('active'); });
+      document.querySelectorAll('.pm-tab-panel').forEach(function(p) { p.classList.remove('active'); });
+      tabEl.classList.add('active');
+      var panel = document.getElementById('tab-' + tab);
+      if (panel) panel.classList.add('active');
+    }
+  }
+})();
+</script>
+{% endblock %}

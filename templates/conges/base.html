@@ -1,0 +1,331 @@
+﻿{% extends 'base.html' %}
+{% load i18n %}
+
+{% block topbar_title %}Congés{% endblock %}
+
+{% block extra_css %}
+{% load static %}
+    <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
+<style>
+/* ══════════════════════════════════════════════════════
+   PALETTE VERT OLIVE — module Congés (couleur logo WALÉ)
+══════════════════════════════════════════════════════ */
+:root {
+  --cg-900: #1b2e13;
+  --cg-800: #27421c;
+  --cg-700: #345726;
+  --cg-600: #4a7236;
+  --cg-500: #5e8e47;
+  --cg-400: #7aaa62;
+  --cg-300: #9dc284;
+  --cg-200: #c2d9b3;
+  --cg-100: #daecd1;
+  --cg-50:  #edf6e8;
+
+  --cg-surface: #fff;
+  --cg-border:  rgba(74,114,54,0.14);
+  --cg-text:    #1b2e13;
+  --cg-muted:   rgba(0,0,0,0.45);
+  --cg-bg:      #f2f7ef;
+}
+html[data-theme="dark"] {
+  --cg-50:      #162212;
+  --cg-100:     #1e3019;
+  --cg-surface: #111c0e;
+  --cg-border:  rgba(122,170,98,0.18);
+  --cg-text:    #c0d9b0;
+  --cg-muted:   rgba(255,255,255,0.4);
+  --cg-bg:      #0b1209;
+}
+
+/* ── Nav ── */
+.cg-nav {
+  background: var(--cg-surface);
+  border-bottom: 1px solid rgba(0,0,0,0.07);
+  margin: -32px -32px 0;
+  padding: 0 32px;
+  display: flex;
+  align-items: stretch;
+  height: 44px;
+  box-shadow: 0 1px 3px rgba(74,114,54,0.07);
+  position: sticky;
+  top: var(--topbar-h);
+  z-index: 250;
+  gap: 2px;
+}
+.cg-nav-link {
+  padding: 11px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--cg-muted);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  margin-bottom: -1px;
+}
+.cg-nav-link:hover  { color: var(--cg-600); }
+.cg-nav-link.active { color: var(--cg-600); border-bottom-color: var(--cg-500); font-weight: 600; }
+html[data-theme="dark"] .cg-nav { background: var(--cg-surface); border-bottom-color: var(--cg-border); }
+html[data-theme="dark"] .cg-nav-link        { color: rgba(255,255,255,0.35); }
+html[data-theme="dark"] .cg-nav-link:hover  { color: var(--cg-300); }
+html[data-theme="dark"] .cg-nav-link.active { color: var(--cg-300); border-bottom-color: var(--cg-400); }
+@media (max-width: 768px) {
+  .cg-nav { margin: -32px -20px 0; padding: 0 20px; overflow-x: auto; }
+}
+
+/* ── Boutons ── */
+.btn-cg {
+  background: var(--cg-600);
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s, box-shadow 0.15s;
+  font-family: 'Sora', sans-serif;
+}
+.btn-cg:hover { background: var(--cg-700); box-shadow: 0 3px 10px rgba(74,114,54,0.28); color: #fff; }
+
+.btn-cg-outline {
+  border: 1.5px solid var(--cg-600);
+  color: var(--cg-600);
+  background: transparent;
+  border-radius: 7px;
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s, color 0.15s;
+  font-family: 'Sora', sans-serif;
+}
+.btn-cg-outline:hover { background: var(--cg-600); color: #fff; }
+html[data-theme="dark"] .btn-cg-outline { border-color: var(--cg-400); color: var(--cg-300); }
+html[data-theme="dark"] .btn-cg-outline:hover { background: var(--cg-600); color: #fff; border-color: var(--cg-600); }
+
+.btn-cg-sm {
+  border: 1px solid var(--cg-600);
+  color: var(--cg-600);
+  background: transparent;
+  border-radius: 5px;
+  padding: 4px 11px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: background 0.15s, color 0.15s;
+  font-family: 'Sora', sans-serif;
+}
+.btn-cg-sm:hover { background: var(--cg-600); color: #fff; }
+html[data-theme="dark"] .btn-cg-sm { border-color: var(--cg-400); color: var(--cg-300); }
+html[data-theme="dark"] .btn-cg-sm:hover { background: var(--cg-600); color: #fff; border-color: var(--cg-600); }
+
+/* ── Inputs ── */
+.cg-input {
+  width: 100%;
+  padding: 9px 4px;
+  border: none;
+  border-bottom: 1.5px solid rgba(0,0,0,0.18);
+  border-radius: 0;
+  font-family: 'Sora', sans-serif;
+  font-size: 13.5px;
+  color: var(--cg-text);
+  background: transparent;
+  transition: border-color 0.18s;
+}
+.cg-input:focus {
+  outline: none;
+  border-bottom-color: var(--cg-600);
+  box-shadow: none;
+}
+.cg-input::placeholder { color: rgba(0,0,0,0.3); }
+html[data-theme="dark"] .cg-input { background: transparent; border-bottom-color: rgba(255,255,255,0.15); color: var(--cg-text); }
+html[data-theme="dark"] .cg-input:focus { border-bottom-color: var(--cg-400); }
+html[data-theme="dark"] .cg-input::placeholder { color: rgba(255,255,255,0.2); }
+
+.cg-label {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: rgba(0,0,0,0.45);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 5px;
+}
+html[data-theme="dark"] .cg-label { color: rgba(255,255,255,0.4); }
+
+/* ── Statut badges ── */
+.cg-badge { display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.2px; }
+.cg-badge::before { content:'';width:6px;height:6px;border-radius:50%;flex-shrink:0; }
+.cg-b-demande  { background:rgba(232,154,26,.12);color:#7a4e00;border:1px solid rgba(232,154,26,.25); }
+.cg-b-demande::before  { background:#e89a1a; }
+.cg-b-approuve { background:rgba(22,169,107,.12);color:#0d5b3d;border:1px solid rgba(22,169,107,.25); }
+.cg-b-approuve::before { background:#16a96b; }
+.cg-b-refuse   { background:rgba(232,69,69,.12);color:#6b1f1f;border:1px solid rgba(232,69,69,.25); }
+.cg-b-refuse::before   { background:#e84545; }
+.cg-b-en_cours { background:rgba(45,153,219,.12);color:#1a4d6d;border:1px solid rgba(45,153,219,.25); }
+.cg-b-en_cours::before { background:#2d99db; }
+.cg-b-termine  { background:rgba(0,0,0,.06);color:rgba(0,0,0,.45);border:1px solid rgba(0,0,0,.1); }
+.cg-b-termine::before  { background:#999; }
+html[data-theme="dark"] .cg-b-demande  { background:rgba(232,154,26,.18);color:#f0c060;border-color:rgba(232,154,26,.3); }
+html[data-theme="dark"] .cg-b-approuve { background:rgba(22,169,107,.18);color:#6eddb0;border-color:rgba(22,169,107,.3); }
+html[data-theme="dark"] .cg-b-refuse   { background:rgba(232,69,69,.18);color:#f09090;border-color:rgba(232,69,69,.3); }
+html[data-theme="dark"] .cg-b-en_cours { background:rgba(45,153,219,.18);color:#80c8ef;border-color:rgba(45,153,219,.3); }
+html[data-theme="dark"] .cg-b-termine  { background:rgba(255,255,255,.06);color:rgba(255,255,255,.4);border-color:rgba(255,255,255,.12); }
+
+/* ── Nav right group (badges) ── */
+.cg-nav-right-group { margin-left: auto; display: flex; align-items: center; }
+.cg-nav-badge-btn {
+  background: none; border: none; cursor: pointer; text-decoration: none;
+  display: flex; align-items: center; justify-content: center;
+  height: 44px; padding: 0 9px; position: relative; font-size: 17px;
+  transition: color 0.15s;
+}
+.cg-nav-badge-btn.bell  { color: var(--cg-600); }
+.cg-nav-badge-btn.pending { color: #e89a1a; }
+.cg-nav-badge-btn:hover { opacity: 0.8; }
+.cg-nav-count {
+  position: absolute; top: 8px; right: 2px;
+  border-radius: 10px; font-size: 10px; font-weight: 700;
+  min-width: 16px; height: 16px; display: flex;
+  align-items: center; justify-content: center;
+  padding: 0 3px; line-height: 1; color: #fff;
+}
+.cg-nav-count.green  { background: var(--cg-600); }
+.cg-nav-count.orange { background: #e89a1a; }
+html[data-theme="dark"] .cg-nav-badge-btn.bell { color: var(--cg-300); }
+
+/* ── Subheader / Form head ── */
+.cg-subheader, .cg-form-head {
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:14px 32px;margin:0 -32px;flex-wrap:wrap;
+  position:sticky;top:calc(var(--topbar-h) + 44px);z-index:100;
+  background:#f0f6fa;border-bottom:1px solid rgba(0,0,0,0.05);
+  box-shadow:0 2px 8px rgba(0,0,0,0.04);
+}
+html[data-theme="dark"] .cg-subheader,
+html[data-theme="dark"] .cg-form-head { background:#071e28;border-bottom-color:rgba(255,255,255,0.05); }
+@media(max-width:1024px){.cg-subheader,.cg-form-head{margin:0 -20px;padding-left:20px;padding-right:20px;}}
+
+/* ── Back button ── */
+.cg-back-btn {
+  display:inline-flex;align-items:center;justify-content:center;
+  width:34px;height:34px;border-radius:8px;
+  border:1.5px solid var(--cg-200);color:var(--cg-700);
+  background:#fff;text-decoration:none;font-size:15px;
+  transition:all 0.15s;
+}
+.cg-back-btn:hover { background:var(--cg-600);color:#fff;border-color:var(--cg-600); }
+
+/* ── Section title ── */
+.cg-section-title {
+  font-size:13px;font-weight:700;color:var(--cg-text);
+  display:flex;align-items:center;gap:8px;
+  border-left:3px solid var(--cg-600);padding-left:10px;
+}
+
+/* ── Surface cards ── */
+.cg-card {
+  background: var(--cg-surface);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+.cg-card-header {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--cg-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.cg-card-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--cg-text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-left: 3px solid var(--cg-600);
+  padding-left: 10px;
+}
+.cg-card-body { padding: 20px; }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="cg-nav">
+  <a href="{% url 'conges:conge_dashboard' %}"
+     class="cg-nav-link {% block cg_nav_dashboard %}{% endblock %}">
+    <i class="bi bi-speedometer2"></i> Tableau de bord
+  </a>
+  <a href="{% url 'conges:conge_list' %}"
+     class="cg-nav-link {% block cg_nav_list %}{% endblock %}">
+    <i class="bi bi-calendar-check-fill"></i> Congés
+  </a>
+  <a href="{% url 'conges:conge_calendrier' %}"
+     class="cg-nav-link {% block cg_nav_calendrier %}{% endblock %}">
+    <i class="bi bi-calendar3"></i> Calendrier
+  </a>
+  <a href="{% url 'conges:conge_mes_conges' %}"
+     class="cg-nav-link {% block cg_nav_mes_conges %}{% endblock %}">
+    <i class="bi bi-person-badge"></i> Mes congés
+  </a>
+  {% if can_manage %}
+  <a href="{% url 'conges:conge_soldes' %}"
+     class="cg-nav-link {% block cg_nav_soldes %}{% endblock %}">
+    <i class="bi bi-table"></i> Soldes
+  </a>
+  <a href="{% url 'conges:conge_stats_service' %}"
+     class="cg-nav-link {% block cg_nav_stats %}{% endblock %}">
+    <i class="bi bi-graph-up"></i> Statistiques
+  </a>
+  <a href="{% url 'conges:conge_planning_equipe' %}"
+     class="cg-nav-link {% block cg_nav_planning %}{% endblock %}">
+    <i class="bi bi-people-fill"></i> Planning équipe
+  </a>
+  <a href="{% url 'conges:conge_rapport' %}"
+     class="cg-nav-link {% block cg_nav_rapport %}{% endblock %}">
+    <i class="bi bi-file-earmark-bar-graph"></i> Rapports
+  </a>
+  <a href="{% url 'conges:conge_nouveau' %}"
+     class="cg-nav-link {% block cg_nav_nouveau %}{% endblock %}">
+    <i class="bi bi-plus-circle-fill"></i> Enregistrer un congé
+  </a>
+  {% endif %}
+
+  <div class="cg-nav-right-group">
+    {% if cg_notifs_count %}
+    <a href="{% url 'conges:conge_notifs_lire' %}" class="cg-nav-badge-btn bell"
+       title="{{ cg_notifs_count }} notification{% if cg_notifs_count > 1 %}s{% endif %} non lue{% if cg_notifs_count > 1 %}s{% endif %}">
+      <i class="bi bi-bell-fill"></i>
+      <span class="cg-nav-count green">{{ cg_notifs_count }}</span>
+    </a>
+    {% endif %}
+    {% if cg_pending_count %}
+    <a href="{% url 'conges:conge_list' %}?statut=demande" class="cg-nav-badge-btn pending"
+       title="{{ cg_pending_count }} demande{% if cg_pending_count > 1 %}s{% endif %} en attente d'approbation">
+      <i class="bi bi-hourglass-split"></i>
+      <span class="cg-nav-count orange">{{ cg_pending_count }}</span>
+    </a>
+    {% endif %}
+  </div>
+</nav>
+{% endblock %}

@@ -5,6 +5,7 @@ from django.utils import timezone
 class Soin(models.Model):
     STATUT = [
         ('brouillon', 'Brouillon'),
+        ('en_attente_de_paiement', 'En attente de paiement'),
         ('en_cours', 'En cours'),
         ('termine', 'Terminé'),
         ('annule', 'Annulé'),
@@ -31,7 +32,7 @@ class Soin(models.Model):
         related_name='soins', verbose_name="Patient"
     )
     infirmier = models.ForeignKey(
-        'employe.Employe', on_delete=models.SET_NULL, null=True, blank=True,
+        'employer.Employe', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='soins_effectues', verbose_name="Infirmier/Agent de soins"
     )
     rendez_vous = models.ForeignKey(
@@ -41,13 +42,13 @@ class Soin(models.Model):
     date_heure = models.DateTimeField(default=timezone.now, verbose_name="Date et heure")
     motif = models.CharField(max_length=500, blank=True, verbose_name="Motif")
     observations = models.TextField(blank=True, verbose_name="Observations")
-    statut = models.CharField(max_length=20, choices=STATUT, default='brouillon', verbose_name="Statut")
+    statut = models.CharField(max_length=25, choices=STATUT, default='brouillon', verbose_name="Statut")
     date_creation = models.DateTimeField(auto_now_add=True)
 
     # Champs supplémentaires
     photo = models.ImageField(upload_to='soins/photos/', blank=True, null=True, verbose_name="Photo")
     departement = models.ForeignKey(
-        'employe.Departement', on_delete=models.SET_NULL, null=True, blank=True,
+        'employer.Departement', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='soins', verbose_name="Département"
     )
     service_inscription = models.ForeignKey(
@@ -61,6 +62,10 @@ class Soin(models.Model):
     maladie_allergique = models.BooleanField(default=False, verbose_name="Maladie allergique")
     lactation = models.BooleanField(default=False, verbose_name="Lactation")
     avertissement_grossesse = models.BooleanField(default=False, verbose_name="Avertissement de grossesse")
+    facture = models.ForeignKey(
+        'facturation.Facture', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='soins', verbose_name="Facture"
+    )
 
     def save(self, *args, **kwargs):
         if not self.numero:
@@ -76,6 +81,10 @@ class Soin(models.Model):
         verbose_name = "Soin"
         verbose_name_plural = "Soins"
         ordering = ['-date_heure']
+        permissions = [
+            ('can_creer_facture', 'Peut créer une facture de soin'),
+            ('can_administrer_soin', 'Peut administrer un soin'),
+        ]
 
 
 class Maladie(models.Model):
@@ -110,7 +119,7 @@ class ProcedureSoin(models.Model):
         related_name='procedures_soins', verbose_name="Patient"
     )
     infirmier = models.ForeignKey(
-        'employe.Employe', on_delete=models.SET_NULL, null=True, blank=True,
+        'employer.Employe', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='procedures_effectuees', verbose_name="Infirmier"
     )
     soin_type = models.ForeignKey(
@@ -119,7 +128,7 @@ class ProcedureSoin(models.Model):
     )
     prix = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="Prix")
     departement = models.ForeignKey(
-        'employe.Departement', on_delete=models.SET_NULL, null=True, blank=True,
+        'employer.Departement', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='procedures_soins', verbose_name="Département"
     )
     date = models.DateTimeField(default=timezone.now, verbose_name="Date")

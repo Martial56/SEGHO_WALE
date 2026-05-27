@@ -1,0 +1,259 @@
+{% extends 'presence/base.html' %}
+{% load static %}
+{% block topbar_title %}Registre des présences{% endblock %}
+{% block pr_nav_registre %}active{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+/* ── Registre table ── */
+.reg-table { width:100%; border-collapse:collapse; font-size:12.5px; }
+.reg-table thead th {
+  background: var(--surface); color: var(--text-muted); padding: 8px 10px;
+  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .3px;
+  white-space: nowrap; text-align: center; border: none;
+  border-bottom: 1px solid var(--border);
+}
+.reg-table thead th.th-left { text-align: left; }
+.reg-table tbody tr { transition: background .1s; }
+.reg-table tbody tr:hover td { background: rgba(26,109,140,.04); }
+.reg-table td { padding: 7px 8px; vertical-align: middle; border: none; border-bottom: 1px solid rgba(0,0,0,.04); }
+.reg-table td.td-num { text-align:center; font-family:monospace; color:var(--pr-muted); font-size:11px; width:32px; }
+.reg-table td.td-nom { font-weight:600; color:var(--pr-text); min-width:180px; }
+.reg-table td.td-service { font-size:11.5px; color:var(--pr-muted); }
+.reg-table td.td-time { text-align:center; width:100px; }
+.reg-table td.td-rem  { min-width:130px; }
+.reg-table td.td-actions { text-align:center; width:60px; }
+
+/* Time input */
+.time-inp {
+  width:90px; padding:5px 7px; border:1.5px solid var(--pr-200);
+  border-radius:6px; font-size:12px; text-align:center; font-family:monospace;
+  background:#fff; color:var(--pr-text); transition:border-color .15s;
+}
+.time-inp:focus { outline:none; border-color:var(--pr-500);
+                  box-shadow:0 0 0 2px rgba(26,109,140,.15); }
+
+/* Present toggle */
+.present-toggle { display:none; }
+.present-label {
+  display:inline-flex; align-items:center; gap:6px; cursor:pointer;
+  padding:4px 10px; border-radius:20px; font-size:11.5px; font-weight:700;
+  border:1.5px solid var(--pr-200); background:var(--pr-50); color:var(--pr-600);
+  transition:all .15s; user-select:none; white-space:nowrap;
+}
+.present-label.absent {
+  background:rgba(232,69,69,.08); border-color:rgba(232,69,69,.25); color:#c0392b;
+}
+.present-toggle:checked + .present-label {
+  background:rgba(22,169,107,.1); border-color:rgba(22,169,107,.3); color:#0d6e45;
+}
+
+/* Motif (visible si absent) */
+.motif-cell { display:none; }
+.motif-visible { display:block; margin-top:4px; }
+.motif-inp {
+  width:100%; padding:5px 8px; border:1.5px solid rgba(232,69,69,.3);
+  border-radius:6px; font-size:12px; background:#fff;
+}
+.motif-inp:focus { outline:none; border-color:#e84545; }
+
+/* Stat chips */
+.stat-chip {
+  display:inline-flex; align-items:center; gap:5px; padding:4px 12px;
+  border-radius:20px; font-size:12.5px; font-weight:700;
+}
+.chip-p { background:rgba(22,169,107,.1); color:#0d6e45; border:1px solid rgba(22,169,107,.2); }
+.chip-a { background:rgba(232,69,69,.1);  color:#c0392b; border:1px solid rgba(232,69,69,.2); }
+
+@media print {
+  .module-nav, .pr-subheader, .no-print { display:none !important; }
+  .pr-card { box-shadow:none; border:1px solid #ccc; }
+  body { font-size:11px; }
+  .time-inp { border:none; background:transparent; }
+  .present-label { border:none; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="page-wrap">
+
+<!-- Subheader : navigation dates + filtres -->
+<div class="pr-subheader">
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+    <!-- Navigation jour -->
+    <a href="?date={{ prev_date|date:'Y-m-d' }}{% if service_sel %}&service={{ service_sel.pk }}{% endif %}"
+       class="btn-pr-outline" style="padding:6px 11px;">
+      <i class="bi bi-chevron-left"></i>
+    </a>
+    <input type="date" id="date-picker" value="{{ selected_date|date:'Y-m-d' }}"
+           class="pr-input" style="width:160px;"
+           onchange="window.location='?date='+this.value{% if service_sel %}+'&service={{ service_sel.pk }}'{% endif %}">
+    <a href="?date={{ next_date|date:'Y-m-d' }}{% if service_sel %}&service={{ service_sel.pk }}{% endif %}"
+       class="btn-pr-outline" style="padding:6px 11px;">
+      <i class="bi bi-chevron-right"></i>
+    </a>
+    <a href="?date={{ today|date:'Y-m-d' }}" class="btn-pr-outline" style="padding:6px 11px;font-size:12px;">
+      Aujourd'hui
+    </a>
+    <!-- Filtre service -->
+    <select class="pr-input" style="width:180px;"
+            onchange="window.location='?date={{ selected_date_iso }}&service='+this.value">
+      <option value="">Tous les services</option>
+      {% for svc in services %}
+      <option value="{{ svc.pk }}" {% if service_sel and service_sel.pk == svc.pk %}selected{% endif %}>
+        {{ svc.nom }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <span class="stat-chip chip-p"><i class="bi bi-check-circle-fill"></i> {{ nb_presents }} présent{{ nb_presents|pluralize }}</span>
+    <span class="stat-chip chip-a"><i class="bi bi-x-circle-fill"></i> {{ nb_absents }} absent{{ nb_absents|pluralize }}</span>
+    <button class="btn-pr-outline no-print" onclick="window.print()">
+      <i class="bi bi-printer"></i> Imprimer
+    </button>
+  </div>
+</div>
+
+<!-- Titre du registre -->
+<div style="text-align:center;padding:16px 32px 12px;">
+  <div style="font-size:13px;font-style:italic;color:var(--pr-600);font-weight:600;">
+    Registre des horaires du personnel
+  </div>
+  <div style="font-size:14px;font-weight:700;color:var(--pr-900);margin-top:4px;">
+    {{ jour_fr }} {{ selected_date|date:"d" }} {{ mois_fr }} {{ selected_date|date:"Y" }}
+  </div>
+</div>
+
+<form method="post">
+  {% csrf_token %}
+  <div style="overflow-x:auto;border-top:1px solid var(--border);border-bottom:1px solid var(--border);">
+      <table class="reg-table">
+        <thead>
+          <tr>
+            <th style="width:36px;">N°</th>
+            <th class="th-left" style="min-width:180px;">Nom et Prénoms</th>
+            <th style="width:80px;">Service</th>
+            <th style="width:60px;">Présent</th>
+            <th>Heure d'arrivée<br><small>matin</small></th>
+            <th>Heure départ<br><small>matin</small></th>
+            <th>Heure d'arrivée<br><small>soir</small></th>
+            <th>Heure de départ<br><small>soir</small></th>
+            <th style="min-width:140px;">Remarques</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ligne in lignes %}
+          {% with emp=ligne.emp p=ligne.p %}
+          <tr id="row-{{ emp.pk }}">
+            <td class="td-num">{{ ligne.num }}</td>
+            <td class="td-nom">
+              <div>{{ emp.nom_complet }}</div>
+              {% if emp.fonction %}<div style="font-size:11px;color:var(--pr-muted);font-weight:400;">{{ emp.fonction }}</div>{% endif %}
+              {% if ligne.conge %}
+              <div style="margin-top:3px;">
+                <span style="background:rgba(99,102,241,.08);color:#4338ca;border:1px solid rgba(99,102,241,.2);border-radius:10px;padding:1px 8px;font-size:10px;font-weight:700;white-space:nowrap;">
+                  <i class="bi bi-calendar-check"></i> {{ ligne.conge.get_type_conge_display }}
+                  — jusqu'au {{ ligne.conge.date_fin|date:"d/m" }}
+                </span>
+              </div>
+              {% endif %}
+            </td>
+            <td class="td-service">
+              {% with svcs=emp.services.all %}
+                {% if svcs %}{% for s in svcs %}{{ s.nom }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                {% else %}—{% endif %}
+              {% endwith %}
+            </td>
+
+            <!-- Présent/Absent toggle -->
+            <td style="text-align:center;">
+              <input type="checkbox" class="present-toggle" id="pres_{{ emp.pk }}"
+                     name="present_{{ emp.pk }}" value="1"
+                     {% if ligne.present %}checked{% endif %}
+                     onchange="togglePresent('{{ emp.pk }}', this.checked)">
+              <label for="pres_{{ emp.pk }}" class="present-label {% if not ligne.present %}absent{% endif %}"
+                     id="lbl_{{ emp.pk }}">
+                {% if ligne.present %}<i class="bi bi-check-lg"></i> Présent
+                {% else %}<i class="bi bi-x-lg"></i> Absent{% endif %}
+              </label>
+            </td>
+
+            <!-- Horaires matin -->
+            <td class="td-time">
+              <input type="time" name="h_am_{{ emp.pk }}" class="time-inp"
+                     value="{{ p.heure_arrivee_matin|time:'H:i'|default:'' }}">
+            </td>
+            <td class="td-time">
+              <input type="time" name="h_dm_{{ emp.pk }}" class="time-inp"
+                     value="{{ p.heure_depart_matin|time:'H:i'|default:'' }}">
+            </td>
+
+            <!-- Horaires soir -->
+            <td class="td-time">
+              <input type="time" name="h_as_{{ emp.pk }}" class="time-inp"
+                     value="{{ p.heure_arrivee_soir|time:'H:i'|default:'' }}">
+            </td>
+            <td class="td-time">
+              <input type="time" name="h_ds_{{ emp.pk }}" class="time-inp"
+                     value="{{ p.heure_depart_soir|time:'H:i'|default:'' }}">
+            </td>
+
+            <!-- Remarques + motif absence -->
+            <td class="td-rem">
+              <input type="text" name="rem_{{ emp.pk }}" class="time-inp"
+                     style="width:100%;text-align:left;"
+                     placeholder="Remarques…"
+                     value="{{ p.remarques|default:'' }}">
+              <div id="motif_wrap_{{ emp.pk }}" class="motif-cell{% if not ligne.present %} motif-visible{% endif %}">
+                <input type="text" name="motif_{{ emp.pk }}" class="motif-inp"
+                       placeholder="Motif d'absence…"
+                       value="{% if p %}{{ p.motif_absence }}{% elif ligne.conge %}{{ ligne.conge.get_type_conge_display }}{% endif %}">
+              </div>
+            </td>
+          </tr>
+          {% endwith %}
+          {% empty %}
+          <tr>
+            <td colspan="9" style="text-align:center;padding:40px;color:var(--pr-muted);">
+              <i class="bi bi-people" style="font-size:32px;display:block;margin-bottom:8px;opacity:.3;"></i>
+              Aucun employé actif trouvé.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+  </div>
+
+  <!-- Bouton sauvegarder -->
+  {% if lignes %}
+  <div style="display:flex;justify-content:flex-end;gap:10px;padding:10px 32px;" class="no-print">
+    <button type="submit" class="btn-pr">
+      <i class="bi bi-floppy-fill"></i> Enregistrer le registre
+    </button>
+  </div>
+  {% endif %}
+</form>
+
+</div><!-- /#page-wrap -->
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function togglePresent(empId, isPresent) {
+  var lbl      = document.getElementById('lbl_' + empId);
+  var motifWrap = document.getElementById('motif_wrap_' + empId);
+  if (isPresent) {
+    lbl.className = 'present-label';
+    lbl.innerHTML = '<i class="bi bi-check-lg"></i> Présent';
+    motifWrap.style.display = 'none';
+  } else {
+    lbl.className = 'present-label absent';
+    lbl.innerHTML = '<i class="bi bi-x-lg"></i> Absent';
+    motifWrap.style.display = 'block';
+  }
+}
+</script>
+{% endblock %}

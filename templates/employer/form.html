@@ -24,6 +24,12 @@ html[data-theme="dark"] .iti--separate-dial-code .iti__selected-flag { border-ri
 html[data-theme="dark"] .iti__selected-dial-code { color: #cce8f4; }
 </style>
 <style>
+/* animation section médicale */
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* grille 3 colonnes */
 .f-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
 @media (max-width: 900px) { .f-grid.cols-3 { grid-template-columns: 1fr 1fr; } }
@@ -193,14 +199,25 @@ html[data-theme="dark"] .f-combo-drop li.f-combo-create { color: #7ab4d8; }
         {% endif %}
       </div>
 
-      <div class="f-grid" style="margin-bottom:20px;">
+      <div class="f-grid cols-3" style="margin-bottom:20px;">
+        <div class="f-field">
+          <label class="field-label" for="id_titre">Titre</label>
+          <select id="id_titre" name="titre" class="field-ul">
+            <option value=""       {% if not form_data.titre                      %}selected{% endif %}>— Aucun —</option>
+            <option value="m"      {% if form_data.titre == 'm'      %}selected{% endif %}>M.</option>
+            <option value="mme"    {% if form_data.titre == 'mme'    %}selected{% endif %}>Mme</option>
+            <option value="dr"     {% if form_data.titre == 'dr'     %}selected{% endif %}>Dr</option>
+            <option value="pr"     {% if form_data.titre == 'pr'     %}selected{% endif %}>Pr</option>
+            <option value="prof"   {% if form_data.titre == 'prof'   %}selected{% endif %}>Prof.</option>
+          </select>
+        </div>
         <div class="f-field">
           <label class="field-label" for="id_nom">Nom <span class="f-required">*</span></label>
           <input type="text" id="id_nom" name="nom" value="{{ form_data.nom }}" class="field-ul" placeholder="Nom de famille" required maxlength="100" autocomplete="family-name">
         </div>
         <div class="f-field">
-          <label class="field-label" for="id_prenoms">Prénoms <span class="f-required">*</span></label>
-          <input type="text" id="id_prenoms" name="prenoms" value="{{ form_data.prenoms }}" class="field-ul" placeholder="Prénoms" required maxlength="150" autocomplete="given-name">
+          <label class="field-label" for="id_prenoms">Prénoms</label>
+          <input type="text" id="id_prenoms" name="prenoms" value="{{ form_data.prenoms }}" class="field-ul" placeholder="Prénoms" maxlength="150" autocomplete="given-name">
         </div>
       </div>
 
@@ -393,10 +410,124 @@ html[data-theme="dark"] .f-combo-drop li.f-combo-create { color: #7ab4d8; }
           </select>
         </div>
       </div>
-      <div class="f-field">
-        <label class="field-label" for="id_notes">Notes internes</label>
-        <textarea id="id_notes" name="notes" class="field-ul" rows="3" placeholder="Observations, informations complémentaires…" style="min-height:72px;">{{ form_data.notes }}</textarea>
+      <!-- ── Toggle Médecin ───────────────────────────────────────── -->
+      <div class="f-field" style="margin-top:8px;">
+        <label class="field-label">Profil médical</label>
+        <div style="display:flex;align-items:center;gap:14px;padding-top:6px;">
+          <label class="f-radio-item">
+            <input type="radio" name="est_medecin" id="est_medecin_non" value=""
+              {% if not form_data.est_medecin %}checked{% endif %}>
+            <span>Pas de profil médical</span>
+          </label>
+          <label class="f-radio-item">
+            <input type="radio" name="est_medecin" id="est_medecin_oui" value="on"
+              {% if form_data.est_medecin %}checked{% endif %}>
+            <span><i class="bi bi-heart-pulse-fill" style="color:#e05252;"></i> Est médecin / docteur</span>
+          </label>
+        </div>
       </div>
+
+      <div class="f-field" style="margin-top:12px;">
+        <label class="field-label" for="id_notes_internes">Notes internes <span style="font-size:11px;color:var(--text-muted);font-weight:400;">(confidentielles — non visibles par l'employé)</span></label>
+        <textarea id="id_notes_internes" name="notes_internes" class="field-ul" rows="3" placeholder="Observations RH, informations confidentielles…" style="min-height:72px;">{{ form_data.notes_internes }}</textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Profil médical (affiché uniquement si est_medecin coché) ── -->
+  <div class="f-card" id="section-medecin" style="{% if not form_data.est_medecin %}display:none;{% endif %}">
+    <div class="f-card-head" style="color:#c0392b;">
+      <i class="bi bi-heart-pulse-fill"></i>
+      Profil médical
+    </div>
+    <div class="f-card-body">
+
+      <div class="f-grid cols-3" style="margin-bottom:20px;">
+        <div class="f-field">
+          <label class="field-label">Spécialité</label>
+          <div class="f-combo" data-model="specialite">
+            <div class="f-combo-input-wrap">
+              <input type="text" class="field-ul f-combo-text" autocomplete="off" placeholder="Rechercher…">
+              <button type="button" class="f-combo-clear" tabindex="-1" title="Effacer">×</button>
+            </div>
+            <input type="hidden" name="specialite" class="f-combo-val" value="{{ form_data.specialite }}">
+            <ul class="f-combo-drop"></ul>
+          </div>
+          <script type="application/json" class="f-combo-data">
+            [{% for sp in specialites %}{"pk":{{ sp.pk }},"nom":"{{ sp.nom|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}]
+          </script>
+        </div>
+        <div class="f-field">
+          <label class="field-label" for="id_ordre_medecin">N° d'ordre médecin</label>
+          <input type="text" id="id_ordre_medecin" name="ordre_medecin" value="{{ form_data.ordre_medecin }}" class="field-ul" placeholder="Ex. CNAMES-2024-001" maxlength="50">
+        </div>
+        <div class="f-field">
+          <label class="field-label" for="id_duree_consultation">Durée consultation (min)</label>
+          <input type="number" id="id_duree_consultation" name="duree_consultation" min="5" max="120" step="5" value="{{ form_data.duree_consultation|default:15 }}" class="field-ul">
+        </div>
+      </div>
+
+      <div class="f-grid cols-3" style="margin-bottom:20px;">
+        <div class="f-field">
+          <label class="field-label" for="id_taux_honoraire">Taux d'honoraire (FCFA)</label>
+          <div style="position:relative;">
+            <input type="number" id="id_taux_honoraire" name="taux_honoraire" min="0" step="500" value="{{ form_data.taux_honoraire|default:0 }}" class="field-ul" style="padding-right:52px;">
+            <span style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:600;color:var(--text-muted);pointer-events:none;">FCFA</span>
+          </div>
+        </div>
+        <div class="f-field" style="display:flex;flex-direction:column;justify-content:flex-end;gap:10px;padding-bottom:4px;">
+          <label class="f-radio-item" style="gap:10px;">
+            <input type="checkbox" name="chirurgien_principal" id="id_chirurgien_principal"
+              {% if form_data.chirurgien_principal %}checked{% endif %}
+              style="width:16px;height:16px;cursor:pointer;accent-color:var(--primary);">
+            <span style="font-size:13px;font-weight:500;">Chirurgien principal</span>
+          </label>
+          <label class="f-radio-item" style="gap:10px;">
+            <input type="checkbox" name="est_referent" id="id_est_referent"
+              {% if form_data.est_referent %}checked{% endif %}
+              style="width:16px;height:16px;cursor:pointer;accent-color:var(--primary);">
+            <span style="font-size:13px;font-weight:500;">Peut être médecin référent d'un patient</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="f-grid" style="margin-bottom:20px;">
+        <div class="f-field">
+          <label class="field-label" for="id_service_consultation">Service de consultation</label>
+          <select id="id_service_consultation" name="service_consultation" class="field-ul">
+            <option value="">— Aucun —</option>
+            {% for svc in services_medicaux %}
+            <option value="{{ svc.pk }}" {% if form_data.service_consultation == svc.pk|stringformat:'s' %}selected{% endif %}>{{ svc.nom }}</option>
+            {% endfor %}
+          </select>
+          <small class="f-hint">Service où le médecin effectue ses consultations</small>
+        </div>
+        <div class="f-field">
+          <label class="field-label" for="id_service_suivi">Service de suivi</label>
+          <select id="id_service_suivi" name="service_suivi" class="field-ul">
+            <option value="">— Aucun —</option>
+            {% for svc in services_medicaux %}
+            <option value="{{ svc.pk }}" {% if form_data.service_suivi == svc.pk|stringformat:'s' %}selected{% endif %}>{{ svc.nom }}</option>
+            {% endfor %}
+          </select>
+          <small class="f-hint">Service de suivi des hospitalisations</small>
+        </div>
+      </div>
+
+      <div class="f-field">
+        <label class="field-label">Signature <span style="font-size:11px;color:var(--text-muted);font-weight:400;">(utilisée sur les ordonnances)</span></label>
+        <div style="display:flex;align-items:center;gap:14px;">
+          {% if employe and employe.signature %}
+          <img src="{{ employe.signature.url }}" alt="Signature actuelle" style="max-height:60px;border:1px solid var(--border);border-radius:4px;padding:4px;background:#fff;">
+          {% endif %}
+          <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;padding:7px 14px;border:1.5px dashed var(--border);border-radius:6px;font-size:13px;color:var(--text-muted);transition:border-color .2s;">
+            <i class="bi bi-upload"></i>
+            <span id="sig-label">{% if employe and employe.signature %}Changer la signature{% else %}Choisir une image{% endif %}</span>
+            <input type="file" name="signature" id="id_signature" accept="image/*" style="display:none;" onchange="document.getElementById('sig-label').textContent=this.files[0]?this.files[0].name:'Choisir une image'">
+          </label>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -485,6 +616,24 @@ document.querySelectorAll('.dept-tag').forEach(function(tag) {
 
 /* ── Combobox création rapide ──────────────────────────────────────────── */
 (function () {
+  /* ── Toggle section médecin ─────────────────────────────────────────────── */
+  (function () {
+    var section = document.getElementById('section-medecin');
+    var radios  = document.querySelectorAll('input[name="est_medecin"]');
+    function syncSection() {
+      var oui = document.getElementById('est_medecin_oui');
+      if (!section || !oui) return;
+      if (oui.checked) {
+        section.style.display = '';
+        section.style.animation = 'slideDown .25s ease';
+      } else {
+        section.style.display = 'none';
+      }
+    }
+    radios.forEach(function(r) { r.addEventListener('change', syncSection); });
+    syncSection();
+  })();
+
   var CONFIG_URLS = {
     'fonction':     '{% url "employer:config_fonctions" %}',
     'grade':        '{% url "employer:config_grades" %}',

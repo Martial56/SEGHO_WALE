@@ -72,6 +72,8 @@ class CategorieArticleForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields['parent'].empty_label = '— Aucune (catégorie racine) —'
         self.fields['parent'].required = False
+        for f in ['reservation_conditionnement', 'methode_cout', 'valorisation_inventaire']:
+            self.fields[f].required = False
         for field in self.fields.values():
             field.error_messages = {
                 'required': 'Ce champ est obligatoire.',

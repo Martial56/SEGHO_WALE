@@ -5,6 +5,7 @@ app_name = 'soins'
 
 urlpatterns = [
     # Soins infirmiers
+    path('patient-counts/', views.soins_patient_counts, name='patient_counts'),
     path('', views.soins_list, name='list'),
     path('nouveau/', views.soins_create, name='create'),
     path('<int:pk>/', views.soins_detail, name='detail'),
@@ -35,12 +36,18 @@ urlpatterns = [
     # Maladies
     path('maladies/nouveau/', views.maladie_create, name='maladie_create'),
 
-    # Facturation depuis soins infirmiers
+    # Actions sur un soin
+    path('<int:pk>/enregistrer/', views.soins_creer_facture, name='creer_facture'),
+    path('<int:pk>/administrer/', views.soins_administrer, name='administrer'),
+
+    # Facturation depuis soins infirmiers (admin / ancien flux)
     path('<int:pk>/facturer/', views.soin_facturer, name='soin_facturer'),
 
     # Factures dans le module soins
     path('factures/<int:pk>/', views.soins_facture_detail, name='facture_detail'),
+    path('factures/<int:pk>/paiement/', views.soins_facture_paiement, name='facture_paiement'),
     path('factures/<int:pk>/modifier/', views.soins_facture_edit, name='facture_edit'),
     path('factures/<int:pk>/valider/', views.soins_facture_valider, name='facture_valider'),
     path('factures/<int:pk>/payer/', views.soins_facture_payer, name='facture_payer'),
+    path('factures/<int:pk>/imprimer/', views.soins_facture_print, name='facture_print'),
 ]

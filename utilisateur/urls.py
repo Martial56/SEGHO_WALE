@@ -27,4 +27,9 @@ urlpatterns = [
     # Documents
     path('<int:pk>/documents/upload/', views.employe_upload_document, name='document_upload'),
     path('<int:pk>/documents/<int:doc_pk>/supprimer/', views.employe_delete_document, name='document_delete'),
+
+    # Liaison compte ↔ dossier employé (admin uniquement)
+    path('lier-compte/<int:user_pk>/', views.lier_compte_a_employe, name='lier_compte'),
+    path('<int:emp_pk>/lier-employe/', views.lier_employe_a_compte, name='lier_employe'),
+    path('<int:emp_pk>/delier/', views.delier_compte, name='delier_compte'),
 ]

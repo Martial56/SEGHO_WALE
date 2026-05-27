@@ -52,33 +52,6 @@
   .o-list-table tbody tr:hover td { background: #f2faf6; }
   .o-list-table tbody tr { cursor: pointer; }
 
-  /* ── BADGES STATUT ── */
-  .badge-statut {
-    display: inline-flex; align-items: center; gap: 5px;
-    font-size: 10px; font-weight: 600; padding: 2px 8px 2px 6px;
-    border-radius: 20px; white-space: nowrap;
-  }
-  .badge-statut::before {
-    content: ''; flex-shrink: 0; width: 5px; height: 5px; border-radius: 50%;
-  }
-  .badge-brouillon { background: #f3f4f6; color: #6b7280; }
-  .badge-brouillon::before { background: #9ca3af; }
-  .badge-en-cours  { background: #fff8e1; color: #b07d00; }
-  .badge-en-cours::before  { background: #d99c2b; }
-  .badge-termine   { background: #e3f5ef; color: #1a5c4a; }
-  .badge-termine::before   { background: #2ca870; }
-  .badge-annule    { background: #fdf0f0; color: #c0392b; }
-  .badge-annule::before    { background: #c0392b; }
-
-  html[data-theme="dark"] .badge-brouillon { background: rgba(107,114,128,.2);  color: #d1d5db; }
-  html[data-theme="dark"] .badge-brouillon::before { background: #9ca3af; }
-  html[data-theme="dark"] .badge-en-cours  { background: rgba(176,125,0,.2);    color: #e2c16a; }
-  html[data-theme="dark"] .badge-en-cours::before  { background: #e2c16a; }
-  html[data-theme="dark"] .badge-termine   { background: rgba(26,92,74,.25);    color: #6eddb0; }
-  html[data-theme="dark"] .badge-termine::before   { background: #6eddb0; }
-  html[data-theme="dark"] .badge-annule    { background: rgba(232,69,69,.2);    color: #f09090; }
-  html[data-theme="dark"] .badge-annule::before    { background: #f09090; }
-
   /* ── BADGE BICOLORE : en cours + payé → à terminer ── */
   .badge-paye-terminer {
     display: inline-flex; overflow: hidden; border-radius: 20px;
@@ -236,10 +209,11 @@
 <div class="filters-panel {% if statut or date_filtre %}open{% endif %}" id="filters-panel">
   <select id="sel-statut" class="filter-select" onchange="applyFilters()">
     <option value="">Tous les statuts</option>
-    <option value="brouillon" {% if statut == 'brouillon' %}selected{% endif %}>Brouillon</option>
-    <option value="en_cours"  {% if statut == 'en_cours'  %}selected{% endif %}>En cours</option>
-    <option value="termine"   {% if statut == 'termine'   %}selected{% endif %}>Terminé</option>
-    <option value="annule"    {% if statut == 'annule'    %}selected{% endif %}>Annulé</option>
+    <option value="brouillon"              {% if statut == 'brouillon'              %}selected{% endif %}>Brouillon</option>
+    <option value="en_attente_de_paiement" {% if statut == 'en_attente_de_paiement' %}selected{% endif %}>En attente de paiement</option>
+    <option value="en_cours"               {% if statut == 'en_cours'               %}selected{% endif %}>En cours</option>
+    <option value="termine"                {% if statut == 'termine'                %}selected{% endif %}>Terminé</option>
+    <option value="annule"                 {% if statut == 'annule'                 %}selected{% endif %}>Annulé</option>
   </select>
   <input type="date" id="sel-date" class="filter-select" value="{{ date_filtre }}" onchange="applyFilters()"
     style="font-size:12px;">
@@ -259,6 +233,13 @@
     <div>
       <div class="stat-label">Ce mois</div>
       <div class="stat-value">{{ stats.ce_mois }}</div>
+    </div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-icon" style="background:#eff6ff;color:#1d4ed8;"><i class="bi bi-clock-history"></i></div>
+    <div>
+      <div class="stat-label">En attente</div>
+      <div class="stat-value">{{ stats.en_attente }}</div>
     </div>
   </div>
   <div class="stat-box">
@@ -358,15 +339,8 @@
         <td data-col="17">
           {% if soin.statut == 'brouillon' %}
             <span class="badge-statut badge-brouillon">Brouillon</span>
-          {% elif soin.statut == 'en_cours' and soin.est_paye %}
-            <form method="post" action="{% url 'soins:terminer' soin.pk %}"
-              onclick="event.stopPropagation()" style="display:inline;">
-              {% csrf_token %}
-              <button type="submit" class="badge-paye-terminer" title="Payé — cliquer pour terminer">
-                <span class="part-terme">Term</span>
-                <span class="part-cours">Cours</span>
-              </button>
-            </form>
+          {% elif soin.statut == 'en_attente_de_paiement' %}
+            <span class="badge-statut badge-en-attente">Att. paiement</span>
           {% elif soin.statut == 'en_cours' %}
             <span class="badge-statut badge-en-cours">En cours</span>
           {% elif soin.statut == 'termine' %}
@@ -375,7 +349,23 @@
             <span class="badge-statut badge-annule">Annulé</span>
           {% endif %}
         </td>
-        <td></td>
+        <td onclick="event.stopPropagation()" style="text-align:center;padding:4px;">
+          {% if soin.statut == 'en_attente_de_paiement' and user_peut_creer_facture %}
+            {% if not soin.facture_id %}
+            <a href="{% url 'soins:creer_facture' soin.pk %}"
+              title="Créer la facture"
+              style="display:inline-flex;align-items:center;gap:3px;padding:3px 8px;background:#16a34a;color:#fff;border-radius:4px;font-size:11px;font-weight:600;text-decoration:none;white-space:nowrap;">
+              <i class="bi bi-receipt"></i> Facturer
+            </a>
+            {% else %}
+            <a href="{% url 'soins:facture_paiement' soin.facture_id %}"
+              title="Encaisser"
+              style="display:inline-flex;align-items:center;gap:3px;padding:3px 8px;background:#1d4ed8;color:#fff;border-radius:4px;font-size:11px;font-weight:600;text-decoration:none;white-space:nowrap;">
+              <i class="bi bi-cash-coin"></i> Encaisser
+            </a>
+            {% endif %}
+          {% endif %}
+        </td>
       </tr>
       {% endwith %}
       {% endfor %}

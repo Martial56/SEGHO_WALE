@@ -11,9 +11,10 @@ from django.http import JsonResponse, HttpResponse
 
 from django.utils import timezone
 from .models import (Employe, Fonction, Grade, TypeContrat,
+                     Specialite, DocteurReferent,
                      DocumentEmploye, InfoSupplementaire, AlerteContrat,
                      AlerteDocument, HistoriqueEmploye, Conge, DOCS_OBLIGATOIRES)
-from utilisateur.models import Departement as Service
+from .models import Departement as Service
 from .forms import FonctionForm, GradeForm, TypeContratForm
 
 RH_MANAGE_GROUPS = {'Médecin Chef', 'Médecin Chef Adjoint', 'Administrateur', 'Directeur', 'RH'}
@@ -21,18 +22,29 @@ RH_MANAGE_GROUPS = {'Médecin Chef', 'Médecin Chef Adjoint', 'Administrateur', 
 LABELS_DOCS = {'cni': "Carte d'identité", 'contrat': 'Contrat signé', 'diplome': 'Diplôme'}
 
 _EMPTY_FORM = {
-    'nom': '', 'prenoms': '', 'sexe': 'M', 'date_naissance': '',
+    # identité
+    'titre': '', 'nom': '', 'prenoms': '', 'sexe': 'M', 'date_naissance': '',
     'lieu_naissance': '', 'nationalite': 'Ivoirienne', 'situation_matrimoniale': '',
     'nombre_enfants': '0', 'telephone': '', 'telephone2': '', 'email': '',
-    'adresse': '', 'services': [], 'fonction': '', 'grade': '', 'type_contrat': '',
+    'adresse': '', 'numero_ordre': '',
+    # RH
+    'services': [], 'fonction': '', 'grade': '', 'type_contrat': '',
     'date_embauche': '', 'date_fin_contrat': '', 'salaire_base': '', 'statut': 'actif',
-    'notes': '', 'numero_ordre': '',
+    'notes_internes': '',
+    # profil médical
+    'est_medecin': False, 'est_referent': False,
+    'specialite': '', 'ordre_medecin': '',
+    'duree_consultation': '15', 'chirurgien_principal': False,
+    'taux_honoraire': '0',
+    'service_consultation': '', 'service_suivi': '',
 }
 
 
 def _employe_to_form(e):
     fmt = lambda d: d.strftime('%Y-%m-%d') if d else ''
     return {
+        # identité
+        'titre':                  e.titre or '',
         'nom':                    e.nom or '',
         'prenoms':                e.prenoms or '',
         'sexe':                   e.sexe or 'M',
@@ -45,6 +57,7 @@ def _employe_to_form(e):
         'telephone2':             e.telephone2 or '',
         'email':                  e.email or '',
         'adresse':                e.adresse or '',
+        # RH
         'services':               list(e.services.values_list('pk', flat=True)),
         'fonction':               str(e.fonction_id)     if e.fonction_id     else '',
         'grade':                  str(e.grade_id)        if e.grade_id        else '',
@@ -53,7 +66,17 @@ def _employe_to_form(e):
         'date_fin_contrat':       fmt(e.date_fin_contrat),
         'salaire_base':           str(int(e.salaire_base)) if e.salaire_base else '',
         'statut':                 e.statut or 'actif',
-        'notes':                  e.notes or '',
+        'notes_internes':         e.notes_internes or '',
+        # profil médical
+        'est_medecin':            e.est_medecin,
+        'est_referent':           e.est_referent,
+        'specialite':             str(e.specialite_id) if e.specialite_id else '',
+        'ordre_medecin':          e.ordre_medecin or '',
+        'duree_consultation':     str(e.duree_consultation) if e.duree_consultation else '15',
+        'chirurgien_principal':   e.chirurgien_principal,
+        'taux_honoraire':         str(int(e.taux_honoraire)) if e.taux_honoraire else '0',
+        'service_consultation':   str(e.service_consultation_id) if e.service_consultation_id else '',
+        'service_suivi':          str(e.service_suivi_id) if e.service_suivi_id else '',
     }
 
 
@@ -66,11 +89,14 @@ def can_manage_rh(user):
 
 
 def _rh_selects(user):
+    from services.models import Articleservice
     return {
         'fonctions':     Fonction.objects.all(),
         'grades':        Grade.objects.all(),
         'types_contrat': TypeContrat.objects.all(),
         'services':      Service.objects.filter(actif=True).order_by('nom'),
+        'specialites':   Specialite.objects.all().order_by('nom'),
+        'services_medicaux': Articleservice.objects.order_by('nom'),
         'can_manage':    can_manage_rh(user),
     }
 
@@ -354,6 +380,7 @@ def _save_employe(request, employe):
         except (model.DoesNotExist, ValueError, TypeError):
             return None
 
+    employe.titre  = p.get('titre', '').strip()
     employe.fonction     = fk_or_none(Fonction, p.get('fonction'))
     employe.grade        = fk_or_none(Grade, p.get('grade'))
     employe.type_contrat = fk_or_none(TypeContrat, p.get('type_contrat'))
@@ -361,7 +388,35 @@ def _save_employe(request, employe):
     employe.date_fin_contrat = p.get('date_fin_contrat') or None
     employe.salaire_base     = p.get('salaire_base') or 0
     employe.statut           = p.get('statut', 'actif')
-    employe.notes            = p.get('notes', '').strip()
+    employe.notes_internes   = p.get('notes_internes', '').strip()
+
+    # ── Profil médical ────────────────────────────────────────────────────────
+    employe.est_medecin  = p.get('est_medecin') == 'on'
+    employe.est_referent = p.get('est_referent') == 'on'
+    if employe.est_medecin:
+        from .models import Specialite as _Spe
+        from services.models import Articleservice as _Svc
+        employe.specialite          = fk_or_none(_Spe, p.get('specialite'))
+        employe.ordre_medecin       = p.get('ordre_medecin', '').strip()
+        employe.duree_consultation  = int(p.get('duree_consultation') or 15)
+        employe.chirurgien_principal = p.get('chirurgien_principal') == 'on'
+        employe.taux_honoraire      = p.get('taux_honoraire') or 0
+        employe.service_consultation = fk_or_none(_Svc, p.get('service_consultation'))
+        employe.service_suivi        = fk_or_none(_Svc, p.get('service_suivi'))
+        if 'signature' in request.FILES:
+            if employe.signature:
+                employe.signature.delete(save=False)
+            employe.signature = request.FILES['signature']
+    else:
+        # Remettre à zéro les champs médicaux si décochés
+        employe.specialite           = None
+        employe.ordre_medecin        = ''
+        employe.duree_consultation   = 15
+        employe.chirurgien_principal = False
+        employe.taux_honoraire       = 0
+        employe.service_consultation = None
+        employe.service_suivi        = None
+        employe.est_referent         = False
 
     if 'photo' in request.FILES:
         if employe.photo:
@@ -727,8 +782,8 @@ def alerte_doc_lue(request, alerte_id):
 
 from django.views.decorators.http import require_POST
 from django.http import JsonResponse as _JsonResponse
-from utilisateur.models import Specialite, Diplome
-from utilisateur.models import Employe as UtilisateurEmploye
+from .models import Specialite, Diplome
+# UtilisateurEmploye supprimé — employer.Employe est l'unique modèle
 from utilisateur.forms import SpecialiteForm, DiplomeForm, DepartementForm
 
 

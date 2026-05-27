@@ -1,6 +1,6 @@
 from django import forms
 from django.forms import inlineformset_factory
-from .models import Employe, Specialite, Diplome, Departement, DocteurReferent, Etiquette, ContactAdresse, DiplomePersonnel
+from employer.models import Employe, Specialite, Diplome, Departement, DocteurReferent, Etiquette, ContactAdresse, DiplomePersonnel
 from services.models import Articleservice
 
 
@@ -69,17 +69,13 @@ class DiplomePersonnelForm(forms.ModelForm):
 class EmployeEducationForm(forms.ModelForm):
     class Meta:
         model = Employe
-        fields = ['diplome', 'etablissement']
+        fields = ['etablissement']
         widgets = {
-            'diplome': forms.Select(attrs={'class': 'field-ul'}),
             'etablissement': forms.TextInput(attrs={'class': 'field-ul', 'placeholder': 'Université, École…'}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['diplome'].queryset = Diplome.objects.all()
-        self.fields['diplome'].empty_label = "— Niveau d'éducation —"
-        self.fields['diplome'].required = False
         self.fields['etablissement'].required = False
 
 _ul = 'field-ul'
@@ -141,7 +137,6 @@ class EmployeForm(forms.ModelForm):
             'date_naissance': forms.DateInput(attrs={'class': _ul, 'type': 'date'}),
             'lieu_naissance': forms.TextInput(attrs={'class': _ul, 'placeholder': 'Ville, Pays'}),
             'fonction': forms.TextInput(attrs={'class': _ul, 'placeholder': 'Ex : Infirmier, Médecin, Aide-soignant…'}),
-            'diplome': forms.Select(attrs={'class': _ul}),
             'specialite': forms.Select(attrs={'class': _ul}),
             'service_consultation': forms.Select(attrs={'class': _ul}),
             'service_suivi': forms.Select(attrs={'class': _ul}),
@@ -169,9 +164,6 @@ class EmployeForm(forms.ModelForm):
         self.fields['specialite'].queryset = Specialite.objects.all()
         self.fields['specialite'].empty_label = '— Choisir une spécialité —'
         self.fields['specialite'].required = False
-        self.fields['diplome'].queryset = Diplome.objects.all()
-        self.fields['diplome'].empty_label = "— Niveau d'éducation —"
-        self.fields['diplome'].required = False
         self.fields['departements'].queryset = Departement.objects.filter(actif=True)
         self.fields['departements'].required = False
         self.fields['service_consultation'].queryset = Articleservice.objects.filter(actif=True).order_by('nom')
@@ -182,7 +174,6 @@ class EmployeForm(forms.ModelForm):
         self.fields['service_suivi'].required = False
         if not self.instance.pk:
             self.fields['duree_consultation'].initial = 15
-            self.fields['actif'].initial = False
         for field in self.fields.values():
             field.error_messages = {
                 'required': 'Ce champ est obligatoire.',
@@ -222,7 +213,7 @@ class DocteurReferentForm(forms.ModelForm):
         self.fields['prenoms'].required = False
         self.fields['etiquettes'].queryset = Etiquette.objects.all()
         self.fields['etiquettes'].required = False
-        self.fields['medecin_interne'].queryset = Employe.objects.filter(actif=True)
+        self.fields['medecin_interne'].queryset = Employe.objects.filter(statut='actif')
         self.fields['medecin_interne'].empty_label = '— Aucun —'
         self.fields['medecin_interne'].required = False
         for field in self.fields.values():

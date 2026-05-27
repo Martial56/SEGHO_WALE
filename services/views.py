@@ -270,6 +270,8 @@ def consommable_create(request):
             obj = form.save()
             messages.success(request, f'Consommable « {obj.nom} » créé avec succès.')
             return redirect('services:consommables')
+        else:
+            messages.error(request, 'Veuillez corriger les erreurs du formulaire.')
     else:
         form = ConsommableForm()
     return render(request, 'services/consommables/form.html', {
@@ -288,6 +290,8 @@ def consommable_edit(request, pk):
             form.save()
             messages.success(request, f'Consommable « {obj.nom} » mis à jour.')
             return redirect('services:consommable_detail', pk=obj.pk)
+        else:
+            messages.error(request, 'Veuillez corriger les erreurs du formulaire.')
     else:
         form = ConsommableForm(instance=obj)
     return render(request, 'services/consommables/form.html', {
@@ -383,6 +387,8 @@ def categorie_create(request):
             obj = form.save()
             messages.success(request, f'Catégorie « {obj.nom} » créée.')
             return redirect('services:categories')
+        else:
+            messages.error(request, 'Veuillez corriger les erreurs du formulaire.')
     else:
         form = CategorieArticleForm()
     return render(request, 'services/categories/form.html', {
@@ -401,6 +407,8 @@ def categorie_edit(request, pk):
             form.save()
             messages.success(request, f'Catégorie « {obj.nom} » mise à jour.')
             return redirect('services:categorie_detail', pk=obj.pk)
+        else:
+            messages.error(request, 'Veuillez corriger les erreurs du formulaire.')
     else:
         form = CategorieArticleForm(instance=obj)
     return render(request, 'services/categories/form.html', {
@@ -461,6 +469,8 @@ def unite_create(request):
             obj = form.save()
             messages.success(request, f'Unité « {obj.nom} » créée.')
             return redirect('services:unites')
+        else:
+            messages.error(request, 'Veuillez corriger les erreurs du formulaire.')
     else:
         form = UniteMesureForm()
     return render(request, 'services/unites/form.html', {
@@ -479,6 +489,8 @@ def unite_edit(request, pk):
             form.save()
             messages.success(request, f'Unité « {obj.nom} » mise à jour.')
             return redirect('services:unite_detail', pk=obj.pk)
+        else:
+            messages.error(request, 'Veuillez corriger les erreurs du formulaire.')
     else:
         form = UniteMesureForm(instance=obj)
     return render(request, 'services/unites/form.html', {
@@ -532,6 +544,8 @@ def categorie_unite_create(request):
             obj = form.save()
             messages.success(request, f'Catégorie « {obj.nom} » créée.')
             return redirect('services:categories_unites')
+        else:
+            messages.error(request, 'Veuillez corriger les erreurs du formulaire.')
     else:
         form = CategorieUniteMesureForm()
     return render(request, 'services/unites/categories/form.html', {
@@ -556,6 +570,8 @@ def categorie_unite_edit(request, pk):
             form.save()
             messages.success(request, f'Catégorie « {obj.nom} » mise à jour.')
             return redirect('services:categorie_unite_detail', pk=obj.pk)
+        else:
+            messages.error(request, 'Veuillez corriger les erreurs du formulaire.')
     else:
         form = CategorieUniteMesureForm(instance=obj)
     return render(request, 'services/unites/categories/form.html', {
@@ -615,6 +631,8 @@ def type_create(request):
             obj = form.save()
             messages.success(request, f'Type « {obj.nom} » créé.')
             return redirect('services:types')
+        else:
+            messages.error(request, 'Veuillez corriger les erreurs du formulaire.')
     else:
         form = TypeserviceForm()
     return render(request, 'services/types/form.html', {
@@ -633,6 +651,8 @@ def type_edit(request, pk):
             form.save()
             messages.success(request, f'Type « {obj.nom} » mis à jour.')
             return redirect('services:type_detail', pk=obj.pk)
+        else:
+            messages.error(request, 'Veuillez corriger les erreurs du formulaire.')
     else:
         form = TypeserviceForm(instance=obj)
     return render(request, 'services/types/form.html', {

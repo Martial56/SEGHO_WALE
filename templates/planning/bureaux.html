@@ -1,0 +1,348 @@
+{% extends 'planning/base.html' %}
+{% load i18n %}
+
+{% block nav_bureaux %}active{% endblock %}
+
+{% block extra_planning_css %}
+/* ── Subheader ── */
+.pl-subheader {
+  position: sticky; top: 44px; z-index: 180;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 10px 0 0; margin: 0 -32px 18px;
+}
+.pl-subheader-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 32px 10px;
+}
+.pl-subheader h1 { font-size: 18px; font-weight: 700; color: var(--text); margin: 0; }
+
+/* ── Alert ── */
+.alert-success {
+  background: var(--pl-100); color: var(--pl-800); border: 1px solid var(--pl-300);
+  border-radius: 6px; padding: 10px 16px; margin-bottom: 14px;
+  font-size: 13px; display: flex; align-items: center; gap: 8px;
+}
+.alert-error {
+  background: #fce4ec; color: #b71c1c; border: 1px solid #f48fb1;
+  border-radius: 6px; padding: 10px 16px; margin-bottom: 14px;
+  font-size: 13px; display: flex; align-items: center; gap: 8px;
+}
+html[data-theme="dark"] .alert-error { background: #3d0010; color: #ff8a80; border-color: #b71c1c; }
+
+/* ── Bureau card ── */
+.bureau-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; margin-bottom: 16px;
+  overflow: hidden;
+}
+.bureau-card-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px; border-bottom: 1px solid var(--border);
+  background: var(--pl-50);
+}
+html[data-theme="dark"] .bureau-card-header { background: var(--pl-100); }
+.bureau-nom { font-size: 15px; font-weight: 700; color: var(--text); flex: 1; }
+.bureau-ordre-badge {
+  font-size: 11px; font-weight: 600; color: var(--text-muted);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 4px; padding: 2px 7px; min-width: 28px; text-align: center;
+}
+.badge-actif {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: var(--pl-100); color: var(--pl-800); border-radius: 20px;
+  padding: 2px 9px; font-size: 11px; font-weight: 600;
+}
+.badge-inactif {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: #fff3cd; color: #856404; border-radius: 20px;
+  padding: 2px 9px; font-size: 11px; font-weight: 600;
+}
+html[data-theme="dark"] .badge-inactif { background: #3d2e00; color: #ffd666; }
+.bureau-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+
+/* ── Plages section ── */
+.plages-section { padding: 12px 16px; }
+.plages-section-title {
+  font-size: 11.5px; font-weight: 600; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 10px;
+}
+.plages-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.plage-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--pl-50); border: 1px solid var(--pl-200);
+  border-radius: 20px; padding: 4px 10px; font-size: 12.5px; font-weight: 500;
+  color: var(--pl-800);
+}
+.plage-chip-actions { display: flex; gap: 3px; }
+.btn-chip-edit {
+  border: none; background: transparent; color: var(--pl-600);
+  cursor: pointer; font-size: 11px; padding: 1px 3px;
+  border-radius: 3px; line-height: 1;
+}
+.btn-chip-edit:hover { background: var(--pl-100); }
+.btn-chip-del {
+  border: none; background: transparent; color: #c0392b;
+  cursor: pointer; font-size: 11px; padding: 1px 3px;
+  border-radius: 3px; line-height: 1;
+}
+.btn-chip-del:hover { background: #fce4ec; }
+.plages-empty { font-size: 12px; color: var(--text-muted); font-style: italic; }
+
+/* ── Add plage inline form ── */
+.add-plage-form {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding-top: 10px; border-top: 1px dashed var(--border);
+}
+.add-plage-form input[type="text"] {
+  padding: 5px 4px; font-size: 13px;
+  border: none; border-bottom: 1.5px solid rgba(0,0,0,0.18); border-radius: 0;
+  background: transparent; color: var(--text); outline: none;
+  width: 140px;
+}
+.add-plage-form input[type="text"]:focus { border-bottom-color: var(--pl-500); }
+html[data-theme="dark"] .add-plage-form input[type="text"] { border-bottom-color: rgba(255,255,255,0.15); }
+html[data-theme="dark"] .add-plage-form input[type="text"]:focus { border-bottom-color: var(--pl-400); }
+.btn-add-plage {
+  background: var(--pl-600); color: #fff; border: none;
+  border-radius: 5px; padding: 5px 12px; font-size: 12.5px;
+  font-weight: 600; cursor: pointer; display: inline-flex;
+  align-items: center; gap: 4px; transition: background 0.15s;
+}
+.btn-add-plage:hover { background: var(--pl-700); }
+
+/* ── Inline modal (edit bureau) via details trick ── */
+.bureau-edit-details summary { list-style: none; cursor: pointer; }
+.bureau-edit-details summary::-webkit-details-marker { display: none; }
+.bureau-edit-panel {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 16px; margin-top: 14px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+}
+.bureau-edit-panel h3 { font-size: 14px; font-weight: 700; margin: 0 0 12px; color: var(--text); }
+.form-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+.form-field { display: flex; flex-direction: column; gap: 4px; }
+.form-field label { font-size: 12px; font-weight: 600; color: var(--text); }
+.form-field input[type="text"] {
+  padding: 7px 4px; font-size: 13px;
+  border: none; border-bottom: 1.5px solid rgba(0,0,0,0.18); border-radius: 0;
+  background: transparent; color: var(--text); outline: none;
+  width: 200px;
+}
+.form-field input[type="text"]:focus { border-bottom-color: var(--pl-500); }
+html[data-theme="dark"] .form-field input[type="text"] { border-bottom-color: rgba(255,255,255,0.15); }
+html[data-theme="dark"] .form-field input[type="text"]:focus { border-bottom-color: var(--pl-400); }
+.form-field-check { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
+.form-field-check label { font-size: 13px; font-weight: 500; color: var(--text); }
+
+/* ── Add bureau section ── */
+.add-bureau-section {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 16px 20px; margin-top: 8px;
+}
+.add-bureau-section h3 {
+  font-size: 14px; font-weight: 700; color: var(--text);
+  margin: 0 0 14px; display: flex; align-items: center; gap: 7px;
+}
+
+/* ── Edit plage inline ── */
+.plage-edit-wrap {
+  display: none; align-items: center; gap: 6px;
+  background: var(--pl-50); border-radius: 6px; padding: 4px 8px;
+  margin-top: 4px; flex-wrap: wrap;
+}
+.plage-edit-wrap.open { display: flex; }
+.plage-edit-wrap input[type="text"] {
+  padding: 4px 4px; font-size: 12.5px;
+  border: none; border-bottom: 1.5px solid rgba(0,0,0,0.18); border-radius: 0;
+  background: transparent; color: var(--text); outline: none;
+  width: 120px;
+}
+.plage-edit-wrap input[type="text"]:focus { border-bottom-color: var(--pl-500); }
+html[data-theme="dark"] .plage-edit-wrap input[type="text"] { border-bottom-color: rgba(255,255,255,0.15); }
+html[data-theme="dark"] .plage-edit-wrap input[type="text"]:focus { border-bottom-color: var(--pl-400); }
+{% endblock %}
+
+{% block content %}
+
+<!-- ══ SUBHEADER ══ -->
+<div class="pl-subheader">
+  <div class="pl-subheader-row">
+    <h1><i class="bi bi-building" style="color:var(--pl-600);margin-right:8px;"></i>Bureaux &amp; plages horaires
+      <span style="font-size:12px;color:var(--text-muted);font-weight:400;margin-left:6px;">({{ bureaux|length }} bureau{{ bureaux|length|pluralize:"x" }})</span>
+    </h1>
+  </div>
+</div>
+
+<!-- ══ BUREAUX ══ -->
+{% if bureaux %}
+  {% for bureau in bureaux %}
+  <div class="bureau-card">
+    <div class="bureau-card-header">
+      <span class="bureau-ordre-badge">{{ bureau.ordre }}</span>
+      <span class="bureau-nom">{{ bureau.nom }}</span>
+      {% if bureau.actif %}
+        <span class="badge-actif"><i class="bi bi-check-circle-fill"></i> Actif</span>
+      {% else %}
+        <span class="badge-inactif"><i class="bi bi-pause-circle"></i> Inactif</span>
+      {% endif %}
+      <div class="bureau-actions">
+        <!-- Monter -->
+        <form method="post" action="{% url 'planning_bureau_ordre' bureau.pk %}" style="display:inline">
+          {% csrf_token %}
+          <input type="hidden" name="direction" value="up">
+          <button type="submit" class="btn-outline-sm" title="Monter"><i class="bi bi-arrow-up"></i></button>
+        </form>
+        <!-- Descendre -->
+        <form method="post" action="{% url 'planning_bureau_ordre' bureau.pk %}" style="display:inline">
+          {% csrf_token %}
+          <input type="hidden" name="direction" value="down">
+          <button type="submit" class="btn-outline-sm" title="Descendre"><i class="bi bi-arrow-down"></i></button>
+        </form>
+        <!-- Modifier (toggle details) -->
+        <button type="button" class="btn-outline-sm"
+                onclick="toggleEdit('bureau-edit-{{ bureau.pk }}')">
+          <i class="bi bi-pencil"></i> Modifier
+        </button>
+        <!-- Supprimer -->
+        <form method="post" action="{% url 'planning_bureau_delete' bureau.pk %}"
+              style="display:inline"
+              onsubmit="return confirm('Supprimer le bureau « {{ bureau.nom }} » ?')">
+          {% csrf_token %}
+          <button type="submit" class="btn-danger-sm"><i class="bi bi-trash"></i></button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Edit bureau panel -->
+    <div id="bureau-edit-{{ bureau.pk }}" class="bureau-edit-panel" style="display:none;margin:12px 16px;">
+      <h3><i class="bi bi-pencil-square" style="color:var(--pl-600)"></i> Modifier « {{ bureau.nom }} »</h3>
+      <form method="post" action="{% url 'planning_bureau_save' %}">
+        {% csrf_token %}
+        <input type="hidden" name="pk" value="{{ bureau.pk }}">
+        <div class="form-row">
+          <div class="form-field">
+            <label for="nom-{{ bureau.pk }}">Nom du bureau</label>
+            <input type="text" id="nom-{{ bureau.pk }}" name="nom" value="{{ bureau.nom }}" required>
+          </div>
+          <div class="form-field" style="justify-content:flex-end;">
+            <div class="form-field-check">
+              <input type="checkbox" id="actif-{{ bureau.pk }}" name="actif" value="1" {% if bureau.actif %}checked{% endif %}>
+              <label for="actif-{{ bureau.pk }}">Actif</label>
+            </div>
+          </div>
+          <button type="submit" class="btn-primary" style="align-self:flex-end;">
+            <i class="bi bi-check-lg"></i> Enregistrer
+          </button>
+          <button type="button" class="btn-secondary" style="align-self:flex-end;"
+                  onclick="toggleEdit('bureau-edit-{{ bureau.pk }}')">
+            Annuler
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Plages section -->
+    <div class="plages-section">
+      <div class="plages-section-title">
+        <i class="bi bi-clock"></i> Plages horaires
+        ({{ bureau.plages.count }})
+      </div>
+
+      {% if bureau.plages.all %}
+      <div class="plages-list">
+        {% for plage in bureau.plages.all %}
+        <div>
+          <div class="plage-chip">
+            <span>{{ plage.code }}</span>
+            <div class="plage-chip-actions">
+              <button type="button" class="btn-chip-edit"
+                      title="Modifier"
+                      onclick="toggleEdit('plage-edit-{{ plage.pk }}')">
+                <i class="bi bi-pencil"></i>
+              </button>
+              <form method="post" action="{% url 'planning_plage_delete' plage.pk %}"
+                    style="display:inline"
+                    onsubmit="return confirm('Supprimer la plage « {{ plage.code }} » ?')">
+                {% csrf_token %}
+                <button type="submit" class="btn-chip-del" title="Supprimer">
+                  <i class="bi bi-x-lg"></i>
+                </button>
+              </form>
+            </div>
+          </div>
+          <!-- Edit plage inline -->
+          <div id="plage-edit-{{ plage.pk }}" class="plage-edit-wrap">
+            <form method="post" action="{% url 'planning_plage_save' %}" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+              {% csrf_token %}
+              <input type="hidden" name="pk" value="{{ plage.pk }}">
+              <input type="text" name="code" value="{{ plage.code }}" required placeholder="Code plage">
+              <button type="submit" class="btn-add-plage">
+                <i class="bi bi-check-lg"></i> OK
+              </button>
+              <button type="button" class="btn-secondary" style="padding:4px 10px;font-size:12px;"
+                      onclick="toggleEdit('plage-edit-{{ plage.pk }}')">
+                Annuler
+              </button>
+            </form>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+        <p class="plages-empty">Aucune plage définie pour ce bureau.</p>
+      {% endif %}
+
+      <!-- Add plage form -->
+      <form method="post" action="{% url 'planning_plage_save' %}" class="add-plage-form">
+        {% csrf_token %}
+        <input type="hidden" name="bureau_pk" value="{{ bureau.pk }}">
+        <input type="text" name="code" placeholder="Nouveau code (ex: Matin, 08h-12h…)" required>
+        <button type="submit" class="btn-add-plage">
+          <i class="bi bi-plus-lg"></i> Ajouter plage
+        </button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+{% else %}
+<div style="text-align:center;padding:60px 20px;color:var(--text-muted);">
+  <i class="bi bi-building" style="font-size:48px;display:block;margin-bottom:12px;color:var(--pl-300);"></i>
+  <p>Aucun bureau défini. Créez votre premier bureau ci-dessous.</p>
+</div>
+{% endif %}
+
+<!-- ══ AJOUT BUREAU ══ -->
+<div class="add-bureau-section">
+  <h3><i class="bi bi-plus-circle" style="color:var(--pl-600);"></i> Ajouter un bureau / service</h3>
+  <form method="post" action="{% url 'planning_bureau_save' %}">
+    {% csrf_token %}
+    <div class="form-row">
+      <div class="form-field">
+        <label for="new-bureau-nom">Nom du bureau</label>
+        <input type="text" id="new-bureau-nom" name="nom" placeholder="ex: Consultations Générales" required>
+      </div>
+      <div class="form-field" style="justify-content:flex-end;">
+        <div class="form-field-check">
+          <input type="checkbox" id="new-bureau-actif" name="actif" value="1" checked>
+          <label for="new-bureau-actif">Actif</label>
+        </div>
+      </div>
+      <button type="submit" class="btn-primary" style="align-self:flex-end;">
+        <i class="bi bi-plus-lg"></i> Créer le bureau
+      </button>
+    </div>
+  </form>
+</div>
+
+<script>
+function toggleEdit(id) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = (el.style.display === 'none' || el.style.display === '') ? 'flex' : 'none';
+  // for bureau-edit panels use block display
+  if (id.startsWith('bureau-edit-')) {
+    el.style.display = (el.style.display === 'flex') ? 'block' : 'none';
+  }
+}
+</script>
+{% endblock %}

@@ -24,5 +24,5 @@ urlpatterns = [
     path('facturation/<int:pk>/annuler/', facture_annuler, name='facture_annuler'),
     path('caisse/', views.caisse_list, name='caisse_list'),
     path('rapports/', views.rapports_list, name='rapports_list'),
-    path('ressources-humaines/', RedirectView.as_view(pattern_name='personnel:list', permanent=True)),
+    path('ressources-humaines/', RedirectView.as_view(pattern_name='employer:ressources_humaines_list', permanent=True)),
 ]

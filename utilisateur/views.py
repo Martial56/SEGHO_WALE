@@ -6,7 +6,7 @@ from django.db.models import Q, Count
 from django.utils import timezone
 from datetime import timedelta
 
-from .models import Employe, DiplomePersonnel
+from employer.models import Employe, DiplomePersonnel
 from .forms import EmployeForm, EmployeEducationForm, DiplomePersonnelForm
 
 
@@ -457,3 +457,121 @@ def employe_update_education(request, pk):
         messages.error(request, 'Erreur lors de la mise à jour.')
     return redirect('utilisateur:detail', pk=pk)
 
+
+# ─── Liaison compte ↔ dossier employé ────────────────────────────────────────
+
+@login_required
+def lier_compte_a_employe(request, user_pk):
+    """Admin : choisit un dossier employer.Employe à lier à ce compte User."""
+    if not request.user.is_staff:
+        return redirect('utilisateur:list')
+
+    from django.contrib.auth.models import User
+    from employer.models import Employe as EmpRH
+
+    cible_user = get_object_or_404(User, pk=user_pk)
+
+    if EmpRH.objects.filter(user=cible_user).exists():
+        messages.warning(request, f"Le compte « {cible_user.username} » est déjà lié à un dossier employé.")
+        return redirect('utilisateur:list')
+
+    employes_sans_compte = (
+        EmpRH.objects.filter(user__isnull=True)
+        .select_related('fonction')
+        .order_by('nom', 'prenoms')
+    )
+
+    if request.method == 'POST':
+        emp_pk = request.POST.get('employe_pk')
+        if not emp_pk:
+            messages.error(request, "Veuillez sélectionner un dossier employé.")
+        else:
+            emp = get_object_or_404(EmpRH, pk=emp_pk)
+            if emp.user_id:
+                messages.error(request, "Ce dossier est déjà lié à un autre compte.")
+            else:
+                emp.user = cible_user
+                emp.save(update_fields=['user'])
+                messages.success(
+                    request,
+                    f"Le compte « {cible_user.username} » a été lié au dossier de {emp.nom} {emp.prenoms}."
+                )
+                return redirect('utilisateur:detail', pk=emp.pk)
+
+    return render(request, 'utilisateur/lier.html', {
+        'mode': 'compte_vers_employe',
+        'cible_user': cible_user,
+        'employes_sans_compte': employes_sans_compte,
+    })
+
+
+@login_required
+def lier_employe_a_compte(request, emp_pk):
+    """Admin : choisit un compte User à lier à ce dossier employer.Employe."""
+    if not request.user.is_staff:
+        return redirect('utilisateur:list')
+
+    from django.contrib.auth.models import User
+    from employer.models import Employe as EmpRH
+
+    emp = get_object_or_404(EmpRH, pk=emp_pk)
+
+    if emp.user_id:
+        messages.warning(
+            request,
+            f"Le dossier de {emp.nom} {emp.prenoms} est déjà lié au compte « {emp.user.username} »."
+        )
+        return redirect('utilisateur:detail', pk=emp.pk)
+
+    utilisateurs_sans_employe = (
+        User.objects.filter(employe_profile__isnull=True)
+        .order_by('last_name', 'username')
+    )
+
+    if request.method == 'POST':
+        user_pk = request.POST.get('user_pk')
+        if not user_pk:
+            messages.error(request, "Veuillez sélectionner un compte utilisateur.")
+        else:
+            user = get_object_or_404(User, pk=user_pk)
+            if EmpRH.objects.filter(user=user).exists():
+                messages.error(request, "Ce compte est déjà lié à un autre dossier.")
+            else:
+                emp.user = user
+                emp.save(update_fields=['user'])
+                messages.success(
+                    request,
+                    f"Le dossier de {emp.nom} {emp.prenoms} a été lié au compte « {user.username} »."
+                )
+                return redirect('utilisateur:detail', pk=emp.pk)
+
+    return render(request, 'utilisateur/lier.html', {
+        'mode': 'employe_vers_compte',
+        'cible_emp': emp,
+        'utilisateurs_sans_employe': utilisateurs_sans_employe,
+    })
+
+
+@login_required
+def delier_compte(request, emp_pk):
+    """Admin : dissocie le compte User d'un dossier employé."""
+    if not request.user.is_staff:
+        return redirect('utilisateur:list')
+
+    from employer.models import Employe as EmpRH
+
+    emp = get_object_or_404(EmpRH, pk=emp_pk)
+
+    if request.method == 'POST':
+        if emp.user_id:
+            username = emp.user.username
+            nom_complet = f"{emp.nom} {emp.prenoms}"
+            emp.user = None
+            emp.save(update_fields=['user'])
+            messages.success(
+                request,
+                f"Le compte « {username} » a été dissocié du dossier de {nom_complet}."
+            )
+        return redirect('utilisateur:list')
+
+    return redirect('utilisateur:detail', pk=emp.pk)

@@ -1,0 +1,344 @@
+{% load static %}<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attestation de congé — {{ conge.employe.nom_complet }}</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      font-size: 13px;
+      color: #1a2e12;
+      background: #fff;
+      padding: 32px 42px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    /* ── En-tête ── */
+    .att-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 3px solid #4a7236;
+      padding-bottom: 16px;
+      margin-bottom: 22px;
+    }
+    .att-header .logo-zone { display: flex; align-items: center; gap: 12px; }
+    .att-header .logo-zone img { width: 56px; height: 56px; object-fit: contain; }
+    .att-header .logo-zone h2 { font-size: 15px; font-weight: 800; color: #4a7236; line-height: 1.2; }
+    .att-header .logo-zone p { font-size: 11px; color: #555; margin-top: 2px; }
+    .att-ref { text-align: right; font-size: 11.5px; color: #555; }
+    .att-ref .ref-num { font-size: 13px; font-weight: 700; color: #4a7236; }
+
+    /* ── Titre ── */
+    .att-title {
+      text-align: center;
+      margin: 22px 0 28px;
+    }
+    .att-title h1 {
+      font-size: 20px;
+      font-weight: 800;
+      color: #1a2e12;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      border-bottom: 2px solid #4a7236;
+      display: inline-block;
+      padding-bottom: 6px;
+    }
+    .att-title .att-objet {
+      font-size: 13px;
+      color: #555;
+      margin-top: 8px;
+    }
+
+    /* ── Corps ── */
+    .att-body {
+      font-size: 13.5px;
+      line-height: 1.85;
+      color: #1a2e12;
+      text-align: justify;
+      margin-bottom: 28px;
+    }
+    .att-body p { margin-bottom: 14px; }
+    .att-body strong { color: #1a2e12; }
+
+    /* ── Tableau identité ── */
+    .att-identity {
+      border: 1.5px solid #c2d9b3;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 18px 0 24px;
+    }
+    .att-identity table { width: 100%; border-collapse: collapse; }
+    .att-identity td {
+      padding: 8px 14px;
+      border-bottom: 1px solid #e8f0e2;
+      font-size: 13px;
+    }
+    .att-identity td:last-child { border-bottom: none; }
+    .att-identity .att-field { font-weight: 700; color: #4a7236; width: 200px; }
+    .att-identity .att-val { color: #1a2e12; }
+    .att-identity tr:last-child td { border-bottom: none; }
+
+    /* ── Cadre dates ── */
+    .att-dates-box {
+      background: #f4faef;
+      border: 1.5px solid #7aaa62;
+      border-radius: 8px;
+      padding: 14px 20px;
+      display: flex;
+      gap: 24px;
+      justify-content: center;
+      margin: 18px 0 24px;
+      flex-wrap: wrap;
+    }
+    .att-dates-box .date-item { text-align: center; }
+    .att-dates-box .date-label {
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      color: #4a7236;
+      margin-bottom: 3px;
+    }
+    .att-dates-box .date-val {
+      font-size: 18px;
+      font-weight: 800;
+      color: #1a2e12;
+    }
+    .att-dates-box .sep {
+      font-size: 28px;
+      color: #9dc284;
+      align-self: center;
+    }
+    .att-jours {
+      text-align: center;
+      font-size: 13px;
+      color: #4a7236;
+      font-weight: 700;
+      margin-top: 4px;
+    }
+
+    /* ── Signatures ── */
+    .att-signatures {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 48px;
+      gap: 20px;
+    }
+    .att-sig {
+      flex: 1;
+      text-align: center;
+      min-width: 180px;
+    }
+    .att-sig .sig-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #4a7236;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      margin-bottom: 48px;
+    }
+    .att-sig .sig-line {
+      border-top: 1.5px solid #ccc;
+      margin: 0 20px;
+    }
+    .att-sig .sig-name {
+      font-size: 11.5px;
+      color: #555;
+      margin-top: 6px;
+    }
+
+    /* ── Pied ── */
+    .att-footer {
+      border-top: 1px solid #c2d9b3;
+      padding-top: 10px;
+      margin-top: 32px;
+      text-align: center;
+      font-size: 10.5px;
+      color: #888;
+    }
+
+    /* ── Bouton impression ── */
+    .print-bar {
+      background: #f4faef;
+      border: 1px solid #c2d9b3;
+      border-radius: 8px;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      font-size: 13px;
+      gap: 10px;
+    }
+    .btn-print {
+      background: #4a7236;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 7px 18px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn-print:hover { background: #345726; }
+    @media print {
+      .print-bar { display: none; }
+      body { padding: 20px 28px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Barre d'action (masquée à l'impression) -->
+<div class="print-bar">
+  <span>Attestation de congé — {{ conge.employe.nom_complet }}</span>
+  <div style="display:flex;gap:8px;">
+    <a href="{% url 'conges:conge_detail' conge.pk %}" style="font-size:12.5px;color:#4a7236;text-decoration:none;">← Retour</a>
+    <button class="btn-print" onclick="window.print()">🖨 Imprimer</button>
+  </div>
+</div>
+
+<!-- ── En-tête ── -->
+<div class="att-header">
+  <div class="logo-zone">
+    <img src="{% static 'logo.png' %}" alt="Logo WALÉ">
+    <div>
+      <h2>Centre Médico-Social WALÉ</h2>
+      <p>Yamoussoukro, Côte d'Ivoire<br>Direction des Ressources Humaines</p>
+    </div>
+  </div>
+  <div class="att-ref">
+    <div class="ref-num">ATT-CGE-{{ conge.pk|stringformat:"04d" }}</div>
+    <div>Délivrée le {{ today|date:"d/m/Y" }}</div>
+    {% if conge.approuve_par %}
+    <div>Par : {{ conge.approuve_par }}</div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ── Titre ── -->
+<div class="att-title">
+  <h1>Attestation de Congé</h1>
+  <div class="att-objet">Objet : {{ conge.get_type_conge_display }}</div>
+</div>
+
+<!-- ── Corps ── -->
+<div class="att-body">
+  <p>
+    La Direction des Ressources Humaines du Centre Médico-Social WALÉ atteste que
+    <strong>{{ conge.employe.nom_complet }}</strong>{% if conge.employe.fonction %},
+    <strong>{{ conge.employe.fonction }}</strong>{% endif %}{% if conge.employe.service %},
+    affecté(e) au service <strong>{{ conge.employe.service }}</strong>{% endif %},
+    bénéficie d'un congé autorisé dans les conditions ci-dessous.
+  </p>
+</div>
+
+<!-- ── Identité de l'employé ── -->
+<div class="att-identity">
+  <table>
+    <tr>
+      <td class="att-field">Nom et prénoms</td>
+      <td class="att-val"><strong>{{ conge.employe.nom_complet }}</strong></td>
+    </tr>
+    <tr>
+      <td class="att-field">Matricule</td>
+      <td class="att-val">{{ conge.employe.matricule }}</td>
+    </tr>
+    {% if conge.employe.fonction %}
+    <tr>
+      <td class="att-field">Fonction</td>
+      <td class="att-val">{{ conge.employe.fonction }}</td>
+    </tr>
+    {% endif %}
+    {% if conge.employe.service %}
+    <tr>
+      <td class="att-field">Service</td>
+      <td class="att-val">{{ conge.employe.service }}</td>
+    </tr>
+    {% endif %}
+    {% if conge.employe.type_contrat %}
+    <tr>
+      <td class="att-field">Type de contrat</td>
+      <td class="att-val">{{ conge.employe.type_contrat }}</td>
+    </tr>
+    {% endif %}
+    <tr>
+      <td class="att-field">Date d'embauche</td>
+      <td class="att-val">{{ conge.employe.date_embauche|date:"d/m/Y" }}</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ── Nature du congé ── -->
+<div class="att-body">
+  <p>
+    Le congé accordé est de nature <strong>{{ conge.get_type_conge_display }}</strong>
+    et couvre la période suivante :
+  </p>
+</div>
+
+<!-- ── Dates ── -->
+<div class="att-dates-box">
+  <div class="date-item">
+    <div class="date-label">Date de départ</div>
+    <div class="date-val">{{ conge.date_debut|date:"d/m/Y" }}</div>
+  </div>
+  <div class="sep">→</div>
+  <div class="date-item">
+    <div class="date-label">Date de retour</div>
+    <div class="date-val">{{ conge.date_fin|date:"d/m/Y" }}</div>
+  </div>
+</div>
+<div class="att-jours">
+  Durée : {{ conge.nb_jours_ouvres }} jour{{ conge.nb_jours_ouvres|pluralize }} ouvré{{ conge.nb_jours_ouvres|pluralize }}
+  ({{ conge.duree }} jour{{ conge.duree|pluralize }} calendaire{{ conge.duree|pluralize }})
+</div>
+
+<!-- ── Conclusion ── -->
+<div class="att-body" style="margin-top:24px;">
+  {% if conge.motif %}
+  <p><strong>Motif :</strong> {{ conge.motif }}</p>
+  {% endif %}
+  <p>
+    La présente attestation est délivrée à l'intéressé(e) pour servir et valoir ce que de droit,
+    notamment auprès de toute administration ou organisme qui en ferait la demande.
+  </p>
+</div>
+
+<!-- ── Signatures ── -->
+<div class="att-signatures">
+  <div class="att-sig">
+    <div class="sig-title">L'employé(e)</div>
+    <div class="sig-line"></div>
+    <div class="sig-name">{{ conge.employe.nom_complet }}</div>
+  </div>
+  <div class="att-sig">
+    <div class="sig-title">Le Directeur des RH</div>
+    <div class="sig-line"></div>
+    {% if conge.approuve_par %}
+    <div class="sig-name">{{ conge.approuve_par }}</div>
+    {% else %}
+    <div class="sig-name">&nbsp;</div>
+    {% endif %}
+  </div>
+  <div class="att-sig">
+    <div class="sig-title">La Direction</div>
+    <div class="sig-line"></div>
+    <div class="sig-name">&nbsp;</div>
+  </div>
+</div>
+
+<!-- ── Pied de page ── -->
+<div class="att-footer">
+  Centre Médico-Social WALÉ — Yamoussoukro, Côte d'Ivoire &nbsp;|&nbsp;
+  Document généré le {% now "d/m/Y à H:i" %} &nbsp;|&nbsp;
+  Réf. ATT-CGE-{{ conge.pk|stringformat:"04d" }}
+</div>
+
+</body>
+</html>

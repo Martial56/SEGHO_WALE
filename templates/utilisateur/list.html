@@ -356,6 +356,7 @@
       <thead><tr>
         <th></th><th>Identifiant</th><th>Nom complet</th>
         <th>Email</th><th>Rôle</th><th>Dernière connexion</th>
+        <th style="width:36px;"></th>
       </tr></thead>
       <tbody>
         {% for u in utilisateurs_sans_employe %}
@@ -368,6 +369,11 @@
               {% elif u.is_staff %}<span class="ul-badge-admin">admin</span>
               {% else %}<span style="font-size:11px;color:var(--text-muted);">Utilisateur</span>{% endif %}</td>
           <td style="color:var(--text-muted);">{% if u.last_login %}{{ u.last_login|date:"d/m/Y H:i" }}{% else %}Jamais{% endif %}</td>
+          <td style="max-width:none;overflow:visible;">
+            <a href="{% url 'utilisateur:lier_compte' u.pk %}" class="o-ctrl-btn" style="padding:3px 9px;font-size:11px;white-space:nowrap;" title="Lier à un dossier employé">
+              <i class="bi bi-link-45deg"></i> Lier
+            </a>
+          </td>
         </tr>
         {% endfor %}
       </tbody>
@@ -388,6 +394,11 @@
             {% if u.is_superuser %}<span class="ul-badge-admin">superuser</span>
             {% elif u.is_staff %}<span class="ul-badge-admin">admin</span>
             {% else %}<span style="font-size:11px;color:var(--text-muted);">Utilisateur</span>{% endif %}
+          </td>
+          <td style="width:60px;text-align:right;">
+            <a href="{% url 'utilisateur:lier_compte' u.pk %}" class="o-ctrl-btn" style="padding:2px 8px;font-size:11px;" title="Lier à un dossier">
+              <i class="bi bi-link-45deg"></i> Lier
+            </a>
           </td>
         </tr>
         {% endfor %}
@@ -450,6 +461,7 @@
       <thead><tr>
         <th></th><th>Matricule</th><th>Nom &amp; Prénom</th>
         <th>Fonction</th><th>Statut</th><th>Embauche</th>
+        <th style="width:36px;"></th>
       </tr></thead>
       <tbody>
         {% for emp in employes_sans_compte %}
@@ -462,6 +474,11 @@
               {% elif emp.statut == 'suspendu' %}<span class="ul-badge-suspendu">● Suspendu</span>
               {% else %}<span class="ul-badge-quitte">● Quitté</span>{% endif %}</td>
           <td style="color:var(--text-muted);">{% if emp.date_embauche %}{{ emp.date_embauche|date:"d/m/Y" }}{% else %}—{% endif %}</td>
+          <td style="max-width:none;overflow:visible;">
+            <a href="{% url 'utilisateur:lier_employe' emp.pk %}" class="o-ctrl-btn" style="padding:3px 9px;font-size:11px;white-space:nowrap;" title="Lier un compte utilisateur">
+              <i class="bi bi-link-45deg"></i> Lier
+            </a>
+          </td>
         </tr>
         {% endfor %}
       </tbody>
@@ -482,6 +499,11 @@
             {% if emp.statut == 'actif' %}<span class="ul-badge-actif">● Actif</span>
             {% elif emp.statut == 'suspendu' %}<span class="ul-badge-suspendu">● Suspendu</span>
             {% else %}<span class="ul-badge-quitte">● Quitté</span>{% endif %}
+          </td>
+          <td style="width:60px;text-align:right;">
+            <a href="{% url 'utilisateur:lier_employe' emp.pk %}" class="o-ctrl-btn" style="padding:2px 8px;font-size:11px;" title="Lier un compte">
+              <i class="bi bi-link-45deg"></i> Lier
+            </a>
           </td>
         </tr>
         {% endfor %}

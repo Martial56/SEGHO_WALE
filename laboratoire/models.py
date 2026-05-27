@@ -21,7 +21,7 @@ class AnalyseLaboratoire(models.Model):
     date_prelevement = models.DateTimeField(auto_now_add=True)
     date_resultat = models.DateTimeField(null=True, blank=True)
     statut = models.CharField(max_length=20, choices=STATUT, default='recu')
-    medecin_prescripteur = models.ForeignKey('employe.Employe', on_delete=models.SET_NULL, null=True, blank=True, related_name='analyses_prescrites', verbose_name='Médecin prescripteur')
+    medecin_prescripteur = models.ForeignKey('employer.Employe', on_delete=models.SET_NULL, null=True, blank=True, related_name='analyses_prescrites', verbose_name='Médecin prescripteur')
     technicien = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='analyses_tech')
     validateur = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='analyses_val')
     commentaire = models.TextField(blank=True)

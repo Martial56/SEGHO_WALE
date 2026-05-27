@@ -13,11 +13,15 @@ admin.site.__class__.has_permission = lambda self, request: request.user.is_acti
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('patients/', include('patients.urls')),
-    path('employes/', include('employe.urls')),
-    path('personnel/', include('personnel.urls')),
+    path('utilisateurs/', include('utilisateur.urls')),
     path('ordonnances/', include('ordonnances.urls')),
     path('soins/', include('soins.urls')),
+    path('employer/', include(('employer.urls', 'employer'), namespace='employer')),
+    path('conges/', include(('conges.urls', 'conges'), namespace='conges')),
+    path('planning/', include(('planning.urls', 'planning'), namespace='planning')),
+    path('presence/', include(('presence.urls', 'presence'), namespace='presence')),
     path('services/', include('services.urls')),
+    path('parametres/', include(('modules_permissions.urls', 'modules_permissions'), namespace='parametres')),
     path('', include('core.urls')),
 ]
 

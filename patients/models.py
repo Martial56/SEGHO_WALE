@@ -40,7 +40,7 @@ class Patient(models.Model):
     contact_urgence_nom = models.CharField(max_length=200, blank=True)
     contact_urgence_telephone = models.CharField(max_length=20, blank=True)
     medecin_referent = models.ForeignKey(
-        'employe.DocteurReferent', on_delete=models.SET_NULL,
+        'employer.DocteurReferent', on_delete=models.SET_NULL,
         null=True, blank=True, related_name='patients',
         verbose_name='Médecin référent'
     )
@@ -118,7 +118,7 @@ class RendezVous(models.Model):
     ]
 
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='rendez_vous')
-    medecin = models.ForeignKey('employe.Employe', on_delete=models.SET_NULL, null=True, related_name='rendez_vous')
+    medecin = models.ForeignKey('employer.Employe', on_delete=models.SET_NULL, null=True, related_name='rendez_vous')
     departement = models.CharField(max_length=30, choices=DEPARTEMENT, blank=True, default='')
     date_heure = models.DateTimeField()
     duree_minutes = models.IntegerField(default=30)

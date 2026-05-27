@@ -22,7 +22,7 @@ class Hospitalisation(models.Model):
 
     numero = models.CharField(max_length=20, unique=True, editable=False)
     patient = models.ForeignKey('patients.Patient', on_delete=models.CASCADE, related_name='hospitalisations')
-    medecin_traitant = models.ForeignKey('employe.Employe', on_delete=models.SET_NULL, null=True)
+    medecin_traitant = models.ForeignKey('employer.Employe', on_delete=models.SET_NULL, null=True)
     chambre = models.ForeignKey(Chambre, on_delete=models.SET_NULL, null=True)
     date_admission = models.DateTimeField(auto_now_add=True)
     date_sortie_prevue = models.DateField(null=True, blank=True)
@@ -58,7 +58,7 @@ class Hospitalisation(models.Model):
 
 class FicheVisite(models.Model):
     hospitalisation = models.ForeignKey(Hospitalisation, on_delete=models.CASCADE, related_name='fiches_visite')
-    medecin = models.ForeignKey('employe.Employe', on_delete=models.SET_NULL, null=True)
+    medecin = models.ForeignKey('employer.Employe', on_delete=models.SET_NULL, null=True)
     date_visite = models.DateTimeField(auto_now_add=True)
     observation = models.TextField()
     evolution = models.TextField(blank=True)
@@ -75,7 +75,7 @@ class ProtocoleHospitalisation(models.Model):
     hospitalisation = models.ForeignKey(Hospitalisation, on_delete=models.CASCADE, related_name='protocoles')
     titre = models.CharField(max_length=200)
     description = models.TextField()
-    medecin = models.ForeignKey('employe.Employe', on_delete=models.SET_NULL, null=True)
+    medecin = models.ForeignKey('employer.Employe', on_delete=models.SET_NULL, null=True)
     date_creation = models.DateTimeField(auto_now_add=True)
     actif = models.BooleanField(default=True)
 

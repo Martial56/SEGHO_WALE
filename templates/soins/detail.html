@@ -14,11 +14,10 @@
     border-radius: 8px; margin-bottom: 10px;
   }
 
-  /* Barre statut + actions */
-  .det-status-bar {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 10px 20px 8px; border-bottom: 1px solid var(--border);
-    flex-wrap: wrap; gap: 10px; border-radius: 8px 8px 0 0;
+  /* Barre actions (sous le stepper) */
+  .det-actions-bar {
+    display: flex; align-items: center; padding: 8px 14px;
+    border-bottom: 1px solid var(--border); gap: 7px; flex-wrap: wrap;
   }
   .det-action-btns { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
   .det-btn {
@@ -32,28 +31,6 @@
   .det-btn-invoice:hover { background: #15803d; }
   .det-btn-delete  { background: none; border: 1.5px solid #fca5a5 !important; color: #dc2626; }
   .det-btn-delete:hover { background: #fef2f2; }
-
-  /* Badges statuts (lecture seule) */
-  .det-status-chips { display: flex; gap: 6px; flex-wrap: wrap; }
-  .det-chip {
-    display: inline-flex; align-items: center; gap: 5px;
-    padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
-    border: 2px solid transparent; cursor: default; user-select: none;
-  }
-  .det-chip .chip-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
-  .det-chip-brouillon { background: #f3f4f6; color: #6b7280; border-color: #e5e7eb; }
-  .det-chip-brouillon .chip-dot { background: #9ca3af; }
-  .det-chip-en_cours  { background: #fff8e1; color: #b07d00; border-color: #f0d060; }
-  .det-chip-en_cours .chip-dot { background: #d99c2b; }
-  .det-chip-termine   { background: #f0fdf4; color: #16a34a; border-color: #bbf7d0; }
-  .det-chip-termine .chip-dot { background: #22c55e; }
-  .det-chip-annule    { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
-  .det-chip-annule .chip-dot { background: #ef4444; }
-  .det-chip.active { filter: saturate(2); }
-  html[data-theme="dark"] .det-chip-brouillon { background: rgba(107,114,128,.2); color: #d1d5db; border-color: rgba(107,114,128,.4); }
-  html[data-theme="dark"] .det-chip-en_cours  { background: rgba(176,125,0,.2);   color: #e2c16a; border-color: rgba(176,125,0,.4); }
-  html[data-theme="dark"] .det-chip-termine   { background: rgba(22,163,74,.15);  color: #86efac; border-color: rgba(22,163,74,.35); }
-  html[data-theme="dark"] .det-chip-annule    { background: rgba(220,38,38,.15);  color: #fca5a5; border-color: rgba(220,38,38,.35); }
 
   /* Quick-nav dans la carte */
   .det-quick-nav {
@@ -217,36 +194,79 @@
   <!-- ══ CARTE EN-TÊTE ══ -->
   <div class="det-header">
 
-    <!-- 1. Barre boutons + statuts -->
+    <!-- 1. Stepper statut (pleine largeur) -->
     <div class="det-status-bar">
-      <div class="det-action-btns">
-        <a href="{% url 'soins:edit' soin.pk %}" class="det-btn det-btn-edit" style="text-decoration:none;">
-          <i class="bi bi-pencil"></i> Modifier
-        </a>
-        {% if soin.statut == 'en_cours' and est_paye %}
-        <form method="post" action="{% url 'soins:terminer' soin.pk %}" style="display:inline;">
-          {% csrf_token %}
-          <button type="submit" class="det-btn" style="background:#16a34a;color:#fff;">
-            <i class="bi bi-check-circle-fill"></i> Terminé
-          </button>
-        </form>
-        {% endif %}
-        {% if request.user.is_staff %}
-        <a href="{% url 'soins:soin_facturer' soin.pk %}" class="det-btn det-btn-invoice" style="text-decoration:none;">
-          <i class="bi bi-receipt"></i> Créer une facture <small style="opacity:.6;font-size:9px;">(ad)</small>
-        </a>
-        {% endif %}
-        <a href="{% url 'soins:list' %}" class="det-btn det-btn-delete" style="text-decoration:none;border:1.5px solid #fca5a5;">
-          <i class="bi bi-arrow-left"></i> Retour
-        </a>
+      <div class="stp-stepper" id="stp-stepper" data-active="{{ soin.statut }}">
+        <div class="stp-flow">
+          <div class="stp-step" data-val="brouillon">
+            <i class="bi bi-pencil stp-icon"></i>
+            <span class="stp-label">Brouillon</span>
+          </div>
+          <div class="stp-step" data-val="en_attente_de_paiement">
+            <i class="bi bi-clock stp-icon"></i>
+            <span class="stp-label">Attente paiement</span>
+          </div>
+          <div class="stp-step" data-val="en_cours">
+            <i class="bi bi-activity stp-icon"></i>
+            <span class="stp-label">En cours</span>
+          </div>
+          <div class="stp-step" data-val="termine">
+            <i class="bi bi-check2-circle stp-icon"></i>
+            <span class="stp-label">Terminé</span>
+          </div>
+        </div>
+        <div class="stp-sep"></div>
+        <div class="stp-annule" data-val="annule">
+          <i class="bi bi-x-circle stp-icon"></i>
+          <span class="stp-label">Annulé</span>
+        </div>
       </div>
-      <div class="det-status-chips">
-        {% for val, label in soin.STATUT %}
-        <span class="det-chip det-chip-{{ val }} {% if soin.statut == val %}active{% endif %}">
-          <span class="chip-dot"></span>{{ label }}
-        </span>
-        {% endfor %}
-      </div>
+    </div>
+
+    <!-- 2. Boutons d'action -->
+    <div class="det-actions-bar">
+      {# Modifier — seulement en brouillon (ou admin) #}
+      {% if soin.statut == 'brouillon' or request.user.is_superuser %}
+      <a href="{% url 'soins:edit' soin.pk %}" class="det-btn det-btn-edit" style="text-decoration:none;">
+        <i class="bi bi-pencil"></i> Modifier
+      </a>
+      {% endif %}
+
+      {# Créer une facture — Caisse uniquement, soin en attente, pas encore de facture #}
+      {% if peut_creer_facture %}
+      <a href="{% url 'soins:creer_facture' soin.pk %}" class="det-btn det-btn-invoice" style="text-decoration:none;">
+        <i class="bi bi-receipt"></i> Créer une facture
+      </a>
+      {% endif %}
+
+      {# Voir la facture — tout le monde, si facture existante #}
+      {% if peut_voir_facture %}
+      <a href="{% url 'soins:facture_paiement' soin.facture.pk %}" class="det-btn"
+        style="background:#1d4ed8;color:#fff;text-decoration:none;" target="_blank">
+        <i class="bi bi-receipt-cutoff"></i> Voir la facture
+      </a>
+      {% endif %}
+
+      {# Encaisser si facture créée mais pas encore payée #}
+      {% if peut_voir_facture and peut_creer_facture %}
+      <a href="{% url 'soins:facture_paiement' soin.facture.pk %}" class="det-btn det-btn-invoice" style="text-decoration:none;">
+        <i class="bi bi-cash-coin"></i> Encaisser
+      </a>
+      {% endif %}
+
+      {# Administrer — Soins uniquement, soin en cours + facture payée #}
+      {% if peut_administrer %}
+      <form method="post" action="{% url 'soins:administrer' soin.pk %}" style="display:inline;">
+        {% csrf_token %}
+        <button type="submit" class="det-btn" style="background:#16a34a;color:#fff;">
+          <i class="bi bi-check-circle-fill"></i> Administrer
+        </button>
+      </form>
+      {% endif %}
+
+      <a href="{% url 'soins:list' %}" class="det-btn det-btn-delete" style="text-decoration:none;border:1.5px solid #fca5a5;">
+        <i class="bi bi-arrow-left"></i> Retour
+      </a>
     </div>
 
     <!-- 2. Navigation rapide avec compteurs -->
@@ -435,12 +455,12 @@
 
   <!-- ══ SOINS APPORTÉS ══ -->
   <div class="det-section">
-    <div class="det-section-head" style="justify-content:space-between;">
-      <span><i class="bi bi-bandaid"></i> Soins apportés</span>
-      {% if request.user.is_staff %}
-      <a href="{% url 'soins:soin_facturer' soin.pk %}" class="det-btn det-btn-invoice" style="font-size:11px;padding:3px 10px;text-decoration:none;">
-        <i class="bi bi-receipt-cutoff"></i> Créer une facture combinée <small style="opacity:.6;font-size:9px;">(ad)</small>
-      </a>
+    <div class="det-section-head">
+      <i class="bi bi-bandaid"></i> Soins apportés
+      {% if total_prix %}
+      <span style="margin-left:auto;font-size:12px;color:var(--text);font-weight:700;">
+        Total : {{ total_prix|floatformat:0 }} FCFA
+      </span>
       {% endif %}
     </div>
     <div class="det-table-wrap">
@@ -453,6 +473,7 @@
             <th>Infirmier</th>
             <th>Date</th>
             <th>État</th>
+            <th>Facture</th>
           </tr>
         </thead>
         <tbody>
@@ -466,14 +487,23 @@
             </td>
             <td style="white-space:nowrap;font-size:12px;">{{ proc.date|date:"d/m/Y" }}</td>
             <td>
-              <span class="det-chip det-chip-{{ proc.statut }}" style="font-size:11px;padding:2px 8px;">
-                <span class="chip-dot"></span>{{ proc.get_statut_display }}
-              </span>
+              <span class="badge-statut {% if soin.statut == 'brouillon' %}badge-brouillon{% elif soin.statut == 'en_attente_de_paiement' %}badge-en-attente{% elif soin.statut == 'en_cours' %}badge-en-cours{% elif soin.statut == 'termine' %}badge-termine{% elif soin.statut == 'annule' %}badge-annule{% endif %}">{{ soin.get_statut_display }}</span>
+            </td>
+            <td style="white-space:nowrap;">
+              {% if proc.facture %}
+              <a href="{% url 'soins:facture_detail' proc.facture.pk %}?next={% url 'soins:detail' soin.pk %}"
+                 style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--accent);text-decoration:none;padding:3px 8px;border:1px solid var(--accent);border-radius:4px;white-space:nowrap;"
+                 title="Voir la facture {{ proc.facture.numero }}">
+                <i class="bi bi-receipt"></i> {{ proc.facture.numero }}
+              </a>
+              {% else %}
+              <span style="font-size:12px;color:var(--text-muted);">—</span>
+              {% endif %}
             </td>
           </tr>
           {% empty %}
           <tr>
-            <td colspan="6" class="det-table-empty">
+            <td colspan="7" class="det-table-empty">
               <i class="bi bi-inbox"></i><br>
               Aucun soin enregistré.<br>
               <small>Modifiez ce dossier et ajoutez des lignes de soin.</small>
@@ -495,6 +525,23 @@
     window.addEventListener('resize', function () {
       if (tb && wp) wp.style.paddingTop = tb.offsetHeight + 'px';
     });
+  })();
+
+  /* ── Stepper statut ── */
+  (function(){
+    var bar = document.getElementById('stp-stepper');
+    if (!bar) return;
+    var active = bar.dataset.active;
+    var order = ['brouillon','en_attente_de_paiement','en_cours','termine'];
+    var activeIdx = order.indexOf(active);
+    bar.querySelectorAll('.stp-step').forEach(function(s){
+      var val = s.dataset.val, idx = order.indexOf(val);
+      if (val === active) s.classList.add('stp-active');
+      else if (activeIdx >= 0 && idx < activeIdx) s.classList.add('stp-done');
+      else s.classList.add('stp-pending');
+    });
+    var ann = bar.querySelector('.stp-annule');
+    if (ann) ann.classList.add(active === 'annule' ? 'stp-active' : 'stp-pending');
   })();
 </script>
 
