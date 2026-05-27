@@ -1,12 +1,10 @@
 # 🏥 SEGHO-WALE — Système de Gestion du Centre Médico-Social WALÉ
 
-## Vue d'ensemble
-
-SEGHO-WALE est un système d'information médical complet développé en **Django** pour le Centre Médico-Social WALÉ de Yamoussoukro (Côte d'Ivoire), conforme au cahier des charges HISOFT.
+Système d'information médical développé en **Django 6** pour le Centre Médico-Social WALÉ de Yamoussoukro (Côte d'Ivoire).
 
 ---
 
-## 🗂️ Architecture du projet
+## 🗂️ Architecture des modules
 
 ```
 medisoft/
@@ -14,69 +12,79 @@ medisoft/
 │   ├── settings.py         # Paramètres (BDD, apps, timezone Africa/Abidjan)
 │   └── urls.py             # Routage principal
 │
-├── patients/               # 👤 Gestion des patients
-│   └── models.py           → Patient, Assurance, RendezVous
+├── core/                   # 🏠 Dashboard & authentification
 │
-├── medecins/               # 👨‍⚕️ Gestion du personnel médical
-│   └── models.py           → Medecin, Specialite, service
+├── patients/               # 👤 Dossiers patients, assurances, rendez-vous
 │
-├── consultations/          # 🩺 Consultations & dossiers médicaux
-│   └── models.py           → Consultation, Constante, Diagnostic,
-│                              Ordonnance, LigneOrdonnance, ExamenDemande
+├── soins/                  # 🩺 Soins infirmiers, procédures, ordonnances
 │
-├── pharmacie/              # 💊 Pharmacie & gestion des stocks
-│   └── models.py           → Medicament, LotMedicament, MouvementStock,
-│                              CommandePharmacies, Fournisseur
+├── ordonnances/            # 💊 Ordonnances & groupes médicaments
 │
-├── laboratoire/            # 🔬 Laboratoire & Imagerie
-│   └── models.py           → AnalyseLaboratoire, ResultatAnalyse,
-│                              ExamenImagerie, TypeExamen
+├── pharmacie/              # 💊 Stock médicaments, lots, commandes fournisseurs
 │
-├── hospitalisation/        # 🛏️ Gestion des hospitalisations
-│   └── models.py           → Hospitalisation, Chambre, FicheVisite,
-│                              ProtocoleHospitalisation
+├── laboratoire/            # 🔬 Analyses biologiques & imagerie médicale
 │
-├── facturation/            # 🧾 Facturation & paiements
-│   └── models.py           → Facture, LigneFacture, Paiement, Acte
+├── hospitalisation/        # 🛏️ Chambres, admissions, fiches de visite
 │
-├── caisse/                 # 💰 Gestion de caisse & trésorerie
-│   └── models.py           → Caisse, SessionCaisse, TransactionCaisse
+├── facturation/            # 🧾 Factures, lignes, paiements (patient + assurance)
 │
-├── ressources_humaines/    # 👥 RH — Personnel, congés, présences
-│   └── models.py           → Employe, Poste, Conge, Presence
+├── caisse/                 # 💰 Sessions de caisse & transactions
 │
-└── rapports/               # 📊 Rapports médicaux & vaccinations
-    └── models.py           → RapportMedical, Vaccination
+├── employer/               # 👥 RH — Employés, congés, présences, planning
+│   ├── Employe             → dossier unifié (identité + profil médical + RH)
+│   ├── Specialite          → spécialités médicales
+│   ├── Departement         → services / départements hospitaliers
+│   ├── DocteurReferent     → médecins référents externes
+│   ├── Conge               → demandes et workflow de congés
+│   ├── Presence            → pointage journalier
+│   └── JourFerie           → calendrier des jours fériés
+│
+├── conges/                 # 📅 Vues et logique du module congés
+│
+├── planning/               # 📆 Planning médecins (hebdomadaire, bureaux)
+│
+├── presence/               # ⏱️ Suivi des présences / pointage
+│
+├── services/               # 🏷️ Catalogue : actes, médicaments, tarifs
+│
+├── utilisateur/            # 🔑 Profil utilisateur & gestion des comptes
+│
+├── modules_permissions/    # 🛡️ Contrôle d'accès par module
+│
+└── rapports/               # 📊 Rapports médicaux & registre vaccinations
 ```
 
 ---
 
-## 🚀 Installation et démarrage
+## 🚀 Installation
 
 ### Prérequis
 - Python 3.10+
 - pip
 
-### Étapes
+### Démarrage rapide
 
 ```bash
-# 1. Cloner/déplacer le projet
-cd medisoft/
+# 1. Créer et activer l'environnement virtuel
+python -m venv venv
+source venv/bin/activate          # Linux/Mac
+venv\Scripts\activate             # Windows
 
 # 2. Installer les dépendances
-pip install django pillow
+pip install -r requirements.txt
 
 # 3. Appliquer les migrations
 python manage.py migrate
 
 # 4. Créer un superutilisateur
 python manage.py createsuperuser
+# (par défaut : admin / wale2024)
 
 # 5. Lancer le serveur
 python manage.py runserver
 
-# 6. Accéder à l'interface
-# http://127.0.0.1:8000/admin/
+# 6. Accéder à l'application
+# http://127.0.0.1:8000/
 ```
 
 ---
@@ -89,69 +97,79 @@ python manage.py runserver
 
 ---
 
-## 📋 Modules fonctionnels
+## 🗺️ URLs principales
 
-### 1. 👤 Gestion des Patients (`patients`)
-- Création de dossier avec **code patient automatique** (PAT20250001)
-- Informations démographiques complètes + photo
-- Gestion des **assurances** (CNPS, MUGEF-CI, AXA, NSIA, SUNU...)
-- Numéro et date d'expiration de carte d'assurance
-- Contact d'urgence
-- **Rendez-vous** (consultation, contrôle, urgence, vaccination)
+| URL | Module |
+|-----|--------|
+| `/` | Dashboard (nécessite connexion) |
+| `/login/` | Authentification |
+| `/employer/` | Module RH (employés, congés, planning, présence) |
+| `/conges/` | Gestion des congés |
+| `/utilisateurs/` | Profils & comptes utilisateurs |
+| `/admin/` | Interface Django Admin |
 
-### 2. 👨‍⚕️ Gestion Médicale (`medecins`, `consultations`)
-- Fichier médecin avec spécialité, honoraires
-- Organisation en **services** (Consultations, Gynéco, Pédiatrie, Labo, Pharmacie...)
-- **Dossier médical** : anamnèse, constantes (poids, taille, TA, température, SpO2, IMC calculé auto)
-- **Diagnostics CIM-10** avec choix principal/associé/différentiel
-- **Ordonnances** internes et externes avec lignes de médicaments
-- **Demandes d'examens** (labo ou imagerie)
+---
 
-### 3. 💊 Pharmacie (`pharmacie`)
-- Catalogue médicaments avec DCI, forme, dosage
-- **Gestion des lots** avec dates de péremption
-- **Mouvements de stock** (entrée, sortie, ajustement)
-- **Alertes de stock** (seuil minimum et d'alerte)
-- **Commandes fournisseurs** (brouillon → envoyé → reçu)
+## 📋 Modules détaillés
 
-### 4. 🔬 Laboratoire & Imagerie (`laboratoire`)
-- **Analyses biologiques** avec numéro auto (LAB20250001)
-- Saisie des résultats par paramètre (valeur, unité, norme min/max)
-- Interprétation automatique (normal/élevé/bas/critique)
-- **Imagerie** : échographies, radios, scanner, IRM
-- Compte-rendu et conclusion radiologue
-- Lien avec les examens demandés en consultation
+### 👤 Patients (`patients`)
+- Dossier patient avec **code automatique** (PAT20250001)
+- Assurances (CNPS, MUGEF-CI, AXA, NSIA, SUNU…)
+- Rendez-vous avec statut (planifié → confirmé → terminé/annulé)
 
-### 5. 🛏️ Hospitalisation (`hospitalisation`)
-- **Chambres** : simple, double, VIP, soins intensifs (avec tarif/jour)
-- Dossier d'hospitalisation avec numéro auto (HOSP20250001)
-- **Fiches de visite quotidiennes** (médecin, observations, constantes JSON)
-- **Protocoles de soins** personnalisés
-- Calcul automatique de la **durée de séjour**
-- Gestion de la **caution**
+### 🩺 Soins (`soins`)
+- Soins infirmiers avec procédures associées
+- Lien vers ordonnances, examens et facturation
 
-### 6. 🧾 Facturation (`facturation`)
-- **Factures** par type (consultation, hospit, pharmacie, labo, imagerie)
-- Lignes de facturation (actes médicaux + médicaments)
-- Calcul **ticket modérateur** (patient) vs **part assurance**
-- **Paiements** multi-modes : espèces, chèque, mobile money, virement, bon
-- Suivi du solde restant dû
+### 💊 Ordonnances (`ordonnances`)
+- Groupes de médicaments avec lignes de prescription
+- Lien vers le médecin prescripteur (employer.Employe)
 
-### 7. 💰 Caisse & Trésorerie (`caisse`)
-- **Sessions de caisse** (ouverture/fermeture avec solde)
-- Transactions : encaissements, décaissements, transferts
-- Historique complet des opérations
+### 💊 Pharmacie (`pharmacie`)
+- Catalogue médicaments avec stock par lot (+ date expiration)
+- Mouvements de stock (entrée, sortie, ajustement)
+- Commandes fournisseurs avec workflow (brouillon → envoyé → reçu)
 
-### 8. 👥 Ressources Humaines (`ressources_humaines`)
-- Fichier employé avec poste et service
-- **Gestion des congés** (annuel, maladie, maternité, exceptionnel)
-- Workflow d'approbation des congés
-- **Pointage et présences** journalières
+### 🔬 Laboratoire (`laboratoire`)
+- Analyses biologiques avec résultats et interprétation automatique
+- Imagerie médicale (radio, écho, scanner, IRM)
 
-### 9. 📊 Rapports (`rapports`)
-- **Rapports médicaux** (mensuel, trimestriel, annuel, activité, directeur)
-- Validation des rapports par la hiérarchie
-- **Registre des vaccinations** avec rappels
+### 🛏️ Hospitalisation (`hospitalisation`)
+- Gestion des chambres (simple, double, VIP, soins intensifs)
+- Dossier hospitalisation (HOSP20250001)
+- Fiches de visite quotidiennes + protocoles de soins
+
+### 🧾 Facturation (`facturation`)
+- Factures multi-types avec co-paiement patient / assurance
+- Paiements : espèces, mobile money, chèque, virement, bon
+
+### 💰 Caisse (`caisse`)
+- Sessions de caisse avec solde ouverture/fermeture
+- Transactions (encaissements, décaissements, transferts)
+
+### 👥 RH — Employer (`employer`)
+- **Fiche employé unifiée** : identité, coordonnées, RH, profil médical
+  - Section médicale conditionnelle (visible si `est_medecin = Oui`)
+  - Spécialité, N° ordre, durée consultation, honoraires, signature
+- Départements/services, fonctions, grades, types de contrat
+- **Congés** : workflow en 2 niveaux (chef de service → RH)
+  - Types : annuel, maladie, maternité, paternité, exceptionnel…
+  - Soldes de congé par année
+- **Présence** : pointage matin/soir avec calcul des retards
+- **Planning médecins** : planning hebdomadaire par bureau
+- Docteurs référents externes (contacts médicaux hors centre)
+
+### 🔑 Utilisateur (`utilisateur`)
+- Profil self-service : l'employé consulte et modifie ses propres infos
+- Admin : liste et modification de tous les comptes utilisateurs
+- Liaison dossier employé ↔ compte Django
+
+### 🛡️ Permissions (`modules_permissions`)
+- Contrôle d'accès par module (activer/désactiver par groupe ou utilisateur)
+
+### 📊 Rapports (`rapports`)
+- Rapports médicaux (mensuel, trimestriel, annuel)
+- Registre des vaccinations
 
 ---
 
@@ -159,30 +177,48 @@ python manage.py runserver
 
 | Groupe | Accès |
 |--------|-------|
-| Médecin | Consultations, ordonnances, diagnostics, examens |
-| Infirmier | Constantes, soins, hospitalisations |
+| Médecin | Soins, ordonnances, labo, hospitalisation |
+| Infirmier | Soins, présences |
 | Pharmacien | Pharmacie, stocks, commandes |
 | Laborantin | Analyses, imagerie, résultats |
 | Caissier | Facturation, caisse, paiements |
-| Accueil | Patients, rendez-vous, admission |
-| Comptable | Facturation, trésorerie, rapports financiers |
-| RH | Employés, congés, présences |
-| Directeur | Tous les modules (lecture) + rapports |
+| Accueil | Patients, rendez-vous |
+| Comptable | Facturation, trésorerie, rapports |
+| RH | Employés, congés, présences, planning |
+| Directeur | Tous modules (lecture) + rapports |
 | Administrateur | Accès complet |
+
+---
+
+## 🔧 Patterns techniques
+
+### Codes automatiques
+Chaque entité principale génère un code lisible : `PREFIX + ANNÉE + séquence 4 chiffres`
+> Ex : `PAT20250001`, `HOSP20250001`, `REF20250001`
+
+### Workflow congés
+```
+demandé → validé_service → approuvé → en_cours → terminé
+                        ↘ refusé
+```
+
+### Modèle Employe unifié
+`employer.Employe` centralise RH + profil médical dans une seule table (`employes_employe`).
+Les champs médicaux (`specialite`, `ordre_medecin`, `service_consultation`…) ne sont actifs que si `est_medecin = True`.
 
 ---
 
 ## 🗄️ Base de données
 
-Par défaut : **SQLite** (développement)
+Défaut : **SQLite** (développement)
 
-Pour la production, configurer PostgreSQL dans `settings.py` :
+Production — configurer PostgreSQL dans `medisoft/settings.py` :
 ```python
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'medisoft_db',
-        'USER': 'medisoft_user',
+        'NAME': 'segho_wale_db',
+        'USER': 'segho_user',
         'PASSWORD': 'votre_mot_de_passe',
         'HOST': 'localhost',
         'PORT': '5432',
@@ -192,25 +228,25 @@ DATABASES = {
 
 ---
 
-## 📈 Évolutions recommandées
+## 🌍 Configuration locale
 
-1. **API REST** (Django REST Framework) pour intégration mobile/tablette
-2. **Tableau de bord** avec graphiques (Chart.js ou ApexCharts)
-3. **Impression PDF** des ordonnances, factures, résultats labo
-4. **Notifications** SMS/email pour rappels rendez-vous
-5. **Interface dédiée** par rôle (médecin, caissier, pharmacien)
-6. **Intégration automates** laboratoire (HL7/FHIR)
-7. **Module BI** pour statistiques épidémiologiques
-
----
-
-## 🌍 Configuration Côte d'Ivoire
-
-- Fuseau horaire : `Africa/Abidjan`
-- Langue : Français (`fr-fr`)
-- Monnaie : Franc CFA (XOF)
-- Assurances préconfigurées : CNPS, MUGEF-CI, AXA, SUNU, NSIA
+| Paramètre | Valeur |
+|-----------|--------|
+| Fuseau horaire | `Africa/Abidjan` |
+| Langue | `fr-fr` |
+| Monnaie | Franc CFA (XOF) |
+| Nationalité par défaut | Ivoirienne |
+| Pays préférés (téléphone) | CI, SN, ML, BF, GN, CM, TG, BJ… |
 
 ---
 
-*SEGHO-WALE v1.0 — Développé pour le Centre Médico-Social WALÉ, Yamoussoukro, Côte d'Ivoire*
+## 🌿 Branches
+
+| Branche | Description |
+|---------|-------------|
+| `main` | Version stable de référence |
+| `Orthiniel_Branch` | Développement actif — refonte architecture RH, modules congés/planning/présence |
+
+---
+
+*SEGHO-WALE — Centre Médico-Social WALÉ, Yamoussoukro, Côte d'Ivoire*
