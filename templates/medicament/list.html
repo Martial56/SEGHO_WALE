@@ -1,0 +1,177 @@
+{% extends 'medicament/base.html' %}
+{% load static %}
+
+{% block content %}
+<div id="page-wrap">
+
+{% include 'medicament/includes/nav.html' %}
+
+<!-- ══ SUBHEADER ══ -->
+<div class="o-subheader" id="subheader">
+  <div class="o-subheader-row">
+    <span class="o-page-title">Catalogue médicaments <span class="o-page-count">{{ total }}</span></span>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+      <form method="get" id="filter-form" style="display:flex;align-items:center;">
+        <input type="hidden" name="statut"    id="fi-statut"    value="{{ statut }}">
+        <input type="hidden" name="categorie" id="fi-categorie" value="{{ cat_id }}">
+        <div class="o-search-bar">
+          <input class="o-search-input" id="search-input" type="text" name="q" value="{{ q }}"
+            placeholder="Désignation, code, DCI…">
+          <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="o-subheader-row">
+    <a href="{% url 'medicament:create' %}" class="o-btn-create">
+      <i class="bi bi-plus-lg"></i> Nouveau médicament
+    </a>
+
+    <button type="button" class="o-ctrl-btn {% if statut or cat_id %}active{% endif %}"
+      id="btn-filtres" onclick="toggleFilters()">
+      <i class="bi bi-funnel"></i> Filtres
+    </button>
+
+    {% if q or statut or cat_id %}
+    <a href="{% url 'medicament:list' %}" class="o-ctrl-btn">
+      <i class="bi bi-x"></i> Effacer
+    </a>
+    {% endif %}
+
+    {% if q      %}<span class="o-filter-tag">{{ q }}          <a href="?{% if statut %}statut={{ statut }}&{% endif %}{% if cat_id %}categorie={{ cat_id }}{% endif %}">×</a></span>{% endif %}
+    {% if statut %}<span class="o-filter-tag">{{ statut }}     <a href="?{% if q %}q={{ q }}&{% endif %}{% if cat_id %}categorie={{ cat_id }}{% endif %}">×</a></span>{% endif %}
+    {% if cat_id %}<span class="o-filter-tag">Catégorie filtrée<a href="?{% if q %}q={{ q }}&{% endif %}{% if statut %}statut={{ statut }}{% endif %}">×</a></span>{% endif %}
+
+    <div style="flex:1;"></div>
+    <div class="o-ctrl-sep"></div>
+  </div>
+</div>
+
+<!-- ══ PANEL FILTRES ══ -->
+<div class="filters-panel {% if statut or cat_id %}open{% endif %}" id="filters-panel">
+  <select id="sel-statut" class="filter-select" onchange="applyFilters()">
+    <option value="">Tous les stocks</option>
+    <option value="ok"      {% if statut == 'ok'      %}selected{% endif %}>En stock</option>
+    <option value="alerte"  {% if statut == 'alerte'  %}selected{% endif %}>En alerte</option>
+    <option value="rupture" {% if statut == 'rupture' %}selected{% endif %}>Rupture</option>
+  </select>
+  <select id="sel-cat" class="filter-select" onchange="applyFilters()">
+    <option value="">Toutes catégories</option>
+    {% for cat in categories %}
+    <option value="{{ cat.pk }}" {% if cat_id == cat.pk|stringformat:'s' %}selected{% endif %}>{{ cat.nom }}</option>
+    {% endfor %}
+  </select>
+</div>
+
+<!-- ══ STATS ══ -->
+<div class="stats-row">
+  <div class="stat-box">
+    <div class="stat-icon rose"><i class="bi bi-capsule"></i></div>
+    <div>
+      <div class="stat-label">Total médicaments</div>
+      <div class="stat-value">{{ stats.total }}</div>
+    </div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-icon green"><i class="bi bi-check-circle"></i></div>
+    <div>
+      <div class="stat-label">En stock</div>
+      <div class="stat-value">{{ stats.ok }}</div>
+    </div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-icon amber"><i class="bi bi-exclamation-triangle"></i></div>
+    <div>
+      <div class="stat-label">En alerte</div>
+      <div class="stat-value">{{ stats.alerte }}</div>
+    </div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-icon red"><i class="bi bi-x-circle"></i></div>
+    <div>
+      <div class="stat-label">Rupture de stock</div>
+      <div class="stat-value">{{ stats.rupture }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TABLEAU ══ -->
+<div class="o-list-wrap">
+  {% if page_obj.object_list %}
+  <table class="o-list-table">
+    <thead>
+      <tr>
+        <th style="width:90px;">Code</th>
+        <th>Désignation</th>
+        <th style="width:150px;">DCI</th>
+        <th style="width:90px;">Forme</th>
+        <th style="width:110px;">Catégorie</th>
+        <th style="width:80px;text-align:right;">Stock</th>
+        <th style="width:80px;text-align:right;">Prix vente</th>
+        <th style="width:90px;">Statut</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for med in page_obj %}
+      <tr onclick="window.location='{% url 'medicament:detail' med.pk %}'">
+        <td style="font-family:monospace;font-size:11.5px;font-weight:500;color:var(--accent);">{{ med.code }}</td>
+        <td style="font-weight:500;">
+          {{ med.designation }}
+          {% if med.dosage %}<span style="color:var(--text-muted);font-size:11px;margin-left:4px;">{{ med.dosage }}</span>{% endif %}
+        </td>
+        <td style="color:var(--text-muted);font-size:11.5px;">{{ med.dci|default:"—" }}</td>
+        <td style="font-size:11.5px;">{{ med.get_forme_display }}</td>
+        <td style="font-size:11.5px;color:var(--text-muted);">{{ med.categorie|default:"—" }}</td>
+        <td style="text-align:right;font-weight:600;font-size:13px;">{{ med.stock_actuel }}</td>
+        <td style="text-align:right;font-size:12px;">{{ med.prix_vente|floatformat:0 }} CFA</td>
+        <td>
+          {% if med.stock_actuel <= med.stock_minimum %}
+            <span class="stock-chip stock-rupture">Rupture</span>
+          {% elif med.stock_actuel <= med.stock_alerte %}
+            <span class="stock-chip stock-alerte">Alerte</span>
+          {% else %}
+            <span class="stock-chip stock-ok">En stock</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="o-pagination-bottom">
+    <span>{{ page_obj.start_index }}–{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
+    <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
+      href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}&q={{ q }}&statut={{ statut }}&categorie={{ cat_id }}{% else %}#{% endif %}">
+      <i class="bi bi-chevron-left"></i>
+    </a>
+    <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
+      href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}&q={{ q }}&statut={{ statut }}&categorie={{ cat_id }}{% else %}#{% endif %}">
+      <i class="bi bi-chevron-right"></i>
+    </a>
+  </div>
+  {% else %}
+  <div class="o-empty">
+    <i class="bi bi-capsule"></i>
+    Aucun médicament trouvé.<br>
+    <a href="{% url 'medicament:create' %}" style="color:var(--accent);font-weight:600;margin-top:8px;display:inline-block;">
+      Ajouter le premier médicament
+    </a>
+  </div>
+  {% endif %}
+</div>
+
+</div><!-- /#page-wrap -->
+
+<script>
+  function toggleFilters() {
+    var p = document.getElementById('filters-panel');
+    p.classList.toggle('open');
+    document.getElementById('btn-filtres').classList.toggle('active', p.classList.contains('open'));
+  }
+  function applyFilters() {
+    document.getElementById('fi-statut').value    = document.getElementById('sel-statut').value;
+    document.getElementById('fi-categorie').value = document.getElementById('sel-cat').value;
+    document.getElementById('filter-form').submit();
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,258 @@
+{% extends 'medicament/base.html' %}
+{% load static %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+  .det-page { padding: 16px 20px 60px; max-width: 1100px; }
+
+  .det-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; margin-bottom: 16px; overflow: hidden;
+  }
+  .det-card-header {
+    padding: 10px 16px; border-bottom: 1px solid var(--border);
+    font-size: 12px; font-weight: 700; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: .05em;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .det-grid { display: grid; grid-template-columns: repeat(3,1fr); }
+  .det-field { padding: 10px 16px; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); }
+  .det-field:nth-child(3n) { border-right: none; }
+  .det-field:nth-last-child(-n+3) { border-bottom: none; }
+  .det-field-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 3px; }
+  .det-field-value { font-size: 13px; color: var(--text); font-weight: 500; }
+
+  html[data-theme="dark"] .det-card { background: var(--surface); border-color: var(--border); }
+  html[data-theme="dark"] .det-card-header { border-bottom-color: var(--border); color: var(--text-muted); }
+  html[data-theme="dark"] .det-field { border-bottom-color: var(--border); border-right-color: var(--border); }
+
+  .stock-gauge-wrap { padding: 12px 16px; }
+  .stock-gauge-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; display: flex; justify-content: space-between; }
+  .stock-gauge-bar { height: 8px; background: #eee; border-radius: 4px; overflow: hidden; }
+  .stock-gauge-fill { height: 100%; border-radius: 4px; transition: width .4s; }
+  html[data-theme="dark"] .stock-gauge-bar { background: #2d3550; }
+
+  .sec-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .sec-table th { padding: 7px 12px; text-align: left; font-size: 10.5px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; background: var(--bg); border-bottom: 1px solid var(--border); }
+  .sec-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--text); }
+  .sec-table tbody tr:last-child td { border-bottom: none; }
+  .sec-table-empty { padding: 24px; text-align: center; color: var(--text-muted); font-size: 12px; }
+  html[data-theme="dark"] .sec-table th { background: var(--surface); border-bottom-color: var(--border); color: var(--text-muted); }
+  html[data-theme="dark"] .sec-table td { border-bottom-color: #2d3550; color: var(--text); }
+
+  .det-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .det-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 5px 13px; border-radius: 4px; font-size: 12px; font-weight: 500;
+    text-decoration: none; cursor: pointer; border: 1px solid transparent; transition: background .15s;
+    font-family: 'Roboto', sans-serif;
+  }
+  .det-btn-primary { background: var(--accent); color: #fff; }
+  .det-btn-primary:hover { background: var(--primary); }
+  .det-btn-outline { background: transparent; color: var(--text); border-color: var(--border); }
+  .det-btn-outline:hover { background: #f5f5f5; }
+  html[data-theme="dark"] .det-btn-outline { color: var(--text); border-color: var(--border); }
+  html[data-theme="dark"] .det-btn-outline:hover { background: #2a3044; }
+
+  .mv-chip { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 10px; font-size: 10.5px; font-weight: 600; }
+  .mv-entree { background: #e3f5ef; color: #1a5c4a; }
+  .mv-sortie, .mv-peremption { background: #fde8ea; color: #9b1f2a; }
+  .mv-ajustement { background: #eff6ff; color: #1d4ed8; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="page-wrap">
+
+{% include 'medicament/includes/nav.html' %}
+
+<div class="o-subheader">
+  <div class="o-subheader-row">
+    <a href="{% url 'medicament:list' %}" class="o-ctrl-btn" style="padding:3px 7px;">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <span style="font-size:13px;color:var(--text-muted);">
+      <a href="{% url 'medicament:list' %}" style="color:var(--accent);text-decoration:none;font-weight:500;">Catalogue</a>
+      <span style="margin:0 5px;opacity:.4;">/</span>
+      <span style="color:var(--text);">{{ medicament.designation }}</span>
+    </span>
+    <div style="margin-left:auto;" class="det-actions">
+      <a href="{% url 'medicament:mouvement_add' medicament.pk %}?next={% url 'medicament:detail' medicament.pk %}"
+         class="det-btn det-btn-primary">
+        <i class="bi bi-arrow-down-up"></i> Mouvement stock
+      </a>
+      <a href="{% url 'medicament:edit' medicament.pk %}?next={% url 'medicament:detail' medicament.pk %}"
+         class="det-btn det-btn-outline">
+        <i class="bi bi-pencil"></i> Modifier
+      </a>
+    </div>
+  </div>
+</div>
+
+<div class="det-page">
+
+  <div class="det-card">
+    <div class="det-card-header">
+      <i class="bi bi-capsule" style="color:var(--accent);"></i>
+      Fiche médicament — <span style="font-weight:500;color:var(--text);font-size:13px;">{{ medicament.code }}</span>
+      <span style="margin-left:auto;">
+        {% if medicament.actif %}
+          <span style="background:#e3f5ef;color:#1a5c4a;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:600;">Actif</span>
+        {% else %}
+          <span style="background:#f0f0f0;color:#888;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:600;">Inactif</span>
+        {% endif %}
+      </span>
+    </div>
+    <div class="det-grid">
+      <div class="det-field">
+        <div class="det-field-label">Désignation</div>
+        <div class="det-field-value">{{ medicament.designation }}</div>
+      </div>
+      <div class="det-field">
+        <div class="det-field-label">DCI</div>
+        <div class="det-field-value">{{ medicament.dci|default:"—" }}</div>
+      </div>
+      <div class="det-field">
+        <div class="det-field-label">Forme</div>
+        <div class="det-field-value">{{ medicament.get_forme_display }}</div>
+      </div>
+      <div class="det-field">
+        <div class="det-field-label">Dosage</div>
+        <div class="det-field-value">{{ medicament.dosage|default:"—" }}</div>
+      </div>
+      <div class="det-field">
+        <div class="det-field-label">Catégorie</div>
+        <div class="det-field-value">{{ medicament.categorie|default:"—" }}</div>
+      </div>
+      <div class="det-field">
+        <div class="det-field-label">Code</div>
+        <div class="det-field-value" style="font-family:monospace;color:var(--accent);">{{ medicament.code }}</div>
+      </div>
+      <div class="det-field">
+        <div class="det-field-label">Prix vente</div>
+        <div class="det-field-value">{{ medicament.prix_vente|floatformat:0 }} CFA</div>
+      </div>
+      <div class="det-field">
+        <div class="det-field-label">Prix achat</div>
+        <div class="det-field-value">{{ medicament.prix_achat|floatformat:0 }} CFA</div>
+      </div>
+      <div class="det-field">
+        <div class="det-field-label">Seuil d'alerte</div>
+        <div class="det-field-value">{{ medicament.stock_alerte }}</div>
+      </div>
+    </div>
+
+    <div class="stock-gauge-wrap">
+      <div class="stock-gauge-label">
+        <span>Stock actuel</span>
+        <span style="font-weight:700;font-size:14px;color:
+          {% if medicament.stock_actuel <= medicament.stock_minimum %}#c0392b
+          {% elif medicament.stock_actuel <= medicament.stock_alerte %}#b07d00
+          {% else %}#1a5c4a{% endif %};">
+          {{ medicament.stock_actuel }}
+          {% if medicament.stock_actuel <= medicament.stock_minimum %}
+            <span class="stock-chip stock-rupture" style="margin-left:4px;">Rupture</span>
+          {% elif medicament.stock_actuel <= medicament.stock_alerte %}
+            <span class="stock-chip stock-alerte" style="margin-left:4px;">Alerte</span>
+          {% else %}
+            <span class="stock-chip stock-ok" style="margin-left:4px;">En stock</span>
+          {% endif %}
+        </span>
+      </div>
+      {% with max_stock=medicament.stock_alerte|add:medicament.stock_alerte %}
+      <div class="stock-gauge-bar">
+        <div class="stock-gauge-fill" style="
+          width: {% widthratio medicament.stock_actuel max_stock 100 %}%;
+          background: {% if medicament.stock_actuel <= medicament.stock_minimum %}#ef4444{% elif medicament.stock_actuel <= medicament.stock_alerte %}#f59e0b{% else %}#22c55e{% endif %};
+        "></div>
+      </div>
+      {% endwith %}
+      <div class="stock-gauge-label" style="margin-top:4px;">
+        <span>Min : {{ medicament.stock_minimum }}</span>
+        <span>Alerte : {{ medicament.stock_alerte }}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="det-card">
+    <div class="det-card-header">
+      <i class="bi bi-boxes" style="color:var(--accent);"></i>
+      Lots en stock
+    </div>
+    {% if lots %}
+    <table class="sec-table">
+      <thead>
+        <tr>
+          <th>N° Lot</th>
+          <th>Fournisseur</th>
+          <th style="text-align:right;">Qté initiale</th>
+          <th style="text-align:right;">Qté actuelle</th>
+          <th>Péremption</th>
+          <th>Réception</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for lot in lots %}
+        <tr>
+          <td style="font-family:monospace;font-size:11.5px;">{{ lot.numero_lot }}</td>
+          <td>{{ lot.fournisseur|default:"—" }}</td>
+          <td style="text-align:right;">{{ lot.quantite_initiale }}</td>
+          <td style="text-align:right;font-weight:600;">{{ lot.quantite_actuelle }}</td>
+          <td>{{ lot.date_peremption|date:"d/m/Y" }}</td>
+          <td style="color:var(--text-muted);">{{ lot.date_reception|date:"d/m/Y" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="sec-table-empty">Aucun lot enregistré.</div>
+    {% endif %}
+  </div>
+
+  <div class="det-card">
+    <div class="det-card-header">
+      <i class="bi bi-arrow-down-up" style="color:var(--accent);"></i>
+      Derniers mouvements de stock
+    </div>
+    {% if mouvements %}
+    <table class="sec-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Type</th>
+          <th>Motif</th>
+          <th style="text-align:right;">Quantité</th>
+          <th style="text-align:right;">Stock avant</th>
+          <th style="text-align:right;">Stock après</th>
+          <th>Référence</th>
+          <th>Agent</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for mv in mouvements %}
+        <tr>
+          <td style="white-space:nowrap;font-size:11.5px;">{{ mv.date_mouvement|date:"d/m/Y H:i" }}</td>
+          <td>
+            <span class="mv-chip mv-{{ mv.type_mouvement }}">{{ mv.get_type_mouvement_display }}</span>
+          </td>
+          <td style="color:var(--text-muted);font-size:11.5px;">{{ mv.get_motif_display }}</td>
+          <td style="text-align:right;font-weight:600;">
+            {% if mv.type_mouvement == 'entree' %}<span style="color:#1a5c4a;">+</span>{% else %}<span style="color:#c0392b;">−</span>{% endif %}{{ mv.quantite }}
+          </td>
+          <td style="text-align:right;color:var(--text-muted);">{{ mv.stock_avant }}</td>
+          <td style="text-align:right;font-weight:600;">{{ mv.stock_apres }}</td>
+          <td style="font-size:11.5px;color:var(--text-muted);">{{ mv.reference|default:"—" }}</td>
+          <td style="font-size:11.5px;color:var(--text-muted);">{{ mv.cree_par|default:"—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="sec-table-empty">Aucun mouvement enregistré.</div>
+    {% endif %}
+  </div>
+
+</div><!-- /.det-page -->
+</div><!-- /#page-wrap -->
+{% endblock %}

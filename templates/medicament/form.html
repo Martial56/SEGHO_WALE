@@ -1,0 +1,392 @@
+{% extends 'medicament/base.html' %}
+{% load static %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+  .frm-page { padding: 16px 20px 60px; max-width: 900px; }
+
+  .tab-bar {
+    display: flex; gap: 0; border-bottom: 2px solid var(--border);
+    margin-bottom: 0; background: var(--surface);
+    overflow-x: auto; flex-wrap: nowrap;
+  }
+  .tab-btn {
+    padding: 8px 16px; font-size: 12.5px; font-weight: 500;
+    color: var(--text-muted); background: none; border: none;
+    border-bottom: 2px solid transparent; margin-bottom: -2px;
+    cursor: pointer; white-space: nowrap; font-family: 'Roboto', sans-serif;
+    transition: color .15s, border-color .15s;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .frm-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 0 0 8px 8px; overflow: hidden; margin-bottom: 12px;
+  }
+  .frm-card-header {
+    padding: 8px 16px; border-bottom: 1px solid var(--border);
+    font-size: 11px; font-weight: 700; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: .06em; background: var(--bg);
+  }
+  .frm-section { padding: 0; }
+  .frm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+  .frm-field { padding: 10px 16px; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); }
+  .frm-field:nth-child(2n) { border-right: none; }
+  .frm-field.full { grid-column: span 2; border-right: none; }
+  .frm-field:last-child { border-bottom: none; }
+  .frm-field.no-border-b { border-bottom: none; }
+
+  .frm-label { font-size: 10.5px; color: var(--text-muted); letter-spacing: .04em; margin-bottom: 4px; display: block; }
+  .frm-input, .frm-select, .frm-textarea {
+    width: 100%; border: 1px solid var(--border); border-radius: 4px;
+    padding: 6px 10px; font-size: 13px; font-family: 'Roboto', sans-serif;
+    color: var(--text); background: var(--surface); outline: none; transition: border-color .15s;
+  }
+  .frm-textarea { min-height: 68px; resize: vertical; }
+  .frm-input:focus, .frm-select:focus, .frm-textarea:focus { border-color: var(--accent); }
+  .frm-checkbox { display: flex; align-items: center; gap: 8px; }
+  .frm-checkbox input { width: 15px; height: 15px; accent-color: var(--accent); }
+  .frm-checkbox span { font-size: 13px; color: var(--text); }
+
+  html[data-theme="dark"] .frm-card { background: var(--surface); border-color: var(--border); }
+  html[data-theme="dark"] .frm-card-header { background: var(--bg); border-bottom-color: var(--border); }
+  html[data-theme="dark"] .frm-field { border-bottom-color: var(--border); border-right-color: var(--border); }
+  html[data-theme="dark"] .frm-input, html[data-theme="dark"] .frm-select, html[data-theme="dark"] .frm-textarea { background: #1a2133; border-color: var(--border); color: var(--text); }
+  html[data-theme="dark"] .tab-bar { background: var(--surface); border-bottom-color: var(--border); }
+
+  .checks-row { display: flex; gap: 24px; flex-wrap: wrap; padding: 10px 16px; }
+
+  .frm-actions {
+    position: sticky; bottom: 0; z-index: 10;
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 16px; border-top: 1px solid var(--border);
+    background: var(--surface); box-shadow: 0 -2px 8px rgba(0,0,0,.06);
+  }
+  .frm-btn-save {
+    background: var(--accent); color: #fff; border: none;
+    padding: 7px 18px; border-radius: 4px; font-size: 13px; font-weight: 500;
+    font-family: 'Roboto', sans-serif; cursor: pointer; transition: background .15s;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .frm-btn-save:hover { background: var(--primary); }
+  .frm-btn-cancel {
+    color: var(--text-muted); text-decoration: none; font-size: 13px; padding: 7px 12px;
+    border-radius: 4px; border: 1px solid var(--border);
+    font-family: 'Roboto', sans-serif; transition: background .15s;
+  }
+  .frm-btn-cancel:hover { background: #f5f5f5; color: var(--text); }
+  html[data-theme="dark"] .frm-actions { background: var(--surface); border-top-color: var(--border); box-shadow: none; }
+  html[data-theme="dark"] .frm-btn-cancel { border-color: var(--border); color: var(--text-muted); }
+  html[data-theme="dark"] .frm-btn-cancel:hover { background: #28304a; }
+
+  ul.errorlist { list-style:none; padding:0; margin:2px 0 0; }
+  ul.errorlist li { color:#c0392b; font-size:11px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="page-wrap">
+{% include 'medicament/includes/nav.html' %}
+
+<div class="o-subheader">
+  <div class="o-subheader-row">
+    <a href="{% if medicament %}{% url 'medicament:detail' medicament.pk %}{% else %}{% url 'medicament:list' %}{% endif %}"
+       class="o-ctrl-btn" style="padding:3px 7px;">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <span style="font-size:13px;color:var(--text-muted);">
+      <a href="{% url 'medicament:list' %}" style="color:var(--accent);text-decoration:none;font-weight:500;">Catalogue</a>
+      {% if medicament %}
+      <span style="margin:0 5px;opacity:.4;">/</span>
+      <a href="{% url 'medicament:detail' medicament.pk %}" style="color:var(--accent);text-decoration:none;font-weight:500;">{{ medicament.designation }}</a>
+      {% endif %}
+      <span style="margin:0 5px;opacity:.4;">/</span>
+      <span style="color:var(--text);">{{ title }}</span>
+    </span>
+  </div>
+</div>
+
+<div class="frm-page">
+  <form method="post" id="med-form">
+    {% csrf_token %}
+
+    <div class="tab-bar" id="tab-bar">
+      <button type="button" class="tab-btn active" data-tab="general">Détails du médicament</button>
+      <button type="button" class="tab-btn" data-tab="clinique">Clinique</button>
+      <button type="button" class="tab-btn" data-tab="fabricant">Fabricant</button>
+      <button type="button" class="tab-btn" data-tab="stock">Tarifs & Stock</button>
+    </div>
+
+    <!-- ══ ONGLET 1 : Général ══ -->
+    <div class="tab-panel active" id="tab-general">
+      <div class="frm-card" style="border-radius:0 0 8px 8px;">
+        <div class="checks-row" style="border-bottom:1px solid var(--border);">
+          <label class="frm-checkbox">
+            <input type="checkbox" name="peut_etre_vendu"  {% if form.peut_etre_vendu.value  %}checked{% endif %}>
+            <span>Peut être vendu</span>
+          </label>
+          <label class="frm-checkbox">
+            <input type="checkbox" name="peut_etre_achete" {% if form.peut_etre_achete.value %}checked{% endif %}>
+            <span>Peut être acheté</span>
+          </label>
+          <label class="frm-checkbox">
+            <input type="checkbox" name="actif" {% if form.actif.value %}checked{% endif %}>
+            <span>Actif</span>
+          </label>
+        </div>
+        <div class="frm-grid">
+          <div class="frm-field full">
+            <label class="frm-label">Désignation (nom de l'article) *</label>
+            <input class="frm-input" type="text" name="designation"
+              value="{{ form.designation.value|default:'' }}" placeholder="Nom commercial du médicament">
+            {{ form.designation.errors }}
+          </div>
+          <div class="frm-field">
+            <label class="frm-label">Code *</label>
+            <input class="frm-input" type="text" name="code"
+              value="{{ form.code.value|default:'' }}" placeholder="ex: MED-001">
+            {{ form.code.errors }}
+          </div>
+          <div class="frm-field">
+            <label class="frm-label">Forme</label>
+            <select class="frm-select" name="forme">
+              {% for val, label in form.fields.forme.choices %}
+              <option value="{{ val }}" {% if form.forme.value == val %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="frm-field">
+            <label class="frm-label">DCI (Dénomination Commune Internationale)</label>
+            <input class="frm-input" type="text" name="dci"
+              value="{{ form.dci.value|default:'' }}" placeholder="Principe actif">
+          </div>
+          <div class="frm-field">
+            <label class="frm-label">Dosage</label>
+            <input class="frm-input" type="text" name="dosage"
+              value="{{ form.dosage.value|default:'' }}" placeholder="ex: 500mg">
+          </div>
+          <div class="frm-field">
+            <label class="frm-label">Voie d'administration</label>
+            <input class="frm-input" type="text" name="voie_administration"
+              value="{{ form.voie_administration.value|default:'' }}" placeholder="ex: orale, injectable">
+          </div>
+          <div class="frm-field">
+            <label class="frm-label">Fréquence posologique</label>
+            <input class="frm-input" type="text" name="frequence"
+              value="{{ form.frequence.value|default:'' }}" placeholder="ex: 3 fois / jour">
+          </div>
+          <div class="frm-field">
+            <label class="frm-label">Catégorie</label>
+            <select class="frm-select" name="categorie">
+              <option value="">— Aucune —</option>
+              {% for val, label in form.fields.categorie.choices %}
+              {% if val %}<option value="{{ val }}" {% if form.categorie.value|stringformat:'s' == val|stringformat:'s' %}selected{% endif %}>{{ label }}</option>{% endif %}
+              {% endfor %}
+            </select>
+          </div>
+          <div class="frm-field">
+            <label class="frm-label">Composant actif</label>
+            <input class="frm-input" type="text" name="composant_actif"
+              value="{{ form.composant_actif.value|default:'' }}" placeholder="Molécule active">
+          </div>
+          <div class="frm-field">
+            <label class="frm-label">Effet thérapeutique</label>
+            <select class="frm-select" name="effet_therapeutique">
+              <option value="">— Aucun —</option>
+              {% for val, label in form.fields.effet_therapeutique.choices %}
+              {% if val %}<option value="{{ val }}" {% if form.effet_therapeutique.value|stringformat:'s' == val|stringformat:'s' %}selected{% endif %}>{{ label }}</option>{% endif %}
+              {% endfor %}
+            </select>
+          </div>
+          <div class="frm-field full">
+            <label class="frm-label">Effets indésirables</label>
+            <textarea class="frm-textarea" name="effets_indesirables">{{ form.effets_indesirables.value|default:'' }}</textarea>
+          </div>
+          <div class="frm-field" style="border-bottom:none;">
+            <label class="frm-checkbox">
+              <input type="checkbox" name="quantite_prescription_manuelle"
+                {% if form.quantite_prescription_manuelle.value %}checked{% endif %}>
+              <span>Quantité de prescription manuelle</span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ ONGLET 2 : Clinique ══ -->
+    <div class="tab-panel" id="tab-clinique">
+      <div class="frm-card" style="border-radius:0 0 8px 8px;">
+        <div class="frm-card-header">Informations cliniques</div>
+        <div class="frm-grid">
+          <div class="frm-field full">
+            <label class="frm-label">Indications</label>
+            <textarea class="frm-textarea" name="indications">{{ form.indications.value|default:'' }}</textarea>
+          </div>
+          <div class="frm-field full">
+            <label class="frm-label">Remarques</label>
+            <textarea class="frm-textarea" name="remarques">{{ form.remarques.value|default:'' }}</textarea>
+          </div>
+        </div>
+        <div class="frm-card-header" style="margin-top:0;">Grossesse</div>
+        <div class="frm-grid">
+          <div class="frm-field" style="border-bottom:none;">
+            <label class="frm-checkbox">
+              <input type="checkbox" name="avertissement_grossesse"
+                {% if form.avertissement_grossesse.value %}checked{% endif %}>
+              <span>Avertissement de grossesse</span>
+            </label>
+          </div>
+          <div class="frm-field" style="border-bottom:none;border-right:none;">
+            <label class="frm-checkbox">
+              <input type="checkbox" name="avertissement_lactation"
+                {% if form.avertissement_lactation.value %}checked{% endif %}>
+              <span>Avertissement de lactation</span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ ONGLET 3 : Fabricant ══ -->
+    <div class="tab-panel" id="tab-fabricant">
+      <div class="frm-card" style="border-radius:0 0 8px 8px;">
+        <div class="frm-card-header">Détails sur le fabricant</div>
+        <div class="frm-grid">
+          <div class="frm-field">
+            <label class="frm-label">Compagnie pharmaceutique</label>
+            <select class="frm-select" name="compagnie_pharma">
+              <option value="">— Aucune —</option>
+              {% for val, label in form.fields.compagnie_pharma.choices %}
+              {% if val %}<option value="{{ val }}" {% if form.compagnie_pharma.value|stringformat:'s' == val|stringformat:'s' %}selected{% endif %}>{{ label }}</option>{% endif %}
+              {% endfor %}
+            </select>
+          </div>
+          <div class="frm-field">
+            <label class="frm-label">Nom du produit (fabricant)</label>
+            <input class="frm-input" type="text" name="nom_produit_fabricant"
+              value="{{ form.nom_produit_fabricant.value|default:'' }}">
+          </div>
+          <div class="frm-field">
+            <label class="frm-label">Code produit</label>
+            <input class="frm-input" type="text" name="code_produit_fabricant"
+              value="{{ form.code_produit_fabricant.value|default:'' }}">
+          </div>
+          <div class="frm-field" style="border-right:none;">
+            <label class="frm-label">URL du produit</label>
+            <input class="frm-input" type="url" name="url_produit"
+              value="{{ form.url_produit.value|default:'' }}" placeholder="https://…">
+          </div>
+        </div>
+        <div class="frm-card-header">Référencement interne</div>
+        <div class="frm-grid">
+          <div class="frm-field" style="border-bottom:none;">
+            <label class="frm-label">Référence interne</label>
+            <input class="frm-input" type="text" name="reference_interne"
+              value="{{ form.reference_interne.value|default:'' }}">
+          </div>
+          <div class="frm-field" style="border-bottom:none;border-right:none;">
+            <label class="frm-label">Code-barres</label>
+            <input class="frm-input" type="text" name="code_barres"
+              value="{{ form.code_barres.value|default:'' }}">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ ONGLET 4 : Stock ══ -->
+    <div class="tab-panel" id="tab-stock">
+      <div class="frm-card" style="border-radius:0 0 8px 8px;">
+        <div class="frm-card-header">Tarifs</div>
+        <div class="frm-grid">
+          <div class="frm-field">
+            <label class="frm-label">Prix de vente (CFA)</label>
+            <input class="frm-input" type="number" name="prix_vente" min="0" step="1"
+              value="{{ form.prix_vente.value|default:'0' }}">
+          </div>
+          <div class="frm-field" style="border-right:none;">
+            <label class="frm-label">Prix d'achat / Coût (CFA)</label>
+            <input class="frm-input" type="number" name="prix_achat" min="0" step="1"
+              value="{{ form.prix_achat.value|default:'0' }}">
+          </div>
+        </div>
+        <div class="frm-card-header">Seuils de stock</div>
+        <div class="frm-grid">
+          <div class="frm-field" style="border-bottom:none;">
+            <label class="frm-label">Seuil d'alerte</label>
+            <input class="frm-input" type="number" name="stock_alerte" min="0"
+              value="{{ form.stock_alerte.value|default:'10' }}">
+          </div>
+          <div class="frm-field" style="border-bottom:none;border-right:none;">
+            <label class="frm-label">Stock minimum</label>
+            <input class="frm-input" type="number" name="stock_minimum" min="0"
+              value="{{ form.stock_minimum.value|default:'5' }}">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="frm-actions">
+      <button type="submit" class="frm-btn-save">
+        <i class="bi bi-check-lg"></i>
+        {% if medicament %}Enregistrer les modifications{% else %}Créer le médicament{% endif %}
+      </button>
+      <a href="{% if medicament %}{% url 'medicament:detail' medicament.pk %}{% else %}{% url 'medicament:list' %}{% endif %}"
+         class="frm-btn-cancel">Annuler</a>
+      {% if form.errors %}
+      <span style="color:#c0392b;font-size:12px;margin-left:8px;">
+        <i class="bi bi-exclamation-circle"></i> Corrigez les erreurs dans les onglets
+      </span>
+      {% endif %}
+    </div>
+
+  </form>
+</div><!-- /.frm-page -->
+</div><!-- /#page-wrap -->
+
+<script>
+  (function () {
+    var tabs    = document.querySelectorAll('.tab-btn');
+    var panels  = document.querySelectorAll('.tab-panel');
+
+    tabs.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var target = btn.dataset.tab;
+        tabs.forEach(function (b) { b.classList.remove('active'); });
+        panels.forEach(function (p) { p.classList.remove('active'); });
+        btn.classList.add('active');
+        document.getElementById('tab-' + target).classList.add('active');
+      });
+    });
+
+    {% if form.errors %}
+    var errorFields = {{ form.errors|safe }};
+    var tabMap = {
+      'designation': 'general', 'code': 'general', 'forme': 'general',
+      'dci': 'general', 'dosage': 'general', 'categorie': 'general',
+      'composant_actif': 'general', 'effet_therapeutique': 'general',
+      'indications': 'clinique', 'remarques': 'clinique',
+      'avertissement_grossesse': 'clinique', 'avertissement_lactation': 'clinique',
+      'compagnie_pharma': 'fabricant', 'nom_produit_fabricant': 'fabricant',
+      'code_produit_fabricant': 'fabricant', 'url_produit': 'fabricant',
+      'prix_vente': 'stock', 'prix_achat': 'stock',
+      'stock_alerte': 'stock', 'stock_minimum': 'stock',
+    };
+    for (var field in errorFields) {
+      if (tabMap[field]) {
+        tabs.forEach(function (b) { b.classList.remove('active'); });
+        panels.forEach(function (p) { p.classList.remove('active'); });
+        var btn = document.querySelector('[data-tab="' + tabMap[field] + '"]');
+        if (btn) btn.classList.add('active');
+        var panel = document.getElementById('tab-' + tabMap[field]);
+        if (panel) panel.classList.add('active');
+        break;
+      }
+    }
+    {% endif %}
+  })();
+</script>
+{% endblock %}

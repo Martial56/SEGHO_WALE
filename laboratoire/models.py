@@ -30,9 +30,8 @@ class AnalyseLaboratoire(models.Model):
     def save(self, *args, **kwargs):
         if not self.numero:
             from django.utils import timezone
-            annee = timezone.now().year
-            count = AnalyseLaboratoire.objects.filter(date_prelevement__year=annee).count() + 1
-            self.numero = f"LAB{annee}{count:06d}"
+            count = AnalyseLaboratoire.objects.count() + 1
+            self.numero = f"LAB{count:06d}"
         super().save(*args, **kwargs)
 
     def __str__(self): return f"Analyse {self.numero} - {self.patient}"
@@ -73,9 +72,8 @@ class ExamenImagerie(models.Model):
     def save(self, *args, **kwargs):
         if not self.numero:
             from django.utils import timezone
-            annee = timezone.now().year
-            count = ExamenImagerie.objects.filter(date_examen__year=annee).count() + 1
-            self.numero = f"IMG{annee}{count:06d}"
+            count = ExamenImagerie.objects.count() + 1
+            self.numero = f"IMG{count:06d}"
         super().save(*args, **kwargs)
 
     def __str__(self): return f"Imagerie {self.numero} - {self.patient}"

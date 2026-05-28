@@ -3,7 +3,7 @@ from django import forms
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User, Group
-from django.utils.html import format_html
+from django.utils.html import format_html, mark_safe
 from django.urls import path
 from django.http import JsonResponse
 
@@ -45,12 +45,15 @@ class GroupAdminWithModules(admin.ModelAdmin):
         modules = [gm.module for gm in obj.group_modules.select_related('module')]
         if not modules:
             return format_html('<span style="color:#999">Aucun module</span>')
-        badges = ' '.join(
-            f'<span style="background:#e8f4f8;padding:2px 8px;border-radius:10px;font-size:11px;margin:1px;display:inline-block">'
-            f'{m.icon} {m.name}</span>'
+        badges = mark_safe(' '.join(
+            format_html(
+                '<span style="background:#e8f4f8;padding:2px 8px;border-radius:10px;font-size:11px;margin:1px;display:inline-block">'
+                '{} {}</span>',
+                m.icon, m.name,
+            )
             for m in modules
-        )
-        return format_html(badges)
+        ))
+        return badges
     modules_list.short_description = "Modules autorisés"
 
 

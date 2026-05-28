@@ -1,0 +1,62 @@
+<nav class="o-nav">
+  <a href="{% url 'dashboard' %}" class="o-nav-grid" title="Accueil">
+    <i class="bi bi-grid-3x3-gap-fill"></i>
+  </a>
+  <span class="o-nav-brand">
+    <i class="bi bi-capsule"></i>
+    Médicaments
+  </span>
+  <a href="{% url 'medicament:list' %}"
+    class="o-nav-link {% if request.resolver_match.url_name in 'list,create,detail,edit,mouvement_add' %}active{% endif %}">
+    Catalogue
+  </a>
+  <a href="{% url 'medicament:groupe_list' %}"
+    class="o-nav-link {% if 'groupe' in request.resolver_match.url_name %}active{% endif %}">
+    Groupes
+  </a>
+  <div class="o-nav-dropdown" id="nav-config-wrap" style="position:relative;">
+    <button type="button" class="o-nav-link o-nav-dropdown-btn" onclick="toggleConfigMenu()"
+      style="border:none;cursor:pointer;background:none;
+      {% if 'config' in request.resolver_match.url_name %}color:var(--primary);border-bottom-color:var(--primary);{% endif %}">
+      Configuration <i class="bi bi-chevron-down" style="font-size:10px;margin-left:3px;"></i>
+    </button>
+    <div class="o-nav-dropdown-menu" id="config-menu" style="display:none;">
+      <a href="{% url 'medicament:config_compagnie' %}" class="o-nav-dropdown-item">Compagnie pharmaceutique</a>
+      <a href="{% url 'medicament:config_effet' %}"      class="o-nav-dropdown-item">Effet thérapeutique</a>
+      <a href="{% url 'medicament:config_dosage' %}"     class="o-nav-dropdown-item">Dosage du médicament</a>
+      <a href="{% url 'medicament:config_route' %}"      class="o-nav-dropdown-item">Route des médicaments</a>
+      <a href="{% url 'medicament:config_formulaire' %}" class="o-nav-dropdown-item">Formulaire du médicament</a>
+    </div>
+  </div>
+</nav>
+
+<style>
+  .o-nav-dropdown-menu {
+    position: absolute; top: 38px; left: 0; z-index: 500;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,.12);
+    min-width: 220px; padding: 4px 0;
+  }
+  .o-nav-dropdown-item {
+    display: block; padding: 8px 16px; font-size: 12.5px;
+    color: var(--text); text-decoration: none;
+    transition: background .12s;
+  }
+  .o-nav-dropdown-item:hover { background: rgba(192,57,43,.07); color: var(--accent); }
+  html[data-theme="dark"] .o-nav-dropdown-menu { background: var(--surface); border-color: var(--border); }
+  html[data-theme="dark"] .o-nav-dropdown-item { color: var(--text); }
+</style>
+
+<script>
+  function toggleConfigMenu() {
+    var m = document.getElementById('config-menu');
+    m.style.display = m.style.display === 'none' ? 'block' : 'none';
+  }
+  document.addEventListener('click', function (e) {
+    var wrap = document.getElementById('nav-config-wrap');
+    if (wrap && !wrap.contains(e.target)) {
+      var m = document.getElementById('config-menu');
+      if (m) m.style.display = 'none';
+    }
+  });
+</script>

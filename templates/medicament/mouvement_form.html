@@ -1,0 +1,136 @@
+{% extends 'medicament/base.html' %}
+{% load static %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+  .frm-page { padding: 16px 20px 60px; max-width: 560px; }
+  .frm-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .frm-card-header { padding: 10px 16px; border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
+  .frm-field { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .frm-field:last-child { border-bottom: none; }
+  .frm-label { font-size: 10.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 5px; display: block; }
+  .frm-input, .frm-select, .frm-textarea {
+    width: 100%; border: 1px solid var(--border); border-radius: 4px;
+    padding: 6px 10px; font-size: 13px; font-family: 'Roboto', sans-serif;
+    color: var(--text); background: var(--surface); outline: none; transition: border-color .15s;
+  }
+  .frm-textarea { min-height: 70px; resize: vertical; }
+  .frm-input:focus, .frm-select:focus, .frm-textarea:focus { border-color: var(--accent); }
+  html[data-theme="dark"] .frm-card { background: var(--surface); border-color: var(--border); }
+  html[data-theme="dark"] .frm-card-header, html[data-theme="dark"] .frm-field { border-bottom-color: var(--border); }
+  html[data-theme="dark"] .frm-input, html[data-theme="dark"] .frm-select, html[data-theme="dark"] .frm-textarea { background: #1a2133; border-color: var(--border); color: var(--text); }
+  .frm-actions { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border); background: var(--bg); }
+  .frm-btn-save { background: var(--accent); color: #fff; border: none; padding: 7px 18px; border-radius: 4px; font-size: 13px; font-weight: 500; font-family: 'Roboto', sans-serif; cursor: pointer; transition: background .15s; display: inline-flex; align-items: center; gap: 5px; }
+  .frm-btn-save:hover { background: var(--primary); }
+  .frm-btn-cancel { color: var(--text-muted); text-decoration: none; font-size: 13px; padding: 7px 12px; border-radius: 4px; border: 1px solid var(--border); }
+  .frm-btn-cancel:hover { background: #f5f5f5; }
+  html[data-theme="dark"] .frm-actions { background: var(--surface); border-top-color: var(--border); }
+  html[data-theme="dark"] .frm-btn-cancel { border-color: var(--border); color: var(--text-muted); }
+  ul.errorlist { list-style:none; padding:0; margin:0; }
+  ul.errorlist li { color:#c0392b; font-size:11px; margin-top:2px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="page-wrap">
+
+{% include 'medicament/includes/nav.html' %}
+
+<div class="o-subheader">
+  <div class="o-subheader-row">
+    <a href="{% url 'medicament:detail' medicament.pk %}" class="o-ctrl-btn" style="padding:3px 7px;">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <span style="font-size:13px;color:var(--text-muted);">
+      <a href="{% url 'medicament:list' %}" style="color:var(--accent);text-decoration:none;font-weight:500;">Catalogue</a>
+      <span style="margin:0 5px;opacity:.4;">/</span>
+      <a href="{% url 'medicament:detail' medicament.pk %}" style="color:var(--accent);text-decoration:none;font-weight:500;">{{ medicament.designation }}</a>
+      <span style="margin:0 5px;opacity:.4;">/</span>
+      <span style="color:var(--text);">Mouvement stock</span>
+    </span>
+  </div>
+</div>
+
+<div class="frm-page">
+
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px;">
+    <div style="width:40px;height:40px;background:#fde8ea;border-radius:8px;display:flex;align-items:center;justify-content:center;">
+      <i class="bi bi-capsule" style="color:var(--accent);font-size:18px;"></i>
+    </div>
+    <div>
+      <div style="font-size:13px;font-weight:600;color:var(--text);">{{ medicament.designation }}</div>
+      <div style="font-size:11.5px;color:var(--text-muted);">Stock actuel : <strong style="color:var(--text);">{{ medicament.stock_actuel }}</strong></div>
+    </div>
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+    <div class="frm-card">
+      <div class="frm-card-header"><i class="bi bi-arrow-down-up" style="color:var(--accent);margin-right:4px;"></i>Saisie du mouvement</div>
+
+      <div class="frm-field">
+        <label class="frm-label">Type de mouvement *</label>
+        <select class="frm-select" name="type_mouvement">
+          {% for val, label in form.fields.type_mouvement.choices %}
+          <option value="{{ val }}" {% if form.type_mouvement.value == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        {{ form.type_mouvement.errors }}
+      </div>
+
+      <div class="frm-field">
+        <label class="frm-label">Motif *</label>
+        <select class="frm-select" name="motif">
+          {% for val, label in form.fields.motif.choices %}
+          <option value="{{ val }}" {% if form.motif.value == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        {{ form.motif.errors }}
+      </div>
+
+      <div class="frm-field">
+        <label class="frm-label">Quantité *</label>
+        <input class="frm-input" type="number" name="quantite" min="1"
+          value="{{ form.quantite.value|default:'' }}" placeholder="Nombre d'unités">
+        {{ form.quantite.errors }}
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Pour "Ajustement" : saisir la nouvelle quantité totale en stock.</div>
+      </div>
+
+      {% if form.fields.lot.queryset %}
+      <div class="frm-field">
+        <label class="frm-label">Lot concerné</label>
+        <select class="frm-select" name="lot">
+          <option value="">— Aucun lot spécifique —</option>
+          {% for lot in form.fields.lot.queryset %}
+          <option value="{{ lot.pk }}" {% if form.lot.value|stringformat:'s' == lot.pk|stringformat:'s' %}selected{% endif %}>
+            {{ lot.numero_lot }} (péremption : {{ lot.date_peremption|date:"d/m/Y" }})
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+
+      <div class="frm-field">
+        <label class="frm-label">Référence (optionnel)</label>
+        <input class="frm-input" type="text" name="reference"
+          value="{{ form.reference.value|default:'' }}" placeholder="N° bon de commande, facture…">
+      </div>
+
+      <div class="frm-field" style="border-bottom:none;">
+        <label class="frm-label">Notes</label>
+        <textarea class="frm-textarea" name="notes">{{ form.notes.value|default:'' }}</textarea>
+      </div>
+    </div>
+
+    <div class="frm-actions">
+      <button type="submit" class="frm-btn-save">
+        <i class="bi bi-check-lg"></i> Enregistrer le mouvement
+      </button>
+      <a href="{% url 'medicament:detail' medicament.pk %}" class="frm-btn-cancel">Annuler</a>
+    </div>
+  </form>
+
+</div><!-- /.frm-page -->
+</div><!-- /#page-wrap -->
+{% endblock %}

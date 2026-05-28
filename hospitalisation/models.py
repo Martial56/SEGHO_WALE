@@ -38,9 +38,8 @@ class Hospitalisation(models.Model):
     def save(self, *args, **kwargs):
         if not self.numero:
             from django.utils import timezone
-            annee = timezone.now().year
-            count = Hospitalisation.objects.filter(date_admission__year=annee).count() + 1
-            self.numero = f"HOSP{annee}{count:05d}"
+            count = Hospitalisation.objects.count() + 1
+            self.numero = f"HOSP{count:05d}"
         super().save(*args, **kwargs)
 
     @property

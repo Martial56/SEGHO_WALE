@@ -48,9 +48,8 @@ class TransactionCaisse(models.Model):
     def save(self, *args, **kwargs):
         if not self.numero:
             from django.utils import timezone
-            annee = timezone.now().year
-            count = TransactionCaisse.objects.filter(date_transaction__year=annee).count() + 1
-            self.numero = f"TRS{annee}{count:07d}"
+            count = TransactionCaisse.objects.count() + 1
+            self.numero = f"TRS{count:07d}"
         super().save(*args, **kwargs)
 
     def __str__(self): return f"{self.numero} - {self.montant} F"

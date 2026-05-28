@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils import timezone
 
 
 class Acte(models.Model):
@@ -14,7 +15,7 @@ class Acte(models.Model):
 
 
 class Facture(models.Model):
-    STATUT = [('brouillon','Brouillon'),('emise','Émise'),('payee','Payée'),('partielle','Partielle'),('annulee','Annulée')]
+    STATUT = [('brouillon','Brouillon'),('emise','Émise'),('payee','Payée'),('partielle','Partielle'),('annulee','Annulée'),('comptabilisee','Comptabilisée')]
     TYPE = [('consultation','Consultation'),('hospitalisation','Hospitalisation'),('pharmacie','Pharmacie'),('laboratoire','Laboratoire'),('imagerie','Imagerie'),('autre','Autre')]
 
     numero = models.CharField(max_length=20, unique=True, editable=False)
@@ -34,9 +35,8 @@ class Facture(models.Model):
     def save(self, *args, **kwargs):
         if not self.numero:
             from django.utils import timezone
-            annee = timezone.now().year
-            count = Facture.objects.filter(date_emission__year=annee).count() + 1
-            self.numero = f"FAC{annee}{count:06d}"
+            count = Facture.objects.count() + 1
+            self.numero = f"FAC{count:06d}"
         super().save(*args, **kwargs)
 
     @property
@@ -52,7 +52,7 @@ class Facture(models.Model):
 class LigneFacture(models.Model):
     facture = models.ForeignKey(Facture, on_delete=models.CASCADE, related_name='lignes')
     acte = models.ForeignKey(Acte, on_delete=models.SET_NULL, null=True, blank=True)
-    medicament = models.ForeignKey('pharmacie.Medicament', on_delete=models.SET_NULL, null=True, blank=True)
+    medicament = models.ForeignKey('medicament.Medicament', on_delete=models.SET_NULL, null=True, blank=True)
     libelle = models.CharField(max_length=300)
     quantite = models.DecimalField(max_digits=10, decimal_places=2, default=1)
     prix_unitaire = models.DecimalField(max_digits=12, decimal_places=2)
@@ -65,22 +65,30 @@ class LigneFacture(models.Model):
 
 class Paiement(models.Model):
     MODE = [('especes','Espèces'),('cheque','Chèque'),('mobile_money','Mobile Money'),('virement','Virement'),('assurance','Assurance'),('bon','Bon')]
+    JOURNAL = [
+        ('caisse_accueil', 'Caisse Accueil'),
+        ('caisse_soins',   'Caisse Soins'),
+        ('banque',         'Banque'),
+        ('mobile_money',   'Mobile Money'),
+        ('assurance',      'Assurance'),
+    ]
 
     numero = models.CharField(max_length=20, unique=True, editable=False)
     facture = models.ForeignKey(Facture, on_delete=models.CASCADE, related_name='paiements')
     montant = models.DecimalField(max_digits=15, decimal_places=2)
-    mode_paiement = models.CharField(max_length=20, choices=MODE)
-    reference = models.CharField(max_length=100, blank=True)
-    date_paiement = models.DateTimeField(auto_now_add=True)
+    mode_paiement = models.CharField(max_length=20, choices=MODE, default='especes')
+    journal = models.CharField(max_length=30, choices=JOURNAL, default='caisse_accueil', verbose_name="Journal")
+    compte_bancaire = models.CharField(max_length=200, blank=True, verbose_name="Compte bancaire du bénéficiaire")
+    reference = models.CharField(max_length=200, blank=True, verbose_name="Mémo")
+    date_paiement = models.DateTimeField(default=timezone.now)
     recu_par = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     notes = models.TextField(blank=True)
 
     def save(self, *args, **kwargs):
         if not self.numero:
             from django.utils import timezone
-            annee = timezone.now().year
-            count = Paiement.objects.filter(date_paiement__year=annee).count() + 1
-            self.numero = f"PAI{annee}{count:07d}"
+            count = Paiement.objects.count() + 1
+            self.numero = f"PAI{count:07d}"
         super().save(*args, **kwargs)
 
     def __str__(self): return f"Paiement {self.numero} - {self.montant} F"

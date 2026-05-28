@@ -40,7 +40,7 @@ class LigneGroupeMedicaments(models.Model):
         verbose_name="Groupe"
     )
     medicament = models.ForeignKey(
-        'pharmacie.Medicament', on_delete=models.SET_NULL, null=True, blank=True,
+        'medicament.Medicament', on_delete=models.SET_NULL, null=True, blank=True,
         verbose_name="Nom du médicament"
     )
     medicament_libre = models.CharField(max_length=200, blank=True, verbose_name="Médicament (libre)")
@@ -122,9 +122,8 @@ class Ordonnance(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.numero:
-            annee = timezone.now().year
-            count = Ordonnance.objects.filter(date_ordonnance__year=annee).count() + 1
-            self.numero = f"ORD{annee}{count:04d}"
+            count = Ordonnance.objects.count() + 1
+            self.numero = f"ORD{count:04d}"
         super().save(*args, **kwargs)
 
     def __str__(self): return f"Ordonnance {self.numero}"
@@ -136,7 +135,7 @@ class Ordonnance(models.Model):
 class LigneOrdonnance(models.Model):
     ordonnance = models.ForeignKey(Ordonnance, on_delete=models.CASCADE, related_name='lignes')
     medicament = models.ForeignKey(
-        'pharmacie.Medicament', on_delete=models.SET_NULL, null=True, blank=True,
+        'medicament.Medicament', on_delete=models.SET_NULL, null=True, blank=True,
         verbose_name="Nom du médicament"
     )
     medicament_libre = models.CharField(max_length=200, blank=True, verbose_name="Médicament (saisie libre)")

@@ -17,6 +17,7 @@ INSTALLED_APPS = [
     'soins',
     'ordonnances',
     'pharmacie',
+    'medicament',
     'laboratoire',
     'hospitalisation',
     'facturation',

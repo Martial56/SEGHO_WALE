@@ -1,3 +1,2 @@
-from django.shortcuts import render
-
-# Create your views here.
+# Pharmacie = gestion du stock (fournisseurs, lots, mouvements, commandes)
+# Le catalogue médicaments est géré par l'app 'medicament'
