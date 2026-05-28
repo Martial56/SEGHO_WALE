@@ -1,0 +1,369 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block topbar_title %}Nouvelle ordonnance{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
+<style>
+:root {
+  --co-900:#1b2e13; --co-800:#2a4219; --co-700:#3a5924;
+  --co-600:#4a6741; --co-500:#5e8050; --co-400:#7a9b68;
+  --co-300:#9ab88a; --co-200:#bcd5a8; --co-100:#d8eac4; --co-50:#eef5e4;
+  --co-surface:#fff; --co-border:rgba(58,89,36,.14);
+  --co-text:#1b2e13; --co-muted:rgba(0,0,0,.45);
+}
+html[data-theme="dark"] {
+  --co-50:#0a1610; --co-100:#0d1f12; --co-surface:#070e05;
+  --co-border:rgba(154,184,138,.18); --co-text:#bcd5a8; --co-muted:rgba(255,255,255,.4);
+}
+
+.co-page-head {
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  padding:14px 32px; margin:0 -32px; flex-wrap:wrap;
+  position:sticky; top:var(--topbar-h); z-index:100;
+  background:#f2f7ee; border-bottom:1px solid rgba(0,0,0,.05);
+  box-shadow:0 2px 8px rgba(0,0,0,.04);
+}
+html[data-theme="dark"] .co-page-head { background:#070e05; }
+
+.co-card { background:var(--co-surface); border-radius:12px; box-shadow:0 2px 12px rgba(58,89,36,.08); overflow:hidden; margin-bottom:20px; }
+.co-card-header { padding:14px 20px 12px; border-bottom:1px solid var(--co-border); display:flex; align-items:center; gap:10px; }
+.co-card-title { font-size:13.5px; font-weight:700; color:var(--co-text); display:flex; align-items:center; gap:8px; border-left:3px solid var(--co-600); padding-left:10px; }
+.co-card-body { padding:20px; }
+
+.form-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.form-grid.cols3 { grid-template-columns:1fr 1fr 1fr; }
+@media(max-width:700px){ .form-grid,.form-grid.cols3 { grid-template-columns:1fr; } }
+.form-full { grid-column:1/-1; }
+
+.form-label { font-size:11px; font-weight:700; color:var(--co-muted); text-transform:uppercase; letter-spacing:.4px; margin-bottom:5px; display:block; }
+.form-input {
+  width:100%; border:none; border-bottom:1.5px solid rgba(0,0,0,.18);
+  border-radius:0; background:transparent; padding:8px 4px;
+  font-size:13px; color:var(--co-text); font-family:inherit;
+  transition:border-color .15s;
+}
+.form-input:focus { outline:none; border-bottom-color:var(--co-500); box-shadow:none; }
+html[data-theme="dark"] .form-input { background:transparent; border-bottom-color:rgba(255,255,255,.15); color:var(--co-text); }
+
+.patient-banner {
+  background:var(--co-50); border:1px solid var(--co-border); border-radius:10px;
+  padding:14px 18px; display:flex; align-items:center; gap:14px; margin-bottom:20px;
+}
+.patient-avatar {
+  width:40px; height:40px; border-radius:50%;
+  background:linear-gradient(135deg,var(--co-600),var(--co-400));
+  display:flex; align-items:center; justify-content:center;
+  color:#fff; font-weight:800; font-size:15px; flex-shrink:0;
+}
+.patient-name { font-size:15px; font-weight:800; color:var(--co-900); }
+.patient-meta { font-size:12px; color:var(--co-muted); margin-top:2px; }
+
+/* Lignes médicaments */
+.lignes-table { width:100%; border-collapse:collapse; }
+.lignes-table th {
+  background:var(--co-100); color:var(--co-800);
+  border-bottom:2px solid var(--co-300);
+  padding:9px 10px; font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; text-align:left;
+}
+.lignes-table td { padding:6px 6px; border-bottom:1px solid var(--co-border); vertical-align:top; }
+.lignes-table tbody tr:last-child td { border-bottom:none; }
+
+.btn-co { background:var(--co-600); color:#fff; border:none; border-radius:7px; padding:9px 20px; font-size:13px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px; text-decoration:none; transition:background .15s; }
+.btn-co:hover { background:var(--co-700); color:#fff; }
+.btn-co-outline { border:1.5px solid var(--co-600); color:var(--co-600); background:transparent; border-radius:7px; padding:8px 16px; font-size:13px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px; text-decoration:none; transition:background .15s,color .15s; }
+.btn-co-outline:hover { background:var(--co-600); color:#fff; }
+.btn-danger { background:transparent; border:1.5px solid #e84545; color:#e84545; border-radius:6px; padding:5px 9px; cursor:pointer; font-size:13px; transition:background .15s; }
+.btn-danger:hover { background:#e84545; color:#fff; }
+.btn-add { background:var(--co-50); border:1.5px dashed var(--co-400); color:var(--co-600); border-radius:7px; padding:8px 16px; font-size:13px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px; transition:background .15s; width:100%; justify-content:center; margin-top:10px; }
+.btn-add:hover { background:var(--co-100); }
+
+/* Autocomplete */
+.ac-wrap { position:relative; }
+.ac-input-row { display:flex; gap:6px; align-items:center; }
+.ac-selected { display:flex; align-items:center; gap:6px; background:var(--co-50); border:1px solid var(--co-border); border-radius:6px; padding:5px 10px; font-size:12.5px; font-weight:600; color:var(--co-700); }
+.ac-selected .ac-clear { background:none; border:none; cursor:pointer; color:var(--co-muted); font-size:14px; line-height:1; padding:0 2px; }
+.ac-selected .ac-clear:hover { color:#e84545; }
+.ac-dropdown {
+  position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:300;
+  background:var(--co-surface); border:1px solid var(--co-border); border-radius:8px;
+  box-shadow:0 4px 20px rgba(0,0,0,.12); max-height:220px; overflow-y:auto; display:none;
+}
+.ac-dropdown.open { display:block; }
+.ac-item { padding:9px 12px; cursor:pointer; border-bottom:1px solid var(--co-border); display:flex; justify-content:space-between; align-items:center; gap:8px; }
+.ac-item:last-child { border-bottom:none; }
+.ac-item:hover,.ac-item.focused { background:var(--co-50); }
+.ac-item-name { font-size:13px; font-weight:600; color:var(--co-text); }
+.ac-item-meta { font-size:11px; color:var(--co-muted); text-align:right; }
+.ac-item-stock-ok   { color:#0d7a4c; font-weight:700; }
+.ac-item-stock-warn { color:#e89a1a; font-weight:700; }
+.ac-item-stock-none { color:#e84545; font-weight:700; }
+.ac-loading { padding:10px 12px; font-size:12px; color:var(--co-muted); text-align:center; }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav style="background:var(--co-surface,#fff);border-bottom:1px solid rgba(0,0,0,.07);margin:-32px -32px 0;padding:0 32px;display:flex;align-items:stretch;height:44px;position:sticky;top:var(--topbar-h);z-index:250;gap:2px;">
+  <a href="{% url 'ordonnance_list' %}" style="padding:11px 16px;font-size:13px;font-weight:500;color:rgba(0,0,0,.45);text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
+    <i class="bi bi-prescription2"></i> Ordonnances
+  </a>
+  <span style="padding:11px 16px;font-size:13px;font-weight:600;color:var(--co-600);border-bottom:2px solid var(--co-500);display:inline-flex;align-items:center;gap:6px;margin-bottom:-1px;">
+    Nouvelle ordonnance
+  </span>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="co-page-head">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <a href="{% url 'ordonnance_list' %}" class="btn-co-outline" style="padding:6px 12px;"><i class="bi bi-arrow-left"></i></a>
+    <div>
+      <div style="font-size:16px;font-weight:800;color:var(--co-900);">Nouvelle ordonnance</div>
+      <div style="font-size:12px;color:var(--co-muted);">Consultation {{ consultation.numero }}</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <a href="{% url 'ordonnance_list' %}" class="btn-co-outline">Annuler</a>
+    <button type="submit" form="form-ordonnance" class="btn-co"><i class="bi bi-check-lg"></i> Enregistrer</button>
+  </div>
+</div>
+
+<div class="patient-banner" style="margin-top:24px;">
+  <div class="patient-avatar">{{ consultation.patient.nom|first|upper }}</div>
+  <div>
+    <div class="patient-name">{{ consultation.patient.nom }} {{ consultation.patient.prenoms }}</div>
+    <div class="patient-meta">
+      Consultation {{ consultation.numero }} &mdash; {{ consultation.date_heure|date:"d/m/Y H:i" }}
+      {% if consultation.medecin %} &mdash; Dr {{ consultation.medecin }}{% endif %}
+    </div>
+  </div>
+</div>
+
+<form id="form-ordonnance" method="post">
+{% csrf_token %}
+
+<div class="co-card">
+  <div class="co-card-header">
+    <div class="co-card-title"><i class="bi bi-prescription2" style="color:var(--co-600);"></i> Informations de l'ordonnance</div>
+  </div>
+  <div class="co-card-body">
+    <div class="form-grid cols3">
+      <div>
+        <label class="form-label">Type <span style="color:#e84545;">*</span></label>
+        <select name="type_ordonnance" class="form-input" required>
+          <option value="interne">Interne (centre)</option>
+          <option value="externe">Externe (pharmacie)</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Date d'expiration</label>
+        <input type="date" name="date_expiration" class="form-input">
+      </div>
+      <div><!-- spacer --></div>
+      <div class="form-full">
+        <label class="form-label">Notes</label>
+        <textarea name="notes" class="form-input" rows="2" placeholder="Remarques ou instructions particulieres..."></textarea>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="co-card">
+  <div class="co-card-header">
+    <div class="co-card-title"><i class="bi bi-capsule-pill" style="color:var(--co-600);"></i> Medicaments prescrits</div>
+    <span id="ligne-count" style="font-size:12px;color:var(--co-muted);">0 ligne</span>
+  </div>
+  <div class="co-card-body" style="padding:0;">
+    <div style="overflow-x:auto;">
+      <table class="lignes-table">
+        <thead>
+          <tr>
+            <th style="width:32px;text-align:center;">#</th>
+            <th style="min-width:220px;">Medicament</th>
+            <th style="min-width:160px;">Posologie <span style="color:#e84545;">*</span></th>
+            <th style="min-width:100px;">Duree</th>
+            <th style="width:80px;text-align:center;">Qte <span style="color:#e84545;">*</span></th>
+            <th style="min-width:130px;">Notes</th>
+            <th style="width:40px;"></th>
+          </tr>
+        </thead>
+        <tbody id="lignes-body">
+          <!-- lignes injectees par JS -->
+        </tbody>
+      </table>
+    </div>
+    <div style="padding:12px 20px;">
+      <button type="button" class="btn-add" onclick="ajouterLigne()">
+        <i class="bi bi-plus-circle"></i> Ajouter un medicament
+      </button>
+    </div>
+  </div>
+</div>
+
+<div style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:32px;">
+  <a href="{% url 'ordonnance_list' %}" class="btn-co-outline">Annuler</a>
+  <button type="submit" form="form-ordonnance" class="btn-co"><i class="bi bi-check-lg"></i> Enregistrer l'ordonnance</button>
+</div>
+
+</form>
+
+<script>
+const SEARCH_URL = "{% url 'medicament_search' %}";
+let ligneIndex = 0;
+
+function updateCount() {
+  const n = document.querySelectorAll('#lignes-body tr').length;
+  document.getElementById('ligne-count').textContent = n + ' ligne' + (n > 1 ? 's' : '');
+}
+
+function ajouterLigne() {
+  const idx = ligneIndex++;
+  const tr = document.createElement('tr');
+  tr.id = 'ligne-' + idx;
+  tr.innerHTML = `
+    <td style="text-align:center;font-size:11px;color:var(--co-muted);font-weight:700;padding-top:14px;">${document.querySelectorAll('#lignes-body tr').length + 1}</td>
+    <td>
+      <div class="ac-wrap" id="ac-wrap-${idx}">
+        <input type="hidden" name="medicament_id[]" id="ac-id-${idx}" value="">
+        <input type="hidden" name="medicament_libre[]" id="ac-libre-${idx}" value="">
+        <div class="ac-input-row">
+          <input type="text" class="form-input ac-search" id="ac-search-${idx}"
+                 placeholder="Rechercher..." autocomplete="off"
+                 oninput="onSearch(${idx}, this.value)"
+                 onkeydown="onKey(event, ${idx})">
+        </div>
+        <div class="ac-selected" id="ac-sel-${idx}" style="display:none;">
+          <span id="ac-sel-name-${idx}"></span>
+          <button type="button" class="ac-clear" onclick="clearSel(${idx})" title="Effacer">&#x2715;</button>
+        </div>
+        <div class="ac-dropdown" id="ac-drop-${idx}"></div>
+      </div>
+    </td>
+    <td><input type="text" name="posologie[]" class="form-input" placeholder="Ex: 1cp matin et soir" required></td>
+    <td><input type="text" name="duree[]" class="form-input" placeholder="Ex: 7 jours"></td>
+    <td><input type="number" name="quantite[]" class="form-input" value="1" min="1" style="text-align:center;" required></td>
+    <td><input type="text" name="notes_ligne[]" class="form-input" placeholder="Remarques..."></td>
+    <td><button type="button" class="btn-danger" onclick="supprimerLigne(${idx})" title="Supprimer"><i class="bi bi-trash3"></i></button></td>
+  `;
+  document.getElementById('lignes-body').appendChild(tr);
+  updateCount();
+  document.getElementById('ac-search-' + idx).focus();
+}
+
+function supprimerLigne(idx) {
+  const row = document.getElementById('ligne-' + idx);
+  if (row) row.remove();
+  updateNums();
+  updateCount();
+}
+
+function updateNums() {
+  document.querySelectorAll('#lignes-body tr').forEach((tr, i) => {
+    const numCell = tr.querySelector('td:first-child');
+    if (numCell) numCell.textContent = i + 1;
+  });
+}
+
+// ── Autocomplete ─────────────────────────────────────
+let timers = {};
+let dropFocused = {};
+
+function onSearch(idx, val) {
+  clearTimeout(timers[idx]);
+  document.getElementById('ac-id-' + idx).value = '';
+  document.getElementById('ac-libre-' + idx).value = val;
+  if (val.length < 2) { closeDropdown(idx); return; }
+  const drop = document.getElementById('ac-drop-' + idx);
+  drop.innerHTML = '<div class="ac-loading"><i class="bi bi-hourglass-split"></i> Recherche...</div>';
+  drop.classList.add('open');
+  timers[idx] = setTimeout(() => fetchMeds(idx, val), 280);
+}
+
+function fetchMeds(idx, q) {
+  fetch(SEARCH_URL + '?q=' + encodeURIComponent(q))
+    .then(r => r.json())
+    .then(data => renderDrop(idx, data.results, q))
+    .catch(() => closeDropdown(idx));
+}
+
+function renderDrop(idx, results, q) {
+  const drop = document.getElementById('ac-drop-' + idx);
+  if (!results.length) {
+    drop.innerHTML = '<div class="ac-loading" style="color:var(--co-muted);">Aucun medicament trouve — sera saisie en texte libre</div>';
+    drop.classList.add('open');
+    return;
+  }
+  const hl = (txt) => txt.replace(new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + ')', 'gi'), '<mark style="background:rgba(94,128,80,.2);border-radius:2px;">$1</mark>');
+  drop.innerHTML = results.map((m, i) => {
+    const stockClass = m.stock > 10 ? 'ac-item-stock-ok' : m.stock > 0 ? 'ac-item-stock-warn' : 'ac-item-stock-none';
+    return `<div class="ac-item" data-id="${m.id}" data-name="${m.designation}" tabindex="-1"
+                 onclick="selectMed(${idx}, ${m.id}, '${m.designation.replace(/'/g,"\\'")}')">
+      <div>
+        <div class="ac-item-name">${hl(m.designation)}</div>
+        <div class="ac-item-meta">${m.forme}${m.dosage ? ' &mdash; ' + m.dosage : ''}</div>
+      </div>
+      <div class="ac-item-meta ${stockClass}">Stock: ${m.stock}</div>
+    </div>`;
+  }).join('');
+  drop.classList.add('open');
+}
+
+function selectMed(idx, id, name) {
+  document.getElementById('ac-id-' + idx).value = id;
+  document.getElementById('ac-libre-' + idx).value = '';
+  document.getElementById('ac-search-' + idx).style.display = 'none';
+  const selDiv = document.getElementById('ac-sel-' + idx);
+  document.getElementById('ac-sel-name-' + idx).textContent = name;
+  selDiv.style.display = 'flex';
+  closeDropdown(idx);
+}
+
+function clearSel(idx) {
+  document.getElementById('ac-id-' + idx).value = '';
+  document.getElementById('ac-libre-' + idx).value = '';
+  const inp = document.getElementById('ac-search-' + idx);
+  inp.style.display = '';
+  inp.value = '';
+  document.getElementById('ac-sel-' + idx).style.display = 'none';
+  inp.focus();
+}
+
+function closeDropdown(idx) {
+  const drop = document.getElementById('ac-drop-' + idx);
+  if (drop) drop.classList.remove('open');
+}
+
+function onKey(e, idx) {
+  const drop = document.getElementById('ac-drop-' + idx);
+  const items = drop.querySelectorAll('.ac-item');
+  const focused = drop.querySelector('.ac-item.focused');
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (!focused) { items[0] && items[0].classList.add('focused'); }
+    else { focused.classList.remove('focused'); const nx = focused.nextElementSibling; if (nx) nx.classList.add('focused'); }
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (focused) { focused.classList.remove('focused'); const pv = focused.previousElementSibling; if (pv) pv.classList.add('focused'); }
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (focused) focused.click();
+  } else if (e.key === 'Escape') {
+    closeDropdown(idx);
+  }
+}
+
+// Fermer les dropdowns au clic en dehors
+document.addEventListener('click', (e) => {
+  document.querySelectorAll('.ac-wrap').forEach(wrap => {
+    if (!wrap.contains(e.target)) {
+      const drop = wrap.querySelector('.ac-dropdown');
+      if (drop) drop.classList.remove('open');
+    }
+  });
+});
+
+// Ajouter une première ligne au chargement
+ajouterLigne();
+</script>
+{% endblock %}

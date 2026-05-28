@@ -1,82 +1,384 @@
 {% extends 'medecins/base.html' %}
+{% load static %}
+
+{% block topbar_title %}Médecins{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
+<style>
+:root {
+  --md-900:#1b2e13; --md-800:#2a4219; --md-700:#3a5924;
+  --md-600:#4a6741; --md-500:#5e8050; --md-400:#7a9b68;
+  --md-300:#9ab88a; --md-200:#bcd5a8; --md-100:#d8eac4; --md-50:#eef5e4;
+  --md-surface:#fff; --md-border:rgba(58,89,36,.13);
+  --md-text:#1b2e13; --md-muted:rgba(0,0,0,.45);
+}
+html[data-theme="dark"] {
+  --md-50:#0a1610; --md-100:#0d1f12; --md-surface:#070e05;
+  --md-border:rgba(154,184,138,.18); --md-text:#bcd5a8; --md-muted:rgba(255,255,255,.4);
+}
+
+/* ── Barre en-tête ── */
+.md-head {
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  padding:14px 32px; margin:0 -32px; flex-wrap:wrap;
+  background:#f2f7ee; border-bottom:1px solid rgba(0,0,0,.05);
+  box-shadow:0 2px 8px rgba(0,0,0,.04);
+  position:sticky; top:calc(var(--topbar-h) + 44px); z-index:100;
+}
+html[data-theme="dark"] .md-head { background:#070e05; }
+
+/* ── Stats ── */
+.md-stats { display:flex; gap:10px; flex-wrap:wrap; margin-top:16px; }
+.md-stat {
+  background:var(--md-surface); border:1px solid var(--md-border);
+  border-radius:8px; padding:8px 18px; min-width:100px;
+  box-shadow:0 1px 4px rgba(58,89,36,.06); display:flex; align-items:center; gap:10px;
+}
+.md-stat-val { font-size:20px; font-weight:800; color:var(--md-700); line-height:1; }
+.md-stat-lbl { font-size:10.5px; color:var(--md-muted); text-transform:uppercase; letter-spacing:.3px; }
+
+/* ── Filtres ── */
+.md-filters {
+  display:flex; gap:8px; flex-wrap:wrap; align-items:center;
+  background:var(--md-surface); border:1px solid var(--md-border);
+  border-radius:10px; padding:8px 14px; margin-top:14px;
+  box-shadow:0 1px 4px rgba(58,89,36,.05);
+}
+.md-filters input, .md-filters select {
+  border:none; border-bottom:1.5px solid rgba(0,0,0,.18);
+  border-radius:0; background:transparent;
+  padding:5px 4px; font-size:12.5px; color:var(--md-text); font-family:inherit;
+}
+.md-filters input:focus, .md-filters select:focus { outline:none; border-bottom-color:var(--md-500); }
+.md-search { flex:1; min-width:180px; }
+
+/* ── Boutons ── */
+.btn-md { background:var(--md-600); color:#fff; border:none; border-radius:6px; padding:7px 16px; font-size:12.5px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:5px; text-decoration:none; transition:background .15s; }
+.btn-md:hover { background:var(--md-700); color:#fff; }
+.btn-md-outline { border:1.5px solid var(--md-600); color:var(--md-600); background:transparent; border-radius:6px; padding:6px 14px; font-size:12.5px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:5px; text-decoration:none; transition:background .15s,color .15s; }
+.btn-md-outline:hover { background:var(--md-600); color:#fff; }
+
+/* ── Toggle vue ── */
+.view-toggle { display:flex; gap:4px; }
+.view-btn {
+  width:32px; height:32px; border:1.5px solid var(--md-border); border-radius:6px;
+  background:var(--md-surface); color:var(--md-muted); cursor:pointer;
+  display:flex; align-items:center; justify-content:center; font-size:15px;
+  transition:background .15s,color .15s,border-color .15s;
+}
+.view-btn.active, .view-btn:hover { background:var(--md-600); color:#fff; border-color:var(--md-600); }
+
+/* ── Vue tableau ── */
+.md-table-wrap { margin-top:14px; border-radius:10px; overflow:hidden; box-shadow:0 2px 12px rgba(58,89,36,.08); }
+.md-table { width:100%; border-collapse:collapse; background:var(--md-surface); font-size:12.5px; }
+.md-table thead tr { background:var(--md-100); color:var(--md-800); border-bottom:2px solid var(--md-300); }
+.md-table thead th { padding:8px 12px; font-weight:700; font-size:10.5px; text-transform:uppercase; letter-spacing:.4px; text-align:left; white-space:nowrap; }
+.md-table tbody tr { border-bottom:1px solid var(--md-border); transition:background .12s; }
+.md-table tbody tr:nth-child(even) { background:var(--md-50); }
+.md-table tbody tr:hover { background:rgba(58,89,36,.05); }
+.md-table tbody td { padding:6px 12px; color:var(--md-text); vertical-align:middle; }
+html[data-theme="dark"] .md-table thead tr { background:var(--md-800); color:var(--md-200); border-bottom-color:var(--md-700); }
+html[data-theme="dark"] .md-table tbody tr:nth-child(even) { background:var(--md-100); }
+
+/* ── Avatar tableau ── */
+.md-avatar {
+  width:30px; height:30px; border-radius:50%; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  font-size:11px; font-weight:800; color:#fff;
+}
+
+/* ── Vue Kanban ── */
+.kb-board {
+  display:flex; gap:16px; margin-top:16px;
+  overflow-x:auto; padding-bottom:16px;
+  align-items:flex-start;
+}
+.kb-board::-webkit-scrollbar { height:6px; }
+.kb-board::-webkit-scrollbar-track { background:transparent; }
+.kb-board::-webkit-scrollbar-thumb { background:var(--md-300); border-radius:3px; }
+
+.kb-col {
+  flex:0 0 220px; min-width:220px;
+  background:var(--md-50); border:1px solid var(--md-border);
+  border-radius:12px; overflow:hidden;
+}
+html[data-theme="dark"] .kb-col { background:var(--md-100); }
+
+.kb-col-head {
+  padding:10px 14px; background:var(--md-100);
+  border-bottom:2px solid var(--md-300);
+  display:flex; align-items:center; justify-content:space-between;
+}
+html[data-theme="dark"] .kb-col-head { background:var(--md-800); border-bottom-color:var(--md-700); }
+.kb-col-title { font-size:12px; font-weight:700; color:var(--md-800); text-transform:uppercase; letter-spacing:.4px; }
+html[data-theme="dark"] .kb-col-title { color:var(--md-200); }
+.kb-col-count {
+  font-size:11px; font-weight:700; color:var(--md-600);
+  background:rgba(58,89,36,.12); border-radius:20px; padding:1px 8px;
+}
+
+.kb-cards { padding:10px; display:flex; flex-direction:column; gap:8px; }
+
+.kb-card {
+  background:var(--md-surface); border:1px solid var(--md-border);
+  border-radius:10px; overflow:hidden;
+  box-shadow:0 1px 4px rgba(58,89,36,.07);
+  transition:box-shadow .15s, transform .12s;
+}
+.kb-card:hover { box-shadow:0 4px 14px rgba(58,89,36,.14); transform:translateY(-1px); }
+
+.kb-card-top { display:flex; align-items:center; gap:10px; padding:10px 12px; }
+.kb-avatar {
+  width:40px; height:40px; border-radius:50%; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  font-size:14px; font-weight:800; color:#fff; overflow:hidden;
+  background:#4a6741;
+}
+.kb-avatar.av-c1{background:#4a6741;}
+.kb-avatar.av-c2{background:#2a4219;}
+.kb-avatar.av-c3{background:#5e8050;}
+.kb-avatar.av-c4{background:#3a5924;}
+.kb-avatar.av-c5{background:#7a9b68;}
+.kb-avatar img { width:100%; height:100%; object-fit:cover; }
+
+.kb-card-name { font-size:12.5px; font-weight:700; color:var(--md-text); line-height:1.3; }
+.kb-card-mat  { font-size:10px; font-family:monospace; color:var(--md-muted); }
+
+.kb-card-foot {
+  padding:6px 12px; border-top:1px solid var(--md-border);
+  display:flex; align-items:center; justify-content:space-between;
+}
+
+.kb-empty {
+  text-align:center; padding:40px 20px; color:var(--md-muted);
+  font-style:italic; font-size:12px;
+}
+
+/* ── Badges ── */
+.badge-spec { background:rgba(58,89,36,.1); color:var(--md-700); border:1px solid rgba(58,89,36,.2); padding:2px 8px; border-radius:20px; font-size:10.5px; font-weight:600; white-space:nowrap; }
+.badge-actif   { background:rgba(22,169,107,.1); color:#0d7a4c; border:1px solid rgba(22,169,107,.25); padding:2px 8px; border-radius:20px; font-size:10.5px; font-weight:600; }
+.badge-inactif { background:rgba(0,0,0,.06); color:rgba(0,0,0,.45); border:1px solid rgba(0,0,0,.12); padding:2px 8px; border-radius:20px; font-size:10.5px; font-weight:600; }
+
+/* ── Couleurs avatar ── */
+.av-c1{background:#4a6741;} .av-c2{background:#2a4219;} .av-c3{background:#5e8050;} .av-c4{background:#3a5924;} .av-c5{background:#7a9b68;}
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav style="background:var(--md-surface,#fff);border-bottom:1px solid rgba(0,0,0,.07);margin:-32px -32px 0;padding:0 32px;display:flex;align-items:stretch;height:44px;position:sticky;top:var(--topbar-h);z-index:250;gap:2px;">
+  <span style="padding:11px 16px;font-size:13px;font-weight:600;color:var(--md-600);border-bottom:2px solid var(--md-500);display:inline-flex;align-items:center;gap:6px;margin-bottom:-1px;">
+    <i class="bi bi-person-badge"></i> Médecins
+  </span>
+</nav>
+{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <div class="page-header-left">
-        <h1>👨‍⚕️ Gestion des Médecins</h1>
-        <p>Liste du personnel médical et paramédical</p>
+<div class="md-head">
+  <div>
+    <div style="font-size:15px;font-weight:800;color:var(--md-900);">
+      <i class="bi bi-person-badge" style="color:var(--md-600);"></i> Médecins
     </div>
-    <div class="page-header-right">
-        <a href="/admin/medecins/medecin/add/" class="btn btn-primary">
-            <span>+</span> Nouveau médecin
-        </a>
+    <div style="font-size:11.5px;color:var(--md-muted);margin-top:1px;">
+      {{ stats.total }} médecin{% if stats.total > 1 %}s{% endif %} enregistré{% if stats.total > 1 %}s{% endif %}
     </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <div class="view-toggle">
+      <button class="view-btn active" id="btn-table" onclick="setView('table')" title="Vue tableau">
+        <i class="bi bi-table"></i>
+      </button>
+      <button class="view-btn" id="btn-kanban" onclick="setView('kanban')" title="Vue Kanban">
+        <i class="bi bi-kanban-fill"></i>
+      </button>
+    </div>
+    <a href="{% url 'medecin_create' %}" class="btn-md">
+      <i class="bi bi-plus-lg"></i> Nouveau médecin
+    </a>
+  </div>
 </div>
 
-<div style="display: flex; gap: 16px; margin-bottom: 24px;">
-    <input type="text" placeholder="Rechercher par nom ou spécialité..." style="flex: 1; padding: 10px 14px; border: 1px solid rgba(0,0,0,0.12); border-radius: 8px; font-size: 14px;">
-    <select style="padding: 10px 14px; border: 1px solid rgba(0,0,0,0.12); border-radius: 8px; font-size: 14px;">
-        <option>Toutes les spécialités</option>
-        <option>Généraliste</option>
-        <option>Cardiologue</option>
-        <option>Neurologue</option>
+<div class="md-stats">
+  <div class="md-stat">
+    <i class="bi bi-people-fill" style="font-size:18px;color:var(--md-400);"></i>
+    <div>
+      <div class="md-stat-val">{{ stats.total }}</div>
+      <div class="md-stat-lbl">Total</div>
+    </div>
+  </div>
+  <div class="md-stat">
+    <i class="bi bi-person-check-fill" style="font-size:18px;color:#16a96b;"></i>
+    <div>
+      <div class="md-stat-val" style="color:#0d7a4c;">{{ stats.actifs }}</div>
+      <div class="md-stat-lbl">Actifs</div>
+    </div>
+  </div>
+  <div class="md-stat">
+    <i class="bi bi-mortarboard-fill" style="font-size:18px;color:var(--md-500);"></i>
+    <div>
+      <div class="md-stat-val" style="color:var(--md-600);">{{ stats.specialites }}</div>
+      <div class="md-stat-lbl">Spécialités</div>
+    </div>
+  </div>
+</div>
+
+<form method="get" id="filter-form">
+  <div class="md-filters">
+    <input type="text" name="q" value="{{ q }}" placeholder="Rechercher nom, prénom, matricule…" class="md-search">
+    <select name="specialite">
+      <option value="">Toutes les spécialités</option>
+      {% for sp in specialites %}
+      <option value="{{ sp.pk }}" {% if specialite_filtre == sp.pk|stringformat:"s" %}selected{% endif %}>{{ sp.nom }}</option>
+      {% endfor %}
     </select>
-</div>
+    <select name="statut">
+      <option value="">Tous les statuts</option>
+      <option value="actif"   {% if statut_filtre == 'actif' %}selected{% endif %}>Actif</option>
+      <option value="inactif" {% if statut_filtre == 'inactif' %}selected{% endif %}>Inactif</option>
+    </select>
+    <input type="hidden" name="vue" id="vue-input" value="{{ vue_active }}">
+    <button type="submit" class="btn-md"><i class="bi bi-search"></i> Filtrer</button>
+    <a href="{% url 'medecins_list' %}" class="btn-md-outline">Réinitialiser</a>
+  </div>
+</form>
 
-<div class="grid">
-    <div class="card">
-        <p class="card-meta">Nombre de médecins</p>
-        <div class="card-stat">{{ stats.total }}</div>
-    </div>
-    <div class="card">
-        <p class="card-meta">Consultations ce mois</p>
-        <div class="card-stat">{{ stats.consultations_mois }}</div>
-    </div>
-    <div class="card">
-        <p class="card-meta">Médecins disponibles</p>
-        <div class="card-stat">{{ stats.disponibles }}</div>
-    </div>
-</div>
-
-<div class="table-container">
-    <table>
-        <thead>
-            <tr>
-                <th>Nom Complet</th>
-                <th>Spécialité</th>
-                <th>Service</th>
-                <th>Licence Médicale</th>
-                <th>Téléphone</th>
-                <th>Statut</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for medecin in page_obj %}
-            <tr>
-                <td>{{ medecin.nom }} {{ medecin.prenoms }}</td>
-                <td>{{ medecin.specialite }}</td>
-                <td>{{ medecin.service }}</td>
-                <td>{{ medecin.numero_ordre }}</td>
-                <td>{{ medecin.telephone }}</td>
-                <td>
-                    <span class="badge badge-success">Actif</span>
-                </td>
-                <td>
-                    <a href="/admin/medecins/medecin/{{ medecin.id }}/change/" class="btn btn-secondary btn-small">Voir</a>
-                    <a href="/admin/medecins/medecin/{{ medecin.id }}/change/" class="btn btn-primary btn-small">Modifier</a>
-                </td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="7" style="text-align: center; padding: 40px; color: rgba(0,0,0,0.4);">
-                    Aucun médecin enregistré
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
+<!-- ══ VUE TABLEAU ══ -->
+<div id="view-table">
+  <div class="md-table-wrap">
+    <table class="md-table">
+      <thead>
+        <tr>
+          <th style="width:46px;"></th>
+          <th>Médecin</th>
+          <th>Spécialité</th>
+          <th>Téléphone</th>
+          <th>Email</th>
+          <th>N° Ordre</th>
+          <th style="text-align:center;">Statut</th>
+          <th style="width:56px;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for med in page_obj %}
+        {% with c=forloop.counter %}
+        <tr>
+          <td>
+            {% if med.photo %}
+            <div class="md-avatar" style="overflow:hidden;">
+              <img src="{{ med.photo.url }}" alt="" style="width:100%;height:100%;object-fit:cover;">
+            </div>
+            {% else %}
+            <div class="md-avatar av-c{{ c|add:0|divisibleby:5|yesno:'5,' }}{% if c|divisibleby:4 %}av-c4{% elif c|divisibleby:3 %}av-c3{% elif c|divisibleby:2 %}av-c2{% else %}av-c1{% endif %}">
+              {{ med.nom|first|upper }}{{ med.prenoms|first|upper }}
+            </div>
+            {% endif %}
+          </td>
+          <td>
+            <div style="font-weight:700;color:var(--md-text);font-size:13px;line-height:1.3;">Dr {{ med.nom }} {{ med.prenoms }}</div>
+            <div style="font-size:10.5px;color:var(--md-muted);font-family:monospace;">{{ med.matricule }}</div>
+          </td>
+          <td>
+            {% if med.specialite %}<span class="badge-spec">{{ med.specialite }}</span>
+            {% else %}<span style="color:var(--md-muted);font-size:12px;">—</span>{% endif %}
+          </td>
+          <td style="font-size:12px;white-space:nowrap;">{{ med.telephone|default:"—" }}</td>
+          <td style="font-size:11.5px;color:var(--md-muted);">{{ med.email|default:"—" }}</td>
+          <td style="font-size:11.5px;font-family:monospace;color:var(--md-muted);">{{ med.ordre_medecin|default:"—" }}</td>
+          <td style="text-align:center;">
+            {% if med.actif %}<span class="badge-actif"><i class="bi bi-circle-fill" style="font-size:7px;"></i> Actif</span>
+            {% else %}<span class="badge-inactif">Inactif</span>{% endif %}
+          </td>
+          <td>
+            <a href="{% url 'medecin_edit' med.pk %}" class="btn-md-outline" style="padding:3px 10px;font-size:11.5px;" title="Modifier">
+              <i class="bi bi-pencil"></i>
+            </a>
+          </td>
+        </tr>
+        {% endwith %}
+        {% empty %}
+        <tr>
+          <td colspan="8" style="text-align:center;padding:40px;color:var(--md-muted);font-style:italic;">
+            Aucun médecin trouvé
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
     </table>
+  </div>
+</div>
+
+<!-- ══ VUE KANBAN ══ -->
+<div id="view-kanban" style="display:none;">
+  {% if kanban_colonnes %}
+  <div class="kb-board">
+    {% for col in kanban_colonnes %}
+    <div class="kb-col">
+      <div class="kb-col-head">
+        <span class="kb-col-title">{{ col.titre }}</span>
+        <span class="kb-col-count">{{ col.medecins|length }}</span>
+      </div>
+      <div class="kb-cards">
+        {% for med in col.medecins %}
+        {% with c=forloop.counter %}
+        <div class="kb-card">
+          <div class="kb-card-top">
+            <div class="kb-avatar {% if c|divisibleby:5 %}av-c5{% elif c|divisibleby:4 %}av-c4{% elif c|divisibleby:3 %}av-c3{% elif c|divisibleby:2 %}av-c2{% else %}av-c1{% endif %}">
+              {% if med.photo %}
+              <img src="{{ med.photo.url }}" alt="">
+              {% else %}
+              {{ med.nom|first|upper }}{{ med.prenoms|first|upper }}
+              {% endif %}
+            </div>
+            <div>
+              <div class="kb-card-name">Dr {{ med.nom }} {{ med.prenoms }}</div>
+              <div class="kb-card-mat">{{ med.matricule }}</div>
+            </div>
+          </div>
+          <div class="kb-card-foot">
+            {% if med.actif %}<span class="badge-actif"><i class="bi bi-circle-fill" style="font-size:7px;"></i> Actif</span>
+            {% else %}<span class="badge-inactif">Inactif</span>{% endif %}
+            <div style="display:flex;align-items:center;gap:6px;">
+              {% if med.telephone %}
+              <span style="font-size:11px;color:var(--md-muted);"><i class="bi bi-telephone"></i> {{ med.telephone }}</span>
+              {% endif %}
+              <a href="{% url 'medecin_edit' med.pk %}" class="btn-md-outline" style="padding:2px 8px;font-size:11px;" title="Modifier">
+                <i class="bi bi-pencil"></i>
+              </a>
+            </div>
+          </div>
+        </div>
+        {% endwith %}
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="kb-empty">
+    <i class="bi bi-person-x" style="font-size:40px;display:block;margin-bottom:12px;"></i>
+    Aucun médecin trouvé
+  </div>
+  {% endif %}
 </div>
 
 {% include 'includes/pagination.html' %}
+
+<script>
+(function(){
+  const VUE_KEY = 'medecins_vue';
+  const saved   = '{{ vue_active }}' || localStorage.getItem(VUE_KEY) || 'table';
+
+  function setView(v){
+    document.getElementById('view-table').style.display  = v === 'table'  ? '' : 'none';
+    document.getElementById('view-kanban').style.display = v === 'kanban' ? '' : 'none';
+    document.getElementById('btn-table').classList.toggle('active',  v === 'table');
+    document.getElementById('btn-kanban').classList.toggle('active', v === 'kanban');
+    document.getElementById('vue-input').value = v;
+    localStorage.setItem(VUE_KEY, v);
+  }
+
+  window.setView = setView;
+  setView(saved);
+})();
+</script>
 {% endblock %}

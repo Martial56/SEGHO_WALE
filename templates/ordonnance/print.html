@@ -1,0 +1,236 @@
+{% load static %}<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ordonnance {{ ordonnance.numero }}</title>
+<style>
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'Segoe UI',Arial,sans-serif; font-size:13px; color:#111; background:#fff; }
+
+@media screen {
+  body { background:#e8eaf0; padding:20px; }
+  .page { background:#fff; max-width:680px; margin:0 auto; padding:32px 40px 40px; box-shadow:0 4px 24px rgba(0,0,0,.15); border-radius:4px; }
+  .print-btn-bar { max-width:680px; margin:0 auto 12px; text-align:right; }
+  .print-btn { background:#4a6741; color:#fff; border:none; border-radius:6px; padding:8px 20px; font-size:13px; font-weight:600; cursor:pointer; }
+  .print-btn:hover { background:#3a5924; }
+  .no-print { }
+}
+
+@media print {
+  body { background:#fff; padding:0; }
+  .page { padding:10mm 14mm; width:100%; max-width:none; box-shadow:none; }
+  .no-print { display:none !important; }
+  @page { size:A4 portrait; margin:10mm; }
+}
+
+/* En-tête */
+.header { display:flex; justify-content:space-between; align-items:flex-start; padding-bottom:14px; border-bottom:2px solid #4a6741; margin-bottom:18px; }
+.header-left .clinic-name { font-size:17px; font-weight:800; color:#1b2e13; }
+.header-left .clinic-sub  { font-size:11px; color:#555; margin-top:2px; }
+.header-right { text-align:right; }
+.header-right .ordo-num { font-size:14px; font-weight:800; color:#4a6741; font-family:monospace; }
+.header-right .ordo-date { font-size:11px; color:#555; margin-top:2px; }
+
+/* Section patient */
+.section { margin-bottom:16px; }
+.section-title { font-size:10px; font-weight:700; color:#4a6741; text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px; border-left:3px solid #5e8050; padding-left:7px; }
+
+.patient-row { display:flex; gap:20px; flex-wrap:wrap; }
+.patient-field { flex:1; min-width:140px; }
+.patient-field .lbl { font-size:10px; color:#888; font-weight:600; text-transform:uppercase; letter-spacing:.3px; }
+.patient-field .val { font-size:13px; font-weight:700; color:#1b2e13; margin-top:1px; }
+
+/* Rx area */
+.rx-header { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+.rx-symbol { font-size:32px; font-weight:900; color:#4a6741; line-height:1; font-family:Georgia,serif; }
+.rx-label  { font-size:11px; color:#888; text-transform:uppercase; letter-spacing:.5px; font-weight:600; }
+
+/* Table medicaments */
+.med-table { width:100%; border-collapse:collapse; font-size:12.5px; }
+.med-table thead tr { background:#3a5924; color:#fff; }
+.med-table thead th { padding:7px 10px; font-weight:700; font-size:10.5px; text-transform:uppercase; letter-spacing:.3px; text-align:left; }
+.med-table tbody tr { border-bottom:1px solid #e0e8f4; }
+.med-table tbody tr:nth-child(even) { background:#f2f7ee; }
+.med-table tbody td { padding:8px 10px; color:#111; vertical-align:top; }
+.med-num { font-size:10px; color:#aaa; font-weight:700; text-align:center; }
+.med-name { font-weight:700; color:#2a4219; }
+.med-posol { color:#333; }
+.med-note  { font-size:11px; color:#777; font-style:italic; }
+
+/* Notes generales */
+.notes-box { background:#f5f9f0; border:1px solid #bcd5a8; border-radius:6px; padding:10px 14px; font-size:12.5px; color:#333; }
+
+/* Signature */
+.signature-area { display:flex; justify-content:flex-end; margin-top:28px; }
+.signature-box { text-align:center; min-width:180px; }
+.signature-line { border-top:1px solid #4a6741; margin-top:40px; padding-top:5px; font-size:11.5px; color:#333; font-weight:600; }
+.signature-sub  { font-size:10.5px; color:#888; margin-top:2px; }
+
+/* Pied de page */
+.footer { margin-top:24px; padding-top:10px; border-top:1px solid #d8eac4; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; }
+.footer-left  { font-size:10px; color:#aaa; }
+.footer-right { font-size:10px; color:#aaa; text-align:right; }
+
+/* Badge statut */
+.badge-emise    { background:rgba(74,103,65,.12); color:#3a5924; border:1px solid rgba(74,103,65,.28); padding:2px 8px; border-radius:20px; font-size:10.5px; font-weight:700; }
+.badge-delivree { background:rgba(22,169,107,.1);  color:#0d7a4c; border:1px solid rgba(22,169,107,.25); padding:2px 8px; border-radius:20px; font-size:10.5px; font-weight:700; }
+.badge-partielle{ background:rgba(232,154,26,.1);  color:#8a5c00; border:1px solid rgba(232,154,26,.25); padding:2px 8px; border-radius:20px; font-size:10.5px; font-weight:700; }
+.badge-expiree  { background:rgba(0,0,0,.06);      color:rgba(0,0,0,.5); border:1px solid rgba(0,0,0,.1); padding:2px 8px; border-radius:20px; font-size:10.5px; font-weight:700; }
+</style>
+</head>
+<body>
+
+<div class="no-print print-btn-bar">
+  <button class="print-btn" style="background:#4a6741;" onclick="window.print()">&#128438; Imprimer</button>
+</div>
+
+<div class="page">
+
+  <!-- En-tête -->
+  <div class="header">
+    <div class="header-left" style="display:flex;align-items:center;gap:14px;">
+      <img src="{% static 'logo.png' %}" alt="Logo WALE" style="width:56px;height:56px;object-fit:contain;flex-shrink:0;">
+      <div>
+        <div class="clinic-name">Centre Medico-Social WALE</div>
+        <div class="clinic-sub">Yamoussoukro, Cote d'Ivoire</div>
+        <div class="clinic-sub" style="margin-top:4px;">Tel : — &nbsp;|&nbsp; BP : —</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="ordo-num">{{ ordonnance.numero }}</div>
+      <div class="ordo-date">{{ ordonnance.date_emission|date:"d/m/Y H:i" }}</div>
+      <div style="margin-top:4px;">
+        {% if ordonnance.statut == 'emise' %}<span class="badge-emise">Emise</span>
+        {% elif ordonnance.statut == 'delivree' %}<span class="badge-delivree">Delivree</span>
+        {% elif ordonnance.statut == 'partielle' %}<span class="badge-partielle">Partielle</span>
+        {% else %}<span class="badge-expiree">Expiree</span>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Patient -->
+  <div class="section">
+    <div class="section-title">Patient</div>
+    <div class="patient-row">
+      <div class="patient-field">
+        <div class="lbl">Nom & Prenoms</div>
+        <div class="val" style="font-size:15px;">{{ ordonnance.consultation.patient.nom }} {{ ordonnance.consultation.patient.prenoms }}</div>
+      </div>
+      {% with p=ordonnance.consultation.patient %}
+      {% if p.date_naissance %}
+      <div class="patient-field">
+        <div class="lbl">Date de naissance</div>
+        <div class="val">{{ p.date_naissance|date:"d/m/Y" }}</div>
+      </div>
+      {% endif %}
+      {% if p.sexe %}
+      <div class="patient-field">
+        <div class="lbl">Sexe</div>
+        <div class="val">{{ p.get_sexe_display|default:p.sexe }}</div>
+      </div>
+      {% endif %}
+      {% if p.telephone %}
+      <div class="patient-field">
+        <div class="lbl">Telephone</div>
+        <div class="val">{{ p.telephone }}</div>
+      </div>
+      {% endif %}
+      {% endwith %}
+    </div>
+  </div>
+
+  <!-- Consultation -->
+  <div class="section">
+    <div class="section-title">Consultation</div>
+    <div class="patient-row">
+      <div class="patient-field">
+        <div class="lbl">N° Consultation</div>
+        <div class="val" style="font-family:monospace;color:#4a6741;">{{ ordonnance.consultation.numero }}</div>
+      </div>
+      <div class="patient-field">
+        <div class="lbl">Date</div>
+        <div class="val">{{ ordonnance.consultation.date_heure|date:"d/m/Y H:i" }}</div>
+      </div>
+      <div class="patient-field">
+        <div class="lbl">Motif</div>
+        <div class="val">{{ ordonnance.consultation.motif }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Prescriptions -->
+  <div class="section">
+    <div class="rx-header">
+      <span class="rx-symbol">Rx</span>
+      <span class="rx-label">Prescriptions &mdash; {{ ordonnance.get_type_ordonnance_display }}</span>
+    </div>
+
+    {% if ordonnance.lignes.all %}
+    <table class="med-table">
+      <thead>
+        <tr>
+          <th style="width:28px;text-align:center;">#</th>
+          <th>Medicament</th>
+          <th>Posologie</th>
+          <th>Duree</th>
+          <th style="text-align:center;">Qte</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ligne in ordonnance.lignes.all %}
+        <tr>
+          <td class="med-num">{{ forloop.counter }}</td>
+          <td>
+            <div class="med-name">{% if ligne.medicament %}{{ ligne.medicament.nom }}{% else %}{{ ligne.medicament_libre }}{% endif %}</div>
+            {% if ligne.notes %}<div class="med-note">{{ ligne.notes }}</div>{% endif %}
+          </td>
+          <td class="med-posol">{{ ligne.posologie }}</td>
+          <td style="white-space:nowrap;font-size:12px;">{{ ligne.duree|default:"&mdash;" }}</td>
+          <td style="text-align:center;font-weight:700;">{{ ligne.quantite }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="text-align:center;color:#aaa;font-style:italic;padding:20px 0;">Aucun medicament prescrit</div>
+    {% endif %}
+  </div>
+
+  {% if ordonnance.date_expiration %}
+  <div style="margin-top:10px;font-size:11.5px;color:{% if ordonnance.date_expiration < today %}#c0392b{% else %}#555{% endif %};">
+    <strong>Validite :</strong> jusqu'au {{ ordonnance.date_expiration|date:"d/m/Y" }}
+    {% if ordonnance.date_expiration < today %} <em>(Expiree)</em>{% endif %}
+  </div>
+  {% endif %}
+
+  {% if ordonnance.notes %}
+  <div class="section" style="margin-top:14px;">
+    <div class="section-title">Remarques</div>
+    <div class="notes-box">{{ ordonnance.notes }}</div>
+  </div>
+  {% endif %}
+
+  <!-- Signature -->
+  <div class="signature-area">
+    <div class="signature-box">
+      <div class="signature-line">Dr {{ ordonnance.consultation.medecin }}</div>
+      <div class="signature-sub">Medecin prescripteur</div>
+    </div>
+  </div>
+
+  <!-- Pied de page -->
+  <div class="footer">
+    <div class="footer-left">
+      Centre Medico-Social WALE &mdash; Yamoussoukro<br>
+      Document genere le {{ today|date:"d/m/Y" }}
+    </div>
+    <div class="footer-right">
+      {{ ordonnance.numero }}<br>
+      Confidentiel &mdash; Usage medical
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

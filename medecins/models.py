@@ -21,6 +21,7 @@ class Medecin(models.Model):
     email = models.EmailField(blank=True)
     ordre_medecin = models.CharField(max_length=50, blank=True)
     taux_honoraire = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    photo = models.ImageField(upload_to='medecins/photos/', blank=True, null=True)
     actif = models.BooleanField(default=True)
     date_creation = models.DateTimeField(auto_now_add=True)
 

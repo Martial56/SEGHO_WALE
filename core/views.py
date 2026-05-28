@@ -108,16 +108,220 @@ def patients_list(request):
 
 @login_required(login_url='login')
 def medecins_list(request):
-    from medecins.models import Medecin
+    from medecins.models import Medecin, Specialite
     from django.core.paginator import Paginator
 
-    medecins = Medecin.objects.all().order_by('nom')
-    paginator = Paginator(medecins, 25)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    stats = {'total': Medecin.objects.count(), 'consultations_mois': 0, 'disponibles': Medecin.objects.count()}
-    breadcrumb = [{'title': 'Accueil', 'url': '/'}, {'title': 'Médecins'}]
-    return render(request, 'medecins/list.html', {'page_obj': page_obj, 'stats': stats, 'breadcrumb': breadcrumb})
+    qs = Medecin.objects.select_related('specialite').order_by('nom')
+
+    q          = request.GET.get('q', '').strip()
+    specialite = request.GET.get('specialite', '')
+    statut     = request.GET.get('statut', '')
+    vue        = request.GET.get('vue', '')
+
+    if q:
+        qs = qs.filter(
+            Q(nom__icontains=q) | Q(prenoms__icontains=q) | Q(matricule__icontains=q)
+        )
+    if specialite:
+        qs = qs.filter(specialite__pk=specialite)
+    if statut == 'actif':
+        qs = qs.filter(actif=True)
+    elif statut == 'inactif':
+        qs = qs.filter(actif=False)
+
+    total       = Medecin.objects.count()
+    actifs      = Medecin.objects.filter(actif=True).count()
+    specialites = Specialite.objects.all().order_by('nom')
+
+    paginator = Paginator(qs, 20)
+    page_obj  = paginator.get_page(request.GET.get('page'))
+
+    # Groupement par spécialité pour la vue Kanban
+    kanban_colonnes = []
+    for sp in specialites:
+        medecins_sp = [m for m in qs if m.specialite_id == sp.pk]
+        if medecins_sp:
+            kanban_colonnes.append({'titre': sp.nom, 'medecins': medecins_sp})
+    sans_spec = [m for m in qs if m.specialite_id is None]
+    if sans_spec:
+        kanban_colonnes.append({'titre': 'Sans spécialité', 'medecins': sans_spec})
+
+    return render(request, 'medecins/list.html', {
+        'page_obj':         page_obj,
+        'specialites':      specialites,
+        'kanban_colonnes':  kanban_colonnes,
+        'stats': {'total': total, 'actifs': actifs, 'specialites': specialites.count()},
+        'q':                q,
+        'specialite_filtre': specialite,
+        'statut_filtre':    statut,
+        'vue_active':       vue,
+    })
+
+
+@login_required(login_url='login')
+def medecin_create(request):
+    from medecins.models import Medecin, Specialite
+    from django.contrib.auth.models import User
+    from django.utils import timezone as tz
+
+    specialites = Specialite.objects.order_by('nom')
+    users_disponibles = User.objects.filter(medecin__isnull=True).order_by('last_name', 'first_name')
+    errors = {}
+
+    if request.method == 'POST':
+        nom = request.POST.get('nom', '').strip()
+        prenoms = request.POST.get('prenoms', '').strip()
+        specialite_pk = request.POST.get('specialite', '')
+        telephone = request.POST.get('telephone', '').strip()
+        email = request.POST.get('email', '').strip()
+        ordre_medecin = request.POST.get('ordre_medecin', '').strip()
+        taux_honoraire = request.POST.get('taux_honoraire', '0').strip() or '0'
+        actif = request.POST.get('actif') == 'on'
+        user_pk = request.POST.get('user', '')
+
+        if not nom:
+            errors['nom'] = 'Le nom est obligatoire.'
+        if not prenoms:
+            errors['prenoms'] = 'Les prénoms sont obligatoires.'
+        if not telephone:
+            errors['telephone'] = 'Le téléphone est obligatoire.'
+
+        if not errors:
+            annee = tz.now().year
+            dernier = Medecin.objects.filter(matricule__startswith=f'MED{annee}').order_by('-matricule').first()
+            if dernier:
+                try:
+                    seq = int(dernier.matricule[-4:]) + 1
+                except ValueError:
+                    seq = 1
+            else:
+                seq = 1
+            matricule = f'MED{annee}{seq:04d}'
+
+            dernier_ord = Medecin.objects.filter(ordre_medecin__startswith=f'ORD{annee}').order_by('-ordre_medecin').first()
+            if dernier_ord:
+                try:
+                    seq_ord = int(dernier_ord.ordre_medecin[-4:]) + 1
+                except ValueError:
+                    seq_ord = 1
+            else:
+                seq_ord = 1
+            ordre_medecin = f'ORD{annee}{seq_ord:04d}'
+
+            med = Medecin(
+                matricule=matricule, nom=nom, prenoms=prenoms,
+                telephone=telephone, email=email,
+                ordre_medecin=ordre_medecin, actif=actif,
+            )
+            try:
+                med.taux_honoraire = float(taux_honoraire)
+            except ValueError:
+                med.taux_honoraire = 0
+
+            if specialite_pk:
+                try:
+                    med.specialite = Specialite.objects.get(pk=specialite_pk)
+                except Specialite.DoesNotExist:
+                    pass
+
+            if user_pk:
+                try:
+                    med.user = User.objects.get(pk=user_pk)
+                except User.DoesNotExist:
+                    pass
+
+            if request.FILES.get('photo'):
+                med.photo = request.FILES['photo']
+
+            med.save()
+            from django.contrib import messages
+            messages.success(request, f'Médecin {med} enregistré avec succès (matricule : {med.matricule}).')
+            return redirect('medecins_list')
+
+        post_data = request.POST
+    else:
+        post_data = None
+
+    return render(request, 'medecins/form.html', {
+        'mode': 'create',
+        'specialites': specialites,
+        'users_disponibles': users_disponibles,
+        'errors': errors,
+        'post': post_data,
+    })
+
+
+@login_required(login_url='login')
+def medecin_edit(request, pk):
+    from medecins.models import Medecin, Specialite
+    from django.contrib.auth.models import User
+    from django.shortcuts import get_object_or_404
+
+    med = get_object_or_404(Medecin, pk=pk)
+    specialites = Specialite.objects.order_by('nom')
+    users_disponibles = User.objects.filter(
+        Q(medecin__isnull=True) | Q(medecin=med)
+    ).order_by('last_name', 'first_name')
+    errors = {}
+
+    if request.method == 'POST':
+        nom = request.POST.get('nom', '').strip()
+        prenoms = request.POST.get('prenoms', '').strip()
+        specialite_pk = request.POST.get('specialite', '')
+        telephone = request.POST.get('telephone', '').strip()
+        email = request.POST.get('email', '').strip()
+        taux_honoraire = request.POST.get('taux_honoraire', '0').strip() or '0'
+        actif = request.POST.get('actif') == 'on'
+        user_pk = request.POST.get('user', '')
+
+        if not nom:
+            errors['nom'] = 'Le nom est obligatoire.'
+        if not prenoms:
+            errors['prenoms'] = 'Les prénoms sont obligatoires.'
+        if not telephone:
+            errors['telephone'] = 'Le téléphone est obligatoire.'
+
+        if not errors:
+            med.nom = nom
+            med.prenoms = prenoms
+            med.telephone = telephone
+            med.email = email
+            med.actif = actif
+            try:
+                med.taux_honoraire = float(taux_honoraire)
+            except ValueError:
+                med.taux_honoraire = 0
+
+            med.specialite = Specialite.objects.filter(pk=specialite_pk).first() if specialite_pk else None
+
+            if user_pk:
+                try:
+                    med.user = User.objects.get(pk=user_pk)
+                except User.DoesNotExist:
+                    med.user = None
+            else:
+                med.user = None
+
+            if request.FILES.get('photo'):
+                if med.photo:
+                    med.photo.delete(save=False)
+                med.photo = request.FILES['photo']
+            elif request.POST.get('photo_supprimer') == '1' and med.photo:
+                med.photo.delete(save=False)
+                med.photo = None
+
+            med.save()
+            from django.contrib import messages
+            messages.success(request, f'Médecin {med} mis à jour avec succès.')
+            return redirect('medecins_list')
+
+    return render(request, 'medecins/form.html', {
+        'mode': 'edit',
+        'med': med,
+        'specialites': specialites,
+        'users_disponibles': users_disponibles,
+        'errors': errors,
+    })
 
 
 @login_required(login_url='login')
@@ -650,6 +854,39 @@ def gynecologie_rdv_detail(request, pk):
         'nav_prev': nav_prev,
         'nav_next': nav_next,
     })
+
+
+@login_required(login_url='login')
+def gynecologie_demarrer_consultation(request, pk):
+    from patients.models import RendezVous
+    from consultations.models import Consultation
+    from django.core.exceptions import ObjectDoesNotExist
+    from django.shortcuts import get_object_or_404
+
+    rdv = get_object_or_404(RendezVous, pk=pk)
+
+    # Si consultation existe déjà, retourner au RDV
+    try:
+        _ = rdv.consultation
+        return redirect('gynecologie_rdv_detail', pk=rdv.pk)
+    except ObjectDoesNotExist:
+        pass
+
+    Consultation.objects.create(
+        patient=rdv.patient,
+        medecin=rdv.medecin,
+        rendez_vous=rdv,
+        motif=rdv.motif or 'Consultation gynecologique',
+        statut='en_cours',
+        cree_par=request.user,
+    )
+
+    # Passer le RDV en consultation si pas encore terminé
+    if rdv.statut in ('planifie', 'confirme', 'en_attente'):
+        rdv.statut = 'en_consultation'
+        rdv.save(update_fields=['statut'])
+
+    return redirect('gynecologie_rdv_detail', pk=rdv.pk)
 
 
 @login_required(login_url='login')

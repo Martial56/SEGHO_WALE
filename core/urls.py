@@ -8,7 +8,9 @@ urlpatterns = [
 
     # URLs des modules
     path('patients/', include('patients.urls')),
-    path('medecins/', views.medecins_list, name='medecins_list'),
+    path('medecins/',                        views.medecins_list,    name='medecins_list'),
+    path('medecins/nouveau/',                views.medecin_create,   name='medecin_create'),
+    path('medecins/<int:pk>/modifier/',      views.medecin_edit,     name='medecin_edit'),
     path('consultations/', views.consultations_list, name='consultations_list'),
     path('pharmacie/', views.pharmacie_list, name='pharmacie_list'),
     path('laboratoire/', views.laboratoire_list, name='laboratoire_list'),
@@ -16,6 +18,7 @@ urlpatterns = [
     path('facturation/', views.facturation_list, name='facturation_list'),
     path('caisse/', views.caisse_list, name='caisse_list'),
     path('employes/', include('employer.urls')),
+    path('ordonnances/', include('ordonnance.urls')),
     path('conges/', include('conges.urls')),
     path('presence/', include('presence.urls')),
     path('rapports/', views.rapports_list, name='rapports_list'),
@@ -29,6 +32,7 @@ urlpatterns = [
     path('gynecologie/cpn/suivi/', views.gynecologie_cpn_suivi, name='gynecologie_cpn_suivi'),
     path('gynecologie/rdv/<int:pk>/', views.gynecologie_rdv_detail, name='gynecologie_rdv_detail'),
     path('gynecologie/rdv/<int:pk>/statut/', views.gynecologie_rdv_set_statut, name='gynecologie_rdv_set_statut'),
+    path('gynecologie/rdv/<int:pk>/consultation/', views.gynecologie_demarrer_consultation, name='gynecologie_demarrer_consultation'),
     path('gynecologie/naissances/', views.gynecologie_registre_naissance, name='gynecologie_naissances'),
     path('gynecologie/naissances/nouveau/', views.gynecologie_naissance_create, name='gynecologie_naissance_create'),
 ]

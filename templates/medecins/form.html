@@ -1,0 +1,443 @@
+{% extends 'medecins/base.html' %}
+{% load static %}
+
+{% block topbar_title %}{% if mode == 'create' %}Nouveau médecin{% else %}Modifier {{ med }}{% endif %}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
+<style>
+:root {
+  --md-900:#1b2e13; --md-800:#2a4219; --md-700:#3a5924;
+  --md-600:#4a6741; --md-500:#5e8050; --md-400:#7a9b68;
+  --md-300:#9ab88a; --md-200:#bcd5a8; --md-100:#d8eac4; --md-50:#eef5e4;
+  --md-surface:#fff; --md-border:rgba(58,89,36,.13);
+  --md-text:#1b2e13; --md-muted:rgba(0,0,0,.45);
+}
+html[data-theme="dark"] {
+  --md-50:#0a1610; --md-100:#0d1f12; --md-surface:#070e05;
+  --md-border:rgba(154,184,138,.18); --md-text:#bcd5a8; --md-muted:rgba(255,255,255,.4);
+}
+
+.md-page-head {
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  padding:14px 32px; margin:0 -32px; flex-wrap:wrap;
+  background:#f2f7ee; border-bottom:1px solid rgba(0,0,0,.05);
+  box-shadow:0 2px 8px rgba(0,0,0,.04);
+  position:sticky; top:var(--topbar-h); z-index:100;
+}
+html[data-theme="dark"] .md-page-head { background:#070e05; }
+
+.md-form-layout {
+  display:grid; grid-template-columns:320px 1fr; gap:24px;
+  margin-top:28px; align-items:start;
+}
+@media(max-width:860px){ .md-form-layout{ grid-template-columns:1fr; } }
+
+.md-card {
+  background:var(--md-surface); border-radius:12px;
+  box-shadow:0 2px 12px rgba(58,89,36,.08); overflow:hidden; margin-bottom:20px;
+}
+.md-card-header {
+  padding:13px 20px 11px; border-bottom:1px solid var(--md-border);
+  display:flex; align-items:center; gap:10px;
+}
+.md-card-title {
+  font-size:13px; font-weight:700; color:var(--md-text);
+  display:flex; align-items:center; gap:8px;
+  border-left:3px solid var(--md-600); padding-left:10px;
+}
+.md-card-body { padding:20px 22px; }
+
+.md-field { margin-bottom:20px; }
+.md-field:last-child { margin-bottom:0; }
+.md-label {
+  display:block; font-size:11px; font-weight:700;
+  color:var(--md-muted); text-transform:uppercase;
+  letter-spacing:.4px; margin-bottom:6px;
+}
+.md-label .req { color:#c0392b; margin-left:2px; }
+
+.md-input {
+  width:100%; border:none; border-bottom:1.5px solid rgba(0,0,0,.18);
+  border-radius:0; background:transparent; padding:9px 4px;
+  font-size:13.5px; color:var(--md-text); font-family:inherit;
+  transition:border-color .15s;
+}
+.md-input:focus { outline:none; border-bottom-color:var(--md-500); }
+.md-input.error { border-bottom-color:#c0392b; }
+html[data-theme="dark"] .md-input {
+  border-bottom-color:rgba(255,255,255,.18); color:var(--md-text);
+}
+html[data-theme="dark"] .md-input:focus { border-bottom-color:var(--md-400); }
+
+.md-error { font-size:11.5px; color:#c0392b; margin-top:4px; }
+
+.md-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:0 20px; }
+@media(max-width:560px){ .md-grid-2{ grid-template-columns:1fr; } }
+
+.md-toggle-wrap {
+  display:flex; align-items:center; gap:12px; padding:10px 0;
+}
+.md-toggle {
+  position:relative; width:44px; height:24px; flex-shrink:0;
+}
+.md-toggle input { opacity:0; width:0; height:0; }
+.md-toggle-slider {
+  position:absolute; inset:0; border-radius:24px;
+  background:rgba(0,0,0,.18); cursor:pointer; transition:background .2s;
+}
+.md-toggle-slider::before {
+  content:''; position:absolute; width:18px; height:18px; border-radius:50%;
+  background:#fff; top:3px; left:3px; transition:transform .2s;
+  box-shadow:0 1px 3px rgba(0,0,0,.2);
+}
+.md-toggle input:checked + .md-toggle-slider { background:var(--md-600); }
+.md-toggle input:checked + .md-toggle-slider::before { transform:translateX(20px); }
+
+.btn-md { background:var(--md-600); color:#fff; border:none; border-radius:7px; padding:9px 22px; font-size:13px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px; text-decoration:none; transition:background .15s; }
+.btn-md:hover { background:var(--md-700); color:#fff; }
+.btn-md-outline { border:1.5px solid var(--md-600); color:var(--md-600); background:transparent; border-radius:7px; padding:8px 18px; font-size:13px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px; text-decoration:none; transition:background .15s,color .15s; }
+.btn-md-outline:hover { background:var(--md-600); color:#fff; }
+
+.md-avatar-preview {
+  width:80px; height:80px; border-radius:50%; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  font-size:24px; font-weight:800; color:#fff; background:var(--md-600);
+  margin:0 auto 12px; overflow:hidden; cursor:pointer;
+  border:3px solid var(--md-200); transition:border-color .15s;
+}
+.md-avatar-preview:hover { border-color:var(--md-500); }
+.md-avatar-preview img { width:100%; height:100%; object-fit:cover; }
+.md-photo-actions { display:flex; gap:8px; justify-content:center; margin-top:8px; flex-wrap:wrap; }
+.md-photo-label {
+  display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600;
+  color:var(--md-600); border:1.5px solid var(--md-600); border-radius:6px;
+  padding:4px 12px; cursor:pointer; transition:background .15s,color .15s;
+}
+.md-photo-label:hover { background:var(--md-600); color:#fff; }
+.md-photo-del {
+  display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600;
+  color:#c0392b; border:1.5px solid #c0392b; border-radius:6px;
+  padding:4px 10px; cursor:pointer; background:transparent; transition:background .15s,color .15s;
+}
+.md-photo-del:hover { background:#c0392b; color:#fff; }
+
+.md-matricule-badge {
+  display:inline-block; font-family:monospace; font-size:12px;
+  background:rgba(58,89,36,.1); color:var(--md-700);
+  border:1px solid rgba(58,89,36,.2); border-radius:6px;
+  padding:4px 10px; margin-top:8px;
+}
+
+.alert-success {
+  background:rgba(22,169,107,.1); border:1px solid rgba(22,169,107,.3);
+  border-radius:8px; padding:10px 16px; font-size:13px; color:#0d7a4c;
+  display:flex; align-items:center; gap:8px; margin-bottom:16px;
+}
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav style="background:var(--md-surface,#fff);border-bottom:1px solid rgba(0,0,0,.07);margin:-32px -32px 0;padding:0 32px;display:flex;align-items:stretch;height:44px;position:sticky;top:var(--topbar-h);z-index:250;gap:2px;">
+  <a href="{% url 'medecins_list' %}" style="padding:11px 16px;font-size:13px;font-weight:500;color:rgba(0,0,0,.45);text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
+    <i class="bi bi-person-badge"></i> Médecins
+  </a>
+  <span style="padding:11px 16px;font-size:13px;font-weight:600;color:var(--md-600);border-bottom:2px solid var(--md-500);display:inline-flex;align-items:center;gap:6px;margin-bottom:-1px;">
+    {% if mode == 'create' %}Nouveau médecin{% else %}Modifier{% endif %}
+  </span>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="md-page-head">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <a href="{% url 'medecins_list' %}" class="btn-md-outline" style="padding:6px 12px;">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <div>
+      <div style="font-size:16px;font-weight:800;color:var(--md-900);">
+        {% if mode == 'create' %}
+          <i class="bi bi-person-plus" style="color:var(--md-600);"></i> Nouveau médecin
+        {% else %}
+          <i class="bi bi-pencil-square" style="color:var(--md-600);"></i> Modifier le médecin
+        {% endif %}
+      </div>
+      {% if mode == 'edit' %}
+      <div style="font-size:12px;color:var(--md-muted);">{{ med }}</div>
+      {% endif %}
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <a href="{% url 'medecins_list' %}" class="btn-md-outline">Annuler</a>
+    <button type="submit" form="medecin-form" class="btn-md">
+      <i class="bi bi-check-lg"></i>
+      {% if mode == 'create' %}Enregistrer{% else %}Mettre à jour{% endif %}
+    </button>
+  </div>
+</div>
+
+{% if messages %}
+<div style="margin-top:16px;">
+  {% for msg in messages %}
+  <div class="alert-success"><i class="bi bi-check-circle-fill"></i> {{ msg }}</div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<form id="medecin-form" method="post" enctype="multipart/form-data" novalidate>
+{% csrf_token %}
+
+<div class="md-form-layout">
+
+  <!-- Colonne gauche : résumé -->
+  <aside>
+    <div class="md-card">
+      <div class="md-card-header">
+        <div class="md-card-title"><i class="bi bi-person-circle" style="color:var(--md-600);"></i> Aperçu</div>
+      </div>
+      <div class="md-card-body" style="text-align:center;">
+        <label for="photo" style="cursor:pointer;">
+          <div class="md-avatar-preview" id="avatar-preview">
+            {% if mode == 'edit' and med.photo %}
+            <img src="{{ med.photo.url }}" id="photo-img" alt="Photo">
+            {% else %}
+            <span id="avatar-initials">{% if mode == 'edit' %}{{ med.nom|first|upper }}{{ med.prenoms|first|upper }}{% else %}DR{% endif %}</span>
+            {% endif %}
+          </div>
+        </label>
+
+        <input type="file" name="photo" id="photo" accept="image/*" style="display:none;">
+        <input type="hidden" name="photo_supprimer" id="photo_supprimer" value="0">
+
+        <div class="md-photo-actions">
+          <label for="photo" class="md-photo-label"><i class="bi bi-camera"></i> Changer</label>
+          {% if mode == 'edit' and med.photo %}
+          <button type="button" class="md-photo-del" id="btn-del-photo" onclick="supprimerPhoto()">
+            <i class="bi bi-trash3"></i>
+          </button>
+          {% endif %}
+        </div>
+
+        <div style="font-size:15px;font-weight:800;color:var(--md-text);margin-top:12px;" id="preview-nom">
+          {% if mode == 'edit' %}Dr {{ med.nom }} {{ med.prenoms }}{% else %}Dr — —{% endif %}
+        </div>
+        {% if mode == 'edit' %}
+        <div class="md-matricule-badge">{{ med.matricule }}</div>
+        {% else %}
+        <div style="font-size:11px;color:var(--md-muted);margin-top:8px;">Le matricule sera généré automatiquement</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="md-card">
+      <div class="md-card-header">
+        <div class="md-card-title"><i class="bi bi-toggle-on" style="color:var(--md-600);"></i> Statut</div>
+      </div>
+      <div class="md-card-body">
+        <div class="md-toggle-wrap">
+          <label class="md-toggle">
+            <input type="checkbox" name="actif" id="actif"
+              {% if mode == 'create' %}checked{% elif med.actif %}checked{% endif %}>
+            <span class="md-toggle-slider"></span>
+          </label>
+          <span style="font-size:13.5px;font-weight:600;color:var(--md-text);" id="actif-label">
+            {% if mode == 'create' or med.actif %}Actif{% else %}Inactif{% endif %}
+          </span>
+        </div>
+        <div style="font-size:11.5px;color:var(--md-muted);margin-top:4px;">Le médecin peut recevoir des consultations lorsqu'il est actif.</div>
+      </div>
+    </div>
+
+    <div class="md-card">
+      <div class="md-card-header">
+        <div class="md-card-title"><i class="bi bi-person-lock" style="color:var(--md-600);"></i> Compte utilisateur</div>
+      </div>
+      <div class="md-card-body">
+        <div class="md-field" style="margin-bottom:0;">
+          <label class="md-label" for="user">Lier à un compte</label>
+          <select name="user" id="user" class="md-input">
+            <option value="">— Aucun compte —</option>
+            {% for u in users_disponibles %}
+            <option value="{{ u.pk }}"
+              {% if mode == 'edit' and med.user and med.user.pk == u.pk %}selected{% endif %}>
+              {{ u.get_full_name|default:u.username }} ({{ u.username }})
+            </option>
+            {% endfor %}
+          </select>
+          <div style="font-size:11px;color:var(--md-muted);margin-top:6px;">Optionnel — permet au médecin de se connecter.</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Colonne droite : informations -->
+  <div>
+    <!-- Identité -->
+    <div class="md-card">
+      <div class="md-card-header">
+        <div class="md-card-title"><i class="bi bi-person-vcard" style="color:var(--md-600);"></i> Identité</div>
+      </div>
+      <div class="md-card-body">
+        <div class="md-grid-2">
+          <div class="md-field">
+            <label class="md-label" for="nom">Nom <span class="req">*</span></label>
+            <input type="text" name="nom" id="nom" class="md-input{% if errors.nom %} error{% endif %}"
+              value="{% if mode == 'edit' %}{{ med.nom }}{% elif post %}{{ post.nom }}{% endif %}"
+              placeholder="Nom de famille" autocomplete="off">
+            {% if errors.nom %}<div class="md-error">{{ errors.nom }}</div>{% endif %}
+          </div>
+          <div class="md-field">
+            <label class="md-label" for="prenoms">Prénoms <span class="req">*</span></label>
+            <input type="text" name="prenoms" id="prenoms" class="md-input{% if errors.prenoms %} error{% endif %}"
+              value="{% if mode == 'edit' %}{{ med.prenoms }}{% elif post %}{{ post.prenoms }}{% endif %}"
+              placeholder="Prénoms" autocomplete="off">
+            {% if errors.prenoms %}<div class="md-error">{{ errors.prenoms }}</div>{% endif %}
+          </div>
+        </div>
+
+        <div class="md-field">
+          <label class="md-label" for="specialite">Spécialité</label>
+          <select name="specialite" id="specialite" class="md-input">
+            <option value="">— Aucune spécialité —</option>
+            {% for sp in specialites %}
+            <option value="{{ sp.pk }}"
+              {% if mode == 'edit' and med.specialite and med.specialite.pk == sp.pk %}selected
+              {% elif post and post.specialite == sp.pk|stringformat:"s" %}selected
+              {% endif %}>{{ sp.nom }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="md-field" style="margin-bottom:0;">
+          <label class="md-label">N° Ordre des médecins</label>
+          {% if mode == 'edit' %}
+          <div style="font-family:monospace;font-size:13.5px;font-weight:700;color:var(--md-600);padding:9px 4px;border-bottom:1.5px solid var(--md-200);">
+            {{ med.ordre_medecin|default:"—" }}
+          </div>
+          {% else %}
+          <div style="font-size:12px;color:var(--md-muted);padding:9px 4px;border-bottom:1.5px solid var(--md-200);">
+            Généré automatiquement à l'enregistrement
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Contact -->
+    <div class="md-card">
+      <div class="md-card-header">
+        <div class="md-card-title"><i class="bi bi-telephone" style="color:var(--md-600);"></i> Contact</div>
+      </div>
+      <div class="md-card-body">
+        <div class="md-grid-2">
+          <div class="md-field">
+            <label class="md-label" for="telephone">Téléphone <span class="req">*</span></label>
+            <input type="tel" name="telephone" id="telephone" class="md-input{% if errors.telephone %} error{% endif %}"
+              value="{% if mode == 'edit' %}{{ med.telephone }}{% elif post %}{{ post.telephone }}{% endif %}"
+              placeholder="+225 07 00 00 00 00">
+            {% if errors.telephone %}<div class="md-error">{{ errors.telephone }}</div>{% endif %}
+          </div>
+          <div class="md-field">
+            <label class="md-label" for="email">Email</label>
+            <input type="email" name="email" id="email" class="md-input"
+              value="{% if mode == 'edit' %}{{ med.email }}{% elif post %}{{ post.email }}{% endif %}"
+              placeholder="email@exemple.com">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Honoraires -->
+    <div class="md-card">
+      <div class="md-card-header">
+        <div class="md-card-title"><i class="bi bi-cash-coin" style="color:var(--md-600);"></i> Honoraires</div>
+      </div>
+      <div class="md-card-body">
+        <div class="md-field" style="max-width:280px;margin-bottom:0;">
+          <label class="md-label" for="taux_honoraire">Taux d'honoraire (FCFA)</label>
+          <input type="number" name="taux_honoraire" id="taux_honoraire" class="md-input"
+            min="0" step="500"
+            value="{% if mode == 'edit' %}{{ med.taux_honoraire }}{% elif post %}{{ post.taux_honoraire }}{% else %}0{% endif %}"
+            placeholder="0">
+          <div style="font-size:11.5px;color:var(--md-muted);margin-top:6px;">Montant par consultation, utilisé pour la facturation.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Boutons bas de page -->
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:8px;">
+      <a href="{% url 'medecins_list' %}" class="btn-md-outline">Annuler</a>
+      <button type="submit" form="medecin-form" class="btn-md">
+        <i class="bi bi-check-lg"></i>
+        {% if mode == 'create' %}Enregistrer le médecin{% else %}Mettre à jour{% endif %}
+      </button>
+    </div>
+  </div>
+
+</div>
+</form>
+
+<script>
+(function(){
+  const nomInput    = document.getElementById('nom');
+  const prenomsInput= document.getElementById('prenoms');
+  const preview     = document.getElementById('preview-nom');
+  const avatarPrev  = document.getElementById('avatar-preview');
+  const actifCheck  = document.getElementById('actif');
+  const actifLabel  = document.getElementById('actif-label');
+  const photoInput  = document.getElementById('photo');
+
+  function getInitials(){
+    const ini1 = nomInput.value.trim()[0] || 'D';
+    const ini2 = prenomsInput.value.trim()[0] || 'R';
+    return ini1.toUpperCase() + ini2.toUpperCase();
+  }
+
+  function showInitials(){
+    avatarPrev.innerHTML = '<span id="avatar-initials">' + getInitials() + '</span>';
+  }
+
+  function updatePreview(){
+    const n = nomInput.value.trim().toUpperCase() || '—';
+    const p = prenomsInput.value.trim() || '—';
+    preview.textContent = 'Dr ' + n + ' ' + p;
+    const img = avatarPrev.querySelector('img');
+    if (!img) showInitials();
+    else {
+      const span = document.getElementById('avatar-initials');
+      if (span) span.textContent = getInitials();
+    }
+  }
+
+  nomInput.addEventListener('input', updatePreview);
+  prenomsInput.addEventListener('input', updatePreview);
+
+  actifCheck.addEventListener('change', function(){
+    actifLabel.textContent = this.checked ? 'Actif' : 'Inactif';
+  });
+
+  photoInput.addEventListener('change', function(){
+    if (!this.files || !this.files[0]) return;
+    const reader = new FileReader();
+    reader.onload = function(e){
+      avatarPrev.innerHTML = '<img src="' + e.target.result + '" id="photo-img" alt="Photo">';
+      document.getElementById('photo_supprimer').value = '0';
+      const delBtn = document.getElementById('btn-del-photo');
+      if (delBtn) delBtn.style.display = 'inline-flex';
+    };
+    reader.readAsDataURL(this.files[0]);
+  });
+})();
+
+function supprimerPhoto(){
+  document.getElementById('photo_supprimer').value = '1';
+  document.getElementById('photo').value = '';
+  const av = document.getElementById('avatar-preview');
+  const nom = document.getElementById('nom').value.trim()[0] || 'D';
+  const pre = document.getElementById('prenoms').value.trim()[0] || 'R';
+  av.innerHTML = '<span id="avatar-initials">' + nom.toUpperCase() + pre.toUpperCase() + '</span>';
+  const delBtn = document.getElementById('btn-del-photo');
+  if (delBtn) delBtn.style.display = 'none';
+}
+</script>
+{% endblock %}

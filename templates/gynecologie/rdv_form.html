@@ -444,7 +444,24 @@
 
 <!-- ACTION BUTTONS -->
 <div class="f-actions-bar">
-  <button type="button" class="f-action-btn"><i class="bi bi-file-medical"></i> Ordonnance</button>
+  {% if not is_new %}
+    {% if rdv.consultation %}
+      <a href="{% url 'ordonnance_create' rdv.consultation.pk %}" class="f-action-btn">
+        <i class="bi bi-file-medical"></i> Ordonnance
+      </a>
+    {% else %}
+      <a href="{% url 'gynecologie_demarrer_consultation' rdv.pk %}" class="f-action-btn"
+         style="background:#e8f5e9;color:#2e7d32;border-color:#a5d6a7;font-weight:600;"
+         title="Creer la consultation pour ce RDV et activer les prescriptions">
+        <i class="bi bi-clipboard2-pulse"></i> Demarrer la consultation
+      </a>
+      <button type="button" class="f-action-btn" disabled
+              style="opacity:.4;cursor:not-allowed;"
+              title="Demandez d'abord la consultation">
+        <i class="bi bi-file-medical"></i> Ordonnance
+      </button>
+    {% endif %}
+  {% endif %}
   <button type="button" class="f-action-btn"><i class="bi bi-receipt"></i> Voir la facture</button>
   <button type="button" class="f-action-btn"><i class="bi bi-files"></i> Aperçu des documents</button>
   {% if not is_new and rdv.statut == 'planifie' or not is_new and rdv.statut == 'confirme' %}

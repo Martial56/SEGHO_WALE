@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     'planning',
     'core',
     'modules_permissions',
+    'ordonnance',
 ]
 
 MIDDLEWARE = [
