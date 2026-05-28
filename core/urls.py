@@ -10,6 +10,7 @@ urlpatterns = [
     path('patients/', include('patients.urls')),
     path('medecins/',                        views.medecins_list,    name='medecins_list'),
     path('medecins/nouveau/',                views.medecin_create,   name='medecin_create'),
+    path('medecins/<int:pk>/',               views.medecin_detail,   name='medecin_detail'),
     path('medecins/<int:pk>/modifier/',      views.medecin_edit,     name='medecin_edit'),
     path('consultations/', views.consultations_list, name='consultations_list'),
     path('soins/', include('soins.urls')),

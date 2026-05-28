@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Medecin, Specialite, Service
+from .models import Medecin, Specialite, Service, Departement
 
 
 @admin.register(Specialite)
@@ -17,3 +17,9 @@ class MedecinAdmin(admin.ModelAdmin):
 @admin.register(Service)
 class ServiceAdmin(admin.ModelAdmin):
     list_display = ['nom', 'code', 'chef_service', 'actif']
+
+
+@admin.register(Departement)
+class DepartementAdmin(admin.ModelAdmin):
+    list_display = ['nom', 'code', 'actif']
+    search_fields = ['nom', 'code']

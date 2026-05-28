@@ -325,6 +325,49 @@ def medecin_edit(request, pk):
 
 
 @login_required(login_url='login')
+def medecin_detail(request, pk):
+    from medecins.models import Medecin
+    from consultations.models import Consultation
+    from patients.models import RendezVous
+
+    med = get_object_or_404(Medecin, pk=pk)
+
+    today = timezone.now().date()
+    consultations_recentes = (
+        Consultation.objects
+        .filter(medecin=med)
+        .select_related('patient')
+        .order_by('-date_heure')[:10]
+    )
+    rdv_a_venir = (
+        RendezVous.objects
+        .filter(medecin=med, date_heure__date__gte=today, statut__in=['planifie', 'confirme', 'en_attente'])
+        .select_related('patient')
+        .order_by('date_heure')[:5]
+    )
+    stats = {
+        'total_consultations': Consultation.objects.filter(medecin=med).count(),
+        'consultations_mois':  Consultation.objects.filter(
+            medecin=med,
+            date_heure__month=today.month,
+            date_heure__year=today.year,
+        ).count(),
+        'rdv_total':   RendezVous.objects.filter(medecin=med).count(),
+        'rdv_a_venir': RendezVous.objects.filter(
+            medecin=med, date_heure__date__gte=today,
+            statut__in=['planifie', 'confirme', 'en_attente']
+        ).count(),
+    }
+    return render(request, 'medecins/detail.html', {
+        'med': med,
+        'consultations_recentes': consultations_recentes,
+        'rdv_a_venir': rdv_a_venir,
+        'stats': stats,
+        'today': today,
+    })
+
+
+@login_required(login_url='login')
 def consultations_list(request):
     from consultations.models import Consultation
     from django.core.paginator import Paginator

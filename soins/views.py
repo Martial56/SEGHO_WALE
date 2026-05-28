@@ -13,7 +13,7 @@ from .models import Soin, ProcedureSoin, Maladie
 from .forms import SoinForm, ProcedureSoinForm
 from patients.models import RendezVous, Patient
 from laboratoire.models import AnalyseLaboratoire, ExamenImagerie
-from utilisateur.models import Employe
+from employer.models import Employe
 from services.models import Articleservice
 
 
