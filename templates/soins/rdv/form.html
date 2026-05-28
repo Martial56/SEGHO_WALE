@@ -6,31 +6,71 @@
 {{ block.super }}
 {% include 'soins/includes/form_css.html' %}
 <style>
-  /* ── Chips RDV (non présents dans form_css) ── */
+  /* ── Barre statut (boutons + chips) ── */
+  .art-status-bar {
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+    gap: 10px; padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* ── Chips statut ── */
+  .art-status-chips {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  }
+  .art-status-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700;
+    border: 1.5px solid transparent; cursor: default; transition: all .15s;
+    background: var(--bg); color: var(--text-muted); border-color: var(--border);
+  }
+  .chip-dot {
+    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+    background: currentColor; opacity: .6;
+  }
+  .chip-active .chip-dot { opacity: 1; }
+
+  /* Planifié */
   .chip-planifie { background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; }
   .chip-planifie .chip-dot { background:#3b82f6; }
   .chip-planifie.chip-active { background:#1d4ed8; color:#fff; border-color:#1d4ed8; box-shadow:0 0 0 3px rgba(29,78,216,.18); }
 
+  /* Confirmé */
   .chip-confirme { background:#f0fdf4; color:#16a34a; border-color:#bbf7d0; }
   .chip-confirme .chip-dot { background:#22c55e; }
   .chip-confirme.chip-active { background:#16a34a; color:#fff; border-color:#16a34a; box-shadow:0 0 0 3px rgba(22,163,74,.18); }
 
+  /* Terminé */
+  .chip-termine { background:#f0fdf4; color:#0f766e; border-color:#99f6e4; }
+  .chip-termine .chip-dot { background:#14b8a6; }
+  .chip-termine.chip-active { background:#0f766e; color:#fff; border-color:#0f766e; box-shadow:0 0 0 3px rgba(15,118,110,.18); }
+
+  /* Annulé */
+  .chip-annule { background:#fef2f2; color:#dc2626; border-color:#fca5a5; }
+  .chip-annule .chip-dot { background:#ef4444; }
+  .chip-annule.chip-active { background:#dc2626; color:#fff; border-color:#dc2626; box-shadow:0 0 0 3px rgba(220,38,38,.18); }
+
+  /* Absent */
   .chip-absent { background:#fef9c3; color:#92400e; border-color:#fde68a; }
   .chip-absent .chip-dot { background:#f59e0b; }
   .chip-absent.chip-active { background:#b45309; color:#fff; border-color:#b45309; box-shadow:0 0 0 3px rgba(180,83,9,.18); }
 
+  /* Dark mode chips */
   html[data-theme="dark"] .chip-planifie { background:rgba(29,78,216,.15); color:#93c5fd; border-color:rgba(29,78,216,.35); }
-  html[data-theme="dark"] .chip-planifie.chip-active { background:rgba(29,78,216,.5); color:#fff; box-shadow:0 0 0 3px rgba(29,78,216,.25); }
+  html[data-theme="dark"] .chip-planifie.chip-active { background:rgba(29,78,216,.5); color:#fff; }
   html[data-theme="dark"] .chip-confirme { background:rgba(22,163,74,.15); color:#86efac; border-color:rgba(22,163,74,.35); }
-  html[data-theme="dark"] .chip-confirme.chip-active { background:rgba(22,163,74,.5); color:#fff; box-shadow:0 0 0 3px rgba(22,163,74,.25); }
+  html[data-theme="dark"] .chip-confirme.chip-active { background:rgba(22,163,74,.5); color:#fff; }
+  html[data-theme="dark"] .chip-termine { background:rgba(15,118,110,.15); color:#5eead4; border-color:rgba(15,118,110,.35); }
+  html[data-theme="dark"] .chip-termine.chip-active { background:rgba(15,118,110,.5); color:#fff; }
+  html[data-theme="dark"] .chip-annule { background:rgba(220,38,38,.15); color:#fca5a5; border-color:rgba(220,38,38,.35); }
+  html[data-theme="dark"] .chip-annule.chip-active { background:rgba(220,38,38,.5); color:#fff; }
   html[data-theme="dark"] .chip-absent { background:rgba(180,83,9,.15); color:#fcd34d; border-color:rgba(180,83,9,.35); }
-  html[data-theme="dark"] .chip-absent.chip-active { background:rgba(180,83,9,.5); color:#fff; box-shadow:0 0 0 3px rgba(180,83,9,.25); }
+  html[data-theme="dark"] .chip-absent.chip-active { background:rgba(180,83,9,.5); color:#fff; }
 
   /* ── Bouton danger (annuler) ── */
   .ab-btn-danger { background:none; border:1.5px solid #fca5a5; color:#dc2626; }
   .ab-btn-danger:hover { background:#fef2f2; border-color:#dc2626; }
 
-  /* ── Champs Django dans la grille (cibles par ID) ── */
+  /* ── Champs Django (selects) dans la grille — style underline ── */
   #rdv-form #id_departement,
   #rdv-form #id_medecin,
   #rdv-form #id_type_rdv,
@@ -71,7 +111,16 @@
   html[data-theme="dark"] #rdv-form #id_duree_minutes:focus { border-bottom-color:var(--accent); }
 
   #rdv-form #id_motif,
-  #rdv-form #id_notes { width:100%; }
+  #rdv-form #id_notes {
+    width:100%; border:1.5px solid var(--border); border-radius:6px;
+    padding:10px 12px; font-size:13px; font-family:'Roboto',sans-serif;
+    color:var(--text); background:var(--bg); outline:none; resize:vertical;
+    min-height:100px; transition:border-color .2s;
+  }
+  #rdv-form #id_motif:focus,
+  #rdv-form #id_notes:focus { border-color:var(--accent); }
+  html[data-theme="dark"] #rdv-form #id_motif,
+  html[data-theme="dark"] #rdv-form #id_notes { border-color:var(--border); background:var(--bg); }
 
   /* ── Autocomplete patient ── */
   .rdv-patient-ac { position:relative; }
@@ -92,7 +141,7 @@
   .rdv-ac-mark { font-weight:700; color:var(--accent); }
   .rdv-ac-empty { padding:10px 14px; font-size:12px; color:var(--text-muted); font-style:italic; }
 
-  /* ── Affichage lecture seule en-tête ── */
+  /* ── Affichage lecture seule ── */
   .rdv-display-val {
     font-size:13px; color:var(--text-muted); padding:4px 2px;
     border-bottom:1.5px dashed #e2eaee; min-height:28px;
@@ -100,7 +149,7 @@
   }
   html[data-theme="dark"] .rdv-display-val { border-bottom-color:rgba(255,255,255,.1); }
 
-  /* ── Timing ── */
+  /* ── Chronomètres ── */
   .rdv-timing-grid {
     display:grid; grid-template-columns:repeat(3,1fr); gap:0 28px;
   }
@@ -163,15 +212,27 @@
   <!-- 1. Barre actions + chips statut -->
   <div class="art-status-bar">
     <div class="art-action-btns">
+      {% if not rdv or rdv.statut == 'planifie' or rdv.statut == 'en_attente' %}
       <button type="submit" name="_action" value="confirmer" class="ab-btn ab-btn-confirm">
         <i class="bi bi-check2-circle"></i> Confirmer
       </button>
+      {% endif %}
+      {% if rdv and rdv.statut == 'confirme' %}
+      <button type="submit" name="_action" value="terminer" class="ab-btn ab-btn-confirm">
+        <i class="bi bi-check2-all"></i> Terminer
+      </button>
+      <button type="submit" name="_action" value="absent" class="ab-btn ab-btn-update" style="background:none;border:1.5px solid #fde68a;color:#92400e;">
+        <i class="bi bi-person-x"></i> Absent
+      </button>
+      {% endif %}
       <button type="button" class="ab-btn ab-btn-update" onclick="window.print()">
         <i class="bi bi-printer"></i> Imprimer
       </button>
+      {% if not rdv or rdv.statut not in 'annule,termine,absent' %}
       <button type="submit" name="_action" value="annuler" class="ab-btn ab-btn-danger">
         <i class="bi bi-x-circle"></i> Annuler
       </button>
+      {% endif %}
     </div>
     <div class="art-status-chips" id="status-chips">
       <span class="art-status-chip chip-planifie {% if current_statut == 'planifie' %}chip-active{% endif %}" data-step="planifie">

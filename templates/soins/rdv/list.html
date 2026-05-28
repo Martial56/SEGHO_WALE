@@ -88,12 +88,12 @@
       </thead>
       <tbody>
         {% for rdv in rdvs %}
-        <tr>
+        <tr style="cursor:pointer;" onclick="window.location='{% url 'soins:rdv_detail' rdv.pk %}?next={{ request.get_full_path|urlencode }}'">
           <td style="white-space:nowrap;font-weight:500;">{{ rdv.date_heure|date:"d/m/Y H:i" }}</td>
-          <td>{{ rdv.patient.nom }} {{ rdv.patient.prenoms }}</td>
+          <td style="font-weight:500;">{{ rdv.patient.nom }} {{ rdv.patient.prenoms }}</td>
           <td>{{ rdv.get_type_rdv_display }}</td>
           <td>{% if rdv.medecin %}{{ rdv.medecin.nom }} {{ rdv.medecin.prenoms }}{% else %}<span style="color:var(--text-muted);">—</span>{% endif %}</td>
-          <td>{% if rdv.departement %}{{ rdv.departement.nom }}{% else %}<span style="color:var(--text-muted);">—</span>{% endif %}</td>
+          <td>{% if rdv.departement %}{{ rdv.get_departement_display }}{% else %}<span style="color:var(--text-muted);">—</span>{% endif %}</td>
           <td>
             <span class="rdv-chip rdv-{{ rdv.statut }}">{{ rdv.get_statut_display }}</span>
           </td>

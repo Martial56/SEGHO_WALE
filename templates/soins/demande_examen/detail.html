@@ -161,19 +161,32 @@
 
       <!-- Boutons d'action -->
       <div class="dex-actions">
-        {% if analyse.statut == 'recu' %}
+        {% if analyse.statut == 'brouillon' %}
+          <a href="{% url 'soins:demande_examen_edit' analyse.pk %}" class="det-btn" style="background:#f0f9ff;color:#0369a1;text-decoration:none;">
+            <i class="bi bi-pencil"></i> Modifier
+          </a>
+          <form method="post" action="{% url 'soins:demande_examen_envoyer' analyse.pk %}" style="display:inline;">
+            {% csrf_token %}
+            <button type="submit" class="det-btn det-btn-progress">
+              <i class="bi bi-send"></i> Envoyer la demande
+            </button>
+          </form>
+        {% elif analyse.statut == 'recu' %}
           <form method="post" action="{% url 'soins:demande_examen_envoyer' analyse.pk %}" style="display:inline;">
             {% csrf_token %}
             <button type="submit" class="det-btn det-btn-progress">
               <i class="bi bi-arrow-right-circle"></i> Mettre en analyse
             </button>
           </form>
-        {% elif analyse.statut != 'envoye' %}
+        {% elif analyse.statut != 'envoye' and analyse.statut != 'termine' %}
           <form method="post" action="{% url 'soins:demande_examen_terminer' analyse.pk %}" style="display:inline;">
             {% csrf_token %}
             <button type="submit" class="det-btn det-btn-done">
               <i class="bi bi-arrow-right-circle-fill"></i>
-              {% if analyse.statut == 'en_analyse' %}Résultat reçu
+              {% if analyse.statut == 'demande' %}Accepter
+              {% elif analyse.statut == 'accepte' %}Mettre en cours
+              {% elif analyse.statut == 'en_cours' %}Terminer
+              {% elif analyse.statut == 'en_analyse' %}Résultat reçu
               {% elif analyse.statut == 'resultat' %}Valider
               {% elif analyse.statut == 'valide' %}Envoyer
               {% endif %}

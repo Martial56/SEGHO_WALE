@@ -1,0 +1,151 @@
+{% extends 'soins/base.html' %}
+{% load static %}
+
+{% block module_navbar %}{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+  html[data-theme="dark"] .o-list-table { background: var(--surface); }
+  html[data-theme="dark"] .o-list-table th { background: var(--surface); border-bottom-color: var(--border); color: var(--text-muted); }
+  html[data-theme="dark"] .o-list-table td { border-bottom-color: #2d3550; color: var(--text); }
+  html[data-theme="dark"] .o-list-table tbody tr:hover td { background: rgba(255,255,255,.04); }
+
+  .o-list-wrap { background: var(--bg); overflow-x: auto; }
+  .o-list-table { width: 100%; border-collapse: collapse; background: var(--surface); }
+  .o-list-table th {
+    padding: 8px 14px; text-align: left; font-size: 11px; font-weight: 600;
+    color: var(--text-muted); border-bottom: 1px solid var(--border);
+    background: var(--surface); white-space: nowrap;
+  }
+  .o-list-table td { padding: 10px 14px; font-size: 13px; border-bottom: 1px solid #f0f0f0; color: var(--text); }
+  .o-list-table tr:last-child td { border-bottom: none; }
+  .o-list-table tbody tr:hover td { background: #f2faf6; }
+
+  .cim-badge {
+    display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 8px;
+    border-radius: 4px; background: #e3f5ef; color: #1a5c4a; font-family: monospace;
+  }
+  html[data-theme="dark"] .cim-badge { background: rgba(26,92,74,.25); color: #6eddb0; }
+
+  .search-bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 16px; background: var(--surface); border-bottom: 1px solid var(--border);
+  }
+  .search-input {
+    flex: 1; max-width: 360px; border: 1px solid var(--border); border-radius: 6px;
+    padding: 6px 12px; font-size: 13px; background: var(--bg); color: var(--text); outline: none;
+  }
+  .search-input:focus { border-color: var(--accent); }
+  html[data-theme="dark"] .search-bar { background: var(--surface); border-bottom-color: var(--border); }
+  html[data-theme="dark"] .search-input { background: var(--bg); border-color: var(--border); color: var(--text); }
+
+  .ml-action-btn {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 10px; border-radius: 5px; font-size: 11px; font-weight: 600;
+    text-decoration: none; cursor: pointer; border: none; font-family: inherit;
+  }
+  .ml-btn-edit { background: #e3f5ef; color: #1a5c4a; }
+  .ml-btn-edit:hover { background: #c6ead9; }
+  .ml-btn-del { background: #fdf0f0; color: #c0392b; }
+  .ml-btn-del:hover { background: #f5cccc; }
+  html[data-theme="dark"] .ml-btn-edit { background: rgba(26,92,74,.25); color: #6eddb0; }
+  html[data-theme="dark"] .ml-btn-del { background: rgba(192,57,43,.2); color: #f09090; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="page-wrap">
+
+{% include 'soins/includes/nav.html' %}
+
+<!-- ══ SUBHEADER ══ -->
+<div class="o-subheader" id="subheader">
+  <div class="o-subheader-row">
+    <span style="font-size:13px;font-weight:600;color:var(--text);">
+      <i class="bi bi-virus" style="margin-right:6px;"></i>Catalogue des maladies
+    </span>
+    <div class="sh-actions">
+      <a href="{% url 'soins:maladie_create' %}" class="sh-btn-save" style="text-decoration:none;">
+        <i class="bi bi-plus-lg"></i> Nouvelle maladie
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- Barre de recherche -->
+<div class="search-bar">
+  <form method="get" style="display:flex;align-items:center;gap:8px;width:100%;">
+    <input type="text" name="q" class="search-input" placeholder="Rechercher par nom ou code CIM-10…" value="{{ q }}">
+    <button type="submit" class="ml-action-btn ml-btn-edit">
+      <i class="bi bi-search"></i> Chercher
+    </button>
+    {% if q %}
+    <a href="{% url 'soins:maladie_list' %}" class="ml-action-btn" style="background:var(--border);color:var(--text);">
+      <i class="bi bi-x"></i> Effacer
+    </a>
+    {% endif %}
+  </form>
+</div>
+
+<div class="o-list-wrap">
+  {% if maladies %}
+  <table class="o-list-table">
+    <thead>
+      <tr>
+        <th>Nom</th>
+        <th>Code CIM-10</th>
+        <th>Description</th>
+        <th style="text-align:right;">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for m in maladies %}
+      <tr>
+        <td style="font-weight:600;">{{ m.nom }}</td>
+        <td>
+          {% if m.code_cim %}<span class="cim-badge">{{ m.code_cim }}</span>{% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
+        </td>
+        <td style="color:var(--text-muted);max-width:340px;">
+          {{ m.description|truncatechars:80|default:"—" }}
+        </td>
+        <td style="text-align:right;white-space:nowrap;">
+          <a href="{% url 'soins:maladie_edit' m.pk %}?next={% url 'soins:maladie_list' %}" class="ml-action-btn ml-btn-edit">
+            <i class="bi bi-pencil"></i> Modifier
+          </a>
+          <form method="post" action="{% url 'soins:maladie_delete' m.pk %}?next={% url 'soins:maladie_list' %}" style="display:inline;" onsubmit="return confirm('Supprimer « {{ m.nom }} » ?')">
+            {% csrf_token %}
+            <button type="submit" class="ml-action-btn ml-btn-del">
+              <i class="bi bi-trash"></i> Supprimer
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="padding:48px 24px;text-align:center;color:var(--text-muted);">
+    <i class="bi bi-virus" style="font-size:36px;display:block;margin-bottom:12px;opacity:.4;"></i>
+    {% if q %}Aucune maladie ne correspond à « {{ q }} ».{% else %}Aucune maladie enregistrée.{% endif %}
+    <a href="{% url 'soins:maladie_create' %}" style="display:inline-block;margin-top:16px;color:var(--accent);font-weight:600;text-decoration:none;">
+      <i class="bi bi-plus-lg"></i> Ajouter une maladie
+    </a>
+  </div>
+  {% endif %}
+</div>
+
+</div>
+
+<script>
+(function(){
+  function adj(){
+    var tb=document.querySelector('.topbar'), wp=document.getElementById('page-wrap');
+    if(tb&&wp) wp.style.paddingTop=tb.offsetHeight+'px';
+  }
+  adj(); window.addEventListener('resize',adj);
+})();
+</script>
+
+{% endblock %}

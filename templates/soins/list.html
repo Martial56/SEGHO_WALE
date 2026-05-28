@@ -197,7 +197,7 @@
     </a>
     {% endif %}
     {% if q %}<span class="o-filter-tag">{{ q }} <a href="?{% if statut %}statut={{ statut }}&{% endif %}{% if date_filtre %}date={{ date_filtre }}{% endif %}">×</a></span>{% endif %}
-    {% if statut %}<span class="o-filter-tag">{% if statut == 'en_cours' %}En cours{% elif statut == 'termine' %}Terminé{% else %}Annulé{% endif %} <a href="?{% if q %}q={{ q }}&{% endif %}{% if date_filtre %}date={{ date_filtre }}{% endif %}">×</a></span>{% endif %}
+    {% if statut %}<span class="o-filter-tag">{% if statut == 'en_cours' %}Soins en cours{% elif statut == 'termine' %}Terminé{% else %}Annulé{% endif %} <a href="?{% if q %}q={{ q }}&{% endif %}{% if date_filtre %}date={{ date_filtre }}{% endif %}">×</a></span>{% endif %}
     {% if date_filtre %}<span class="o-filter-tag">{{ date_filtre }} <a href="?{% if q %}q={{ q }}&{% endif %}{% if statut %}statut={{ statut }}{% endif %}">×</a></span>{% endif %}
 
     <div style="flex:1;"></div>
@@ -210,8 +210,8 @@
   <select id="sel-statut" class="filter-select" onchange="applyFilters()">
     <option value="">Tous les statuts</option>
     <option value="brouillon"              {% if statut == 'brouillon'              %}selected{% endif %}>Brouillon</option>
-    <option value="en_attente_de_paiement" {% if statut == 'en_attente_de_paiement' %}selected{% endif %}>En attente de paiement</option>
-    <option value="en_cours"               {% if statut == 'en_cours'               %}selected{% endif %}>En cours</option>
+    <option value="en_attente_de_paiement" {% if statut == 'en_attente_de_paiement' %}selected{% endif %}>Paiement en attente</option>
+    <option value="en_cours"               {% if statut == 'en_cours'               %}selected{% endif %}>Soins en cours</option>
     <option value="termine"                {% if statut == 'termine'                %}selected{% endif %}>Terminé</option>
     <option value="annule"                 {% if statut == 'annule'                 %}selected{% endif %}>Annulé</option>
   </select>
@@ -245,7 +245,7 @@
   <div class="stat-box">
     <div class="stat-icon yellow"><i class="bi bi-hourglass-split"></i></div>
     <div>
-      <div class="stat-label">En cours</div>
+      <div class="stat-label">Soins en cours</div>
       <div class="stat-value">{{ stats.en_cours }}</div>
     </div>
   </div>
@@ -340,30 +340,13 @@
           {% if soin.statut == 'brouillon' %}
             <span class="badge-statut badge-brouillon">Brouillon</span>
           {% elif soin.statut == 'en_attente_de_paiement' %}
-            <span class="badge-statut badge-en-attente">Att. paiement</span>
+            <span class="badge-statut badge-en-attente">Pmt. attente</span>
           {% elif soin.statut == 'en_cours' %}
-            <span class="badge-statut badge-en-cours">En cours</span>
+            <span class="badge-statut badge-en-cours">Soins en cours</span>
           {% elif soin.statut == 'termine' %}
             <span class="badge-statut badge-termine">Terminé</span>
           {% elif soin.statut == 'annule' %}
             <span class="badge-statut badge-annule">Annulé</span>
-          {% endif %}
-        </td>
-        <td onclick="event.stopPropagation()" style="text-align:center;padding:4px;">
-          {% if soin.statut == 'en_attente_de_paiement' and user_peut_creer_facture %}
-            {% if not soin.facture_id %}
-            <a href="{% url 'soins:creer_facture' soin.pk %}"
-              title="Créer la facture"
-              style="display:inline-flex;align-items:center;gap:3px;padding:3px 8px;background:#16a34a;color:#fff;border-radius:4px;font-size:11px;font-weight:600;text-decoration:none;white-space:nowrap;">
-              <i class="bi bi-receipt"></i> Facturer
-            </a>
-            {% else %}
-            <a href="{% url 'soins:facture_paiement' soin.facture_id %}"
-              title="Encaisser"
-              style="display:inline-flex;align-items:center;gap:3px;padding:3px 8px;background:#1d4ed8;color:#fff;border-radius:4px;font-size:11px;font-weight:600;text-decoration:none;white-space:nowrap;">
-              <i class="bi bi-cash-coin"></i> Encaisser
-            </a>
-            {% endif %}
           {% endif %}
         </td>
       </tr>

@@ -52,13 +52,28 @@
 .fac-chip-payee .chip-dot { background: #22c55e; }
 .fac-chip-partielle { background: #fffbeb; color: #d97706; border-color: #fde68a; }
 .fac-chip-partielle .chip-dot { background: #f59e0b; }
-.fac-chip-annulee   { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
+.fac-chip-annulee        { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
 .fac-chip-annulee .chip-dot { background: #ef4444; }
-html[data-theme="dark"] .fac-chip-brouillon { background: rgba(107,114,128,.2); color: #d1d5db; border-color: rgba(107,114,128,.4); }
-html[data-theme="dark"] .fac-chip-emise     { background: rgba(37,99,235,.15); color: #93c5fd; border-color: rgba(37,99,235,.35); }
-html[data-theme="dark"] .fac-chip-payee     { background: rgba(22,163,74,.15); color: #86efac; border-color: rgba(22,163,74,.35); }
-html[data-theme="dark"] .fac-chip-partielle { background: rgba(217,119,6,.15); color: #fcd34d; border-color: rgba(217,119,6,.35); }
-html[data-theme="dark"] .fac-chip-annulee   { background: rgba(220,38,38,.15); color: #fca5a5; border-color: rgba(220,38,38,.35); }
+.fac-chip-comptabilisee  { background: #f0fdf4; color: #16a34a; border-color: #86efac; }
+.fac-chip-comptabilisee .chip-dot { background: #16a34a; }
+html[data-theme="dark"] .fac-chip-brouillon     { background: rgba(107,114,128,.2); color: #d1d5db; border-color: rgba(107,114,128,.4); }
+html[data-theme="dark"] .fac-chip-emise          { background: rgba(37,99,235,.15); color: #93c5fd; border-color: rgba(37,99,235,.35); }
+html[data-theme="dark"] .fac-chip-payee          { background: rgba(22,163,74,.15); color: #86efac; border-color: rgba(22,163,74,.35); }
+html[data-theme="dark"] .fac-chip-partielle      { background: rgba(217,119,6,.15); color: #fcd34d; border-color: rgba(217,119,6,.35); }
+html[data-theme="dark"] .fac-chip-annulee        { background: rgba(220,38,38,.15); color: #fca5a5; border-color: rgba(220,38,38,.35); }
+html[data-theme="dark"] .fac-chip-comptabilisee  { background: rgba(22,163,74,.15); color: #86efac; border-color: rgba(22,163,74,.35); }
+
+/* ── RUBAN PAYÉ ── */
+.fac-ribbon-wrap { position: relative; overflow: hidden; }
+.fac-ribbon {
+  position: absolute; top: 18px; right: -28px;
+  background: #16a34a; color: #fff;
+  font-size: 11px; font-weight: 900; letter-spacing: 1.5px;
+  text-transform: uppercase; padding: 6px 40px;
+  transform: rotate(35deg); transform-origin: center;
+  box-shadow: 0 2px 8px rgba(22,163,74,.35);
+  z-index: 10; user-select: none; pointer-events: none;
+}
 
 /* ── PATIENT CARD ── */
 .fac-patient-card {
@@ -122,11 +137,14 @@ html[data-theme="dark"] .fac-chip-annulee   { background: rgba(220,38,38,.15); c
 }
 .fac-ro-table tbody td {
   padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--text);
+  background: var(--bg); cursor: default; user-select: none;
 }
 .fac-ro-table tbody tr:last-child td { border-bottom: none; }
-.fac-ro-table tbody tr:hover td { background: rgba(0,0,0,.02); }
-html[data-theme="dark"] .fac-ro-table tbody tr:hover td { background: rgba(255,255,255,.03); }
+.fac-ro-table tbody tr:hover td { background: var(--bg); }
+html[data-theme="dark"] .fac-ro-table tbody td { background: rgba(255,255,255,.025); }
+html[data-theme="dark"] .fac-ro-table tbody tr:hover td { background: rgba(255,255,255,.025); }
 .td-right { text-align: right; }
+.fac-ro-table thead th.td-right { text-align: right; }
 .td-accent { color: var(--accent); font-weight: 700; }
 .fac-empty { text-align: center; padding: 28px; color: var(--text-muted); font-size: 13px; font-style: italic; }
 
@@ -168,6 +186,86 @@ html[data-theme="dark"] .fac-tab-btn:hover:not(.active) { background: rgba(255,2
 html[data-theme="dark"] .fac-alert-success {
   background: rgba(22,163,74,.12); border-color: rgba(22,163,74,.3); color: #86efac;
 }
+
+/* ── STEPPER STATUT ── */
+.fac-stepper {
+  display: flex; align-items: center; gap: 0;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 12px 20px; margin-bottom: 10px;
+  overflow-x: auto;
+}
+.fac-step {
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  min-width: 90px; position: relative;
+}
+.fac-step:not(:last-child)::after {
+  content: ''; position: absolute; top: 14px; left: calc(50% + 18px);
+  width: calc(100% - 36px); height: 2px; background: var(--border); z-index: 0;
+}
+.fac-step.done:not(:last-child)::after { background: #22c55e; }
+.fac-step.active:not(:last-child)::after { background: var(--border); }
+.fac-step-circle {
+  width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--border);
+  background: var(--bg); display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: var(--text-muted); z-index: 1;
+  position: relative; transition: all .2s;
+}
+.fac-step.done .fac-step-circle { background: #22c55e; border-color: #22c55e; color: #fff; }
+.fac-step.active .fac-step-circle { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 0 0 3px rgba(var(--accent-rgb),.15); }
+.fac-step-label {
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .04em; color: var(--text-muted); text-align: center; white-space: nowrap;
+}
+.fac-step.done .fac-step-label { color: #16a34a; }
+.fac-step.active .fac-step-label { color: var(--accent); font-weight: 700; }
+.fac-step.cancelled .fac-step-circle { background: #ef4444; border-color: #ef4444; color: #fff; }
+.fac-step.cancelled .fac-step-label { color: #dc2626; }
+
+/* ── CHAMPS GRISÉS (lecture seule) ── */
+.fac-ro-field.grey-field .fac-ro-value {
+  color: var(--text-muted); background: var(--bg);
+  border-radius: 4px; padding: 4px 8px; font-style: italic;
+}
+.fac-ro-field.grey-field { background: rgba(0,0,0,.015); }
+html[data-theme="dark"] .fac-ro-field.grey-field { background: rgba(255,255,255,.03); }
+
+/* ── TABLE ECRITURES ── */
+.fac-ecr-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.fac-ecr-table thead th {
+  padding: 9px 12px; text-align: left;
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .04em; color: var(--text-muted);
+  border-bottom: 2px solid var(--border); background: var(--bg);
+}
+.fac-ecr-table tbody td {
+  padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--text);
+}
+.fac-ecr-table tbody tr:last-child td { border-bottom: none; }
+.fac-ecr-total-row td {
+  font-weight: 700; border-top: 2px solid var(--border); background: var(--bg);
+}
+
+/* ── SECTION INTERIEURE ONGLET ── */
+.fac-inner-section {
+  padding: 16px 20px; border-bottom: 1px solid var(--border);
+}
+.fac-inner-section:last-child { border-bottom: none; }
+.fac-section-title {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--text-muted); margin-bottom: 12px;
+  display: flex; align-items: center; gap: 6px;
+}
+.fac-section-title::after {
+  content: ''; flex: 1; height: 1px; background: var(--border);
+}
+.fac-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+@media(max-width:680px){ .fac-2col { grid-template-columns: 1fr; } }
+.fac-checkbox-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 16px; font-size: 13px; color: var(--text-muted);
+}
+.fac-checkbox-row i { font-size: 15px; }
+.fac-checkbox-row.checked { color: var(--accent); }
 </style>
 {% endblock %}
 
@@ -213,9 +311,19 @@ html[data-theme="dark"] .fac-alert-success {
     </button>
     {% endif %}
 
+    {% if is_admin and facture.statut != 'brouillon' and facture.statut != 'emise' %}
+    <a href="{% url 'soins:facture_edit' facture.pk %}?next={{ back_url }}" class="fac-btn fac-btn-edit" style="text-decoration:none;" title="Modification administrateur">
+      <i class="bi bi-pencil"></i> Modifier (admin)
+    </a>
+    {% endif %}
+
     <a href="{% url 'soins:facture_print' facture.pk %}?next={{ back_url }}" class="fac-btn" target="_blank"
        style="text-decoration:none;background:var(--surface);border:1.5px solid var(--border);color:var(--text-muted);">
       <i class="bi bi-printer"></i> Imprimer
+    </a>
+    <a href="{% url 'soins:facture_apercu' facture.pk %}?next={{ back_url }}" class="fac-btn" target="_blank"
+       style="text-decoration:none;background:var(--surface);border:1.5px solid var(--border);color:var(--text-muted);">
+      <i class="bi bi-eye"></i> Aperçu
     </a>
     <a href="{{ back_url }}" class="fac-btn fac-btn-back" style="text-decoration:none;">
       <i class="bi bi-arrow-left"></i> Retour
@@ -233,8 +341,76 @@ html[data-theme="dark"] .fac-alert-success {
   {% endfor %}
   {% endif %}
 
+  <!-- ══ STEPPER STATUT ══ -->
+  {% with s=facture.statut %}
+  <div class="fac-stepper">
+    {% comment %} Étape 1 : Brouillon {% endcomment %}
+    <div class="fac-step {% if s == 'brouillon' %}active{% elif s != 'annulee' %}done{% endif %}">
+      <div class="fac-step-circle">
+        {% if s != 'brouillon' and s != 'annulee' %}<i class="bi bi-check-lg"></i>{% else %}1{% endif %}
+      </div>
+      <div class="fac-step-label">Brouillon</div>
+    </div>
+    {% comment %} Étape 2 : Émise {% endcomment %}
+    {% if s == 'emise' %}
+    <div class="fac-step active">
+    {% elif s == 'partielle' or s == 'payee' or s == 'comptabilisee' %}
+    <div class="fac-step done">
+    {% else %}
+    <div class="fac-step">
+    {% endif %}
+      <div class="fac-step-circle">
+        {% if s == 'partielle' or s == 'payee' or s == 'comptabilisee' %}<i class="bi bi-check-lg"></i>{% else %}2{% endif %}
+      </div>
+      <div class="fac-step-label">Émise</div>
+    </div>
+    {% comment %} Étape 3 : Pmt. partiel {% endcomment %}
+    {% if s == 'partielle' %}
+    <div class="fac-step active">
+    {% elif s == 'payee' or s == 'comptabilisee' %}
+    <div class="fac-step done">
+    {% else %}
+    <div class="fac-step">
+    {% endif %}
+      <div class="fac-step-circle">
+        {% if s == 'payee' or s == 'comptabilisee' %}<i class="bi bi-check-lg"></i>{% else %}3{% endif %}
+      </div>
+      <div class="fac-step-label">Pmt. partiel</div>
+    </div>
+    {% comment %} Étape 4 : Payée {% endcomment %}
+    {% if s == 'payee' or s == 'comptabilisee' %}
+    <div class="fac-step done">
+    {% else %}
+    <div class="fac-step">
+    {% endif %}
+      <div class="fac-step-circle">
+        {% if s == 'payee' or s == 'comptabilisee' %}<i class="bi bi-check-lg"></i>{% else %}4{% endif %}
+      </div>
+      <div class="fac-step-label">Payée</div>
+    </div>
+    {% comment %} Étape 5 : Comptabilisé / Annulée {% endcomment %}
+    {% if s == 'comptabilisee' or s == 'payee' %}
+    <div class="fac-step active">
+    {% elif s == 'annulee' %}
+    <div class="fac-step cancelled">
+    {% else %}
+    <div class="fac-step">
+    {% endif %}
+      <div class="fac-step-circle">
+        {% if s == 'annulee' %}<i class="bi bi-x-lg"></i>{% else %}5{% endif %}
+      </div>
+      <div class="fac-step-label">{% if s == 'annulee' %}Annulée{% else %}Comptabilisé{% endif %}</div>
+    </div>
+  </div>
+  {% endwith %}
+
   <!-- ══ HEADER CARD ══ -->
+  {% if facture.statut == 'comptabilisee' or facture.statut == 'payee' %}
+  <div class="fac-header-card fac-ribbon-wrap">
+    <div class="fac-ribbon">Payé</div>
+  {% else %}
   <div class="fac-header-card">
+  {% endif %}
     <div class="fac-header-top">
       <div style="display:flex;align-items:center;gap:14px;">
         <i class="bi bi-file-earmark-text" style="font-size:22px;color:var(--accent);"></i>
@@ -246,11 +422,17 @@ html[data-theme="dark"] .fac-alert-success {
           <span class="chip-dot"></span>{{ facture.get_statut_display }}
         </span>
       </div>
-      <div style="font-size:12px;color:var(--text-muted);text-align:right;">
-        <div>Émise le {{ facture.date_emission|date:"d/m/Y à H:i" }}</div>
-        {% if facture.cree_par %}
-        <div style="margin-top:2px;">Par {{ facture.cree_par.get_full_name|default:facture.cree_par.username }}</div>
-        {% endif %}
+      <div style="display:flex;align-items:center;gap:24px;">
+        <div style="text-align:center;">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:2px;">Montant total</div>
+          <div style="font-size:20px;font-weight:800;color:var(--text);">{{ facture.montant_total|floatformat:0 }} <span style="font-size:12px;font-weight:600;color:var(--text-muted);">CFA</span></div>
+        </div>
+        <div style="font-size:12px;color:var(--text-muted);text-align:right;">
+          <div>Émise le {{ facture.date_emission|date:"d/m/Y à H:i" }}</div>
+          {% if facture.cree_par %}
+          <div style="margin-top:2px;">Par {{ facture.cree_par.get_full_name|default:facture.cree_par.username }}</div>
+          {% endif %}
+        </div>
       </div>
     </div>
 
@@ -285,6 +467,10 @@ html[data-theme="dark"] .fac-alert-success {
         style="padding:10px 20px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-muted);border-bottom:2px solid transparent;transition:all .15s;font-family:inherit;">
         <i class="bi bi-list-ul"></i> Lignes de facture
       </button>
+      <button type="button" class="fac-tab-btn" data-tab="tab-ecritures"
+        style="padding:10px 20px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-muted);border-bottom:2px solid transparent;transition:all .15s;font-family:inherit;">
+        <i class="bi bi-journal-text"></i> Écritures comptables
+      </button>
       <button type="button" class="fac-tab-btn" data-tab="tab-infos"
         style="padding:10px 20px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-muted);border-bottom:2px solid transparent;transition:all .15s;font-family:inherit;">
         <i class="bi bi-info-circle"></i> Autres informations
@@ -302,8 +488,20 @@ html[data-theme="dark"] .fac-alert-success {
 
     <!-- ── Onglet 1 : Lignes de facture ── -->
     <div class="fac-tab-panel" id="tab-lignes">
+      <div style="padding:8px 16px 0;display:flex;align-items:center;gap:6px;">
+        <i class="bi bi-lock-fill" style="font-size:10px;color:var(--text-muted);"></i>
+        <span style="font-size:10px;color:var(--text-muted);font-style:italic;">Lignes en lecture seule — utilisez « Modifier la facture » pour apporter des corrections</span>
+      </div>
       <div class="fac-table-wrap">
         <table class="fac-ro-table">
+          <colgroup>
+            <col style="width:28%;">
+            <col style="width:22%;">
+            <col style="width:70px;">
+            <col style="width:130px;">
+            <col style="width:90px;">
+            <col style="width:120px;">
+          </colgroup>
           <thead>
             <tr>
               <th>Désignation</th>
@@ -365,42 +563,201 @@ html[data-theme="dark"] .fac-alert-success {
       </div>
     </div>
 
-    <!-- ── Onglet 2 : Autres informations ── -->
+    <!-- ── Onglet 2 : Écritures comptables ── -->
+    <div class="fac-tab-panel" id="tab-ecritures" style="display:none;">
+      <div class="fac-inner-section">
+        <div class="fac-section-title"><i class="bi bi-journal-text"></i> Pièces comptables</div>
+        <div class="fac-table-wrap">
+          <table class="fac-ecr-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Compte</th>
+                <th>Libellé</th>
+                <th>Étiquettes analytiques</th>
+                <th class="td-right">Débit (CFA)</th>
+                <th class="td-right">Crédit (CFA)</th>
+                <th>Grilles de Taxe</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% if facture.statut != 'brouillon' %}
+              <!-- Ligne débiteur (client) -->
+              <tr>
+                <td style="white-space:nowrap;color:var(--text-muted);">{{ facture.date_emission|date:"d/m/Y" }}</td>
+                <td style="font-family:monospace;color:var(--accent);">411100</td>
+                <td>{{ facture.patient.nom }} {{ facture.patient.prenoms }}</td>
+                <td>—</td>
+                <td class="td-right td-accent">{{ facture.montant_total|floatformat:0 }}</td>
+                <td class="td-right">—</td>
+                <td>—</td>
+              </tr>
+              <!-- Lignes produits -->
+              {% for ligne in lignes %}
+              <tr>
+                <td style="white-space:nowrap;color:var(--text-muted);">{{ facture.date_emission|date:"d/m/Y" }}</td>
+                <td style="font-family:monospace;color:var(--accent);">706000</td>
+                <td>{{ ligne.libelle }}</td>
+                <td>—</td>
+                <td class="td-right">—</td>
+                <td class="td-right td-accent">{{ ligne.montant_ligne|floatformat:0 }}</td>
+                <td>—</td>
+              </tr>
+              {% endfor %}
+              {% if paiements %}
+              {% for pay in paiements %}
+              <tr>
+                <td style="white-space:nowrap;color:var(--text-muted);">{{ pay.date_paiement|date:"d/m/Y" }}</td>
+                <td style="font-family:monospace;color:var(--accent);">512000</td>
+                <td>Paiement — {{ pay.get_mode_paiement_display }}</td>
+                <td>—</td>
+                <td class="td-right td-accent">{{ pay.montant|floatformat:0 }}</td>
+                <td class="td-right">—</td>
+                <td>—</td>
+              </tr>
+              {% endfor %}
+              {% endif %}
+              <!-- Total -->
+              <tr class="fac-ecr-total-row">
+                <td colspan="4" style="text-align:right;color:var(--text-muted);font-size:12px;">Total</td>
+                <td class="td-right" style="color:var(--accent);">{{ facture.montant_total|floatformat:0 }}</td>
+                <td class="td-right" style="color:var(--accent);">{{ facture.montant_total|floatformat:0 }}</td>
+                <td></td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="7" class="fac-empty" style="padding:28px;text-align:center;color:var(--text-muted);font-style:italic;">
+                  <i class="bi bi-journal-x" style="font-size:22px;display:block;margin-bottom:6px;"></i>
+                  Aucune écriture — la facture est encore en brouillon.
+                </td>
+              </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Onglet 3 : Autres informations ── -->
     <div class="fac-tab-panel" id="tab-infos" style="display:none;">
-      <div class="fac-ro-grid">
-        <div class="fac-ro-field">
-          <div class="fac-ro-label">Type de facture</div>
-          <div class="fac-ro-value">{{ facture.get_type_facture_display }}</div>
-        </div>
-        <div class="fac-ro-field">
-          <div class="fac-ro-label">Statut</div>
-          <div class="fac-ro-value">
-            <span class="fac-chip fac-chip-{{ facture.statut }}" style="font-size:11px;padding:2px 9px;">
-              <span class="chip-dot"></span>{{ facture.get_statut_display }}
-            </span>
+
+      <!-- Section 1 : Informations générales -->
+      <div class="fac-inner-section">
+        <div class="fac-section-title"><i class="bi bi-file-text"></i> Informations générales</div>
+        <div class="fac-2col">
+          <div>
+            <div class="fac-ro-field grey-field">
+              <div class="fac-ro-label">Référence client</div>
+              <div class="fac-ro-value">{{ facture.numero }}</div>
+            </div>
+            <div class="fac-ro-field grey-field">
+              <div class="fac-ro-label">Vendeur</div>
+              <div class="fac-ro-value">
+                {% if facture.cree_par %}{{ facture.cree_par.get_full_name|default:facture.cree_par.username }}{% else %}<span class="muted">—</span>{% endif %}
+              </div>
+            </div>
+            <div class="fac-ro-field grey-field">
+              <div class="fac-ro-label">Équipe commerciale</div>
+              <div class="fac-ro-value muted">—</div>
+            </div>
+            <div class="fac-ro-field grey-field">
+              <div class="fac-ro-label">Code-barres scanné</div>
+              <div class="fac-ro-value muted">—</div>
+            </div>
+          </div>
+          <div>
+            <div class="fac-ro-field grey-field">
+              <div class="fac-ro-label">Type de facture</div>
+              <div class="fac-ro-value">{{ facture.get_type_facture_display }}</div>
+            </div>
+            <div class="fac-ro-field grey-field">
+              <div class="fac-ro-label">Date d'émission</div>
+              <div class="fac-ro-value">{{ facture.date_emission|date:"d/m/Y à H:i" }}</div>
+            </div>
+            <div class="fac-ro-field grey-field">
+              <div class="fac-ro-label">Date d'échéance</div>
+              <div class="fac-ro-value {% if not facture.date_echeance %}muted{% endif %}">
+                {% if facture.date_echeance %}{{ facture.date_echeance|date:"d/m/Y" }}{% else %}—{% endif %}
+              </div>
+            </div>
+            <div class="fac-ro-field grey-field">
+              <div class="fac-ro-label">Statut</div>
+              <div class="fac-ro-value">
+                <span class="fac-chip fac-chip-{{ facture.statut }}" style="font-size:11px;padding:2px 9px;">
+                  <span class="chip-dot"></span>{{ facture.get_statut_display }}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
-        <div class="fac-ro-field">
-          <div class="fac-ro-label">Date d'émission</div>
-          <div class="fac-ro-value">{{ facture.date_emission|date:"d/m/Y à H:i" }}</div>
-        </div>
-        <div class="fac-ro-field">
-          <div class="fac-ro-label">Date d'échéance</div>
-          <div class="fac-ro-value {% if not facture.date_echeance %}muted{% endif %}">
-            {% if facture.date_echeance %}{{ facture.date_echeance|date:"d/m/Y" }}{% else %}—{% endif %}
+      </div>
+
+      <!-- Section 2 : Paiement & Comptabilité -->
+      <div class="fac-inner-section">
+        <div class="fac-section-title"><i class="bi bi-bank"></i> Paiement &amp; Comptabilité</div>
+        <div class="fac-2col">
+          <div>
+            <div class="fac-ro-field grey-field">
+              <div class="fac-ro-label">Part assurance</div>
+              <div class="fac-ro-value">{{ facture.montant_assurance|floatformat:0 }} CFA</div>
+            </div>
+            <div class="fac-ro-field grey-field">
+              <div class="fac-ro-label">Ticket modérateur</div>
+              <div class="fac-ro-value">{{ facture.ticket_moderateur|floatformat:0 }} CFA</div>
+            </div>
+            <div class="fac-ro-field grey-field">
+              <div class="fac-ro-label">Compte bancaire destinataire</div>
+              <div class="fac-ro-value muted">—</div>
+            </div>
+          </div>
+          <div>
+            <div class="fac-ro-field grey-field">
+              <div class="fac-ro-label">Position fiscale</div>
+              <div class="fac-ro-value muted">—</div>
+            </div>
+            <div class="fac-ro-field grey-field">
+              <div class="fac-ro-label">Incoterm</div>
+              <div class="fac-ro-value muted">—</div>
+            </div>
           </div>
         </div>
-        <div class="fac-ro-field">
-          <div class="fac-ro-label">Part assurance</div>
-          <div class="fac-ro-value">{{ facture.montant_assurance|floatformat:0 }} CFA</div>
+        <!-- Checkboxes -->
+        <div style="display:flex;flex-wrap:wrap;gap:0;border-top:1px solid var(--border);margin-top:4px;">
+          <div class="fac-checkbox-row" style="flex:1;min-width:200px;border-right:1px solid var(--border);">
+            <i class="bi bi-square" style="color:var(--text-muted);"></i>
+            <span style="font-size:13px;">Publié automatiquement</span>
+          </div>
+          <div class="fac-checkbox-row" style="flex:1;min-width:200px;">
+            <i class="bi bi-square" style="color:var(--text-muted);"></i>
+            <span style="font-size:13px;">À vérifier</span>
+          </div>
         </div>
-        <div class="fac-ro-field">
-          <div class="fac-ro-label">Ticket modérateur</div>
-          <div class="fac-ro-value">{{ facture.ticket_moderateur|floatformat:0 }} CFA</div>
+      </div>
+
+      <!-- Section 3 : Guichet -->
+      <div class="fac-inner-section">
+        <div class="fac-section-title"><i class="bi bi-shop"></i> Guichet</div>
+        <div class="fac-2col">
+          <div>
+            <div class="fac-ro-field grey-field">
+              <div class="fac-ro-label">Type de guichet</div>
+              <div class="fac-ro-value muted">—</div>
+            </div>
+          </div>
+          <div>
+            <div class="fac-checkbox-row">
+              <i class="bi bi-square" style="color:var(--text-muted);"></i>
+              <span style="font-size:13px;">Créer des mouvements de stock</span>
+            </div>
+          </div>
         </div>
-        <div class="fac-ro-field" style="{% if not facture.notes %}{% endif %}grid-column: span 3;">
-          <div class="fac-ro-label">Notes</div>
-          <div class="fac-ro-value {% if not facture.notes %}muted{% endif %}">
+      </div>
+
+      <!-- Section 4 : Notes -->
+      <div class="fac-inner-section">
+        <div class="fac-section-title"><i class="bi bi-chat-left-text"></i> Notes</div>
+        <div class="fac-ro-field grey-field" style="border:none;padding:4px 0;">
+          <div class="fac-ro-value {% if not facture.notes %}muted{% endif %}" style="font-size:13px;line-height:1.6;">
             {% if facture.notes %}{{ facture.notes }}{% else %}—{% endif %}
           </div>
         </div>
@@ -442,43 +799,85 @@ html[data-theme="dark"] .fac-alert-success {
       {% endif %}
     </div>
 
-    <!-- ── Onglet 4 : Info de l'hôpital ── -->
+    <!-- ── Onglet 5 : Info de l'hôpital ── -->
     <div class="fac-tab-panel" id="tab-medical" style="display:none;">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;">
-        <div style="padding:20px 24px;border-right:1px solid var(--border);">
-          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:14px;">Détails Généraux</div>
-          <div class="fac-ro-field" style="border:none;padding:6px 0;">
-            <div class="fac-ro-label">Type de facture d'hôpital</div>
-            <div class="fac-ro-value">{{ facture.get_type_facture_display }}</div>
-          </div>
-          <div class="fac-ro-field" style="border:none;padding:6px 0;">
-            <div class="fac-ro-label">Hospitalisation</div>
-            <div class="fac-ro-value {% if not facture.hospitalisation %}muted{% endif %}">
-              {% if facture.hospitalisation %}{{ facture.hospitalisation }}{% else %}—{% endif %}
+
+      <!-- Section : Détails médicaux -->
+      <div class="fac-inner-section">
+        <div class="fac-section-title"><i class="bi bi-person-vcard"></i> Informations médicales</div>
+        <div class="fac-2col">
+          <div>
+            <div class="fac-ro-field grey-field">
+              <div class="fac-ro-label">Docteur</div>
+              <div class="fac-ro-value {% if not facture.soins.first.infirmier %}muted{% endif %}">
+                {% with soin=facture.soins.first %}
+                  {% if soin and soin.infirmier %}{{ soin.infirmier.nom_complet|default:soin.infirmier }}{% else %}—{% endif %}
+                {% endwith %}
+              </div>
+            </div>
+            <div class="fac-ro-field grey-field">
+              <div class="fac-ro-label">Docteur référant</div>
+              <div class="fac-ro-value muted">—</div>
+            </div>
+            <div class="fac-ro-field grey-field">
+              <div class="fac-ro-label">Type de facture hôpital</div>
+              <div class="fac-ro-value">{{ facture.get_type_facture_display }}</div>
+            </div>
+            <div class="fac-ro-field grey-field">
+              <div class="fac-ro-label">Ordonnance</div>
+              <div class="fac-ro-value muted">—</div>
             </div>
           </div>
-          <div class="fac-ro-field" style="border:none;padding:6px 0;">
-            <div class="fac-ro-label">Créée par</div>
-            <div class="fac-ro-value {% if not facture.cree_par %}muted{% endif %}">
-              {% if facture.cree_par %}{{ facture.cree_par.get_full_name|default:facture.cree_par.username }}{% else %}—{% endif %}
+          <div>
+            <div class="fac-ro-field grey-field">
+              <div class="fac-ro-label">Rendez-vous</div>
+              <div class="fac-ro-value {% if not facture.soins.first.rendez_vous %}muted{% endif %}">
+                {% with soin=facture.soins.first %}
+                  {% if soin and soin.rendez_vous %}{{ soin.rendez_vous }}{% else %}—{% endif %}
+                {% endwith %}
+              </div>
+            </div>
+            <div class="fac-ro-field grey-field">
+              <div class="fac-ro-label">Hospitalisation</div>
+              <div class="fac-ro-value {% if not facture.hospitalisation %}muted{% endif %}">
+                {% if facture.hospitalisation %}{{ facture.hospitalisation }}{% else %}—{% endif %}
+              </div>
+            </div>
+            <div class="fac-ro-field grey-field">
+              <div class="fac-ro-label">Créée par</div>
+              <div class="fac-ro-value {% if not facture.cree_par %}muted{% endif %}">
+                {% if facture.cree_par %}{{ facture.cree_par.get_full_name|default:facture.cree_par.username }}{% else %}—{% endif %}
+              </div>
             </div>
           </div>
         </div>
-        <div style="padding:20px 24px;">
-          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:14px;">Détails de l'assurance</div>
-          <div class="fac-ro-field" style="border:none;padding:6px 0;">
-            <div class="fac-ro-label">Assurance patient</div>
-            <div class="fac-ro-value {% if not facture.patient.assurance %}muted{% endif %}">
-              {% if facture.patient.assurance %}{{ facture.patient.assurance.nom }}{% else %}—{% endif %}
+      </div>
+
+      <!-- Section : Assurance -->
+      <div class="fac-inner-section">
+        <div class="fac-section-title"><i class="bi bi-shield-check"></i> Assurance</div>
+        <div class="fac-2col">
+          <div>
+            <div class="fac-ro-field grey-field">
+              <div class="fac-ro-label">Police d'assurance</div>
+              <div class="fac-ro-value {% if not facture.patient.assurance %}muted{% endif %}">
+                {% if facture.patient.assurance %}{{ facture.patient.assurance.nom }}{% else %}—{% endif %}
+              </div>
+            </div>
+            <div class="fac-ro-field grey-field">
+              <div class="fac-ro-label">Part assurance</div>
+              <div class="fac-ro-value">{{ facture.montant_assurance|floatformat:0 }} CFA</div>
             </div>
           </div>
-          <div class="fac-ro-field" style="border:none;padding:6px 0;">
-            <div class="fac-ro-label">Part assurance</div>
-            <div class="fac-ro-value">{{ facture.montant_assurance|floatformat:0 }} CFA</div>
-          </div>
-          <div class="fac-ro-field" style="border:none;padding:6px 0;">
-            <div class="fac-ro-label">Ticket modérateur</div>
-            <div class="fac-ro-value">{{ facture.ticket_moderateur|floatformat:0 }} CFA</div>
+          <div>
+            <div class="fac-ro-field grey-field">
+              <div class="fac-ro-label">Réclamation</div>
+              <div class="fac-ro-value muted">—</div>
+            </div>
+            <div class="fac-ro-field grey-field">
+              <div class="fac-ro-label">Ticket modérateur</div>
+              <div class="fac-ro-value">{{ facture.ticket_moderateur|floatformat:0 }} CFA</div>
+            </div>
           </div>
         </div>
       </div>
@@ -490,50 +889,156 @@ html[data-theme="dark"] .fac-alert-success {
 
 <!-- ══ MODAL PAIEMENT ══ -->
 {% if facture.statut == 'emise' or facture.statut == 'partielle' %}
-<div id="modal-paiement" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;align-items:center;justify-content:center;">
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:24px 28px;width:100%;max-width:400px;box-shadow:0 12px 40px rgba(0,0,0,.25);">
-    <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;">
-      <span><i class="bi bi-cash-coin" style="color:var(--accent);margin-right:7px;"></i>Enregistrer un paiement</span>
+<div id="modal-paiement" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:2000;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;width:100%;max-width:600px;box-shadow:0 16px 48px rgba(0,0,0,.3);overflow:hidden;">
+
+    <!-- En-tête modal -->
+    <div style="padding:16px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--bg);">
+      <div style="font-size:14px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px;">
+        <i class="bi bi-cash-coin" style="color:var(--accent);font-size:16px;"></i>
+        Enregistrer un paiement
+      </div>
       <button type="button" onclick="document.getElementById('modal-paiement').style.display='none'"
-        style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--text-muted);line-height:1;">×</button>
+        style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-muted);line-height:1;padding:0 4px;">&times;</button>
     </div>
+
     <form method="post" action="{% url 'soins:facture_payer' facture.pk %}">
       {% csrf_token %}
       <input type="hidden" name="next" value="{{ back_url }}">
-      <div style="margin-bottom:14px;">
-        <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);display:block;margin-bottom:5px;">Montant (CFA) *</label>
-        <input type="number" name="pay_montant" min="1" max="{{ facture.solde_restant|floatformat:0 }}"
-          value="{{ facture.solde_restant|floatformat:0 }}"
-          style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:5px;font-size:14px;font-weight:700;background:var(--bg);color:var(--text);"
-          required>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Solde restant : {{ facture.solde_restant|floatformat:0 }} CFA</div>
-      </div>
-      <div style="margin-bottom:14px;">
-        <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);display:block;margin-bottom:5px;">Mode de paiement</label>
-        <select name="pay_mode" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:5px;font-size:13px;background:var(--bg);color:var(--text);">
-          <option value="especes">Espèces</option>
-          <option value="mobile_money">Mobile Money</option>
-          <option value="cheque">Chèque</option>
-          <option value="virement">Virement</option>
-          <option value="assurance">Assurance</option>
-        </select>
-      </div>
-      <div style="margin-bottom:20px;">
-        <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);display:block;margin-bottom:5px;">Référence / Note</label>
-        <input type="text" name="pay_reference" placeholder="Optionnel…"
-          style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:5px;font-size:13px;background:var(--bg);color:var(--text);">
-      </div>
-      <div style="display:flex;gap:8px;justify-content:flex-end;">
-        <button type="button" onclick="document.getElementById('modal-paiement').style.display='none'"
-          style="padding:8px 16px;border-radius:5px;border:1.5px solid var(--border);background:none;cursor:pointer;font-size:13px;color:var(--text-muted);">Annuler</button>
+
+      <div style="padding:20px 22px;">
+        <!-- Grille 2 colonnes -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px 24px;">
+
+          <!-- Colonne gauche -->
+          <div>
+            <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);display:block;margin-bottom:5px;">
+              Journal <span style="color:#dc2626;">*</span>
+            </label>
+            <select name="pay_journal" id="pay-journal"
+              style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:5px;font-size:13px;font-weight:600;background:var(--bg);color:var(--text);">
+              <option value="caisse_accueil">CAISSE ACCUEIL</option>
+              <option value="caisse_soins">CAISSE SOINS</option>
+              <option value="banque">BANQUE</option>
+              <option value="mobile_money">MOBILE MONEY</option>
+              <option value="assurance">ASSURANCE</option>
+            </select>
+          </div>
+
+          <!-- Montant -->
+          <div>
+            <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);display:block;margin-bottom:5px;">
+              Montant <span style="color:#dc2626;">*</span>
+            </label>
+            <div style="display:flex;gap:0;align-items:stretch;">
+              <input type="number" name="pay_montant" id="pay-montant"
+                min="1" max="{{ facture.solde_restant|floatformat:0 }}"
+                value="{{ facture.solde_restant|floatformat:0 }}"
+                style="flex:1;padding:8px 10px;border:1.5px solid var(--border);border-right:none;border-radius:5px 0 0 5px;font-size:14px;font-weight:700;background:var(--bg);color:var(--text);"
+                required>
+              <span style="padding:8px 12px;background:var(--bg);border:1.5px solid var(--border);border-left:none;border-radius:0 5px 5px 0;font-size:12px;font-weight:700;color:var(--text-muted);display:flex;align-items:center;">CFA</span>
+            </div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Solde : {{ facture.solde_restant|floatformat:0 }} CFA</div>
+          </div>
+
+          <!-- Compte bancaire bénéficiaire -->
+          <div>
+            <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);display:block;margin-bottom:5px;">
+              Compte bancaire du bénéficiaire
+            </label>
+            <input type="text" name="pay_compte_bancaire" placeholder="—"
+              style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:5px;font-size:13px;background:var(--bg);color:var(--text);">
+          </div>
+
+          <!-- Date de règlement -->
+          <div>
+            <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);display:block;margin-bottom:5px;">
+              Date de règlement <span style="color:#dc2626;">*</span>
+            </label>
+            <input type="date" name="pay_date" id="pay-date"
+              style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:5px;font-size:13px;background:var(--bg);color:var(--text);"
+              required>
+          </div>
+
+          <!-- Mémo (pleine largeur) -->
+          <div style="grid-column:1/-1;">
+            <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);display:block;margin-bottom:5px;">
+              Mémo
+            </label>
+            <input type="text" name="pay_memo" id="pay-memo"
+              style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:5px;font-size:13px;font-family:monospace;background:var(--bg);color:var(--text);"
+              placeholder="Référence interne…">
+          </div>
+
+        </div><!-- /grille -->
+      </div><!-- /padding -->
+
+      <!-- Boutons -->
+      <div style="padding:14px 22px;border-top:1px solid var(--border);background:var(--bg);display:flex;align-items:center;gap:10px;">
         <button type="submit"
-          style="padding:8px 20px;border-radius:5px;border:none;background:#16a34a;color:#fff;font-size:13px;font-weight:600;cursor:pointer;">
-          <i class="bi bi-check-lg"></i> Confirmer le paiement
+          style="padding:9px 22px;border-radius:5px;border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+          <i class="bi bi-check-lg"></i> CRÉER UN PAIEMENT
+        </button>
+        <button type="button" onclick="document.getElementById('modal-paiement').style.display='none'"
+          style="padding:9px 18px;border-radius:5px;border:1.5px solid var(--border);background:none;cursor:pointer;font-size:13px;font-weight:600;color:var(--text-muted);">
+          ANNULER
         </button>
       </div>
     </form>
   </div>
 </div>
+{% endif %}
+
+<!-- ══ MODAL PAIEMENT PARTIEL ══ -->
+{% if facture.statut == 'partielle' %}
+{% with soins_en_attente=facture.soins.all %}
+{% if soins_en_attente %}
+<div id="modal-partiel" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:2100;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;width:100%;max-width:480px;box-shadow:0 16px 48px rgba(0,0,0,.3);overflow:hidden;">
+    <div style="padding:16px 22px;border-bottom:1px solid var(--border);background:var(--bg);display:flex;align-items:center;gap:10px;">
+      <div style="width:36px;height:36px;border-radius:50%;background:rgba(245,158,11,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <i class="bi bi-exclamation-triangle" style="color:#d97706;font-size:16px;"></i>
+      </div>
+      <div>
+        <div style="font-size:14px;font-weight:700;color:var(--text);">Paiement partiel</div>
+        <div style="font-size:12px;color:var(--text-muted);">Facture {{ facture.numero }}</div>
+      </div>
+      <button type="button" onclick="document.getElementById('modal-partiel').style.display='none'"
+        style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-muted);line-height:1;">&times;</button>
+    </div>
+    <div style="padding:22px 22px 16px;">
+      <p style="font-size:13px;color:var(--text);margin:0 0 8px;line-height:1.6;">
+        Le paiement enregistré est <strong>partiel</strong>.<br>
+        Solde restant : <strong style="color:#d97706;">{{ facture.solde_restant|floatformat:0 }} CFA</strong>
+      </p>
+      <p style="font-size:13px;color:var(--text-muted);margin:0;line-height:1.6;">
+        Souhaitez-vous autoriser quand même la dispensation du soin malgré le paiement incomplet ?
+      </p>
+    </div>
+    <div style="padding:0 22px 22px;display:flex;gap:10px;">
+      <form method="post" action="{% url 'soins:facture_autoriser_partiel' facture.pk %}" style="display:inline;">
+        {% csrf_token %}
+        <input type="hidden" name="autoriser" value="1">
+        <input type="hidden" name="next" value="{{ back_url }}">
+        <button type="submit"
+          style="padding:9px 20px;border-radius:5px;border:none;background:#16a34a;color:#fff;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+          <i class="bi bi-check-lg"></i> Oui, autoriser le soin
+        </button>
+      </form>
+      <form method="post" action="{% url 'soins:facture_autoriser_partiel' facture.pk %}" style="display:inline;">
+        {% csrf_token %}
+        <input type="hidden" name="autoriser" value="0">
+        <input type="hidden" name="next" value="{{ back_url }}">
+        <button type="submit"
+          style="padding:9px 18px;border-radius:5px;border:1.5px solid var(--border);background:none;cursor:pointer;font-size:13px;font-weight:600;color:var(--text-muted);">
+          Non, attendre le paiement complet
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endwith %}
 {% endif %}
 
 <script>
@@ -556,6 +1061,47 @@ document.querySelectorAll('.fac-tab-btn').forEach(function(btn){
     if (panel) panel.style.display = '';
   });
 });
+
+/* ── Modal paiement : pré-remplissage ── */
+(function(){
+  var dateInput = document.getElementById('pay-date');
+  var memoInput = document.getElementById('pay-memo');
+  if (dateInput) {
+    var today = new Date();
+    var y = today.getFullYear();
+    var m = String(today.getMonth()+1).padStart(2,'0');
+    var d = String(today.getDate()).padStart(2,'0');
+    dateInput.value = y+'-'+m+'-'+d;
+  }
+  if (memoInput && !'{{ facture.numero }}'.startsWith('{')) {
+    memoInput.value = '{{ facture.numero }}';
+  }
+  /* Fermer en cliquant sur le fond */
+  var overlay = document.getElementById('modal-paiement');
+  if (overlay) {
+    overlay.addEventListener('click', function(e){
+      if (e.target === overlay) overlay.style.display = 'none';
+    });
+  }
+
+  /* Ouvrir modal partiel si ?partial_confirm=1 */
+  var params = new URLSearchParams(window.location.search);
+  if (params.get('partial_confirm') === '1') {
+    var mp = document.getElementById('modal-partiel');
+    if (mp) {
+      mp.style.display = 'flex';
+      /* Nettoyer l'URL sans recharger */
+      var clean = window.location.pathname + '?next=' + encodeURIComponent(params.get('next') || '/soins/');
+      history.replaceState(null, '', clean);
+    }
+  }
+  var overlayP = document.getElementById('modal-partiel');
+  if (overlayP) {
+    overlayP.addEventListener('click', function(e){
+      if (e.target === overlayP) overlayP.style.display = 'none';
+    });
+  }
+})();
 </script>
 
 </div><!-- /#page-wrap -->

@@ -213,19 +213,27 @@ def soins_detail(request, pk):
     total_prix = sum(p.prix for p in procedures)
     facture_payee = (
         soin.facture is not None and
-        soin.facture.statut in ('payee', 'partielle')
+        soin.facture.statut in ('payee', 'partielle', 'comptabilisee')
     )
+    # Auto-sync : si la facture est payée mais le soin encore en attente → passer en_cours
+    if facture_payee and soin.statut == 'en_attente_de_paiement':
+        soin.statut = 'en_cours'
+        soin.save(update_fields=['statut'])
     peut_administrer = (
         soin.statut == 'en_cours' and
         facture_payee and
-        request.user.has_perm('soins.can_administrer_soin')
+        (request.user.has_perm('soins.can_administrer_soin') or request.user.is_superuser)
     )
     peut_creer_facture = (
         soin.statut == 'en_attente_de_paiement' and
         not soin.facture_id and
         request.user.has_perm('soins.can_creer_facture')
     )
-    peut_voir_facture = soin.facture_id is not None
+    est_caisse = request.user.has_perm('soins.can_creer_facture') or request.user.is_superuser
+    peut_voir_facture = (
+        soin.facture_id is not None and
+        (facture_payee or est_caisse)
+    )
     return render(request, 'soins/detail.html', {
         'soin': soin,
         'counts': counts,
@@ -360,7 +368,7 @@ def soins_edit(request, pk):
 @login_required(login_url='login')
 def soins_administrer(request, pk):
     """Marque le soin comme terminé (dispensé). Réservé au groupe Soins."""
-    if not request.user.has_perm('soins.can_administrer_soin'):
+    if not (request.user.has_perm('soins.can_administrer_soin') or request.user.is_superuser):
         messages.error(request, "Vous n'avez pas la permission d'administrer un soin.")
         return redirect('soins:detail', pk=pk)
     if request.method != 'POST':
@@ -369,7 +377,7 @@ def soins_administrer(request, pk):
     if soin.statut != 'en_cours':
         messages.error(request, "Ce soin n'est pas en cours.")
         return redirect('soins:detail', pk=pk)
-    if not soin.facture or soin.facture.statut not in ('payee', 'partielle'):
+    if not soin.facture or soin.facture.statut not in ('payee', 'partielle', 'comptabilisee'):
         messages.error(request, "La facture doit être payée avant d'administrer le soin.")
         return redirect('soins:detail', pk=pk)
     soin.statut = 'termine'
@@ -390,7 +398,10 @@ def soins_creer_facture(request, pk):
         messages.error(request, "Ce soin n'est pas en attente de paiement.")
         return redirect('soins:detail', pk=pk)
     if soin.facture_id:
-        return redirect('soins:facture_paiement', pk=soin.facture.pk)
+        from django.urls import reverse
+        detail_url = reverse('soins:facture_detail', kwargs={'pk': soin.facture.pk})
+        back_url = f'/soins/{soin.pk}/'
+        return redirect(f'{detail_url}?next={back_url}')
 
     from facturation.models import Facture, LigneFacture
     procedures = list(soin.procedures.select_related('soin_type').all())
@@ -398,7 +409,12 @@ def soins_creer_facture(request, pk):
         messages.error(request, "Ce soin n'a pas de lignes de soin à facturer.")
         return redirect('soins:detail', pk=pk)
 
-    total = sum(p.prix for p in procedures)
+    def _prix_effectif(proc):
+        if proc.prix:
+            return proc.prix
+        return proc.soin_type.prix_vente if proc.soin_type else 0
+
+    total = sum(_prix_effectif(p) for p in procedures)
     facture = Facture.objects.create(
         patient=soin.patient,
         cree_par=request.user,
@@ -407,15 +423,20 @@ def soins_creer_facture(request, pk):
         montant_total=total,
     )
     for proc in procedures:
+        prix = _prix_effectif(proc)
         LigneFacture.objects.create(
             facture=facture,
             libelle=proc.soin_type.nom if proc.soin_type else f"Soin – {proc.numero}",
             quantite=1,
-            prix_unitaire=proc.prix,
+            prix_unitaire=prix,
             remise=0,
         )
+        update_fields = ['facture']
+        if not proc.prix and prix:
+            proc.prix = prix
+            update_fields.append('prix')
         proc.facture = facture
-        proc.save(update_fields=['facture'])
+        proc.save(update_fields=update_fields)
 
     soin.facture = facture
     soin.save(update_fields=['facture'])
@@ -452,7 +473,7 @@ def soins_facture_paiement(request, pk):
                 mode_paiement=mode, reference=reference, recu_par=request.user,
             )
             facture.montant_paye = facture.montant_total
-            facture.statut = 'payee'
+            facture.statut = 'comptabilisee'
             facture.save(update_fields=['montant_paye', 'statut'])
             if soin:
                 soin.statut = 'en_cours'
@@ -584,6 +605,49 @@ def soins_rdv_create(request):
     return render(request, 'soins/rdv/form.html', {
         'form': form,
         'is_new': True,
+        'next_url': next_url,
+    })
+
+
+@login_required(login_url='login')
+def soins_rdv_detail(request, pk):
+    from patients.forms import RendezVousForm
+    from patients.models import RendezVous
+    rdv = get_object_or_404(
+        RendezVous.objects.select_related('patient', 'medecin', 'docteur_jr'),
+        pk=pk
+    )
+    next_url = request.GET.get('next') or request.POST.get('next') or '/soins/rendez-vous/'
+
+    if request.method == 'POST':
+        form = RendezVousForm(request.POST, instance=rdv)
+        if form.is_valid():
+            rdv = form.save()
+            action = request.POST.get('_action', '')
+            if action == 'confirmer':
+                rdv.statut = 'confirme'
+                rdv.save(update_fields=['statut'])
+            elif action == 'annuler':
+                rdv.statut = 'annule'
+                rdv.save(update_fields=['statut'])
+            elif action == 'terminer':
+                rdv.statut = 'termine'
+                rdv.save(update_fields=['statut'])
+            elif action == 'absent':
+                rdv.statut = 'absent'
+                rdv.save(update_fields=['statut'])
+            messages.success(
+                request,
+                f'Rendez-vous de {rdv.patient.nom} {rdv.patient.prenoms} mis à jour.'
+            )
+            return redirect('soins:rdv_detail', pk=rdv.pk)
+    else:
+        form = RendezVousForm(instance=rdv)
+
+    return render(request, 'soins/rdv/form.html', {
+        'form': form,
+        'rdv': rdv,
+        'is_new': False,
         'next_url': next_url,
     })
 
@@ -842,92 +906,55 @@ def maladie_create(request):
     return render(request, 'soins/maladie/form.html', {
         'form': form,
         'next_url': next_url,
+        'title': 'Nouvelle maladie',
     })
 
 
-# ─── FACTURATION DEPUIS SOINS ───────────────────────────────────────────────
+@login_required(login_url='login')
+def maladie_list(request):
+    q = request.GET.get('q', '').strip()
+    maladies = Maladie.objects.all()
+    if q:
+        maladies = maladies.filter(
+            Q(nom__icontains=q) | Q(code_cim__icontains=q)
+        )
+    return render(request, 'soins/maladie/list.html', {
+        'maladies': maladies,
+        'q': q,
+    })
 
-def _facturation_context(patient):
-    from facturation.models import Acte
-    from caisse.models import Caisse
-    return {
-        'actes': Acte.objects.filter(actif=True).order_by('categorie', 'libelle'),
-        'caisses': Caisse.objects.filter(actif=True),
-        'patient': patient,
-    }
+
+@login_required(login_url='login')
+def maladie_edit(request, pk):
+    from .forms import MaladieForm
+    maladie = get_object_or_404(Maladie, pk=pk)
+    next_url = request.GET.get('next') or request.POST.get('next') or '/soins/maladies/'
+    if request.method == 'POST':
+        form = MaladieForm(request.POST, instance=maladie)
+        if form.is_valid():
+            form.save()
+            return redirect(next_url)
+    else:
+        form = MaladieForm(instance=maladie)
+    return render(request, 'soins/maladie/form.html', {
+        'form': form,
+        'next_url': next_url,
+        'title': 'Modifier la maladie',
+        'maladie': maladie,
+    })
 
 
-def _process_facturation_post(request, patient, origin_url):
-    from facturation.models import Facture, LigneFacture, Acte, Paiement
-    from facturation.forms import FactureForm
-
-    def parse_float(val, default=0):
-        try:
-            return float(val)
-        except (TypeError, ValueError):
-            return default
-
-    form = FactureForm(request.POST)
-    if form.is_valid():
-        facture = form.save(commit=False)
-        facture.patient = patient
-        facture.cree_par = request.user
-
-        total = 0
-        lignes_data = []
-        i = 0
-        while f'ligne_libelle_{i}' in request.POST:
-            libelle = request.POST.get(f'ligne_libelle_{i}', '').strip()
-            acte_id = request.POST.get(f'ligne_acte_{i}') or None
-            qte = parse_float(request.POST.get(f'ligne_qte_{i}'), 1)
-            prix = parse_float(request.POST.get(f'ligne_prix_{i}'), 0)
-            remise = parse_float(request.POST.get(f'ligne_remise_{i}'), 0)
-            if libelle or acte_id:
-                montant = qte * prix * (1 - remise / 100)
-                total += montant
-                lignes_data.append({
-                    'libelle': libelle,
-                    'acte_id': acte_id,
-                    'quantite': qte,
-                    'prix_unitaire': prix,
-                    'remise': remise,
-                })
-            i += 1
-
-        facture.montant_total = round(total, 2)
-        facture.save()
-
-        for l in lignes_data:
-            LigneFacture.objects.create(
-                facture=facture,
-                acte_id=l['acte_id'],
-                libelle=l['libelle'] or (
-                    Acte.objects.get(pk=l['acte_id']).libelle if l['acte_id'] else '—'
-                ),
-                quantite=l['quantite'],
-                prix_unitaire=l['prix_unitaire'],
-                remise=l['remise'],
-            )
-
-        pay_montant = parse_float(request.POST.get('pay_montant'), 0)
-        pay_mode = request.POST.get('pay_mode', 'especes')
-        pay_memo = request.POST.get('pay_memo', '')
-        if pay_montant > 0:
-            Paiement.objects.create(
-                facture=facture,
-                montant=pay_montant,
-                mode_paiement=pay_mode,
-                reference=pay_memo,
-                recu_par=request.user,
-            )
-            facture.montant_paye = pay_montant
-            facture.statut = 'payee' if pay_montant >= total else 'partielle'
-            facture.save()
-
-        messages.success(request, f"Facture {facture.numero} créée avec succès.")
-        return redirect('facturation_list')
-
-    return form
+@login_required(login_url='login')
+def maladie_delete(request, pk):
+    maladie = get_object_or_404(Maladie, pk=pk)
+    next_url = request.GET.get('next') or '/soins/maladies/'
+    if request.method == 'POST':
+        maladie.delete()
+        return redirect(next_url)
+    return render(request, 'soins/maladie/confirm_delete.html', {
+        'maladie': maladie,
+        'next_url': next_url,
+    })
 
 
 @_staff_required
@@ -1022,23 +1049,49 @@ def procedure_facturer(request, pk):
 
 # ─── FACTURE DANS LE MODULE SOINS ──────────────────────────────────────────
 
-@_staff_required
+@login_required(login_url='login')
 def soins_facture_detail(request, pk):
     from facturation.models import Facture
     facture = get_object_or_404(
         Facture.objects.select_related('patient', 'cree_par'),
         pk=pk
     )
+    # Auto-correction : si le montant_total est 0 mais les procédures liées ont des prix,
+    # recalculer silencieusement les lignes et le total depuis soin_type.prix_vente.
+    if facture.montant_total == 0 and facture.statut in ('brouillon', 'emise'):
+        lignes = list(facture.lignes.select_related('acte').all())
+        procedures = list(facture.procedures_soins.select_related('soin_type').all())
+        proc_by_libelle = {
+            (p.soin_type.nom if p.soin_type else None): p for p in procedures
+        }
+        recalcule = False
+        for ligne in lignes:
+            if ligne.prix_unitaire == 0:
+                proc = proc_by_libelle.get(ligne.libelle)
+                prix = 0
+                if proc:
+                    prix = proc.prix or (proc.soin_type.prix_vente if proc.soin_type else 0)
+                if prix:
+                    ligne.prix_unitaire = prix
+                    ligne.save(update_fields=['prix_unitaire'])
+                    recalcule = True
+        if recalcule:
+            nouveau_total = sum(
+                l.prix_unitaire for l in facture.lignes.all()
+            )
+            facture.montant_total = nouveau_total
+            facture.save(update_fields=['montant_total'])
     back_url = request.GET.get('next', '/soins/')
     return render(request, 'soins/facturation/detail.html', {
         'facture': facture,
         'lignes': facture.lignes.all(),
         'paiements': facture.paiements.all(),
         'back_url': back_url,
+        'is_admin': request.user.is_superuser,
     })
 
 
-@_staff_required
+@login_required(login_url='login')
 def soins_facture_edit(request, pk):
     from facturation.models import Facture, LigneFacture, Acte
     from facturation.forms import FactureForm
@@ -1101,7 +1154,7 @@ def soins_facture_edit(request, pk):
     })
 
 
-@_staff_required
+@login_required(login_url='login')
 def soins_facture_valider(request, pk):
     from facturation.models import Facture
     from django.urls import reverse
@@ -1117,7 +1170,7 @@ def soins_facture_valider(request, pk):
     return redirect('soins:facture_detail', pk=pk)
 
 
-@_staff_required
+@login_required(login_url='login')
 def soins_facture_payer(request, pk):
     from facturation.models import Facture, Paiement
     from django.urls import reverse
@@ -1133,28 +1186,80 @@ def soins_facture_payer(request, pk):
     except (TypeError, ValueError):
         montant = 0
 
-    mode = request.POST.get('pay_mode', 'especes')
-    reference = request.POST.get('pay_reference', '')
+    journal = request.POST.get('pay_journal', 'caisse_accueil')
+    compte_bancaire = request.POST.get('pay_compte_bancaire', '')
+    memo = request.POST.get('pay_memo', '')
+
+    journal_to_mode = {
+        'caisse_accueil': 'especes',
+        'caisse_soins':   'especes',
+        'banque':         'virement',
+        'mobile_money':   'mobile_money',
+        'assurance':      'assurance',
+    }
+    mode = journal_to_mode.get(journal, 'especes')
+
+    from django.utils.dateparse import parse_date
+    date_str = request.POST.get('pay_date', '')
+    from django.utils import timezone as tz
+    if date_str:
+        d = parse_date(date_str)
+        date_paiement = tz.make_aware(
+            __import__('datetime').datetime.combine(d, __import__('datetime').time.min)
+        ) if d else tz.now()
+    else:
+        date_paiement = tz.now()
 
     if montant > 0 and facture.statut in ('brouillon', 'emise', 'partielle'):
         Paiement.objects.create(
             facture=facture,
             montant=montant,
             mode_paiement=mode,
-            reference=reference,
+            journal=journal,
+            compte_bancaire=compte_bancaire,
+            reference=memo,
+            date_paiement=date_paiement,
             recu_par=request.user,
         )
         total_paye = sum(p.montant for p in facture.paiements.all())
         facture.montant_paye = total_paye
         if total_paye >= facture.montant_total:
-            facture.statut = 'payee'
+            facture.statut = 'comptabilisee'
+            facture.save(update_fields=['montant_paye', 'statut'])
+            for soin in facture.soins.all():
+                if soin.statut in ('en_attente_de_paiement', 'brouillon'):
+                    soin.statut = 'en_cours'
+                    soin.save(update_fields=['statut'])
+            messages.success(request, f"Paiement complet — facture {facture.numero} comptabilisée.")
+            detail_url = reverse('soins:facture_detail', kwargs={'pk': pk})
+            return redirect(f'{detail_url}?next={back_url}')
         else:
             facture.statut = 'partielle'
-        facture.save(update_fields=['montant_paye', 'statut'])
-        messages.success(request, f"Paiement de {int(montant):,} CFA enregistré pour la facture {facture.numero}.".replace(',', ' '))
+            facture.save(update_fields=['montant_paye', 'statut'])
+            messages.success(request, f"Paiement partiel de {int(montant):,} CFA enregistré.".replace(',', ' '))
+            detail_url = reverse('soins:facture_detail', kwargs={'pk': pk})
+            return redirect(f'{detail_url}?next={back_url}&partial_confirm=1')
 
     detail_url = reverse('soins:facture_detail', kwargs={'pk': pk})
     return redirect(f'{detail_url}?next={back_url}')
+
+
+@login_required(login_url='login')
+def soins_autoriser_soin_partiel(request, pk):
+    from facturation.models import Facture
+    facture = get_object_or_404(Facture, pk=pk)
+    if request.method == 'POST':
+        autoriser = request.POST.get('autoriser') == '1'
+        back_url = request.POST.get('next', '/soins/')
+        if autoriser:
+            for soin in facture.soins.all():
+                if soin.statut == 'en_attente_de_paiement':
+                    soin.statut = 'en_cours'
+                    soin.save(update_fields=['statut'])
+            messages.success(request, "Le soin a été autorisé malgré le paiement partiel.")
+        detail_url = reverse('soins:facture_detail', kwargs={'pk': pk})
+        return redirect(f'{detail_url}?next={back_url}')
+    return redirect('soins:facture_detail', pk=pk)
 
 
 @login_required(login_url='login')
@@ -1173,18 +1278,32 @@ def soins_facture_print(request, pk):
     })
 
 
-# ─── DEMANDES D'EXAMEN (via laboratoire.AnalyseLaboratoire) ─────────────────
+@login_required(login_url='login')
+def soins_facture_apercu(request, pk):
+    from facturation.models import Facture
+    facture = get_object_or_404(
+        Facture.objects.select_related('patient', 'cree_par'),
+        pk=pk
+    )
+    back_url = request.GET.get('next', '/soins/')
+    return render(request, 'soins/facturation/apercu.html', {
+        'facture': facture,
+        'lignes': facture.lignes.select_related('acte').all(),
+        'paiements': facture.paiements.all(),
+        'back_url': back_url,
+    })
+
+
+# ─── DEMANDES D'EXAMEN ──────────────────────────────────────────────────────
 
 @login_required(login_url='login')
 def demande_examen_list(request):
+    from .models import DemandeExamen
     patient_id = request.GET.get('patient_id', '').strip()
-    q = request.GET.get('q', '').strip()
-    back = request.GET.get('next', '/soins/')
-    back_label = request.GET.get('back_label', '')
+    q          = request.GET.get('q', '').strip()
+    back       = request.GET.get('next', '/soins/')
 
-    qs = AnalyseLaboratoire.objects.select_related(
-        'patient', 'medecin_prescripteur', 'type_examen'
-    ).order_by('-date_prelevement')
+    qs = DemandeExamen.objects.select_related('patient', 'medecin_prescripteur').order_by('-date_creation')
 
     if patient_id:
         qs = qs.filter(patient_id=patient_id)
@@ -1192,8 +1311,7 @@ def demande_examen_list(request):
         qs = qs.filter(
             Q(numero__icontains=q) |
             Q(patient__nom__icontains=q) |
-            Q(patient__prenoms__icontains=q) |
-            Q(type_examen__nom__icontains=q)
+            Q(patient__prenoms__icontains=q)
         )
 
     patient = None
@@ -1204,67 +1322,105 @@ def demande_examen_list(request):
             pass
 
     return render(request, 'soins/demande_examen/list.html', {
-        'analyses': qs[:200],
+        'demandes': qs[:200],
         'patient': patient,
         'patient_id': patient_id,
         'q': q,
         'back': back,
-        'back_label': back_label,
     })
 
 
 @login_required(login_url='login')
 def demande_examen_create(request):
+    from .models import DemandeExamen, LigneDemandeExamen
     from laboratoire.models import TypeExamen
 
-    if request.method == 'POST':
-        patient_id = request.POST.get('patient') or ''
-        medecin_id = request.POST.get('medecin_prescripteur') or None
-        urgent = bool(request.POST.get('urgent'))
-        commentaire = request.POST.get('notes', '')
+    soin_id = request.GET.get('soin_id', '') or request.POST.get('soin_id', '')
+    initial_soin = None
+    if soin_id:
+        try:
+            initial_soin = Soin.objects.select_related('patient').get(pk=soin_id)
+        except Soin.DoesNotExist:
+            pass
 
-        if patient_id:
+    if request.method == 'POST':
+        patient_id  = request.POST.get('patient') or ''
+        medecin_id  = request.POST.get('medecin_prescripteur') or None
+        soin_fk_id  = request.POST.get('soin_id') or None
+
+        if not patient_id:
+            pass
+        else:
             try:
                 pat = Patient.objects.get(pk=patient_id)
-                lignes_type = request.POST.getlist('ligne_type[]')
-
-                created_pks = []
-                for type_id in lignes_type:
-                    if not type_id:
-                        continue
-                    analyse = AnalyseLaboratoire.objects.create(
-                        patient=pat,
-                        type_examen_id=type_id,
-                        medecin_prescripteur_id=medecin_id if medecin_id else None,
-                        urgent=urgent,
-                        commentaire=commentaire,
-                        statut='recu',
-                    )
-                    created_pks.append(analyse.pk)
-
-                if created_pks:
-                    if len(created_pks) == 1:
-                        return redirect('soins:demande_examen_detail', pk=created_pks[0])
-                    from django.urls import reverse
-                    return redirect(reverse('soins:demande_examen_list') + f'?patient_id={patient_id}')
             except Patient.DoesNotExist:
-                pass
+                pat = None
+
+            if pat:
+                demande = DemandeExamen.objects.create(
+                    patient=pat,
+                    soin_id=soin_fk_id if soin_fk_id else None,
+                    medecin_prescripteur_id=medecin_id if medecin_id else None,
+                    lab_groupe=request.POST.get('lab_groupe', ''),
+                    est_demande_groupe=bool(request.POST.get('est_demande_groupe')),
+                    type_test=request.POST.get('type_test', ''),
+                    centre_collecte=request.POST.get('centre_collecte', ''),
+                    envoyer_autre_lab=bool(request.POST.get('envoyer_autre_lab')),
+                    sampler=request.POST.get('sampler', ''),
+                    date_actes=request.POST.get('date_actes') or None,
+                    echantillon_du_test=bool(request.POST.get('echantillon_du_test')),
+                    statut=request.POST.get('statut', 'brouillon'),
+                    raison_refus=request.POST.get('raison_refus', ''),
+                    # HL7
+                    type_segment=request.POST.get('type_segment', 'H'),
+                    nom_fichier=request.POST.get('nom_fichier', 'WAL001.HPR'),
+                    code_emetteur=request.POST.get('code_emetteur', '001'),
+                    nom_emetteur=request.POST.get('nom_emetteur', ''),
+                    code_recepteur=request.POST.get('code_recepteur', '002'),
+                    nom_recepteur=request.POST.get('nom_recepteur', 'CMSWALE.0000'),
+                    identifiant_recepteur=request.POST.get('identifiant_recepteur', 'WALE.SYSLAM'),
+                    type_message=request.POST.get('type_message', 'DRA'),
+                    mode_traitement=request.POST.get('mode_traitement', 'P'),
+                    version_type=request.POST.get('version_type', 'H2.4'),
+                    type_liaison=request.POST.get('type_liaison', 'L'),
+                    liste_prix=request.POST.get('liste_prix', ''),
+                    type_segment_patient=request.POST.get('type_segment_patient', 'P'),
+                    rang_segment_patient=request.POST.get('rang_segment_patient', 'D'),
+                    type_code=request.POST.get('type_code', 'L'),
+                    priorite=request.POST.get('priorite', 'C'),
+                    code_action=request.POST.get('code_action', 'N'),
+                    date_heure_resultats=request.POST.get('date_heure_resultats') or None,
+                    statuts_resultats=request.POST.get('statuts_resultats', 'F'),
+                    couts_transport=request.POST.get('couts_transport', 'WALK'),
+                    type_segment_qbr=request.POST.get('type_segment_qbr', 'QBR'),
+                    type_segment_l=request.POST.get('type_segment_l', 'L'),
+                )
+                # Lignes
+                types_ids   = request.POST.getlist('ligne_type[]')
+                delais      = request.POST.getlist('ligne_delai[]')
+                prix_list   = request.POST.getlist('ligne_prix[]')
+                instructions = request.POST.getlist('ligne_instructions[]')
+                for i, tid in enumerate(types_ids):
+                    if not tid:
+                        continue
+                    LigneDemandeExamen.objects.create(
+                        demande=demande,
+                        type_examen_id=tid,
+                        delai_execution=delais[i] if i < len(delais) else '',
+                        prix_vente=prix_list[i] if i < len(prix_list) and prix_list[i] else 0,
+                        instructions_speciales=instructions[i] if i < len(instructions) else '',
+                    )
+                return redirect('soins:demande_examen_detail', pk=demande.pk)
 
     types_examens = list(TypeExamen.objects.values('pk', 'nom', 'prix', 'delai_resultat_heures'))
-    employes = list(Employe.objects.order_by('nom', 'prenoms').values('pk', 'nom', 'prenoms'))
-    patients_qs = list(Patient.objects.order_by('nom', 'prenoms').values('pk', 'nom', 'prenoms', 'code_patient'))
-
-    patient_id_get = request.GET.get('patient_id', '')
-    initial_patient = None
-    if patient_id_get:
-        try:
-            initial_patient = Patient.objects.get(pk=patient_id_get)
-        except Patient.DoesNotExist:
-            pass
+    employes      = list(Employe.objects.order_by('nom', 'prenoms').values('pk', 'nom', 'prenoms'))
+    patients_qs   = list(Patient.objects.order_by('nom', 'prenoms').values('pk', 'nom', 'prenoms', 'code_patient'))
 
     return render(request, 'soins/demande_examen/form.html', {
         'is_new': True,
-        'initial_patient': initial_patient,
+        'initial_soin': initial_soin,
+        'initial_patient': initial_soin.patient if initial_soin else None,
+        'soin_id': soin_id,
         'types_examens_json': json.dumps(types_examens, default=str),
         'employes_json': json.dumps(employes),
         'patients_json': json.dumps(patients_qs),
@@ -1273,42 +1429,142 @@ def demande_examen_create(request):
 
 @login_required(login_url='login')
 def demande_examen_detail(request, pk):
-    analyse = get_object_or_404(
-        AnalyseLaboratoire.objects.select_related(
-            'patient', 'medecin_prescripteur', 'type_examen', 'technicien', 'validateur'
-        ),
+    from .models import DemandeExamen
+    demande = get_object_or_404(
+        DemandeExamen.objects.select_related('patient', 'medecin_prescripteur', 'soin', 'rendez_vous'),
         pk=pk
     )
-    return render(request, 'soins/demande_examen/detail.html', {'analyse': analyse})
+    lignes = demande.lignes.select_related('type_examen').all()
+    return render(request, 'soins/demande_examen/detail.html', {
+        'demande': demande,
+        'analyse': demande,  # alias for template compatibility
+        'lignes': lignes,
+    })
 
 
 @login_required(login_url='login')
 def demande_examen_envoyer(request, pk):
-    analyse = get_object_or_404(AnalyseLaboratoire, pk=pk)
-    if request.method == 'POST' and analyse.statut == 'recu':
-        analyse.statut = 'en_analyse'
-        analyse.save()
+    from .models import DemandeExamen
+    demande = get_object_or_404(DemandeExamen, pk=pk)
+    if request.method == 'POST' and demande.statut == 'brouillon':
+        demande.statut = 'demande'
+        demande.save(update_fields=['statut'])
     return redirect('soins:demande_examen_detail', pk=pk)
 
 
 @login_required(login_url='login')
 def demande_examen_terminer(request, pk):
-    analyse = get_object_or_404(AnalyseLaboratoire, pk=pk)
+    from .models import DemandeExamen
+    demande = get_object_or_404(DemandeExamen, pk=pk)
     if request.method == 'POST':
         transitions = {
-            'recu': 'en_analyse',
-            'en_analyse': 'resultat',
-            'resultat': 'valide',
-            'valide': 'envoye',
+            'brouillon': 'demande',
+            'demande':   'accepte',
+            'accepte':   'en_cours',
+            'en_cours':  'termine',
         }
-        next_statut = transitions.get(analyse.statut)
+        next_statut = transitions.get(demande.statut)
         if next_statut:
-            analyse.statut = next_statut
-            analyse.save()
+            demande.statut = next_statut
+            demande.save(update_fields=['statut'])
     return redirect('soins:demande_examen_detail', pk=pk)
 
 
 @login_required(login_url='login')
 def demande_examen_annuler(request, pk):
-    # AnalyseLaboratoire n'a pas de statut "annule" — on redirige simplement
+    from .models import DemandeExamen
+    demande = get_object_or_404(DemandeExamen, pk=pk)
+    if request.method == 'POST' and demande.statut != 'termine':
+        demande.statut = 'brouillon'
+        demande.save(update_fields=['statut'])
     return redirect('soins:demande_examen_detail', pk=pk)
+
+
+@login_required(login_url='login')
+def demande_examen_edit(request, pk):
+    from .models import DemandeExamen, LigneDemandeExamen
+    from laboratoire.models import TypeExamen
+
+    demande = get_object_or_404(DemandeExamen, pk=pk)
+    if demande.statut != 'brouillon':
+        return redirect('soins:demande_examen_detail', pk=pk)
+
+    if request.method == 'POST':
+        patient_id = request.POST.get('patient') or ''
+        medecin_id = request.POST.get('medecin_prescripteur') or None
+
+        if patient_id:
+            try:
+                pat = Patient.objects.get(pk=patient_id)
+                demande.patient = pat
+            except Patient.DoesNotExist:
+                pass
+
+        demande.medecin_prescripteur_id = medecin_id if medecin_id else None
+        demande.lab_groupe = request.POST.get('lab_groupe', '')
+        demande.est_demande_groupe = bool(request.POST.get('est_demande_groupe'))
+        demande.type_test = request.POST.get('type_test', '')
+        demande.centre_collecte = request.POST.get('centre_collecte', '')
+        demande.envoyer_autre_lab = bool(request.POST.get('envoyer_autre_lab'))
+        demande.sampler = request.POST.get('sampler', '')
+        demande.date_actes = request.POST.get('date_actes') or None
+        demande.echantillon_du_test = bool(request.POST.get('echantillon_du_test'))
+        demande.raison_refus = request.POST.get('raison_refus', '')
+        demande.type_segment = request.POST.get('type_segment', 'H')
+        demande.nom_fichier = request.POST.get('nom_fichier', 'WAL001.HPR')
+        demande.code_emetteur = request.POST.get('code_emetteur', '001')
+        demande.nom_emetteur = request.POST.get('nom_emetteur', '')
+        demande.code_recepteur = request.POST.get('code_recepteur', '002')
+        demande.nom_recepteur = request.POST.get('nom_recepteur', 'CMSWALE.0000')
+        demande.identifiant_recepteur = request.POST.get('identifiant_recepteur', 'WALE.SYSLAM')
+        demande.type_message = request.POST.get('type_message', 'DRA')
+        demande.mode_traitement = request.POST.get('mode_traitement', 'P')
+        demande.version_type = request.POST.get('version_type', 'H2.4')
+        demande.type_liaison = request.POST.get('type_liaison', 'L')
+        demande.liste_prix = request.POST.get('liste_prix', '')
+        demande.save()
+
+        # Rebuild lignes
+        demande.lignes.all().delete()
+        types_ids    = request.POST.getlist('ligne_type[]')
+        delais       = request.POST.getlist('ligne_delai[]')
+        prix_list    = request.POST.getlist('ligne_prix[]')
+        instructions = request.POST.getlist('ligne_instructions[]')
+        for i, tid in enumerate(types_ids):
+            if not tid:
+                continue
+            LigneDemandeExamen.objects.create(
+                demande=demande,
+                type_examen_id=tid,
+                delai_execution=delais[i] if i < len(delais) else '',
+                prix_vente=prix_list[i] if i < len(prix_list) and prix_list[i] else 0,
+                instructions_speciales=instructions[i] if i < len(instructions) else '',
+            )
+        return redirect('soins:demande_examen_detail', pk=demande.pk)
+
+    types_examens = list(TypeExamen.objects.values('pk', 'nom', 'prix', 'delai_resultat_heures'))
+    employes      = list(Employe.objects.order_by('nom', 'prenoms').values('pk', 'nom', 'prenoms'))
+    patients_qs   = list(Patient.objects.order_by('nom', 'prenoms').values('pk', 'nom', 'prenoms', 'code_patient'))
+
+    existing_lignes = []
+    for ligne in demande.lignes.select_related('type_examen').all():
+        existing_lignes.append({
+            'type_examen': ligne.type_examen_id,
+            'delai_execution': ligne.delai_execution,
+            'prix_vente': str(ligne.prix_vente),
+            'instructions_speciales': ligne.instructions_speciales,
+        })
+
+    return render(request, 'soins/demande_examen/form.html', {
+        'instance': demande,
+        'is_new': False,
+        'initial_soin': demande.soin,
+        'initial_patient': demande.patient,
+        'soin_id': demande.soin_id or '',
+        'date_str': demande.date.strftime('%Y-%m-%dT%H:%M') if demande.date else '',
+        'date_actes_str': demande.date_actes.strftime('%Y-%m-%dT%H:%M') if demande.date_actes else '',
+        'types_examens_json': json.dumps(types_examens, default=str),
+        'employes_json': json.dumps(employes),
+        'patients_json': json.dumps(patients_qs),
+        'existing_lignes_json': json.dumps(existing_lignes),
+    })
