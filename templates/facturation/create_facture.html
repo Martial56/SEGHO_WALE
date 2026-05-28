@@ -4,6 +4,37 @@
 
 {% block extra_css %}
 <style>
+/* ── Combobox recherche prestation ── */
+.svc-combo { position: relative; width: 100%; }
+.svc-combo-inner { position: relative; display: flex; align-items: center; }
+.svc-input {
+    flex: 1; padding: 5px 22px 5px 2px;
+    border: none; border-bottom: 1.5px solid #d1dde3;
+    border-radius: 0; font-size: 12px; font-family: inherit;
+    background: transparent; outline: none; color: var(--teal-900);
+    transition: border-color .2s; width: 100%;
+}
+.svc-input:focus { border-bottom-color: var(--teal-500); }
+.svc-input::placeholder { color: #bfcdd4; }
+.svc-arrow {
+    position: absolute; right: 3px; top: 50%; transform: translateY(-50%);
+    pointer-events: none; color: #aaa; font-size: 10px; line-height: 1;
+}
+.svc-preloaded .svc-input { color: var(--teal-700, #0d7b6a); font-weight: 500; }
+.svc-preloaded .svc-arrow { color: var(--teal-500); }
+.svc-dropdown {
+    display: none; position: fixed;
+    background: #fff; border: 1px solid #d1dde3;
+    border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,0.14);
+    max-height: 240px; overflow-y: auto;
+    z-index: 99999; font-size: 12px; font-family: inherit;
+    min-width: 260px;
+}
+.svc-opt { padding: 7px 12px; cursor: pointer; color: var(--teal-900, #1a3a4a); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.svc-opt:hover, .svc-opt.focused { background: #e0f7f4; color: var(--teal-700, #0d7b6a); }
+.svc-opt.is-selected { background: #f0fdf9; font-weight: 600; }
+.svc-empty { padding: 10px 12px; color: rgba(0,0,0,0.35); font-style: italic; }
+
 /* ── Control panel ── */
 .control-panel {
     background: #fff;
@@ -145,12 +176,11 @@ textarea.field-ul:focus { border-color: var(--teal-500); }
 .lignes-table input:focus, .lignes-table select:focus {
     border-bottom-color: var(--teal-500);
 }
-.lignes-table .col-libelle { min-width: 200px; }
-.lignes-table .col-acte    { width: 160px; }
+.lignes-table .col-libelle { min-width: 260px; }
 .lignes-table .col-qte     { width: 70px; }
-.lignes-table .col-prix    { width: 110px; }
+.lignes-table .col-prix    { width: 120px; }
 .lignes-table .col-remise  { width: 80px; }
-.lignes-table .col-total   { width: 110px; font-weight: 600; color: var(--teal-700); text-align: right; }
+.lignes-table .col-total   { width: 120px; font-weight: 600; color: var(--teal-700); text-align: right; }
 .lignes-table .col-del     { width: 36px; text-align: center; }
 .btn-del-ligne {
     background: none; border: none; cursor: pointer;
@@ -350,7 +380,6 @@ textarea.field-ul:focus { border-color: var(--teal-500); }
             <thead>
                 <tr>
                     <th class="col-libelle">Désignation <span class="required-star">*</span></th>
-                    <th class="col-acte">Acte catalogue</th>
                     <th class="col-qte">Qté</th>
                     <th class="col-prix">Prix unit. (CFA)</th>
                     <th class="col-remise">Remise %</th>
@@ -361,16 +390,19 @@ textarea.field-ul:focus { border-color: var(--teal-500); }
             <tbody id="lignes-body">
                 <!-- ligne initiale -->
                 <tr class="ligne-row">
-                    <td class="col-libelle"><input type="text" name="ligne_libelle_0" placeholder="Ex : Consultation générale…" value="{{ initial_ligne_libelle }}"></td>
-                    <td class="col-acte">
-                        <select name="ligne_acte_0" onchange="fillFromActe(this, 0)">
-                            <option value="">— Choisir —</option>
-                            {% for acte in actes %}
-                            <option value="{{ acte.pk }}" data-prix="{{ acte.prix }}" data-libelle="{{ acte.libelle }}">
-                                {{ acte.libelle }} ({{ acte.prix }} CFA)
-                            </option>
-                            {% endfor %}
-                        </select>
+                    <td class="col-libelle">
+                        <div class="svc-combo{% if initial_ligne_libelle %} svc-preloaded{% endif %}" data-idx="0">
+                            <div class="svc-combo-inner">
+                                <input type="text" class="svc-input"
+                                       placeholder="Chercher une prestation…"
+                                       autocomplete="off"
+                                       value="{{ initial_ligne_libelle }}">
+                                <span class="svc-arrow">▼</span>
+                            </div>
+                            <input type="hidden" name="ligne_libelle_0"
+                                   class="svc-hidden" value="{{ initial_ligne_libelle }}">
+                            <div class="svc-dropdown"></div>
+                        </div>
                     </td>
                     <td class="col-qte"><input type="number" name="ligne_qte_0" value="1" min="0.01" step="0.01" oninput="recalcRow(0)"></td>
                     <td class="col-prix"><input type="number" name="ligne_prix_0" value="0" min="0" step="1" oninput="recalcRow(0)"></td>
@@ -530,6 +562,13 @@ textarea.field-ul:focus { border-color: var(--teal-500); }
 (function () {
     var lineCount = 1;
 
+    /* ── Données services (sérialisées depuis Django) ── */
+    var _SERVICES = [
+        {% for svc in services %}{ nom: "{{ svc.nom|escapejs }}", prix: {{ svc.prix_vente }} },
+        {% endfor %}
+    ];
+    console.log('[Facturation] Services chargés :', _SERVICES.length, _SERVICES.slice(0,3));
+
     function fmt(n) {
         return Number(n).toLocaleString('fr-FR') + ' CFA';
     }
@@ -564,14 +603,87 @@ textarea.field-ul:focus { border-color: var(--teal-500); }
         document.getElementById('raw-total').value = Math.round(subtotal);
     };
 
-    window.fillFromActe = function (sel, idx) {
-        var opt = sel.options[sel.selectedIndex];
-        if (!opt || !opt.value) return;
-        var libInput  = document.querySelector('[name="ligne_libelle_' + idx + '"]');
-        var prixInput = document.querySelector('[name="ligne_prix_'   + idx + '"]');
-        if (libInput && !libInput.value) libInput.value = opt.dataset.libelle || '';
-        if (prixInput) { prixInput.value = opt.dataset.prix || 0; }
-        recalcRow(idx);
+    /* ── Combobox : attacher comportement sur un .svc-combo ── */
+    window.buildCombo = function (wrapper) {
+        var idx      = parseInt(wrapper.dataset.idx, 10);
+        var input    = wrapper.querySelector('.svc-input');
+        var hidden   = wrapper.querySelector('.svc-hidden');
+        var dropdown = wrapper.querySelector('.svc-dropdown');
+
+        function positionDropdown() {
+            var rect = input.getBoundingClientRect();
+            /* position:fixed → coordonnées viewport, sans offset de scroll */
+            dropdown.style.top   = rect.bottom + 'px';
+            dropdown.style.left  = rect.left   + 'px';
+            dropdown.style.width = Math.max(rect.width, 280) + 'px';
+        }
+
+        function render(q) {
+            var current = hidden.value;
+            var list = (q && q !== current)
+                ? _SERVICES.filter(function (s) {
+                    return s.nom.toLowerCase().indexOf(q.toLowerCase()) !== -1;
+                  })
+                : _SERVICES;
+            if (!list.length) {
+                dropdown.innerHTML = '<div class="svc-empty">Aucun résultat pour "' + q + '"</div>';
+            } else {
+                dropdown.innerHTML = list.map(function (s) {
+                    var sel = s.nom === current ? ' is-selected' : '';
+                    return '<div class="svc-opt' + sel + '" data-nom="' + s.nom.replace(/"/g, '&quot;') +
+                           '" data-prix="' + s.prix + '">' + s.nom + '</div>';
+                }).join('');
+            }
+            positionDropdown();
+            dropdown.style.display = 'block';
+        }
+
+        function selectService(nom, prix) {
+            hidden.value = nom;
+            input.value  = nom;
+            wrapper.classList.add('svc-preloaded');
+            var prixInput = document.querySelector('[name="ligne_prix_' + idx + '"]');
+            if (prixInput) { prixInput.value = prix; recalcRow(idx); }
+        }
+
+        function close() { dropdown.style.display = 'none'; }
+
+        input.addEventListener('focus', function () { render(input.value); });
+        input.addEventListener('input', function () {
+            wrapper.classList.remove('svc-preloaded');
+            hidden.value = '';
+            render(input.value);
+        });
+        input.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') { close(); input.blur(); }
+        });
+
+        dropdown.addEventListener('mousedown', function (e) {
+            e.preventDefault();
+            var opt = e.target.closest('.svc-opt');
+            if (!opt) return;
+            selectService(opt.dataset.nom, opt.dataset.prix || 0);
+            close();
+        });
+
+        document.addEventListener('click', function (e) {
+            if (!wrapper.contains(e.target)) close();
+        });
+
+        /* Repositionner lors du scroll (position:fixed suit le viewport) */
+        window.addEventListener('scroll', positionDropdown, true);
+
+        /* ── Auto-remplissage si une valeur initiale est déjà définie (ex: RDV) ── */
+        if (hidden.value) {
+            var initSvc = _SERVICES.find(function (s) { return s.nom === hidden.value; });
+            if (initSvc) {
+                var prixInput = document.querySelector('[name="ligne_prix_' + idx + '"]');
+                if (prixInput && (parseFloat(prixInput.value) || 0) === 0) {
+                    prixInput.value = initSvc.prix;
+                    recalcRow(idx);
+                }
+            }
+        }
     };
 
     window.addLigne = function () {
@@ -580,20 +692,24 @@ textarea.field-ul:focus { border-color: var(--teal-500); }
         var tr   = document.createElement('tr');
         tr.className = 'ligne-row';
 
-        var acteOptions = '<option value="">— Choisir —</option>';
-        {% for acte in actes %}
-        acteOptions += '<option value="{{ acte.pk }}" data-prix="{{ acte.prix }}" data-libelle="{{ acte.libelle|escapejs }}">{{ acte.libelle|escapejs }} ({{ acte.prix }} CFA)</option>';
-        {% endfor %}
-
         tr.innerHTML =
-            '<td class="col-libelle"><input type="text" name="ligne_libelle_' + idx + '" placeholder="Désignation…"></td>' +
-            '<td class="col-acte"><select name="ligne_acte_' + idx + '" onchange="fillFromActe(this,' + idx + ')">' + acteOptions + '</select></td>' +
+            '<td class="col-libelle">' +
+              '<div class="svc-combo" data-idx="' + idx + '">' +
+                '<div class="svc-combo-inner">' +
+                  '<input type="text" class="svc-input" placeholder="Chercher une prestation…" autocomplete="off">' +
+                  '<span class="svc-arrow">▼</span>' +
+                '</div>' +
+                '<input type="hidden" name="ligne_libelle_' + idx + '" class="svc-hidden">' +
+                '<div class="svc-dropdown"></div>' +
+              '</div>' +
+            '</td>' +
             '<td class="col-qte"><input type="number" name="ligne_qte_' + idx + '" value="1" min="0.01" step="0.01" oninput="recalcRow(' + idx + ')"></td>' +
             '<td class="col-prix"><input type="number" name="ligne_prix_' + idx + '" value="0" min="0" step="1" oninput="recalcRow(' + idx + ')"></td>' +
             '<td class="col-remise"><input type="number" name="ligne_remise_' + idx + '" value="0" min="0" max="100" step="0.01" oninput="recalcRow(' + idx + ')"></td>' +
             '<td class="col-total" id="total-' + idx + '">0 CFA</td>' +
             '<td class="col-del"><button type="button" class="btn-del-ligne" onclick="removeLigne(this)">×</button></td>';
         body.appendChild(tr);
+        buildCombo(tr.querySelector('.svc-combo'));
     };
 
     window.removeLigne = function (btn) {
@@ -611,6 +727,10 @@ textarea.field-ul:focus { border-color: var(--teal-500); }
     if (tickEl) tickEl.addEventListener('input', recalcTotaux);
 
     recalcTotaux();
+
+    /* Initialiser le combobox sur la première ligne */
+    var combo0 = document.querySelector('.svc-combo[data-idx="0"]');
+    if (combo0) buildCombo(combo0);
 
     window.openPaymentModal = function () {
         var total = parseInt(document.getElementById('raw-total').value, 10) || 0;

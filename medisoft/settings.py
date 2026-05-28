@@ -24,6 +24,9 @@ INSTALLED_APPS = [
     'rapports',
     'core',
     'modules_permissions',
+    'utilisateur',
+    'services',
+    'soins',
 ]
 
 MIDDLEWARE = [

@@ -80,6 +80,7 @@ class RendezVous(models.Model):
     docteur_jr = models.ForeignKey('medecins.Medecin', on_delete=models.SET_NULL, null=True, blank=True, related_name='rdv_docteur_jr', verbose_name='Docteur Jr. responsable')
     departement = models.CharField(max_length=30, choices=DEPARTEMENT, blank=True, default='')
     service = models.ForeignKey('medecins.Service', on_delete=models.SET_NULL, null=True, blank=True, related_name='rendez_vous')
+    type_consultation = models.ForeignKey('services.Articleservice', on_delete=models.SET_NULL, null=True, blank=True, related_name='rendez_vous', verbose_name='Type de consultation')
     salle_consultation = models.CharField(max_length=100, blank=True, verbose_name='Salle de consultation')
     date_heure = models.DateTimeField()
     date_suivi = models.DateTimeField(null=True, blank=True, verbose_name='Date de suivi')
@@ -154,6 +155,49 @@ class RendezVous(models.Model):
     class Meta:
         verbose_name = "Rendez-vous"
         ordering = ['date_heure']
+
+
+class RegistreCPN(models.Model):
+    rdv = models.OneToOneField(RendezVous, on_delete=models.CASCADE, related_name='registre_cpn')
+    donnees = models.JSONField(default=dict, blank=True)
+    date_modification = models.DateTimeField(auto_now=True)
+    class Meta:
+        verbose_name = "Registre CPN"
+
+class RegistreAccouchement(models.Model):
+    rdv = models.OneToOneField(RendezVous, on_delete=models.CASCADE, related_name='registre_accouchement')
+    donnees = models.JSONField(default=dict, blank=True)
+    date_modification = models.DateTimeField(auto_now=True)
+    class Meta:
+        verbose_name = "Registre Accouchement"
+
+class RegistrePostnatale(models.Model):
+    rdv = models.OneToOneField(RendezVous, on_delete=models.CASCADE, related_name='registre_postnatale')
+    donnees = models.JSONField(default=dict, blank=True)
+    date_modification = models.DateTimeField(auto_now=True)
+    class Meta:
+        verbose_name = "Registre Postnatale"
+
+class RegistreCuratif(models.Model):
+    rdv = models.OneToOneField(RendezVous, on_delete=models.CASCADE, related_name='registre_curatif')
+    donnees = models.JSONField(default=dict, blank=True)
+    date_modification = models.DateTimeField(auto_now=True)
+
+    @property
+    def diagnostic_display(self):
+        """Retourne les noms des pathologies sélectionnées dans cur_diagnostic."""
+        raw = self.donnees.get('cur_diagnostic', [])
+        if isinstance(raw, str):
+            raw = [raw] if raw else []
+        pks = [int(v) for v in raw if str(v).strip().isdigit()]
+        if not pks:
+            return ''
+        return ', '.join(
+            Pathologie.objects.filter(pk__in=pks).order_by('nom').values_list('nom', flat=True)
+        )
+
+    class Meta:
+        verbose_name = "Registre Curatif"
 
 
 class Pathologie(models.Model):

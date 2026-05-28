@@ -465,7 +465,7 @@
             {% elif rdv.statut == 'confirme' %}
                 <button type="submit" name="_action" value="en_attente" class="btn-action btn-waiting"
                     {% if not consultation %}disabled title="L'évaluation clinique doit être enregistrée d'abord"{% endif %}>En Attente</button>
-                <button type="submit" name="_action" value="créer une facture" class="btn-action">Créer une facture</button>
+                <button type="submit" name="_action" value="créer une facture" class="btn-action">Modifier</button>
             {% elif rdv.statut == 'en_attente' %}
                 <button type="submit" name="_action" value="en_consultation" class="btn-action btn-teal">Consultation</button>
             {% elif rdv.statut == 'en_consultation' %}
@@ -593,12 +593,12 @@
                 </div>
             </div>
 
-            <!-- Service -->
+            <!-- Type de consultation -->
             <div class="field-row">
-                <label for="{{ form.service.id_for_label }}">
-                    Service <span class="required-star">*</span>
+                <label for="{{ form.type_consultation.id_for_label }}">
+                    Type de consultation <span class="required-star">*</span>
                 </label>
-                {{ form.service }}
+                {{ form.type_consultation }}
             </div>
             <div class="field-row">
                 <span></span>
@@ -2110,5 +2110,38 @@
 })();
 </script>
 {% endif %}
+
+{% if registre_cpn %}{{ registre_cpn.donnees|json_script:"_reg_cpn" }}{% endif %}
+{% if registre_accouchement %}{{ registre_accouchement.donnees|json_script:"_reg_acc" }}{% endif %}
+{% if registre_postnatale %}{{ registre_postnatale.donnees|json_script:"_reg_post" }}{% endif %}
+{% if registre_curatif %}{{ registre_curatif.donnees|json_script:"_reg_cur" }}{% endif %}
+<script>
+(function () {
+  function preremplir(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    var data = JSON.parse(el.textContent);
+    Object.keys(data).forEach(function (name) {
+      var v = data[name];
+      var items = document.querySelectorAll('[name="' + name + '"]');
+      if (!items.length) return;
+      var first = items[0];
+      if (first.type === 'radio') {
+        var val = Array.isArray(v) ? v[0] : v;
+        items.forEach(function (r) { r.checked = r.value === val; });
+      } else if (first.type === 'checkbox') {
+        var vals = Array.isArray(v) ? v : [v];
+        items.forEach(function (c) { c.checked = vals.indexOf(c.value) !== -1; });
+      } else {
+        first.value = Array.isArray(v) ? v[0] : (v || '');
+      }
+    });
+  }
+  preremplir('_reg_cpn');
+  preremplir('_reg_acc');
+  preremplir('_reg_post');
+  preremplir('_reg_cur');
+})();
+</script>
 
 {% endblock %}

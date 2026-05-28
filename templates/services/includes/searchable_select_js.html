@@ -1,0 +1,218 @@
+<script>
+  /* ════════════════════════════════════════════════════
+     initSearchableSelect(selectEl, options?)
+     Transforme un <select class="field-ul"> en dropdown
+     searchable custom — Module services.
+  
+     options (optionnel) :
+       placeholder  {string}  texte affiché si rien n'est sélectionné
+       searchHint   {string}  placeholder du champ de recherche
+  
+     Usage :
+       initSearchableSelect(document.getElementById('id_categorie'));
+     ════════════════════════════════════════════════════ */
+  function initSearchableSelect(select, options) {
+    if (!select) return;
+    options = options || {};
+
+    var searchHint = options.searchHint || 'Rechercher…';
+
+    /* Masquer le select natif (reste dans le DOM pour le POST) */
+    select.style.cssText = 'position:absolute;opacity:0;width:0;height:0;pointer-events:none;';
+
+    /* Lire les options du select natif */
+    function getNativeOptions() {
+      return Array.from(select.options).map(function (o) {
+        return { value: o.value, label: o.text.trim(), blank: o.value === '' };
+      });
+    }
+
+    /* ── Wrapper ── */
+    var wrap = document.createElement('div');
+    wrap.className = 'ss-wrap';
+    select.parentNode.insertBefore(wrap, select);
+    wrap.appendChild(select);
+
+    /* ── Trigger ── */
+    var trigger = document.createElement('div');
+    trigger.className = 'ss-trigger';
+    trigger.tabIndex = 0;
+    trigger.setAttribute('role', 'combobox');
+    trigger.setAttribute('aria-haspopup', 'listbox');
+    trigger.setAttribute('aria-expanded', 'false');
+    trigger.innerHTML =
+      '<span class="ss-trigger-text"></span>' +
+      '<svg class="ss-chevron" viewBox="0 0 12 8" width="10" height="10" fill="none" ' +
+      'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M1 1l5 5 5-5"/>' +
+      '</svg>';
+    wrap.insertBefore(trigger, select);
+
+    var triggerText = trigger.querySelector('.ss-trigger-text');
+
+    /* ── Dropdown ── */
+    var dropdown = document.createElement('div');
+    dropdown.className = 'ss-dropdown';
+    dropdown.setAttribute('role', 'listbox');
+    dropdown.innerHTML =
+      '<div class="ss-search">' +
+      '<i class="bi bi-search ss-search-icon"></i>' +
+      '<input class="ss-search-input" type="text" placeholder="' + searchHint + '" autocomplete="off" aria-label="' + searchHint + '">' +
+      '</div>' +
+      '<div class="ss-list"></div>';
+    wrap.appendChild(dropdown);
+
+    var searchInput = dropdown.querySelector('.ss-search-input');
+    var list = dropdown.querySelector('.ss-list');
+
+    /* ── Mettre à jour le texte du trigger ── */
+    function updateTrigger() {
+      var sel = select.options[select.selectedIndex];
+      if (sel && sel.value !== '') {
+        triggerText.textContent = sel.text.trim();
+        triggerText.classList.remove('placeholder');
+      } else {
+        triggerText.textContent = (options.placeholder || (sel ? sel.text.trim() : '—'));
+        triggerText.classList.add('placeholder');
+      }
+    }
+    updateTrigger();
+
+    /* ── Rendre la liste (filtrée) ── */
+    var focusedIndex = -1;
+
+    function renderList(query) {
+      query = (query || '').toLowerCase().trim();
+      var all = getNativeOptions();
+      var filtered = query
+        ? all.filter(function (o) { return o.label.toLowerCase().indexOf(query) !== -1; })
+        : all;
+
+      focusedIndex = -1;
+      list.innerHTML = '';
+
+      if (!filtered.length) {
+        list.innerHTML = '<div class="ss-empty">Aucun résultat</div>';
+        return;
+      }
+
+      filtered.forEach(function (o, i) {
+        var item = document.createElement('div');
+        item.className = 'ss-option' +
+          (o.blank ? ' blank' : '') +
+          (o.value === select.value ? ' selected' : '');
+        item.textContent = o.label;
+        item.dataset.value = o.value;
+        item.setAttribute('role', 'option');
+        item.setAttribute('aria-selected', o.value === select.value ? 'true' : 'false');
+
+        item.addEventListener('mousedown', function (e) {
+          e.preventDefault();
+          select.value = o.value;
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+          updateTrigger();
+          close();
+          trigger.focus();
+        });
+        list.appendChild(item);
+      });
+    }
+
+    /* ── Navigation clavier dans la liste ── */
+    function moveFocus(dir) {
+      var items = list.querySelectorAll('.ss-option');
+      if (!items.length) return;
+      items.forEach(function (el) { el.classList.remove('focused'); });
+      focusedIndex = Math.max(0, Math.min(items.length - 1, focusedIndex + dir));
+      items[focusedIndex].classList.add('focused');
+      items[focusedIndex].scrollIntoView({ block: 'nearest' });
+    }
+
+    function selectFocused() {
+      var items = list.querySelectorAll('.ss-option');
+      if (focusedIndex >= 0 && items[focusedIndex]) {
+        items[focusedIndex].dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      }
+    }
+
+    /* ── Ouvrir / Fermer ── */
+    var isOpen = false;
+
+    function open() {
+      /* Repositionner : ouvrir vers le bas ou le haut selon l'espace disponible */
+      var rect = wrap.getBoundingClientRect();
+      var spaceBelow = window.innerHeight - rect.bottom;
+      dropdown.style.bottom = '';
+      dropdown.style.top = '';
+      if (spaceBelow < 260 && rect.top > 260) {
+        dropdown.style.bottom = '100%';
+        dropdown.style.top = 'auto';
+        dropdown.style.marginBottom = '3px';
+        dropdown.style.marginTop = '';
+      } else {
+        dropdown.style.top = 'calc(100% + 3px)';
+        dropdown.style.bottom = 'auto';
+        dropdown.style.marginTop = '';
+        dropdown.style.marginBottom = '';
+      }
+
+      isOpen = true;
+      dropdown.classList.add('open');
+      trigger.classList.add('open');
+      trigger.setAttribute('aria-expanded', 'true');
+      searchInput.value = '';
+      renderList('');
+
+      /* Scroller sur l'option sélectionnée */
+      requestAnimationFrame(function () {
+        var sel = list.querySelector('.selected');
+        if (sel) sel.scrollIntoView({ block: 'nearest' });
+        searchInput.focus();
+      });
+    }
+
+    function close() {
+      isOpen = false;
+      dropdown.classList.remove('open');
+      trigger.classList.remove('open');
+      trigger.setAttribute('aria-expanded', 'false');
+    }
+
+    /* ── Évènements trigger ── */
+    trigger.addEventListener('click', function (e) {
+      e.stopPropagation();
+      isOpen ? close() : open();
+    });
+
+    trigger.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (!isOpen) open();
+        else moveFocus(1);
+      }
+      if (e.key === 'ArrowUp') { e.preventDefault(); if (isOpen) moveFocus(-1); }
+      if (e.key === 'Escape') { close(); }
+      if (e.key === 'Tab' && isOpen) { close(); }
+    });
+
+    /* ── Évènements champ de recherche ── */
+    searchInput.addEventListener('input', function () {
+      renderList(this.value);
+    });
+
+    searchInput.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); moveFocus(1); }
+      if (e.key === 'ArrowUp') { e.preventDefault(); moveFocus(-1); }
+      if (e.key === 'Enter') { e.preventDefault(); selectFocused(); }
+      if (e.key === 'Escape') { close(); trigger.focus(); }
+    });
+
+    /* ── Clic extérieur ── */
+    document.addEventListener('mousedown', function (e) {
+      if (isOpen && !wrap.contains(e.target)) close();
+    });
+
+    /* ── Sync si le select natif change via JS ── */
+    select.addEventListener('change', function () { updateTrigger(); });
+  }
+</script>

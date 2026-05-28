@@ -190,13 +190,21 @@ def facturation_list(request):
     from facturation.models import Facture
     from django.core.paginator import Paginator
 
+    q = request.GET.get('q', '').strip()
     factures = Facture.objects.all().order_by('-date_emission')
+    if q:
+        factures = factures.filter(
+            Q(numero_facture__icontains=q) |
+            Q(patient__nom__icontains=q) |
+            Q(patient__prenoms__icontains=q)
+        )
+    total = factures.count()
     paginator = Paginator(factures, 25)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     stats = {'montant_total': 0, 'montant_recu': 0, 'montant_attente': 0, 'taux_recouvrement': 0}
     breadcrumb = [{'title': 'Accueil', 'url': '/'}, {'title': 'Facturation'}]
-    return render(request, 'facturation/list.html', {'page_obj': page_obj, 'stats': stats, 'breadcrumb': breadcrumb})
+    return render(request, 'facturation/list.html', {'page_obj': page_obj, 'stats': stats, 'q': q, 'total': total, 'breadcrumb': breadcrumb})
 
 
 @login_required(login_url='login')
@@ -257,6 +265,8 @@ def facture_create(request):
     patient = get_object_or_404(Patient, pk=patient_pk) if patient_pk else None
     actes = Acte.objects.filter(actif=True).order_by('categorie', 'libelle')
     caisses = Caisse.objects.filter(actif=True).order_by('nom')
+    from services.models import Articleservice
+    services = Articleservice.objects.all().order_by('nom')
 
     rdv_obj = None
     rdv_pk = request.GET.get('rdv') or request.POST.get('rdv_id')
@@ -267,7 +277,7 @@ def facture_create(request):
             pass
 
     initial_type_facture = 'consultation' if rdv_obj else ''
-    initial_ligne_libelle = rdv_obj.service.nom if (rdv_obj and rdv_obj.service) else ''
+    initial_ligne_libelle = rdv_obj.type_consultation.nom if (rdv_obj and rdv_obj.type_consultation) else ''
 
     if request.method == 'POST':
         form = FactureForm(request.POST)
@@ -349,6 +359,7 @@ def facture_create(request):
         'form': form,
         'patient': patient,
         'actes': actes,
+        'services': services,
         'caisses': caisses,
         'rdv': rdv_obj,
         'initial_ligne_libelle': initial_ligne_libelle,
@@ -767,6 +778,8 @@ def gynecologie_rdv_create(request):
             if code:
                 rdv.code_confirmation = code
             rdv.save()
+            from patients.utils import save_registres
+            save_registres(request, rdv)
             action = request.POST.get('_action', '')
             if action == 'annuler':
                 return redirect('gynecologie_rdv')
@@ -796,6 +809,10 @@ def gynecologie_rdv_create(request):
         'pathologies': Pathologie.objects.filter(actif=True).order_by('nom'),
         'types_visite': TypeVisite.objects.filter(actif=True).order_by('nom'),
         'breadcrumb': breadcrumb,
+        'registre_cpn': None,
+        'registre_accouchement': None,
+        'registre_postnatale': None,
+        'registre_curatif': None,
     })
 
 
@@ -909,6 +926,8 @@ def gynecologie_rdv_detail(request, pk):
             else:
                 rdv.cur_type_visite = None
             rdv.save()
+            from patients.utils import save_registres
+            save_registres(request, rdv)
             if action == 'créer une facture':
                 from django.urls import reverse
                 return redirect(reverse('facture_create') + f'?patient={rdv.patient.pk}&rdv={rdv.pk}')
@@ -932,7 +951,13 @@ def gynecologie_rdv_detail(request, pk):
         {'title': 'Rendez-vous', 'url': '/gynecologie/rdv/'},
         {'title': rdv.code_rdv or rdv.patient.code_patient},
     ]
-    from patients.models import Pathologie, TypeVisite
+    from patients.models import Pathologie, TypeVisite, RegistreCPN, RegistreAccouchement, RegistrePostnatale, RegistreCuratif
+    def _get_reg(Model):
+        try:
+            return Model.objects.get(rdv=rdv)
+        except Model.DoesNotExist:
+            return None
+
     return render(request, 'gynecologie/rdv_form.html', {
         'form': form,
         'rdv': rdv,
@@ -949,6 +974,10 @@ def gynecologie_rdv_detail(request, pk):
         'nav_pos': nav_pos,
         'nav_prev': nav_prev,
         'nav_next': nav_next,
+        'registre_cpn':          _get_reg(RegistreCPN),
+        'registre_accouchement': _get_reg(RegistreAccouchement),
+        'registre_postnatale':   _get_reg(RegistrePostnatale),
+        'registre_curatif':      _get_reg(RegistreCuratif),
     })
 
 

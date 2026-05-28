@@ -148,7 +148,7 @@ def rdv_global_list(request):
     date_from_s = request.GET.get('date_from', '')
     date_to_s   = request.GET.get('date_to', '')
 
-    qs = RendezVous.objects.select_related('patient', 'medecin').order_by('-date_heure')
+    qs = RendezVous.objects.select_related('patient', 'medecin', 'type_consultation').prefetch_related('registre_curatif').order_by('-date_heure')
 
     if q:
         qs = qs.filter(
@@ -364,6 +364,9 @@ def rdv_edit(request, pk):
                 rdv.code_confirmation = code
             rdv.save()
 
+            from patients.utils import save_registres
+            save_registres(request, rdv)
+
             # Sauvegarder l'évaluation clinique si des champs sont remplis
             _eval_map = {
                 'eval_poids': 'poids',
@@ -409,6 +412,13 @@ def rdv_edit(request, pk):
     else:
         form = RendezVousForm(instance=rdv)
 
+    from patients.models import RegistreCPN, RegistreAccouchement, RegistrePostnatale, RegistreCuratif
+    def _get_reg(Model):
+        try:
+            return Model.objects.get(rdv=rdv)
+        except Model.DoesNotExist:
+            return None
+
     return render(request, 'patients/rendez_vous_form.html', {
         'form':          form,
         'rdv':           rdv,
@@ -419,6 +429,10 @@ def rdv_edit(request, pk):
         'consultation':  consultation,
         'constante':     constante,
         'pathologies':   Pathologie.objects.filter(actif=True).order_by('nom'),
+        'registre_cpn':          _get_reg(RegistreCPN),
+        'registre_accouchement': _get_reg(RegistreAccouchement),
+        'registre_postnatale':   _get_reg(RegistrePostnatale),
+        'registre_curatif':      _get_reg(RegistreCuratif),
     })
 
 
@@ -432,7 +446,7 @@ def gynecologie_rdv_list(request):
     date_from  = request.GET.get('date_from', '')
     date_to    = request.GET.get('date_to', '')
 
-    qs = RendezVous.objects.select_related('patient', 'medecin').filter(
+    qs = RendezVous.objects.select_related('patient', 'medecin', 'type_consultation').prefetch_related('registre_curatif').filter(
         departement='gynecologie_cpn'
     ).order_by('-date_heure')
 

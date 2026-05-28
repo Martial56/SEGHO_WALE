@@ -1,0 +1,245 @@
+{% extends 'services/base.html' %}
+{% block breadcrumb %}{% endblock %}
+{% block module_navbar %}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+  .det-page { width: 100%; padding: 16px 24px 48px; }
+
+  .det-header {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+
+  .det-header-inner {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+    padding: 20px 24px 18px;
+  }
+
+  .det-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 8px;
+    background: #e6f2f5;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    color: var(--primary);
+    border: 1px solid var(--border);
+  }
+
+  html[data-theme="dark"] .det-icon { background: rgba(33,136,171,.15); color: #7ecae0; }
+
+  .det-title-block { flex: 1; min-width: 0; }
+
+  .det-name {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 6px;
+    line-height: 1.2;
+  }
+
+  .det-actions { display: flex; align-items: flex-start; gap: 8px; flex-shrink: 0; }
+
+  .det-btn-edit {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 7px 16px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: 'Roboto', sans-serif;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: background .15s;
+    white-space: nowrap;
+  }
+  .det-btn-edit:hover { background: var(--primary); }
+
+  .det-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+
+  .det-section-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .7px;
+    color: var(--text-muted);
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+  }
+
+  html[data-theme="dark"] .det-section-title { background: rgba(255,255,255,.02); }
+
+  .det-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; }
+
+  .det-field {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+  }
+  .det-field:nth-child(3n) { border-right: none; }
+
+  .det-field-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+
+  .det-field-value {
+    font-size: 13.5px;
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .det-field-value.muted { color: var(--text-muted); font-weight: 400; font-style: italic; }
+  .det-field-value.primary { font-size: 15px; font-weight: 700; color: var(--primary); }
+
+  .det-unites-list { padding: 14px 20px; }
+
+  .det-unite-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--text);
+  }
+  .det-unite-row:last-child { border-bottom: none; }
+
+  .det-unite-code {
+    font-family: monospace;
+    font-size: 11px;
+    background: rgba(33,136,171,.08);
+    color: var(--primary);
+    padding: 2px 7px;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+
+  html[data-theme="dark"] .det-unite-code { background: rgba(33,136,171,.18); color: #7ecae0; }
+
+  .det-empty-unites {
+    padding: 18px 20px;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-style: italic;
+  }
+
+  @media (max-width: 900px) {
+    .det-grid { grid-template-columns: repeat(2, 1fr); }
+    .det-field:nth-child(3n) { border-right: 1px solid var(--border); }
+    .det-field:nth-child(2n) { border-right: none; }
+  }
+  @media (max-width: 600px) {
+    .det-grid { grid-template-columns: 1fr; }
+    .det-field { border-right: none !important; }
+    .det-header-inner { flex-direction: column; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="page-wrap">
+
+{% include 'services/includes/nav.html' %}
+
+<!-- ══ SUBHEADER ══ -->
+<div class="o-subheader" id="subheader">
+  <div class="o-subheader-row">
+    <a href="{% url 'services:categories_unites' %}" class="o-ctrl-btn" style="padding:3px 7px;">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <span style="font-size:13px;color:var(--text-muted);">
+      <a href="{% url 'services:unites' %}" style="color:var(--accent);text-decoration:none;font-weight:500;">Unités de mesure</a>
+      <span style="margin:0 5px;opacity:.4;">/</span>
+      <a href="{% url 'services:categories_unites' %}" style="color:var(--accent);text-decoration:none;font-weight:500;">Catégories</a>
+      <span style="margin:0 5px;opacity:.4;">/</span>
+      <span style="color:var(--text);">{{ obj.nom|truncatechars:40 }}</span>
+    </span>
+    <div style="flex:1;"></div>
+    <!-- <a href="{% url 'services:categorie_unite_edit' obj.pk %}" class="det-btn-edit">
+      <i class="bi bi-pencil"></i> Modifie
+    </a> -->
+  </div>
+</div>
+
+<div class="det-page">
+
+  <!-- ══ EN-TÊTE ══ -->
+  <div class="det-header">
+    <div class="det-header-inner">
+      <div class="det-icon">
+        <i class="bi bi-folder2"></i>
+      </div>
+      <div class="det-title-block">
+        <div class="det-name">{{ obj.nom }}</div>
+        <span style="font-size:13px;color:var(--text-muted);">
+          {{ obj.unites.count }} unité{{ obj.unites.count|pluralize }} associée{{ obj.unites.count|pluralize }}
+        </span>
+      </div>
+      <div class="det-actions">
+        <a href="{% url 'services:categorie_unite_edit' obj.pk %}" class="det-btn-edit">
+          <i class="bi bi-pencil"></i> Modifier
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ UNITÉS ASSOCIÉES ══ -->
+  <div class="det-section">
+    <div class="det-section-title">Unités de mesure associées</div>
+    {% if obj.unites.exists %}
+    <div class="det-unites-list">
+      {% for u in obj.unites.all %}
+      <div class="det-unite-row">
+        <span class="det-unite-code">{{ u.code }}</span>
+        <span style="font-weight:500;">{{ u.nom }}</span>
+        {% if not u.actif %}<span style="font-size:11px;color:#c0392b;margin-left:auto;">Inactif</span>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="det-empty-unites">Aucune unité de mesure dans cette catégorie.</div>
+    {% endif %}
+  </div>
+
+</div><!-- /.det-page -->
+
+<script>
+  (function () {
+    function adjustOffsets() {
+      var topbar = document.querySelector('.topbar');
+      var wrap = document.getElementById('page-wrap');
+      if (topbar && wrap) wrap.style.paddingTop = topbar.offsetHeight + 'px';
+    }
+    adjustOffsets();
+    window.addEventListener('resize', adjustOffsets);
+  })();
+</script>
+
+</div><!-- /#page-wrap -->
+{% endblock %}

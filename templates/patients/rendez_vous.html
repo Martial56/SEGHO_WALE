@@ -138,8 +138,8 @@
         <td class="td-name">{{ rdv.patient.nom|upper }} {{ rdv.patient.prenoms }}</td>
         <td>{{ rdv.date_heure|date:"d/m/Y H:i" }}</td>
         <td class="td-doctor">{% if rdv.medecin %}{{ rdv.medecin }}{% else %}<span style="color:#ddd">—</span>{% endif %}</td>
-        <td>{{ rdv.get_type_rdv_display }}</td>
-        <td class="td-diagnostic">{{ rdv.maladies|truncatechars:45|default:"—" }}</td>
+        <td>{{ rdv.type_consultation.nom|default:"—" }}</td>
+        <td class="td-diagnostic">{% with diag=rdv.registre_curatif.diagnostic_display %}{{ diag|default:rdv.maladies|truncatechars:45|default:"—" }}{% endwith %}</td>
         <td>{% if rdv.patient.date_naissance %}{{ rdv.patient.age }} ans{% else %}<span style="color:#ddd">—</span>{% endif %}</td>
         <td>{% if rdv.patient.sexe == 'F' %}Femme{% elif rdv.patient.sexe == 'M' %}Homme{% else %}<span style="color:#ddd">—</span>{% endif %}</td>
         <td><span class="o-badge badge-{{ rdv.statut }}">{{ rdv.get_statut_display }}</span></td>

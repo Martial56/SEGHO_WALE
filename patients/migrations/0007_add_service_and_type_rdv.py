@@ -10,37 +10,32 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        # service_id existe déjà en base — on met à jour uniquement l'état Django
+        # service est géré par 0003_replace_type_rdv_with_service_fk (état uniquement).
+        # Ici on ne fait rien pour service (ni DB ni état).
+        migrations.SeparateDatabaseAndState(
+            database_operations=[],
+            state_operations=[],
+        ),
+        # type_rdv : retiré de l'état par 0003_replace — on le remet dans l'état.
+        # La colonne DB est déjà présente (ajoutée lors de la première exécution de 0007).
         migrations.SeparateDatabaseAndState(
             database_operations=[],
             state_operations=[
                 migrations.AddField(
                     model_name='rendezvous',
-                    name='service',
-                    field=models.ForeignKey(
-                        blank=True,
-                        null=True,
-                        on_delete=django.db.models.deletion.SET_NULL,
-                        related_name='rendez_vous',
-                        to='medecins.service',
+                    name='type_rdv',
+                    field=models.CharField(
+                        choices=[
+                            ('consultation', 'Consultation'),
+                            ('controle', 'Contrôle'),
+                            ('urgence', 'Urgence'),
+                            ('examen', 'Examen'),
+                            ('vaccination', 'Vaccination'),
+                        ],
+                        default='consultation',
+                        max_length=20,
                     ),
                 ),
             ],
-        ),
-        # type_rdv est absent — on l'ajoute normalement
-        migrations.AddField(
-            model_name='rendezvous',
-            name='type_rdv',
-            field=models.CharField(
-                choices=[
-                    ('consultation', 'Consultation'),
-                    ('controle', 'Contrôle'),
-                    ('urgence', 'Urgence'),
-                    ('examen', 'Examen'),
-                    ('vaccination', 'Vaccination'),
-                ],
-                default='consultation',
-                max_length=20,
-            ),
         ),
     ]
