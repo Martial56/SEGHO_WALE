@@ -1,9 +1,11 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
+from django.contrib import messages
 from django.utils import timezone
 from django.db.models import F, Q
+from datetime import timedelta
 
 
 def login_view(request):
@@ -37,7 +39,6 @@ def dashboard(request):
     from facturation.models import Facture
     from laboratoire.models import AnalyseLaboratoire
     from employer.models import Employe
-    from modules_permissions.models import get_user_modules
 
     today = timezone.now().date()
 
@@ -55,16 +56,20 @@ def dashboard(request):
 
     rdv_auj = RendezVous.objects.filter(
         date_heure__date=today,
-        statut__in=['planifie', 'confirme']
+        statut__in=['planifie', 'confirme', 'en_attente', 'en_consultation']
     ).select_related('patient', 'medecin').order_by('date_heure')[:8]
 
     last_cons = Consultation.objects.select_related(
         'patient', 'medecin'
     ).order_by('-date_heure')[:6]
 
-    # Modules accessibles pour cet utilisateur
-    user_modules = get_user_modules(request.user)
-    accessible_codes = set(user_modules.values_list('code', flat=True))
+    try:
+        from modules_permissions.models import get_user_modules
+        user_modules = get_user_modules(request.user)
+        accessible_codes = set(user_modules.values_list('code', flat=True))
+    except Exception:
+        user_modules = []
+        accessible_codes = set()
 
     # Plannings publiés non encore vus par cet utilisateur
     from planning.models import PlanningHebdomadaire, PlanningVu
@@ -100,7 +105,7 @@ def patients_list(request):
     stats = {
         'total': Patient.objects.filter(actif=True).count(),
         'actifs': Patient.objects.filter(actif=True).count(),
-        'nouveaux_30j': Patient.objects.filter(date_creation__date__gte=today - timezone.timedelta(days=30)).count(),
+        'nouveaux_30j': Patient.objects.filter(date_creation__date__gte=today - timedelta(days=30)).count(),
     }
     breadcrumb = [{'title': 'Accueil', 'url': '/'}, {'title': 'Patients'}]
     return render(request, 'patients/list.html', {'page_obj': page_obj, 'stats': stats, 'breadcrumb': breadcrumb})
@@ -162,7 +167,6 @@ def medecins_list(request):
 def medecin_create(request):
     from medecins.models import Medecin, Specialite
     from django.contrib.auth.models import User
-    from django.utils import timezone as tz
 
     specialites = Specialite.objects.order_by('nom')
     users_disponibles = User.objects.filter(medecin__isnull=True).order_by('last_name', 'first_name')
@@ -174,7 +178,6 @@ def medecin_create(request):
         specialite_pk = request.POST.get('specialite', '')
         telephone = request.POST.get('telephone', '').strip()
         email = request.POST.get('email', '').strip()
-        ordre_medecin = request.POST.get('ordre_medecin', '').strip()
         taux_honoraire = request.POST.get('taux_honoraire', '0').strip() or '0'
         actif = request.POST.get('actif') == 'on'
         user_pk = request.POST.get('user', '')
@@ -187,7 +190,7 @@ def medecin_create(request):
             errors['telephone'] = 'Le téléphone est obligatoire.'
 
         if not errors:
-            annee = tz.now().year
+            annee = timezone.now().year
             dernier = Medecin.objects.filter(matricule__startswith=f'MED{annee}').order_by('-matricule').first()
             if dernier:
                 try:
@@ -234,7 +237,6 @@ def medecin_create(request):
                 med.photo = request.FILES['photo']
 
             med.save()
-            from django.contrib import messages
             messages.success(request, f'Médecin {med} enregistré avec succès (matricule : {med.matricule}).')
             return redirect('medecins_list')
 
@@ -255,7 +257,6 @@ def medecin_create(request):
 def medecin_edit(request, pk):
     from medecins.models import Medecin, Specialite
     from django.contrib.auth.models import User
-    from django.shortcuts import get_object_or_404
 
     med = get_object_or_404(Medecin, pk=pk)
     specialites = Specialite.objects.order_by('nom')
@@ -311,7 +312,6 @@ def medecin_edit(request, pk):
                 med.photo = None
 
             med.save()
-            from django.contrib import messages
             messages.success(request, f'Médecin {med} mis à jour avec succès.')
             return redirect('medecins_list')
 
@@ -363,14 +363,16 @@ def laboratoire_list(request):
     from laboratoire.models import AnalyseLaboratoire
     from django.core.paginator import Paginator
 
-    analyses = AnalyseLaboratoire.objects.all().order_by('-date_reception')
+    analyses = AnalyseLaboratoire.objects.select_related(
+        'patient', 'type_examen'
+    ).order_by('-date_prelevement')
     paginator = Paginator(analyses, 25)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     stats = {
         'en_cours': AnalyseLaboratoire.objects.filter(statut__in=['recu', 'en_analyse']).count(),
-        'resultats_prets': AnalyseLaboratoire.objects.filter(statut='resultats_prets').count(),
-        'analyses_mois': AnalyseLaboratoire.objects.filter(date_reception__month=timezone.now().month).count(),
+        'resultats_prets': AnalyseLaboratoire.objects.filter(statut__in=['resultat', 'valide']).count(),
+        'analyses_mois': AnalyseLaboratoire.objects.filter(date_prelevement__month=timezone.now().month).count(),
         'delai_moyen': 0,
     }
     breadcrumb = [{'title': 'Accueil', 'url': '/'}, {'title': 'Laboratoire'}]
@@ -396,13 +398,21 @@ def facturation_list(request):
     from facturation.models import Facture
     from django.core.paginator import Paginator
 
+    q = request.GET.get('q', '').strip()
     factures = Facture.objects.all().order_by('-date_emission')
+    if q:
+        factures = factures.filter(
+            Q(numero_facture__icontains=q) |
+            Q(patient__nom__icontains=q) |
+            Q(patient__prenoms__icontains=q)
+        )
+    total = factures.count()
     paginator = Paginator(factures, 25)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     stats = {'montant_total': 0, 'montant_recu': 0, 'montant_attente': 0, 'taux_recouvrement': 0}
     breadcrumb = [{'title': 'Accueil', 'url': '/'}, {'title': 'Facturation'}]
-    return render(request, 'facturation/list.html', {'page_obj': page_obj, 'stats': stats, 'breadcrumb': breadcrumb})
+    return render(request, 'facturation/list.html', {'page_obj': page_obj, 'stats': stats, 'q': q, 'total': total, 'breadcrumb': breadcrumb})
 
 
 @login_required(login_url='login')
@@ -449,6 +459,201 @@ def rapports_list(request):
     }
     breadcrumb = [{'title': 'Accueil', 'url': '/'}, {'title': 'Rapports'}]
     return render(request, 'rapports/list.html', {'page_obj': page_obj, 'stats': stats, 'breadcrumb': breadcrumb})
+
+
+@login_required(login_url='login')
+def facture_create(request):
+    from facturation.models import Facture, LigneFacture, Acte, Paiement
+    from facturation.forms import FactureForm
+    from patients.models import Patient, RendezVous
+    from caisse.models import Caisse
+    from django.urls import reverse
+
+    patient_pk = request.GET.get('patient') or request.POST.get('patient_id')
+    patient = get_object_or_404(Patient, pk=patient_pk) if patient_pk else None
+    actes = Acte.objects.filter(actif=True).order_by('categorie', 'libelle')
+    caisses = Caisse.objects.filter(actif=True).order_by('nom')
+    from services.models import Articleservice
+    services = Articleservice.objects.all().order_by('nom')
+
+    rdv_obj = None
+    rdv_pk = request.GET.get('rdv') or request.POST.get('rdv_id')
+    if rdv_pk:
+        try:
+            rdv_obj = RendezVous.objects.get(pk=rdv_pk)
+        except RendezVous.DoesNotExist:
+            pass
+
+    initial_type_facture = 'consultation' if rdv_obj else ''
+    initial_ligne_libelle = rdv_obj.type_consultation.nom if (rdv_obj and rdv_obj.type_consultation) else ''
+
+    if request.method == 'POST':
+        form = FactureForm(request.POST)
+        if not patient:
+            messages.error(request, 'Patient introuvable.')
+            return redirect('facturation_list')
+        if form.is_valid():
+            facture = form.save(commit=False)
+            facture.patient = patient
+            facture.cree_par = request.user
+            facture.save()
+
+            total = 0
+            i = 0
+            while True:
+                libelle = request.POST.get(f'ligne_libelle_{i}')
+                if libelle is None:
+                    break
+                if libelle.strip():
+                    try:
+                        qte = float(request.POST.get(f'ligne_qte_{i}', 1) or 1)
+                        prix = float(request.POST.get(f'ligne_prix_{i}', 0) or 0)
+                        remise = float(request.POST.get(f'ligne_remise_{i}', 0) or 0)
+                    except ValueError:
+                        qte, prix, remise = 1, 0, 0
+                    ligne = LigneFacture(
+                        facture=facture,
+                        libelle=libelle.strip(),
+                        quantite=qte,
+                        prix_unitaire=prix,
+                        remise=remise,
+                    )
+                    acte_id = request.POST.get(f'ligne_acte_{i}')
+                    if acte_id:
+                        try:
+                            ligne.acte_id = int(acte_id)
+                        except ValueError:
+                            pass
+                    ligne.save()
+                    total += qte * prix * (1 - remise / 100)
+                i += 1
+
+            facture.montant_total = total
+            facture.save()
+
+            pay_montant_raw = request.POST.get('pay_montant', '').strip()
+            if pay_montant_raw:
+                try:
+                    pay_montant = float(pay_montant_raw)
+                except ValueError:
+                    pay_montant = 0
+                if pay_montant > 0:
+                    mode = request.POST.get('pay_mode', 'especes')
+                    memo = request.POST.get('pay_memo', '')
+                    compte = request.POST.get('pay_compte', '')
+                    reference = compte if compte else memo
+                    paiement = Paiement(
+                        facture=facture,
+                        montant=pay_montant,
+                        mode_paiement=mode,
+                        reference=reference,
+                        notes=memo,
+                        recu_par=request.user,
+                    )
+                    paiement.save()
+                    facture.montant_paye = pay_montant
+                    facture.statut = 'payee' if pay_montant >= total else 'partielle'
+                    facture.save()
+
+            messages.success(request, f'Facture {facture.numero} créée avec succès.')
+            if rdv_pk:
+                return redirect(reverse('patients:rdv_edit', kwargs={'pk': rdv_pk}))
+            return redirect('facturation_list')
+    else:
+        initial = {'type_facture': initial_type_facture} if initial_type_facture else {}
+        form = FactureForm(initial=initial)
+
+    return render(request, 'facturation/create_facture.html', {
+        'form': form,
+        'patient': patient,
+        'actes': actes,
+        'services': services,
+        'caisses': caisses,
+        'rdv': rdv_obj,
+        'initial_ligne_libelle': initial_ligne_libelle,
+        'breadcrumb': [
+            {'title': 'Accueil', 'url': '/'},
+            {'title': 'Facturation', 'url': '/facturation/'},
+            {'title': 'Nouvelle facture'},
+        ],
+    })
+
+
+@login_required(login_url='login')
+def laboratoire_create(request):
+    from laboratoire.models import DemandeExamen, LigneDemandeExamen, TypeExamen
+    from patients.models import Patient
+    from django.contrib.auth.models import User
+    from django.utils.dateparse import parse_datetime
+
+    patient_pk = request.GET.get('patient') or request.POST.get('patient_id')
+    patient = get_object_or_404(Patient, pk=patient_pk) if patient_pk else None
+    types_examens = TypeExamen.objects.order_by('categorie', 'nom')
+    techniciens = User.objects.filter(is_active=True).order_by('last_name', 'first_name')
+
+    if request.method == 'POST':
+        if not patient:
+            messages.error(request, 'Patient requis.')
+            return redirect('laboratoire_list')
+
+        action = request.POST.get('action', 'brouillon')
+        demande = DemandeExamen(
+            patient=patient,
+            type_test=request.POST.get('type_test', ''),
+            urgent=request.POST.get('urgent') == 'on',
+            commentaire=request.POST.get('commentaire', '').strip(),
+            statut='demande' if action == 'envoyer' else 'brouillon',
+            cree_par=request.user,
+        )
+        tech_id = request.POST.get('technicien')
+        if tech_id:
+            try:
+                demande.technicien_id = int(tech_id)
+            except ValueError:
+                pass
+        raw_date = request.POST.get('date_prelevement', '').strip()
+        if raw_date:
+            demande.date_prelevement = parse_datetime(raw_date)
+        demande.save()
+
+        total = 0
+        i = 0
+        while True:
+            examen_id = request.POST.get(f'ligne_examen_{i}')
+            if examen_id is None:
+                break
+            if examen_id.strip():
+                try:
+                    te = TypeExamen.objects.get(pk=int(examen_id))
+                    prix = float(request.POST.get(f'ligne_prix_{i}', te.prix) or te.prix)
+                    LigneDemandeExamen.objects.create(
+                        demande=demande,
+                        type_examen=te,
+                        libelle=te.nom,
+                        prix=prix,
+                        instructions=request.POST.get(f'ligne_instructions_{i}', '').strip(),
+                    )
+                    total += prix
+                except (ValueError, TypeExamen.DoesNotExist):
+                    pass
+            i += 1
+
+        demande.montant_total = total
+        demande.save()
+        messages.success(request, f'Demande {demande.numero} créée avec succès.')
+        return redirect('laboratoire_list')
+
+    return render(request, 'laboratoire/create_analyse.html', {
+        'patient': patient,
+        'types_examens': types_examens,
+        'techniciens': techniciens,
+        'type_test_choices': DemandeExamen.TYPE_TEST,
+        'breadcrumb': [
+            {'title': 'Accueil', 'url': '/'},
+            {'title': 'Laboratoire', 'url': '/laboratoire/'},
+            {'title': 'Nouvelle demande'},
+        ],
+    })
 
 
 @login_required(login_url='login')
@@ -769,51 +974,82 @@ def _rdv_form_post(request, rdv):
 
 @login_required(login_url='login')
 def gynecologie_rdv_create(request):
-    from patients.models import Patient, RendezVous
+    from patients.forms import RendezVousForm
     from medecins.models import Medecin
 
-    patients = Patient.objects.filter(actif=True).order_by('nom')
     medecins = Medecin.objects.all().order_by('nom')
-    error = None
 
     if request.method == 'POST':
-        rdv = RendezVous()
-        err, ok = _rdv_form_post(request, rdv)
-        if ok:
-            return redirect('gynecologie_rdv_detail', pk=rdv.pk)
-        error = err
+        form = RendezVousForm(request.POST)
+        if form.is_valid():
+            rdv = form.save(commit=False)
+            code = request.POST.get('code_confirmation', '').strip()
+            if code:
+                rdv.code_confirmation = code
+            rdv.save()
+            from patients.utils import save_registres
+            save_registres(request, rdv)
+            action = request.POST.get('_action', '')
+            if action == 'annuler':
+                return redirect('gynecologie_rdv')
+            from django.urls import reverse
+            return redirect(reverse('facture_create') + f'?patient={rdv.patient.pk}&rdv={rdv.pk}')
+    else:
+        form = RendezVousForm(initial={
+            'date_heure': timezone.now().strftime('%Y-%m-%dT%H:%M'),
+            'departement': 'gynecologie_cpn',
+        })
 
-    total = _rdv_gyn_qs().count()
     breadcrumb = [
-        {'title': 'Accueil', 'url': '/'},
         {'title': 'Gynécologie', 'url': '/gynecologie/'},
         {'title': 'Rendez-vous', 'url': '/gynecologie/rdv/'},
         {'title': 'Nouveau'},
     ]
+    from patients.models import Pathologie, TypeVisite
     return render(request, 'gynecologie/rdv_form.html', {
-        'patients': patients,
-        'medecins': medecins,
-        'breadcrumb': breadcrumb,
-        'error': error,
+        'form': form,
         'rdv': None,
         'is_new': True,
-        'nav_total': total,
-        'nav_pos': None,
-        'nav_prev': None,
-        'nav_next': None,
+        'patient_prefill': None,
+        'consultation': None,
+        'constante': None,
+        'facture_payee': False,
+        'medecins': medecins,
+        'pathologies': Pathologie.objects.filter(actif=True).order_by('nom'),
+        'types_visite': TypeVisite.objects.filter(actif=True).order_by('nom'),
+        'breadcrumb': breadcrumb,
+        'registre_cpn': None,
+        'registre_accouchement': None,
+        'registre_postnatale': None,
+        'registre_curatif': None,
     })
 
 
 @login_required(login_url='login')
 def gynecologie_rdv_detail(request, pk):
-    from patients.models import Patient, RendezVous
+    from patients.forms import RendezVousForm
+    from patients.models import RendezVous
     from medecins.models import Medecin
-    from django.shortcuts import get_object_or_404
 
     rdv = get_object_or_404(RendezVous, pk=pk)
-    patients = Patient.objects.filter(actif=True).order_by('nom')
     medecins = Medecin.objects.all().order_by('nom')
-    error = None
+
+    try:
+        from facturation.models import Facture
+        facture_payee = Facture.objects.filter(patient=rdv.patient, statut='payee').exists()
+    except Exception:
+        facture_payee = False
+
+    consultation = None
+    constante = None
+    try:
+        consultation = rdv.consultation
+        try:
+            constante = consultation.constantes
+        except Exception:
+            pass
+    except Exception:
+        pass
 
     if request.method == 'POST':
         action = request.POST.get('action', '')
@@ -825,7 +1061,96 @@ def gynecologie_rdv_detail(request, pk):
             return redirect('gynecologie_rdv_detail', pk=rdv.pk)
         error = err
 
-    # Page navigation within gynécologie RDV queryset
+        if action == 'save_eval':
+            _eval_map = {
+                'eval_poids': 'poids', 'eval_taille': 'taille',
+                'eval_temperature': 'temperature',
+                'eval_tension_systolique': 'tension_systolique',
+                'eval_tension_diastolique': 'tension_diastolique',
+                'eval_tension_systolique_droite': 'tension_systolique_droite',
+                'eval_tension_diastolique_droite': 'tension_diastolique_droite',
+                'eval_pouls': 'pouls', 'eval_frequence_respiratoire': 'frequence_respiratoire',
+                'eval_saturation_oxygene': 'saturation_oxygene', 'eval_glycemie': 'glycemie',
+                'eval_albumine': 'albumine', 'eval_perimetre_brachial': 'perimetre_brachial',
+                'eval_niveau_douleur': 'niveau_douleur',
+            }
+            from consultations.models import Consultation as Consult, Constante as Const
+            try:
+                consult_obj = rdv.consultation
+            except Exception:
+                consult_obj = None
+            if consult_obj is None:
+                consult_obj = Consult.objects.create(
+                    patient=rdv.patient, medecin=rdv.medecin, rendez_vous=rdv,
+                    motif=rdv.motif or 'Évaluation clinique', cree_par=request.user,
+                )
+            const_obj, _ = Const.objects.get_or_create(consultation=consult_obj)
+            for post_key, model_field in _eval_map.items():
+                val = request.POST.get(post_key, '').strip()
+                if val != '':
+                    setattr(const_obj, model_field, val)
+            const_obj.save()
+            return redirect('gynecologie_rdv_detail', pk=rdv.pk)
+
+        if action == 'confirmer':
+            if facture_payee:
+                rdv.statut = 'confirme'
+                rdv.save(update_fields=['statut'])
+            return redirect('gynecologie_rdv')
+
+        if action in ('en_attente', 'en_consultation'):
+            rdv.statut = action
+            rdv.save(update_fields=['statut'])
+            return redirect('gynecologie_rdv_detail', pk=rdv.pk)
+
+        if action == 'terminer':
+            rdv.statut = 'termine'
+            rdv.save(update_fields=['statut'])
+            return redirect('gynecologie_rdv')
+
+        if action == 'annuler':
+            rdv.statut = 'annule'
+            rdv.save(update_fields=['statut'])
+            return redirect('gynecologie_rdv')
+
+        form = RendezVousForm(request.POST, instance=rdv)
+        if form.is_valid():
+            rdv = form.save(commit=False)
+            code = request.POST.get('code_confirmation', '').strip()
+            if code:
+                rdv.code_confirmation = code
+            from patients.models import TypeVisite
+            rdv.cpn_mode_entree = request.POST.get('cpn_mode_entree', '').strip()
+            rdv.cpn_mode_entree_autre = request.POST.get('cpn_mode_entree_autre', '').strip()
+            cpn_tv_pk = request.POST.get('cpn_type_visite', '').strip()
+            if cpn_tv_pk:
+                try:
+                    rdv.cpn_type_visite = TypeVisite.objects.get(pk=int(cpn_tv_pk))
+                except (ValueError, TypeVisite.DoesNotExist):
+                    rdv.cpn_type_visite = None
+            else:
+                rdv.cpn_type_visite = None
+            rdv.cur_mode_entree = request.POST.get('cur_mode_entree', '').strip()
+            rdv.cur_mode_entree_autre = request.POST.get('cur_mode_entree_autre', '').strip()
+            cur_tv_pk = request.POST.get('cur_type_visite', '').strip()
+            if cur_tv_pk:
+                try:
+                    rdv.cur_type_visite = TypeVisite.objects.get(pk=int(cur_tv_pk))
+                except (ValueError, TypeVisite.DoesNotExist):
+                    rdv.cur_type_visite = None
+            else:
+                rdv.cur_type_visite = None
+            rdv.save()
+            from patients.utils import save_registres
+            save_registres(request, rdv)
+            if action == 'créer une facture':
+                from django.urls import reverse
+                return redirect(reverse('facture_create') + f'?patient={rdv.patient.pk}&rdv={rdv.pk}')
+            return redirect('gynecologie_rdv')
+    else:
+        form = RendezVousForm(instance=rdv)
+
+    # Navigation précédent/suivant dans la liste gynécologie
     qs_pks = list(_rdv_gyn_qs().values_list('pk', flat=True))
     total = len(qs_pks)
     try:
@@ -837,22 +1162,37 @@ def gynecologie_rdv_detail(request, pk):
         nav_pos, nav_prev, nav_next = None, None, None
 
     breadcrumb = [
-        {'title': 'Accueil', 'url': '/'},
         {'title': 'Gynécologie', 'url': '/gynecologie/'},
         {'title': 'Rendez-vous', 'url': '/gynecologie/rdv/'},
         {'title': rdv.code_rdv or rdv.patient.code_patient},
     ]
+    from patients.models import Pathologie, TypeVisite, RegistreCPN, RegistreAccouchement, RegistrePostnatale, RegistreCuratif
+    def _get_reg(Model):
+        try:
+            return Model.objects.get(rdv=rdv)
+        except Model.DoesNotExist:
+            return None
+
     return render(request, 'gynecologie/rdv_form.html', {
-        'patients': patients,
-        'medecins': medecins,
-        'breadcrumb': breadcrumb,
-        'error': error,
+        'form': form,
         'rdv': rdv,
         'is_new': False,
+        'patient_prefill': rdv.patient,
+        'facture_payee': facture_payee,
+        'consultation': consultation,
+        'constante': constante,
+        'medecins': medecins,
+        'pathologies': Pathologie.objects.filter(actif=True).order_by('nom'),
+        'types_visite': TypeVisite.objects.filter(actif=True).order_by('nom'),
+        'breadcrumb': breadcrumb,
         'nav_total': total,
         'nav_pos': nav_pos,
         'nav_prev': nav_prev,
         'nav_next': nav_next,
+        'registre_cpn':          _get_reg(RegistreCPN),
+        'registre_accouchement': _get_reg(RegistreAccouchement),
+        'registre_postnatale':   _get_reg(RegistrePostnatale),
+        'registre_curatif':      _get_reg(RegistreCuratif),
     })
 
 
@@ -861,7 +1201,6 @@ def gynecologie_demarrer_consultation(request, pk):
     from patients.models import RendezVous
     from consultations.models import Consultation
     from django.core.exceptions import ObjectDoesNotExist
-    from django.shortcuts import get_object_or_404
 
     rdv = get_object_or_404(RendezVous, pk=pk)
 
@@ -917,7 +1256,6 @@ def gynecologie_rdv(request):
         )
 
     # --- Filtre rapide (défaut : aujourd'hui sauf si filter=all ou autre filtre actif) ---
-    # La plage de dates a priorité sur le raccourci "aujourd'hui"
     no_active_filter = not filter_val and not type_rdv_val and not type_visite_cpn_val and not date_from and not date_to and not q
     if (filter_val == 'today' or no_active_filter) and not date_from and not date_to:
         rdvs = rdvs.filter(date_heure__date=_date.today())
@@ -1350,7 +1688,6 @@ def gynecologie_rdv_kanban(request):
 @login_required(login_url='login')
 def gynecologie_rdv_set_statut(request, pk):
     from patients.models import RendezVous
-    from django.shortcuts import get_object_or_404
     STATUTS = ('planifie', 'confirme', 'en_attente', 'en_consultation', 'termine', 'annule', 'absent')
     if request.method == 'POST':
         rdv = get_object_or_404(RendezVous, pk=pk)
@@ -1391,7 +1728,7 @@ def gynecologie_list(request):
 
     if q:
         patients = patients.filter(
-            Q(nom__icontains=q) | Q(prenoms__icontains=q) | Q(code_patient__icontains=q)
+            Q(nom__icontains=q) | Q(prenoms__icontains=q) | Q(code_patient__icontains=q) | Q(telephone__icontains=q)
         )
 
     # --- Filtres patients ---
@@ -1421,5 +1758,8 @@ def gynecologie_list(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
-    breadcrumb = [{'title': 'Accueil', 'url': '/'}, {'title': 'Gynécologie'}]
+    breadcrumb = [
+        {'title': 'Gynécologie', 'url': '/gynecologie/'},
+        {'title': 'Patients'},
+    ]
     return render(request, 'gynecologie/list.html', {'page_obj': page_obj, 'breadcrumb': breadcrumb})

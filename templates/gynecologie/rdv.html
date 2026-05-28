@@ -4,114 +4,8 @@
 
 {% block content %}
 <style>
-  :root {
-    --accent: var(--teal-500);
-  }
-
+  :root { --accent: var(--teal-500); }
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  /* ── DARK MODE ── */
-  html[data-theme="dark"] .o-list tbody tr:hover { background: rgba(33,136,171,0.2); }
-  html[data-theme="dark"] .o-list thead th:hover { background: #28304a; }
-  html[data-theme="dark"] .o-list thead th { background: var(--surface); }
-  html[data-theme="dark"] .o-search-input { color: var(--text); }
-  html[data-theme="dark"] .o-search-bar { border-bottom-color: #3a4a62; }
-  html[data-theme="dark"] .o-ctrl-btn { color: var(--text-muted); }
-  html[data-theme="dark"] .o-ctrl-btn:hover { background: #28304a; color: var(--text); border-color: var(--border); }
-  html[data-theme="dark"] .o-pag-btn { background: var(--surface); border-color: var(--border); color: var(--text-muted); }
-  html[data-theme="dark"] .o-view-btn { background: var(--surface); color: var(--text-muted); border-color: var(--border); }
-  html[data-theme="dark"] .o-view-btns { border-color: var(--border); }
-  html[data-theme="dark"] .o-ctrl-sep { background: var(--border); }
-  html[data-theme="dark"] .o-empty-state { background: var(--bg); }
-  html[data-theme="dark"] .o-empty-illo { background: linear-gradient(135deg, var(--teal-700) 0%, var(--teal-500) 100%); }
-
-  /* ══ SUBHEADER ══ */
-  .o-subheader {
-    background: var(--surface); border-bottom: 1px solid var(--border);
-    padding: 6px 16px; display: flex; flex-direction: column; gap: 5px;
-    position: sticky; top: var(--gyn-nav-h); z-index: 190;
-    margin: 0 -32px 16px;
-  }
-  .o-subheader-row { display: flex; align-items: center; gap: 8px; }
-  .o-subheader-row-right { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-  .o-page-title { font-size: 17px; font-weight: 400; color: var(--text); }
-  .o-btn-create {
-    background: var(--teal-500); color: #fff; border: none; padding: 5px 14px; border-radius: 4px;
-    font-size: 12.5px; font-weight: 500; cursor: pointer;
-    text-decoration: none; display: inline-flex; align-items: center;
-    letter-spacing: 0.5px; transition: background 0.15s;
-  }
-  .o-btn-create:hover { background: var(--teal-600); }
-  .o-btn-excel {
-    width: 28px; height: 28px; border: 1px solid #d0e9d1; border-radius: 4px;
-    background: #f0faf0; color: #217346; font-size: 15px;
-    display: inline-flex; align-items: center; justify-content: center;
-    text-decoration: none; transition: background 0.15s, border-color 0.15s;
-  }
-  .o-btn-excel:hover { background: #217346; color: #fff; border-color: #217346; }
-  .o-search-bar {
-    display: flex; align-items: center; border: none; border-bottom: 1px solid #bbb;
-    background: transparent; min-height: 28px; padding: 2px 4px; gap: 4px; width: 320px;
-  }
-  .o-search-input {
-    border: none; outline: none; font-size: 12px;
-    color: var(--text); flex: 1; min-width: 60px; background: transparent;
-  }
-  .o-search-btn { background: none; border: none; cursor: pointer; color: #888; font-size: 13px; padding: 2px; }
-  .o-ctrl-btn {
-    background: none; border: 1px solid transparent; border-radius: 4px;
-    padding: 4px 8px; font-size: 12px;
-    color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 4px;
-    transition: border-color 0.15s, color 0.15s, background 0.15s; white-space: nowrap;
-  }
-  .o-ctrl-btn:hover { border-color: var(--border); color: var(--text); background: #f3f3f3; }
-  .o-ctrl-sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }
-  .o-pagination { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
-  .o-pag-btn {
-    width: 24px; height: 24px; border: 1px solid var(--border); border-radius: 3px;
-    background: var(--surface); display: flex; align-items: center; justify-content: center;
-    color: var(--text-muted); text-decoration: none; font-size: 12px;
-    transition: background 0.15s, color 0.15s;
-  }
-  .o-pag-btn:hover { background: var(--teal-600); color: #fff; border-color: var(--teal-600); }
-  .o-pag-btn.disabled { opacity: 0.35; pointer-events: none; }
-  .o-view-btns { display: flex; border: 1px solid var(--border); border-radius: 3px; overflow: hidden; }
-  .o-view-btn {
-    width: 26px; height: 24px; border: none; background: var(--surface);
-    display: flex; align-items: center; justify-content: center;
-    color: var(--text-muted); font-size: 13px; cursor: pointer;
-    transition: background 0.15s, color 0.15s;
-  }
-  .o-view-btn:not(:last-child) { border-right: 1px solid var(--border); }
-  .o-view-btn.active, .o-view-btn:hover { background: var(--teal-600); color: #fff; }
-
-  /* ══ LIST TABLE ══ */
-  .o-list-wrap {
-    overflow-x: auto; overflow-y: auto; background: var(--surface);
-    margin: 0 -32px;
-  }
-  .o-list { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
-  .o-list thead th {
-    background: var(--surface); border-bottom: 1px solid var(--border);
-    padding: 6px 10px; font-weight: 500; font-size: 11.5px;
-    color: var(--text-muted); text-align: left;
-    position: sticky; top: 0; z-index: 2; cursor: pointer; user-select: none;
-  }
-  .o-list thead th:hover { background: #f5f5f5; }
-  .o-list thead th.th-center { text-align: center; }
-  .o-col-resize {
-    position: absolute; right: 0; top: 0; bottom: 0; width: 5px;
-    cursor: col-resize; user-select: none; background: transparent; z-index: 2;
-  }
-  .o-col-resize:hover, .o-col-resize.active { background: var(--accent); opacity: 0.45; }
-  .o-list tbody tr { border-bottom: 1px solid #f0f0f0; transition: background 0.1s; cursor: pointer; }
-  .o-list tbody tr:hover { background: var(--teal-50); }
-  .o-list tbody td { padding: 5px 10px; color: var(--text); vertical-align: middle; }
-  .o-list tbody td.td-center { text-align: center; }
-  .o-list tbody td.td-muted { color: #ddd; text-align: center; font-size: 10px; }
-  .o-list tbody td.td-code { color: var(--accent); font-weight: 500; font-size: 12px; }
-  .o-list tbody td.td-name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
-  .o-list tbody td.td-doctor { max-width: 130px; overflow: hidden; text-overflow: ellipsis; color: var(--text-muted); }
   /* Statut badges */
   .o-badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 500; white-space: nowrap; }
   .badge-planifie        { background: #e3f2fd; color: #1565c0; }
@@ -793,7 +687,6 @@
 <script>
   // ── Clic simple → aperçu rapide, double-clic → détail ──
   document.querySelectorAll('.rdv-row').forEach(function(row) {
-    var clicks = 0, timer = null;
     row.addEventListener('click', function(e) {
       if (e.target.type === 'checkbox' || e.target.closest('.o-status-wrap')) return;
       clicks++;

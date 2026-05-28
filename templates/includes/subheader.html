@@ -1,0 +1,460 @@
+<style>
+  /* ── DARK MODE ── */
+  html[data-theme="dark"] .o-list tbody tr:hover { background: rgba(33,136,171,0.2); }
+  html[data-theme="dark"] .o-list thead th:hover { background: #28304a; }
+  html[data-theme="dark"] .o-list thead th { background: var(--surface); }
+  html[data-theme="dark"] .o-search-input { color: var(--text); }
+  html[data-theme="dark"] .o-search-bar { border-bottom-color: #3a4a62; }
+  html[data-theme="dark"] .o-ctrl-btn { color: var(--text-muted); }
+  html[data-theme="dark"] .o-ctrl-btn:hover { background: #28304a; color: var(--text); border-color: var(--border); }
+  html[data-theme="dark"] .o-pag-btn { background: var(--surface); border-color: var(--border); color: var(--text-muted); }
+  html[data-theme="dark"] .o-view-btn { background: var(--surface); color: var(--text-muted); border-color: var(--border); }
+  html[data-theme="dark"] .o-view-btns { border-color: var(--border); }
+  html[data-theme="dark"] .o-ctrl-sep { background: var(--border); }
+  html[data-theme="dark"] .o-empty-state { background: var(--bg); }
+  html[data-theme="dark"] .o-empty-illo { background: linear-gradient(135deg, var(--teal-700) 0%, var(--teal-500) 100%); }
+
+  /* ══ SUBHEADER ══ */
+  .o-subheader {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 6px 16px; display: flex; flex-direction: column; gap: 5px;
+    position: sticky; top: 0; z-index: 190;
+    margin: 0 -32px 16px;
+  }
+  .o-subheader-row { display: flex; align-items: center; gap: 8px; }
+  .o-subheader-row-right { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .o-page-title { font-size: 17px; font-weight: 400; color: var(--text); }
+  .o-btn-create {
+    background: var(--teal-500); color: #fff; border: none; padding: 5px 14px; border-radius: 4px;
+    font-size: 12.5px; font-weight: 500; cursor: pointer;
+    text-decoration: none; display: inline-flex; align-items: center;
+    letter-spacing: 0.5px; transition: background 0.15s;
+  }
+  .o-btn-create:hover { background: var(--teal-600); }
+  .o-btn-excel {
+    width: 28px; height: 28px; border: 1px solid #d0e9d1; border-radius: 4px;
+    background: #f0faf0; color: #217346; font-size: 15px;
+    display: inline-flex; align-items: center; justify-content: center;
+    text-decoration: none; transition: background 0.15s, border-color 0.15s;
+  }
+  .o-btn-excel:hover { background: #217346; color: #fff; border-color: #217346; }
+  .o-search-bar {
+    display: flex; align-items: center; border: none; border-bottom: 1px solid #bbb;
+    background: transparent; min-height: 28px; padding: 2px 4px; gap: 4px; width: 320px;
+  }
+  .o-search-input {
+    border: none; outline: none; font-size: 12px;
+    color: var(--text); flex: 1; min-width: 60px; background: transparent;
+  }
+  .o-search-btn { background: none; border: none; cursor: pointer; color: #888; font-size: 13px; padding: 2px; }
+  .o-ctrl-btn {
+    background: none; border: 1px solid transparent; border-radius: 4px;
+    padding: 4px 8px; font-size: 12px;
+    color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 4px;
+    transition: border-color 0.15s, color 0.15s, background 0.15s; white-space: nowrap;
+  }
+  .o-ctrl-btn:hover { border-color: var(--border); color: var(--text); background: #f3f3f3; }
+  .o-ctrl-sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }
+  .o-pagination { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+  .o-pag-btn {
+    width: 24px; height: 24px; border: 1px solid var(--border); border-radius: 3px;
+    background: var(--surface); display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted); text-decoration: none; font-size: 12px;
+    transition: background 0.15s, color 0.15s;
+  }
+  .o-pag-btn:hover { background: var(--teal-600); color: #fff; border-color: var(--teal-600); }
+  .o-pag-btn.disabled { opacity: 0.35; pointer-events: none; }
+  .o-view-btns { display: flex; border: 1px solid var(--border); border-radius: 3px; overflow: hidden; }
+  .o-view-btn {
+    width: 26px; height: 24px; border: none; background: var(--surface);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted); font-size: 13px; cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .o-view-btn:not(:last-child) { border-right: 1px solid var(--border); }
+  .o-view-btn.active, .o-view-btn:hover { background: var(--teal-600); color: #fff; }
+
+  /* ══ LIST TABLE ══ */
+  .o-list-wrap {
+    overflow-x: auto; overflow-y: auto; background: var(--surface);
+    margin: 0 -32px;
+  }
+  .o-list { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
+  .o-list thead th {
+    background: #f5f5f5; border-bottom: 1px solid var(--border);
+    padding: 6px 10px; font-weight: 500; font-size: 11.5px;
+    color: var(--text-muted); text-align: left;
+    position: sticky; top: 0; z-index: 2; cursor: pointer; user-select: none;
+  }
+  .o-list thead th:hover { background: #f5f5f5; }
+  .o-list thead th.th-center { text-align: center; }
+  .o-col-resize {
+    position: absolute; right: 0; top: 0; bottom: 0; width: 5px;
+    cursor: col-resize; user-select: none; background: transparent; z-index: 2;
+  }
+  .o-col-resize:hover, .o-col-resize.active { background: var(--teal-500); opacity: 0.45; }
+  .o-list tbody tr { border-bottom: 1px solid #f0f0f0; transition: background 0.1s; cursor: pointer; }
+  .o-list tbody tr:hover { background: var(--teal-50); }
+  .o-list tbody td { padding: 5px 10px; color: var(--text); vertical-align: middle; }
+  .o-list tbody td.td-center { text-align: center; }
+  .o-list tbody td.td-muted { color: #ddd; text-align: center; font-size: 10px; }
+  .o-list tbody td.td-code { color: var(--teal-500); font-weight: 500; font-size: 12px; }
+  .o-list tbody td.td-name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+  .o-list tbody td.td-doctor { max-width: 130px; overflow: hidden; text-overflow: ellipsis; color: var(--text-muted); }
+
+  /* Checkbox col */
+  .o-cb { width: 16px; height: 16px; cursor: pointer; accent-color: var(--teal-600); }
+  .th-cb, .td-cb { width: 36px; text-align: center; }
+
+  /* Empty state */
+  .o-empty-state {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 80px 20px;
+  }
+  .o-empty-illo {
+    width: 88px; height: 88px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--teal-600) 0%, var(--teal-400) 100%);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 20px; position: relative;
+  }
+  .o-empty-illo svg { color: #fff; opacity: 0.9; }
+  .o-empty-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+  .o-empty-sub { font-size: 12.5px; color: var(--text-muted); margin-bottom: 20px; }
+  .o-empty-btn {
+    background: var(--teal-500); color: #fff; border: none; padding: 7px 20px; border-radius: 4px;
+    font-size: 12.5px; font-weight: 500;
+    cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+    transition: background 0.15s;
+  }
+  .o-empty-btn:hover { background: var(--teal-600); }
+
+  /* ══ DROPDOWNS ══ */
+  .o-dd-wrap { position: relative; }
+  .o-dd-panel {
+    display: none; position: fixed; z-index: 9999;
+    background: #fff; border: 1px solid #dde3ec;
+    border-radius: 6px; box-shadow: 0 8px 28px rgba(0,0,0,0.16);
+    min-width: 230px; padding: 5px 0;
+  }
+  .o-dd-panel.open { display: block; }
+  .o-dd-section {
+    padding: 6px 14px 3px; font-size: 10px; font-weight: 600;
+    color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .o-dd-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 14px; font-size: 12.5px; color: var(--text);
+    cursor: pointer; text-decoration: none; transition: background 0.1s;
+    white-space: nowrap; gap: 10px; position: relative;
+  }
+  .o-dd-item:hover { background: var(--teal-50); color: var(--teal-600); }
+  .o-dd-item.active { background: #ede7f6; color: var(--teal-600); font-weight: 500; }
+  .o-dd-item .o-dd-arr { font-size: 10px; color: var(--text-muted); flex-shrink: 0; }
+  .o-dd-sep { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+  .o-dd-sub {
+    display: none; position: absolute; left: 100%; top: 0; z-index: 10000;
+    background: #fff; border: 1px solid #dde3ec;
+    border-radius: 6px; box-shadow: 0 8px 28px rgba(0,0,0,0.16);
+    min-width: 160px; padding: 5px 0;
+  }
+  .o-dd-item:hover > .o-dd-sub { display: block; }
+  .o-dd-sub .o-dd-item { font-size: 12px; }
+
+  /* Active filter tag */
+  .o-active-filters { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+  .o-filter-tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: var(--teal-50); color: var(--teal-600); border: 1px solid #b2d8db;
+    border-radius: 3px; padding: 1px 8px; font-size: 11.5px; font-weight: 500;
+  }
+  .o-filter-tag button {
+    background: none; border: none; cursor: pointer; color: #999;
+    font-size: 14px; line-height: 1; padding: 0; margin-left: 2px;
+  }
+  .o-filter-tag button:hover { color: #333; }
+
+  /* Date block inside filter dropdown */
+  .o-dd-date-block { padding: 8px 14px 10px; }
+  .o-dd-date-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .o-dd-date-row label { font-size: 11.5px; color: var(--text-muted); min-width: 18px; }
+  .o-dd-date-input {
+    flex: 1; border: none; border-bottom: 1px solid #bbb; background: transparent;
+    font-size: 12px; color: var(--text); padding: 2px 2px; outline: none;
+  }
+  .o-dd-date-input:focus { border-bottom-color: var(--teal-600); }
+  .o-dd-date-actions { display: flex; gap: 6px; margin-top: 10px; }
+  .o-dd-apply-btn {
+    flex: 1; background: var(--teal-600); color: #fff; border: none; border-radius: 3px;
+    padding: 5px 0; font-size: 12px; font-weight: 500;
+    cursor: pointer; transition: background 0.15s;
+  }
+  .o-dd-apply-btn:hover { background: var(--teal-700); }
+  .o-dd-clear-btn {
+    background: none; border: 1px solid var(--border); border-radius: 3px;
+    padding: 5px 10px; font-size: 11.5px; color: var(--text-muted);
+    cursor: pointer; text-decoration: none; display: inline-flex; align-items: center;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .o-dd-clear-btn:hover { border-color: #999; color: var(--text); }
+
+  html[data-theme="dark"] .o-dd-panel, html[data-theme="dark"] .o-dd-sub { background: #1a2535; border-color: #2e3f58; }
+  html[data-theme="dark"] .o-dd-item:hover { background: rgba(33,136,171,0.2); color: #c5d4e2; }
+  html[data-theme="dark"] .o-dd-item.active { background: rgba(33,136,171,0.3); color: var(--teal-300); }
+  html[data-theme="dark"] .o-filter-tag { background: rgba(33,136,171,0.25); border-color: rgba(33,136,171,0.5); color: var(--teal-300); }
+  html[data-theme="dark"] .o-dd-date-input { border-bottom-color: #3a4a62; color: var(--text); }
+  html[data-theme="dark"] .o-dd-clear-btn { border-color: var(--border); color: var(--text-muted); }
+</style>
+
+<!-- ══ SUBHEADER ══ -->
+<div class="o-subheader"{% if subheader_sticky_top %} style="top: {{ subheader_sticky_top }};"{% endif %}>
+
+  <!-- Ligne 1 : titre + recherche -->
+  <div class="o-subheader-row">
+    <span class="o-page-title">{{ subheader_title }}</span>
+    <div class="o-subheader-row-right">
+      <form method="get" style="display:flex;align-items:center;">
+        {% for key, val in request.GET.items %}
+          {% if key != 'q' and key != 'page' %}
+          <input type="hidden" name="{{ key }}" value="{{ val }}">
+          {% endif %}
+        {% endfor %}
+        <div class="o-search-bar">
+          <input class="o-search-input" type="text" name="q"
+                 value="{{ request.GET.q }}"
+                 placeholder="{{ subheader_placeholder|default:'Rechercher...' }}">
+          <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Ligne 2 : CRÉER + contrôles + pagination -->
+  <div class="o-subheader-row">
+    <a href="{{ subheader_create_url }}" class="o-btn-create">CRÉER</a>
+
+    <div class="o-subheader-row-right">
+
+      <!-- ── Filtres ── -->
+      {% if subheader_filters_tpl %}
+      <div class="o-dd-wrap">
+        <button class="o-ctrl-btn {% if request.GET.filter %}active{% endif %}" id="btn-filtres" onclick="toggleDd('dd-filtres',this)">
+          <i class="bi bi-funnel{% if request.GET.filter %}-fill{% endif %}"></i> Filtres{% if request.GET.filter %} <span style="background:var(--teal-600);color:#fff;border-radius:10px;font-size:10px;padding:0 5px;">1</span>{% endif %}
+        </button>
+        <div class="o-dd-panel" id="dd-filtres">
+          {% include subheader_filters_tpl %}
+          <hr class="o-dd-sep">
+          <div class="o-dd-section">Par date</div>
+          <div class="o-dd-date-block">
+            <div class="o-dd-date-row">
+              <label>De</label>
+              <input type="date" id="filter-date-from" class="o-dd-date-input" value="{{ request.GET.date_from }}">
+            </div>
+            <div class="o-dd-date-row">
+              <label>À</label>
+              <input type="date" id="filter-date-to" class="o-dd-date-input" value="{{ request.GET.date_to }}">
+            </div>
+            <div class="o-dd-date-actions">
+              <button type="button" class="o-dd-apply-btn" onclick="applyDateFilter()">Appliquer</button>
+              {% if request.GET.date_from or request.GET.date_to %}
+              <a class="o-dd-clear-btn" href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.filter %}filter={{ request.GET.filter }}&{% endif %}{% if request.GET.group %}group={{ request.GET.group }}{% endif %}">Effacer</a>
+              {% endif %}
+            </div>
+          </div>
+          <hr class="o-dd-sep">
+          <a class="o-dd-item" href="#">Ajouter un filtre personnalisé <span class="o-dd-arr">›</span></a>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- ── Regrouper par ── -->
+      {% if subheader_groups_tpl %}
+      <div class="o-dd-wrap">
+        <button class="o-ctrl-btn {% if request.GET.group %}active{% endif %}" id="btn-group" onclick="toggleDd('dd-group',this)">
+          <i class="bi bi-list-ul"></i> Regrouper par{% if request.GET.group %} <span style="background:var(--teal-600);color:#fff;border-radius:10px;font-size:10px;padding:0 5px;">1</span>{% endif %}
+        </button>
+        <div class="o-dd-panel" id="dd-group">
+          <div class="o-dd-section">Regrouper par</div>
+          {% include subheader_groups_tpl %}
+          <hr class="o-dd-sep">
+          <a class="o-dd-item" href="#">Ajouter un groupe personnalisé <span class="o-dd-arr">›</span></a>
+          {% if request.GET.group %}
+          <hr class="o-dd-sep">
+          <a class="o-dd-item" href="?{% if request.GET.q %}q={{ request.GET.q }}{% endif %}" style="color:#b71c1c;">
+            <i class="bi bi-x-circle" style="font-size:11px;"></i> Supprimer le regroupement
+          </a>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+      <button class="o-ctrl-btn"><i class="bi bi-star"></i> Favoris</button>
+      <div class="o-ctrl-sep"></div>
+
+      <!-- ── Pagination ── -->
+      <div class="o-pagination">
+        <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
+        <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
+           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-left"></i>
+        </a>
+        <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
+           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-right"></i>
+        </a>
+      </div>
+
+      <div class="o-ctrl-sep"></div>
+      <div class="o-view-btns">
+        <button class="o-view-btn active"><i class="bi bi-list-ul"></i></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ligne 3 : tags filtres actifs -->
+  {% if request.GET.filter or request.GET.group or request.GET.date_from or request.GET.date_to %}
+  <div class="o-subheader-row" style="padding-top:0;gap:6px;flex-wrap:wrap;">
+
+    {% if request.GET.filter %}
+    <div class="o-active-filters">
+      <span style="font-size:11px;color:var(--text-muted);margin-right:2px;">Filtre :</span>
+      <span class="o-filter-tag">
+        {{ subheader_active_filter_label|default:request.GET.filter }}
+        <button onclick="window.location='?{% if request.GET.q %}q={{ request.GET.q }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}'" title="Supprimer">×</button>
+      </span>
+    </div>
+    {% endif %}
+
+    {% if request.GET.date_from or request.GET.date_to %}
+    <div class="o-active-filters">
+      <span style="font-size:11px;color:var(--text-muted);margin-right:2px;">Date :</span>
+      <span class="o-filter-tag">
+        {% if request.GET.date_from and request.GET.date_to %}{{ request.GET.date_from }} → {{ request.GET.date_to }}
+        {% elif request.GET.date_from %}À partir du {{ request.GET.date_from }}
+        {% else %}Jusqu'au {{ request.GET.date_to }}{% endif %}
+        <button onclick="window.location='?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.filter %}filter={{ request.GET.filter }}&{% endif %}{% if request.GET.group %}group={{ request.GET.group }}{% endif %}'" title="Supprimer">×</button>
+      </span>
+    </div>
+    {% endif %}
+
+    {% if request.GET.group %}
+    <div class="o-active-filters">
+      <span style="font-size:11px;color:var(--text-muted);margin-right:2px;">Groupé par :</span>
+      <span class="o-filter-tag">
+        {{ subheader_active_group_label|default:request.GET.group }}
+        <button onclick="window.location='?{% if request.GET.q %}q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}'" title="Supprimer">×</button>
+      </span>
+    </div>
+    {% endif %}
+
+  </div>
+  {% endif %}
+
+</div>
+
+<script>
+  // Colonnes redimensionnables
+  function initResizableCols(table) {
+    var ths = table.querySelectorAll('thead th');
+    ths.forEach(function(th) {
+      if (th.classList.contains('th-cb')) return;
+      var h = document.createElement('div');
+      h.className = 'o-col-resize';
+      th.appendChild(h);
+      h.addEventListener('mousedown', function(e) {
+        e.preventDefault(); e.stopPropagation();
+        var startX = e.pageX, startW = th.offsetWidth;
+        h.classList.add('active');
+        ths.forEach(function(t) { t.style.width = t.offsetWidth + 'px'; });
+        table.style.tableLayout = 'fixed';
+        function onMove(e) { th.style.width = Math.max(40, startW + e.pageX - startX) + 'px'; }
+        function onUp() { h.classList.remove('active'); document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); }
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      });
+    });
+  }
+  // Appelé après le rendu DOM complet (la table est après cet include)
+  document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.o-list').forEach(initResizableCols);
+    var chkAll = document.getElementById('chk-all');
+    if (chkAll) chkAll.addEventListener('change', function() {
+      document.querySelectorAll('.o-cb:not(#chk-all)').forEach(function(cb) { cb.checked = this.checked; }, this);
+    });
+  });
+
+  // Filtre par date
+  function applyDateFilter() {
+    var from = document.getElementById('filter-date-from').value;
+    var to   = document.getElementById('filter-date-to').value;
+    if (!from && !to) return;
+    var params = new URLSearchParams(window.location.search);
+    if (from) params.set('date_from', from); else params.delete('date_from');
+    if (to)   params.set('date_to',   to);   else params.delete('date_to');
+    window.location = '?' + params.toString();
+  }
+  ['filter-date-from','filter-date-to'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('keydown', function(e){ if(e.key==='Enter') applyDateFilter(); });
+  });
+
+  // Dropdowns
+  function toggleDd(id, btn) {
+    var panel = document.getElementById(id);
+    var isOpen = panel.classList.contains('open');
+    document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
+    if (!isOpen) {
+      var rect = btn.getBoundingClientRect();
+      panel.style.top  = (rect.bottom + 4) + 'px';
+      panel.style.left = rect.left + 'px';
+      panel.style.right = 'auto';
+      panel.classList.add('open');
+      var pr = panel.getBoundingClientRect();
+      if (pr.right > window.innerWidth - 8) {
+        panel.style.left  = 'auto';
+        panel.style.right = (window.innerWidth - rect.right) + 'px';
+      }
+    }
+  }
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.o-dd-wrap')) {
+      document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
+    }
+  });
+  document.addEventListener('scroll', function() {
+    document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
+  }, true);
+
+  // Auto-recherche AJAX
+  (function() {
+    var input = document.querySelector('.o-search-input');
+    if (!input) return;
+    var timer;
+    input.addEventListener('input', function() {
+      clearTimeout(timer);
+      var val = this.value;
+      timer = setTimeout(function() {
+        var params = new URLSearchParams(window.location.search);
+        if (val) params.set('q', val); else params.delete('q');
+        params.delete('page');
+        var url = window.location.pathname + '?' + params.toString();
+        fetch(url)
+          .then(function(r) { return r.text(); })
+          .then(function(html) {
+            var doc = new DOMParser().parseFromString(html, 'text/html');
+            var newWrap = doc.querySelector('.o-list-wrap');
+            var curWrap = document.querySelector('.o-list-wrap');
+            if (newWrap && curWrap) curWrap.innerHTML = newWrap.innerHTML;
+            var newPag = doc.querySelector('.o-pagination');
+            var curPag = document.querySelector('.o-pagination');
+            if (newPag && curPag) curPag.innerHTML = newPag.innerHTML;
+            document.querySelectorAll('.o-list').forEach(initResizableCols);
+            var chk = document.getElementById('chk-all');
+            if (chk) chk.addEventListener('change', function() {
+              document.querySelectorAll('.o-cb:not(#chk-all)').forEach(function(cb) { cb.checked = this.checked; }, this);
+            });
+            history.replaceState(null, '', url);
+          });
+      }, 300);
+    });
+  })();
+</script>

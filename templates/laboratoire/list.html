@@ -1,96 +1,111 @@
 {% extends 'laboratoire/base.html' %}
+{% load static %}
+
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<style>
+  :root {
+    --accent: var(--teal-500);
+    --surface: #fff;
+    --border: #e8edf2;
+    --text: #0d3040;
+    --text-muted: rgba(0,0,0,0.45);
+    --bg: #f0f6fa;
+  }
+  html[data-theme="dark"] {
+    --surface: #132033;
+    --border: #243044;
+    --text: #d4e6f5;
+    --text-muted: rgba(255,255,255,0.45);
+    --bg: #0b1929;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  .o-badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 500; white-space: nowrap; }
+  .badge-recu        { background: #e3f2fd; color: #1565c0; }
+  .badge-en_analyse  { background: #fff8e1; color: #f57f17; }
+  .badge-resultat    { background: #e8f5e9; color: #2e7d32; }
+  .badge-valide      { background: #ede7f6; color: #4527a0; }
+  .badge-envoye      { background: var(--teal-50,#e0f7fa); color: var(--teal-600,#00796b); }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <div class="page-header-left">
-        <h1>🧪 Gestion du Laboratoire</h1>
-        <p>Gestion des analyses biologiques et examens d'imagerie</p>
-    </div>
-    <div class="page-header-right">
-        <a href="/admin/laboratoire/analyselaboratoire/add/" class="btn btn-primary">
-            <span>+</span> Nouvelle analyse
-        </a>
-    </div>
+{% url 'laboratoire_create' as subheader_create_url %}
+{% include 'includes/subheader.html' with subheader_title="Laboratoire" subheader_create_url=subheader_create_url subheader_placeholder="Rechercher un patient ou type d'examen…" subheader_filters_tpl="includes/subheader_filters_labo.html" subheader_groups_tpl="includes/subheader_groups_labo.html" %}
+
+<!-- ══ STATS ══ -->
+<div style="display:flex; gap:12px; margin:0 0 16px; flex-wrap:wrap;">
+  <div class="card" style="flex:1; min-width:140px;">
+    <p class="card-meta">Analyses en cours</p>
+    <div class="card-stat">{{ stats.en_cours }}</div>
+  </div>
+  <div class="card" style="flex:1; min-width:140px;">
+    <p class="card-meta">Résultats à remettre</p>
+    <div class="card-stat" style="color: var(--amber);">{{ stats.resultats_prets }}</div>
+  </div>
+  <div class="card" style="flex:1; min-width:140px;">
+    <p class="card-meta">Analyses ce mois</p>
+    <div class="card-stat">{{ stats.analyses_mois }}</div>
+  </div>
+  <div class="card" style="flex:1; min-width:140px;">
+    <p class="card-meta">Délai moyen (jours)</p>
+    <div class="card-stat">{{ stats.delai_moyen }}</div>
+  </div>
 </div>
 
-<div style="display: flex; gap: 16px; margin-bottom: 24px;">
-    <input type="text" placeholder="Rechercher par patient ou type d'analyse..." style="flex: 1; padding: 10px 14px; border: 1px solid rgba(0,0,0,0.12); border-radius: 8px; font-size: 14px;">
-    <select style="padding: 10px 14px; border: 1px solid rgba(0,0,0,0.12); border-radius: 8px; font-size: 14px;">
-        <option>Tous les statuts</option>
-        <option>Reçu</option>
-        <option>En analyse</option>
-        <option>Résultats prêts</option>
-        <option>Livré</option>
-    </select>
-</div>
-
-<div class="grid">
-    <div class="card">
-        <p class="card-meta">Analyses en cours</p>
-        <div class="card-stat">{{ stats.en_cours }}</div>
+<!-- ══ TABLE ══ -->
+<div class="o-list-wrap {% if request.GET.filter or request.GET.group %}has-tags{% endif %}">
+  {% if page_obj %}
+  <table class="o-list">
+    <thead>
+      <tr>
+        <th class="th-cb"><input type="checkbox" class="o-cb" id="chk-all"></th>
+        <th>N° Analyse</th>
+        <th>Patient</th>
+        <th>Type d'examen</th>
+        <th>Date prélèvement</th>
+        <th>Délai prévu</th>
+        <th>Résultats</th>
+        <th>Statut</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for analyse in page_obj %}
+      <tr>
+        <td class="td-cb"><input type="checkbox" class="o-cb" onclick="event.stopPropagation()"></td>
+        <td class="td-code">{{ analyse.numero }}</td>
+        <td class="td-name">{{ analyse.patient.nom|upper }} {{ analyse.patient.prenoms }}</td>
+        <td>{{ analyse.type_examen|default:"—" }}</td>
+        <td>{{ analyse.date_prelevement|date:"d/m/Y" }}</td>
+        <td>{% if analyse.type_examen %}{{ analyse.type_examen.delai_resultat_heures }} h{% else %}<span style="color:#ddd">—</span>{% endif %}</td>
+        <td>{% if analyse.resultats.exists %}<span class="o-badge badge-resultat">Disponible</span>{% else %}<span style="color:var(--text-muted)">En attente</span>{% endif %}</td>
+        <td><span class="o-badge badge-{{ analyse.statut }}">{{ analyse.get_statut_display }}</span></td>
+        <td><a href="/admin/laboratoire/analyselaboratoire/{{ analyse.pk }}/change/" class="o-btn-create" style="padding:3px 10px; font-size:11.5px;">Modifier</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="o-empty-state">
+    <div class="o-empty-illo">
+      <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9"/><polyline points="9 3 9 9 15 9"/>
+        <line x1="12" y1="12" x2="12" y2="18"/><line x1="9" y1="15" x2="15" y2="15"/>
+      </svg>
     </div>
-    <div class="card">
-        <p class="card-meta">Résultats à remettre</p>
-        <div class="card-stat" style="color: var(--amber);">{{ stats.resultats_prets }}</div>
-    </div>
-    <div class="card">
-        <p class="card-meta">Analyses ce mois</p>
-        <div class="card-stat">{{ stats.analyses_mois }}</div>
-    </div>
-    <div class="card">
-        <p class="card-meta">Délai moyen (jours)</p>
-        <div class="card-stat">{{ stats.delai_moyen }}</div>
-    </div>
-</div>
-
-<div class="table-container">
-    <table>
-        <thead>
-            <tr>
-                <th>Code Analyse</th>
-                <th>Patient</th>
-                <th>Type d'Analyse</th>
-                <th>Date Reçu</th>
-                <th>Délai prévu</th>
-                <th>Statut</th>
-                <th>Résultats</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for analyse in page_obj %}
-            <tr>
-                <td>{{ analyse.code_analyse }}</td>
-                <td>{{ analyse.patient.nom }} {{ analyse.patient.prenoms }}</td>
-                <td>{{ analyse.type_analyse }}</td>
-                <td>{{ analyse.date_reception|date:"d/m/Y" }}</td>
-                <td>{{ analyse.delai_prevu }} jours</td>
-                <td>
-                    <span class="badge badge-{% if analyse.statut == 'resultats_prets' %}success{% elif analyse.statut == 'en_analyse' %}warning{% else %}primary{% endif %}">
-                        {{ analyse.get_statut_display }}
-                    </span>
-                </td>
-                <td>
-                    {% if analyse.resultats %}
-                        <span class="badge badge-success">Disponible</span>
-                    {% else %}
-                        <span class="badge badge-secondary">En attente</span>
-                    {% endif %}
-                </td>
-                <td>
-                    <a href="/admin/laboratoire/analyselaboratoire/{{ analyse.id }}/change/" class="btn btn-secondary btn-small">Voir</a>
-                    <a href="/admin/laboratoire/analyselaboratoire/{{ analyse.id }}/change/" class="btn btn-primary btn-small">Modifier</a>
-                </td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="8" style="text-align: center; padding: 40px; color: rgba(0,0,0,0.4);">
-                    Aucune analyse enregistrée
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <div class="o-empty-title">Aucune analyse{% if request.GET.q %} pour "{{ request.GET.q }}"{% endif %}</div>
+    <div class="o-empty-sub">{% if request.GET.q %}Essayez avec un autre terme de recherche.{% else %}Créez la première demande d'analyse.{% endif %}</div>
+    {% if not request.GET.q %}
+    <a href="{% url 'laboratoire_create' %}" class="o-empty-btn">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      NOUVELLE DEMANDE
+    </a>
+    {% endif %}
+  </div>
+  {% endif %}
 </div>
 
 {% include 'includes/pagination.html' %}

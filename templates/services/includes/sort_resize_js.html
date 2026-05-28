@@ -1,0 +1,59 @@
+<script>
+/* ── Tri colonnes (délégation — survit aux DOM swaps) ── */
+(function () {
+  var sortState = { col: null, dir: 1 };
+  document.addEventListener('click', function (e) {
+    var th = e.target.closest('th.sortable, th.sortable-col');
+    if (!th) return;
+    if (e.target.closest('.col-resizer') || e.target.closest('#col-picker-btn')) return;
+    var col = th.dataset.colIdx !== undefined ? th.dataset.colIdx : th.dataset.col;
+    if (col === undefined || col === null) return;
+    if (sortState.col === col) { sortState.dir *= -1; } else { sortState.col = col; sortState.dir = 1; }
+    document.querySelectorAll('.o-list-table th .sort-icon').forEach(function (ic) { ic.textContent = ''; });
+    var icon = th.querySelector('.sort-icon');
+    if (icon) icon.textContent = sortState.dir === 1 ? ' ▲' : ' ▼';
+    var colIdx = parseInt(col, 10);
+    var tbody = document.querySelector('.o-list-table tbody');
+    if (!tbody) return;
+    Array.from(tbody.querySelectorAll('tr'))
+      .sort(function (a, b) {
+        var aVal = a.cells[colIdx] ? a.cells[colIdx].textContent.trim() : '';
+        var bVal = b.cells[colIdx] ? b.cells[colIdx].textContent.trim() : '';
+        var aNum = parseFloat(aVal.replace(/[^\d.,-]/g, '').replace(',', '.'));
+        var bNum = parseFloat(bVal.replace(/[^\d.,-]/g, '').replace(',', '.'));
+        if (!isNaN(aNum) && !isNaN(bNum)) return (aNum - bNum) * sortState.dir;
+        return aVal.localeCompare(bVal, 'fr') * sortState.dir;
+      })
+      .forEach(function (row) { tbody.appendChild(row); });
+  });
+})();
+
+/* ── Redimensionnement colonnes (délégation) ── */
+(function () {
+  var resizing = null, startX = 0, startW = 0;
+  document.addEventListener('mousedown', function (e) {
+    var handle = e.target.closest('.col-resizer');
+    if (!handle) return;
+    e.preventDefault(); e.stopPropagation();
+    resizing = handle.parentElement;
+    startX = e.pageX; startW = resizing.offsetWidth;
+    handle.classList.add('resizing');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  });
+  document.addEventListener('mousemove', function (e) {
+    if (!resizing) return;
+    var w = Math.max(60, startW + e.pageX - startX);
+    resizing.style.width = w + 'px';
+    resizing.style.minWidth = w + 'px';
+  });
+  document.addEventListener('mouseup', function () {
+    if (!resizing) return;
+    var h = resizing.querySelector('.col-resizer');
+    if (h) h.classList.remove('resizing');
+    resizing = null;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  });
+})();
+</script>

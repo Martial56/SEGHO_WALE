@@ -1,0 +1,675 @@
+{% extends 'services/base.html' %}
+{% load static %}
+
+{% block module_navbar %}{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+  /* ── DARK MODE — composants spécifiques liste ── */
+
+  html[data-theme="dark"] .o-card {
+    background: var(--surface);
+    border-color: var(--border);
+  }
+
+  html[data-theme="dark"] .o-card:hover {
+    border-color: #4a5a78;
+  }
+
+  html[data-theme="dark"] .o-card-name {
+    color: var(--text);
+  }
+
+  html[data-theme="dark"] .o-list-table {
+    background: var(--surface);
+  }
+
+  html[data-theme="dark"] .o-list-table th {
+    background: var(--surface);
+    border-bottom-color: var(--border);
+    color: var(--text-muted);
+  }
+
+  html[data-theme="dark"] .o-list-table td {
+    border-bottom-color: #2d3550;
+    color: var(--text);
+  }
+
+  html[data-theme="dark"] .o-list-table tbody tr:hover td {
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  /* ── Redimensionnement colonnes ── */
+  .o-list-table th {
+    position: relative;
+    user-select: none;
+  }
+  .col-resizer {
+    position: absolute;
+    right: 0;
+    top: 0;
+    height: 100%;
+    width: 5px;
+    cursor: col-resize;
+    z-index: 1;
+  }
+  .col-resizer:hover,
+  .col-resizer.resizing {
+    background: var(--accent);
+    opacity: 0.4;
+  }
+
+  html[data-theme="dark"] .filters-panel {
+    background: #1a2133;
+    border-bottom-color: var(--border);
+  }
+
+  html[data-theme="dark"] .filter-select {
+    background: var(--surface);
+    border-color: var(--border);
+    color: var(--text);
+  }
+
+  .o-icon-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .o-icon-btn:hover {
+    background: rgba(33, 136, 171, 0.07);
+    color: var(--primary);
+    border-color: #aaa;
+  }
+
+  html[data-theme="dark"] .o-icon-btn {
+    background: var(--surface);
+    border-color: var(--border);
+    color: var(--text-muted);
+  }
+
+  /* ── PANEL FILTRES ── */
+  .filters-panel {
+    display: none;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: 8px 16px;
+    background: #f4f9fb;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .filters-panel.open {
+    display: flex;
+  }
+
+  .filter-select {
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-family: 'Roboto', sans-serif;
+    font-size: 12px;
+    color: var(--text);
+    background: var(--surface);
+    cursor: pointer;
+    outline: none;
+  }
+
+  .filter-select:focus {
+    border-color: var(--accent);
+  }
+
+
+  /* ── KANBAN ── */
+  .o-kanban {
+    padding: 12px 16px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    background: var(--bg);
+  }
+
+  /* ── CARD ── */
+  .o-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 10px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    cursor: pointer;
+    transition: box-shadow 0.15s, border-color 0.15s;
+    box-shadow: var(--shadow-card);
+  }
+
+  .o-card:hover {
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.13);
+    border-color: #bbb;
+  }
+
+  .o-avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: #d5d5d5;
+    flex-shrink: 0;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .o-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .o-avatar svg {
+    width: 28px;
+    fill: #999;
+    margin-bottom: -1px;
+  }
+
+  html[data-theme="dark"] .o-avatar {
+    background: #3a4a5e;
+  }
+
+  html[data-theme="dark"] .o-avatar svg {
+    fill: #6c85a0;
+  }
+
+  .o-card-cb {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    accent-color: var(--accent);
+    display: none;
+  }
+
+  .o-card-wrap {
+    position: relative;
+  }
+
+  .o-card-wrap:hover .o-card-cb,
+  .o-card-cb:checked {
+    display: block;
+  }
+
+  .o-card-body {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .o-card-name {
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .o-card-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.7;
+  }
+
+  .o-card-meta .val {
+    color: var(--text);
+  }
+
+  .badge-actif {
+    display: inline-block;
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 20px;
+    background: #e3f9ee;
+    color: #0d8a52;
+    font-weight: 600;
+  }
+
+  .badge-inactif {
+    display: inline-block;
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 20px;
+    background: #fdf0f0;
+    color: #c0392b;
+    font-weight: 600;
+  }
+
+  html[data-theme="dark"] .badge-actif {
+    background: rgba(22, 169, 107, 0.2);
+    color: #6eddb0;
+  }
+
+  html[data-theme="dark"] .badge-inactif {
+    background: rgba(232, 69, 69, 0.2);
+    color: #f09090;
+  }
+
+  /* ── TABLE LISTE ── */
+  .o-list-wrap {
+    background: var(--bg);
+    overflow-x: auto;
+  }
+
+  .o-list-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--surface);
+  }
+
+  .o-list-table th {
+    padding: 8px 14px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    white-space: nowrap;
+  }
+
+  .o-list-table td {
+    padding: 9px 14px;
+    font-size: 13px;
+    border-bottom: 1px solid #f0f0f0;
+    color: var(--text);
+  }
+
+  .o-list-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .o-list-table tbody tr:hover td {
+    background: #f4f9fb;
+  }
+
+  .o-list-table tbody tr {
+    cursor: pointer;
+  }
+
+  .badge-cat {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 20px;
+    background: #e6f2f5;
+    color: var(--primary);
+  }
+
+  html[data-theme="dark"] .badge-cat {
+    background: rgba(33, 136, 171, 0.15);
+    color: #7ecae0;
+  }
+
+  /* ── VIDE ── */
+  .o-empty {
+    grid-column: 1/-1;
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+
+  .o-empty i {
+    font-size: 36px;
+    display: block;
+    margin-bottom: 10px;
+    opacity: 0.5;
+  }
+
+  /* ── TRI COLONNES ── */
+  .sortable-col { cursor: pointer; user-select: none; }
+  .sortable-col:hover { background: rgba(0,0,0,0.025); }
+  html[data-theme="dark"] .sortable-col:hover { background: rgba(255,255,255,0.04); }
+  .sort-icon { font-size: 11px; color: var(--accent); margin-left: 3px; vertical-align: middle; }
+
+  /* ── SÉLECTEUR COLONNES ── */
+  .col-picker-th { width: 30px; text-align: center; padding: 0 2px; position: relative; }
+  .col-picker-btn {
+    background: none; border: none; cursor: pointer;
+    color: var(--text-muted); font-size: 15px; padding: 2px 5px;
+    border-radius: 3px; line-height: 1; font-weight: 700; letter-spacing: -1px;
+  }
+  .col-picker-btn:hover { background: rgba(0,0,0,0.06); color: var(--text); }
+  .col-picker-menu {
+    display: none; position: absolute; right: 0; top: calc(100% + 2px);
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+    z-index: 500; min-width: 160px; padding: 6px 0;
+  }
+  .col-picker-menu.open { display: block; }
+  .col-picker-menu label {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 14px; font-size: 13px; color: var(--text);
+    cursor: pointer; white-space: nowrap;
+  }
+  .col-picker-menu label:hover { background: rgba(0,0,0,0.03); }
+  html[data-theme="dark"] .col-picker-menu { background: var(--surface); border-color: var(--border); }
+  html[data-theme="dark"] .col-picker-menu label { color: var(--text); }
+  html[data-theme="dark"] .col-picker-menu label:hover { background: rgba(255,255,255,0.04); }
+
+  /* ── PAGINATION BAS ── */
+  .o-pagination-bottom {
+    display: flex; align-items: center; gap: 6px;
+    justify-content: center; padding: 14px 0;
+    border-top: 1px solid var(--border);
+    font-size: 12px; color: var(--text-muted);
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width:1300px) {
+    .o-kanban {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  @media (max-width:1000px) {
+    .o-kanban {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (max-width:680px) {
+    .o-kanban {
+      grid-template-columns: repeat(1, 1fr);
+    }
+
+    .o-nav-link:not(.active) {
+      display: none;
+    }
+  }
+
+  @media (max-width:420px) {
+    .o-kanban {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="page-wrap">
+
+{% include 'services/includes/nav.html' %}
+
+<!-- ══ SUBHEADER ══ -->
+<div class="o-subheader" id="subheader">
+
+  <!-- Ligne 1 : titre + recherche -->
+  <div class="o-subheader-row">
+    <span class="o-page-title">Prestations <span class="o-page-count">{{ total }}</span></span>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+      <form method="get" id="filter-form" style="display:flex;align-items:center;">
+        <input type="hidden" name="vue" id="vue-input" value="{{ vue }}">
+        <input type="hidden" name="categorie" id="fi-cat" value="{{ categorie_id }}">
+        <input type="hidden" name="type_produit" id="fi-type" value="{{ type_produit }}">
+        <input type="hidden" name="statut" id="fi-statut" value="{{ statut }}">
+        <div class="o-search-bar">
+          <input class="o-search-input" id="search-input" type="text" name="q" value="{{ q }}"
+            placeholder="Rechercher une prestation…">
+          <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Ligne 2 : créer + contrôles + pagination + vue -->
+  <div class="o-subheader-row">
+    <!-- Bouton créer + export -->
+    <a href="{% url 'services:create' %}" class="o-btn-create">
+      <i class="bi bi-plus-lg"></i> Créer
+    </a>
+
+    <!-- Tags filtres actifs -->
+    {% if q or categorie_id or type_produit or statut %}
+    <a href="{% url 'services:list' %}" class="o-ctrl-btn">
+      <i class="bi bi-x"></i> Effacer
+    </a>
+    {% endif %}
+    {% if q %}<span class="o-filter-tag">{{ q }} <a href="?{% if categorie_id %}categorie={{ categorie_id }}&{% endif %}{% if type_produit %}type_produit={{ type_produit }}&{% endif %}{% if statut %}statut={{ statut }}&{% endif %}vue={{ vue }}">×</a></span>{% endif %}
+    {% if categorie_id %}{% for cat in categories %}{% if cat.pk|stringformat:"s" == categorie_id %}<span class="o-filter-tag">{{ cat.nom }} <a href="?{% if q %}q={{ q }}&{% endif %}{% if type_produit %}type_produit={{ type_produit }}&{% endif %}{% if statut %}statut={{ statut }}&{% endif %}vue={{ vue }}">×</a></span>{% endif %}{% endfor %}{% endif %}
+    {% if type_produit %}<span class="o-filter-tag">{{ type_produit }} <a href="?{% if q %}q={{ q }}&{% endif %}{% if categorie_id %}categorie={{ categorie_id }}&{% endif %}{% if statut %}statut={{ statut }}&{% endif %}vue={{ vue }}">×</a></span>{% endif %}
+    {% if statut %}<span class="o-filter-tag">{% if statut == 'actif' %}Actifs{% else %}Inactifs{% endif %} <a href="?{% if q %}q={{ q }}&{% endif %}{% if categorie_id %}categorie={{ categorie_id }}&{% endif %}{% if type_produit %}type_produit={{ type_produit }}&{% endif %}vue={{ vue }}">×</a></span>{% endif %}
+
+    <div style="flex:1;"></div>
+
+    <div class="o-ctrl-sep"></div>
+
+    <!-- Vue -->
+    <div class="o-view-btns">
+      <button type="button" class="o-view-btn {% if vue == 'liste' %}active{% endif %}" onclick="setVue('liste')"
+        title="Vue Liste">
+        <i class="bi bi-list-ul"></i>
+      </button>
+      <button type="button" class="o-view-btn {% if vue == 'kanban' %}active{% endif %}" onclick="setVue('kanban')"
+        title="Vue Kanban">
+        <i class="bi bi-grid"></i>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PANEL FILTRES ══ -->
+<div class="filters-panel {% if categorie_id or type_produit or statut %}open{% endif %}" id="filters-panel">
+  <select id="sel-cat" class="filter-select" onchange="applyFilters()">
+    <option value="">Toutes catégories</option>
+    {% for cat in categories %}
+    <option value="{{ cat.pk }}" {% if categorie_id == cat.pk|stringformat:"s" %}selected{% endif %}>
+      {{ cat.code }} — {{ cat.nom }}
+    </option>
+    {% endfor %}
+  </select>
+  <select id="sel-type" class="filter-select" onchange="applyFilters()">
+    <option value="">Tous types</option>
+    {% for val, label in type_produit_choices %}
+    <option value="{{ val }}" {% if type_produit == val %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <select id="sel-statut" class="filter-select" onchange="applyFilters()">
+    <option value="">Tous statuts</option>
+    <option value="actif" {% if statut == "actif" %}selected{% endif %}>Actifs</option>
+    <option value="inactif" {% if statut == "inactif" %}selected{% endif %}>Inactifs</option>
+  </select>
+</div>
+
+
+<div id="list-result">
+<!-- ══ CONTENU ══ -->
+{% if vue == 'kanban' %}
+<!-- ── VUE KANBAN ── -->
+<div class="o-kanban" id="main-content">
+  {% for art in page_obj %}
+  <div class="o-card-wrap">
+    <div class="o-card" data-url="{% url 'services:detail' art.pk %}" onclick="window.location=this.dataset.url" style="cursor:pointer;">
+      <div class="o-avatar">
+        {% if art.photo %}
+        <img src="{{ art.photo.url }}" alt="{{ art.nom }}">
+        {% else %}
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path
+            d="M20 7h-4V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2H4a1 1 0 0 0-1 1v11a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8a1 1 0 0 0-1-1zM10 5h4v2h-4V5zm1 9v2H9v-2H7v-2h2v-2h2v2h2v2h-2z" />
+        </svg>
+        {% endif %}
+      </div>
+      <div class="o-card-body">
+        <div class="o-card-name">{{ art.nom }}</div>
+        <div class="o-card-meta">
+          {% if art.reference_interne %}<span style="font-family:monospace;font-size:10px;">{{ art.reference_interne }}</span><br>{% endif %}
+          {% if art.categorie %}<span class="val">{{ art.categorie.code }}</span><br>{% endif %}
+          <span class="val">{{ art.prix_vente|floatformat:0 }} CFA</span>
+          &nbsp;
+          {% if art.actif %}<span class="badge-actif">Actif</span>{% else %}<span class="badge-inactif">Inactif</span>{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% empty %}
+  <div class="o-empty">
+    <i class="bi bi-box-seam"></i>
+    Aucune prestation trouvé.<br>
+    <a href="{% url 'services:create' %}"
+      style="color:var(--accent);font-weight:600;margin-top:8px;display:inline-block;">Créer une première prestation</a>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<!-- ── VUE LISTE ── -->
+<div class="o-list-wrap" id="main-content">
+  {% if page_obj.object_list %}
+  <table class="o-list-table">
+    <thead>
+      <tr id="col-header-row">
+        <th class="sortable-col" data-col="0"><span class="col-label">Désignation</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
+        <th class="sortable-col" data-col="1"><span class="col-label">Référence</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
+        <th class="sortable-col" data-col="2"><span class="col-label">Catégorie</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
+        <th class="sortable-col" data-col="3"><span class="col-label">Type</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
+        <th class="sortable-col" data-col="4" style="text-align:right;"><span class="col-label">Prix de vente</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
+        <th class="sortable-col" data-col="5"><span class="col-label">Statut</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
+        <th class="col-picker-th">
+          <button class="col-picker-btn" id="col-picker-btn" title="Colonnes visibles"><i class="bi bi-three-dots-vertical"></i></button>
+          <div class="col-picker-menu" id="col-picker-menu">
+            <label><input type="checkbox" data-col-idx="0" checked> Désignation</label>
+            <label><input type="checkbox" data-col-idx="1" checked> Référence</label>
+            <label><input type="checkbox" data-col-idx="2" checked> Catégorie</label>
+            <label><input type="checkbox" data-col-idx="3" checked> Type</label>
+            <label><input type="checkbox" data-col-idx="4" checked> Prix de vente</label>
+            <label><input type="checkbox" data-col-idx="5" checked> Statut</label>
+          </div>
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for art in page_obj %}
+      <tr data-url="{% url 'services:detail' art.pk %}" onclick="window.location=this.dataset.url" style="cursor:pointer;">
+        <td style="font-weight:500;" data-col="0">{{ art.nom }}</td>
+        <td data-col="1"><span style="font-family:monospace;font-size:11px;color:var(--text-muted);">{{ art.reference_interne|default:"—" }}</span></td>
+        <td data-col="2">
+          {% if art.categorie %}<span class="badge-cat">{{ art.categorie.code }} — {{ art.categorie.nom }}</span>{% else %}—{% endif %}
+        </td>
+        <td style="font-size:12px;color:var(--text-muted);" data-col="3">{{ art.get_type_produit_hospitalier_display|default:"—" }}</td>
+        <td style="text-align:right;font-weight:700;color:var(--primary);" data-col="4">{{ art.prix_vente|floatformat:0 }} CFA</td>
+        <td data-col="5">
+          {% if art.actif %}<span class="badge-actif">Actif</span>{% else %}<span class="badge-inactif">Inactif</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="o-pagination-bottom">
+    <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
+    <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
+      href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}&q={{ q }}&categorie={{ categorie_id }}&type_produit={{ type_produit }}&statut={{ statut }}&vue={{ vue }}{% else %}#{% endif %}">
+      <i class="bi bi-chevron-left"></i>
+    </a>
+    <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
+      href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}&q={{ q }}&categorie={{ categorie_id }}&type_produit={{ type_produit }}&statut={{ statut }}&vue={{ vue }}{% else %}#{% endif %}">
+      <i class="bi bi-chevron-right"></i>
+    </a>
+  </div>
+  {% else %}
+  <div class="o-empty" style="padding:60px 20px;">
+    <i class="bi bi-box-seam"></i>
+    Aucun prestation trouvé.<br>
+    <a href="{% url 'services:create' %}"
+      style="color:var(--accent);font-weight:600;margin-top:8px;display:inline-block;">Créer une première prestation</a>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+</div><!-- /.list-result -->
+
+{% include 'services/includes/list_live_js.html' %}
+
+<script>
+  /* ── Décalage page sous le topbar fixe ── */
+  function adjustOffsets() {
+    var topbar = document.querySelector('.topbar');
+    var wrap = document.getElementById('page-wrap');
+    if (topbar && wrap) wrap.style.paddingTop = topbar.offsetHeight + 'px';
+  }
+  adjustOffsets();
+  window.addEventListener('resize', adjustOffsets);
+
+  /* ── Vue ── */
+  function setVue(v) {
+    document.getElementById('vue-input').value = v;
+    window.liveLoad();
+  }
+
+  /* ── Filtres ── */
+  function toggleFilters() {
+    var p = document.getElementById('filters-panel');
+    if (p) p.classList.toggle('open');
+    document.getElementById('btn-filtres').classList.toggle('active', p.classList.contains('open'));
+  }
+  function applyFilters() {
+    document.getElementById('fi-cat').value = document.getElementById('sel-cat').value;
+    document.getElementById('fi-type').value = document.getElementById('sel-type').value;
+    document.getElementById('fi-statut').value = document.getElementById('sel-statut').value;
+    window.liveLoad();
+  }
+
+  /* ── Recherche automatique (debounce 400ms) ── */
+  (function () {
+    var inp = document.getElementById('search-input');
+    if (!inp) return;
+    var timer;
+    inp.addEventListener('input', function () {
+      clearTimeout(timer);
+      timer = setTimeout(window.liveLoad, 400);
+    });
+  })();
+
+  /* ── Redimensionnement colonnes par glisser ── */
+  (function () {
+    var table = document.querySelector('.o-list-table');
+    if (!table) return;
+    var dragging = null, startX, startW;
+    table.querySelectorAll('th .col-resizer').forEach(function (handle) {
+      handle.addEventListener('mousedown', function (e) {
+        dragging = handle.parentElement;
+        startX = e.clientX;
+        startW = dragging.offsetWidth;
+        handle.classList.add('resizing');
+        e.preventDefault();
+      });
+    });
+    document.addEventListener('mousemove', function (e) {
+      if (!dragging) return;
+      dragging.style.width = Math.max(60, startW + (e.clientX - startX)) + 'px';
+    });
+    document.addEventListener('mouseup', function () {
+      if (dragging) {
+        dragging.querySelector('.col-resizer').classList.remove('resizing');
+        dragging = null;
+      }
+    });
+  })();
+</script>
+
+</div><!-- /#page-wrap -->
+
+{% endblock %}

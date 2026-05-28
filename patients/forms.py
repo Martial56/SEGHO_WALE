@@ -1,5 +1,5 @@
 from django import forms
-from .models import Patient, Assurance, RendezVous
+from .models import Patient, Assurance, RendezVous, Pathologie, TypeVisite
 
 _ul = 'field-ul'          # underline (bottom border only)
 _ul_name = 'field-ul field-ul-name'
@@ -99,15 +99,41 @@ class PatientForm(forms.ModelForm):
                 'invalid': 'Valeur invalide.',
             }
 
+    def clean(self):
+        cleaned = super().clean()
+        nom            = (cleaned.get('nom') or '').strip()
+        prenoms        = (cleaned.get('prenoms') or '').strip()
+        date_naissance = cleaned.get('date_naissance')
+        telephone      = (cleaned.get('telephone') or '').strip()
+
+        if nom and prenoms and date_naissance and telephone:
+            qs = Patient.objects.filter(
+                nom__iexact=nom,
+                prenoms__iexact=prenoms,
+                date_naissance=date_naissance,
+                telephone=telephone,
+            )
+            if self.instance and self.instance.pk:
+                qs = qs.exclude(pk=self.instance.pk)
+            doublon = qs.first()
+            if doublon:
+                raise forms.ValidationError(
+                    f'Un dossier patient identique existe déjà : {doublon.code_patient} — '
+                    f'{doublon.nom} {doublon.prenoms}, né(e) le {doublon.date_naissance.strftime("%d/%m/%Y")}, '
+                    f'tél. {doublon.telephone}.'
+                )
+        return cleaned
+
 
 class RendezVousForm(forms.ModelForm):
     class Meta:
         model = RendezVous
-        fields = ['patient', 'departement', 'medecin', 'date_heure', 'duree_minutes', 'type_rdv', 'motif', 'statut', 'notes']
+        fields = ['patient', 'departement', 'medecin', 'type_consultation', 'date_heure', 'duree_minutes', 'motif', 'statut', 'notes']
         widgets = {
             'patient': forms.Select(attrs={'class': _ul, 'id': 'id_patient'}),
             'departement': forms.Select(attrs={'class': _ul}),
             'medecin': forms.Select(attrs={'class': _ul}),
+            'type_consultation': forms.Select(attrs={'class': _ul}),
             'date_heure': forms.DateTimeInput(
                 attrs={'class': _ul, 'type': 'datetime-local'},
                 format='%Y-%m-%dT%H:%M',
@@ -115,7 +141,6 @@ class RendezVousForm(forms.ModelForm):
             'duree_minutes': forms.NumberInput(attrs={
                 'class': _ul, 'min': '5', 'step': '5', 'placeholder': '30',
             }),
-            'type_rdv': forms.Select(attrs={'class': _ul}),
             'statut': forms.Select(attrs={'class': _ul}),
             'motif': forms.Textarea(attrs={
                 'class': _ul, 'rows': 3, 'placeholder': 'Motif de la visite...',
@@ -126,9 +151,51 @@ class RendezVousForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        from services.models import Articleservice
         super().__init__(*args, **kwargs)
-        self.fields['patient'].queryset = Patient.objects.filter(actif=True).order_by('nom', 'prenoms')
+        self.fields['patient'].queryset = Patient.objects.all().order_by('nom', 'prenoms')
         self.fields['medecin'].empty_label = '— Aucun médecin —'
         self.fields['medecin'].required = False
         self.fields['departement'].empty_label = '— Choisir un département —'
         self.fields['departement'].required = False
+        self.fields['type_consultation'].queryset = Articleservice.objects.filter(actif=True, categorie__code__iexact='cs').order_by('nom')
+        self.fields['type_consultation'].empty_label = '— Choisir un type de consultation —'
+        self.fields['type_consultation'].required = False
+
+
+class PathologieForm(forms.ModelForm):
+    class Meta:
+        model = Pathologie
+        fields = ['nom', 'description', 'actif']
+        widgets = {
+            'nom': forms.TextInput(attrs={
+                'class': _ul,
+                'placeholder': 'Nom de la pathologie',
+            }),
+            'description': forms.Textarea(attrs={
+                'class': _ul,
+                'rows': 3,
+                'placeholder': 'Description optionnelle...',
+            }),
+        }
+
+
+class TypeVisiteForm(forms.ModelForm):
+    class Meta:
+        model = TypeVisite
+        fields = ['nom', 'code', 'description', 'actif']
+        widgets = {
+            'nom': forms.TextInput(attrs={
+                'class': _ul,
+                'placeholder': 'Nom du type de visite',
+            }),
+            'code': forms.TextInput(attrs={
+                'class': _ul,
+                'placeholder': 'Ex: CPN01',
+            }),
+            'description': forms.Textarea(attrs={
+                'class': _ul,
+                'rows': 3,
+                'placeholder': 'Description optionnelle...',
+            }),
+        }

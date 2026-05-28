@@ -28,6 +28,8 @@ INSTALLED_APPS = [
     'core',
     'modules_permissions',
     'ordonnance',
+    'services',
+    'soins',
 ]
 
 MIDDLEWARE = [
@@ -56,6 +58,7 @@ TEMPLATES = [
                 'planning.context_processors.planning_alertes_ctx',
                 'employer.context_processors.alertes_contrat',
                 'conges.context_processors.conge_context',
+                'core.context_processors.header_stats',
             ],
         },
     },

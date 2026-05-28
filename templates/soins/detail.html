@@ -1,0 +1,549 @@
+{% extends 'soins/base.html' %}
+{% load static %}
+{% block breadcrumb %}{% endblock %}
+{% block module_navbar %}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+  .det-page { width: 100%; padding: 12px 20px 48px; }
+
+  /* ── CARTE HEADER ── */
+  .det-header {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; margin-bottom: 10px;
+  }
+
+  /* Barre actions (sous le stepper) */
+  .det-actions-bar {
+    display: flex; align-items: center; padding: 8px 14px;
+    border-bottom: 1px solid var(--border); gap: 7px; flex-wrap: wrap;
+  }
+  .det-action-btns { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+  .det-btn {
+    padding: 5px 13px; border-radius: 4px; font-size: 12px; font-weight: 600;
+    font-family: 'Roboto', sans-serif; cursor: pointer; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 5px; transition: all .15s; border: none;
+  }
+  .det-btn-edit    { background: var(--accent); color: #fff; }
+  .det-btn-edit:hover { filter: brightness(1.1); }
+  .det-btn-invoice { background: #16a34a; color: #fff; }
+  .det-btn-invoice:hover { background: #15803d; }
+  .det-btn-delete  { background: none; border: 1.5px solid #fca5a5 !important; color: #dc2626; }
+  .det-btn-delete:hover { background: #fef2f2; }
+
+  /* Quick-nav dans la carte */
+  .det-quick-nav {
+    display: flex; align-items: center; overflow-x: auto;
+    scrollbar-width: none; border-bottom: 1px solid var(--border);
+  }
+  .det-quick-nav::-webkit-scrollbar { display: none; }
+  .det-qnav-sep { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; }
+  .qnav-count {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 18px; height: 18px; padding: 0 5px;
+    border-radius: 9px; font-size: 10px; font-weight: 700;
+    background: var(--accent); color: #fff; line-height: 1;
+  }
+  .qnav-count-gray  { background: #9ca3af; }
+  .qnav-count-green { background: #16a34a; }
+  .det-qnav-link {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 10px 16px; font-size: 12px; font-weight: 500; color: var(--text-muted);
+    text-decoration: none; white-space: nowrap; transition: color .15s;
+  }
+  .det-qnav-link:hover { color: var(--accent); }
+
+  /* Corps identité */
+  .det-identity-row {
+    display: flex; align-items: flex-start; gap: 20px;
+    padding: 18px 20px 16px;
+  }
+  .det-photo {
+    width: 76px; height: 76px; border-radius: 50%; flex-shrink: 0;
+    border: 2px solid var(--border); background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden; font-size: 28px; color: var(--text-muted);
+  }
+  .det-photo img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+  .det-info-block { flex: 1; min-width: 0; }
+  .det-patient-name {
+    font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 6px;
+  }
+  .det-meta-row {
+    display: flex; flex-wrap: wrap; gap: 6px 20px;
+    font-size: 12.5px; color: var(--text-muted); margin-bottom: 8px;
+  }
+  .det-meta-item { display: inline-flex; align-items: center; gap: 5px; }
+  .det-meta-item i { font-size: 13px; color: var(--accent); }
+  .det-numero-badge {
+    font-family: monospace; font-size: 12px; font-weight: 700;
+    color: var(--accent); letter-spacing: .5px;
+  }
+  .det-date-block {
+    flex-shrink: 0; text-align: right; min-width: 160px;
+  }
+  .det-date-label {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .5px; color: var(--text-muted); margin-bottom: 3px;
+  }
+  .det-date-val { font-size: 13px; font-weight: 600; color: var(--text); }
+
+  /* ── SECTIONS CONTENU ── */
+  .det-section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; margin-bottom: 10px;
+  }
+  .det-section-head {
+    display: flex; align-items: center; gap: 7px;
+    padding: 9px 16px; border-bottom: 1px solid var(--border);
+    font-size: 11px; font-weight: 700; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: .05em;
+  }
+  .det-section-head i { font-size: 13px; color: var(--accent); }
+
+  .det-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 0;
+  }
+  .det-grid-2 { grid-template-columns: repeat(2, 1fr); }
+  .det-field {
+    padding: 13px 18px; border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+  }
+  .det-grid .det-field:nth-child(3n)   { border-right: none; }
+  .det-grid-2 .det-field:nth-child(2n) { border-right: none; }
+  .det-field:last-child { border-bottom: none; }
+  .det-field-label {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .5px; color: var(--text-muted); margin-bottom: 4px;
+  }
+  .det-field-value {
+    font-size: 13px; color: var(--text); font-weight: 500; word-break: break-word;
+  }
+  .det-field-value.muted { color: var(--text-muted); font-style: italic; font-weight: 400; }
+  .det-field-full {
+    padding: 14px 18px; border-bottom: 1px solid var(--border);
+  }
+  .det-field-full:last-child { border-bottom: none; }
+
+  /* Badges alertes médicales */
+  .det-alerte {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 10px; border-radius: 5px; font-size: 12px; font-weight: 600;
+    background: #fff8e1; color: #b07d00; border: 1px solid #f0d060; margin: 3px;
+  }
+  html[data-theme="dark"] .det-alerte { background: rgba(176,125,0,.2); color: #e2c16a; border-color: rgba(176,125,0,.4); }
+
+  /* Tableau soins */
+  .det-table-wrap { overflow-x: auto; }
+  .det-table {
+    width: 100%; border-collapse: collapse; font-size: 12.5px;
+  }
+  .det-table th {
+    padding: 9px 14px; text-align: left; font-size: 11px; font-weight: 700;
+    color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em;
+    border-bottom: 2px solid var(--border); background: var(--bg);
+  }
+  .det-table td {
+    padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--text);
+  }
+  .det-table tbody tr:last-child td { border-bottom: none; }
+  .det-table tbody tr:hover td { background: rgba(0,0,0,.02); }
+  html[data-theme="dark"] .det-table tbody tr:hover td { background: rgba(255,255,255,.03); }
+  .det-table-empty {
+    text-align: center; padding: 30px; color: var(--text-muted);
+    font-size: 13px; font-style: italic;
+  }
+
+  @media (max-width: 860px) {
+    .det-grid { grid-template-columns: repeat(2, 1fr); }
+    .det-grid .det-field:nth-child(3n) { border-right: 1px solid var(--border); }
+    .det-grid .det-field:nth-child(2n) { border-right: none; }
+  }
+  @media (max-width: 600px) {
+    .det-grid, .det-grid-2 { grid-template-columns: 1fr; }
+    .det-field { border-right: none !important; }
+    .det-identity-row { flex-direction: column; }
+    .det-date-block { text-align: left; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="page-wrap">
+
+{% include 'soins/includes/nav.html' %}
+
+<!-- ══ SUBHEADER ══ -->
+<div class="o-subheader" id="subheader">
+  <div class="o-subheader-row">
+    <a href="{% url 'soins:list' %}" class="o-ctrl-btn" style="padding:3px 7px;">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <span style="font-size:13px;color:var(--text-muted);">
+      <a href="{% url 'soins:list' %}" style="color:var(--accent);text-decoration:none;font-weight:500;">Soins</a>
+      <span style="margin:0 5px;opacity:.4;">/</span>
+      <span style="color:var(--text);">{{ soin.numero }}</span>
+    </span>
+    <div style="flex:1;"></div>
+  </div>
+</div>
+
+<div class="det-page">
+
+  <!-- ══ CARTE EN-TÊTE ══ -->
+  <div class="det-header">
+
+    <!-- 1. Stepper statut (pleine largeur) -->
+    <div class="det-status-bar">
+      <div class="stp-stepper" id="stp-stepper" data-active="{{ soin.statut }}">
+        <div class="stp-flow">
+          <div class="stp-step" data-val="brouillon">
+            <i class="bi bi-pencil stp-icon"></i>
+            <span class="stp-label">Brouillon</span>
+          </div>
+          <div class="stp-step" data-val="en_attente_de_paiement">
+            <i class="bi bi-clock stp-icon"></i>
+            <span class="stp-label">Attente paiement</span>
+          </div>
+          <div class="stp-step" data-val="en_cours">
+            <i class="bi bi-activity stp-icon"></i>
+            <span class="stp-label">En cours</span>
+          </div>
+          <div class="stp-step" data-val="termine">
+            <i class="bi bi-check2-circle stp-icon"></i>
+            <span class="stp-label">Terminé</span>
+          </div>
+        </div>
+        <div class="stp-sep"></div>
+        <div class="stp-annule" data-val="annule">
+          <i class="bi bi-x-circle stp-icon"></i>
+          <span class="stp-label">Annulé</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Boutons d'action -->
+    <div class="det-actions-bar">
+      {# Modifier — seulement en brouillon (ou admin) #}
+      {% if soin.statut == 'brouillon' or request.user.is_superuser %}
+      <a href="{% url 'soins:edit' soin.pk %}" class="det-btn det-btn-edit" style="text-decoration:none;">
+        <i class="bi bi-pencil"></i> Modifier
+      </a>
+      {% endif %}
+
+      {# Créer une facture — Caisse uniquement, soin en attente, pas encore de facture #}
+      {% if peut_creer_facture %}
+      <a href="{% url 'soins:creer_facture' soin.pk %}" class="det-btn det-btn-invoice" style="text-decoration:none;">
+        <i class="bi bi-receipt"></i> Créer une facture
+      </a>
+      {% endif %}
+
+      {# Voir la facture — tout le monde, si facture existante #}
+      {% if peut_voir_facture %}
+      <a href="{% url 'soins:facture_paiement' soin.facture.pk %}" class="det-btn"
+        style="background:#1d4ed8;color:#fff;text-decoration:none;" target="_blank">
+        <i class="bi bi-receipt-cutoff"></i> Voir la facture
+      </a>
+      {% endif %}
+
+      {# Encaisser si facture créée mais pas encore payée #}
+      {% if peut_voir_facture and peut_creer_facture %}
+      <a href="{% url 'soins:facture_paiement' soin.facture.pk %}" class="det-btn det-btn-invoice" style="text-decoration:none;">
+        <i class="bi bi-cash-coin"></i> Encaisser
+      </a>
+      {% endif %}
+
+      {# Administrer — Soins uniquement, soin en cours + facture payée #}
+      {% if peut_administrer %}
+      <form method="post" action="{% url 'soins:administrer' soin.pk %}" style="display:inline;">
+        {% csrf_token %}
+        <button type="submit" class="det-btn" style="background:#16a34a;color:#fff;">
+          <i class="bi bi-check-circle-fill"></i> Administrer
+        </button>
+      </form>
+      {% endif %}
+
+      <a href="{% url 'soins:list' %}" class="det-btn det-btn-delete" style="text-decoration:none;border:1.5px solid #fca5a5;">
+        <i class="bi bi-arrow-left"></i> Retour
+      </a>
+    </div>
+
+    <!-- 2. Navigation rapide avec compteurs -->
+    <div class="det-quick-nav">
+      <div style="flex:1;"></div>
+      <div class="det-qnav-sep"></div>
+      <a href="#" class="det-qnav-link">
+        <i class="bi bi-calendar-check"></i> Rendez-vous
+        <span class="qnav-count">{{ counts.rdv|default:0 }}</span>
+      </a>
+      <div class="det-qnav-sep"></div>
+      <a href="{% url 'soins:procedure_list' %}?patient_id={{ soin.patient.pk }}" class="det-qnav-link">
+        <i class="bi bi-bandaid"></i> Liste des soins
+        <span class="qnav-count qnav-count-gray">{{ counts.soins|default:0 }}</span>
+      </a>
+      <div class="det-qnav-sep"></div>
+      <a href="{% url 'soins:demande_examen_list' %}?patient_id={{ soin.patient.pk }}" class="det-qnav-link">
+        <i class="bi bi-clipboard2-pulse"></i> Demandes d'examen
+        <span class="qnav-count">{{ counts.examens|default:0 }}</span>
+      </a>
+      <div class="det-qnav-sep"></div>
+      <a href="#" class="det-qnav-link">
+        <i class="bi bi-graph-up"></i> Résultats de traitement
+        <span class="qnav-count qnav-count-green">{{ counts.analyses|default:0 }}</span>
+      </a>
+    </div>
+
+    <!-- 3. Identité -->
+    <div class="det-identity-row">
+      <div class="det-photo">
+        {% if soin.photo %}
+        <img src="{{ soin.photo.url }}" alt="Photo">
+        {% else %}
+        <i class="bi bi-person-bounding-box"></i>
+        {% endif %}
+      </div>
+      <div class="det-info-block">
+        <div class="det-patient-name">{{ soin.patient.nom }} {{ soin.patient.prenoms }}</div>
+        <div class="det-meta-row">
+          <span class="det-meta-item">
+            <i class="bi bi-person-badge"></i>
+            <span class="det-numero-badge">{{ soin.numero }}</span>
+          </span>
+          {% if soin.infirmier %}
+          <span class="det-meta-item">
+            <i class="bi bi-person-heart"></i>
+            {{ soin.infirmier.nom }} {{ soin.infirmier.prenoms }}
+          </span>
+          {% endif %}
+          {% if soin.departement %}
+          <span class="det-meta-item">
+            <i class="bi bi-building"></i>
+            {{ soin.departement.nom }}
+          </span>
+          {% endif %}
+          {% if soin.service_inscription %}
+          <span class="det-meta-item">
+            <i class="bi bi-hospital"></i>
+            {{ soin.service_inscription.nom }}
+          </span>
+          {% endif %}
+        </div>
+        {% if soin.motif %}
+        <div style="font-size:13px;color:var(--text-muted);font-style:italic;">
+          <i class="bi bi-chat-left-text" style="margin-right:4px;"></i>{{ soin.motif }}
+        </div>
+        {% endif %}
+      </div>
+      <div class="det-date-block">
+        <div class="det-date-label">Date &amp; Heure</div>
+        <div class="det-date-val">{{ soin.date_heure|date:"d/m/Y" }}</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">{{ soin.date_heure|date:"H:i" }}</div>
+        <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);">
+          <div class="det-date-label">Enregistré le</div>
+          <div style="font-size:12px;color:var(--text-muted);">{{ soin.date_creation|date:"d/m/Y" }}</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /.det-header -->
+
+  <!-- ══ INFORMATIONS CLINIQUES ══ -->
+  <div class="det-section">
+    <div class="det-section-head">
+      <i class="bi bi-clipboard2-pulse"></i> Informations cliniques
+    </div>
+    <div class="det-grid">
+      <div class="det-field">
+        <div class="det-field-label">Patient</div>
+        <div class="det-field-value">{{ soin.patient.nom }} {{ soin.patient.prenoms }}</div>
+      </div>
+      <div class="det-field">
+        <div class="det-field-label">Infirmier / Agent</div>
+        <div class="det-field-value {% if not soin.infirmier %}muted{% endif %}">
+          {% if soin.infirmier %}{{ soin.infirmier.nom }} {{ soin.infirmier.prenoms }}{% else %}—{% endif %}
+        </div>
+      </div>
+      <div class="det-field">
+        <div class="det-field-label">Statut</div>
+        <div class="det-field-value">{{ soin.get_statut_display }}</div>
+      </div>
+      <div class="det-field">
+        <div class="det-field-label">Département</div>
+        <div class="det-field-value {% if not soin.departement %}muted{% endif %}">
+          {% if soin.departement %}{{ soin.departement.nom }}{% else %}—{% endif %}
+        </div>
+      </div>
+      <div class="det-field">
+        <div class="det-field-label">Service d'inscription</div>
+        <div class="det-field-value {% if not soin.service_inscription %}muted{% endif %}">
+          {% if soin.service_inscription %}{{ soin.service_inscription.nom }}{% else %}—{% endif %}
+        </div>
+      </div>
+      <div class="det-field">
+        <div class="det-field-label">Rendez-vous lié</div>
+        <div class="det-field-value {% if not soin.rendez_vous %}muted{% endif %}">
+          {% if soin.rendez_vous %}{{ soin.rendez_vous.date_heure|date:"d/m/Y H:i" }}{% else %}—{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ ÉTAT DE LA MALADIE ══ -->
+  {% if soin.statut_maladie or soin.severite or soin.date_guerison %}
+  <div class="det-section">
+    <div class="det-section-head">
+      <i class="bi bi-heart-pulse"></i> État de la maladie
+    </div>
+    <div class="det-grid-2 det-grid">
+      {% if soin.statut_maladie %}
+      <div class="det-field">
+        <div class="det-field-label">Statut de la maladie</div>
+        <div class="det-field-value">{{ soin.statut_maladie }}</div>
+      </div>
+      {% endif %}
+      {% if soin.severite %}
+      <div class="det-field">
+        <div class="det-field-label">Sévérité</div>
+        <div class="det-field-value">{{ soin.get_severite_display }}</div>
+      </div>
+      {% endif %}
+      {% if soin.date_guerison %}
+      <div class="det-field">
+        <div class="det-field-label">Date de guérison</div>
+        <div class="det-field-value">{{ soin.date_guerison|date:"d/m/Y" }}</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ══ ALERTES MÉDICALES ══ -->
+  {% if soin.maladie_infectieuse or soin.maladie_allergique or soin.lactation or soin.avertissement_grossesse %}
+  <div class="det-section">
+    <div class="det-section-head">
+      <i class="bi bi-exclamation-triangle"></i> Alertes médicales
+    </div>
+    <div style="padding:14px 18px;display:flex;flex-wrap:wrap;gap:4px;">
+      {% if soin.maladie_infectieuse %}
+      <span class="det-alerte"><i class="bi bi-virus"></i> Maladie infectieuse</span>
+      {% endif %}
+      {% if soin.maladie_allergique %}
+      <span class="det-alerte"><i class="bi bi-shield-exclamation"></i> Maladie allergique</span>
+      {% endif %}
+      {% if soin.lactation %}
+      <span class="det-alerte"><i class="bi bi-heart"></i> Lactation</span>
+      {% endif %}
+      {% if soin.avertissement_grossesse %}
+      <span class="det-alerte"><i class="bi bi-person-heart"></i> Avertissement grossesse</span>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ══ OBSERVATIONS ══ -->
+  {% if soin.observations %}
+  <div class="det-section">
+    <div class="det-section-head">
+      <i class="bi bi-journal-text"></i> Observations
+    </div>
+    <div class="det-field-full">
+      <div class="det-field-value" style="white-space:pre-line;line-height:1.7;">{{ soin.observations }}</div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ══ SOINS APPORTÉS ══ -->
+  <div class="det-section">
+    <div class="det-section-head">
+      <i class="bi bi-bandaid"></i> Soins apportés
+      {% if total_prix %}
+      <span style="margin-left:auto;font-size:12px;color:var(--text);font-weight:700;">
+        Total : {{ total_prix|floatformat:0 }} FCFA
+      </span>
+      {% endif %}
+    </div>
+    <div class="det-table-wrap">
+      <table class="det-table">
+        <thead>
+          <tr>
+            <th>N°</th>
+            <th>Soin / Service</th>
+            <th>Prix (CFA)</th>
+            <th>Infirmier</th>
+            <th>Date</th>
+            <th>État</th>
+            <th>Facture</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for proc in procedures %}
+          <tr>
+            <td style="font-family:monospace;font-size:11.5px;font-weight:600;color:var(--accent);">{{ proc.numero }}</td>
+            <td style="font-size:12px;color:var(--text-muted);">{{ proc.soin_type.nom|default:"—" }}</td>
+            <td style="white-space:nowrap;font-size:12px;">{{ proc.prix|floatformat:0 }} CFA</td>
+            <td style="font-size:12px;color:var(--text-muted);">
+              {% if proc.infirmier %}{{ proc.infirmier.nom }} {{ proc.infirmier.prenoms }}{% else %}—{% endif %}
+            </td>
+            <td style="white-space:nowrap;font-size:12px;">{{ proc.date|date:"d/m/Y" }}</td>
+            <td>
+              <span class="badge-statut {% if soin.statut == 'brouillon' %}badge-brouillon{% elif soin.statut == 'en_attente_de_paiement' %}badge-en-attente{% elif soin.statut == 'en_cours' %}badge-en-cours{% elif soin.statut == 'termine' %}badge-termine{% elif soin.statut == 'annule' %}badge-annule{% endif %}">{{ soin.get_statut_display }}</span>
+            </td>
+            <td style="white-space:nowrap;">
+              {% if proc.facture %}
+              <a href="{% url 'soins:facture_detail' proc.facture.pk %}?next={% url 'soins:detail' soin.pk %}"
+                 style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--accent);text-decoration:none;padding:3px 8px;border:1px solid var(--accent);border-radius:4px;white-space:nowrap;"
+                 title="Voir la facture {{ proc.facture.numero }}">
+                <i class="bi bi-receipt"></i> {{ proc.facture.numero }}
+              </a>
+              {% else %}
+              <span style="font-size:12px;color:var(--text-muted);">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="det-table-empty">
+              <i class="bi bi-inbox"></i><br>
+              Aucun soin enregistré.<br>
+              <small>Modifiez ce dossier et ajoutez des lignes de soin.</small>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /.det-page -->
+
+<script>
+  (function () {
+    var tb = document.querySelector('.topbar');
+    var wp = document.getElementById('page-wrap');
+    if (tb && wp) wp.style.paddingTop = tb.offsetHeight + 'px';
+    window.addEventListener('resize', function () {
+      if (tb && wp) wp.style.paddingTop = tb.offsetHeight + 'px';
+    });
+  })();
+
+  /* ── Stepper statut ── */
+  (function(){
+    var bar = document.getElementById('stp-stepper');
+    if (!bar) return;
+    var active = bar.dataset.active;
+    var order = ['brouillon','en_attente_de_paiement','en_cours','termine'];
+    var activeIdx = order.indexOf(active);
+    bar.querySelectorAll('.stp-step').forEach(function(s){
+      var val = s.dataset.val, idx = order.indexOf(val);
+      if (val === active) s.classList.add('stp-active');
+      else if (activeIdx >= 0 && idx < activeIdx) s.classList.add('stp-done');
+      else s.classList.add('stp-pending');
+    });
+    var ann = bar.querySelector('.stp-annule');
+    if (ann) ann.classList.add(active === 'annule' ? 'stp-active' : 'stp-pending');
+  })();
+</script>
+
+</div><!-- /#page-wrap -->
+{% endblock %}
