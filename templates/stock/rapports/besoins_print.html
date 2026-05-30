@@ -1,0 +1,174 @@
+{% load static %}<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fiche de besoins — {{ today|date:"d/m/Y" }}</title>
+<style>
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'Segoe UI',Arial,sans-serif; font-size:11.5px; color:#111; background:#fff; }
+
+@media screen {
+  body { background:#e8edf0; padding:20px; }
+  .page { background:#fff; max-width:960px; margin:0 auto; padding:28px 36px 36px; box-shadow:0 4px 24px rgba(0,0,0,.15); border-radius:4px; }
+  .print-btn-bar { max-width:960px; margin:0 auto 12px; display:flex; gap:8px; justify-content:flex-end; }
+  .print-btn { background:#3a5924; color:#fff; border:none; border-radius:6px; padding:8px 20px; font-size:13px; font-weight:600; cursor:pointer; }
+  .print-btn:hover { background:#2a4219; }
+  .print-btn-back { background:#fff; color:#555; border:1px solid #ddd; border-radius:6px; padding:8px 16px; font-size:13px; font-weight:500; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:6px; }
+}
+
+@media print {
+  body { background:#fff; padding:0; font-size:10px; }
+  .page { padding:8mm 10mm; width:100%; max-width:none; box-shadow:none; }
+  .no-print { display:none !important; }
+  @page { size:A4 landscape; margin:8mm; }
+}
+
+/* En-tête */
+.header { display:flex; justify-content:space-between; align-items:center; padding-bottom:12px; border-bottom:3px solid #3a5924; margin-bottom:16px; }
+.header-left { display:flex; align-items:center; gap:12px; }
+.header-left img { width:48px; height:48px; object-fit:contain; }
+.clinic-name { font-size:15px; font-weight:800; color:#3a5924; }
+.clinic-sub  { font-size:10px; color:#555; margin-top:2px; }
+.doc-info { text-align:right; }
+.doc-title { font-size:16px; font-weight:800; color:#3a5924; }
+.doc-sub   { font-size:10px; color:#888; margin-top:3px; }
+
+/* Tableau */
+table { width:100%; border-collapse:collapse; font-size:10.5px; }
+thead tr { background:#3a5924; color:#fff; }
+thead th { padding:6px 8px; font-weight:700; font-size:9.5px; text-transform:uppercase; letter-spacing:.3px; text-align:left; white-space:nowrap; }
+thead th.right { text-align:right; }
+thead th.center { text-align:center; }
+tbody tr { border-bottom:1px solid #e8f0e4; }
+tbody tr:nth-child(even) { background:#f5f9f0; }
+tbody tr.type-header td { background:#d8eac4; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#3a5924; padding:4px 8px; }
+tbody td { padding:5px 8px; vertical-align:middle; }
+tbody td.right { text-align:right; font-family:monospace; }
+tbody td.center { text-align:center; }
+tfoot tr { background:#eef5e4; border-top:2px solid #3a5924; }
+tfoot td { padding:6px 8px; font-weight:700; font-size:10.5px; }
+
+/* Badges couverture */
+.cov-ok       { color:#0d7a4c; font-weight:700; }
+.cov-alerte   { color:#8a5c00; font-weight:700; }
+.cov-critique { color:#b71c1c; font-weight:800; }
+.badge-cmd { background:#3a5924; color:#fff; border-radius:10px; padding:1px 7px; font-size:9px; font-weight:700; }
+.badge-ok  { color:#0d7a4c; font-size:11px; }
+
+/* Légende */
+.legend { display:flex; gap:20px; flex-wrap:wrap; margin-top:12px; font-size:10px; color:#666; }
+.legend span { display:flex; align-items:center; gap:4px; }
+</style>
+</head>
+<body>
+
+<div class="no-print print-btn-bar">
+  <a href="{% url 'stock_rapports_besoins' %}?type={{ type_filtre }}" class="print-btn-back">&#8592; Retour</a>
+  <button class="print-btn" onclick="window.print()">&#128438; Imprimer / Exporter PDF</button>
+</div>
+
+<div class="page">
+
+  <!-- En-tête -->
+  <div class="header">
+    <div class="header-left">
+      <img src="{% static 'logo.png' %}" alt="Logo WALÉ">
+      <div>
+        <div class="clinic-name">Centre Médico-Social WALÉ</div>
+        <div class="clinic-sub">Yamoussoukro, Côte d'Ivoire &nbsp;·&nbsp; Gestion du stock</div>
+      </div>
+    </div>
+    <div class="doc-info">
+      <div class="doc-title">FICHE DE BESOINS MENSUELS</div>
+      <div class="doc-sub">{{ type_label }} &nbsp;·&nbsp; Éditée le {{ today|date:"d/m/Y" }}</div>
+    </div>
+  </div>
+
+  <!-- Tableau -->
+  <table>
+    <thead>
+      <tr>
+        <th style="width:20px;">#</th>
+        <th>Code</th>
+        <th style="min-width:180px;">Désignation</th>
+        <th>Unité</th>
+        <th class="right">Stock initial</th>
+        <th class="right">CMM</th>
+        <th class="right">Stock sécu.</th>
+        <th class="right">Point cmd.</th>
+        <th class="center">Couverture</th>
+        <th class="right" style="background:#2a4219;">Qté à commander</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% regroup produits_data by produit.type as groupes %}
+    {% for groupe in groupes %}
+    <tr class="type-header">
+      <td colspan="10">
+        {% if groupe.grouper == 'medicament' %}&#9670; Médicaments
+        {% elif groupe.grouper == 'consommable' %}&#9670; Consommables médicaux
+        {% else %}&#9670; Équipements & matériel{% endif %}
+      </td>
+    </tr>
+    {% for d in groupe.list %}
+    <tr>
+      <td style="color:#aaa;font-size:9px;text-align:center;">{{ forloop.counter }}</td>
+      <td style="font-family:monospace;font-size:9.5px;color:#666;">{{ d.produit.code }}</td>
+      <td>
+        <strong>{{ d.produit.nom }}</strong>
+        {% if d.produit.dci %}<div style="font-size:9px;color:#888;">{{ d.produit.dci }}</div>{% endif %}
+      </td>
+      <td style="color:#888;">{{ d.produit.unite_mesure }}</td>
+      <td class="right" style="font-weight:700;{% if d.stock <= 0 %}color:#b71c1c;{% elif d.produit.en_alerte %}color:#8a5c00;{% else %}color:#0d7a4c;{% endif %}">{{ d.stock|floatformat:0 }}</td>
+      <td class="right">{{ d.cmm|floatformat:1 }}</td>
+      <td class="right" style="color:#888;">{{ d.produit.stock_minimum|floatformat:0 }}</td>
+      <td class="right" style="color:#888;">{{ d.produit.point_commande|floatformat:0 }}</td>
+      <td class="center">
+        {% if d.couverture is not None %}
+        <span class="{% if d.couverture < 30 %}cov-critique{% elif d.couverture < 60 %}cov-alerte{% else %}cov-ok{% endif %}">{{ d.couverture }}j</span>
+        {% else %}<span style="color:#aaa;">—</span>{% endif %}
+      </td>
+      <td class="center">
+        {% if d.qte_cmd > 0 %}
+        <span class="badge-cmd">{{ d.qte_cmd }}</span>
+        {% else %}
+        <span class="badge-ok">&#10003;</span>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="4">TOTAL — {{ produits_data|length }} produit{{ produits_data|length|pluralize }}</td>
+        <td class="right">{{ stats.rupture|default:0 }} rupture{{ stats.rupture|default:0|pluralize }}</td>
+        <td colspan="3"></td>
+        <td colspan="2" style="text-align:center;color:#3a5924;">
+          {% with nb=0 %}{% for d in produits_data %}{% if d.qte_cmd > 0 %}{{ forloop.counter }}{% endif %}{% endfor %}{% endwith %}
+          produits à commander
+        </td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <!-- Légende -->
+  <div class="legend">
+    <span><span style="color:#b71c1c;font-weight:700;">■</span> Couverture &lt; 30j — critique</span>
+    <span><span style="color:#8a5c00;font-weight:700;">■</span> Couverture &lt; 60j — alerte</span>
+    <span><span style="color:#0d7a4c;font-weight:700;">■</span> Couverture ≥ 60j — OK</span>
+    <span style="margin-left:10px;"><strong>CMM</strong> = Consommation Mensuelle Moyenne (3 mois)</span>
+    <span><strong>Point cmd.</strong> = CMM + Stock sécurité</span>
+    <span><strong>Qté à cmd.</strong> = (CMM×3) − Stock + Stock sécu.</span>
+  </div>
+
+  <!-- Pied de page -->
+  <div style="margin-top:16px;padding-top:8px;border-top:1px solid #ddd;display:flex;justify-content:space-between;font-size:9px;color:#aaa;">
+    <div>Centre Médico-Social WALÉ — Yamoussoukro, Côte d'Ivoire</div>
+    <div>Document généré le {{ today|date:"d/m/Y" }} — Confidentiel</div>
+  </div>
+
+</div>
+</body>
+</html>

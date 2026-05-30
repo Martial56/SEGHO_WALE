@@ -1,0 +1,212 @@
+{% extends 'pharmacie/base.html' %}
+{% load static %}
+{% block nav_caisse %}active{% endblock %}
+
+{% block extra_ph_css %}<style>
+.ph-page-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 11px 32px; margin: 0 -32px;
+  background: var(--ph-surface); border-bottom: 1px solid var(--ph-border);
+  box-shadow: 0 2px 8px rgba(36,113,163,.06);
+  position: sticky; top: calc(var(--topbar-h) + 44px); z-index: 100;
+  flex-wrap: wrap;
+}
+.ph-filter-bar {
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  padding: 10px 32px; margin: 0 -32px;
+  background: var(--ph-50); border-bottom: 1px solid var(--ph-border);
+}
+.ph-filter-bar input[type="text"] {
+  border: none; border-bottom: 1.5px solid rgba(0,0,0,.15); background: transparent;
+  padding: 6px 4px; font-size: 12.5px; width: 260px; font-family: inherit;
+  color: var(--ph-text); transition: border-color .15s;
+}
+.ph-filter-bar input[type="text"]:focus { outline: none; border-bottom-color: var(--ph-500); }
+.ph-type-btn {
+  padding: 4px 12px; border-radius: 20px; font-size: 11.5px; font-weight: 600;
+  text-decoration: none; border: 1.5px solid var(--ph-200); color: var(--ph-600);
+  background: transparent; cursor: pointer; transition: all .15s;
+}
+.ph-type-btn:hover, .ph-type-btn.actif { background: var(--ph-600); color: #fff; border-color: var(--ph-600); }
+.ph-caisse-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.ph-caisse-table thead tr { background: var(--ph-100); border-bottom: 2px solid var(--ph-300); }
+.ph-caisse-table thead th { padding: 9px 14px; font-weight: 700; font-size: 10.5px; text-transform: uppercase; letter-spacing: .4px; color: var(--ph-800); text-align: left; white-space: nowrap; }
+.ph-caisse-table thead th:first-child { padding-left: 32px; }
+.ph-caisse-table thead th:last-child  { padding-right: 32px; }
+.ph-caisse-table tbody tr { border-bottom: 1px solid var(--ph-border); transition: background .12s; }
+.ph-caisse-table tbody tr:hover { background: var(--ph-50); }
+.ph-caisse-table tbody td { padding: 8px 14px; color: var(--ph-text); vertical-align: middle; }
+.ph-caisse-table tbody td:first-child { padding-left: 32px; }
+.ph-caisse-table tbody td:last-child  { padding-right: 32px; }
+.ph-qte-cell { border: none; border-bottom: 1.5px solid rgba(0,0,0,.15); background: transparent; padding: 5px 4px; font-size: 13px; text-align: center; width: 80px; font-family: inherit; color: var(--ph-text); transition: border-color .15s; }
+.ph-qte-cell:focus { outline: none; border-bottom-color: var(--ph-500); }
+.ph-pay-footer {
+  background: var(--ph-surface); border-top: 2px solid var(--ph-border);
+  padding: 16px 32px; margin: 0 -32px;
+  display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-end;
+}
+.ph-mode-group { display: flex; gap: 6px; }
+.ph-mode-btn input[type="radio"] { display: none; }
+.ph-mode-btn label {
+  padding: 6px 14px; border-radius: 6px; font-size: 12.5px; font-weight: 600;
+  border: 1.5px solid var(--ph-200); color: var(--ph-700); cursor: pointer;
+  background: transparent; transition: all .15s; display: flex; align-items: center; gap: 5px;
+}
+.ph-mode-btn input[type="radio"]:checked + label { background: var(--ph-600); color: #fff; border-color: var(--ph-600); }
+.ph-type-sep-row td { background: var(--ph-100); padding: 6px 14px 6px 32px; font-size: 10.5px; font-weight: 700; color: var(--ph-700); text-transform: uppercase; letter-spacing: .5px; }
+.caisse-stat { display: flex; flex-direction: column; align-items: center; padding: 8px 20px; border-radius: 8px; background: var(--ph-50); border: 1px solid var(--ph-border); }
+.caisse-stat-val { font-size: 20px; font-weight: 800; color: var(--ph-700); }
+.caisse-stat-lbl { font-size: 10px; font-weight: 600; color: var(--ph-muted); text-transform: uppercase; }
+</style>{% endblock %}
+
+{% block content %}
+<form method="post" id="form-caisse" novalidate>
+{% csrf_token %}
+
+<!-- En-tête sticky -->
+<div class="ph-page-head">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <div style="width:34px;height:34px;border-radius:8px;background:var(--ph-100);display:flex;align-items:center;justify-content:center;font-size:17px;color:var(--ph-600);">
+      <i class="bi bi-cash-coin"></i>
+    </div>
+    <div>
+      <div style="font-size:15px;font-weight:800;color:var(--ph-900);">Caisse — {{ label }}</div>
+      <div style="font-size:11px;color:var(--ph-muted);">{{ today }}</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <div class="caisse-stat">
+      <div class="caisse-stat-val">{{ stats_jour.nb }}</div>
+      <div class="caisse-stat-lbl">Ventes ce jour</div>
+    </div>
+    <div class="caisse-stat">
+      <div class="caisse-stat-val" style="color:#0d7a4c;">{{ stats_jour.total|floatformat:0 }} F</div>
+      <div class="caisse-stat-lbl">CA du jour</div>
+    </div>
+    <a href="{% url 'pharmacie_recette' pharmacie %}" class="btn-ph-outline" style="font-size:12px;padding:5px 12px;">
+      <i class="bi bi-graph-up"></i> Recette
+    </a>
+    <button type="submit" form="form-caisse" class="btn-ph">
+      <i class="bi bi-check2-circle"></i> Valider la vente
+    </button>
+  </div>
+</div>
+
+<!-- Messages -->
+{% if messages %}
+{% for msg in messages %}
+<div style="margin:12px 0;padding:8px 16px;border-radius:6px;font-size:12.5px;
+  {% if msg.tags == 'error' %}background:rgba(232,69,69,.1);color:#b71c1c;border:1px solid rgba(232,69,69,.2);
+  {% else %}background:rgba(22,169,107,.1);color:#0d7a4c;border:1px solid rgba(22,169,107,.2);{% endif %}">
+  <i class="bi bi-{% if msg.tags == 'error' %}exclamation-triangle{% else %}check-circle{% endif %}-fill"></i> {{ msg }}
+</div>
+{% endfor %}
+{% endif %}
+
+<!-- Barre de filtre -->
+<div class="ph-filter-bar">
+  <i class="bi bi-search" style="color:var(--ph-muted);font-size:14px;"></i>
+  <input type="text" name="q" value="{{ q }}" placeholder="Rechercher un produit…" style="outline:none;">
+  <span style="margin:0 4px;color:rgba(0,0,0,.15);">|</span>
+  <a href="?{% if q %}q={{ q }}&{% endif %}" class="ph-type-btn {% if not type_filtre %}actif{% endif %}">Tous</a>
+  <a href="?type=medicament{% if q %}&q={{ q }}{% endif %}" class="ph-type-btn {% if type_filtre == 'medicament' %}actif{% endif %}"><i class="bi bi-capsule-pill"></i> Médicaments</a>
+  <a href="?type=consommable{% if q %}&q={{ q }}{% endif %}" class="ph-type-btn {% if type_filtre == 'consommable' %}actif{% endif %}"><i class="bi bi-bandaid"></i> Consommables</a>
+  <a href="?type=equipement{% if q %}&q={{ q }}{% endif %}" class="ph-type-btn {% if type_filtre == 'equipement' %}actif{% endif %}"><i class="bi bi-tools"></i> Équipements</a>
+  <button type="submit" form="form-search" style="display:none;"></button>
+</div>
+
+<!-- Tableau produits bord à bord -->
+<div style="margin:0 -32px;overflow-x:auto;">
+  <div style="padding:12px 20px 12px 32px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--ph-muted);background:var(--ph-surface);border-bottom:1px solid var(--ph-border);">Produits disponibles en stock</div>
+  <table class="ph-caisse-table">
+    <thead>
+      <tr>
+        <th>Code</th>
+        <th>Produit</th>
+        <th style="text-align:center;">Stock dispo</th>
+        <th style="text-align:right;">Prix unitaire</th>
+        <th style="text-align:center;">Quantité</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in stock_items %}
+      {% ifchanged item.produit.type %}
+      <tr class="ph-type-sep-row">
+        <td colspan="5">
+          {% if item.produit.type == 'medicament' %}<i class="bi bi-capsule-pill"></i> Médicaments
+          {% elif item.produit.type == 'consommable' %}<i class="bi bi-bandaid"></i> Consommables médicaux
+          {% else %}<i class="bi bi-tools"></i> Équipements{% endif %}
+        </td>
+      </tr>
+      {% endifchanged %}
+      <tr>
+        <td><span style="font-family:monospace;font-size:11px;color:var(--ph-600);background:var(--ph-50);padding:2px 6px;border-radius:4px;border:1px solid var(--ph-200);">{{ item.produit.code }}</span></td>
+        <td>
+          <div style="font-weight:600;">{{ item.produit.nom }}</div>
+          {% if item.produit.dci %}<div style="font-size:10.5px;color:var(--ph-muted);">{{ item.produit.dci }}</div>{% endif %}
+          {% if item.produit.unite_mesure %}<div style="font-size:10.5px;color:var(--ph-muted);">Unité : {{ item.produit.unite_mesure }}</div>{% endif %}
+        </td>
+        <td style="text-align:center;">
+          <span style="font-weight:700;color:{% if item.quantite <= 5 %}#8a5c00{% else %}#0d7a4c{% endif %};">
+            {{ item.quantite|floatformat:0 }}
+          </span>
+          {% if item.produit.unite_mesure %}<span style="font-size:10.5px;color:var(--ph-muted);"> {{ item.produit.unite_mesure }}</span>{% endif %}
+        </td>
+        <td style="text-align:right;font-weight:700;color:var(--ph-800);">
+          {{ item.produit.prix_vente|floatformat:0 }}<span style="font-size:10px;font-weight:400;color:var(--ph-muted);"> F</span>
+        </td>
+        <td style="text-align:center;">
+          <input type="number" name="qte_{{ item.produit.pk }}" class="ph-qte-cell"
+            min="0" max="{{ item.quantite|floatformat:0 }}" step="1" placeholder="—">
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="5" style="text-align:center;padding:48px;color:var(--ph-muted);">
+          <i class="bi bi-inbox" style="font-size:28px;display:block;margin-bottom:8px;color:var(--ph-200);"></i>
+          Aucun produit disponible en stock.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Footer paiement -->
+{% if stock_items %}
+<div class="ph-pay-footer" style="margin-top:16px;">
+  <div>
+    <div style="font-size:10.5px;font-weight:700;color:var(--ph-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;">Mode de paiement</div>
+    <div class="ph-mode-group">
+      <div class="ph-mode-btn">
+        <input type="radio" name="mode_paiement" id="mode_especes" value="especes" checked>
+        <label for="mode_especes"><i class="bi bi-cash-coin"></i> Espèces</label>
+      </div>
+      <div class="ph-mode-btn">
+        <input type="radio" name="mode_paiement" id="mode_mobile" value="mobile_money">
+        <label for="mode_mobile"><i class="bi bi-phone"></i> Mobile Money</label>
+      </div>
+      <div class="ph-mode-btn">
+        <input type="radio" name="mode_paiement" id="mode_assurance" value="assurance">
+        <label for="mode_assurance"><i class="bi bi-shield-check"></i> Assurance</label>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div style="font-size:10.5px;font-weight:700;color:var(--ph-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;">Remise (F CFA)</div>
+    <input type="number" name="remise" class="ph-qte-cell" min="0" step="100" placeholder="0" style="width:120px;text-align:left;">
+  </div>
+  <div style="flex:1;">
+    <div style="font-size:10.5px;font-weight:700;color:var(--ph-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;">Notes</div>
+    <input type="text" name="notes" style="border:none;border-bottom:1.5px solid rgba(0,0,0,.15);background:transparent;padding:5px 4px;font-size:12.5px;width:100%;font-family:inherit;color:var(--ph-text);" placeholder="Remarques optionnelles…">
+  </div>
+  <div style="display:flex;gap:8px;">
+    <button type="submit" form="form-caisse" class="btn-ph" style="padding:9px 24px;font-size:13px;">
+      <i class="bi bi-check2-circle"></i> Valider la vente
+    </button>
+  </div>
+</div>
+{% endif %}
+
+</form>
+{% endblock %}

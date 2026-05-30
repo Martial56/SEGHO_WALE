@@ -1,0 +1,194 @@
+{% extends 'pharmacie/base.html' %}
+{% load static %}
+{% block nav_recette %}active{% endblock %}
+
+{% block extra_ph_css %}<style>
+.ph-page-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 11px 32px; margin: 0 -32px;
+  background: var(--ph-surface); border-bottom: 1px solid var(--ph-border);
+  box-shadow: 0 2px 8px rgba(36,113,163,.06);
+  position: sticky; top: calc(var(--topbar-h) + 44px); z-index: 100;
+  flex-wrap: wrap;
+}
+.rec-stats-grid {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px;
+  margin: 16px 0;
+}
+@media(max-width:1100px){ .rec-stats-grid{ grid-template-columns:repeat(3,1fr); } }
+@media(max-width:700px){  .rec-stats-grid{ grid-template-columns:1fr 1fr; } }
+.rec-stat-card {
+  background: var(--ph-surface); border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(58,89,36,.08); padding: 18px 20px;
+  border-left: 4px solid var(--ph-400);
+}
+.rec-stat-card.v-total   { border-left-color: var(--ph-600); }
+.rec-stat-card.v-nb      { border-left-color: #2980b9; }
+.rec-stat-card.v-esp     { border-left-color: #27ae60; }
+.rec-stat-card.v-mobile  { border-left-color: #8e44ad; }
+.rec-stat-card.v-assur   { border-left-color: #e67e22; }
+.rec-stat-label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: var(--ph-muted); margin-bottom: 5px; }
+.rec-stat-value { font-size: 22px; font-weight: 800; line-height: 1.1; }
+.rec-table-wrap { margin: 0 -32px; overflow-x: auto; }
+.rec-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.rec-table thead tr { background: var(--ph-100); border-bottom: 2px solid var(--ph-300); }
+.rec-table thead th { padding: 9px 14px; font-weight: 700; font-size: 10.5px; text-transform: uppercase; letter-spacing: .4px; color: var(--ph-800); text-align: left; white-space: nowrap; }
+.rec-table thead th:first-child { padding-left: 32px; }
+.rec-table thead th:last-child  { padding-right: 32px; }
+.rec-table tbody tr { border-bottom: 1px solid var(--ph-border); transition: background .12s; }
+.rec-table tbody tr:hover { background: var(--ph-50); }
+.rec-table tbody td { padding: 9px 14px; color: var(--ph-text); vertical-align: middle; }
+.rec-table tbody td:first-child { padding-left: 32px; }
+.rec-table tbody td:last-child  { padding-right: 32px; }
+.date-input {
+  border: none; border-bottom: 1.5px solid rgba(0,0,0,.18); background: transparent;
+  padding: 5px 4px; font-size: 13px; color: var(--ph-text); font-family: inherit;
+  cursor: pointer; transition: border-color .15s;
+}
+.date-input:focus { outline: none; border-bottom-color: var(--ph-500); }
+</style>{% endblock %}
+
+{% block content %}
+
+<!-- En-tête sticky -->
+<div class="ph-page-head">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <div style="width:34px;height:34px;border-radius:8px;background:var(--ph-100);display:flex;align-items:center;justify-content:center;font-size:17px;color:var(--ph-600);">
+      <i class="bi bi-graph-up"></i>
+    </div>
+    <div>
+      <div style="font-size:15px;font-weight:800;color:var(--ph-900);">Recette journalière — {{ label }}</div>
+      <div style="font-size:11px;color:var(--ph-muted);">Suivi des ventes par caisse</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <form method="get" style="display:flex;align-items:center;gap:8px;">
+      <label style="font-size:11px;font-weight:700;color:var(--ph-muted);text-transform:uppercase;">Date</label>
+      <input type="date" name="date" value="{{ selected_date|date:'Y-m-d' }}" class="date-input" onchange="this.form.submit()">
+      {% if selected_date != today %}
+      <a href="?" class="btn-ph-outline" style="font-size:11.5px;padding:4px 10px;">Aujourd'hui</a>
+      {% endif %}
+    </form>
+    <a href="{% url 'pharmacie_rapport_journalier' pharmacie %}?date={{ selected_date|date:'Y-m-d' }}"
+       class="btn-ph-outline" style="font-size:12px;" target="_blank">
+      <i class="bi bi-file-earmark-pdf"></i> Rapport PDF
+    </a>
+    <a href="{% url 'pharmacie_caisse' pharmacie %}" class="btn-ph" style="font-size:12px;">
+      <i class="bi bi-cash-coin"></i> Caisse
+    </a>
+  </div>
+</div>
+
+<!-- Titre date -->
+<div style="margin:16px 0 12px;font-size:13px;font-weight:700;color:var(--ph-800);">
+  {% if selected_date == today %}
+  <i class="bi bi-calendar-check" style="color:var(--ph-600);"></i> Aujourd'hui — {{ selected_date|date:"d/m/Y" }}
+  {% else %}
+  <i class="bi bi-calendar" style="color:var(--ph-600);"></i> {{ selected_date|date:"l d F Y" }}
+  {% endif %}
+</div>
+
+<!-- 5 stats cards -->
+<div class="rec-stats-grid">
+  <div class="rec-stat-card v-total">
+    <div class="rec-stat-label"><i class="bi bi-wallet2"></i> Recette totale</div>
+    <div class="rec-stat-value" style="color:var(--ph-700);">{{ stats.total|floatformat:0 }}<span style="font-size:12px;font-weight:500;"> F</span></div>
+    <div style="font-size:11px;color:var(--ph-muted);">Net encaissé</div>
+  </div>
+  <div class="rec-stat-card v-nb">
+    <div class="rec-stat-label"><i class="bi bi-receipt"></i> Nombre de ventes</div>
+    <div class="rec-stat-value" style="color:#2980b9;">{{ stats.nb }}<span style="font-size:12px;font-weight:500;"> vente{{ stats.nb|pluralize }}</span></div>
+    <div style="font-size:11px;color:var(--ph-muted);">Transactions payées</div>
+  </div>
+  <div class="rec-stat-card v-esp">
+    <div class="rec-stat-label"><i class="bi bi-cash-coin"></i> Espèces</div>
+    <div class="rec-stat-value" style="color:#27ae60;">{{ stats.especes|floatformat:0 }}<span style="font-size:12px;font-weight:500;"> F</span></div>
+    <div style="font-size:11px;color:var(--ph-muted);">Paiement cash</div>
+  </div>
+  <div class="rec-stat-card v-mobile">
+    <div class="rec-stat-label"><i class="bi bi-phone"></i> Mobile Money</div>
+    <div class="rec-stat-value" style="color:#8e44ad;">{{ stats.mobile|floatformat:0 }}<span style="font-size:12px;font-weight:500;"> F</span></div>
+    <div style="font-size:11px;color:var(--ph-muted);">Orange / Wave / MTN</div>
+  </div>
+  <div class="rec-stat-card v-assur">
+    <div class="rec-stat-label"><i class="bi bi-shield-check"></i> Assurance</div>
+    <div class="rec-stat-value" style="color:#e67e22;">{{ stats.assurance|floatformat:0 }}<span style="font-size:12px;font-weight:500;"> F</span></div>
+    <div style="font-size:11px;color:var(--ph-muted);">Prise en charge</div>
+  </div>
+</div>
+
+<!-- Tableau des ventes -->
+<div style="background:var(--ph-surface);box-shadow:0 2px 12px rgba(58,89,36,.08);overflow:hidden;border-radius:0;">
+  <div style="padding:12px 20px 12px 32px;border-bottom:1px solid var(--ph-border);display:flex;align-items:center;justify-content:space-between;">
+    <div style="font-size:13px;font-weight:700;color:var(--ph-text);display:flex;align-items:center;gap:8px;border-left:3px solid var(--ph-600);padding-left:10px;">
+      <i class="bi bi-list-ul"></i> Détail des ventes
+    </div>
+    <span style="font-size:11.5px;color:var(--ph-muted);">{{ ventes|length }} vente{{ ventes|length|pluralize }}</span>
+  </div>
+
+  <div class="rec-table-wrap">
+    <table class="rec-table">
+      <thead>
+        <tr>
+          <th>Heure</th>
+          <th>N° vente</th>
+          <th>Patient</th>
+          <th style="text-align:center;">Produits</th>
+          <th>Mode</th>
+          <th style="text-align:right;">Montant</th>
+          <th>Statut</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for vente in ventes %}
+        <tr>
+          <td style="font-size:11.5px;color:var(--ph-muted);white-space:nowrap;">{{ vente.date_vente|date:"H:i" }}</td>
+          <td>
+            <span style="font-family:monospace;font-size:11.5px;color:var(--ph-700);background:var(--ph-50);padding:2px 7px;border-radius:4px;border:1px solid var(--ph-200);">{{ vente.numero }}</span>
+          </td>
+          <td style="font-size:12px;">
+            {% if vente.patient %}{{ vente.patient }}{% else %}<span style="color:var(--ph-muted);">Client anonyme</span>{% endif %}
+          </td>
+          <td style="text-align:center;">
+            <span class="badge-ph-emise">{{ vente.lignes.count }} art.</span>
+          </td>
+          <td>
+            {% if vente.mode_paiement == 'especes' %}
+              <span style="font-size:11.5px;"><i class="bi bi-cash-coin" style="color:#27ae60;"></i> Espèces</span>
+            {% elif vente.mode_paiement == 'mobile_money' %}
+              <span style="font-size:11.5px;"><i class="bi bi-phone" style="color:#8e44ad;"></i> Mobile Money</span>
+            {% else %}
+              <span style="font-size:11.5px;"><i class="bi bi-shield-check" style="color:#e67e22;"></i> Assurance</span>
+            {% endif %}
+          </td>
+          <td style="text-align:right;font-weight:700;font-size:13px;color:var(--ph-800);">
+            {{ vente.montant_net|floatformat:0 }}<span style="font-size:10px;font-weight:400;color:var(--ph-muted);"> F</span>
+          </td>
+          <td>
+            {% if vente.statut == 'payee' %}
+              <span class="badge-ph-ok" style="font-size:10px;">Payée</span>
+            {% else %}
+              <span class="badge-ph-rupture" style="font-size:10px;">Annulée</span>
+            {% endif %}
+          </td>
+          <td>
+            <a href="{% url 'pharmacie_ticket' pharmacie vente.pk %}" class="btn-ph-outline" style="font-size:11px;padding:3px 9px;">
+              <i class="bi bi-receipt"></i>
+            </a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="8" style="text-align:center;padding:48px;color:var(--ph-muted);">
+            <i class="bi bi-receipt" style="font-size:28px;display:block;margin-bottom:8px;color:var(--ph-200);"></i>
+            Aucune vente enregistrée pour cette date
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,81 @@
+{% extends 'pharmacie/base.html' %}
+{% load static %}
+{% block extra_ph_css %}<style>
+.fiche-wrap{max-width:700px;margin:20px auto;background:var(--ph-surface);border-radius:12px;box-shadow:0 4px 24px rgba(58,89,36,.12);overflow:hidden;}
+.fiche-header{background:var(--ph-600);color:#fff;padding:22px 32px;}
+.fiche-body{padding:24px 32px;}
+.fiche-section{margin-bottom:20px;}
+.fiche-section-title{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--ph-muted);margin-bottom:10px;border-bottom:1px solid var(--ph-border);padding-bottom:6px;}
+.fiche-row{display:flex;gap:32px;flex-wrap:wrap;margin-bottom:8px;}
+.fiche-field{display:flex;flex-direction:column;gap:2px;}
+.fiche-label{font-size:10px;font-weight:700;text-transform:uppercase;color:var(--ph-muted);}
+.fiche-value{font-size:13px;font-weight:600;color:var(--ph-text);}
+.fiche-table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:8px;}
+.fiche-table th{padding:7px 10px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--ph-muted);border-bottom:2px solid var(--ph-300);text-align:left;}
+.fiche-table td{padding:8px 10px;border-bottom:1px solid var(--ph-border);}
+.fiche-table td:last-child{text-align:right;font-weight:700;}
+.fiche-sign{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:32px;padding-top:16px;border-top:1px dashed var(--ph-300);}
+.fiche-sign-box{text-align:center;}
+.fiche-sign-line{border-bottom:1.5px solid var(--ph-400);margin:28px 20px 6px;}
+.fiche-sign-lbl{font-size:10.5px;color:var(--ph-muted);font-weight:700;text-transform:uppercase;}
+@media print{.rj-print-actions,.ph-nav,.topbar{display:none!important;}body{background:#fff!important;}.fiche-wrap{box-shadow:none;margin:0;max-width:100%;}@page{size:A4;margin:12mm 15mm;}}
+</style>{% endblock %}
+{% block content %}
+<div class="rj-print-actions" style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;margin-bottom:4px;">
+  <a href="{% url 'pharmacie_ordonnances' pharmacie %}" class="btn-ph-outline" style="font-size:12px;"><i class="bi bi-arrow-left"></i> Retour</a>
+  <button onclick="window.print()" class="btn-ph"><i class="bi bi-printer-fill"></i> Imprimer / PDF</button>
+</div>
+<div class="fiche-wrap">
+  <div class="fiche-header">
+    <div style="font-size:10.5px;font-weight:600;letter-spacing:1px;opacity:.8;text-transform:uppercase;">Centre Médico-Social Walé</div>
+    <div style="font-size:20px;font-weight:900;margin:3px 0;">{{ label }}</div>
+    <div style="font-size:12px;opacity:.75;">Fiche de dispensation</div>
+  </div>
+  <div class="fiche-body">
+    <div class="fiche-section">
+      <div class="fiche-section-title"><i class="bi bi-person-fill"></i> Informations patient</div>
+      <div class="fiche-row">
+        <div class="fiche-field"><span class="fiche-label">Patient</span><span class="fiche-value">{{ ordonnance.consultation.patient }}</span></div>
+        <div class="fiche-field"><span class="fiche-label">N° ordonnance</span><span class="fiche-value" style="font-family:monospace;color:var(--ph-700);">{{ ordonnance.numero }}</span></div>
+        <div class="fiche-field"><span class="fiche-label">Date prescrite</span><span class="fiche-value">{{ ordonnance.date_emission|date:"d/m/Y" }}</span></div>
+        <div class="fiche-field"><span class="fiche-label">Médecin</span><span class="fiche-value">{{ ordonnance.consultation.medecin }}</span></div>
+        <div class="fiche-field"><span class="fiche-label">Date dispensation</span><span class="fiche-value">{{ dispensation.date|date:"d/m/Y à H:i" }}</span></div>
+        <div class="fiche-field"><span class="fiche-label">Pharmacien(ne)</span><span class="fiche-value">{{ dispensation.dispense_par|default:"—" }}</span></div>
+      </div>
+    </div>
+    <div class="fiche-section">
+      <div class="fiche-section-title"><i class="bi bi-capsule-pill"></i> Médicaments dispensés</div>
+      <table class="fiche-table">
+        <thead><tr><th style="width:45%;">Médicament</th><th style="text-align:center;">Prescrit</th><th style="text-align:center;">Dispensé</th><th>Statut</th></tr></thead>
+        <tbody>
+          {% for ligne in dispensation.lignes.all %}
+          <tr>
+            <td><div style="font-weight:600;">{% if ligne.produit %}{{ ligne.produit.nom }}{% else %}{{ ligne.medicament_libre|default:"—" }}{% endif %}</div>{% if ligne.produit and ligne.produit.dci %}<div style="font-size:10.5px;color:var(--ph-muted);">{{ ligne.produit.dci }}</div>{% endif %}</td>
+            <td style="text-align:center;font-weight:700;">{{ ligne.quantite_prescrite }}</td>
+            <td style="text-align:center;font-weight:700;color:{% if ligne.quantite_dispensee < ligne.quantite_prescrite %}#8a5c00{% else %}#0d7a4c{% endif %};">{{ ligne.quantite_dispensee }}</td>
+            <td>{% if ligne.quantite_dispensee == 0 %}<span style="color:#b71c1c;font-size:11px;font-weight:700;">Non dispensé</span>{% elif ligne.quantite_dispensee < ligne.quantite_prescrite %}<span style="color:#8a5c00;font-size:11px;font-weight:700;">Partiel</span>{% else %}<span style="color:#0d7a4c;font-size:11px;font-weight:700;">Complet</span>{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if dispensation.notes %}
+    <div class="fiche-section">
+      <div class="fiche-section-title"><i class="bi bi-chat-text"></i> Observations</div>
+      <div style="font-size:12.5px;color:var(--ph-text);line-height:1.5;">{{ dispensation.notes }}</div>
+    </div>
+    {% endif %}
+    <div style="text-align:center;padding:10px 0;margin-bottom:16px;">
+      <span style="padding:4px 14px;border-radius:20px;font-size:12px;font-weight:700;
+        {% if dispensation.statut == 'complete' %}background:rgba(22,169,107,.1);color:#0d7a4c;border:1px solid rgba(22,169,107,.3);{% else %}background:rgba(232,154,26,.1);color:#8a5c00;border:1px solid rgba(232,154,26,.3);{% endif %}">
+        Dispensation {{ dispensation.get_statut_display }}
+      </span>
+    </div>
+    <div class="fiche-sign">
+      <div class="fiche-sign-box"><div class="fiche-sign-line"></div><div class="fiche-sign-lbl">Signature du pharmacien(ne)</div></div>
+      <div class="fiche-sign-box"><div class="fiche-sign-line"></div><div class="fiche-sign-lbl">Signature du patient</div></div>
+    </div>
+    <div style="text-align:center;font-size:10.5px;color:var(--ph-muted);margin-top:20px;border-top:1px solid var(--ph-border);padding-top:10px;">Centre Médico-Social Walé — {{ now|date:"d/m/Y à H:i" }}</div>
+  </div>
+</div>
+{% endblock %}

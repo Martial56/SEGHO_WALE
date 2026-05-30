@@ -1,0 +1,96 @@
+{% extends 'pharmacie/base.html' %}
+{% load static %}
+{% block nav_livraisons %}active{% endblock %}
+{% block topbar_title %}Confirmer livraison {{ demande.numero }}{% endblock %}
+
+{% block extra_ph_css %}<style>
+.ph-page-head { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 32px;margin:0 -32px;background:#f2f7ee;border-bottom:1px solid rgba(0,0,0,.05);box-shadow:0 2px 8px rgba(0,0,0,.04);position:sticky;top:calc(var(--topbar-h) + 44px);z-index:100; }
+.qte-input { border:none;border-bottom:2px solid var(--ph-300);background:transparent;padding:5px 6px;font-size:14px;font-weight:700;color:var(--ph-text);text-align:center;width:90px;font-family:inherit;border-radius:0; }
+.qte-input:focus { outline:none;border-bottom-color:var(--ph-600); }
+</style>{% endblock %}
+
+{% block content %}
+<div class="ph-page-head">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <a href="{% url 'pharmacie_livraisons' pharmacie %}" class="btn-ph-outline" style="padding:6px 12px;"><i class="bi bi-arrow-left"></i></a>
+    <div>
+      <div style="font-size:15px;font-weight:800;color:var(--ph-900);">
+        <i class="bi bi-box-arrow-in-down" style="color:var(--ph-600);"></i> Confirmer la réception
+      </div>
+      <div style="font-size:11.5px;color:var(--ph-muted);">Livraison {{ demande.numero }} — {{ label }}</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <a href="{% url 'pharmacie_livraisons' pharmacie %}" class="btn-ph-outline">Annuler</a>
+    <button type="submit" form="form-confirmer" class="btn-ph"><i class="bi bi-check-lg"></i> Confirmer la réception</button>
+  </div>
+</div>
+
+{% if messages %}
+<div style="margin-top:14px;">
+  {% for msg in messages %}
+  <div style="background:rgba(22,169,107,.1);border:1px solid rgba(22,169,107,.3);border-radius:8px;padding:10px 16px;font-size:13px;color:#0d7a4c;display:flex;align-items:center;gap:8px;">
+    <i class="bi bi-check-circle-fill"></i> {{ msg }}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if demande.notes_stock %}
+<div style="margin-top:16px;padding:12px 16px;background:var(--ph-50);border:1px solid var(--ph-200);border-radius:8px;font-size:13px;color:var(--ph-700);">
+  <i class="bi bi-chat-text" style="margin-right:6px;"></i>
+  <strong>Message du gestionnaire de stock :</strong> {{ demande.notes_stock }}
+</div>
+{% endif %}
+
+<form id="form-confirmer" method="post" action="{% url 'pharmacie_confirmer_livraison' pharmacie demande.pk %}">
+{% csrf_token %}
+<div style="margin:0 -32px;background:#fff;box-shadow:0 2px 12px rgba(58,89,36,.08);overflow-x:auto;">
+  <div style="padding:12px 20px 12px 32px;"></div>
+  <table class="ph-table">
+    <thead>
+      <tr>
+        <th style="padding-left:32px;">Produit</th>
+        <th style="text-align:center;">Qté approuvée par le stock</th>
+        <th style="text-align:center;">Stock actuel en pharmacie</th>
+        <th style="text-align:center;padding-right:32px;">Qté reçue</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for item in lignes_enrichies %}
+    <tr>
+      <td style="padding-left:32px;">
+        <div style="font-weight:600;">{{ item.produit.nom }}</div>
+        <div style="font-size:10.5px;font-family:monospace;color:var(--ph-600);">{{ item.produit.code }}</div>
+      </td>
+      <td style="text-align:center;font-size:16px;font-weight:800;color:var(--ph-600);">
+        {{ item.ligne.quantite_approuvee|floatformat:0 }}
+        <span style="font-size:10.5px;font-weight:400;color:var(--ph-muted);"> {{ item.produit.unite_mesure }}</span>
+      </td>
+      <td style="text-align:center;font-weight:700;color:{% if item.stock_actuel > 0 %}var(--ph-600){% else %}#b71c1c{% endif %};">
+        {{ item.stock_actuel|floatformat:0 }}
+        <span style="font-size:10.5px;font-weight:400;color:var(--ph-muted);"> {{ item.produit.unite_mesure }}</span>
+      </td>
+      <td style="text-align:center;padding-right:32px;">
+        <input type="number" name="recu_{{ item.ligne.pk }}" class="qte-input"
+          value="{{ item.ligne.quantite_approuvee|floatformat:0 }}"
+          min="0" max="{{ item.ligne.quantite_approuvee|floatformat:0 }}" step="1">
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="4" style="text-align:center;padding:24px;color:var(--ph-muted);">Aucun produit dans cette livraison</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div style="margin-top:16px;padding:12px 16px;background:var(--ph-50);border:1px solid var(--ph-200);border-radius:8px;font-size:12.5px;color:var(--ph-700);">
+  <i class="bi bi-info-circle"></i> Les quantités sont pré-remplies avec les montants approuvés par le stock. Modifiez si la quantité physiquement reçue est différente.
+</div>
+
+<div style="display:flex;justify-content:flex-end;gap:10px;margin:16px 0 24px;">
+  <a href="{% url 'pharmacie_livraisons' pharmacie %}" class="btn-ph-outline">Annuler</a>
+  <button type="submit" class="btn-ph"><i class="bi bi-check-lg"></i> Confirmer la réception</button>
+</div>
+</form>
+{% endblock %}

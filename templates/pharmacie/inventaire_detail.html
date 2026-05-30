@@ -1,0 +1,259 @@
+{% extends "pharmacie/base.html" %}
+
+{% block nav_inventaire %}active{% endblock %}
+
+{% block title %}Inventaire {{ inv.numero }} - Pharmacie{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+
+  {# ── En-tête sticky ── #}
+  <div class="sticky-top bg-white border-bottom shadow-sm py-2 px-3 mb-4" style="z-index: 1020;">
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      <div class="me-auto">
+        <h5 class="mb-0 fw-bold">
+          Inventaire n° {{ inv.numero }}
+          {% if inv.statut == 'brouillon' %}
+            <span class="badge bg-warning text-dark ms-2">Brouillon</span>
+          {% elif inv.statut == 'valide' %}
+            <span class="badge bg-success ms-2">Validé</span>
+          {% else %}
+            <span class="badge bg-secondary ms-2">{{ inv.statut|capfirst }}</span>
+          {% endif %}
+        </h5>
+        <small class="text-muted">
+          Pharmacie&nbsp;: <strong>{{ pharmacie.nom }}</strong>
+          &nbsp;|&nbsp;Date&nbsp;: {{ inv.date_inventaire|date:"d/m/Y" }}
+        </small>
+      </div>
+
+      {% if inv.statut == 'brouillon' %}
+        <form method="post" class="d-inline">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="sauvegarder">
+          <button type="submit" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-save"></i> Sauvegarder
+          </button>
+        </form>
+        <form method="post" class="d-inline"
+              onsubmit="return confirm('Confirmer la validation de cet inventaire ? Cette action est irréversible.');">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="valider">
+          <button type="submit" class="btn btn-success btn-sm">
+            <i class="bi bi-check-circle"></i> Valider l'inventaire
+          </button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="px-3">
+
+    {# ── Bandeau validation ── #}
+    {% if inv.statut == 'valide' %}
+    <div class="alert alert-success d-flex align-items-center mb-4" role="alert">
+      <i class="bi bi-patch-check-fill fs-5 me-2"></i>
+      <div>
+        Inventaire validé le <strong>{{ inv.date_validation|date:"d/m/Y à H:i" }}</strong>
+        par <strong>{{ inv.valide_par }}</strong>.
+      </div>
+    </div>
+    {% endif %}
+
+    {# ── 4 cartes statistiques ── #}
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-body text-center">
+            <div class="fs-1 fw-bold text-primary">{{ stats.total }}</div>
+            <div class="text-muted small">Lignes total</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-body text-center">
+            <div class="fs-1 fw-bold text-warning">{{ stats.avec_ecart }}</div>
+            <div class="text-muted small">Avec écart</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-body text-center">
+            <div class="fs-1 fw-bold text-danger">{{ stats.manquants }}</div>
+            <div class="text-muted small">Manquants</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-body text-center">
+            <div class="fs-1 fw-bold text-success">{{ stats.excedents }}</div>
+            <div class="text-muted small">Excédents</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# ── Tableau des lignes ── #}
+    {% if inv.statut == 'brouillon' %}
+    <form method="post" id="form-inventaire">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="sauvegarder">
+    {% endif %}
+
+    {% regroup lignes by produit.type as lignes_par_type %}
+
+    {% for groupe in lignes_par_type %}
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-header bg-light fw-semibold" style="padding:12px 20px 12px 32px;">
+        {{ groupe.grouper|default:"Sans type" }}
+      </div>
+      <div class="table-responsive" style="margin:0 -32px;overflow-x:auto;">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th style="width:120px;padding-left:32px;">Code</th>
+              <th>Produit</th>
+              <th class="text-end" style="width:140px;">Stock théorique</th>
+              <th class="text-end" style="width:160px;">Stock réel</th>
+              <th class="text-end" style="width:100px;">Écart</th>
+              <th class="text-center" style="width:160px;padding-right:32px;">Statut</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for ligne in groupe.list %}
+            {% with ecart=ligne.stock_reel|add:ligne.stock_theorique|stringformat:"s" %}
+            {# We compute ecart via template filter below #}
+            <tr>
+              <td style="padding-left:32px;">
+                <code class="text-secondary">{{ ligne.produit.code }}</code>
+              </td>
+              <td>
+                <div class="fw-medium">{{ ligne.produit.nom }}</div>
+                {% if ligne.produit.dosage %}
+                  <small class="text-muted">{{ ligne.produit.dosage }}</small>
+                {% endif %}
+              </td>
+              <td class="text-end">{{ ligne.stock_theorique }}</td>
+              <td class="text-end">
+                {% if inv.statut == 'brouillon' %}
+                  <input type="number"
+                         name="stock_reel_{{ ligne.pk }}"
+                         value="{{ ligne.stock_reel }}"
+                         min="0"
+                         step="1"
+                         class="form-control form-control-sm text-end ecart-input"
+                         data-pk="{{ ligne.pk }}"
+                         data-theorique="{{ ligne.stock_theorique }}"
+                         style="width:90px; display:inline-block;">
+                {% else %}
+                  {{ ligne.stock_reel }}
+                {% endif %}
+              </td>
+              <td class="text-end fw-semibold
+                {% if ligne.ecart > 0 %}text-success
+                {% elif ligne.ecart < 0 %}text-danger
+                {% else %}text-success{% endif %}"
+                id="ecart-{{ ligne.pk }}">
+                {% if ligne.ecart > 0 %}+{{ ligne.ecart }}
+                {% elif ligne.ecart < 0 %}{{ ligne.ecart }}
+                {% else %}0{% endif %}
+              </td>
+              <td class="text-center" id="statut-{{ ligne.pk }}" style="padding-right:32px;">
+                {% if ligne.ecart > 0 %}
+                  <span class="badge bg-success">+{{ ligne.ecart }} excédent</span>
+                {% elif ligne.ecart < 0 %}
+                  <span class="badge bg-danger">{{ ligne.ecart|abs }} manquant</span>
+                {% else %}
+                  <span class="badge bg-success">&#10003; Conforme</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endwith %}
+            {% empty %}
+            <tr>
+              <td colspan="6" class="text-center text-muted py-3">Aucune ligne pour ce type.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% empty %}
+    <div class="alert alert-info">Aucune ligne dans cet inventaire.</div>
+    {% endfor %}
+
+    {% if inv.statut == 'brouillon' %}
+    </form>
+    {% endif %}
+
+    {# ── Notes ── #}
+    {% if inv.notes %}
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-header bg-light fw-semibold py-2">
+        <i class="bi bi-journal-text me-1"></i> Notes
+      </div>
+      <div class="card-body">
+        <p class="mb-0" style="white-space: pre-wrap;">{{ inv.notes }}</p>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>{# /px-3 #}
+</div>{# /container-fluid #}
+{% endblock %}
+
+{% block extra_js %}
+{% if inv.statut == 'brouillon' %}
+<script>
+(function () {
+  "use strict";
+
+  document.querySelectorAll(".ecart-input").forEach(function (input) {
+    input.addEventListener("input", function () {
+      var pk = this.dataset.pk;
+      var theorique = parseFloat(this.dataset.theorique) || 0;
+      var reel = parseFloat(this.value);
+      if (isNaN(reel)) { return; }
+
+      var ecart = reel - theorique;
+
+      var ecartCell = document.getElementById("ecart-" + pk);
+      var statutCell = document.getElementById("statut-" + pk);
+
+      // Mise à jour de la cellule écart
+      ecartCell.className = "text-end fw-semibold " + (ecart > 0 ? "text-success" : ecart < 0 ? "text-danger" : "text-success");
+      ecartCell.textContent = ecart > 0 ? "+" + ecart : ecart;
+
+      // Mise à jour du badge statut
+      if (ecart > 0) {
+        statutCell.innerHTML = '<span class="badge bg-success">+' + ecart + ' excédent</span>';
+      } else if (ecart < 0) {
+        statutCell.innerHTML = '<span class="badge bg-danger">' + Math.abs(ecart) + ' manquant</span>';
+      } else {
+        statutCell.innerHTML = '<span class="badge bg-success">&#10003; Conforme</span>';
+      }
+    });
+  });
+
+  // Lier le bouton "Sauvegarder" du header au formulaire principal
+  var btnSave = document.querySelector('form[data-action="sauvegarder"] button, .sticky-top form [name="action"][value="sauvegarder"]');
+  // Sync: clicking header save submits the main form
+  var headerSaveForm = document.querySelector('.sticky-top form [name="action"][value="sauvegarder"]');
+  if (headerSaveForm) {
+    headerSaveForm.closest("form").addEventListener("submit", function (e) {
+      e.preventDefault();
+      var mainForm = document.getElementById("form-inventaire");
+      if (mainForm) {
+        // Copy stock_reel values are already in mainForm; just submit it
+        mainForm.querySelector('[name="action"]').value = "sauvegarder";
+        mainForm.requestSubmit ? mainForm.requestSubmit() : mainForm.submit();
+      }
+    });
+  }
+}());
+</script>
+{% endif %}
+{% endblock %}

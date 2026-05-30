@@ -1,0 +1,271 @@
+{% extends 'stock/base.html' %}
+{% load static %}
+{% block topbar_title %}Stock — Péremptions{% endblock %}
+{% block nav_peremptions %}active{% endblock %}
+
+{% block extra_st_css %}<style>
+.content { padding-top: 0; }
+
+.st-page-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 32px; margin: 0 -32px;
+  background: #f2f7ee; border-bottom: 1px solid rgba(0,0,0,.05);
+  box-shadow: 0 2px 8px rgba(0,0,0,.04);
+  position: sticky; top: calc(var(--topbar-h) + 44px); z-index: 100;
+}
+html[data-theme="dark"] .st-page-header {
+  background: var(--st-100); border-bottom-color: var(--st-border);
+}
+
+.st-filter-link {
+  padding: 5px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;
+  color: var(--st-muted); text-decoration: none;
+  border: 1.5px solid transparent;
+  transition: all .15s; display: inline-flex; align-items: center; gap: 5px;
+}
+.st-filter-link:hover { color: var(--st-600); border-color: var(--st-300); }
+.st-filter-link.active { background: var(--st-600); color: #fff; border-color: var(--st-600); }
+.st-filter-link.f-expire  { color: #b71c1c; }
+.st-filter-link.f-expire.active  { background: #c62828; border-color: #c62828; color: #fff; }
+.st-filter-link.f-30.active  { background: #bf360c; border-color: #bf360c; color: #fff; }
+.st-filter-link.f-60.active  { background: #e65100; border-color: #e65100; color: #fff; }
+
+/* Chips stats */
+.st-chips { display: flex; gap: 10px; flex-wrap: wrap; padding: 10px 0 4px; }
+.st-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 14px; border-radius: 20px; font-size: 12px; font-weight: 700;
+  border: 1.5px solid;
+}
+.chip-all    { background: rgba(58,89,36,.07);  color: var(--st-700); border-color: var(--st-300); }
+.chip-30     { background: rgba(198,40,40,.08);  color: #c62828; border-color: rgba(198,40,40,.3); }
+.chip-60     { background: rgba(230,81,0,.08);   color: #e65100; border-color: rgba(230,81,0,.3); }
+.chip-expire { background: rgba(183,28,28,.08);  color: #b71c1c; border-color: rgba(183,28,28,.3); }
+
+/* Cellules péremption colorées */
+.perm-expire { color: #b71c1c; font-weight: 700; }
+.perm-30     { color: #c62828; font-weight: 700; }
+.perm-60     { color: #e65100; font-weight: 600; }
+.perm-ok     { color: var(--st-text); }
+
+.jours-expire { color: #b71c1c; font-weight: 700; font-size: 11.5px; }
+.jours-30     { color: #c62828; font-weight: 700; font-size: 11.5px; }
+.jours-60     { color: #e65100; font-weight: 600; font-size: 11.5px; }
+.jours-ok     { color: var(--st-600); font-weight: 600; font-size: 11.5px; }
+</style>{% endblock %}
+
+{% block content %}
+
+<!-- En-tête sticky -->
+<div class="st-page-header">
+  <div>
+    <div style="font-size:15px;font-weight:800;color:var(--st-900);">
+      <i class="bi bi-clock-history" style="color:var(--st-600);"></i> Gestion des péremptions
+    </div>
+    <div style="font-size:11.5px;color:var(--st-muted);">
+      Suivi des dates de péremption des lots
+    </div>
+  </div>
+  <!-- Boutons-filtres -->
+  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+    <a href="?filtre=all"
+       class="st-filter-link {% if filtre == 'all' or not filtre %}active{% endif %}">
+      <i class="bi bi-list-ul"></i> Tous (&lt;90j)
+    </a>
+    <a href="?filtre=30"
+       class="st-filter-link f-30 {% if filtre == '30' %}active{% endif %}">
+      <i class="bi bi-exclamation-triangle-fill"></i> &lt;30j
+    </a>
+    <a href="?filtre=60"
+       class="st-filter-link f-60 {% if filtre == '60' %}active{% endif %}">
+      <i class="bi bi-exclamation-circle-fill"></i> &lt;60j
+    </a>
+    <a href="?filtre=expire"
+       class="st-filter-link f-expire {% if filtre == 'expire' %}active{% endif %}">
+      <i class="bi bi-x-circle-fill"></i> Expirés
+    </a>
+  </div>
+</div>
+
+<!-- Chips statistiques -->
+<div class="st-chips" style="padding:14px 0 4px;">
+  <span class="st-chip chip-all">
+    <i class="bi bi-box-seam"></i>
+    <span>{{ stats.total }} lot{{ stats.total|pluralize }} actif{{ stats.total|pluralize }}</span>
+  </span>
+  <span class="st-chip chip-30">
+    <i class="bi bi-exclamation-triangle-fill"></i>
+    <span>{{ stats.moins_30 }} &lt; 30 jours</span>
+  </span>
+  <span class="st-chip chip-60">
+    <i class="bi bi-exclamation-circle-fill"></i>
+    <span>{{ stats.moins_60 }} &lt; 60 jours</span>
+  </span>
+  <span class="st-chip chip-expire">
+    <i class="bi bi-x-circle-fill"></i>
+    <span>{{ stats.expires }} expiré{{ stats.expires|pluralize }}</span>
+  </span>
+</div>
+
+<!-- Tableau des lots -->
+<div style="margin-top:14px;margin-left:-32px;margin-right:-32px;background:var(--st-surface);box-shadow:0 2px 12px rgba(58,89,36,.08);overflow:hidden;">
+  {% if lots %}
+  <table class="st-table">
+    <thead>
+      <tr>
+        <th>Produit</th>
+        <th>Type</th>
+        <th>N° Lot</th>
+        <th style="text-align:right;">Qté restante</th>
+        <th>Date fabrication</th>
+        <th>Date péremption</th>
+        <th>Fournisseur</th>
+        <th style="text-align:center;">Jours restants</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for lot in lots %}
+    {% with dp=lot.date_peremption %}
+    <tr>
+
+      <!-- Produit -->
+      <td>
+        <div style="font-weight:600;color:var(--st-text);">{{ lot.produit.nom }}</div>
+        <div style="font-size:10.5px;font-family:monospace;color:var(--st-600);margin-top:1px;">
+          {{ lot.produit.code }}
+        </div>
+      </td>
+
+      <!-- Type badge -->
+      <td>
+        {% if lot.produit.type == 'medicament' %}
+          <span class="badge-type-med"><i class="bi bi-capsule-pill"></i> Médicament</span>
+        {% elif lot.produit.type == 'consommable' %}
+          <span class="badge-type-cons"><i class="bi bi-bandaid"></i> Consommable</span>
+        {% else %}
+          <span class="badge-type-eqp"><i class="bi bi-tools"></i> Équipement</span>
+        {% endif %}
+      </td>
+
+      <!-- N° Lot -->
+      <td>
+        <span style="font-family:monospace;font-size:11.5px;background:var(--st-50);
+                     border:1px solid var(--st-200);padding:2px 7px;border-radius:4px;">
+          {{ lot.numero_lot }}
+        </span>
+      </td>
+
+      <!-- Quantité restante -->
+      <td style="text-align:right;font-weight:600;">
+        {{ lot.quantite_actuelle|floatformat:0 }}
+        <span style="font-size:10px;font-weight:400;color:var(--st-muted);">
+          {{ lot.produit.unite_mesure }}
+        </span>
+      </td>
+
+      <!-- Date fabrication -->
+      <td style="font-size:12px;color:var(--st-muted);">
+        {% if lot.date_fabrication %}
+          {{ lot.date_fabrication|date:"d/m/Y" }}
+        {% else %}
+          <span style="color:var(--st-muted);">—</span>
+        {% endif %}
+      </td>
+
+      <!-- Date péremption (colorée selon l'état) -->
+      <td>
+        {% if dp %}
+          {% if dp < today %}
+            <span class="perm-expire">
+              <i class="bi bi-x-circle-fill"></i> {{ dp|date:"d/m/Y" }}
+            </span>
+          {% else %}
+            {% with jours=dp|timeuntil:today %}
+            {% comment %}Calcul approx via soustraction en template{% endcomment %}
+            {% endwith %}
+            {% if dp|date:"U"|add:"0" < today|date:"U"|add:"2592000" %}
+              <span class="perm-30">
+                <i class="bi bi-exclamation-triangle-fill"></i> {{ dp|date:"d/m/Y" }}
+              </span>
+            {% elif dp|date:"U"|add:"0" < today|date:"U"|add:"5184000" %}
+              <span class="perm-60">
+                <i class="bi bi-exclamation-circle-fill"></i> {{ dp|date:"d/m/Y" }}
+              </span>
+            {% else %}
+              <span class="perm-ok">{{ dp|date:"d/m/Y" }}</span>
+            {% endif %}
+          {% endif %}
+        {% else %}
+          <span style="color:var(--st-muted);">—</span>
+        {% endif %}
+      </td>
+
+      <!-- Fournisseur -->
+      <td style="font-size:12px;">
+        {{ lot.fournisseur.nom|default:"—" }}
+      </td>
+
+      <!-- Jours restants (calculé côté template via lot.jours_restants fourni par la vue) -->
+      <td style="text-align:center;">
+        {% if lot.jours_restants is not None %}
+          {% if lot.jours_restants < 0 %}
+            <span class="jours-expire">
+              <i class="bi bi-x-circle-fill"></i>
+              Expiré depuis {{ lot.date_peremption|timesince:today }}
+            </span>
+          {% elif lot.jours_restants < 30 %}
+            <span class="jours-30">
+              <i class="bi bi-exclamation-triangle-fill"></i>
+              {{ lot.jours_restants }} jour{{ lot.jours_restants|pluralize }}
+            </span>
+          {% elif lot.jours_restants < 60 %}
+            <span class="jours-60">
+              <i class="bi bi-exclamation-circle-fill"></i>
+              {{ lot.jours_restants }} jours
+            </span>
+          {% else %}
+            <span class="jours-ok">
+              {{ lot.jours_restants }} jours
+            </span>
+          {% endif %}
+        {% else %}
+          <span style="color:var(--st-muted);">—</span>
+        {% endif %}
+      </td>
+
+    </tr>
+    {% endwith %}
+    {% empty %}
+    <tr>
+      <td colspan="8" style="text-align:center;padding:48px;color:var(--st-muted);font-style:italic;">
+        <i class="bi bi-check-circle" style="font-size:26px;display:block;margin-bottom:10px;color:var(--st-400);"></i>
+        Aucun lot dans cette catégorie de péremption.
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="st-card-body" style="text-align:center;padding:48px;color:var(--st-muted);">
+    <i class="bi bi-check-circle" style="font-size:26px;display:block;margin-bottom:10px;color:var(--st-400);"></i>
+    Aucun lot à surveiller pour ce filtre.
+  </div>
+  {% endif %}
+</div>
+
+
+{% if page_obj.has_other_pages %}
+<div style="display:flex;justify-content:center;align-items:center;gap:6px;padding:14px 0;">
+  {% if page_obj.has_previous %}
+  <a href="?page=1&filtre={{ filtre }}" class="btn-st-outline" style="padding:4px 10px;font-size:12px;"><i class="bi bi-chevron-double-left"></i></a>
+  <a href="?page={{ page_obj.previous_page_number }}&filtre={{ filtre }}" class="btn-st-outline" style="padding:4px 10px;font-size:12px;"><i class="bi bi-chevron-left"></i></a>
+  {% endif %}
+  <span style="font-size:12px;color:var(--st-muted);padding:0 8px;">Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} &nbsp;&middot;&nbsp; {{ page_obj.paginator.count }} enregistrement{{ page_obj.paginator.count|pluralize }}</span>
+  {% if page_obj.has_next %}
+  <a href="?page={{ page_obj.next_page_number }}&filtre={{ filtre }}" class="btn-st-outline" style="padding:4px 10px;font-size:12px;"><i class="bi bi-chevron-right"></i></a>
+  <a href="?page={{ page_obj.paginator.num_pages }}&filtre={{ filtre }}" class="btn-st-outline" style="padding:4px 10px;font-size:12px;"><i class="bi bi-chevron-double-right"></i></a>
+  {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,138 @@
+{% extends 'pharmacie/base.html' %}
+{% load static %}
+{% block nav_rapport_mensuel %}active{% endblock %}
+
+{% block extra_ph_css %}<style>
+.ph-page-head {
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:11px 32px;margin:0 -32px;
+  background:var(--ph-surface);border-bottom:1px solid var(--ph-border);
+  box-shadow:0 2px 8px rgba(36,113,163,.06);
+  position:sticky;top:calc(var(--topbar-h) + 44px);z-index:100;flex-wrap:wrap;
+}
+.rm-stats { display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0; }
+@media(max-width:700px){ .rm-stats{ grid-template-columns:1fr; } }
+.rm-stat { background:var(--ph-surface);border-radius:12px;box-shadow:0 2px 12px rgba(58,89,36,.08);padding:18px 20px;border-left:4px solid var(--ph-400); }
+.rm-stat.v-total { border-left-color:var(--ph-600); }
+.rm-stat.v-disp  { border-left-color:#e67e22; }
+.rm-stat.v-mois  { border-left-color:#2980b9; }
+.rm-stat-label { font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--ph-muted);margin-bottom:5px; }
+.rm-stat-value { font-size:22px;font-weight:800;line-height:1.1; }
+.rm-stat-sub   { font-size:11px;color:var(--ph-muted);margin-top:3px; }
+.rm-charts { display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px; }
+@media(max-width:900px){ .rm-charts{ grid-template-columns:1fr; } }
+.rm-chart-card { background:var(--ph-surface);border-radius:12px;box-shadow:0 2px 12px rgba(58,89,36,.08);padding:16px 20px; }
+.rm-chart-title { font-size:12px;font-weight:700;color:var(--ph-text);margin-bottom:14px;border-left:3px solid var(--ph-600);padding-left:10px; }
+.rm-top-table { width:100%;border-collapse:collapse;font-size:12.5px; }
+.rm-top-table thead tr { background:var(--ph-100);border-bottom:2px solid var(--ph-300); }
+.rm-top-table thead th { padding:8px 14px;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--ph-800); }
+.rm-top-table tbody tr { border-bottom:1px solid var(--ph-border); }
+.rm-top-table tbody td { padding:8px 14px;color:var(--ph-text); }
+</style>{% endblock %}
+
+{% block content %}
+<div class="ph-page-head">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <div style="width:34px;height:34px;border-radius:8px;background:var(--ph-100);display:flex;align-items:center;justify-content:center;font-size:17px;color:var(--ph-600);">
+      <i class="bi bi-bar-chart-line"></i>
+    </div>
+    <div>
+      <div style="font-size:15px;font-weight:800;color:var(--ph-900);">Rapport mensuel — {{ label }}</div>
+      <div style="font-size:11px;color:var(--ph-muted);">{{ today|date:"F Y" }}</div>
+    </div>
+  </div>
+  <a href="{% url 'pharmacie_recette' pharmacie %}" class="btn-ph-outline" style="font-size:12px;">
+    <i class="bi bi-graph-up"></i> Recette journalière
+  </a>
+</div>
+
+<!-- 3 cartes stat -->
+<div class="rm-stats">
+  <div class="rm-stat v-total">
+    <div class="rm-stat-label"><i class="bi bi-wallet2"></i> Total ventes 12 mois</div>
+    <div class="rm-stat-value" style="color:var(--ph-700);">{{ total_annee|floatformat:0 }}<span style="font-size:12px;font-weight:500;"> F</span></div>
+    <div class="rm-stat-sub">Chiffre d'affaires cumulé</div>
+  </div>
+  <div class="rm-stat v-disp">
+    <div class="rm-stat-label"><i class="bi bi-clipboard2-pulse"></i> Total dispensations 12 mois</div>
+    <div class="rm-stat-value" style="color:#e67e22;">{{ total_disp }}<span style="font-size:12px;font-weight:500;"> ordonnance{{ total_disp|pluralize }}</span></div>
+    <div class="rm-stat-sub">Via ordonnances médecin</div>
+  </div>
+  {% with dernier=ventes_mois|last %}
+  <div class="rm-stat v-mois">
+    <div class="rm-stat-label"><i class="bi bi-calendar-check"></i> Mois actuel — {{ dernier.label }}</div>
+    <div class="rm-stat-value" style="color:#2980b9;">{{ dernier.total|floatformat:0 }}<span style="font-size:12px;font-weight:500;"> F</span></div>
+    <div class="rm-stat-sub">{{ dernier.nb }} vente{{ dernier.nb|pluralize }} en caisse</div>
+  </div>
+  {% endwith %}
+</div>
+
+<!-- Graphiques -->
+<div class="rm-charts">
+  <div class="rm-chart-card">
+    <div class="rm-chart-title"><i class="bi bi-bar-chart" style="color:var(--ph-600);"></i> Ventes mensuelles (F CFA)</div>
+    <canvas id="chartVentes" style="max-height:280px;"></canvas>
+  </div>
+  <div class="rm-chart-card">
+    <div class="rm-chart-title"><i class="bi bi-bar-chart" style="color:#e67e22;"></i> Ordonnances dispensées</div>
+    <canvas id="chartDisp" style="max-height:280px;"></canvas>
+  </div>
+</div>
+
+<!-- Top 10 produits ce mois -->
+<div class="ph-card">
+  <div class="ph-card-header" style="padding:12px 20px 12px 32px;">
+    <div class="ph-card-title"><i class="bi bi-trophy" style="color:#e67e22;"></i> Top 10 produits vendus ce mois</div>
+  </div>
+  {% if top_produits %}
+  <div style="margin:0 -32px;overflow-x:auto;">
+    <table class="rm-top-table">
+      <thead><tr>
+        <th style="width:40px;padding-left:32px;">#</th>
+        <th>Produit</th>
+        <th style="text-align:right;">Qté vendue</th>
+        <th style="text-align:right;padding-right:32px;">Montant</th>
+      </tr></thead>
+      <tbody>
+        {% for item in top_produits %}
+        <tr>
+          <td style="padding-left:32px;color:var(--ph-muted);font-size:12px;">{{ forloop.counter }}</td>
+          <td style="font-weight:600;">{{ item.produit__nom }}</td>
+          <td style="text-align:right;font-weight:700;">{{ item.qte|floatformat:0 }}</td>
+          <td style="text-align:right;font-weight:700;color:var(--ph-700);padding-right:32px;">{{ item.montant|floatformat:0 }} F</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="ph-card-body" style="text-align:center;color:var(--ph-muted);padding:32px;">
+    <i class="bi bi-inbox" style="font-size:24px;display:block;margin-bottom:8px;"></i>Aucune vente enregistrée ce mois.
+  </div>
+  {% endif %}
+</div>
+
+<!-- Données Chart.js -->
+{{ chart_labels|json_script:"chl" }}
+{{ chart_ventes|json_script:"chv" }}
+{{ chart_disp|json_script:"chd" }}
+
+<script src="{% static 'vendor/chart.umd.min.js' %}"></script>
+<script>
+(function(){
+  var labels = JSON.parse(document.getElementById('chl').textContent);
+  var ventes = JSON.parse(document.getElementById('chv').textContent);
+  var disp   = JSON.parse(document.getElementById('chd').textContent);
+  new Chart(document.getElementById('chartVentes'), {
+    type:'bar',
+    data:{labels:labels, datasets:[{label:'F CFA', data:ventes, backgroundColor:'rgba(74,103,65,.7)', borderRadius:4}]},
+    options:{responsive:true, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true, ticks:{callback:function(v){return v.toLocaleString('fr-FR')+' F';}}}}}
+  });
+  new Chart(document.getElementById('chartDisp'), {
+    type:'bar',
+    data:{labels:labels, datasets:[{label:'Dispensations', data:disp, backgroundColor:'rgba(230,126,34,.7)', borderRadius:4}]},
+    options:{responsive:true, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true, ticks:{stepSize:1}}}}
+  });
+})();
+</script>
+{% endblock %}

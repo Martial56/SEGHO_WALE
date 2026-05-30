@@ -1,0 +1,133 @@
+{% extends "pharmacie/base.html" %}
+
+{% block title %}Nouvel inventaire physique — {{ label }}{% endblock %}
+
+{% block content %}
+<form method="post" id="form-inventaire">
+  {% csrf_token %}
+
+  {# ===== En-tête sticky ===== #}
+  <div class="sticky-top bg-white border-bottom shadow-sm py-2 px-3 d-flex align-items-center justify-content-between" style="top:0; z-index:1020;">
+    <h4 class="mb-0 fw-semibold">Nouvel inventaire physique</h4>
+    <button type="submit" class="btn btn-primary">
+      <i class="bi bi-save me-1"></i>Enregistrer
+    </button>
+  </div>
+
+  <div class="container-fluid px-3 py-3">
+
+    {# ===== Message d'information ===== #}
+    <div class="alert alert-info d-flex align-items-start gap-2" role="alert">
+      <i class="bi bi-info-circle-fill flex-shrink-0 mt-1"></i>
+      <span>Saisissez les quantités physiquement comptées. Le stock théorique est pré-rempli.</span>
+    </div>
+
+    {# ===== Section date et notes ===== #}
+    <div class="card mb-3">
+      <div class="card-body row g-3 align-items-start">
+        <div class="col-12 col-md-3">
+          <label for="date_inventaire" class="form-label fw-semibold">Date de l'inventaire</label>
+          <input
+            type="date"
+            id="date_inventaire"
+            name="date_inventaire"
+            class="form-control"
+            value="{{ today|date:'Y-m-d' }}"
+            required
+          >
+        </div>
+        <div class="col-12 col-md-9">
+          <label for="notes" class="form-label fw-semibold">Notes</label>
+          <textarea
+            id="notes"
+            name="notes"
+            class="form-control"
+            rows="3"
+            placeholder="Observations, conditions de comptage…"
+          ></textarea>
+        </div>
+      </div>
+    </div>
+
+    {# ===== Tableau des produits ===== #}
+    <div class="table-responsive" style="margin:0 -32px;overflow-x:auto;">
+      <div style="padding:12px 20px 12px 32px;font-weight:600;font-size:.95rem;border-bottom:1px solid #dee2e6;">Produits en stock</div>
+      <table class="table table-bordered table-hover align-middle mb-3 w-100">
+        <thead class="table-dark sticky-top" style="top:56px;">
+          <tr>
+            <th scope="col" style="width:120px;padding-left:32px;">Code</th>
+            <th scope="col">Produit</th>
+            <th scope="col" class="text-center text-muted" style="width:180px;">
+              Stock théorique
+              <small class="d-block fw-normal fst-italic">(lecture seule)</small>
+            </th>
+            <th scope="col" class="text-center" style="width:200px;padding-right:32px;">Stock réel constaté</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for sp in stock_items %}
+
+            {# Séparateur de groupe par type de produit #}
+            {% ifchanged sp.produit.type_produit %}
+            <tr class="table-secondary">
+              <td colspan="4" class="fw-bold text-uppercase small py-1 px-3" style="letter-spacing:.05em;">
+                {{ sp.produit.get_type_produit_display|default:sp.produit.type_produit }}
+              </td>
+            </tr>
+            {% endifchanged %}
+
+            <tr>
+              <td class="font-monospace small" style="padding-left:32px;">{{ sp.produit.code }}</td>
+              <td>
+                <span class="fw-semibold">{{ sp.produit.nom }}</span>
+                {% if sp.produit.unite %}
+                  <small class="text-muted ms-1">({{ sp.produit.unite }})</small>
+                {% endif %}
+              </td>
+              <td class="text-center bg-light text-muted">
+                <input
+                  type="number"
+                  class="form-control form-control-sm text-center bg-light text-muted border-0"
+                  value="{{ sp.quantite|floatformat:0 }}"
+                  readonly
+                  tabindex="-1"
+                  aria-label="Stock théorique — lecture seule"
+                  style="pointer-events:none;"
+                >
+              </td>
+              <td class="text-center" style="padding-right:32px;">
+                <input
+                  type="number"
+                  name="reel_{{ sp.produit.pk }}"
+                  id="reel_{{ sp.produit.pk }}"
+                  class="form-control form-control-sm text-center"
+                  value="{{ sp.quantite|floatformat:0 }}"
+                  min="0"
+                  step="1"
+                  required
+                  aria-label="Stock réel constaté pour {{ sp.produit.nom }}"
+                >
+              </td>
+            </tr>
+
+          {% empty %}
+            <tr>
+              <td colspan="4" class="text-center text-muted py-4">
+                Aucun produit en stock pour cette pharmacie.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {# ===== Bouton submit bas de page ===== #}
+    <div class="d-flex justify-content-end pb-4">
+      <button type="submit" class="btn btn-primary btn-lg">
+        <i class="bi bi-save me-1"></i>Enregistrer l'inventaire
+      </button>
+    </div>
+
+  </div>{# /container-fluid #}
+</form>
+{% endblock %}

@@ -1,0 +1,171 @@
+{% extends 'pharmacie/base.html' %}
+{% load static %}
+{% block nav_comparaison %}active{% endblock %}
+
+{% block extra_ph_css %}<style>
+.ph-page-head {
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:11px 32px;margin:0 -32px;
+  background:var(--ph-surface);border-bottom:1px solid var(--ph-border);
+  box-shadow:0 2px 8px rgba(36,113,163,.06);
+  position:sticky;top:calc(var(--topbar-h) + 44px);z-index:100;flex-wrap:wrap;
+}
+.cmp-stats { display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0; }
+@media(max-width:700px){ .cmp-stats{ grid-template-columns:1fr; } }
+.cmp-stat { background:var(--ph-surface);border-radius:12px;box-shadow:0 2px 12px rgba(58,89,36,.08);padding:16px 20px;border-left:4px solid var(--ph-400); }
+.cmp-stat-label { font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--ph-muted);margin-bottom:5px; }
+.cmp-stat-value { font-size:20px;font-weight:800; }
+.cmp-table-wrap { margin:0 -32px;overflow-x:auto; }
+.cmp-table { width:100%;border-collapse:collapse;font-size:12.5px; }
+.cmp-table thead tr { background:var(--ph-800);color:#fff; }
+.cmp-table thead th { padding:9px 14px;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:rgba(255,255,255,.85);text-align:left;white-space:nowrap; }
+.cmp-table thead th:first-child { padding-left:32px; }
+.cmp-table thead th:last-child  { padding-right:32px; }
+.cmp-table tbody tr { border-bottom:1px solid var(--ph-border);transition:background .12s; }
+.cmp-table tbody tr:hover { background:var(--ph-50); }
+.cmp-table tbody td { padding:9px 14px;color:var(--ph-text);vertical-align:middle; }
+.cmp-table tbody td:first-child { padding-left:32px; }
+.cmp-table tbody td:last-child  { padding-right:32px; }
+.cmp-sep-row td { background:var(--ph-100);padding:7px 32px;font-size:10.5px;font-weight:700;color:var(--ph-700);text-transform:uppercase;letter-spacing:.5px; }
+.cmp-badge-ok   { font-weight:700;color:#0d7a4c; }
+.cmp-badge-rupt { background:rgba(232,69,69,.1);color:#b71c1c;border:1px solid rgba(232,69,69,.25);padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700; }
+.cmp-badge-alrt { background:rgba(232,154,26,.1);color:#8a5c00;border:1px solid rgba(232,154,26,.25);padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700; }
+.filter-btn { padding:4px 12px;border-radius:20px;font-size:11.5px;font-weight:600;text-decoration:none;border:1.5px solid var(--ph-200);color:var(--ph-700);background:transparent;transition:all .15s; }
+.filter-btn:hover,.filter-btn.actif { background:var(--ph-600);color:#fff;border-color:var(--ph-600); }
+</style>{% endblock %}
+
+{% block content %}
+<div class="ph-page-head">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <div style="width:34px;height:34px;border-radius:8px;background:var(--ph-100);display:flex;align-items:center;justify-content:center;font-size:17px;color:var(--ph-600);">
+      <i class="bi bi-columns-gap"></i>
+    </div>
+    <div>
+      <div style="font-size:15px;font-weight:800;color:var(--ph-900);">Comparaison des deux pharmacies</div>
+      <div style="font-size:11px;color:var(--ph-muted);">
+        <span style="background:var(--ph-100);padding:1px 8px;border-radius:10px;font-weight:700;color:var(--ph-700);">PH1</span> {{ ph1_label }} &nbsp;·&nbsp;
+        <span style="background:rgba(41,128,185,.1);padding:1px 8px;border-radius:10px;font-weight:700;color:#1565c0;">PH2</span> {{ ph2_label }}
+      </div>
+    </div>
+  </div>
+  <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+    {% with tf=request.GET.type %}
+    <a href="?" class="filter-btn {% if not tf %}actif{% endif %}">Tous</a>
+    <a href="?type=medicament" class="filter-btn {% if tf == 'medicament' %}actif{% endif %}"><i class="bi bi-capsule-pill"></i> Médicaments</a>
+    <a href="?type=consommable" class="filter-btn {% if tf == 'consommable' %}actif{% endif %}"><i class="bi bi-bandaid"></i> Consommables</a>
+    <a href="?type=equipement" class="filter-btn {% if tf == 'equipement' %}actif{% endif %}"><i class="bi bi-tools"></i> Équipements</a>
+    {% endwith %}
+  </div>
+</div>
+
+<!-- Stats -->
+<div class="cmp-stats">
+  <div class="cmp-stat" style="border-left-color:var(--ph-600);">
+    <div class="cmp-stat-label"><i class="bi bi-collection"></i> Références communes</div>
+    <div class="cmp-stat-value" style="color:var(--ph-700);">{{ produits_data|length }}</div>
+  </div>
+  <div class="cmp-stat" style="border-left-color:var(--ph-600);">
+    <div class="cmp-stat-label"><i class="bi bi-building"></i> Stock total — {{ ph1_label }}</div>
+    <div class="cmp-stat-value" style="color:var(--ph-700);" id="stat-ph1">—</div>
+  </div>
+  <div class="cmp-stat" style="border-left-color:#2980b9;">
+    <div class="cmp-stat-label"><i class="bi bi-building"></i> Stock total — {{ ph2_label }}</div>
+    <div class="cmp-stat-value" style="color:#2980b9;" id="stat-ph2">—</div>
+  </div>
+</div>
+
+<!-- Tableau comparatif bord à bord -->
+<div class="cmp-table-wrap">
+  <div style="padding:12px 20px 12px 32px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--ph-muted);background:var(--ph-surface);border-bottom:1px solid var(--ph-border);">Tableau comparatif</div>
+  <table class="cmp-table" id="cmp-tableau">
+    <thead>
+      <tr>
+        <th style="width:110px;">Code</th>
+        <th>Produit</th>
+        <th style="text-align:center;min-width:140px;">
+          <span style="background:rgba(255,255,255,.15);padding:2px 8px;border-radius:10px;">PH1</span>
+          {{ ph1_label }}
+        </th>
+        <th style="text-align:center;min-width:140px;">
+          <span style="background:rgba(41,128,185,.3);padding:2px 8px;border-radius:10px;">PH2</span>
+          {{ ph2_label }}
+        </th>
+        <th style="text-align:center;min-width:80px;">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% with type_filtre=request.GET.type %}
+      {% for item in produits_data %}
+      {% ifchanged item.produit.type %}
+      <tr class="cmp-sep-row">
+        <td colspan="5">
+          {% if item.produit.type == 'medicament' %}<i class="bi bi-capsule-pill"></i> Médicaments
+          {% elif item.produit.type == 'consommable' %}<i class="bi bi-bandaid"></i> Consommables
+          {% else %}<i class="bi bi-tools"></i> Équipements{% endif %}
+        </td>
+      </tr>
+      {% endifchanged %}
+      <tr class="ligne-prod" data-type="{{ item.produit.type }}" data-q1="{{ item.qte1 }}" data-q2="{{ item.qte2 }}"
+        {% if type_filtre and item.produit.type != type_filtre %}style="display:none;"{% endif %}>
+        <td><span style="font-family:monospace;font-size:11px;color:var(--ph-600);background:var(--ph-50);padding:2px 6px;border-radius:4px;border:1px solid var(--ph-200);">{{ item.produit.code }}</span></td>
+        <td>
+          <div style="font-weight:600;">{{ item.produit.nom }}</div>
+          {% if item.produit.dci %}<div style="font-size:10.5px;color:var(--ph-muted);">{{ item.produit.dci }}</div>{% endif %}
+        </td>
+        <td style="text-align:center;">
+          {% if item.qte1 == 0 %}
+            <span class="cmp-badge-rupt"><i class="bi bi-x-circle-fill"></i> Rupture</span>
+          {% elif item.produit.stock_alerte and item.qte1 <= item.produit.stock_alerte %}
+            <span class="cmp-badge-alrt"><i class="bi bi-exclamation-triangle-fill"></i> {{ item.qte1|floatformat:0 }}{% if item.produit.unite_mesure %} {{ item.produit.unite_mesure }}{% endif %}</span>
+          {% else %}
+            <span class="cmp-badge-ok">{{ item.qte1|floatformat:0 }}{% if item.produit.unite_mesure %} <span style="font-size:10px;font-weight:400;color:var(--ph-muted);">{{ item.produit.unite_mesure }}</span>{% endif %}</span>
+          {% endif %}
+        </td>
+        <td style="text-align:center;">
+          {% if item.qte2 == 0 %}
+            <span class="cmp-badge-rupt"><i class="bi bi-x-circle-fill"></i> Rupture</span>
+          {% elif item.produit.stock_alerte and item.qte2 <= item.produit.stock_alerte %}
+            <span class="cmp-badge-alrt"><i class="bi bi-exclamation-triangle-fill"></i> {{ item.qte2|floatformat:0 }}{% if item.produit.unite_mesure %} {{ item.produit.unite_mesure }}{% endif %}</span>
+          {% else %}
+            <span class="cmp-badge-ok">{{ item.qte2|floatformat:0 }}{% if item.produit.unite_mesure %} <span style="font-size:10px;font-weight:400;color:var(--ph-muted);">{{ item.produit.unite_mesure }}</span>{% endif %}</span>
+          {% endif %}
+        </td>
+        <td style="text-align:center;font-weight:700;">{{ item.total|floatformat:0 }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5" style="text-align:center;padding:48px;color:var(--ph-muted);">
+        <i class="bi bi-inbox" style="font-size:28px;display:block;margin-bottom:8px;color:var(--ph-200);"></i>
+        Aucun produit en stock dans ces pharmacies.
+      </td></tr>
+      {% endfor %}
+      {% endwith %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+(function(){
+  var q1=0, q2=0;
+  document.querySelectorAll('#cmp-tableau tbody tr.ligne-prod').forEach(function(r){
+    if(r.style.display==='none') return;
+    q1 += parseFloat(r.dataset.q1||0);
+    q2 += parseFloat(r.dataset.q2||0);
+  });
+  var e1=document.getElementById('stat-ph1'), e2=document.getElementById('stat-ph2');
+  if(e1) e1.textContent = q1.toLocaleString('fr-FR');
+  if(e2) e2.textContent = q2.toLocaleString('fr-FR');
+  // Masquer séparateurs orphelins si filtre actif
+  var tf = new URLSearchParams(window.location.search).get('type');
+  if(tf){
+    document.querySelectorAll('#cmp-tableau tbody tr.cmp-sep-row').forEach(function(sep){
+      var s=sep.nextElementSibling, vis=false;
+      while(s && !s.classList.contains('cmp-sep-row')){
+        if(s.style.display!=='none'){vis=true;break;}
+        s=s.nextElementSibling;
+      }
+      if(!vis) sep.style.display='none';
+    });
+  }
+})();
+</script>
+{% endblock %}

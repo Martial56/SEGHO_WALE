@@ -1,0 +1,194 @@
+{% extends 'stock/base.html' %}
+{% load static %}
+{% block nav_fournisseurs %}active{% endblock %}
+{% block topbar_title %}Stock — Fournisseurs{% endblock %}
+
+{% block extra_st_css %}<style>
+.st-page-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 32px; margin: 0 -32px;
+  background: #f2f7ee; border-bottom: 1px solid rgba(0,0,0,.05);
+  box-shadow: 0 2px 8px rgba(0,0,0,.04);
+  position: sticky; top: calc(var(--topbar-h) + 44px); z-index: 100;
+}
+.st-search {
+  display: flex; align-items: center; gap: 0;
+  border-bottom: 1.5px solid rgba(0,0,0,.18); padding: 5px 6px;
+  background: transparent; min-width: 220px;
+}
+.st-search input {
+  border: none; background: transparent; font-size: 13px;
+  color: var(--st-text); outline: none; width: 100%;
+}
+.st-search i { color: var(--st-muted); font-size: 14px; margin-right: 6px; }
+</style>{% endblock %}
+
+{% block content %}
+
+<!-- En-tête sticky -->
+<div class="st-page-header">
+  <div>
+    <div style="font-size:15px;font-weight:800;color:var(--st-900);">
+      <i class="bi bi-truck" style="color:var(--st-600);"></i> Fournisseurs
+    </div>
+    <div style="font-size:11.5px;color:var(--st-muted);">
+      {{ fournisseurs|length }} fournisseur{{ fournisseurs|length|pluralize }} enregistré{{ fournisseurs|length|pluralize }}
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <form method="get" style="display:flex;align-items:center;gap:8px;">
+      <div class="st-search">
+        <i class="bi bi-search"></i>
+        <input type="text" name="q" value="{{ q }}" placeholder="Nom, code fournisseur…">
+      </div>
+      <button type="submit" class="btn-st" style="padding:6px 14px;">
+        <i class="bi bi-search"></i>
+      </button>
+    </form>
+    <!-- Nouveau fournisseur via admin Django -->
+    <a href="{% url 'stock_fournisseur_create' %}" class="btn-st">
+      <i class="bi bi-plus-lg"></i> Nouveau fournisseur
+    </a>
+  </div>
+</div>
+
+<!-- Tableau -->
+<div style="margin-top:14px;margin-left:-32px;margin-right:-32px;background:var(--st-surface);box-shadow:0 2px 12px rgba(58,89,36,.08);overflow:hidden;">
+  {% if fournisseurs %}
+  <table class="st-table">
+    <thead>
+      <tr>
+        <th>Code</th>
+        <th>Nom</th>
+        <th>Téléphone</th>
+        <th>Email</th>
+        <th style="text-align:right;">Nb commandes</th>
+        <th>Statut</th>
+        <th style="width:80px;"></th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for f in fournisseurs %}
+    <tr>
+      <td>
+        <span style="font-family:monospace;font-size:11px;color:var(--st-600);background:var(--st-50);padding:2px 6px;border-radius:4px;border:1px solid var(--st-200);">
+          {{ f.code }}
+        </span>
+      </td>
+      <td>
+        <span style="font-weight:700;color:var(--st-text);">{{ f.nom }}</span>
+      </td>
+      <td style="font-size:12.5px;">
+        {% if f.telephone %}
+          <a href="tel:{{ f.telephone }}" style="color:var(--st-text);text-decoration:none;">
+            <i class="bi bi-telephone" style="color:var(--st-500);font-size:11px;margin-right:3px;"></i>
+            {{ f.telephone }}
+          </a>
+        {% else %}
+          <span style="color:var(--st-muted);">—</span>
+        {% endif %}
+      </td>
+      <td style="font-size:12.5px;">
+        {% if f.email %}
+          <a href="mailto:{{ f.email }}" style="color:var(--st-600);text-decoration:none;">
+            <i class="bi bi-envelope" style="font-size:11px;margin-right:3px;"></i>
+            {{ f.email|truncatechars:30 }}
+          </a>
+        {% else %}
+          <span style="color:var(--st-muted);">—</span>
+        {% endif %}
+      </td>
+      <td style="text-align:right;">
+        <a href="{% url 'stock_commandes' %}?fournisseur={{ f.pk }}"
+           style="font-weight:700;color:var(--st-600);text-decoration:none;font-size:13px;">
+          {{ f.commandes.count }}
+        </a>
+        <span style="font-size:10.5px;color:var(--st-muted);margin-left:3px;">commande{{ f.commandes.count|pluralize }}</span>
+      </td>
+      <td>
+        {% if f.actif %}
+          <span class="badge-ok"><i class="bi bi-check-circle-fill"></i> Actif</span>
+        {% else %}
+          <span class="badge-rupture">Inactif</span>
+        {% endif %}
+      </td>
+      <td style="text-align:center;">
+        <a href="{% url 'stock_fournisseur_edit' f.pk %}" class="btn-st-outline"
+           style="padding:3px 10px;font-size:11.5px;" title="Modifier">
+          <i class="bi bi-pencil"></i>
+        </a>
+      </td>
+    </tr>
+    {% empty %}
+    <tr>
+      <td colspan="7" style="text-align:center;padding:40px;color:var(--st-muted);font-style:italic;">
+        <i class="bi bi-truck" style="font-size:24px;display:block;margin-bottom:8px;opacity:.3;"></i>
+        Aucun fournisseur trouvé
+        {% if q %} pour "{{ q }}"{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Pagination si nécessaire -->
+  {% if page_obj and page_obj.has_other_pages %}
+  <div style="display:flex;justify-content:center;align-items:center;gap:6px;padding:14px 20px;border-top:1px solid var(--st-border);">
+    {% if page_obj.has_previous %}
+      <a href="?page=1{% if q %}&q={{ q }}{% endif %}"
+         class="btn-st-outline" style="padding:4px 10px;font-size:12px;"><i class="bi bi-chevron-double-left"></i></a>
+      <a href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}"
+         class="btn-st-outline" style="padding:4px 10px;font-size:12px;"><i class="bi bi-chevron-left"></i></a>
+    {% endif %}
+    {% for num in page_obj.paginator.page_range %}
+      {% if num == page_obj.number %}
+        <span class="btn-st" style="padding:4px 11px;font-size:12px;min-width:32px;justify-content:center;">{{ num }}</span>
+      {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+        <a href="?page={{ num }}{% if q %}&q={{ q }}{% endif %}"
+           class="btn-st-outline" style="padding:4px 11px;font-size:12px;min-width:32px;justify-content:center;">{{ num }}</a>
+      {% endif %}
+    {% endfor %}
+    {% if page_obj.has_next %}
+      <a href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}"
+         class="btn-st-outline" style="padding:4px 10px;font-size:12px;"><i class="bi bi-chevron-right"></i></a>
+      <a href="?page={{ page_obj.paginator.num_pages }}{% if q %}&q={{ q }}{% endif %}"
+         class="btn-st-outline" style="padding:4px 10px;font-size:12px;"><i class="bi bi-chevron-double-right"></i></a>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% else %}
+  <div class="st-card-body" style="text-align:center;padding:40px;color:var(--st-muted);">
+    <i class="bi bi-truck" style="font-size:28px;display:block;margin-bottom:10px;opacity:.3;"></i>
+    Aucun fournisseur enregistré.
+    <br>
+    <a href="{% url 'stock_fournisseur_create' %}" class="btn-st" style="margin-top:12px;display:inline-flex;">
+      <i class="bi bi-plus-lg"></i> Ajouter un fournisseur
+    </a>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Note info admin -->
+<div style="margin-top:10px;font-size:11px;color:var(--st-muted);text-align:right;">
+  <i class="bi bi-info-circle"></i>
+  La gestion des fournisseurs s'effectue via
+  <a href="{% url 'admin:stock_fournisseur_changelist' %}" target="_blank" style="color:var(--st-500);">l'interface d'administration</a>.
+</div>
+
+
+{% if page_obj.has_other_pages %}
+<div style="display:flex;justify-content:center;align-items:center;gap:6px;padding:14px 0;">
+  {% if page_obj.has_previous %}
+  <a href="?page=1&q={{ q }}" class="btn-st-outline" style="padding:4px 10px;font-size:12px;"><i class="bi bi-chevron-double-left"></i></a>
+  <a href="?page={{ page_obj.previous_page_number }}&q={{ q }}" class="btn-st-outline" style="padding:4px 10px;font-size:12px;"><i class="bi bi-chevron-left"></i></a>
+  {% endif %}
+  <span style="font-size:12px;color:var(--st-muted);padding:0 8px;">Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} &nbsp;&middot;&nbsp; {{ page_obj.paginator.count }} enregistrement{{ page_obj.paginator.count|pluralize }}</span>
+  {% if page_obj.has_next %}
+  <a href="?page={{ page_obj.next_page_number }}&q={{ q }}" class="btn-st-outline" style="padding:4px 10px;font-size:12px;"><i class="bi bi-chevron-right"></i></a>
+  <a href="?page={{ page_obj.paginator.num_pages }}&q={{ q }}" class="btn-st-outline" style="padding:4px 10px;font-size:12px;"><i class="bi bi-chevron-double-right"></i></a>
+  {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}

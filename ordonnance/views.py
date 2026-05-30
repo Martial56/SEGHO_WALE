@@ -205,7 +205,10 @@ def ordonnance_changer_statut(request, pk):
     nouveau_statut = request.POST.get('statut', '')
     statuts_valides = [s[0] for s in Ordonnance.STATUT]
     if nouveau_statut in statuts_valides:
+        ancien_statut = ordonnance.statut
         ordonnance.statut = nouveau_statut
         ordonnance.save()
+
+
         messages.success(request, f'Statut mis a jour : {ordonnance.get_statut_display()}.')
     return redirect('ordonnance_detail', pk=pk)

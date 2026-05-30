@@ -6,9 +6,12 @@ def alertes_contrat(request):
     if not request.user.is_authenticated:
         return {}
 
-    # Alertes RH hors-sujet dans les modules cliniques
-    if request.path.startswith('/gynecologie/'):
-        return {}
+    # Alertes RH masquées dans les modules non-RH
+    MODULES_SANS_ALERTES_RH = ('/gynecologie/', '/pharmacie/', '/stock/', '/patients/', '/consultations/')
+    if any(request.path.startswith(m) for m in MODULES_SANS_ALERTES_RH):
+        return {'show_rh_alerts': False}
+
+
 
     today     = date.today()
     limite_2m = today + timedelta(days=60)
@@ -100,9 +103,10 @@ def alertes_contrat(request):
     )
 
     return {
-        'alertes_contrat':   alertes_c,
-        'alertes_document':  alertes_d,
-        'alertes_count':     total,
-        'notifs_conge':      notifs_conge,
+        'alertes_contrat':    alertes_c,
+        'alertes_document':   alertes_d,
+        'alertes_count':      total,
+        'notifs_conge':       notifs_conge,
         'notifs_conge_count': notifs_conge_count,
+        'show_rh_alerts':     True,
     }

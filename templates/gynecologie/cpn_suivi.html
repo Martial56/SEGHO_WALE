@@ -6,14 +6,17 @@
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+  .content { padding-top: 0; }
   .o-subheader {
-    background: var(--surface); border-bottom: 1px solid var(--border);
-    padding: 8px 16px; display: flex; flex-direction: column; gap: 6px;
-    position: sticky; top: var(--gyn-nav-h); z-index: 190;
-    margin: 0 -32px 16px;
+    background: #fff; border-bottom: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    position: sticky; top: calc(var(--topbar-h) + var(--gyn-nav-h)); z-index: 190;
+    margin: 0 -32px 0;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.04);
   }
-  .o-subheader-row { display: flex; align-items: center; gap: 8px; }
-  .o-page-title { font-size: 17px; font-weight: 400; color: var(--text); }
+  .o-subheader-row { display: flex; align-items: center; gap: 8px; padding: 6px 20px; border-bottom: 1px solid var(--border); }
+  .o-subheader-row:last-child { border-bottom: none; }
+  .o-page-title { font-size: 14px; font-weight: 600; color: var(--text); }
   .o-search-bar {
     display: flex; align-items: center; border: none; border-bottom: 1px solid #bbb;
     background: transparent; padding: 2px 4px; gap: 4px; width: 280px;
@@ -35,9 +38,9 @@
 
   .cpn-table { width: 100%; border-collapse: collapse; font-size: 12.5px; background: var(--surface); }
   .cpn-table thead th {
-    background: var(--surface); border-bottom: 2px solid var(--border);
-    padding: 8px 12px; font-size: 11.5px; font-weight: 600; color: var(--text-muted);
-    text-align: left; position: sticky; top: 0; z-index: 2;
+    background: #f5f5f5; border-bottom: 2px solid var(--border);
+    padding: 8px 12px; font-size: 11px; font-weight: 600; color: var(--text-muted);
+    text-align: left; text-transform: uppercase; letter-spacing: .3px;
   }
   .cpn-table thead th.th-cpn { text-align: center; min-width: 105px; }
   .cpn-table tbody tr { border-bottom: 1px solid #f0f0f0; transition: background 0.1s; }
@@ -78,8 +81,18 @@
 <!-- ══ SUBHEADER ══ -->
 <div class="o-subheader">
   <div class="o-subheader-row">
-    <span class="o-page-title">Suivi parcours CPN</span>
-    <div style="margin-left:auto;">
+    <span class="o-page-title"><i class="bi bi-heart-pulse" style="color:var(--teal-600);margin-right:5px;font-size:13px;"></i>Suivi parcours CPN</span>
+
+    <!-- Navigation mois -->
+    <div class="month-nav" style="margin-left:12px;">
+      <a class="month-nav-btn" href="?year={{ prev_year }}&month={{ prev_month }}{% if q %}&q={{ q }}{% endif %}" title="Mois précédent"><i class="bi bi-chevron-left"></i></a>
+      <span class="month-label">{{ month_name }} {{ year }}</span>
+      <a class="month-nav-btn" href="?year={{ next_year }}&month={{ next_month }}{% if q %}&q={{ q }}{% endif %}" title="Mois suivant"><i class="bi bi-chevron-right"></i></a>
+      <span class="month-total">{{ total }} patiente{{ total|pluralize }}</span>
+    </div>
+
+    <!-- Recherche à droite -->
+    <div style="margin-left:auto;display:flex;align-items:center;gap:10px;">
       <form method="get" style="display:flex;align-items:center;">
         <input type="hidden" name="year"  value="{{ year }}">
         <input type="hidden" name="month" value="{{ month }}">
@@ -88,26 +101,15 @@
           <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
         </div>
       </form>
+      <a href="{% url 'gynecologie_rdv' %}" style="font-size:12px;color:var(--text-muted);text-decoration:none;white-space:nowrap;">
+        <i class="bi bi-arrow-left"></i> RDV
+      </a>
     </div>
-  </div>
-  <div class="o-subheader-row" style="justify-content:space-between;">
-    <div class="month-nav">
-      <a class="month-nav-btn"
-         href="?year={{ prev_year }}&month={{ prev_month }}{% if q %}&q={{ q }}{% endif %}"
-         title="Mois précédent"><i class="bi bi-chevron-left"></i></a>
-      <span class="month-label">{{ month_name }} {{ year }}</span>
-      <a class="month-nav-btn"
-         href="?year={{ next_year }}&month={{ next_month }}{% if q %}&q={{ q }}{% endif %}"
-         title="Mois suivant"><i class="bi bi-chevron-right"></i></a>
-      <span class="month-total">{{ total }} patiente{{ total|pluralize }}</span>
-    </div>
-    <a href="{% url 'gynecologie_rdv' %}" style="font-size:12px;color:var(--text-muted);text-decoration:none;">
-      <i class="bi bi-arrow-left"></i> Retour aux RDV
-    </a>
   </div>
 </div>
 
 {% if rows %}
+<div style="margin: 16px -32px 0; overflow-x: auto;">
 <table class="cpn-table">
   <thead>
     <tr>
@@ -170,6 +172,7 @@
     {% endfor %}
   </tbody>
 </table>
+</div>
 {% else %}
 <div class="empty-state">
   <i class="bi bi-person-heart" style="font-size:36px;display:block;margin-bottom:10px;"></i>

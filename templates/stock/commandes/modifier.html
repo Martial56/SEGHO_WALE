@@ -1,0 +1,58 @@
+{% extends 'stock/base.html' %}
+{% load static %}
+{% block nav_commandes %}active{% endblock %}
+{% block topbar_title %}Modifier commande {{ commande.numero }}{% endblock %}
+
+{% block extra_st_css %}<style>
+.st-page-head { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 32px;margin:0 -32px;background:#f2f7ee;border-bottom:1px solid rgba(0,0,0,.05);box-shadow:0 2px 8px rgba(0,0,0,.04);position:sticky;top:calc(var(--topbar-h) + 44px);z-index:100; }
+</style>{% endblock %}
+
+{% block content %}
+<div class="st-page-head">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <a href="{% url 'stock_commande_detail' commande.pk %}" class="btn-st-outline" style="padding:6px 12px;"><i class="bi bi-arrow-left"></i></a>
+    <div>
+      <div style="font-size:15px;font-weight:800;color:var(--st-900);"><i class="bi bi-pencil" style="color:var(--st-600);"></i> Modifier la commande</div>
+      <div style="font-size:11.5px;color:var(--st-muted);font-family:monospace;">{{ commande.numero }}</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <a href="{% url 'stock_commande_detail' commande.pk %}" class="btn-st-outline">Annuler</a>
+    <button type="submit" form="form-modifier" class="btn-st"><i class="bi bi-check-lg"></i> Enregistrer</button>
+  </div>
+</div>
+
+<form id="form-modifier" method="post" action="{% url 'stock_commande_modifier' commande.pk %}" novalidate>
+{% csrf_token %}
+<div class="st-card" style="margin-top:20px;max-width:580px;">
+  <div class="st-card-header"><div class="st-card-title"><i class="bi bi-file-earmark-text" style="color:var(--st-600);"></i> Informations</div></div>
+  <div class="st-card-body">
+
+    <div class="st-field">
+      <label class="st-label">Fournisseur <span style="color:#c0392b;">*</span></label>
+      {% if errors.fournisseur %}<div class="st-error">{{ errors.fournisseur }}</div>{% endif %}
+      <select name="fournisseur" class="st-input" required>
+        <option value="">— Sélectionner —</option>
+        {% for f in fournisseurs %}
+        <option value="{{ f.pk }}" {% if f.pk == commande.fournisseur.pk %}selected{% endif %}>
+          {{ f.code }} — {{ f.nom }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="st-field">
+      <label class="st-label">Date de livraison prévue</label>
+      <input type="date" name="date_livraison_prevue" class="st-input"
+        value="{% if commande.date_livraison_prevue %}{{ commande.date_livraison_prevue|date:'Y-m-d' }}{% endif %}">
+    </div>
+
+    <div class="st-field" style="margin-bottom:0;">
+      <label class="st-label">Notes</label>
+      <textarea name="notes" class="st-input" rows="3" style="resize:vertical;">{{ commande.notes }}</textarea>
+    </div>
+
+  </div>
+</div>
+</form>
+{% endblock %}

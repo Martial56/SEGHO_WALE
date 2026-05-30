@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     'ordonnance',
     'services',
     'soins',
+    'stock',
 ]
 
 MIDDLEWARE = [
@@ -59,6 +60,8 @@ TEMPLATES = [
                 'employer.context_processors.alertes_contrat',
                 'conges.context_processors.conge_context',
                 'core.context_processors.header_stats',
+                'stock.context_processors.stock_alertes',
+                'pharmacie.context_processors.pharmacie_alertes',
             ],
         },
     },
