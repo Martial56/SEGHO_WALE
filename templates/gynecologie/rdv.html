@@ -1,0 +1,91 @@
+{% extends 'gynecologie/base.html' %}
+{% load static %}
+{% block nav_rdv %}active{% endblock %}
+
+{% block content %}
+<style>
+  :root { --accent: var(--teal-500); }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  /* Statut badges */
+  .o-badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 500; white-space: nowrap; }
+  .badge-planifie        { background: #e3f2fd; color: #1565c0; }
+  .badge-confirme        { background: #e8f5e9; color: #2e7d32; }
+  .badge-en_attente      { background: #fff8e1; color: #f57f17; }
+  .badge-en_consultation { background: var(--teal-50); color: var(--teal-600); }
+  .badge-termine         { background: #ede7f6; color: #4527a0; }
+  .badge-annule          { background: #fce4ec; color: #b71c1c; }
+  .badge-absent          { background: #fff3e0; color: #e65100; }
+</style>
+
+{% url 'gynecologie_rdv_create' as subheader_create_url %}
+{% include 'includes/subheader.html' with subheader_title="Rendez-vous" subheader_create_url=subheader_create_url subheader_placeholder="Rechercher un patient…" subheader_sticky_top="var(--gyn-nav-h)" subheader_filters_tpl="includes/subheader_filters_rdv_gyn.html" subheader_groups_tpl="includes/subheader_groups_rdv_gyn.html" %}
+
+<!-- ══ TABLE ══ -->
+<div class="o-list-wrap {% if request.GET.filter or request.GET.group %}has-tags{% endif %}">
+
+  {% if page_obj %}
+  <table class="o-list">
+    <thead>
+      <tr>
+        <th class="th-cb"><input type="checkbox" class="o-cb" id="chk-all"></th>
+        <th>Rendez-vous</th>
+        <th>Patient</th>
+        <th>Date</th>
+        <th>Docteur</th>
+        <th>Type de consultation</th>
+        <th>Diagnostic retenu / Autres pathologies associées</th>
+        <th>Âge</th>
+        <th>Genre</th>
+        <th>État</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for rdv in page_obj %}
+      {% with age=rdv.patient.age %}
+      <tr class="rdv-row" data-url="{% url 'gynecologie_rdv_detail' rdv.pk %}">
+        <td class="td-cb"><input type="checkbox" class="o-cb" onclick="event.stopPropagation()"></td>
+        <td class="td-code">{{ rdv.code_rdv|default:rdv.patient.code_patient }}</td>
+        <td class="td-name">{{ rdv.patient.nom|upper }} {{ rdv.patient.prenoms }}</td>
+        <td>{{ rdv.date_heure|date:"d/m/Y H:i" }}</td>
+        <td class="td-doctor">{% if rdv.medecin %}{{ rdv.medecin }}{% else %}<span style="color:#ddd">—</span>{% endif %}</td>
+        <td>{{ rdv.type_consultation.nom|default:"—" }}</td>
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;color:var(--text-muted);">{% with diag=rdv.registre_curatif.diagnostic_display %}{{ diag|default:rdv.maladies|truncatechars:45|default:"—" }}{% endwith %}</td>
+        <td>{% if rdv.patient.date_naissance %}{{ age }} ans{% else %}<span style="color:#ddd">—</span>{% endif %}</td>
+        <td>{% if rdv.patient.sexe == 'F' %}Femme{% elif rdv.patient.sexe == 'M' %}Homme{% else %}<span style="color:#ddd">—</span>{% endif %}</td>
+        <td><span class="o-badge badge-{{ rdv.statut }}">{{ rdv.get_statut_display }}</span></td>
+      </tr>
+      {% endwith %}
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="o-empty-state">
+    <div class="o-empty-illo">
+      <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+        <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+        <line x1="3" y1="10" x2="21" y2="10"/>
+        <line x1="9" y1="15" x2="15" y2="15"/>
+      </svg>
+    </div>
+    <div class="o-empty-title">Aucun rendez-vous{% if request.GET.q %} pour "{{ request.GET.q }}"{% endif %}</div>
+    <div class="o-empty-sub">{% if request.GET.q %}Essayez avec un autre terme de recherche.{% else %}Créez le premier rendez-vous gynécologique.{% endif %}</div>
+    {% if not request.GET.q %}
+    <a href="{% url 'gynecologie_rdv_create' %}" class="o-empty-btn">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      CRÉER UN RENDEZ-VOUS
+    </a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<script>
+  document.querySelectorAll('.rdv-row').forEach(function(row) {
+    row.addEventListener('click', function(e) {
+      if (e.target.type === 'checkbox') return;
+      window.location = row.dataset.url;
+    });
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,83 @@
+{% extends 'consultations/base.html' %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-left">
+        <h1>💊 Gestion des Consultations</h1>
+        <p>Suivi et enregistrement des consultations médicales</p>
+    </div>
+    <div class="page-header-right">
+        <a href="/admin/consultations/consultation/add/" class="btn btn-primary">
+            <span>+</span> Nouvelle consultation
+        </a>
+    </div>
+</div>
+
+<div style="display: flex; gap: 16px; margin-bottom: 24px;">
+    <input type="text" placeholder="Rechercher par patient ou médecin..." style="flex: 1; padding: 10px 14px; border: 1px solid rgba(0,0,0,0.12); border-radius: 8px; font-size: 14px;">
+    <input type="date" style="padding: 10px 14px; border: 1px solid rgba(0,0,0,0.12); border-radius: 8px; font-size: 14px;">
+</div>
+
+<div class="grid">
+    <div class="card">
+        <p class="card-meta">Consultations aujourd'hui</p>
+        <div class="card-stat">{{ stats.aujourdhui }}</div>
+    </div>
+    <div class="card">
+        <p class="card-meta">Consultations ce mois</p>
+        <div class="card-stat">{{ stats.ce_mois }}</div>
+    </div>
+    <div class="card">
+        <p class="card-meta">Rendez-vous à venir</p>
+        <div class="card-stat">{{ stats.rdv_venir }}</div>
+    </div>
+    <div class="card">
+        <p class="card-meta">Taux de diagnostic</p>
+        <div class="card-stat">{{ stats.diagnostic_rate }}%</div>
+    </div>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>Code Consultation</th>
+                <th>Patient</th>
+                <th>Médecin</th>
+                <th>Date/Heure</th>
+                <th>Motif</th>
+                <th>Diagnostic</th>
+                <th>Statut</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for consultation in page_obj %}
+            <tr>
+                <td>{{ consultation.code_consultation }}</td>
+                <td>{{ consultation.patient.nom }} {{ consultation.patient.prenoms }}</td>
+                <td>{{ consultation.medecin.nom }} {{ consultation.medecin.prenoms }}</td>
+                <td>{{ consultation.date_heure|date:"d/m/Y H:i" }}</td>
+                <td>{{ consultation.motif }}</td>
+                <td>{{ consultation.diagnostic|truncatechars:30 }}</td>
+                <td>
+                    <span class="badge badge-success">{{ consultation.get_statut_display }}</span>
+                </td>
+                <td>
+                    <a href="/admin/consultations/consultation/{{ consultation.id }}/change/" class="btn btn-secondary btn-small">Voir</a>
+                    <a href="/admin/consultations/consultation/{{ consultation.id }}/change/" class="btn btn-primary btn-small">Modifier</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="8" style="text-align: center; padding: 40px; color: rgba(0,0,0,0.4);">
+                    Aucune consultation enregistrée
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% include 'includes/pagination.html' %}
+{% endblock %}

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Matrice des Permissions</title>
+    <link rel="stylesheet" href="{% static 'modules_permissions/css/modules.css' %}">
+</head>
+<body>
+    <h1>Matrice des Permissions</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>Modules</th>
+                {% for group in user_groups %}
+                    <th>{{ group.name }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for module in modules %}
+                <tr>
+                    <td>{{ module.name }}</td>
+                    {% for group in user_groups %}
+                        <td>
+                            {% if module in group.permissions.all %}
+                                ✔️
+                            {% else %}
+                                ❌
+                            {% endif %}
+                        </td>
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

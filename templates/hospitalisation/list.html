@@ -1,0 +1,90 @@
+{% extends 'hospitalisation/base.html' %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-left">
+        <h1>🛏️ Gestion de l'Hospitalisation</h1>
+        <p>Gestion des admissions, chambres et soins</p>
+    </div>
+    <div class="page-header-right">
+        <a href="/admin/hospitalisation/hospitalisation/add/" class="btn btn-primary">
+            <span>+</span> Nouvelle admission
+        </a>
+    </div>
+</div>
+
+<div style="display: flex; gap: 16px; margin-bottom: 24px;">
+    <input type="text" placeholder="Rechercher par patient ou numéro de chambre..." style="flex: 1; padding: 10px 14px; border: 1px solid rgba(0,0,0,0.12); border-radius: 8px; font-size: 14px;">
+    <select style="padding: 10px 14px; border: 1px solid rgba(0,0,0,0.12); border-radius: 8px; font-size: 14px;">
+        <option>Tous les services</option>
+        <option>Médecine générale</option>
+        <option>Chirurgie</option>
+        <option>Maternité</option>
+    </select>
+</div>
+
+<div class="grid">
+    <div class="card">
+        <p class="card-meta">Patients hospitalisés</p>
+        <div class="card-stat">{{ stats.patients_hospitalises }}</div>
+    </div>
+    <div class="card">
+        <p class="card-meta">Taux d'occupation</p>
+        <div class="card-stat">{{ stats.taux_occupation }}%</div>
+    </div>
+    <div class="card">
+        <p class="card-meta">Chambres disponibles</p>
+        <div class="card-stat" style="color: var(--green);">{{ stats.chambres_disponibles }}</div>
+    </div>
+    <div class="card">
+        <p class="card-meta">Durée moyenne (jours)</p>
+        <div class="card-stat">{{ stats.duree_moyenne }}</div>
+    </div>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>Code Hospitalisation</th>
+                <th>Patient</th>
+                <th>Chambre</th>
+                <th>Service</th>
+                <th>Date Admission</th>
+                <th>Médecin Traitant</th>
+                <th>Statut</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for hospitalisation in page_obj %}
+            <tr>
+                <td>{{ hospitalisation.code_hospitalisation }}</td>
+                <td>{{ hospitalisation.patient.nom }} {{ hospitalisation.patient.prenoms }}</td>
+                <td>{{ hospitalisation.chambre.numero }} - {{ hospitalisation.chambre.type_chambre }}</td>
+                <td>{{ hospitalisation.service }}</td>
+                <td>{{ hospitalisation.date_admission|date:"d/m/Y" }}</td>
+                <td>{{ hospitalisation.medecin_traitant.nom }} {{ hospitalisation.medecin_traitant.prenoms }}</td>
+                <td>
+                    <span class="badge badge-{% if hospitalisation.statut == 'admis' %}success{% elif hospitalisation.statut == 'en_soins' %}warning{% else %}secondary{% endif %}">
+                        {{ hospitalisation.get_statut_display }}
+                    </span>
+                </td>
+                <td>
+                    <a href="/admin/hospitalisation/hospitalisation/{{ hospitalisation.id }}/change/" class="btn btn-secondary btn-small">Voir</a>
+                    <a href="/admin/hospitalisation/hospitalisation/{{ hospitalisation.id }}/change/" class="btn btn-primary btn-small">Modifier</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="8" style="text-align: center; padding: 40px; color: rgba(0,0,0,0.4);">
+                    Aucune hospitalisation enregistrée
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% include 'includes/pagination.html' %}
+{% endblock %}

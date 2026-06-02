@@ -1,0 +1,87 @@
+{% extends 'rapports/base.html' %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-left">
+        <h1>📋 Gestion des Rapports</h1>
+        <p>Gestion des rapports médicaux et documents</p>
+    </div>
+    <div class="page-header-right">
+        <a href="/admin/rapports/rapport/add/" class="btn btn-primary">
+            <span>+</span> Nouveau rapport
+        </a>
+        <a href="#" class="btn btn-secondary">
+            <span>📥</span> Exporter
+        </a>
+    </div>
+</div>
+
+<div style="display: flex; gap: 16px; margin-bottom: 24px;">
+    <input type="text" placeholder="Rechercher par type ou patient..." style="flex: 1; padding: 10px 14px; border: 1px solid rgba(0,0,0,0.12); border-radius: 8px; font-size: 14px;">
+    <select style="padding: 10px 14px; border: 1px solid rgba(0,0,0,0.12); border-radius: 8px; font-size: 14px;">
+        <option>Tous les types</option>
+        <option>Rapport médical</option>
+        <option>Certificat</option>
+        <option>Ordonnance</option>
+    </select>
+</div>
+
+<div class="grid">
+    <div class="card">
+        <p class="card-meta">Total de rapports</p>
+        <div class="card-stat">{{ stats.total_rapports }}</div>
+    </div>
+    <div class="card">
+        <p class="card-meta">Rapports ce mois</p>
+        <div class="card-stat">{{ stats.rapports_mois }}</div>
+    </div>
+    <div class="card">
+        <p class="card-meta">Rapports en attente</p>
+        <div class="card-stat" style="color: var(--amber);">{{ stats.rapports_attente }}</div>
+    </div>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>Code Rapport</th>
+                <th>Patient</th>
+                <th>Type de Rapport</th>
+                <th>Date Création</th>
+                <th>Médecin</th>
+                <th>Statut</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for rapport in page_obj %}
+            <tr>
+                <td>{{ rapport.code_rapport }}</td>
+                <td>{{ rapport.patient.nom }} {{ rapport.patient.prenoms }}</td>
+                <td>{{ rapport.type_rapport }}</td>
+                <td>{{ rapport.date_creation|date:"d/m/Y" }}</td>
+                <td>{{ rapport.medecin.nom }} {{ rapport.medecin.prenoms }}</td>
+                <td>
+                    <span class="badge badge-{% if rapport.statut == 'finalise' %}success{% elif rapport.statut == 'en_attente' %}warning{% else %}primary{% endif %}">
+                        {{ rapport.get_statut_display }}
+                    </span>
+                </td>
+                <td>
+                    <a href="/admin/rapports/rapport/{{ rapport.id }}/change/" class="btn btn-secondary btn-small">Voir</a>
+                    <a href="/admin/rapports/rapport/{{ rapport.id }}/change/" class="btn btn-primary btn-small">Modifier</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" style="text-align: center; padding: 40px; color: rgba(0,0,0,0.4);">
+                    Aucun rapport enregistré
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% include 'includes/pagination.html' %}
+{% endblock %}

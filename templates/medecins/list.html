@@ -1,0 +1,82 @@
+{% extends 'medecins/base.html' %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-left">
+        <h1>👨‍⚕️ Gestion des Médecins</h1>
+        <p>Liste du personnel médical et paramédical</p>
+    </div>
+    <div class="page-header-right">
+        <a href="/admin/medecins/medecin/add/" class="btn btn-primary">
+            <span>+</span> Nouveau médecin
+        </a>
+    </div>
+</div>
+
+<div style="display: flex; gap: 16px; margin-bottom: 24px;">
+    <input type="text" placeholder="Rechercher par nom ou spécialité..." style="flex: 1; padding: 10px 14px; border: 1px solid rgba(0,0,0,0.12); border-radius: 8px; font-size: 14px;">
+    <select style="padding: 10px 14px; border: 1px solid rgba(0,0,0,0.12); border-radius: 8px; font-size: 14px;">
+        <option>Toutes les spécialités</option>
+        <option>Généraliste</option>
+        <option>Cardiologue</option>
+        <option>Neurologue</option>
+    </select>
+</div>
+
+<div class="grid">
+    <div class="card">
+        <p class="card-meta">Nombre de médecins</p>
+        <div class="card-stat">{{ stats.total }}</div>
+    </div>
+    <div class="card">
+        <p class="card-meta">Consultations ce mois</p>
+        <div class="card-stat">{{ stats.consultations_mois }}</div>
+    </div>
+    <div class="card">
+        <p class="card-meta">Médecins disponibles</p>
+        <div class="card-stat">{{ stats.disponibles }}</div>
+    </div>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>Nom Complet</th>
+                <th>Spécialité</th>
+                <th>Service</th>
+                <th>Licence Médicale</th>
+                <th>Téléphone</th>
+                <th>Statut</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for medecin in page_obj %}
+            <tr>
+                <td>{{ medecin.nom }} {{ medecin.prenoms }}</td>
+                <td>{{ medecin.specialite }}</td>
+                <td>{{ medecin.service }}</td>
+                <td>{{ medecin.numero_ordre }}</td>
+                <td>{{ medecin.telephone }}</td>
+                <td>
+                    <span class="badge badge-success">Actif</span>
+                </td>
+                <td>
+                    <a href="/admin/medecins/medecin/{{ medecin.id }}/change/" class="btn btn-secondary btn-small">Voir</a>
+                    <a href="/admin/medecins/medecin/{{ medecin.id }}/change/" class="btn btn-primary btn-small">Modifier</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" style="text-align: center; padding: 40px; color: rgba(0,0,0,0.4);">
+                    Aucun médecin enregistré
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% include 'includes/pagination.html' %}
+{% endblock %}

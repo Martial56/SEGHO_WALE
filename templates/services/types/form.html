@@ -1,0 +1,134 @@
+{% extends 'services/base.html' %}
+{% block breadcrumb %}{% endblock %}
+{% block module_navbar %}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'services/includes/form_css.html' %}
+{% endblock %}
+
+{% block content %}
+<div id="page-wrap">
+
+  {% include 'services/includes/nav.html' %}
+
+  <div class="o-subheader" id="subheader">
+    <div class="o-subheader-row">
+      <a href="{% if edit and obj %}{% url 'services:type_detail' obj.pk %}{% else %}{% url 'services:types' %}{% endif %}" class="o-ctrl-btn" style="padding:3px 7px;">
+        <i class="bi bi-arrow-left"></i>
+      </a>
+      <span style="font-size:13.5px;color:var(--text-muted);">
+        <a href="{% url 'services:types' %}" style="color:var(--accent);text-decoration:none;font-weight:500;">Types
+          de service</a>
+        {% if edit and obj %}
+        <span style="margin:0 5px;opacity:.4;">/</span>
+        <a href="{% url 'services:type_detail' obj.pk %}" style="color:var(--accent);text-decoration:none;font-weight:500;">{{ obj.nom }}</a>
+        {% endif %}
+        <span style="margin:0 5px;opacity:.4;">/</span>
+        <span style="color:var(--text);">{{ titre }}</span>
+      </span>
+      <div style="flex:1;"></div>
+    </div>
+  </div>
+
+  <div class="f-page-body">
+
+    <form method="post" novalidate id="type-form">
+      {% csrf_token %}
+
+      <div class="f-card">
+        <div class="f-card-head">
+          <i class="bi bi-tag"></i>
+          Informations
+        </div>
+        <div class="f-card-body">
+          <div class="f-grid">
+
+            <div class="f-field span-2">
+              <label class="field-label" for="{{ form.nom.id_for_label }}">
+                Nom du type <span class="f-required">*</span>
+              </label>
+              {{ form.nom }}
+              <div class="f-hint">Exemples : Consultation, Suivi, Urgence, Hospitalisation, Tous</div>
+              {% if form.nom.errors %}<div class="f-error">{{ form.nom.errors.0 }}</div>{% endif %}
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <div class="f-card">
+        <div class="f-card-head">
+          <i class="bi bi-toggle-on"></i>
+          Statut
+        </div>
+        <div class="f-card-body" style="padding-top:6px;padding-bottom:6px;">
+          <div class="toggle-row">
+            <span class="toggle-label">Type actif</span>
+            <label class="toggle-switch">
+              {{ form.actif }}
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="f-form-footer">
+        <a href="{% if edit and obj %}{% url 'services:type_detail' obj.pk %}{% else %}{% url 'services:types' %}{% endif %}" class="o-btn-secondary">Annuler</a>
+        <button type="submit" class="o-btn-create">
+          <i class="bi bi-check-lg"></i> Enregistrer
+        </button>
+      </div>
+
+    </form>
+
+    {% if edit and obj %}
+    <div class="f-danger">
+      <div class="f-danger-text">
+        <strong>Zone de danger</strong>
+        Supprimer ce type le retirera de tous les services qui l'utilisent.
+      </div>
+      <button type="button" class="o-btn-danger"
+        onclick="document.getElementById('delete-modal').classList.add('open')">
+        <i class="bi bi-trash"></i> Supprimer
+      </button>
+    </div>
+
+    <div class="modal-overlay" id="delete-modal">
+      <div class="modal-box">
+        <div class="modal-icon">🗑️</div>
+        <div class="modal-title">Confirmer la suppression</div>
+        <div class="modal-msg">
+          Supprimer le type <strong>{{ obj.nom }}</strong> ?<br>
+          <span style="font-size:11px;color:var(--text-muted);">Il sera retiré de tous les services associés.</span>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-modal-cancel"
+            onclick="document.getElementById('delete-modal').classList.remove('open')">
+            Annuler
+          </button>
+          <form method="post" action="{% url 'services:type_delete' obj.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="btn-modal-confirm">Supprimer</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+  </div><!-- /.f-page-body -->
+</div><!-- /#page-wrap -->
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    var cb = document.getElementById('{{ form.actif.id_for_label }}');
+    if (cb) cb.style.cssText = 'position:absolute;opacity:0;width:0;height:0;';
+    var modal = document.getElementById('delete-modal');
+    if (modal) modal.addEventListener('click', function (e) {
+      if (e.target === this) this.classList.remove('open');
+    });
+  });
+</script>
+{% endblock %}

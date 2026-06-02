@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Permissions du Groupe</title>
+    <link rel="stylesheet" href="{% static 'modules_permissions/css/modules.css' %}">
+</head>
+<body>
+    <h1>Permissions pour le groupe : {{ group.name }}</h1>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Module</th>
+                <th>Permissions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for module in modules %}
+                <tr>
+                    <td>{{ module.name }}</td>
+                    <td>
+                        {% for permission in module.permissions.all %}
+                            <label>
+                                <input type="checkbox" 
+                                       name="permissions" 
+                                       value="{{ permission.id }}" 
+                                       {% if permission in group.permissions.all %}checked{% endif %}>
+                                {{ permission.name }}
+                            </label><br>
+                        {% endfor %}
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <button type="submit">Enregistrer les modifications</button>
+</body>
+</html>

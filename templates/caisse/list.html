@@ -1,0 +1,93 @@
+{% extends 'caisse/base.html' %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-left">
+        <h1>💵 Gestion de la Caisse</h1>
+        <p>Gestion des sessions de caisse et transactions</p>
+    </div>
+    <div class="page-header-right">
+        <a href="/admin/caisse/session/add/" class="btn btn-primary">
+            <span>+</span> Nouvelle session
+        </a>
+    </div>
+</div>
+
+<div style="display: flex; gap: 16px; margin-bottom: 24px;">
+    <input type="date" style="padding: 10px 14px; border: 1px solid rgba(0,0,0,0.12); border-radius: 8px; font-size: 14px;">
+    <select style="padding: 10px 14px; border: 1px solid rgba(0,0,0,0.12); border-radius: 8px; font-size: 14px;">
+        <option>Toutes les sessions</option>
+        <option>Ouverte</option>
+        <option>Fermée</option>
+    </select>
+</div>
+
+<div class="grid">
+    <div class="card">
+        <p class="card-meta">Solde caisse actuel</p>
+        <div class="card-stat">{{ stats.solde_actuel }} CFA</div>
+    </div>
+    <div class="card">
+        <p class="card-meta">Entrées du jour</p>
+        <div class="card-stat" style="color: var(--green);">{{ stats.entrees_jour }} CFA</div>
+    </div>
+    <div class="card">
+        <p class="card-meta">Sorties du jour</p>
+        <div class="card-stat" style="color: var(--rose);">{{ stats.sorties_jour }} CFA</div>
+    </div>
+    <div class="card">
+        <p class="card-meta">Transactions</p>
+        <div class="card-stat">{{ stats.transactions }}</div>
+    </div>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>Session</th>
+                <th>Caissier</th>
+                <th>Ouverture</th>
+                <th>Solde Ouverture</th>
+                <th>Total Entrées</th>
+                <th>Total Sorties</th>
+                <th>Fermeture</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for session in page_obj %}
+            <tr>
+                <td>{{ session.id }}</td>
+                <td>{{ session.caissier.nom }} {{ session.caissier.prenoms }}</td>
+                <td>{{ session.date_ouverture|date:"d/m/Y H:i" }}</td>
+                <td>{{ session.solde_ouverture }} CFA</td>
+                <td>{{ session.total_entrees }} CFA</td>
+                <td>{{ session.total_sorties }} CFA</td>
+                <td>
+                    {% if session.date_fermeture %}
+                        {{ session.date_fermeture|date:"d/m/Y H:i" }}
+                    {% else %}
+                        <span class="badge badge-success">Ouverte</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="/admin/caisse/session/{{ session.id }}/change/" class="btn btn-secondary btn-small">Voir</a>
+                    {% if not session.date_fermeture %}
+                        <a href="/admin/caisse/session/{{ session.id }}/change/" class="btn btn-primary btn-small">Fermer</a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="8" style="text-align: center; padding: 40px; color: rgba(0,0,0,0.4);">
+                    Aucune session enregistrée
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% include 'includes/pagination.html' %}
+{% endblock %}
