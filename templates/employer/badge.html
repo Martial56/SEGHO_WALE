@@ -1,0 +1,256 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Badge — {{ employe.nom_complet }}</title>
+<link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
+<style>
+@page { size: 86mm 120mm; margin: 0; }
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  font-family: 'Arial', sans-serif;
+  background: #d0d0d0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  min-height: 100vh; gap: 24px;
+}
+
+/* ── Badge portrait ── */
+.badge {
+  width: 86mm; height: 120mm;
+  background: #fff;
+  border-radius: 5mm;
+  display: flex;
+  overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0,0,0,.25);
+  border: 0.3mm solid #ccc;
+  position: relative;
+}
+
+/* Bande latérale gauche */
+.badge-side {
+  width: 13mm; background: #1b2e13;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: space-between;
+  padding: 4mm 0; flex-shrink: 0;
+}
+.badge-side-logo {
+  width: 12mm; height: 12mm; object-fit: contain;
+  filter: brightness(0) invert(1);
+}
+.badge-side-text {
+  font-size: 13px; font-weight: 800; color: #fff;
+  text-transform: uppercase; letter-spacing: 1.5px;
+  writing-mode: vertical-rl; text-orientation: mixed;
+  transform: rotate(180deg);
+  white-space: nowrap;
+}
+.badge-side-year {
+  font-size: 11px; font-weight: 800; color: rgba(255,255,255,.7);
+}
+
+/* Corps principal */
+.badge-main {
+  flex: 1; display: flex; flex-direction: column;
+  padding: 8mm 4mm 4mm 3mm;
+}
+
+/* Photo */
+.badge-photo {
+  width: 26mm; height: 26mm;
+  border-radius: 50%; overflow: hidden;
+  background: #f0f4ec; border: 0.6mm solid #dce8d0;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 3.5mm; flex-shrink: 0;
+}
+.badge-photo img { width: 100%; height: 100%; object-fit: cover; }
+.badge-photo .initials { font-size: 30px; font-weight: 800; color: #4a7236; }
+
+/* Nom */
+.badge-nom   { font-size: 16px; font-weight: 800; color: #111; line-height: 1.2; text-align: center; }
+.badge-prenom{ font-size: 12px; color: #555; font-weight: 500; text-align: center; margin-top: 1mm; }
+
+/* Séparateur */
+.badge-sep { width: 14mm; height: 0.7mm; background: #2a4219; margin: 2.5mm auto; }
+
+/* Infos */
+.badge-infos { display: flex; flex-direction: column; gap: 2mm; margin-bottom: 3mm; }
+.badge-info-row {
+  display: flex; align-items: center; gap: 2mm;
+}
+.badge-info-icon { font-size: 16px; color: #2a4219; width: 8mm; flex-shrink: 0; text-align: center; padding-top: 1mm; }
+.badge-info-text { font-size: 15px; font-weight: 700; color: #222; }
+.badge-info-sub  { font-size: 10px; color: #bbb; text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 0.3mm; }
+
+/* Matricule + QR */
+.badge-bottom {
+  margin-top: auto;
+  background: #f7f9f5;
+  border-radius: 2mm;
+  border: 0.3mm solid #dce8d0;
+  padding: 2.5mm;
+  display: flex; align-items: center; gap: 2.5mm;
+}
+.badge-mat-block { flex: 1; }
+.badge-mat-lbl { font-size: 9px; color: #aaa; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 1mm; }
+.badge-mat-val {
+  font-size: 16px; font-weight: 800; font-family: 'Courier New', monospace;
+  color: #1b2e13; letter-spacing: 1px;
+}
+.badge-qr-mini {
+  width: 18mm; height: 18mm;
+  border-radius: 1.5mm; border: 0.3mm solid #ddd;
+  padding: 0.5mm; background: #fff; flex-shrink: 0;
+}
+
+/* Trou de suspension */
+.badge-hole {
+  position: absolute; top: 3mm;
+  width: 4.5mm; height: 4.5mm; border-radius: 50%;
+  background: #d0d0d0; border: 0.4mm solid #bbb;
+  left: calc(13mm + (86mm - 13mm)/2 - 2.25mm);
+}
+
+/* ── Actions ── */
+.actions { display: flex; gap: 10px; }
+.btn-action {
+  padding: 9px 22px; border-radius: 8px; font-size: 13px; font-weight: 600;
+  cursor: pointer; font-family: inherit; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 8px; border: none; transition: all .15s;
+}
+.btn-print { background: #1b2e13; color: #fff; }
+.btn-print:hover { background: #2a4219; }
+.btn-close  { background: #fff; color: #555; border: 1.5px solid #ddd !important; }
+.btn-close:hover { background: #f5f5f5; }
+
+@media print {
+  body { background: #fff; display: block; padding:0; margin:0; }
+  .actions { display: none !important; }
+  .badge { box-shadow: none; border: 0.5mm solid #ccc; margin:0; }
+  .badge-hole { background: #fff; border: 0.5mm solid #999; }
+}
+</style>
+</head>
+<body>
+
+<div style="display:flex;flex-direction:column;align-items:center;gap:20px;">
+
+  <div class="badge">
+    <!-- Trou de suspension -->
+    <div class="badge-hole"></div>
+
+    <!-- Bande latérale -->
+    <div class="badge-side">
+      <img src="{% static 'logo.png' %}" alt="" class="badge-side-logo">
+      <div class="badge-side-text">Centre Médico-Social WALÉ</div>
+      <div class="badge-side-year">{{ today.year }}</div>
+    </div>
+
+    <!-- Corps -->
+    <div class="badge-main">
+      <!-- Photo -->
+      <div class="badge-photo">
+        {% if employe.photo %}
+        <img src="{{ employe.photo.url }}" alt="">
+        {% else %}
+        <div class="initials">{{ employe.initiales|default:employe.nom|first|upper }}</div>
+        {% endif %}
+      </div>
+
+      <!-- Nom -->
+      <div class="badge-nom">{{ employe.nom|upper }}</div>
+      <div class="badge-prenom">{{ employe.prenoms }}</div>
+      <div class="badge-sep"></div>
+
+      <!-- Infos -->
+      <div class="badge-infos">
+        {% if employe.fonction %}
+        <div class="badge-info-row">
+          <span class="badge-info-icon"><i class="bi bi-person-badge-fill"></i></span>
+          <div>
+            <div class="badge-info-sub">Fonction</div>
+            <div class="badge-info-text">{{ employe.fonction.nom }}</div>
+          </div>
+        </div>
+        {% endif %}
+        {% if employe.service %}
+        <div class="badge-info-row">
+          <span class="badge-info-icon"><i class="bi bi-building-fill"></i></span>
+          <div>
+            <div class="badge-info-sub">Service</div>
+            <div class="badge-info-text">{{ employe.service.nom }}</div>
+          </div>
+        </div>
+        {% endif %}
+        {% if employe.grade %}
+        <div class="badge-info-row">
+          <span class="badge-info-icon"><i class="bi bi-award-fill"></i></span>
+          <div>
+            <div class="badge-info-sub">Grade</div>
+            <div class="badge-info-text">{{ employe.grade.nom }}</div>
+          </div>
+        </div>
+        {% endif %}
+
+        {% if employe.telephone %}
+        <div class="badge-info-row">
+          <span class="badge-info-icon"><i class="bi bi-telephone-fill"></i></span>
+          <div>
+            <div class="badge-info-sub">Téléphone</div>
+            <div class="badge-info-text">{{ employe.telephone }}</div>
+          </div>
+        </div>
+        {% endif %}
+        {% if employe.email %}
+        <div class="badge-info-row">
+          <span class="badge-info-icon"><i class="bi bi-envelope-fill"></i></span>
+          <div>
+            <div class="badge-info-sub">Email</div>
+            <div class="badge-info-text">{{ employe.email }}</div>
+          </div>
+        </div>
+        {% endif %}
+        {% if employe.biometric_id %}
+        <div class="badge-info-row">
+          <span class="badge-info-icon"><i class="bi bi-fingerprint"></i></span>
+          <div>
+            <div class="badge-info-sub">Biométrie</div>
+            <div class="badge-info-text" style="color:#0a6040;">✓ Enregistrée</div>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Matricule + QR -->
+      <div class="badge-bottom">
+        <div class="badge-mat-block">
+          <div class="badge-mat-lbl">Matricule</div>
+          <div class="badge-mat-val">{{ employe.matricule }}</div>
+          {% if employe.biometric_id %}
+          <div style="font-size:5.5px;color:#0a6040;margin-top:1mm;font-weight:700;">✓ Biométrie enregistrée</div>
+          {% endif %}
+        </div>
+        <img src="data:image/png;base64,{{ qr_b64 }}" alt="QR" class="badge-qr-mini">
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Boutons -->
+  <div class="actions">
+    <button class="btn-action btn-print" onclick="window.print()">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 6 2 18 2 18 9"/>
+        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+        <rect x="6" y="14" width="12" height="8"/>
+      </svg>
+      Imprimer le badge
+    </button>
+    <a href="{% url 'rh_detail' employe.pk %}" class="btn-action btn-close">✕ Fermer</a>
+  </div>
+
+</div>
+</body>
+</html>

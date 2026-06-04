@@ -17,12 +17,12 @@ html[data-theme="dark"] {
   --ph-50:#0a1610; --ph-100:#0d1f12; --ph-surface:#070e05;
   --ph-border:rgba(154,184,138,.18); --ph-text:#bcd5a8; --ph-muted:rgba(255,255,255,.4);
 }
-.content { padding-top: 0; }
+.content { padding-top: 0; padding-left: 0; padding-right: 0; }
 .ph-nav {
   background:#fff; border-bottom:1px solid rgba(0,0,0,.07);
-  margin:0 -32px; padding:0 32px;
+  padding:0 32px;
   display:flex; align-items:stretch; height:44px;
-  position:sticky; top:var(--topbar-h); z-index:250;
+  position:fixed; top:var(--topbar-h); left:0; right:0; z-index:250;
   gap:2px; overflow-x:auto;
 }
 html[data-theme="dark"] .ph-nav { background:var(--ph-surface); border-bottom-color:var(--ph-border); }
@@ -40,7 +40,7 @@ html[data-theme="dark"] .ph-nav { background:var(--ph-surface); border-bottom-co
 .btn-ph:hover { background:var(--ph-700); color:#fff; }
 .btn-ph-outline { border:1.5px solid var(--ph-600); color:var(--ph-600); background:transparent; border-radius:6px; padding:6px 14px; font-size:12.5px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:5px; text-decoration:none; transition:background .15s,color .15s; }
 .btn-ph-outline:hover { background:var(--ph-600); color:#fff; }
-.ph-card { background:var(--ph-surface); border-radius:12px; box-shadow:0 2px 12px rgba(58,89,36,.08); overflow:hidden; margin-bottom:16px; }
+.ph-card { background:var(--ph-surface); border-bottom:1px solid var(--ph-border); margin-bottom:16px; }
 .ph-card-header { padding:12px 20px; border-bottom:1px solid var(--ph-border); display:flex; align-items:center; justify-content:space-between; }
 .ph-card-title { font-size:13px; font-weight:700; color:var(--ph-text); display:flex; align-items:center; gap:8px; border-left:3px solid var(--ph-600); padding-left:10px; }
 .ph-card-body { padding:16px 20px; }
@@ -110,6 +110,7 @@ html[data-theme="dark"] .ph-nav { background:var(--ph-surface); border-bottom-co
     </div>
   </div>
 </nav>
+<div style="height:44px;"></div>
 <script>
 function togglePhMenu(){
   var p=document.getElementById('ph-menu-popup');
@@ -124,6 +125,15 @@ function togglePhMenu(){
   }
 }
 document.addEventListener('click',function(e){var w=document.getElementById('ph-menu-wrap');if(w&&!w.contains(e.target)){var p=document.getElementById('ph-menu-popup');if(p)p.style.display='none';}});
+(function(){
+  var tb=document.querySelector('.topbar');
+  var nav=document.querySelector('.ph-nav');
+  if(tb&&nav){
+    var h=tb.getBoundingClientRect().height;
+    nav.style.top=h+'px';
+    document.documentElement.style.setProperty('--topbar-h',h+'px');
+  }
+})();
 </script>
 {% endif %}
 {% endblock %}

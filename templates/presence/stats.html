@@ -12,6 +12,11 @@
 .bar-fill.good { background: var(--pr-500); }
 .bar-fill.warn { background: #e89a1a; }
 .bar-fill.bad  { background: #e84545; }
+.pr-pagination { display:flex;justify-content:center;align-items:center;gap:6px;padding:16px 0;flex-wrap:wrap; }
+.pr-page-link { display:inline-flex;align-items:center;justify-content:center;min-width:32px;height:32px;padding:0 8px;border-radius:6px;font-size:13px;font-weight:600;text-decoration:none;color:var(--pr-700);background:#fff;border:1px solid var(--pr-200);transition:all .15s; }
+.pr-page-link:hover { background:var(--pr-50); }
+.pr-page-link.active { background:var(--pr-600);color:#fff;border-color:var(--pr-600); }
+.pr-page-link.disabled { opacity:.35;pointer-events:none; }
 </style>
 {% endblock %}
 
@@ -60,7 +65,7 @@
 <div class="pr-card">
   <div class="pr-card-header">
     <div class="pr-card-title"><i class="bi bi-people"></i> Détail par employé — {{ mois_fr }} {{ year }}</div>
-    <span style="font-size:12px;color:var(--pr-muted);">{{ stats|length }} employé{{ stats|length|pluralize }}</span>
+    <span style="font-size:12px;color:var(--pr-muted);">{{ page_obj.paginator.count }} employé{{ page_obj.paginator.count|pluralize }}</span>
   </div>
   <div style="overflow-x:auto;">
     <table style="width:100%;border-collapse:collapse;font-size:13px;">
@@ -105,6 +110,32 @@
       </tbody>
     </table>
   </div>
+
+  {% if page_obj.has_other_pages %}
+  <div class="pr-pagination">
+    {% if page_obj.has_previous %}
+      <a href="?year={{ year }}&month={{ month }}{% if service_sel %}&service={{ service_sel.pk }}{% endif %}&page=1" class="pr-page-link"><i class="bi bi-chevron-double-left"></i></a>
+      <a href="?year={{ year }}&month={{ month }}{% if service_sel %}&service={{ service_sel.pk }}{% endif %}&page={{ page_obj.previous_page_number }}" class="pr-page-link"><i class="bi bi-chevron-left"></i></a>
+    {% else %}
+      <span class="pr-page-link disabled"><i class="bi bi-chevron-double-left"></i></span>
+      <span class="pr-page-link disabled"><i class="bi bi-chevron-left"></i></span>
+    {% endif %}
+    {% for num in page_obj.paginator.page_range %}
+      {% if num == page_obj.number %}<span class="pr-page-link active">{{ num }}</span>
+      {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
+        <a href="?year={{ year }}&month={{ month }}{% if service_sel %}&service={{ service_sel.pk }}{% endif %}&page={{ num }}" class="pr-page-link">{{ num }}</a>
+      {% endif %}
+    {% endfor %}
+    {% if page_obj.has_next %}
+      <a href="?year={{ year }}&month={{ month }}{% if service_sel %}&service={{ service_sel.pk }}{% endif %}&page={{ page_obj.next_page_number }}" class="pr-page-link"><i class="bi bi-chevron-right"></i></a>
+      <a href="?year={{ year }}&month={{ month }}{% if service_sel %}&service={{ service_sel.pk }}{% endif %}&page={{ page_obj.paginator.num_pages }}" class="pr-page-link"><i class="bi bi-chevron-double-right"></i></a>
+    {% else %}
+      <span class="pr-page-link disabled"><i class="bi bi-chevron-right"></i></span>
+      <span class="pr-page-link disabled"><i class="bi bi-chevron-double-right"></i></span>
+    {% endif %}
+    <span style="font-size:12px;color:var(--pr-muted);margin-left:6px;">Page {{ page_obj.number }}/{{ page_obj.paginator.num_pages }}</span>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}
 

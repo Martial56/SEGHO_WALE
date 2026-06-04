@@ -14,7 +14,7 @@
   justify-content: space-between;
   gap: 16px;
   padding: 14px 32px 14px;
-  margin: 0 -32px;
+  
   flex-wrap: wrap;
   position: sticky;
   top: calc(var(--topbar-h) + 44px);
@@ -63,8 +63,9 @@ html[data-theme="dark"] .rh-count-badge {
 .rh-stats-row {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
-  margin-bottom: 22px;
+  gap: 12px;
+  padding: 16px 32px 0;
+  margin-bottom: 16px;
 }
 @media (max-width: 900px)  { .rh-stats-row { grid-template-columns: repeat(2,1fr); } }
 @media (max-width: 500px)  { .rh-stats-row { grid-template-columns: 1fr; } }
@@ -112,7 +113,7 @@ html[data-theme="dark"] .rh-stat-lbl { color: rgba(255,255,255,0.35); }
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 18px;
+  padding: 12px 32px;
   flex-wrap: wrap;
 }
 .rh-filter-row .rh-input { max-width: 280px; }
@@ -148,9 +149,9 @@ html[data-theme="dark"] .rh-table-wrap { background: var(--rh-surface); }
 }
 html[data-theme="dark"] .rh-table thead { background: rgba(74,114,54,0.1); border-bottom-color: var(--rh-border); }
 .rh-table th {
-  padding: 12px 16px;
+  padding: 9px 12px;
   text-align: left;
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   color: var(--rh-800);
@@ -159,9 +160,9 @@ html[data-theme="dark"] .rh-table thead { background: rgba(74,114,54,0.1); borde
 }
 html[data-theme="dark"] .rh-table th { color: var(--rh-300); }
 .rh-table td {
-  padding: 12px 16px;
+  padding: 9px 12px;
   border-bottom: 1px solid rgba(0,0,0,0.04);
-  font-size: 13.5px;
+  font-size: 13px;
   color: var(--rh-text);
   vertical-align: middle;
 }
@@ -192,7 +193,17 @@ html[data-theme="dark"] .rh-name-cell .mat { color: rgba(255,255,255,0.28); }
 html[data-theme="dark"] .rh-text-muted { color: rgba(255,255,255,0.35); }
 
 /* ── Actions cell ── */
-.rh-actions { display: flex; align-items: center; gap: 6px; }
+.rh-actions { display: flex; align-items: center; gap: 4px; }
+.rh-icon-btn {
+  width:30px; height:30px; border-radius:7px;
+  display:inline-flex; align-items:center; justify-content:center;
+  color:var(--rh-600); text-decoration:none; font-size:14px;
+  background:var(--rh-50); border:1px solid var(--rh-200);
+  transition:background .15s, color .15s;
+}
+.rh-icon-btn:hover { background:var(--rh-600); color:#fff; border-color:var(--rh-600); }
+html[data-theme="dark"] .rh-icon-btn { background:rgba(74,114,54,.15); border-color:var(--rh-border); color:var(--rh-300); }
+html[data-theme="dark"] .rh-icon-btn:hover { background:var(--rh-600); color:#fff; }
 
 /* ── Empty state ── */
 .rh-empty {
@@ -238,13 +249,17 @@ html[data-theme="dark"] .rh-page-link:hover  { background: rgba(74,114,54,0.15);
 html[data-theme="dark"] .rh-page-link.active { background: var(--rh-600); color: #fff; border-color: var(--rh-600); }
 
 @media (max-width: 1100px) {
-  .rh-table th:nth-child(5),
-  .rh-table td:nth-child(5) { display: none; } /* grade */
+  .rh-table th:nth-child(4),
+  .rh-table td:nth-child(4) { display: none; } /* grade */
 }
 @media (max-width: 900px) {
-  .rh-table th:nth-child(6),
-  .rh-table td:nth-child(6) { display: none; } /* type contrat */
+  .rh-table th:nth-child(5),
+  .rh-table td:nth-child(5) { display: none; } /* contrat */
   .rh-filter-row .rh-input  { max-width: 100%; }
+}
+@media (max-width: 700px) {
+  .rh-table th:nth-child(6),
+  .rh-table td:nth-child(6) { display: none; } /* ancienneté */
 }
 </style>
 {% endblock %}
@@ -329,14 +344,13 @@ html[data-theme="dark"] .rh-page-link.active { background: var(--rh-600); color:
     <thead>
       <tr>
         <th>Employé</th>
-        <th>Matricule</th>
         <th>Service</th>
         <th>Fonction</th>
         <th>Grade</th>
         <th>Contrat</th>
         <th>Ancienneté</th>
         <th>Statut</th>
-        <th style="text-align:right;">Actions</th>
+        <th></th>
       </tr>
     </thead>
     <tbody>
@@ -353,11 +367,6 @@ html[data-theme="dark"] .rh-page-link.active { background: var(--rh-600); color:
               <div class="mat">{{ emp.matricule }}</div>
             </div>
           </div>
-        </td>
-
-        <!-- Matricule (hidden on mobile, shown separately) -->
-        <td style="font-family:monospace; font-size:12.5px; color:var(--rh-600);">
-          {{ emp.matricule }}
         </td>
 
         <!-- Service -->
@@ -387,14 +396,14 @@ html[data-theme="dark"] .rh-page-link.active { background: var(--rh-600); color:
         </td>
 
         <!-- Actions -->
-        <td>
+        <td style="white-space:nowrap;">
           <div class="rh-actions" style="justify-content:flex-end;">
-            <a href="{% url 'rh_detail' emp.pk %}" class="btn-rh-sm">
-              <i class="bi bi-eye"></i> Voir
+            <a href="{% url 'rh_detail' emp.pk %}" class="rh-icon-btn" title="Voir le profil">
+              <i class="bi bi-eye"></i>
             </a>
             {% if can_manage %}
-            <a href="{% url 'rh_modifier' emp.pk %}" class="btn-rh-sm">
-              <i class="bi bi-pencil"></i> Modifier
+            <a href="{% url 'rh_modifier' emp.pk %}" class="rh-icon-btn" title="Modifier">
+              <i class="bi bi-pencil"></i>
             </a>
             {% endif %}
           </div>

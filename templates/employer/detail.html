@@ -14,7 +14,7 @@
   justify-content: space-between;
   gap: 16px;
   padding: 14px 32px 14px;
-  margin: 0 -32px;
+  
   flex-wrap: wrap;
   position: sticky;
   top: calc(var(--topbar-h) + 44px);
@@ -292,6 +292,9 @@ html[data-theme="dark"] .cg-b-termine{background:rgba(255,255,255,.06);color:rgb
     {% if can_manage %}
     <a href="{% url 'rh_modifier' employe.pk %}" class="btn-rh">
       <i class="bi bi-pencil-fill"></i> Modifier
+    </a>
+    <a href="{% url 'rh_badge' employe.pk %}" class="btn-rh-outline" title="Imprimer le badge">
+      <i class="bi bi-credit-card-2-front-fill"></i> Badge
     </a>
     {% endif %}
   </div>
@@ -735,6 +738,80 @@ html[data-theme="dark"] .cg-b-termine{background:rgba(255,255,255,.06);color:rgb
         </div>
         {% endif %}
 
+      </div>
+    </div>
+
+    <!-- ── Section Identification pointage ── -->
+    <div class="rh-card" style="margin-bottom:14px;">
+      <div class="rh-card-header">
+        <div class="rh-section-title">
+          <i class="bi bi-person-badge-fill" style="color:var(--rh-500);"></i>
+          Identification — Pointage
+        </div>
+        <a href="{% url 'rh_badge' employe.pk %}" class="btn-rh-sm">
+          <i class="bi bi-credit-card-2-front-fill"></i> Imprimer badge
+        </a>
+      </div>
+      <div class="rh-card-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;align-items:start;">
+
+          <!-- QR Code -->
+          <div style="text-align:center;">
+            <div style="font-size:11px;font-weight:700;color:var(--rh-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;">
+              <i class="bi bi-qr-code"></i> Code QR
+            </div>
+            <img src="{% url 'rh_qrcode' employe.pk %}" alt="QR {{ employe.matricule }}"
+                 style="width:100px;height:100px;border-radius:8px;border:1px solid var(--rh-border);padding:4px;background:#fff;">
+            <div style="font-size:11px;color:var(--rh-muted);margin-top:6px;">Contenu : <strong>{{ employe.matricule }}</strong></div>
+            <div style="font-size:10.5px;color:var(--rh-muted);margin-top:2px;">Scanner avec le kiosque de pointage</div>
+          </div>
+
+          <!-- Matricule -->
+          <div style="text-align:center;">
+            <div style="font-size:11px;font-weight:700;color:var(--rh-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;">
+              <i class="bi bi-hash"></i> Matricule
+            </div>
+            <div style="font-size:28px;font-weight:800;font-family:monospace;color:var(--rh-700);
+                        background:var(--rh-50);border-radius:8px;padding:12px 16px;border:1px solid var(--rh-200);">
+              {{ employe.matricule }}
+            </div>
+            <div style="font-size:10.5px;color:var(--rh-muted);margin-top:6px;">Identifiant principal de saisie</div>
+          </div>
+
+          <!-- Empreinte digitale -->
+          <div style="text-align:center;">
+            <div style="font-size:11px;font-weight:700;color:var(--rh-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;">
+              <i class="bi bi-fingerprint"></i> Empreinte digitale
+            </div>
+            {% if employe.biometric_id %}
+            <div style="font-size:13px;font-weight:700;font-family:monospace;color:var(--rh-700);
+                        background:rgba(22,169,107,.08);border-radius:8px;padding:8px 12px;
+                        border:1px solid rgba(22,169,107,.2);word-break:break-all;">
+              {{ employe.biometric_id }}
+            </div>
+            <div style="font-size:10.5px;color:#0a6040;margin-top:4px;font-weight:600;">
+              <i class="bi bi-check-circle-fill"></i> Empreinte enregistrée
+            </div>
+            {% else %}
+            <div style="background:rgba(0,0,0,.04);border-radius:8px;padding:12px;border:1px dashed var(--rh-border);margin-bottom:8px;">
+              <i class="bi bi-fingerprint" style="font-size:28px;color:var(--rh-300);display:block;margin-bottom:4px;"></i>
+              <div style="font-size:11px;color:var(--rh-muted);">Non enregistrée</div>
+            </div>
+            {% endif %}
+            {% if can_manage %}
+            <form method="post" action="{% url 'rh_biometric_save' employe.pk %}" style="margin-top:8px;display:flex;gap:6px;">
+              {% csrf_token %}
+              <input type="text" name="biometric_id" value="{{ employe.biometric_id }}"
+                     placeholder="ID du lecteur biométrique"
+                     class="rh-input" style="font-size:11.5px;flex:1;text-align:center;">
+              <button type="submit" class="btn-rh-sm" title="Enregistrer">
+                <i class="bi bi-floppy-fill"></i>
+              </button>
+            </form>
+            {% endif %}
+          </div>
+
+        </div>
       </div>
     </div>
 

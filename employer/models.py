@@ -110,6 +110,13 @@ class Employe(models.Model):
     salaire_base = models.DecimalField(max_digits=12, decimal_places=0, default=0)
     statut = models.CharField(max_length=20, choices=STATUT_CHOICES, default='actif')
 
+    # Identification pointage
+    biometric_id = models.CharField(
+        max_length=100, blank=True,
+        verbose_name="Identifiant biométrique",
+        help_text="Identifiant renseigné par le lecteur d'empreinte digitale."
+    )
+
     notes = models.TextField(blank=True)
 
     user = models.OneToOneField(
@@ -354,19 +361,20 @@ class Conge(models.Model):
         ('sans_solde',      'Congé sans solde'),
     ]
     STATUT = [
-        ('demande',         'Demandé'),
-        ('valide_service',  'Validé par le service'),
         ('approuve',        'À venir'),
-        ('refuse',          'Annulé'),
         ('en_cours',        'En cours'),
         ('termine',         'Terminé'),
+        ('refuse',          'Annulé'),
+        # Conservés pour compatibilité données existantes
+        ('demande',         'Demandé'),
+        ('valide_service',  'Validé service'),
     ]
     employe      = models.ForeignKey(Employe, on_delete=models.CASCADE, related_name='conges')
     type_conge   = models.CharField(max_length=20, choices=TYPE)
     date_debut   = models.DateField()
     date_fin     = models.DateField()
     motif        = models.TextField(blank=True)
-    statut       = models.CharField(max_length=20, choices=STATUT, default='demande')
+    statut       = models.CharField(max_length=20, choices=STATUT, default='approuve')
     nb_jours_ouvres      = models.PositiveSmallIntegerField(default=0, help_text="Jours ouvrés décomptés du solde")
     approuve_par         = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='conges_approuves')
     date_demande         = models.DateTimeField(auto_now_add=True)
@@ -493,8 +501,14 @@ class Presence(models.Model):
     heure_arrivee_soir   = models.TimeField(null=True, blank=True, verbose_name="Arrivée soir")
     heure_depart_soir    = models.TimeField(null=True, blank=True, verbose_name="Départ soir")
     present              = models.BooleanField(default=True)
+    permanence           = models.BooleanField(default=False, verbose_name="Permanence 8h–15h")
     motif_absence        = models.CharField(max_length=200, blank=True)
     remarques            = models.CharField(max_length=300, blank=True)
+    # Audit
+    modifie_par          = models.ForeignKey(
+        'auth.User', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='presences_modifiees', verbose_name="Modifié par")
+    modifie_le           = models.DateTimeField(null=True, blank=True, verbose_name="Modifié le")
 
     def __str__(self): return f"Présence {self.employe} - {self.date}"
 
@@ -524,13 +538,24 @@ class Presence(models.Model):
 
     @property
     def duree_totale(self):
-        """Durée totale journalière en minutes."""
+        """Durée totale journalière en minutes.
+        Pour les permanences : de arrivée_matin à départ_soir."""
+        if self.permanence:
+            if self.heure_arrivee_matin and self.heure_depart_soir:
+                from datetime import datetime as _dt
+                d = self.date
+                dt1 = _dt.combine(d, self.heure_arrivee_matin)
+                dt2 = _dt.combine(d, self.heure_depart_soir)
+                diff = int((dt2 - dt1).total_seconds() // 60)
+                return diff if diff > 0 else 0
+            return None
         m = self.duree_matin or 0
         s = self.duree_soir or 0
         return m + s if (m or s) else None
 
     @property
     def retard_matin_min(self):
+        """Retard à l'arrivée — référence 08:00, tolérance 15 min."""
         if not self.heure_arrivee_matin:
             return 0
         if self.heure_arrivee_matin <= time(8, 15):
@@ -542,6 +567,10 @@ class Presence(models.Model):
 
     @property
     def retard_soir_min(self):
+        """Retard à la session soir — référence 15:00, tolérance 15 min.
+        Pour les permanences ce champ n'est pas utilisé (ils n'ont pas de session soir)."""
+        if self.permanence:
+            return 0
         if self.date.weekday() >= 5 or not self.heure_arrivee_soir:
             return 0
         if self.heure_arrivee_soir <= time(15, 15):
@@ -550,6 +579,20 @@ class Presence(models.Model):
         ref = _dt.combine(self.date, time(15, 0))
         arr = _dt.combine(self.date, self.heure_arrivee_soir)
         return int((arr - ref).total_seconds() // 60)
+
+    @property
+    def depart_anticipe_min(self):
+        """Départ avant 14h45 pour les employés de permanence (référence 15:00)."""
+        if not self.permanence:
+            return 0
+        if not self.heure_depart_soir:
+            return 0
+        if self.heure_depart_soir >= time(14, 45):
+            return 0
+        from datetime import datetime as _dt
+        ref = _dt.combine(self.date, time(15, 0))
+        dep = _dt.combine(self.date, self.heure_depart_soir)
+        return int((ref - dep).total_seconds() // 60)
 
     class Meta:
         db_table = 'ressources_humaines_presence'

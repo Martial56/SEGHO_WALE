@@ -1,0 +1,356 @@
+{% extends 'conges/base.html' %}
+{% load static %}
+{% block topbar_title %}Vue Direction — Congés {{ year }}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+.dir-page {
+  display:flex; flex-direction:column;
+  height:calc(100vh - var(--topbar-h) - 44px);
+  overflow:hidden;
+}
+.dir-head {
+  display:flex; align-items:center; gap:12px; padding:8px 20px; flex-shrink:0;
+  background:var(--cg-surface); border-bottom:1px solid var(--cg-border);
+}
+.dir-title { font-size:16px; font-weight:800; color:var(--cg-900); }
+html[data-theme="dark"] .dir-title { color:var(--cg-200); }
+
+/* KPIs */
+.dir-kpis {
+  display:grid; grid-template-columns:repeat(5,1fr);
+  flex-shrink:0; border-bottom:1px solid var(--cg-border);
+}
+.dir-kpi {
+  padding:10px 18px; border-right:1px solid var(--cg-border);
+  display:flex; align-items:center; gap:10px;
+}
+.dir-kpi:last-child { border-right:none; }
+.dir-kpi-icon {
+  width:38px; height:38px; border-radius:10px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center; font-size:16px;
+}
+.dir-kpi-val { font-size:22px; font-weight:800; line-height:1; }
+.dir-kpi-lbl { font-size:10.5px; color:var(--cg-muted); font-weight:600; text-transform:uppercase; letter-spacing:.3px; margin-top:1px; }
+
+/* Corps */
+.dir-body { flex:1; overflow:auto; min-height:0; }
+
+/* Graphes */
+.dir-charts {
+  display:grid; grid-template-columns:1fr 1fr; gap:0;
+  border-bottom:1px solid var(--cg-border);
+}
+.dir-chart-box {
+  padding:14px 20px; border-right:1px solid var(--cg-border);
+}
+.dir-chart-box:last-child { border-right:none; }
+.dir-chart-title {
+  font-size:10.5px; font-weight:800; color:var(--cg-600);
+  text-transform:uppercase; letter-spacing:.4px; margin-bottom:10px;
+  display:flex; align-items:center; gap:6px;
+}
+
+/* Tables */
+.dir-section { border-bottom:1px solid var(--cg-border); }
+.dir-section-head {
+  display:flex; align-items:center; gap:10px; padding:9px 20px;
+  background:var(--cg-50); border-bottom:1px solid var(--cg-border);
+  position:sticky; top:0; z-index:3;
+}
+html[data-theme="dark"] .dir-section-head { background:rgba(74,114,54,.04); }
+.dir-section-title { font-size:11px; font-weight:800; color:var(--cg-900); text-transform:uppercase; letter-spacing:.4px; }
+html[data-theme="dark"] .dir-section-title { color:var(--cg-200); }
+
+.dir-table { width:100%; border-collapse:collapse; font-size:13px; }
+.dir-table thead th {
+  background:var(--cg-700); color:#fff; padding:8px 14px;
+  text-align:left; font-size:10.5px; font-weight:700;
+  text-transform:uppercase; letter-spacing:.3px;
+}
+.dir-table thead th.num { text-align:right; }
+.dir-table tbody tr { border-bottom:1px solid var(--cg-border); transition:background .1s; }
+.dir-table tbody tr:hover { background:var(--cg-50); }
+html[data-theme="dark"] .dir-table tbody tr:hover { background:rgba(74,114,54,.06); }
+.dir-table td { padding:9px 14px; color:var(--cg-text); vertical-align:middle; }
+.dir-table td.num { text-align:right; font-weight:700; color:var(--cg-700); }
+
+/* Barre taux */
+.taux-bar-wrap { display:flex; align-items:center; gap:8px; }
+.taux-bar { flex:1; height:6px; background:rgba(0,0,0,.07); border-radius:3px; overflow:hidden; min-width:80px; }
+html[data-theme="dark"] .taux-bar { background:rgba(255,255,255,.1); }
+.taux-fill { height:100%; border-radius:3px; }
+.taux-fill.low  { background:#16a96b; }
+.taux-fill.mid  { background:#e89a1a; }
+.taux-fill.high { background:#e84545; }
+
+/* Badge solde */
+.solde-badge {
+  padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700;
+  display:inline-block;
+}
+.solde-neg  { background:rgba(232,69,69,.1); color:#b71c1c; border:1px solid rgba(232,69,69,.25); }
+.solde-warn { background:rgba(232,154,26,.1); color:#8a5c00; border:1px solid rgba(232,154,26,.25); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dir-page">
+
+  <!-- En-tête -->
+  <div class="dir-head">
+    <div>
+      <div class="dir-title">
+        <i class="bi bi-graph-up-arrow" style="color:var(--cg-600);margin-right:6px;"></i>Vue Direction — Absentéisme
+      </div>
+      <div style="font-size:11.5px;color:var(--cg-muted);">Analyse des congés — Année {{ year }}</div>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+      <form method="get" style="display:flex;gap:6px;">
+        <input type="number" name="year" value="{{ year }}" min="2020" max="2099"
+               class="cg-input" style="width:80px;">
+        <button type="submit" class="btn-cg" style="padding:6px 12px;font-size:12.5px;">
+          <i class="bi bi-search"></i>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="dir-kpis">
+    <div class="dir-kpi">
+      <div class="dir-kpi-icon" style="background:rgba(74,114,54,.1);color:var(--cg-600);">
+        <i class="bi bi-percent"></i>
+      </div>
+      <div>
+        <div class="dir-kpi-val" style="color:{% if taux_global > 10 %}#b71c1c{% elif taux_global > 5 %}#c47a00{% else %}#0a6040{% endif %};">{{ taux_global }}%</div>
+        <div class="dir-kpi-lbl">Taux absentéisme</div>
+      </div>
+    </div>
+    <div class="dir-kpi">
+      <div class="dir-kpi-icon" style="background:rgba(232,69,69,.1);color:#e84545;">
+        <i class="bi bi-thermometer-half"></i>
+      </div>
+      <div>
+        <div class="dir-kpi-val" style="color:#b71c1c;">{{ taux_maladie }}%</div>
+        <div class="dir-kpi-lbl">Dont maladie</div>
+      </div>
+    </div>
+    <div class="dir-kpi">
+      <div class="dir-kpi-icon" style="background:rgba(45,153,219,.1);color:#2d99db;">
+        <i class="bi bi-calendar-minus-fill"></i>
+      </div>
+      <div>
+        <div class="dir-kpi-val" style="color:#1a4d6d;">{{ total_jours }}</div>
+        <div class="dir-kpi-lbl">Jours d'absence</div>
+      </div>
+    </div>
+    <div class="dir-kpi">
+      <div class="dir-kpi-icon" style="background:rgba(232,154,26,.1);color:#e89a1a;">
+        <i class="bi bi-calendar-event-fill"></i>
+      </div>
+      <div>
+        <div class="dir-kpi-val" style="color:#8a5c00;">{{ pic_mois }}</div>
+        <div class="dir-kpi-lbl">Pic d'absence</div>
+      </div>
+    </div>
+    <div class="dir-kpi">
+      <div class="dir-kpi-icon" style="background:rgba(74,114,54,.1);color:var(--cg-600);">
+        <i class="bi bi-people-fill"></i>
+      </div>
+      <div>
+        <div class="dir-kpi-val" style="color:var(--cg-700);">{{ soldes_critiques|length }}</div>
+        <div class="dir-kpi-lbl">Soldes critiques</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Corps -->
+  <div class="dir-body">
+
+    <!-- Graphes -->
+    <div class="dir-charts">
+      <div class="dir-chart-box">
+        <div class="dir-chart-title">
+          <i class="bi bi-activity"></i> Évolution mensuelle — Jours d'absence
+        </div>
+        <canvas id="chartEvolution" height="140"></canvas>
+      </div>
+      <div class="dir-chart-box">
+        <div class="dir-chart-title">
+          <i class="bi bi-bar-chart-horizontal-fill"></i> Taux d'absentéisme par service (%)
+        </div>
+        <canvas id="chartServices" height="140"></canvas>
+      </div>
+    </div>
+
+    <!-- Tableau par service -->
+    <div class="dir-section">
+      <div class="dir-section-head">
+        <i class="bi bi-building" style="color:var(--cg-600);font-size:14px;"></i>
+        <span class="dir-section-title">Absentéisme par service</span>
+        <span style="font-size:10.5px;color:var(--cg-muted);margin-left:auto;">Trié par taux décroissant</span>
+      </div>
+      <table class="dir-table">
+        <thead><tr>
+          <th>Service</th>
+          <th class="num">Employés</th>
+          <th class="num">Jours abs.</th>
+          <th class="num">Dont maladie</th>
+          <th style="min-width:160px;">Taux</th>
+        </tr></thead>
+        <tbody>
+        {% for s in services_stats %}
+        <tr>
+          <td style="font-weight:600;">{{ s.service.nom }}</td>
+          <td class="num" style="color:var(--cg-muted);">{{ s.nb_employes }}</td>
+          <td class="num">{{ s.jours_total }}j</td>
+          <td class="num" style="color:#b71c1c;">{{ s.jours_maladie }}j</td>
+          <td>
+            <div class="taux-bar-wrap">
+              <div class="taux-bar">
+                <div class="taux-fill {% if s.taux > 10 %}high{% elif s.taux > 5 %}mid{% else %}low{% endif %}"
+                     style="width:{{ s.taux|floatformat:0 }}%;max-width:100%;"></div>
+              </div>
+              <span style="font-size:12px;font-weight:700;min-width:38px;text-align:right;
+                    color:{% if s.taux > 10 %}#b71c1c{% elif s.taux > 5 %}#c47a00{% else %}#0a6040{% endif %};">
+                {{ s.taux }}%
+              </span>
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" style="text-align:center;padding:24px;color:var(--cg-muted);">Aucune donnée</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Soldes critiques -->
+    {% if soldes_critiques %}
+    <div class="dir-section">
+      <div class="dir-section-head">
+        <i class="bi bi-exclamation-triangle-fill" style="color:#e89a1a;font-size:14px;"></i>
+        <span class="dir-section-title">Soldes critiques — moins de 5 jours restants</span>
+        <span style="background:rgba(232,154,26,.1);color:#8a5c00;border-radius:20px;padding:1px 8px;font-size:10px;font-weight:700;margin-left:8px;">{{ soldes_critiques|length }}</span>
+      </div>
+      <table class="dir-table">
+        <thead><tr>
+          <th>Employé</th>
+          <th>Service</th>
+          <th class="num">Quota {{ year }}</th>
+          <th class="num">Jours pris</th>
+          <th class="num">Solde restant</th>
+          <th></th>
+        </tr></thead>
+        <tbody>
+        {% for item in soldes_critiques %}
+        <tr>
+          <td>
+            <div style="font-weight:700;color:var(--cg-text);">{{ item.emp.nom_complet|truncatechars:22 }}</div>
+            <div style="font-size:10.5px;color:var(--cg-muted);">{{ item.emp.matricule }}</div>
+          </td>
+          <td style="color:var(--cg-muted);font-size:12px;">{{ item.emp.service.nom|default:"—" }}</td>
+          <td class="num">{{ item.solde.quota|floatformat:1 }}j</td>
+          <td class="num">{{ item.solde.jours_pris|floatformat:1 }}j</td>
+          <td class="num">
+            <span class="solde-badge {% if item.solde.solde < 0 %}solde-neg{% else %}solde-warn{% endif %}">
+              {{ item.solde.solde|floatformat:1 }}j
+            </span>
+          </td>
+          <td style="text-align:right;">
+            <a href="{% url 'conge_historique_employe' item.emp.pk %}" class="btn-cg-sm">
+              <i class="bi bi-eye"></i>
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    <!-- Note -->
+    <div style="padding:10px 20px;font-size:11px;color:var(--cg-muted);">
+      <i class="bi bi-info-circle"></i>
+      Taux d'absentéisme = (jours d'absence) / (nb employés × jours ouvrés théoriques) × 100 — Année {{ year }}
+    </div>
+
+  </div><!-- /dir-body -->
+</div><!-- /dir-page -->
+{% endblock %}
+
+{% block extra_js %}
+{{ chart_evolution|json_script:"data-evolution" }}
+{{ chart_services|json_script:"data-services" }}
+<script src="{% static 'vendor/chart.umd.min.js' %}"></script>
+<script>
+var dataEvo = JSON.parse(document.getElementById('data-evolution').textContent);
+var dataSvc = JSON.parse(document.getElementById('data-services').textContent);
+
+Chart.defaults.font.family = "'Sora', sans-serif";
+Chart.defaults.font.size   = 11;
+
+/* 1. Évolution mensuelle */
+if (document.getElementById('chartEvolution')) {
+  new Chart(document.getElementById('chartEvolution'), {
+    type: 'line',
+    data: {
+      labels: dataEvo.labels,
+      datasets: [
+        {
+          label: 'Congés (j)',
+          data: dataEvo.conges,
+          borderColor: '#4a7236', backgroundColor: 'rgba(74,114,54,.08)',
+          tension: 0.4, fill: true, pointRadius: 3, borderWidth: 2,
+          pointBackgroundColor: '#4a7236',
+        },
+        {
+          label: 'Maladie (j)',
+          data: dataEvo.maladies,
+          borderColor: '#e84545', backgroundColor: 'rgba(232,69,69,.06)',
+          tension: 0.4, fill: true, pointRadius: 3, borderWidth: 2,
+          pointBackgroundColor: '#e84545',
+        }
+      ]
+    },
+    options: {
+      plugins: { legend: { position: 'top', labels: { usePointStyle: true, pointStyleWidth: 10, padding: 14 } } },
+      scales: {
+        x: { grid: { display: false } },
+        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,.05)' },
+             ticks: { callback: function(v){ return v + 'j'; } } }
+      }
+    }
+  });
+}
+
+/* 2. Taux par service */
+if (document.getElementById('chartServices') && dataSvc.labels.length) {
+  new Chart(document.getElementById('chartServices'), {
+    type: 'bar',
+    data: {
+      labels: dataSvc.labels,
+      datasets: [{
+        label: 'Taux (%)',
+        data: dataSvc.taux,
+        backgroundColor: dataSvc.taux.map(function(v) {
+          return v > 10 ? 'rgba(232,69,69,.65)' : v > 5 ? 'rgba(232,154,26,.65)' : 'rgba(74,114,54,.65)';
+        }),
+        borderRadius: 5, borderSkipped: false,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { beginAtZero: true, grid: { color: 'rgba(0,0,0,.05)' },
+             ticks: { callback: function(v){ return v + '%'; } } },
+        y: { grid: { display: false }, ticks: { font: { size: 10 } } }
+      }
+    }
+  });
+}
+</script>
+{% endblock %}

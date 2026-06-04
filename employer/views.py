@@ -4,6 +4,7 @@ import io
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
+from django.views.decorators.http import require_POST
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Q, Count
@@ -494,6 +495,59 @@ def employe_export_excel(request):
 # â"€â"€ Export PDF (fiche individuelle) â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 @login_required(login_url='login')
+def employe_qrcode(request, pk):
+    """Retourne le QR code de l'employé en PNG (contenu = matricule)."""
+    employe = get_object_or_404(Employe, pk=pk)
+    import qrcode, io, base64
+    qr = qrcode.QRCode(version=1, box_size=8, border=2,
+                       error_correction=qrcode.constants.ERROR_CORRECT_M)
+    qr.add_data(employe.matricule)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color='black', back_color='white')
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    buf.seek(0)
+    return HttpResponse(buf.getvalue(), content_type='image/png')
+
+
+@login_required(login_url='login')
+def employe_badge(request, pk):
+    """Page badge imprimable avec photo + QR + infos."""
+    employe = get_object_or_404(
+        Employe.objects.select_related('service', 'fonction'), pk=pk
+    )
+    import qrcode, io, base64
+    qr = qrcode.QRCode(version=1, box_size=6, border=2,
+                       error_correction=qrcode.constants.ERROR_CORRECT_M)
+    qr.add_data(employe.matricule)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color='#1b2e13', back_color='white')
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    qr_b64 = base64.b64encode(buf.getvalue()).decode()
+    from datetime import date as _date
+    return render(request, 'employer/badge.html', {
+        'employe': employe,
+        'qr_b64':  qr_b64,
+        'today':   _date.today(),
+    })
+
+
+@login_required(login_url='login')
+@require_POST
+def employe_biometric_save(request, pk):
+    """Enregistre l'identifiant biométrique de l'employé."""
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
+    employe = get_object_or_404(Employe, pk=pk)
+    biometric_id = request.POST.get('biometric_id', '').strip()
+    employe.biometric_id = biometric_id
+    employe.save(update_fields=['biometric_id'])
+    messages.success(request, f"Identifiant biométrique mis à jour pour {employe.nom_complet}.")
+    return redirect('rh_detail', pk=pk)
+
+
+@login_required(login_url='login')
 def employe_fiche_pdf(request, pk):
     employe = get_object_or_404(
         Employe.objects.select_related('service', 'fonction', 'grade', 'type_contrat')
@@ -516,11 +570,14 @@ def rh_registre(request):
     statut = request.GET.get('statut', '')
     if statut:
         qs = qs.filter(statut=statut)
+    paginator = Paginator(qs, 25)
+    page_obj  = paginator.get_page(request.GET.get('page'))
     return render(request, 'employer/registre.html', {
-        'employes': qs,
+        'employes':      page_obj,
+        'page_obj':      page_obj,
         'statut_filtre': statut,
-        'can_manage': can_manage_rh(request.user),
-        'today': date.today(),
+        'can_manage':    can_manage_rh(request.user),
+        'today':         date.today(),
     })
 
 
@@ -683,26 +740,7 @@ def employe_import(request):
 
 @login_required(login_url='login')
 def rh_organigramme(request):
-    employes = (
-        Employe.objects.filter(statut='actif')
-        .select_related('service', 'fonction', 'grade')
-        .order_by('service__nom', 'nom')
-    )
-    # Grouper par service
-    services = {}
-    sans_service = []
-    for e in employes:
-        if e.service:
-            key = e.service.nom
-            services.setdefault(key, []).append(e)
-        else:
-            sans_service.append(e)
-
-    return render(request, 'employer/organigramme.html', {
-        'services': services,
-        'sans_service': sans_service,
-        'can_manage': can_manage_rh(request.user),
-    })
+    return redirect('rh_annuaire')
 
 
 # â"€â"€ Documents â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
@@ -791,11 +829,15 @@ def rh_annuaire(request):
         )
     if f_service:
         qs = qs.filter(service_id=f_service)
+    qs = qs.order_by('service__nom', 'nom')
+    paginator = Paginator(qs, 24)
+    page_obj  = paginator.get_page(request.GET.get('page'))
     return render(request, 'employer/annuaire.html', {
-        'employes':  qs.order_by('service__nom', 'nom'),
-        'services':  Service.objects.filter(actif=True).order_by('nom'),
-        'q':         q,
-        'f_service': f_service,
+        'employes':   page_obj,
+        'page_obj':   page_obj,
+        'services':   Service.objects.filter(actif=True).order_by('nom'),
+        'q':          q,
+        'f_service':  f_service,
         'can_manage': can_manage_rh(request.user),
     })
 

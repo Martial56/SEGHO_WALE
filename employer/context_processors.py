@@ -6,9 +6,9 @@ def alertes_contrat(request):
     if not request.user.is_authenticated:
         return {}
 
-    # Alertes RH masquées dans les modules non-RH
-    MODULES_SANS_ALERTES_RH = ('/gynecologie/', '/pharmacie/', '/stock/', '/patients/', '/consultations/')
-    if any(request.path.startswith(m) for m in MODULES_SANS_ALERTES_RH):
+    # Alertes RH visibles uniquement dans les modules RH
+    MODULES_AVEC_ALERTES_RH = ('/employes/', '/conges/', '/presence/')
+    if not any(request.path.startswith(m) for m in MODULES_AVEC_ALERTES_RH):
         return {'show_rh_alerts': False}
 
 

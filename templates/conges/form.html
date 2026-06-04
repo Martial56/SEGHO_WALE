@@ -1,184 +1,524 @@
-﻿{% extends 'conges/base.html' %}
-
+{% extends 'conges/base.html' %}
 {% block topbar_title %}Enregistrer un congé{% endblock %}
-{% block cg_nav_nouveau %}active{% endblock %}
 
 {% block extra_css %}
 {{ block.super }}
 <style>
-.cg-form-head {
-  display:flex;align-items:center;justify-content:space-between;gap:16px;
-  padding:14px 32px;margin:0 -32px;flex-wrap:wrap;
-  position:sticky;top:calc(var(--topbar-h) + 44px);z-index:100;
-  background:#f0f6fa;border-bottom:1px solid rgba(0,0,0,0.05);
-  box-shadow:0 2px 8px rgba(0,0,0,0.04);
+/* ── Layout pleine page sans scroll ── */
+.cf-page {
+  display:flex; flex-direction:column;
+  height:calc(100vh - var(--topbar-h) - 44px);
+  overflow:hidden;
 }
-html[data-theme="dark"] .cg-form-head{background:#071e28;border-bottom-color:rgba(255,255,255,0.05);}
-@media(max-width:1024px){.cg-form-head{margin:0 -20px;padding-left:20px;padding-right:20px;}}
-
-.cg-form-card{background:var(--cg-surface);border-radius:12px;box-shadow:var(--shadow-sm);
-  padding:28px 32px;max-width:680px;margin:20px auto;}
-.cg-grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
-@media(max-width:640px){.cg-grid2{grid-template-columns:1fr;}}
-
-#cg-duree{
-  display:inline-flex;align-items:center;gap:6px;
-  background:var(--cg-50);color:var(--cg-700);
-  border:1px solid var(--cg-200);padding:6px 14px;border-radius:8px;
-  font-size:13px;font-weight:700;margin-top:8px;
+.cf-head {
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  padding:10px 24px; flex-shrink:0;
+  background:var(--cg-surface); border-bottom:1px solid var(--cg-border);
 }
-html[data-theme="dark"] #cg-duree{background:rgba(74,114,54,.15);color:var(--cg-300);border-color:var(--cg-border);}
+.cf-back {
+  width:32px; height:32px; border-radius:8px; border:1.5px solid var(--cg-200);
+  display:inline-flex; align-items:center; justify-content:center;
+  color:var(--cg-600); background:var(--cg-surface); text-decoration:none;
+  transition:all .15s; flex-shrink:0;
+}
+.cf-back:hover { background:var(--cg-600); color:#fff; border-color:var(--cg-600); }
+.cf-title { font-size:16px; font-weight:800; color:var(--cg-900); }
+html[data-theme="dark"] .cf-title { color:var(--cg-200); }
+
+.cf-body {
+  display:grid; grid-template-columns:1fr 300px;
+  flex:1; min-height:0; overflow:hidden;
+}
+.cf-main { overflow-y:auto; padding:16px 20px; }
+.cf-sidebar { border-left:1px solid var(--cg-border); overflow-y:auto; padding:14px 16px; background:var(--cg-50); }
+html[data-theme="dark"] .cf-sidebar { background:rgba(74,114,54,.04); }
+
+/* ── Carte formulaire ── */
+.cf-card {
+  background:var(--cg-surface); border-radius:12px;
+  box-shadow:0 1px 6px rgba(74,114,54,.06);
+  border:1px solid var(--cg-border); overflow:hidden;
+  margin-bottom:14px;
+}
+.cf-card:last-child { margin-bottom:0; }
+.cf-section { padding:12px 18px; border-bottom:1px solid var(--cg-border); }
+.cf-section:last-child { border-bottom:none; }
+.cf-section-label {
+  font-size:10px; font-weight:800; color:var(--cg-600);
+  text-transform:uppercase; letter-spacing:.6px; margin-bottom:10px;
+  display:flex; align-items:center; gap:5px;
+}
+
+/* ── Employé card (info panel) ── */
+#emp-panel {
+  background:var(--cg-50); border-radius:10px; padding:14px 16px;
+  margin-top:10px; display:none; gap:12px; align-items:center;
+  border:1px solid var(--cg-200);
+}
+html[data-theme="dark"] #emp-panel { background:rgba(74,114,54,.1); border-color:var(--cg-border); }
+#emp-avatar {
+  width:44px; height:44px; border-radius:50%; flex-shrink:0;
+  background:linear-gradient(135deg,var(--cg-600),var(--cg-400));
+  display:flex; align-items:center; justify-content:center;
+  font-size:16px; font-weight:800; color:#fff; overflow:hidden;
+}
+#emp-avatar img { width:100%; height:100%; object-fit:cover; }
+#emp-name { font-size:14px; font-weight:700; color:var(--cg-900); }
+html[data-theme="dark"] #emp-name { color:var(--cg-200); }
+#emp-sub { font-size:12px; color:var(--cg-muted); margin-top:2px; }
+
+/* ── Solde bar ── */
+.solde-bar-wrap { margin-top:8px; }
+.solde-bar-track { height:6px; background:rgba(0,0,0,.08); border-radius:3px; overflow:hidden; margin:4px 0; }
+.solde-bar-fill { height:100%; border-radius:3px; transition:width .4s ease; }
+.solde-bar-fill.ok  { background:var(--cg-500); }
+.solde-bar-fill.warn{ background:#e89a1a; }
+.solde-bar-fill.bad { background:#e84545; }
+
+/* ── Duree badge ── */
+.cf-duree-row { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+.cf-badge {
+  display:inline-flex; align-items:center; gap:5px;
+  padding:5px 12px; border-radius:8px; font-size:12.5px; font-weight:700;
+}
+.cf-badge.cal  { background:rgba(74,114,54,.08); color:var(--cg-700); border:1px solid var(--cg-200); }
+.cf-badge.ouv  { background:rgba(26,35,126,.08); color:#1a237e; border:1px solid rgba(26,35,126,.2); }
+.cf-badge.warn { background:rgba(232,69,69,.08); color:#b71c1c; border:1px solid rgba(232,69,69,.2); }
+
+
+/* Note légale */
+.cf-legal {
+  background:rgba(45,153,219,.08); border:1px solid rgba(45,153,219,.25);
+  border-radius:8px; padding:10px 14px; font-size:12.5px; color:#1a4d6d;
+  display:none; margin-top:8px;
+}
+html[data-theme="dark"] .cf-legal { background:rgba(45,153,219,.12); color:#80c8ef; }
+
+/* Alerte solde */
+#solde-alerte {
+  background:rgba(232,69,69,.08); border:1px solid rgba(232,69,69,.2);
+  border-radius:8px; padding:10px 14px; font-size:12.5px; color:#b71c1c;
+  display:none; margin-top:8px; align-items:center; gap:8px;
+}
+
+/* Boutons submit */
+.cf-actions { display:flex; gap:10px; justify-content:flex-end; padding:12px 18px; background:var(--cg-50); border-top:1px solid var(--cg-border); flex-shrink:0; }
+html[data-theme="dark"] .cf-actions { background:rgba(74,114,54,.06); }
+
+/* ── Recherche employé ── */
+.emp-search-wrap { position:relative; }
+.emp-search-inp {
+  width:100%; padding:9px 4px 9px 26px;
+  border:none; border-bottom:1.5px solid rgba(0,0,0,.18); border-radius:0;
+  font-family:inherit; font-size:13.5px; color:var(--cg-text);
+  background:transparent; transition:border-color .15s;
+  outline:none;
+}
+.emp-search-inp:focus { border-bottom-color:var(--cg-500); }
+html[data-theme="dark"] .emp-search-inp { border-bottom-color:rgba(154,184,138,.25); color:var(--cg-text); }
+.emp-search-icon { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--cg-400); font-size:14px; pointer-events:none; }
+.emp-search-clear { position:absolute; right:10px; top:50%; transform:translateY(-50%); color:var(--cg-muted); font-size:13px; cursor:pointer; display:none; background:none; border:none; padding:2px; }
+.emp-dropdown {
+  position:absolute; top:calc(100% + 4px); left:0; right:0;
+  background:var(--cg-surface); border:1.5px solid var(--cg-300);
+  border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.12);
+  z-index:500; max-height:220px; overflow-y:auto; display:none;
+}
+.emp-dropdown-item {
+  padding:9px 14px; cursor:pointer; display:flex; align-items:center; gap:10px;
+  border-bottom:1px solid var(--cg-border); transition:background .1s;
+}
+.emp-dropdown-item:last-child { border-bottom:none; }
+.emp-dropdown-item:hover, .emp-dropdown-item.focused { background:var(--cg-50); }
+.emp-dropdown-item .emp-di-name { font-size:13px; font-weight:600; color:var(--cg-text); }
+.emp-dropdown-item .emp-di-sub  { font-size:11px; color:var(--cg-muted); margin-top:1px; }
+.emp-dropdown-item .emp-di-mat  { font-size:11px; font-family:monospace; color:var(--cg-500); margin-left:auto; flex-shrink:0; }
+.emp-no-result { padding:14px; text-align:center; color:var(--cg-muted); font-size:13px; }
+
+/* Side cards */
+.cf-side-card { background:var(--cg-surface); border-radius:10px; border:1px solid var(--cg-border); padding:10px 12px; margin-bottom:10px; }
+.cf-side-card:last-child { margin-bottom:0; }
+.cf-side-title { font-size:10px; font-weight:800; color:var(--cg-600); text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px; }
 </style>
 {% endblock %}
 
 {% block content %}
+<div class="cf-page">
 
-<div class="cg-form-head">
-  <div style="display:flex;align-items:center;gap:12px;">
-    <a href="{% url 'conge_list' %}" class="cg-back-btn" style="
-      display:inline-flex;align-items:center;justify-content:center;
-      width:34px;height:34px;border-radius:8px;border:1.5px solid var(--cg-200);
-      color:var(--cg-700);background:#fff;text-decoration:none;font-size:15px;">
-      <i class="bi bi-arrow-left"></i>
-    </a>
-    <span style="font-size:18px;font-weight:800;color:var(--cg-900);">Enregistrer un congé</span>
-  </div>
-</div>
-
-<div class="cg-form-card">
-  <form method="post" novalidate>
-    {% csrf_token %}
-
-    <!-- Employé -->
-    <div style="margin-bottom:18px;">
-      <label class="cg-label">Employé <span class="req" style="color:var(--rose);">*</span></label>
-      <select name="employe" class="cg-input" required>
-        <option value="">— Sélectionner un employé —</option>
-        {% for emp in employes %}
-        <option value="{{ emp.pk }}"
-          {% if employe_pre and employe_pre.pk == emp.pk %}selected{% endif %}>
-          {{ emp.nom_complet }} — {{ emp.service.nom|default:"Sans service" }}
-        </option>
-        {% endfor %}
-      </select>
-    </div>
-
-    <!-- Type -->
-    <div style="margin-bottom:18px;">
-      <label class="cg-label">Type de congé <span class="req" style="color:var(--rose);">*</span></label>
-      <select name="type_conge" id="id_type_conge" class="cg-input" required onchange="onTypeChange(this.value)">
-        <option value="">— Sélectionner un type —</option>
-        {% for code,label in types %}
-        <option value="{{ code }}" {% if post_data.type_conge == code %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
-    </div>
-
-    <!-- Dates -->
-    <div class="cg-grid2" style="margin-bottom:10px;">
+  <!-- En-tête compact -->
+  <div class="cf-head">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <a href="{% url 'conge_list' %}" class="cf-back" title="Retour"><i class="bi bi-arrow-left"></i></a>
       <div>
-        <label class="cg-label">Date de début <span class="req" style="color:var(--rose);">*</span></label>
-        <input type="date" name="date_debut" id="id_debut" class="cg-input" required
-               value="{{ post_data.date_debut }}" onchange="calcDuree()">
-      </div>
-      <div>
-        <label class="cg-label">Date de fin <span class="req" style="color:var(--rose);">*</span></label>
-        <input type="date" name="date_fin" id="id_fin" class="cg-input" required
-               value="{{ post_data.date_fin }}" onchange="calcDuree()">
+        <div class="cf-title"><i class="bi bi-plus-circle-fill" style="color:var(--cg-600);margin-right:5px;font-size:14px;"></i>Enregistrer un congé</div>
+        <div style="font-size:11px;color:var(--cg-muted);">Accord papier déjà obtenu — saisie RH</div>
       </div>
     </div>
-    <div style="margin-bottom:18px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-      <div id="cg-duree" style="display:none;">
-        <i class="bi bi-clock"></i> <span id="cg-duree-val">—</span>
-      </div>
-      <div id="cg-ouvres" style="display:none;background:var(--cg-50);color:var(--cg-700);
-        border:1px solid var(--cg-200);padding:6px 14px;border-radius:8px;
-        font-size:13px;font-weight:700;align-items:center;gap:6px;">
-        <i class="bi bi-briefcase"></i>
-        Jours ouvrés estimés&nbsp;: <span id="cg-ouvres-val" style="font-size:15px;">—</span>
-      </div>
-    </div>
-
-    <!-- Avertissement durée légale type exceptionnel -->
-    <div id="cg-legal-note" style="display:none;
-      background:rgba(45,153,219,.08);border:1px solid rgba(45,153,219,.25);
-      border-radius:8px;padding:10px 14px;margin-bottom:14px;
-      font-size:12.5px;color:#1a4d6d;">
-      <i class="bi bi-info-circle-fill" style="color:#2d99db;"></i>
-      <span id="cg-legal-text"></span>
-    </div>
-
-
-    <!-- Motif -->
-    <div style="margin-bottom:24px;">
-      <label class="cg-label">Motif <small style="font-weight:400;text-transform:none;">(facultatif)</small></label>
-      <textarea name="motif" class="cg-input" rows="3"
-                placeholder="Précisez le motif si nécessaire…"
-                style="resize:vertical;">{{ post_data.motif }}</textarea>
-    </div>
-
-    <div style="display:flex;gap:10px;justify-content:flex-end;">
-      <a href="{% url 'conge_list' %}" class="btn-cg-outline" style="padding:9px 20px;">Annuler</a>
-      <button type="submit" class="btn-cg">
-        <i class="bi bi-floppy-fill"></i> Enregistrer le congé
+    <div style="display:flex;gap:8px;">
+      <a href="{% url 'conge_list' %}" class="btn-cg-outline" style="padding:6px 14px;font-size:12.5px;"><i class="bi bi-x"></i> Annuler</a>
+      <button type="submit" form="cg-form" class="btn-cg" style="padding:6px 16px;font-size:12.5px;">
+        <i class="bi bi-floppy-fill"></i> Enregistrer
       </button>
     </div>
-  </form>
-</div>
+  </div>
 
+  <form method="post" novalidate id="cg-form" style="display:contents;">
+  {% csrf_token %}
+  <div class="cf-body">
+
+    <!-- ── Colonne gauche : formulaire ── -->
+    <div class="cf-main">
+    <div class="cf-card">
+
+      <!-- 1. Employé -->
+      <div class="cf-section">
+        <div class="cf-section-label"><i class="bi bi-person-fill"></i> Employé concerné</div>
+
+        <!-- Champ de recherche + input caché -->
+        <input type="hidden" name="employe" id="id_employe" value="{{ employe_pre.pk|default:'' }}">
+        <div class="emp-search-wrap">
+          <i class="bi bi-search emp-search-icon"></i>
+          <input type="text" id="emp-search-inp" class="emp-search-inp"
+                 placeholder="Rechercher par nom, matricule ou service…"
+                 autocomplete="off"
+                 value="{{ employe_pre.nom_complet|default:'' }}{% if employe_pre %} — {{ employe_pre.service.nom|default:'' }}{% endif %}">
+          <button type="button" class="emp-search-clear" id="emp-clear" onclick="clearEmp()">
+            <i class="bi bi-x-circle-fill"></i>
+          </button>
+          <div class="emp-dropdown" id="emp-dropdown"></div>
+        </div>
+
+        <!-- Carte info employé (chargée en AJAX) -->
+        <div id="emp-panel">
+          <div id="emp-avatar"></div>
+          <div style="flex:1;min-width:0;">
+            <div id="emp-name"></div>
+            <div id="emp-sub"></div>
+            <div class="solde-bar-wrap" id="emp-solde-wrap" style="display:none;">
+              <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--cg-muted);margin-bottom:2px;">
+                <span>Solde <span id="emp-annee"></span></span>
+                <span id="emp-solde-txt" style="font-weight:700;"></span>
+              </div>
+              <div class="solde-bar-track">
+                <div class="solde-bar-fill ok" id="emp-solde-bar" style="width:0%;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="solde-alerte">
+          <i class="bi bi-exclamation-triangle-fill"></i>
+          <span id="solde-alerte-txt"></span>
+        </div>
+      </div>
+
+      <!-- 2. Type de congé -->
+      <div class="cf-section">
+        <div class="cf-section-label"><i class="bi bi-tag-fill"></i> Type de congé</div>
+        <select name="type_conge" id="id_type_conge" class="cg-input" required>
+          <option value="">— Sélectionner un type —</option>
+          {% for code,label in types %}
+          <option value="{{ code }}" {% if post_data.type_conge == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <div class="cf-legal" id="cg-legal">
+          <i class="bi bi-info-circle-fill" style="color:#2d99db;flex-shrink:0;"></i>
+          <span id="cg-legal-text"></span>
+        </div>
+      </div>
+
+      <!-- 3. Dates -->
+      <div class="cf-section">
+        <div class="cf-section-label"><i class="bi bi-calendar-range-fill"></i> Période</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+          <div>
+            <label class="cg-label">Début <span style="color:var(--rose);">*</span></label>
+            <input type="date" name="date_debut" id="id_debut" class="cg-input" required
+                   value="{{ post_data.date_debut }}">
+          </div>
+          <div>
+            <label class="cg-label">Fin <span style="color:var(--rose);">*</span></label>
+            <input type="date" name="date_fin" id="id_fin" class="cg-input" required
+                   value="{{ post_data.date_fin }}">
+          </div>
+        </div>
+        <div class="cf-duree-row" id="duree-row" style="display:none;">
+          <span class="cf-badge cal" id="badge-cal"><i class="bi bi-calendar3"></i> <span id="val-cal">—</span></span>
+          <span class="cf-badge ouv" id="badge-ouv"><i class="bi bi-briefcase"></i> ≈ <span id="val-ouv">—</span> j ouvrés</span>
+        </div>
+      </div>
+
+      <!-- 4. Motif -->
+      <div class="cf-section">
+        <div class="cf-section-label"><i class="bi bi-chat-text"></i> Motif <span style="font-weight:400;text-transform:none;font-size:11px;">(facultatif)</span></div>
+        <textarea name="motif" class="cg-input" rows="3"
+                  placeholder="Précisez si nécessaire (maladie, événement familial…)"
+                  style="resize:vertical;">{{ post_data.motif }}</textarea>
+      </div>
+
+    </div><!-- /cf-card -->
+    </div><!-- /cf-main -->
+
+    <!-- ── Colonne droite : aide & contexte ── -->
+    <div class="cf-sidebar">
+
+      <!-- Solde annuel (pré-sélection) -->
+      {% if solde and employe_pre %}
+      <div class="cf-side-card">
+        <div class="cf-side-title"><i class="bi bi-table"></i> Solde {{ employe_pre.nom_complet|truncatechars:18 }}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div style="text-align:center;padding:10px 6px;background:var(--cg-50);border-radius:8px;border:1px solid var(--cg-200);">
+            <div style="font-size:20px;font-weight:800;color:var(--cg-700);">{{ solde.quota|floatformat:0 }}j</div>
+            <div style="font-size:10.5px;color:var(--cg-muted);font-weight:600;text-transform:uppercase;margin-top:2px;">Quota</div>
+          </div>
+          <div style="text-align:center;padding:10px 6px;background:var(--cg-50);border-radius:8px;border:1px solid var(--cg-200);">
+            <div style="font-size:20px;font-weight:800;color:{% if solde.solde >= 5 %}var(--cg-600){% elif solde.solde > 0 %}#c47a00{% else %}#b71c1c{% endif %};">{{ solde.solde|floatformat:1 }}j</div>
+            <div style="font-size:10.5px;color:var(--cg-muted);font-weight:600;text-transform:uppercase;margin-top:2px;">Restant</div>
+          </div>
+        </div>
+        {% if solde.jours_pris > 0 %}
+        <div style="margin-top:8px;font-size:11.5px;color:var(--cg-muted);text-align:center;">
+          {{ solde.jours_pris|floatformat:1 }}j déjà pris cette année
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <!-- Durées légales -->
+      <div class="cf-side-card">
+        <div class="cf-side-title"><i class="bi bi-book"></i> Durées légales (CODI)</div>
+        <div style="font-size:12px;line-height:1.8;color:var(--cg-text);">
+          {% for code,jours in durees_exceptionnelles.items %}
+          {% for c,label in types %}{% if c == code %}
+          <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--cg-50);">
+            <span style="color:var(--cg-muted);">{{ label }}</span>
+            <span style="font-weight:700;color:var(--cg-700);">{{ jours }}j</span>
+          </div>
+          {% endif %}{% endfor %}
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Congés actifs de l'employé (si pré-sélectionné) -->
+      {% if employe_pre %}
+      <div class="cf-side-card">
+        <div class="cf-side-title"><i class="bi bi-calendar-check"></i> Congés en cours / à venir</div>
+        {% with actifs=employe_pre.conges.filter %}
+        {% with conges=employe_pre.conges.all %}
+        {% with actifs=conges|dictsortreversed:"date_debut" %}
+        {% if actifs %}
+        <div style="font-size:12px;">
+          {% for c in actifs %}
+          {% if c.statut in 'approuve,en_cours' %}
+          <div style="padding:5px 0;border-bottom:1px solid var(--cg-50);display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="font-weight:600;color:var(--cg-text);">{{ c.get_type_conge_display }}</div>
+              <div style="font-size:11px;color:var(--cg-muted);">{{ c.date_debut|date:"d/m" }} → {{ c.date_fin|date:"d/m/Y" }}</div>
+            </div>
+            <span class="cg-badge cg-b-{{ c.statut }}" style="font-size:10px;">{{ c.get_statut_display }}</span>
+          </div>
+          {% endif %}
+          {% endfor %}
+        </div>
+        {% else %}
+        <div style="text-align:center;padding:12px;color:var(--cg-muted);font-size:12px;">Aucun congé actif</div>
+        {% endif %}
+        {% endwith %}{% endwith %}{% endwith %}
+      </div>
+      {% endif %}
+
+    </div><!-- /cf-sidebar -->
+  </div><!-- /cf-body -->
+  </form>
+</div><!-- /cf-page -->
 {% endblock %}
 
 {% block extra_js %}
 {{ durees_exceptionnelles|json_script:"cg-durees-data" }}
+{{ employes_json|json_script:"cg-employes-data" }}
 <script>
+var EMPLOYES_LIST     = JSON.parse(document.getElementById('cg-employes-data').textContent);
+var DUREES_LEGALES    = JSON.parse(document.getElementById('cg-durees-data').textContent);
+var TYPES_DEDUCTIBLES = {{ types_deductibles|safe }};
+var EMP_INFO_URL      = '{% url "conge_employe_info" 0 %}'.replace('/0/', '/');
+var currentSolde      = null;
+
+/* ── Recherche employé ── */
+var empInp   = document.getElementById('emp-search-inp');
+var empDrop  = document.getElementById('emp-dropdown');
+var empHid   = document.getElementById('id_employe');
+var empClear = document.getElementById('emp-clear');
+var focusIdx = -1;
+
+function renderDropdown(items) {
+  if (!items.length) {
+    empDrop.innerHTML = '<div class="emp-no-result"><i class="bi bi-search"></i> Aucun résultat</div>';
+  } else {
+    empDrop.innerHTML = items.slice(0, 12).map(function(e, i) {
+      return '<div class="emp-dropdown-item" data-pk="' + e.pk + '" data-idx="' + i + '">' +
+        '<div><div class="emp-di-name">' + e.nom + '</div>' +
+        '<div class="emp-di-sub">' + (e.svc || '—') + (e.fn ? ' · ' + e.fn : '') + '</div></div>' +
+        '<span class="emp-di-mat">' + e.mat + '</span></div>';
+    }).join('');
+    empDrop.querySelectorAll('.emp-dropdown-item').forEach(function(item) {
+      item.addEventListener('mousedown', function(ev) {
+        ev.preventDefault();
+        selectEmp(parseInt(this.dataset.pk));
+      });
+    });
+  }
+  empDrop.style.display = 'block';
+  focusIdx = -1;
+}
+
+function selectEmp(pk) {
+  var emp = EMPLOYES_LIST.find(function(e){ return e.pk === pk; });
+  if (!emp) return;
+  empHid.value = pk;
+  empInp.value = emp.nom + (emp.svc ? ' — ' + emp.svc : '');
+  empDrop.style.display = 'none';
+  empClear.style.display = 'block';
+  loadEmpInfo(pk);
+}
+
+function clearEmp() {
+  empHid.value = '';
+  empInp.value = '';
+  empClear.style.display = 'none';
+  empDrop.style.display = 'none';
+  document.getElementById('emp-panel').style.display = 'none';
+  document.getElementById('solde-alerte').style.display = 'none';
+  currentSolde = null;
+  empInp.focus();
+}
+
+empInp.addEventListener('input', function() {
+  var q = this.value.trim().toLowerCase();
+  if (!q) { empDrop.style.display = 'none'; empClear.style.display = 'none'; return; }
+  var filtered = EMPLOYES_LIST.filter(function(e) {
+    return e.nom.toLowerCase().includes(q) ||
+           e.mat.toLowerCase().includes(q) ||
+           e.svc.toLowerCase().includes(q);
+  });
+  renderDropdown(filtered);
+});
+
+empInp.addEventListener('keydown', function(e) {
+  var items = empDrop.querySelectorAll('.emp-dropdown-item');
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    focusIdx = Math.min(focusIdx + 1, items.length - 1);
+    items.forEach(function(el, i) { el.classList.toggle('focused', i === focusIdx); });
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    focusIdx = Math.max(focusIdx - 1, 0);
+    items.forEach(function(el, i) { el.classList.toggle('focused', i === focusIdx); });
+  } else if (e.key === 'Enter' && focusIdx >= 0 && items[focusIdx]) {
+    e.preventDefault();
+    selectEmp(parseInt(items[focusIdx].dataset.pk));
+  } else if (e.key === 'Escape') {
+    empDrop.style.display = 'none';
+  }
+});
+
+empInp.addEventListener('focus', function() {
+  if (this.value && !empHid.value) {
+    var q = this.value.trim().toLowerCase();
+    var filtered = EMPLOYES_LIST.filter(function(e) { return e.nom.toLowerCase().includes(q); });
+    if (filtered.length) renderDropdown(filtered);
+  }
+});
+
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.emp-search-wrap')) empDrop.style.display = 'none';
+});
+
+function loadEmpInfo(pk) {
+  fetch(EMP_INFO_URL + pk + '/info/')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      currentSolde = data;
+      var av = document.getElementById('emp-avatar');
+      av.innerHTML = data.photo ? '<img src="' + data.photo + '">' : data.initiales;
+      document.getElementById('emp-name').textContent  = data.nom;
+      document.getElementById('emp-sub').textContent   = data.matricule + (data.service !== '—' ? ' · ' + data.service : '');
+      document.getElementById('emp-annee').textContent = data.annee;
+      var restant = parseFloat(data.solde_restant);
+      var quota   = parseFloat(data.quota) || 1;
+      var pct     = Math.max(0, Math.min(100, Math.round(restant / quota * 100)));
+      var cls     = restant >= 5 ? 'ok' : restant >= 0 ? 'warn' : 'bad';
+      document.getElementById('emp-solde-txt').textContent = restant.toFixed(1) + 'j / ' + data.quota.toFixed(1) + 'j';
+      var bar = document.getElementById('emp-solde-bar');
+      bar.style.width = pct + '%';
+      bar.className   = 'solde-bar-fill ' + cls;
+      document.getElementById('emp-solde-wrap').style.display = 'block';
+      document.getElementById('emp-panel').style.display = 'flex';
+      calcDuree();
+    });
+}
+
+/* ── Calcul durée ── */
 function isWeekend(d) { return d.getDay() === 0 || d.getDay() === 6; }
 
 function calcDuree() {
   var d1 = document.getElementById('id_debut').value;
   var d2 = document.getElementById('id_fin').value;
-  var box  = document.getElementById('cg-duree');
-  var val  = document.getElementById('cg-duree-val');
-  var oBox = document.getElementById('cg-ouvres');
-  var oVal = document.getElementById('cg-ouvres-val');
+  var row = document.getElementById('duree-row');
+  if (!d1 || !d2) { row.style.display = 'none'; return; }
+  var dt1 = new Date(d1 + 'T12:00:00');
+  var dt2 = new Date(d2 + 'T12:00:00');
+  var diff = Math.round((dt2 - dt1) / 86400000) + 1;
+  if (diff <= 0) { row.style.display = 'none'; return; }
+  document.getElementById('val-cal').textContent = diff + ' jour' + (diff > 1 ? 's' : '') + ' calendaires';
+  var ouvres = 0, cur = new Date(dt1);
+  while (cur <= dt2) { if (!isWeekend(cur)) ouvres++; cur.setDate(cur.getDate() + 1); }
+  document.getElementById('val-ouv').textContent = ouvres;
+  row.style.display = 'flex';
+  checkSolde(ouvres);
+}
 
-  if (d1 && d2) {
-    var dt1 = new Date(d1 + 'T12:00:00');
-    var dt2 = new Date(d2 + 'T12:00:00');
-    var diff = Math.round((dt2 - dt1) / 86400000) + 1;
-    if (diff > 0) {
-      val.textContent = diff + ' jour' + (diff > 1 ? 's' : '') + ' calendaires';
-      box.style.display = 'inline-flex';
-      // Calcul jours ouvrés approximatif (sans jours fériés côté JS)
-      var ouvres = 0;
-      var cur = new Date(dt1);
-      while (cur <= dt2) {
-        if (!isWeekend(cur)) ouvres++;
-        cur.setDate(cur.getDate() + 1);
-      }
-      oVal.textContent = '≈ ' + ouvres + ' j';
-      oBox.style.display = 'inline-flex';
-    } else {
-      val.textContent = 'Date de fin invalide';
-      box.style.display = 'inline-flex';
-      oBox.style.display = 'none';
-    }
+/* ── Vérif solde ── */
+function checkSolde(ouvres) {
+  if (!currentSolde) return;
+  var typeCode = document.getElementById('id_type_conge').value;
+  if (!TYPES_DEDUCTIBLES.includes(typeCode)) {
+    document.getElementById('solde-alerte').style.display = 'none'; return;
+  }
+  var restant = parseFloat(currentSolde.solde_restant);
+  if (restant < ouvres) {
+    document.getElementById('solde-alerte-txt').textContent =
+      'Solde insuffisant : ' + restant.toFixed(1) + 'j restants pour ' + ouvres + 'j demandés.';
+    document.getElementById('solde-alerte').style.display = 'flex';
   } else {
-    box.style.display = 'none';
-    oBox.style.display = 'none';
+    document.getElementById('solde-alerte').style.display = 'none';
   }
 }
 
-var DUREES_LEGALES = JSON.parse(document.getElementById('cg-durees-data').textContent);
-
-function onTypeChange(code) {
-  var note = document.getElementById('cg-legal-note');
-  var text = document.getElementById('cg-legal-text');
-  if (code && DUREES_LEGALES[code]) {
-    text.textContent = 'Durée légale pour ce type : ' + DUREES_LEGALES[code] + ' jour(s) selon le Code du travail ivoirien.';
-    note.style.display = 'block';
+/* ── Changement type ── */
+document.getElementById('id_type_conge').addEventListener('change', function() {
+  var note = document.getElementById('cg-legal');
+  if (this.value && DUREES_LEGALES[this.value]) {
+    document.getElementById('cg-legal-text').textContent =
+      'Durée légale : ' + DUREES_LEGALES[this.value] + ' jour(s) selon le Code du travail ivoirien.';
+    note.style.display = 'flex';
+    note.style.gap = '8px';
+    note.style.alignItems = 'flex-start';
   } else {
     note.style.display = 'none';
   }
-}
+  calcDuree();
+});
+
+/* ── Changement dates ── */
+document.getElementById('id_debut').addEventListener('change', calcDuree);
+document.getElementById('id_fin').addEventListener('change', calcDuree);
+
+/* Init si pré-sélectionné */
+window.addEventListener('DOMContentLoaded', function() {
+  var pk = document.getElementById('id_employe').value;
+  if (pk) { loadEmpInfo(parseInt(pk)); empClear.style.display = 'block'; }
+  var type = document.getElementById('id_type_conge');
+  if (type.value) type.dispatchEvent(new Event('change'));
+  calcDuree();
+});
 </script>
 {% endblock %}

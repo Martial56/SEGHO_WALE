@@ -1123,16 +1123,33 @@ def rapports_indicateurs(request):
         key=lambda x: x['qte'], reverse=True
     )[:10]
 
+    chart_service_data = {
+        'labels': ['Taux de service', 'Taux de rupture'],
+        'data': [float(taux_service), float(taux_rupture)],
+        'colors': ['#0d7a4c', '#e84545'],
+    }
+    chart_critiques_data = {
+        'labels': [c['produit'].nom[:22] for c in critiques],
+        'data': [int(c['couverture']) for c in critiques],
+    }
+    chart_commander_data = {
+        'labels': [c['produit'].nom[:22] for c in a_commander],
+        'data': [int(c['qte']) for c in a_commander],
+    }
+
     return render(request, 'stock/rapports/indicateurs.html', {
-        'today':          today,
-        'taux_service':   taux_service,
-        'taux_rupture':   taux_rupture,
-        'taux_rotation':  taux_rotation,
-        'couverture_moy': couverture_moy,
-        'valeur_stock':   valeur_stock,
-        'critiques':      critiques,
-        'a_commander':    a_commander,
-        'total_produits': len(produits),
+        'today':           today,
+        'taux_service':    taux_service,
+        'taux_rupture':    taux_rupture,
+        'taux_rotation':   taux_rotation,
+        'couverture_moy':  couverture_moy,
+        'valeur_stock':    valeur_stock,
+        'critiques':       critiques,
+        'a_commander':     a_commander,
+        'total_produits':  len(produits),
+        'chart_service':   chart_service_data,
+        'chart_critiques': chart_critiques_data,
+        'chart_commander': chart_commander_data,
     })
 
 

@@ -1,6 +1,17 @@
 from django.db.models import F
 
 
+def user_profile(request):
+    if not request.user.is_authenticated:
+        return {'user_profile': None}
+    try:
+        from core.models import UserProfile
+        profile, _ = UserProfile.objects.get_or_create(user=request.user)
+        return {'user_profile': profile}
+    except Exception:
+        return {'user_profile': None}
+
+
 def header_stats(request):
     if not request.user.is_authenticated:
         return {'header_stats': {'medicaments_alerte': 0, 'factures_impayees': 0, 'analyses_pending': 0}}

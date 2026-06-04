@@ -68,6 +68,32 @@
 
 </div>
 
+<!-- Graphiques KPI -->
+<div style="display:grid;grid-template-columns:220px 1fr 1fr;gap:12px;margin-top:16px;">
+
+  <!-- Doughnut service / rupture -->
+  <div class="st-card" style="padding:16px;">
+    <div style="font-size:12px;font-weight:700;color:var(--st-700);margin-bottom:12px;"><i class="bi bi-pie-chart-fill" style="color:var(--st-600);"></i> Service &amp; Rupture</div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:10px;">
+      <div style="position:relative;width:140px;height:140px;"><canvas id="chartService"></canvas></div>
+      <div id="legendService" style="font-size:11.5px;display:flex;flex-direction:column;gap:4px;width:100%;"></div>
+    </div>
+  </div>
+
+  <!-- Bar couverture critique -->
+  <div class="st-card" style="padding:16px;">
+    <div style="font-size:12px;font-weight:700;color:var(--st-700);margin-bottom:12px;"><i class="bi bi-exclamation-triangle-fill" style="color:#b71c1c;"></i> Couverture critique (jours)</div>
+    <canvas id="chartCritiques" height="90"></canvas>
+  </div>
+
+  <!-- Bar quantités à commander -->
+  <div class="st-card" style="padding:16px;">
+    <div style="font-size:12px;font-weight:700;color:var(--st-700);margin-bottom:12px;"><i class="bi bi-cart-plus" style="color:#1a237e;"></i> Quantités à commander</div>
+    <canvas id="chartCommander" height="90"></canvas>
+  </div>
+
+</div>
+
 <div class="two-col">
 
   <!-- Produits couverture critique -->
@@ -136,4 +162,88 @@
   <div><strong>Taux de rotation</strong> = Total livraisons / Stock actuel total</div>
   <div><strong>Point de commande</strong> = CMM × délai + Stock sécurité</div>
 </div>
+
+{{ chart_service|json_script:"data-service" }}
+{{ chart_critiques|json_script:"data-critiques" }}
+{{ chart_commander|json_script:"data-commander" }}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'vendor/chart.umd.min.js' %}"></script>
+<script>
+var svc  = JSON.parse(document.getElementById('data-service').textContent);
+var crit = JSON.parse(document.getElementById('data-critiques').textContent);
+var cmd  = JSON.parse(document.getElementById('data-commander').textContent);
+
+Chart.defaults.font.family = "'Sora', sans-serif";
+Chart.defaults.font.size   = 11;
+
+/* 1 — Doughnut taux de service / rupture */
+new Chart(document.getElementById('chartService'), {
+  type: 'doughnut',
+  data: { labels: svc.labels, datasets: [{ data: svc.data, backgroundColor: svc.colors, borderWidth: 2, borderColor: '#fff' }] },
+  options: {
+    cutout: '68%',
+    plugins: { legend: { display: false }, tooltip: { callbacks: {
+      label: function(c){ return ' ' + c.label + ' : ' + c.raw + '%'; }
+    }}}
+  }
+});
+var leg = document.getElementById('legendService');
+svc.labels.forEach(function(lbl, i){
+  leg.innerHTML += '<div style="display:flex;align-items:center;gap:6px;">' +
+    '<span style="width:10px;height:10px;border-radius:50%;background:' + svc.colors[i] + ';flex-shrink:0;"></span>' +
+    '<span style="color:var(--st-muted);flex:1;">' + lbl + '</span>' +
+    '<strong style="color:var(--st-text);">' + svc.data[i] + '%</strong></div>';
+});
+
+/* 2 — Bar couverture critique */
+if (crit.labels.length > 0) {
+  new Chart(document.getElementById('chartCritiques'), {
+    type: 'bar',
+    data: {
+      labels: crit.labels,
+      datasets: [{ label: 'Couverture (j)', data: crit.data,
+        backgroundColor: crit.data.map(function(v){ return v < 15 ? '#b71c1c' : '#e47a2e'; }),
+        borderRadius: 4, borderSkipped: false }]
+    },
+    options: {
+      indexAxis: 'y',
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { beginAtZero: true, max: 30, grid: { color: 'rgba(0,0,0,.05)' },
+             ticks: { callback: function(v){ return v + 'j'; } } },
+        y: { grid: { display: false }, ticks: { font: { size: 10 } } }
+      }
+    }
+  });
+} else {
+  var ec = document.getElementById('chartCritiques');
+  if (ec) { ec.parentElement.innerHTML += '<div style="text-align:center;padding:20px;color:#0d7a4c;font-size:13px;"><i class="bi bi-check-circle-fill"></i> Aucun produit critique</div>'; ec.style.display = 'none'; }
+}
+
+/* 3 — Bar quantités à commander */
+if (cmd.labels.length > 0) {
+  new Chart(document.getElementById('chartCommander'), {
+    type: 'bar',
+    data: {
+      labels: cmd.labels,
+      datasets: [{ label: 'Qté à commander', data: cmd.data,
+        backgroundColor: '#1a237e',
+        borderRadius: 4, borderSkipped: false }]
+    },
+    options: {
+      indexAxis: 'y',
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { beginAtZero: true, grid: { color: 'rgba(0,0,0,.05)' } },
+        y: { grid: { display: false }, ticks: { font: { size: 10 } } }
+      }
+    }
+  });
+} else {
+  var ec2 = document.getElementById('chartCommander');
+  if (ec2) { ec2.parentElement.innerHTML += '<div style="text-align:center;padding:20px;color:#0d7a4c;font-size:13px;"><i class="bi bi-check-circle-fill"></i> Aucune commande urgente</div>'; ec2.style.display = 'none'; }
+}
+</script>
 {% endblock %}

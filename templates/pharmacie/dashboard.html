@@ -5,7 +5,7 @@
 {% block extra_ph_css %}<style>
 .ph-page-head {
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
-  padding: 12px 32px; margin: 0 -32px;
+  padding: 12px 32px;
   background: var(--ph-surface); border-bottom: 1px solid var(--ph-border);
   box-shadow: 0 2px 8px rgba(36,113,163,.06);
   position: sticky; top: calc(var(--topbar-h) + 44px); z-index: 100;
@@ -89,21 +89,21 @@
       <div class="ph-card-title"><i class="bi bi-prescription2" style="color:var(--ph-600);"></i> Ordonnances à dispenser</div>
       <a href="{% url 'pharmacie_ordonnances' pharmacie %}" class="btn-ph-outline" style="font-size:11px;padding:4px 10px;">Voir toutes</a>
     </div>
-    <div style="margin:0 -32px;overflow-x:auto;">
+    <div style="overflow-x:auto;">
       <table class="ph-table">
         <thead>
           <tr>
-            <th style="padding-left:32px;">Patient</th>
+            <th style="">Patient</th>
             <th>Date</th>
             <th>Médecin</th>
             <th style="text-align:center;">Médicaments</th>
-            <th style="padding-right:32px;"></th>
+            <th style=""></th>
           </tr>
         </thead>
         <tbody>
           {% for ord in ordonnances_attente %}
           <tr>
-            <td style="padding-left:32px;">
+            <td style="">
               <div style="font-weight:600;">{{ ord.consultation.patient }}</div>
               <div style="font-size:10.5px;color:var(--ph-muted);">{{ ord.numero }}</div>
             </td>
@@ -112,7 +112,7 @@
             <td style="text-align:center;">
               <span class="badge-ph-emise">{{ ord.lignes.count }} méd.</span>
             </td>
-            <td style="padding-right:32px;">
+            <td style="">
               <a href="{% url 'pharmacie_dispenser' pharmacie ord.pk %}" class="btn-ph" style="font-size:11px;padding:4px 10px;">
                 <i class="bi bi-check2-circle"></i> Dispenser
               </a>
@@ -137,19 +137,19 @@
       <div class="ph-card-title"><i class="bi bi-exclamation-triangle" style="color:#8a5c00;"></i> Stock critique</div>
       <a href="{% url 'pharmacie_stock' pharmacie %}?statut=alerte" class="btn-ph-outline" style="font-size:11px;padding:4px 10px;">Voir tout</a>
     </div>
-    <div style="margin:0 -32px;overflow-x:auto;">
+    <div style="overflow-x:auto;">
       <table class="ph-table">
         <thead>
           <tr>
-            <th style="padding-left:32px;">Produit</th>
+            <th style="">Produit</th>
             <th style="text-align:center;">Quantité</th>
-            <th style="text-align:center;padding-right:32px;">État</th>
+            <th style="text-align:center">État</th>
           </tr>
         </thead>
         <tbody>
           {% for item in stock_critique %}
           <tr>
-            <td style="padding-left:32px;">
+            <td style="">
               <div style="font-weight:600;">{{ item.produit.nom }}</div>
               <div style="font-size:10.5px;font-family:monospace;color:var(--ph-600);">{{ item.produit.code }}</div>
             </td>
@@ -157,7 +157,7 @@
               color:{% if item.quantite <= 0 %}#b71c1c{% else %}#8a5c00{% endif %};">
               {{ item.quantite }} {{ item.produit.unite_mesure }}
             </td>
-            <td style="text-align:center;padding-right:32px;">
+            <td style="text-align:center">
               {% if item.quantite <= 0 %}
                 <span class="badge-ph-rupture">Rupture</span>
               {% elif item.quantite <= item.produit.stock_alerte %}
@@ -185,20 +185,20 @@
     <div class="ph-card-title"><i class="bi bi-clock-history" style="color:var(--ph-600);"></i> Dernières opérations</div>
     <a href="{% url 'pharmacie_journal' pharmacie %}" class="btn-ph-outline" style="font-size:11px;padding:4px 10px;">Journal complet</a>
   </div>
-  <div style="margin:0 -32px;overflow-x:auto;">
+  <div style="overflow-x:auto;">
     <table class="ph-table">
       <thead>
         <tr>
-          <th style="padding-left:32px;">Date</th>
+          <th style="">Date</th>
           <th>Produit</th>
           <th>Type</th>
-          <th style="text-align:center;padding-right:32px;">Quantité</th>
+          <th style="text-align:center">Quantité</th>
         </tr>
       </thead>
       <tbody>
         {% for mvt in derniers_mvts %}
         <tr>
-          <td style="white-space:nowrap;color:var(--ph-muted);font-size:11.5px;padding-left:32px;">{{ mvt.date }}</td>
+          <td style="white-space:nowrap;color:var(--ph-muted);font-size:11.5px">{{ mvt.date }}</td>
           <td style="font-weight:600;">{{ mvt.produit }}</td>
           <td>
             {% if mvt.type == 'dispensation' %}
@@ -211,7 +211,7 @@
               <span class="badge-ph-emise">{{ mvt.type }}</span>
             {% endif %}
           </td>
-          <td style="text-align:center;font-weight:700;padding-right:32px;
+          <td style="text-align:center;font-weight:700;
             color:{% if mvt.quantite < 0 %}#b71c1c{% else %}#0d7a4c{% endif %};">
             {% if mvt.quantite > 0 %}+{% endif %}{{ mvt.quantite }}
           </td>

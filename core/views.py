@@ -31,6 +31,64 @@ def logout_view(request):
 
 
 @login_required(login_url='login')
+def mon_compte(request):
+    from django.contrib.auth import update_session_auth_hash
+    from core.models import UserProfile
+    user    = request.user
+    profile, _ = UserProfile.objects.get_or_create(user=user)
+    errors  = {}
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        if action == 'profil':
+            user.first_name = request.POST.get('first_name', '').strip()
+            user.last_name  = request.POST.get('last_name', '').strip()
+            user.email      = request.POST.get('email', '').strip()
+            user.save()
+            messages.success(request, 'Informations mises à jour.')
+            return redirect('mon_compte')
+
+        elif action == 'photo':
+            photo = request.FILES.get('photo')
+            if photo:
+                if profile.photo:
+                    profile.photo.delete(save=False)
+                profile.photo = photo
+                profile.save()
+                messages.success(request, 'Photo de profil mise à jour.')
+            return redirect('mon_compte')
+
+        elif action == 'supprimer_photo':
+            if profile.photo:
+                profile.photo.delete(save=False)
+                profile.photo = None
+                profile.save()
+                messages.success(request, 'Photo supprimée.')
+            return redirect('mon_compte')
+
+        elif action == 'password':
+            current = request.POST.get('current_password', '')
+            new_pw  = request.POST.get('new_password', '')
+            confirm = request.POST.get('confirm_password', '')
+
+            if not user.check_password(current):
+                errors['password'] = 'Mot de passe actuel incorrect.'
+            elif len(new_pw) < 8:
+                errors['password'] = 'Le nouveau mot de passe doit contenir au moins 8 caractères.'
+            elif new_pw != confirm:
+                errors['password'] = 'Les deux mots de passe ne correspondent pas.'
+            else:
+                user.set_password(new_pw)
+                user.save()
+                update_session_auth_hash(request, user)
+                messages.success(request, 'Mot de passe modifié avec succès.')
+                return redirect('mon_compte')
+
+    return render(request, 'utilisateur/mon_compte.html', {'errors': errors, 'profile': profile})
+
+
+@login_required(login_url='login')
 def dashboard(request):
     from patients.models import Patient, RendezVous
     from consultations.models import Consultation

@@ -7,6 +7,7 @@
 {% load static %}
     <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
 <style>
+.content { padding:0; }
 /* ══════════════════════════════════════════════════════
    PALETTE VERT OLIVE — module Ressources Humaines
    Inspirée du logo Centre Médico-Social WALÉ
@@ -45,14 +46,13 @@ html[data-theme="dark"] {
 .rh-nav {
   background: var(--rh-surface);
   border-bottom: 1px solid rgba(0,0,0,0.07);
-  margin: -32px -32px 0;
+  margin: 0;
   padding: 0 32px;
   display: flex;
   align-items: stretch;
   height: 44px;
   box-shadow: 0 1px 3px rgba(74,114,54,0.06);
-  position: sticky;
-  top: var(--topbar-h);
+  position: fixed; top: var(--topbar-h); left:0; right:0;
   z-index: 250;
   gap: 2px;
 }
@@ -315,7 +315,7 @@ html[data-theme="dark"] .rh-label { color: rgba(255,255,255,0.4); }
 
 /* ── Responsive ── */
 @media (max-width: 768px) {
-  .rh-nav { margin: -32px -20px 0; padding: 0 20px; overflow-x: auto; }
+  .rh-nav { margin: 0; padding: 0 16px; overflow-x: auto; }
 }
 </style>
 {% endblock %}
@@ -334,10 +334,7 @@ html[data-theme="dark"] .rh-label { color: rgba(255,255,255,0.4); }
      class="rh-nav-link {% block rh_nav_annuaire %}{% endblock %}">
     <i class="bi bi-person-lines-fill"></i> Annuaire
   </a>
-  <a href="{% url 'rh_organigramme' %}"
-     class="rh-nav-link {% block rh_nav_org %}{% endblock %}">
-    <i class="bi bi-diagram-3-fill"></i> Organigramme
-  </a>
+  {% block rh_nav_org %}{% endblock %}
   <a href="{% url 'rh_registre' %}"
      class="rh-nav-link {% block rh_nav_registre %}{% endblock %}">
     <i class="bi bi-journal-bookmark-fill"></i> Registre
@@ -353,5 +350,9 @@ html[data-theme="dark"] .rh-label { color: rgba(255,255,255,0.4); }
   </a>
   {% endif %}
 </nav>
+<div style="height:44px;"></div>
+<script>(function(){var tb=document.querySelector('.topbar'),nav=document.querySelector('.rh-nav');if(tb&&nav){var h=tb.getBoundingClientRect().height;if(h<30)return;nav.style.top=h+'px';document.documentElement.style.setProperty('--topbar-h',h+'px');}})();
+document.addEventListener('DOMContentLoaded',_fixNavTop);
+window.addEventListener('load',function(){var tb=document.querySelector('.topbar'),nav=document.querySelector('.cg-nav')||document.querySelector('[class*="-nav"]');if(tb&&nav){var h=tb.getBoundingClientRect().height;if(h>=30){nav.style.top=h+'px';document.documentElement.style.setProperty('--topbar-h',h+'px');}}});</script>
 {% endblock %}
 

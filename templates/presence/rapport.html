@@ -64,6 +64,13 @@
   h2.print-title { display:block !important; font-size:14px; margin-bottom:8px; }
 }
 h2.print-title { display:none; }
+.pr-pagination { display:flex;justify-content:center;align-items:center;gap:6px;padding:16px 0;flex-wrap:wrap; }
+.pr-page-link { display:inline-flex;align-items:center;justify-content:center;min-width:32px;height:32px;padding:0 8px;border-radius:6px;font-size:13px;font-weight:600;text-decoration:none;color:var(--pr-700);background:#fff;border:1px solid var(--pr-200);transition:all .15s; }
+.pr-page-link:hover { background:var(--pr-50); }
+.pr-page-link.active { background:var(--pr-600);color:#fff;border-color:var(--pr-600); }
+.pr-page-link.disabled { opacity:.35;pointer-events:none; }
+html[data-theme="dark"] .pr-page-link { background:var(--pr-surface);border-color:var(--pr-border);color:var(--pr-300); }
+html[data-theme="dark"] .pr-page-link.active { background:var(--pr-600);color:#fff; }
 </style>
 {% endblock %}
 
@@ -95,7 +102,11 @@ h2.print-title { display:none; }
     <span style="font-size:14px;font-weight:700;color:var(--pr-900);min-width:130px;text-align:center;">{{ mois_fr }} {{ year }}</span>
     <a href="?year={{ next_year }}&month={{ next_month }}{% if service_sel %}&service={{ service_sel.pk }}{% endif %}"
        class="btn-pr-outline" style="padding:6px 11px;"><i class="bi bi-chevron-right"></i></a>
-    <button onclick="window.print()" class="btn-pr" style="margin-left:8px;">
+    <a href="{% url 'presence_rapport_export' %}?year={{ year }}&month={{ month }}{% if service_sel %}&service={{ service_sel.pk }}{% endif %}"
+       class="btn-pr-outline" style="margin-left:8px;">
+      <i class="bi bi-file-earmark-excel-fill" style="color:#1d7a45;"></i> Excel
+    </a>
+    <button onclick="window.print()" class="btn-pr" style="margin-left:4px;">
       <i class="bi bi-printer"></i> Imprimer
     </button>
   </div>
@@ -134,6 +145,12 @@ h2.print-title { display:none; }
     <span style="background:rgba(232,154,26,.2);color:#c47a00;border-radius:10px;padding:1px 7px;font-size:11px;margin-left:4px;">{{ retards_all|length }}</span>
     {% endif %}
   </button>
+  <button class="rp-tab" onclick="showTab('motifs',this)">
+    <i class="bi bi-bar-chart-fill"></i> Absences par motif
+    {% if motifs_list %}
+    <span style="background:rgba(232,69,69,.15);color:#b71c1c;border-radius:10px;padding:1px 7px;font-size:11px;margin-left:4px;">{{ motifs_list|length }}</span>
+    {% endif %}
+  </button>
 </div>
 
 <!-- Tab: Récapitulatif -->
@@ -157,6 +174,7 @@ h2.print-title { display:none; }
             <th class="num">Absences</th>
             <th class="num">Non saisi</th>
             <th class="num">Retards</th>
+            <th class="num">Heures</th>
             <th style="min-width:120px;">Taux</th>
           </tr>
         </thead>
@@ -182,6 +200,9 @@ h2.print-title { display:none; }
               <span style="color:var(--pr-300);">—</span>
               {% endif %}
             </td>
+            <td class="num" style="font-size:12px;font-weight:600;color:var(--pr-700);">
+              {% if s.total_h or s.total_m %}{{ s.total_h }}h{{ s.total_m|stringformat:"02d" }}{% else %}—{% endif %}
+            </td>
             <td>
               <div style="display:flex;align-items:center;gap:8px;">
                 <div class="bar-track">
@@ -201,6 +222,32 @@ h2.print-title { display:none; }
       </table>
     </div>
   </div>
+
+  {% if page_obj.has_other_pages %}
+  <div class="pr-pagination no-print">
+    {% if page_obj.has_previous %}
+      <a href="?year={{ year }}&month={{ month }}{% if service_sel %}&service={{ service_sel.pk }}{% endif %}&page=1" class="pr-page-link"><i class="bi bi-chevron-double-left"></i></a>
+      <a href="?year={{ year }}&month={{ month }}{% if service_sel %}&service={{ service_sel.pk }}{% endif %}&page={{ page_obj.previous_page_number }}" class="pr-page-link"><i class="bi bi-chevron-left"></i></a>
+    {% else %}
+      <span class="pr-page-link disabled"><i class="bi bi-chevron-double-left"></i></span>
+      <span class="pr-page-link disabled"><i class="bi bi-chevron-left"></i></span>
+    {% endif %}
+    {% for num in page_obj.paginator.page_range %}
+      {% if num == page_obj.number %}<span class="pr-page-link active">{{ num }}</span>
+      {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
+        <a href="?year={{ year }}&month={{ month }}{% if service_sel %}&service={{ service_sel.pk }}{% endif %}&page={{ num }}" class="pr-page-link">{{ num }}</a>
+      {% endif %}
+    {% endfor %}
+    {% if page_obj.has_next %}
+      <a href="?year={{ year }}&month={{ month }}{% if service_sel %}&service={{ service_sel.pk }}{% endif %}&page={{ page_obj.next_page_number }}" class="pr-page-link"><i class="bi bi-chevron-right"></i></a>
+      <a href="?year={{ year }}&month={{ month }}{% if service_sel %}&service={{ service_sel.pk }}{% endif %}&page={{ page_obj.paginator.num_pages }}" class="pr-page-link"><i class="bi bi-chevron-double-right"></i></a>
+    {% else %}
+      <span class="pr-page-link disabled"><i class="bi bi-chevron-right"></i></span>
+      <span class="pr-page-link disabled"><i class="bi bi-chevron-double-right"></i></span>
+    {% endif %}
+    <span style="font-size:12px;color:var(--pr-muted);margin-left:6px;">Page {{ page_obj.number }}/{{ page_obj.paginator.num_pages }}</span>
+  </div>
+  {% endif %}
 </div>
 
 <!-- Tab: Retards -->
@@ -258,6 +305,45 @@ h2.print-title { display:none; }
       <i class="bi bi-check-circle" style="font-size:32px;color:var(--pr-400);display:block;margin-bottom:10px;"></i>
       <div style="font-size:14px;font-weight:600;">Aucun retard enregistré pour ce mois</div>
       <div style="font-size:12px;margin-top:4px;">Tous les employés sont arrivés dans les délais</div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Tab: Absences par motif -->
+<div id="pane-motifs" class="rp-pane">
+  <div class="pr-card">
+    <div class="pr-card-header">
+      <div class="pr-card-title"><i class="bi bi-bar-chart-fill"></i> Absences par motif — {{ mois_fr }} {{ year }}</div>
+    </div>
+    {% if motifs_list %}
+    <table class="rp-table">
+      <thead><tr>
+        <th>#</th><th>Motif d'absence</th><th class="num">Nb occurrences</th><th style="min-width:150px;">Part</th>
+      </tr></thead>
+      <tbody>
+      {% with total_abs=motifs_list|length %}
+      {% for motif, nb in motifs_list %}
+      <tr>
+        <td style="color:var(--pr-muted);font-size:11px;">{{ forloop.counter }}</td>
+        <td style="font-weight:600;">{{ motif }}</td>
+        <td class="num" style="font-weight:700;color:var(--pr-700);">{{ nb }}</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div class="bar-track">
+              <div class="bar-fill bad" style="width:{{ nb|add:"0" }}00%; max-width:100%;"></div>
+            </div>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+      {% endwith %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="text-align:center;padding:32px;color:var(--pr-muted);">
+      <i class="bi bi-check-circle-fill" style="font-size:28px;color:var(--pr-400);display:block;margin-bottom:8px;"></i>
+      Aucune absence avec motif enregistrée ce mois
     </div>
     {% endif %}
   </div>

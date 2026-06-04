@@ -4,7 +4,7 @@
 {% block topbar_title %}Confirmer livraison {{ demande.numero }}{% endblock %}
 
 {% block extra_ph_css %}<style>
-.ph-page-head { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 32px;margin:0 -32px;background:#f2f7ee;border-bottom:1px solid rgba(0,0,0,.05);box-shadow:0 2px 8px rgba(0,0,0,.04);position:sticky;top:calc(var(--topbar-h) + 44px);z-index:100; }
+.ph-page-head { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 32px;background:#f2f7ee;border-bottom:1px solid rgba(0,0,0,.05);box-shadow:0 2px 8px rgba(0,0,0,.04);position:sticky;top:calc(var(--topbar-h) + 44px);z-index:100; }
 .qte-input { border:none;border-bottom:2px solid var(--ph-300);background:transparent;padding:5px 6px;font-size:14px;font-weight:700;color:var(--ph-text);text-align:center;width:90px;font-family:inherit;border-radius:0; }
 .qte-input:focus { outline:none;border-bottom-color:var(--ph-600); }
 </style>{% endblock %}
@@ -45,21 +45,21 @@
 
 <form id="form-confirmer" method="post" action="{% url 'pharmacie_confirmer_livraison' pharmacie demande.pk %}">
 {% csrf_token %}
-<div style="margin:0 -32px;background:#fff;box-shadow:0 2px 12px rgba(58,89,36,.08);overflow-x:auto;">
+<div style="background:#fff;box-shadow:0 2px 12px rgba(58,89,36,.08);overflow-x:auto;">
   <div style="padding:12px 20px 12px 32px;"></div>
   <table class="ph-table">
     <thead>
       <tr>
-        <th style="padding-left:32px;">Produit</th>
+        <th style="">Produit</th>
         <th style="text-align:center;">Qté approuvée par le stock</th>
         <th style="text-align:center;">Stock actuel en pharmacie</th>
-        <th style="text-align:center;padding-right:32px;">Qté reçue</th>
+        <th style="text-align:center">Qté reçue</th>
       </tr>
     </thead>
     <tbody>
     {% for item in lignes_enrichies %}
     <tr>
-      <td style="padding-left:32px;">
+      <td style="">
         <div style="font-weight:600;">{{ item.produit.nom }}</div>
         <div style="font-size:10.5px;font-family:monospace;color:var(--ph-600);">{{ item.produit.code }}</div>
       </td>
@@ -71,7 +71,7 @@
         {{ item.stock_actuel|floatformat:0 }}
         <span style="font-size:10.5px;font-weight:400;color:var(--ph-muted);"> {{ item.produit.unite_mesure }}</span>
       </td>
-      <td style="text-align:center;padding-right:32px;">
+      <td style="text-align:center">
         <input type="number" name="recu_{{ item.ligne.pk }}" class="qte-input"
           value="{{ item.ligne.quantite_approuvee|floatformat:0 }}"
           min="0" max="{{ item.ligne.quantite_approuvee|floatformat:0 }}" step="1">

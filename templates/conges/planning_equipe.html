@@ -1,130 +1,236 @@
 {% extends 'conges/base.html' %}
-
-{% block topbar_title %}Planning équipe — {{ nom_mois }} {{ year }}{% endblock %}
-{% block cg_nav_planning %}active{% endblock %}
+{% block topbar_title %}Planning — {{ nom_mois }} {{ year }}{% endblock %}
 
 {% block extra_css %}
 {{ block.super }}
 <style>
-.planning-table{width:100%;border-collapse:collapse;font-size:11.5px;}
-.planning-table th,.planning-table td{padding:5px 4px;border:1px solid var(--cg-border);white-space:nowrap;}
-.planning-table thead th{background:var(--cg-50);font-weight:700;text-align:center;color:var(--cg-text);font-size:10.5px;}
-.planning-table .emp-col{min-width:130px;max-width:160px;text-align:left !important;padding-left:10px !important;font-weight:600;color:var(--cg-text);position:sticky;left:0;background:var(--cg-surface);z-index:2;}
-.planning-table thead .emp-col{background:var(--cg-50);z-index:3;}
-.cell-present{background:#f0faf5;text-align:center;}
-.cell-conge{background:rgba(74,114,54,.15);text-align:center;cursor:default;}
-.cell-non-ouvre{background:rgba(0,0,0,.04);text-align:center;}
-.cell-today{outline:2px solid var(--cg-600);outline-offset:-2px;}
-.cell-dot{display:inline-block;width:10px;height:10px;border-radius:50%;}
-.cell-dot-present{background:#16a96b;}
-.cell-dot-conge{background:var(--cg-600);font-size:9px;color:#fff;width:14px;height:14px;line-height:14px;text-align:center;border-radius:3px;font-weight:700;}
-.cell-dot-non-ouvre{background:rgba(0,0,0,.12);}
-.th-weekend{color:var(--rose);background:rgba(232,69,69,.04) !important;}
-.th-ferie{color:var(--amber);background:rgba(232,154,26,.06) !important;}
-html[data-theme="dark"] .planning-table thead th{background:var(--cg-100);}
-html[data-theme="dark"] .planning-table .emp-col{background:var(--cg-surface);}
-html[data-theme="dark"] .planning-table thead .emp-col{background:var(--cg-100);}
-html[data-theme="dark"] .cell-present{background:rgba(22,169,107,.06);}
-html[data-theme="dark"] .cell-conge{background:rgba(74,114,54,.25);}
-html[data-theme="dark"] .cell-non-ouvre{background:rgba(255,255,255,.03);}
+/* ── Pleine page sans scroll global ── */
+.pl-page {
+  display:flex; flex-direction:column;
+  height:calc(100vh - var(--topbar-h) - 44px);
+  overflow:hidden;
+}
+
+/* ── En-tête ── */
+.pl-head {
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  padding:8px 20px; flex-shrink:0;
+  background:var(--cg-surface); border-bottom:1px solid var(--cg-border);
+  flex-wrap:wrap;
+}
+.pl-nav { display:flex; align-items:center; gap:8px; }
+.pl-month { font-size:16px; font-weight:800; color:var(--cg-900); min-width:160px; text-align:center; }
+html[data-theme="dark"] .pl-month { color:var(--cg-200); }
+.pl-btn-nav {
+  width:30px; height:30px; border-radius:7px; border:1px solid var(--cg-200);
+  background:var(--cg-surface); color:var(--cg-600); text-decoration:none;
+  display:inline-flex; align-items:center; justify-content:center; font-size:13px;
+  transition:all .15s;
+}
+.pl-btn-nav:hover { background:var(--cg-600); color:#fff; border-color:var(--cg-600); }
+
+/* ── Légende ── */
+.pl-legend { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+.pl-leg-item { display:flex; align-items:center; gap:5px; font-size:11px; color:var(--cg-muted); }
+.pl-leg-dot { width:12px; height:12px; border-radius:3px; flex-shrink:0; }
+
+/* ── Corps : grille ── */
+.pl-body { flex:1; overflow:auto; min-height:0; }
+
+/* ── Tableau ── */
+.pl-table { border-collapse:collapse; font-size:11.5px; white-space:nowrap; }
+.pl-table th, .pl-table td { border:1px solid var(--cg-border); padding:0; }
+
+/* Colonne employé sticky */
+.pl-emp-th {
+  position:sticky; left:0; z-index:10;
+  background:var(--cg-700); color:#fff;
+  padding:8px 12px; text-align:left; min-width:160px; max-width:180px;
+  font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.3px;
+}
+.pl-emp-td {
+  position:sticky; left:0; z-index:5;
+  background:var(--cg-surface); padding:6px 10px;
+  border-right:2px solid var(--cg-300) !important;
+}
+html[data-theme="dark"] .pl-emp-td { background:var(--cg-surface); }
+.pl-emp-name  { font-size:12px; font-weight:700; color:var(--cg-text); }
+.pl-emp-svc   { font-size:10px; color:var(--cg-muted); margin-top:1px; }
+.pl-emp-count { font-size:10px; color:var(--cg-600); font-weight:700; }
+
+/* En-têtes jours */
+.pl-day-th {
+  background:var(--cg-700); color:#fff;
+  text-align:center; min-width:28px; padding:4px 2px;
+  font-size:10px; font-weight:700;
+}
+.pl-day-th .dn { font-size:9px; opacity:.7; }
+.pl-day-th.weekend { background:rgba(0,0,0,.35); }
+.pl-day-th.ferie   { background:rgba(232,154,26,.6); color:#000; }
+.pl-day-th.today   { background:#e84545 !important; color:#fff !important; }
+
+/* Colonne total sticky droite */
+.pl-total-th {
+  position:sticky; right:0; z-index:10;
+  background:var(--cg-700); color:#fff; padding:8px 8px;
+  text-align:center; min-width:44px; font-size:10px; font-weight:700;
+  text-transform:uppercase; letter-spacing:.3px;
+  border-left:2px solid rgba(255,255,255,.3) !important;
+}
+.pl-total-td {
+  position:sticky; right:0; z-index:5;
+  background:var(--cg-50); text-align:center; padding:4px 6px;
+  border-left:2px solid var(--cg-300) !important;
+  font-weight:800; font-size:12px;
+}
+html[data-theme="dark"] .pl-total-td { background:rgba(74,114,54,.1); }
+
+/* Cellules */
+.pl-cell { text-align:center; padding:3px 2px; height:32px; vertical-align:middle; }
+.pl-cell.weekend, .pl-cell.ferie { background:rgba(0,0,0,.04); }
+html[data-theme="dark"] .pl-cell.weekend,
+html[data-theme="dark"] .pl-cell.ferie { background:rgba(255,255,255,.03); }
+.pl-cell.today-col { outline:2px solid #e84545; outline-offset:-2px; }
+.pl-cell.present   { background:#f0faf5; }
+html[data-theme="dark"] .pl-cell.present { background:rgba(22,169,107,.06); }
+
+/* Badges type congé */
+.pl-cg-badge {
+  display:inline-block; border-radius:3px; padding:2px 4px;
+  font-size:9px; font-weight:800; color:#fff; cursor:default;
+  line-height:1; text-transform:uppercase; letter-spacing:.2px;
+}
+.cg-t-annuel    { background:var(--cg-600); }
+.cg-t-maladie   { background:#e84545; }
+.cg-t-maternite { background:#e91e8c; }
+.cg-t-paternite { background:#2d99db; }
+.cg-t-exceptionnel { background:#e89a1a; }
+.cg-t-sans_solde { background:#9e9e9e; }
+.cg-t-other     { background:#6c757d; }
+
+/* ── Pied : totaux par jour ── */
+.pl-foot-th {
+  position:sticky; left:0; z-index:10;
+  background:var(--cg-100); padding:5px 10px;
+  font-size:10px; font-weight:800; color:var(--cg-700); text-transform:uppercase; letter-spacing:.3px;
+  border-top:2px solid var(--cg-300) !important;
+}
+html[data-theme="dark"] .pl-foot-th { background:rgba(74,114,54,.1); }
+.pl-foot-td {
+  text-align:center; padding:4px 2px;
+  border-top:2px solid var(--cg-300) !important;
+  font-size:10.5px; font-weight:700; color:var(--cg-700);
+  background:var(--cg-50);
+}
+.pl-foot-td.has-abs { background:rgba(74,114,54,.1); }
+.pl-foot-total {
+  position:sticky; right:0; z-index:5;
+  background:var(--cg-100); text-align:center; padding:4px 6px;
+  border-left:2px solid var(--cg-300) !important;
+  border-top:2px solid var(--cg-300) !important;
+  font-weight:800; font-size:11px; color:var(--cg-700);
+}
 </style>
 {% endblock %}
 
 {% block content %}
+<div class="pl-page">
 
-<!-- Subheader -->
-<div class="cg-subheader">
-  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-    <a href="?year={{ prev_year }}&mois={{ prev_mois }}{% if service_sel %}&service={{ service_sel.pk }}{% endif %}" class="btn-cg-outline" style="padding:7px 13px;">
-      <i class="bi bi-chevron-left"></i>
-    </a>
-    <div>
-      <h1 style="font-size:20px;font-weight:800;color:var(--cg-900);margin:0;">
-        <i class="bi bi-people-fill" style="color:var(--cg-600);"></i> Planning équipe
-      </h1>
-      <div style="font-size:12px;color:var(--cg-muted);">{{ nom_mois }} {{ year }}</div>
+  <!-- En-tête -->
+  <div class="pl-head">
+    <div class="pl-nav">
+      <a href="?year={{ prev_year }}&mois={{ prev_mois }}{% if service_sel %}&service={{ service_sel.pk }}{% endif %}" class="pl-btn-nav">
+        <i class="bi bi-chevron-left"></i>
+      </a>
+      <div class="pl-month">{{ nom_mois }} {{ year }}</div>
+      <a href="?year={{ next_year }}&mois={{ next_mois }}{% if service_sel %}&service={{ service_sel.pk }}{% endif %}" class="pl-btn-nav">
+        <i class="bi bi-chevron-right"></i>
+      </a>
     </div>
-    <a href="?year={{ next_year }}&mois={{ next_mois }}{% if service_sel %}&service={{ service_sel.pk }}{% endif %}" class="btn-cg-outline" style="padding:7px 13px;">
-      <i class="bi bi-chevron-right"></i>
-    </a>
-  </div>
-  <!-- Filtre service -->
-  <form method="get" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-    <input type="hidden" name="year" value="{{ year }}">
-    <input type="hidden" name="mois" value="{{ mois }}">
-    <select name="service" class="cg-input" style="width:auto;min-width:160px;" onchange="this.form.submit()">
-      <option value="">Tous les services</option>
-      {% for svc in services %}
-      <option value="{{ svc.pk }}" {% if service_sel and service_sel.pk == svc.pk %}selected{% endif %}>{{ svc.nom }}</option>
-      {% endfor %}
-    </select>
-  </form>
-</div>
 
-<!-- Grille planning -->
-<div style="overflow-x:auto;margin-top:24px;">
+    <!-- Filtre service -->
+    <form method="get" style="display:flex;align-items:center;gap:8px;">
+      <input type="hidden" name="year" value="{{ year }}">
+      <input type="hidden" name="mois" value="{{ mois }}">
+      <select name="service" class="cg-input" style="min-width:160px;" onchange="this.form.submit()">
+        <option value="">Tous les services ({{ nb_employes }} emp.)</option>
+        {% for svc in services %}
+        <option value="{{ svc.pk }}" {% if service_sel and service_sel.pk == svc.pk %}selected{% endif %}>{{ svc.nom }}</option>
+        {% endfor %}
+      </select>
+    </form>
+
+    <!-- Légende -->
+    <div class="pl-legend">
+      <div class="pl-leg-item"><div class="pl-leg-dot" style="background:var(--cg-600);"></div> Congé annuel</div>
+      <div class="pl-leg-item"><div class="pl-leg-dot" style="background:#e84545;"></div> Maladie</div>
+      <div class="pl-leg-item"><div class="pl-leg-dot" style="background:#e89a1a;"></div> Exceptionnel</div>
+      <div class="pl-leg-item"><div class="pl-leg-dot" style="background:#9e9e9e;"></div> Sans solde</div>
+      <div class="pl-leg-item"><div class="pl-leg-dot" style="background:#f0faf5;border:1px solid var(--cg-200);"></div> Présent</div>
+      <div class="pl-leg-item"><div class="pl-leg-dot" style="background:rgba(0,0,0,.08);border:1px solid rgba(0,0,0,.1);"></div> WE / Férié</div>
+      <div class="pl-leg-item"><div class="pl-leg-dot" style="background:#e84545;border-radius:50%;"></div> Aujourd'hui</div>
+    </div>
+  </div>
+
+  <!-- Grille -->
+  <div class="pl-body">
   {% if planning_grid %}
-  <table class="planning-table">
+  <table class="pl-table">
     <thead>
       <tr>
-        <th class="emp-col">Employé</th>
+        <th class="pl-emp-th">Employé</th>
         {% for day in days %}
-        <th class="{% if day.weekend or day.ferie %}{% if day.weekend %}th-weekend{% else %}th-ferie{% endif %}{% endif %} {% if day.today %}cell-today{% endif %}" title="{% if day.ferie %}Jour férié{% elif day.weekend %}Week-end{% endif %}">
+        <th class="pl-day-th {% if day.weekend %}weekend{% elif day.ferie %}ferie{% endif %} {% if day.today %}today{% endif %}"
+            title="{% if day.ferie %}Jour férié — {% endif %}{{ day.date|date:'l d/m' }}">
           <div>{{ day.num }}</div>
-          <div style="font-size:9px;opacity:.7;">{{ day.date|date:"D"|slice:":2"|upper }}</div>
+          <div class="dn">{{ day.date|date:"D"|slice:":2"|upper }}</div>
         </th>
         {% endfor %}
+        <th class="pl-total-th">Congés</th>
       </tr>
     </thead>
     <tbody>
       {% for row in planning_grid %}
       <tr>
-        <td class="emp-col">
-          <div style="font-size:12px;font-weight:700;color:var(--cg-text);">{{ row.employe.nom }}</div>
-          <div style="font-size:10px;color:var(--cg-muted);">{{ row.employe.prenoms|truncatechars:12 }}</div>
+        <td class="pl-emp-td">
+          <div class="pl-emp-name">{{ row.employe.nom_complet|truncatechars:22 }}</div>
+          <div class="pl-emp-svc">{{ row.employe.service.nom|default:"—" }}</div>
         </td>
         {% for cell in row.cells %}
-        <td class="cell-{{ cell.type }} {% for day in days %}{% if forloop.counter == forloop.parentloop.counter and day.today %}cell-today{% endif %}{% endfor %}"
-          {% if cell.type == 'conge' %}title="{{ cell.label }}"{% endif %}>
+        <td class="pl-cell {% if cell.type == 'non_ouvre' %}{% if cell.weekend %}weekend{% else %}ferie{% endif %}{% elif cell.type == 'present' %}present{% endif %}{% if cell.today %} today-col{% endif %}"
+            {% if cell.type == 'conge' %}title="{{ cell.label }}"{% endif %}>
           {% if cell.type == 'conge' %}
-          <span class="cell-dot cell-dot-conge">C</span>
+            <span class="pl-cg-badge {% if cell.type_code == 'annuel' %}cg-t-annuel{% elif cell.type_code == 'maladie' %}cg-t-maladie{% elif cell.type_code == 'maternite' or cell.type_code == 'maternite_prolongee' %}cg-t-maternite{% elif cell.type_code == 'paternite' %}cg-t-paternite{% elif cell.type_code == 'sans_solde' %}cg-t-sans_solde{% else %}cg-t-exceptionnel{% endif %}"
+                  title="{{ cell.label }}">{{ cell.label|slice:":3" }}</span>
           {% elif cell.type == 'present' %}
-          <span class="cell-dot cell-dot-present"></span>
-          {% else %}
-          <span class="cell-dot cell-dot-non-ouvre"></span>
+            <span style="color:var(--cg-300);font-size:10px;">·</span>
           {% endif %}
         </td>
         {% endfor %}
+        <td class="pl-total-td {% if row.nb_conge > 0 %}has-abs{% endif %}">
+          {% if row.nb_conge > 0 %}{{ row.nb_conge }}j{% else %}<span style="color:var(--cg-muted);">—</span>{% endif %}
+        </td>
       </tr>
       {% endfor %}
     </tbody>
+    <tfoot>
+      <tr>
+        <td class="pl-foot-th"><i class="bi bi-people"></i> Absences/jour</td>
+        {% for nb in absences_par_jour %}
+        <td class="pl-foot-td {% if nb %}has-abs{% endif %}">
+          {% if nb %}<span style="color:var(--cg-700);">{{ nb }}</span>{% else %}<span style="color:var(--cg-border);">—</span>{% endif %}
+        </td>
+        {% endfor %}
+        <td class="pl-foot-total">—</td>
+      </tr>
+    </tfoot>
   </table>
   {% else %}
-  <div style="padding:50px;text-align:center;color:var(--cg-muted);">
-    <i class="bi bi-people" style="font-size:36px;display:block;margin-bottom:12px;opacity:.3;"></i>
-    <p>Aucun employé trouvé pour ce filtre.</p>
+  <div style="text-align:center;padding:60px;color:var(--cg-muted);">
+    <i class="bi bi-people" style="font-size:40px;display:block;margin-bottom:12px;opacity:.3;"></i>
+    <div style="font-size:14px;font-weight:600;">Aucun employé trouvé</div>
   </div>
   {% endif %}
-</div>
-
-<!-- Légende -->
-<div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:16px;padding:12px 16px;background:var(--cg-surface);border-radius:10px;box-shadow:var(--shadow-sm);">
-  <div style="display:flex;align-items:center;gap:7px;">
-    <span class="cell-dot cell-dot-present"></span>
-    <span style="font-size:12px;color:var(--cg-muted);">Présent (jour ouvré)</span>
-  </div>
-  <div style="display:flex;align-items:center;gap:7px;">
-    <span class="cell-dot cell-dot-conge" style="font-size:8px;width:12px;height:12px;line-height:12px;">C</span>
-    <span style="font-size:12px;color:var(--cg-muted);">En congé (survoler pour le type)</span>
-  </div>
-  <div style="display:flex;align-items:center;gap:7px;">
-    <span class="cell-dot cell-dot-non-ouvre"></span>
-    <span style="font-size:12px;color:var(--cg-muted);">Week-end / Jour férié</span>
-  </div>
-  <div style="display:flex;align-items:center;gap:7px;">
-    <span style="display:inline-block;width:12px;height:12px;outline:2px solid var(--cg-600);border-radius:2px;"></span>
-    <span style="font-size:12px;color:var(--cg-muted);">Aujourd'hui</span>
   </div>
 </div>
-
 {% endblock %}

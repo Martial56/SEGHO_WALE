@@ -7,6 +7,7 @@
 {% load static %}
     <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
 <style>
+.content { padding:0; }
 /* ══════════════════════════════════════════════════════
    PALETTE VERT OLIVE — module Congés (couleur logo WALÉ)
 ══════════════════════════════════════════════════════ */
@@ -42,40 +43,37 @@ html[data-theme="dark"] {
 .cg-nav {
   background: var(--cg-surface);
   border-bottom: 1px solid rgba(0,0,0,0.07);
-  margin: -32px -32px 0;
-  padding: 0 32px;
-  display: flex;
-  align-items: stretch;
-  height: 44px;
+  margin: 0; padding: 0;
+  display: flex; align-items: stretch; height: 44px;
   box-shadow: 0 1px 3px rgba(74,114,54,0.07);
-  position: sticky;
-  top: var(--topbar-h);
+  position: sticky; top: var(--topbar-h);
   z-index: 250;
-  gap: 2px;
 }
-.cg-nav-link {
-  padding: 11px 16px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--cg-muted);
-  text-decoration: none;
-  border-bottom: 2px solid transparent;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  transition: color 0.15s, border-color 0.15s;
-  white-space: nowrap;
-  margin-bottom: -1px;
-}
-.cg-nav-link:hover  { color: var(--cg-600); }
-.cg-nav-link.active { color: var(--cg-600); border-bottom-color: var(--cg-500); font-weight: 600; }
 html[data-theme="dark"] .cg-nav { background: var(--cg-surface); border-bottom-color: var(--cg-border); }
-html[data-theme="dark"] .cg-nav-link        { color: rgba(255,255,255,0.35); }
-html[data-theme="dark"] .cg-nav-link:hover  { color: var(--cg-300); }
-html[data-theme="dark"] .cg-nav-link.active { color: var(--cg-300); border-bottom-color: var(--cg-400); }
-@media (max-width: 768px) {
-  .cg-nav { margin: -32px -20px 0; padding: 0 20px; overflow-x: auto; }
+
+/* Zone liens — défile si trop étroit */
+.cg-nav-links {
+  display: flex; align-items: stretch;
+  padding: 0 20px; gap: 0;
+  overflow-x: auto; flex: 1; min-width: 0;
+  scrollbar-width: none;
+  scroll-behavior: smooth;
 }
+.cg-nav-links::-webkit-scrollbar { display: none; }
+
+.cg-nav-link {
+  padding: 0 13px; font-size: 12.5px; font-weight: 500;
+  color: var(--cg-muted); text-decoration: none;
+  border-bottom: 2px solid transparent;
+  display: inline-flex; align-items: center; gap: 5px;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap; height: 44px; flex-shrink: 0;
+}
+.cg-nav-link:hover  { color: var(--cg-600); background: rgba(74,103,65,.05); }
+.cg-nav-link.active { color: var(--cg-600); border-bottom-color: var(--cg-500); font-weight: 700; }
+html[data-theme="dark"] .cg-nav-link        { color: rgba(255,255,255,0.35); }
+html[data-theme="dark"] .cg-nav-link:hover  { color: var(--cg-300); background: rgba(74,103,65,.08); }
+html[data-theme="dark"] .cg-nav-link.active { color: var(--cg-300); border-bottom-color: var(--cg-400); }
 
 /* ── Boutons ── */
 .btn-cg {
@@ -189,8 +187,23 @@ html[data-theme="dark"] .cg-b-refuse   { background:rgba(232,69,69,.18);color:#f
 html[data-theme="dark"] .cg-b-en_cours { background:rgba(45,153,219,.18);color:#80c8ef;border-color:rgba(45,153,219,.3); }
 html[data-theme="dark"] .cg-b-termine  { background:rgba(255,255,255,.06);color:rgba(255,255,255,.4);border-color:rgba(255,255,255,.12); }
 
-/* ── Nav right group (badges) ── */
-.cg-nav-right-group { margin-left: auto; display: flex; align-items: center; }
+/* ── Nav right group (badges) — toujours visible à droite ── */
+.cg-nav-right-group {
+  display: flex; align-items: center;
+  padding: 0 16px; gap: 4px;
+  flex-shrink: 0; border-left: 1px solid rgba(0,0,0,.06);
+  background: var(--cg-surface);
+}
+/* Dropdown Plus */
+.cg-more-item {
+  display:flex; align-items:center; gap:8px;
+  padding:9px 14px; font-size:13px; font-weight:500;
+  color:var(--cg-text); text-decoration:none; border-radius:8px;
+  transition:background .12s; white-space:nowrap;
+}
+.cg-more-item:hover, .cg-more-item.active { background:var(--cg-50); color:var(--cg-700); }
+html[data-theme="dark"] .cg-more-item { color:var(--cg-200); }
+html[data-theme="dark"] .cg-more-item:hover { background:rgba(74,103,65,.12); }
 .cg-nav-badge-btn {
   background: none; border: none; cursor: pointer; text-decoration: none;
   display: flex; align-items: center; justify-content: center;
@@ -214,14 +227,14 @@ html[data-theme="dark"] .cg-nav-badge-btn.bell { color: var(--cg-300); }
 /* ── Subheader / Form head ── */
 .cg-subheader, .cg-form-head {
   display:flex;align-items:center;justify-content:space-between;gap:16px;
-  padding:14px 32px;margin:0 -32px;flex-wrap:wrap;
+  padding:14px 32px;flex-wrap:wrap;
   position:sticky;top:calc(var(--topbar-h) + 44px);z-index:100;
   background:#f0f6fa;border-bottom:1px solid rgba(0,0,0,0.05);
   box-shadow:0 2px 8px rgba(0,0,0,0.04);
 }
 html[data-theme="dark"] .cg-subheader,
 html[data-theme="dark"] .cg-form-head { background:#071e28;border-bottom-color:rgba(255,255,255,0.05); }
-@media(max-width:1024px){.cg-subheader,.cg-form-head{margin:0 -20px;padding-left:20px;padding-right:20px;}}
+@media(max-width:1024px){.cg-subheader,.cg-form-head{margin:0;padding-left:20px;padding-right:20px;}}
 
 /* ── Back button ── */
 .cg-back-btn {
@@ -272,60 +285,111 @@ html[data-theme="dark"] .cg-form-head { background:#071e28;border-bottom-color:r
 
 {% block breadcrumb %}
 <nav class="cg-nav">
-  <a href="{% url 'conge_dashboard' %}"
-     class="cg-nav-link {% block cg_nav_dashboard %}{% endblock %}">
-    <i class="bi bi-speedometer2"></i> Tableau de bord
-  </a>
-  <a href="{% url 'conge_list' %}"
-     class="cg-nav-link {% block cg_nav_list %}{% endblock %}">
-    <i class="bi bi-calendar-check-fill"></i> Congés
-  </a>
-  <a href="{% url 'conge_calendrier' %}"
-     class="cg-nav-link {% block cg_nav_calendrier %}{% endblock %}">
-    <i class="bi bi-calendar3"></i> Calendrier
-  </a>
-  <a href="{% url 'conge_mes_conges' %}"
-     class="cg-nav-link {% block cg_nav_mes_conges %}{% endblock %}">
-    <i class="bi bi-person-badge"></i> Mes congés
-  </a>
-  {% if can_manage %}
-  <a href="{% url 'conge_soldes' %}"
-     class="cg-nav-link {% block cg_nav_soldes %}{% endblock %}">
-    <i class="bi bi-table"></i> Soldes
-  </a>
-  <a href="{% url 'conge_stats_service' %}"
-     class="cg-nav-link {% block cg_nav_stats %}{% endblock %}">
-    <i class="bi bi-graph-up"></i> Statistiques
-  </a>
-  <a href="{% url 'conge_planning_equipe' %}"
-     class="cg-nav-link {% block cg_nav_planning %}{% endblock %}">
-    <i class="bi bi-people-fill"></i> Planning équipe
-  </a>
-  <a href="{% url 'conge_rapport' %}"
-     class="cg-nav-link {% block cg_nav_rapport %}{% endblock %}">
-    <i class="bi bi-file-earmark-bar-graph"></i> Rapports
-  </a>
-  <a href="{% url 'conge_nouveau' %}"
-     class="cg-nav-link {% block cg_nav_nouveau %}{% endblock %}">
-    <i class="bi bi-plus-circle-fill"></i> Enregistrer un congé
-  </a>
-  {% endif %}
+  <!-- Zone liens défilante -->
+  <div class="cg-nav-links">
+    <a href="{% url 'conge_dashboard' %}"
+       class="cg-nav-link {% if nav_active == 'dashboard' %}active{% endif %}">
+      <i class="bi bi-speedometer2"></i> Tableau de bord
+    </a>
+    <a href="{% url 'conge_list' %}"
+       class="cg-nav-link {% if nav_active == 'list' %}active{% endif %}">
+      <i class="bi bi-list-ul"></i> Liste des congés
+    </a>
+    <a href="{% url 'conge_suivi_retours' %}"
+       class="cg-nav-link {% if nav_active == 'retours' %}active{% endif %}">
+      <i class="bi bi-arrow-return-left"></i> Suivi retours
+    </a>
+    <a href="{% url 'conge_calendrier' %}"
+       class="cg-nav-link {% if nav_active == 'calendrier' %}active{% endif %}">
+      <i class="bi bi-calendar3"></i> Calendrier
+    </a>
+    <a href="{% url 'conge_nouveau' %}"
+       class="cg-nav-link {% if nav_active == 'nouveau' %}active{% endif %}"
+       style="color:var(--cg-600);font-weight:600;">
+      <i class="bi bi-plus-circle-fill"></i> Enregistrer
+    </a>
+  </div>
 
+  <!-- Groupe droite : dropdown + badges —TOUJOURS VISIBLE-->
   <div class="cg-nav-right-group">
+
+    {% if can_manage %}
+    <!-- Dropdown "Plus" -->
+    <div style="position:relative;" id="cg-more-wrap">
+      <button onclick="toggleCgMore()" id="cg-more-btn"
+              class="cg-nav-badge-btn"
+              style="color:var(--cg-muted);gap:4px;font-size:12.5px;font-weight:500;padding:0 10px;"
+              title="Plus d'options">
+        <i class="bi bi-grid-3x3-gap-fill"></i> Plus
+      </button>
+      <div id="cg-more-popup"
+           style="display:none;position:fixed;background:var(--cg-surface);border:1px solid var(--cg-border);
+                  border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.14);padding:8px;
+                  min-width:180px;z-index:9001;">
+        <a href="{% url 'conge_soldes' %}" class="cg-more-item">
+          <i class="bi bi-table"></i> Soldes congés
+        </a>
+        <a href="{% url 'conge_planning_equipe' %}" class="cg-more-item">
+          <i class="bi bi-people-fill"></i> Planning équipe
+        </a>
+        <a href="{% url 'conge_rapport' %}" class="cg-more-item">
+          <i class="bi bi-file-earmark-bar-graph"></i> Rapports
+        </a>
+        <a href="{% url 'conge_direction' %}" class="cg-more-item {% if nav_active == 'direction' %}active{% endif %}">
+          <i class="bi bi-graph-up-arrow"></i> Vue direction
+        </a>
+        <a href="{% url 'conge_export_csv' %}" class="cg-more-item">
+          <i class="bi bi-file-earmark-excel"></i> Export CSV
+        </a>
+      </div>
+    </div>
+    {% endif %}
+
     {% if cg_notifs_count %}
     <a href="{% url 'conge_notifs_lire' %}" class="cg-nav-badge-btn bell"
-       title="{{ cg_notifs_count }} notification{% if cg_notifs_count > 1 %}s{% endif %} non lue{% if cg_notifs_count > 1 %}s{% endif %}">
+       title="{{ cg_notifs_count }} notification{{ cg_notifs_count|pluralize }} non lue{{ cg_notifs_count|pluralize }}">
       <i class="bi bi-bell-fill"></i>
       <span class="cg-nav-count green">{{ cg_notifs_count }}</span>
     </a>
     {% endif %}
     {% if cg_pending_count %}
     <a href="{% url 'conge_list' %}?statut=demande" class="cg-nav-badge-btn pending"
-       title="{{ cg_pending_count }} demande{% if cg_pending_count > 1 %}s{% endif %} en attente d'approbation">
+       title="{{ cg_pending_count }} demande{{ cg_pending_count|pluralize }} en attente">
       <i class="bi bi-hourglass-split"></i>
       <span class="cg-nav-count orange">{{ cg_pending_count }}</span>
     </a>
     {% endif %}
+    {% if cg_dans_7j %}
+    <a href="{% url 'conge_dashboard' %}" class="cg-nav-badge-btn"
+       style="color:#2d99db;"
+       title="{{ cg_dans_7j }} congé{{ cg_dans_7j|pluralize }} débutant dans 7 jours">
+      <i class="bi bi-calendar-event-fill"></i>
+      <span class="cg-nav-count" style="background:#2d99db;">{{ cg_dans_7j }}</span>
+    </a>
+    {% endif %}
   </div>
 </nav>
+<script>
+/* Scroll vers le lien actif dans la nav */
+(function(){
+  var active = document.querySelector('.cg-nav-links .cg-nav-link.active');
+  if(active){ active.scrollIntoView({inline:'nearest', block:'nearest'}); }
+})();
+
+function toggleCgMore(){
+  var popup=document.getElementById('cg-more-popup');
+  var btn=document.getElementById('cg-more-btn');
+  if(!popup)return;
+  if(popup.style.display==='block'){popup.style.display='none';return;}
+  var r=btn.getBoundingClientRect();
+  popup.style.top=(r.bottom+4)+'px';
+  popup.style.right=(window.innerWidth-r.right)+'px';
+  popup.style.display='block';
+}
+document.addEventListener('click',function(e){
+  var w=document.getElementById('cg-more-wrap');
+  var p=document.getElementById('cg-more-popup');
+  if(w&&p&&!w.contains(e.target))p.style.display='none';
+});
+</script>
 {% endblock %}

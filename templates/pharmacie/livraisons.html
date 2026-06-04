@@ -4,7 +4,7 @@
 {% block topbar_title %}Pharmacie — Livraisons{% endblock %}
 
 {% block extra_ph_css %}<style>
-.ph-page-head { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 32px;margin:0 -32px;background:#f2f7ee;border-bottom:1px solid rgba(0,0,0,.05);box-shadow:0 2px 8px rgba(0,0,0,.04);position:sticky;top:calc(var(--topbar-h) + 44px);z-index:100; }
+.ph-page-head { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 32px;background:#f2f7ee;border-bottom:1px solid rgba(0,0,0,.05);box-shadow:0 2px 8px rgba(0,0,0,.04);position:sticky;top:calc(var(--topbar-h) + 44px);z-index:100; }
 .badge-livraison { background:rgba(58,89,36,.1);color:var(--ph-700);border:1px solid rgba(58,89,36,.2);padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600; }
 .badge-confirmee { background:rgba(22,169,107,.1);color:#0d7a4c;border:1px solid rgba(22,169,107,.25);padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600; }
 .badge-partielle  { background:rgba(45,153,219,.1);color:#1565c0;border:1px solid rgba(45,153,219,.25);padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600; }
@@ -26,26 +26,26 @@
   </div>
 
   {% if en_attente %}
-  <div class="ph-card" style="margin:0 -32px;overflow-x:auto;">
+  <div class="ph-card" style="overflow-x:auto;">
     <div style="padding:12px 20px 12px 32px;font-size:13px;font-weight:700;color:var(--ph-text);"></div>
     <table class="ph-table">
       <thead>
         <tr>
-          <th style="padding-left:32px;">N° Demande</th>
+          <th style="">N° Demande</th>
           <th>Date livraison</th>
           <th style="text-align:center;">Nb produits</th>
           <th>Message du stock</th>
-          <th style="width:140px;padding-right:32px;"></th>
+          <th style="width:140px"></th>
         </tr>
       </thead>
       <tbody>
       {% for d in en_attente %}
       <tr>
-        <td style="padding-left:32px;font-family:monospace;font-weight:700;color:var(--ph-600);">{{ d.numero }}</td>
+        <td style="font-family:monospace;font-weight:700;color:var(--ph-600);">{{ d.numero }}</td>
         <td style="font-size:12px;">{{ d.date_traitement|date:"d/m/Y H:i" }}</td>
         <td style="text-align:center;font-weight:700;">{{ d.lignes.count }}</td>
         <td style="font-size:12px;color:var(--ph-muted);font-style:italic;">{{ d.notes_stock|default:"—"|truncatechars:40 }}</td>
-        <td style="padding-right:32px;">
+        <td style="">
           <a href="{% url 'pharmacie_confirmer_livraison' pharmacie d.pk %}" class="btn-ph" style="padding:5px 12px;font-size:12px;">
             <i class="bi bi-check2-circle"></i> Confirmer la réception
           </a>
@@ -69,24 +69,24 @@
   <div style="font-size:13px;font-weight:700;color:var(--ph-text);margin-bottom:10px;display:flex;align-items:center;gap:8px;">
     <i class="bi bi-clock-history" style="color:var(--ph-500);"></i> Livraisons récentes confirmées
   </div>
-  <div class="ph-card" style="margin:0 -32px;overflow-x:auto;">
+  <div class="ph-card" style="overflow-x:auto;">
     <div style="padding:12px 20px 12px 32px;font-size:13px;font-weight:700;color:var(--ph-text);"></div>
     <table class="ph-table">
       <thead>
         <tr>
-          <th style="padding-left:32px;">N° Demande</th>
+          <th style="">N° Demande</th>
           <th>Date confirmation</th>
           <th style="text-align:center;">Nb produits</th>
-          <th style="padding-right:32px;">Statut</th>
+          <th style="">Statut</th>
         </tr>
       </thead>
       <tbody>
       {% for d in historique %}
       <tr>
-        <td style="padding-left:32px;font-family:monospace;font-weight:700;color:var(--ph-600);">{{ d.numero }}</td>
+        <td style="font-family:monospace;font-weight:700;color:var(--ph-600);">{{ d.numero }}</td>
         <td style="font-size:12px;">{{ d.date_traitement|date:"d/m/Y" }}</td>
         <td style="text-align:center;font-weight:700;">{{ d.lignes.count }}</td>
-        <td style="padding-right:32px;">
+        <td style="">
           {% if d.statut == 'approuvee' %}<span class="badge-confirmee"><i class="bi bi-check-circle-fill" style="font-size:9px;"></i> Confirmée</span>
           {% else %}<span class="badge-partielle"><i class="bi bi-check2-all" style="font-size:9px;"></i> Partielle</span>{% endif %}
         </td>

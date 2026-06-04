@@ -123,6 +123,14 @@
   <div style="font-size:14px;font-weight:700;color:var(--pr-900);margin-top:4px;">
     {{ jour_fr }} {{ selected_date|date:"d" }} {{ mois_fr }} {{ selected_date|date:"Y" }}
   </div>
+  {% if jour_ferie %}
+  <div style="display:inline-flex;align-items:center;gap:6px;margin-top:8px;
+              background:rgba(232,154,26,.12);border:1px solid rgba(232,154,26,.3);
+              border-radius:20px;padding:4px 14px;font-size:12.5px;font-weight:700;color:#8a5c00;">
+    <i class="bi bi-star-fill" style="font-size:11px;"></i>
+    Jour férié — {{ jour_ferie.nom }}
+  </div>
+  {% endif %}
 </div>
 
 <form method="post">
@@ -136,11 +144,13 @@
             <th class="th-left" style="min-width:180px;">Nom et Prénoms</th>
             <th style="width:80px;">Service</th>
             <th style="width:60px;">Présent</th>
+            <th style="width:70px;font-size:10px;">Permanence<br><small>8h–15h</small></th>
             <th>Heure d'arrivée<br><small>matin</small></th>
             <th>Heure départ<br><small>matin</small></th>
             <th>Heure d'arrivée<br><small>soir</small></th>
             <th>Heure de départ<br><small>soir</small></th>
             <th style="min-width:140px;">Remarques</th>
+            <th style="min-width:120px;font-size:10px;">Modifié par</th>
           </tr>
         </thead>
         <tbody>
@@ -151,6 +161,16 @@
             <td class="td-nom">
               <div>{{ emp.nom_complet }}</div>
               {% if emp.fonction %}<div style="font-size:11px;color:var(--pr-muted);font-weight:400;">{{ emp.fonction }}</div>{% endif %}
+              {% if ligne.perm_active %}
+              <span style="background:rgba(26,35,126,.08);color:#1a237e;border:1px solid rgba(26,35,126,.2);border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700;">
+                <i class="bi bi-clock-fill" style="font-size:9px;"></i>
+                Permanence {% if planning_perm %}{{ planning_perm.heure_debut|time:"H:i" }}–{{ planning_perm.heure_fin|time:"H:i" }}{% else %}8h–15h{% endif %}
+              </span>
+              {% elif ligne.perm_planifiee %}
+              <span style="background:rgba(232,154,26,.08);color:#8a5c00;border:1px solid rgba(232,154,26,.25);border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700;">
+                <i class="bi bi-calendar-check" style="font-size:9px;"></i> Planifié
+              </span>
+              {% endif %}
               {% if ligne.conge %}
               <div style="margin-top:3px;">
                 <span style="background:rgba(99,102,241,.08);color:#4338ca;border:1px solid rgba(99,102,241,.2);border-radius:10px;padding:1px 8px;font-size:10px;font-weight:700;white-space:nowrap;">
@@ -175,22 +195,45 @@
               </label>
             </td>
 
-            <!-- Horaires matin -->
-            <td class="td-time">
+            <!-- Checkbox permanence -->
+            <td style="text-align:center;">
+              <input type="checkbox" name="perm_{{ emp.pk }}" value="1"
+                     id="perm_{{ emp.pk }}"
+                     {% if ligne.perm_active %}checked{% endif %}
+                     onchange="togglePermanence('{{ emp.pk }}', this.checked)"
+                     style="width:16px;height:16px;cursor:pointer;accent-color:#1a237e;">
+            </td>
+
+            <!-- Zone permanence (2 champs) -->
+            <td class="td-time" colspan="2" id="zone_perm_{{ emp.pk }}"
+                style="text-align:center;{% if not ligne.perm_active %}display:none;{% endif %}">
+              <span style="font-size:9.5px;color:#1a237e;display:block;margin-bottom:2px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;">Arrivée</span>
+              <input type="time" name="h_am_{{ emp.pk }}" class="time-inp"
+                     value="{{ p.heure_arrivee_matin|time:'H:i'|default:'' }}"
+                     placeholder="08:00">
+            </td>
+            <td class="td-time" colspan="2" style="text-align:center;{% if not p or not p.permanence %}display:none;{% endif %}">
+              <span style="font-size:9.5px;color:#1a237e;display:block;margin-bottom:2px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;">Départ</span>
+              <input type="time" name="h_ds_{{ emp.pk }}" class="time-inp"
+                     value="{{ p.heure_depart_soir|time:'H:i'|default:'' }}"
+                     placeholder="15:00">
+            </td>
+
+            <!-- Zone normale (4 champs) -->
+            <td class="td-time" id="zone_normale_{{ emp.pk }}"
+                style="{% if ligne.perm_active %}display:none;{% endif %}">
               <input type="time" name="h_am_{{ emp.pk }}" class="time-inp"
                      value="{{ p.heure_arrivee_matin|time:'H:i'|default:'' }}">
             </td>
-            <td class="td-time">
+            <td class="td-time" style="{% if ligne.perm_active %}display:none;{% endif %}">
               <input type="time" name="h_dm_{{ emp.pk }}" class="time-inp"
                      value="{{ p.heure_depart_matin|time:'H:i'|default:'' }}">
             </td>
-
-            <!-- Horaires soir -->
-            <td class="td-time">
+            <td class="td-time" style="{% if ligne.perm_active %}display:none;{% endif %}">
               <input type="time" name="h_as_{{ emp.pk }}" class="time-inp"
                      value="{{ p.heure_arrivee_soir|time:'H:i'|default:'' }}">
             </td>
-            <td class="td-time">
+            <td class="td-time" style="{% if ligne.perm_active %}display:none;{% endif %}">
               <input type="time" name="h_ds_{{ emp.pk }}" class="time-inp"
                      value="{{ p.heure_depart_soir|time:'H:i'|default:'' }}">
             </td>
@@ -207,11 +250,18 @@
                        value="{% if p %}{{ p.motif_absence }}{% elif ligne.conge %}{{ ligne.conge.get_type_conge_display }}{% endif %}">
               </div>
             </td>
+            <!-- Audit -->
+            <td style="font-size:10.5px;color:var(--pr-muted);white-space:nowrap;vertical-align:middle;">
+              {% if p and p.modifie_par %}
+              <div>{{ p.modifie_par.get_full_name|default:p.modifie_par.username }}</div>
+              <div style="font-size:10px;opacity:.7;">{{ p.modifie_le|date:"d/m/Y H:i" }}</div>
+              {% else %}—{% endif %}
+            </td>
           </tr>
           {% endwith %}
           {% empty %}
           <tr>
-            <td colspan="9" style="text-align:center;padding:40px;color:var(--pr-muted);">
+            <td colspan="10" style="text-align:center;padding:40px;color:var(--pr-muted);">
               <i class="bi bi-people" style="font-size:32px;display:block;margin-bottom:8px;opacity:.3;"></i>
               Aucun employé actif trouvé.
             </td>
@@ -236,6 +286,13 @@
 
 {% block extra_js %}
 <script>
+function togglePermanence(empId, isPerm) {
+  var zoneNormale = document.getElementById('zone_normale_' + empId);
+  var zonePerm    = document.getElementById('zone_perm_' + empId);
+  if (zoneNormale) zoneNormale.style.display = isPerm ? 'none' : '';
+  if (zonePerm)    zonePerm.style.display    = isPerm ? '' : 'none';
+}
+
 function togglePresent(empId, isPresent) {
   var lbl      = document.getElementById('lbl_' + empId);
   var motifWrap = document.getElementById('motif_wrap_' + empId);

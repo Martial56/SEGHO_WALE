@@ -184,13 +184,19 @@ body {
 .confirm-icon {
   width:72px; height:72px; border-radius:50%; background:rgba(22,169,107,.12);
   display:flex; align-items:center; justify-content:center;
-  font-size:36px; color:#16a96b; margin:0 auto 16px;
+  font-size:36px; color:#16a96b; margin:0 auto 14px;
   animation:pop .3s ease;
 }
 @keyframes pop { from{transform:scale(.6);opacity:0} to{transform:scale(1);opacity:1} }
-.confirm-titre { font-size:20px; font-weight:800; color:var(--g900); margin-bottom:6px; }
-.confirm-sous  { font-size:13px; color:rgba(0,0,0,.5); margin-bottom:4px; }
-.confirm-heure { font-size:28px; font-weight:800; color:var(--g600); font-variant-numeric:tabular-nums; }
+.confirm-greeting {
+  font-size:22px; font-weight:800; color:var(--g700);
+  margin-bottom:4px; animation:fadeUp .35s ease both;
+}
+@keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+.confirm-greeting .greet-emoji { font-size:26px; margin-right:6px; }
+.confirm-titre { font-size:14px; font-weight:600; color:rgba(0,0,0,.45); margin-bottom:12px; }
+.confirm-sous  { font-size:12px; color:rgba(0,0,0,.4); margin-bottom:2px; }
+.confirm-heure { font-size:32px; font-weight:800; color:var(--g600); font-variant-numeric:tabular-nums; }
 .confirm-action{ display:inline-flex;align-items:center;gap:6px;background:var(--g50);
                  color:var(--g700);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:700;margin-top:10px;}
 </style>
@@ -295,6 +301,7 @@ body {
   <!-- Confirmation -->
   <div id="confirmation">
     <div class="confirm-icon"><i class="bi bi-check-lg"></i></div>
+    <div class="confirm-greeting" id="conf-greeting"></div>
     <div class="confirm-titre" id="conf-nom"></div>
     <div class="confirm-sous">Pointage enregistré à</div>
     <div class="confirm-heure" id="conf-heure"></div>
@@ -407,14 +414,31 @@ async function validerPointage() {
   }
 }
 
+var GREETINGS = {
+  'arrivee_matin': { emoji: '🌅', msg: 'Bonjour' },
+  'depart_matin':  { emoji: '🍽️', msg: 'Bonne pause déjeuner' },
+  'arrivee_soir':  { emoji: '☀️', msg: 'Bon retour' },
+  'depart_soir':   { emoji: '🌆', msg: 'Bonne fin de journée' },
+  'complet':       { emoji: '✅', msg: 'Excellente journée' },
+  // Permanence (horaire continu 8h–15h)
+  'arrivee':       { emoji: '🏥', msg: 'Bonjour, bonne permanence' },
+  'depart':        { emoji: '🌟', msg: 'Merci pour votre permanence' },
+};
+
 function showConfirmation(data) {
+  var prenom = (empData.nom || '').split(' ')[0];
+  var greet  = GREETINGS[data.action] || { emoji: '👋', msg: 'Bonne journée' };
+
+  document.getElementById('conf-greeting').innerHTML =
+    '<span class="greet-emoji">' + greet.emoji + '</span>' +
+    greet.msg + ' ' + prenom + ' !';
+
   document.getElementById('conf-nom').textContent    = empData.nom;
   document.getElementById('conf-heure').textContent  = data.heure;
   document.getElementById('conf-action').innerHTML   = '<i class="bi bi-clock"></i> ' + data.label;
   document.getElementById('emp-section').style.display  = 'none';
   document.getElementById('confirmation').style.display = 'block';
-  // Retour auto après 4 secondes
-  setTimeout(function() { resetKiosque(); }, 4000);
+  setTimeout(function() { resetKiosque(); }, 4500);
 }
 
 function annuler()    { resetKiosque(); }
