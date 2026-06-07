@@ -1,0 +1,459 @@
+{% extends 'patients/base.html' %}
+
+{% block topbar_title %}Créer une ordonnance{% endblock %}
+
+{% block extra_css %}
+<style>
+    .ord-panel {
+        background: #fff; border-bottom: 1px solid rgba(0,0,0,0.08);
+        position: sticky; top: 0; z-index: 100;
+    }
+    .ord-top {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 10px 24px; gap: 12px;
+    }
+    .ord-breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; }
+    .ord-breadcrumb a { color: var(--teal-600); text-decoration: none; font-weight: 600; }
+    .ord-breadcrumb a:hover { color: var(--teal-500); }
+    .ord-breadcrumb .sep { color: #bbb; font-weight: 400; }
+    .ord-breadcrumb .current { color: rgba(0,0,0,0.45); font-weight: 500; }
+    .btn-save {
+        background: var(--teal-500); color: #fff; border: none; border-radius: 6px;
+        padding: 8px 20px; font-size: 13px; font-weight: 700;
+        cursor: pointer; font-family: 'Sora', sans-serif; transition: background 0.15s;
+    }
+    .btn-save:hover { background: var(--teal-600); }
+    .btn-save:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-discard {
+        background: transparent; color: rgba(0,0,0,0.55);
+        border: 1px solid rgba(0,0,0,0.15); border-radius: 6px;
+        padding: 8px 16px; font-size: 13px; font-weight: 600;
+        cursor: pointer; font-family: 'Sora', sans-serif;
+        text-decoration: none; transition: all 0.15s;
+    }
+    .btn-discard:hover { border-color: var(--rose); color: var(--rose); }
+
+    .ord-body { background: #f6f8fa; min-height: calc(100vh - 60px); padding: 24px; }
+    .ord-card { background: #fff; border: 1px solid rgba(0,0,0,0.08); border-radius: 8px; margin-bottom: 20px; overflow: hidden; }
+    .ord-card-head {
+        padding: 12px 20px; font-size: 12px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.06em; color: rgba(0,0,0,0.45);
+        border-bottom: 1px solid rgba(0,0,0,0.07); background: #fafbfc;
+    }
+    .ord-card-body { padding: 20px; }
+
+    .ord-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 48px; }
+    .ord-field { display: flex; flex-direction: column; gap: 4px; padding: 6px 0; }
+    .ord-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(0,0,0,0.4); }
+    .ord-input {
+        border: none; border-bottom: 1.5px solid #d1dde3; border-radius: 0;
+        padding: 5px 2px; font-size: 13px; color: var(--teal-900);
+        background: transparent; outline: none; font-family: 'Sora', sans-serif;
+        transition: border-color .2s; width: 100%;
+    }
+    .ord-input:focus { border-bottom-color: var(--teal-500); }
+    select.ord-input {
+        appearance: none; -webkit-appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23839aaa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+        background-repeat: no-repeat; background-position: right 4px center;
+        padding-right: 20px; cursor: pointer;
+    }
+    textarea.ord-input { resize: vertical; border: 1.5px solid #d1dde3; border-radius: 6px; padding: 8px 10px; }
+    textarea.ord-input:focus { border-color: var(--teal-500); }
+
+    /* Patient search */
+    .pat-search-wrap { position: relative; }
+    .pat-search-input {
+        width: 100%; border: none; border-bottom: 1.5px solid #d1dde3;
+        padding: 5px 2px; font-size: 13px; color: var(--teal-900);
+        background: transparent; outline: none; font-family: 'Sora', sans-serif;
+        transition: border-color .2s;
+    }
+    .pat-search-input:focus { border-bottom-color: var(--teal-500); }
+    .pat-search-dd {
+        display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+        background: #fff; border: 1px solid rgba(0,0,0,0.12);
+        border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,0.10);
+        z-index: 400; max-height: 230px; overflow-y: auto;
+    }
+    .pat-dd-item { padding: 9px 14px; font-size: 13px; cursor: pointer; border-bottom: 1px solid rgba(0,0,0,0.05); }
+    .pat-dd-item:last-child { border-bottom: none; }
+    .pat-dd-item:hover { background: var(--teal-50); }
+    .pat-dd-name { font-weight: 600; color: var(--teal-900); }
+    .pat-dd-code { font-size: 11px; color: rgba(0,0,0,0.4); font-family: monospace; }
+    .pat-dd-empty { padding: 12px 14px; font-size: 12px; color: rgba(0,0,0,0.35); font-style: italic; }
+
+    /* Patient banner */
+    .patient-banner {
+        display: flex; align-items: center; gap: 14px;
+        padding: 10px 20px; background: #f0f9f8; border-radius: 6px;
+        margin-top: 12px; border: 1px solid #b2dfdb;
+    }
+    .patient-banner-av {
+        width: 36px; height: 36px; border-radius: 50%;
+        background: var(--teal-600); color: #fff;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 14px; font-weight: 700; flex-shrink: 0;
+    }
+    .patient-banner-name { font-size: 13px; font-weight: 700; color: var(--teal-900); }
+    .patient-banner-meta { font-size: 11.5px; color: rgba(0,0,0,0.45); margin-top: 1px; }
+
+    /* Médicaments */
+    .lines-table { width: 100%; border-collapse: collapse; }
+    .lines-table thead th {
+        font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.05em; color: rgba(0,0,0,0.38);
+        padding: 6px 8px; border-bottom: 1px solid rgba(0,0,0,0.08); text-align: left;
+    }
+    .lines-table tbody td { padding: 6px 8px; border-bottom: 1px solid #f3f3f3; vertical-align: middle; }
+    .line-input {
+        border: none; border-bottom: 1px solid #dde3ec; outline: none;
+        font-size: 12.5px; color: var(--teal-900); background: transparent;
+        padding: 3px 2px; width: 100%; font-family: 'Sora', sans-serif;
+    }
+    .line-input:focus { border-bottom-color: var(--teal-500); }
+    .line-input.qty { width: 52px; text-align: center; }
+    .btn-remove-line {
+        background: none; border: none; cursor: pointer;
+        color: #bbb; font-size: 15px; line-height: 1; padding: 2px 4px;
+        border-radius: 3px; transition: color 0.15s;
+    }
+    .btn-remove-line:hover { color: var(--rose,#e11d48); }
+    .btn-add-line {
+        display: inline-flex; align-items: center; gap: 6px;
+        background: none; border: 1px dashed #b2dfdb; border-radius: 5px;
+        color: var(--teal-600); font-size: 12.5px; font-weight: 600;
+        padding: 7px 16px; cursor: pointer; margin-top: 12px;
+        font-family: 'Sora', sans-serif; transition: background 0.15s;
+    }
+    .btn-add-line:hover { background: var(--teal-50); }
+
+    /* Autocomplete médicament */
+    .med-ac-wrap { position: relative; }
+    .med-ac-dropdown {
+        display: none; position: absolute; top: calc(100% + 2px); left: 0;
+        background: #fff; border: 1px solid rgba(0,0,0,0.12);
+        border-radius: 7px; box-shadow: 0 6px 18px rgba(0,0,0,0.10);
+        z-index: 500; min-width: 240px; max-height: 200px; overflow-y: auto;
+    }
+    .med-ac-item { padding: 7px 12px; font-size: 12.5px; cursor: pointer; border-bottom: 1px solid rgba(0,0,0,0.04); line-height: 1.4; color: var(--teal-900); }
+    .med-ac-item:hover { background: var(--teal-50); }
+    .med-ac-name { font-weight: 500; }
+    .med-ac-sub { font-size: 11px; color: rgba(0,0,0,0.4); }
+
+    /* Stock badge */
+    .stock-badge {
+        display: inline-block; border-radius: 4px; padding: 2px 8px;
+        font-size: 11.5px; font-weight: 700; min-width: 28px; text-align: center;
+    }
+    .stock-ok      { background: #f0fdf4; color: #15803d; }
+    .stock-low     { background: #fffbeb; color: #b45309; }
+    .stock-empty   { background: #fff0f0; color: #b91c1c; }
+    .stock-unknown { color: rgba(0,0,0,0.25); font-size: 12px; }
+
+    @media (max-width: 700px) { .ord-grid { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="breadcrumb">
+    <a href="{% url 'dashboard' %}"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z"/><polyline points="9 21 9 12 15 12 15 21"/></svg>Accueil</a>
+    <span class="breadcrumb-sep">›</span>
+    <a href="{% url 'pharmacie:ordonnance_list' %}">Ordonnances</a>
+    {% if patient %}
+    <span class="breadcrumb-sep">›</span>
+    <span>{{ patient.nom }} {{ patient.prenoms }}</span>
+    {% endif %}
+    <span class="breadcrumb-sep">›</span>
+    <span>Nouvelle ordonnance</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+
+{% if messages %}
+{% for msg in messages %}
+<div style="margin:12px 24px 0;padding:10px 16px;border-radius:6px;font-size:13px;{% if msg.tags == 'error' %}background:#fff0f0;border:1px solid #fca5a5;color:#b91c1c{% else %}background:#f0fdf4;border:1px solid #86efac;color:#15803d{% endif %}">{{ msg }}</div>
+{% endfor %}
+{% endif %}
+
+<form method="post" id="ord-form">
+{% csrf_token %}
+<input type="hidden" name="consultation_id" value="{{ consultation.pk|default:'' }}">
+<input type="hidden" name="rdv_id" value="">
+<input type="hidden" name="patient_id" id="patient-id-hidden" value="{{ patient.pk|default:'' }}">
+
+<!-- Panneau de contrôle -->
+<div class="ord-panel">
+    <div class="ord-top">
+        <div class="ord-breadcrumb">
+            <a href="{% url 'pharmacie:ordonnance_list' %}">Ordonnances</a>
+            <span class="sep">/</span>
+            <span class="current">Nouvelle ordonnance</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+            <button type="submit" class="btn-save" id="btn-save" {% if not patient %}disabled{% endif %}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2" style="vertical-align:-2px;margin-right:4px"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                Sauvegarder
+            </button>
+            <a href="{% url 'pharmacie:ordonnance_list' %}" class="btn-discard">Annuler</a>
+        </div>
+    </div>
+</div>
+
+<div class="ord-body">
+
+    <!-- Recherche patient -->
+    <div class="ord-card" style="overflow:visible;">
+        <div class="ord-card-head">Patient</div>
+        <div class="ord-card-body" style="overflow:visible;">
+            {% if patient %}
+            {# Cas depuis rendez-vous — patient déjà connu #}
+            <div class="patient-banner" id="patient-banner">
+                <div class="patient-banner-av" id="pat-av">{{ patient.nom|first }}{{ patient.prenoms|first }}</div>
+                <div>
+                    <div class="patient-banner-name" id="pat-name">{{ patient.nom }} {{ patient.prenoms }}</div>
+                    <div class="patient-banner-meta" id="pat-meta">
+                        {{ patient.code }}{% if consultation %} · Consultation {{ consultation.numero }}{% endif %}{% if patient.date_naissance %} · {{ patient.date_naissance|date:"d/m/Y" }}{% endif %}
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            {# Cas depuis pharmacie — recherche patient #}
+            <div class="ord-field">
+                <label class="ord-label">Rechercher un patient <span style="color:var(--rose)">*</span></label>
+                <div class="pat-search-wrap">
+                    <input type="text" id="pat-search-input" class="pat-search-input"
+                           placeholder="Nom, prénom, code ou téléphone…" autocomplete="off">
+                    <div id="pat-search-dd" class="pat-search-dd"></div>
+                </div>
+            </div>
+            <div class="patient-banner" id="patient-banner" style="display:none;">
+                <div class="patient-banner-av" id="pat-av"></div>
+                <div>
+                    <div class="patient-banner-name" id="pat-name"></div>
+                    <div class="patient-banner-meta" id="pat-meta"></div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Informations de l'ordonnance -->
+    <div class="ord-card">
+        <div class="ord-card-head">Informations générales</div>
+        <div class="ord-card-body">
+            <div class="ord-grid">
+                <div>
+                    <div class="ord-field">
+                        <label class="ord-label">Type d'ordonnance</label>
+                        <select name="type_ordonnance" class="ord-input">
+                            {% for val, lbl in types %}<option value="{{ val }}">{{ lbl }}</option>{% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <div class="ord-field">
+                        <label class="ord-label">Date d'expiration</label>
+                        <input type="date" name="date_expiration" class="ord-input" value="{% now 'Y-m-d' %}">
+                    </div>
+                    <div class="ord-field" style="margin-top:8px;">
+                        <label class="ord-label">Notes</label>
+                        <textarea name="notes" class="ord-input" rows="3" placeholder="Instructions, remarques…"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lignes de médicaments -->
+    <div class="ord-card">
+        <div class="ord-card-head">Médicaments prescrits</div>
+        <div class="ord-card-body">
+            <table class="lines-table" id="lines-table">
+                <thead>
+                    <tr>
+                        <th style="width:30%">Médicament</th>
+                        <th style="width:25%">Posologie <span style="color:var(--rose)">*</span></th>
+                        <th style="width:18%">Durée</th>
+                        <th style="width:8%">Qté</th>
+                        <th style="width:14%;text-align:center;">Qté en stock</th>
+                        <th style="width:5%"></th>
+                    </tr>
+                </thead>
+                <tbody id="lines-body">
+                    <tr class="line-row">
+                        <td>
+                            <div class="med-ac-wrap">
+                                <input type="text" class="line-input med-search" placeholder="Rechercher…" autocomplete="off">
+                                <div class="med-ac-dropdown"></div>
+                                <input type="hidden" name="medicament[]" class="med-id-hidden" value="">
+                            </div>
+                        </td>
+                        <td><input type="text" name="posologie[]" class="line-input" placeholder="Ex : 1cp matin et soir"></td>
+                        <td><input type="text" name="duree[]" class="line-input" placeholder="Ex : 7 jours"></td>
+                        <td><input type="number" name="quantite[]" class="line-input qty" value="1" min="1"></td>
+                        <td style="text-align:center;"><span class="stock-badge stock-unknown med-stock-display">—</span></td>
+                        <td><button type="button" class="btn-remove-line" title="Supprimer">✕</button></td>
+                    </tr>
+                </tbody>
+            </table>
+            <button type="button" class="btn-add-line" id="btn-add-line">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                Ajouter un médicament
+            </button>
+        </div>
+    </div>
+
+</div>
+</form>
+
+<script>
+const MEDS = {{ medicaments_dispo|safe }};
+const patientPreselected = {{ patient|yesno:"true,false" }};
+
+/* ── Recherche patient ── */
+if (!patientPreselected) {
+    const searchInput = document.getElementById('pat-search-input');
+    const dropdown    = document.getElementById('pat-search-dd');
+    const hiddenId    = document.getElementById('patient-id-hidden');
+    const banner      = document.getElementById('patient-banner');
+    const patAv       = document.getElementById('pat-av');
+    const patName     = document.getElementById('pat-name');
+    const patMeta     = document.getElementById('pat-meta');
+    const btnSave     = document.getElementById('btn-save');
+    let timer;
+
+    searchInput.addEventListener('input', function () {
+        clearTimeout(timer);
+        hiddenId.value = ''; btnSave.disabled = true;
+        banner.style.display = 'none';
+        const q = this.value.trim();
+        if (q.length < 2) { dropdown.style.display = 'none'; return; }
+        timer = setTimeout(() => {
+            fetch('/patients/recherche/?q=' + encodeURIComponent(q))
+                .then(r => r.json())
+                .then(data => {
+                    /* L'API retourne { results: [{id, nom_complet, code, telephone, actif}] } */
+                    const list = data.results || data.patients || (Array.isArray(data) ? data : []);
+                    if (!list.length) {
+                        dropdown.innerHTML = '<div class="pat-dd-empty">Aucun patient trouvé</div>';
+                    } else {
+                        dropdown.innerHTML = list.slice(0, 10).map(p => {
+                            const nom = p.nom_complet || ((p.nom||'') + ' ' + (p.prenoms||'')).trim();
+                            const code = p.code || '';
+                            const id = p.id || p.pk || '';
+                            return `<div class="pat-dd-item" data-id="${id}" data-nom="${nom}" data-code="${code}">
+                                <div class="pat-dd-name">${nom}</div>
+                                <div class="pat-dd-code">${code}</div>
+                            </div>`;
+                        }).join('');
+                        dropdown.querySelectorAll('.pat-dd-item').forEach(item => {
+                            item.addEventListener('mousedown', e => {
+                                e.preventDefault();
+                                searchInput.value = item.dataset.nom;
+                                hiddenId.value    = item.dataset.id;
+                                dropdown.style.display = 'none';
+                                /* Initiales pour l'avatar */
+                                const mots = item.dataset.nom.trim().split(' ');
+                                patAv.textContent   = ((mots[0]||'')[0] + (mots[1]||'')[0]).toUpperCase();
+                                patName.textContent = item.dataset.nom;
+                                patMeta.textContent = item.dataset.code;
+                                banner.style.display = 'flex';
+                                btnSave.disabled = false;
+                            });
+                        });
+                    }
+                    dropdown.style.display = 'block';
+                }).catch(() => {});
+        }, 260);
+    });
+
+    searchInput.addEventListener('blur', () => setTimeout(() => { dropdown.style.display = 'none'; }, 150));
+}
+
+/* ── Autocomplete médicaments ── */
+function stockBadge(stock, alerte, minimum) {
+    let cls = 'stock-ok';
+    if (stock <= 0)       cls = 'stock-empty';
+    else if (stock <= (minimum || 5)) cls = 'stock-empty';
+    else if (stock <= (alerte || 10)) cls = 'stock-low';
+    return `<span class="stock-badge ${cls} med-stock-display">${stock}</span>`;
+}
+
+function setupLine(row) {
+    const searchInput  = row.querySelector('.med-search');
+    const dropdown     = row.querySelector('.med-ac-dropdown');
+    const hiddenId     = row.querySelector('.med-id-hidden');
+    const removeBtn    = row.querySelector('.btn-remove-line');
+    const stockCell    = row.querySelector('td:has(.med-stock-display)') ||
+                         [...row.querySelectorAll('td')].find(td => td.querySelector('.med-stock-display'));
+
+    function resetStock() {
+        if (stockCell) stockCell.innerHTML = '<span class="stock-badge stock-unknown med-stock-display">—</span>';
+    }
+
+    removeBtn.addEventListener('click', () => {
+        if (document.querySelectorAll('.line-row').length > 1) row.remove();
+    });
+
+    searchInput.addEventListener('input', function () {
+        const q = this.value.trim().toLowerCase();
+        hiddenId.value = '';
+        resetStock();
+        if (!q) { dropdown.style.display = 'none'; return; }
+        const matches = MEDS.filter(m =>
+            m.designation.toLowerCase().includes(q) || (m.dci || '').toLowerCase().includes(q)
+        ).slice(0, 12);
+        if (!matches.length) { dropdown.style.display = 'none'; return; }
+        dropdown.innerHTML = matches.map(m =>
+            `<div class="med-ac-item"
+                  data-id="${m.pk}" data-name="${m.designation}"
+                  data-stock="${m.stock_actuel ?? ''}"
+                  data-alerte="${m.stock_alerte ?? 10}"
+                  data-minimum="${m.stock_minimum ?? 5}">
+                <div class="med-ac-name">${m.designation}</div>
+                <div class="med-ac-sub">${m.dosage||''} ${m.forme||''}
+                    <span style="float:right;margin-left:8px;font-weight:600;color:${(m.stock_actuel||0) > (m.stock_alerte||10) ? '#15803d' : (m.stock_actuel||0) > 0 ? '#b45309' : '#b91c1c'}">
+                        Stock : ${m.stock_actuel ?? '—'}
+                    </span>
+                </div>
+            </div>`
+        ).join('');
+        dropdown.style.display = 'block';
+        dropdown.querySelectorAll('.med-ac-item').forEach(item => {
+            item.addEventListener('mousedown', e => {
+                e.preventDefault();
+                searchInput.value = item.dataset.name;
+                hiddenId.value    = item.dataset.id;
+                dropdown.style.display = 'none';
+                const s = parseInt(item.dataset.stock, 10);
+                if (!isNaN(s) && stockCell) {
+                    stockCell.innerHTML = stockBadge(s, parseInt(item.dataset.alerte,10), parseInt(item.dataset.minimum,10));
+                }
+            });
+        });
+    });
+
+    searchInput.addEventListener('blur', () => setTimeout(() => { dropdown.style.display = 'none'; }, 150));
+}
+
+function addLine() {
+    const tbody = document.getElementById('lines-body');
+    const tpl = tbody.querySelector('.line-row').cloneNode(true);
+    tpl.querySelector('.med-search').value = '';
+    tpl.querySelector('.med-id-hidden').value = '';
+    tpl.querySelector('.med-ac-dropdown').innerHTML = '';
+    tpl.querySelector('.med-ac-dropdown').style.display = 'none';
+    tpl.querySelectorAll('.line-input:not(.qty)').forEach(i => i.value = '');
+    tpl.querySelector('.line-input.qty').value = '1';
+    const stockEl = tpl.querySelector('.med-stock-display');
+    if (stockEl) { stockEl.className = 'stock-badge stock-unknown med-stock-display'; stockEl.textContent = '—'; }
+    setupLine(tpl);
+    tbody.appendChild(tpl);
+}
+
+document.querySelectorAll('.line-row').forEach(setupLine);
+document.getElementById('btn-add-line').addEventListener('click', addLine);
+</script>
+{% endblock %}

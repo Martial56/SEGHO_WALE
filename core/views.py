@@ -139,16 +139,7 @@ def consultations_list(request):
 
 @login_required(login_url='login')
 def pharmacie_list(request):
-    from pharmacie.models import Medicament
-    from django.core.paginator import Paginator
-
-    medicaments = Medicament.objects.all().order_by('nom')
-    paginator = Paginator(medicaments, 25)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    stats = {'total_medicaments': Medicament.objects.count(), 'valeur_stock': 0, 'ruptures': 0, 'commandes_attente': 0}
-    breadcrumb = [{'title': 'Accueil', 'url': '/'}, {'title': 'Pharmacie'}]
-    return render(request, 'pharmacie/list.html', {'page_obj': page_obj, 'stats': stats, 'breadcrumb': breadcrumb})
+    return redirect('pharmacie:ordonnance_list')
 
 
 @login_required(login_url='login')
@@ -336,12 +327,41 @@ def facture_create(request):
         except RendezVous.DoesNotExist:
             pass
 
-    initial_type_facture = 'consultation' if rdv_obj else ('laboratoire' if demande_obj else '')
-    initial_ligne_libelle = rdv_obj.type_consultation.nom if (rdv_obj and rdv_obj.type_consultation) else ''
-    initial_lignes = [
-        {'libelle': lg.libelle, 'prix': float(lg.prix)}
-        for lg in demande_obj.lignes.all()
-    ] if demande_obj else []
+    ordonnance_pk = request.GET.get('ordonnance') or request.POST.get('ordonnance_id')
+    ordonnance_obj = None
+    if ordonnance_pk:
+        from consultations.models import Ordonnance
+        try:
+            ordonnance_obj = Ordonnance.objects.prefetch_related('lignes__medicament').get(pk=ordonnance_pk)
+            if patient is None:
+                patient = ordonnance_obj.consultation.patient
+        except Ordonnance.DoesNotExist:
+            pass
+
+    if ordonnance_obj:
+        initial_type_facture = 'pharmacie'
+        initial_ligne_libelle = ''
+        initial_lignes = []
+        for ligne in ordonnance_obj.lignes.select_related('medicament').all():
+            if ligne.medicament:
+                libelle = ligne.medicament.designation
+            elif ligne.medicament_libre:
+                libelle = ligne.medicament_libre
+            else:
+                continue
+            initial_lignes.append({'libelle': libelle, 'prix': 0, 'qte': int(ligne.quantite)})
+    elif rdv_obj:
+        initial_type_facture = 'consultation'
+        initial_ligne_libelle = rdv_obj.type_consultation.nom if rdv_obj.type_consultation else ''
+        initial_lignes = []
+    elif demande_obj:
+        initial_type_facture = 'laboratoire'
+        initial_ligne_libelle = ''
+        initial_lignes = [{'libelle': lg.libelle, 'prix': float(lg.prix), 'qte': 1} for lg in demande_obj.lignes.all()]
+    else:
+        initial_type_facture = ''
+        initial_ligne_libelle = ''
+        initial_lignes = []
 
     if request.method == 'POST':
         form = FactureForm(request.POST)
@@ -433,6 +453,7 @@ def facture_create(request):
         'caisses': caisses,
         'rdv': rdv_obj,
         'demande': demande_obj,
+        'ordonnance': ordonnance_obj,
         'initial_ligne_libelle': initial_ligne_libelle,
         'initial_lignes': initial_lignes,
         'breadcrumb': [

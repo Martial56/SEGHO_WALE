@@ -514,9 +514,10 @@
                 <button type="submit" name="_action" value="en_consultation" class="btn-action btn-teal">Consultation</button>
             {% elif rdv.statut == 'en_consultation' %}
                 <button type="button" class="btn-action" id="btn-pause"><i class="bi bi-pause-fill"></i> Pause</button>
-                <button type="button" class="btn-action btn-ghost"><i class="bi bi-person-fill"></i> Créer une ordonnance</button>
-                <a href="{% url 'laboratoire_create' %}?patient={{ rdv.patient.pk }}" class="btn-action btn-ghost"><i class="bi bi-eyedropper"></i> Demande de lab</a>
-                <a href="{% url 'soins:create' %}?patient_id={{ rdv.patient.pk }}" class="btn-action btn-ghost"><i class="bi bi-eyedropper"></i> Soins</a>
+                <a href="{% url 'patients:ordonnance_create' rdv.patient.pk %}{% if consultation %}?consultation={{ consultation.pk }}{% else %}?rdv={{ rdv.pk }}{% endif %}" class="btn-action btn-ghost"><i class="bi bi-file-earmark-medical"></i> Créer une ordonnance</a>
+                <a href="{% url 'laboratoire_create' %}?patient={{ rdv.patient.pk }}" class="btn-action btn-ghost"><i class="bi bi-flask"></i> Demande de lab</a>
+                <a href="{% url 'soins:create' %}?patient_id={{ rdv.patient.pk }}" class="btn-action btn-ghost"><i class="bi bi-bandaid"></i> Soins</a>
+                <a href="{% url 'patients:hospitalisation_list' rdv.patient.pk %}" class="btn-action btn-ghost"><i class="bi bi-clipboard2-pulse"></i> M.O</a>
                 <button type="submit" name="_action" value="terminer" class="btn-action btn-dark">Consultation terminée</button>
                 <button type="submit" name="_action" value="annuler" class="btn-action btn-danger-outline">Annuler</button>
             {% endif %}

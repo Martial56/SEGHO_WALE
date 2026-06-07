@@ -18,7 +18,7 @@ def envoyer_fichier(
     repertoire_distant: str = "",
     extension_temoin: str = ".ok",
     use_tls: bool = False,
-    timeout: int = 30,
+    timeout: int = 10,
 ) -> None:
     """Dépose <nom>.HPR puis le témoin <nom>.ok (déposé APRÈS, §6.3)."""
     base = os.path.splitext(nom_fichier)[0]
