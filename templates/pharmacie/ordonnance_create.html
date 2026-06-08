@@ -386,16 +386,34 @@ function setupLine(row) {
     const dropdown     = row.querySelector('.med-ac-dropdown');
     const hiddenId     = row.querySelector('.med-id-hidden');
     const removeBtn    = row.querySelector('.btn-remove-line');
+    const qtyInput     = row.querySelector('.line-input.qty');
     const stockCell    = row.querySelector('td:has(.med-stock-display)') ||
                          [...row.querySelectorAll('td')].find(td => td.querySelector('.med-stock-display'));
 
     function resetStock() {
-        if (stockCell) stockCell.innerHTML = '<span class="stock-badge stock-unknown med-stock-display">—</span>';
+        if (stockCell) {
+            stockCell.innerHTML = '<span class="stock-badge stock-unknown med-stock-display">—</span>';
+            delete stockCell.dataset.originalStock;
+        }
+    }
+
+    function updateStockDisplay() {
+        const origStock = parseInt(stockCell.dataset.originalStock, 10);
+        if (!isNaN(origStock) && stockCell) {
+            const qty = parseInt(qtyInput ? qtyInput.value : 1, 10) || 0;
+            const alerte  = parseInt(stockCell.dataset.alerte, 10)  || 10;
+            const minimum = parseInt(stockCell.dataset.minimum, 10) || 5;
+            stockCell.innerHTML = stockBadge(origStock - qty, alerte, minimum);
+        }
     }
 
     removeBtn.addEventListener('click', () => {
         if (document.querySelectorAll('.line-row').length > 1) row.remove();
     });
+
+    if (qtyInput) {
+        qtyInput.addEventListener('input', updateStockDisplay);
+    }
 
     searchInput.addEventListener('input', function () {
         const q = this.value.trim().toLowerCase();
@@ -429,7 +447,10 @@ function setupLine(row) {
                 dropdown.style.display = 'none';
                 const s = parseInt(item.dataset.stock, 10);
                 if (!isNaN(s) && stockCell) {
-                    stockCell.innerHTML = stockBadge(s, parseInt(item.dataset.alerte,10), parseInt(item.dataset.minimum,10));
+                    stockCell.dataset.originalStock = s;
+                    stockCell.dataset.alerte  = item.dataset.alerte;
+                    stockCell.dataset.minimum = item.dataset.minimum;
+                    updateStockDisplay();
                 }
             });
         });
