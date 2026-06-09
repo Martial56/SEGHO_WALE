@@ -1,4 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
+from django.http import JsonResponse
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
@@ -447,37 +448,78 @@ def consultations_list(request):
 
 @login_required(login_url='login')
 def pharmacie_list(request):
-    from pharmacie.models import Medicament
-    from django.core.paginator import Paginator
-
-    medicaments = Medicament.objects.all().order_by('nom')
-    paginator = Paginator(medicaments, 25)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    stats = {'total_medicaments': Medicament.objects.count(), 'valeur_stock': 0, 'ruptures': 0, 'commandes_attente': 0}
-    breadcrumb = [{'title': 'Accueil', 'url': '/'}, {'title': 'Pharmacie'}]
-    return render(request, 'pharmacie/list.html', {'page_obj': page_obj, 'stats': stats, 'breadcrumb': breadcrumb})
+    return redirect('pharmacie:ordonnance_list')
 
 
 @login_required(login_url='login')
 def laboratoire_list(request):
-    from laboratoire.models import AnalyseLaboratoire
+    from laboratoire.models import DemandeExamen
     from django.core.paginator import Paginator
 
-    analyses = AnalyseLaboratoire.objects.select_related(
-        'patient', 'type_examen'
-    ).order_by('-date_prelevement')
-    paginator = Paginator(analyses, 25)
+    q = request.GET.get('q', '').strip()
+    demandes = DemandeExamen.objects.select_related(
+        'patient', 'technicien', 'facture'
+    ).prefetch_related('lignes').order_by('-date_creation')
+
+    if q:
+        demandes = demandes.filter(
+            Q(numero__icontains=q) |
+            Q(patient__nom__icontains=q) |
+            Q(patient__prenoms__icontains=q) |
+            Q(patient__code_patient__icontains=q) |
+            Q(lignes__libelle__icontains=q)
+        ).distinct()
+
+    now = timezone.now()
+    stats = {
+        'en_attente': DemandeExamen.objects.filter(statut__in=['brouillon', 'demande']).count(),
+        'en_cours': DemandeExamen.objects.filter(statut__in=['accepte', 'en_cours']).count(),
+        'terminees': DemandeExamen.objects.filter(statut='termine').count(),
+        'ce_mois': DemandeExamen.objects.filter(date_creation__month=now.month, date_creation__year=now.year).count(),
+    }
+    paginator = Paginator(demandes, 25)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-    stats = {
-        'en_cours': AnalyseLaboratoire.objects.filter(statut__in=['recu', 'en_analyse']).count(),
-        'resultats_prets': AnalyseLaboratoire.objects.filter(statut__in=['resultat', 'valide']).count(),
-        'analyses_mois': AnalyseLaboratoire.objects.filter(date_prelevement__month=timezone.now().month).count(),
-        'delai_moyen': 0,
-    }
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        rows = []
+        for d in page_obj:
+            lignes_all = list(d.lignes.all())
+            rows.append({
+                'pk': d.pk,
+                'url': f'/laboratoire/{d.pk}/',
+                'numero': d.numero,
+                'urgent': d.urgent,
+                'patient_nom': d.patient.nom.upper(),
+                'patient_prenoms': d.patient.prenoms,
+                'patient_code': d.patient.code_patient,
+                'lignes': [l.libelle[:30] for l in lignes_all[:3]],
+                'lignes_extra': max(0, len(lignes_all) - 3),
+                'date_creation': d.date_creation.strftime('%d/%m/%Y'),
+                'heure_creation': d.date_creation.strftime('%H:%M'),
+                'montant_total': str(int(d.montant_total)) if d.montant_total else '',
+                'facture_numero': d.facture.numero if d.facture else '',
+                'statut': d.statut,
+                'statut_display': d.get_statut_display(),
+            })
+        return JsonResponse({
+            'rows': rows,
+            'count': page_obj.paginator.count,
+            'start': page_obj.start_index(),
+            'end': page_obj.end_index(),
+            'has_previous': page_obj.has_previous(),
+            'has_next': page_obj.has_next(),
+            'previous_page': page_obj.previous_page_number() if page_obj.has_previous() else None,
+            'next_page': page_obj.next_page_number() if page_obj.has_next() else None,
+        })
+
     breadcrumb = [{'title': 'Accueil', 'url': '/'}, {'title': 'Laboratoire'}]
-    return render(request, 'laboratoire/list.html', {'page_obj': page_obj, 'stats': stats, 'breadcrumb': breadcrumb})
+    return render(request, 'laboratoire/list.html', {
+        'page_obj': page_obj,
+        'stats': stats,
+        'q': q,
+        'breadcrumb': breadcrumb,
+    })
 
 
 @login_required(login_url='login')
@@ -577,6 +619,15 @@ def facture_create(request):
     from services.models import Articleservice
     services = Articleservice.objects.all().order_by('nom')
 
+    demande_pk = request.GET.get('demande') or request.POST.get('demande_id')
+    demande_obj = None
+    if demande_pk:
+        from laboratoire.models import DemandeExamen
+        try:
+            demande_obj = DemandeExamen.objects.get(pk=demande_pk)
+        except DemandeExamen.DoesNotExist:
+            pass
+
     rdv_obj = None
     rdv_pk = request.GET.get('rdv') or request.POST.get('rdv_id')
     if rdv_pk:
@@ -585,8 +636,41 @@ def facture_create(request):
         except RendezVous.DoesNotExist:
             pass
 
-    initial_type_facture = 'consultation' if rdv_obj else ''
-    initial_ligne_libelle = rdv_obj.type_consultation.nom if (rdv_obj and rdv_obj.type_consultation) else ''
+    ordonnance_pk = request.GET.get('ordonnance') or request.POST.get('ordonnance_id')
+    ordonnance_obj = None
+    if ordonnance_pk:
+        from consultations.models import Ordonnance
+        try:
+            ordonnance_obj = Ordonnance.objects.prefetch_related('lignes__medicament').get(pk=ordonnance_pk)
+            if patient is None:
+                patient = ordonnance_obj.consultation.patient
+        except Ordonnance.DoesNotExist:
+            pass
+
+    if ordonnance_obj:
+        initial_type_facture = 'pharmacie'
+        initial_ligne_libelle = ''
+        initial_lignes = []
+        for ligne in ordonnance_obj.lignes.select_related('medicament').all():
+            if ligne.medicament:
+                libelle = ligne.medicament.designation
+            elif ligne.medicament_libre:
+                libelle = ligne.medicament_libre
+            else:
+                continue
+            initial_lignes.append({'libelle': libelle, 'prix': 0, 'qte': int(ligne.quantite)})
+    elif rdv_obj:
+        initial_type_facture = 'consultation'
+        initial_ligne_libelle = rdv_obj.type_consultation.nom if rdv_obj.type_consultation else ''
+        initial_lignes = []
+    elif demande_obj:
+        initial_type_facture = 'laboratoire'
+        initial_ligne_libelle = ''
+        initial_lignes = [{'libelle': lg.libelle, 'prix': float(lg.prix), 'qte': 1} for lg in demande_obj.lignes.all()]
+    else:
+        initial_type_facture = ''
+        initial_ligne_libelle = ''
+        initial_lignes = []
 
     if request.method == 'POST':
         form = FactureForm(request.POST)
@@ -656,7 +740,13 @@ def facture_create(request):
                     facture.statut = 'payee' if pay_montant >= total else 'partielle'
                     facture.save()
 
+            if demande_obj:
+                demande_obj.facture = facture
+                demande_obj.save(update_fields=['facture'])
+
             messages.success(request, f'Facture {facture.numero} créée avec succès.')
+            if demande_obj:
+                return redirect('laboratoire_detail', pk=demande_obj.pk)
             if rdv_pk:
                 return redirect(reverse('patients:rdv_edit', kwargs={'pk': rdv_pk}))
             return redirect('facturation_list')
@@ -671,7 +761,10 @@ def facture_create(request):
         'services': services,
         'caisses': caisses,
         'rdv': rdv_obj,
+        'demande': demande_obj,
+        'ordonnance': ordonnance_obj,
         'initial_ligne_libelle': initial_ligne_libelle,
+        'initial_lignes': initial_lignes,
         'breadcrumb': [
             {'title': 'Accueil', 'url': '/'},
             {'title': 'Facturation', 'url': '/facturation/'},
@@ -689,8 +782,11 @@ def laboratoire_create(request):
 
     patient_pk = request.GET.get('patient') or request.POST.get('patient_id')
     patient = get_object_or_404(Patient, pk=patient_pk) if patient_pk else None
-    types_examens = TypeExamen.objects.order_by('categorie', 'nom')
     techniciens = User.objects.filter(is_active=True).order_by('last_name', 'first_name')
+    from services.models import Articleservice
+    services_examens = Articleservice.objects.filter(
+        categorie__code='EX', actif=True
+    ).order_by('nom')
 
     if request.method == 'POST':
         if not patient:
@@ -720,39 +816,64 @@ def laboratoire_create(request):
         total = 0
         i = 0
         while True:
-            examen_id = request.POST.get(f'ligne_examen_{i}')
-            if examen_id is None:
+            svc_nom = request.POST.get(f'ligne_examen_{i}')
+            if svc_nom is None:
                 break
-            if examen_id.strip():
+            if svc_nom.strip():
                 try:
-                    te = TypeExamen.objects.get(pk=int(examen_id))
-                    prix = float(request.POST.get(f'ligne_prix_{i}', te.prix) or te.prix)
-                    LigneDemandeExamen.objects.create(
-                        demande=demande,
-                        type_examen=te,
-                        libelle=te.nom,
-                        prix=prix,
-                        instructions=request.POST.get(f'ligne_instructions_{i}', '').strip(),
-                    )
-                    total += prix
-                except (ValueError, TypeExamen.DoesNotExist):
-                    pass
+                    prix = float(request.POST.get(f'ligne_prix_{i}', 0) or 0)
+                except ValueError:
+                    prix = 0
+                LigneDemandeExamen.objects.create(
+                    demande=demande,
+                    libelle=svc_nom.strip(),
+                    prix=prix,
+                    instructions=request.POST.get(f'ligne_instructions_{i}', '').strip(),
+                )
+                total += prix
             i += 1
 
         demande.montant_total = total
         demande.save()
         messages.success(request, f'Demande {demande.numero} créée avec succès.')
-        return redirect('laboratoire_list')
+        return redirect('laboratoire_detail', pk=demande.pk)
 
     return render(request, 'laboratoire/create_analyse.html', {
         'patient': patient,
-        'types_examens': types_examens,
+        'services_examens': services_examens,
         'techniciens': techniciens,
         'type_test_choices': DemandeExamen.TYPE_TEST,
         'breadcrumb': [
             {'title': 'Accueil', 'url': '/'},
             {'title': 'Laboratoire', 'url': '/laboratoire/'},
             {'title': 'Nouvelle demande'},
+        ],
+    })
+
+
+@login_required(login_url='login')
+def laboratoire_detail(request, pk):
+    from laboratoire.models import DemandeExamen
+
+    demande = get_object_or_404(DemandeExamen, pk=pk)
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'envoyer_labo' and demande.facture and demande.statut == 'brouillon':
+            demande.statut = 'demande'
+            demande.save(update_fields=['statut'])
+            messages.success(request, f'Demande {demande.numero} envoyée au laboratoire.')
+        return redirect('laboratoire_detail', pk=pk)
+
+    lignes = demande.lignes.select_related('type_examen').all()
+    return render(request, 'laboratoire/detail_demande.html', {
+        'demande': demande,
+        'lignes': lignes,
+        'facture_url': f'/facturation/nouvelle/?patient={demande.patient_id}&demande={demande.pk}',
+        'breadcrumb': [
+            {'title': 'Accueil', 'url': '/'},
+            {'title': 'Laboratoire', 'url': '/laboratoire/'},
+            {'title': demande.numero},
         ],
     })
 
@@ -1196,17 +1317,36 @@ def gynecologie_rdv_detail(request, pk):
         if action == 'confirmer':
             if facture_payee:
                 rdv.statut = 'confirme'
-                rdv.save(update_fields=['statut'])
+                rdv.date_confirme = timezone.now()
+                rdv.save(update_fields=['statut', 'date_confirme'])
+                return redirect('gynecologie_rdv_detail', pk=rdv.pk)
             return redirect('gynecologie_rdv')
 
-        if action in ('en_attente', 'en_consultation'):
-            rdv.statut = action
-            rdv.save(update_fields=['statut'])
+        if action == 'en_attente':
+            now = timezone.now()
+            rdv.statut = 'en_attente'
+            rdv.date_en_attente = now
+            if rdv.date_confirme:
+                rdv.temps_constante_minutes = int((now - rdv.date_confirme).total_seconds() / 60)
+            rdv.save(update_fields=['statut', 'date_en_attente', 'temps_constante_minutes'])
+            return redirect('gynecologie_rdv_detail', pk=rdv.pk)
+
+        if action == 'en_consultation':
+            now = timezone.now()
+            rdv.statut = 'en_consultation'
+            rdv.date_en_consultation = now
+            if rdv.date_en_attente:
+                rdv.temps_attente_minutes = int((now - rdv.date_en_attente).total_seconds() / 60)
+            rdv.save(update_fields=['statut', 'date_en_consultation', 'temps_attente_minutes'])
             return redirect('gynecologie_rdv_detail', pk=rdv.pk)
 
         if action == 'terminer':
+            now = timezone.now()
             rdv.statut = 'termine'
-            rdv.save(update_fields=['statut'])
+            rdv.date_termine = now
+            if rdv.date_en_consultation:
+                rdv.temps_consultation_minutes = int((now - rdv.date_en_consultation).total_seconds() / 60)
+            rdv.save(update_fields=['statut', 'date_termine', 'temps_consultation_minutes'])
             return redirect('gynecologie_rdv')
 
         if action == 'annuler':

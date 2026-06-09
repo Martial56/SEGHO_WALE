@@ -112,6 +112,10 @@ class RendezVous(models.Model):
     temps_constante_minutes = models.IntegerField(default=0)
     temps_attente_minutes = models.IntegerField(default=0)
     temps_consultation_minutes = models.IntegerField(default=0)
+    date_confirme = models.DateTimeField(null=True, blank=True)
+    date_en_attente = models.DateTimeField(null=True, blank=True)
+    date_en_consultation = models.DateTimeField(null=True, blank=True)
+    date_termine = models.DateTimeField(null=True, blank=True)
     date_creation = models.DateTimeField(auto_now_add=True)
 
     MODE_ENTREE = [
@@ -154,15 +158,32 @@ class RendezVous(models.Model):
         h, m = divmod(self.duree_minutes, 60)
         return f"{h:02d}:{m:02d}"
 
+    @staticmethod
+    def _fmt_sec(sec):
+        sec = max(0, int(sec))
+        h, rem = divmod(sec, 3600)
+        m, s = divmod(rem, 60)
+        if h > 0:
+            return f"{h:02d}:{m:02d}:{s:02d}"
+        return f"{m:02d}:{s:02d}"
+
+    @property
+    def temps_constante_display(self):
+        if self.date_en_attente and self.date_confirme:
+            return self._fmt_sec((self.date_en_attente - self.date_confirme).total_seconds())
+        return self._fmt_sec(self.temps_constante_minutes * 60)
+
     @property
     def temps_attente_display(self):
-        h, m = divmod(self.temps_attente_minutes, 60)
-        return f"{h:02d}:{m:02d}"
+        if self.date_en_consultation and self.date_en_attente:
+            return self._fmt_sec((self.date_en_consultation - self.date_en_attente).total_seconds())
+        return self._fmt_sec(self.temps_attente_minutes * 60)
 
     @property
     def temps_consultation_display(self):
-        h, m = divmod(self.temps_consultation_minutes, 60)
-        return f"{h:02d}:{m:02d}"
+        if self.date_termine and self.date_en_consultation:
+            return self._fmt_sec((self.date_termine - self.date_en_consultation).total_seconds())
+        return self._fmt_sec(self.temps_consultation_minutes * 60)
 
     def __str__(self): return f"RDV {self.patient} - {self.date_heure.strftime('%d/%m/%Y %H:%M')}"
     class Meta:

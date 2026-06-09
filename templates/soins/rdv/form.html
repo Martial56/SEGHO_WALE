@@ -308,24 +308,24 @@
     <div class="rdv-timing-grid">
       <div>
         <div class="art-field-label">Temps de constante</div>
-        <div class="rdv-timing-val {% if not rdv %}zero{% endif %}" id="t-constante">
-          {% if rdv %}{{ rdv.temps_constante_minutes|floatformat:0 }}{% else %}00:00{% endif %}
+        <div class="rdv-timing-val {% if not rdv or not rdv.date_en_attente %}zero{% endif %}" id="t-constante">
+          {% if rdv and rdv.date_en_attente %}{{ rdv.temps_constante_display }}{% else %}00:00{% endif %}
         </div>
-        <div style="font-size:11px;color:var(--text-muted);">Création → Prise de constante</div>
+        <div style="font-size:11px;color:var(--text-muted);">Confirmation → En attente</div>
       </div>
       <div>
         <div class="art-field-label">Temps d'attente</div>
-        <div class="rdv-timing-val {% if not rdv or not rdv.temps_attente_minutes %}zero{% endif %}" id="t-attente">
-          {% if rdv and rdv.temps_attente_minutes %}{{ rdv.temps_attente_minutes }}{% else %}00:00{% endif %}
+        <div class="rdv-timing-val {% if not rdv or not rdv.date_en_consultation %}zero{% endif %}" id="t-attente">
+          {% if rdv and rdv.date_en_consultation %}{{ rdv.temps_attente_display }}{% else %}00:00{% endif %}
         </div>
-        <div style="font-size:11px;color:var(--text-muted);">Constante → Réception agent</div>
+        <div style="font-size:11px;color:var(--text-muted);">En attente → En consultation</div>
       </div>
       <div>
         <div class="art-field-label">Temps de soin</div>
-        <div class="rdv-timing-val {% if not rdv or not rdv.temps_consultation_minutes %}zero{% endif %}" id="t-consult">
-          {% if rdv and rdv.temps_consultation_minutes %}{{ rdv.temps_consultation_minutes }}{% else %}00:00{% endif %}
+        <div class="rdv-timing-val {% if not rdv or not rdv.date_termine %}zero{% endif %}" id="t-consult">
+          {% if rdv and rdv.date_termine %}{{ rdv.temps_consultation_display }}{% else %}00:00{% endif %}
         </div>
-        <div style="font-size:11px;color:var(--text-muted);">Durée de la prise en charge</div>
+        <div style="font-size:11px;color:var(--text-muted);">En consultation → Terminée</div>
       </div>
     </div>
   </div>
@@ -482,11 +482,37 @@
 
   if (patientSelect && patientSelect.value) fetchPatientInfo(patientSelect.value);
 
-  /* ── Chronomètres : colorier si non-zéro ── */
-  ['t-constante', 't-attente', 't-consult'].forEach(function (id) {
-    var el = document.getElementById(id);
-    if (el && el.textContent.trim() !== '00:00') el.classList.remove('zero');
-  });
+  /* ── Chronomètres en temps réel ── */
+  (function() {
+    var _statut = '{{ current_statut }}';
+    function pad(n) { return n < 10 ? '0' + n : '' + n; }
+    function fmt(sec) {
+      var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+      return (h > 0 ? pad(h) + ':' : '') + pad(m) + ':' + pad(s);
+    }
+    var liveMap = {
+      'confirme':        { ts: {% if rdv and rdv.date_confirme %}{{ rdv.date_confirme|date:"U" }}{% else %}0{% endif %}, id: 't-constante' },
+      'en_attente':      { ts: {% if rdv and rdv.date_en_attente %}{{ rdv.date_en_attente|date:"U" }}{% else %}0{% endif %}, id: 't-attente' },
+      'en_consultation': { ts: {% if rdv and rdv.date_en_consultation %}{{ rdv.date_en_consultation|date:"U" }}{% else %}0{% endif %}, id: 't-consult' },
+    };
+    var live = liveMap[_statut];
+    if (live && live.ts) {
+      var liveEl = document.getElementById(live.id);
+      if (liveEl) {
+        liveEl.classList.remove('zero');
+        liveEl.classList.add('running');
+        setInterval(function() {
+          var elapsed = Math.floor(Date.now() / 1000) - live.ts;
+          liveEl.textContent = fmt(elapsed < 0 ? 0 : elapsed);
+        }, 1000);
+      }
+    }
+    ['t-constante', 't-attente', 't-consult'].forEach(function(id) {
+      if (live && id === live.id) return;
+      var el = document.getElementById(id);
+      if (el && el.textContent.trim() !== '00:00') el.classList.remove('zero');
+    });
+  })();
 
   /* ── Offset topbar ── */
   (function () {

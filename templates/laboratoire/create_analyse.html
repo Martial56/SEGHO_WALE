@@ -222,6 +222,36 @@ input:checked + .tog-slider:before { transform: translateX(18px); }
     background: linear-gradient(to right, rgba(0,0,0,0.1), transparent);
 }
 
+/* ── Combobox examen ── */
+.ex-combo { position: relative; width: 100%; }
+.ex-combo-inner { position: relative; display: flex; align-items: center; }
+.ex-input {
+    flex: 1; padding: 5px 22px 5px 2px;
+    border: none; border-bottom: 1.5px solid #d1dde3;
+    border-radius: 0; font-size: 12px; font-family: inherit;
+    background: transparent; outline: none; color: var(--teal-900);
+    transition: border-color .2s; width: 100%;
+}
+.ex-input:focus { border-bottom-color: var(--teal-500); }
+.ex-input::placeholder { color: #bfcdd4; }
+.ex-arrow {
+    position: absolute; right: 3px; top: 50%; transform: translateY(-50%);
+    pointer-events: none; color: #aaa; font-size: 10px; line-height: 1;
+}
+.ex-preloaded .ex-input { color: var(--teal-700); font-weight: 500; }
+.ex-dropdown {
+    display: none; position: fixed;
+    background: #fff; border: 1px solid #d1dde3;
+    border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,0.14);
+    max-height: 220px; overflow-y: auto;
+    z-index: 99999; font-size: 12px; font-family: inherit;
+    min-width: 260px;
+}
+.ex-opt { padding: 7px 12px; cursor: pointer; color: var(--teal-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ex-opt:hover, .ex-opt.focused { background: #e0f7f4; color: var(--teal-700); }
+.ex-opt.is-selected { background: #f0fdf9; font-weight: 600; }
+.ex-empty { padding: 10px 12px; color: rgba(0,0,0,0.35); font-style: italic; }
+
 /* ── Tests table ── */
 .tests-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .tests-table thead th {
@@ -323,11 +353,8 @@ input:checked + .tog-slider:before { transform: translateX(18px); }
                 <span>Nouveau</span>
             </div>
             <div class="dem-actions">
-                <button type="submit" name="action" value="envoyer" class="btn-envoyer">
-                    Envoyer la demande
-                </button>
-                <button type="submit" name="action" value="brouillon" class="btn-brouillon">
-                    Sauvegarder
+                <button type="submit" name="action" value="brouillon" class="btn-envoyer">
+                    Sauvegarder la demande
                 </button>
                 <a href="{% url 'laboratoire_list' %}" class="btn-cancel">Ignorer</a>
             </div>
@@ -452,7 +479,7 @@ input:checked + .tog-slider:before { transform: translateX(18px); }
             <div class="field-col">
 
                 <div class="field-row">
-                    <label for="id_technicien">Technicien assigné</label>
+                    <label for="id_technicien">Médecin demandeur</label>
                     <select name="technicien" id="id_technicien" class="field-ul">
                         <option value="">— Non assigné —</option>
                         {% for u in techniciens %}
@@ -490,21 +517,18 @@ input:checked + .tog-slider:before { transform: translateX(18px); }
                 <tbody id="tests-body">
                     <tr class="test-row">
                         <td class="col-test">
-                            <select name="ligne_examen_0" class="examen-select"
-                                    onchange="fillFromExamen(this, 0)">
-                                <option value="">— Choisir un test —</option>
-                                {% for t in types_examens %}
-                                <option value="{{ t.pk }}"
-                                    data-delai="{{ t.delai_resultat_heures }}"
-                                    data-prix="{{ t.prix }}"
-                                    data-nom="{{ t.nom }}">
-                                    {{ t.nom }}{% if t.code %} [{{ t.code }}]{% endif %}
-                                </option>
-                                {% endfor %}
-                            </select>
+                            <div class="ex-combo" data-idx="0">
+                                <div class="ex-combo-inner">
+                                    <input type="text" class="ex-input"
+                                           placeholder="Chercher un examen…" autocomplete="off">
+                                    <span class="ex-arrow">▼</span>
+                                </div>
+                                <input type="hidden" name="ligne_examen_0" class="ex-hidden">
+                                <div class="ex-dropdown"></div>
+                            </div>
                         </td>
                         <td class="col-delai">
-                            <input type="text" name="ligne_delai_0" id="delai-0" readonly placeholder="—">
+                            <input type="text" name="ligne_delai_0" id="delai-0" placeholder="—">
                         </td>
                         <td class="col-prix">
                             <input type="number" name="ligne_prix_0" id="prix-0"
@@ -544,31 +568,13 @@ input:checked + .tog-slider:before { transform: translateX(18px); }
 <script>
 (function () {
     var lineCount = 1;
-    var examensData = {
-        {% for t in types_examens %}
-        "{{ t.pk }}": { nom: "{{ t.nom|escapejs }}", delai: {{ t.delai_resultat_heures }}, prix: {{ t.prix }} },
-        {% endfor %}
-    };
 
-    /* ── Remplissage auto depuis sélecteur ── */
-    window.fillFromExamen = function (sel, idx) {
-        var pk = sel.value;
-        var delaiEl = document.getElementById('delai-' + idx);
-        var prixEl  = document.getElementById('prix-' + idx);
-        if (!pk) {
-            if (delaiEl) delaiEl.value = '';
-            if (prixEl)  prixEl.value = 0;
-            recalcTotal(); return;
-        }
-        var d = examensData[pk];
-        if (!d) { recalcTotal(); return; }
-        if (delaiEl) {
-            var h = d.delai;
-            delaiEl.value = h >= 24 ? Math.round(h / 24) + ' jour(s)' : h + ' h';
-        }
-        if (prixEl) prixEl.value = d.prix;
-        recalcTotal();
-    };
+    /* ── Données examens (services catégorie EX) ── */
+    var _EXAMENS = [
+        {% for svc in services_examens %}
+        { nom: "{{ svc.nom|escapejs }}", prix: {{ svc.prix_vente }} },
+        {% endfor %}
+    ];
 
     /* ── Recalc total ── */
     window.recalcTotal = function () {
@@ -580,29 +586,100 @@ input:checked + .tog-slider:before { transform: translateX(18px); }
             Number(total).toLocaleString('fr-FR') + ' CFA';
     };
 
-    /* ── Ajouter ligne ── */
-    window.addLigne = function () {
-        var idx = lineCount++;
-        var body = document.getElementById('tests-body');
-        var tr = document.createElement('tr');
-        tr.className = 'test-row';
+    /* ── Combobox : attacher comportement sur un .ex-combo ── */
+    window.buildExCombo = function (wrapper) {
+        var idx      = parseInt(wrapper.dataset.idx, 10);
+        var input    = wrapper.querySelector('.ex-input');
+        var hidden   = wrapper.querySelector('.ex-hidden');
+        var dropdown = wrapper.querySelector('.ex-dropdown');
 
-        var opts = '<option value="">— Choisir un test —</option>';
-        Object.keys(examensData).forEach(function (pk) {
-            opts += '<option value="' + pk + '" data-delai="' + examensData[pk].delai +
-                    '" data-prix="' + examensData[pk].prix + '">' +
-                    examensData[pk].nom + '</option>';
+        function positionDropdown() {
+            var rect = input.getBoundingClientRect();
+            dropdown.style.top   = rect.bottom + 'px';
+            dropdown.style.left  = rect.left   + 'px';
+            dropdown.style.width = Math.max(rect.width, 260) + 'px';
+        }
+
+        function render(q) {
+            var current = hidden.value;
+            var list = (q && q !== current)
+                ? _EXAMENS.filter(function (s) {
+                    return s.nom.toLowerCase().indexOf(q.toLowerCase()) !== -1;
+                  })
+                : _EXAMENS;
+            if (!list.length) {
+                dropdown.innerHTML = '<div class="ex-empty">Aucun résultat pour "' + q + '"</div>';
+            } else {
+                dropdown.innerHTML = list.map(function (s) {
+                    var sel = s.nom === current ? ' is-selected' : '';
+                    return '<div class="ex-opt' + sel + '" data-nom="' +
+                           s.nom.replace(/"/g, '&quot;') + '" data-prix="' + s.prix + '">' +
+                           s.nom + '</div>';
+                }).join('');
+            }
+            positionDropdown();
+            dropdown.style.display = 'block';
+        }
+
+        function selectExamen(nom, prix) {
+            hidden.value = nom;
+            input.value  = nom;
+            wrapper.classList.add('ex-preloaded');
+            var prixInput = document.querySelector('[name="ligne_prix_' + idx + '"]');
+            if (prixInput) { prixInput.value = prix; recalcTotal(); }
+        }
+
+        function close() { dropdown.style.display = 'none'; }
+
+        input.addEventListener('focus', function () { render(input.value); });
+        input.addEventListener('input', function () {
+            wrapper.classList.remove('ex-preloaded');
+            hidden.value = '';
+            render(input.value);
+        });
+        input.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') { close(); input.blur(); }
         });
 
+        dropdown.addEventListener('mousedown', function (e) {
+            e.preventDefault();
+            var opt = e.target.closest('.ex-opt');
+            if (!opt) return;
+            selectExamen(opt.dataset.nom, parseFloat(opt.dataset.prix) || 0);
+            close();
+        });
+
+        document.addEventListener('click', function (e) {
+            if (!wrapper.contains(e.target)) close();
+        });
+
+        window.addEventListener('scroll', positionDropdown, true);
+    };
+
+    /* ── Ajouter ligne ── */
+    window.addLigne = function () {
+        var idx  = lineCount++;
+        var body = document.getElementById('tests-body');
+        var tr   = document.createElement('tr');
+        tr.className = 'test-row';
         tr.innerHTML =
-            '<td class="col-test"><select name="ligne_examen_' + idx + '" class="examen-select"' +
-                ' onchange="fillFromExamen(this,' + idx + ')">' + opts + '</select></td>' +
-            '<td class="col-delai"><input type="text" name="ligne_delai_' + idx + '" id="delai-' + idx + '" readonly placeholder="—"></td>' +
+            '<td class="col-test">' +
+              '<div class="ex-combo" data-idx="' + idx + '">' +
+                '<div class="ex-combo-inner">' +
+                  '<input type="text" class="ex-input" placeholder="Chercher un examen…" autocomplete="off">' +
+                  '<span class="ex-arrow">▼</span>' +
+                '</div>' +
+                '<input type="hidden" name="ligne_examen_' + idx + '" class="ex-hidden">' +
+                '<div class="ex-dropdown"></div>' +
+              '</div>' +
+            '</td>' +
+            '<td class="col-delai"><input type="text" name="ligne_delai_' + idx + '" id="delai-' + idx + '" placeholder="—"></td>' +
             '<td class="col-prix"><input type="number" name="ligne_prix_' + idx + '" id="prix-' + idx +
                 '" min="0" step="1" value="0" oninput="recalcTotal()"></td>' +
             '<td class="col-instr"><input type="text" name="ligne_instructions_' + idx + '" placeholder="Précisions…"></td>' +
             '<td class="col-del"><button type="button" class="btn-del" onclick="removeLigne(this)">×</button></td>';
         body.appendChild(tr);
+        buildExCombo(tr.querySelector('.ex-combo'));
     };
 
     /* ── Supprimer ligne ── */
@@ -623,6 +700,10 @@ input:checked + .tog-slider:before { transform: translateX(18px); }
             urgLbl.style.fontWeight = this.checked ? '800' : '600';
         });
     }
+
+    /* ── Initialiser le combobox sur la première ligne ── */
+    var combo0 = document.querySelector('.ex-combo[data-idx="0"]');
+    if (combo0) buildExCombo(combo0);
 
     /* ── Recherche patient ── */
     var searchInput = document.getElementById('patient-search');
@@ -704,8 +785,8 @@ input:checked + .tog-slider:before { transform: translateX(18px); }
             return;
         }
         var hasTest = false;
-        document.querySelectorAll('.examen-select').forEach(function (s) {
-            if (s.value) hasTest = true;
+        document.querySelectorAll('.ex-hidden').forEach(function (h) {
+            if (h.value.trim()) hasTest = true;
         });
         if (!hasTest) {
             e.preventDefault();

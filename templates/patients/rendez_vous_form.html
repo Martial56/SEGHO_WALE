@@ -79,6 +79,8 @@
     .btn-action.btn-danger-outline:hover { background: #fff0f0; border-color: #fca5a5; color: var(--rose); filter: none; }
     .btn-action:disabled { opacity: 0.38; cursor: not-allowed; filter: none; }
     .btn-action.btn-waiting { background: #f57c00; }
+    .btn-action.btn-ghost { background: transparent; color: rgba(0,0,0,0.55); border: none; }
+    .btn-action.btn-ghost:hover { background: rgba(0,0,0,0.05); filter: none; }
     .f-tab-disabled { opacity: 0.38; cursor: not-allowed; pointer-events: none; }
 
     /* ── Évaluation clinique ── */
@@ -240,6 +242,14 @@
         letter-spacing: 0.02em;
     }
     .timing-value.zero { color: rgba(0,0,0,0.2); }
+    .timing-value.running { color: var(--teal-600); }
+    .timing-value.running::after {
+        content: ' ●';
+        font-size: 10px;
+        vertical-align: middle;
+        animation: blink 1s step-start infinite;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
 
     /* ── Tabs ── */
     .form-tabs-section { margin-top: 0; }
@@ -391,6 +401,32 @@
     .acc-apgar tbody td:not(:first-child) { text-align: center; }
     .acc-apgar input { width: 52px; border: none; border-bottom: 1px solid #ddd; outline: none; font-size: 12.5px; text-align: center; background: transparent; padding: 2px 0; color: var(--teal-900); }
 
+    /* ── Actions pausées (statut en_consultation) ── */
+    .cp-actions.paused .btn-action:not(#btn-pause) {
+        opacity: 0.35;
+        pointer-events: none;
+    }
+
+    /* ── Mode verrouillé (statut confirmé) ── */
+    .rdv-locked .field-ul,
+    .rdv-locked .f-tab-input,
+    .rdv-locked .f-tab-textarea,
+    .rdv-locked .f-select,
+    .rdv-locked .cpn-inp,
+    .rdv-locked .cpn-sel {
+        pointer-events: none !important;
+        color: rgba(0,0,0,0.45) !important;
+    }
+    .rdv-locked select.field-ul { pointer-events: none !important; }
+    .rdv-locked .patho-ms-trigger,
+    .rdv-locked .f-check,
+    .rdv-locked .cpn-radios input { pointer-events: none !important; }
+    .rdv-locked .form-body::after {
+        content: '';
+        position: fixed; inset: 0;
+        pointer-events: none;
+    }
+
     /* ── Alert ── */
     .alert-form-error {
         display: flex; gap: 10px; align-items: flex-start;
@@ -463,15 +499,25 @@
                     {% if not facture_payee %}disabled title="Une facture payée est requise pour confirmer ce rendez-vous"{% endif %}>Confirmer</button>
                 <button type="submit" name="_action" value="créer une facture" class="btn-action">Créer une facture</button>
             {% elif rdv.statut == 'confirme' %}
-                <button type="submit" name="_action" value="en_attente" class="btn-action btn-waiting"
-                    {% if not consultation %}disabled title="L'évaluation clinique doit être enregistrée d'abord"{% endif %}>En Attente</button>
-                <button type="submit" name="_action" value="créer une facture" class="btn-action">Modifier</button>
+                <button type="button" class="btn-action btn-teal" id="btn-modifier">
+                    <i class="bi bi-pencil"></i> Modifier
+                </button>
+                <div id="edit-actions" style="display:none;gap:6px;align-items:center;">
+                    <button type="submit" name="_action" value="en_attente" class="btn-action btn-waiting"
+                        {% if not consultation %}disabled title="L'évaluation clinique doit être enregistrée d'abord"{% endif %}>En Attente</button>
+                    <!-- <button type="submit" name="_action" value="créer une facture" class="btn-action">Créer une facture</button> -->
+                    <button type="button" class="btn-action btn-danger-outline" id="btn-cancel-edit">
+                        <i class="bi bi-x-lg"></i> Annuler
+                    </button>
+                </div>
             {% elif rdv.statut == 'en_attente' %}
                 <button type="submit" name="_action" value="en_consultation" class="btn-action btn-teal">Consultation</button>
             {% elif rdv.statut == 'en_consultation' %}
-                <button type="button" class="btn-action">Pause</button>
-                <button type="button" class="btn-action btn-blue"><i class="bi bi-person-fill"></i> Créer une ordonnance</button>
-                <a href="{% url 'laboratoire_create' %}?patient={{ rdv.patient.pk }}" class="btn-action btn-teal"><i class="bi bi-eyedropper"></i> Demande de lab</a>
+                <button type="button" class="btn-action" id="btn-pause"><i class="bi bi-pause-fill"></i> Pause</button>
+                <a href="{% url 'patients:ordonnance_create' rdv.patient.pk %}{% if consultation %}?consultation={{ consultation.pk }}{% else %}?rdv={{ rdv.pk }}{% endif %}" class="btn-action btn-ghost"><i class="bi bi-file-earmark-medical"></i> Créer une ordonnance</a>
+                <a href="{% url 'laboratoire_create' %}?patient={{ rdv.patient.pk }}" class="btn-action btn-ghost"><i class="bi bi-flask"></i> Demande de lab</a>
+                <a href="{% url 'soins:create' %}?patient_id={{ rdv.patient.pk }}" class="btn-action btn-ghost"><i class="bi bi-bandaid"></i> Soins</a>
+                <a href="{% url 'patients:hospitalisation_list' rdv.patient.pk %}" class="btn-action btn-ghost"><i class="bi bi-clipboard2-pulse"></i> M.O</a>
                 <button type="submit" name="_action" value="terminer" class="btn-action btn-dark">Consultation terminée</button>
                 <button type="submit" name="_action" value="annuler" class="btn-action btn-danger-outline">Annuler</button>
             {% endif %}
@@ -620,24 +666,24 @@
     <div class="timing-section">
         <div class="timing-card">
             <div class="timing-label">Temps de constante</div>
-            <div class="timing-value zero" id="t-constante">
-                {% if rdv %}{% with h=rdv.temps_constante_minutes|divisibleby:60 %}{{ rdv.temps_constante_minutes|floatformat:0 }}{% endwith %}{% else %}00:00{% endif %}
+            <div class="timing-value {% if not rdv or not rdv.date_en_attente %}zero{% endif %}" id="t-constante">
+                {% if rdv and rdv.date_en_attente %}{{ rdv.temps_constante_display }}{% else %}00:00{% endif %}
             </div>
-            <div style="font-size:11px;color:rgba(0,0,0,0.3);">Création → Prise de constante</div>
+            <div style="font-size:11px;color:rgba(0,0,0,0.3);">Confirmation → En attente</div>
         </div>
         <div class="timing-card">
             <div class="timing-label">Temps d'attente</div>
-            <div class="timing-value zero" id="t-attente">
-                {% if rdv and rdv.temps_attente_minutes %}{{ rdv.temps_attente_minutes }}{% else %}00:00{% endif %}
+            <div class="timing-value {% if not rdv or not rdv.date_en_consultation %}zero{% endif %}" id="t-attente">
+                {% if rdv and rdv.date_en_consultation %}{{ rdv.temps_attente_display }}{% else %}00:00{% endif %}
             </div>
-            <div style="font-size:11px;color:rgba(0,0,0,0.3);">Constante → Réception médecin</div>
+            <div style="font-size:11px;color:rgba(0,0,0,0.3);">En attente → En consultation</div>
         </div>
         <div class="timing-card">
             <div class="timing-label">Temps de consultation</div>
-            <div class="timing-value zero" id="t-consult">
-                {% if rdv and rdv.temps_consultation_minutes %}{{ rdv.temps_consultation_minutes }}{% else %}00:00{% endif %}
+            <div class="timing-value {% if not rdv or not rdv.date_termine %}zero{% endif %}" id="t-consult">
+                {% if rdv and rdv.date_termine %}{{ rdv.temps_consultation_display }}{% else %}00:00{% endif %}
             </div>
-            <div style="font-size:11px;color:rgba(0,0,0,0.3);">Durée de la consultation</div>
+            <div style="font-size:11px;color:rgba(0,0,0,0.3);">En consultation → Terminée</div>
         </div>
     </div>
 
@@ -1748,13 +1794,68 @@
         updateDateValidite();
     }
 
-    /* ── Chronomètres : colorier si non-zéro ── */
-    ['t-constante', 't-attente', 't-consult'].forEach(function (id) {
-        var el = document.getElementById(id);
-        if (el && el.textContent.trim() !== '00:00') {
-            el.classList.remove('zero');
+    /* ── Chronomètres en temps réel ── */
+    (function() {
+        var _statut = (document.getElementById('rdv-form') || {dataset:{}}).dataset.statut || '';
+        function pad(n) { return n < 10 ? '0' + n : '' + n; }
+        function fmt(sec) {
+            var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+            return (h > 0 ? pad(h) + ':' : '') + pad(m) + ':' + pad(s);
         }
-    });
+        var liveMap = {
+            'confirme':        { ts: {% if rdv and rdv.date_confirme %}{{ rdv.date_confirme|date:"U" }}{% else %}0{% endif %}, id: 't-constante' },
+            'en_attente':      { ts: {% if rdv and rdv.date_en_attente %}{{ rdv.date_en_attente|date:"U" }}{% else %}0{% endif %}, id: 't-attente' },
+            'en_consultation': { ts: {% if rdv and rdv.date_en_consultation %}{{ rdv.date_en_consultation|date:"U" }}{% else %}0{% endif %}, id: 't-consult' },
+        };
+        var live      = liveMap[_statut];
+        var _ivId     = null;
+        var _pauseSec = 0;
+        var _pauseAt  = null;
+
+        function _tick() {
+            var el = live && document.getElementById(live.id);
+            if (!el) return;
+            var elapsed = Math.floor(Date.now() / 1000) - live.ts - _pauseSec;
+            el.textContent = fmt(elapsed < 0 ? 0 : elapsed);
+        }
+
+        function startLive() {
+            if (!live || !live.ts) return;
+            var el = document.getElementById(live.id);
+            if (!el) return;
+            el.classList.remove('zero');
+            el.classList.add('running');
+            _tick();
+            _ivId = setInterval(_tick, 1000);
+        }
+
+        window._rdvTimer = {
+            pause: function() {
+                if (_ivId) { clearInterval(_ivId); _ivId = null; }
+                _pauseAt = Math.floor(Date.now() / 1000);
+                var el = live && document.getElementById(live.id);
+                if (el) el.classList.remove('running');
+            },
+            resume: function() {
+                if (_pauseAt !== null) {
+                    _pauseSec += Math.floor(Date.now() / 1000) - _pauseAt;
+                    _pauseAt = null;
+                }
+                var el = live && document.getElementById(live.id);
+                if (el) el.classList.add('running');
+                _tick();
+                _ivId = setInterval(_tick, 1000);
+            }
+        };
+
+        startLive();
+
+        ['t-constante', 't-attente', 't-consult'].forEach(function(id) {
+            if (live && id === live.id) return;
+            var el = document.getElementById(id);
+            if (el && el.textContent.trim() !== '00:00') el.classList.remove('zero');
+        });
+    })();
 
     /* ── Onglets médicaux ── */
     var REGISTER_TABS = ['cpn', 'accouchement', 'postnatale', 'curative'];
@@ -2141,6 +2242,73 @@
   preremplir('_reg_acc');
   preremplir('_reg_post');
   preremplir('_reg_cur');
+})();
+</script>
+
+<script>
+/* ── Bouton Pause / Démarrer (statut en_consultation) ── */
+(function() {
+    var rdvForm = document.getElementById('rdv-form');
+    if (!rdvForm || rdvForm.dataset.statut !== 'en_consultation') return;
+
+    var btnPause  = document.getElementById('btn-pause');
+    if (!btnPause) return;
+
+    var formBody  = document.querySelector('.form-body');
+    var cpActions = document.querySelector('.cp-actions');
+    var isPaused  = false;
+
+    btnPause.addEventListener('click', function() {
+        isPaused = !isPaused;
+        if (isPaused) {
+            btnPause.innerHTML = '<i class="bi bi-play-fill"></i> Démarrer';
+            btnPause.classList.add('btn-teal');
+            if (formBody)  formBody.classList.add('rdv-locked');
+            if (cpActions) cpActions.classList.add('paused');
+            if (window._rdvTimer) window._rdvTimer.pause();
+        } else {
+            btnPause.innerHTML = '<i class="bi bi-pause-fill"></i> Pause';
+            btnPause.classList.remove('btn-teal');
+            if (formBody)  formBody.classList.remove('rdv-locked');
+            if (cpActions) cpActions.classList.remove('paused');
+            if (window._rdvTimer) window._rdvTimer.resume();
+        }
+    });
+})();
+
+/* ── Mode verrouillé / édition pour statut confirmé ── */
+(function() {
+    var rdvForm    = document.getElementById('rdv-form');
+    if (!rdvForm || rdvForm.dataset.statut !== 'confirme') return;
+
+    var formBody   = document.querySelector('.form-body');
+    var saveBtn    = document.querySelector('.btn-save');
+    var discardBtn = document.querySelector('.btn-discard');
+    var editActions  = document.getElementById('edit-actions');
+    var btnModifier  = document.getElementById('btn-modifier');
+    var btnCancel    = document.getElementById('btn-cancel-edit');
+
+    function lock() {
+        if (formBody)   formBody.classList.add('rdv-locked');
+        if (saveBtn)    saveBtn.style.display = 'none';
+        if (discardBtn) discardBtn.style.display = 'none';
+        if (editActions) editActions.style.display = 'none';
+        if (btnModifier) btnModifier.style.display = '';
+    }
+
+    function unlock() {
+        if (formBody)   formBody.classList.remove('rdv-locked');
+        if (saveBtn)    saveBtn.style.display = '';
+        if (discardBtn) discardBtn.style.display = '';
+        if (editActions) { editActions.style.display = 'flex'; }
+        if (btnModifier) btnModifier.style.display = 'none';
+    }
+
+    /* Départ en mode verrouillé */
+    lock();
+
+    if (btnModifier) btnModifier.addEventListener('click', unlock);
+    if (btnCancel)   btnCancel.addEventListener('click', lock);
 })();
 </script>
 

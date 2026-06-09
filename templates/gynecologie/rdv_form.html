@@ -249,6 +249,14 @@
         letter-spacing: 0.02em;
     }
     .timing-value.zero { color: rgba(0,0,0,0.2); }
+    .timing-value.running { color: var(--teal-600); }
+    .timing-value.running::after {
+        content: ' ●';
+        font-size: 10px;
+        vertical-align: middle;
+        animation: blink 1s step-start infinite;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
 
     /* ── Tabs ── */
     .form-tabs-section { margin-top: 0; }
@@ -377,6 +385,27 @@
     .acc-apgar tbody td:first-child { font-weight: 500; color: #111; padding-left: 0; }
     .acc-apgar tbody td:not(:first-child) { text-align: center; }
     .acc-apgar input { width: 52px; border: none; border-bottom: 1px solid #ddd; outline: none; font-size: 12.5px; text-align: center; background: transparent; padding: 2px 0; color: var(--teal-900); }
+
+    /* ── Actions pausées (statut en_consultation) ── */
+    .cp-actions.paused .btn-action:not(#btn-pause) {
+        opacity: 0.35;
+        pointer-events: none;
+    }
+
+    /* ── Mode verrouillé (statut confirmé) ── */
+    .rdv-locked .field-ul,
+    .rdv-locked .f-tab-input,
+    .rdv-locked .f-tab-textarea,
+    .rdv-locked .f-select,
+    .rdv-locked .cpn-inp,
+    .rdv-locked .cpn-sel {
+        pointer-events: none !important;
+        color: rgba(0,0,0,0.45) !important;
+    }
+    .rdv-locked select.field-ul { pointer-events: none !important; }
+    .rdv-locked .patho-ms-trigger,
+    .rdv-locked .f-check,
+    .rdv-locked .cpn-radios input { pointer-events: none !important; }
 
     /* ── Alert ── */
     .alert-form-error {
@@ -575,17 +604,25 @@
             {% if not rdv %}
                 {# Nouveau RDV — pas encore de boutons d'action #}
             {% elif rdv.statut == 'planifie' %}
-                <button type="submit" name="_action" value="confirmer" class="btn-action btn-teal"
+               <button type="submit" name="_action" value="confirmer" class="btn-action btn-teal"
                     {% if not facture_payee %}disabled title="Une facture payée est requise pour confirmer ce rendez-vous"{% endif %}>Confirmer</button>
                 <button type="submit" name="_action" value="créer une facture" class="btn-action">Créer une facture</button>
             {% elif rdv.statut == 'confirme' %}
-                <button type="submit" name="_action" value="en_attente" class="btn-action btn-waiting"
-                    {% if not consultation %}disabled title="L'évaluation clinique doit être enregistrée d'abord"{% endif %}>En Attente</button>
-                <button type="submit" name="_action" value="créer une facture" class="btn-action">Créer une facture</button>
+                <button type="button" class="btn-action btn-teal" id="btn-modifier">
+                    <i class="bi bi-pencil"></i> Modifier
+                </button>
+                <div id="edit-actions" style="display:none;gap:6px;align-items:center;">
+                    <button type="submit" name="_action" value="en_attente" class="btn-action btn-waiting"
+                        {% if not consultation %}disabled title="L'évaluation clinique doit être enregistrée d'abord"{% endif %}>En Attente</button>
+                    <!-- <button type="submit" name="_action" value="créer une facture" class="btn-action">Créer une facture</button> -->
+                    <button type="button" class="btn-action btn-danger-outline" id="btn-cancel-edit">
+                        <i class="bi bi-x-lg"></i> Annuler
+                    </button>
+                </div>
             {% elif rdv.statut == 'en_attente' %}
                 <button type="submit" name="_action" value="en_consultation" class="btn-action btn-teal">Consultation</button>
             {% elif rdv.statut == 'en_consultation' %}
-                <button type="button" class="btn-action">Pause</button>
+                <button type="button" class="btn-action" id="btn-pause"><i class="bi bi-pause-fill"></i> Pause</button>
                 <button type="button" class="btn-action btn-blue"><i class="bi bi-person-fill"></i> Créer une ordonnance</button>
                 <a href="{% url 'laboratoire_create' %}?patient={{ rdv.patient.pk }}" class="btn-action btn-teal"><i class="bi bi-eyedropper"></i> Demande de lab</a>
                 <button type="submit" name="_action" value="terminer" class="btn-action btn-dark">Consultation terminée</button>
@@ -736,24 +773,24 @@
     <div class="timing-section">
         <div class="timing-card">
             <div class="timing-label">Temps de constante</div>
-            <div class="timing-value zero" id="t-constante">
-                {% if rdv %}{% with h=rdv.temps_constante_minutes|divisibleby:60 %}{{ rdv.temps_constante_minutes|floatformat:0 }}{% endwith %}{% else %}00:00{% endif %}
+            <div class="timing-value {% if not rdv or not rdv.date_en_attente %}zero{% endif %}" id="t-constante">
+                {% if rdv and rdv.date_en_attente %}{{ rdv.temps_constante_display }}{% else %}00:00{% endif %}
             </div>
-            <div style="font-size:11px;color:rgba(0,0,0,0.3);">Création → Prise de constante</div>
+            <div style="font-size:11px;color:rgba(0,0,0,0.3);">Confirmation → En attente</div>
         </div>
         <div class="timing-card">
             <div class="timing-label">Temps d'attente</div>
-            <div class="timing-value zero" id="t-attente">
-                {% if rdv and rdv.temps_attente_minutes %}{{ rdv.temps_attente_minutes }}{% else %}00:00{% endif %}
+            <div class="timing-value {% if not rdv or not rdv.date_en_consultation %}zero{% endif %}" id="t-attente">
+                {% if rdv and rdv.date_en_consultation %}{{ rdv.temps_attente_display }}{% else %}00:00{% endif %}
             </div>
-            <div style="font-size:11px;color:rgba(0,0,0,0.3);">Constante → Réception médecin</div>
+            <div style="font-size:11px;color:rgba(0,0,0,0.3);">En attente → En consultation</div>
         </div>
         <div class="timing-card">
             <div class="timing-label">Temps de consultation</div>
-            <div class="timing-value zero" id="t-consult">
-                {% if rdv and rdv.temps_consultation_minutes %}{{ rdv.temps_consultation_minutes }}{% else %}00:00{% endif %}
+            <div class="timing-value {% if not rdv or not rdv.date_termine %}zero{% endif %}" id="t-consult">
+                {% if rdv and rdv.date_termine %}{{ rdv.temps_consultation_display }}{% else %}00:00{% endif %}
             </div>
-            <div style="font-size:11px;color:rgba(0,0,0,0.3);">Durée de la consultation</div>
+            <div style="font-size:11px;color:rgba(0,0,0,0.3);">En consultation → Terminée</div>
         </div>
     </div>
 
@@ -897,18 +934,17 @@
             <div class="cpn-row"><span class="cpn-lbl">Report numéro gestante précédent</span><input type="text" name="cpn_report_numero" class="cpn-inp editable"></div>
             <div class="cpn-row"><span class="cpn-lbl">Numéro gestante de la visite</span><input type="text" name="cpn_numero_gestante" class="cpn-inp editable"></div>
 
-            <hr class="cpn-sep">
-            <div class="cpn-sub">Constantes physiques : <a href="#" style="color:var(--teal-600);font-size:12.5px;text-decoration:none;margin-left:8px;font-style:normal;">Créer</a></div>
-            <div class="cpn-row"><span class="cpn-lbl">Poids</span><div class="cpn-val"><input type="number" name="cpn_poids" class="cpn-inp editable" step="0.01" value="0.00" style="max-width:90px;"><span class="cpn-unit">kg</span></div></div>
-            <div class="cpn-row"><span class="cpn-lbl">Taille</span><div class="cpn-val"><input type="number" name="cpn_taille" class="cpn-inp editable" step="0.01" value="0.00" style="max-width:90px;"><span class="cpn-unit">m</span></div></div>
-            <div class="cpn-row"><span class="cpn-lbl">Température</span><div class="cpn-val"><input type="number" name="cpn_temperature" class="cpn-inp editable" step="0.01" value="0.00" style="max-width:90px;"><span class="cpn-unit">°C</span></div></div>
-            <div class="cpn-row"><span class="cpn-lbl">Pouls</span><div class="cpn-val"><input type="number" name="cpn_pouls" class="cpn-inp editable" value="0" style="max-width:90px;"><span class="cpn-unit">bpm</span></div></div>
-            <div class="cpn-row"><span class="cpn-lbl">Fréquence respiratoire</span><div class="cpn-val"><input type="number" name="cpn_freq_resp" class="cpn-inp editable" value="0" style="max-width:90px;"><span class="cpn-unit">cpm</span></div></div>
-            <div class="cpn-row"><span class="cpn-lbl">Périmètre Brachial</span><input type="number" name="cpn_perimetre_brachial" class="cpn-inp editable" step="0.01" value="0.00"></div>
-            <div class="cpn-row"><span class="cpn-lbl">IMC</span><input type="number" name="cpn_imc" class="cpn-inp editable" step="0.01" value="0.00"></div>
-            <div class="cpn-row"><span class="cpn-lbl">TA Bras gauche (mmHg)</span><input type="text" name="cpn_ta_gauche" class="cpn-inp editable"></div>
-            <div class="cpn-row"><span class="cpn-lbl">TA Bras droit (mmHg)</span><input type="text" name="cpn_ta_droit" class="cpn-inp editable"></div>
-            <div class="cpn-row"><span class="cpn-lbl">Périmètre Brachial (cm)</span><input type="text" name="cpn_perimetre_brachial_cm" class="cpn-inp editable"></div>
+            <div class="cpn-section">Constantes physiques</div>
+            <div class="cpn-row"><span class="cpn-lbl">Poids</span><div class="cpn-val"><input type="text" name="cpn_poids" class="cpn-inp-ro" readonly value="{{ constante.poids|default:'—' }}" style="max-width:90px;"><span class="cpn-unit">kg</span></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Taille</span><div class="cpn-val"><input type="text" name="cpn_taille" class="cpn-inp-ro" readonly value="{{ constante.taille|default:'—' }}" style="max-width:90px;"><span class="cpn-unit">m</span></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Température</span><div class="cpn-val"><input type="text" name="cpn_temperature" class="cpn-inp-ro" readonly value="{{ constante.temperature|default:'—' }}" style="max-width:90px;"><span class="cpn-unit">°C</span></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Pouls</span><div class="cpn-val"><input type="text" name="cpn_pouls" class="cpn-inp-ro" readonly value="{{ constante.pouls|default:'—' }}" style="max-width:90px;"><span class="cpn-unit">bpm</span></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Fréquence respiratoire</span><div class="cpn-val"><input type="text" name="cpn_freq_resp" class="cpn-inp-ro" readonly value="{{ constante.frequence_respiratoire|default:'—' }}" style="max-width:90px;"><span class="cpn-unit">cpm</span></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Périmètre Brachial</span><input type="text" name="cpn_perimetre_brachial" class="cpn-inp-ro" readonly value="{{ constante.perimetre_brachial|default:'—' }}"></div>
+            <div class="cpn-row"><span class="cpn-lbl">IMC</span><input type="text" name="cpn_imc" class="cpn-inp-ro" readonly value="{{ constante.imc|default:'—' }}"></div>
+            <div class="cpn-row"><span class="cpn-lbl">TA Bras gauche (mmHg)</span><input type="text" name="cpn_ta_gauche" class="cpn-inp-ro" readonly value="{% if constante and constante.tension_systolique %}{{ constante.tension_systolique }}/{{ constante.tension_diastolique }}{% else %}—{% endif %}"></div>
+            <div class="cpn-row"><span class="cpn-lbl">TA Bras droit (mmHg)</span><input type="text" name="cpn_ta_droit" class="cpn-inp-ro" readonly value="{% if constante and constante.tension_systolique_droite %}{{ constante.tension_systolique_droite }}/{{ constante.tension_diastolique_droite }}{% else %}—{% endif %}"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Périmètre Brachial (cm)</span><input type="text" name="cpn_perimetre_brachial_cm" class="cpn-inp-ro" readonly value="{{ constante.perimetre_brachial|default:'—' }}"></div>
 
             <hr class="cpn-sep">
             <div class="cpn-row"><span class="cpn-lbl">Statut VAT</span><select name="cpn_statut_vat" class="cpn-sel editable"><option value=""></option><option value="0">Non vaccinée</option><option value="1">VAT1</option><option value="2">VAT2</option><option value="3">VAT3</option><option value="4">VAT4</option><option value="5">VAT5</option></select></div>
@@ -1041,6 +1077,8 @@
           <div class="cpn-col">
             <div class="cpn-section">Arrivée</div>
             <div class="cpn-row"><span class="cpn-lbl">Date</span><input type="date" name="acc_date_arrivee" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Mode d'entrée</span><select name="acc_mode_entree" id="acc_mode_entree" class="cpn-sel editable"><option value=""></option><option value="venu_lui_meme">Patient venu de lui-même</option><option value="reference_centre">Référence d'un centre de santé</option><option value="refere_tradipraticien">Référé par un tradipraticien</option><option value="autre">Autre</option></select></div>
+            <div class="cpn-row" id="acc_mode_entree_autre_row" style="display:none;"><span class="cpn-lbl">Préciser</span><input type="text" name="acc_mode_entree_autre" class="cpn-inp editable" placeholder="Préciser le mode d'entrée..."></div>
             <div class="cpn-row"><span class="cpn-lbl">Motif d'admission</span><input type="text" name="acc_motif_admission" class="cpn-inp editable"></div>
             <div class="cpn-row"><span class="cpn-lbl">En travail</span><div class="cpn-radios"><label><input type="radio" name="acc_en_travail" value="oui" class="editable"> Oui</label><label><input type="radio" name="acc_en_travail" value="non" class="editable"> Non</label></div></div>
             <div class="cpn-row"><span class="cpn-lbl">Contractions</span><input type="text" name="acc_contractions" class="cpn-inp editable"></div>
@@ -1077,16 +1115,16 @@
             <div class="cpn-row"><span class="cpn-lbl">Initiation ARV</span><select name="acc_initiation_arv_pf" class="cpn-sel editable"><option value=""></option><option value="oui">Oui</option><option value="non">Non</option></select></div>
 
             <hr class="cpn-sep">
-            <div class="cpn-sub">Informations cliniques et examen obstétrical : <a href="#" style="color:var(--teal-600);font-size:12.5px;text-decoration:none;margin-left:8px;">Créer</a></div>
-            <div class="cpn-row"><span class="cpn-lbl">Poids</span><div class="cpn-val"><input type="number" name="acc_poids" class="cpn-inp editable" step="0.01" value="0.00" style="max-width:90px;"><span class="cpn-unit">kg</span></div></div>
-            <div class="cpn-row"><span class="cpn-lbl">Taille</span><div class="cpn-val"><input type="number" name="acc_taille" class="cpn-inp editable" step="0.01" value="0.00" style="max-width:90px;"><span class="cpn-unit">m</span></div></div>
-            <div class="cpn-row"><span class="cpn-lbl">Température</span><div class="cpn-val"><input type="number" name="acc_temperature" class="cpn-inp editable" step="0.01" value="0.00" style="max-width:90px;"><span class="cpn-unit">°C</span></div></div>
-            <div class="cpn-row"><span class="cpn-lbl">Pouls</span><div class="cpn-val"><input type="number" name="acc_pouls" class="cpn-inp editable" value="0" style="max-width:90px;"><span class="cpn-unit">bpm</span></div></div>
-            <div class="cpn-row"><span class="cpn-lbl">Fréquence respiratoire</span><div class="cpn-val"><input type="number" name="acc_freq_resp" class="cpn-inp editable" value="0" style="max-width:90px;"><span class="cpn-unit">cpm</span></div></div>
-            <div class="cpn-row"><span class="cpn-lbl">IMC</span><input type="number" name="acc_imc" class="cpn-inp editable" step="0.01" value="0.00"></div>
-            <div class="cpn-row"><span class="cpn-lbl">TA Bras gauche (mmHg)</span><input type="text" name="acc_ta_gauche" class="cpn-inp editable"></div>
-            <div class="cpn-row"><span class="cpn-lbl">TA Bras droit (mmHg)</span><input type="text" name="acc_ta_droit" class="cpn-inp editable"></div>
-            <div class="cpn-row"><span class="cpn-lbl">Périmètre Brachial (cm)</span><input type="text" name="acc_perimetre_brachial" class="cpn-inp editable"></div>
+            <div class="cpn-section">Informations cliniques et examen obstétrical <!--: <a href="#" style="color:var(--teal-600);font-size:12.5px;text-decoration:none;margin-left:8px;">Créer</a>--></div>
+            <div class="cpn-row"><span class="cpn-lbl">Poids</span><div class="cpn-val"><input type="text" name="acc_poids" class="cpn-inp-ro" readonly value="{{ constante.poids|default:'—' }}" style="max-width:90px;"><span class="cpn-unit">kg</span></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Taille</span><div class="cpn-val"><input type="text" name="acc_taille" class="cpn-inp-ro" readonly value="{{ constante.taille|default:'—' }}" style="max-width:90px;"><span class="cpn-unit">m</span></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Température</span><div class="cpn-val"><input type="text" name="acc_temperature" class="cpn-inp-ro" readonly value="{{ constante.temperature|default:'—' }}" style="max-width:90px;"><span class="cpn-unit">°C</span></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Pouls</span><div class="cpn-val"><input type="text" name="acc_pouls" class="cpn-inp-ro" readonly value="{{ constante.pouls|default:'—' }}" style="max-width:90px;"><span class="cpn-unit">bpm</span></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Fréquence respiratoire</span><div class="cpn-val"><input type="text" name="acc_freq_resp" class="cpn-inp-ro" readonly value="{{ constante.frequence_respiratoire|default:'—' }}" style="max-width:90px;"><span class="cpn-unit">cpm</span></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">IMC</span><input type="text" name="acc_imc" class="cpn-inp-ro" readonly value="{{ constante.imc|default:'—' }}"></div>
+            <div class="cpn-row"><span class="cpn-lbl">TA Bras gauche (mmHg)</span><input type="text" name="acc_ta_gauche" class="cpn-inp-ro" readonly value="{% if constante and constante.tension_systolique %}{{ constante.tension_systolique }}/{{ constante.tension_diastolique }}{% else %}—{% endif %}"></div>
+            <div class="cpn-row"><span class="cpn-lbl">TA Bras droit (mmHg)</span><input type="text" name="acc_ta_droit" class="cpn-inp-ro" readonly value="{% if constante and constante.tension_systolique_droite %}{{ constante.tension_systolique_droite }}/{{ constante.tension_diastolique_droite }}{% else %}—{% endif %}"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Périmètre Brachial (cm)</span><input type="text" name="acc_perimetre_brachial" class="cpn-inp-ro" readonly value="{{ constante.perimetre_brachial|default:'—' }}"></div>
             <div class="cpn-row"><span class="cpn-lbl">Groupe Rhésus</span><input type="text" name="acc_groupe_rhesus" class="cpn-inp editable"></div>
             <div class="cpn-row"><span class="cpn-lbl">D.D.R.</span><input type="date" name="acc_ddr" class="cpn-inp editable"></div>
             <div class="cpn-row"><span class="cpn-lbl">TP</span><input type="date" name="acc_tp" class="cpn-inp editable"></div>
@@ -1212,7 +1250,8 @@
           <!-- ══ COLONNE GAUCHE ══ -->
           <div class="cpn-col">
             <div class="cpn-section">Données administratives</div>
-            <div class="cpn-row"><span class="cpn-lbl">Mode d'entrée</span><select name="cposo_mode_entree" class="cpn-sel editable"><option value=""></option><option value="spontane">Spontané</option><option value="refere">Référé</option><option value="transfere">Transféré</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Mode d'entrée</span><select name="cposo_mode_entree" id="cposo_mode_entree" class="cpn-sel editable"><option value=""></option><option value="venu_lui_meme">Patient venu de lui-même</option><option value="reference_centre">Référence d'un centre de santé</option><option value="refere_tradipraticien">Référé par un tradipraticien</option><option value="autre">Autre</option></select></div>
+            <div class="cpn-row" id="cposo_mode_entree_autre_row" style="display:none;"><span class="cpn-lbl">Préciser</span><input type="text" name="cposo_mode_entree_autre" class="cpn-inp editable" placeholder="Préciser le mode d'entrée..."></div>
             <div class="cpn-row"><span class="cpn-lbl">Report N° Gestante</span><input type="text" name="cposo_report_numero" class="cpn-inp editable"></div>
             <div class="cpn-row"><span class="cpn-lbl">Type de consultation postnatale</span><select name="cposo_type_consultation" class="cpn-sel editable"><option value=""></option><option value="j3">J3</option><option value="j7">J7</option><option value="j28">J28</option><option value="j42">J42</option></select></div>
             <div class="cpn-row"><span class="cpn-lbl">Autre à préciser</span><input type="text" name="cposo_autre_preciser" class="cpn-inp editable"></div>
@@ -1230,16 +1269,16 @@
             <div class="cpn-row"><span class="cpn-lbl">Traitement ARV</span><div class="cpn-radios"><label><input type="radio" name="cposo_traitement_arv" value="oui" class="editable"> Oui</label><label><input type="radio" name="cposo_traitement_arv" value="non" class="editable"> Non</label></div></div>
 
             <hr class="cpn-sep">
-            <div class="cpn-sub">Examen de la patiente : <a href="#" style="color:var(--teal-600);font-size:12.5px;text-decoration:none;margin-left:8px;">Créer</a></div>
-            <div class="cpn-row"><span class="cpn-lbl">Poids</span><div class="cpn-val"><input type="number" name="cposo_poids" class="cpn-inp editable" step="0.01" value="0.00" style="max-width:90px;"><span class="cpn-unit">kg</span></div></div>
-            <div class="cpn-row"><span class="cpn-lbl">Taille</span><div class="cpn-val"><input type="number" name="cposo_taille" class="cpn-inp editable" step="0.01" value="0.00" style="max-width:90px;"><span class="cpn-unit">m</span></div></div>
-            <div class="cpn-row"><span class="cpn-lbl">Température</span><div class="cpn-val"><input type="number" name="cposo_temperature" class="cpn-inp editable" step="0.01" value="0.00" style="max-width:90px;"><span class="cpn-unit">°C</span></div></div>
-            <div class="cpn-row"><span class="cpn-lbl">Pouls</span><div class="cpn-val"><input type="number" name="cposo_pouls" class="cpn-inp editable" value="0" style="max-width:90px;"><span class="cpn-unit">bpm</span></div></div>
-            <div class="cpn-row"><span class="cpn-lbl">Fréquence respiratoire</span><div class="cpn-val"><input type="number" name="cposo_freq_resp" class="cpn-inp editable" value="0" style="max-width:90px;"><span class="cpn-unit">cpm</span></div></div>
-            <div class="cpn-row"><span class="cpn-lbl">IMC</span><input type="number" name="cposo_imc" class="cpn-inp editable" step="0.01" value="0.00"></div>
-            <div class="cpn-row"><span class="cpn-lbl">TA Bras gauche (mmHg)</span><input type="text" name="cposo_ta_gauche" class="cpn-inp editable"></div>
-            <div class="cpn-row"><span class="cpn-lbl">TA Bras droit (mmHg)</span><input type="text" name="cposo_ta_droit" class="cpn-inp editable"></div>
-            <div class="cpn-row"><span class="cpn-lbl">Périmètre Brachial (cm)</span><input type="text" name="cposo_perimetre_brachial" class="cpn-inp editable"></div>
+            <div class="cpn-sub">Examen de la patiente <!--: <a href="#" style="color:var(--teal-600);font-size:12.5px;text-decoration:none;margin-left:8px;">Créer</a>--></div>
+            <div class="cpn-row"><span class="cpn-lbl">Poids</span><div class="cpn-val"><input type="text" name="cposo_poids" class="cpn-inp-ro" readonly value="{{ constante.poids|default:'—' }}" style="max-width:90px;"><span class="cpn-unit">kg</span></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Taille</span><div class="cpn-val"><input type="text" name="cposo_taille" class="cpn-inp-ro" readonly value="{{ constante.taille|default:'—' }}" style="max-width:90px;"><span class="cpn-unit">m</span></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Température</span><div class="cpn-val"><input type="text" name="cposo_temperature" class="cpn-inp-ro" readonly value="{{ constante.temperature|default:'—' }}" style="max-width:90px;"><span class="cpn-unit">°C</span></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Pouls</span><div class="cpn-val"><input type="text" name="cposo_pouls" class="cpn-inp-ro" readonly value="{{ constante.pouls|default:'—' }}" style="max-width:90px;"><span class="cpn-unit">bpm</span></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">Fréquence respiratoire</span><div class="cpn-val"><input type="text" name="cposo_freq_resp" class="cpn-inp-ro" readonly value="{{ constante.frequence_respiratoire|default:'—' }}" style="max-width:90px;"><span class="cpn-unit">cpm</span></div></div>
+            <div class="cpn-row"><span class="cpn-lbl">IMC</span><input type="text" name="cposo_imc" class="cpn-inp-ro" readonly value="{{ constante.imc|default:'—' }}"></div>
+            <div class="cpn-row"><span class="cpn-lbl">TA Bras gauche (mmHg)</span><input type="text" name="cposo_ta_gauche" class="cpn-inp-ro" readonly value="{% if constante and constante.tension_systolique %}{{ constante.tension_systolique }}/{{ constante.tension_diastolique }}{% else %}—{% endif %}"></div>
+            <div class="cpn-row"><span class="cpn-lbl">TA Bras droit (mmHg)</span><input type="text" name="cposo_ta_droit" class="cpn-inp-ro" readonly value="{% if constante and constante.tension_systolique_droite %}{{ constante.tension_systolique_droite }}/{{ constante.tension_diastolique_droite }}{% else %}—{% endif %}"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Périmètre Brachial (cm)</span><input type="text" name="cposo_perimetre_brachial" class="cpn-inp-ro" readonly value="{{ constante.perimetre_brachial|default:'—' }}"></div>
             <div class="cpn-row"><span class="cpn-lbl">PB</span><input type="text" name="cposo_pb" class="cpn-inp editable"></div>
             <div class="cpn-row"><span class="cpn-lbl">Œdèmes</span><input type="text" name="cposo_oedemes" class="cpn-inp editable"></div>
             <div class="cpn-row"><span class="cpn-lbl">Varices</span><input type="text" name="cposo_varices" class="cpn-inp editable"></div>
@@ -1598,6 +1637,7 @@
         });
     });
 
+<<<<<<< HEAD
 // Toast statut pipeline
 (function() {
   var t = document.getElementById('pipeline-toast');
@@ -1605,6 +1645,445 @@
     setTimeout(function() { t.classList.add('show'); }, 80);
     setTimeout(function() { t.classList.remove('show'); }, 3000);
   }
+=======
+    /* ── Autocomplete patient (AJAX) ── */
+    var patientHidden    = document.getElementById('id_patient');
+    var codeHidden       = document.getElementById('id_code_confirmation');
+    var codeDisplay      = document.getElementById('code-confirmation');
+    var searchInput      = document.getElementById('patient-search');
+    var dropdown         = document.getElementById('ac-dropdown');
+    var focusedIdx       = -1;
+    var searchTimer      = null;
+    var SEARCH_URL       = '{% url "patients:patient_search" %}';
+    var INFO_URL         = '{% url "patients:patient_info" 0 %}';
+
+    function generateConfirmCode() {
+        var now = new Date();
+        var pad = function(n) { return String(n).padStart(2, '0'); };
+        var d = String(now.getFullYear()).slice(-2) + pad(now.getMonth()+1) + pad(now.getDate());
+        var t = pad(now.getHours()) + pad(now.getMinutes());
+        var r = Math.floor(Math.random() * 9000 + 1000);
+        return 'RDV' + d + '-' + t + r;
+    }
+
+    function highlight(text, q) {
+        if (!q) return text;
+        var i = text.toLowerCase().indexOf(q.toLowerCase());
+        if (i < 0) return text;
+        return text.slice(0, i) +
+               '<mark class="ac-mark">' + text.slice(i, i + q.length) + '</mark>' +
+               text.slice(i + q.length);
+    }
+
+    function renderResults(results, q) {
+        dropdown.innerHTML = '';
+        focusedIdx = -1;
+        if (!results.length) {
+            dropdown.innerHTML = '<div class="ac-empty">Aucun patient trouvé</div>';
+            dropdown.style.display = 'block';
+            return;
+        }
+        results.forEach(function(p) {
+            var div = document.createElement('div');
+            div.className = 'ac-item';
+            div.innerHTML =
+                '<strong>' + highlight(p.nom_complet, q) + '</strong>' +
+                '<br><span style="font-size:11px;color:rgba(0,0,0,0.4);">' +
+                highlight(p.code, q) +
+                (p.telephone ? ' · ' + highlight(p.telephone, q) : '') +
+                '</span>';
+            div.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                selectPatient(p.id, p.nom_complet);
+            });
+            dropdown.appendChild(div);
+        });
+        dropdown.style.display = 'block';
+    }
+
+    function doSearch(q) {
+        if (!q) { dropdown.style.display = 'none'; return; }
+        fetch(SEARCH_URL + '?q=' + encodeURIComponent(q))
+            .then(function(r){ return r.json(); })
+            .then(function(d){ renderResults(d.results, q); });
+    }
+
+    function selectPatient(id, nom) {
+        patientHidden.value = id;
+        searchInput.value   = nom;
+        dropdown.style.display = 'none';
+        fetchPatientInfo(id);
+        /* Générer le code de confirmation si pas déjà présent */
+        if (!codeHidden.value) {
+            var code = generateConfirmCode();
+            codeHidden.value = code;
+            codeDisplay.textContent = code;
+            codeDisplay.classList.remove('placeholder');
+        }
+    }
+
+    function moveFocus(dir) {
+        var items = dropdown.querySelectorAll('.ac-item');
+        if (!items.length) return;
+        focusedIdx = Math.max(0, Math.min(focusedIdx + dir, items.length - 1));
+        items.forEach(function(el, i){ el.classList.toggle('focused', i === focusedIdx); });
+        items[focusedIdx].scrollIntoView({ block: 'nearest' });
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            clearTimeout(searchTimer);
+            var q = this.value.trim();
+            patientHidden.value = '';
+            /* Réinitialiser le code si le patient est désélectionné */
+            if (!q) {
+                codeHidden.value = '';
+                codeDisplay.textContent = 'Sélectionnez un patient…';
+                codeDisplay.classList.add('placeholder');
+            }
+            searchTimer = setTimeout(function(){ doSearch(q); }, 220);
+        });
+        searchInput.addEventListener('keydown', function(e) {
+            if (e.key === 'ArrowDown')  { e.preventDefault(); moveFocus(1); }
+            else if (e.key === 'ArrowUp')   { e.preventDefault(); moveFocus(-1); }
+            else if (e.key === 'Enter') {
+                var items = dropdown.querySelectorAll('.ac-item');
+                if (focusedIdx >= 0 && items[focusedIdx]) {
+                    e.preventDefault();
+                    items[focusedIdx].dispatchEvent(new MouseEvent('mousedown'));
+                }
+            }
+            else if (e.key === 'Escape') { dropdown.style.display = 'none'; }
+        });
+        searchInput.addEventListener('blur', function(){
+            setTimeout(function(){ dropdown.style.display = 'none'; }, 200);
+        });
+
+        /* Pré-remplir si patient passé en paramètre (mode création uniquement) */
+        {% if patient_prefill and not rdv %}
+        searchInput.value = '{{ patient_prefill.nom }} {{ patient_prefill.prenoms }}';
+        patientHidden.value = '{{ patient_prefill.pk }}';
+        fetchPatientInfo('{{ patient_prefill.pk }}');
+        if (!codeHidden.value) {
+            var code = generateConfirmCode();
+            codeHidden.value = code;
+            codeDisplay.textContent = code;
+            codeDisplay.classList.remove('placeholder');
+        }
+        {% endif %}
+    }
+
+    /* ── Info patient (âge + téléphone) ── */
+    function fetchPatientInfo(pk) {
+        if (!pk) { setPlaceholder('patient-age', '—'); setPlaceholder('patient-tel', '—'); return; }
+        fetch(INFO_URL.replace('/0/', '/' + pk + '/'))
+            .then(function(r){ return r.json(); })
+            .then(function(d) {
+                var ageEl = document.getElementById('patient-age');
+                var telEl = document.getElementById('patient-tel');
+                ageEl.textContent = d.age + ' ans';
+                ageEl.classList.remove('placeholder');
+                telEl.textContent = d.telephone || '—';
+                telEl.classList.remove('placeholder');
+            });
+    }
+
+    function setPlaceholder(id, text) {
+        var el = document.getElementById(id);
+        if (el) { el.textContent = text; el.classList.add('placeholder'); }
+    }
+
+    if (patientHidden && patientHidden.value) fetchPatientInfo(patientHidden.value);
+
+    /* En mode édition : générer le code si absent */
+    {% if rdv and not rdv.code_confirmation %}
+    if (!codeHidden.value) {
+        var editCode = generateConfirmCode();
+        codeHidden.value = editCode;
+        codeDisplay.textContent = editCode;
+        codeDisplay.classList.remove('placeholder');
+    }
+    {% endif %}
+
+    /* ── Date de validité = date_heure + 14 jours ── */
+    var dateHeureInput = document.getElementById('{{ form.date_heure.id_for_label }}');
+    var dateValiditeEl = document.getElementById('date-validite');
+
+    function updateDateValidite() {
+        if (!dateHeureInput || !dateValiditeEl) return;
+        var val = dateHeureInput.value;
+        if (!val) {
+            dateValiditeEl.innerHTML = '<span style="font-style:italic;color:#bfcdd4;">J + 14 jours</span>';
+            return;
+        }
+        var d = new Date(val);
+        if (isNaN(d.getTime())) return;
+        d.setDate(d.getDate() + 14);
+        var dd = String(d.getDate()).padStart(2, '0');
+        var mm = String(d.getMonth() + 1).padStart(2, '0');
+        dateValiditeEl.textContent = dd + '/' + mm + '/' + d.getFullYear();
+    }
+
+    if (dateHeureInput) {
+        dateHeureInput.addEventListener('input', updateDateValidite);
+        dateHeureInput.addEventListener('change', updateDateValidite);
+        updateDateValidite();
+    }
+
+    /* ── Chronomètres en temps réel ── */
+    (function() {
+        var _statut = (document.getElementById('rdv-form') || {dataset:{}}).dataset.statut || '';
+        function pad(n) { return n < 10 ? '0' + n : '' + n; }
+        function fmt(sec) {
+            var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+            return (h > 0 ? pad(h) + ':' : '') + pad(m) + ':' + pad(s);
+        }
+        var liveMap = {
+            'confirme':        { ts: {% if rdv and rdv.date_confirme %}{{ rdv.date_confirme|date:"U" }}{% else %}0{% endif %}, id: 't-constante' },
+            'en_attente':      { ts: {% if rdv and rdv.date_en_attente %}{{ rdv.date_en_attente|date:"U" }}{% else %}0{% endif %}, id: 't-attente' },
+            'en_consultation': { ts: {% if rdv and rdv.date_en_consultation %}{{ rdv.date_en_consultation|date:"U" }}{% else %}0{% endif %}, id: 't-consult' },
+        };
+        var live      = liveMap[_statut];
+        var _ivId     = null;
+        var _pauseSec = 0;
+        var _pauseAt  = null;
+
+        function _tick() {
+            var el = live && document.getElementById(live.id);
+            if (!el) return;
+            var elapsed = Math.floor(Date.now() / 1000) - live.ts - _pauseSec;
+            el.textContent = fmt(elapsed < 0 ? 0 : elapsed);
+        }
+
+        function startLive() {
+            if (!live || !live.ts) return;
+            var el = document.getElementById(live.id);
+            if (!el) return;
+            el.classList.remove('zero');
+            el.classList.add('running');
+            _tick();
+            _ivId = setInterval(_tick, 1000);
+        }
+
+        window._rdvTimer = {
+            pause: function() {
+                if (_ivId) { clearInterval(_ivId); _ivId = null; }
+                _pauseAt = Math.floor(Date.now() / 1000);
+                var el = live && document.getElementById(live.id);
+                if (el) el.classList.remove('running');
+            },
+            resume: function() {
+                if (_pauseAt !== null) {
+                    _pauseSec += Math.floor(Date.now() / 1000) - _pauseAt;
+                    _pauseAt = null;
+                }
+                var el = live && document.getElementById(live.id);
+                if (el) el.classList.add('running');
+                _tick();
+                _ivId = setInterval(_tick, 1000);
+            }
+        };
+
+        startLive();
+
+        ['t-constante', 't-attente', 't-consult'].forEach(function(id) {
+            if (live && id === live.id) return;
+            var el = document.getElementById(id);
+            if (el && el.textContent.trim() !== '00:00') el.classList.remove('zero');
+        });
+    })();
+
+    /* ── Mode d'entrée CPN : afficher/masquer "Préciser" ── */
+    var _cpnModeEntree = document.getElementById('cpn_mode_entree');
+    if (_cpnModeEntree) {
+        _cpnModeEntree.addEventListener('change', function() {
+            var row = document.getElementById('cpn_mode_entree_autre_row');
+            if (row) row.style.display = (this.value === 'autre') ? '' : 'none';
+        });
+    }
+
+    /* ── Mode d'entrée curatif : afficher/masquer "Préciser" ── */
+    var _curModeEntree = document.getElementById('cur_mode_entree');
+    if (_curModeEntree) {
+        _curModeEntree.addEventListener('change', function() {
+            var row = document.getElementById('cur_mode_entree_autre_row');
+            if (row) row.style.display = (this.value === 'autre') ? '' : 'none';
+        });
+    }
+
+    /* ── Mode d'entrée accouchement : afficher/masquer "Préciser" ── */
+    var _accModeEntree = document.getElementById('acc_mode_entree');
+    if (_accModeEntree) {
+        _accModeEntree.addEventListener('change', function() {
+            var row = document.getElementById('acc_mode_entree_autre_row');
+            if (row) row.style.display = (this.value === 'autre') ? '' : 'none';
+        });
+    }
+
+    /* ── Mode d'entrée postnatale : afficher/masquer "Préciser" ── */
+    var _cposoModeEntree = document.getElementById('cposo_mode_entree');
+    if (_cposoModeEntree) {
+        _cposoModeEntree.addEventListener('change', function() {
+            var row = document.getElementById('cposo_mode_entree_autre_row');
+            if (row) row.style.display = (this.value === 'autre') ? '' : 'none';
+        });
+    }
+
+    /* ── Multi-select pathologies ── */
+    (function () {
+        function msUpdateTags(ms) {
+            var tagsEl = document.getElementById(ms.id + '_tags');
+            if (!tagsEl) return;
+            var checked = ms.querySelectorAll('.patho-ms-chk:checked');
+            tagsEl.innerHTML = '';
+            if (!checked.length) {
+                tagsEl.innerHTML = '<span class="patho-ms-placeholder">Sélectionner…</span>';
+                return;
+            }
+            checked.forEach(function(chk) {
+                var label = chk.closest('label');
+                var name = label ? label.textContent.trim() : chk.value;
+                var tag = document.createElement('span');
+                tag.className = 'patho-ms-tag';
+                tag.innerHTML = '<span>' + name + '</span>'
+                    + '<span class="patho-ms-tag-rm" data-val="' + chk.value + '">×</span>';
+                tagsEl.appendChild(tag);
+            });
+        }
+        function msClose(ms) {
+            var panel = ms.querySelector('.patho-ms-panel');
+            if (panel) panel.style.display = 'none';
+            ms.classList.remove('open');
+        }
+        function msOpen(ms) {
+            document.querySelectorAll('.patho-ms').forEach(msClose);
+            var panel = ms.querySelector('.patho-ms-panel');
+            if (panel) panel.style.display = '';
+            ms.classList.add('open');
+        }
+        document.querySelectorAll('.patho-ms').forEach(function(ms) {
+            var trigger = ms.querySelector('.patho-ms-trigger');
+            var search  = ms.querySelector('.patho-ms-search');
+            var list    = ms.querySelector('.patho-ms-list');
+            var panel   = ms.querySelector('.patho-ms-panel');
+            if (trigger) trigger.addEventListener('click', function(e) {
+                e.stopPropagation();
+                ms.classList.contains('open') ? msClose(ms) : msOpen(ms);
+            });
+            if (panel) panel.addEventListener('click', function(e) { e.stopPropagation(); });
+            if (search && list) search.addEventListener('input', function() {
+                var q = this.value.toLowerCase();
+                list.querySelectorAll('.patho-ms-item').forEach(function(item) {
+                    item.style.display = item.textContent.toLowerCase().includes(q) ? '' : 'none';
+                });
+            });
+            ms.querySelectorAll('.patho-ms-chk').forEach(function(chk) {
+                chk.addEventListener('change', function() { msUpdateTags(ms); });
+            });
+            ms.addEventListener('click', function(e) {
+                var rm = e.target.closest('.patho-ms-tag-rm');
+                if (!rm) return;
+                e.stopPropagation();
+                var chk = ms.querySelector('.patho-ms-chk[value="' + rm.dataset.val + '"]');
+                if (chk) { chk.checked = false; msUpdateTags(ms); }
+            });
+        });
+        document.addEventListener('click', function() {
+            document.querySelectorAll('.patho-ms').forEach(msClose);
+        });
+    }());
+
+    /* ── Onglets médicaux ── */
+    var REGISTER_TABS = ['cpn', 'accouchement', 'postnatale', 'curative'];
+    var rdvForm = document.getElementById('rdv-form');
+    var isNew = rdvForm.dataset.isNew === '1';
+    var confirmeFacture = rdvForm.dataset.confirmeFacture === '1';
+    var currentStatut = rdvForm.dataset.statut || '';
+    // Évaluation clinique accessible dès que le RDV est confirmé
+    var evalAccessible = ['confirme', 'en_attente', 'en_consultation', 'termine'].indexOf(currentStatut) !== -1;
+    // Registres (CPN, accouchement, postnatale, curative) accessibles uniquement en consultation
+    var consultationStarted = (currentStatut === 'en_consultation' || currentStatut === 'termine');
+
+    document.querySelectorAll('.f-tab').forEach(function(tab) {
+        var tabId = tab.dataset.tab;
+        var isClinic  = (tabId === 'clinique');
+        var isRegister = REGISTER_TABS.indexOf(tabId) !== -1;
+
+        if (isClinic  && !evalAccessible)     tab.classList.add('f-tab-disabled');
+        if (isRegister && !consultationStarted) tab.classList.add('f-tab-disabled');
+
+        tab.addEventListener('click', function() {
+            var id = this.dataset.tab;
+            if (id === 'clinique' && !evalAccessible) return;
+            if (REGISTER_TABS.indexOf(id) !== -1 && !consultationStarted) return;
+            document.querySelectorAll('.f-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.f-tab-panel').forEach(p => p.classList.remove('active'));
+            this.classList.add('active');
+            document.getElementById('tab-' + id).classList.add('active');
+        });
+    });
+
+    // Mode édition : actif si création, confirmé+facturé, en attente, ou en consultation
+    var editMode = isNew || confirmeFacture || currentStatut === 'en_attente' || consultationStarted;
+    function applyEditMode() {
+    var editables = document.querySelectorAll('.editable');
+    editables.forEach(function(el) {
+        if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+        el.disabled = !editMode;
+        el.style.borderBottomColor = editMode ? '' : 'transparent';
+        el.style.cursor = editMode ? '' : 'default';
+        } else if (el.tagName === 'SELECT') {
+        el.disabled = !editMode;
+        el.style.cursor = editMode ? 'pointer' : 'default';
+        el.style.backgroundImage = editMode ? '' : 'none';
+        }
+    });
+    var saveBtn = document.getElementById('save-btn');
+    var discardBtn = document.getElementById('discard-btn');
+    var modifyBtn = document.getElementById('modify-btn');
+    if (saveBtn) saveBtn.style.display = editMode ? 'inline-flex' : 'none';
+    if (discardBtn) discardBtn.style.display = editMode ? 'inline-flex' : 'none';
+    }
+    function toggleEdit() {
+    editMode = !editMode;
+    applyEditMode();
+    }
+    applyEditMode();
+
+    // Auto-fill age when patient changes
+    var patientSelect = document.getElementById('patient-select');
+    if (patientSelect) {
+    patientSelect.addEventListener('change', function() {
+        var opt = this.options[this.selectedIndex];
+        var age = opt.dataset.age;
+        var ageEl = document.getElementById('age-display');
+        if (ageEl) ageEl.textContent = age ? age + ' Ans' : '—';
+    });
+    }
+
+    // Action menu toggle
+    var actionToggle = document.getElementById('action-toggle');
+    if (actionToggle) {
+    actionToggle.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var menu = document.getElementById('action-menu');
+        if (menu) menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    });
+    }
+    document.addEventListener('click', function() {
+    var menu = document.getElementById('action-menu');
+    if (menu) menu.style.display = 'none';
+    });
+
+    /* ── Bouton évaluation : ouvrir la modal ── */
+    var btnEval = document.getElementById('btn-eval-toggle');
+    if (btnEval) {
+        btnEval.addEventListener('click', function() {
+            var m = document.getElementById('eval-modal');
+            if (m) { m.style.display = 'flex'; document.body.style.overflow = 'hidden'; }
+        });
+    }
+>>>>>>> origin/Martial_branch
 })();
 
 // Action menu toggle
@@ -1821,6 +2300,7 @@ document.addEventListener('click', function() {
       var items = document.querySelectorAll('[name="' + name + '"]');
       if (!items.length) return;
       var first = items[0];
+      if (first.readOnly) return;
       if (first.type === 'radio') {
         var val = Array.isArray(v) ? v[0] : v;
         items.forEach(function (r) { r.checked = r.value === val; });
@@ -1836,6 +2316,81 @@ document.addEventListener('click', function() {
   preremplir('_reg_acc');
   preremplir('_reg_post');
   preremplir('_reg_cur');
+
+  /* Afficher "Préciser" si la valeur chargée est "autre" */
+  ['acc_mode_entree', 'cposo_mode_entree'].forEach(function(id) {
+    var sel = document.getElementById(id);
+    if (!sel) return;
+    var row = document.getElementById(id + '_autre_row');
+    if (row) row.style.display = (sel.value === 'autre') ? '' : 'none';
+  });
+})();
+</script>
+
+<script>
+/* ── Bouton Pause / Démarrer (statut en_consultation) ── */
+(function() {
+    var rdvForm = document.getElementById('rdv-form');
+    if (!rdvForm || rdvForm.dataset.statut !== 'en_consultation') return;
+
+    var btnPause  = document.getElementById('btn-pause');
+    if (!btnPause) return;
+
+    var formBody  = document.querySelector('.form-body');
+    var cpActions = document.querySelector('.cp-actions');
+    var isPaused  = false;
+
+    btnPause.addEventListener('click', function() {
+        isPaused = !isPaused;
+        if (isPaused) {
+            btnPause.innerHTML = '<i class="bi bi-play-fill"></i> Démarrer';
+            btnPause.classList.add('btn-teal');
+            if (formBody)  formBody.classList.add('rdv-locked');
+            if (cpActions) cpActions.classList.add('paused');
+            if (window._rdvTimer) window._rdvTimer.pause();
+        } else {
+            btnPause.innerHTML = '<i class="bi bi-pause-fill"></i> Pause';
+            btnPause.classList.remove('btn-teal');
+            if (formBody)  formBody.classList.remove('rdv-locked');
+            if (cpActions) cpActions.classList.remove('paused');
+            if (window._rdvTimer) window._rdvTimer.resume();
+        }
+    });
+})();
+
+/* ── Mode verrouillé / édition pour statut confirmé ── */
+(function() {
+    var rdvForm    = document.getElementById('rdv-form');
+    if (!rdvForm || rdvForm.dataset.statut !== 'confirme') return;
+
+    var formBody   = document.querySelector('.form-body');
+    var saveBtn    = document.querySelector('.btn-save');
+    var discardBtn = document.querySelector('.btn-discard');
+    var editActions  = document.getElementById('edit-actions');
+    var btnModifier  = document.getElementById('btn-modifier');
+    var btnCancel    = document.getElementById('btn-cancel-edit');
+
+    function lock() {
+        if (formBody)   formBody.classList.add('rdv-locked');
+        if (saveBtn)    saveBtn.style.display = 'none';
+        if (discardBtn) discardBtn.style.display = 'none';
+        if (editActions) editActions.style.display = 'none';
+        if (btnModifier) btnModifier.style.display = '';
+    }
+
+    function unlock() {
+        if (formBody)   formBody.classList.remove('rdv-locked');
+        if (saveBtn)    saveBtn.style.display = '';
+        if (discardBtn) discardBtn.style.display = '';
+        if (editActions) { editActions.style.display = 'flex'; }
+        if (btnModifier) btnModifier.style.display = 'none';
+    }
+
+    /* Départ en mode verrouillé */
+    lock();
+
+    if (btnModifier) btnModifier.addEventListener('click', unlock);
+    if (btnCancel)   btnCancel.addEventListener('click', lock);
 })();
 </script>
 

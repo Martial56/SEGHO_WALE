@@ -32,7 +32,11 @@ class Soin(models.Model):
         related_name='soins', verbose_name="Patient"
     )
     infirmier = models.ForeignKey(
+<<<<<<< HEAD
         'employer.Employe', on_delete=models.SET_NULL, null=True, blank=True,
+=======
+        'ressources_humaines.Employe', on_delete=models.SET_NULL, null=True, blank=True,
+>>>>>>> origin/Martial_branch
         related_name='soins_effectues', verbose_name="Infirmier/Agent de soins"
     )
     rendez_vous = models.ForeignKey(
@@ -48,7 +52,11 @@ class Soin(models.Model):
     # Champs supplémentaires
     photo = models.ImageField(upload_to='soins/photos/', blank=True, null=True, verbose_name="Photo")
     departement = models.ForeignKey(
+<<<<<<< HEAD
         'medecins.Departement', on_delete=models.SET_NULL, null=True, blank=True,
+=======
+        'medecins.Service', on_delete=models.SET_NULL, null=True, blank=True,
+>>>>>>> origin/Martial_branch
         related_name='soins', verbose_name="Département"
     )
     service_inscription = models.ForeignKey(
@@ -119,7 +127,11 @@ class ProcedureSoin(models.Model):
         related_name='procedures_soins', verbose_name="Patient"
     )
     infirmier = models.ForeignKey(
+<<<<<<< HEAD
         'employer.Employe', on_delete=models.SET_NULL, null=True, blank=True,
+=======
+        'ressources_humaines.Employe', on_delete=models.SET_NULL, null=True, blank=True,
+>>>>>>> origin/Martial_branch
         related_name='procedures_effectuees', verbose_name="Infirmier"
     )
     soin_type = models.ForeignKey(
@@ -128,7 +140,11 @@ class ProcedureSoin(models.Model):
     )
     prix = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="Prix")
     departement = models.ForeignKey(
+<<<<<<< HEAD
         'medecins.Departement', on_delete=models.SET_NULL, null=True, blank=True,
+=======
+        'medecins.Service', on_delete=models.SET_NULL, null=True, blank=True,
+>>>>>>> origin/Martial_branch
         related_name='procedures_soins', verbose_name="Département"
     )
     date = models.DateTimeField(default=timezone.now, verbose_name="Date")

@@ -1,6 +1,7 @@
 from django.urls import path
 from . import views
 
+<<<<<<< HEAD
 urlpatterns = [
     path('',                                    views.pharmacie_accueil,        name='pharmacie_accueil'),
     path('<str:pharmacie>/',                    views.pharmacie_dashboard,      name='pharmacie_dashboard'),
@@ -25,4 +26,12 @@ urlpatterns = [
     path('<str:pharmacie>/rapport-mensuel/',             views.pharmacie_rapport_mensuel,        name='pharmacie_rapport_mensuel'),
     path('<str:pharmacie>/rapport-dispensation/',        views.pharmacie_rapport_dispensation,   name='pharmacie_rapport_dispensation'),
     path('<str:pharmacie>/comparaison/',                 views.pharmacie_comparaison,            name='pharmacie_comparaison'),
+=======
+app_name = 'pharmacie'
+
+urlpatterns = [
+    path('', views.ordonnance_list, name='ordonnance_list'),
+    path('creer/', views.ordonnance_create, name='ordonnance_create'),
+    path('<int:pk>/', views.ordonnance_detail, name='ordonnance_detail'),
+>>>>>>> origin/Martial_branch
 ]
