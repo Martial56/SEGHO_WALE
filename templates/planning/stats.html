@@ -6,7 +6,7 @@
 {% block extra_planning_css %}
 /* ── Subheader ── */
 .pl-subheader {
-  position: sticky; top: 44px; z-index: 180;
+  position: sticky; top: calc(var(--topbar-h) + 44px); z-index: 180;
   background: var(--surface); border-bottom: 1px solid var(--border);
   padding: 10px 0 0; 
 }
@@ -20,6 +20,7 @@
 .stats-cards {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 14px; margin-bottom: 24px;
+  padding: 16px 32px 0;
 }
 .stats-card {
   background: var(--surface); border: 1px solid var(--border);
@@ -66,33 +67,14 @@
 .pct-label.red    { color: #c0392b; }
 
 /* ── Monthly chart ── */
-.monthly-chart-section { margin-bottom: 28px; }
+.monthly-chart-section { margin-bottom: 28px; padding: 0 32px; }
 .monthly-chart-section h2 {
   font-size: 15px; font-weight: 700; color: var(--text);
   margin: 0 0 14px;
 }
-.monthly-chart {
-  display: flex; align-items: flex-end; gap: 10px;
-  height: 140px; padding: 0 4px;
+.monthly-canvas-wrap {
+  position: relative; height: 200px;
 }
-.monthly-bar-col {
-  display: flex; flex-direction: column; align-items: center;
-  gap: 4px; flex: 1; min-width: 40px;
-}
-.monthly-bar-track {
-  width: 100%; background: var(--border);
-  border-radius: 6px 6px 0 0; overflow: hidden;
-  display: flex; flex-direction: column; justify-content: flex-end;
-  height: 100px;
-}
-.monthly-bar-fill {
-  border-radius: 6px 6px 0 0; transition: height 0.4s; width: 100%;
-}
-.monthly-bar-fill.green  { background: var(--pl-400); }
-.monthly-bar-fill.orange { background: #e67e22; }
-.monthly-bar-fill.red    { background: #c0392b; }
-.monthly-bar-label { font-size: 11px; color: var(--text-muted); text-align: center; line-height: 1.2; }
-.monthly-bar-pct { font-size: 12px; font-weight: 700; color: var(--text); }
 
 /* ── Empty ── */
 .pl-empty { text-align: center; padding: 60px 20px; color: var(--text-muted); }
@@ -103,15 +85,17 @@
 .stats-section h2 {
   font-size: 15px; font-weight: 700; color: var(--text);
   margin: 0 0 14px; display: flex; align-items: center; gap: 8px;
+  padding: 0 32px;
 }
 .stats-section h2 i { color: var(--pl-600); }
 .stats-grid-2 {
   display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  padding: 0 0 32px;
 }
 @media (max-width: 900px) { .stats-grid-2 { grid-template-columns: 1fr; } }
 
 /* Classement médecins */
-.top-med-list { display: flex; flex-direction: column; gap: 6px; }
+.top-med-list { display: flex; flex-direction: column; gap: 6px; padding: 0 32px; }
 .top-med-item {
   display: flex; align-items: center; gap: 10px;
   padding: 8px 12px; background: var(--surface);
@@ -191,43 +175,12 @@ html[data-theme="dark"] .badge-brouillon-inline { background: #3d2e00; color: #f
 <!-- ══ MONTHLY CHART ══ -->
 {% if monthly_stats %}
 <div class="monthly-chart-section">
-  <h2><i class="bi bi-calendar-month" style="color:var(--pl-600);margin-right:6px;"></i>Moyenne mensuelle</h2>
-  <div class="monthly-chart">
-    {% for m in monthly_stats reversed %}
-    {% if m.avg_pct >= 80 %}
-      {% with color="green" %}
-      <div class="monthly-bar-col">
-        <span class="monthly-bar-pct">{{ m.avg_pct }}%</span>
-        <div class="monthly-bar-track">
-          <div class="monthly-bar-fill {{ color }}" style="height:{{ m.avg_pct }}%;"></div>
-        </div>
-        <span class="monthly-bar-label">{{ m.mois_nom|slice:":3" }}<br>{{ m.year }}</span>
-      </div>
-      {% endwith %}
-    {% elif m.avg_pct >= 50 %}
-      {% with color="orange" %}
-      <div class="monthly-bar-col">
-        <span class="monthly-bar-pct">{{ m.avg_pct }}%</span>
-        <div class="monthly-bar-track">
-          <div class="monthly-bar-fill {{ color }}" style="height:{{ m.avg_pct }}%;"></div>
-        </div>
-        <span class="monthly-bar-label">{{ m.mois_nom|slice:":3" }}<br>{{ m.year }}</span>
-      </div>
-      {% endwith %}
-    {% else %}
-      {% with color="red" %}
-      <div class="monthly-bar-col">
-        <span class="monthly-bar-pct">{{ m.avg_pct }}%</span>
-        <div class="monthly-bar-track">
-          <div class="monthly-bar-fill {{ color }}" style="height:{{ m.avg_pct }}%;"></div>
-        </div>
-        <span class="monthly-bar-label">{{ m.mois_nom|slice:":3" }}<br>{{ m.year }}</span>
-      </div>
-      {% endwith %}
-    {% endif %}
-    {% endfor %}
+  <h2><i class="bi bi-bar-chart-fill" style="color:var(--pl-600);margin-right:6px;"></i>Couverture mensuelle moyenne</h2>
+  <div class="monthly-canvas-wrap">
+    <canvas id="monthlyChart"></canvas>
   </div>
 </div>
+{{ monthly_stats|json_script:"monthly-stats-data" }}
 {% endif %}
 
 <!-- ══ TABLE DES 12 DERNIERS ══ -->
@@ -425,5 +378,70 @@ html[data-theme="dark"] .badge-brouillon-inline { background: #3d2e00; color: #f
   {% endif %}
 </div>
 {% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+(function() {
+  var dataEl = document.getElementById('monthly-stats-data');
+  if (!dataEl) return;
+  var raw = JSON.parse(dataEl.textContent);
+  if (!raw || !raw.length) return;
+  var reversed = raw.slice().reverse();
+  var labels = reversed.map(function(m) { return m.mois_nom.slice(0, 3) + ' ' + m.year; });
+  var values = reversed.map(function(m) { return m.avg_pct; });
+  var bgColors = values.map(function(v) {
+    return v >= 80 ? 'rgba(94,128,80,0.75)' : v >= 50 ? 'rgba(230,126,34,0.75)' : 'rgba(192,57,43,0.75)';
+  });
+  var borderColors = values.map(function(v) {
+    return v >= 80 ? '#4a6741' : v >= 50 ? '#d35400' : '#a93226';
+  });
+  var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  var gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  var tickColor = isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)';
+
+  new Chart(document.getElementById('monthlyChart'), {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        data: values,
+        backgroundColor: bgColors,
+        borderColor: borderColors,
+        borderWidth: 1.5,
+        borderRadius: 5,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) { return ctx.raw + '% couverture'; }
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          max: 100,
+          ticks: {
+            callback: function(v) { return v + '%'; },
+            stepSize: 20,
+            color: tickColor,
+          },
+          grid: { color: gridColor }
+        },
+        x: {
+          ticks: { color: tickColor },
+          grid: { display: false }
+        }
+      }
+    }
+  });
+})();
+</script>
 
 {% endblock %}

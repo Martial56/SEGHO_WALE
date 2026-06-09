@@ -4,10 +4,9 @@
 {% block extra_planning_css %}
 .pl-actions { display: flex; align-items: center; gap: 10px; padding: 14px 0 16px 0; flex-wrap: wrap; }
 .pl-title-block {
-  position: sticky; top: 44px; z-index: 180;
+  position: sticky; top: calc(var(--topbar-h) + 44px); z-index: 180;
   background: var(--surface); border-bottom: 1px solid var(--border);
   text-align: center; padding: 10px 0 8px;
-  
 }
 .pl-title-block h2 { font-size: 17px; font-weight: 700; color: var(--text); margin: 0 0 2px 0; }
 .pl-title-block .subtitle { font-size: 13px; color: var(--text-muted); }
@@ -35,6 +34,26 @@
 .td-cell.conflict .grid-input  { color: #856404; }
 .td-cell.too-many  { background: #f8d7da !important; border-color: #f5c2c7 !important; }
 .td-cell.too-many .grid-input  { color: #842029; }
+/* Ligne permanence */
+.td-perm-label {
+  background: var(--pl-800); color: #fff; font-size: 10px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  padding: 6px 8px; border: 1px solid var(--pl-700);
+  text-align: center; vertical-align: middle;
+}
+.td-perm {
+  background: var(--pl-50) !important; border: 1px solid var(--pl-200) !important;
+  padding: 3px 4px; vertical-align: middle;
+}
+.perm-input {
+  width: 100%; border: none; background: transparent; font-size: 12px;
+  padding: 4px 6px; outline: none; font-family: inherit; color: var(--text);
+  box-sizing: border-box;
+}
+.perm-input:focus { background: rgba(74,103,65,0.08); outline: 1px solid var(--pl-400); border-radius: 3px; }
+html[data-theme="dark"] .td-perm-label { background: var(--pl-900); }
+html[data-theme="dark"] .td-perm { background: var(--pl-100) !important; border-color: var(--pl-300) !important; }
+html[data-theme="dark"] .perm-input { color: var(--text); }
 
 /* Input grille */
 .grid-input {
@@ -93,6 +112,36 @@ html[data-theme="dark"] .med-item:hover { background: var(--pl-100); }
 html[data-theme="dark"] .med-absent-tag { background: #3d0010; color: #ff8a80; }
 .med-item-left { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 
+/* ── Chips médecins ── */
+.chip-display {
+  display: flex; flex-wrap: wrap; gap: 3px; align-items: center;
+  min-height: 28px; padding: 2px 0; cursor: default;
+}
+.chip {
+  display: inline-flex; align-items: center; gap: 3px;
+  background: var(--pl-50); border: 1px solid var(--pl-200);
+  border-radius: 20px; padding: 2px 6px 2px 9px;
+  font-size: 11.5px; font-weight: 500; color: var(--pl-800);
+  max-width: 120px;
+}
+.chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+.chip-x {
+  background: none; border: none; cursor: pointer; padding: 0 2px;
+  color: var(--pl-400); font-size: 14px; line-height: 1; flex-shrink: 0;
+  display: flex; align-items: center; border-radius: 50%;
+}
+.chip-x:hover { color: #c0392b; background: #fce4ec; }
+.chip-add {
+  background: transparent; border: 1.5px dashed var(--pl-300);
+  border-radius: 20px; padding: 2px 9px; font-size: 11px;
+  color: var(--pl-500); cursor: pointer;
+  display: inline-flex; align-items: center; gap: 3px;
+  transition: background 0.1s, border-color 0.1s; white-space: nowrap;
+}
+.chip-add:hover { background: var(--pl-50); border-color: var(--pl-600); color: var(--pl-700); }
+html[data-theme="dark"] .chip { background: var(--pl-100); border-color: var(--pl-300); color: var(--pl-900); }
+html[data-theme="dark"] .chip-x:hover { background: rgba(192,57,43,0.2); color: #ff8a80; }
+
 /* Notes par cellule */
 .note-btn {
   background: none; border: none; cursor: pointer; padding: 2px 3px;
@@ -137,8 +186,8 @@ html[data-theme="dark"] .med-absent-tag { background: #3d0010; color: #ff8a80; }
 
 /* Footer */
 .pl-footer {
-  margin-top: 20px; padding: 16px; background: var(--surface);
-  border: 1px solid var(--border); border-radius: 8px;
+  margin: 20px 0; padding: 16px 32px; background: var(--surface);
+  border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
   display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap;
 }
 .pl-footer .form-group { margin: 0; flex: 1; min-width: 200px; }
@@ -167,14 +216,14 @@ html[data-theme="dark"] .med-absent-tag { background: #3d0010; color: #ff8a80; }
 }
 .error-banner {
   background: #f8d7da; color: #842029; border: 1px solid #f5c2c7;
-  border-radius: 6px; padding: 9px 14px; margin-bottom: 6px;
+  border-radius: 6px; padding: 9px 14px; margin: 6px 32px;
   font-size: 12px; display: none; align-items: flex-start; gap: 8px;
 }
 .error-banner.show { display: flex; }
 .error-banner ul { margin: 0; padding-left: 16px; }
 .conflict-banner {
   background: #fff3cd; color: #856404; border: 1px solid #ffc107;
-  border-radius: 6px; padding: 9px 14px; margin-bottom: 12px;
+  border-radius: 6px; padding: 9px 14px; margin: 6px 32px 12px;
   font-size: 12px; display: none; align-items: flex-start; gap: 8px;
 }
 .conflict-banner.show { display: flex; }
@@ -229,23 +278,20 @@ html[data-theme="dark"] .med-absent-tag { background: #3d0010; color: #ff8a80; }
           {% for cell in row.cells %}
             <td class="td-cell" data-plage="{{ row.plage.pk }}" data-jour="{{ forloop.counter0 }}" data-code="{{ row.plage.code }}">
               <div style="display:flex;align-items:flex-start;gap:2px;">
-                <div class="ac-wrap" style="flex:1;min-width:0;">
-                  <input type="text"
-                         name="{{ cell.input_name }}"
-                         value="{{ cell.value }}"
-                         class="grid-input"
-                         autocomplete="off"
-                         spellcheck="false"
-                         data-plage="{{ row.plage.pk }}"
-                         data-jour="{{ forloop.counter0 }}"
-                         data-code="{{ row.plage.code }}">
-                </div>
+                <div class="chip-display" style="flex:1;min-width:0;"></div>
                 <button type="button"
                         class="note-btn{% if cell.note %} note-btn-active{% endif %}"
                         title="{% if cell.note %}{{ cell.note }}{% else %}Ajouter une note{% endif %}">
                   <i class="bi bi-sticky{% if cell.note %}-fill{% endif %}"></i>
                 </button>
               </div>
+              <input type="hidden"
+                     name="{{ cell.input_name }}"
+                     value="{{ cell.value }}"
+                     class="grid-input"
+                     data-plage="{{ row.plage.pk }}"
+                     data-jour="{{ forloop.counter0 }}"
+                     data-code="{{ row.plage.code }}">
               <div class="note-wrap{% if cell.note %} note-wrap-open{% endif %}">
                 <input type="text"
                        name="note_{{ row.plage.pk }}_{{ forloop.counter0 }}"
@@ -258,7 +304,20 @@ html[data-theme="dark"] .med-absent-tag { background: #3d0010; color: #ff8a80; }
           {% endfor %}
         </tr>
         {% endfor %}
-      </tbody>
+      <tr>
+        <td class="td-perm-label" colspan="2"><i class="bi bi-clock-history"></i> Permanence</td>
+        {% for val in perm_list %}
+        <td class="td-perm">
+          <input type="text"
+                 name="perm_{{ forloop.counter0 }}"
+                 value="{{ val }}"
+                 class="perm-input"
+                 autocomplete="off"
+                 placeholder="Nom…">
+        </td>
+        {% endfor %}
+      </tr>
+    </tbody>
     </table>
   </div>
 
@@ -432,8 +491,10 @@ function medRender(q) {
       if (parts.length >= 2) parts[1] = item.label;
       else parts.push(item.label);
       medTargetInput.value = parts.join(' / ');
+      var td = medTargetInput.closest('.td-cell');
       medClose();
       checkConflicts();
+      if (td) renderChips(td);
     });
     medList.appendChild(d);
   });
@@ -451,11 +512,57 @@ function splitNames(val) {
   return val.split(/[\/,]/).map(function(s){ return s.trim(); }).filter(function(s){ return s.length > 0; });
 }
 
-// ── Ouvrir la modale au clic sur une cellule ──────────────────────────────────
-document.querySelectorAll('.grid-input').forEach(function(input) {
-  input.addEventListener('click', function() { medOpen(input); });
-  input.addEventListener('change', checkConflicts);
-});
+// ── Chips : affichage et suppression individuelle ─────────────────────────────
+function renderChips(td) {
+  var inp     = td.querySelector('.grid-input');
+  var display = td.querySelector('.chip-display');
+  if (!inp || !display) return;
+
+  var val   = inp.value.trim();
+  var names = val ? val.split('/').map(function(s){ return s.trim(); }).filter(Boolean) : [];
+
+  display.innerHTML = '';
+
+  names.forEach(function(name, idx) {
+    var chip = document.createElement('span');
+    chip.className = 'chip';
+
+    var textSpan = document.createElement('span');
+    textSpan.textContent = name;
+    textSpan.title = name;
+
+    var xBtn = document.createElement('button');
+    xBtn.type = 'button';
+    xBtn.className = 'chip-x';
+    xBtn.title = 'Retirer ' + name;
+    xBtn.innerHTML = '&times;';
+    xBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var cur = inp.value.split('/').map(function(s){ return s.trim(); }).filter(Boolean);
+      cur.splice(idx, 1);
+      inp.value = cur.join(' / ');
+      renderChips(td);
+      checkConflicts();
+    });
+
+    chip.appendChild(textSpan);
+    chip.appendChild(xBtn);
+    display.appendChild(chip);
+  });
+
+  if (names.length < 2) {
+    var addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'chip-add';
+    addBtn.title = names.length === 0 ? 'Ajouter un médecin' : 'Ajouter un 2ᵉ médecin';
+    addBtn.innerHTML = '<i class="bi bi-plus-lg" style="font-size:10px;"></i>';
+    addBtn.addEventListener('click', function() { medOpen(inp); });
+    display.appendChild(addBtn);
+  }
+}
+
+// Initialiser toutes les cellules
+document.querySelectorAll('.td-cell').forEach(function(td) { renderChips(td); });
 
 // ── Validation en temps réel ──────────────────────────────────────────────────
 function checkConflicts() {
@@ -545,27 +652,34 @@ document.querySelectorAll('.td-cell').forEach(td => {
 document.addEventListener('click',   () => ctxMenu.classList.remove('open'));
 document.addEventListener('keydown', e => { if (e.key === 'Escape') ctxMenu.classList.remove('open'); });
 
+function refreshAllChips(inputs) {
+  inputs.forEach(function(i) { var td = i.closest('.td-cell'); if (td) renderChips(td); });
+}
 function ctxFillRow() {
   if (!ctxTarget) return;
   const val = ctxTarget.value.trim();
-  document.querySelectorAll(`.grid-input[data-plage="${ctxTarget.dataset.plage}"]`).forEach(i => i.value = val);
-  ctxMenu.classList.remove('open'); checkConflicts();
+  const inputs = Array.from(document.querySelectorAll(`.grid-input[data-plage="${ctxTarget.dataset.plage}"]`));
+  inputs.forEach(i => i.value = val);
+  ctxMenu.classList.remove('open'); checkConflicts(); refreshAllChips(inputs);
 }
 function ctxFillCol() {
   if (!ctxTarget) return;
   const val = ctxTarget.value.trim();
-  document.querySelectorAll(`.grid-input[data-jour="${ctxTarget.dataset.jour}"][data-code="${ctxTarget.dataset.code}"]`).forEach(i => i.value = val);
-  ctxMenu.classList.remove('open'); checkConflicts();
+  const inputs = Array.from(document.querySelectorAll(`.grid-input[data-jour="${ctxTarget.dataset.jour}"][data-code="${ctxTarget.dataset.code}"]`));
+  inputs.forEach(i => i.value = val);
+  ctxMenu.classList.remove('open'); checkConflicts(); refreshAllChips(inputs);
 }
 function ctxClearRow() {
   if (!ctxTarget) return;
-  document.querySelectorAll(`.grid-input[data-plage="${ctxTarget.dataset.plage}"]`).forEach(i => i.value = '');
-  ctxMenu.classList.remove('open'); checkConflicts();
+  const inputs = Array.from(document.querySelectorAll(`.grid-input[data-plage="${ctxTarget.dataset.plage}"]`));
+  inputs.forEach(i => i.value = '');
+  ctxMenu.classList.remove('open'); checkConflicts(); refreshAllChips(inputs);
 }
 function ctxClearCol() {
   if (!ctxTarget) return;
-  document.querySelectorAll(`.grid-input[data-jour="${ctxTarget.dataset.jour}"][data-code="${ctxTarget.dataset.code}"]`).forEach(i => i.value = '');
-  ctxMenu.classList.remove('open'); checkConflicts();
+  const inputs = Array.from(document.querySelectorAll(`.grid-input[data-jour="${ctxTarget.dataset.jour}"][data-code="${ctxTarget.dataset.code}"]`));
+  inputs.forEach(i => i.value = '');
+  ctxMenu.classList.remove('open'); checkConflicts(); refreshAllChips(inputs);
 }
 
 // ── Notes par cellule ─────────────────────────────────────────────────────────

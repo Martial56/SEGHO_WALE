@@ -1,0 +1,355 @@
+{% extends 'planning/base.html' %}
+{% load i18n static %}
+
+{% block nav_courant %}active{% endblock %}
+
+{% block extra_planning_css %}
+/* ── Layout dashboard ── */
+.db-wrap {
+  padding: 20px 0 40px;
+  display: flex; flex-direction: column; gap: 24px;
+}
+.db-inner { padding: 0 32px; }
+
+/* ── En-tête ── */
+.db-header {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px;
+}
+.db-header h1 { font-size: 20px; font-weight: 800; color: var(--text); margin: 0; }
+.db-header .subtitle { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+
+/* ── Cartes semaines ── */
+.db-weeks { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+@media (max-width: 900px) { .db-weeks { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 600px) { .db-weeks { grid-template-columns: 1fr; } }
+
+.db-week-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.db-week-card.current { border-color: var(--pl-400); box-shadow: 0 0 0 2px var(--pl-100); }
+html[data-theme="dark"] .db-week-card.current { box-shadow: 0 0 0 2px rgba(74,103,65,0.25); }
+
+.db-week-head {
+  padding: 12px 16px 10px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
+}
+.db-week-card.current .db-week-head { background: var(--pl-50); }
+html[data-theme="dark"] .db-week-card.current .db-week-head { background: var(--pl-100); }
+
+.db-week-label {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.05em; color: var(--text-muted);
+}
+.db-week-card.current .db-week-label { color: var(--pl-600); }
+
+.db-week-dates { font-size: 12.5px; color: var(--text); font-weight: 600; }
+
+.db-week-body { padding: 16px; flex: 1; display: flex; flex-direction: column; gap: 12px; }
+
+/* Badge statut */
+.db-status-pub {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--pl-100); color: var(--pl-800);
+  border-radius: 20px; padding: 4px 12px; font-size: 12px; font-weight: 700;
+}
+.db-status-draft {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: #fff3cd; color: #856404;
+  border-radius: 20px; padding: 4px 12px; font-size: 12px; font-weight: 700;
+}
+html[data-theme="dark"] .db-status-draft { background: #3d2e00; color: #ffd666; }
+.db-status-none {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--border); color: var(--text-muted);
+  border-radius: 20px; padding: 4px 12px; font-size: 12px; font-weight: 700;
+}
+
+/* Barre de couverture */
+.db-cover-wrap { display: flex; flex-direction: column; gap: 5px; }
+.db-cover-label { font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.db-cover-row { display: flex; align-items: center; gap: 10px; }
+.db-cover-track { flex: 1; height: 7px; background: var(--border); border-radius: 99px; overflow: hidden; }
+.db-cover-fill { height: 100%; border-radius: 99px; transition: width 0.4s; }
+.db-cover-fill.green  { background: var(--pl-500); }
+.db-cover-fill.orange { background: #e67e22; }
+.db-cover-fill.red    { background: #c0392b; }
+.db-cover-pct { font-size: 13px; font-weight: 700; min-width: 36px; text-align: right; }
+.db-cover-pct.green  { color: var(--pl-600); }
+.db-cover-pct.orange { color: #e67e22; }
+.db-cover-pct.red    { color: #c0392b; }
+
+/* Actions */
+.db-week-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: auto; }
+
+/* ── Stats KPI ── */
+.db-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+@media (max-width: 900px) { .db-kpis { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px) { .db-kpis { grid-template-columns: 1fr 1fr; } }
+
+.db-kpi {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 14px 18px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.db-kpi-icon { font-size: 18px; color: var(--pl-500); margin-bottom: 2px; }
+.db-kpi-value { font-size: 26px; font-weight: 800; color: var(--pl-700); line-height: 1.1; }
+.db-kpi-label { font-size: 11.5px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+
+/* ── Récents ── */
+.db-recents-section h2 {
+  font-size: 15px; font-weight: 700; color: var(--text);
+  margin: 0 0 12px; display: flex; align-items: center; gap: 8px;
+}
+.db-recents-section h2 i { color: var(--pl-600); }
+
+.db-recents-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.db-recents-table thead th {
+  background: var(--pl-700); color: #fff; padding: 8px 14px;
+  font-weight: 600; font-size: 12px; text-align: left;
+}
+.db-recents-table tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+.db-recents-table tbody tr:hover { background: var(--pl-50); }
+.db-recents-table tbody td { padding: 9px 14px; vertical-align: middle; color: var(--text); }
+{% endblock %}
+
+{% block content %}
+<div class="db-wrap">
+
+  <!-- En-tête -->
+  <div class="db-inner">
+  <div class="db-header">
+    <div>
+      <h1><i class="bi bi-speedometer2" style="color:var(--pl-600);margin-right:8px;"></i>Tableau de bord — Planning</h1>
+      <div class="subtitle">Centre Médico-Social WALÉ · {{ today|date:"l d F Y"|capfirst }}</div>
+    </div>
+    {% if pl_can_manage %}
+    <a href="{% url 'planning_nouveau' %}" class="btn-primary">
+      <i class="bi bi-plus-lg"></i> Nouveau planning
+    </a>
+    {% endif %}
+  </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="db-inner">
+  <div class="db-kpis">
+    <div class="db-kpi">
+      <span class="db-kpi-icon"><i class="bi bi-calendar3"></i></span>
+      <span class="db-kpi-value">{{ total_plannings }}</span>
+      <span class="db-kpi-label">Plannings créés</span>
+    </div>
+    <div class="db-kpi">
+      <span class="db-kpi-icon"><i class="bi bi-check-circle-fill"></i></span>
+      <span class="db-kpi-value">{{ total_published }}</span>
+      <span class="db-kpi-label">Publiés</span>
+    </div>
+    <div class="db-kpi">
+      <span class="db-kpi-icon"><i class="bi bi-percent"></i></span>
+      <span class="db-kpi-value"
+            style="color:{% if pct_courant >= 80 %}var(--pl-600){% elif pct_courant >= 50 %}#e67e22{% else %}#c0392b{% endif %}">
+        {{ pct_courant }}%
+      </span>
+      <span class="db-kpi-label">Couverture sem. courante</span>
+    </div>
+    <div class="db-kpi">
+      <span class="db-kpi-icon"><i class="bi bi-building"></i></span>
+      <span class="db-kpi-value">{{ total_cells_week }}</span>
+      <span class="db-kpi-label">Créneaux / semaine</span>
+    </div>
+  </div>
+  </div><!-- /db-inner kpis -->
+
+  <!-- Cartes semaines -->
+  <div class="db-inner">
+  <div class="db-weeks">
+
+    <!-- Semaine précédente -->
+    <div class="db-week-card">
+      <div class="db-week-head">
+        <div>
+          <div class="db-week-label"><i class="bi bi-arrow-left"></i> Semaine précédente</div>
+          <div class="db-week-dates">{{ prev_monday|date:"d/m" }} – {{ prev_monday|date:"d/m/Y"|slice:"3:" }}</div>
+        </div>
+        {% if planning_precedent %}
+          {% if planning_precedent.publie %}
+            <span class="db-status-pub"><i class="bi bi-check-circle-fill"></i> Publié</span>
+          {% else %}
+            <span class="db-status-draft"><i class="bi bi-pencil"></i> Brouillon</span>
+          {% endif %}
+        {% else %}
+          <span class="db-status-none"><i class="bi bi-dash-circle"></i> Absent</span>
+        {% endif %}
+      </div>
+      <div class="db-week-body">
+        {% if planning_precedent %}
+          <div class="db-week-actions">
+            <a href="{% url 'planning_detail' planning_precedent.pk %}" class="btn-outline-sm">
+              <i class="bi bi-eye"></i> Voir
+            </a>
+          </div>
+        {% else %}
+          <p style="font-size:12.5px;color:var(--text-muted);margin:0;">Aucun planning pour cette semaine.</p>
+          {% if pl_can_manage %}
+          <div class="db-week-actions">
+            <a href="{% url 'planning_nouveau' %}" class="btn-outline-sm">
+              <i class="bi bi-plus-lg"></i> Créer
+            </a>
+          </div>
+          {% endif %}
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Semaine courante -->
+    <div class="db-week-card current">
+      <div class="db-week-head">
+        <div>
+          <div class="db-week-label"><i class="bi bi-calendar-check"></i> Cette semaine</div>
+          <div class="db-week-dates">{{ monday|date:"d/m" }} – {{ monday|date:"d/m/Y"|slice:"3:" }}</div>
+        </div>
+        {% if planning_courant %}
+          {% if planning_courant.publie %}
+            <span class="db-status-pub"><i class="bi bi-check-circle-fill"></i> Publié</span>
+          {% else %}
+            <span class="db-status-draft"><i class="bi bi-pencil"></i> Brouillon</span>
+          {% endif %}
+        {% else %}
+          <span class="db-status-none"><i class="bi bi-x-circle"></i> Absent</span>
+        {% endif %}
+      </div>
+      <div class="db-week-body">
+        {% if planning_courant %}
+          <div class="db-cover-wrap">
+            <div class="db-cover-label">Couverture</div>
+            <div class="db-cover-row">
+              <div class="db-cover-track">
+                <div class="db-cover-fill {% if pct_courant >= 80 %}green{% elif pct_courant >= 50 %}orange{% else %}red{% endif %}"
+                     style="width:{{ pct_courant }}%;"></div>
+              </div>
+              <span class="db-cover-pct {% if pct_courant >= 80 %}green{% elif pct_courant >= 50 %}orange{% else %}red{% endif %}">
+                {{ pct_courant }}%
+              </span>
+            </div>
+            <div style="font-size:11px;color:var(--text-muted);">{{ filled_courant }} / {{ total_cells_week }} créneaux remplis</div>
+          </div>
+          <div class="db-week-actions">
+            <a href="{% url 'planning_detail' planning_courant.pk %}" class="btn-primary">
+              <i class="bi bi-eye"></i> Voir
+            </a>
+            {% if pl_can_manage and not planning_courant.publie %}
+            <a href="{% url 'planning_modifier' planning_courant.pk %}" class="btn-outline-sm">
+              <i class="bi bi-pencil"></i> Modifier
+            </a>
+            {% endif %}
+          </div>
+        {% else %}
+          <p style="font-size:12.5px;color:var(--text-muted);margin:0;">Aucun planning pour cette semaine.</p>
+          {% if pl_can_manage %}
+          <div class="db-week-actions">
+            <a href="{% url 'planning_nouveau' %}" class="btn-primary">
+              <i class="bi bi-plus-lg"></i> Créer le planning
+            </a>
+          </div>
+          {% endif %}
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Semaine prochaine -->
+    <div class="db-week-card">
+      <div class="db-week-head">
+        <div>
+          <div class="db-week-label"><i class="bi bi-arrow-right"></i> Semaine prochaine</div>
+          <div class="db-week-dates">{{ next_monday|date:"d/m" }} – {{ next_monday|date:"d/m/Y"|slice:"3:" }}</div>
+        </div>
+        {% if planning_prochain %}
+          {% if planning_prochain.publie %}
+            <span class="db-status-pub"><i class="bi bi-check-circle-fill"></i> Publié</span>
+          {% else %}
+            <span class="db-status-draft"><i class="bi bi-pencil"></i> Brouillon</span>
+          {% endif %}
+        {% else %}
+          <span class="db-status-none"><i class="bi bi-dash-circle"></i> Absent</span>
+        {% endif %}
+      </div>
+      <div class="db-week-body">
+        {% if planning_prochain %}
+          <div class="db-week-actions">
+            <a href="{% url 'planning_detail' planning_prochain.pk %}" class="btn-outline-sm">
+              <i class="bi bi-eye"></i> Voir
+            </a>
+            {% if pl_can_manage and not planning_prochain.publie %}
+            <a href="{% url 'planning_modifier' planning_prochain.pk %}" class="btn-outline-sm">
+              <i class="bi bi-pencil"></i> Modifier
+            </a>
+            {% endif %}
+          </div>
+        {% else %}
+          <p style="font-size:12.5px;color:var(--text-muted);margin:0;">Pas encore de planning.</p>
+          {% if pl_can_manage %}
+          <div class="db-week-actions">
+            <a href="{% url 'planning_nouveau' %}" class="btn-outline-sm">
+              <i class="bi bi-plus-lg"></i> Créer
+            </a>
+          </div>
+          {% endif %}
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+  </div><!-- /db-inner weeks -->
+
+  <!-- Récents -->
+  {% if recents %}
+  <div class="db-recents-section">
+    <h2 style="padding: 0 32px;"><i class="bi bi-clock-history"></i> Plannings récents</h2>
+    <div style="overflow-x:auto;">
+      <table class="db-recents-table">
+        <thead>
+          <tr>
+            <th>Semaine</th>
+            <th>Période</th>
+            <th>Créé par</th>
+            <th>État</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for pl in recents %}
+          <tr>
+            <td><strong>S{{ pl.semaine_debut|date:"W" }} — {{ pl.semaine_debut|date:"Y" }}</strong></td>
+            <td>{{ pl.semaine_debut|date:"d/m/Y" }} – {{ pl.semaine_fin|date:"d/m/Y" }}</td>
+            <td>{{ pl.cree_par.get_full_name|default:pl.cree_par.username|default:"—" }}</td>
+            <td>
+              {% if pl.publie %}
+                <span class="db-status-pub" style="font-size:11px;padding:2px 9px;"><i class="bi bi-check-circle-fill"></i> Publié</span>
+              {% else %}
+                <span class="db-status-draft" style="font-size:11px;padding:2px 9px;"><i class="bi bi-pencil"></i> Brouillon</span>
+              {% endif %}
+            </td>
+            <td>
+              <a href="{% url 'planning_detail' pl.pk %}" class="btn-outline-sm">
+                <i class="bi bi-eye"></i> Voir
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div style="margin-top:12px;text-align:right;padding:0 32px;">
+      <a href="{% url 'planning_list' %}" class="btn-secondary" style="font-size:12.5px;">
+        <i class="bi bi-list-ul"></i> Voir tous les plannings
+      </a>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

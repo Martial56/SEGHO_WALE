@@ -9,6 +9,7 @@
 <style>
 /* ── Palette logo (vert forêt) ── */
 :root {
+  --pl-nav-h: 44px;
   --pl-900: #2b3e22;
   --pl-800: #364e2b;
   --pl-700: #445f35;
@@ -28,8 +29,7 @@ html[data-theme="dark"] {
   --surface: #152010; --border: #2a3d25; --text: #d4e8c8;
   --text-muted: rgba(255,255,255,0.45); --bg: #0e1a0b;
 }
-.main { height: 100vh; overflow: hidden; }
-.content { min-height:0; padding-top:0; padding-left:0; padding-right:0; overflow-x: hidden; }
+.content { padding: 0; overflow-x: clip; }
 
 .pl-nav {
   background: #fff; border-bottom: 1px solid rgba(0,0,0,0.08);
@@ -181,7 +181,7 @@ html[data-theme="dark"] .pl-notif-btn { color: var(--pl-300); }
 {% block breadcrumb %}
 <nav class="pl-nav">
   <a href="{% url 'planning_courant' %}" class="pl-nav-link {% block nav_courant %}{% endblock %}">
-    <i class="bi bi-calendar-check"></i> Cette semaine
+    <i class="bi bi-speedometer2"></i> Tableau de bord
   </a>
   <a href="{% url 'planning_list' %}" class="pl-nav-link {% block nav_list %}{% endblock %}">
     <i class="bi bi-list-ul"></i> Liste
@@ -238,9 +238,22 @@ html[data-theme="dark"] .pl-notif-btn { color: var(--pl-300); }
     {% endif %}
   </div>
 </nav>
-<div style="height:44px;"></div>
+<div id="pl-nav-spacer" style="height:44px;"></div>
 <script>
-(function(){var tb=document.querySelector('.topbar'),nav=document.querySelector('.pl-nav');if(tb&&nav){var h=tb.getBoundingClientRect().height;if(h<30)return;nav.style.top=h+'px';document.documentElement.style.setProperty('--topbar-h',h+'px');}})();
+(function() {
+  function fixNavTop() {
+    var tb  = document.querySelector('.topbar');
+    var nav = document.querySelector('.pl-nav');
+    if (!tb || !nav) return;
+    var h = tb.getBoundingClientRect().height;
+    if (h > 20) {
+      nav.style.top = h + 'px';
+      document.documentElement.style.setProperty('--topbar-h', h + 'px');
+    }
+  }
+  fixNavTop();
+  window.addEventListener('load', fixNavTop);
+})();
 (function() {
   var btn   = document.getElementById('planningAlerteBtn');
   var popup = document.getElementById('planningAlertePopup');

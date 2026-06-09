@@ -5,7 +5,7 @@
 
 {% block extra_planning_css %}
 .pl-cal-header {
-  position: sticky; top: 44px; z-index: 180;
+  position: sticky; top: calc(var(--topbar-h) + 44px); z-index: 180;
   background: var(--surface); border-bottom: 1px solid var(--border);
   padding: 10px 0 0; 
 }
@@ -32,7 +32,7 @@
   width: 14.28%;
 }
 .cal-day {
-  min-height: 80px; padding: 6px 8px; display: flex; flex-direction: column; gap: 4px;
+  min-height: 110px; padding: 8px 10px; display: flex; flex-direction: column; gap: 5px;
 }
 .cal-day.other-month { background: var(--bg); }
 .cal-day-num {
@@ -42,9 +42,12 @@
 }
 .cal-day-num.today { background: var(--pl-600); color: #fff; }
 .cal-pl-badge {
-  display: block; font-size: 11px; padding: 3px 8px; border-radius: 4px;
+  display: block; font-size: 11.5px; padding: 4px 9px; border-radius: 5px;
   text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  font-weight: 500; line-height: 1.5;
+  font-weight: 600; line-height: 1.6;
+}
+.cal-no-planning {
+  font-size: 10.5px; color: var(--text-muted); font-style: italic; margin-top: auto;
 }
 .cal-pl-badge.publie   { background: var(--pl-100); color: var(--pl-800); }
 .cal-pl-badge.brouillon{ background: #fff3cd; color: #856404; }
@@ -94,11 +97,10 @@ html[data-theme="dark"] .cal-pl-badge.brouillon { background: #3d2e00; color: #f
               <a href="{% url 'planning_detail' cell.planning.pk %}"
                  class="cal-pl-badge {% if cell.planning.publie %}publie{% else %}brouillon{% endif %}">
                 {% if cell.planning.publie %}
-                  <i class="bi bi-check-circle-fill"></i>
+                  <i class="bi bi-check-circle-fill"></i> Publié — S{{ cell.planning.semaine_debut|date:"W" }}
                 {% else %}
-                  <i class="bi bi-pencil"></i>
+                  <i class="bi bi-pencil"></i> Brouillon — S{{ cell.planning.semaine_debut|date:"W" }}
                 {% endif %}
-                Semaine {{ cell.planning.semaine_debut|date:"W" }}
               </a>
             {% endif %}
           </div>

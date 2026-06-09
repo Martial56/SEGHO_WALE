@@ -3,17 +3,20 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Q
 from datetime import date, timedelta
 from collections import defaultdict
 from types import SimpleNamespace
 import re as _re
 import calendar as cal_module
+import logging
+
+logger = logging.getLogger(__name__)
 
 from .models import (Bureau, PlageHoraire, PlanningHebdomadaire,
                      Affectation, PlanningVu, PlanningModification, PlanningConfig,
-                     PlanningGabarit, GabaritAffectation)
+                     PlanningGabarit, GabaritAffectation, LignePermanence)
 from medecins.models import Medecin
 
 JOURS_LABELS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi']
@@ -88,6 +91,10 @@ def _conges_semaine(semaine_debut, semaine_fin):
     """Retourne la liste des employés en congé sur la semaine donnée."""
     try:
         from employer.models import Conge
+    except ImportError:
+        logger.warning("Module employer introuvable — congés non chargés dans le planning.")
+        return []
+    try:
         conges = Conge.objects.filter(
             date_debut__lte=semaine_fin,
             date_fin__gte=semaine_debut,
@@ -105,7 +112,8 @@ def _conges_semaine(semaine_debut, semaine_fin):
                     'type':    c.get_type_conge_display(),
                 })
         return result
-    except Exception:
+    except Exception as exc:
+        logger.error("Erreur lecture congés pour planning (%s → %s) : %s", semaine_debut, semaine_fin, exc)
         return []
 
 
@@ -291,12 +299,16 @@ def planning_detail(request, pk):
     ).order_by('semaine_debut').first()
 
     confirm_publish = request.GET.get('confirm_publish') == '1'
-    pub_empty_days  = request.session.pop('pub_empty_days', []) if confirm_publish else []
+    pub_empty_days  = [d for d in request.GET.get('empty_days', '').split(',') if d] if confirm_publish else []
+
+    perm_map  = {p.jour: p.personnel for p in planning.permanences.all()}
+    perm_list = [perm_map.get(j, '') for j in range(6)]
 
     return render(request, 'planning/hebdomadaire.html', {
         'planning':        planning,
         'rows':            rows,
         'jours_labels':    JOURS_LABELS,
+        'perm_list':       perm_list,
         'can_manage':      can_manage_planning(request.user),
         'can_delete_pub':  can_delete_published(request.user),
         'prev_planning':   prev_planning,
@@ -382,16 +394,30 @@ def planning_modifier(request, pk):
                 resume='; '.join(changes[:30]),
             )
 
+        # Permanence
+        for j in range(6):
+            val = request.POST.get(f'perm_{j}', '').strip()
+            if val:
+                LignePermanence.objects.update_or_create(
+                    planning=planning, jour=j,
+                    defaults={'personnel': val}
+                )
+            else:
+                LignePermanence.objects.filter(planning=planning, jour=j).delete()
+
         messages.success(request, 'Planning enregistré avec succès.')
         return redirect('planning_list')
 
-    aff_map  = {(a.plage_id, a.jour): a for a in planning.affectations.all()}
-    rows     = build_grid_rows(bureaux, aff_map)
-    gabarits = PlanningGabarit.objects.all()
+    aff_map   = {(a.plage_id, a.jour): a for a in planning.affectations.all()}
+    rows      = build_grid_rows(bureaux, aff_map)
+    gabarits  = PlanningGabarit.objects.all()
+    perm_map  = {p.jour: p.personnel for p in planning.permanences.all()}
+    perm_list = [perm_map.get(j, '') for j in range(6)]
     return render(request, 'planning/modifier.html', {
         'planning':       planning,
         'rows':           rows,
         'jours_labels':   JOURS_LABELS,
+        'perm_list':      perm_list,
         'medecins':       medecins,
         'medecins_json':  _medecins_json(medecins),
         'absents_json':   absents,
@@ -479,7 +505,10 @@ def planning_publier(request, pk):
                 date__range=(planning.semaine_debut, planning.semaine_fin)
             ).values_list('date', flat=True)
         )
-    except Exception:
+    except ImportError:
+        feries = set()
+    except Exception as exc:
+        logger.error("Erreur lecture jours fériés : %s", exc)
         feries = set()
 
     empty_days = []
@@ -493,11 +522,10 @@ def planning_publier(request, pk):
     justification = request.POST.get('justification', '').strip()
 
     if empty_days and not justification:
-        # Stocker les jours vides en session et redemander une justification
-        request.session['pub_empty_days'] = empty_days
         from django.urls import reverse as _reverse
         url = _reverse('planning_detail', args=[pk])
-        return redirect(f'{url}?confirm_publish=1')
+        days_param = ','.join(empty_days)
+        return redirect(f'{url}?confirm_publish=1&empty_days={days_param}')
 
     # ── Publication ───────────────────────────────────────────────────────────
     planning.publie = True
@@ -672,21 +700,61 @@ def _send_publication_email(planning, published_by):
     from django.conf import settings as django_settings
     from_email = getattr(django_settings, 'DEFAULT_FROM_EMAIL', 'planning@cms-wale.ci')
     msgs = [(subject, body, from_email, [e]) for e in all_emails]
-    send_mass_mail(msgs, fail_silently=True)
-    return len(all_emails)
+    try:
+        sent = send_mass_mail(msgs, fail_silently=False)
+        return sent
+    except Exception as exc:
+        logger.error("Erreur envoi emails planning %s : %s", planning.pk, exc)
+        return 0
 
 
-# ── Semaine en cours ──────────────────────────────────────────────────────────
+# ── Semaine en cours / Tableau de bord ───────────────────────────────────────
 
 @login_required(login_url='login')
 def planning_courant(request):
-    today  = date.today()
-    monday = today - timedelta(days=today.weekday())
-    planning = PlanningHebdomadaire.objects.filter(semaine_debut=monday).first()
-    if planning:
-        return redirect('planning_detail', pk=planning.pk)
-    messages.info(request, "Aucun planning n'a été créé pour la semaine en cours.")
-    return redirect('planning_list')
+    today       = date.today()
+    monday      = today - timedelta(days=today.weekday())
+    next_monday = monday + timedelta(weeks=1)
+    prev_monday = monday - timedelta(weeks=1)
+
+    planning_courant_ = PlanningHebdomadaire.objects.filter(semaine_debut=monday).first()
+    planning_prochain = PlanningHebdomadaire.objects.filter(semaine_debut=next_monday).first()
+    planning_precedent = PlanningHebdomadaire.objects.filter(semaine_debut=prev_monday).first()
+
+    # 6 derniers plannings (hors semaine courante)
+    recents = (
+        PlanningHebdomadaire.objects
+        .exclude(semaine_debut=monday)
+        .order_by('-semaine_debut')[:6]
+    )
+
+    # Stats rapides
+    active_bureaux = Bureau.objects.filter(actif=True).prefetch_related('plages')
+    total_cells_week = sum(b.plages.count() * 6 for b in active_bureaux)
+    filled_courant = 0
+    if planning_courant_:
+        filled_courant = planning_courant_.affectations.exclude(personnel='').count()
+    pct_courant = round(filled_courant * 100 / total_cells_week) if total_cells_week else 0
+
+    total_published = PlanningHebdomadaire.objects.filter(publie=True).count()
+    total_plannings = PlanningHebdomadaire.objects.count()
+
+    return render(request, 'planning/dashboard.html', {
+        'today':               today,
+        'monday':              monday,
+        'next_monday':         next_monday,
+        'prev_monday':         prev_monday,
+        'planning_courant':    planning_courant_,
+        'planning_prochain':   planning_prochain,
+        'planning_precedent':  planning_precedent,
+        'recents':             recents,
+        'total_cells_week':    total_cells_week,
+        'filled_courant':      filled_courant,
+        'pct_courant':         pct_courant,
+        'total_published':     total_published,
+        'total_plannings':     total_plannings,
+        **_base_ctx(request),
+    })
 
 
 # ── Gestion des bureaux et plages ─────────────────────────────────────────────
@@ -940,17 +1008,24 @@ def planning_gabarit_appliquer(request, pk):
     if request.method == 'POST':
         gabarit_pk = request.POST.get('gabarit_pk', '').strip()
         gabarit = get_object_or_404(PlanningGabarit, pk=gabarit_pk)
-        planning.affectations.all().delete()
-        for ga in gabarit.affectations.all():
-            Affectation.objects.create(
-                planning=planning, plage=ga.plage, jour=ga.jour, personnel=ga.personnel
-            )
-        PlanningModification.objects.create(
-            planning=planning,
-            modifie_par=request.user,
-            resume=f'Gabarit « {gabarit.nom} » appliqué.',
-        )
-        messages.success(request, f'Gabarit « {gabarit.nom} » appliqué.')
+        try:
+            with transaction.atomic():
+                planning.affectations.all().delete()
+                Affectation.objects.bulk_create([
+                    Affectation(
+                        planning=planning, plage=ga.plage, jour=ga.jour, personnel=ga.personnel
+                    )
+                    for ga in gabarit.affectations.all()
+                ])
+                PlanningModification.objects.create(
+                    planning=planning,
+                    modifie_par=request.user,
+                    resume=f'Gabarit « {gabarit.nom} » appliqué (id={gabarit.pk}).',
+                )
+            messages.success(request, f'Gabarit « {gabarit.nom} » appliqué.')
+        except Exception as exc:
+            logger.error("Erreur application gabarit %s sur planning %s : %s", gabarit.pk, pk, exc)
+            messages.error(request, "Erreur lors de l'application du gabarit. Le planning n'a pas été modifié.")
     return redirect('planning_modifier', pk=pk)
 
 

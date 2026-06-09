@@ -113,6 +113,20 @@ class GabaritAffectation(models.Model):
         verbose_name = "Affectation gabarit"
 
 
+class LignePermanence(models.Model):
+    planning  = models.ForeignKey(PlanningHebdomadaire, on_delete=models.CASCADE, related_name='permanences')
+    jour      = models.PositiveSmallIntegerField(choices=JOURS)
+    personnel = models.CharField(max_length=200, blank=True)
+
+    class Meta:
+        unique_together = ['planning', 'jour']
+        verbose_name = "Ligne de permanence"
+        verbose_name_plural = "Lignes de permanence"
+
+    def __str__(self):
+        return f"Permanence {JOURS[self.jour][1]} — {self.planning}"
+
+
 class PlanningConfig(models.Model):
     signataire_defaut = models.CharField(max_length=200, blank=True)
 
