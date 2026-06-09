@@ -1,4 +1,4 @@
-{% load static %}{% load django_browser_reload %}
+{% load static %}
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -26,6 +26,9 @@ html, body {
   height: 100%;
   font-family: 'Sora', sans-serif;
 }
+input, select, textarea, button {
+  font-family: 'Sora', sans-serif;
+}
 
 body {
   background: #f0fafa;
@@ -51,18 +54,17 @@ body {
   display: flex; align-items: center; gap: 14px;
 }
 .brand-logo {
-  width: 50px; height: 50px; flex-shrink: 0;
-  object-fit: contain;
-  /* filter: brightness(1.1) drop-shadow(0 0 8px rgba(33,136,171,0.45)); */
+  width: 64px; height: 64px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
 }
-html[data-theme="dark"] .brand-logo {
-  /* filter: brightness(1.2) drop-shadow(0 0 10px rgba(52,168,204,0.6)); */
+.brand-logo img {
+  width: 100%; height: 100%; object-fit: contain;
 }
 .brand-text h1 {
   font-size: 17px; font-weight: 800; letter-spacing: -0.3px; color: var(--teal-900);
 }
 .brand-text p {
-  font-size: 10px; color: var(--text-muted); margin-top: 1px; line-height: 1.4;
+  font-size: 11px; color: var(--text-muted); margin-top: 1px;
 }
 
 .topbar-right {
@@ -158,7 +160,7 @@ html[data-theme="dark"] .brand-logo {
 .content {
   flex: 1;
   padding: 70px 40px;
-  max-width: 1000px;
+  max-width: 1100px;
   margin: 0 auto;
   width: 100%;
 }
@@ -426,36 +428,14 @@ html[data-theme="dark"] #theme-toggle .icon-moon { display: block; }
 <!-- ══════════════ TOPBAR ══════════════ -->
 <header class="topbar">
   <div class="brand">
-    <img src="{% static 'img/logo.png' %}" alt="SEGHO-WALE" class="brand-logo">
+    <div class="brand-logo"><img src="{% static 'img/logo.png' %}" alt="Logo WALÉ"></div>
     <div class="brand-text">
       <h1>SEGHO-WALE</h1>
-      <p>Système Electronique de Gestion Hospitalière de WALÉ &mdash; Yamoussoukro</p>
+      <p>Système Electronique de Gestion Hospitalière de WALE &mdash; Yamoussoukro</p>
     </div>
   </div>
 
   <div class="topbar-right">
-
-    <!-- Alertes rapides -->
-    <div class="top-alerts">
-      {% if stats.medicaments_alerte > 0 %}
-      <a href="{% url 'medicament:list' %}" class="top-alert-badge">
-        <span class="dot dot-amber">{{ stats.medicaments_alerte }}</span>
-        Stock alerte
-      </a>
-      {% endif %}
-      {% if stats.factures_impayees > 0 %}
-      <a href="{% url 'facturation_list' %}" class="top-alert-badge">
-        <span class="dot dot-rose">{{ stats.factures_impayees }}</span>
-        Impayées
-      </a>
-      {% endif %}
-      {% if stats.analyses_pending > 0 %}
-      <a href="{% url 'laboratoire_list' %}" class="top-alert-badge">
-        <span class="dot dot-teal">{{ stats.analyses_pending }}</span>
-        Labo
-      </a>
-      {% endif %}
-    </div>
 
     <!-- Messagerie -->
     <button class="icon-btn" title="Messagerie">
@@ -470,9 +450,6 @@ html[data-theme="dark"] #theme-toggle .icon-moon { display: block; }
         <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
         <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
       </svg>
-      {% if stats.medicaments_alerte > 0 or stats.analyses_pending > 0 %}
-      <span class="notif-dot"></span>
-      {% endif %}
     </button>
 
     <!-- Bascule thème -->
@@ -537,8 +514,8 @@ html[data-theme="dark"] #theme-toggle .icon-moon { display: block; }
   <div class="stat-chip">
     <span class="stat-chip-icon">🩺</span>
     <div>
-      <div class="stat-chip-val">{{ stats.soins_today }}</div>
-      <div class="stat-chip-lbl">Soins auj.</div>
+      <div class="stat-chip-val">{{ stats.consultations_today }}</div>
+      <div class="stat-chip-lbl">Consultations auj.</div>
     </div>
   </div>
   <div class="stat-chip">
@@ -553,6 +530,13 @@ html[data-theme="dark"] #theme-toggle .icon-moon { display: block; }
     <div>
       <div class="stat-chip-val">{{ stats.medicaments_alerte }}</div>
       <div class="stat-chip-lbl">Alertes pharmacie</div>
+    </div>
+  </div>
+  <div class="stat-chip">
+    <span class="stat-chip-icon">🧾</span>
+    <div>
+      <div class="stat-chip-val">{{ stats.factures_impayees }}</div>
+      <div class="stat-chip-lbl">Factures impayées</div>
     </div>
   </div>
   <div class="stat-chip">
@@ -583,18 +567,18 @@ html[data-theme="dark"] #theme-toggle .icon-moon { display: block; }
     </a>
     {% endif %}
 
-    {% if 'utilisateur' in accessible_codes %}
-    <a href="{% url 'utilisateur:list' %}" class="module-card">
+    {% if 'medecins' in accessible_codes %}
+    <a href="{% url 'medecins_list' %}" class="module-card">
       <div class="module-icon-box ic-sky" style="padding:0;overflow:hidden;">
-        <img src="{% static 'img/user1.png' %}" alt="Utilisateur" style="width:90%;height:90%;object-fit:cover;border-radius:50%;">
+        <img src="{% static 'img/logchir.png' %}" alt="Docteurs" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
       </div>
-      <div class="module-name">Utilisateurs</div>
-      <div class="module-sub">Mon profil</div>
+      <div class="module-name">Docteurs</div>
+      <div class="module-sub">Corps médical</div>
     </a>
     {% endif %}
 
     {% if 'services' in accessible_codes %}
-    <a href="/services/" class="module-card">
+    <a href="{% url 'services:list' %}" class="module-card">
       <div class="module-icon-box ic-teal2" style="padding:0;overflow:hidden;">
         <img src="{% static 'img/ser1.png' %}" alt="Services" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
       </div>
@@ -604,7 +588,7 @@ html[data-theme="dark"] #theme-toggle .icon-moon { display: block; }
     {% endif %}
 
     {% if 'medicaments' in accessible_codes %}
-    <a href="{% url 'medicament:list' %}" class="module-card">
+    <a href="/admin/pharmacie/medicament/" class="module-card">
       <div class="module-icon-box ic-rose" style="padding:0;overflow:hidden;">
         <img src="{% static 'img/medoc.png' %}" alt="Médicaments" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
       </div>
@@ -634,7 +618,7 @@ html[data-theme="dark"] #theme-toggle .icon-moon { display: block; }
     {% endif %}
 
     {% if 'hospitalisation' in accessible_codes %}
-    <a href="{% url 'hospitalisation_list' %}" class="module-card">
+    <a href="{% url 'hospitalisation:list' %}" class="module-card">
       <div class="module-icon-box ic-coral" style="padding:0;overflow:hidden;">
         <img src="{% static 'img/hosp.png' %}" alt="Hospitalisation" style="width:105%;height:105%;object-fit:cover;border-radius:50%;">
       </div>
@@ -643,13 +627,13 @@ html[data-theme="dark"] #theme-toggle .icon-moon { display: block; }
     </a>
     {% endif %}
 
-    {% if 'soins' in accessible_codes %}
+    {% if 'consultations' in accessible_codes %}
     <a href="{% url 'soins:list' %}" class="module-card">
       <div class="module-icon-box ic-amber" style="padding:0;overflow:hidden;">
-        <img src="{% static 'img/soin.png' %}" alt="Soins" style="width:95%;height:95%;object-fit:cover;border-radius:50%;">
+        <img src="{% static 'img/soins.png' %}" alt="Soins" style="width:90%;height:90%;object-fit:cover;border-radius:50%;">
       </div>
       <div class="module-name">Soins</div>
-      <div class="module-sub">{{ stats.soins_today }} aujourd'hui</div>
+      <div class="module-sub">{{ stats.soins_aujourd_hui }} aujourd'hui</div>
     </a>
     {% endif %}
 
@@ -664,7 +648,7 @@ html[data-theme="dark"] #theme-toggle .icon-moon { display: block; }
     {% endif %}
 
     {% if 'pharmacie' in accessible_codes %}
-    <a href="#" class="module-card">
+    <a href="{% url 'pharmacie_list' %}" class="module-card">
       <div class="module-icon-box ic-pink" style="padding:0;overflow:hidden;">
         <img src="{% static 'img/phar.png' %}" alt="Pharmacie" style="width:102%;height:102%;object-fit:cover;border-radius:50%;">
       </div>
@@ -674,7 +658,7 @@ html[data-theme="dark"] #theme-toggle .icon-moon { display: block; }
     {% endif %}
 
     {% if 'assurance' in accessible_codes %}
-    <a href="#" class="module-card">
+    <a href="/admin/patients/assurance/" class="module-card">
       <div class="module-icon-box ic-sky" style="padding:0;overflow:hidden;">
         <img src="{% static 'img/ass.png' %}" alt="Assurance" style="width:90%;height:90%;object-fit:cover;border-radius:50%;">
       </div>
@@ -684,27 +668,27 @@ html[data-theme="dark"] #theme-toggle .icon-moon { display: block; }
     {% endif %}
 
     {% if 'facturation' in accessible_codes %}
-    <a href="{% url 'facturation_list' %}" class="module-card">
+    <a href="{% url 'facturation:list' %}" class="module-card">
       <div class="module-icon-box ic-teal" style="padding:0;overflow:hidden;">
         <img src="{% static 'img/compp.png' %}" alt="Comptabilité" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
       </div>
       <div class="module-name">Comptabilité</div>
-      <div class="module-sub">Facturation</div>
+      <div class="module-sub">Factures & paiements</div>
     </a>
     {% endif %}
 
     {% if 'gynecologie' in accessible_codes %}
-    <a href="/gynecologie/" class="module-card">
+    <a href="{% url 'gynecologie_list' %}" class="module-card">
       <div class="module-icon-box ic-plum" style="padding:0;overflow:hidden;">
         <img src="{% static 'img/gyn.png' %}" alt="Gynécologie" style="width:103%;height:103%;object-fit:cover;border-radius:50%;">
       </div>
       <div class="module-name">Gynécologie</div>
-      <div class="module-sub">Soins spécialisés</div>
+      <div class="module-sub">Consultations spécialisées</div>
     </a>
     {% endif %}
 
     {% if 'planning' in accessible_codes %}
-    <a href="/planning/" class="module-card">
+    <a href="/admin/patients/rendezvous/" class="module-card">
       <div class="module-icon-box ic-green" style="padding:0;overflow:hidden;">
         <img src="{% static 'img/calllll.jpg' %}" alt="Planning" style="width:150%;height:150%;object-fit:cover;border-radius:50%;">
       </div>
@@ -714,9 +698,9 @@ html[data-theme="dark"] #theme-toggle .icon-moon { display: block; }
     {% endif %}
 
     {% if 'achats' in accessible_codes %}
-    <a href="#" class="module-card">
+    <a href="/admin/pharmacie/commandepharmacies/" class="module-card">
       <div class="module-icon-box ic-coral" style="padding:0;overflow:hidden;">
-        <img src="{% static 'img/cart33.jpg' %}" alt="Stock" style="width:135%;height:135%;object-fit:cover;border-radius:50%;">
+        <img src="{% static 'img/cart.svg' %}" alt="Stock" style="width:90%;height:90%;object-fit:cover;border-radius:50%;">
       </div>
       <div class="module-name">Achats</div>
       <div class="module-sub">Commandes fournisseurs</div>
@@ -724,7 +708,7 @@ html[data-theme="dark"] #theme-toggle .icon-moon { display: block; }
     {% endif %}
 
     {% if 'stock' in accessible_codes %}
-    <a href="#" class="module-card">
+    <a href="/admin/pharmacie/lotmedicament/" class="module-card">
       <div class="module-icon-box ic-white" style="padding:0;overflow:hidden;">
         <img src="{% static 'img/stockk.jpg' %}" alt="Stock" style="width:105%;height:105%;object-fit:cover;border-radius:50%;">
       </div>
@@ -733,44 +717,39 @@ html[data-theme="dark"] #theme-toggle .icon-moon { display: block; }
     </a>
     {% endif %}
 
-
-    {% if 'employer' in accessible_codes %}
-    <a href="{% url 'employer:ressources_humaines_list' %}" class="module-card">
-      <div class="module-icon-box ic-blue">
-        <span style="font-size:2rem;">👔</span>
+    {% if 'ressources_humaines' in accessible_codes %}
+    <a href="{% url 'ressources_humaines_list' %}" class="module-card">
+      <div class="module-icon-box ic-teal2" style="padding:0;overflow:hidden;">
+        <img src="{% static 'img/emp.png' %}" alt="Employés" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
       </div>
       <div class="module-name">Employés</div>
-      <div class="module-sub">Gestion du personnel</div>
+      <div class="module-sub">{{ stats.employes_actifs }} actifs</div>
     </a>
     {% endif %}
 
-    {% if 'conges' in accessible_codes %}
-    <a href="/conges/" class="module-card">
-      <div class="module-icon-box ic-green">
-        <span style="font-size:2rem;">🏖️</span>
-      </div>
-      <div class="module-name">Congés</div>
-      <div class="module-sub">Demandes & soldes</div>
+    {% if 'evaluation' in accessible_codes %}
+    <a href="/admin/ressources_humaines/evaluationemploye/" class="module-card">
+      <div class="module-icon-box ic-amber">⭐</div>
+      <div class="module-name">Évaluation</div>
+      <div class="module-sub">Performance du personnel</div>
     </a>
     {% endif %}
 
     {% if 'presence' in accessible_codes %}
-    <a href="/presence/" class="module-card">
-      <div class="module-icon-box ic-coral">
-        <span style="font-size:2rem;">📊</span>
+    <a href="/admin/ressources_humaines/presence/" class="module-card">
+      <div class="module-icon-box ic-violet" style="padding:0;overflow:hidden;">
+        <img src="{% static 'img/pres.png' %}" alt="Présence" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
       </div>
       <div class="module-name">Présence</div>
-      <div class="module-sub">Pointage & suivi</div>
+      <div class="module-sub">Pointage & assiduité</div>
     </a>
     {% endif %}
 
-    {% if 'admin' in accessible_codes %}
-    <a href="/parametres/" class="module-card">
-      <div class="module-icon-box ic-slate" style="padding:0;overflow:hidden;">
-        <img src="{% static 'img/para.png' %}" alt="Paramètres" style="width:80%;height:80%;object-fit:cover;border-radius:50%;">
-      </div>
-      <div class="module-name">Paramètres</div>
-      <div class="module-sub">Administration</div>
+    {% if 'conges' in accessible_codes %}
+    <a href="/admin/ressources_humaines/conge/" class="module-card">
+      <div class="module-icon-box ic-sky">🏖️</div>
+      <div class="module-name">Congés</div>
+      <div class="module-sub">Demandes & planification</div>
     </a>
     {% endif %}
 
@@ -779,8 +758,8 @@ html[data-theme="dark"] #theme-toggle .icon-moon { display: block; }
       <div class="module-icon-box ic-slate" style="padding:0;overflow:hidden;">
         <img src="{% static 'img/para.png' %}" alt="Paramètres" style="width:80%;height:80%;object-fit:cover;border-radius:50%;">
       </div>
-      <div class="module-name">Admin</div>
-      <div class="module-sub">Django</div>
+      <div class="module-name">Paramètres</div>
+      <div class="module-sub">Administration</div>
     </a>
     {% endif %}
 
@@ -794,7 +773,7 @@ html[data-theme="dark"] #theme-toggle .icon-moon { display: block; }
     <div class="panel">
       <div class="panel-header">
         <div class="panel-title">📅 Rendez-vous &mdash; {{ today|date:"d/m/Y" }}</div>
-        <a href="{% url 'soins:list' %}" class="panel-link">Voir tout →</a>
+        <a href="{% url 'consultations_list' %}" class="panel-link">Voir tout →</a>
       </div>
       {% if rdv_auj %}
         {% for rdv in rdv_auj %}
@@ -803,7 +782,7 @@ html[data-theme="dark"] #theme-toggle .icon-moon { display: block; }
           <div class="rdv-avatar">{{ rdv.patient.nom|first|upper }}</div>
           <div class="rdv-info">
             <div class="rdv-name">{{ rdv.patient.nom }} {{ rdv.patient.prenoms }}</div>
-            <div class="rdv-doctor">{% if rdv.medecin %}Dr {{ rdv.medecin.nom }}{% else %}Non assigné{% endif %} &middot; {{ rdv.get_type_rdv_display }}</div>
+            <div class="rdv-doctor">{% if rdv.medecin %}Dr {{ rdv.medecin.nom }}{% else %}Non assigné{% endif %}{% if rdv.service %} &middot; {{ rdv.service.nom }}{% endif %}</div>
           </div>
           <span class="rdv-badge badge-{{ rdv.statut }}">{{ rdv.get_statut_display }}</span>
         </div>
@@ -816,32 +795,31 @@ html[data-theme="dark"] #theme-toggle .icon-moon { display: block; }
       {% endif %}
     </div>-->
 
-    <!-- DERNIERS SOINS
+    <!-- DERNIÈRES CONSULTATIONS 
     <div class="panel">
       <div class="panel-header">
-        <div class="panel-title">🩺 Derniers soins</div>
-        <a href="{% url 'soins:list' %}" class="panel-link">Voir tout →</a>
+        <div class="panel-title">🩺 Dernières consultations</div>
+        <a href="{% url 'consultations_list' %}" class="panel-link">Voir tout →</a>
       </div>
-      {% if last_soins %}
-        {% for s in last_soins %}
+      {% if last_cons %}
+        {% for c in last_cons %}
         <div class="cons-item">
-          <div class="cons-dot {{ s.statut }}"></div>
+          <div class="cons-dot {{ c.statut }}"></div>
           <div class="cons-info">
-            <div class="cons-patient">{{ s.patient.nom }} {{ s.patient.prenom }}</div>
-            <div class="cons-meta">{% if s.infirmier %}{{ s.infirmier.nom }} &middot; {% endif %}{{ s.date_heure|date:"d/m/Y H:i" }}</div>
+            <div class="cons-patient">{{ c.patient.nom }} {{ c.patient.prenoms }}</div>
+            <div class="cons-meta">{% if c.medecin %}Dr {{ c.medecin.nom }} &middot; {% endif %}{{ c.date_heure|date:"d/m/Y H:i" }}</div>
           </div>
-          <span class="cons-num">{{ s.numero }}</span>
+          <span class="cons-num">{{ c.numero }}</span>
         </div>
         {% endfor %}
       {% else %}
         <div class="empty-state">
           <span class="empty-icon">🩺</span>
-          Aucun soin enregistré
+          Aucune consultation enregistrée
         </div>
       {% endif %}
     </div>-->
 
-  </div>
 </div><!-- /content -->
 
 <script>
@@ -869,6 +847,5 @@ document.getElementById('theme-toggle').addEventListener('click', () => {
   }
 });
 </script>
-{% django_browser_reload_script %}
 </body>
 </html>

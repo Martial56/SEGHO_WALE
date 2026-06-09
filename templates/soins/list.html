@@ -12,15 +12,7 @@
   html[data-theme="dark"] .o-list-table th { background: var(--surface); border-bottom-color: var(--border); color: var(--text-muted); }
   html[data-theme="dark"] .o-list-table td { border-bottom-color: #2d3550; color: var(--text); }
   html[data-theme="dark"] .o-list-table tbody tr:hover td { background: rgba(255,255,255,.04); }
-  html[data-theme="dark"] .filters-panel { background: #1a2133; border-bottom-color: var(--border); }
   html[data-theme="dark"] .filter-select { background: var(--surface); border-color: var(--border); color: var(--text); }
-
-  /* ── PANEL FILTRES ── */
-  .filters-panel {
-    display: none; gap: 8px; flex-wrap: wrap; align-items: center;
-    padding: 8px 16px; background: #f2faf6; border-bottom: 1px solid var(--border);
-  }
-  .filters-panel.open { display: flex; }
 
   .filter-select {
     border: 1px solid var(--border); border-radius: 4px; padding: 4px 10px;
@@ -28,6 +20,39 @@
     background: var(--surface); cursor: pointer; outline: none;
   }
   .filter-select:focus { border-color: var(--accent); }
+
+  /* ── DROPDOWNS (style patient) ── */
+  .o-dd-wrap { position: relative; }
+  .o-dd-panel {
+    display: none; position: fixed; z-index: 9999;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; box-shadow: 0 8px 28px rgba(0,0,0,.16);
+    min-width: 210px; padding: 5px 0;
+  }
+  .o-dd-panel.open { display: block; }
+  .o-dd-section {
+    padding: 6px 14px 3px; font-size: 10px; font-weight: 600;
+    color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px;
+  }
+  .o-dd-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 14px; font-size: 12.5px; color: var(--text);
+    cursor: pointer; text-decoration: none; transition: background .1s;
+    white-space: nowrap; gap: 10px;
+  }
+  .o-dd-item:hover { background: rgba(26,92,74,.08); color: var(--accent); }
+  .o-dd-item.active { background: rgba(26,92,74,.12); color: var(--primary); font-weight: 500; }
+  .o-dd-sep { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+  html[data-theme="dark"] .o-dd-panel { background: #1a2535; border-color: #2e3f58; }
+  html[data-theme="dark"] .o-dd-item:hover { background: rgba(34,137,107,.2); color: #7ac4a7; }
+  html[data-theme="dark"] .o-dd-item.active { background: rgba(34,137,107,.25); color: #7ac4a7; }
+
+  /* ── PAGINATION INLINE ── */
+  .o-pagination-top {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 12px; color: var(--text-muted); white-space: nowrap;
+  }
+  html[data-theme="dark"] .o-ctrl-btn.active { background: #28304a; border-color: #3a4a62; color: var(--text); }
 
   /* ── TABLE ── */
   .o-list-wrap { background: var(--bg); overflow-x: auto; }
@@ -171,6 +196,7 @@
       <form method="get" id="filter-form" style="display:flex;align-items:center;">
         <input type="hidden" name="statut" id="fi-statut" value="{{ statut }}">
         <input type="hidden" name="date" id="fi-date" value="{{ date_filtre }}">
+        <input type="hidden" name="hospitalisation_id" id="fi-hosp" value="{{ hospitalisation_id }}">
         <div class="o-search-bar">
           <input class="o-search-input" id="search-input" type="text" name="q" value="{{ q }}"
             placeholder="Rechercher patient, agent, numéro…">
@@ -186,38 +212,99 @@
       <i class="bi bi-plus-lg"></i> Nouveau soin
     </a>
 
-    <button type="button" class="o-ctrl-btn {% if statut or date_filtre %}active{% endif %}"
-      id="btn-filtres" onclick="toggleFilters()">
-      <i class="bi bi-funnel"></i> Filtres
-    </button>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
 
-    {% if q or statut or date_filtre %}
-    <a href="{% url 'soins:list' %}" class="o-ctrl-btn">
-      <i class="bi bi-x"></i> Effacer
-    </a>
-    {% endif %}
-    {% if q %}<span class="o-filter-tag">{{ q }} <a href="?{% if statut %}statut={{ statut }}&{% endif %}{% if date_filtre %}date={{ date_filtre }}{% endif %}">×</a></span>{% endif %}
-    {% if statut %}<span class="o-filter-tag">{% if statut == 'en_cours' %}Soins en cours{% elif statut == 'termine' %}Terminé{% else %}Annulé{% endif %} <a href="?{% if q %}q={{ q }}&{% endif %}{% if date_filtre %}date={{ date_filtre }}{% endif %}">×</a></span>{% endif %}
-    {% if date_filtre %}<span class="o-filter-tag">{{ date_filtre }} <a href="?{% if q %}q={{ q }}&{% endif %}{% if statut %}statut={{ statut }}{% endif %}">×</a></span>{% endif %}
+      <!-- ── Filtres dropdown ── -->
+      {% with nb_filtres=0|add:statut|add:date_filtre|add:hospitalisation_id %}
+      <div class="o-dd-wrap">
+        <button class="o-ctrl-btn {% if statut or date_filtre or hospitalisation_id %}active{% endif %}"
+                id="btn-filtres" onclick="toggleDd('dd-filtres', this)">
+          <i class="bi bi-funnel{% if statut or date_filtre or hospitalisation_id %}-fill{% endif %}"></i>
+          Filtres{% if statut or date_filtre or hospitalisation_id %} <span style="background:var(--accent);color:#fff;border-radius:10px;font-size:10px;padding:0 5px;">{% if statut %}1{% endif %}{% if date_filtre %}1{% endif %}{% if hospitalisation_id %}1{% endif %}</span>{% endif %}
+        </button>
+        <div class="o-dd-panel" id="dd-filtres">
+          <div class="o-dd-section">Statut</div>
+          <a class="o-dd-item {% if statut == 'brouillon' %}active{% endif %}"
+             onclick="setFiltreStatut('brouillon')">Brouillon</a>
+          <a class="o-dd-item {% if statut == 'en_attente_de_paiement' %}active{% endif %}"
+             onclick="setFiltreStatut('en_attente_de_paiement')">En attente de paiement</a>
+          <a class="o-dd-item {% if statut == 'en_cours' %}active{% endif %}"
+             onclick="setFiltreStatut('en_cours')">En cours</a>
+          <a class="o-dd-item {% if statut == 'termine' %}active{% endif %}"
+             onclick="setFiltreStatut('termine')">Terminé</a>
+          <a class="o-dd-item {% if statut == 'annule' %}active{% endif %}"
+             onclick="setFiltreStatut('annule')">Annulé</a>
+          {% if statut %}
+          <hr class="o-dd-sep">
+          <a class="o-dd-item" onclick="setFiltreStatut('')" style="color:#b71c1c;">
+            <i class="bi bi-x-circle" style="font-size:11px;"></i> Supprimer le filtre statut
+          </a>
+          {% endif %}
+          <hr class="o-dd-sep">
+          <div class="o-dd-section">Date</div>
+          <div style="padding:4px 14px 6px;">
+            <input type="date" id="dd-date-input" value="{{ date_filtre }}"
+                   class="filter-select" style="width:100%;font-size:12px;"
+                   onchange="setFiltreDate(this.value)">
+          </div>
+          {% if date_filtre %}
+          <a class="o-dd-item" onclick="setFiltreDate('')" style="color:#b71c1c;">
+            <i class="bi bi-x-circle" style="font-size:11px;"></i> Effacer la date
+          </a>
+          {% endif %}
+          <hr class="o-dd-sep">
+          <div class="o-dd-section">Hospitalisation</div>
+          <div style="padding:4px 14px 6px;">
+            <input type="text" id="dd-hosp-input" placeholder="N° hospitalisation…"
+                   value="{% if hospitalisation_filtre %}{{ hospitalisation_filtre.numero }}{% endif %}"
+                   class="filter-select" style="width:100%;font-size:12px;"
+                   oninput="searchHosp(this.value)">
+            <div id="dd-hosp-results" style="margin-top:4px;"></div>
+          </div>
+          {% if hospitalisation_id %}
+          <a class="o-dd-item" onclick="setFiltreHosp('',''); document.getElementById('dd-hosp-input').value=''" style="color:#b71c1c;">
+            <i class="bi bi-x-circle" style="font-size:11px;"></i> Effacer le filtre hospitalisation
+          </a>
+          {% endif %}
+        </div>
+      </div>
+      {% endwith %}
 
-    <div style="flex:1;"></div>
-    <div class="o-ctrl-sep"></div>
+      <!-- Tags filtres actifs -->
+      {% if q %}<span class="o-filter-tag">{{ q }} <a onclick="clearQ()" style="cursor:pointer;">×</a></span>{% endif %}
+      {% if statut %}<span class="o-filter-tag">{% if statut == 'brouillon' %}Brouillon{% elif statut == 'en_attente_de_paiement' %}Att. paiement{% elif statut == 'en_cours' %}En cours{% elif statut == 'termine' %}Terminé{% else %}Annulé{% endif %} <a onclick="setFiltreStatut('')" style="cursor:pointer;">×</a></span>{% endif %}
+      {% if date_filtre %}<span class="o-filter-tag">{{ date_filtre }} <a onclick="setFiltreDate('')" style="cursor:pointer;">×</a></span>{% endif %}
+      {% if hospitalisation_filtre %}<span class="o-filter-tag"><i class="bi bi-hospital" style="font-size:10px;"></i> {{ hospitalisation_filtre.numero }} — {{ hospitalisation_filtre.patient.nom }} <a onclick="setFiltreHosp('',''); document.getElementById('dd-hosp-input').value=''" style="cursor:pointer;">×</a></span>{% endif %}
+      {% if q or statut or date_filtre or hospitalisation_id %}
+      <a onclick="clearAll()" class="o-ctrl-btn" style="cursor:pointer;"><i class="bi bi-x"></i> Effacer</a>
+      {% endif %}
+
+      <div class="o-ctrl-sep"></div>
+
+      <!-- Pagination inline -->
+      <div class="o-pagination-top">
+        <span id="pag-info-top">{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
+        <a id="pag-prev-top" class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
+           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}&q={{ q }}&statut={{ statut }}&date={{ date_filtre }}&hospitalisation_id={{ hospitalisation_id }}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-left"></i>
+        </a>
+        <a id="pag-next-top" class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
+           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}&q={{ q }}&statut={{ statut }}&date={{ date_filtre }}&hospitalisation_id={{ hospitalisation_id }}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-right"></i>
+        </a>
+      </div>
+
+      <div class="o-ctrl-sep"></div>
+
+      <!-- Vue toggle -->
+      <div class="o-view-btns">
+        <button class="o-view-btn active" title="Vue liste"><i class="bi bi-list-ul"></i></button>
+      </div>
+
+    </div>
   </div>
 </div>
 
-<!-- ══ PANEL FILTRES ══ -->
-<div class="filters-panel {% if statut or date_filtre %}open{% endif %}" id="filters-panel">
-  <select id="sel-statut" class="filter-select" onchange="applyFilters()">
-    <option value="">Tous les statuts</option>
-    <option value="brouillon"              {% if statut == 'brouillon'              %}selected{% endif %}>Brouillon</option>
-    <option value="en_attente_de_paiement" {% if statut == 'en_attente_de_paiement' %}selected{% endif %}>Paiement en attente</option>
-    <option value="en_cours"               {% if statut == 'en_cours'               %}selected{% endif %}>Soins en cours</option>
-    <option value="termine"                {% if statut == 'termine'                %}selected{% endif %}>Terminé</option>
-    <option value="annule"                 {% if statut == 'annule'                 %}selected{% endif %}>Annulé</option>
-  </select>
-  <input type="date" id="sel-date" class="filter-select" value="{{ date_filtre }}" onchange="applyFilters()"
-    style="font-size:12px;">
-</div>
 
 <!-- ══ STATS ══ -->
 <div class="stats-row">
@@ -245,7 +332,7 @@
   <div class="stat-box">
     <div class="stat-icon yellow"><i class="bi bi-hourglass-split"></i></div>
     <div>
-      <div class="stat-label">Soins en cours</div>
+      <div class="stat-label">En cours</div>
       <div class="stat-value">{{ stats.en_cours }}</div>
     </div>
   </div>
@@ -268,8 +355,7 @@
         <th class="sortable-col" data-col="0" style="width:85px"><span class="col-label">Nom</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
         <th class="sortable-col" data-col="1" style="width:130px"><span class="col-label">Patient</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
 
-        <th class="sortable-col" data-col="4" style="width:110px"><span class="col-label">Infirmier</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
-        <th class="sortable-col" data-col="5" style="width:85px"><span class="col-label">Département</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
+        <th class="sortable-col" data-col="4" style="width:130px"><span class="col-label">Infirmier</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
         <th class="sortable-col" data-col="6" style="width:105px"><span class="col-label">Date</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
         <th class="sortable-col" data-col="7" style="width:36px;text-align:center;"><span class="col-label">Sexe</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
         <th class="sortable-col" data-col="8" style="width:42px;text-align:center;"><span class="col-label">Âge</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
@@ -291,7 +377,6 @@
             <label><input type="checkbox" data-col-idx="1" checked> Patient</label>
 
             <label><input type="checkbox" data-col-idx="4" checked> Infirmier</label>
-            <label><input type="checkbox" data-col-idx="5" checked> Département</label>
             <label><input type="checkbox" data-col-idx="6" checked> Date</label>
             <label><input type="checkbox" data-col-idx="7" checked> Sexe</label>
             <label><input type="checkbox" data-col-idx="8" checked> Âge</label>
@@ -320,10 +405,15 @@
         <td data-col="1" style="font-weight:500;">{{ soin.patient.nom }} {{ soin.patient.prenoms }}</td>
 
         <td data-col="4" style="color:var(--text-muted);font-size:12px;">
-          {% if soin.infirmier %}{{ soin.infirmier.nom }} {{ soin.infirmier.prenoms }}{% else %}<span style="opacity:.4;">—</span>{% endif %}
+          {% with p=soin.procedures_list|first %}
+            {% if p and p.infirmier %}{{ p.infirmier.nom }} {{ p.infirmier.prenoms }}{% else %}<span style="opacity:.4;">—</span>{% endif %}
+          {% endwith %}
         </td>
-        <td data-col="5" style="font-size:12px;color:var(--text-muted);">{{ soin.departement.nom|default:"—" }}</td>
-        <td data-col="6" style="font-size:12px;white-space:nowrap;">{{ soin.date_heure|date:"d/m/Y H:i" }}</td>
+        <td data-col="6" style="font-size:12px;white-space:nowrap;">
+          {% with p=soin.procedures_list|first %}
+            {% if p %}{{ p.date|date:"d/m/Y H:i" }}{% else %}{{ soin.date_creation|date:"d/m/Y" }}{% endif %}
+          {% endwith %}
+        </td>
         <td data-col="7" style="text-align:center;font-size:12px;color:var(--text-muted);">{{ soin.patient.sexe }}</td>
         <td data-col="8" style="text-align:center;font-size:12px;white-space:nowrap;">{{ soin.patient.age_display }}</td>
         {% comment %}
@@ -340,15 +430,16 @@
           {% if soin.statut == 'brouillon' %}
             <span class="badge-statut badge-brouillon">Brouillon</span>
           {% elif soin.statut == 'en_attente_de_paiement' %}
-            <span class="badge-statut badge-en-attente">Pmt. attente</span>
+            <span class="badge-statut badge-en-attente">Att. paiement</span>
           {% elif soin.statut == 'en_cours' %}
-            <span class="badge-statut badge-en-cours">Soins en cours</span>
+            <span class="badge-statut badge-en-cours">En cours</span>
           {% elif soin.statut == 'termine' %}
             <span class="badge-statut badge-termine">Terminé</span>
           {% elif soin.statut == 'annule' %}
             <span class="badge-statut badge-annule">Annulé</span>
           {% endif %}
         </td>
+        <td></td>
       </tr>
       {% endwith %}
       {% endfor %}
@@ -383,22 +474,125 @@
   function adjustOffsets() {
     var topbar = document.querySelector('.topbar');
     var wrap = document.getElementById('page-wrap');
-    if (topbar && wrap) wrap.style.paddingTop = topbar.offsetHeight + 'px';
+    if (topbar && wrap) wrap.style.paddingTop = '0';
   }
   adjustOffsets();
   window.addEventListener('resize', adjustOffsets);
 
-  function toggleFilters() {
-    var p = document.getElementById('filters-panel');
-    if (p) p.classList.toggle('open');
-    document.getElementById('btn-filtres').classList.toggle('active', p.classList.contains('open'));
+  /* ── Dropdown ── */
+  function toggleDd(id, btn) {
+    var panel = document.getElementById(id);
+    var isOpen = panel.classList.contains('open');
+    document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
+    if (!isOpen) {
+      var rect = btn.getBoundingClientRect();
+      panel.style.top = (rect.bottom + 4) + 'px';
+      panel.style.left = rect.left + 'px';
+      panel.style.right = 'auto';
+      panel.classList.add('open');
+      var pr = panel.getBoundingClientRect();
+      if (pr.right > window.innerWidth - 8) {
+        panel.style.left = 'auto';
+        panel.style.right = (window.innerWidth - rect.right) + 'px';
+      }
+    }
   }
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.o-dd-wrap')) {
+      document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
+    }
+  });
 
-  function applyFilters() {
-    document.getElementById('fi-statut').value = document.getElementById('sel-statut').value;
-    document.getElementById('fi-date').value = document.getElementById('sel-date').value;
+  /* ── Filtres ── */
+  function setFiltreStatut(val) {
+    var el = document.getElementById('fi-statut');
+    if (el) el.value = val;
+    document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
     window.liveLoad();
   }
+
+  function setFiltreDate(val) {
+    var el = document.getElementById('fi-date');
+    if (el) el.value = val;
+    var ddInput = document.getElementById('dd-date-input');
+    if (ddInput) ddInput.value = val;
+    document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
+    window.liveLoad();
+  }
+
+  function clearQ() {
+    var inp = document.getElementById('search-input');
+    if (inp) inp.value = '';
+    window.liveLoad();
+  }
+
+  function clearAll() {
+    var inp = document.getElementById('search-input');
+    if (inp) inp.value = '';
+    var statEl = document.getElementById('fi-statut');
+    if (statEl) statEl.value = '';
+    var dateEl = document.getElementById('fi-date');
+    if (dateEl) dateEl.value = '';
+    var hospEl = document.getElementById('fi-hosp');
+    if (hospEl) hospEl.value = '';
+    window.liveLoad();
+  }
+
+  function setFiltreHosp(id, label) {
+    var el = document.getElementById('fi-hosp');
+    if (el) el.value = id;
+    document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
+    window.liveLoad();
+  }
+
+  var hospSearchTimer = null;
+  function searchHosp(val) {
+    var resultsEl = document.getElementById('dd-hosp-results');
+    if (!val || val.length < 2) { resultsEl.innerHTML = ''; return; }
+    clearTimeout(hospSearchTimer);
+    hospSearchTimer = setTimeout(function() {
+      fetch('/hospitalisation/?q=' + encodeURIComponent(val) + '&format=json', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function(r) { return r.json(); })
+        .catch(function() { return { results: [] }; })
+        .then(function(data) {
+          if (!data.results || !data.results.length) {
+            resultsEl.innerHTML = '<div style="padding:4px 14px;font-size:12px;color:var(--text-muted);">Aucun résultat</div>';
+            return;
+          }
+          resultsEl.innerHTML = data.results.map(function(h) {
+            return '<a class="o-dd-item" onclick="setFiltreHosp(\'' + h.id + '\',\'' + h.numero + '\'); document.getElementById(\'dd-hosp-input\').value=\'' + h.numero + ' — ' + h.patient + '\'">' +
+              '<i class="bi bi-hospital" style="font-size:11px;color:var(--accent);"></i> ' + h.numero + ' — ' + h.patient +
+              '</a>';
+          }).join('');
+        });
+    }, 300);
+  }
+
+  /* ── Sync pagination top depuis le bas après liveLoad ── */
+  document.addEventListener('liveload:complete', function() {
+    var srcSpan = document.querySelector('.o-pagination-bottom span');
+    var tgtSpan = document.getElementById('pag-info-top');
+    if (srcSpan && tgtSpan) tgtSpan.textContent = srcSpan.textContent;
+
+    var bottomBtns = document.querySelectorAll('.o-pagination-bottom .o-pag-btn');
+    var prevSrc = bottomBtns[0], nextSrc = bottomBtns[1];
+    var prevTgt = document.getElementById('pag-prev-top');
+    var nextTgt = document.getElementById('pag-next-top');
+    if (prevTgt && prevSrc) { prevTgt.className = prevSrc.className; prevTgt.href = prevSrc.href; }
+    if (nextTgt && nextSrc) { nextTgt.className = nextSrc.className; nextTgt.href = nextSrc.href; }
+  });
+
+  /* ── Pagination top → liveLoad ── */
+  document.addEventListener('click', function(e) {
+    var a = e.target.closest('#pag-prev-top, #pag-next-top');
+    if (!a || a.classList.contains('disabled')) return;
+    var href = a.getAttribute('href');
+    if (!href || href === '#') return;
+    e.preventDefault();
+    var qs = href.includes('?') ? href.split('?')[1] : '';
+    var p = new URLSearchParams(qs);
+    window.liveLoad({ page: p.get('page') || '1' });
+  });
 
   /* Recherche auto (debounce 400ms) */
   (function () {

@@ -1,0 +1,2015 @@
+{% extends 'hospitalisation/base.html' %}
+{% load i18n core_tags %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+:root { --surface:#fff; --border:#e8edf2; --text:#0d3040; --text-muted:rgba(0,0,0,.45); }
+html[data-theme="dark"] { --surface:#132033; --border:#243044; --text:#d4e6f5; --text-muted:rgba(255,255,255,.45); }
+
+/* ── Subheader ── */
+.o-subheader {
+  background:var(--surface); border-bottom:1px solid var(--border);
+  padding:5px 16px; display:flex; flex-direction:column; gap:4px;
+  position:sticky; top: 38px; z-index:190; margin:0 -32px;
+}
+.o-subheader-row { display:flex; align-items:center; gap:8px; }
+
+.o-ctrl-btn {
+  background:none; border:1px solid transparent; border-radius:4px;
+  padding:4px 8px; font-size:14px; color:var(--text-muted);
+  text-decoration:none; transition:border-color .15s, color .15s, background .15s;
+  display:inline-flex; align-items:center;
+}
+.o-ctrl-btn:hover { border-color:var(--border); color:var(--text); background:#f3f3f3; }
+.btn-save {
+  background:var(--teal-500,#1588ab); color:#fff; border:none; padding:5px 18px;
+  border-radius:4px; font-size:12.5px; font-weight:600; font-family:inherit;
+  cursor:pointer; letter-spacing:.4px; transition:background .15s;
+}
+.btn-save:hover { background:var(--teal-600,#0f6e8e); }
+.btn-save:disabled { background:#9cb8c7; cursor:not-allowed; opacity:.8; }
+.btn-cancel {
+  background:none; border:none; color:var(--text-muted); padding:5px 12px;
+  font-size:12.5px; font-family:inherit; cursor:pointer; text-decoration:none;
+  transition:color .15s;
+}
+.btn-cancel:hover { color:var(--text); }
+
+/* ── Champ d'en-tête verrouillé (statut > brouillon + valeur déjà renseignée) ── */
+.field-locked-val {
+  width:100%; border-bottom:1px solid var(--border); padding:6px 2px;
+  font-size:13px; color:var(--text-muted); cursor:not-allowed;
+  background:rgba(0,0,0,.025); display:flex; align-items:center;
+  gap:5px; min-height:28px; border-radius:0;
+}
+html[data-theme="dark"] .field-locked-val { background:rgba(255,255,255,.03); }
+
+
+/* ── Barre de workflow ── */
+.workflow-bar {
+  background:var(--surface); border-bottom:1px solid var(--border);
+  padding:5px 16px; display:flex; align-items:center; gap:8px;
+  margin:0 -32px;
+}
+.wf-btn {
+  border:none; padding:5px 16px; border-radius:4px; font-size:12px;
+  font-weight:600; font-family:inherit; cursor:pointer; letter-spacing:.5px;
+  transition:background .15s; text-transform:uppercase;
+}
+.wf-btn-confirmer  { background:#3d3d99; color:#fff; }
+.wf-btn-confirmer:hover { background:#2d2d88; }
+.wf-btn-update { background:#5c5ca8; color:#fff; }
+.wf-btn-update:hover { background:#4a4a96; }
+.wf-btn:disabled { background:#ccc; color:#888; cursor:not-allowed; }
+
+.pipeline {
+  margin-left:auto; display:flex; align-items:stretch;
+  font-size:11px; font-weight:700; letter-spacing:.6px;
+  gap:2px;
+}
+.pip-step {
+  padding:0 22px 0 28px; height:32px;
+  display:flex; align-items:center;
+  color:rgba(0,0,0,.35); background:#eef1f5;
+  white-space:nowrap; transition:background .15s, color .15s;
+  clip-path:polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%, 10px 50%);
+  cursor:default; user-select:none;
+}
+.pip-step:first-child {
+  padding-left:18px;
+  clip-path:polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%);
+  border-radius:3px 0 0 3px;
+}
+.pip-step:last-child {
+  padding-right:18px;
+  clip-path:polygon(0 0, 100% 0, 100% 100%, 0 100%, 10px 50%);
+  border-radius:0 3px 3px 0;
+}
+.pip-step.done   { background:#daedf8; color:var(--teal-700,#0a5a78); }
+.pip-step.active { background:#3d3d99; color:#fff; }
+html[data-theme="dark"] .pip-step         { background:#1e2d42; color:rgba(255,255,255,.3); }
+html[data-theme="dark"] .pip-step.done    { background:#0f3050; color:var(--teal-300,#7fd4ea); }
+html[data-theme="dark"] .pip-step.active  { background:#3d3d99; color:#fff; }
+
+/* ── Stats bar ── */
+.stats-bar {
+  display:flex; gap:0; margin:0 -32px;
+  border-bottom:1px solid var(--border);
+}
+.stat-btn {
+  display:flex; align-items:center; gap:8px; padding:10px 20px;
+  border:none; border-right:1px solid var(--border); background:var(--surface);
+  font-family:inherit; cursor:pointer; transition:background .12s;
+  text-decoration:none; color:var(--text);
+}
+.stat-btn:hover { background:#f5fbff; }
+.stat-btn i { font-size:18px; color:var(--teal-400,#38b2d0); }
+.stat-count { font-size:15px; font-weight:700; color:var(--teal-600,#0f6e8e); line-height:1; }
+.stat-label { font-size:11px; color:var(--text-muted); line-height:1; margin-top:2px; }
+
+/* ── Carte principale ── */
+.hosp-card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:6px; margin-top:16px; overflow:hidden;
+}
+.hosp-card-header {
+  display:block;
+}
+.hosp-header-fields { padding:20px 24px; }
+.hosp-numero {
+  font-size:12px; font-weight:600; color:var(--text-muted);
+  letter-spacing:.5px; text-transform:uppercase; margin-bottom:16px;
+}
+.hosp-numero span { font-size:15px; color:var(--teal-600,#0f6e8e); font-weight:700; }
+.fields-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px 32px; }
+.fields-grid .full { grid-column:1/-1; }
+/* ── Champs underline ── */
+.field-ul {
+  width:100%; background:transparent; border:none;
+  border-bottom:1.5px solid #d1dde3; border-radius:0;
+  padding:6px 2px; font-size:13px; color:var(--text);
+  transition:border-color .2s; box-shadow:none; outline:none; font-family:inherit;
+}
+.field-ul:focus { border-bottom-color:var(--teal-500,#1588ab); }
+.field-ul::placeholder { color:#bfcdd4; }
+textarea.field-ul { resize:vertical; min-height:60px; padding:4px 2px; }
+select.field-ul {
+  appearance:none; -webkit-appearance:none; background-color:transparent;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23839aaa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 4px center; padding-right:22px; cursor:pointer;
+}
+.field-label { display:block; font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:3px; }
+.field-error { font-size:11.5px; color:#e53935; margin-top:2px; }
+
+/* ── Onglets ── */
+.tabs-wrap { border-top:1px solid var(--border); }
+.tabs-nav {
+  display:flex; border-bottom:1px solid var(--border);
+  padding:0 24px; background:var(--surface);
+  overflow-x:auto;
+}
+.tab-btn {
+  padding:10px 16px; font-size:13px; font-family:inherit; cursor:pointer;
+  border:none; background:none; color:var(--text-muted); white-space:nowrap;
+  border-bottom:2px solid transparent; margin-bottom:-1px;
+  transition:color .15s, border-color .15s;
+}
+.tab-btn.active { color:var(--teal-600,#0f6e8e); border-bottom-color:var(--teal-500,#1588ab); font-weight:600; }
+.tab-btn:hover:not(.active) { color:var(--text); }
+.tab-pane { display:none; padding:22px 24px; }
+.tab-pane.active { display:block; }
+
+/* ── Chatter / Activité ── */
+.chatter-wrap {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:6px; margin-top:20px; overflow:hidden;
+}
+.chatter-header {
+  padding:10px 18px; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; gap:8px;
+  font-size:13px; font-weight:600; color:var(--text);
+}
+.chatter-compose { padding:14px 18px; border-bottom:1px solid var(--border); }
+.chatter-input {
+  width:100%; border:1px solid var(--border); border-radius:6px;
+  padding:10px 14px; font-size:13px; font-family:inherit; color:var(--text);
+  background:var(--surface); resize:vertical; min-height:60px; outline:none;
+  transition:border-color .2s;
+}
+.chatter-input:focus { border-color:var(--teal-500,#1588ab); }
+.chatter-input::placeholder { color:#bfcdd4; }
+.chatter-send {
+  margin-top:8px; background:var(--teal-500,#1588ab); color:#fff; border:none;
+  padding:5px 16px; border-radius:4px; font-size:12.5px; font-weight:600;
+  font-family:inherit; cursor:pointer; transition:background .15s;
+}
+.chatter-send:hover { background:var(--teal-600,#0f6e8e); }
+.log-list { max-height:360px; overflow-y:auto; }
+.log-item {
+  display:flex; gap:10px; padding:12px 18px;
+  border-bottom:1px solid #f2f5f8;
+}
+.log-item:last-child { border-bottom:none; }
+.log-avatar {
+  width:32px; height:32px; border-radius:50%;
+  background:var(--teal-100,#b2e0ef); display:flex; align-items:center;
+  justify-content:center; font-size:13px; font-weight:700;
+  color:var(--teal-700,#0f5a78); flex-shrink:0;
+}
+.log-body { flex:1; }
+.log-meta { font-size:11.5px; color:var(--text-muted); margin-bottom:3px; }
+.log-meta strong { color:var(--text); font-weight:600; }
+.log-msg { font-size:13px; color:var(--text); }
+.log-type-statut .log-msg { color:var(--teal-600,#0f6e8e); font-style:italic; font-size:12.5px; }
+.log-type-modif  .log-msg { color:var(--text-muted); font-style:italic; font-size:12.5px; }
+.log-empty { padding:24px 18px; text-align:center; color:var(--text-muted); font-size:13px; }
+
+/* Messages */
+.msg-success { background:#d4edda; color:#1a6b3c; padding:9px 14px; border-radius:4px; font-size:13px; margin:10px 0; }
+.msg-error   { background:#fde8e8; color:#7b1c1c; padding:9px 14px; border-radius:4px; font-size:13px; margin:10px 0; }
+
+/* ── Layout deux colonnes ── */
+.hosp-page-layout { display:flex; align-items:flex-start; gap:14px; padding-top:12px; }
+.hosp-page-main   { flex:1; min-width:0; }
+.hosp-page-aside  { width:290px; flex-shrink:0; position:sticky; top:110px; }
+@media(max-width:960px){ .hosp-page-layout { flex-direction:column; } .hosp-page-aside { width:100%; position:static; } }
+
+/* Tom Select */
+.ts-wrapper { padding:0 !important; }
+.ts-wrapper .ts-control {
+  background:transparent !important; border:none !important;
+  border-bottom:1.5px solid #d1dde3 !important; border-radius:0 !important;
+  box-shadow:none !important; padding:6px 24px 6px 2px !important;
+  font-size:13px !important; font-family:inherit !important; min-height:unset !important; cursor:pointer;
+}
+.ts-wrapper.focus .ts-control { border-bottom-color:var(--teal-500,#1588ab) !important; box-shadow:none !important; }
+.ts-wrapper .ts-control .item { font-size:13px !important; font-family:inherit !important; color:var(--text) !important; padding:0 !important; margin:0 !important; }
+.ts-wrapper .ts-control input { font-size:13px !important; font-family:inherit !important; color:var(--text) !important; padding:0 !important; margin:0 !important; }
+.ts-wrapper .ts-control input::placeholder { color:#bfcdd4; }
+.ts-control .item[data-value=""] { color:#bfcdd4 !important; font-style:italic; }
+.ts-dropdown .option[data-value=""] { display:none !important; }
+.ts-wrapper.single .ts-control::after {
+  content:'' !important; width:12px !important; height:8px !important;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23839aaa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat !important;
+  border:none !important; position:absolute !important; right:4px !important;
+  top:50% !important; transform:translateY(-50%) !important;
+}
+.ts-wrapper.single.input-active .ts-control::after { transform:translateY(-50%) rotate(180deg) !important; }
+.ts-dropdown { font-size:13px !important; font-family:inherit !important; border:1px solid #dde3ec !important; border-radius:6px !important; box-shadow:0 8px 24px rgba(0,0,0,.14) !important; background:#fff !important; }
+.ts-dropdown .option { padding:7px 14px !important; color:var(--text) !important; }
+.ts-dropdown .option:hover, .ts-dropdown .option.active, .ts-dropdown .option.selected { background:#e8f4f8 !important; color:var(--teal-600,#0f6e8e) !important; }
+.ts-dropdown .no-results { padding:8px 14px; color:#999; font-size:12px; }
+
+/* dark */
+html[data-theme="dark"] .hosp-card { background:var(--surface); border-color:var(--border); }
+html[data-theme="dark"] .field-ul { color:var(--text); border-bottom-color:#3a4a62; }
+html[data-theme="dark"] .field-ul:focus { border-bottom-color:var(--teal-400); }
+html[data-theme="dark"] .pip-step { background:#1a2535; color:rgba(255,255,255,.3); }
+html[data-theme="dark"] .pip-step:not(:last-child)::after { border-left-color:#1a2535; }
+html[data-theme="dark"] .pip-step.done { background:#0f3050; color:var(--teal-300); }
+html[data-theme="dark"] .pip-step.done::after { border-left-color:#0f3050; }
+html[data-theme="dark"] .stat-btn { background:var(--surface); border-color:var(--border); }
+html[data-theme="dark"] .stat-btn:hover { background:#0f2035; }
+html[data-theme="dark"] .workflow-bar { background:var(--surface); border-color:var(--border); }
+html[data-theme="dark"] .tabs-nav { background:var(--surface); border-color:var(--border); }
+html[data-theme="dark"] .chatter-wrap { background:var(--surface); border-color:var(--border); }
+html[data-theme="dark"] .chatter-input { background:var(--surface); border-color:var(--border); color:var(--text); }
+html[data-theme="dark"] .log-item { border-color:#1a3050; }
+html[data-theme="dark"] .ts-wrapper .ts-control { border-bottom-color:rgba(255,255,255,.15) !important; }
+html[data-theme="dark"] .ts-wrapper.focus .ts-control { border-bottom-color:var(--teal-400) !important; }
+html[data-theme="dark"] .ts-dropdown { background:#1a2535 !important; border-color:#2e3f58 !important; }
+html[data-theme="dark"] .ts-dropdown .option { color:#c5d4e2 !important; }
+html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-dropdown .option.active, html[data-theme="dark"] .ts-dropdown .option.selected { background:rgba(33,136,171,.2) !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Subheader ── -->
+<div class="o-subheader">
+  <div class="o-subheader-row">
+    <a href="{% url 'hospitalisation:list' %}" class="o-ctrl-btn" style="padding:3px 7px;">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <span style="font-size:13px;color:var(--text-muted);">
+      <a href="{% url 'hospitalisation:list' %}" style="color:var(--accent,var(--teal-600));text-decoration:none;font-weight:500;">Hospitalisation</a>
+      <span style="margin:0 4px;opacity:.4;">/</span>
+      <span style="color:var(--text);">{{ titre }}</span>
+    </span>
+    <div style="flex:1;"></div>
+    <a href="{% url 'hospitalisation:list' %}" class="btn-cancel">IGNORER</a>
+    {% if not edit or hosp.statut == 'brouillon' or hosp.statut == 'confirme' or hosp.statut == 'hospitalise' %}
+    <button type="submit" form="hosp-form" class="btn-save" id="btn-save-bottom" disabled>SAUVEGARDER</button>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ── Barre workflow ── -->
+<div class="workflow-bar">
+  {% if edit %}
+
+    {# ─── CONFIRMER / ENREGISTRER LES SOINS ──────────────────────────────── #}
+    {% if actions.confirmer.visible %}
+      <button type="submit" form="hosp-form" name="action_confirmer"
+              id="btn-confirmer-edit"
+              class="wf-btn {% if hosp.statut == 'brouillon' %}wf-btn-confirmer{% else %}wf-btn-update{% endif %}"
+              {% if not actions.confirmer.enabled %}
+                disabled title="{{ actions.confirmer.raison_blocage }}"
+                data-soins-gated="true"
+                {% if hosp.statut in 'confirme,hospitalise' %}data-soins-mode="sync"{% endif %}
+              {% else %}
+                title="Confirmer la demande d'hospitalisation"
+              {% endif %}>
+        {% if hosp.statut == 'brouillon' %}CONFIRMER LA DEMANDE{% else %}ENREGISTRER LES SOINS{% endif %}
+      </button>
+    {% endif %}
+
+    {# ─── HOSPITALISER ───────────────────────────────────────────────────── #}
+    {% if actions.installer.visible %}
+      <button type="submit" form="hosp-form" name="action_hospitaliser" id="btn-hospitaliser"
+              class="wf-btn wf-btn-confirmer"
+              {% if not actions.installer.enabled %}disabled title="{{ actions.installer.raison_blocage }}"{% else %}title="Installer le patient en observation"{% endif %}>
+        HOSPITALISER
+      </button>
+    {% endif %}
+
+    {# ─── CRÉER UNE FACTURE ──────────────────────────────────────────────── #}
+    {% if actions.creer_facture.visible %}
+      {% if actions.creer_facture.enabled %}
+      <a id="btn-facture" href="{{ url_facture }}" class="wf-btn" style="background:#16a34a;color:#fff;text-decoration:none;" title="Créer une nouvelle facture">
+        <i class="bi bi-receipt"></i> CRÉER UNE FACTURE
+        {% if saf_non_factures %}<span style="background:rgba(255,255,255,.3);border-radius:10px;padding:0 6px;font-size:10px;margin-left:4px;">{{ saf_non_factures }}</span>{% endif %}
+      </a>
+      {% else %}
+      <span id="btn-facture" class="wf-btn" style="background:#e5e7eb;color:#9ca3af;cursor:not-allowed;"
+            title="{{ actions.creer_facture.raison_blocage }}">
+        <i class="bi bi-receipt"></i> CRÉER UNE FACTURE
+      </span>
+      {% endif %}
+    {% endif %}
+
+    {# ─── DÉCHARGER (ouvre la modale, type="button" intentionnel) ────────── #}
+    {% if actions.decharger.visible %}
+      {% if actions.decharger.enabled %}
+        <button type="button" class="wf-btn wf-btn-confirmer" onclick="openDechargeModal()" title="Décharger médicalement le patient">
+          DÉCHARGER
+        </button>
+      {% else %}
+        <button type="button" class="wf-btn" disabled style="background:#e5e7eb;color:#9ca3af;cursor:not-allowed;"
+                title="{{ actions.decharger.raison_blocage }}">
+          DÉCHARGER
+        </button>
+      {% endif %}
+    {% endif %}
+
+    {# ─── DEMANDE DE LAB (hospitalisé uniquement) ───────────────────────── #}
+    {% if hosp.statut == 'hospitalise' %}
+    <a href="{{ url_labo }}" class="wf-btn" style="background:#1a7a4a;color:#fff;text-decoration:none;">
+      <i class="bi bi-flask"></i> DEMANDE DE LAB
+    </a>
+    {% endif %}
+
+    {# ─── CLÔTURER (TERMINÉ) ──────────────────────────────────────────── #}
+    {% if actions.terminer.visible %}
+      {% if actions.terminer.enabled %}
+        <button type="submit" form="hosp-form" name="action_terminer" class="wf-btn wf-btn-confirmer" title="Clôturer administrativement le dossier">
+          CLÔTURER
+        </button>
+      {% else %}
+        <button type="button" class="wf-btn" disabled style="background:#e5e7eb;color:#9ca3af;cursor:not-allowed;"
+                title="{{ actions.terminer.raison_blocage }}">
+          CLÔTURER
+        </button>
+      {% endif %}
+    {% endif %}
+
+    {# ─── ANNULER ────────────────────────────────────────────────────────── #}
+    {% if actions.annuler.visible %}
+      {% if actions.annuler.enabled %}
+        <button type="button" id="btn-annuler-confirme" class="wf-btn" style="background:#dc3545;color:#fff;"
+                onclick="openAnnulModalForm()"
+                title="Annuler la demande d'hospitalisation">
+          ANNULER
+        </button>
+      {% else %}
+        <button type="button" class="wf-btn" disabled style="background:#e5e7eb;color:#9ca3af;cursor:not-allowed;"
+                title="{{ actions.annuler.raison_blocage }}">
+          ANNULER
+        </button>
+      {% endif %}
+    {% endif %}
+
+  {% else %}
+  <button type="submit" form="hosp-form" name="action_confirmer"
+          id="btn-confirmer-create"
+          class="wf-btn wf-btn-confirmer" disabled
+          title="Sélectionnez un patient d'abord">CONFIRMER</button>
+  {% endif %}
+
+  <div class="pipeline">
+    {% with s=hosp.statut|default:'brouillon' %}
+    {% for val, label in hosp.STATUT|default:'' %}{% endfor %}
+    <div class="pip-step {% if s == 'brouillon' %}active{% elif s != 'brouillon' %}done{% endif %}">BROUILLON</div>
+    <div class="pip-step {% if s == 'confirme' %}active{% elif s in 'hospitalise,decharge,termine' %}done{% endif %}">CONFIRMÉ</div>
+    <div class="pip-step {% if s == 'hospitalise' %}active{% elif s in 'decharge,termine' %}done{% endif %}">HOSPITALISÉ</div>
+    <div class="pip-step {% if s == 'decharge' %}active{% elif s == 'termine' %}done{% endif %}">DÉCHARGÉ</div>
+    <div class="pip-step {% if s == 'termine' %}active{% endif %}">TERMINÉ</div>
+    {% endwith %}
+  </div>
+</div>
+
+<!-- ── Bandeau lecture seule ── -->
+{% if lecture_seule_totale %}
+<div style="margin:0 -32px;padding:7px 20px;background:#fef3c7;border-bottom:1px solid #fde68a;display:flex;align-items:center;gap:8px;font-size:12.5px;color:#92400e;">
+  <i class="bi bi-lock-fill"></i>
+  <strong>Dossier en lecture seule</strong> — Statut {{ hosp.get_statut_display }} : aucune modification n'est possible.
+</div>
+{% endif %}
+
+{% if facture_blocage %}
+<div style="margin:0 -32px;padding:7px 20px;background:#fef3c7;border-bottom:1px solid #fde68a;display:flex;align-items:center;gap:8px;font-size:12.5px;color:#92400e;">
+  <i class="bi bi-lock-fill"></i>
+  <strong>Dossier verrouillé</strong> — facture
+  <a href="{% url 'hospitalisation:facture_detail' facture_blocage.pk %}" style="color:#92400e;font-weight:700;text-decoration:underline;">{{ facture_blocage.numero }}</a>
+  en attente de paiement.
+  <span style="margin-left:6px;background:#fde68a;border-radius:10px;padding:0 8px;font-size:11px;">Accessible en tant que superutilisateur</span>
+</div>
+{% endif %}
+
+<!-- ── Stats ── -->
+{% if edit %}
+<div class="stats-bar">
+  <button type="button" class="stat-btn" onclick="switchTab('tab-services', document.querySelectorAll('.tab-btn')[4])" title="Voir les services à facturer">
+    <i class="bi bi-receipt" style="color:var(--teal-400,#38b2d0);font-size:18px;"></i>
+    <div>
+      <div class="stat-count">{{ nb_factures }}</div>
+      <div class="stat-label">Factures</div>
+    </div>
+  </button>
+  <button type="button" class="stat-btn">
+    <i class="bi bi-file-earmark-medical" style="color:var(--teal-400,#38b2d0);font-size:18px;"></i>
+    <div>
+      <div class="stat-count">{{ nb_ordonnances }}</div>
+      <div class="stat-label">Créer une ord...</div>
+    </div>
+  </button>
+  <button type="button" class="stat-btn">
+    <i class="bi bi-hospital" style="color:var(--teal-400,#38b2d0);font-size:18px;"></i>
+    <div>
+      <div class="stat-count">{{ nb_attribution }}</div>
+      <div class="stat-label">Attribution de...</div>
+    </div>
+  </button>
+  <button type="button" class="stat-btn">
+    <i class="bi bi-heart-pulse" style="color:var(--teal-400,#38b2d0);font-size:18px;"></i>
+    <div>
+      <div class="stat-count">{{ nb_evaluations }}</div>
+      <div class="stat-label">Évaluations</div>
+    </div>
+  </button>
+  {% if hosp.statut in 'hospitalise,decharge,termine' %}
+  <a href="{{ url_labo }}" class="stat-btn" title="Demandes de laboratoire">
+    <i class="bi bi-list-columns" style="color:var(--teal-400,#38b2d0);font-size:18px;"></i>
+    <div>
+      <div class="stat-count">{{ nb_labo }}</div>
+      <div class="stat-label">Demandes de...</div>
+    </div>
+  </a>
+  <button type="button" class="stat-btn">
+    <i class="bi bi-flask" style="color:var(--teal-400,#38b2d0);font-size:18px;"></i>
+    <div>
+      <div class="stat-count">0</div>
+      <div class="stat-label">Résultats de t...</div>
+    </div>
+  </button>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- ── Layout principal ── -->
+<div class="hosp-page-layout">
+<div class="hosp-page-main">
+
+<!-- ── Carte principale ── -->
+<form method="post" id="hosp-form" enctype="multipart/form-data" novalidate>
+  {% csrf_token %}
+  <div class="hosp-card">
+
+    <!-- En-tête -->
+    <div class="hosp-card-header">
+      <div class="hosp-header-fields">
+        {% if edit %}
+        <div class="hosp-numero">Hospitalisation # <span>{{ hosp.numero }}</span></div>
+        {% endif %}
+        <div class="fields-grid">
+
+          <div>
+            <label class="field-label">Patient</label>
+            {% if lock_patient %}
+              <div class="field-locked-val" title="Verrouillé — {{ hosp.get_statut_display }}">
+                <i class="bi bi-lock" style="font-size:10px;opacity:.45;flex-shrink:0;"></i>{{ hosp.patient }}
+              </div>
+              <input type="hidden" name="patient" value="{{ hosp.patient_id }}">
+            {% else %}
+              {{ form.patient }}
+              {% if form.patient.errors %}<div class="field-error">{{ form.patient.errors|join:", " }}</div>{% endif %}
+            {% endif %}
+          </div>
+
+          <div>
+            <label class="field-label">Date d'hospitalisation</label>
+            {% if lock_date_admission %}
+              <div class="field-locked-val" title="Verrouillé — {{ hosp.get_statut_display }}">
+                <i class="bi bi-lock" style="font-size:10px;opacity:.45;flex-shrink:0;"></i>{{ hosp.date_admission|date:"d/m/Y H:i" }}
+              </div>
+              <input type="hidden" name="date_admission" value="{{ hosp.date_admission|date:'Y-m-d' }}T{{ hosp.date_admission|date:'H:i' }}">
+            {% else %}
+              {{ form.date_admission }}
+              {% if form.date_admission.errors %}<div class="field-error">{{ form.date_admission.errors|join:", " }}</div>{% endif %}
+            {% endif %}
+          </div>
+
+          <div>
+            <label class="field-label">Docteur</label>
+            {% if lock_medecin_traitant %}
+              <div class="field-locked-val" title="Verrouillé — {{ hosp.get_statut_display }}">
+                <i class="bi bi-lock" style="font-size:10px;opacity:.45;flex-shrink:0;"></i>{{ hosp.medecin_traitant }}
+              </div>
+              <input type="hidden" name="medecin_traitant" value="{{ hosp.medecin_traitant_id }}">
+            {% else %}
+              {{ form.medecin_traitant }}
+              {% if form.medecin_traitant.errors %}<div class="field-error">{{ form.medecin_traitant.errors|join:", " }}</div>{% endif %}
+            {% endif %}
+          </div>
+
+          <div>
+            <label class="field-label">Date de sortie</label>
+            {{ form.date_sortie }}
+            {% if form.date_sortie.errors %}<div class="field-error">{{ form.date_sortie.errors|join:", " }}</div>{% endif %}
+          </div>
+
+          <div>
+            <label class="field-label">Maladie</label>
+            {{ form.maladie }}
+            {% if form.maladie.errors %}<div class="field-error">{{ form.maladie.errors|join:", " }}</div>{% endif %}
+          </div>
+
+          <div>
+            <label class="field-label">Salle / Chambre</label>
+            {% if lock_chambre %}
+              <div class="field-locked-val" title="Verrouillé — {{ hosp.get_statut_display }}">
+                <i class="bi bi-lock" style="font-size:10px;opacity:.45;flex-shrink:0;"></i>{{ hosp.chambre }}
+              </div>
+              <input type="hidden" name="chambre" value="{{ hosp.chambre_id }}">
+            {% else %}
+              {{ form.chambre }}
+              {% if form.chambre.errors %}<div class="field-error">{{ form.chambre.errors|join:", " }}</div>{% endif %}
+            {% endif %}
+          </div>
+
+          <div class="full">
+            <label class="field-label">Mise en observation</label>
+            {% if lock_mise_en_observation %}
+              <div class="field-locked-val" title="Verrouillé — {{ hosp.get_statut_display }}">
+                <i class="bi bi-lock" style="font-size:10px;opacity:.45;flex-shrink:0;"></i>{{ hosp.mise_en_observation }}
+              </div>
+              <input type="hidden" name="mise_en_observation" value="{{ hosp.mise_en_observation }}">
+            {% else %}
+              {{ form.mise_en_observation }}
+            {% endif %}
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Onglets -->
+    <div class="tabs-wrap">
+      <div class="tabs-nav">
+        <button type="button" class="tab-btn active" onclick="switchTab('tab-evaluation', this)">Évaluation clinique</button>
+        <button type="button" class="tab-btn" onclick="switchTab('tab-soins', this)">Soins</button>
+        {% if edit and hosp.statut in 'confirme,hospitalise,decharge,termine' %}
+        <button type="button" class="tab-btn" onclick="switchTab('tab-services', this)">
+          Services à facturer
+          {% if saf_non_factures %}<span style="background:var(--teal-500,#1588ab);color:#fff;border-radius:10px;padding:0 6px;font-size:10px;margin-left:4px;">{{ saf_non_factures }}</span>{% endif %}
+        </button>
+        {% endif %}
+        {% if edit and hosp.statut in 'hospitalise,decharge,termine' %}
+        <button type="button" class="tab-btn" onclick="switchTab('tab-resume', this)">Résumé de décharge</button>
+        {% endif %}
+      </div>
+
+      <!-- Onglet 1 — Informations générales -->
+      <div class="tab-pane" id="tab-general">
+        <div class="fields-grid">
+
+          <div>
+            <label class="field-label">Nom du parent (gardien) du patient</label>
+            {{ form.nom_parent_gardien }}
+          </div>
+
+          <div>
+            <label class="field-label">Phone du parent (gardien) du patient</label>
+            {{ form.phone_parent_gardien }}
+          </div>
+
+          <div>
+            <label class="field-label">Médecin référent</label>
+            {{ form.medecin_referent }}
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Onglet 2 — Liste de contrôle -->
+      <div class="tab-pane" id="tab-controle">
+        {% if edit %}
+
+        <style>
+        .ck-section-title { font-size:12.5px; font-weight:600; color:var(--text); margin-bottom:12px; }
+        .ck-table { width:100%; border-collapse:collapse; font-size:13px; margin-bottom:8px; }
+        .ck-table thead th { border-bottom:1px solid var(--border); padding:6px 10px; text-align:left; font-size:11.5px; font-weight:600; color:var(--text-muted); }
+        .ck-table thead th.col-cb { width:42px; text-align:center; }
+        .ck-table thead th.col-del { width:36px; }
+        .ck-table thead th.col-right { text-align:right; padding-right:10px; }
+        .ck-table tbody tr { border-bottom:1px solid #f2f5f8; }
+        .ck-table tbody td { padding:6px 10px; vertical-align:middle; }
+        .ck-table tbody td.col-cb { text-align:center; }
+        .ck-item-input { width:100%; border:none; background:transparent; font-size:13px; font-family:inherit; color:var(--text); outline:none; }
+        .ck-item-input:focus { border-bottom:1px solid var(--teal-500,#1588ab); }
+        .ck-rem-input { width:100%; border:none; background:transparent; font-size:12.5px; font-family:inherit; color:var(--text-muted); outline:none; }
+        .ck-rem-input:focus { border-bottom:1px solid var(--teal-500,#1588ab); }
+        .ck-check { width:16px; height:16px; accent-color:var(--teal-500,#1588ab); cursor:pointer; }
+        .ck-del-btn { background:none; border:none; color:#bbb; cursor:pointer; padding:2px 6px; border-radius:3px; transition:color .15s; }
+        .ck-del-btn:hover { color:#e53935; }
+        .ck-add-btn { background:none; border:none; color:var(--teal-600,#0f6e8e); font-size:13px; font-family:inherit; cursor:pointer; padding:4px 0; display:inline-flex; align-items:center; gap:4px; }
+        .ck-add-btn:hover { text-decoration:underline; }
+        .ck-progress { display:flex; align-items:center; gap:8px; justify-content:flex-end; margin-bottom:8px; font-size:12px; color:var(--text-muted); }
+        .ck-badge { background:#e8f4f8; color:var(--teal-600,#0f6e8e); border-radius:20px; padding:2px 10px; font-weight:700; font-size:12px; border:1px solid #b2d8e4; }
+        .ck-sep { border:none; border-top:1px solid var(--border); margin:20px 0; }
+        html[data-theme="dark"] .ck-table tbody tr { border-color:#1a3050; }
+        html[data-theme="dark"] .ck-item-input { color:var(--text); }
+        html[data-theme="dark"] .ck-rem-input { color:var(--text-muted); }
+        </style>
+
+        <!-- ─── Section 1 : Liste de contrôle d'admission ─── -->
+        <div class="ck-section-title">Liste de contrôle d'admission</div>
+        <div class="ck-progress">
+          <span id="pct-adm-label">{{ pct_adm }}%</span>
+          <span class="ck-badge" id="pct-adm-badge">{{ pct_adm }}%</span>
+          <span>Vérifié</span>
+        </div>
+        <table class="ck-table" id="tbl-adm">
+          <thead>
+            <tr>
+              <th>Nom</th>
+              <th class="col-cb">O/N</th>
+              <th>Remarques</th>
+              <th class="col-del"></th>
+            </tr>
+          </thead>
+          <tbody id="tbody-adm">
+            {% for c in checklist_adm %}
+            <tr data-idx="{{ forloop.counter0 }}">
+              <td>
+                <input type="hidden"  name="cadm_id[]"  value="{{ c.pk }}">
+                <input type="text"    name="cadm_item[]" class="ck-item-input" value="{{ c.item }}">
+              </td>
+              <td class="col-cb">
+                <input type="checkbox" class="ck-check ck-adm-check"
+                       {% if c.verifie %}checked{% endif %}
+                       onchange="updatePct('adm')">
+                <input type="hidden" name="cadm_verifie[]" value="">
+              </td>
+              <td>
+                <input type="text" name="cadm_remarques[]" class="ck-rem-input"
+                       value="{{ c.remarques }}" placeholder="Remarques…">
+              </td>
+              <td class="col-del">
+                <button type="button" class="ck-del-btn" onclick="delRow(this)">
+                  <i class="bi bi-trash3"></i>
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <button type="button" class="ck-add-btn" onclick="addRow('adm')">
+          <i class="bi bi-plus-circle"></i> Ajouter une ligne
+        </button>
+
+        <hr class="ck-sep">
+
+        <!-- ─── Section 2 : Liste de vérification préalable ─── -->
+        <div class="ck-section-title">Liste de vérification préalable</div>
+        <div class="ck-progress">
+          <span class="ck-badge" id="pct-ver-badge">{{ pct_ver }}%</span>
+          <span>Vérifié</span>
+        </div>
+        <table class="ck-table" id="tbl-ver">
+          <thead>
+            <tr>
+              <th>Nom</th>
+              <th class="col-cb">Terminé</th>
+              <th>Remarques</th>
+              <th class="col-del"></th>
+            </tr>
+          </thead>
+          <tbody id="tbody-ver">
+            {% for c in checklist_ver %}
+            <tr data-idx="{{ forloop.counter0 }}">
+              <td>
+                <input type="hidden" name="cver_id[]"   value="{{ c.pk }}">
+                <input type="text"   name="cver_item[]" class="ck-item-input" value="{{ c.item }}">
+              </td>
+              <td class="col-cb">
+                <input type="checkbox" class="ck-check ck-ver-check"
+                       {% if c.termine %}checked{% endif %}
+                       onchange="updatePct('ver')">
+                <input type="hidden" name="cver_termine[]" value="">
+              </td>
+              <td>
+                <input type="text" name="cver_remarques[]" class="ck-rem-input"
+                       value="{{ c.remarques }}" placeholder="Remarques…">
+              </td>
+              <td class="col-del">
+                <button type="button" class="ck-del-btn" onclick="delRow(this)">
+                  <i class="bi bi-trash3"></i>
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <button type="button" class="ck-add-btn" onclick="addRow('ver')">
+          <i class="bi bi-plus-circle"></i> Ajouter une ligne
+        </button>
+
+        {% else %}
+        <p style="color:var(--text-muted);font-size:13px;">Sauvegardez d'abord l'hospitalisation pour accéder à la liste de contrôle.</p>
+        {% endif %}
+      </div>
+      <!-- Onglet 3 — Évaluation clinique -->
+      <div class="tab-pane active" id="tab-evaluation">
+        <style>
+        .ev-note { font-size:12px; color:var(--text-muted); margin-bottom:18px; padding:8px 12px; background:#f8fafc; border-left:3px solid var(--teal-400,#38b2d0); border-radius:2px; }
+        .ev-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px 60px; }
+        .ev-field { display:flex; align-items:baseline; gap:12px; padding:6px 0; border-bottom:1px solid #f0f4f7; }
+        .ev-label { font-size:12.5px; color:var(--text); font-weight:500; flex-shrink:0; min-width:160px; }
+        .ev-input { flex:1; background:transparent; border:none; border-bottom:1.5px solid #d1dde3; padding:3px 2px; font-size:13px; font-family:inherit; color:var(--text); outline:none; text-align:right; min-width:80px; }
+        .ev-input:focus { border-bottom-color:var(--teal-500,#1588ab); }
+        .ev-unit { font-size:11.5px; color:var(--text-muted); flex-shrink:0; min-width:30px; }
+        .ev-imc-badge { display:inline-block; padding:2px 10px; border-radius:20px; font-size:11.5px; font-weight:600; }
+        .ev-imc-normal   { background:#d4edda; color:#1a6b3c; }
+        .ev-imc-surpoids { background:#fff3cd; color:#856404; }
+        .ev-imc-obese    { background:#fde8e8; color:#7b1c1c; }
+        .ev-imc-insuf    { background:#cce5ff; color:#004085; }
+        .ev-sep { grid-column:1/-1; border:none; border-top:1px solid var(--border); margin:8px 0; }
+        .ev-section-title { grid-column:1/-1; font-size:11.5px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:-4px; }
+        .ev-pain-wrap { display:flex; align-items:center; gap:12px; margin-top:6px; }
+        .ev-pain-track { flex:1; display:flex; gap:4px; }
+        .ev-pain-btn { width:32px; height:32px; border-radius:50%; border:2px solid #e0e0e0; background:none; font-size:12px; font-weight:600; cursor:pointer; transition:all .15s; color:var(--text-muted); }
+        .ev-pain-btn:hover { border-color:var(--teal-500,#1588ab); color:var(--teal-600,#0f6e8e); }
+        .ev-pain-btn.selected { color:#fff; border-color:transparent; }
+        .ev-pain-btn[data-v="0"],.ev-pain-btn[data-v="1"],.ev-pain-btn[data-v="2"]  { --pc:#4caf50; }
+        .ev-pain-btn[data-v="3"],.ev-pain-btn[data-v="4"]  { --pc:#8bc34a; }
+        .ev-pain-btn[data-v="5"],.ev-pain-btn[data-v="6"]  { --pc:#ff9800; }
+        .ev-pain-btn[data-v="7"],.ev-pain-btn[data-v="8"]  { --pc:#f44336; }
+        .ev-pain-btn[data-v="9"],.ev-pain-btn[data-v="10"] { --pc:#b71c1c; }
+        .ev-pain-btn.selected { background:var(--pc); }
+        html[data-theme="dark"] .ev-note { background:#0f2035; border-color:var(--teal-500,#1588ab); }
+        html[data-theme="dark"] .ev-field { border-color:#1a3050; }
+        html[data-theme="dark"] .ev-input { color:var(--text); border-bottom-color:#3a4a62; }
+        html[data-theme="dark"] .ev-input:focus { border-bottom-color:var(--teal-400); }
+        </style>
+
+        <div class="ev-note">
+          <i class="bi bi-info-circle"></i>
+          REMARQUE : Les détails sont affichés en fonction de la dernière évaluation complète du patient.
+        </div>
+
+        {% with e=eval_clin %}
+        <div class="ev-grid">
+
+          <!-- Colonne gauche -->
+          <div>
+            <div class="ev-field">
+              <span class="ev-label">Poids</span>
+              <input type="number" name="eval_poids" class="ev-input" step="0.01" min="0"
+                     value="{{ e.poids|default:'0' }}" id="ev-poids">
+              <span class="ev-unit">kg</span>
+            </div>
+            <div class="ev-field">
+              <span class="ev-label">Taille</span>
+              <input type="number" name="eval_taille" class="ev-input" step="0.01" min="0"
+                     value="{{ e.taille|default:'0' }}" id="ev-taille">
+              <span class="ev-unit">m</span>
+            </div>
+            <div class="ev-field">
+              <span class="ev-label">Temp</span>
+              <input type="number" name="eval_temperature" class="ev-input" step="0.1" min="0"
+                     value="{{ e.temperature|default:'0' }}">
+              <span class="ev-unit">°C</span>
+            </div>
+            <div class="ev-field" style="border-bottom:none;">
+              <span class="ev-label">Indice de masse corporelle</span>
+              <span class="ev-input" id="ev-imc-val" style="border:none;text-align:right;">
+                {% if e.imc %}{{ e.imc }}{% else %}0,00{% endif %}
+              </span>
+              <span class="ev-unit"></span>
+            </div>
+          </div>
+
+          <!-- Colonne droite -->
+          <div>
+            <div class="ev-field">
+              <span class="ev-label">Fréquence respiratoire</span>
+              <input type="number" name="eval_freq_resp" class="ev-input" step="1" min="0"
+                     value="{{ e.frequence_respiratoire|default:'0' }}">
+              <span class="ev-unit">/min</span>
+            </div>
+            <div class="ev-field">
+              <span class="ev-label">Systolic/Diastolic BP</span>
+              <div style="display:flex;align-items:center;gap:4px;flex:1;">
+                <input type="number" name="eval_tension_sys" class="ev-input" step="1" min="0"
+                       value="{{ e.tension_systolique|default:'0' }}" style="max-width:60px;">
+                <span style="color:var(--text-muted);font-size:13px;">/</span>
+                <input type="number" name="eval_tension_dia" class="ev-input" step="1" min="0"
+                       value="{{ e.tension_diastolique|default:'0' }}" style="max-width:60px;">
+              </div>
+              <span class="ev-unit">mmHg</span>
+            </div>
+            <div class="ev-field">
+              <span class="ev-label">Saturation d'O2</span>
+              <input type="number" name="eval_sat_o2" class="ev-input" step="0.01" min="0" max="100"
+                     value="{{ e.saturation_o2|default:'0' }}">
+              <span class="ev-unit">%</span>
+            </div>
+            <div class="ev-field">
+              <span class="ev-label">Glycémie aléatoire</span>
+              <input type="number" name="eval_glycemie" class="ev-input" step="0.01" min="0"
+                     value="{{ e.glycemie|default:'0' }}">
+              <span class="ev-unit">g/L</span>
+            </div>
+            <div class="ev-field" style="border-bottom:none;">
+              <span class="ev-label">Indice de masse corporelle Statut</span>
+              <span id="ev-imc-statut" class="ev-imc-badge {% if e.imc_statut == 'Normal' %}ev-imc-normal{% elif e.imc_statut == 'Surpoids' %}ev-imc-surpoids{% elif e.imc_statut == 'Obèse' %}ev-imc-obese{% elif e.imc_statut == 'Insuffisance pondérale' %}ev-imc-insuf{% endif %}">
+                {{ e.imc_statut|default:"—" }}
+              </span>
+            </div>
+          </div>
+
+          <hr class="ev-sep">
+
+          <!-- Pain Level -->
+          <div style="grid-column:1/-1;">
+            <div style="font-size:11.5px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">
+              Pain Level
+            </div>
+            <div class="ev-field" style="border:none;padding:0;align-items:center;">
+              <span class="ev-label">
+                Niveau de douleur
+                <span title="0 = Pas de douleur | 1-3 = Légère | 4-6 = Modérée | 7-8 = Sévère | 9-10 = Insupportable"
+                      style="cursor:help;color:var(--teal-500,#1588ab);font-size:13px;margin-left:4px;">
+                  <i class="bi bi-question-circle"></i>
+                </span>
+              </span>
+              <div class="ev-pain-wrap">
+                <div class="ev-pain-track" id="ev-pain-track">
+                  {% range_tag 11 as pain_range %}
+                  {% for n in pain_range %}
+                  <button type="button" class="ev-pain-btn" data-v="{{ n }}" onclick="selectPain({{ n }})">{{ n }}</button>
+                  {% endfor %}
+                </div>
+                <input type="hidden" name="eval_douleur" id="ev-douleur-val"
+                       value="{{ e.niveau_douleur|default:'' }}">
+              </div>
+            </div>
+          </div>
+
+        </div>
+        {% endwith %}
+
+        <script>
+        // IMC auto-calculé
+        function calcIMC() {
+          var poids  = parseFloat(document.getElementById('ev-poids').value)  || 0;
+          var taille = parseFloat(document.getElementById('ev-taille').value) || 0;
+          var imcEl  = document.getElementById('ev-imc-val');
+          var statEl = document.getElementById('ev-imc-statut');
+          if (poids > 0 && taille > 0) {
+            var imc = (poids / (taille * taille)).toFixed(2);
+            imcEl.textContent = imc;
+            var statut = '', cls = '';
+            if (imc < 18.5)      { statut = 'Insuffisance pondérale'; cls = 'ev-imc-insuf'; }
+            else if (imc < 25)   { statut = 'Normal';   cls = 'ev-imc-normal'; }
+            else if (imc < 30)   { statut = 'Surpoids'; cls = 'ev-imc-surpoids'; }
+            else                 { statut = 'Obèse';    cls = 'ev-imc-obese'; }
+            statEl.textContent = statut;
+            statEl.className = 'ev-imc-badge ' + cls;
+          } else {
+            imcEl.textContent = '0,00';
+            statEl.textContent = '—';
+            statEl.className = 'ev-imc-badge';
+          }
+        }
+        document.getElementById('ev-poids').addEventListener('input', calcIMC);
+        document.getElementById('ev-taille').addEventListener('input', calcIMC);
+
+        // Pain level
+        function selectPain(v) {
+          document.querySelectorAll('.ev-pain-btn').forEach(function(b) {
+            b.classList.toggle('selected', parseInt(b.dataset.v) === v);
+          });
+          document.getElementById('ev-douleur-val').value = v;
+        }
+        // Init pain display
+        (function() {
+          var cur = parseInt(document.getElementById('ev-douleur-val').value);
+          if (!isNaN(cur)) selectPain(cur);
+        })();
+        </script>
+      </div>
+      <!-- Onglet 4 — Soins -->
+      <div class="tab-pane" id="tab-soins">
+        <style>
+        .vs-hdr { display:grid; grid-template-columns:1fr 2fr; gap:14px 40px; margin-bottom:20px; align-items:start; }
+        .vs-section-title { font-size:12.5px; font-weight:600; color:var(--text); margin:16px 0 8px; }
+        .vs-table { width:100%; border-collapse:collapse; font-size:12.5px; }
+        .vs-table thead th { border-bottom:1px solid var(--border); padding:6px 8px; text-align:left; font-size:11.5px; font-weight:600; color:var(--text-muted); white-space:nowrap; }
+        .vs-table thead th.col-del { width:32px; }
+        .vs-table tbody tr { border-bottom:1px solid #f2f5f8; }
+        .vs-table tbody td { padding:5px 8px; vertical-align:middle; }
+        .vs-input { width:100%; border:none; background:transparent; font-size:12.5px; font-family:inherit; color:var(--text); outline:none; border-bottom:1.5px solid transparent; }
+        .vs-input:focus { border-bottom-color:var(--teal-500,#1588ab); }
+        .vs-select { width:100%; border:none; background:transparent; font-size:12.5px; font-family:inherit; color:var(--text); outline:none; cursor:pointer; }
+        /* TomSelect compact dans les cellules du tableau soins */
+        .vs-table .ts-wrapper { padding:0 !important; }
+        .vs-table .ts-wrapper .ts-control {
+          background:transparent !important; border:none !important;
+          border-bottom:1px solid transparent !important; border-radius:0 !important;
+          box-shadow:none !important; padding:2px 20px 2px 0 !important;
+          font-size:12.5px !important; font-family:inherit !important;
+          min-height:unset !important; min-width:120px;
+        }
+        .vs-table .ts-wrapper.focus .ts-control { border-bottom-color:var(--teal-500,#1588ab) !important; }
+        .vs-table .ts-wrapper .ts-control .item { font-size:12.5px !important; color:var(--text) !important; padding:0 !important; margin:0 !important; }
+        .vs-table .ts-wrapper .ts-control input { font-size:12.5px !important; color:var(--text) !important; padding:0 !important; margin:0 !important; min-width:40px !important; }
+        .vs-table .ts-wrapper .ts-control input::placeholder { color:#bfcdd4; font-style:italic; }
+        .vs-table .ts-wrapper.single .ts-control::after {
+          content:'' !important; width:10px !important; height:7px !important;
+          background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23839aaa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat !important;
+          border:none !important; position:absolute !important; right:2px !important;
+          top:50% !important; transform:translateY(-50%) !important; margin:0 !important;
+        }
+        .vs-add-btn { background:none; border:none; color:var(--teal-600,#0f6e8e); font-size:12.5px; font-family:inherit; cursor:pointer; padding:6px 0; display:inline-flex; align-items:center; gap:4px; }
+        .vs-add-btn:hover { text-decoration:underline; }
+        .vs-del-btn { background:none; border:none; color:#bbb; cursor:pointer; padding:2px 4px; border-radius:3px; }
+        .vs-del-btn:hover { color:#e53935; }
+        html[data-theme="dark"] .vs-table tbody tr { border-color:#1a3050; }
+        html[data-theme="dark"] .vs-input { color:var(--text); }
+
+        /* ── Soins apportés (multi-select custom) ── */
+        .soins-field { position:relative; }
+        .soins-tags {
+          display:flex; flex-wrap:wrap; align-items:center; gap:5px;
+          padding:5px 0 7px; border-bottom:1.5px solid #d1dde3;
+          min-height:34px; cursor:text; transition:border-color .2s;
+        }
+        .soins-tags:focus-within { border-bottom-color:var(--teal-500,#1588ab); }
+        .soins-tag {
+          display:inline-flex; align-items:center; gap:5px;
+          background:#e8f5fb; color:var(--teal-700,#0a5a78);
+          border:1px solid #b8dcea; border-radius:4px;
+          padding:3px 7px 3px 9px; font-size:12px; font-weight:600;
+          line-height:1.4; white-space:nowrap;
+        }
+        .soins-tag-remove {
+          display:inline-flex; align-items:center; justify-content:center;
+          width:15px; height:15px; border-radius:50%;
+          background:none; border:none; cursor:pointer;
+          color:#5a8fa0; font-size:13px; line-height:1;
+          padding:0; transition:background .12s, color .12s;
+        }
+        .soins-tag-remove:hover { background:#dc2626; color:#fff; }
+        .soins-input {
+          flex:1; min-width:120px; border:none; background:transparent; outline:none;
+          font-size:13px; font-family:inherit; color:var(--text); padding:2px 0;
+        }
+        .soins-input::placeholder { color:#bfcdd4; }
+        .soins-dropdown {
+          position:fixed; z-index:9999; background:#fff;
+          border:1px solid #dde3ec; border-radius:6px;
+          box-shadow:0 4px 16px rgba(0,0,0,.12);
+          max-height:220px; overflow-y:auto;
+          display:none;
+        }
+        .soins-dropdown.open { display:block; }
+        .soins-opt {
+          padding:8px 14px; font-size:13px; cursor:pointer;
+          color:var(--text); transition:background .1s;
+        }
+        .soins-opt:hover, .soins-opt.hl { background:#e8f4f8; color:var(--teal-600,#0f6e8e); }
+        .soins-opt.selected { display:none; }
+        .soins-empty { padding:8px 14px; font-size:12px; color:#999; }
+        html[data-theme="dark"] .soins-tags { border-bottom-color:rgba(255,255,255,.15); }
+        html[data-theme="dark"] .soins-tags:focus-within { border-bottom-color:var(--teal-400); }
+        html[data-theme="dark"] .soins-tag { background:rgba(21,136,171,.2); color:var(--teal-200,#a8dff0); border-color:rgba(56,178,208,.3); }
+        html[data-theme="dark"] .soins-dropdown { background:#1a2535; border-color:#2e3f58; }
+        html[data-theme="dark"] .soins-opt { color:#c5d4e2; }
+        html[data-theme="dark"] .soins-opt:hover, html[data-theme="dark"] .soins-opt.hl { background:rgba(33,136,171,.2); }
+        </style>
+
+        <div class="vs-hdr">
+          <div>
+            <label class="field-label">Infirmières</label>
+            {% if lock_infirmiere_primaire %}
+              <div class="field-locked-val" title="Verrouillé — {{ hosp.get_statut_display }}">
+                <i class="bi bi-lock" style="font-size:10px;opacity:.45;flex-shrink:0;"></i>{{ hosp.infirmiere_primaire }}
+              </div>
+              <input type="hidden" name="infirmiere_primaire" value="{{ hosp.infirmiere_primaire_id }}">
+            {% else %}
+              {{ form.infirmiere_primaire }}
+            {% endif %}
+          </div>
+          <div class="soins-field">
+            <label class="field-label">Soins apportés</label>
+            {{ form.soins_apportes }}
+            <script>
+            (function(){
+              var s = document.getElementById('{{ form.soins_apportes.id_for_label }}');
+              if (s) s.classList.remove('field-ul');
+            })();
+            </script>
+            <div class="soins-tags" id="soins-tags">
+              <input type="text" class="soins-input" id="soins-input" placeholder="Rechercher un soin…" autocomplete="off">
+            </div>
+            <div class="soins-dropdown" id="soins-dropdown"></div>
+          </div>
+        </div>
+        <script>
+        (function() {
+          var select = document.getElementById('{{ form.soins_apportes.id_for_label }}');
+          if (!select) return;
+          // Empêcher l'init TomSelect globale (base.html cible select.field-ul)
+          select.classList.remove('field-ul');
+          select.style.display = 'none';
+
+          var tagsEl    = document.getElementById('soins-tags');
+          var inputEl   = document.getElementById('soins-input');
+          var dropEl    = document.getElementById('soins-dropdown');
+
+          // Déplacer le dropdown dans le body pour éviter overflow:hidden des parents
+          document.body.appendChild(dropEl);
+
+          function positionDropdown() {
+            var rect       = tagsEl.getBoundingClientRect();
+            var dropH      = 220; // max-height du dropdown
+            var spaceBelow = window.innerHeight - rect.bottom;
+            var spaceAbove = rect.top;
+
+            dropEl.style.left  = rect.left + 'px';
+            dropEl.style.width = rect.width + 'px';
+
+            if (spaceBelow >= dropH || spaceBelow >= spaceAbove) {
+              // Assez de place en bas, ou plus de place en bas qu'en haut
+              dropEl.style.top    = (rect.bottom + 2) + 'px';
+              dropEl.style.bottom = 'auto';
+            } else {
+              // Pas assez en bas → sortir en haut
+              dropEl.style.bottom = (window.innerHeight - rect.top + 2) + 'px';
+              dropEl.style.top    = 'auto';
+            }
+          }
+
+          // Construire la liste des options depuis le <select>
+          var options = Array.from(select.options).filter(function(o){ return o.value; }).map(function(o){
+            return { value: o.value, label: o.text, selected: o.selected };
+          });
+
+          var hlIdx = -1;
+
+          function render() {
+            Array.from(tagsEl.querySelectorAll('.soins-tag')).forEach(function(t){ t.remove(); });
+            options.filter(function(o){ return o.selected; }).forEach(function(o) {
+              var locked = window.LOCKED_SOINS && window.LOCKED_SOINS.has(String(o.value));
+              // Soins facturés : masqués de l'UI mais restent sélectionnés dans le <select>
+              // pour que form.save_m2m() les conserve lors du POST.
+              if (locked) return;
+              var tag = document.createElement('span');
+              tag.className = 'soins-tag';
+              tag.innerHTML = o.label + '<button type="button" class="soins-tag-remove" title="Retirer" data-val="' + o.value + '">×</button>';
+              tagsEl.insertBefore(tag, inputEl);
+            });
+            options.forEach(function(o){
+              var opt = select.querySelector('option[value="' + o.value + '"]');
+              if (opt) opt.selected = o.selected;
+            });
+            syncInput();
+          }
+
+          function syncInput() {
+            // Ne compter que les soins visibles (non facturés) pour décider d'afficher l'input
+            var hasVisible = options.some(function(o){
+              return o.selected && !(window.LOCKED_SOINS && window.LOCKED_SOINS.has(String(o.value)));
+            });
+            inputEl.style.display = hasVisible ? 'none' : '';
+          }
+
+          function showInput() {
+            inputEl.style.display = '';
+            inputEl.focus();
+          }
+
+          function renderDropdown() {
+            var q = (inputEl.value || '').toLowerCase();
+            var visible = options.filter(function(o){
+              return !o.selected && (!q || o.label.toLowerCase().includes(q));
+            });
+            dropEl.innerHTML = '';
+            if (!visible.length) {
+              dropEl.innerHTML = '<div class="soins-empty">Aucun résultat</div>';
+            } else {
+              visible.forEach(function(o, i) {
+                var d = document.createElement('div');
+                d.className = 'soins-opt' + (i === hlIdx ? ' hl' : '');
+                d.textContent = o.label;
+                d.dataset.val = o.value;
+                dropEl.appendChild(d);
+              });
+            }
+          }
+
+          function openDropdown() {
+            hlIdx = -1;
+            positionDropdown();
+            renderDropdown();
+            dropEl.classList.add('open');
+          }
+          function closeDropdown() {
+            dropEl.classList.remove('open');
+            inputEl.value = '';
+            hlIdx = -1;
+            syncInput();
+          }
+
+          // Clic dans la zone tags
+          tagsEl.addEventListener('click', function(e) {
+            var removeBtn = e.target.closest('.soins-tag-remove');
+            if (removeBtn) {
+              if (!removeBtn.dataset.val) return;
+              if (window.LOCKED_SOINS && window.LOCKED_SOINS.has(removeBtn.dataset.val)) return;
+              options.forEach(function(o){ if (o.value === removeBtn.dataset.val) o.selected = false; });
+              render();
+              select.dispatchEvent(new Event('change', { bubbles: true }));
+              closeDropdown();
+            } else if (!e.target.closest('.soins-input')) {
+              showInput();
+              openDropdown();
+            }
+          });
+
+          inputEl.addEventListener('focus', openDropdown);
+          inputEl.addEventListener('input', function() { hlIdx = -1; renderDropdown(); dropEl.classList.add('open'); });
+
+          dropEl.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            var opt = e.target.closest('.soins-opt');
+            if (!opt) return;
+            options.forEach(function(o){ if (o.value === opt.dataset.val) o.selected = true; });
+            render();        // cache l'input après sélection
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+            closeDropdown();
+          });
+
+          inputEl.addEventListener('keydown', function(e) {
+            var items = dropEl.querySelectorAll('.soins-opt');
+            if (e.key === 'ArrowDown') { hlIdx = Math.min(hlIdx+1, items.length-1); renderDropdown(); }
+            else if (e.key === 'ArrowUp') { hlIdx = Math.max(hlIdx-1, 0); renderDropdown(); }
+            else if (e.key === 'Enter' && hlIdx >= 0) {
+              e.preventDefault();
+              items[hlIdx] && items[hlIdx].dispatchEvent(new MouseEvent('mousedown', {bubbles:true}));
+            }
+            else if (e.key === 'Escape') closeDropdown();
+          });
+
+          document.addEventListener('mousedown', function(e) {
+            if (!e.target.closest('.soins-field')) closeDropdown();
+          });
+
+          render();
+
+          // Re-rendu après initialisation de LOCKED_SOINS : les soins facturés affichent 🔒
+          select.addEventListener('soins-rerender', function() {
+            render();
+          });
+        })();
+        </script>
+
+        <!-- Visite infirmière -->
+        <div class="vs-section-title" style="margin-top:20px;">Visites infirmières</div>
+        <table class="vs-table">
+          <thead>
+            <tr>
+              <th style="width:130px;">Date</th>
+              <th>Soin / Acte</th>
+              <th style="width:80px;">Quantité</th>
+              <th>Unité</th>
+              <th>Infirmière</th>
+              <th>Remarques</th>
+              <th class="col-del"></th>
+            </tr>
+          </thead>
+          <tbody id="tbody-vi">
+            {% for v in visites_inf %}
+            <tr>
+              <td>
+                <input type="hidden" name="vi_id[]" value="{{ v.pk }}">
+                <input type="datetime-local" name="vi_date[]" class="vs-input"
+                       value="{% if v.date %}{{ v.date|date:'Y-m-d' }}T{{ v.date|date:'H:i' }}{% endif %}">
+              </td>
+              <td>
+                <select name="vi_soin[]" class="vs-select">
+                  <option value="">—</option>
+                  {% for s in soins_pour_visites %}
+                  <option value="{{ s.pk }}" {% if v.soin_id == s.pk %}selected{% endif %}>{{ s.nom }}</option>
+                  {% endfor %}
+                  {% if v.soin and v.soin not in soins_pour_visites %}
+                  <option value="{{ v.soin.pk }}" selected>{{ v.soin.nom }}</option>
+                  {% endif %}
+                </select>
+              </td>
+              <td><input type="number" name="vi_quantite[]" class="vs-input" step="0.01" value="{{ v.quantite }}"></td>
+              <td>
+                <select name="vi_unite[]" class="vs-select">
+                  <option value="">—</option>
+                  {% for u in unites_list %}
+                  <option value="{{ u.pk }}" {% if v.unite_mesure_id == u.pk %}selected{% endif %}>{{ u.nom }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td>
+                <select name="vi_infirmiere[]" class="vs-select">
+                  <option value="">—</option>
+                  {% for m in medecins_list %}
+                  <option value="{{ m.pk }}" {% if v.infirmiere_id == m.pk %}selected{% endif %}>{{ m.nom }} {{ m.prenoms }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td><input type="text" name="vi_remarques[]" class="vs-input" value="{{ v.remarques }}" placeholder="Remarques…"></td>
+              <td><button type="button" class="vs-del-btn" onclick="this.closest('tr').remove()"><i class="bi bi-trash3"></i></button></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <button type="button" class="vs-add-btn" onclick="addViRow('vi')">
+          <i class="bi bi-plus-circle"></i> Ajouter une visite infirmière
+        </button>
+
+        <!-- Visites du Docteur -->
+        <div class="vs-section-title" style="margin-top:24px;">Visites du Docteur</div>
+        <table class="vs-table">
+          <thead>
+            <tr>
+              <th style="width:130px;">Date</th>
+              <th>Instruction</th>
+              <th>Docteur</th>
+              <th>Remarques</th>
+              <th class="col-del"></th>
+            </tr>
+          </thead>
+          <tbody id="tbody-vd">
+            {% for v in visites_doc %}
+            <tr>
+              <td>
+                <input type="hidden" name="vd_id[]" value="{{ v.pk }}">
+                <input type="datetime-local" name="vd_date[]" class="vs-input"
+                       value="{% if v.date %}{{ v.date|date:'Y-m-d' }}T{{ v.date|date:'H:i' }}{% endif %}">
+              </td>
+              <td><input type="text" name="vd_instruction[]" class="vs-input" value="{{ v.instruction }}" placeholder="Instruction…"></td>
+              <td>
+                <select name="vd_docteur[]" class="vs-select">
+                  <option value="">—</option>
+                  {% for m in medecins_list %}
+                  <option value="{{ m.pk }}" {% if v.docteur_id == m.pk %}selected{% endif %}>{{ m.nom }} {{ m.prenoms }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td><input type="text" name="vd_remarques[]" class="vs-input" value="{{ v.remarques }}" placeholder="Remarques…"></td>
+              <td><button type="button" class="vs-del-btn" onclick="this.closest('tr').remove()"><i class="bi bi-trash3"></i></button></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <button type="button" class="vs-add-btn" onclick="addViRow('vd')">
+          <i class="bi bi-plus-circle"></i> Ajouter une visite docteur
+        </button>
+
+        <script>
+        var SOINS_OPTIONS    = `{% for s in soins_pour_visites %}<option value="{{ s.pk }}">{{ s.nom }}</option>{% endfor %}`;
+        var UNITES_OPTIONS   = `{% for u in unites_list %}<option value="{{ u.pk }}">{{ u.nom }}</option>{% endfor %}`;
+        var MEDECINS_OPTIONS = `{% for m in medecins_list %}<option value="{{ m.pk }}">{{ m.nom }} {{ m.prenoms }}</option>{% endfor %}`;
+
+        function initVsSelect(el) {
+          if (el.tomselect) return;
+          var name = el.getAttribute('name') || '';
+          var ph = name.includes('soin')      ? 'Rechercher une prestation…'
+                 : name.includes('infirmiere') ? 'Rechercher une infirmière…'
+                 : name.includes('docteur')    ? 'Rechercher un docteur…'
+                 : name.includes('unite')      ? 'Unité…'
+                 : name.includes('service')    ? 'Rechercher une prestation…'
+                 : 'Rechercher…';
+          new TomSelect(el, {
+            allowEmptyOption: false,
+            placeholder: ph,
+            maxOptions: 400,
+            dropdownParent: 'body',
+            render: {
+              no_results: function() {
+                return '<div style="padding:8px 12px;color:#999;font-size:12px;">Aucun résultat</div>';
+              }
+            }
+          });
+        }
+
+        function addViRow(type) {
+          var tbody = document.getElementById('tbody-' + type);
+          var tr = document.createElement('tr');
+          if (type === 'vi') {
+            tr.innerHTML =
+              '<td><input type="hidden" name="vi_id[]" value=""><input type="datetime-local" name="vi_date[]" class="vs-input"></td>' +
+              '<td><select name="vi_soin[]" class="vs-select"><option value="">—</option>' + SOINS_OPTIONS + '</select></td>' +
+              '<td><input type="number" name="vi_quantite[]" class="vs-input" step="0.01" value="1"></td>' +
+              '<td><select name="vi_unite[]" class="vs-select"><option value="">—</option>' + UNITES_OPTIONS + '</select></td>' +
+              '<td><select name="vi_infirmiere[]" class="vs-select"><option value="">—</option>' + MEDECINS_OPTIONS + '</select></td>' +
+              '<td><input type="text" name="vi_remarques[]" class="vs-input" placeholder="Remarques…"></td>' +
+              '<td><button type="button" class="vs-del-btn" onclick="this.closest(\'tr\').remove()"><i class="bi bi-trash3"></i></button></td>';
+          } else {
+            tr.innerHTML =
+              '<td><input type="hidden" name="vd_id[]" value=""><input type="datetime-local" name="vd_date[]" class="vs-input"></td>' +
+              '<td><input type="text" name="vd_instruction[]" class="vs-input" placeholder="Instruction…"></td>' +
+              '<td><select name="vd_docteur[]" class="vs-select"><option value="">—</option>' + MEDECINS_OPTIONS + '</select></td>' +
+              '<td><input type="text" name="vd_remarques[]" class="vs-input" placeholder="Remarques…"></td>' +
+              '<td><button type="button" class="vs-del-btn" onclick="this.closest(\'tr\').remove()"><i class="bi bi-trash3"></i></button></td>';
+          }
+          tbody.appendChild(tr);
+          tr.querySelectorAll('.vs-select').forEach(initVsSelect);
+          tr.querySelector('input').focus();
+        }
+
+        // Init TomSelect sur les lignes existantes
+        document.querySelectorAll('.vs-table .vs-select').forEach(initVsSelect);
+        </script>
+      </div>
+      <!-- Onglet 5 — Services à facturer -->
+      <div class="tab-pane" id="tab-services">
+        <style>
+        .saf-badge { display:inline-block; padding:1px 7px; border-radius:10px; font-size:10px; font-weight:600; }
+        .saf-badge-inf  { background:#dbeafe; color:#1e40af; }
+        .saf-badge-doc  { background:#dcfce7; color:#166534; }
+        .saf-badge-ch   { background:#fef9c3; color:#854d0e; }
+        .saf-badge-soin { background:#e8f5fb; color:#0a5a78; }
+        .saf-badge-man  { background:#f3f4f6; color:#6b7280; }
+        .saf-badge-ok   { background:#dcfce7; color:#166534; }
+        .saf-row-facture td { background:#f0fdf4 !important; }
+        html[data-theme="dark"] .saf-row-facture td { background:rgba(22,163,74,.08) !important; }
+        </style>
+
+        {% if factures_list %}
+        <div style="margin-bottom:14px;">
+          <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Factures émises</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;">
+            {% for f in factures_list %}
+            <a href="{% url 'hospitalisation:facture_detail' f.pk %}?next=/hospitalisation/{{ hosp.pk }}/modifier/"
+               style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border:1px solid var(--border);border-radius:20px;font-size:12px;font-weight:600;color:var(--accent);text-decoration:none;background:var(--surface);">
+              <i class="bi bi-receipt"></i> {{ f.numero }}
+              <span style="font-size:10px;padding:1px 6px;border-radius:10px;
+                {% if f.statut == 'payee' %}background:#dcfce7;color:#166534;
+                {% elif f.statut == 'emise' %}background:#dbeafe;color:#1e40af;
+                {% else %}background:#f3f4f6;color:#6b7280;{% endif %}">
+                {{ f.get_statut_display }}
+              </span>
+            </a>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+        <table class="vs-table">
+          <thead>
+            <tr>
+              <th>Service</th>
+              <th style="width:90px;">Quantité</th>
+              <th style="width:120px;">Date</th>
+              <th style="width:110px;">Statut</th>
+              <th class="col-del"></th>
+            </tr>
+          </thead>
+          <tbody id="tbody-saf">
+            {% for s in services_a_facturer %}
+            <tr {% if s.facture %}class="saf-row-facture"{% endif %}>
+              <td>
+                <input type="hidden" name="saf_id[]" value="{{ s.pk }}">
+                {% if s.facture %}
+                  <span style="font-size:12.5px;color:var(--text);">{{ s.service.nom|default:"Chambre" }}</span>
+                  <input type="hidden" name="saf_service[]" value="{{ s.service_id|default:'' }}">
+                {% else %}
+                  <select name="saf_service[]" class="vs-select">
+                    <option value="">—</option>
+                    {% for svc in services_list %}
+                    <option value="{{ svc.pk }}" {% if s.service_id == svc.pk %}selected{% endif %}>{{ svc.nom }}</option>
+                    {% endfor %}
+                  </select>
+                {% endif %}
+              </td>
+              <td>
+                {% if s.facture %}
+                  <span style="font-size:12.5px;">{{ s.quantite }}</span>
+                  <input type="hidden" name="saf_quantite[]" value="{{ s.quantite }}">
+                {% else %}
+                  <input type="number" name="saf_quantite[]" class="vs-input" step="0.01" value="{{ s.quantite }}">
+                {% endif %}
+              </td>
+              <td>
+                {% if s.facture %}
+                  <span style="font-size:12px;color:var(--text-muted);">{% if s.date %}{{ s.date|date:'d/m/Y' }}{% else %}—{% endif %}</span>
+                  <input type="hidden" name="saf_date[]" value="{% if s.date %}{{ s.date|date:'Y-m-d' }}{% endif %}">
+                {% else %}
+                  <input type="date" name="saf_date[]" class="vs-input" value="{% if s.date %}{{ s.date|date:'Y-m-d' }}{% endif %}">
+                {% endif %}
+                <input type="hidden" name="saf_unite[]" value="{{ s.unite_mesure_id|default:'' }}">
+              </td>
+              <td>
+                {% if s.facture %}
+                <span class="saf-badge saf-badge-ok"><i class="bi bi-check-lg"></i> Facturé</span>
+                {% else %}
+                <span style="font-size:11px;color:var(--text-muted);">Non facturé</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if not s.facture and is_admin and s.source == 'manuel' %}
+                <button type="button" class="vs-del-btn" onclick="this.closest('tr').remove()"><i class="bi bi-trash3"></i></button>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <button type="button" class="vs-add-btn" onclick="addSAFRow()">
+          <i class="bi bi-plus-circle"></i> Ajouter une ligne manuellement
+        </button>
+        <script>
+        var SAF_SERVICES = `{% for s in services_list %}<option value="{{ s.pk }}">{{ s.nom }}</option>{% endfor %}`;
+        function addSAFRow() {
+          var tbody = document.getElementById('tbody-saf');
+          var tr = document.createElement('tr');
+          tr.innerHTML =
+            '<td><input type="hidden" name="saf_id[]" value=""><select name="saf_service[]" class="vs-select"><option value="">—</option>' + SAF_SERVICES + '</select></td>' +
+            '<td><input type="number" name="saf_quantite[]" class="vs-input" step="0.01" value="1"></td>' +
+            '<td><input type="date" name="saf_date[]" class="vs-input"><input type="hidden" name="saf_unite[]" value=""></td>' +
+            '<td><span style="font-size:11px;color:var(--text-muted);">Non facturé</span></td>' +
+            '<td><button type="button" class="vs-del-btn" onclick="this.closest(\'tr\').remove()"><i class="bi bi-trash3"></i></button></td>';
+          tbody.appendChild(tr);
+        }
+        </script>
+      </div>
+
+      <!-- Onglet 6 — Résumé de décharge -->
+      <div class="tab-pane" id="tab-resume">
+        <style>
+        .rd-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px 48px; }
+        .rd-field { display:flex; flex-direction:column; gap:5px; }
+        .rd-label { font-size:12px; font-weight:600; color:var(--text); }
+        .rd-textarea { width:100%; border:none; border-bottom:1.5px solid #d1dde3; border-radius:0; background:transparent; padding:6px 2px; font-size:13px; font-family:inherit; color:var(--text); outline:none; resize:vertical; min-height:60px; }
+        .rd-textarea:focus { border-bottom-color:var(--teal-500,#1588ab); }
+        .rd-check-row { display:flex; align-items:center; gap:10px; padding:6px 0; }
+        .rd-sep { grid-column:1/-1; border:none; border-top:1px solid var(--border); margin:6px 0; }
+        html[data-theme="dark"] .rd-textarea { color:var(--text); border-bottom-color:#3a4a62; }
+        </style>
+        {% with r=resume %}
+        <div class="rd-grid">
+
+          <div style="grid-column:1/-1;">
+            <div class="rd-check-row">
+              <input type="checkbox" name="rd_transfert" id="rd_transfert" style="width:16px;height:16px;accent-color:var(--teal-500,#1588ab);" {% if r.transfert %}checked{% endif %}>
+              <label for="rd_transfert" class="rd-label" style="cursor:pointer;">Transfert vers un autre établissement</label>
+            </div>
+            <div id="transfert-fields" style="display:{% if r.transfert %}grid{% else %}none{% endif %};grid-template-columns:1fr 1fr;gap:12px;margin-top:10px;padding:12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;">
+              <div class="rd-field">
+                <label class="rd-label">Établissement de destination <span style="color:#dc2626;">*</span></label>
+                <input type="text" name="rd_etablissement_destination" id="rd_etablissement_destination"
+                  class="rd-textarea" style="min-height:unset;height:36px;resize:none;"
+                  value="{{ hosp.etablissement_destination }}"
+                  placeholder="Nom de l'établissement...">
+              </div>
+              <div class="rd-field">
+                <label class="rd-label">Motif du transfert <span style="color:#dc2626;">*</span></label>
+                <textarea name="rd_motif_reference" id="rd_motif_reference"
+                  class="rd-textarea" rows="2"
+                  placeholder="Raison du transfert...">{{ hosp.motif_reference }}</textarea>
+              </div>
+            </div>
+          </div>
+
+          <div class="rd-field">
+            <label class="rd-label">Registre des décès</label>
+            <select name="rd_registre_deces" class="vs-select" style="border-bottom:1.5px solid #d1dde3;padding:6px 2px;">
+              <option value="">—</option>
+              {% for d in deces_list %}
+              <option value="{{ d.pk }}" {% if r.registre_deces_id == d.pk %}selected{% endif %}>{{ d.code }} – {{ d.date_deces|date:"d/m/Y" }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <hr class="rd-sep">
+
+          <div class="rd-field" style="grid-column:1/-1;">
+            <label class="rd-label">Diagnostic de décharge</label>
+            <textarea name="rd_diagnostic" class="rd-textarea" rows="2">{{ r.diagnostic_decharge }}</textarea>
+          </div>
+          <div class="rd-field" style="grid-column:1/-1;">
+            <label class="rd-label">Note préopératoire</label>
+            <textarea name="rd_note_preop" class="rd-textarea" rows="2">{{ r.note_preoperatoire }}</textarea>
+          </div>
+          <div class="rd-field" style="grid-column:1/-1;">
+            <label class="rd-label">Cours post-opératoire</label>
+            <textarea name="rd_cours_post_op" class="rd-textarea" rows="2">{{ r.cours_post_operatoire }}</textarea>
+          </div>
+          <div class="rd-field" style="grid-column:1/-1;">
+            <label class="rd-label">Plan de sortie</label>
+            <textarea name="rd_plan_sortie" class="rd-textarea" rows="2">{{ r.plan_sortie }}</textarea>
+          </div>
+          <div class="rd-field" style="grid-column:1/-1;">
+            <label class="rd-label">Instructions</label>
+            <textarea name="rd_instructions" class="rd-textarea" rows="3">{{ r.instructions }}</textarea>
+          </div>
+
+        </div>
+        {% endwith %}
+      </div>
+
+      <!-- Onglet 7 — Détails juridiques -->
+      <div class="tab-pane" id="tab-juridique">
+        <style>
+        .jur-field { display:flex; align-items:center; gap:16px; padding:12px 0; border-bottom:1px solid #f0f4f7; }
+        .jur-field:last-child { border-bottom:none; }
+        .jur-label { font-size:13px; font-weight:500; color:var(--text); min-width:180px; }
+        .jur-radio-group { display:flex; flex-direction:column; gap:8px; }
+        .jur-radio-item { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text); cursor:pointer; }
+        .jur-radio-item input[type="radio"] { width:16px; height:16px; accent-color:var(--teal-500,#1588ab); cursor:pointer; }
+        .jur-checkbox { width:17px; height:17px; accent-color:var(--teal-500,#1588ab); cursor:pointer; }
+        html[data-theme="dark"] .jur-field { border-color:#1a3050; }
+        </style>
+
+        <div class="jur-field">
+          <span class="jur-label">Cas légal</span>
+          {{ form.cas_legal }}
+        </div>
+
+        <div class="jur-field" style="align-items:flex-start;">
+          <span class="jur-label">Signalé à la police</span>
+          <div class="jur-radio-group">
+            {% for val, label in form.signale_police.field.choices %}
+            {% if val %}
+            <label class="jur-radio-item">
+              <input type="radio" name="signale_police" value="{{ val }}"
+                     {% if form.instance.signale_police == val %}checked{% endif %}>
+              {{ label }}
+            </label>
+            {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</form>
+
+</div><!-- /.hosp-page-main -->
+
+<!-- ── Sidebar Activité ── -->
+{% if edit %}
+<div class="hosp-page-aside">
+  {% include 'includes/chatter.html' with obj=hosp logs=logs %}
+</div>
+{% endif %}
+
+</div><!-- /.hosp-page-layout -->
+
+
+<!-- ── Modale décharge ── -->
+{% if edit and actions.decharger.visible %}
+<div id="modal-decharge" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:2000;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;width:100%;max-width:480px;box-shadow:0 16px 48px rgba(0,0,0,.3);overflow:hidden;">
+
+    <div style="padding:16px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--bg);">
+      <div style="font-size:14px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px;">
+        <i class="bi bi-box-arrow-right" style="color:var(--accent);font-size:16px;"></i>
+        Décharger le patient
+      </div>
+      <button type="button" onclick="closeDechargeModal()"
+        style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-muted);line-height:1;padding:0 4px;">&times;</button>
+    </div>
+
+    <form method="post" id="decharge-form">
+      {% csrf_token %}
+      <div style="padding:20px 22px;">
+
+        <div style="margin-bottom:18px;">
+          <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);display:block;margin-bottom:6px;">
+            Date de sortie <span style="color:#dc2626;">*</span>
+          </label>
+          <input type="date" name="date_sortie_decharge" id="decharge-date"
+            style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:5px;font-size:14px;font-weight:600;background:var(--bg);color:var(--text);"
+            required>
+        </div>
+
+        {% if hosp.chambre %}
+        <div id="decharge-preview" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:12px 16px;font-size:13px;color:#166534;">
+          <div style="font-weight:600;margin-bottom:4px;"><i class="bi bi-door-open"></i> Chambre : {{ hosp.chambre.nom }}</div>
+          <div id="decharge-calc" style="color:#166534;"></div>
+        </div>
+        {% endif %}
+
+      </div>
+
+      <div style="padding:14px 22px;border-top:1px solid var(--border);background:var(--bg);display:flex;align-items:center;gap:10px;">
+        <button type="submit" name="action_decharger"
+          style="padding:9px 22px;border-radius:5px;border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+          <i class="bi bi-check-lg"></i> CONFIRMER LA DÉCHARGE
+        </button>
+        <button type="button" onclick="closeDechargeModal()"
+          style="padding:9px 18px;border-radius:5px;border:1.5px solid var(--border);background:none;cursor:pointer;font-size:13px;font-weight:600;color:var(--text-muted);">
+          ANNULER
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function() {
+  var admissionDate = new Date('{{ hosp.date_admission|date:"Y-m-d" }}');
+
+  function openDechargeModal() {
+    var today = new Date();
+    var y = today.getFullYear();
+    var m = String(today.getMonth()+1).padStart(2,'0');
+    var d = String(today.getDate()).padStart(2,'0');
+    document.getElementById('decharge-date').value = y+'-'+m+'-'+d;
+    updateDechargeCalc();
+    document.getElementById('modal-decharge').style.display = 'flex';
+  }
+  function closeDechargeModal() {
+    document.getElementById('modal-decharge').style.display = 'none';
+  }
+  function updateDechargeCalc() {
+    var calcEl = document.getElementById('decharge-calc');
+    if (!calcEl) return;
+    var sortieStr = document.getElementById('decharge-date').value;
+    if (!sortieStr) return;
+    var sortie = new Date(sortieStr);
+    var diff = Math.round((sortie - admissionDate) / (1000*60*60*24));
+    var jours = Math.max(1, diff);
+    calcEl.innerHTML = '<strong>' + jours + ' jour(s)</strong> d\'hospitalisation.';
+  }
+
+  window.openDechargeModal  = openDechargeModal;
+  window.closeDechargeModal = closeDechargeModal;
+
+  var dateInput = document.getElementById('decharge-date');
+  if (dateInput) dateInput.addEventListener('change', updateDechargeCalc);
+
+  // Fermer si clic en dehors
+  document.getElementById('modal-decharge').addEventListener('click', function(e) {
+    if (e.target === this) closeDechargeModal();
+  });
+})();
+</script>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+// Onglets
+function switchTab(id, btn) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ── Checklist helpers ──
+function delRow(btn) {
+  btn.closest('tr').remove();
+  updatePct('adm');
+  updatePct('ver');
+}
+
+function addRow(type) {
+  var tbody = document.getElementById('tbody-' + type);
+  var prefix = type === 'adm' ? 'cadm' : 'cver';
+  var checkField = type === 'adm' ? 'verifie' : 'termine';
+  var tr = document.createElement('tr');
+  tr.innerHTML =
+    '<td>' +
+      '<input type="hidden" name="' + prefix + '_id[]" value="">' +
+      '<input type="text"   name="' + prefix + '_item[]" class="ck-item-input" placeholder="Nouvel élément…">' +
+    '</td>' +
+    '<td class="col-cb">' +
+      '<input type="checkbox" class="ck-check ck-' + type + '-check" onchange="updatePct(\'' + type + '\')">' +
+      '<input type="hidden" name="' + prefix + '_' + checkField + '[]" value="">' +
+    '</td>' +
+    '<td><input type="text" name="' + prefix + '_remarques[]" class="ck-rem-input" placeholder="Remarques…"></td>' +
+    '<td class="col-del"><button type="button" class="ck-del-btn" onclick="delRow(this)"><i class="bi bi-trash3"></i></button></td>';
+  tbody.appendChild(tr);
+  tr.querySelector('.ck-item-input').focus();
+}
+
+function updatePct(type) {
+  var all     = document.querySelectorAll('.ck-' + type + '-check');
+  var checked = document.querySelectorAll('.ck-' + type + '-check:checked');
+  var pct     = all.length ? Math.round(checked.length * 100 / all.length) : 0;
+  var badge   = document.getElementById('pct-' + type + '-badge');
+  if (badge) badge.textContent = pct + '%';
+}
+
+// Sync checkbox hidden inputs before form submit
+document.getElementById('hosp-form').addEventListener('submit', function() {
+  // Admission
+  document.querySelectorAll('#tbody-adm tr').forEach(function(row) {
+    var cb  = row.querySelector('.ck-adm-check');
+    var hid = row.querySelector('input[name="cadm_verifie[]"]');
+    if (cb && hid) hid.value = cb.checked ? '1' : '';
+  });
+  // Verification
+  document.querySelectorAll('#tbody-ver tr').forEach(function(row) {
+    var cb  = row.querySelector('.ck-ver-check');
+    var hid = row.querySelector('input[name="cver_termine[]"]');
+    if (cb && hid) hid.value = cb.checked ? '1' : '';
+  });
+});
+
+// ── Bouton CONFIRMER activé seulement si patient + soins sélectionnés (création) ──
+(function() {
+  var btn = document.getElementById('btn-confirmer-create');
+  if (!btn) return;  // mode édition, pas besoin
+
+  var patientEl = document.getElementById('id_patient');
+  var soinsEl   = document.getElementById('id_soins_apportes');
+  if (!patientEl) return;
+
+  function hasSoins() {
+    if (!soinsEl) return false;
+    return Array.from(soinsEl.options).some(function(o) { return o.selected && o.value; });
+  }
+
+  function update() {
+    var ts  = patientEl.tomselect;
+    var val = ts ? ts.getValue() : patientEl.value;
+    var hasPatient = val && val !== '';
+    var hasSoinsOk = hasSoins();
+    var ok = hasPatient && hasSoinsOk;
+    btn.disabled = !ok;
+    btn.title = !hasPatient ? "Sélectionnez un patient d'abord"
+              : !hasSoinsOk ? "Au moins un soin requis pour confirmer"
+              : '';
+  }
+
+  patientEl.addEventListener('change', update);
+  if (soinsEl) soinsEl.addEventListener('change', update);
+
+  // Au cas où TomSelect n'est pas encore initialisé : poll court puis arrêt
+  var tries = 0;
+  var timer = setInterval(function() {
+    tries++;
+    update();
+    if (tries >= 20) clearInterval(timer);  // max 2 s
+  }, 100);
+})();
+
+{% if edit %}
+// Soins déjà facturés — leurs tags affichent 🔒 et ne peuvent pas être retirés
+window.LOCKED_SOINS = new Set([{{ soins_factures_ids|join:',' }}]);
+// Désélectionner automatiquement les soins déjà facturés au chargement
+(function() {
+  var el = document.getElementById('id_soins_apportes');
+  if (el) el.dispatchEvent(new Event('soins-rerender'));
+})();
+
+{% endif %}
+
+// ── Boutons HOSPITALISER / CRÉER FACTURE / ANNULER (statut confirme) ──
+(function() {
+  var btnHosp    = document.getElementById('btn-hospitaliser');
+  var btnAnnuler = document.getElementById('btn-annuler-confirme');
+  if (!btnHosp && !btnAnnuler) return;  // pas en statut confirme
+
+  var chambreEl = document.getElementById('id_chambre');
+  var soinsEl   = document.getElementById('{{ form.soins_apportes.id_for_label }}');
+
+  function hasChambre() {
+    if (!chambreEl) return false;
+    var ts = chambreEl.tomselect;
+    var v  = ts ? ts.getValue() : chambreEl.value;
+    return v && v !== '';
+  }
+
+  function hasSoins() {
+    if (!soinsEl) return false;
+    return Array.from(soinsEl.options).some(function(o) { return o.selected && o.value; });
+  }
+
+  function update() {
+    var soins   = hasSoins();
+    var chambre = hasChambre();
+
+    if (btnHosp) {
+      var ok = soins && chambre;
+      btnHosp.disabled = !ok;
+      btnHosp.title    = !soins   ? 'Ajoutez au moins un soin'
+                       : !chambre ? 'Sélectionnez une chambre'
+                       : 'Hospitaliser le patient';
+    }
+    if (btnAnnuler) {
+      btnAnnuler.disabled = !soins;
+      btnAnnuler.title    = soins ? 'Annuler cette hospitalisation' : 'Ajoutez au moins un soin';
+    }
+  }
+
+  // Listener natif (fallback si TomSelect n'est pas encore init)
+  if (chambreEl) chambreEl.addEventListener('change', update);
+  if (soinsEl)   soinsEl.addEventListener('change', update);
+
+  // Poll court : attend que TomSelect soit initialisé sur la chambre,
+  // puis accroche son propre système d'événements (TomSelect ne dispatche
+  // pas d'événement DOM natif 'change' sur le <select> sous-jacent).
+  var tries = 0;
+  var t = setInterval(function() {
+    tries++;
+    update();
+    if (chambreEl && chambreEl.tomselect && !chambreEl._hospHooked) {
+      chambreEl.tomselect.on('change', update);
+      chambreEl._hospHooked = true;
+    }
+    if (tries >= 20) clearInterval(t);
+  }, 100);
+})();
+
+// ── Edit mode : activation du bouton Confirmer/Enregistrer-soins ──
+(function() {
+  var btn = document.getElementById('btn-confirmer-edit');
+  if (!btn || !btn.dataset.soinsGated) return;
+  var soinsEl = document.getElementById('id_soins_apportes');
+  if (!soinsEl) return;
+  var mode = btn.dataset.soinsMode || '';  // '' = brouillon, 'sync' = confirme/hospitalise
+  if (mode === 'sync') {
+    // confirme/hospitalise : activer dès qu'un changement de soins est détecté
+    soinsEl.addEventListener('change', function() {
+      btn.disabled = false;
+      btn.title = 'Enregistrer les soins';
+    });
+  } else {
+    // brouillon : activer quand au moins un soin est sélectionné
+    function update() {
+      var hasSoins = Array.from(soinsEl.options).some(function(o) { return o.selected && o.value; });
+      btn.disabled = !hasSoins;
+      btn.title = hasSoins ? "Confirmer la demande d'hospitalisation" : "Au moins un soin requis pour confirmer";
+    }
+    soinsEl.addEventListener('change', update);
+  }
+})();
+
+// Pipeline — workflow statut depuis le contexte Django
+(function() {
+  const statut = "{{ hosp.statut|default:'brouillon' }}";
+  const ORDER  = ['brouillon','confirme','hospitalise','decharge','termine'];
+  const idx    = ORDER.indexOf(statut);
+  document.querySelectorAll('.pip-step').forEach(function(el, i) {
+    el.classList.remove('active','done');
+    if (i === idx) el.classList.add('active');
+    else if (i < idx) el.classList.add('done');
+  });
+})();
+
+// ── Formulaire : détection des changements et bouton sauvegarder ──
+(function() {
+  var form    = document.getElementById('hosp-form');
+  var saveBtn = document.getElementById('btn-save-bottom');
+  if (!saveBtn) return;
+
+  var dirty = false;
+
+  function markDirty() {
+    if (dirty) return;
+    dirty = true;
+    saveBtn.disabled = false;
+  }
+  window.markFormDirty = markDirty;
+
+  if (form) {
+    form.addEventListener('input',  markDirty);
+    form.addEventListener('change', markDirty);
+  }
+
+  // Détection des ajouts/suppressions de lignes dans les tableaux
+  ['tbody-adm','tbody-ver','tbody-vi','tbody-vd','tbody-saf'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) new MutationObserver(markDirty).observe(el, { childList: true });
+  });
+
+  // Avertissement si l'utilisateur quitte la page sans sauvegarder
+  window.addEventListener('beforeunload', function(e) {
+    if (dirty) {
+      e.preventDefault();
+      e.returnValue = '';
+    }
+  });
+
+  // Réinitialiser après soumission
+  if (form) form.addEventListener('submit', function() { dirty = false; });
+})();
+
+// ── Champs transfert conditionnels ──────────────────────────────────────────
+(function() {
+  var chk = document.getElementById('rd_transfert');
+  var box = document.getElementById('transfert-fields');
+  if (!chk || !box) return;
+  function toggleTransfert() {
+    box.style.display = chk.checked ? 'grid' : 'none';
+    var dest = document.getElementById('rd_etablissement_destination');
+    var motif = document.getElementById('rd_motif_reference');
+    if (dest)  dest.required  = chk.checked;
+    if (motif) motif.required = chk.checked;
+  }
+  chk.addEventListener('change', toggleTransfert);
+  toggleTransfert();
+})();
+</script>
+
+{# ── Modale annulation avec motif obligatoire (form.html) ── #}
+<div id="modal-annul-form" style="
+  display:none;position:fixed;inset:0;z-index:9999;
+  background:rgba(0,0,0,.45);
+  align-items:center;justify-content:center;
+">
+  <div style="
+    background:var(--surface,#fff);border-radius:10px;width:min(480px,92vw);
+    padding:28px 28px 22px;box-shadow:0 8px 32px rgba(0,0,0,.22);
+  ">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+      <i class="bi bi-exclamation-triangle-fill" style="color:#dc3545;font-size:20px;flex-shrink:0;"></i>
+      <strong style="font-size:15px;">Confirmer l'annulation</strong>
+    </div>
+    <p style="font-size:13px;color:var(--text-muted,#6b7280);margin-bottom:14px;line-height:1.55;">
+      Cette action est irréversible. Les factures impayées seront annulées
+      et la chambre (si attribuée) sera libérée.
+    </p>
+    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px;">
+      Motif d'annulation <span style="color:#dc3545;">*</span>
+    </label>
+    <textarea id="motif-annul-form-input" rows="3" placeholder="Saisir le motif…"
+      style="width:100%;box-sizing:border-box;border:1.5px solid var(--border,#d1d5db);
+             border-radius:6px;padding:8px 10px;font-size:13px;font-family:inherit;
+             resize:vertical;background:var(--surface,#fff);color:var(--text,#111);"></textarea>
+    <div id="motif-annul-form-err" style="color:#dc3545;font-size:12px;margin-top:4px;display:none;">
+      Veuillez saisir un motif.
+    </div>
+    {# Champ caché envoyé avec le formulaire principal #}
+    <input type="hidden" id="motif-annul-hidden" name="motif_annulation" form="hosp-form" value="">
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px;">
+      <button type="button" onclick="closeAnnulModalForm()"
+        style="padding:7px 18px;border-radius:6px;border:1px solid var(--border,#d1d5db);
+               background:var(--surface,#fff);cursor:pointer;font-size:13px;">
+        Retour
+      </button>
+      <button type="button" onclick="confirmAnnulForm()"
+        style="padding:7px 18px;border-radius:6px;border:none;
+               background:#dc3545;color:#fff;cursor:pointer;font-size:13px;font-weight:600;">
+        Confirmer l'annulation
+      </button>
+    </div>
+  </div>
+</div>
+<script>
+function openAnnulModalForm() {
+  var m   = document.getElementById('modal-annul-form');
+  var ta  = document.getElementById('motif-annul-form-input');
+  var err = document.getElementById('motif-annul-form-err');
+  if (ta) ta.value = '';
+  if (err) err.style.display = 'none';
+  if (m) { m.style.display = 'flex'; ta && ta.focus(); }
+}
+function closeAnnulModalForm() {
+  var m = document.getElementById('modal-annul-form');
+  if (m) m.style.display = 'none';
+}
+function confirmAnnulForm() {
+  var motif = (document.getElementById('motif-annul-form-input') || {}).value || '';
+  var err   = document.getElementById('motif-annul-form-err');
+  if (!motif.trim()) {
+    if (err) err.style.display = '';
+    return;
+  }
+  var hidden = document.getElementById('motif-annul-hidden');
+  if (hidden) hidden.value = motif.trim();
+  closeAnnulModalForm();
+  // Soumettre le formulaire principal avec le nom d'action annuler
+  var form = document.getElementById('hosp-form');
+  if (form) {
+    var btn = document.createElement('input');
+    btn.type = 'hidden'; btn.name = 'action_annuler'; btn.value = '1';
+    form.appendChild(btn);
+    form.submit();
+  }
+}
+document.getElementById('modal-annul-form').addEventListener('click', function(e) {
+  if (e.target === this) closeAnnulModalForm();
+});
+</script>
+{% endblock %}

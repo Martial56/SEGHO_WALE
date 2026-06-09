@@ -1,0 +1,722 @@
+{% extends 'laboratoire/base.html' %}
+{% load core_tags %}
+
+{% block topbar_title %}Nouvelle demande d'examen{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── Page wrapper ── */
+.dem-page { display: flex; flex-direction: column; gap: 0; }
+
+/* ── Top bar ── */
+.dem-topbar {
+    background: #fff;
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+    position: sticky; top: 0; z-index: 100;
+}
+.dem-topbar-inner {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 24px; gap: 12px; flex-wrap: wrap;
+}
+.dem-breadcrumb {
+    font-size: 13px; font-weight: 600; color: rgba(0,0,0,0.45);
+    display: flex; align-items: center; gap: 6px;
+}
+.dem-breadcrumb a { color: var(--teal-600); text-decoration: none; }
+.dem-breadcrumb a:hover { color: var(--teal-500); }
+.dem-breadcrumb .sep { color: #ccc; }
+.dem-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+.btn-envoyer {
+    background: var(--teal-600); color: #fff;
+    border: none; border-radius: 6px; padding: 8px 18px;
+    font-size: 13px; font-weight: 700; cursor: pointer;
+    font-family: inherit; transition: background .15s; letter-spacing: .03em;
+}
+.btn-envoyer:hover { background: var(--teal-700); }
+.btn-brouillon {
+    background: #f0f4f8; color: rgba(0,0,0,0.6);
+    border: 1px solid rgba(0,0,0,0.12); border-radius: 6px; padding: 8px 16px;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    font-family: inherit; transition: all .15s;
+}
+.btn-brouillon:hover { border-color: var(--teal-400); color: var(--teal-700); }
+.btn-cancel {
+    background: transparent; color: rgba(0,0,0,0.5);
+    border: 1px solid rgba(0,0,0,0.13); border-radius: 6px; padding: 8px 14px;
+    font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
+    text-decoration: none; transition: all .15s;
+}
+.btn-cancel:hover { border-color: #e84545; color: #e84545; }
+
+/* ── Pipeline / status bar ── */
+.pipeline-bar {
+    background: #f8fbfd;
+    border-bottom: 1px solid rgba(0,0,0,0.07);
+    padding: 0 24px;
+    display: flex; align-items: stretch; gap: 0;
+    overflow-x: auto;
+}
+.pipeline-step {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 20px 10px 14px;
+    font-size: 12px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .04em; color: rgba(0,0,0,0.35);
+    position: relative; white-space: nowrap;
+    border-bottom: 3px solid transparent;
+    cursor: default; user-select: none;
+}
+.pipeline-step .step-num {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: rgba(0,0,0,0.1); color: rgba(0,0,0,0.4);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 800; flex-shrink: 0;
+}
+.pipeline-step.active {
+    color: var(--teal-700);
+    border-bottom-color: var(--teal-500);
+}
+.pipeline-step.active .step-num {
+    background: var(--teal-500); color: #fff;
+}
+.pipeline-step.done { color: rgba(0,0,0,0.4); }
+.pipeline-step.done .step-num {
+    background: #c6ede6; color: var(--teal-700);
+}
+.pipeline-arrow {
+    align-self: center; color: rgba(0,0,0,0.2);
+    font-size: 16px; padding: 0 2px; flex-shrink: 0;
+}
+
+/* ── Main layout ── */
+.dem-body { background: #fff; padding: 24px 28px; }
+
+/* ── Patient zone ── */
+.patient-zone { margin-bottom: 24px; }
+.patient-search-wrap { max-width: 440px; }
+.psearch-label {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .06em; color: rgba(0,0,0,0.4);
+    display: block; margin-bottom: 7px;
+}
+.psearch-input-wrap { position: relative; }
+.psearch-icon {
+    position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+    color: rgba(0,0,0,0.35); pointer-events: none;
+}
+.psearch-input {
+    width: 100%; padding: 9px 12px 9px 36px;
+    border: 1.5px solid #d1dde3; border-radius: 8px;
+    font-size: 13px; font-family: inherit; outline: none;
+    color: var(--teal-900); transition: border-color .2s;
+}
+.psearch-input:focus { border-color: var(--teal-500); }
+.psearch-dropdown {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+    background: #fff; border: 1px solid rgba(0,0,0,0.1);
+    border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    z-index: 200; max-height: 220px; overflow-y: auto; display: none;
+}
+.psearch-item {
+    padding: 10px 14px; cursor: pointer;
+    border-bottom: 1px solid rgba(0,0,0,0.05); font-size: 13px;
+}
+.psearch-item:last-child { border-bottom: none; }
+.psearch-item:hover { background: #f0faf8; }
+.psearch-item .pi-name { font-weight: 700; color: var(--teal-900); }
+.psearch-item .pi-meta { font-size: 11px; color: rgba(0,0,0,0.45); margin-top: 1px; }
+
+.patient-card {
+    background: linear-gradient(135deg, #f0faff, #e8f5ff);
+    border: 1px solid rgba(33,136,171,0.2); border-radius: 12px;
+    padding: 16px 20px;
+    display: flex; align-items: center; gap: 14px;
+}
+.pat-avatar {
+    width: 48px; height: 48px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--teal-600), var(--teal-400));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px; font-weight: 800; color: #fff; flex-shrink: 0;
+    overflow: hidden;
+}
+.pat-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.pat-info { flex: 1; }
+.pat-fullname { font-size: 15px; font-weight: 800; color: var(--teal-900); margin-bottom: 6px; }
+.pat-meta { display: flex; gap: 20px; flex-wrap: wrap; }
+.pat-meta-item { display: flex; flex-direction: column; gap: 1px; }
+.pat-meta-label { font-size: 10px; font-weight: 700; text-transform: uppercase;
+                  letter-spacing: .06em; color: rgba(0,0,0,0.35); }
+.pat-meta-value { font-size: 12px; font-weight: 600; color: var(--teal-900); }
+.pat-code { font-family: monospace; color: var(--teal-600); }
+.btn-change-pat {
+    background: none; border: 1px solid rgba(0,0,0,0.13); border-radius: 6px;
+    padding: 5px 11px; font-size: 11px; font-weight: 600; cursor: pointer;
+    color: rgba(0,0,0,0.45); font-family: inherit; flex-shrink: 0;
+    transition: all .15s;
+}
+.btn-change-pat:hover { border-color: var(--teal-400); color: var(--teal-600); }
+
+/* ── Two-column fields ── */
+.fields-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 48px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid rgba(0,0,0,0.07);
+    margin-bottom: 24px;
+}
+.field-col { display: flex; flex-direction: column; gap: 14px; }
+.field-row {
+    display: grid; grid-template-columns: 170px 1fr;
+    align-items: center; gap: 10px; min-height: 34px;
+}
+.field-row label {
+    font-size: 13px; font-weight: 600;
+    color: rgba(0,0,0,0.5); text-align: right;
+}
+.req { color: #e84545; margin-left: 2px; }
+.field-ul {
+    width: 100%; background: transparent;
+    border: none; border-bottom: 1.5px solid #d1dde3; border-radius: 0;
+    padding: 5px 2px; font-size: 13px; color: var(--teal-900);
+    transition: border-color .2s; outline: none; font-family: inherit;
+}
+.field-ul:focus { border-bottom-color: var(--teal-500); }
+.field-ul::placeholder { color: #bfcdd4; }
+select.field-ul {
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23839aaa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 4px center;
+    padding-right: 20px; cursor: pointer; background-color: transparent;
+}
+textarea.field-ul {
+    resize: vertical; border: 1.5px solid #d1dde3;
+    border-radius: 6px; padding: 8px 10px; min-height: 68px;
+}
+textarea.field-ul:focus { border-color: var(--teal-500); }
+
+/* ── Urgent toggle ── */
+.toggle-wrap { display: flex; align-items: center; gap: 10px; }
+.tog { position: relative; width: 40px; height: 22px; flex-shrink: 0; }
+.tog input { opacity: 0; width: 0; height: 0; }
+.tog-slider {
+    position: absolute; cursor: pointer; inset: 0;
+    background: #d1dde3; border-radius: 22px; transition: .2s;
+}
+.tog-slider:before {
+    content: ""; position: absolute;
+    width: 16px; height: 16px; left: 3px; top: 3px;
+    background: #fff; border-radius: 50%; transition: .2s;
+}
+input:checked + .tog-slider { background: #e84545; }
+input:checked + .tog-slider:before { transform: translateX(18px); }
+.tog-lbl { font-size: 13px; font-weight: 600; color: rgba(0,0,0,0.5); }
+
+/* ── Section title ── */
+.section-title {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .08em; color: rgba(0,0,0,0.35);
+    margin-bottom: 12px; display: flex; align-items: center; gap: 10px;
+}
+.section-title::after {
+    content: ''; flex: 1; height: 1px;
+    background: linear-gradient(to right, rgba(0,0,0,0.1), transparent);
+}
+
+/* ── Tests table ── */
+.tests-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tests-table thead th {
+    padding: 8px 10px; text-align: left;
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .05em; color: rgba(0,0,0,0.4);
+    border-bottom: 2px solid rgba(0,0,0,0.07);
+    background: #f8fbfd;
+}
+.tests-table tbody td { padding: 6px 7px; vertical-align: middle; }
+.tests-table tbody tr:hover td { background: #f8fbfd; }
+.tests-table input, .tests-table select {
+    width: 100%; padding: 5px 6px;
+    border: none; border-bottom: 1.5px solid #d1dde3; border-radius: 0;
+    font-size: 12px; font-family: inherit; background: transparent;
+    outline: none; color: var(--teal-900);
+}
+.tests-table input:focus, .tests-table select:focus { border-bottom-color: var(--teal-500); }
+.tests-table input[readonly] { color: rgba(0,0,0,0.4); border-bottom-color: transparent; cursor: default; }
+.col-test      { min-width: 220px; }
+.col-delai     { width: 120px; }
+.col-prix      { width: 110px; }
+.col-instr     { min-width: 180px; }
+.col-del       { width: 36px; text-align: center; }
+.btn-del {
+    background: none; border: none; cursor: pointer;
+    color: rgba(0,0,0,0.25); padding: 4px; border-radius: 4px;
+    font-size: 16px; transition: all .15s;
+}
+.btn-del:hover { color: #e84545; background: #fff0f0; }
+.btn-add-ligne {
+    display: inline-flex; align-items: center; gap: 6px;
+    margin-top: 10px; background: none; border: 1.5px dashed rgba(0,0,0,0.15);
+    border-radius: 8px; padding: 7px 16px; font-size: 13px; font-weight: 600;
+    color: var(--teal-600); cursor: pointer; font-family: inherit;
+    transition: all .15s;
+}
+.btn-add-ligne:hover { border-color: var(--teal-400); background: #f0faff; }
+
+/* ── Total ── */
+.total-wrap {
+    display: flex; justify-content: flex-end; margin-top: 18px;
+    padding-top: 14px; border-top: 1px solid rgba(0,0,0,0.07);
+}
+.total-box {
+    display: flex; align-items: center; gap: 16px;
+}
+.total-label {
+    font-size: 13px; font-weight: 700; color: rgba(0,0,0,0.45);
+    text-transform: uppercase; letter-spacing: .06em;
+}
+.total-value {
+    font-size: 20px; font-weight: 800; color: var(--teal-700);
+    min-width: 130px; text-align: right;
+}
+
+@media (max-width: 860px) {
+    .fields-grid { grid-template-columns: 1fr; gap: 14px; }
+    .field-row { grid-template-columns: 130px 1fr; }
+    .pat-meta { gap: 12px; }
+}
+@media (max-width: 540px) {
+    .field-row { grid-template-columns: 1fr; }
+    .field-row label { text-align: left; }
+    .pipeline-step { padding: 10px 12px; font-size: 11px; }
+}
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="breadcrumb">
+    <a href="{% url 'dashboard' %}">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24"
+             stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px">
+            <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z"/>
+            <polyline points="9 21 9 12 15 12 15 21"/>
+        </svg>Accueil
+    </a>
+    <span class="breadcrumb-sep">›</span>
+    <a href="{% url 'laboratoire_list' %}">Laboratoire</a>
+    <span class="breadcrumb-sep">›</span>
+    <span>Nouvelle demande d'examen</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+<form method="post" id="dem-form" novalidate>
+{% csrf_token %}
+<input type="hidden" name="patient_id" id="patient-id-input" value="{{ patient.pk|default:'' }}">
+
+<div class="dem-page">
+
+    <!-- ══ TOP BAR ══ -->
+    <div class="dem-topbar">
+        <div class="dem-topbar-inner">
+            <div class="dem-breadcrumb">
+                <a href="{% url 'laboratoire_list' %}">Demandes de lab</a>
+                <span class="sep">/</span>
+                <span>Nouveau</span>
+            </div>
+            <div class="dem-actions">
+                <button type="submit" name="action" value="envoyer" class="btn-envoyer">
+                    Envoyer la demande
+                </button>
+                <button type="submit" name="action" value="brouillon" class="btn-brouillon">
+                    Sauvegarder
+                </button>
+                <a href="{% url 'laboratoire_list' %}" class="btn-cancel">Ignorer</a>
+            </div>
+        </div>
+
+        <!-- Pipeline -->
+        <div class="pipeline-bar">
+            <div class="pipeline-step active">
+                <span class="step-num">1</span> Brouillon
+            </div>
+            <span class="pipeline-arrow">›</span>
+            <div class="pipeline-step">
+                <span class="step-num">2</span> Demandé
+            </div>
+            <span class="pipeline-arrow">›</span>
+            <div class="pipeline-step">
+                <span class="step-num">3</span> Accepté
+            </div>
+            <span class="pipeline-arrow">›</span>
+            <div class="pipeline-step">
+                <span class="step-num">4</span> En cours
+            </div>
+            <span class="pipeline-arrow">›</span>
+            <div class="pipeline-step">
+                <span class="step-num">5</span> Terminé
+            </div>
+        </div>
+    </div>
+
+    <!-- ══ BODY ══ -->
+    <div class="dem-body">
+
+        <!-- ── Patient ── -->
+        <div class="patient-zone">
+
+            {% if not patient %}
+            <div class="patient-search-wrap" id="search-wrap">
+                <span class="psearch-label">Patient <span class="req">*</span></span>
+                <div class="psearch-input-wrap">
+                    <svg class="psearch-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14"
+                         fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    </svg>
+                    <input type="text" id="patient-search" class="psearch-input"
+                           placeholder="Chercher par nom, code patient ou téléphone…" autocomplete="off">
+                    <div class="psearch-dropdown" id="patient-dropdown"></div>
+                </div>
+            </div>
+            {% endif %}
+
+            <div id="patient-card-zone" {% if not patient %}style="display:none;margin-top:12px"{% endif %}>
+                <div class="patient-card">
+                    <div class="pat-avatar" id="pat-avatar">
+                        {% if patient %}
+                            {% if patient.photo %}<img src="{{ patient.photo.url }}" alt="">
+                            {% else %}{{ patient.nom|slice:":1"|upper }}{{ patient.prenoms|slice:":1"|upper }}
+                            {% endif %}
+                        {% endif %}
+                    </div>
+                    <div class="pat-info">
+                        <div class="pat-fullname" id="pat-fullname">
+                            {% if patient %}{{ patient.nom }} {{ patient.prenoms }}{% endif %}
+                        </div>
+                        <div class="pat-meta">
+                            <div class="pat-meta-item">
+                                <span class="pat-meta-label">Code</span>
+                                <span class="pat-meta-value pat-code" id="pat-code">{% if patient %}{{ patient.code_patient }}{% endif %}</span>
+                            </div>
+                            <div class="pat-meta-item">
+                                <span class="pat-meta-label">Âge</span>
+                                <span class="pat-meta-value" id="pat-age">{% if patient %}{{ patient.age }} ans{% endif %}</span>
+                            </div>
+                            <div class="pat-meta-item">
+                                <span class="pat-meta-label">Sexe</span>
+                                <span class="pat-meta-value" id="pat-sexe">{% if patient %}{{ patient.get_sexe_display }}{% endif %}</span>
+                            </div>
+                            <div class="pat-meta-item">
+                                <span class="pat-meta-label">Téléphone</span>
+                                <span class="pat-meta-value" id="pat-tel">{% if patient %}{{ patient.telephone }}{% endif %}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-change-pat" onclick="resetPatient()">Changer</button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ── Champs principaux ── -->
+        <div class="fields-grid">
+
+            <div class="field-col">
+
+                <div class="field-row">
+                    <label for="id_type_test">Type du test</label>
+                    <select name="type_test" id="id_type_test" class="field-ul">
+                        <option value="">— Toutes catégories —</option>
+                        {% for val, lbl in type_test_choices %}
+                        <option value="{{ val }}">{{ lbl }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="field-row">
+                    <label for="id_date_prel">Date et heure du prélèvement</label>
+                    <input type="datetime-local" name="date_prelevement" id="id_date_prel" class="field-ul">
+                </div>
+
+                <div class="field-row">
+                    <label>Urgence</label>
+                    <div class="toggle-wrap">
+                        <label class="tog">
+                            <input type="checkbox" name="urgent" id="id_urgent">
+                            <span class="tog-slider"></span>
+                        </label>
+                        <span class="tog-lbl" id="urg-lbl">Non urgent</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="field-col">
+
+                <div class="field-row">
+                    <label for="id_technicien">Technicien assigné</label>
+                    <select name="technicien" id="id_technicien" class="field-ul">
+                        <option value="">— Non assigné —</option>
+                        {% for u in techniciens %}
+                        <option value="{{ u.pk }}">
+                            {% if u.get_full_name %}{{ u.get_full_name }}{% else %}{{ u.username }}{% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="field-row" style="align-items:flex-start;padding-top:4px;">
+                    <label for="id_commentaire">Instructions / Notes</label>
+                    <textarea name="commentaire" id="id_commentaire" class="field-ul"
+                              placeholder="Contexte clinique, précautions particulières…"></textarea>
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- ══ LIGNES DE TESTS ══ -->
+        <div class="section-title">Tests demandés</div>
+
+        <div style="overflow-x: auto;">
+            <table class="tests-table" id="tests-table">
+                <thead>
+                    <tr>
+                        <th class="col-test">Test <span class="req">*</span></th>
+                        <th class="col-delai">Délai d'exécution</th>
+                        <th class="col-prix">Prix de vente (CFA)</th>
+                        <th class="col-instr">Instructions spéciales</th>
+                        <th class="col-del"></th>
+                    </tr>
+                </thead>
+                <tbody id="tests-body">
+                    <tr class="test-row">
+                        <td class="col-test">
+                            <select name="ligne_examen_0" class="examen-select"
+                                    onchange="fillFromExamen(this, 0)">
+                                <option value="">— Choisir un test —</option>
+                                {% for t in types_examens %}
+                                <option value="{{ t.pk }}"
+                                    data-delai="{{ t.delai_resultat_heures }}"
+                                    data-prix="{{ t.prix }}"
+                                    data-nom="{{ t.nom }}">
+                                    {{ t.nom }}{% if t.code %} [{{ t.code }}]{% endif %}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                        <td class="col-delai">
+                            <input type="text" name="ligne_delai_0" id="delai-0" readonly placeholder="—">
+                        </td>
+                        <td class="col-prix">
+                            <input type="number" name="ligne_prix_0" id="prix-0"
+                                   min="0" step="1" value="0" oninput="recalcTotal()">
+                        </td>
+                        <td class="col-instr">
+                            <input type="text" name="ligne_instructions_0" placeholder="Précisions…">
+                        </td>
+                        <td class="col-del">
+                            <button type="button" class="btn-del" onclick="removeLigne(this)">×</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <button type="button" class="btn-add-ligne" onclick="addLigne()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24"
+                 stroke="currentColor" stroke-width="2.5">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Ajouter une ligne
+        </button>
+
+        <!-- ── Total ── -->
+        <div class="total-wrap">
+            <div class="total-box">
+                <span class="total-label">Total :</span>
+                <span class="total-value" id="disp-total">0 CFA</span>
+            </div>
+        </div>
+
+    </div><!-- /.dem-body -->
+</div><!-- /.dem-page -->
+</form>
+
+{% if obj %}{% include 'includes/chatter.html' with obj=obj logs=logs %}{% endif %}
+
+<script>
+(function () {
+    var lineCount = 1;
+    var examensData = {
+        {% for t in types_examens %}
+        "{{ t.pk }}": { nom: "{{ t.nom|escapejs }}", delai: {{ t.delai_resultat_heures }}, prix: {{ t.prix }} },
+        {% endfor %}
+    };
+
+    /* ── Remplissage auto depuis sélecteur ── */
+    window.fillFromExamen = function (sel, idx) {
+        var pk = sel.value;
+        var delaiEl = document.getElementById('delai-' + idx);
+        var prixEl  = document.getElementById('prix-' + idx);
+        if (!pk) {
+            if (delaiEl) delaiEl.value = '';
+            if (prixEl)  prixEl.value = 0;
+            recalcTotal(); return;
+        }
+        var d = examensData[pk];
+        if (!d) { recalcTotal(); return; }
+        if (delaiEl) {
+            var h = d.delai;
+            delaiEl.value = h >= 24 ? Math.round(h / 24) + ' jour(s)' : h + ' h';
+        }
+        if (prixEl) prixEl.value = d.prix;
+        recalcTotal();
+    };
+
+    /* ── Recalc total ── */
+    window.recalcTotal = function () {
+        var total = 0;
+        document.querySelectorAll('[name^="ligne_prix_"]').forEach(function (el) {
+            total += parseFloat(el.value) || 0;
+        });
+        document.getElementById('disp-total').textContent =
+            Number(total).toLocaleString('fr-FR') + ' CFA';
+    };
+
+    /* ── Ajouter ligne ── */
+    window.addLigne = function () {
+        var idx = lineCount++;
+        var body = document.getElementById('tests-body');
+        var tr = document.createElement('tr');
+        tr.className = 'test-row';
+
+        var opts = '<option value="">— Choisir un test —</option>';
+        Object.keys(examensData).forEach(function (pk) {
+            opts += '<option value="' + pk + '" data-delai="' + examensData[pk].delai +
+                    '" data-prix="' + examensData[pk].prix + '">' +
+                    examensData[pk].nom + '</option>';
+        });
+
+        tr.innerHTML =
+            '<td class="col-test"><select name="ligne_examen_' + idx + '" class="examen-select"' +
+                ' onchange="fillFromExamen(this,' + idx + ')">' + opts + '</select></td>' +
+            '<td class="col-delai"><input type="text" name="ligne_delai_' + idx + '" id="delai-' + idx + '" readonly placeholder="—"></td>' +
+            '<td class="col-prix"><input type="number" name="ligne_prix_' + idx + '" id="prix-' + idx +
+                '" min="0" step="1" value="0" oninput="recalcTotal()"></td>' +
+            '<td class="col-instr"><input type="text" name="ligne_instructions_' + idx + '" placeholder="Précisions…"></td>' +
+            '<td class="col-del"><button type="button" class="btn-del" onclick="removeLigne(this)">×</button></td>';
+        body.appendChild(tr);
+    };
+
+    /* ── Supprimer ligne ── */
+    window.removeLigne = function (btn) {
+        if (document.querySelectorAll('.test-row').length > 1) {
+            btn.closest('tr').remove();
+            recalcTotal();
+        }
+    };
+
+    /* ── Toggle urgent ── */
+    var urgChk = document.getElementById('id_urgent');
+    var urgLbl = document.getElementById('urg-lbl');
+    if (urgChk) {
+        urgChk.addEventListener('change', function () {
+            urgLbl.textContent = this.checked ? 'URGENT' : 'Non urgent';
+            urgLbl.style.color = this.checked ? '#e84545' : '';
+            urgLbl.style.fontWeight = this.checked ? '800' : '600';
+        });
+    }
+
+    /* ── Recherche patient ── */
+    var searchInput = document.getElementById('patient-search');
+    var dropdown    = document.getElementById('patient-dropdown');
+    var patIdInput  = document.getElementById('patient-id-input');
+    var cardZone    = document.getElementById('patient-card-zone');
+
+    if (searchInput) {
+        var timer;
+        searchInput.addEventListener('input', function () {
+            clearTimeout(timer);
+            var q = this.value.trim();
+            if (q.length < 2) { dropdown.style.display = 'none'; return; }
+            timer = setTimeout(function () {
+                fetch('{% url "patients:patient_search" %}?q=' + encodeURIComponent(q))
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        dropdown.innerHTML = '';
+                        var results = data.results || [];
+                        if (!results.length) {
+                            dropdown.innerHTML = '<div class="psearch-item" style="color:rgba(0,0,0,0.4);">Aucun résultat</div>';
+                        } else {
+                            results.forEach(function (p) {
+                                var el = document.createElement('div');
+                                el.className = 'psearch-item';
+                                el.innerHTML = '<div class="pi-name">' + p.nom_complet + '</div>' +
+                                    '<div class="pi-meta">' + p.code +
+                                    (p.telephone ? ' · ' + p.telephone : '') + '</div>';
+                                el.addEventListener('click', function () { selectPatient(p); });
+                                dropdown.appendChild(el);
+                            });
+                        }
+                        dropdown.style.display = 'block';
+                    });
+            }, 280);
+        });
+        document.addEventListener('click', function (e) {
+            var wrap = document.getElementById('search-wrap');
+            if (wrap && !wrap.contains(e.target)) dropdown.style.display = 'none';
+        });
+    }
+
+    function selectPatient(p) {
+        patIdInput.value = p.id;
+        document.getElementById('pat-fullname').textContent = p.nom_complet;
+        document.getElementById('pat-code').textContent = p.code;
+        document.getElementById('pat-tel').textContent = p.telephone || '—';
+        var initials = p.nom_complet.split(' ').map(function (w) { return w[0] || ''; }).slice(0, 2).join('').toUpperCase();
+        var av = document.getElementById('pat-avatar');
+        av.innerHTML = '';
+        av.textContent = initials;
+
+        fetch('/patients/' + p.id + '/info/')
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                var ageEl = document.getElementById('pat-age');
+                var sexeEl = document.getElementById('pat-sexe');
+                if (ageEl && d.age !== undefined) ageEl.textContent = d.age + ' ans';
+                if (sexeEl && d.sexe !== undefined) sexeEl.textContent = d.sexe;
+            }).catch(function () {});
+
+        cardZone.style.display = '';
+        if (searchInput) searchInput.value = '';
+        dropdown.style.display = 'none';
+    }
+
+    window.resetPatient = function () {
+        patIdInput.value = '';
+        cardZone.style.display = 'none';
+        if (searchInput) { searchInput.value = ''; searchInput.focus(); }
+    };
+
+    /* ── Validation soumission ── */
+    document.getElementById('dem-form').addEventListener('submit', function (e) {
+        if (!patIdInput.value) {
+            e.preventDefault();
+            alert('Veuillez sélectionner un patient.');
+            if (searchInput) searchInput.focus();
+            return;
+        }
+        var hasTest = false;
+        document.querySelectorAll('.examen-select').forEach(function (s) {
+            if (s.value) hasTest = true;
+        });
+        if (!hasTest) {
+            e.preventDefault();
+            alert('Veuillez sélectionner au moins un test.');
+        }
+    });
+
+})();
+</script>
+
+{% endblock %}

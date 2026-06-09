@@ -1,0 +1,379 @@
+{% extends 'hospitalisation/base.html' %}
+{% load i18n %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+:root {
+  --surface: #fff;
+  --border:  #e8edf2;
+  --text:    #0d3040;
+  --text-muted: rgba(0,0,0,.45);
+}
+html[data-theme="dark"] {
+  --surface: #132033;
+  --border:  #243044;
+  --text:    #d4e6f5;
+  --text-muted: rgba(255,255,255,.45);
+}
+
+/* ── Subheader ─────────────────────────────── */
+.o-subheader {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 6px 16px;
+  display: flex; flex-direction: column; gap: 5px;
+  position: sticky; top: 38px;
+  z-index: 190;
+  margin: 0 -32px;
+}
+.o-subheader-row { display: flex; align-items: center; gap: 8px; }
+.o-subheader-row-right { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.o-page-title { font-size: 17px; font-weight: 400; color: var(--text); }
+
+.o-btn-create {
+  background: var(--teal-500); color: #fff; border: none;
+  padding: 5px 14px; border-radius: 4px;
+  font-size: 12.5px; font-weight: 500; font-family: inherit;
+  cursor: pointer; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 4px;
+  letter-spacing: .5px; transition: background .15s;
+}
+.o-btn-create:hover { background: var(--teal-600); color: #fff; }
+
+
+.o-search-bar {
+  display: flex; align-items: center;
+  border: none; border-bottom: 1px solid #bbb;
+  background: transparent; min-height: 28px;
+  padding: 2px 4px; gap: 4px; width: 300px;
+}
+.o-search-input {
+  border: none; outline: none; font-size: 12px;
+  color: var(--text); font-family: inherit;
+  flex: 1; min-width: 60px; background: transparent;
+}
+.o-search-btn { background: none; border: none; cursor: pointer; color: #888; font-size: 13px; padding: 2px; }
+
+.o-ctrl-btn {
+  background: none; border: 1px solid transparent; border-radius: 4px;
+  padding: 4px 8px; font-size: 12px; font-family: inherit;
+  color: var(--text-muted); cursor: pointer;
+  display: flex; align-items: center; gap: 4px;
+  transition: border-color .15s, color .15s, background .15s;
+  white-space: nowrap;
+}
+.o-ctrl-btn:hover { border-color: var(--border); color: var(--text); background: #f3f3f3; }
+.o-ctrl-btn.active { color: var(--teal-600); }
+
+.o-ctrl-sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }
+
+.o-pagination { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+.o-pag-btn {
+  width: 24px; height: 24px; border: 1px solid var(--border); border-radius: 3px;
+  background: var(--surface); display: flex; align-items: center; justify-content: center;
+  color: var(--text-muted); text-decoration: none; font-size: 12px; cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.o-pag-btn:hover { background: var(--teal-600); color: #fff; border-color: var(--teal-600); }
+.o-pag-btn.disabled { opacity: .35; pointer-events: none; }
+
+.o-filter-tag {
+  display: inline-flex; align-items: center; gap: 3px;
+  background: var(--teal-50); color: var(--teal-600);
+  border: 1px solid #b2d8db; border-radius: 3px;
+  padding: 1px 6px; font-size: 11.5px; font-weight: 500; white-space: nowrap;
+}
+.o-filter-tag a { color: #888; text-decoration: none; font-size: 14px; line-height: 1; margin-left: 2px; }
+.o-filter-tag a:hover { color: #333; }
+
+/* ── Dropdowns ─────────────────────────────── */
+.o-dd-wrap { position: relative; }
+.o-dd-panel {
+  display: none; position: fixed; z-index: 9999;
+  background: #fff; border: 1px solid #dde3ec;
+  border-radius: 6px; box-shadow: 0 8px 28px rgba(0,0,0,.16);
+  min-width: 210px; padding: 5px 0;
+}
+.o-dd-panel.open { display: block; }
+.o-dd-section {
+  padding: 6px 14px 3px; font-size: 10px; font-weight: 600;
+  color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px;
+}
+.o-dd-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 14px; font-size: 12.5px; color: var(--text);
+  cursor: pointer; text-decoration: none; transition: background .1s;
+  white-space: nowrap; gap: 10px;
+}
+.o-dd-item:hover { background: var(--teal-50); color: var(--teal-600); }
+.o-dd-item.active { background: #e8f4f8; color: var(--teal-600); font-weight: 500; }
+.o-dd-sep { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+
+/* ── List table ────────────────────────────── */
+.ch-list-wrap { margin: 0 -32px; }
+.ch-list-table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--surface); }
+
+.ch-list-table thead th {
+  border-bottom: 1px solid var(--border);
+  padding: 8px 12px;
+  text-align: left; font-size: 12px; font-weight: 600;
+  color: var(--text-muted); white-space: nowrap;
+  background: var(--surface); user-select: none;
+  position: sticky; top: 112px; z-index: 100;
+}
+.ch-list-table thead th.col-check { width: 36px; text-align: center; }
+.ch-list-table thead th.col-right { text-align: right; padding-right: 20px; }
+
+.ch-list-table tbody tr {
+  border-bottom: 1px solid #f0f4f7;
+  cursor: pointer; transition: background .1s;
+}
+.ch-list-table tbody tr:hover { background: #ddeef7; }
+.ch-list-table tbody td { padding: 9px 12px; color: var(--text); font-size: 13px; }
+.ch-list-table tbody td.col-check { text-align: center; }
+.ch-list-table tbody td.col-num  { color: var(--teal-600); font-weight: 500; }
+.ch-list-table tbody td.col-right { text-align: right; padding-right: 20px; color: var(--text-muted); }
+
+.ch-check { width: 15px; height: 15px; cursor: pointer; accent-color: var(--teal-500); }
+
+.badge-dispo {
+  display: inline-block; padding: 2px 10px; border-radius: 3px;
+  font-size: 11.5px; font-weight: 600;
+  color: #1a6b3c; background: #d4edda;
+}
+.badge-occupe {
+  display: inline-block; padding: 2px 10px; border-radius: 3px;
+  font-size: 11.5px; font-weight: 600;
+  color: #7b1c1c; background: #fde8e8;
+}
+
+.ch-empty {
+  text-align: center; padding: 60px 20px;
+  color: var(--text-muted);
+}
+.ch-empty i { font-size: 40px; display: block; margin-bottom: 12px; opacity: .35; }
+
+/* dark */
+html[data-theme="dark"] .o-search-bar { border-bottom-color: rgba(255,255,255,.2); }
+html[data-theme="dark"] .o-search-input { color: var(--text); }
+html[data-theme="dark"] .o-ctrl-btn:hover { background: rgba(255,255,255,.05); }
+html[data-theme="dark"] .o-dd-panel { background: #1a2535; border-color: #2e3f58; }
+html[data-theme="dark"] .o-dd-item { color: #c5d4e2; }
+html[data-theme="dark"] .o-dd-item:hover { background: rgba(33,136,171,.2); color: #c5d4e2; }
+html[data-theme="dark"] .o-dd-item.active { background: rgba(33,136,171,.3); color: var(--teal-300); }
+html[data-theme="dark"] .o-filter-tag { background: rgba(33,136,171,.25); border-color: rgba(33,136,171,.5); color: var(--teal-300); }
+html[data-theme="dark"] .ch-list-table thead th { background: var(--surface); border-bottom-color: var(--border); }
+html[data-theme="dark"] .ch-list-table tbody tr { border-bottom-color: #1a3050; }
+html[data-theme="dark"] .ch-list-table tbody tr:hover { background: #0f3050; }
+html[data-theme="dark"] .ch-list-table tbody td.col-num { color: var(--teal-300); }
+html[data-theme="dark"] .badge-dispo { color: #6fcf97; background: rgba(111,207,151,.12); }
+html[data-theme="dark"] .badge-occupe { color: #f48787; background: rgba(244,135,135,.12); }
+html[data-theme="dark"] .o-pag-btn { background: var(--surface); border-color: var(--border); color: var(--text-muted); }
+html[data-theme="dark"] .o-ctrl-sep { background: var(--border); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ══ SUBHEADER ══ -->
+<div class="o-subheader">
+
+  <!-- Ligne 1 : titre + search -->
+  <div class="o-subheader-row">
+    <span class="o-page-title">Salle/Chambre d'hôpital</span>
+
+    <div class="o-subheader-row-right">
+      <form method="get" id="search-form" style="display:flex;align-items:center;">
+        {% if type_chambre %}<input type="hidden" name="type"  value="{{ type_chambre }}">{% endif %}
+        {% if dispo       %}<input type="hidden" name="dispo" value="{{ dispo }}">{% endif %}
+        <div class="o-search-bar">
+          <input class="o-search-input" type="text" name="q"
+                 value="{{ q }}" placeholder="Rechercher une chambre…" id="search-q">
+          <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Ligne 2 : créer + filtres / groupes / pagination -->
+  <div class="o-subheader-row">
+    <a href="{% url 'hospitalisation:chambre_create' %}" class="o-btn-create">
+      <i class="bi bi-plus-lg"></i> Créer
+    </a>
+    <div class="o-subheader-row-right">
+
+      <!-- Filtres -->
+      <div class="o-dd-wrap">
+        <button class="o-ctrl-btn {% if type_chambre or dispo %}active{% endif %}"
+                onclick="toggleDd('dd-filtres', this)" id="btn-filtres">
+          <i class="bi bi-funnel{% if type_chambre or dispo %}-fill{% endif %}"></i>
+          Filtres
+        </button>
+        <div class="o-dd-panel" id="dd-filtres">
+          <div class="o-dd-section">Disponibilité</div>
+          <a class="o-dd-item {% if dispo == '1' %}active{% endif %}"
+             href="?dispo=1{% if q %}&q={{ q }}{% endif %}{% if type_chambre %}&type={{ type_chambre }}{% endif %}{% if service_id %}&service={{ service_id }}{% endif %}">
+            Disponible
+          </a>
+          <a class="o-dd-item {% if dispo == '0' %}active{% endif %}"
+             href="?dispo=0{% if q %}&q={{ q }}{% endif %}{% if type_chambre %}&type={{ type_chambre }}{% endif %}{% if service_id %}&service={{ service_id }}{% endif %}">
+            Occupée
+          </a>
+          <div class="o-dd-section">Type de chambre</div>
+          {% for val, label in types %}
+          <a class="o-dd-item {% if type_chambre == val %}active{% endif %}"
+             href="?type={{ val }}{% if q %}&q={{ q }}{% endif %}{% if dispo %}&dispo={{ dispo }}{% endif %}{% if service_id %}&service={{ service_id }}{% endif %}">
+            {{ label }}
+          </a>
+          {% endfor %}
+          {% if type_chambre or dispo %}
+          <hr class="o-dd-sep">
+          <a class="o-dd-item" href="?{% if q %}q={{ q }}&{% endif %}{% if service_id %}service={{ service_id }}{% endif %}" style="color:#b71c1c;">
+            <i class="bi bi-x-circle" style="font-size:11px;"></i> Supprimer les filtres
+          </a>
+          {% endif %}
+        </div>
+      </div>
+
+      <button class="o-ctrl-btn"><i class="bi bi-star"></i> Favoris</button>
+
+      <div class="o-ctrl-sep"></div>
+
+      <!-- Pagination compteur + flèches -->
+      <div class="o-pagination">
+        {% if page_obj.paginator.count > 0 %}
+        <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
+        {% else %}
+        <span>0</span>
+        {% endif %}
+        <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
+           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if type_chambre %}&type={{ type_chambre }}{% endif %}{% if dispo %}&dispo={{ dispo }}{% endif %}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-left"></i>
+        </a>
+        <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
+           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if type_chambre %}&type={{ type_chambre }}{% endif %}{% if dispo %}&dispo={{ dispo }}{% endif %}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-right"></i>
+        </a>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Ligne 3 : tags filtres actifs -->
+  {% if q or type_chambre or dispo %}
+  <div class="o-subheader-row" style="gap:6px;flex-wrap:wrap;padding-top:0;">
+    {% if q %}
+    <span style="font-size:11px;color:var(--text-muted);">Recherche :</span>
+    <span class="o-filter-tag">
+      {{ q }}
+      <a href="?{% if type_chambre %}type={{ type_chambre }}&{% endif %}{% if dispo %}dispo={{ dispo }}{% endif %}" title="Supprimer">×</a>
+    </span>
+    {% endif %}
+    {% if type_chambre %}
+    <span style="font-size:11px;color:var(--text-muted);">Type :</span>
+    <span class="o-filter-tag">
+      {% for val, label in types %}{% if val == type_chambre %}{{ label }}{% endif %}{% endfor %}
+      <a href="?{% if q %}q={{ q }}&{% endif %}{% if dispo %}dispo={{ dispo }}{% endif %}" title="Supprimer">×</a>
+    </span>
+    {% endif %}
+    {% if dispo %}
+    <span style="font-size:11px;color:var(--text-muted);">Disponibilité :</span>
+    <span class="o-filter-tag">
+      {% if dispo == '1' %}Disponible{% else %}Occupée{% endif %}
+      <a href="?{% if q %}q={{ q }}&{% endif %}{% if type_chambre %}type={{ type_chambre }}{% endif %}" title="Supprimer">×</a>
+    </span>
+    {% endif %}
+  </div>
+  {% endif %}
+
+</div>
+<!-- ══ fin subheader ══ -->
+
+
+<!-- ══ TABLEAU ══ -->
+<div class="ch-list-wrap">
+  <table class="ch-list-table">
+    <thead>
+      <tr>
+        <th class="col-check">
+          <input type="checkbox" class="ch-check" id="chk-all" onchange="toggleAll(this)">
+        </th>
+        <th>Nom</th>
+        <th>Salle/Chambre Type</th>
+        <th>Genre</th>
+        <th style="text-align:center;">Téléphone</th>
+        <th>Statut</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for chambre in page_obj %}
+      <tr onclick="window.location='{% url 'hospitalisation:chambre_detail' chambre.id %}'">
+        <td class="col-check" onclick="event.stopPropagation()">
+          <input type="checkbox" class="ch-check row-check">
+        </td>
+        <td class="col-num">{{ chambre.nom|default:chambre.salle_no }}</td>
+        <td>{{ chambre.get_type_chambre_display }}</td>
+        <td>{{ chambre.get_genre_display }}</td>
+        <td style="text-align:center;color:{% if chambre.telephone_chambre %}#1a6b3c{% else %}#bbb{% endif %};">
+          <i class="bi bi-telephone{% if not chambre.telephone_chambre %}-x{% endif %}" style="font-size:14px;"></i>
+        </td>
+        <td>
+          {% if chambre.statut %}
+          <span class="badge-dispo">Disponible</span>
+          {% else %}
+          <span class="badge-occupe">Occupée</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="7">
+          <div class="ch-empty">
+            <i class="bi bi-door-closed"></i>
+            Aucune chambre trouvée{% if q %} pour « {{ q }} »{% endif %}
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+function toggleDd(id, btn) {
+  const panel = document.getElementById(id);
+  document.querySelectorAll('.o-dd-panel').forEach(p => { if (p.id !== id) p.classList.remove('open'); });
+  if (!panel) return;
+  const open = panel.classList.toggle('open');
+  if (open) {
+    const r = btn.getBoundingClientRect();
+    panel.style.top  = (r.bottom + window.scrollY + 4) + 'px';
+    panel.style.left = r.left + 'px';
+  }
+}
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.o-dd-wrap') && !e.target.closest('.o-dd-panel')) {
+    document.querySelectorAll('.o-dd-panel').forEach(p => p.classList.remove('open'));
+  }
+});
+function toggleAll(master) {
+  document.querySelectorAll('.row-check').forEach(c => c.checked = master.checked);
+}
+
+function updateTheadTop() {
+  const sub = document.querySelector('.o-subheader');
+  const ths = document.querySelectorAll('.ch-list-table thead th');
+  if (sub && ths.length) {
+    const top = 38 + sub.offsetHeight;
+    ths.forEach(th => th.style.top = top + 'px');
+  }
+}
+updateTheadTop();
+window.addEventListener('resize', updateTheadTop);
+</script>
+{% endblock %}

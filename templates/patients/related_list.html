@@ -101,49 +101,18 @@
     .empty-state .es-icon { font-size: 42px; margin-bottom: 14px; }
     .empty-state .es-msg { font-size: 15px; font-weight: 600; }
 
-    /* ── Recherche ── */
-    .rl-search-wrap {
-        position: relative; flex: 1; max-width: 300px;
-    }
-    .rl-search-wrap svg {
-        position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
-        color: rgba(0,0,0,0.3); pointer-events: none;
-    }
-    .rl-search-wrap input {
-        width: 100%; padding: 7px 12px 7px 32px;
-        border: none; border-bottom: 1px solid rgba(0,0,0,0.12);
-        border-radius: 0; font-size: 13px; font-family: inherit;
-        background: transparent; color: var(--teal-900); outline: none;
-        transition: border-color .2s, box-shadow .2s;
-    }
-    .rl-search-wrap input:focus {
-        border-bottom-color: var(--teal-400);
-        box-shadow: 0 2px 0 rgba(33,136,171,.25);
-    }
-    .rl-no-results {
-        text-align: center; padding: 40px 24px;
-        color: rgba(0,0,0,0.35); font-size: 13px; display: none;
-    }
-    html[data-theme="dark"] .rl-search-wrap input {
-        color: #cce8f4; border-bottom-color: rgba(255,255,255,0.12);
-        background: transparent;
-    }
-    html[data-theme="dark"] .rl-search-wrap input:focus {
-        border-bottom-color: var(--teal-400);
-    }
+    .data-table tbody tr[data-url] { cursor: pointer; }
+    .data-table tbody tr[data-url]:hover td { background: #eef7f5; }
 </style>
 {% endblock %}
 
 {% block breadcrumb %}
-<nav class="breadcrumb">
-    <a href="{% url 'dashboard' %}"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z"/><polyline points="9 21 9 12 15 12 15 21"/></svg>Accueil</a>
-    <span class="breadcrumb-sep">›</span>
-    <a href="{% url 'patients:list' %}">Patients</a>
-    <span class="breadcrumb-sep">›</span>
-    <a href="{% url 'patients:detail' patient.pk %}">{{ patient.nom }} {{ patient.prenoms }}</a>
-    <span class="breadcrumb-sep">›</span>
-    <span>{{ titre }}</span>
-</nav>
+<div style="display:flex;align-items:center;gap:8px;padding:8px 32px;border-bottom:1px solid var(--border);margin:0 -32px 20px;background:var(--surface);">
+  <a href="{% url 'patients:detail' patient.pk %}" class="o-ctrl-btn" style="padding:3px 7px;flex-shrink:0;"><i class="bi bi-arrow-left"></i></a>
+  <span style="font-size:13.5px;color:var(--text-muted);">
+    <a href="{% url 'patients:list' %}" style="color:var(--accent);text-decoration:none;font-weight:500;">Patients</a> <span style="margin:0 5px;opacity:.4;">/</span> <span style="color:var(--text);">{{ patient.nom }} {{ patient.prenoms }}</span>
+  </span>
+</div>
 {% endblock %}
 
 {% block content %}
@@ -159,7 +128,7 @@
         <a href="{% url 'patients:rdv_list' patient.pk %}"
            class="rl-tab {% if view_type == 'rdv' %}active{% endif %}">Rendez-vous</a>
         <a href="{% url 'patients:consultation_list' patient.pk %}"
-           class="rl-tab {% if view_type == 'consultation' %}active{% endif %}">Consultations</a>
+           class="rl-tab {% if view_type == 'consultation' %}active{% endif %}">Soins</a>
         <a href="{% url 'patients:ordonnance_list' patient.pk %}"
            class="rl-tab {% if view_type == 'ordonnance' %}active{% endif %}">Ordonnances</a>
         <a href="{% url 'patients:hospitalisation_list' patient.pk %}"
@@ -174,12 +143,8 @@
 <!-- Corps -->
 <div class="rl-body">
     <div class="rl-toolbar">
-        <span class="rl-count"><strong id="rl-visible-count">{{ items|length }}</strong> {{ titre|lower }}</span>
-        <div class="rl-search-wrap">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" id="rl-search-q" placeholder="Filtrer…" autocomplete="off" aria-label="Filtrer les résultats">
-        </div>
-        <a href="{% url 'patients:rdv_create'%}" class="btn btn-secondary btn-small">créer un rendez-vous</a>
+        <span class="rl-count"><strong>{{ items|length }}</strong> {{ titre|lower }}</span>
+        <a href="{% url 'patients:rdv_create' %}?patient={{ patient.pk }}" class="btn btn-secondary btn-small">créer un rendez-vous</a>
     </div>
 
     {% if items %}
@@ -197,9 +162,9 @@
         </thead>
         <tbody>
         {% for rdv in items %}
-            <tr>
+            <tr data-url="{% url 'patients:rdv_edit' rdv.pk %}">
                 <td>{{ rdv.date_heure|date:"d/m/Y à H:i" }}</td>
-                <td>{{ rdv.get_type_rdv_display }}</td>
+                <td>{{ rdv.service.nom|default:"—" }}</td>
                 <td>{{ rdv.motif|truncatechars:60 }}</td>
                 <td>{% if rdv.medecin %}{{ rdv.medecin }}{% else %}<span style="color:rgba(0,0,0,0.3)">—</span>{% endif %}</td>
                 <td>
@@ -231,7 +196,7 @@
         </thead>
         <tbody>
         {% for c in items %}
-            <tr>
+            <tr data-url="/admin/consultations/consultation/{{ c.pk }}/change/">
                 <td><code style="font-size:12px; color:var(--teal-600);">{{ c.numero }}</code></td>
                 <td>{{ c.date_heure|date:"d/m/Y à H:i" }}</td>
                 <td>{{ c.motif|truncatechars:60 }}</td>
@@ -262,7 +227,7 @@
         </thead>
         <tbody>
         {% for o in items %}
-            <tr>
+            <tr data-url="/admin/consultations/ordonnance/{{ o.pk }}/change/">
                 <td><code style="font-size:12px; color:var(--teal-600);">{{ o.numero }}</code></td>
                 <td>{{ o.date_emission|date:"d/m/Y" }}</td>
                 <td>{{ o.get_type_ordonnance_display }}</td>
@@ -296,7 +261,7 @@
         </thead>
         <tbody>
         {% for h in items %}
-            <tr>
+            <tr data-url="/admin/hospitalisation/hospitalisation/{{ h.pk }}/change/">
                 <td><code style="font-size:12px; color:var(--teal-600);">{{ h.numero }}</code></td>
                 <td>{{ h.date_admission|date:"d/m/Y" }}</td>
                 <td>{{ h.motif_admission|truncatechars:50 }}</td>
@@ -330,7 +295,7 @@
         </thead>
         <tbody>
         {% for a in items %}
-            <tr>
+            <tr data-url="/admin/laboratoire/analyselaboratoire/{{ a.pk }}/change/">
                 <td><code style="font-size:12px; color:var(--teal-600);">{{ a.numero }}</code></td>
                 <td>{{ a.date_prelevement|date:"d/m/Y à H:i" }}</td>
                 <td>{{ a.type_examen }}</td>
@@ -368,7 +333,7 @@
         </thead>
         <tbody>
         {% for a in items %}
-            <tr>
+            <tr data-url="/admin/laboratoire/analyselaboratoire/{{ a.pk }}/change/">
                 <td><code style="font-size:12px; color:var(--teal-600);">{{ a.numero }}</code></td>
                 <td>{{ a.date_resultat|date:"d/m/Y à H:i"|default:"—" }}</td>
                 <td>{{ a.type_examen }}</td>
@@ -400,33 +365,13 @@
     </div>
     {% endif %}
 
-    <div class="rl-no-results" id="rl-no-results">Aucun résultat pour cette recherche.</div>
-
 </div>
 
 <script>
-(function () {
-    var inp = document.getElementById('rl-search-q');
-    if (!inp) return;
-
-    var rows       = document.querySelectorAll('.data-table tbody tr');
-    var countEl    = document.getElementById('rl-visible-count');
-    var noResults  = document.getElementById('rl-no-results');
-
-    function filterRows() {
-        var q = inp.value.trim().toLowerCase();
-        var visible = 0;
-        rows.forEach(function (tr) {
-            var match = !q || tr.textContent.toLowerCase().indexOf(q) !== -1;
-            tr.style.display = match ? '' : 'none';
-            if (match) visible++;
-        });
-        if (countEl) countEl.textContent = visible;
-        if (noResults) noResults.style.display = (rows.length > 0 && visible === 0) ? 'block' : 'none';
-    }
-
-    inp.addEventListener('input', filterRows);
-})();
+document.querySelectorAll('.data-table tbody tr[data-url]').forEach(function(row) {
+    row.addEventListener('click', function() {
+        window.location.href = this.dataset.url;
+    });
+});
 </script>
-
 {% endblock %}

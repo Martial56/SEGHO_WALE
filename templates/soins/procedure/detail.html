@@ -1,12 +1,29 @@
 {% extends 'soins/base.html' %}
 {% load static %}
+{% load core_tags %}
 {% block breadcrumb %}{% endblock %}
 {% block module_navbar %}{% endblock %}
 
 {% block extra_css %}
 {{ block.super }}
 <style>
-  .det-page { width:100%;padding:12px 20px 48px; }
+  .det-page { width:100%;padding:12px 20px 48px;display:flex;align-items:flex-start;gap:14px; }
+  .det-main  { flex:1;min-width:0; }
+  .det-aside-act { width:280px;flex-shrink:0;position:sticky;top:70px; }
+  .f-activity { background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden; }
+  .f-activity-head { padding:10px 14px;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between; }
+  .f-activity-list { max-height:480px;overflow-y:auto; }
+  .f-activity-item { display:flex;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border); }
+  .f-activity-item:last-child { border-bottom:none; }
+  .f-avatar { width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#fff;flex-shrink:0; }
+  .f-avatar-teal  { background:var(--accent); }
+  .f-avatar-green { background:#16a34a; }
+  .f-activity-body { flex:1; }
+  .f-activity-who  { font-size:12px;font-weight:500;color:var(--text); }
+  .f-activity-time { font-size:11px;color:var(--text-muted); }
+  .f-activity-change { font-size:11.5px;color:var(--text-muted);margin-top:3px;display:flex;align-items:center;gap:4px; }
+  .f-activity-change i { font-size:11px; }
+  @media(max-width:900px){ .det-page{flex-direction:column;} .det-aside-act{width:100%;position:static;} }
 
   .det-header { background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:10px; }
 
@@ -128,6 +145,7 @@
 </div>
 
 <div class="det-page">
+<div class="det-main">
 
   <!-- ══ CARTE HEADER ══ -->
   <div class="det-header">
@@ -147,7 +165,7 @@
           <div class="proc-step-connector"></div>
           <div class="proc-step step-cancelled">
             <div class="proc-step-node step-node-cancelled"><span>2</span></div>
-            <span class="proc-step-label">Soins en cours</span>
+            <span class="proc-step-label">En cours</span>
           </div>
           <div class="proc-step-connector"></div>
           <div class="proc-step step-cancelled">
@@ -170,7 +188,7 @@
             <div class="proc-step-node {% if statut == 'en_cours' %}step-node-active{% elif statut == 'termine' %}step-node-done{% else %}step-node-future{% endif %}">
               {% if statut == 'termine' %}<i class="bi bi-check-lg"></i>{% else %}<span>2</span>{% endif %}
             </div>
-            <span class="proc-step-label">Soins en cours</span>
+            <span class="proc-step-label">En cours</span>
           </div>
 
           <div class="proc-step-connector {% if statut == 'termine' %}connector-done{% endif %}"></div>
@@ -228,13 +246,12 @@
       <div class="det-num-badge">{{ proc.numero }}</div>
       <div class="det-main-info">
         <div class="det-main-name">{{ proc.patient.nom }} {{ proc.patient.prenoms }}</div>
-        <div class="det-main-sub">
-          {{ proc.patient.code_patient }}
-          {% if proc.soin_type %}
-          &nbsp;·&nbsp; <strong>{{ proc.soin_type.nom }}</strong>
-          {% endif %}
-          &nbsp;·&nbsp; {{ proc.date|date:"d/m/Y H:i" }}
-        </div>
+        <div class="det-main-sub">{{ proc.patient.code_patient }}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:3px;">Enregistré le</div>
+        <div style="font-size:13px;font-weight:600;color:var(--text);">{{ proc.date_creation|date:"d/m/Y" }}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:1px;">{{ proc.date_creation|date:"H:i" }}</div>
       </div>
     </div>
 
@@ -266,6 +283,7 @@
           </div>
         </div>
 
+        {% comment %}
         <div>
           <div class="det-field-label">Département</div>
           <div class="det-field-value">
@@ -282,13 +300,13 @@
           </div>
         </div>
 
-        <div>
+        {# <div>
           <div class="det-field-label">Rendez-vous</div>
           <div class="det-field-value">
             {% if proc.rendez_vous %}{{ proc.rendez_vous }}
             {% else %}<span class="det-field-empty">—</span>{% endif %}
           </div>
-        </div>
+        </div> #}
 
         <div>
           <div class="det-field-label">Facture</div>
@@ -297,16 +315,21 @@
             {% else %}<span class="det-field-empty">—</span>{% endif %}
           </div>
         </div>
+        {% endcomment %}
 
-        <div>
-          <div class="det-field-label">Enregistré le</div>
-          <div class="det-field-value">{{ proc.date_creation|date:"d/m/Y à H:i" }}</div>
-        </div>
+        {# Enregistré le déplacé dans l'en-tête identité (coin droit) #}
 
       </div>
     </div>
 
   </div><!-- /.det-header -->
+
+</div><!-- /.det-main -->
+
+<!-- ══ ASIDE ACTIVITÉ ══ -->
+<div class="det-aside-act">
+  {% include 'includes/chatter.html' with obj=proc logs=logs %}
+</div><!-- /.det-aside-act -->
 
 </div><!-- /.det-page -->
 
@@ -314,7 +337,7 @@
 (function(){
   function adj(){
     var tb=document.querySelector('.topbar'),wp=document.getElementById('page-wrap');
-    if(tb&&wp) wp.style.paddingTop=tb.offsetHeight+'px';
+    if(tb&&wp) wp.style.paddingTop='0';
   }
   adj(); window.addEventListener('resize',adj);
 })();

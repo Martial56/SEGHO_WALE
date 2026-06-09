@@ -23,8 +23,8 @@ urlpatterns = [
 
     # Rendez-vous dans le module soins
     path('rendez-vous/nouveau/', views.soins_rdv_create, name='rdv_create'),
-    path('rendez-vous/<int:pk>/', views.soins_rdv_detail, name='rdv_detail'),
     path('rendez-vous/', views.soins_rdv_list, name='rdv_list'),
+    path('rendez-vous/<int:pk>/', views.soins_rdv_detail, name='rdv_detail'),
 
     # Demandes d'examen
     path('examens/', views.demande_examen_list, name='demande_examen_list'),
@@ -33,13 +33,6 @@ urlpatterns = [
     path('examens/<int:pk>/envoyer/', views.demande_examen_envoyer, name='demande_examen_envoyer'),
     path('examens/<int:pk>/terminer/', views.demande_examen_terminer, name='demande_examen_terminer'),
     path('examens/<int:pk>/annuler/', views.demande_examen_annuler, name='demande_examen_annuler'),
-    path('examens/<int:pk>/modifier/', views.demande_examen_edit, name='demande_examen_edit'),
-
-    # Maladies
-    path('maladies/', views.maladie_list, name='maladie_list'),
-    path('maladies/nouveau/', views.maladie_create, name='maladie_create'),
-    path('maladies/<int:pk>/modifier/', views.maladie_edit, name='maladie_edit'),
-    path('maladies/<int:pk>/supprimer/', views.maladie_delete, name='maladie_delete'),
 
     # Actions sur un soin
     path('<int:pk>/enregistrer/', views.soins_creer_facture, name='creer_facture'),
@@ -50,11 +43,9 @@ urlpatterns = [
 
     # Factures dans le module soins
     path('factures/<int:pk>/', views.soins_facture_detail, name='facture_detail'),
-    path('factures/<int:pk>/paiement/', views.soins_facture_paiement, name='facture_paiement'),
     path('factures/<int:pk>/modifier/', views.soins_facture_edit, name='facture_edit'),
     path('factures/<int:pk>/valider/', views.soins_facture_valider, name='facture_valider'),
     path('factures/<int:pk>/payer/', views.soins_facture_payer, name='facture_payer'),
-    path('factures/<int:pk>/autoriser-partiel/', views.soins_autoriser_soin_partiel, name='facture_autoriser_partiel'),
     path('factures/<int:pk>/imprimer/', views.soins_facture_print, name='facture_print'),
     path('factures/<int:pk>/apercu/', views.soins_facture_apercu, name='facture_apercu'),
 ]

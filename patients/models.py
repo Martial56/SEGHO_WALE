@@ -39,11 +39,6 @@ class Patient(models.Model):
     date_expiration_assurance = models.DateField(null=True, blank=True)
     contact_urgence_nom = models.CharField(max_length=200, blank=True)
     contact_urgence_telephone = models.CharField(max_length=20, blank=True)
-    medecin_referent = models.ForeignKey(
-        'employer.DocteurReferent', on_delete=models.SET_NULL,
-        null=True, blank=True, related_name='patients',
-        verbose_name='Médecin référent'
-    )
     date_creation = models.DateTimeField(auto_now_add=True)
     date_modification = models.DateTimeField(auto_now=True)
     actif = models.BooleanField(default=True)
@@ -51,18 +46,25 @@ class Patient(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.code_patient:
-            count = Patient.objects.count() + 1
-            self.code_patient = f"PAT{count:05d}"
+            annee = timezone.now().year
+            prefix = f"PAT{annee}"
+            last = Patient.objects.filter(code_patient__startswith=prefix).order_by('-pk').first()
+            count = (int(last.code_patient[len(prefix):]) + 1) if last else 1
+            self.code_patient = f"{prefix}{count:05d}"
         super().save(*args, **kwargs)
 
     @property
     def age(self):
+        if not self.date_naissance:
+            return None
         from datetime import date
         t = date.today()
         return t.year - self.date_naissance.year - ((t.month, t.day) < (self.date_naissance.month, self.date_naissance.day))
 
     @property
     def age_en_mois(self):
+        if not self.date_naissance:
+            return None
         from datetime import date
         today = date.today()
         mois = (today.year - self.date_naissance.year) * 12 + (today.month - self.date_naissance.month)
@@ -72,12 +74,14 @@ class Patient(models.Model):
 
     @property
     def age_display(self):
+        mois_total = self.age_en_mois
+        if mois_total is None:
+            return '—'
+        if mois_total >= 60:
+            return f"{self.age}Ans"
         import calendar as cal
         from datetime import date
         today = date.today()
-        mois_total = self.age_en_mois
-        if mois_total >= 60:
-            return f"{self.age}Ans"
         ans = mois_total // 12
         mois = mois_total % 12
         if today.day >= self.date_naissance.day:
@@ -86,11 +90,13 @@ class Patient(models.Model):
             prev_month = today.month - 1 if today.month > 1 else 12
             prev_year = today.year if today.month > 1 else today.year - 1
             jours = cal.monthrange(prev_year, prev_month)[1] - self.date_naissance.day + today.day
-        return f"{ans}Ans{mois}Mois{jours}Jours"
+        return f"{ans}Ans{mois}Mois{jours}J"
 
     @property
     def tranche_age(self):
         mois = self.age_en_mois
+        if mois is None:
+            return ''
         if mois < 12:
             return 'mois_0_11'
         a = self.age
@@ -108,59 +114,24 @@ class Patient(models.Model):
         ordering = ['-date_creation']
 
 
-class TypeVisite(models.Model):
-    nom           = models.CharField(max_length=200, verbose_name='Nom')
-    code          = models.CharField(max_length=50, unique=True, verbose_name='Code')
-    description   = models.TextField(blank=True, verbose_name='Description')
-    actif         = models.BooleanField(default=True)
-    date_creation = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self): return self.nom
-    class Meta:
-        verbose_name = "Type de visite"
-        ordering = ['nom']
-
-
-class Pathologie(models.Model):
-    nom           = models.CharField(max_length=300, verbose_name='Nom')
-    description   = models.TextField(blank=True, verbose_name='Description')
-    actif         = models.BooleanField(default=True)
-    date_creation = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self): return self.nom
-    class Meta:
-        verbose_name = "Pathologie"
-        ordering = ['nom']
-
-
 class RendezVous(models.Model):
-    STATUT = [
-        ('planifie', 'Planifié'),
-        ('confirme', 'Confirmé'),
-        ('en_attente', 'En attente'),
-        ('en_consultation', 'En consultation'),
-        ('termine', 'Terminé'),
-        ('annule', 'Annulé'),
-        ('absent', 'Absent'),
-    ]
+
+    STATUT = [('planifie','Planifié'),('confirme','Confirmé'),('en_attente','En attente'),('en_consultation','En consultation'),('termine','Terminé'),('annule','Annulé'),('absent','Absent')]
     TYPE = [('consultation','Consultation'),('controle','Contrôle'),('urgence','Urgence'),('examen','Examen'),('vaccination','Vaccination')]
+
     DEPARTEMENT = [
         ('medecine_generale', 'Médecine générale'),
         ('gynecologie_cpn', 'Gynécologie / CPN'),
     ]
     URGENCE = [('normal', 'Normal'), ('urgent', 'Urgent'), ('tres_urgent', 'Très urgent')]
-    MODE_ENTREE = [
-        ('venu_lui_meme', 'Patient venu de lui-même'),
-        ('reference_centre', "Référence d'un centre de santé"),
-        ('refere_tradipraticien', 'Référé par un tradipraticien'),
-        ('autre', 'Autre'),
-    ]
 
     code_rdv = models.CharField(max_length=20, blank=True, default='', verbose_name='Code RDV')
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='rendez_vous')
-    medecin = models.ForeignKey('employer.Employe', on_delete=models.SET_NULL, null=True, blank=True, related_name='rendez_vous')
-    docteur_jr = models.ForeignKey('employer.Employe', on_delete=models.SET_NULL, null=True, blank=True, related_name='rdv_docteur_jr', verbose_name='Docteur Jr. responsable')
+    medecin = models.ForeignKey('medecins.Medecin', on_delete=models.SET_NULL, null=True, blank=True, related_name='rendez_vous')
+    docteur_jr = models.ForeignKey('medecins.Medecin', on_delete=models.SET_NULL, null=True, blank=True, related_name='rdv_docteur_jr', verbose_name='Docteur Jr. responsable')
     departement = models.CharField(max_length=30, choices=DEPARTEMENT, blank=True, default='')
+    service = models.ForeignKey('medecins.Service', on_delete=models.SET_NULL, null=True, blank=True, related_name='rendez_vous')
+    type_consultation = models.ForeignKey('services.Articleservice', on_delete=models.SET_NULL, null=True, blank=True, related_name='rendez_vous', verbose_name='Type de consultation')
     salle_consultation = models.CharField(max_length=100, blank=True, verbose_name='Salle de consultation')
     date_heure = models.DateTimeField()
     date_suivi = models.DateTimeField(null=True, blank=True, verbose_name='Date de suivi')
@@ -181,15 +152,25 @@ class RendezVous(models.Model):
     temps_consultation_minutes = models.IntegerField(default=0)
     date_creation = models.DateTimeField(auto_now_add=True)
 
-    # Champs CPN
+    MODE_ENTREE = [
+        ('venu_lui_meme', 'Patient venu de lui-même'),
+        ('reference_centre', "Référence d'un centre de santé"),
+        ('refere_tradipraticien', 'Référé par un tradipraticien'),
+        ('autre', 'Autre'),
+    ]
     cpn_mode_entree = models.CharField(max_length=30, choices=MODE_ENTREE, blank=True, default='', verbose_name="Mode d'entrée CPN")
     cpn_mode_entree_autre = models.CharField(max_length=200, blank=True, default='', verbose_name="Mode d'entrée CPN (préciser)")
-    cpn_type_visite = models.ForeignKey(TypeVisite, on_delete=models.SET_NULL, null=True, blank=True, related_name='rendez_vous_cpn', verbose_name='Type de visite CPN')
+    cpn_type_visite = models.ForeignKey('TypeVisite', on_delete=models.SET_NULL, null=True, blank=True, related_name='rendez_vous_cpn', verbose_name='Type de visite CPN')
 
-    # Champs curatifs
-    cur_mode_entree = models.CharField(max_length=30, choices=MODE_ENTREE, blank=True, default='', verbose_name="Mode d'entrée curatif")
+    CUR_MODE_ENTREE = [
+        ('venu_lui_meme', 'Patient venu de lui-même'),
+        ('reference_centre', "Référence d'un centre de santé"),
+        ('refere_tradipraticien', 'Référé par un tradipraticien'),
+        ('autre', 'Autre'),
+    ]
+    cur_mode_entree = models.CharField(max_length=30, choices=CUR_MODE_ENTREE, blank=True, default='', verbose_name="Mode d'entrée curatif")
     cur_mode_entree_autre = models.CharField(max_length=200, blank=True, default='', verbose_name="Mode d'entrée curatif (préciser)")
-    cur_type_visite = models.ForeignKey(TypeVisite, on_delete=models.SET_NULL, null=True, blank=True, related_name='rendez_vous_curatifs', verbose_name='Type de visite curative')
+    cur_type_visite = models.ForeignKey('TypeVisite', on_delete=models.SET_NULL, null=True, blank=True, related_name='rendez_vous_curatifs', verbose_name='Type de visite curative')
 
     def save(self, *args, **kwargs):
         if not self.code_rdv:
@@ -227,6 +208,74 @@ class RendezVous(models.Model):
         ordering = ['date_heure']
 
 
+class RegistreCPN(models.Model):
+    rdv = models.OneToOneField(RendezVous, on_delete=models.CASCADE, related_name='registre_cpn')
+    donnees = models.JSONField(default=dict, blank=True)
+    date_modification = models.DateTimeField(auto_now=True)
+    class Meta:
+        verbose_name = "Registre CPN"
+
+class RegistreAccouchement(models.Model):
+    rdv = models.OneToOneField(RendezVous, on_delete=models.CASCADE, related_name='registre_accouchement')
+    donnees = models.JSONField(default=dict, blank=True)
+    date_modification = models.DateTimeField(auto_now=True)
+    class Meta:
+        verbose_name = "Registre Accouchement"
+
+class RegistrePostnatale(models.Model):
+    rdv = models.OneToOneField(RendezVous, on_delete=models.CASCADE, related_name='registre_postnatale')
+    donnees = models.JSONField(default=dict, blank=True)
+    date_modification = models.DateTimeField(auto_now=True)
+    class Meta:
+        verbose_name = "Registre Postnatale"
+
+class RegistreCuratif(models.Model):
+    rdv = models.OneToOneField(RendezVous, on_delete=models.CASCADE, related_name='registre_curatif')
+    donnees = models.JSONField(default=dict, blank=True)
+    date_modification = models.DateTimeField(auto_now=True)
+
+    @property
+    def diagnostic_display(self):
+        """Retourne les noms des pathologies sélectionnées dans cur_diagnostic."""
+        raw = self.donnees.get('cur_diagnostic', [])
+        if isinstance(raw, str):
+            raw = [raw] if raw else []
+        pks = [int(v) for v in raw if str(v).strip().isdigit()]
+        if not pks:
+            return ''
+        return ', '.join(
+            Pathologie.objects.filter(pk__in=pks).order_by('nom').values_list('nom', flat=True)
+        )
+
+    class Meta:
+        verbose_name = "Registre Curatif"
+
+
+class Pathologie(models.Model):
+    nom           = models.CharField(max_length=300, verbose_name='Nom')
+    description   = models.TextField(blank=True, verbose_name='Description')
+    actif         = models.BooleanField(default=True)
+    date_creation = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self): return self.nom
+    class Meta:
+        verbose_name = "Pathologie"
+        ordering = ['nom']
+
+
+class TypeVisite(models.Model):
+    nom           = models.CharField(max_length=200, verbose_name='Nom')
+    code          = models.CharField(max_length=50, unique=True, verbose_name='Code')
+    description   = models.TextField(blank=True, verbose_name='Description')
+    actif         = models.BooleanField(default=True)
+    date_creation = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self): return self.nom
+    class Meta:
+        verbose_name = "Type de visite"
+        ordering = ['nom']
+
+
 class Naissance(models.Model):
     SEXE = [('M', 'Masculin'), ('F', 'Féminin')]
     MODE = [
@@ -242,7 +291,7 @@ class Naissance(models.Model):
 
     numero = models.CharField(max_length=20, unique=True, editable=False)
     mere = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='naissances', verbose_name='Mère')
-    medecin = models.ForeignKey('employer.Employe', on_delete=models.SET_NULL, null=True, blank=True, verbose_name='Médecin')
+    medecin = models.ForeignKey('medecins.Medecin', on_delete=models.SET_NULL, null=True, blank=True, verbose_name='Médecin')
     date_accouchement = models.DateTimeField(verbose_name="Date d'accouchement")
     lieu_naissance = models.CharField(max_length=100, blank=True, verbose_name="Lieu de naissance")
     mode_accouchement = models.CharField(max_length=20, choices=MODE, default='voie_basse', verbose_name="Mode d'accouchement")
@@ -268,8 +317,11 @@ class Naissance(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.numero:
-            count = Naissance.objects.count() + 1
-            self.numero = f"NAISS{count:04d}"
+            annee = timezone.now().year
+            prefix = f"NAISS{annee}"
+            last = Naissance.objects.filter(numero__startswith=prefix).order_by('-pk').first()
+            count = (int(last.numero[len(prefix):]) + 1) if last else 1
+            self.numero = f"{prefix}{count:04d}"
         super().save(*args, **kwargs)
 
     def __str__(self): return f"{self.numero} - {self.mere}"

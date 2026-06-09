@@ -56,4 +56,16 @@ urlpatterns = [
     path('ajax/variante-ligne/', views.ajax_add_variante, name='ajax_variante'),
     path('ajax/regle-prix-ligne/', views.ajax_add_regle_prix, name='ajax_regle_prix'),
     path('ajax/delete-ligne/<str:model>/<int:pk>/', views.ajax_delete_ligne, name='ajax_delete_ligne'),
+
+    # ── Export ────────────────────────────────────────────────────────────────
+    path('export/articles/',          views.export_articles,          name='export_articles'),
+    path('export/categories/',        views.export_categories,        name='export_categories'),
+    path('export/unites/',            views.export_unites,            name='export_unites'),
+    path('export/categories-unites/', views.export_categories_unites, name='export_categories_unites'),
+
+    # ── Import ────────────────────────────────────────────────────────────────
+    path('importer/articles/',          views.import_articles,          name='import_articles'),
+    path('importer/categories/',        views.import_categories,        name='import_categories'),
+    path('importer/unites/',            views.import_unites,            name='import_unites'),
+    path('importer/categories-unites/', views.import_categories_unites, name='import_categories_unites'),
 ]

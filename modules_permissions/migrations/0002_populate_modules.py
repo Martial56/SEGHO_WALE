@@ -1,52 +1,33 @@
 from django.db import migrations
 
-MODULES = [
-    {'code': 'patients',       'name': 'Patients',       'icon': '🏥', 'url_name': 'patients:list',            'order': 1},
-    {'code': 'rendezvous',     'name': 'Rendez-vous',    'icon': '📅', 'url_name': 'patients:rdv_global',      'order': 2},
-    {'code': 'soins',          'name': 'Soins',          'icon': '💉', 'url_name': 'soins:list',               'order': 3},
-    {'code': 'medicaments',    'name': 'Médicaments',    'icon': '💊', 'url_name': 'medicament:list',          'order': 4},
-    {'code': 'pharmacie',      'name': 'Pharmacie',      'icon': '⚕️', 'url_name': '',                        'order': 5},
-    {'code': 'ordonnances',    'name': 'Ordonnances',    'icon': '📋', 'url_name': '',                        'order': 6},
-    {'code': 'laboratoire',    'name': 'Laboratoire',    'icon': '🔬', 'url_name': 'laboratoire_list',        'order': 7},
-    {'code': 'hospitalisation','name': 'Hospitalisation','icon': '🛏️', 'url_name': 'hospitalisation_list',    'order': 8},
-    {'code': 'gynecologie',    'name': 'Gynécologie',    'icon': '🩺', 'url_name': '',                        'order': 9},
-    {'code': 'facturation',    'name': 'Comptabilité',   'icon': '💰', 'url_name': 'facturation_list',        'order': 10},
-    {'code': 'assurance',      'name': 'Assurance',      'icon': '🛡️', 'url_name': '',                       'order': 11},
-    {'code': 'achats',         'name': 'Achats',         'icon': '🛒', 'url_name': '',                        'order': 12},
-    {'code': 'stock',          'name': 'Stock',          'icon': '📦', 'url_name': '',                        'order': 13},
-    {'code': 'planning',       'name': 'Planning',       'icon': '🗓️', 'url_name': '',                       'order': 14},
-    {'code': 'employer',       'name': 'Employés',       'icon': '👔', 'url_name': 'employer:ressources_humaines_list', 'order': 15},
-    {'code': 'conges',         'name': 'Congés',         'icon': '🏖️', 'url_name': '',                       'order': 16},
-    {'code': 'presence',       'name': 'Présence',       'icon': '📊', 'url_name': '',                        'order': 17},
-    {'code': 'services',       'name': 'Prestations',    'icon': '🏷️', 'url_name': '',                       'order': 18},
-    {'code': 'utilisateur',    'name': 'Utilisateurs',   'icon': '👤', 'url_name': 'utilisateur:list',        'order': 19},
-    {'code': 'admin',          'name': 'Administration', 'icon': '⚙️', 'url_name': '',                       'order': 20},
+DEFAULT_MODULES = [
+    {'code': 'patients',            'name': 'Patients',            'icon': '👥', 'url_name': 'patients_list',            'order': 1},
+    {'code': 'medecins',            'name': 'Médecins',            'icon': '👨‍⚕️', 'url_name': 'medecins_list',            'order': 2},
+    {'code': 'consultations',       'name': 'Consultations',       'icon': '💊', 'url_name': 'consultations_list',       'order': 3},
+    {'code': 'pharmacie',           'name': 'Pharmacie',           'icon': '⚗️', 'url_name': 'pharmacie_list',           'order': 4},
+    {'code': 'laboratoire',         'name': 'Laboratoire',         'icon': '🧪', 'url_name': 'laboratoire_list',         'order': 5},
+    {'code': 'hospitalisation',     'name': 'Hospitalisation',     'icon': '🛏️', 'url_name': 'hospitalisation_list',     'order': 6},
+    {'code': 'facturation',         'name': 'Facturation',         'icon': '💰', 'url_name': 'facturation_list',         'order': 7},
+    {'code': 'caisse',              'name': 'Caisse',              'icon': '💵', 'url_name': 'caisse_list',              'order': 8},
+    {'code': 'ressources_humaines', 'name': 'Ressources Humaines', 'icon': '👤', 'url_name': 'ressources_humaines_list', 'order': 9},
+    {'code': 'rapports',            'name': 'Rapports',            'icon': '📋', 'url_name': 'rapports_list',            'order': 10},
+    {'code': 'admin',               'name': 'Administration',      'icon': '⚙️', 'url_name': '',                         'order': 11},
 ]
 
-
-def populate(apps, schema_editor):
+def populate_modules(apps, schema_editor):
     Module = apps.get_model('modules_permissions', 'Module')
-    for m in MODULES:
-        Module.objects.get_or_create(code=m['code'], defaults={
-            'name':     m['name'],
-            'icon':     m['icon'],
-            'url_name': m['url_name'],
-            'order':    m['order'],
-            'is_active': True,
-        })
+    for m in DEFAULT_MODULES:
+        Module.objects.get_or_create(code=m['code'], defaults=m)
 
-
-def depopulate(apps, schema_editor):
+def unpopulate_modules(apps, schema_editor):
     Module = apps.get_model('modules_permissions', 'Module')
-    Module.objects.filter(code__in=[m['code'] for m in MODULES]).delete()
+    Module.objects.filter(code__in=[m['code'] for m in DEFAULT_MODULES]).delete()
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('modules_permissions', '0001_initial'),
     ]
-
     operations = [
-        migrations.RunPython(populate, depopulate),
+        migrations.RunPython(populate_modules, unpopulate_modules),
     ]

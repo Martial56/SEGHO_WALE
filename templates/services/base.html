@@ -74,6 +74,106 @@
     html[data-theme="dark"] .module-nav-brand {
         border-right-color: rgba(255, 255, 255, 0.1);
     }
+
+    /* ── Dropdown Import/Export ── */
+    .io-nav-wrap {
+        position: relative;
+        height: 100%;
+        display: flex;
+        align-items: center;
+    }
+
+    .io-nav-menu {
+        display: none;
+        position: absolute;
+        top: calc(100% + 2px);
+        right: 0;
+        min-width: 280px;
+        background: #fff;
+        border: 1px solid #dde3ea;
+        border-radius: 6px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.13);
+        z-index: 9999;
+        padding: 6px 0;
+    }
+
+    .io-nav-wrap.open .io-nav-menu { display: block; }
+
+    .io-section-label {
+        padding: 6px 14px 3px;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+        color: #9aa3ad;
+    }
+
+    .io-nav-sep { height: 1px; background: #eaedf0; margin: 5px 0; }
+
+    .io-nav-row {
+        display: flex;
+        align-items: center;
+        padding: 5px 14px;
+        gap: 8px;
+        font-size: 13px;
+        color: #2c3a46;
+    }
+
+    .io-nav-row span { flex: 1; white-space: nowrap; }
+
+    .io-fmt {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 7px;
+        border-radius: 3px;
+        font-size: 11px;
+        font-weight: 600;
+        text-decoration: none;
+        border: 1px solid transparent;
+        transition: background .12s;
+        white-space: nowrap;
+    }
+
+    .io-fmt-json  { color: #c97a00; border-color: #f5c97a; background: #fff8e6; }
+    .io-fmt-json:hover  { background: #fef0c2; }
+    .io-fmt-csv   { color: #1a7a4a; border-color: #6ecfa0; background: #edfaf3; }
+    .io-fmt-csv:hover   { background: #d2f5e3; }
+    .io-fmt-xlsx  { color: #217346; border-color: #82c89a; background: #edf7f0; }
+    .io-fmt-xlsx:hover  { background: #d0eedd; }
+
+    .io-nav-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 14px;
+        font-size: 13px;
+        color: #2c3a46;
+        text-decoration: none;
+        cursor: pointer;
+        border: none;
+        background: none;
+        width: 100%;
+        text-align: left;
+        font-family: inherit;
+    }
+
+    .io-nav-item:hover { background: #f0f6fc; color: #1a6da3; }
+    .io-nav-item i { color: #6a8aaa; font-size: 14px; }
+
+    html[data-theme="dark"] .io-nav-menu {
+        background: #1a2640;
+        border-color: #2d3f58;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    }
+    html[data-theme="dark"] .io-section-label { color: #6a8aaa; }
+    html[data-theme="dark"] .io-nav-sep { background: #2d3f58; }
+    html[data-theme="dark"] .io-nav-row { color: #c8d8e8; }
+    html[data-theme="dark"] .io-nav-item { color: #c8d8e8; }
+    html[data-theme="dark"] .io-nav-item:hover { background: #243450; color: #7ec8e3; }
+    html[data-theme="dark"] .io-nav-item i { color: #5a80a0; }
+    html[data-theme="dark"] .io-fmt-json  { color: #f5c97a; border-color: #7a5800; background: #3a2800; }
+    html[data-theme="dark"] .io-fmt-csv   { color: #6ecfa0; border-color: #1a5a3a; background: #0a2a18; }
+    html[data-theme="dark"] .io-fmt-xlsx  { color: #82c89a; border-color: #1a5a30; background: #0a2a14; }
 </style>
 <nav class="module-nav">
     <div class="module-nav-brand">
@@ -94,12 +194,87 @@
             class="module-nav-link {% if request.resolver_match.url_name == 'unites' or request.resolver_match.url_name == 'unite_create' or request.resolver_match.url_name == 'unite_edit' or request.resolver_match.url_name == 'categories_unites' or request.resolver_match.url_name == 'categorie_unite_create' or request.resolver_match.url_name == 'categorie_unite_edit' %}active{% endif %}">
             Unités de mesure
         </a>
-<a href="{% url 'services:categories' %}"
+        <a href="{% url 'services:categories' %}"
             class="module-nav-link {% if request.resolver_match.url_name == 'categories' or request.resolver_match.url_name == 'categorie_create' or request.resolver_match.url_name == 'categorie_edit' %}active{% endif %}">
             Catégories de prestations
         </a>
+
+        <!-- ── Import / Export ── -->
+        <div class="io-nav-wrap" id="io-nav-wrap">
+            <button type="button" class="module-nav-link" onclick="toggleIOMenu(event)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="margin-right:3px">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="17 8 12 3 7 8"/>
+                    <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                Import / Export
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-left:3px">
+                    <polyline points="6 9 12 15 18 9"/>
+                </svg>
+            </button>
+
+            <div class="io-nav-menu" id="io-nav-menu">
+                <!-- EXPORTER -->
+                <div class="io-section-label">Exporter</div>
+
+                <div class="io-nav-row">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6a8aaa" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    <span>Prestations</span>
+                    <a class="io-fmt io-fmt-json"  href="{% url 'services:export_articles' %}?format=json">JSON</a>
+                    <a class="io-fmt io-fmt-csv"   href="{% url 'services:export_articles' %}?format=csv">CSV</a>
+                    <a class="io-fmt io-fmt-xlsx"  href="{% url 'services:export_articles' %}?format=xlsx">Excel</a>
+                </div>
+                <div class="io-nav-row">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6a8aaa" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    <span>Catégories</span>
+                    <a class="io-fmt io-fmt-json"  href="{% url 'services:export_categories' %}?format=json">JSON</a>
+                    <a class="io-fmt io-fmt-csv"   href="{% url 'services:export_categories' %}?format=csv">CSV</a>
+                    <a class="io-fmt io-fmt-xlsx"  href="{% url 'services:export_categories' %}?format=xlsx">Excel</a>
+                </div>
+                <div class="io-nav-row">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6a8aaa" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    <span>Unités de mesure</span>
+                    <a class="io-fmt io-fmt-json"  href="{% url 'services:export_unites' %}?format=json">JSON</a>
+                    <a class="io-fmt io-fmt-csv"   href="{% url 'services:export_unites' %}?format=csv">CSV</a>
+                    <a class="io-fmt io-fmt-xlsx"  href="{% url 'services:export_unites' %}?format=xlsx">Excel</a>
+                </div>
+                <div class="io-nav-row">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6a8aaa" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    <span>Catégories unités</span>
+                    <a class="io-fmt io-fmt-json"  href="{% url 'services:export_categories_unites' %}?format=json">JSON</a>
+                    <a class="io-fmt io-fmt-csv"   href="{% url 'services:export_categories_unites' %}?format=csv">CSV</a>
+                    <a class="io-fmt io-fmt-xlsx"  href="{% url 'services:export_categories_unites' %}?format=xlsx">Excel</a>
+                </div>
+
+                <div class="io-nav-sep"></div>
+
+                <!-- IMPORTER -->
+                <div class="io-section-label">Importer</div>
+                <a href="{% url 'services:list' %}?action=import" class="io-nav-item">
+                    <i class="bi bi-upload"></i> Importer des Prestations
+                </a>
+                <a href="{% url 'services:categories' %}?action=import" class="io-nav-item">
+                    <i class="bi bi-upload"></i> Importer des Catégories
+                </a>
+                <a href="{% url 'services:unites' %}?action=import" class="io-nav-item">
+                    <i class="bi bi-upload"></i> Importer des Unités
+                </a>
+                <a href="{% url 'services:categories_unites' %}?action=import" class="io-nav-item">
+                    <i class="bi bi-upload"></i> Importer Catégories unités
+                </a>
+            </div>
+        </div>
     </div>
 </nav>
+<script>
+function toggleIOMenu(e) {
+    e.stopPropagation();
+    document.getElementById('io-nav-wrap').classList.toggle('open');
+}
+document.addEventListener('click', function() {
+    document.getElementById('io-nav-wrap').classList.remove('open');
+});
+</script>
 {% endblock %}
 
 {% block breadcrumb %}{% endblock %}

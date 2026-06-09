@@ -1,0 +1,413 @@
+{% extends 'hospitalisation/base.html' %}
+{% load i18n %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+:root { --surface:#fff; --border:#e8edf2; --text:#0d3040; --text-muted:rgba(0,0,0,.45); }
+html[data-theme="dark"] { --surface:#132033; --border:#243044; --text:#d4e6f5; --text-muted:rgba(255,255,255,.45); }
+
+/* ── Subheader (breadcrumb + workflow fusionnés) ── */
+.o-subheader {
+  background:var(--surface); border-bottom:1px solid var(--border);
+  padding:0; display:flex; flex-direction:column;
+  position:sticky; top:38px; z-index:190; margin:0 -32px;
+}
+.o-subheader-row {
+  display:flex; align-items:center; gap:8px;
+  padding:5px 16px;
+}
+.o-subheader-row + .o-subheader-row {
+  border-top:1px solid var(--border);
+}
+
+.o-ctrl-btn {
+  background:none; border:1px solid transparent; border-radius:4px;
+  padding:4px 8px; font-size:12px; font-family:inherit;
+  color:var(--text-muted); cursor:pointer;
+  display:flex; align-items:center; gap:4px; text-decoration:none;
+  transition:border-color .15s, color .15s, background .15s;
+}
+.o-ctrl-btn:hover { border-color:var(--border); color:var(--text); background:#f3f3f3; }
+
+.btn-save {
+  background:var(--teal-500); color:#fff; border:none;
+  padding:5px 18px; border-radius:4px; font-size:12.5px; font-weight:600;
+  font-family:inherit; cursor:pointer; display:inline-flex; align-items:center;
+  gap:6px; transition:background .15s;
+}
+.btn-save:hover { background:var(--teal-600); }
+.btn-cancel {
+  background:none; border:none; color:var(--text-muted);
+  padding:5px 10px; font-size:12.5px; font-family:inherit;
+  cursor:pointer; text-decoration:none; transition:color .15s;
+}
+.btn-cancel:hover { color:var(--text); }
+
+/* ── Workflow row ── */
+.wf-btn {
+  border:none; padding:5px 16px; border-radius:4px; font-size:12px;
+  font-weight:600; font-family:inherit; cursor:pointer;
+  letter-spacing:.5px; transition:background .15s; text-transform:uppercase;
+}
+.wf-btn-termine     { background:#3d3d99; color:#fff; }
+.wf-btn-termine:hover { background:#2d2d88; }
+.wf-btn:disabled    { background:#e5e7eb; color:#9ca3af; cursor:not-allowed; }
+
+.pipeline {
+  margin-left:auto; display:flex; align-items:stretch;
+  font-size:11px; font-weight:700; letter-spacing:.6px; gap:2px;
+}
+.pip-step {
+  padding:0 22px 0 28px; height:30px;
+  display:flex; align-items:center;
+  color:rgba(0,0,0,.35); background:#eef1f5; white-space:nowrap;
+  clip-path:polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%, 10px 50%);
+  transition:background .15s, color .15s;
+}
+.pip-step:first-child {
+  padding-left:16px;
+  clip-path:polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%);
+  border-radius:3px 0 0 3px;
+}
+.pip-step:last-child {
+  padding-right:16px;
+  clip-path:polygon(0 0, 100% 0, 100% 100%, 0 100%, 10px 50%);
+  border-radius:0 3px 3px 0;
+}
+.pip-step.active { background:#3d3d99; color:#fff; }
+.pip-step.done   { background:#daedf8; color:var(--teal-700); }
+
+/* ── Form card ── */
+.form-card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:8px; margin-top:10px; overflow:hidden;
+}
+
+/* ── En-tête patient ── */
+.fc-patient-header {
+  padding:20px 28px 18px;
+  border-bottom:1px solid var(--border);
+  display:grid; grid-template-columns:1fr auto; gap:16px 40px; align-items:start;
+}
+.fc-code-badge {
+  display:inline-flex; align-items:center; gap:6px;
+  background:#fef2f2; border:1px solid #fecaca;
+  color:#991b1b; border-radius:4px; padding:4px 12px;
+  font-size:12px; font-family:monospace; margin-bottom:10px;
+}
+.fc-code-badge.nouveau { background:#f5f7fa; border-color:#dde3ec; color:#7a8fa0; }
+.fc-code-badge strong { font-style:normal; font-size:13px; }
+
+/* ── Champs underline ── */
+.field-ul {
+  width:100%; background:transparent; border:none;
+  border-bottom:1.5px solid #d1dde3; border-radius:0;
+  padding:7px 2px; font-size:13px; color:var(--text);
+  transition:border-color .2s; box-shadow:none; outline:none; font-family:inherit;
+}
+.field-ul:focus { border-bottom-color:var(--teal-500); }
+.field-ul::placeholder { color:#bfcdd4; }
+textarea.field-ul { resize:vertical; min-height:80px; padding:6px 2px; border-bottom-width:1.5px; }
+select.field-ul {
+  appearance:none; -webkit-appearance:none; background-color:transparent;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23839aaa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 4px center; padding-right:22px; cursor:pointer;
+}
+.field-label {
+  display:block; font-size:11px; font-weight:700; color:var(--text-muted);
+  text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px;
+}
+.field-error { font-size:12px; color:#e53935; margin-top:3px; }
+
+/* Readonly */
+.field-readonly {
+  padding:7px 2px; font-size:13px; color:var(--text);
+  border-bottom:1.5px solid #edf1f5; min-height:34px;
+}
+.field-readonly.empty { color:var(--text-muted); font-style:italic; }
+
+/* ── Info badges (genre, âge) ── */
+.info-badge {
+  display:inline-flex; align-items:center; gap:5px;
+  background:#f0f4f8; border:1px solid #dde3ec; border-radius:4px;
+  padding:5px 12px; font-size:13px; color:var(--text); font-weight:500;
+}
+.info-badge i { font-size:14px; color:var(--teal-600); }
+.info-badge.empty { color:var(--text-muted); font-style:italic; background:#f8fafc; }
+
+/* ── Grid champs ── */
+.fc-grid {
+  display:grid; grid-template-columns:1fr 1fr; gap:20px 48px;
+  padding:22px 28px;
+}
+.fc-grid .full { grid-column:1/-1; }
+.fc-divider { grid-column:1/-1; border:none; border-top:1px solid var(--border); margin:4px 0; }
+
+/* ── Section auto-info (genre + âge) ── */
+.fc-auto-info {
+  padding:12px 28px; background:#f8fafc;
+  border-bottom:1px solid var(--border);
+  display:flex; align-items:center; gap:24px;
+}
+.fc-auto-item { display:flex; flex-direction:column; gap:4px; }
+.fc-auto-lbl  { font-size:10.5px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; }
+
+/* Messages */
+.messages-list { list-style:none; padding:0; margin:8px 0 0; }
+.msg-success { background:#d4edda; color:#1a6b3c; padding:9px 14px; border-radius:4px; font-size:13px; }
+.msg-error   { background:#fde8e8; color:#7b1c1c; padding:9px 14px; border-radius:4px; font-size:13px; }
+
+/* ── TomSelect underline ── */
+.ts-wrapper { padding:0 !important; }
+.ts-wrapper .ts-control {
+  background:transparent !important; border:none !important;
+  border-bottom:1.5px solid #d1dde3 !important; border-radius:0 !important;
+  box-shadow:none !important; padding:7px 24px 7px 2px !important;
+  font-size:13px !important; font-family:inherit !important; min-height:unset !important; cursor:pointer;
+}
+.ts-wrapper.focus .ts-control { border-bottom-color:var(--teal-500) !important; box-shadow:none !important; }
+.ts-wrapper .ts-control .item { font-size:13px !important; font-family:inherit !important; color:var(--text) !important; padding:0 !important; margin:0 !important; }
+.ts-wrapper .ts-control input { font-size:13px !important; font-family:inherit !important; color:var(--text) !important; padding:0 !important; margin:0 !important; }
+.ts-wrapper .ts-control input::placeholder { color:#bfcdd4; }
+.ts-control .item[data-value=""] { color:#bfcdd4 !important; font-style:italic; }
+.ts-dropdown .option[data-value=""] { display:none !important; }
+.ts-wrapper.single .ts-control::after {
+  content:'' !important; width:12px !important; height:8px !important;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23839aaa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat !important;
+  border:none !important; position:absolute !important; right:4px !important;
+  top:50% !important; transform:translateY(-50%) !important; margin:0 !important;
+}
+.ts-wrapper.single.input-active .ts-control::after { transform:translateY(-50%) rotate(180deg) !important; }
+.ts-dropdown {
+  font-size:13px !important; font-family:inherit !important;
+  border:1px solid #dde3ec !important; border-radius:6px !important;
+  box-shadow:0 8px 24px rgba(0,0,0,.14) !important; margin-top:3px !important; background:#fff !important;
+}
+.ts-dropdown .ts-dropdown-content { max-height:220px; }
+.ts-dropdown .option { padding:7px 14px !important; font-size:13px !important; color:var(--text) !important; cursor:pointer; }
+.ts-dropdown .option:hover, .ts-dropdown .option.selected, .ts-dropdown .option.active { background:#e8f4f8 !important; color:var(--teal-600) !important; }
+.ts-dropdown .no-results { padding:8px 14px; color:#999; font-size:12px; }
+
+/* Dark */
+html[data-theme="dark"] .form-card   { background:var(--surface); border-color:var(--border); }
+html[data-theme="dark"] .fc-auto-info { background:#0d1f30; }
+html[data-theme="dark"] .info-badge  { background:#1a2535; border-color:#2e3f58; }
+html[data-theme="dark"] .info-badge.empty { background:#132033; }
+html[data-theme="dark"] .field-ul   { color:var(--text); border-bottom-color:rgba(255,255,255,.15); }
+html[data-theme="dark"] .field-ul:focus { border-bottom-color:var(--teal-400); }
+html[data-theme="dark"] .field-ul::placeholder { color:rgba(255,255,255,.25); }
+html[data-theme="dark"] .field-readonly { color:var(--text); border-bottom-color:rgba(255,255,255,.08); }
+html[data-theme="dark"] .fc-code-badge { background:rgba(153,27,27,.15); border-color:rgba(252,165,165,.3); color:#fca5a5; }
+html[data-theme="dark"] .pip-step  { background:#1a2535; color:rgba(255,255,255,.3); }
+html[data-theme="dark"] .pip-step.active { background:#3d3d99; color:#fff; }
+html[data-theme="dark"] .pip-step.done   { background:#0f3050; color:var(--teal-300); }
+html[data-theme="dark"] .o-ctrl-btn:hover { background:rgba(255,255,255,.05); }
+html[data-theme="dark"] .btn-cancel { color:var(--text-muted); }
+html[data-theme="dark"] .ts-wrapper .ts-control { border-bottom-color:rgba(255,255,255,.15) !important; }
+html[data-theme="dark"] .ts-wrapper.focus .ts-control { border-bottom-color:var(--teal-400) !important; }
+html[data-theme="dark"] .ts-dropdown { background:#1a2535 !important; border-color:#2e3f58 !important; }
+html[data-theme="dark"] .ts-dropdown .option { color:#c5d4e2 !important; }
+html[data-theme="dark"] .ts-dropdown .option:hover,
+html[data-theme="dark"] .ts-dropdown .option.active,
+html[data-theme="dark"] .ts-dropdown .option.selected { background:rgba(33,136,171,.2) !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Subheader (breadcrumb + workflow) ── -->
+<div class="o-subheader">
+
+  <!-- Ligne 1 : breadcrumb + actions -->
+  <div class="o-subheader-row">
+    <a href="{% url 'hospitalisation:deces_list' %}" class="o-ctrl-btn" style="padding:3px 7px;">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <span style="font-size:13px;color:var(--text-muted);">
+      <a href="{% url 'hospitalisation:deces_list' %}" style="color:var(--accent,var(--teal-600));text-decoration:none;font-weight:500;">Registre des décès</a>
+      <span style="margin:0 4px;opacity:.4;">/</span>
+      <span style="color:var(--text);">{{ titre }}</span>
+    </span>
+    <div style="flex:1;"></div>
+    <a href="{% url 'hospitalisation:deces_list' %}" class="btn-cancel">Ignorer</a>
+    <button type="submit" form="deces-form" class="btn-save">
+      <i class="bi bi-check2"></i> Sauvegarder
+    </button>
+  </div>
+
+  <!-- Ligne 2 : workflow -->
+  <div class="o-subheader-row">
+    {% if edit and deces.statut == 'brouillon' %}
+    <form method="post" style="display:contents;">
+      {% csrf_token %}
+      <button type="submit" name="terminer" value="1" class="wf-btn wf-btn-termine">Terminer</button>
+    </form>
+    {% else %}
+    <button class="wf-btn" disabled>Terminer</button>
+    {% endif %}
+
+    <div class="pipeline">
+      <div class="pip-step {% if not edit or deces.statut == 'brouillon' %}active{% else %}done{% endif %}">
+        Brouillon
+      </div>
+      <div class="pip-step {% if edit and deces.statut == 'termine' %}active{% endif %}">
+        Terminé
+      </div>
+    </div>
+  </div>
+
+</div>
+
+{% if messages %}
+<ul class="messages-list">
+  {% for msg in messages %}<li class="msg-{{ msg.tags }}">{{ msg }}</li>{% endfor %}
+</ul>
+{% endif %}
+
+<!-- ── Formulaire ── -->
+<form method="post" id="deces-form" novalidate>
+  {% csrf_token %}
+
+  <div class="form-card">
+
+    <!-- En-tête : code + patient + date -->
+    <div class="fc-patient-header">
+      <div>
+        <div class="fc-code-badge {% if not edit %}nouveau{% endif %}">
+          <i class="bi bi-file-earmark-x"></i>
+          {% if edit %}<strong>{{ deces.code }}</strong>{% else %}<span>Code auto</span>{% endif %}
+        </div>
+        <label class="field-label" for="{{ form.patient.id_for_label }}">
+          <i class="bi bi-person" style="margin-right:4px;"></i>Patient
+        </label>
+        {{ form.patient }}
+        {% if form.patient.errors %}<div class="field-error">{{ form.patient.errors|join:", " }}</div>{% endif %}
+      </div>
+      <div style="min-width:220px;">
+        <label class="field-label" for="{{ form.date_deces.id_for_label }}">
+          <i class="bi bi-calendar-x" style="margin-right:4px;"></i>Date de décès
+        </label>
+        {{ form.date_deces }}
+        {% if form.date_deces.errors %}<div class="field-error">{{ form.date_deces.errors|join:", " }}</div>{% endif %}
+      </div>
+    </div>
+
+    <!-- Auto-info patient (genre + âge) -->
+    <div class="fc-auto-info">
+      <div class="fc-auto-item">
+        <span class="fc-auto-lbl">Genre</span>
+        <div class="info-badge {% if not edit %}empty{% endif %}" id="display-genre">
+          <i class="bi bi-gender-ambiguous"></i>
+          {% if edit %}{{ deces.patient.get_sexe_display }}{% else %}Sélectionner un patient{% endif %}
+        </div>
+      </div>
+      <div class="fc-auto-item">
+        <span class="fc-auto-lbl">Âge</span>
+        <div class="info-badge {% if not edit %}empty{% endif %}" id="display-age">
+          <i class="bi bi-calendar3"></i>
+          {% if edit %}{{ deces.patient.age }} ans{% else %}—{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Champs principaux -->
+    <div class="fc-grid">
+
+      <!-- Hospitalisation -->
+      <div>
+        <label class="field-label" for="{{ form.hospitalisation.id_for_label }}">
+          <i class="bi bi-hospital" style="margin-right:4px;"></i>Hospitalisation liée
+        </label>
+        {{ form.hospitalisation }}
+        {% if form.hospitalisation.errors %}<div class="field-error">{{ form.hospitalisation.errors|join:", " }}</div>{% endif %}
+      </div>
+
+      <!-- Médecin -->
+      <div>
+        <label class="field-label" for="{{ form.medecin.id_for_label }}">
+          <i class="bi bi-person-badge" style="margin-right:4px;"></i>Médecin traitant
+        </label>
+        {{ form.medecin }}
+        {% if form.medecin.errors %}<div class="field-error">{{ form.medecin.errors|join:", " }}</div>{% endif %}
+      </div>
+
+      <hr class="fc-divider">
+
+      <!-- Raison du décès -->
+      <div class="full">
+        <label class="field-label" for="{{ form.raison_deces.id_for_label }}">
+          <i class="bi bi-clipboard2-pulse" style="margin-right:4px;"></i>Raison du décès
+        </label>
+        {{ form.raison_deces }}
+        {% if form.raison_deces.errors %}<div class="field-error">{{ form.raison_deces.errors|join:", " }}</div>{% endif %}
+      </div>
+
+      <!-- Remarques -->
+      <div class="full">
+        <label class="field-label" for="{{ form.remarques.id_for_label }}">
+          <i class="bi bi-chat-text" style="margin-right:4px;"></i>Remarques
+        </label>
+        {{ form.remarques }}
+        {% if form.remarques.errors %}<div class="field-error">{{ form.remarques.errors|join:", " }}</div>{% endif %}
+      </div>
+
+    </div>
+  </div>
+</form>
+
+<script id="patients-data" type="application/json">
+{
+  {% for p in form.patient.field.queryset %}
+  "{{ p.pk }}": { "genre": "{{ p.get_sexe_display }}", "age": "{{ p.age }} ans" }{% if not forloop.last %},{% endif %}
+  {% endfor %}
+}
+</script>
+
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+/* TomSelect */
+document.querySelectorAll('select.field-ul').forEach(function(el) {
+  var emptyOpt = el.querySelector('option[value=""]');
+  var placeholder = emptyOpt ? emptyOpt.textContent.trim() : 'Sélectionner…';
+  new TomSelect(el, {
+    allowEmptyOption: false,
+    placeholder: placeholder,
+    maxOptions: 300,
+    render: { no_results: function() { return '<div class="no-results" style="padding:8px 14px;color:#999;font-size:12px;">Aucun résultat</div>'; } }
+  });
+});
+
+/* Auto-remplissage genre/âge depuis le patient sélectionné */
+(function () {
+  const patEl = document.getElementById('{{ form.patient.id_for_label }}');
+  if (!patEl) return;
+  const PATIENTS = JSON.parse(document.getElementById('patients-data').textContent);
+
+  function fill() {
+    const ts  = patEl.tomselect;
+    const val = ts ? ts.getValue() : patEl.value;
+    const d   = PATIENTS[val] || {};
+    const gEl = document.getElementById('display-genre');
+    const aEl = document.getElementById('display-age');
+    if (gEl) {
+      gEl.querySelector('i').className = 'bi bi-gender-ambiguous';
+      gEl.childNodes[gEl.childNodes.length - 1].textContent = ' ' + (d.genre || 'Sélectionner un patient');
+      gEl.classList.toggle('empty', !d.genre);
+    }
+    if (aEl) {
+      aEl.childNodes[aEl.childNodes.length - 1].textContent = ' ' + (d.age || '—');
+      aEl.classList.toggle('empty', !d.age);
+    }
+  }
+
+  const ts = patEl.tomselect;
+  if (ts) ts.on('change', fill);
+  else patEl.addEventListener('change', fill);
+  fill();
+})();
+</script>
+{% endblock %}

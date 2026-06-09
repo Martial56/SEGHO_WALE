@@ -1,0 +1,236 @@
+{% extends 'patients/base.html' %}
+
+{% block topbar_title %}Pathologies{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html[data-theme="dark"] .o-list tbody tr:hover { background: rgba(33,136,171,0.2); }
+  html[data-theme="dark"] .o-list thead th { background: var(--surface); }
+  html[data-theme="dark"] .o-search-input { color: var(--text); }
+  html[data-theme="dark"] .o-search-bar { border-bottom-color: #3a4a62; }
+  html[data-theme="dark"] .o-pag-btn { background: var(--surface); border-color: var(--border); color: var(--text-muted); }
+  html[data-theme="dark"] .o-empty-state { background: var(--bg); }
+
+  .o-subheader {
+    background: #fff; border-bottom: 1px solid var(--border);
+    padding: 6px 16px; display: flex; flex-direction: column; gap: 5px;
+    position: sticky; top: 0; z-index: 190; margin: 0 -32px 16px;
+  }
+  .o-subheader-row { display: flex; align-items: center; gap: 8px; }
+  .o-subheader-row-right { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .o-page-title { font-size: 17px; font-weight: 400; color: var(--text); }
+  .o-btn-create {
+    background: var(--teal-500); color: #fff; border: none; padding: 5px 14px; border-radius: 4px;
+    font-size: 12.5px; font-weight: 500; cursor: pointer;
+    text-decoration: none; display: inline-flex; align-items: center;
+    letter-spacing: 0.5px; transition: background 0.15s;
+  }
+  .o-btn-create:hover { background: var(--teal-600); }
+  .o-search-bar {
+    display: flex; align-items: center; border: none; border-bottom: 1px solid #bbb;
+    background: transparent; min-height: 28px; padding: 2px 4px; gap: 4px; width: 320px;
+  }
+  .o-search-input {
+    border: none; outline: none; font-size: 12px;
+    color: var(--text); flex: 1; min-width: 60px; background: transparent;
+  }
+  .o-search-btn { background: none; border: none; cursor: pointer; color: #888; font-size: 13px; padding: 2px; }
+  .o-ctrl-sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }
+  .o-pagination { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+  .o-pag-btn {
+    color: #555; text-decoration: none; font-size: 15px;
+    display: inline-flex; align-items: center; padding: 0 2px;
+    transition: color 0.15s;
+  }
+  .o-pag-btn:hover { color: var(--teal-600); }
+  .o-pag-btn.disabled { opacity: 0.3; pointer-events: none; }
+
+  .o-list-wrap { overflow-x: auto; overflow-y: auto; background: #fff; margin: 0 -32px; }
+  .o-list { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .o-list thead th {
+    background: #f5f5f5; border-bottom: 1px solid var(--border);
+    padding: 6px 10px; font-weight: 500; font-size: 11.5px;
+    color: var(--text-muted); text-align: left;
+    position: sticky; top: 0; z-index: 2; user-select: none;
+  }
+  .o-list tbody tr { border-bottom: 1px solid #f0f0f0; transition: background 0.1s; cursor: pointer; }
+  .o-list tbody tr:hover { background: var(--teal-50); }
+  .o-list tbody td { padding: 6px 10px; color: var(--text); vertical-align: middle; }
+  .o-list tbody td.td-nom { white-space: normal; font-weight: 500; }
+  .o-list tbody td.td-actions { text-align: center; white-space: nowrap; width: 80px; }
+
+  .btn-icon {
+    width: 26px; height: 26px; border: 1px solid var(--border); border-radius: 3px;
+    background: var(--surface); display: inline-flex; align-items: center; justify-content: center;
+    color: var(--text-muted); font-size: 12px; text-decoration: none; cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .btn-icon:hover { background: var(--teal-600); color: #fff; border-color: var(--teal-600); }
+  .btn-icon.btn-danger:hover { background: #b71c1c; border-color: #b71c1c; }
+
+  .o-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 20px; }
+  .o-empty-illo {
+    width: 88px; height: 88px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--teal-600) 0%, var(--teal-400) 100%);
+    display: flex; align-items: center; justify-content: center; margin-bottom: 20px;
+  }
+  .o-empty-illo svg { color: #fff; opacity: 0.9; }
+  .o-empty-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+  .o-empty-sub { font-size: 12.5px; color: var(--text-muted); margin-bottom: 20px; }
+  .o-empty-btn {
+    background: var(--teal-500); color: #fff; border: none; padding: 7px 20px; border-radius: 4px;
+    font-size: 12.5px; font-weight: 500; cursor: pointer; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 6px; transition: background 0.15s;
+  }
+  .o-empty-btn:hover { background: var(--teal-600); }
+
+  .gyn-nav {
+    background: #fff; border-bottom: 1px solid rgba(0,0,0,0.08);
+    margin: 0 -32px 0; padding: 0 32px;
+    display: flex; align-items: stretch; height: 44px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    position: sticky; top: 0; z-index: 250;
+  }
+  .gyn-nav-link {
+    padding: 11px 16px; font-size: 13px; font-weight: 500;
+    color: rgba(0,0,0,0.5); text-decoration: none;
+    border-bottom: 2px solid transparent;
+    display: inline-flex; align-items: center; gap: 6px;
+    transition: color 0.15s, border-color 0.15s; white-space: nowrap;
+  }
+  .gyn-nav-link:hover { color: var(--teal-600); }
+  .gyn-nav-link.active { color: var(--teal-600); border-bottom-color: var(--teal-500); font-weight: 600; }
+  html[data-theme="dark"] .gyn-nav { background: #091d2e; border-bottom-color: rgba(255,255,255,0.06); }
+  html[data-theme="dark"] .gyn-nav-link { color: rgba(255,255,255,0.4); }
+  html[data-theme="dark"] .gyn-nav-link.active { color: var(--teal-300); border-bottom-color: var(--teal-400); }
+
+  /* ── Config dropdown ── */
+  .gyn-nav-dd { position: relative; display: inline-flex; align-items: stretch; }
+  .gyn-nav-dd-panel {
+    display: none; position: absolute; top: 100%; left: 0;
+    background: #fff; border: 1px solid #dde3ec;
+    border-radius: 6px; box-shadow: 0 8px 28px rgba(0,0,0,0.16);
+    min-width: 200px; padding: 5px 0; z-index: 9999;
+  }
+  .gyn-nav-dd:hover .gyn-nav-dd-panel,
+  .gyn-nav-dd-panel:hover { display: block; }
+  .gyn-nav-dd-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 16px; font-size: 12.5px; color: var(--text);
+    text-decoration: none; transition: background 0.1s; white-space: nowrap;
+  }
+  .gyn-nav-dd-item:hover { background: var(--teal-50); color: var(--teal-600); }
+  .gyn-nav-dd-item.active { background: #ede7f6; color: var(--teal-600); font-weight: 500; }
+  html[data-theme="dark"] .gyn-nav-dd-panel { background: #1a2535; border-color: #2e3f58; }
+  html[data-theme="dark"] .gyn-nav-dd-item { color: var(--text); }
+  html[data-theme="dark"] .gyn-nav-dd-item:hover { background: rgba(33,136,171,0.2); color: var(--teal-300); }
+  .main { height: 100vh; overflow: hidden; }
+  .content { min-height: 0; padding-top: 0; overflow-x: hidden; }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+
+<div class="o-subheader">
+  <div class="o-subheader-row">
+    <span class="o-page-title">Pathologies <span style="font-size:13px;color:var(--text-muted);font-weight:400;">({{ total }})</span></span>
+    <div class="o-subheader-row-right">
+      <form method="get" id="search-form" style="display:flex;align-items:center;">
+        <div class="o-search-bar">
+          <input class="o-search-input" id="search-input" type="text" name="q"
+                 value="{{ q }}" placeholder="Rechercher une pathologie…" autocomplete="off">
+          <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
+        </div>
+      </form>
+      <div class="o-ctrl-sep"></div>
+      <div class="o-pagination">
+        <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
+           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-left"></i>
+        </a>
+        <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
+        <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
+           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-right"></i>
+        </a>
+      </div>
+    </div>
+  </div>
+  <div class="o-subheader-row">
+    <a href="{% url 'patients:pathologie_create' %}" class="o-btn-create">CRÉER</a>
+  </div>
+</div>
+
+<div class="o-list-wrap">
+  {% if page_obj %}
+  <table class="o-list">
+    <thead>
+      <tr>
+        <th style="width:40px;text-align:center;">#</th>
+        <th>Nom de la pathologie</th>
+        <th style="width:60px;text-align:center;">Actif</th>
+        <th style="width:80px;text-align:center;">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in page_obj %}
+      <tr onclick="window.location='{% url 'patients:pathologie_edit' p.pk %}'">
+        <td style="text-align:center;color:var(--text-muted);font-size:11px;">{{ forloop.counter0|add:page_obj.start_index }}</td>
+        <td class="td-nom">{{ p.nom }}</td>
+        <td style="text-align:center;">
+          {% if p.actif %}
+            <span style="color:#2e7d32;font-size:15px;"><i class="bi bi-check-circle-fill"></i></span>
+          {% else %}
+            <span style="color:#ccc;font-size:15px;"><i class="bi bi-x-circle"></i></span>
+          {% endif %}
+        </td>
+        <td class="td-actions" onclick="event.stopPropagation()">
+          <a href="{% url 'patients:pathologie_edit' p.pk %}" class="btn-icon" title="Modifier"><i class="bi bi-pencil"></i></a>
+          <form method="post" action="{% url 'patients:pathologie_delete' p.pk %}" style="display:inline;"
+                onsubmit="return confirm('Supprimer « {{ p.nom|escapejs }} » ?')">
+            {% csrf_token %}
+            <button type="submit" class="btn-icon btn-danger" title="Supprimer"><i class="bi bi-trash"></i></button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="o-empty-state">
+    <div class="o-empty-illo">
+      <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+      </svg>
+    </div>
+    <div class="o-empty-title">Aucune pathologie{% if q %} pour "{{ q }}"{% endif %}</div>
+    <div class="o-empty-sub">{% if q %}Essayez avec un autre terme.{% else %}Créez la première pathologie.{% endif %}</div>
+    {% if not q %}
+    <a href="{% url 'patients:pathologie_create' %}" class="o-empty-btn">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      CRÉER UNE PATHOLOGIE
+    </a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<script>
+  (function() {
+    var input = document.getElementById('search-input');
+    var form  = document.getElementById('search-form');
+    var timer = null;
+    if (!input) return;
+    input.addEventListener('input', function() {
+      clearTimeout(timer);
+      timer = setTimeout(function() { form.submit(); }, 350);
+    });
+  })();
+</script>
+{% endblock %}

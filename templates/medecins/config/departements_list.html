@@ -1,0 +1,227 @@
+{% extends 'medecins/base.html' %}
+
+{% block topbar_title %}Départements{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+  /* ── Départements page ── */
+  .page-icon { width:34px; height:34px; border-radius:8px; background:rgba(26,84,130,.1); display:inline-flex; align-items:center; justify-content:center; font-size:16px; color:var(--primary); flex-shrink:0; vertical-align:middle; }
+  html[data-theme="dark"] .page-icon { background:rgba(33,136,171,.18); color:#7ecae0; }
+  .o-page-title { display:inline-flex !important; align-items:center; gap:9px; }
+  /* Card accent strip */
+  .dep-strip { height:3px; margin:-16px -16px 12px; border-radius:10px 10px 0 0; }
+  .dep-strip-actif  { background:linear-gradient(90deg,var(--primary),var(--accent)); }
+  .dep-strip-inactif { background:rgba(0,0,0,.1); }
+  html[data-theme="dark"] .dep-strip-inactif { background:rgba(255,255,255,.08); }
+  /* Card icon */
+  .dep-icon { width:36px; height:36px; border-radius:9px; display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0; }
+  .dep-icon-actif   { background:rgba(26,84,130,.1);  color:var(--primary); }
+  .dep-icon-inactif { background:rgba(0,0,0,.06); color:var(--text-muted); }
+  html[data-theme="dark"] .dep-icon-actif   { background:rgba(33,136,171,.2); color:#7ecae0; }
+  html[data-theme="dark"] .dep-icon-inactif { background:rgba(255,255,255,.06); }
+  /* Employee stat */
+  .dep-stat { display:flex; flex-direction:column; align-items:flex-start; }
+  .dep-stat-num { font-size:20px; font-weight:800; color:var(--text); line-height:1; }
+  .dep-stat-lbl { font-size:10px; text-transform:uppercase; letter-spacing:.3px; color:var(--text-muted); margin-top:2px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="page-wrap">
+
+<div class="o-subheader" id="subheader">
+  <div class="o-subheader-row">
+    <span class="o-page-title">
+      <span class="page-icon"><i class="bi bi-building-fill"></i></span>
+      Départements <span class="o-page-count">{{ total_filtre }}</span>
+    </span>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+      <form method="get" id="filter-form" style="display:flex;align-items:center;">
+        <input type="hidden" name="vue" id="vue-input" value="{{ vue|default:'liste' }}">
+        <div class="o-search-bar">
+          <input class="o-search-input" id="search-input" type="text" name="q" value="{{ q }}" placeholder="Rechercher un département…">
+          <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <div class="o-subheader-row">
+    <a href="{% url 'medecins_departement_create' %}" class="o-btn-create">
+      <i class="bi bi-plus-lg"></i> Créer
+    </a>
+    {% if q %}
+    <a href="{% url 'medecins_departements' %}" class="o-ctrl-btn"><i class="bi bi-x"></i> Effacer</a>
+    <span class="o-filter-tag">{{ q }} <a href="{% url 'medecins_departements' %}?vue={{ vue }}">×</a></span>
+    {% endif %}
+    <div style="flex:1;"></div>
+    <span style="font-size:12px;color:var(--text-muted);">{{ total_filtre }} / {{ total }}</span>
+    <div class="o-ctrl-sep"></div>
+    <div class="o-view-btns">
+      <button type="button" class="o-view-btn {% if vue|default:'liste' == 'liste' %}active{% endif %}" onclick="setVue('liste', this)" title="Vue Liste"><i class="bi bi-list-ul"></i></button>
+      <button type="button" class="o-view-btn {% if vue == 'grille' %}active{% endif %}" onclick="setVue('grille', this)" title="Vue Grille"><i class="bi bi-grid"></i></button>
+    </div>
+  </div>
+</div>
+
+<div class="bulk-bar" id="bulk-bar">
+  <i class="bi bi-check2-square"></i>
+  <span id="bulk-count">0</span> élément(s) sélectionné(s)
+  <button type="button" class="btn-bulk-delete" onclick="openBulkModal()"><i class="bi bi-trash"></i> Supprimer</button>
+  <button type="button" class="btn-bulk-cancel" onclick="clearSelection()">Annuler</button>
+</div>
+
+<div id="list-result">
+{% if total_filtre > 0 %}
+
+{% if vue == 'grille' %}
+<div class="o-kanban">
+  {% for dep in page_obj %}
+  <div class="o-card" onclick="window.location='{% url 'medecins_departement_detail' dep.pk %}'">
+    <div class="dep-strip {% if dep.actif %}dep-strip-actif{% else %}dep-strip-inactif{% endif %}"></div>
+    <div class="o-card-header">
+      <span class="o-card-code">{{ dep.code }}</span>
+      <div class="dep-icon {% if dep.actif %}dep-icon-actif{% else %}dep-icon-inactif{% endif %}"><i class="bi bi-building-fill"></i></div>
+    </div>
+    <div class="o-card-name">{{ dep.nom }}</div>
+    <div class="o-card-footer">
+      <div class="dep-stat">
+        <span class="dep-stat-num">{{ dep.nb_employes }}</span>
+        <span class="dep-stat-lbl">Utilisateur(s)</span>
+      </div>
+      {% if dep.actif %}<span class="badge-actif"><i class="bi bi-check-circle-fill"></i> Actif</span>{% else %}<span class="badge-inactif"><i class="bi bi-x-circle-fill"></i> Inactif</span>{% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="o-list-wrap">
+  <table class="o-list-table">
+    <thead>
+      <tr>
+        <th style="width:36px;padding:8px 8px 8px 14px;">
+          <input type="checkbox" id="select-all" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent);" onchange="toggleAll(this)">
+        </th>
+        <th class="col-code">Code</th>
+        <th class="col-nom">Nom</th>
+        <th class="col-med">Utilisateurs</th>
+        <th class="col-statut">Statut</th>
+        <th class="col-picker-th">
+          <button class="col-picker-btn" id="col-picker-btn" title="Colonnes visibles"><i class="bi bi-three-dots-vertical"></i></button>
+          <div class="col-picker-menu" id="col-picker-menu">
+            <label><input type="checkbox" data-col-cls="col-code" checked> Code</label>
+            <label><input type="checkbox" data-col-cls="col-nom" checked> Nom</label>
+            <label><input type="checkbox" data-col-cls="col-med" checked> Utilisateurs</label>
+            <label><input type="checkbox" data-col-cls="col-statut" checked> Statut</label>
+          </div>
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for dep in page_obj %}
+      <tr onclick="if(event.target.type!=='checkbox'){window.location='{% url 'medecins_departement_detail' dep.pk %}'}">
+        <td style="padding:10px 8px 10px 14px;" onclick="event.stopPropagation()">
+          <input type="checkbox" class="row-check" value="{{ dep.pk }}" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent);" onchange="onCheckChange()">
+        </td>
+        <td class="col-code col-accent"><span class="badge-code">{{ dep.code }}</span></td>
+        <td class="col-nom" style="font-weight:600;">{{ dep.nom }}</td>
+        <td class="col-med" style="color:var(--text-muted);">
+          <i class="bi bi-people" style="margin-right:4px;"></i>{{ dep.nb_employes }}
+        </td>
+        <td class="col-statut">
+          {% if dep.actif %}<span class="badge-actif"><i class="bi bi-check-circle-fill"></i> Actif</span>{% else %}<span class="badge-inactif"><i class="bi bi-x-circle-fill"></i> Inactif</span>{% endif %}
+        </td>
+        <td></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="o-pagination-bottom">
+    <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
+    <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}" href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}&q={{ q }}&vue={{ vue }}{% else %}#{% endif %}"><i class="bi bi-chevron-left"></i></a>
+    <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}" href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}&q={{ q }}&vue={{ vue }}{% else %}#{% endif %}"><i class="bi bi-chevron-right"></i></a>
+  </div>
+</div>
+{% endif %}
+
+{% else %}
+<div class="o-empty-state">
+  <div class="empty-icon"><i class="bi bi-building"></i></div>
+  {% if q %}
+  <div class="empty-title">Aucun résultat pour « {{ q }} »</div>
+  <div class="empty-sub">Essayez un autre terme de recherche.</div>
+  <a href="{% url 'medecins_departements' %}" class="o-ctrl-btn">Effacer la recherche</a>
+  {% else %}
+  <div class="empty-title">Aucun département enregistré</div>
+  <div class="empty-sub">Créez votre premier département.</div>
+  <a href="{% url 'medecins_departement_create' %}" class="o-btn-create"><i class="bi bi-plus-lg"></i> Créer un département</a>
+  {% endif %}
+</div>
+{% endif %}
+</div>
+
+<div class="modal-overlay" id="bulk-delete-modal">
+  <div class="modal-box">
+    <div class="modal-icon">🗑️</div>
+    <div class="modal-title">Confirmer la suppression</div>
+    <div class="modal-msg">Vous allez supprimer <strong id="modal-count">0</strong> département(s).<br>
+      <span style="font-size:12px;">Cette action est irréversible.</span>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn-modal-cancel" onclick="closeBulkModal()">Annuler</button>
+      <button type="button" class="btn-modal-confirm" onclick="executeBulkDelete()">Supprimer</button>
+    </div>
+  </div>
+</div>
+
+</div>
+
+{% include 'services/includes/list_live_js.html' %}
+
+<script>
+const BULK_URL = "{% url 'medecins_departement_bulk_delete' %}";
+const CSRF_TOKEN = "{{ csrf_token }}";
+function setVue(v, btn) {
+  document.getElementById('vue-input').value = v;
+  document.querySelectorAll('.o-view-btn').forEach(function(b) { b.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  window.liveLoad();
+}
+(function () {
+  var inp = document.getElementById('search-input'); if (!inp) return;
+  var timer;
+  inp.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(window.liveLoad, 400); });
+  document.getElementById('filter-form').addEventListener('submit', function (e) { e.preventDefault(); window.liveLoad(); });
+})();
+function onCheckChange() {
+  var count = document.querySelectorAll('.row-check:checked').length;
+  document.getElementById('bulk-count').textContent = count;
+  document.getElementById('bulk-bar').classList.toggle('visible', count > 0);
+  var all = document.getElementById('select-all');
+  if (all) { var total = document.querySelectorAll('.row-check').length; all.indeterminate = count > 0 && count < total; all.checked = count === total && total > 0; }
+}
+function toggleAll(master) { document.querySelectorAll('.row-check').forEach(function(cb) { cb.checked = master.checked; }); onCheckChange(); }
+function clearSelection() { document.querySelectorAll('.row-check, #select-all').forEach(function(cb) { cb.checked = false; }); onCheckChange(); }
+function openBulkModal() { document.getElementById('modal-count').textContent = document.querySelectorAll('.row-check:checked').length; document.getElementById('bulk-delete-modal').classList.add('open'); }
+function closeBulkModal() { document.getElementById('bulk-delete-modal').classList.remove('open'); }
+function executeBulkDelete() {
+  var ids = Array.from(document.querySelectorAll('.row-check:checked')).map(function(cb) { return cb.value; });
+  if (!ids.length) return;
+  var fd = new FormData(); fd.append('csrfmiddlewaretoken', CSRF_TOKEN);
+  ids.forEach(function(id) { fd.append('ids[]', id); });
+  fetch(BULK_URL, { method: 'POST', body: fd }).then(function(r) { return r.json(); }).then(function(d) { if (d.ok) window.location.reload(); }).catch(function() { closeBulkModal(); });
+}
+document.getElementById('bulk-delete-modal').addEventListener('click', function(e) { if (e.target === this) closeBulkModal(); });
+document.addEventListener('click', function(e) {
+  var menu = document.getElementById('col-picker-menu'); if (!menu) return;
+  if (e.target.closest('#col-picker-btn')) { menu.classList.toggle('open'); return; }
+  if (!e.target.closest('#col-picker-menu')) menu.classList.remove('open');
+});
+document.addEventListener('change', function(e) {
+  var cb = e.target.closest('#col-picker-menu input[data-col-cls]'); if (!cb) return;
+  document.querySelectorAll('.' + cb.dataset.colCls).forEach(function(el) { el.style.display = cb.checked ? '' : 'none'; });
+});
+</script>
+{% endblock %}

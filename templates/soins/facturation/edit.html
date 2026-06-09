@@ -26,20 +26,23 @@
 .fac-patient-card {
   background: var(--surface); border: 1px solid var(--border);
   border-radius: 8px; padding: 14px 18px; margin-bottom: 12px;
-  display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: center;
+  display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: flex-start;
 }
 .fac-patient-avatar {
   width: 50px; height: 50px; border-radius: 50%;
   background: linear-gradient(135deg, var(--primary), var(--accent));
   display: flex; align-items: center; justify-content: center;
   font-size: 18px; font-weight: 800; color: #fff; flex-shrink: 0; overflow: hidden;
+  margin-top: 2px;
 }
 .fac-patient-avatar img { width: 100%; height: 100%; object-fit: cover; }
-.fac-patient-name { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 5px; }
-.fac-patient-meta { display: flex; flex-wrap: wrap; gap: 5px 18px; font-size: 12px; color: var(--text-muted); }
-.fac-patient-meta span { display: inline-flex; align-items: center; gap: 4px; }
-.fac-patient-meta i { color: var(--accent); }
-.fac-code { font-family: monospace; font-weight: 700; color: var(--accent); }
+.fac-patient-name { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 10px; }
+.patient-info-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 24px; }
+@media(max-width:680px){ .patient-info-grid { grid-template-columns: repeat(2, 1fr); } }
+.pi-item { display: flex; flex-direction: column; gap: 2px; }
+.pi-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
+.pi-value { font-size: 13px; font-weight: 600; color: var(--text); }
+.pi-code { font-family: monospace; font-size: 12px; color: var(--accent); }
 
 /* ── SECTION CARDS ── */
 .fac-card {
@@ -108,7 +111,6 @@ html[data-theme="dark"] .fac-lignes-table tbody tr:hover td { background: rgba(3
 }
 .fac-lignes-table input:focus, .fac-lignes-table select:focus { border-bottom-color: var(--accent); }
 .col-libelle { min-width: 200px; }
-.col-acte    { width: 160px; }
 .col-qte     { width: 70px; }
 .col-prix    { width: 110px; }
 .col-remise  { width: 80px; }
@@ -231,11 +233,31 @@ html[data-theme="dark"] .fac-alert-error {
     </div>
     <div>
       <div class="fac-patient-name">{{ facture.patient.nom }} {{ facture.patient.prenoms }}</div>
-      <div class="fac-patient-meta">
-        <span><i class="bi bi-person-badge"></i> <span class="fac-code">{{ facture.patient.code_patient }}</span></span>
-        {% if facture.patient.age %}<span><i class="bi bi-calendar3"></i> {{ facture.patient.age }} ans</span>{% endif %}
-        {% if facture.patient.telephone %}<span><i class="bi bi-telephone"></i> {{ facture.patient.telephone }}</span>{% endif %}
-        {% if facture.patient.assurance %}<span><i class="bi bi-shield-check"></i> {{ facture.patient.assurance.nom }}</span>{% endif %}
+      <div class="patient-info-grid">
+        <div class="pi-item">
+          <span class="pi-label">Code patient</span>
+          <span class="pi-value pi-code">{{ facture.patient.code_patient }}</span>
+        </div>
+        <div class="pi-item">
+          <span class="pi-label">Âge</span>
+          <span class="pi-value">{{ facture.patient.age_display|default:"—" }}</span>
+        </div>
+        <div class="pi-item">
+          <span class="pi-label">Sexe</span>
+          <span class="pi-value">{{ facture.patient.get_sexe_display|default:"—" }}</span>
+        </div>
+        <div class="pi-item">
+          <span class="pi-label">Téléphone</span>
+          <span class="pi-value">{{ facture.patient.telephone|default:"—" }}</span>
+        </div>
+        <div class="pi-item">
+          <span class="pi-label">Adresse</span>
+          <span class="pi-value">{{ facture.patient.adresse|default:facture.patient.ville|default:"—" }}</span>
+        </div>
+        <div class="pi-item">
+          <span class="pi-label">Assurance</span>
+          <span class="pi-value">{% if facture.patient.assurance %}{{ facture.patient.assurance.nom }}{% else %}—{% endif %}</span>
+        </div>
       </div>
     </div>
   </div>
@@ -249,9 +271,6 @@ html[data-theme="dark"] .fac-alert-error {
       <button type="button" class="fac-edit-tab-btn" data-etab="etab-infos">
         <i class="bi bi-info-circle"></i> Autres informations
       </button>
-      <button type="button" class="fac-edit-tab-btn" data-etab="etab-medical">
-        <i class="bi bi-hospital"></i> Info de l'hôpital
-      </button>
     </div>
 
     <!-- ── Onglet Lignes ── -->
@@ -263,7 +282,6 @@ html[data-theme="dark"] .fac-alert-error {
           <thead>
             <tr>
               <th class="col-libelle">Désignation <span style="color:#dc2626;">*</span></th>
-              <th class="col-acte">Acte catalogue</th>
               <th class="col-qte">Qté</th>
               <th class="col-prix">Prix unit. (CFA)</th>
               <th class="col-remise">Remise %</th>
@@ -276,17 +294,6 @@ html[data-theme="dark"] .fac-alert-error {
             <tr class="ligne-row">
               <td class="col-libelle">
                 <input type="text" name="ligne_libelle_{{ forloop.counter0 }}" value="{{ ligne.libelle }}">
-              </td>
-              <td class="col-acte">
-                <select name="ligne_acte_{{ forloop.counter0 }}" onchange="fillFromActe(this, {{ forloop.counter0 }})">
-                  <option value="">— Choisir —</option>
-                  {% for acte in actes %}
-                  <option value="{{ acte.pk }}" data-prix="{{ acte.prix }}" data-libelle="{{ acte.libelle }}"
-                    {% if ligne.acte_id == acte.pk %}selected{% endif %}>
-                    {{ acte.libelle }} ({{ acte.prix }} CFA)
-                  </option>
-                  {% endfor %}
-                </select>
               </td>
               <td class="col-qte">
                 <input type="number" name="ligne_qte_{{ forloop.counter0 }}" value="{{ ligne.quantite }}" min="0.01" step="0.01" oninput="recalcRow({{ forloop.counter0 }})">
@@ -306,16 +313,6 @@ html[data-theme="dark"] .fac-alert-error {
             <tr class="ligne-row">
               <td class="col-libelle">
                 <input type="text" name="ligne_libelle_0" placeholder="Ex : Soin infirmier…">
-              </td>
-              <td class="col-acte">
-                <select name="ligne_acte_0" onchange="fillFromActe(this, 0)">
-                  <option value="">— Choisir —</option>
-                  {% for acte in actes %}
-                  <option value="{{ acte.pk }}" data-prix="{{ acte.prix }}" data-libelle="{{ acte.libelle }}">
-                    {{ acte.libelle }} ({{ acte.prix }} CFA)
-                  </option>
-                  {% endfor %}
-                </select>
               </td>
               <td class="col-qte">
                 <input type="number" name="ligne_qte_0" value="1" min="0.01" step="0.01" oninput="recalcRow(0)">
@@ -367,16 +364,11 @@ html[data-theme="dark"] .fac-alert-error {
 
     <!-- ── Onglet Autres informations ── -->
     <div class="fac-edit-panel" id="etab-infos">
-      <div class="edit-section-title"><i class="bi bi-file-text"></i> Informations générales</div>
       <div class="fac-fields-grid">
         <div class="fac-field">
           <label for="{{ form.type_facture.id_for_label }}">Type de facture <span style="color:#dc2626;">*</span></label>
           {{ form.type_facture }}
           {% if form.type_facture.errors %}<span style="font-size:11px;color:#dc2626;">{{ form.type_facture.errors.0 }}</span>{% endif %}
-        </div>
-        <div class="fac-field">
-          <label for="{{ form.statut.id_for_label }}">Statut</label>
-          {{ form.statut }}
         </div>
         <div class="fac-field">
           <label for="{{ form.date_echeance.id_for_label }}">Date d'échéance</label>
@@ -395,76 +387,8 @@ html[data-theme="dark"] .fac-alert-error {
           {{ form.notes }}
         </div>
       </div>
-
-      <div class="edit-section-title" style="margin-top:20px;"><i class="bi bi-bank"></i> Paiement &amp; Comptabilité</div>
-      <div class="fac-fields-grid">
-        <div class="fac-field" style="opacity:.5;pointer-events:none;">
-          <label>Référence client</label>
-          <input class="field-ul" type="text" value="{{ facture.numero }}" disabled>
-        </div>
-        <div class="fac-field" style="opacity:.5;pointer-events:none;">
-          <label>Vendeur</label>
-          <input class="field-ul" type="text" value="{{ facture.cree_par.get_full_name|default:facture.cree_par.username|default:'—' }}" disabled>
-        </div>
-        <div class="fac-field" style="opacity:.5;pointer-events:none;">
-          <label>Compte bancaire destinataire</label>
-          <input class="field-ul" type="text" value="—" disabled>
-        </div>
-        <div class="fac-field" style="opacity:.5;pointer-events:none;">
-          <label>Position fiscale</label>
-          <input class="field-ul" type="text" value="—" disabled>
-        </div>
-        <div class="fac-field" style="opacity:.5;pointer-events:none;">
-          <label>Incoterm</label>
-          <input class="field-ul" type="text" value="—" disabled>
-        </div>
-      </div>
     </div><!-- /etab-infos -->
 
-    <!-- ── Onglet Info de l'hôpital ── -->
-    <div class="fac-edit-panel" id="etab-medical">
-      <div class="edit-section-title"><i class="bi bi-person-vcard"></i> Informations médicales</div>
-      <div class="fac-fields-grid">
-        <div class="fac-field" style="opacity:.5;pointer-events:none;">
-          <label>Docteur</label>
-          <input class="field-ul" type="text"
-            value="{% with soin=facture.soins.first %}{% if soin and soin.infirmier %}{{ soin.infirmier }}{% else %}—{% endif %}{% endwith %}" disabled>
-        </div>
-        <div class="fac-field" style="opacity:.5;pointer-events:none;">
-          <label>Docteur référant</label>
-          <input class="field-ul" type="text" value="—" disabled>
-        </div>
-        <div class="fac-field" style="opacity:.5;pointer-events:none;">
-          <label>Ordonnance</label>
-          <input class="field-ul" type="text" value="—" disabled>
-        </div>
-        <div class="fac-field" style="opacity:.5;pointer-events:none;">
-          <label>Rendez-vous</label>
-          <input class="field-ul" type="text"
-            value="{% with soin=facture.soins.first %}{% if soin and soin.rendez_vous %}{{ soin.rendez_vous }}{% else %}—{% endif %}{% endwith %}" disabled>
-        </div>
-        <div class="fac-field" style="opacity:.5;pointer-events:none;">
-          <label>Hospitalisation</label>
-          <input class="field-ul" type="text" value="{{ facture.hospitalisation|default:'—' }}" disabled>
-        </div>
-        <div class="fac-field" style="opacity:.5;pointer-events:none;">
-          <label>Type de facture hôpital</label>
-          <input class="field-ul" type="text" value="{{ facture.get_type_facture_display }}" disabled>
-        </div>
-      </div>
-
-      <div class="edit-section-title" style="margin-top:20px;"><i class="bi bi-shield-check"></i> Assurance</div>
-      <div class="fac-fields-grid">
-        <div class="fac-field" style="opacity:.5;pointer-events:none;">
-          <label>Police d'assurance</label>
-          <input class="field-ul" type="text" value="{{ facture.patient.assurance.nom|default:'—' }}" disabled>
-        </div>
-        <div class="fac-field" style="opacity:.5;pointer-events:none;">
-          <label>Réclamation</label>
-          <input class="field-ul" type="text" value="—" disabled>
-        </div>
-      </div>
-    </div><!-- /etab-medical -->
 
   </div><!-- /.fac-card onglets -->
 
@@ -511,30 +435,14 @@ html[data-theme="dark"] .fac-alert-error {
     document.getElementById('disp-total').textContent     = fmt(subtotal);
   };
 
-  window.fillFromActe = function (sel, idx) {
-    var opt = sel.options[sel.selectedIndex];
-    if (!opt || !opt.value) return;
-    var libInput  = document.querySelector('[name="ligne_libelle_' + idx + '"]');
-    var prixInput = document.querySelector('[name="ligne_prix_'   + idx + '"]');
-    if (libInput && !libInput.value) libInput.value = opt.dataset.libelle || '';
-    if (prixInput) { prixInput.value = opt.dataset.prix || 0; }
-    recalcRow(idx);
-  };
-
   window.addLigne = function () {
     var idx  = lineCount++;
     var body = document.getElementById('lignes-body');
     var tr   = document.createElement('tr');
     tr.className = 'ligne-row';
 
-    var acteOptions = '<option value="">— Choisir —</option>';
-    {% for acte in actes %}
-    acteOptions += '<option value="{{ acte.pk }}" data-prix="{{ acte.prix }}" data-libelle="{{ acte.libelle|escapejs }}">{{ acte.libelle|escapejs }} ({{ acte.prix }} CFA)</option>';
-    {% endfor %}
-
     tr.innerHTML =
       '<td class="col-libelle"><input type="text" name="ligne_libelle_' + idx + '" placeholder="Désignation…"></td>' +
-      '<td class="col-acte"><select name="ligne_acte_' + idx + '" onchange="fillFromActe(this,' + idx + ')">' + acteOptions + '</select></td>' +
       '<td class="col-qte"><input type="number" name="ligne_qte_' + idx + '" value="1" min="0.01" step="0.01" oninput="recalcRow(' + idx + ')"></td>' +
       '<td class="col-prix"><input type="number" name="ligne_prix_' + idx + '" value="0" min="0" step="1" oninput="recalcRow(' + idx + ')"></td>' +
       '<td class="col-remise"><input type="number" name="ligne_remise_' + idx + '" value="0" min="0" max="100" step="0.01" oninput="recalcRow(' + idx + ')"></td>' +
@@ -564,12 +472,12 @@ html[data-theme="dark"] .fac-alert-error {
   (function adj() {
     var tb = document.querySelector('.topbar');
     var wp = document.getElementById('page-wrap');
-    if (tb && wp) wp.style.paddingTop = tb.offsetHeight + 'px';
+    if (tb && wp) wp.style.paddingTop = '0';
   })();
   window.addEventListener('resize', function () {
     var tb = document.querySelector('.topbar');
     var wp = document.getElementById('page-wrap');
-    if (tb && wp) wp.style.paddingTop = tb.offsetHeight + 'px';
+    if (tb && wp) wp.style.paddingTop = '0';
   });
 })();
 </script>

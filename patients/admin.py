@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Patient, Assurance, RendezVous
+from .models import Patient, Assurance, RendezVous, Naissance
 
 
 @admin.register(Assurance)
@@ -26,7 +26,16 @@ class PatientAdmin(admin.ModelAdmin):
 
 @admin.register(RendezVous)
 class RendezVousAdmin(admin.ModelAdmin):
-    list_display = ['patient', 'medecin', 'date_heure', 'type_rdv', 'statut']
-    list_filter = ['statut', 'type_rdv']
-    search_fields = ['patient__nom', 'patient__prenoms']
+    list_display = ['patient', 'medecin', 'date_heure', 'departement', 'service', 'statut', 'type_rdv']
+    list_filter = ['statut', 'departement', 'type_rdv', 'service']
+    search_fields = ['patient__nom', 'patient__prenoms', 'code_rdv']
     date_hierarchy = 'date_heure'
+
+
+@admin.register(Naissance)
+class NaissanceAdmin(admin.ModelAdmin):
+    list_display = ['numero', 'mere', 'date_accouchement', 'sexe_enfant', 'poids_naissance', 'mode_accouchement', 'statut']
+    list_filter = ['statut', 'mode_accouchement', 'sexe_enfant']
+    search_fields = ['numero', 'mere__nom', 'mere__prenoms', 'nom_enfant']
+    readonly_fields = ['numero', 'date_creation']
+    date_hierarchy = 'date_accouchement'
