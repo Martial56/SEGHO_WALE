@@ -1,0 +1,42 @@
+from django.urls import path
+from . import views
+
+app_name = 'hospitalisation'
+
+urlpatterns = [
+    path('', views.hospitalisation_list, name='list'),
+    path('nouveau/', views.hospitalisation_create, name='create'),
+    path('<int:pk>/',              views.hospitalisation_detail,       name='detail'),
+    path('<int:pk>/modifier/',     views.hospitalisation_edit,         name='edit'),
+    path('<int:pk>/creer-facture/', views.hospitalisation_creer_facture, name='creer_facture'),
+    path('<int:pk>/confirmer/',    views.hospitalisation_confirmer,    name='confirmer'),
+    path('<int:pk>/installer/',    views.hospitalisation_installer,    name='installer'),
+    path('<int:pk>/decharger/',    views.hospitalisation_decharger,    name='decharger'),
+    path('<int:pk>/terminer/',     views.hospitalisation_terminer,     name='terminer'),
+    path('<int:pk>/annuler/',      views.hospitalisation_annuler,      name='annuler'),
+    path('<int:pk>/etat/',         views.hospitalisation_etat,         name='etat'),
+    path('facture/<int:pk>/', views.hosp_facture_detail, name='facture_detail'),
+    path('facture/<int:pk>/modifier/', views.hosp_facture_edit, name='facture_edit'),
+    path('facture/<int:pk>/valider/', views.hosp_facture_valider, name='facture_valider'),
+    path('facture/<int:pk>/payer/', views.hosp_facture_payer, name='facture_payer'),
+    path('facture/<int:pk>/imprimer/', views.hosp_facture_print, name='facture_print'),
+    path('facture/<int:pk>/apercu/', views.hosp_facture_apercu, name='facture_apercu'),
+    path('chambres/', views.chambres_list, name='chambres_list'),
+    path('chambres/nouveau/', views.chambre_create, name='chambre_create'),
+    path('chambres/<int:pk>/', views.chambre_detail, name='chambre_detail'),
+    path('chambres/<int:pk>/modifier/', views.chambre_edit, name='chambre_edit'),
+    path('deces/', views.registre_deces, name='deces_list'),
+    path('deces/nouveau/', views.deces_create, name='deces_create'),
+    path('deces/<int:pk>/', views.deces_detail, name='deces_detail'),
+    path('deces/<int:pk>/modifier/', views.deces_edit, name='deces_edit'),
+    path('configuration/', views.configuration, name='configuration'),
+    path('configuration/batiments/', views.config_batiments, name='config_batiments'),
+    path('configuration/liste-admission/', views.config_liste_admission, name='config_liste_admission'),
+    path('configuration/liste-admission/nouveau/', views.liste_admission_create, name='liste_admission_create'),
+    path('configuration/liste-admission/<int:pk>/modifier/', views.liste_admission_edit, name='liste_admission_edit'),
+    path('configuration/liste-admission/<int:pk>/supprimer/', views.liste_admission_delete, name='liste_admission_delete'),
+    path('configuration/liste-service/', views.config_liste_service, name='config_liste_service'),
+    path('configuration/liste-service/nouveau/', views.liste_service_create, name='liste_service_create'),
+    path('configuration/liste-service/<int:pk>/modifier/', views.liste_service_edit, name='liste_service_edit'),
+    path('configuration/liste-service/<int:pk>/supprimer/', views.liste_service_delete, name='liste_service_delete'),
+]

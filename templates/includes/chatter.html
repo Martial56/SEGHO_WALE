@@ -1,0 +1,54 @@
+{% comment %}
+  Include réutilisable — Chatter / Activité
+  Usage dans n'importe quelle vue :
+    {% include 'includes/chatter.html' with obj=hosp logs=logs %}
+
+  Pré-requis dans la vue :
+    from core.views import get_logs
+    logs = get_logs(obj)   # passer au contexte
+{% endcomment %}
+{% load i18n core_tags %}
+
+<div class="chatter-wrap">
+  <div class="chatter-header">
+    <i class="bi bi-chat-text" style="color:var(--teal-500,#1588ab);"></i>
+    Activité &amp; Notes
+  </div>
+
+  <!-- Zone de saisie -->
+  <div class="chatter-compose">
+    <form method="post" action="{% url 'post_note' %}">
+      {% csrf_token %}
+      <input type="hidden" name="app_label"  value="{{ obj|app_label }}">
+      <input type="hidden" name="model_name" value="{{ obj|model_name }}">
+      <input type="hidden" name="object_id"  value="{{ obj.pk }}">
+      <input type="hidden" name="next"       value="{{ request.path }}">
+      <textarea name="note_text" class="chatter-input" placeholder="Écrire une note…" rows="2"></textarea>
+      <button type="submit" class="chatter-send">
+        <i class="bi bi-send"></i> Envoyer
+      </button>
+    </form>
+  </div>
+
+  <!-- Liste des logs -->
+  <div class="log-list">
+    {% for log in logs %}
+    <div class="log-item log-type-{{ log.type }}">
+      <div class="log-avatar">
+        {% if log.user %}{{ log.user.get_username|slice:":1"|upper }}{% else %}S{% endif %}
+      </div>
+      <div class="log-body">
+        <div class="log-meta">
+          <strong>{% if log.user %}{{ log.user.get_full_name|default:log.user.get_username }}{% else %}Système{% endif %}</strong>
+          &nbsp;·&nbsp; {{ log.date|date:"d/m/Y H:i" }}
+          {% if log.type == 'statut' %}&nbsp;·&nbsp; <span style="color:var(--teal-600,#0f6e8e);">statut</span>{% endif %}
+          {% if log.type == 'modif'  %}&nbsp;·&nbsp; <span style="color:var(--text-muted);">modification</span>{% endif %}
+        </div>
+        <div class="log-msg">{{ log.message }}</div>
+      </div>
+    </div>
+    {% empty %}
+    <div class="log-empty">Aucune activité enregistrée.</div>
+    {% endfor %}
+  </div>
+</div>

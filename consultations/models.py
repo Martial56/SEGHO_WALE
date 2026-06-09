@@ -19,8 +19,10 @@ class Consultation(models.Model):
         if not self.numero:
             from django.utils import timezone
             annee = timezone.now().year
-            count = Consultation.objects.filter(date_heure__year=annee).count() + 1
-            self.numero = f"CONS{annee}{count:06d}"
+            prefix = f"CONS{annee}"
+            last = Consultation.objects.filter(numero__startswith=prefix).order_by('-pk').first()
+            count = (int(last.numero[len(prefix):]) + 1) if last else 1
+            self.numero = f"{prefix}{count:06d}"
         super().save(*args, **kwargs)
 
     def __str__(self): return f"Consultation {self.numero} - {self.patient}"
@@ -89,8 +91,10 @@ class Ordonnance(models.Model):
         if not self.numero:
             from django.utils import timezone
             annee = timezone.now().year
-            count = Ordonnance.objects.filter(date_emission__year=annee).count() + 1
-            self.numero = f"ORD{annee}{count:06d}"
+            prefix = f"ORD{annee}"
+            last = Ordonnance.objects.filter(numero__startswith=prefix).order_by('-pk').first()
+            count = (int(last.numero[len(prefix):]) + 1) if last else 1
+            self.numero = f"{prefix}{count:06d}"
         super().save(*args, **kwargs)
 
     def __str__(self): return f"Ordonnance {self.numero}"

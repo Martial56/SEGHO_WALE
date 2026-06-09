@@ -93,8 +93,10 @@ class CommandePharmacies(models.Model):
         if not self.numero:
             from django.utils import timezone
             annee = timezone.now().year
-            count = CommandePharmacies.objects.filter(date_commande__year=annee).count() + 1
-            self.numero = f"CMD{annee}{count:05d}"
+            prefix = f"CMD{annee}"
+            last = CommandePharmacies.objects.filter(numero__startswith=prefix).order_by('-pk').first()
+            count = (int(last.numero[len(prefix):]) + 1) if last else 1
+            self.numero = f"{prefix}{count:05d}"
         super().save(*args, **kwargs)
 
     def __str__(self): return f"Commande {self.numero}"

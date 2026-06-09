@@ -14,8 +14,8 @@ class Acte(models.Model):
 
 
 class Facture(models.Model):
-    STATUT = [('brouillon','Brouillon'),('emise','Émise'),('payee','Payée'),('partielle','Partielle'),('annulee','Annulée')]
-    TYPE = [('consultation','Consultation'),('hospitalisation','Hospitalisation'),('pharmacie','Pharmacie'),('laboratoire','Laboratoire'),('imagerie','Imagerie'),('autre','Autre')]
+    STATUT = [('brouillon','Brouillon'),('emise','Émise'),('payee','Payée'),('annulee','Annulée')]
+    TYPE = [('consultation','Consultation'),('soins','Soins'),('hospitalisation','Hospitalisation'),('pharmacie','Pharmacie'),('laboratoire','Laboratoire'),('imagerie','Imagerie'),('autre','Autre')]
 
     numero = models.CharField(max_length=20, unique=True, editable=False)
     patient = models.ForeignKey('patients.Patient', on_delete=models.CASCADE, related_name='factures')
@@ -35,14 +35,29 @@ class Facture(models.Model):
     def save(self, *args, **kwargs):
         if not self.numero:
             from django.utils import timezone
-            annee = timezone.now().year
-            count = Facture.objects.filter(date_emission__year=annee).count() + 1
-            self.numero = f"FAC{annee}{count:06d}"
+            now = timezone.now()
+            annee = now.year
+            date_part = now.strftime('%y%m%d')
+            count = Facture.objects.count() + 1
+            numero = f"VTES/{annee}/{date_part}{count:04d}"
+            while Facture.objects.filter(numero=numero).exists():
+                count += 1
+                numero = f"VTES/{annee}/{date_part}{count:04d}"
+            self.numero = numero
         super().save(*args, **kwargs)
 
     @property
     def solde_restant(self):
         return self.montant_total - self.montant_paye
+
+    def recalculer_total(self, save=True):
+        """Recalcule montant_total en sommant montant_ligne de toutes les lignes.
+        Idempotent : plusieurs appels successifs produisent le même résultat."""
+        total = sum(ligne.montant_ligne for ligne in self.lignes.all())
+        self.montant_total = round(total, 2)
+        if save:
+            self.save(update_fields=['montant_total'])
+        return self.montant_total
 
     def __str__(self): return f"Facture {self.numero}"
     class Meta:
@@ -80,8 +95,10 @@ class Paiement(models.Model):
         if not self.numero:
             from django.utils import timezone
             annee = timezone.now().year
-            count = Paiement.objects.filter(date_paiement__year=annee).count() + 1
-            self.numero = f"PAI{annee}{count:07d}"
+            prefix = f"PAI{annee}"
+            last = Paiement.objects.filter(numero__startswith=prefix).order_by('-pk').first()
+            count = (int(last.numero[len(prefix):]) + 1) if last else 1
+            self.numero = f"{prefix}{count:07d}"
         super().save(*args, **kwargs)
 
     def __str__(self): return f"Paiement {self.numero} - {self.montant} F"

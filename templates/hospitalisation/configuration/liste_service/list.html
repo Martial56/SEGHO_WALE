@@ -1,0 +1,169 @@
+{% extends 'hospitalisation/base.html' %}
+{% block extra_css %}
+{{ block.super }}
+<style>
+:root { --surface:#fff; --border:#e8edf2; --text:#0d3040; --text-muted:rgba(0,0,0,.45); }
+html[data-theme="dark"] { --surface:#132033; --border:#243044; --text:#d4e6f5; --text-muted:rgba(255,255,255,.45); }
+.o-subheader {
+  background:var(--surface); border-bottom:1px solid var(--border);
+  padding:6px 16px; display:flex; flex-direction:column; gap:5px;
+  position:sticky; top:38px; z-index:190; margin:0 -32px;
+}
+.o-subheader-row { display:flex; align-items:center; gap:8px; }
+.o-page-title { font-size:17px; font-weight:400; color:var(--text); }
+.o-btn-create {
+  background:var(--teal-500); color:#fff; border:none;
+  padding:5px 14px; border-radius:4px; font-size:12.5px; font-weight:600;
+  font-family:inherit; cursor:pointer; text-decoration:none;
+  display:inline-flex; align-items:center; gap:4px; letter-spacing:.6px;
+  transition:background .15s; text-transform:uppercase;
+}
+.o-btn-create:hover { background:var(--teal-600); color:#fff; }
+.o-search-bar {
+  display:flex; align-items:center; border:none; border-bottom:1px solid #bbb;
+  background:transparent; min-height:28px; padding:2px 4px; gap:4px; width:280px;
+}
+.o-search-input { border:none; outline:none; font-size:12px; color:var(--text); font-family:inherit; flex:1; background:transparent; }
+.o-search-btn { background:none; border:none; cursor:pointer; color:#888; font-size:13px; padding:2px; }
+.o-ctrl-btn {
+  background:none; border:1px solid transparent; border-radius:4px;
+  padding:4px 8px; font-size:12px; font-family:inherit; color:var(--text-muted);
+  cursor:pointer; display:flex; align-items:center; gap:4px;
+  transition:border-color .15s, color .15s, background .15s; white-space:nowrap;
+}
+.o-ctrl-btn:hover { border-color:var(--border); color:var(--text); background:#f3f3f3; }
+.o-ctrl-sep { width:1px; height:18px; background:var(--border); margin:0 3px; }
+.o-pagination { display:flex; align-items:center; gap:4px; font-size:12px; color:var(--text-muted); white-space:nowrap; }
+.o-pag-btn {
+  width:24px; height:24px; border:1px solid var(--border); border-radius:3px;
+  background:var(--surface); display:flex; align-items:center; justify-content:center;
+  color:var(--text-muted); text-decoration:none; font-size:12px;
+  transition:background .15s, color .15s;
+}
+.o-pag-btn:hover { background:var(--teal-600); color:#fff; border-color:var(--teal-600); }
+.o-pag-btn.disabled { opacity:.35; pointer-events:none; }
+.cfg-table-wrap { margin:0 -32px; }
+.cfg-table { width:100%; border-collapse:collapse; font-size:13px; background:var(--surface); }
+.cfg-table thead th {
+  border-bottom:1px solid var(--border); padding:8px 14px;
+  text-align:left; font-size:12px; font-weight:700;
+  color:var(--text); white-space:nowrap; background:var(--surface);
+  position:sticky; top:112px; z-index:100;
+}
+.cfg-table thead th.col-check { width:36px; text-align:center; }
+.cfg-table thead th.col-actions { width:36px; }
+.cfg-table tbody tr { border-bottom:1px solid #f0f4f7; cursor:pointer; transition:background .1s; }
+.cfg-table tbody tr:hover { background:#ddeef7; }
+.cfg-table tbody td { padding:10px 14px; color:var(--text); font-size:13px; vertical-align:middle; }
+.cfg-table tbody td.col-check { text-align:center; }
+.ch-check { width:15px; height:15px; cursor:pointer; accent-color:var(--teal-500); }
+.cfg-empty { text-align:center; padding:60px 20px; color:var(--text-muted); }
+.cfg-empty i { font-size:38px; display:block; margin-bottom:12px; opacity:.3; }
+html[data-theme="dark"] .cfg-table thead th { background:var(--surface); border-bottom-color:var(--border); }
+html[data-theme="dark"] .cfg-table tbody tr { border-bottom-color:#1a3050; }
+html[data-theme="dark"] .cfg-table tbody tr:hover { background:#0f3050; }
+html[data-theme="dark"] .o-search-bar { border-bottom-color:rgba(255,255,255,.2); }
+html[data-theme="dark"] .o-search-input { color:var(--text); }
+html[data-theme="dark"] .o-ctrl-btn:hover { background:rgba(255,255,255,.05); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="o-subheader">
+  <div class="o-subheader-row">
+    <span class="o-page-title">Liste de vérification avant le service</span>
+    <div style="margin-left:auto;display:flex;align-items:center;">
+      <form method="get" style="display:flex;align-items:center;">
+        <div class="o-search-bar">
+          <input class="o-search-input" type="text" name="q" value="{{ q }}" placeholder="Rechercher…">
+          <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
+          {% if q %}<a href="?" class="o-search-btn"><i class="bi bi-x"></i></a>{% endif %}
+        </div>
+      </form>
+    </div>
+  </div>
+  <div class="o-subheader-row">
+    <a href="{% url 'hospitalisation:liste_service_create' %}" class="o-btn-create">
+      <i class="bi bi-plus-lg"></i> Créer
+    </a>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:6px;">
+      <button class="o-ctrl-btn"><i class="bi bi-funnel"></i> Filtres</button>
+      <button class="o-ctrl-btn"><i class="bi bi-list-ul"></i> Regrouper par</button>
+      <button class="o-ctrl-btn"><i class="bi bi-star"></i> Favoris</button>
+      <div class="o-ctrl-sep"></div>
+      <div class="o-pagination">
+        {% if page_obj.paginator.count > 0 %}
+        <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
+        {% else %}<span>0 / 0</span>{% endif %}
+        <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
+           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-left"></i></a>
+        <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
+           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-right"></i></a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="cfg-table-wrap">
+  <table class="cfg-table">
+    <thead>
+      <tr>
+        <th class="col-check">
+          <input type="checkbox" class="ch-check" onchange="document.querySelectorAll('.row-check').forEach(c=>c.checked=this.checked)">
+        </th>
+        <th>Élément de la liste de contrôle de salle</th>
+        <th class="col-actions"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for obj in page_obj %}
+      <tr onclick="window.location='{% url 'hospitalisation:liste_service_edit' obj.pk %}'">
+        <td class="col-check" onclick="event.stopPropagation()">
+          <input type="checkbox" class="ch-check row-check">
+        </td>
+        <td>{{ obj.item }}</td>
+        <td onclick="event.stopPropagation()" style="text-align:right;padding-right:10px;">
+          <form method="post" action="{% url 'hospitalisation:liste_service_delete' obj.pk %}" style="display:inline;" id="del-{{ obj.pk }}">
+            {% csrf_token %}
+          </form>
+          <button type="button" class="o-ctrl-btn" style="padding:3px 7px;"
+                  onclick="if(confirm('Supprimer cet élément ?')) document.getElementById('del-{{ obj.pk }}').submit()">
+            <i class="bi bi-trash3" style="font-size:12px;color:#c62828;"></i>
+          </button>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="3">
+          <div class="cfg-empty">
+            <i class="bi bi-clipboard2-check"></i>
+            Aucun élément{% if q %} pour « {{ q }} »{% endif %}.
+            {% if not q %}<br><a href="{% url 'hospitalisation:liste_service_create' %}" style="color:var(--teal-600);text-decoration:none;font-size:13px;">Créer le premier élément</a>{% endif %}
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+function updateTheadTop() {
+  const sub = document.querySelector('.o-subheader');
+  const ths = document.querySelectorAll('.cfg-table thead th');
+  if (sub && ths.length) {
+    const top = 38 + sub.offsetHeight;
+    ths.forEach(th => th.style.top = top + 'px');
+  }
+}
+updateTheadTop();
+window.addEventListener('resize', updateTheadTop);
+</script>
+{% endblock %}
