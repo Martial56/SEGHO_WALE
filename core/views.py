@@ -448,7 +448,8 @@ def consultations_list(request):
 
 @login_required(login_url='login')
 def pharmacie_list(request):
-    return redirect('pharmacie:ordonnance_list')
+    from pharmacie.views import pharmacie_accueil
+    return pharmacie_accueil(request)
 
 
 @login_required(login_url='login')
@@ -1215,7 +1216,7 @@ def gynecologie_rdv_create(request):
             if action == 'annuler':
                 return redirect('gynecologie_rdv')
             from django.urls import reverse
-            return redirect(reverse('facture_create') + f'?patient={rdv.patient.pk}&rdv={rdv.pk}')
+            return redirect(reverse('facturation:create') + f'?patient={rdv.patient.pk}&rdv={rdv.pk}')
     else:
         form = RendezVousForm(initial={
             'date_heure': timezone.now().strftime('%Y-%m-%dT%H:%M'),
@@ -1386,7 +1387,7 @@ def gynecologie_rdv_detail(request, pk):
             save_registres(request, rdv)
             if action == 'créer une facture':
                 from django.urls import reverse
-                return redirect(reverse('facture_create') + f'?patient={rdv.patient.pk}&rdv={rdv.pk}')
+                return redirect(reverse('facture_create') + f'?patient={rdv.patient.pk}&rdv={rdv.pk}')  # core:facture_create
             return redirect('gynecologie_rdv')
     else:
         form = RendezVousForm(instance=rdv)
@@ -2004,3 +2005,53 @@ def gynecologie_list(request):
         {'title': 'Patients'},
     ]
     return render(request, 'gynecologie/list.html', {'page_obj': page_obj, 'breadcrumb': breadcrumb})
+
+
+# ──────────────────────────────────────────────────────────────────
+# Helpers de log d'activité générique (utilisés par hospitalisation,
+# facturation, et tout module avec un LogActivite générique)
+# ──────────────────────────────────────────────────────────────────
+@login_required(login_url='login')
+def post_note(request):
+    if request.method != 'POST':
+        return redirect('dashboard')
+    from django.contrib.contenttypes.models import ContentType
+    from core.models import LogActivite
+    app_label  = request.POST.get('app_label', '')
+    model_name = request.POST.get('model_name', '')
+    object_id  = request.POST.get('object_id', '')
+    note_text  = request.POST.get('note_text', '').strip()
+    next_url   = request.POST.get('next', '/')
+    if note_text and app_label and model_name and object_id:
+        try:
+            ct  = ContentType.objects.get(app_label=app_label, model=model_name)
+            LogActivite.objects.create(
+                content_type=ct,
+                object_id=int(object_id),
+                user=request.user,
+                message=note_text,
+                type='note',
+            )
+        except Exception:
+            pass
+    return redirect(next_url)
+
+
+def log_event(instance, user, message, type='note'):
+    from django.contrib.contenttypes.models import ContentType
+    from core.models import LogActivite
+    ct = ContentType.objects.get_for_model(instance)
+    LogActivite.objects.create(
+        content_type=ct,
+        object_id=instance.pk,
+        user=user if user and user.is_authenticated else None,
+        message=message,
+        type=type,
+    )
+
+
+def get_logs(instance):
+    from django.contrib.contenttypes.models import ContentType
+    from core.models import LogActivite
+    ct = ContentType.objects.get_for_model(instance)
+    return LogActivite.objects.filter(content_type=ct, object_id=instance.pk)

@@ -10,7 +10,8 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('employer', '0019_fonction_categorie_data'),
+        ('employer', '0001_initial'),
+        ('medecins', '0001_initial'),
         ('facturation', '0001_initial'),
         ('patients', '0001_initial'),
         ('services', '0008_add_quantite_stock_to_articleservice'),
@@ -50,8 +51,8 @@ class Migration(migrations.Migration):
                 ('maladie_allergique', models.BooleanField(default=False, verbose_name='Maladie allergique')),
                 ('lactation', models.BooleanField(default=False, verbose_name='Lactation')),
                 ('avertissement_grossesse', models.BooleanField(default=False, verbose_name='Avertissement de grossesse')),
-                ('departement', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='soins', to='utilisateur.departement', verbose_name='Département')),
-                ('infirmier', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='soins_effectues', to='utilisateur.employe', verbose_name='Infirmier/Agent de soins')),
+                ('departement', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='soins', to='medecins.departement', verbose_name='Département')),
+                ('infirmier', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='soins_effectues', to='employer.employe', verbose_name='Infirmier/Agent de soins')),
                 ('patient', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='soins', to='patients.patient', verbose_name='Patient')),
                 ('rendez_vous', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='soins', to='patients.rendezvous', verbose_name='Rendez-vous')),
                 ('service_inscription', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='soins_inscrits', to='services.articleservice', verbose_name="Service d'inscription")),
@@ -72,9 +73,9 @@ class Migration(migrations.Migration):
                 ('date', models.DateTimeField(default=django.utils.timezone.now, verbose_name='Date')),
                 ('statut', models.CharField(choices=[('brouillon', 'Brouillon'), ('en_cours', 'En cours'), ('termine', 'Terminé'), ('annule', 'Annulé')], default='brouillon', max_length=20, verbose_name='État')),
                 ('date_creation', models.DateTimeField(auto_now_add=True)),
-                ('departement', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='procedures_soins', to='utilisateur.departement', verbose_name='Département')),
+                ('departement', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='procedures_soins', to='medecins.departement', verbose_name='Département')),
                 ('facture', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='procedures_soins', to='facturation.facture', verbose_name='Facture')),
-                ('infirmier', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='procedures_effectuees', to='utilisateur.employe', verbose_name='Infirmier')),
+                ('infirmier', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='procedures_effectuees', to='employer.employe', verbose_name='Infirmier')),
                 ('maladie', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='soins.maladie', verbose_name='Maladie')),
                 ('patient', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='procedures_soins', to='patients.patient', verbose_name='Patient')),
                 ('rendez_vous', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='procedures_soins', to='patients.rendezvous', verbose_name='Rendez-vous')),
