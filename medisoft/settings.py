@@ -27,10 +27,7 @@ INSTALLED_APPS = [
     'planning',
     'core',
     'modules_permissions',
-<<<<<<< HEAD
     'ordonnance',
-=======
->>>>>>> origin/Martial_branch
     'services',
     'soins',
     'stock',

@@ -1,13 +1,8 @@
 from django import forms
 from .models import Soin, ProcedureSoin, Maladie
 from patients.models import Patient, RendezVous
-<<<<<<< HEAD
 from employer.models import Employe
 from medecins.models import Departement
-=======
-from ressources_humaines.models import Employe
-from medecins.models import Service as Departement
->>>>>>> origin/Martial_branch
 from services.models import Articleservice
 from facturation.models import Facture
 
