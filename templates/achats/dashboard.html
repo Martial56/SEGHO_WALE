@@ -1,0 +1,278 @@
+{% extends 'achats/base.html' %}
+{% load i18n %}
+
+{% block title %}Achats — Tableau de bord{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+.content { padding: 0; }
+.ac-page { display:flex; flex-direction:column; height:calc(100vh - var(--topbar-h) - 44px); overflow:hidden; }
+
+/* ── Barre KPI ── */
+.ac-kpis { display:flex; gap:10px; padding:12px 28px; background:#fff; border-bottom:1px solid rgba(0,0,0,.07); flex-shrink:0; flex-wrap:wrap; }
+.ac-kpi { display:flex; align-items:center; gap:12px; padding:10px 18px; background:#f8fafb; border-radius:10px; border:1px solid rgba(0,0,0,.07); min-width:145px; cursor:pointer; text-decoration:none; transition:box-shadow .15s,transform .15s; }
+.ac-kpi:hover { box-shadow:0 4px 16px rgba(0,0,0,.1); transform:translateY(-1px); }
+.ac-kpi-icon { width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0; }
+.ac-kpi-info { display:flex;flex-direction:column;gap:1px; }
+.ac-kpi-val { font-size:20px; font-weight:800; line-height:1; }
+.ac-kpi-label { font-size:11px; color:#777; font-weight:500; }
+
+/* ── Corps ── */
+.ac-body { flex:1; overflow:auto; min-height:0; padding:18px 28px; display:grid; grid-template-columns:1fr 1fr 1fr; grid-auto-rows:auto; gap:14px; align-content:start; }
+
+/* ── Cards ── */
+.ac-card { background:#fff; border-radius:10px; border:1px solid rgba(0,0,0,.08); box-shadow:0 1px 4px rgba(0,0,0,.04); overflow:hidden; }
+.ac-card-head { display:flex; align-items:center; justify-content:space-between; padding:11px 16px; border-bottom:1px solid rgba(0,0,0,.06); }
+.ac-card-head h2 { font-size:13px; font-weight:700; color:var(--teal-800); margin:0; display:flex;align-items:center;gap:7px; }
+.ac-card-head a { font-size:12px; color:var(--teal-600); text-decoration:none; font-weight:600; }
+.ac-card-body { }
+.ac-card table { width:100%; border-collapse:collapse; font-size:12.5px; }
+.ac-card table th { padding:7px 12px; font-size:10px; font-weight:700; color:#aaa; text-transform:uppercase; letter-spacing:.04em; background:#fafafa; border-bottom:1px solid rgba(0,0,0,.06); }
+.ac-card table td { padding:8px 12px; border-bottom:1px solid rgba(0,0,0,.04); color:rgba(0,0,0,.75); vertical-align:middle; }
+.ac-card table tr:last-child td { border-bottom:none; }
+.ac-empty { padding:28px; text-align:center; color:#bbb; font-size:13px; }
+.badge-s { display:inline-block; padding:2px 8px; border-radius:20px; font-size:10.5px; font-weight:700; }
+.s-brouillon { background:#f3f4f6; color:#6b7280; }
+.s-soumis { background:#dbeafe; color:#1d4ed8; }
+.s-en_cours { background:#fef3c7; color:#92400e; }
+.s-satisfait { background:#d1fae5; color:#065f46; }
+.s-annule { background:#fee2e2; color:#991b1b; }
+.s-en_attente { background:#fef3c7; color:#92400e; }
+.s-valide { background:#d1fae5; color:#065f46; }
+.s-rejete { background:#fee2e2; color:#991b1b; }
+.s-envoyee { background:#dbeafe; color:#1d4ed8; }
+.s-en_livraison { background:#fef3c7; color:#92400e; }
+.s-recue { background:#d1fae5; color:#065f46; }
+.s-annulee { background:#fee2e2; color:#991b1b; }
+/* Alertes livraison en retard */
+.retard { background:#fee2e2!important; }
+.retard td { color:#991b1b!important; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ac-page">
+
+  <!-- KPIs -->
+  <div class="ac-kpis">
+    <a href="{% url 'achats:fournisseurs_list' %}" class="ac-kpi">
+      <div class="ac-kpi-icon" style="background:#e0f2fe;"><i class="bi bi-building" style="color:#0369a1;"></i></div>
+      <div class="ac-kpi-info">
+        <span class="ac-kpi-val" style="color:#0369a1;">{{ stats.fournisseurs }}</span>
+        <span class="ac-kpi-label">Fournisseurs actifs</span>
+      </div>
+    </a>
+    <a href="{% url 'achats:besoins_list' %}" class="ac-kpi">
+      <div class="ac-kpi-icon" style="background:#ede9fe;"><i class="bi bi-list-check" style="color:#6d28d9;"></i></div>
+      <div class="ac-kpi-info">
+        <span class="ac-kpi-val" style="color:#6d28d9;">{{ stats.besoins_ouverts }}</span>
+        <span class="ac-kpi-label">Besoins ouverts</span>
+      </div>
+    </a>
+    <a href="{% url 'achats:proformas_list' %}?statut=en_attente" class="ac-kpi">
+      <div class="ac-kpi-icon" style="background:#fef3c7;"><i class="bi bi-file-earmark-text" style="color:#92400e;"></i></div>
+      <div class="ac-kpi-info">
+        <span class="ac-kpi-val" style="color:#92400e;">{{ stats.proformas_attente }}</span>
+        <span class="ac-kpi-label">Proformas à valider</span>
+      </div>
+    </a>
+    <a href="{% url 'achats:commandes_list' %}" class="ac-kpi">
+      <div class="ac-kpi-icon" style="background:#d1fae5;"><i class="bi bi-bag-check" style="color:#065f46;"></i></div>
+      <div class="ac-kpi-info">
+        <span class="ac-kpi-val" style="color:#065f46;">{{ stats.commandes_en_cours }}</span>
+        <span class="ac-kpi-label">Commandes en cours</span>
+      </div>
+    </a>
+    <a href="{% url 'achats:commandes_list' %}?statut=recue" class="ac-kpi">
+      <div class="ac-kpi-icon" style="background:#f0fdf4;"><i class="bi bi-box-seam" style="color:#16a34a;"></i></div>
+      <div class="ac-kpi-info">
+        <span class="ac-kpi-val" style="color:#16a34a;">{{ stats.receptions_recentes }}</span>
+        <span class="ac-kpi-label">Réceptions (30 j)</span>
+      </div>
+    </a>
+    {% if stats.livraisons_en_retard > 0 %}
+    <a href="{% url 'achats:commandes_list' %}?statut=envoyee" class="ac-kpi" style="border-color:#fca5a5;background:#fff5f5;">
+      <div class="ac-kpi-icon" style="background:#fee2e2;"><i class="bi bi-exclamation-triangle" style="color:#dc2626;"></i></div>
+      <div class="ac-kpi-info">
+        <span class="ac-kpi-val" style="color:#dc2626;">{{ stats.livraisons_en_retard }}</span>
+        <span class="ac-kpi-label">Livraisons en retard</span>
+      </div>
+    </a>
+    {% endif %}
+    <div style="margin-left:auto;display:flex;align-items:center;">
+      <a href="{% url 'achats:besoin_create' %}" style="display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:8px;background:var(--teal-600);color:#fff;text-decoration:none;font-size:13px;font-weight:700;">
+        <i class="bi bi-plus-lg"></i> Nouveau besoin
+      </a>
+    </div>
+  </div>
+
+  <!-- Corps -->
+  <div class="ac-body">
+
+    <!-- Graphique dépenses mensuelles -->
+    <div class="ac-card" style="grid-column:1/3;display:flex;flex-direction:column;">
+      <div class="ac-card-head">
+        <h2><i class="bi bi-bar-chart-line"></i> Dépenses mensuelles (6 mois)</h2>
+      </div>
+      <div class="ac-card-body" style="padding:12px 16px;flex:1;min-height:0;">
+        <div style="position:relative;height:100%;min-height:160px;">
+          <canvas id="chartDepenses"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Colonne droite : Flux + Besoins empilés (pas de vide entre eux) -->
+    <div style="display:flex;flex-direction:column;gap:14px;">
+
+      <!-- Flux rapide -->
+      <div class="ac-card">
+        <div class="ac-card-head">
+          <h2><i class="bi bi-activity"></i> Flux d'achat</h2>
+        </div>
+        <div class="ac-card-body" style="padding:10px 16px;display:grid;gap:8px;">
+          {% for step in workflow_steps %}
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:rgba(0,0,0,.7);">
+              <div style="width:8px;height:8px;border-radius:50%;background:{{ step.color }};flex-shrink:0;"></div>
+              {{ step.label }}
+            </div>
+            <a href="{{ step.url }}" style="font-size:14px;font-weight:800;color:{{ step.color }};text-decoration:none;">{{ step.count }}</a>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Besoins récents -->
+      <div class="ac-card">
+        <div class="ac-card-head">
+          <h2><i class="bi bi-list-check"></i> Derniers besoins</h2>
+          <a href="{% url 'achats:besoins_list' %}">Voir tout <i class="bi bi-arrow-right"></i></a>
+        </div>
+        <div class="ac-card-body">
+          {% if besoins_recents %}
+          <table>
+            <thead><tr><th>N°</th><th>Titre</th><th>Statut</th></tr></thead>
+            <tbody>
+            {% for b in besoins_recents %}
+            <tr>
+              <td><a href="{% url 'achats:besoin_detail' b.pk %}" style="color:var(--teal-700);font-weight:700;text-decoration:none;">{{ b.numero }}</a></td>
+              <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ b.titre }}</td>
+              <td><span class="badge-s s-{{ b.statut }}">{{ b.get_statut_display }}</span></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div class="ac-empty"><i class="bi bi-list-check" style="font-size:28px;display:block;margin-bottom:8px;opacity:.3;"></i>Aucun besoin</div>
+          {% endif %}
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Proformas en attente (pleine largeur) -->
+    <div class="ac-card" style="grid-column:1/-1;">
+      <div class="ac-card-head">
+        <h2><i class="bi bi-file-earmark-text"></i> Proformas à valider</h2>
+        <a href="{% url 'achats:proformas_list' %}?statut=en_attente">Voir tout <i class="bi bi-arrow-right"></i></a>
+      </div>
+      <div class="ac-card-body">
+        {% if proformas_attente %}
+        <table>
+          <thead><tr><th>N°</th><th>Besoin lié</th><th>Fournisseur</th><th>Réf. fournisseur</th><th>Date réception</th><th>Soumis par</th><th style="text-align:right;">Montant</th><th></th></tr></thead>
+          <tbody>
+          {% for p in proformas_attente %}
+          <tr>
+            <td><a href="{% url 'achats:proforma_detail' p.pk %}" style="color:var(--teal-700);font-weight:700;text-decoration:none;">{{ p.numero }}</a></td>
+            <td style="color:#888;">{{ p.besoin.titre|truncatechars:40 }}</td>
+            <td style="font-weight:500;">{{ p.fournisseur.nom }}</td>
+            <td style="color:#888;">{{ p.reference_fournisseur|default:"—" }}</td>
+            <td style="color:#888;">{{ p.date_reception }}</td>
+            <td style="color:#888;">{{ p.soumis_par.get_full_name|default:p.soumis_par.username|default:"—" }}</td>
+            <td style="text-align:right;font-weight:600;white-space:nowrap;">{{ p.montant_total|floatformat:0 }}&nbsp;FCFA</td>
+            <td><a href="{% url 'achats:proforma_detail' p.pk %}" style="color:var(--teal-600);font-size:13px;"><i class="bi bi-eye"></i></a></td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="ac-empty"><i class="bi bi-check-circle" style="font-size:28px;display:block;margin-bottom:8px;color:#d1fae5;"></i>Tout est validé</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Commandes actives (pleine largeur) -->
+    <div class="ac-card" style="grid-column:1/-1;">
+      <div class="ac-card-head">
+        <h2><i class="bi bi-bag-check"></i> Commandes actives</h2>
+        <a href="{% url 'achats:commandes_list' %}">Voir tout <i class="bi bi-arrow-right"></i></a>
+      </div>
+      <div class="ac-card-body">
+        {% if commandes_actives %}
+        <table>
+          <thead><tr><th>N°</th><th>Fournisseur</th><th>Proforma</th><th style="text-align:right;">Montant</th><th>Statut</th><th>Date commande</th><th>Livraison prévue</th><th></th></tr></thead>
+          <tbody>
+          {% for c in commandes_actives %}
+          <tr {% if c.est_en_retard %}class="retard"{% endif %}>
+            <td style="font-weight:700;"><a href="{% url 'achats:commande_detail' c.pk %}" style="color:var(--teal-700);text-decoration:none;">{{ c.numero }}</a></td>
+            <td style="font-weight:500;">{{ c.fournisseur.nom }}</td>
+            <td style="color:#888;font-size:12px;"><a href="{% url 'achats:proforma_detail' c.proforma.pk %}" style="color:var(--teal-600);text-decoration:none;">{{ c.proforma.numero }}</a></td>
+            <td style="text-align:right;font-weight:600;white-space:nowrap;">{{ c.montant_total|floatformat:0 }}&nbsp;FCFA</td>
+            <td><span class="badge-s s-{{ c.statut }}">{{ c.get_statut_display }}</span></td>
+            <td style="color:#888;">{{ c.date_commande }}</td>
+            <td style="{% if c.est_en_retard %}color:#dc2626;font-weight:700;{% else %}color:#888;{% endif %}">
+              {{ c.date_livraison_prevue|default:"—" }}
+              {% if c.est_en_retard %} <i class="bi bi-exclamation-triangle-fill"></i>{% endif %}
+            </td>
+            <td><a href="{% url 'achats:commande_detail' c.pk %}" style="color:var(--teal-600);font-size:13px;"><i class="bi bi-eye"></i></a></td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="ac-empty"><i class="bi bi-bag-check" style="font-size:28px;display:block;margin-bottom:8px;opacity:.3;"></i>Aucune commande active</div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+(function(){
+  var labels = {{ chart_labels|safe }};
+  var data   = {{ chart_data|safe }};
+  var ctx    = document.getElementById('chartDepenses');
+  if (!ctx) return;
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Dépenses (FCFA)',
+        data: data,
+        backgroundColor: 'rgba(74,103,65,.18)',
+        borderColor: 'rgba(74,103,65,.7)',
+        borderWidth: 2,
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: { callback: function(v){ return (v/1000).toFixed(0)+'k'; }, font:{size:10} },
+          grid: { color:'rgba(0,0,0,.05)' }
+        },
+        x: { grid: { display:false }, ticks:{ font:{size:11} } }
+      }
+    }
+  });
+})();
+</script>
+{% endblock %}

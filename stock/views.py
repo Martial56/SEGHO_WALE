@@ -6,7 +6,8 @@ from django.utils import timezone
 from django.core.paginator import Paginator
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
-from .models import Produit, CategorieStock, Fournisseur, LotProduit, MouvementStock, CommandeStock, LigneCommande, Inventaire, LigneInventaire, DemandePharmacie, LigneDemande, PHARMACIES, FicheBesoins, LigneFicheBesoins
+from .models import Produit, CategorieStock, LotProduit, MouvementStock, CommandeStock, LigneCommande, Inventaire, LigneInventaire, DemandePharmacie, LigneDemande, PHARMACIES, FicheBesoins, LigneFicheBesoins
+from achats.models import Fournisseur
 
 
 @login_required(login_url='login')
@@ -1380,36 +1381,40 @@ def fiche_list(request):
 
 @login_required(login_url='login')
 def fiche_create(request):
-    produits = Produit.objects.filter(actif=True).order_by('type', 'nom')
+    produits = Produit.objects.filter(actif=True).select_related('categorie').order_by('categorie__type', 'categorie__nom', 'nom')
     if request.method == 'POST':
-        pharmacie = request.POST.get('pharmacie', '')
         periode_debut = request.POST.get('periode_debut', '')
         periode_fin   = request.POST.get('periode_fin', '')
         notes = request.POST.get('notes', '').strip()
-        if pharmacie and periode_debut and periode_fin:
+
+        lignes_data = [(p, request.POST.get(f'cmd_{p.pk}', '').strip()) for p in produits]
+        lignes_data = [(p, q) for p, q in lignes_data if q]
+
+        if not lignes_data:
+            messages.error(request, "Sélectionnez au moins un produit et renseignez les quantités.")
+        elif periode_debut and periode_fin:
+            from decimal import Decimal
+
             fiche = FicheBesoins.objects.create(
-                pharmacie=pharmacie, periode_debut=periode_debut,
-                periode_fin=periode_fin, notes=notes, cree_par=request.user,
+                periode_debut=periode_debut, periode_fin=periode_fin,
+                notes=notes, cree_par=request.user, statut='brouillon',
             )
-            for p in produits:
-                stock_init = request.POST.get(f'stock_{p.pk}', '').strip()
-                qte_recue  = request.POST.get(f'recu_{p.pk}', '').strip()
-                qte_disp   = request.POST.get(f'disp_{p.pk}', '').strip()
-                qte_cmd    = request.POST.get(f'cmd_{p.pk}', '').strip()
-                if any([stock_init, qte_recue, qte_disp, qte_cmd]):
-                    from decimal import Decimal
-                    LigneFicheBesoins.objects.create(
-                        fiche=fiche, produit=p,
-                        stock_initial=Decimal(stock_init or 0),
-                        qte_recue=Decimal(qte_recue or 0),
-                        qte_dispensee=Decimal(qte_disp or 0),
-                        cmm=Decimal(str(p.cmm)),
-                        qte_commander=Decimal(qte_cmd or str(p.qte_a_commander)),
-                    )
-            messages.success(request, f'Fiche {fiche.numero} créée.')
+            for p, qte_cmd in lignes_data:
+                qte = Decimal(qte_cmd)
+                LigneFicheBesoins.objects.create(
+                    fiche=fiche, produit=p,
+                    stock_initial=Decimal(str(p.stock_actuel or 0)),
+                    cmm=Decimal(str(p.cmm or 0)),
+                    qte_commander=qte, qte_accordee=qte,
+                )
+
+            messages.success(request, f'Fiche {fiche.numero} créée. Vérifiez et envoyez aux achats.')
             return redirect('stock_fiche_detail', pk=fiche.pk)
+
+    categories = CategorieStock.objects.filter(actif=True).order_by('type', 'nom')
     return render(request, 'stock/fiches/form.html', {
-        'mode': 'create', 'produits': produits, 'pharmacies': PHARMACIES,
+        'mode': 'create', 'produits': produits,
+        'categories': categories,
         'today': timezone.now().date(),
     })
 
@@ -1417,7 +1422,7 @@ def fiche_create(request):
 @login_required(login_url='login')
 def fiche_detail(request, pk):
     fiche  = get_object_or_404(FicheBesoins, pk=pk)
-    lignes = fiche.lignes.select_related('produit').all()
+    lignes = fiche.lignes.select_related('produit__categorie').order_by('produit__categorie__type', 'produit__categorie__nom', 'produit__nom')
     return render(request, 'stock/fiches/detail.html', {
         'fiche': fiche, 'lignes': lignes,
     })
@@ -1429,15 +1434,12 @@ def fiche_edit(request, pk):
     if fiche.statut not in ('brouillon',):
         messages.error(request, 'Seule une fiche en brouillon est modifiable.')
         return redirect('stock_fiche_detail', pk=pk)
-    lignes = fiche.lignes.select_related('produit').all()
+    lignes = fiche.lignes.select_related('produit__categorie').order_by('produit__categorie__type', 'produit__categorie__nom', 'produit__nom')
     if request.method == 'POST':
         from decimal import Decimal
         for ligne in lignes:
-            ligne.stock_initial  = Decimal(request.POST.get(f'stock_{ligne.pk}', 0) or 0)
-            ligne.qte_recue      = Decimal(request.POST.get(f'recu_{ligne.pk}', 0) or 0)
-            ligne.qte_dispensee  = Decimal(request.POST.get(f'disp_{ligne.pk}', 0) or 0)
-            ligne.qte_commander  = Decimal(request.POST.get(f'cmd_{ligne.pk}', 0) or 0)
-            ligne.notes          = request.POST.get(f'notes_{ligne.pk}', '').strip()
+            ligne.qte_commander = Decimal(request.POST.get(f'cmd_{ligne.pk}', 0) or 0)
+            ligne.notes         = request.POST.get(f'notes_{ligne.pk}', '').strip()
             ligne.save()
         fiche.notes = request.POST.get('notes', '').strip()
         fiche.save(update_fields=['notes'])
@@ -1479,6 +1481,40 @@ def fiche_valider(request, pk):
     return render(request, 'stock/fiches/valider.html', {
         'fiche': fiche, 'lignes': lignes,
     })
+
+
+@login_required(login_url='login')
+@require_POST
+def fiche_envoyer_achats(request, pk):
+    from achats.models import BesoinAchat, LigneBesoin
+    fiche = get_object_or_404(FicheBesoins, pk=pk)
+
+    if fiche.statut != 'brouillon':
+        besoin_existant = fiche.besoins_achats.first()
+        if besoin_existant:
+            messages.warning(request, f"Cette fiche a déjà été transmise ({besoin_existant.numero}).")
+            return redirect('achats:besoin_detail', pk=besoin_existant.pk)
+        return redirect('stock_fiche_detail', pk=pk)
+
+    besoin = BesoinAchat.objects.create(
+        titre=f"Fiche besoins {fiche.numero} — {fiche.periode_debut.strftime('%d/%m/%Y')} au {fiche.periode_fin.strftime('%d/%m/%Y')}",
+        fiche_besoins=fiche, statut='soumis', cree_par=request.user,
+        notes=f"Généré depuis la fiche {fiche.numero}",
+    )
+    lignes_creees = 0
+    for ligne in fiche.lignes.select_related('produit').all():
+        LigneBesoin.objects.create(
+            besoin=besoin, produit=ligne.produit,
+            quantite=ligne.qte_commander,
+            unite=ligne.produit.unite_mesure or 'unité',
+        )
+        lignes_creees += 1
+
+    fiche.statut = 'valide'
+    fiche.save(update_fields=['statut'])
+
+    messages.success(request, f"Besoin {besoin.numero} transmis aux achats ({lignes_creees} produit(s)).")
+    return redirect('achats:besoin_detail', pk=besoin.pk)
 
 
 @login_required(login_url='login')

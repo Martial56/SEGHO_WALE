@@ -1,0 +1,186 @@
+{% extends 'achats/base.html' %}
+{% load i18n %}
+
+{% block title %}{{ besoin.numero }} — Besoin d'achat{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+.content { padding:0; }
+.bd-page { display:flex; flex-direction:column; height:calc(100vh - var(--topbar-h) - 44px); overflow:hidden; }
+.bd-head { display:flex; align-items:center; justify-content:space-between; padding:14px 28px; background:#fff; border-bottom:1px solid rgba(0,0,0,.07); flex-shrink:0; gap:12px; }
+.bd-head-left { display:flex; align-items:center; gap:12px; }
+.bd-head h1 { font-size:16px; font-weight:700; color:var(--teal-800); margin:0; }
+.bd-body { flex:1; overflow:auto; min-height:0; padding:20px 28px; display:flex; flex-direction:column; gap:16px; }
+.bd-card { background:#fff; border-radius:10px; border:1px solid rgba(0,0,0,.08); overflow:hidden; }
+.bd-card-head { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; background:#fafafa; border-bottom:1px solid rgba(0,0,0,.06); }
+.bd-card-head h2 { font-size:13px; font-weight:700; color:var(--teal-800); margin:0; }
+.bd-info { display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; padding:16px; }
+.bd-info-item { display:flex; flex-direction:column; gap:3px; }
+.bd-info-label { font-size:11px; font-weight:600; color:#888; text-transform:uppercase; }
+.bd-info-val { font-size:13px; color:rgba(0,0,0,.8); font-weight:500; }
+.badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; }
+.s-brouillon { background:#f3f4f6; color:#6b7280; }
+.s-soumis { background:#dbeafe; color:#1d4ed8; }
+.s-en_cours { background:#fef3c7; color:#92400e; }
+.s-satisfait { background:#d1fae5; color:#065f46; }
+.s-annule { background:#fee2e2; color:#991b1b; }
+.s-en_attente { background:#fef3c7; color:#92400e; }
+.s-valide { background:#d1fae5; color:#065f46; }
+.s-rejete { background:#fee2e2; color:#991b1b; }
+.bd-table { width:100%; border-collapse:collapse; font-size:13px; }
+.bd-table th { padding:9px 14px; font-size:11px; font-weight:700; color:#888; text-transform:uppercase; background:#fafafa; border-bottom:1px solid rgba(0,0,0,.08); }
+.bd-table td { padding:9px 14px; border-bottom:1px solid rgba(0,0,0,.05); vertical-align:middle; }
+.bd-table tr:last-child td { border-bottom:none; }
+.btn { display:inline-flex; align-items:center; gap:5px; padding:6px 14px; border-radius:6px; font-size:13px; font-weight:600; text-decoration:none; border:none; cursor:pointer; }
+.btn-primary { background:var(--teal-600); color:#fff; }
+.btn-secondary { background:#fff; color:rgba(0,0,0,.7); border:1px solid #d1d5db; }
+.btn-warning { background:#f59e0b; color:#fff; }
+.btn-danger { background:#ef4444; color:#fff; }
+.statut-actions { display:flex; gap:8px; align-items:center; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="bd-page">
+  <div class="bd-head">
+    <div class="bd-head-left">
+      <a href="{% url 'achats:besoins_list' %}" style="color:#888;text-decoration:none;font-size:13px;"><i class="bi bi-arrow-left"></i></a>
+      <h1>{{ besoin.numero }} — {{ besoin.titre }}</h1>
+      <span class="badge s-{{ besoin.statut }}">{{ besoin.get_statut_display }}</span>
+    </div>
+    <div class="statut-actions">
+      {% if besoin.statut == 'brouillon' %}
+        {% if not besoin.fiche_besoins %}
+        <a href="{% url 'achats:besoin_edit' besoin.pk %}" class="btn btn-secondary"><i class="bi bi-pencil"></i> Modifier</a>
+        {% endif %}
+        <form method="post" action="{% url 'achats:besoin_statut' besoin.pk %}" style="display:inline;">
+          {% csrf_token %}<input type="hidden" name="statut" value="soumis">
+          <button type="submit" class="btn btn-primary"><i class="bi bi-send"></i> Soumettre</button>
+        </form>
+      {% elif besoin.statut == 'soumis' %}
+        {% if not besoin.fiche_besoins %}
+        <a href="{% url 'achats:besoin_edit' besoin.pk %}" class="btn btn-secondary"><i class="bi bi-pencil"></i> Modifier</a>
+        {% endif %}
+        <a href="{% url 'achats:proforma_create' besoin.pk %}" class="btn btn-primary"><i class="bi bi-file-earmark-plus"></i> Ajouter un proforma</a>
+      {% elif besoin.statut == 'en_cours' %}
+        <a href="{% url 'achats:proforma_create' besoin.pk %}" class="btn btn-secondary"><i class="bi bi-file-earmark-plus"></i> Ajouter un proforma</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="bd-body">
+    <!-- Informations -->
+    <div class="bd-card">
+      <div class="bd-card-head"><h2><i class="bi bi-info-circle" style="margin-right:6px;"></i>Informations</h2></div>
+      <div class="bd-info">
+        <div class="bd-info-item">
+          <span class="bd-info-label">Numéro</span>
+          <span class="bd-info-val">{{ besoin.numero }}</span>
+        </div>
+        <div class="bd-info-item">
+          <span class="bd-info-label">Date de création</span>
+          <span class="bd-info-val">{{ besoin.date_creation|date:"d/m/Y H:i" }}</span>
+        </div>
+        <div class="bd-info-item">
+          <span class="bd-info-label">Livraison souhaitée</span>
+          <span class="bd-info-val">{{ besoin.date_besoin_souhaite|default:"—" }}</span>
+        </div>
+        <div class="bd-info-item">
+          <span class="bd-info-label">Créé par</span>
+          <span class="bd-info-val">{{ besoin.cree_par.get_full_name|default:besoin.cree_par.username|default:"—" }}</span>
+        </div>
+        <div class="bd-info-item">
+          <span class="bd-info-label">Source</span>
+          <span class="bd-info-val">
+            {% if besoin.fiche_besoins %}
+              <a href="{% url 'stock_fiche_detail' besoin.fiche_besoins.pk %}" style="color:var(--teal-700);text-decoration:none;display:inline-flex;align-items:center;gap:5px;background:rgba(58,89,36,.08);padding:3px 10px;border-radius:10px;font-size:12px;font-weight:600;">
+                <i class="bi bi-box-seam"></i> {{ besoin.fiche_besoins.numero }} — {{ besoin.fiche_besoins.get_pharmacie_display }}
+              </a>
+            {% else %}
+              <span style="color:#aaa;font-size:12px;">Besoin manuel</span>
+            {% endif %}
+          </span>
+        </div>
+        {% if besoin.notes %}
+        <div class="bd-info-item" style="grid-column:1/-1;">
+          <span class="bd-info-label">Notes</span>
+          <span class="bd-info-val">{{ besoin.notes }}</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Lignes de besoin -->
+    <div class="bd-card">
+      <div class="bd-card-head">
+        <h2><i class="bi bi-card-list" style="margin-right:6px;"></i>Articles demandés ({{ lignes.count }})</h2>
+      </div>
+      {% if lignes %}
+      <table class="bd-table">
+        <thead>
+          <tr><th>#</th><th>Désignation</th><th>Quantité</th><th>Unité</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+        {% for l in lignes %}
+        <tr>
+          <td style="color:#888;">{{ forloop.counter }}</td>
+          <td style="font-weight:500;">{{ l.libelle }}</td>
+          <td style="font-weight:700;">{{ l.quantite }}</td>
+          <td style="color:#666;">{{ l.unite }}</td>
+          <td style="color:#888;">{{ l.notes|default:"" }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div style="padding:24px;text-align:center;color:#aaa;font-size:13px;">Aucun article</div>
+      {% endif %}
+    </div>
+
+    <!-- Proformas associés -->
+    <div class="bd-card">
+      <div class="bd-card-head">
+        <h2><i class="bi bi-file-earmark-text" style="margin-right:6px;"></i>Proformas ({{ proformas.count }})</h2>
+        {% if besoin.statut in 'soumis en_cours' %}
+        <a href="{% url 'achats:proforma_create' besoin.pk %}" style="font-size:12px;color:var(--teal-600);text-decoration:none;font-weight:600;">
+          <i class="bi bi-plus-lg"></i> Ajouter
+        </a>
+        {% endif %}
+      </div>
+      {% if proformas %}
+      <table class="bd-table">
+        <thead>
+          <tr><th>N°</th><th>Fournisseur</th><th>Montant</th><th>Statut</th><th>Date</th><th></th></tr>
+        </thead>
+        <tbody>
+        {% for p in proformas %}
+        <tr>
+          <td style="font-weight:700;color:var(--teal-700);">
+            <a href="{% url 'achats:proforma_detail' p.pk %}" style="color:inherit;text-decoration:none;">{{ p.numero }}</a>
+          </td>
+          <td>{{ p.fournisseur.nom }}</td>
+          <td style="white-space:nowrap;">{{ p.montant_total|floatformat:0 }} FCFA</td>
+          <td>
+            {% if p.statut == 'en_attente' %}<span class="badge s-en_attente">En attente</span>
+            {% elif p.statut == 'valide' %}<span class="badge s-valide">Validé</span>
+            {% else %}<span class="badge s-rejete">Rejeté</span>{% endif %}
+          </td>
+          <td>{{ p.date_reception }}</td>
+          <td><a href="{% url 'achats:proforma_detail' p.pk %}" style="color:var(--teal-600);font-size:13px;"><i class="bi bi-eye"></i></a></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div style="padding:20px;text-align:center;color:#aaa;font-size:13px;">
+        Aucun proforma.
+        {% if besoin.statut in 'soumis en_cours' %}
+        <a href="{% url 'achats:proforma_create' besoin.pk %}" style="color:var(--teal-600);margin-left:6px;">Ajouter un proforma →</a>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

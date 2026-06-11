@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+﻿{% extends 'base.html' %}
 {% load static %}
 
 {% block topbar_title %}Pharmacie{% if label %} — {{ label }}{% endif %}{% endblock %}
@@ -14,8 +14,8 @@
   --ph-text:#1b2e13; --ph-muted:rgba(0,0,0,.45);
 }
 html[data-theme="dark"] {
-  --ph-50:#0a1610; --ph-100:#0d1f12; --ph-surface:#070e05;
-  --ph-border:rgba(154,184,138,.18); --ph-text:#bcd5a8; --ph-muted:rgba(255,255,255,.4);
+  --ph-50:#1a1818; --ph-100:#222020; --ph-surface:#201d1d;
+  --ph-border:rgba(255,255,255,.09); --ph-text:#e0dada; --ph-muted:rgba(255,255,255,.4);
 }
 .content { padding-top: 0; padding-left: 0; padding-right: 0; }
 .ph-nav {
@@ -25,7 +25,11 @@ html[data-theme="dark"] {
   position:fixed; top:var(--topbar-h); left:0; right:0; z-index:250;
   gap:2px; overflow-x:auto;
 }
-html[data-theme="dark"] .ph-nav { background:var(--ph-surface); border-bottom-color:var(--ph-border); }
+html[data-theme="dark"] .ph-nav {
+  background:#201d1d;
+  border-bottom-color:rgba(255,255,255,.08);
+  box-shadow:0 1px 4px rgba(0,0,0,.4);
+}
 .ph-nav-link {
   padding:0 14px; font-size:12.5px; font-weight:500;
   color:var(--ph-muted); text-decoration:none;
@@ -36,6 +40,12 @@ html[data-theme="dark"] .ph-nav { background:var(--ph-surface); border-bottom-co
 .ph-nav-link:hover { color:var(--ph-700); background:rgba(58,89,36,.06); }
 .ph-nav-link.active { color:var(--ph-700); font-weight:700; border-bottom-color:var(--ph-600); background:rgba(58,89,36,.07); }
 .ph-nav-link.active i { color:var(--ph-600); }
+html[data-theme="dark"] .ph-nav-link         { color:rgba(255,255,255,.45); }
+html[data-theme="dark"] .ph-nav-link:hover   { color:var(--ph-300); background:rgba(154,184,138,.08); }
+html[data-theme="dark"] .ph-nav-link.active  { color:var(--ph-300); border-bottom-color:var(--ph-400); background:rgba(154,184,138,.08); }
+html[data-theme="dark"] .ph-nav-link.active i{ color:var(--ph-400); }
+.ph-nav-brand { font-weight:700; color:var(--ph-700); }
+html[data-theme="dark"] .ph-nav-brand        { color:var(--ph-300); }
 .btn-ph { background:var(--ph-600); color:#fff; border:none; border-radius:6px; padding:7px 16px; font-size:12.5px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:5px; text-decoration:none; transition:background .15s; }
 .btn-ph:hover { background:var(--ph-700); color:#fff; }
 .btn-ph-outline { border:1.5px solid var(--ph-600); color:var(--ph-600); background:transparent; border-radius:6px; padding:6px 14px; font-size:12.5px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:5px; text-decoration:none; transition:background .15s,color .15s; }
@@ -68,6 +78,20 @@ html[data-theme="dark"] .ph-nav { background:var(--ph-surface); border-bottom-co
 .ph-menu-item:hover{background:var(--ph-100);border-color:var(--ph-300);}
 .ph-menu-item.active{background:var(--ph-600);color:#fff;border-color:var(--ph-600);}
 .ph-menu-item i{font-size:17px;}
+/* ── Dark mode overrides ── */
+html[data-theme="dark"] .ph-table thead tr { background:var(--ph-100); border-bottom-color:rgba(255,255,255,.1); }
+html[data-theme="dark"] .ph-table thead th { color:var(--ph-300); }
+html[data-theme="dark"] .ph-table tbody tr:hover { background:rgba(255,255,255,.04); }
+html[data-theme="dark"] .badge-ph-ok      { background:rgba(22,169,107,.18); color:#6eddb0; border-color:rgba(22,169,107,.3); }
+html[data-theme="dark"] .badge-ph-alerte  { background:rgba(232,154,26,.18); color:#f0c060; border-color:rgba(232,154,26,.3); }
+html[data-theme="dark"] .badge-ph-rupture { background:rgba(232,69,69,.18);  color:#f09090; border-color:rgba(232,69,69,.3); }
+html[data-theme="dark"] .badge-ph-emise   { background:rgba(154,184,138,.15); color:var(--ph-300); border-color:rgba(154,184,138,.25); }
+html[data-theme="dark"] .ph-input { border-bottom-color:rgba(255,255,255,.18); }
+html[data-theme="dark"] .ph-input:focus { border-bottom-color:var(--ph-400); }
+html[data-theme="dark"] .ph-menu-item { color:var(--ph-300); background:rgba(255,255,255,.04); }
+html[data-theme="dark"] .ph-menu-item:hover { background:rgba(154,184,138,.1); border-color:rgba(154,184,138,.25); }
+html[data-theme="dark"] #ph-menu-popup { border-color:var(--ph-border); }
+html[data-theme="dark"] #ph-menu-wrap button { color:rgba(255,255,255,.45); }
 </style>
 {% block extra_ph_css %}{% endblock %}
 {% endblock %}
@@ -75,10 +99,10 @@ html[data-theme="dark"] .ph-nav { background:var(--ph-surface); border-bottom-co
 {% block breadcrumb %}
 {% if pharmacie %}
 <nav class="ph-nav">
-  <a href="{% url 'pharmacie_accueil' %}" class="ph-nav-link" style="font-weight:700;color:var(--ph-700);">
+  <a href="{% url 'pharmacie_accueil' %}" class="ph-nav-link ph-nav-brand">
     <i class="bi bi-hospital-fill"></i> {{ label }}
   </a>
-  <span style="display:flex;align-items:center;color:rgba(0,0,0,.2);padding:0 4px;">›</span>
+  <span style="display:flex;align-items:center;color:var(--ph-border);padding:0 4px;">›</span>
   <a href="{% url 'pharmacie_dashboard' pharmacie %}"   class="ph-nav-link {% block nav_dashboard %}{% endblock %}"><i class="bi bi-speedometer2"></i> Dashboard</a>
   <a href="{% url 'pharmacie_ordonnances' pharmacie %}" class="ph-nav-link {% block nav_ordonnances %}{% endblock %}"><i class="bi bi-prescription2"></i> Ordonnances</a>
   <a href="{% url 'pharmacie_caisse' pharmacie %}"      class="ph-nav-link {% block nav_caisse %}{% endblock %}"><i class="bi bi-cash-coin"></i> Caisse</a>
@@ -130,6 +154,7 @@ document.addEventListener('click',function(e){var w=document.getElementById('ph-
   var nav=document.querySelector('.ph-nav');
   if(tb&&nav){
     var h=tb.getBoundingClientRect().height;
+    if(h<30)return;
     nav.style.top=h+'px';
     document.documentElement.style.setProperty('--topbar-h',h+'px');
   }

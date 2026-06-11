@@ -1,0 +1,141 @@
+{% extends 'achats/base.html' %}
+{% load i18n %}
+
+{% block title %}{% if action == 'create' %}Nouveau fournisseur{% else %}Modifier {{ fournisseur.nom }}{% endif %}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+.content { padding:0; }
+.fr-form-page { display:flex; flex-direction:column; height:calc(100vh - var(--topbar-h) - 44px); overflow:hidden; }
+.fr-form-head { display:flex; align-items:center; gap:12px; padding:14px 28px; background:#fff; border-bottom:1px solid rgba(0,0,0,.07); flex-shrink:0; }
+.fr-form-head h1 { font-size:16px; font-weight:700; color:var(--teal-800); margin:0; }
+.fr-form-body { flex:1; overflow:auto; min-height:0; padding:24px 28px; }
+.fr-form { max-width:800px; }
+.fr-section { background:#fff; border-radius:10px; border:1px solid rgba(0,0,0,.08); padding:20px 24px; margin-bottom:16px; }
+.fr-section-title { font-size:13px; font-weight:700; color:var(--teal-800); margin-bottom:16px; padding-bottom:10px; border-bottom:1px solid rgba(0,0,0,.06); display:flex; align-items:center; gap:8px; }
+.fr-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px; }
+.fr-row.three { grid-template-columns:1fr 1fr 1fr; }
+.fr-row.one { grid-template-columns:1fr; }
+.fr-field { display:flex; flex-direction:column; gap:4px; }
+.fr-field label { font-size:12px; font-weight:600; color:rgba(0,0,0,.6); }
+.fr-field input, .fr-field select, .fr-field textarea { border:none; border-bottom:1px solid #d1d5db; border-radius:0; padding:8px 4px; font-size:13px; font-family:inherit; background:transparent; width:100%; }
+.fr-field textarea { resize:vertical; min-height:70px; }
+.fr-field input:focus, .fr-field select:focus, .fr-field textarea:focus { outline:none; border-bottom-color:var(--teal-600); box-shadow:none; }
+.fr-footer { padding:14px 28px; background:#fff; border-top:1px solid rgba(0,0,0,.07); display:flex; gap:10px; flex-shrink:0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="fr-form-page">
+  <div class="fr-form-head">
+    <a href="{% url 'achats:fournisseurs_list' %}" style="color:#888;text-decoration:none;font-size:13px;">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <h1>{% if action == 'create' %}Nouveau fournisseur{% else %}Modifier — {{ fournisseur.nom }}{% endif %}</h1>
+  </div>
+
+  <div class="fr-form-body">
+    <form method="post" class="fr-form">
+      {% csrf_token %}
+
+      <div class="fr-section">
+        <div class="fr-section-title"><i class="bi bi-building"></i> Informations générales</div>
+        <div class="fr-row">
+          <div class="fr-field">
+            <label>Nom du fournisseur *</label>
+            <input type="text" name="nom" value="{{ fournisseur.nom|default:'' }}" required>
+          </div>
+          <div class="fr-field">
+            <label>Pays</label>
+            <input type="text" name="pays" value="{{ fournisseur.pays|default:"Côte d'Ivoire" }}">
+          </div>
+        </div>
+        <div class="fr-row three">
+          <div class="fr-field">
+            <label>Téléphone</label>
+            <input type="text" name="telephone" value="{{ fournisseur.telephone|default:'' }}">
+          </div>
+          <div class="fr-field">
+            <label>Téléphone 2</label>
+            <input type="text" name="telephone2" value="{{ fournisseur.telephone2|default:'' }}">
+          </div>
+          <div class="fr-field">
+            <label>Email</label>
+            <input type="email" name="email" value="{{ fournisseur.email|default:'' }}">
+          </div>
+        </div>
+        <div class="fr-row">
+          <div class="fr-field">
+            <label>Ville</label>
+            <input type="text" name="ville" value="{{ fournisseur.ville|default:'' }}">
+          </div>
+          <div class="fr-field">
+            <label>Délai livraison moyen (jours)</label>
+            <input type="number" name="delai_livraison_moyen" value="{{ fournisseur.delai_livraison_moyen|default:'' }}" min="0">
+          </div>
+        </div>
+        <div class="fr-row one">
+          <div class="fr-field">
+            <label>Adresse</label>
+            <textarea name="adresse">{{ fournisseur.adresse|default:'' }}</textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="fr-section">
+        <div class="fr-section-title"><i class="bi bi-person"></i> Contact</div>
+        <div class="fr-row three">
+          <div class="fr-field">
+            <label>Nom du contact</label>
+            <input type="text" name="contact_nom" value="{{ fournisseur.contact_nom|default:'' }}">
+          </div>
+          <div class="fr-field">
+            <label>Tél. contact</label>
+            <input type="text" name="contact_telephone" value="{{ fournisseur.contact_telephone|default:'' }}">
+          </div>
+          <div class="fr-field">
+            <label>Email contact</label>
+            <input type="email" name="contact_email" value="{{ fournisseur.contact_email|default:'' }}">
+          </div>
+        </div>
+      </div>
+
+      <div class="fr-section">
+        <div class="fr-section-title"><i class="bi bi-info-circle"></i> Informations commerciales</div>
+        <div class="fr-row one">
+          <div class="fr-field">
+            <label>Types de produits / spécialités</label>
+            <textarea name="specialites">{{ fournisseur.specialites|default:'' }}</textarea>
+          </div>
+        </div>
+        <div class="fr-row">
+          <div class="fr-field">
+            <label>Conditions de paiement</label>
+            <input type="text" name="conditions_paiement" value="{{ fournisseur.conditions_paiement|default:'' }}" placeholder="Ex: 30 jours net, à la livraison…">
+          </div>
+          <div class="fr-field" style="justify-content:flex-end;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:auto;padding-bottom:8px;">
+              <input type="checkbox" name="actif" {% if action == 'create' or fournisseur.actif %}checked{% endif %} style="width:16px;height:16px;">
+              Fournisseur actif
+            </label>
+          </div>
+        </div>
+        <div class="fr-row one">
+          <div class="fr-field">
+            <label>Notes</label>
+            <textarea name="notes">{{ fournisseur.notes|default:'' }}</textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="fr-footer" style="background:transparent;border:none;padding:0;">
+        <button type="submit" style="padding:9px 24px;border-radius:6px;background:var(--teal-600);color:#fff;border:none;font-size:14px;font-weight:600;cursor:pointer;">
+          {% if action == 'create' %}<i class="bi bi-plus-lg"></i> Créer{% else %}<i class="bi bi-check-lg"></i> Enregistrer{% endif %}
+        </button>
+        <a href="{% url 'achats:fournisseurs_list' %}" style="padding:9px 20px;border-radius:6px;border:1px solid #d1d5db;background:#fff;font-size:14px;text-decoration:none;color:rgba(0,0,0,.7);">Annuler</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,188 @@
+{% extends 'achats/base.html' %}
+{% load i18n %}
+
+{% block title %}{{ commande.numero }} — Commande{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+.content { padding:0; }
+.cd-page { display:flex; flex-direction:column; height:calc(100vh - var(--topbar-h) - 44px); overflow:hidden; }
+.cd-head { display:flex; align-items:center; justify-content:space-between; padding:14px 28px; background:#fff; border-bottom:1px solid rgba(0,0,0,.07); flex-shrink:0; gap:12px; }
+.cd-head-left { display:flex; align-items:center; gap:12px; }
+.cd-head h1 { font-size:16px; font-weight:700; color:var(--teal-800); margin:0; }
+.cd-body { flex:1; overflow:auto; min-height:0; padding:20px 28px; display:flex; flex-direction:column; gap:16px; }
+.cd-card { background:#fff; border-radius:10px; border:1px solid rgba(0,0,0,.08); overflow:hidden; }
+.cd-card-head { padding:12px 16px; background:#fafafa; border-bottom:1px solid rgba(0,0,0,.06); font-size:13px; font-weight:700; color:var(--teal-800); display:flex; align-items:center; justify-content:space-between; }
+.cd-info { display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; padding:16px; }
+.cd-info-item { display:flex; flex-direction:column; gap:3px; }
+.cd-info-label { font-size:11px; font-weight:600; color:#888; text-transform:uppercase; }
+.cd-info-val { font-size:13px; color:rgba(0,0,0,.8); font-weight:500; }
+.badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; }
+.s-brouillon { background:#f3f4f6; color:#6b7280; }
+.s-envoyee { background:#dbeafe; color:#1d4ed8; }
+.s-en_livraison { background:#fef3c7; color:#92400e; }
+.s-recue { background:#d1fae5; color:#065f46; }
+.s-annulee { background:#fee2e2; color:#991b1b; }
+.cd-table { width:100%; border-collapse:collapse; font-size:13px; }
+.cd-table th { padding:9px 14px; font-size:11px; font-weight:700; color:#888; text-transform:uppercase; background:#fafafa; border-bottom:1px solid rgba(0,0,0,.08); }
+.cd-table td { padding:9px 14px; border-bottom:1px solid rgba(0,0,0,.05); vertical-align:middle; }
+.cd-table tr:last-child td { border-bottom:none; }
+.cd-total { padding:12px 16px; background:#f0f9f4; border-top:2px solid rgba(0,0,0,.06); display:flex; justify-content:flex-end; gap:16px; align-items:center; }
+.btn { display:inline-flex; align-items:center; gap:5px; padding:6px 14px; border-radius:6px; font-size:13px; font-weight:600; text-decoration:none; border:none; cursor:pointer; }
+.btn-primary { background:var(--teal-600); color:#fff; }
+.btn-secondary { background:#fff; color:rgba(0,0,0,.7); border:1px solid #d1d5db; }
+.btn-warning { background:#f59e0b; color:#fff; }
+/* Statut modal */
+.statut-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:1000; align-items:center; justify-content:center; }
+.statut-modal.open { display:flex; }
+.statut-modal-inner { background:#fff; border-radius:10px; padding:20px 24px; width:340px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cd-page">
+  <div class="cd-head">
+    <div class="cd-head-left">
+      <a href="{% url 'achats:commandes_list' %}" style="color:#888;text-decoration:none;font-size:13px;"><i class="bi bi-arrow-left"></i></a>
+      <h1>{{ commande.numero }}</h1>
+      <span class="badge s-{{ commande.statut }}">{{ commande.get_statut_display }}</span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      {% if commande.statut == 'brouillon' %}
+        <button class="btn btn-warning" onclick="document.getElementById('modal-statut').classList.add('open')"><i class="bi bi-send"></i> Marquer envoyée</button>
+      {% elif commande.statut == 'envoyee' %}
+        <button class="btn btn-warning" onclick="document.getElementById('modal-statut').classList.add('open')"><i class="bi bi-truck"></i> Marquer en livraison</button>
+      {% endif %}
+      {% if commande.statut in 'envoyee en_livraison' %}
+        <a href="{% url 'achats:reception_create' commande.pk %}" class="btn btn-primary"><i class="bi bi-box-seam"></i> Saisir une réception</a>
+      {% endif %}
+      <a href="{% url 'achats:commande_imprimer' commande.pk %}" target="_blank" class="btn btn-secondary"><i class="bi bi-printer"></i> Imprimer</a>
+    </div>
+  </div>
+
+  <div class="cd-body">
+    <div class="cd-card">
+      <div class="cd-card-head"><span><i class="bi bi-info-circle" style="margin-right:6px;"></i>Informations</span></div>
+      <div class="cd-info">
+        <div class="cd-info-item">
+          <span class="cd-info-label">Numéro</span>
+          <span class="cd-info-val">{{ commande.numero }}</span>
+        </div>
+        <div class="cd-info-item">
+          <span class="cd-info-label">Fournisseur</span>
+          <span class="cd-info-val">
+            <a href="{% url 'achats:fournisseur_detail' commande.fournisseur.pk %}" style="color:var(--teal-700);text-decoration:none;">{{ commande.fournisseur.nom }}</a>
+          </span>
+        </div>
+        <div class="cd-info-item">
+          <span class="cd-info-label">Date commande</span>
+          <span class="cd-info-val">{{ commande.date_commande }}</span>
+        </div>
+        <div class="cd-info-item">
+          <span class="cd-info-label">Livraison prévue</span>
+          <span class="cd-info-val">{{ commande.date_livraison_prevue|default:"—" }}</span>
+        </div>
+        <div class="cd-info-item">
+          <span class="cd-info-label">Proforma lié</span>
+          <span class="cd-info-val">
+            <a href="{% url 'achats:proforma_detail' commande.proforma.pk %}" style="color:var(--teal-700);text-decoration:none;">{{ commande.proforma.numero }}</a>
+          </span>
+        </div>
+        <div class="cd-info-item">
+          <span class="cd-info-label">Montant total</span>
+          <span class="cd-info-val" style="font-size:15px;font-weight:800;color:var(--teal-700);">{{ commande.montant_total|floatformat:0 }} FCFA</span>
+        </div>
+        {% if commande.notes %}
+        <div class="cd-info-item" style="grid-column:1/-1;">
+          <span class="cd-info-label">Notes</span>
+          <span class="cd-info-val">{{ commande.notes }}</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="cd-card">
+      <div class="cd-card-head"><span><i class="bi bi-table" style="margin-right:6px;"></i>Articles commandés</span></div>
+      {% if lignes %}
+      <table class="cd-table">
+        <thead>
+          <tr><th>#</th><th>Désignation</th><th style="text-align:right;">Qté commandée</th><th style="text-align:right;">Prix unit. (FCFA)</th><th style="text-align:right;">Montant (FCFA)</th></tr>
+        </thead>
+        <tbody>
+        {% for l in lignes %}
+        <tr>
+          <td style="color:#888;">{{ forloop.counter }}</td>
+          <td style="font-weight:500;">{{ l.designation }}</td>
+          <td style="text-align:right;">{{ l.quantite_commandee }}</td>
+          <td style="text-align:right;">{{ l.prix_unitaire|floatformat:0 }}</td>
+          <td style="text-align:right;font-weight:600;">{{ l.montant|floatformat:0 }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      <div class="cd-total">
+        <span style="font-size:13px;font-weight:600;color:#666;">Total</span>
+        <span style="font-size:18px;font-weight:800;color:var(--teal-700);">{{ montant_calc|floatformat:0 }} FCFA</span>
+      </div>
+      {% endif %}
+    </div>
+
+    {% if receptions %}
+    <div class="cd-card">
+      <div class="cd-card-head"><span><i class="bi bi-box-seam" style="margin-right:6px;"></i>Réceptions ({{ receptions.count }})</span></div>
+      <table class="cd-table">
+        <thead>
+          <tr><th>N°</th><th>Date</th><th>Statut</th><th>Réceptionné par</th><th></th></tr>
+        </thead>
+        <tbody>
+        {% for r in receptions %}
+        <tr>
+          <td style="font-weight:700;color:var(--teal-700);">{{ r.numero }}</td>
+          <td>{{ r.date_reception }}</td>
+          <td>
+            {% if r.statut == 'conforme' %}<span class="badge s-recue">Conforme</span>
+            {% elif r.statut == 'partielle' %}<span class="badge s-en_livraison">Partielle</span>
+            {% else %}<span class="badge s-annulee">Non conforme</span>{% endif %}
+          </td>
+          <td>{{ r.receptionne_par.get_full_name|default:r.receptionne_par.username|default:"—" }}</td>
+          <td><a href="{% url 'achats:reception_detail' r.pk %}" style="color:var(--teal-600);font-size:13px;"><i class="bi bi-eye"></i></a></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Modal changement de statut -->
+<div class="statut-modal" id="modal-statut">
+  <div class="statut-modal-inner">
+    <h2 style="font-size:15px;font-weight:700;margin-bottom:12px;">Changer le statut</h2>
+    <form method="post" action="{% url 'achats:commande_statut' commande.pk %}">
+      {% csrf_token %}
+      {% if commande.statut == 'brouillon' %}
+        <input type="hidden" name="statut" value="envoyee">
+        <p style="font-size:13px;color:#666;">Confirmer que la commande {{ commande.numero }} a été envoyée au fournisseur ?</p>
+        <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end;">
+          <button type="button" class="btn btn-secondary" onclick="document.getElementById('modal-statut').classList.remove('open')">Annuler</button>
+          <button type="submit" class="btn btn-warning"><i class="bi bi-send"></i> Marquer envoyée</button>
+        </div>
+      {% elif commande.statut == 'envoyee' %}
+        <input type="hidden" name="statut" value="en_livraison">
+        <p style="font-size:13px;color:#666;">Confirmer que la commande {{ commande.numero }} est en cours de livraison ?</p>
+        <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end;">
+          <button type="button" class="btn btn-secondary" onclick="document.getElementById('modal-statut').classList.remove('open')">Annuler</button>
+          <button type="submit" class="btn btn-warning"><i class="bi bi-truck"></i> Marquer en livraison</button>
+        </div>
+      {% endif %}
+    </form>
+  </div>
+</div>
+<script>
+document.getElementById('modal-statut').addEventListener('click', function(e) {
+  if(e.target === this) this.classList.remove('open');
+});
+</script>
+{% endblock %}

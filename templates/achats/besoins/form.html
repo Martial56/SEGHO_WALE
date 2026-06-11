@@ -1,0 +1,154 @@
+{% extends 'achats/base.html' %}
+{% load i18n %}
+
+{% block title %}{% if action == 'create' %}Nouveau besoin{% else %}Modifier {{ besoin.numero }}{% endif %}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+.content { padding:0; }
+.bf-page { display:flex; flex-direction:column; height:calc(100vh - var(--topbar-h) - 44px); overflow:hidden; }
+.bf-head { display:flex; align-items:center; gap:12px; padding:14px 28px; background:#fff; border-bottom:1px solid rgba(0,0,0,.07); flex-shrink:0; }
+.bf-head h1 { font-size:16px; font-weight:700; color:var(--teal-800); margin:0; }
+.bf-body { flex:1; overflow:auto; min-height:0; padding:20px 28px; }
+.bf-form { max-width:900px; }
+.bf-card { background:#fff; border-radius:10px; border:1px solid rgba(0,0,0,.08); margin-bottom:16px; overflow:hidden; }
+.bf-card-head { padding:12px 16px; background:#fafafa; border-bottom:1px solid rgba(0,0,0,.06); font-size:13px; font-weight:700; color:var(--teal-800); display:flex; align-items:center; gap:8px; }
+.bf-card-body { padding:16px; }
+.bf-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px; }
+.bf-row.one { grid-template-columns:1fr; }
+.bf-field { display:flex; flex-direction:column; gap:4px; }
+.bf-field label { font-size:12px; font-weight:600; color:rgba(0,0,0,.6); }
+.bf-field input, .bf-field select, .bf-field textarea { border:1px solid #d1d5db; border-radius:6px; padding:8px 10px; font-size:13px; font-family:inherit; }
+.bf-field textarea { resize:vertical; min-height:60px; }
+/* Lignes */
+.lignes-table { width:100%; border-collapse:collapse; font-size:13px; }
+.lignes-table th { padding:8px 10px; font-size:11px; font-weight:700; color:#888; text-transform:uppercase; background:#f9fafb; border-bottom:1px solid rgba(0,0,0,.08); }
+.lignes-table td { padding:6px 8px; border-bottom:1px solid rgba(0,0,0,.05); vertical-align:middle; }
+.lignes-table input, .lignes-table select { border:1px solid #e5e7eb; border-radius:4px; padding:5px 8px; font-size:12.5px; width:100%; font-family:inherit; }
+.btn-add-ligne { margin-top:10px; padding:6px 14px; border:1px dashed #d1d5db; border-radius:6px; background:#fafafa; font-size:13px; cursor:pointer; width:100%; text-align:center; color:#666; }
+.btn-add-ligne:hover { background:#f0f4f8; border-color:var(--teal-400); color:var(--teal-700); }
+.remove-ligne { color:#ef4444; cursor:pointer; font-size:14px; border:none; background:none; padding:0 4px; }
+.bf-footer { padding:14px 0 0; display:flex; gap:10px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="bf-page">
+  <div class="bf-head">
+    <a href="{% url 'achats:besoins_list' %}" style="color:#888;text-decoration:none;font-size:13px;"><i class="bi bi-arrow-left"></i></a>
+    <h1>{% if action == 'create' %}Nouveau besoin d'achat{% else %}Modifier {{ besoin.numero }}{% endif %}</h1>
+  </div>
+
+  <div class="bf-body">
+    <form method="post" class="bf-form">
+      {% csrf_token %}
+
+      <div class="bf-card">
+        <div class="bf-card-head"><i class="bi bi-info-circle"></i> Informations générales</div>
+        <div class="bf-card-body">
+          <div class="bf-row">
+            <div class="bf-field">
+              <label>Titre du besoin *</label>
+              <input type="text" name="titre" value="{{ besoin.titre|default:'' }}" required placeholder="Ex: Commande médicaments octobre 2026">
+            </div>
+            <div class="bf-field">
+              <label>Date de livraison souhaitée</label>
+              <input type="date" name="date_besoin_souhaite" value="{{ besoin.date_besoin_souhaite|default:'' }}">
+            </div>
+          </div>
+          <div class="bf-row one">
+            <div class="bf-field">
+              <label>Notes</label>
+              <textarea name="notes" placeholder="Informations complémentaires…">{{ besoin.notes|default:'' }}</textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bf-card">
+        <div class="bf-card-head"><i class="bi bi-card-list"></i> Articles</div>
+        <div class="bf-card-body">
+          <table class="lignes-table" id="lignes-table">
+            <thead>
+              <tr>
+                <th style="width:35%;">Produit du catalogue</th>
+                <th style="width:25%;">Désignation libre (si hors catalogue)</th>
+                <th style="width:12%;">Quantité</th>
+                <th style="width:12%;">Unité</th>
+                <th style="width:12%;">Notes</th>
+                <th style="width:4%;"></th>
+              </tr>
+            </thead>
+            <tbody id="lignes-body">
+            {% if action == 'edit' and lignes %}
+              {% for l in lignes %}
+              <tr class="ligne-row">
+                <td>
+                  <select name="produit_id">
+                    <option value="">— Hors catalogue —</option>
+                    {% for p in produits %}
+                    <option value="{{ p.pk }}" {% if l.produit_id == p.pk %}selected{% endif %}>{{ p.nom }} ({{ p.code }})</option>
+                    {% endfor %}
+                  </select>
+                </td>
+                <td><input type="text" name="designation" value="{{ l.designation }}" placeholder="Désignation…"></td>
+                <td><input type="number" name="quantite" value="{{ l.quantite }}" step="0.01" min="0.01" required></td>
+                <td><input type="text" name="unite" value="{{ l.unite }}" placeholder="unité"></td>
+                <td><input type="text" name="ligne_notes" value="{{ l.notes }}"></td>
+                <td><button type="button" class="remove-ligne" onclick="removeLigne(this)"><i class="bi bi-trash"></i></button></td>
+              </tr>
+              {% endfor %}
+            {% else %}
+              <tr class="ligne-row">
+                <td><select name="produit_id"><option value="">— Hors catalogue —</option>{% for p in produits %}<option value="{{ p.pk }}">{{ p.nom }} ({{ p.code }})</option>{% endfor %}</select></td>
+                <td><input type="text" name="designation" placeholder="Désignation libre…"></td>
+                <td><input type="number" name="quantite" step="0.01" min="0.01" required></td>
+                <td><input type="text" name="unite" value="unité"></td>
+                <td><input type="text" name="ligne_notes"></td>
+                <td><button type="button" class="remove-ligne" onclick="removeLigne(this)"><i class="bi bi-trash"></i></button></td>
+              </tr>
+            {% endif %}
+            </tbody>
+          </table>
+          <button type="button" class="btn-add-ligne" onclick="addLigne()">
+            <i class="bi bi-plus-lg"></i> Ajouter un article
+          </button>
+        </div>
+      </div>
+
+      <div class="bf-footer">
+        <button type="submit" style="padding:9px 24px;border-radius:6px;background:var(--teal-600);color:#fff;border:none;font-size:14px;font-weight:600;cursor:pointer;">
+          {% if action == 'create' %}<i class="bi bi-plus-lg"></i> Créer{% else %}<i class="bi bi-check-lg"></i> Enregistrer{% endif %}
+        </button>
+        <a href="{% url 'achats:besoins_list' %}" style="padding:9px 20px;border-radius:6px;border:1px solid #d1d5db;background:#fff;font-size:14px;text-decoration:none;color:rgba(0,0,0,.7);">Annuler</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+var produitsOptions = `{% for p in produits %}<option value="{{ p.pk }}">{{ p.nom }} ({{ p.code }})</option>{% endfor %}`;
+
+function addLigne() {
+  var tbody = document.getElementById('lignes-body');
+  var row = document.createElement('tr');
+  row.className = 'ligne-row';
+  row.innerHTML = `
+    <td><select name="produit_id"><option value="">— Hors catalogue —</option>${produitsOptions}</select></td>
+    <td><input type="text" name="designation" placeholder="Désignation libre…"></td>
+    <td><input type="number" name="quantite" step="0.01" min="0.01" required></td>
+    <td><input type="text" name="unite" value="unité"></td>
+    <td><input type="text" name="ligne_notes"></td>
+    <td><button type="button" class="remove-ligne" onclick="removeLigne(this)"><i class="bi bi-trash"></i></button></td>
+  `;
+  tbody.appendChild(row);
+}
+
+function removeLigne(btn) {
+  var rows = document.querySelectorAll('.ligne-row');
+  if (rows.length <= 1) { alert('Il faut au moins un article.'); return; }
+  btn.closest('tr').remove();
+}
+</script>
+{% endblock %}

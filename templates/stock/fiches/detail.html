@@ -12,11 +12,8 @@
   box-shadow:0 2px 8px rgba(0,0,0,.04);
   position:sticky; top:calc(var(--topbar-h) + 44px); z-index:100;
 }
-.badge-brouillon { background:rgba(0,0,0,.06);   color:rgba(0,0,0,.5);  border:1px solid rgba(0,0,0,.12);    padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; }
-.badge-soumis    { background:rgba(232,154,26,.1); color:#8a5c00;        border:1px solid rgba(232,154,26,.25); padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; }
+.badge-brouillon { background:rgba(232,154,26,.1); color:#8a5c00;        border:1px solid rgba(232,154,26,.25); padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; }
 .badge-valide    { background:rgba(22,169,107,.1); color:#0d7a4c;        border:1px solid rgba(22,169,107,.25); padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; }
-.badge-rejete    { background:rgba(232,69,69,.1);  color:#b71c1c;        border:1px solid rgba(232,69,69,.25);  padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; }
-.badge-pharma    { background:rgba(58,89,36,.1); color:var(--st-700); border:1px solid rgba(58,89,36,.2); padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; }
 .info-row { padding:8px 0; border-bottom:1px solid var(--st-border); display:flex; justify-content:space-between; align-items:baseline; font-size:12.5px; }
 .info-row:last-child { border-bottom:none; }
 .info-lbl { color:var(--st-muted); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.3px; }
@@ -34,15 +31,10 @@
     <div>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
         <span style="font-size:15px;font-weight:800;color:var(--st-900);font-family:monospace;">{{ fiche.numero }}</span>
-        <span class="badge-pharma"><i class="bi bi-hospital" style="font-size:10px;"></i> {{ fiche.get_pharmacie_display }}</span>
         {% if fiche.statut == 'brouillon' %}
-          <span class="badge-brouillon"><i class="bi bi-pencil"></i> Brouillon</span>
-        {% elif fiche.statut == 'soumis' %}
-          <span class="badge-soumis"><i class="bi bi-hourglass-split"></i> Soumis</span>
-        {% elif fiche.statut == 'valide' %}
-          <span class="badge-valide"><i class="bi bi-check-circle-fill"></i> Validé</span>
+          <span class="badge-brouillon"><i class="bi bi-pencil"></i> Non envoyée</span>
         {% else %}
-          <span class="badge-rejete"><i class="bi bi-x-circle-fill"></i> Rejeté</span>
+          <span class="badge-valide"><i class="bi bi-send-check"></i> Transmis aux achats</span>
         {% endif %}
       </div>
       <div style="font-size:11.5px;color:var(--st-muted);margin-top:2px;">
@@ -56,28 +48,25 @@
       <a href="{% url 'stock_fiche_edit' fiche.pk %}" class="btn-st-outline">
         <i class="bi bi-pencil"></i> Modifier
       </a>
-      <form method="post" action="{% url 'stock_fiche_soumettre' fiche.pk %}" style="display:inline;">
+      <form method="post" action="{% url 'stock_fiche_envoyer_achats' fiche.pk %}" style="display:inline;">
         {% csrf_token %}
         <button type="submit" class="btn-st"
-          onclick="return confirm('Soumettre cette fiche pour validation par le Directeur Adjoint ?')">
-          <i class="bi bi-send"></i> Soumettre pour validation
+          onclick="return confirm('Envoyer cette fiche aux achats ? Elle ne sera plus modifiable.')">
+          <i class="bi bi-send-arrow-up"></i> Envoyer aux achats
         </button>
       </form>
-      <a href="{% url 'stock_fiche_print' fiche.pk %}" class="btn-st-outline" target="_blank" title="Imprimer">
-        <i class="bi bi-printer"></i>
-      </a>
-    {% elif fiche.statut == 'soumis' %}
-      <a href="{% url 'stock_fiche_valider' fiche.pk %}" class="btn-st">
-        <i class="bi bi-check2-square"></i> Valider / Rejeter
-      </a>
-      <a href="{% url 'stock_fiche_print' fiche.pk %}" class="btn-st-outline" target="_blank" title="Imprimer">
-        <i class="bi bi-printer"></i>
-      </a>
     {% else %}
-      <a href="{% url 'stock_fiche_print' fiche.pk %}" class="btn-st-outline" target="_blank">
-        <i class="bi bi-printer"></i> Imprimer
-      </a>
+      {% with besoin=fiche.besoins_achats.first %}
+      {% if besoin %}
+        <a href="{% url 'achats:besoin_detail' besoin.pk %}" class="btn-st">
+          <i class="bi bi-send-check"></i> Voir dans Achats — {{ besoin.numero }}
+        </a>
+      {% endif %}
+      {% endwith %}
     {% endif %}
+    <a href="{% url 'stock_fiche_print' fiche.pk %}" class="btn-st-outline" target="_blank" title="Imprimer">
+      <i class="bi bi-printer"></i> Imprimer
+    </a>
   </div>
 </div>
 
@@ -108,10 +97,6 @@
         <div class="st-card-title"><i class="bi bi-info-circle" style="color:var(--st-600);"></i> Informations</div>
       </div>
       <div class="st-card-body" style="padding:0 20px;">
-        <div class="info-row">
-          <span class="info-lbl">Pharmacie</span>
-          <span style="font-weight:700;">{{ fiche.get_pharmacie_display }}</span>
-        </div>
         <div class="info-row">
           <span class="info-lbl">Période</span>
           <span style="font-size:12px;">{{ fiche.periode_debut|date:"d/m/Y" }}<br>au {{ fiche.periode_fin|date:"d/m/Y" }}</span>
@@ -161,10 +146,7 @@
             <tr>
               <th>Désignation / DCI</th>
               <th>Unité</th>
-              <th style="text-align:center;">Stock initial</th>
-              <th style="text-align:center;">Qté reçue</th>
-              <th style="text-align:center;">Qté dispensée</th>
-              <th style="text-align:center;background:rgba(58,89,36,.07);">Stock dispo</th>
+              <th style="text-align:center;">Stock actuel</th>
               <th style="text-align:center;">CMM</th>
               <th style="text-align:center;">Qté commander</th>
               {% if fiche.statut == 'valide' or fiche.statut == 'rejete' %}
@@ -173,34 +155,50 @@
             </tr>
           </thead>
           <tbody>
-          {% for ligne in lignes %}
+          {% regroup lignes by produit.categorie as lignes_par_cat %}
+          {% if lignes_par_cat %}
+            {% for cat_group in lignes_par_cat %}
+            <tr style="background:var(--st-50);">
+              <td colspan="{% if fiche.statut == 'valide' or fiche.statut == 'rejete' %}6{% else %}5{% endif %}"
+                style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--st-600);padding:6px 12px;border-bottom:1px solid var(--st-border);">
+                {% if cat_group.grouper %}
+                  {% with t=cat_group.grouper.type %}
+                    {% if t == 'medicament' %}<i class="bi bi-capsule"></i>
+                    {% elif t == 'consommable' %}<i class="bi bi-bandaid"></i>
+                    {% else %}<i class="bi bi-tools"></i>{% endif %}
+                  {% endwith %}
+                  {{ cat_group.grouper.nom }}
+                {% else %}
+                  <i class="bi bi-question-circle"></i> Sans catégorie
+                {% endif %}
+                <span style="font-weight:400;color:var(--st-muted);margin-left:8px;">{{ cat_group.list|length }} ligne{{ cat_group.list|length|pluralize }}</span>
+              </td>
+            </tr>
+            {% for ligne in cat_group.list %}
+            <tr>
+              <td>
+                <div style="font-weight:600;">{{ ligne.produit.nom }}</div>
+                {% if ligne.produit.dci %}<div style="font-size:10.5px;color:var(--st-muted);">{{ ligne.produit.dci }}</div>{% endif %}
+              </td>
+              <td style="font-size:12px;color:var(--st-muted);">{{ ligne.produit.unite_mesure|default:"—" }}</td>
+              <td style="text-align:center;font-weight:700;color:var(--st-700);">{{ ligne.produit.stock_actuel|floatformat:0|default:"—" }}</td>
+              <td style="text-align:center;color:var(--st-muted);">{{ ligne.cmm|floatformat:0|default:"—" }}</td>
+              <td style="text-align:center;font-weight:700;">{{ ligne.qte_commander|floatformat:0|default:"—" }}</td>
+              {% if fiche.statut == 'valide' or fiche.statut == 'rejete' %}
+              <td style="text-align:center;font-weight:800;color:{% if ligne.qte_accordee > 0 %}#0d7a4c{% else %}#b71c1c{% endif %};">
+                {{ ligne.qte_accordee|floatformat:0|default:"0" }}
+              </td>
+              {% endif %}
+            </tr>
+            {% endfor %}
+            {% endfor %}
+          {% else %}
           <tr>
-            <td>
-              <div style="font-weight:600;">{{ ligne.produit.nom }}</div>
-              {% if ligne.produit.dci %}<div style="font-size:10.5px;color:var(--st-muted);">{{ ligne.produit.dci }}</div>{% endif %}
-            </td>
-            <td style="font-size:12px;color:var(--st-muted);">{{ ligne.produit.unite_mesure|default:"—" }}</td>
-            <td style="text-align:center;">{{ ligne.stock_initial|floatformat:0|default:"—" }}</td>
-            <td style="text-align:center;">{{ ligne.qte_recue|floatformat:0|default:"0" }}</td>
-            <td style="text-align:center;">{{ ligne.qte_dispensee|floatformat:0|default:"0" }}</td>
-            <td style="text-align:center;background:rgba(58,89,36,.04);font-weight:700;color:var(--st-700);">
-              {{ ligne.stock_disponible|floatformat:0|default:"—" }}
-            </td>
-            <td style="text-align:center;color:var(--st-muted);">{{ ligne.cmm|floatformat:0|default:"—" }}</td>
-            <td style="text-align:center;font-weight:700;">{{ ligne.qte_commander|floatformat:0|default:"—" }}</td>
-            {% if fiche.statut == 'valide' or fiche.statut == 'rejete' %}
-            <td style="text-align:center;font-weight:800;color:{% if ligne.qte_accordee > 0 %}#0d7a4c{% else %}#b71c1c{% endif %};">
-              {{ ligne.qte_accordee|floatformat:0|default:"0" }}
-            </td>
-            {% endif %}
-          </tr>
-          {% empty %}
-          <tr>
-            <td colspan="9" style="text-align:center;padding:28px;color:var(--st-muted);font-style:italic;">
+            <td colspan="5" style="text-align:center;padding:28px;color:var(--st-muted);font-style:italic;">
               Aucun produit dans cette fiche
             </td>
           </tr>
-          {% endfor %}
+          {% endif %}
           </tbody>
         </table>
       </div>

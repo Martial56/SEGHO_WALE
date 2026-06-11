@@ -32,6 +32,7 @@ urlpatterns = [
     path('conges/', include('conges.urls')),
     path('presence/', include('presence.urls')),
     path('stock/', include('stock.urls')),
+    path('achats/', include('achats.urls')),
     path('post-note/', views.post_note, name='post_note'),
     path('rapports/', views.rapports_list, name='rapports_list'),
     path('planning/', include('planning.urls')),

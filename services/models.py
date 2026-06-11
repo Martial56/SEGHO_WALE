@@ -293,7 +293,7 @@ class Articleservice(models.Model):
 
 class LigneFournisseurArticle(models.Model):
     article = models.ForeignKey(Articleservice, on_delete=models.CASCADE, related_name='fournisseurs')
-    fournisseur = models.ForeignKey('pharmacie.Fournisseur', on_delete=models.CASCADE, verbose_name="Fournisseur")
+    fournisseur = models.ForeignKey('achats.Fournisseur', on_delete=models.CASCADE, verbose_name="Fournisseur")
     nom_article_fournisseur = models.CharField(max_length=200, blank=True, verbose_name="Nom de l'article chez le fournisseur")
     reference_fournisseur = models.CharField(max_length=100, blank=True, verbose_name="Référence fournisseur")
     date_debut = models.DateField(null=True, blank=True, verbose_name="Date de début")

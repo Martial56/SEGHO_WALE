@@ -2,6 +2,30 @@
 {% load i18n %}
 {% block topbar_title %}Caisse{% endblock %}
 
+{% block extra_css %}
+{{ block.super }}
+<style>
+  .content { padding-top: 0 !important; }
+  .breadcrumb { display: none !important; }
+</style>
+<script>
+  (function () {
+    function syncTopbarH() {
+      var topbar = document.querySelector('.topbar');
+      if (topbar) {
+        document.documentElement.style.setProperty('--topbar-h', topbar.getBoundingClientRect().height + 'px');
+      }
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', syncTopbarH);
+    } else {
+      syncTopbarH();
+    }
+    window.addEventListener('resize', syncTopbarH);
+  })();
+</script>
+{% endblock %}
+
 {% block module_navbar %}
 <nav class="o-nav">
   <a href="{% url 'dashboard' %}" class="o-nav-grid" title="Accueil">

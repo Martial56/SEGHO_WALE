@@ -13,7 +13,7 @@ from .models import (
     UniteMesure, CategorieUniteMesure, Consommable, Typeservice,
 )
 from .forms import CategorieArticleForm, CategorieUniteMesureForm, UniteMesureForm, ConsommableForm, TypeserviceForm
-from pharmacie.models import Fournisseur
+from achats.models import Fournisseur
 from django.contrib.auth.models import User
 
 

@@ -1,0 +1,114 @@
+{% extends 'achats/base.html' %}
+{% load i18n %}
+
+{% block title %}Saisir une réception — {{ commande.numero }}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+.content { padding:0; }
+.rf-page { display:flex; flex-direction:column; height:calc(100vh - var(--topbar-h) - 44px); overflow:hidden; }
+.rf-head { display:flex; align-items:center; gap:12px; padding:14px 28px; background:#fff; border-bottom:1px solid rgba(0,0,0,.07); flex-shrink:0; }
+.rf-head h1 { font-size:16px; font-weight:700; color:var(--teal-800); margin:0; }
+.rf-body { flex:1; overflow:auto; min-height:0; padding:20px 28px; }
+.rf-card { background:#fff; border-radius:10px; border:1px solid rgba(0,0,0,.08); margin-bottom:16px; overflow:hidden; max-width:1000px; }
+.rf-card-head { padding:12px 16px; background:#fafafa; border-bottom:1px solid rgba(0,0,0,.06); font-size:13px; font-weight:700; color:var(--teal-800); display:flex; align-items:center; gap:8px; }
+.rf-card-body { padding:16px; }
+.rf-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px; }
+.rf-field { display:flex; flex-direction:column; gap:4px; }
+.rf-field label { font-size:12px; font-weight:600; color:rgba(0,0,0,.6); }
+.rf-field input, .rf-field textarea { border:1px solid #d1d5db; border-radius:6px; padding:8px 10px; font-size:13px; font-family:inherit; }
+.rf-table { width:100%; border-collapse:collapse; font-size:13px; }
+.rf-table th { padding:9px 12px; font-size:11px; font-weight:700; color:#888; text-transform:uppercase; background:#fafafa; border-bottom:1px solid rgba(0,0,0,.08); }
+.rf-table td { padding:8px 12px; border-bottom:1px solid rgba(0,0,0,.05); vertical-align:middle; }
+.rf-table input[type=number] { border:1px solid #e5e7eb; border-radius:4px; padding:5px 8px; font-size:13px; width:100px; font-family:inherit; }
+.rf-table input[type=text] { border:1px solid #e5e7eb; border-radius:4px; padding:5px 8px; font-size:12px; width:100%; font-family:inherit; }
+.qte-cmd { color:#888; font-size:12px; }
+.ecart-neg { color:#ef4444; font-weight:600; }
+.ecart-ok { color:#22c55e; font-weight:600; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="rf-page">
+  <div class="rf-head">
+    <a href="{% url 'achats:commande_detail' commande.pk %}" style="color:#888;text-decoration:none;font-size:13px;"><i class="bi bi-arrow-left"></i></a>
+    <h1>Réception — {{ commande.numero }}</h1>
+  </div>
+
+  <div class="rf-body">
+    <form method="post" style="max-width:1000px;">
+      {% csrf_token %}
+      <div class="rf-card">
+        <div class="rf-card-head"><i class="bi bi-info-circle"></i> Informations de réception</div>
+        <div class="rf-card-body">
+          <div class="rf-row">
+            <div class="rf-field">
+              <label>Date de réception *</label>
+              <input type="date" name="date_reception" required>
+            </div>
+          </div>
+          <div class="rf-field">
+            <label>Notes / Observations</label>
+            <textarea name="notes" placeholder="État de la livraison, anomalies constatées…" style="min-height:60px;resize:vertical;"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="rf-card">
+        <div class="rf-card-head"><i class="bi bi-box-seam"></i> Quantités reçues</div>
+        <table class="rf-table">
+          <thead>
+            <tr>
+              <th>Désignation</th>
+              <th style="text-align:right;">Qté commandée</th>
+              <th style="text-align:center;">Qté reçue</th>
+              <th style="text-align:center;">Conforme</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for l in lignes %}
+          <tr>
+            <td style="font-weight:500;">{{ l.designation }}</td>
+            <td style="text-align:right;" class="qte-cmd">{{ l.quantite_commandee }}</td>
+            <td style="text-align:center;">
+              <input type="number" name="qte_{{ l.pk }}" value="{{ l.quantite_commandee }}" step="0.01" min="0" oninput="checkEcart(this, {{ l.quantite_commandee }})">
+            </td>
+            <td style="text-align:center;">
+              <input type="checkbox" name="conforme_{{ l.pk }}" checked style="width:16px;height:16px;cursor:pointer;">
+            </td>
+            <td><input type="text" name="notes_{{ l.pk }}" placeholder="Remarques…"></td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div style="display:flex;gap:10px;padding-bottom:20px;">
+        <button type="submit" style="padding:9px 24px;border-radius:6px;background:var(--teal-600);color:#fff;border:none;font-size:14px;font-weight:600;cursor:pointer;">
+          <i class="bi bi-check-circle"></i> Confirmer la réception
+        </button>
+        <a href="{% url 'achats:commande_detail' commande.pk %}" style="padding:9px 20px;border-radius:6px;border:1px solid #d1d5db;background:#fff;font-size:14px;text-decoration:none;color:rgba(0,0,0,.7);">Annuler</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function checkEcart(input, cmdQte) {
+  var recu = parseFloat(input.value) || 0;
+  var row = input.closest('tr');
+  var prev = row.querySelector('.ecart-info');
+  if (prev) prev.remove();
+  if (Math.abs(recu - cmdQte) > 0.001) {
+    var span = document.createElement('small');
+    span.className = recu < cmdQte ? 'ecart-neg' : 'ecart-ok';
+    span.style.display = 'block';
+    span.textContent = recu < cmdQte ? ('−' + (cmdQte - recu)) : ('+' + (recu - cmdQte));
+    span.classList.add('ecart-info');
+    input.parentNode.appendChild(span);
+  }
+}
+</script>
+{% endblock %}

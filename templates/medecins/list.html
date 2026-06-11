@@ -1,9 +1,10 @@
-{% extends 'medecins/base.html' %}
+﻿{% extends 'medecins/base.html' %}
 {% load static %}
 
 {% block topbar_title %}Médecins{% endblock %}
 
 {% block extra_css %}
+{{ block.super }}
 <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
 <style>
 :root {
@@ -14,7 +15,7 @@
   --md-text:#1b2e13; --md-muted:rgba(0,0,0,.45);
 }
 html[data-theme="dark"] {
-  --md-50:#0a1610; --md-100:#0d1f12; --md-surface:#070e05;
+  --md-50:#171616; --md-100:#201d1d; --md-surface:#0f0e0e;
   --md-border:rgba(154,184,138,.18); --md-text:#bcd5a8; --md-muted:rgba(255,255,255,.4);
 }
 
@@ -26,7 +27,7 @@ html[data-theme="dark"] {
   box-shadow:0 2px 8px rgba(0,0,0,.04);
   position:sticky; top:calc(var(--topbar-h) + 44px); z-index:100;
 }
-html[data-theme="dark"] .md-head { background:#070e05; }
+html[data-theme="dark"] .md-head { background:#0f0e0e; }
 
 /* ── Stats ── */
 .md-stats { display:flex; gap:10px; flex-wrap:wrap; margin-top:16px; }
@@ -70,7 +71,7 @@ html[data-theme="dark"] .md-head { background:#070e05; }
 .view-btn.active, .view-btn:hover { background:var(--md-600); color:#fff; border-color:var(--md-600); }
 
 /* ── Vue tableau ── */
-.md-table-wrap { margin-top:14px; border-radius:10px; overflow:hidden; box-shadow:0 2px 12px rgba(58,89,36,.08); }
+.md-table-wrap { margin-top:14px; margin-left:-32px; margin-right:-32px; border-radius:0; overflow:hidden; box-shadow:0 2px 12px rgba(58,89,36,.08); }
 .md-table { width:100%; border-collapse:collapse; background:var(--md-surface); font-size:12.5px; }
 .md-table thead tr { background:var(--md-100); color:var(--md-800); border-bottom:2px solid var(--md-300); }
 .md-table thead th { padding:8px 12px; font-weight:700; font-size:10.5px; text-transform:uppercase; letter-spacing:.4px; text-align:left; white-space:nowrap; }
@@ -83,9 +84,15 @@ html[data-theme="dark"] .md-table tbody tr:nth-child(even) { background:var(--md
 
 /* ── Avatar tableau ── */
 .md-avatar {
-  width:30px; height:30px; border-radius:50%; flex-shrink:0;
+  width:44px; height:44px; border-radius:6px; flex-shrink:0;
   display:flex; align-items:center; justify-content:center;
-  font-size:11px; font-weight:800; color:#fff;
+  font-size:13px; font-weight:800; color:#fff; overflow:hidden;
+}
+.md-avatar img { width:100%; height:100%; object-fit:cover; display:block; }
+.md-avatar-ph {
+  width:44px; height:44px; border-radius:6px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  background:#f0f4f8; color:#aab; font-size:22px;
 }
 
 /* ── Vue Kanban ── */
@@ -248,7 +255,7 @@ html[data-theme="dark"] .kb-col-title { color:var(--md-200); }
     <table class="md-table">
       <thead>
         <tr>
-          <th style="width:46px;"></th>
+          <th style="width:60px;">Photo</th>
           <th>Médecin</th>
           <th>Spécialité</th>
           <th>Téléphone</th>
@@ -262,14 +269,14 @@ html[data-theme="dark"] .kb-col-title { color:var(--md-200); }
         {% for med in page_obj %}
         {% with c=forloop.counter %}
         <tr>
-          <td>
+          <td style="padding:6px 10px;">
             {% if med.photo %}
-            <div class="md-avatar" style="overflow:hidden;">
-              <img src="{{ med.photo.url }}" alt="" style="width:100%;height:100%;object-fit:cover;">
+            <div class="md-avatar">
+              <img src="{{ med.photo.url }}" alt="Photo de {{ med.nom }}">
             </div>
             {% else %}
-            <div class="md-avatar av-c{{ c|add:0|divisibleby:5|yesno:'5,' }}{% if c|divisibleby:4 %}av-c4{% elif c|divisibleby:3 %}av-c3{% elif c|divisibleby:2 %}av-c2{% else %}av-c1{% endif %}">
-              {{ med.nom|first|upper }}{{ med.prenoms|first|upper }}
+            <div class="md-avatar-ph">
+              <i class="bi bi-person-fill"></i>
             </div>
             {% endif %}
           </td>

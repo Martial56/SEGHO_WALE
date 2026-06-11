@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+﻿{% extends 'base.html' %}
 {% load static %}
 
 {% block topbar_title %}Stock{% endblock %}
@@ -14,7 +14,7 @@
   --st-text:#1b2e13; --st-muted:rgba(0,0,0,.45);
 }
 html[data-theme="dark"] {
-  --st-50:#0a1610; --st-100:#0d1f12; --st-surface:#070e05;
+  --st-50:#171616; --st-100:#201d1d; --st-surface:#0f0e0e;
   --st-border:rgba(154,184,138,.18); --st-text:#bcd5a8; --st-muted:rgba(255,255,255,.4);
 }
 
@@ -94,13 +94,29 @@ html[data-theme="dark"] .st-table thead tr { background:var(--st-800); color:var
 
 </style>
 {% block extra_st_css %}{% endblock %}
+<script>
+  (function () {
+    function syncTopbarH() {
+      var topbar = document.querySelector('.topbar');
+      if (topbar) {
+        document.documentElement.style.setProperty('--topbar-h', topbar.getBoundingClientRect().height + 'px');
+      }
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', syncTopbarH);
+    } else {
+      syncTopbarH();
+    }
+    window.addEventListener('resize', syncTopbarH);
+  })();
+</script>
 {% endblock %}
 
 {% block breadcrumb %}
 <nav class="st-nav">
   <a href="{% url 'stock_dashboard' %}" class="st-nav-link {% block nav_dashboard %}{% endblock %}"><i class="bi bi-speedometer2"></i> Tableau de bord</a>
   <a href="{% url 'stock_produits' %}" class="st-nav-link {% block nav_produits %}{% endblock %}"><i class="bi bi-box-seam"></i> Produits</a>
-  <a href="{% url 'stock_commandes' %}" class="st-nav-link {% block nav_commandes %}{% endblock %}"><i class="bi bi-cart3"></i> Commandes</a>
+  <a href="{% url 'stock_fiche_list' %}" class="st-nav-link {% block nav_rapports_besoins %}{% endblock %}"><i class="bi bi-file-earmark-text"></i> Fiches besoins</a>
   <a href="{% url 'stock_dotation_list' %}" class="st-nav-link {% block nav_dotation %}{% endblock %}" style="position:relative;">
     <i class="bi bi-bag-check"></i> Dotation
     {% if stock_demandes_en_attente %}
@@ -124,17 +140,15 @@ html[data-theme="dark"] .st-table thead tr { background:var(--st-800); color:var
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">
     {% url 'stock_mouvements' as url_mv %}{% url 'stock_transfert' as url_tr %}
     {% url 'stock_inventaire_list' as url_iv %}{% url 'stock_peremptions' as url_pe %}
-    {% url 'stock_fournisseurs' as url_fr %}{% url 'stock_valorisation' as url_vl %}
-    {% url 'stock_fiche_list' as url_fb %}{% url 'stock_rapports_besoins' as url_rb %}
+    {% url 'stock_valorisation' as url_vl %}
+    {% url 'stock_rapports_besoins' as url_rb %}
     {% url 'stock_rapports_indicateurs' as url_ri %}{% url 'stock_rapports_consommation' as url_rc %}
     {% url 'stock_rapports_dotations' as url_rd %}
 
     <a href="{{ url_mv }}" class="st-menu-item"><i class="bi bi-journal-text"></i><span>Journal</span></a>
-    <a href="{{ url_fr }}" class="st-menu-item"><i class="bi bi-truck"></i><span>Fournisseurs</span></a>
     <a href="{{ url_iv }}" class="st-menu-item"><i class="bi bi-clipboard2-check"></i><span>Inventaires</span></a>
     <a href="{{ url_pe }}" class="st-menu-item"><i class="bi bi-calendar-x"></i><span>Péremptions</span></a>
     <a href="{{ url_vl }}" class="st-menu-item"><i class="bi bi-graph-up-arrow"></i><span>Valorisation</span></a>
-    <a href="{{ url_fb }}" class="st-menu-item"><i class="bi bi-file-earmark-text"></i><span>Fiches besoins</span></a>
     <a href="{{ url_rb }}" class="st-menu-item"><i class="bi bi-clipboard2-data"></i><span>Rapport besoins</span></a>
     <a href="{{ url_ri }}" class="st-menu-item"><i class="bi bi-speedometer2"></i><span>Indicateurs</span></a>
     <a href="{{ url_rc }}" class="st-menu-item"><i class="bi bi-box-arrow-right"></i><span>Dotations prod.</span></a>

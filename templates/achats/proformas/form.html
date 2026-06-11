@@ -1,0 +1,212 @@
+{% extends 'achats/base.html' %}
+{% load i18n %}
+
+{% block title %}{% if action == 'create' %}Nouveau proforma{% else %}Modifier {{ proforma.numero }}{% endif %}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+.content { padding:0; }
+.pff-page { display:flex; flex-direction:column; height:calc(100vh - var(--topbar-h) - 44px); overflow:hidden; }
+.pff-head { display:flex; align-items:center; gap:12px; padding:14px 28px; background:#fff; border-bottom:1px solid rgba(0,0,0,.07); flex-shrink:0; }
+.pff-head h1 { font-size:16px; font-weight:700; color:var(--teal-800); margin:0; }
+.pff-body { flex:1; overflow:auto; min-height:0; padding:20px 28px; }
+.pff-form { max-width:950px; }
+.pff-card { background:#fff; border-radius:10px; border:1px solid rgba(0,0,0,.08); margin-bottom:16px; overflow:hidden; }
+.pff-card-head { padding:12px 16px; background:#fafafa; border-bottom:1px solid rgba(0,0,0,.06); font-size:13px; font-weight:700; color:var(--teal-800); display:flex; align-items:center; gap:8px; }
+.pff-card-body { padding:16px; }
+.pff-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin-bottom:14px; }
+.pff-row.two { grid-template-columns:1fr 1fr; }
+.pff-field { display:flex; flex-direction:column; gap:4px; }
+.pff-field label { font-size:12px; font-weight:600; color:rgba(0,0,0,.6); }
+.pff-field input, .pff-field select, .pff-field textarea { border:1px solid #d1d5db; border-radius:6px; padding:8px 10px; font-size:13px; font-family:inherit; }
+.pff-field textarea { resize:vertical; min-height:60px; }
+.lig-table { width:100%; border-collapse:collapse; font-size:13px; }
+.lig-table th { padding:8px 10px; font-size:11px; font-weight:700; color:#888; text-transform:uppercase; background:#f9fafb; border-bottom:1px solid rgba(0,0,0,.08); }
+.lig-table td { padding:6px 8px; border-bottom:1px solid rgba(0,0,0,.05); vertical-align:middle; }
+.lig-table input, .lig-table select { border:1px solid #e5e7eb; border-radius:4px; padding:5px 8px; font-size:12.5px; width:100%; font-family:inherit; }
+.montant-cell { font-weight:600; text-align:right; }
+.btn-add { margin-top:10px; padding:6px 14px; border:1px dashed #d1d5db; border-radius:6px; background:#fafafa; font-size:13px; cursor:pointer; width:100%; text-align:center; color:#666; }
+.btn-add:hover { background:#f0f4f8; border-color:var(--teal-400); color:var(--teal-700); }
+.remove-btn { color:#ef4444; cursor:pointer; font-size:14px; border:none; background:none; padding:0 4px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pff-page">
+  <div class="pff-head">
+    <a href="{% url 'achats:besoin_detail' besoin.pk %}" style="color:#888;text-decoration:none;font-size:13px;"><i class="bi bi-arrow-left"></i></a>
+    <h1>{% if action == 'create' %}Nouveau proforma — {{ besoin.numero }}{% else %}Modifier {{ proforma.numero }}{% endif %}</h1>
+  </div>
+
+  <div class="pff-body">
+    <form method="post" enctype="multipart/form-data" class="pff-form">
+      {% csrf_token %}
+
+      <!-- Besoin résumé -->
+      <div style="background:#f0f9f4;border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:rgba(0,0,0,.7);">
+        <i class="bi bi-list-check" style="margin-right:6px;color:var(--teal-600);"></i>
+        Besoin : <strong>{{ besoin.numero }}</strong> — {{ besoin.titre }}
+        <span style="margin-left:12px;color:#888;">({{ lignes_besoin.count }} article{{ lignes_besoin.count|pluralize }})</span>
+      </div>
+
+      <div class="pff-card">
+        <div class="pff-card-head"><i class="bi bi-info-circle"></i> Informations du proforma</div>
+        <div class="pff-card-body">
+          <div class="pff-row">
+            <div class="pff-field">
+              <label>Fournisseur *</label>
+              <select name="fournisseur_id" required>
+                <option value="">— Choisir un fournisseur —</option>
+                {% for f in fournisseurs %}
+                <option value="{{ f.pk }}" {% if proforma.fournisseur_id == f.pk %}selected{% endif %}>{{ f.nom }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="pff-field">
+              <label>Date de réception du document *</label>
+              <input type="date" name="date_reception" value="{{ proforma.date_reception|default:'' }}" required>
+            </div>
+            <div class="pff-field">
+              <label>Référence fournisseur</label>
+              <input type="text" name="reference_fournisseur" value="{{ proforma.reference_fournisseur|default:'' }}" placeholder="N° du document fournisseur">
+            </div>
+          </div>
+          <div class="pff-row two">
+            <div class="pff-field">
+              <label>Document proforma (PDF, image)</label>
+              <input type="file" name="fichier" accept=".pdf,.jpg,.jpeg,.png">
+              {% if proforma.fichier %}<small style="color:var(--teal-600);">Fichier actuel : {{ proforma.fichier.name }}</small>{% endif %}
+            </div>
+            <div class="pff-field">
+              <label>Notes</label>
+              <input type="text" name="notes" value="{{ proforma.notes|default:'' }}" placeholder="Remarques…">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pff-card">
+        <div class="pff-card-head"><i class="bi bi-table"></i> Articles & prix</div>
+        <div class="pff-card-body">
+          <table class="lig-table" id="lig-table">
+            <thead>
+              <tr>
+                <th style="width:30%;">Désignation</th>
+                <th style="width:20%;">Ligne besoin</th>
+                <th style="width:12%;">Quantité</th>
+                <th style="width:16%;">Prix unitaire (FCFA)</th>
+                <th style="width:15%;text-align:right;">Montant</th>
+                <th style="width:7%;"></th>
+              </tr>
+            </thead>
+            <tbody id="lig-body">
+            {% if action == 'edit' and lignes %}
+              {% for l in lignes %}
+              <tr class="lig-row">
+                <td><input type="text" name="designation" value="{{ l.designation }}" required></td>
+                <td>
+                  <select name="ligne_besoin_id">
+                    <option value="">—</option>
+                    {% for lb in lignes_besoin %}
+                    <option value="{{ lb.pk }}" {% if l.ligne_besoin_id == lb.pk %}selected{% endif %}>{{ lb.libelle }}</option>
+                    {% endfor %}
+                  </select>
+                </td>
+                <td><input type="number" name="quantite" value="{{ l.quantite }}" step="0.01" min="0" class="qte" onchange="calcMontant(this)"></td>
+                <td><input type="number" name="prix_unitaire" value="{{ l.prix_unitaire }}" step="0.01" min="0" class="pu" onchange="calcMontant(this)"></td>
+                <td class="montant-cell"><span class="montant">{{ l.montant|floatformat:0 }}</span></td>
+                <td><button type="button" class="remove-btn" onclick="removeRow(this)"><i class="bi bi-trash"></i></button></td>
+              </tr>
+              {% endfor %}
+            {% else %}
+              {% for lb in lignes_besoin %}
+              <tr class="lig-row">
+                <td><input type="text" name="designation" value="{{ lb.libelle }}" required></td>
+                <td>
+                  <select name="ligne_besoin_id">
+                    <option value="">—</option>
+                    {% for lbx in lignes_besoin %}
+                    <option value="{{ lbx.pk }}" {% if lbx.pk == lb.pk %}selected{% endif %}>{{ lbx.libelle }}</option>
+                    {% endfor %}
+                  </select>
+                </td>
+                <td><input type="number" name="quantite" value="{{ lb.quantite }}" step="0.01" min="0" class="qte" onchange="calcMontant(this)"></td>
+                <td><input type="number" name="prix_unitaire" value="0" step="0.01" min="0" class="pu" onchange="calcMontant(this)"></td>
+                <td class="montant-cell"><span class="montant">0</span></td>
+                <td><button type="button" class="remove-btn" onclick="removeRow(this)"><i class="bi bi-trash"></i></button></td>
+              </tr>
+              {% empty %}
+              <tr class="lig-row">
+                <td><input type="text" name="designation" placeholder="Désignation…" required></td>
+                <td><select name="ligne_besoin_id"><option value="">—</option>{% for lb in lignes_besoin %}<option value="{{ lb.pk }}">{{ lb.libelle }}</option>{% endfor %}</select></td>
+                <td><input type="number" name="quantite" value="1" step="0.01" min="0" class="qte" onchange="calcMontant(this)"></td>
+                <td><input type="number" name="prix_unitaire" value="0" step="0.01" min="0" class="pu" onchange="calcMontant(this)"></td>
+                <td class="montant-cell"><span class="montant">0</span></td>
+                <td><button type="button" class="remove-btn" onclick="removeRow(this)"><i class="bi bi-trash"></i></button></td>
+              </tr>
+              {% endfor %}
+            {% endif %}
+            </tbody>
+          </table>
+          <button type="button" class="btn-add" onclick="addRow()"><i class="bi bi-plus-lg"></i> Ajouter une ligne</button>
+          <div style="margin-top:12px;text-align:right;font-size:15px;font-weight:700;color:var(--teal-700);">
+            Total : <span id="total-global">0</span> FCFA
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;padding-bottom:20px;">
+        <button type="submit" style="padding:9px 24px;border-radius:6px;background:var(--teal-600);color:#fff;border:none;font-size:14px;font-weight:600;cursor:pointer;">
+          {% if action == 'create' %}<i class="bi bi-plus-lg"></i> Soumettre le proforma{% else %}<i class="bi bi-check-lg"></i> Enregistrer{% endif %}
+        </button>
+        <a href="{% url 'achats:besoin_detail' besoin.pk %}" style="padding:9px 20px;border-radius:6px;border:1px solid #d1d5db;background:#fff;font-size:14px;text-decoration:none;color:rgba(0,0,0,.7);">Annuler</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+var lignesBesoinsOpts = `<option value="">—</option>{% for lb in lignes_besoin %}<option value="{{ lb.pk }}">{{ lb.libelle }}</option>{% endfor %}`;
+
+function calcMontant(input) {
+  var row = input.closest('tr');
+  var qte = parseFloat(row.querySelector('.qte').value) || 0;
+  var pu = parseFloat(row.querySelector('.pu').value) || 0;
+  row.querySelector('.montant').textContent = Math.round(qte * pu).toLocaleString('fr-FR');
+  updateTotal();
+}
+
+function updateTotal() {
+  var total = 0;
+  document.querySelectorAll('.montant').forEach(function(el) {
+    total += parseFloat(el.textContent.replace(/\s/g, '')) || 0;
+  });
+  document.getElementById('total-global').textContent = Math.round(total).toLocaleString('fr-FR');
+}
+
+function addRow() {
+  var tbody = document.getElementById('lig-body');
+  var tr = document.createElement('tr');
+  tr.className = 'lig-row';
+  tr.innerHTML = `
+    <td><input type="text" name="designation" placeholder="Désignation…" required></td>
+    <td><select name="ligne_besoin_id">${lignesBesoinsOpts}</select></td>
+    <td><input type="number" name="quantite" value="1" step="0.01" min="0" class="qte" onchange="calcMontant(this)"></td>
+    <td><input type="number" name="prix_unitaire" value="0" step="0.01" min="0" class="pu" onchange="calcMontant(this)"></td>
+    <td class="montant-cell"><span class="montant">0</span></td>
+    <td><button type="button" class="remove-btn" onclick="removeRow(this)"><i class="bi bi-trash"></i></button></td>
+  `;
+  tbody.appendChild(tr);
+}
+
+function removeRow(btn) {
+  var rows = document.querySelectorAll('.lig-row');
+  if (rows.length <= 1) { alert('Il faut au moins une ligne.'); return; }
+  btn.closest('tr').remove();
+  updateTotal();
+}
+
+updateTotal();
+</script>
+{% endblock %}

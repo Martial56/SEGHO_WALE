@@ -1,0 +1,111 @@
+{% extends 'achats/base.html' %}
+{% load i18n %}
+
+{% block title %}Besoins d'achat{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+.content { padding:0; }
+.ba-page { display:flex; flex-direction:column; height:calc(100vh - var(--topbar-h) - 44px); overflow:hidden; }
+.ba-head { display:flex; align-items:center; justify-content:space-between; padding:14px 28px 10px; background:#fff; border-bottom:1px solid rgba(0,0,0,.07); flex-shrink:0; }
+.ba-head h1 { font-size:16px; font-weight:700; color:var(--teal-800); margin:0; }
+.ba-kpis { display:flex; gap:10px; padding:10px 28px; background:#f8fafb; border-bottom:1px solid rgba(0,0,0,.06); flex-shrink:0; }
+.ba-kpi { padding:7px 16px; background:#fff; border-radius:8px; border:1px solid rgba(0,0,0,.08); font-size:13px; cursor:pointer; text-decoration:none; color:rgba(0,0,0,.7); display:flex; align-items:center; gap:8px; }
+.ba-kpi .val { font-weight:800; color:var(--teal-700); }
+.ba-filters { display:flex; align-items:center; gap:10px; padding:10px 28px; background:#fff; border-bottom:1px solid rgba(0,0,0,.07); flex-shrink:0; }
+.ba-body { flex:1; overflow:auto; min-height:0; }
+.ba-table { width:100%; border-collapse:collapse; font-size:13px; }
+.ba-table th { padding:10px 14px; font-size:11px; font-weight:700; color:#888; text-transform:uppercase; background:#fafafa; border-bottom:2px solid rgba(0,0,0,.08); position:sticky; top:0; }
+.ba-table td { padding:10px 14px; border-bottom:1px solid rgba(0,0,0,.05); vertical-align:middle; }
+.ba-table tr:hover td { background:#f8fafb; }
+.badge { display:inline-block; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:600; }
+.s-brouillon { background:#f3f4f6; color:#6b7280; }
+.s-soumis { background:#dbeafe; color:#1d4ed8; }
+.s-en_cours { background:#fef3c7; color:#92400e; }
+.s-satisfait { background:#d1fae5; color:#065f46; }
+.s-annule { background:#fee2e2; color:#991b1b; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ba-page">
+  <div class="ba-head">
+    <h1><i class="bi bi-list-check" style="color:var(--teal-600);margin-right:8px;"></i>Besoins d'achat</h1>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span style="font-size:12px;color:#888;padding:6px 12px;border-radius:6px;background:#f4f8f0;border:1px solid rgba(0,0,0,.08);">
+        <i class="bi bi-info-circle"></i> Les besoins sont transmis depuis le module Stock
+      </span>
+      <a href="/stock/fiches/" style="padding:7px 16px;border-radius:6px;background:var(--teal-600);color:#fff;text-decoration:none;font-size:13px;font-weight:600;">
+        <i class="bi bi-arrow-right"></i> Aller au Stock
+      </a>
+    </div>
+  </div>
+
+  <div class="ba-kpis">
+    <a href="?" class="ba-kpi"><span class="val">{{ stats.total }}</span> Total</a>
+    <a href="?statut=brouillon" class="ba-kpi"><span class="val">{{ stats.brouillon }}</span> Brouillons</a>
+    <a href="?statut=soumis" class="ba-kpi"><span class="val">{{ stats.soumis }}</span> Soumis</a>
+    <a href="?statut=en_cours" class="ba-kpi"><span class="val">{{ stats.en_cours }}</span> En cours</a>
+  </div>
+
+  <div class="ba-filters">
+    <form method="get" style="display:flex;gap:10px;align-items:center;">
+      <input type="search" name="q" value="{{ q }}" placeholder="Rechercher…" style="height:34px;border:1px solid #d1d5db;border-radius:6px;padding:0 12px;font-size:13px;width:260px;">
+      <select name="statut" onchange="this.form.submit()" style="height:34px;border:1px solid #d1d5db;border-radius:6px;padding:0 10px;font-size:13px;">
+        <option value="">Tous les statuts</option>
+        {% for val, label in statut_choices %}
+        <option value="{{ val }}" {% if statut == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" style="padding:6px 14px;border-radius:6px;border:1px solid #d1d5db;background:#fff;font-size:13px;cursor:pointer;"><i class="bi bi-search"></i></button>
+      {% if q or statut %}<a href="{% url 'achats:besoins_list' %}" style="font-size:13px;color:#888;">Effacer</a>{% endif %}
+    </form>
+  </div>
+
+  <div class="ba-body">
+    {% if besoins %}
+    <table class="ba-table">
+      <thead>
+        <tr>
+          <th>N°</th><th>Titre</th><th>Source</th><th>Statut</th><th>Lignes</th><th>Date</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for b in besoins %}
+      <tr>
+        <td style="font-weight:700;color:var(--teal-700);">
+          <a href="{% url 'achats:besoin_detail' b.pk %}" style="color:inherit;text-decoration:none;">{{ b.numero }}</a>
+        </td>
+        <td><a href="{% url 'achats:besoin_detail' b.pk %}" style="color:rgba(0,0,0,.8);text-decoration:none;font-weight:500;">{{ b.titre }}</a></td>
+        <td>
+          {% if b.fiche_besoins %}
+            <a href="{% url 'stock_fiche_detail' b.fiche_besoins.pk %}" style="font-size:12px;color:var(--teal-700);text-decoration:none;display:inline-flex;align-items:center;gap:4px;background:rgba(58,89,36,.08);padding:2px 8px;border-radius:10px;">
+              <i class="bi bi-box-seam" style="font-size:10px;"></i> {{ b.fiche_besoins.numero }}
+            </a>
+          {% else %}
+            <span style="font-size:11px;color:#aaa;">Manuel</span>
+          {% endif %}
+        </td>
+        <td><span class="badge s-{{ b.statut }}">{{ b.get_statut_display }}</span></td>
+        <td style="color:#666;">{{ b.lignes.count }}</td>
+        <td style="color:#888;white-space:nowrap;">{{ b.date_creation|date:"d/m/Y" }}</td>
+        <td>
+          <a href="{% url 'achats:besoin_detail' b.pk %}" style="color:var(--teal-600);font-size:13px;"><i class="bi bi-eye"></i></a>
+          {% if b.statut in 'brouillon soumis' %}
+          <a href="{% url 'achats:besoin_edit' b.pk %}" style="color:var(--teal-600);font-size:13px;margin-left:6px;"><i class="bi bi-pencil"></i></a>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="padding:48px;text-align:center;color:#aaa;">
+      <i class="bi bi-list-check" style="font-size:36px;display:block;margin-bottom:12px;"></i>
+      Aucun besoin trouvé.
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,116 @@
+{% extends 'achats/base.html' %}
+{% load i18n %}
+
+{% block title %}Commandes d'achat{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+.content { padding:0; }
+.cm-page { display:flex; flex-direction:column; height:calc(100vh - var(--topbar-h) - 44px); overflow:hidden; }
+.cm-head { display:flex; align-items:center; justify-content:space-between; padding:14px 28px 10px; background:#fff; border-bottom:1px solid rgba(0,0,0,.07); flex-shrink:0; }
+.cm-head h1 { font-size:16px; font-weight:700; color:var(--teal-800); margin:0; }
+.cm-kpis { display:flex; gap:8px; padding:10px 28px; background:#f8fafb; border-bottom:1px solid rgba(0,0,0,.06); flex-shrink:0; flex-wrap:wrap; }
+.cm-kpi { padding:6px 14px; background:#fff; border-radius:20px; border:1px solid rgba(0,0,0,.08); font-size:12.5px; cursor:pointer; text-decoration:none; color:rgba(0,0,0,.65); display:flex; align-items:center; gap:6px; transition:box-shadow .12s; }
+.cm-kpi:hover { box-shadow:0 2px 8px rgba(0,0,0,.1); }
+.cm-kpi .val { font-weight:800; }
+.cm-kpi.active { border-color:var(--teal-500); background:var(--teal-50); color:var(--teal-800); }
+.cm-filters { display:flex; align-items:center; gap:10px; padding:10px 28px; background:#fff; border-bottom:1px solid rgba(0,0,0,.07); flex-shrink:0; flex-wrap:wrap; }
+.cm-body { flex:1; overflow:auto; min-height:0; }
+.cm-table { width:100%; border-collapse:collapse; font-size:13px; }
+.cm-table th { padding:10px 14px; font-size:10.5px; font-weight:700; color:#888; text-transform:uppercase; background:#fafafa; border-bottom:2px solid rgba(0,0,0,.08); position:sticky; top:0; white-space:nowrap; }
+.cm-table td { padding:10px 14px; border-bottom:1px solid rgba(0,0,0,.05); vertical-align:middle; }
+.cm-table tr:hover td { background:#f8fafb; }
+.badge { display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600; }
+.s-brouillon { background:#f3f4f6; color:#6b7280; }
+.s-envoyee { background:#dbeafe; color:#1d4ed8; }
+.s-en_livraison { background:#fef3c7; color:#92400e; }
+.s-recue { background:#d1fae5; color:#065f46; }
+.s-annulee { background:#fee2e2; color:#991b1b; }
+.retard-row td { background:#fff5f5 !important; }
+.retard-date { color:#dc2626 !important; font-weight:700 !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cm-page">
+  <div class="cm-head">
+    <h1><i class="bi bi-bag-check" style="color:var(--teal-600);margin-right:8px;"></i>Commandes d'achat</h1>
+    <span style="font-size:12px;color:#888;">{{ commandes|length }} commande{{ commandes|length|pluralize }}</span>
+  </div>
+
+  <div class="cm-kpis">
+    <a href="?" class="cm-kpi {% if not statut %}active{% endif %}"><span class="val">{{ stats.total }}</span> Toutes</a>
+    <a href="?statut=brouillon{% if q %}&q={{ q }}{% endif %}" class="cm-kpi {% if statut == 'brouillon' %}active{% endif %}"><span class="val" style="color:#6b7280;">{{ stats.brouillon }}</span> Brouillon</a>
+    <a href="?statut=envoyee{% if q %}&q={{ q }}{% endif %}" class="cm-kpi {% if statut == 'envoyee' %}active{% endif %}"><span class="val" style="color:#1d4ed8;">{{ stats.envoyee }}</span> Envoyées</a>
+    <a href="?statut=en_livraison{% if q %}&q={{ q }}{% endif %}" class="cm-kpi {% if statut == 'en_livraison' %}active{% endif %}"><span class="val" style="color:#92400e;">{{ stats.en_livraison }}</span> En livraison</a>
+    <a href="?statut=recue{% if q %}&q={{ q }}{% endif %}" class="cm-kpi {% if statut == 'recue' %}active{% endif %}"><span class="val" style="color:#065f46;">{{ stats.recue }}</span> Reçues</a>
+    {% if stats.retard > 0 %}
+    <a href="?retard=1" class="cm-kpi" style="border-color:#fca5a5;"><span class="val" style="color:#dc2626;"><i class="bi bi-exclamation-triangle-fill"></i> {{ stats.retard }}</span> En retard</a>
+    {% endif %}
+  </div>
+
+  <div class="cm-filters">
+    <form method="get" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <input type="search" name="q" value="{{ q }}" placeholder="Rechercher (n°, fournisseur…)" style="height:34px;border:1px solid #d1d5db;border-radius:6px;padding:0 12px;font-size:13px;width:260px;">
+      <select name="statut" onchange="this.form.submit()" style="height:34px;border:1px solid #d1d5db;border-radius:6px;padding:0 10px;font-size:13px;">
+        <option value="">Tous les statuts</option>
+        {% for val, label in statut_choices %}
+        <option value="{{ val }}" {% if statut == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" style="height:34px;padding:0 14px;border-radius:6px;border:1px solid #d1d5db;background:#fff;font-size:13px;cursor:pointer;"><i class="bi bi-search"></i></button>
+      {% if q or statut %}<a href="{% url 'achats:commandes_list' %}" style="font-size:13px;color:#888;text-decoration:none;">Effacer</a>{% endif %}
+    </form>
+  </div>
+
+  <div class="cm-body">
+    {% if commandes %}
+    <table class="cm-table">
+      <thead>
+        <tr>
+          <th>N° Commande</th>
+          <th>Fournisseur</th>
+          <th style="text-align:right;">Montant</th>
+          <th>Statut</th>
+          <th>Date commande</th>
+          <th>Livraison prévue</th>
+          <th>Proforma</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for c in commandes %}
+      <tr {% if c.est_en_retard %}class="retard-row"{% endif %}>
+        <td style="font-weight:700;">
+          <a href="{% url 'achats:commande_detail' c.pk %}" style="color:var(--teal-700);text-decoration:none;">{{ c.numero }}</a>
+        </td>
+        <td style="font-weight:500;">{{ c.fournisseur.nom }}</td>
+        <td style="text-align:right;font-weight:600;white-space:nowrap;">{{ c.montant_total|floatformat:0 }}&nbsp;FCFA</td>
+        <td><span class="badge s-{{ c.statut }}">{{ c.get_statut_display }}</span></td>
+        <td style="color:#888;">{{ c.date_commande }}</td>
+        <td class="{% if c.est_en_retard %}retard-date{% else %}{% endif %}" style="color:#888;">
+          {{ c.date_livraison_prevue|default:"—" }}
+          {% if c.est_en_retard %}<i class="bi bi-exclamation-triangle-fill" style="margin-left:4px;" title="Retard de livraison"></i>{% endif %}
+        </td>
+        <td style="color:#888;font-size:12px;">
+          <a href="{% url 'achats:proforma_detail' c.proforma.pk %}" style="color:var(--teal-600);text-decoration:none;">{{ c.proforma.numero }}</a>
+        </td>
+        <td style="white-space:nowrap;">
+          <a href="{% url 'achats:commande_detail' c.pk %}" style="color:var(--teal-600);font-size:13px;margin-right:6px;" title="Voir"><i class="bi bi-eye"></i></a>
+          <a href="{% url 'achats:commande_imprimer' c.pk %}" target="_blank" style="color:#888;font-size:13px;" title="Imprimer"><i class="bi bi-printer"></i></a>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="padding:60px;text-align:center;color:#ccc;">
+      <i class="bi bi-bag-check" style="font-size:40px;display:block;margin-bottom:14px;"></i>
+      Aucune commande trouvée.
+      {% if q or statut %}<br><a href="{% url 'achats:commandes_list' %}" style="font-size:13px;color:var(--teal-600);text-decoration:none;">Effacer les filtres</a>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

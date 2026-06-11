@@ -3,13 +3,24 @@
 
 {% block topbar_title %}Fractionner le congé — {{ conge.employe.nom_complet }}{% endblock %}
 
+{% block extra_css %}
+{{ block.super }}
+<style>
+.frac-info { background:rgba(74,114,54,.07); border:1px solid var(--cg-border); border-radius:10px; padding:14px 18px; margin-bottom:24px; font-size:13px; color:var(--cg-text); }
+html[data-theme="dark"] .frac-info { background:rgba(74,114,54,.08); }
+.solde-ok  { font-size:15px; font-weight:700; color:var(--cg-600); }
+html[data-theme="dark"] .solde-ok  { color:var(--cg-400); }
+.solde-bad { font-size:15px; font-weight:700; color:#e84545; }
+</style>
+{% endblock %}
+
 {% block content %}
 
 <div class="cg-form-head">
   <div style="display:flex;align-items:center;gap:12px;">
     <a href="{% url 'conge_detail' conge.pk %}" class="cg-back-btn"><i class="bi bi-arrow-left"></i></a>
     <div>
-      <h1 style="font-size:18px;font-weight:800;color:var(--cg-900);margin:0;">
+      <h1 style="font-size:18px;font-weight:800;color:var(--cg-text);margin:0;">
         <i class="bi bi-scissors" style="color:var(--cg-600);"></i> Fractionner le congé
       </h1>
       <div style="font-size:12px;color:var(--cg-muted);">Art. 25.7 CODI — {{ conge.employe.nom_complet }}</div>
@@ -20,7 +31,7 @@
 <div style="max-width:660px;margin:28px auto 0;">
 
   <!-- Info légale -->
-  <div style="background:rgba(74,114,54,.07);border:1px solid var(--cg-200);border-radius:10px;padding:14px 18px;margin-bottom:24px;font-size:13px;color:var(--cg-800);">
+  <div class="frac-info">
     <strong><i class="bi bi-info-circle-fill" style="color:var(--cg-600);"></i> Art. 25.7 CODI</strong> —
     Le congé annuel peut être fractionné en 2 périodes. L'une d'elles ne doit pas être inférieure à 12 jours ouvrables.
     Les deux périodes peuvent être prises dans la même année ou réparties sur 2 ans avec accord des parties.
@@ -48,7 +59,7 @@
       {% if solde %}
       <div>
         <div class="cg-label">Solde actuel</div>
-        <div style="font-size:15px;font-weight:700;color:{% if solde.solde >= 0 %}var(--cg-600){% else %}#e84545{% endif %};">
+        <div class="{% if solde.solde >= 0 %}solde-ok{% else %}solde-bad{% endif %}">
           {{ solde.solde|floatformat:1 }} j
         </div>
       </div>

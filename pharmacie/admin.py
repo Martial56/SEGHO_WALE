@@ -1,15 +1,10 @@
 from django.contrib import admin
-from .models import Medicament, CategorieMedicament, Fournisseur, LotMedicament, MouvementStock, CommandePharmacies
+from .models import Medicament, CategorieMedicament, LotMedicament, MouvementStock, CommandePharmacies
 
 
 @admin.register(CategorieMedicament)
 class CategorieAdmin(admin.ModelAdmin):
     list_display = ['nom', 'code']
-
-
-@admin.register(Fournisseur)
-class FournisseurAdmin(admin.ModelAdmin):
-    list_display = ['nom', 'code', 'telephone', 'actif']
 
 
 @admin.register(Medicament)

@@ -9,16 +9,6 @@ class CategorieMedicament(models.Model):
     class Meta: verbose_name = "Catégorie médicament"
 
 
-class Fournisseur(models.Model):
-    nom = models.CharField(max_length=200)
-    code = models.CharField(max_length=50, unique=True)
-    telephone = models.CharField(max_length=20, blank=True)
-    email = models.EmailField(blank=True)
-    adresse = models.TextField(blank=True)
-    actif = models.BooleanField(default=True)
-    def __str__(self): return self.nom
-    class Meta: verbose_name = "Fournisseur"
-
 
 class Medicament(models.Model):
     FORME = [('comprime','Comprimé'),('sirop','Sirop'),('injectable','Injectable'),('pommade','Pommade'),('gelule','Gélule'),('solution','Solution'),('autre','Autre')]
@@ -49,7 +39,7 @@ class LotMedicament(models.Model):
     date_peremption = models.DateField()
     quantite_initiale = models.IntegerField()
     quantite_actuelle = models.IntegerField()
-    fournisseur = models.ForeignKey(Fournisseur, on_delete=models.SET_NULL, null=True, blank=True)
+    fournisseur = models.ForeignKey('achats.Fournisseur', on_delete=models.SET_NULL, null=True, blank=True)
     date_reception = models.DateField(auto_now_add=True)
 
     def __str__(self): return f"{self.medicament} - Lot {self.numero_lot}"
@@ -81,7 +71,7 @@ class CommandePharmacies(models.Model):
     STATUT = [('brouillon','Brouillon'),('envoye','Envoyé'),('recu','Reçu'),('partiel','Partiel'),('annule','Annulé')]
 
     numero = models.CharField(max_length=20, unique=True, editable=False)
-    fournisseur = models.ForeignKey(Fournisseur, on_delete=models.SET_NULL, null=True)
+    fournisseur = models.ForeignKey('achats.Fournisseur', on_delete=models.SET_NULL, null=True)
     date_commande = models.DateField(auto_now_add=True)
     date_livraison_prevue = models.DateField(null=True, blank=True)
     statut = models.CharField(max_length=20, choices=STATUT, default='brouillon')

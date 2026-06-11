@@ -1,8 +1,9 @@
-{% extends 'base.html' %}
-{% load i18n %}
+﻿{% extends 'base.html' %}
+{% load i18n static %}
 {% block topbar_title %}Hospitalisation{% endblock %}
 
 {% block extra_css %}
+<link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
 <style>
 /* ── Dropdown nav ── */
 .o-nav-drop-wrap {
@@ -69,7 +70,7 @@
 .o-nav-drop-section:first-child { border-top: none; margin-top: 0; }
 
 html[data-theme="dark"] .o-nav-dropdown {
-  background: #0d2035;
+  background: #171616;
   border-color: rgba(255,255,255,.08);
   box-shadow: 0 6px 24px rgba(0,0,0,.4);
 }
@@ -78,6 +79,26 @@ html[data-theme="dark"] .o-nav-drop-item:hover { background: rgba(33,136,171,.1)
 html[data-theme="dark"] .o-nav-drop-item.active { background: rgba(33,136,171,.15); color: #7aaec7; }
 html[data-theme="dark"] .o-nav-drop-section { color: rgba(255,255,255,.3); border-top-color: rgba(255,255,255,.06); }
 </style>
+<style>
+  .content { padding-top: 0 !important; }
+  .breadcrumb { display: none !important; }
+</style>
+<script>
+  (function () {
+    function syncTopbarH() {
+      var topbar = document.querySelector('.topbar');
+      if (topbar) {
+        document.documentElement.style.setProperty('--topbar-h', topbar.getBoundingClientRect().height + 'px');
+      }
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', syncTopbarH);
+    } else {
+      syncTopbarH();
+    }
+    window.addEventListener('resize', syncTopbarH);
+  })();
+</script>
 {% endblock %}
 
 {% block module_navbar %}

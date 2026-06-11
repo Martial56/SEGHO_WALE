@@ -19,26 +19,6 @@ class CategorieStock(models.Model):
         ordering = ['type', 'nom']
 
 
-class Fournisseur(models.Model):
-    code      = models.CharField(max_length=20, unique=True, blank=True)
-    nom       = models.CharField(max_length=150)
-    telephone = models.CharField(max_length=30, blank=True)
-    email     = models.EmailField(blank=True)
-    adresse   = models.TextField(blank=True)
-    actif     = models.BooleanField(default=True)
-
-    def __str__(self): return self.nom
-    def save(self, *args, **kwargs):
-        if not self.code:
-            annee = timezone.now().year
-            dernier = Fournisseur.objects.filter(code__startswith=f'FRN{annee}').order_by('-code').first()
-            seq = (int(dernier.code[-4:]) + 1) if dernier else 1
-            self.code = f'FRN{annee}{seq:04d}'
-        super().save(*args, **kwargs)
-    class Meta:
-        verbose_name = "Fournisseur"
-        ordering = ['nom']
-
 
 class Produit(models.Model):
     TYPE_CHOICES = [
@@ -62,7 +42,7 @@ class Produit(models.Model):
     type      = models.CharField(max_length=20, choices=TYPE_CHOICES, default='medicament')
     categorie = models.ForeignKey(CategorieStock, on_delete=models.SET_NULL, null=True, blank=True)
     fournisseur_principal = models.ForeignKey(
-        Fournisseur, on_delete=models.SET_NULL, null=True, blank=True
+        'achats.Fournisseur', on_delete=models.SET_NULL, null=True, blank=True
     )
     description  = models.TextField(blank=True)
     unite_mesure = models.CharField(max_length=30, default='unité')
@@ -156,7 +136,7 @@ class LotProduit(models.Model):
     date_peremption   = models.DateField(null=True, blank=True)
     quantite_initiale = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     quantite_actuelle = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    fournisseur       = models.ForeignKey(Fournisseur, on_delete=models.SET_NULL, null=True, blank=True)
+    fournisseur       = models.ForeignKey('achats.Fournisseur', on_delete=models.SET_NULL, null=True, blank=True)
     date_reception    = models.DateField(default=timezone.now)
     prix_achat_lot    = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     notes             = models.TextField(blank=True)
@@ -229,7 +209,7 @@ class CommandeStock(models.Model):
         ('annule',    'Annulée'),
     ]
     numero        = models.CharField(max_length=20, unique=True, blank=True)
-    fournisseur   = models.ForeignKey(Fournisseur, on_delete=models.PROTECT, related_name='commandes')
+    fournisseur   = models.ForeignKey('achats.Fournisseur', on_delete=models.PROTECT, related_name='commandes_stock')
     statut        = models.CharField(max_length=20, choices=STATUT_CHOICES, default='brouillon')
     date_commande = models.DateField(default=timezone.now)
     date_livraison_prevue = models.DateField(null=True, blank=True)
@@ -367,7 +347,7 @@ class FicheBesoins(models.Model):
         ('rejete',    'Rejeté'),
     ]
     numero          = models.CharField(max_length=20, unique=True, blank=True)
-    pharmacie       = models.CharField(max_length=30, choices=PHARMACIES)
+    pharmacie       = models.CharField(max_length=30, choices=PHARMACIES, blank=True, default='')
     periode_debut   = models.DateField()
     periode_fin     = models.DateField()
     statut          = models.CharField(max_length=20, choices=STATUT_CHOICES, default='brouillon')
@@ -378,7 +358,7 @@ class FicheBesoins(models.Model):
     date_creation   = models.DateTimeField(auto_now_add=True)
     date_validation = models.DateTimeField(null=True, blank=True)
 
-    def __str__(self): return f'Fiche {self.numero} — {self.get_pharmacie_display()}'
+    def __str__(self): return f'Fiche {self.numero} — {self.periode_debut} / {self.periode_fin}'
     def save(self, *args, **kwargs):
         if not self.numero:
             annee = timezone.now().year

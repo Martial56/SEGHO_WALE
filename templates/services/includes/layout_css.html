@@ -1,4 +1,4 @@
-<style>
+﻿<style>
   /* ══════════════════════════════════════════════════════════════
    CSS LAYOUT PARTAGÉ — MODULE services
    Inclus par : list, consommables_list, categories_list, unites_list
@@ -124,7 +124,7 @@
   }
 
   html[data-theme="dark"] .o-nav {
-    background: #0a1e2e;
+    background: #171616;
     border-bottom-color: rgba(255, 255, 255, 0.06);
     box-shadow: none;
   }
@@ -289,7 +289,7 @@
   }
 
   html[data-theme="dark"] .o-ctrl-btn:hover {
-    background: #28304a;
+    background: #201d1d;
     color: var(--text);
     border-color: var(--border);
   }
@@ -477,13 +477,19 @@
   }
 </style>
 <script>
-  document.addEventListener('DOMContentLoaded', function () {
-    function adjustOffsets() {
+  (function () {
+    function syncTopbarH() {
       var topbar = document.querySelector('.topbar');
-      var wrap = document.getElementById('page-wrap');
-      if (topbar && wrap) { wrap.style.paddingTop = topbar.offsetHeight + 'px'; }
+      if (topbar) {
+        var h = topbar.getBoundingClientRect().height;
+        document.documentElement.style.setProperty('--topbar-h', h + 'px');
+      }
     }
-    adjustOffsets();
-    window.addEventListener('resize', adjustOffsets);
-  });
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', syncTopbarH);
+    } else {
+      syncTopbarH();
+    }
+    window.addEventListener('resize', syncTopbarH);
+  })();
 </script>

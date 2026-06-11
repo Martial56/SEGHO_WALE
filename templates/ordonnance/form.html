@@ -1,9 +1,24 @@
-{% extends 'base.html' %}
+﻿{% extends 'base.html' %}
 {% load static %}
 
 {% block topbar_title %}Nouvelle ordonnance{% endblock %}
 
 {% block extra_css %}
+{{ block.super }}
+<style>
+  .content { padding-top: 0 !important; }
+  .breadcrumb { display: none !important; }
+</style>
+<script>
+  (function () {
+    function syncTopbarH() {
+      var topbar = document.querySelector('.topbar');
+      if (topbar) document.documentElement.style.setProperty('--topbar-h', topbar.getBoundingClientRect().height + 'px');
+    }
+    if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', syncTopbarH); } else { syncTopbarH(); }
+    window.addEventListener('resize', syncTopbarH);
+  })();
+</script>
 <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
 <style>
 :root {
@@ -14,18 +29,18 @@
   --co-text:#1b2e13; --co-muted:rgba(0,0,0,.45);
 }
 html[data-theme="dark"] {
-  --co-50:#0a1610; --co-100:#0d1f12; --co-surface:#070e05;
+  --co-50:#171616; --co-100:#201d1d; --co-surface:#0f0e0e;
   --co-border:rgba(154,184,138,.18); --co-text:#bcd5a8; --co-muted:rgba(255,255,255,.4);
 }
 
 .co-page-head {
   display:flex; align-items:center; justify-content:space-between; gap:16px;
   padding:14px 32px;  flex-wrap:wrap;
-  position:sticky; top:var(--topbar-h); z-index:100;
+  position:sticky; top:calc(var(--topbar-h) + 44px); z-index:100;
   background:#f2f7ee; border-bottom:1px solid rgba(0,0,0,.05);
   box-shadow:0 2px 8px rgba(0,0,0,.04);
 }
-html[data-theme="dark"] .co-page-head { background:#070e05; }
+html[data-theme="dark"] .co-page-head { background:#0f0e0e; }
 
 .co-card { background:var(--co-surface); border-radius:12px; box-shadow:0 2px 12px rgba(58,89,36,.08); overflow:hidden; margin-bottom:20px; }
 .co-card-header { padding:14px 20px 12px; border-bottom:1px solid var(--co-border); display:flex; align-items:center; gap:10px; }

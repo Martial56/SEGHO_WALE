@@ -3,13 +3,23 @@
 
 {% block topbar_title %}Dépassement de congé — {{ conge.employe.nom_complet }}{% endblock %}
 
+{% block extra_css %}
+{{ block.super }}
+<style>
+.abs-warn-title { font-weight:700; font-size:14px; color:#c0392b; margin-bottom:4px; }
+html[data-theme="dark"] .abs-warn-title { color:#f09090; }
+.abs-warn-text  { font-size:13px; color:rgba(0,0,0,.6); }
+html[data-theme="dark"] .abs-warn-text  { color:var(--cg-muted); }
+</style>
+{% endblock %}
+
 {% block content %}
 
 <div class="cg-form-head">
   <div style="display:flex;align-items:center;gap:12px;">
     <a href="{% url 'conge_detail' conge.pk %}" class="cg-back-btn"><i class="bi bi-arrow-left"></i></a>
     <div>
-      <h1 style="font-size:18px;font-weight:800;color:var(--cg-900);margin:0;">
+      <h1 style="font-size:18px;font-weight:800;color:var(--cg-text);margin:0;">
         <i class="bi bi-exclamation-triangle" style="color:#e84545;"></i> Dépassement de congé
       </h1>
       <div style="font-size:12px;color:var(--cg-muted);">{{ conge.employe.nom_complet }} · {{ conge.get_type_conge_display }}</div>
@@ -24,10 +34,10 @@
               padding:16px 20px;margin-bottom:24px;display:flex;gap:14px;align-items:flex-start;">
     <i class="bi bi-exclamation-triangle-fill" style="color:#e84545;font-size:22px;flex-shrink:0;margin-top:2px;"></i>
     <div>
-      <div style="font-weight:700;font-size:14px;color:#c0392b;margin-bottom:4px;">
+      <div class="abs-warn-title">
         Dépassement de {{ jours_depasses }} jour{{ jours_depasses|pluralize }} ouvré{{ jours_depasses|pluralize }}
       </div>
-      <div style="font-size:13px;color:rgba(0,0,0,.6);">
+      <div class="abs-warn-text">
         Le congé de <strong>{{ conge.employe.nom_complet }}</strong> devait se terminer
         le <strong>{{ conge.date_fin|date:"d/m/Y" }}</strong>.
         Le retour prévu était le <strong>{{ date_retour_prevue|date:"d/m/Y" }}</strong>.

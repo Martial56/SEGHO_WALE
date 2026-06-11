@@ -92,6 +92,40 @@ html[data-theme="dark"] .taux-bar { background:rgba(255,255,255,.1); }
 }
 .solde-neg  { background:rgba(232,69,69,.1); color:#b71c1c; border:1px solid rgba(232,69,69,.25); }
 .solde-warn { background:rgba(232,154,26,.1); color:#8a5c00; border:1px solid rgba(232,154,26,.25); }
+html[data-theme="dark"] .solde-neg  { background:rgba(232,69,69,.18);  color:#f09090; border-color:rgba(232,69,69,.3); }
+html[data-theme="dark"] .solde-warn { background:rgba(232,154,26,.18); color:#f0c060; border-color:rgba(232,154,26,.3); }
+html[data-theme="dark"] .dir-table td.num { color:var(--cg-300); }
+
+/* KPI val variants */
+.dir-kpi-val.v-triage-ok   { color:#0a6040; }
+.dir-kpi-val.v-triage-mid  { color:#c47a00; }
+.dir-kpi-val.v-triage-high { color:#b71c1c; }
+.dir-kpi-val.v-danger  { color:#b71c1c; }
+.dir-kpi-val.v-info    { color:#1a4d6d; }
+.dir-kpi-val.v-warn    { color:#8a5c00; }
+.dir-kpi-val.v-neutral { color:var(--cg-700); }
+html[data-theme="dark"] .dir-kpi-val.v-triage-ok   { color:#6eddb0; }
+html[data-theme="dark"] .dir-kpi-val.v-triage-mid  { color:#f0c060; }
+html[data-theme="dark"] .dir-kpi-val.v-triage-high { color:#f09090; }
+html[data-theme="dark"] .dir-kpi-val.v-danger  { color:#f09090; }
+html[data-theme="dark"] .dir-kpi-val.v-info    { color:#80c8ef; }
+html[data-theme="dark"] .dir-kpi-val.v-warn    { color:#f0c060; }
+html[data-theme="dark"] .dir-kpi-val.v-neutral { color:var(--cg-300); }
+
+/* Taux inline dans tableau */
+.taux-val.t-ok   { font-size:12px; font-weight:700; min-width:38px; text-align:right; color:#0a6040; }
+.taux-val.t-mid  { font-size:12px; font-weight:700; min-width:38px; text-align:right; color:#c47a00; }
+.taux-val.t-high { font-size:12px; font-weight:700; min-width:38px; text-align:right; color:#b71c1c; }
+html[data-theme="dark"] .taux-val.t-ok   { color:#6eddb0; }
+html[data-theme="dark"] .taux-val.t-mid  { color:#f0c060; }
+html[data-theme="dark"] .taux-val.t-high { color:#f09090; }
+
+/* Badge count warn */
+.dir-count-warn { background:rgba(232,154,26,.1); color:#8a5c00; border-radius:20px; padding:1px 8px; font-size:10px; font-weight:700; margin-left:8px; }
+html[data-theme="dark"] .dir-count-warn { background:rgba(232,154,26,.18); color:#f0c060; }
+/* Maladie cell */
+.td-maladie { color:#b71c1c; }
+html[data-theme="dark"] .td-maladie { color:#f09090; }
 </style>
 {% endblock %}
 
@@ -124,7 +158,7 @@ html[data-theme="dark"] .taux-bar { background:rgba(255,255,255,.1); }
         <i class="bi bi-percent"></i>
       </div>
       <div>
-        <div class="dir-kpi-val" style="color:{% if taux_global > 10 %}#b71c1c{% elif taux_global > 5 %}#c47a00{% else %}#0a6040{% endif %};">{{ taux_global }}%</div>
+        <div class="dir-kpi-val {% if taux_global > 10 %}v-triage-high{% elif taux_global > 5 %}v-triage-mid{% else %}v-triage-ok{% endif %}">{{ taux_global }}%</div>
         <div class="dir-kpi-lbl">Taux absentéisme</div>
       </div>
     </div>
@@ -133,7 +167,7 @@ html[data-theme="dark"] .taux-bar { background:rgba(255,255,255,.1); }
         <i class="bi bi-thermometer-half"></i>
       </div>
       <div>
-        <div class="dir-kpi-val" style="color:#b71c1c;">{{ taux_maladie }}%</div>
+        <div class="dir-kpi-val v-danger">{{ taux_maladie }}%</div>
         <div class="dir-kpi-lbl">Dont maladie</div>
       </div>
     </div>
@@ -142,7 +176,7 @@ html[data-theme="dark"] .taux-bar { background:rgba(255,255,255,.1); }
         <i class="bi bi-calendar-minus-fill"></i>
       </div>
       <div>
-        <div class="dir-kpi-val" style="color:#1a4d6d;">{{ total_jours }}</div>
+        <div class="dir-kpi-val v-info">{{ total_jours }}</div>
         <div class="dir-kpi-lbl">Jours d'absence</div>
       </div>
     </div>
@@ -151,7 +185,7 @@ html[data-theme="dark"] .taux-bar { background:rgba(255,255,255,.1); }
         <i class="bi bi-calendar-event-fill"></i>
       </div>
       <div>
-        <div class="dir-kpi-val" style="color:#8a5c00;">{{ pic_mois }}</div>
+        <div class="dir-kpi-val v-warn">{{ pic_mois }}</div>
         <div class="dir-kpi-lbl">Pic d'absence</div>
       </div>
     </div>
@@ -160,7 +194,7 @@ html[data-theme="dark"] .taux-bar { background:rgba(255,255,255,.1); }
         <i class="bi bi-people-fill"></i>
       </div>
       <div>
-        <div class="dir-kpi-val" style="color:var(--cg-700);">{{ soldes_critiques|length }}</div>
+        <div class="dir-kpi-val v-neutral">{{ soldes_critiques|length }}</div>
         <div class="dir-kpi-lbl">Soldes critiques</div>
       </div>
     </div>
@@ -206,17 +240,14 @@ html[data-theme="dark"] .taux-bar { background:rgba(255,255,255,.1); }
           <td style="font-weight:600;">{{ s.service.nom }}</td>
           <td class="num" style="color:var(--cg-muted);">{{ s.nb_employes }}</td>
           <td class="num">{{ s.jours_total }}j</td>
-          <td class="num" style="color:#b71c1c;">{{ s.jours_maladie }}j</td>
+          <td class="num td-maladie">{{ s.jours_maladie }}j</td>
           <td>
             <div class="taux-bar-wrap">
               <div class="taux-bar">
                 <div class="taux-fill {% if s.taux > 10 %}high{% elif s.taux > 5 %}mid{% else %}low{% endif %}"
                      style="width:{{ s.taux|floatformat:0 }}%;max-width:100%;"></div>
               </div>
-              <span style="font-size:12px;font-weight:700;min-width:38px;text-align:right;
-                    color:{% if s.taux > 10 %}#b71c1c{% elif s.taux > 5 %}#c47a00{% else %}#0a6040{% endif %};">
-                {{ s.taux }}%
-              </span>
+              <span class="taux-val {% if s.taux > 10 %}t-high{% elif s.taux > 5 %}t-mid{% else %}t-ok{% endif %}">{{ s.taux }}%</span>
             </div>
           </td>
         </tr>
@@ -233,7 +264,7 @@ html[data-theme="dark"] .taux-bar { background:rgba(255,255,255,.1); }
       <div class="dir-section-head">
         <i class="bi bi-exclamation-triangle-fill" style="color:#e89a1a;font-size:14px;"></i>
         <span class="dir-section-title">Soldes critiques — moins de 5 jours restants</span>
-        <span style="background:rgba(232,154,26,.1);color:#8a5c00;border-radius:20px;padding:1px 8px;font-size:10px;font-weight:700;margin-left:8px;">{{ soldes_critiques|length }}</span>
+        <span class="dir-count-warn">{{ soldes_critiques|length }}</span>
       </div>
       <table class="dir-table">
         <thead><tr>
@@ -291,6 +322,9 @@ var dataSvc = JSON.parse(document.getElementById('data-services').textContent);
 
 Chart.defaults.font.family = "'Sora', sans-serif";
 Chart.defaults.font.size   = 11;
+var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+var gridColor = isDark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.05)';
+Chart.defaults.color = isDark ? 'rgba(255,255,255,.45)' : 'rgba(0,0,0,.55)';
 
 /* 1. Évolution mensuelle */
 if (document.getElementById('chartEvolution')) {
@@ -319,7 +353,7 @@ if (document.getElementById('chartEvolution')) {
       plugins: { legend: { position: 'top', labels: { usePointStyle: true, pointStyleWidth: 10, padding: 14 } } },
       scales: {
         x: { grid: { display: false } },
-        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,.05)' },
+        y: { beginAtZero: true, grid: { color: gridColor },
              ticks: { callback: function(v){ return v + 'j'; } } }
       }
     }
@@ -345,7 +379,7 @@ if (document.getElementById('chartServices') && dataSvc.labels.length) {
       indexAxis: 'y',
       plugins: { legend: { display: false } },
       scales: {
-        x: { beginAtZero: true, grid: { color: 'rgba(0,0,0,.05)' },
+        x: { beginAtZero: true, grid: { color: gridColor },
              ticks: { callback: function(v){ return v + '%'; } } },
         y: { grid: { display: false }, ticks: { font: { size: 10 } } }
       }

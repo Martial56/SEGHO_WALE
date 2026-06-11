@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+{% load i18n static %}
+
+{% block topbar_title %}Achats{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
+<style>
+/* ── Nav achats ── */
+.o-nav-drop-wrap { position:relative; display:flex; align-items:center; }
+.o-nav-drop-trigger { cursor:pointer; background:none; border:none; font-family:inherit; display:flex; align-items:center; gap:5px; user-select:none; }
+.o-nav-drop-trigger .chev { font-size:10px; opacity:.55; transition:transform .18s; }
+.o-nav-drop-wrap.open .chev { transform:rotate(180deg); }
+.o-nav-dropdown { display:none; position:absolute; top:calc(100% + 1px); left:0; min-width:220px; background:#fff; border:1px solid rgba(0,0,0,.1); border-radius:6px; box-shadow:0 6px 24px rgba(0,0,0,.12); z-index:600; padding:4px 0; }
+.o-nav-drop-wrap.open .o-nav-dropdown { display:block; }
+.o-nav-drop-item { display:block; padding:8px 16px; font-size:13px; color:rgba(0,0,0,.72); text-decoration:none; white-space:nowrap; transition:background .12s,color .12s; }
+.o-nav-drop-item:hover { background:rgba(21,87,112,.06); color:var(--teal-700); }
+.o-nav-drop-item.active { color:var(--teal-700); font-weight:600; background:rgba(21,87,112,.06); }
+.o-nav-drop-section { padding:8px 16px 3px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:rgba(0,0,0,.38); border-top:1px solid rgba(0,0,0,.06); margin-top:2px; }
+.o-nav-drop-section:first-child { border-top:none; margin-top:0; }
+.content { padding-top: 0 !important; }
+.breadcrumb { display: none !important; }
+</style>
+<script>
+  (function () {
+    function syncTopbarH() {
+      var topbar = document.querySelector('.topbar');
+      if (topbar) {
+        document.documentElement.style.setProperty('--topbar-h', topbar.getBoundingClientRect().height + 'px');
+      }
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', syncTopbarH);
+    } else {
+      syncTopbarH();
+    }
+    window.addEventListener('resize', syncTopbarH);
+  })();
+</script>
+{% endblock %}
+
+{% block module_navbar %}
+{% with uname=request.resolver_match.url_name %}
+<nav class="o-nav">
+  <a href="{% url 'dashboard' %}" class="o-nav-grid" title="Accueil">
+    <i class="bi bi-grid-3x3-gap-fill"></i>
+  </a>
+  <span class="o-nav-brand">
+    <i class="bi bi-cart3"></i>
+    Achats
+  </span>
+
+  <a href="{% url 'achats:dashboard' %}"
+     class="o-nav-link {% if uname == 'dashboard' %}active{% endif %}">
+    Tableau de bord
+  </a>
+
+  <a href="{% url 'achats:fournisseurs_list' %}"
+     class="o-nav-link {% if 'fournisseur' in uname %}active{% endif %}">
+    Fournisseurs
+  </a>
+
+  <a href="{% url 'achats:besoins_list' %}"
+     class="o-nav-link {% if 'besoin' in uname %}active{% endif %}">
+    Besoins
+  </a>
+
+  <a href="{% url 'achats:proformas_list' %}"
+     class="o-nav-link {% if 'proforma' in uname %}active{% endif %}">
+    Proformas
+  </a>
+
+  <a href="{% url 'achats:commandes_list' %}"
+     class="o-nav-link {% if 'commande' in uname or 'reception' in uname %}active{% endif %}">
+    Commandes
+  </a>
+</nav>
+{% endwith %}
+{% endblock %}
+
+{% block breadcrumb %}{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+(function(){
+  document.querySelectorAll('.o-nav-drop-wrap').forEach(function(wrap){
+    var btn = wrap.querySelector('.o-nav-drop-trigger');
+    if(!btn) return;
+    btn.addEventListener('click', function(e){ e.stopPropagation(); wrap.classList.toggle('open'); });
+    document.addEventListener('click', function(e){ if(!wrap.contains(e.target)) wrap.classList.remove('open'); });
+  });
+})();
+</script>
+{% endblock %}

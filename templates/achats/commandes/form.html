@@ -1,0 +1,73 @@
+{% extends 'achats/base.html' %}
+{% load i18n %}
+
+{% block title %}Créer la commande — {{ proforma.numero }}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+.content { padding:0; }
+.cmf-page { display:flex; flex-direction:column; height:calc(100vh - var(--topbar-h) - 44px); overflow:hidden; }
+.cmf-head { display:flex; align-items:center; gap:12px; padding:14px 28px; background:#fff; border-bottom:1px solid rgba(0,0,0,.07); flex-shrink:0; }
+.cmf-head h1 { font-size:16px; font-weight:700; color:var(--teal-800); margin:0; }
+.cmf-body { flex:1; overflow:auto; min-height:0; padding:24px 28px; }
+.cmf-card { background:#fff; border-radius:10px; border:1px solid rgba(0,0,0,.08); padding:20px 24px; margin-bottom:16px; max-width:700px; }
+.cmf-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px; }
+.cmf-field { display:flex; flex-direction:column; gap:4px; }
+.cmf-field label { font-size:12px; font-weight:600; color:rgba(0,0,0,.6); }
+.cmf-field input, .cmf-field textarea { border:1px solid #d1d5db; border-radius:6px; padding:8px 10px; font-size:13px; font-family:inherit; }
+.cmf-field textarea { resize:vertical; min-height:60px; }
+.summary-box { background:#f0f9f4; border:1px solid rgba(0,128,80,.2); border-radius:8px; padding:14px 16px; margin-bottom:16px; max-width:700px; font-size:13px; }
+.summary-box table { width:100%; border-collapse:collapse; margin-top:10px; }
+.summary-box td { padding:5px 8px; border-bottom:1px solid rgba(0,0,0,.06); color:rgba(0,0,0,.75); }
+.summary-box td:first-child { font-weight:600; color:rgba(0,0,0,.5); font-size:11px; text-transform:uppercase; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cmf-page">
+  <div class="cmf-head">
+    <a href="{% url 'achats:proforma_detail' proforma.pk %}" style="color:#888;text-decoration:none;font-size:13px;"><i class="bi bi-arrow-left"></i></a>
+    <h1>Créer la commande — {{ proforma.numero }}</h1>
+  </div>
+
+  <div class="cmf-body">
+    <!-- Résumé proforma -->
+    <div class="summary-box">
+      <strong style="color:var(--teal-800);">Proforma {{ proforma.numero }}</strong> — Validé
+      <table>
+        <tr><td>Fournisseur</td><td>{{ proforma.fournisseur.nom }}</td></tr>
+        <tr><td>Montant</td><td style="font-weight:700;color:var(--teal-700);">{{ proforma.montant_total|floatformat:0 }} FCFA</td></tr>
+        <tr><td>Besoin</td><td>{{ proforma.besoin.numero }} — {{ proforma.besoin.titre }}</td></tr>
+      </table>
+    </div>
+
+    <form method="post">
+      {% csrf_token %}
+      <div class="cmf-card">
+        <div class="cmf-row">
+          <div class="cmf-field">
+            <label>Date de commande *</label>
+            <input type="date" name="date_commande" required>
+          </div>
+          <div class="cmf-field">
+            <label>Date de livraison prévue</label>
+            <input type="date" name="date_livraison_prevue">
+          </div>
+        </div>
+        <div class="cmf-field" style="margin-bottom:0;">
+          <label>Notes</label>
+          <textarea name="notes" placeholder="Instructions particulières, références, etc."></textarea>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;">
+        <button type="submit" style="padding:9px 24px;border-radius:6px;background:var(--teal-600);color:#fff;border:none;font-size:14px;font-weight:600;cursor:pointer;">
+          <i class="bi bi-bag-plus"></i> Générer la commande
+        </button>
+        <a href="{% url 'achats:proforma_detail' proforma.pk %}" style="padding:9px 20px;border-radius:6px;border:1px solid #d1d5db;background:#fff;font-size:14px;text-decoration:none;color:rgba(0,0,0,.7);">Annuler</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

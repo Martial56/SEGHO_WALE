@@ -1,6 +1,6 @@
 from django.contrib import admin
 from .models import (
-    CategorieStock, Fournisseur, Produit,
+    CategorieStock, Produit,
     LotProduit, MouvementStock, CommandeStock, LigneCommande,
     Inventaire, LigneInventaire,
     DemandePharmacie, LigneDemande,
@@ -13,13 +13,6 @@ class CategorieStockAdmin(admin.ModelAdmin):
     list_display  = ['nom', 'type', 'actif']
     list_filter   = ['type', 'actif']
     search_fields = ['nom']
-
-
-@admin.register(Fournisseur)
-class FournisseurAdmin(admin.ModelAdmin):
-    list_display  = ['code', 'nom', 'telephone', 'email', 'actif']
-    search_fields = ['nom', 'code']
-    list_filter   = ['actif']
 
 
 class LotProduitInline(admin.TabularInline):

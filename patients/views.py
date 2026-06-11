@@ -15,37 +15,57 @@ from .forms import PatientForm, RendezVousForm, PathologieForm, TypeVisiteForm
 def patient_list(request):
     qs = Patient.objects.all()
     stats = {
-        'total': qs.count(),
-        'actifs': qs.filter(actif=True).count(),
+        'total':        qs.count(),
+        'actifs':       qs.filter(actif=True).count(),
         'nouveaux_30j': qs.filter(date_creation__gte=timezone.now() - timedelta(days=30)).count(),
+        'femmes':       qs.filter(sexe='F').count(),
+        'hommes':       qs.filter(sexe='M').count(),
     }
 
-    q = request.GET.get('q', '').strip()
-    statut = request.GET.get('statut', '')
-    sexe = request.GET.get('sexe', '')
+    q      = request.GET.get('q', '').strip()
+    filtre = request.GET.get('filter', '')
+    group  = request.GET.get('group', '')
 
     if q:
         qs = qs.filter(
             Q(nom__icontains=q) | Q(prenoms__icontains=q) |
             Q(code_patient__icontains=q) | Q(telephone__icontains=q)
         )
-    if statut == 'actif':
+
+    if filtre == 'actif':
         qs = qs.filter(actif=True)
-    elif statut == 'inactif':
-        qs = qs.filter(actif=False)
-    if sexe in ('M', 'F'):
-        qs = qs.filter(sexe=sexe)
+    elif filtre == 'nouveau':
+        qs = qs.filter(date_creation__gte=timezone.now() - timedelta(days=30))
+    elif filtre == 'femme':
+        qs = qs.filter(sexe='F')
+    elif filtre == 'homme':
+        qs = qs.filter(sexe='M')
+    elif filtre == 'mineur':
+        from datetime import date
+        cutoff = date.today().replace(year=date.today().year - 18)
+        qs = qs.filter(date_naissance__gt=cutoff)
+    elif filtre == 'adulte':
+        from datetime import date
+        today = date.today()
+        qs = qs.filter(
+            date_naissance__lte=today.replace(year=today.year - 18),
+            date_naissance__gt=today.replace(year=today.year - 60),
+        )
+    elif filtre == 'senior':
+        from datetime import date
+        cutoff = date.today().replace(year=date.today().year - 60)
+        qs = qs.filter(date_naissance__lte=cutoff)
 
     paginator = Paginator(qs, 40)
     page_obj = paginator.get_page(request.GET.get('page'))
     return render(request, 'patients/list.html', {
-        'page_obj': page_obj,
-        'stats': stats,
-        'q': q,
-        'statut': statut,
-        'sexe': sexe,
+        'page_obj':     page_obj,
+        'stats':        stats,
+        'q':            q,
+        'filtre':       filtre,
+        'group':        group,
         'total_filtre': qs.count(),
-        'breadcrumb': [{'title': 'Patients'}],
+        'breadcrumb':   [{'title': 'Patients'}],
     })
 
 
@@ -144,11 +164,24 @@ def rdv_global_list(request):
 
     today = date.today()
     q           = request.GET.get('q', '').strip()
-    filter_val  = request.GET.get('filter', '')
+    filter_val  = request.GET.get('filter', 'today')
     date_from_s = request.GET.get('date_from', '')
     date_to_s   = request.GET.get('date_to', '')
 
-    qs = RendezVous.objects.select_related('patient', 'medecin', 'type_consultation').prefetch_related('registre_curatif').order_by('-date_heure')
+    base_qs = RendezVous.objects.select_related('patient', 'medecin', 'type_consultation')
+
+    # Stats du jour (toujours calculées sur aujourd'hui)
+    today_qs = base_qs.filter(date_heure__date=today)
+    stats = {
+        'aujourd_hui': today_qs.count(),
+        'planifie':    today_qs.filter(statut='planifie').count(),
+        'confirme':    today_qs.filter(statut='confirme').count(),
+        'termine':     today_qs.filter(statut='termine').count(),
+        'annule':      today_qs.filter(statut__in=['annule', 'absent']).count(),
+        'total':       base_qs.count(),
+    }
+
+    qs = base_qs.prefetch_related('registre_curatif').order_by('-date_heure')
 
     if q:
         qs = qs.filter(
@@ -165,24 +198,26 @@ def rdv_global_list(request):
                 qs = qs.filter(date_heure__date__lte=dt.strptime(date_to_s, '%Y-%m-%d').date())
         except ValueError:
             pass
-    elif filter_val == 'mine':
-        qs = qs.filter(date_heure__date=today)
-        if hasattr(request.user, 'medecin'):
-            qs = qs.filter(medecin=request.user.medecin)
+    elif filter_val == 'all':
+        pass  # pas de filtre date
     elif filter_val in ('planifie', 'confirme', 'termine', 'annule', 'absent'):
         qs = qs.filter(statut=filter_val)
     elif filter_val == 'not_done':
         qs = qs.filter(statut__in=['planifie', 'confirme'])
     else:
-        # Par défaut (filter=today ou aucun paramètre) : rendez-vous du jour
         qs = qs.filter(date_heure__date=today)
 
     paginator = Paginator(qs, 25)
     page_obj  = paginator.get_page(request.GET.get('page'))
 
     return render(request, 'patients/rendez_vous.html', {
-        'page_obj': page_obj,
-        'today':    today.isoformat(),
+        'page_obj':    page_obj,
+        'today':       today.isoformat(),
+        'stats':       stats,
+        'filter_val':  filter_val,
+        'q':           q,
+        'date_from':   date_from_s,
+        'date_to':     date_to_s,
     })
 
 

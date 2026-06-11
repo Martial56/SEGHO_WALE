@@ -1,0 +1,194 @@
+{% extends 'achats/base.html' %}
+{% load i18n %}
+
+{% block title %}{{ proforma.numero }} — Proforma{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+.content { padding:0; }
+.pd-page { display:flex; flex-direction:column; height:calc(100vh - var(--topbar-h) - 44px); overflow:hidden; }
+.pd-head { display:flex; align-items:center; justify-content:space-between; padding:14px 28px; background:#fff; border-bottom:1px solid rgba(0,0,0,.07); flex-shrink:0; gap:12px; }
+.pd-head-left { display:flex; align-items:center; gap:12px; }
+.pd-head h1 { font-size:16px; font-weight:700; color:var(--teal-800); margin:0; }
+.pd-body { flex:1; overflow:auto; min-height:0; padding:20px 28px; display:flex; flex-direction:column; gap:16px; }
+.pd-card { background:#fff; border-radius:10px; border:1px solid rgba(0,0,0,.08); overflow:hidden; }
+.pd-card-head { padding:12px 16px; background:#fafafa; border-bottom:1px solid rgba(0,0,0,.06); font-size:13px; font-weight:700; color:var(--teal-800); display:flex; align-items:center; justify-content:space-between; }
+.pd-info { display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; padding:16px; }
+.pd-info-item { display:flex; flex-direction:column; gap:3px; }
+.pd-info-label { font-size:11px; font-weight:600; color:#888; text-transform:uppercase; }
+.pd-info-val { font-size:13px; color:rgba(0,0,0,.8); font-weight:500; }
+.badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; }
+.s-en_attente { background:#fef3c7; color:#92400e; }
+.s-valide { background:#d1fae5; color:#065f46; }
+.s-rejete { background:#fee2e2; color:#991b1b; }
+.pd-table { width:100%; border-collapse:collapse; font-size:13px; }
+.pd-table th { padding:9px 14px; font-size:11px; font-weight:700; color:#888; text-transform:uppercase; background:#fafafa; border-bottom:1px solid rgba(0,0,0,.08); }
+.pd-table td { padding:9px 14px; border-bottom:1px solid rgba(0,0,0,.05); vertical-align:middle; }
+.pd-table tr:last-child td { border-bottom:none; }
+.pd-total { padding:12px 16px; background:#f0f9f4; border-top:2px solid rgba(0,0,0,.06); display:flex; justify-content:flex-end; gap:20px; align-items:center; }
+.pd-total-label { font-size:13px; font-weight:600; color:#666; }
+.pd-total-val { font-size:18px; font-weight:800; color:var(--teal-700); }
+.btn { display:inline-flex; align-items:center; gap:5px; padding:6px 14px; border-radius:6px; font-size:13px; font-weight:600; text-decoration:none; border:none; cursor:pointer; }
+.btn-success { background:#22c55e; color:#fff; }
+.btn-danger { background:#ef4444; color:#fff; }
+.btn-primary { background:var(--teal-600); color:#fff; }
+.btn-secondary { background:#fff; color:rgba(0,0,0,.7); border:1px solid #d1d5db; }
+/* Modal validation */
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:1000; align-items:center; justify-content:center; }
+.modal-overlay.open { display:flex; }
+.modal { background:#fff; border-radius:10px; padding:24px; max-width:480px; width:90%; }
+.modal h2 { font-size:15px; font-weight:700; margin-bottom:12px; }
+.modal textarea { width:100%; border:1px solid #d1d5db; border-radius:6px; padding:8px; font-size:13px; font-family:inherit; min-height:80px; margin-bottom:12px; }
+.modal-actions { display:flex; gap:10px; justify-content:flex-end; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pd-page">
+  <div class="pd-head">
+    <div class="pd-head-left">
+      <a href="{% url 'achats:besoin_detail' proforma.besoin.pk %}" style="color:#888;text-decoration:none;font-size:13px;"><i class="bi bi-arrow-left"></i></a>
+      <h1>{{ proforma.numero }}</h1>
+      <span class="badge s-{{ proforma.statut }}">{{ proforma.get_statut_display }}</span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      {% if proforma.statut == 'en_attente' %}
+        <a href="{% url 'achats:proforma_edit' proforma.pk %}" class="btn btn-secondary"><i class="bi bi-pencil"></i> Modifier</a>
+        <button type="button" class="btn btn-danger" onclick="openModal('rejeter')"><i class="bi bi-x-circle"></i> Rejeter</button>
+        <button type="button" class="btn btn-success" onclick="openModal('valider')"><i class="bi bi-check-circle"></i> Valider</button>
+      {% elif proforma.statut == 'valide' and not has_commande %}
+        <a href="{% url 'achats:commande_create' proforma.pk %}" class="btn btn-primary"><i class="bi bi-bag-plus"></i> Créer la commande</a>
+      {% elif proforma.statut == 'valide' and has_commande %}
+        <a href="{% url 'achats:commande_detail' proforma.commande.pk %}" class="btn btn-secondary"><i class="bi bi-bag-check"></i> Voir la commande</a>
+      {% endif %}
+      {% if proforma.fichier %}
+      <a href="{{ proforma.fichier.url }}" target="_blank" class="btn btn-secondary"><i class="bi bi-file-pdf"></i> Document</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="pd-body">
+    <!-- Infos -->
+    <div class="pd-card">
+      <div class="pd-card-head"><span><i class="bi bi-info-circle" style="margin-right:6px;"></i>Informations</span></div>
+      <div class="pd-info">
+        <div class="pd-info-item">
+          <span class="pd-info-label">Numéro</span>
+          <span class="pd-info-val">{{ proforma.numero }}</span>
+        </div>
+        <div class="pd-info-item">
+          <span class="pd-info-label">Fournisseur</span>
+          <span class="pd-info-val">
+            <a href="{% url 'achats:fournisseur_detail' proforma.fournisseur.pk %}" style="color:var(--teal-700);text-decoration:none;">{{ proforma.fournisseur.nom }}</a>
+          </span>
+        </div>
+        <div class="pd-info-item">
+          <span class="pd-info-label">Besoin lié</span>
+          <span class="pd-info-val">
+            <a href="{% url 'achats:besoin_detail' proforma.besoin.pk %}" style="color:var(--teal-700);text-decoration:none;">{{ proforma.besoin.numero }}</a>
+          </span>
+        </div>
+        <div class="pd-info-item">
+          <span class="pd-info-label">Date du document</span>
+          <span class="pd-info-val">{{ proforma.date_reception }}</span>
+        </div>
+        {% if proforma.reference_fournisseur %}
+        <div class="pd-info-item">
+          <span class="pd-info-label">Réf. fournisseur</span>
+          <span class="pd-info-val">{{ proforma.reference_fournisseur }}</span>
+        </div>
+        {% endif %}
+        {% if proforma.valide_par %}
+        <div class="pd-info-item">
+          <span class="pd-info-label">{% if proforma.statut == 'valide' %}Validé par{% else %}Rejeté par{% endif %}</span>
+          <span class="pd-info-val">{{ proforma.valide_par.get_full_name|default:proforma.valide_par.username }} — {{ proforma.date_validation|date:"d/m/Y" }}</span>
+        </div>
+        {% endif %}
+        {% if proforma.notes %}
+        <div class="pd-info-item" style="grid-column:1/-1;">
+          <span class="pd-info-label">Notes</span>
+          <span class="pd-info-val">{{ proforma.notes }}</span>
+        </div>
+        {% endif %}
+        {% if proforma.notes_direction %}
+        <div class="pd-info-item" style="grid-column:1/-1;background:#fef3c7;padding:8px 12px;border-radius:6px;">
+          <span class="pd-info-label">Observations direction</span>
+          <span class="pd-info-val">{{ proforma.notes_direction }}</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Lignes -->
+    <div class="pd-card">
+      <div class="pd-card-head"><span><i class="bi bi-table" style="margin-right:6px;"></i>Détail des articles</span></div>
+      {% if lignes %}
+      <table class="pd-table">
+        <thead>
+          <tr><th>#</th><th>Désignation</th><th style="text-align:right;">Quantité</th><th style="text-align:right;">Prix unitaire (FCFA)</th><th style="text-align:right;">Montant (FCFA)</th></tr>
+        </thead>
+        <tbody>
+        {% for l in lignes %}
+        <tr>
+          <td style="color:#888;">{{ forloop.counter }}</td>
+          <td style="font-weight:500;">{{ l.designation }}{% if l.notes %}<br><small style="color:#888;">{{ l.notes }}</small>{% endif %}</td>
+          <td style="text-align:right;">{{ l.quantite }}</td>
+          <td style="text-align:right;">{{ l.prix_unitaire|floatformat:0 }}</td>
+          <td style="text-align:right;font-weight:600;">{{ l.montant|floatformat:0 }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      <div class="pd-total">
+        <span class="pd-total-label">Total</span>
+        <span class="pd-total-val">{{ montant_calc|floatformat:0 }} FCFA</span>
+      </div>
+      {% else %}
+      <div style="padding:24px;text-align:center;color:#aaa;font-size:13px;">Aucun article</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Modals validation / rejet -->
+{% if proforma.statut == 'en_attente' %}
+<div class="modal-overlay" id="modal-valider">
+  <div class="modal">
+    <h2><i class="bi bi-check-circle-fill" style="color:#22c55e;margin-right:6px;"></i>Valider le proforma {{ proforma.numero }}</h2>
+    <p style="font-size:13px;color:#666;margin-bottom:12px;">La validation génère un bon de commande. Confirmez-vous la validation de ce proforma auprès de {{ proforma.fournisseur.nom }} ?</p>
+    <form method="post" action="{% url 'achats:proforma_valider' proforma.pk %}">
+      {% csrf_token %}
+      <textarea name="notes_direction" placeholder="Observations (optionnel)…"></textarea>
+      <div class="modal-actions">
+        <button type="button" onclick="closeModal('valider')" class="btn btn-secondary">Annuler</button>
+        <button type="submit" class="btn btn-success"><i class="bi bi-check-lg"></i> Confirmer la validation</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-rejeter">
+  <div class="modal">
+    <h2><i class="bi bi-x-circle-fill" style="color:#ef4444;margin-right:6px;"></i>Rejeter le proforma {{ proforma.numero }}</h2>
+    <p style="font-size:13px;color:#666;margin-bottom:12px;">Veuillez indiquer la raison du rejet :</p>
+    <form method="post" action="{% url 'achats:proforma_rejeter' proforma.pk %}">
+      {% csrf_token %}
+      <textarea name="notes_direction" placeholder="Motif du rejet…" required></textarea>
+      <div class="modal-actions">
+        <button type="button" onclick="closeModal('rejeter')" class="btn btn-secondary">Annuler</button>
+        <button type="submit" class="btn btn-danger"><i class="bi bi-x-lg"></i> Confirmer le rejet</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openModal(name) { document.getElementById('modal-' + name).classList.add('open'); }
+function closeModal(name) { document.getElementById('modal-' + name).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(function(m) {
+  m.addEventListener('click', function(e) { if(e.target === m) m.classList.remove('open'); });
+});
+</script>
+{% endif %}
+{% endblock %}

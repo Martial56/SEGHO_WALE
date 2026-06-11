@@ -53,7 +53,8 @@ urlpatterns = [
     path('fiches/<int:pk>/modifier/',  views.fiche_edit,       name='stock_fiche_edit'),
     path('fiches/<int:pk>/soumettre/', views.fiche_soumettre,  name='stock_fiche_soumettre'),
     path('fiches/<int:pk>/valider/',   views.fiche_valider,    name='stock_fiche_valider'),
-    path('fiches/<int:pk>/imprimer/',  views.fiche_print,      name='stock_fiche_print'),
+    path('fiches/<int:pk>/imprimer/',       views.fiche_print,           name='stock_fiche_print'),
+    path('fiches/<int:pk>/envoyer-achats/', views.fiche_envoyer_achats,  name='stock_fiche_envoyer_achats'),
     path('rapports/indicateurs/',     views.rapports_indicateurs,  name='stock_rapports_indicateurs'),
 
     # Fournisseurs
