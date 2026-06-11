@@ -1,0 +1,614 @@
+﻿{% extends 'employer/base.html' %}
+{% load i18n %}
+
+{% block topbar_title %}{% if employe %}Modifier — {{ employe.nom_complet|default:employe.nom }}{% else %}Nouvel employé{% endif %}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+.rh-form-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 36px 14px;
+  
+  flex-wrap: wrap;
+  position: sticky;
+  top: 38px;
+  z-index: 100;
+  background: #f0f6fa;
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+html[data-theme="dark"] .rh-form-head {
+  background: #071e28;
+  border-bottom-color: rgba(255,255,255,0.05);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+@media (max-width: 1024px) {
+  .rh-form-head { margin: 0 -20px; padding-left: 20px; padding-right: 20px; }
+}
+.rh-form-head-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.rh-form-title {
+  font-size: 20px; font-weight: 800;
+  color: var(--rh-900); letter-spacing: -0.2px;
+}
+html[data-theme="dark"] .rh-form-title { color: var(--rh-text); }
+.rh-form-subtitle {
+  font-size: 13px; color: var(--rh-muted); margin-top: 2px;
+}
+.rh-form-head-right { display: flex; align-items: center; gap: 10px; }
+
+/* ── Back btn ── */
+.rh-back-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 8px;
+  border: 1.5px solid var(--rh-200); color: var(--rh-700);
+  background: #fff; text-decoration: none; font-size: 15px;
+  transition: all 0.15s; flex-shrink: 0;
+}
+.rh-back-btn:hover { background: var(--rh-50); border-color: var(--rh-400); color: var(--rh-800); }
+html[data-theme="dark"] .rh-back-btn { background: var(--rh-surface); border-color: var(--rh-border); color: var(--rh-300); }
+html[data-theme="dark"] .rh-back-btn:hover { background: rgba(38,83,128,0.15); }
+
+/* ── Form sections ── */
+.rh-form-sections { display: flex; flex-direction: column; gap: 20px; }
+
+.rh-form-card {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+html[data-theme="dark"] .rh-form-card { background: var(--rh-surface); }
+
+.rh-form-card-header {
+  padding: 14px 22px 12px;
+  border-bottom: 1px solid var(--rh-border);
+  display: flex; align-items: center; gap: 10px;
+}
+.rh-form-card-title {
+  font-size: 13.5px; font-weight: 700; color: var(--rh-800);
+  border-left: 3px solid var(--rh-600); padding-left: 10px;
+  display: flex; align-items: center; gap: 8px;
+}
+html[data-theme="dark"] .rh-form-card-title { color: var(--rh-300); }
+
+.rh-form-card-body { padding: 20px 22px; }
+
+/* ── Form rows ── */
+.rh-form-row {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.rh-form-row:last-child { margin-bottom: 0; }
+.rh-form-row.cols-2 { grid-template-columns: 1fr 1fr; }
+.rh-form-row.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+.rh-form-row.cols-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+@media (max-width: 900px) {
+  .rh-form-row.cols-3 { grid-template-columns: 1fr 1fr; }
+  .rh-form-row.cols-4 { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 600px) {
+  .rh-form-row.cols-2,
+  .rh-form-row.cols-3,
+  .rh-form-row.cols-4 { grid-template-columns: 1fr; }
+}
+
+/* ── Field group ── */
+.rh-fgroup { display: flex; flex-direction: column; gap: 5px; }
+.rh-fgroup.full { grid-column: 1 / -1; }
+.rh-fgroup .rh-error {
+  font-size: 11.5px; color: var(--rose); display: flex; align-items: center; gap: 4px;
+}
+
+/* ── Radio sex ── */
+.rh-radio-group {
+  display: flex; gap: 10px; flex-wrap: wrap; padding-top: 4px;
+}
+.rh-radio-item {
+  display: flex; align-items: center; gap: 7px;
+  cursor: pointer; user-select: none;
+}
+.rh-radio-item input[type="radio"] {
+  width: 16px; height: 16px; cursor: pointer;
+  accent-color: var(--rh-600);
+  flex-shrink: 0;
+}
+.rh-radio-item span {
+  font-size: 13.5px; font-weight: 500; color: var(--rh-text);
+}
+html[data-theme="dark"] .rh-radio-item span { color: var(--rh-text); }
+
+/* ── Photo preview ── */
+.rh-photo-block {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
+}
+.rh-photo-preview {
+  width: 80px; height: 80px; border-radius: 10px; object-fit: cover;
+  border: 2px solid var(--rh-200);
+}
+.rh-photo-placeholder {
+  width: 80px; height: 80px; border-radius: 10px;
+  background: var(--rh-50); border: 2px dashed var(--rh-300);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; color: var(--rh-300);
+}
+html[data-theme="dark"] .rh-photo-placeholder { background: rgba(38,83,128,0.1); border-color: var(--rh-400); }
+.rh-photo-label {
+  font-size: 12px; color: var(--rh-600); cursor: pointer;
+  text-decoration: underline; text-underline-offset: 2px;
+  background: none; border: none; padding: 0;
+  font-family: 'Sora', sans-serif;
+  transition: color 0.15s;
+}
+.rh-photo-label:hover { color: var(--rh-800); }
+html[data-theme="dark"] .rh-photo-label { color: var(--rh-300); }
+html[data-theme="dark"] .rh-photo-label:hover { color: var(--rh-200); }
+
+/* ── Select ── */
+select.rh-input {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b80d9' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+}
+
+/* ── Textarea ── */
+textarea.rh-input {
+  resize: vertical;
+  min-height: 80px;
+}
+
+/* ── Footer actions ── */
+.rh-form-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 22px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  margin-top: 4px;
+}
+html[data-theme="dark"] .rh-form-footer { background: var(--rh-surface); }
+
+/* ── Error banner ── */
+.rh-form-error-banner {
+  display: flex; align-items: flex-start; gap: 12px;
+  background: rgba(232,69,69,0.08);
+  border: 1px solid rgba(232,69,69,0.25);
+  border-left: 4px solid var(--rose);
+  border-radius: 8px; padding: 12px 16px; margin-bottom: 18px;
+  font-size: 13.5px; color: #7a1515;
+}
+html[data-theme="dark"] .rh-form-error-banner { color: #f09090; background: rgba(232,69,69,0.1); }
+.rh-form-error-banner i { font-size: 18px; color: var(--rose); flex-shrink: 0; margin-top: 1px; }
+
+/* ── Matricule badge ── */
+.rh-mat-auto {
+  display: inline-block; padding: 8px 14px; border-radius: 7px;
+  font-size: 13px; color: rgba(0,0,0,0.4); background: #f5f5f5;
+  border: 1px solid #e0e0e0; font-style: italic; font-family: monospace;
+}
+html[data-theme="dark"] .rh-mat-auto {
+  background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.3);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<form method="post" enctype="multipart/form-data" novalidate id="rhForm">
+{% csrf_token %}
+
+<!-- En-tête formulaire -->
+<div class="rh-form-head">
+  <div class="rh-form-head-left">
+    <a href="{% if employe %}{% url 'rh_detail' employe.pk %}{% else %}{% url 'ressources_humaines_list' %}{% endif %}"
+       class="rh-back-btn" title="Annuler">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <div>
+      <div class="rh-form-title">
+        {% if employe %}Modifier — {{ employe.nom_complet|default:employe.nom }}{% else %}Nouveau dossier employé{% endif %}
+      </div>
+      <div class="rh-form-subtitle">
+        {% if employe %}
+          Matricule : <strong>{{ employe.matricule }}</strong> &nbsp;·&nbsp; Dernière modification : {{ employe.modifie_le|date:"d/m/Y à H:i"|default:"—" }}
+        {% else %}
+          Remplissez le formulaire pour créer un nouveau dossier.
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="rh-form-head-right">
+    <a href="{% if employe %}{% url 'rh_detail' employe.pk %}{% else %}{% url 'ressources_humaines_list' %}{% endif %}"
+       class="btn-rh-outline">
+      <i class="bi bi-x-lg"></i> Annuler
+    </a>
+    <button type="submit" form="rhForm" class="btn-rh">
+      <i class="bi bi-check2-all"></i>
+      {% if employe %}Enregistrer les modifications{% else %}Créer le dossier{% endif %}
+    </button>
+  </div>
+</div>
+
+<div class="rh-form-sections">
+
+  <!-- ════════════════════════════════════════
+       SECTION 1 — Informations personnelles
+  ════════════════════════════════════════ -->
+  <div class="rh-form-card">
+    <div class="rh-form-card-header">
+      <div class="rh-form-card-title">
+        <i class="bi bi-person-fill" style="color:var(--rh-500);"></i>
+        Informations personnelles
+      </div>
+    </div>
+    <div class="rh-form-card-body">
+
+      <!-- Matricule (read-only) -->
+      <div class="rh-form-row" style="margin-bottom:18px;">
+        <div class="rh-fgroup">
+          <label class="rh-label">Matricule</label>
+          {% if employe %}
+            <div class="rh-mat-auto">{{ employe.matricule }}</div>
+          {% else %}
+            <div class="rh-mat-auto">Généré automatiquement</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Nom / Prénoms -->
+      <div class="rh-form-row cols-2">
+        <div class="rh-fgroup">
+          <label class="rh-label" for="id_nom">Nom <span style="color:var(--rose);">*</span></label>
+          <input type="text" id="id_nom" name="nom"
+                 value="{{ form_data.nom }}"
+                 class="rh-input"
+                 placeholder="Nom de famille" required maxlength="100"
+                 autocomplete="family-name">
+        </div>
+        <div class="rh-fgroup">
+          <label class="rh-label" for="id_prenoms">Prénoms <span style="color:var(--rose);">*</span></label>
+          <input type="text" id="id_prenoms" name="prenoms"
+                 value="{{ form_data.prenoms }}"
+                 class="rh-input"
+                 placeholder="Prénoms" required maxlength="150"
+                 autocomplete="given-name">
+        </div>
+      </div>
+
+      <!-- Sexe / Date naissance / Lieu naissance -->
+      <div class="rh-form-row cols-3">
+        <div class="rh-fgroup">
+          <label class="rh-label">Sexe <span style="color:var(--rose);">*</span></label>
+          <div class="rh-radio-group">
+            <label class="rh-radio-item">
+              <input type="radio" name="sexe" value="M" required
+                     {% if form_data.sexe == 'M' %}checked{% endif %}>
+              <span><i class="bi bi-gender-male" style="color:var(--sky);"></i> Masculin</span>
+            </label>
+            <label class="rh-radio-item">
+              <input type="radio" name="sexe" value="F" required
+                     {% if form_data.sexe == 'F' %}checked{% endif %}>
+              <span><i class="bi bi-gender-female" style="color:var(--violet);"></i> Féminin</span>
+            </label>
+          </div>
+        </div>
+        <div class="rh-fgroup">
+          <label class="rh-label" for="id_date_naissance">Date de naissance <span style="color:var(--rose);">*</span></label>
+          <input type="date" id="id_date_naissance" name="date_naissance"
+                 value="{{ form_data.date_naissance }}"
+                 class="rh-input" max="{% now 'Y-m-d' %}" required>
+          <small id="age-display" style="font-size:11.5px; color:var(--rh-muted); margin-top:2px;"></small>
+        </div>
+        <div class="rh-fgroup">
+          <label class="rh-label" for="id_lieu_naissance">Lieu de naissance</label>
+          <input type="text" id="id_lieu_naissance" name="lieu_naissance"
+                 value="{{ form_data.lieu_naissance }}"
+                 class="rh-input" placeholder="Ex. Abidjan">
+        </div>
+      </div>
+
+      <!-- Nationalité / Situation matrimoniale / Nombre d'enfants -->
+      <div class="rh-form-row cols-3">
+        <div class="rh-fgroup">
+          <label class="rh-label" for="id_nationalite">Nationalité <span style="color:var(--rose);">*</span></label>
+          <input type="text" id="id_nationalite" name="nationalite"
+                 value="{{ form_data.nationalite }}"
+                 class="rh-input" placeholder="Ivoirienne" required>
+        </div>
+        <div class="rh-fgroup">
+          <label class="rh-label" for="id_situation_matrimoniale">Situation matrimoniale</label>
+          <select id="id_situation_matrimoniale" name="situation_matrimoniale" class="rh-input">
+            <option value="">— Sélectionner —</option>
+            <option value="celibataire" {% if form_data.situation_matrimoniale == 'celibataire' %}selected{% endif %}>Célibataire</option>
+            <option value="marie"       {% if form_data.situation_matrimoniale == 'marie'       %}selected{% endif %}>Marié(e)</option>
+            <option value="divorce"     {% if form_data.situation_matrimoniale == 'divorce'     %}selected{% endif %}>Divorcé(e)</option>
+            <option value="veuf"        {% if form_data.situation_matrimoniale == 'veuf'        %}selected{% endif %}>Veuf / Veuve</option>
+          </select>
+        </div>
+        <div class="rh-fgroup">
+          <label class="rh-label" for="id_nombre_enfants">Nombre d'enfants</label>
+          <input type="number" id="id_nombre_enfants" name="nombre_enfants" min="0" max="20"
+                 value="{{ form_data.nombre_enfants }}"
+                 class="rh-input">
+        </div>
+      </div>
+
+      <!-- Photo -->
+      <div class="rh-form-row">
+        <div class="rh-fgroup">
+          <label class="rh-label">Photo</label>
+          <div class="rh-photo-block">
+            {% if employe and employe.photo %}
+              <img src="{{ employe.photo.url }}" alt="Photo actuelle"
+                   class="rh-photo-preview" id="photo-preview">
+            {% else %}
+              <div class="rh-photo-placeholder" id="photo-placeholder">
+                <i class="bi bi-camera"></i>
+              </div>
+              <img src="" alt="" class="rh-photo-preview" id="photo-preview" style="display:none;">
+            {% endif %}
+            <label for="id_photo" class="rh-photo-label">
+              {% if employe and employe.photo %}Changer la photo{% else %}Ajouter une photo{% endif %}
+            </label>
+            <input type="file" id="id_photo" name="photo" accept="image/*"
+                   style="display:none;">
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       SECTION 2 — Coordonnées
+  ════════════════════════════════════════ -->
+  <div class="rh-form-card">
+    <div class="rh-form-card-header">
+      <div class="rh-form-card-title">
+        <i class="bi bi-telephone-fill" style="color:var(--rh-500);"></i>
+        Coordonnées
+      </div>
+    </div>
+    <div class="rh-form-card-body">
+
+      <div class="rh-form-row cols-2">
+        <div class="rh-fgroup">
+          <label class="rh-label" for="id_telephone">Téléphone principal <span style="color:var(--rose);">*</span></label>
+          <input type="tel" id="id_telephone" name="telephone"
+                 value="{{ form_data.telephone }}"
+                 class="rh-input" placeholder="Ex. +225 07 00 00 00 00"
+                 autocomplete="tel" required>
+        </div>
+        <div class="rh-fgroup">
+          <label class="rh-label" for="id_telephone2">Téléphone 2</label>
+          <input type="tel" id="id_telephone2" name="telephone2"
+                 value="{{ form_data.telephone2 }}"
+                 class="rh-input" placeholder="Facultatif"
+                 autocomplete="tel">
+        </div>
+      </div>
+
+      <div class="rh-form-row cols-2">
+        <div class="rh-fgroup">
+          <label class="rh-label" for="id_email">Adresse email</label>
+          <input type="email" id="id_email" name="email"
+                 value="{{ form_data.email }}"
+                 class="rh-input"
+                 placeholder="exemple@hopital.ci"
+                 autocomplete="email">
+        </div>
+        <div class="rh-fgroup">
+          <label class="rh-label" for="id_adresse">Adresse postale</label>
+          <textarea id="id_adresse" name="adresse" class="rh-input" rows="2"
+                    placeholder="Quartier, commune, ville…"
+                    style="min-height:56px; resize:vertical;">{{ form_data.adresse }}</textarea>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       SECTION 3 — Situation professionnelle
+  ════════════════════════════════════════ -->
+  <div class="rh-form-card">
+    <div class="rh-form-card-header">
+      <div class="rh-form-card-title">
+        <i class="bi bi-briefcase-fill" style="color:var(--rh-500);"></i>
+        Situation professionnelle
+      </div>
+    </div>
+    <div class="rh-form-card-body">
+
+      <div class="rh-form-row cols-2">
+        <div class="rh-fgroup">
+          <label class="rh-label" for="id_service">Service</label>
+          <select id="id_service" name="service" class="rh-input">
+            <option value="">— Sélectionner un service —</option>
+            {% for svc in services %}
+            <option value="{{ svc.pk }}"
+              {% if form_data.service == svc.pk|stringformat:"s" %}selected{% endif %}>
+              {{ svc.nom }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="rh-fgroup">
+          <label class="rh-label" for="id_fonction">Fonction <span style="color:var(--rose);">*</span></label>
+          <select id="id_fonction" name="fonction" class="rh-input" required>
+            <option value="">— Sélectionner une fonction —</option>
+            {% for groupe in fonctions_groupes %}
+            <optgroup label="{{ groupe.label }}">
+              {% for fn in groupe.items %}
+              <option value="{{ fn.pk }}"
+                {% if form_data.fonction == fn.pk|stringformat:"s" %}selected{% endif %}>
+                {{ fn.nom }}
+              </option>
+              {% endfor %}
+            </optgroup>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="rh-form-row cols-2">
+        <div class="rh-fgroup">
+          <label class="rh-label" for="id_grade">Grade</label>
+          <select id="id_grade" name="grade" class="rh-input">
+            <option value="">— Sélectionner un grade —</option>
+            {% for gr in grades %}
+            <option value="{{ gr.pk }}"
+              {% if form_data.grade == gr.pk|stringformat:"s" %}selected{% endif %}>
+              {{ gr.nom }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="rh-fgroup">
+          <label class="rh-label" for="id_type_contrat">Type de contrat</label>
+          <select id="id_type_contrat" name="type_contrat" class="rh-input">
+            <option value="">— Sélectionner —</option>
+            {% for tc in types_contrat %}
+            <option value="{{ tc.pk }}"
+              {% if form_data.type_contrat == tc.pk|stringformat:"s" %}selected{% endif %}>
+              {{ tc.nom }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="rh-form-row cols-2">
+        <div class="rh-fgroup">
+          <label class="rh-label" for="id_date_embauche">Date d'embauche <span style="color:var(--rose);">*</span></label>
+          <input type="date" id="id_date_embauche" name="date_embauche"
+                 value="{{ form_data.date_embauche }}"
+                 class="rh-input" required>
+        </div>
+        <div class="rh-fgroup">
+          <label class="rh-label" for="id_date_fin_contrat">Date fin de contrat</label>
+          <input type="date" id="id_date_fin_contrat" name="date_fin_contrat"
+                 value="{{ form_data.date_fin_contrat }}"
+                 class="rh-input">
+          <small style="font-size:11px; color:var(--rh-muted);">Laisser vide pour un CDI</small>
+        </div>
+      </div>
+
+      <div class="rh-form-row cols-2">
+        <div class="rh-fgroup">
+          <label class="rh-label" for="id_salaire_base">Salaire de base (FCFA)</label>
+          <div style="position:relative;">
+            <input type="number" id="id_salaire_base" name="salaire_base" min="0" step="1000"
+                   value="{{ form_data.salaire_base }}"
+                   class="rh-input"
+                   placeholder="Ex. 250000"
+                   style="padding-right:56px;">
+            <span style="position:absolute; right:12px; top:50%; transform:translateY(-50%);
+                         font-size:12px; font-weight:600; color:var(--rh-muted); pointer-events:none;">
+              FCFA
+            </span>
+          </div>
+        </div>
+        <div class="rh-fgroup">
+          <label class="rh-label" for="id_statut">Statut <span style="color:var(--rose);">*</span></label>
+          <select id="id_statut" name="statut" class="rh-input" required>
+            <option value="actif"    {% if form_data.statut == 'actif'    %}selected{% endif %}>Actif</option>
+            <option value="suspendu" {% if form_data.statut == 'suspendu' %}selected{% endif %}>Suspendu</option>
+            <option value="quitte"   {% if form_data.statut == 'quitte'   %}selected{% endif %}>Quitté</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="rh-form-row">
+        <div class="rh-fgroup full">
+          <label class="rh-label" for="id_notes">Notes internes</label>
+          <textarea id="id_notes" name="notes" class="rh-input" rows="3"
+                    placeholder="Observations, informations complémentaires…"
+                    style="min-height:80px;">{{ form_data.notes }}</textarea>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       FOOTER
+  ════════════════════════════════════════ -->
+  <div class="rh-form-footer">
+    <a href="{% if employe %}{% url 'rh_detail' employe.pk %}{% else %}{% url 'ressources_humaines_list' %}{% endif %}"
+       class="btn-rh-outline">
+      <i class="bi bi-x-lg"></i> Annuler
+    </a>
+    <button type="submit" class="btn-rh" style="padding:9px 28px;">
+      <i class="bi bi-check2-all"></i>
+      {% if employe %}Enregistrer les modifications{% else %}Créer le dossier employé{% endif %}
+    </button>
+  </div>
+
+</div><!-- /rh-form-sections -->
+</form>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  /* ── Calcul automatique de l'âge ── */
+  var dateInput  = document.getElementById('id_date_naissance');
+  var ageDisplay = document.getElementById('age-display');
+
+  function updateAge() {
+    if (!dateInput || !dateInput.value || !ageDisplay) return;
+    var birth = new Date(dateInput.value);
+    if (isNaN(birth)) { ageDisplay.textContent = ''; return; }
+    var today = new Date();
+    var age = today.getFullYear() - birth.getFullYear();
+    var m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+    if (age < 0) { ageDisplay.textContent = ''; return; }
+    ageDisplay.textContent = age === 0
+      ? ((today.getFullYear() - birth.getFullYear()) * 12 + today.getMonth() - birth.getMonth()) + ' mois'
+      : age + ' an' + (age > 1 ? 's' : '');
+  }
+
+  if (dateInput) {
+    dateInput.addEventListener('change', updateAge);
+    updateAge();
+  }
+
+  /* ── Prévisualisation photo ── */
+  var photoInput   = document.getElementById('id_photo');
+  var photoPreview = document.getElementById('photo-preview');
+  var photoHolder  = document.getElementById('photo-placeholder');
+
+  if (photoInput) {
+    photoInput.addEventListener('change', function () {
+      var file = this.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function (e) {
+        if (photoHolder)  photoHolder.style.display  = 'none';
+        if (photoPreview) { photoPreview.src = e.target.result; photoPreview.style.display = 'block'; }
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+})();
+</script>
+{% endblock %}
+

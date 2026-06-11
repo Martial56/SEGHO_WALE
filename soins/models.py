@@ -33,7 +33,7 @@ class Soin(models.Model):
         related_name='soins', verbose_name="Patient"
     )
     infirmier = models.ForeignKey(
-        'ressources_humaines.Employe', on_delete=models.SET_NULL, null=True, blank=True,
+        'employer.Employe', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='soins_pris_en_charge', verbose_name="Infirmier responsable"
     )
     motif = models.CharField(max_length=500, blank=True, verbose_name="Motif")
@@ -124,7 +124,7 @@ class ProcedureSoin(models.Model):
         related_name='procedures_soins', verbose_name="Patient"
     )
     infirmier = models.ForeignKey(
-        'ressources_humaines.Employe', on_delete=models.SET_NULL, null=True, blank=True,
+        'employer.Employe', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='procedures_effectuees', verbose_name="Infirmier"
     )
     soin_type = models.ForeignKey(

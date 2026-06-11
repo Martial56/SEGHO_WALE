@@ -10,6 +10,7 @@ admin.site.index_title = "Tableau de bord"
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('core.urls')),
+    path('pharmacie/', include('pharmacie.urls')),
 ]
 
 if settings.DEBUG:

@@ -1,0 +1,283 @@
+{% extends 'employer/base.html' %}
+
+{% block topbar_title %}Congés{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+/* ── Subheader ── */
+.cg-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 13px 36px; flex-wrap: wrap;
+  position: sticky; top: 38px; z-index: 100;
+  background: #fff; border-bottom: 1px solid rgba(0,0,0,0.05);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+}
+html[data-theme="dark"] .cg-head { background: #0b1828; border-bottom-color: rgba(255,255,255,0.06); }
+
+.cg-title { font-size: 16px; font-weight: 800; color: var(--rh-900); display: flex; align-items: center; gap: 8px; }
+html[data-theme="dark"] .cg-title { color: var(--rh-200); }
+
+/* ── Filtres ── */
+.cg-filters {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.cg-filter-select {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--rh-surface); border: 1px solid var(--rh-border);
+  border-radius: 8px; padding: 5px 10px; font-size: 13px;
+}
+.cg-filter-select select {
+  border: none; background: transparent; color: var(--rh-text);
+  font-size: 13px; font-family: 'Sora', sans-serif; outline: none; cursor: pointer;
+}
+.cg-search {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--rh-surface); border: 1px solid var(--rh-border);
+  border-radius: 8px; padding: 5px 10px; font-size: 13px;
+}
+.cg-search input {
+  border: none; background: transparent; color: var(--rh-text);
+  font-size: 13px; font-family: 'Sora', sans-serif; outline: none; width: 160px;
+}
+.cg-search input::placeholder { color: var(--rh-muted); }
+
+/* ── Stats ── */
+.cg-stats {
+  display: flex; gap: 12px; flex-wrap: wrap;
+  padding: 16px 36px 0;
+}
+.cg-stat {
+  background: var(--rh-surface); border: 1px solid var(--rh-border);
+  border-radius: 10px; padding: 12px 20px;
+  display: flex; flex-direction: column; gap: 2px;
+  box-shadow: 0 1px 4px rgba(15,31,58,0.06);
+  min-width: 120px;
+}
+.cg-stat-val { font-size: 24px; font-weight: 800; color: var(--rh-700); }
+.cg-stat-lbl { font-size: 11px; color: var(--rh-muted); text-transform: uppercase; letter-spacing: 0.3px; }
+.cg-stat.en-cours .cg-stat-val { color: #2e63ac; }
+.cg-stat.a-venir  .cg-stat-val { color: #16a96b; }
+.cg-stat.demandes .cg-stat-val { color: #c97a00; }
+html[data-theme="dark"] .cg-stat { background: var(--rh-surface); border-color: var(--rh-border); }
+html[data-theme="dark"] .cg-stat-val { color: var(--rh-300); }
+
+/* ── Tableau ── */
+.cg-wrap { margin: 16px 36px 32px; box-shadow: 0 2px 12px rgba(15,31,58,0.07); border-radius: 10px; overflow: hidden; }
+.cg-table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--rh-surface); }
+.cg-table thead { background: var(--rh-600); color: #fff; }
+.cg-table thead th {
+  padding: 10px 14px; font-weight: 700; font-size: 11.5px;
+  text-transform: uppercase; letter-spacing: 0.3px; text-align: left;
+}
+.cg-table tbody tr { border-bottom: 1px solid var(--rh-border); transition: background .12s; }
+.cg-table tbody tr:hover { background: rgba(38,83,128,0.04); }
+.cg-table tbody td { padding: 10px 14px; color: var(--rh-text); vertical-align: middle; }
+html[data-theme="dark"] .cg-table thead { background: var(--rh-800); }
+html[data-theme="dark"] .cg-table tbody tr:hover { background: rgba(77,135,190,0.08); }
+html[data-theme="dark"] .cg-table tbody td { color: var(--rh-text); }
+
+.cg-emp-name { font-weight: 600; font-size: 13.5px; }
+.cg-emp-mat  { font-size: 11px; color: var(--rh-muted); font-family: monospace; }
+.cg-type     { font-size: 12px; }
+.cg-dates    { font-variant-numeric: tabular-nums; font-size: 12px; white-space: nowrap; }
+.cg-duree    { text-align: center; font-weight: 700; color: var(--rh-600); }
+
+/* Badges statut */
+.badge-cg {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.2px; white-space: nowrap;
+}
+.badge-cg::before { content:''; width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+.badge-cg.en_cours  { background:rgba(46,99,172,.12); color:#1a5fa0; border:1px solid rgba(46,99,172,.25); }
+.badge-cg.en_cours::before { background:#2e63ac; }
+.badge-cg.approuve  { background:rgba(22,169,107,.12); color:#0d6e43; border:1px solid rgba(22,169,107,.25); }
+.badge-cg.approuve::before { background:#16a96b; }
+.badge-cg.demande,
+.badge-cg.valide_service { background:rgba(201,122,0,.12); color:#7a4b00; border:1px solid rgba(201,122,0,.25); }
+.badge-cg.demande::before,
+.badge-cg.valide_service::before { background:#c97a00; }
+.badge-cg.refuse    { background:rgba(220,53,69,.1); color:#9b1c2a; border:1px solid rgba(220,53,69,.2); }
+.badge-cg.refuse::before { background:#dc3545; }
+.badge-cg.termine   { background:rgba(0,0,0,.06); color:rgba(0,0,0,.5); border:1px solid rgba(0,0,0,.1); }
+.badge-cg.termine::before { background:#999; }
+html[data-theme="dark"] .badge-cg.en_cours  { background:rgba(77,135,190,.15); color:#7dabd4; }
+html[data-theme="dark"] .badge-cg.approuve  { background:rgba(22,169,107,.15); color:#5dd4a0; }
+html[data-theme="dark"] .badge-cg.demande,
+html[data-theme="dark"] .badge-cg.valide_service { background:rgba(201,122,0,.15); color:#f0c060; }
+html[data-theme="dark"] .badge-cg.refuse    { background:rgba(220,53,69,.15); color:#e87070; }
+html[data-theme="dark"] .badge-cg.termine   { background:rgba(255,255,255,.06); color:rgba(255,255,255,.4); }
+
+/* ── Vide ── */
+.cg-empty { text-align: center; padding: 48px 24px; color: var(--rh-muted); }
+.cg-empty i { font-size: 40px; display: block; margin-bottom: 12px; opacity: .4; }
+
+/* ── Pagination ── */
+.cg-pagination { display:flex; justify-content:center; gap:6px; padding:16px 36px; flex-wrap:wrap; }
+.cg-page-link {
+  display:inline-flex; align-items:center; justify-content:center;
+  min-width:32px; height:32px; padding:0 8px; border-radius:6px;
+  font-size:13px; font-weight:600; text-decoration:none;
+  color:var(--rh-700); background:#fff; border:1px solid var(--rh-200); transition:all .15s;
+}
+.cg-page-link:hover { background:var(--rh-50); border-color:var(--rh-400); }
+.cg-page-link.active { background:var(--rh-600); color:#fff; border-color:var(--rh-600); }
+.cg-page-link.disabled { opacity:.35; pointer-events:none; }
+html[data-theme="dark"] .cg-page-link { background:var(--rh-surface); border-color:var(--rh-border); color:var(--rh-300); }
+html[data-theme="dark"] .cg-page-link.active { background:var(--rh-600); color:#fff; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="cg-head">
+  <div class="cg-title">
+    <i class="bi bi-calendar2-week-fill" style="color:var(--rh-600);"></i>
+    Gestion des congés
+  </div>
+  <div class="cg-filters">
+    <form method="get" style="display:contents;">
+      <!-- Recherche -->
+      <div class="cg-search">
+        <i class="bi bi-search" style="color:var(--rh-muted);font-size:13px;"></i>
+        <input type="text" name="q" value="{{ q }}" placeholder="Rechercher un employé…">
+      </div>
+      <!-- Statut -->
+      <div class="cg-filter-select">
+        <i class="bi bi-funnel" style="color:var(--rh-600);font-size:12px;"></i>
+        <select name="statut" onchange="this.form.submit()">
+          <option value="">Tous les statuts</option>
+          {% for val, lbl in statuts %}
+          <option value="{{ val }}" {% if f_statut == val %}selected{% endif %}>{{ lbl }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <!-- Type -->
+      <div class="cg-filter-select">
+        <select name="type" onchange="this.form.submit()">
+          <option value="">Tous les types</option>
+          {% for val, lbl in types %}
+          <option value="{{ val }}" {% if f_type == val %}selected{% endif %}>{{ lbl }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <!-- Année -->
+      <div class="cg-filter-select">
+        <select name="annee" onchange="this.form.submit()">
+          {% for a in annees %}
+          <option value="{{ a }}" {% if f_annee == a|stringformat:"s" %}selected{% endif %}>{{ a }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% if q %}<button type="submit" name="q" value="" class="btn-rh-sm">Effacer</button>{% endif %}
+    </form>
+    {% if can_manage %}
+    <a href="/admin/employer/conge/add/" class="btn-rh">
+      <i class="bi bi-plus-lg"></i> Nouveau congé
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Stats -->
+<div class="cg-stats">
+  <div class="cg-stat en-cours">
+    <span class="cg-stat-val">{{ stats.en_cours }}</span>
+    <span class="cg-stat-lbl">En cours</span>
+  </div>
+  <div class="cg-stat a-venir">
+    <span class="cg-stat-val">{{ stats.a_venir }}</span>
+    <span class="cg-stat-lbl">À venir</span>
+  </div>
+  <div class="cg-stat demandes">
+    <span class="cg-stat-val">{{ stats.demandes }}</span>
+    <span class="cg-stat-lbl">En attente</span>
+  </div>
+  <div class="cg-stat">
+    <span class="cg-stat-val">{{ stats.total }}</span>
+    <span class="cg-stat-lbl">Total {{ f_annee }}</span>
+  </div>
+</div>
+
+<!-- Tableau -->
+<div class="cg-wrap">
+  <table class="cg-table">
+    <thead>
+      <tr>
+        <th>Employé</th>
+        <th>Type de congé</th>
+        <th>Début</th>
+        <th>Fin</th>
+        <th style="text-align:center;">Jours</th>
+        <th>Statut</th>
+        {% if can_manage %}<th></th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for cg in page_obj %}
+      <tr>
+        <td>
+          <div class="cg-emp-name">{{ cg.employe.nom }} {{ cg.employe.prenoms }}</div>
+          <div class="cg-emp-mat">{{ cg.employe.matricule }}</div>
+        </td>
+        <td class="cg-type">{{ cg.get_type_conge_display }}</td>
+        <td class="cg-dates">{{ cg.date_debut|date:"d/m/Y" }}</td>
+        <td class="cg-dates">{{ cg.date_fin|date:"d/m/Y" }}</td>
+        <td class="cg-duree">{{ cg.nb_jours_ouvres }}j</td>
+        <td>
+          <span class="badge-cg {{ cg.statut }}">{{ cg.get_statut_display }}</span>
+        </td>
+        {% if can_manage %}
+        <td>
+          <a href="/admin/employer/conge/{{ cg.pk }}/change/" class="btn-rh-sm" title="Modifier">
+            <i class="bi bi-pencil-fill"></i>
+          </a>
+        </td>
+        {% endif %}
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="{% if can_manage %}7{% else %}6{% endif %}">
+          <div class="cg-empty">
+            <i class="bi bi-calendar-x"></i>
+            Aucun congé trouvé pour les critères sélectionnés
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if page_obj.has_other_pages %}
+<div class="cg-pagination">
+  {% if page_obj.has_previous %}
+    <a href="?statut={{ f_statut }}&type={{ f_type }}&annee={{ f_annee }}&q={{ q }}&page=1" class="cg-page-link"><i class="bi bi-chevron-double-left"></i></a>
+    <a href="?statut={{ f_statut }}&type={{ f_type }}&annee={{ f_annee }}&q={{ q }}&page={{ page_obj.previous_page_number }}" class="cg-page-link"><i class="bi bi-chevron-left"></i></a>
+  {% else %}
+    <span class="cg-page-link disabled"><i class="bi bi-chevron-double-left"></i></span>
+    <span class="cg-page-link disabled"><i class="bi bi-chevron-left"></i></span>
+  {% endif %}
+  {% for num in page_obj.paginator.page_range %}
+    {% if num == page_obj.number %}
+      <span class="cg-page-link active">{{ num }}</span>
+    {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
+      <a href="?statut={{ f_statut }}&type={{ f_type }}&annee={{ f_annee }}&q={{ q }}&page={{ num }}" class="cg-page-link">{{ num }}</a>
+    {% endif %}
+  {% endfor %}
+  {% if page_obj.has_next %}
+    <a href="?statut={{ f_statut }}&type={{ f_type }}&annee={{ f_annee }}&q={{ q }}&page={{ page_obj.next_page_number }}" class="cg-page-link"><i class="bi bi-chevron-right"></i></a>
+    <a href="?statut={{ f_statut }}&type={{ f_type }}&annee={{ f_annee }}&q={{ q }}&page={{ page_obj.paginator.num_pages }}" class="cg-page-link"><i class="bi bi-chevron-double-right"></i></a>
+  {% else %}
+    <span class="cg-page-link disabled"><i class="bi bi-chevron-right"></i></span>
+    <span class="cg-page-link disabled"><i class="bi bi-chevron-double-right"></i></span>
+  {% endif %}
+  <span style="font-size:12px;color:var(--rh-muted);margin-left:8px;">
+    Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+    &nbsp;·&nbsp; {{ page_obj.paginator.count }} congé{% if page_obj.paginator.count != 1 %}s{% endif %}
+  </span>
+</div>
+{% endif %}
+
+{% endblock %}

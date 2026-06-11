@@ -26,14 +26,6 @@ urlpatterns = [
     path('rendez-vous/', views.soins_rdv_list, name='rdv_list'),
     path('rendez-vous/<int:pk>/', views.soins_rdv_detail, name='rdv_detail'),
 
-    # Demandes d'examen
-    path('examens/', views.demande_examen_list, name='demande_examen_list'),
-    path('examens/nouveau/', views.demande_examen_create, name='demande_examen_create'),
-    path('examens/<int:pk>/', views.demande_examen_detail, name='demande_examen_detail'),
-    path('examens/<int:pk>/envoyer/', views.demande_examen_envoyer, name='demande_examen_envoyer'),
-    path('examens/<int:pk>/terminer/', views.demande_examen_terminer, name='demande_examen_terminer'),
-    path('examens/<int:pk>/annuler/', views.demande_examen_annuler, name='demande_examen_annuler'),
-
     # Actions sur un soin
     path('<int:pk>/enregistrer/', views.soins_creer_facture, name='creer_facture'),
     path('<int:pk>/administrer/', views.soins_administrer, name='administrer'),

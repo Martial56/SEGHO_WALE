@@ -1,0 +1,269 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block topbar_title %}Planning{% endblock %}
+
+{% block extra_css %}
+{% include 'soins/includes/layout_css.html' %}
+<style>
+.content { padding:0; overflow-x: clip; }
+.o-nav { padding-left: 36px; padding-right: 36px; }
+.o-nav-link { gap: 5px; }
+.o-nav-brand { gap: 6px; }
+/* override --primary → violet planning */
+:root { --primary: #5843be; }
+html[data-theme="dark"] { --primary: #8f7de0; }
+/* override background hover/active o-nav-link */
+.o-nav-link:hover, .o-nav-link.active { background: rgba(88,67,190,.06); }
+html[data-theme="dark"] .o-nav-link:hover,
+html[data-theme="dark"] .o-nav-link.active {
+  color: #b3a8ed; background: rgba(88,67,190,.12); border-bottom-color: var(--pl-400);
+}
+
+/* ══════════════════════════════════════════════
+   PALETTE VIOLET — module Planning
+══════════════════════════════════════════════ */
+:root {
+  --pl-900: #1a1140;
+  --pl-800: #261a5e;
+  --pl-700: #32247c;
+  --pl-600: #5843be;
+  --pl-500: #6e5acf;
+  --pl-400: #8f7de0;
+  --pl-300: #b3a8ed;
+  --pl-200: #d5d0f5;
+  --pl-100: #e8e5fb;
+  --pl-50:  #f4f2fd;
+
+  --surface: #fff;
+  --border:  rgba(88,67,190,0.14);
+  --text:    #1a1140;
+  --text-muted: rgba(0,0,0,0.45);
+  --bg:      #f4f2fd;
+}
+html[data-theme="dark"] {
+  --pl-50:   #261a5e; --pl-100: #32247c;
+  --surface: #100c2e; --border: rgba(143,125,224,0.18);
+  --text:    #d5d0f5; --text-muted: rgba(255,255,255,0.45);
+  --bg:      #0a0820;
+}
+
+/* ── Boutons communs ── */
+.btn-primary {
+  background: var(--pl-600); color: #fff; border: none; border-radius: 6px;
+  padding: 7px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+  text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+  transition: background 0.15s;
+}
+.btn-primary:hover { background: var(--pl-700); color: #fff; }
+
+.btn-outline {
+  border: 1px solid var(--pl-600); color: var(--pl-600); background: transparent;
+  border-radius: 6px; padding: 7px 14px; font-size: 13px; font-weight: 500;
+  text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+  transition: background 0.15s, color 0.15s; cursor: pointer;
+}
+.btn-outline:hover { background: var(--pl-600); color: #fff; }
+
+.btn-secondary {
+  border: 1px solid var(--border); color: var(--text); background: var(--surface);
+  border-radius: 6px; padding: 7px 14px; font-size: 13px; font-weight: 500;
+  text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+  transition: background 0.15s; cursor: pointer;
+}
+.btn-secondary:hover { background: var(--pl-50); color: var(--pl-700); }
+
+.btn-outline-sm {
+  border: 1px solid var(--pl-600); color: var(--pl-600); background: transparent;
+  border-radius: 5px; padding: 4px 10px; font-size: 12px; font-weight: 500;
+  text-decoration: none; display: inline-flex; align-items: center; gap: 4px;
+  transition: background 0.15s, color 0.15s;
+}
+.btn-outline-sm:hover { background: var(--pl-600); color: #fff; }
+
+.btn-danger-sm {
+  border: 1px solid #c0392b; color: #c0392b; background: transparent;
+  border-radius: 5px; padding: 4px 10px; font-size: 12px; font-weight: 500;
+  cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
+  transition: background 0.15s, color 0.15s;
+}
+.btn-danger-sm:hover { background: #c0392b; color: #fff; }
+
+/* ── Groupe droite : alertes + notifs ── */
+.pl-nav-right-group {
+  margin-left: auto; display: flex; align-items: center;
+}
+.pl-nav-alerte-wrap {
+  display: flex; align-items: center;
+  position: relative; padding: 0 4px;
+}
+.pl-alerte-btn {
+  background: none; border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  height: 38px; padding: 0 8px; position: relative;
+  color: #f9a825; font-size: 17px; transition: color 0.15s;
+}
+.pl-alerte-btn:hover { color: #e65100; }
+.pl-alerte-badge {
+  position: absolute; top: 6px; right: 3px;
+  background: #e65100; color: #fff; border-radius: 10px;
+  font-size: 10px; font-weight: 700; min-width: 16px; height: 16px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 3px; line-height: 1;
+}
+.pl-alerte-popup {
+  display: none; position: absolute; top: calc(100% + 4px); right: 0;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 9px; box-shadow: 0 8px 28px rgba(0,0,0,0.14);
+  min-width: 290px; z-index: 600; overflow: hidden;
+}
+.pl-alerte-popup.open { display: block; }
+.pl-alerte-popup-head {
+  padding: 10px 14px 8px; font-size: 11px; font-weight: 700;
+  color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 7px;
+}
+.pl-alerte-popup-head i { color: #f9a825; font-size: 13px; }
+.pl-alerte-popup-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; font-size: 12.5px; color: var(--text);
+  border-bottom: 1px solid var(--border);
+}
+.pl-alerte-popup-item:last-child { border-bottom: none; }
+.pl-alerte-popup-item i { color: #f9a825; flex-shrink: 0; font-size: 14px; }
+.pl-alerte-popup-item span { flex: 1; line-height: 1.35; }
+.pl-alerte-popup-item a {
+  color: var(--pl-600); font-size: 11.5px; font-weight: 600;
+  text-decoration: none; padding: 3px 9px; border-radius: 4px;
+  border: 1px solid var(--pl-300); white-space: nowrap;
+  transition: background 0.12s;
+}
+.pl-alerte-popup-item a:hover { background: var(--pl-50); }
+html[data-theme="dark"] .pl-alerte-btn { color: #ffd180; }
+html[data-theme="dark"] .pl-alerte-btn:hover { color: #ffab40; }
+
+/* ── Badge notifications ── */
+.pl-notif-btn {
+  background: none; border: none; cursor: pointer; text-decoration: none;
+  display: flex; align-items: center; justify-content: center;
+  height: 38px; padding: 0 8px; position: relative;
+  color: var(--pl-600); font-size: 17px; transition: color 0.15s;
+}
+.pl-notif-btn:hover { color: var(--pl-800); }
+.pl-notif-badge {
+  position: absolute; top: 6px; right: 3px;
+  background: var(--pl-600); color: #fff; border-radius: 10px;
+  font-size: 10px; font-weight: 700; min-width: 16px; height: 16px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 3px; line-height: 1;
+}
+html[data-theme="dark"] .pl-notif-btn { color: var(--pl-300); }
+
+/* ── Mobile ── */
+@media (max-width: 768px) {
+  .main { height: auto !important; overflow: visible !important; }
+  .content { overflow-x: visible; padding: 0 8px !important; }
+  .o-nav { padding: 0 8px; overflow-x: auto; flex-wrap: nowrap; }
+  .pl-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .stats-cards { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+  .monthly-chart { gap: 6px; }
+  .monthly-bar-col { min-width: 32px; }
+}
+
+{% block extra_planning_css %}{% endblock %}
+</style>
+{% endblock %}
+
+{% block module_navbar %}
+<nav class="o-nav">
+  <a href="{% url 'dashboard' %}" class="o-nav-grid" title="Accueil">
+    <i class="bi bi-grid-3x3-gap-fill"></i>
+  </a>
+  <span class="o-nav-brand">
+    <i class="bi bi-calendar3-week-fill"></i>
+    Planning
+  </span>
+  <a href="{% url 'planning_courant' %}"
+     class="o-nav-link {% block nav_courant %}{% endblock %}">
+    <i class="bi bi-speedometer2"></i> Tableau de bord
+  </a>
+  <a href="{% url 'planning_list' %}"
+     class="o-nav-link {% block nav_list %}{% endblock %}">
+    <i class="bi bi-list-ul"></i> Liste
+  </a>
+  <a href="{% url 'planning_mensuel' %}"
+     class="o-nav-link {% block nav_mensuel %}{% endblock %}">
+    <i class="bi bi-calendar3"></i> Mensuel
+  </a>
+  <a href="{% url 'planning_par_medecin' %}"
+     class="o-nav-link {% block nav_medecin %}{% endblock %}">
+    <i class="bi bi-person-lines-fill"></i> Par médecin
+  </a>
+  <a href="{% url 'planning_stats' %}"
+     class="o-nav-link {% block nav_stats %}{% endblock %}">
+    <i class="bi bi-bar-chart-line"></i> Statistiques
+  </a>
+  {% if pl_can_manage %}
+  <a href="{% url 'planning_bureaux' %}"
+     class="o-nav-link {% block nav_bureaux %}{% endblock %}">
+    <i class="bi bi-building"></i> Bureaux
+  </a>
+  <a href="{% url 'planning_nouveau' %}"
+     class="o-nav-link {% block nav_nouveau %}{% endblock %}">
+    <i class="bi bi-plus-lg"></i> Nouveau
+  </a>
+  {% endif %}
+
+  <div class="pl-nav-right-group">
+    {% if pl_notifs_count %}
+    <a href="{% url 'planning_list' %}" class="pl-notif-btn"
+       title="{{ pl_notifs_count }} planning{% if pl_notifs_count > 1 %}s publiés{% else %} publié{% endif %} non consulté{% if pl_notifs_count > 1 %}s{% endif %}">
+      <i class="bi bi-bell-fill"></i>
+      <span class="pl-notif-badge">{{ pl_notifs_count }}</span>
+    </a>
+    {% endif %}
+    {% if planning_alertes %}
+    <div class="pl-nav-alerte-wrap">
+      <button type="button" class="pl-alerte-btn" id="planningAlerteBtn"
+              title="{{ planning_alertes|length }} semaine{% if planning_alertes|length > 1 %}s{% endif %} sans planning publié">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        <span class="pl-alerte-badge">{{ planning_alertes|length }}</span>
+      </button>
+      <div class="pl-alerte-popup" id="planningAlertePopup">
+        <div class="pl-alerte-popup-head">
+          <i class="bi bi-exclamation-triangle-fill"></i>
+          Semaines sans planning publié
+        </div>
+        {% for a in planning_alertes %}
+        <div class="pl-alerte-popup-item">
+          <i class="bi bi-calendar-x"></i>
+          <span>{{ a.label }}</span>
+          {% if pl_can_manage %}
+          <a href="{% url 'planning_nouveau' %}">Créer</a>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</nav>
+<script>
+(function() {
+  var btn   = document.getElementById('planningAlerteBtn');
+  var popup = document.getElementById('planningAlertePopup');
+  if (!btn || !popup) return;
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    popup.classList.toggle('open');
+  });
+  document.addEventListener('click', function(e) {
+    if (!popup.contains(e.target) && e.target !== btn) {
+      popup.classList.remove('open');
+    }
+  });
+})();
+</script>
+{% endblock %}
+
+{% block breadcrumb %}{% endblock %}

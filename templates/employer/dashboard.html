@@ -1,0 +1,678 @@
+﻿{% extends 'employer/base.html' %}
+{% load i18n %}
+
+{% block topbar_title %}Tableau de bord RH{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+/* ── Subheader ── */
+.rh-subheader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 36px;
+  
+  flex-wrap: wrap;
+  position: sticky;
+  top: 38px;
+  z-index: 100;
+  background: #f0f6fa;
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+html[data-theme="dark"] .rh-subheader {
+  background: #071e28;
+  border-bottom-color: rgba(255,255,255,0.05);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+@media (max-width: 1024px) {
+  .rh-subheader { margin: 0 -20px; padding-left: 20px; padding-right: 20px; }
+}
+.rh-subheader h1 {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--rh-900);
+  letter-spacing: -0.3px;
+}
+html[data-theme="dark"] .rh-subheader h1 { color: var(--rh-text); }
+
+/* ── Stat cards ── */
+.rh-stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-top: 28px;
+  margin-bottom: 24px;
+}
+@media (max-width: 900px)  { .rh-stats-row { grid-template-columns: repeat(2,1fr); } }
+@media (max-width: 500px)  { .rh-stats-row { grid-template-columns: 1fr; } }
+
+.rh-stat-card {
+  background: var(--rh-surface);
+  border-radius: 11px;
+  padding: 18px 20px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border-left: 4px solid transparent;
+  transition: box-shadow 0.18s, transform 0.15s;
+}
+.rh-stat-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.rh-stat-card.total   { border-left-color: var(--rh-500); }
+.rh-stat-card.actif   { border-left-color: var(--green); }
+.rh-stat-card.suspendu{ border-left-color: var(--amber); }
+.rh-stat-card.quitte  { border-left-color: #aaa; }
+
+.rh-stat-icon {
+  width: 44px; height: 44px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.rh-stat-card.total   .rh-stat-icon { background: var(--rh-50); color: var(--rh-600); }
+.rh-stat-card.actif   .rh-stat-icon { background: rgba(22,169,107,0.1); color: #0d7a4c; }
+.rh-stat-card.suspendu .rh-stat-icon{ background: rgba(232,154,26,0.1); color: #8a5c00; }
+.rh-stat-card.quitte  .rh-stat-icon { background: rgba(0,0,0,0.05); color: #777; }
+html[data-theme="dark"] .rh-stat-card.total   .rh-stat-icon { background: rgba(38,83,128,0.2); color: var(--rh-300); }
+html[data-theme="dark"] .rh-stat-card.actif   .rh-stat-icon { background: rgba(22,169,107,0.15); color: #6eddb0; }
+html[data-theme="dark"] .rh-stat-card.suspendu .rh-stat-icon{ background: rgba(232,154,26,0.15); color: #f0c060; }
+html[data-theme="dark"] .rh-stat-card.quitte  .rh-stat-icon { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.35); }
+
+.rh-stat-info { flex: 1; min-width: 0; }
+.rh-stat-val {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+}
+.rh-stat-card.total   .rh-stat-val { color: var(--rh-600); }
+.rh-stat-card.actif   .rh-stat-val { color: #0d7a4c; }
+.rh-stat-card.suspendu .rh-stat-val{ color: #8a5c00; }
+.rh-stat-card.quitte  .rh-stat-val { color: #777; }
+html[data-theme="dark"] .rh-stat-card.actif   .rh-stat-val { color: #6eddb0; }
+html[data-theme="dark"] .rh-stat-card.suspendu .rh-stat-val{ color: #f0c060; }
+html[data-theme="dark"] .rh-stat-card.quitte  .rh-stat-val { color: rgba(255,255,255,0.35); }
+
+.rh-stat-lbl {
+  font-size: 11.5px;
+  color: rgba(0,0,0,0.45);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  font-weight: 600;
+  margin-top: 4px;
+}
+html[data-theme="dark"] .rh-stat-lbl { color: rgba(255,255,255,0.35); }
+
+/* ── Two-column grid ── */
+.rh-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+@media (max-width: 860px) { .rh-2col { grid-template-columns: 1fr; } }
+
+/* ── Horizontal bar charts ── */
+.rh-bar-list { display: flex; flex-direction: column; gap: 10px; }
+.rh-bar-item { display: flex; align-items: center; gap: 10px; }
+.rh-bar-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--rh-text);
+  width: 130px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+html[data-theme="dark"] .rh-bar-label { color: var(--rh-text); }
+.rh-bar-track {
+  flex: 1;
+  background: var(--rh-100);
+  border-radius: 20px;
+  height: 10px;
+  overflow: hidden;
+}
+html[data-theme="dark"] .rh-bar-track { background: rgba(38,83,128,0.18); }
+.rh-bar-fill {
+  height: 100%;
+  border-radius: 20px;
+  background: linear-gradient(90deg, var(--rh-500), var(--rh-400));
+  transition: width 0.6s ease;
+  min-width: 4px;
+}
+.rh-bar-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--rh-700);
+  width: 28px;
+  text-align: right;
+  flex-shrink: 0;
+}
+html[data-theme="dark"] .rh-bar-count { color: var(--rh-300); }
+
+/* ── Contracts table ── */
+.rh-exp-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.rh-exp-table thead { background: var(--rh-50); }
+html[data-theme="dark"] .rh-exp-table thead { background: rgba(38,83,128,0.1); }
+.rh-exp-table th {
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--rh-800);
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  border-bottom: 2px solid var(--rh-100);
+}
+html[data-theme="dark"] .rh-exp-table th { color: var(--rh-300); border-bottom-color: var(--rh-border); }
+.rh-exp-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+  font-size: 13px;
+  color: var(--rh-text);
+  vertical-align: middle;
+}
+html[data-theme="dark"] .rh-exp-table td { border-bottom-color: rgba(255,255,255,0.04); color: var(--rh-text); }
+.rh-exp-table tbody tr:hover { background: rgba(38,83,128,0.03); }
+html[data-theme="dark"] .rh-exp-table tbody tr:hover { background: rgba(38,83,128,0.07); }
+.rh-exp-table tbody tr:last-child td { border-bottom: none; }
+
+/* ── Days remaining badges ── */
+.badge-days {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.badge-days-red    { background: rgba(232,69,69,0.12);   color: #c0392b; border: 1px solid rgba(232,69,69,0.2); }
+.badge-days-orange { background: rgba(232,154,26,0.12);  color: #8a5c00; border: 1px solid rgba(232,154,26,0.2); }
+.badge-days-yellow { background: rgba(232,210,26,0.15);  color: #6b5a00; border: 1px solid rgba(232,210,26,0.25); }
+html[data-theme="dark"] .badge-days-red    { background: rgba(232,69,69,0.18);  color: #f09090; border-color: rgba(232,69,69,0.3); }
+html[data-theme="dark"] .badge-days-orange { background: rgba(232,154,26,0.18); color: #f0c060; border-color: rgba(232,154,26,0.3); }
+html[data-theme="dark"] .badge-days-yellow { background: rgba(232,210,26,0.18); color: #f0dd80; border-color: rgba(232,210,26,0.3); }
+
+/* ── Vertical bar chart (pyramide) ── */
+.rh-pyramid {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+  height: 120px;
+  padding: 0 4px;
+}
+.rh-pyramid-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 1;
+  height: 100%;
+  gap: 5px;
+}
+.rh-pyramid-bar-wrap {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.rh-pyramid-bar {
+  width: 70%;
+  border-radius: 6px 6px 0 0;
+  background: linear-gradient(180deg, var(--rh-400), var(--rh-600));
+  min-height: 4px;
+  transition: height 0.6s ease;
+}
+.rh-pyramid-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--rh-700);
+}
+html[data-theme="dark"] .rh-pyramid-count { color: var(--rh-300); }
+.rh-pyramid-label {
+  font-size: 10.5px;
+  color: var(--rh-muted);
+  text-align: center;
+  line-height: 1.2;
+  white-space: nowrap;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Documents manquants ── */
+.rh-docs-missing-list { display: flex; flex-direction: column; gap: 10px; }
+.rh-docs-missing-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 13px;
+  background: var(--rh-50);
+  border: 1px solid var(--rh-100);
+  border-radius: 8px;
+  text-decoration: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+.rh-docs-missing-item:hover { border-color: var(--rh-300); background: var(--rh-100); }
+html[data-theme="dark"] .rh-docs-missing-item { background: rgba(38,83,128,0.08); border-color: var(--rh-border); }
+html[data-theme="dark"] .rh-docs-missing-item:hover { background: rgba(38,83,128,0.14); border-color: var(--rh-400); }
+.rh-docs-missing-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--rh-text);
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rh-doc-badge {
+  display: inline-flex; align-items: center;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+  background: rgba(232,69,69,0.1);
+  color: #c0392b;
+  border: 1px solid rgba(232,69,69,0.2);
+  white-space: nowrap;
+}
+html[data-theme="dark"] .rh-doc-badge { background: rgba(232,69,69,0.15); color: #f09090; border-color: rgba(232,69,69,0.25); }
+
+/* ── Empty state ── */
+.rh-empty-inline {
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--rh-muted);
+}
+.rh-empty-inline i { font-size: 32px; color: var(--rh-200); display: block; margin-bottom: 8px; }
+.rh-empty-inline p { font-size: 13.5px; font-weight: 500; color: rgba(0,0,0,0.35); }
+html[data-theme="dark"] .rh-empty-inline i { color: rgba(38,83,128,0.25); }
+html[data-theme="dark"] .rh-empty-inline p { color: rgba(255,255,255,0.25); }
+
+/* ── Success message ── */
+.rh-all-good {
+  display: flex; align-items: center; gap: 9px;
+  padding: 12px 16px;
+  background: rgba(22,169,107,0.08);
+  border: 1px solid rgba(22,169,107,0.2);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0d6e45;
+}
+html[data-theme="dark"] .rh-all-good { background: rgba(22,169,107,0.12); border-color: rgba(22,169,107,0.25); color: #6eddb0; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Subheader -->
+<div class="rh-subheader">
+  <h1><i class="bi bi-bar-chart-fill" style="color:var(--rh-500); font-size:20px; margin-right:6px;"></i>Tableau de bord RH</h1>
+</div>
+
+<!-- ── 1. Stat cards ── -->
+<div class="rh-stats-row">
+  <div class="rh-stat-card total">
+    <div class="rh-stat-icon"><i class="bi bi-people-fill"></i></div>
+    <div class="rh-stat-info">
+      <div class="rh-stat-val">{{ total }}</div>
+      <div class="rh-stat-lbl">Total employés</div>
+    </div>
+  </div>
+  <div class="rh-stat-card actif">
+    <div class="rh-stat-icon"><i class="bi bi-person-check-fill"></i></div>
+    <div class="rh-stat-info">
+      <div class="rh-stat-val">{{ actifs }}</div>
+      <div class="rh-stat-lbl">Actifs</div>
+    </div>
+  </div>
+  <div class="rh-stat-card suspendu">
+    <div class="rh-stat-icon"><i class="bi bi-pause-circle-fill"></i></div>
+    <div class="rh-stat-info">
+      <div class="rh-stat-val">{{ suspendus }}</div>
+      <div class="rh-stat-lbl">Suspendus</div>
+    </div>
+  </div>
+  <div class="rh-stat-card quitte">
+    <div class="rh-stat-icon"><i class="bi bi-person-dash-fill"></i></div>
+    <div class="rh-stat-info">
+      <div class="rh-stat-val">{{ quittes }}</div>
+      <div class="rh-stat-lbl">Quittés</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── 2. Répartition par contrat et service ── -->
+<div class="rh-2col">
+
+  <!-- Par type de contrat -->
+  <div class="rh-card">
+    <div class="rh-card-header">
+      <div class="rh-card-title">
+        <i class="bi bi-file-earmark-text" style="color:var(--rh-500);"></i>
+        Répartition par type de contrat
+      </div>
+    </div>
+    <div class="rh-card-body">
+      {% if par_contrat %}
+        {% with max_n=par_contrat.0.n %}
+        <div class="rh-bar-list">
+          {% for item in par_contrat %}
+          <div class="rh-bar-item">
+            <span class="rh-bar-label" title="{{ item.type_contrat__nom }}">{{ item.type_contrat__nom|default:"—" }}</span>
+            <div class="rh-bar-track">
+              <div class="rh-bar-fill" style="width:{% widthratio item.n max_n 100 %}%;"></div>
+            </div>
+            <span class="rh-bar-count">{{ item.n }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endwith %}
+      {% else %}
+        <div class="rh-empty-inline">
+          <i class="bi bi-file-earmark"></i>
+          <p>Aucune donnée disponible</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Par service -->
+  <div class="rh-card">
+    <div class="rh-card-header">
+      <div class="rh-card-title">
+        <i class="bi bi-building" style="color:var(--rh-500);"></i>
+        Répartition par service
+      </div>
+    </div>
+    <div class="rh-card-body">
+      {% if par_service %}
+        {% with max_n=par_service.0.n %}
+        <div class="rh-bar-list">
+          {% for item in par_service %}
+          <div class="rh-bar-item">
+            <span class="rh-bar-label" title="{{ item.service__nom }}">{{ item.service__nom|default:"Sans service" }}</span>
+            <div class="rh-bar-track">
+              <div class="rh-bar-fill" style="width:{% widthratio item.n max_n 100 %}%;"></div>
+            </div>
+            <span class="rh-bar-count">{{ item.n }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endwith %}
+      {% else %}
+        <div class="rh-empty-inline">
+          <i class="bi bi-building"></i>
+          <p>Aucune donnée disponible</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<!-- ── 3. Contrats expirant dans 90 jours ── -->
+<div class="rh-card">
+  <div class="rh-card-header">
+    <div class="rh-card-title">
+      <i class="bi bi-clock-history" style="color:var(--rh-500);"></i>
+      Contrats expirant dans les 90 jours
+    </div>
+    {% if fin_90j %}
+    <span style="font-size:12px; color:var(--rh-muted);">{{ fin_90j|length }} contrat{% if fin_90j|length != 1 %}s{% endif %}</span>
+    {% endif %}
+  </div>
+  <div class="rh-card-body" style="padding: 0;">
+    {% if fin_90j %}
+    <div style="overflow-x: auto;">
+      <table class="rh-exp-table">
+        <thead>
+          <tr>
+            <th>Employé</th>
+            <th>Matricule</th>
+            <th>Service</th>
+            <th>Type contrat</th>
+            <th>Date fin</th>
+            <th>Jours restants</th>
+            <th style="text-align:right;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for emp in fin_90j %}
+          <tr>
+            <td style="font-weight:600;">{{ emp.nom_complet }}</td>
+            <td style="font-family:monospace; font-size:12px; color:var(--rh-600);">{{ emp.matricule }}</td>
+            <td style="color:var(--rh-muted); font-size:13px;">{{ emp.service.nom|default:"—" }}</td>
+            <td style="font-size:13px;">{{ emp.type_contrat.nom|default:"—" }}</td>
+            <td style="font-size:13px;">{{ emp.date_fin_contrat|date:"d/m/Y" }}</td>
+            <td>
+              <span class="badge-days" data-fin="{{ emp.date_fin_contrat|date:'Y-m-d' }}">
+                <i class="bi bi-hourglass-split"></i>
+                <span class="days-val">—</span>
+              </span>
+            </td>
+            <td style="text-align:right;">
+              <a href="{% url 'rh_detail' emp.pk %}" class="btn-rh-sm">
+                <i class="bi bi-eye"></i> Voir
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="rh-empty-inline">
+      <i class="bi bi-calendar-check"></i>
+      <p>Aucun contrat à expirer dans les 90 prochains jours</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ── 3b. Mouvement du personnel (turnover) ── -->
+<div class="rh-2col" style="margin-bottom:20px;">
+  <div class="rh-card">
+    <div class="rh-card-header">
+      <div class="rh-card-title">
+        <i class="bi bi-arrow-left-right" style="color:var(--rh-500);"></i>
+        Mouvement du personnel — {{ annee }}
+      </div>
+    </div>
+    <div class="rh-card-body" style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;">
+      <!-- Entrées -->
+      <div style="flex:1;min-width:110px;text-align:center;padding:10px;background:rgba(22,169,107,.07);border-radius:10px;border:1px solid rgba(22,169,107,.15);">
+        <div style="font-size:32px;font-weight:800;color:#16a96b;line-height:1;">{{ entrees_annee }}</div>
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:rgba(0,0,0,.45);margin-top:4px;font-weight:700;">Embauches</div>
+      </div>
+      <!-- Départs -->
+      <div style="flex:1;min-width:110px;text-align:center;padding:10px;background:rgba(232,69,69,.07);border-radius:10px;border:1px solid rgba(232,69,69,.12);">
+        <div style="font-size:32px;font-weight:800;color:#e84545;line-height:1;">{{ departs_annee }}</div>
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:rgba(0,0,0,.45);margin-top:4px;font-weight:700;">Départs</div>
+      </div>
+      <!-- Taux de turnover -->
+      <div style="flex:1;min-width:110px;text-align:center;padding:10px;background:var(--rh-50);border-radius:10px;border:1px solid var(--rh-100);">
+        <div style="font-size:28px;font-weight:800;color:var(--rh-600);line-height:1;">{{ taux_turnover }}%</div>
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:rgba(0,0,0,.45);margin-top:4px;font-weight:700;">Taux turnover</div>
+      </div>
+      <!-- Ancienneté moyenne -->
+      {% if anciennete_moy is not None %}
+      <div style="flex:1;min-width:110px;text-align:center;padding:10px;background:rgba(45,153,219,.07);border-radius:10px;border:1px solid rgba(45,153,219,.12);">
+        <div style="font-size:28px;font-weight:800;color:#2d99db;line-height:1;">{{ anciennete_moy }}<span style="font-size:14px;">an{{ anciennete_moy|floatformat:0|length|pluralize:"s" }}</span></div>
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:rgba(0,0,0,.45);margin-top:4px;font-weight:700;">Ancienneté moy.</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Congés en cours (bonus utile) -->
+  <div class="rh-card">
+    <div class="rh-card-header">
+      <div class="rh-card-title">
+        <i class="bi bi-calendar-week" style="color:var(--rh-500);"></i>
+        Congés du jour
+      </div>
+    </div>
+    <div class="rh-card-body" style="padding:14px 20px;">
+      {% load static %}
+      <div style="font-size:13px;color:var(--rh-muted);">
+        <a href="{% url 'ressources_humaines_list' %}" style="color:var(--rh-600);font-weight:600;text-decoration:none;">
+          <i class="bi bi-box-arrow-up-right" style="font-size:11px;"></i> Aller au module Congés
+        </a>
+        pour voir les absences du jour, les soldes et le planning équipe.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── 4. Pyramide des âges + Documents manquants ── -->
+<div class="rh-2col">
+
+  <!-- Pyramide des âges -->
+  <div class="rh-card">
+    <div class="rh-card-header">
+      <div class="rh-card-title">
+        <i class="bi bi-bar-chart-steps" style="color:var(--rh-500);"></i>
+        Pyramide des âges
+      </div>
+    </div>
+    <div class="rh-card-body">
+      {% if pyramide %}
+        {% with pmax=pyramide.0.n %}
+        {% comment %}Find the actual max by iterating — we'll do it client-side via the bars{% endcomment %}
+        <div class="rh-pyramid" id="pyramid-chart">
+          {% for bracket in pyramide %}
+          <div class="rh-pyramid-col">
+            <div class="rh-pyramid-count">{{ bracket.n }}</div>
+            <div class="rh-pyramid-bar-wrap">
+              <div class="rh-pyramid-bar"
+                   data-n="{{ bracket.n }}"
+                   style="height: 4px;"></div>
+            </div>
+            <div class="rh-pyramid-label">{{ bracket.label }}</div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endwith %}
+      {% else %}
+        <div class="rh-empty-inline">
+          <i class="bi bi-bar-chart"></i>
+          <p>Aucune donnée disponible</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Documents manquants -->
+  <div class="rh-card">
+    <div class="rh-card-header">
+      <div class="rh-card-title">
+        <i class="bi bi-folder-x" style="color:var(--rh-500);"></i>
+        Documents manquants
+      </div>
+      {% if employes_docs_manquants %}
+      <span style="font-size:12px; color:var(--rh-muted);">{{ employes_docs_manquants|length }} employé{% if employes_docs_manquants|length != 1 %}s{% endif %}</span>
+      {% endif %}
+    </div>
+    <div class="rh-card-body">
+      {% if employes_docs_manquants %}
+        <div class="rh-docs-missing-list">
+          {% for emp in employes_docs_manquants %}
+          <a href="{% url 'rh_detail' emp.pk %}" class="rh-docs-missing-item">
+            <i class="bi bi-person-fill" style="color:var(--rh-400); font-size:16px; flex-shrink:0;"></i>
+            <span class="rh-docs-missing-name">{{ emp.nom_complet }}</span>
+            <div style="display:flex; gap:5px; flex-wrap:wrap; justify-content:flex-end;">
+              {% for doc in emp.docs_manquants %}
+                {% if doc == 'cni' %}
+                  <span class="rh-doc-badge"><i class="bi bi-credit-card" style="font-size:9px;"></i>&nbsp;CNI</span>
+                {% elif doc == 'contrat' %}
+                  <span class="rh-doc-badge"><i class="bi bi-file-earmark-text" style="font-size:9px;"></i>&nbsp;Contrat</span>
+                {% elif doc == 'diplome' %}
+                  <span class="rh-doc-badge"><i class="bi bi-award" style="font-size:9px;"></i>&nbsp;Diplôme</span>
+                {% else %}
+                  <span class="rh-doc-badge">{{ doc }}</span>
+                {% endif %}
+              {% endfor %}
+            </div>
+            <i class="bi bi-chevron-right" style="color:var(--rh-300); font-size:12px; flex-shrink:0;"></i>
+          </a>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="rh-all-good">
+          <i class="bi bi-patch-check-fill" style="font-size:20px;"></i>
+          Tous les documents sont complets
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  /* ── Jours restants ── */
+  var today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  document.querySelectorAll('.badge-days[data-fin]').forEach(function (badge) {
+    var finStr = badge.getAttribute('data-fin');
+    if (!finStr) return;
+    var parts = finStr.split('-');
+    var fin = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    fin.setHours(0, 0, 0, 0);
+    var diff = Math.round((fin - today) / 86400000);
+    var span = badge.querySelector('.days-val');
+    if (!span) return;
+
+    if (diff <= 0) {
+      span.textContent = 'Expiré';
+      badge.classList.add('badge-days-red');
+    } else {
+      span.textContent = diff + ' j';
+      if (diff <= 30) {
+        badge.classList.add('badge-days-red');
+      } else if (diff <= 60) {
+        badge.classList.add('badge-days-orange');
+      } else {
+        badge.classList.add('badge-days-yellow');
+      }
+    }
+  });
+
+  /* ── Pyramide des âges : scale bars to fill 100% of track height ── */
+  var chart = document.getElementById('pyramid-chart');
+  if (chart) {
+    var bars = chart.querySelectorAll('.rh-pyramid-bar[data-n]');
+    var maxN = 0;
+    bars.forEach(function (b) { maxN = Math.max(maxN, parseInt(b.getAttribute('data-n')) || 0); });
+    if (maxN > 0) {
+      bars.forEach(function (b) {
+        var n = parseInt(b.getAttribute('data-n')) || 0;
+        var pct = Math.max(4, Math.round((n / maxN) * 100));
+        b.style.height = pct + '%';
+      });
+    }
+  }
+})();
+</script>
+{% endblock %}

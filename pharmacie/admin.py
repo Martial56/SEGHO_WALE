@@ -31,6 +31,14 @@ class MedicamentAdmin(admin.ModelAdmin):
     stock_status.short_description = "Statut stock"
 
 
+@admin.register(LotMedicament)
+class LotMedicamentAdmin(admin.ModelAdmin):
+    list_display = ['medicament', 'numero_lot', 'quantite_actuelle', 'quantite_initiale', 'date_peremption', 'fournisseur', 'date_reception']
+    list_filter = ['fournisseur', 'date_peremption']
+    search_fields = ['numero_lot', 'medicament__designation']
+    date_hierarchy = 'date_peremption'
+
+
 @admin.register(MouvementStock)
 class MouvementStockAdmin(admin.ModelAdmin):
     list_display = ['medicament', 'type_mouvement', 'motif', 'quantite', 'stock_avant', 'stock_apres', 'date_mouvement']

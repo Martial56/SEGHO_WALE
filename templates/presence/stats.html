@@ -1,0 +1,150 @@
+{% extends 'presence/base.html' %}
+{% block topbar_title %}Statistiques de présence{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+.bar-track  { flex:1; background:var(--pr-100); border-radius:20px; overflow:hidden; }
+.bar-track.h12 { height:12px; }
+.bar-track.h8  { height:8px; min-width:80px; }
+.bar-fill   { height:100%; border-radius:20px; transition:width .5s; }
+.bar-fill.good { background: var(--pr-500); }
+.bar-fill.warn { background: #e89a1a; }
+.bar-fill.bad  { background: #e84545; }
+.pr-pagination { display:flex;justify-content:center;align-items:center;gap:6px;padding:16px 0;flex-wrap:wrap; }
+.pr-page-link { display:inline-flex;align-items:center;justify-content:center;min-width:32px;height:32px;padding:0 8px;border-radius:6px;font-size:13px;font-weight:600;text-decoration:none;color:var(--pr-700);background:#fff;border:1px solid var(--pr-200);transition:all .15s; }
+.pr-page-link:hover { background:var(--pr-50); }
+.pr-page-link.active { background:var(--pr-600);color:#fff;border-color:var(--pr-600); }
+.pr-page-link.disabled { opacity:.35;pointer-events:none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pr-subheader">
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+    <a href="?year={{ prev_year }}&month={{ prev_month }}{% if service_sel %}&service={{ service_sel.pk }}{% endif %}" class="btn-pr-outline" style="padding:6px 11px;"><i class="bi bi-chevron-left"></i></a>
+    <span style="font-size:15px;font-weight:700;color:var(--pr-900);min-width:140px;text-align:center;">{{ mois_fr }} {{ year }}</span>
+    <a href="?year={{ next_year }}&month={{ next_month }}{% if service_sel %}&service={{ service_sel.pk }}{% endif %}" class="btn-pr-outline" style="padding:6px 11px;"><i class="bi bi-chevron-right"></i></a>
+    <select class="pr-input" style="width:180px;"
+            onchange="window.location='?year={{ year }}&month={{ month }}&service='+this.value">
+      <option value="">Tous les services</option>
+      {% for svc in services %}
+      <option value="{{ svc.pk }}" {% if service_sel and service_sel.pk == svc.pk %}selected{% endif %}>{{ svc.nom }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div style="font-size:12px;color:var(--pr-muted);">{{ jouvres }} jours ouvrés</div>
+</div>
+
+<!-- Stats par service -->
+{% if stats_svc %}
+<div class="pr-card" style="margin-top:24px;">
+  <div class="pr-card-header">
+    <div class="pr-card-title"><i class="bi bi-building"></i> Taux de présence par service</div>
+  </div>
+  <div class="pr-card-body">
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      {% for s in stats_svc %}
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:160px;font-size:12.5px;font-weight:600;color:var(--pr-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="{{ s.service.nom }}">{{ s.service.nom }}</div>
+        <div class="bar-track h12">
+          <div class="bar-fill {% if s.taux >= 80 %}good{% elif s.taux >= 60 %}warn{% else %}bad{% endif %}"
+               data-w="{{ s.taux }}"></div>
+        </div>
+        <div style="font-size:13px;font-weight:700;color:var(--pr-700);width:44px;text-align:right;">{{ s.taux }}%</div>
+        <div style="font-size:11.5px;color:var(--pr-muted);width:60px;">{{ s.nb_emps }} emp.</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Stats par employé -->
+<div class="pr-card">
+  <div class="pr-card-header">
+    <div class="pr-card-title"><i class="bi bi-people"></i> Détail par employé — {{ mois_fr }} {{ year }}</div>
+    <span style="font-size:12px;color:var(--pr-muted);">{{ page_obj.paginator.count }} employé{{ page_obj.paginator.count|pluralize }}</span>
+  </div>
+  <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead>
+        <tr style="background:var(--pr-100);">
+          <th style="padding:10px 16px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--pr-800);border-bottom:2px solid var(--pr-200);">Employé</th>
+          <th style="padding:10px 12px;text-align:center;border-bottom:2px solid var(--pr-200);font-size:11px;font-weight:700;text-transform:uppercase;color:#0d6e45;">Présents</th>
+          <th style="padding:10px 12px;text-align:center;border-bottom:2px solid var(--pr-200);font-size:11px;font-weight:700;text-transform:uppercase;color:#c0392b;">Absents</th>
+          <th style="padding:10px 12px;text-align:center;border-bottom:2px solid var(--pr-200);font-size:11px;font-weight:700;text-transform:uppercase;color:var(--pr-muted);">Non saisi</th>
+          <th style="padding:10px 16px;text-align:left;border-bottom:2px solid var(--pr-200);font-size:11px;font-weight:700;text-transform:uppercase;color:var(--pr-800);">Taux</th>
+          <th style="padding:10px 12px;border-bottom:2px solid var(--pr-200);"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in stats %}
+        <tr style="border-bottom:1px solid var(--pr-50);">
+          <td style="padding:10px 16px;">
+            <div style="font-weight:600;color:var(--pr-text);">{{ s.emp.nom_complet }}</div>
+            <div style="font-size:11.5px;color:var(--pr-muted);">{{ s.emp.service.nom|default:"—" }}</div>
+          </td>
+          <td style="padding:10px 12px;text-align:center;font-weight:700;color:#0d6e45;">{{ s.nb_p }}</td>
+          <td style="padding:10px 12px;text-align:center;font-weight:700;" class="{% if s.nb_a > 0 %}col-abs{% else %}col-ns{% endif %}">{{ s.nb_a }}</td>
+          <td style="padding:10px 12px;text-align:center;color:var(--pr-muted);">{{ s.nb_ns }}</td>
+          <td style="padding:10px 16px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div class="bar-track h8">
+                <div class="bar-fill {% if s.taux >= 80 %}good{% elif s.taux >= 60 %}warn{% else %}bad{% endif %}"
+                     data-w="{{ s.taux }}"></div>
+              </div>
+              <span style="font-size:12px;font-weight:700;color:var(--pr-700);width:40px;">{{ s.taux }}%</span>
+            </div>
+          </td>
+          <td style="padding:10px 12px;text-align:right;">
+            <a href="{% url 'presence_employe' s.emp.pk %}?year={{ year }}&month={{ month }}" class="btn-pr-sm">
+              <i class="bi bi-eye"></i>
+            </a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" style="padding:40px;text-align:center;color:var(--pr-muted);">Aucune donnée.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if page_obj.has_other_pages %}
+  <div class="pr-pagination">
+    {% if page_obj.has_previous %}
+      <a href="?year={{ year }}&month={{ month }}{% if service_sel %}&service={{ service_sel.pk }}{% endif %}&page=1" class="pr-page-link"><i class="bi bi-chevron-double-left"></i></a>
+      <a href="?year={{ year }}&month={{ month }}{% if service_sel %}&service={{ service_sel.pk }}{% endif %}&page={{ page_obj.previous_page_number }}" class="pr-page-link"><i class="bi bi-chevron-left"></i></a>
+    {% else %}
+      <span class="pr-page-link disabled"><i class="bi bi-chevron-double-left"></i></span>
+      <span class="pr-page-link disabled"><i class="bi bi-chevron-left"></i></span>
+    {% endif %}
+    {% for num in page_obj.paginator.page_range %}
+      {% if num == page_obj.number %}<span class="pr-page-link active">{{ num }}</span>
+      {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
+        <a href="?year={{ year }}&month={{ month }}{% if service_sel %}&service={{ service_sel.pk }}{% endif %}&page={{ num }}" class="pr-page-link">{{ num }}</a>
+      {% endif %}
+    {% endfor %}
+    {% if page_obj.has_next %}
+      <a href="?year={{ year }}&month={{ month }}{% if service_sel %}&service={{ service_sel.pk }}{% endif %}&page={{ page_obj.next_page_number }}" class="pr-page-link"><i class="bi bi-chevron-right"></i></a>
+      <a href="?year={{ year }}&month={{ month }}{% if service_sel %}&service={{ service_sel.pk }}{% endif %}&page={{ page_obj.paginator.num_pages }}" class="pr-page-link"><i class="bi bi-chevron-double-right"></i></a>
+    {% else %}
+      <span class="pr-page-link disabled"><i class="bi bi-chevron-right"></i></span>
+      <span class="pr-page-link disabled"><i class="bi bi-chevron-double-right"></i></span>
+    {% endif %}
+    <span style="font-size:12px;color:var(--pr-muted);margin-left:6px;">Page {{ page_obj.number }}/{{ page_obj.paginator.num_pages }}</span>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelectorAll('.bar-fill[data-w]').forEach(function(el) {
+  el.style.width = el.dataset.w + '%';
+});
+/* couleur cellule absences */
+document.querySelectorAll('td.col-abs').forEach(function(el) { el.style.color = '#c0392b'; });
+document.querySelectorAll('td.col-ns').forEach(function(el) { el.style.color = 'var(--pr-muted)'; });
+</script>
+{% endblock %}

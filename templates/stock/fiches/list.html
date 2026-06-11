@@ -1,0 +1,108 @@
+{% extends 'stock/base.html' %}
+{% load static %}
+{% block nav_rapports_besoins %}active{% endblock %}
+{% block topbar_title %}Stock — Fiches de besoins{% endblock %}
+
+{% block extra_st_css %}<style>
+.content { padding-top: 0; }
+.st-page-head {
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  padding:12px 32px; margin:0 -32px;
+  background:#f2f7ee; border-bottom:1px solid rgba(0,0,0,.05);
+  box-shadow:0 2px 8px rgba(0,0,0,.04);
+  position:sticky; top:calc(var(--topbar-h) + 44px); z-index:100;
+}
+.badge-brouillon { background:rgba(0,0,0,.06);   color:rgba(0,0,0,.5);  border:1px solid rgba(0,0,0,.12);    padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
+.badge-soumis    { background:rgba(232,154,26,.1); color:#8a5c00;        border:1px solid rgba(232,154,26,.25); padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
+.badge-valide    { background:rgba(22,169,107,.1); color:#0d7a4c;        border:1px solid rgba(22,169,107,.25); padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
+.badge-rejete    { background:rgba(232,69,69,.1);  color:#b71c1c;        border:1px solid rgba(232,69,69,.25);  padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
+.badge-pharma    { background:rgba(58,89,36,.1); color:var(--st-700); border:1px solid rgba(58,89,36,.2); padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
+</style>{% endblock %}
+
+{% block content %}
+<!-- En-tête sticky -->
+<div class="st-page-head">
+  <div>
+    <div style="font-size:15px;font-weight:800;color:var(--st-900);">
+      <i class="bi bi-clipboard2-data" style="color:var(--st-600);"></i> Fiches de besoins mensuels
+    </div>
+    <div style="font-size:11.5px;color:var(--st-muted);">Suivi des besoins mensuels par pharmacie</div>
+  </div>
+  <a href="{% url 'stock_fiche_create' %}" class="btn-st">
+    <i class="bi bi-plus-lg"></i> Nouvelle fiche
+  </a>
+</div>
+
+<!-- Tableau -->
+<div style="margin-top:14px;margin-left:-32px;margin-right:-32px;background:var(--st-surface);box-shadow:0 2px 12px rgba(58,89,36,.08);overflow:hidden;">
+  {% if fiches %}
+  <table class="st-table">
+    <thead>
+      <tr>
+        <th>N° Fiche</th>
+        <th>Pharmacie</th>
+        <th>Période</th>
+        <th>Statut</th>
+        <th style="text-align:center;">Nb lignes</th>
+        <th>Créée par</th>
+        <th style="width:110px;"></th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for fiche in fiches %}
+    <tr style="cursor:pointer;" onclick="window.location='{% url 'stock_fiche_detail' fiche.pk %}'">
+      <td style="font-family:monospace;font-size:12px;color:var(--st-600);font-weight:700;">
+        {{ fiche.numero }}
+      </td>
+      <td>
+        <span class="badge-pharma">
+          <i class="bi bi-hospital" style="font-size:10px;"></i> {{ fiche.get_pharmacie_display }}
+        </span>
+      </td>
+      <td style="font-size:12px;">
+        <i class="bi bi-calendar3" style="color:var(--st-muted);font-size:10px;"></i>
+        du {{ fiche.periode_debut|date:"d/m/Y" }} au {{ fiche.periode_fin|date:"d/m/Y" }}
+      </td>
+      <td>
+        {% if fiche.statut == 'brouillon' %}
+          <span class="badge-brouillon"><i class="bi bi-pencil" style="font-size:9px;"></i> Brouillon</span>
+        {% elif fiche.statut == 'soumis' %}
+          <span class="badge-soumis"><i class="bi bi-hourglass-split" style="font-size:9px;"></i> Soumis</span>
+        {% elif fiche.statut == 'valide' %}
+          <span class="badge-valide"><i class="bi bi-check-circle-fill" style="font-size:9px;"></i> Validé</span>
+        {% else %}
+          <span class="badge-rejete"><i class="bi bi-x-circle-fill" style="font-size:9px;"></i> Rejeté</span>
+        {% endif %}
+      </td>
+      <td style="text-align:center;font-weight:700;">{{ fiche.lignes.count }}</td>
+      <td style="font-size:12px;color:var(--st-muted);">
+        {% if fiche.cree_par %}{{ fiche.cree_par.get_full_name|default:fiche.cree_par.username }}{% else %}—{% endif %}
+      </td>
+      <td style="display:flex;gap:4px;align-items:center;">
+        <a href="{% url 'stock_fiche_detail' fiche.pk %}" class="btn-st-outline"
+           style="padding:3px 10px;font-size:11.5px;" onclick="event.stopPropagation()">
+          <i class="bi bi-eye"></i> Voir
+        </a>
+        {% if fiche.statut == 'valide' %}
+        <a href="{% url 'stock_fiche_print' fiche.pk %}" class="btn-st-outline"
+           style="padding:3px 8px;font-size:11.5px;" onclick="event.stopPropagation()" target="_blank" title="Imprimer">
+          <i class="bi bi-printer"></i>
+        </a>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="st-card-body" style="text-align:center;padding:60px 32px;color:var(--st-muted);">
+    <i class="bi bi-clipboard2-x" style="font-size:40px;display:block;margin-bottom:14px;opacity:.35;"></i>
+    <div style="font-size:14px;font-weight:600;margin-bottom:6px;color:var(--st-text);">Aucune fiche de besoins</div>
+    <div style="font-size:12.5px;margin-bottom:18px;">Créez la première fiche de besoins mensuels.</div>
+    <a href="{% url 'stock_fiche_create' %}" class="btn-st">
+      <i class="bi bi-plus-lg"></i> Créer une fiche
+    </a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

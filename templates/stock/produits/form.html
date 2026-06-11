@@ -1,0 +1,406 @@
+{% extends 'stock/base.html' %}
+{% load static %}
+{% block nav_produits %}active{% endblock %}
+{% block topbar_title %}{% if mode == 'create' %}Nouveau produit{% else %}Modifier {{ produit.nom }}{% endif %}{% endblock %}
+
+{% block extra_st_css %}<style>
+.st-page-head {
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  padding:12px 32px; margin:0 -32px; flex-wrap:wrap;
+  background:#f2f7ee; border-bottom:1px solid rgba(0,0,0,.05);
+  box-shadow:0 2px 8px rgba(0,0,0,.04);
+  position:sticky; top:calc(var(--topbar-h) + 44px); z-index:100;
+}
+html[data-theme="dark"] .st-page-head { background:#070e05; }
+.st-form-layout { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-top:20px; }
+@media(max-width:800px){ .st-form-layout{ grid-template-columns:1fr; } }
+.st-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:0 20px; }
+@media(max-width:560px){ .st-grid-2{ grid-template-columns:1fr; } }
+.type-btn { border:2px solid var(--st-border); background:var(--st-surface); border-radius:10px; padding:12px 18px; cursor:pointer; display:flex; align-items:center; gap:10px; font-size:13px; font-weight:500; color:var(--st-muted); transition:all .15s; flex:1; min-width:160px; }
+.type-btn:hover { transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,.08); }
+
+/* Médicament — vert */
+.type-btn[data-type="medicament"] { border-color:rgba(58,89,36,.2); }
+.type-btn[data-type="medicament"]:hover { border-color:var(--st-500); color:var(--st-700); background:var(--st-50); }
+.type-btn[data-type="medicament"].selected { border-color:var(--st-600); background:rgba(58,89,36,.09); color:var(--st-700); font-weight:700; box-shadow:0 0 0 3px rgba(58,89,36,.12); }
+.type-btn[data-type="medicament"] .type-icon { background:rgba(58,89,36,.1); color:var(--st-600); }
+.type-btn[data-type="medicament"].selected .type-icon { background:var(--st-600); color:#fff; }
+
+/* Consommable — bleu */
+.type-btn[data-type="consommable"] { border-color:rgba(21,101,192,.18); }
+.type-btn[data-type="consommable"]:hover { border-color:#1565c0; color:#1565c0; background:#e3f2fd; }
+.type-btn[data-type="consommable"].selected { border-color:#1565c0; background:#e3f2fd; color:#1565c0; font-weight:700; box-shadow:0 0 0 3px rgba(21,101,192,.12); }
+.type-btn[data-type="consommable"] .type-icon { background:rgba(21,101,192,.1); color:#1565c0; }
+.type-btn[data-type="consommable"].selected .type-icon { background:#1565c0; color:#fff; }
+
+/* Équipement — violet */
+.type-btn[data-type="equipement"] { border-color:rgba(69,39,160,.18); }
+.type-btn[data-type="equipement"]:hover { border-color:#4527a0; color:#4527a0; background:#ede7f6; }
+.type-btn[data-type="equipement"].selected { border-color:#4527a0; background:#ede7f6; color:#4527a0; font-weight:700; box-shadow:0 0 0 3px rgba(69,39,160,.12); }
+.type-btn[data-type="equipement"] .type-icon { background:rgba(69,39,160,.1); color:#4527a0; }
+.type-btn[data-type="equipement"].selected .type-icon { background:#4527a0; color:#fff; }
+
+.type-icon { width:36px; height:36px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0; transition:all .15s; }
+</style>{% endblock %}
+
+{% block content %}
+<div class="st-page-head">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <a href="{% url 'stock_produits' %}" class="btn-st-outline" style="padding:6px 12px;"><i class="bi bi-arrow-left"></i></a>
+    <div>
+      <div style="font-size:15px;font-weight:800;color:var(--st-900);">
+        {% if mode == 'create' %}<i class="bi bi-plus-circle" style="color:var(--st-600);"></i> Nouveau produit
+        {% else %}<i class="bi bi-pencil-square" style="color:var(--st-600);"></i> Modifier le produit{% endif %}
+      </div>
+      {% if mode == 'edit' %}<div style="font-size:11.5px;color:var(--st-muted);">{{ produit.code }}</div>{% endif %}
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <a href="{% url 'stock_produits' %}" class="btn-st-outline">Annuler</a>
+    <button type="submit" form="produit-form" class="btn-st">
+      <i class="bi bi-check-lg"></i> {% if mode == 'create' %}Enregistrer{% else %}Mettre à jour{% endif %}
+    </button>
+  </div>
+</div>
+
+{% if messages %}
+<div style="margin-top:14px;">
+  {% for msg in messages %}
+  <div style="background:rgba(22,169,107,.1);border:1px solid rgba(22,169,107,.3);border-radius:8px;padding:10px 16px;font-size:13px;color:#0d7a4c;display:flex;align-items:center;gap:8px;">
+    <i class="bi bi-check-circle-fill"></i> {{ msg }}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<form id="produit-form" method="post" novalidate>
+{% csrf_token %}
+
+<!-- Type de produit -->
+<div class="st-card" style="margin-top:20px;">
+  <div class="st-card-header"><div class="st-card-title"><i class="bi bi-tag" style="color:var(--st-600);"></i> Type de produit</div></div>
+  <div class="st-card-body">
+    <div style="display:flex;gap:12px;flex-wrap:wrap;">
+
+      <label class="type-btn {% if mode == 'edit' and produit.type == 'medicament' %}selected{% elif mode == 'create' and not post or post.type == 'medicament' %}selected{% endif %}" data-type="medicament">
+        <input type="radio" name="type" value="medicament" style="display:none;"
+          {% if mode == 'edit' and produit.type == 'medicament' %}checked
+          {% elif mode == 'create' and not post %}checked{% elif post and post.type == 'medicament' %}checked{% endif %}>
+        <div class="type-icon"><i class="bi bi-capsule-pill"></i></div>
+        <div>
+          <div style="font-size:13px;font-weight:600;">Médicament</div>
+          <div style="font-size:11px;opacity:.7;margin-top:1px;">Comprimés, sirops, injectables…</div>
+        </div>
+      </label>
+
+      <label class="type-btn {% if mode == 'edit' and produit.type == 'consommable' %}selected{% elif post and post.type == 'consommable' %}selected{% endif %}" data-type="consommable">
+        <input type="radio" name="type" value="consommable" style="display:none;"
+          {% if mode == 'edit' and produit.type == 'consommable' %}checked{% elif post and post.type == 'consommable' %}checked{% endif %}>
+        <div class="type-icon"><i class="bi bi-bandaid"></i></div>
+        <div>
+          <div style="font-size:13px;font-weight:600;">Consommable médical</div>
+          <div style="font-size:11px;opacity:.7;margin-top:1px;">Seringues, gants, pansements…</div>
+        </div>
+      </label>
+
+      <label class="type-btn {% if mode == 'edit' and produit.type == 'equipement' %}selected{% elif post and post.type == 'equipement' %}selected{% endif %}" data-type="equipement">
+        <input type="radio" name="type" value="equipement" style="display:none;"
+          {% if mode == 'edit' and produit.type == 'equipement' %}checked{% elif post and post.type == 'equipement' %}checked{% endif %}>
+        <div class="type-icon"><i class="bi bi-tools"></i></div>
+        <div>
+          <div style="font-size:13px;font-weight:600;">Équipement & matériel</div>
+          <div style="font-size:11px;opacity:.7;margin-top:1px;">Appareils, mobilier médical…</div>
+        </div>
+      </label>
+
+    </div>
+  </div>
+</div>
+
+<div class="st-form-layout">
+
+  <!-- Colonne gauche -->
+  <div>
+    <!-- Identité -->
+    <div class="st-card">
+      <div class="st-card-header"><div class="st-card-title"><i class="bi bi-box-seam" style="color:var(--st-600);"></i> Identité</div></div>
+      <div class="st-card-body">
+        <div class="st-field">
+          <label class="st-label" for="nom">Nom <span class="req" style="color:#c0392b;">*</span></label>
+          <input type="text" name="nom" id="nom" class="st-input{% if errors.nom %} error{% endif %}"
+            value="{% if mode == 'edit' %}{{ produit.nom }}{% elif post %}{{ post.nom }}{% endif %}"
+            placeholder="Nom du produit" autocomplete="off">
+          {% if errors.nom %}<div class="st-error">{{ errors.nom }}</div>{% endif %}
+        </div>
+        <div class="st-grid-2">
+          <div class="st-field">
+            <label class="st-label" for="categorie">Catégorie
+              <button type="button" onclick="ouvrirModalCategorie()" title="Ajouter une catégorie"
+                style="margin-left:6px;background:none;border:none;cursor:pointer;color:var(--st-600);font-size:13px;padding:0;vertical-align:middle;">
+                <i class="bi bi-plus-circle"></i>
+              </button>
+            </label>
+            <select name="categorie" id="categorie" class="st-input">
+              <option value="">— Aucune —</option>
+              {% for cat in categories %}
+              <option value="{{ cat.pk }}"
+                {% if mode == 'edit' and produit.categorie and produit.categorie.pk == cat.pk %}selected
+                {% elif post and post.categorie == cat.pk|stringformat:"s" %}selected{% endif %}>
+                {{ cat.nom }} ({{ cat.get_type_display }})
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="st-field">
+            <label class="st-label" for="unite_mesure">Unité de mesure</label>
+            <select name="unite_mesure" id="unite_mesure" class="st-input">
+              <optgroup label="Médicaments">
+                <option value="comprimé"     {% if mode == 'edit' and produit.unite_mesure == 'comprimé' %}selected{% elif post and post.unite_mesure == 'comprimé' %}selected{% endif %}>Comprimé</option>
+                <option value="gélule"       {% if mode == 'edit' and produit.unite_mesure == 'gélule' %}selected{% elif post and post.unite_mesure == 'gélule' %}selected{% endif %}>Gélule</option>
+                <option value="ampoule"      {% if mode == 'edit' and produit.unite_mesure == 'ampoule' %}selected{% elif post and post.unite_mesure == 'ampoule' %}selected{% endif %}>Ampoule</option>
+                <option value="flacon"       {% if mode == 'edit' and produit.unite_mesure == 'flacon' %}selected{% elif post and post.unite_mesure == 'flacon' %}selected{% endif %}>Flacon</option>
+                <option value="sachet"       {% if mode == 'edit' and produit.unite_mesure == 'sachet' %}selected{% elif post and post.unite_mesure == 'sachet' %}selected{% endif %}>Sachet</option>
+                <option value="tube"         {% if mode == 'edit' and produit.unite_mesure == 'tube' %}selected{% elif post and post.unite_mesure == 'tube' %}selected{% endif %}>Tube</option>
+                <option value="suppositoire" {% if mode == 'edit' and produit.unite_mesure == 'suppositoire' %}selected{% elif post and post.unite_mesure == 'suppositoire' %}selected{% endif %}>Suppositoire</option>
+                <option value="poche"        {% if mode == 'edit' and produit.unite_mesure == 'poche' %}selected{% elif post and post.unite_mesure == 'poche' %}selected{% endif %}>Poche (perfusion)</option>
+                <option value="boîte"        {% if mode == 'edit' and produit.unite_mesure == 'boîte' %}selected{% elif post and post.unite_mesure == 'boîte' %}selected{% endif %}>Boîte</option>
+              </optgroup>
+              <optgroup label="Consommables">
+                <option value="pièce"        {% if mode == 'edit' and produit.unite_mesure == 'pièce' %}selected{% elif post and post.unite_mesure == 'pièce' %}selected{% endif %}>Pièce</option>
+                <option value="paire"        {% if mode == 'edit' and produit.unite_mesure == 'paire' %}selected{% elif post and post.unite_mesure == 'paire' %}selected{% endif %}>Paire</option>
+                <option value="rouleau"      {% if mode == 'edit' and produit.unite_mesure == 'rouleau' %}selected{% elif post and post.unite_mesure == 'rouleau' %}selected{% endif %}>Rouleau</option>
+                <option value="litre"        {% if mode == 'edit' and produit.unite_mesure == 'litre' %}selected{% elif post and post.unite_mesure == 'litre' %}selected{% endif %}>Litre</option>
+                <option value="millilitre"   {% if mode == 'edit' and produit.unite_mesure == 'millilitre' %}selected{% elif post and post.unite_mesure == 'millilitre' %}selected{% endif %}>Millilitre</option>
+                <option value="kilogramme"   {% if mode == 'edit' and produit.unite_mesure == 'kilogramme' %}selected{% elif post and post.unite_mesure == 'kilogramme' %}selected{% endif %}>Kilogramme</option>
+                <option value="gramme"       {% if mode == 'edit' and produit.unite_mesure == 'gramme' %}selected{% elif post and post.unite_mesure == 'gramme' %}selected{% endif %}>Gramme</option>
+              </optgroup>
+              <optgroup label="Équipements">
+                <option value="unité"        {% if mode == 'edit' and produit.unite_mesure == 'unité' or not mode %}selected{% elif post and post.unite_mesure == 'unité' %}selected{% endif %}>Unité</option>
+                <option value="lot"          {% if mode == 'edit' and produit.unite_mesure == 'lot' %}selected{% elif post and post.unite_mesure == 'lot' %}selected{% endif %}>Lot</option>
+                <option value="set"          {% if mode == 'edit' and produit.unite_mesure == 'set' %}selected{% elif post and post.unite_mesure == 'set' %}selected{% endif %}>Set / Kit</option>
+              </optgroup>
+            </select>
+          </div>
+        </div>
+        <div class="st-field" style="margin-bottom:0;">
+          <label class="st-label" for="description">Description</label>
+          <textarea name="description" id="description" class="st-input" rows="3" style="resize:vertical;">{% if mode == 'edit' %}{{ produit.description }}{% elif post %}{{ post.description }}{% endif %}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- Infos médicament (visible seulement pour médicament) -->
+    <div class="st-card" id="section-medicament" style="{% if mode == 'edit' and produit.type != 'medicament' %}display:none;{% endif %}">
+      <div class="st-card-header"><div class="st-card-title"><i class="bi bi-capsule-pill" style="color:var(--st-600);"></i> Informations médicament</div></div>
+      <div class="st-card-body">
+        <div class="st-field">
+          <label class="st-label" for="dci">DCI / Principe actif</label>
+          <input type="text" name="dci" id="dci" class="st-input"
+            value="{% if mode == 'edit' %}{{ produit.dci }}{% elif post %}{{ post.dci }}{% endif %}"
+            placeholder="Dénomination commune internationale">
+        </div>
+        <div class="st-grid-2">
+          <div class="st-field">
+            <label class="st-label" for="dosage">Dosage</label>
+            <input type="text" name="dosage" id="dosage" class="st-input"
+              value="{% if mode == 'edit' %}{{ produit.dosage }}{% elif post %}{{ post.dosage }}{% endif %}"
+              placeholder="Ex : 500mg">
+          </div>
+          <div class="st-field">
+            <label class="st-label" for="forme">Forme</label>
+            <select name="forme" id="forme" class="st-input">
+              <option value="">— Forme —</option>
+              {% for val, lbl in produit.FORME_CHOICES|default:"" %}
+              <option value="{{ val }}" {% if mode == 'edit' and produit.forme == val %}selected{% elif post and post.forme == val %}selected{% endif %}>{{ lbl }}</option>
+              {% empty %}
+              <option value="comprime" {% if mode == 'edit' and produit.forme == 'comprime' %}selected{% endif %}>Comprimé</option>
+              <option value="gelule" {% if mode == 'edit' and produit.forme == 'gelule' %}selected{% endif %}>Gélule</option>
+              <option value="sirop" {% if mode == 'edit' and produit.forme == 'sirop' %}selected{% endif %}>Sirop</option>
+              <option value="injectable" {% if mode == 'edit' and produit.forme == 'injectable' %}selected{% endif %}>Injectable</option>
+              <option value="creme" {% if mode == 'edit' and produit.forme == 'creme' %}selected{% endif %}>Crème</option>
+              <option value="pommade" {% if mode == 'edit' and produit.forme == 'pommade' %}selected{% endif %}>Pommade</option>
+              <option value="gouttes" {% if mode == 'edit' and produit.forme == 'gouttes' %}selected{% endif %}>Gouttes</option>
+              <option value="suppositoire" {% if mode == 'edit' and produit.forme == 'suppositoire' %}selected{% endif %}>Suppositoire</option>
+              <option value="autre" {% if mode == 'edit' and produit.forme == 'autre' %}selected{% endif %}>Autre</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="st-field" style="margin-bottom:0;">
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+            <input type="checkbox" name="prescription_obligatoire"
+              {% if mode == 'edit' and produit.prescription_obligatoire %}checked
+              {% elif post and post.prescription_obligatoire %}checked{% endif %}
+              style="accent-color:var(--st-600);width:16px;height:16px;">
+            <span style="font-size:13px;color:var(--st-text);">Prescription médicale obligatoire</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Colonne droite -->
+  <div>
+    <!-- Stock -->
+    <div class="st-card">
+      <div class="st-card-header"><div class="st-card-title"><i class="bi bi-bar-chart-line" style="color:var(--st-600);"></i> Seuils de stock</div></div>
+      <div class="st-card-body">
+        {% if mode == 'edit' %}
+        <div style="background:var(--st-50);border:1px solid var(--st-border);border-radius:8px;padding:10px 14px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-size:12px;color:var(--st-muted);">Stock actuel</span>
+          <span style="font-size:20px;font-weight:800;color:{% if produit.en_rupture %}#b71c1c{% elif produit.en_alerte %}#8a5c00{% else %}var(--st-600){% endif %};">{{ produit.stock_actuel|floatformat:0 }} {{ produit.unite_mesure }}</span>
+        </div>
+        {% endif %}
+        <div class="st-grid-2">
+          <div class="st-field">
+            <label class="st-label" for="stock_alerte">Seuil d'alerte</label>
+            <input type="number" name="stock_alerte" id="stock_alerte" class="st-input" min="0" step="1"
+              value="{% if mode == 'edit' %}{{ produit.stock_alerte|floatformat:0 }}{% elif post %}{{ post.stock_alerte }}{% else %}10{% endif %}">
+          </div>
+          <div class="st-field">
+            <label class="st-label" for="stock_minimum">Seuil minimum</label>
+            <input type="number" name="stock_minimum" id="stock_minimum" class="st-input" min="0" step="1"
+              value="{% if mode == 'edit' %}{{ produit.stock_minimum|floatformat:0 }}{% elif post %}{{ post.stock_minimum }}{% else %}5{% endif %}">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Prix & Fournisseur -->
+    <div class="st-card">
+      <div class="st-card-header"><div class="st-card-title"><i class="bi bi-cash-coin" style="color:var(--st-600);"></i> Prix & Fournisseur</div></div>
+      <div class="st-card-body">
+        <div class="st-grid-2">
+          <div class="st-field">
+            <label class="st-label" for="prix_achat">Prix d'achat (FCFA)</label>
+            <input type="number" name="prix_achat" id="prix_achat" class="st-input" min="0" step="1"
+              value="{% if mode == 'edit' %}{{ produit.prix_achat|floatformat:0 }}{% elif post %}{{ post.prix_achat }}{% else %}0{% endif %}">
+          </div>
+          <div class="st-field">
+            <label class="st-label" for="prix_vente">Prix de vente (FCFA)</label>
+            <input type="number" name="prix_vente" id="prix_vente" class="st-input" min="0" step="1"
+              value="{% if mode == 'edit' %}{{ produit.prix_vente|floatformat:0 }}{% elif post %}{{ post.prix_vente }}{% else %}0{% endif %}">
+          </div>
+        </div>
+        <div class="st-field" style="margin-bottom:0;">
+          <label class="st-label" for="fournisseur_principal">Fournisseur principal</label>
+          <select name="fournisseur_principal" id="fournisseur_principal" class="st-input">
+            <option value="">— Aucun —</option>
+            {% for f in fournisseurs %}
+            <option value="{{ f.pk }}"
+              {% if mode == 'edit' and produit.fournisseur_principal and produit.fournisseur_principal.pk == f.pk %}selected
+              {% elif post and post.fournisseur_principal == f.pk|stringformat:"s" %}selected{% endif %}>
+              {{ f.nom }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:8px;margin-bottom:24px;">
+  <a href="{% url 'stock_produits' %}" class="btn-st-outline">Annuler</a>
+  <button type="submit" form="produit-form" class="btn-st">
+    <i class="bi bi-check-lg"></i> {% if mode == 'create' %}Enregistrer{% else %}Mettre à jour{% endif %}
+  </button>
+</div>
+</form>
+
+<!-- Modal ajout catégorie -->
+<div id="modal-categorie" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.35);align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:12px;padding:24px;width:420px;max-width:95vw;box-shadow:0 8px 32px rgba(0,0,0,.2);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+      <div style="font-size:15px;font-weight:700;color:var(--st-900);"><i class="bi bi-tag" style="color:var(--st-600);margin-right:6px;"></i>Nouvelle catégorie</div>
+      <button type="button" onclick="fermerModalCategorie()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--st-muted);">&times;</button>
+    </div>
+    <div class="st-field">
+      <label class="st-label" for="cat-nom">Nom <span style="color:#c0392b;">*</span></label>
+      <input type="text" id="cat-nom" class="st-input" placeholder="Ex : Antipaludéens, Gants médicaux…" autocomplete="off">
+      <div id="cat-error" style="display:none;font-size:11.5px;color:#c0392b;margin-top:3px;"></div>
+    </div>
+    <div class="st-field" style="margin-bottom:0;">
+      <label class="st-label" for="cat-type">Type</label>
+      <select id="cat-type" class="st-input">
+        <option value="medicament">Médicament</option>
+        <option value="consommable">Consommable médical</option>
+        <option value="equipement">Équipement & matériel</option>
+      </select>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;">
+      <button type="button" onclick="fermerModalCategorie()" class="btn-st-outline">Annuler</button>
+      <button type="button" onclick="sauvegarderCategorie()" id="cat-save-btn" class="btn-st"><i class="bi bi-check-lg"></i> Ajouter</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── Type de produit ── */
+document.querySelectorAll('.type-btn').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    document.querySelectorAll('.type-btn').forEach(function(b){ b.classList.remove('selected'); });
+    btn.classList.add('selected');
+    var type = btn.querySelector('input').value;
+    document.getElementById('section-medicament').style.display = (type === 'medicament') ? '' : 'none';
+    // Synchroniser le type dans le modal catégorie
+    document.getElementById('cat-type').value = type;
+  });
+});
+
+/* ── Modal catégorie ── */
+function ouvrirModalCategorie(){
+  var modal = document.getElementById('modal-categorie');
+  modal.style.display = 'flex';
+  document.getElementById('cat-nom').value = '';
+  document.getElementById('cat-error').style.display = 'none';
+  // Pré-sélectionner le type actuel du produit
+  var typeActif = document.querySelector('.type-btn.selected input');
+  if(typeActif) document.getElementById('cat-type').value = typeActif.value;
+  setTimeout(function(){ document.getElementById('cat-nom').focus(); }, 100);
+}
+
+function fermerModalCategorie(){
+  document.getElementById('modal-categorie').style.display = 'none';
+}
+
+function sauvegarderCategorie(){
+  var nom  = document.getElementById('cat-nom').value.trim();
+  var type = document.getElementById('cat-type').value;
+  var errEl = document.getElementById('cat-error');
+  var btn   = document.getElementById('cat-save-btn');
+
+  if(!nom){ errEl.textContent = 'Le nom est obligatoire.'; errEl.style.display='block'; return; }
+  errEl.style.display = 'none';
+  btn.disabled = true; btn.textContent = 'Enregistrement…';
+
+  var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+  fetch('{% url "stock_categorie_ajax" %}', {
+    method: 'POST',
+    headers: {'Content-Type':'application/x-www-form-urlencoded','X-CSRFToken': csrfToken},
+    body: 'nom=' + encodeURIComponent(nom) + '&type=' + encodeURIComponent(type)
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    if(data.error){ errEl.textContent = data.error; errEl.style.display='block'; btn.disabled=false; btn.innerHTML='<i class="bi bi-check-lg"></i> Ajouter'; return; }
+    // Ajouter l'option dans le select et la sélectionner
+    var select = document.getElementById('categorie');
+    var opt = document.createElement('option');
+    opt.value = data.id;
+    opt.textContent = data.nom + ' (' + {'medicament':'Médicament','consommable':'Consommable médical','equipement':'Équipement & matériel'}[data.type] + ')';
+    opt.selected = true;
+    select.appendChild(opt);
+    fermerModalCategorie();
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-check-lg"></i> Ajouter';
+  })
+  .catch(function(){ errEl.textContent = 'Erreur réseau.'; errEl.style.display='block'; btn.disabled=false; btn.innerHTML='<i class="bi bi-check-lg"></i> Ajouter'; });
+}
+
+// Fermer le modal en cliquant à l'extérieur
+document.getElementById('modal-categorie').addEventListener('click', function(e){
+  if(e.target === this) fermerModalCategorie();
+});
+</script>
+{% endblock %}

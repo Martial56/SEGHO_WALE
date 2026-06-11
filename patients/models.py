@@ -150,6 +150,10 @@ class RendezVous(models.Model):
     temps_constante_minutes = models.IntegerField(default=0)
     temps_attente_minutes = models.IntegerField(default=0)
     temps_consultation_minutes = models.IntegerField(default=0)
+    date_confirme = models.DateTimeField(null=True, blank=True)
+    date_en_attente = models.DateTimeField(null=True, blank=True)
+    date_en_consultation = models.DateTimeField(null=True, blank=True)
+    date_termine = models.DateTimeField(null=True, blank=True)
     date_creation = models.DateTimeField(auto_now_add=True)
 
     MODE_ENTREE = [
@@ -190,6 +194,11 @@ class RendezVous(models.Model):
     @property
     def duree_display(self):
         h, m = divmod(self.duree_minutes, 60)
+        return f"{h:02d}:{m:02d}"
+
+    @property
+    def temps_constante_display(self):
+        h, m = divmod(self.temps_constante_minutes, 60)
         return f"{h:02d}:{m:02d}"
 
     @property

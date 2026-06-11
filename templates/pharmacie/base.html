@@ -3,16 +3,20 @@
 {% block topbar_title %}Pharmacie{% endblock %}
 
 {% block module_navbar %}
+{% with uname=request.resolver_match.url_name %}
 <nav class="o-nav">
   <a href="{% url 'dashboard' %}" class="o-nav-grid" title="Accueil">
     <i class="bi bi-grid-3x3-gap-fill"></i>
   </a>
-  <span class="o-nav-brand">
-    <i class="bi bi-capsule-pill"></i>
-    Pharmacie
-  </span>
-  <a href="{% url 'pharmacie_list' %}" class="o-nav-link {% if request.resolver_match.url_name == 'pharmacie_list' %}active{% endif %}">Médicaments</a>
+
+  <span class="o-nav-brand"><i class="bi bi-capsule-pill"></i> Pharmacie</span>
+  {% if uname == 'ordonnances_list' or uname == 'ordonnance_list' or uname == 'ordonnance_create' or uname == 'ordonnance_detail' %}
+  <a href="{% url 'ordonnances_list' %}" class="o-nav-link active">Ordonnances</a>
+  {% else %}
+  <a href="{% url 'pharmacie_list' %}" class="o-nav-link {% if uname == 'pharmacie_list' %}active{% endif %}">Médicaments</a>
+  {% endif %}
 </nav>
+{% endwith %}
 {% endblock %}
 
 {% block breadcrumb %}{% endblock %}

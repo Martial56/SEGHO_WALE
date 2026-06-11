@@ -327,30 +327,47 @@ def rdv_edit(request, pk):
 
         if action == 'confirmer':
             if facture_payee:
+                from django.utils import timezone
                 rdv.statut = 'confirme'
-                rdv.save(update_fields=['statut'])
+                rdv.date_confirme = timezone.now()
+                rdv.save(update_fields=['statut', 'date_confirme'])
                 messages.success(request, 'Rendez-vous confirmé.')
             else:
                 messages.error(request, 'Une facture payée est requise pour confirmer ce rendez-vous.')
             return redirect('patients:rdv_global')
 
         if action == 'en_attente':
+            from django.utils import timezone
+            now = timezone.now()
             rdv.statut = 'en_attente'
-            rdv.save(update_fields=['statut'])
+            rdv.date_en_attente = now
+            if rdv.date_confirme:
+                rdv.temps_constante_minutes = int((now - rdv.date_confirme).total_seconds() / 60)
+            rdv.save(update_fields=['statut', 'date_en_attente', 'temps_constante_minutes'])
             messages.success(request, 'Rendez-vous mis en attente de consultation.')
             from django.urls import reverse
             return redirect(reverse('patients:rdv_edit', kwargs={'pk': rdv.pk}))
 
         if action == 'en_consultation':
+            from django.utils import timezone
+            now = timezone.now()
             rdv.statut = 'en_consultation'
-            rdv.save(update_fields=['statut'])
+            rdv.date_en_consultation = now
+            if rdv.date_en_attente:
+                rdv.temps_attente_minutes = int((now - rdv.date_en_attente).total_seconds() / 60)
+            rdv.save(update_fields=['statut', 'date_en_consultation', 'temps_attente_minutes'])
             messages.success(request, 'Consultation démarrée.')
             from django.urls import reverse
             return redirect(reverse('patients:rdv_edit', kwargs={'pk': rdv.pk}))
 
         if action == 'terminer':
+            from django.utils import timezone
+            now = timezone.now()
             rdv.statut = 'termine'
-            rdv.save(update_fields=['statut'])
+            rdv.date_termine = now
+            if rdv.date_en_consultation:
+                rdv.temps_consultation_minutes = int((now - rdv.date_en_consultation).total_seconds() / 60)
+            rdv.save(update_fields=['statut', 'date_termine', 'temps_consultation_minutes'])
             messages.success(request, 'Consultation terminée.')
             return redirect('patients:rdv_global')
 
@@ -739,3 +756,108 @@ def typevisite_delete(request, pk):
         tv.delete()
         messages.success(request, f'Type de visite "{nom}" supprimé.')
     return redirect('patients:typevisite_list')
+
+
+@login_required
+def ordonnance_create(request, pk):
+    patient = get_object_or_404(Patient, pk=pk)
+    from consultations.models import Consultation as Consult, Ordonnance, LigneOrdonnance
+
+    consultation = None
+    consultation_pk = request.GET.get('consultation') or request.POST.get('consultation_id')
+    rdv_pk = request.GET.get('rdv') or request.POST.get('rdv_id')
+
+    if consultation_pk:
+        consultation = get_object_or_404(Consult, pk=consultation_pk)
+    elif rdv_pk:
+        rdv_obj = get_object_or_404(RendezVous, pk=rdv_pk)
+        try:
+            consultation = rdv_obj.consultation
+        except Exception:
+            consultation = Consult.objects.create(
+                patient=patient,
+                medecin=rdv_obj.medecin,
+                rendez_vous=rdv_obj,
+                motif=rdv_obj.motif or 'Consultation',
+                cree_par=request.user,
+            )
+
+    if request.method == 'POST':
+        if consultation is None:
+            messages.error(request, "Impossible de créer une ordonnance sans consultation associée.")
+            return redirect('patients:ordonnance_list', pk=pk)
+
+        notes = request.POST.get('notes', '')
+        date_expiration = request.POST.get('date_expiration') or None
+        statut = request.POST.get('statut', 'emise')
+        type_ordonnance = request.POST.get('type_ordonnance', 'interne')
+
+        ordonnance = Ordonnance.objects.create(
+            consultation=consultation,
+            notes=notes,
+            date_expiration=date_expiration,
+            statut=statut,
+            type_ordonnance=type_ordonnance,
+        )
+
+        medicaments = request.POST.getlist('medicament[]')
+        medicaments_libres = request.POST.getlist('medicament_libre[]')
+        posologies = request.POST.getlist('posologie[]')
+        durees = request.POST.getlist('duree[]')
+        quantites = request.POST.getlist('quantite[]')
+
+        for i, posologie in enumerate(posologies):
+            if not posologie.strip():
+                continue
+            med_id = medicaments[i] if i < len(medicaments) else ''
+            med_libre = medicaments_libres[i] if i < len(medicaments_libres) else ''
+            duree = durees[i] if i < len(durees) else ''
+            quantite_val = quantites[i] if i < len(quantites) else '1'
+            try:
+                quantite = int(quantite_val)
+            except (ValueError, TypeError):
+                quantite = 1
+
+            ligne = LigneOrdonnance(
+                ordonnance=ordonnance,
+                posologie=posologie,
+                medicament_libre=med_libre,
+                duree=duree,
+                quantite=quantite,
+            )
+            if med_id:
+                try:
+                    ligne.medicament_id = int(med_id)
+                except (ValueError, TypeError):
+                    pass
+            ligne.save()
+
+        messages.success(request, f"Ordonnance {ordonnance.numero} créée avec succès.")
+        return redirect('patients:ordonnance_detail', pk=ordonnance.pk)
+
+    try:
+        from pharmacie.models import Medicament
+        medicaments_dispo = list(Medicament.objects.filter(actif=True).values('pk', 'designation', 'dosage', 'forme'))
+    except Exception:
+        medicaments_dispo = []
+
+    return render(request, 'pharmacie/ordonnance_create.html', {
+        'patient': patient,
+        'consultation': consultation,
+        'medicaments_dispo': medicaments_dispo,
+        'titre': 'Créer une ordonnance',
+        'statuts': [('emise', 'Émise'), ('delivree', 'Délivrée'), ('partielle', 'Partielle'), ('expiree', 'Expirée')],
+        'types': [('interne', 'Interne'), ('externe', 'Externe')],
+    })
+
+
+@login_required
+def ordonnance_detail(request, pk):
+    from consultations.models import Ordonnance
+    ordonnance = get_object_or_404(
+        Ordonnance.objects
+        .select_related('consultation__patient', 'consultation__medecin')
+        .prefetch_related('lignes__medicament'),
+        pk=pk,
+    )
+    return render(request, 'pharmacie/ordonnance_detail.html', {'ordonnance': ordonnance})

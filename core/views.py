@@ -81,12 +81,52 @@ def logout_view(request):
 @login_required(login_url='login')
 def dashboard(request):
     from patients.models import Patient, RendezVous
+    from hospitalisation.models import Hospitalisation
+    from pharmacie.models import Medicament
+    from laboratoire.models import AnalyseLaboratoire
+    from employer.models import Employe
+    from soins.models import Soin
+
+    today = timezone.now().date()
+
+    stats = {
+        'patients_total': Patient.objects.filter(actif=True).count(),
+        'rdv_today': RendezVous.objects.filter(date_heure__date=today).count(),
+        'hospitalisations': Hospitalisation.objects.filter(statut='hospitalise').count(),
+        'analyses_pending': AnalyseLaboratoire.objects.filter(statut__in=['recu', 'en_analyse']).count(),
+        'medicaments_alerte': Medicament.objects.filter(stock_actuel__lte=F('stock_alerte')).count(),
+        'employes_actifs': Employe.objects.filter(statut='actif').count(),
+        'soins_aujourd_hui': Soin.objects.filter(date_creation__date=today).count(),
+    }
+
+    try:
+        from modules_permissions.models import get_user_modules
+        user_modules = get_user_modules(request.user)
+        accessible_codes = set(user_modules.values_list('code', flat=True))
+    except Exception:
+        user_modules = []
+        accessible_codes = set()
+
+    return render(request, 'core/dashboard.html', {
+        'stats': stats,
+        'today': today,
+        'user': request.user,
+        'user_modules': user_modules,
+        'accessible_codes': accessible_codes,
+    })
+
+
+@login_required(login_url='login')
+def kpi_dashboard(request):
+    import json as _json
+    from patients.models import Patient, RendezVous
     from consultations.models import Consultation
     from hospitalisation.models import Hospitalisation
     from pharmacie.models import Medicament
     from laboratoire.models import AnalyseLaboratoire
-    from ressources_humaines.models import Employe
+    from employer.models import Employe
     from soins.models import Soin
+    from medecins.models import Medecin
 
     today = timezone.now().date()
 
@@ -100,16 +140,50 @@ def dashboard(request):
         'medicaments_alerte': Medicament.objects.filter(stock_actuel__lte=F('stock_alerte')).count(),
         'employes_actifs': Employe.objects.filter(statut='actif').count(),
         'soins_aujourd_hui': Soin.objects.filter(date_creation__date=today).count(),
+        'medecins_actifs': Medecin.objects.filter(actif=True).count(),
+        'medecins_total': Medecin.objects.count(),
     }
+
+    try:
+        from facturation.models import Facture
+        from django.db.models import Sum
+        fq = Facture.objects.filter(statut__in=['brouillon', 'emise'])
+        stats['factures_impayees_count'] = fq.count()
+        m = fq.aggregate(t=Sum('montant_total'))['t'] or 0
+        if m >= 1_000_000:
+            stats['factures_montant_fmt'] = f"{m/1_000_000:.1f}M F"
+        elif m >= 1_000:
+            stats['factures_montant_fmt'] = f"{int(m/1_000)}k F"
+        else:
+            stats['factures_montant_fmt'] = f"{int(m)} F"
+    except Exception:
+        stats['factures_impayees_count'] = 0
+        stats['factures_montant_fmt'] = "0 F"
+
+    stats['patients_anniversaires'] = Patient.objects.filter(
+        date_naissance__month=today.month, date_naissance__day=today.day, actif=True
+    ).count()
+    stats['employes_anniversaires'] = Employe.objects.filter(
+        date_naissance__month=today.month, date_naissance__day=today.day
+    ).count()
+
+    chart_labels, chart_patients, chart_rdv = [], [], []
+    current_monday = today - timedelta(days=today.weekday())
+    for i in range(7, -1, -1):
+        w_start = current_monday - timedelta(weeks=i)
+        w_end = w_start + timedelta(days=6)
+        chart_labels.append(w_start.strftime('%d/%m'))
+        chart_patients.append(Patient.objects.filter(date_creation__date__range=[w_start, w_end]).count())
+        chart_rdv.append(RendezVous.objects.filter(date_heure__date__range=[w_start, w_end]).count())
+
+    chart_data = _json.dumps({'labels': chart_labels, 'patients': chart_patients, 'rdv': chart_rdv})
 
     rdv_auj = RendezVous.objects.filter(
         date_heure__date=today,
         statut__in=['planifie', 'confirme', 'en_attente', 'en_consultation']
-    ).select_related('patient', 'medecin').order_by('date_heure')[:8]
+    ).select_related('patient', 'medecin').order_by('date_heure')[:10]
 
-    last_cons = Consultation.objects.select_related(
-        'patient', 'medecin'
-    ).order_by('-date_heure')[:6]
+    last_cons = Consultation.objects.select_related('patient', 'medecin').order_by('-date_heure')[:6]
 
     try:
         from modules_permissions.models import get_user_modules
@@ -119,7 +193,7 @@ def dashboard(request):
         user_modules = []
         accessible_codes = set()
 
-    return render(request, 'core/dashboard.html', {
+    return render(request, 'core/kpi_dashboard.html', {
         'stats': stats,
         'rdv_auj': rdv_auj,
         'last_cons': last_cons,
@@ -127,6 +201,7 @@ def dashboard(request):
         'user': request.user,
         'user_modules': user_modules,
         'accessible_codes': accessible_codes,
+        'chart_data': chart_data,
     })
 
 
@@ -375,7 +450,7 @@ def pharmacie_list(request):
             except (CommandePharmacies.DoesNotExist, ValueError):
                 pass
 
-    medicaments = Medicament.objects.all().order_by('nom')
+    medicaments = Medicament.objects.all().order_by('designation')
     paginator = Paginator(medicaments, 25)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
@@ -397,6 +472,50 @@ def pharmacie_list(request):
         'breadcrumb': breadcrumb,
         'obj': derniere_commande,
         'logs': logs,
+    })
+
+
+@login_required(login_url='login')
+def ordonnances_list(request):
+    from consultations.models import Ordonnance
+    from django.core.paginator import Paginator
+    from django.db.models import Q as DbQ
+
+    qs = Ordonnance.objects.select_related(
+        'consultation__patient', 'consultation__medecin'
+    ).prefetch_related('lignes').order_by('-date_emission')
+
+    q = request.GET.get('q', '').strip()
+    statut_filtre = request.GET.get('statut', '')
+    type_filtre = request.GET.get('type', '')
+
+    if q:
+        qs = qs.filter(
+            DbQ(numero__icontains=q) |
+            DbQ(consultation__patient__nom__icontains=q) |
+            DbQ(consultation__patient__prenoms__icontains=q)
+        )
+    if statut_filtre:
+        qs = qs.filter(statut=statut_filtre)
+    if type_filtre:
+        qs = qs.filter(type_ordonnance=type_filtre)
+
+    stats = {
+        'total':     Ordonnance.objects.count(),
+        'emises':    Ordonnance.objects.filter(statut='emise').count(),
+        'delivrees': Ordonnance.objects.filter(statut='delivree').count(),
+        'expirees':  Ordonnance.objects.filter(statut='expiree').count(),
+    }
+
+    paginator = Paginator(qs, 25)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    return render(request, 'pharmacie/ordonnance_list.html', {
+        'page_obj': page_obj,
+        'q': q,
+        'statut_filtre': statut_filtre,
+        'type_filtre': type_filtre,
+        'stats': stats,
     })
 
 
@@ -451,7 +570,7 @@ def caisse_list(request):
 
 @login_required(login_url='login')
 def ressources_humaines_list(request):
-    from ressources_humaines.models import Employe, Conge
+    from employer.models import Employe, Conge
     from django.core.paginator import Paginator
 
     # Journalisation des actions POST (create/edit/statut sur Conge ou Employe)

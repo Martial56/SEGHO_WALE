@@ -1,18 +1,357 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% block topbar_title %}Ressources humaines{% endblock %}
 
-{% block module_navbar %}
-<nav class="o-nav">
-  <a href="{% url 'dashboard' %}" class="o-nav-grid" title="Accueil">
-    <i class="bi bi-grid-3x3-gap-fill"></i>
+{% block topbar_title %}Employés{% endblock %}
+
+{% block extra_css %}
+{% load static %}
+    <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
+<style>
+/* ══════════════════════════════════════════════════════
+   PALETTE VERT OLIVE — module Ressources Humaines
+   Inspirée du logo Centre Médico-Social WALÉ
+══════════════════════════════════════════════════════ */
+:root {
+  --rh-900: #1b2e13;
+  --rh-800: #27421c;
+  --rh-700: #345726;
+  --rh-600: #4a7236;
+  --rh-500: #5e8e47;
+  --rh-400: #7aaa62;
+  --rh-300: #9dc284;
+  --rh-200: #c2d9b3;
+  --rh-100: #daecd1;
+  --rh-50:  #edf6e8;
+
+  --rh-surface: #fff;
+  --rh-border:  rgba(74,114,54,0.14);
+  --rh-text:    #1b2e13;
+  --rh-muted:   rgba(0,0,0,0.45);
+  --rh-bg:      #f2f7ef;
+}
+
+/* ── Dark mode overrides ── */
+html[data-theme="dark"] {
+  --rh-50:      #162212;
+  --rh-100:     #1e3019;
+  --rh-surface: #111c0e;
+  --rh-border:  rgba(122,170,98,0.18);
+  --rh-text:    #c0d9b0;
+  --rh-muted:   rgba(255,255,255,0.4);
+  --rh-bg:      #0b1209;
+}
+
+/* ── Nav ── */
+.rh-nav {
+  background: var(--rh-surface);
+  border-bottom: 1px solid rgba(0,0,0,0.07);
+  margin: -32px -32px 0;
+  padding: 0 32px;
+  display: flex;
+  align-items: stretch;
+  height: 44px;
+  box-shadow: 0 1px 3px rgba(74,114,54,0.06);
+  position: sticky;
+  top: var(--topbar-h);
+  z-index: 250;
+  gap: 2px;
+}
+.rh-nav-link {
+  padding: 11px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--rh-muted);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  margin-bottom: -1px;
+}
+.rh-nav-link:hover  { color: var(--rh-600); }
+.rh-nav-link.active { color: var(--rh-600); border-bottom-color: var(--rh-500); font-weight: 600; }
+html[data-theme="dark"] .rh-nav { background: var(--rh-surface); border-bottom-color: var(--rh-border); }
+html[data-theme="dark"] .rh-nav-link        { color: rgba(255,255,255,0.35); }
+html[data-theme="dark"] .rh-nav-link:hover  { color: var(--rh-300); }
+html[data-theme="dark"] .rh-nav-link.active { color: var(--rh-300); border-bottom-color: var(--rh-400); }
+
+/* ── Boutons RH ── */
+.btn-rh {
+  background: var(--rh-600);
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s, box-shadow 0.15s;
+  font-family: 'Sora', sans-serif;
+}
+.btn-rh:hover { background: var(--rh-700); box-shadow: 0 3px 10px rgba(74,114,54,0.28); color: #fff; }
+
+.btn-rh-outline {
+  border: 1.5px solid var(--rh-600);
+  color: var(--rh-600);
+  background: transparent;
+  border-radius: 7px;
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s, color 0.15s;
+  font-family: 'Sora', sans-serif;
+}
+.btn-rh-outline:hover { background: var(--rh-600); color: #fff; }
+html[data-theme="dark"] .btn-rh-outline { border-color: var(--rh-400); color: var(--rh-300); }
+html[data-theme="dark"] .btn-rh-outline:hover { background: var(--rh-600); color: #fff; border-color: var(--rh-600); }
+
+.btn-rh-sm {
+  border: 1px solid var(--rh-600);
+  color: var(--rh-600);
+  background: transparent;
+  border-radius: 5px;
+  padding: 4px 11px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: background 0.15s, color 0.15s;
+  font-family: 'Sora', sans-serif;
+}
+.btn-rh-sm:hover { background: var(--rh-600); color: #fff; }
+html[data-theme="dark"] .btn-rh-sm { border-color: var(--rh-400); color: var(--rh-300); }
+html[data-theme="dark"] .btn-rh-sm:hover { background: var(--rh-600); color: #fff; border-color: var(--rh-600); }
+
+.btn-danger-sm {
+  border: 1px solid #c0392b;
+  color: #c0392b;
+  background: transparent;
+  border-radius: 5px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: background 0.15s, color 0.15s;
+  font-family: 'Sora', sans-serif;
+}
+.btn-danger-sm:hover { background: #c0392b; color: #fff; }
+html[data-theme="dark"] .btn-danger-sm { border-color: #e87070; color: #e87070; }
+html[data-theme="dark"] .btn-danger-sm:hover { background: #c0392b; color: #fff; border-color: #c0392b; }
+
+/* ── Badges statut ── */
+.badge-actif {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(22,169,107,0.12);
+  color: #0d7a4c;
+  border: 1px solid rgba(22,169,107,0.25);
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+}
+.badge-actif::before {
+  content: '';
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #16a96b;
+  flex-shrink: 0;
+}
+.badge-suspendu {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(232,154,26,0.12);
+  color: #8a5c00;
+  border: 1px solid rgba(232,154,26,0.25);
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+}
+.badge-suspendu::before {
+  content: '';
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--amber);
+  flex-shrink: 0;
+}
+.badge-quitte {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(0,0,0,0.06);
+  color: rgba(0,0,0,0.5);
+  border: 1px solid rgba(0,0,0,0.1);
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+}
+.badge-quitte::before {
+  content: '';
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #999;
+  flex-shrink: 0;
+}
+html[data-theme="dark"] .badge-actif    { background: rgba(22,169,107,0.18); color: #6eddb0; border-color: rgba(22,169,107,0.3); }
+html[data-theme="dark"] .badge-suspendu { background: rgba(232,154,26,0.18); color: #f0c060; border-color: rgba(232,154,26,0.3); }
+html[data-theme="dark"] .badge-quitte   { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.4); border-color: rgba(255,255,255,0.12); }
+
+/* ── Carte section RH ── */
+.rh-card {
+  background: var(--rh-surface);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+.rh-card-header {
+  padding: 16px 22px 14px;
+  border-bottom: 1px solid var(--rh-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.rh-card-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--rh-text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-left: 3px solid var(--rh-600);
+  padding-left: 10px;
+}
+.rh-card-body { padding: 20px 22px; }
+html[data-theme="dark"] .rh-card { background: var(--rh-surface); }
+html[data-theme="dark"] .rh-card-header { border-bottom-color: var(--rh-border); }
+html[data-theme="dark"] .rh-card-title  { color: var(--rh-text); }
+
+/* ── Champs détail ── */
+.rh-field {
+  display: flex; flex-direction: column; gap: 2px;
+  padding-bottom: 13px;
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+  margin-bottom: 2px;
+}
+.rh-field:last-child { border-bottom: none; padding-bottom: 0; }
+.rh-field .lbl {
+  font-size: 11px; font-weight: 700;
+  color: rgba(0,0,0,0.38);
+  text-transform: uppercase; letter-spacing: 0.4px;
+}
+.rh-field .val {
+  font-size: 14px; color: var(--rh-text); font-weight: 500;
+}
+.rh-field .val.empty { color: rgba(0,0,0,0.25); font-style: italic; font-weight: 400; }
+html[data-theme="dark"] .rh-field { border-bottom-color: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .rh-field .lbl { color: rgba(255,255,255,0.38); }
+html[data-theme="dark"] .rh-field .val { color: var(--rh-text); }
+html[data-theme="dark"] .rh-field .val.empty { color: rgba(255,255,255,0.2); }
+
+/* ── Inputs RH ── */
+.rh-input {
+  width: 100%;
+  padding: 9px 13px;
+  border: 1.5px solid rgba(0,0,0,0.12);
+  border-radius: 7px;
+  font-family: 'Sora', sans-serif;
+  font-size: 13.5px;
+  color: var(--rh-text);
+  background: #fff;
+  transition: border-color 0.18s, box-shadow 0.18s;
+}
+.rh-input:focus {
+  outline: none;
+  border-color: var(--rh-600);
+  box-shadow: 0 0 0 3px rgba(74,114,54,0.1);
+}
+.rh-input::placeholder { color: rgba(0,0,0,0.3); }
+html[data-theme="dark"] .rh-input {
+  background: #0e1428;
+  border-color: rgba(255,255,255,0.1);
+  color: var(--rh-text);
+}
+html[data-theme="dark"] .rh-input:focus {
+  border-color: var(--rh-400);
+  box-shadow: 0 0 0 3px rgba(107,128,217,0.18);
+}
+html[data-theme="dark"] .rh-input::placeholder { color: rgba(255,255,255,0.2); }
+
+/* ── Label formulaire ── */
+.rh-label {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: rgba(0,0,0,0.45);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 5px;
+}
+.rh-label .req { color: var(--rose); margin-left: 2px; }
+html[data-theme="dark"] .rh-label { color: rgba(255,255,255,0.4); }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .rh-nav { margin: -32px -20px 0; padding: 0 20px; overflow-x: auto; }
+}
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="rh-nav">
+  <a href="{% url 'rh_dashboard' %}"
+     class="rh-nav-link {% block rh_nav_dashboard %}{% endblock %}">
+    <i class="bi bi-bar-chart-fill"></i> Tableau de bord
   </a>
-  <span class="o-nav-brand">
-    <i class="bi bi-people-fill"></i>
-    Ressources humaines
-  </span>
-  <a href="{% url 'ressources_humaines_list' %}" class="o-nav-link {% if request.resolver_match.url_name == 'ressources_humaines_list' %}active{% endif %}">Employés</a>
+  <a href="{% url 'ressources_humaines_list' %}"
+     class="rh-nav-link {% block rh_nav_list %}{% endblock %}">
+    <i class="bi bi-people-fill"></i> Employés
+  </a>
+  <a href="{% url 'rh_conge_list' %}"
+     class="rh-nav-link {% block rh_nav_conges %}{% endblock %}">
+    <i class="bi bi-calendar-check-fill"></i> Congés
+  </a>
+  <a href="{% url 'rh_annuaire' %}"
+     class="rh-nav-link {% block rh_nav_annuaire %}{% endblock %}">
+    <i class="bi bi-person-lines-fill"></i> Annuaire
+  </a>
+  <a href="{% url 'rh_organigramme' %}"
+  class="rh-nav-link {% block rh_nav_org %}{% endblock %}">
+    <i class="bi bi-diagram-3-fill"></i> Organigramme
+  </a>
+  {% if can_manage %}
+  <a href="{% url 'rh_nouveau' %}"
+     class="rh-nav-link {% block rh_nav_nouveau %}{% endblock %}">
+    <i class="bi bi-person-plus-fill"></i> Nouvel employé
+  </a>
+  <a href="{% url 'rh_import' %}"
+     class="rh-nav-link {% block rh_nav_import %}{% endblock %}">
+    <i class="bi bi-upload"></i> Import
+  </a>
+  {% endif %}
 </nav>
 {% endblock %}
 
-{% block breadcrumb %}{% endblock %}

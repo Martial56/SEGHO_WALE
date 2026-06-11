@@ -1,0 +1,447 @@
+{% extends 'planning/base.html' %}
+{% load i18n %}
+
+{% block nav_stats %}active{% endblock %}
+
+{% block extra_planning_css %}
+/* ── Subheader ── */
+.pl-subheader {
+  position: sticky; top: 38px; z-index: 180;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 10px 0 0; 
+}
+.pl-subheader-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 32px 10px;
+}
+.pl-subheader h1 { font-size: 18px; font-weight: 700; color: var(--text); margin: 0; }
+
+/* ── Summary cards ── */
+.stats-cards {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px; margin-bottom: 24px;
+  padding: 16px 32px 0;
+}
+.stats-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 18px 20px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.stats-card-label {
+  font-size: 11.5px; font-weight: 600; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.stats-card-value {
+  font-size: 28px; font-weight: 800; color: var(--pl-700); line-height: 1.1;
+}
+.stats-card-sub { font-size: 11.5px; color: var(--text-muted); }
+
+/* ── Table ── */
+.pl-table-wrap { overflow-x: auto; margin-bottom: 28px; }
+.pl-stats-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.pl-stats-table thead th {
+  background: var(--pl-700); color: #fff; padding: 9px 14px;
+  font-weight: 600; font-size: 12px; text-align: left; white-space: nowrap;
+}
+.pl-stats-table tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+.pl-stats-table tbody tr:hover { background: var(--pl-50); }
+.pl-stats-table tbody td { padding: 10px 14px; vertical-align: middle; color: var(--text); }
+
+/* ── Progress bar ── */
+.pct-bar-wrap {
+  display: flex; align-items: center; gap: 10px; min-width: 180px;
+}
+.pct-bar-track {
+  flex: 1; height: 8px; background: var(--border);
+  border-radius: 99px; overflow: hidden;
+}
+.pct-bar-fill {
+  height: 100%; border-radius: 99px; transition: width 0.4s;
+}
+.pct-bar-fill.green  { background: var(--pl-500); }
+.pct-bar-fill.orange { background: #e67e22; }
+.pct-bar-fill.red    { background: #c0392b; }
+.pct-label { font-size: 13px; font-weight: 700; min-width: 36px; text-align: right; }
+.pct-label.green  { color: var(--pl-600); }
+.pct-label.orange { color: #e67e22; }
+.pct-label.red    { color: #c0392b; }
+
+/* ── Monthly chart ── */
+.monthly-chart-section { margin-bottom: 28px; padding: 0 32px; }
+.monthly-chart-section h2 {
+  font-size: 15px; font-weight: 700; color: var(--text);
+  margin: 0 0 14px;
+}
+.monthly-canvas-wrap {
+  position: relative; height: 200px;
+}
+
+/* ── Empty ── */
+.pl-empty { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+.pl-empty i { font-size: 48px; display: block; margin-bottom: 12px; color: var(--pl-300); }
+
+/* ── Sections avancées ── */
+.stats-section { margin-bottom: 32px; }
+.stats-section h2 {
+  font-size: 15px; font-weight: 700; color: var(--text);
+  margin: 0 0 14px; display: flex; align-items: center; gap: 8px;
+  padding: 0 32px;
+}
+.stats-section h2 i { color: var(--pl-600); }
+.stats-grid-2 {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  padding: 0 0 32px;
+}
+@media (max-width: 900px) { .stats-grid-2 { grid-template-columns: 1fr; } }
+
+/* Classement médecins */
+.top-med-list { display: flex; flex-direction: column; gap: 6px; padding: 0 32px; }
+.top-med-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 8px;
+}
+.top-med-rank {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--pl-600); color: #fff;
+  font-size: 11px; font-weight: 700; display: flex;
+  align-items: center; justify-content: center; flex-shrink: 0;
+}
+.top-med-rank.rank-1 { background: #f39c12; }
+.top-med-rank.rank-2 { background: #7f8c8d; }
+.top-med-rank.rank-3 { background: #c0392b; }
+.top-med-name { flex: 1; font-size: 13px; font-weight: 600; color: var(--text); }
+.top-med-count {
+  font-size: 12px; font-weight: 700; color: var(--pl-600);
+  background: var(--pl-50); border-radius: 20px; padding: 2px 10px;
+}
+
+/* ── Highlight best/worst ── */
+tr.row-best td { background: var(--pl-50) !important; }
+tr.row-worst td { background: #fce4ec !important; }
+html[data-theme="dark"] tr.row-worst td { background: #3d0010 !important; }
+
+/* ── Brouillon badge dark mode ── */
+.badge-brouillon-inline {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: #fff3cd; color: #856404;
+  border-radius: 20px; padding: 2px 9px; font-size: 11px; font-weight: 600;
+}
+html[data-theme="dark"] .badge-brouillon-inline { background: #3d2e00; color: #ffd666; }
+{% endblock %}
+
+{% block content %}
+
+<!-- ══ SUBHEADER ══ -->
+<div class="pl-subheader">
+  <div class="pl-subheader-row">
+    <h1><i class="bi bi-bar-chart-line" style="color:var(--pl-600);margin-right:8px;"></i>Statistiques de couverture</h1>
+  </div>
+</div>
+
+{% if stats %}
+
+<!-- ══ SUMMARY CARDS ══ -->
+<div class="stats-cards">
+  <div class="stats-card">
+    <span class="stats-card-label"><i class="bi bi-calendar3"></i> Plannings analysés</span>
+    <span class="stats-card-value">{{ total_plannings }}</span>
+    <span class="stats-card-sub">12 derniers</span>
+  </div>
+  <div class="stats-card">
+    <span class="stats-card-label"><i class="bi bi-percent"></i> Couverture moyenne</span>
+    <span class="stats-card-value"
+          style="color:{% if avg_global >= 80 %}var(--pl-600){% elif avg_global >= 50 %}#e67e22{% else %}#c0392b{% endif %}">
+      {{ avg_global }}%
+    </span>
+    <span class="stats-card-sub">sur {{ total_plannings }} semaine{{ total_plannings|pluralize }}</span>
+  </div>
+  {% if best %}
+  <div class="stats-card">
+    <span class="stats-card-label"><i class="bi bi-trophy"></i> Meilleure semaine</span>
+    <span class="stats-card-value" style="color:var(--pl-600)">{{ best.pct }}%</span>
+    <span class="stats-card-sub">S{{ best.planning.semaine_debut|date:"W" }} — {{ best.planning.semaine_debut|date:"d/m/Y" }}</span>
+  </div>
+  {% endif %}
+  {% if worst %}
+  <div class="stats-card">
+    <span class="stats-card-label"><i class="bi bi-exclamation-triangle"></i> Semaine la plus faible</span>
+    <span class="stats-card-value" style="color:#c0392b">{{ worst.pct }}%</span>
+    <span class="stats-card-sub">S{{ worst.planning.semaine_debut|date:"W" }} — {{ worst.planning.semaine_debut|date:"d/m/Y" }}</span>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ══ MONTHLY CHART ══ -->
+{% if monthly_stats %}
+<div class="monthly-chart-section">
+  <h2><i class="bi bi-bar-chart-fill" style="color:var(--pl-600);margin-right:6px;"></i>Couverture mensuelle moyenne</h2>
+  <div class="monthly-canvas-wrap">
+    <canvas id="monthlyChart"></canvas>
+  </div>
+</div>
+{{ monthly_stats|json_script:"monthly-stats-data" }}
+{% endif %}
+
+<!-- ══ TABLE DES 12 DERNIERS ══ -->
+<div class="pl-table-wrap">
+  <table class="pl-stats-table">
+    <thead>
+      <tr>
+        <th>Semaine</th>
+        <th>Période</th>
+        <th>Affectations</th>
+        <th>Créneaux total</th>
+        <th>Couverture</th>
+        <th>État</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in stats %}
+      {% if s.pct >= 80 %}
+        {% with color="green" row_class="" %}
+        <tr class="{{ row_class }}{% if best and s.planning.pk == best.planning.pk %} row-best{% endif %}{% if worst and s.planning.pk == worst.planning.pk %} row-worst{% endif %}">
+          <td><strong>S{{ s.planning.semaine_debut|date:"W" }} — {{ s.planning.semaine_debut|date:"Y" }}</strong></td>
+          <td>Du <strong>{{ s.planning.semaine_debut|date:"d/m/Y" }}</strong> au {{ s.planning.semaine_fin|date:"d/m/Y" }}</td>
+          <td>{{ s.filled }}</td>
+          <td>{{ s.total_cells }}</td>
+          <td>
+            <div class="pct-bar-wrap">
+              <div class="pct-bar-track">
+                <div class="pct-bar-fill {{ color }}" style="width:{{ s.pct }}%;"></div>
+              </div>
+              <span class="pct-label {{ color }}">{{ s.pct }}%</span>
+            </div>
+          </td>
+          <td>
+            {% if s.planning.publie %}
+              <span style="display:inline-flex;align-items:center;gap:4px;background:var(--pl-100);color:var(--pl-800);border-radius:20px;padding:2px 9px;font-size:11px;font-weight:600;">
+                <i class="bi bi-check-circle-fill"></i> Publié
+              </span>
+            {% else %}
+              <span class="badge-brouillon-inline">
+                <i class="bi bi-pencil"></i> Brouillon
+              </span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endwith %}
+      {% elif s.pct >= 50 %}
+        {% with color="orange" %}
+        <tr class="{% if best and s.planning.pk == best.planning.pk %}row-best{% endif %}{% if worst and s.planning.pk == worst.planning.pk %} row-worst{% endif %}">
+          <td><strong>S{{ s.planning.semaine_debut|date:"W" }} — {{ s.planning.semaine_debut|date:"Y" }}</strong></td>
+          <td>Du <strong>{{ s.planning.semaine_debut|date:"d/m/Y" }}</strong> au {{ s.planning.semaine_fin|date:"d/m/Y" }}</td>
+          <td>{{ s.filled }}</td>
+          <td>{{ s.total_cells }}</td>
+          <td>
+            <div class="pct-bar-wrap">
+              <div class="pct-bar-track">
+                <div class="pct-bar-fill {{ color }}" style="width:{{ s.pct }}%;"></div>
+              </div>
+              <span class="pct-label {{ color }}">{{ s.pct }}%</span>
+            </div>
+          </td>
+          <td>
+            {% if s.planning.publie %}
+              <span style="display:inline-flex;align-items:center;gap:4px;background:var(--pl-100);color:var(--pl-800);border-radius:20px;padding:2px 9px;font-size:11px;font-weight:600;">
+                <i class="bi bi-check-circle-fill"></i> Publié
+              </span>
+            {% else %}
+              <span class="badge-brouillon-inline">
+                <i class="bi bi-pencil"></i> Brouillon
+              </span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endwith %}
+      {% else %}
+        {% with color="red" %}
+        <tr class="{% if best and s.planning.pk == best.planning.pk %}row-best{% endif %}{% if worst and s.planning.pk == worst.planning.pk %} row-worst{% endif %}">
+          <td><strong>S{{ s.planning.semaine_debut|date:"W" }} — {{ s.planning.semaine_debut|date:"Y" }}</strong></td>
+          <td>Du <strong>{{ s.planning.semaine_debut|date:"d/m/Y" }}</strong> au {{ s.planning.semaine_fin|date:"d/m/Y" }}</td>
+          <td>{{ s.filled }}</td>
+          <td>{{ s.total_cells }}</td>
+          <td>
+            <div class="pct-bar-wrap">
+              <div class="pct-bar-track">
+                <div class="pct-bar-fill {{ color }}" style="width:{{ s.pct }}%;"></div>
+              </div>
+              <span class="pct-label {{ color }}">{{ s.pct }}%</span>
+            </div>
+          </td>
+          <td>
+            {% if s.planning.publie %}
+              <span style="display:inline-flex;align-items:center;gap:4px;background:var(--pl-100);color:var(--pl-800);border-radius:20px;padding:2px 9px;font-size:11px;font-weight:600;">
+                <i class="bi bi-check-circle-fill"></i> Publié
+              </span>
+            {% else %}
+              <span class="badge-brouillon-inline">
+                <i class="bi bi-pencil"></i> Brouillon
+              </span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endwith %}
+      {% endif %}
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- ══ STATS PAR BUREAU + TOP MÉDECINS ══ -->
+{% if bureau_stats or top_medecins %}
+<div class="stats-grid-2">
+
+  {% if bureau_stats %}
+  <div class="stats-section">
+    <h2><i class="bi bi-building"></i> Couverture par bureau <small style="font-size:11px;color:var(--text-muted);font-weight:400;">(12 dernières semaines)</small></h2>
+    <div class="pl-table-wrap">
+      <table class="pl-stats-table">
+        <thead>
+          <tr>
+            <th>Bureau / Service</th>
+            <th>Affectations</th>
+            <th>Couverture</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for b in bureau_stats %}
+          {% if b.pct >= 80 %}{% with color="green" %}
+          <tr>
+            <td><strong>{{ b.bureau.nom }}</strong></td>
+            <td>{{ b.filled }} / {{ b.total }}</td>
+            <td>
+              <div class="pct-bar-wrap">
+                <div class="pct-bar-track"><div class="pct-bar-fill {{ color }}" style="width:{{ b.pct }}%;"></div></div>
+                <span class="pct-label {{ color }}">{{ b.pct }}%</span>
+              </div>
+            </td>
+          </tr>
+          {% endwith %}{% elif b.pct >= 50 %}{% with color="orange" %}
+          <tr>
+            <td><strong>{{ b.bureau.nom }}</strong></td>
+            <td>{{ b.filled }} / {{ b.total }}</td>
+            <td>
+              <div class="pct-bar-wrap">
+                <div class="pct-bar-track"><div class="pct-bar-fill {{ color }}" style="width:{{ b.pct }}%;"></div></div>
+                <span class="pct-label {{ color }}">{{ b.pct }}%</span>
+              </div>
+            </td>
+          </tr>
+          {% endwith %}{% else %}{% with color="red" %}
+          <tr>
+            <td><strong>{{ b.bureau.nom }}</strong></td>
+            <td>{{ b.filled }} / {{ b.total }}</td>
+            <td>
+              <div class="pct-bar-wrap">
+                <div class="pct-bar-track"><div class="pct-bar-fill {{ color }}" style="width:{{ b.pct }}%;"></div></div>
+                <span class="pct-label {{ color }}">{{ b.pct }}%</span>
+              </div>
+            </td>
+          </tr>
+          {% endwith %}{% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if top_medecins %}
+  <div class="stats-section">
+    <h2><i class="bi bi-person-badge"></i> Top médecins planifiés <small style="font-size:11px;color:var(--text-muted);font-weight:400;">(12 dernières semaines)</small></h2>
+    <div class="top-med-list">
+      {% for name, count in top_medecins %}
+      <div class="top-med-item">
+        <span class="top-med-rank {% if forloop.counter == 1 %}rank-1{% elif forloop.counter == 2 %}rank-2{% elif forloop.counter == 3 %}rank-3{% endif %}">
+          {{ forloop.counter }}
+        </span>
+        <span class="top-med-name">{{ name }}</span>
+        <span class="top-med-count">{{ count }} créneaux</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endif %}
+
+{% else %}
+<div class="pl-empty">
+  <i class="bi bi-bar-chart"></i>
+  <p>Aucun planning disponible pour calculer les statistiques.</p>
+  {% if can_manage %}
+  <a href="{% url 'planning_nouveau' %}" class="btn-primary">
+    <i class="bi bi-plus-lg"></i> Créer un planning
+  </a>
+  {% endif %}
+</div>
+{% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+(function() {
+  var dataEl = document.getElementById('monthly-stats-data');
+  if (!dataEl) return;
+  var raw = JSON.parse(dataEl.textContent);
+  if (!raw || !raw.length) return;
+  var reversed = raw.slice().reverse();
+  var labels = reversed.map(function(m) { return m.mois_nom.slice(0, 3) + ' ' + m.year; });
+  var values = reversed.map(function(m) { return m.avg_pct; });
+  var bgColors = values.map(function(v) {
+    return v >= 80 ? 'rgba(94,128,80,0.75)' : v >= 50 ? 'rgba(230,126,34,0.75)' : 'rgba(192,57,43,0.75)';
+  });
+  var borderColors = values.map(function(v) {
+    return v >= 80 ? '#4a6741' : v >= 50 ? '#d35400' : '#a93226';
+  });
+  var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  var gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  var tickColor = isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)';
+
+  new Chart(document.getElementById('monthlyChart'), {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        data: values,
+        backgroundColor: bgColors,
+        borderColor: borderColors,
+        borderWidth: 1.5,
+        borderRadius: 5,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) { return ctx.raw + '% couverture'; }
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          max: 100,
+          ticks: {
+            callback: function(v) { return v + '%'; },
+            stepSize: 20,
+            color: tickColor,
+          },
+          grid: { color: gridColor }
+        },
+        x: {
+          ticks: { color: tickColor },
+          grid: { display: false }
+        }
+      }
+    }
+  });
+})();
+</script>
+
+{% endblock %}

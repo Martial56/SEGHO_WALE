@@ -1,0 +1,1005 @@
+{% extends 'employer/base.html' %}
+{% load i18n %}
+
+{% block topbar_title %}{{ employe.nom_complet|default:employe.nom }}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+/* ── Sticky page header ── */
+.rh-page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 36px 14px;
+  
+  flex-wrap: wrap;
+  position: sticky;
+  top: 38px;
+  z-index: 100;
+  background: #f0f6fa;
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+html[data-theme="dark"] .rh-page-head {
+  background: #071e28;
+  border-bottom-color: rgba(255,255,255,0.05);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+@media (max-width: 1024px) {
+  .rh-page-head { margin: 0 -20px; padding-left: 20px; padding-right: 20px; }
+}
+.rh-page-head-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.rh-back-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px;
+  border-radius: 8px;
+  border: 1.5px solid var(--rh-200);
+  color: var(--rh-700);
+  background: #fff;
+  text-decoration: none;
+  font-size: 15px;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.rh-back-btn:hover { background: var(--rh-50); border-color: var(--rh-400); color: var(--rh-800); }
+html[data-theme="dark"] .rh-back-btn { background: var(--rh-surface); border-color: var(--rh-border); color: var(--rh-300); }
+html[data-theme="dark"] .rh-back-btn:hover { background: rgba(38,83,128,0.15); }
+
+.rh-page-name { font-size: 20px; font-weight: 800; color: var(--rh-900); letter-spacing: -0.2px; }
+html[data-theme="dark"] .rh-page-name { color: var(--rh-text); }
+.rh-page-mat {
+  font-size: 12px; font-weight: 700; font-family: monospace;
+  background: var(--rh-50); color: var(--rh-700);
+  border: 1px solid var(--rh-200);
+  padding: 3px 11px; border-radius: 20px;
+}
+html[data-theme="dark"] .rh-page-mat { background: rgba(38,83,128,0.15); color: var(--rh-300); border-color: var(--rh-border); }
+.rh-page-head-right { display: flex; align-items: center; gap: 8px; }
+
+/* ── Layout: left sidebar + main ── */
+.rh-detail-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 900px) { .rh-detail-layout { grid-template-columns: 1fr; } }
+
+/* ── Profile card (left) ── */
+.rh-profile-card {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  position: sticky;
+  top: calc(38px + 58px);
+}
+html[data-theme="dark"] .rh-profile-card { background: var(--rh-surface); }
+.rh-profile-banner {
+  height: 70px;
+  background: linear-gradient(135deg, var(--rh-700), var(--rh-500));
+}
+.rh-profile-photo-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 20px 16px;
+  margin-top: -40px;
+}
+.rh-profile-photo {
+  width: 80px; height: 80px;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  overflow: hidden;
+  background: var(--rh-100);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+html[data-theme="dark"] .rh-profile-photo { border-color: var(--rh-surface); background: rgba(38,83,128,0.2); }
+.rh-profile-photo img { width: 100%; height: 100%; object-fit: cover; }
+.rh-profile-avatar-lg {
+  width: 80px; height: 80px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; font-weight: 800; color: #fff;
+  border: 3px solid #fff;
+}
+html[data-theme="dark"] .rh-profile-avatar-lg { border-color: var(--rh-surface); }
+.rh-profile-avatar-lg.av-actif    { background: linear-gradient(135deg, var(--rh-600), var(--rh-400)); }
+.rh-profile-avatar-lg.av-suspendu { background: linear-gradient(135deg, #d4830a, #f0a830); }
+.rh-profile-avatar-lg.av-quitte   { background: linear-gradient(135deg, #8a9298, #b0bec5); }
+
+.rh-profile-name {
+  font-size: 15px; font-weight: 800; color: var(--rh-900); text-align: center; margin-top: 10px;
+  line-height: 1.3;
+}
+html[data-theme="dark"] .rh-profile-name { color: var(--rh-text); }
+.rh-profile-sub {
+  font-size: 12px; color: rgba(0,0,0,0.45); text-align: center; margin-top: 3px;
+  font-style: italic;
+}
+html[data-theme="dark"] .rh-profile-sub { color: rgba(255,255,255,0.35); }
+
+.rh-profile-meta {
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--rh-border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.rh-pmeta-item {
+  display: flex; align-items: flex-start; gap: 9px; font-size: 12.5px;
+}
+.rh-pmeta-item i { color: var(--rh-500); margin-top: 1px; flex-shrink: 0; font-size: 13px; }
+.rh-pmeta-item .pm-val { color: var(--rh-text); font-weight: 500; line-height: 1.4; }
+.rh-pmeta-item .pm-lbl { font-size: 10.5px; color: var(--rh-muted); display: block; }
+html[data-theme="dark"] .rh-pmeta-item .pm-val { color: var(--rh-text); }
+
+/* ── Main sections ── */
+.rh-sections { display: flex; flex-direction: column; gap: 18px; }
+
+/* ── Section header ── */
+.rh-section-title {
+  font-size: 13px; font-weight: 700; color: var(--rh-800);
+  border-left: 3px solid var(--rh-600); padding-left: 10px;
+  display: flex; align-items: center; gap: 8px;
+}
+html[data-theme="dark"] .rh-section-title { color: var(--rh-300); }
+
+/* ── 2-col grid inside card ── */
+.rh-fields-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 28px;
+}
+@media (max-width: 600px) { .rh-fields-grid { grid-template-columns: 1fr; } }
+
+/* ── Documents ── */
+.rh-doc-list { display: flex; flex-direction: column; gap: 8px; }
+.rh-doc-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--rh-50);
+  border: 1px solid var(--rh-100);
+  transition: border-color 0.15s;
+}
+.rh-doc-item:hover { border-color: var(--rh-300); }
+html[data-theme="dark"] .rh-doc-item { background: rgba(38,83,128,0.08); border-color: var(--rh-border); }
+html[data-theme="dark"] .rh-doc-item:hover { border-color: var(--rh-400); }
+
+.rh-doc-icon {
+  width: 36px; height: 36px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px; flex-shrink: 0;
+  background: var(--rh-100); color: var(--rh-600);
+}
+html[data-theme="dark"] .rh-doc-icon { background: rgba(38,83,128,0.2); color: var(--rh-300); }
+.rh-doc-icon.pdf   { background: rgba(232,69,69,0.1); color: var(--rose); }
+.rh-doc-icon.image { background: rgba(22,169,107,0.1); color: var(--green); }
+
+.rh-doc-info { flex: 1; min-width: 0; }
+.rh-doc-info .doc-titre { font-size: 13.5px; font-weight: 600; color: var(--rh-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rh-doc-info .doc-meta  { font-size: 11px; color: var(--rh-muted); margin-top: 2px; }
+html[data-theme="dark"] .rh-doc-info .doc-titre { color: var(--rh-text); }
+
+.rh-doc-type-badge {
+  display: inline-block; padding: 2px 9px; border-radius: 12px;
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+  background: var(--rh-100); color: var(--rh-700);
+}
+html[data-theme="dark"] .rh-doc-type-badge { background: rgba(38,83,128,0.2); color: var(--rh-300); }
+
+.rh-doc-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
+/* ── Upload form ── */
+.rh-upload-form {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--rh-200);
+}
+html[data-theme="dark"] .rh-upload-form { border-top-color: var(--rh-border); }
+.rh-upload-title {
+  font-size: 12px; font-weight: 700; color: var(--rh-muted);
+  text-transform: uppercase; letter-spacing: 0.4px;
+  margin-bottom: 12px;
+  display: flex; align-items: center; gap: 6px;
+}
+
+/* ── Info supp table ── */
+.rh-info-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.rh-info-table tr { border-bottom: 1px solid rgba(0,0,0,0.04); }
+html[data-theme="dark"] .rh-info-table tr { border-bottom-color: rgba(255,255,255,0.04); }
+.rh-info-table tr:last-child { border-bottom: none; }
+.rh-info-table td { padding: 9px 4px; font-size: 13.5px; vertical-align: middle; }
+.rh-info-table .ik { color: var(--rh-muted); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; width: 40%; padding-right: 12px; }
+html[data-theme="dark"] .rh-info-table .ik { color: rgba(255,255,255,0.35); }
+.rh-info-table .iv { color: var(--rh-text); font-weight: 500; }
+html[data-theme="dark"] .rh-info-table .iv { color: var(--rh-text); }
+
+/* ── Notes card ── */
+.rh-notes-text {
+  font-size: 13.5px; line-height: 1.7; color: rgba(0,0,0,0.65);
+  white-space: pre-line;
+}
+html[data-theme="dark"] .rh-notes-text { color: rgba(255,255,255,0.5); }
+
+/* ── Salary ── */
+.rh-salary {
+  font-size: 16px; font-weight: 800; color: var(--rh-700);
+}
+html[data-theme="dark"] .rh-salary { color: var(--rh-300); }
+
+/* Congé status badges (reused from conges/list.html) */
+.cg-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.2px;}
+.cg-badge::before{content:'';width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.cg-b-demande{background:rgba(232,154,26,.12);color:#7a4e00;border:1px solid rgba(232,154,26,.25);}
+.cg-b-demande::before{background:var(--amber);}
+.cg-b-approuve{background:rgba(22,169,107,.12);color:#0d5b3d;border:1px solid rgba(22,169,107,.25);}
+.cg-b-approuve::before{background:var(--green);}
+.cg-b-refuse{background:rgba(232,69,69,.12);color:#6b1f1f;border:1px solid rgba(232,69,69,.25);}
+.cg-b-refuse::before{background:var(--rose);}
+.cg-b-en_cours{background:rgba(45,153,219,.12);color:#1a4d6d;border:1px solid rgba(45,153,219,.25);}
+.cg-b-en_cours::before{background:var(--sky);}
+.cg-b-termine{background:rgba(0,0,0,.06);color:rgba(0,0,0,.45);border:1px solid rgba(0,0,0,.1);}
+.cg-b-termine::before{background:#999;}
+html[data-theme="dark"] .cg-b-demande{background:rgba(232,154,26,.18);color:#f0c060;border-color:rgba(232,154,26,.3);}
+html[data-theme="dark"] .cg-b-approuve{background:rgba(22,169,107,.18);color:#6eddb0;border-color:rgba(22,169,107,.3);}
+html[data-theme="dark"] .cg-b-refuse{background:rgba(232,69,69,.18);color:#f09090;border-color:rgba(232,69,69,.3);}
+html[data-theme="dark"] .cg-b-en_cours{background:rgba(45,153,219,.18);color:#80c8ef;border-color:rgba(45,153,219,.3);}
+html[data-theme="dark"] .cg-b-termine{background:rgba(255,255,255,.06);color:rgba(255,255,255,.4);border-color:rgba(255,255,255,.12);}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Page header -->
+<div class="rh-page-head">
+  <div class="rh-page-head-left">
+    <a href="{% url 'ressources_humaines_list' %}" class="rh-back-btn" title="Retour à la liste">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <span class="rh-page-name">{{ employe.nom_complet|default:employe.nom }}</span>
+    <span class="rh-page-mat">{{ employe.matricule }}</span>
+    {% if employe.statut == 'actif' %}
+      <span class="badge-actif">Actif</span>
+    {% elif employe.statut == 'suspendu' %}
+      <span class="badge-suspendu">Suspendu</span>
+    {% else %}
+      <span class="badge-quitte">Quitté</span>
+    {% endif %}
+  </div>
+  <div class="rh-page-head-right">
+    <a href="{% url 'rh_fiche_pdf' employe.pk %}" target="_blank" class="btn-rh-outline" title="Imprimer la fiche">
+      <i class="bi bi-printer"></i> Imprimer
+    </a>
+    {% if can_manage and employe.date_fin_contrat %}
+    <button onclick="document.getElementById('modal-renouveler').style.display='flex'" class="btn-rh-outline">
+      <i class="bi bi-arrow-repeat"></i> Renouveler
+    </button>
+    {% endif %}
+    {% if can_manage %}
+    <a href="{% url 'rh_modifier' employe.pk %}" class="btn-rh">
+      <i class="bi bi-pencil-fill"></i> Modifier
+    </a>
+    <a href="{% url 'rh_badge' employe.pk %}" class="btn-rh-outline" title="Imprimer le badge">
+      <i class="bi bi-credit-card-2-front-fill"></i> Badge
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Alerte documents manquants -->
+{% if docs_manquants %}
+<div style="
+  margin: 12px 0 0;
+  padding: 12px 18px;
+  background: rgba(232,154,26,0.1);
+  border: 1px solid rgba(232,154,26,0.3);
+  border-radius: 9px;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+">
+  <i class="bi bi-exclamation-triangle-fill" style="color:#e89a1a; font-size:16px; flex-shrink:0;"></i>
+  <span style="font-size:13px; font-weight:600; color:#6b4a00; flex:1;">
+    Documents obligatoires manquants :
+    {% for d in docs_manquants %}
+      <span style="
+        display:inline-flex; align-items:center; gap:4px;
+        background:rgba(232,154,26,0.18); color:#7a4e00;
+        border:1px solid rgba(232,154,26,0.3);
+        padding:2px 9px; border-radius:12px; font-size:11.5px; font-weight:700;
+        margin-left:4px;
+      ">{{ d.label }}</span>
+    {% endfor %}
+  </span>
+  <a href="#section-docs" style="font-size:12px; color:#265380; font-weight:600; text-decoration:none;">
+    Ajouter <i class="bi bi-arrow-down"></i>
+  </a>
+</div>
+{% endif %}
+
+<!-- Modal renouvellement contrat -->
+{% if can_manage and employe.date_fin_contrat %}
+<div id="modal-renouveler" style="
+  display:none; position:fixed; inset:0; z-index:2000;
+  background:rgba(0,0,0,0.45); align-items:center; justify-content:center;
+" onclick="if(event.target===this)this.style.display='none'">
+  <div style="
+    background:#fff; border-radius:14px; padding:28px 32px; width:100%; max-width:420px;
+    box-shadow:0 16px 48px rgba(0,0,0,0.2);
+  ">
+    <div style="font-size:16px; font-weight:800; color:#1a3020; margin-bottom:6px;">
+      <i class="bi bi-arrow-repeat" style="color:var(--rh-600);"></i> Renouveler le contrat
+    </div>
+    <div style="font-size:13px; color:rgba(0,0,0,0.5); margin-bottom:20px;">
+      Actuel : <strong>{{ employe.date_fin_contrat|date:"d/m/Y" }}</strong>
+    </div>
+    <form method="post" action="{% url 'rh_renouveler' employe.pk %}">
+      {% csrf_token %}
+      <label class="rh-label">Nouvelle date de fin <span class="req">*</span></label>
+      <input type="date" name="date_fin_contrat" class="rh-input" required
+             style="margin-bottom:20px;"
+             min="{{ employe.date_fin_contrat|date:'Y-m-d' }}">
+      <div style="display:flex; gap:10px; justify-content:flex-end;">
+        <button type="button" onclick="document.getElementById('modal-renouveler').style.display='none'"
+                class="btn-rh-outline" style="padding:8px 18px;">Annuler</button>
+        <button type="submit" class="btn-rh">
+          <i class="bi bi-check-lg"></i> Confirmer
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<!-- Layout -->
+<div class="rh-detail-layout">
+
+  <!-- ══ Colonne gauche : carte profil ══ -->
+  <aside>
+    <div class="rh-profile-card">
+      <div class="rh-profile-banner"></div>
+      <div class="rh-profile-photo-wrap">
+        {% if employe.photo %}
+          <div class="rh-profile-photo">
+            <img src="{{ employe.photo.url }}" alt="{{ employe.nom_complet }}">
+          </div>
+        {% else %}
+          <div class="rh-profile-avatar-lg av-{{ employe.statut }}">
+            {{ employe.initiales|default:"?" }}
+          </div>
+        {% endif %}
+        <div class="rh-profile-name">{{ employe.nom_complet|default:employe.nom }}</div>
+        <div class="rh-profile-sub">
+          {{ employe.fonction.nom|default:"Fonction non renseignée" }}
+        </div>
+        <div style="margin-top:10px;">
+          {% if employe.statut == 'actif' %}
+            <span class="badge-actif">Actif</span>
+          {% elif employe.statut == 'suspendu' %}
+            <span class="badge-suspendu">Suspendu</span>
+          {% else %}
+            <span class="badge-quitte">Quitté</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="rh-profile-meta">
+        <div class="rh-pmeta-item">
+          <i class="bi bi-building"></i>
+          <div>
+            <span class="pm-lbl">Service</span>
+            <span class="pm-val">{{ employe.service.nom|default:"—" }}</span>
+          </div>
+        </div>
+        <div class="rh-pmeta-item">
+          <i class="bi bi-briefcase"></i>
+          <div>
+            <span class="pm-lbl">Grade</span>
+            <span class="pm-val">{{ employe.grade.nom|default:"—" }}</span>
+          </div>
+        </div>
+        {% if employe.telephone %}
+        <div class="rh-pmeta-item">
+          <i class="bi bi-telephone"></i>
+          <div>
+            <span class="pm-lbl">Téléphone</span>
+            <span class="pm-val">{{ employe.telephone }}</span>
+          </div>
+        </div>
+        {% endif %}
+        {% if employe.email %}
+        <div class="rh-pmeta-item">
+          <i class="bi bi-envelope"></i>
+          <div>
+            <span class="pm-lbl">Email</span>
+            <span class="pm-val" style="word-break:break-all;">{{ employe.email }}</span>
+          </div>
+        </div>
+        {% endif %}
+        <div class="rh-pmeta-item">
+          <i class="bi bi-calendar3"></i>
+          <div>
+            <span class="pm-lbl">Embauché le</span>
+            <span class="pm-val">{{ employe.date_embauche|date:"d/m/Y"|default:"—" }}</span>
+          </div>
+        </div>
+        <div class="rh-pmeta-item">
+          <i class="bi bi-clock-history"></i>
+          <div>
+            <span class="pm-lbl">Modifié le</span>
+            <span class="pm-val">{{ employe.modifie_le|date:"d/m/Y à H:i"|default:"—" }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ══ Contenu principal ══ -->
+  <div class="rh-sections">
+
+    <!-- ── Section 1 : Identité & Contact ── -->
+    <div class="rh-card">
+      <div class="rh-card-header">
+        <div class="rh-section-title">
+          <i class="bi bi-person-vcard" style="color:var(--rh-500);"></i>
+          Identité &amp; Contact
+        </div>
+      </div>
+      <div class="rh-card-body">
+        <div class="rh-fields-grid">
+          <!-- Colonne gauche : identité -->
+          <div>
+            <div class="rh-field">
+              <span class="lbl">Sexe</span>
+              <span class="val">
+                {% if employe.sexe == 'M' %}
+                  <i class="bi bi-gender-male" style="color:var(--sky);"></i> Masculin
+                {% elif employe.sexe == 'F' %}
+                  <i class="bi bi-gender-female" style="color:var(--violet);"></i> Féminin
+                {% else %}
+                  <span class="empty">—</span>
+                {% endif %}
+              </span>
+            </div>
+            <div class="rh-field">
+              <span class="lbl">Date de naissance</span>
+              <span class="val {% if not employe.date_naissance %}empty{% endif %}">
+                {{ employe.date_naissance|date:"d/m/Y"|default:"—" }}
+                {% if employe.age %}
+                  <small style="color:var(--rh-muted); font-weight:400;">({{ employe.age }} ans)</small>
+                {% endif %}
+              </span>
+            </div>
+            <div class="rh-field">
+              <span class="lbl">Lieu de naissance</span>
+              <span class="val {% if not employe.lieu_naissance %}empty{% endif %}">
+                {{ employe.lieu_naissance|default:"—" }}
+              </span>
+            </div>
+            <div class="rh-field">
+              <span class="lbl">Nationalité</span>
+              <span class="val {% if not employe.nationalite %}empty{% endif %}">
+                {{ employe.nationalite|default:"—" }}
+              </span>
+            </div>
+            <div class="rh-field">
+              <span class="lbl">Situation matrimoniale</span>
+              <span class="val {% if not employe.situation_matrimoniale %}empty{% endif %}">
+                {% if employe.situation_matrimoniale == 'celibataire' %}Célibataire
+                {% elif employe.situation_matrimoniale == 'marie' %}Marié(e)
+                {% elif employe.situation_matrimoniale == 'divorce' %}Divorcé(e)
+                {% elif employe.situation_matrimoniale == 'veuf' %}Veuf/Veuve
+                {% else %}—{% endif %}
+              </span>
+            </div>
+            <div class="rh-field">
+              <span class="lbl">Nombre d'enfants</span>
+              <span class="val">{{ employe.nombre_enfants|default:"0" }}</span>
+            </div>
+          </div>
+          <!-- Colonne droite : contact -->
+          <div>
+            <div class="rh-field">
+              <span class="lbl">Téléphone principal</span>
+              <span class="val {% if not employe.telephone %}empty{% endif %}">
+                {% if employe.telephone %}
+                  <a href="tel:{{ employe.telephone }}" style="color:var(--rh-600); text-decoration:none;">{{ employe.telephone }}</a>
+                {% else %}—{% endif %}
+              </span>
+            </div>
+            <div class="rh-field">
+              <span class="lbl">Téléphone 2</span>
+              <span class="val {% if not employe.telephone2 %}empty{% endif %}">
+                {% if employe.telephone2 %}
+                  <a href="tel:{{ employe.telephone2 }}" style="color:var(--rh-600); text-decoration:none;">{{ employe.telephone2 }}</a>
+                {% else %}—{% endif %}
+              </span>
+            </div>
+            <div class="rh-field">
+              <span class="lbl">Email</span>
+              <span class="val {% if not employe.email %}empty{% endif %}">
+                {% if employe.email %}
+                  <a href="mailto:{{ employe.email }}" style="color:var(--rh-600); text-decoration:none; word-break:break-all;">{{ employe.email }}</a>
+                {% else %}—{% endif %}
+              </span>
+            </div>
+            <div class="rh-field">
+              <span class="lbl">Adresse</span>
+              <span class="val {% if not employe.adresse %}empty{% endif %}">
+                {{ employe.adresse|default:"—" }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Section 2 : Situation professionnelle ── -->
+    <div class="rh-card">
+      <div class="rh-card-header">
+        <div class="rh-section-title">
+          <i class="bi bi-briefcase-fill" style="color:var(--rh-500);"></i>
+          Situation professionnelle
+        </div>
+      </div>
+      <div class="rh-card-body">
+        <div class="rh-fields-grid">
+          <!-- Colonne gauche -->
+          <div>
+            <div class="rh-field">
+              <span class="lbl">Service</span>
+              <span class="val {% if not employe.service %}empty{% endif %}">
+                {{ employe.service.nom|default:"—" }}
+              </span>
+            </div>
+            <div class="rh-field">
+              <span class="lbl">Fonction</span>
+              <span class="val {% if not employe.fonction %}empty{% endif %}">
+                {{ employe.fonction.nom|default:"—" }}
+              </span>
+            </div>
+            <div class="rh-field">
+              <span class="lbl">Grade</span>
+              <span class="val {% if not employe.grade %}empty{% endif %}">
+                {{ employe.grade.nom|default:"—" }}
+              </span>
+            </div>
+            <div class="rh-field">
+              <span class="lbl">Type de contrat</span>
+              <span class="val {% if not employe.type_contrat %}empty{% endif %}">
+                {{ employe.type_contrat.nom|default:"—" }}
+              </span>
+            </div>
+          </div>
+          <!-- Colonne droite -->
+          <div>
+            <div class="rh-field">
+              <span class="lbl">Date d'embauche</span>
+              <span class="val {% if not employe.date_embauche %}empty{% endif %}">
+                {{ employe.date_embauche|date:"d/m/Y"|default:"—" }}
+              </span>
+            </div>
+            <div class="rh-field">
+              <span class="lbl">Ancienneté</span>
+              <span class="val">{{ employe.anciennete.label }}</span>
+            </div>
+            <div class="rh-field">
+              <span class="lbl">Date fin de contrat</span>
+              <span class="val">
+                {% if employe.date_fin_contrat %}
+                  {{ employe.date_fin_contrat|date:"d/m/Y" }}
+                {% else %}
+                  <span style="color:var(--green); font-weight:600;">CDI</span>
+                {% endif %}
+              </span>
+            </div>
+            <div class="rh-field">
+              <span class="lbl">Salaire de base</span>
+              <span class="val">
+                {% if employe.salaire_base %}
+                  <span class="rh-salary">{{ employe.salaire_base|floatformat:0 }} FCFA</span>
+                {% else %}
+                  <span class="empty">—</span>
+                {% endif %}
+              </span>
+            </div>
+            <div class="rh-field">
+              <span class="lbl">Statut</span>
+              <span class="val">
+                {% if employe.statut == 'actif' %}
+                  <span class="badge-actif">Actif</span>
+                {% elif employe.statut == 'suspendu' %}
+                  <span class="badge-suspendu">Suspendu</span>
+                {% else %}
+                  <span class="badge-quitte">Quitté</span>
+                {% endif %}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Section 3 : Documents ── -->
+    <div class="rh-card" id="section-docs">
+      <div class="rh-card-header">
+        <div class="rh-section-title">
+          <i class="bi bi-folder2-open" style="color:var(--rh-500);"></i>
+          Documents
+        </div>
+        <span style="font-size:12px; color:var(--rh-muted);">
+          {{ docs|length }} document{% if docs|length != 1 %}s{% endif %}
+        </span>
+      </div>
+      <div class="rh-card-body">
+
+        {% if docs %}
+        <div class="rh-doc-list">
+          {% for doc in docs %}
+          <div class="rh-doc-item">
+            <div class="rh-doc-icon {% if doc.is_pdf %}pdf{% elif doc.is_image %}image{% endif %}">
+              {% if doc.is_pdf %}
+                <i class="bi bi-file-earmark-pdf"></i>
+              {% elif doc.is_image %}
+                <i class="bi bi-image"></i>
+              {% else %}
+                <i class="bi bi-file-earmark-text"></i>
+              {% endif %}
+            </div>
+            <div class="rh-doc-info">
+              <div class="doc-titre">{{ doc.titre }}</div>
+              <div class="doc-meta">
+                <span class="rh-doc-type-badge">{{ doc.get_type_document_display|default:doc.type_document }}</span>
+                &nbsp;·&nbsp; {{ doc.date_ajout|date:"d/m/Y" }}
+                {% if doc.ajoute_par %}&nbsp;·&nbsp; par {{ doc.ajoute_par }}{% endif %}
+              </div>
+            </div>
+            <div class="rh-doc-actions">
+              <a href="{{ doc.fichier.url }}" target="_blank" rel="noopener" class="btn-rh-sm" title="Télécharger">
+                <i class="bi bi-download"></i>
+              </a>
+              {% if can_manage %}
+              <form method="post" action="{% url 'rh_doc_delete' employe.pk doc.pk %}"
+                    onsubmit="return confirm('Supprimer ce document ?');" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn-danger-sm" title="Supprimer">
+                  <i class="bi bi-trash3"></i>
+                </button>
+              </form>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p style="color:var(--rh-muted); font-size:13.5px; text-align:center; padding:16px 0;">
+          <i class="bi bi-folder" style="font-size:28px; display:block; margin-bottom:8px; color:var(--rh-200);"></i>
+          Aucun document enregistré
+        </p>
+        {% endif %}
+
+        <!-- Formulaire d'ajout de document -->
+        {% if can_manage %}
+        <div class="rh-upload-form">
+          <div class="rh-upload-title">
+            <i class="bi bi-upload"></i> Ajouter un document
+          </div>
+          <form method="post" action="{% url 'rh_doc_upload' employe.pk %}"
+                enctype="multipart/form-data" novalidate>
+            {% csrf_token %}
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+              <div>
+                <label class="rh-label">Type de document</label>
+                <select name="type_document" class="rh-input" required>
+                  {% for code, label in type_doc_choices %}
+                  <option value="{{ code }}">{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div>
+                <label class="rh-label">Titre <span class="req">*</span></label>
+                <input type="text" name="titre" class="rh-input" placeholder="Ex. CNI originale, Diplôme BTS…" required>
+              </div>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:10px;">
+              <div>
+                <label class="rh-label">Fichier <span class="req">*</span></label>
+                <input type="file" name="fichier" class="rh-input" required
+                       style="padding:6px 10px; cursor:pointer;">
+              </div>
+              <div>
+                <label class="rh-label">Date d'expiration</label>
+                <input type="date" name="date_expiration" class="rh-input"
+                       title="Laisser vide si le document n'expire pas">
+              </div>
+              <div>
+                <label class="rh-label">Notes</label>
+                <input type="text" name="doc_notes" class="rh-input" placeholder="Facultatif…">
+              </div>
+            </div>
+            <div style="text-align:right;">
+              <button type="submit" class="btn-rh" style="padding:7px 18px;">
+                <i class="bi bi-upload"></i> Enregistrer
+              </button>
+            </div>
+          </form>
+        </div>
+        {% endif %}
+
+      </div>
+    </div>
+
+    <!-- ── Section Identification pointage ── -->
+    <div class="rh-card" style="margin-bottom:14px;">
+      <div class="rh-card-header">
+        <div class="rh-section-title">
+          <i class="bi bi-person-badge-fill" style="color:var(--rh-500);"></i>
+          Identification — Pointage
+        </div>
+        <a href="{% url 'rh_badge' employe.pk %}" class="btn-rh-sm">
+          <i class="bi bi-credit-card-2-front-fill"></i> Imprimer badge
+        </a>
+      </div>
+      <div class="rh-card-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;align-items:start;">
+
+          <!-- QR Code -->
+          <div style="text-align:center;">
+            <div style="font-size:11px;font-weight:700;color:var(--rh-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;">
+              <i class="bi bi-qr-code"></i> Code QR
+            </div>
+            <img src="{% url 'rh_qrcode' employe.pk %}" alt="QR {{ employe.matricule }}"
+                 style="width:100px;height:100px;border-radius:8px;border:1px solid var(--rh-border);padding:4px;background:#fff;">
+            <div style="font-size:11px;color:var(--rh-muted);margin-top:6px;">Contenu : <strong>{{ employe.matricule }}</strong></div>
+            <div style="font-size:10.5px;color:var(--rh-muted);margin-top:2px;">Scanner avec le kiosque de pointage</div>
+          </div>
+
+          <!-- Matricule -->
+          <div style="text-align:center;">
+            <div style="font-size:11px;font-weight:700;color:var(--rh-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;">
+              <i class="bi bi-hash"></i> Matricule
+            </div>
+            <div style="font-size:28px;font-weight:800;font-family:monospace;color:var(--rh-700);
+                        background:var(--rh-50);border-radius:8px;padding:12px 16px;border:1px solid var(--rh-200);">
+              {{ employe.matricule }}
+            </div>
+            <div style="font-size:10.5px;color:var(--rh-muted);margin-top:6px;">Identifiant principal de saisie</div>
+          </div>
+
+          <!-- Empreinte digitale -->
+          <div style="text-align:center;">
+            <div style="font-size:11px;font-weight:700;color:var(--rh-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;">
+              <i class="bi bi-fingerprint"></i> Empreinte digitale
+            </div>
+            {% if employe.biometric_id %}
+            <div style="font-size:13px;font-weight:700;font-family:monospace;color:var(--rh-700);
+                        background:rgba(22,169,107,.08);border-radius:8px;padding:8px 12px;
+                        border:1px solid rgba(22,169,107,.2);word-break:break-all;">
+              {{ employe.biometric_id }}
+            </div>
+            <div style="font-size:10.5px;color:#0a6040;margin-top:4px;font-weight:600;">
+              <i class="bi bi-check-circle-fill"></i> Empreinte enregistrée
+            </div>
+            {% else %}
+            <div style="background:rgba(0,0,0,.04);border-radius:8px;padding:12px;border:1px dashed var(--rh-border);margin-bottom:8px;">
+              <i class="bi bi-fingerprint" style="font-size:28px;color:var(--rh-300);display:block;margin-bottom:4px;"></i>
+              <div style="font-size:11px;color:var(--rh-muted);">Non enregistrée</div>
+            </div>
+            {% endif %}
+            {% if can_manage %}
+            <form method="post" action="{% url 'rh_biometric_save' employe.pk %}" style="margin-top:8px;display:flex;gap:6px;">
+              {% csrf_token %}
+              <input type="text" name="biometric_id" value="{{ employe.biometric_id }}"
+                     placeholder="ID du lecteur biométrique"
+                     class="rh-input" style="font-size:11.5px;flex:1;text-align:center;">
+              <button type="submit" class="btn-rh-sm" title="Enregistrer">
+                <i class="bi bi-floppy-fill"></i>
+              </button>
+            </form>
+            {% endif %}
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Section 4 : Informations supplémentaires ── -->
+    <div class="rh-card">
+      <div class="rh-card-header">
+        <div class="rh-section-title">
+          <i class="bi bi-card-list" style="color:var(--rh-500);"></i>
+          Informations supplémentaires
+        </div>
+      </div>
+      <div class="rh-card-body">
+
+        {% if infos_supp %}
+        <table class="rh-info-table">
+          {% for info in infos_supp %}
+          <tr>
+            <td class="ik">{{ info.cle }}</td>
+            <td class="iv">{{ info.valeur }}</td>
+            <td style="text-align:right; width:40px;">
+              {% if can_manage %}
+              <form method="post" action="{% url 'rh_info_delete' employe.pk info.pk %}"
+                    onsubmit="return confirm('Supprimer cet élément ?');" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn-danger-sm" title="Supprimer">
+                  <i class="bi bi-x-lg"></i>
+                </button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </table>
+        {% else %}
+        <p style="color:var(--rh-muted); font-size:13px; margin-bottom:14px; font-style:italic;">
+          Aucune information supplémentaire pour cet employé.
+        </p>
+        {% endif %}
+
+        <!-- Formulaire ajout info supp -->
+        {% if can_manage %}
+        <div class="rh-upload-form">
+          <div class="rh-upload-title">
+            <i class="bi bi-plus-circle"></i> Ajouter une information
+          </div>
+          <form method="post" action="{% url 'rh_info_save' employe.pk %}" novalidate>
+            {% csrf_token %}
+            <div style="display:grid; grid-template-columns:1fr 1fr auto; gap:10px; align-items:flex-end;">
+              <div>
+                <label class="rh-label">Clé (nom de l'info) <span class="req">*</span></label>
+                <input type="text" name="cle" class="rh-input" list="info-cle-suggestions"
+                       placeholder="Ex. Numéro CNPS…" required autocomplete="off">
+                <datalist id="info-cle-suggestions">
+                  <option value="Numéro CNPS">
+                  <option value="Groupe sanguin">
+                  <option value="Compte bancaire">
+                  <option value="Personne à contacter en urgence">
+                  <option value="Taille">
+                  <option value="Poids">
+                  <option value="Numéro passeport">
+                  <option value="Permis de conduire">
+                  <option value="Religion">
+                  <option value="Ethnie">
+                </datalist>
+              </div>
+              <div>
+                <label class="rh-label">Valeur <span class="req">*</span></label>
+                <input type="text" name="valeur" class="rh-input" placeholder="Ex. 12345678-A…" required>
+              </div>
+              <div>
+                <button type="submit" class="btn-rh" style="padding:9px 18px; white-space:nowrap;">
+                  <i class="bi bi-plus-lg"></i> Ajouter
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+        {% endif %}
+
+      </div>
+    </div>
+
+    <!-- ── Notes ── -->
+    {% if employe.notes %}
+    <div class="rh-card">
+      <div class="rh-card-header">
+        <div class="rh-section-title">
+          <i class="bi bi-sticky" style="color:var(--rh-500);"></i>
+          Notes internes
+        </div>
+      </div>
+      <div class="rh-card-body">
+        <p class="rh-notes-text">{{ employe.notes }}</p>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- ── Section : Congés ── -->
+    <div class="rh-card">
+      <div class="rh-card-header">
+        <div class="rh-section-title">
+          <i class="bi bi-calendar-check-fill" style="color:var(--rh-500);"></i>
+          Congés
+        </div>
+        {% if can_manage %}
+        <a href="{% url 'ressources_humaines_list' %}" class="btn-rh-sm">
+          <i class="bi bi-plus-lg"></i> Nouvelle demande
+        </a>
+        {% endif %}
+      </div>
+      {% if conges %}
+      <div class="rh-card-body" style="padding:0;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead>
+            <tr style="background:rgba(38,83,128,0.06);">
+              <th style="padding:9px 16px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--rh-700);">Type</th>
+              <th style="padding:9px 16px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--rh-700);">Période</th>
+              <th style="padding:9px 16px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--rh-700);">Durée</th>
+              <th style="padding:9px 16px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--rh-700);">Demandé le</th>
+              <th style="padding:9px 16px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--rh-700);">Statut</th>
+              <th style="padding:9px 16px;"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for cg in conges %}
+            <tr style="border-bottom:1px solid rgba(0,0,0,0.04);">
+              <td style="padding:9px 16px;">
+                <span style="font-size:11.5px;color:var(--rh-600);background:var(--rh-50);border:1px solid var(--rh-200);padding:2px 8px;border-radius:8px;font-weight:600;">{{ cg.get_type_conge_display }}</span>
+              </td>
+              <td style="padding:9px 16px;color:var(--rh-text);white-space:nowrap;">{{ cg.date_debut|date:"d/m/Y" }} → {{ cg.date_fin|date:"d/m/Y" }}</td>
+              <td style="padding:9px 16px;font-weight:700;color:var(--rh-700);">{{ cg.duree }}j</td>
+              <td style="padding:9px 16px;color:var(--rh-muted);white-space:nowrap;">{{ cg.date_demande|date:"d/m/Y" }}</td>
+              <td style="padding:9px 16px;">
+                <span class="cg-badge cg-b-{{ cg.statut }}">{{ cg.get_statut_display }}</span>
+              </td>
+              <td style="padding:9px 16px;text-align:right;">
+                <a href="{% url 'ressources_humaines_list' %}" class="btn-rh-sm"><i class="bi bi-eye"></i></a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="rh-card-body" style="text-align:center;padding:32px 20px;color:var(--rh-muted);">
+        <i class="bi bi-calendar-x" style="font-size:32px;opacity:.3;display:block;margin-bottom:10px;"></i>
+        <p style="margin:0;font-size:13px;">Aucune demande de congé enregistrée.</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- ── Section : Historique ── -->
+    {% if historique %}
+    <div class="rh-card">
+      <div class="rh-card-header">
+        <div class="rh-section-title">
+          <i class="bi bi-clock-history" style="color:var(--rh-500);"></i>
+          Historique des modifications
+        </div>
+      </div>
+      <div class="rh-card-body" style="padding:0;">
+        <table style="width:100%; border-collapse:collapse; font-size:13px;">
+          <thead>
+            <tr style="background:rgba(38,83,128,0.06);">
+              <th style="padding:9px 16px; text-align:left; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; color:var(--rh-700);">Date</th>
+              <th style="padding:9px 16px; text-align:left; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; color:var(--rh-700);">Événement</th>
+              <th style="padding:9px 16px; text-align:left; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; color:var(--rh-700);">Ancien</th>
+              <th style="padding:9px 16px; text-align:left; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; color:var(--rh-700);">Nouveau</th>
+              <th style="padding:9px 16px; text-align:left; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; color:var(--rh-700);">Par</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for h in historique %}
+            <tr style="border-bottom:1px solid rgba(0,0,0,0.04);">
+              <td style="padding:9px 16px; color:var(--rh-muted); white-space:nowrap;">{{ h.date|date:"d/m/Y H:i" }}</td>
+              <td style="padding:9px 16px; font-weight:600; color:var(--rh-800);">{{ h.get_type_changement_display }}</td>
+              <td style="padding:9px 16px; color:var(--rh-muted);">{{ h.ancienne_valeur|default:"—" }}</td>
+              <td style="padding:9px 16px; color:var(--rh-700); font-weight:500;">{{ h.nouvelle_valeur|default:"—" }}</td>
+              <td style="padding:9px 16px; color:var(--rh-muted);">{{ h.fait_par|default:"—" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
+  </div><!-- /rh-sections -->
+</div><!-- /rh-detail-layout -->
+
+{% endblock %}
+

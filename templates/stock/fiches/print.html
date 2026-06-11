@@ -1,0 +1,219 @@
+{% load static %}<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Fiche de besoins {{ fiche.numero }}</title>
+<style>
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'Segoe UI',Arial,sans-serif; font-size:10.5px; color:#111; background:#fff; }
+
+@media screen {
+  body { background:#e8edf0; padding:20px; }
+  .page { background:#fff; max-width:1000px; margin:0 auto; padding:28px 36px 36px; box-shadow:0 4px 24px rgba(0,0,0,.15); border-radius:4px; }
+  .print-btn-bar { max-width:1000px; margin:0 auto 12px; display:flex; gap:8px; justify-content:flex-end; align-items:center; }
+  .print-btn { background:#3a5924; color:#fff; border:none; border-radius:6px; padding:8px 20px; font-size:13px; font-weight:600; cursor:pointer; }
+  .print-btn:hover { background:#2a4219; }
+  .back-btn { background:#fff; color:#555; border:1px solid #ddd; border-radius:6px; padding:8px 16px; font-size:13px; text-decoration:none; display:inline-flex; align-items:center; gap:6px; }
+}
+@media print {
+  body { background:#fff; padding:0; font-size:9px; }
+  .page { padding:6mm 8mm; width:100%; box-shadow:none; }
+  .no-print { display:none !important; }
+  @page { size:A4 landscape; margin:6mm; }
+}
+
+/* En-tête */
+.header { display:flex; justify-content:space-between; align-items:flex-start; padding-bottom:10px; border-bottom:3px solid #3a5924; margin-bottom:14px; }
+.header-brand { display:flex; align-items:center; gap:12px; }
+.header-brand img { width:44px; height:44px; object-fit:contain; }
+.clinic-name { font-size:14px; font-weight:800; color:#3a5924; }
+.clinic-sub  { font-size:9.5px; color:#666; margin-top:2px; }
+.doc-right { text-align:right; }
+.doc-title { font-size:15px; font-weight:800; color:#3a5924; text-transform:uppercase; }
+.doc-sub { font-size:9.5px; color:#666; margin-top:3px; }
+.doc-num { font-size:12px; font-weight:700; color:#555; font-family:monospace; margin-top:3px; }
+
+/* Info période */
+.info-strip { display:flex; gap:20px; background:#f5f9f0; border:1px solid #bcd5a8; border-radius:6px; padding:8px 14px; margin-bottom:14px; font-size:10px; }
+.info-item { display:flex; flex-direction:column; gap:2px; }
+.info-lbl { color:#888; font-size:9px; text-transform:uppercase; letter-spacing:.3px; }
+.info-val { font-weight:700; color:#1b2e13; }
+
+/* Statut */
+.badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:9.5px; font-weight:700; }
+.badge-brouillon { background:#f0f0f0; color:#555; }
+.badge-soumis    { background:#fff3e0; color:#e65100; }
+.badge-valide    { background:#e8f5e9; color:#2e7d32; }
+.badge-rejete    { background:#fce4ec; color:#c62828; }
+
+/* Tableau */
+table { width:100%; border-collapse:collapse; font-size:9.5px; }
+thead tr { background:#3a5924; color:#fff; }
+thead th { padding:5px 6px; font-weight:700; font-size:8.5px; text-transform:uppercase; letter-spacing:.3px; text-align:left; white-space:nowrap; }
+thead th.right { text-align:right; }
+thead th.center { text-align:center; }
+thead th.accordee { background:#2a4219; }
+.type-row td { background:#d8eac4; font-size:8.5px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#3a5924; padding:4px 6px; }
+tbody tr { border-bottom:1px solid #e8f0e4; }
+tbody tr:nth-child(even) { background:#f8fdf4; }
+tbody td { padding:4px 6px; vertical-align:middle; }
+tbody td.right { text-align:right; font-family:monospace; }
+tbody td.center { text-align:center; }
+.td-name { font-weight:600; }
+.td-dci  { font-size:8.5px; color:#888; }
+tfoot tr { background:#eef5e4; border-top:2px solid #3a5924; }
+tfoot td { padding:5px 6px; font-weight:700; font-size:10px; }
+
+/* Signatures */
+.sig-area { display:flex; justify-content:space-between; margin-top:24px; gap:20px; }
+.sig-box { flex:1; text-align:center; border-top:1px solid #3a5924; padding-top:5px; }
+.sig-title { font-size:9.5px; font-weight:700; color:#333; }
+.sig-name  { font-size:9px; color:#888; margin-top:2px; }
+.sig-space { height:35px; }
+
+/* Notes direction */
+.notes-dir { background:#fff8e1; border:1px solid #ffe082; border-radius:5px; padding:8px 12px; font-size:10px; color:#5d4037; margin-bottom:12px; }
+
+/* Pied */
+.footer { margin-top:16px; padding-top:8px; border-top:1px solid #ddd; display:flex; justify-content:space-between; font-size:8.5px; color:#aaa; }
+</style>
+</head>
+<body>
+
+<div class="no-print print-btn-bar">
+  <a href="{% url 'stock_fiche_detail' fiche.pk %}" class="back-btn">&#8592; Retour</a>
+  <button class="print-btn" onclick="window.print()">&#128438; Imprimer / Exporter PDF</button>
+</div>
+
+<div class="page">
+
+  <!-- En-tête -->
+  <div class="header">
+    <div class="header-brand">
+      <img src="{% static 'logo.png' %}" alt="WALÉ">
+      <div>
+        <div class="clinic-name">Centre Médico-Social WALÉ</div>
+        <div class="clinic-sub">Yamoussoukro, Côte d'Ivoire</div>
+      </div>
+    </div>
+    <div class="doc-right">
+      <div class="doc-title">Besoins exprimés pour commande mensuelle pharmacie</div>
+      <div class="doc-sub">{{ fiche.get_pharmacie_display }} &nbsp;·&nbsp; Éditée le {{ today|date:"d/m/Y" }}</div>
+      <div class="doc-num">{{ fiche.numero }}</div>
+      <div style="margin-top:4px;">
+        {% if fiche.statut == 'brouillon' %}<span class="badge badge-brouillon">Brouillon</span>
+        {% elif fiche.statut == 'soumis' %}<span class="badge badge-soumis">Soumis</span>
+        {% elif fiche.statut == 'valide' %}<span class="badge badge-valide">Validé</span>
+        {% else %}<span class="badge badge-rejete">Rejeté</span>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Infos période -->
+  <div class="info-strip">
+    <div class="info-item"><span class="info-lbl">Pharmacie</span><span class="info-val">{{ fiche.get_pharmacie_display }}</span></div>
+    <div class="info-item"><span class="info-lbl">Période du</span><span class="info-val">{{ fiche.periode_debut|date:"d/m/Y" }}</span></div>
+    <div class="info-item"><span class="info-lbl">Au</span><span class="info-val">{{ fiche.periode_fin|date:"d/m/Y" }}</span></div>
+    <div class="info-item"><span class="info-lbl">Établie par</span><span class="info-val">{{ fiche.cree_par.get_full_name|default:fiche.cree_par.username|default:"—" }}</span></div>
+    {% if fiche.valide_par %}
+    <div class="info-item"><span class="info-lbl">Validée par</span><span class="info-val">{{ fiche.valide_par.get_full_name|default:fiche.valide_par.username }}</span></div>
+    {% endif %}
+    {% if fiche.date_validation %}
+    <div class="info-item"><span class="info-lbl">Date validation</span><span class="info-val">{{ fiche.date_validation|date:"d/m/Y" }}</span></div>
+    {% endif %}
+  </div>
+
+  <!-- Notes direction -->
+  {% if fiche.notes_direction %}
+  <div class="notes-dir"><strong>Observations de la direction :</strong> {{ fiche.notes_direction }}</div>
+  {% endif %}
+
+  <!-- Tableau -->
+  <table>
+    <thead>
+      <tr>
+        <th style="width:18px;">#</th>
+        <th style="min-width:170px;">Désignation</th>
+        <th>Unité</th>
+        <th class="right">Stock initial<br><small style="font-weight:400;font-size:7.5px;">au {{ fiche.periode_debut|date:"d/m/Y" }}</small></th>
+        <th class="right">Qté reçue</th>
+        <th class="right">Qté dispensée</th>
+        <th class="right">Stock dispo<br><small style="font-weight:400;font-size:7.5px;">au {{ fiche.periode_fin|date:"d/m/Y" }}</small></th>
+        <th class="right">CMM</th>
+        <th class="right">Qté à commander</th>
+        {% if fiche.statut == 'valide' %}<th class="right accordee">Qté accordée</th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+    {% regroup lignes by produit.type as groupes %}
+    {% for groupe in groupes %}
+    <tr class="type-row">
+      <td colspan="{% if fiche.statut == 'valide' %}10{% else %}9{% endif %}">
+        {% if groupe.grouper == 'medicament' %}&#9670; Médicaments
+        {% elif groupe.grouper == 'consommable' %}&#9670; Consommables médicaux
+        {% else %}&#9670; Équipements{% endif %}
+      </td>
+    </tr>
+    {% for ligne in groupe.list %}
+    <tr>
+      <td style="color:#aaa;font-size:8px;text-align:center;">{{ forloop.counter }}</td>
+      <td>
+        <div class="td-name">{{ ligne.produit.nom }}</div>
+        {% if ligne.produit.dci %}<div class="td-dci">{{ ligne.produit.dci }}</div>{% endif %}
+      </td>
+      <td style="color:#888;">{{ ligne.produit.unite_mesure }}</td>
+      <td class="right">{{ ligne.stock_initial|floatformat:0 }}</td>
+      <td class="right">{{ ligne.qte_recue|floatformat:0 }}</td>
+      <td class="right">{{ ligne.qte_dispensee|floatformat:0 }}</td>
+      <td class="right" style="font-weight:700;">{{ ligne.stock_disponible|floatformat:0 }}</td>
+      <td class="right">{{ ligne.cmm|floatformat:1 }}</td>
+      <td class="right" style="font-weight:700;color:#1a237e;">{{ ligne.qte_commander|floatformat:0 }}</td>
+      {% if fiche.statut == 'valide' %}<td class="right" style="font-weight:800;color:#3a5924;">{{ ligne.qte_accordee|floatformat:0 }}</td>{% endif %}
+    </tr>
+    {% endfor %}
+    {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="{% if fiche.statut == 'valide' %}9{% else %}8{% endif %}">TOTAL — {{ lignes|length }} produit{{ lignes|length|pluralize }}</td>
+        <td class="right" style="color:#1a237e;">{% for l in lignes %}{{ l.qte_commander|add:0 }}{% endfor %}</td>
+        {% if fiche.statut == 'valide' %}<td class="right" style="color:#3a5924;">—</td>{% endif %}
+      </tr>
+    </tfoot>
+  </table>
+
+  <!-- Notes -->
+  {% if fiche.notes %}
+  <div style="margin-top:10px;padding:7px 12px;background:#f5f9f0;border:1px solid #bcd5a8;border-radius:5px;font-size:10px;color:#333;">
+    <strong>Notes :</strong> {{ fiche.notes }}
+  </div>
+  {% endif %}
+
+  <!-- Signatures -->
+  <div class="sig-area">
+    <div class="sig-box">
+      <div class="sig-space"></div>
+      <div class="sig-title">Le Gestionnaire de stock</div>
+      <div class="sig-name">Nom & Signature</div>
+    </div>
+    <div class="sig-box">
+      <div class="sig-space"></div>
+      <div class="sig-title">Le Directeur Adjoint</div>
+      <div class="sig-name">Cachet & Signature</div>
+    </div>
+    <div class="sig-box">
+      <div class="sig-space"></div>
+      <div class="sig-title">Le Directeur</div>
+      <div class="sig-name">Cachet & Signature</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div>Centre Médico-Social WALÉ — Yamoussoukro, Côte d'Ivoire</div>
+    <div>{{ fiche.numero }} — {{ fiche.get_pharmacie_display }} — Généré le {{ today|date:"d/m/Y" }}</div>
+    <div>Document confidentiel</div>
+  </div>
+
+</div>
+</body>
+</html>

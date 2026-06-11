@@ -1,0 +1,224 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block topbar_title %}Employés{% endblock %}
+
+{% block extra_css %}
+{% include 'soins/includes/layout_css.html' %}
+<style>
+.content { padding:0; }
+.o-nav { padding-left: 36px; padding-right: 36px; }
+.o-nav-link { gap: 5px; }
+.o-nav-brand { gap: 6px; }
+/* o-nav : override --primary pour utiliser la couleur RH au lieu du vert soins */
+:root { --primary: #265380; }
+html[data-theme="dark"] { --primary: #4d87be; }
+/* override background hover/active o-nav-link (hardcodé vert dans layout_css) */
+.o-nav-link:hover, .o-nav-link.active { background: rgba(38,83,128,.06); }
+html[data-theme="dark"] .o-nav-link:hover,
+html[data-theme="dark"] .o-nav-link.active {
+  color: #b5d0e8; background: rgba(38,83,128,.12); border-bottom-color: var(--rh-400);
+}
+
+/* ══════════════════════════════════════════════════════
+   PALETTE BLEU ARDOISE — module Ressources Humaines
+══════════════════════════════════════════════════════ */
+:root {
+  --rh-900: #0f1f3a;
+  --rh-800: #17304d;
+  --rh-700: #1e4062;
+  --rh-600: #265380;
+  --rh-500: #2e679f;
+  --rh-400: #4d87be;
+  --rh-300: #7dabd4;
+  --rh-200: #b5d0e8;
+  --rh-100: #d8e8f5;
+  --rh-50:  #eef5fb;
+
+  --rh-surface: #fff;
+  --rh-border:  rgba(38,83,128,0.14);
+  --rh-text:    #0f1f3a;
+  --rh-muted:   rgba(0,0,0,0.45);
+  --rh-bg:      #f0f5fb;
+}
+html[data-theme="dark"] {
+  --rh-50:      #17304d;
+  --rh-100:     #1e4062;
+  --rh-surface: #0b1828;
+  --rh-border:  rgba(77,135,190,0.18);
+  --rh-text:    #b5d0e8;
+  --rh-muted:   rgba(255,255,255,0.4);
+  --rh-bg:      #070e1c;
+}
+
+/* ── Boutons RH ── */
+.btn-rh {
+  background: var(--rh-600); color: #fff; border: none;
+  border-radius: 7px; padding: 8px 18px; font-size: 13px; font-weight: 600;
+  cursor: pointer; text-decoration: none; display: inline-flex; align-items: center;
+  gap: 6px; transition: background 0.15s, box-shadow 0.15s; font-family: 'Sora', sans-serif;
+}
+.btn-rh:hover { background: var(--rh-700); box-shadow: 0 3px 10px rgba(38,83,128,0.25); color: #fff; }
+
+.btn-rh-outline {
+  border: 1.5px solid var(--rh-600); color: var(--rh-600); background: transparent;
+  border-radius: 7px; padding: 7px 16px; font-size: 13px; font-weight: 600;
+  cursor: pointer; text-decoration: none; display: inline-flex; align-items: center;
+  gap: 6px; transition: background 0.15s, color 0.15s; font-family: 'Sora', sans-serif;
+}
+.btn-rh-outline:hover { background: var(--rh-600); color: #fff; }
+html[data-theme="dark"] .btn-rh-outline { border-color: var(--rh-400); color: var(--rh-300); }
+html[data-theme="dark"] .btn-rh-outline:hover { background: var(--rh-600); color: #fff; border-color: var(--rh-600); }
+
+.btn-rh-sm {
+  border: 1px solid var(--rh-600); color: var(--rh-600); background: transparent;
+  border-radius: 5px; padding: 4px 11px; font-size: 12px; font-weight: 500;
+  cursor: pointer; text-decoration: none; display: inline-flex; align-items: center;
+  gap: 4px; transition: background 0.15s, color 0.15s; font-family: 'Sora', sans-serif;
+}
+.btn-rh-sm:hover { background: var(--rh-600); color: #fff; }
+html[data-theme="dark"] .btn-rh-sm { border-color: var(--rh-400); color: var(--rh-300); }
+html[data-theme="dark"] .btn-rh-sm:hover { background: var(--rh-600); color: #fff; }
+
+.btn-danger-sm {
+  border: 1px solid #c0392b; color: #c0392b; background: transparent;
+  border-radius: 5px; padding: 4px 10px; font-size: 12px; font-weight: 500;
+  cursor: pointer; text-decoration: none; display: inline-flex; align-items: center;
+  gap: 4px; transition: background 0.15s, color 0.15s; font-family: 'Sora', sans-serif;
+}
+.btn-danger-sm:hover { background: #c0392b; color: #fff; }
+html[data-theme="dark"] .btn-danger-sm { border-color: #e87070; color: #e87070; }
+html[data-theme="dark"] .btn-danger-sm:hover { background: #c0392b; color: #fff; }
+
+/* ── Badges statut ── */
+.badge-actif {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(22,169,107,0.12); color: #0d7a4c;
+  border: 1px solid rgba(22,169,107,0.25);
+  padding: 3px 10px; border-radius: 20px; font-size: 11.5px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.2px;
+}
+.badge-actif::before { content:''; width:6px; height:6px; border-radius:50%; background:#16a96b; flex-shrink:0; }
+.badge-suspendu {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(232,154,26,0.12); color: #8a5c00;
+  border: 1px solid rgba(232,154,26,0.25);
+  padding: 3px 10px; border-radius: 20px; font-size: 11.5px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.2px;
+}
+.badge-suspendu::before { content:''; width:6px; height:6px; border-radius:50%; background:var(--amber); flex-shrink:0; }
+.badge-quitte {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(0,0,0,0.06); color: rgba(0,0,0,0.5);
+  border: 1px solid rgba(0,0,0,0.1);
+  padding: 3px 10px; border-radius: 20px; font-size: 11.5px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.2px;
+}
+.badge-quitte::before { content:''; width:6px; height:6px; border-radius:50%; background:#999; flex-shrink:0; }
+html[data-theme="dark"] .badge-actif    { background: rgba(22,169,107,0.18); color: #6eddb0; border-color: rgba(22,169,107,0.3); }
+html[data-theme="dark"] .badge-suspendu { background: rgba(232,154,26,0.18); color: #f0c060; border-color: rgba(232,154,26,0.3); }
+html[data-theme="dark"] .badge-quitte   { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.4); border-color: rgba(255,255,255,0.12); }
+
+/* ── Carte section RH ── */
+.rh-card {
+  background: var(--rh-surface); border-radius: 12px;
+  box-shadow: var(--shadow-sm); overflow: hidden; margin-bottom: 20px;
+}
+.rh-card-header {
+  padding: 16px 22px 14px; border-bottom: 1px solid var(--rh-border);
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.rh-card-title {
+  font-size: 14px; font-weight: 700; color: var(--rh-text);
+  display: flex; align-items: center; gap: 8px;
+  border-left: 3px solid var(--rh-600); padding-left: 10px;
+}
+.rh-card-body { padding: 20px 22px; }
+html[data-theme="dark"] .rh-card { background: var(--rh-surface); }
+html[data-theme="dark"] .rh-card-header { border-bottom-color: var(--rh-border); }
+html[data-theme="dark"] .rh-card-title  { color: var(--rh-text); }
+
+/* ── Champs détail ── */
+.rh-field {
+  display: flex; flex-direction: column; gap: 2px;
+  padding-bottom: 13px; border-bottom: 1px solid rgba(0,0,0,0.05); margin-bottom: 2px;
+}
+.rh-field:last-child { border-bottom: none; padding-bottom: 0; }
+.rh-field .lbl { font-size: 11px; font-weight: 700; color: rgba(0,0,0,0.38); text-transform: uppercase; letter-spacing: 0.4px; }
+.rh-field .val { font-size: 14px; color: var(--rh-text); font-weight: 500; }
+.rh-field .val.empty { color: rgba(0,0,0,0.25); font-style: italic; font-weight: 400; }
+html[data-theme="dark"] .rh-field { border-bottom-color: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .rh-field .lbl { color: rgba(255,255,255,0.38); }
+html[data-theme="dark"] .rh-field .val { color: var(--rh-text); }
+html[data-theme="dark"] .rh-field .val.empty { color: rgba(255,255,255,0.2); }
+
+/* ── Inputs RH ── */
+.rh-input {
+  width: 100%; padding: 9px 4px; border: none;
+  border-bottom: 1.5px solid rgba(0,0,0,0.18); border-radius: 0;
+  font-family: 'Sora', sans-serif; font-size: 13.5px; color: var(--rh-text);
+  background: transparent; transition: border-color 0.18s;
+}
+.rh-input:focus { outline: none; border-bottom-color: var(--rh-600); box-shadow: none; }
+.rh-input::placeholder { color: rgba(0,0,0,0.3); }
+html[data-theme="dark"] .rh-input { background: transparent; border-bottom-color: rgba(255,255,255,0.15); color: var(--rh-text); }
+html[data-theme="dark"] .rh-input:focus { border-bottom-color: var(--rh-400); }
+html[data-theme="dark"] .rh-input::placeholder { color: rgba(255,255,255,0.2); }
+
+/* ── Label formulaire ── */
+.rh-label {
+  display: block; font-size: 11.5px; font-weight: 700;
+  color: rgba(0,0,0,0.45); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 5px;
+}
+.rh-label .req { color: var(--rose); margin-left: 2px; }
+html[data-theme="dark"] .rh-label { color: rgba(255,255,255,0.4); }
+</style>
+{% endblock %}
+
+{% block module_navbar %}
+<nav class="o-nav">
+  <a href="{% url 'dashboard' %}" class="o-nav-grid" title="Accueil">
+    <i class="bi bi-grid-3x3-gap-fill"></i>
+  </a>
+  <span class="o-nav-brand">
+    <i class="bi bi-people-fill"></i>
+    Employés
+  </span>
+  <a href="{% url 'rh_dashboard' %}"
+     class="o-nav-link {% if request.resolver_match.url_name == 'rh_dashboard' %}active{% endif %}">
+    <i class="bi bi-bar-chart-fill"></i> Tableau de bord
+  </a>
+  <a href="{% url 'ressources_humaines_list' %}"
+     class="o-nav-link {% if request.resolver_match.url_name == 'ressources_humaines_list' or request.resolver_match.url_name == 'rh_detail' or request.resolver_match.url_name == 'rh_modifier' or request.resolver_match.url_name == 'rh_renouveler' or request.resolver_match.url_name == 'rh_badge' or request.resolver_match.url_name == 'rh_fiche_pdf' %}active{% endif %}">
+    <i class="bi bi-card-list"></i> Liste
+  </a>
+  <a href="{% url 'rh_conge_list' %}"
+     class="o-nav-link {% if request.resolver_match.url_name == 'rh_conge_list' %}active{% endif %}">
+    <i class="bi bi-calendar2-week-fill"></i> Congés
+  </a>
+  <a href="{% url 'rh_annuaire' %}"
+     class="o-nav-link {% if request.resolver_match.url_name == 'rh_annuaire' %}active{% endif %}">
+    <i class="bi bi-person-lines-fill"></i> Annuaire
+  </a>
+  <a href="{% url 'rh_organigramme' %}"
+     class="o-nav-link {% if request.resolver_match.url_name == 'rh_organigramme' %}active{% endif %}">
+    <i class="bi bi-diagram-3-fill"></i> Organigramme
+  </a>
+  <a href="{% url 'rh_registre' %}"
+     class="o-nav-link {% if request.resolver_match.url_name == 'rh_registre' %}active{% endif %}">
+    <i class="bi bi-journal-bookmark-fill"></i> Registre
+  </a>
+  {% if can_manage %}
+  <a href="{% url 'rh_nouveau' %}"
+     class="o-nav-link {% if request.resolver_match.url_name == 'rh_nouveau' %}active{% endif %}">
+    <i class="bi bi-person-plus-fill"></i> Nouvel employé
+  </a>
+  <a href="{% url 'rh_import' %}"
+     class="o-nav-link {% if request.resolver_match.url_name == 'rh_import' %}active{% endif %}">
+    <i class="bi bi-upload"></i> Import
+  </a>
+  {% endif %}
+</nav>
+{% endblock %}
+
+{% block breadcrumb %}{% endblock %}

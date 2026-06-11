@@ -1,0 +1,263 @@
+{% extends 'pharmacie/base.html' %}
+{% load static %}
+
+{% block topbar_title %}Ordonnances{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<style>
+  .o-badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .badge-emise     { background: #eff6ff; color: #1d4ed8; }
+  .badge-delivree  { background: #f0fdf4; color: #15803d; }
+  .badge-partielle { background: #fffbeb; color: #b45309; }
+  .badge-expiree   { background: #fce4ec; color: #b91c1c; }
+
+  .badge-interne { background: #e8f5f3; color: var(--teal-700,#0f766e); border-radius: 20px; padding: 2px 7px; font-size: 10px; font-weight: 700; }
+  .badge-externe { background: #f3e5f5; color: #7b1fa2; border-radius: 20px; padding: 2px 7px; font-size: 10px; font-weight: 700; }
+
+  .meds-list { font-size: 12px; color: rgba(0,0,0,0.55); }
+  .meds-list span { display: inline-block; background: #f0f6fa; border-radius: 4px; padding: 1px 7px; margin: 1px 2px 1px 0; font-size: 11px; }
+  .meds-more { color: rgba(0,0,0,0.35); font-size: 11px; margin-left: 2px; }
+
+  html[data-theme="dark"] .o-list tbody tr:hover { background: rgba(33,136,171,0.2); }
+  html[data-theme="dark"] .o-list thead th { background: var(--surface); }
+  html[data-theme="dark"] .o-search-input { color: var(--text); }
+  html[data-theme="dark"] .o-search-bar { border-bottom-color: #3a4a62; }
+  html[data-theme="dark"] .o-pag-btn { background: var(--surface); border-color: var(--border); color: var(--text-muted); }
+  html[data-theme="dark"] .o-empty-state { background: var(--bg); }
+
+  .o-list-wrap { overflow-x: auto; overflow-y: auto; background: #fff; margin: 0 -32px; }
+  .o-list { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .o-list thead th {
+    background: #f5f5f5; border-bottom: 1px solid var(--border);
+    padding: 6px 10px; font-weight: 500; font-size: 11.5px;
+    color: var(--text-muted); text-align: left;
+    position: sticky; top: 0; z-index: 2; user-select: none;
+  }
+  .o-list tbody tr { border-bottom: 1px solid #f0f0f0; transition: background 0.1s; cursor: pointer; }
+  .o-list tbody tr:hover { background: var(--teal-50); }
+  .o-list tbody td { padding: 6px 10px; color: var(--text); vertical-align: middle; }
+  .o-list tbody td.td-num { color: var(--teal-600); font-weight: 700; font-family: monospace; }
+  .o-list tbody td.td-patient { white-space: normal; font-weight: 500; }
+  .o-list tbody td.td-actions { text-align: center; white-space: nowrap; width: 80px; }
+
+  .btn-icon {
+    width: 26px; height: 26px; border: 1px solid var(--border); border-radius: 3px;
+    background: var(--surface); display: inline-flex; align-items: center; justify-content: center;
+    color: var(--text-muted); font-size: 12px; text-decoration: none; cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .btn-icon:hover { background: var(--teal-600); color: #fff; border-color: var(--teal-600); }
+
+  .o-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 20px; }
+  .o-empty-illo {
+    width: 88px; height: 88px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--teal-600) 0%, var(--teal-400) 100%);
+    display: flex; align-items: center; justify-content: center; margin-bottom: 20px;
+  }
+  .o-empty-illo svg { color: #fff; opacity: 0.9; }
+  .o-empty-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+  .o-empty-sub { font-size: 12.5px; color: var(--text-muted); }
+
+  .fac-stats { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+  .fac-stat-card {
+    flex: 1; min-width: 160px; background: #fff; border: 1px solid var(--border);
+    border-radius: 6px; padding: 10px 14px;
+  }
+  .fac-stat-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+  .fac-stat-value { font-size: 18px; font-weight: 600; color: var(--text); }
+
+  .o-subheader {
+    background: #fff; border-bottom: 1px solid var(--border);
+    padding: 6px 16px; display: flex; flex-direction: column; gap: 5px;
+    position: sticky; top: 44px; z-index: 190; margin: 0 -32px 16px;
+  }
+  .o-subheader-row { display: flex; align-items: center; gap: 8px; }
+  .o-subheader-row-right { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .o-page-title { font-size: 17px; font-weight: 400; color: var(--text); }
+  .o-search-bar {
+    display: flex; align-items: center; border: none; border-bottom: 1px solid #bbb;
+    background: transparent; min-height: 28px; padding: 2px 4px; gap: 4px; width: 320px;
+  }
+  .o-search-input {
+    border: none; outline: none; font-size: 12px;
+    color: var(--text); flex: 1; min-width: 60px; background: transparent;
+  }
+  .o-search-btn { background: none; border: none; cursor: pointer; color: #888; font-size: 13px; padding: 2px; }
+  .o-ctrl-sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }
+  .o-pagination { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+  .o-pag-btn {
+    color: #555; text-decoration: none; font-size: 15px;
+    display: inline-flex; align-items: center; padding: 0 2px;
+    transition: color 0.15s;
+  }
+  .o-pag-btn:hover { color: var(--teal-600); }
+  .o-pag-btn.disabled { opacity: 0.3; pointer-events: none; }
+
+  .o-filter-select {
+    border: none; border-bottom: 1px solid #bbb; background: transparent;
+    font-size: 12px; color: var(--text); outline: none; padding: 2px 18px 2px 2px;
+    cursor: pointer; appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23999'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 2px center;
+  }
+  .o-btn-create {
+    background: var(--teal-500); color: #fff; border: none; padding: 5px 14px; border-radius: 4px;
+    font-size: 12.5px; font-weight: 500; cursor: pointer; text-decoration: none;
+    display: inline-flex; align-items: center; letter-spacing: 0.5px; transition: background 0.15s;
+  }
+  .o-btn-create:hover { background: var(--teal-600); }
+</style>
+{% endblock %}
+
+
+{% block content %}
+
+<!-- ══ SUBHEADER ══ -->
+<div class="o-subheader">
+  <div class="o-subheader-row">
+    <span class="o-page-title">Ordonnances <span style="font-size:13px;color:var(--text-muted);font-weight:400;">({{ page_obj.paginator.count }})</span></span>
+    <div class="o-subheader-row-right"></div>
+  </div>
+  <div class="o-subheader-row">
+    <a href="{% url 'pharmacie:ordonnance_create' %}" class="o-btn-create">CRÉER</a>
+    <div class="o-subheader-row-right">
+      <form method="get" id="search-form" style="display:flex;align-items:center;gap:8px;">
+        <div class="o-search-bar">
+          <input class="o-search-input" id="search-input" type="text" name="q"
+                 value="{{ q }}" placeholder="Numéro, nom du patient…" autocomplete="off">
+          <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
+        </div>
+        <select name="statut" class="o-filter-select" onchange="this.form.submit()">
+          <option value="">Tous les statuts</option>
+          <option value="emise"     {% if statut_filtre == 'emise' %}selected{% endif %}>Émise</option>
+          <option value="delivree"  {% if statut_filtre == 'delivree' %}selected{% endif %}>Délivrée</option>
+          <option value="partielle" {% if statut_filtre == 'partielle' %}selected{% endif %}>Partielle</option>
+          <option value="expiree"   {% if statut_filtre == 'expiree' %}selected{% endif %}>Expirée</option>
+        </select>
+        <select name="type" class="o-filter-select" onchange="this.form.submit()">
+          <option value="">Tous les types</option>
+          <option value="interne" {% if type_filtre == 'interne' %}selected{% endif %}>Interne</option>
+          <option value="externe" {% if type_filtre == 'externe' %}selected{% endif %}>Externe</option>
+        </select>
+      </form>
+      <div class="o-ctrl-sep"></div>
+      <div class="o-pagination">
+        <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
+           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if statut_filtre %}&statut={{ statut_filtre }}{% endif %}{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-left"></i>
+        </a>
+        <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
+        <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
+           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if statut_filtre %}&statut={{ statut_filtre }}{% endif %}{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-right"></i>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ STATS ══ -->
+<div class="fac-stats">
+  <div class="fac-stat-card">
+    <div class="fac-stat-label">Total</div>
+    <div class="fac-stat-value">{{ stats.total }}</div>
+  </div>
+  <div class="fac-stat-card">
+    <div class="fac-stat-label">Émises</div>
+    <div class="fac-stat-value" style="color:#1d4ed8;">{{ stats.emises }}</div>
+  </div>
+  <div class="fac-stat-card">
+    <div class="fac-stat-label">Délivrées</div>
+    <div class="fac-stat-value" style="color:#15803d;">{{ stats.delivrees }}</div>
+  </div>
+  <div class="fac-stat-card">
+    <div class="fac-stat-label">Expirées</div>
+    <div class="fac-stat-value" style="color:#b91c1c;">{{ stats.expirees }}</div>
+  </div>
+</div>
+
+<!-- ══ TABLE ══ -->
+<div class="o-list-wrap">
+  {% if page_obj %}
+  <table class="o-list">
+    <thead>
+      <tr>
+        <th style="width:40px;text-align:center;">#</th>
+        <th>N° Ordonnance</th>
+        <th>Patient</th>
+        <th>Médecin</th>
+        <th>Médicaments</th>
+        <th>Date d'émission</th>
+        <th>Expiration</th>
+        <th>Type</th>
+        <th>Statut</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ord in page_obj %}
+      <tr onclick="window.location='{% url 'patients:ordonnance_detail' pk=ord.pk %}'" style="cursor:pointer;">
+        <td style="text-align:center;color:var(--text-muted);font-size:11px;">{{ forloop.counter0|add:page_obj.start_index }}</td>
+        <td class="td-num">{{ ord.numero }}</td>
+        <td class="td-patient">
+          {% if ord.consultation.patient %}
+          {{ ord.consultation.patient.nom|upper }} {{ ord.consultation.patient.prenoms }}
+          <div style="font-size:11px;color:rgba(0,0,0,0.4);font-family:monospace;">{{ ord.consultation.patient.code }}</div>
+          {% else %}<span style="color:rgba(0,0,0,0.3);">—</span>{% endif %}
+        </td>
+        <td>
+          {% if ord.consultation.medecin %}
+          Dr. {{ ord.consultation.medecin.nom }}
+          {% else %}<span style="color:rgba(0,0,0,0.3);">—</span>{% endif %}
+        </td>
+        <td>
+          {% with lignes=ord.lignes.all %}
+          {% if lignes %}
+            <div class="meds-list">
+              {% for l in lignes|slice:":3" %}
+                <span>{{ l.medicament_libre|default:l.medicament|truncatechars:25 }}</span>
+              {% endfor %}
+              {% if lignes|length > 3 %}
+                <span class="meds-more">+{{ lignes|length|add:"-3" }} autres</span>
+              {% endif %}
+            </div>
+          {% else %}
+            <span style="color:rgba(0,0,0,0.3);font-size:12px;">—</span>
+          {% endif %}
+          {% endwith %}
+        </td>
+        <td style="font-size:12px;">
+          {{ ord.date_emission|date:"d/m/Y" }}
+          <div style="font-size:11px;color:var(--text-muted);">{{ ord.date_emission|date:"H:i" }}</div>
+        </td>
+        <td style="font-size:12px;">
+          {% if ord.date_expiration %}{{ ord.date_expiration|date:"d/m/Y" }}
+          {% else %}<span style="color:rgba(0,0,0,0.3);">—</span>{% endif %}
+        </td>
+        <td>
+          <span class="badge-{{ ord.type_ordonnance }}">{{ ord.get_type_ordonnance_display }}</span>
+        </td>
+        <td><span class="o-badge badge-{{ ord.statut }}">{{ ord.get_statut_display }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="o-empty-state">
+    <div class="o-empty-illo">
+      <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
+        <polyline points="10 9 9 9 8 9"/>
+      </svg>
+    </div>
+    <div class="o-empty-title">Aucune ordonnance{% if q %} pour "{{ q }}"{% endif %}</div>
+    <div class="o-empty-sub">{% if q %}Essayez avec un autre terme de recherche.{% else %}Les ordonnances apparaîtront ici dès qu'elles seront créées.{% endif %}</div>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

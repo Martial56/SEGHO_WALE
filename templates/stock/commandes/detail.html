@@ -1,0 +1,536 @@
+{% extends 'stock/base.html' %}
+{% load static %}
+{% block nav_commandes %}active{% endblock %}
+{% block topbar_title %}Stock — Commande {{ commande.numero }}{% endblock %}
+
+{% block extra_st_css %}<style>
+.st-page-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 32px; margin: 0 -32px;
+  background: #f2f7ee; border-bottom: 1px solid rgba(0,0,0,.05);
+  box-shadow: 0 2px 8px rgba(0,0,0,.04);
+  position: sticky; top: calc(var(--topbar-h) + 44px); z-index: 100;
+}
+.st-info-row {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 9px 0; border-bottom: 1px solid var(--st-border); font-size: 12.5px;
+}
+.st-info-row:last-child { border-bottom: none; }
+.st-info-label { color: var(--st-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .3px; }
+.st-info-val { font-weight: 600; color: var(--st-text); text-align: right; }
+.badge-cmd-brouillon { background:rgba(0,0,0,.06); color:rgba(0,0,0,.5); border:1px solid rgba(0,0,0,.12); padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
+.badge-cmd-envoye    { background:rgba(45,153,219,.1); color:#1565c0; border:1px solid rgba(45,153,219,.25); padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
+.badge-cmd-partiel   { background:rgba(232,154,26,.1); color:#8a5c00; border:1px solid rgba(232,154,26,.25); padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
+.badge-cmd-recu      { background:rgba(22,169,107,.1); color:#0d7a4c; border:1px solid rgba(22,169,107,.25); padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
+.badge-cmd-annule    { background:rgba(232,69,69,.1);  color:#b71c1c; border:1px solid rgba(232,69,69,.25);  padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
+.ligne-complete { background: rgba(22,169,107,.04); }
+
+/* Modal réception */
+.modal-overlay {
+  display: none; position: fixed; inset: 0; z-index: 9999;
+  background: rgba(0,0,0,.4); align-items: center; justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal-box {
+  background: #fff; border-radius: 14px;
+  box-shadow: 0 16px 48px rgba(0,0,0,.22);
+  width: 820px; max-width: 96vw;
+  max-height: 90vh; display: flex; flex-direction: column;
+  overflow: hidden;
+}
+html[data-theme="dark"] .modal-box { background: var(--st-surface); }
+.modal-header {
+  padding: 18px 24px; border-bottom: 1px solid var(--st-border);
+  display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+}
+.modal-title { font-size: 15px; font-weight: 700; color: var(--st-900); display: flex; align-items: center; gap: 8px; }
+.modal-close { background: none; border: none; font-size: 22px; cursor: pointer; color: var(--st-muted); line-height: 1; padding: 0 4px; }
+.modal-close:hover { color: var(--st-text); }
+.modal-body { padding: 20px 24px; overflow-y: auto; flex: 1; }
+.modal-footer { padding: 14px 24px; border-top: 1px solid var(--st-border); display: flex; justify-content: flex-end; gap: 10px; flex-shrink: 0; }
+.reception-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.reception-table thead th {
+  padding: 8px 10px; font-weight: 700; font-size: 10.5px;
+  text-transform: uppercase; letter-spacing: .4px;
+  color: var(--st-800); text-align: left; white-space: nowrap;
+  background: var(--st-100); border-bottom: 2px solid var(--st-300);
+}
+.reception-table tbody tr { border-bottom: 1px solid var(--st-border); }
+.reception-table tbody tr:last-child { border-bottom: none; }
+.reception-table tbody td { padding: 10px 10px; vertical-align: middle; }
+.rec-input {
+  width: 100%; border: none; border-bottom: 1.5px solid rgba(0,0,0,.18);
+  border-radius: 0; background: transparent; padding: 5px 4px;
+  font-size: 12.5px; color: var(--st-text); font-family: inherit; outline: none;
+}
+.rec-input:focus { border-bottom-color: var(--st-500); }
+</style>{% endblock %}
+
+{% block content %}
+
+<!-- En-tête sticky -->
+<div class="st-page-header">
+  <div style="display:flex;align-items:center;gap:14px;">
+    <a href="{% url 'stock_commandes' %}" style="color:var(--st-muted);font-size:13px;text-decoration:none;">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:15px;font-weight:800;color:var(--st-900);font-family:monospace;">
+          {{ commande.numero }}
+        </span>
+        {% if commande.statut == 'brouillon' %}
+          <span class="badge-cmd-brouillon"><i class="bi bi-file-earmark"></i> Brouillon</span>
+        {% elif commande.statut == 'envoye' %}
+          <span class="badge-cmd-envoye"><i class="bi bi-send"></i> Envoyée</span>
+        {% elif commande.statut == 'partiel' %}
+          <span class="badge-cmd-partiel"><i class="bi bi-hourglass-split"></i> Reçu partiellement</span>
+        {% elif commande.statut == 'recu' %}
+          <span class="badge-cmd-recu"><i class="bi bi-check2-circle"></i> Reçu complet</span>
+        {% elif commande.statut == 'annule' %}
+          <span class="badge-cmd-annule"><i class="bi bi-x-circle"></i> Annulée</span>
+        {% endif %}
+      </div>
+      <div style="font-size:11.5px;color:var(--st-muted);margin-top:2px;">
+        <i class="bi bi-truck"></i> {{ commande.fournisseur.nom }}
+        &nbsp;·&nbsp; Créée le {{ commande.date_creation|date:"d/m/Y" }}
+      </div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <a href="{% url 'stock_commande_print' commande.pk %}" target="_blank" class="btn-st-outline">
+      <i class="bi bi-printer"></i> Bon de commande
+    </a>
+    {% if commande.statut == 'brouillon' %}
+    <a href="{% url 'stock_commande_modifier' commande.pk %}" class="btn-st-outline">
+      <i class="bi bi-pencil"></i> Modifier
+    </a>
+    <form method="post" action="{% url 'stock_commande_envoyer' commande.pk %}" style="display:inline;"
+      onsubmit="return confirm('Envoyer la commande au fournisseur {{ commande.fournisseur.nom }} ?');">
+      {% csrf_token %}
+      <button type="submit" class="btn-st"><i class="bi bi-send"></i> Envoyer</button>
+    </form>
+    {% elif commande.statut == 'envoye' or commande.statut == 'partiel' %}
+    <button type="button" onclick="ouvrirModalReception()" class="btn-st" title="Enregistrer une réception">
+      <i class="bi bi-box-arrow-in-down"></i> Réceptionner
+    </button>
+    {% endif %}
+  </div>
+</div>
+
+{% if messages %}
+<div style="margin-top:14px;display:flex;flex-direction:column;gap:8px;">
+  {% for msg in messages %}
+  {% if msg.tags == 'success' %}
+  <div style="background:rgba(22,169,107,.1);border:1px solid rgba(22,169,107,.3);border-radius:8px;padding:9px 14px;font-size:13px;color:#0d7a4c;display:flex;align-items:center;gap:8px;">
+    <i class="bi bi-check-circle-fill"></i> {{ msg }}
+  </div>
+  {% elif msg.tags == 'warning' %}
+  <div style="background:rgba(232,154,26,.1);border:1px solid rgba(232,154,26,.3);border-radius:8px;padding:9px 14px;font-size:13px;color:#8a5c00;display:flex;align-items:center;gap:8px;">
+    <i class="bi bi-exclamation-triangle-fill"></i> {{ msg }}
+  </div>
+  {% else %}
+  <div style="background:rgba(58,89,36,.08);border:1px solid rgba(58,89,36,.2);border-radius:8px;padding:9px 14px;font-size:13px;color:var(--st-700);display:flex;align-items:center;gap:8px;">
+    <i class="bi bi-info-circle-fill"></i> {{ msg }}
+  </div>
+  {% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Layout : infos + lignes -->
+<div style="display:grid;grid-template-columns:280px 1fr;gap:16px;margin-top:16px;align-items:start;">
+
+  <!-- Colonne gauche : infos commande -->
+  <div>
+    <div class="st-card">
+      <div class="st-card-header">
+        <div class="st-card-title"><i class="bi bi-info-circle" style="color:var(--st-600);"></i> Informations</div>
+      </div>
+      <div class="st-card-body">
+        <div class="st-info-row">
+          <span class="st-info-label">N° Commande</span>
+          <span class="st-info-val" style="font-family:monospace;color:var(--st-600);">{{ commande.numero }}</span>
+        </div>
+        <div class="st-info-row">
+          <span class="st-info-label">Fournisseur</span>
+          <span class="st-info-val">{{ commande.fournisseur.nom }}</span>
+        </div>
+        <div class="st-info-row">
+          <span class="st-info-label">Date commande</span>
+          <span class="st-info-val">{{ commande.date_commande|date:"d/m/Y" }}</span>
+        </div>
+        <div class="st-info-row">
+          <span class="st-info-label">Livraison prévue</span>
+          <span class="st-info-val">
+            {% if commande.date_livraison_prevue %}
+              {{ commande.date_livraison_prevue|date:"d/m/Y" }}
+            {% else %}
+              <span style="color:var(--st-muted);">—</span>
+            {% endif %}
+          </span>
+        </div>
+        {% if commande.date_reception %}
+        <div class="st-info-row">
+          <span class="st-info-label">Date réception</span>
+          <span class="st-info-val" style="color:#0d7a4c;">{{ commande.date_reception|date:"d/m/Y" }}</span>
+        </div>
+        {% endif %}
+        <div class="st-info-row">
+          <span class="st-info-label">Créée par</span>
+          <span class="st-info-val">{{ commande.cree_par.get_full_name|default:commande.cree_par.username|default:"—" }}</span>
+        </div>
+        {% if commande.notes %}
+        <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--st-border);">
+          <div style="font-size:11px;font-weight:700;color:var(--st-muted);text-transform:uppercase;letter-spacing:.3px;margin-bottom:5px;">Notes</div>
+          <div style="font-size:12.5px;color:var(--st-text);font-style:italic;">{{ commande.notes }}</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Total -->
+    <div class="st-card">
+      <div class="st-card-body" style="text-align:center;padding:20px;">
+        <div style="font-size:11px;font-weight:700;color:var(--st-muted);text-transform:uppercase;letter-spacing:.3px;margin-bottom:6px;">Montant total</div>
+        <div style="font-size:28px;font-weight:800;color:var(--st-700);">
+          {{ commande.montant_total|floatformat:0 }}
+          <span style="font-size:14px;font-weight:500;color:var(--st-muted);">F CFA</span>
+        </div>
+        {% if commande.lignes.count > 0 %}
+        <div style="font-size:11.5px;color:var(--st-muted);margin-top:4px;">
+          {{ commande.lignes.count }} ligne{{ commande.lignes.count|pluralize }} de commande
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Colonne droite : lignes de commande -->
+  <div class="st-card">
+    <div class="st-card-header">
+      <div class="st-card-title">
+        <i class="bi bi-list-ul" style="color:var(--st-600);"></i> Lignes de commande
+      </div>
+      {% if commande.statut == 'brouillon' %}
+      <button type="button" onclick="ouvrirModalProduits()" class="btn-st" style="padding:4px 12px;font-size:11.5px;">
+        <i class="bi bi-plus-lg"></i> Ajouter des produits
+      </button>
+      {% endif %}
+    </div>
+
+    <table class="st-table" id="lignes-table" {% if not commande.lignes.all %}style="display:none;"{% endif %}>
+      <thead>
+        <tr>
+          <th>Produit</th>
+          <th style="text-align:right;">Qté commandée</th>
+          <th style="text-align:right;">Qté reçue</th>
+          <th style="text-align:right;">Prix unitaire</th>
+          <th style="text-align:right;">Total ligne</th>
+          <th>Avancement</th>
+          {% if commande.statut == 'brouillon' %}<th style="width:40px;"></th>{% endif %}
+        </tr>
+      </thead>
+      <tbody id="lignes-tbody">
+      {% for ligne in commande.lignes.all %}
+      <tr id="ligne-{{ ligne.pk }}" {% if ligne.quantite_recue >= ligne.quantite_commandee %}class="ligne-complete"{% endif %}>
+        <td>
+          <a href="{% url 'stock_produit_detail' ligne.produit.pk %}" style="color:var(--st-text);text-decoration:none;font-weight:600;">{{ ligne.produit.nom|truncatechars:35 }}</a>
+          <div style="font-size:10.5px;font-family:monospace;color:var(--st-600);">{{ ligne.produit.code }}</div>
+        </td>
+        <td style="text-align:right;font-weight:700;">{{ ligne.quantite_commandee|floatformat:0 }}</td>
+        <td style="text-align:right;font-weight:700;{% if ligne.quantite_recue >= ligne.quantite_commandee %}color:#0d7a4c;{% elif ligne.quantite_recue > 0 %}color:#8a5c00;{% else %}color:var(--st-muted);{% endif %}">{{ ligne.quantite_recue|floatformat:0 }}</td>
+        <td style="text-align:right;font-size:12px;">{{ ligne.prix_unitaire|floatformat:0 }} F</td>
+        <td style="text-align:right;font-weight:700;color:var(--st-700);">{{ ligne.montant|floatformat:0 }} F</td>
+        <td>
+          {% if ligne.quantite_recue >= ligne.quantite_commandee %}<span class="badge-ok"><i class="bi bi-check-circle-fill"></i> Complet</span>
+          {% elif ligne.quantite_recue > 0 %}<span class="badge-alerte"><i class="bi bi-hourglass-split"></i> Partiel</span>
+          {% else %}<span style="font-size:11px;color:var(--st-muted);">En attente</span>{% endif %}
+        </td>
+        {% if commande.statut == 'brouillon' %}
+        <td>
+          <button type="button" onclick="supprimerLigne({{ ligne.pk }}, this)" title="Supprimer"
+            style="background:none;border:none;cursor:pointer;color:#c0392b;font-size:14px;padding:2px 6px;border-radius:4px;"
+            onmouseover="this.style.background='rgba(192,57,43,.08)'" onmouseout="this.style.background='none'">
+            <i class="bi bi-trash3"></i>
+          </button>
+        </td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr style="background:var(--st-100);border-top:2px solid var(--st-300);">
+          <td colspan="4" style="padding:8px 12px;font-weight:700;font-size:12px;text-align:right;color:var(--st-800);">TOTAL COMMANDE</td>
+          <td id="total-commande" style="padding:8px 12px;font-weight:800;font-size:13px;text-align:right;color:var(--st-700);">{{ commande.montant_total|floatformat:0 }} F</td>
+          <td {% if commande.statut == 'brouillon' %}colspan="2"{% endif %}></td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <div id="empty-state" class="st-card-body" style="text-align:center;padding:40px;color:var(--st-muted);{% if commande.lignes.all %}display:none;{% endif %}">
+      <i class="bi bi-cart-x" style="font-size:24px;display:block;margin-bottom:8px;"></i>
+      Aucun produit dans cette commande.
+      {% if commande.statut == 'brouillon' %}
+      <br>
+      <button type="button" onclick="ouvrirModalProduits()" class="btn-st" style="margin-top:12px;">
+        <i class="bi bi-plus-lg"></i> Ajouter des produits
+      </button>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<!-- ══ Modal ajout produits (tableau) ══ -->
+<div id="modal-produits" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.4);align-items:flex-start;justify-content:center;padding-top:30px;">
+  <div style="background:#fff;border-radius:14px;width:960px;max-width:97vw;box-shadow:0 16px 48px rgba(0,0,0,.22);display:flex;flex-direction:column;max-height:88vh;">
+    <div style="padding:14px 24px;border-bottom:1px solid var(--st-border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+      <div style="font-size:15px;font-weight:700;color:var(--st-900);"><i class="bi bi-cart-plus" style="color:var(--st-600);margin-right:6px;"></i>Ajouter des produits</div>
+      <button type="button" onclick="fermerModalProduits()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--st-muted);">&times;</button>
+    </div>
+    <div style="padding:10px 24px;border-bottom:1px solid var(--st-border);display:flex;align-items:center;gap:10px;flex-shrink:0;flex-wrap:wrap;background:var(--st-50);">
+      <div style="display:flex;align-items:center;gap:0;border-bottom:1.5px solid rgba(0,0,0,.18);flex:1;min-width:180px;max-width:280px;">
+        <i class="bi bi-search" style="color:var(--st-muted);font-size:13px;margin-right:6px;"></i>
+        <input type="text" id="mp-search" placeholder="Rechercher produit..." style="border:none;background:transparent;font-size:13px;outline:none;flex:1;padding:5px 0;" oninput="filtrerProduits()">
+      </div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;">
+        <button type="button" onclick="setTypeFiltre('')" id="mp-f-tous" style="border:1.5px solid var(--st-600);border-radius:20px;padding:3px 11px;font-size:11.5px;font-weight:600;cursor:pointer;background:var(--st-600);color:#fff;">Tous</button>
+        <button type="button" onclick="setTypeFiltre('medicament')" id="mp-f-med" style="border:1.5px solid var(--st-border);border-radius:20px;padding:3px 11px;font-size:11.5px;font-weight:600;cursor:pointer;background:var(--st-surface);color:var(--st-muted);">Medicaments</button>
+        <button type="button" onclick="setTypeFiltre('consommable')" id="mp-f-cons" style="border:1.5px solid var(--st-border);border-radius:20px;padding:3px 11px;font-size:11.5px;font-weight:600;cursor:pointer;background:var(--st-surface);color:var(--st-muted);">Consommables</button>
+        <button type="button" onclick="setTypeFiltre('equipement')" id="mp-f-eqp" style="border:1.5px solid var(--st-border);border-radius:20px;padding:3px 11px;font-size:11.5px;font-weight:600;cursor:pointer;background:var(--st-surface);color:var(--st-muted);">Equipements</button>
+        <button type="button" onclick="setTypeFiltre('alerte')" id="mp-f-alert" style="border:1.5px solid rgba(232,154,26,.4);border-radius:20px;padding:3px 11px;font-size:11.5px;font-weight:600;cursor:pointer;background:rgba(232,154,26,.08);color:#8a5c00;">Alertes stock</button>
+      </div>
+      <span id="mp-count" style="font-size:11px;color:var(--st-muted);margin-left:auto;white-space:nowrap;"></span>
+    </div>
+    <div style="overflow-y:auto;flex:1;">
+      <form id="form-ajout-lot" method="post" action="{% url 'stock_commande_ajouter_lot' commande.pk %}">
+        {% csrf_token %}
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
+          <thead style="position:sticky;top:0;z-index:2;background:var(--st-100);">
+            <tr style="border-bottom:2px solid var(--st-300);">
+              <th style="padding:7px 10px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--st-800);">Code</th>
+              <th style="padding:7px 10px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--st-800);">Produit</th>
+              <th style="padding:7px 10px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--st-800);">Type</th>
+              <th style="padding:7px 10px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--st-800);text-align:right;">Stock actuel</th>
+              <th style="padding:7px 10px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--st-800);text-align:right;">Prix achat</th>
+              <th style="padding:7px 10px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--st-800);text-align:center;min-width:110px;">Qte a commander</th>
+              <th style="padding:7px 10px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--st-800);text-align:right;min-width:90px;">Prix unitaire</th>
+            </tr>
+          </thead>
+          <tbody id="mp-tbody">
+            {% for p in produits %}
+            <tr class="mp-row"
+              data-nom="{{ p.nom|lower }}"
+              data-code="{{ p.code|lower }}"
+              data-type="{{ p.type }}"
+              data-alert="{% if p.stock_actuel <= p.stock_alerte %}1{% else %}0{% endif %}"
+              style="border-bottom:1px solid var(--st-border);">
+              <td style="padding:6px 10px;font-family:monospace;font-size:11px;color:var(--st-600);">{{ p.code }}</td>
+              <td style="padding:6px 10px;">
+                <div style="font-weight:600;">{{ p.nom }}</div>
+                {% if p.dci %}<div style="font-size:10px;color:var(--st-muted);">{{ p.dci }}</div>{% endif %}
+              </td>
+              <td style="padding:6px 10px;">
+                {% if p.type == 'medicament' %}<span class="badge-type-med" style="font-size:9.5px;padding:1px 7px;"><i class="bi bi-capsule-pill"></i> Med.</span>
+                {% elif p.type == 'consommable' %}<span class="badge-type-cons" style="font-size:9.5px;padding:1px 7px;"><i class="bi bi-bandaid"></i> Cons.</span>
+                {% else %}<span class="badge-type-eqp" style="font-size:9.5px;padding:1px 7px;"><i class="bi bi-tools"></i> Eqp.</span>{% endif %}
+              </td>
+              <td style="padding:6px 10px;text-align:right;font-weight:700;color:{% if p.stock_actuel <= 0 %}#b71c1c{% elif p.stock_actuel <= p.stock_alerte %}#8a5c00{% else %}#0d7a4c{% endif %};">
+                {{ p.stock_actuel|floatformat:0 }} <span style="font-size:10px;font-weight:400;color:var(--st-muted);">{{ p.unite_mesure }}</span>
+              </td>
+              <td style="padding:6px 10px;text-align:right;font-size:12px;color:var(--st-muted);">{{ p.prix_achat|floatformat:0 }} F</td>
+              <td style="padding:6px 10px;text-align:center;">
+                <input type="number" name="qte_{{ p.pk }}" min="0" step="1" placeholder="--"
+                  style="width:85px;border:none;border-bottom:2px solid var(--st-200);background:transparent;padding:4px 6px;font-size:13px;font-weight:700;text-align:center;font-family:inherit;outline:none;"
+                  onfocus="this.style.borderBottomColor='var(--st-600)'"
+                  onblur="this.style.borderBottomColor='var(--st-200)'"
+                  oninput="majSelectionCount()">
+              </td>
+              <td style="padding:6px 10px;text-align:right;">
+                <input type="number" name="prix_{{ p.pk }}" min="0" step="1" placeholder="{{ p.prix_achat|floatformat:0 }}"
+                  style="width:80px;border:none;border-bottom:1.5px solid rgba(0,0,0,.1);background:transparent;padding:4px 4px;font-size:12px;text-align:right;font-family:inherit;outline:none;"
+                  onfocus="this.style.borderBottomColor='var(--st-600)'"
+                  onblur="this.style.borderBottomColor='rgba(0,0,0,.1)'">
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </form>
+    </div>
+    <div style="padding:12px 24px;border-top:1px solid var(--st-border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+      <div style="font-size:12.5px;color:var(--st-muted);">
+        <i class="bi bi-info-circle"></i> Seules les lignes avec Qte superieure a 0 seront ajoutees.
+        <strong id="mp-sel-count" style="color:var(--st-700);margin-left:4px;"></strong>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button type="button" onclick="fermerModalProduits()" class="btn-st-outline">Annuler</button>
+        <button type="submit" form="form-ajout-lot" class="btn-st"><i class="bi bi-check-lg"></i> Ajouter a la commande</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+var CSRF = '{{ csrf_token }}';
+var currentTypeFiltre = '';
+
+function ouvrirModalProduits(){
+  var m = document.getElementById('modal-produits');
+  m.style.display='flex';
+  document.getElementById('mp-search').value='';
+  filtrerProduits();
+  setTimeout(function(){ document.getElementById('mp-search').focus(); },100);
+}
+function fermerModalProduits(){ document.getElementById('modal-produits').style.display='none'; }
+document.getElementById('modal-produits').addEventListener('click', function(e){ if(e.target===this) fermerModalProduits(); });
+
+function setTypeFiltre(type){
+  currentTypeFiltre = type;
+  var btns = {'':'mp-f-tous','medicament':'mp-f-med','consommable':'mp-f-cons','equipement':'mp-f-eqp','alerte':'mp-f-alert'};
+  Object.values(btns).forEach(function(id){
+    var b = document.getElementById(id);
+    if(!b) return;
+    b.style.background='var(--st-surface)'; b.style.color='var(--st-muted)'; b.style.borderColor='var(--st-border)';
+  });
+  var active = document.getElementById(btns[type]);
+  if(active){ active.style.background='var(--st-600)'; active.style.color='#fff'; active.style.borderColor='var(--st-600)'; }
+  filtrerProduits();
+}
+
+function filtrerProduits(){
+  var q = (document.getElementById('mp-search').value||'').toLowerCase().trim();
+  var rows = document.querySelectorAll('#mp-tbody .mp-row');
+  var nb = 0;
+  rows.forEach(function(tr){
+    var nom=tr.dataset.nom||'', code=tr.dataset.code||'', type=tr.dataset.type||'', alert=tr.dataset.alert||'0';
+    var mQ = !q || nom.includes(q) || code.includes(q);
+    var mT = !currentTypeFiltre || (currentTypeFiltre==='alerte' ? alert==='1' : type===currentTypeFiltre);
+    if(mQ && mT){ tr.style.display=''; nb++; } else { tr.style.display='none'; }
+  });
+  document.getElementById('mp-count').textContent = nb + ' produit' + (nb>1?'s':'') + ' affiche' + (nb>1?'s':'');
+  majSelectionCount();
+}
+
+function majSelectionCount(){
+  var n=0;
+  document.querySelectorAll('#mp-tbody input[name^="qte_"]').forEach(function(i){ if(parseFloat(i.value)>0) n++; });
+  var el=document.getElementById('mp-sel-count');
+  if(el) el.textContent = n>0 ? n+' produit'+(n>1?'s':'')+' selectionne'+(n>1?'s':'') : '';
+}
+
+function supprimerLigne(ligneId, btn){
+  if(!confirm('Supprimer cette ligne ?')) return;
+  fetch('/stock/commandes/{{ commande.pk }}/ligne/'+ligneId+'/supprimer/', {
+    method:'POST', headers:{'X-CSRFToken':CSRF}
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    var tr = document.getElementById('ligne-'+ligneId);
+    if(tr) tr.remove();
+    document.getElementById('total-commande').textContent = data.total.toLocaleString('fr-FR')+' F';
+    if(data.nb_lignes===0){ document.getElementById('lignes-table').style.display='none'; document.getElementById('empty-state').style.display=''; }
+  });
+}
+
+function ouvrirModalReception(){ document.getElementById('modal-reception').classList.add('open'); }
+function fermerModalReception(){ document.getElementById('modal-reception').classList.remove('open'); }
+document.addEventListener('DOMContentLoaded', function(){
+  var overlay = document.getElementById('modal-reception');
+  if(overlay){ overlay.addEventListener('click', function(e){ if(e.target===this) fermerModalReception(); }); }
+});
+</script>
+
+<!-- ══ Modal réception ══ -->
+<div id="modal-reception" class="modal-overlay">
+  <div class="modal-box">
+
+    <div class="modal-header">
+      <div class="modal-title">
+        <i class="bi bi-box-arrow-in-down" style="color:var(--st-600);"></i>
+        Réceptionner la commande
+      </div>
+      <button type="button" class="modal-close" onclick="fermerModalReception()" title="Fermer">&times;</button>
+    </div>
+
+    <div class="modal-body">
+      <p style="font-size:12.5px;color:var(--st-muted);margin:0 0 16px;">
+        Renseignez les quantités effectivement reçues, les numéros de lot et les dates de péremption pour chaque produit.
+      </p>
+
+      <form id="form-reception" method="post" action="{% url 'stock_commande_receptionner' commande.pk %}">
+        {% csrf_token %}
+
+        <table class="reception-table">
+          <thead>
+            <tr>
+              <th style="min-width:160px;">Produit</th>
+              <th style="text-align:right;width:90px;">Qté commandée</th>
+              <th style="text-align:right;width:90px;">Déjà reçue</th>
+              <th style="width:100px;">Qté reçue maintenant <span style="color:#c0392b;">*</span></th>
+              <th style="width:130px;">N° Lot</th>
+              <th style="width:140px;">Date péremption</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for ligne in commande.lignes.all %}
+            <tr>
+              <td>
+                <div style="font-weight:600;color:var(--st-text);">{{ ligne.produit.nom|truncatechars:40 }}</div>
+                <div style="font-size:10.5px;font-family:monospace;color:var(--st-600);">{{ ligne.produit.code }}</div>
+              </td>
+              <td style="text-align:right;font-weight:700;">{{ ligne.quantite_commandee|floatformat:0 }}</td>
+              <td style="text-align:right;font-weight:700;{% if ligne.quantite_recue >= ligne.quantite_commandee %}color:#0d7a4c;{% elif ligne.quantite_recue > 0 %}color:#8a5c00;{% else %}color:var(--st-muted);{% endif %}">
+                {{ ligne.quantite_recue|floatformat:0 }}
+              </td>
+              <td>
+                <input type="number"
+                       name="recu_{{ ligne.pk }}"
+                       class="rec-input"
+                       min="0"
+                       step="1"
+                       placeholder="0"
+                       value="0"
+                       style="width:80px;">
+              </td>
+              <td>
+                <input type="text"
+                       name="lot_{{ ligne.pk }}"
+                       class="rec-input"
+                       placeholder="ex: LOT-2026-01"
+                       autocomplete="off">
+              </td>
+              <td>
+                <input type="date"
+                       name="peremption_{{ ligne.pk }}"
+                       class="rec-input"
+                       {% if ligne.produit.type == 'medicament' %}required title="Requis pour les médicaments"{% endif %}>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="6" style="text-align:center;padding:24px;color:var(--st-muted);font-size:12.5px;">
+                <i class="bi bi-cart-x"></i> Aucun produit dans cette commande.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+      </form>
+    </div>
+
+    <div class="modal-footer">
+      <button type="button" onclick="fermerModalReception()" class="btn-st-outline">
+        <i class="bi bi-x-lg"></i> Annuler
+      </button>
+      <button type="submit" form="form-reception" class="btn-st">
+        <i class="bi bi-check2-circle"></i> Confirmer la réception
+      </button>
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}

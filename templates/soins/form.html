@@ -329,12 +329,6 @@ html[data-theme="dark"] .proc-annule-badge { background:rgba(220,38,38,.15);bord
           <i class="bi bi-bandaid"></i> Liste des soins
         </a>
         <div class="art-qnav-sep"></div>
-        <a href="{% url 'soins:demande_examen_list' %}{% if not is_new %}?patient_id={{ soin.patient.pk }}&next={% url 'soins:edit' soin.pk %}{% endif %}"
-          id="qnav-exam-link" class="art-qnav-link">
-          <i class="bi bi-clipboard2-pulse"></i> Demandes d'examen
-          <span class="qnav-count" id="count-exam">{{ counts.examens|default:0 }}</span>
-        </a>
-        <div class="art-qnav-sep"></div>
         <a href="#" class="art-qnav-link">
           <i class="bi bi-graph-up"></i> Résultats de traitement
           <span class="qnav-count qnav-count-green" id="count-result">{{ counts.analyses|default:0 }}</span>
@@ -625,7 +619,6 @@ html[data-theme="dark"] .proc-annule-badge { background:rgba(220,38,38,.15);bord
   "isNew":      {% if is_new %}true{% else %}false{% endif %},
   {# "rdvListUrl": "{% url 'soins:rdv_list' %}", #}
   "soinsListUrl":     "{% url 'soins:list' %}",
-  "examListUrl":      "{% url 'soins:demande_examen_list' %}",
   "patientCountsUrl": "{% url 'soins:patient_counts' %}",
   "editUrl":          "{% if not is_new %}{% url 'soins:edit' soin.pk %}{% else %}{% url 'soins:create' %}{% endif %}"
 }
@@ -769,17 +762,14 @@ document.addEventListener('click', function(e) {
   var section   = document.getElementById('qnav-patient-section');
   // var rdvLink   = document.getElementById('qnav-rdv-link');
   var soinsLink = document.getElementById('qnav-soins-link');
-  var examLink  = document.getElementById('qnav-exam-link');
   // var RDV_URL = _d.rdvListUrl;
   var SOINS_URL  = _d.soinsListUrl;
-  var EXAM_URL   = _d.examListUrl;
   var COUNTS_URL = _d.patientCountsUrl;
   var EDIT_URL   = _d.editUrl;
 
   function majCompteurs(c) {
     var el;
     // el = document.getElementById('count-rdv'); if (el) el.textContent = c.rdv || 0;
-    el = document.getElementById('count-exam');   if (el) el.textContent = c.examens  || 0;
     el = document.getElementById('count-result'); if (el) el.textContent = c.analyses || 0;
   }
 
@@ -794,7 +784,6 @@ document.addEventListener('click', function(e) {
     /* Mettre à jour les hrefs */
     // if (rdvLink) rdvLink.href = patientId ? RDV_URL + '?patient_id=' + patientId + '&next=' + encodeURIComponent(returnUrl) + '&back_label=' + encodeURIComponent(backLabel) : RDV_URL;
     if (soinsLink) soinsLink.href = patientId ? SOINS_URL + '?patient_id=' + patientId : SOINS_URL;
-    if (examLink)  examLink.href  = patientId ? EXAM_URL  + '?patient_id=' + patientId + '&next=' + encodeURIComponent(returnUrl) + '&back_label=' + encodeURIComponent(backLabel) : EXAM_URL;
 
     /* Rafraîchir les compteurs via AJAX */
     if (patientId && COUNTS_URL) {

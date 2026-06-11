@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block topbar_title %}Présence{% endblock %}
+
+{% block extra_css %}
+{% load static %}
+<link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
+{% include 'soins/includes/layout_css.html' %}
+<style>
+.content { padding:0; }
+.o-nav { padding-left: 36px; padding-right: 36px; }
+.o-nav-link { gap: 5px; }
+.o-nav-brand { gap: 6px; }
+/* override --primary → teal présence */
+:root { --primary: #0e6b89; }
+html[data-theme="dark"] { --primary: #30a8cc; }
+/* override background hover/active (teal présence) */
+.o-nav-link:hover, .o-nav-link.active { background: rgba(14,107,137,.06); }
+html[data-theme="dark"] .o-nav-link:hover,
+html[data-theme="dark"] .o-nav-link.active {
+  color: #70cee2; background: rgba(14,107,137,.12); border-bottom-color: var(--pr-400);
+}
+
+/* ── Palette Teal Présence ── */
+:root {
+  --pr-900: #0c2f3d; --pr-800: #0e4258; --pr-700: #0e5570;
+  --pr-600: #0e6b89; --pr-500: #1288ac; --pr-400: #30a8cc;
+  --pr-300: #70cee2; --pr-200: #b0e4f2; --pr-100: #d8f2fb;
+  --pr-50:  #eef9fd;
+  --pr-surface: #fff;
+  --pr-border:  rgba(14,107,137,0.14);
+  --pr-text:    #0c2f3d;
+  --pr-muted:   rgba(0,0,0,0.45);
+}
+html[data-theme="dark"] {
+  --pr-50:      #0e4258; --pr-100: #0e5570;
+  --pr-surface: #091c28; --pr-border: rgba(48,168,204,0.18);
+  --pr-text:    #b0e4f2; --pr-muted: rgba(255,255,255,0.4);
+}
+
+/* ── Boutons ── */
+.btn-pr {
+  background: var(--pr-600); color: #fff; border: none; border-radius: 7px;
+  padding: 8px 18px; font-size: 13px; font-weight: 600; cursor: pointer;
+  text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+  transition: background .15s; font-family: 'Sora', sans-serif;
+}
+.btn-pr:hover { background: var(--pr-700); color: #fff; }
+.btn-pr-outline {
+  border: 1.5px solid var(--pr-600); color: var(--pr-600); background: transparent;
+  border-radius: 7px; padding: 7px 16px; font-size: 13px; font-weight: 600;
+  cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+  transition: background .15s, color .15s; font-family: 'Sora', sans-serif;
+}
+.btn-pr-outline:hover { background: var(--pr-600); color: #fff; }
+.btn-pr-sm {
+  border: 1px solid var(--pr-400); color: var(--pr-600); background: transparent;
+  border-radius: 5px; padding: 4px 10px; font-size: 12px; font-weight: 500;
+  cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;
+  transition: background .15s, color .15s; font-family: 'Sora', sans-serif;
+}
+.btn-pr-sm:hover { background: var(--pr-600); color: #fff; }
+
+/* ── Card ── */
+.pr-card {
+  background: var(--pr-surface); border-radius: 12px;
+  box-shadow: var(--shadow-sm); overflow: hidden; margin-bottom: 20px;
+}
+.pr-card-header {
+  padding: 14px 20px; border-bottom: 1px solid var(--pr-border);
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.pr-card-title {
+  font-size: 14px; font-weight: 700; color: var(--pr-text);
+  display: flex; align-items: center; gap: 8px;
+  border-left: 3px solid var(--pr-600); padding-left: 10px;
+}
+.pr-card-body { padding: 20px; }
+
+/* ── Input ── */
+.pr-input {
+  width: 100%; padding: 8px 4px;
+  border: none; border-bottom: 1.5px solid rgba(0,0,0,0.18); border-radius: 0;
+  font-family: 'Sora', sans-serif; font-size: 13px; color: var(--pr-text);
+  background: transparent; transition: border-color .18s;
+}
+.pr-input:focus { outline: none; border-bottom-color: var(--pr-600); box-shadow: none; }
+.pr-label {
+  display: block; font-size: 11px; font-weight: 700; color: rgba(0,0,0,.45);
+  text-transform: uppercase; letter-spacing: .4px; margin-bottom: 4px;
+}
+
+/* ── Subheader (sticky, référence le scroll container .content) ── */
+.pr-subheader {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 14px 36px; flex-wrap: wrap;
+  position: sticky; top: 38px; z-index: 100;
+  background: #eef8fc; border-bottom: 1px solid rgba(0,0,0,.05);
+  box-shadow: 0 2px 8px rgba(0,0,0,.04);
+}
+html[data-theme="dark"] .pr-subheader { background: #0a1e2e; }
+</style>
+{% endblock %}
+
+{% block module_navbar %}
+<nav class="o-nav">
+  <a href="{% url 'dashboard' %}" class="o-nav-grid" title="Accueil">
+    <i class="bi bi-grid-3x3-gap-fill"></i>
+  </a>
+  <span class="o-nav-brand">
+    <i class="bi bi-person-badge-fill"></i>
+    Présence
+  </span>
+  {% if can_manage %}
+  <a href="{% url 'presence_registre' %}"
+     class="o-nav-link {% if request.resolver_match.url_name == 'presence_registre' %}active{% endif %}">
+    <i class="bi bi-clipboard-check"></i> Registre du jour
+  </a>
+  <a href="{% url 'presence_recap' %}"
+     class="o-nav-link {% if request.resolver_match.url_name == 'presence_recap' %}active{% endif %}">
+    <i class="bi bi-calendar3"></i> Récap mensuel
+  </a>
+  <a href="{% url 'presence_stats' %}"
+     class="o-nav-link {% if request.resolver_match.url_name == 'presence_stats' %}active{% endif %}">
+    <i class="bi bi-bar-chart-line"></i> Statistiques
+  </a>
+  <a href="{% url 'presence_rapport' %}"
+     class="o-nav-link {% if request.resolver_match.url_name == 'presence_rapport' or request.resolver_match.url_name == 'presence_rapport_export' %}active{% endif %}">
+    <i class="bi bi-file-earmark-text"></i> Rapport
+  </a>
+  <a href="{% url 'presence_parametres' %}"
+     class="o-nav-link {% if request.resolver_match.url_name == 'presence_parametres' %}active{% endif %}">
+    <i class="bi bi-gear-fill"></i> Paramètres
+  </a>
+  {% endif %}
+  <a href="{% url 'presence_pointage' %}" target="_blank"
+     class="o-nav-link" style="margin-left:auto;">
+    <i class="bi bi-qr-code-scan"></i> Kiosque pointage
+  </a>
+</nav>
+{% endblock %}
+
+{% block breadcrumb %}{% endblock %}

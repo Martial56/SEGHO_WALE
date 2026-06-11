@@ -1,0 +1,341 @@
+{% extends 'stock/base.html' %}
+{% load static %}
+{% block nav_dashboard %}active{% endblock %}
+{% block topbar_title %}Stock — Tableau de bord{% endblock %}
+
+{% block extra_st_css %}<style>
+.st-stats { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px; margin-top:20px; }
+.st-stat { background:var(--st-surface); border:1px solid var(--st-border); border-radius:10px; padding:14px 18px; box-shadow:0 1px 4px rgba(58,89,36,.06); display:flex; align-items:center; gap:12px; }
+.st-stat-icon { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
+.st-stat-val { font-size:22px; font-weight:800; line-height:1; }
+.st-stat-lbl { font-size:10.5px; color:var(--st-muted); text-transform:uppercase; letter-spacing:.3px; margin-top:2px; }
+
+.st-layout { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:20px; }
+@media(max-width:900px){ .st-layout{ grid-template-columns:1fr; } }
+
+.st-progress { display:flex; align-items:center; gap:8px; }
+.st-bar { flex:1; height:5px; background:rgba(0,0,0,.08); border-radius:3px; overflow:hidden; }
+.st-bar-fill { height:100%; border-radius:3px; background:var(--st-500); }
+.val-rupture { color:#b71c1c; font-weight:700; }
+.val-alerte  { color:#8a5c00; font-weight:700; }
+.val-perime  { color:#b71c1c; font-weight:700; }
+.val-proche  { color:#8a5c00; }
+.charts-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px; }
+@media(max-width:900px){ .charts-grid{ grid-template-columns:1fr; } }
+.chart-card { background:var(--st-surface); border:1px solid var(--st-border); border-radius:12px; padding:18px 20px; box-shadow:0 2px 10px rgba(58,89,36,.07); }
+.chart-title { font-size:13px; font-weight:700; color:var(--st-text); margin-bottom:14px; display:flex; align-items:center; gap:7px; border-left:3px solid var(--st-600); padding-left:10px; }
+</style>{% endblock %}
+
+{% block content %}
+<!-- En-tête -->
+<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 32px;margin:0 -32px;background:#f2f7ee;border-bottom:1px solid rgba(0,0,0,.05);box-shadow:0 2px 8px rgba(0,0,0,.04);position:sticky;top:calc(var(--topbar-h) + 44px);z-index:100;">
+  <div>
+    <div style="font-size:15px;font-weight:800;color:var(--st-900);"><i class="bi bi-boxes" style="color:var(--st-600);"></i> Gestion du stock</div>
+    <div style="font-size:11.5px;color:var(--st-muted);">Vue d'ensemble — {{ today|date:"d/m/Y" }}</div>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <a href="{% url 'stock_mouvement_create' %}" class="btn-st-outline"><i class="bi bi-arrow-left-right"></i> Nouveau mouvement</a>
+    <a href="{% url 'stock_produit_create' %}" class="btn-st"><i class="bi bi-plus-lg"></i> Nouveau produit</a>
+  </div>
+</div>
+
+<!-- Stats -->
+<div class="st-stats">
+  <div class="st-stat">
+    <div class="st-stat-icon" style="background:rgba(58,89,36,.1);color:var(--st-700);"><i class="bi bi-box-seam"></i></div>
+    <div><div class="st-stat-val" style="color:var(--st-700);">{{ stats.total_produits }}</div><div class="st-stat-lbl">Produits actifs</div></div>
+  </div>
+  <div class="st-stat">
+    <div class="st-stat-icon" style="background:rgba(58,89,36,.1);color:var(--st-600);"><i class="bi bi-capsule-pill"></i></div>
+    <div><div class="st-stat-val" style="color:var(--st-600);">{{ stats.medicaments }}</div><div class="st-stat-lbl">Médicaments</div></div>
+  </div>
+  <div class="st-stat">
+    <div class="st-stat-icon" style="background:rgba(45,153,219,.1);color:#1a237e;"><i class="bi bi-bandaid"></i></div>
+    <div><div class="st-stat-val" style="color:#1a237e;">{{ stats.consommables }}</div><div class="st-stat-lbl">Consommables</div></div>
+  </div>
+  <div class="st-stat">
+    <div class="st-stat-icon" style="background:rgba(123,87,194,.1);color:#4527a0;"><i class="bi bi-tools"></i></div>
+    <div><div class="st-stat-val" style="color:#4527a0;">{{ stats.equipements }}</div><div class="st-stat-lbl">Équipements</div></div>
+  </div>
+  <div class="st-stat">
+    <div class="st-stat-icon" style="background:rgba(232,69,69,.1);color:#b71c1c;"><i class="bi bi-exclamation-triangle-fill"></i></div>
+    <div><div class="st-stat-val" style="color:#b71c1c;">{{ stats.ruptures }}</div><div class="st-stat-lbl">Ruptures</div></div>
+  </div>
+  <div class="st-stat">
+    <div class="st-stat-icon" style="background:rgba(232,154,26,.1);color:#8a5c00;"><i class="bi bi-bell-fill"></i></div>
+    <div><div class="st-stat-val" style="color:#8a5c00;">{{ stats.alertes }}</div><div class="st-stat-lbl">En alerte</div></div>
+  </div>
+  <div class="st-stat">
+    <div class="st-stat-icon" style="background:rgba(58,89,36,.1);color:var(--st-600);"><i class="bi bi-cart3"></i></div>
+    <div><div class="st-stat-val" style="color:var(--st-600);">{{ stats.commandes_en_cours }}</div><div class="st-stat-lbl">Commandes en cours</div></div>
+  </div>
+  <div class="st-stat">
+    <div class="st-stat-icon" style="background:rgba(232,69,69,.08);color:#c0392b;"><i class="bi bi-calendar-x"></i></div>
+    <div><div class="st-stat-val" style="color:#c0392b;">{{ stats.lots_perimes }}</div><div class="st-stat-lbl">Lots périmés</div></div>
+  </div>
+</div>
+
+
+<!-- ══ GRAPHES ══ -->
+<div class="charts-grid">
+
+  <!-- Donut : répartition statut -->
+  <!-- Donut : répartition statut -->
+  <div class="chart-card" style="display:flex;flex-direction:column;">
+    <div class="chart-title"><i class="bi bi-pie-chart-fill" style="color:var(--st-600);"></i> Répartition du stock</div>
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:12px 0;">
+      <div style="position:relative;width:160px;height:160px;">
+        <canvas id="chartStatut"></canvas>
+      </div>
+      <div id="legendStatut" style="font-size:12px;display:flex;gap:16px;flex-wrap:wrap;justify-content:center;"></div>
+    </div>
+  </div>
+
+  <!-- Bar : répartition par type -->
+  <div class="chart-card" style="display:flex;flex-direction:column;">
+    <div class="chart-title"><i class="bi bi-bar-chart-fill" style="color:var(--st-600);"></i> Produits par type</div>
+    <div style="flex:1;display:flex;align-items:center;">
+      <canvas id="chartTypes"></canvas>
+    </div>
+  </div>
+
+  <!-- Ligne : entrées vs livraisons 7 jours -->
+  <div class="chart-card" style="grid-column:1/-1;">
+    <div class="chart-title"><i class="bi bi-activity" style="color:var(--st-600);"></i> Entrées &amp; Livraisons — 7 derniers jours</div>
+    <canvas id="chartMouvements" height="80"></canvas>
+  </div>
+
+  <!-- Bar : top livrés 30 jours -->
+  <div class="chart-card" style="grid-column:1/-1;">
+    <div class="chart-title"><i class="bi bi-trophy-fill" style="color:#e89a1a;"></i> Top produits livrés aux pharmacies — 30 jours</div>
+    <canvas id="chartTop" height="70"></canvas>
+  </div>
+
+</div>
+
+
+<div class="st-layout">
+
+  <!-- Produits en alerte -->
+  <div class="st-card">
+    <div class="st-card-header">
+      <div class="st-card-title"><i class="bi bi-exclamation-circle" style="color:#e89a1a;"></i> Stock critique</div>
+      <a href="{% url 'stock_produits' %}?statut=rupture" class="btn-st-outline" style="padding:3px 10px;font-size:11.5px;">Voir tout</a>
+    </div>
+    {% if produits_alerte %}
+    <table class="st-table">
+      <thead><tr><th>Produit</th><th>Type</th><th style="text-align:right;">Stock</th><th style="text-align:right;">Seuil</th><th>État</th></tr></thead>
+      <tbody>
+      {% for p in produits_alerte %}
+      <tr>
+        <td><a href="{% url 'stock_produit_detail' p.pk %}" style="text-decoration:none;color:var(--st-text);font-weight:600;">{{ p.nom }}</a>
+            <div style="font-size:10.5px;color:var(--st-muted);font-family:monospace;">{{ p.code }}</div></td>
+        <td>{% if p.type == 'medicament' %}<span class="badge-type-med">Médicament</span>
+            {% elif p.type == 'consommable' %}<span class="badge-type-cons">Consommable</span>
+            {% else %}<span class="badge-type-eqp">Équipement</span>{% endif %}</td>
+        <td style="text-align:right;" class="{% if p.en_rupture %}val-rupture{% else %}val-alerte{% endif %}">{{ p.stock_actuel|floatformat:0 }}</td>
+        <td style="text-align:right;font-size:11.5px;color:var(--st-muted);">{{ p.stock_alerte|floatformat:0 }}</td>
+        <td>{% if p.en_rupture %}<span class="badge-rupture">Rupture</span>{% else %}<span class="badge-alerte">Alerte</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="st-card-body" style="text-align:center;color:var(--st-muted);font-style:italic;padding:32px;">
+      <i class="bi bi-check-circle-fill" style="font-size:24px;color:#16a96b;display:block;margin-bottom:8px;"></i>
+      Aucun produit en rupture ou alerte
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Lots à surveiller -->
+  <div class="st-card">
+    <div class="st-card-header">
+      <div class="st-card-title"><i class="bi bi-calendar-x" style="color:#c0392b;"></i> Lots à surveiller</div>
+      <span style="font-size:11.5px;color:var(--st-muted);">90 prochains jours</span>
+    </div>
+    {% if lots_a_surveiller %}
+    <table class="st-table">
+      <thead><tr><th>Produit</th><th>Lot</th><th>Qté</th><th>Péremption</th></tr></thead>
+      <tbody>
+      {% for lot in lots_a_surveiller %}
+      <tr>
+        <td style="font-weight:600;">{{ lot.produit.nom|truncatechars:25 }}</td>
+        <td style="font-family:monospace;font-size:11.5px;">{{ lot.numero_lot }}</td>
+        <td style="font-weight:700;">{{ lot.quantite_actuelle|floatformat:0 }}</td>
+        <td style="font-size:12px;" class="{% if lot.est_perime %}val-perime{% else %}val-proche{% endif %}">
+          {{ lot.date_peremption|date:"d/m/Y" }}{% if lot.est_perime %} <span style="font-size:10px;">(périmé)</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="st-card-body" style="text-align:center;color:var(--st-muted);font-style:italic;padding:32px;">Aucun lot à surveiller</div>
+    {% endif %}
+  </div>
+
+  <!-- Derniers mouvements -->
+  <div class="st-card">
+    <div class="st-card-header">
+      <div class="st-card-title"><i class="bi bi-arrow-left-right" style="color:var(--st-600);"></i> Derniers mouvements</div>
+      <a href="{% url 'stock_mouvements' %}" class="btn-st-outline" style="padding:3px 10px;font-size:11.5px;">Voir tout</a>
+    </div>
+    {% if derniers_mouvements %}
+    <table class="st-table">
+      <thead><tr><th>Date</th><th>Produit</th><th>Type</th><th style="text-align:right;">Qté</th></tr></thead>
+      <tbody>
+      {% for mv in derniers_mouvements %}
+      <tr>
+        <td style="font-size:11.5px;white-space:nowrap;">{{ mv.date|date:"d/m H:i" }}</td>
+        <td style="font-weight:500;">{{ mv.produit.nom|truncatechars:25 }}</td>
+        <td>
+          {% if mv.type == 'entree' %}<span style="color:#0d7a4c;font-size:11px;font-weight:600;"><i class="bi bi-arrow-down-circle-fill"></i> Entrée</span>
+          {% elif mv.type == 'sortie' %}<span style="color:#b71c1c;font-size:11px;font-weight:600;"><i class="bi bi-arrow-up-circle-fill"></i> Sortie</span>
+          {% else %}<span style="color:var(--st-muted);font-size:11px;">{{ mv.get_type_display }}</span>{% endif %}
+        </td>
+        <td style="text-align:right;font-weight:700;">{{ mv.quantite|floatformat:0 }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="st-card-body" style="text-align:center;color:var(--st-muted);font-style:italic;padding:32px;">Aucun mouvement enregistré</div>
+    {% endif %}
+  </div>
+
+  <!-- Commandes récentes -->
+  <div class="st-card">
+    <div class="st-card-header">
+      <div class="st-card-title"><i class="bi bi-cart3" style="color:var(--st-600);"></i> Commandes en cours</div>
+      <a href="{% url 'stock_commandes' %}" class="btn-st-outline" style="padding:3px 10px;font-size:11.5px;">Voir tout</a>
+    </div>
+    {% if commandes_recentes %}
+    <table class="st-table">
+      <thead><tr><th>N°</th><th>Fournisseur</th><th>Date</th><th>Statut</th></tr></thead>
+      <tbody>
+      {% for cmd in commandes_recentes %}
+      <tr>
+        <td style="font-family:monospace;font-size:11.5px;color:var(--st-600);"><a href="{% url 'stock_commande_detail' cmd.pk %}" style="text-decoration:none;">{{ cmd.numero }}</a></td>
+        <td style="font-weight:500;">{{ cmd.fournisseur.nom|truncatechars:20 }}</td>
+        <td style="font-size:11.5px;">{{ cmd.date_commande|date:"d/m/Y" }}</td>
+        <td>
+          {% if cmd.statut == 'brouillon' %}<span style="background:rgba(0,0,0,.06);color:rgba(0,0,0,.45);border:1px solid rgba(0,0,0,.1);padding:2px 8px;border-radius:20px;font-size:10.5px;font-weight:600;">Brouillon</span>
+          {% elif cmd.statut == 'envoye' %}<span class="badge-type-cons">Envoyée</span>
+          {% elif cmd.statut == 'partiel' %}<span class="badge-alerte">Partiel</span>
+          {% elif cmd.statut == 'recu' %}<span class="badge-ok">Reçue</span>
+          {% else %}<span class="badge-rupture">Annulée</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="st-card-body" style="text-align:center;color:var(--st-muted);font-style:italic;padding:32px;">Aucune commande récente</div>
+    {% endif %}
+  </div>
+
+</div>
+
+{{ chart_statut|json_script:"data-statut" }}
+{{ chart_mouvements|json_script:"data-mouvements" }}
+{{ chart_top|json_script:"data-top" }}
+{{ chart_types|json_script:"data-types" }}
+
+<script src="{% static 'vendor/chart.umd.min.js' %}"></script>
+<script>
+var statut     = JSON.parse(document.getElementById('data-statut').textContent);
+var mouvements = JSON.parse(document.getElementById('data-mouvements').textContent);
+var topChart   = JSON.parse(document.getElementById('data-top').textContent);
+var types      = JSON.parse(document.getElementById('data-types').textContent);
+
+Chart.defaults.font.family = "'Sora', sans-serif";
+Chart.defaults.font.size   = 12;
+
+/* 1. Donut statut */
+new Chart(document.getElementById('chartStatut'), {
+  type: 'doughnut',
+  data: { labels: statut.labels, datasets: [{ data: statut.data, backgroundColor: statut.colors, borderWidth: 2, borderColor: '#fff' }] },
+  options: {
+    cutout: '68%', plugins: { legend: { display: false }, tooltip: { callbacks: {
+      label: function(c){ return ' ' + c.label + ' : ' + c.raw; }
+    }}},
+  }
+});
+var leg = document.getElementById('legendStatut');
+statut.labels.forEach(function(lbl, i){
+  leg.innerHTML += '<div style="display:flex;align-items:center;gap:6px;">'+
+    '<span style="width:10px;height:10px;border-radius:50%;background:'+statut.colors[i]+';flex-shrink:0;"></span>'+
+    '<span style="color:var(--st-muted);white-space:nowrap;">'+lbl+'</span>'+
+    '<strong style="color:var(--st-text);margin-left:4px;">'+statut.data[i]+'</strong></div>';
+});
+
+/* 2. Bar types — couleurs distinctes par type */
+new Chart(document.getElementById('chartTypes'), {
+  type: 'bar',
+  data: {
+    labels: types.labels,
+    datasets: [{
+      data: types.data,
+      backgroundColor: ['#1a237e', '#ef6c00', '#6a1b9a'],
+      borderRadius: 8, borderSkipped: false,
+      hoverBackgroundColor: ['#0d1b6e', '#e65100', '#4a148c']
+    }]
+  },
+  options: {
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { display: false } },
+      y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: 'rgba(0,0,0,.05)' } }
+    }
+  }
+});
+
+/* 3. Ligne mouvements — vert entrées, orange livraisons */
+new Chart(document.getElementById('chartMouvements'), {
+  type: 'line',
+  data: {
+    labels: mouvements.labels,
+    datasets: [
+      { label: 'Entrées fournisseurs', data: mouvements.entrees,
+        borderColor: '#1a237e', backgroundColor: 'rgba(26,35,126,.1)',
+        tension: 0.4, fill: true, pointRadius: 4, pointBackgroundColor: '#1a237e', borderWidth: 2 },
+      { label: 'Livraisons pharmacies', data: mouvements.sorties,
+        borderColor: '#ef6c00', backgroundColor: 'rgba(239,108,0,.08)',
+        tension: 0.4, fill: true, pointRadius: 4, pointBackgroundColor: '#ef6c00', borderWidth: 2 },
+    ]
+  },
+  options: {
+    plugins: { legend: { position: 'top', labels: { usePointStyle: true, pointStyleWidth: 10, padding: 16 } } },
+    scales: {
+      x: { grid: { display: false } },
+      y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: 'rgba(0,0,0,.05)' } }
+    }
+  }
+});
+
+/* 4. Bar top livrés — dégradé de couleurs */
+if(topChart.labels.length > 0){
+  var barColors = ['#1a237e','#ef6c00','#6a1b9a','#00838f','#e91e63','#1a237e'];
+  new Chart(document.getElementById('chartTop'), {
+    type: 'bar',
+    data: {
+      labels: topChart.labels,
+      datasets: [{ label: 'Qté livrée', data: topChart.data,
+        backgroundColor: topChart.labels.map(function(_,i){ return barColors[i % barColors.length]; }),
+        borderRadius: 6, borderSkipped: false }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false } },
+        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,.05)' } }
+      }
+    }
+  });
+} else {
+  var el = document.getElementById('chartTop');
+  if(el){ el.parentElement.innerHTML += '<div style="text-align:center;padding:20px;color:var(--st-muted);font-style:italic;font-size:13px;">Aucune livraison aux pharmacies ces 30 derniers jours</div>'; el.style.display='none'; }
+}
+</script>
+{% endblock %}

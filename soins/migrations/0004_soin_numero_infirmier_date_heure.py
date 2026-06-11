@@ -8,7 +8,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('ressources_humaines', '0001_initial'),
+        ('employer', '0001_initial'),
         ('soins', '0003_remove_soin_numero_infirmier_rendez_vous_date_heure_service'),
     ]
 
@@ -21,7 +21,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='soin',
             name='infirmier',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='soins_pris_en_charge', to='ressources_humaines.employe', verbose_name='Infirmier responsable'),
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='soins_pris_en_charge', to='employer.employe', verbose_name='Infirmier responsable'),
         ),
         migrations.AddField(
             model_name='soin',

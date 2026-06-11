@@ -1,0 +1,514 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pointage — Centre Médico-Social WALÉ</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<style>
+*,*::before,*::after { margin:0;padding:0;box-sizing:border-box; }
+:root {
+  --g900:#1b2e13; --g700:#3a5924; --g600:#4a6741; --g500:#5e8050;
+  --g400:#7a9b68; --g300:#9ab88a; --g100:#d8eac4; --g50:#eef5e4;
+}
+body {
+  font-family:'Sora',sans-serif;
+  background: linear-gradient(135deg, #1b2e13 0%, #3a5924 50%, #4a6741 100%);
+  min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding:20px;
+}
+
+/* ── En-tête ── */
+.kiosk-header {
+  text-align:center; margin-bottom:28px; color:#fff;
+}
+.kiosk-header img {
+  width:64px; height:64px; object-fit:contain; margin-bottom:10px;
+  filter:brightness(0) invert(1);
+}
+.kiosk-header .etablissement { font-size:13px; opacity:.7; letter-spacing:.3px; }
+.kiosk-header .nom { font-size:22px; font-weight:800; letter-spacing:-.3px; }
+
+/* ── Horloge ── */
+.kiosk-clock {
+  font-size:48px; font-weight:800; color:#fff; letter-spacing:-1px;
+  font-variant-numeric:tabular-nums; text-align:center; margin-bottom:6px;
+  text-shadow:0 2px 12px rgba(0,0,0,.3);
+}
+.kiosk-date {
+  font-size:14px; color:rgba(255,255,255,.75); text-align:center;
+  margin-bottom:28px; font-weight:500;
+}
+
+/* ── Carte principale ── */
+.kiosk-card {
+  background:rgba(255,255,255,.96); backdrop-filter:blur(20px);
+  border-radius:20px; padding:32px; width:100%; max-width:520px;
+  box-shadow:0 20px 60px rgba(0,0,0,.35);
+}
+
+/* ── Fermeture ── */
+.ferme-box {
+  text-align:center; padding:40px 20px; color:var(--g700);
+}
+.ferme-box .ferme-icon { font-size:56px; margin-bottom:16px; opacity:.5; }
+.ferme-box .ferme-titre { font-size:22px; font-weight:800; margin-bottom:8px; }
+.ferme-box .ferme-sous  { font-size:14px; color:rgba(0,0,0,.45); }
+
+/* ── Recherche ── */
+.section-title {
+  font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px;
+  color:var(--g600); margin-bottom:10px;
+}
+.matricule-wrap {
+  display:flex; gap:10px; margin-bottom:12px;
+}
+.matricule-inp {
+  flex:1; padding:14px 16px; border:2px solid var(--g100); border-radius:12px;
+  font-family:'Sora',sans-serif; font-size:18px; font-weight:700; text-transform:uppercase;
+  color:var(--g900); background:#fff; transition:border-color .2s, box-shadow .2s;
+  text-align:center; letter-spacing:2px;
+}
+.matricule-inp:focus {
+  outline:none; border-color:var(--g500);
+  box-shadow:0 0 0 3px rgba(94,128,80,.15);
+}
+.matricule-inp::placeholder { color:rgba(0,0,0,.25); letter-spacing:1px; font-size:14px; font-weight:400; }
+.btn-search {
+  padding:14px 18px; background:var(--g600); color:#fff; border:none; border-radius:12px;
+  font-size:18px; cursor:pointer; transition:background .15s; flex-shrink:0;
+}
+.btn-search:hover { background:var(--g700); }
+
+/* ── Séparateur ── */
+.sep { display:flex; align-items:center; gap:10px; margin:14px 0; }
+.sep-line { flex:1; height:1px; background:rgba(0,0,0,.1); }
+.sep-txt { font-size:11px; color:rgba(0,0,0,.35); font-weight:600; white-space:nowrap; }
+
+/* ── Boutons modes ── */
+.modes { display:flex; gap:10px; }
+.btn-mode {
+  flex:1; padding:12px 8px; border:2px solid var(--g100); border-radius:12px;
+  background:#fff; color:var(--g600); font-family:'Sora',sans-serif;
+  font-size:12px; font-weight:600; cursor:pointer;
+  display:flex; flex-direction:column; align-items:center; gap:6px;
+  transition:all .15s;
+}
+.btn-mode i { font-size:22px; }
+.btn-mode:hover, .btn-mode.active {
+  border-color:var(--g500); background:var(--g50); color:var(--g700);
+}
+
+/* ── Scanner QR ── */
+#qr-section { margin-top:14px; display:none; }
+#qr-reader { border-radius:12px; overflow:hidden; }
+.btn-stop-scan {
+  width:100%; margin-top:10px; padding:10px; border:1px solid rgba(0,0,0,.1);
+  border-radius:10px; background:#fff; color:rgba(0,0,0,.5); font-family:'Sora',sans-serif;
+  font-size:12px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;
+}
+.btn-stop-scan:hover { background:rgba(0,0,0,.04); }
+
+/* ── Biométrie ── */
+#bio-section { margin-top:14px; display:none; }
+.bio-placeholder {
+  border:2px dashed var(--g100); border-radius:12px; padding:28px; text-align:center; color:rgba(0,0,0,.4);
+}
+.bio-placeholder i { font-size:40px; display:block; margin-bottom:10px; }
+.bio-placeholder p { font-size:12px; line-height:1.5; }
+
+/* ── Erreur ── */
+.erreur-box {
+  background:rgba(232,69,69,.08); border:1px solid rgba(232,69,69,.2);
+  border-radius:10px; padding:12px 16px; margin-top:14px;
+  color:#c0392b; font-size:13px; font-weight:600; display:none;
+  align-items:center; gap:8px;
+}
+.erreur-box.show { display:flex; }
+
+/* ── Fiche employé ── */
+#emp-section { display:none; margin-top:20px; }
+.emp-card {
+  border:2px solid var(--g100); border-radius:14px; padding:18px 20px;
+  display:flex; align-items:center; gap:16px; margin-bottom:20px;
+  background:var(--g50);
+}
+.emp-avatar {
+  width:60px; height:60px; border-radius:50%; flex-shrink:0;
+  background:var(--g500); display:flex; align-items:center; justify-content:center;
+  font-size:22px; font-weight:800; color:#fff; overflow:hidden;
+}
+.emp-avatar img { width:100%; height:100%; object-fit:cover; }
+.emp-nom  { font-size:16px; font-weight:800; color:var(--g900); line-height:1.2; }
+.emp-mat  { font-size:11px; font-weight:700; color:var(--g600); margin-top:2px; letter-spacing:.5px; }
+.emp-info { font-size:12px; color:rgba(0,0,0,.5); margin-top:4px; }
+
+/* ── Action ── */
+.action-label {
+  text-align:center; margin-bottom:14px;
+}
+.action-badge {
+  display:inline-flex; align-items:center; gap:8px;
+  background:var(--g100); color:var(--g700); border-radius:20px;
+  padding:6px 16px; font-size:13px; font-weight:700;
+}
+.complet-badge {
+  display:inline-flex; align-items:center; gap:8px;
+  background:rgba(22,169,107,.1); color:#0d6e45; border-radius:20px;
+  padding:6px 16px; font-size:13px; font-weight:700;
+}
+
+/* ── Bouton valider ── */
+.btn-valider {
+  width:100%; padding:18px; background:var(--g600); color:#fff;
+  border:none; border-radius:14px; font-family:'Sora',sans-serif;
+  font-size:16px; font-weight:700; cursor:pointer; transition:all .15s;
+  display:flex; align-items:center; justify-content:center; gap:10px;
+}
+.btn-valider:hover  { background:var(--g700); transform:translateY(-1px); box-shadow:0 6px 20px rgba(74,103,65,.4); }
+.btn-valider:active { transform:translateY(0); }
+.btn-valider:disabled { background:rgba(0,0,0,.15); cursor:not-allowed; transform:none; box-shadow:none; }
+
+.btn-annuler {
+  width:100%; padding:12px; background:transparent; color:rgba(0,0,0,.4);
+  border:1px solid rgba(0,0,0,.1); border-radius:12px;
+  font-family:'Sora',sans-serif; font-size:13px; font-weight:600;
+  cursor:pointer; margin-top:8px; transition:all .15s;
+}
+.btn-annuler:hover { background:rgba(0,0,0,.04); color:rgba(0,0,0,.6); }
+
+/* ── Confirmation ── */
+#confirmation { display:none; text-align:center; padding:20px 0 10px; }
+.confirm-icon {
+  width:72px; height:72px; border-radius:50%; background:rgba(22,169,107,.12);
+  display:flex; align-items:center; justify-content:center;
+  font-size:36px; color:#16a96b; margin:0 auto 14px;
+  animation:pop .3s ease;
+}
+@keyframes pop { from{transform:scale(.6);opacity:0} to{transform:scale(1);opacity:1} }
+.confirm-greeting {
+  font-size:22px; font-weight:800; color:var(--g700);
+  margin-bottom:4px; animation:fadeUp .35s ease both;
+}
+@keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+.confirm-greeting .greet-emoji { font-size:26px; margin-right:6px; }
+.confirm-titre { font-size:14px; font-weight:600; color:rgba(0,0,0,.45); margin-bottom:12px; }
+.confirm-sous  { font-size:12px; color:rgba(0,0,0,.4); margin-bottom:2px; }
+.confirm-heure { font-size:32px; font-weight:800; color:var(--g600); font-variant-numeric:tabular-nums; }
+.confirm-action{ display:inline-flex;align-items:center;gap:6px;background:var(--g50);
+                 color:var(--g700);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:700;margin-top:10px;}
+</style>
+</head>
+<body>
+
+<!-- En-tête -->
+<div class="kiosk-header">
+  <img src="{% static 'img/logo.png' %}" alt="Logo WALÉ">
+  <div class="etablissement">Centre Médico-Social</div>
+  <div class="nom">WALÉ — Pointage</div>
+</div>
+
+<!-- Horloge live -->
+<div class="kiosk-clock" id="clock">{{ heure_init }}</div>
+<div class="kiosk-date" id="kiosk-date">{{ jour_fr }} {{ today|date:"d" }} {{ mois_fr }} {{ today|date:"Y" }}</div>
+
+<!-- Carte kiosque -->
+<div class="kiosk-card">
+
+  {% if not ouvre %}
+  <!-- Jour fermé -->
+  <div class="ferme-box">
+    <div class="ferme-icon"><i class="bi bi-moon-stars-fill"></i></div>
+    <div class="ferme-titre">Service fermé</div>
+    <div class="ferme-sous">{{ raison_ferme }}</div>
+  </div>
+
+  {% else %}
+  <!-- Vue saisie -->
+  <div id="saisie-section">
+
+    <div class="section-title"><i class="bi bi-person-badge"></i> Identification</div>
+
+    <!-- Matricule -->
+    <div class="matricule-wrap">
+      <input type="text" id="matricule-inp" class="matricule-inp"
+             placeholder="N° MATRICULE" maxlength="20" autocomplete="off" autocapitalize="characters">
+      <button class="btn-search" onclick="chercherEmploye()" title="Rechercher">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+
+    <!-- Modes alternatifs -->
+    <div class="sep"><div class="sep-line"></div><div class="sep-txt">ou identifier via</div><div class="sep-line"></div></div>
+    <div class="modes">
+      <button class="btn-mode" id="btn-qr" onclick="toggleQR()">
+        <i class="bi bi-qr-code-scan"></i>
+        <span>Scanner badge QR</span>
+      </button>
+      <button class="btn-mode" id="btn-bio" onclick="toggleBio()">
+        <i class="bi bi-fingerprint"></i>
+        <span>Empreinte digitale</span>
+      </button>
+    </div>
+
+    <!-- Scanner QR -->
+    <div id="qr-section">
+      <div id="qr-reader" style="width:100%;"></div>
+      <button class="btn-stop-scan" onclick="stopQR()">
+        <i class="bi bi-x-circle"></i> Arrêter le scanner
+      </button>
+    </div>
+
+    <!-- Biométrie (placeholder) -->
+    <div id="bio-section">
+      <div class="bio-placeholder">
+        <i class="bi bi-fingerprint"></i>
+        <p>Posez votre doigt sur le lecteur biométrique<br>
+           <small style="color:rgba(0,0,0,.3);">Nécessite un lecteur d'empreinte USB dédié</small></p>
+      </div>
+    </div>
+
+    <!-- Erreur -->
+    <div class="erreur-box" id="erreur-box">
+      <i class="bi bi-exclamation-triangle-fill"></i>
+      <span id="erreur-txt"></span>
+    </div>
+  </div>
+
+  <!-- Fiche employé + validation -->
+  <div id="emp-section">
+    <div class="emp-card" id="emp-card">
+      <div class="emp-avatar" id="emp-avatar"></div>
+      <div>
+        <div class="emp-nom" id="emp-nom"></div>
+        <div class="emp-mat" id="emp-mat"></div>
+        <div class="emp-info" id="emp-info"></div>
+      </div>
+    </div>
+
+    <div class="action-label" id="action-label"></div>
+
+    <button class="btn-valider" id="btn-valider" onclick="validerPointage()">
+      <i class="bi bi-check2-circle"></i> Valider le pointage
+    </button>
+    <button class="btn-annuler" onclick="annuler()">
+      <i class="bi bi-arrow-left"></i> Changer d'employé
+    </button>
+  </div>
+
+  <!-- Confirmation -->
+  <div id="confirmation">
+    <div class="confirm-icon"><i class="bi bi-check-lg"></i></div>
+    <div class="confirm-greeting" id="conf-greeting"></div>
+    <div class="confirm-titre" id="conf-nom"></div>
+    <div class="confirm-sous">Pointage enregistré à</div>
+    <div class="confirm-heure" id="conf-heure"></div>
+    <div><span class="confirm-action" id="conf-action"></span></div>
+  </div>
+
+  {% endif %}
+</div>
+
+<!-- Lien admin discret -->
+<a href="{% url 'presence_registre' %}" style="margin-top:20px;font-size:11px;color:rgba(255,255,255,.35);text-decoration:none;">
+  <i class="bi bi-shield-lock"></i> Accès administration
+</a>
+
+<!-- html5-qrcode -->
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+const CSRF = '{{ csrf_token }}';
+let empData   = null;
+let actionKey = null;
+let html5QrCode = null;
+
+// ── Horloge ──────────────────────────────────────────────────────────────────
+(function tickClock() {
+  const now  = new Date();
+  const h    = String(now.getHours()).padStart(2, '0');
+  const m    = String(now.getMinutes()).padStart(2, '0');
+  const s    = String(now.getSeconds()).padStart(2, '0');
+  document.getElementById('clock').textContent = h + ':' + m + ':' + s;
+  setTimeout(tickClock, 1000);
+})();
+
+// ── Matricule : touche Entrée ─────────────────────────────────────────────────
+document.getElementById('matricule-inp').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') chercherEmploye();
+});
+
+// ── Recherche ─────────────────────────────────────────────────────────────────
+async function chercherEmploye(matricule) {
+  const val = matricule || document.getElementById('matricule-inp').value.trim().toUpperCase();
+  if (!val) { showErreur('Saisissez votre matricule.'); return; }
+  hideErreur();
+  try {
+    const res  = await fetch('{% url "presence_chercher" %}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+      body: JSON.stringify({ matricule: val }),
+    });
+    const data = await res.json();
+    if (!data.ok) { showErreur(data.erreur); return; }
+    afficherEmploye(data);
+  } catch(e) { showErreur('Erreur réseau, réessayez.'); }
+}
+
+function afficherEmploye(data) {
+  stopQR();
+  empData   = data.emp;
+  actionKey = data.action;
+
+  // Avatar
+  const av = document.getElementById('emp-avatar');
+  if (data.emp.photo) {
+    av.innerHTML = '<img src="' + data.emp.photo + '" alt="">';
+  } else {
+    av.textContent = data.emp.nom.charAt(0).toUpperCase();
+  }
+
+  document.getElementById('emp-nom').textContent  = data.emp.nom;
+  document.getElementById('emp-mat').textContent  = data.emp.matricule;
+  document.getElementById('emp-info').textContent = [data.emp.service, data.emp.fonction].filter(Boolean).join(' · ');
+
+  const lbl = document.getElementById('action-label');
+  if (data.complet) {
+    lbl.innerHTML = '<span class="complet-badge"><i class="bi bi-check-all"></i> Journée complète — bonne journée !</span>';
+    document.getElementById('btn-valider').disabled = true;
+  } else {
+    lbl.innerHTML = '<span class="action-badge"><i class="bi bi-clock"></i> ' + data.action_label + '</span>';
+    document.getElementById('btn-valider').disabled = false;
+  }
+
+  document.getElementById('saisie-section').style.display = 'none';
+  document.getElementById('emp-section').style.display    = 'block';
+  document.getElementById('confirmation').style.display   = 'none';
+}
+
+// ── Validation ────────────────────────────────────────────────────────────────
+async function validerPointage() {
+  if (!empData || !actionKey) return;
+  const btn = document.getElementById('btn-valider');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Enregistrement…';
+  try {
+    const res  = await fetch('{% url "presence_pointer" %}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+      body: JSON.stringify({ emp_pk: empData.pk, action: actionKey }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-check2-circle"></i> Valider le pointage';
+      showErreur(data.erreur);
+      return;
+    }
+    showConfirmation(data);
+  } catch(e) {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-check2-circle"></i> Valider le pointage';
+    showErreur('Erreur réseau, réessayez.');
+  }
+}
+
+var GREETINGS = {
+  'arrivee_matin': { emoji: '🌅', msg: 'Bonjour' },
+  'depart_matin':  { emoji: '🍽️', msg: 'Bonne pause déjeuner' },
+  'arrivee_soir':  { emoji: '☀️', msg: 'Bon retour' },
+  'depart_soir':   { emoji: '🌆', msg: 'Bonne fin de journée' },
+  'complet':       { emoji: '✅', msg: 'Excellente journée' },
+  // Permanence (horaire continu 8h–15h)
+  'arrivee':       { emoji: '🏥', msg: 'Bonjour, bonne permanence' },
+  'depart':        { emoji: '🌟', msg: 'Merci pour votre permanence' },
+};
+
+function showConfirmation(data) {
+  var prenom = (empData.nom || '').split(' ')[0];
+  var greet  = GREETINGS[data.action] || { emoji: '👋', msg: 'Bonne journée' };
+
+  document.getElementById('conf-greeting').innerHTML =
+    '<span class="greet-emoji">' + greet.emoji + '</span>' +
+    greet.msg + ' ' + prenom + ' !';
+
+  document.getElementById('conf-nom').textContent    = empData.nom;
+  document.getElementById('conf-heure').textContent  = data.heure;
+  document.getElementById('conf-action').innerHTML   = '<i class="bi bi-clock"></i> ' + data.label;
+  document.getElementById('emp-section').style.display  = 'none';
+  document.getElementById('confirmation').style.display = 'block';
+  setTimeout(function() { resetKiosque(); }, 4500);
+}
+
+function annuler()    { resetKiosque(); }
+function resetKiosque() {
+  empData = null; actionKey = null;
+  document.getElementById('matricule-inp').value = '';
+  document.getElementById('saisie-section').style.display = 'block';
+  document.getElementById('emp-section').style.display    = 'none';
+  document.getElementById('confirmation').style.display   = 'none';
+  hideErreur();
+  document.getElementById('matricule-inp').focus();
+}
+
+// ── Erreurs ───────────────────────────────────────────────────────────────────
+function showErreur(msg) {
+  const b = document.getElementById('erreur-box');
+  document.getElementById('erreur-txt').textContent = msg;
+  b.classList.add('show');
+}
+function hideErreur() { document.getElementById('erreur-box').classList.remove('show'); }
+
+// ── Scanner QR ────────────────────────────────────────────────────────────────
+function toggleQR() {
+  const sec = document.getElementById('qr-section');
+  const btn = document.getElementById('btn-qr');
+  if (sec.style.display === 'block') { stopQR(); return; }
+  document.getElementById('bio-section').style.display = 'none';
+  document.getElementById('btn-bio').classList.remove('active');
+  sec.style.display = 'block';
+  btn.classList.add('active');
+  html5QrCode = new Html5Qrcode('qr-reader');
+  html5QrCode.start(
+    { facingMode: 'environment' },
+    { fps: 10, qrbox: { width: 220, height: 220 } },
+    function(decodedText) {
+      stopQR();
+      chercherEmploye(decodedText.trim().toUpperCase());
+    },
+    function() {}
+  ).catch(function(err) {
+    sec.style.display = 'none';
+    btn.classList.remove('active');
+    showErreur('Caméra inaccessible : ' + err);
+  });
+}
+
+function stopQR() {
+  if (html5QrCode) {
+    html5QrCode.stop().catch(function(){});
+    html5QrCode = null;
+  }
+  document.getElementById('qr-section').style.display = 'none';
+  document.getElementById('btn-qr').classList.remove('active');
+}
+
+// ── Biométrie ─────────────────────────────────────────────────────────────────
+function toggleBio() {
+  const sec = document.getElementById('bio-section');
+  const btn = document.getElementById('btn-bio');
+  stopQR();
+  if (sec.style.display === 'block') { sec.style.display='none'; btn.classList.remove('active'); return; }
+  sec.style.display = 'block';
+  btn.classList.add('active');
+}
+
+// Focus auto sur l'input
+document.addEventListener('DOMContentLoaded', function() {
+  const inp = document.getElementById('matricule-inp');
+  if (inp) inp.focus();
+});
+</script>
+</body>
+</html>
