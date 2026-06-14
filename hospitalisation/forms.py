@@ -29,11 +29,10 @@ class HospitalisationForm(forms.ModelForm):
         self.fields['infirmiere_primaire'].empty_label  = 'Sélectionner une infirmière…'
         self.fields['soins_apportes'].queryset    = Articleservice.objects.filter(actif=True).order_by('nom')
         self.fields['soins_apportes'].empty_label = 'Rechercher un soin…'
-        # Chambres disponibles uniquement ; en brouillon, inclure la chambre déjà attribuée
-        # (sinon elle disparaîtrait de sa propre liste en édition)
-        is_brouillon = not self.instance.pk or self.instance.statut == 'brouillon'
+        # Chambres disponibles + toujours inclure la chambre déjà attribuée
+        # (quelle que soit sa disponibilité, pour qu'elle reste visible dans le select)
         current_chambre_id = self.instance.chambre_id if self.instance and self.instance.pk else None
-        if is_brouillon and current_chambre_id:
+        if current_chambre_id:
             chambre_qs = Chambre.objects.filter(
                 Q(statut=True) | Q(pk=current_chambre_id)
             ).distinct().order_by('salle_no')

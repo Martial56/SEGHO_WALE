@@ -1,66 +1,25 @@
-﻿{% extends 'base.html' %}
+{% extends 'base.html' %}
+{% load i18n %}
 {% block topbar_title %}Soins{% endblock %}
 
 {% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 {% include 'soins/includes/layout_css.html' %}
 {% include 'soins/includes/statut_css.html' %}
 {% endblock %}
 
 {% block module_navbar %}
-<style>
-.content { padding:0; }
-  .module-nav {
-    background: #1a5c4a;
-    display: flex; align-items: center;
-    padding: 0 32px; height: 44px;
-    box-shadow: 0 2px 6px rgba(0,0,0,.18);
-    position: fixed; top: var(--topbar-h); left:0; right:0; z-index: 250;
-  }
-
-  .module-nav-brand {
-    display: flex; align-items: center; gap: 8px;
-    color: #fff; font-weight: 700; font-size: 14px;
-    padding-right: 20px;
-    border-right: 1px solid rgba(255,255,255,.2);
-    margin-right: 4px; flex-shrink: 0;
-  }
-
-  .module-nav-links { display: flex; align-items: center; height: 100%; }
-
-  .module-nav-link {
-    color: rgba(255,255,255,.82); text-decoration: none;
-    padding: 0 16px; height: 100%;
-    display: flex; align-items: center;
-    font-size: 13px; font-weight: 500; border: none;
-    background: none; cursor: pointer;
-    transition: background .15s, color .15s;
-    white-space: nowrap; font-family: 'Roboto', sans-serif; gap: 5px;
-  }
-
-  .module-nav-link:hover { background: rgba(255,255,255,.12); color: #fff; }
-  .module-nav-link.active { background: rgba(0,0,0,.25); color: #fff; font-weight: 600; }
-
-  html[data-theme="dark"] .module-nav { background: #171616; border-bottom: 1px solid rgba(255,255,255,.06); }
-  html[data-theme="dark"] .module-nav-brand { border-right-color: rgba(255,255,255,.1); }
-</style>
-<nav class="module-nav">
-  <div class="module-nav-brand">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-      <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-    </svg>
+<nav class="o-nav">
+  <a href="{% url 'dashboard' %}" class="o-nav-grid" title="Accueil">
+    <i class="bi bi-grid-3x3-gap-fill"></i>
+  </a>
+  <span class="o-nav-brand">
+    <i class="bi bi-bandaid-fill"></i>
     Soins
-  </div>
-  <div class="module-nav-links">
-    <a href="{% url 'soins:list' %}"
-      class="module-nav-link {% if request.resolver_match.url_name == 'list' or request.resolver_match.url_name == 'detail' %}active{% endif %}">
-      Soins infirmiers
-    </a>
-  </div>
+  </span>
+  <a href="{% url 'soins:list' %}" class="o-nav-link {% if request.resolver_match.url_name == 'list' or request.resolver_match.url_name == 'detail' or request.resolver_match.url_name == 'create' or request.resolver_match.url_name == 'edit' %}active{% endif %}">Soins infirmiers</a>
+  <a href="{% url 'soins:procedure_list' %}" class="o-nav-link {% if request.resolver_match.url_name == 'procedure_list' or request.resolver_match.url_name == 'procedure_detail' or request.resolver_match.url_name == 'procedure_create' or request.resolver_match.url_name == 'procedure_edit' %}active{% endif %}">Procédures</a>
 </nav>
-<div style="height:44px;"></div>
-<script>(function(){var tb=document.querySelector('.topbar'),nav=document.querySelector('.module-nav');if(tb&&nav){var h=tb.getBoundingClientRect().height;if(h<30)return;nav.style.top=h+'px';document.documentElement.style.setProperty('--topbar-h',h+'px');}})();
-document.addEventListener('DOMContentLoaded',_fixTop);
-window.addEventListener('load',function(){var tb=document.querySelector('.topbar'),nav=document.querySelector('.cg-nav')||document.querySelector('[class*="-nav"]');if(tb&&nav){var h=tb.getBoundingClientRect().height;if(h>=30){nav.style.top=h+'px';document.documentElement.style.setProperty('--topbar-h',h+'px');}}});</script>
 {% endblock %}
 
 {% block breadcrumb %}{% endblock %}

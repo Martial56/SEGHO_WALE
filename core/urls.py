@@ -1,8 +1,11 @@
 from django.urls import path, include
 from . import views
+from facturation.views import facturation_list as _facturation_list_view
 
 urlpatterns = [
     path('', views.dashboard, name='dashboard'),
+    path('api/dashboard-stats/', views.dashboard_stats_json, name='dashboard_stats_json'),
+    path('tableau-de-bord/', views.kpi_dashboard, name='kpi_dashboard'),
     path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),
     path('compte/', views.mon_compte, name='mon_compte'),
@@ -13,16 +16,29 @@ urlpatterns = [
     path('medecins/nouveau/',                views.medecin_create,   name='medecin_create'),
     path('medecins/<int:pk>/',               views.medecin_detail,   name='medecin_detail'),
     path('medecins/<int:pk>/modifier/',      views.medecin_edit,     name='medecin_edit'),
+
+    # Spécialités
+    path('medecins/config/specialites/',                    views.medecins_specialites,             name='medecins_specialites'),
+    path('medecins/config/specialites/nouveau/',            views.medecins_specialite_create,        name='medecins_specialite_create'),
+    path('medecins/config/specialites/bulk-delete/',        views.medecins_specialite_bulk_delete,   name='medecins_specialite_bulk_delete'),
+    path('medecins/config/specialites/<int:pk>/',           views.medecins_specialite_detail,        name='medecins_specialite_detail'),
+    path('medecins/config/specialites/<int:pk>/modifier/',  views.medecins_specialite_edit,          name='medecins_specialite_edit'),
+
+    # Départements
+    path('medecins/config/departements/',                    views.medecins_departements,             name='medecins_departements'),
+    path('medecins/config/departements/nouveau/',            views.medecins_departement_create,        name='medecins_departement_create'),
+    path('medecins/config/departements/bulk-delete/',        views.medecins_departement_bulk_delete,   name='medecins_departement_bulk_delete'),
+    path('medecins/config/departements/<int:pk>/',           views.medecins_departement_detail,        name='medecins_departement_detail'),
+    path('medecins/config/departements/<int:pk>/modifier/',  views.medecins_departement_edit,          name='medecins_departement_edit'),
     path('consultations/', views.consultations_list, name='consultations_list'),
     path('soins/', include('soins.urls')),
     path('services/', include('services.urls')),
     path('pharmacie/', views.pharmacie_list, name='pharmacie_list'),
     path('pharmacie/', include('pharmacie.urls')),
     path('laboratoire/', views.laboratoire_list, name='laboratoire_list'),
-    path('hospitalisation/', views.hospitalisation_list, name='hospitalisation_list'),
     path('hospitalisation/', include('hospitalisation.urls')),
     path('facture/nouveau/', views.facture_create, name='facture_create'),
-    path('facturation/', views.facturation_list, name='facturation_list'),
+    path('facturation/', _facturation_list_view, name='facturation_list'),
     path('facturation/', include('facturation.urls')),
     path('laboratoire/nouvelle/', views.laboratoire_create, name='laboratoire_create'),
     path('laboratoire/<int:pk>/', views.laboratoire_detail, name='laboratoire_detail'),

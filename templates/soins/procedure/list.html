@@ -1,4 +1,4 @@
-﻿{% extends 'soins/base.html' %}
+{% extends 'soins/base.html' %}
 {% load static %}
 
 {% block module_navbar %}{% endblock %}
@@ -11,7 +11,7 @@
   html[data-theme="dark"] .o-list-table th { background: var(--surface); border-bottom-color: var(--border); color: var(--text-muted); }
   html[data-theme="dark"] .o-list-table td { border-bottom-color: #2d3550; color: var(--text); }
   html[data-theme="dark"] .o-list-table tbody tr:hover td { background: rgba(255,255,255,.04); }
-  html[data-theme="dark"] .filters-panel { background: #201d1d; border-bottom-color: var(--border); }
+  html[data-theme="dark"] .filters-panel { background: #1a2133; border-bottom-color: var(--border); }
   html[data-theme="dark"] .filter-select { background: var(--surface); border-color: var(--border); color: var(--text); }
 
   .filters-panel {
@@ -64,7 +64,7 @@
   html[data-theme="dark"] .stat-icon.green  { background:rgba(26,92,74,.25);color:#6eddb0; }
   html[data-theme="dark"] .stat-icon.yellow { background:rgba(176,125,0,.2);color:#e2c16a; }
   html[data-theme="dark"] .stat-icon.blue   { background:rgba(20,87,112,.2);color:#7ecae0; }
-  html[data-theme="dark"] .stat-icon.gray   { background:#201d1d;color:#8a9ab0; }
+  html[data-theme="dark"] .stat-icon.gray   { background:#2a3548;color:#8a9ab0; }
   .stat-label { font-size:11px;color:var(--text-muted);margin-bottom:2px; }
   .stat-value { font-size:22px;font-weight:700;color:var(--text);line-height:1.1; }
 
@@ -161,7 +161,7 @@
         <th>Soin</th>
         <th>Prix</th>
         <th>Infirmier</th>
-        <th>Département</th>
+        {# <th>Département</th> #}
         <th>Date</th>
         <th>État</th>
       </tr>
@@ -178,7 +178,7 @@
         <td style="color:var(--text-muted);font-size:12px;">
           {% if proc.infirmier %}{{ proc.infirmier.nom }} {{ proc.infirmier.prenoms }}{% else %}<span style="opacity:.4;">—</span>{% endif %}
         </td>
-        <td style="font-size:12px;color:var(--text-muted);">{{ proc.departement.nom|default:"—" }}</td>
+        {# <td style="font-size:12px;color:var(--text-muted);">{{ proc.departement.nom|default:"—" }}</td> #}
         <td style="font-size:12px;white-space:nowrap;">{{ proc.date|date:"d/m/Y H:i" }}</td>
         <td>
           {% if proc.statut == 'brouillon' %}<span class="badge-brouillon">Brouillon</span>
@@ -218,6 +218,12 @@
 {% include 'soins/includes/list_live_js.html' %}
 
 <script>
+function adjustOffsets(){
+  var tb=document.querySelector('.topbar'),wp=document.getElementById('page-wrap');
+  if(tb&&wp) wp.style.paddingTop='0';
+}
+adjustOffsets(); window.addEventListener('resize',adjustOffsets);
+
 function toggleFilters(){
   var p=document.getElementById('filters-panel');
   if(p) p.classList.toggle('open');

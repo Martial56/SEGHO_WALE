@@ -1,0 +1,673 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SEGHO-WALE — Tableau de bord</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --teal-900: #0d3040; --teal-800: #0f4358; --teal-700: #145770;
+      --teal-600: #1a6d8c; --teal-500: #2188ab; --teal-400: #34a8cc;
+      --teal-300: #6ecae3; --teal-200: #aae1f2; --teal-50: #eef9fd;
+      --text-main: #0d3040; --text-muted: #8aafbf;
+      --border: rgba(0,0,0,0.07); --radius: 18px;
+    }
+
+    html, body { height: 100%; font-family: 'Sora', sans-serif; }
+    body { background: #f0fafa; min-height: 100vh; color: var(--text-main); display: flex; flex-direction: column; }
+
+    /* ══ TOPBAR ══ */
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 36px; background: #fff;
+      border-bottom: 1px solid rgba(0,0,0,0.07);
+      position: sticky; top: 0; z-index: 100;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+    }
+    .topbar-left { display: flex; align-items: center; gap: 16px; }
+    .btn-back {
+      display: flex; align-items: center; gap: 6px;
+      padding: 7px 14px; border-radius: 10px;
+      background: rgba(33,136,171,0.08); border: none;
+      color: var(--teal-700); font-size: 12px; font-weight: 600;
+      cursor: pointer; text-decoration: none;
+      transition: all 0.15s; font-family: 'Sora', sans-serif;
+    }
+    .btn-back:hover { background: rgba(33,136,171,0.15); }
+    .topbar-title { font-size: 16px; font-weight: 800; color: var(--teal-900); display: flex; align-items: center; gap: 8px; }
+    .topbar-title-sub { font-size: 11px; color: var(--text-muted); font-weight: 500; }
+
+    .topbar-right { display: flex; align-items: center; gap: 20px; }
+    .top-clock { text-align: right; font-size: 12px; color: var(--text-muted); line-height: 1.6; }
+    .top-clock .time { font-size: 18px; font-weight: 700; color: var(--teal-700); font-variant-numeric: tabular-nums; }
+
+    .user-chip { display: flex; align-items: center; gap: 10px; background: #f7fcff; border: 1px solid rgba(33,136,171,0.12); border-radius: 30px; padding: 6px 14px 6px 7px; }
+    .user-avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, var(--teal-600), var(--teal-400)); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; color: #fff; flex-shrink: 0; }
+    .user-info .uname { font-size: 13px; font-weight: 600; color: var(--teal-900); }
+    .user-info .urole { font-size: 10px; color: var(--text-muted); }
+
+    .btn-logout { background: rgba(33,136,171,0.08); border: none; border-radius: 10px; color: var(--teal-800); width: 36px; height: 36px; padding: 0; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .btn-logout:hover { background: rgba(232,69,69,0.1); color: #c0392b; }
+
+    .icon-btn { width: 36px; height: 36px; border-radius: 10px; border: none; background: transparent; color: var(--text-muted); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s; position: relative; flex-shrink: 0; }
+    .icon-btn:hover { background: rgba(33,136,171,0.08); color: var(--teal-700); }
+    .icon-btn .notif-dot { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: #e84545; border: 2px solid #fff; pointer-events: none; }
+    #theme-toggle .icon-sun  { display: block; }
+    #theme-toggle .icon-moon { display: none; }
+
+    /* ══ PAGE BODY ══ */
+    .page-body { flex: 1; }
+
+    /* ══ KPI SECTION ══ */
+    .kpi-section { padding: 32px 36px 24px; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; max-width: 1400px; margin: 0 auto; }
+
+    .kpi-card {
+      border-radius: 16px; padding: 22px 22px 0;
+      display: flex; flex-direction: column;
+      color: #fff; overflow: hidden; text-decoration: none;
+      transition: transform 0.22s cubic-bezier(.34,1.56,.64,1), box-shadow 0.22s ease;
+      cursor: pointer; position: relative;
+      animation: kpiFadeUp 0.45s ease both;
+    }
+    .kpi-card:hover { transform: translateY(-5px) scale(1.01); box-shadow: 0 16px 40px rgba(0,0,0,0.22); }
+    .kpi-card::after {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.13) 50%, transparent 70%);
+      transform: translateX(-100%); transition: transform 0.55s ease; pointer-events: none;
+    }
+    .kpi-card:hover::after { transform: translateX(100%); }
+
+    .kpi-top { display: flex; align-items: flex-start; gap: 14px; padding-bottom: 18px; flex: 1; }
+    .kpi-ico  { width: 46px; height: 46px; flex-shrink: 0; opacity: 0.92; }
+    .kpi-vals { flex: 1; }
+
+    .kv-main  { display: block; font-size: 32px; font-weight: 800; line-height: 1.05; }
+    .kv-label { display: block; font-size: 12px; font-weight: 500; opacity: 0.85; margin-top: 3px; }
+    .kv-sub   { display: block; font-size: 11px; opacity: 0.70; margin-top: 2px; }
+
+    .two-vals { display: flex; gap: 14px; align-items: center; }
+    .kv-sep   { width: 1px; height: 36px; background: rgba(255,255,255,0.28); flex-shrink: 0; }
+
+    .kpi-foot {
+      padding: 10px 0; border-top: 1px solid rgba(255,255,255,0.18);
+      font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.88);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+
+    /* Card colors */
+    .kpi-teal   { background: linear-gradient(135deg, #0e8fae, #2bb5d8); }
+    .kpi-sky    { background: linear-gradient(135deg, #1a6eb0, #2d99db); }
+    .kpi-amber  { background: linear-gradient(135deg, #c27a10, #e8a82a); }
+    .kpi-blue   { background: linear-gradient(135deg, #0277BD, #29B6F6); }
+    .kpi-coral  { background: linear-gradient(135deg, #b83c1e, #e66144); }
+    .kpi-rose   { background: linear-gradient(135deg, #b82020, #e84545); }
+    .kpi-indigo { background: linear-gradient(135deg, #2d3eb0, #4b61db); }
+    .kpi-green  { background: linear-gradient(135deg, #0d8a52, #16c977); }
+
+    /* KPI stagger */
+    .kpi-card:nth-child(1) { animation-delay: 0.05s; } .kpi-card:nth-child(2) { animation-delay: 0.10s; }
+    .kpi-card:nth-child(3) { animation-delay: 0.15s; } .kpi-card:nth-child(4) { animation-delay: 0.20s; }
+    .kpi-card:nth-child(5) { animation-delay: 0.25s; } .kpi-card:nth-child(6) { animation-delay: 0.30s; }
+    .kpi-card:nth-child(7) { animation-delay: 0.35s; } .kpi-card:nth-child(8) { animation-delay: 0.40s; }
+
+    /* ══ DASHBOARD BODY ══ */
+    .dash-body { display: grid; grid-template-columns: 1fr 300px; gap: 20px; max-width: 1400px; margin: 0 auto; padding: 0 36px 28px; }
+
+    /* ══ RDV PANEL ══ */
+    .rdv-panel { background: #fff; border: 1px solid rgba(0,0,0,0.06); border-radius: var(--radius); overflow: hidden; box-shadow: 0 2px 16px rgba(0,0,0,0.05); animation: fadeUp 0.4s 0.2s ease both; }
+    .rdv-panel-head { background: var(--teal-600); color: #fff; padding: 14px 20px; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .rdv-panel-link { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.8); text-decoration: none; transition: color 0.15s; }
+    .rdv-panel-link:hover { color: #fff; }
+
+    .rdv-table-wrap { overflow-x: auto; }
+    .rdv-tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .rdv-tbl thead th { background: #f5fbfd; color: var(--text-muted); font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; padding: 10px 16px; text-align: left; border-bottom: 1px solid rgba(0,0,0,0.05); }
+    .rdv-tbl tbody tr { border-bottom: 1px solid rgba(0,0,0,0.04); transition: background 0.15s; }
+    .rdv-tbl tbody tr:last-child { border-bottom: none; }
+    .rdv-tbl tbody tr:hover { background: var(--teal-50); }
+    .rdv-tbl td { padding: 11px 16px; color: var(--text-main); }
+
+    .tbl-patient { display: flex; align-items: center; gap: 9px; }
+    .tbl-avatar { width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, var(--teal-500), var(--teal-300)); color: #fff; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .tbl-name { font-weight: 600; font-size: 12px; }
+    .tbl-code { font-size: 10px; color: var(--text-muted); }
+    .tbl-time { font-weight: 700; color: var(--teal-700); font-size: 12px; font-variant-numeric: tabular-nums; }
+    .tbl-doc  { color: var(--text-muted); font-size: 11px; }
+
+    .badge { display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 10px; font-weight: 700; }
+    .badge-planifie        { background: #e8f4fd; color: #1a6d8c; }
+    .badge-confirme        { background: #e3f9ee; color: #0d8a52; }
+    .badge-en_attente      { background: #fff4e0; color: #c27a10; }
+    .badge-en_consultation { background: #ffe8e8; color: #b82020; }
+
+    .empty-state { padding: 38px 20px; text-align: center; color: var(--text-muted); font-size: 13px; }
+    .empty-icon  { font-size: 32px; margin-bottom: 10px; display: block; opacity: 0.45; }
+
+    /* ══ SIDEBAR ══ */
+    .dash-side { display: flex; flex-direction: column; gap: 16px; animation: fadeUp 0.4s 0.25s ease both; }
+
+    .anniv-card { background: linear-gradient(135deg, #0a7a5a, #14b88a); color: #fff; border-radius: var(--radius); padding: 20px; }
+    .anniv-head { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; margin-bottom: 16px; opacity: 0.92; }
+    .anniv-vals { display: flex; }
+    .anniv-val  { flex: 1; text-align: center; }
+    .anniv-val .n { display: block; font-size: 32px; font-weight: 800; line-height: 1; }
+    .anniv-val .l { display: block; font-size: 11px; opacity: 0.82; margin-top: 4px; }
+    .anniv-sep  { width: 1px; background: rgba(255,255,255,0.25); align-self: stretch; margin: 0 6px; }
+
+    .recents-panel { background: #fff; border: 1px solid rgba(0,0,0,0.06); border-radius: var(--radius); overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.04); flex: 1; }
+    .recents-head  { padding: 13px 16px; border-bottom: 1px solid rgba(0,0,0,0.05); font-size: 12px; font-weight: 700; color: var(--teal-800); display: flex; align-items: center; gap: 6px; }
+    .recent-item   { padding: 10px 14px; display: flex; align-items: center; gap: 9px; border-bottom: 1px solid rgba(0,0,0,0.04); transition: background 0.15s; }
+    .recent-item:last-child { border-bottom: none; }
+    .recent-item:hover { background: var(--teal-50); }
+    .recent-dot  { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .recent-dot.en_cours { background: #e89a1a; }
+    .recent-dot.termine  { background: #16a96b; }
+    .recent-dot.other    { background: var(--teal-400); }
+    .recent-name { font-size: 11px; font-weight: 600; color: var(--teal-900); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .recent-time { font-size: 10px; color: var(--text-muted); white-space: nowrap; }
+
+    .staff-card { background: linear-gradient(135deg, #1a6d8c, #2188ab); border-radius: var(--radius); padding: 18px; color: #fff; }
+
+    /* ══ CHARTS ══ */
+    .charts-section { max-width: 1400px; margin: 0 auto; padding: 0 36px 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .chart-card { background: #fff; border: 1px solid rgba(0,0,0,0.06); border-radius: var(--radius); padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.04); animation: fadeUp 0.45s 0.3s ease both; }
+    .chart-title { font-size: 13px; font-weight: 700; color: var(--teal-800); margin-bottom: 16px; display: flex; align-items: center; gap: 7px; }
+    .chart-canvas-wrap { position: relative; height: 200px; }
+
+    /* ══ ANIMATIONS ══ */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(22px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes kpiFadeUp {
+      from { opacity: 0; transform: translateY(28px) scale(0.96); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* ══ DARK THEME ══ */
+    html[data-theme="dark"] { --text-main: #F1F5F9; --text-muted: #5a8aaa; --border: rgba(255,255,255,0.07); }
+    html[data-theme="dark"] body { background: #0B1220; }
+    html[data-theme="dark"] .topbar { background: #0B1220; border-bottom-color: #243447; box-shadow: 0 2px 12px rgba(0,0,0,0.4); }
+    html[data-theme="dark"] .topbar-title { color: #F1F5F9; }
+    html[data-theme="dark"] .btn-back { background: rgba(33,150,243,0.15); color: var(--teal-300); }
+    html[data-theme="dark"] .user-chip { background: #233A5A; border-color: #2F4B66; }
+    html[data-theme="dark"] .user-info .uname { color: #F1F5F9; }
+    html[data-theme="dark"] .btn-logout { background: #233A5A; color: #7aaec7; }
+    html[data-theme="dark"] .btn-logout:hover { background: rgba(232,69,69,0.15); color: #e87070; }
+    html[data-theme="dark"] .icon-btn { color: #4a7a90; }
+    html[data-theme="dark"] .icon-btn:hover { background: #233A5A; color: #F1F5F9; }
+    html[data-theme="dark"] .icon-btn .notif-dot { border-color: #0B1220; }
+    html[data-theme="dark"] .top-clock .time { color: var(--teal-300); }
+    html[data-theme="dark"] .kpi-section { background: #0B1220; }
+    html[data-theme="dark"] .rdv-panel { background: #111C2E; border-color: #243447; }
+    html[data-theme="dark"] .rdv-tbl thead th { background: rgba(255,255,255,0.04); border-bottom-color: #243447; }
+    html[data-theme="dark"] .rdv-tbl tbody tr { border-bottom-color: #243447; }
+    html[data-theme="dark"] .rdv-tbl tbody tr:hover { background: #1D2C44; }
+    html[data-theme="dark"] .rdv-tbl td { color: #F1F5F9; }
+    html[data-theme="dark"] .tbl-time { color: var(--teal-300); }
+    html[data-theme="dark"] .recents-panel { background: #111C2E; border-color: #243447; }
+    html[data-theme="dark"] .recents-head { border-bottom-color: #243447; color: var(--teal-200); }
+    html[data-theme="dark"] .recent-item { border-bottom-color: #243447; }
+    html[data-theme="dark"] .recent-item:hover { background: #1D2C44; }
+    html[data-theme="dark"] .recent-name { color: #F1F5F9; }
+    html[data-theme="dark"] .chart-card { background: #111C2E; border-color: #243447; }
+    html[data-theme="dark"] .chart-title { color: var(--teal-200); }
+    html[data-theme="dark"] #theme-toggle .icon-sun  { display: none; }
+    html[data-theme="dark"] #theme-toggle .icon-moon { display: block; }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 3px; }
+    html[data-theme="dark"] ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); }
+
+    @media (max-width: 1280px) { .kpi-grid { grid-template-columns: repeat(4, 1fr); } }
+    @media (max-width: 1024px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } .dash-body { grid-template-columns: 1fr; } .charts-section { grid-template-columns: 1fr; } .kpi-section, .dash-body, .charts-section { padding-left: 20px; padding-right: 20px; } }
+    @media (max-width: 640px)  { .kpi-grid { grid-template-columns: repeat(2, 1fr); } .topbar { padding: 12px 16px; } }
+  </style>
+</head>
+
+<body>
+
+  <!-- ══ TOPBAR ══ -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <a href="{% url 'dashboard' %}" class="btn-back">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+        Modules
+      </a>
+      <div>
+        <div class="topbar-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+            <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+          </svg>
+          Tableau de bord
+        </div>
+        <div class="topbar-title-sub">Vue d'ensemble — {{ today|date:"l j F Y" }}</div>
+      </div>
+    </div>
+
+    <div class="topbar-right">
+      <button class="icon-btn" title="Notifications">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+        </svg>
+        <span class="notif-dot"></span>
+      </button>
+
+      <button class="icon-btn" id="theme-toggle" title="Thème sombre / clair">
+        <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"/>
+          <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+          <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+        <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+      </button>
+
+      <div class="top-clock">
+        <div class="time" id="live-time">--:--:--</div>
+        <div>{% now "j F Y" %}</div>
+      </div>
+
+      <div class="user-chip">
+        <div class="user-avatar">{{ user.username|first|upper }}</div>
+        <div class="user-info">
+          <div class="uname">{{ user.get_full_name|default:user.username }}</div>
+          <div class="urole">{% if user.is_superuser %}Administrateur{% else %}Utilisateur{% endif %}</div>
+        </div>
+      </div>
+
+      <form method="post" action="{% url 'logout' %}" style="margin:0;">
+        {% csrf_token %}
+        <button type="submit" class="btn-logout" title="Déconnexion">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+        </button>
+      </form>
+    </div>
+  </header>
+
+  <div class="page-body">
+
+    <!-- ══ KPI CARDS ══ -->
+    <div class="kpi-section">
+      <div class="kpi-grid">
+
+        <!-- Patients -->
+        {% if 'patients' in accessible_codes %}<a href="{% url 'patients:list' %}" class="kpi-card kpi-teal">{% else %}<div class="kpi-card kpi-teal">{% endif %}
+          <div class="kpi-top">
+            <svg class="kpi-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+            <div class="kpi-vals">
+              <span class="kv-main">{{ stats.patients_total }}</span>
+              <span class="kv-label">Les patients</span>
+              <span class="kv-sub">+{{ stats.patients_today }} aujourd'hui</span>
+            </div>
+          </div>
+          <div class="kpi-foot">
+            <span>Afficher les détails</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+          </div>
+        {% if 'patients' in accessible_codes %}</a>{% else %}</div>{% endif %}
+
+        <!-- Médecins -->
+        {% if 'medecins' in accessible_codes %}<a href="{% url 'medecins_list' %}" class="kpi-card kpi-sky">{% else %}<div class="kpi-card kpi-sky">{% endif %}
+          <div class="kpi-top">
+            <svg class="kpi-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/>
+              <path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4"/><circle cx="20" cy="10" r="2"/>
+            </svg>
+            <div class="kpi-vals">
+              <div class="two-vals">
+                <div><span class="kv-main">{{ stats.medecins_actifs }}</span><span class="kv-label">Actifs</span></div>
+                <div class="kv-sep"></div>
+                <div><span class="kv-main">{{ stats.medecins_total }}</span><span class="kv-label">Total</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="kpi-foot"><span>Corps médical</span></div>
+        {% if 'medecins' in accessible_codes %}</a>{% else %}</div>{% endif %}
+
+        <!-- Rendez-vous -->
+        {% if 'rendezvous' in accessible_codes %}<a href="{% url 'patients:rdv_global' %}" class="kpi-card kpi-amber">{% else %}<div class="kpi-card kpi-amber">{% endif %}
+          <div class="kpi-top">
+            <svg class="kpi-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+              <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+            <div class="kpi-vals">
+              <span class="kv-main">{{ stats.rdv_today }}</span>
+              <span class="kv-label">Rendez-vous</span>
+              <span class="kv-sub">Aujourd'hui</span>
+            </div>
+          </div>
+          <div class="kpi-foot">
+            <span>Afficher les détails</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+          </div>
+        {% if 'rendezvous' in accessible_codes %}</a>{% else %}</div>{% endif %}
+
+        <!-- Consultations & Soins -->
+        {% if 'consultations' in accessible_codes %}<a href="{% url 'soins:list' %}" class="kpi-card kpi-blue">{% else %}<div class="kpi-card kpi-blue">{% endif %}
+          <div class="kpi-top">
+            <svg class="kpi-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
+            <div class="kpi-vals">
+              <div class="two-vals">
+                <div><span class="kv-main">{{ stats.consultations_today }}</span><span class="kv-label">Consult.</span></div>
+                <div class="kv-sep"></div>
+                <div><span class="kv-main">{{ stats.soins_aujourd_hui }}</span><span class="kv-label">Soins</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="kpi-foot"><span>Activité du jour</span></div>
+        {% if 'consultations' in accessible_codes %}</a>{% else %}</div>{% endif %}
+
+        <!-- Hospitalisés -->
+        {% if 'hospitalisation' in accessible_codes %}<a href="{% url 'hospitalisation:list' %}" class="kpi-card kpi-coral">{% else %}<div class="kpi-card kpi-coral">{% endif %}
+          <div class="kpi-top">
+            <svg class="kpi-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/>
+              <path d="M2 17h20"/><path d="M6 8v9"/>
+            </svg>
+            <div class="kpi-vals">
+              <span class="kv-main">{{ stats.hospitalisations }}</span>
+              <span class="kv-label">Hospitalisés</span>
+              <span class="kv-sub">En cours</span>
+            </div>
+          </div>
+          <div class="kpi-foot">
+            <span>Afficher les détails</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+          </div>
+        {% if 'hospitalisation' in accessible_codes %}</a>{% else %}</div>{% endif %}
+
+        <!-- Factures impayées -->
+        {% if 'facturation' in accessible_codes %}<a href="{% url 'facturation:list' %}" class="kpi-card kpi-rose">{% else %}<div class="kpi-card kpi-rose">{% endif %}
+          <div class="kpi-top">
+            <svg class="kpi-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+            </svg>
+            <div class="kpi-vals">
+              <div class="two-vals">
+                <div><span class="kv-main">{{ stats.factures_impayees_count }}</span><span class="kv-label">Factures</span></div>
+                <div class="kv-sep"></div>
+                <div><span class="kv-main" style="font-size:20px;">{{ stats.factures_montant_fmt }}</span><span class="kv-label">Montant</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="kpi-foot"><span>Factures impayées</span></div>
+        {% if 'facturation' in accessible_codes %}</a>{% else %}</div>{% endif %}
+
+        <!-- Laboratoire -->
+        {% if 'laboratoire' in accessible_codes %}<a href="{% url 'laboratoire_list' %}" class="kpi-card kpi-indigo">{% else %}<div class="kpi-card kpi-indigo">{% endif %}
+          <div class="kpi-top">
+            <svg class="kpi-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10 2v7.527a2 2 0 0 1-.211.896L4.72 20.55a1 1 0 0 0 .9 1.45h12.76a1 1 0 0 0 .9-1.45l-5.069-10.127A2 2 0 0 1 14 9.527V2"/>
+              <path d="M8.5 2h7"/><path d="M7 16h10"/>
+            </svg>
+            <div class="kpi-vals">
+              <span class="kv-main">{{ stats.analyses_pending }}</span>
+              <span class="kv-label">Analyses</span>
+              <span class="kv-sub">En attente</span>
+            </div>
+          </div>
+          <div class="kpi-foot"><span>Laboratoire</span></div>
+        {% if 'laboratoire' in accessible_codes %}</a>{% else %}</div>{% endif %}
+
+        <!-- Pharmacie -->
+        {% if 'pharmacie' in accessible_codes %}<a href="{% url 'pharmacie_list' %}" class="kpi-card kpi-green">{% else %}<div class="kpi-card kpi-green">{% endif %}
+          <div class="kpi-top">
+            <svg class="kpi-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/>
+              <path d="m8.5 8.5 7 7"/>
+            </svg>
+            <div class="kpi-vals">
+              <span class="kv-main">{{ stats.medicaments_alerte }}</span>
+              <span class="kv-label">Alertes stock</span>
+              <span class="kv-sub">{% if stats.medicaments_alerte > 0 %}Action requise{% else %}Stock OK{% endif %}</span>
+            </div>
+          </div>
+          <div class="kpi-foot"><span>Pharmacie</span></div>
+        {% if 'pharmacie' in accessible_codes %}</a>{% else %}</div>{% endif %}
+
+      </div>
+    </div>
+
+    <!-- ══ BODY : RDV + SIDEBAR ══ -->
+    <div class="dash-body">
+
+      <!-- Tableau RDV du jour -->
+      <div class="rdv-panel">
+        <div class="rdv-panel-head">
+          <span style="display:flex;align-items:center;gap:8px;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+              <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+            Rendez-vous &mdash; {{ today|date:"d/m/Y" }}
+          </span>
+          {% if 'rendezvous' in accessible_codes %}
+          <a href="{% url 'patients:rdv_global' %}" class="rdv-panel-link">Voir tout &rarr;</a>
+          {% endif %}
+        </div>
+
+        {% if rdv_auj %}
+        <div class="rdv-table-wrap">
+          <table class="rdv-tbl">
+            <thead>
+              <tr>
+                <th>#</th><th>Patient</th><th>Heure</th><th>Médecin</th><th>Motif</th><th>État</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for rdv in rdv_auj %}
+              <tr>
+                <td style="color:var(--text-muted);font-size:11px;">{{ forloop.counter }}</td>
+                <td>
+                  <div class="tbl-patient">
+                    <div class="tbl-avatar">{{ rdv.patient.nom|first|upper }}</div>
+                    <div>
+                      <div class="tbl-name">{{ rdv.patient.nom }} {{ rdv.patient.prenoms }}</div>
+                      <div class="tbl-code">{{ rdv.patient.code_patient }}</div>
+                    </div>
+                  </div>
+                </td>
+                <td><span class="tbl-time">{{ rdv.date_heure|time:"H:i" }}</span></td>
+                <td><span class="tbl-doc">{% if rdv.medecin %}Dr {{ rdv.medecin.nom }}{% else %}&mdash;{% endif %}</span></td>
+                <td style="font-size:11px;max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ rdv.motif|default:"&mdash;"|truncatechars:28 }}</td>
+                <td><span class="badge badge-{{ rdv.statut }}">{{ rdv.get_statut_display }}</span></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+          <span class="empty-icon">📭</span>
+          Aucun rendez-vous planifié aujourd'hui
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Sidebar -->
+      <div class="dash-side">
+
+        <!-- Anniversaires -->
+        <div class="anniv-card">
+          <div class="anniv-head">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8"/>
+              <path d="M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1"/>
+              <path d="M2 21h20"/><path d="M7 8v2"/><path d="M12 8v2"/><path d="M17 8v2"/>
+              <path d="M7 4 8 2l1 2"/><path d="M12 4l1-2 1 2"/><path d="M17 4l1-2 1 2"/>
+            </svg>
+            Anniversaires du {{ today|date:"j F" }}
+          </div>
+          <div class="anniv-vals">
+            <div class="anniv-val">
+              <span class="n">{{ stats.employes_anniversaires }}</span>
+              <span class="l">Employé(s)</span>
+            </div>
+            <div class="anniv-sep"></div>
+            <div class="anniv-val">
+              <span class="n">{{ stats.patients_anniversaires }}</span>
+              <span class="l">Patient(s)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dernières consultations -->
+        <div class="recents-panel">
+          <div class="recents-head">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
+            Dernières consultations
+          </div>
+          {% if last_cons %}
+            {% for c in last_cons %}
+            <div class="recent-item">
+              <div class="recent-dot {% if c.statut == 'en_cours' %}en_cours{% elif c.statut == 'termine' %}termine{% else %}other{% endif %}"></div>
+              <div class="recent-name">{{ c.patient.nom }} {{ c.patient.prenoms }}</div>
+              <div class="recent-time">{{ c.date_heure|date:"d/m H:i" }}</div>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div style="padding:22px 16px;text-align:center;font-size:12px;color:var(--text-muted);">Aucune consultation</div>
+          {% endif %}
+        </div>
+
+        <!-- Personnel -->
+        <div class="staff-card">
+          <div style="font-size:11px;font-weight:700;opacity:0.85;margin-bottom:10px;display:flex;align-items:center;gap:7px;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+            Personnel actif
+          </div>
+          <div style="font-size:36px;font-weight:800;line-height:1;color:#fff;">{{ stats.employes_actifs }}</div>
+          <div style="font-size:11px;opacity:0.75;margin-top:4px;color:#fff;">employés actifs</div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══ CHARTS ══ -->
+    <div class="charts-section">
+      <div class="chart-card">
+        <div class="chart-title">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+          </svg>
+          Nouveaux patients &mdash; 8 dernières semaines
+        </div>
+        <div class="chart-canvas-wrap"><canvas id="chartPatients"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+            <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+          Rendez-vous &mdash; 8 dernières semaines
+        </div>
+        <div class="chart-canvas-wrap"><canvas id="chartRdv"></canvas></div>
+      </div>
+    </div>
+
+  </div><!-- /page-body -->
+
+  <script>
+    // Horloge
+    function updateTime() {
+      const now = new Date();
+      const pad = n => String(n).padStart(2, '0');
+      const el = document.getElementById('live-time');
+      if (el) el.textContent = pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+    }
+    updateTime();
+    setInterval(updateTime, 1000);
+
+    // Thème
+    const html = document.documentElement;
+    if (localStorage.getItem('segho-theme') === 'dark') html.setAttribute('data-theme', 'dark');
+    document.getElementById('theme-toggle').addEventListener('click', () => {
+      const isDark = html.getAttribute('data-theme') === 'dark';
+      if (isDark) { html.removeAttribute('data-theme'); localStorage.setItem('segho-theme', 'light'); }
+      else { html.setAttribute('data-theme', 'dark'); localStorage.setItem('segho-theme', 'dark'); }
+      setTimeout(initCharts, 60);
+    });
+
+    // Charts
+    const chartData = {{ chart_data|safe }};
+    let pChart, rChart;
+
+    function isDark() { return document.documentElement.getAttribute('data-theme') === 'dark'; }
+
+    function initCharts() {
+      const c = {
+        grid:       isDark() ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
+        tick:       isDark() ? '#5a8aaa' : '#8aafbf',
+        pLine:      isDark() ? '#34a8cc' : '#2188ab',
+        pBg:        isDark() ? 'rgba(52,168,204,0.18)' : 'rgba(33,136,171,0.12)',
+        rdvBar:     isDark() ? 'rgba(232,168,42,0.75)' : 'rgba(194,122,16,0.72)',
+        rdvHover:   isDark() ? 'rgba(232,168,42,0.95)' : 'rgba(194,122,16,0.92)',
+        tooltip:    isDark() ? '#0d2035' : '#0f4358',
+      };
+      const baseOpts = {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { backgroundColor: c.tooltip, titleColor: '#fff', bodyColor: '#aae1f2', cornerRadius: 8, padding: 10 },
+        },
+        scales: {
+          y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0, color: c.tick, font: { family: "'Sora', sans-serif", size: 10 } }, grid: { color: c.grid } },
+          x: { ticks: { color: c.tick, font: { family: "'Sora', sans-serif", size: 10 } }, grid: { display: false } },
+        },
+        animation: { duration: 700, easing: 'easeOutQuart' },
+      };
+
+      if (pChart) pChart.destroy();
+      if (rChart) rChart.destroy();
+
+      pChart = new Chart(document.getElementById('chartPatients').getContext('2d'), {
+        type: 'line',
+        data: { labels: chartData.labels, datasets: [{ label: 'Nouveaux patients', data: chartData.patients, borderColor: c.pLine, backgroundColor: c.pBg, fill: true, tension: 0.4, pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: c.pLine, borderWidth: 2 }] },
+        options: baseOpts,
+      });
+
+      rChart = new Chart(document.getElementById('chartRdv').getContext('2d'), {
+        type: 'bar',
+        data: { labels: chartData.labels, datasets: [{ label: 'Rendez-vous', data: chartData.rdv, backgroundColor: c.rdvBar, hoverBackgroundColor: c.rdvHover, borderRadius: 6, borderSkipped: false }] },
+        options: baseOpts,
+      });
+    }
+
+    initCharts();
+  </script>
+</body>
+</html>

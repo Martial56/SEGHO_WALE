@@ -7,14 +7,17 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 _staff_required = user_passes_test(lambda u: u.is_staff, login_url='login')
 from django.contrib import messages
 from django.core.paginator import Paginator
-from django.db.models import Q, Exists, OuterRef
+from django.db.models import Q, Exists, OuterRef, Prefetch
 from django.utils import timezone
-from .models import Soin, ProcedureSoin, Maladie
+from django.contrib.auth.models import User
+from .models import Soin, ProcedureSoin
 from .forms import SoinForm, ProcedureSoinForm
 from patients.models import RendezVous, Patient
+from patients.models import Pathologie
 from laboratoire.models import AnalyseLaboratoire, ExamenImagerie
 from employer.models import Employe
 from services.models import Articleservice
+from core.views import log_event, get_logs
 
 
 _STATUT_PROCEDURE_MAP = {
@@ -49,7 +52,7 @@ def _parse_prix(val):
         return 0
 
 
-def _save_procedures_from_lignes(soin, post_data):
+def _save_procedures_from_lignes(soin, post_data, user=None):
     """Supprime les anciennes procédures liées à ce soin puis recrée depuis les lignes du POST."""
     ProcedureSoin.objects.filter(soin=soin).delete()
     lignes = {}
@@ -73,10 +76,12 @@ def _save_procedures_from_lignes(soin, post_data):
         prix = _parse_prix(prix_raw)
         date = timezone.now()
         if date_str:
-            try:
-                date = timezone.make_aware(datetime.strptime(date_str, '%Y-%m-%d'))
-            except ValueError:
-                pass
+            for fmt in ('%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M', '%Y-%m-%d'):
+                try:
+                    date = timezone.make_aware(datetime.strptime(date_str, fmt))
+                    break
+                except ValueError:
+                    pass
         ProcedureSoin.objects.create(
             soin=soin,
             patient_id=patient_id,
@@ -86,6 +91,7 @@ def _save_procedures_from_lignes(soin, post_data):
             prix=prix,
             date=date,
             statut='brouillon',
+            cree_par=user,
         )
 
 
@@ -103,14 +109,10 @@ def _form_extras():
     ).values('pk', 'nom', 'prix_vente'))
     employes = list(Employe.objects.order_by('nom', 'prenoms').values('pk', 'nom', 'prenoms'))
     patients = list(Patient.objects.order_by('nom', 'prenoms').values('pk', 'nom', 'prenoms', 'code_patient'))
-    rdvs = list(RendezVous.objects.select_related('patient').values(
-        'pk', 'patient_id', 'date_heure', 'type_rdv', 'statut', 'motif'
-    ).order_by('-date_heure')[:500])
     return {
         'services_json': json.dumps(services, default=str),
         'employes_json': json.dumps(employes),
         'patients_json': json.dumps(patients),
-        'rdvs_json': json.dumps(rdvs, default=str),
     }
 
 
@@ -138,26 +140,33 @@ def soins_list(request):
     statut = request.GET.get('statut', '').strip()
     date_filtre = request.GET.get('date', '').strip()
     patient_id = request.GET.get('patient_id', '').strip()
+    hospitalisation_id = request.GET.get('hospitalisation_id', '').strip()
 
     soins = Soin.objects.select_related(
-        'patient', 'infirmier', 'departement', 'service_inscription'
+        'patient', 'hospitalisation'
+    ).prefetch_related(
+        Prefetch(
+            'procedures',
+            queryset=ProcedureSoin.objects.select_related('infirmier').order_by('date'),
+            to_attr='procedures_list'
+        )
     ).annotate(
         est_paye=Exists(
             ProcedureSoin.objects.filter(
                 soin=OuterRef('pk'),
-                facture__statut__in=['payee', 'partielle']
+                facture__statut__in=['payee']
             )
         )
-    ).order_by('-date_heure')
+    ).order_by('-date_creation')
 
-    if patient_id:
+    if hospitalisation_id:
+        soins = soins.filter(hospitalisation_id=hospitalisation_id)
+    elif patient_id:
         soins = soins.filter(patient_id=patient_id)
     elif q:
         soins = soins.filter(
-            Q(numero__icontains=q) |
             Q(patient__nom__icontains=q) |
             Q(patient__prenoms__icontains=q) |
-            Q(infirmier__nom__icontains=q) |
             Q(motif__icontains=q)
         )
 
@@ -165,7 +174,7 @@ def soins_list(request):
         soins = soins.filter(statut=statut)
 
     if date_filtre:
-        soins = soins.filter(date_heure__date=date_filtre)
+        soins = soins.filter(date_creation__date=date_filtre)
 
     total = soins.count()
     paginator = Paginator(soins, 25)
@@ -173,8 +182,8 @@ def soins_list(request):
 
     today = timezone.now().date()
     stats = {
-        'aujourdhui': Soin.objects.filter(date_heure__date=today).count(),
-        'ce_mois': Soin.objects.filter(date_heure__month=today.month, date_heure__year=today.year).count(),
+        'aujourdhui': Soin.objects.filter(date_creation__date=today).count(),
+        'ce_mois': Soin.objects.filter(date_creation__month=today.month, date_creation__year=today.year).count(),
         'en_attente': Soin.objects.filter(statut='en_attente_de_paiement').count(),
         'en_cours': Soin.objects.filter(statut='en_cours').count(),
         'termines': Soin.objects.filter(statut='termine').count(),
@@ -187,6 +196,14 @@ def soins_list(request):
         except Patient.DoesNotExist:
             pass
 
+    hospitalisation_filtre = None
+    if hospitalisation_id:
+        from hospitalisation.models import Hospitalisation
+        try:
+            hospitalisation_filtre = Hospitalisation.objects.select_related('patient').get(pk=hospitalisation_id)
+        except Hospitalisation.DoesNotExist:
+            pass
+
     return render(request, 'soins/list.html', {
         'page_obj': page_obj,
         'total': total,
@@ -196,6 +213,8 @@ def soins_list(request):
         'date_filtre': date_filtre,
         'patient_id': patient_id,
         'patient_filtre': patient_filtre,
+        'hospitalisation_id': hospitalisation_id,
+        'hospitalisation_filtre': hospitalisation_filtre,
         'user_peut_creer_facture': request.user.has_perm('soins.can_creer_facture'),
     })
 
@@ -203,7 +222,10 @@ def soins_list(request):
 @login_required(login_url='login')
 def soins_detail(request, pk):
     soin = get_object_or_404(
-        Soin.objects.select_related('patient', 'infirmier', 'rendez_vous', 'departement', 'service_inscription', 'facture'),
+        Soin.objects.select_related(
+            'patient', 'departement', 'facture',
+            'cree_par', 'modifie_par', 'termine_par',
+        ),
         pk=pk
     )
     counts = _patient_counts(soin.patient)
@@ -211,10 +233,18 @@ def soins_detail(request, pk):
     counts['soins'] = ProcedureSoin.objects.filter(patient=soin.patient).count()
     procedures = list(soin.procedures.select_related('soin_type', 'infirmier', 'facture').all())
     total_prix = sum(p.prix for p in procedures)
-    facture_payee = (
-        soin.facture is not None and
-        soin.facture.statut in ('payee', 'partielle')
-    )
+    if soin.hospitalisation_id:
+        from hospitalisation.models import ServiceAFacturer
+        facture_payee = ServiceAFacturer.objects.filter(
+            hospitalisation_id=soin.hospitalisation_id,
+            source__in=['soin', 'manuel'],
+            facture__statut='payee'
+        ).exists()
+    else:
+        facture_payee = (
+            soin.facture is not None and
+            soin.facture.statut == 'payee'
+        )
     peut_administrer = (
         soin.statut == 'en_cours' and
         facture_payee and
@@ -225,7 +255,12 @@ def soins_detail(request, pk):
         not soin.facture_id and
         request.user.has_perm('soins.can_creer_facture')
     )
-    peut_voir_facture = soin.facture_id is not None
+    peut_voir_facture = (
+        soin.facture_id is not None and (
+            soin.statut != 'en_attente_de_paiement' or
+            request.user.has_perm('soins.can_creer_facture')
+        )
+    )
     return render(request, 'soins/detail.html', {
         'soin': soin,
         'counts': counts,
@@ -235,6 +270,7 @@ def soins_detail(request, pk):
         'peut_administrer': peut_administrer,
         'peut_creer_facture': peut_creer_facture,
         'peut_voir_facture': peut_voir_facture,
+        'logs': get_logs(soin),
     })
 
 
@@ -244,6 +280,7 @@ def soins_create(request):
         form = SoinForm(request.POST, request.FILES)
         if form.is_valid():
             soin = form.save(commit=False)
+            soin.cree_par = request.user
             action = request.POST.get('action', 'save')
             if action == 'enregistrer':
                 if not _has_at_least_one_ligne(request.POST):
@@ -258,14 +295,14 @@ def soins_create(request):
             else:
                 soin.statut = 'brouillon'
             soin.save()
-            _save_procedures_from_lignes(soin, request.POST)
+            log_event(soin, request.user, 'Soin créé.', type='system')
+            _save_procedures_from_lignes(soin, request.POST, user=request.user)
             return redirect('soins:detail', pk=soin.pk)
     else:
         form = SoinForm()
 
     extras = _form_extras()
     patient_id = request.GET.get('patient_id', '')
-    rdv_id = request.GET.get('rdv_id', '')
     initial = {}
     counts = {'rdv': 0, 'examens': 0, 'analyses': 0}
     if patient_id:
@@ -275,11 +312,6 @@ def soins_create(request):
             c = _patient_counts(pat)
             counts = {'rdv': c['rdv'], 'examens': c['analyses'] + c['imageries'], 'analyses': c['analyses']}
         except Patient.DoesNotExist:
-            pass
-    if rdv_id:
-        try:
-            initial['rendez_vous'] = RendezVous.objects.get(pk=rdv_id)
-        except RendezVous.DoesNotExist:
             pass
     if initial and request.method == 'GET':
         form = SoinForm(initial=initial)
@@ -296,6 +328,20 @@ def soins_create(request):
 def soins_edit(request, pk):
     soin = get_object_or_404(Soin, pk=pk)
 
+    # Dossier auto-géré par une hospitalisation
+    hosp_warning = None
+    if soin.hospitalisation_id:
+        hosp = soin.hospitalisation
+        if not request.user.is_superuser:
+            messages.warning(
+                request,
+                f"Ce dossier de soins est géré automatiquement depuis l'hospitalisation "
+                f"N°{hosp.numero}. Modification manuelle désactivée."
+            )
+            return redirect('soins:detail', pk=pk)
+        # Superuser : accès autorisé mais avec bandeau d'avertissement dans le formulaire
+        hosp_warning = hosp
+
     # Verrouillage : seul l'admin peut modifier un soin hors brouillon
     if soin.statut != 'brouillon' and not request.user.is_superuser:
         messages.warning(request, "Ce soin ne peut plus être modifié.")
@@ -305,6 +351,8 @@ def soins_edit(request, pk):
         form = SoinForm(request.POST, request.FILES, instance=soin)
         if form.is_valid():
             soin = form.save(commit=False)
+            soin.modifie_par = request.user
+            soin.date_modification = timezone.now()
             action = request.POST.get('action', 'save')
             if action == 'enregistrer':
                 if not _has_at_least_one_ligne(request.POST):
@@ -312,27 +360,34 @@ def soins_edit(request, pk):
                 else:
                     soin.statut = 'en_attente_de_paiement'
                     soin.save()
-                    _save_procedures_from_lignes(soin, request.POST)
+                    log_event(soin, request.user, 'Soin modifié.', type='modif')
+                    _save_procedures_from_lignes(soin, request.POST, user=request.user)
                     return redirect('soins:detail', pk=soin.pk)
             else:
                 soin.statut = 'brouillon'
             soin.save()
-            _save_procedures_from_lignes(soin, request.POST)
+            log_event(soin, request.user, 'Soin modifié.', type='modif')
+            _save_procedures_from_lignes(soin, request.POST, user=request.user)
             return redirect('soins:detail', pk=soin.pk)
     else:
         form = SoinForm(instance=soin)
-        rdv_id = request.GET.get('rdv_id', '')
-        if rdv_id and not soin.rendez_vous_id:
-            try:
-                soin.rendez_vous = RendezVous.objects.get(pk=rdv_id)
-                soin.save(update_fields=['rendez_vous'])
-                form = SoinForm(instance=soin)
-            except RendezVous.DoesNotExist:
-                pass
 
     counts = _patient_counts(soin.patient)
     counts['examens'] = counts['analyses'] + counts['imageries']
     extras = _form_extras()
+
+    procedures_qs = list(soin.procedures.select_related('patient', 'infirmier', 'soin_type').all())
+
+    # Inject any services from existing procedures that fall outside the 'SN' category
+    # filter used in _form_extras() — otherwise the select shows blank for those lines.
+    existing_pks = {p.soin_type_id for p in procedures_qs if p.soin_type_id}
+    loaded_services = json.loads(extras['services_json'])
+    loaded_pks = {s['pk'] for s in loaded_services}
+    missing_pks = existing_pks - loaded_pks
+    if missing_pks:
+        missing = list(Articleservice.objects.filter(pk__in=missing_pks).values('pk', 'nom', 'prix_vente'))
+        loaded_services.extend(missing)
+        extras['services_json'] = json.dumps(loaded_services, default=str)
 
     procedures_json = json.dumps([
         {
@@ -341,10 +396,10 @@ def soins_edit(request, pk):
             'service':      p.soin_type_id,
             'prix':         float(p.prix),
             'infirmier':    p.infirmier_id,
-            'date':         p.date.strftime('%Y-%m-%d') if p.date else '',
+            'date':         p.date.strftime('%Y-%m-%dT%H:%M') if p.date else '',
             'statut':       p.statut,
         }
-        for p in soin.procedures.select_related('patient', 'infirmier', 'soin_type').all()
+        for p in procedures_qs
     ], default=str)
 
     return render(request, 'soins/form.html', {
@@ -353,6 +408,7 @@ def soins_edit(request, pk):
         'is_new': False,
         'counts': counts,
         'procedures_json': procedures_json,
+        'hosp_warning': hosp_warning,
         **extras,
     })
 
@@ -369,13 +425,26 @@ def soins_administrer(request, pk):
     if soin.statut != 'en_cours':
         messages.error(request, "Ce soin n'est pas en cours.")
         return redirect('soins:detail', pk=pk)
-    if not soin.facture or soin.facture.statut not in ('payee', 'partielle'):
+    if soin.hospitalisation_id:
+        from hospitalisation.models import ServiceAFacturer
+        saf_paye = ServiceAFacturer.objects.filter(
+            hospitalisation_id=soin.hospitalisation_id,
+            source__in=['soin', 'manuel'],
+            facture__statut='payee'
+        ).exists()
+        if not saf_paye:
+            messages.error(request, "Une facture complémentaire payée est requise avant d'administrer ce soin.")
+            return redirect('soins:detail', pk=pk)
+    elif not soin.facture or soin.facture.statut != 'payee':
         messages.error(request, "La facture doit être payée avant d'administrer le soin.")
         return redirect('soins:detail', pk=pk)
     soin.statut = 'termine'
-    soin.save(update_fields=['statut'])
+    soin.termine_par = request.user
+    soin.date_termine = timezone.now()
+    soin.save(update_fields=['statut', 'termine_par', 'date_termine'])
+    log_event(soin, request.user, 'Soin administré — statut : Terminé.', type='statut')
     _sync_procedures(soin, 'termine')
-    messages.success(request, f"Soin {soin.numero} marqué comme terminé.")
+    messages.success(request, f"Soin de {soin.patient} marqué comme terminé.")
     return redirect('soins:detail', pk=pk)
 
 
@@ -390,7 +459,7 @@ def soins_creer_facture(request, pk):
         messages.error(request, "Ce soin n'est pas en attente de paiement.")
         return redirect('soins:detail', pk=pk)
     if soin.facture_id:
-        return redirect('soins:facture_paiement', pk=soin.facture.pk)
+        return redirect('facturation:detail', pk=soin.facture.pk)
 
     from facturation.models import Facture, LigneFacture
     procedures = list(soin.procedures.select_related('soin_type').all())
@@ -402,7 +471,7 @@ def soins_creer_facture(request, pk):
     facture = Facture.objects.create(
         patient=soin.patient,
         cree_par=request.user,
-        type_facture='autre',
+        type_facture='soins',
         statut='emise',
         montant_total=total,
     )
@@ -419,117 +488,14 @@ def soins_creer_facture(request, pk):
 
     soin.facture = facture
     soin.save(update_fields=['facture'])
+    log_event(soin, request.user, f'Facture {facture.numero if hasattr(facture, "numero") else ""} créée.', type='system')
+    log_event(facture, request.user, 'Facture créée.', type='system')
     from django.urls import reverse
-    detail_url = reverse('soins:facture_detail', kwargs={'pk': facture.pk})
+    detail_url = reverse('facturation:detail', kwargs={'pk': facture.pk})
     back_url = f'/soins/{soin.pk}/'
     return redirect(f'{detail_url}?next={back_url}')
 
 
-@login_required(login_url='login')
-def soins_facture_paiement(request, pk):
-    """Page de paiement de la facture d'un soin (Caisse uniquement)."""
-    from facturation.models import Facture, Paiement
-
-    facture = get_object_or_404(
-        Facture.objects.select_related('patient', 'cree_par'),
-        pk=pk
-    )
-    # Retrouve le soin lié
-    soin = Soin.objects.filter(facture=facture).select_related('patient').first()
-
-    if request.method == 'POST':
-        if not request.user.has_perm('soins.can_creer_facture'):
-            messages.error(request, "Vous n'avez pas la permission d'enregistrer un paiement.")
-            return redirect('soins:facture_paiement', pk=pk)
-
-        type_paiement = request.POST.get('type_paiement', '')
-        mode = request.POST.get('mode_paiement', 'especes')
-        reference = request.POST.get('reference', '')
-
-        if type_paiement == 'paye':
-            Paiement.objects.create(
-                facture=facture, montant=facture.montant_total,
-                mode_paiement=mode, reference=reference, recu_par=request.user,
-            )
-            facture.montant_paye = facture.montant_total
-            facture.statut = 'payee'
-            facture.save(update_fields=['montant_paye', 'statut'])
-            if soin:
-                soin.statut = 'en_cours'
-                soin.save(update_fields=['statut'])
-                _sync_procedures(soin, 'en_cours')
-            messages.success(request, "Paiement enregistré. Le soin peut maintenant être administré.")
-            return redirect('soins:detail', pk=soin.pk) if soin else redirect('soins:list')
-
-        elif type_paiement == 'partiel':
-            try:
-                montant = float(request.POST.get('montant_partiel', 0) or 0)
-            except ValueError:
-                montant = 0
-            peut_administrer = request.POST.get('peut_administrer', '') == 'oui'
-
-            if montant <= 0:
-                messages.error(request, "Veuillez saisir un montant valide.")
-            elif peut_administrer:
-                Paiement.objects.create(
-                    facture=facture, montant=montant,
-                    mode_paiement=mode, reference=reference, recu_par=request.user,
-                )
-                facture.montant_paye = montant
-                facture.statut = 'partielle'
-                facture.save(update_fields=['montant_paye', 'statut'])
-                if soin:
-                    soin.statut = 'en_cours'
-                    soin.save(update_fields=['statut'])
-                    _sync_procedures(soin, 'en_cours')
-                messages.success(request, f"Paiement partiel de {int(montant):,} FCFA enregistré.".replace(',', ' '))
-                return redirect('soins:detail', pk=soin.pk) if soin else redirect('soins:list')
-            else:
-                # Paiement partiel refusé → annulation
-                facture.statut = 'annulee'
-                facture.save(update_fields=['statut'])
-                if soin:
-                    soin.statut = 'annule'
-                    soin.save(update_fields=['statut'])
-                    _sync_procedures(soin, 'annule')
-                messages.warning(request, "Soin et facture annulés suite au refus du paiement partiel.")
-                return redirect('soins:detail', pk=soin.pk) if soin else redirect('soins:list')
-
-        elif type_paiement == 'non_paye':
-            raison_choisie = request.POST.getlist('raison_preset')
-            raison_libre = request.POST.get('raison_libre', '').strip()
-            raison_finale = ', '.join(raison_choisie)
-            if raison_libre:
-                raison_finale = (raison_finale + ' — ' + raison_libre) if raison_finale else raison_libre
-            facture.statut = 'annulee'
-            facture.notes = raison_finale
-            facture.save(update_fields=['statut', 'notes'])
-            if soin:
-                soin.statut = 'annule'
-                soin.save(update_fields=['statut'])
-                _sync_procedures(soin, 'annule')
-            messages.warning(request, "Soin et facture annulés — non paiement.")
-            return redirect('soins:detail', pk=soin.pk) if soin else redirect('soins:list')
-
-    return render(request, 'soins/facturation/paiement.html', {
-        'facture': facture,
-        'lignes': facture.lignes.all(),
-        'soin': soin,
-        'user_peut_payer': request.user.has_perm('soins.can_creer_facture'),
-        'MODES_PAIEMENT': [
-            ('especes', 'Espèces'),
-            ('mobile_money', 'Mobile Money'),
-            ('cheque', 'Chèque'),
-            ('virement', 'Virement'),
-            ('assurance', 'Assurance'),
-        ],
-        'RAISONS_NON_PAIEMENT': [
-            'Manque de moyens',
-            'Contestation du montant',
-            'Patient parti sans payer',
-            'Renvoi vers l\'assurance',
-        ],
-    })
 
 
 @login_required(login_url='login')
@@ -540,7 +506,10 @@ def soins_terminer(request, pk):
     soin = get_object_or_404(Soin, pk=pk)
     if request.user.is_superuser and soin.statut == 'en_cours':
         soin.statut = 'termine'
-        soin.save(update_fields=['statut'])
+        soin.termine_par = request.user
+        soin.date_termine = timezone.now()
+        soin.save(update_fields=['statut', 'termine_par', 'date_termine'])
+        log_event(soin, request.user, 'Soin terminé (admin).', type='statut')
         _sync_procedures(soin, 'termine')
     return redirect('soins:detail', pk=pk)
 
@@ -614,6 +583,48 @@ def soins_rdv_list(request):
     })
 
 
+@login_required(login_url='login')
+def soins_rdv_detail(request, pk):
+    from patients.models import RendezVous
+    from patients.forms import RendezVousForm
+    rdv = get_object_or_404(
+        RendezVous.objects.select_related('patient', 'medecin', 'docteur_jr'),
+        pk=pk
+    )
+    next_url = request.GET.get('next') or request.POST.get('next') or '/soins/'
+
+    if request.method == 'POST':
+        form = RendezVousForm(request.POST, instance=rdv)
+        if form.is_valid():
+            rdv = form.save()
+            action = request.POST.get('_action', '')
+            if action == 'confirmer':
+                rdv.statut = 'confirme'
+                rdv.save(update_fields=['statut'])
+            elif action == 'terminer':
+                rdv.statut = 'termine'
+                rdv.save(update_fields=['statut'])
+            elif action == 'annuler':
+                rdv.statut = 'annule'
+                rdv.save(update_fields=['statut'])
+            elif action == 'absent':
+                rdv.statut = 'absent'
+                rdv.save(update_fields=['statut'])
+            messages.success(
+                request,
+                f'Rendez-vous de {rdv.patient.nom} {rdv.patient.prenoms} mis à jour.'
+            )
+            return redirect('soins:rdv_detail', pk=rdv.pk)
+    else:
+        form = RendezVousForm(instance=rdv)
+
+    return render(request, 'soins/rdv/form.html', {
+        'form': form,
+        'rdv': rdv,
+        'next_url': next_url,
+    })
+
+
 # ─── LISTE DES SOINS (ProcedureSoin) ───────────────────────────────────────
 
 def _procedure_extras():
@@ -627,14 +638,13 @@ def _procedure_extras():
         'pk', 'patient_id', 'date_heure', 'type_rdv', 'statut'
     ).order_by('-date_heure')[:500])
     factures = list(FactureModel.objects.values('pk', 'numero', 'patient_id', 'montant_total').order_by('-date_emission')[:300])
-    maladies = list(Maladie.objects.values('pk', 'nom', 'code_cim'))
     return {
         'services_json': json.dumps(services, default=str),
         'employes_json': json.dumps(employes),
         'patients_json': json.dumps(patients),
         'rdvs_json': json.dumps(rdvs, default=str),
         'factures_json': json.dumps(factures, default=str),
-        'maladies': Maladie.objects.all(),
+        'maladies': Pathologie.objects.filter(actif=True),
     }
 
 
@@ -706,7 +716,7 @@ def _auto_creer_facture(proc, user):
     facture = Facture.objects.create(
         patient=proc.patient,
         cree_par=user,
-        type_facture='autre',
+        type_facture='soins',
         statut='brouillon',
         montant_total=proc.prix or 0,
     )
@@ -733,6 +743,7 @@ def procedure_create(request):
                 proc.soin_type_id,
                 proc.departement_id,
             ])
+            proc.cree_par = request.user
             if champs_ok:
                 proc.statut = 'en_cours'
                 proc.save()
@@ -755,17 +766,19 @@ def procedure_create(request):
 def procedure_detail(request, pk):
     proc = get_object_or_404(
         ProcedureSoin.objects.select_related(
-            'patient', 'infirmier', 'departement', 'soin_type', 'maladie', 'rendez_vous', 'facture'
+            'patient', 'infirmier', 'departement', 'soin_type', 'maladie', 'rendez_vous', 'facture',
+            'cree_par', 'modifie_par',
         ),
         pk=pk
     )
     facture_payee = (
         proc.facture is not None and
-        proc.facture.statut in ('payee', 'partielle')
+        proc.facture.statut == 'payee'
     )
     return render(request, 'soins/procedure/detail.html', {
         'proc': proc,
         'facture_payee': facture_payee,
+        'logs': get_logs(proc),
     })
 
 
@@ -776,6 +789,8 @@ def procedure_edit(request, pk):
         form = ProcedureSoinForm(request.POST, instance=proc)
         if form.is_valid():
             proc = form.save(commit=False)
+            proc.modifie_par = request.user
+            proc.date_modification = timezone.now()
             action = request.POST.get('action', 'save')
             if action == 'annuler':
                 proc.statut = 'annule'
@@ -815,6 +830,7 @@ def procedure_terminer(request, pk):
     if request.method == 'POST' and proc.statut == 'en_cours':
         proc.statut = 'termine'
         proc.save()
+        log_event(proc, request.user, 'Procédure terminée.', type='statut')
     return redirect('soins:procedure_detail', pk=pk)
 
 
@@ -824,25 +840,8 @@ def procedure_annuler(request, pk):
     if request.method == 'POST' and proc.statut not in ('termine', 'annule'):
         proc.statut = 'annule'
         proc.save()
+        log_event(proc, request.user, 'Procédure annulée.', type='statut')
     return redirect('soins:procedure_detail', pk=pk)
-
-
-@login_required(login_url='login')
-def maladie_create(request):
-    from .forms import MaladieForm
-    next_url = request.GET.get('next') or request.POST.get('next') or '/soins/procedures/nouveau/'
-    if request.method == 'POST':
-        form = MaladieForm(request.POST)
-        if form.is_valid():
-            form.save()
-            return redirect(next_url)
-    else:
-        nom_initial = request.GET.get('nom', '')
-        form = MaladieForm(initial={'nom': nom_initial})
-    return render(request, 'soins/maladie/form.html', {
-        'form': form,
-        'next_url': next_url,
-    })
 
 
 # ─── FACTURATION DEPUIS SOINS ───────────────────────────────────────────────
@@ -878,16 +877,14 @@ def _process_facturation_post(request, patient, origin_url):
         i = 0
         while f'ligne_libelle_{i}' in request.POST:
             libelle = request.POST.get(f'ligne_libelle_{i}', '').strip()
-            acte_id = request.POST.get(f'ligne_acte_{i}') or None
             qte = parse_float(request.POST.get(f'ligne_qte_{i}'), 1)
             prix = parse_float(request.POST.get(f'ligne_prix_{i}'), 0)
             remise = parse_float(request.POST.get(f'ligne_remise_{i}'), 0)
-            if libelle or acte_id:
+            if libelle:
                 montant = qte * prix * (1 - remise / 100)
                 total += montant
                 lignes_data.append({
                     'libelle': libelle,
-                    'acte_id': acte_id,
                     'quantite': qte,
                     'prix_unitaire': prix,
                     'remise': remise,
@@ -900,10 +897,7 @@ def _process_facturation_post(request, patient, origin_url):
         for l in lignes_data:
             LigneFacture.objects.create(
                 facture=facture,
-                acte_id=l['acte_id'],
-                libelle=l['libelle'] or (
-                    Acte.objects.get(pk=l['acte_id']).libelle if l['acte_id'] else '—'
-                ),
+                libelle=l['libelle'],
                 quantite=l['quantite'],
                 prix_unitaire=l['prix_unitaire'],
                 remise=l['remise'],
@@ -921,22 +915,22 @@ def _process_facturation_post(request, patient, origin_url):
                 recu_par=request.user,
             )
             facture.montant_paye = pay_montant
-            facture.statut = 'payee' if pay_montant >= total else 'partielle'
+            facture.statut = 'payee'
             facture.save()
 
         messages.success(request, f"Facture {facture.numero} créée avec succès.")
-        return redirect('facturation_list')
+        return redirect('facturation:list')
 
     return form
 
 
-@_staff_required
+@login_required(login_url='login')
 def soin_facturer(request, pk):
     from facturation.models import Facture, LigneFacture
     from django.urls import reverse
 
     soin = get_object_or_404(
-        Soin.objects.select_related('patient', 'service_inscription'), pk=pk
+        Soin.objects.select_related('patient'), pk=pk
     )
     procedures = list(soin.procedures.select_related('soin_type').all())
 
@@ -945,7 +939,7 @@ def soin_facturer(request, pk):
         facture = Facture.objects.create(
             patient=soin.patient,
             cree_par=request.user,
-            type_facture='autre',
+            type_facture='soins',
             statut='brouillon',
             montant_total=total,
         )
@@ -961,38 +955,37 @@ def soin_facturer(request, pk):
             proc.facture = facture
             proc.save(update_fields=['facture'])
     else:
-        libelle = f"Soins infirmiers - {soin.numero}"
-        prix_unitaire = 0
-        if soin.service_inscription:
-            libelle = f"{soin.service_inscription.nom} - {soin.numero}"
-            prix_unitaire = soin.service_inscription.prix_vente or 0
         facture = Facture.objects.create(
             patient=soin.patient,
             cree_par=request.user,
-            type_facture='autre',
+            type_facture='soins',
             statut='brouillon',
-            montant_total=prix_unitaire,
+            montant_total=0,
         )
         LigneFacture.objects.create(
             facture=facture,
-            libelle=libelle,
+            libelle="Soins infirmiers",
             quantite=1,
-            prix_unitaire=prix_unitaire,
+            prix_unitaire=0,
             remise=0,
         )
 
-    detail_url = reverse('soins:facture_detail', kwargs={'pk': facture.pk})
+    detail_url = reverse('facturation:detail', kwargs={'pk': facture.pk})
     return redirect(f'{detail_url}?next=/soins/{pk}/')
 
 
-@_staff_required
+@login_required(login_url='login')
 def procedure_facturer(request, pk):
     from facturation.models import Facture, LigneFacture
     from django.urls import reverse
 
     proc = get_object_or_404(
-        ProcedureSoin.objects.select_related('patient', 'soin_type'), pk=pk
+        ProcedureSoin.objects.select_related('patient', 'soin_type', 'facture'), pk=pk
     )
+
+    if proc.facture_id:
+        messages.warning(request, "Cette procédure est déjà associée à la facture.")
+        return redirect('soins:procedure_detail', pk=pk)
 
     soin_label = proc.soin_type.nom if proc.soin_type else "Soin"
     libelle = f"{soin_label} - {proc.numero}"
@@ -1000,7 +993,7 @@ def procedure_facturer(request, pk):
     facture = Facture.objects.create(
         patient=proc.patient,
         cree_par=request.user,
-        type_facture='autre',
+        type_facture='soins',
         statut='brouillon',
         montant_total=proc.prix,
     )
@@ -1016,299 +1009,5 @@ def procedure_facturer(request, pk):
     proc.facture = facture
     proc.save()
 
-    detail_url = reverse('soins:facture_detail', kwargs={'pk': facture.pk})
+    detail_url = reverse('facturation:detail', kwargs={'pk': facture.pk})
     return redirect(f'{detail_url}?next=/soins/procedures/{pk}/')
-
-
-# ─── FACTURE DANS LE MODULE SOINS ──────────────────────────────────────────
-
-@_staff_required
-def soins_facture_detail(request, pk):
-    from facturation.models import Facture
-    facture = get_object_or_404(
-        Facture.objects.select_related('patient', 'cree_par'),
-        pk=pk
-    )
-    back_url = request.GET.get('next', '/soins/')
-    return render(request, 'soins/facturation/detail.html', {
-        'facture': facture,
-        'lignes': facture.lignes.all(),
-        'paiements': facture.paiements.all(),
-        'back_url': back_url,
-    })
-
-
-@_staff_required
-def soins_facture_edit(request, pk):
-    from facturation.models import Facture, LigneFacture, Acte
-    from facturation.forms import FactureForm
-    from caisse.models import Caisse
-
-    facture = get_object_or_404(Facture.objects.select_related('patient'), pk=pk)
-
-    def _parse(val, default=0):
-        try:
-            return float(val)
-        except (TypeError, ValueError):
-            return default
-
-    if request.method == 'POST':
-        form = FactureForm(request.POST, instance=facture)
-        back_url = request.POST.get('next', '/soins/')
-        if form.is_valid():
-            f = form.save(commit=False)
-            LigneFacture.objects.filter(facture_id=facture.pk).delete()
-
-            total = 0
-            i = 0
-            while f'ligne_libelle_{i}' in request.POST:
-                libelle = request.POST.get(f'ligne_libelle_{i}', '').strip()
-                acte_id = request.POST.get(f'ligne_acte_{i}') or None
-                qte = _parse(request.POST.get(f'ligne_qte_{i}'), 1)
-                prix = _parse(request.POST.get(f'ligne_prix_{i}'), 0)
-                remise = _parse(request.POST.get(f'ligne_remise_{i}'), 0)
-                if libelle or acte_id:
-                    total += qte * prix * (1 - remise / 100)
-                    LigneFacture.objects.create(
-                        facture_id=facture.pk,
-                        acte_id=acte_id,
-                        libelle=libelle or (
-                            Acte.objects.get(pk=acte_id).libelle if acte_id else '—'
-                        ),
-                        quantite=qte,
-                        prix_unitaire=prix,
-                        remise=remise,
-                    )
-                i += 1
-
-            f.montant_total = round(total, 2)
-            f.save()
-            messages.success(request, f"Facture {f.numero} mise à jour.")
-            from django.urls import reverse
-            detail_url = reverse('soins:facture_detail', kwargs={'pk': facture.pk})
-            return redirect(f'{detail_url}?next={back_url}')
-    else:
-        form = FactureForm(instance=facture)
-        back_url = request.GET.get('next', '/soins/')
-
-    return render(request, 'soins/facturation/edit.html', {
-        'facture': facture,
-        'form': form,
-        'lignes': facture.lignes.all(),
-        'actes': Acte.objects.filter(actif=True).order_by('categorie', 'libelle'),
-        'caisses': Caisse.objects.filter(actif=True),
-        'back_url': back_url,
-    })
-
-
-@_staff_required
-def soins_facture_valider(request, pk):
-    from facturation.models import Facture
-    from django.urls import reverse
-    facture = get_object_or_404(Facture, pk=pk)
-    if request.method == 'POST':
-        back_url = request.POST.get('next', '/soins/')
-        if facture.statut == 'brouillon':
-            facture.statut = 'emise'
-            facture.save()
-            messages.success(request, f"Facture {facture.numero} validée et émise avec succès.")
-        detail_url = reverse('soins:facture_detail', kwargs={'pk': pk})
-        return redirect(f'{detail_url}?next={back_url}')
-    return redirect('soins:facture_detail', pk=pk)
-
-
-@_staff_required
-def soins_facture_payer(request, pk):
-    from facturation.models import Facture, Paiement
-    from django.urls import reverse
-
-    facture = get_object_or_404(Facture, pk=pk)
-    if request.method != 'POST':
-        return redirect('soins:facture_detail', pk=pk)
-
-    back_url = request.POST.get('next', '/soins/')
-
-    try:
-        montant = float(request.POST.get('pay_montant', 0))
-    except (TypeError, ValueError):
-        montant = 0
-
-    mode = request.POST.get('pay_mode', 'especes')
-    reference = request.POST.get('pay_reference', '')
-
-    if montant > 0 and facture.statut in ('brouillon', 'emise', 'partielle'):
-        Paiement.objects.create(
-            facture=facture,
-            montant=montant,
-            mode_paiement=mode,
-            reference=reference,
-            recu_par=request.user,
-        )
-        total_paye = sum(p.montant for p in facture.paiements.all())
-        facture.montant_paye = total_paye
-        if total_paye >= facture.montant_total:
-            facture.statut = 'payee'
-        else:
-            facture.statut = 'partielle'
-        facture.save(update_fields=['montant_paye', 'statut'])
-        messages.success(request, f"Paiement de {int(montant):,} CFA enregistré pour la facture {facture.numero}.".replace(',', ' '))
-
-    detail_url = reverse('soins:facture_detail', kwargs={'pk': pk})
-    return redirect(f'{detail_url}?next={back_url}')
-
-
-@login_required(login_url='login')
-def soins_facture_print(request, pk):
-    from facturation.models import Facture
-    facture = get_object_or_404(
-        Facture.objects.select_related('patient', 'cree_par'),
-        pk=pk
-    )
-    back_url = request.GET.get('next', '/soins/')
-    return render(request, 'soins/facturation/print.html', {
-        'facture': facture,
-        'lignes': facture.lignes.select_related('acte').all(),
-        'paiements': facture.paiements.all(),
-        'back_url': back_url,
-    })
-
-
-# ─── DEMANDES D'EXAMEN (via laboratoire.AnalyseLaboratoire) ─────────────────
-
-@login_required(login_url='login')
-def demande_examen_list(request):
-    patient_id = request.GET.get('patient_id', '').strip()
-    q = request.GET.get('q', '').strip()
-    back = request.GET.get('next', '/soins/')
-    back_label = request.GET.get('back_label', '')
-
-    qs = AnalyseLaboratoire.objects.select_related(
-        'patient', 'medecin_prescripteur', 'type_examen'
-    ).order_by('-date_prelevement')
-
-    if patient_id:
-        qs = qs.filter(patient_id=patient_id)
-    elif q:
-        qs = qs.filter(
-            Q(numero__icontains=q) |
-            Q(patient__nom__icontains=q) |
-            Q(patient__prenoms__icontains=q) |
-            Q(type_examen__nom__icontains=q)
-        )
-
-    patient = None
-    if patient_id:
-        try:
-            patient = Patient.objects.get(pk=patient_id)
-        except Patient.DoesNotExist:
-            pass
-
-    return render(request, 'soins/demande_examen/list.html', {
-        'analyses': qs[:200],
-        'patient': patient,
-        'patient_id': patient_id,
-        'q': q,
-        'back': back,
-        'back_label': back_label,
-    })
-
-
-@login_required(login_url='login')
-def demande_examen_create(request):
-    from laboratoire.models import TypeExamen
-
-    if request.method == 'POST':
-        patient_id = request.POST.get('patient') or ''
-        medecin_id = request.POST.get('medecin_prescripteur') or None
-        urgent = bool(request.POST.get('urgent'))
-        commentaire = request.POST.get('notes', '')
-
-        if patient_id:
-            try:
-                pat = Patient.objects.get(pk=patient_id)
-                lignes_type = request.POST.getlist('ligne_type[]')
-
-                created_pks = []
-                for type_id in lignes_type:
-                    if not type_id:
-                        continue
-                    analyse = AnalyseLaboratoire.objects.create(
-                        patient=pat,
-                        type_examen_id=type_id,
-                        medecin_prescripteur_id=medecin_id if medecin_id else None,
-                        urgent=urgent,
-                        commentaire=commentaire,
-                        statut='recu',
-                    )
-                    created_pks.append(analyse.pk)
-
-                if created_pks:
-                    if len(created_pks) == 1:
-                        return redirect('soins:demande_examen_detail', pk=created_pks[0])
-                    from django.urls import reverse
-                    return redirect(reverse('soins:demande_examen_list') + f'?patient_id={patient_id}')
-            except Patient.DoesNotExist:
-                pass
-
-    types_examens = list(TypeExamen.objects.values('pk', 'nom', 'prix', 'delai_resultat_heures'))
-    employes = list(Employe.objects.order_by('nom', 'prenoms').values('pk', 'nom', 'prenoms'))
-    patients_qs = list(Patient.objects.order_by('nom', 'prenoms').values('pk', 'nom', 'prenoms', 'code_patient'))
-
-    patient_id_get = request.GET.get('patient_id', '')
-    initial_patient = None
-    if patient_id_get:
-        try:
-            initial_patient = Patient.objects.get(pk=patient_id_get)
-        except Patient.DoesNotExist:
-            pass
-
-    return render(request, 'soins/demande_examen/form.html', {
-        'is_new': True,
-        'initial_patient': initial_patient,
-        'types_examens_json': json.dumps(types_examens, default=str),
-        'employes_json': json.dumps(employes),
-        'patients_json': json.dumps(patients_qs),
-    })
-
-
-@login_required(login_url='login')
-def demande_examen_detail(request, pk):
-    analyse = get_object_or_404(
-        AnalyseLaboratoire.objects.select_related(
-            'patient', 'medecin_prescripteur', 'type_examen', 'technicien', 'validateur'
-        ),
-        pk=pk
-    )
-    return render(request, 'soins/demande_examen/detail.html', {'analyse': analyse})
-
-
-@login_required(login_url='login')
-def demande_examen_envoyer(request, pk):
-    analyse = get_object_or_404(AnalyseLaboratoire, pk=pk)
-    if request.method == 'POST' and analyse.statut == 'recu':
-        analyse.statut = 'en_analyse'
-        analyse.save()
-    return redirect('soins:demande_examen_detail', pk=pk)
-
-
-@login_required(login_url='login')
-def demande_examen_terminer(request, pk):
-    analyse = get_object_or_404(AnalyseLaboratoire, pk=pk)
-    if request.method == 'POST':
-        transitions = {
-            'recu': 'en_analyse',
-            'en_analyse': 'resultat',
-            'resultat': 'valide',
-            'valide': 'envoye',
-        }
-        next_statut = transitions.get(analyse.statut)
-        if next_statut:
-            analyse.statut = next_statut
-            analyse.save()
-    return redirect('soins:demande_examen_detail', pk=pk)
-
-
-@login_required(login_url='login')
-def demande_examen_annuler(request, pk):
-    # AnalyseLaboratoire n'a pas de statut "annule" — on redirige simplement
-    return redirect('soins:demande_examen_detail', pk=pk)

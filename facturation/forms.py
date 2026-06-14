@@ -16,6 +16,11 @@ class FactureForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        is_admin = kwargs.pop('is_admin', True)
         super().__init__(*args, **kwargs)
         for field in self.fields.values():
             field.widget.attrs.setdefault('class', 'field-ul')
+        self.fields['date_echeance'].widget.format = '%Y-%m-%d'
+        if not is_admin:
+            self.fields.pop('statut', None)
+            self.fields.pop('type_facture', None)

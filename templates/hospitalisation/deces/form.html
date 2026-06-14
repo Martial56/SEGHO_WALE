@@ -1,25 +1,22 @@
-﻿{% extends 'hospitalisation/base.html' %}
+{% extends 'hospitalisation/base.html' %}
 {% load i18n %}
 
 {% block extra_css %}
 {{ block.super }}
 <style>
+.content    { padding: 0 !important; overflow-x: clip; }
+.breadcrumb { display: none !important; }
+
 :root { --surface:#fff; --border:#e8edf2; --text:#0d3040; --text-muted:rgba(0,0,0,.45); }
-html[data-theme="dark"] { --surface:#201d1d; --border:#201d1d; --text:#d4e6f5; --text-muted:rgba(255,255,255,.45); }
+html[data-theme="dark"] { --surface:#132033; --border:#243044; --text:#d4e6f5; --text-muted:rgba(255,255,255,.45); }
 
 /* ── Subheader (breadcrumb + workflow fusionnés) ── */
 .o-subheader {
   background:var(--surface); border-bottom:1px solid var(--border);
   padding:0; display:flex; flex-direction:column;
-  position:sticky; top:38px; z-index:190; margin:0 -32px;
+  position:sticky; top:76px; z-index:190;
 }
-.o-subheader-row {
-  display:flex; align-items:center; gap:8px;
-  padding:5px 16px;
-}
-.o-subheader-row + .o-subheader-row {
-  border-top:1px solid var(--border);
-}
+
 
 .o-ctrl-btn {
   background:none; border:1px solid transparent; border-radius:4px;
@@ -32,14 +29,14 @@ html[data-theme="dark"] { --surface:#201d1d; --border:#201d1d; --text:#d4e6f5; -
 
 .btn-save {
   background:var(--teal-500); color:#fff; border:none;
-  padding:5px 18px; border-radius:4px; font-size:12.5px; font-weight:600;
+  padding:6px 18px; border-radius:4px; font-size:12.5px; font-weight:600;
   font-family:inherit; cursor:pointer; display:inline-flex; align-items:center;
-  gap:6px; transition:background .15s;
+  gap:6px; transition:background .15s; margin-top:3px;
 }
 .btn-save:hover { background:var(--teal-600); }
 .btn-cancel {
   background:none; border:none; color:var(--text-muted);
-  padding:5px 10px; font-size:12.5px; font-family:inherit;
+  padding:6px 10px; font-size:12.5px; font-family:inherit;
   cursor:pointer; text-decoration:none; transition:color .15s;
 }
 .btn-cancel:hover { color:var(--text); }
@@ -56,24 +53,24 @@ html[data-theme="dark"] { --surface:#201d1d; --border:#201d1d; --text:#d4e6f5; -
 
 .pipeline {
   margin-left:auto; display:flex; align-items:stretch;
-  font-size:11px; font-weight:700; letter-spacing:.6px; gap:2px;
+  font-size:11.5px; font-weight:700; letter-spacing:.5px; gap:2px;
 }
 .pip-step {
-  padding:0 22px 0 28px; height:30px;
+  padding:0 22px 0 28px; height:28px;
   display:flex; align-items:center;
   color:rgba(0,0,0,.35); background:#eef1f5; white-space:nowrap;
-  clip-path:polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%, 10px 50%);
+  clip-path:polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%, 12px 50%);
   transition:background .15s, color .15s;
 }
 .pip-step:first-child {
-  padding-left:16px;
-  clip-path:polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%);
-  border-radius:3px 0 0 3px;
+  padding-left:18px;
+  clip-path:polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%);
+  border-radius:4px 0 0 4px;
 }
 .pip-step:last-child {
-  padding-right:16px;
-  clip-path:polygon(0 0, 100% 0, 100% 100%, 0 100%, 10px 50%);
-  border-radius:0 3px 3px 0;
+  padding-right:18px;
+  clip-path:polygon(0 0, 100% 0, 100% 100%, 0 100%, 12px 50%);
+  border-radius:0 4px 4px 0;
 }
 .pip-step.active { background:#3d3d99; color:#fff; }
 .pip-step.done   { background:#daedf8; color:var(--teal-700); }
@@ -153,11 +150,6 @@ select.field-ul {
 .fc-auto-item { display:flex; flex-direction:column; gap:4px; }
 .fc-auto-lbl  { font-size:10.5px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; }
 
-/* Messages */
-.messages-list { list-style:none; padding:0; margin:8px 0 0; }
-.msg-success { background:#d4edda; color:#1a6b3c; padding:9px 14px; border-radius:4px; font-size:13px; }
-.msg-error   { background:#fde8e8; color:#7b1c1c; padding:9px 14px; border-radius:4px; font-size:13px; }
-
 /* ── TomSelect underline ── */
 .ts-wrapper { padding:0 !important; }
 .ts-wrapper .ts-control {
@@ -191,22 +183,22 @@ select.field-ul {
 
 /* Dark */
 html[data-theme="dark"] .form-card   { background:var(--surface); border-color:var(--border); }
-html[data-theme="dark"] .fc-auto-info { background:#171616; }
-html[data-theme="dark"] .info-badge  { background:#201d1d; border-color:#2e3f58; }
-html[data-theme="dark"] .info-badge.empty { background:#201d1d; }
+html[data-theme="dark"] .fc-auto-info { background:#0d1f30; }
+html[data-theme="dark"] .info-badge  { background:#1a2535; border-color:#2e3f58; }
+html[data-theme="dark"] .info-badge.empty { background:#132033; }
 html[data-theme="dark"] .field-ul   { color:var(--text); border-bottom-color:rgba(255,255,255,.15); }
 html[data-theme="dark"] .field-ul:focus { border-bottom-color:var(--teal-400); }
 html[data-theme="dark"] .field-ul::placeholder { color:rgba(255,255,255,.25); }
 html[data-theme="dark"] .field-readonly { color:var(--text); border-bottom-color:rgba(255,255,255,.08); }
 html[data-theme="dark"] .fc-code-badge { background:rgba(153,27,27,.15); border-color:rgba(252,165,165,.3); color:#fca5a5; }
-html[data-theme="dark"] .pip-step  { background:#201d1d; color:rgba(255,255,255,.3); }
+html[data-theme="dark"] .pip-step  { background:#1a2535; color:rgba(255,255,255,.3); }
 html[data-theme="dark"] .pip-step.active { background:#3d3d99; color:#fff; }
-html[data-theme="dark"] .pip-step.done   { background:#171616; color:var(--teal-300); }
+html[data-theme="dark"] .pip-step.done   { background:#0f3050; color:var(--teal-300); }
 html[data-theme="dark"] .o-ctrl-btn:hover { background:rgba(255,255,255,.05); }
 html[data-theme="dark"] .btn-cancel { color:var(--text-muted); }
 html[data-theme="dark"] .ts-wrapper .ts-control { border-bottom-color:rgba(255,255,255,.15) !important; }
 html[data-theme="dark"] .ts-wrapper.focus .ts-control { border-bottom-color:var(--teal-400) !important; }
-html[data-theme="dark"] .ts-dropdown { background:#201d1d !important; border-color:#2e3f58 !important; }
+html[data-theme="dark"] .ts-dropdown { background:#1a2535 !important; border-color:#2e3f58 !important; }
 html[data-theme="dark"] .ts-dropdown .option { color:#c5d4e2 !important; }
 html[data-theme="dark"] .ts-dropdown .option:hover,
 html[data-theme="dark"] .ts-dropdown .option.active,
@@ -215,6 +207,7 @@ html[data-theme="dark"] .ts-dropdown .option.selected { background:rgba(33,136,1
 {% endblock %}
 
 {% block content %}
+<div id="page-wrap">
 
 <!-- ── Subheader (breadcrumb + workflow) ── -->
 <div class="o-subheader">
@@ -237,16 +230,13 @@ html[data-theme="dark"] .ts-dropdown .option.selected { background:rgba(33,136,1
   </div>
 
   <!-- Ligne 2 : workflow -->
-  <div class="o-subheader-row">
+  <div class="o-subheader-row" style="border-top:1px solid var(--border); padding-top:8px; padding-bottom:8px;">
     {% if edit and deces.statut == 'brouillon' %}
     <form method="post" style="display:contents;">
       {% csrf_token %}
       <button type="submit" name="terminer" value="1" class="wf-btn wf-btn-termine">Terminer</button>
     </form>
-    {% else %}
-    <button class="wf-btn" disabled>Terminer</button>
     {% endif %}
-
     <div class="pipeline">
       <div class="pip-step {% if not edit or deces.statut == 'brouillon' %}active{% else %}done{% endif %}">
         Brouillon
@@ -258,12 +248,6 @@ html[data-theme="dark"] .ts-dropdown .option.selected { background:rgba(33,136,1
   </div>
 
 </div>
-
-{% if messages %}
-<ul class="messages-list">
-  {% for msg in messages %}<li class="msg-{{ msg.tags }}">{{ msg }}</li>{% endfor %}
-</ul>
-{% endif %}
 
 <!-- ── Formulaire ── -->
 <form method="post" id="deces-form" novalidate>
@@ -355,6 +339,8 @@ html[data-theme="dark"] .ts-dropdown .option.selected { background:rgba(33,136,1
     </div>
   </div>
 </form>
+
+</div><!-- /page-wrap -->
 
 <script id="patients-data" type="application/json">
 {

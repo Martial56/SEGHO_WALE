@@ -1,4 +1,4 @@
-﻿{% extends 'services/base.html' %}
+{% extends 'services/base.html' %}
 {% load static %}
 {% block breadcrumb %}{% endblock %}
 {% block module_navbar %}{% endblock %}
@@ -53,7 +53,7 @@
   }
 
   html[data-theme="dark"] .det-photo {
-    background: #201d1d;
+    background: #2a3a50;
   }
 
   html[data-theme="dark"] .det-photo svg {
@@ -104,7 +104,7 @@
   html[data-theme="dark"] .det-badge-actif   { background: rgba(22,169,107,.2); color: #6eddb0; }
   html[data-theme="dark"] .det-badge-inactif { background: rgba(232,69,69,.2);  color: #f09090; }
   html[data-theme="dark"] .det-badge-info    { background: rgba(33,136,171,.18); color: #7ecae0; }
-  html[data-theme="dark"] .det-badge-gray    { background: #201d1d; color: #8a9ab0; }
+  html[data-theme="dark"] .det-badge-gray    { background: #2a3548; color: #8a9ab0; }
 
   .det-actions {
     display: flex;
@@ -291,9 +291,6 @@
           {% if article.peut_etre_achete %}
             <span class="det-badge det-badge-gray">Peut être acheté</span>
           {% endif %}
-          {% if article.favori %}
-            <span class="det-badge det-badge-gray">★ Favori</span>
-          {% endif %}
         </div>
       </div>
       <div class="det-actions">
@@ -315,13 +312,7 @@
         </div>
       </div>
       <div class="det-field">
-        <div class="det-field-label">Type de produit</div>
-        <div class="det-field-value {% if not article.type_produit_hospitalier %}muted{% endif %}">
-          {{ article.get_type_produit_hospitalier_display|default:"—" }}
-        </div>
-      </div>
-      <div class="det-field">
-        <div class="det-field-label">Type d'article</div>
+        <div class="det-field-label">Type de prestation</div>
         <div class="det-field-value">{{ article.get_type_article_display }}</div>
       </div>
       <div class="det-field">
@@ -329,7 +320,7 @@
         <div class="det-field-value price">{{ article.prix_vente|floatformat:0 }} CFA</div>
       </div>
       <div class="det-field">
-        <div class="det-field-label">Coût</div>
+        <div class="det-field-label">Prix d'achat</div>
         <div class="det-field-value {% if not article.cout %}muted{% endif %}">
           {% if article.cout %}{{ article.cout|floatformat:0 }} CFA{% else %}—{% endif %}
         </div>
@@ -341,32 +332,6 @@
         </div>
       </div>
       <div class="det-field">
-        <div class="det-field-label">Unité d'achat</div>
-        <div class="det-field-value {% if not article.unite_achat %}muted{% endif %}">
-          {% if article.unite_achat %}{{ article.unite_achat.nom }} ({{ article.unite_achat.code }}){% else %}—{% endif %}
-        </div>
-      </div>
-      <div class="det-field">
-        <div class="det-field-label">Code-barres</div>
-        <div class="det-field-value {% if not article.code_barres %}muted{% endif %}" style="font-family:monospace;font-size:12px;">
-          {{ article.code_barres|default:"—" }}
-        </div>
-      </div>
-      <div class="det-field">
-        <div class="det-field-label">Famille</div>
-        <div class="det-field-value {% if not article.famille %}muted{% endif %}">
-          {{ article.famille|default:"—" }}
-        </div>
-      </div>
-      <div class="det-field">
-        <div class="det-field-label">Politique de facturation</div>
-        <div class="det-field-value">{{ article.get_politique_facturation_display }}</div>
-      </div>
-      <div class="det-field">
-        <div class="det-field-label">Re-facturer les dépenses</div>
-        <div class="det-field-value">{{ article.get_refacturer_depenses_display }}</div>
-      </div>
-      <div class="det-field">
         <div class="det-field-label">Stock disponible</div>
         <div class="det-field-value {% if not article.quantite_stock %}muted{% endif %}">
           {% if article.quantite_stock %}{{ article.quantite_stock }}{% else %}0{% endif %}
@@ -376,118 +341,20 @@
     </div>
   </div>
 
-  <!-- ══ DÉTAILS MÉDICAMENT (affiché seulement si au moins un champ renseigné) ══ -->
-  {% if article.forme or article.voie_administration or article.dosage or article.composant_actif or article.compagnie_pharmaceutique or article.indications %}
-  <div class="det-section">
-    <div class="det-section-title">Détails médicament / produit</div>
-    <div class="det-grid">
-      {% if article.forme %}
-      <div class="det-field">
-        <div class="det-field-label">Forme</div>
-        <div class="det-field-value">{{ article.get_forme_display }}</div>
-      </div>
-      {% endif %}
-      {% if article.voie_administration %}
-      <div class="det-field">
-        <div class="det-field-label">Voie d'administration</div>
-        <div class="det-field-value">{{ article.get_voie_administration_display }}</div>
-      </div>
-      {% endif %}
-      {% if article.dosage %}
-      <div class="det-field">
-        <div class="det-field-label">Dosage</div>
-        <div class="det-field-value">{{ article.dosage }}{% if article.dosage_unite %} {{ article.dosage_unite }}{% endif %}</div>
-      </div>
-      {% endif %}
-      {% if article.frequence %}
-      <div class="det-field">
-        <div class="det-field-label">Fréquence</div>
-        <div class="det-field-value">{{ article.frequence }}</div>
-      </div>
-      {% endif %}
-      {% if article.composant_actif %}
-      <div class="det-field">
-        <div class="det-field-label">Composant actif</div>
-        <div class="det-field-value">{{ article.composant_actif }}</div>
-      </div>
-      {% endif %}
-      {% if article.effet_therapeutique %}
-      <div class="det-field">
-        <div class="det-field-label">Effet thérapeutique</div>
-        <div class="det-field-value">{{ article.effet_therapeutique }}</div>
-      </div>
-      {% endif %}
-      {% if article.compagnie_pharmaceutique %}
-      <div class="det-field">
-        <div class="det-field-label">Compagnie pharmaceutique</div>
-        <div class="det-field-value">{{ article.compagnie_pharmaceutique.nom }}</div>
-      </div>
-      {% endif %}
-      {% if article.nom_produit_fabricant %}
-      <div class="det-field">
-        <div class="det-field-label">Nom fabricant</div>
-        <div class="det-field-value">{{ article.nom_produit_fabricant }}</div>
-      </div>
-      {% endif %}
-      {% if article.code_produit %}
-      <div class="det-field">
-        <div class="det-field-label">Code produit</div>
-        <div class="det-field-value" style="font-family:monospace;font-size:12px;">{{ article.code_produit }}</div>
-      </div>
-      {% endif %}
-    </div>
-    {% if article.indications or article.effets_indesirables or article.remarques %}
-    <div style="border-top:1px solid var(--border);">
-      {% if article.indications %}
-      <div class="det-field-full">
-        <div class="det-field-label">Indications</div>
-        <div class="det-field-value" style="white-space:pre-line;margin-top:4px;">{{ article.indications }}</div>
-      </div>
-      {% endif %}
-      {% if article.effets_indesirables %}
-      <div class="det-field-full">
-        <div class="det-field-label">Effets indésirables</div>
-        <div class="det-field-value" style="white-space:pre-line;margin-top:4px;">{{ article.effets_indesirables }}</div>
-      </div>
-      {% endif %}
-      {% if article.remarques %}
-      <div class="det-field-full">
-        <div class="det-field-label">Remarques</div>
-        <div class="det-field-value" style="white-space:pre-line;margin-top:4px;">{{ article.remarques }}</div>
-      </div>
-      {% endif %}
-    </div>
-    {% endif %}
-  </div>
-  {% endif %}
-
-  <!-- ══ NOTES / DESCRIPTIONS ══ -->
-  {% if article.notes_internes or article.description_vente or article.description_achat %}
-  <div class="det-section">
-    <div class="det-section-title">Notes et descriptions</div>
-    {% if article.notes_internes %}
-    <div class="det-field-full">
-      <div class="det-field-label">Notes internes</div>
-      <div class="det-field-value" style="white-space:pre-line;margin-top:4px;">{{ article.notes_internes }}</div>
-    </div>
-    {% endif %}
-    {% if article.description_vente %}
-    <div class="det-field-full">
-      <div class="det-field-label">Description vente</div>
-      <div class="det-field-value" style="white-space:pre-line;margin-top:4px;">{{ article.description_vente }}</div>
-    </div>
-    {% endif %}
-    {% if article.description_achat %}
-    <div class="det-field-full">
-      <div class="det-field-label">Description achat</div>
-      <div class="det-field-value" style="white-space:pre-line;margin-top:4px;">{{ article.description_achat }}</div>
-    </div>
-    {% endif %}
-  </div>
-  {% endif %}
 
 </div><!-- /.det-page -->
 
+<script>
+  (function () {
+    function adjustOffsets() {
+      var topbar = document.querySelector('.topbar');
+      var wrap = document.getElementById('page-wrap');
+      if (topbar && wrap) wrap.style.paddingTop = '0';
+    }
+    adjustOffsets();
+    window.addEventListener('resize', adjustOffsets);
+  })();
+</script>
 
 </div><!-- /#page-wrap -->
 {% endblock %}

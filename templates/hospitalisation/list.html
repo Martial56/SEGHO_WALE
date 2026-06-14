@@ -1,8 +1,9 @@
-﻿{% extends 'hospitalisation/base.html' %}
+{% extends 'hospitalisation/base.html' %}
 {% load static %}
 {% block extra_css %}
 {{ block.super }}
 <style>
+/* ── Variables ── */
 :root {
   --surface: #fff;
   --border:  #e8edf2;
@@ -10,186 +11,151 @@
   --text-muted: rgba(0,0,0,.45);
 }
 html[data-theme="dark"] {
-  --surface: #201d1d;
-  --border:  #201d1d;
+  --surface: #132033;
+  --border:  #243044;
   --text:    #d4e6f5;
-  --text-muted: rgba(255,255,255,.45);
+  --text-muted: rgba(255,255,255,.4);
 }
 
 /* ── Layout ── */
-.content { padding: 0 !important; overflow-x: clip; }
-.content > .o-nav { margin: 0 !important; }
+.content    { padding: 0 !important; overflow-x: clip; }
 .breadcrumb { display: none !important; }
 
 /* ── Subheader ── */
 .o-subheader {
   background: var(--surface);
   border-bottom: 1px solid var(--border);
-  padding: 6px 16px;
+  padding: 7px 16px;
   display: flex; flex-direction: column; gap: 5px;
-  position: sticky; top: 38px;
+  position: sticky; top: 76px;
   z-index: 190;
-  margin: 0;
 }
-.o-subheader-row { display: flex; align-items: center; gap: 8px; }
-.o-subheader-row-right { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.o-page-title { font-size: 17px; font-weight: 400; color: var(--text); }
-.o-page-count {
-  display: inline-flex; align-items: center; justify-content: center;
-  background: rgba(33,136,171,.12); color: var(--teal-600);
-  border-radius: 20px; padding: 0 8px; min-width: 22px; height: 19px;
-  font-size: 11px; font-weight: 700; line-height: 1;
-}
-
-.o-btn-create {
-  background: var(--teal-500); color: #fff; border: none;
-  padding: 5px 14px; border-radius: 4px;
-  font-size: 12.5px; font-weight: 500; font-family: inherit;
-  cursor: pointer; text-decoration: none;
-  display: inline-flex; align-items: center; gap: 4px;
-  letter-spacing: .5px; transition: background .15s;
-}
-.o-btn-create:hover { background: var(--teal-600); color: #fff; }
-
-.o-search-bar {
-  display: flex; align-items: center;
-  border: none; border-bottom: 1px solid #bbb;
-  background: transparent; min-height: 28px;
-  padding: 2px 4px; gap: 4px; width: 260px;
-}
-.o-search-input {
-  border: none; outline: none; font-size: 12px;
-  color: var(--text); font-family: inherit;
-  flex: 1; min-width: 60px; background: transparent;
-}
-.o-search-btn { background: none; border: none; cursor: pointer; color: #888; font-size: 13px; padding: 2px; }
-
-.o-ctrl-btn {
-  background: none; border: 1px solid transparent; border-radius: 4px;
-  padding: 4px 8px; font-size: 12px; font-family: inherit;
-  color: var(--text-muted); cursor: pointer;
-  display: flex; align-items: center; gap: 4px;
-  transition: border-color .15s, color .15s, background .15s;
-  white-space: nowrap;
-}
-.o-ctrl-btn:hover { border-color: var(--border); color: var(--text); background: #f3f3f3; }
-.o-ctrl-btn.active { color: var(--teal-600); }
-
-.o-ctrl-sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }
-
-.o-pagination { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
-.o-pag-btn {
-  width: 24px; height: 24px; border: 1px solid var(--border); border-radius: 3px;
-  background: var(--surface); display: flex; align-items: center; justify-content: center;
-  color: var(--text-muted); text-decoration: none; font-size: 12px; cursor: pointer;
-  transition: background .15s, color .15s;
-}
-.o-pag-btn:hover { background: var(--teal-600); color: #fff; border-color: var(--teal-600); }
-.o-pag-btn.disabled { opacity: .35; pointer-events: none; }
-
-.o-filter-tag {
-  display: inline-flex; align-items: center; gap: 3px;
-  background: var(--teal-50); color: var(--teal-600);
-  border: 1px solid #b2d8db; border-radius: 3px;
-  padding: 1px 6px; font-size: 11.5px; font-weight: 500; white-space: nowrap;
-}
-.o-filter-tag a { color: #888; text-decoration: none; font-size: 14px; line-height: 1; margin-left: 2px; }
-.o-filter-tag a:hover { color: #333; }
-
-/* ── Dropdown ── */
-.o-dd-wrap { position: relative; }
-.o-dd-panel {
-  display: none; position: fixed; z-index: 9999;
-  background: #fff; border: 1px solid #dde3ec;
-  border-radius: 6px; box-shadow: 0 8px 28px rgba(0,0,0,.16);
-  min-width: 210px; padding: 5px 0;
-}
-.o-dd-panel.open { display: block; }
-.o-dd-section { padding: 6px 14px 3px; font-size: 10px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; }
-.o-dd-item {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 6px 14px; font-size: 12.5px; color: var(--text);
-  cursor: pointer; text-decoration: none; transition: background .1s; white-space: nowrap; gap: 10px;
-}
-.o-dd-item:hover { background: var(--teal-50); color: var(--teal-600); }
-.o-dd-item.active { background: #e8f4f8; color: var(--teal-600); font-weight: 500; }
-.o-dd-sep { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+.o-subheader-row        { display: flex; align-items: center; gap: 8px; }
+.o-subheader-row-right  { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+html[data-theme="dark"] .o-subheader { background: var(--surface); border-bottom-color: var(--border); }
 
 /* ── Stats ── */
-.stats-row {
+.h-stats {
   display: grid; grid-template-columns: repeat(4,1fr);
   background: var(--surface); border-bottom: 1px solid var(--border);
 }
-.stat-box {
-  border-right: 1px solid var(--border);
-  padding: 14px 20px; display: flex; align-items: center; gap: 13px;
-  background: var(--surface);
+.h-stat {
+  padding: 14px 20px; border-right: 1px solid var(--border);
+  display: flex; align-items: center; gap: 14px;
 }
-.stat-box:last-child { border-right: none; }
-.stat-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
-.stat-icon.blue  { background: #dbeafe; color: #1d4ed8; }
-.stat-icon.green { background: #d1fae5; color: #065f46; }
-.stat-icon.teal  { background: #e3f5ef; color: #1a5c4a; }
-.stat-icon.gray  { background: #f3f4f6; color: #6b7280; }
-.stat-label { font-size: 11px; color: var(--text-muted); margin-bottom: 2px; }
-.stat-value { font-size: 22px; font-weight: 700; color: var(--text); line-height: 1.1; }
+.h-stat:last-child { border-right: none; }
+.h-stat-icon {
+  width: 40px; height: 40px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+}
+.h-stat-icon.blue   { background: #eff6ff; color: #2563eb; }
+.h-stat-icon.teal   { background: #f0fdfa; color: #0d9488; }
+.h-stat-icon.amber  { background: #fffbeb; color: #d97706; }
+.h-stat-icon.violet { background: #f5f3ff; color: #7c3aed; }
+.h-stat-num   { font-size: 24px; font-weight: 700; color: var(--text); line-height: 1; }
+.h-stat-label { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+
+html[data-theme="dark"] .h-stats { background: var(--surface); border-bottom-color: var(--border); }
+html[data-theme="dark"] .h-stat  { border-right-color: var(--border); }
+html[data-theme="dark"] .h-stat-icon.blue   { background: rgba(37,99,235,.15);  color: #93c5fd; }
+html[data-theme="dark"] .h-stat-icon.teal   { background: rgba(13,148,136,.15); color: #5eead4; }
+html[data-theme="dark"] .h-stat-icon.amber  { background: rgba(217,119,6,.15);  color: #fcd34d; }
+html[data-theme="dark"] .h-stat-icon.violet { background: rgba(124,58,237,.15); color: #c4b5fd; }
 
 /* ── Table ── */
-.o-list-wrap { margin: 0; }
-.o-list-table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--surface); table-layout: fixed; }
-.o-list-table thead th {
-  border-bottom: 1px solid var(--border);
-  padding: 8px 12px; text-align: left; font-size: 12px; font-weight: 600;
-  color: var(--text-muted); white-space: nowrap; background: var(--surface);
+.h-table-wrap { overflow-x: auto; }
+.h-table {
+  width: 100%; border-collapse: collapse;
+  background: var(--surface); table-layout: fixed;
 }
-.o-list-table tbody tr { border-bottom: 1px solid #f0f4f7; cursor: pointer; transition: background .1s; }
-.o-list-table tbody tr:hover { background: #ddeef7; }
-.o-list-table tbody td { padding: 9px 12px; color: var(--text); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.o-list-table tbody tr:last-child td { border-bottom: none; }
+.h-table thead th {
+  padding: 9px 14px; text-align: left;
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--text-muted); border-bottom: 1px solid var(--border);
+  background: var(--surface); white-space: nowrap;
+}
+.h-table tbody tr {
+  border-bottom: 1px solid var(--border);
+  cursor: pointer; transition: background .1s;
+}
+.h-table tbody tr:hover  { background: #f0f7fb; }
+.h-table tbody td {
+  padding: 10px 14px; color: var(--text); font-size: 13px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  vertical-align: middle;
+}
+.h-table tbody tr:last-child td { border-bottom: none; }
 
-/* ── Badges statuts ── */
-.badge-statut { display: inline-block; padding: 2px 10px; border-radius: 3px; font-size: 11.5px; font-weight: 600; }
-.badge-brouillon   { background: #f3f4f6; color: #6b7280; }
-.badge-confirme    { background: #ede9fe; color: #5b21b6; }
-.badge-hospitalise { background: #dbeafe; color: #1d4ed8; }
-.badge-decharge    { background: #d1fae5; color: #065f46; }
-.badge-termine     { background: #e3f5ef; color: #1a5c4a; }
-.badge-annule      { background: #fde8e8; color: #7b1c1c; }
+.h-num  {
+  font-family: monospace; font-size: 12px; font-weight: 700;
+  color: var(--teal-600); letter-spacing: .03em;
+}
+.h-patient-name { font-weight: 600; font-size: 13px; }
+.h-patient-code { font-size: 10.5px; color: var(--text-muted); margin-top: 1px; }
+.h-chambre-nom  { font-weight: 500; }
+.h-chambre-type { font-size: 10.5px; color: var(--text-muted); margin-top: 1px; }
+
+html[data-theme="dark"] .h-table thead th   { background: var(--surface); border-bottom-color: var(--border); }
+html[data-theme="dark"] .h-table tbody tr   { border-bottom-color: var(--border); }
+html[data-theme="dark"] .h-table tbody tr:hover { background: rgba(255,255,255,.04); }
+
+/* ── Badges statut ── */
+.h-badge {
+  display: inline-flex; align-items: center;
+  padding: 3px 10px; border-radius: 20px;
+  font-size: 11px; font-weight: 600; white-space: nowrap;
+}
+.h-badge-brouillon   { background: #f3f4f6; color: #6b7280; }
+.h-badge-confirme    { background: #ede9fe; color: #5b21b6; }
+.h-badge-hospitalise { background: #dbeafe; color: #1d4ed8; }
+.h-badge-decharge    { background: #d1fae5; color: #065f46; }
+.h-badge-termine     { background: #dcfce7; color: #15803d; }
+.h-badge-annule      { background: #fee2e2; color: #b91c1c; }
+
+html[data-theme="dark"] .h-badge-brouillon   { background: rgba(107,114,128,.2); color: #9ca3af; }
+html[data-theme="dark"] .h-badge-confirme    { background: rgba(91,33,182,.2);   color: #c4b5fd; }
+html[data-theme="dark"] .h-badge-hospitalise { background: rgba(29,78,216,.2);   color: #93c5fd; }
+html[data-theme="dark"] .h-badge-decharge    { background: rgba(6,95,70,.2);     color: #6ee7b7; }
+html[data-theme="dark"] .h-badge-termine     { background: rgba(21,128,61,.2);   color: #86efac; }
+html[data-theme="dark"] .h-badge-annule      { background: rgba(185,28,28,.2);   color: #fca5a5; }
+
+/* ── Dropdown filtre ── */
+.o-dd-wrap  { position: relative; }
+.o-dd-panel {
+  display: none; position: fixed; z-index: 9999;
+  background: #fff; border: 1px solid #dde3ec;
+  border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,.16);
+  min-width: 210px; padding: 5px 0;
+}
+.o-dd-panel.open  { display: block; }
+.o-dd-section     { padding: 7px 14px 4px; font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; }
+.o-dd-item {
+  display: flex; align-items: center; padding: 7px 14px;
+  font-size: 13px; color: var(--text); cursor: pointer;
+  text-decoration: none; transition: background .1s; white-space: nowrap;
+}
+.o-dd-item:hover  { background: rgba(20,87,112,.06); color: var(--teal-700); }
+.o-dd-item.active { background: rgba(20,87,112,.08); color: var(--teal-700); font-weight: 600; }
+.o-dd-sep         { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+
+html[data-theme="dark"] .o-dd-panel   { background: #1a2535; border-color: #2e3f58; }
+html[data-theme="dark"] .o-dd-item    { color: var(--text); }
+html[data-theme="dark"] .o-dd-item:hover  { background: rgba(33,136,171,.15); color: #7aaec7; }
+html[data-theme="dark"] .o-dd-item.active { background: rgba(33,136,171,.2);  color: #7aaec7; }
 
 /* ── Vide ── */
-.o-empty { text-align: center; padding: 60px 20px; color: var(--text-muted); }
-.o-empty i { font-size: 40px; display: block; margin-bottom: 12px; opacity: .35; }
+.h-empty     { text-align: center; padding: 64px 20px; color: var(--text-muted); font-size: 13px; }
+.h-empty i   { font-size: 42px; display: block; margin-bottom: 12px; opacity: .3; }
+.h-empty p   { margin-top: 4px; font-size: 12px; }
 
-/* ── Dark ── */
-html[data-theme="dark"] .stats-row { background: var(--surface); border-bottom-color: var(--border); }
-html[data-theme="dark"] .stat-box { background: var(--surface); border-right-color: var(--border); }
-html[data-theme="dark"] .stat-icon.blue  { background: rgba(29,78,216,.18); color: #93c5fd; }
-html[data-theme="dark"] .stat-icon.green { background: rgba(6,95,70,.25);  color: #6ee7b7; }
-html[data-theme="dark"] .stat-icon.teal  { background: rgba(26,92,74,.25);  color: #6ecdc2; }
-html[data-theme="dark"] .stat-icon.gray  { background: rgba(107,114,128,.18); color: #9ca3af; }
-html[data-theme="dark"] .o-search-bar { border-bottom-color: rgba(255,255,255,.2); }
-html[data-theme="dark"] .o-search-input { color: var(--text); }
-html[data-theme="dark"] .o-ctrl-btn:hover { background: rgba(255,255,255,.05); }
-html[data-theme="dark"] .o-dd-panel { background: #201d1d; border-color: #2e3f58; }
-html[data-theme="dark"] .o-dd-item { color: #c5d4e2; }
-html[data-theme="dark"] .o-dd-item:hover { background: rgba(33,136,171,.2); color: #c5d4e2; }
-html[data-theme="dark"] .o-dd-item.active { background: rgba(33,136,171,.3); color: var(--teal-300); }
-html[data-theme="dark"] .o-filter-tag { background: rgba(33,136,171,.25); border-color: rgba(33,136,171,.5); color: var(--teal-300); }
-html[data-theme="dark"] .o-list-table thead th { background: var(--surface); border-bottom-color: var(--border); }
-html[data-theme="dark"] .o-list-table tbody tr { border-bottom-color: #201d1d; }
-html[data-theme="dark"] .o-list-table tbody tr:hover { background: #171616; }
-html[data-theme="dark"] .o-pag-btn { background: var(--surface); border-color: var(--border); color: var(--text-muted); }
-html[data-theme="dark"] .o-ctrl-sep { background: var(--border); }
-html[data-theme="dark"] .badge-confirme    { background: rgba(91,33,182,.18);  color: #c4b5fd; }
-html[data-theme="dark"] .badge-hospitalise { background: rgba(29,78,216,.18);  color: #93c5fd; }
-html[data-theme="dark"] .badge-decharge    { background: rgba(6,95,70,.22);    color: #6ee7b7; }
-html[data-theme="dark"] .badge-termine     { background: rgba(26,92,74,.22);   color: #6ecdc2; }
-html[data-theme="dark"] .badge-annule      { background: rgba(185,28,28,.18);  color: #fca5a5; }
+/* ── Pagination label ── */
+.o-pag-label { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
 
 @media (max-width: 800px) {
-  .stats-row { grid-template-columns: repeat(2, 1fr); }
-  .stat-box:nth-child(2) { border-right: none; }
-  .stat-box:nth-child(3) { border-right: 1px solid var(--border); }
+  .h-stats { grid-template-columns: repeat(2,1fr); }
+  .h-stat:nth-child(2) { border-right: none; }
+  .h-stat:nth-child(3) { border-right: 1px solid var(--border); }
 }
 </style>
 {% endblock %}
@@ -203,36 +169,42 @@ html[data-theme="dark"] .badge-annule      { background: rgba(185,28,28,.18);  c
   <!-- Ligne 1 : titre + recherche -->
   <div class="o-subheader-row">
     <span class="o-page-title">Hospitalisations <span class="o-page-count">{{ total }}</span></span>
-    <div class="o-subheader-row-right">
+    <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
       <form method="get" id="filter-form" style="display:flex;align-items:center;">
         <input type="hidden" name="statut" id="fi-statut" value="{{ statut }}">
+        <input type="hidden" name="vue"    id="vue-input" value="{{ vue }}">
         <div class="o-search-bar">
           <input class="o-search-input" id="search-input" type="text" name="q" value="{{ q }}"
-                 placeholder="Patient, numéro…">
+                 placeholder="Rechercher patient, numéro…">
           <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- Ligne 2 : créer + filtres + pagination -->
+  <!-- Ligne 2 : créer + contrôles -->
   <div class="o-subheader-row">
     {% if perms.hospitalisation.add_hospitalisation or user.is_superuser %}
     <a href="{% url 'hospitalisation:create' %}" class="o-btn-create">
       <i class="bi bi-plus-lg"></i> Nouvelle admission
     </a>
     {% endif %}
-    <div class="o-subheader-row-right">
 
-      <!-- Filtre statut -->
+    <div style="margin-left:auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+
+      <!-- Tags filtres actifs -->
+      {% if q %}<span class="o-filter-tag">{{ q }} <a onclick="clearQ()" style="cursor:pointer;" title="Supprimer">×</a></span>{% endif %}
+      {% if statut %}<span class="o-filter-tag">{{ statut }} <a onclick="setFiltre('')" style="cursor:pointer;" title="Supprimer">×</a></span>{% endif %}
+
+      <!-- Filtres dropdown -->
       <div class="o-dd-wrap">
         <button class="o-ctrl-btn {% if statut %}active{% endif %}"
                 id="btn-filtres" onclick="toggleDd('dd-filtres', this)">
           <i class="bi bi-funnel{% if statut %}-fill{% endif %}"></i>
-          Statut{% if statut %} <span style="background:var(--accent);color:#fff;border-radius:10px;font-size:10px;padding:0 5px;">1</span>{% endif %}
+          Filtres{% if statut %}&nbsp;<span style="background:var(--accent);color:#fff;border-radius:10px;font-size:10px;padding:0 5px;vertical-align:middle;">1</span>{% endif %}
         </button>
         <div class="o-dd-panel" id="dd-filtres">
-          <div class="o-dd-section">Statut</div>
+          <div class="o-dd-section">Filtrer par statut</div>
           {% for val, label in statut_choices %}
           <a class="o-dd-item {% if statut == val %}active{% endif %}"
              onclick="setFiltre('{{ val }}')">{{ label }}</a>
@@ -240,7 +212,7 @@ html[data-theme="dark"] .badge-annule      { background: rgba(185,28,28,.18);  c
           {% if statut %}
           <hr class="o-dd-sep">
           <a class="o-dd-item" onclick="setFiltre('')" style="color:#b71c1c;">
-            <i class="bi bi-x-circle" style="font-size:11px;"></i> Effacer le filtre
+            <i class="bi bi-x-circle" style="font-size:11px;margin-right:6px;"></i> Effacer
           </a>
           {% endif %}
         </div>
@@ -249,129 +221,145 @@ html[data-theme="dark"] .badge-annule      { background: rgba(185,28,28,.18);  c
       <div class="o-ctrl-sep"></div>
 
       <!-- Pagination -->
-      <div class="o-pagination">
-        {% if page_obj.paginator.count > 0 %}
-        <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
-        {% else %}
-        <span>0</span>
-        {% endif %}
+      <div class="o-pagination-top">
+        <span>{% if page_obj.paginator.count > 0 %}{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}{% else %}0{% endif %}</span>
         <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
-           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}&q={{ q }}&statut={{ statut }}{% else %}#{% endif %}">
+           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}&q={{ q }}&statut={{ statut }}&vue={{ vue }}{% else %}#{% endif %}">
           <i class="bi bi-chevron-left"></i>
         </a>
         <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
-           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}&q={{ q }}&statut={{ statut }}{% else %}#{% endif %}">
+           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}&q={{ q }}&statut={{ statut }}&vue={{ vue }}{% else %}#{% endif %}">
           <i class="bi bi-chevron-right"></i>
         </a>
+      </div>
+
+      <div class="o-ctrl-sep"></div>
+
+      <!-- Vue -->
+      <div class="o-view-btns">
+        <button type="button" class="o-view-btn {% if vue == 'liste' %}active{% endif %}" onclick="setVue('liste')" title="Vue liste">
+          <i class="bi bi-list-ul"></i>
+        </button>
+        <button type="button" class="o-view-btn {% if vue == 'kanban' %}active{% endif %}" onclick="setVue('kanban')" title="Vue kanban">
+          <i class="bi bi-grid"></i>
+        </button>
       </div>
 
     </div>
   </div>
 
-  <!-- Ligne 3 : tags filtres actifs -->
-  {% if q or statut %}
-  <div class="o-subheader-row" style="gap:6px;flex-wrap:wrap;padding-top:0;">
-    {% if q %}
-    <span style="font-size:11px;color:var(--text-muted);">Recherche :</span>
-    <span class="o-filter-tag">
-      {{ q }}
-      <a onclick="clearQ()" style="cursor:pointer;" title="Supprimer">×</a>
-    </span>
-    {% endif %}
-    {% if statut %}
-    <span style="font-size:11px;color:var(--text-muted);">Statut :</span>
-    <span class="o-filter-tag">
-      {{ statut }}
-      <a onclick="setFiltre('')" style="cursor:pointer;" title="Supprimer">×</a>
-    </span>
-    {% endif %}
-    <a onclick="clearAll()" class="o-ctrl-btn" style="cursor:pointer;">
-      <i class="bi bi-x"></i> Effacer tout
-    </a>
-  </div>
-  {% endif %}
-
-</div>
-<!-- ══ fin subheader ══ -->
+</div><!-- /o-subheader -->
 
 <!-- ══ STATS ══ -->
-<div class="stats-row">
-  <div class="stat-box">
-    <div class="stat-icon blue"><i class="bi bi-hospital"></i></div>
+<div class="h-stats">
+  <div class="h-stat">
+    <div class="h-stat-icon blue"><i class="bi bi-hospital"></i></div>
     <div>
-      <div class="stat-label">Hospitalisés</div>
-      <div class="stat-value">{{ stats.patients_hospitalises }}</div>
+      <div class="h-stat-num">{{ stats.patients_hospitalises }}</div>
+      <div class="h-stat-label">Hospitalisés</div>
     </div>
   </div>
-  <div class="stat-box">
-    <div class="stat-icon teal"><i class="bi bi-door-open"></i></div>
+  <div class="h-stat">
+    <div class="h-stat-icon teal"><i class="bi bi-door-open"></i></div>
     <div>
-      <div class="stat-label">Chambres dispo.</div>
-      <div class="stat-value">{{ stats.chambres_disponibles }}</div>
+      <div class="h-stat-num">{{ stats.chambres_disponibles }}</div>
+      <div class="h-stat-label">Chambres disponibles</div>
     </div>
   </div>
-  <div class="stat-box">
-    <div class="stat-icon gray"><i class="bi bi-percent"></i></div>
+  <div class="h-stat">
+    <div class="h-stat-icon amber"><i class="bi bi-percent"></i></div>
     <div>
-      <div class="stat-label">Taux occupation</div>
-      <div class="stat-value">{{ stats.taux_occupation }}%</div>
+      <div class="h-stat-num">{{ stats.taux_occupation }}%</div>
+      <div class="h-stat-label">Taux d'occupation</div>
     </div>
   </div>
-  <div class="stat-box">
-    <div class="stat-icon green"><i class="bi bi-calendar-range"></i></div>
+  <div class="h-stat">
+    <div class="h-stat-icon violet"><i class="bi bi-calendar-range"></i></div>
     <div>
-      <div class="stat-label">Durée moy. (j)</div>
-      <div class="stat-value">{{ stats.duree_moyenne }}</div>
+      <div class="h-stat-num">{{ stats.duree_moyenne }}</div>
+      <div class="h-stat-label">Durée moy. (jours)</div>
     </div>
   </div>
 </div>
 
-<!-- ══ TABLEAU ══ -->
-<div class="o-list-wrap">
-  <table class="o-list-table">
+{% if vue == 'kanban' %}
+<!-- ══ VUE KANBAN ══ -->
+<div class="h-kanban">
+  {% for hosp in page_obj %}
+  <a class="h-kcard" href="{% url 'hospitalisation:detail' hosp.pk %}">
+    <div class="h-kcard-head">
+      <span class="h-badge h-badge-{{ hosp.statut }}">{{ hosp.get_statut_display }}</span>
+      <span class="h-kcard-num">{{ hosp.numero }}</span>
+    </div>
+    <div class="h-kcard-patient">{{ hosp.patient.nom }} {{ hosp.patient.prenoms }}</div>
+    <div class="h-kcard-code">{{ hosp.patient.code_patient }}</div>
+    <hr class="h-kcard-sep">
+    <div class="h-kcard-row">
+      <i class="bi bi-door-closed"></i>
+      {% if hosp.chambre %}{{ hosp.chambre.nom }}{% if hosp.chambre.type_chambre %} — {{ hosp.chambre.get_type_chambre_display }}{% endif %}{% else %}<span style="opacity:.5;">Chambre non assignée</span>{% endif %}
+    </div>
+    <div class="h-kcard-row">
+      <i class="bi bi-person-badge"></i>
+      {% if hosp.medecin_traitant %}Dr {{ hosp.medecin_traitant.nom }} {{ hosp.medecin_traitant.prenoms }}{% else %}<span style="opacity:.5;">Médecin non assigné</span>{% endif %}
+    </div>
+    <div class="h-kcard-date">
+      <i class="bi bi-calendar3"></i> Admis le {{ hosp.date_admission|date:"d/m/Y à H:i" }}
+    </div>
+  </a>
+  {% empty %}
+  <div class="h-empty" style="grid-column:1/-1;">
+    <i class="bi bi-hospital"></i>
+    Aucune hospitalisation trouvée
+    {% if q or statut %}<p>Modifiez vos filtres de recherche.</p>{% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<!-- ══ VUE LISTE ══ -->
+<div class="h-table-wrap">
+  <table class="h-table">
     <thead>
       <tr>
         <th style="width:130px;">N° Dossier</th>
-        <th style="width:200px;">Patient</th>
-        <th style="width:160px;">Chambre</th>
-        <th style="width:160px;">Médecin traitant</th>
-        <th style="width:130px;">Date admission</th>
-        <th style="width:110px;">Statut</th>
+        <th style="width:210px;">Patient</th>
+        <th style="width:170px;">Chambre</th>
+        <th style="width:170px;">Médecin traitant</th>
+        <th style="width:130px;">Admission</th>
+        <th style="width:120px;">Statut</th>
       </tr>
     </thead>
     <tbody>
       {% for hosp in page_obj %}
       <tr onclick="window.location='{% url 'hospitalisation:detail' hosp.pk %}'">
+        <td><span class="h-num">{{ hosp.numero }}</span></td>
         <td>
-          <span style="font-family:monospace;font-size:11.5px;font-weight:700;color:var(--teal-600);">{{ hosp.numero }}</span>
-        </td>
-        <td>
-          <div style="font-weight:600;">{{ hosp.patient.nom }} {{ hosp.patient.prenoms }}</div>
-          <div style="font-size:10.5px;color:var(--text-muted);">{{ hosp.patient.code_patient }}</div>
+          <div class="h-patient-name">{{ hosp.patient.nom }} {{ hosp.patient.prenoms }}</div>
+          <div class="h-patient-code">{{ hosp.patient.code_patient }}</div>
         </td>
         <td>
           {% if hosp.chambre %}
-          <div>{{ hosp.chambre.nom }}</div>
-          <div style="font-size:10.5px;color:var(--text-muted);">{{ hosp.chambre.get_type_chambre_display }}</div>
-          {% endif %}
+          <div class="h-chambre-nom">{{ hosp.chambre.nom }}</div>
+          <div class="h-chambre-type">{{ hosp.chambre.get_type_chambre_display }}</div>
+          {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
         </td>
         <td>
-          {% if hosp.medecin_traitant %}{{ hosp.medecin_traitant.nom }} {{ hosp.medecin_traitant.prenoms }}{% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
+          {% if hosp.medecin_traitant %}{{ hosp.medecin_traitant.nom }} {{ hosp.medecin_traitant.prenoms }}
+          {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
         </td>
-        <td style="white-space:nowrap;">
+        <td>
           {{ hosp.date_admission|date:"d/m/Y" }}<br>
           <span style="font-size:10.5px;color:var(--text-muted);">{{ hosp.date_admission|date:"H:i" }}</span>
         </td>
-        <td>
-          <span class="badge-statut badge-{{ hosp.statut }}">{{ hosp.get_statut_display }}</span>
-        </td>
+        <td><span class="h-badge h-badge-{{ hosp.statut }}">{{ hosp.get_statut_display }}</span></td>
       </tr>
       {% empty %}
       <tr>
         <td colspan="6">
-          <div class="o-empty">
+          <div class="h-empty">
             <i class="bi bi-hospital"></i>
             Aucune hospitalisation trouvée
+            {% if q or statut %}<p>Modifiez vos filtres de recherche.</p>{% endif %}
           </div>
         </td>
       </tr>
@@ -379,6 +367,7 @@ html[data-theme="dark"] .badge-annule      { background: rgba(185,28,28,.18);  c
     </tbody>
   </table>
 </div>
+{% endif %}
 
 </div><!-- /#page-wrap -->
 {% endblock %}
@@ -398,10 +387,13 @@ function toggleDd(id, btn) {
   }
 }
 document.addEventListener('click', function(e) {
-  if (!e.target.closest('.o-dd-wrap') && !e.target.closest('.o-dd-panel')) {
+  if (!e.target.closest('.o-dd-wrap') && !e.target.closest('.o-dd-panel'))
     document.querySelectorAll('.o-dd-panel').forEach(p => p.classList.remove('open'));
-  }
 });
+function setVue(v) {
+  document.getElementById('vue-input').value = v;
+  document.getElementById('filter-form').submit();
+}
 function setFiltre(val) {
   document.getElementById('fi-statut').value = val;
   document.getElementById('filter-form').submit();

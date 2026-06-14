@@ -89,8 +89,7 @@ def mon_compte(request):
     return render(request, 'utilisateur/mon_compte.html', {'errors': errors, 'profile': profile})
 
 
-@login_required(login_url='login')
-def dashboard(request):
+def _get_dashboard_stats():
     from patients.models import Patient, RendezVous
     from consultations.models import Consultation
     from hospitalisation.models import Hospitalisation
@@ -98,20 +97,35 @@ def dashboard(request):
     from facturation.models import Facture
     from laboratoire.models import AnalyseLaboratoire
     from employer.models import Employe
+    from soins.models import Soin
 
     today = timezone.now().date()
-
-    stats = {
+    return {
         'patients_total': Patient.objects.filter(actif=True).count(),
         'patients_today': Patient.objects.filter(date_creation__date=today).count(),
         'consultations_today': Consultation.objects.filter(date_heure__date=today).count(),
+        'soins_aujourd_hui': Soin.objects.filter(date_creation__date=today).count(),
         'rdv_today': RendezVous.objects.filter(date_heure__date=today).count(),
-        'hospitalisations': Hospitalisation.objects.filter(statut__in=['admis', 'en_soins']).count(),
+        'hospitalisations': Hospitalisation.objects.filter(statut__in=['confirme', 'hospitalise']).count(),
         'analyses_pending': AnalyseLaboratoire.objects.filter(statut__in=['recu', 'en_analyse']).count(),
-        'factures_impayees': Facture.objects.filter(statut__in=['emise', 'partielle']).count(),
+        'factures_impayees': Facture.objects.filter(statut='emise').count(),
         'medicaments_alerte': Medicament.objects.filter(stock_actuel__lte=F('stock_alerte')).count(),
         'employes_actifs': Employe.objects.filter(statut='actif').count(),
     }
+
+
+@login_required(login_url='login')
+def dashboard_stats_json(request):
+    return JsonResponse(_get_dashboard_stats())
+
+
+@login_required(login_url='login')
+def dashboard(request):
+    from patients.models import RendezVous
+    from consultations.models import Consultation
+
+    today = timezone.now().date()
+    stats = _get_dashboard_stats()
 
     rdv_auj = RendezVous.objects.filter(
         date_heure__date=today,
@@ -138,7 +152,7 @@ def dashboard(request):
         vus_par__user=request.user
     ).count()
 
-    return render(request, 'core/dashboard.html', {
+    response = render(request, 'core/dashboard.html', {
         'stats': stats,
         'rdv_auj': rdv_auj,
         'last_cons': last_cons,
@@ -148,6 +162,9 @@ def dashboard(request):
         'accessible_codes': accessible_codes,
         'plannings_non_vus': plannings_non_vus,
     })
+    response['Cache-Control'] = 'no-store, no-cache, must-revalidate'
+    response['Pragma'] = 'no-cache'
+    return response
 
 
 @login_required(login_url='login')
@@ -521,20 +538,6 @@ def laboratoire_list(request):
         'q': q,
         'breadcrumb': breadcrumb,
     })
-
-
-@login_required(login_url='login')
-def hospitalisation_list(request):
-    from hospitalisation.models import Hospitalisation
-    from django.core.paginator import Paginator
-
-    hospitalisations = Hospitalisation.objects.all().order_by('-date_admission')
-    paginator = Paginator(hospitalisations, 25)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    stats = {'patients_hospitalises': Hospitalisation.objects.filter(statut__in=['admis', 'en_soins']).count(), 'taux_occupation': 0, 'chambres_disponibles': 0, 'duree_moyenne': 0}
-    breadcrumb = [{'title': 'Accueil', 'url': '/'}, {'title': 'Hospitalisation'}]
-    return render(request, 'hospitalisation/list.html', {'page_obj': page_obj, 'stats': stats, 'breadcrumb': breadcrumb})
 
 
 @login_required(login_url='login')
@@ -2055,3 +2058,271 @@ def get_logs(instance):
     from core.models import LogActivite
     ct = ContentType.objects.get_for_model(instance)
     return LogActivite.objects.filter(content_type=ct, object_id=instance.pk)
+@login_required(login_url='login')
+def kpi_dashboard(request):
+    import json as _json
+    from patients.models import Patient, RendezVous
+    from consultations.models import Consultation
+    from hospitalisation.models import Hospitalisation
+    from pharmacie.models import Medicament
+    from laboratoire.models import AnalyseLaboratoire
+    from employer.models import Employe
+    from soins.models import Soin
+    from medecins.models import Medecin
+
+    today = timezone.now().date()
+
+    stats = {
+        'patients_total': Patient.objects.filter(actif=True).count(),
+        'patients_today': Patient.objects.filter(date_creation__date=today).count(),
+        'consultations_today': Consultation.objects.filter(date_heure__date=today).count(),
+        'rdv_today': RendezVous.objects.filter(date_heure__date=today).count(),
+        'hospitalisations': Hospitalisation.objects.filter(statut='hospitalise').count(),
+        'analyses_pending': AnalyseLaboratoire.objects.filter(statut__in=['recu', 'en_analyse']).count(),
+        'medicaments_alerte': Medicament.objects.filter(stock_actuel__lte=F('stock_alerte')).count(),
+        'employes_actifs': Employe.objects.filter(statut='actif').count(),
+        'soins_aujourd_hui': Soin.objects.filter(date_creation__date=today).count(),
+        'medecins_actifs': Medecin.objects.filter(actif=True).count(),
+        'medecins_total': Medecin.objects.count(),
+    }
+
+    try:
+        from facturation.models import Facture
+        from django.db.models import Sum
+        fq = Facture.objects.filter(statut__in=['brouillon', 'emise'])
+        stats['factures_impayees_count'] = fq.count()
+        m = fq.aggregate(t=Sum('montant_total'))['t'] or 0
+        if m >= 1_000_000:
+            stats['factures_montant_fmt'] = f"{m/1_000_000:.1f}M F"
+        elif m >= 1_000:
+            stats['factures_montant_fmt'] = f"{int(m/1_000)}k F"
+        else:
+            stats['factures_montant_fmt'] = f"{int(m)} F"
+    except Exception:
+        stats['factures_impayees_count'] = 0
+        stats['factures_montant_fmt'] = "0 F"
+
+    stats['patients_anniversaires'] = Patient.objects.filter(
+        date_naissance__month=today.month, date_naissance__day=today.day, actif=True
+    ).count()
+    stats['employes_anniversaires'] = Employe.objects.filter(
+        date_naissance__month=today.month, date_naissance__day=today.day
+    ).count()
+
+    chart_labels, chart_patients, chart_rdv = [], [], []
+    current_monday = today - timedelta(days=today.weekday())
+    for i in range(7, -1, -1):
+        w_start = current_monday - timedelta(weeks=i)
+        w_end = w_start + timedelta(days=6)
+        chart_labels.append(w_start.strftime('%d/%m'))
+        chart_patients.append(Patient.objects.filter(date_creation__date__range=[w_start, w_end]).count())
+        chart_rdv.append(RendezVous.objects.filter(date_heure__date__range=[w_start, w_end]).count())
+
+    chart_data = _json.dumps({'labels': chart_labels, 'patients': chart_patients, 'rdv': chart_rdv})
+
+    rdv_auj = RendezVous.objects.filter(
+        date_heure__date=today,
+        statut__in=['planifie', 'confirme', 'en_attente', 'en_consultation']
+    ).select_related('patient', 'medecin').order_by('date_heure')[:10]
+
+    last_cons = Consultation.objects.select_related('patient', 'medecin').order_by('-date_heure')[:6]
+
+    try:
+        from modules_permissions.models import get_user_modules
+        user_modules = get_user_modules(request.user)
+        accessible_codes = set(user_modules.values_list('code', flat=True))
+    except Exception:
+        user_modules = []
+        accessible_codes = set()
+
+    return render(request, 'core/kpi_dashboard.html', {
+        'stats': stats,
+        'rdv_auj': rdv_auj,
+        'last_cons': last_cons,
+        'today': today,
+        'user': request.user,
+        'user_modules': user_modules,
+        'accessible_codes': accessible_codes,
+        'chart_data': chart_data,
+    })
+
+
+
+
+# ══════════════════════════════════════════════
+#  MÉDECINS — Configuration : Spécialités
+# ══════════════════════════════════════════════
+
+def _specialite_form_class():
+    from django import forms
+    from medecins.models import Specialite
+    class SpecialiteForm(forms.ModelForm):
+        class Meta:
+            model = Specialite
+            fields = ['nom', 'code', 'description']
+            widgets = {
+                'nom':         forms.TextInput(attrs={'class': 'f-input', 'placeholder': 'Ex : Cardiologie'}),
+                'code':        forms.TextInput(attrs={'class': 'f-input', 'placeholder': 'Ex : CARD'}),
+                'description': forms.Textarea(attrs={'class': 'f-input', 'rows': 3, 'placeholder': 'Description optionnelle'}),
+            }
+    return SpecialiteForm
+
+
+@login_required(login_url='login')
+def medecins_specialites(request):
+    from medecins.models import Specialite
+    from django.core.paginator import Paginator
+
+    q   = request.GET.get('q', '').strip()
+    vue = request.GET.get('vue', 'liste')
+    qs  = Specialite.objects.order_by('nom')
+    if q:
+        qs = qs.filter(Q(nom__icontains=q) | Q(code__icontains=q))
+    total = Specialite.objects.count()
+    paginator = Paginator(qs, 25)
+    page_obj  = paginator.get_page(request.GET.get('page'))
+    return render(request, 'medecins/config/specialites_list.html', {
+        'page_obj': page_obj, 'total': total,
+        'total_filtre': qs.count(), 'q': q, 'vue': vue,
+    })
+
+
+@login_required(login_url='login')
+def medecins_specialite_detail(request, pk):
+    from medecins.models import Specialite
+    obj  = get_object_or_404(Specialite, pk=pk)
+    pks  = list(Specialite.objects.order_by('nom').values_list('pk', flat=True))
+    pos  = pks.index(pk) if pk in pks else None
+    return render(request, 'medecins/config/specialite_detail.html', {
+        'obj':      obj,
+        'prev_pk':  pks[pos - 1] if pos and pos > 0 else None,
+        'next_pk':  pks[pos + 1] if pos is not None and pos < len(pks) - 1 else None,
+        'medecins': obj.medecin_set.select_related('service').order_by('nom'),
+    })
+
+
+@login_required(login_url='login')
+def medecins_specialite_create(request):
+    Form = _specialite_form_class()
+    form = Form(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(request, 'Spécialité créée.')
+        return redirect('medecins_specialites')
+    return render(request, 'medecins/config/specialite_form.html', {
+        'form': form, 'titre': 'Nouvelle spécialité',
+    })
+
+
+@login_required(login_url='login')
+def medecins_specialite_edit(request, pk):
+    from medecins.models import Specialite
+    obj  = get_object_or_404(Specialite, pk=pk)
+    Form = _specialite_form_class()
+    form = Form(request.POST or None, instance=obj)
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(request, 'Spécialité mise à jour.')
+        return redirect('medecins_specialite_detail', pk=pk)
+    return render(request, 'medecins/config/specialite_form.html', {
+        'form': form, 'titre': f'Modifier – {obj.nom}', 'obj': obj,
+    })
+
+
+@login_required(login_url='login')
+@require_POST
+def medecins_specialite_bulk_delete(request):
+    from medecins.models import Specialite
+    ids = request.POST.getlist('ids[]')
+    if ids:
+        Specialite.objects.filter(pk__in=ids).delete()
+    return JsonResponse({'ok': True})
+
+
+# ══════════════════════════════════════════════
+#  MÉDECINS — Configuration : Départements
+# ══════════════════════════════════════════════
+
+def _departement_form_class():
+    from django import forms
+    from medecins.models import Departement
+    class DepartementForm(forms.ModelForm):
+        class Meta:
+            model = Departement
+            fields = ['nom', 'code', 'description', 'actif']
+            widgets = {
+                'nom':         forms.TextInput(attrs={'class': 'f-input', 'placeholder': 'Ex : Médecine interne'}),
+                'code':        forms.TextInput(attrs={'class': 'f-input', 'placeholder': 'Ex : MED-INT'}),
+                'description': forms.Textarea(attrs={'class': 'f-input', 'rows': 3}),
+            }
+    return DepartementForm
+
+
+@login_required(login_url='login')
+def medecins_departements(request):
+    from medecins.models import Departement
+    from django.core.paginator import Paginator
+
+    q   = request.GET.get('q', '').strip()
+    vue = request.GET.get('vue', 'liste')
+    qs  = Departement.objects.order_by('nom')
+    if q:
+        qs = qs.filter(Q(nom__icontains=q) | Q(code__icontains=q))
+    total = Departement.objects.count()
+    paginator = Paginator(qs, 25)
+    page_obj  = paginator.get_page(request.GET.get('page'))
+    return render(request, 'medecins/config/departements_list.html', {
+        'page_obj': page_obj, 'total': total,
+        'total_filtre': qs.count(), 'q': q, 'vue': vue,
+    })
+
+
+@login_required(login_url='login')
+def medecins_departement_detail(request, pk):
+    from medecins.models import Departement
+    obj = get_object_or_404(Departement, pk=pk)
+    pks = list(Departement.objects.order_by('nom').values_list('pk', flat=True))
+    pos = pks.index(pk) if pk in pks else None
+    return render(request, 'medecins/config/departement_detail.html', {
+        'obj':     obj,
+        'prev_pk': pks[pos - 1] if pos and pos > 0 else None,
+        'next_pk': pks[pos + 1] if pos is not None and pos < len(pks) - 1 else None,
+    })
+
+
+@login_required(login_url='login')
+def medecins_departement_create(request):
+    Form = _departement_form_class()
+    form = Form(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(request, 'Département créé.')
+        return redirect('medecins_departements')
+    return render(request, 'medecins/config/departement_form.html', {
+        'form': form, 'titre': 'Nouveau département',
+    })
+
+
+@login_required(login_url='login')
+def medecins_departement_edit(request, pk):
+    from medecins.models import Departement
+    obj  = get_object_or_404(Departement, pk=pk)
+    Form = _departement_form_class()
+    form = Form(request.POST or None, instance=obj)
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(request, 'Département mis à jour.')
+        return redirect('medecins_departement_detail', pk=pk)
+    return render(request, 'medecins/config/departement_form.html', {
+        'form': form, 'titre': f'Modifier – {obj.nom}', 'obj': obj,
+    })
+
+
+@login_required(login_url='login')
+@require_POST
+def medecins_departement_bulk_delete(request):
+    from medecins.models import Departement
+    ids = request.POST.getlist('ids[]')
+    if ids:
+        Departement.objects.filter(pk__in=ids).delete()
+    return JsonResponse({'ok': True})

@@ -1,4 +1,4 @@
-﻿<style>
+<style>
   /* ══════════════════════════════════════════════════════════════
    CSS LAYOUT PARTAGÉ — MODULE services
    Inclus par : list, consommables_list, categories_list, unites_list
@@ -58,6 +58,7 @@
     padding: 0 !important;
     overflow-x: hidden;
   }
+  .o-list-wrap { margin: 0 !important; }
 
   /* ── O-NAV ── */
   .o-nav {
@@ -65,9 +66,13 @@
     display: flex;
     align-items: center;
     height: 38px;
-    padding: 0 10px;
+    padding: 0 16px;
     border-bottom: 1px solid #e0e0e0;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.07);
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 200;
   }
 
   .o-nav-grid {
@@ -124,7 +129,7 @@
   }
 
   html[data-theme="dark"] .o-nav {
-    background: #171616;
+    background: #0a1e2e;
     border-bottom-color: rgba(255, 255, 255, 0.06);
     box-shadow: none;
   }
@@ -289,7 +294,7 @@
   }
 
   html[data-theme="dark"] .o-ctrl-btn:hover {
-    background: #201d1d;
+    background: #28304a;
     color: var(--text);
     border-color: var(--border);
   }
@@ -477,19 +482,20 @@
   }
 </style>
 <script>
-  (function () {
-    function syncTopbarH() {
-      var topbar = document.querySelector('.topbar');
-      if (topbar) {
-        var h = topbar.getBoundingClientRect().height;
-        document.documentElement.style.setProperty('--topbar-h', h + 'px');
+  document.addEventListener('DOMContentLoaded', function () {
+    var topbar = document.querySelector('.topbar');
+    var onav   = document.querySelector('.o-nav');
+    var wrap   = document.getElementById('page-wrap');
+    if (!topbar || !onav) return;
+    function adjust() {
+      var topbarH = topbar.offsetHeight;
+      var bodyPT  = parseInt(getComputedStyle(document.body).paddingTop) || 0;
+      onav.style.top = topbarH + 'px';
+      if (wrap) {
+        wrap.style.paddingTop = Math.max(0, topbarH + onav.offsetHeight - bodyPT) + 'px';
       }
     }
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', syncTopbarH);
-    } else {
-      syncTopbarH();
-    }
-    window.addEventListener('resize', syncTopbarH);
-  })();
+    adjust();
+    window.addEventListener('resize', adjust);
+  });
 </script>

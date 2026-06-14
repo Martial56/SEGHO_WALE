@@ -82,6 +82,10 @@ def hospitalisation_list(request):
     paginator = Paginator(qs, 25)
     page_obj = paginator.get_page(request.GET.get('page'))
 
+    vue = request.GET.get('vue', 'liste')
+    if vue not in ('liste', 'kanban'):
+        vue = 'liste'
+
     return render(request, 'hospitalisation/list.html', {
         'page_obj':      page_obj,
         'total':         qs.count(),
@@ -89,6 +93,7 @@ def hospitalisation_list(request):
         'q':             q,
         'statut':        statut,
         'statut_choices': Hospitalisation.STATUT,
+        'vue':           vue,
     })
 
 
@@ -766,7 +771,7 @@ def hospitalisation_creer_facture(request, pk):
     from django.utils import timezone as tz
     from django.urls import reverse
 
-    back_url = f'/hospitalisation/{hosp.pk}/'
+    back_url = reverse('hospitalisation:detail', kwargs={'pk': hosp.pk})
 
     # Prendre uniquement les SAF non encore facturés avec un service réel (pas chambre)
     services = list(hosp.services_a_facturer.filter(
@@ -824,7 +829,7 @@ def hospitalisation_creer_facture(request, pk):
     log_event(facture, request.user, 'Facture complémentaire créée depuis hospitalisation.', type='system')
     messages.success(request, f'Facture {facture.numero} créée.')
 
-    detail_url = reverse('hospitalisation:facture_detail', kwargs={'pk': facture.pk})
+    detail_url = reverse('facturation:detail', kwargs={'pk': facture.pk})
     return redirect(f'{detail_url}?next={back_url}')
 
 
@@ -1104,6 +1109,43 @@ def hospitalisation_etat(request, pk):
     """GET → JSON état courant (badge, pipeline, boutons, durée)."""
     hosp = get_object_or_404(Hospitalisation, pk=pk)
     return JsonResponse(_etat_payload(hosp, request.user))
+
+
+@login_required(login_url='login')
+def hospitalisation_ajouter_soin(request, pk):
+    """Endpoint POST : ajoute un seul soin à une hospitalisation confirmée ou en cours."""
+    from services.models import Articleservice
+    hosp = get_object_or_404(Hospitalisation, pk=pk)
+
+    if request.method != 'POST':
+        return redirect('hospitalisation:edit', pk=pk)
+
+    if hosp.statut not in ('confirme', 'hospitalise'):
+        return JsonResponse({'ok': False, 'error': "Statut incompatible."}, status=400)
+
+    soin_pk = request.POST.get('soin_pk', '').strip()
+    if not soin_pk:
+        return JsonResponse({'ok': False, 'error': "Soin non spécifié."}, status=400)
+
+    try:
+        soin = Articleservice.objects.get(pk=soin_pk, actif=True)
+    except Articleservice.DoesNotExist:
+        return JsonResponse({'ok': False, 'error': "Soin introuvable."}, status=404)
+
+    hosp.soins_apportes.add(soin)
+    _sync_soins_services(hosp)
+    from django.utils import timezone as tz
+    hosp.modifie_par = request.user
+    hosp.date_modification = tz.now()
+    hosp.save(update_fields=['modifie_par', 'date_modification'])
+    log_event(hosp, request.user, f'Soin ajouté : {soin.nom}', type='modif')
+
+    from django.urls import reverse
+    return JsonResponse({
+        'ok': True,
+        'soin_nom': soin.nom,
+        'redirect': reverse('hospitalisation:detail', kwargs={'pk': pk}),
+    })
 
 
 @login_required(login_url='login')
@@ -1427,158 +1469,6 @@ def deces_edit(request, pk):
 
 
 @login_required(login_url='login')
-def hosp_facture_detail(request, pk):
-    from facturation.models import Facture
-    facture = get_object_or_404(
-        Facture.objects.select_related('patient', 'cree_par', 'hospitalisation'),
-        pk=pk
-    )
-    back_url = request.GET.get('next', '/hospitalisation/')
-    return render(request, 'hospitalisation/facturation/detail.html', {
-        'facture':   facture,
-        'lignes':    facture.lignes.all(),
-        'paiements': facture.paiements.select_related('recu_par').all(),
-        'back_url':  back_url,
-        'is_admin':  request.user.is_staff or request.user.is_superuser,
-        'logs':      get_logs(facture),
-    })
-
-
-@login_required(login_url='login')
-def hosp_facture_edit(request, pk):
-    from facturation.models import Facture, LigneFacture
-    from facturation.forms import FactureForm
-
-    facture = get_object_or_404(Facture.objects.select_related('patient'), pk=pk)
-
-    if request.method == 'POST':
-        form = FactureForm(request.POST, instance=facture)
-        back_url = request.POST.get('next', '/hospitalisation/')
-        if form.is_valid():
-            f = form.save(commit=False)
-            LigneFacture.objects.filter(facture_id=facture.pk).delete()
-            i = 0
-            while f'ligne_libelle_{i}' in request.POST:
-                libelle = request.POST.get(f'ligne_libelle_{i}', '').strip()
-                qte    = _parse_decimal(request.POST.get(f'ligne_qte_{i}', ''), Decimal('1'))
-                prix   = _parse_decimal(request.POST.get(f'ligne_prix_{i}', ''), Decimal('0'))
-                remise = _parse_decimal(request.POST.get(f'ligne_remise_{i}', ''), Decimal('0'))
-                if libelle:
-                    LigneFacture.objects.create(
-                        facture_id=facture.pk,
-                        libelle=libelle, quantite=qte,
-                        prix_unitaire=prix, remise=remise,
-                    )
-                i += 1
-            f.save()
-            # Recalcule montant_total depuis les lignes créées ci-dessus (remises incluses).
-            f.recalculer_total()
-            log_event(f, request.user, 'Facture modifiée.', type='modif')
-            messages.success(request, f"Facture {f.numero} mise à jour.")
-            from django.urls import reverse
-            detail_url = reverse('hospitalisation:facture_detail', kwargs={'pk': facture.pk})
-            return redirect(f'{detail_url}?next={back_url}')
-    else:
-        form = FactureForm(instance=facture)
-        back_url = request.GET.get('next', '/hospitalisation/')
-
-    return render(request, 'hospitalisation/facturation/edit.html', {
-        'facture':  facture,
-        'form':     form,
-        'lignes':   facture.lignes.all(),
-        'back_url': back_url,
-    })
-
-
-@login_required(login_url='login')
-def hosp_facture_valider(request, pk):
-    from facturation.models import Facture
-    from django.urls import reverse
-    facture = get_object_or_404(Facture, pk=pk)
-    if request.method == 'POST':
-        back_url = request.POST.get('next', '/hospitalisation/')
-        if facture.statut == 'brouillon':
-            facture.statut = 'emise'
-            facture.save()
-            log_event(facture, request.user, 'Statut changé : émise', type='statut')
-            messages.success(request, f"Facture {facture.numero} validée et émise.")
-        detail_url = reverse('hospitalisation:facture_detail', kwargs={'pk': pk})
-        return redirect(f'{detail_url}?next={back_url}')
-    return redirect('hospitalisation:facture_detail', pk=pk)
-
-
-@login_required(login_url='login')
-def hosp_facture_payer(request, pk):
-    from facturation.models import Facture, Paiement
-    from django.urls import reverse
-
-    facture = get_object_or_404(Facture, pk=pk)
-    if request.method != 'POST':
-        return redirect('hospitalisation:facture_detail', pk=pk)
-
-    back_url = request.POST.get('next', '/hospitalisation/')
-
-    try:
-        montant = float(request.POST.get('pay_montant', 0))
-    except (TypeError, ValueError):
-        montant = 0
-
-    mode      = request.POST.get('pay_mode', 'especes')
-    reference = request.POST.get('pay_reference', '')
-
-    if montant > 0 and facture.statut in ('brouillon', 'emise'):
-        Paiement.objects.create(
-            facture=facture,
-            montant=montant,
-            mode_paiement=mode,
-            reference=reference,
-            recu_par=request.user,
-        )
-        total_paye = sum(p.montant for p in facture.paiements.all())
-        facture.montant_paye = total_paye
-        if total_paye >= facture.montant_total:
-            facture.statut = 'payee'
-            facture.save(update_fields=['montant_paye', 'statut'])
-            log_event(facture, request.user, 'Statut changé : payée', type='statut')
-            # Pas d'auto-transition hospitalisation : le passage à "Hospitalisé"
-            # est une action manuelle déclenchée via "Installer le patient".
-        else:
-            facture.save(update_fields=['montant_paye'])
-
-    detail_url = reverse('hospitalisation:facture_detail', kwargs={'pk': pk})
-    return redirect(f'{detail_url}?next={back_url}')
-
-
-@login_required(login_url='login')
-def hosp_facture_print(request, pk):
-    from facturation.models import Facture
-    facture = get_object_or_404(
-        Facture.objects.select_related('patient', 'cree_par', 'hospitalisation'),
-        pk=pk
-    )
-    back_url = request.GET.get('next', '/hospitalisation/')
-    return render(request, 'hospitalisation/facturation/print.html', {
-        'facture':   facture,
-        'lignes':    facture.lignes.all(),
-        'paiements': facture.paiements.all(),
-        'back_url':  back_url,
-    })
-
-
-@login_required(login_url='login')
-def hosp_facture_apercu(request, pk):
-    from facturation.models import Facture
-    facture = get_object_or_404(
-        Facture.objects.select_related('patient', 'cree_par', 'hospitalisation'),
-        pk=pk
-    )
-    back_url = request.GET.get('next', '/hospitalisation/')
-    return render(request, 'hospitalisation/facturation/apercu.html', {
-        'facture':   facture,
-        'lignes':    facture.lignes.all(),
-        'paiements': facture.paiements.all(),
-        'back_url':  back_url,
-    })
 
 
 @login_required(login_url='login')

@@ -33,6 +33,8 @@ html[data-theme="dark"] .prix-display { border-bottom-color: rgba(255,255,255,.1
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: 12px;
+  padding: 12px 16px;
+  overflow: visible !important; /* annule overflow:hidden de .art-status-bar qui clippe les cercles */
 }
 .proc-steps { grid-column: 2; display: flex; align-items: flex-start; flex-wrap: nowrap; }
 .proc-side-actions { grid-column: 3; justify-self: end; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
@@ -92,11 +94,49 @@ html[data-theme="dark"] .step-node-future   { background: var(--surface); border
 html[data-theme="dark"] .step-node-next     { background: var(--surface); border-color: var(--accent); }
 html[data-theme="dark"] .step-node-cancelled{ background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.15); color: rgba(255,255,255,.25); }
 html[data-theme="dark"] .proc-annule-badge  { background: rgba(220,38,38,.15); border-color: rgba(220,38,38,.35); color: #fca5a5; }
+
+/* ── o-subheader fixe ── */
+.o-subheader {
+  position: fixed;
+  top: calc(var(--topbar-h, 62px) + 38px); /* topbar + o-nav ; affiné par JS */
+  left: 0;
+  right: 0;
+  z-index: 199;
+  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+}
+
+/* Fallback CSS immédiat : pousse le contenu sous topbar + o-nav + o-subheader
+   avant que le JS calcule la valeur exacte. Le JS écrase cette valeur en inline !important. */
+#page-wrap {
+  padding-top: calc(38px + 50px) !important; /* o-nav (38) + subheader (~50) */
+}
+
+/* ── Layout avec aside ── */
+.proc-frm-layout { display: flex; align-items: flex-start; gap: 14px; }
+.proc-frm-main   { flex: 1; min-width: 0; }
+.proc-frm-aside  { width: 260px; flex-shrink: 0; position: sticky; top: 220px; }
+@media (max-width: 900px) { .proc-frm-layout { flex-direction: column; } .proc-frm-aside { width: 100%; position: static; } }
+
+/* ── Activité latérale ── */
+.f-activity { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.f-activity-head { padding: 10px 14px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.f-activity-list { max-height: 480px; overflow-y: auto; }
+.f-activity-item { display: flex; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+.f-activity-item:last-child { border-bottom: none; }
+.f-avatar { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: #fff; flex-shrink: 0; }
+.f-avatar-teal   { background: var(--accent); }
+.f-avatar-blue   { background: #2563eb; }
+.f-avatar-green  { background: #16a34a; }
+.f-activity-body { flex: 1; }
+.f-activity-who  { font-size: 12px; font-weight: 500; color: var(--text); }
+.f-activity-time { font-size: 11px; color: var(--text-muted); }
+.f-activity-change { font-size: 11.5px; color: var(--text-muted); margin-top: 3px; display: flex; align-items: center; gap: 4px; }
+.f-activity-change i { font-size: 11px; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div id="page-wrap">
+<div id="page-wrap" data-fixed-subheader="1">
 
 {% include 'soins/includes/nav.html' %}
 
@@ -143,6 +183,8 @@ html[data-theme="dark"] .proc-annule-badge  { background: rgba(220,38,38,.15); b
 </div>
 {% endif %}
 
+<div class="proc-frm-layout">
+<div class="proc-frm-main">
 <form method="post" id="proc-form" novalidate>
   {% csrf_token %}
 
@@ -475,7 +517,7 @@ html[data-theme="dark"] .proc-annule-badge  { background: rgba(220,38,38,.15); b
                 <li class="svc-option" data-value="">— Aucune —</li>
                 {% for m in maladies %}
                 <li class="svc-option {% if form.maladie.value|stringformat:"s" == m.pk|stringformat:"s" %}selected{% endif %}"
-                    data-value="{{ m.pk }}">{{ m.nom }}{% if m.code_cim %} <small style="color:var(--text-muted);">({{ m.code_cim }})</small>{% endif %}</li>
+                    data-value="{{ m.pk }}">{{ m.nom }}</li>
                 {% endfor %}
               </ul>
               {% if request.user.is_staff %}
@@ -490,41 +532,17 @@ html[data-theme="dark"] .proc-annule-badge  { background: rgba(220,38,38,.15); b
           </div>
         </div>
 
-        <!-- Rendez-vous : svc-select filtré par patient -->
+        {% comment %}Rendez-vous : commenté temporairement
         <div class="f-field">
           <label class="field-label">Rendez-vous</label>
           <input type="hidden" name="rendez_vous" id="rdv-hidden" value="{{ form.rendez_vous.value|default:'' }}">
-          <div class="svc-select" id="rdv-select" style="z-index:100;">
-            <div class="svc-display" id="rdv-display" tabindex="0">
-              {% if form.rendez_vous.value %}
-                {% for rv in form.rendez_vous.field.queryset %}{% if form.rendez_vous.value|stringformat:"s" == rv.pk|stringformat:"s" %}<span>{{ rv.date_heure|date:"d/m/Y H:i" }} — {{ rv.get_type_rdv_display }}</span>{% endif %}{% endfor %}
-              {% else %}
-                <span class="svc-placeholder">— Aucun rendez-vous lié —</span>
-              {% endif %}
-              <i class="bi bi-chevron-down svc-chevron"></i>
-            </div>
-            <div class="svc-dropdown" id="rdv-dropdown">
-              <div class="svc-search-wrap">
-                <i class="bi bi-search"></i>
-                <input type="text" class="svc-search" id="rdv-search" placeholder="Rechercher un rendez-vous…" autocomplete="off">
-              </div>
-              <ul class="svc-list" id="rdv-list">
-                <li class="svc-option" data-value="">— Aucun —</li>
-                {% for rv in form.rendez_vous.field.queryset %}
-                <li class="svc-option {% if form.rendez_vous.value|stringformat:"s" == rv.pk|stringformat:"s" %}selected{% endif %}"
-                    data-value="{{ rv.pk }}" data-patient="{{ rv.patient_id }}">
-                  {{ rv.date_heure|date:"d/m/Y H:i" }} — {{ rv.get_type_rdv_display }}
-                </li>
-                {% endfor %}
-              </ul>
-            </div>
-          </div>
-          <div class="f-hint">Sélectionnez d'abord un patient pour filtrer les rendez-vous.</div>
+          ...
         </div>
+        {% endcomment %}
       </div>
 
       <!-- Facture : svc-select filtré par patient -->
-      <div class="f-field">
+      <div class="f-field" style="margin-top:18px;">
         <label class="field-label">Facture liée</label>
         <input type="hidden" name="facture" id="fac-hidden" value="{{ form.facture.value|default:'' }}">
         <div class="svc-select" id="fac-select" style="z-index:90;">
@@ -559,6 +577,56 @@ html[data-theme="dark"] .proc-annule-badge  { background: rgba(220,38,38,.15); b
   </div>
 
 </form>
+</div><!-- /.proc-frm-main -->
+
+<!-- ══ ASIDE ACTIVITÉ ══ -->
+<div class="proc-frm-aside">
+  <div class="f-activity">
+    <div class="f-activity-head">
+      <span>Activité</span>
+      {% if not is_new %}<span style="font-size:11px;">{{ proc.date_creation|date:"d/m/Y" }}</span>{% endif %}
+    </div>
+    <div class="f-activity-list">
+      {% if not is_new %}
+        <div class="f-activity-item">
+          <div class="f-avatar f-avatar-teal">
+            {% if proc.cree_par %}{{ proc.cree_par.username|first|upper }}{% else %}<i class="bi bi-person" style="font-size:13px;"></i>{% endif %}
+          </div>
+          <div class="f-activity-body">
+            <div class="f-activity-who">{% if proc.cree_par %}{{ proc.cree_par.get_full_name|default:proc.cree_par.username }}{% else %}—{% endif %}</div>
+            <div class="f-activity-time">{{ proc.date_creation|date:"d/m/Y H:i" }}</div>
+            <div class="f-activity-change"><i class="bi bi-dot" style="color:var(--accent);"></i> Soin créé</div>
+          </div>
+        </div>
+        {% if proc.modifie_par %}
+        <div class="f-activity-item">
+          <div class="f-avatar f-avatar-blue">{{ proc.modifie_par.username|first|upper }}</div>
+          <div class="f-activity-body">
+            <div class="f-activity-who">{{ proc.modifie_par.get_full_name|default:proc.modifie_par.username }}</div>
+            <div class="f-activity-time">{% if proc.date_modification %}{{ proc.date_modification|date:"d/m/Y H:i" }}{% else %}—{% endif %}</div>
+            <div class="f-activity-change"><i class="bi bi-pencil"></i> État : <strong>{{ proc.get_statut_display }}</strong></div>
+          </div>
+        </div>
+        {% endif %}
+        {% if proc.facture %}
+        <div class="f-activity-item">
+          <div class="f-avatar f-avatar-green"><i class="bi bi-receipt" style="font-size:12px;"></i></div>
+          <div class="f-activity-body">
+            <div class="f-activity-who">Facture liée</div>
+            <div class="f-activity-change"><i class="bi bi-link-45deg"></i> {{ proc.facture.numero }}</div>
+          </div>
+        </div>
+        {% endif %}
+      {% else %}
+        <div style="padding:14px;color:var(--text-muted);font-size:12px;">
+          L'activité apparaîtra après la création.
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div><!-- /.proc-frm-aside -->
+
+</div><!-- /.proc-frm-layout -->
 </div><!-- /.f-page-body -->
 
 {% endwith %}
@@ -674,10 +742,10 @@ document.addEventListener('click', function(e) {
   }
 });
 
-/* ── Filtre RDV + Facture par patient ── */
+/* ── Filtre Facture par patient ── */
 function filterByPatient(patientId) {
   [
-    { pfx: 'rdv', ph: '— Aucun rendez-vous lié —' },
+    // { pfx: 'rdv', ph: '— Aucun rendez-vous lié —' },
     { pfx: 'fac', ph: '— Aucune facture liée —' }
   ].forEach(function(cfg) {
     var list    = document.getElementById(cfg.pfx + '-list');
@@ -738,13 +806,10 @@ makeDrop({
 makeDrop({
   prefix: 'mal',
   placeholder: '— Sélectionner une maladie —',
-  createBase: '{% url "soins:maladie_create" %}?next={{ request.path|urlencode }}'
+  createBase: '{% url "patients:pathologie_create" %}?next={{ request.path|urlencode }}'
 });
 
-makeDrop({
-  prefix: 'rdv',
-  placeholder: '— Aucun rendez-vous lié —'
-});
+// makeDrop({ prefix: 'rdv', placeholder: '— Aucun rendez-vous lié —' });
 
 makeDrop({
   prefix: 'fac',
@@ -778,13 +843,29 @@ makeDrop({
     + 'T' + pad(now.getHours()) + ':' + pad(now.getMinutes());
 })();
 
-/* ── Offset topbar ── */
+/* ── o-subheader fixe + aside ── */
 (function() {
   function adj() {
-    var tb = document.querySelector('.topbar'), wp = document.getElementById('page-wrap');
-    if (tb && wp) wp.style.paddingTop = tb.offsetHeight + 'px';
+    var tb    = document.querySelector('.topbar');
+    var onav  = document.querySelector('.o-nav');
+    var sub   = document.getElementById('subheader');
+    var wrap  = document.getElementById('page-wrap');
+    var aside = document.querySelector('.proc-frm-aside');
+    if (!tb || !onav || !sub || !wrap) return;
+    var navBottom = tb.offsetHeight + onav.offsetHeight;
+    sub.style.top = navBottom + 'px';
+    var subH  = sub.getBoundingClientRect().height || sub.offsetHeight || 48;
+    var bodyPT = parseInt(getComputedStyle(document.body).paddingTop) || 0;
+    var pt = Math.max(0, navBottom + subH - bodyPT);
+    wrap.style.setProperty('padding-top', pt + 'px', 'important');
+    if (aside) aside.style.top = (navBottom + subH + 8) + 'px';
   }
-  adj(); window.addEventListener('resize', adj);
+  document.addEventListener('DOMContentLoaded', function() {
+    adj();
+    window.addEventListener('resize', adj); /* layout_css ne touche plus ce page-wrap */
+  });
+  window.addEventListener('load', adj);
+  setTimeout(adj, 50);
 })();
 </script>
 

@@ -1,4 +1,4 @@
-﻿<style>
+<style>
   @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap');
 
   :root {
@@ -42,6 +42,7 @@
   .breadcrumb { display: none !important; }
 
   .content { padding: 0 !important; overflow-x: hidden; }
+  .o-list-wrap { margin: 0 !important; }
 
   /* ── O-NAV ── */
   .o-nav {
@@ -51,7 +52,11 @@
     height: 38px;
     padding: 0 10px;
     border-bottom: 1px solid #e0e0e0;
-    box-shadow: 0 1px 3px rgba(0,0,0,.07);
+    position: fixed;
+    top: var(--topbar-h, 62px);
+    left: 0;
+    right: 0;
+    z-index: 200;
   }
 
   .o-nav-grid {
@@ -85,7 +90,7 @@
     border-bottom-color: var(--primary);
   }
 
-  html[data-theme="dark"] .o-nav { background: #171616; border-bottom-color: rgba(255,255,255,.06); box-shadow: none; }
+  html[data-theme="dark"] .o-nav { background: #0a1e2e; border-bottom-color: rgba(255,255,255,.06); box-shadow: none; }
   html[data-theme="dark"] .o-nav-grid { color: rgba(255,255,255,.5); }
   html[data-theme="dark"] .o-nav-grid:hover { background: rgba(255,255,255,.08); color: #7ac4a7; }
   html[data-theme="dark"] .o-nav-brand { color: #7ac4a7; border-right-color: rgba(255,255,255,.1); }
@@ -151,7 +156,7 @@
   .o-ctrl-btn:hover { border-color: var(--border); color: var(--text); background: #f3f3f3; }
   .o-ctrl-btn.active { border-color: #aaa; color: var(--text); background: #efefef; }
   html[data-theme="dark"] .o-ctrl-btn { color: var(--text-muted); }
-  html[data-theme="dark"] .o-ctrl-btn:hover { background: #201d1d; color: var(--text); border-color: var(--border); }
+  html[data-theme="dark"] .o-ctrl-btn:hover { background: #28304a; color: var(--text); border-color: var(--border); }
 
   .o-ctrl-sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; flex-shrink: 0; }
 
@@ -218,19 +223,31 @@
   .col-resizer:hover, .col-resizer.resizing { background: var(--accent); opacity: .45; }
 </style>
 <script>
-  (function () {
-    function syncTopbarH() {
-      var topbar = document.querySelector('.topbar');
-      if (topbar) {
-        var h = topbar.getBoundingClientRect().height;
-        document.documentElement.style.setProperty('--topbar-h', h + 'px');
+  document.addEventListener('DOMContentLoaded', function () {
+    var topbar = document.querySelector('.topbar');
+    var onav   = document.querySelector('.o-nav');
+    if (!topbar || !onav) return;
+    function adjust() {
+      var topbarH = topbar.offsetHeight;
+      var bodyPT  = parseInt(getComputedStyle(document.body).paddingTop) || 0;
+      onav.style.top = topbarH + 'px';
+      /* Expose la hauteur cumulée topbar+o-nav comme variable CSS pour les barres fixes en dessous */
+      document.documentElement.style.setProperty('--nav-stack-h', (topbarH + onav.offsetHeight) + 'px');
+      var pt = Math.max(0, topbarH + onav.offsetHeight - bodyPT) + 'px';
+      /* #page-wrap existe dans list.html (o-nav inclus dedans) ;
+         sinon on cible .content avec setProperty pour passer le !important */
+      var pageWrap = document.getElementById('page-wrap');
+      if (pageWrap) {
+        /* Si la page gère elle-même son padding-top (subheader fixe), ne pas écraser */
+        if (!pageWrap.dataset.fixedSubheader) {
+          pageWrap.style.setProperty('padding-top', pt, 'important');
+        }
+      } else {
+        var content = document.querySelector('.content');
+        if (content) content.style.setProperty('padding-top', pt, 'important');
       }
     }
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', syncTopbarH);
-    } else {
-      syncTopbarH();
-    }
-    window.addEventListener('resize', syncTopbarH);
-  })();
+    adjust();
+    window.addEventListener('resize', adjust);
+  });
 </script>

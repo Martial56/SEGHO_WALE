@@ -1,69 +1,83 @@
-﻿{% extends 'hospitalisation/base.html' %}
+{% extends 'hospitalisation/base.html' %}
 
 {% block extra_css %}
 {{ block.super }}
 <style>
-:root { --surface:#fff; --border:#e8edf2; --text:#0d3040; --text-muted:rgba(0,0,0,.45); }
-html[data-theme="dark"] { --surface:#201d1d; --border:#201d1d; --text:#d4e6f5; --text-muted:rgba(255,255,255,.45); }
-.o-subheader {
-  background:var(--surface); border-bottom:1px solid var(--border);
-  padding:6px 16px; display:flex; flex-direction:column; gap:5px;
-  position:sticky; top:38px; z-index:190; margin:0 -32px;
-}
-.o-subheader-row { display:flex; align-items:center; gap:8px; }
+/* ── Layout ── */
+.content    { padding: 0 !important; overflow-x: clip; }
+.breadcrumb { display: none !important; }
+
+/* ── Subheader ── */
+.o-subheader { position: sticky; top: 76px; z-index: 190; }
+
+/* ── Boutons ── */
 .btn-save {
-  background:var(--teal-500); color:#fff; border:none; padding:6px 20px; border-radius:4px;
-  font-size:13px; font-weight:500; font-family:inherit; cursor:pointer;
-  display:inline-flex; align-items:center; gap:6px; transition:background .15s; letter-spacing:.4px;
+  background: var(--teal-500); color: #fff; border: none;
+  padding: 6px 18px; border-radius: 4px; font-size: 12.5px; font-weight: 600;
+  font-family: inherit; cursor: pointer; display: inline-flex; align-items: center;
+  gap: 6px; transition: background .15s; letter-spacing: .4px;
 }
-.btn-save:hover { background:var(--teal-600); }
+.btn-save:hover { background: var(--teal-600); }
 .btn-cancel {
-  background:none; border:none; color:var(--text-muted); padding:6px 14px;
-  font-size:13px; font-family:inherit; cursor:pointer; text-decoration:none;
-  display:inline-flex; align-items:center; transition:color .15s;
+  background: none; border: none; color: var(--text-muted);
+  padding: 6px 10px; font-size: 12.5px; font-family: inherit;
+  cursor: pointer; text-decoration: none; transition: color .15s;
 }
-.btn-cancel:hover { color:var(--text); }
+.btn-cancel:hover { color: var(--text); }
+
+/* ── Champs ── */
 .field-ul {
-  width:100%; background:transparent; border-top:none; border-left:none; border-right:none;
-  border-bottom:1.5px solid #d1dde3; border-radius:0;
-  padding:7px 2px; font-size:13px; color:var(--text);
-  transition:border-color .2s; box-shadow:none; outline:none; font-family:inherit;
+  width: 100%; background: transparent; border: none;
+  border-bottom: 1.5px solid #d1dde3; border-radius: 0;
+  padding: 7px 2px; font-size: 13px; color: var(--text);
+  transition: border-color .2s; box-shadow: none; outline: none; font-family: inherit;
 }
-.field-ul:focus { border-bottom-color:var(--teal-500); }
-.field-ul::placeholder { color:#bfcdd4; }
-.field-label { display:block; font-size:11.5px; font-weight:600; color:var(--text-muted); margin-bottom:4px; }
-.field-error { font-size:12px; color:#e53935; margin-top:3px; }
-.form-card { background:var(--surface); border:1px solid var(--border); border-radius:6px; overflow:hidden; margin-top:8px; }
-.form-body { padding:28px 32px; max-width:600px; }
-.msg-success { background:#d4edda; color:#1a6b3c; padding:10px 16px; border-radius:4px; font-size:13px; margin-top:12px; }
-.msg-error   { background:#fde8e8; color:#7b1c1c; padding:10px 16px; border-radius:4px; font-size:13px; margin-top:12px; }
-html[data-theme="dark"] .form-card { background:var(--surface); border-color:var(--border); }
-html[data-theme="dark"] .field-ul { color:var(--text); border-bottom-color:#3a4a62; }
-html[data-theme="dark"] .field-ul:focus { border-bottom-color:var(--teal-400); }
-html[data-theme="dark"] .field-ul::placeholder { color:rgba(255,255,255,.25); }
-html[data-theme="dark"] .o-subheader { background:var(--surface); border-bottom-color:var(--border); }
+.field-ul:focus { border-bottom-color: var(--teal-500); }
+.field-ul::placeholder { color: #bfcdd4; }
+.field-label {
+  display: block; font-size: 11px; font-weight: 700; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: .05em; margin-bottom: 4px;
+}
+.field-error { font-size: 12px; color: #e53935; margin-top: 3px; }
+
+/* ── Carte formulaire ── */
+.form-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; overflow: hidden; margin: 16px 24px;
+}
+.form-body { padding: 24px 28px; max-width: 600px; }
+
+html[data-theme="dark"] .form-card { background: var(--surface); border-color: var(--border); }
+html[data-theme="dark"] .field-ul { color: var(--text); border-bottom-color: rgba(255,255,255,.15); }
+html[data-theme="dark"] .field-ul:focus { border-bottom-color: var(--teal-400); }
+html[data-theme="dark"] .field-ul::placeholder { color: rgba(255,255,255,.25); }
+html[data-theme="dark"] .btn-cancel { color: var(--text-muted); }
 </style>
 {% endblock %}
 
 {% block content %}
+<div id="page-wrap">
 
 <div class="o-subheader">
   <div class="o-subheader-row">
-    <span style="font-size:13.5px;color:var(--text-muted);">
+    <a href="{% url 'hospitalisation:config_liste_service' %}" class="o-ctrl-btn" style="padding:3px 7px;">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <span style="font-size:13px; color:var(--text-muted);">
       <a href="{% url 'hospitalisation:config_liste_service' %}"
-         style="color:var(--accent,var(--teal-600));text-decoration:none;font-weight:500;">
+         style="color:var(--accent,var(--teal-600)); text-decoration:none; font-weight:500;">
         Liste de vérification avant le service
       </a>
-      <span style="margin:0 5px;opacity:.4;">/</span>
+      <span style="margin:0 4px; opacity:.4;">/</span>
       <span style="color:var(--text);">{{ titre }}</span>
     </span>
     <div style="flex:1;"></div>
-    <a href="{% url 'hospitalisation:config_liste_service' %}" class="btn-cancel">IGNORER</a>
-    <button type="submit" form="service-form" class="btn-save">SAUVEGARDER</button>
+    <a href="{% url 'hospitalisation:config_liste_service' %}" class="btn-cancel">Ignorer</a>
+    <button type="submit" form="service-form" class="btn-save">
+      <i class="bi bi-check2"></i> Sauvegarder
+    </button>
   </div>
 </div>
-
-
 
 <form method="post" id="service-form" novalidate>
   {% csrf_token %}
@@ -78,4 +92,5 @@ html[data-theme="dark"] .o-subheader { background:var(--surface); border-bottom-
   </div>
 </form>
 
+</div><!-- /page-wrap -->
 {% endblock %}

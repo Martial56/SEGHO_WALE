@@ -371,9 +371,7 @@ class Consommable(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.code:
-            from django.utils import timezone
-            year = timezone.now().year
-            prefix = f'CONS{year}'
+            prefix = 'CONS'
             last = Consommable.objects.filter(code__startswith=prefix).order_by('code').last()
             if last:
                 try:

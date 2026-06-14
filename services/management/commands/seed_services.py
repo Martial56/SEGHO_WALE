@@ -248,13 +248,7 @@ class Command(BaseCommand):
             cat_map[code] = obj
         self.stdout.write(self.style.SUCCESS(f'  {len(CATEGORIES)} catégories OK'))
 
-        # 2. Unités de mesure
-        self.stdout.write('→ Unités de mesure...')
-        for nom, code, categorie in UNITES:
-            UniteMesure.objects.get_or_create(
-                code=code, defaults={'nom': nom, 'categorie': categorie}
-            )
-        self.stdout.write(self.style.SUCCESS(f'  {len(UNITES)} unités OK'))
+        # 2. Unités de mesure (gérées par seed_unites_mesure — ignoré ici)
 
         # 3. Articles / services
         self.stdout.write('→ Articles / services...')

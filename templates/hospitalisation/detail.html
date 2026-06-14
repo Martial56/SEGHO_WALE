@@ -1,4 +1,4 @@
-﻿{% extends 'hospitalisation/base.html' %}
+{% extends 'hospitalisation/base.html' %}
 {% load i18n core_tags %}
 
 {% block extra_css %}
@@ -17,10 +17,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  position: sticky;
-  top: var(--o-nav-h, 38px);
-  z-index: var(--z-breadcrumb);
-  margin: 0 -32px;
+  position: fixed; left: 0; right: 0;
+  top: calc(var(--topbar-h, 62px) + 38px);
+  z-index: 190;
 }
 .det-back {
   display: inline-flex; align-items: center; justify-content: center;
@@ -41,7 +40,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 16px 24px;
-  margin-top: 14px;
+  margin-top: 0;
   display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
   box-shadow: var(--shadow-sm);
 }
@@ -82,7 +81,7 @@
   box-shadow: var(--shadow-sm);
 }
 .pipeline {
-  flex: 1; display: flex; align-items: stretch;
+  margin-left: auto; display: flex; align-items: stretch;
   font-size: 11px; font-weight: 700; letter-spacing: .06em; gap: 2px;
   transition: opacity .25s;
 }
@@ -228,7 +227,7 @@
 .info-val.empty { color: var(--text-muted); font-style: italic; font-weight: 400; }
 
 /* ── Table SAF ── */
-.saf-wrap { border: 1px solid var(--border); border-radius: 0; overflow: hidden; margin: 0 -24px; }
+.saf-wrap { border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
 .saf-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 .saf-tbl th {
   background: var(--surface-muted); padding: 8px 12px;
@@ -391,13 +390,6 @@
   to   { opacity: 1; transform: translateX(0); }
 }
 
-/* ── Messages Django ── */
-.dj-msg { padding: 10px 14px; border-radius: var(--radius-xs); font-size: 13px; margin-bottom: 8px; }
-.dj-msg.success { background: #d4edda; color: #1a6b3c; }
-.dj-msg.error   { background: #fde8e8; color: #7b1c1c; }
-.dj-msg.warning { background: #fff3cd; color: #7a5000; }
-.dj-msg.info    { background: #cfe2ff; color: #084298; }
-
 /* ── Barre action SAF info ── */
 .saf-info-bar {
   border-top: 1px solid var(--border); padding: 10px 16px;
@@ -424,32 +416,28 @@ html[data-theme="dark"] .aside-card,
 html[data-theme="dark"] .fac-row,
 html[data-theme="dark"] .dur-card { background: var(--surface); border-color: var(--border); }
 html[data-theme="dark"] .dur-card { background: linear-gradient(135deg, rgba(14,67,88,.3) 0%, var(--surface) 100%); }
-html[data-theme="dark"] .pip-step { background: #201d1d; color: rgba(255,255,255,.28); }
-html[data-theme="dark"] .pip-step.done { background: #171616; color: var(--teal-300); }
+html[data-theme="dark"] .pip-step { background: #1a2a3e; color: rgba(255,255,255,.28); }
+html[data-theme="dark"] .pip-step.done { background: #0f2e48; color: var(--teal-300); }
 html[data-theme="dark"] .pip-step.active { background: var(--teal-500); color: #fff; }
-html[data-theme="dark"] .saf-tbl th { background: #171616; }
-html[data-theme="dark"] .saf-tbl tbody tr:hover td { background: #171616; }
-html[data-theme="dark"] .saf-add-bar { background: #171616; }
-html[data-theme="dark"] .chip-none { background: #201d1d; color: #9aa8b5; }
+html[data-theme="dark"] .saf-tbl th { background: #0f2035; }
+html[data-theme="dark"] .saf-tbl tbody tr:hover td { background: #0c1e30; }
+html[data-theme="dark"] .saf-add-bar { background: #0d1f32; }
+html[data-theme="dark"] .chip-none { background: #1e2d40; color: #9aa8b5; }
 html[data-theme="dark"] .src-chip { background: rgba(33,136,171,.12); color: var(--teal-300); }
 html[data-theme="dark"] .modal-box { background: var(--surface); }
-html[data-theme="dark"] .fld { background: #171616; border-color: rgba(255,255,255,.1); color: var(--text); }
+html[data-theme="dark"] .fld { background: #0d1f32; border-color: rgba(255,255,255,.1); color: var(--text); }
 html[data-theme="dark"] .fld:focus { border-color: var(--teal-400); }
-html[data-theme="dark"] .vis-empty { background: #171616; }
-html[data-theme="dark"] .saf-info-bar { background: #171616; }
+html[data-theme="dark"] .vis-empty { background: #0d1f32; }
+html[data-theme="dark"] .saf-info-bar { background: #0d1f32; }
 html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
 </style>
 {% endblock %}
 
 {% block content %}
-
-{# ── Messages Django ── #}
-{% for msg in messages %}
-<div class="dj-msg {{ msg.tags|default:'info' }}">{{ msg }}</div>
-{% endfor %}
+<div id="page-wrap">
 
 {# SUBHEADER / BREADCRUMB #}
-<div class="det-subhdr">
+<div class="det-subhdr" data-fixed="1">
   <a href="{% url 'hospitalisation:list' %}" class="det-back" title="Retour">
     <i class="bi bi-arrow-left"></i>
   </a>
@@ -457,14 +445,6 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
     <a href="{% url 'hospitalisation:list' %}">Hospitalisation</a>
     <span class="sep">/</span>
     <span>{{ hosp.numero }}</span>
-  </div>
-  <div style="margin-left:auto;display:flex;gap:6px;">
-    {% if peut_modifier %}
-    <a href="{% url 'hospitalisation:edit' hosp.pk %}" class="abtn abtn-neutral"
-       style="font-size:11.5px;padding:4px 12px;" title="Modifier toutes les données">
-      <i class="bi bi-pencil-square"></i> Modifier
-    </a>
-    {% endif %}
   </div>
 </div>
 
@@ -517,19 +497,9 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
   </span>
 </div>
 
-{# ── Bandeau verrouillage facture ── #}
-{% if facture_blocage %}
-<div style="margin:0 -32px;padding:8px 20px;background:#fef3c7;border-bottom:1px solid #fde68a;display:flex;align-items:center;gap:8px;font-size:12.5px;color:#92400e;">
-  <i class="bi bi-lock-fill"></i>
-  <strong>Dossier verrouillé</strong> — facture
-  <a href="{% url 'hospitalisation:facture_detail' facture_blocage.pk %}"
-     style="color:#92400e;font-weight:700;text-decoration:underline;">{{ facture_blocage.numero }}</a>
-  en attente de paiement.
-  {% if is_admin %}<span style="margin-left:6px;background:#fde68a;border-radius:10px;padding:0 8px;font-size:11px;">Modification possible (superutilisateur)</span>{% endif %}
-</div>
-{% endif %}
 
-{# BARRE D'ACTIONS CONTEXTUELLE #}
+{# BARRE D'ACTIONS CONTEXTUELLE — masquée si aucune action visible #}
+{% if lecture_seule_totale or actions.confirmer.visible or actions.creer_facture.visible or actions.installer.visible or actions.decharger.visible or actions.terminer.visible or actions.annuler.visible or peut_modifier and hosp.statut == 'confirme' or peut_modifier and hosp.statut == 'hospitalise' %}
 <div class="det-acts" id="action-bar">
   {% if lecture_seule_totale %}
   <span class="act-ro">
@@ -538,8 +508,8 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
   </span>
   {% else %}
 
-  {# ─ Confirmer / Enregistrer les soins ─ #}
-  {% if actions.confirmer.visible %}
+  {# ─ Confirmer (brouillon uniquement) ─ #}
+  {% if actions.confirmer.visible and hosp.statut == 'brouillon' %}
   <button type="button"
           class="abtn abtn-primary {% if not actions.confirmer.enabled %}off{% endif %}"
           {% if actions.confirmer.enabled %}
@@ -548,9 +518,10 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
             disabled title="{{ actions.confirmer.raison_blocage }}"
           {% endif %}>
     <i class="bi bi-check2-circle"></i>
-    {% if hosp.statut == 'brouillon' %}Confirmer la demande{% else %}Enregistrer les soins{% endif %}
+    Confirmer la demande
   </button>
   {% endif %}
+
 
   {# ─ Créer facture ─ #}
   {% if actions.creer_facture.visible %}
@@ -564,6 +535,13 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
       <i class="bi bi-receipt"></i> Créer la facture
     </button>
     {% endif %}
+  {% endif %}
+
+  {# ─ Ajouter un soin ─ #}
+  {% if peut_modifier and hosp.statut == 'confirme' or peut_modifier and hosp.statut == 'hospitalise' %}
+  <a href="{% url 'hospitalisation:edit' hosp.pk %}?tab=soins" class="abtn abtn-neutral">
+    <i class="bi bi-plus-circle"></i> Ajouter un soin
+  </a>
   {% endif %}
 
   {# ─ Installer le patient ─ #}
@@ -593,17 +571,6 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
     {% endif %}
   {% endif %}
 
-  {# ─ Facture complémentaire (hospitalisé avec SAF non facturés) ─ #}
-  {% if hosp.statut == 'hospitalise' and actions.creer_facture.visible and saf_non_factures %}
-    <div class="act-sep"></div>
-    {% if actions.creer_facture.enabled %}
-    <a href="{{ url_facture }}" class="abtn abtn-neutral"
-       title="Créer une facture complémentaire pour les {{ saf_non_factures }} service(s) non facturés">
-      <i class="bi bi-receipt-cutoff"></i> Facture complémentaire
-      <span style="background:var(--teal-100);color:var(--teal-700);border-radius:100px;padding:0 6px;font-size:10px;">{{ saf_non_factures }}</span>
-    </a>
-    {% endif %}
-  {% endif %}
 
   {# ─ Clôturer le dossier ─ #}
   {% if actions.terminer.visible %}
@@ -620,9 +587,9 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
     {% endif %}
   {% endif %}
 
-  {# ─ Annuler (toujours en fin, séparé) ─ #}
+  {# ─ Annuler (toujours à droite) ─ #}
   {% if actions.annuler.visible %}
-  <div style="margin-left:auto;"></div>
+  <div style="margin-left:auto;">
     {% if actions.annuler.enabled %}
     <button type="button" class="abtn abtn-danger" onclick="openAnnulModal()">
       <i class="bi bi-x-circle"></i> Annuler
@@ -632,10 +599,12 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
       <i class="bi bi-x-circle"></i> Annuler
     </button>
     {% endif %}
+  </div>
   {% endif %}
 
   {% endif %}{# /lecture_seule_totale #}
 </div>
+{% endif %}{# /action-bar condition #}
 
 {# CORPS PRINCIPAL : layout 2 colonnes #}
 <div class="det-layout">
@@ -701,6 +670,13 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
           <i class="bi bi-file-medical" style="font-size:13px;"></i>
           Décharge
         </button>
+        {% if peut_modifier %}
+        <a href="{% url 'hospitalisation:edit' hosp.pk %}" class="abtn abtn-neutral"
+           style="margin-left:auto;align-self:center;font-size:12px;padding:4px 12px;white-space:nowrap;"
+           title="Modifier toutes les données">
+          <i class="bi bi-pencil-square"></i> Modifier
+        </a>
+        {% endif %}
       </nav>
 
       {# ─────────────────────────── ONGLET : INFORMATIONS ─────────────────────────── #}
@@ -833,14 +809,6 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
 
         </div>
 
-        {% if peut_modifier %}
-        <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;">
-          <a href="{% url 'hospitalisation:edit' hosp.pk %}" class="abtn abtn-neutral"
-             title="Modifier toutes les informations du dossier">
-            <i class="bi bi-pencil"></i> Modifier les informations
-          </a>
-        </div>
-        {% endif %}
       </div>
 
       {# ─────────────────── ONGLET : SOINS & SERVICES À FACTURER ─────────────────── #}
@@ -954,12 +922,9 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
               <div class="vis-soin">{{ vd.soin.nom|default:"—" }}</div>
               <div class="vis-detail">
                 {% if vd.docteur %}Dr. {{ vd.docteur.nom }} {{ vd.docteur.prenoms }}{% endif %}
-                {% if vd.instructions %} — {{ vd.instructions|truncatechars:80 }}{% endif %}
+                {% if vd.instruction %} — {{ vd.instruction|truncatechars:80 }}{% endif %}
               </div>
             </div>
-            {% if vd.quantite %}
-            <div class="vis-qte">{{ vd.quantite }}</div>
-            {% endif %}
           </div>
           {% endfor %}
           {% else %}
@@ -989,7 +954,7 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
               <div class="fac-num">{{ fac.numero }}</div>
               <div class="fac-meta">
                 {{ fac.date_emission|date:"d/m/Y"|default:"—" }}
-                {% if fac.type %} &middot; {{ fac.get_type_display }}{% endif %}
+                {% if fac.type_facture %} &middot; {{ fac.get_type_facture_display }}{% endif %}
               </div>
             </div>
             {# Chip statut #}
@@ -1011,7 +976,7 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
               {% endif %}
             </div>
             <div>
-              <a href="{% url 'hospitalisation:facture_detail' fac.pk %}" class="fac-link">
+              <a href="{% url 'facturation:detail' fac.pk %}?next={% url 'hospitalisation:detail' hosp.pk %}" class="fac-link">
                 <i class="bi bi-eye"></i> Voir
               </a>
             </div>
@@ -1025,22 +990,6 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
         </div>
         {% endif %}
 
-        {% if actions.creer_facture.visible and not lecture_seule_totale %}
-        <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;">
-          {% if actions.creer_facture.enabled %}
-          <a href="{{ url_facture }}" class="abtn abtn-success">
-            <i class="bi bi-receipt"></i> Facture complémentaire
-            {% if saf_non_factures %}
-            <span style="background:rgba(255,255,255,.28);border-radius:100px;padding:0 6px;font-size:10px;">{{ saf_non_factures }}</span>
-            {% endif %}
-          </a>
-          {% else %}
-          <button class="abtn abtn-success off" disabled title="{{ actions.creer_facture.raison_blocage }}">
-            <i class="bi bi-receipt"></i> Facture complémentaire
-          </button>
-          {% endif %}
-        </div>
-        {% endif %}
 
       </div>
 
@@ -1139,6 +1088,7 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
 {# Zone de toasts #}
 <div id="toast-area" aria-live="polite" aria-atomic="true"></div>
 
+</div><!-- /#page-wrap -->
 {% endblock %}
 
 {% block extra_js %}
@@ -1273,9 +1223,11 @@ function renderActionBar(data) {
     return '<button class="abtn ' + cls + '" onclick="' + onclk + '">' + body + '</button>';
   }
 
-  var confirmerLabel = (s === 'brouillon') ? 'Confirmer la demande' : 'Enregistrer les soins';
-  html += abtn('confirmer', 'abtn-primary', 'bi-check2-circle', confirmerLabel,
-               "doTransition('" + URL_CONFIRMER + "')");
+  /* Confirmer uniquement visible en brouillon (cohérent avec le template) */
+  if (s === 'brouillon') {
+    html += abtn('confirmer', 'abtn-primary', 'bi-check2-circle', 'Confirmer la demande',
+                 "doTransition('" + URL_CONFIRMER + "')");
+  }
 
   if (A.creer_facture && A.creer_facture.visible) {
     var sfBadge = (data.saf_non_factures || 0) > 0 ? String(data.saf_non_factures) : '';

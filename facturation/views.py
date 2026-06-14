@@ -12,8 +12,9 @@ from core.views import log_event, get_logs
 
 @login_required(login_url='login')
 def facturation_list(request):
-    q = request.GET.get('q', '').strip()
+    q      = request.GET.get('q', '').strip()
     statut = request.GET.get('statut', '').strip()
+    type_f = request.GET.get('type_f', '').strip()
 
     qs = Facture.objects.select_related('patient').order_by('-date_emission')
 
@@ -25,32 +26,42 @@ def facturation_list(request):
         )
     if statut:
         qs = qs.filter(statut=statut)
+    if type_f:
+        qs = qs.filter(type_facture=type_f)
 
     total = qs.count()
 
     all_qs = Facture.objects.all()
-    montant_total   = all_qs.aggregate(s=Sum('montant_total'))['s'] or 0
-    montant_recu    = all_qs.aggregate(s=Sum('montant_paye'))['s']  or 0
-    montant_attente = montant_total - montant_recu
+    montant_total     = all_qs.aggregate(s=Sum('montant_total'))['s'] or 0
+    montant_recu      = all_qs.aggregate(s=Sum('montant_paye'))['s']  or 0
+    montant_attente   = montant_total - montant_recu
     taux_recouvrement = round(montant_recu * 100 / montant_total) if montant_total else 0
+    nb_factures       = all_qs.count()
+    nb_payees         = all_qs.filter(statut='payee').count()
+    nb_emises         = all_qs.filter(statut='emise').count()
 
     stats = {
-        'montant_total':      int(montant_total),
-        'montant_recu':       int(montant_recu),
-        'montant_attente':    int(montant_attente),
-        'taux_recouvrement':  taux_recouvrement,
+        'montant_total':     int(montant_total),
+        'montant_recu':      int(montant_recu),
+        'montant_attente':   int(montant_attente),
+        'taux_recouvrement': taux_recouvrement,
+        'nb_factures':       nb_factures,
+        'nb_payees':         nb_payees,
+        'nb_emises':         nb_emises,
     }
 
     paginator = Paginator(qs, 25)
-    page_obj = paginator.get_page(request.GET.get('page'))
+    page_obj  = paginator.get_page(request.GET.get('page'))
 
     return render(request, 'facturation/list.html', {
         'page_obj':       page_obj,
         'stats':          stats,
         'q':              q,
         'statut':         statut,
+        'type_f':         type_f,
         'total':          total,
         'statut_choices': Facture.STATUT,
+        'type_choices':   Facture.TYPE,
     })
 
 
@@ -64,7 +75,7 @@ def facture_create(request):
     patient    = get_object_or_404(Patient, pk=patient_pk) if patient_pk else None
     actes      = Acte.objects.filter(actif=True).order_by('categorie', 'libelle')
     caisses    = Caisse.objects.filter(actif=True).order_by('nom')
-    services   = Articleservice.objects.all().order_by('nom')
+    services   = Articleservice.objects.select_related('categorie').filter(actif=True).order_by('nom')
 
     hosp_obj = None
     hosp_pk  = request.GET.get('hospitalisation') or request.POST.get('hospitalisation_id')
@@ -132,6 +143,94 @@ def facture_create(request):
 
 
 @login_required(login_url='login')
+def facture_detail(request, pk):
+    facture   = get_object_or_404(Facture, pk=pk)
+    lignes    = facture.lignes.all()
+    paiements = facture.paiements.order_by('date_paiement') if hasattr(facture, 'paiements') else []
+    logs      = get_logs(facture)
+    back_url  = request.GET.get('next', reverse('facturation:list'))
+    return render(request, 'facturation/detail.html', {
+        'facture':   facture,
+        'lignes':    lignes,
+        'paiements': paiements,
+        'logs':      logs,
+        'is_admin':  request.user.is_superuser or request.user.is_staff,
+        'back_url':  back_url,
+    })
+
+
+@login_required(login_url='login')
+def facture_valider(request, pk):
+    facture  = get_object_or_404(Facture, pk=pk)
+    back_url = request.POST.get('next', reverse('facturation:list'))
+    if request.method == 'POST' and facture.statut == 'brouillon':
+        facture.statut = 'emise'
+        facture.save()
+        log_event(facture, request.user, 'Statut changé : émise', type='statut')
+        messages.success(request, f"Facture {facture.numero} validée et émise.")
+    return redirect(f"{reverse('facturation:detail', kwargs={'pk': pk})}?next={back_url}")
+
+
+@login_required(login_url='login')
+def facture_payer(request, pk):
+    from soins.models import Soin
+    facture  = get_object_or_404(Facture, pk=pk)
+    if request.method != 'POST':
+        return redirect('facturation:detail', pk=pk)
+    back_url = request.POST.get('next', reverse('facturation:list'))
+
+    try:
+        montant = float(request.POST.get('pay_montant', 0))
+    except (TypeError, ValueError):
+        montant = 0
+
+    if montant > 0 and facture.statut in ('brouillon', 'emise'):
+        Paiement.objects.create(
+            facture=facture,
+            montant=montant,
+            mode_paiement=request.POST.get('pay_mode', 'especes'),
+            reference=request.POST.get('pay_reference', ''),
+            recu_par=request.user,
+        )
+        total_paye = sum(p.montant for p in facture.paiements.all())
+        facture.montant_paye = total_paye
+        if total_paye >= facture.montant_total:
+            facture.statut = 'payee'
+            facture.save(update_fields=['montant_paye', 'statut'])
+            log_event(facture, request.user, 'Statut changé : payée', type='statut')
+            soin = Soin.objects.filter(facture=facture).first()
+            if soin:
+                soin.statut = 'en_cours'
+                soin.save(update_fields=['statut'])
+        else:
+            facture.save(update_fields=['montant_paye'])
+
+    return redirect(f"{reverse('facturation:detail', kwargs={'pk': pk})}?next={back_url}")
+
+
+@login_required(login_url='login')
+def facture_print(request, pk):
+    facture = get_object_or_404(Facture.objects.select_related('patient', 'cree_par'), pk=pk)
+    return render(request, 'facturation/print.html', {
+        'facture':   facture,
+        'lignes':    facture.lignes.select_related('acte').all(),
+        'paiements': facture.paiements.all(),
+        'back_url':  request.GET.get('next', reverse('facturation:list')),
+    })
+
+
+@login_required(login_url='login')
+def facture_apercu(request, pk):
+    facture = get_object_or_404(Facture.objects.select_related('patient', 'cree_par'), pk=pk)
+    return render(request, 'facturation/apercu.html', {
+        'facture':   facture,
+        'lignes':    facture.lignes.select_related('acte').all(),
+        'paiements': facture.paiements.all(),
+        'back_url':  request.GET.get('next', reverse('facturation:list')),
+    })
+
+
+@login_required(login_url='login')
 def facture_edit(request, pk):
     from caisse.models import Caisse
     from services.models import Articleservice
@@ -139,11 +238,14 @@ def facture_edit(request, pk):
     facture  = get_object_or_404(Facture, pk=pk)
     actes    = Acte.objects.filter(actif=True).order_by('categorie', 'libelle')
     caisses  = Caisse.objects.filter(actif=True).order_by('nom')
-    services = Articleservice.objects.all().order_by('nom')
-    lignes   = list(facture.lignes.all())
+    services = Articleservice.objects.select_related('categorie').filter(actif=True).order_by('nom')
     is_admin = request.user.is_superuser
+    back_url = request.GET.get('next', reverse('facturation:detail', kwargs={'pk': pk}))
 
     if request.method == 'POST':
+        back_url = request.POST.get('next', back_url)
+        detail_url = reverse('facturation:detail', kwargs={'pk': pk})
+
         # ── Actions workflow ────────────────────────────────────────────────
         if 'action_emettre' in request.POST:
             if facture.statut == 'brouillon' or is_admin:
@@ -151,7 +253,7 @@ def facture_edit(request, pk):
                 facture.save()
                 log_event(facture, request.user, 'Statut changé : Émise', type='statut')
                 messages.success(request, 'Facture émise.')
-            return redirect('facturation:edit', pk=facture.pk)
+            return redirect(f'{detail_url}?next={back_url}')
 
         if 'action_payer' in request.POST:
             if facture.statut in ('emise', 'brouillon') or is_admin:
@@ -159,7 +261,7 @@ def facture_edit(request, pk):
                 facture.save()
                 log_event(facture, request.user, 'Statut changé : Payée', type='statut')
                 messages.success(request, 'Facture marquée comme payée.')
-            return redirect('facturation:edit', pk=facture.pk)
+            return redirect(f'{detail_url}?next={back_url}')
 
         if 'action_annuler' in request.POST:
             if facture.statut != 'annulee' or is_admin:
@@ -167,7 +269,7 @@ def facture_edit(request, pk):
                 facture.save()
                 log_event(facture, request.user, 'Facture annulée', type='statut')
                 messages.success(request, 'Facture annulée.')
-            return redirect('facturation:edit', pk=facture.pk)
+            return redirect(f'{detail_url}?next={back_url}')
 
         if 'action_brouillon' in request.POST:
             if facture.statut == 'emise' or is_admin:
@@ -175,37 +277,45 @@ def facture_edit(request, pk):
                 facture.save()
                 log_event(facture, request.user, 'Remise en brouillon', type='statut')
                 messages.success(request, 'Remise en brouillon.')
-            return redirect('facturation:edit', pk=facture.pk)
+            return redirect(f'{detail_url}?next={back_url}')
 
         # ── Sauvegarde ──────────────────────────────────────────────────────
-        form = FactureForm(request.POST, instance=facture)
+        form = FactureForm(request.POST, instance=facture, is_admin=is_admin)
         if form.is_valid():
             facture = form.save(commit=False)
             facture.lignes.all().delete()
             total = _save_lignes(facture, request.POST)
             facture.montant_total = total
             facture.save()
-
-            facture = _handle_paiement(facture, request.POST, request.user, total)
-
             log_event(facture, request.user, 'Facture mise à jour.', type='modif')
             messages.success(request, f'Facture {facture.numero} mise à jour.')
-            return redirect('facturation:edit', pk=facture.pk)
+            return redirect(f'{detail_url}?next={back_url}')
     else:
-        form = FactureForm(instance=facture)
+        form = FactureForm(instance=facture, is_admin=is_admin)
+
+    initial_lignes = [
+        {
+            'libelle': l.libelle,
+            'qte':     float(l.quantite),
+            'prix':    float(l.prix_unitaire),
+            'remise':  float(l.remise),
+        }
+        for l in facture.lignes.all()
+    ]
 
     return render(request, 'facturation/create_facture.html', {
-        'form':      form,
-        'facture':   facture,
-        'patient':   facture.patient,
-        'actes':     actes,
-        'services':  services,
-        'caisses':   caisses,
-        'lignes':    lignes,
-        'is_admin':  is_admin,
-        'edit':      True,
-        'paiements': list(facture.paiements.all()),
-        'logs':      get_logs(facture),
+        'form':          form,
+        'facture':       facture,
+        'patient':       facture.patient,
+        'actes':         actes,
+        'services':      services,
+        'caisses':       caisses,
+        'initial_lignes': initial_lignes,
+        'is_admin':      is_admin,
+        'edit':          True,
+        'back_url':      back_url,
+        'paiements':     list(facture.paiements.all()),
+        'logs':          get_logs(facture),
     })
 
 

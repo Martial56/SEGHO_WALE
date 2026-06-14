@@ -29,7 +29,7 @@ def get_actions_disponibles(hosp, user):
     """
     from facturation.models import Facture
 
-    su = user.is_superuser
+    su = user.is_superuser or user.is_staff
 
     if su:
         return {k: {'visible': True, 'enabled': True, 'raison_blocage': ''}
