@@ -12,20 +12,15 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.SeparateDatabaseAndState(
-            state_operations=[
-                migrations.AlterModelTable('Fonction',           'ressources_humaines_fonction'),
-                migrations.AlterModelTable('Grade',              'ressources_humaines_grade'),
-                migrations.AlterModelTable('TypeContrat',        'ressources_humaines_typecontrat'),
-                migrations.AlterModelTable('Employe',            'ressources_humaines_employe'),
-                migrations.AlterModelTable('DocumentEmploye',    'ressources_humaines_documentemploye'),
-                migrations.AlterModelTable('AlerteDocument',     'ressources_humaines_alertedocument'),
-                migrations.AlterModelTable('InfoSupplementaire', 'ressources_humaines_infosupplementaire'),
-                migrations.AlterModelTable('HistoriqueEmploye',  'ressources_humaines_historiqueemploye'),
-                migrations.AlterModelTable('AlerteContrat',      'ressources_humaines_alertecontrat'),
-                migrations.AlterModelTable('Conge',              'ressources_humaines_conge'),
-                migrations.AlterModelTable('Presence',           'ressources_humaines_presence'),
-            ],
-            database_operations=[],
-        ),
+        migrations.AlterModelTable('Fonction',           'ressources_humaines_fonction'),
+        migrations.AlterModelTable('Grade',              'ressources_humaines_grade'),
+        migrations.AlterModelTable('TypeContrat',        'ressources_humaines_typecontrat'),
+        migrations.AlterModelTable('Employe',            'ressources_humaines_employe'),
+        migrations.AlterModelTable('DocumentEmploye',    'ressources_humaines_documentemploye'),
+        migrations.AlterModelTable('AlerteDocument',     'ressources_humaines_alertedocument'),
+        migrations.AlterModelTable('InfoSupplementaire', 'ressources_humaines_infosupplementaire'),
+        migrations.AlterModelTable('HistoriqueEmploye',  'ressources_humaines_historiqueemploye'),
+        migrations.AlterModelTable('AlerteContrat',      'ressources_humaines_alertecontrat'),
+        migrations.AlterModelTable('Conge',              'ressources_humaines_conge'),
+        migrations.AlterModelTable('Presence',           'ressources_humaines_presence'),
     ]

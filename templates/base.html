@@ -1,12 +1,13 @@
-﻿{% load static %}
+﻿{% load static django_browser_reload %}
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}SEGHO-WALE{% endblock %}</title>
-    <link rel="icon" href="{% static 'logo.png' %}" type="image/png">
+    <link rel="icon" href="{% static 'img/logo.png' %}" type="image/png">
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=Lora:ital,wght@0,600;1,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/variables.css' %}">
     <script>
       if (localStorage.getItem('segho-theme') === 'dark') {
         document.documentElement.setAttribute('data-theme', 'dark');
@@ -18,19 +19,19 @@
         ═══════════════════════════════════════ */
         *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
         :root {
-            --teal-950: #0e1d09; --teal-900: #1b2e13; --teal-800: #2a4219;
-            --teal-700: #3a5924; --teal-600: #4a6741; --teal-500: #5e8050;
-            --teal-400: #7a9b68; --teal-300: #9ab88a; --teal-200: #bcd5a8;
-            --teal-100: #d8eac4; --teal-50:  #eef5e4;
-            --green: #16a96b; --amber: #e89a1a; --rose: #e84545;
+            --teal-950: #0e1d09; --teal-900: #071e28; --teal-800: #071e28;
+            --teal-700: #0f4358; --teal-600: #1a6d8c; --teal-500: #1a6d8c;
+            --teal-400: #1a6d8c; --teal-300: #8ab8d0; --teal-200: #a8c8d8;
+            --teal-100: #c8dce8; --teal-50:  #e8f2f8;
+            --green: #1a6d8c; --amber: #e89a1a; --rose: #e84545;
             --violet: #7b57c2; --coral: #e66144; --sky: #2d99db;
             --radius: 16px;
             --shadow-sm: 0 2px 8px rgba(0,0,0,0.08);
             --shadow-md: 0 4px 16px rgba(0,0,0,0.1);
             --shadow-lg: 0 8px 32px rgba(0,0,0,0.15);
-            --topbar-h: 92px;
+            --topbar-h: 62px;
         }
-        html { font-size: 16px; min-height: 100vh; background: #f3f7ee; }
+        html { font-size: 16px; min-height: 100vh; background: #f0f5fa; }
         body {
             margin: 0;
             font-family: 'Sora', sans-serif;
@@ -48,7 +49,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 14px 36px;
+            padding: 8px 28px;
             background: #ffffff;
             border-bottom: 1px solid rgba(0,0,0,0.07);
             position: fixed;
@@ -56,20 +57,19 @@
             left: 0;
             right: 0;
             z-index: 500;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.05);
         }
         body { padding-top: var(--topbar-h); }
 
-        .brand { display: flex; align-items: center; gap: 14px; text-decoration: none; }
+        .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
         .brand-logo {
-            width: 64px; height: 64px; flex-shrink: 0;
+            width: 42px; height: 42px; flex-shrink: 0;
             display: flex; align-items: center; justify-content: center;
         }
         .brand-logo img { width: 100%; height: 100%; object-fit: contain; }
         .brand-text h1 {
-            font-size: 17px; font-weight: 800; letter-spacing: -0.3px; color: var(--teal-900);
+            font-size: 15px; font-weight: 800; letter-spacing: -0.3px; color: var(--teal-900);
         }
-        .brand-text p { font-size: 11px; color: rgba(0,0,0,0.45); margin-top: 1px; }
+        .brand-text p { font-size: 10px; color: rgba(0,0,0,0.45); margin-top: 1px; }
 
         .topbar-right { display: flex; align-items: center; gap: 20px; }
 
@@ -103,7 +103,7 @@
             display: flex; align-items: center; justify-content: center;
             cursor: pointer; transition: all 0.15s; position: relative; flex-shrink: 0;
         }
-        .icon-btn:hover { background: rgba(74,103,65,0.08); color: var(--teal-700); }
+        .icon-btn:hover { background: rgba(26,109,140,0.08); color: var(--teal-700); }
         .icon-btn .notif-dot {
             position: absolute; top: 6px; right: 6px;
             width: 7px; height: 7px; border-radius: 50%;
@@ -126,19 +126,19 @@
         /* User chip */
         .user-chip {
             display: flex; align-items: center; gap: 10px;
-            background: #f4f8f0; border: 1px solid rgba(74,103,65,0.12);
+            background: #f0f5fa; border: 1px solid rgba(26,109,140,0.12);
             border-radius: 30px; padding: 5px 12px 5px 6px;
             cursor: pointer; font-family: inherit;
             transition: background .15s, border-color .15s;
         }
-        .user-chip:hover { background: #e8f0e0; border-color: rgba(74,103,65,0.25); }
+        .user-chip:hover { background: #e2eef5; border-color: rgba(26,109,140,0.25); }
         .user-dropdown {
             display: none; position: fixed; z-index: 9000;
             background: #fff; border: 1px solid rgba(0,0,0,.1);
             border-radius: 12px; box-shadow: 0 8px 28px rgba(0,0,0,.14);
             min-width: 200px; overflow: hidden;
         }
-        html[data-theme="dark"] .user-dropdown { background: #201d1d; border-color: rgba(154,184,138,.2); }
+        html[data-theme="dark"] .user-dropdown { background: #111C2E; border-color: rgba(33,150,243,.2); }
         .user-dropdown a, .user-dropdown button.udrop-item {
             display: flex; align-items: center; gap: 10px;
             padding: 11px 16px; font-size: 13px; font-weight: 500;
@@ -147,10 +147,10 @@
             cursor: pointer; text-align: left; transition: background .12s;
         }
         html[data-theme="dark"] .user-dropdown a,
-        html[data-theme="dark"] .user-dropdown button.udrop-item { color: #d0e8c0; }
-        .user-dropdown a:hover, .user-dropdown button.udrop-item:hover { background: rgba(74,103,65,.07); }
+        html[data-theme="dark"] .user-dropdown button.udrop-item { color: #F1F5F9; }
+        .user-dropdown a:hover, .user-dropdown button.udrop-item:hover { background: rgba(26,109,140,.07); }
         .udrop-sep { height: 1px; background: rgba(0,0,0,.07); margin: 4px 0; }
-        html[data-theme="dark"] .udrop-sep { background: rgba(154,184,138,.12); }
+        html[data-theme="dark"] .udrop-sep { background: rgba(33,150,243,.12); }
         .udrop-logout { color: #b71c1c !important; }
         .user-avatar {
             width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
@@ -163,7 +163,7 @@
 
         /* Logout button */
         .btn-logout {
-            background: rgba(74,103,65,0.08); border: none; border-radius: 10px;
+            background: rgba(26,109,140,0.08); border: none; border-radius: 10px;
             color: var(--teal-800); width: 34px; height: 34px; padding: 0;
             cursor: pointer; transition: all 0.15s;
             display: flex; align-items: center; justify-content: center; flex-shrink: 0;
@@ -189,15 +189,15 @@
             transition: background .15s, color .15s;
         }
         .breadcrumb a:hover {
-            background: rgba(74,103,65,.08);
+            background: rgba(26,109,140,.08);
             color: var(--teal-600);
         }
         .breadcrumb span { color: rgba(0,0,0,0.4); }
         .breadcrumb-sep { color: rgba(0,0,0,0.25); font-size: 15px; line-height: 1; }
         html[data-theme="dark"] .breadcrumb a { color: var(--teal-300); }
-        html[data-theme="dark"] .breadcrumb a:hover { background: rgba(74,103,65,.15); color: var(--teal-200); }
+        html[data-theme="dark"] .breadcrumb a:hover { background: rgba(33,150,243,0.15); color: var(--teal-200); }
         html[data-theme="dark"] .breadcrumb span,
-        html[data-theme="dark"] .breadcrumb-sep { color: rgba(255,255,255,0.3); }
+        html[data-theme="dark"] .breadcrumb-sep { color: #64748B; }
 
         /* ═══════════════════════════════════════
            PAGE HEADER
@@ -256,7 +256,7 @@
            ALERTS (kept for any inline usage)
         ═══════════════════════════════════════ */
         .alert { padding: 14px 18px; border-radius: 10px; font-size: 14px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; }
-        .alert-success { background: rgba(22,169,107,0.1);  color: #0d5b3d; border-left: 4px solid var(--green); }
+        .alert-success { background: rgba(26,109,140,0.1);  color: #0f4358; border-left: 4px solid var(--green); }
         .alert-error   { background: rgba(232,69,69,0.1);   color: #6b1f1f; border-left: 4px solid var(--rose); }
         .alert-warning { background: rgba(232,154,26,0.1);  color: #6b4a0f; border-left: 4px solid var(--amber); }
         .alert-info    { background: rgba(45,153,219,0.1);  color: #1a4d6d; border-left: 4px solid var(--sky); }
@@ -334,12 +334,12 @@
             to   { transform: scaleX(0); }
         }
         html[data-theme="dark"] .toast {
-            background: #201d1d;
+            background: #111C2E;
             box-shadow: 0 6px 24px rgba(0,0,0,0.4);
         }
-        html[data-theme="dark"] .toast-body { color: #d8eac4; }
+        html[data-theme="dark"] .toast-body { color: #F1F5F9; }
         html[data-theme="dark"] .toast-close { color: #666; }
-        html[data-theme="dark"] .toast-close:hover { color: #e0e8e0; }
+        html[data-theme="dark"] .toast-close:hover { color: #daeaf5; }
 
         /* ═══════════════════════════════════════
            FORMS
@@ -380,11 +380,11 @@
             letter-spacing: 0.2px;
         }
         .badge-primary {
-            background: rgba(74,103,65,0.15);
+            background: rgba(26,109,140,0.15);
             color: var(--teal-600);
         }
         .badge-success {
-            background: rgba(22,169,107,0.15);
+            background: rgba(26,109,140,0.15);
             color: var(--green);
         }
         .badge-warning {
@@ -403,7 +403,7 @@
             .content { padding: 20px; }
             .table-container, .o-list-wrap { margin: 0 -20px; }
             .page-header { flex-direction: column; }
-            .topbar { padding: 12px 20px; }
+            .topbar { padding: 6px 16px; }
         }
         @media (max-width: 768px) {
             .grid { grid-template-columns: 1fr; }
@@ -415,55 +415,58 @@
         /* ═══════════════════════════════════════
            DARK THEME
         ═══════════════════════════════════════ */
+        html[data-theme="dark"] {
+            background: #0B1220;
+        }
         html[data-theme="dark"] body {
-            background: #171616;
-            color: #d0e8c0;
+            background: #0B1220;
+            color: #F1F5F9;
         }
         html[data-theme="dark"] .topbar {
-            background: #201d1d;
-            border-bottom: 1px solid rgba(255,255,255,0.06);
-            box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+            background: #111C2E;
+            border-bottom: 1px solid #243447;
         }
-        html[data-theme="dark"] .topbar-title { color: #d0e8c0; }
-        html[data-theme="dark"] .brand-text p { color: rgba(255,255,255,0.35); }
-        html[data-theme="dark"] .topbar-action { color: #7a9b68; }
-        html[data-theme="dark"] .topbar-action:hover { color: #9ab88a; }
-        html[data-theme="dark"] .icon-btn { color: #72984e; }
-        html[data-theme="dark"] .icon-btn:hover { background: rgba(74,103,65,0.15); color: #d0e8c0; }
-        html[data-theme="dark"] .icon-btn .notif-dot { border-color: #201d1d; }
-        html[data-theme="dark"] .user-chip { background: rgba(74,103,65,0.15); border-color: rgba(74,103,65,0.25); }
-        html[data-theme="dark"] .user-info .uname { color: #d0e8c0; }
-        html[data-theme="dark"] .user-info .urole { color: rgba(255,255,255,0.35); }
+        html[data-theme="dark"] .topbar-title { color: #F1F5F9; }
+        html[data-theme="dark"] .brand-text h1 { color: #e2eef5; }
+        html[data-theme="dark"] .brand-text p { color: #64748B; }
+        html[data-theme="dark"] .topbar-action { color: #2196F3; }
+        html[data-theme="dark"] .topbar-action:hover { color: #42A5F5; }
+        html[data-theme="dark"] .icon-btn { color: #2196F3; }
+        html[data-theme="dark"] .icon-btn:hover { background: rgba(33,150,243,0.15); color: #F1F5F9; }
+        html[data-theme="dark"] .icon-btn .notif-dot { border-color: #111C2E; }
+        html[data-theme="dark"] .user-chip { background: rgba(33,150,243,0.15); border-color: #2F4B66; }
+        html[data-theme="dark"] .user-info .uname { color: #F1F5F9; }
+        html[data-theme="dark"] .user-info .urole { color: #94A3B8; }
         html[data-theme="dark"] .top-clock .time { color: var(--teal-300); }
-        html[data-theme="dark"] .top-clock { color: rgba(255,255,255,0.35); }
-        html[data-theme="dark"] .btn-logout { background: rgba(74,103,65,0.15); color: #9ab88a; }
+        html[data-theme="dark"] .top-clock { color: #94A3B8; }
+        html[data-theme="dark"] .btn-logout { background: rgba(33,150,243,0.15); color: #42A5F5; }
         html[data-theme="dark"] .btn-logout:hover { background: rgba(232,69,69,0.15); color: #e87070; }
         html[data-theme="dark"] .top-alert-badge {
-            background: rgba(74,103,65,0.15);
-            border-color: rgba(74,103,65,0.25);
+            background: rgba(33,150,243,0.15);
+            border-color: #2F4B66;
             color: var(--teal-300);
         }
         html[data-theme="dark"] .top-alert-badge:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.3); }
 
-        html[data-theme="dark"] .breadcrumb span { color: rgba(255,255,255,0.3); }
+        html[data-theme="dark"] .breadcrumb span { color: #64748B; }
         html[data-theme="dark"] .breadcrumb a { color: var(--teal-400); }
 
-        html[data-theme="dark"] .page-header-left h1 { color: #d0e8c0; }
-        html[data-theme="dark"] .page-header-left p  { color: rgba(255,255,255,0.4); }
+        html[data-theme="dark"] .page-header-left h1 { color: #F1F5F9; }
+        html[data-theme="dark"] .page-header-left p  { color: #94A3B8; }
 
-        html[data-theme="dark"] .table-container { background: #201d1d; }
-        html[data-theme="dark"] thead { background: rgba(255,255,255,0.03); border-bottom-color: rgba(255,255,255,0.08); }
-        html[data-theme="dark"] th { color: #9ab88a; }
-        html[data-theme="dark"] td { border-bottom-color: rgba(255,255,255,0.04); color: #bcd5a8; }
-        html[data-theme="dark"] tbody tr:hover { background: rgba(74,103,65,0.06); }
+        html[data-theme="dark"] .table-container { background: #111C2E; }
+        html[data-theme="dark"] thead { background: rgba(255,255,255,0.03); border-bottom-color: #243447; }
+        html[data-theme="dark"] th { color: #42A5F5; }
+        html[data-theme="dark"] td { border-bottom-color: rgba(255,255,255,0.04); color: #a8c8d8; }
+        html[data-theme="dark"] tbody tr:hover { background: #1D2C44; }
 
-        html[data-theme="dark"] .card { background: #201d1d; }
-        html[data-theme="dark"] .card-title { color: #d0e8c0; }
-        html[data-theme="dark"] .card-meta { color: rgba(255,255,255,0.4); }
+        html[data-theme="dark"] .card { background: #162235; }
+        html[data-theme="dark"] .card-title { color: #F1F5F9; }
+        html[data-theme="dark"] .card-meta { color: #94A3B8; }
 
-        html[data-theme="dark"] .btn-secondary { background: rgba(255,255,255,0.08); color: #d0e8c0; }
+        html[data-theme="dark"] .btn-secondary { background: rgba(255,255,255,0.08); color: #F1F5F9; }
         html[data-theme="dark"] .btn-secondary:hover { background: rgba(255,255,255,0.12); }
-        html[data-theme="dark"] .alert-success { background: rgba(22,169,107,0.12); color: #6eddb0; }
+        html[data-theme="dark"] .alert-success { background: rgba(26,109,140,0.12); color: #7ab8d0; }
         html[data-theme="dark"] .alert-error   { background: rgba(232,69,69,0.12);  color: #f09090; }
         html[data-theme="dark"] .alert-warning { background: rgba(232,154,26,0.12); color: #f0c070; }
         html[data-theme="dark"] .alert-info    { background: rgba(45,153,219,0.12); color: #80c8ef; }
@@ -473,7 +476,7 @@
         html[data-theme="dark"] .form-group select {
             background: transparent;
             border-bottom-color: rgba(255,255,255,0.15);
-            color: #d0e8c0;
+            color: #F1F5F9;
         }
         html[data-theme="dark"] .form-group input:focus,
         html[data-theme="dark"] .form-group textarea:focus,
@@ -488,59 +491,59 @@
            Inutile de les répéter dans chaque template. */
 
         /* Barre d'actions */
-        html[data-theme="dark"] .action-bar { background: #201d1d; }
+        html[data-theme="dark"] .action-bar { background: #111C2E; }
 
         /* Status flow */
-        html[data-theme="dark"] .status-step { background: #0f0e0e; border-color: rgba(255,255,255,0.1); color: rgba(255,255,255,0.3); }
+        html[data-theme="dark"] .status-step { background: #0f0e0e; border-color: #243447; color: #64748B; }
         html[data-theme="dark"] .status-step.active { background: var(--teal-600); color: #fff; border-color: var(--teal-600); }
         html[data-theme="dark"] .form-card,
-        html[data-theme="dark"] .detail-card { background: #201d1d; }
+        html[data-theme="dark"] .detail-card { background: #111C2E; }
         html[data-theme="dark"] .form-section,
-        html[data-theme="dark"] .detail-section { border-top-color: rgba(255,255,255,0.06) !important; }
+        html[data-theme="dark"] .detail-section { border-top-color: #243447 !important; }
         html[data-theme="dark"] .detail-field .lbl { color: rgba(255,255,255,0.45); text-transform: uppercase; }
-        html[data-theme="dark"] .detail-field .val { color: #d0e8c0; }
+        html[data-theme="dark"] .detail-field .val { color: #F1F5F9; }
         html[data-theme="dark"] .detail-field .val.empty { color: rgba(255,255,255,0.2); }
-        html[data-theme="dark"] .form-check label { color: #d0e8c0; }
+        html[data-theme="dark"] .form-check label { color: #F1F5F9; }
 
         /* Inputs inline (form-input et variantes hors .form-group) */
-        html[data-theme="dark"] .form-input { background: transparent; border-bottom-color: rgba(255,255,255,0.15); color: #d0e8c0; }
+        html[data-theme="dark"] .form-input { background: transparent; border-bottom-color: rgba(255,255,255,0.15); color: #F1F5F9; }
         html[data-theme="dark"] .form-input:focus { border-bottom-color: var(--teal-400); box-shadow: none; }
 
         /* Onglets */
-        html[data-theme="dark"] .tabs { background: #201d1d; border-bottom-color: rgba(255,255,255,0.06); }
-        html[data-theme="dark"] .tab-btn { color: rgba(255,255,255,0.35); background: none; }
+        html[data-theme="dark"] .tabs { background: #111C2E; border-bottom-color: #243447; }
+        html[data-theme="dark"] .tab-btn { color: #94A3B8; background: none; }
         html[data-theme="dark"] .tab-btn.active { color: var(--teal-300); border-bottom-color: var(--teal-300); }
-        html[data-theme="dark"] .tab-pane { background: #201d1d; }
+        html[data-theme="dark"] .tab-pane { background: #111C2E; }
 
         /* Tableau de lignes (formset) */
-        html[data-theme="dark"] .lignes-table th { color: rgba(255,255,255,0.4); border-bottom-color: rgba(255,255,255,0.08); }
-        html[data-theme="dark"] .lignes-table td { border-bottom-color: rgba(255,255,255,0.04); color: #bcd5a8; }
+        html[data-theme="dark"] .lignes-table th { color: #94A3B8; border-bottom-color: #243447; }
+        html[data-theme="dark"] .lignes-table td { border-bottom-color: rgba(255,255,255,0.04); color: #a8c8d8; }
         html[data-theme="dark"] .lignes-table input,
-        html[data-theme="dark"] .lignes-table select { background: #0f0e0e; border-color: rgba(255,255,255,0.1); color: #d0e8c0; }
+        html[data-theme="dark"] .lignes-table select { background: #0f0e0e; border-color: #243447; color: #F1F5F9; }
         html[data-theme="dark"] .lignes-table .qte-totale,
         html[data-theme="dark"] .qte-totale-cell { color: var(--teal-300); }
-        html[data-theme="dark"] .btn-add-line { background: rgba(74,103,65,0.1); color: var(--teal-300); border-color: rgba(74,103,65,0.3); }
+        html[data-theme="dark"] .btn-add-line { background: rgba(33,150,243,0.1); color: var(--teal-300); border-color: rgba(33,150,243,0.3); }
         html[data-theme="dark"] .btn-del-line { background: rgba(232,69,69,0.15); color: #f09090; }
 
         /* Stats */
-        html[data-theme="dark"] .stat-box { background: #201d1d; }
+        html[data-theme="dark"] .stat-box { background: #111C2E; }
         html[data-theme="dark"] .stat-box .val { color: var(--teal-300); }
-        html[data-theme="dark"] .stat-box .lbl { color: rgba(255,255,255,0.4); }
+        html[data-theme="dark"] .stat-box .lbl { color: #94A3B8; }
         html[data-theme="dark"] .toolbar input,
-        html[data-theme="dark"] .toolbar select { background: #201d1d; border-color: rgba(255,255,255,0.1); color: #d0e8c0; font-family: 'Sora', sans-serif; }
+        html[data-theme="dark"] .toolbar select { background: #111C2E; border-color: #243447; color: #F1F5F9; font-family: 'Sora', sans-serif; }
 
         /* Badges statut */
         html[data-theme="dark"] .badge-brouillon { background: rgba(232,154,26,0.2);  color: #f0c060; }
-        html[data-theme="dark"] .badge-prescrit  { background: rgba(22,169,107,0.2);  color: #6eddb0; }
-        html[data-theme="dark"] .badge-code      { background: rgba(74,103,65,0.2);  color: var(--teal-300); }
+        html[data-theme="dark"] .badge-prescrit  { background: rgba(26,109,140,0.2);  color: #7ab8d0; }
+        html[data-theme="dark"] .badge-code      { background: rgba(26,109,140,0.2);  color: var(--teal-300); }
 
         /* Titres de section */
-        html[data-theme="dark"] .section-title { color: var(--teal-300); border-bottom-color: rgba(255,255,255,0.06); }
+        html[data-theme="dark"] .section-title { color: var(--teal-300); border-bottom-color: #243447; }
 
         /* Dropdown configuration */
-        html[data-theme="dark"] #config-dropdown { background: #201d1d; border-color: rgba(255,255,255,0.08); }
-        html[data-theme="dark"] #config-dropdown a { color: #d0e8c0; border-bottom-color: rgba(255,255,255,0.06); }
-        html[data-theme="dark"] #config-dropdown a:hover { background: rgba(74,103,65,0.1); }
+        html[data-theme="dark"] #config-dropdown { background: #111C2E; border-color: #243447; }
+        html[data-theme="dark"] #config-dropdown a { color: #F1F5F9; border-bottom-color: #243447; }
+        html[data-theme="dark"] #config-dropdown a:hover { background: rgba(33,150,243,0.1); }
 
         /* ── fin composants réutilisables ─────────────────────────────────── */
 
@@ -552,7 +555,7 @@
             border-radius: 8px; transition: all 0.15s;
             display: flex; align-items: center;
         }
-        .theme-toggle:hover { background: rgba(74,103,65,0.1); color: var(--teal-400); }
+        .theme-toggle:hover { background: rgba(26,109,140,0.1); color: var(--teal-400); }
         .theme-toggle .icon-sun  { display:block; }
         .theme-toggle .icon-moon { display:none; }
         html[data-theme="dark"] .theme-toggle .icon-sun  { display:none; }
@@ -562,12 +565,12 @@
     <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
     {% block extra_css %}{% endblock %}
 </head>
-<body><div id="page-loader" style="position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:#f3f7ee;transition:opacity .4s ease;"><div style="position:relative;width:90px;height:90px;display:flex;align-items:center;justify-content:center;"><svg width="90" height="90" viewBox="0 0 90 90" style="position:absolute;top:0;left:0;animation:spin 1.2s linear infinite;"><circle cx="45" cy="45" r="40" fill="none" stroke="#e8f0e0" stroke-width="5"/><circle cx="45" cy="45" r="40" fill="none" stroke="#4a6741" stroke-width="5" stroke-dasharray="60 192" stroke-linecap="round"/></svg><img src="{% static 'logo.png' %}" alt="WALÉ" style="width:50px;height:50px;object-fit:contain;"></div></div><div class="main">
+<body><div id="page-loader" style="position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:#f0f5fa;transition:opacity .4s ease;"><div style="position:relative;width:90px;height:90px;display:flex;align-items:center;justify-content:center;"><svg width="90" height="90" viewBox="0 0 90 90" style="position:absolute;top:0;left:0;animation:spin 1.2s linear infinite;"><circle cx="45" cy="45" r="40" fill="none" stroke="#e2eef5" stroke-width="5"/><circle cx="45" cy="45" r="40" fill="none" stroke="#1a6d8c" stroke-width="5" stroke-dasharray="60 192" stroke-linecap="round"/></svg><img src="{% static 'img/logo.png' %}" alt="WALÉ" style="width:50px;height:50px;object-fit:contain;"></div></div><div class="main">
         <div class="topbar">
         <div class="topbar-left" style="display:flex;align-items:center;gap:16px;">
             <a href="/" style="text-decoration:none;" class="brand">
                 <div class="brand-logo">
-                    <img src="{% static 'logo.png' %}" alt="Logo WALÉ">
+                    <img src="{% static 'img/logo.png' %}" alt="Logo WALÉ">
                 </div>
                 <div class="brand-text">
                     <h1>SEGHO-WALE</h1>
@@ -620,7 +623,7 @@
                 <div style="padding:12px 16px 10px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(0,0,0,0.07);">
                   <span style="font-size:13px;font-weight:700;color:#1a3020;">Notifications</span>
                   {% if alertes_count %}
-                  <button onclick="toutLire()" style="font-size:11px;color:#4a7236;background:none;border:none;cursor:pointer;font-weight:600;padding:2px 6px;border-radius:4px;" onmouseover="this.style.background='rgba(74,114,54,0.08)'" onmouseout="this.style.background='none'">
+                  <button onclick="toutLire()" style="font-size:11px;color:#0f4358;background:none;border:none;cursor:pointer;font-weight:600;padding:2px 6px;border-radius:4px;" onmouseover="this.style.background='rgba(26,109,140,0.08)'" onmouseout="this.style.background='none'">
                     Tout marquer lu
                   </button>
                   {% endif %}
@@ -647,7 +650,7 @@
                         {% endwith %}
                       </div>
                     </div>
-                    <button onclick="marquerLue({{ alerte.id }}, this)" title="Marquer comme lu" style="background:none;border:none;cursor:pointer;color:rgba(0,0,0,0.25);padding:4px;border-radius:4px;flex-shrink:0;" onmouseover="this.style.color='#4a7236'" onmouseout="this.style.color='rgba(0,0,0,0.25)'">
+                    <button onclick="marquerLue({{ alerte.id }}, this)" title="Marquer comme lu" style="background:none;border:none;cursor:pointer;color:rgba(0,0,0,0.25);padding:4px;border-radius:4px;flex-shrink:0;" onmouseover="this.style.color='#0f4358'" onmouseout="this.style.color='rgba(0,0,0,0.25)'">
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                     </button>
                   </div>
@@ -670,11 +673,11 @@
                       <div style="font-size:11.5px;color:rgba(0,0,0,0.55);margin-top:2px;">
                         {{ alerte.document.titre }} — exp. <strong>{{ alerte.date_expiration|date:"d/m/Y" }}</strong>
                         {% with j=alerte.jours_restants %}
-                        <span style="margin-left:3px;padding:1px 5px;border-radius:8px;font-size:10px;font-weight:700;{% if j <= 30 %}background:rgba(123,87,194,0.12);color:#5b3fa0;{% else %}background:rgba(45,153,219,0.12);color:#4a6741;{% endif %}">{{ j }}j</span>
+                        <span style="margin-left:3px;padding:1px 5px;border-radius:8px;font-size:10px;font-weight:700;{% if j <= 30 %}background:rgba(123,87,194,0.12);color:#5b3fa0;{% else %}background:rgba(45,153,219,0.12);color:#1a6d8c;{% endif %}">{{ j }}j</span>
                         {% endwith %}
                       </div>
                     </div>
-                    <button onclick="marquerLueDoc({{ alerte.id }}, this)" title="Marquer comme lu" style="background:none;border:none;cursor:pointer;color:rgba(0,0,0,0.25);padding:4px;border-radius:4px;flex-shrink:0;" onmouseover="this.style.color='#4a7236'" onmouseout="this.style.color='rgba(0,0,0,0.25)'">
+                    <button onclick="marquerLueDoc({{ alerte.id }}, this)" title="Marquer comme lu" style="background:none;border:none;cursor:pointer;color:rgba(0,0,0,0.25);padding:4px;border-radius:4px;flex-shrink:0;" onmouseover="this.style.color='#0f4358'" onmouseout="this.style.color='rgba(0,0,0,0.25)'">
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                     </button>
                   </div>
@@ -686,13 +689,13 @@
                     <span>Congés</span>
                     <form method="post" action="/conges/notifs/lire/" style="display:inline;">
                       <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
-                      <button type="submit" style="font-size:10px;color:#4a7236;background:none;border:none;cursor:pointer;font-weight:600;padding:1px 5px;border-radius:4px;">Tout lire</button>
+                      <button type="submit" style="font-size:10px;color:#0f4358;background:none;border:none;cursor:pointer;font-weight:600;padding:1px 5px;border-radius:4px;">Tout lire</button>
                     </form>
                   </div>
                   {% for notif in notifs_conge %}
                   <div id="notif-conge-{{ notif.id }}" style="padding:10px 16px;border-bottom:1px solid rgba(0,0,0,0.04);display:flex;align-items:flex-start;gap:10px;">
-                    <div style="width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:rgba(74,114,54,0.12);">
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#4a7236" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <div style="width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:rgba(26,109,140,0.12);">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0f4358" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
                       </svg>
                     </div>
@@ -703,7 +706,7 @@
                         <div style="font-size:10.5px;color:rgba(0,0,0,0.4);margin-top:2px;">{{ notif.cree_le|date:"d/m/Y à H:i" }}</div>
                       </a>
                     </div>
-                    <button onclick="marquerLueConge({{ notif.id }}, '{{ notif.conge.pk }}', this)" title="Marquer comme lu" style="background:none;border:none;cursor:pointer;color:rgba(0,0,0,0.25);padding:4px;border-radius:4px;flex-shrink:0;" onmouseover="this.style.color='#4a7236'" onmouseout="this.style.color='rgba(0,0,0,0.25)'">
+                    <button onclick="marquerLueConge({{ notif.id }}, '{{ notif.conge.pk }}', this)" title="Marquer comme lu" style="background:none;border:none;cursor:pointer;color:rgba(0,0,0,0.25);padding:4px;border-radius:4px;flex-shrink:0;" onmouseover="this.style.color='#0f4358'" onmouseout="this.style.color='rgba(0,0,0,0.25)'">
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                     </button>
                   </div>
@@ -804,6 +807,7 @@
     </script>
         
         <div class="content">
+            {% block module_navbar %}{% endblock %}
             {% block breadcrumb %}{% endblock %}
             {% block content %}{% endblock %}
         </div>
@@ -953,5 +957,6 @@
         });
     }
     </script>
+    {% django_browser_reload_script %}
 </body>
 </html>
