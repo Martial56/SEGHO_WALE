@@ -1,0 +1,390 @@
+{% extends 'medecins/base.html' %}
+{% load static %}
+
+{% block topbar_title %}Tableau de bord Médecins{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
+<style>
+:root {
+  --md-900:#1b2e13; --md-800:#2a4219; --md-700:#3a5924;
+  --md-600:#4a6741; --md-500:#5e8050; --md-400:#7a9b68;
+  --md-300:#9ab88a; --md-200:#bcd5a8; --md-100:#d8eac4; --md-50:#eef5e4;
+  --md-surface:#fff; --md-border:rgba(58,89,36,.13);
+  --md-text:#1b2e13; --md-muted:rgba(0,0,0,.45);
+}
+html[data-theme="dark"] {
+  --md-50:#171616; --md-100:#201d1d; --md-surface:#0f0e0e;
+  --md-border:rgba(154,184,138,.18); --md-text:#bcd5a8; --md-muted:rgba(255,255,255,.4);
+}
+
+.db-page-head {
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  padding:14px 32px; margin:0 -32px; flex-wrap:wrap;
+  background:#f2f7ee; border-bottom:1px solid rgba(0,0,0,.05);
+  position:sticky; top:calc(var(--topbar-h) + 44px); z-index:100;
+}
+html[data-theme="dark"] .db-page-head { background:#0f0e0e; }
+
+/* ── KPI row ── */
+.db-kpis { display:grid; grid-template-columns:repeat(5,1fr); gap:16px; margin:24px 0 20px; }
+@media(max-width:1100px){ .db-kpis{ grid-template-columns:repeat(3,1fr); } }
+@media(max-width:680px) { .db-kpis{ grid-template-columns:1fr 1fr; } }
+
+.db-kpi {
+  background:var(--md-surface); border:1px solid var(--md-border);
+  border-radius:12px; padding:18px 20px;
+  display:flex; align-items:center; gap:14px;
+  box-shadow:0 1px 6px rgba(58,89,36,.06);
+}
+.db-kpi-icon {
+  width:44px; height:44px; border-radius:10px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center; font-size:20px;
+}
+.db-kpi-icon.green  { background:rgba(58,89,36,.1);  color:var(--md-600); }
+.db-kpi-icon.blue   { background:rgba(37,99,235,.1);  color:#2563eb; }
+.db-kpi-icon.orange { background:rgba(234,88,12,.1);  color:#ea580c; }
+.db-kpi-icon.teal   { background:rgba(13,148,136,.1); color:#0d9488; }
+.db-kpi-icon.red    { background:rgba(220,38,38,.1);  color:#dc2626; }
+.db-kpi-val { font-size:26px; font-weight:800; color:var(--md-text); line-height:1; }
+.db-kpi-lbl { font-size:11.5px; color:var(--md-muted); margin-top:3px; }
+
+/* ── Cards ── */
+.db-card {
+  background:var(--md-surface); border:1px solid var(--md-border);
+  border-radius:12px; box-shadow:0 1px 6px rgba(58,89,36,.06); overflow:hidden; margin-bottom:20px;
+}
+.db-card-header {
+  padding:13px 20px 11px; border-bottom:1px solid var(--md-border);
+  display:flex; align-items:center; justify-content:space-between;
+}
+.db-card-title {
+  font-size:13px; font-weight:700; color:var(--md-text);
+  display:flex; align-items:center; gap:8px;
+  border-left:3px solid var(--md-600); padding-left:10px;
+}
+.db-card-body { padding:20px; }
+
+/* ── Grid ── */
+.db-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:start; }
+@media(max-width:900px){ .db-grid-2{ grid-template-columns:1fr; } }
+
+/* ── Table ── */
+.db-table { width:100%; border-collapse:collapse; font-size:12.5px; }
+.db-table thead th { padding:9px 14px; font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; color:var(--md-muted); border-bottom:2px solid var(--md-border); background:var(--md-50); white-space:nowrap; text-align:left; }
+.db-table tbody tr { border-bottom:1px solid var(--md-border); transition:background .1s; }
+.db-table tbody tr:hover { background:rgba(58,89,36,.03); }
+.db-table tbody td { padding:9px 14px; color:var(--md-text); vertical-align:middle; }
+
+/* ── Statut pills ── */
+.pill { display:inline-flex; align-items:center; gap:4px; padding:2px 9px; border-radius:12px; font-size:11px; font-weight:600; white-space:nowrap; }
+.pill-planifie  { background:rgba(37,99,235,.1);  color:#2563eb; }
+.pill-confirme  { background:rgba(13,148,136,.1); color:#0d9488; }
+.pill-attente   { background:rgba(234,179,8,.1);  color:#b45309; }
+.pill-termine   { background:rgba(22,163,74,.1);  color:#15803d; }
+.pill-annule    { background:rgba(220,38,38,.1);  color:#dc2626; }
+.pill-default   { background:rgba(0,0,0,.07);     color:rgba(0,0,0,.5); }
+
+/* ── Répartition bar ── */
+.spec-bar-row { margin-bottom:12px; }
+.spec-bar-row:last-child { margin-bottom:0; }
+.spec-bar-label { display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px; }
+.spec-bar-label .name { font-weight:600; color:var(--md-text); }
+.spec-bar-label .count { color:var(--md-muted); }
+.spec-bar-bg { background:var(--md-100); border-radius:4px; height:8px; overflow:hidden; }
+.spec-bar-fill { height:8px; border-radius:4px; background:linear-gradient(90deg,var(--md-500),var(--md-400)); transition:width .4s ease; }
+html[data-theme="dark"] .spec-bar-bg { background:rgba(255,255,255,.08); }
+</style>
+{% endblock %}
+
+
+{% block content %}
+<div class="db-page-head">
+  <div>
+    <div style="font-size:16px;font-weight:800;color:var(--md-900);">
+      <i class="bi bi-graph-up" style="color:var(--md-600);"></i> Tableau de bord médecins
+    </div>
+    <div style="font-size:12px;color:var(--md-muted);">{{ today|date:"l d F Y" }}</div>
+  </div>
+  <a href="{% url 'medecins_list' %}" class="btn-md" style="background:var(--md-600);color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:12.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:5px;text-decoration:none;">
+    <i class="bi bi-people"></i> Liste des médecins
+  </a>
+</div>
+
+<!-- ── KPIs ── -->
+<div class="db-kpis">
+  <div class="db-kpi">
+    <div class="db-kpi-icon green"><i class="bi bi-people-fill"></i></div>
+    <div>
+      <div class="db-kpi-val">{{ total }}</div>
+      <div class="db-kpi-lbl">Médecins total</div>
+    </div>
+  </div>
+  <div class="db-kpi">
+    <div class="db-kpi-icon teal"><i class="bi bi-person-check-fill"></i></div>
+    <div>
+      <div class="db-kpi-val" style="color:#0d9488;">{{ actifs }}</div>
+      <div class="db-kpi-lbl">Actifs</div>
+    </div>
+  </div>
+  <div class="db-kpi">
+    <div class="db-kpi-icon red"><i class="bi bi-person-dash-fill"></i></div>
+    <div>
+      <div class="db-kpi-val" style="color:#dc2626;">{{ inactifs }}</div>
+      <div class="db-kpi-lbl">Inactifs</div>
+    </div>
+  </div>
+  <div class="db-kpi">
+    <div class="db-kpi-icon blue"><i class="bi bi-clipboard2-pulse-fill"></i></div>
+    <div>
+      <div class="db-kpi-val" style="color:#2563eb;">{{ cons_today }}</div>
+      <div class="db-kpi-lbl">Consultations aujourd'hui</div>
+    </div>
+  </div>
+  <div class="db-kpi">
+    <div class="db-kpi-icon orange"><i class="bi bi-calendar2-check-fill"></i></div>
+    <div>
+      <div class="db-kpi-val" style="color:#ea580c;">{{ rdv_today }}</div>
+      <div class="db-kpi-lbl">RDV aujourd'hui</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Chart + Top médecins ── -->
+<div class="db-grid-2">
+
+  <!-- Consultations par mois -->
+  <div class="db-card">
+    <div class="db-card-header">
+      <div class="db-card-title"><i class="bi bi-bar-chart-fill" style="color:var(--md-600);"></i> Consultations / mois</div>
+      <span style="font-size:11px;color:var(--md-muted);">6 derniers mois</span>
+    </div>
+    <div class="db-card-body">
+      <div style="position:relative;height:220px;">
+        <canvas id="chartConsultations"></canvas>
+      </div>
+      {% if not chart_data %}
+      <div style="text-align:center;color:var(--md-muted);font-style:italic;font-size:13px;padding:24px 0;">
+        Aucune consultation enregistrée
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- RDV par statut — doughnut -->
+  <div class="db-card">
+    <div class="db-card-header">
+      <div class="db-card-title"><i class="bi bi-pie-chart-fill" style="color:var(--md-600);"></i> RDV par statut</div>
+    </div>
+    <div class="db-card-body" style="display:flex;align-items:center;justify-content:center;min-height:240px;">
+      {% if rdv_par_statut %}
+      <div style="display:flex;align-items:center;justify-content:center;gap:24px;">
+        <canvas id="chartRDV" width="200" height="200" style="flex-shrink:0;width:200px;height:200px;"></canvas>
+        <div style="flex:1;min-width:130px;">
+          {% for row in rdv_par_statut %}
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+            <span class="rdv-dot-color" data-index="{{ forloop.counter0 }}"
+                  style="width:12px;height:12px;border-radius:50%;flex-shrink:0;background:#ccc;"></span>
+            <span style="font-size:13px;flex:1;color:var(--md-text);">{{ row.statut }}</span>
+            <span style="font-size:14px;font-weight:700;color:var(--md-text);">{{ row.n }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% else %}
+      <div style="text-align:center;color:var(--md-muted);font-style:italic;font-size:13px;padding:24px 0;">
+        Aucun rendez-vous enregistré
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Top médecins + Répartition spécialités ── -->
+<div class="db-grid-2">
+
+  <!-- Top médecins -->
+  <div class="db-card">
+    <div class="db-card-header">
+      <div class="db-card-title"><i class="bi bi-trophy-fill" style="color:var(--md-600);"></i> Top médecins (6 mois)</div>
+      <span style="font-size:11px;color:var(--md-muted);">par consultations</span>
+    </div>
+    {% if top_medecins %}
+    <table class="db-table">
+      <thead>
+        <tr><th>#</th><th>Médecin</th><th style="text-align:right;">Consultations</th></tr>
+      </thead>
+      <tbody>
+        {% for med in top_medecins %}
+        <tr>
+          <td style="color:var(--md-muted);font-weight:700;width:30px;">{{ forloop.counter }}</td>
+          <td>
+            <a href="{% url 'medecin_detail' med.medecin__pk %}" style="font-weight:600;color:var(--md-text);text-decoration:none;">
+              Dr {{ med.medecin__nom }} {{ med.medecin__prenoms }}
+            </a>
+          </td>
+          <td style="text-align:right;">
+            <span style="font-size:13px;font-weight:800;color:var(--md-700);">{{ med.n }}</span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="db-card-body" style="text-align:center;color:var(--md-muted);font-style:italic;font-size:13px;padding:24px;">
+      Aucune consultation enregistrée
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Répartition par spécialité -->
+  <div class="db-card">
+    <div class="db-card-header">
+      <div class="db-card-title"><i class="bi bi-tag-fill" style="color:var(--md-600);"></i> Répartition par spécialité</div>
+      <span style="font-size:11px;color:var(--md-muted);">médecins actifs</span>
+    </div>
+    <div class="db-card-body">
+      {% if par_specialite %}
+      {% with max_n=par_specialite.0.n %}
+      {% for row in par_specialite %}
+      <div class="spec-bar-row">
+        <div class="spec-bar-label">
+          <span class="name">{{ row.specialite__nom }}</span>
+          <span class="count">{{ row.n }} médecin{{ row.n|pluralize }}</span>
+        </div>
+        <div class="spec-bar-bg">
+          <div class="spec-bar-fill spec-bar-item" data-index="{{ forloop.counter0 }}"
+               style="width:{% widthratio row.n max_n 100 %}%;"></div>
+        </div>
+      </div>
+      {% endfor %}
+      {% endwith %}
+      {% else %}
+      <div style="text-align:center;color:var(--md-muted);font-style:italic;font-size:13px;padding:24px 0;">
+        Aucune spécialité configurée
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+(function(){
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const gridColor = isDark ? 'rgba(255,255,255,.07)' : 'rgba(0,0,0,.06)';
+  const textColor = isDark ? 'rgba(200,220,190,.6)' : 'rgba(0,0,0,.45)';
+
+  /* ── Palette multi-couleurs ── */
+  const PALETTE = [
+    { bg: 'rgba(59,130,246,.75)',  border: 'rgb(37,99,235)'  },  // bleu
+    { bg: 'rgba(16,185,129,.75)',  border: 'rgb(5,150,105)'  },  // vert émeraude
+    { bg: 'rgba(245,158,11,.75)',  border: 'rgb(217,119,6)'  },  // ambre
+    { bg: 'rgba(139,92,246,.75)',  border: 'rgb(109,40,217)' },  // violet
+    { bg: 'rgba(236,72,153,.75)',  border: 'rgb(219,39,119)' },  // rose
+    { bg: 'rgba(20,184,166,.75)',  border: 'rgb(13,148,136)' },  // teal
+    { bg: 'rgba(239,68,68,.75)',   border: 'rgb(220,38,38)'  },  // rouge
+    { bg: 'rgba(234,179,8,.75)',   border: 'rgb(202,138,4)'  },  // jaune
+  ];
+
+  /* ── Graphique 1 : Consultations par mois (barres colorées) ── */
+  const consLabels = {{ chart_labels|safe }};
+  const consData   = {{ chart_data|safe }};
+
+  if (consLabels.length > 0) {
+    new Chart(document.getElementById('chartConsultations'), {
+      type: 'bar',
+      data: {
+        labels: consLabels,
+        datasets: [{
+          label: 'Consultations',
+          data: consData,
+          backgroundColor: consLabels.map((_, i) => PALETTE[i % PALETTE.length].bg),
+          borderColor:     consLabels.map((_, i) => PALETTE[i % PALETTE.length].border),
+          borderWidth: 2,
+          borderRadius: 6,
+          borderSkipped: false,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (c) => ` ${c.parsed.y} consultation${c.parsed.y > 1 ? 's' : ''}`
+            }
+          }
+        },
+        scales: {
+          x: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 11 } } },
+          y: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: textColor, font: { size: 11 }, stepSize: 1 } }
+        }
+      }
+    });
+  }
+
+  /* ── Graphique 2 : RDV par statut (doughnut) ── */
+  const rdvLabels = {{ rdv_chart_labels|safe }};
+  const rdvData   = {{ rdv_chart_data|safe }};
+
+  const STATUS_PALETTE = [
+    'rgba(37,99,235,.85)',   // bleu — Planifié
+    'rgba(13,148,136,.85)',  // teal — Confirmé
+    'rgba(217,119,6,.85)',   // ambre — En attente
+    'rgba(22,163,74,.85)',   // vert — Terminé
+    'rgba(220,38,38,.85)',   // rouge — Annulé
+    'rgba(107,114,128,.85)', // gris — Non présenté
+  ];
+
+  if (rdvLabels.length > 0) {
+    const bgColors = rdvLabels.map((_, i) => STATUS_PALETTE[i % STATUS_PALETTE.length]);
+    new Chart(document.getElementById('chartRDV'), {
+      type: 'doughnut',
+      data: {
+        labels: rdvLabels,
+        datasets: [{
+          data: rdvData,
+          backgroundColor: bgColors,
+          borderWidth: 2,
+          borderColor: isDark ? '#0f0e0e' : '#fff',
+          hoverOffset: 6,
+        }]
+      },
+      options: {
+        responsive: false,
+        cutout: '62%',
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (c) => ` ${c.label} : ${c.parsed}`
+            }
+          }
+        }
+      }
+    });
+    /* colorier les légendes inline */
+    document.querySelectorAll('.rdv-dot-color').forEach(function(dot) {
+      const i = parseInt(dot.dataset.index, 10);
+      dot.style.background = bgColors[i] || '#ccc';
+    });
+  }
+
+  /* ── Barres de spécialités : couleur différente par barre ── */
+  document.querySelectorAll('.spec-bar-item').forEach(function(bar) {
+    const i = parseInt(bar.dataset.index, 10);
+    const p = PALETTE[i % PALETTE.length];
+    bar.style.background = p.bg;
+    bar.style.border     = 'none';
+  });
+
+})();
+</script>
+{% endblock %}

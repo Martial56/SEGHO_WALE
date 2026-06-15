@@ -97,14 +97,20 @@ def achats_dashboard(request):
         {'label': 'Reçues ce mois',          'count': ReceptionAchat.objects.filter(date_reception__month=today.month, date_reception__year=today.year).count(), 'color': '#065f46', 'url': '/achats/commandes/?statut=recue'},
     ]
 
+    from stock.models import FicheBesoins
+    nb_fiches_stock = FicheBesoins.objects.filter(
+        statut__in=('soumis', 'valide'), besoins_achats__isnull=True
+    ).count()
+
     return render(request, 'achats/dashboard.html', {
         'stats': stats,
-        'besoins_recents':   BesoinAchat.objects.select_related('cree_par').order_by('-date_creation')[:6],
-        'proformas_attente': Proforma.objects.filter(statut='en_attente').select_related('fournisseur', 'besoin').order_by('-date_creation')[:6],
-        'commandes_actives': commandes_actives[:8],
-        'chart_labels':      json.dumps(chart_labels),
-        'chart_data':        json.dumps(chart_data),
-        'workflow_steps':    workflow_steps,
+        'nb_fiches_stock':    nb_fiches_stock,
+        'besoins_recents':    BesoinAchat.objects.select_related('cree_par').order_by('-date_creation')[:6],
+        'proformas_attente':  Proforma.objects.filter(statut='en_attente').select_related('fournisseur', 'besoin').order_by('-date_creation')[:6],
+        'commandes_actives':  commandes_actives[:8],
+        'chart_labels':       json.dumps(chart_labels),
+        'chart_data':         json.dumps(chart_data),
+        'workflow_steps':     workflow_steps,
     })
 
 
@@ -190,23 +196,31 @@ def _save_fournisseur(obj, data):
 
 @login_required(login_url='login')
 def besoins_list(request):
-    qs = BesoinAchat.objects.select_related('cree_par').prefetch_related('lignes')
+    from stock.models import FicheBesoins
+    qs = BesoinAchat.objects.select_related('cree_par', 'fiche_besoins').prefetch_related('lignes')
     q = request.GET.get('q', '').strip()
     statut = request.GET.get('statut', '')
     if q:
         qs = qs.filter(Q(numero__icontains=q) | Q(titre__icontains=q))
     if statut:
         qs = qs.filter(statut=statut)
+
+    fiches_a_importer = FicheBesoins.objects.filter(
+        statut__in=('soumis', 'valide'),
+        besoins_achats__isnull=True,
+    ).order_by('-date_creation')
+
     return render(request, 'achats/besoins/list.html', {
         'besoins': qs,
         'q': q,
         'statut': statut,
         'statut_choices': BesoinAchat.STATUT_CHOICES,
+        'fiches_a_importer': fiches_a_importer,
         'stats': {
             'total': BesoinAchat.objects.count(),
-            'brouillon': BesoinAchat.objects.filter(statut='brouillon').count(),
             'soumis': BesoinAchat.objects.filter(statut='soumis').count(),
             'en_cours': BesoinAchat.objects.filter(statut='en_cours').count(),
+            'satisfait': BesoinAchat.objects.filter(statut='satisfait').count(),
         },
     })
 
@@ -541,14 +555,21 @@ def commande_create(request, proforma_pk):
 
 @login_required(login_url='login')
 def commande_detail(request, pk):
+    from datetime import date
     cmd = get_object_or_404(CommandeAchat, pk=pk)
     lignes = cmd.lignes.all()
     receptions = cmd.receptions.select_related('receptionne_par').all()
+    est_en_retard = (
+        cmd.date_livraison_prevue is not None
+        and cmd.statut not in ('recue', 'annulee')
+        and cmd.date_livraison_prevue < date.today()
+    )
     return render(request, 'achats/commandes/detail.html', {
         'commande': cmd,
         'lignes': lignes,
         'receptions': receptions,
         'montant_calc': sum(l.montant for l in lignes),
+        'est_en_retard': est_en_retard,
     })
 
 
@@ -601,11 +622,14 @@ def reception_create(request, commande_pk):
             except ValueError:
                 qte = 0
             conforme = request.POST.get(f'conforme_{ligne.pk}') == 'on'
+            dp_str = request.POST.get(f'peremption_{ligne.pk}', '').strip()
             LigneReceptionAchat.objects.create(
                 reception=rec,
                 ligne_commande=ligne,
                 quantite_recue=qte,
                 conforme=conforme,
+                numero_lot=request.POST.get(f'lot_{ligne.pk}', '').strip(),
+                date_peremption=dp_str if dp_str else None,
                 notes=request.POST.get(f'notes_{ligne.pk}', ''),
             )
         total_rec = sum(l.quantite_recue for l in rec.lignes.all())
@@ -617,10 +641,7 @@ def reception_create(request, commande_pk):
         commande.proforma.besoin.statut = 'satisfait'
         commande.proforma.besoin.save(update_fields=['statut'])
 
-        # ── Intégration stock ──────────────────────────────────────────────
-        _integrer_stock(rec, commande, request.user)
-
-        messages.success(request, f'Réception {rec.numero} enregistrée.')
+        messages.success(request, f'Réception {rec.numero} enregistrée. Le module Stock sera notifié pour intégration.')
         return redirect('achats:reception_detail', pk=rec.pk)
     return render(request, 'achats/receptions/form.html', {
         'commande': commande,
@@ -656,15 +677,27 @@ def _integrer_stock(reception, commande, user):
         if produit is None:
             continue
 
-        lot = LotProduit.objects.create(
-            produit=produit,
-            numero_lot=reception.numero,
-            date_reception=reception.date_reception,
-            quantite_initiale=lr.quantite_recue,
-            quantite_actuelle=lr.quantite_recue,
-            fournisseur=commande.fournisseur,
-            prix_achat_lot=lc.prix_unitaire,
-        )
+        numero_lot = lr.numero_lot or reception.numero
+        lot = LotProduit.objects.filter(produit=produit, numero_lot=numero_lot).first()
+        if lot:
+            lot.quantite_actuelle += lr.quantite_recue
+            lot.quantite_initiale += lr.quantite_recue
+            update_lot_fields = ['quantite_actuelle', 'quantite_initiale']
+            if not lot.date_peremption and lr.date_peremption:
+                lot.date_peremption = lr.date_peremption
+                update_lot_fields.append('date_peremption')
+            lot.save(update_fields=update_lot_fields)
+        else:
+            lot = LotProduit.objects.create(
+                produit=produit,
+                numero_lot=numero_lot,
+                date_reception=reception.date_reception,
+                date_peremption=lr.date_peremption,
+                quantite_initiale=lr.quantite_recue,
+                quantite_actuelle=lr.quantite_recue,
+                fournisseur=commande.fournisseur,
+                prix_achat_lot=lc.prix_unitaire,
+            )
         stock_avant = produit.stock_actuel
         produit.stock_actuel = produit.stock_actuel + lr.quantite_recue
         produit.save(update_fields=['stock_actuel'])

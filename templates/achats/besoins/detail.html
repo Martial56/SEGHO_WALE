@@ -45,23 +45,12 @@
 <div class="bd-page">
   <div class="bd-head">
     <div class="bd-head-left">
-      <a href="{% url 'achats:besoins_list' %}" style="color:#888;text-decoration:none;font-size:13px;"><i class="bi bi-arrow-left"></i></a>
+      <a class="o-back-btn" href="javascript:history.back()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 5l-7 7 7 7"/></svg> Retour</a>
       <h1>{{ besoin.numero }} — {{ besoin.titre }}</h1>
       <span class="badge s-{{ besoin.statut }}">{{ besoin.get_statut_display }}</span>
     </div>
     <div class="statut-actions">
-      {% if besoin.statut == 'brouillon' %}
-        {% if not besoin.fiche_besoins %}
-        <a href="{% url 'achats:besoin_edit' besoin.pk %}" class="btn btn-secondary"><i class="bi bi-pencil"></i> Modifier</a>
-        {% endif %}
-        <form method="post" action="{% url 'achats:besoin_statut' besoin.pk %}" style="display:inline;">
-          {% csrf_token %}<input type="hidden" name="statut" value="soumis">
-          <button type="submit" class="btn btn-primary"><i class="bi bi-send"></i> Soumettre</button>
-        </form>
-      {% elif besoin.statut == 'soumis' %}
-        {% if not besoin.fiche_besoins %}
-        <a href="{% url 'achats:besoin_edit' besoin.pk %}" class="btn btn-secondary"><i class="bi bi-pencil"></i> Modifier</a>
-        {% endif %}
+      {% if besoin.statut == 'soumis' %}
         <a href="{% url 'achats:proforma_create' besoin.pk %}" class="btn btn-primary"><i class="bi bi-file-earmark-plus"></i> Ajouter un proforma</a>
       {% elif besoin.statut == 'en_cours' %}
         <a href="{% url 'achats:proforma_create' besoin.pk %}" class="btn btn-secondary"><i class="bi bi-file-earmark-plus"></i> Ajouter un proforma</a>

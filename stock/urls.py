@@ -68,4 +68,16 @@ urlpatterns = [
     path('dotation/<int:pk>/',         views.dotation_detail,  name='stock_dotation_detail'),
     path('dotation/<int:pk>/valider/', views.dotation_valider, name='stock_dotation_valider'),
     path('categories/ajax/',          views.categorie_create_ajax, name='stock_categorie_ajax'),
+
+    # Réceptions achats à intégrer dans le stock
+    path('receptions-achats/',                   views.receptions_a_integrer, name='stock_receptions_a_integrer'),
+    path('receptions-achats/<int:pk>/integrer/', views.integrer_reception,    name='stock_integrer_reception'),
+
+    # Nouvelles fonctionnalités
+    path('peremptions/eliminer/',                views.elimination_create,         name='stock_elimination_create'),
+    path('retours/creer/',                       views.retour_create,              name='stock_retour_create'),
+    path('fiches/generer-auto/',                 views.besoins_generer_auto,       name='stock_besoins_generer_auto'),
+    path('rapports/peremptions/',                views.rapports_peremptions,       name='stock_rapports_peremptions'),
+    path('rapports/bilan/',                      views.rapports_bilan_mensuel,     name='stock_rapports_bilan'),
+    path('rapports/fournisseurs-prix/',          views.rapports_fournisseurs_prix, name='stock_rapports_fournisseurs_prix'),
 ]

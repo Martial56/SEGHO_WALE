@@ -76,21 +76,43 @@ html[data-theme="dark"] .md-table thead tr { background:var(--md-800); color:var
 .rdv-item { display:flex; align-items:center; gap:12px; padding:8px 0; border-bottom:1px solid var(--md-border); }
 .rdv-item:last-child { border-bottom:none; }
 .rdv-dot { width:8px; height:8px; border-radius:50%; background:var(--md-500); flex-shrink:0; }
+
+@media print {
+  /* Masquer navigation et éléments interactifs */
+  .topbar, .o-nav, .md-page-head, .o-back-btn,
+  .btn-md, .btn-md-outline,
+  [style*="display:flex;gap:4px"] { display:none !important; }
+
+  /* Fond blanc, encre noire */
+  body, .content, .md-card, .md-stat-box {
+    background:#fff !important; color:#000 !important;
+    box-shadow:none !important;
+  }
+
+  /* Grille : 2 colonnes côte à côte */
+  .md-layout { display:grid !important; grid-template-columns:220px 1fr !important; gap:16px !important; margin-top:8px !important; }
+
+  /* Cartes sans ombre */
+  .md-card { border:1px solid #ccc !important; border-radius:0 !important; margin-bottom:10px !important; page-break-inside:avoid; }
+  .md-card-header { background:#f5f5f5 !important; }
+
+  /* Tableau */
+  .md-table thead tr { background:#eee !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .md-table td, .md-table th { padding:5px 8px !important; }
+
+  /* Stat boxes */
+  .md-stat-box { background:#f5f5f5 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+
+  /* Forcer la mise en page */
+  @page { margin:1.5cm; }
+  aside { break-inside:avoid; }
+}
 </style>
 {% endblock %}
 
-{% block breadcrumb %}
-<nav style="background:var(--md-surface,#fff);border-bottom:1px solid rgba(0,0,0,.07);margin:-32px -32px 0;padding:0 32px;display:flex;align-items:stretch;height:44px;position:sticky;top:var(--topbar-h);z-index:250;gap:2px;">
-  <a href="{% url 'medecins_list' %}" style="padding:11px 16px;font-size:13px;font-weight:500;color:rgba(0,0,0,.45);text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
-    <i class="bi bi-person-badge"></i> Médecins
-  </a>
-  <span style="padding:11px 16px;font-size:13px;font-weight:600;color:var(--md-600);border-bottom:2px solid var(--md-500);display:inline-flex;align-items:center;gap:6px;margin-bottom:-1px;">
-    {{ med }}
-  </span>
-</nav>
-{% endblock %}
 
 {% block content %}
+<a class="o-back-btn" href="javascript:history.back()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 5l-7 7 7 7"/></svg> Retour</a>
 <div class="md-page-head">
   <div style="display:flex;align-items:center;gap:12px;">
     <a href="{% url 'medecins_list' %}" class="btn-md-outline" style="padding:6px 12px;"><i class="bi bi-arrow-left"></i></a>
@@ -104,9 +126,14 @@ html[data-theme="dark"] .md-table thead tr { background:var(--md-800); color:var
     {% if med.actif %}<span class="badge-actif"><i class="bi bi-circle-fill" style="font-size:7px;"></i> Actif</span>
     {% else %}<span class="badge-inactif">Inactif</span>{% endif %}
   </div>
-  <a href="{% url 'medecin_edit' med.pk %}" class="btn-md">
-    <i class="bi bi-pencil-square"></i> Modifier
-  </a>
+  <div style="display:flex;gap:8px;">
+    <button onclick="window.print()" class="btn-md-outline" title="Imprimer la fiche" style="padding:7px 12px;">
+      <i class="bi bi-printer"></i>
+    </button>
+    <a href="{% url 'medecin_edit' med.pk %}" class="btn-md">
+      <i class="bi bi-pencil-square"></i> Modifier
+    </a>
+  </div>
 </div>
 
 <div class="md-layout">
@@ -158,6 +185,17 @@ html[data-theme="dark"] .md-table thead tr { background:var(--md-800); color:var
             <div class="lbl">À venir</div>
           </div>
         </div>
+        {% if stats.taux_presence is not None %}
+        <div style="background:var(--md-50);border:1px solid var(--md-border);border-radius:10px;padding:12px 16px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;">
+            <span style="font-size:10px;color:var(--md-muted);text-transform:uppercase;letter-spacing:.3px;font-weight:700;">Taux de présence</span>
+            <span style="font-size:16px;font-weight:800;color:{% if stats.taux_presence >= 75 %}#0d7a4c{% elif stats.taux_presence >= 50 %}var(--md-600){% else %}#c0392b{% endif %};">{{ stats.taux_presence }}%</span>
+          </div>
+          <div style="height:6px;background:rgba(0,0,0,.08);border-radius:4px;overflow:hidden;">
+            <div style="height:100%;width:{{ stats.taux_presence }}%;border-radius:4px;background:{% if stats.taux_presence >= 75 %}#16a34a{% elif stats.taux_presence >= 50 %}var(--md-600){% else %}#c0392b{% endif %};transition:width .4s;"></div>
+          </div>
+        </div>
+        {% endif %}
       </div>
     </div>
 
@@ -277,9 +315,83 @@ html[data-theme="dark"] .md-table thead tr { background:var(--md-800); color:var
           {% endfor %}
         </tbody>
       </table>
+      {% if consultations_recentes.paginator.num_pages > 1 %}
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:1px solid var(--md-border);font-size:12px;color:var(--md-muted);">
+        <span>Page {{ consultations_recentes.number }} / {{ consultations_recentes.paginator.num_pages }}</span>
+        <div style="display:flex;gap:4px;">
+          {% if consultations_recentes.has_previous %}
+          <a href="?cons_page={{ consultations_recentes.previous_page_number }}"
+             style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;background:rgba(58,89,36,.08);color:var(--md-600);text-decoration:none;font-size:13px;"
+             title="Précédent"><i class="bi bi-chevron-left"></i></a>
+          {% endif %}
+          {% if consultations_recentes.has_next %}
+          <a href="?cons_page={{ consultations_recentes.next_page_number }}"
+             style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;background:rgba(58,89,36,.08);color:var(--md-600);text-decoration:none;font-size:13px;"
+             title="Suivant"><i class="bi bi-chevron-right"></i></a>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
       {% else %}
       <div class="md-card-body" style="text-align:center;padding:32px;color:var(--md-muted);font-style:italic;">
         Aucune consultation enregistrée
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Planning semaine courante -->
+    <div class="md-card">
+      <div class="md-card-header">
+        <div class="md-card-title"><i class="bi bi-calendar3-week" style="color:var(--md-600);"></i> Planning semaine courante</div>
+        {% if planning_grid %}
+        <span style="font-size:11.5px;color:var(--md-muted);">
+          Semaine du {{ planning_grid.semaine.semaine_debut|date:"d/m/Y" }}
+        </span>
+        {% endif %}
+      </div>
+      {% if planning_grid %}
+      <div style="overflow-x:auto;">
+        <table class="md-table" style="min-width:520px;">
+          <thead>
+            <tr>
+              <th>Bureau / Plage</th>
+              {% for j in planning_grid.jours %}<th style="text-align:center;white-space:nowrap;">{{ j }}</th>{% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in planning_grid.grid %}
+            <tr>
+              <td style="font-weight:600;white-space:nowrap;">
+                <span style="font-size:10px;color:var(--md-muted);display:block;">{{ row.plage.bureau.nom }}</span>
+                {{ row.plage.code }}
+              </td>
+              {% for cell in row.jours %}
+              <td style="text-align:center;">
+                {% if cell.aff %}
+                <span style="display:inline-block;background:rgba(58,89,36,.1);color:var(--md-700);
+                             border:1px solid rgba(58,89,36,.2);border-radius:4px;
+                             padding:2px 8px;font-size:11px;font-weight:600;white-space:nowrap;">
+                  <i class="bi bi-check2" style="font-size:10px;"></i>
+                  {% if cell.aff.note %}<span title="{{ cell.aff.note }}">{{ cell.aff.note|truncatechars:18 }}</span>
+                  {% else %}Présent{% endif %}
+                </span>
+                {% else %}
+                <span style="color:var(--md-muted);font-size:11px;">—</span>
+                {% endif %}
+              </td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="md-card-body" style="text-align:center;padding:24px;color:var(--md-muted);font-style:italic;font-size:13px;">
+        {% if planning_grid is None %}
+        Aucun planning publié pour cette semaine
+        {% else %}
+        Aucune affectation trouvée pour ce médecin cette semaine
+        {% endif %}
       </div>
       {% endif %}
     </div>

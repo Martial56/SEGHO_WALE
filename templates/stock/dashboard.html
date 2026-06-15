@@ -24,6 +24,20 @@
 @media(max-width:900px){ .charts-grid{ grid-template-columns:1fr; } }
 .chart-card { background:var(--st-surface); border:1px solid var(--st-border); border-radius:12px; padding:18px 20px; box-shadow:0 2px 10px rgba(15,67,88,.07); }
 .chart-title { font-size:13px; font-weight:700; color:var(--st-text); margin-bottom:14px; display:flex; align-items:center; gap:7px; border-left:3px solid var(--st-600); padding-left:10px; }
+
+/* Alerte banner */
+.alert-banner { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin-top:16px; padding:12px 18px; background:rgba(232,69,69,.05); border:1px solid rgba(232,69,69,.2); border-radius:10px; }
+.alert-pill { display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border-radius:20px; font-size:12px; font-weight:700; }
+.alert-pill.rupture  { background:rgba(232,69,69,.12); color:#b71c1c; border:1px solid rgba(232,69,69,.3); }
+.alert-pill.min      { background:rgba(232,154,26,.12); color:#7a4d00; border:1px solid rgba(232,154,26,.3); }
+.alert-pill.expir    { background:rgba(200,100,0,.1); color:#7a3800; border:1px solid rgba(200,100,0,.25); }
+
+/* KPI band */
+.kpi-band { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:16px; }
+@media(max-width:900px){ .kpi-band{ grid-template-columns:repeat(2,1fr); } }
+.kpi-card { background:var(--st-surface); border:1px solid var(--st-border); border-radius:10px; padding:14px 18px; box-shadow:0 1px 4px rgba(58,89,36,.06); }
+.kpi-label { font-size:10.5px; color:var(--st-muted); text-transform:uppercase; letter-spacing:.3px; margin-bottom:4px; }
+.kpi-val   { font-size:20px; font-weight:800; line-height:1; }
 </style>{% endblock %}
 
 {% block content %}
@@ -38,6 +52,28 @@
     <a href="{% url 'stock_produit_create' %}" class="btn-st"><i class="bi bi-plus-lg"></i> Nouveau produit</a>
   </div>
 </div>
+
+<!-- Alertes critiques (Point 1) -->
+{% if stats.ruptures > 0 or produits_sous_minimum or lots_expiration_30 %}
+<div class="alert-banner">
+  <span style="font-size:12px;font-weight:700;color:#b71c1c;margin-right:4px;"><i class="bi bi-exclamation-triangle-fill"></i> Alertes :</span>
+  {% if stats.ruptures > 0 %}
+  <a href="{% url 'stock_produits' %}?statut=rupture" class="alert-pill rupture" style="text-decoration:none;">
+    <i class="bi bi-x-circle-fill" style="font-size:10px;"></i> {{ stats.ruptures }} rupture{{ stats.ruptures|pluralize }}
+  </a>
+  {% endif %}
+  {% if produits_sous_minimum %}
+  <a href="{% url 'stock_produits' %}?statut=alerte" class="alert-pill min" style="text-decoration:none;">
+    <i class="bi bi-arrow-down-circle-fill" style="font-size:10px;"></i> {{ produits_sous_minimum|length }} sous seuil min.
+  </a>
+  {% endif %}
+  {% if lots_expiration_30 %}
+  <span class="alert-pill expir">
+    <i class="bi bi-calendar-x-fill" style="font-size:10px;"></i> {{ lots_expiration_30|length }} lot{{ lots_expiration_30|length|pluralize }} expire dans 30j
+  </span>
+  {% endif %}
+</div>
+{% endif %}
 
 <!-- Stats -->
 <div class="st-stats">
@@ -75,6 +111,30 @@
   </div>
 </div>
 
+
+<!-- KPIs avancés (Point 6) -->
+<div class="kpi-band">
+  <div class="kpi-card">
+    <div class="kpi-label"><i class="bi bi-check2-circle" style="color:#0d7a4c;"></i> Taux de service</div>
+    <div class="kpi-val" style="color:{% if kpi_taux_service >= 80 %}#0d7a4c{% elif kpi_taux_service >= 60 %}#8a5c00{% else %}#b71c1c{% endif %};">{{ kpi_taux_service }}%</div>
+    <div style="font-size:10.5px;color:var(--st-muted);margin-top:4px;">Demandes satisfaites</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label"><i class="bi bi-currency-exchange" style="color:var(--st-600);"></i> Valeur du stock</div>
+    <div class="kpi-val" style="color:var(--st-700);">{{ kpi_valeur_stock|floatformat:0 }} <span style="font-size:13px;font-weight:400;">F</span></div>
+    <div style="font-size:10.5px;color:var(--st-muted);margin-top:4px;">Stock × prix d'achat</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label"><i class="bi bi-arrow-repeat" style="color:#1a237e;"></i> Taux de rotation</div>
+    <div class="kpi-val" style="color:#1a237e;">{{ kpi_taux_rotation }}</div>
+    <div style="font-size:10.5px;color:var(--st-muted);margin-top:4px;">Livraisons / stock actuel</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label"><i class="bi bi-hourglass-split" style="color:#8a5c00;"></i> Lots anciens (&gt;6 mois)</div>
+    <div class="kpi-val" style="color:{% if lots_obsoletes_count > 0 %}#8a5c00{% else %}#0d7a4c{% endif %};">{{ lots_obsoletes_count }}</div>
+    <div style="font-size:10.5px;color:var(--st-muted);margin-top:4px;">En stock sans mouvement</div>
+  </div>
+</div>
 
 <!-- ══ GRAPHES ══ -->
 <div class="charts-grid">
@@ -232,6 +292,52 @@
     </table>
     {% else %}
     <div class="st-card-body" style="text-align:center;color:var(--st-muted);font-style:italic;padding:32px;">Aucune commande récente</div>
+    {% endif %}
+  </div>
+
+  <!-- Point de commande automatique (Point 3) -->
+  <div class="st-card" style="grid-column:1/-1;">
+    <div class="st-card-header">
+      <div class="st-card-title"><i class="bi bi-cart-plus-fill" style="color:#0d7a4c;"></i> Suggestions de réapprovisionnement</div>
+      <a href="{% url 'stock_rapports_indicateurs' %}" class="btn-st-outline" style="padding:3px 10px;font-size:11.5px;">Rapport complet</a>
+    </div>
+    {% if a_commander_dash %}
+    <table class="st-table">
+      <thead>
+        <tr>
+          <th>Produit</th>
+          <th style="text-align:right;">Stock actuel</th>
+          <th style="text-align:right;">Seuil minimum</th>
+          <th style="text-align:right;">CMM (mois)</th>
+          <th style="text-align:right;color:#0d7a4c;">Qté à commander</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for item in a_commander_dash %}
+      <tr>
+        <td>
+          <a href="{% url 'stock_produit_detail' item.produit.pk %}" style="text-decoration:none;color:var(--st-text);font-weight:600;">{{ item.produit.nom }}</a>
+          <div style="font-size:10.5px;font-family:monospace;color:var(--st-600);">{{ item.produit.code }}</div>
+        </td>
+        <td style="text-align:right;">
+          <span style="font-weight:700;color:{% if item.produit.en_rupture %}#b71c1c{% else %}#8a5c00{% endif %};">{{ item.stock|floatformat:0 }}</span>
+          <span style="font-size:10px;color:var(--st-muted);"> {{ item.produit.unite_mesure }}</span>
+        </td>
+        <td style="text-align:right;color:var(--st-muted);font-size:12px;">{{ item.minimum|floatformat:0 }}</td>
+        <td style="text-align:right;color:var(--st-muted);font-size:12px;">{{ item.produit.cmm|floatformat:1 }}</td>
+        <td style="text-align:right;">
+          <span style="font-size:16px;font-weight:800;color:#0d7a4c;">{{ item.qte|floatformat:0 }}</span>
+          <span style="font-size:10px;color:var(--st-muted);"> {{ item.produit.unite_mesure }}</span>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="st-card-body" style="text-align:center;color:#0d7a4c;font-style:italic;padding:32px;">
+      <i class="bi bi-check-circle-fill" style="font-size:24px;display:block;margin-bottom:8px;"></i>
+      Tous les stocks sont au-dessus du point de commande
+    </div>
     {% endif %}
   </div>
 

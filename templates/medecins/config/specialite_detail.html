@@ -1,124 +1,206 @@
-﻿{% extends 'medecins/base.html' %}
+{% extends 'medecins/base.html' %}
 {% block topbar_title %}{{ obj.nom }}{% endblock %}
-{% block breadcrumb %}{% endblock %}
 
 {% block extra_css %}
 {{ block.super }}
 <style>
-  /* ── DET STYLES ── */
-  .det-page { width:100%; padding:16px 24px 48px; }
-  .det-section { background:var(--surface); border:1px solid var(--border); border-radius:8px; margin-bottom:12px; overflow:hidden; }
-  .det-section-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.7px; color:var(--text-muted); padding:10px 20px; border-bottom:1px solid var(--border); background:var(--bg); display:flex; align-items:center; justify-content:space-between; }
-  html[data-theme="dark"] .det-section-title { background:rgba(255,255,255,.02); }
-  .det-grid { display:grid; grid-template-columns:repeat(3,1fr); }
-  .det-grid-2 { grid-template-columns:repeat(2,1fr); }
-  .det-field { padding:14px 20px; border-bottom:1px solid var(--border); border-right:1px solid var(--border); }
-  .det-field:nth-child(3n) { border-right:none; }
-  .det-grid-2 .det-field:nth-child(2n) { border-right:none; }
-  .det-field-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--text-muted); margin-bottom:4px; }
-  .det-field-value { font-size:13.5px; color:var(--text); font-weight:500; word-break:break-word; }
-  .det-field-value.muted { color:var(--text-muted); font-weight:400; font-style:italic; }
-  .det-field-full { padding:14px 20px; border-bottom:1px solid var(--border); }
-  .det-field-full:last-child { border-bottom:none; }
-  .det-btn-edit { background:var(--accent); color:#fff; border:none; padding:7px 16px; border-radius:4px; font-size:13px; font-weight:600; font-family:'Roboto',sans-serif; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:6px; transition:background .15s; white-space:nowrap; }
-  .det-btn-edit:hover { background:var(--primary); }
-  /* Utilisateurs table */
-  .emp-table { width:100%; border-collapse:collapse; }
-  .emp-table th { padding:8px 16px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--text-muted); border-bottom:1px solid var(--border); text-align:left; }
-  .emp-table td { padding:10px 16px; font-size:13px; border-bottom:1px solid var(--border); color:var(--text); }
-  .emp-table tr:last-child td { border-bottom:none; }
-  .emp-table tbody tr { cursor:pointer; transition:background .1s; }
-  .emp-table tbody tr:hover td { background:rgba(33,136,171,.04); }
-  .emp-badge { display:inline-block; font-size:11px; font-family:monospace; background:rgba(33,136,171,.08); color:var(--primary); padding:1px 7px; border-radius:4px; }
-  html[data-theme="dark"] .emp-badge { background:rgba(33,136,171,.15); color:#7ecae0; }
-  .emp-avatar { width:28px; height:28px; border-radius:6px; background:#e8eef2; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#7a9ab0; flex-shrink:0; overflow:hidden; }
-  html[data-theme="dark"] .emp-avatar { background:#201d1d; color:#4a6a80; }
-  @media (max-width:700px) { .det-grid,.det-grid-2 { grid-template-columns:1fr; } .det-field { border-right:none !important; } }
+/* ── Head ── */
+.det-head {
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  padding:10px 32px; margin:0 -32px;
+  background:#f2f7ee; border-bottom:1px solid rgba(58,89,36,.15);
+  position:sticky; top:calc(var(--topbar-h) + 44px); z-index:100;
+  box-shadow:0 2px 6px rgba(0,0,0,.04);
+}
+html[data-theme="dark"] .det-head { background:#0f0e0e; border-bottom-color:rgba(58,89,36,.25); }
+
+.det-head-back { width:30px; height:30px; border-radius:6px; background:rgba(58,89,36,.08); color:#4a6741; display:inline-flex; align-items:center; justify-content:center; text-decoration:none; font-size:14px; transition:background .15s; flex-shrink:0; }
+.det-head-back:hover { background:rgba(58,89,36,.18); color:#2a4219; }
+html[data-theme="dark"] .det-head-back { background:rgba(58,89,36,.15); color:#9ab88a; }
+
+.det-head-crumb { font-size:13px; color:#7a9b68; flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.det-head-crumb a { color:#4a6741; text-decoration:none; font-weight:500; }
+.det-head-crumb a:hover { text-decoration:underline; }
+.det-head-crumb span { margin:0 5px; opacity:.4; }
+
+.det-head-nav { display:flex; align-items:center; gap:4px; margin-left:auto; flex-shrink:0; }
+.det-head-nav-pos { font-size:11.5px; color:#7a9b68; padding:0 6px; white-space:nowrap; }
+.det-head-nav-btn { width:28px; height:28px; border-radius:5px; background:rgba(58,89,36,.08); color:#4a6741; display:inline-flex; align-items:center; justify-content:center; text-decoration:none; font-size:13px; transition:background .15s; }
+.det-head-nav-btn:hover { background:rgba(58,89,36,.18); }
+.det-head-nav-btn.disabled { opacity:.3; pointer-events:none; }
+html[data-theme="dark"] .det-head-nav-btn { background:rgba(58,89,36,.15); color:#9ab88a; }
+
+.btn-edit { background:#4a6741; color:#fff; border:none; border-radius:7px; padding:7px 16px; font-size:12.5px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px; text-decoration:none; transition:background .15s; flex-shrink:0; }
+.btn-edit:hover { background:#3a5924; color:#fff; }
+
+/* ── Hero card ── */
+.det-hero {
+  margin-top:20px; background:#fff; border:1px solid rgba(58,89,36,.13);
+  border-left:4px solid #4a6741; border-radius:12px; padding:20px 24px;
+  display:flex; align-items:center; gap:18px;
+  box-shadow:0 1px 8px rgba(58,89,36,.08);
+}
+html[data-theme="dark"] .det-hero { background:#0f0e0e; border-color:rgba(58,89,36,.2); }
+.det-hero-icon { width:56px; height:56px; border-radius:14px; background:rgba(58,89,36,.1); display:flex; align-items:center; justify-content:center; font-size:26px; color:#4a6741; flex-shrink:0; }
+html[data-theme="dark"] .det-hero-icon { background:rgba(58,89,36,.2); color:#9ab88a; }
+.det-hero-name { font-size:22px; font-weight:800; color:#2a4219; line-height:1.2; }
+html[data-theme="dark"] .det-hero-name { color:#bcd5a8; }
+.det-hero-code { display:inline-flex; align-items:center; font-family:monospace; font-size:12px; font-weight:700; background:rgba(58,89,36,.1); color:#3a5924; padding:3px 10px; border-radius:6px; letter-spacing:.4px; margin-top:5px; }
+html[data-theme="dark"] .det-hero-code { background:rgba(58,89,36,.2); color:#9ab88a; }
+.det-hero-desc { font-size:13px; color:#7a9b68; margin-top:6px; line-height:1.5; }
+
+/* ── Section card ── */
+.det-section { background:#fff; border:1px solid rgba(58,89,36,.12); border-radius:12px; margin-top:14px; overflow:hidden; box-shadow:0 1px 6px rgba(58,89,36,.06); }
+html[data-theme="dark"] .det-section { background:#0f0e0e; border-color:rgba(58,89,36,.18); }
+.det-section-head { padding:11px 20px; background:#f2f7ee; border-bottom:1px solid rgba(58,89,36,.1); display:flex; align-items:center; justify-content:space-between; }
+html[data-theme="dark"] .det-section-head { background:#1b2e13; border-bottom-color:rgba(58,89,36,.2); }
+.det-section-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:#4a6741; display:flex; align-items:center; gap:6px; }
+html[data-theme="dark"] .det-section-title { color:#9ab88a; }
+
+/* ── Champs ── */
+.det-fields { display:grid; grid-template-columns:1fr 1fr; }
+@media(max-width:600px){ .det-fields { grid-template-columns:1fr; } }
+.det-field { padding:14px 20px; border-bottom:1px solid rgba(58,89,36,.07); border-right:1px solid rgba(58,89,36,.07); }
+.det-field:nth-child(2n) { border-right:none; }
+.det-field:last-child, .det-field:nth-last-child(2):nth-child(odd) { border-bottom:none; }
+html[data-theme="dark"] .det-field { border-bottom-color:rgba(58,89,36,.12); border-right-color:rgba(58,89,36,.12); }
+.det-field-full { padding:14px 20px; border-bottom:1px solid rgba(58,89,36,.07); }
+.det-field-full:last-child { border-bottom:none; }
+.det-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#7a9b68; margin-bottom:4px; }
+.det-value { font-size:13.5px; color:#1b2e13; font-weight:500; word-break:break-word; }
+html[data-theme="dark"] .det-value { color:#bcd5a8; }
+.det-value.muted { color:#7a9b68; font-style:italic; font-weight:400; }
+
+/* ── Table médecins ── */
+.med-table { width:100%; border-collapse:collapse; font-size:13px; }
+.med-table th { padding:9px 16px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#7a9b68; border-bottom:1px solid rgba(58,89,36,.1); text-align:left; }
+.med-table td { padding:11px 16px; border-bottom:1px solid rgba(58,89,36,.07); color:#1b2e13; vertical-align:middle; }
+html[data-theme="dark"] .med-table td { color:#bcd5a8; border-bottom-color:rgba(58,89,36,.1); }
+.med-table tbody tr:last-child td { border-bottom:none; }
+.med-table tbody tr { transition:background .1s; cursor:pointer; }
+.med-table tbody tr:hover td { background:rgba(58,89,36,.04); }
+.med-avatar { width:32px; height:32px; border-radius:50%; background:#4a6741; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:#fff; overflow:hidden; flex-shrink:0; }
+.med-avatar img { width:100%; height:100%; object-fit:cover; }
+.badge-actif   { background:rgba(22,163,74,.1); color:#15803d; border:1px solid rgba(22,163,74,.25); padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
+.badge-inactif { background:rgba(0,0,0,.06); color:rgba(0,0,0,.45); border:1px solid rgba(0,0,0,.12); padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
+
+.det-empty { text-align:center; padding:36px 20px; color:#7a9b68; font-style:italic; font-size:13px; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div id="page-wrap">
 
-<div class="o-subheader" id="subheader">
-  <div class="o-subheader-row">
-    <a href="{% url 'medecins_specialites' %}" class="o-ctrl-btn" style="padding:3px 7px;"><i class="bi bi-arrow-left"></i></a>
-    <span style="font-size:13px;color:var(--text-muted);">
-      <a href="{% url 'medecins_specialites' %}" style="color:var(--accent);text-decoration:none;font-weight:500;">Spécialités</a>
-      <span style="margin:0 5px;opacity:.4;">/</span>
-      <span style="color:var(--text);">{{ obj.nom }}</span>
-    </span>
-    <div style="flex:1;"></div>
-    <span style="font-size:12px;color:var(--text-muted);margin-right:4px;">{{ position }} / {{ total }}</span>
-    {% if prev_pk %}<a href="{% url 'medecins_specialite_detail' prev_pk %}" class="o-ctrl-btn" style="padding:3px 7px;"><i class="bi bi-chevron-left"></i></a>
-    {% else %}<span class="o-ctrl-btn" style="padding:3px 7px;opacity:.3;pointer-events:none;"><i class="bi bi-chevron-left"></i></span>{% endif %}
-    {% if next_pk %}<a href="{% url 'medecins_specialite_detail' next_pk %}" class="o-ctrl-btn" style="padding:3px 7px;"><i class="bi bi-chevron-right"></i></a>
-    {% else %}<span class="o-ctrl-btn" style="padding:3px 7px;opacity:.3;pointer-events:none;"><i class="bi bi-chevron-right"></i></span>{% endif %}
-    <a href="{% url 'medecins_specialite_edit' obj.pk %}" class="det-btn-edit"><i class="bi bi-pencil"></i> Modifier</a>
+<!-- ── En-tête sticky ── -->
+<div class="det-head">
+  <a href="{% url 'medecins_specialites' %}" class="det-head-back" title="Retour"><i class="bi bi-arrow-left"></i></a>
+  <div class="det-head-crumb">
+    <a href="{% url 'medecins_specialites' %}">Spécialités</a>
+    <span>/</span>
+    {{ obj.nom }}
   </div>
+  <div class="det-head-nav">
+    <span class="det-head-nav-pos">{{ position }} / {{ total }}</span>
+    <a href="{% if prev_pk %}{% url 'medecins_specialite_detail' prev_pk %}{% else %}#{% endif %}"
+       class="det-head-nav-btn {% if not prev_pk %}disabled{% endif %}" title="Précédent">
+      <i class="bi bi-chevron-left"></i>
+    </a>
+    <a href="{% if next_pk %}{% url 'medecins_specialite_detail' next_pk %}{% else %}#{% endif %}"
+       class="det-head-nav-btn {% if not next_pk %}disabled{% endif %}" title="Suivant">
+      <i class="bi bi-chevron-right"></i>
+    </a>
+  </div>
+  <a href="{% url 'medecins_specialite_edit' obj.pk %}" class="btn-edit">
+    <i class="bi bi-pencil"></i> Modifier
+  </a>
 </div>
 
-<div class="det-page">
-
-  <div class="det-section">
-    <div class="det-section-title">Informations</div>
-    <div class="det-grid det-grid-2">
-      <div class="det-field">
-        <div class="det-field-label">Code</div>
-        <div class="det-field-value" style="font-family:monospace;">{{ obj.code }}</div>
-      </div>
-      <div class="det-field">
-        <div class="det-field-label">Nom</div>
-        <div class="det-field-value">{{ obj.nom }}</div>
-      </div>
-    </div>
+<!-- ── Hero ── -->
+<div class="det-hero">
+  <div class="det-hero-icon"><i class="bi bi-award-fill"></i></div>
+  <div>
+    <div class="det-hero-name">{{ obj.nom }}</div>
+    <div class="det-hero-code">{{ obj.code }}</div>
     {% if obj.description %}
-    <div class="det-field-full">
-      <div class="det-field-label">Description</div>
-      <div class="det-field-value" style="margin-top:4px;">{{ obj.description }}</div>
-    </div>
+    <div class="det-hero-desc">{{ obj.description }}</div>
     {% endif %}
   </div>
+  <div style="margin-left:auto;text-align:center;flex-shrink:0;">
+    <div style="font-size:28px;font-weight:800;color:#4a6741;line-height:1;">{{ medecins|length }}</div>
+    <div style="font-size:11px;color:#7a9b68;text-transform:uppercase;letter-spacing:.4px;margin-top:2px;">Médecin{{ medecins|length|pluralize }}</div>
+  </div>
+</div>
 
-  <div class="det-section">
+<!-- ── Informations ── -->
+<div class="det-section">
+  <div class="det-section-head">
+    <div class="det-section-title"><i class="bi bi-info-circle"></i> Informations</div>
+  </div>
+  <div class="det-fields">
+    <div class="det-field">
+      <div class="det-label">Code</div>
+      <div class="det-value" style="font-family:monospace;font-size:14px;">{{ obj.code }}</div>
+    </div>
+    <div class="det-field">
+      <div class="det-label">Nom</div>
+      <div class="det-value">{{ obj.nom }}</div>
+    </div>
+  </div>
+  {% if obj.description %}
+  <div class="det-field-full">
+    <div class="det-label">Description</div>
+    <div class="det-value" style="margin-top:4px;">{{ obj.description }}</div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ── Médecins ── -->
+<div class="det-section" style="margin-bottom:32px;">
+  <div class="det-section-head">
     <div class="det-section-title">
-      <span>Utilisateurs avec cette spécialité <span style="font-size:12px;font-weight:400;text-transform:none;letter-spacing:0;">({{ utilisateurs|length }})</span></span>
+      <i class="bi bi-person-badge"></i>
+      Médecins avec cette spécialité
+      <span style="font-size:11px;font-weight:400;text-transform:none;letter-spacing:0;color:#7a9b68;">({{ medecins|length }})</span>
     </div>
-    {% if utilisateurs %}
-    <table class="emp-table">
-      <thead>
-        <tr>
-          <th style="width:36px;"></th>
-          <th>Code</th>
-          <th>Nom</th>
-          <th>Fonction</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for emp in utilisateurs %}
-        <tr onclick="window.location='{% url 'ressources_humaines_list' emp.pk %}'">
-          <td>
-            <div class="emp-avatar">
-              {% if emp.photo %}<img src="{{ emp.photo.url }}" style="width:100%;height:100%;object-fit:cover;">
-              {% else %}{{ emp.nom|first|upper }}{% endif %}
-            </div>
-          </td>
-          <td><span class="emp-badge">{{ emp.code|default:"—" }}</span></td>
-          <td style="font-weight:500;">{{ emp.nom }} {{ emp.prenoms }}</td>
-          <td style="color:var(--text-muted);font-size:12px;">{{ emp.fonction|default:"—" }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <div style="padding:32px 20px;text-align:center;color:var(--text-muted);font-size:13px;font-style:italic;">Aucun utilisateur avec cette spécialité.</div>
-    {% endif %}
   </div>
-
+  {% if medecins %}
+  <table class="med-table">
+    <thead>
+      <tr>
+        <th style="width:40px;"></th>
+        <th>Médecin</th>
+        <th>Matricule</th>
+        <th>Téléphone</th>
+        <th>Statut</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for med in medecins %}
+      <tr onclick="window.location='{% url 'medecin_detail' med.pk %}'">
+        <td>
+          <div class="med-avatar">
+            {% if med.photo %}<img src="{{ med.photo.url }}" alt="">
+            {% else %}{{ med.nom|first|upper }}{{ med.prenoms|first|upper }}{% endif %}
+          </div>
+        </td>
+        <td>
+          <div style="font-weight:600;color:#2a4219;">Dr {{ med.nom }} {{ med.prenoms }}</div>
+        </td>
+        <td><span style="font-family:monospace;font-size:12px;color:#7a9b68;">{{ med.matricule }}</span></td>
+        <td style="color:#7a9b68;font-size:12.5px;">{{ med.telephone|default:"—" }}</td>
+        <td>
+          {% if med.actif %}<span class="badge-actif">Actif</span>
+          {% else %}<span class="badge-inactif">Inactif</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="det-empty">
+    <i class="bi bi-person-x" style="font-size:32px;display:block;margin-bottom:8px;opacity:.4;"></i>
+    Aucun médecin avec cette spécialité.
+  </div>
+  {% endif %}
 </div>
 
-<script>
-(function(){var t=document.querySelector('.topbar'),w=document.getElementById('page-wrap');if(t&&w)w.style.paddingTop='0';window.addEventListener('resize',function(){if(t&&w)w.style.paddingTop='0';});})();
-</script>
-</div>
 {% endblock %}

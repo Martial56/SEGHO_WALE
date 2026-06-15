@@ -138,16 +138,6 @@ html[data-theme="dark"] .md-input:focus { border-bottom-color:var(--md-400); }
 </style>
 {% endblock %}
 
-{% block breadcrumb %}
-<nav style="background:var(--md-surface,#fff);border-bottom:1px solid rgba(0,0,0,.07);margin:-32px -32px 0;padding:0 32px;display:flex;align-items:stretch;height:44px;position:sticky;top:var(--topbar-h);z-index:250;gap:2px;">
-  <a href="{% url 'medecins_list' %}" style="padding:11px 16px;font-size:13px;font-weight:500;color:rgba(0,0,0,.45);text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
-    <i class="bi bi-person-badge"></i> Médecins
-  </a>
-  <span style="padding:11px 16px;font-size:13px;font-weight:600;color:var(--md-600);border-bottom:2px solid var(--md-500);display:inline-flex;align-items:center;gap:6px;margin-bottom:-1px;">
-    {% if mode == 'create' %}Nouveau médecin{% else %}Modifier{% endif %}
-  </span>
-</nav>
-{% endblock %}
 
 {% block content %}
 <div class="md-page-head">
@@ -305,6 +295,19 @@ html[data-theme="dark"] .md-input:focus { border-bottom-color:var(--md-400); }
               {% if mode == 'edit' and med.specialite and med.specialite.pk == sp.pk %}selected
               {% elif post and post.specialite == sp.pk|stringformat:"s" %}selected
               {% endif %}>{{ sp.nom }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="md-field">
+          <label class="md-label" for="service">Département / Service</label>
+          <select name="service" id="service" class="md-input">
+            <option value="">— Aucun département —</option>
+            {% for svc in services %}
+            <option value="{{ svc.pk }}"
+              {% if mode == 'edit' and med.service and med.service.pk == svc.pk %}selected
+              {% elif post and post.service == svc.pk|stringformat:"s" %}selected
+              {% endif %}>{{ svc.nom }}</option>
             {% endfor %}
           </select>
         </div>

@@ -206,13 +206,16 @@ class ReceptionAchat(models.Model):
         ('partielle',    'Partielle'),
         ('non_conforme', 'Non conforme'),
     ]
-    numero          = models.CharField(max_length=20, unique=True, blank=True)
-    commande        = models.ForeignKey(CommandeAchat, on_delete=models.PROTECT, related_name='receptions')
-    date_reception  = models.DateField(default=timezone.now)
-    statut          = models.CharField(max_length=20, choices=STATUT_CHOICES, default='conforme')
-    notes           = models.TextField(blank=True)
-    receptionne_par = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='receptions_achats')
-    date_creation   = models.DateTimeField(auto_now_add=True)
+    numero             = models.CharField(max_length=20, unique=True, blank=True)
+    commande           = models.ForeignKey(CommandeAchat, on_delete=models.PROTECT, related_name='receptions')
+    date_reception     = models.DateField(default=timezone.now)
+    statut             = models.CharField(max_length=20, choices=STATUT_CHOICES, default='conforme')
+    notes              = models.TextField(blank=True)
+    receptionne_par    = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='receptions_achats')
+    integre_en_stock   = models.BooleanField("Intégré en stock", default=False)
+    date_integration   = models.DateTimeField("Date d'intégration stock", null=True, blank=True)
+    integre_par        = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='receptions_integrees')
+    date_creation      = models.DateTimeField(auto_now_add=True)
 
     def __str__(self): return f"Réception {self.numero} — {self.commande.numero}"
 
@@ -231,11 +234,13 @@ class ReceptionAchat(models.Model):
 
 
 class LigneReceptionAchat(models.Model):
-    reception      = models.ForeignKey(ReceptionAchat, on_delete=models.CASCADE, related_name='lignes')
-    ligne_commande = models.ForeignKey(LigneCommandeAchat, on_delete=models.PROTECT)
-    quantite_recue = models.DecimalField(max_digits=12, decimal_places=2)
-    conforme       = models.BooleanField(default=True)
-    notes          = models.CharField(max_length=300, blank=True)
+    reception       = models.ForeignKey(ReceptionAchat, on_delete=models.CASCADE, related_name='lignes')
+    ligne_commande  = models.ForeignKey(LigneCommandeAchat, on_delete=models.PROTECT)
+    quantite_recue  = models.DecimalField(max_digits=12, decimal_places=2)
+    conforme        = models.BooleanField(default=True)
+    numero_lot      = models.CharField("N° de lot", max_length=100, blank=True)
+    date_peremption = models.DateField("Date de péremption", null=True, blank=True)
+    notes           = models.CharField(max_length=300, blank=True)
 
     @property
     def ecart(self):

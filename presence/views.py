@@ -84,13 +84,18 @@ def presence_registre(request):
                 employe=emp, date=selected_date,
                 defaults={'present': present},
             )
-            obj.present             = present
-            obj.permanence          = (request.POST.get(f'perm_{emp.pk}', '0') == '1')
-            obj.heure_arrivee_matin = _parse_time(request.POST.get(f'h_am_{emp.pk}'))
-            obj.heure_depart_matin  = _parse_time(request.POST.get(f'h_dm_{emp.pk}'))
-            obj.heure_arrivee_soir  = _parse_time(request.POST.get(f'h_as_{emp.pk}'))
-            obj.heure_depart_soir   = _parse_time(request.POST.get(f'h_ds_{emp.pk}'))
-            obj.remarques           = request.POST.get(f'rem_{emp.pk}', '').strip()
+            obj.present    = present
+            obj.permanence = (request.POST.get(f'perm_{emp.pk}', '0') == '1')
+            # Respecter le verrouillage kiosk : ne pas écraser les heures pointées
+            if not obj.am_in_locked:
+                obj.heure_arrivee_matin = _parse_time(request.POST.get(f'h_am_{emp.pk}'))
+            if not obj.am_out_locked:
+                obj.heure_depart_matin  = _parse_time(request.POST.get(f'h_dm_{emp.pk}'))
+            if not obj.pm_in_locked:
+                obj.heure_arrivee_soir  = _parse_time(request.POST.get(f'h_as_{emp.pk}'))
+            if not obj.pm_out_locked:
+                obj.heure_depart_soir   = _parse_time(request.POST.get(f'h_ds_{emp.pk}'))
+            obj.remarques = request.POST.get(f'rem_{emp.pk}', '').strip()
             if not present:
                 motif = request.POST.get(f'motif_{emp.pk}', '').strip()
                 obj.motif_absence = motif
@@ -910,17 +915,23 @@ def presence_pointer(request):
 
     if action == 'arrivee_matin':
         p.heure_arrivee_matin = now
+        p.am_in_locked = True
     elif action == 'depart_matin':
         p.heure_depart_matin = now
+        p.am_out_locked = True
     elif action == 'arrivee_soir':
         p.heure_arrivee_soir = now
+        p.pm_in_locked = True
     elif action == 'depart_soir':
         p.heure_depart_soir = now
+        p.pm_out_locked = True
     # Permanence
     elif action == 'arrivee':
         p.heure_arrivee_matin = now
+        p.am_in_locked = True
     elif action == 'depart':
         p.heure_depart_soir = now
+        p.pm_out_locked = True
 
     p.save()
 

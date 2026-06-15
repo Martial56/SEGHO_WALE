@@ -97,6 +97,36 @@ def stock_dashboard(request):
         statut='annule'
     ).order_by('-date_creation')[:5]
 
+    # Point 1 — Alertes critiques (ruptures, sous seuil minimum, lots périmant dans 30j)
+    produits_rupture      = Produit.objects.filter(actif=True, stock_actuel__lte=0).order_by('nom')[:5]
+    produits_sous_minimum = Produit.objects.filter(
+        actif=True, stock_actuel__gt=0, stock_actuel__lte=F('stock_minimum')
+    ).order_by('stock_actuel')[:5]
+    lots_expiration_30 = LotProduit.objects.filter(
+        quantite_actuelle__gt=0,
+        date_peremption__gt=today,
+        date_peremption__lte=today + timezone.timedelta(days=30),
+    ).select_related('produit').order_by('date_peremption')[:5]
+
+    # Points 3 & 6 — À commander + KPIs (une seule requête produits partagée)
+    produits_all = list(Produit.objects.filter(actif=True))
+    a_commander_dash = sorted(
+        [{'produit': p, 'qte': p.qte_a_commander, 'stock': p.stock_actuel, 'minimum': p.stock_minimum}
+         for p in produits_all if p.qte_a_commander > 0],
+        key=lambda x: x['qte'], reverse=True
+    )[:8]
+    kpi_valeur_stock     = round(sum(float(p.stock_actuel) * float(p.prix_achat) for p in produits_all))
+    total_livr_kpi       = float(MouvementStock.objects.filter(type='livraison').aggregate(t=Sum('quantite'))['t'] or 0)
+    stock_total_kpi      = sum(float(p.stock_actuel) for p in produits_all)
+    kpi_taux_rotation    = round(total_livr_kpi / stock_total_kpi, 2) if stock_total_kpi > 0 else 0
+    _td = float(LigneDemande.objects.aggregate(t=Sum('quantite_demandee'))['t'] or 0)
+    _ta = float(LigneDemande.objects.aggregate(t=Sum('quantite_approuvee'))['t'] or 0)
+    kpi_taux_service     = round(_ta / _td * 100, 1) if _td > 0 else 0
+    lots_obsoletes_count = LotProduit.objects.filter(
+        quantite_actuelle__gt=0,
+        date_reception__lt=today - timezone.timedelta(days=180),
+    ).count()
+
     return render(request, 'stock/dashboard.html', {
         'stats':               stats,
         'produits_alerte':     produits_alerte,
@@ -108,6 +138,17 @@ def stock_dashboard(request):
         'chart_mouvements':    chart_mouvements,
         'chart_top':           chart_top,
         'chart_types':         chart_types,
+        # Point 1
+        'produits_rupture':      produits_rupture,
+        'produits_sous_minimum': produits_sous_minimum,
+        'lots_expiration_30':    lots_expiration_30,
+        # Point 3
+        'a_commander_dash':      a_commander_dash,
+        # Point 6
+        'kpi_valeur_stock':      kpi_valeur_stock,
+        'kpi_taux_rotation':     kpi_taux_rotation,
+        'kpi_taux_service':      kpi_taux_service,
+        'lots_obsoletes_count':  lots_obsoletes_count,
     })
 
 
@@ -853,22 +894,25 @@ def rapports_consommation(request):
     mouvements = MouvementStock.objects.filter(
         type='livraison',
         date__month=mois, date__year=annee,
-    ).select_related('produit')
+    ).select_related('produit', 'lot')
 
     if type_filtre:
         mouvements = mouvements.filter(produit__type=type_filtre)
 
-    # Agréger par produit
-    consommation = defaultdict(lambda: {'produit': None, 'total': 0.0, 'nb_livraisons': 0})
+    # Agréger par produit (quantité + valorisation)
+    consommation = defaultdict(lambda: {'produit': None, 'total': 0.0, 'nb_livraisons': 0, 'valeur': 0.0})
     for mv in mouvements:
         k = mv.produit.pk
-        consommation[k]['produit'] = mv.produit
+        consommation[k]['produit']       = mv.produit
         consommation[k]['total']         += float(mv.quantite)
         consommation[k]['nb_livraisons'] += 1
+        prix = float(mv.lot.prix_achat_lot) if mv.lot_id else float(mv.produit.prix_achat)
+        consommation[k]['valeur']        += float(mv.quantite) * prix
 
     lignes = sorted(consommation.values(), key=lambda x: x['total'], reverse=True)
 
     total_quantite = sum(l['total'] for l in lignes)
+    total_valeur   = sum(l['valeur'] for l in lignes)
 
     # Mois nav
     d_courante = datetime.date(annee, mois, 1)
@@ -886,19 +930,20 @@ def rapports_consommation(request):
     annees_dispo = list(range(today.year, today.year - 3, -1))
 
     return render(request, 'stock/rapports/consommation.html', {
-        'lignes':        lignes,
-        'mois':          mois,
-        'annee':         annee,
-        'mois_nom':      MOIS_NOMS[mois],
-        'mois_noms':     MOIS_NOMS,
-        'annees_dispo':  annees_dispo,
-        'type_filtre':   type_filtre,
+        'lignes':         lignes,
+        'mois':           mois,
+        'annee':          annee,
+        'mois_nom':       MOIS_NOMS[mois],
+        'mois_noms':      MOIS_NOMS,
+        'annees_dispo':   annees_dispo,
+        'type_filtre':    type_filtre,
         'total_quantite': total_quantite,
-        'prev_mois':     prev_mois,
-        'prev_annee':    prev_annee,
-        'next_mois':     next_mois,
-        'next_annee':    next_annee,
-        'today':         today,
+        'total_valeur':   total_valeur,
+        'prev_mois':      prev_mois,
+        'prev_annee':     prev_annee,
+        'next_mois':      next_mois,
+        'next_annee':     next_annee,
+        'today':          today,
     })
 
 
@@ -1124,6 +1169,22 @@ def rapports_indicateurs(request):
         key=lambda x: x['qte'], reverse=True
     )[:10]
 
+    # Prévision 3 mois (Feature 3)
+    previsions = []
+    for item in a_commander:
+        p   = item['produit']
+        cmm = item['cmm'] or 0
+        s0  = float(p.stock_actuel)
+        previsions.append({
+            'produit':         p,
+            'cmm':             cmm,
+            'stock_actuel':    s0,
+            'stock_m1':        max(0, s0 - cmm),
+            'stock_m2':        max(0, s0 - 2 * cmm),
+            'stock_m3':        max(0, s0 - 3 * cmm),
+            'qte_a_commander': item['qte'],
+        })
+
     chart_service_data = {
         'labels': ['Taux de service', 'Taux de rupture'],
         'data': [float(taux_service), float(taux_rupture)],
@@ -1147,10 +1208,302 @@ def rapports_indicateurs(request):
         'valeur_stock':    valeur_stock,
         'critiques':       critiques,
         'a_commander':     a_commander,
+        'previsions':      previsions,
         'total_produits':  len(produits),
         'chart_service':   chart_service_data,
         'chart_critiques': chart_critiques_data,
         'chart_commander': chart_commander_data,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Rapport de péremptions (Feature 1)
+# ---------------------------------------------------------------------------
+
+@login_required(login_url='login')
+def rapports_peremptions(request):
+    from collections import defaultdict
+    today = timezone.now().date()
+    mois  = int(request.GET.get('mois', today.month))
+    annee = int(request.GET.get('annee', today.year))
+
+    mouvements = MouvementStock.objects.filter(
+        type='peremption',
+        date__month=mois, date__year=annee,
+    ).select_related('produit', 'lot', 'cree_par').order_by('-date')
+
+    total_quantite = sum(float(mv.quantite) for mv in mouvements)
+    total_valeur   = sum(
+        float(mv.quantite) * float(mv.lot.prix_achat_lot if mv.lot_id else mv.produit.prix_achat)
+        for mv in mouvements
+    )
+
+    MOIS_NOMS = ['', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+                 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre']
+    annees_dispo = list(range(today.year, today.year - 3, -1))
+    prev_mois, prev_annee = (12, annee - 1) if mois == 1 else (mois - 1, annee)
+    next_mois, next_annee = (1, annee + 1) if mois == 12 else (mois + 1, annee)
+
+    return render(request, 'stock/rapports/peremptions.html', {
+        'mouvements':     mouvements,
+        'mois':           mois, 'annee': annee, 'mois_nom': MOIS_NOMS[mois],
+        'annees_dispo':   annees_dispo,
+        'total_quantite': total_quantite, 'total_valeur': total_valeur,
+        'prev_mois': prev_mois, 'prev_annee': prev_annee,
+        'next_mois': next_mois, 'next_annee': next_annee,
+        'today': today,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Saisie des éliminations / destructions (Feature 2)
+# ---------------------------------------------------------------------------
+
+@login_required(login_url='login')
+def elimination_create(request):
+    today = timezone.now().date()
+
+    if request.method == 'POST':
+        nb = 0
+        notes_global = request.POST.get('notes', '').strip()
+        for key, val in request.POST.items():
+            if not key.startswith('qte_'):
+                continue
+            lot_pk = key[4:]
+            try:
+                qte = float(val)
+            except (ValueError, TypeError):
+                continue
+            if qte <= 0:
+                continue
+            try:
+                lot = LotProduit.objects.select_related('produit').get(pk=lot_pk)
+            except LotProduit.DoesNotExist:
+                continue
+            qte = min(qte, float(lot.quantite_actuelle))
+            if qte <= 0:
+                continue
+            sv = float(lot.produit.stock_actuel)
+            sa = max(0, sv - qte)
+            MouvementStock.objects.create(
+                produit=lot.produit, lot=lot,
+                type='peremption', motif='peremption',
+                quantite=qte, stock_avant=sv, stock_apres=sa,
+                notes=notes_global, cree_par=request.user,
+            )
+            lot.quantite_actuelle = max(0, float(lot.quantite_actuelle) - qte)
+            lot.save(update_fields=['quantite_actuelle'])
+            lot.produit.stock_actuel = sa
+            lot.produit.save(update_fields=['stock_actuel'])
+            nb += 1
+        if nb:
+            messages.success(request, f'{nb} lot(s) éliminé(s) et enregistré(s).')
+        return redirect('stock_peremptions')
+
+    # GET : lots périmés ou expirant dans 30 jours
+    lots = LotProduit.objects.filter(
+        quantite_actuelle__gt=0
+    ).filter(
+        Q(date_peremption__lt=today) | Q(date_peremption__lte=today + timezone.timedelta(days=30))
+    ).select_related('produit', 'fournisseur').order_by('date_peremption')
+
+    return render(request, 'stock/peremptions/eliminer.html', {
+        'lots': lots, 'today': today,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Génération automatique de fiche de besoins (Feature 4)
+# ---------------------------------------------------------------------------
+
+@login_required(login_url='login')
+@require_POST
+def besoins_generer_auto(request):
+    import datetime as _dt
+    today = timezone.now().date()
+    debut = today.replace(day=1)
+    if today.month == 12:
+        fin = today.replace(day=31)
+    else:
+        fin = today.replace(month=today.month + 1, day=1) - _dt.timedelta(days=1)
+
+    produits_all = list(Produit.objects.filter(actif=True))
+    a_commander  = [p for p in produits_all if p.qte_a_commander > 0]
+
+    if not a_commander:
+        messages.warning(request, 'Aucun produit à commander actuellement.')
+        return redirect('stock_rapports_indicateurs')
+
+    fiche = FicheBesoins.objects.create(
+        periode_debut=debut, periode_fin=fin,
+        cree_par=request.user,
+        notes='Généré automatiquement depuis les indicateurs de stock.',
+    )
+    for p in a_commander:
+        LigneFicheBesoins.objects.create(
+            fiche=fiche, produit=p,
+            stock_initial=p.stock_actuel,
+            cmm=p.cmm,
+            qte_commander=p.qte_a_commander,
+        )
+    messages.success(request, f'Fiche {fiche.numero} créée avec {len(a_commander)} produit(s).')
+    return redirect('stock_fiche_detail', pk=fiche.pk)
+
+
+# ---------------------------------------------------------------------------
+# Bilan mensuel (Feature 5)
+# ---------------------------------------------------------------------------
+
+@login_required(login_url='login')
+def rapports_bilan_mensuel(request):
+    from collections import defaultdict
+    today = timezone.now().date()
+    mois  = int(request.GET.get('mois', today.month))
+    annee = int(request.GET.get('annee', today.year))
+    MOIS_NOMS = ['', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+                 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre']
+    annees_dispo = list(range(today.year, today.year - 3, -1))
+    prev_mois, prev_annee = (12, annee - 1) if mois == 1 else (mois - 1, annee)
+    next_mois, next_annee = (1, annee + 1) if mois == 12 else (mois + 1, annee)
+
+    mvts = list(MouvementStock.objects.filter(
+        date__month=mois, date__year=annee,
+    ).select_related('produit', 'lot').order_by('-date'))
+
+    def _val(mv):
+        prix = float(mv.lot.prix_achat_lot) if mv.lot_id else float(mv.produit.prix_achat)
+        return float(mv.quantite) * prix
+
+    entrees     = [mv for mv in mvts if mv.type == 'entree']
+    sorties     = [mv for mv in mvts if mv.type == 'livraison']
+    peremptes   = [mv for mv in mvts if mv.type == 'peremption']
+    ajustements = [mv for mv in mvts if mv.type == 'ajustement']
+    retours     = [mv for mv in mvts if mv.type == 'retour']
+
+    conso = defaultdict(float)
+    for mv in sorties:
+        conso[mv.produit.nom[:30]] += float(mv.quantite)
+    top_sorties = sorted(conso.items(), key=lambda x: x[1], reverse=True)[:5]
+
+    return render(request, 'stock/rapports/bilan.html', {
+        'mois': mois, 'annee': annee, 'mois_nom': MOIS_NOMS[mois],
+        'annees_dispo': annees_dispo,
+        'prev_mois': prev_mois, 'prev_annee': prev_annee,
+        'next_mois': next_mois, 'next_annee': next_annee,
+        'today': today,
+        'entrees': entrees, 'sorties': sorties,
+        'peremptes': peremptes, 'ajustements': ajustements, 'retours': retours,
+        'qte_entrees':   sum(float(mv.quantite) for mv in entrees),
+        'qte_sorties':   sum(float(mv.quantite) for mv in sorties),
+        'qte_peremptes': sum(float(mv.quantite) for mv in peremptes),
+        'val_entrees':   round(sum(_val(mv) for mv in entrees)),
+        'val_sorties':   round(sum(_val(mv) for mv in sorties)),
+        'val_peremptes': round(sum(_val(mv) for mv in peremptes)),
+        'top_sorties':   top_sorties,
+        'nb_ruptures':   Produit.objects.filter(actif=True, stock_actuel__lte=0).count(),
+        'nb_alertes':    Produit.objects.filter(actif=True, stock_actuel__gt=0, stock_actuel__lte=F('stock_alerte')).count(),
+    })
+
+
+# ---------------------------------------------------------------------------
+# Comparatif fournisseurs / historique des prix (Feature 6)
+# ---------------------------------------------------------------------------
+
+@login_required(login_url='login')
+def rapports_fournisseurs_prix(request):
+    from collections import defaultdict
+    fournisseur_pk = request.GET.get('fournisseur', '')
+    produit_pk     = request.GET.get('produit', '')
+
+    lots_qs = LotProduit.objects.filter(
+        prix_achat_lot__gt=0,
+    ).select_related('produit', 'fournisseur').order_by('produit__nom', 'date_reception')
+
+    if fournisseur_pk:
+        lots_qs = lots_qs.filter(fournisseur_id=fournisseur_pk)
+    if produit_pk:
+        lots_qs = lots_qs.filter(produit_id=produit_pk)
+
+    par_produit = defaultdict(list)
+    for lot in lots_qs:
+        par_produit[lot.produit].append(lot)
+
+    produits_data = []
+    for prod, lots in par_produit.items():
+        prices = [float(l.prix_achat_lot) for l in lots]
+        pmin, pmax = min(prices), max(prices)
+        produits_data.append({
+            'produit':   prod,
+            'lots':      lots,
+            'prix_min':  pmin,
+            'prix_max':  pmax,
+            'prix_moy':  round(sum(prices) / len(prices)),
+            'variation': round((pmax - pmin) / pmin * 100, 1) if pmin > 0 else 0,
+        })
+    produits_data.sort(key=lambda x: x['variation'], reverse=True)
+
+    from achats.models import Fournisseur as FournisseurAchat
+    fournisseurs = FournisseurAchat.objects.filter(actif=True).order_by('nom')
+    produits_avec_lots = Produit.objects.filter(
+        lots__prix_achat_lot__gt=0, actif=True
+    ).distinct().order_by('nom')
+
+    return render(request, 'stock/rapports/fournisseurs_prix.html', {
+        'produits_data':      produits_data,
+        'fournisseurs':       fournisseurs,
+        'produits_avec_lots': produits_avec_lots,
+        'fournisseur_pk':     fournisseur_pk,
+        'produit_pk':         produit_pk,
+        'today':              timezone.now().date(),
+    })
+
+
+# ---------------------------------------------------------------------------
+# Retours pharmacie → stock central (Feature 8)
+# ---------------------------------------------------------------------------
+
+@login_required(login_url='login')
+def retour_create(request):
+    if request.method == 'POST':
+        produit_pk = request.POST.get('produit', '')
+        lot_pk     = request.POST.get('lot', '')
+        pharmacie  = request.POST.get('pharmacie', '')
+        notes      = request.POST.get('notes', '').strip()
+        try:
+            qte = float(request.POST.get('quantite', 0) or 0)
+        except ValueError:
+            qte = 0
+
+        if not produit_pk or qte <= 0:
+            messages.error(request, 'Produit et quantité requis.')
+            return redirect('stock_retour_create')
+
+        produit = get_object_or_404(Produit, pk=produit_pk)
+        lot = LotProduit.objects.filter(pk=lot_pk, produit=produit).first() if lot_pk else None
+
+        sv = float(produit.stock_actuel)
+        sa = sv + qte
+        MouvementStock.objects.create(
+            produit=produit, lot=lot,
+            type='retour', motif='retour',
+            pharmacie=pharmacie, quantite=qte,
+            stock_avant=sv, stock_apres=sa,
+            notes=notes, cree_par=request.user,
+        )
+        produit.stock_actuel = sa
+        produit.save(update_fields=['stock_actuel'])
+        if lot:
+            lot.quantite_actuelle = float(lot.quantite_actuelle) + qte
+            lot.save(update_fields=['quantite_actuelle'])
+
+        messages.success(request, f'Retour de {qte:.0f} {produit.unite_mesure} enregistré pour « {produit.nom} ».')
+        return redirect('stock_mouvements')
+
+    produits  = Produit.objects.filter(actif=True).order_by('nom')
+    return render(request, 'stock/retours/form.html', {
+        'produits':   produits,
+        'pharmacies': PHARMACIES,
+        'today':      timezone.now().date(),
     })
 
 
@@ -1313,18 +1666,45 @@ def dotation_valider(request, pk):
         if qte < float(ligne.quantite_demandee):
             tout_approuve = False
         if qte > 0:
-            stock_avant = float(ligne.produit.stock_actuel)
-            stock_apres = max(0, stock_avant - qte)
-            MouvementStock.objects.create(
-                produit=ligne.produit, type='livraison', motif='livraison',
-                pharmacie=demande.pharmacie, quantite=qte,
-                stock_avant=stock_avant, stock_apres=stock_apres,
-                reference=demande.numero,
-                notes=f'Dotation {demande.get_pharmacie_display()}',
-                cree_par=request.user,
-            )
-            ligne.produit.stock_actuel = stock_apres
-            ligne.produit.save(update_fields=['stock_actuel'])
+            # FIFO: déduit depuis les lots les plus anciens en premier
+            qte_restante = qte
+            lots_dispo = LotProduit.objects.filter(
+                produit=ligne.produit, quantite_actuelle__gt=0,
+            ).order_by('date_reception')
+            for lot in lots_dispo:
+                if qte_restante <= 0:
+                    break
+                qte_lot = min(float(lot.quantite_actuelle), qte_restante)
+                sv = float(ligne.produit.stock_actuel)
+                sa = max(0, sv - qte_lot)
+                MouvementStock.objects.create(
+                    produit=ligne.produit, lot=lot,
+                    type='livraison', motif='livraison',
+                    pharmacie=demande.pharmacie, quantite=qte_lot,
+                    stock_avant=sv, stock_apres=sa,
+                    reference=demande.numero,
+                    notes=f'Dotation {demande.get_pharmacie_display()} — Lot {lot.numero_lot}',
+                    cree_par=request.user,
+                )
+                lot.quantite_actuelle = max(0, float(lot.quantite_actuelle) - qte_lot)
+                lot.save(update_fields=['quantite_actuelle'])
+                ligne.produit.stock_actuel = sa
+                ligne.produit.save(update_fields=['stock_actuel'])
+                qte_restante -= qte_lot
+            # Fallback si aucun lot enregistré
+            if qte_restante > 0:
+                sv = float(ligne.produit.stock_actuel)
+                sa = max(0, sv - qte_restante)
+                MouvementStock.objects.create(
+                    produit=ligne.produit, type='livraison', motif='livraison',
+                    pharmacie=demande.pharmacie, quantite=qte_restante,
+                    stock_avant=sv, stock_apres=sa,
+                    reference=demande.numero,
+                    notes=f'Dotation {demande.get_pharmacie_display()}',
+                    cree_par=request.user,
+                )
+                ligne.produit.stock_actuel = sa
+                ligne.produit.save(update_fields=['stock_actuel'])
 
     # Le stock passe en "en_livraison" — la pharmacie doit confirmer la réception
     demande.statut          = 'en_livraison'
@@ -1489,11 +1869,13 @@ def fiche_envoyer_achats(request, pk):
     from achats.models import BesoinAchat, LigneBesoin
     fiche = get_object_or_404(FicheBesoins, pk=pk)
 
-    if fiche.statut != 'brouillon':
-        besoin_existant = fiche.besoins_achats.first()
-        if besoin_existant:
-            messages.warning(request, f"Cette fiche a déjà été transmise ({besoin_existant.numero}).")
-            return redirect('achats:besoin_detail', pk=besoin_existant.pk)
+    besoin_existant = fiche.besoins_achats.first()
+    if besoin_existant:
+        messages.warning(request, f"Cette fiche a déjà été transmise ({besoin_existant.numero}).")
+        return redirect('achats:besoin_detail', pk=besoin_existant.pk)
+
+    if fiche.statut not in ('soumis', 'valide'):
+        messages.error(request, "La fiche doit être soumise ou validée avant de pouvoir être transmise aux achats.")
         return redirect('stock_fiche_detail', pk=pk)
 
     besoin = BesoinAchat.objects.create(
@@ -1503,15 +1885,13 @@ def fiche_envoyer_achats(request, pk):
     )
     lignes_creees = 0
     for ligne in fiche.lignes.select_related('produit').all():
+        qte = ligne.qte_accordee if ligne.qte_accordee else ligne.qte_commander
         LigneBesoin.objects.create(
             besoin=besoin, produit=ligne.produit,
-            quantite=ligne.qte_commander,
+            quantite=qte,
             unite=ligne.produit.unite_mesure or 'unité',
         )
         lignes_creees += 1
-
-    fiche.statut = 'valide'
-    fiche.save(update_fields=['statut'])
 
     messages.success(request, f"Besoin {besoin.numero} transmis aux achats ({lignes_creees} produit(s)).")
     return redirect('achats:besoin_detail', pk=besoin.pk)
@@ -1524,3 +1904,88 @@ def fiche_print(request, pk):
     return render(request, 'stock/fiches/print.html', {
         'fiche': fiche, 'lignes': lignes, 'today': timezone.now().date(),
     })
+
+
+# ──────────────────────────────────────────────────────────────
+# INTÉGRATION DES RÉCEPTIONS D'ACHATS
+# ──────────────────────────────────────────────────────────────
+
+@login_required(login_url='login')
+def receptions_a_integrer(request):
+    from achats.models import ReceptionAchat
+    receptions = ReceptionAchat.objects.filter(
+        integre_en_stock=False
+    ).select_related(
+        'commande__fournisseur',
+        'commande__proforma__besoin__fiche_besoins',
+        'receptionne_par',
+    ).order_by('-date_creation')
+    return render(request, 'stock/receptions_a_integrer.html', {
+        'receptions': receptions,
+        'nb': receptions.count(),
+    })
+
+
+@login_required(login_url='login')
+@require_POST
+def integrer_reception(request, pk):
+    from achats.models import ReceptionAchat, LigneReceptionAchat
+    reception = get_object_or_404(ReceptionAchat, pk=pk, integre_en_stock=False)
+    commande = reception.commande
+
+    for lr in reception.lignes.select_related(
+        'ligne_commande__ligne_proforma__ligne_besoin__produit'
+    ).all():
+        if lr.quantite_recue <= 0:
+            continue
+        lc = lr.ligne_commande
+        produit = None
+        if (lc.ligne_proforma and
+                lc.ligne_proforma.ligne_besoin and
+                lc.ligne_proforma.ligne_besoin.produit):
+            produit = lc.ligne_proforma.ligne_besoin.produit
+        if produit is None:
+            continue
+
+        numero_lot = lr.numero_lot or reception.numero
+        lot = LotProduit.objects.filter(produit=produit, numero_lot=numero_lot).first()
+        if lot:
+            lot.quantite_actuelle += lr.quantite_recue
+            lot.quantite_initiale += lr.quantite_recue
+            update_lot_fields = ['quantite_actuelle', 'quantite_initiale']
+            if not lot.date_peremption and lr.date_peremption:
+                lot.date_peremption = lr.date_peremption
+                update_lot_fields.append('date_peremption')
+            lot.save(update_fields=update_lot_fields)
+        else:
+            lot = LotProduit.objects.create(
+                produit=produit,
+                numero_lot=numero_lot,
+                date_reception=reception.date_reception,
+                date_peremption=lr.date_peremption,
+                quantite_initiale=lr.quantite_recue,
+                quantite_actuelle=lr.quantite_recue,
+                fournisseur=commande.fournisseur,
+                prix_achat_lot=lc.prix_unitaire,
+            )
+        stock_avant = produit.stock_actuel
+        produit.stock_actuel = produit.stock_actuel + lr.quantite_recue
+        produit.save(update_fields=['stock_actuel'])
+        MouvementStock.objects.create(
+            produit=produit, lot=lot,
+            type='entree', motif='achat',
+            quantite=lr.quantite_recue,
+            stock_avant=stock_avant,
+            stock_apres=produit.stock_actuel,
+            reference=reception.numero,
+            notes=f'Réception {reception.numero} — Commande {commande.numero}',
+            cree_par=request.user,
+        )
+
+    reception.integre_en_stock = True
+    reception.date_integration = timezone.now()
+    reception.integre_par = request.user
+    reception.save(update_fields=['integre_en_stock', 'date_integration', 'integre_par'])
+
+    messages.success(request, f'Réception {reception.numero} intégrée dans le stock.')
+    return redirect('stock_receptions_a_integrer')

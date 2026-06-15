@@ -1,166 +1,248 @@
 {% extends 'medecins/base.html' %}
-
 {% block topbar_title %}Spécialités{% endblock %}
-{% block breadcrumb %}{% endblock %}
 
 {% block extra_css %}
 {{ block.super }}
 <style>
-  /* ── Spécialités page ── */
-  .page-icon { width:34px; height:34px; border-radius:8px; background:rgba(13,148,136,.1); display:inline-flex; align-items:center; justify-content:center; font-size:16px; color:#1a6d8c; flex-shrink:0; vertical-align:middle; }
-  html[data-theme="dark"] .page-icon { background:rgba(13,148,136,.2); color:#2d99db; }
-  .o-page-title { display:inline-flex !important; align-items:center; gap:9px; }
-  /* Card accent strip */
-  .sp-strip { height:3px; margin:-16px -16px 12px; border-radius:10px 10px 0 0; background:linear-gradient(90deg,#1a6d8c,#2d99db); }
-  /* Card icon */
-  .sp-icon { width:36px; height:36px; border-radius:9px; background:rgba(13,148,136,.1); display:flex; align-items:center; justify-content:center; font-size:17px; color:#1a6d8c; flex-shrink:0; }
-  html[data-theme="dark"] .sp-icon { background:rgba(13,148,136,.2); color:#2d99db; }
-  /* Code chip teal */
-  .sp-code { display:inline-flex; align-items:center; font-family:monospace; font-size:11px; font-weight:700; background:rgba(13,148,136,.1); color:#0f4358; padding:3px 9px; border-radius:5px; letter-spacing:.3px; }
-  html[data-theme="dark"] .sp-code { background:rgba(13,148,136,.2); color:#2d99db; }
-  /* Empty description */
-  .sp-no-desc { font-style:italic; opacity:.55; }
+:root {
+  --cfg-accent:#4a6741; --cfg-accent-l:rgba(58,89,36,.1); --cfg-accent-b:rgba(58,89,36,.25);
+}
+/* ── Head ── */
+.cfg-head {
+  display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+  padding:12px 32px; margin:0 -32px;
+  background:#f2f7ee; border-bottom:1px solid rgba(58,89,36,.18);
+  position:sticky; top:calc(var(--topbar-h) + 44px); z-index:100;
+  box-shadow:0 2px 6px rgba(0,0,0,.04);
+}
+html[data-theme="dark"] .cfg-head { background:#0f0e0e; border-bottom-color:rgba(58,89,36,.3); }
+.cfg-head-left { display:flex; align-items:center; gap:10px; }
+.cfg-head-icon { width:32px; height:32px; border-radius:8px; background:var(--cfg-accent-l); display:flex; align-items:center; justify-content:center; font-size:16px; color:var(--cfg-accent); }
+.cfg-head-title { font-size:15px; font-weight:800; color:#2a4219; }
+html[data-theme="dark"] .cfg-head-title { color:#9ab88a; }
+.cfg-head-count { font-size:11px; font-weight:700; background:var(--cfg-accent-l); color:var(--cfg-accent); border-radius:20px; padding:2px 9px; }
+.cfg-head-right { display:flex; align-items:center; gap:8px; }
+
+/* ── Barre filtres ── */
+.cfg-filters {
+  display:flex; gap:8px; align-items:center; flex-wrap:wrap;
+  background:#fff; border:1px solid rgba(13,148,136,.18); border-radius:10px;
+  padding:7px 12px; margin-top:12px; box-shadow:0 1px 4px rgba(0,0,0,.04);
+}
+html[data-theme="dark"] .cfg-filters { background:#0f0e0e; }
+.cfg-search { flex:1; min-width:200px; border:none; border-bottom:1.5px solid rgba(0,0,0,.15); background:transparent; padding:4px 2px; font-size:12.5px; font-family:inherit; color:#1b2e13; outline:none; }
+.cfg-search:focus { border-bottom-color:var(--cfg-accent); }
+html[data-theme="dark"] .cfg-search { color:#bcd5a8; }
+
+/* ── Boutons ── */
+.btn-cfg { background:var(--cfg-accent); color:#fff; border:none; border-radius:7px; padding:7px 16px; font-size:12.5px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:5px; text-decoration:none; transition:background .15s; }
+.btn-cfg:hover { background:#0a7a70; color:#fff; }
+.btn-cfg-outline { border:1.5px solid rgba(13,148,136,.4); color:var(--cfg-accent); background:transparent; border-radius:7px; padding:6px 13px; font-size:12.5px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:5px; text-decoration:none; transition:background .15s,color .15s; }
+.btn-cfg-outline:hover { background:var(--cfg-accent); color:#fff; }
+.btn-cfg-del { border:1.5px solid rgba(220,38,38,.3); color:#dc2626; background:rgba(220,38,38,.06); border-radius:6px; padding:4px 10px; font-size:11.5px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:4px; transition:background .15s; }
+.btn-cfg-del:hover { background:#dc2626; color:#fff; border-color:#dc2626; }
+
+/* ── Table ── */
+.cfg-table-wrap { margin-top:12px; margin-left:-32px; margin-right:-32px; border-radius:0; overflow:hidden; box-shadow:0 1px 8px rgba(0,0,0,.05); }
+.cfg-table { width:100%; border-collapse:collapse; background:#fff; font-size:13px; }
+html[data-theme="dark"] .cfg-table { background:#0f0e0e; }
+.cfg-table thead tr { background:#f2f7ee; border-bottom:2px solid rgba(58,89,36,.2); }
+html[data-theme="dark"] .cfg-table thead tr { background:#1b2e13; }
+.cfg-table thead th { padding:9px 14px; font-weight:700; font-size:10.5px; text-transform:uppercase; letter-spacing:.5px; color:#3a5924; text-align:left; white-space:nowrap; }
+html[data-theme="dark"] .cfg-table thead th { color:#9ab88a; }
+.cfg-table tbody tr { border-bottom:1px solid rgba(13,148,136,.08); transition:background .1s; cursor:pointer; }
+.cfg-table tbody tr:last-child { border-bottom:none; }
+.cfg-table tbody tr:hover { background:rgba(13,148,136,.04); }
+html[data-theme="dark"] .cfg-table tbody tr:hover { background:rgba(13,148,136,.08); }
+.cfg-table tbody td { padding:10px 14px; color:#1b2e13; vertical-align:middle; }
+html[data-theme="dark"] .cfg-table tbody td { color:#bcd5a8; }
+
+/* ── Code badge ── */
+.badge-code { display:inline-flex; align-items:center; font-family:monospace; font-size:11.5px; font-weight:700; background:var(--cfg-accent-l); color:#3a5924; padding:3px 10px; border-radius:6px; letter-spacing:.3px; }
+html[data-theme="dark"] .badge-code { background:rgba(58,89,36,.2); color:#9ab88a; }
+
+/* ── Vue grille ── */
+.cfg-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:14px; margin-top:12px; }
+.cfg-card {
+  background:#fff; border:1px solid rgba(13,148,136,.18); border-top:3px solid var(--cfg-accent);
+  border-radius:10px; padding:16px; cursor:pointer;
+  box-shadow:0 1px 6px rgba(0,0,0,.05); transition:box-shadow .15s,transform .12s;
+}
+html[data-theme="dark"] .cfg-card { background:#0f1918; border-color:rgba(13,148,136,.25); }
+.cfg-card:hover { box-shadow:0 4px 16px rgba(13,148,136,.15); transform:translateY(-2px); }
+.cfg-card-code { font-size:11px; font-family:monospace; font-weight:700; color:var(--cfg-accent); background:var(--cfg-accent-l); display:inline-block; padding:2px 8px; border-radius:5px; margin-bottom:8px; }
+.cfg-card-name { font-size:14px; font-weight:700; color:#2a4219; margin-bottom:6px; line-height:1.3; }
+html[data-theme="dark"] .cfg-card-name { color:#9ab88a; }
+.cfg-card-desc { font-size:12px; color:#6b8e8a; line-height:1.4; }
+
+/* ── Toggle vue ── */
+.view-toggle { display:flex; gap:3px; }
+.view-btn { width:30px; height:30px; border:1.5px solid rgba(13,148,136,.3); border-radius:6px; background:#fff; color:rgba(13,148,136,.6); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:14px; transition:all .15s; }
+html[data-theme="dark"] .view-btn { background:#0f1918; }
+.view-btn.active, .view-btn:hover { background:var(--cfg-accent); color:#fff; border-color:var(--cfg-accent); }
+
+/* ── Bulk bar ── */
+.bulk-bar { display:none; align-items:center; gap:10px; background:#fff3cd; border:1px solid #ffc107; border-radius:8px; padding:8px 14px; margin-top:10px; font-size:12.5px; font-weight:600; color:#856404; }
+.bulk-bar.visible { display:flex; }
+html[data-theme="dark"] .bulk-bar { background:#2a2000; border-color:#a87800; color:#ffd861; }
+
+/* ── Empty ── */
+.cfg-empty { text-align:center; padding:56px 24px; color:rgba(0,0,0,.35); }
+html[data-theme="dark"] .cfg-empty { color:rgba(255,255,255,.3); }
+.cfg-empty i { font-size:48px; display:block; margin-bottom:12px; opacity:.4; }
+.cfg-empty-title { font-size:15px; font-weight:700; margin-bottom:6px; }
+.cfg-empty-sub { font-size:13px; margin-bottom:16px; }
+
+/* ── Modal ── */
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:999; align-items:center; justify-content:center; }
+.modal-overlay.open { display:flex; }
+.modal-box { background:#fff; border-radius:12px; padding:28px; max-width:360px; width:90%; text-align:center; box-shadow:0 8px 32px rgba(0,0,0,.2); }
+html[data-theme="dark"] .modal-box { background:#1a1a1a; }
+.modal-icon { font-size:32px; margin-bottom:10px; }
+.modal-title { font-size:16px; font-weight:800; margin-bottom:8px; }
+.modal-msg { font-size:13px; color:rgba(0,0,0,.55); margin-bottom:20px; line-height:1.5; }
+html[data-theme="dark"] .modal-msg { color:rgba(255,255,255,.45); }
+.modal-actions { display:flex; gap:10px; justify-content:center; }
+.btn-modal-cancel { padding:8px 20px; background:rgba(0,0,0,.07); border:none; border-radius:7px; font-size:13px; font-weight:600; cursor:pointer; }
+.btn-modal-confirm { padding:8px 20px; background:#dc2626; color:#fff; border:none; border-radius:7px; font-size:13px; font-weight:600; cursor:pointer; }
+.btn-modal-confirm:hover { background:#b91c1c; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div id="page-wrap">
 
-<div class="o-subheader" id="subheader">
-  <div class="o-subheader-row">
-    <span class="o-page-title">
-      <span class="page-icon"><i class="bi bi-clipboard2-pulse-fill"></i></span>
-      Spécialités <span class="o-page-count">{{ total_filtre }}</span>
-    </span>
-    <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
-      <form method="get" id="filter-form" style="display:flex;align-items:center;">
-        <input type="hidden" name="vue" id="vue-input" value="{{ vue|default:'liste' }}">
-        <div class="o-search-bar">
-          <input class="o-search-input" id="search-input" type="text" name="q" value="{{ q }}" placeholder="Rechercher une spécialité…">
-          <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
-        </div>
-      </form>
-    </div>
+<!-- ── En-tête ── -->
+<div class="cfg-head">
+  <div class="cfg-head-left">
+    <div class="cfg-head-icon"><i class="bi bi-award-fill"></i></div>
+    <div class="cfg-head-title">Spécialités</div>
+    <span class="cfg-head-count">{{ total }}</span>
   </div>
-  <div class="o-subheader-row">
-    <a href="{% url 'medecins_specialite_create' %}" class="o-btn-create">
-      <i class="bi bi-plus-lg"></i> Créer
-    </a>
-    {% if q %}
-    <a href="{% url 'medecins_specialites' %}" class="o-ctrl-btn"><i class="bi bi-x"></i> Effacer</a>
-    <span class="o-filter-tag">{{ q }} <a href="{% url 'medecins_specialites' %}?vue={{ vue }}">×</a></span>
-    {% endif %}
-    <div style="flex:1;"></div>
-    <span style="font-size:12px;color:var(--text-muted);">{{ total_filtre }} / {{ total }}</span>
-    <div class="o-ctrl-sep"></div>
-    <div class="o-view-btns">
-      <button type="button" class="o-view-btn {% if vue|default:'liste' == 'liste' %}active{% endif %}" onclick="setVue('liste', this)" title="Vue Liste"><i class="bi bi-list-ul"></i></button>
-      <button type="button" class="o-view-btn {% if vue == 'grille' %}active{% endif %}" onclick="setVue('grille', this)" title="Vue Grille"><i class="bi bi-grid"></i></button>
+  <div class="cfg-head-right">
+    <div class="view-toggle">
+      <button class="view-btn {% if vue|default:'liste' == 'liste' %}active{% endif %}" onclick="setVue('liste',this)" title="Vue liste"><i class="bi bi-list-ul"></i></button>
+      <button class="view-btn {% if vue == 'grille' %}active{% endif %}" onclick="setVue('grille',this)" title="Vue grille"><i class="bi bi-grid"></i></button>
     </div>
+    <a href="{% url 'medecins_specialite_create' %}" class="btn-cfg">
+      <i class="bi bi-plus-lg"></i> Nouvelle spécialité
+    </a>
   </div>
 </div>
 
+<!-- ── Filtres ── -->
+<form method="get" id="filter-form">
+  <input type="hidden" name="vue" id="vue-input" value="{{ vue|default:'liste' }}">
+  <div class="cfg-filters">
+    <i class="bi bi-search" style="color:var(--cfg-accent);font-size:13px;flex-shrink:0;"></i>
+    <input type="text" name="q" id="search-input" value="{{ q }}" placeholder="Rechercher une spécialité…" class="cfg-search">
+    {% if q %}
+    <a href="{% url 'medecins_specialites' %}" class="btn-cfg-outline" style="padding:4px 10px;font-size:11.5px;">
+      <i class="bi bi-x"></i> Effacer
+    </a>
+    {% endif %}
+    <span style="font-size:12px;color:#6b8e8a;margin-left:auto;">{{ total_filtre }} / {{ total }}</span>
+  </div>
+</form>
+
+<!-- ── Bulk bar ── -->
 <div class="bulk-bar" id="bulk-bar">
   <i class="bi bi-check2-square"></i>
-  <span id="bulk-count">0</span> élément(s) sélectionné(s)
-  <button type="button" class="btn-bulk-delete" onclick="openBulkModal()"><i class="bi bi-trash"></i> Supprimer</button>
-  <button type="button" class="btn-bulk-cancel" onclick="clearSelection()">Annuler</button>
+  <span id="bulk-count">0</span> sélectionné(s)
+  <button type="button" class="btn-cfg-del" onclick="openBulkModal()"><i class="bi bi-trash"></i> Supprimer</button>
+  <button type="button" class="btn-cfg-outline" style="padding:4px 10px;font-size:12px;" onclick="clearSelection()">Annuler</button>
 </div>
 
 <div id="list-result">
 {% if total_filtre > 0 %}
 
-{% if vue == 'grille' %}
-<div class="o-kanban">
-  {% for sp in page_obj %}
-  <div class="o-card" onclick="window.location='{% url 'medecins_specialite_detail' sp.pk %}'">
-    <div class="sp-strip"></div>
-    <div class="o-card-header">
-      <span class="sp-code">{{ sp.code }}</span>
-      <div class="sp-icon"><i class="bi bi-clipboard2-pulse-fill"></i></div>
+<!-- Vue Grille -->
+<div id="view-grille" style="{% if vue != 'grille' %}display:none;{% endif %}">
+  <div class="cfg-grid">
+    {% for sp in page_obj %}
+    <div class="cfg-card" onclick="window.location='{% url 'medecins_specialite_detail' sp.pk %}'">
+      <div class="cfg-card-code">{{ sp.code }}</div>
+      <div class="cfg-card-name">{{ sp.nom }}</div>
+      <div class="cfg-card-desc">{{ sp.description|default:"Aucune description"|truncatechars:70 }}</div>
     </div>
-    <div class="o-card-name">{{ sp.nom }}</div>
-    {% if sp.description %}
-    <div class="o-card-desc">{{ sp.description|truncatechars:70 }}</div>
-    {% else %}
-    <div class="o-card-desc sp-no-desc">Aucune description</div>
-    {% endif %}
+    {% endfor %}
   </div>
-  {% endfor %}
+</div>
+
+<!-- Vue Liste -->
+<div id="view-liste" style="{% if vue == 'grille' %}display:none;{% endif %}">
+  <div class="cfg-table-wrap">
+    <table class="cfg-table">
+      <thead>
+        <tr>
+          <th style="width:36px;padding:9px 10px 9px 14px;">
+            <input type="checkbox" id="select-all" style="width:14px;height:14px;cursor:pointer;accent-color:var(--cfg-accent);" onchange="toggleAll(this)">
+          </th>
+          <th style="width:110px;">Code</th>
+          <th>Nom</th>
+          <th>Description</th>
+          <th style="width:90px;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for sp in page_obj %}
+        <tr onclick="if(event.target.type!=='checkbox'&&!event.target.closest('.row-actions'))window.location='{% url 'medecins_specialite_detail' sp.pk %}'">
+          <td style="padding:10px 10px 10px 14px;" onclick="event.stopPropagation()">
+            <input type="checkbox" class="row-check" value="{{ sp.pk }}" style="width:14px;height:14px;cursor:pointer;accent-color:var(--cfg-accent);" onchange="onCheckChange()">
+          </td>
+          <td><span class="badge-code">{{ sp.code }}</span></td>
+          <td style="font-weight:600;">{{ sp.nom }}</td>
+          <td style="color:#6b8e8a;font-size:12.5px;">{{ sp.description|default:"—"|truncatechars:80 }}</td>
+          <td class="row-actions" onclick="event.stopPropagation()">
+            <div style="display:flex;align-items:center;gap:5px;">
+              <a href="{% url 'medecins_specialite_edit' sp.pk %}" class="btn-cfg-outline" style="padding:3px 9px;font-size:11.5px;" title="Modifier">
+                <i class="bi bi-pencil"></i>
+              </a>
+              <button type="button" class="btn-cfg-del" style="padding:3px 9px;font-size:11.5px;" title="Supprimer"
+                      onclick="confirmDelete('{{ sp.pk }}','{{ sp.nom|escapejs }}')">
+                <i class="bi bi-trash"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <!-- Pagination -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:1px solid rgba(13,148,136,.1);font-size:12.5px;color:#6b8e8a;">
+      <span>{{ page_obj.start_index }}–{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
+      <div style="display:flex;gap:4px;">
+        <a class="btn-cfg-outline" style="padding:3px 10px;font-size:12px;{% if not page_obj.has_previous %}opacity:.4;pointer-events:none;{% endif %}"
+           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}&q={{ q }}&vue={{ vue }}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-left"></i>
+        </a>
+        <a class="btn-cfg-outline" style="padding:3px 10px;font-size:12px;{% if not page_obj.has_next %}opacity:.4;pointer-events:none;{% endif %}"
+           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}&q={{ q }}&vue={{ vue }}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-right"></i>
+        </a>
+      </div>
+    </div>
+  </div>
 </div>
 
 {% else %}
-<div class="o-list-wrap">
-  <table class="o-list-table">
-    <thead>
-      <tr>
-        <th style="width:36px;padding:8px 8px 8px 14px;">
-          <input type="checkbox" id="select-all" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent);" onchange="toggleAll(this)">
-        </th>
-        <th class="col-code">Code</th>
-        <th class="col-nom">Nom</th>
-        <th class="col-desc">Description</th>
-        <th class="col-picker-th">
-          <button class="col-picker-btn" id="col-picker-btn" title="Colonnes visibles"><i class="bi bi-three-dots-vertical"></i></button>
-          <div class="col-picker-menu" id="col-picker-menu">
-            <label><input type="checkbox" data-col-cls="col-code" checked> Code</label>
-            <label><input type="checkbox" data-col-cls="col-nom" checked> Nom</label>
-            <label><input type="checkbox" data-col-cls="col-desc" checked> Description</label>
-          </div>
-        </th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for sp in page_obj %}
-      <tr onclick="if(event.target.type!=='checkbox'){window.location='{% url 'medecins_specialite_detail' sp.pk %}'}">
-        <td style="padding:10px 8px 10px 14px;" onclick="event.stopPropagation()">
-          <input type="checkbox" class="row-check" value="{{ sp.pk }}" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent);" onchange="onCheckChange()">
-        </td>
-        <td class="col-code col-accent"><span class="badge-code">{{ sp.code }}</span></td>
-        <td class="col-nom" style="font-weight:600;">{{ sp.nom }}</td>
-        <td class="col-desc" style="color:var(--text-muted);">{{ sp.description|default:"—"|truncatechars:80 }}</td>
-        <td></td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  <div class="o-pagination-bottom">
-    <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
-    <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
-      href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}&q={{ q }}&vue={{ vue }}{% else %}#{% endif %}">
-      <i class="bi bi-chevron-left"></i>
-    </a>
-    <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
-      href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}&q={{ q }}&vue={{ vue }}{% else %}#{% endif %}">
-      <i class="bi bi-chevron-right"></i>
-    </a>
-  </div>
-</div>
-{% endif %}
-
-{% else %}
-<div class="o-empty-state">
-  <div class="empty-icon"><i class="bi bi-tag"></i></div>
-  {% if q %}
-  <div class="empty-title">Aucun résultat pour « {{ q }} »</div>
-  <div class="empty-sub">Essayez un autre terme de recherche.</div>
-  <a href="{% url 'medecins_specialites' %}" class="o-ctrl-btn">Effacer la recherche</a>
-  {% else %}
-  <div class="empty-title">Aucune spécialité enregistrée</div>
-  <div class="empty-sub">Créez votre première spécialité médicale.</div>
-  <a href="{% url 'medecins_specialite_create' %}" class="o-btn-create"><i class="bi bi-plus-lg"></i> Créer une spécialité</a>
+<div class="cfg-empty">
+  <i class="bi bi-award"></i>
+  <div class="cfg-empty-title">{% if q %}Aucun résultat pour « {{ q }} »{% else %}Aucune spécialité enregistrée{% endif %}</div>
+  <div class="cfg-empty-sub">{% if q %}Essayez un autre terme.{% else %}Commencez par créer une spécialité médicale.{% endif %}</div>
+  {% if not q %}
+  <a href="{% url 'medecins_specialite_create' %}" class="btn-cfg"><i class="bi bi-plus-lg"></i> Créer une spécialité</a>
   {% endif %}
 </div>
 {% endif %}
 </div>
 
+<!-- Modal suppression bulk -->
 <div class="modal-overlay" id="bulk-delete-modal">
   <div class="modal-box">
     <div class="modal-icon">🗑️</div>
     <div class="modal-title">Confirmer la suppression</div>
     <div class="modal-msg">Vous allez supprimer <strong id="modal-count">0</strong> spécialité(s).<br>
-      <span style="font-size:12px;">Cette action est irréversible.</span>
-    </div>
+      <span style="font-size:12px;">Cette action est irréversible.</span></div>
     <div class="modal-actions">
       <button type="button" class="btn-modal-cancel" onclick="closeBulkModal()">Annuler</button>
       <button type="button" class="btn-modal-confirm" onclick="executeBulkDelete()">Supprimer</button>
@@ -168,53 +250,77 @@
   </div>
 </div>
 
+<!-- Modal suppression unitaire -->
+<div class="modal-overlay" id="single-delete-modal">
+  <div class="modal-box">
+    <div class="modal-icon">🗑️</div>
+    <div class="modal-title">Supprimer la spécialité</div>
+    <div class="modal-msg">Supprimer <strong id="single-name"></strong> ?<br>
+      <span style="font-size:12px;">Cette action est irréversible.</span></div>
+    <div class="modal-actions">
+      <button type="button" class="btn-modal-cancel" onclick="closeSingleModal()">Annuler</button>
+      <button type="button" class="btn-modal-confirm" id="single-confirm-btn">Supprimer</button>
+    </div>
+  </div>
 </div>
 
-{% include 'services/includes/list_live_js.html' %}
+{% endblock %}
 
+{% block extra_js %}
 <script>
 const BULK_URL   = "{% url 'medecins_specialite_bulk_delete' %}";
 const CSRF_TOKEN = "{{ csrf_token }}";
 
+/* ── Vue toggle ── */
 function setVue(v, btn) {
   document.getElementById('vue-input').value = v;
-  document.querySelectorAll('.o-view-btn').forEach(function(b) { b.classList.remove('active'); });
+  document.getElementById('view-liste').style.display  = v === 'liste'  ? '' : 'none';
+  document.getElementById('view-grille').style.display = v === 'grille' ? '' : 'none';
+  document.querySelectorAll('.view-btn').forEach(function(b){ b.classList.remove('active'); });
   if (btn) btn.classList.add('active');
-  window.liveLoad();
 }
-(function () {
+
+/* ── Recherche live ── */
+(function(){
   var inp = document.getElementById('search-input'); if (!inp) return;
   var timer;
-  inp.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(window.liveLoad, 400); });
-  document.getElementById('filter-form').addEventListener('submit', function (e) { e.preventDefault(); window.liveLoad(); });
+  inp.addEventListener('input', function(){ clearTimeout(timer); timer = setTimeout(function(){ document.getElementById('filter-form').submit(); }, 500); });
 })();
-function onCheckChange() {
-  var count = document.querySelectorAll('.row-check:checked').length;
-  document.getElementById('bulk-count').textContent = count;
-  document.getElementById('bulk-bar').classList.toggle('visible', count > 0);
+
+/* ── Bulk ── */
+function onCheckChange(){
+  var n = document.querySelectorAll('.row-check:checked').length;
+  document.getElementById('bulk-count').textContent = n;
+  document.getElementById('bulk-bar').classList.toggle('visible', n > 0);
   var all = document.getElementById('select-all');
-  if (all) { var total = document.querySelectorAll('.row-check').length; all.indeterminate = count > 0 && count < total; all.checked = count === total && total > 0; }
+  if (all){ var t = document.querySelectorAll('.row-check').length; all.indeterminate = n>0&&n<t; all.checked = n===t&&t>0; }
 }
-function toggleAll(master) { document.querySelectorAll('.row-check').forEach(function(cb) { cb.checked = master.checked; }); onCheckChange(); }
-function clearSelection() { document.querySelectorAll('.row-check, #select-all').forEach(function(cb) { cb.checked = false; }); onCheckChange(); }
-function openBulkModal() { document.getElementById('modal-count').textContent = document.querySelectorAll('.row-check:checked').length; document.getElementById('bulk-delete-modal').classList.add('open'); }
-function closeBulkModal() { document.getElementById('bulk-delete-modal').classList.remove('open'); }
-function executeBulkDelete() {
-  var ids = Array.from(document.querySelectorAll('.row-check:checked')).map(function(cb) { return cb.value; });
+function toggleAll(m){ document.querySelectorAll('.row-check').forEach(function(cb){ cb.checked = m.checked; }); onCheckChange(); }
+function clearSelection(){ document.querySelectorAll('.row-check,#select-all').forEach(function(cb){ cb.checked=false; }); onCheckChange(); }
+function openBulkModal(){ document.getElementById('modal-count').textContent=document.querySelectorAll('.row-check:checked').length; document.getElementById('bulk-delete-modal').classList.add('open'); }
+function closeBulkModal(){ document.getElementById('bulk-delete-modal').classList.remove('open'); }
+function executeBulkDelete(){
+  var ids = Array.from(document.querySelectorAll('.row-check:checked')).map(function(cb){ return cb.value; });
   if (!ids.length) return;
   var fd = new FormData(); fd.append('csrfmiddlewaretoken', CSRF_TOKEN);
-  ids.forEach(function(id) { fd.append('ids[]', id); });
-  fetch(BULK_URL, { method: 'POST', body: fd }).then(function(r) { return r.json(); }).then(function(d) { if (d.ok) window.location.reload(); }).catch(function() { closeBulkModal(); });
+  ids.forEach(function(id){ fd.append('ids[]', id); });
+  fetch(BULK_URL, {method:'POST', body:fd}).then(function(r){ return r.json(); }).then(function(d){ if(d.ok) window.location.reload(); }).catch(closeBulkModal);
 }
-document.getElementById('bulk-delete-modal').addEventListener('click', function(e) { if (e.target === this) closeBulkModal(); });
-document.addEventListener('click', function(e) {
-  var menu = document.getElementById('col-picker-menu'); if (!menu) return;
-  if (e.target.closest('#col-picker-btn')) { menu.classList.toggle('open'); return; }
-  if (!e.target.closest('#col-picker-menu')) menu.classList.remove('open');
+document.getElementById('bulk-delete-modal').addEventListener('click', function(e){ if(e.target===this) closeBulkModal(); });
+
+/* ── Suppression unitaire ── */
+var _singleId = null;
+function confirmDelete(pk, nom){
+  _singleId = pk;
+  document.getElementById('single-name').textContent = nom;
+  document.getElementById('single-delete-modal').classList.add('open');
+}
+function closeSingleModal(){ document.getElementById('single-delete-modal').classList.remove('open'); }
+document.getElementById('single-confirm-btn').addEventListener('click', function(){
+  if (!_singleId) return;
+  var fd = new FormData(); fd.append('csrfmiddlewaretoken', CSRF_TOKEN); fd.append('ids[]', _singleId);
+  fetch(BULK_URL, {method:'POST', body:fd}).then(function(r){ return r.json(); }).then(function(d){ if(d.ok) window.location.reload(); }).catch(closeSingleModal);
 });
-document.addEventListener('change', function(e) {
-  var cb = e.target.closest('#col-picker-menu input[data-col-cls]'); if (!cb) return;
-  document.querySelectorAll('.' + cb.dataset.colCls).forEach(function(el) { el.style.display = cb.checked ? '' : 'none'; });
-});
+document.getElementById('single-delete-modal').addEventListener('click', function(e){ if(e.target===this) closeSingleModal(); });
 </script>
 {% endblock %}

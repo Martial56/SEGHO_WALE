@@ -504,6 +504,11 @@ class Presence(models.Model):
     permanence           = models.BooleanField(default=False, verbose_name="Permanence 8h–15h")
     motif_absence        = models.CharField(max_length=200, blank=True)
     remarques            = models.CharField(max_length=300, blank=True)
+    # Verrouillage kiosk : True = heure enregistrée par pointage, non modifiable manuellement
+    am_in_locked         = models.BooleanField(default=False)
+    am_out_locked        = models.BooleanField(default=False)
+    pm_in_locked         = models.BooleanField(default=False)
+    pm_out_locked        = models.BooleanField(default=False)
     # Audit
     modifie_par          = models.ForeignKey(
         'auth.User', null=True, blank=True, on_delete=models.SET_NULL,
@@ -612,3 +617,25 @@ class JourFerie(models.Model):
         ordering            = ['date']
         verbose_name        = 'Jour férié'
         verbose_name_plural = 'Jours fériés'
+
+
+class CredentialBiometrique(models.Model):
+    """Credential WebAuthn (empreinte digitale) associé à un employé."""
+    employe       = models.ForeignKey(
+        Employe, on_delete=models.CASCADE, related_name='credentials_bio'
+    )
+    credential_id = models.TextField(unique=True, verbose_name="ID credential (base64url)")
+    public_key    = models.TextField(verbose_name="Clé publique (base64url)")
+    sign_count    = models.PositiveIntegerField(default=0)
+    aaguid        = models.CharField(max_length=100, blank=True)
+    device_name   = models.CharField(max_length=100, blank=True, verbose_name="Appareil")
+    created_at    = models.DateTimeField(auto_now_add=True)
+    last_used     = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name        = 'Credential biométrique'
+        verbose_name_plural = 'Credentials biométriques'
+        ordering            = ['-created_at']
+
+    def __str__(self):
+        return f"Biométrie – {self.employe} – {self.device_name or self.credential_id[:12]}"

@@ -1,5 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
+from django.core.exceptions import PermissionDenied
 from django.contrib import messages
 from django.db.models import Q, F
 from django.utils import timezone
@@ -56,6 +58,8 @@ def pharmacie_dashboard(request, pharmacie):
 
     stock_items = StockPharmacie.objects.filter(pharmacie=pharmacie).select_related('produit')
 
+    from django.db.models import Sum, Count
+
     ruptures = stock_items.filter(quantite__lte=0).count()
     alertes  = stock_items.filter(quantite__gt=0, quantite__lte=F('produit__stock_alerte')).count()
 
@@ -64,6 +68,23 @@ def pharmacie_dashboard(request, pharmacie):
         'ruptures':   ruptures,
         'alertes':    alertes,
     }
+
+    month_start = today.replace(day=1)
+    ca_data = VentePharmacie.objects.filter(
+        pharmacie=pharmacie, date_vente__gte=month_start,
+    ).aggregate(ca=Sum('montant_net'), nb=Count('id'))
+    ca_mois = ca_data['ca'] or 0
+    nb_ventes_mois = ca_data['nb'] or 0
+
+    ventes_par_mode = list(VentePharmacie.objects.filter(
+        pharmacie=pharmacie, date_vente__gte=month_start,
+    ).values('mode_paiement').annotate(total=Sum('montant_net'), nb=Count('id')).order_by('-total'))
+
+    top_produits = list(LigneVente.objects.filter(
+        vente__pharmacie=pharmacie, vente__date_vente__gte=month_start,
+    ).values('produit__nom', 'produit__code').annotate(
+        qte=Sum('quantite'), ca=Sum('montant')
+    ).order_by('-qte')[:5])
 
     from consultations.models import Ordonnance
     ordonnances_attente = Ordonnance.objects.filter(
@@ -86,6 +107,10 @@ def pharmacie_dashboard(request, pharmacie):
         'pharmacie':           pharmacie,
         'label':               label,
         'stats':               stats,
+        'ca_mois':             ca_mois,
+        'nb_ventes_mois':      nb_ventes_mois,
+        'ventes_par_mode':     ventes_par_mode,
+        'top_produits':        top_produits,
         'ordonnances_attente': ordonnances_attente,
         'derniers_mvts':       derniers_mvts,
         'stock_critique':      stock_critique,
@@ -99,7 +124,7 @@ def pharmacie_stock(request, pharmacie):
     get_pharmacie_or_404(pharmacie)
     label = PHARMACIES_DICT[pharmacie]
 
-    qs          = StockPharmacie.objects.filter(pharmacie=pharmacie).select_related('produit', 'produit__categorie')
+    qs          = StockPharmacie.objects.filter(pharmacie=pharmacie).select_related('produit', 'produit__categorie').prefetch_related('produit__lots')
     q           = request.GET.get('q', '').strip()
     statut      = request.GET.get('statut', '')
     type_filtre = request.GET.get('type', '')
@@ -946,6 +971,22 @@ def pharmacie_inventaire_detail(request, pharmacie, pk):
         'pharmacie': pharmacie, 'label': label,
         'inv': inv, 'lignes': lignes, 'stats': stats,
     })
+
+
+@login_required(login_url='login')
+@require_POST
+def pharmacie_inventaire_supprimer(request, pharmacie, pk):
+    if not (request.user.is_staff or request.user.is_superuser):
+        raise PermissionDenied
+    get_pharmacie_or_404(pharmacie)
+    inv = get_object_or_404(InventairePharmacie, pk=pk, pharmacie=pharmacie)
+    if inv.statut != 'brouillon':
+        messages.error(request, "Seuls les inventaires en brouillon peuvent être supprimés.")
+        return redirect('pharmacie_inventaire_list', pharmacie=pharmacie)
+    numero = inv.numero
+    inv.delete()
+    messages.success(request, f"Inventaire {numero} supprimé.")
+    return redirect('pharmacie_inventaire_list', pharmacie=pharmacie)
 
 
 @login_required(login_url='login')
