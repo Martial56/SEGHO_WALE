@@ -1,0 +1,228 @@
+{% extends 'stock/base.html' %}
+{% load static %}
+{% block topbar_title %}Stock — Retour pharmacie{% endblock %}
+
+{% block extra_st_css %}<style>
+.content { padding-top: 0; }
+
+/* ── En-tête sticky ── */
+.ret-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 32px; margin: 0 -32px;
+  background: #f2f7ee; border-bottom: 1px solid rgba(0,0,0,.05);
+  box-shadow: 0 2px 8px rgba(0,0,0,.04);
+  position: sticky; top: calc(var(--topbar-h) + 44px); z-index: 100;
+}
+html[data-theme="dark"] .ret-head { background: #0f0e0e; }
+
+/* ── Select style unifié ── */
+.st-select {
+  width: 100%; border: none; border-bottom: 1.5px solid rgba(0,0,0,.18);
+  border-radius: 0; background: transparent; padding: 8px 28px 8px 4px;
+  font-size: 13px; color: var(--st-text); outline: none; cursor: pointer;
+  font-family: inherit; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 6px center;
+}
+.st-select:focus { border-bottom-color: var(--st-500); }
+
+/* ── Textarea ── */
+.st-textarea {
+  width: 100%; border: none; border-bottom: 1.5px solid rgba(0,0,0,.18);
+  border-radius: 0; background: transparent; padding: 8px 4px;
+  font-size: 13px; color: var(--st-text); outline: none;
+  font-family: inherit; resize: vertical; min-height: 64px;
+}
+.st-textarea:focus { border-bottom-color: var(--st-500); }
+
+/* ── Info banner ── */
+.ret-info {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 11px 16px; margin-bottom: 20px;
+  background: rgba(45,153,219,.07);
+  border-left: 3px solid rgba(45,153,219,.55);
+  border-radius: 0 6px 6px 0;
+  font-size: 12.5px; color: #1565c0;
+}
+html[data-theme="dark"] .ret-info { background: rgba(45,153,219,.12); color: #90caf9; }
+</style>{% endblock %}
+
+{% block content %}
+
+<!-- ══ En-tête sticky ══ -->
+<div class="ret-head">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <a href="javascript:history.back()" class="o-back-btn" title="Retour">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <div>
+      <div style="font-size:15px;font-weight:800;color:var(--st-900);">
+        <i class="bi bi-arrow-return-left" style="color:var(--st-600);"></i> Enregistrer un retour pharmacie
+      </div>
+      <div style="font-size:11.5px;color:var(--st-muted);">{{ today|date:"d/m/Y" }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Formulaire centré ══ -->
+<div style="max-width:640px;margin:24px auto 0;">
+
+  <!-- Bannière info -->
+  <div class="ret-info">
+    <i class="bi bi-info-circle-fill" style="flex-shrink:0;margin-top:1px;"></i>
+    <span>Un retour pharmacie <strong>réintègre des produits dans le stock central</strong>. La quantité retournée sera ajoutée au stock disponible du lot sélectionné.</span>
+  </div>
+
+  <!-- Carte formulaire -->
+  <div class="st-card">
+    <div class="st-card-header">
+      <div class="st-card-title">
+        <i class="bi bi-hospital" style="color:var(--st-600);"></i> Détails du retour
+      </div>
+    </div>
+    <div class="st-card-body">
+
+      <form method="post" action="{% url 'stock_retour_create' %}" novalidate>
+        {% csrf_token %}
+
+        <!-- Pharmacie -->
+        <div class="st-field">
+          <label class="st-label" for="id_pharmacie">
+            Pharmacie <span class="req">*</span>
+          </label>
+          <select name="pharmacie" id="id_pharmacie" class="st-select" required>
+            <option value="">— Sélectionner une pharmacie —</option>
+            {% for code, label in pharmacies %}
+            <option value="{{ code }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Produit -->
+        <div class="st-field">
+          <label class="st-label" for="sel-produit">
+            Produit <span class="req">*</span>
+          </label>
+          <select name="produit" id="sel-produit" class="st-select" required>
+            <option value="">— Sélectionner un produit —</option>
+            {% for p in produits %}
+            <option value="{{ p.pk }}" data-unite="{{ p.unite_mesure }}">
+              {% if p.code %}{{ p.code }} — {% endif %}{{ p.nom }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Lot -->
+        <div class="st-field">
+          <label class="st-label" for="sel-lot">
+            Lot
+            <span style="font-size:10px;font-weight:400;color:var(--st-muted);text-transform:none;letter-spacing:0;margin-left:4px;">facultatif</span>
+          </label>
+          <select name="lot" id="sel-lot" class="st-select">
+            <option value="">— Aucun lot spécifié —</option>
+          </select>
+          <div id="lot-hint" style="font-size:11px;color:var(--st-muted);margin-top:4px;display:none;">
+            <i class="bi bi-info-circle"></i> Sélectionnez d'abord un produit pour voir ses lots disponibles.
+          </div>
+        </div>
+
+        <!-- Quantité -->
+        <div class="st-field">
+          <label class="st-label" for="id_quantite">
+            Quantité <span class="req">*</span>
+          </label>
+          <input
+            type="number" name="quantite" id="id_quantite"
+            class="st-input" required min="0.01" step="0.01"
+            placeholder="0.00">
+          <div id="unite-hint" style="font-size:11px;color:var(--st-muted);margin-top:4px;display:none;"></div>
+        </div>
+
+        <!-- Notes -->
+        <div class="st-field">
+          <label class="st-label" for="id_notes">Notes</label>
+          <textarea name="notes" id="id_notes" class="st-textarea" rows="2"
+                    placeholder="Motif du retour, état des produits…"></textarea>
+        </div>
+
+        <!-- Boutons -->
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:24px;padding-top:16px;border-top:1px solid var(--st-border);">
+          <a href="{% url 'stock_mouvements' %}" class="btn-st-outline">
+            <i class="bi bi-x-lg"></i> Annuler
+          </a>
+          <button type="submit" class="btn-st">
+            <i class="bi bi-arrow-return-left"></i> Enregistrer le retour
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══ Données lots embarquées ══ -->
+<script>
+/* Mapping produit_pk → [{pk, label}] construit côté serveur */
+var LOTS_PAR_PRODUIT = {
+  {% for p in produits %}
+  "{{ p.pk }}": [
+    {% for lot in p.lots.all %}
+    {
+      "pk": "{{ lot.pk }}",
+      "label": "{{ lot.numero_lot|escapejs }}{% if lot.quantite_actuelle is not None %} — {{ lot.quantite_actuelle|floatformat:0 }} {{ p.unite_mesure|escapejs }}{% endif %}"
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+  ]{% if not forloop.last %},{% endif %}
+  {% endfor %}
+};
+
+(function () {
+  var selProduit = document.getElementById('sel-produit');
+  var selLot     = document.getElementById('sel-lot');
+  var lotHint    = document.getElementById('lot-hint');
+  var uniteHint  = document.getElementById('unite-hint');
+
+  function rebuildLots() {
+    var pk   = selProduit.value;
+    var lots = pk ? (LOTS_PAR_PRODUIT[pk] || []) : [];
+
+    /* Vider et reconstruire le select lot */
+    selLot.innerHTML = '<option value="">— Aucun lot spécifié —</option>';
+    lots.forEach(function (l) {
+      var opt = document.createElement('option');
+      opt.value       = l.pk;
+      opt.textContent = l.label;
+      selLot.appendChild(opt);
+    });
+
+    /* Hint unité */
+    var opt = selProduit.selectedOptions[0];
+    if (opt && opt.dataset.unite) {
+      uniteHint.textContent = 'Unité : ' + opt.dataset.unite;
+      uniteHint.style.display = 'block';
+    } else {
+      uniteHint.style.display = 'none';
+    }
+
+    /* Hint lot */
+    if (pk && lots.length === 0) {
+      lotHint.style.display = 'block';
+      lotHint.innerHTML = '<i class="bi bi-exclamation-circle"></i> Aucun lot enregistré pour ce produit.';
+    } else if (!pk) {
+      lotHint.style.display = 'block';
+      lotHint.innerHTML = '<i class="bi bi-info-circle"></i> Sélectionnez d\'abord un produit pour voir ses lots.';
+    } else {
+      lotHint.style.display = 'none';
+    }
+  }
+
+  selProduit.addEventListener('change', rebuildLots);
+
+  /* Init au chargement si un produit est déjà sélectionné */
+  if (selProduit.value) rebuildLots();
+})();
+</script>
+
+{% endblock %}

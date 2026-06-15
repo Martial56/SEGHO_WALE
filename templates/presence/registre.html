@@ -32,6 +32,17 @@
 }
 .time-inp:focus { outline:none; border-color:var(--pr-500);
                   box-shadow:0 0 0 2px rgba(74,103,65,.15); }
+/* Heure verrouillée (pointage kiosk) */
+.locked-time {
+  display:inline-flex; align-items:center; gap:4px;
+  font-size:12px; font-weight:700; font-family:monospace;
+  color:var(--pr-700);
+  background:rgba(74,103,65,.08);
+  border:1.5px solid rgba(74,103,65,.2);
+  border-radius:6px; padding:4px 8px;
+  cursor:default; white-space:nowrap;
+}
+.locked-time i { font-size:10px; color:var(--pr-500); }
 
 /* Present toggle */
 .present-toggle { display:none; }
@@ -222,20 +233,48 @@
             <!-- Zone normale (4 champs) -->
             <td class="td-time" id="zone_normale_{{ emp.pk }}"
                 style="{% if ligne.perm_active %}display:none;{% endif %}">
-              <input type="time" name="h_am_{{ emp.pk }}" class="time-inp"
-                     value="{{ p.heure_arrivee_matin|time:'H:i'|default:'' }}">
+              {% if p and p.am_in_locked %}
+                <span class="locked-time" title="Enregistré par pointage — non modifiable">
+                  <i class="bi bi-lock-fill"></i> {{ p.heure_arrivee_matin|time:'H:i' }}
+                </span>
+                <input type="hidden" name="h_am_{{ emp.pk }}" value="{{ p.heure_arrivee_matin|time:'H:i'|default:'' }}">
+              {% else %}
+                <input type="time" name="h_am_{{ emp.pk }}" class="time-inp"
+                       value="{{ p.heure_arrivee_matin|time:'H:i'|default:'' }}">
+              {% endif %}
             </td>
             <td class="td-time" style="{% if ligne.perm_active %}display:none;{% endif %}">
-              <input type="time" name="h_dm_{{ emp.pk }}" class="time-inp"
-                     value="{{ p.heure_depart_matin|time:'H:i'|default:'' }}">
+              {% if p and p.am_out_locked %}
+                <span class="locked-time" title="Enregistré par pointage — non modifiable">
+                  <i class="bi bi-lock-fill"></i> {{ p.heure_depart_matin|time:'H:i' }}
+                </span>
+                <input type="hidden" name="h_dm_{{ emp.pk }}" value="{{ p.heure_depart_matin|time:'H:i'|default:'' }}">
+              {% else %}
+                <input type="time" name="h_dm_{{ emp.pk }}" class="time-inp"
+                       value="{{ p.heure_depart_matin|time:'H:i'|default:'' }}">
+              {% endif %}
             </td>
             <td class="td-time" style="{% if ligne.perm_active %}display:none;{% endif %}">
-              <input type="time" name="h_as_{{ emp.pk }}" class="time-inp"
-                     value="{{ p.heure_arrivee_soir|time:'H:i'|default:'' }}">
+              {% if p and p.pm_in_locked %}
+                <span class="locked-time" title="Enregistré par pointage — non modifiable">
+                  <i class="bi bi-lock-fill"></i> {{ p.heure_arrivee_soir|time:'H:i' }}
+                </span>
+                <input type="hidden" name="h_as_{{ emp.pk }}" value="{{ p.heure_arrivee_soir|time:'H:i'|default:'' }}">
+              {% else %}
+                <input type="time" name="h_as_{{ emp.pk }}" class="time-inp"
+                       value="{{ p.heure_arrivee_soir|time:'H:i'|default:'' }}">
+              {% endif %}
             </td>
             <td class="td-time" style="{% if ligne.perm_active %}display:none;{% endif %}">
-              <input type="time" name="h_ds_{{ emp.pk }}" class="time-inp"
-                     value="{{ p.heure_depart_soir|time:'H:i'|default:'' }}">
+              {% if p and p.pm_out_locked %}
+                <span class="locked-time" title="Enregistré par pointage — non modifiable">
+                  <i class="bi bi-lock-fill"></i> {{ p.heure_depart_soir|time:'H:i' }}
+                </span>
+                <input type="hidden" name="h_ds_{{ emp.pk }}" value="{{ p.heure_depart_soir|time:'H:i'|default:'' }}">
+              {% else %}
+                <input type="time" name="h_ds_{{ emp.pk }}" class="time-inp"
+                       value="{{ p.heure_depart_soir|time:'H:i'|default:'' }}">
+              {% endif %}
             </td>
 
             <!-- Remarques + motif absence -->

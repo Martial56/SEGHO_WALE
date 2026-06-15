@@ -1,0 +1,321 @@
+{% extends 'employer/base.html' %}
+{% load static %}
+{% block topbar_title %}Présence — {{ employe.nom }} {{ employe.prenoms }}{% endblock %}
+{% block rh_nav_presence %}active{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+/* ── Sticky header ── */
+.pr-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 12px 32px; flex-wrap: wrap;
+  position: sticky; top: calc(var(--topbar-h) + 44px); z-index: 100;
+  background: var(--rh-surface);
+  border-bottom: 2px solid var(--rh-border);
+  box-shadow: 0 2px 10px rgba(74,114,54,.06);
+}
+html[data-theme="dark"] .pr-head { background: var(--rh-surface); }
+
+/* Mois nav */
+.mn-btn {
+  width: 28px; height: 28px; border-radius: 6px;
+  border: 1.5px solid var(--rh-200); background: var(--rh-50);
+  color: var(--rh-500); display: inline-flex; align-items: center; justify-content: center;
+  text-decoration: none; font-size: 12px; transition: all .15s;
+}
+.mn-btn:hover { border-color: var(--rh-500); background: var(--rh-100); color: var(--rh-700); }
+.mn-label { font-size: 15px; font-weight: 800; color: var(--rh-800); min-width: 148px; text-align: center; }
+
+/* ── Stats row (même pattern que rh-stats-row) ── */
+.pr-stats-row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 14px;
+  padding: 24px 32px 0;
+}
+@media (max-width: 1200px) { .pr-stats-row { grid-template-columns: repeat(4,1fr); } }
+@media (max-width: 700px)  { .pr-stats-row { grid-template-columns: repeat(2,1fr); } }
+
+.pr-stat {
+  background: var(--rh-surface); border-radius: 10px;
+  padding: 14px 16px; display: flex; align-items: center; gap: 10px;
+  border-left: 4px solid transparent;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow .15s, transform .15s;
+}
+.pr-stat:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.pr-stat-icon {
+  width: 38px; height: 38px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px; flex-shrink: 0;
+}
+.pr-stat-val { font-size: 22px; font-weight: 800; line-height: 1; }
+.pr-stat-lbl { font-size: 10.5px; color: var(--rh-muted); font-weight: 600;
+               text-transform: uppercase; letter-spacing: .3px; margin-top: 2px; }
+
+.ps-ouv  { border-left-color: var(--rh-400); }
+.ps-ouv  .pr-stat-icon { background: var(--rh-50); color: var(--rh-500); }
+.ps-ouv  .pr-stat-val  { color: var(--rh-700); }
+
+.ps-pres { border-left-color: #16a34a; }
+.ps-pres .pr-stat-icon { background: rgba(22,163,74,.1); color: #16a34a; }
+.ps-pres .pr-stat-val  { color: #15803d; }
+
+.ps-abs  { border-left-color: #dc2626; }
+.ps-abs  .pr-stat-icon { background: rgba(220,38,38,.1); color: #dc2626; }
+.ps-abs  .pr-stat-val  { color: #b91c1c; }
+
+.ps-cg   { border-left-color: #2563eb; }
+.ps-cg   .pr-stat-icon { background: rgba(37,99,235,.1); color: #2563eb; }
+.ps-cg   .pr-stat-val  { color: #1d4ed8; }
+
+.ps-ns   { border-left-color: #9ca3af; }
+.ps-ns   .pr-stat-icon { background: rgba(156,163,175,.1); color: #9ca3af; }
+.ps-ns   .pr-stat-val  { color: #6b7280; }
+
+.ps-h    { border-left-color: var(--rh-500); }
+.ps-h    .pr-stat-icon { background: var(--rh-50); color: var(--rh-600); }
+.ps-h    .pr-stat-val  { color: var(--rh-700); }
+
+.ps-ret  { border-left-color: #d97706; }
+.ps-ret  .pr-stat-icon { background: rgba(217,119,6,.1); color: #d97706; }
+.ps-ret  .pr-stat-val  { color: #b45309; }
+
+/* ── Barre taux ── */
+.pr-taux-wrap { display: flex; align-items: center; gap: 12px; padding: 14px 32px 0; }
+.pr-taux-track { flex: 1; max-width: 280px; height: 8px; border-radius: 99px; background: var(--rh-100); overflow: hidden; }
+.pr-taux-fill  { height: 100%; border-radius: 99px; transition: width .4s; }
+
+/* ── Tableau ── */
+.pr-table-wrap {
+  margin: 16px 32px 32px;
+  background: var(--rh-surface);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.pr-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.pr-table thead { background: var(--rh-50); border-bottom: 2px solid var(--rh-200); }
+html[data-theme="dark"] .pr-table thead { background: rgba(74,114,54,.1); border-bottom-color: var(--rh-border); }
+.pr-table th {
+  padding: 9px 12px; text-align: left; font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .4px; color: var(--rh-700); white-space: nowrap;
+}
+html[data-theme="dark"] .pr-table th { color: var(--rh-300); }
+.pr-table td { padding: 8px 12px; border-bottom: 1px solid rgba(0,0,0,.04); vertical-align: middle; }
+html[data-theme="dark"] .pr-table td { border-bottom-color: rgba(255,255,255,.04); }
+.pr-table tbody tr:hover td { background: rgba(74,114,54,.03); }
+.pr-table tbody tr:last-child td { border-bottom: none; }
+
+/* Indicateur coloré gauche par statut */
+.row-present  td:first-child { border-left: 3px solid #22c55e; }
+.row-absent   td:first-child { border-left: 3px solid #ef4444; }
+.row-conge    td:first-child { border-left: 3px solid #3b82f6; }
+.row-ferie    td:first-child { border-left: 3px solid #f59e0b; }
+.row-weekend  { opacity: .6; }
+.row-non-saisi { opacity: .7; }
+
+/* Badges */
+.sb { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px;
+      border-radius: 20px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+.sb-present { background: rgba(34,197,94,.12);  color: #15803d; border: 1px solid rgba(34,197,94,.2); }
+.sb-absent  { background: rgba(239,68,68,.1);   color: #b91c1c; border: 1px solid rgba(239,68,68,.2); }
+.sb-conge   { background: rgba(59,130,246,.1);  color: #1d4ed8; border: 1px solid rgba(59,130,246,.2); }
+.sb-weekend { background: rgba(107,114,128,.1); color: #4b5563; border: 1px solid rgba(107,114,128,.2); }
+.sb-ferie   { background: rgba(245,158,11,.12); color: #92400e; border: 1px solid rgba(245,158,11,.2); }
+.sb-nosaisi { background: rgba(156,163,175,.1); color: #6b7280; border: 1px solid rgba(156,163,175,.2); font-style: italic; }
+
+/* Pill retard */
+.retard-pill {
+  display: inline-flex; align-items: center;
+  background: rgba(239,68,68,.1); color: #b91c1c;
+  border-radius: 20px; padding: 1px 6px; font-size: 10.5px; font-weight: 700; margin-left: 4px;
+}
+
+@media print {
+  .rh-nav, .pr-head, .btn-rh-sm { display: none !important; }
+  body { font-size: 9pt; }
+  .pr-stats-row { padding: 8px; gap: 6px; grid-template-columns: repeat(7,1fr) !important; }
+  .pr-stat { padding: 8px 10px; box-shadow: none; border: 1px solid #ddd; }
+  .pr-table-wrap { margin: 8px; box-shadow: none; border: 1px solid #ddd; border-radius: 0; }
+  .print-only { display: block !important; font-size: 14pt; font-weight: 800; padding: 16px 32px 0; }
+}
+.print-only { display: none !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ══ Sticky header ══ -->
+<div class="pr-head">
+  <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+    <a href="{% url 'rh_detail' employe.pk %}" class="o-back-btn"><i class="bi bi-arrow-left"></i></a>
+    <div>
+      <div style="font-size:15px;font-weight:800;color:var(--rh-900);">
+        <i class="bi bi-calendar-check" style="color:#2563eb;margin-right:5px;"></i>{{ employe.nom }} {{ employe.prenoms }}
+      </div>
+      <div style="font-size:11.5px;color:var(--rh-muted);margin-top:1px;">
+        {% if employe.service %}{{ employe.service.nom }}{% endif %}{% if employe.fonction %} · {{ employe.fonction.nom }}{% endif %}{% if employe.matricule %} · <span style="font-family:monospace;">{{ employe.matricule }}</span>{% endif %}
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <a href="?mois={{ prev_mois }}&annee={{ prev_annee }}" class="mn-btn"><i class="bi bi-chevron-left"></i></a>
+      <span class="mn-label">{{ mois_nom }} {{ annee }}</span>
+      <a href="?mois={{ next_mois }}&annee={{ next_annee }}" class="mn-btn"><i class="bi bi-chevron-right"></i></a>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+    <a href="{% url 'rh_presence_rapport' %}?mois={{ mois }}&annee={{ annee }}" class="btn-rh-sm">
+      <i class="bi bi-table"></i> Rapport global
+    </a>
+    <button onclick="window.print()" class="btn-rh-sm" type="button">
+      <i class="bi bi-printer"></i> Imprimer
+    </button>
+  </div>
+</div>
+
+<!-- Titre impression -->
+<div class="print-only">Présence — {{ employe.nom }} {{ employe.prenoms }} — {{ mois_nom }} {{ annee }}</div>
+
+<!-- ══ Cartes stats ══ -->
+<div class="pr-stats-row">
+
+  <div class="pr-stat ps-ouv">
+    <div class="pr-stat-icon"><i class="bi bi-calendar3"></i></div>
+    <div><div class="pr-stat-val">{{ nb_ouvrables }}</div><div class="pr-stat-lbl">Ouvrables</div></div>
+  </div>
+
+  <div class="pr-stat ps-pres">
+    <div class="pr-stat-icon"><i class="bi bi-person-check-fill"></i></div>
+    <div><div class="pr-stat-val">{{ nb_presents }}</div><div class="pr-stat-lbl">Présents</div></div>
+  </div>
+
+  <div class="pr-stat ps-abs">
+    <div class="pr-stat-icon"><i class="bi bi-person-x-fill"></i></div>
+    <div><div class="pr-stat-val">{{ nb_absents }}</div><div class="pr-stat-lbl">Absences</div></div>
+  </div>
+
+  <div class="pr-stat ps-cg">
+    <div class="pr-stat-icon"><i class="bi bi-calendar-week-fill"></i></div>
+    <div><div class="pr-stat-val">{{ nb_conge }}</div><div class="pr-stat-lbl">Congés</div></div>
+  </div>
+
+  {% if nb_non_saisi > 0 %}
+  <div class="pr-stat ps-ns">
+    <div class="pr-stat-icon"><i class="bi bi-question-circle"></i></div>
+    <div><div class="pr-stat-val">{{ nb_non_saisi }}</div><div class="pr-stat-lbl">Non saisi</div></div>
+  </div>
+  {% endif %}
+
+  <div class="pr-stat ps-h">
+    <div class="pr-stat-icon"><i class="bi bi-hourglass-split"></i></div>
+    <div><div class="pr-stat-val">{{ total_heures }}h{{ total_min_reste|stringformat:"02d" }}</div><div class="pr-stat-lbl">Heures</div></div>
+  </div>
+
+  {% if nb_retards > 0 %}
+  <div class="pr-stat ps-ret">
+    <div class="pr-stat-icon"><i class="bi bi-clock-fill"></i></div>
+    <div><div class="pr-stat-val">{{ nb_retards }}</div><div class="pr-stat-lbl">Retard{{ nb_retards|pluralize }} · {{ total_retard_min }}'</div></div>
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- ══ Barre de taux ══ -->
+{% if nb_ouvrables > 0 %}
+{% widthratio nb_presents nb_ouvrables 100 as pct %}
+<div class="pr-taux-wrap">
+  <span style="font-size:12px;font-weight:600;color:var(--rh-muted);min-width:120px;">Taux de présence</span>
+  <div class="pr-taux-track">
+    <div class="pr-taux-fill" style="width:{{ pct }}%;background:{% if pct >= 90 %}#22c55e{% elif pct >= 75 %}#f59e0b{% else %}#ef4444{% endif %};"></div>
+  </div>
+  <span style="font-size:14px;font-weight:800;color:{% if pct >= 90 %}#15803d{% elif pct >= 75 %}#92400e{% else %}#b91c1c{% endif %};">{{ pct }}%</span>
+</div>
+{% endif %}
+
+<!-- ══ Tableau journalier ══ -->
+<div class="pr-table-wrap">
+  <table class="pr-table">
+    <thead>
+      <tr>
+        <th style="width:52px;">Jour</th>
+        <th style="width:108px;">Date</th>
+        <th style="width:175px;">Statut</th>
+        <th style="text-align:center;">Arr. M.</th>
+        <th style="text-align:center;">Dép. M.</th>
+        <th style="text-align:center;">Arr. S.</th>
+        <th style="text-align:center;">Dép. S.</th>
+        <th style="text-align:right;width:74px;">Durée</th>
+        <th>Notes / Motif</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for j in jours %}
+    <tr class="row-{{ j.statut }}{% if j.weekend %} row-weekend{% endif %}">
+
+      <td style="font-size:12px;font-weight:{% if j.weekend %}400{% else %}600{% endif %};color:var(--rh-muted);">
+        {{ j.weekday }}
+      </td>
+
+      <td style="font-weight:600;font-size:13px;white-space:nowrap;">{{ j.date|date:"d/m/Y" }}</td>
+
+      <td>
+        {% if j.statut == 'present' %}
+          <span class="sb sb-present"><i class="bi bi-check-circle-fill"></i> Présent{% if j.presence.permanence %} · Perm.{% endif %}</span>
+        {% elif j.statut == 'absent' %}
+          <span class="sb sb-absent"><i class="bi bi-x-circle-fill"></i> Absent</span>
+        {% elif j.statut == 'conge' %}
+          <span class="sb sb-conge"><i class="bi bi-calendar2-week-fill"></i> {% if j.conge %}{{ j.conge.get_type_conge_display }}{% else %}Congé{% endif %}</span>
+        {% elif j.statut == 'ferie' %}
+          <span class="sb sb-ferie"><i class="bi bi-star-fill"></i> Jour férié</span>
+        {% elif j.statut == 'weekend' %}
+          <span class="sb sb-weekend">Week-end</span>
+        {% else %}
+          <span class="sb sb-nosaisi">Non saisi</span>
+        {% endif %}
+      </td>
+
+      {% if j.presence and j.presence.present %}
+        <td style="text-align:center;font-family:monospace;font-size:13px;">
+          {{ j.presence.heure_arrivee_matin|time:"H:i"|default:"—" }}
+          {% if j.presence.retard_matin_min > 0 %}<span class="retard-pill">+{{ j.presence.retard_matin_min }}'</span>{% endif %}
+        </td>
+        <td style="text-align:center;font-family:monospace;font-size:13px;">{{ j.presence.heure_depart_matin|time:"H:i"|default:"—" }}</td>
+        <td style="text-align:center;font-family:monospace;font-size:13px;">
+          {% if not j.presence.permanence %}
+            {{ j.presence.heure_arrivee_soir|time:"H:i"|default:"—" }}
+            {% if j.presence.retard_soir_min > 0 %}<span class="retard-pill">+{{ j.presence.retard_soir_min }}'</span>{% endif %}
+          {% else %}<span style="color:var(--rh-300);">—</span>{% endif %}
+        </td>
+        <td style="text-align:center;font-family:monospace;font-size:13px;">{{ j.presence.heure_depart_soir|time:"H:i"|default:"—" }}</td>
+        <td style="text-align:right;">
+          {% if j.presence.duree_totale %}
+            <span style="font-weight:700;">{{ j.presence.duree_totale }}</span>
+            <span style="font-size:10px;color:var(--rh-muted);">&nbsp;min</span>
+          {% else %}<span style="color:var(--rh-300);">—</span>{% endif %}
+        </td>
+      {% else %}
+        <td colspan="4" style="text-align:center;color:var(--rh-300);">—</td>
+        <td></td>
+      {% endif %}
+
+      <td style="font-size:12px;color:var(--rh-muted);max-width:180px;">
+        {% if j.presence and j.presence.motif_absence %}{{ j.presence.motif_absence }}
+        {% elif j.presence and j.presence.remarques %}{{ j.presence.remarques }}
+        {% elif j.conge and j.statut == 'conge' %}
+          <span style="color:#1d4ed8;font-size:11.5px;">
+            {% if j.conge.date_debut == j.conge.date_fin %}{{ j.conge.date_debut|date:"d/m/Y" }}
+            {% else %}{{ j.conge.date_debut|date:"d/m" }} – {{ j.conge.date_fin|date:"d/m/Y" }}{% endif %}
+          </span>
+        {% else %}<span style="opacity:.4;">—</span>{% endif %}
+      </td>
+
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

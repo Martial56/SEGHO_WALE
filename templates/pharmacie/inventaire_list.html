@@ -23,6 +23,8 @@
 .ph-table-bord tbody td:last-child  { padding-right: 12px; }
 .badge-valide   { background: rgba(22,169,107,.1); color: #0d7a4c; border: 1px solid rgba(22,169,107,.25); padding: 2px 9px; border-radius: 20px; font-size: 10.5px; font-weight: 600; }
 .badge-brouillon{ background: rgba(232,154,26,.1); color: #8a5c00; border: 1px solid rgba(232,154,26,.25); padding: 2px 9px; border-radius: 20px; font-size: 10.5px; font-weight: 600; }
+.btn-ph-del { display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600; padding:4px 10px; border-radius:6px; border:1px solid rgba(220,53,69,.35); background:rgba(220,53,69,.07); color:#c0392b; cursor:pointer; transition:background .15s,color .15s; }
+.btn-ph-del:hover { background:rgba(220,53,69,.15); color:#a93226; }
 </style>{% endblock %}
 
 {% block content %}
@@ -74,10 +76,18 @@
           <td style="font-size:11.5px;color:var(--ph-muted);">
             {% if inv.date_validation %}{{ inv.date_validation|date:"d/m/Y" }}{% else %}—{% endif %}
           </td>
-          <td style="text-align:center;">
+          <td style="text-align:center; white-space:nowrap;">
             <a href="{% url 'pharmacie_inventaire_detail' pharmacie inv.pk %}" class="btn-ph-outline" style="font-size:11px;padding:4px 12px;">
               <i class="bi bi-eye"></i> Voir
             </a>
+            {% if inv.statut == 'brouillon' and request.user.is_staff or inv.statut == 'brouillon' and request.user.is_superuser %}
+            <form method="post" action="{% url 'pharmacie_inventaire_supprimer' pharmacie inv.pk %}" style="display:inline;" onsubmit="return confirm('Supprimer cet inventaire brouillon ?');">
+              {% csrf_token %}
+              <button type="submit" class="btn-ph-del">
+                <i class="bi bi-trash3"></i>
+              </button>
+            </form>
+            {% endif %}
           </td>
         </tr>
         {% empty %}

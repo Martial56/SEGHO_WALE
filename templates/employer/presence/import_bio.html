@@ -1,0 +1,572 @@
+{% extends 'employer/base.html' %}
+{% load static %}
+
+{% block title %}Import biométrique — Présence{% endblock %}
+{% block rh_nav_presence %}active{% endblock %}
+
+{% block extra_css %}{{ block.super }}
+<style>
+/* ── layout ─────────────────────────────────────────────────────── */
+.ib-head {
+  padding: 12px 32px;
+  background: var(--rh-surface);
+  border-bottom: 1px solid var(--rh-border);
+  position: sticky;
+  top: calc(var(--topbar-h) + 44px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.ib-head-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--rh-text);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ib-head-title i { color: var(--rh-500); font-size: 20px; }
+.ib-body { padding: 24px 32px 40px; }
+
+/* ── step indicator ─────────────────────────────────────────────── */
+.ib-steps {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-bottom: 28px;
+}
+.ib-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--rh-muted);
+}
+.ib-step-num {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.07);
+  color: rgba(0,0,0,0.4);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700;
+}
+.ib-step.active .ib-step-num {
+  background: var(--rh-600);
+  color: #fff;
+}
+.ib-step.active { color: var(--rh-700); }
+.ib-step.done .ib-step-num {
+  background: #22c55e;
+  color: #fff;
+}
+.ib-step-sep {
+  width: 40px; height: 2px;
+  background: var(--rh-border);
+  margin: 0 6px;
+  flex-shrink: 0;
+}
+html[data-theme="dark"] .ib-step-num { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.4); }
+html[data-theme="dark"] .ib-step.active .ib-step-num { background: var(--rh-500); }
+
+/* ── upload card ─────────────────────────────────────────────────── */
+.ib-upload-card {
+  background: var(--rh-surface);
+  border-radius: 14px;
+  border: 1.5px dashed var(--rh-300);
+  padding: 40px 36px;
+  text-align: center;
+  max-width: 560px;
+  margin: 0 auto 28px;
+  transition: border-color 0.2s;
+}
+.ib-upload-card:hover { border-color: var(--rh-500); }
+.ib-upload-icon {
+  width: 56px; height: 56px;
+  border-radius: 14px;
+  background: var(--rh-50);
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 16px;
+  font-size: 26px; color: var(--rh-500);
+}
+.ib-upload-card h2 {
+  font-size: 16px; font-weight: 700;
+  color: var(--rh-text); margin: 0 0 6px;
+}
+.ib-upload-card p { font-size: 13px; color: var(--rh-muted); margin: 0 0 22px; }
+
+.ib-file-input-wrap {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+}
+.ib-file-input-wrap input[type="file"] {
+  position: absolute; inset: 0;
+  opacity: 0; cursor: pointer; width: 100%; height: 100%;
+}
+.ib-file-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 11px 20px;
+  border-radius: 8px;
+  border: 1.5px solid var(--rh-400);
+  background: var(--rh-50);
+  color: var(--rh-700);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.ib-file-btn:hover { background: var(--rh-100); border-color: var(--rh-500); }
+html[data-theme="dark"] .ib-upload-card { border-color: var(--rh-border); background: var(--rh-surface); }
+html[data-theme="dark"] .ib-upload-icon { background: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .ib-file-btn { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.18); color: var(--rh-200); }
+
+/* ── format guide ───────────────────────────────────────────────── */
+.ib-guide {
+  background: var(--rh-surface);
+  border-radius: 12px;
+  border: 1px solid var(--rh-border);
+  padding: 20px 24px;
+  max-width: 740px;
+  margin: 0 auto 28px;
+}
+.ib-guide-title {
+  font-size: 13px; font-weight: 700;
+  color: var(--rh-text);
+  margin: 0 0 12px;
+  display: flex; align-items: center; gap: 7px;
+}
+.ib-guide-title i { color: var(--rh-500); }
+.ib-guide pre {
+  margin: 0;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  background: rgba(0,0,0,0.04);
+  border-radius: 7px;
+  padding: 12px 14px;
+  color: var(--rh-text);
+  overflow-x: auto;
+  white-space: pre;
+}
+html[data-theme="dark"] .ib-guide pre { background: rgba(255,255,255,0.06); }
+
+/* ── mapped employees ───────────────────────────────────────────── */
+.ib-map-card {
+  background: var(--rh-surface);
+  border-radius: 12px;
+  border: 1px solid var(--rh-border);
+  max-width: 740px;
+  margin: 0 auto;
+  overflow: hidden;
+}
+.ib-map-header {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--rh-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.ib-map-header h3 {
+  font-size: 13px; font-weight: 700;
+  color: var(--rh-text);
+  margin: 0;
+  display: flex; align-items: center; gap: 7px;
+}
+.ib-map-header h3 i { color: var(--rh-500); }
+.ib-map-badge {
+  background: var(--rh-50);
+  color: var(--rh-700);
+  border-radius: 20px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.ib-map-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ib-map-table th {
+  padding: 9px 16px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--rh-muted);
+  background: var(--rh-50);
+}
+.ib-map-table td {
+  padding: 9px 16px;
+  border-bottom: 1px solid var(--rh-border);
+  color: var(--rh-text);
+}
+.ib-map-table tr:last-child td { border-bottom: none; }
+.ib-map-table tr:hover td { background: var(--rh-50); }
+.bio-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(94,142,71,0.1);
+  color: var(--rh-700);
+  border-radius: 6px;
+  padding: 3px 9px;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: monospace;
+}
+html[data-theme="dark"] .ib-map-badge { background: rgba(255,255,255,0.06); color: var(--rh-200); }
+html[data-theme="dark"] .ib-map-table th { background: rgba(255,255,255,0.04); }
+html[data-theme="dark"] .ib-map-table tr:hover td { background: rgba(255,255,255,0.03); }
+html[data-theme="dark"] .bio-chip { background: rgba(94,142,71,0.18); color: var(--rh-300); }
+
+/* ── alert no-map ─────────────────────────────────────────────────── */
+.ib-alert-warn {
+  display: flex; gap: 12px; align-items: flex-start;
+  background: rgba(234,179,8,0.08);
+  border: 1px solid rgba(234,179,8,0.3);
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-size: 13px;
+  color: #7a5200;
+  max-width: 740px;
+  margin: 0 auto 20px;
+}
+.ib-alert-warn i { font-size: 18px; color: #d97706; flex-shrink: 0; margin-top: 1px; }
+html[data-theme="dark"] .ib-alert-warn { background: rgba(234,179,8,0.12); border-color: rgba(234,179,8,0.25); color: #f5d57a; }
+html[data-theme="dark"] .ib-alert-warn i { color: #f5c842; }
+
+/* ── preview table ──────────────────────────────────────────────── */
+.ib-preview-wrap {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 28px;
+}
+.ib-preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  background: var(--rh-surface);
+}
+.ib-preview-table thead th {
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--rh-muted);
+  background: var(--rh-50);
+  border-bottom: 1px solid var(--rh-border);
+  white-space: nowrap;
+}
+.ib-preview-table tbody td {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--rh-border);
+  color: var(--rh-text);
+  vertical-align: middle;
+}
+.ib-preview-table tbody tr:last-child td { border-bottom: none; }
+.ib-preview-table tbody tr:hover td { background: var(--rh-50); }
+.t-pill {
+  display: inline-block;
+  background: rgba(94,142,71,0.1);
+  color: var(--rh-700);
+  border-radius: 5px;
+  padding: 2px 7px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: monospace;
+  min-width: 44px;
+  text-align: center;
+}
+.t-pill.empty { background: rgba(0,0,0,0.05); color: var(--rh-muted); }
+.pt-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+.pt-badge.ok { background: rgba(34,197,94,0.1); color: #166534; }
+.pt-badge.warn { background: rgba(234,179,8,0.1); color: #7a4f00; }
+html[data-theme="dark"] .ib-preview-table tbody tr:hover td { background: rgba(255,255,255,0.03); }
+html[data-theme="dark"] .t-pill { background: rgba(94,142,71,0.2); color: var(--rh-300); }
+html[data-theme="dark"] .t-pill.empty { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.3); }
+html[data-theme="dark"] .pt-badge.ok { background: rgba(34,197,94,0.14); color: #86efac; }
+html[data-theme="dark"] .pt-badge.warn { background: rgba(234,179,8,0.14); color: #fde68a; }
+
+/* ── résumé préview ─────────────────────────────────────────────── */
+.ib-summary-bar {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  background: var(--rh-surface);
+  border-radius: 12px;
+  border: 1px solid var(--rh-border);
+  padding: 16px 22px;
+  margin-bottom: 20px;
+}
+.ib-sum-item {
+  display: flex; flex-direction: column; gap: 2px;
+}
+.ib-sum-label { font-size: 11px; font-weight: 700; color: var(--rh-muted); text-transform: uppercase; letter-spacing: 0.3px; }
+.ib-sum-value { font-size: 20px; font-weight: 800; color: var(--rh-text); }
+.ib-sum-value.accent { color: var(--rh-600); }
+.ib-sum-value.danger { color: #dc2626; }
+.ib-sum-sep { width: 1px; height: 36px; background: var(--rh-border); flex-shrink: 0; }
+
+/* ── confirm bar ─────────────────────────────────────────────────── */
+.ib-confirm-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--rh-border);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ib-head">
+  <div class="ib-head-title">
+    <i class="bi bi-fingerprint"></i>
+    Import biométrique — Pointeuse
+  </div>
+  <a href="{% url 'rh_presence_rapport' %}" class="btn-rh-outline" style="font-size:12px;padding:6px 14px;">
+    <i class="bi bi-arrow-left"></i> Rapport présence
+  </a>
+</div>
+
+<div class="ib-body">
+  {% if messages %}
+    {% for msg in messages %}
+    <div class="ib-alert-warn" style="{% if 'success' in msg.tags %}background:rgba(34,197,94,0.08);border-color:rgba(34,197,94,0.3);color:#166534;{% endif %}margin-bottom:20px;max-width:none;">
+      <i class="bi {% if 'success' in msg.tags %}bi-check-circle-fill{% else %}bi-exclamation-triangle-fill{% endif %}"></i>
+      <span>{{ msg }}</span>
+    </div>
+    {% endfor %}
+  {% endif %}
+
+  <!-- Étapes -->
+  <div class="ib-steps">
+    <div class="ib-step {% if step == 'upload' %}active{% else %}done{% endif %}">
+      <div class="ib-step-num">
+        {% if step == 'preview' %}<i class="bi bi-check-lg" style="font-size:11px;"></i>{% else %}1{% endif %}
+      </div>
+      Choisir le fichier
+    </div>
+    <div class="ib-step-sep"></div>
+    <div class="ib-step {% if step == 'preview' %}active{% endif %}">
+      <div class="ib-step-num">2</div>
+      Vérifier & confirmer
+    </div>
+    <div class="ib-step-sep"></div>
+    <div class="ib-step">
+      <div class="ib-step-num">3</div>
+      Import terminé
+    </div>
+  </div>
+
+  {% if step == 'upload' %}
+  <!-- ─── ÉTAPE 1 : Upload ─────────────────────────────────────────── -->
+
+  {% if nb_mapped == 0 %}
+  <div class="ib-alert-warn">
+    <i class="bi bi-exclamation-triangle-fill"></i>
+    <div>
+      <strong>Aucun employé n'a d'identifiant biométrique configuré.</strong><br>
+      Ouvrez la fiche de chaque employé et assignez-lui son numéro de badge
+      avant de lancer l'import.
+    </div>
+  </div>
+  {% endif %}
+
+  <form method="post" enctype="multipart/form-data" id="uploadForm">
+    {% csrf_token %}
+    <div class="ib-upload-card">
+      <div class="ib-upload-icon"><i class="bi bi-file-earmark-arrow-up"></i></div>
+      <h2>Fichier d'export de la pointeuse</h2>
+      <p>Formats acceptés : .txt, .csv, .log exporté depuis ZKTeco ou compatible</p>
+      <div class="ib-file-input-wrap">
+        <input type="file" name="fichier" accept=".txt,.csv,.log,.dat" required
+               onchange="document.getElementById('fileLabel').textContent = this.files[0]?.name || 'Choisir un fichier'">
+        <div class="ib-file-btn">
+          <i class="bi bi-folder2-open"></i>
+          <span id="fileLabel">Choisir un fichier…</span>
+        </div>
+      </div>
+      <div style="margin-top:18px;">
+        <button type="submit" class="btn-rh" style="width:100%;justify-content:center;">
+          <i class="bi bi-arrow-right-circle-fill"></i> Analyser le fichier
+        </button>
+      </div>
+    </div>
+  </form>
+
+  <!-- Guide format -->
+  <div class="ib-guide">
+    <div class="ib-guide-title"><i class="bi bi-info-circle-fill"></i> Formats acceptés</div>
+    <p style="font-size:12.5px;color:var(--rh-muted);margin:0 0 10px;">
+      Chaque ligne doit contenir l'<strong>ID biométrique</strong>, la <strong>date</strong> et l'<strong>heure</strong> dans l'un des formats suivants :
+    </p>
+    <pre>Format 1 (ZKTeco standard) :
+UserID  DateTime                  Status
+1       2026-06-01 08:02:34       0
+1       2026-06-01 12:01:15       0
+
+Format 2 (CSV) :
+1,2026-06-01,08:02:34
+1,2026-06-01,12:01:15
+
+Format 3 (espaces multiples) :
+1   2026-06-01 08:02:34   0   0   0</pre>
+    <p style="font-size:12px;color:var(--rh-muted);margin:10px 0 0;">
+      <i class="bi bi-lightbulb-fill" style="color:#f59e0b;"></i>
+      Les heures avant 13h00 sont considérées comme session <strong>matin</strong>, après 13h00 comme session <strong>soir</strong>.
+    </p>
+  </div>
+
+  <!-- Employés avec badge configuré -->
+  {% if nb_mapped > 0 %}
+  <div class="ib-map-card">
+    <div class="ib-map-header">
+      <h3><i class="bi bi-person-badge-fill"></i> Badges configurés</h3>
+      <span class="ib-map-badge">{{ nb_mapped }} employé{{ nb_mapped|pluralize }}</span>
+    </div>
+    <table class="ib-map-table">
+      <thead>
+        <tr>
+          <th>ID Badge</th>
+          <th>Employé</th>
+          <th>Service</th>
+          <th>Fonction</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for emp in employes_bio %}
+        <tr>
+          <td><span class="bio-chip"><i class="bi bi-upc-scan"></i> {{ emp.biometric_id }}</span></td>
+          <td>
+            <a href="{% url 'rh_detail' emp.pk %}" style="color:var(--rh-700);font-weight:600;text-decoration:none;">
+              {{ emp.nom_complet }}
+            </a>
+          </td>
+          <td style="color:var(--rh-muted);">{{ emp.service.nom|default:"—" }}</td>
+          <td style="color:var(--rh-muted);">{{ emp.fonction.nom|default:"—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% elif step == 'preview' %}
+  <!-- ─── ÉTAPE 2 : Prévisualisation ──────────────────────────────── -->
+
+  <!-- Résumé -->
+  <div class="ib-summary-bar">
+    <div class="ib-sum-item">
+      <div class="ib-sum-label">Lignes importables</div>
+      <div class="ib-sum-value accent">{{ nb_total }}</div>
+    </div>
+    <div class="ib-sum-sep"></div>
+    <div class="ib-sum-item">
+      <div class="ib-sum-label">Badges non reconnus</div>
+      <div class="ib-sum-value {% if nb_inconnus > 0 %}danger{% endif %}">{{ nb_inconnus }}</div>
+    </div>
+    {% if nb_inconnus > 0 %}
+    <div class="ib-sum-sep"></div>
+    <div class="ib-sum-item" style="flex:1;">
+      <div class="ib-sum-label">IDs inconnus</div>
+      <div style="font-size:12.5px;color:var(--rh-muted);">
+        {% for bid in inconnus %}<span class="bio-chip" style="margin:2px;">{{ bid }}</span>{% endfor %}
+        — <a href="{% url 'ressources_humaines_list' %}" style="color:var(--rh-600);">Configurer les badges</a>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if nb_inconnus > 0 %}
+  <div class="ib-alert-warn">
+    <i class="bi bi-exclamation-triangle-fill"></i>
+    <div>
+      <strong>{{ nb_inconnus }} badge{{ nb_inconnus|pluralize }}  ignoré{{ nb_inconnus|pluralize }}</strong>
+      — ces IDs n'ont aucun employé associé et ne seront pas importés.
+      Assignez les IDs biométriques manquants via les fiches employés, puis relancez l'import.
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Tableau de prévisualisation -->
+  {% if preview %}
+  <div class="ib-preview-wrap">
+    <table class="ib-preview-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Employé</th>
+          <th>Date</th>
+          <th><i class="bi bi-sunrise" style="color:#f59e0b;"></i> Arrivée matin</th>
+          <th><i class="bi bi-sun-fill" style="color:#f59e0b;"></i> Départ matin</th>
+          <th><i class="bi bi-sunset" style="color:#6366f1;"></i> Arrivée soir</th>
+          <th><i class="bi bi-moon-stars-fill" style="color:#6366f1;"></i> Départ soir</th>
+          <th>Pointages</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in preview %}
+        <tr>
+          <td style="color:var(--rh-muted);font-size:12px;">{{ forloop.counter }}</td>
+          <td style="font-weight:600;">{{ r.employe }}</td>
+          <td style="font-size:12.5px;color:var(--rh-muted);">{{ r.date }}</td>
+          <td><span class="t-pill {% if not r.am_in %}empty{% endif %}">{{ r.am_in|default:"—" }}</span></td>
+          <td><span class="t-pill {% if not r.am_out %}empty{% endif %}">{{ r.am_out|default:"—" }}</span></td>
+          <td><span class="t-pill {% if not r.pm_in %}empty{% endif %}">{{ r.pm_in|default:"—" }}</span></td>
+          <td><span class="t-pill {% if not r.pm_out %}empty{% endif %}">{{ r.pm_out|default:"—" }}</span></td>
+          <td>
+            <span class="pt-badge {% if r.nb_pointages >= 4 %}ok{% else %}warn{% endif %}">
+              <i class="bi bi-fingerprint"></i> {{ r.nb_pointages }}
+            </span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Confirmer -->
+  <form method="post" id="confirmForm">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="confirmer">
+    <input type="hidden" name="data_json" value="{{ data_json|escapejs }}">
+    <div class="ib-confirm-bar">
+      <button type="submit" class="btn-rh">
+        <i class="bi bi-check2-circle"></i> Confirmer l'import ({{ nb_total }} enregistrement{{ nb_total|pluralize }})
+      </button>
+      <a href="{% url 'rh_presence_import' %}" class="btn-rh-outline">
+        <i class="bi bi-arrow-counterclockwise"></i> Recommencer
+      </a>
+      <span style="font-size:12px;color:var(--rh-muted);margin-left:8px;">
+        Les présences existantes pour ces dates seront <strong>mises à jour</strong>, pas supprimées.
+      </span>
+    </div>
+  </form>
+  {% else %}
+  <div style="text-align:center;padding:40px;color:var(--rh-muted);">
+    <i class="bi bi-inbox" style="font-size:36px;display:block;margin-bottom:10px;"></i>
+    Aucune ligne importable (tous les IDs sont inconnus).
+    <br><a href="{% url 'rh_presence_import' %}" class="btn-rh" style="margin-top:16px;display:inline-flex;">Recommencer</a>
+  </div>
+  {% endif %}
+
+  {% endif %}
+</div>
+{% endblock %}

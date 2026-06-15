@@ -59,6 +59,9 @@ html[data-theme="dark"] .md-head { background:#0f0e0e; }
 .btn-md:hover { background:var(--md-700); color:#fff; }
 .btn-md-outline { border:1.5px solid var(--md-600); color:var(--md-600); background:transparent; border-radius:6px; padding:6px 14px; font-size:12.5px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:5px; text-decoration:none; transition:background .15s,color .15s; }
 .btn-md-outline:hover { background:var(--md-600); color:#fff; }
+.btn-md-del { border:1.5px solid rgba(220,38,38,.3); color:#dc2626; background:rgba(220,38,38,.06); border-radius:6px; padding:3px 10px; font-size:11.5px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:4px; transition:background .15s,color .15s; }
+.btn-md-del:hover { background:#dc2626; color:#fff; border-color:#dc2626; }
+html[data-theme="dark"] .btn-md-del { background:rgba(220,38,38,.1); border-color:rgba(220,38,38,.3); color:#f87171; }
 
 /* ── Toggle vue ── */
 .view-toggle { display:flex; gap:4px; }
@@ -106,60 +109,72 @@ html[data-theme="dark"] .md-table tbody tr:nth-child(even) { background:var(--md
 .kb-board::-webkit-scrollbar-thumb { background:var(--md-300); border-radius:3px; }
 
 .kb-col {
-  flex:0 0 220px; min-width:220px;
+  flex:0 0 260px; min-width:260px;
   background:var(--md-50); border:1px solid var(--md-border);
   border-radius:12px; overflow:hidden;
 }
 html[data-theme="dark"] .kb-col { background:var(--md-100); }
 
 .kb-col-head {
-  padding:10px 14px; background:var(--md-100);
-  border-bottom:2px solid var(--md-300);
+  padding:11px 16px; background:var(--md-surface);
+  border-bottom:3px solid var(--kb-accent,var(--md-400));
   display:flex; align-items:center; justify-content:space-between;
 }
-html[data-theme="dark"] .kb-col-head { background:var(--md-800); border-bottom-color:var(--md-700); }
-.kb-col-title { font-size:12px; font-weight:700; color:var(--md-800); text-transform:uppercase; letter-spacing:.4px; }
-html[data-theme="dark"] .kb-col-title { color:var(--md-200); }
+html[data-theme="dark"] .kb-col-head { background:#1a1a1a; }
+.kb-col-title { font-size:11.5px; font-weight:700; color:var(--md-text); text-transform:uppercase; letter-spacing:.5px; }
 .kb-col-count {
-  font-size:11px; font-weight:700; color:var(--md-600);
-  background:rgba(58,89,36,.12); border-radius:20px; padding:1px 8px;
+  font-size:11px; font-weight:700; color:var(--kb-accent,var(--md-600));
+  background:color-mix(in srgb, var(--kb-accent,var(--md-600)) 12%, transparent);
+  border-radius:20px; padding:2px 9px; min-width:22px; text-align:center;
 }
 
 .kb-cards { padding:10px; display:flex; flex-direction:column; gap:8px; }
 
 .kb-card {
   background:var(--md-surface); border:1px solid var(--md-border);
-  border-radius:10px; overflow:hidden;
-  box-shadow:0 1px 4px rgba(58,89,36,.07);
+  border-left:3px solid var(--kb-accent,var(--md-400));
+  border-radius:10px; overflow:hidden; position:relative;
+  box-shadow:0 1px 4px rgba(0,0,0,.06);
   transition:box-shadow .15s, transform .12s;
 }
-.kb-card:hover { box-shadow:0 4px 14px rgba(58,89,36,.14); transform:translateY(-1px); }
+.kb-card:hover { box-shadow:0 4px 16px rgba(0,0,0,.12); transform:translateY(-2px); }
 
-.kb-card-top { display:flex; align-items:center; gap:10px; padding:10px 12px; }
+/* Lien couvrant toute la carte */
+.kb-card-link {
+  position:absolute; inset:0; z-index:1; border-radius:9px;
+}
+
+.kb-card-top { display:flex; align-items:center; gap:10px; padding:12px 14px 8px; }
 .kb-avatar {
-  width:40px; height:40px; border-radius:50%; flex-shrink:0;
+  width:42px; height:42px; border-radius:50%; flex-shrink:0;
   display:flex; align-items:center; justify-content:center;
   font-size:14px; font-weight:800; color:#fff; overflow:hidden;
-  background:#4a6741;
+  background:var(--kb-accent,#4a6741);
+  box-shadow:0 2px 6px rgba(0,0,0,.18);
 }
-.kb-avatar.av-c1{background:#4a6741;}
-.kb-avatar.av-c2{background:#2a4219;}
-.kb-avatar.av-c3{background:#5e8050;}
-.kb-avatar.av-c4{background:#3a5924;}
-.kb-avatar.av-c5{background:#7a9b68;}
 .kb-avatar img { width:100%; height:100%; object-fit:cover; }
+.kb-card-name { font-size:13px; font-weight:700; color:var(--md-text); line-height:1.3; }
+.kb-card-mat  { font-size:10px; font-family:monospace; color:var(--md-muted); margin-top:1px; }
 
-.kb-card-name { font-size:12.5px; font-weight:700; color:var(--md-text); line-height:1.3; }
-.kb-card-mat  { font-size:10px; font-family:monospace; color:var(--md-muted); }
+.kb-card-meta {
+  padding:0 14px 10px; display:flex; flex-direction:column; gap:4px;
+}
+.kb-card-meta-row {
+  display:flex; align-items:center; gap:5px;
+  font-size:11.5px; color:var(--md-muted);
+}
+.kb-card-meta-row i { font-size:11px; flex-shrink:0; }
 
 .kb-card-foot {
-  padding:6px 12px; border-top:1px solid var(--md-border);
+  padding:7px 12px; border-top:1px solid var(--md-border);
   display:flex; align-items:center; justify-content:space-between;
+  position:relative; z-index:2;
 }
+.kb-card-actions { display:flex; align-items:center; gap:5px; }
 
 .kb-empty {
-  text-align:center; padding:40px 20px; color:var(--md-muted);
-  font-style:italic; font-size:12px;
+  text-align:center; padding:48px 20px; color:var(--md-muted);
+  font-style:italic; font-size:13px;
 }
 
 /* ── Badges ── */
@@ -172,13 +187,6 @@ html[data-theme="dark"] .kb-col-title { color:var(--md-200); }
 </style>
 {% endblock %}
 
-{% block breadcrumb %}
-<nav style="background:var(--md-surface,#fff);border-bottom:1px solid rgba(0,0,0,.07);margin:-32px -32px 0;padding:0 32px;display:flex;align-items:stretch;height:44px;position:sticky;top:var(--topbar-h);z-index:250;gap:2px;">
-  <span style="padding:11px 16px;font-size:13px;font-weight:600;color:var(--md-600);border-bottom:2px solid var(--md-500);display:inline-flex;align-items:center;gap:6px;margin-bottom:-1px;">
-    <i class="bi bi-person-badge"></i> Médecins
-  </span>
-</nav>
-{% endblock %}
 
 {% block content %}
 <div class="md-head">
@@ -199,6 +207,10 @@ html[data-theme="dark"] .kb-col-title { color:var(--md-200); }
         <i class="bi bi-kanban-fill"></i>
       </button>
     </div>
+    <a href="{% url 'medecins_export_csv' %}?q={{ q }}&specialite={{ specialite_filtre }}&statut={{ statut_filtre }}"
+       class="btn-md-outline" title="Exporter en CSV" style="padding:7px 12px;">
+      <i class="bi bi-filetype-csv"></i>
+    </a>
     <a href="{% url 'medecin_create' %}" class="btn-md">
       <i class="bi bi-plus-lg"></i> Nouveau médecin
     </a>
@@ -297,10 +309,21 @@ html[data-theme="dark"] .kb-col-title { color:var(--md-200); }
             {% if med.actif %}<span class="badge-actif"><i class="bi bi-circle-fill" style="font-size:7px;"></i> Actif</span>
             {% else %}<span class="badge-inactif">Inactif</span>{% endif %}
           </td>
-          <td>
-            <a href="{% url 'medecin_edit' med.pk %}" class="btn-md-outline" style="padding:3px 10px;font-size:11.5px;" title="Modifier">
-              <i class="bi bi-pencil"></i>
-            </a>
+          <td style="white-space:nowrap;">
+            <div style="display:flex;align-items:center;gap:5px;">
+              <a href="{% url 'medecin_edit' med.pk %}" class="btn-md-outline" style="padding:3px 10px;font-size:11.5px;" title="Modifier">
+                <i class="bi bi-pencil"></i>
+              </a>
+              {% if can_manage %}
+              <form method="post" action="{% url 'medecin_supprimer' med.pk %}" style="display:inline;"
+                    onsubmit="return confirm('Supprimer Dr {{ med.nom }} {{ med.prenoms }} ?\nCette action est irréversible.')">
+                {% csrf_token %}
+                <button type="submit" class="btn-md-del" title="Supprimer">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+              {% endif %}
+            </div>
           </td>
         </tr>
         {% endwith %}
@@ -321,42 +344,74 @@ html[data-theme="dark"] .kb-col-title { color:var(--md-200); }
   {% if kanban_colonnes %}
   <div class="kb-board">
     {% for col in kanban_colonnes %}
-    <div class="kb-col">
+    <div class="kb-col" data-col="{{ forloop.counter0 }}">
       <div class="kb-col-head">
         <span class="kb-col-title">{{ col.titre }}</span>
         <span class="kb-col-count">{{ col.medecins|length }}</span>
       </div>
       <div class="kb-cards">
         {% for med in col.medecins %}
-        {% with c=forloop.counter %}
         <div class="kb-card">
+          <a href="{% url 'medecin_detail' med.pk %}" class="kb-card-link" aria-label="Voir {{ med.nom }}"></a>
           <div class="kb-card-top">
-            <div class="kb-avatar {% if c|divisibleby:5 %}av-c5{% elif c|divisibleby:4 %}av-c4{% elif c|divisibleby:3 %}av-c3{% elif c|divisibleby:2 %}av-c2{% else %}av-c1{% endif %}">
+            <div class="kb-avatar">
               {% if med.photo %}
               <img src="{{ med.photo.url }}" alt="">
               {% else %}
               {{ med.nom|first|upper }}{{ med.prenoms|first|upper }}
               {% endif %}
             </div>
-            <a href="{% url 'medecin_detail' med.pk %}" style="text-decoration:none;">
+            <div style="min-width:0;">
               <div class="kb-card-name">Dr {{ med.nom }} {{ med.prenoms }}</div>
               <div class="kb-card-mat">{{ med.matricule }}</div>
-            </a>
+            </div>
+          </div>
+          <div class="kb-card-meta">
+            {% if med.specialite %}
+            <div class="kb-card-meta-row">
+              <i class="bi bi-award-fill" style="color:var(--kb-accent,var(--md-500));"></i>
+              <span>{{ med.specialite }}</span>
+            </div>
+            {% endif %}
+            {% if med.service %}
+            <div class="kb-card-meta-row">
+              <i class="bi bi-building"></i>
+              <span>{{ med.service }}</span>
+            </div>
+            {% endif %}
+            {% if med.telephone %}
+            <div class="kb-card-meta-row">
+              <i class="bi bi-telephone"></i>
+              <span>{{ med.telephone }}</span>
+            </div>
+            {% endif %}
           </div>
           <div class="kb-card-foot">
-            {% if med.actif %}<span class="badge-actif"><i class="bi bi-circle-fill" style="font-size:7px;"></i> Actif</span>
-            {% else %}<span class="badge-inactif">Inactif</span>{% endif %}
-            <div style="display:flex;align-items:center;gap:6px;">
-              {% if med.telephone %}
-              <span style="font-size:11px;color:var(--md-muted);"><i class="bi bi-telephone"></i> {{ med.telephone }}</span>
-              {% endif %}
-              <a href="{% url 'medecin_edit' med.pk %}" class="btn-md-outline" style="padding:2px 8px;font-size:11px;" title="Modifier">
+            {% if med.pk in en_service_pks %}
+            <span style="background:rgba(234,179,8,.15);color:#92400e;border:1px solid rgba(234,179,8,.4);padding:2px 8px;border-radius:12px;font-size:10.5px;font-weight:600;display:inline-flex;align-items:center;gap:4px;">
+              <i class="bi bi-clock-fill" style="font-size:8px;"></i> En service
+            </span>
+            {% elif med.actif %}
+            <span class="badge-actif"><i class="bi bi-circle-fill" style="font-size:7px;"></i> Actif</span>
+            {% else %}
+            <span class="badge-inactif">Inactif</span>
+            {% endif %}
+            <div class="kb-card-actions">
+              <a href="{% url 'medecin_edit' med.pk %}" class="btn-md-outline" style="padding:3px 9px;font-size:11.5px;" title="Modifier">
                 <i class="bi bi-pencil"></i>
               </a>
+              {% if can_manage %}
+              <form method="post" action="{% url 'medecin_supprimer' med.pk %}" style="display:inline;"
+                    onsubmit="return confirm('Supprimer Dr {{ med.nom }} {{ med.prenoms }} ?')">
+                {% csrf_token %}
+                <button type="submit" class="btn-md-del" style="padding:3px 9px;font-size:11.5px;" title="Supprimer">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+              {% endif %}
             </div>
           </div>
         </div>
-        {% endwith %}
         {% endfor %}
       </div>
     </div>
@@ -364,7 +419,7 @@ html[data-theme="dark"] .kb-col-title { color:var(--md-200); }
   </div>
   {% else %}
   <div class="kb-empty">
-    <i class="bi bi-person-x" style="font-size:40px;display:block;margin-bottom:12px;"></i>
+    <i class="bi bi-person-x" style="font-size:44px;display:block;margin-bottom:14px;opacity:.4;"></i>
     Aucun médecin trouvé
   </div>
   {% endif %}
@@ -374,6 +429,15 @@ html[data-theme="dark"] .kb-col-title { color:var(--md-200); }
 
 <script>
 (function(){
+  /* ── Accents par colonne ── */
+  const ACCENT = ['#3b82f6','#10b981','#f59e0b','#8b5cf6','#ec4899','#14b8a6','#ef4444','#f97316'];
+  document.querySelectorAll('.kb-col').forEach(function(col){
+    const i = parseInt(col.dataset.col, 10);
+    const c = ACCENT[i % ACCENT.length];
+    col.style.setProperty('--kb-accent', c);
+  });
+
+  /* ── Toggle vue ── */
   const VUE_KEY = 'medecins_vue';
   const saved   = '{{ vue_active }}' || localStorage.getItem(VUE_KEY) || 'table';
 

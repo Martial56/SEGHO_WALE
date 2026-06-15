@@ -22,6 +22,7 @@ urlpatterns = [
     path('<str:pharmacie>/inventaire/',                  views.pharmacie_inventaire_list,        name='pharmacie_inventaire_list'),
     path('<str:pharmacie>/inventaire/nouveau/',          views.pharmacie_inventaire_nouveau,     name='pharmacie_inventaire_nouveau'),
     path('<str:pharmacie>/inventaire/<int:pk>/',         views.pharmacie_inventaire_detail,      name='pharmacie_inventaire_detail'),
+    path('<str:pharmacie>/inventaire/<int:pk>/supprimer/', views.pharmacie_inventaire_supprimer, name='pharmacie_inventaire_supprimer'),
     path('<str:pharmacie>/rapport-mensuel/',             views.pharmacie_rapport_mensuel,        name='pharmacie_rapport_mensuel'),
     path('<str:pharmacie>/rapport-dispensation/',        views.pharmacie_rapport_dispensation,   name='pharmacie_rapport_dispensation'),
     path('<str:pharmacie>/comparaison/',                 views.pharmacie_comparaison,            name='pharmacie_comparaison'),

@@ -1,31 +1,8 @@
 ﻿{% extends 'base.html' %}
-{% load i18n %}
+{% load i18n static %}
 {% block topbar_title %}Médecins{% endblock %}
 
-{% block module_navbar %}
-<style>
-.o-nav-dropdown { position: relative; height: 38px; display: flex; align-items: center; }
-.o-nav-dropdown-menu {
-  display: none; position: absolute; top: calc(100% + 1px); left: 0;
-  background: var(--surface); border-radius: 8px;
-  box-shadow: 0 6px 20px rgba(0,0,0,0.13);
-  min-width: 190px; z-index: 9999; overflow: hidden;
-  border: 1px solid rgba(0,0,0,0.08);
-}
-.o-nav-dropdown-menu.open { display: block; }
-.o-nav-dropdown-menu a {
-  display: flex; align-items: center; gap: 8px;
-  padding: 10px 14px; font-size: 13px; color: var(--text);
-  text-decoration: none; border-bottom: 1px solid rgba(0,0,0,0.05);
-  transition: background 0.12s;
-}
-.o-nav-dropdown-menu a:last-child { border-bottom: none; }
-.o-nav-dropdown-menu a:hover { background: rgba(26,84,130,0.06); }
-.o-nav-dropdown-sep { height: 1px; background: var(--border); margin: 4px 0; }
-html[data-theme="dark"] .o-nav-dropdown-menu { background: var(--surface); border-color: rgba(255,255,255,0.08); }
-html[data-theme="dark"] .o-nav-dropdown-menu a { color: var(--text); border-bottom-color: rgba(255,255,255,0.06); }
-html[data-theme="dark"] .o-nav-dropdown-menu a:hover { background: rgba(34,113,177,0.1); }
-</style>
+{% block breadcrumb %}
 <nav class="o-nav">
   <a href="{% url 'dashboard' %}" class="o-nav-grid" title="Accueil">
     <i class="bi bi-grid-3x3-gap-fill"></i>
@@ -34,8 +11,12 @@ html[data-theme="dark"] .o-nav-dropdown-menu a:hover { background: rgba(34,113,1
     <i class="bi bi-person-badge-fill"></i>
     Médecins
   </span>
+  <a href="{% url 'medecin_dashboard' %}"
+     class="o-nav-link {% if request.resolver_match.url_name == 'medecin_dashboard' %}active{% endif %}">
+    <i class="bi bi-graph-up" style="font-size:12px;"></i> Tableau de bord
+  </a>
   <a href="{% url 'medecins_list' %}"
-     class="o-nav-link {% if request.resolver_match.url_name in 'medecins_list,medecin_edit,medecin_create' %}active{% endif %}">
+     class="o-nav-link {% if request.resolver_match.url_name in 'medecins_list,medecin_edit,medecin_create,medecin_detail' %}active{% endif %}">
     Médecins
   </a>
   {% if request.user.is_staff %}
@@ -72,9 +53,61 @@ function toggleMedNavDropdown(e, btn) {
 </script>
 {% endblock %}
 
-{% block breadcrumb %}{% endblock %}
-
 {% block extra_css %}
+<link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
+<style>
+/* ── Module nav ── */
+.o-nav {
+  background:var(--surface,#fff); border-bottom:1px solid rgba(0,0,0,.07);
+  margin:-32px -32px 0; padding:0 32px;
+  display:flex; align-items:stretch; height:44px;
+  position:sticky; top:var(--topbar-h); z-index:250;
+  gap:2px;
+}
+html[data-theme="dark"] .o-nav { background:var(--surface); border-bottom-color:rgba(255,255,255,.08); }
+.o-nav-grid {
+  padding:0 12px; display:flex; align-items:center; color:rgba(0,0,0,.35);
+  text-decoration:none; font-size:17px; flex-shrink:0;
+  border-bottom:3px solid transparent; transition:color .15s,background .15s;
+}
+.o-nav-grid:hover { color:var(--md-600,#4a6741); background:rgba(58,89,36,.06); }
+html[data-theme="dark"] .o-nav-grid { color:rgba(255,255,255,.3); }
+html[data-theme="dark"] .o-nav-grid:hover { color:rgba(255,255,255,.6); }
+.o-nav-brand {
+  display:inline-flex; align-items:center; gap:6px; padding:0 14px 0 8px;
+  font-size:13px; font-weight:700; color:var(--md-600,#4a6741);
+  border-right:1px solid rgba(0,0,0,.08); margin-right:4px; white-space:nowrap; flex-shrink:0;
+}
+html[data-theme="dark"] .o-nav-brand { color:var(--md-300,#9ab88a); border-right-color:rgba(255,255,255,.08); }
+.o-nav-link {
+  padding:0 14px; font-size:12.5px; font-weight:500; color:rgba(0,0,0,.45);
+  text-decoration:none; display:inline-flex; align-items:center; gap:6px;
+  border-bottom:3px solid transparent; transition:color .15s,background .15s,border-color .15s;
+  white-space:nowrap; height:44px;
+}
+.o-nav-link:hover { color:var(--md-700,#3a5924); background:rgba(58,89,36,.06); }
+.o-nav-link.active { color:var(--md-700,#3a5924); font-weight:700; border-bottom-color:var(--md-600,#4a6741); background:rgba(58,89,36,.07); }
+html[data-theme="dark"] .o-nav-link { color:rgba(255,255,255,.35); }
+html[data-theme="dark"] .o-nav-link:hover,
+html[data-theme="dark"] .o-nav-link.active { color:var(--md-300,#9ab88a); background:rgba(154,184,138,.07); border-bottom-color:var(--md-400,#7a9b68); }
+.o-nav-dropdown { position:relative; height:44px; display:flex; align-items:center; }
+.o-nav-dropdown-menu {
+  display:none; position:absolute; top:calc(100% + 1px); left:0;
+  background:var(--surface,#fff); border-radius:8px;
+  box-shadow:0 6px 20px rgba(0,0,0,.13); min-width:190px; z-index:9999;
+  overflow:hidden; border:1px solid rgba(0,0,0,.08);
+}
+.o-nav-dropdown-menu.open { display:block; }
+.o-nav-dropdown-menu a {
+  display:flex; align-items:center; gap:8px; padding:10px 14px;
+  font-size:13px; color:var(--text,#1b2e13); text-decoration:none;
+  border-bottom:1px solid rgba(0,0,0,.05); transition:background .12s;
+}
+.o-nav-dropdown-menu a:last-child { border-bottom:none; }
+.o-nav-dropdown-menu a:hover { background:rgba(58,89,36,.06); }
+html[data-theme="dark"] .o-nav-dropdown-menu { background:var(--surface); border-color:rgba(255,255,255,.08); }
+html[data-theme="dark"] .o-nav-dropdown-menu a { color:var(--text); border-bottom-color:rgba(255,255,255,.06); }
+</style>
 <style>
   /* ── Subheader & layout ── */
   .o-subheader { background: var(--surface); border-bottom: 1px solid var(--border); padding: 6px 32px; margin: 0 -32px; display: flex; flex-direction: column; gap: 5px; }
@@ -93,7 +126,7 @@ function toggleMedNavDropdown(e, btn) {
   .o-ctrl-btn:hover { border-color: var(--border); color: var(--text); background: rgba(0,0,0,.04); }
   html[data-theme="dark"] .o-ctrl-btn:hover { background: #201d1d; color: var(--text); border-color: var(--border); }
   .o-ctrl-sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; flex-shrink: 0; }
-  .o-filter-tag { display: inline-flex; align-items: center; gap: 3px; background: #e6f2f5; color: var(--primary); border: 1px solid #b5d5de; border-radius: 3px; padding: 1px 6px; font-size: 11.5px; font-weight: 500; white-space: nowrap; }
+  .o-filter-tag { display: inline-flex; align-items: center; gap: 3px; background: #eef5e4; color: var(--primary); border: 1px solid #bcd5a8; border-radius: 3px; padding: 1px 6px; font-size: 11.5px; font-weight: 500; white-space: nowrap; }
   .o-filter-tag a { color: #888; text-decoration: none; font-size: 14px; line-height: 1; margin-left: 2px; }
   .o-filter-tag a:hover { color: #333; }
   .o-view-btns { display: flex; border: 1px solid var(--border); border-radius: 3px; overflow: hidden; }
@@ -119,7 +152,7 @@ function toggleMedNavDropdown(e, btn) {
   .o-list-table td { padding: 10px 14px; font-size: 13px; border-bottom: 1px solid var(--border); color: var(--text); transition: background .1s; }
   .o-list-table tr:last-child td { border-bottom: none; }
   .o-list-table tbody tr { cursor: pointer; }
-  .o-list-table tbody tr:hover td { background: rgba(33,136,171,.05); }
+  .o-list-table tbody tr:hover td { background: rgba(58,89,36,.05); }
   .o-list-table tbody tr:hover .col-accent { border-left-color: var(--accent); }
   .col-accent { border-left: 3px solid transparent; transition: border-color .12s; padding-left: 11px !important; }
   html[data-theme="dark"] .o-list-table th { border-bottom-color: var(--border); color: var(--text-muted); }
@@ -143,24 +176,24 @@ function toggleMedNavDropdown(e, btn) {
   .o-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
   .o-card-code {
     font-family: monospace; font-size: 10px; font-weight: 700; letter-spacing: .5px;
-    color: var(--accent); background: rgba(33,136,171,.1); padding: 3px 8px; border-radius: 5px;
+    color: var(--accent); background: rgba(58,89,36,.1); padding: 3px 8px; border-radius: 5px;
   }
-  .o-card-icon { width: 32px; height: 32px; border-radius: 8px; background: rgba(33,136,171,.1); display: flex; align-items: center; justify-content: center; color: var(--accent); font-size: 15px; flex-shrink: 0; }
+  .o-card-icon { width: 32px; height: 32px; border-radius: 8px; background: rgba(58,89,36,.1); display: flex; align-items: center; justify-content: center; color: var(--accent); font-size: 15px; flex-shrink: 0; }
   .o-card-name { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 4px; line-height: 1.3; }
   .o-card-desc { font-size: 12px; color: var(--text-muted); line-height: 1.45; }
   .o-card-footer { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-muted); }
   html[data-theme="dark"] .o-card { border-color: var(--border); }
   html[data-theme="dark"] .o-card:hover { border-color: #4a90d9; }
-  html[data-theme="dark"] .o-card-code { background: rgba(33,136,171,.18); }
-  html[data-theme="dark"] .o-card-icon { background: rgba(33,136,171,.18); }
+  html[data-theme="dark"] .o-card-code { background: rgba(58,89,36,.18); }
+  html[data-theme="dark"] .o-card-icon { background: rgba(58,89,36,.18); }
   html[data-theme="dark"] .o-card-footer { border-top-color: var(--border); }
 
   /* ── Badges ── */
   .badge-code {
     display: inline-flex; align-items: center; font-family: monospace; font-size: 11px; font-weight: 700;
-    background: rgba(33,136,171,.08); color: var(--primary); padding: 3px 9px; border-radius: 5px; letter-spacing: .3px;
+    background: rgba(58,89,36,.08); color: var(--primary); padding: 3px 9px; border-radius: 5px; letter-spacing: .3px;
   }
-  html[data-theme="dark"] .badge-code { background: rgba(33,136,171,.18); color: #7ecae0; }
+  html[data-theme="dark"] .badge-code { background: rgba(58,89,36,.18); color: #9ab88a; }
   .badge-actif  { display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 8px;border-radius:20px;background:#e3f9ee;color:#0d8a52;font-weight:600; }
   .badge-inactif{ display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 8px;border-radius:20px;background:#fdf0f0;color:#c0392b;font-weight:600; }
   html[data-theme="dark"] .badge-actif  { background:rgba(22,169,107,.2);color:#6eddb0; }
@@ -178,14 +211,14 @@ function toggleMedNavDropdown(e, btn) {
   html[data-theme="dark"] .col-picker-menu label { color: var(--text); }
 
   /* ── Bulk bar ── */
-  .bulk-bar { display: none; align-items: center; gap: 12px; background: rgba(33,136,171,.07); border-bottom: 1px solid rgba(33,136,171,.18); padding: 9px 32px; margin: 0 -32px; font-size: 13px; font-weight: 600; color: var(--primary); }
+  .bulk-bar { display: none; align-items: center; gap: 12px; background: rgba(58,89,36,.07); border-bottom: 1px solid rgba(58,89,36,.18); padding: 9px 32px; margin: 0 -32px; font-size: 13px; font-weight: 600; color: var(--primary); }
   .bulk-bar.visible { display: flex; }
   .btn-bulk-delete { display: flex; align-items: center; gap: 6px; padding: 5px 13px; background: #dc2626; color: #fff; border: none; border-radius: 5px; font-size: 12px; font-weight: 700; cursor: pointer; transition: background .15s; }
   .btn-bulk-delete:hover { background: #b91c1c; }
   .btn-bulk-cancel { padding: 5px 11px; background: transparent; border: 1px solid rgba(0,0,0,.15); border-radius: 5px; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--primary); transition: background .12s; }
   .btn-bulk-cancel:hover { background: rgba(0,0,0,.04); }
-  html[data-theme="dark"] .bulk-bar { background: rgba(33,136,171,.12); border-color: rgba(33,136,171,.25); color: #7ecae0; }
-  html[data-theme="dark"] .btn-bulk-cancel { border-color: rgba(255,255,255,.15); color: #7ecae0; }
+  html[data-theme="dark"] .bulk-bar { background: rgba(58,89,36,.12); border-color: rgba(58,89,36,.25); color: #9ab88a; }
+  html[data-theme="dark"] .btn-bulk-cancel { border-color: rgba(255,255,255,.15); color: #9ab88a; }
 
   /* ── Modal ── */
   .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 9000; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
@@ -236,3 +269,5 @@ function toggleMedNavDropdown(e, btn) {
   })();
 </script>
 {% endblock %}
+
+

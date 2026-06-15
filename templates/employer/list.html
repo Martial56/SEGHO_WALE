@@ -204,6 +204,9 @@ html[data-theme="dark"] .rh-text-muted { color: rgba(255,255,255,0.35); }
 .rh-icon-btn:hover { background:var(--rh-600); color:#fff; border-color:var(--rh-600); }
 html[data-theme="dark"] .rh-icon-btn { background:rgba(74,114,54,.15); border-color:var(--rh-border); color:var(--rh-300); }
 html[data-theme="dark"] .rh-icon-btn:hover { background:var(--rh-600); color:#fff; }
+.rh-icon-btn-del { color:#dc2626; background:rgba(220,38,38,.06); border-color:rgba(220,38,38,.2); }
+.rh-icon-btn-del:hover { background:#dc2626; color:#fff; border-color:#dc2626; }
+html[data-theme="dark"] .rh-icon-btn-del { background:rgba(220,38,38,.1); border-color:rgba(220,38,38,.25); color:#f87171; }
 
 /* ── Empty state ── */
 .rh-empty {
@@ -405,6 +408,13 @@ html[data-theme="dark"] .rh-page-link.active { background: var(--rh-600); color:
             <a href="{% url 'rh_modifier' emp.pk %}" class="rh-icon-btn" title="Modifier">
               <i class="bi bi-pencil"></i>
             </a>
+            <form method="post" action="{% url 'rh_supprimer' emp.pk %}" style="display:inline;"
+                  onsubmit="return confirm('Supprimer {{ emp.nom_complet }} ?\nCette action est irréversible.')">
+              {% csrf_token %}
+              <button type="submit" class="rh-icon-btn rh-icon-btn-del" title="Supprimer">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
             {% endif %}
           </div>
         </td>

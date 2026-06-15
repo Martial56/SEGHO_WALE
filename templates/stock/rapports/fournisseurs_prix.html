@@ -1,0 +1,215 @@
+{% extends 'stock/base.html' %}
+{% load static %}
+{% block topbar_title %}Stock — Comparatif fournisseurs{% endblock %}
+
+{% block extra_st_css %}<style>
+.content { padding-top: 0; }
+
+/* ── En-tête sticky ── */
+.fp-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 32px; margin: 0 -32px;
+  background: #f2f7ee; border-bottom: 1px solid rgba(0,0,0,.05);
+  box-shadow: 0 2px 8px rgba(0,0,0,.04);
+  position: sticky; top: calc(var(--topbar-h) + 44px); z-index: 100;
+}
+html[data-theme="dark"] .fp-head { background: #0f0e0e; }
+
+/* ── Filtres ── */
+.fp-filter-wrap {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.fp-select {
+  border: none; border-bottom: 1.5px solid rgba(0,0,0,.2);
+  background: transparent; padding: 5px 22px 5px 4px;
+  font-size: 13px; font-weight: 500; color: var(--st-text);
+  font-family: inherit; cursor: pointer; appearance: none; min-width: 160px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 4px center;
+}
+.fp-select:focus { outline: none; border-bottom-color: var(--st-500); }
+
+/* ── Grille stats prix ── */
+.fp-prix-grid {
+  display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px;
+}
+.fp-prix-card {
+  background: var(--st-50); border: 1px solid var(--st-border);
+  border-radius: 8px; padding: 10px 16px; min-width: 110px; text-align: center;
+}
+.fp-prix-val { font-size: 18px; font-weight: 800; line-height: 1; }
+.fp-prix-lbl { font-size: 10px; color: var(--st-muted); text-transform: uppercase; letter-spacing: .3px; margin-top: 3px; }
+
+/* ── Variation badge ── */
+.var-ok      { color: #0d7a4c; font-weight: 700; }
+.var-alerte  { color: #8a5c00; font-weight: 700; }
+.var-danger  { color: #b71c1c; font-weight: 700; }
+
+/* ── Empty state ── */
+.fp-empty {
+  text-align: center; padding: 60px 20px; color: var(--st-muted);
+}
+.fp-empty i { font-size: 40px; display: block; margin-bottom: 12px; opacity: .4; }
+.fp-empty p { font-size: 14px; font-style: italic; margin: 0; }
+</style>{% endblock %}
+
+{% block content %}
+
+<!-- ══ En-tête sticky ══ -->
+<div class="fp-head">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <a href="javascript:history.back()" class="o-back-btn" title="Retour">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <div>
+      <div style="font-size:15px;font-weight:800;color:var(--st-900);">
+        <i class="bi bi-graph-up" style="color:var(--st-600);"></i> Historique &amp; comparatif des prix d'achat
+      </div>
+      <div style="font-size:11.5px;color:var(--st-muted);">Évolution des prix par lot et fournisseur — {{ today|date:"d/m/Y" }}</div>
+    </div>
+  </div>
+
+  <!-- Filtres GET -->
+  <form method="get" class="fp-filter-wrap">
+    <div>
+      <label style="display:block;font-size:10px;font-weight:700;color:var(--st-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px;">Fournisseur</label>
+      <select name="fournisseur" class="fp-select" onchange="this.form.submit()">
+        <option value="">Tous</option>
+        {% for f in fournisseurs %}
+        <option value="{{ f.pk }}" {% if fournisseur_pk == f.pk|stringformat:'s' %}selected{% endif %}>{{ f.nom }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label style="display:block;font-size:10px;font-weight:700;color:var(--st-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px;">Produit</label>
+      <select name="produit" class="fp-select" onchange="this.form.submit()">
+        <option value="">Tous</option>
+        {% for p in produits_avec_lots %}
+        <option value="{{ p.pk }}" {% if produit_pk == p.pk|stringformat:'s' %}selected{% endif %}>{{ p.nom }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <noscript>
+      <button type="submit" class="btn-st-outline" style="font-size:12px;">Filtrer</button>
+    </noscript>
+  </form>
+</div>
+
+<!-- ══ Contenu ══ -->
+{% if produits_data %}
+
+  {% for item in produits_data %}
+  <div class="st-card" style="margin-top:{% if forloop.first %}20{% else %}12{% endif %}px;">
+
+    <!-- Titre produit -->
+    <div class="st-card-header">
+      <div class="st-card-title">
+        <i class="bi bi-box-seam" style="color:var(--st-600);"></i>
+        {{ item.produit.nom }}
+        {% if item.produit.code %}
+        <span style="font-size:11px;font-weight:400;font-family:monospace;color:var(--st-muted);">({{ item.produit.code }})</span>
+        {% endif %}
+      </div>
+      <span style="font-size:11.5px;color:var(--st-muted);">{{ item.lots|length }} lot{{ item.lots|length|pluralize }}</span>
+    </div>
+
+    <div class="st-card-body">
+
+      <!-- Résumé prix -->
+      <div class="fp-prix-grid">
+        <div class="fp-prix-card">
+          <div class="fp-prix-val" style="color:#0d7a4c;">{{ item.prix_min|floatformat:0 }}</div>
+          <div class="fp-prix-lbl">Prix min (F)</div>
+        </div>
+        <div class="fp-prix-card">
+          <div class="fp-prix-val" style="color:#b71c1c;">{{ item.prix_max|floatformat:0 }}</div>
+          <div class="fp-prix-lbl">Prix max (F)</div>
+        </div>
+        <div class="fp-prix-card">
+          <div class="fp-prix-val" style="color:var(--st-700);">{{ item.prix_moy|floatformat:0 }}</div>
+          <div class="fp-prix-lbl">Prix moyen (F)</div>
+        </div>
+        {% if item.variation is not None %}
+        <div class="fp-prix-card">
+          <div class="fp-prix-val
+            {% if item.variation > 20 %}var-danger
+            {% elif item.variation > 10 %}var-alerte
+            {% else %}var-ok{% endif %}">
+            {% if item.variation > 0 %}+{% endif %}{{ item.variation|floatformat:1 }}%
+          </div>
+          <div class="fp-prix-lbl">Variation</div>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Table des lots -->
+      {% if item.lots %}
+      <div style="overflow-x:auto;">
+        <table class="st-table">
+          <thead>
+            <tr>
+              <th>Lot N°</th>
+              <th>Date réception</th>
+              <th>Fournisseur</th>
+              <th style="text-align:right;">Prix achat (F)</th>
+              <th style="text-align:right;">Qté initiale</th>
+              <th style="text-align:right;">Qté actuelle</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for lot in item.lots %}
+            <tr>
+              <td style="font-family:monospace;font-size:12px;color:var(--st-600);font-weight:600;">{{ lot.numero_lot }}</td>
+              <td style="font-size:12px;white-space:nowrap;">
+                {% if lot.date_reception %}{{ lot.date_reception|date:"d/m/Y" }}{% else %}<span style="color:var(--st-muted);">—</span>{% endif %}
+              </td>
+              <td style="font-size:12.5px;">
+                {% if lot.fournisseur %}{{ lot.fournisseur.nom }}{% else %}<span style="color:var(--st-muted);">—</span>{% endif %}
+              </td>
+              <td style="text-align:right;font-weight:700;font-size:13px;">
+                {% if lot.prix_achat %}{{ lot.prix_achat|floatformat:0 }}{% else %}<span style="color:var(--st-muted);">—</span>{% endif %}
+              </td>
+              <td style="text-align:right;font-size:12.5px;">{{ lot.quantite_initiale|floatformat:0 }}</td>
+              <td style="text-align:right;font-size:12.5px;
+                {% if lot.quantite_actuelle == 0 %}color:#b71c1c;font-weight:700;
+                {% elif lot.quantite_actuelle < lot.quantite_initiale %}color:#8a5c00;{% endif %}">
+                {{ lot.quantite_actuelle|floatformat:0 }}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div style="text-align:center;padding:20px;color:var(--st-muted);font-style:italic;font-size:13px;">
+        Aucun lot pour ce produit
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+  {% endfor %}
+
+{% else %}
+<!-- Empty state -->
+<div class="st-card" style="margin-top:20px;">
+  <div class="fp-empty">
+    <i class="bi bi-search"></i>
+    <p>
+      {% if fournisseur_pk or produit_pk %}
+        Aucun lot trouvé pour les filtres sélectionnés.
+      {% else %}
+        Aucune donnée de prix disponible. Les prix apparaissent lors de la réception de lots d'achat.
+      {% endif %}
+    </p>
+    {% if fournisseur_pk or produit_pk %}
+    <a href="?" class="btn-st-outline" style="margin-top:16px;font-size:12px;">
+      <i class="bi bi-x-circle"></i> Réinitialiser les filtres
+    </a>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

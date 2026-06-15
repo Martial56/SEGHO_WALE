@@ -59,7 +59,7 @@ class CommandeAchatAdmin(admin.ModelAdmin):
 class LigneReceptionInline(admin.TabularInline):
     model = LigneReceptionAchat
     extra = 0
-    fields = ['ligne_commande', 'quantite_recue', 'conforme', 'notes']
+    fields = ['ligne_commande', 'quantite_recue', 'conforme', 'numero_lot', 'date_peremption', 'notes']
 
 
 @admin.register(ReceptionAchat)

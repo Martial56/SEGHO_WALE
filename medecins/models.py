@@ -13,17 +13,21 @@ class Specialite(models.Model):
 
 class Medecin(models.Model):
     user = models.OneToOneField(User, on_delete=models.SET_NULL, null=True, blank=True)
+    employe = models.OneToOneField(
+        'employer.Employe', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='fiche_medecin',
+        verbose_name="Employé lié",
+    )
     matricule = models.CharField(max_length=20, unique=True)
     nom = models.CharField(max_length=100)
     prenoms = models.CharField(max_length=200)
-    specialite = models.ForeignKey(Specialite, on_delete=models.SET_NULL, null=True)
+    specialite = models.ForeignKey(Specialite, on_delete=models.SET_NULL, null=True, blank=True)
     service = models.ForeignKey('Service', on_delete=models.SET_NULL, null=True, blank=True, related_name='medecins', verbose_name="Département")
     telephone = models.CharField(max_length=20)
     email = models.EmailField(blank=True)
     ordre_medecin = models.CharField(max_length=50, blank=True)
     photo = models.ImageField(upload_to='medecins/photos/', blank=True, null=True)
     taux_honoraire = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    photo = models.ImageField(upload_to='medecins/photos/', blank=True, null=True)
     actif = models.BooleanField(default=True)
     date_creation = models.DateTimeField(auto_now_add=True)
 

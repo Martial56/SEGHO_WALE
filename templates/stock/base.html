@@ -117,6 +117,12 @@ html[data-theme="dark"] .st-table thead tr { background:var(--st-800); color:var
   <a href="{% url 'stock_dashboard' %}" class="st-nav-link {% block nav_dashboard %}{% endblock %}"><i class="bi bi-speedometer2"></i> Tableau de bord</a>
   <a href="{% url 'stock_produits' %}" class="st-nav-link {% block nav_produits %}{% endblock %}"><i class="bi bi-box-seam"></i> Produits</a>
   <a href="{% url 'stock_fiche_list' %}" class="st-nav-link {% block nav_rapports_besoins %}{% endblock %}"><i class="bi bi-file-earmark-text"></i> Fiches besoins</a>
+  <a href="{% url 'stock_receptions_a_integrer' %}" class="st-nav-link {% block nav_receptions_integrer %}{% endblock %}" style="position:relative;">
+    <i class="bi bi-box-arrow-in-down-right"></i> Réceptions achats
+    {% if stock_receptions_a_integrer %}
+    <span style="position:absolute;top:8px;right:4px;min-width:16px;height:16px;border-radius:8px;background:#d97706;color:#fff;font-size:9px;font-weight:800;line-height:16px;text-align:center;padding:0 3px;border:2px solid #fff;">{{ stock_receptions_a_integrer }}</span>
+    {% endif %}
+  </a>
   <a href="{% url 'stock_dotation_list' %}" class="st-nav-link {% block nav_dotation %}{% endblock %}" style="position:relative;">
     <i class="bi bi-bag-check"></i> Dotation
     {% if stock_demandes_en_attente %}
@@ -135,25 +141,37 @@ html[data-theme="dark"] .st-table thead tr { background:var(--st-800); color:var
 
 <!-- Popup menu grille -->
 <div id="st-menu-overlay" onclick="toggleStMenu()" style="display:none;position:fixed;inset:0;z-index:8000;background:rgba(0,0,0,.25);"></div>
-<div id="st-menu-popup" style="display:none;position:fixed;top:calc(var(--topbar-h) + 44px);right:8px;z-index:8001;background:#fff;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,.18);padding:16px;width:360px;max-width:96vw;">
-  <div style="font-size:11px;font-weight:700;color:var(--st-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;padding-left:4px;">Tous les modules stock</div>
-  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">
+<div id="st-menu-popup" style="display:none;position:fixed;top:calc(var(--topbar-h) + 44px);right:8px;z-index:8001;background:#fff;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,.18);padding:16px;width:420px;max-width:96vw;max-height:80vh;overflow-y:auto;">
+  <div style="font-size:11px;font-weight:700;color:var(--st-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;padding-left:4px;">Tous les modules stock</div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
     {% url 'stock_mouvements' as url_mv %}{% url 'stock_transfert' as url_tr %}
     {% url 'stock_inventaire_list' as url_iv %}{% url 'stock_peremptions' as url_pe %}
     {% url 'stock_valorisation' as url_vl %}
     {% url 'stock_rapports_besoins' as url_rb %}
     {% url 'stock_rapports_indicateurs' as url_ri %}{% url 'stock_rapports_consommation' as url_rc %}
     {% url 'stock_rapports_dotations' as url_rd %}
+    {% url 'stock_elimination_create' as url_elim %}
+    {% url 'stock_retour_create' as url_retour %}
+    {% url 'stock_rapports_peremptions' as url_rp %}
+    {% url 'stock_rapports_bilan' as url_bilan %}
+    {% url 'stock_rapports_fournisseurs_prix' as url_frn %}
 
+    <div style="font-size:10px;font-weight:800;color:var(--st-muted);text-transform:uppercase;letter-spacing:.5px;padding:4px 6px 2px;grid-column:1/-1;">Gestion</div>
     <a href="{{ url_mv }}" class="st-menu-item"><i class="bi bi-journal-text"></i><span>Journal</span></a>
     <a href="{{ url_iv }}" class="st-menu-item"><i class="bi bi-clipboard2-check"></i><span>Inventaires</span></a>
     <a href="{{ url_pe }}" class="st-menu-item"><i class="bi bi-calendar-x"></i><span>Péremptions</span></a>
+    <a href="{{ url_elim }}" class="st-menu-item"><i class="bi bi-trash3"></i><span>Éliminations</span></a>
+    <a href="{{ url_retour }}" class="st-menu-item"><i class="bi bi-box-arrow-in-left"></i><span>Retour pharma</span></a>
     <a href="{{ url_vl }}" class="st-menu-item"><i class="bi bi-graph-up-arrow"></i><span>Valorisation</span></a>
-    <a href="{{ url_rb }}" class="st-menu-item"><i class="bi bi-clipboard2-data"></i><span>Rapport besoins</span></a>
-    <a href="{{ url_ri }}" class="st-menu-item"><i class="bi bi-speedometer2"></i><span>Indicateurs</span></a>
-    <a href="{{ url_rc }}" class="st-menu-item"><i class="bi bi-box-arrow-right"></i><span>Dotations prod.</span></a>
-    <a href="{{ url_rd }}" class="st-menu-item"><i class="bi bi-graph-up"></i><span>Tendances</span></a>
     <a href="{{ url_tr }}" class="st-menu-item"><i class="bi bi-shuffle"></i><span>Distribution</span></a>
+    <div style="font-size:10px;font-weight:800;color:var(--st-muted);text-transform:uppercase;letter-spacing:.5px;padding:4px 6px 2px;grid-column:1/-1;">Rapports</div>
+    <a href="{{ url_rb }}" class="st-menu-item"><i class="bi bi-clipboard2-data"></i><span>Besoins</span></a>
+    <a href="{{ url_ri }}" class="st-menu-item"><i class="bi bi-speedometer2"></i><span>Indicateurs</span></a>
+    <a href="{{ url_rc }}" class="st-menu-item"><i class="bi bi-box-arrow-right"></i><span>Dotations</span></a>
+    <a href="{{ url_rd }}" class="st-menu-item"><i class="bi bi-graph-up"></i><span>Tendances</span></a>
+    <a href="{{ url_rp }}" class="st-menu-item"><i class="bi bi-trash3-fill"></i><span>Élim. rapport</span></a>
+    <a href="{{ url_bilan }}" class="st-menu-item"><i class="bi bi-file-earmark-bar-graph"></i><span>Bilan mensuel</span></a>
+    <a href="{{ url_frn }}" class="st-menu-item"><i class="bi bi-currency-exchange"></i><span>Prix fourn.</span></a>
   </div>
 </div>
 
