@@ -1,6 +1,11 @@
 from django.urls import path, include
 from . import views
 from facturation.views import facturation_list as _facturation_list_view
+from medecins.views import (
+    medecin_dashboard as _medecin_dashboard_view,
+    medecins_export_csv as _medecins_export_csv_view,
+    medecin_supprimer as _medecin_supprimer_view,
+)
 
 urlpatterns = [
     path('', views.dashboard, name='dashboard'),
@@ -12,10 +17,13 @@ urlpatterns = [
 
     # URLs des modules
     path('patients/', include('patients.urls')),
-    path('medecins/',                        views.medecins_list,    name='medecins_list'),
-    path('medecins/nouveau/',                views.medecin_create,   name='medecin_create'),
-    path('medecins/<int:pk>/',               views.medecin_detail,   name='medecin_detail'),
-    path('medecins/<int:pk>/modifier/',      views.medecin_edit,     name='medecin_edit'),
+    path('medecins/',                        views.medecins_list,          name='medecins_list'),
+    path('medecins/dashboard/',              _medecin_dashboard_view,      name='medecin_dashboard'),
+    path('medecins/export/csv/',             _medecins_export_csv_view,    name='medecins_export_csv'),
+    path('medecins/nouveau/',                views.medecin_create,         name='medecin_create'),
+    path('medecins/<int:pk>/',               views.medecin_detail,         name='medecin_detail'),
+    path('medecins/<int:pk>/modifier/',      views.medecin_edit,           name='medecin_edit'),
+    path('medecins/<int:pk>/supprimer/',     _medecin_supprimer_view,      name='medecin_supprimer'),
 
     # Spécialités
     path('medecins/config/specialites/',                    views.medecins_specialites,             name='medecins_specialites'),

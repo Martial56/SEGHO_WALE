@@ -2072,16 +2072,37 @@ def kpi_dashboard(request):
 
     today = timezone.now().date()
 
+    # Période sélectionnée
+    period = request.GET.get('period', 'jour')
+    if period not in ('jour', 'semaine', 'mois', 'tout'):
+        period = 'jour'
+
+    if period == 'jour':
+        date_from = today
+        period_label = f"Aujourd'hui — {today.strftime('%d/%m/%Y')}"
+    elif period == 'semaine':
+        date_from = today - timedelta(days=today.weekday())
+        period_label = f"Cette semaine — du {date_from.strftime('%d/%m')} au {today.strftime('%d/%m/%Y')}"
+    elif period == 'mois':
+        date_from = today.replace(day=1)
+        period_label = f"Ce mois — {today.strftime('%B %Y')}"
+    else:  # tout
+        from datetime import date as _date
+        date_from = _date(2000, 1, 1)
+        period_label = "Jusqu'à maintenant"
+
+    date_to = today
+
     stats = {
         'patients_total': Patient.objects.filter(actif=True).count(),
-        'patients_today': Patient.objects.filter(date_creation__date=today).count(),
-        'consultations_today': Consultation.objects.filter(date_heure__date=today).count(),
-        'rdv_today': RendezVous.objects.filter(date_heure__date=today).count(),
+        'patients_periode': Patient.objects.filter(date_creation__date__range=[date_from, date_to]).count(),
+        'consultations_periode': Consultation.objects.filter(date_heure__date__range=[date_from, date_to]).count(),
+        'rdv_periode': RendezVous.objects.filter(date_heure__date__range=[date_from, date_to]).count(),
         'hospitalisations': Hospitalisation.objects.filter(statut='hospitalise').count(),
         'analyses_pending': AnalyseLaboratoire.objects.filter(statut__in=['recu', 'en_analyse']).count(),
         'medicaments_alerte': Medicament.objects.filter(stock_actuel__lte=F('stock_alerte')).count(),
         'employes_actifs': Employe.objects.filter(statut='actif').count(),
-        'soins_aujourd_hui': Soin.objects.filter(date_creation__date=today).count(),
+        'soins_periode': Soin.objects.filter(date_creation__date__range=[date_from, date_to]).count(),
         'medecins_actifs': Medecin.objects.filter(actif=True).count(),
         'medecins_total': Medecin.objects.count(),
     }
@@ -2121,9 +2142,9 @@ def kpi_dashboard(request):
     chart_data = _json.dumps({'labels': chart_labels, 'patients': chart_patients, 'rdv': chart_rdv})
 
     rdv_auj = RendezVous.objects.filter(
-        date_heure__date=today,
+        date_heure__date__range=[date_from, date_to],
         statut__in=['planifie', 'confirme', 'en_attente', 'en_consultation']
-    ).select_related('patient', 'medecin').order_by('date_heure')[:10]
+    ).select_related('patient', 'medecin').order_by('date_heure')[:15]
 
     last_cons = Consultation.objects.select_related('patient', 'medecin').order_by('-date_heure')[:6]
 
@@ -2144,6 +2165,8 @@ def kpi_dashboard(request):
         'user_modules': user_modules,
         'accessible_codes': accessible_codes,
         'chart_data': chart_data,
+        'period': period,
+        'period_label': period_label,
     })
 
 

@@ -33,6 +33,7 @@ def services_list(request):
     categorie_id = request.GET.get('categorie', '')
     type_produit = request.GET.get('type_produit', '')
     statut = request.GET.get('statut', '')
+    filtre = request.GET.get('filtre', '')
     vue = request.GET.get('vue', 'liste')  # kanban ou liste
 
     if q:
@@ -48,6 +49,20 @@ def services_list(request):
     if statut == 'actif':
         qs = qs.filter(actif=True)
     elif statut == 'inactif':
+        qs = qs.filter(actif=False)
+    if filtre == 'services':
+        qs = qs.filter(type_produit_hospitalier='service')
+    elif filtre == 'articles':
+        qs = qs.exclude(type_produit_hospitalier='service')
+    elif filtre == 'peut_etre_vendu':
+        qs = qs.filter(peut_etre_vendu=True)
+    elif filtre == 'peut_etre_achete':
+        qs = qs.filter(peut_etre_achete=True)
+    elif filtre == 'favori':
+        qs = qs.filter(favori=True)
+    elif filtre == 'avertissement':
+        qs = qs.filter(Q(avertissement_grossesse=True) | Q(avertissement_lactation=True))
+    elif filtre == 'archive':
         qs = qs.filter(actif=False)
 
     total = qs.count()
@@ -65,6 +80,7 @@ def services_list(request):
         'categorie_id': categorie_id,
         'type_produit': type_produit,
         'statut': statut,
+        'filtre': filtre,
         'vue': vue,
         'total': total,
     })

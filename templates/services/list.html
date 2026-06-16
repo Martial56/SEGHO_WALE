@@ -60,16 +60,8 @@
     opacity: 0.4;
   }
 
-  html[data-theme="dark"] .filters-panel {
-    background: #1a2133;
-    border-bottom-color: var(--border);
-  }
-
-  html[data-theme="dark"] .filter-select {
-    background: var(--surface);
-    border-color: var(--border);
-    color: var(--text);
-  }
+  .io-pm-active { font-weight: 600; color: var(--primary, #1a6da3) !important; background: #f0f6fc; }
+  html[data-theme="dark"] .io-pm-active { background: #1e3050; color: #7ec8e3 !important; }
 
   .o-icon-btn {
     width: 28px;
@@ -478,6 +470,40 @@
 
     <div style="flex:1;"></div>
 
+    <!-- Filtres dropdown -->
+    <div class="io-page-wrap" id="filters-dd-wrap">
+      <button type="button" class="o-ctrl-btn io-toggle-btn {% if filtre or categorie_id or type_produit or statut %}active{% endif %}"
+              onclick="toggleFiltersMenu(event)">
+        <i class="bi bi-funnel"></i> Filtres
+      </button>
+      <div class="io-page-menu" style="right:0;left:auto;min-width:200px;">
+        <a class="io-pm-item{% if filtre == 'services' %} io-pm-active{% endif %}"
+           href="?{% if q %}q={{ q }}&{% endif %}{% if categorie_id %}categorie={{ categorie_id }}&{% endif %}filtre=services&vue={{ vue }}">Services</a>
+        <a class="io-pm-item{% if filtre == 'articles' %} io-pm-active{% endif %}"
+           href="?{% if q %}q={{ q }}&{% endif %}{% if categorie_id %}categorie={{ categorie_id }}&{% endif %}filtre=articles&vue={{ vue }}">Articles</a>
+        <div class="io-pm-sep"></div>
+        <a class="io-pm-item{% if filtre == 'peut_etre_vendu' %} io-pm-active{% endif %}"
+           href="?{% if q %}q={{ q }}&{% endif %}{% if categorie_id %}categorie={{ categorie_id }}&{% endif %}filtre=peut_etre_vendu&vue={{ vue }}">Peut être vendu</a>
+        <a class="io-pm-item{% if filtre == 'peut_etre_achete' %} io-pm-active{% endif %}"
+           href="?{% if q %}q={{ q }}&{% endif %}{% if categorie_id %}categorie={{ categorie_id }}&{% endif %}filtre=peut_etre_achete&vue={{ vue }}">Peut être acheté</a>
+        <div class="io-pm-sep"></div>
+        <a class="io-pm-item{% if filtre == 'favori' %} io-pm-active{% endif %}"
+           href="?{% if q %}q={{ q }}&{% endif %}{% if categorie_id %}categorie={{ categorie_id }}&{% endif %}filtre=favori&vue={{ vue }}">Favoris</a>
+        <div class="io-pm-sep"></div>
+        <a class="io-pm-item{% if filtre == 'avertissement' %} io-pm-active{% endif %}"
+           href="?{% if q %}q={{ q }}&{% endif %}{% if categorie_id %}categorie={{ categorie_id }}&{% endif %}filtre=avertissement&vue={{ vue }}">Avertissements</a>
+        <div class="io-pm-sep"></div>
+        <a class="io-pm-item{% if filtre == 'archive' %} io-pm-active{% endif %}"
+           href="?{% if q %}q={{ q }}&{% endif %}{% if categorie_id %}categorie={{ categorie_id }}&{% endif %}filtre=archive&vue={{ vue }}">Archivé</a>
+        {% if filtre or categorie_id %}
+        <div class="io-pm-sep"></div>
+        <a class="io-pm-item" href="?{% if q %}q={{ q }}&{% endif %}vue={{ vue }}" style="color:#c0392b;">
+          <i class="bi bi-x-circle" style="font-size:11px;"></i> Effacer les filtres
+        </a>
+        {% endif %}
+      </div>
+    </div>
+
     <div class="o-ctrl-sep"></div>
 
     <!-- Vue -->
@@ -494,28 +520,6 @@
   </div>
 </div>
 
-<!-- ══ PANEL FILTRES ══ -->
-<div class="filters-panel {% if categorie_id or type_produit or statut %}open{% endif %}" id="filters-panel">
-  <select id="sel-cat" class="filter-select" onchange="applyFilters()">
-    <option value="">Toutes catégories</option>
-    {% for cat in categories %}
-    <option value="{{ cat.pk }}" {% if categorie_id == cat.pk|stringformat:"s" %}selected{% endif %}>
-      {{ cat.code }} — {{ cat.nom }}
-    </option>
-    {% endfor %}
-  </select>
-  <select id="sel-type" class="filter-select" onchange="applyFilters()">
-    <option value="">Tous types</option>
-    {% for val, label in type_produit_choices %}
-    <option value="{{ val }}" {% if type_produit == val %}selected{% endif %}>{{ label }}</option>
-    {% endfor %}
-  </select>
-  <select id="sel-statut" class="filter-select" onchange="applyFilters()">
-    <option value="">Tous statuts</option>
-    <option value="actif" {% if statut == "actif" %}selected{% endif %}>Actifs</option>
-    <option value="inactif" {% if statut == "inactif" %}selected{% endif %}>Inactifs</option>
-  </select>
-</div>
 
 
 <div id="list-result">
@@ -634,16 +638,9 @@
   }
 
   /* ── Filtres ── */
-  function toggleFilters() {
-    var p = document.getElementById('filters-panel');
-    if (p) p.classList.toggle('open');
-    document.getElementById('btn-filtres').classList.toggle('active', p.classList.contains('open'));
-  }
-  function applyFilters() {
-    document.getElementById('fi-cat').value = document.getElementById('sel-cat').value;
-    document.getElementById('fi-type').value = document.getElementById('sel-type').value;
-    document.getElementById('fi-statut').value = document.getElementById('sel-statut').value;
-    window.liveLoad();
+  function toggleFiltersMenu(e) {
+    e.stopPropagation();
+    document.getElementById('filters-dd-wrap').classList.toggle('open');
   }
 
   /* ── Recherche automatique (debounce 400ms) ── */
@@ -695,6 +692,8 @@ function toggleIOPage(e) {
 document.addEventListener('click', function() {
   var w = document.getElementById('io-page-wrap');
   if (w) w.classList.remove('open');
+  var f = document.getElementById('filters-dd-wrap');
+  if (f) f.classList.remove('open');
 });
 /* ── IO Modal ── */
 function openImportModal() {

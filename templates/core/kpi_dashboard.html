@@ -52,6 +52,14 @@
     .user-info .uname { font-size: 13px; font-weight: 600; color: var(--teal-900); }
     .user-info .urole { font-size: 10px; color: var(--text-muted); }
 
+    .period-tabs { display: flex; align-items: center; gap: 4px; background: rgba(33,136,171,0.07); border-radius: 12px; padding: 4px; }
+    .period-tab { padding: 5px 13px; border-radius: 9px; font-size: 12px; font-weight: 600; color: var(--teal-700); text-decoration: none; transition: all 0.15s; white-space: nowrap; }
+    .period-tab:hover { background: rgba(33,136,171,0.12); }
+    .period-tab.active { background: var(--teal-600); color: #fff; box-shadow: 0 2px 8px rgba(33,136,171,0.3); }
+    html[data-theme="dark"] .period-tabs { background: rgba(255,255,255,0.05); }
+    html[data-theme="dark"] .period-tab { color: #7aaec7; }
+    html[data-theme="dark"] .period-tab.active { background: var(--teal-600); color: #fff; }
+
     .btn-logout { background: rgba(33,136,171,0.08); border: none; border-radius: 10px; color: var(--teal-800); width: 36px; height: 36px; padding: 0; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
     .btn-logout:hover { background: rgba(232,69,69,0.1); color: #c0392b; }
 
@@ -252,11 +260,19 @@
           </svg>
           Tableau de bord
         </div>
-        <div class="topbar-title-sub">Vue d'ensemble — {{ today|date:"l j F Y" }}</div>
+        <div class="topbar-title-sub">Vue d'ensemble — {{ period_label }}</div>
       </div>
     </div>
 
     <div class="topbar-right">
+      <!-- Sélecteur de période -->
+      <div class="period-tabs">
+        <a href="?period=jour"    class="period-tab {% if period == 'jour' %}active{% endif %}">Aujourd'hui</a>
+        <a href="?period=semaine" class="period-tab {% if period == 'semaine' %}active{% endif %}">Cette semaine</a>
+        <a href="?period=mois"   class="period-tab {% if period == 'mois' %}active{% endif %}">Ce mois</a>
+        <a href="?period=tout"   class="period-tab {% if period == 'tout' %}active{% endif %}">Jusqu'à maintenant</a>
+      </div>
+
       <button class="icon-btn" title="Notifications">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
@@ -319,8 +335,8 @@
             </svg>
             <div class="kpi-vals">
               <span class="kv-main">{{ stats.patients_total }}</span>
-              <span class="kv-label">Les patients</span>
-              <span class="kv-sub">+{{ stats.patients_today }} aujourd'hui</span>
+              <span class="kv-label">Patients actifs</span>
+              <span class="kv-sub">+{{ stats.patients_periode }} sur la période</span>
             </div>
           </div>
           <div class="kpi-foot">
@@ -355,9 +371,9 @@
               <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
             </svg>
             <div class="kpi-vals">
-              <span class="kv-main">{{ stats.rdv_today }}</span>
+              <span class="kv-main">{{ stats.rdv_periode }}</span>
               <span class="kv-label">Rendez-vous</span>
-              <span class="kv-sub">Aujourd'hui</span>
+              <span class="kv-sub">{{ period_label }}</span>
             </div>
           </div>
           <div class="kpi-foot">
@@ -374,13 +390,13 @@
             </svg>
             <div class="kpi-vals">
               <div class="two-vals">
-                <div><span class="kv-main">{{ stats.consultations_today }}</span><span class="kv-label">Consult.</span></div>
+                <div><span class="kv-main">{{ stats.consultations_periode }}</span><span class="kv-label">Consult.</span></div>
                 <div class="kv-sep"></div>
-                <div><span class="kv-main">{{ stats.soins_aujourd_hui }}</span><span class="kv-label">Soins</span></div>
+                <div><span class="kv-main">{{ stats.soins_periode }}</span><span class="kv-label">Soins</span></div>
               </div>
             </div>
           </div>
-          <div class="kpi-foot"><span>Activité du jour</span></div>
+          <div class="kpi-foot"><span>Activité — {{ period_label }}</span></div>
         {% if 'consultations' in accessible_codes %}</a>{% else %}</div>{% endif %}
 
         <!-- Hospitalisés -->
@@ -401,25 +417,6 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
           </div>
         {% if 'hospitalisation' in accessible_codes %}</a>{% else %}</div>{% endif %}
-
-        <!-- Factures impayées -->
-        {% if 'facturation' in accessible_codes %}<a href="{% url 'facturation:list' %}" class="kpi-card kpi-rose">{% else %}<div class="kpi-card kpi-rose">{% endif %}
-          <div class="kpi-top">
-            <svg class="kpi-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
-              <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
-            </svg>
-            <div class="kpi-vals">
-              <div class="two-vals">
-                <div><span class="kv-main">{{ stats.factures_impayees_count }}</span><span class="kv-label">Factures</span></div>
-                <div class="kv-sep"></div>
-                <div><span class="kv-main" style="font-size:20px;">{{ stats.factures_montant_fmt }}</span><span class="kv-label">Montant</span></div>
-              </div>
-            </div>
-          </div>
-          <div class="kpi-foot"><span>Factures impayées</span></div>
-        {% if 'facturation' in accessible_codes %}</a>{% else %}</div>{% endif %}
 
         <!-- Laboratoire -->
         {% if 'laboratoire' in accessible_codes %}<a href="{% url 'laboratoire_list' %}" class="kpi-card kpi-indigo">{% else %}<div class="kpi-card kpi-indigo">{% endif %}
