@@ -1,4 +1,4 @@
-﻿{% extends 'patients/base.html' %}
+{% extends 'patients/base.html' %}
 
 {% block topbar_title %}{{ titre }}{% endblock %}
 
@@ -387,8 +387,8 @@
     .patho-ms-item:hover { background: var(--teal-50); }
     .patho-ms-item input[type="checkbox"] { accent-color: var(--teal-600); cursor: pointer; flex-shrink: 0; }
     .patho-ms-empty { padding: 10px 12px; font-size: 12px; color: var(--text-muted); text-align: center; }
-    html[data-theme="dark"] .patho-ms-panel { background: #201d1d; border-color: #2e3f58; }
-    html[data-theme="dark"] .patho-ms-search { background: #171616; border-color: #2e3f58; color: var(--text); }
+    html[data-theme="dark"] .patho-ms-panel { background: #1a2535; border-color: #2e3f58; }
+    html[data-theme="dark"] .patho-ms-search { background: #0f1b2b; border-color: #2e3f58; color: var(--text); }
     html[data-theme="dark"] .patho-ms-item { color: var(--text); }
     html[data-theme="dark"] .patho-ms-item:hover { background: rgba(33,136,171,0.18); }
 
@@ -496,28 +496,30 @@
                 {# Nouveau RDV — pas encore de boutons d'action #}
             {% elif rdv.statut == 'planifie' %}
                 <button type="submit" name="_action" value="confirmer" class="btn-action btn-teal"
-                    {% if not facture_payee %}disabled title="Une facture payée est requise pour confirmer ce rendez-vous"{% endif %}>Confirmer</button>
-                <button type="submit" name="_action" value="créer une facture" class="btn-action">Créer une facture</button>
+                    {% if not facture_payee %}disabled title="Sauvegardez et créez d'abord une facture pour confirmer ce rendez-vous"{% endif %}>Confirmer</button>
             {% elif rdv.statut == 'confirme' %}
-                <button type="button" class="btn-action btn-teal" id="btn-modifier">
-                    <i class="bi bi-pencil"></i> Modifier
-                </button>
-                <div id="edit-actions" style="display:none;gap:6px;align-items:center;">
-                    <button type="submit" name="_action" value="en_attente" class="btn-action btn-waiting"
-                        {% if not consultation %}disabled title="L'évaluation clinique doit être enregistrée d'abord"{% endif %}>En Attente</button>
-                    <!-- <button type="submit" name="_action" value="créer une facture" class="btn-action">Créer une facture</button> -->
-                    <button type="button" class="btn-action btn-danger-outline" id="btn-cancel-edit">
-                        <i class="bi bi-x-lg"></i> Annuler
+                {% if consultation and rdv.medecin %}
+                    <button type="submit" name="_action" value="en_attente" class="btn-action btn-waiting">En Attente</button>
+                {% else %}
+                    <button type="button" class="btn-action btn-teal" id="btn-modifier">
+                        <i class="bi bi-pencil"></i> Modifier
                     </button>
-                </div>
+                    <div id="edit-actions" style="display:none;gap:6px;align-items:center;">
+                        <button type="submit" name="_action" value="en_attente" class="btn-action btn-waiting"
+                            disabled title="{% if not consultation %}Créez l'évaluation clinique{% elif not rdv.medecin %}Sélectionnez un médecin{% endif %}">En Attente</button>
+                        <button type="button" class="btn-action btn-danger-outline" id="btn-cancel-edit">
+                            <i class="bi bi-x-lg"></i> Annuler
+                        </button>
+                    </div>
+                {% endif %}
             {% elif rdv.statut == 'en_attente' %}
-                <button type="submit" name="_action" value="en_consultation" class="btn-action btn-teal">Consultation</button>
+                <button type="submit" name="_action" value="en_consultation" class="btn-action btn-teal">En consultation</button>
             {% elif rdv.statut == 'en_consultation' %}
                 <button type="button" class="btn-action" id="btn-pause"><i class="bi bi-pause-fill"></i> Pause</button>
-                <a href="{% url 'patients:ordonnance_create' rdv.patient.pk %}{% if consultation %}?consultation={{ consultation.pk }}{% else %}?rdv={{ rdv.pk }}{% endif %}" class="btn-action btn-ghost"><i class="bi bi-file-earmark-medical"></i> Créer une ordonnance</a>
+                <a href="{% url 'ordonnance_create_libre' %}?patient_id={{ rdv.patient.pk }}{% if consultation %}&consultation_id={{ consultation.pk }}{% elif rdv.medecin %}&medecin_id={{ rdv.medecin.pk }}{% endif %}" class="btn-action btn-ghost"><i class="bi bi-file-earmark-medical"></i> Créer une ordonnance</a>
                 <a href="{% url 'laboratoire_create' %}?patient={{ rdv.patient.pk }}" class="btn-action btn-ghost"><i class="bi bi-flask"></i> Demande de lab</a>
                 <a href="{% url 'soins:create' %}?patient_id={{ rdv.patient.pk }}" class="btn-action btn-ghost"><i class="bi bi-bandaid"></i> Soins</a>
-                <a href="{% url 'patients:hospitalisation_list' rdv.patient.pk %}" class="btn-action btn-ghost"><i class="bi bi-clipboard2-pulse"></i> M.O</a>
+                <a href="{% url 'hospitalisation:create' %}?patient={{ rdv.patient.pk }}{% if rdv.medecin %}&medecin={{ rdv.medecin.pk }}{% endif %}" class="btn-action btn-ghost"><i class="bi bi-clipboard2-pulse"></i> M.O</a>
                 <button type="submit" name="_action" value="terminer" class="btn-action btn-dark">Consultation terminée</button>
                 <button type="submit" name="_action" value="annuler" class="btn-action btn-danger-outline">Annuler</button>
             {% endif %}
@@ -2060,7 +2062,7 @@
           {% else %}<svg width="28" height="28" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" fill="#ccc"/><path d="M4 20c0-4 3.6-6 8-6s8 2 8 6" stroke="#ccc" stroke-width="1.5" fill="none"/><path d="M9 6.5a3.5 3.5 0 016 2.3" stroke="#bbb" stroke-width="1.2" fill="none"/></svg>{% endif %}
         </div>
         <div class="em-pgrid">
-          <div class="em-prow"><span class="em-plbl">Patient</span><span class="em-pval">{{ rdv.patient.nom }} {{ rdv.patient.prenoms }}</span><span class="em-plbl">Docteur</span><span class="em-pval">{% if rdv.medecin %}Dr. {{ rdv.medecin.nom }}{% else %}—{% endif %}</span></div>
+          <div class="em-prow"><span class="em-plbl">Patient</span><span class="em-pval">{{ rdv.patient.nom }} {{ rdv.patient.prenoms }}</span><span class="em-plbl">Médecin <span style="color:#e53935;">*</span></span><span class="em-pval"><select name="eval_medecin" style="border:none;border-bottom:1px solid #ccc;outline:none;font-size:12.5px;background:transparent;padding:2px 0;font-family:'Sora',sans-serif;min-width:140px;"><option value="">— Sélectionner —</option>{% for m in medecins %}<option value="{{ m.pk }}"{% if rdv.medecin_id == m.pk %} selected{% endif %}>Dr. {{ m.nom }}</option>{% endfor %}</select></span></div>
           <div class="em-prow"><span class="em-plbl">Âge</span><span class="em-pval">{{ rdv.patient.age|default:"—" }}</span><span class="em-plbl">Date</span><span class="em-pval">{{ rdv.date_heure|date:"d/m/Y H:i:s" }}</span></div>
           <div class="em-prow"><span class="em-plbl"></span><span class="em-pval"></span><span class="em-plbl">Rendez-vous</span><span class="em-pval">{{ rdv.code_rdv }}</span></div>
         </div>

@@ -128,7 +128,7 @@
     <div class="o-subheader-row-right"></div>
   </div>
   <div class="o-subheader-row">
-    <a href="{% url 'pharmacie:ordonnance_create' %}" class="o-btn-create">CRÉER</a>
+    <a href="{% url 'ordonnance_create_libre' %}" class="o-btn-create">CRÉER</a>
     <div class="o-subheader-row-right">
       <form method="get" id="search-form" style="display:flex;align-items:center;gap:8px;">
         <div class="o-search-bar">
@@ -204,18 +204,20 @@
     </thead>
     <tbody>
       {% for ord in page_obj %}
-      <tr onclick="window.location='{% url 'pharmacie:ordonnance_detail' ord.pk %}'">
+      <tr onclick="window.location='{% url 'ordonnance_detail' ord.pk %}'">
         <td style="text-align:center;color:var(--text-muted);font-size:11px;">{{ forloop.counter0|add:page_obj.start_index }}</td>
         <td class="td-num">{{ ord.numero }}</td>
         <td class="td-patient">
-          {% if ord.consultation.patient %}
-          {{ ord.consultation.patient.nom|upper }} {{ ord.consultation.patient.prenoms }}
-          <div style="font-size:11px;color:rgba(0,0,0,0.4);font-family:monospace;">{{ ord.consultation.patient.code }}</div>
+          {% with pat=ord.consultation.patient|default:ord.patient %}
+          {% if pat %}
+          {{ pat.nom|upper }} {{ pat.prenoms }}
+          <div style="font-size:11px;color:rgba(0,0,0,0.4);font-family:monospace;">{{ pat.code }}</div>
           {% else %}<span style="color:rgba(0,0,0,0.3);">—</span>{% endif %}
+          {% endwith %}
         </td>
         <td>
-          {% if ord.consultation.medecin %}
-          Dr. {{ ord.consultation.medecin.nom }}
+          {% if ord.medecin %}Dr. {{ ord.medecin.nom }}
+          {% elif ord.consultation.medecin %}Dr. {{ ord.consultation.medecin.nom }}
           {% else %}<span style="color:rgba(0,0,0,0.3);">—</span>{% endif %}
         </td>
         <td>

@@ -80,7 +80,9 @@ class Ordonnance(models.Model):
     STATUT = [('emise','Émise'),('delivree','Délivrée'),('partielle','Partielle'),('expiree','Expirée')]
 
     numero = models.CharField(max_length=20, unique=True, editable=False)
-    consultation = models.ForeignKey(Consultation, on_delete=models.CASCADE, related_name='ordonnances')
+    consultation = models.ForeignKey(Consultation, on_delete=models.CASCADE, related_name='ordonnances', null=True, blank=True)
+    patient = models.ForeignKey('patients.Patient', on_delete=models.SET_NULL, null=True, blank=True, related_name='ordonnances_directes')
+    medecin = models.ForeignKey('medecins.Medecin', on_delete=models.SET_NULL, null=True, blank=True, related_name='ordonnances_prescrites', verbose_name="Médecin prescripteur")
     date_emission = models.DateTimeField(auto_now_add=True)
     date_expiration = models.DateField(null=True, blank=True)
     statut = models.CharField(max_length=20, choices=STATUT, default='emise')
@@ -103,6 +105,7 @@ class Ordonnance(models.Model):
 
 class LigneOrdonnance(models.Model):
     ordonnance = models.ForeignKey(Ordonnance, on_delete=models.CASCADE, related_name='lignes')
+    produit = models.ForeignKey('stock.Produit', on_delete=models.SET_NULL, null=True, blank=True, related_name='lignes_ordonnance')
     medicament = models.ForeignKey('pharmacie.Medicament', on_delete=models.SET_NULL, null=True, blank=True)
     medicament_libre = models.CharField(max_length=200, blank=True)
     posologie = models.CharField(max_length=500)

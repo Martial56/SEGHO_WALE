@@ -645,9 +645,11 @@ def facture_create(request):
     if ordonnance_pk:
         from consultations.models import Ordonnance
         try:
-            ordonnance_obj = Ordonnance.objects.prefetch_related('lignes__medicament').get(pk=ordonnance_pk)
-            if patient is None:
+            ordonnance_obj = Ordonnance.objects.prefetch_related('lignes__produit', 'lignes__medicament').get(pk=ordonnance_pk)
+            if patient is None and ordonnance_obj.consultation:
                 patient = ordonnance_obj.consultation.patient
+            if patient is None and ordonnance_obj.patient_id:
+                patient = ordonnance_obj.patient
         except Ordonnance.DoesNotExist:
             pass
 
@@ -655,14 +657,19 @@ def facture_create(request):
         initial_type_facture = 'pharmacie'
         initial_ligne_libelle = ''
         initial_lignes = []
-        for ligne in ordonnance_obj.lignes.select_related('medicament').all():
-            if ligne.medicament:
+        for ligne in ordonnance_obj.lignes.select_related('produit', 'medicament').all():
+            if ligne.produit:
+                libelle = ligne.produit.nom
+                prix = float(ligne.produit.prix_vente)
+            elif ligne.medicament:
                 libelle = ligne.medicament.designation
+                prix = float(ligne.medicament.prix_vente)
             elif ligne.medicament_libre:
                 libelle = ligne.medicament_libre
+                prix = 0
             else:
                 continue
-            initial_lignes.append({'libelle': libelle, 'prix': 0, 'qte': int(ligne.quantite)})
+            initial_lignes.append({'libelle': libelle, 'prix': prix, 'qte': int(ligne.quantite)})
     elif rdv_obj:
         initial_type_facture = 'consultation'
         initial_ligne_libelle = rdv_obj.type_consultation.nom if rdv_obj.type_consultation else ''
@@ -751,12 +758,20 @@ def facture_create(request):
             messages.success(request, f'Facture {facture.numero} créée avec succès.')
             if demande_obj:
                 return redirect('laboratoire_detail', pk=demande_obj.pk)
+            if ordonnance_pk:
+                return redirect('ordonnance_detail', pk=ordonnance_pk)
             if rdv_pk:
                 return redirect(reverse('patients:rdv_edit', kwargs={'pk': rdv_pk}))
             return redirect('facturation_list')
     else:
         initial = {'type_facture': initial_type_facture} if initial_type_facture else {}
         form = FactureForm(initial=initial)
+
+    back_url = (
+        reverse('ordonnance_detail', kwargs={'pk': ordonnance_pk}) if ordonnance_pk else
+        f'/laboratoire/{demande_pk}/' if demande_pk else
+        ''
+    )
 
     return render(request, 'facturation/create_facture.html', {
         'form': form,
@@ -769,6 +784,7 @@ def facture_create(request):
         'ordonnance': ordonnance_obj,
         'initial_ligne_libelle': initial_ligne_libelle,
         'initial_lignes': initial_lignes,
+        'back_url': back_url,
         'breadcrumb': [
             {'title': 'Accueil', 'url': '/'},
             {'title': 'Facturation', 'url': '/facturation/'},
@@ -873,7 +889,7 @@ def laboratoire_detail(request, pk):
     return render(request, 'laboratoire/detail_demande.html', {
         'demande': demande,
         'lignes': lignes,
-        'facture_url': f'/facturation/nouvelle/?patient={demande.patient_id}&demande={demande.pk}',
+        'facture_url': f'/facturation/nouvelle/?patient={demande.patient_id}&demande={demande.pk}&back=/laboratoire/{demande.pk}/',
         'breadcrumb': [
             {'title': 'Accueil', 'url': '/'},
             {'title': 'Laboratoire', 'url': '/laboratoire/'},
@@ -1262,7 +1278,7 @@ def gynecologie_rdv_detail(request, pk):
 
     try:
         from facturation.models import Facture
-        facture_payee = Facture.objects.filter(patient=rdv.patient, statut='payee').exists()
+        facture_payee = Facture.objects.filter(patient=rdv.patient).exclude(statut='annulee').exists()
     except Exception:
         facture_payee = False
 
@@ -1278,16 +1294,19 @@ def gynecologie_rdv_detail(request, pk):
         pass
 
     if request.method == 'POST':
-        action = request.POST.get('action', '')
-        PIPELINE = ('planifie', 'confirme', 'en_attente', 'en_consultation', 'termine', 'annule', 'absent')
-        err, ok = _rdv_form_post(request, rdv)
-        if ok:
-            if action in PIPELINE:
-                return redirect(f'/gynecologie/rdv/{rdv.pk}/?status_changed=1')
-            return redirect('gynecologie_rdv_detail', pk=rdv.pk)
-        error = err
+        action = request.POST.get('_action', '')
 
         if action == 'save_eval':
+            # Sauvegarder le médecin sélectionné dans le modal
+            medecin_pk = request.POST.get('eval_medecin', '').strip()
+            if medecin_pk:
+                try:
+                    from medecins.models import Medecin
+                    rdv.medecin = Medecin.objects.get(pk=medecin_pk)
+                    rdv.save(update_fields=['medecin'])
+                except Exception:
+                    pass
+
             _eval_map = {
                 'eval_poids': 'poids', 'eval_taille': 'taille',
                 'eval_temperature': 'temperature',
@@ -1316,6 +1335,7 @@ def gynecologie_rdv_detail(request, pk):
                 if val != '':
                     setattr(const_obj, model_field, val)
             const_obj.save()
+            messages.success(request, 'Évaluation enregistrée.')
             return redirect('gynecologie_rdv_detail', pk=rdv.pk)
 
         if action == 'confirmer':
@@ -1323,7 +1343,9 @@ def gynecologie_rdv_detail(request, pk):
                 rdv.statut = 'confirme'
                 rdv.date_confirme = timezone.now()
                 rdv.save(update_fields=['statut', 'date_confirme'])
-                return redirect('gynecologie_rdv_detail', pk=rdv.pk)
+                messages.success(request, 'Rendez-vous confirmé.')
+            else:
+                messages.error(request, 'Une facture est requise pour confirmer ce rendez-vous.')
             return redirect('gynecologie_rdv')
 
         if action == 'en_attente':
@@ -1333,6 +1355,7 @@ def gynecologie_rdv_detail(request, pk):
             if rdv.date_confirme:
                 rdv.temps_constante_minutes = int((now - rdv.date_confirme).total_seconds() / 60)
             rdv.save(update_fields=['statut', 'date_en_attente', 'temps_constante_minutes'])
+            messages.success(request, 'Rendez-vous mis en attente.')
             return redirect('gynecologie_rdv_detail', pk=rdv.pk)
 
         if action == 'en_consultation':
@@ -1342,6 +1365,7 @@ def gynecologie_rdv_detail(request, pk):
             if rdv.date_en_attente:
                 rdv.temps_attente_minutes = int((now - rdv.date_en_attente).total_seconds() / 60)
             rdv.save(update_fields=['statut', 'date_en_consultation', 'temps_attente_minutes'])
+            messages.success(request, 'Consultation démarrée.')
             return redirect('gynecologie_rdv_detail', pk=rdv.pk)
 
         if action == 'terminer':
@@ -1351,13 +1375,16 @@ def gynecologie_rdv_detail(request, pk):
             if rdv.date_en_consultation:
                 rdv.temps_consultation_minutes = int((now - rdv.date_en_consultation).total_seconds() / 60)
             rdv.save(update_fields=['statut', 'date_termine', 'temps_consultation_minutes'])
+            messages.success(request, 'Consultation terminée.')
             return redirect('gynecologie_rdv')
 
         if action == 'annuler':
             rdv.statut = 'annule'
             rdv.save(update_fields=['statut'])
+            messages.success(request, 'Rendez-vous annulé.')
             return redirect('gynecologie_rdv')
 
+        # Sauvegarde normale du formulaire
         form = RendezVousForm(request.POST, instance=rdv)
         if form.is_valid():
             rdv = form.save(commit=False)
@@ -1388,10 +1415,11 @@ def gynecologie_rdv_detail(request, pk):
             rdv.save()
             from patients.utils import save_registres
             save_registres(request, rdv)
+            messages.success(request, 'Rendez-vous modifié.')
             if action == 'créer une facture':
                 from django.urls import reverse
-                return redirect(reverse('facture_create') + f'?patient={rdv.patient.pk}&rdv={rdv.pk}')  # core:facture_create
-            return redirect('gynecologie_rdv')
+                return redirect(reverse('facture_create') + f'?patient={rdv.patient.pk}&rdv={rdv.pk}')
+            return redirect('gynecologie_rdv_detail', pk=rdv.pk)
     else:
         form = RendezVousForm(instance=rdv)
 
