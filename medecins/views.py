@@ -545,7 +545,7 @@ def medecin_dashboard(request):
 
     # Top 8 médecins par consultations (6 derniers mois)
     top_medecins = list(
-        Consultation.objects.filter(date_heure__date__gte=six_mois_ago)
+        Consultation.objects.filter(date_heure__date__gte=six_mois_ago, medecin__isnull=False)
         .values('medecin__pk', 'medecin__nom', 'medecin__prenoms')
         .annotate(n=Count('id'))
         .order_by('-n')[:8]

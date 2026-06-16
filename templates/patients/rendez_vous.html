@@ -1,328 +1,180 @@
-﻿{% extends 'patients/base.html' %}
-{% load static %}
+{% extends 'patients/base.html' %}
 
 {% block topbar_title %}Rendez-vous{% endblock %}
 
 {% block extra_css %}
 {{ block.super }}
-<link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <style>
-.content { padding:0; overflow-x:clip; }
+  :root {
+    --accent: var(--teal-500);
+    --surface: #fff;
+    --border: #e8edf2;
+    --text: #0d3040;
+    --text-muted: rgba(0,0,0,0.45);
+    --bg: #f0f6fa;
+  }
+  html[data-theme="dark"] {
+    --surface: #132033;
+    --border: #243044;
+    --text: #d4e6f5;
+    --text-muted: rgba(255,255,255,0.45);
+    --bg: #0b1929;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* ── Nav ── */
-.rv-nav {
-  background:#fff; border-bottom:1px solid rgba(0,0,0,.07);
-  padding:0 32px; display:flex; align-items:stretch; height:44px;
-  position:sticky; top:var(--topbar-h); z-index:250; gap:2px;
-}
-.rv-nav-link {
-  padding:11px 16px; font-size:13px; font-weight:500; color:rgba(0,0,0,.5);
-  text-decoration:none; border-bottom:2px solid transparent;
-  display:inline-flex; align-items:center; gap:6px; transition:color .15s,border-color .15s;
-}
-.rv-nav-link:hover { color:var(--teal-600); }
-.rv-nav-link.active { color:var(--teal-600); border-bottom-color:var(--teal-500); font-weight:600; }
+  /* Status badges */
+  .o-badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 500; white-space: nowrap; }
+  .badge-planifie   { background: #e3f2fd; color: #1565c0; }
+  .badge-confirme   { background: #e8f5e9; color: #2e7d32; }
+  .badge-en_attente { background: #fff8e1; color: #f57f17; }
+  .badge-en_consultation { background: var(--teal-50); color: var(--teal-600); }
+  .badge-termine    { background: #ede7f6; color: #4527a0; }
+  .badge-annule     { background: #fce4ec; color: #b71c1c; }
+  .badge-absent     { background: #fff3e0; color: #e65100; }
 
-/* ── En-tête sticky ── */
-.rv-head {
-  display:flex; align-items:center; justify-content:space-between; gap:16px;
-  padding:14px 32px; flex-wrap:wrap;
-  position:sticky; top:calc(var(--topbar-h) + 44px); z-index:200;
-  background:#f4f8f0; border-bottom:1px solid rgba(0,0,0,.05);
-  box-shadow:0 2px 8px rgba(0,0,0,.04);
-}
-.rv-head-title { font-size:17px; font-weight:800; color:var(--teal-900); }
-.rv-head-sub   { font-size:12px; color:rgba(0,0,0,.45); margin-top:2px; }
+  .o-list tbody td.td-diagnostic { max-width: 200px; overflow: hidden; text-overflow: ellipsis; color: var(--text-muted); }
 
-/* ── KPIs ── */
-.rv-kpis { display:flex; gap:10px; flex-wrap:wrap; padding:16px 32px 0; }
-.rv-kpi {
-  display:flex; align-items:center; gap:10px;
-  padding:10px 16px; background:#fff; border:1px solid rgba(0,0,0,.08);
-  border-radius:10px; text-decoration:none; transition:box-shadow .15s;
-  min-width:120px;
-}
-.rv-kpi:hover { box-shadow:0 3px 12px rgba(0,0,0,.1); }
-.rv-kpi-val  { font-size:20px; font-weight:800; line-height:1; }
-.rv-kpi-lbl  { font-size:11px; color:rgba(0,0,0,.5); font-weight:500; }
+  /* ══ Layout pour sticky ══ */
+  .main { height: 100vh; overflow: hidden; }
+  .content { min-height: 0; padding-top: 0; overflow-x: hidden; }
 
-/* ── Filtres ── */
-.rv-filters {
-  display:flex; gap:8px; flex-wrap:wrap; align-items:center;
-  padding:14px 32px;
-  border-bottom:1px solid rgba(0,0,0,.06);
-  background:#fff;
-}
-.rv-pill {
-  padding:5px 14px; border-radius:20px; font-size:12.5px; font-weight:600;
-  text-decoration:none; border:1px solid rgba(0,0,0,.1); color:rgba(0,0,0,.6);
-  transition:all .15s; white-space:nowrap;
-}
-.rv-pill:hover { border-color:var(--teal-500); color:var(--teal-700); }
-.rv-pill.active { background:var(--teal-600); color:#fff; border-color:var(--teal-600); }
-.rv-search {
-  flex:1; min-width:220px; display:flex; align-items:center; gap:6px;
-  border-bottom:1.5px solid rgba(0,0,0,.18); padding:5px 4px;
-}
-.rv-search input { border:none; background:transparent; font-size:13px; outline:none; width:100%; }
-.rv-search i { color:rgba(0,0,0,.35); font-size:14px; }
-.rv-dates { display:flex; gap:6px; align-items:center; }
-.rv-dates input {
-  border:none; border-bottom:1.5px solid rgba(0,0,0,.18);
-  background:transparent; padding:5px 4px; font-size:13px;
-  outline:none; width:130px; color:inherit; font-family:inherit;
-}
-.rv-dates input:focus { border-bottom-color:var(--teal-500); }
+  /* ══ GYN NAV ══ */
+  .gyn-nav {
+    background: #fff; border-bottom: 1px solid rgba(0,0,0,0.08);
+    margin: 0 -32px 0; padding: 0 32px;
+    display: flex; align-items: stretch; height: 44px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    position: sticky; top: 0; z-index: 250;
+  }
+  .gyn-nav-link {
+    padding: 11px 16px; font-size: 13px; font-weight: 500;
+    color: rgba(0,0,0,0.5); text-decoration: none;
+    border-bottom: 2px solid transparent;
+    display: inline-flex; align-items: center; gap: 6px;
+    transition: color 0.15s, border-color 0.15s; white-space: nowrap;
+  }
+  .gyn-nav-link:hover { color: var(--teal-600); }
+  .gyn-nav-link.active { color: var(--teal-600); border-bottom-color: var(--teal-500); font-weight: 600; }
+  html[data-theme="dark"] .gyn-nav { background: #091d2e; border-bottom-color: rgba(255,255,255,0.06); }
+  html[data-theme="dark"] .gyn-nav-link { color: rgba(255,255,255,0.4); }
+  html[data-theme="dark"] .gyn-nav-link:hover { color: var(--teal-300); }
+  html[data-theme="dark"] .gyn-nav-link.active { color: var(--teal-300); border-bottom-color: var(--teal-400); }
 
-/* ── Tableau ── */
-.rv-table { width:100%; border-collapse:collapse; font-size:13px; background:#fff; }
-.rv-table thead tr { background:#f4f8f0; border-bottom:2px solid rgba(74,103,65,.2); }
-.rv-table th { padding:10px 14px; font-size:10.5px; font-weight:700; color:rgba(0,0,0,.5); text-transform:uppercase; letter-spacing:.04em; white-space:nowrap; }
-.rv-table tbody tr { border-bottom:1px solid rgba(0,0,0,.05); transition:background .1s; cursor:pointer; }
-.rv-table tbody tr:hover { background:#f4f8f0; }
-.rv-table td { padding:10px 14px; vertical-align:middle; }
-
-.rv-avatar {
-  width:32px; height:32px; border-radius:50%; background:var(--teal-100);
-  color:var(--teal-700); font-size:12px; font-weight:800;
-  display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;
-}
-.rv-patient-name { font-weight:600; font-size:13px; color:var(--teal-900); }
-.rv-patient-sub  { font-size:11px; color:rgba(0,0,0,.45); margin-top:1px; }
-
-/* ── Badges statut ── */
-.rv-badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; white-space:nowrap; }
-.rv-badge-planifie   { background:#e3f2fd; color:#1565c0; }
-.rv-badge-confirme   { background:#e8f5e9; color:#2e7d32; }
-.rv-badge-en_attente { background:#fff8e1; color:#f57f17; }
-.rv-badge-en_consultation { background:var(--teal-50); color:var(--teal-700); }
-.rv-badge-termine    { background:#ede7f6; color:#4527a0; }
-.rv-badge-annule     { background:#fce4ec; color:#b71c1c; }
-.rv-badge-absent     { background:#fff3e0; color:#e65100; }
-
-/* ── Pagination ── */
-.rv-pag { display:flex; align-items:center; justify-content:space-between; padding:12px 32px; border-top:1px solid rgba(0,0,0,.06); font-size:13px; color:rgba(0,0,0,.5); background:#fff; }
-.rv-pag a { padding:4px 12px; border-radius:6px; border:1px solid rgba(0,0,0,.1); text-decoration:none; color:var(--teal-700); font-weight:600; font-size:12px; }
-.rv-pag a:hover { background:var(--teal-50); }
-
-/* ── Empty ── */
-.rv-empty { padding:60px; text-align:center; color:rgba(0,0,0,.3); }
-.rv-empty i { font-size:40px; display:block; margin-bottom:14px; }
-.rv-empty a { color:var(--teal-600); text-decoration:none; font-weight:600; }
-
-/* ── Bouton ── */
-.btn-rv { background:var(--teal-600); color:#fff; border:none; border-radius:7px; padding:8px 18px; font-size:13px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px; text-decoration:none; }
-.btn-rv:hover { background:var(--teal-700); color:#fff; }
-
-/* ── Dark mode ── */
-html[data-theme="dark"] .rv-nav { background:#201d1d; border-bottom-color:rgba(255,255,255,.06); }
-html[data-theme="dark"] .rv-nav-link { color:rgba(255,255,255,.4); }
-html[data-theme="dark"] .rv-nav-link:hover { color:var(--teal-300); }
-html[data-theme="dark"] .rv-nav-link.active { color:var(--teal-300); border-bottom-color:var(--teal-400); }
-html[data-theme="dark"] .rv-head { background:#201d1d; border-bottom-color:rgba(255,255,255,.06); }
-html[data-theme="dark"] .rv-head-title { color:#d0e8c0; }
-html[data-theme="dark"] .rv-kpi { background:#201d1d; border-color:rgba(255,255,255,.06); }
-html[data-theme="dark"] .rv-kpi-lbl { color:rgba(255,255,255,.4); }
-html[data-theme="dark"] .rv-filters { background:#201d1d; border-bottom-color:rgba(255,255,255,.06); }
-html[data-theme="dark"] .rv-pill { border-color:rgba(255,255,255,.1); color:rgba(255,255,255,.5); }
-html[data-theme="dark"] .rv-pill:hover { border-color:var(--teal-400); color:var(--teal-300); }
-html[data-theme="dark"] .rv-pill.active { background:var(--teal-700); border-color:var(--teal-700); color:#fff; }
-html[data-theme="dark"] .rv-search { border-bottom-color:rgba(255,255,255,.15); }
-html[data-theme="dark"] .rv-search input { color:#d0e8c0; }
-html[data-theme="dark"] .rv-search i { color:rgba(255,255,255,.3); }
-html[data-theme="dark"] .rv-dates input { border-bottom-color:rgba(255,255,255,.15); color:#d0e8c0; }
-html[data-theme="dark"] .rv-table { background:#171616; }
-html[data-theme="dark"] .rv-table thead tr { background:#201d1d; border-bottom-color:rgba(255,255,255,.08); }
-html[data-theme="dark"] .rv-table th { color:#9ab88a; }
-html[data-theme="dark"] .rv-table tbody tr { border-bottom-color:rgba(255,255,255,.04); }
-html[data-theme="dark"] .rv-table tbody tr:hover { background:rgba(74,103,65,.15); }
-html[data-theme="dark"] .rv-table td { color:#bcd5a8; }
-html[data-theme="dark"] .rv-patient-name { color:#d0e8c0; }
-html[data-theme="dark"] .rv-patient-sub { color:rgba(255,255,255,.35); }
-html[data-theme="dark"] .rv-avatar { background:rgba(74,103,65,.3); color:var(--teal-300); }
-html[data-theme="dark"] .rv-pag { background:#201d1d; border-top-color:rgba(255,255,255,.06); color:rgba(255,255,255,.4); }
-html[data-theme="dark"] .rv-pag a { border-color:rgba(255,255,255,.1); color:var(--teal-300); }
-html[data-theme="dark"] .rv-pag a:hover { background:rgba(74,103,65,.15); }
-html[data-theme="dark"] .rv-empty { color:rgba(255,255,255,.25); }
+  /* ── Config dropdown ── */
+  .gyn-nav-dd { position: relative; display: inline-flex; align-items: stretch; }
+  .gyn-nav-dd-panel {
+    display: none; position: absolute; top: 100%; left: 0;
+    background: #fff; border: 1px solid #dde3ec;
+    border-radius: 6px; box-shadow: 0 8px 28px rgba(0,0,0,0.16);
+    min-width: 200px; padding: 5px 0; z-index: 9999;
+  }
+  .gyn-nav-dd:hover .gyn-nav-dd-panel,
+  .gyn-nav-dd-panel:hover { display: block; }
+  .gyn-nav-dd-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 16px; font-size: 12.5px; color: var(--text);
+    text-decoration: none; transition: background 0.1s; white-space: nowrap;
+  }
+  .gyn-nav-dd-item:hover { background: var(--teal-50); color: var(--teal-600); }
+  .gyn-nav-dd-item.active { background: #ede7f6; color: var(--teal-600); font-weight: 500; }
+  html[data-theme="dark"] .gyn-nav-dd-panel { background: #1a2535; border-color: #2e3f58; }
+  html[data-theme="dark"] .gyn-nav-dd-item { color: var(--text); }
+  html[data-theme="dark"] .gyn-nav-dd-item:hover { background: rgba(33,136,171,0.2); color: var(--teal-300); }
 </style>
 {% endblock %}
 
 {% block breadcrumb %}
-<nav class="rv-nav">
-  <a href="{% url 'patients:list' %}" class="rv-nav-link"><i class="bi bi-people"></i> Patients</a>
-  <a href="{% url 'patients:rdv_global' %}" class="rv-nav-link active"><i class="bi bi-calendar2-check"></i> Rendez-vous</a>
-  <a href="{% url 'patients:pathologie_list' %}" class="rv-nav-link"><i class="bi bi-heart-pulse"></i> Pathologies</a>
-  <a href="{% url 'patients:typevisite_list' %}" class="rv-nav-link"><i class="bi bi-clipboard-plus"></i> Types de visite</a>
+<nav class="gyn-nav">
+  <div class="gyn-nav-dd">
+    <span class="gyn-nav-link" style="cursor:pointer;">
+      Configurations <i class="bi bi-chevron-down" style="font-size:10px;"></i>
+    </span>
+    <div class="gyn-nav-dd-panel">
+      <a href="{% url 'patients:pathologie_list' %}" class="gyn-nav-dd-item">
+        <i class="bi bi-clipboard2-pulse" style="font-size:13px;"></i> Diagnostic retenu
+      </a>
+      <a href="{% url 'patients:typevisite_list' %}" class="gyn-nav-dd-item">
+        <i class="bi bi-card-list" style="font-size:13px;"></i> Type de visite
+      </a>
+    </div>
+  </div>
+</nav>
+<nav class="breadcrumb">
+    <a href="{% url 'dashboard' %}"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z"/><polyline points="9 21 9 12 15 12 15 21"/></svg>Accueil</a>
+    <span class="breadcrumb-sep">›</span>
+    <span>Rendez-vous</span>
 </nav>
 {% endblock %}
 
 {% block content %}
 
-<!-- En-tête -->
-<div class="rv-head">
-  <div>
-    <div class="rv-head-title"><i class="bi bi-calendar2-check" style="color:var(--teal-600);margin-right:6px;"></i>Rendez-vous</div>
-    <div class="rv-head-sub">{{ page_obj.paginator.count }} rendez-vous trouvé{{ page_obj.paginator.count|pluralize }}</div>
-  </div>
-  <a href="{% url 'patients:rdv_create' %}" class="btn-rv">
-    <i class="bi bi-plus-lg"></i> Nouveau rendez-vous
-  </a>
-</div>
+{% url 'patients:rdv_create' as subheader_create_url %}
+{% include 'includes/subheader.html' with subheader_title="Rendez-vous" subheader_create_url=subheader_create_url subheader_placeholder="Rechercher un patient…" subheader_filters_tpl="includes/subheader_filters_rdv.html" subheader_groups_tpl="includes/subheader_groups_rdv.html" %}
 
-<!-- KPIs du jour -->
-<div class="rv-kpis">
-  <div class="rv-kpi">
-    <div>
-      <div class="rv-kpi-val" style="color:var(--teal-700);">{{ stats.aujourd_hui }}</div>
-      <div class="rv-kpi-lbl">Aujourd'hui</div>
+<!-- ══ TABLE ══ -->
+<div class="o-list-wrap">
+  {% if page_obj %}
+  <table class="o-list">
+    <thead>
+      <tr>
+        <th class="th-cb"><input type="checkbox" class="o-cb" id="chk-all"></th>
+        <th>Rendez-vous</th>
+        <th>Patient</th>
+        <th>Date</th>
+        <th>Docteur</th>
+        <th>Type de consultation</th>
+        <th>Diagnostic retenu / Autres pathologies associées</th>
+        <th>Âge</th>
+        <th>Genre</th>
+        <th>État</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for rdv in page_obj %}
+      <tr class="rdv-row" data-url="{% url 'patients:rdv_edit' rdv.pk %}">
+        <td class="td-cb"><input type="checkbox" class="o-cb" onclick="event.stopPropagation()"></td>
+        <td class="td-code">{{ rdv.code_rdv }}</td>
+        <td class="td-name">{{ rdv.patient.nom|upper }} {{ rdv.patient.prenoms }}</td>
+        <td>{{ rdv.date_heure|date:"d/m/Y H:i" }}</td>
+        <td class="td-doctor">{% if rdv.medecin %}{{ rdv.medecin }}{% else %}<span style="color:#ddd">—</span>{% endif %}</td>
+        <td>{{ rdv.type_consultation.nom|default:"—" }}</td>
+        <td class="td-diagnostic">{% with diag=rdv.registre_curatif.diagnostic_display %}{{ diag|default:rdv.maladies|truncatechars:45|default:"—" }}{% endwith %}</td>
+        <td>{% if rdv.patient.date_naissance %}{{ rdv.patient.age }} ans{% else %}<span style="color:#ddd">—</span>{% endif %}</td>
+        <td>{% if rdv.patient.sexe == 'F' %}Femme{% elif rdv.patient.sexe == 'M' %}Homme{% else %}<span style="color:#ddd">—</span>{% endif %}</td>
+        <td><span class="o-badge badge-{{ rdv.statut }}">{{ rdv.get_statut_display }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="o-empty-state">
+    <div class="o-empty-illo">
+      <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+        <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+        <line x1="3" y1="10" x2="21" y2="10"/>
+        <line x1="9" y1="15" x2="15" y2="15"/>
+      </svg>
     </div>
-  </div>
-  <div class="rv-kpi">
-    <div>
-      <div class="rv-kpi-val" style="color:#1565c0;">{{ stats.planifie }}</div>
-      <div class="rv-kpi-lbl">Planifiés</div>
-    </div>
-  </div>
-  <div class="rv-kpi">
-    <div>
-      <div class="rv-kpi-val" style="color:#2e7d32;">{{ stats.confirme }}</div>
-      <div class="rv-kpi-lbl">Confirmés</div>
-    </div>
-  </div>
-  <div class="rv-kpi">
-    <div>
-      <div class="rv-kpi-val" style="color:#4527a0;">{{ stats.termine }}</div>
-      <div class="rv-kpi-lbl">Terminés</div>
-    </div>
-  </div>
-  {% if stats.annule > 0 %}
-  <div class="rv-kpi">
-    <div>
-      <div class="rv-kpi-val" style="color:#b71c1c;">{{ stats.annule }}</div>
-      <div class="rv-kpi-lbl">Annulés/Absents</div>
-    </div>
+    <div class="o-empty-title">Aucun rendez-vous{% if request.GET.q %} pour "{{ request.GET.q }}"{% endif %}</div>
+    <div class="o-empty-sub">{% if request.GET.q %}Essayez avec un autre terme de recherche.{% else %}Créez le premier rendez-vous.{% endif %}</div>
+    {% if not request.GET.q %}
+    <a href="{% url 'patients:rdv_create' %}" class="o-empty-btn">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      CRÉER UN RENDEZ-VOUS
+    </a>
+    {% endif %}
   </div>
   {% endif %}
-  <div class="rv-kpi">
-    <div>
-      <div class="rv-kpi-val" style="color:rgba(0,0,0,.5);">{{ stats.total }}</div>
-      <div class="rv-kpi-lbl">Total</div>
-    </div>
-  </div>
 </div>
-
-<!-- Filtres -->
-<form method="get">
-  <div class="rv-filters">
-    <!-- Pilules de filtre rapide -->
-    <a href="?filter=today{% if q %}&q={{ q }}{% endif %}" class="rv-pill {% if filter_val == 'today' and not date_from and not date_to %}active{% endif %}">Aujourd'hui</a>
-    <a href="?filter=not_done{% if q %}&q={{ q }}{% endif %}" class="rv-pill {% if filter_val == 'not_done' %}active{% endif %}">En attente</a>
-    <a href="?filter=planifie{% if q %}&q={{ q }}{% endif %}" class="rv-pill {% if filter_val == 'planifie' %}active{% endif %}">Planifiés</a>
-    <a href="?filter=confirme{% if q %}&q={{ q }}{% endif %}" class="rv-pill {% if filter_val == 'confirme' %}active{% endif %}">Confirmés</a>
-    <a href="?filter=termine{% if q %}&q={{ q }}{% endif %}" class="rv-pill {% if filter_val == 'termine' %}active{% endif %}">Terminés</a>
-    <a href="?filter=annule{% if q %}&q={{ q }}{% endif %}" class="rv-pill {% if filter_val == 'annule' %}active{% endif %}">Annulés</a>
-    <a href="?filter=all{% if q %}&q={{ q }}{% endif %}" class="rv-pill {% if filter_val == 'all' %}active{% endif %}">Tous</a>
-
-    <div style="flex:1;"></div>
-
-    <!-- Recherche -->
-    <div class="rv-search">
-      <i class="bi bi-search"></i>
-      <input type="text" name="q" value="{{ q }}" placeholder="Patient, code…">
-      <input type="hidden" name="filter" value="{{ filter_val }}">
-    </div>
-
-    <!-- Plage de dates -->
-    <div class="rv-dates">
-      <i class="bi bi-calendar3" style="color:rgba(0,0,0,.35);font-size:13px;"></i>
-      <input type="date" name="date_from" value="{{ date_from }}" title="Du">
-      <span style="color:rgba(0,0,0,.3);font-size:12px;">→</span>
-      <input type="date" name="date_to" value="{{ date_to }}" title="Au">
-      <button type="submit" style="padding:5px 12px;border-radius:6px;border:1px solid rgba(0,0,0,.12);background:#fff;font-size:12px;cursor:pointer;font-weight:600;color:var(--teal-700);">OK</button>
-    </div>
-  </div>
-</form>
-
-<!-- Tableau pleine largeur -->
-{% if page_obj %}
-<table class="rv-table">
-  <thead>
-    <tr>
-      <th>Patient</th>
-      <th>Date / Heure</th>
-      <th>Médecin</th>
-      <th>Type de consultation</th>
-      <th>Diagnostic / Motif</th>
-      <th style="text-align:center;">Statut</th>
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-  {% for rdv in page_obj %}
-  <tr onclick="window.location='{% url 'patients:rdv_edit' rdv.pk %}'">
-    <td>
-      <div style="display:flex;align-items:center;gap:10px;">
-        <div class="rv-avatar">{{ rdv.patient.nom|first|upper }}</div>
-        <div>
-          <div class="rv-patient-name">{{ rdv.patient.nom|upper }} {{ rdv.patient.prenoms }}</div>
-          <div class="rv-patient-sub">
-            {{ rdv.patient.code_patient }}
-            {% if rdv.patient.date_naissance %} &middot; {{ rdv.patient.age }} ans{% endif %}
-            {% if rdv.patient.sexe == 'F' %} &middot; Femme{% elif rdv.patient.sexe == 'M' %} &middot; Homme{% endif %}
-          </div>
-        </div>
-      </div>
-    </td>
-    <td style="white-space:nowrap;">
-      <div style="font-weight:600;">{{ rdv.date_heure|date:"d/m/Y" }}</div>
-      <div style="font-size:11.5px;color:rgba(0,0,0,.45);">{{ rdv.date_heure|date:"H:i" }}</div>
-    </td>
-    <td style="font-size:12.5px;color:rgba(0,0,0,.7);">
-      {% if rdv.medecin %}Dr {{ rdv.medecin }}{% else %}<span style="color:#ddd;">—</span>{% endif %}
-    </td>
-    <td style="font-size:12.5px;">{{ rdv.type_consultation.nom|default:"—" }}</td>
-    <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:rgba(0,0,0,.55);">
-      {% with diag=rdv.registre_curatif.diagnostic_display %}{{ diag|default:rdv.motif|truncatechars:50|default:"—" }}{% endwith %}
-    </td>
-    <td style="text-align:center;">
-      <span class="rv-badge rv-badge-{{ rdv.statut }}">{{ rdv.get_statut_display }}</span>
-    </td>
-    <td onclick="event.stopPropagation();" style="white-space:nowrap;">
-      <a href="{% url 'patients:rdv_edit' rdv.pk %}" style="color:var(--teal-600);font-size:13px;padding:4px 8px;" title="Modifier"><i class="bi bi-pencil"></i></a>
-    </td>
-  </tr>
-  {% endfor %}
-  </tbody>
-</table>
-
-<!-- Pagination -->
-{% if page_obj.has_other_pages %}
-<div class="rv-pag">
-  <span>Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
-  <div style="display:flex;gap:6px;">
-    {% if page_obj.has_previous %}
-    <a href="?page={{ page_obj.previous_page_number }}&filter={{ filter_val }}&q={{ q }}&date_from={{ date_from }}&date_to={{ date_to }}"><i class="bi bi-chevron-left"></i> Précédent</a>
-    {% endif %}
-    {% if page_obj.has_next %}
-    <a href="?page={{ page_obj.next_page_number }}&filter={{ filter_val }}&q={{ q }}&date_from={{ date_from }}&date_to={{ date_to }}">Suivant <i class="bi bi-chevron-right"></i></a>
-    {% endif %}
-  </div>
-</div>
-{% endif %}
-
-{% else %}
-<div class="rv-empty">
-  <i class="bi bi-calendar2-x"></i>
-  Aucun rendez-vous trouvé{% if q %} pour « {{ q }} »{% endif %}.
-  <br><br>
-  <a href="{% url 'patients:rdv_create' %}"><i class="bi bi-plus-lg"></i> Créer un rendez-vous</a>
-</div>
-{% endif %}
 
 <script>
-document.querySelectorAll('.rv-table tbody tr').forEach(function(row) {
-  row.style.cursor = 'pointer';
-});
+  document.querySelectorAll('.rdv-row').forEach(function(row) {
+    row.addEventListener('click', function(e) {
+      if (e.target.type === 'checkbox') return;
+      window.location = row.dataset.url;
+    });
+  });
 </script>
-
 {% endblock %}

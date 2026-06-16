@@ -295,7 +295,7 @@ def rdv_edit(request, pk):
 
     try:
         from facturation.models import Facture
-        facture_payee = Facture.objects.filter(patient=rdv.patient, statut='payee').exists()
+        facture_payee = Facture.objects.filter(patient=rdv.patient).exclude(statut='annulee').exists()
     except Exception:
         facture_payee = False
 
@@ -315,6 +315,16 @@ def rdv_edit(request, pk):
         action = request.POST.get('_action', '')
 
         if action == 'save_eval':
+            # Sauvegarder le médecin sélectionné dans le modal
+            medecin_pk = request.POST.get('eval_medecin', '').strip()
+            if medecin_pk:
+                try:
+                    from medecins.models import Medecin
+                    rdv.medecin = Medecin.objects.get(pk=medecin_pk)
+                    rdv.save(update_fields=['medecin'])
+                except Exception:
+                    pass
+
             _eval_map = {
                 'eval_poids': 'poids',
                 'eval_taille': 'taille',
@@ -348,9 +358,7 @@ def rdv_edit(request, pk):
             for post_key, model_field in _eval_map.items():
                 val = request.POST.get(post_key, '').strip()
                 if val != '':
-                    # Valeur soumise : mettre à jour
                     setattr(const_obj, model_field, val)
-                # Valeur vide : conserver la valeur existante (ne pas écraser)
             const_obj.save()
             messages.success(request, 'Évaluation enregistrée.')
             from django.urls import reverse
@@ -363,11 +371,10 @@ def rdv_edit(request, pk):
                 rdv.date_confirme = tz.now()
                 rdv.save(update_fields=['statut', 'date_confirme'])
                 messages.success(request, 'Rendez-vous confirmé.')
-                from django.urls import reverse
-                return redirect(reverse('patients:rdv_edit', kwargs={'pk': rdv.pk}))
+                return redirect('patients:rdv_global')
             else:
-                messages.error(request, 'Une facture payée est requise pour confirmer ce rendez-vous.')
-            return redirect('patients:rdv_global')
+                messages.error(request, 'Une facture est requise pour confirmer ce rendez-vous.')
+                return redirect('patients:rdv_global')
 
         if action == 'en_attente':
             from django.utils import timezone as tz
@@ -462,7 +469,8 @@ def rdv_edit(request, pk):
             if action == 'créer une facture':
                 from django.urls import reverse
                 return redirect(reverse('facture_create') + f'?patient={rdv.patient.pk}&rdv={rdv.pk}')
-            return redirect('patients:rdv_global')
+            from django.urls import reverse
+            return redirect(reverse('patients:rdv_edit', kwargs={'pk': rdv.pk}))
     else:
         form = RendezVousForm(instance=rdv)
 
@@ -490,23 +498,6 @@ def rdv_edit(request, pk):
     })
 
 
-@login_required
-def rdv_edit(request, pk):
-    from patients.models import RendezVous as RV
-    rdv = get_object_or_404(RV, pk=pk)
-    if request.method == 'POST':
-        form = RendezVousForm(request.POST, instance=rdv)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Rendez-vous mis à jour.')
-            return redirect('patients:rdv_global')
-    else:
-        form = RendezVousForm(instance=rdv)
-    return render(request, 'patients/rendez_vous_form.html', {
-        'form':  form,
-        'titre': 'Modifier le rendez-vous',
-        'rdv':   rdv,
-    })
 
 
 @login_required

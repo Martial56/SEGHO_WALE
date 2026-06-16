@@ -1,6 +1,7 @@
 from django.urls import path, include
 from . import views
 from facturation.views import facturation_list as _facturation_list_view
+from medecins.views import medecin_dashboard as _medecin_dashboard, medecins_export_csv as _medecins_export_csv
 
 urlpatterns = [
     path('', views.dashboard, name='dashboard'),
@@ -13,6 +14,8 @@ urlpatterns = [
     # URLs des modules
     path('patients/', include('patients.urls')),
     path('medecins/',                        views.medecins_list,    name='medecins_list'),
+    path('medecins/export/csv/',             _medecins_export_csv,   name='medecins_export_csv'),
+    path('medecins/dashboard/',              _medecin_dashboard,     name='medecin_dashboard'),
     path('medecins/nouveau/',                views.medecin_create,   name='medecin_create'),
     path('medecins/<int:pk>/',               views.medecin_detail,   name='medecin_detail'),
     path('medecins/<int:pk>/modifier/',      views.medecin_edit,     name='medecin_edit'),
