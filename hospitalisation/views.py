@@ -13,6 +13,7 @@ from core.views import log_event, get_logs
 from .forms import ChambreForm, RegistreDecesForm, ListeControleAdmissionForm, ListeVerificationServiceForm
 
 
+
 def _is_ajax(request):
     return request.headers.get('X-Requested-With') == 'XMLHttpRequest'
 
@@ -172,7 +173,7 @@ def hospitalisation_create(request):
         'edit':          False,
         'medecins_list': list(Medecin.objects.filter(actif=True).order_by('nom')),
         'unites_list':   list(UniteMesure.objects.filter(actif=True).order_by('nom')),
-        'services_list': list(Articleservice.objects.filter(actif=True).order_by('nom')),
+        'services_list': list(Articleservice.objects.filter(actif=True, categorie__code='sn').order_by('nom')),
     })
 
 
@@ -988,21 +989,15 @@ def hospitalisation_edit(request, pk):
 
     medecins_list  = list(Medecin.objects.filter(actif=True).order_by('nom'))
     unites_list    = list(UniteMesure.objects.filter(actif=True).order_by('nom'))
-    services_list  = list(Articleservice.objects.filter(actif=True).order_by('nom'))
+    services_list  = list(Articleservice.objects.filter(actif=True, categorie__code='sn').order_by('nom'))
 
     # Soins déjà sur une facture → verrouillés (non supprimables dans soins_apportes)
     soins_factures_ids = list(hosp.services_a_facturer.filter(
         source='soin', facture__isnull=False
     ).values_list('service_id', flat=True))
 
-    # Soins prescrits (soins_apportes) dont la facture a été payée en caisse.
-    # Ce sont les soins disponibles pour les visites infirmières.
-    soins_payes_ids = set(hosp.services_a_facturer.filter(
-        source='soin',
-        facture__statut='payee'
-    ).values_list('service_id', flat=True))
     soins_pour_visites = list(Articleservice.objects.filter(
-        pk__in=soins_payes_ids, actif=True
+        actif=True, categorie__code='sn'
     ).order_by('nom'))
     deces_list     = list(RegistreDeces.objects.filter(patient=hosp.patient))
 

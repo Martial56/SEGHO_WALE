@@ -27,7 +27,7 @@ class HospitalisationForm(forms.ModelForm):
         self.fields['chambre'].empty_label              = 'Sélectionner une salle/chambre…'
         self.fields['medecin_referent'].empty_label     = 'Sélectionner un médecin…'
         self.fields['infirmiere_primaire'].empty_label  = 'Sélectionner une infirmière…'
-        self.fields['soins_apportes'].queryset    = Articleservice.objects.filter(actif=True).order_by('nom')
+        self.fields['soins_apportes'].queryset    = Articleservice.objects.filter(actif=True, categorie__code='sn').order_by('nom')
         self.fields['soins_apportes'].empty_label = 'Rechercher un soin…'
         # Chambres disponibles + toujours inclure la chambre déjà attribuée
         # (quelle que soit sa disponibilité, pour qu'elle reste visible dans le select)
