@@ -471,7 +471,8 @@
 <form method="post" novalidate id="rdv-form"
       data-is-new="{{ is_new|yesno:'1,0' }}"
       data-confirme-facture="{% if rdv and rdv.statut == 'confirme' and facture_payee %}1{% else %}0{% endif %}"
-      data-statut="{{ rdv.statut|default:'' }}">
+      data-statut="{{ rdv.statut|default:'' }}"
+      data-has-consultation="{% if consultation %}1{% else %}0{% endif %}">
 {% csrf_token %}
 
 <!-- ══════════════ PANNEAU DE CONTRÔLE ══════════════ -->
@@ -2290,6 +2291,7 @@
     var btnModifier  = document.getElementById('btn-modifier');
     var btnCancel    = document.getElementById('btn-cancel-edit');
     var btnEnAttenteEdit = document.getElementById('btn-en-attente-edit');
+    var hasConsultation  = rdvForm.dataset.hasConsultation === '1';
 
     function lock() {
         if (formBody)   formBody.classList.add('rdv-locked');
@@ -2308,17 +2310,19 @@
         syncEnAttenteBtn();
     }
 
-    /* Activer/désactiver le bouton En Attente selon le médecin sélectionné */
+    /* Activer/désactiver le bouton En Attente :
+       les deux conditions doivent être remplies — évaluation clinique ET médecin */
     var medSelect = document.getElementById('id_medecin');
     function syncEnAttenteBtn() {
         if (!btnEnAttenteEdit) return;
-        btnEnAttenteEdit.disabled = !(medSelect && medSelect.value);
+        var medecinOk = !!(medSelect && medSelect.value);
+        btnEnAttenteEdit.disabled = !(hasConsultation && medecinOk);
     }
     if (medSelect) medSelect.addEventListener('change', syncEnAttenteBtn);
 
-    /* Départ : verrouillé sauf si ?edit=1 dans l'URL (retour après save_eval) */
+    /* Départ : verrouillé sauf si ?edit=1 OU si l'évaluation clinique est déjà enregistrée */
     var urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('edit') === '1' && editActions) {
+    if ((urlParams.get('edit') === '1' || hasConsultation) && editActions) {
         unlock();
     } else {
         lock();
