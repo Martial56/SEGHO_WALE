@@ -95,6 +95,7 @@
     .status-bar {
         display: flex; align-items: center; gap: 0;
         flex-shrink: 0;
+        margin-left: auto;
     }
     .status-sep {
         font-size: 15px; color: rgba(0,0,0,0.2);
@@ -662,11 +663,16 @@
         <div class="f-tabs-wrap">
       <div class="f-tabs">
         <button type="button" class="f-tab active" data-tab="infos">Informations générales</button>
-        <button type="button" class="f-tab" data-tab="clinique">Évaluation clinique</button>
-        <button type="button" class="f-tab" data-tab="cpn">Consultation prénatale</button>
-        <button type="button" class="f-tab" data-tab="accouchement">Accouchement</button>
-        <button type="button" class="f-tab" data-tab="postnatale">Consultation postnatale</button>
-        <button type="button" class="f-tab" data-tab="curative">Consultation curative</button>
+        <button type="button" class="f-tab" data-tab="clinique"
+          title="Disponible après confirmation du rendez-vous">Évaluation clinique</button>
+        <button type="button" class="f-tab" data-tab="cpn"
+          title="Disponible en cours de consultation">Consultation prénatale</button>
+        <button type="button" class="f-tab" data-tab="accouchement"
+          title="Disponible en cours de consultation">Accouchement</button>
+        <button type="button" class="f-tab" data-tab="postnatale"
+          title="Disponible en cours de consultation">Consultation postnatale</button>
+        <button type="button" class="f-tab" data-tab="curative"
+          title="Disponible en cours de consultation">Consultation curative</button>
         <button type="button" class="f-tab" data-tab="autres">Autres informations</button>
       </div>
 
@@ -1837,30 +1843,30 @@
     }());
 
     /* ── Onglets médicaux ── */
-    var REGISTER_TABS = ['cpn', 'accouchement', 'postnatale', 'curative'];
     var rdvForm = document.getElementById('rdv-form');
     var isNew = rdvForm.dataset.isNew === '1';
     var confirmeFacture = rdvForm.dataset.confirmeFacture === '1';
     var currentStatut = rdvForm.dataset.statut || '';
     // Évaluation clinique accessible dès que le RDV est confirmé
     var evalAccessible = ['confirme', 'en_attente', 'en_consultation', 'termine'].indexOf(currentStatut) !== -1;
-    // Registres (CPN, accouchement, postnatale, curative) accessibles uniquement en consultation
     var consultationStarted = (currentStatut === 'en_consultation' || currentStatut === 'termine');
+
+    var CONSULT_TABS = ['cpn', 'accouchement', 'postnatale', 'curative'];
 
     document.querySelectorAll('.f-tab').forEach(function(tab) {
         var tabId = tab.dataset.tab;
-        var isClinic  = (tabId === 'clinique');
-        var isRegister = REGISTER_TABS.indexOf(tabId) !== -1;
+        var isClinic = (tabId === 'clinique');
+        var isConsultTab = CONSULT_TABS.indexOf(tabId) !== -1;
 
-        if (isClinic  && !evalAccessible)     tab.classList.add('f-tab-disabled');
-        if (isRegister && !consultationStarted) tab.classList.add('f-tab-disabled');
+        if (isClinic && !evalAccessible)       tab.classList.add('f-tab-disabled');
+        if (isConsultTab && !consultationStarted) tab.classList.add('f-tab-disabled');
 
         tab.addEventListener('click', function() {
             var id = this.dataset.tab;
             if (id === 'clinique' && !evalAccessible) return;
-            if (REGISTER_TABS.indexOf(id) !== -1 && !consultationStarted) return;
-            document.querySelectorAll('.f-tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.f-tab-panel').forEach(p => p.classList.remove('active'));
+            if (CONSULT_TABS.indexOf(id) !== -1 && !consultationStarted) return;
+            document.querySelectorAll('.f-tab').forEach(function(t) { t.classList.remove('active'); });
+            document.querySelectorAll('.f-tab-panel').forEach(function(p) { p.classList.remove('active'); });
             this.classList.add('active');
             document.getElementById('tab-' + id).classList.add('active');
         });

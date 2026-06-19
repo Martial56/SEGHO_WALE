@@ -506,7 +506,7 @@
                     </button>
                     <div id="edit-actions" style="display:none;gap:6px;align-items:center;">
                         <button type="submit" name="_action" value="en_attente" class="btn-action btn-waiting"
-                            disabled title="{% if not consultation %}Créez l'évaluation clinique{% elif not rdv.medecin %}Sélectionnez un médecin{% endif %}">En Attente</button>
+                            id="btn-en-attente-edit" disabled>En Attente</button>
                         <button type="button" class="btn-action btn-danger-outline" id="btn-cancel-edit">
                             <i class="bi bi-x-lg"></i> Annuler
                         </button>
@@ -2289,6 +2289,7 @@
     var editActions  = document.getElementById('edit-actions');
     var btnModifier  = document.getElementById('btn-modifier');
     var btnCancel    = document.getElementById('btn-cancel-edit');
+    var btnEnAttenteEdit = document.getElementById('btn-en-attente-edit');
 
     function lock() {
         if (formBody)   formBody.classList.add('rdv-locked');
@@ -2304,10 +2305,24 @@
         if (discardBtn) discardBtn.style.display = '';
         if (editActions) { editActions.style.display = 'flex'; }
         if (btnModifier) btnModifier.style.display = 'none';
+        syncEnAttenteBtn();
     }
 
-    /* Départ en mode verrouillé */
-    lock();
+    /* Activer/désactiver le bouton En Attente selon le médecin sélectionné */
+    var medSelect = document.getElementById('id_medecin');
+    function syncEnAttenteBtn() {
+        if (!btnEnAttenteEdit) return;
+        btnEnAttenteEdit.disabled = !(medSelect && medSelect.value);
+    }
+    if (medSelect) medSelect.addEventListener('change', syncEnAttenteBtn);
+
+    /* Départ : verrouillé sauf si ?edit=1 dans l'URL (retour après save_eval) */
+    var urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('edit') === '1' && editActions) {
+        unlock();
+    } else {
+        lock();
+    }
 
     if (btnModifier) btnModifier.addEventListener('click', unlock);
     if (btnCancel)   btnCancel.addEventListener('click', lock);

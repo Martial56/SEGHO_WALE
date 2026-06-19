@@ -360,9 +360,9 @@ def rdv_edit(request, pk):
                 if val != '':
                     setattr(const_obj, model_field, val)
             const_obj.save()
-            messages.success(request, 'Évaluation enregistrée.')
+            messages.success(request, 'Évaluation enregistrée. Sélectionnez un médecin et cliquez sur « En Attente » pour continuer.')
             from django.urls import reverse
-            return redirect(reverse('patients:rdv_edit', kwargs={'pk': rdv.pk}))
+            return redirect(reverse('patients:rdv_edit', kwargs={'pk': rdv.pk}) + '?edit=1')
 
         if action == 'confirmer':
             if facture_payee:
@@ -383,7 +383,16 @@ def rdv_edit(request, pk):
             rdv.date_en_attente = now
             if rdv.date_confirme:
                 rdv.temps_constante_minutes = int((now - rdv.date_confirme).total_seconds() / 60)
-            rdv.save(update_fields=['statut', 'date_en_attente', 'temps_constante_minutes'])
+            update_fields = ['statut', 'date_en_attente', 'temps_constante_minutes']
+            medecin_pk = request.POST.get('medecin', '').strip()
+            if medecin_pk:
+                try:
+                    from medecins.models import Medecin
+                    rdv.medecin = Medecin.objects.get(pk=medecin_pk)
+                    update_fields.append('medecin')
+                except Exception:
+                    pass
+            rdv.save(update_fields=update_fields)
             messages.success(request, 'Rendez-vous mis en attente de consultation.')
             from django.urls import reverse
             return redirect(reverse('patients:rdv_edit', kwargs={'pk': rdv.pk}))
