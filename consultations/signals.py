@@ -14,7 +14,10 @@ def sync_rdv_statut(sender, instance, created, **kwargs):
     TERMINAL = ('termine', 'annule', 'absent')
 
     if created:
-        if rdv.statut not in TERMINAL:
+        # N'avancer vers 'en_consultation' que si le RDV est déjà en attente.
+        # Créer une consultation pendant l'évaluation clinique (statut 'confirme')
+        # ne doit pas sauter l'étape 'en_attente'.
+        if rdv.statut == 'en_attente':
             rdv.statut = 'en_consultation'
             rdv.save(update_fields=['statut'])
     else:

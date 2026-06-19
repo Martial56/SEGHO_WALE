@@ -236,12 +236,15 @@
     var onav   = document.querySelector('.o-nav');
     var wrap   = document.getElementById('page-wrap');
     var sub    = document.querySelector('.o-subheader, .det-subhdr');
-    if (!topbar || !onav) return;
+    if (!topbar) return;
     function adjust() {
       var topbarH  = topbar.offsetHeight;
       var bodyPT   = parseInt(getComputedStyle(document.body).paddingTop) || 0;
-      var navBottom = topbarH + onav.offsetHeight;
-      onav.style.top = topbarH + 'px';
+      var navBottom = topbarH;
+      if (onav) {
+        onav.style.top = topbarH + 'px';
+        navBottom = topbarH + onav.offsetHeight;
+      }
       if (sub) sub.style.top = navBottom + 'px';
       var subH = (sub && sub.dataset.fixed) ? sub.offsetHeight : 0;
       var target = wrap || document.querySelector('.content');
