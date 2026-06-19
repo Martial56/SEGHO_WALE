@@ -1423,75 +1423,7 @@
   </div><!-- /f-main -->
 
   <!-- ASIDE ACTIVITY -->
-  <div class="f-aside">
-    <div class="f-activity">
-      <div class="f-activity-head">
-        <span>Activité</span>
-        {% if not is_new %}
-        <span style="font-size:11px;">{{ rdv.date_creation|date:"d/m/Y" }}</span>
-        {% endif %}
-      </div>
-      <div class="f-activity-list">
-        {% if rdv %}
-          <!-- Current status indicator -->
-          <div class="f-activity-item">
-            <div class="f-avatar f-avatar-purple">{{ request.user.username|first|upper }}</div>
-            <div class="f-activity-body">
-              <div class="f-activity-who">{{ request.user.get_full_name|default:request.user.username }}</div>
-              <div class="f-activity-time">{{ rdv.date_creation|date:"d/m/Y H:i" }}</div>
-              <div class="f-activity-change">
-                <i class="bi bi-dot" style="color:var(--teal-600);"></i>
-                Rendez-vous créé(e)
-              </div>
-            </div>
-          </div>
-          {% if rdv.statut != 'planifie' %}
-          <div class="f-activity-item">
-            <div class="f-avatar f-avatar-teal">{{ request.user.username|first|upper }}</div>
-            <div class="f-activity-body">
-              <div class="f-activity-who">{{ request.user.get_full_name|default:request.user.username }}</div>
-              <div class="f-activity-time">Mis à jour</div>
-              <div class="f-activity-change">
-                <i class="bi bi-arrow-right"></i>
-                État :
-                <strong>{{ rdv.get_statut_display }}</strong>
-              </div>
-            </div>
-          </div>
-          {% endif %}
-          {% if rdv.medecin %}
-          <div class="f-activity-item">
-            <div class="f-avatar f-avatar-green">{{ rdv.medecin.nom|first|upper }}</div>
-            <div class="f-activity-body">
-              <div class="f-activity-who">{{ rdv.medecin }}</div>
-              <div class="f-activity-time">Médecin assigné</div>
-              <div class="f-activity-change">
-                <i class="bi bi-person-check"></i>
-                Docteur : <strong>{{ rdv.medecin }}</strong>
-              </div>
-            </div>
-          </div>
-          {% endif %}
-          {% if rdv.statut == 'termine' %}
-          <div class="f-activity-item">
-            <div class="f-avatar f-avatar-green">T</div>
-            <div class="f-activity-body">
-              <div class="f-activity-who">Consultation terminée</div>
-              <div class="f-activity-time">
-                Durée : {{ rdv.duree_display }}
-                &nbsp;·&nbsp; Attente : {{ rdv.temps_attente_display }}
-              </div>
-            </div>
-          </div>
-          {% endif %}
-        {% else %}
-          <div style="padding:14px;color:var(--text-muted);font-size:12px;">
-            L'activité apparaîtra après la création du dossier.
-          </div>
-        {% endif %}
-      </div>
-    </div>
-  </div>
+  {% load core_tags %}{% historique_sidebar rdv %}
 
 </div><!-- /f-layout -->
 
