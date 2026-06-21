@@ -880,9 +880,17 @@ def laboratoire_detail(request, pk):
     if request.method == 'POST':
         action = request.POST.get('action')
         if action == 'envoyer_labo' and demande.facture and demande.statut == 'brouillon':
-            demande.statut = 'demande'
-            demande.save(update_fields=['statut'])
-            messages.success(request, f'Demande {demande.numero} envoyée au laboratoire.')
+            from laboratoire.hprim.services import envoyer_demande
+            try:
+                echange = envoyer_demande(demande)
+                if echange.statut == 'transmis':
+                    messages.success(request, f'Demande {demande.numero} transmise au laboratoire.')
+                elif echange.statut == 'en_attente':
+                    messages.warning(request, f'Demande {demande.numero} enregistrée (FTP non configuré) : {echange.message_log}')
+                else:
+                    messages.error(request, f'Échec de l\'envoi : {echange.message_log}')
+            except RuntimeError as exc:
+                messages.error(request, str(exc))
         return redirect('laboratoire_detail', pk=pk)
 
     lignes = demande.lignes.select_related('type_examen').all()
