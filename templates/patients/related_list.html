@@ -82,17 +82,25 @@
     .badge-delivree  { background: #e2eef5; color: var(--green); }
     .badge-partielle { background: #fef3e0; color: var(--amber); }
     .badge-expiree   { background: #fde8e8; color: var(--rose); }
-    .badge-admis     { background: #e8f4fd; color: var(--sky); }
-    .badge-ensoins   { background: #fef3e0; color: var(--amber); }
-    .badge-sorti     { background: #eef9fd; color: var(--teal-600); }
-    .badge-transfere { background: #ede8fd; color: var(--violet); }
-    .badge-decede    { background: #fde8e8; color: var(--rose); }
+    .badge-brouillon         { background: #f3f4f6; color: rgba(0,0,0,0.5); }
+    .badge-en-attente-paiement { background: #ede8fd; color: var(--violet); }
+    .badge-hospitalise { background: #fef3e0; color: var(--amber); }
+    .badge-decharge    { background: #eef9fd; color: var(--teal-600); }
+    .badge-en-attente  { background: #fef3e0; color: var(--amber); }
+    .badge-en-consultation { background: #e8f4fd; color: var(--sky); }
     .badge-recu      { background: #f8fbfd; color: rgba(0,0,0,0.4); }
     .badge-enanalyse { background: #fef3e0; color: var(--amber); }
     .badge-resultat  { background: #e8f4fd; color: var(--sky); }
     .badge-valide    { background: #e2eef5; color: var(--green); }
     .badge-envoye    { background: #eef9fd; color: var(--teal-600); }
     .badge-urgent    { background: #fde8e8; color: var(--rose); }
+    .badge-demande   { background: #eff6ff; color: #1d4ed8; }
+    .badge-accepte   { background: #f0fdf4; color: #15803d; }
+    .badge-en_cours  { background: #fef3e0; color: var(--amber); }
+
+    .tests-list { font-size: 12px; }
+    .tests-list span { display: inline-block; background: #f0f6fa; border-radius: 4px; padding: 1px 7px; margin: 1px 2px 1px 0; font-size: 11px; color: rgba(0,0,0,0.55); }
+    .tests-more { color: rgba(0,0,0,0.35); font-size: 11px; margin-left: 2px; }
 
     .empty-state {
         text-align: center; padding: 60px 24px;
@@ -130,8 +138,8 @@
     <div class="rl-tab-nav">
         <a href="{% url 'patients:rdv_list' patient.pk %}"
            class="rl-tab {% if view_type == 'rdv' %}active{% endif %}">Rendez-vous</a>
-        <a href="{% url 'patients:consultation_list' patient.pk %}"
-           class="rl-tab {% if view_type == 'consultation' %}active{% endif %}">Soins</a>
+        <a href="{% url 'patients:soin_list' patient.pk %}"
+           class="rl-tab {% if view_type == 'soin' %}active{% endif %}">Soins</a>
         <a href="{% url 'patients:ordonnance_list' patient.pk %}"
            class="rl-tab {% if view_type == 'ordonnance' %}active{% endif %}">Ordonnances</a>
         <a href="{% url 'patients:hospitalisation_list' patient.pk %}"
@@ -171,47 +179,51 @@
                 <td>{{ rdv.motif|truncatechars:60 }}</td>
                 <td>{% if rdv.medecin %}{{ rdv.medecin }}{% else %}<span style="color:rgba(0,0,0,0.3)">—</span>{% endif %}</td>
                 <td>
-                    {% with s=rdv.statut %}
-                    <span class="badge badge-{{ s|lower|cut:' '|cut:'é'|cut:'è' }}
-                        {% if s == 'planifié' %}badge-planifie
-                        {% elif s == 'confirmé' %}badge-confirme
-                        {% elif s == 'terminé' %}badge-termine
-                        {% elif s == 'annulé' %}badge-annule
-                        {% elif s == 'absent' %}badge-absent
+                    <span class="badge
+                        {% if rdv.statut == 'planifie' %}badge-planifie
+                        {% elif rdv.statut == 'confirme' %}badge-confirme
+                        {% elif rdv.statut == 'en_attente' %}badge-encours
+                        {% elif rdv.statut == 'en_consultation' %}badge-encours
+                        {% elif rdv.statut == 'termine' %}badge-termine
+                        {% elif rdv.statut == 'annule' %}badge-annule
+                        {% elif rdv.statut == 'absent' %}badge-absent
                         {% endif %}">{{ rdv.get_statut_display }}</span>
-                    {% endwith %}
                 </td>
             </tr>
         {% endfor %}
         </tbody>
     </table>
 
-    {% elif view_type == 'consultation' %}
+    {% elif view_type == 'soin' %}
     <table class="data-table">
         <thead>
             <tr>
                 <th>N°</th>
                 <th>Date / heure</th>
-                <th>Motif</th>
-                <th>Médecin</th>
+                <th>Soins apportés</th>
+                <th>Infirmier</th>
                 <th>Statut</th>
             </tr>
         </thead>
         <tbody>
-        {% for c in items %}
-            <tr data-url="/admin/consultations/consultation/{{ c.pk }}/change/">
-                <td><code style="font-size:12px; color:var(--teal-600);">{{ c.numero }}</code></td>
-                <td>{{ c.date_heure|date:"d/m/Y à H:i" }}</td>
-                <td>{{ c.motif|truncatechars:60 }}</td>
-                <td>{% if c.medecin %}{{ c.medecin }}{% else %}<span style="color:rgba(0,0,0,0.3)">—</span>{% endif %}</td>
+        {% for s in items %}
+            {% with p=s.procedures_list|first %}
+            <tr data-url="{% url 'soins:detail' s.pk %}">
+                <td><code style="font-size:12px; color:var(--teal-600);">{{ s.numero }}</code></td>
+                <td>{{ s.date_heure|date:"d/m/Y à H:i" }}</td>
+                <td>{{ p.soin_type.nom|default:"—" }}</td>
+                <td>{% if p and p.infirmier %}{{ p.infirmier.nom }} {{ p.infirmier.prenoms }}{% else %}<span style="color:rgba(0,0,0,0.3)">—</span>{% endif %}</td>
                 <td>
                     <span class="badge
-                        {% if c.statut == 'en_cours' %}badge-encours
-                        {% elif c.statut == 'terminé' %}badge-termine
-                        {% elif c.statut == 'annulé' %}badge-annule
-                        {% endif %}">{{ c.get_statut_display }}</span>
+                        {% if s.statut == 'brouillon' %}badge-brouillon
+                        {% elif s.statut == 'en_attente_de_paiement' %}badge-en-attente-paiement
+                        {% elif s.statut == 'en_cours' %}badge-encours
+                        {% elif s.statut == 'termine' %}badge-termine
+                        {% elif s.statut == 'annule' %}badge-annule
+                        {% endif %}">{{ s.get_statut_display }}</span>
                 </td>
             </tr>
+            {% endwith %}
         {% endfor %}
         </tbody>
     </table>
@@ -238,10 +250,10 @@
                 <td>{% if o.date_expiration %}{{ o.date_expiration|date:"d/m/Y" }}{% else %}<span style="color:rgba(0,0,0,0.3)">—</span>{% endif %}</td>
                 <td>
                     <span class="badge
-                        {% if o.statut == 'émise' %}badge-emise
-                        {% elif o.statut == 'délivrée' %}badge-delivree
+                        {% if o.statut == 'emise' %}badge-emise
+                        {% elif o.statut == 'delivree' %}badge-delivree
                         {% elif o.statut == 'partielle' %}badge-partielle
-                        {% elif o.statut == 'expirée' %}badge-expiree
+                        {% elif o.statut == 'expiree' %}badge-expiree
                         {% endif %}">{{ o.get_statut_display }}</span>
                 </td>
             </tr>
@@ -270,14 +282,15 @@
                 <td>{{ h.motif_admission|truncatechars:50 }}</td>
                 <td>{% if h.chambre %}{{ h.chambre }}{% else %}<span style="color:rgba(0,0,0,0.3)">—</span>{% endif %}</td>
                 <td>{% if h.medecin_traitant %}{{ h.medecin_traitant }}{% else %}<span style="color:rgba(0,0,0,0.3)">—</span>{% endif %}</td>
-                <td>{% if h.date_sortie_effective %}{{ h.date_sortie_effective|date:"d/m/Y" }}{% else %}<span style="color:rgba(0,0,0,0.3)">—</span>{% endif %}</td>
+                <td>{% if h.heure_sortie %}{{ h.heure_sortie|date:"d/m/Y" }}{% else %}<span style="color:rgba(0,0,0,0.3)">—</span>{% endif %}</td>
                 <td>
                     <span class="badge
-                        {% if h.statut == 'admis' %}badge-admis
-                        {% elif h.statut == 'en_soins' %}badge-ensoins
-                        {% elif h.statut == 'sorti' %}badge-sorti
-                        {% elif h.statut == 'transféré' %}badge-transfere
-                        {% elif h.statut == 'décédé' %}badge-decede
+                        {% if h.statut == 'brouillon' %}badge-brouillon
+                        {% elif h.statut == 'confirme' %}badge-confirme
+                        {% elif h.statut == 'hospitalise' %}badge-hospitalise
+                        {% elif h.statut == 'decharge' %}badge-decharge
+                        {% elif h.statut == 'termine' %}badge-termine
+                        {% elif h.statut == 'annule' %}badge-annule
                         {% endif %}">{{ h.get_statut_display }}</span>
                 </td>
             </tr>
@@ -289,35 +302,40 @@
     <table class="data-table">
         <thead>
             <tr>
-                <th>N°</th>
-                <th>Date prélèvement</th>
-                <th>Type d'examen</th>
-                <th>Urgent</th>
+                <th>N° Demande</th>
+                <th>Tests demandés</th>
+                <th>Date création</th>
                 <th>Statut</th>
             </tr>
         </thead>
         <tbody>
-        {% for a in items %}
-            <tr data-url="/admin/laboratoire/analyselaboratoire/{{ a.pk }}/change/">
-                <td><code style="font-size:12px; color:var(--teal-600);">{{ a.numero }}</code></td>
-                <td>{{ a.date_prelevement|date:"d/m/Y à H:i" }}</td>
-                <td>{{ a.type_examen }}</td>
+        {% for d in items %}
+            <tr data-url="{% url 'laboratoire_detail' d.pk %}">
                 <td>
-                    {% if a.urgent %}
-                        <span class="badge badge-urgent">Urgent</span>
+                    <code style="font-size:12px; color:var(--teal-600);">{{ d.numero }}</code>
+                    {% if d.urgent %}<span class="badge badge-urgent" style="margin-left:4px;">Urgent</span>{% endif %}
+                </td>
+                <td>
+                    {% with lignes=d.lignes.all %}
+                    {% if lignes %}
+                        <div class="tests-list">
+                            {% for l in lignes|slice:":3" %}
+                                <span>{{ l.libelle|truncatechars:30 }}</span>
+                            {% endfor %}
+                            {% if lignes|length > 3 %}
+                                <span class="tests-more">+{{ lignes|length|add:"-3" }} autres</span>
+                            {% endif %}
+                        </div>
                     {% else %}
                         <span style="color:rgba(0,0,0,0.3)">—</span>
                     {% endif %}
+                    {% endwith %}
                 </td>
                 <td>
-                    <span class="badge
-                        {% if a.statut == 'reçu' %}badge-recu
-                        {% elif a.statut == 'en_analyse' %}badge-enanalyse
-                        {% elif a.statut == 'résultat' %}badge-resultat
-                        {% elif a.statut == 'validé' %}badge-valide
-                        {% elif a.statut == 'envoyé' %}badge-envoye
-                        {% endif %}">{{ a.get_statut_display }}</span>
+                    {{ d.date_creation|date:"d/m/Y" }}
+                    <div style="font-size:11px;color:rgba(0,0,0,0.4);">{{ d.date_creation|date:"H:i" }}</div>
                 </td>
+                <td><span class="badge badge-{{ d.statut }}">{{ d.get_statut_display }}</span></td>
             </tr>
         {% endfor %}
         </tbody>
@@ -349,9 +367,9 @@
                 </td>
                 <td>
                     <span class="badge
-                        {% if a.statut == 'résultat' %}badge-resultat
-                        {% elif a.statut == 'validé' %}badge-valide
-                        {% elif a.statut == 'envoyé' %}badge-envoye
+                        {% if a.statut == 'resultat' %}badge-resultat
+                        {% elif a.statut == 'valide' %}badge-valide
+                        {% elif a.statut == 'envoye' %}badge-envoye
                         {% endif %}">{{ a.get_statut_display }}</span>
                 </td>
             </tr>

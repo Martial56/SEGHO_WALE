@@ -17,6 +17,7 @@ urlpatterns = [
     path('<int:pk>/modifier/', views.patient_edit, name='edit'),
     path('<int:pk>/rendez-vous/', views.patient_rdv_list, name='rdv_list'),
     path('<int:pk>/consultations/', views.patient_consultation_list, name='consultation_list'),
+    path('<int:pk>/soins/', views.patient_soin_list, name='soin_list'),
     path('<int:pk>/ordonnances/', views.patient_ordonnance_list, name='ordonnance_list'),
     path('<int:pk>/ordonnances/creer/', views.ordonnance_create, name='ordonnance_create'),
     path('<int:pk>/hospitalisations/', views.patient_hospitalisation_list, name='hospitalisation_list'),

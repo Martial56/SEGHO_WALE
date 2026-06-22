@@ -9,6 +9,7 @@ from datetime import timedelta
 
 from .models import Patient, RendezVous, Pathologie, TypeVisite
 from .forms import PatientForm, RendezVousForm, PathologieForm, TypeVisiteForm
+from core.views import log_event
 
 
 @login_required
@@ -259,7 +260,9 @@ def rdv_create(request):
             code = request.POST.get('code_confirmation', '').strip()
             if code:
                 rdv.code_confirmation = code
+            rdv._skip_auto_log = True
             rdv.save()
+            log_event(rdv, request.user, 'Rendez-vous créé.', type='system')
             messages.success(
                 request,
                 f'Rendez-vous créé pour {rdv.patient.nom} {rdv.patient.prenoms} '
@@ -369,7 +372,9 @@ def rdv_edit(request, pk):
                 from django.utils import timezone as tz
                 rdv.statut = 'confirme'
                 rdv.date_confirme = tz.now()
+                rdv._skip_auto_log = True
                 rdv.save(update_fields=['statut', 'date_confirme'])
+                log_event(rdv, request.user, 'État : Brouillon → Confirmer', type='statut')
                 messages.success(request, 'Rendez-vous confirmé.')
                 return redirect('patients:rdv_global')
             else:
@@ -392,7 +397,9 @@ def rdv_edit(request, pk):
                     update_fields.append('medecin')
                 except Exception:
                     pass
+            rdv._skip_auto_log = True
             rdv.save(update_fields=update_fields)
+            log_event(rdv, request.user, 'État : Confirmer → En Attente', type='statut')
             messages.success(request, 'Rendez-vous mis en attente de consultation.')
             from django.urls import reverse
             return redirect(reverse('patients:rdv_edit', kwargs={'pk': rdv.pk}))
@@ -404,7 +411,9 @@ def rdv_edit(request, pk):
             rdv.date_en_consultation = now
             if rdv.date_en_attente:
                 rdv.temps_attente_minutes = int((now - rdv.date_en_attente).total_seconds() / 60)
+            rdv._skip_auto_log = True
             rdv.save(update_fields=['statut', 'date_en_consultation', 'temps_attente_minutes'])
+            log_event(rdv, request.user, 'État : En Attente → En Consultation', type='statut')
             messages.success(request, 'Consultation démarrée.')
             from django.urls import reverse
             return redirect(reverse('patients:rdv_edit', kwargs={'pk': rdv.pk}))
@@ -416,13 +425,17 @@ def rdv_edit(request, pk):
             rdv.date_termine = now
             if rdv.date_en_consultation:
                 rdv.temps_consultation_minutes = int((now - rdv.date_en_consultation).total_seconds() / 60)
+            rdv._skip_auto_log = True
             rdv.save(update_fields=['statut', 'date_termine', 'temps_consultation_minutes'])
+            log_event(rdv, request.user, 'État : En Consultation → Terminé', type='statut')
             messages.success(request, 'Consultation terminée.')
             return redirect('patients:rdv_global')
 
         if action == 'annuler':
             rdv.statut = 'annule'
+            rdv._skip_auto_log = True
             rdv.save(update_fields=['statut'])
+            log_event(rdv, request.user, 'Rendez-vous annulé.', type='statut')
             messages.success(request, 'Rendez-vous annulé.')
             return redirect('patients:rdv_global')
 
@@ -432,7 +445,9 @@ def rdv_edit(request, pk):
             code = request.POST.get('code_confirmation', '').strip()
             if code:
                 rdv.code_confirmation = code
+            rdv._skip_auto_log = True
             rdv.save()
+            log_event(rdv, request.user, 'Rendez-vous modifié.', type='modif')
 
             from patients.utils import save_registres
             save_registres(request, rdv)
@@ -623,6 +638,29 @@ def patient_consultation_list(request, pk):
 
 
 @login_required
+def patient_soin_list(request, pk):
+    patient = get_object_or_404(Patient, pk=pk)
+    try:
+        from soins.models import Soin, ProcedureSoin
+        from django.db.models import Prefetch
+        items = Soin.objects.filter(patient=patient).prefetch_related(
+            Prefetch(
+                'procedures',
+                queryset=ProcedureSoin.objects.select_related('infirmier', 'soin_type').order_by('date'),
+                to_attr='procedures_list'
+            )
+        ).order_by('-date_heure')
+    except Exception:
+        items = []
+    return render(request, 'patients/related_list.html', {
+        'patient': patient,
+        'view_type': 'soin',
+        'titre': 'Soins infirmiers',
+        'items': items,
+    })
+
+
+@login_required
 def patient_ordonnance_list(request, pk):
     patient = get_object_or_404(Patient, pk=pk)
     try:
@@ -662,14 +700,14 @@ def patient_hospitalisation_list(request, pk):
 def patient_demande_examens_list(request, pk):
     patient = get_object_or_404(Patient, pk=pk)
     try:
-        from laboratoire.models import AnalyseLaboratoire
-        items = AnalyseLaboratoire.objects.filter(patient=patient).order_by('-date_prelevement')
+        from laboratoire.models import DemandeExamen
+        items = DemandeExamen.objects.filter(patient=patient).prefetch_related('lignes').order_by('-date_creation')
     except Exception:
         items = []
     return render(request, 'patients/related_list.html', {
         'patient': patient,
         'view_type': 'demande_examens',
-        'titre': "Demandes d'examens de laboratoire",
+        'titre': "Demandes d'examens",
         'items': items,
     })
 
@@ -680,7 +718,7 @@ def patient_resultat_examens_list(request, pk):
     try:
         from laboratoire.models import AnalyseLaboratoire
         items = AnalyseLaboratoire.objects.filter(
-            patient=patient, statut__in=['résultat', 'validé', 'envoyé']
+            patient=patient, statut__in=['resultat', 'valide', 'envoye']
         ).order_by('-date_resultat')
     except Exception:
         items = []

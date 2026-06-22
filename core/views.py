@@ -880,9 +880,17 @@ def laboratoire_detail(request, pk):
     if request.method == 'POST':
         action = request.POST.get('action')
         if action == 'envoyer_labo' and demande.facture and demande.statut == 'brouillon':
-            demande.statut = 'demande'
-            demande.save(update_fields=['statut'])
-            messages.success(request, f'Demande {demande.numero} envoyée au laboratoire.')
+            from laboratoire.hprim.services import envoyer_demande
+            try:
+                echange = envoyer_demande(demande)
+                if echange.statut == 'transmis':
+                    messages.success(request, f'Demande {demande.numero} transmise au laboratoire.')
+                elif echange.statut == 'en_attente':
+                    messages.warning(request, f'Demande {demande.numero} enregistrée (FTP non configuré) : {echange.message_log}')
+                else:
+                    messages.error(request, f'Échec de l\'envoi : {echange.message_log}')
+            except RuntimeError as exc:
+                messages.error(request, str(exc))
         return redirect('laboratoire_detail', pk=pk)
 
     lignes = demande.lignes.select_related('type_examen').all()
@@ -1342,7 +1350,9 @@ def gynecologie_rdv_detail(request, pk):
             if facture_payee:
                 rdv.statut = 'confirme'
                 rdv.date_confirme = timezone.now()
+                rdv._skip_auto_log = True
                 rdv.save(update_fields=['statut', 'date_confirme'])
+                log_event(rdv, request.user, 'État : Brouillon → Confirmer', type='statut')
                 messages.success(request, 'Rendez-vous confirmé.')
             else:
                 messages.error(request, 'Une facture est requise pour confirmer ce rendez-vous.')
@@ -1354,7 +1364,9 @@ def gynecologie_rdv_detail(request, pk):
             rdv.date_en_attente = now
             if rdv.date_confirme:
                 rdv.temps_constante_minutes = int((now - rdv.date_confirme).total_seconds() / 60)
+            rdv._skip_auto_log = True
             rdv.save(update_fields=['statut', 'date_en_attente', 'temps_constante_minutes'])
+            log_event(rdv, request.user, 'État : Confirmer → En Attente', type='statut')
             messages.success(request, 'Rendez-vous mis en attente.')
             return redirect('gynecologie_rdv_detail', pk=rdv.pk)
 
@@ -1364,7 +1376,9 @@ def gynecologie_rdv_detail(request, pk):
             rdv.date_en_consultation = now
             if rdv.date_en_attente:
                 rdv.temps_attente_minutes = int((now - rdv.date_en_attente).total_seconds() / 60)
+            rdv._skip_auto_log = True
             rdv.save(update_fields=['statut', 'date_en_consultation', 'temps_attente_minutes'])
+            log_event(rdv, request.user, 'État : En Attente → En Consultation', type='statut')
             messages.success(request, 'Consultation démarrée.')
             return redirect('gynecologie_rdv_detail', pk=rdv.pk)
 
@@ -1374,13 +1388,17 @@ def gynecologie_rdv_detail(request, pk):
             rdv.date_termine = now
             if rdv.date_en_consultation:
                 rdv.temps_consultation_minutes = int((now - rdv.date_en_consultation).total_seconds() / 60)
+            rdv._skip_auto_log = True
             rdv.save(update_fields=['statut', 'date_termine', 'temps_consultation_minutes'])
+            log_event(rdv, request.user, 'État : En Consultation → Terminé', type='statut')
             messages.success(request, 'Consultation terminée.')
             return redirect('gynecologie_rdv')
 
         if action == 'annuler':
             rdv.statut = 'annule'
+            rdv._skip_auto_log = True
             rdv.save(update_fields=['statut'])
+            log_event(rdv, request.user, 'Rendez-vous annulé.', type='statut')
             messages.success(request, 'Rendez-vous annulé.')
             return redirect('gynecologie_rdv')
 
@@ -1412,7 +1430,9 @@ def gynecologie_rdv_detail(request, pk):
                     rdv.cur_type_visite = None
             else:
                 rdv.cur_type_visite = None
+            rdv._skip_auto_log = True
             rdv.save()
+            log_event(rdv, request.user, 'Rendez-vous modifié.', type='modif')
             from patients.utils import save_registres
             save_registres(request, rdv)
             messages.success(request, 'Rendez-vous modifié.')
