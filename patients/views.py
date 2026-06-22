@@ -638,6 +638,29 @@ def patient_consultation_list(request, pk):
 
 
 @login_required
+def patient_soin_list(request, pk):
+    patient = get_object_or_404(Patient, pk=pk)
+    try:
+        from soins.models import Soin, ProcedureSoin
+        from django.db.models import Prefetch
+        items = Soin.objects.filter(patient=patient).prefetch_related(
+            Prefetch(
+                'procedures',
+                queryset=ProcedureSoin.objects.select_related('infirmier', 'soin_type').order_by('date'),
+                to_attr='procedures_list'
+            )
+        ).order_by('-date_heure')
+    except Exception:
+        items = []
+    return render(request, 'patients/related_list.html', {
+        'patient': patient,
+        'view_type': 'soin',
+        'titre': 'Soins infirmiers',
+        'items': items,
+    })
+
+
+@login_required
 def patient_ordonnance_list(request, pk):
     patient = get_object_or_404(Patient, pk=pk)
     try:
@@ -677,14 +700,14 @@ def patient_hospitalisation_list(request, pk):
 def patient_demande_examens_list(request, pk):
     patient = get_object_or_404(Patient, pk=pk)
     try:
-        from laboratoire.models import AnalyseLaboratoire
-        items = AnalyseLaboratoire.objects.filter(patient=patient).order_by('-date_prelevement')
+        from laboratoire.models import DemandeExamen
+        items = DemandeExamen.objects.filter(patient=patient).prefetch_related('lignes').order_by('-date_creation')
     except Exception:
         items = []
     return render(request, 'patients/related_list.html', {
         'patient': patient,
         'view_type': 'demande_examens',
-        'titre': "Demandes d'examens de laboratoire",
+        'titre': "Demandes d'examens",
         'items': items,
     })
 
@@ -695,7 +718,7 @@ def patient_resultat_examens_list(request, pk):
     try:
         from laboratoire.models import AnalyseLaboratoire
         items = AnalyseLaboratoire.objects.filter(
-            patient=patient, statut__in=['résultat', 'validé', 'envoyé']
+            patient=patient, statut__in=['resultat', 'valide', 'envoye']
         ).order_by('-date_resultat')
     except Exception:
         items = []
