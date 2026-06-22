@@ -21,6 +21,8 @@ class FactureForm(forms.ModelForm):
         for field in self.fields.values():
             field.widget.attrs.setdefault('class', 'field-ul')
         self.fields['date_echeance'].widget.format = '%Y-%m-%d'
+        if 'type_facture' in self.fields:
+            self.fields['type_facture'].widget.attrs['autocomplete'] = 'off'
         if not is_admin:
             self.fields.pop('statut', None)
             self.fields.pop('type_facture', None)

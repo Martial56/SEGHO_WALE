@@ -19,16 +19,11 @@ class HospitalisationForm(forms.ModelForm):
         self.fields['medecin_traitant'].label_from_instance = lambda m: f"{m.nom} {m.prenoms}"
         self.fields['medecin_referent'].queryset = Medecin.objects.filter(actif=True).order_by('nom')
         self.fields['medecin_referent'].label_from_instance = lambda m: f"{m.nom} {m.prenoms}"
-        self.fields['infirmiere_primaire'].queryset = Medecin.objects.filter(actif=True).order_by('nom')
-        self.fields['infirmiere_primaire'].label_from_instance = lambda m: f"{m.nom} {m.prenoms}"
         self.fields['patient'].empty_label              = 'Rechercher un patient…'
         self.fields['medecin_traitant'].empty_label     = 'Sélectionner un docteur…'
         self.fields['maladie'].empty_label              = 'Sélectionner une maladie…'
         self.fields['chambre'].empty_label              = 'Sélectionner une salle/chambre…'
         self.fields['medecin_referent'].empty_label     = 'Sélectionner un médecin…'
-        self.fields['infirmiere_primaire'].empty_label  = 'Sélectionner une infirmière…'
-        self.fields['soins_apportes'].queryset    = Articleservice.objects.filter(actif=True, categorie__code='sn').order_by('nom')
-        self.fields['soins_apportes'].empty_label = 'Rechercher un soin…'
         # Chambres disponibles + toujours inclure la chambre déjà attribuée
         # (quelle que soit sa disponibilité, pour qu'elle reste visible dans le select)
         current_chambre_id = self.instance.chambre_id if self.instance and self.instance.pk else None
@@ -46,10 +41,8 @@ class HospitalisationForm(forms.ModelForm):
         fields = [
             'patient', 'medecin_traitant', 'maladie',
             'date_admission',
-            'mise_en_observation',
             'nom_parent_gardien', 'phone_parent_gardien',
             'medecin_referent', 'chambre',
-            'infirmiere_primaire', 'soins_apportes',
             'cas_legal', 'signale_police',
             'motif_admission', 'notes',
             'etablissement_destination', 'motif_reference',
@@ -59,17 +52,14 @@ class HospitalisationForm(forms.ModelForm):
             'medecin_traitant':           forms.Select(attrs={'class': _ul}),
             'maladie':                    forms.Select(attrs={'class': _ul}),
             'date_admission':             forms.DateTimeInput(attrs={'class': _ul, 'type': 'datetime-local'}, format='%Y-%m-%dT%H:%M'),
-            'mise_en_observation':        forms.TextInput(attrs={'class': _ul, 'placeholder': 'Mise en observation…'}),
             'nom_parent_gardien':         forms.TextInput(attrs={'class': _ul, 'placeholder': 'Nom du parent / gardien…'}),
             'phone_parent_gardien':       forms.TextInput(attrs={'class': _ul, 'placeholder': 'Numéro de téléphone…'}),
             'medecin_referent':           forms.Select(attrs={'class': _ul}),
             'chambre':                    forms.Select(attrs={'class': _ul}),
-            'infirmiere_primaire':        forms.Select(attrs={'class': _ul}),
             'cas_legal':                  forms.CheckboxInput(),
             'signale_police':             forms.RadioSelect(),
             'motif_admission':            forms.Textarea(attrs={'class': _ul, 'rows': 3, 'placeholder': "Motif d'admission…"}),
             'notes':                      forms.Textarea(attrs={'class': _ul, 'rows': 3, 'placeholder': 'Notes internes…'}),
-            'soins_apportes':             forms.SelectMultiple(attrs={'class': _ul}),
             'etablissement_destination':  forms.TextInput(attrs={'class': _ul, 'placeholder': 'Établissement de destination…'}),
             'motif_reference':            forms.Textarea(attrs={'class': _ul, 'rows': 3, 'placeholder': 'Motif du transfert…'}),
         }

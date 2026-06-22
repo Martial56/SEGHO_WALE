@@ -191,6 +191,21 @@ def facture_create(request):
             if next_url:
                 return redirect(next_url)
             return redirect('facturation:list')
+        # Form invalid: preserve submitted lignes so dynamically-added rows survive re-render
+        _i, _post_lignes = 0, []
+        while True:
+            _lib = request.POST.get(f'ligne_libelle_{_i}')
+            if _lib is None:
+                break
+            _post_lignes.append({
+                'libelle': _lib,
+                'prix':    request.POST.get(f'ligne_prix_{_i}', 0),
+                'qte':     request.POST.get(f'ligne_qte_{_i}', 1),
+                'remise':  request.POST.get(f'ligne_remise_{_i}', 0),
+            })
+            _i += 1
+        if _post_lignes:
+            initial_lignes = _post_lignes
     else:
         initial = {'type_facture': initial_type_facture} if initial_type_facture else {}
         form = FactureForm(initial=initial)

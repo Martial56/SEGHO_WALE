@@ -279,6 +279,7 @@ class ServiceAFacturer(models.Model):
         ('visite_infirmiere', 'Visite infirmière'),
         ('visite_docteur',    'Visite docteur'),
         ('soin',              'Soin apporté'),
+        ('meo',               'Mise en observation'),
         ('manuel',            'Manuel'),
     ]
     hospitalisation = models.ForeignKey('Hospitalisation', on_delete=models.CASCADE,
