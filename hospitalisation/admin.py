@@ -10,7 +10,7 @@ class BatimentAdmin(admin.ModelAdmin):
 
 @admin.register(Chambre)
 class ChambreAdmin(admin.ModelAdmin):
-    list_display  = ['nom', 'salle_no', 'type_chambre', 'statut']
+    list_display  = ['nom', 'salle_no', 'type_chambre', 'nombre_lits', 'statut']
     list_filter   = ['type_chambre', 'statut', 'prive', 'genre']
     search_fields = ['nom', 'salle_no']
     readonly_fields = ['salle_no']
@@ -19,7 +19,7 @@ class ChambreAdmin(admin.ModelAdmin):
         (None, {
             'fields': (
                 ('nom', 'salle_no'),
-                ('type_chambre', 'statut'),
+                ('type_chambre', 'nombre_lits', 'statut'),
                 ('prive', 'genre'),
             )
         }),

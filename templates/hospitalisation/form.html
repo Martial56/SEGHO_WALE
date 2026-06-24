@@ -600,12 +600,12 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
             <label class="field-label">Salle / Chambre</label>
             {% if lock_chambre %}
               <div class="field-locked-val" title="Verrouillé — {{ hosp.get_statut_display }}">
-                <i class="bi bi-lock" style="font-size:10px;opacity:.45;flex-shrink:0;"></i>{{ hosp.chambre }}
+                <i class="bi bi-lock" style="font-size:10px;opacity:.45;flex-shrink:0;"></i>{{ hosp.chambre }}{% if hosp.numero_lit %} - Lit {{ hosp.numero_lit }}{% endif %}
               </div>
-              <input type="hidden" name="chambre" value="{{ hosp.chambre_id }}">
+              <input type="hidden" name="chambre_lit" value="{{ hosp.chambre_id }}_{{ hosp.numero_lit|default:'0' }}">
             {% else %}
-              {{ form.chambre }}
-              {% if form.chambre.errors %}<div class="field-error">{{ form.chambre.errors|join:", " }}</div>{% endif %}
+              {{ form.chambre_lit }}
+              {% if form.chambre_lit.errors %}<div class="field-error">{{ form.chambre_lit.errors|join:", " }}</div>{% endif %}
             {% endif %}
           </div>
 
@@ -1415,7 +1415,7 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
 
         {% if hosp.chambre %}
         <div id="decharge-preview" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:12px 16px;font-size:13px;color:#166534;">
-          <div style="font-weight:600;margin-bottom:4px;"><i class="bi bi-door-open"></i> Chambre : {{ hosp.chambre.nom }}</div>
+          <div style="font-weight:600;margin-bottom:4px;"><i class="bi bi-door-open"></i> Chambre : {{ hosp.chambre.nom }}{% if hosp.numero_lit %} — Lit {{ hosp.numero_lit }}{% endif %}</div>
           <div id="decharge-calc" style="color:#166534;"></div>
         </div>
         {% endif %}
@@ -1644,14 +1644,14 @@ document.getElementById('hosp-form').addEventListener('submit', function() {
   var btnHosp = document.getElementById('btn-hospitaliser');
   if (!btnHosp) return;
 
-  var chambreEl = document.getElementById('id_chambre');
+  var chambreEl = document.getElementById('id_chambre_lit');
 
   function update() {
     if (!chambreEl) return;
     var ts = chambreEl.tomselect;
     var v  = ts ? ts.getValue() : chambreEl.value;
     btnHosp.disabled = !(v && v !== '');
-    btnHosp.title    = btnHosp.disabled ? 'Sélectionnez une chambre' : 'Hospitaliser le patient';
+    btnHosp.title    = btnHosp.disabled ? 'Sélectionnez une chambre / un lit' : 'Hospitaliser le patient';
   }
 
   if (chambreEl) chambreEl.addEventListener('change', update);

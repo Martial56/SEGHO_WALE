@@ -4,37 +4,83 @@ from .models import Chambre, RegistreDeces, ListeControleAdmission, ListeVerific
 
 _ul = 'field-ul'
 
+STATUTS_ACTIFS = ['brouillon', 'confirme', 'hospitalise']
+
+
+def _build_chambre_lit_choices(instance=None):
+    """Retourne les choix (valeur, libellé) pour le select chambre/lit.
+
+    - Chambre à 1 lit  → "Chambre X"            si disponible
+    - Chambre à N lits → "Chambre X - Lit Y"     pour chaque lit non occupé
+
+    La valeur encodée est "{chambre_pk}_{lit_no}" :
+      lit_no = 0 pour les chambres mono-lit (pas de numérotation visible).
+    """
+    current_chambre_id = instance.chambre_id if instance and instance.pk else None
+    current_lit_no     = instance.numero_lit  if instance and instance.pk else None
+    current_pk         = instance.pk          if instance and instance.pk else None
+
+    occupied = set(
+        Hospitalisation.objects.filter(statut__in=STATUTS_ACTIFS)
+        .exclude(pk=current_pk)
+        .values_list('chambre_id', 'numero_lit')
+    )
+
+    choices = [('', 'Sélectionner une salle/chambre…')]
+    for chambre in Chambre.objects.order_by('salle_no'):
+        if chambre.nombre_lits == 1:
+            is_current = current_chambre_id == chambre.pk
+            if chambre.statut or is_current:
+                choices.append((f"{chambre.pk}_0", str(chambre)))
+        else:
+            for lit_no in range(1, chambre.nombre_lits + 1):
+                is_current = current_chambre_id == chambre.pk and current_lit_no == lit_no
+                if (chambre.pk, lit_no) not in occupied or is_current:
+                    choices.append((f"{chambre.pk}_{lit_no}", f"{chambre} - Lit {lit_no}"))
+    return choices
+
 
 class HospitalisationForm(forms.ModelForm):
+
+    chambre_lit = forms.ChoiceField(
+        required=False,
+        widget=forms.Select(attrs={'class': _ul}),
+        label="Salle/Chambre",
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         from patients.models import Patient as PatientModel
         from medecins.models import Medecin
-        from services.models import Articleservice
-        # Noms uniquement (sans code patient)
         self.fields['patient'].queryset = PatientModel.objects.all().order_by('nom')
         self.fields['patient'].label_from_instance = lambda p: f"{p.nom} {p.prenoms}"
         self.fields['medecin_traitant'].queryset = Medecin.objects.filter(actif=True).order_by('nom')
         self.fields['medecin_traitant'].label_from_instance = lambda m: f"{m.nom} {m.prenoms}"
         self.fields['medecin_referent'].queryset = Medecin.objects.filter(actif=True).order_by('nom')
         self.fields['medecin_referent'].label_from_instance = lambda m: f"{m.nom} {m.prenoms}"
-        self.fields['patient'].empty_label              = 'Rechercher un patient…'
-        self.fields['medecin_traitant'].empty_label     = 'Sélectionner un docteur…'
-        self.fields['maladie'].empty_label              = 'Sélectionner une maladie…'
-        self.fields['chambre'].empty_label              = 'Sélectionner une salle/chambre…'
-        self.fields['medecin_referent'].empty_label     = 'Sélectionner un médecin…'
-        # Chambres disponibles + toujours inclure la chambre déjà attribuée
-        # (quelle que soit sa disponibilité, pour qu'elle reste visible dans le select)
-        current_chambre_id = self.instance.chambre_id if self.instance and self.instance.pk else None
-        if current_chambre_id:
-            chambre_qs = Chambre.objects.filter(
-                Q(statut=True) | Q(pk=current_chambre_id)
-            ).distinct().order_by('salle_no')
-        else:
-            chambre_qs = Chambre.objects.filter(statut=True).order_by('salle_no')
-        self.fields['chambre'].queryset = chambre_qs
+        self.fields['patient'].empty_label          = 'Rechercher un patient…'
+        self.fields['medecin_traitant'].empty_label = 'Sélectionner un docteur…'
+        self.fields['maladie'].empty_label          = 'Sélectionner une maladie…'
+        self.fields['medecin_referent'].empty_label = 'Sélectionner un médecin…'
 
+        self.fields['chambre_lit'].choices = _build_chambre_lit_choices(self.instance)
+
+        # Valeur initiale depuis l'instance existante
+        if self.instance and self.instance.pk and self.instance.chambre_id:
+            lit = self.instance.numero_lit or 0
+            self.fields['chambre_lit'].initial = f"{self.instance.chambre_id}_{lit}"
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        val = self.cleaned_data.get('chambre_lit', '')
+        if val:
+            chambre_pk, lit_no = val.split('_', 1)
+            instance.chambre_id = int(chambre_pk)
+            instance.numero_lit = int(lit_no) if int(lit_no) > 0 else None
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
 
     class Meta:
         model  = Hospitalisation
@@ -42,7 +88,7 @@ class HospitalisationForm(forms.ModelForm):
             'patient', 'medecin_traitant', 'maladie',
             'date_admission',
             'nom_parent_gardien', 'phone_parent_gardien',
-            'medecin_referent', 'chambre',
+            'medecin_referent',
             'cas_legal', 'signale_police',
             'motif_admission', 'notes',
             'etablissement_destination', 'motif_reference',
@@ -55,7 +101,6 @@ class HospitalisationForm(forms.ModelForm):
             'nom_parent_gardien':         forms.TextInput(attrs={'class': _ul, 'placeholder': 'Nom du parent / gardien…'}),
             'phone_parent_gardien':       forms.TextInput(attrs={'class': _ul, 'placeholder': 'Numéro de téléphone…'}),
             'medecin_referent':           forms.Select(attrs={'class': _ul}),
-            'chambre':                    forms.Select(attrs={'class': _ul}),
             'cas_legal':                  forms.CheckboxInput(),
             'signale_police':             forms.RadioSelect(),
             'motif_admission':            forms.Textarea(attrs={'class': _ul, 'rows': 3, 'placeholder': "Motif d'admission…"}),
@@ -75,6 +120,7 @@ class ChambreForm(forms.ModelForm):
                 'placeholder': 'Nom de la chambre',
             }),
             'type_chambre':        forms.Select(attrs={'class': _ul}),
+            'nombre_lits':         forms.NumberInput(attrs={'class': _ul, 'min': 1}),
             'statut':              forms.Select(attrs={'class': _ul},
                                                 choices=[(True, 'Disponible'), (False, 'Occupée')]),
             'prive':               forms.CheckboxInput(attrs={'class': 'field-check'}),

@@ -249,24 +249,31 @@ def _transition_installer(hosp, user):
     ok, err = check_action(hosp, user, 'installer')
     if not ok:
         return False, err
-    # Défense en profondeur : chambre obligatoire même pour les superusers
     if not hosp.chambre_id:
         return False, "Une chambre doit être attribuée avant d'hospitaliser."
     from django.utils import timezone as tz
     with db_transaction.atomic():
-        # Verrouillage pessimiste : on récupère la chambre avec SELECT FOR UPDATE
-        # pour éviter deux installations simultanées dans la même chambre.
         chambre = Chambre.objects.select_for_update().get(pk=hosp.chambre_id)
-        if not chambre.statut:
-            return False, "Cette chambre n'est plus disponible."
+        if chambre.nombre_lits == 1:
+            if not chambre.statut:
+                return False, "Cette chambre n'est plus disponible."
+            chambre.statut = False
+            chambre.save(update_fields=['statut'])
+        else:
+            lit_no = hosp.numero_lit
+            if not lit_no:
+                return False, "Aucun lit sélectionné pour cette chambre."
+            deja_pris = Hospitalisation.objects.filter(
+                chambre=chambre, numero_lit=lit_no, statut='hospitalise'
+            ).exclude(pk=hosp.pk).exists()
+            if deja_pris:
+                return False, f"Le lit {lit_no} de cette chambre est déjà occupé."
         now = tz.now()
         hosp.statut = 'hospitalise'
         hosp.heure_entree = now
         hosp.modifie_par = user
         hosp.date_modification = now
         hosp.save(update_fields=['statut', 'heure_entree', 'modifie_par', 'date_modification'])
-        chambre.statut = False
-        chambre.save(update_fields=['statut'])
     log_event(hosp, user, "Statut changé : Hospitalisé — heure d'entrée figée à %s." % hosp.heure_entree.strftime('%H:%M'), type='statut')
     return True, None
 
@@ -291,7 +298,7 @@ def _transition_decharger(hosp, user):
     hosp.heure_sortie = now
     hosp.modifie_par = user
     hosp.date_modification = now
-    if hosp.chambre_id:
+    if hosp.chambre_id and hosp.chambre.nombre_lits == 1:
         hosp.chambre.statut = True
         hosp.chambre.save(update_fields=['statut'])
     hosp.save(update_fields=['statut', 'heure_sortie', 'modifie_par', 'date_modification'])
@@ -332,10 +339,10 @@ def _transition_annuler(hosp, user, motif=''):
     from facturation.models import Facture
     now = tz.now()
     statut_avant = hosp.statut
-    # Libérer la chambre si le patient était installé
     if statut_avant == 'hospitalise' and hosp.chambre_id:
-        hosp.chambre.statut = True
-        hosp.chambre.save(update_fields=['statut'])
+        if hosp.chambre.nombre_lits == 1:
+            hosp.chambre.statut = True
+            hosp.chambre.save(update_fields=['statut'])
         hosp.heure_sortie = now
     # Annuler les factures impayées (les factures payées sont conservées)
     Facture.objects.filter(hospitalisation=hosp).exclude(
@@ -395,7 +402,8 @@ def _apply_lock_protection(hosp, post_data, is_admin=False, facture_bloquante=Fa
     if hosp.medecin_traitant_id:
         data['medecin_traitant'] = str(hosp.medecin_traitant_id)
     if hosp.chambre_id:
-        data['chambre'] = str(hosp.chambre_id)
+        lit = hosp.numero_lit or 0
+        data['chambre_lit'] = f"{hosp.chambre_id}_{lit}"
     if hosp.date_admission:
         data['date_admission'] = hosp.date_admission.strftime('%Y-%m-%dT%H:%M')
     if (hosp.mise_en_observation or '').strip():

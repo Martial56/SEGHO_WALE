@@ -38,6 +38,7 @@ class Chambre(models.Model):
     type_chambre = models.CharField(max_length=20, choices=TYPE, default='general',
                                     verbose_name="Salle/Chambre Type")
     statut       = models.BooleanField(default=True, verbose_name="Disponible")
+    nombre_lits  = models.PositiveIntegerField(default=1, verbose_name="Nombre de lits")
 
     # Caractéristiques
     prive     = models.BooleanField(default=False, verbose_name="Privé")
@@ -127,6 +128,8 @@ class Hospitalisation(models.Model):
                                              verbose_name="Médecin référent")
     chambre              = models.ForeignKey(Chambre, on_delete=models.SET_NULL,
                                              null=True, blank=True, verbose_name="Salle/Chambre")
+    numero_lit           = models.PositiveIntegerField(null=True, blank=True,
+                                                       verbose_name="Numéro de lit")
 
     # Onglet Soins
     infirmiere_primaire  = models.ForeignKey(
