@@ -215,7 +215,6 @@ select.field-ul {
 @media(max-width:960px){ .hosp-page-layout { flex-direction:column; } .hosp-page-aside { width:100%; position:static; } }
 
 /* ── Patient Picker (AJAX) ── */
-#pp-patient select { display:none !important; }
 .pat-search-dd {
   display:none; position:fixed;
   background:#fff; border:1px solid rgba(0,0,0,.12);
@@ -409,7 +408,7 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
     {% else %}
       <button type="submit" form="hosp-form" name="action_confirmer"
               id="btn-confirmer-create" class="wf-btn wf-btn-confirmer" disabled
-              title="Sélectionnez un patient d'abord">CONFIRMER</button>
+              title="Sélectionnez un patient et un docteur d'abord">CONFIRMER</button>
     {% endif %}
 
     <div class="pipeline">
@@ -517,7 +516,8 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
               <input type="hidden" name="patient" value="{{ hosp.patient_id }}">
             {% else %}
               <div id="pp-patient">
-                {{ form.patient }}
+                <input type="hidden" name="patient" id="id_patient"
+                       value="{{ form.patient.value|default:'' }}">
                 <div id="pat-search-wrap">
                   <input type="text" id="pat-search-input" class="field-ul"
                          placeholder="Rechercher un patient…" autocomplete="off">
@@ -1588,7 +1588,7 @@ document.getElementById('hosp-form').addEventListener('submit', function() {
   });
 });
 
-// ── Bouton CONFIRMER activé seulement si patient sélectionné (création) ──
+// ── Bouton CONFIRMER activé seulement si patient + docteur sélectionnés (création) ──
 (function() {
   var btn = document.getElementById('btn-confirmer-create');
   if (!btn) return;
@@ -1596,31 +1596,46 @@ document.getElementById('hosp-form').addEventListener('submit', function() {
   var patientEl = document.getElementById('id_patient');
   if (!patientEl) return;
 
-  var chambreEl2 = document.getElementById('id_chambre');
+  var medecinEl  = document.getElementById('id_medecin_traitant');
+  var patBanner  = document.getElementById('patient-banner');
+
+  function patSelected() {
+    if (patientEl.value) return true;
+    return !!(patBanner && patBanner.style.display === 'grid');
+  }
+
+  function medSelected() {
+    if (!medecinEl) return false;
+    if (medecinEl.value) return true;
+    if (medecinEl.tomselect && medecinEl.tomselect.getValue()) return true;
+    return false;
+  }
 
   function update() {
-    var patVal = patientEl.tomselect ? patientEl.tomselect.getValue() : patientEl.value;
-    var chamVal = chambreEl2 ? (chambreEl2.tomselect ? chambreEl2.tomselect.getValue() : chambreEl2.value) : '';
-    var ok = (patVal && patVal !== '') && (chamVal && chamVal !== '');
+    var ok = patSelected() && medSelected();
     btn.disabled = !ok;
-    btn.title = !patVal || patVal === '' ? "Sélectionnez un patient d'abord"
-              : !chamVal || chamVal === '' ? "Attribuez une chambre avant de confirmer"
+    btn.title = !patSelected() ? "Sélectionnez un patient d'abord"
+              : !medSelected() ? "Sélectionnez un docteur avant de confirmer"
               : '';
   }
 
-  patientEl.addEventListener('change', update);
-  if (chambreEl2) chambreEl2.addEventListener('change', update);
+  // Exposé pour appel direct depuis le patient picker
+  window._updateConfirmerBtn = update;
 
-  var tries = 0;
-  var timer = setInterval(function() {
-    tries++;
-    update();
-    if (chambreEl2 && chambreEl2.tomselect && !chambreEl2._confHooked) {
-      chambreEl2.tomselect.on('change', update);
-      chambreEl2._confHooked = true;
+  // Écoute native patient (dispatchEvent depuis showBanner)
+  patientEl.addEventListener('change', update);
+
+  // Écoute native medecin + hook TomSelect direct
+  if (medecinEl) {
+    medecinEl.addEventListener('change', update);
+    if (medecinEl.tomselect) {
+      medecinEl.tomselect.on('change', update);
     }
-    if (tries >= 20) clearInterval(timer);
-  }, 100);
+  }
+
+  // Polling de secours toutes les 300ms
+  setInterval(update, 300);
+  update();
 })();
 
 
@@ -1840,6 +1855,7 @@ document.getElementById('modal-annul-form').addEventListener('click', function(e
     searchWrap.style.display = 'none';
     searchInput.value = '';
     dropdown.style.display = 'none';
+    if (window._updateConfirmerBtn) window._updateConfirmerBtn();
   }
 
   window.patDeselect = function() {
@@ -1850,6 +1866,7 @@ document.getElementById('modal-annul-form').addEventListener('click', function(e
     searchInput.value = '';
     dropdown.style.display = 'none';
     setTimeout(function() { searchInput.focus(); }, 0);
+    if (window._updateConfirmerBtn) window._updateConfirmerBtn();
   };
 
   searchInput.addEventListener('input', function() {

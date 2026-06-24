@@ -206,7 +206,7 @@ def rdv_global_list(request):
     elif filter_val == 'not_done':
         qs = qs.filter(statut__in=['planifie', 'confirme'])
     else:
-        qs = qs.filter(date_heure__date=today)
+        qs = qs.filter(date_heure__date=today).exclude(statut='termine')
 
     paginator = Paginator(qs, 25)
     page_obj  = paginator.get_page(request.GET.get('page'))
@@ -230,24 +230,39 @@ def patient_info_json(request, pk):
 
 @login_required
 def patient_search_json(request):
-    q = request.GET.get('q', '').strip()
-    if len(q) < 1:
-        return JsonResponse({'results': []})
-    qs = Patient.objects.filter(
-        Q(nom__icontains=q) | Q(prenoms__icontains=q) |
-        Q(code_patient__icontains=q) | Q(telephone__icontains=q)
-    ).order_by('nom', 'prenoms')[:20]
-    results = [
-        {
+    def _to_dict(p):
+        return {
             'id': p.pk,
             'nom_complet': f"{p.nom} {p.prenoms}",
             'code': p.code_patient,
             'telephone': p.telephone or '',
+            'age': p.age,
+            'sexe_display': p.get_sexe_display(),
+            'adresse': p.adresse or '',
+            'assurance_nom': p.assurance.nom if p.assurance_id else '',
             'actif': p.actif,
         }
-        for p in qs
-    ]
-    return JsonResponse({'results': results})
+
+    pk = request.GET.get('id', '').strip()
+    if pk:
+        try:
+            p = Patient.objects.select_related('assurance').get(pk=int(pk))
+            return JsonResponse({'results': [_to_dict(p)]})
+        except (Patient.DoesNotExist, ValueError):
+            return JsonResponse({'results': []})
+
+    q = request.GET.get('q', '').strip()
+    base_qs = Patient.objects.select_related('assurance').order_by('nom', 'prenoms')
+    if not q:
+        qs = base_qs[:20]
+    elif len(q) < 2:
+        return JsonResponse({'results': []})
+    else:
+        qs = base_qs.filter(
+            Q(nom__icontains=q) | Q(prenoms__icontains=q) |
+            Q(code_patient__icontains=q) | Q(telephone__icontains=q)
+        )[:20]
+    return JsonResponse({'results': [_to_dict(p) for p in qs]})
 
 
 @login_required

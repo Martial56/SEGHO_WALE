@@ -68,8 +68,8 @@ def get_actions_disponibles(hosp, user):
     elif statut == 'brouillon':
         if not hosp.patient_id:
             result['confirmer'] = _act(True, False, "Sélectionnez un patient avant de confirmer")
-        elif not hosp.chambre_id:
-            result['confirmer'] = _act(True, False, "Attribuez une chambre avant de confirmer")
+        elif not hosp.medecin_traitant_id:
+            result['confirmer'] = _act(True, False, "Sélectionnez un docteur avant de confirmer")
         else:
             result['confirmer'] = _act(True, True)
     else:  # confirme, hospitalise

@@ -13,7 +13,7 @@ class HospitalisationForm(forms.ModelForm):
         from medecins.models import Medecin
         from services.models import Articleservice
         # Noms uniquement (sans code patient)
-        self.fields['patient'].queryset = PatientModel.objects.filter(actif=True).order_by('nom')
+        self.fields['patient'].queryset = PatientModel.objects.all().order_by('nom')
         self.fields['patient'].label_from_instance = lambda p: f"{p.nom} {p.prenoms}"
         self.fields['medecin_traitant'].queryset = Medecin.objects.filter(actif=True).order_by('nom')
         self.fields['medecin_traitant'].label_from_instance = lambda m: f"{m.nom} {m.prenoms}"

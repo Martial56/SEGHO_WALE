@@ -1601,10 +1601,10 @@
     }
 
     function doSearch(q) {
-        if (!q) { dropdown.style.display = 'none'; return; }
         fetch(SEARCH_URL + '?q=' + encodeURIComponent(q))
             .then(function(r){ return r.json(); })
-            .then(function(d){ renderResults(d.results, q); });
+            .then(function(d){ renderResults(d.results, q); })
+            .catch(function() { dropdown.style.display = 'none'; });
     }
 
     function selectPatient(id, nom) {
@@ -1630,6 +1630,12 @@
     }
 
     if (searchInput) {
+        searchInput.addEventListener('focus', function() {
+            if (!patientHidden.value) {
+                clearTimeout(searchTimer);
+                searchTimer = setTimeout(function(){ doSearch(searchInput.value.trim()); }, 100);
+            }
+        });
         searchInput.addEventListener('input', function() {
             clearTimeout(searchTimer);
             var q = this.value.trim();
