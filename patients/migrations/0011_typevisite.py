@@ -25,4 +25,9 @@ class Migration(migrations.Migration):
                 'ordering': ['nom'],
             },
         ),
+        migrations.AddField(
+            model_name='rendezvous',
+            name='type_rdv',
+            field=models.CharField(choices=[('consultation', 'Consultation'), ('controle', 'Contrôle'), ('urgence', 'Urgence'), ('examen', 'Examen'), ('vaccination', 'Vaccination')], default='consultation', max_length=20),
+        ),
     ]

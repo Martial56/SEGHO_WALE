@@ -106,7 +106,7 @@ html[data-theme="dark"] .ret-info { background: rgba(45,153,219,.12); color: #90
           <select name="produit" id="sel-produit" class="st-select" required>
             <option value="">— Sélectionner un produit —</option>
             {% for p in produits %}
-            <option value="{{ p.pk }}" data-unite="{{ p.unite_mesure }}">
+            <option value="{{ p.pk }}" data-unite="{{ p.unite_mesure.code|default:'' }}">
               {% if p.code %}{{ p.code }} — {% endif %}{{ p.nom }}
             </option>
             {% endfor %}
@@ -134,7 +134,7 @@ html[data-theme="dark"] .ret-info { background: rgba(45,153,219,.12); color: #90
           </label>
           <input
             type="number" name="quantite" id="id_quantite"
-            class="st-input" required min="1" step="1"
+            class="st-input" required min="0.01" step="0.01"
             placeholder="0.00">
           <div id="unite-hint" style="font-size:11px;color:var(--st-muted);margin-top:4px;display:none;"></div>
         </div>
@@ -171,7 +171,7 @@ var LOTS_PAR_PRODUIT = {
     {% for lot in p.lots.all %}
     {
       "pk": "{{ lot.pk }}",
-      "label": "{{ lot.numero_lot|escapejs }}{% if lot.quantite_actuelle is not None %} — {{ lot.quantite_actuelle|floatformat:0 }} {{ p.unite_mesure|escapejs }}{% endif %}"
+      "label": "{{ lot.numero_lot|escapejs }}{% if lot.quantite_actuelle is not None %} — {{ lot.quantite_actuelle|floatformat:0 }} {{ p.unite_mesure.code|default:''|escapejs }}{% endif %}"
     }{% if not forloop.last %},{% endif %}
     {% endfor %}
   ]{% if not forloop.last %},{% endif %}

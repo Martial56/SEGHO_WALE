@@ -1,0 +1,319 @@
+{% extends 'stock/base.html' %}
+{% load static %}
+{% block topbar_title %}Stock — Unités de mesure{% endblock %}
+
+{% block extra_st_css %}<style>
+.st-page-header {
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 32px;margin:0 -32px;
+  background:#f2f7ee;border-bottom:1px solid rgba(0,0,0,.05);
+  box-shadow:0 2px 8px rgba(0,0,0,.04);
+  position:sticky;top:calc(var(--topbar-h) + 44px);z-index:100;
+}
+html[data-theme="dark"] .st-page-header { background:var(--st-surface); }
+.st-search {
+  display:flex;align-items:center;
+  border-bottom:1.5px solid rgba(0,0,0,.18);padding:5px 6px;
+  background:transparent;min-width:200px;
+}
+.st-search input { border:none;background:transparent;font-size:13px;color:var(--st-text);outline:none;width:100%; }
+.st-search i { color:var(--st-muted);font-size:14px;margin-right:6px; }
+.badge-actif   { background:rgba(22,169,107,.1);color:#0d7a4c;border:1px solid rgba(22,169,107,.25);padding:2px 9px;border-radius:20px;font-size:10.5px;font-weight:600; }
+.badge-inactif { background:rgba(160,160,160,.12);color:#666;border:1px solid rgba(0,0,0,.12);padding:2px 9px;border-radius:20px;font-size:10.5px;font-weight:600; }
+
+/* Groupe header */
+.st-group-header td {
+  background:var(--st-100);font-size:10.5px;font-weight:800;
+  text-transform:uppercase;letter-spacing:.5px;color:var(--st-700);
+  padding:6px 12px;border-top:2px solid var(--st-300);
+  cursor:pointer;user-select:none;
+}
+.st-group-header:hover td { background:var(--st-200); }
+html[data-theme="dark"] .st-group-header td { background:rgba(154,184,138,.08);color:var(--st-300);border-top-color:var(--st-700); }
+html[data-theme="dark"] .st-group-header:hover td { background:rgba(154,184,138,.15); }
+
+/* Chevron toggle */
+.grp-chevron {
+  display:inline-block;margin-right:6px;
+  transition:transform .2s ease;font-size:12px;
+  color:var(--st-500);
+}
+.grp-collapsed .grp-chevron { transform:rotate(-90deg); }
+
+/* Lignes masquées */
+tr.grp-row-hidden { display:none; }
+
+/* Pill filtre catégorie */
+.cat-pill {
+  display:inline-flex;align-items:center;gap:5px;
+  padding:4px 11px;border-radius:20px;font-size:11.5px;font-weight:600;
+  border:1.5px solid var(--st-300);color:var(--st-700);
+  background:transparent;cursor:pointer;text-decoration:none;
+  transition:background .12s,color .12s;white-space:nowrap;
+}
+.cat-pill:hover, .cat-pill.active {
+  background:var(--st-600);color:#fff;border-color:var(--st-600);
+}
+
+/* Pagination */
+.st-pagination {
+  display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:10px;
+  padding:12px 32px;margin:0 -32px;
+  background:var(--st-surface);border-top:1px solid var(--st-100);
+}
+.st-pag-info { font-size:12px;color:var(--st-muted); }
+.st-pag-nav  { display:flex;align-items:center;gap:4px; }
+.st-pag-btn {
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:32px;height:32px;padding:0 8px;
+  border-radius:7px;font-size:12.5px;font-weight:600;
+  border:1.5px solid var(--st-200);color:var(--st-700);
+  background:transparent;text-decoration:none;cursor:pointer;
+  transition:background .12s,color .12s,border-color .12s;
+}
+.st-pag-btn:hover   { background:var(--st-100);border-color:var(--st-300); }
+.st-pag-btn.active  { background:var(--st-600);color:#fff;border-color:var(--st-600); }
+.st-pag-btn.disabled{ opacity:.35;pointer-events:none; }
+.st-pag-ellipsis    { font-size:12px;color:var(--st-muted);padding:0 4px; }
+.per-page-select {
+  border:none;border-bottom:1.5px solid var(--st-200);
+  background:transparent;font-size:12px;color:var(--st-text);
+  padding:3px 4px;outline:none;cursor:pointer;
+}
+</style>{% endblock %}
+
+{% block content %}
+
+<div class="st-page-header">
+  <div>
+    <div style="font-size:15px;font-weight:800;color:var(--st-900);">
+      <i class="bi bi-rulers" style="color:var(--st-600);"></i> Unités de mesure
+    </div>
+    <div style="font-size:11.5px;color:var(--st-muted);">
+      {{ total }} unité{{ total|pluralize }} — {{ total_filtre }} affichée{{ total_filtre|pluralize }}
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+    <form method="get" style="display:flex;align-items:center;gap:8px;">
+      {% if cat_filtre %}<input type="hidden" name="cat" value="{{ cat_filtre }}">{% endif %}
+      <div class="st-search">
+        <i class="bi bi-search"></i>
+        <input type="text" name="q" value="{{ q }}" placeholder="Nom, code, groupe…">
+      </div>
+      <button type="submit" class="btn-st" style="padding:6px 14px;"><i class="bi bi-search"></i></button>
+      {% if q or cat_filtre %}<a href="{% url 'stock_unites' %}" class="btn-st-outline" style="padding:6px 12px;"><i class="bi bi-x-lg"></i></a>{% endif %}
+    </form>
+    <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--st-muted);">
+      Afficher
+      <form method="get" id="per-page-form" style="display:inline;">
+        {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
+        {% if cat_filtre %}<input type="hidden" name="cat" value="{{ cat_filtre }}">{% endif %}
+        <select name="per_page" class="per-page-select" onchange="document.getElementById('per-page-form').submit()">
+          <option value="5"  {% if per_page == 5  %}selected{% endif %}>5</option>
+          <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
+          <option value="20" {% if per_page == 20 %}selected{% endif %}>20</option>
+          <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+        </select>
+      </form>
+      lignes
+    </div>
+    <a href="{% url 'stock_unite_create' %}" class="btn-st">
+      <i class="bi bi-plus-lg"></i> Nouvelle unité
+    </a>
+  </div>
+</div>
+
+<!-- Filtres par catégorie (pills) -->
+{% if categories %}
+<div style="display:flex;flex-wrap:wrap;gap:6px;padding:12px 0 4px;">
+  <a href="?{% if q %}q={{ q }}&{% endif %}"
+     class="cat-pill {% if not cat_filtre %}active{% endif %}">
+    <i class="bi bi-grid"></i> Toutes
+  </a>
+  {% for cat in categories %}
+  <a href="?{% if q %}q={{ q }}&{% endif %}cat={{ cat|urlencode }}"
+     class="cat-pill {% if cat_filtre == cat %}active{% endif %}">
+    {{ cat }}
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Tableau -->
+<div style="margin-top:10px;margin-left:-32px;margin-right:-32px;background:var(--st-surface);box-shadow:0 2px 12px rgba(58,89,36,.08);overflow:hidden;">
+  <table class="st-table">
+    <thead>
+      <tr>
+        <th style="width:60px;">#</th>
+        <th>Nom</th>
+        <th style="width:120px;">Abréviation</th>
+        <th>Groupe</th>
+        <th style="width:100px;">Statut</th>
+        <th style="width:90px;text-align:center;">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% if unites %}
+      {% regroup unites by categorie as groupes %}
+      {% for groupe in groupes %}
+        {% if not cat_filtre %}
+        <tr class="st-group-header" data-grp="{{ forloop.counter }}">
+          <td colspan="6">
+            <i class="bi bi-chevron-down grp-chevron"></i>
+            {% if groupe.grouper %}
+              <i class="bi bi-folder2-open" style="margin-right:4px;"></i>{{ groupe.grouper }}
+            {% else %}
+              <i class="bi bi-question-circle" style="margin-right:4px;opacity:.5;"></i>Sans groupe
+            {% endif %}
+            <span style="font-weight:400;opacity:.7;margin-left:6px;">({{ groupe.list|length }})</span>
+          </td>
+        </tr>
+        {% endif %}
+        {% for obj in groupe.list %}
+        <tr data-grp-row="{{ forloop.parentloop.counter }}">
+          <td style="color:var(--st-muted);font-size:11px;">{{ forloop.counter }}</td>
+          <td style="font-weight:600;color:var(--st-text);">{{ obj.nom }}</td>
+          <td>
+            <span style="font-family:monospace;font-size:12px;background:var(--st-100);color:var(--st-700);padding:2px 8px;border-radius:4px;border:1px solid var(--st-200);">
+              {{ obj.code }}
+            </span>
+          </td>
+          <td style="font-size:12px;color:var(--st-muted);">
+            {% if obj.categorie %}
+            <a href="?cat={{ obj.categorie|urlencode }}" style="color:var(--st-600);text-decoration:none;font-weight:500;">
+              {{ obj.categorie }}
+            </a>
+            {% else %}—{% endif %}
+          </td>
+          <td>
+            {% if obj.actif %}
+              <span class="badge-actif"><i class="bi bi-check-circle-fill"></i> Actif</span>
+            {% else %}
+              <span class="badge-inactif">Inactif</span>
+            {% endif %}
+          </td>
+          <td style="text-align:center;">
+            <div style="display:flex;gap:4px;justify-content:center;">
+              <a href="{% url 'stock_unite_edit' obj.pk %}" class="btn-st-outline" style="padding:3px 10px;font-size:11.5px;" title="Modifier">
+                <i class="bi bi-pencil"></i>
+              </a>
+              <form method="post" action="{% url 'stock_unite_delete' obj.pk %}"
+                    onsubmit="return confirm('Supprimer « {{ obj.nom }} » ?');" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn-st-outline" style="padding:3px 10px;font-size:11.5px;border-color:#e84545;color:#e84545;" title="Supprimer">
+                  <i class="bi bi-trash3"></i>
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      {% endfor %}
+    {% else %}
+    <tr>
+      <td colspan="6" style="text-align:center;padding:48px;color:var(--st-muted);">
+        <i class="bi bi-rulers" style="font-size:28px;display:block;margin-bottom:10px;opacity:.3;"></i>
+        Aucune unité de mesure{% if q %} pour « {{ q }} »{% endif %}{% if cat_filtre %} dans « {{ cat_filtre }} »{% endif %}.
+        <br>
+        <a href="{% url 'stock_unite_create' %}" class="btn-st" style="margin-top:12px;display:inline-flex;">
+          <i class="bi bi-plus-lg"></i> Ajouter une unité
+        </a>
+      </td>
+    </tr>
+    {% endif %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Pagination -->
+{% if page_obj.paginator.num_pages > 1 %}
+{% with p=page_obj %}
+<div class="st-pagination">
+  <div class="st-pag-info">
+    Page {{ p.number }} / {{ p.paginator.num_pages }}
+    &nbsp;·&nbsp;
+    {% with start=p.start_index end=p.end_index %}
+    Unités {{ start }}–{{ end }} sur {{ total_filtre }}
+    {% endwith %}
+  </div>
+
+  <nav class="st-pag-nav" aria-label="Pagination">
+    {% if p.has_previous %}
+    <a class="st-pag-btn" href="?{% if q %}q={{ q }}&{% endif %}{% if cat_filtre %}cat={{ cat_filtre }}&{% endif %}per_page={{ per_page }}&page=1" title="Première page">
+      <i class="bi bi-chevron-double-left"></i>
+    </a>
+    <a class="st-pag-btn" href="?{% if q %}q={{ q }}&{% endif %}{% if cat_filtre %}cat={{ cat_filtre }}&{% endif %}per_page={{ per_page }}&page={{ p.previous_page_number }}" title="Page précédente">
+      <i class="bi bi-chevron-left"></i>
+    </a>
+    {% else %}
+    <span class="st-pag-btn disabled"><i class="bi bi-chevron-double-left"></i></span>
+    <span class="st-pag-btn disabled"><i class="bi bi-chevron-left"></i></span>
+    {% endif %}
+
+    {% for num in p.paginator.page_range %}
+      {% if num == p.number %}
+        <span class="st-pag-btn active">{{ num }}</span>
+      {% elif num == 1 or num == p.paginator.num_pages or num >= p.number|add:"-2" and num <= p.number|add:"2" %}
+        <a class="st-pag-btn" href="?{% if q %}q={{ q }}&{% endif %}{% if cat_filtre %}cat={{ cat_filtre }}&{% endif %}per_page={{ per_page }}&page={{ num }}">{{ num }}</a>
+      {% elif num == p.number|add:"-3" or num == p.number|add:"3" %}
+        <span class="st-pag-ellipsis">…</span>
+      {% endif %}
+    {% endfor %}
+
+    {% if p.has_next %}
+    <a class="st-pag-btn" href="?{% if q %}q={{ q }}&{% endif %}{% if cat_filtre %}cat={{ cat_filtre }}&{% endif %}per_page={{ per_page }}&page={{ p.next_page_number }}" title="Page suivante">
+      <i class="bi bi-chevron-right"></i>
+    </a>
+    <a class="st-pag-btn" href="?{% if q %}q={{ q }}&{% endif %}{% if cat_filtre %}cat={{ cat_filtre }}&{% endif %}per_page={{ per_page }}&page={{ p.paginator.num_pages }}" title="Dernière page">
+      <i class="bi bi-chevron-double-right"></i>
+    </a>
+    {% else %}
+    <span class="st-pag-btn disabled"><i class="bi bi-chevron-right"></i></span>
+    <span class="st-pag-btn disabled"><i class="bi bi-chevron-double-right"></i></span>
+    {% endif %}
+  </nav>
+</div>
+{% endwith %}
+{% endif %}
+
+<script>
+(function () {
+  const STORAGE_KEY = 'unites_grp_state';
+
+  function loadState() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+    catch { return {}; }
+  }
+  function saveState(state) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  function collapse(headerRow, save) {
+    const grp = headerRow.dataset.grp;
+    document.querySelectorAll(`tr[data-grp-row="${grp}"]`).forEach(r => r.classList.add('grp-row-hidden'));
+    headerRow.classList.add('grp-collapsed');
+    if (save) { const s = loadState(); s[grp] = 1; saveState(s); }
+  }
+  function expand(headerRow, save) {
+    const grp = headerRow.dataset.grp;
+    document.querySelectorAll(`tr[data-grp-row="${grp}"]`).forEach(r => r.classList.remove('grp-row-hidden'));
+    headerRow.classList.remove('grp-collapsed');
+    if (save) { const s = loadState(); delete s[grp]; saveState(s); }
+  }
+
+  document.querySelectorAll('.st-group-header[data-grp]').forEach(headerRow => {
+    const grp = headerRow.dataset.grp;
+    const state = loadState();
+
+    if (state[grp]) collapse(headerRow, false);
+
+    headerRow.addEventListener('click', () => {
+      if (headerRow.classList.contains('grp-collapsed')) expand(headerRow, true);
+      else collapse(headerRow, true);
+    });
+  });
+})();
+</script>
+
+{% endblock %}

@@ -1,9 +1,104 @@
-{% extends 'base.html' %}
+﻿{% extends 'base.html' %}
 {% load i18n static %}
 {% block topbar_title %}Hospitalisation{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
+<style>
+/* ── Dropdown nav ── */
+.o-nav-drop-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.o-nav-drop-trigger {
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  user-select: none;
+}
+.o-nav-drop-trigger .chev {
+  font-size: 10px;
+  opacity: .55;
+  transition: transform .18s;
+}
+.o-nav-drop-wrap.open .chev { transform: rotate(180deg); }
+
+.o-nav-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 1px);
+  left: 0;
+  min-width: 230px;
+  background: #fff;
+  border: 1px solid rgba(0,0,0,.1);
+  border-radius: 6px;
+  box-shadow: 0 6px 24px rgba(0,0,0,.12);
+  z-index: 600;
+  padding: 4px 0;
+  overflow: hidden;
+}
+.o-nav-drop-wrap.open .o-nav-dropdown { display: block; }
+
+.o-nav-drop-item {
+  display: block;
+  padding: 8px 16px;
+  font-size: 13px;
+  color: rgba(0,0,0,.72);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background .12s, color .12s;
+}
+.o-nav-drop-item:hover { background: rgba(58,89,36,.07); color: var(--teal-700); }
+.o-nav-drop-item.active { color: var(--teal-700); font-weight: 600; background: rgba(58,89,36,.07); }
+.o-nav-drop-item.sub { padding-left: 28px; }
+
+.o-nav-drop-section {
+  padding: 8px 16px 3px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: rgba(0,0,0,.38);
+  border-top: 1px solid rgba(0,0,0,.06);
+  margin-top: 2px;
+}
+.o-nav-drop-section:first-child { border-top: none; margin-top: 0; }
+
+html[data-theme="dark"] .o-nav-dropdown {
+  background: #201d1d;
+  border-color: rgba(255,255,255,.08);
+  box-shadow: 0 6px 24px rgba(0,0,0,.4);
+}
+html[data-theme="dark"] .o-nav-drop-item { color: var(--teal-200); }
+html[data-theme="dark"] .o-nav-drop-item:hover { background: rgba(58,89,36,.15); }
+html[data-theme="dark"] .o-nav-drop-item.active { background: rgba(58,89,36,.2); color: var(--teal-300); }
+html[data-theme="dark"] .o-nav-drop-section { color: rgba(255,255,255,.3); border-top-color: rgba(255,255,255,.06); }
+</style>
+<style>
+  .content { padding-top: 0 !important; }
+  .breadcrumb { display: none !important; }
+</style>
+<script>
+  (function () {
+    function syncTopbarH() {
+      var topbar = document.querySelector('.topbar');
+      if (topbar) {
+        document.documentElement.style.setProperty('--topbar-h', topbar.getBoundingClientRect().height + 'px');
+      }
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', syncTopbarH);
+    } else {
+      syncTopbarH();
+    }
+    window.addEventListener('resize', syncTopbarH);
+  })();
+</script>
 {% include 'hospitalisation/includes/layout_css.html' %}
 {% endblock %}
 

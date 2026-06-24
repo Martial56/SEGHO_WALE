@@ -90,24 +90,149 @@ details > .det-body {
   border-radius: 0 0 8px 8px; overflow: hidden;
 }
 
+/* Éléments uniquement pour l'impression */
+.print-header, .print-section-title, .print-footer { display: none; }
+
 /* ── Impression ── */
 @media print {
-  .bil-head .o-back-btn,
-  .bil-head .mois-nav,
-  .bil-head form,
-  .bil-head .btn-st { display: none !important; }
-  .bil-head { position: static !important; box-shadow: none !important; border-bottom: 2px solid #ccc !important; }
-  .st-nav, #st-menu-overlay, #st-menu-popup { display: none !important; }
-  details { display: block !important; }
+  @page {
+    size: A4 portrait;
+    margin: 15mm 12mm 18mm;
+  }
+
+  /* Masquer tout l'UI chrome */
+  .bil-head, .st-nav, #st-menu-overlay, #st-menu-popup,
+  .bil-head .o-back-btn, .bil-head .mois-nav,
+  .bil-head form, .bil-head .btn-st,
+  .topbar, #topbar { display: none !important; }
+
+  body, .content { padding: 0 !important; margin: 0 !important; font-size: 10pt; color: #000; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  /* ── En-tête d'impression ── */
+  .print-header {
+    display: block !important;
+    border-bottom: 2.5pt solid #2d5a1b;
+    padding-bottom: 8pt;
+    margin-bottom: 14pt;
+  }
+  .print-header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12pt;
+  }
+  .print-org { font-size: 10pt; color: #444; }
+  .print-org strong { font-size: 13pt; color: #1a3a0a; display: block; }
+  .print-org span { font-size: 8.5pt; }
+  .print-report-title { text-align: right; }
+  .print-report-title h1 {
+    font-size: 15pt; font-weight: 900; color: #2d5a1b;
+    margin: 0 0 2pt; text-transform: uppercase; letter-spacing: .5pt;
+  }
+  .print-report-title p { font-size: 9pt; color: #555; margin: 0; }
+  .print-period-bar {
+    margin-top: 8pt;
+    background: #eef6e8;
+    border: 1pt solid #a8d48a;
+    border-radius: 4pt;
+    padding: 5pt 10pt;
+    font-size: 10pt; font-weight: 700; color: #1a3a0a;
+    text-align: center;
+    letter-spacing: .3pt;
+  }
+
+  /* ── Statistiques ── */
+  .bil-stats {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 8pt !important;
+    margin: 10pt 0 !important;
+    page-break-inside: avoid;
+  }
+  .bil-stat {
+    border: 1pt solid #ccc !important;
+    border-radius: 5pt !important;
+    padding: 8pt 10pt !important;
+    box-shadow: none !important;
+    page-break-inside: avoid;
+  }
+  .bil-stat-icon { width: 30pt !important; height: 30pt !important; font-size: 14pt !important; }
+  .bil-stat-val  { font-size: 16pt !important; }
+  .bil-stat-sub, .bil-stat-lbl { font-size: 8pt !important; }
+
+  /* ── Top 5 ── */
+  .st-card { box-shadow: none !important; border: 1pt solid #ccc !important; border-radius: 5pt !important; margin: 8pt 0 !important; page-break-inside: avoid; }
+  .st-card-header { background: #eef6e8 !important; padding: 6pt 12pt !important; }
+  .st-card-title  { font-size: 10pt !important; }
+  .top5-row { padding: 4pt 0 !important; }
+  .top5-name { font-size: 9pt !important; }
+  .top5-qty, .top5-pct { font-size: 9pt !important; }
+  .top5-bar-fill { background: #2d5a1b !important; }
+
+  /* ── Sections détails → toujours ouvertes ── */
+  details { display: block !important; margin-bottom: 10pt !important; page-break-inside: avoid; }
   details > summary { display: none !important; }
-  details > .det-body { border: 1px solid #ddd !important; border-radius: 6px !important; }
-  .content { padding: 0 !important; }
-  body { font-size: 11px; }
-  .bil-stats { grid-template-columns: repeat(3, 1fr) !important; }
+  details > .det-body {
+    border: 1pt solid #ccc !important;
+    border-radius: 0 0 5pt 5pt !important;
+  }
+
+  /* Titres de section en remplacement du summary */
+  .print-section-title {
+    display: flex !important;
+    align-items: center; gap: 6pt;
+    font-size: 10pt; font-weight: 800; color: #1a3a0a;
+    background: #eef6e8;
+    border: 1pt solid #ccc; border-bottom: none;
+    border-radius: 5pt 5pt 0 0;
+    padding: 6pt 12pt;
+    page-break-after: avoid;
+  }
+
+  /* ── Tableaux ── */
+  .st-table { font-size: 8.5pt !important; width: 100% !important; border-collapse: collapse !important; }
+  .st-table th {
+    background: #f0f7ea !important; color: #1a3a0a !important;
+    font-size: 7.5pt !important; padding: 4pt 6pt !important;
+    border-bottom: 1.5pt solid #a8d48a !important;
+    text-transform: uppercase; letter-spacing: .3pt;
+  }
+  .st-table td { padding: 4pt 6pt !important; border-bottom: .5pt solid #e0e0e0 !important; }
+  .st-table tr:last-child td { border-bottom: none !important; }
+
+  /* ── Retours ── */
+  .st-card .st-table { page-break-inside: avoid; }
+
+  /* ── Pied de page ── */
+  .print-footer {
+    display: block !important;
+    position: fixed; bottom: 0; left: 0; right: 0;
+    border-top: 1pt solid #ccc;
+    padding: 4pt 12mm;
+    font-size: 7.5pt; color: #888;
+    display: flex; justify-content: space-between;
+  }
 }
 </style>{% endblock %}
 
 {% block content %}
+
+<!-- ══ En-tête d'impression (masqué à l'écran) ══ -->
+<div class="print-header">
+  <div class="print-header-top">
+    <div class="print-org">
+      <strong>Centre Médico-Social WALÉ</strong>
+      <span>Yamoussoukro, Côte d'Ivoire</span>
+    </div>
+    <div class="print-report-title">
+      <h1>Bilan Mensuel du Stock</h1>
+      <p>Imprimé le {{ today|date:"d/m/Y" }}</p>
+    </div>
+  </div>
+  <div class="print-period-bar">
+    Période : {{ mois_nom }} {{ annee }}
+  </div>
+</div>
 
 <!-- ══ En-tête sticky ══ -->
 <div class="bil-head">
@@ -265,6 +390,11 @@ details > .det-body {
 <div style="margin-top:20px;">
 
   <!-- Entrées -->
+  <div class="print-section-title">
+    <i class="bi bi-arrow-down-circle-fill" style="color:#0d7a4c;"></i>
+    Entrées de stock
+    <span style="font-weight:400;font-size:9pt;margin-left:8pt;">{{ entrees|length }} mouvement{{ entrees|length|pluralize }}</span>
+  </div>
   <details>
     <summary>
       <i class="bi bi-arrow-down-circle-fill" style="color:#0d7a4c;"></i>
@@ -305,6 +435,11 @@ details > .det-body {
   </details>
 
   <!-- Sorties / Dotations -->
+  <div class="print-section-title">
+    <i class="bi bi-bag-check-fill" style="color:#1565c0;"></i>
+    Sorties &amp; Dotations pharmacies
+    <span style="font-weight:400;font-size:9pt;margin-left:8pt;">{{ sorties|length }} mouvement{{ sorties|length|pluralize }}</span>
+  </div>
   <details>
     <summary>
       <i class="bi bi-bag-check-fill" style="color:#1565c0;"></i>
@@ -345,6 +480,11 @@ details > .det-body {
   </details>
 
   <!-- Péremptions -->
+  <div class="print-section-title">
+    <i class="bi bi-calendar-x-fill" style="color:#b71c1c;"></i>
+    Péremptions
+    <span style="font-weight:400;font-size:9pt;margin-left:8pt;">{{ peremptes|length }} mouvement{{ peremptes|length|pluralize }}</span>
+  </div>
   <details>
     <summary>
       <i class="bi bi-calendar-x-fill" style="color:#b71c1c;"></i>
@@ -412,5 +552,11 @@ details > .det-body {
   </table>
 </div>
 {% endif %}
+
+<!-- Pied de page d'impression -->
+<div class="print-footer">
+  <span>Centre Médico-Social WALÉ — Bilan Mensuel Stock — {{ mois_nom }} {{ annee }}</span>
+  <span>Document généré le {{ today|date:"d/m/Y" }}</span>
+</div>
 
 {% endblock %}

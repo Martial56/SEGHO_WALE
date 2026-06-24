@@ -2,6 +2,19 @@ from django.db import models
 from django.utils import timezone
 
 
+class UniteMesure(models.Model):
+    nom       = models.CharField(max_length=100, unique=True, verbose_name="Nom")
+    code      = models.CharField(max_length=20,  unique=True, verbose_name="Abréviation")
+    categorie = models.CharField(max_length=100, blank=True, null=True, default='', verbose_name="Groupe / Catégorie")
+    actif     = models.BooleanField(default=True, verbose_name="Actif")
+
+    def __str__(self): return f"{self.nom} ({self.code})"
+    class Meta:
+        verbose_name = "Unité de mesure"
+        verbose_name_plural = "Unités de mesure"
+        ordering = ['categorie', 'nom']
+
+
 class CategorieStock(models.Model):
     TYPE_CHOICES = [
         ('medicament',  'Médicament'),
@@ -45,7 +58,7 @@ class Produit(models.Model):
         'achats.Fournisseur', on_delete=models.SET_NULL, null=True, blank=True
     )
     description  = models.TextField(blank=True)
-    unite_mesure = models.CharField(max_length=30, default='unité')
+    unite_mesure = models.ForeignKey('stock.UniteMesure', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Unité de mesure")
 
     # Champs spécifiques médicaments
     dci    = models.CharField("DCI / Principe actif", max_length=200, blank=True)

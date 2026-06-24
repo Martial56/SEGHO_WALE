@@ -86,8 +86,8 @@
     /* Patient banner */
     .patient-banner {
         display: flex; align-items: center; gap: 14px;
-        padding: 10px 20px; background: #f0f5fa; border-radius: 6px;
-        margin-top: 12px; border: 1px solid #a8c8d8;
+        padding: 10px 20px; background: #f0f9f8; border-radius: 6px;
+        margin-top: 12px; border: 1px solid #b2dfdb;
     }
     .patient-banner-av {
         width: 36px; height: 36px; border-radius: 50%;
@@ -121,7 +121,7 @@
     .btn-remove-line:hover { color: var(--rose,#e11d48); }
     .btn-add-line {
         display: inline-flex; align-items: center; gap: 6px;
-        background: none; border: 1px dashed #a8c8d8; border-radius: 5px;
+        background: none; border: 1px dashed #b2dfdb; border-radius: 5px;
         color: var(--teal-600); font-size: 12.5px; font-weight: 600;
         padding: 7px 16px; cursor: pointer; margin-top: 12px;
         font-family: 'Sora', sans-serif; transition: background 0.15s;
@@ -146,7 +146,7 @@
         display: inline-block; border-radius: 4px; padding: 2px 8px;
         font-size: 11.5px; font-weight: 700; min-width: 28px; text-align: center;
     }
-    .stock-ok      { background: #e8f2f7; color: #1a6d8c; }
+    .stock-ok      { background: #f0fdf4; color: #15803d; }
     .stock-low     { background: #fffbeb; color: #b45309; }
     .stock-empty   { background: #fff0f0; color: #b91c1c; }
     .stock-unknown { color: rgba(0,0,0,0.25); font-size: 12px; }
@@ -159,7 +159,7 @@
 <nav class="breadcrumb">
     <a href="{% url 'dashboard' %}"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z"/><polyline points="9 21 9 12 15 12 15 21"/></svg>Accueil</a>
     <span class="breadcrumb-sep">›</span>
-    <a href="{% url 'ordonnance_list' %}">Ordonnances</a>
+    <a href="{% url 'pharmacie:ordonnance_list' %}">Ordonnances</a>
     {% if patient %}
     <span class="breadcrumb-sep">›</span>
     <span>{{ patient.nom }} {{ patient.prenoms }}</span>
@@ -173,7 +173,7 @@
 
 {% if messages %}
 {% for msg in messages %}
-<div style="margin:12px 24px 0;padding:10px 16px;border-radius:6px;font-size:13px;{% if msg.tags == 'error' %}background:#fff0f0;border:1px solid #fca5a5;color:#b91c1c{% else %}background:#e8f2f7;border:1px solid #86d0ef;color:#1a6d8c{% endif %}">{{ msg }}</div>
+<div style="margin:12px 24px 0;padding:10px 16px;border-radius:6px;font-size:13px;{% if msg.tags == 'error' %}background:#fff0f0;border:1px solid #fca5a5;color:#b91c1c{% else %}background:#f0fdf4;border:1px solid #86efac;color:#15803d{% endif %}">{{ msg }}</div>
 {% endfor %}
 {% endif %}
 
@@ -187,16 +187,16 @@
 <div class="ord-panel">
     <div class="ord-top">
         <div class="ord-breadcrumb">
-            <a href="{% url 'ordonnance_list' %}">Ordonnances</a>
+            <a href="{% url 'pharmacie:ordonnance_list' %}">Ordonnances</a>
             <span class="sep">/</span>
             <span class="current">Nouvelle ordonnance</span>
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
-            <button type="submit" class="btn-save" id="btn-save" {% if not patient or not medecin_preselect %}disabled{% endif %}>
+            <button type="submit" class="btn-save" id="btn-save" {% if not patient %}disabled{% endif %}>
                 <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2" style="vertical-align:-2px;margin-right:4px"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
                 Sauvegarder
             </button>
-            <a href="{% url 'ordonnance_list' %}" class="btn-discard">Annuler</a>
+            <a href="{% url 'pharmacie:ordonnance_list' %}" class="btn-discard">Annuler</a>
         </div>
     </div>
 </div>
@@ -246,18 +246,6 @@
             <div class="ord-grid">
                 <div>
                     <div class="ord-field">
-                        <label class="ord-label">Médecin prescripteur <span style="color:var(--rose)">*</span></label>
-                        <select name="medecin_id" id="medecin-select" class="ord-input" required>
-                            <option value="">— Sélectionner un médecin —</option>
-                            {% for med in medecins %}
-                            <option value="{{ med.pk }}"
-                                {% if medecin_preselect and medecin_preselect.pk == med.pk %}selected{% endif %}>
-                                Dr. {{ med.nom }} {{ med.prenoms }}{% if med.specialite %} ({{ med.specialite }}){% endif %}
-                            </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="ord-field" style="margin-top:8px;">
                         <label class="ord-label">Type d'ordonnance</label>
                         <select name="type_ordonnance" class="ord-input">
                             {% for val, lbl in types %}<option value="{{ val }}">{{ lbl }}</option>{% endfor %}
@@ -294,28 +282,10 @@
                     </tr>
                 </thead>
                 <tbody id="lines-body">
-                    {% if initial_lignes %}
-                        {% for ligne in initial_lignes %}
-                        <tr class="line-row">
-                            <td>
-                                <div class="med-ac-wrap">
-                                    <input type="text" class="line-input med-search" name="medicament_libre[]" placeholder="Rechercher…" autocomplete="off" value="{{ ligne.med_nom }}">
-                                    <div class="med-ac-dropdown"></div>
-                                    <input type="hidden" name="medicament[]" class="med-id-hidden" value="{{ ligne.med_id }}">
-                                </div>
-                            </td>
-                            <td><input type="text" name="posologie[]" class="line-input" placeholder="Ex : 1cp matin et soir" value="{{ ligne.posologie }}"></td>
-                            <td><input type="text" name="duree[]" class="line-input" placeholder="Ex : 7 jours" value="{{ ligne.duree }}"></td>
-                            <td><input type="number" name="quantite[]" class="line-input qty" value="{{ ligne.quantite }}" min="1"></td>
-                            <td style="text-align:center;"><span class="stock-badge stock-unknown med-stock-display">—</span></td>
-                            <td><button type="button" class="btn-remove-line" title="Supprimer">✕</button></td>
-                        </tr>
-                        {% endfor %}
-                    {% else %}
                     <tr class="line-row">
                         <td>
                             <div class="med-ac-wrap">
-                                <input type="text" class="line-input med-search" name="medicament_libre[]" placeholder="Rechercher…" autocomplete="off">
+                                <input type="text" class="line-input med-search" placeholder="Rechercher…" autocomplete="off">
                                 <div class="med-ac-dropdown"></div>
                                 <input type="hidden" name="medicament[]" class="med-id-hidden" value="">
                             </div>
@@ -326,7 +296,6 @@
                         <td style="text-align:center;"><span class="stock-badge stock-unknown med-stock-display">—</span></td>
                         <td><button type="button" class="btn-remove-line" title="Supprimer">✕</button></td>
                     </tr>
-                    {% endif %}
                 </tbody>
             </table>
             <button type="button" class="btn-add-line" id="btn-add-line">
@@ -340,23 +309,8 @@
 </form>
 
 <script>
-const MEDS = {{ medicaments_dispo|default:"[]"|safe }};
+const MEDS = {{ medicaments_dispo|safe }};
 const patientPreselected = {{ patient|yesno:"true,false" }};
-const medecinPreselected = {{ medecin_preselect|yesno:"true,false" }};
-
-const btnSave      = document.getElementById('btn-save');
-const medecinSel   = document.getElementById('medecin-select');
-
-function updateSaveBtn(patientSelected) {
-    const medecinOk = medecinSel && medecinSel.value !== '';
-    const patOk = patientSelected !== undefined ? patientSelected : (patientPreselected || document.getElementById('patient-id-hidden').value !== '');
-    btnSave.disabled = !(patOk && medecinOk);
-}
-
-/* ── Médecin prescripteur ── */
-if (medecinSel) {
-    medecinSel.addEventListener('change', () => updateSaveBtn());
-}
 
 /* ── Recherche patient ── */
 if (!patientPreselected) {
@@ -367,12 +321,12 @@ if (!patientPreselected) {
     const patAv       = document.getElementById('pat-av');
     const patName     = document.getElementById('pat-name');
     const patMeta     = document.getElementById('pat-meta');
+    const btnSave     = document.getElementById('btn-save');
     let timer;
 
     searchInput.addEventListener('input', function () {
         clearTimeout(timer);
-        hiddenId.value = '';
-        updateSaveBtn(false);
+        hiddenId.value = ''; btnSave.disabled = true;
         banner.style.display = 'none';
         const q = this.value.trim();
         if (q.length < 2) { dropdown.style.display = 'none'; return; }
@@ -406,7 +360,7 @@ if (!patientPreselected) {
                                 patName.textContent = item.dataset.nom;
                                 patMeta.textContent = item.dataset.code;
                                 banner.style.display = 'flex';
-                                updateSaveBtn(true);
+                                btnSave.disabled = false;
                             });
                         });
                     }
@@ -478,7 +432,7 @@ function setupLine(row) {
                   data-minimum="${m.stock_minimum ?? 5}">
                 <div class="med-ac-name">${m.designation}</div>
                 <div class="med-ac-sub">${m.dosage||''} ${m.forme||''}
-                    <span style="float:right;margin-left:8px;font-weight:600;color:${(m.stock_actuel||0) > (m.stock_alerte||10) ? '#1a6d8c' : (m.stock_actuel||0) > 0 ? '#b45309' : '#b91c1c'}">
+                    <span style="float:right;margin-left:8px;font-weight:600;color:${(m.stock_actuel||0) > (m.stock_alerte||10) ? '#15803d' : (m.stock_actuel||0) > 0 ? '#b45309' : '#b91c1c'}">
                         Stock : ${m.stock_actuel ?? '—'}
                     </span>
                 </div>

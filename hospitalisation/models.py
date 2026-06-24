@@ -247,7 +247,7 @@ class VisiteInfirmiere(models.Model):
                                         null=True, blank=True, verbose_name="Soin / Acte")
     quantite        = models.DecimalField(max_digits=8, decimal_places=2, default=1,
                                           verbose_name="Quantité")
-    unite_mesure    = models.ForeignKey('services.UniteMesure', on_delete=models.SET_NULL,
+    unite_mesure    = models.ForeignKey('stock.UniteMesure', on_delete=models.SET_NULL,
                                         null=True, blank=True, verbose_name="Unité de mesure")
     infirmiere      = models.ForeignKey('medecins.Medecin', on_delete=models.SET_NULL,
                                         null=True, blank=True, verbose_name="Infirmière")
@@ -279,14 +279,13 @@ class ServiceAFacturer(models.Model):
         ('visite_infirmiere', 'Visite infirmière'),
         ('visite_docteur',    'Visite docteur'),
         ('soin',              'Soin apporté'),
-        ('meo',               'Mise en observation'),
         ('manuel',            'Manuel'),
     ]
     hospitalisation = models.ForeignKey('Hospitalisation', on_delete=models.CASCADE,
                                         related_name='services_a_facturer')
     service      = models.ForeignKey('services.Articleservice', on_delete=models.SET_NULL,
                                      null=True, blank=True, verbose_name="Service")
-    unite_mesure = models.ForeignKey('services.UniteMesure', on_delete=models.SET_NULL,
+    unite_mesure = models.ForeignKey('stock.UniteMesure', on_delete=models.SET_NULL,
                                      null=True, blank=True, verbose_name="Unité de mesure")
     quantite     = models.DecimalField(max_digits=8, decimal_places=2, default=1, verbose_name="Quantité")
     date         = models.DateField(null=True, blank=True, verbose_name="Date")

@@ -6,7 +6,7 @@ from django.utils import timezone
 from django.core.paginator import Paginator
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
-from .models import Produit, CategorieStock, LotProduit, MouvementStock, CommandeStock, LigneCommande, Inventaire, LigneInventaire, DemandePharmacie, LigneDemande, PHARMACIES, FicheBesoins, LigneFicheBesoins
+from .models import Produit, CategorieStock, LotProduit, MouvementStock, CommandeStock, LigneCommande, Inventaire, LigneInventaire, DemandePharmacie, LigneDemande, PHARMACIES, FicheBesoins, LigneFicheBesoins, UniteMesure
 from achats.models import Fournisseur
 
 
@@ -215,6 +215,7 @@ def produit_detail(request, pk):
 def produit_create(request):
     categories  = CategorieStock.objects.filter(actif=True).order_by('nom')
     fournisseurs = Fournisseur.objects.filter(actif=True).order_by('nom')
+    unites      = UniteMesure.objects.filter(actif=True).order_by('categorie', 'nom')
     errors = {}
 
     if request.method == 'POST':
@@ -223,12 +224,13 @@ def produit_create(request):
         if not nom:
             errors['nom'] = 'Le nom est obligatoire.'
         if not errors:
+            um_pk = request.POST.get('unite_mesure', '')
             p = Produit(
                 nom=nom, type=type_,
                 dci=request.POST.get('dci', '').strip(),
                 dosage=request.POST.get('dosage', '').strip(),
                 forme=request.POST.get('forme', ''),
-                unite_mesure=request.POST.get('unite_mesure', 'unité').strip() or 'unité',
+                unite_mesure_id=int(um_pk) if um_pk.isdigit() else None,
                 description=request.POST.get('description', '').strip(),
                 prescription_obligatoire=request.POST.get('prescription_obligatoire') == 'on',
             )
@@ -254,6 +256,7 @@ def produit_create(request):
         'mode':         'create',
         'categories':   categories,
         'fournisseurs': fournisseurs,
+        'unites':       unites,
         'errors':       errors,
         'post':         request.POST if request.method == 'POST' else None,
     })
@@ -264,6 +267,7 @@ def produit_edit(request, pk):
     produit = get_object_or_404(Produit, pk=pk)
     categories   = CategorieStock.objects.filter(actif=True).order_by('nom')
     fournisseurs = Fournisseur.objects.filter(actif=True).order_by('nom')
+    unites       = UniteMesure.objects.filter(actif=True).order_by('categorie', 'nom')
     errors = {}
 
     if request.method == 'POST':
@@ -271,12 +275,13 @@ def produit_edit(request, pk):
         if not nom:
             errors['nom'] = 'Le nom est obligatoire.'
         if not errors:
+            um_pk = request.POST.get('unite_mesure', '')
             produit.nom   = nom
             produit.type  = request.POST.get('type', produit.type)
             produit.dci   = request.POST.get('dci', '').strip()
             produit.dosage = request.POST.get('dosage', '').strip()
             produit.forme  = request.POST.get('forme', '')
-            produit.unite_mesure = request.POST.get('unite_mesure', 'unité').strip() or 'unité'
+            produit.unite_mesure_id = int(um_pk) if um_pk.isdigit() else None
             produit.description  = request.POST.get('description', '').strip()
             produit.prescription_obligatoire = request.POST.get('prescription_obligatoire') == 'on'
             produit.actif = request.POST.get('actif') != 'off'
@@ -301,6 +306,7 @@ def produit_edit(request, pk):
         'produit':      produit,
         'categories':   categories,
         'fournisseurs': fournisseurs,
+        'unites':       unites,
         'errors':       errors,
     })
 
@@ -326,10 +332,19 @@ def mouvements_list(request):
     elif periode == 'month':
         qs = qs.filter(date__month=today.month, date__year=today.year)
 
-    paginator = Paginator(qs, 40)
+    try:
+        per_page = int(request.GET.get('per_page', 20))
+        if per_page not in (10, 20, 40, 50, 100):
+            per_page = 20
+    except ValueError:
+        per_page = 20
+
+    paginator = Paginator(qs, per_page)
     page_obj  = paginator.get_page(request.GET.get('page'))
     return render(request, 'stock/mouvements/list.html', {
         'page_obj':    page_obj,
+        'per_page':    per_page,
+        'total':       qs.count(),
         'type_filtre': type_filtre,
         'periode':     periode,
         'q':           q,
@@ -1496,7 +1511,7 @@ def retour_create(request):
             lot.quantite_actuelle = float(lot.quantite_actuelle) + qte
             lot.save(update_fields=['quantite_actuelle'])
 
-        messages.success(request, f'Retour de {qte:.0f} {produit.unite_mesure} enregistré pour « {produit.nom} ».')
+        messages.success(request, f'Retour de {qte:.0f} {produit.unite_mesure.code if produit.unite_mesure else "unité(s)"} enregistré pour « {produit.nom} ».')
         return redirect('stock_mouvements')
 
     produits  = Produit.objects.filter(actif=True).order_by('nom')
@@ -1530,7 +1545,7 @@ def export_stock_excel(request):
         writer.writerow([
             p.code, p.nom, p.get_type_display(),
             p.categorie.nom if p.categorie else '',
-            p.unite_mesure, p.stock_actuel, p.stock_alerte,
+            p.unite_mesure.code if p.unite_mesure else '', p.stock_actuel, p.stock_alerte,
             p.prix_achat, p.prix_vente, etat,
         ])
     return response
@@ -1562,7 +1577,7 @@ def transfert_create(request):
         if quantite <= 0:
             errors['quantite'] = 'La quantité doit être supérieure à 0.'
         elif produit and float(produit.stock_actuel) < quantite:
-            errors['quantite'] = f'Stock insuffisant — disponible : {produit.stock_actuel} {produit.unite_mesure}.'
+            errors['quantite'] = f'Stock insuffisant — disponible : {produit.stock_actuel} {produit.unite_mesure.code if produit.unite_mesure else "unité(s)"}.'
 
         if not errors:
             stock_avant = float(produit.stock_actuel)
@@ -1577,7 +1592,7 @@ def transfert_create(request):
             )
             produit.stock_actuel = stock_apres
             produit.save(update_fields=['stock_actuel'])
-            messages.success(request, f'{quantite} {produit.unite_mesure} de « {produit.nom} » livrés à {pharma_label}.')
+            messages.success(request, f'{quantite} {produit.unite_mesure.code if produit.unite_mesure else "unité(s)"} de « {produit.nom} » livrés à {pharma_label}.')
             return redirect('stock_mouvements')
 
     return render(request, 'stock/transfert/form.html', {
@@ -1889,7 +1904,7 @@ def fiche_envoyer_achats(request, pk):
         LigneBesoin.objects.create(
             besoin=besoin, produit=ligne.produit,
             quantite=qte,
-            unite=ligne.produit.unite_mesure or 'unité',
+            unite=ligne.produit.unite_mesure.code if ligne.produit.unite_mesure else 'unité',
         )
         lignes_creees += 1
 
@@ -1989,3 +2004,114 @@ def integrer_reception(request, pk):
 
     messages.success(request, f'Réception {reception.numero} intégrée dans le stock.')
     return redirect('stock_receptions_a_integrer')
+
+
+# ── Unités de mesure ──────────────────────────────────────────────────────────
+
+@login_required(login_url='login')
+def unites_list(request):
+    q          = request.GET.get('q', '').strip()
+    cat_filtre = request.GET.get('cat', '').strip()
+    try:
+        per_page = int(request.GET.get('per_page', 10))
+        if per_page not in (5, 10, 20, 50):
+            per_page = 10
+    except ValueError:
+        per_page = 10
+
+    qs = UniteMesure.objects.all()
+    if q:
+        qs = qs.filter(Q(nom__icontains=q) | Q(code__icontains=q) | Q(categorie__icontains=q))
+    if cat_filtre:
+        qs = qs.filter(categorie=cat_filtre)
+
+    categories = (UniteMesure.objects
+                  .exclude(categorie__in=['', None])
+                  .values_list('categorie', flat=True)
+                  .distinct()
+                  .order_by('categorie'))
+
+    total_filtre = qs.count()
+    paginator  = Paginator(qs, per_page)
+    page_num   = request.GET.get('page', 1)
+    page_obj   = paginator.get_page(page_num)
+
+    return render(request, 'stock/unites/list.html', {
+        'unites':       page_obj.object_list,
+        'page_obj':     page_obj,
+        'paginator':    paginator,
+        'per_page':     per_page,
+        'q':            q,
+        'cat_filtre':   cat_filtre,
+        'categories':   list(categories),
+        'total':        UniteMesure.objects.count(),
+        'total_filtre': total_filtre,
+    })
+
+
+def _get_unite_form():
+    from django import forms as dj_forms
+
+    class UniteMesureForm(dj_forms.ModelForm):
+        class Meta:
+            model = UniteMesure
+            fields = ['nom', 'code', 'categorie', 'actif']
+            widgets = {
+                'nom':       dj_forms.TextInput(attrs={'class': 'field-ul', 'placeholder': 'Ex : Millilitre'}),
+                'code':      dj_forms.TextInput(attrs={'class': 'field-ul', 'placeholder': 'Ex : ml'}),
+                'categorie': dj_forms.TextInput(attrs={'class': 'field-ul', 'placeholder': 'Ex : Volume, Poids, Forme galénique…', 'list': 'cats-list'}),
+            }
+    return UniteMesureForm
+
+
+@login_required(login_url='login')
+def unite_create(request):
+    Form = _get_unite_form()
+    categories = list(UniteMesure.objects.exclude(categorie__in=['', None]).values_list('categorie', flat=True).distinct().order_by('categorie'))
+    if request.method == 'POST':
+        form = Form(request.POST)
+        if form.is_valid():
+            obj = form.save()
+            messages.success(request, f'Unité « {obj.nom} » créée.')
+            return redirect('stock_unites')
+        messages.error(request, 'Veuillez corriger les erreurs.')
+    else:
+        form = Form()
+    return render(request, 'stock/unites/form.html', {'form': form, 'titre': 'Nouvelle unité de mesure', 'edit': False, 'categories': categories})
+
+
+@login_required(login_url='login')
+def unite_edit(request, pk):
+    Form = _get_unite_form()
+    obj = get_object_or_404(UniteMesure, pk=pk)
+    categories = list(UniteMesure.objects.exclude(categorie__in=['', None]).values_list('categorie', flat=True).distinct().order_by('categorie'))
+    if request.method == 'POST':
+        form = Form(request.POST, instance=obj)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'Unité « {obj.nom} » mise à jour.')
+            return redirect('stock_unites')
+        messages.error(request, 'Veuillez corriger les erreurs.')
+    else:
+        form = Form(instance=obj)
+    return render(request, 'stock/unites/form.html', {'form': form, 'obj': obj, 'titre': f'Modifier — {obj.nom}', 'edit': True, 'categories': categories})
+
+
+@login_required(login_url='login')
+@require_POST
+def unite_delete(request, pk):
+    obj = get_object_or_404(UniteMesure, pk=pk)
+    nom = obj.nom
+    obj.delete()
+    messages.success(request, f'Unité « {nom} » supprimée.')
+    return redirect('stock_unites')
+
+
+@login_required(login_url='login')
+@require_POST
+def unite_bulk_delete(request):
+    ids = request.POST.getlist('ids[]')
+    if ids:
+        count, _ = UniteMesure.objects.filter(pk__in=ids).delete()
+        return JsonResponse({'ok': True, 'count': count})
+    return JsonResponse({'ok': False}, status=400)

@@ -3,134 +3,322 @@
 {% block title %}Nouvel inventaire physique — {{ label }}{% endblock %}
 
 {% block content %}
+<style>
+  .inv-group-row td {
+    background: var(--ph-100);
+    color: var(--ph-800);
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    padding: 6px 14px;
+    border-left: 3px solid var(--ph-500);
+  }
+  html[data-theme="dark"] .inv-group-row td {
+    background: rgba(255,255,255,.05);
+    color: var(--ph-300);
+  }
+  .inv-row-changed {
+    background: rgba(90,150,60,.06) !important;
+  }
+  html[data-theme="dark"] .inv-row-changed {
+    background: rgba(154,184,138,.07) !important;
+  }
+  .ecart-pos { color: #166534; font-weight: 700; }
+  .ecart-neg { color: #991b1b; font-weight: 700; }
+  .ecart-zero { color: var(--ph-muted); }
+  html[data-theme="dark"] .ecart-pos { color: #86efac; }
+  html[data-theme="dark"] .ecart-neg { color: #fca5a5; }
+  .inv-input-reel {
+    width: 90px;
+    border: 1.5px solid var(--ph-300);
+    border-radius: 6px;
+    padding: 5px 8px;
+    font-size: 13px;
+    text-align: right;
+    background: var(--ph-surface);
+    color: var(--ph-text);
+    font-family: inherit;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .inv-input-reel:focus {
+    outline: none;
+    border-color: var(--ph-500);
+    box-shadow: 0 0 0 3px rgba(94,128,80,.18);
+  }
+  .inv-input-reel.changed {
+    border-color: var(--ph-600);
+    background: rgba(94,128,80,.06);
+  }
+  .inv-input-theo {
+    width: 80px;
+    background: transparent;
+    border: none;
+    color: var(--ph-muted);
+    font-size: 13px;
+    text-align: right;
+    font-family: inherit;
+    pointer-events: none;
+  }
+  .badge-summary {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 600;
+  }
+  .badge-total  { background: var(--ph-100); color: var(--ph-700); }
+  .badge-ecart  { background: rgba(239,68,68,.1); color: #991b1b; }
+  .badge-ok     { background: rgba(22,163,74,.1); color: #166534; }
+  html[data-theme="dark"] .badge-total { background: rgba(255,255,255,.08); color: var(--ph-300); }
+  html[data-theme="dark"] .badge-ecart { background: rgba(252,165,165,.1); color: #fca5a5; }
+  html[data-theme="dark"] .badge-ok    { background: rgba(134,239,172,.1); color: #86efac; }
+</style>
+
 <form method="post" id="form-inventaire">
   {% csrf_token %}
 
   {# ===== En-tête sticky ===== #}
   <div style="position:sticky; top:calc(var(--topbar-h) + 44px); z-index:100;
               background:var(--ph-surface); border-bottom:1px solid var(--ph-border);
-              box-shadow:0 2px 8px rgba(0,0,0,.06); padding:10px 20px 10px 32px;
-              display:flex; align-items:center; justify-content:space-between; gap:12px;">
-    <div style="font-size:14px; font-weight:800; color:var(--ph-900);">Nouvel inventaire physique</div>
-    <button type="submit" class="btn-ph" style="font-size:11.5px; padding:5px 14px;">
-      <i class="bi bi-save me-1"></i>Enregistrer
-    </button>
+              box-shadow:0 2px 8px rgba(0,0,0,.06); padding:10px 20px 10px 24px;
+              display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+    <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+      <span style="font-size:14px; font-weight:800; color:var(--ph-900);">Nouvel inventaire physique</span>
+      <span class="badge-summary badge-total" id="badge-total">
+        <i class="bi bi-boxes"></i> <span id="cnt-total">0</span> produits
+      </span>
+      <span class="badge-summary badge-ecart" id="badge-ecart" style="display:none;">
+        <i class="bi bi-exclamation-triangle-fill"></i> <span id="cnt-ecart">0</span> écart(s)
+      </span>
+      <span class="badge-summary badge-ok" id="badge-ok" style="display:none;">
+        <i class="bi bi-check-circle-fill"></i> <span id="cnt-ok">0</span> conforme(s)
+      </span>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <button type="button" class="btn-ph-outline" id="btn-tout-confirmer" style="font-size:11.5px; padding:5px 12px;">
+        <i class="bi bi-check2-all"></i> Tout confirmer
+      </button>
+      <button type="submit" class="btn-ph" style="font-size:11.5px; padding:5px 14px;">
+        <i class="bi bi-save me-1"></i>Enregistrer
+      </button>
+    </div>
   </div>
 
   <div class="container-fluid px-3 py-3">
 
     {# ===== Message d'information ===== #}
-    <div class="alert alert-info d-flex align-items-start gap-2" role="alert">
+    <div class="alert alert-info d-flex align-items-start gap-2 mb-3" role="alert" style="font-size:13px;">
       <i class="bi bi-info-circle-fill flex-shrink-0 mt-1"></i>
-      <span>Saisissez les quantités physiquement comptées. Le stock théorique est pré-rempli.</span>
+      <span>Saisissez les quantités physiquement comptées. Le stock théorique est pré-rempli. La colonne <strong>Écart</strong> se met à jour en temps réel.</span>
     </div>
 
     {# ===== Section date et notes ===== #}
-    <div class="card mb-3">
-      <div class="card-body row g-3 align-items-start">
-        <div class="col-12 col-md-3">
-          <label for="date_inventaire" class="form-label fw-semibold">Date de l'inventaire</label>
-          <input
-            type="date"
-            id="date_inventaire"
-            name="date_inventaire"
-            class="form-control"
-            value="{{ today|date:'Y-m-d' }}"
-            required
-          >
-        </div>
-        <div class="col-12 col-md-9">
-          <label for="notes" class="form-label fw-semibold">Notes</label>
-          <textarea
-            id="notes"
-            name="notes"
-            class="form-control"
-            rows="3"
-            placeholder="Observations, conditions de comptage…"
-          ></textarea>
+    <div class="ph-card mb-3">
+      <div class="ph-card-header">
+        <span class="ph-card-title"><i class="bi bi-calendar3"></i> Informations générales</span>
+      </div>
+      <div class="ph-card-body">
+        <div class="row g-3 align-items-start">
+          <div class="col-12 col-sm-auto">
+            <div class="ph-field mb-0">
+              <label class="ph-label" for="date_inventaire">Date de l'inventaire</label>
+              <input
+                type="date"
+                id="date_inventaire"
+                name="date_inventaire"
+                class="ph-input"
+                style="width:160px;"
+                value="{{ today|date:'Y-m-d' }}"
+                required
+              >
+            </div>
+          </div>
+          <div class="col">
+            <div class="ph-field mb-0">
+              <label class="ph-label" for="notes">Notes / Observations</label>
+              <input
+                type="text"
+                id="notes"
+                name="notes"
+                class="ph-input"
+                placeholder="Conditions de comptage, remarques…"
+              >
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
     {# ===== Tableau des produits ===== #}
-    <div class="table-responsive" style="overflow-x:auto;">
-      <div style="padding:12px 20px 12px 32px;font-weight:600;font-size:.95rem;border-bottom:1px solid #dee2e6;">Produits en stock</div>
-      <table class="table table-bordered table-hover align-middle mb-3 w-100">
-        <thead class="table-dark sticky-top" style="top:56px;">
-          <tr>
-            <th scope="col" style="width:120px">Code</th>
-            <th scope="col">Produit</th>
-            <th scope="col" class="text-center text-muted" style="width:180px;">
-              Stock théorique
-              <small class="d-block fw-normal fst-italic">(lecture seule)</small>
-            </th>
-            <th scope="col" class="text-center" style="width:200px">Stock réel constaté</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for sp in stock_items %}
-
-            {# Séparateur de groupe par type de produit #}
-            {% ifchanged sp.produit.type_produit %}
-            <tr class="table-secondary">
-              <td colspan="4" class="fw-bold text-uppercase small py-1 px-3" style="letter-spacing:.05em;">
-                {{ sp.produit.get_type_produit_display|default:sp.produit.type_produit }}
-              </td>
-            </tr>
-            {% endifchanged %}
-
+    <div class="ph-card">
+      <div class="ph-card-header">
+        <span class="ph-card-title"><i class="bi bi-clipboard2-check"></i> Produits en stock</span>
+        <span style="font-size:11.5px; color:var(--ph-muted);">{{ stock_items|length }} article(s)</span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="ph-table" id="inv-table">
+          <thead>
             <tr>
-              <td class="font-monospace small" style="">{{ sp.produit.code }}</td>
-              <td>
-                <span class="fw-semibold">{{ sp.produit.nom }}</span>
-                {% if sp.produit.unite %}
-                  <small class="text-muted ms-1">({{ sp.produit.unite }})</small>
-                {% endif %}
-              </td>
-              <td class="text-center bg-light text-muted">
-                <input
-                  type="number"
-                  class="form-control form-control-sm text-center bg-light text-muted border-0"
-                  value="{{ sp.quantite|floatformat:0 }}"
-                  readonly
-                  tabindex="-1"
-                  aria-label="Stock théorique — lecture seule"
-                  style="pointer-events:none;"
-                >
-              </td>
-              <td class="text-center" style="">
-                <input
-                  type="number"
-                  name="reel_{{ sp.produit.pk }}"
-                  id="reel_{{ sp.produit.pk }}"
-                  class="form-control form-control-sm text-center"
-                  value="{{ sp.quantite|floatformat:0 }}"
-                  min="0"
-                  step="1"
-                  required
-                  aria-label="Stock réel constaté pour {{ sp.produit.nom }}"
-                >
-              </td>
+              <th style="width:120px;">Code</th>
+              <th>Produit</th>
+              <th style="width:110px; text-align:right;">Stock théorique</th>
+              <th style="width:120px; text-align:right;">Stock réel compté</th>
+              <th style="width:100px; text-align:right;">Écart</th>
             </tr>
+          </thead>
+          <tbody>
+            {% for sp in stock_items %}
 
-          {% empty %}
-            <tr>
-              <td colspan="4" class="text-center text-muted py-4">
-                Aucun produit en stock pour cette pharmacie.
-              </td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+              {# Séparateur de groupe par type de produit #}
+              {% ifchanged sp.produit.type %}
+              <tr class="inv-group-row">
+                <td colspan="5">
+                  <i class="bi bi-tag-fill me-1"></i>{{ sp.produit.get_type_display|default:sp.produit.type }}
+                </td>
+              </tr>
+              {% endifchanged %}
+
+              <tr class="inv-data-row" data-theo="{{ sp.quantite|floatformat:0 }}">
+                <td class="font-monospace" style="font-size:11.5px; color:var(--ph-muted);">{{ sp.produit.code }}</td>
+                <td>
+                  <span class="fw-semibold" style="font-size:13px;">{{ sp.produit.nom }}</span>
+                  {% if sp.produit.unite %}
+                    <small class="text-muted ms-1" style="font-size:11px;">({{ sp.produit.unite }})</small>
+                  {% endif %}
+                  {% if sp.produit.dci and sp.produit.dci != sp.produit.nom %}
+                    <br><small style="color:var(--ph-muted); font-size:10.5px; font-style:italic;">{{ sp.produit.dci }}</small>
+                  {% endif %}
+                </td>
+                <td style="text-align:right;">
+                  <input
+                    type="number"
+                    class="inv-input-theo"
+                    value="{{ sp.quantite|floatformat:0 }}"
+                    readonly tabindex="-1"
+                    aria-hidden="true"
+                  >
+                </td>
+                <td style="text-align:right;">
+                  <input
+                    type="number"
+                    name="reel_{{ sp.produit.pk }}"
+                    id="reel_{{ sp.produit.pk }}"
+                    class="inv-input-reel"
+                    value="{{ sp.quantite|floatformat:0 }}"
+                    min="0"
+                    step="1"
+                    required
+                    data-theo="{{ sp.quantite|floatformat:0 }}"
+                    aria-label="Stock réel pour {{ sp.produit.nom }}"
+                  >
+                </td>
+                <td style="text-align:right;">
+                  <span class="ecart-val ecart-zero">—</span>
+                </td>
+              </tr>
+
+            {% empty %}
+              <tr>
+                <td colspan="5" class="text-center py-4" style="color:var(--ph-muted);">
+                  <i class="bi bi-inbox fs-4 d-block mb-2"></i>
+                  Aucun produit en stock pour cette pharmacie.
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
 
     {# ===== Bouton submit bas de page ===== #}
-    <div class="d-flex justify-content-end pb-4">
-      <button type="submit" class="btn btn-primary btn-lg">
+    <div class="d-flex justify-content-between align-items-center pb-4 mt-3">
+      <a href="{% url 'pharmacie_inventaire_list' pharmacie=pharmacie %}" class="btn-ph-outline" style="font-size:12.5px;">
+        <i class="bi bi-arrow-left"></i> Annuler
+      </a>
+      <button type="submit" class="btn-ph" style="font-size:13px; padding:8px 20px;">
         <i class="bi bi-save me-1"></i>Enregistrer l'inventaire
       </button>
     </div>
 
   </div>{# /container-fluid #}
 </form>
+
+<script>
+(function () {
+  const rows   = document.querySelectorAll('.inv-data-row');
+  const cntTotal = document.getElementById('cnt-total');
+  const cntEcart = document.getElementById('cnt-ecart');
+  const cntOk    = document.getElementById('cnt-ok');
+  const badgeEcart = document.getElementById('badge-ecart');
+  const badgeOk    = document.getElementById('badge-ok');
+
+  cntTotal.textContent = rows.length;
+
+  function updateRow(input) {
+    const row   = input.closest('.inv-data-row');
+    const theo  = parseFloat(input.dataset.theo) || 0;
+    const reel  = parseFloat(input.value);
+    const ecart = isNaN(reel) ? 0 : reel - theo;
+    const span  = row.querySelector('.ecart-val');
+
+    // Écart display
+    span.className = 'ecart-val';
+    if (isNaN(reel) || ecart === 0) {
+      span.textContent = '—';
+      span.classList.add('ecart-zero');
+    } else if (ecart > 0) {
+      span.textContent = '+' + ecart.toFixed(ecart % 1 === 0 ? 0 : 2);
+      span.classList.add('ecart-pos');
+    } else {
+      span.textContent = ecart.toFixed(ecart % 1 === 0 ? 0 : 2);
+      span.classList.add('ecart-neg');
+    }
+
+    // Row highlight
+    if (!isNaN(reel) && ecart !== 0) {
+      row.classList.add('inv-row-changed');
+      input.classList.add('changed');
+    } else {
+      row.classList.remove('inv-row-changed');
+      input.classList.remove('changed');
+    }
+
+    refreshSummary();
+  }
+
+  function refreshSummary() {
+    const inputs = document.querySelectorAll('.inv-input-reel');
+    let nbEcart = 0, nbOk = 0;
+    inputs.forEach(inp => {
+      const theo = parseFloat(inp.dataset.theo) || 0;
+      const reel = parseFloat(inp.value);
+      if (!isNaN(reel)) {
+        if (reel !== theo) nbEcart++; else nbOk++;
+      }
+    });
+    cntEcart.textContent = nbEcart;
+    cntOk.textContent    = nbOk;
+    badgeEcart.style.display = nbEcart > 0 ? '' : 'none';
+    badgeOk.style.display    = nbOk > 0    ? '' : 'none';
+  }
+
+  // Attach listeners
+  document.querySelectorAll('.inv-input-reel').forEach(inp => {
+    inp.addEventListener('input', () => updateRow(inp));
+  });
+
+  // Tout confirmer
+  document.getElementById('btn-tout-confirmer').addEventListener('click', function () {
+    document.querySelectorAll('.inv-input-reel').forEach(inp => {
+      inp.value = inp.dataset.theo;
+      updateRow(inp);
+    });
+  });
+
+  // Init (all matching → no highlight needed, just refresh summary)
+  refreshSummary();
+
+  // Focus first réel input
+  const first = document.querySelector('.inv-input-reel');
+  if (first) first.focus();
+})();
+</script>
 {% endblock %}

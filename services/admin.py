@@ -1,17 +1,9 @@
 from django.contrib import admin
 from .models import (
-    UniteMesure, CategorieArticle, FamilleArticle, CompagniePharma,
+    CategorieArticle, FamilleArticle, CompagniePharma,
     Articleservice, LigneFournisseurArticle, ConditionnementArticle,
     VarianteAttributArticle, ReglePrix,
 )
-
-
-@admin.register(UniteMesure)
-class UniteMesureAdmin(admin.ModelAdmin):
-    list_display = ('nom', 'code', 'categorie')
-    list_filter = ('categorie',)
-    search_fields = ('nom', 'code')
-    ordering = ('nom',)
 
 
 @admin.register(CategorieArticle)

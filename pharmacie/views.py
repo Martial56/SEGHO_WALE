@@ -124,6 +124,13 @@ def pharmacie_stock(request, pharmacie):
     get_pharmacie_or_404(pharmacie)
     label = PHARMACIES_DICT[pharmacie]
 
+    # Créer les entrées manquantes (quantite=0) pour tous les produits actifs
+    tous_produits = Produit.objects.filter(actif=True)
+    StockPharmacie.objects.bulk_create(
+        [StockPharmacie(pharmacie=pharmacie, produit=p, quantite=0) for p in tous_produits],
+        ignore_conflicts=True,
+    )
+
     qs          = StockPharmacie.objects.filter(pharmacie=pharmacie).select_related('produit', 'produit__categorie').prefetch_related('produit__lots')
     q           = request.GET.get('q', '').strip()
     statut      = request.GET.get('statut', '')
@@ -164,7 +171,6 @@ def pharmacie_ordonnances(request, pharmacie):
 
     from consultations.models import Ordonnance
     statut_filtre = request.GET.get('statut', 'emise')
-    type_filtre   = request.GET.get('type', '')
     q             = request.GET.get('q', '').strip()
 
     qs = Ordonnance.objects.select_related(
@@ -173,8 +179,6 @@ def pharmacie_ordonnances(request, pharmacie):
 
     if statut_filtre:
         qs = qs.filter(statut=statut_filtre)
-    if type_filtre:
-        qs = qs.filter(type_ordonnance=type_filtre)
     if q:
         qs = qs.filter(
             Q(consultation__patient__nom__icontains=q) |
@@ -185,21 +189,11 @@ def pharmacie_ordonnances(request, pharmacie):
     paginator = Paginator(qs, 25)
     page_obj  = paginator.get_page(request.GET.get('page'))
 
-    all_ords = Ordonnance.objects.all()
-    stats = {
-        'total':    all_ords.count(),
-        'emises':   all_ords.filter(statut='emise').count(),
-        'delivrees': all_ords.filter(statut='delivree').count(),
-        'expirees': all_ords.filter(statut='expiree').count(),
-    }
-
-    return render(request, 'pharmacie/ordonnance/ordonnance_list.html', {
+    return render(request, 'pharmacie/ordonnances.html', {
         'pharmacie':     pharmacie, 'label': label,
         'page_obj':      page_obj,
         'statut_filtre': statut_filtre,
-        'type_filtre':   type_filtre,
         'q':             q,
-        'stats':         stats,
     })
 
 

@@ -1166,10 +1166,15 @@ def presence_rapport_mensuel(request):
         if date(annee, mois, d).weekday() < 5 and date(annee, mois, d) not in jours_feries
     )
 
-    service_id  = request.GET.get('service') or None
-    employes_qs = Employe.objects.filter(statut='actif').select_related('service', 'fonction')
+    service_id     = request.GET.get('service') or None
+    service_filtre = None
+    employes_qs    = Employe.objects.filter(statut='actif').select_related('service', 'fonction')
     if service_id:
-        employes_qs = employes_qs.filter(service_id=service_id)
+        try:
+            service_filtre = Service.objects.get(pk=service_id)
+            employes_qs = employes_qs.filter(service=service_filtre)
+        except Service.DoesNotExist:
+            service_id = None
 
     presences_mois = list(
         Presence.objects.filter(date__year=annee, date__month=mois).select_related('employe')
@@ -1257,6 +1262,7 @@ def presence_rapport_mensuel(request):
         'next_mois':       next_mois, 'next_annee': next_annee,
         'services':        services,
         'service_id':      service_id,
+        'service_filtre':  service_filtre,
         'total_presents':  sum(e['nb_presents'] for e in employes_stats),
         'total_absents':   sum(e['nb_absents_non_just'] for e in employes_stats),
         'total_conge':     sum(e['nb_absents_conge'] for e in employes_stats),

@@ -13,7 +13,6 @@ from core.views import log_event, get_logs
 from .forms import ChambreForm, RegistreDecesForm, ListeControleAdmissionForm, ListeVerificationServiceForm
 
 
-
 def _is_ajax(request):
     return request.headers.get('X-Requested-With') == 'XMLHttpRequest'
 
@@ -173,7 +172,7 @@ def hospitalisation_create(request):
         'edit':          False,
         'medecins_list': list(Medecin.objects.filter(actif=True).order_by('nom')),
         'unites_list':   list(UniteMesure.objects.filter(actif=True).order_by('nom')),
-        'services_list': list(Articleservice.objects.filter(actif=True, categorie__code='SN').order_by('nom')),
+        'services_list': list(Articleservice.objects.filter(actif=True).order_by('nom')),
     })
 
 
@@ -203,28 +202,18 @@ def _sync_soins_services(hosp):
 # La vue appelante affiche le message et redirige.
 
 def _transition_confirmer(hosp, user):
-    """brouillon → confirme : crée la ligne MEO et synchronise les SAF depuis soins_apportes."""
+    """brouillon → confirme : synchronise les SAF depuis soins_apportes."""
     from .services import check_action
     ok, err = check_action(hosp, user, 'confirmer')
     if not ok:
         return False, err
     _sync_soins_services(hosp)
-    # Ligne MEO automatique (une seule fois)
-    from services.models import Articleservice
     from django.utils import timezone as tz
-    meo = Articleservice.objects.filter(categorie__code='MO').first()
-    if meo:
-        date_adm = hosp.date_admission.date() if hosp.date_admission else tz.now().date()
-        ServiceAFacturer.objects.get_or_create(
-            hospitalisation=hosp,
-            source='meo',
-            defaults={'service': meo, 'quantite': 1, 'date': date_adm},
-        )
     hosp.statut = 'confirme'
     hosp.modifie_par = user
     hosp.date_modification = tz.now()
     hosp.save(update_fields=['statut', 'modifie_par', 'date_modification'])
-    log_event(hosp, user, 'Statut changé : Confirmé — Mise en observation générée.', type='statut')
+    log_event(hosp, user, 'Statut changé : Confirmé — services à facturer générés.', type='statut')
     return True, None
 
 
@@ -640,8 +629,7 @@ def _save_visites_infirmieres(hosp, POST, user=None):
         inf_pk   = infirmieres[i] if i < len(infirmieres) else ''
         rem      = remarques[i] if i < len(remarques) else ''
         from django.utils.dateparse import parse_datetime
-        from django.utils import timezone as tz
-        date_obj  = parse_datetime(date_val) if date_val else tz.now()
+        date_obj  = parse_datetime(date_val) if date_val else None
         soin_obj  = Articleservice.objects.filter(pk=soin_pk).first() if soin_pk else None
         unite_obj = UniteMesure.objects.filter(pk=unite_pk).first() if unite_pk else None
         inf_obj   = Medecin.objects.filter(pk=inf_pk).first() if inf_pk else None
@@ -1000,15 +988,21 @@ def hospitalisation_edit(request, pk):
 
     medecins_list  = list(Medecin.objects.filter(actif=True).order_by('nom'))
     unites_list    = list(UniteMesure.objects.filter(actif=True).order_by('nom'))
-    services_list  = list(Articleservice.objects.filter(actif=True, categorie__code='SN').order_by('nom'))
+    services_list  = list(Articleservice.objects.filter(actif=True).order_by('nom'))
 
     # Soins déjà sur une facture → verrouillés (non supprimables dans soins_apportes)
     soins_factures_ids = list(hosp.services_a_facturer.filter(
         source='soin', facture__isnull=False
     ).values_list('service_id', flat=True))
 
+    # Soins prescrits (soins_apportes) dont la facture a été payée en caisse.
+    # Ce sont les soins disponibles pour les visites infirmières.
+    soins_payes_ids = set(hosp.services_a_facturer.filter(
+        source='soin',
+        facture__statut='payee'
+    ).values_list('service_id', flat=True))
     soins_pour_visites = list(Articleservice.objects.filter(
-        actif=True, categorie__code='SN'
+        pk__in=soins_payes_ids, actif=True
     ).order_by('nom'))
     deces_list     = list(RegistreDeces.objects.filter(patient=hosp.patient))
 

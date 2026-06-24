@@ -13,40 +13,6 @@ class Typeservice(models.Model):
         ordering = ['nom']
 
 
-class CategorieUniteMesure(models.Model):
-    nom = models.CharField(max_length=100, unique=True, verbose_name="Nom")
-
-    def __str__(self): return self.nom
-    class Meta:
-        verbose_name = "Catégorie d'unité de mesure"
-        verbose_name_plural = "Catégories d'unités de mesure"
-        ordering = ['nom']
-
-
-class UniteMesure(models.Model):
-    TYPE_CHOICES = [
-        ('pgumr', "Plus grande que l'unité de mesure de référence"),
-        ('umrc', "Unité de mesure de référence pour cette catégorie"),
-        ('ppumr', "Plus petite que l'unité de mesure de référence"),
-    ]
-    nom = models.CharField(max_length=100, unique=True, verbose_name="Nom")
-    code = models.CharField(max_length=20, unique=True, verbose_name="Abréviation")
-    categorie = models.ForeignKey(
-        CategorieUniteMesure, on_delete=models.SET_NULL, null=True, blank=True,
-        verbose_name="Catégorie", related_name='unites'
-    )
-    type_unite = models.CharField(max_length=10, choices=TYPE_CHOICES, default='umrc', verbose_name="Type")
-    ratio = models.DecimalField(max_digits=12, decimal_places=6, default=1, verbose_name="Ratio")
-    precision_arrondi = models.DecimalField(max_digits=8, decimal_places=5, default=0.01000, verbose_name="Précision d'arrondi")
-    actif = models.BooleanField(default=True, verbose_name="Actif")
-
-    def __str__(self): return f"{self.nom} ({self.code})"
-    class Meta:
-        verbose_name = "Unité de mesure"
-        verbose_name_plural = "Unités de mesure"
-        ordering = ['nom']
-
-
 class CategorieArticle(models.Model):
     METHODE_COUT_CHOICES = [
         ('prix_standard', 'Prix standard'),
@@ -219,11 +185,11 @@ class Articleservice(models.Model):
     politique_facturation = models.CharField(max_length=20, choices=POLITIQUE_FACT_CHOICES, default='qtes_commandees', verbose_name="Politique de facturation")
     refacturer_depenses = models.CharField(max_length=20, choices=REFACTURER_CHOICES, default='non', verbose_name="Re-facturer les dépenses")
     unite_mesure = models.ForeignKey(
-        'UniteMesure', on_delete=models.SET_NULL, null=True, blank=True,
+        'stock.UniteMesure', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='articles_um', verbose_name="Unité de mesure"
     )
     unite_achat = models.ForeignKey(
-        'UniteMesure', on_delete=models.SET_NULL, null=True, blank=True,
+        'stock.UniteMesure', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='articles_ua', verbose_name="Unité d'achat"
     )
     prix_vente = models.DecimalField(max_digits=12, decimal_places=0, default=0, verbose_name="Prix de vente (CFA)")
@@ -300,7 +266,7 @@ class LigneFournisseurArticle(models.Model):
     date_fin = models.DateField(null=True, blank=True, verbose_name="Date de fin")
     quantite_min = models.DecimalField(max_digits=10, decimal_places=2, default=1, verbose_name="Quantité min.")
     unite_mesure = models.ForeignKey(
-        'UniteMesure', on_delete=models.SET_NULL, null=True, blank=True,
+        'stock.UniteMesure', on_delete=models.SET_NULL, null=True, blank=True,
         verbose_name="Unité de mesure"
     )
     prix = models.DecimalField(max_digits=12, decimal_places=0, default=0, verbose_name="Prix (CFA)")
@@ -316,7 +282,7 @@ class ConditionnementArticle(models.Model):
     conditionnement = models.CharField(max_length=100, verbose_name="Conditionnement")
     quantite = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Quantité contenue")
     unite_mesure = models.ForeignKey(
-        'UniteMesure', on_delete=models.SET_NULL, null=True, blank=True,
+        'stock.UniteMesure', on_delete=models.SET_NULL, null=True, blank=True,
         verbose_name="Unité de mesure"
     )
     pour_vente = models.BooleanField(default=True, verbose_name="Ventes")
@@ -358,7 +324,7 @@ class Consommable(models.Model):
         verbose_name="Catégorie"
     )
     unite_mesure = models.ForeignKey(
-        UniteMesure, on_delete=models.SET_NULL, null=True, blank=True,
+        'stock.UniteMesure', on_delete=models.SET_NULL, null=True, blank=True,
         verbose_name="Unité de mesure"
     )
     prix_achat = models.DecimalField(max_digits=12, decimal_places=0, default=0, verbose_name="Prix d'achat (CFA)")

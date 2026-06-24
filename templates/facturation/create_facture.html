@@ -1,5 +1,4 @@
-{% extends 'facturation/base.html' %}
-{% load l10n %}
+﻿{% extends 'facturation/base.html' %}
 
 {% block topbar_title %}Nouvelle facture{% endblock %}
 
@@ -78,7 +77,7 @@
 /* ── Patient card ── */
 .patient-card {
     background: linear-gradient(135deg, #f0faff, #e6f7ff);
-    border: 1px solid rgba(33,136,171,0.2);
+    border: 1px solid rgba(58,89,36,0.2);
     border-radius: 14px;
     padding: 20px 24px;
     margin-bottom: 28px;
@@ -364,7 +363,7 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
             {% if edit %}
             <a href="{% url 'facturation:detail' facture.pk %}?next={{ back_url }}" class="btn-discard">Annuler</a>
             {% else %}
-            <a href="{% if back_url %}{{ back_url }}{% else %}{% url 'facturation:list' %}{% endif %}" class="btn-discard">Annuler</a>
+            <a href="{% url 'facturation:list' %}" class="btn-discard">Annuler</a>
             {% endif %}
         </div>
     </div>
@@ -605,9 +604,9 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
                                 <div class="svc-dropdown"></div>
                             </div>
                         </td>
-                        <td class="col-qte"><input type="number" name="ligne_qte_{{ forloop.counter0 }}" value="{{ ligne.qte|default:1|unlocalize }}" min="0.01" step="0.01" oninput="recalcRow({{ forloop.counter0 }})"></td>
-                        <td class="col-prix"><input type="number" name="ligne_prix_{{ forloop.counter0 }}" value="{{ ligne.prix|unlocalize }}" min="0" step="1" oninput="recalcRow({{ forloop.counter0 }})"></td>
-                        <td class="col-remise"><input type="number" name="ligne_remise_{{ forloop.counter0 }}" value="{{ ligne.remise|default:0|unlocalize }}" min="0" max="100" step="0.01" oninput="recalcRow({{ forloop.counter0 }})"></td>
+                        <td class="col-qte"><input type="number" name="ligne_qte_{{ forloop.counter0 }}" value="{{ ligne.qte|default:1 }}" min="0.01" step="0.01" oninput="recalcRow({{ forloop.counter0 }})"></td>
+                        <td class="col-prix"><input type="number" name="ligne_prix_{{ forloop.counter0 }}" value="{{ ligne.prix }}" min="0" step="1" oninput="recalcRow({{ forloop.counter0 }})"></td>
+                        <td class="col-remise"><input type="number" name="ligne_remise_{{ forloop.counter0 }}" value="{{ ligne.remise|default:0 }}" min="0" max="100" step="0.01" oninput="recalcRow({{ forloop.counter0 }})"></td>
                         <td class="col-total" id="total-{{ forloop.counter0 }}">0</td>
                         <td class="col-del"><button type="button" class="btn-del-ligne" onclick="removeLigne(this)">×</button></td>
                     </tr>
@@ -629,7 +628,7 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
                             <div class="svc-dropdown"></div>
                         </div>
                     </td>
-                    <td class="col-qte"><input type="number" name="ligne_qte_0" value="1" min="1" step="1" oninput="recalcRow(0)"></td>
+                    <td class="col-qte"><input type="number" name="ligne_qte_0" value="1" min="0.01" step="0.01" oninput="recalcRow(0)"></td>
                     <td class="col-prix"><input type="number" name="ligne_prix_0" value="0" min="0" step="1" oninput="recalcRow(0)"></td>
                     <td class="col-remise"><input type="number" name="ligne_remise_0" value="0" min="0" max="100" step="0.01" oninput="recalcRow(0)"></td>
                     <td class="col-total" id="total-0">0</td>
@@ -889,21 +888,17 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
             dropdown.style.display = 'block';
         }
 
-        var _justSelected = false;
-
         function selectService(nom, prix) {
-            _justSelected = true;
             hidden.value = nom;
             input.value  = nom;
             wrapper.classList.add('svc-preloaded');
             var prixInput = document.querySelector('[name="ligne_prix_' + idx + '"]');
             if (prixInput) { prixInput.value = prix; recalcRow(idx); }
-            setTimeout(function() { _justSelected = false; }, 50);
         }
 
         function close() { dropdown.style.display = 'none'; }
 
-        input.addEventListener('focus', function () { if (!_justSelected) render(input.value); });
+        input.addEventListener('focus', function () { render(input.value); });
         input.addEventListener('input', function () {
             wrapper.classList.remove('svc-preloaded');
             hidden.value = '';
@@ -958,7 +953,7 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
                 '<div class="svc-dropdown"></div>' +
               '</div>' +
             '</td>' +
-            '<td class="col-qte"><input type="number" name="ligne_qte_' + idx + '" value="1" min="1" step="1" oninput="recalcRow(' + idx + ')"></td>' +
+            '<td class="col-qte"><input type="number" name="ligne_qte_' + idx + '" value="1" min="0.01" step="0.01" oninput="recalcRow(' + idx + ')"></td>' +
             '<td class="col-prix"><input type="number" name="ligne_prix_' + idx + '" value="0" min="0" step="1" oninput="recalcRow(' + idx + ')"></td>' +
             '<td class="col-remise"><input type="number" name="ligne_remise_' + idx + '" value="0" min="0" max="100" step="0.01" oninput="recalcRow(' + idx + ')"></td>' +
             '<td class="col-total" id="total-' + idx + '">0 CFA</td>' +
@@ -980,7 +975,6 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
     if (typeSelect) {
         typeSelect.addEventListener('change', function() {
             document.querySelectorAll('.svc-combo').forEach(function(combo) {
-                var idx    = parseInt(combo.dataset.idx, 10);
                 var hidden = combo.querySelector('.svc-hidden');
                 var input  = combo.querySelector('.svc-input');
                 var dd     = combo.querySelector('.svc-dropdown');
@@ -988,9 +982,6 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
                 if (input)  input.value  = '';
                 if (dd)     dd.style.display = 'none';
                 combo.classList.remove('svc-preloaded');
-                /* Vider aussi le prix pour éviter l'incohérence désignation vide / prix rempli */
-                var prixEl = document.querySelector('[name="ligne_prix_' + idx + '"]');
-                if (prixEl) { prixEl.value = 0; recalcRow(idx); }
             });
             recalcTotaux();
         });
@@ -1055,3 +1046,4 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
 </script>
 
 {% endblock %}
+

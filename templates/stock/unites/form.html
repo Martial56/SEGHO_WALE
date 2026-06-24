@@ -1,0 +1,238 @@
+{% extends 'stock/base.html' %}
+{% load static %}
+{% block topbar_title %}Stock — {{ titre }}{% endblock %}
+
+{% block extra_st_css %}<style>
+.uf-wrap {
+  max-width:620px;margin:24px auto 0;
+}
+.uf-card {
+  background:var(--st-surface);border-radius:14px;
+  box-shadow:0 2px 20px rgba(58,89,36,.1);
+  padding:32px 36px 28px;
+}
+.uf-title {
+  font-size:13.5px;font-weight:800;color:var(--st-700);
+  text-transform:uppercase;letter-spacing:.5px;
+  display:flex;align-items:center;gap:8px;
+  margin-bottom:24px;padding-bottom:12px;
+  border-bottom:2px solid var(--st-100);
+}
+/* Grille 2 colonnes */
+.uf-row { display:grid;grid-template-columns:1fr 160px;gap:16px;margin-bottom:0; }
+.uf-field { margin-bottom:18px; }
+.uf-label {
+  display:block;font-size:11px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.4px;
+  color:var(--st-600);margin-bottom:6px;
+}
+.uf-label .req { color:#e84545;margin-left:2px; }
+.uf-label .opt { font-weight:400;text-transform:none;font-size:10.5px;color:var(--st-muted);margin-left:4px; }
+.uf-input {
+  width:100%;border:none;border-bottom:2px solid var(--st-200);
+  border-radius:0;background:transparent;padding:8px 4px;
+  font-size:14px;color:var(--st-text);font-family:inherit;
+  transition:border-color .15s;
+}
+.uf-input:focus { outline:none;border-bottom-color:var(--st-500); }
+.uf-hint { font-size:11px;color:var(--st-muted);margin-top:4px; }
+.uf-error { font-size:11.5px;color:#c0392b;margin-top:4px;list-style:none;padding:0; }
+
+/* Aperçu live */
+.uf-preview {
+  display:flex;align-items:center;gap:10px;
+  background:var(--st-50,#f7fbf3);border:1.5px dashed var(--st-300);
+  border-radius:10px;padding:12px 16px;margin-bottom:18px;
+  min-height:48px;
+}
+.uf-preview-label { font-size:11px;color:var(--st-muted);white-space:nowrap; }
+.uf-preview-val {
+  font-size:15px;font-weight:700;color:var(--st-800);
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+}
+.uf-badge {
+  display:inline-block;font-family:monospace;font-size:12px;
+  background:var(--st-100);color:var(--st-700);
+  padding:2px 9px;border-radius:5px;border:1px solid var(--st-200);
+}
+.uf-preview-empty { font-size:13px;color:var(--st-muted);font-style:italic; }
+
+/* Suggestions groupe */
+.uf-cats {
+  display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;
+}
+.uf-cat-chip {
+  display:inline-flex;align-items:center;gap:4px;
+  padding:3px 10px;border-radius:20px;font-size:11.5px;font-weight:600;
+  border:1.5px solid var(--st-300);color:var(--st-700);
+  background:transparent;cursor:pointer;
+  transition:background .12s,color .12s;
+}
+.uf-cat-chip:hover { background:var(--st-600);color:#fff;border-color:var(--st-600); }
+
+/* Toggle actif */
+.uf-toggle-wrap { display:flex;align-items:center;gap:12px;margin-bottom:24px; }
+.uf-toggle {
+  position:relative;display:inline-block;width:40px;height:22px;flex-shrink:0;
+}
+.uf-toggle input { opacity:0;width:0;height:0;position:absolute; }
+.uf-toggle-slider {
+  position:absolute;inset:0;border-radius:22px;
+  background:var(--st-200);cursor:pointer;
+  transition:background .2s;
+}
+.uf-toggle-slider::before {
+  content:'';position:absolute;
+  width:16px;height:16px;border-radius:50%;
+  background:#fff;top:3px;left:3px;
+  transition:transform .2s;
+  box-shadow:0 1px 3px rgba(0,0,0,.25);
+}
+.uf-toggle input:checked + .uf-toggle-slider { background:var(--st-500); }
+.uf-toggle input:checked + .uf-toggle-slider::before { transform:translateX(18px); }
+.uf-toggle-text { font-size:13px;font-weight:600;color:var(--st-text);cursor:pointer;user-select:none; }
+
+/* Boutons */
+.uf-actions { display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding-top:8px;border-top:1px solid var(--st-100); }
+</style>{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:12px;padding:16px 0 8px;">
+  <a href="{% url 'stock_unites' %}" class="btn-st-outline" style="padding:5px 12px;font-size:12.5px;">
+    <i class="bi bi-arrow-left"></i> Retour
+  </a>
+  <h2 style="font-size:16px;font-weight:800;color:var(--st-900);margin:0;">{{ titre }}</h2>
+</div>
+
+<datalist id="cats-list">
+  {% for cat in categories %}<option value="{{ cat }}">{% endfor %}
+</datalist>
+
+<div class="uf-wrap">
+  <div class="uf-card">
+    <div class="uf-title">
+      <i class="bi bi-rulers" style="color:var(--st-500);font-size:15px;"></i>
+      Informations de l'unité
+    </div>
+
+    <form method="post" id="uf-form">
+      {% csrf_token %}
+
+      <!-- Nom + Code sur la même ligne -->
+      <div class="uf-row">
+        <div class="uf-field">
+          <label class="uf-label" for="{{ form.nom.id_for_label }}">
+            Nom <span class="req">*</span>
+          </label>
+          {{ form.nom }}
+          {% if form.nom.errors %}<ul class="uf-error">{% for e in form.nom.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+        <div class="uf-field">
+          <label class="uf-label" for="{{ form.code.id_for_label }}">
+            Abréviation <span class="req">*</span>
+          </label>
+          {{ form.code }}
+          {% if form.code.errors %}<ul class="uf-error">{% for e in form.code.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+          <div class="uf-hint">Ex : ml, mg, cp, fl…</div>
+        </div>
+      </div>
+
+      <!-- Aperçu live -->
+      <div class="uf-preview" id="uf-preview">
+        <span class="uf-preview-label">Aperçu :</span>
+        <span class="uf-preview-val" id="uf-preview-val">
+          <span class="uf-preview-empty">Renseignez le nom et l'abréviation…</span>
+        </span>
+      </div>
+
+      <!-- Groupe -->
+      <div class="uf-field">
+        <label class="uf-label" for="{{ form.categorie.id_for_label }}">
+          Groupe <span class="opt">(optionnel)</span>
+        </label>
+        {{ form.categorie }}
+        {% if form.categorie.errors %}<ul class="uf-error">{% for e in form.categorie.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        {% if categories %}
+        <div class="uf-cats" id="uf-cats">
+          {% for cat in categories %}
+          <button type="button" class="uf-cat-chip" onclick="setCategorie('{{ cat|escapejs }}')">
+            <i class="bi bi-tag"></i> {{ cat }}
+          </button>
+          {% endfor %}
+        </div>
+        {% endif %}
+        <div class="uf-hint">Les unités du même groupe sont regroupées dans les listes.</div>
+      </div>
+
+      <!-- Actif toggle -->
+      <div class="uf-toggle-wrap">
+        <label class="uf-toggle">
+          {{ form.actif }}
+          <span class="uf-toggle-slider"></span>
+        </label>
+        <span class="uf-toggle-text" onclick="document.getElementById('{{ form.actif.id_for_label }}').click()">
+          Actif — visible dans les formulaires de saisie
+        </span>
+      </div>
+
+      <!-- Actions -->
+      <div class="uf-actions">
+        <button type="submit" class="btn-st" style="padding:9px 24px;">
+          <i class="bi bi-check-lg"></i>
+          {% if edit %}Mettre à jour{% else %}Créer l'unité{% endif %}
+        </button>
+        <a href="{% url 'stock_unites' %}" class="btn-st-outline" style="padding:9px 20px;">Annuler</a>
+        {% if edit and obj %}
+        <form method="post" action="{% url 'stock_unite_delete' obj.pk %}"
+              onsubmit="return confirm('Supprimer « {{ obj.nom }} » définitivement ?');"
+              style="margin-left:auto;">
+          {% csrf_token %}
+          <button type="submit" class="btn-st-outline" style="padding:9px 16px;border-color:#e84545;color:#e84545;">
+            <i class="bi bi-trash3"></i> Supprimer
+          </button>
+        </form>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function () {
+  const nomInput  = document.getElementById('{{ form.nom.id_for_label }}');
+  const codeInput = document.getElementById('{{ form.code.id_for_label }}');
+  const preview   = document.getElementById('uf-preview-val');
+
+  function updatePreview() {
+    const nom  = nomInput  ? nomInput.value.trim()  : '';
+    const code = codeInput ? codeInput.value.trim() : '';
+    if (!nom && !code) {
+      preview.innerHTML = '<span class="uf-preview-empty">Renseignez le nom et l\'abréviation…</span>';
+      return;
+    }
+    const nomHtml  = nom  ? `<span>${nom}</span>`                                      : '<span style="color:var(--st-muted);font-style:italic;">Nom</span>';
+    const codeHtml = code ? `<span class="uf-badge">${code}</span>`                    : '<span class="uf-badge" style="opacity:.4;">?</span>';
+    preview.innerHTML = nomHtml + codeHtml;
+  }
+
+  if (nomInput)  nomInput.addEventListener('input',  updatePreview);
+  if (codeInput) codeInput.addEventListener('input', updatePreview);
+
+  updatePreview();
+
+  /* Appliquer le style uf-input aux champs du formulaire Django */
+  [nomInput, codeInput].forEach(el => { if (el) el.classList.add('uf-input'); });
+  const catInput = document.getElementById('{{ form.categorie.id_for_label }}');
+  if (catInput) {
+    catInput.classList.add('uf-input');
+    catInput.setAttribute('list', 'cats-list');
+  }
+})();
+
+function setCategorie(val) {
+  const inp = document.getElementById('{{ form.categorie.id_for_label }}');
+  if (inp) { inp.value = val; inp.focus(); }
+}
+</script>
+
+{% endblock %}

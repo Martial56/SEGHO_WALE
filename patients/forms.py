@@ -23,7 +23,7 @@ class PatientForm(forms.ModelForm):
             'date_naissance': forms.DateInput(attrs={
                 'class': _ul,
                 'type': 'date',
-            }, format='%Y-%m-%d'),
+            }),
             'lieu_naissance': forms.TextInput(attrs={
                 'class': _ul,
                 'placeholder': 'Ville, pays',
@@ -76,7 +76,7 @@ class PatientForm(forms.ModelForm):
             'date_expiration_assurance': forms.DateInput(attrs={
                 'class': _ul,
                 'type': 'date',
-            }, format='%Y-%m-%d'),
+            }),
             'contact_urgence_nom': forms.TextInput(attrs={
                 'class': _ul,
                 'placeholder': 'Nom et lien de parenté',

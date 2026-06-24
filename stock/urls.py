@@ -80,4 +80,11 @@ urlpatterns = [
     path('rapports/peremptions/',                views.rapports_peremptions,       name='stock_rapports_peremptions'),
     path('rapports/bilan/',                      views.rapports_bilan_mensuel,     name='stock_rapports_bilan'),
     path('rapports/fournisseurs-prix/',          views.rapports_fournisseurs_prix, name='stock_rapports_fournisseurs_prix'),
+
+    # Unités de mesure
+    path('unites/',                  views.unites_list,       name='stock_unites'),
+    path('unites/nouveau/',          views.unite_create,      name='stock_unite_create'),
+    path('unites/<int:pk>/modifier/', views.unite_edit,       name='stock_unite_edit'),
+    path('unites/<int:pk>/supprimer/', views.unite_delete,    name='stock_unite_delete'),
+    path('unites/supprimer-selection/', views.unite_bulk_delete, name='stock_unite_bulk_delete'),
 ]

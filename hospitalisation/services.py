@@ -66,10 +66,8 @@ def get_actions_disponibles(hosp, user):
     elif statut in ('decharge', 'termine', 'annule'):
         result['confirmer'] = _act(False, False)  # caché — soins figés
     elif statut == 'brouillon':
-        if not hosp.patient_id:
-            result['confirmer'] = _act(True, False, "Sélectionnez un patient avant de confirmer")
-        elif not hosp.chambre_id:
-            result['confirmer'] = _act(True, False, "Attribuez une chambre avant de confirmer")
+        if hosp.soins_apportes.count() == 0:
+            result['confirmer'] = _act(True, False, "Au moins un soin requis pour confirmer")
         else:
             result['confirmer'] = _act(True, True)
     else:  # confirme, hospitalise

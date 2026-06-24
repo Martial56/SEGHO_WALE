@@ -6,9 +6,10 @@
 <style>
     .rl-header {
         background: #fff;
-        border-radius: var(--radius) var(--radius) 0 0;
+        border-radius: 0;
         padding: 20px 28px 0;
         border-bottom: 1px solid rgba(0,0,0,0.07);
+        margin: 0 -32px;
     }
     .rl-patient-strip {
         display: flex; align-items: center; gap: 12px;
@@ -37,9 +38,10 @@
 
     .rl-body {
         background: #fff;
-        border-radius: 0 0 var(--radius) var(--radius);
+        border-radius: 0;
         box-shadow: var(--shadow-sm);
         overflow: hidden;
+        margin: 0 -32px;
     }
     .rl-toolbar {
         padding: 16px 24px;
@@ -73,34 +75,26 @@
         font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px;
     }
     .badge-planifie  { background: #e8f4fd; color: var(--sky); }
-    .badge-confirme  { background: #e2eef5; color: var(--green); }
+    .badge-confirme  { background: #e6f7ef; color: var(--green); }
     .badge-termine   { background: #eef9fd; color: var(--teal-600); }
     .badge-annule    { background: #fde8e8; color: var(--rose); }
     .badge-absent    { background: #fef3e0; color: var(--amber); }
     .badge-encours   { background: #fef3e0; color: var(--amber); }
     .badge-emise     { background: #e8f4fd; color: var(--sky); }
-    .badge-delivree  { background: #e2eef5; color: var(--green); }
+    .badge-delivree  { background: #e6f7ef; color: var(--green); }
     .badge-partielle { background: #fef3e0; color: var(--amber); }
     .badge-expiree   { background: #fde8e8; color: var(--rose); }
-    .badge-brouillon         { background: #f3f4f6; color: rgba(0,0,0,0.5); }
-    .badge-en-attente-paiement { background: #ede8fd; color: var(--violet); }
-    .badge-hospitalise { background: #fef3e0; color: var(--amber); }
-    .badge-decharge    { background: #eef9fd; color: var(--teal-600); }
-    .badge-en-attente  { background: #fef3e0; color: var(--amber); }
-    .badge-en-consultation { background: #e8f4fd; color: var(--sky); }
+    .badge-admis     { background: #e8f4fd; color: var(--sky); }
+    .badge-ensoins   { background: #fef3e0; color: var(--amber); }
+    .badge-sorti     { background: #eef9fd; color: var(--teal-600); }
+    .badge-transfere { background: #ede8fd; color: var(--violet); }
+    .badge-decede    { background: #fde8e8; color: var(--rose); }
     .badge-recu      { background: #f8fbfd; color: rgba(0,0,0,0.4); }
     .badge-enanalyse { background: #fef3e0; color: var(--amber); }
     .badge-resultat  { background: #e8f4fd; color: var(--sky); }
-    .badge-valide    { background: #e2eef5; color: var(--green); }
+    .badge-valide    { background: #e6f7ef; color: var(--green); }
     .badge-envoye    { background: #eef9fd; color: var(--teal-600); }
     .badge-urgent    { background: #fde8e8; color: var(--rose); }
-    .badge-demande   { background: #eff6ff; color: #1d4ed8; }
-    .badge-accepte   { background: #f0fdf4; color: #15803d; }
-    .badge-en_cours  { background: #fef3e0; color: var(--amber); }
-
-    .tests-list { font-size: 12px; }
-    .tests-list span { display: inline-block; background: #f0f6fa; border-radius: 4px; padding: 1px 7px; margin: 1px 2px 1px 0; font-size: 11px; color: rgba(0,0,0,0.55); }
-    .tests-more { color: rgba(0,0,0,0.35); font-size: 11px; margin-left: 2px; }
 
     .empty-state {
         text-align: center; padding: 60px 24px;
@@ -110,20 +104,17 @@
     .empty-state .es-msg { font-size: 15px; font-weight: 600; }
 
     .data-table tbody tr[data-url] { cursor: pointer; }
-    .data-table tbody tr[data-url]:hover td { background: #e8f2f8; }
+    .data-table tbody tr[data-url]:hover td { background: #eef7f5; }
 </style>
 {% endblock %}
 
 {% block breadcrumb %}
-<nav class="breadcrumb">
-    <a href="{% url 'dashboard' %}"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z"/><polyline points="9 21 9 12 15 12 15 21"/></svg>Accueil</a>
-    <span class="breadcrumb-sep">›</span>
-    <a href="{% url 'patients:list' %}">Patients</a>
-    <span class="breadcrumb-sep">›</span>
-    <a href="{% url 'patients:detail' patient.pk %}">{{ patient.nom }} {{ patient.prenoms }}</a>
-    <span class="breadcrumb-sep">›</span>
-    <span>{{ titre }}</span>
-</nav>
+<div style="display:flex;align-items:center;gap:8px;padding:8px 32px;border-bottom:1px solid var(--border);margin:0 -32px 20px;background:var(--surface);">
+  <a href="{% url 'patients:detail' patient.pk %}" class="o-ctrl-btn" style="padding:3px 7px;flex-shrink:0;"><i class="bi bi-arrow-left"></i></a>
+  <span style="font-size:13.5px;color:var(--text-muted);">
+    <a href="{% url 'patients:list' %}" style="color:var(--accent);text-decoration:none;font-weight:500;">Patients</a> <span style="margin:0 5px;opacity:.4;">/</span> <span style="color:var(--text);">{{ patient.nom }} {{ patient.prenoms }}</span>
+  </span>
+</div>
 {% endblock %}
 
 {% block content %}
@@ -138,8 +129,8 @@
     <div class="rl-tab-nav">
         <a href="{% url 'patients:rdv_list' patient.pk %}"
            class="rl-tab {% if view_type == 'rdv' %}active{% endif %}">Rendez-vous</a>
-        <a href="{% url 'patients:soin_list' patient.pk %}"
-           class="rl-tab {% if view_type == 'soin' %}active{% endif %}">Soins</a>
+        <a href="{% url 'patients:consultation_list' patient.pk %}"
+           class="rl-tab {% if view_type == 'consultation' %}active{% endif %}">Soins</a>
         <a href="{% url 'patients:ordonnance_list' patient.pk %}"
            class="rl-tab {% if view_type == 'ordonnance' %}active{% endif %}">Ordonnances</a>
         <a href="{% url 'patients:hospitalisation_list' patient.pk %}"
@@ -179,51 +170,47 @@
                 <td>{{ rdv.motif|truncatechars:60 }}</td>
                 <td>{% if rdv.medecin %}{{ rdv.medecin }}{% else %}<span style="color:rgba(0,0,0,0.3)">—</span>{% endif %}</td>
                 <td>
-                    <span class="badge
-                        {% if rdv.statut == 'planifie' %}badge-planifie
-                        {% elif rdv.statut == 'confirme' %}badge-confirme
-                        {% elif rdv.statut == 'en_attente' %}badge-encours
-                        {% elif rdv.statut == 'en_consultation' %}badge-encours
-                        {% elif rdv.statut == 'termine' %}badge-termine
-                        {% elif rdv.statut == 'annule' %}badge-annule
-                        {% elif rdv.statut == 'absent' %}badge-absent
+                    {% with s=rdv.statut %}
+                    <span class="badge badge-{{ s|lower|cut:' '|cut:'é'|cut:'è' }}
+                        {% if s == 'planifié' %}badge-planifie
+                        {% elif s == 'confirmé' %}badge-confirme
+                        {% elif s == 'terminé' %}badge-termine
+                        {% elif s == 'annulé' %}badge-annule
+                        {% elif s == 'absent' %}badge-absent
                         {% endif %}">{{ rdv.get_statut_display }}</span>
+                    {% endwith %}
                 </td>
             </tr>
         {% endfor %}
         </tbody>
     </table>
 
-    {% elif view_type == 'soin' %}
+    {% elif view_type == 'consultation' %}
     <table class="data-table">
         <thead>
             <tr>
                 <th>N°</th>
                 <th>Date / heure</th>
-                <th>Soins apportés</th>
-                <th>Infirmier</th>
+                <th>Motif</th>
+                <th>Médecin</th>
                 <th>Statut</th>
             </tr>
         </thead>
         <tbody>
-        {% for s in items %}
-            {% with p=s.procedures_list|first %}
-            <tr data-url="{% url 'soins:detail' s.pk %}">
-                <td><code style="font-size:12px; color:var(--teal-600);">{{ s.numero }}</code></td>
-                <td>{{ s.date_heure|date:"d/m/Y à H:i" }}</td>
-                <td>{{ p.soin_type.nom|default:"—" }}</td>
-                <td>{% if p and p.infirmier %}{{ p.infirmier.nom }} {{ p.infirmier.prenoms }}{% else %}<span style="color:rgba(0,0,0,0.3)">—</span>{% endif %}</td>
+        {% for c in items %}
+            <tr data-url="/admin/consultations/consultation/{{ c.pk }}/change/">
+                <td><code style="font-size:12px; color:var(--teal-600);">{{ c.numero }}</code></td>
+                <td>{{ c.date_heure|date:"d/m/Y à H:i" }}</td>
+                <td>{{ c.motif|truncatechars:60 }}</td>
+                <td>{% if c.medecin %}{{ c.medecin }}{% else %}<span style="color:rgba(0,0,0,0.3)">—</span>{% endif %}</td>
                 <td>
                     <span class="badge
-                        {% if s.statut == 'brouillon' %}badge-brouillon
-                        {% elif s.statut == 'en_attente_de_paiement' %}badge-en-attente-paiement
-                        {% elif s.statut == 'en_cours' %}badge-encours
-                        {% elif s.statut == 'termine' %}badge-termine
-                        {% elif s.statut == 'annule' %}badge-annule
-                        {% endif %}">{{ s.get_statut_display }}</span>
+                        {% if c.statut == 'en_cours' %}badge-encours
+                        {% elif c.statut == 'terminé' %}badge-termine
+                        {% elif c.statut == 'annulé' %}badge-annule
+                        {% endif %}">{{ c.get_statut_display }}</span>
                 </td>
             </tr>
-            {% endwith %}
         {% endfor %}
         </tbody>
     </table>
@@ -250,10 +237,10 @@
                 <td>{% if o.date_expiration %}{{ o.date_expiration|date:"d/m/Y" }}{% else %}<span style="color:rgba(0,0,0,0.3)">—</span>{% endif %}</td>
                 <td>
                     <span class="badge
-                        {% if o.statut == 'emise' %}badge-emise
-                        {% elif o.statut == 'delivree' %}badge-delivree
+                        {% if o.statut == 'émise' %}badge-emise
+                        {% elif o.statut == 'délivrée' %}badge-delivree
                         {% elif o.statut == 'partielle' %}badge-partielle
-                        {% elif o.statut == 'expiree' %}badge-expiree
+                        {% elif o.statut == 'expirée' %}badge-expiree
                         {% endif %}">{{ o.get_statut_display }}</span>
                 </td>
             </tr>
@@ -282,15 +269,14 @@
                 <td>{{ h.motif_admission|truncatechars:50 }}</td>
                 <td>{% if h.chambre %}{{ h.chambre }}{% else %}<span style="color:rgba(0,0,0,0.3)">—</span>{% endif %}</td>
                 <td>{% if h.medecin_traitant %}{{ h.medecin_traitant }}{% else %}<span style="color:rgba(0,0,0,0.3)">—</span>{% endif %}</td>
-                <td>{% if h.heure_sortie %}{{ h.heure_sortie|date:"d/m/Y" }}{% else %}<span style="color:rgba(0,0,0,0.3)">—</span>{% endif %}</td>
+                <td>{% if h.date_sortie_effective %}{{ h.date_sortie_effective|date:"d/m/Y" }}{% else %}<span style="color:rgba(0,0,0,0.3)">—</span>{% endif %}</td>
                 <td>
                     <span class="badge
-                        {% if h.statut == 'brouillon' %}badge-brouillon
-                        {% elif h.statut == 'confirme' %}badge-confirme
-                        {% elif h.statut == 'hospitalise' %}badge-hospitalise
-                        {% elif h.statut == 'decharge' %}badge-decharge
-                        {% elif h.statut == 'termine' %}badge-termine
-                        {% elif h.statut == 'annule' %}badge-annule
+                        {% if h.statut == 'admis' %}badge-admis
+                        {% elif h.statut == 'en_soins' %}badge-ensoins
+                        {% elif h.statut == 'sorti' %}badge-sorti
+                        {% elif h.statut == 'transféré' %}badge-transfere
+                        {% elif h.statut == 'décédé' %}badge-decede
                         {% endif %}">{{ h.get_statut_display }}</span>
                 </td>
             </tr>
@@ -302,40 +288,35 @@
     <table class="data-table">
         <thead>
             <tr>
-                <th>N° Demande</th>
-                <th>Tests demandés</th>
-                <th>Date création</th>
+                <th>N°</th>
+                <th>Date prélèvement</th>
+                <th>Type d'examen</th>
+                <th>Urgent</th>
                 <th>Statut</th>
             </tr>
         </thead>
         <tbody>
-        {% for d in items %}
-            <tr data-url="{% url 'laboratoire_detail' d.pk %}">
+        {% for a in items %}
+            <tr data-url="/admin/laboratoire/analyselaboratoire/{{ a.pk }}/change/">
+                <td><code style="font-size:12px; color:var(--teal-600);">{{ a.numero }}</code></td>
+                <td>{{ a.date_prelevement|date:"d/m/Y à H:i" }}</td>
+                <td>{{ a.type_examen }}</td>
                 <td>
-                    <code style="font-size:12px; color:var(--teal-600);">{{ d.numero }}</code>
-                    {% if d.urgent %}<span class="badge badge-urgent" style="margin-left:4px;">Urgent</span>{% endif %}
-                </td>
-                <td>
-                    {% with lignes=d.lignes.all %}
-                    {% if lignes %}
-                        <div class="tests-list">
-                            {% for l in lignes|slice:":3" %}
-                                <span>{{ l.libelle|truncatechars:30 }}</span>
-                            {% endfor %}
-                            {% if lignes|length > 3 %}
-                                <span class="tests-more">+{{ lignes|length|add:"-3" }} autres</span>
-                            {% endif %}
-                        </div>
+                    {% if a.urgent %}
+                        <span class="badge badge-urgent">Urgent</span>
                     {% else %}
                         <span style="color:rgba(0,0,0,0.3)">—</span>
                     {% endif %}
-                    {% endwith %}
                 </td>
                 <td>
-                    {{ d.date_creation|date:"d/m/Y" }}
-                    <div style="font-size:11px;color:rgba(0,0,0,0.4);">{{ d.date_creation|date:"H:i" }}</div>
+                    <span class="badge
+                        {% if a.statut == 'reçu' %}badge-recu
+                        {% elif a.statut == 'en_analyse' %}badge-enanalyse
+                        {% elif a.statut == 'résultat' %}badge-resultat
+                        {% elif a.statut == 'validé' %}badge-valide
+                        {% elif a.statut == 'envoyé' %}badge-envoye
+                        {% endif %}">{{ a.get_statut_display }}</span>
                 </td>
-                <td><span class="badge badge-{{ d.statut }}">{{ d.get_statut_display }}</span></td>
             </tr>
         {% endfor %}
         </tbody>
@@ -367,9 +348,9 @@
                 </td>
                 <td>
                     <span class="badge
-                        {% if a.statut == 'resultat' %}badge-resultat
-                        {% elif a.statut == 'valide' %}badge-valide
-                        {% elif a.statut == 'envoye' %}badge-envoye
+                        {% if a.statut == 'résultat' %}badge-resultat
+                        {% elif a.statut == 'validé' %}badge-valide
+                        {% elif a.statut == 'envoyé' %}badge-envoye
                         {% endif %}">{{ a.get_statut_display }}</span>
                 </td>
             </tr>

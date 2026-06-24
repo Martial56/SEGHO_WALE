@@ -111,6 +111,19 @@ html[data-theme="dark"] .module-sub { color:#64748B; }
 
 {% block content %}
 
+<!-- Alertes rapides -->
+<div class="dash-alerts" id="dash-alerts-bar" {% if not stats.medicaments_alerte and not stats.factures_impayees and not stats.analyses_pending %}style="display:none"{% endif %}>
+  <a href="{% url 'stock_produits' %}?statut=alerte" class="dash-alert-badge" id="badge-medicaments" {% if not stats.medicaments_alerte %}style="display:none"{% endif %}>
+    <span class="dal-dot dot-amber" id="badge-medicaments-count">{{ stats.medicaments_alerte }}</span> Stock alerte
+  </a>
+  <a href="{% url 'facturation_list' %}" class="dash-alert-badge" id="badge-factures" {% if not stats.factures_impayees %}style="display:none"{% endif %}>
+    <span class="dal-dot dot-rose" id="badge-factures-count">{{ stats.factures_impayees }}</span> Factures impayées
+  </a>
+  <a href="{% url 'laboratoire_list' %}" class="dash-alert-badge" id="badge-analyses" {% if not stats.analyses_pending %}style="display:none"{% endif %}>
+    <span class="dal-dot dot-teal" id="badge-analyses-count">{{ stats.analyses_pending }}</span> Labo en attente
+  </a>
+</div>
+
 <!-- Grille des modules -->
 <div class="dash-wrap">
   <div class="modules-grid">
@@ -134,7 +147,7 @@ html[data-theme="dark"] .module-sub { color:#64748B; }
     {% endif %}
 
     {% if 'medecins' in accessible_codes %}
-    <a href="{% url 'medecin_dashboard' %}" class="module-card">
+    <a href="{% url 'medecins_list' %}" class="module-card">
       <div class="module-icon-box ic-sky" style="padding:0;overflow:hidden;">
         <img src="{% static 'img/logchir.png' %}" alt="Docteurs" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
       </div>

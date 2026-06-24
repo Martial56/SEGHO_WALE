@@ -94,65 +94,9 @@ def facture_create(request):
         except RendezVous.DoesNotExist:
             pass
 
-    demande_obj = None
-    demande_pk  = request.GET.get('demande') or request.POST.get('demande_id')
-    if demande_pk:
-        try:
-            from laboratoire.models import DemandeExamen
-            demande_obj = DemandeExamen.objects.prefetch_related('lignes__type_examen').get(pk=demande_pk)
-        except Exception:
-            pass
-
-    ordonnance_obj = None
-    ordonnance_pk  = request.GET.get('ordonnance') or request.POST.get('ordonnance_id')
-    if ordonnance_pk:
-        try:
-            from consultations.models import Ordonnance
-            ordonnance_obj = Ordonnance.objects.prefetch_related(
-                'lignes__produit', 'lignes__medicament'
-            ).get(pk=ordonnance_pk)
-        except Exception:
-            pass
-
-    initial_lignes = []
-    if demande_obj:
-        for ligne in demande_obj.lignes.select_related('type_examen').all():
-            libelle = ligne.libelle or (str(ligne.type_examen) if ligne.type_examen else '')
-            initial_lignes.append({
-                'libelle': libelle,
-                'prix': ligne.prix,
-                'qte': 1,
-                'remise': 0,
-            })
-    elif ordonnance_obj:
-        for ligne in ordonnance_obj.lignes.all():
-            if ligne.produit:
-                libelle = ligne.produit.nom
-                prix    = float(ligne.produit.prix_vente)
-            elif ligne.medicament:
-                libelle = ligne.medicament.designation
-                prix    = float(ligne.medicament.prix_vente)
-            elif ligne.medicament_libre:
-                libelle = ligne.medicament_libre
-                prix    = 0
-            else:
-                continue
-            initial_lignes.append({
-                'libelle': libelle,
-                'prix':    prix,
-                'qte':     ligne.quantite,
-                'remise':  0,
-            })
-
-    initial_type_facture  = ('laboratoire' if demande_obj else
-                             'pharmacie'   if ordonnance_obj else
-                             'consultation' if rdv_obj else '')
+    initial_type_facture  = 'consultation' if rdv_obj else ''
     initial_ligne_libelle = (rdv_obj.type_consultation.nom
                              if (rdv_obj and rdv_obj.type_consultation) else '')
-
-    back_url = request.GET.get('back') or (
-        f'/laboratoire/{demande_pk}/' if demande_pk else ''
-    )
 
     if request.method == 'POST':
         form = FactureForm(request.POST)
@@ -172,10 +116,6 @@ def facture_create(request):
             facture.montant_total = total
             facture.save()
 
-            if demande_obj:
-                demande_obj.facture = facture
-                demande_obj.save(update_fields=['facture'])
-
             log_event(facture, request.user, 'Facture créée.', type='system')
 
             facture = _handle_paiement(facture, request.POST, request.user, total)
@@ -185,27 +125,7 @@ def facture_create(request):
                 return redirect(f'/hospitalisation/{hosp_pk}/modifier/')
             if rdv_pk:
                 return redirect(reverse('patients:rdv_edit', kwargs={'pk': rdv_pk}))
-            if demande_pk:
-                return redirect(f'/laboratoire/{demande_pk}/')
-            next_url = request.POST.get('next')
-            if next_url:
-                return redirect(next_url)
             return redirect('facturation:list')
-        # Form invalid: preserve submitted lignes so dynamically-added rows survive re-render
-        _i, _post_lignes = 0, []
-        while True:
-            _lib = request.POST.get(f'ligne_libelle_{_i}')
-            if _lib is None:
-                break
-            _post_lignes.append({
-                'libelle': _lib,
-                'prix':    request.POST.get(f'ligne_prix_{_i}', 0),
-                'qte':     request.POST.get(f'ligne_qte_{_i}', 1),
-                'remise':  request.POST.get(f'ligne_remise_{_i}', 0),
-            })
-            _i += 1
-        if _post_lignes:
-            initial_lignes = _post_lignes
     else:
         initial = {'type_facture': initial_type_facture} if initial_type_facture else {}
         form = FactureForm(initial=initial)
@@ -217,11 +137,7 @@ def facture_create(request):
         'services':             services,
         'caisses':              caisses,
         'rdv':                  rdv_obj,
-        'demande':              demande_obj,
-        'ordonnance':           ordonnance_obj,
         'initial_ligne_libelle': initial_ligne_libelle,
-        'initial_lignes':       initial_lignes,
-        'back_url':             back_url,
         'edit':                 False,
     })
 

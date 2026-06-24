@@ -9,7 +9,7 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.RunSQL(
-            "UPDATE employer_employe SET date_embauche = '2020-01-01' WHERE date_embauche IS NULL",
+            "UPDATE ressources_humaines_employe SET date_embauche = '2020-01-01' WHERE date_embauche IS NULL",
             migrations.RunSQL.noop,
         ),
         migrations.AlterField(
