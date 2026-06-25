@@ -343,6 +343,11 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
 <div class="control-panel">
     <div class="cp-top">
         <div class="cp-breadcrumb">
+            <a href="{% if back_url %}{{ back_url }}{% elif edit %}{% url 'facturation:detail' facture.pk %}{% else %}{% url 'facturation:list' %}{% endif %}"
+               style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border:1px solid var(--border,#d1dde3);border-radius:4px;color:var(--teal-700);text-decoration:none;margin-right:6px;flex-shrink:0;"
+               title="Retour">
+                <i class="bi bi-arrow-left" style="font-size:13px;"></i>
+            </a>
             <a href="{% url 'facturation:list' %}">Facturation</a>
             <span class="sep">/</span>
             {% if edit %}
@@ -533,15 +538,7 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
                 <span class="field-ul" style="border-color:transparent;color:var(--teal-900);cursor:default;">{{ facture.get_type_facture_display }}</span>
                 {% else %}
                 {{ form.type_facture }}
-                {% endif %}
-            </div>
-
-            <div class="field-row">
-                <label>Statut</label>
-                {% if edit and not is_admin %}
-                <span class="field-ul" style="border-color:transparent;color:var(--teal-900);cursor:default;">{{ facture.get_statut_display }}</span>
-                {% else %}
-                {{ form.statut }}
+                {% if rdv or demande or ordonnance %}<input type="hidden" id="type-is-prefilled" value="1">{% endif %}
                 {% endif %}
             </div>
 
@@ -606,7 +603,7 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
                             </div>
                         </td>
                         <td class="col-qte"><input type="number" name="ligne_qte_{{ forloop.counter0 }}" value="{{ ligne.qte|default:1|unlocalize }}" min="0.01" step="0.01" oninput="recalcRow({{ forloop.counter0 }})"></td>
-                        <td class="col-prix"><input type="number" name="ligne_prix_{{ forloop.counter0 }}" value="{{ ligne.prix|unlocalize }}" min="0" step="1" oninput="recalcRow({{ forloop.counter0 }})"></td>
+                        <td class="col-prix"><input type="number" name="ligne_prix_{{ forloop.counter0 }}" value="{{ ligne.prix|unlocalize }}" min="0" step="1" readonly style="pointer-events:none;cursor:default;" oninput="recalcRow({{ forloop.counter0 }})"></td>
                         <td class="col-remise"><input type="number" name="ligne_remise_{{ forloop.counter0 }}" value="{{ ligne.remise|default:0|unlocalize }}" min="0" max="100" step="0.01" oninput="recalcRow({{ forloop.counter0 }})"></td>
                         <td class="col-total" id="total-{{ forloop.counter0 }}">0</td>
                         <td class="col-del"><button type="button" class="btn-del-ligne" onclick="removeLigne(this)">×</button></td>
@@ -1051,6 +1048,17 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
     document.getElementById('payment-modal-overlay').addEventListener('click', function (e) {
         if (e.target === this) closePaymentModal();
     });
+})();
+</script>
+
+<script>
+/* Type pré-rempli depuis un module : lecture seule */
+(function() {
+  if (!document.getElementById('type-is-prefilled')) return;
+  var sel = document.getElementById('id_type_facture');
+  if (!sel) return;
+  sel.style.pointerEvents = 'none';
+  sel.style.cursor = 'default';
 })();
 </script>
 

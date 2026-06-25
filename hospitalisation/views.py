@@ -98,6 +98,37 @@ def hospitalisation_list(request):
     })
 
 
+def _constante_to_eval_prefill(constante):
+    """Adapte un objet Constante (consultation) aux noms de champs d'EvaluationClinique."""
+    from types import SimpleNamespace
+    poids  = constante.poids
+    taille = constante.taille
+    imc    = round(float(poids) / (float(taille) ** 2), 2) if poids and taille and float(taille) > 0 else None
+    if imc is None:
+        imc_statut = ''
+    elif imc < 18.5:
+        imc_statut = 'Insuffisance pondérale'
+    elif imc < 25:
+        imc_statut = 'Normal'
+    elif imc < 30:
+        imc_statut = 'Surpoids'
+    else:
+        imc_statut = 'Obèse'
+    return SimpleNamespace(
+        poids=poids,
+        taille=taille,
+        temperature=constante.temperature,
+        frequence_respiratoire=constante.frequence_respiratoire,
+        tension_systolique=constante.tension_systolique,
+        tension_diastolique=constante.tension_diastolique,
+        saturation_o2=constante.saturation_oxygene,
+        glycemie=constante.glycemie,
+        niveau_douleur=constante.niveau_douleur,
+        imc=imc,
+        imc_statut=imc_statut,
+    )
+
+
 @login_required(login_url='login')
 def hospitalisation_create(request):
     from django.utils import timezone
@@ -109,7 +140,6 @@ def hospitalisation_create(request):
             hosp.cree_par = request.user
             hosp.save()
             form.save_m2m()
-            # Auto-peupler les checklists depuis la configuration
             for i, item in enumerate(ListeControleAdmission.objects.all()):
                 ChecklistAdmission.objects.create(
                     hospitalisation=hosp, item=item.item, ordre=i
@@ -118,27 +148,12 @@ def hospitalisation_create(request):
                 ChecklistVerification.objects.create(
                     hospitalisation=hosp, item=item.item, ordre=i
                 )
-            # Créer évaluation clinique pré-peuplée depuis dernière consultation
-            eval_data = {}
-            try:
-                from consultations.models import Constante
-                last = Constante.objects.filter(
-                    consultation__patient=hosp.patient
-                ).order_by('-date_saisie').first()
-                if last:
-                    eval_data = {
-                        'poids': last.poids, 'taille': last.taille,
-                        'temperature': last.temperature,
-                        'frequence_respiratoire': last.frequence_respiratoire,
-                        'tension_systolique': last.tension_systolique,
-                        'tension_diastolique': last.tension_diastolique,
-                        'saturation_o2': last.saturation_oxygene,
-                        'glycemie': last.glycemie,
-                        'niveau_douleur': last.niveau_douleur,
-                    }
-            except (ImportError, AttributeError):
-                pass
-            EvaluationClinique.objects.create(hospitalisation=hosp, **eval_data)
+            # Évaluation clinique : priorité aux valeurs soumises dans le formulaire
+            _save_evaluation_clinique(hosp, request.POST)
+            # Soins et services saisis dans le formulaire de création
+            _save_visites_infirmieres(hosp, request.POST, user=request.user)
+            _save_visites_docteur(hosp, request.POST, user=request.user)
+            _save_services_a_facturer(hosp, request.POST)
             log_event(hosp, request.user, 'Hospitalisation créée.', type='system')
             _sync_soins_services(hosp)
             if 'action_confirmer' in request.POST:
@@ -153,6 +168,9 @@ def hospitalisation_create(request):
             return redirect('hospitalisation:detail', pk=hosp.pk)
     else:
         initial = {'date_admission': timezone.now()}
+        eval_prefill = None
+        is_mo = False
+        mo_patient = mo_medecin = mo_maladie = None
         # Pré-remplissage depuis les paramètres URL (ex. depuis rendez-vous)
         try:
             if request.GET.get('medecin'):
@@ -164,17 +182,68 @@ def hospitalisation_create(request):
                 initial['patient'] = int(request.GET['patient'])
         except (ValueError, TypeError):
             pass
+        # Pré-remplissage depuis un rendez-vous (mode M.O)
+        try:
+            rdv_pk = request.GET.get('rdv')
+            if rdv_pk:
+                from patients.models import RendezVous, RegistreCuratif, Pathologie
+                rdv = RendezVous.objects.select_related(
+                    'patient', 'medecin', 'consultation'
+                ).get(pk=int(rdv_pk))
+                is_mo = True
+                mo_patient = rdv.patient
+                mo_medecin = rdv.medecin
+                # Maladie : premier diagnostic retenu du registre curatif
+                try:
+                    reg = rdv.registre_curatif
+                    diag_pks = reg.donnees.get('cur_diagnostic', [])
+                    if isinstance(diag_pks, str):
+                        diag_pks = [diag_pks] if diag_pks else []
+                    first_pk = next((int(v) for v in diag_pks if str(v).strip().isdigit()), None)
+                    if first_pk:
+                        initial['maladie'] = first_pk
+                        mo_maladie = Pathologie.objects.filter(pk=first_pk).first()
+                except (RegistreCuratif.DoesNotExist, AttributeError):
+                    pass
+                # Évaluation clinique : constantes de la consultation liée au RDV
+                try:
+                    constante = rdv.consultation.constantes
+                    eval_prefill = _constante_to_eval_prefill(constante)
+                except AttributeError:
+                    pass
+        except (ValueError, TypeError, Exception):
+            pass
+        # Fallback : dernière constante du patient si pas de RDV
+        if eval_prefill is None:
+            try:
+                patient_pk = initial.get('patient')
+                if patient_pk:
+                    from consultations.models import Constante
+                    last = Constante.objects.filter(
+                        consultation__patient_id=patient_pk
+                    ).order_by('-date_saisie').first()
+                    if last:
+                        eval_prefill = _constante_to_eval_prefill(last)
+            except Exception:
+                pass
         form = HospitalisationForm(initial=initial)
     from medecins.models import Medecin
     from services.models import Articleservice, UniteMesure
-    return render(request, 'hospitalisation/form.html', {
+    ctx = {
         'form':          form,
         'titre':         'Nouveau',
         'edit':          False,
         'medecins_list': list(Medecin.objects.filter(actif=True).order_by('nom')),
         'unites_list':   list(UniteMesure.objects.filter(actif=True).order_by('nom')),
         'services_list': list(Articleservice.objects.filter(actif=True, categorie__code='SN').order_by('nom')),
-    })
+    }
+    if request.method == 'GET':
+        ctx['eval_clin'] = eval_prefill
+        ctx['is_mo']     = is_mo
+        ctx['mo_patient'] = mo_patient
+        ctx['mo_medecin'] = mo_medecin
+        ctx['mo_maladie'] = mo_maladie
+    return render(request, 'hospitalisation/form.html', ctx)
 
 
 def _sync_soins_services(hosp):
@@ -377,19 +446,10 @@ def _get_facture_blocage(hosp):
     ).order_by('date_emission').first()
 
 
-def _apply_lock_protection(hosp, post_data, is_admin=False, facture_bloquante=False):
+def _apply_lock_protection(hosp, post_data, is_admin=False, facture_bloquante=False, chambre_libre=False):
     """
     Neutralise les POST forgés sur les champs d'en-tête verrouillés.
-    Réinjecte la valeur d'origine du champ (depuis la base) dans la copie du
-    POST — le serveur ignore tout essai de modification même si le navigateur
-    envoie une valeur différente.
-
-    Verrou actif si : statut != brouillon OU une facture est en attente de
-    paiement (facture_bloquante=True). Le champ 'soins_apportes' n'est JAMAIS
-    verrouillé ici : il reste librement modifiable et synchronisé via
-    _sync_soins_services().
-
-    Sans effet pour les superutilisateurs, ni si aucun verrou n'est actif.
+    chambre_libre=True : ne réinjecte pas chambre_lit (mode attribution chambre).
     """
     if is_admin:
         return post_data
@@ -401,7 +461,7 @@ def _apply_lock_protection(hosp, post_data, is_admin=False, facture_bloquante=Fa
         data['patient'] = str(hosp.patient_id)
     if hosp.medecin_traitant_id:
         data['medecin_traitant'] = str(hosp.medecin_traitant_id)
-    if hosp.chambre_id:
+    if hosp.chambre_id and not chambre_libre:
         lit = hosp.numero_lit or 0
         data['chambre_lit'] = f"{hosp.chambre_id}_{lit}"
     if hosp.date_admission:
@@ -638,6 +698,11 @@ def _save_visites_infirmieres(hosp, POST, user=None):
     unites      = POST.getlist('vi_unite[]')
     infirmieres = POST.getlist('vi_infirmiere[]')
     remarques   = POST.getlist('vi_remarques[]')
+    # VIs dont la facture est payée : intouchables (ni modification, ni suppression)
+    payees_pks = set(hosp.services_a_facturer.filter(
+        source='visite_infirmiere', facture__statut='payee'
+    ).values_list('ordre', flat=True))
+
     seen = set()
     seen_saf_orders = set()
     for i, pk_str in enumerate(ids):
@@ -656,9 +721,14 @@ def _save_visites_infirmieres(hosp, POST, user=None):
         if pk_str:
             try:
                 obj = VisiteInfirmiere.objects.get(pk=int(pk_str), hospitalisation=hosp)
+                seen.add(obj.pk)
+                if obj.pk in payees_pks:
+                    # Ligne payée : on la conserve sans la modifier
+                    seen_saf_orders.add(obj.pk)
+                    continue
                 obj.date=date_obj; obj.soin=soin_obj; obj.quantite=qte
                 obj.unite_mesure=unite_obj; obj.infirmiere=inf_obj; obj.remarques=rem; obj.ordre=i
-                obj.save(); seen.add(obj.pk)
+                obj.save()
                 _sync_saf_from_visite(hosp, soin_obj, qte, date_obj, 'visite_infirmiere', obj.pk)
                 seen_saf_orders.add(obj.pk)
             except VisiteInfirmiere.DoesNotExist:
@@ -671,8 +741,8 @@ def _save_visites_infirmieres(hosp, POST, user=None):
             seen.add(obj.pk)
             _sync_saf_from_visite(hosp, soin_obj, qte, date_obj, 'visite_infirmiere', obj.pk)
             seen_saf_orders.add(obj.pk)
-    # Supprimer les visites retirées et leurs SAF associés
-    removed = hosp.visites_infirmieres.exclude(pk__in=seen)
+    # Supprimer uniquement les visites non payées retirées
+    removed = hosp.visites_infirmieres.exclude(pk__in=seen).exclude(pk__in=payees_pks)
     removed_pks = list(removed.values_list('pk', flat=True))
     hosp.services_a_facturer.filter(source='visite_infirmiere', ordre__in=removed_pks, facture__isnull=True).delete()
     removed.delete()
@@ -865,19 +935,38 @@ def hospitalisation_edit(request, pk):
     hosp = get_object_or_404(Hospitalisation, pk=pk)
     is_admin = request.user.is_superuser
 
-    # Permission de modification (GET et POST, URL directe comprise)
-    if not is_admin and not request.user.has_perm('hospitalisation.change_hospitalisation'):
-        messages.error(request, "Vous n'avez pas l'autorisation de modifier ce dossier.")
-        return redirect('hospitalisation:detail', pk=pk)
+    # Permission de modification
+    peut_changer   = is_admin or request.user.has_perm('hospitalisation.change_hospitalisation')
+    peut_installer = request.user.has_perm('hospitalisation.can_installer_patient')
+    peut_soins     = request.user.has_perm('hospitalisation.can_ajouter_soin')
+    peut_decharger = request.user.has_perm('hospitalisation.can_decharger_patient')
+
+    facture_blocage = _get_facture_blocage(hosp)
+    facture_payee   = Facture.objects.filter(hospitalisation=hosp, statut='payee').exists()
+    factures_impayees = Facture.objects.filter(hospitalisation=hosp).exclude(statut__in=['payee', 'annulee']).count()
+
+    # Mode attribution chambre : confirme + facture payée — seul chambre_lit est modifiable.
+    mode_chambre_seule = (not is_admin) and hosp.statut == 'confirme' and facture_payee
+    # Mode soins seuls : patient hospitalisé — seuls les soins/visites sont modifiables.
+    mode_soins_seuls = (not is_admin) and hosp.statut == 'hospitalise' and peut_soins and not peut_changer and not peut_decharger
+    # Mode décharge : toutes factures payées — seul l'onglet résumé de décharge est modifiable.
+    mode_decharge_seule = (not is_admin) and hosp.statut == 'hospitalise' and peut_decharger and factures_impayees == 0 and not peut_changer
+
+    # Vérification d'accès
+    if not peut_changer:
+        if peut_installer and mode_chambre_seule:
+            pass  # accès limité à l'attribution de chambre
+        elif mode_soins_seuls:
+            pass  # accès limité à l'ajout de soins
+        elif mode_decharge_seule:
+            pass  # accès limité au résumé de décharge
+        else:
+            messages.error(request, "Vous n'avez pas l'autorisation de modifier ce dossier.")
+            return redirect('hospitalisation:detail', pk=pk)
 
     if hosp.statut in ('termine', 'annule') and not is_admin:
         messages.warning(request, "Ce dossier est clôturé et ne peut plus être modifié.")
         return redirect('hospitalisation:detail', pk=pk)
-
-    # Facture en attente de paiement : ne bloque PAS la sauvegarde.
-    # Le verrouillage des champs d'en-tête est assuré par _apply_lock_protection()
-    # et par les variables lock_* du contexte. Les soins restent modifiables.
-    facture_blocage = _get_facture_blocage(hosp)
 
     if request.method == 'POST':
         # ── ANNULER : transition immédiate, sans sauvegarde de la fiche ────────
@@ -900,16 +989,39 @@ def hospitalisation_edit(request, pk):
             return redirect('hospitalisation:detail', pk=hosp.pk)
 
         # ── Sauvegarde complète : helpers + HospitalisationForm ─────────────────
-        _save_checklist_admission(hosp, request.POST)
-        _save_checklist_verification(hosp, request.POST)
-        _save_evaluation_clinique(hosp, request.POST)
-        _save_visites_infirmieres(hosp, request.POST, user=request.user)
-        _save_visites_docteur(hosp, request.POST, user=request.user)
-        _save_services_a_facturer(hosp, request.POST)
-        _save_resume_decharge(hosp, request.POST)
+        if mode_decharge_seule:
+            _save_visites_infirmieres(hosp, request.POST, user=request.user)
+            _save_visites_docteur(hosp, request.POST, user=request.user)
+            _save_services_a_facturer(hosp, request.POST)
+            _sync_soins_services(hosp)
+            _save_resume_decharge(hosp, request.POST)
+            ok, err = _transition_decharger(hosp, request.user)
+            if err:
+                messages.error(request, err)
+            else:
+                messages.success(request, 'Patient déchargé — sortie médicale enregistrée.')
+            return redirect('hospitalisation:detail', pk=hosp.pk)
+        if mode_soins_seuls:
+            # Seuls les soins/visites sont sauvegardés
+            _save_visites_infirmieres(hosp, request.POST, user=request.user)
+            _save_visites_docteur(hosp, request.POST, user=request.user)
+            _save_services_a_facturer(hosp, request.POST)
+            _sync_soins_services(hosp)
+            log_event(hosp, request.user, 'Soins infirmiers enregistrés.', type='modif')
+            messages.success(request, 'Soins enregistrés.')
+            return redirect('hospitalisation:detail', pk=hosp.pk)
+        if not mode_chambre_seule:
+            _save_checklist_admission(hosp, request.POST)
+            _save_checklist_verification(hosp, request.POST)
+            _save_evaluation_clinique(hosp, request.POST)
+            _save_visites_infirmieres(hosp, request.POST, user=request.user)
+            _save_visites_docteur(hosp, request.POST, user=request.user)
+            _save_services_a_facturer(hosp, request.POST)
+            _save_resume_decharge(hosp, request.POST)
         _post = _apply_lock_protection(
             hosp, request.POST, is_admin=is_admin,
             facture_bloquante=bool(facture_blocage),
+            chambre_libre=mode_chambre_seule,
         )
         form = HospitalisationForm(_post, request.FILES, instance=hosp)
         form_ok = form.is_valid()
@@ -992,12 +1104,14 @@ def hospitalisation_edit(request, pk):
     # Verrous d'en-tête : statut != brouillon ET champ renseigné ET non superutilisateur.
     # Champ vide → reste modifiable même après brouillon (ex : chambre non encore attribuée).
     _post_brouillon           = not is_admin and hosp.statut != 'brouillon'
-    lock_patient              = _post_brouillon and bool(hosp.patient_id)
-    lock_medecin_traitant     = _post_brouillon and bool(hosp.medecin_traitant_id)
-    lock_chambre              = _post_brouillon and bool(hosp.chambre_id)
-    lock_date_admission       = _post_brouillon and bool(hosp.date_admission)
-    lock_mise_en_observation  = _post_brouillon and bool((hosp.mise_en_observation or '').strip())
-    lock_infirmiere_primaire  = _post_brouillon and bool(hosp.infirmiere_primaire_id)
+    # En mode soins/chambre/décharge, aucun verrou visuel — le JS bloque sans griser
+    _no_lock = mode_soins_seuls or mode_chambre_seule or mode_decharge_seule
+    lock_patient              = _post_brouillon and bool(hosp.patient_id) and not _no_lock
+    lock_medecin_traitant     = _post_brouillon and bool(hosp.medecin_traitant_id) and not _no_lock
+    lock_chambre              = _post_brouillon and bool(hosp.chambre_id) and not mode_chambre_seule and not mode_soins_seuls and not mode_decharge_seule
+    lock_date_admission       = _post_brouillon and bool(hosp.date_admission) and not _no_lock
+    lock_mise_en_observation  = _post_brouillon and bool((hosp.mise_en_observation or '').strip()) and not _no_lock
+    lock_infirmiere_primaire  = _post_brouillon and bool(hosp.infirmiere_primaire_id) and not _no_lock
     lecture_seule_totale = (
         not is_admin and hosp.statut in ('termine', 'annule')
     )
@@ -1014,6 +1128,11 @@ def hospitalisation_edit(request, pk):
     soins_factures_ids = list(hosp.services_a_facturer.filter(
         source='soin', facture__isnull=False
     ).values_list('service_id', flat=True))
+
+    # Visites infirmières dont la facture est payée → lignes non modifiables
+    vi_payees_ids = set(hosp.services_a_facturer.filter(
+        source='visite_infirmiere', facture__statut='payee'
+    ).values_list('ordre', flat=True))
 
     soins_pour_visites = list(Articleservice.objects.filter(
         actif=True, categorie__code='SN'
@@ -1037,6 +1156,7 @@ def hospitalisation_edit(request, pk):
         'has_chambre':        has_chambre,
         'has_soins':          has_soins,
         'soins_factures_ids': soins_factures_ids,
+        'vi_payees_ids':      vi_payees_ids,
         # Stats
         'nb_factures':        nb_factures,
         'nb_ordonnances':     nb_ordonnances,
@@ -1079,6 +1199,9 @@ def hospitalisation_edit(request, pk):
         'lock_infirmiere_primaire':  lock_infirmiere_primaire,
         'lecture_seule_totale': lecture_seule_totale,
         'facture_blocage':      facture_blocage,
+        'mode_chambre_seule':    mode_chambre_seule,
+        'mode_soins_seuls':      mode_soins_seuls,
+        'mode_decharge_seule':   mode_decharge_seule,
     })
 
 
@@ -1281,9 +1404,24 @@ def hospitalisation_detail(request, pk):
 
     lecture_seule_totale = (not is_admin and hosp.statut in ('termine', 'annule'))
     facture_blocage = _get_facture_blocage(hosp)
+    facture_payee = Facture.objects.filter(hospitalisation=hosp, statut='payee').exists()
+    # Bouton Modifier : utilisateurs change_hospitalisation uniquement (confirme + facture payée)
     peut_modifier = is_admin or (
         request.user.has_perm('hospitalisation.change_hospitalisation')
-        and hosp.statut not in ('termine', 'annule')
+        and hosp.statut == 'confirme'
+        and facture_payee
+    )
+    # Bouton Attribuer une chambre : utilisateurs can_installer_patient (confirme + facture payée)
+    peut_attribuer_chambre = (
+        not is_admin
+        and request.user.has_perm('hospitalisation.can_installer_patient')
+        and hosp.statut == 'confirme'
+        and facture_payee
+    )
+    # Bouton Ajouter un soin : can_ajouter_soin ou admin, statut hospitalise
+    peut_ajouter_soin = is_admin or (
+        request.user.has_perm('hospitalisation.can_ajouter_soin')
+        and hosp.statut == 'hospitalise'
     )
 
     factures_list = list(Facture.objects.filter(hospitalisation=hosp).order_by('-date_emission'))
@@ -1312,9 +1450,11 @@ def hospitalisation_detail(request, pk):
         'actions':             actions,
         'lecture_seule_totale': lecture_seule_totale,
         'facture_blocage':     facture_blocage,
-        'peut_modifier':       peut_modifier,
-        'url_facture':         url_facture,
-        'today':               tz.now().date(),
+        'peut_modifier':           peut_modifier,
+        'peut_attribuer_chambre':  peut_attribuer_chambre,
+        'peut_ajouter_soin':       peut_ajouter_soin,
+        'url_facture':             url_facture,
+        'today':                   tz.now().date(),
     })
 
 

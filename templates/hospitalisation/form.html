@@ -50,6 +50,15 @@ html[data-theme="dark"] { --surface:#132033; --border:#243044; --text:#d4e6f5; -
 }
 html[data-theme="dark"] .field-locked-val { background:rgba(255,255,255,.03); }
 
+/* ── Champ non-éditable mode M.O (apparence normale, sans interaction) ── */
+.mo-field-disabled {
+  width:100%; border-bottom:1.5px solid var(--border); padding:6px 8px;
+  font-size:13px; color:var(--text);
+  background:transparent; min-height:32px;
+  display:flex; align-items:center; gap:6px;
+  cursor:default; user-select:none;
+}
+
 
 /* ── Boutons workflow (dans le subheader ligne 2) ── */
 .wf-btn {
@@ -159,6 +168,8 @@ select.field-ul {
 }
 .tab-btn.active { color:var(--teal-600,#0f6e8e); border-bottom-color:var(--teal-500,#1588ab); font-weight:600; }
 .tab-btn:hover:not(.active) { color:var(--text); }
+.mo-tab-disabled { opacity:.38; cursor:not-allowed !important; pointer-events:none; }
+.mo-eval-readonly input, .mo-eval-readonly select, .mo-eval-readonly textarea { pointer-events:none; background:var(--bg); opacity:.7; }
 .tab-pane { display:none; padding:22px 24px; }
 .tab-pane.active { display:block; }
 
@@ -359,7 +370,13 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
           CONFIRMER LA DEMANDE
         </button>
       {% endif %}
-      {% if actions.installer.visible %}
+      {% if mode_decharge_seule %}
+        <button type="submit" form="hosp-form" class="wf-btn" style="background:#7c3aed;color:#fff;"
+                title="Enregistrer le résumé et décharger le patient">
+          VALIDER LA DÉCHARGE
+        </button>
+      {% endif %}
+      {% if actions.installer.visible and not mode_soins_seuls and not mode_decharge_seule %}
         <button type="submit" form="hosp-form" name="action_hospitaliser" id="btn-hospitaliser"
                 class="wf-btn wf-btn-confirmer"
                 {% if not actions.installer.enabled %}disabled title="{{ actions.installer.raison_blocage }}"{% else %}title="Installer le patient en observation"{% endif %}>
@@ -378,7 +395,7 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
         </span>
         {% endif %}
       {% endif %}
-      {% if actions.decharger.visible %}
+      {% if actions.decharger.visible and not mode_decharge_seule %}
         {% if actions.decharger.enabled %}
           <button type="button" class="wf-btn wf-btn-confirmer" onclick="openDechargeModal()" title="Décharger médicalement le patient">DÉCHARGER</button>
         {% else %}
@@ -495,7 +512,7 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
     <!-- En-tête -->
     <div class="hosp-card-header">
       <div class="hosp-header-fields">
-        {% if edit %}
+        {% if edit and not mode_chambre_seule and not mode_soins_seuls and not mode_decharge_seule %}
         <div style="margin-bottom:16px;">
           <div style="font-size:19px;font-weight:700;color:var(--text);line-height:1.2;">
             {% if hosp.patient %}{{ hosp.patient }}{% else %}Nouveau dossier{% endif %}
@@ -518,11 +535,13 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
               <div id="pp-patient">
                 <input type="hidden" name="patient" id="id_patient"
                        value="{{ form.patient.value|default:'' }}">
+                {% if not is_mo and not mode_chambre_seule and not mode_soins_seuls and not mode_decharge_seule %}
                 <div id="pat-search-wrap">
                   <input type="text" id="pat-search-input" class="field-ul"
                          placeholder="Rechercher un patient…" autocomplete="off">
                   <div id="pat-search-dd" class="pat-search-dd"></div>
                 </div>
+                {% endif %}
                 <div class="patient-card" id="patient-banner" style="display:none;">
                   <div class="patient-avatar" id="pat-av"></div>
                   <div>
@@ -554,9 +573,11 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
                       </div>
                     </div>
                   </div>
+                  {% if not is_mo and not mode_chambre_seule and not mode_soins_seuls and not mode_decharge_seule %}
                   <button type="button" class="pp-desel-btn" onclick="patDeselect()">
                     <i class="bi bi-x"></i>
                   </button>
+                  {% endif %}
                 </div>
               </div>
               {% if form.patient.errors %}<div class="field-error">{{ form.patient.errors|join:", " }}</div>{% endif %}
@@ -564,12 +585,22 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
           </div>
 
           <div>
-            <label class="field-label">Date d'hospitalisation</label>
-            {% if lock_date_admission %}
+            <label class="field-label">Date de la demande d'hospitalisation</label>
+            {% if mode_chambre_seule and hosp.date_admission or mode_soins_seuls and hosp.date_admission or mode_decharge_seule and hosp.date_admission %}
+              <input type="text" class="field-ul" readonly style="pointer-events:none;"
+                     value="{{ hosp.date_admission|date:'d/m/Y H:i' }}">
+              <input type="hidden" name="date_admission" value="{{ hosp.date_admission|date:'Y-m-d' }}T{{ hosp.date_admission|date:'H:i' }}">
+            {% elif lock_date_admission %}
               <div class="field-locked-val" title="Verrouillé — {{ hosp.get_statut_display }}">
                 <i class="bi bi-lock" style="font-size:10px;opacity:.45;flex-shrink:0;"></i>{{ hosp.date_admission|date:"d/m/Y H:i" }}
               </div>
               <input type="hidden" name="date_admission" value="{{ hosp.date_admission|date:'Y-m-d' }}T{{ hosp.date_admission|date:'H:i' }}">
+            {% elif is_mo %}
+              <div class="mo-field-disabled" style="font-weight:600;">
+                <i class="bi bi-clock" style="font-size:12px;opacity:.5;flex-shrink:0;"></i>
+                <span id="mo-date-text">—</span>
+              </div>
+              <input type="hidden" name="date_admission" id="mo-date-input" value="">
             {% else %}
               {{ form.date_admission }}
               {% if form.date_admission.errors %}<div class="field-error">{{ form.date_admission.errors|join:", " }}</div>{% endif %}
@@ -578,11 +609,19 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
 
           <div>
             <label class="field-label">Docteur</label>
-            {% if lock_medecin_traitant %}
+            {% if mode_chambre_seule and hosp.medecin_traitant_id or mode_soins_seuls and hosp.medecin_traitant_id or mode_decharge_seule and hosp.medecin_traitant_id %}
+              <input type="text" class="field-ul" readonly style="pointer-events:none;"
+                     value="{{ hosp.medecin_traitant }}">
+              <input type="hidden" name="medecin_traitant" value="{{ hosp.medecin_traitant_id }}">
+            {% elif lock_medecin_traitant %}
               <div class="field-locked-val" title="Verrouillé — {{ hosp.get_statut_display }}">
                 <i class="bi bi-lock" style="font-size:10px;opacity:.45;flex-shrink:0;"></i>{{ hosp.medecin_traitant }}
               </div>
               <input type="hidden" name="medecin_traitant" value="{{ hosp.medecin_traitant_id }}">
+            {% elif is_mo %}
+              <input type="text" class="field-ul" readonly style="pointer-events:none;"
+                     value="{{ mo_medecin|default:'' }}">
+              {% if mo_medecin %}<input type="hidden" name="medecin_traitant" id="id_medecin_traitant" value="{{ mo_medecin.pk }}">{% endif %}
             {% else %}
               {{ form.medecin_traitant }}
               {% if form.medecin_traitant.errors %}<div class="field-error">{{ form.medecin_traitant.errors|join:", " }}</div>{% endif %}
@@ -592,13 +631,32 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
 
           <div>
             <label class="field-label">Maladie</label>
-            {{ form.maladie }}
-            {% if form.maladie.errors %}<div class="field-error">{{ form.maladie.errors|join:", " }}</div>{% endif %}
+            {% if is_mo and mo_maladie %}
+              <input type="text" class="field-ul" readonly style="pointer-events:none;"
+                     value="{{ mo_maladie }}">
+              <input type="hidden" name="maladie" value="{{ mo_maladie.pk }}">
+            {% elif mode_soins_seuls and hosp.maladie_id or mode_decharge_seule and hosp.maladie_id %}
+              <input type="text" class="field-ul" readonly style="pointer-events:none;"
+                     value="{{ hosp.maladie }}">
+              <input type="hidden" name="maladie" value="{{ hosp.maladie_id }}">
+            {% else %}
+              {{ form.maladie }}
+              {% if form.maladie.errors %}<div class="field-error">{{ form.maladie.errors|join:", " }}</div>{% endif %}
+            {% endif %}
           </div>
 
           <div>
             <label class="field-label">Salle / Chambre</label>
-            {% if lock_chambre %}
+            {% if is_mo or not edit %}
+              <div class="mo-field-disabled">
+                <i class="bi bi-hourglass-split" style="font-size:11px;opacity:.5;flex-shrink:0;"></i>
+                <span style="font-style:italic;">Sera attribuée après confirmation</span>
+              </div>
+            {% elif mode_soins_seuls and hosp.chambre_id or mode_decharge_seule and hosp.chambre_id %}
+              <input type="text" class="field-ul" readonly style="pointer-events:none;"
+                     value="{{ hosp.chambre }}{% if hosp.numero_lit %} - Lit {{ hosp.numero_lit }}{% endif %}">
+              <input type="hidden" name="chambre_lit" value="{{ hosp.chambre_id }}_{{ hosp.numero_lit|default:'0' }}">
+            {% elif lock_chambre %}
               <div class="field-locked-val" title="Verrouillé — {{ hosp.get_statut_display }}">
                 <i class="bi bi-lock" style="font-size:10px;opacity:.45;flex-shrink:0;"></i>{{ hosp.chambre }}{% if hosp.numero_lit %} - Lit {{ hosp.numero_lit }}{% endif %}
               </div>
@@ -618,12 +676,12 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
     <!-- Onglets -->
     <div class="tabs-wrap">
       <div class="tabs-nav">
-        <button type="button" class="tab-btn" onclick="switchTab('tab-general', this)">Informations</button>
-        <button type="button" class="tab-btn" onclick="switchTab('tab-controle', this)">Listes de contrôle</button>
-        <button type="button" class="tab-btn active" onclick="switchTab('tab-evaluation', this)">Évaluation clinique</button>
+        <button type="button" class="tab-btn{% if is_mo %} mo-tab-disabled{% endif %}" {% if not is_mo and not mode_chambre_seule and not mode_soins_seuls and not mode_decharge_seule %}onclick="switchTab('tab-general', this)"{% endif %}>Informations</button>
+        <button type="button" class="tab-btn{% if is_mo %} mo-tab-disabled{% endif %}" {% if not is_mo and not mode_chambre_seule and not mode_soins_seuls and not mode_decharge_seule %}onclick="switchTab('tab-controle', this)"{% endif %}>Listes de contrôle</button>
+        <button type="button" class="tab-btn" {% if not mode_chambre_seule and not mode_soins_seuls and not mode_decharge_seule %}onclick="switchTab('tab-evaluation', this)"{% endif %}>Évaluation clinique</button>
         <button type="button" class="tab-btn" onclick="switchTab('tab-soins', this)">Soins</button>
         {% if edit and hosp.statut in 'confirme,hospitalise,decharge,termine' %}
-        <button type="button" class="tab-btn" onclick="switchTab('tab-services', this)">
+        <button type="button" class="tab-btn" {% if not mode_chambre_seule and not mode_soins_seuls and not mode_decharge_seule %}onclick="switchTab('tab-services', this)"{% endif %}>
           Services à facturer
           {% if saf_non_factures %}<span style="background:var(--teal-500,#1588ab);color:#fff;border-radius:10px;padding:0 6px;font-size:10px;margin-left:4px;">{{ saf_non_factures }}</span>{% endif %}
         </button>
@@ -784,7 +842,7 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
         {% endif %}
       </div>
       <!-- Onglet 3 — Évaluation clinique -->
-      <div class="tab-pane active" id="tab-evaluation">
+      <div class="tab-pane {% if not mode_soins_seuls and not mode_decharge_seule %}active{% endif %}" id="tab-evaluation"{% if is_mo or mode_chambre_seule or mode_soins_seuls or mode_decharge_seule %} data-mo-readonly="1"{% endif %}>
         <style>
         .ev-note { font-size:12px; color:var(--text-muted); margin-bottom:18px; padding:8px 12px; background:#f8fafc; border-left:3px solid var(--teal-400,#38b2d0); border-radius:2px; }
         .ev-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px 60px; }
@@ -965,7 +1023,7 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
         </script>
       </div>
       <!-- Onglet 4 — Soins -->
-      <div class="tab-pane" id="tab-soins">
+      <div class="tab-pane {% if mode_soins_seuls %}active{% endif %}" id="tab-soins">
         <style>
         .vs-section-title { font-size:12.5px; font-weight:600; color:var(--text); margin:16px 0 8px; }
         .vs-table { width:100%; border-collapse:collapse; font-size:12.5px; }
@@ -1019,10 +1077,11 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
           </thead>
           <tbody id="tbody-vi">
             {% for v in visites_inf %}
+            {% if v.pk not in vi_payees_ids %}
             <tr>
               <td>
                 <input type="hidden" name="vi_id[]" value="{{ v.pk }}">
-                <input type="datetime-local" name="vi_date[]" class="vs-input"
+                <input type="datetime-local" name="vi_date[]" class="field-ul"
                        value="{% if v.date %}{{ v.date|date:'Y-m-d' }}T{{ v.date|date:'H:i' }}{% endif %}">
               </td>
               <td>
@@ -1048,6 +1107,7 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
               <td><input type="text" name="vi_remarques[]" class="vs-input" value="{{ v.remarques }}" placeholder="Remarques…"></td>
               <td><button type="button" class="vs-del-btn" onclick="this.closest('tr').remove()"><i class="bi bi-trash3"></i></button></td>
             </tr>
+            {% endif %}
             {% endfor %}
           </tbody>
         </table>
@@ -1072,7 +1132,7 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
             <tr>
               <td>
                 <input type="hidden" name="vd_id[]" value="{{ v.pk }}">
-                <input type="datetime-local" name="vd_date[]" class="vs-input"
+                <input type="datetime-local" name="vd_date[]" class="field-ul"
                        value="{% if v.date %}{{ v.date|date:'Y-m-d' }}T{{ v.date|date:'H:i' }}{% endif %}">
               </td>
               <td><input type="text" name="vd_instruction[]" class="vs-input" value="{{ v.instruction }}" placeholder="Instruction…"></td>
@@ -1121,12 +1181,21 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
           });
         }
 
+        function nowDT() {
+          var n = new Date(), p = function(x){ return String(x).padStart(2,'0'); };
+          return n.getFullYear()+'-'+p(n.getMonth()+1)+'-'+p(n.getDate())+'T'+p(n.getHours())+':'+p(n.getMinutes());
+        }
+        function nowD() {
+          var n = new Date(), p = function(x){ return String(x).padStart(2,'0'); };
+          return n.getFullYear()+'-'+p(n.getMonth()+1)+'-'+p(n.getDate());
+        }
+
         function addViRow(type) {
           var tbody = document.getElementById('tbody-' + type);
           var tr = document.createElement('tr');
           if (type === 'vi') {
             tr.innerHTML =
-              '<td><input type="hidden" name="vi_id[]" value=""><input type="datetime-local" name="vi_date[]" class="vs-input"></td>' +
+              '<td><input type="hidden" name="vi_id[]" value=""><input type="datetime-local" name="vi_date[]" class="field-ul" value="' + nowDT() + '"></td>' +
               '<td><select name="vi_soin[]" class="vs-select"><option value="">—</option>' + SOINS_OPTIONS + '</select></td>' +
               '<td><input type="number" name="vi_quantite[]" class="vs-input" step="1" value="1"></td>' +
               '<td><select name="vi_infirmiere[]" class="vs-select"><option value="">—</option>' + MEDECINS_OPTIONS + '</select></td>' +
@@ -1134,7 +1203,7 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
               '<td><button type="button" class="vs-del-btn" onclick="this.closest(\'tr\').remove()"><i class="bi bi-trash3"></i></button></td>';
           } else {
             tr.innerHTML =
-              '<td><input type="hidden" name="vd_id[]" value=""><input type="datetime-local" name="vd_date[]" class="vs-input"></td>' +
+              '<td><input type="hidden" name="vd_id[]" value=""><input type="datetime-local" name="vd_date[]" class="field-ul" value="' + nowDT() + '"></td>' +
               '<td><input type="text" name="vd_instruction[]" class="vs-input" placeholder="Instruction…"></td>' +
               '<td><select name="vd_docteur[]" class="vs-select"><option value="">—</option>' + MEDECINS_OPTIONS + '</select></td>' +
               '<td><input type="text" name="vd_remarques[]" class="vs-input" placeholder="Remarques…"></td>' +
@@ -1223,7 +1292,7 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
                   <span style="font-size:12px;color:var(--text-muted);">{% if s.date %}{{ s.date|date:'d/m/Y' }}{% else %}—{% endif %}</span>
                   <input type="hidden" name="saf_date[]" value="{% if s.date %}{{ s.date|date:'Y-m-d' }}{% endif %}">
                 {% else %}
-                  <input type="date" name="saf_date[]" class="vs-input" value="{% if s.date %}{{ s.date|date:'Y-m-d' }}{% endif %}">
+                  <input type="date" name="saf_date[]" class="field-ul" value="{% if s.date %}{{ s.date|date:'Y-m-d' }}{% endif %}">
                 {% endif %}
                 <input type="hidden" name="saf_unite[]" value="{{ s.unite_mesure_id|default:'' }}">
               </td>
@@ -1254,7 +1323,7 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
           tr.innerHTML =
             '<td><input type="hidden" name="saf_id[]" value=""><select name="saf_service[]" class="vs-select"><option value="">—</option>' + SAF_SERVICES + '</select></td>' +
             '<td><input type="number" name="saf_quantite[]" class="vs-input" step="1" value="1"></td>' +
-            '<td><input type="date" name="saf_date[]" class="vs-input"><input type="hidden" name="saf_unite[]" value=""></td>' +
+            '<td><input type="date" name="saf_date[]" class="field-ul" value="' + nowD() + '"><input type="hidden" name="saf_unite[]" value=""></td>' +
             '<td><span style="font-size:11px;color:var(--text-muted);">Non facturé</span></td>' +
             '<td><button type="button" class="vs-del-btn" onclick="this.closest(\'tr\').remove()"><i class="bi bi-trash3"></i></button></td>';
           tbody.appendChild(tr);
@@ -1263,12 +1332,12 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
       </div>
 
       <!-- Onglet 6 — Résumé de décharge -->
-      <div class="tab-pane" id="tab-resume">
+      <div class="tab-pane {% if mode_decharge_seule %}active{% endif %}" id="tab-resume">
         <style>
         .rd-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px 48px; }
         .rd-field { display:flex; flex-direction:column; gap:5px; }
         .rd-label { font-size:12px; font-weight:600; color:var(--text); }
-        .rd-textarea { width:100%; border:none; border-bottom:1.5px solid #d1dde3; border-radius:0; background:transparent; padding:6px 2px; font-size:13px; font-family:inherit; color:var(--text); outline:none; resize:vertical; min-height:60px; }
+        .rd-textarea { width:100%; border:none; border-bottom:1.5px solid #d1dde3; border-radius:0; background:transparent; padding:6px 2px; font-size:13px; font-family:inherit; color:var(--text); outline:none; resize:none; height:36px; overflow:hidden; }
         .rd-textarea:focus { border-bottom-color:var(--teal-500,#1588ab); }
         .rd-check-row { display:flex; align-items:center; gap:10px; padding:6px 0; }
         .rd-sep { grid-column:1/-1; border:none; border-top:1px solid var(--border); margin:6px 0; }
@@ -1293,7 +1362,7 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
               <div class="rd-field">
                 <label class="rd-label">Motif du transfert <span style="color:#dc2626;">*</span></label>
                 <textarea name="rd_motif_reference" id="rd_motif_reference"
-                  class="rd-textarea" rows="2"
+                  class="rd-textarea" rows="1" style="min-height:unset;height:34px;resize:none;"
                   placeholder="Raison du transfert...">{{ hosp.motif_reference }}</textarea>
               </div>
             </div>
@@ -1311,25 +1380,25 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
 
           <hr class="rd-sep">
 
-          <div class="rd-field" style="grid-column:1/-1;">
+          <div class="rd-field">
             <label class="rd-label">Diagnostic de décharge</label>
-            <textarea name="rd_diagnostic" class="rd-textarea" rows="2">{{ r.diagnostic_decharge }}</textarea>
+            <textarea name="rd_diagnostic" class="rd-textarea">{{ r.diagnostic_decharge }}</textarea>
           </div>
-          <div class="rd-field" style="grid-column:1/-1;">
+          <div class="rd-field">
             <label class="rd-label">Note préopératoire</label>
-            <textarea name="rd_note_preop" class="rd-textarea" rows="2">{{ r.note_preoperatoire }}</textarea>
+            <textarea name="rd_note_preop" class="rd-textarea">{{ r.note_preoperatoire }}</textarea>
           </div>
-          <div class="rd-field" style="grid-column:1/-1;">
+          <div class="rd-field">
             <label class="rd-label">Cours post-opératoire</label>
-            <textarea name="rd_cours_post_op" class="rd-textarea" rows="2">{{ r.cours_post_operatoire }}</textarea>
+            <textarea name="rd_cours_post_op" class="rd-textarea">{{ r.cours_post_operatoire }}</textarea>
           </div>
-          <div class="rd-field" style="grid-column:1/-1;">
+          <div class="rd-field">
             <label class="rd-label">Plan de sortie</label>
-            <textarea name="rd_plan_sortie" class="rd-textarea" rows="2">{{ r.plan_sortie }}</textarea>
+            <textarea name="rd_plan_sortie" class="rd-textarea">{{ r.plan_sortie }}</textarea>
           </div>
           <div class="rd-field" style="grid-column:1/-1;">
             <label class="rd-label">Instructions</label>
-            <textarea name="rd_instructions" class="rd-textarea" rows="3">{{ r.instructions }}</textarea>
+            <textarea name="rd_instructions" class="rd-textarea" style="height:42px;">{{ r.instructions }}</textarea>
           </div>
 
         </div>
@@ -1387,7 +1456,7 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
 
 
 <!-- ── Modale décharge ── -->
-{% if edit and actions.decharger.visible %}
+{% if edit and actions.decharger.visible and not mode_decharge_seule %}
 <div id="modal-decharge" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:2000;align-items:center;justify-content:center;padding:16px;">
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;width:100%;max-width:480px;box-shadow:0 16px 48px rgba(0,0,0,.3);overflow:hidden;">
 
@@ -1819,7 +1888,7 @@ document.getElementById('modal-annul-form').addEventListener('click', function(e
   var dropdown    = document.getElementById('pat-search-dd');
   var searchWrap  = document.getElementById('pat-search-wrap');
   var banner      = document.getElementById('patient-banner');
-  if (!selectEl || !searchInput) return;
+  if (!selectEl) return;
 
   var timer;
 
@@ -1828,6 +1897,7 @@ document.getElementById('modal-annul-form').addEventListener('click', function(e
   }
 
   function positionDropdown() {
+    if (!searchInput) return;
     var rect = searchInput.getBoundingClientRect();
     dropdown.style.top   = (rect.bottom + 4) + 'px';
     dropdown.style.left  = rect.left + 'px';
@@ -1852,9 +1922,9 @@ document.getElementById('modal-annul-form').addEventListener('click', function(e
     selectEl.dispatchEvent(new Event('change', {bubbles: true}));
     fillCard(p);
     banner.style.display = 'grid';
-    searchWrap.style.display = 'none';
-    searchInput.value = '';
-    dropdown.style.display = 'none';
+    if (searchWrap) searchWrap.style.display = 'none';
+    if (searchInput) searchInput.value = '';
+    if (dropdown) dropdown.style.display = 'none';
     if (window._updateConfirmerBtn) window._updateConfirmerBtn();
   }
 
@@ -1862,51 +1932,51 @@ document.getElementById('modal-annul-form').addEventListener('click', function(e
     selectEl.value = '';
     selectEl.dispatchEvent(new Event('change', {bubbles: true}));
     banner.style.display = 'none';
-    searchWrap.style.display = '';
-    searchInput.value = '';
-    dropdown.style.display = 'none';
-    setTimeout(function() { searchInput.focus(); }, 0);
+    if (searchWrap) searchWrap.style.display = '';
+    if (searchInput) { searchInput.value = ''; setTimeout(function() { searchInput.focus(); }, 0); }
+    if (dropdown) dropdown.style.display = 'none';
     if (window._updateConfirmerBtn) window._updateConfirmerBtn();
   };
 
-  searchInput.addEventListener('input', function() {
-    clearTimeout(timer);
-    selectEl.value = '';
-    var q = this.value.trim();
-    if (q.length < 2) { dropdown.style.display = 'none'; return; }
-    timer = setTimeout(function() {
-      fetch('{% url "patients:patient_search" %}?q=' + encodeURIComponent(q))
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          var list = data.results || [];
-          if (!list.length) {
-            dropdown.innerHTML = '<div class="pat-dd-empty">Aucun patient trouvé</div>';
-          } else {
-            dropdown.innerHTML = list.map(function(p) {
-              var initials = (p.nom_complet || '').trim().split(/\s+/).slice(0,2).map(function(w){ return w[0]||''; }).join('').toUpperCase();
-              return '<div class="pat-dd-item"'
-                + ' data-id="'    + esc(p.id)            + '"'
-                + ' data-nom="'   + esc(p.nom_complet)   + '"'
-                + ' data-code="'  + esc(p.code)          + '"'
-                + ' data-age="'   + esc(p.age)           + '"'
-                + ' data-sexe="'  + esc(p.sexe_display)  + '"'
-                + ' data-tel="'   + esc(p.telephone)     + '"'
-                + ' data-addr="'  + esc(p.adresse)       + '"'
-                + ' data-ass="'   + esc(p.assurance_nom) + '">'
-                + '<div class="pat-dd-av">' + esc(initials) + '</div>'
-                + '<div style="flex:1;min-width:0;">'
-                + '<span class="pat-dd-name">' + esc(p.nom_complet) + '</span>'
-                + '<span class="pat-dd-sub">'  + esc(p.code) + (p.telephone ? ' · ' + esc(p.telephone) : '') + '</span>'
-                + '</div>'
-                + '</div>';
-            }).join('');
-            dropdown.querySelectorAll('.pat-dd-item').forEach(function(item) {
-              item.addEventListener('mousedown', function(e) {
-                e.preventDefault();
-                showBanner({
-                  id:           item.dataset.id,
-                  nom_complet:  item.dataset.nom,
-                  code:         item.dataset.code,
+  if (searchInput && dropdown && searchWrap) {
+    searchInput.addEventListener('input', function() {
+      clearTimeout(timer);
+      selectEl.value = '';
+      var q = this.value.trim();
+      if (q.length < 1) { dropdown.style.display = 'none'; return; }
+      timer = setTimeout(function() {
+        fetch('{% url "patients:patient_search" %}?q=' + encodeURIComponent(q))
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            var list = data.results || [];
+            if (!list.length) {
+              dropdown.innerHTML = '<div class="pat-dd-empty">Aucun patient trouvé</div>';
+            } else {
+              dropdown.innerHTML = list.map(function(p) {
+                var initials = (p.nom_complet || '').trim().split(/\s+/).slice(0,2).map(function(w){ return w[0]||''; }).join('').toUpperCase();
+                return '<div class="pat-dd-item"'
+                  + ' data-id="'    + esc(p.id)            + '"'
+                  + ' data-nom="'   + esc(p.nom_complet)   + '"'
+                  + ' data-code="'  + esc(p.code)          + '"'
+                  + ' data-age="'   + esc(p.age)           + '"'
+                  + ' data-sexe="'  + esc(p.sexe_display)  + '"'
+                  + ' data-tel="'   + esc(p.telephone)     + '"'
+                  + ' data-addr="'  + esc(p.adresse)       + '"'
+                  + ' data-ass="'   + esc(p.assurance_nom) + '">'
+                  + '<div class="pat-dd-av">' + esc(initials) + '</div>'
+                  + '<div style="flex:1;min-width:0;">'
+                  + '<span class="pat-dd-name">' + esc(p.nom_complet) + '</span>'
+                  + '<span class="pat-dd-sub">'  + esc(p.code) + (p.telephone ? ' · ' + esc(p.telephone) : '') + '</span>'
+                  + '</div>'
+                  + '</div>';
+              }).join('');
+              dropdown.querySelectorAll('.pat-dd-item').forEach(function(item) {
+                item.addEventListener('mousedown', function(e) {
+                  e.preventDefault();
+                  showBanner({
+                    id:           item.dataset.id,
+                    nom_complet:  item.dataset.nom,
+                    code:         item.dataset.code,
                   age:          item.dataset.age,
                   sexe_display: item.dataset.sexe,
                   telephone:    item.dataset.tel,
@@ -1922,16 +1992,17 @@ document.getElementById('modal-annul-form').addEventListener('click', function(e
     }, 280);
   });
 
-  searchInput.addEventListener('blur', function() {
-    setTimeout(function() { dropdown.style.display = 'none'; }, 180);
-  });
+    searchInput.addEventListener('blur', function() {
+      setTimeout(function() { dropdown.style.display = 'none'; }, 180);
+    });
 
-  document.addEventListener('click', function(e) {
-    if (!e.target.closest('#pp-patient')) dropdown.style.display = 'none';
-  });
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('#pp-patient')) dropdown.style.display = 'none';
+    });
 
-  window.addEventListener('scroll', positionDropdown, true);
-  window.addEventListener('resize', positionDropdown);
+    window.addEventListener('scroll', positionDropdown, true);
+    window.addEventListener('resize', positionDropdown);
+  } // fin if (searchInput && dropdown && searchWrap)
 
   function prefillById(pk) {
     fetch('{% url "patients:patient_search" %}?id=' + encodeURIComponent(pk))
@@ -1949,5 +2020,142 @@ document.getElementById('modal-annul-form').addEventListener('click', function(e
     if (urlPk) prefillById(urlPk);
   }
 })();
+
+{% if is_mo %}
+// ── Mode M.O ─────────────────────────────────────────────────────────────────
+(function() {
+  // Horloge ticking sur le champ date
+  var dateInput   = document.getElementById('mo-date-input');
+  var dateDisplay = document.getElementById('mo-date-text');
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function tick() {
+    var now = new Date();
+    var iso = now.getFullYear() + '-' + pad(now.getMonth()+1) + '-' + pad(now.getDate())
+            + 'T' + pad(now.getHours()) + ':' + pad(now.getMinutes());
+    if (dateInput)   dateInput.value = iso;
+    if (dateDisplay) dateDisplay.textContent =
+      pad(now.getDate()) + '/' + pad(now.getMonth()+1) + '/' + now.getFullYear()
+      + '  ' + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+  }
+  tick();
+  setInterval(tick, 1000);
+})();
+{% endif %}
+
+// ── Lock évaluation (MO + mode_chambre_seule) ─────────────────────────────────
+(function() {
+  var evalPane = document.getElementById('tab-evaluation');
+  if (evalPane && evalPane.dataset.moReadonly) {
+    evalPane.classList.add('mo-eval-readonly');
+    evalPane.querySelectorAll('input, select, textarea').forEach(function(el) {
+      el.setAttribute('readonly', 'readonly');
+      if (el.tagName === 'SELECT') el.setAttribute('disabled', 'disabled');
+    });
+    evalPane.querySelectorAll('button').forEach(function(btn) {
+      btn.style.pointerEvents = 'none';
+      btn.style.cursor = 'default';
+    });
+  }
+})();
+
+{% if mode_decharge_seule %}
+// ── Mode décharge : verrouiller tout sauf Résumé de décharge + Soins ──────────
+(function() {
+  var resumePane = document.getElementById('tab-resume');
+  var soinsPane  = document.getElementById('tab-soins');
+  var form = document.querySelector('form');
+  if (!form) return;
+  function inFreePane(el) {
+    return (resumePane && resumePane.contains(el)) || (soinsPane && soinsPane.contains(el));
+  }
+  form.querySelectorAll('input, textarea').forEach(function(el) {
+    if (el.type === 'hidden') return;
+    if (inFreePane(el)) return;
+    el.setAttribute('readonly', 'readonly');
+    el.style.pointerEvents = 'none';
+    el.style.cursor = 'default';
+  });
+  form.querySelectorAll('.ts-wrapper').forEach(function(w) {
+    if (inFreePane(w)) return;
+    w.style.pointerEvents = 'none';
+    w.style.cursor = 'default';
+  });
+  form.querySelectorAll('button[type="button"]').forEach(function(btn) {
+    if (btn.closest('.subheader-actions')) return;
+    if (inFreePane(btn)) return;
+    btn.style.pointerEvents = 'none';
+    btn.style.cursor = 'default';
+  });
+})();
+{% endif %}
+
+{% if mode_soins_seuls %}
+// ── Mode soins seuls : verrouiller hors onglet Soins, sans griser ─────────────
+(function() {
+  var soinsPane = document.getElementById('tab-soins');
+  var form = document.querySelector('form');
+  if (!form) return;
+  // Inputs/textareas : readonly + pointer-events (pas disabled pour ne pas griser)
+  form.querySelectorAll('input, textarea').forEach(function(el) {
+    if (el.type === 'hidden') return;
+    if (soinsPane && soinsPane.contains(el)) return;
+    el.setAttribute('readonly', 'readonly');
+    el.style.pointerEvents = 'none';
+    el.style.cursor = 'default';
+  });
+  // TomSelect wrappers hors soins : pointer-events sur le wrapper uniquement
+  form.querySelectorAll('.ts-wrapper').forEach(function(w) {
+    if (soinsPane && soinsPane.contains(w)) return;
+    w.style.pointerEvents = 'none';
+    w.style.cursor = 'default';
+  });
+  // Boutons hors subheader et hors onglet soins
+  form.querySelectorAll('button[type="button"]').forEach(function(btn) {
+    if (btn.closest('.subheader-actions')) return;
+    if (soinsPane && soinsPane.contains(btn)) return;
+    btn.style.pointerEvents = 'none';
+    btn.style.cursor = 'default';
+  });
+})();
+{% endif %}
+
+{% if mode_chambre_seule %}
+// ── Mode attribution chambre : tout verrouiller sauf chambre_lit ──────────────
+(function() {
+  var form = document.querySelector('form');
+  if (!form) return;
+
+  // Trouver le wrapper TomSelect de chambre_lit pour exclure ses éléments internes
+  var chambreNative = document.getElementById('id_chambre_lit');
+  var chambreWrapper = chambreNative && chambreNative.closest('.ts-wrapper');
+
+  form.querySelectorAll('input, select, textarea').forEach(function(el) {
+    if (el.id === 'id_chambre_lit') return;
+    if (el.type === 'hidden') return;
+    if (chambreWrapper && chambreWrapper.contains(el)) return;
+    el.setAttribute('readonly', 'readonly');
+    if (el.tagName === 'SELECT') el.setAttribute('disabled', 'disabled');
+    el.style.pointerEvents = 'none';
+    el.style.cursor = 'default';
+  });
+
+  form.querySelectorAll('button[type="button"]').forEach(function(btn) {
+    if (btn.closest('.subheader-actions')) return;
+    if (chambreWrapper && chambreWrapper.contains(btn)) return;
+    btn.style.pointerEvents = 'none';
+    btn.style.cursor = 'default';
+  });
+
+  // Réactiver explicitement le TomSelect de chambre_lit (s'il est déjà initialisé)
+  function enableChambre() {
+    if (chambreNative && chambreNative.tomselect) {
+      chambreNative.tomselect.enable();
+    }
+  }
+  enableChambre();
+  // Réessayer après l'init TomSelect différée
+  setTimeout(enableChambre, 400);
+})();
+{% endif %}
 </script>
 {% endblock %}

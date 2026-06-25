@@ -151,7 +151,11 @@ def facture_create(request):
                              if (rdv_obj and rdv_obj.type_consultation) else '')
 
     back_url = request.GET.get('back') or (
-        f'/laboratoire/{demande_pk}/' if demande_pk else ''
+        reverse('hospitalisation:detail', kwargs={'pk': hosp_obj.pk})       if hosp_obj else
+        f'/laboratoire/{demande_obj.pk}/'                                    if demande_obj else
+        reverse('ordonnance_detail', kwargs={'pk': ordonnance_obj.pk})       if ordonnance_obj else
+        reverse('patients:rdv_edit', kwargs={'pk': rdv_obj.pk})              if rdv_obj else
+        ''
     )
 
     if request.method == 'POST':

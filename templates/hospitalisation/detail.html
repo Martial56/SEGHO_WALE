@@ -38,8 +38,9 @@
 .det-hdr {
   background: var(--surface);
   border: 1px solid var(--border);
+  border-top: 3px solid var(--teal-500);
   border-radius: var(--radius);
-  padding: 16px 24px;
+  padding: 18px 24px;
   margin-top: 0;
   display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
   box-shadow: var(--shadow-sm);
@@ -76,12 +77,12 @@
 .det-pipe-wrap {
   background: var(--surface);
   border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 10px 20px; margin-top: 8px;
-  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 12px 20px; margin-top: 10px;
+  display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;
   box-shadow: var(--shadow-sm);
 }
 .pipeline {
-  margin-left: auto; display: flex; align-items: stretch;
+  margin-left: 0; display: flex; align-items: stretch;
   font-size: 11px; font-weight: 700; letter-spacing: .06em; gap: 2px;
   transition: opacity .25s;
 }
@@ -120,13 +121,21 @@
 .det-acts {
   background: var(--surface);
   border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 10px 16px; margin-top: 8px;
+  padding: 10px 16px; margin-top: 10px;
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   min-height: 52px; box-shadow: var(--shadow-sm);
   transition: opacity .2s;
 }
 .det-acts[data-loading="true"] { opacity: .55; pointer-events: none; }
-.act-ro { font-size: 12.5px; color: var(--text-muted); font-style: italic; padding: 3px 0; }
+.act-ro {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; padding: 8px 14px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--teal-400);
+  border-radius: var(--radius-xs);
+  font-size: 13px; color: var(--text-muted);
+}
 .act-sep { width: 1px; height: 24px; background: var(--border-strong); flex-shrink: 0; }
 
 /* Boutons d'action */
@@ -160,22 +169,29 @@
 .abtn-neutral:not(:disabled):not(.off):hover { background: #ddedf5; color: var(--teal-700); }
 
 /* ── Layout ── */
-.det-layout { padding-top: 14px; }
+.det-layout { padding-top: 16px; }
 .det-main   { min-width: 0; }
+
+/* ── Sidebar sticky offset : topbar(70) + o-nav(38) + subhdr(~44) ── */
+.hist-aside {
+  top: 158px;
+  max-height: calc(100vh - 170px);
+}
 
 /* ── Encart durée ── */
 .dur-card {
   background: linear-gradient(135deg, var(--teal-50) 0%, var(--surface) 100%);
   border: 1px solid var(--teal-200); border-radius: var(--radius-sm);
-  padding: 14px 18px; margin-bottom: 14px;
-  display: flex; align-items: center; gap: 16px;
+  padding: 16px 22px; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 20px;
 }
 .dur-card[hidden] { display: none; }
-.dur-icon { font-size: 26px; color: var(--teal-400); flex-shrink: 0; }
-.dur-row  { display: flex; gap: 24px; flex-wrap: wrap; }
+.dur-icon { font-size: 32px; color: var(--teal-400); flex-shrink: 0; line-height: 1; }
+.dur-row  { display: flex; gap: 32px; flex-wrap: wrap; align-items: center; }
+.dur-divider { width: 1px; height: 36px; background: var(--teal-200); flex-shrink: 0; }
 .dur-lbl  { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); }
-.dur-val  { font-size: 13px; font-weight: 700; color: var(--teal-700); margin-top: 2px; }
-.dur-val.main { font-size: 18px; color: var(--teal-500); }
+.dur-val  { font-size: 14px; font-weight: 700; color: var(--teal-700); margin-top: 3px; }
+.dur-val.main { font-size: 22px; color: var(--teal-500); }
 
 /* ── Card + onglets ── */
 .det-card {
@@ -203,7 +219,7 @@
   border-radius: 100px; font-size: 10px; font-weight: 700;
   background: var(--teal-100); color: var(--teal-700);
 }
-.tab-pane { display: none; padding: 22px 24px; }
+.tab-pane { display: none; padding: 24px 28px; }
 .tab-pane.active { display: block; }
 
 /* ── Grid infos ── */
@@ -410,7 +426,10 @@ html[data-theme="dark"] .det-card,
 html[data-theme="dark"] .aside-card,
 html[data-theme="dark"] .fac-row,
 html[data-theme="dark"] .dur-card { background: var(--surface); border-color: var(--border); }
+html[data-theme="dark"] .det-hdr { border-top-color: var(--teal-500); }
 html[data-theme="dark"] .dur-card { background: linear-gradient(135deg, rgba(14,67,88,.3) 0%, var(--surface) 100%); }
+html[data-theme="dark"] .dur-divider { background: rgba(255,255,255,.1); }
+html[data-theme="dark"] .act-ro { background: #0d1f32; border-color: rgba(255,255,255,.08); border-left-color: var(--teal-400); }
 html[data-theme="dark"] .pip-step { background: #1a2a3e; color: rgba(255,255,255,.28); }
 html[data-theme="dark"] .pip-step.done { background: #0f2e48; color: var(--teal-300); }
 html[data-theme="dark"] .pip-step.active { background: var(--teal-500); color: #fff; }
@@ -494,15 +513,10 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
 </div>
 
 
-{# BARRE D'ACTIONS CONTEXTUELLE — masquée si aucune action visible #}
-{% if lecture_seule_totale or actions.confirmer.visible or actions.creer_facture.visible or actions.installer.visible or actions.decharger.visible or actions.terminer.visible or actions.annuler.visible or peut_modifier and hosp.statut == 'confirme' or peut_modifier and hosp.statut == 'hospitalise' %}
+{# BARRE D'ACTIONS CONTEXTUELLE — cachée pour dossiers terminés/annulés #}
+{% if not lecture_seule_totale %}
+{% if actions.confirmer.visible or actions.creer_facture.visible or actions.installer.visible or actions.decharger.visible or peut_attribuer_chambre or peut_ajouter_soin or peut_modifier and hosp.statut == 'confirme' %}
 <div class="det-acts" id="action-bar">
-  {% if lecture_seule_totale %}
-  <span class="act-ro">
-    <i class="bi bi-lock-fill" style="margin-right:5px;"></i>
-    Dossier en lecture seule — {{ hosp.get_statut_display }}
-  </span>
-  {% else %}
 
   {# ─ Confirmer (brouillon uniquement) ─ #}
   {% if actions.confirmer.visible and hosp.statut == 'brouillon' %}
@@ -534,14 +548,18 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
   {% endif %}
 
   {# ─ Ajouter un soin ─ #}
-  {% if peut_modifier and hosp.statut == 'confirme' or peut_modifier and hosp.statut == 'hospitalise' %}
+  {% if peut_ajouter_soin %}
   <a href="{% url 'hospitalisation:edit' hosp.pk %}?tab=soins" class="abtn abtn-neutral">
     <i class="bi bi-plus-circle"></i> Ajouter un soin
   </a>
   {% endif %}
 
-  {# ─ Installer le patient ─ #}
-  {% if actions.installer.visible %}
+  {# ─ Installer le patient / Attribuer une chambre ─ #}
+  {% if peut_attribuer_chambre %}
+  <a href="{% url 'hospitalisation:edit' hosp.pk %}" class="abtn abtn-info">
+    <i class="bi bi-door-open"></i> Attribuer une chambre
+  </a>
+  {% elif actions.installer.visible and hosp.statut == 'confirme' %}
   <button type="button"
           class="abtn abtn-info {% if not actions.installer.enabled %}off{% endif %}"
           {% if actions.installer.enabled %}
@@ -554,12 +572,11 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
   {% endif %}
 
   {# ─ Décharger ─ #}
-  {% if actions.decharger.visible %}
+  {% if actions.decharger.visible and hosp.statut == 'hospitalise' %}
     {% if actions.decharger.enabled %}
-    <button type="button" class="abtn abtn-violet"
-            onclick="doTransition('{% url 'hospitalisation:decharger' hosp.pk %}')">
+    <a href="{% url 'hospitalisation:edit' hosp.pk %}?tab=resume" class="abtn abtn-violet">
       <i class="bi bi-door-open"></i> Décharger
-    </button>
+    </a>
     {% else %}
     <button type="button" class="abtn abtn-violet off" disabled title="{{ actions.decharger.raison_blocage }}">
       <i class="bi bi-door-open"></i> Décharger
@@ -598,9 +615,9 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
   </div>
   {% endif %}
 
-  {% endif %}{# /lecture_seule_totale #}
 </div>
-{% endif %}{# /action-bar condition #}
+{% endif %}{# /actions visibles #}
+{% endif %}{# /not lecture_seule_totale #}
 
 {# CORPS PRINCIPAL : layout 2 colonnes #}
 <div class="det-layout">
@@ -619,6 +636,7 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
               {% if hosp.heure_entree %}{{ hosp.heure_entree|date:"d/m/Y H:i" }}{% endif %}
             </div>
           </div>
+          <div class="dur-divider"></div>
           {% if hosp.heure_sortie %}
           <div>
             <div class="dur-lbl">Sortie</div>
@@ -630,6 +648,7 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
             <div class="dur-val" id="dur-sortie">—</div>
           </div>
           {% endif %}
+          <div class="dur-divider"></div>
           <div>
             <div class="dur-lbl">Durée d'observation</div>
             <div class="dur-val main" id="dur-duree">
@@ -1056,7 +1075,7 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
 
 </div><!-- /#page-wrap -->
 </div>
-{% historique_sidebar hospitalisation %}
+{% historique_sidebar hosp %}
 </div>
 {% endblock %}
 
@@ -1171,9 +1190,7 @@ function renderActionBar(data) {
   var A = data.actions || {};
 
   if (s === 'termine' || s === 'annule') {
-    var lbl = (STATUT_CFG[s] || {}).label || s;
-    bar.innerHTML = '<span class="act-ro"><i class="bi bi-lock-fill" style="margin-right:5px;"></i>'
-                  + 'Dossier en lecture seule — ' + esc(lbl) + '</span>';
+    bar.style.display = 'none';
     return;
   }
 

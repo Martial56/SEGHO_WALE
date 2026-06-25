@@ -121,10 +121,10 @@ def get_actions_disponibles(hosp, user):
             True, False,
             f"Statut actuel : {hosp.get_statut_display()} — hospitalisé requis"
         )
-    elif not resume_ok:
+    elif nb_fac_imp > 0:
         result['decharger'] = _act(
             True, False,
-            "Résumé de décharge manquant (champ « Diagnostic de décharge » requis)"
+            "Des factures non payées existent — réglez toutes les factures avant de décharger"
         )
     else:
         result['decharger'] = _act(True, True)

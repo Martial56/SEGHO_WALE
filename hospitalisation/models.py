@@ -112,7 +112,7 @@ class Hospitalisation(models.Model):
                                          verbose_name="Docteur principal")
     maladie        = models.ForeignKey('patients.Pathologie', on_delete=models.SET_NULL,
                                        null=True, blank=True, verbose_name="Maladie")
-    date_admission = models.DateTimeField(verbose_name="Date d'hospitalisation")
+    date_admission = models.DateTimeField(verbose_name="Date de la demande d'hospitalisation")
     consultation   = models.ForeignKey('consultations.Consultation', on_delete=models.SET_NULL,
                                        null=True, blank=True, related_name='hospitalisations',
                                        verbose_name="Consultation d'origine")
@@ -220,6 +220,7 @@ class Hospitalisation(models.Model):
             ('can_confirmer_demande', "Peut confirmer une demande d'hospitalisation"),   # Médecin, Major
             ('can_creer_facture',     "Peut créer une facture d'hospitalisation"),        # Caisse
             ('can_installer_patient', "Peut installer le patient (passage en Hospitalisé)"),  # Infirmier, Major
+            ('can_ajouter_soin',      "Peut ajouter des soins infirmiers (patient hospitalisé)"),  # Infirmier, Major
             ('can_decharger_patient', "Peut décharger un patient (sortie médicale)"),    # Médecin, Soins
             ('can_cloturer_dossier',  "Peut clôturer un dossier (passage à Terminé)"),   # Caisse, Admin
             ('can_annuler_demande',   "Peut annuler une demande"),                        # Médecin, Accueil, Major

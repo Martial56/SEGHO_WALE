@@ -5,7 +5,17 @@
 {% block extra_css %}
 {{ block.super }}
 <style>
-.fac-page { width: 100%; padding: 12px 20px 48px; }
+.fac-page { width: 100%; padding: 50px 20px 48px; } /* 12 + 38px subheader fixe */
+
+/* Subheader pleine largeur — top ajusté dynamiquement par JS */
+#subheader {
+  position: fixed;
+  top: 108px; /* valeur initiale, corrigée par JS */
+  left: 0; right: 0;
+  margin: 0; padding: 0 20px;
+  z-index: 195;
+}
+#subheader .o-subheader-row { height: 38px; }
 
 .fac-btn {
   padding: 5px 14px; border-radius: 4px; font-size: 12px; font-weight: 600;
@@ -217,32 +227,14 @@ html[data-theme="dark"] .fac-tab-btn:hover:not(.active) { background: rgba(255,2
 .fac-step.cancelled .fac-step-label { color: #dc2626; }
 
 /* ── LAYOUT DEUX COLONNES ── */
-.fac-layout { display: flex; align-items: flex-start; gap: 14px; }
+.fac-layout { display: flex; align-items: flex-start; }
 .fac-main   { flex: 1; min-width: 0; }
-.fac-aside  { width: 270px; flex-shrink: 0; position: sticky; top: 70px; }
-@media(max-width: 900px){ .fac-layout { flex-direction: column; } .fac-aside { width: 100%; position: static; } }
-
-/* ── PANNEAU ACTIVITÉ ── */
-.f-activity { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-.f-activity-head {
-  padding: 10px 14px; font-size: 11px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .5px; color: var(--text-muted); border-bottom: 1px solid var(--border);
-  display: flex; align-items: center; justify-content: space-between;
-}
-.f-activity-head i { font-size: 13px; color: var(--accent); }
-.f-activity-list { max-height: 520px; overflow-y: auto; }
-.f-activity-item { display: flex; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
-.f-activity-item:last-child { border-bottom: none; }
-.f-avatar { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0; }
-.f-avatar-teal  { background: var(--accent); }
-.f-avatar-green { background: #16a34a; }
-.f-avatar-blue  { background: #2563eb; }
-.f-avatar-red   { background: #dc2626; }
-.f-activity-body { flex: 1; min-width: 0; }
-.f-activity-who  { font-size: 12px; font-weight: 600; color: var(--text); }
-.f-activity-time { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
-.f-activity-change { font-size: 11.5px; color: var(--text-muted); margin-top: 3px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
-.f-activity-change i { font-size: 11px; }
+/* overflow-x:clip coupe les débordements sans casser position:sticky */
+.content { overflow-x: clip !important; }
+.hist-aside { margin-left: -10px !important; margin-right: 14px !important; margin-top: 90px !important; width: 245px !important; scrollbar-width: none; }
+.hist-aside::-webkit-scrollbar { display: none; }
+.hist-list { scrollbar-width: none; }
+.hist-list::-webkit-scrollbar { display: none; }
 
 /* ── CHAMPS GRISÉS (lecture seule) ── */
 .fac-ro-field.grey-field .fac-ro-value {
@@ -276,6 +268,29 @@ html[data-theme="dark"] .fac-ro-field.grey-field { background: rgba(255,255,255,
 .fac-checkbox-row i { font-size: 15px; }
 .fac-checkbox-row.checked { color: var(--accent); }
 </style>
+<script>
+(function() {
+  function posElements() {
+    var tb  = document.querySelector('.topbar');
+    var nav = document.querySelector('.o-nav');
+    var sub = document.getElementById('subheader');
+    var aside = document.querySelector('.hist-aside');
+    if (!tb || !nav) return;
+    var totalTop = tb.offsetHeight + nav.offsetHeight;
+    if (sub) sub.style.top = totalTop + 'px';
+    if (aside) {
+      /* Flux normal — défile avec la page, pas de sticky */
+      aside.style.position = 'static';
+      aside.style.top = '';
+      aside.style.zIndex = '';
+      aside.style.maxHeight = '';
+      aside.style.marginTop = '';
+    }
+  }
+  document.addEventListener('DOMContentLoaded', function() { setTimeout(posElements, 0); });
+  window.addEventListener('resize', posElements);
+})();
+</script>
 {% endblock %}
 
 {% block content %}
@@ -455,10 +470,7 @@ html[data-theme="dark"] .fac-ro-field.grey-field { background: rgba(255,255,255,
 
     <!-- ── Onglet 1 : Lignes de facture ── -->
     <div class="fac-tab-panel" id="tab-lignes">
-      <div style="padding:8px 16px 0;display:flex;align-items:center;gap:6px;">
-        <i class="bi bi-lock-fill" style="font-size:10px;color:var(--text-muted);"></i>
-        <span style="font-size:10px;color:var(--text-muted);font-style:italic;">Lignes en lecture seule — utilisez « Modifier la facture » pour apporter des corrections</span>
-      </div>
+
       <div class="fac-table-wrap">
         <table class="fac-ro-table">
           <colgroup>
@@ -628,11 +640,6 @@ html[data-theme="dark"] .fac-ro-field.grey-field { background: rgba(255,255,255,
   </div><!-- /.fac-card onglets -->
 
 </div><!-- /.fac-main -->
-
-<!-- ══ ASIDE ACTIVITÉ ══ -->
-<div class="fac-aside">
-  {% include 'includes/chatter.html' with obj=facture logs=logs %}
-</div><!-- /.fac-aside -->
 
 </div><!-- /.fac-layout -->
 </div><!-- /.fac-page -->
