@@ -571,6 +571,7 @@ def medecin_dashboard(request):
         'par_specialite':    par_specialite,
         'chart_labels':      json.dumps(chart_labels),
         'chart_data':        json.dumps(chart_data),
+        'chart_has_data':    bool(chart_labels),
         'rdv_chart_labels':  rdv_chart_labels,
         'rdv_chart_data':    rdv_chart_data,
         'today':             today,

@@ -30,15 +30,15 @@
   .o-list-wrap { overflow-x: auto; overflow-y: auto; background: #fff; margin: 0 -32px; }
   .o-list { width: 100%; border-collapse: collapse; font-size: 12px; }
   .o-list thead th {
-    background: #f5f5f5; border-bottom: 1px solid var(--border);
-    padding: 6px 10px; font-weight: 500; font-size: 11.5px;
-    color: var(--text-muted); text-align: left;
-    position: sticky; top: 0; z-index: 2; user-select: none;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 8px 14px; font-weight: 600; font-size: 11px;
+    color: var(--text-muted); text-align: left; text-transform: uppercase;
+    white-space: nowrap; position: sticky; top: 0; z-index: 2; user-select: none;
   }
   .o-list tbody tr { border-bottom: 1px solid #f0f0f0; transition: background 0.1s; cursor: pointer; }
   .o-list tbody tr:hover { background: var(--teal-50); }
   .o-list tbody td { padding: 6px 10px; color: var(--text); vertical-align: middle; }
-  .o-list tbody td.td-num { color: var(--teal-600); font-weight: 700; font-family: monospace; }
+  .o-list tbody td.td-num { color: var(--teal-600); font-weight: 700; font-family: var(--font-mono); }
   .o-list tbody td.td-patient { white-space: normal; font-weight: 500; }
   .o-list tbody td.td-actions { text-align: center; white-space: nowrap; width: 80px; }
 
@@ -60,18 +60,29 @@
   .o-empty-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
   .o-empty-sub { font-size: 12.5px; color: var(--text-muted); }
 
-  .fac-stats { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+  .fac-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 16px 0; }
   .fac-stat-card {
-    flex: 1; min-width: 160px; background: #fff; border: 1px solid var(--border);
-    border-radius: 6px; padding: 10px 14px;
+    background: #fff; border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 16px;
+    border-top: 3px solid transparent;
+    transition: box-shadow .15s;
   }
-  .fac-stat-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
-  .fac-stat-value { font-size: 18px; font-weight: 600; color: var(--text); }
+  .fac-stat-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.07); }
+  .fac-stat-card.c-total  { border-top-color: #94a3b8; }
+  .fac-stat-card.c-emises { border-top-color: #1d4ed8; }
+  .fac-stat-card.c-deliv  { border-top-color: var(--teal-500); }
+  .fac-stat-card.c-expir  { border-top-color: #b91c1c; }
+  .fac-stat-label {
+    font-size: 10.5px; font-weight: 600; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: .4px; margin-bottom: 6px;
+  }
+  .fac-stat-value { font-size: 22px; font-weight: 700; color: var(--text); line-height: 1; }
+  html[data-theme="dark"] .fac-stat-card { background: var(--surface); }
 
   .o-subheader {
     background: #fff; border-bottom: 1px solid var(--border);
     padding: 6px 16px; display: flex; flex-direction: column; gap: 5px;
-    position: sticky; top: 44px; z-index: 190; margin: 0 -32px 16px;
+    position: sticky; top: 0; z-index: 190; margin: 0 -32px 0;
   }
   .o-subheader-row { display: flex; align-items: center; gap: 8px; }
   .o-subheader-row-right { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -85,6 +96,7 @@
     color: var(--text); flex: 1; min-width: 60px; background: transparent;
   }
   .o-search-btn { background: none; border: none; cursor: pointer; color: #888; font-size: 13px; padding: 2px; }
+  html[data-theme="dark"] .o-search-bar { border-bottom-color: #3a4a62; }
   .o-ctrl-sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }
   .o-pagination { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
   .o-pag-btn {
@@ -95,13 +107,43 @@
   .o-pag-btn:hover { color: var(--teal-600); }
   .o-pag-btn.disabled { opacity: 0.3; pointer-events: none; }
 
-  .o-filter-select {
-    border: none; border-bottom: 1px solid #bbb; background: transparent;
-    font-size: 12px; color: var(--text); outline: none; padding: 2px 18px 2px 2px;
-    cursor: pointer; appearance: none; -webkit-appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23999'/%3E%3C/svg%3E");
-    background-repeat: no-repeat; background-position: right 2px center;
+  .o-filter-dd { position: relative; }
+  .o-filter-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    border: 1px solid var(--border); border-radius: var(--radius-xs, 4px);
+    background: var(--surface); color: var(--text-muted);
+    font-size: 12px; padding: 4px 10px; cursor: pointer;
+    transition: border-color .15s, color .15s; white-space: nowrap;
   }
+  .o-filter-btn:hover { border-color: var(--teal-400); color: var(--teal-600); }
+  .o-filter-btn.active { border-color: var(--teal-500); color: var(--teal-600); background: var(--teal-50); }
+  .o-filter-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--teal-500); display: inline-block;
+  }
+  .o-filter-panel {
+    display: none; position: absolute; top: calc(100% + 6px); right: 0;
+    background: #fff; border: 1px solid var(--border);
+    border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,0.14);
+    min-width: 190px; padding: 8px 0; z-index: 999;
+  }
+  .o-filter-panel.open { display: block; }
+  .o-filter-section-label {
+    display: block; font-size: 10.5px; font-weight: 700; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: .5px;
+    padding: 8px 16px 4px;
+  }
+  .o-filter-section-label:first-child { padding-top: 4px; }
+  .o-filter-option {
+    display: block; padding: 6px 16px; font-size: 13px; color: var(--text);
+    text-decoration: none; cursor: pointer; transition: background .1s;
+    white-space: nowrap;
+  }
+  .o-filter-option:hover { background: var(--teal-50); color: var(--teal-600); }
+  .o-filter-option.active { color: var(--teal-600); font-weight: 600; }
+  .o-filter-sep { border: none; border-top: 1px solid var(--border); margin: 6px 0; }
+  html[data-theme="dark"] .o-filter-panel { background: #1a2535; border-color: #2e3f58; }
+  html[data-theme="dark"] .o-filter-option:hover { background: rgba(33,136,171,0.15); }
   .o-btn-create {
     background: var(--teal-500); color: #fff; border: none; padding: 5px 14px; border-radius: 4px;
     font-size: 12.5px; font-weight: 500; cursor: pointer; text-decoration: none;
@@ -111,13 +153,7 @@
 </style>
 {% endblock %}
 
-{% block breadcrumb %}
-<nav class="breadcrumb">
-  <a href="{% url 'dashboard' %}"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z"/><polyline points="9 21 9 12 15 12 15 21"/></svg>Accueil</a>
-  <span class="breadcrumb-sep">›</span>
-  <span>Ordonnances</span>
-</nav>
-{% endblock %}
+{% block breadcrumb %}{% endblock %}
 
 {% block content %}
 
@@ -125,30 +161,50 @@
 <div class="o-subheader">
   <div class="o-subheader-row">
     <span class="o-page-title">Ordonnances <span style="font-size:13px;color:var(--text-muted);font-weight:400;">({{ page_obj.paginator.count }})</span></span>
-    <div class="o-subheader-row-right"></div>
-  </div>
-  <div class="o-subheader-row">
-    <a href="{% url 'ordonnance_create_libre' %}" class="o-btn-create">CRÉER</a>
     <div class="o-subheader-row-right">
-      <form method="get" id="search-form" style="display:flex;align-items:center;gap:8px;">
+      <form method="get" id="search-form">
         <div class="o-search-bar">
           <input class="o-search-input" id="search-input" type="text" name="q"
-                 value="{{ q }}" placeholder="Numéro, nom du patient…" autocomplete="off">
+                 value="{{ q }}" placeholder="Rechercher une ordonnance…" autocomplete="off">
           <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
         </div>
-        <select name="statut" class="o-filter-select" onchange="this.form.submit()">
-          <option value="">Tous les statuts</option>
-          <option value="emise"     {% if statut_filtre == 'emise' %}selected{% endif %}>Émise</option>
-          <option value="delivree"  {% if statut_filtre == 'delivree' %}selected{% endif %}>Délivrée</option>
-          <option value="partielle" {% if statut_filtre == 'partielle' %}selected{% endif %}>Partielle</option>
-          <option value="expiree"   {% if statut_filtre == 'expiree' %}selected{% endif %}>Expirée</option>
-        </select>
-        <select name="type" class="o-filter-select" onchange="this.form.submit()">
-          <option value="">Tous les types</option>
-          <option value="interne" {% if type_filtre == 'interne' %}selected{% endif %}>Interne</option>
-          <option value="externe" {% if type_filtre == 'externe' %}selected{% endif %}>Externe</option>
-        </select>
+        {% if statut_filtre %}<input type="hidden" name="statut" value="{{ statut_filtre }}">{% endif %}
+        {% if type_filtre %}<input type="hidden" name="type" value="{{ type_filtre }}">{% endif %}
+
       </form>
+    </div>
+  </div>
+  <div class="o-subheader-row">
+    <a href="{% url 'ordonnance_create_libre' %}" class="o-btn-create">+ CRÉER</a>
+    <div class="o-subheader-row-right">
+      <div class="o-filter-dd" id="filter-dd">
+        <button type="button" class="o-filter-btn {% if statut_filtre or type_filtre %}active{% endif %}"
+                onclick="document.getElementById('filter-panel').classList.toggle('open')">
+          <i class="bi bi-funnel"></i> Filtres
+          {% if statut_filtre or type_filtre %}<span class="o-filter-dot"></span>{% endif %}
+        </button>
+        <div class="o-filter-panel" id="filter-panel">
+          <span class="o-filter-section-label">Statut</span>
+          <a class="o-filter-option {% if not statut_filtre %}active{% endif %}"
+             href="?{% if q %}q={{ q }}&{% endif %}{% if type_filtre %}type={{ type_filtre }}{% endif %}">Tous</a>
+          <a class="o-filter-option {% if statut_filtre == 'emise' %}active{% endif %}"
+             href="?{% if q %}q={{ q }}&{% endif %}statut=emise{% if type_filtre %}&type={{ type_filtre }}{% endif %}">Émise</a>
+          <a class="o-filter-option {% if statut_filtre == 'delivree' %}active{% endif %}"
+             href="?{% if q %}q={{ q }}&{% endif %}statut=delivree{% if type_filtre %}&type={{ type_filtre }}{% endif %}">Délivrée</a>
+          <a class="o-filter-option {% if statut_filtre == 'partielle' %}active{% endif %}"
+             href="?{% if q %}q={{ q }}&{% endif %}statut=partielle{% if type_filtre %}&type={{ type_filtre }}{% endif %}">Partielle</a>
+          <a class="o-filter-option {% if statut_filtre == 'expiree' %}active{% endif %}"
+             href="?{% if q %}q={{ q }}&{% endif %}statut=expiree{% if type_filtre %}&type={{ type_filtre }}{% endif %}">Expirée</a>
+          <hr class="o-filter-sep">
+          <span class="o-filter-section-label">Type</span>
+          <a class="o-filter-option {% if not type_filtre %}active{% endif %}"
+             href="?{% if q %}q={{ q }}&{% endif %}{% if statut_filtre %}statut={{ statut_filtre }}{% endif %}">Tous</a>
+          <a class="o-filter-option {% if type_filtre == 'interne' %}active{% endif %}"
+             href="?{% if q %}q={{ q }}&{% endif %}{% if statut_filtre %}statut={{ statut_filtre }}&{% endif %}type=interne">Interne</a>
+          <a class="o-filter-option {% if type_filtre == 'externe' %}active{% endif %}"
+             href="?{% if q %}q={{ q }}&{% endif %}{% if statut_filtre %}statut={{ statut_filtre }}&{% endif %}type=externe">Externe</a>
+        </div>
+      </div>
       <div class="o-ctrl-sep"></div>
       <div class="o-pagination">
         <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
@@ -167,19 +223,19 @@
 
 <!-- ══ STATS ══ -->
 <div class="fac-stats">
-  <div class="fac-stat-card">
+  <div class="fac-stat-card c-total">
     <div class="fac-stat-label">Total</div>
     <div class="fac-stat-value">{{ stats.total }}</div>
   </div>
-  <div class="fac-stat-card">
+  <div class="fac-stat-card c-emises">
     <div class="fac-stat-label">Émises</div>
     <div class="fac-stat-value" style="color:#1d4ed8;">{{ stats.emises }}</div>
   </div>
-  <div class="fac-stat-card">
+  <div class="fac-stat-card c-deliv">
     <div class="fac-stat-label">Délivrées</div>
-    <div class="fac-stat-value" style="color:#1a6d8c;">{{ stats.delivrees }}</div>
+    <div class="fac-stat-value" style="color:var(--teal-600);">{{ stats.delivrees }}</div>
   </div>
-  <div class="fac-stat-card">
+  <div class="fac-stat-card c-expir">
     <div class="fac-stat-label">Expirées</div>
     <div class="fac-stat-value" style="color:#b91c1c;">{{ stats.expirees }}</div>
   </div>
@@ -191,7 +247,6 @@
   <table class="o-list">
     <thead>
       <tr>
-        <th style="width:40px;text-align:center;">#</th>
         <th>N° Ordonnance</th>
         <th>Patient</th>
         <th>Médecin</th>
@@ -205,13 +260,12 @@
     <tbody>
       {% for ord in page_obj %}
       <tr onclick="window.location='{% url 'ordonnance_detail' ord.pk %}'">
-        <td style="text-align:center;color:var(--text-muted);font-size:11px;">{{ forloop.counter0|add:page_obj.start_index }}</td>
         <td class="td-num">{{ ord.numero }}</td>
         <td class="td-patient">
           {% with pat=ord.consultation.patient|default:ord.patient %}
           {% if pat %}
           {{ pat.nom|upper }} {{ pat.prenoms }}
-          <div style="font-size:11px;color:rgba(0,0,0,0.4);font-family:monospace;">{{ pat.code }}</div>
+          <div style="font-size:11px;color:rgba(0,0,0,0.4);font-family: var(--font-mono);">{{ pat.code }}</div>
           {% else %}<span style="color:rgba(0,0,0,0.3);">—</span>{% endif %}
           {% endwith %}
         </td>
@@ -268,5 +322,29 @@
   </div>
   {% endif %}
 </div>
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+(function() {
+  var input = document.getElementById('search-input');
+  var form  = document.getElementById('search-form');
+  var timer = null;
+  if (input) {
+    input.addEventListener('input', function() {
+      clearTimeout(timer);
+      timer = setTimeout(function() { form.submit(); }, 350);
+    });
+  }
+  document.addEventListener('click', function(e) {
+    var dd = document.getElementById('filter-dd');
+    var panel = document.getElementById('filter-panel');
+    if (dd && panel && !dd.contains(e.target)) {
+      panel.classList.remove('open');
+    }
+  });
+})();
+</script>
+{% endblock %}
 
 {% endblock %}

@@ -18,7 +18,7 @@
   .o-subheader {
     background: #fff; border-bottom: 1px solid var(--border);
     padding: 6px 16px; display: flex; flex-direction: column; gap: 5px;
-    position: sticky; top: 0; z-index: 190; margin: 0 -32px 16px;
+    position: sticky; top: 0; z-index: 190; margin: 0 -32px 0;
   }
   .o-subheader-row { display: flex; align-items: center; gap: 8px; }
   .o-subheader-row-right { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -52,11 +52,12 @@
   .o-list-wrap { overflow-x: auto; overflow-y: auto; background: #fff; margin: 0 -32px; }
   .o-list { width: 100%; border-collapse: collapse; font-size: 12px; }
   .o-list thead th {
-    background: #f5f5f5; border-bottom: 1px solid var(--border);
-    padding: 6px 10px; font-weight: 500; font-size: 11.5px;
-    color: var(--text-muted); text-align: left;
-    position: sticky; top: 0; z-index: 2; user-select: none;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 8px 14px; font-weight: 600; font-size: 11px;
+    color: var(--text-muted); text-align: left; text-transform: uppercase;
+    white-space: nowrap; position: sticky; top: 0; z-index: 2; user-select: none;
   }
+  html[data-theme="dark"] .o-list thead th { background: var(--surface); border-bottom-color: var(--border); }
   .o-list tbody tr { border-bottom: 1px solid #f0f0f0; transition: background 0.1s; cursor: pointer; }
   .o-list tbody tr:hover { background: var(--teal-50); }
   .o-list tbody td { padding: 6px 10px; color: var(--text); vertical-align: middle; }
@@ -133,31 +134,7 @@
 </style>
 {% endblock %}
 
-{% block breadcrumb %}
-<nav class="gyn-nav">
-  <div class="gyn-nav-dd">
-    <span class="gyn-nav-link active" style="cursor:pointer;">
-      Configurations <i class="bi bi-chevron-down" style="font-size:10px;"></i>
-    </span>
-    <div class="gyn-nav-dd-panel">
-      <a href="{% url 'patients:pathologie_list' %}" class="gyn-nav-dd-item active">
-        <i class="bi bi-clipboard2-pulse" style="font-size:13px;"></i> Diagnostic retenu
-      </a>
-      <a href="{% url 'patients:typevisite_list' %}" class="gyn-nav-dd-item">
-        <i class="bi bi-card-list" style="font-size:13px;"></i> Type de visite
-      </a>
-    </div>
-  </div>
-</nav>
-<nav class="breadcrumb">
-  <a href="{% url 'dashboard' %}">
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z"/><polyline points="9 21 9 12 15 12 15 21"/></svg>
-    Accueil
-  </a>
-  <span class="breadcrumb-sep">›</span>
-  <span>Pathologies</span>
-</nav>
-{% endblock %}
+{% block breadcrumb %}{% endblock %}
 
 {% block content %}
 
@@ -172,7 +149,11 @@
           <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
         </div>
       </form>
-      <div class="o-ctrl-sep"></div>
+    </div>
+  </div>
+  <div class="o-subheader-row">
+    <a href="{% url 'patients:pathologie_create' %}" class="o-btn-create">CRÉER</a>
+    <div class="o-subheader-row-right">
       <div class="o-pagination">
         <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
            href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% else %}#{% endif %}">
@@ -186,9 +167,6 @@
       </div>
     </div>
   </div>
-  <div class="o-subheader-row">
-    <a href="{% url 'patients:pathologie_create' %}" class="o-btn-create">CRÉER</a>
-  </div>
 </div>
 
 <div class="o-list-wrap">
@@ -196,7 +174,6 @@
   <table class="o-list">
     <thead>
       <tr>
-        <th style="width:40px;text-align:center;">#</th>
         <th>Nom de la pathologie</th>
         <th style="width:60px;text-align:center;">Actif</th>
         <th style="width:80px;text-align:center;">Actions</th>
@@ -205,7 +182,6 @@
     <tbody>
       {% for p in page_obj %}
       <tr onclick="window.location='{% url 'patients:pathologie_edit' p.pk %}'">
-        <td style="text-align:center;color:var(--text-muted);font-size:11px;">{{ forloop.counter0|add:page_obj.start_index }}</td>
         <td class="td-nom">{{ p.nom }}</td>
         <td style="text-align:center;">
           {% if p.actif %}

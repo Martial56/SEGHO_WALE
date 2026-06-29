@@ -3,138 +3,31 @@
 
 {% block extra_css %}
 {{ block.super }}
-<style>
-:root {
-  --cfg-600:#4a6741; --cfg-700:#3a5924; --cfg-50:#f2f7ee;
-  --cfg-border:rgba(58,89,36,.13); --cfg-muted:#7a9b68;
-}
 
-.cfg-head {
-  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
-  padding:10px 32px; margin:0 -32px;
-  background:var(--cfg-50); border-bottom:1px solid rgba(58,89,36,.15);
-  position:sticky; top:calc(var(--topbar-h) + 44px); z-index:100;
-  box-shadow:0 2px 6px rgba(0,0,0,.04);
-}
-html[data-theme="dark"] .cfg-head { background:#0f0e0e; border-bottom-color:rgba(58,89,36,.25); }
-
-.cfg-head-back {
-  width:30px; height:30px; border-radius:6px; background:rgba(58,89,36,.08);
-  color:var(--cfg-600); display:inline-flex; align-items:center; justify-content:center;
-  text-decoration:none; font-size:14px; transition:background .15s; flex-shrink:0;
-}
-.cfg-head-back:hover { background:rgba(58,89,36,.18); color:var(--cfg-700); }
-html[data-theme="dark"] .cfg-head-back { background:rgba(58,89,36,.15); color:#9ab88a; }
-
-.cfg-head-crumb {
-  font-size:13px; color:var(--cfg-muted); flex:1; min-width:0;
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-}
-.cfg-head-crumb a { color:var(--cfg-600); text-decoration:none; font-weight:500; }
-.cfg-head-crumb a:hover { text-decoration:underline; }
-.cfg-head-crumb span { margin:0 5px; opacity:.4; }
-.cfg-head-title { font-size:14px; font-weight:700; color:#1b2e13; }
-html[data-theme="dark"] .cfg-head-title { color:#bcd5a8; }
-
-.btn-save {
-  background:var(--cfg-600); color:#fff; border:none; border-radius:7px;
-  padding:7px 18px; font-size:12.5px; font-weight:600; cursor:pointer;
-  display:inline-flex; align-items:center; gap:6px; transition:background .15s; flex-shrink:0;
-}
-.btn-save:hover { background:var(--cfg-700); color:#fff; }
-.btn-cancel {
-  color:var(--cfg-600); background:transparent; border:1.5px solid var(--cfg-600);
-  border-radius:7px; padding:6px 16px; font-size:12.5px; font-weight:600;
-  text-decoration:none; display:inline-flex; align-items:center; gap:6px; transition:background .15s,color .15s;
-}
-.btn-cancel:hover { background:var(--cfg-600); color:#fff; }
-
-/* ── Card ── */
-.cfg-card {
-  background:#fff; border:1px solid var(--cfg-border); border-radius:12px;
-  overflow:hidden; box-shadow:0 1px 8px rgba(58,89,36,.07); margin-top:24px;
-}
-html[data-theme="dark"] .cfg-card { background:#0f0e0e; border-color:rgba(58,89,36,.2); }
-.cfg-card-head {
-  padding:12px 20px; background:var(--cfg-50); border-bottom:1px solid var(--cfg-border);
-  font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.6px;
-  color:var(--cfg-600); display:flex; align-items:center; gap:8px;
-}
-html[data-theme="dark"] .cfg-card-head { background:#1b2e13; border-bottom-color:rgba(58,89,36,.2); color:#9ab88a; }
-.cfg-card-body { padding:24px; }
-
-/* ── Champs ── */
-.cfg-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:0 24px; }
-@media(max-width:560px){ .cfg-grid-2{ grid-template-columns:1fr; } }
-.cfg-field { margin-bottom:22px; }
-.cfg-field:last-child { margin-bottom:0; }
-.cfg-label {
-  display:block; font-size:10.5px; font-weight:700; text-transform:uppercase;
-  letter-spacing:.4px; color:var(--cfg-muted); margin-bottom:7px;
-}
-.cfg-label .req { color:#c0392b; margin-left:2px; }
-.cfg-input, .cfg-select {
-  width:100%; border:none; border-bottom:1.5px solid rgba(0,0,0,.18);
-  background:transparent; padding:9px 4px; font-size:13.5px;
-  color:#1b2e13; font-family:inherit; transition:border-color .15s; box-sizing:border-box;
-}
-.cfg-input:focus, .cfg-select:focus { outline:none; border-bottom-color:var(--cfg-600); }
-html[data-theme="dark"] .cfg-input, html[data-theme="dark"] .cfg-select {
-  border-bottom-color:rgba(255,255,255,.18); color:#bcd5a8;
-}
-.cfg-textarea {
-  width:100%; resize:vertical; min-height:80px; box-sizing:border-box;
-  border:1.5px solid rgba(0,0,0,.13); border-radius:6px; padding:10px 12px;
-  font-size:13.5px; color:#1b2e13; font-family:inherit; transition:border-color .15s; background:transparent;
-}
-.cfg-textarea:focus { outline:none; border-color:var(--cfg-600); }
-html[data-theme="dark"] .cfg-textarea { border-color:rgba(255,255,255,.15); color:#bcd5a8; }
-.cfg-error { font-size:11.5px; color:#c0392b; margin-top:4px; }
-
-/* ── Toggle ── */
-.cfg-toggle-wrap {
-  display:flex; align-items:center; gap:14px; padding:10px 0;
-}
-.cfg-toggle { position:relative; width:44px; height:24px; flex-shrink:0; }
-.cfg-toggle input { opacity:0; width:0; height:0; }
-.cfg-toggle-slider {
-  position:absolute; inset:0; border-radius:24px;
-  background:rgba(0,0,0,.18); cursor:pointer; transition:background .2s;
-}
-.cfg-toggle-slider::before {
-  content:''; position:absolute; width:18px; height:18px; border-radius:50%;
-  background:#fff; top:3px; left:3px; transition:transform .2s;
-  box-shadow:0 1px 3px rgba(0,0,0,.2);
-}
-.cfg-toggle input:checked + .cfg-toggle-slider { background:var(--cfg-600); }
-.cfg-toggle input:checked + .cfg-toggle-slider::before { transform:translateX(20px); }
-.cfg-toggle-text { font-size:13.5px; font-weight:600; color:#1b2e13; }
-html[data-theme="dark"] .cfg-toggle-text { color:#bcd5a8; }
-
-/* ── Footer ── */
-.cfg-footer {
-  display:flex; justify-content:flex-end; gap:10px;
-  margin-top:20px; padding-bottom:32px;
-}
-</style>
 {% endblock %}
 
 {% block content %}
 
-<div class="cfg-head">
-  <a href="{% url 'medecins_departements' %}" class="cfg-head-back"><i class="bi bi-arrow-left"></i></a>
-  <div class="cfg-head-crumb">
-    <a href="{% url 'medecins_departements' %}">Départements</a>
-    <span>/</span>
-    <span class="cfg-head-title">{{ titre }}</span>
+<div class="o-subheader">
+  <div class="o-subheader-row">
+    <a href="{% url 'medecins_departements' %}" class="o-ctrl-btn" style="padding:3px 7px;">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <span style="font-size:13px;color:var(--text-muted);">
+      <a href="{% url 'medecins_departements' %}" style="color:var(--teal-700);text-decoration:none;font-weight:500;">Départements</a>
+      <span style="margin:0 5px;opacity:.4;">/</span>
+      <span style="color:var(--text);font-weight:600;">{{ titre }}</span>
+    </span>
+    <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+      <a href="{% url 'medecins_departements' %}" class="o-ctrl-btn" style="border-color:var(--border-strong);color:var(--text);">Annuler</a>
+      <button type="submit" form="departement-form" class="o-btn-create">
+        <i class="bi bi-check-lg"></i> Enregistrer
+      </button>
+    </div>
   </div>
-  <a href="{% url 'medecins_departements' %}" class="btn-cancel">Annuler</a>
-  <button type="submit" form="departement-form" class="btn-save">
-    <i class="bi bi-check-lg"></i> Enregistrer
-  </button>
 </div>
 
-<div class="cfg-card">
+<div class="cfg-card" style="margin-top:24px;">
   <div class="cfg-card-head"><i class="bi bi-building-fill"></i> Informations du département</div>
   <div class="cfg-card-body">
 
@@ -152,7 +45,7 @@ html[data-theme="dark"] .cfg-toggle-text { color:#bcd5a8; }
           <label class="cfg-label" for="{{ form.code.id_for_label }}">Code <span class="req">*</span></label>
           <input type="text" name="code" id="{{ form.code.id_for_label }}" class="cfg-input"
             value="{{ form.code.value|default_if_none:'' }}" placeholder="Ex: URG" autocomplete="off"
-            style="font-family:monospace;text-transform:uppercase;">
+            style="font-family: var(--font-mono);text-transform:uppercase;">
           {% if form.code.errors %}<div class="cfg-error">{{ form.code.errors.0 }}</div>{% endif %}
         </div>
       </div>
@@ -197,8 +90,8 @@ html[data-theme="dark"] .cfg-toggle-text { color:#bcd5a8; }
 </div>
 
 <div class="cfg-footer">
-  <a href="{% url 'medecins_departements' %}" class="btn-cancel">Annuler</a>
-  <button type="submit" form="departement-form" class="btn-save">
+  <a href="{% url 'medecins_departements' %}" class="o-ctrl-btn" style="border-color:var(--border-strong);color:var(--text);">Annuler</a>
+  <button type="submit" form="departement-form" class="o-btn-create">
     <i class="bi bi-check-lg"></i> Enregistrer
   </button>
 </div>
@@ -215,4 +108,31 @@ html[data-theme="dark"] .cfg-toggle-text { color:#bcd5a8; }
 })();
 </script>
 
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+(function () {
+  function alignSousTopbar() {
+    var topbar = document.querySelector('.topbar');
+    var sh = document.querySelector('.o-subheader');
+    if (!topbar || !sh) return;
+    var tbH = Math.ceil(topbar.getBoundingClientRect().height);
+    if (tbH <= 0) return;
+    document.body.style.paddingTop = tbH + 'px';
+    document.documentElement.style.setProperty('--header-h', tbH + 'px');
+    requestAnimationFrame(function () {
+      var gap = Math.round(sh.getBoundingClientRect().top - topbar.getBoundingClientRect().bottom);
+      if (gap > 0) {
+        document.body.style.paddingTop = (tbH - gap) + 'px';
+        document.documentElement.style.setProperty('--header-h', (tbH - gap) + 'px');
+      }
+    });
+  }
+  if (document.readyState !== 'loading') { alignSousTopbar(); }
+  else { document.addEventListener('DOMContentLoaded', alignSousTopbar); }
+  window.addEventListener('resize', function () { document.body.style.paddingTop = ''; alignSousTopbar(); });
+})();
+</script>
 {% endblock %}

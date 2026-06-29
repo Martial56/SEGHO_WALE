@@ -18,19 +18,20 @@ html[data-theme="dark"] {
 }
 
 /* ── Layout ── */
-.content    { padding: 0 !important; overflow-x: clip; }
+.content    { padding: 0 !important; overflow: visible !important; }
 .breadcrumb { display: none !important; }
 
 /* ── Subheader ── */
 .o-subheader {
   background: var(--surface);
   border-bottom: 1px solid var(--border);
-  padding: 7px 16px;
+  padding: 6px 16px;
+  margin: 0;
   display: flex; flex-direction: column; gap: 5px;
-  position: sticky; top: 76px;
+  position: fixed; left: 0; right: 0; top: 0;
   z-index: 190;
 }
-.o-subheader-row        { display: flex; align-items: center; gap: 8px; }
+.o-subheader-row        { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .o-subheader-row-right  { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 html[data-theme="dark"] .o-subheader { background: var(--surface); border-bottom-color: var(--border); }
 
@@ -88,7 +89,7 @@ html[data-theme="dark"] .h-stat-icon.violet { background: rgba(124,58,237,.15); 
 .h-table tbody tr:last-child td { border-bottom: none; }
 
 .h-num  {
-  font-family: monospace; font-size: 12px; font-weight: 700;
+  font-family: var(--font-mono); font-size: 12px; font-weight: 700;
   color: var(--teal-600); letter-spacing: .03em;
 }
 .h-patient-name { font-weight: 600; font-size: 13px; }
@@ -164,12 +165,12 @@ html[data-theme="dark"] .o-dd-item.active { background: rgba(33,136,171,.2);  co
 <div id="page-wrap">
 
 <!-- ══ SUBHEADER ══ -->
-<div class="o-subheader">
+<div class="o-subheader" data-fixed="1">
 
   <!-- Ligne 1 : titre + recherche -->
   <div class="o-subheader-row">
     <span class="o-page-title">Hospitalisations <span class="o-page-count">{{ total }}</span></span>
-    <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+    <div class="o-subheader-row-right">
       <form method="get" id="filter-form" style="display:flex;align-items:center;">
         <input type="hidden" name="statut" id="fi-statut" value="{{ statut }}">
         <input type="hidden" name="vue"    id="vue-input" value="{{ vue }}">
@@ -190,7 +191,7 @@ html[data-theme="dark"] .o-dd-item.active { background: rgba(33,136,171,.2);  co
     </a>
     {% endif %}
 
-    <div style="margin-left:auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+    <div class="o-subheader-row-right">
 
       <!-- Tags filtres actifs -->
       {% if q %}<span class="o-filter-tag">{{ q }} <a onclick="clearQ()" style="cursor:pointer;" title="Supprimer">×</a></span>{% endif %}

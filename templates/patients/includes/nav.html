@@ -1,0 +1,61 @@
+{% with url=request.resolver_match.url_name %}
+<nav class="o-nav">
+  <a href="{% url 'dashboard' %}" class="o-nav-grid" title="Accueil">
+    <i class="bi bi-grid-3x3-gap-fill"></i>
+  </a>
+
+  {% if url == 'ordonnance_list' or url == 'ordonnance_create_libre' or url == 'ordonnance_create' or url == 'ordonnance_detail' or url == 'ordonnance_statut' or url == 'ordonnance_print' %}
+    <span class="o-nav-brand">
+      <i class="bi bi-file-earmark-medical-fill"></i>
+      Ordonnances
+    </span>
+    <a href="{% url 'ordonnance_list' %}" class="o-nav-link active">Ordonnances</a>
+
+  {% elif url == 'rdv_global' or url == 'rdv_create' or url == 'rdv_edit' %}
+    <span class="o-nav-brand">
+      <i class="bi bi-people-fill"></i>
+      Patients
+    </span>
+    <a href="{% url 'patients:rdv_global' %}" class="o-nav-link active">Rendez-vous</a>
+    <div class="o-nav-dd">
+      <span class="o-nav-link o-nav-dd-trigger">
+        Configurations <i class="bi bi-chevron-down" style="font-size:9px;margin-left:2px;"></i>
+      </span>
+      <div class="o-nav-dd-panel">
+        <a href="{% url 'patients:pathologie_list' %}" class="o-nav-dd-item">
+          <i class="bi bi-clipboard2-pulse"></i> Diagnostic retenu
+        </a>
+        <a href="{% url 'patients:typevisite_list' %}" class="o-nav-dd-item">
+          <i class="bi bi-card-list"></i> Type de visite
+        </a>
+      </div>
+    </div>
+
+  {% else %}
+    <span class="o-nav-brand">
+      <i class="bi bi-people-fill"></i>
+      Patients
+    </span>
+    <a href="{% url 'patients:list' %}"
+       class="o-nav-link {% if url == 'list' or url == 'create' or url == 'detail' or url == 'edit' or url == 'patient_search' or url == 'patient_info' or url == 'rdv_list' or url == 'consultation_list' or url == 'soin_list' or url == 'hospitalisation_list' %}active{% endif %}">
+      Patients
+    </a>
+    <div class="o-nav-dd">
+      <span class="o-nav-link o-nav-dd-trigger {% if url == 'pathologie_list' or url == 'pathologie_create' or url == 'pathologie_edit' or url == 'typevisite_list' or url == 'typevisite_create' or url == 'typevisite_edit' %}active{% endif %}">
+        Configurations <i class="bi bi-chevron-down" style="font-size:9px;margin-left:2px;"></i>
+      </span>
+      <div class="o-nav-dd-panel">
+        <a href="{% url 'patients:pathologie_list' %}"
+           class="o-nav-dd-item {% if url == 'pathologie_list' or url == 'pathologie_create' or url == 'pathologie_edit' %}active{% endif %}">
+          <i class="bi bi-clipboard2-pulse"></i> Diagnostic retenu
+        </a>
+        <a href="{% url 'patients:typevisite_list' %}"
+           class="o-nav-dd-item {% if url == 'typevisite_list' or url == 'typevisite_create' or url == 'typevisite_edit' %}active{% endif %}">
+          <i class="bi bi-card-list"></i> Type de visite
+        </a>
+      </div>
+    </div>
+  {% endif %}
+
+</nav>
+{% endwith %}

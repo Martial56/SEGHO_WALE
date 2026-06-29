@@ -1,7 +1,6 @@
 {% extends 'soins/base.html' %}
 {% load static %}
 {% block breadcrumb %}{% endblock %}
-{% block module_navbar %}{% endblock %}
 
 {% block extra_css %}
 {{ block.super }}
@@ -40,7 +39,7 @@ html[data-theme="dark"] .art-tabs { box-shadow: 0 1px 8px rgba(0,0,0,0.3); }
   margin-top: 10px; background: none;
   border: 1.5px dashed rgba(0,0,0,.18) !important; border-radius: 8px;
   padding: 7px 18px; font-size: 13px; font-weight: 600;
-  color: var(--accent); cursor: pointer; font-family: 'Roboto',sans-serif;
+  color: var(--accent); cursor: pointer; font-family: var(--font-main);
   transition: all .15s;
 }
 .btn-add-ligne:hover:not(:disabled) { border-color: var(--accent) !important; background: rgba(26,92,74,.04); }
@@ -51,102 +50,22 @@ html[data-theme="dark"] .btn-add-ligne { border-color: rgba(255,255,255,.18) !im
 .btn-enreg-bottom {
   background: #16a34a; color: #fff; border: none;
   padding: 9px 22px; border-radius: 6px; font-size: 13px; font-weight: 700;
-  font-family: 'Roboto',sans-serif; cursor: pointer;
+  font-family: var(--font-main); cursor: pointer;
   display: inline-flex; align-items: center; gap: 7px; transition: background .15s;
 }
 .btn-enreg-bottom:hover { background: #15803d; }
 
-/* ══ FIXED HEADER UNIFIÉ (nav + breadcrumb + stepper en un seul bloc) ══ */
-.soin-fixed-header {
-  position: fixed; left: 0; right: 0;
-  top: var(--topbar-h, 62px);   /* JS ajuste sur hauteur réelle */
-  z-index: 95;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  box-shadow: 0 2px 8px rgba(0,0,0,.06);
-}
-
-/* ── Rangée 1 : liens de navigation ── */
-.sfh-nav {
-  background: var(--nav-bg);
-  display: flex; align-items: center; height: 38px; padding: 0 10px;
-  border-bottom: 1px solid #e0e0e0;
-}
-.sfh-nav-grid {
-  width: 32px; height: 32px; display: flex; align-items: center;
-  justify-content: center; color: rgba(0,0,0,.45); font-size: 17px;
-  border-radius: 4px; margin-right: 4px;
-  transition: background .15s; text-decoration: none;
-}
-.sfh-nav-grid:hover { background: rgba(0,0,0,.06); color: var(--primary); }
-.sfh-nav-brand {
-  font-size: 14px; font-weight: 600; color: var(--primary);
-  padding: 0 12px 0 4px; margin-right: 2px;
-  border-right: 1px solid rgba(0,0,0,.12);
-  white-space: nowrap; display: flex; align-items: center; gap: 6px;
-}
-.sfh-nav-link {
-  color: rgba(0,0,0,.58); text-decoration: none; font-size: 13px;
-  padding: 0 12px; height: 38px; display: flex; align-items: center;
-  border-bottom: 2px solid transparent;
-  transition: color .15s, background .15s, border-color .15s; white-space: nowrap;
-}
-.sfh-nav-link:hover, .sfh-nav-link.active {
-  color: var(--primary); background: rgba(26,92,74,.06);
-  border-bottom-color: var(--primary);
-}
-html[data-theme="dark"] .sfh-nav { background: #0a1e2e; border-bottom-color: rgba(255,255,255,.06); }
-html[data-theme="dark"] .sfh-nav-grid { color: rgba(255,255,255,.5); }
-html[data-theme="dark"] .sfh-nav-grid:hover { background: rgba(255,255,255,.08); color: #7ac4a7; }
-html[data-theme="dark"] .sfh-nav-brand { color: #7ac4a7; border-right-color: rgba(255,255,255,.1); }
-html[data-theme="dark"] .sfh-nav-link { color: rgba(255,255,255,.6); }
-html[data-theme="dark"] .sfh-nav-link:hover,
-html[data-theme="dark"] .sfh-nav-link.active { color: #cce8f4; background: rgba(34,137,107,.1); border-bottom-color: #4aaa87; }
-
-/* ── Rangée 2 : breadcrumb + boutons ── */
-.sfh-bar {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 16px; gap: 12px; flex-wrap: wrap;
-}
-.sfh-breadcrumb {
-  font-size: 13px; font-weight: 600; color: var(--text-muted);
-  display: flex; align-items: center; gap: 6px;
-}
-.sfh-breadcrumb a { color: var(--accent); text-decoration: none; font-weight: 500; }
-.sfh-breadcrumb a:hover { opacity: .8; }
-.sfh-breadcrumb .sep { opacity: .35; }
-.sfh-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-
-.btn-brouillon {
-  background: #f0f4f8; color: rgba(0,0,0,0.6);
-  border: 1px solid rgba(0,0,0,0.12); border-radius: 6px;
-  padding: 8px 16px; font-size: 13px; font-weight: 600;
-  cursor: pointer; font-family: 'Roboto',sans-serif; transition: all .15s;
-  display: inline-flex; align-items: center; gap: 6px;
-}
-.btn-brouillon:hover { border-color: var(--accent); color: var(--accent); }
-html[data-theme="dark"] .btn-brouillon { background: #28304a; color: var(--text-muted); border-color: var(--border); }
-html[data-theme="dark"] .btn-brouillon:hover { border-color: var(--accent); color: var(--accent); }
-
-.btn-cancel-top {
-  background: transparent; color: var(--text-muted);
-  border: 1px solid var(--border); border-radius: 6px;
-  padding: 8px 14px; font-size: 13px; font-weight: 600;
-  cursor: pointer; font-family: 'Roboto',sans-serif;
-  text-decoration: none; transition: all .15s;
-  display: inline-flex; align-items: center; gap: 6px;
-}
-.btn-cancel-top:hover { border-color: #dc2626; color: #dc2626; }
-
-/* ── Rangée 3 : stepper ── */
+/* ── Stepper statuts (dans art-header) ── */
 .sfh-stepper {
   display: flex; justify-content: center;
-  padding: 8px 20px; border-top: 1px solid var(--border);
+  padding: 8px 20px;
+  border-bottom: 1px solid var(--border);
+  border-radius: 10px 10px 0 0;
 }
 
 /* ── Stepper (même style que les procédures) ── */
 .proc-steps { display:flex;align-items:flex-start;flex-wrap:nowrap; }
-.proc-step { display:flex;flex-direction:column;align-items:center;gap:5px;background:none;border:none;padding:0 2px;font-family:'Roboto',sans-serif;cursor:default;min-width:60px; }
+.proc-step { display:flex;flex-direction:column;align-items:center;gap:5px;background:none;border:none;padding:0 2px;font-family: var(--font-main);cursor:default;min-width:60px; }
 .proc-step-node { width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0; }
 .proc-step-label { font-size:10px;font-weight:600;white-space:nowrap;text-transform:uppercase;letter-spacing:.04em;text-align:center; }
 .proc-step-connector { flex:0 1 44px;min-width:18px;height:2px;background:var(--border);margin-top:13px; }
@@ -169,10 +88,10 @@ html[data-theme="dark"] .proc-annule-badge { background:rgba(220,38,38,.15);bord
 .qnav-visible { display: contents; }
 
 /* ── Layout formulaire + aside ── */
-.f-page-body { padding-top: 0; }
+.f-page-body { padding-top: 16px; }
 .soin-frm-layout { display: flex; align-items: flex-start; gap: 14px; }
 .soin-frm-main   { flex: 1; min-width: 0; }
-.soin-frm-aside  { width: 280px; flex-shrink: 0; position: sticky; top: 260px; }
+.soin-frm-aside  { width: 280px; flex-shrink: 0; position: sticky; top: 110px; }
 @media (max-width: 900px) { .soin-frm-layout { flex-direction: column; } .soin-frm-aside { width: 100%; position: static; } }
 
 /* ── Patient lecture seule (mode édition) ── */
@@ -211,96 +130,31 @@ html[data-theme="dark"] .proc-annule-badge { background:rgba(220,38,38,.15);bord
 
 {% with current_statut=form.statut.value|default:'brouillon' %}
 
-<!-- ══ HEADER FIXE UNIFIÉ (nav + breadcrumb + stepper) ══ -->
-<div class="soin-fixed-header" id="soin-fixed-header">
-
-  <!-- Rangée 1 : nav -->
-  <div class="sfh-nav">
-    <a href="{% url 'dashboard' %}" class="sfh-nav-grid" title="Accueil">
-      <i class="bi bi-grid-3x3-gap-fill"></i>
+<!-- ══ SUBHEADER : breadcrumb ══ -->
+<div class="o-subheader" data-fixed="1" id="subheader">
+  <div class="o-subheader-row">
+    <a href="{% if is_new %}{% url 'soins:list' %}{% else %}{% url 'soins:detail' soin.pk %}{% endif %}"
+       class="o-ctrl-btn" style="padding:3px 7px;">
+      <i class="bi bi-arrow-left"></i>
     </a>
-    <span class="sfh-nav-brand"><i class="bi bi-bandaid"></i> Soins</span>
-    <a href="{% url 'soins:list' %}"
-       class="sfh-nav-link {% if request.resolver_match.url_name == 'list' or request.resolver_match.url_name == 'create' or request.resolver_match.url_name == 'edit' or request.resolver_match.url_name == 'detail' %}active{% endif %}">
-      Soins infirmiers
-    </a>
-    <a href="{% url 'soins:procedure_list' %}"
-       class="sfh-nav-link {% if request.resolver_match.url_name == 'procedure_list' or request.resolver_match.url_name == 'procedure_create' or request.resolver_match.url_name == 'procedure_edit' or request.resolver_match.url_name == 'procedure_detail' %}active{% endif %}">
-      Liste des soins
-    </a>
-  </div>
-
-  <!-- Rangée 2 : breadcrumb + boutons -->
-  <div class="sfh-bar">
-    <div style="display:flex;align-items:center;gap:8px;">
-      <a href="{% if is_new %}{% url 'soins:list' %}{% else %}{% url 'soins:detail' soin.pk %}{% endif %}"
-         class="o-ctrl-btn" style="padding:3px 7px;flex-shrink:0;">
-        <i class="bi bi-arrow-left"></i>
-      </a>
-      <div class="sfh-breadcrumb">
-        <a href="{% url 'soins:list' %}">Soins</a>
-        {% if not is_new %}
-        <span class="sep">/</span>
-        <a href="{% url 'soins:detail' soin.pk %}">{{ soin.patient }}</a>
-        {% endif %}
-        <span class="sep">/</span>
-        <span style="color:var(--text);">{% if is_new %}Nouveau soin{% else %}Modifier{% endif %}</span>
-      </div>
-    </div>
-    <div class="sfh-actions">
-      {% if is_new or current_statut == 'brouillon' %}
-      <button type="submit" form="soin-form" name="action" value="save" class="btn-brouillon">
-        <i class="bi bi-floppy"></i> Sauvegarder
-      </button>
+    <span style="font-size:13.5px;color:var(--text-muted);">
+      <a href="{% url 'soins:list' %}" style="color:var(--accent);text-decoration:none;font-weight:500;">Soins</a>
+      {% if not is_new %}
+      <span style="margin:0 5px;opacity:.4;">/</span>
+      <a href="{% url 'soins:detail' soin.pk %}" style="color:var(--accent);text-decoration:none;font-weight:500;">{{ soin.patient }}</a>
       {% endif %}
+      <span style="margin:0 5px;opacity:.4;">/</span>
+      <span style="color:var(--text);">{% if is_new %}Nouveau soin{% else %}Modifier{% endif %}</span>
+    </span>
+    <div class="sh-actions">
+      <button type="submit" form="soin-form" name="action" value="enregistrer" class="sh-btn-save">
+        <i class="bi bi-floppy"></i>
+        {% if is_new %}Sauvegarder{% else %}Modifier{% endif %}
+      </button>
       <a href="{% if is_new %}{% url 'soins:list' %}{% else %}{% url 'soins:detail' soin.pk %}{% endif %}"
-         class="btn-cancel-top">
+        class="sh-btn-ignore">
         <i class="bi bi-x"></i> Ignorer
       </a>
-    </div>
-  </div>
-
-  <!-- Rangée 3 : stepper statuts -->
-  <div class="sfh-stepper">
-    <div class="proc-steps">
-      {% if current_statut == 'annule' %}
-        <div class="proc-step step-cancelled"><div class="proc-step-node step-node-cancelled"><span>1</span></div><span class="proc-step-label">Brouillon</span></div>
-        <div class="proc-step-connector"></div>
-        <div class="proc-step step-cancelled"><div class="proc-step-node step-node-cancelled"><span>2</span></div><span class="proc-step-label">Att. paiement</span></div>
-        <div class="proc-step-connector"></div>
-        <div class="proc-step step-cancelled"><div class="proc-step-node step-node-cancelled"><span>3</span></div><span class="proc-step-label">En cours</span></div>
-        <div class="proc-step-connector"></div>
-        <div class="proc-step step-cancelled"><div class="proc-step-node step-node-cancelled"><span>4</span></div><span class="proc-step-label">Terminé</span></div>
-        <span class="proc-annule-badge"><i class="bi bi-x-circle-fill"></i> Annulé</span>
-      {% else %}
-        <div class="proc-step {% if current_statut == 'brouillon' %}step-active{% else %}step-done{% endif %}">
-          <div class="proc-step-node {% if current_statut == 'brouillon' %}step-node-active{% else %}step-node-done{% endif %}">
-            {% if current_statut != 'brouillon' %}<i class="bi bi-check-lg"></i>{% else %}<span>1</span>{% endif %}
-          </div>
-          <span class="proc-step-label">Brouillon</span>
-        </div>
-        <div class="proc-step-connector {% if current_statut != 'brouillon' %}connector-done{% endif %}"></div>
-        <div class="proc-step {% if current_statut == 'en_attente_de_paiement' %}step-active{% elif current_statut == 'en_cours' or current_statut == 'termine' %}step-done{% else %}step-future{% endif %}">
-          <div class="proc-step-node {% if current_statut == 'en_attente_de_paiement' %}step-node-active{% elif current_statut == 'en_cours' or current_statut == 'termine' %}step-node-done{% else %}step-node-future{% endif %}">
-            {% if current_statut == 'en_cours' or current_statut == 'termine' %}<i class="bi bi-check-lg"></i>{% else %}<span>2</span>{% endif %}
-          </div>
-          <span class="proc-step-label">Paiement en attente</span>
-        </div>
-        <div class="proc-step-connector {% if current_statut == 'en_cours' or current_statut == 'termine' %}connector-done{% endif %}"></div>
-        <div class="proc-step {% if current_statut == 'en_cours' %}step-active{% elif current_statut == 'termine' %}step-done{% else %}step-future{% endif %}">
-          <div class="proc-step-node {% if current_statut == 'en_cours' %}step-node-active{% elif current_statut == 'termine' %}step-node-done{% else %}step-node-future{% endif %}">
-            {% if current_statut == 'termine' %}<i class="bi bi-check-lg"></i>{% else %}<span>3</span>{% endif %}
-          </div>
-          <span class="proc-step-label">Soins en cours</span>
-        </div>
-        <div class="proc-step-connector {% if current_statut == 'termine' %}connector-done{% endif %}"></div>
-        <div class="proc-step {% if current_statut == 'termine' %}step-active-termine{% else %}step-future{% endif %}">
-          <div class="proc-step-node {% if current_statut == 'termine' %}step-node-done-green{% else %}step-node-future{% endif %}">
-            {% if current_statut == 'termine' %}<i class="bi bi-check-lg"></i>{% else %}<span>4</span>{% endif %}
-          </div>
-          <span class="proc-step-label">Terminé</span>
-        </div>
-      {% endif %}
     </div>
   </div>
 </div>
@@ -346,6 +200,50 @@ html[data-theme="dark"] .proc-annule-badge { background:rgba(220,38,38,.15);bord
 
   <!-- ══ EN-TÊTE ══ -->
   <div class="art-header">
+
+    <!-- Stepper statuts -->
+    <div class="sfh-stepper">
+      <div class="proc-steps">
+        {% if current_statut == 'annule' %}
+          <div class="proc-step step-cancelled"><div class="proc-step-node step-node-cancelled"><span>1</span></div><span class="proc-step-label">Brouillon</span></div>
+          <div class="proc-step-connector"></div>
+          <div class="proc-step step-cancelled"><div class="proc-step-node step-node-cancelled"><span>2</span></div><span class="proc-step-label">Att. paiement</span></div>
+          <div class="proc-step-connector"></div>
+          <div class="proc-step step-cancelled"><div class="proc-step-node step-node-cancelled"><span>3</span></div><span class="proc-step-label">En cours</span></div>
+          <div class="proc-step-connector"></div>
+          <div class="proc-step step-cancelled"><div class="proc-step-node step-node-cancelled"><span>4</span></div><span class="proc-step-label">Terminé</span></div>
+          <span class="proc-annule-badge"><i class="bi bi-x-circle-fill"></i> Annulé</span>
+        {% else %}
+          <div class="proc-step {% if current_statut == 'brouillon' %}step-active{% else %}step-done{% endif %}">
+            <div class="proc-step-node {% if current_statut == 'brouillon' %}step-node-active{% else %}step-node-done{% endif %}">
+              {% if current_statut != 'brouillon' %}<i class="bi bi-check-lg"></i>{% else %}<span>1</span>{% endif %}
+            </div>
+            <span class="proc-step-label">Brouillon</span>
+          </div>
+          <div class="proc-step-connector {% if current_statut != 'brouillon' %}connector-done{% endif %}"></div>
+          <div class="proc-step {% if current_statut == 'en_attente_de_paiement' %}step-active{% elif current_statut == 'en_cours' or current_statut == 'termine' %}step-done{% else %}step-future{% endif %}">
+            <div class="proc-step-node {% if current_statut == 'en_attente_de_paiement' %}step-node-active{% elif current_statut == 'en_cours' or current_statut == 'termine' %}step-node-done{% else %}step-node-future{% endif %}">
+              {% if current_statut == 'en_cours' or current_statut == 'termine' %}<i class="bi bi-check-lg"></i>{% else %}<span>2</span>{% endif %}
+            </div>
+            <span class="proc-step-label">Paiement en attente</span>
+          </div>
+          <div class="proc-step-connector {% if current_statut == 'en_cours' or current_statut == 'termine' %}connector-done{% endif %}"></div>
+          <div class="proc-step {% if current_statut == 'en_cours' %}step-active{% elif current_statut == 'termine' %}step-done{% else %}step-future{% endif %}">
+            <div class="proc-step-node {% if current_statut == 'en_cours' %}step-node-active{% elif current_statut == 'termine' %}step-node-done{% else %}step-node-future{% endif %}">
+              {% if current_statut == 'termine' %}<i class="bi bi-check-lg"></i>{% else %}<span>3</span>{% endif %}
+            </div>
+            <span class="proc-step-label">Soins en cours</span>
+          </div>
+          <div class="proc-step-connector {% if current_statut == 'termine' %}connector-done{% endif %}"></div>
+          <div class="proc-step {% if current_statut == 'termine' %}step-active-termine{% else %}step-future{% endif %}">
+            <div class="proc-step-node {% if current_statut == 'termine' %}step-node-done-green{% else %}step-node-future{% endif %}">
+              {% if current_statut == 'termine' %}<i class="bi bi-check-lg"></i>{% else %}<span>4</span>{% endif %}
+            </div>
+            <span class="proc-step-label">Terminé</span>
+          </div>
+        {% endif %}
+      </div>
+    </div>
 
     <!-- Navigation rapide -->
     <!-- <nav class="art-quick-nav art-quick-nav--incard">
@@ -967,26 +865,6 @@ makeDrop({
 makeDrop({ prefix: 'stm', placeholder: '— Sélectionner —' });
 makeDrop({ prefix: 'sev', placeholder: '— Sélectionner —' });
 
-/* ── Positionnement du header fixe unifié ── */
-(function(){
-  function adj(){
-    var topbar = document.querySelector('.topbar');
-    var hdr    = document.getElementById('soin-fixed-header');
-    var wrap   = document.getElementById('page-wrap');
-    var aside  = document.querySelector('.soin-frm-aside');
-    if (!topbar || !hdr) return;
-    var topbarH = topbar.offsetHeight;
-    hdr.style.top = topbarH + 'px';
-    var hdrH   = hdr.offsetHeight;
-    var bodyPT = parseInt(getComputedStyle(document.body).paddingTop) || 0;
-    var pt     = Math.max(0, topbarH + hdrH - bodyPT);
-    if (wrap)  wrap.style.setProperty('padding-top', pt + 'px', 'important');
-    if (aside) aside.style.top = (topbarH + hdrH + 8) + 'px';
-  }
-  document.addEventListener('DOMContentLoaded', adj);
-  window.addEventListener('resize', adj);
-  setTimeout(adj, 50);
-})();
 
 /* ── Onglets ── */
 document.querySelectorAll('.art-tab-btn').forEach(function(btn){

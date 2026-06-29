@@ -3,6 +3,7 @@
 {% block topbar_title %}{{ titre }}{% endblock %}
 
 {% block extra_css %}
+{{ block.super }}
 <style>
     /* ── Control panel ── */
     .control-panel {
@@ -10,47 +11,43 @@
         border-bottom: 1px solid rgba(0,0,0,0.08);
         position: sticky;
         top: 0;
-        z-index: 100;
+        z-index: 490;
+        margin: 0 -32px;
     }
     .cp-top {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 10px 24px;
+        padding: 6px 16px;
         gap: 12px;
     }
-    .cp-breadcrumb {
-        display: flex; align-items: center; gap: 6px;
-        font-size: 14px; font-weight: 600;
-    }
-    .cp-breadcrumb a { color: var(--teal-600); text-decoration: none; font-weight: 600; }
-    .cp-breadcrumb a:hover { color: var(--teal-500); }
-    .cp-breadcrumb .sep { color: #bbb; font-weight: 400; }
-    .cp-breadcrumb .current { color: rgba(0,0,0,0.45); font-weight: 500; }
 
     .cp-save-group { display: flex; gap: 8px; align-items: center; }
     .btn-save {
+        display: inline-flex; align-items: center; gap: 5px;
         background: var(--teal-500); color: #fff;
-        border: none; border-radius: 6px;
-        padding: 8px 20px; font-size: 13px; font-weight: 700;
+        border: none; border-radius: var(--radius-xs, 4px);
+        padding: 6px 14px; font-size: 12.5px; font-weight: 600;
         cursor: pointer; font-family: 'Sora', sans-serif;
-        transition: background 0.15s;
+        text-decoration: none; transition: background 0.15s; white-space: nowrap; flex-shrink: 0;
     }
-    .btn-save:hover { background: var(--teal-600); }
+    .btn-save:hover { background: var(--teal-600); color: #fff; }
     .btn-discard {
-        background: transparent; color: rgba(0,0,0,0.55);
-        border: 1px solid rgba(0,0,0,0.15); border-radius: 6px;
-        padding: 8px 16px; font-size: 13px; font-weight: 600;
+        display: inline-flex; align-items: center; gap: 5px;
+        border: 1px solid var(--border); border-radius: 4px;
+        background: var(--surface); color: var(--text-muted);
+        padding: 5px 14px; font-size: 12.5px; font-weight: 500;
         cursor: pointer; font-family: 'Sora', sans-serif;
-        text-decoration: none; transition: all 0.15s;
+        text-decoration: none; transition: border-color 0.15s, color 0.15s, background 0.15s; white-space: nowrap;
     }
-    .btn-discard:hover { border-color: var(--rose); color: var(--rose); }
+    .btn-discard:hover { border-color: #aaa; color: var(--text); background: rgba(0,0,0,.03); }
 
     /* ── Workflow row (action buttons + status bar) ── */
     .cp-workflow-row {
         display: flex; align-items: center; justify-content: space-between;
-        padding: 0 16px 8px;
-        border-top: 1px solid rgba(0,0,0,0.06);
+        padding: 0 0 16px;
+        margin: 0;
+        border-bottom: 1px solid rgba(0,0,0,0.06);
         gap: 12px; flex-wrap: wrap;
     }
 
@@ -116,7 +113,7 @@
     .status-step .step-dot { display: none; }
 
     /* ── Form body ── */
-    .form-body { background: #fff; padding: 28px 28px 0; }
+    .form-body { background: #fff; margin-top: 16px; padding: 24px 28px 0; border-radius: 8px 8px 0 0; }
 
     /* ── Two-column main layout ── */
     .form-main-grid {
@@ -124,6 +121,7 @@
         grid-template-columns: 1fr 1fr;
         gap: 32px 48px;
         padding-bottom: 28px;
+        margin-top: 20px;
         border-bottom: 1px solid rgba(0,0,0,0.07);
     }
 
@@ -446,18 +444,11 @@
         .status-bar { flex-wrap: wrap; }
         .timing-section { grid-template-columns: 1fr; }
     }
+    .content { padding-top: 0 !important; overflow-x: hidden; }
 </style>
 {% endblock %}
 
-{% block breadcrumb %}
-<nav class="breadcrumb">
-    <a href="{% url 'dashboard' %}"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z"/><polyline points="9 21 9 12 15 12 15 21"/></svg>Accueil</a>
-    <span class="breadcrumb-sep">›</span>
-    <a href="{% url 'patients:rdv_global' %}">Rendez-vous</a>
-    <span class="breadcrumb-sep">›</span>
-    <span>{% if rdv %}{{ rdv.patient.nom }} {{ rdv.patient.prenoms }}{% else %}Nouveau{% endif %}</span>
-</nav>
-{% endblock %}
+{% block breadcrumb %}{% endblock %}
 
 {% block content %}
 
@@ -479,16 +470,24 @@
 <div class="control-panel">
 
     <div class="cp-top">
-        <div class="cp-breadcrumb">
-            <a href="{% url 'patients:rdv_global' %}">Rendez-vous</a>
-            <span class="sep">/</span>
-            <span class="current">{% if rdv %}{{ rdv.patient.nom }} {{ rdv.patient.prenoms }}{% else %}Nouveau{% endif %}</span>
-        </div>
+        <a href="{% url 'patients:rdv_global' %}" class="o-ctrl-btn" style="padding:3px 7px;" title="Retour aux rendez-vous">
+            <i class="bi bi-arrow-left"></i>
+        </a>
+        <span style="font-size:13.5px;color:var(--text-muted);">
+            <a href="{% url 'patients:rdv_global' %}" style="color:var(--teal-600);text-decoration:none;font-weight:500;">Rendez-vous</a>
+            <span style="margin:0 5px;opacity:.4;">/</span>
+            <span style="color:var(--text);">{% if rdv %}{{ rdv.patient.nom }} {{ rdv.patient.prenoms }}{% else %}Nouveau{% endif %}</span>
+        </span>
+        <div style="flex:1;"></div>
         <div class="cp-save-group">
             <button type="submit" class="btn-save">{% if rdv %}Enregistrer{% else %}Sauvegarder et facturer{% endif %}</button>
             <a href="{% url 'patients:rdv_global' %}" class="btn-discard">Ignorer</a>
         </div>
     </div>
+</div>
+
+<!-- ══════════════ CORPS DU FORMULAIRE ══════════════ -->
+<div class="form-body">
 
     <div class="cp-workflow-row">
 
@@ -539,10 +538,6 @@
         </div>
 
     </div>
-</div>
-
-<!-- ══════════════ CORPS DU FORMULAIRE ══════════════ -->
-<div class="form-body">
 
     <!-- Deux colonnes principales -->
     <div class="form-main-grid">
@@ -2268,6 +2263,36 @@
 
     if (btnModifier) btnModifier.addEventListener('click', unlock);
     if (btnCancel)   btnCancel.addEventListener('click', lock);
+})();
+</script>
+
+<script>
+(function () {
+  function alignControlPanel() {
+    var topbar = document.querySelector('.topbar');
+    var cp = document.querySelector('.control-panel');
+    if (!topbar || !cp) return;
+    var tbH = Math.ceil(topbar.getBoundingClientRect().height);
+    if (tbH <= 0) return;
+    document.body.style.paddingTop = tbH + 'px';
+    document.documentElement.style.setProperty('--header-h', tbH + 'px');
+    requestAnimationFrame(function () {
+      var gap = Math.round(cp.getBoundingClientRect().top - topbar.getBoundingClientRect().bottom);
+      if (gap > 0) {
+        document.body.style.paddingTop = (tbH - gap) + 'px';
+        document.documentElement.style.setProperty('--header-h', (tbH - gap) + 'px');
+      }
+    });
+  }
+  if (document.readyState !== 'loading') {
+    alignControlPanel();
+  } else {
+    document.addEventListener('DOMContentLoaded', alignControlPanel);
+  }
+  window.addEventListener('resize', function () {
+    document.body.style.paddingTop = '';
+    alignControlPanel();
+  });
 })();
 </script>
 

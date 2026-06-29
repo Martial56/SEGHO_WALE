@@ -1,0 +1,48 @@
+<nav class="o-nav">
+  <a href="{% url 'dashboard' %}" class="o-nav-grid" title="Accueil">
+    <i class="bi bi-grid-3x3-gap-fill"></i>
+  </a>
+  <span class="o-nav-brand">
+    <i class="bi bi-person-badge-fill"></i>
+    Médecins
+  </span>
+  <a href="{% url 'medecin_dashboard' %}"
+     class="o-nav-link {% if request.resolver_match.url_name == 'medecin_dashboard' %}active{% endif %}">
+    <i class="bi bi-graph-up" style="font-size:12px;"></i> Tableau de bord
+  </a>
+  <a href="{% url 'medecins_list' %}"
+     class="o-nav-link {% if request.resolver_match.url_name in 'medecins_list,medecin_edit,medecin_create,medecin_detail' %}active{% endif %}">
+    Médecins
+  </a>
+  {% if request.user.is_staff %}
+  <div class="o-nav-dropdown">
+    <button type="button"
+      class="o-nav-link {% if request.resolver_match.url_name in 'medecins_specialites,medecins_specialite_detail,medecins_specialite_create,medecins_specialite_edit,medecins_departements,medecins_departement_detail,medecins_departement_create,medecins_departement_edit' %}active{% endif %}"
+      style="background:none;border:none;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;"
+      onclick="toggleMedNavDropdown(event, this)">
+      Configuration
+      <i class="bi bi-chevron-down" style="font-size:10px;"></i>
+    </button>
+    <div class="o-nav-dropdown-menu" id="med-nav-config-dropdown">
+      <a href="{% url 'medecins_specialites' %}"><i class="bi bi-tag"></i> Spécialités</a>
+      <a href="{% url 'medecins_departements' %}"><i class="bi bi-building"></i> Départements</a>
+    </div>
+  </div>
+  {% endif %}
+</nav>
+<script>
+function toggleMedNavDropdown(e, btn) {
+  e.stopPropagation();
+  var menu = document.getElementById('med-nav-config-dropdown');
+  menu.classList.toggle('open');
+  if (menu.classList.contains('open')) {
+    function close(ev) {
+      if (!btn.closest('.o-nav-dropdown').contains(ev.target)) {
+        menu.classList.remove('open');
+        document.removeEventListener('click', close);
+      }
+    }
+    setTimeout(function () { document.addEventListener('click', close); }, 0);
+  }
+}
+</script>

@@ -1,7 +1,6 @@
 {% extends 'soins/base.html' %}
 {% load static %}
 
-{% block module_navbar %}{% endblock %}
 {% block breadcrumb %}{% endblock %}
 
 {% block extra_css %}
@@ -11,20 +10,48 @@
   html[data-theme="dark"] .o-list-table th { background: var(--surface); border-bottom-color: var(--border); color: var(--text-muted); }
   html[data-theme="dark"] .o-list-table td { border-bottom-color: #2d3550; color: var(--text); }
   html[data-theme="dark"] .o-list-table tbody tr:hover td { background: rgba(255,255,255,.04); }
-  html[data-theme="dark"] .filters-panel { background: #1a2133; border-bottom-color: var(--border); }
   html[data-theme="dark"] .filter-select { background: var(--surface); border-color: var(--border); color: var(--text); }
 
-  .filters-panel {
-    display: none; gap: 8px; flex-wrap: wrap; align-items: center;
-    padding: 8px 16px; background: #f2faf6; border-bottom: 1px solid var(--border);
-  }
-  .filters-panel.open { display: flex; }
   .filter-select {
     border: 1px solid var(--border); border-radius: 4px; padding: 4px 10px;
-    font-family: 'Roboto', sans-serif; font-size: 12px; color: var(--text);
+    font-family: var(--font-main); font-size: 12px; color: var(--text);
     background: var(--surface); cursor: pointer; outline: none;
   }
   .filter-select:focus { border-color: var(--accent); }
+  html[data-theme="dark"] .filter-select { background: var(--surface); border-color: var(--border); color: var(--text); }
+
+  /* ── DROPDOWNS ── */
+  .o-dd-wrap { position: relative; }
+  .o-dd-panel {
+    display: none; position: fixed; z-index: 9999;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; box-shadow: 0 8px 28px rgba(0,0,0,.16);
+    min-width: 210px; padding: 5px 0;
+  }
+  .o-dd-panel.open { display: block; }
+  .o-dd-section {
+    padding: 6px 14px 3px; font-size: 10px; font-weight: 600;
+    color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px;
+  }
+  .o-dd-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 14px; font-size: 12.5px; color: var(--text);
+    cursor: pointer; text-decoration: none; transition: background .1s;
+    white-space: nowrap; gap: 10px;
+  }
+  .o-dd-item:hover { background: rgba(26,92,74,.08); color: var(--accent); }
+  .o-dd-item.active { background: rgba(26,92,74,.12); color: var(--primary); font-weight: 500; }
+  .o-dd-sep { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+  html[data-theme="dark"] .o-dd-panel { background: #1a2535; border-color: #2e3f58; }
+  html[data-theme="dark"] .o-dd-item:hover { background: rgba(34,137,107,.2); color: #7ac4a7; }
+  html[data-theme="dark"] .o-dd-item.active { background: rgba(34,137,107,.25); color: #7ac4a7; }
+
+  /* ── PAGINATION INLINE ── */
+  .o-pagination-top {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 12px; color: var(--text-muted); white-space: nowrap;
+  }
+  html[data-theme="dark"] .o-ctrl-btn.active { background: #28304a; border-color: #3a4a62; color: var(--text); }
 
   .o-list-wrap { background: var(--bg); overflow-x: auto; }
   .o-list-table { width: 100%; border-collapse: collapse; background: var(--surface); }
@@ -79,10 +106,8 @@
 {% block content %}
 <div id="page-wrap">
 
-{% include 'soins/includes/nav.html' %}
-
 <!-- ══ SUBHEADER ══ -->
-<div class="o-subheader" id="subheader">
+<div class="o-subheader" data-fixed="1" id="subheader">
   <div class="o-subheader-row">
     <span class="o-page-title">Liste des soins <span class="o-page-count">{{ total }}</span></span>
     <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
@@ -102,32 +127,74 @@
     <a href="{% url 'soins:procedure_create' %}" class="o-btn-create">
       <i class="bi bi-plus-lg"></i> Créer
     </a>
-    <button type="button" class="o-ctrl-btn {% if statut or date_filtre %}active{% endif %}"
-      id="btn-filtres" onclick="toggleFilters()">
-      <i class="bi bi-funnel"></i> Filtres
-    </button>
-    {% if q or statut or date_filtre %}
-    <a href="{% url 'soins:procedure_list' %}" class="o-ctrl-btn">
-      <i class="bi bi-x"></i> Effacer
-    </a>
-    {% endif %}
-    {% if q %}<span class="o-filter-tag">{{ q }} <a href="?{% if statut %}statut={{ statut }}&{% endif %}{% if date_filtre %}date={{ date_filtre }}{% endif %}">×</a></span>{% endif %}
-    {% if statut %}<span class="o-filter-tag">{{ statut }} <a href="?{% if q %}q={{ q }}&{% endif %}{% if date_filtre %}date={{ date_filtre }}{% endif %}">×</a></span>{% endif %}
-    {% if date_filtre %}<span class="o-filter-tag">{{ date_filtre }} <a href="?{% if q %}q={{ q }}&{% endif %}{% if statut %}statut={{ statut }}{% endif %}">×</a></span>{% endif %}
-    <div style="flex:1;"></div>
-  </div>
-</div>
 
-<!-- ══ FILTRES ══ -->
-<div class="filters-panel {% if statut or date_filtre %}open{% endif %}" id="filters-panel">
-  <select id="sel-statut" class="filter-select" onchange="applyFilters()">
-    <option value="">Tous les statuts</option>
-    <option value="brouillon" {% if statut == 'brouillon' %}selected{% endif %}>Brouillon</option>
-    <option value="en_cours"  {% if statut == 'en_cours'  %}selected{% endif %}>En cours</option>
-    <option value="termine"   {% if statut == 'termine'   %}selected{% endif %}>Terminé</option>
-    <option value="annule"    {% if statut == 'annule'    %}selected{% endif %}>Annulé</option>
-  </select>
-  <input type="date" id="sel-date" class="filter-select" value="{{ date_filtre }}" onchange="applyFilters()" style="font-size:12px;">
+    <div style="margin-left:auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+
+      <!-- Filtres dropdown -->
+      <div class="o-dd-wrap">
+        <button class="o-ctrl-btn {% if statut or date_filtre %}active{% endif %}"
+                id="btn-filtres" onclick="toggleDd('dd-filtres', this)">
+          <i class="bi bi-funnel{% if statut or date_filtre %}-fill{% endif %}"></i>
+          Filtres{% if statut or date_filtre %} <span style="background:var(--accent);color:#fff;border-radius:10px;font-size:10px;padding:0 5px;">{% if statut %}1{% endif %}{% if date_filtre %}1{% endif %}</span>{% endif %}
+        </button>
+        <div class="o-dd-panel" id="dd-filtres">
+          <div class="o-dd-section">Statut</div>
+          <a class="o-dd-item {% if statut == 'brouillon' %}active{% endif %}" onclick="setFiltreStatut('brouillon')">Brouillon</a>
+          <a class="o-dd-item {% if statut == 'en_cours' %}active{% endif %}"  onclick="setFiltreStatut('en_cours')">En cours</a>
+          <a class="o-dd-item {% if statut == 'termine' %}active{% endif %}"   onclick="setFiltreStatut('termine')">Terminé</a>
+          <a class="o-dd-item {% if statut == 'annule' %}active{% endif %}"    onclick="setFiltreStatut('annule')">Annulé</a>
+          {% if statut %}
+          <hr class="o-dd-sep">
+          <a class="o-dd-item" onclick="setFiltreStatut('')" style="color:#b71c1c;">
+            <i class="bi bi-x-circle" style="font-size:11px;"></i> Effacer le filtre
+          </a>
+          {% endif %}
+          <hr class="o-dd-sep">
+          <div class="o-dd-section">Date</div>
+          <div style="padding:4px 14px 6px;">
+            <input type="date" id="dd-date-input" value="{{ date_filtre }}"
+                   class="filter-select" style="width:100%;font-size:12px;"
+                   onchange="setFiltreDate(this.value)">
+          </div>
+          {% if date_filtre %}
+          <a class="o-dd-item" onclick="setFiltreDate('')" style="color:#b71c1c;">
+            <i class="bi bi-x-circle" style="font-size:11px;"></i> Effacer la date
+          </a>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Tags filtres actifs -->
+      {% if q %}<span class="o-filter-tag">{{ q }} <a onclick="clearQ()" style="cursor:pointer;">×</a></span>{% endif %}
+      {% if statut %}<span class="o-filter-tag">{% if statut == 'brouillon' %}Brouillon{% elif statut == 'en_cours' %}En cours{% elif statut == 'termine' %}Terminé{% elif statut == 'annule' %}Annulé{% endif %} <a onclick="setFiltreStatut('')" style="cursor:pointer;">×</a></span>{% endif %}
+      {% if date_filtre %}<span class="o-filter-tag">{{ date_filtre }} <a onclick="setFiltreDate('')" style="cursor:pointer;">×</a></span>{% endif %}
+      {% if q or statut or date_filtre %}
+      <a onclick="clearAll()" class="o-ctrl-btn" style="cursor:pointer;"><i class="bi bi-x"></i> Effacer</a>
+      {% endif %}
+
+      <div class="o-ctrl-sep"></div>
+
+      <!-- Pagination inline -->
+      <div class="o-pagination-top">
+        <span id="pag-info-top">{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
+        <a id="pag-prev-top" class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
+           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}&q={{ q }}&statut={{ statut }}&date={{ date_filtre }}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-left"></i>
+        </a>
+        <a id="pag-next-top" class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
+           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}&q={{ q }}&statut={{ statut }}&date={{ date_filtre }}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-right"></i>
+        </a>
+      </div>
+
+      <div class="o-ctrl-sep"></div>
+
+      <div class="o-view-btns">
+        <button class="o-view-btn active" title="Vue liste"><i class="bi bi-list-ul"></i></button>
+      </div>
+
+    </div>
+  </div>
 </div>
 
 <!-- ══ STATS ══ -->
@@ -169,7 +236,7 @@
     <tbody>
       {% for proc in page_obj %}
       <tr onclick="window.location='{% url 'soins:procedure_detail' proc.pk %}'">
-        <td><span style="font-family:monospace;font-size:11.5px;font-weight:500;color:var(--accent);">{{ proc.numero }}</span></td>
+        <td><span style="font-family: var(--font-mono);font-size:11.5px;font-weight:500;color:var(--accent);">{{ proc.numero }}</span></td>
         <td style="font-weight:500;">{{ proc.patient.nom }} {{ proc.patient.prenoms }}</td>
         <td style="font-size:12px;color:var(--text-muted);">{{ proc.soin_type.nom|default:"—" }}</td>
         <td style="font-size:12px;white-space:nowrap;">
@@ -218,23 +285,81 @@
 {% include 'soins/includes/list_live_js.html' %}
 
 <script>
-function adjustOffsets(){
-  var tb=document.querySelector('.topbar'),wp=document.getElementById('page-wrap');
-  if(tb&&wp) wp.style.paddingTop='0';
+/* ── Dropdown filtres ── */
+function toggleDd(id, btn) {
+  var panel = document.getElementById(id);
+  var isOpen = panel.classList.contains('open');
+  document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
+  if (!isOpen) {
+    var rect = btn.getBoundingClientRect();
+    panel.style.top = (rect.bottom + 4) + 'px';
+    panel.style.left = rect.left + 'px';
+    panel.style.right = 'auto';
+    panel.classList.add('open');
+    var pr = panel.getBoundingClientRect();
+    if (pr.right > window.innerWidth - 8) {
+      panel.style.left = 'auto';
+      panel.style.right = (window.innerWidth - rect.right) + 'px';
+    }
+  }
 }
-adjustOffsets(); window.addEventListener('resize',adjustOffsets);
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.o-dd-wrap')) {
+    document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
+  }
+});
 
-function toggleFilters(){
-  var p=document.getElementById('filters-panel');
-  if(p) p.classList.toggle('open');
-  document.getElementById('btn-filtres').classList.toggle('active',p.classList.contains('open'));
-}
-
-function applyFilters(){
-  document.getElementById('fi-statut').value=document.getElementById('sel-statut').value;
-  document.getElementById('fi-date').value=document.getElementById('sel-date').value;
+function setFiltreStatut(val) {
+  var el = document.getElementById('fi-statut');
+  if (el) el.value = val;
+  document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
   window.liveLoad();
 }
+function setFiltreDate(val) {
+  var el = document.getElementById('fi-date');
+  if (el) el.value = val;
+  var ddInput = document.getElementById('dd-date-input');
+  if (ddInput) ddInput.value = val;
+  document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
+  window.liveLoad();
+}
+function clearQ() {
+  var inp = document.getElementById('search-input');
+  if (inp) inp.value = '';
+  window.liveLoad();
+}
+function clearAll() {
+  var inp = document.getElementById('search-input');
+  if (inp) inp.value = '';
+  var el = document.getElementById('fi-statut'); if (el) el.value = '';
+  var el2 = document.getElementById('fi-date');   if (el2) el2.value = '';
+  window.liveLoad();
+}
+
+/* ── Sync pagination top après liveLoad ── */
+document.addEventListener('liveload:complete', function() {
+  var srcSpan = document.querySelector('.o-pagination-bottom span');
+  var tgtSpan = document.getElementById('pag-info-top');
+  if (srcSpan && tgtSpan) tgtSpan.textContent = srcSpan.textContent;
+  var bottomBtns = document.querySelectorAll('.o-pagination-bottom .o-pag-btn');
+  var prevSrc = bottomBtns[0], nextSrc = bottomBtns[1];
+  var prevTgt = document.getElementById('pag-prev-top');
+  var nextTgt = document.getElementById('pag-next-top');
+  if (prevTgt && prevSrc) { prevTgt.className = prevSrc.className; prevTgt.href = prevSrc.href; }
+  if (nextTgt && nextSrc) { nextTgt.className = nextSrc.className; nextTgt.href = nextSrc.href; }
+});
+
+/* ── Pagination top → liveLoad ── */
+document.addEventListener('click', function(e) {
+  var a = e.target.closest('#pag-prev-top, #pag-next-top');
+  if (!a || a.classList.contains('disabled')) return;
+  var href = a.getAttribute('href');
+  if (!href || href === '#') return;
+  e.preventDefault();
+  var qs = href.includes('?') ? href.split('?')[1] : '';
+  var p = new URLSearchParams(qs);
+  window.liveLoad({ page: p.get('page') || '1' });
+});
 
 (function(){
   var inp=document.getElementById('search-input');

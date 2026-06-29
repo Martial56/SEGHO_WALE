@@ -3,35 +3,40 @@
 {% block topbar_title %}Créer une ordonnance{% endblock %}
 
 {% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <style>
     .ord-panel {
         background: #fff; border-bottom: 1px solid rgba(0,0,0,0.08);
-        position: sticky; top: 0; z-index: 100;
+        position: sticky; top: 0; z-index: 190;
+        margin: 0 -32px 0;
     }
     .ord-top {
-        display: flex; align-items: center; justify-content: space-between;
-        padding: 10px 24px; gap: 12px;
+        display: flex; align-items: center;
+        padding: 6px 16px; gap: 8px;
     }
-    .ord-breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; }
-    .ord-breadcrumb a { color: var(--teal-600); text-decoration: none; font-weight: 600; }
+    .ord-breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 13.5px; }
+    .ord-breadcrumb a { color: var(--teal-600); text-decoration: none; font-weight: 500; }
     .ord-breadcrumb a:hover { color: var(--teal-500); }
-    .ord-breadcrumb .sep { color: #bbb; font-weight: 400; }
-    .ord-breadcrumb .current { color: rgba(0,0,0,0.45); font-weight: 500; }
+    .ord-breadcrumb .sep { color: #bbb; opacity: .4; margin: 0 3px; }
+    .ord-breadcrumb .current { color: var(--text); }
     .btn-save {
-        background: var(--teal-500); color: #fff; border: none; border-radius: 6px;
-        padding: 8px 20px; font-size: 13px; font-weight: 700;
-        cursor: pointer; font-family: 'Sora', sans-serif; transition: background 0.15s;
+        display: inline-flex; align-items: center; gap: 5px;
+        background: var(--teal-500); color: #fff; border: none;
+        border-radius: var(--radius-xs, 4px);
+        padding: 6px 14px; font-size: 12.5px; font-weight: 600;
+        cursor: pointer; transition: background 0.15s;
     }
     .btn-save:hover { background: var(--teal-600); }
     .btn-save:disabled { opacity: .4; cursor: not-allowed; }
     .btn-discard {
-        background: transparent; color: rgba(0,0,0,0.55);
-        border: 1px solid rgba(0,0,0,0.15); border-radius: 6px;
-        padding: 8px 16px; font-size: 13px; font-weight: 600;
-        cursor: pointer; font-family: 'Sora', sans-serif;
-        text-decoration: none; transition: all 0.15s;
+        display: inline-flex; align-items: center;
+        background: var(--surface); color: var(--text-muted);
+        border: 1px solid var(--border); border-radius: 4px;
+        padding: 5px 14px; font-size: 12.5px;
+        cursor: pointer; text-decoration: none; transition: border-color 0.15s, color 0.15s;
     }
-    .btn-discard:hover { border-color: var(--rose); color: var(--rose); }
+    .btn-discard:hover { border-color: #999; color: var(--text); }
 
     .ord-body { background: #f6f8fa; min-height: calc(100vh - 60px); padding: 24px; }
     .ord-card { background: #fff; border: 1px solid rgba(0,0,0,0.08); border-radius: 8px; margin-bottom: 20px; overflow: hidden; }
@@ -80,7 +85,7 @@
     .pat-dd-item:last-child { border-bottom: none; }
     .pat-dd-item:hover { background: var(--teal-50); }
     .pat-dd-name { font-weight: 600; color: var(--teal-900); }
-    .pat-dd-code { font-size: 11px; color: rgba(0,0,0,0.4); font-family: monospace; }
+    .pat-dd-code { font-size: 11px; color: rgba(0,0,0,0.4); font-family: var(--font-mono); }
     .pat-dd-empty { padding: 12px 14px; font-size: 12px; color: rgba(0,0,0,0.35); font-style: italic; }
 
     /* Patient banner */
@@ -155,19 +160,7 @@
 </style>
 {% endblock %}
 
-{% block breadcrumb %}
-<nav class="breadcrumb">
-    <a href="{% url 'dashboard' %}"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z"/><polyline points="9 21 9 12 15 12 15 21"/></svg>Accueil</a>
-    <span class="breadcrumb-sep">›</span>
-    <a href="{% url 'ordonnance_list' %}">Ordonnances</a>
-    {% if patient %}
-    <span class="breadcrumb-sep">›</span>
-    <span>{{ patient.nom }} {{ patient.prenoms }}</span>
-    {% endif %}
-    <span class="breadcrumb-sep">›</span>
-    <span>Nouvelle ordonnance</span>
-</nav>
-{% endblock %}
+{% block breadcrumb %}{% endblock %}
 
 {% block content %}
 
@@ -186,14 +179,17 @@
 <!-- Panneau de contrôle -->
 <div class="ord-panel">
     <div class="ord-top">
+        <a href="{% url 'ordonnance_list' %}" class="o-ctrl-btn" style="padding:3px 7px;" title="Retour aux ordonnances">
+            <i class="bi bi-arrow-left"></i>
+        </a>
         <div class="ord-breadcrumb">
             <a href="{% url 'ordonnance_list' %}">Ordonnances</a>
             <span class="sep">/</span>
             <span class="current">Nouvelle ordonnance</span>
         </div>
+        <div style="flex:1;"></div>
         <div style="display:flex;gap:8px;align-items:center;">
             <button type="submit" class="btn-save" id="btn-save" {% if not patient or not medecin_preselect %}disabled{% endif %}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2" style="vertical-align:-2px;margin-right:4px"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
                 Sauvegarder
             </button>
             <a href="{% url 'ordonnance_list' %}" class="btn-discard">Annuler</a>
@@ -522,5 +518,23 @@ function addLine() {
 
 document.querySelectorAll('.line-row').forEach(setupLine);
 document.getElementById('btn-add-line').addEventListener('click', addLine);
+
+(function () {
+  function alignControlPanel() {
+    var topbar = document.querySelector('.topbar');
+    var cp = document.querySelector('.ord-panel');
+    if (!topbar || !cp) return;
+    var tbH = Math.ceil(topbar.getBoundingClientRect().height);
+    if (tbH <= 0) return;
+    document.body.style.paddingTop = tbH + 'px';
+    requestAnimationFrame(function () {
+      var gap = Math.round(cp.getBoundingClientRect().top - topbar.getBoundingClientRect().bottom);
+      if (gap > 0) document.body.style.paddingTop = (tbH - gap) + 'px';
+    });
+  }
+  if (document.readyState !== 'loading') { alignControlPanel(); }
+  else { document.addEventListener('DOMContentLoaded', alignControlPanel); }
+  window.addEventListener('resize', function () { document.body.style.paddingTop = ''; alignControlPanel(); });
+})();
 </script>
 {% endblock %}

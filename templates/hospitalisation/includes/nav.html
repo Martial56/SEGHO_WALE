@@ -14,31 +14,32 @@
   </a>
 
   {% if user.is_staff or user.is_superuser %}
-  <div class="o-nav-drop-wrap" id="hosp-config-wrap">
+  <div class="o-nav-dropdown" id="hosp-config-wrap">
     <button type="button"
-            class="o-nav-link o-nav-drop-trigger {% if uname == 'configuration' or uname|slice:':7' == 'config_' or uname|slice:':7' == 'chambre' or uname|slice:':5' == 'deces' or uname|slice:':5' == 'liste' %}active{% endif %}"
-            onclick="toggleHospConfig(event)">
+            class="o-nav-link {% if uname == 'configuration' or uname|slice:':7' == 'config_' or uname|slice:':7' == 'chambre' or uname|slice:':5' == 'deces' or uname|slice:':5' == 'liste' %}active{% endif %}"
+            style="background:none;border:none;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;"
+            onclick="toggleHospConfig(event, this)">
       Configuration
-      <i class="bi bi-chevron-down chev"></i>
+      <i class="bi bi-chevron-down" style="font-size:10px;"></i>
     </button>
-    <div class="o-nav-dropdown" id="hosp-config-dropdown">
-      <div class="o-nav-drop-section">Établissement</div>
+    <div class="o-nav-dropdown-menu" id="hosp-config-dropdown">
+      <div class="o-nav-dd-section">Établissement</div>
       <a href="{% url 'hospitalisation:chambres_list' %}"
-         class="o-nav-drop-item sub {% if uname|slice:':7' == 'chambre' %}active{% endif %}">
-        <i class="bi bi-door-closed" style="font-size:12px;margin-right:6px;"></i>Salles / Chambres
+         class="{% if uname|slice:':7' == 'chambre' %}active{% endif %}">
+        <i class="bi bi-door-closed" style="font-size:12px;"></i> Salles / Chambres
       </a>
       <a href="{% url 'hospitalisation:deces_list' %}"
-         class="o-nav-drop-item sub {% if uname|slice:':5' == 'deces' %}active{% endif %}">
-        <i class="bi bi-journal-x" style="font-size:12px;margin-right:6px;"></i>Registre des décès
+         class="{% if uname|slice:':5' == 'deces' %}active{% endif %}">
+        <i class="bi bi-journal-x" style="font-size:12px;"></i> Registre des décès
       </a>
-      <div class="o-nav-drop-section">Listes de contrôle</div>
+      <div class="o-nav-dd-section">Listes de contrôle</div>
       <a href="{% url 'hospitalisation:config_liste_admission' %}"
-         class="o-nav-drop-item sub {% if uname == 'config_liste_admission' or uname == 'liste_admission_create' or uname == 'liste_admission_edit' or uname == 'liste_admission_delete' %}active{% endif %}">
-        <i class="bi bi-clipboard-check" style="font-size:12px;margin-right:6px;"></i>Contrôle d'admission
+         class="{% if uname == 'config_liste_admission' or uname == 'liste_admission_create' or uname == 'liste_admission_edit' or uname == 'liste_admission_delete' %}active{% endif %}">
+        <i class="bi bi-clipboard-check" style="font-size:12px;"></i> Contrôle d'admission
       </a>
       <a href="{% url 'hospitalisation:config_liste_service' %}"
-         class="o-nav-drop-item sub {% if uname == 'config_liste_service' or uname == 'liste_service_create' or uname == 'liste_service_edit' or uname == 'liste_service_delete' %}active{% endif %}">
-        <i class="bi bi-clipboard2-check" style="font-size:12px;margin-right:6px;"></i>Vérification avant service
+         class="{% if uname == 'config_liste_service' or uname == 'liste_service_create' or uname == 'liste_service_edit' or uname == 'liste_service_delete' %}active{% endif %}">
+        <i class="bi bi-clipboard2-check" style="font-size:12px;"></i> Vérification avant service
       </a>
     </div>
   </div>
@@ -52,10 +53,10 @@
   if (!wrap || !dropdown) return;
   window.toggleHospConfig = function (e) {
     e.stopPropagation();
-    wrap.classList.toggle('open');
+    dropdown.classList.toggle('open');
   };
   document.addEventListener('click', function (e) {
-    if (!wrap.contains(e.target)) wrap.classList.remove('open');
+    if (!wrap.contains(e.target)) dropdown.classList.remove('open');
   });
 })();
 </script>

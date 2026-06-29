@@ -3,263 +3,105 @@
 
 {% block topbar_title %}Médecins{% endblock %}
 
+{% block breadcrumb %}{% endblock %}
+
 {% block extra_css %}
 {{ block.super }}
 <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
 <style>
-:root {
-  --md-900:#071e28; --md-800:#071e28; --md-700:#0f4358;
-  --md-600:#1a6d8c; --md-500:#1a6d8c; --md-400:#1a6d8c;
-  --md-300:#8ab8d0; --md-200:#a8c8d8; --md-100:#c8dce8; --md-50:#e8f2f8;
-  --md-surface:#fff; --md-border:rgba(15,67,88,.13);
-  --md-text:#071e28; --md-muted:rgba(0,0,0,.45);
-}
-html[data-theme="dark"] {
-  --md-50:#171616; --md-100:#201d1d; --md-surface:#0f0e0e;
-  --md-border:rgba(154,184,138,.18); --md-text:#a8c8d8; --md-muted:rgba(255,255,255,.4);
-}
+  .o-pagination-top {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 12px; color: var(--text-muted); white-space: nowrap;
+  }
+  #subheader {
+    position: sticky;
+    top: 0;
+    z-index: 190;
+  }
 
-/* ── Barre en-tête ── */
-.md-head {
-  display:flex; align-items:center; justify-content:space-between; gap:16px;
-  padding:14px 32px; margin:0 -32px; flex-wrap:wrap;
-  background:#e8f2f7; border-bottom:1px solid rgba(0,0,0,.05);
-  box-shadow:0 2px 8px rgba(0,0,0,.04);
-  position:sticky; top:calc(var(--topbar-h) + 44px); z-index:100;
-}
-html[data-theme="dark"] .md-head { background:#0f0e0e; }
+  /* ── Empêche le scroll horizontal de la page ── */
+  /* overflow-y:auto sur .content force overflow-x:auto (spec CSS),
+     exposant les marges négatives des éléments pleine-largeur.
+     overflow-x:clip coupe sans créer de scroll container (sticky reste OK). */
+  .content { overflow-x: clip; }
 
-/* ── Stats ── */
-.md-stats { display:flex; gap:10px; flex-wrap:wrap; margin-top:16px; }
-.md-stat {
-  background:var(--md-surface); border:1px solid var(--md-border);
-  border-radius:8px; padding:8px 18px; min-width:100px;
-  box-shadow:0 1px 4px rgba(15,67,88,.06); display:flex; align-items:center; gap:10px;
-}
-.md-stat-val { font-size:20px; font-weight:800; color:var(--md-700); line-height:1; }
-.md-stat-lbl { font-size:10.5px; color:var(--md-muted); text-transform:uppercase; letter-spacing:.3px; }
-
-/* ── Filtres ── */
-.md-filters {
-  display:flex; gap:8px; flex-wrap:wrap; align-items:center;
-  background:var(--md-surface); border:1px solid var(--md-border);
-  border-radius:10px; padding:8px 14px; margin-top:14px;
-  box-shadow:0 1px 4px rgba(15,67,88,.05);
-}
-.md-filters input, .md-filters select {
-  border:none; border-bottom:1.5px solid rgba(0,0,0,.18);
-  border-radius:0; background:transparent;
-  padding:5px 4px; font-size:12.5px; color:var(--md-text); font-family:inherit;
-}
-.md-filters input:focus, .md-filters select:focus { outline:none; border-bottom-color:var(--md-500); }
-.md-search { flex:1; min-width:180px; }
-
-/* ── Boutons ── */
-.btn-md { background:var(--md-600); color:#fff; border:none; border-radius:6px; padding:7px 16px; font-size:12.5px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:5px; text-decoration:none; transition:background .15s; }
-.btn-md:hover { background:var(--md-700); color:#fff; }
-.btn-md-outline { border:1.5px solid var(--md-600); color:var(--md-600); background:transparent; border-radius:6px; padding:6px 14px; font-size:12.5px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:5px; text-decoration:none; transition:background .15s,color .15s; }
-.btn-md-outline:hover { background:var(--md-600); color:#fff; }
-.btn-md-del { border:1.5px solid rgba(220,38,38,.3); color:#dc2626; background:rgba(220,38,38,.06); border-radius:6px; padding:3px 10px; font-size:11.5px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:4px; transition:background .15s,color .15s; }
-.btn-md-del:hover { background:#dc2626; color:#fff; border-color:#dc2626; }
-html[data-theme="dark"] .btn-md-del { background:rgba(220,38,38,.1); border-color:rgba(220,38,38,.3); color:#f87171; }
-
-/* ── Toggle vue ── */
-.view-toggle { display:flex; gap:4px; }
-.view-btn {
-  width:32px; height:32px; border:1.5px solid var(--md-border); border-radius:6px;
-  background:var(--md-surface); color:var(--md-muted); cursor:pointer;
-  display:flex; align-items:center; justify-content:center; font-size:15px;
-  transition:background .15s,color .15s,border-color .15s;
-}
-.view-btn.active, .view-btn:hover { background:var(--md-600); color:#fff; border-color:var(--md-600); }
-
-/* ── Vue tableau ── */
-.md-table-wrap { margin-top:14px; margin-left:-32px; margin-right:-32px; border-radius:0; overflow:hidden; box-shadow:0 2px 12px rgba(15,67,88,.08); }
-.md-table { width:100%; border-collapse:collapse; background:var(--md-surface); font-size:12.5px; }
-.md-table thead tr { background:var(--md-100); color:var(--md-800); border-bottom:2px solid var(--md-300); }
-.md-table thead th { padding:8px 12px; font-weight:700; font-size:10.5px; text-transform:uppercase; letter-spacing:.4px; text-align:left; white-space:nowrap; }
-.md-table tbody tr { border-bottom:1px solid var(--md-border); transition:background .12s; }
-.md-table tbody tr:nth-child(even) { background:var(--md-50); }
-.md-table tbody tr:hover { background:rgba(15,67,88,.05); }
-.md-table tbody td { padding:6px 12px; color:var(--md-text); vertical-align:middle; }
-html[data-theme="dark"] .md-table thead tr { background:var(--md-800); color:var(--md-200); border-bottom-color:var(--md-700); }
-html[data-theme="dark"] .md-table tbody tr:nth-child(even) { background:var(--md-100); }
-
-/* ── Avatar tableau ── */
-.md-avatar {
-  width:44px; height:44px; border-radius:6px; flex-shrink:0;
-  display:flex; align-items:center; justify-content:center;
-  font-size:13px; font-weight:800; color:#fff; overflow:hidden;
-}
-.md-avatar img { width:100%; height:100%; object-fit:cover; display:block; }
-.md-avatar-ph {
-  width:44px; height:44px; border-radius:6px; flex-shrink:0;
-  display:flex; align-items:center; justify-content:center;
-  background:#f0f4f8; color:#aab; font-size:22px;
-}
-
-/* ── Vue Kanban ── */
-.kb-board {
-  display:flex; gap:16px; margin-top:16px;
-  overflow-x:auto; padding-bottom:16px;
-  align-items:flex-start;
-}
-.kb-board::-webkit-scrollbar { height:6px; }
-.kb-board::-webkit-scrollbar-track { background:transparent; }
-.kb-board::-webkit-scrollbar-thumb { background:var(--md-300); border-radius:3px; }
-
-.kb-col {
-  flex:0 0 260px; min-width:260px;
-  background:var(--md-50); border:1px solid var(--md-border);
-  border-radius:12px; overflow:hidden;
-}
-html[data-theme="dark"] .kb-col { background:var(--md-100); }
-
-.kb-col-head {
-  padding:11px 16px; background:var(--md-surface);
-  border-bottom:3px solid var(--kb-accent,var(--md-400));
-  display:flex; align-items:center; justify-content:space-between;
-}
-html[data-theme="dark"] .kb-col-head { background:#1a1a1a; }
-.kb-col-title { font-size:11.5px; font-weight:700; color:var(--md-text); text-transform:uppercase; letter-spacing:.5px; }
-.kb-col-count {
-  font-size:11px; font-weight:700; color:var(--kb-accent,var(--md-600));
-  background:color-mix(in srgb, var(--kb-accent,var(--md-600)) 12%, transparent);
-  border-radius:20px; padding:2px 9px; min-width:22px; text-align:center;
-}
-
-.kb-cards { padding:10px; display:flex; flex-direction:column; gap:8px; }
-
-.kb-card {
-  background:var(--md-surface); border:1px solid var(--md-border);
-  border-left:3px solid var(--kb-accent,var(--md-400));
-  border-radius:10px; overflow:hidden; position:relative;
-  box-shadow:0 1px 4px rgba(0,0,0,.06);
-  transition:box-shadow .15s, transform .12s;
-}
-.kb-card:hover { box-shadow:0 4px 16px rgba(0,0,0,.12); transform:translateY(-2px); }
-
-/* Lien couvrant toute la carte */
-.kb-card-link {
-  position:absolute; inset:0; z-index:1; border-radius:9px;
-}
-
-.kb-card-top { display:flex; align-items:center; gap:10px; padding:12px 14px 8px; }
-.kb-avatar {
-  width:42px; height:42px; border-radius:50%; flex-shrink:0;
-  display:flex; align-items:center; justify-content:center;
-  font-size:14px; font-weight:800; color:#fff; overflow:hidden;
-  background:var(--kb-accent,#4a6741);
-  box-shadow:0 2px 6px rgba(0,0,0,.18);
-}
-.kb-avatar img { width:100%; height:100%; object-fit:cover; }
-.kb-card-name { font-size:13px; font-weight:700; color:var(--md-text); line-height:1.3; }
-.kb-card-mat  { font-size:10px; font-family:monospace; color:var(--md-muted); margin-top:1px; }
-
-.kb-card-meta {
-  padding:0 14px 10px; display:flex; flex-direction:column; gap:4px;
-}
-.kb-card-meta-row {
-  display:flex; align-items:center; gap:5px;
-  font-size:11.5px; color:var(--md-muted);
-}
-.kb-card-meta-row i { font-size:11px; flex-shrink:0; }
-
-.kb-card-foot {
-  padding:7px 12px; border-top:1px solid var(--md-border);
-  display:flex; align-items:center; justify-content:space-between;
-  position:relative; z-index:2;
-}
-.kb-card-actions { display:flex; align-items:center; gap:5px; }
-
-.kb-empty {
-  text-align:center; padding:48px 20px; color:var(--md-muted);
-  font-style:italic; font-size:13px;
-}
-
-/* ── Badges ── */
-.badge-spec { background:rgba(15,67,88,.1); color:var(--md-700); border:1px solid rgba(15,67,88,.2); padding:2px 8px; border-radius:20px; font-size:10.5px; font-weight:600; white-space:nowrap; }
-.badge-actif   { background:rgba(26,109,140,.1); color:#1a6d8c; border:1px solid rgba(26,109,140,.25); padding:2px 8px; border-radius:20px; font-size:10.5px; font-weight:600; }
-.badge-inactif { background:rgba(0,0,0,.06); color:rgba(0,0,0,.45); border:1px solid rgba(0,0,0,.12); padding:2px 8px; border-radius:20px; font-size:10.5px; font-weight:600; }
-
-/* ── Couleurs avatar ── */
-.av-c1{background:#1a6d8c;} .av-c2{background:#071e28;} .av-c3{background:#1a6d8c;} .av-c4{background:#0f4358;} .av-c5{background:#1a6d8c;}
+  /* ── Kanban responsive : wrap sur petits écrans ── */
+  @media (max-width: 860px) {
+    .kb-board { flex-wrap: wrap; }
+    .kb-col   { flex-shrink: 1; width: calc(50% - 7px); }
+  }
+  @media (max-width: 500px) {
+    .kb-col { width: 100%; }
+  }
 </style>
 {% endblock %}
 
-
 {% block content %}
-<div class="md-head">
-  <div>
-    <div style="font-size:15px;font-weight:800;color:var(--md-900);">
-      <i class="bi bi-person-badge" style="color:var(--md-600);"></i> Médecins
-    </div>
-    <div style="font-size:11.5px;color:var(--md-muted);margin-top:1px;">
-      {{ stats.total }} médecin{% if stats.total > 1 %}s{% endif %} enregistré{% if stats.total > 1 %}s{% endif %}
+<!-- ══ SUBHEADER ══ -->
+<div class="o-subheader" id="subheader">
+
+  <!-- Ligne 1 : titre + recherche -->
+  <div class="o-subheader-row">
+    <span class="o-page-title">Médecins <span class="o-page-count">{{ stats.total }}</span></span>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+      <form method="get" action="{% url 'medecins_list' %}" id="filter-form" style="display:flex;align-items:center;">
+        <input type="hidden" name="vue" id="vue-input" value="{{ vue_active }}">
+        <div class="o-search-bar">
+          <input class="o-search-input" id="search-input" type="text" name="q" value="{{ q }}"
+            placeholder="Rechercher nom, prénom, matricule…">
+          <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
+        </div>
+      </form>
     </div>
   </div>
-  <div style="display:flex;align-items:center;gap:10px;">
-    <div class="view-toggle">
-      <button class="view-btn active" id="btn-table" onclick="setView('table')" title="Vue tableau">
-        <i class="bi bi-table"></i>
-      </button>
-      <button class="view-btn" id="btn-kanban" onclick="setView('kanban')" title="Vue Kanban">
-        <i class="bi bi-kanban-fill"></i>
-      </button>
-    </div>
-    <a href="{% url 'medecins_export_csv' %}?q={{ q }}&specialite={{ specialite_filtre }}&statut={{ statut_filtre }}"
-       class="btn-md-outline" title="Exporter en CSV" style="padding:7px 12px;">
-      <i class="bi bi-filetype-csv"></i>
-    </a>
-    <a href="{% url 'medecin_create' %}" class="btn-md">
+
+  <!-- Ligne 2 : créer + contrôles -->
+  <div class="o-subheader-row">
+    <a href="{% url 'medecin_create' %}" class="o-btn-create">
       <i class="bi bi-plus-lg"></i> Nouveau médecin
     </a>
-  </div>
-</div>
 
-<div class="md-stats">
-  <div class="md-stat">
-    <i class="bi bi-people-fill" style="font-size:18px;color:var(--md-400);"></i>
-    <div>
-      <div class="md-stat-val">{{ stats.total }}</div>
-      <div class="md-stat-lbl">Total</div>
-    </div>
-  </div>
-  <div class="md-stat">
-    <i class="bi bi-person-check-fill" style="font-size:18px;color:#1a6d8c;"></i>
-    <div>
-      <div class="md-stat-val" style="color:#1a6d8c;">{{ stats.actifs }}</div>
-      <div class="md-stat-lbl">Actifs</div>
-    </div>
-  </div>
-  <div class="md-stat">
-    <i class="bi bi-mortarboard-fill" style="font-size:18px;color:var(--md-500);"></i>
-    <div>
-      <div class="md-stat-val" style="color:var(--md-600);">{{ stats.specialites }}</div>
-      <div class="md-stat-lbl">Spécialités</div>
-    </div>
-  </div>
-</div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
 
-<form method="get" id="filter-form">
-  <div class="md-filters">
-    <input type="text" name="q" value="{{ q }}" placeholder="Rechercher nom, prénom, matricule…" class="md-search">
-    <select name="specialite">
-      <option value="">Toutes les spécialités</option>
-      {% for sp in specialites %}
-      <option value="{{ sp.pk }}" {% if specialite_filtre == sp.pk|stringformat:"s" %}selected{% endif %}>{{ sp.nom }}</option>
-      {% endfor %}
-    </select>
-    <select name="statut">
-      <option value="">Tous les statuts</option>
-      <option value="actif"   {% if statut_filtre == 'actif' %}selected{% endif %}>Actif</option>
-      <option value="inactif" {% if statut_filtre == 'inactif' %}selected{% endif %}>Inactif</option>
-    </select>
-    <input type="hidden" name="vue" id="vue-input" value="{{ vue_active }}">
-    <button type="submit" class="btn-md"><i class="bi bi-search"></i> Filtrer</button>
-    <a href="{% url 'medecins_list' %}" class="btn-md-outline">Réinitialiser</a>
+      <div class="o-ctrl-sep"></div>
+
+      <!-- Export CSV -->
+      <a href="{% url 'medecins_export_csv' %}?q={{ q }}"
+         class="o-ctrl-btn" title="Exporter en CSV">
+        <i class="bi bi-filetype-csv"></i>
+      </a>
+
+      <div class="o-ctrl-sep"></div>
+
+      <!-- Pagination inline -->
+      <div class="o-pagination-top">
+        <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
+        <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
+           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}&q={{ q }}&vue={{ vue_active }}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-left"></i>
+        </a>
+        <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
+           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}&q={{ q }}&vue={{ vue_active }}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-right"></i>
+        </a>
+      </div>
+
+      <div class="o-ctrl-sep"></div>
+
+      <!-- Vue toggle -->
+      <div class="view-toggle">
+        <button class="view-btn" id="btn-table" onclick="setView('table')" title="Vue tableau">
+          <i class="bi bi-table"></i>
+        </button>
+        <button class="view-btn" id="btn-kanban" onclick="setView('kanban')" title="Vue Kanban">
+          <i class="bi bi-kanban-fill"></i>
+        </button>
+      </div>
+
+    </div>
   </div>
-</form>
+
+</div>
 
 <!-- ══ VUE TABLEAU ══ -->
 <div id="view-table">
@@ -295,7 +137,7 @@ html[data-theme="dark"] .kb-col-head { background:#1a1a1a; }
           <td>
             <a href="{% url 'medecin_detail' med.pk %}" style="text-decoration:none;">
               <div style="font-weight:700;color:var(--md-700);font-size:13px;line-height:1.3;">Dr {{ med.nom }} {{ med.prenoms }}</div>
-              <div style="font-size:10.5px;color:var(--md-muted);font-family:monospace;">{{ med.matricule }}</div>
+              <div style="font-size:10.5px;color:var(--md-muted);font-family: var(--font-mono);">{{ med.matricule }}</div>
             </a>
           </td>
           <td>
@@ -304,7 +146,7 @@ html[data-theme="dark"] .kb-col-head { background:#1a1a1a; }
           </td>
           <td style="font-size:12px;white-space:nowrap;">{{ med.telephone|default:"—" }}</td>
           <td style="font-size:11.5px;color:var(--md-muted);">{{ med.email|default:"—" }}</td>
-          <td style="font-size:11.5px;font-family:monospace;color:var(--md-muted);">{{ med.ordre_medecin|default:"—" }}</td>
+          <td style="font-size:11.5px;font-family: var(--font-mono);color:var(--md-muted);">{{ med.ordre_medecin|default:"—" }}</td>
           <td style="text-align:center;">
             {% if med.actif %}<span class="badge-actif"><i class="bi bi-circle-fill" style="font-size:7px;"></i> Actif</span>
             {% else %}<span class="badge-inactif">Inactif</span>{% endif %}
@@ -429,17 +271,15 @@ html[data-theme="dark"] .kb-col-head { background:#1a1a1a; }
 
 <script>
 (function(){
-  /* ── Accents par colonne ── */
-  const ACCENT = ['#3b82f6','#10b981','#f59e0b','#8b5cf6','#ec4899','#14b8a6','#ef4444','#f97316'];
+  /* ── Accents par colonne kanban ── */
+  var ACCENT = ['#3b82f6','#10b981','#f59e0b','#8b5cf6','#ec4899','#14b8a6','#ef4444','#f97316'];
   document.querySelectorAll('.kb-col').forEach(function(col){
-    const i = parseInt(col.dataset.col, 10);
-    const c = ACCENT[i % ACCENT.length];
-    col.style.setProperty('--kb-accent', c);
+    var i = parseInt(col.dataset.col, 10);
+    col.style.setProperty('--kb-accent', ACCENT[i % ACCENT.length]);
   });
 
-  /* ── Toggle vue ── */
-  const VUE_KEY = 'medecins_vue';
-  const saved   = '{{ vue_active }}' || localStorage.getItem(VUE_KEY) || 'table';
+  /* ── Toggle vue (défaut : kanban) ── */
+  var saved = '{{ vue_active }}' || localStorage.getItem('medecins_vue') || 'kanban';
 
   function setView(v){
     document.getElementById('view-table').style.display  = v === 'table'  ? '' : 'none';
@@ -447,11 +287,87 @@ html[data-theme="dark"] .kb-col-head { background:#1a1a1a; }
     document.getElementById('btn-table').classList.toggle('active',  v === 'table');
     document.getElementById('btn-kanban').classList.toggle('active', v === 'kanban');
     document.getElementById('vue-input').value = v;
-    localStorage.setItem(VUE_KEY, v);
+    localStorage.setItem('medecins_vue', v);
   }
-
   window.setView = setView;
   setView(saved);
+
+  /* ── Effacer la recherche ── */
+  var form = document.getElementById('filter-form');
+
+  function clearQ(){
+    searchInput.value = '';
+    filterLive('');
+  }
+  window.clearQ = clearQ;
+
+  /* ── Recherche dynamique (sans rechargement) ── */
+  var searchInput = document.getElementById('search-input');
+
+  /* Bloquer toute soumission du formulaire */
+  form.addEventListener('submit', function(e) { e.preventDefault(); });
+
+  function filterLive(q) {
+    q = q.toLowerCase().trim();
+
+    /* Table : masquer les lignes qui ne correspondent pas */
+    document.querySelectorAll('#view-table .md-table tbody tr').forEach(function(row) {
+      if (row.children.length <= 1) return; /* ligne "aucun résultat" */
+      row.style.display = !q || row.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+
+    /* Kanban : masquer les cartes puis les colonnes vides */
+    document.querySelectorAll('.kb-card').forEach(function(card) {
+      card.style.display = !q || card.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+    document.querySelectorAll('.kb-col').forEach(function(col) {
+      var visible = col.querySelectorAll('.kb-card:not([style*="display: none"])').length;
+      col.style.display = visible > 0 ? '' : 'none';
+    });
+  }
+
+  searchInput.addEventListener('input', function() {
+    filterLive(this.value);
+  });
+})();
+</script>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+(function () {
+  /* Colle le subheader exactement sous la topbar.
+   * Mesure l'écart réel et ajuste le padding-top du body en style inline
+   * (priorité maximale, contourne toute variable CSS). */
+  function alignSousTopbar() {
+    var topbar = document.querySelector('.topbar');
+    var sh = document.getElementById('subheader');
+    if (!topbar || !sh) return;
+    var tbH = Math.ceil(topbar.getBoundingClientRect().height);
+    if (tbH <= 0) return;
+    /* Padding inline override */
+    document.body.style.paddingTop = tbH + 'px';
+    document.documentElement.style.setProperty('--header-h', tbH + 'px');
+    /* Si un petit écart subsiste après le reflow, on le ferme */
+    requestAnimationFrame(function () {
+      var gap = Math.round(sh.getBoundingClientRect().top - topbar.getBoundingClientRect().bottom);
+      if (gap > 0) {
+        document.body.style.paddingTop = (tbH - gap) + 'px';
+        document.documentElement.style.setProperty('--header-h', (tbH - gap) + 'px');
+      }
+    });
+  }
+
+  if (document.readyState !== 'loading') {
+    alignSousTopbar();
+  } else {
+    document.addEventListener('DOMContentLoaded', alignSousTopbar);
+  }
+  window.addEventListener('resize', function () {
+    document.body.style.paddingTop = '';
+    alignSousTopbar();
+  });
 })();
 </script>
 {% endblock %}

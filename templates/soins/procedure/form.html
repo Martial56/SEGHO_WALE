@@ -1,7 +1,6 @@
 {% extends 'soins/base.html' %}
 {% load static %}
 {% block breadcrumb %}{% endblock %}
-{% block module_navbar %}{% endblock %}
 
 {% block extra_css %}
 {{ block.super }}
@@ -18,7 +17,7 @@
 .prix-display {
   width: 100%; background: transparent;
   border: none; border-bottom: 1.5px solid #d1dde3; border-radius: 0;
-  padding: 7px 2px; font-size: 13px; font-family: 'Roboto', sans-serif;
+  padding: 7px 2px; font-size: 13px; font-family: var(--font-main);
   color: var(--accent); font-weight: 600; outline: none;
   cursor: default; opacity: .85;
 }
@@ -41,7 +40,7 @@ html[data-theme="dark"] .prix-display { border-bottom-color: rgba(255,255,255,.1
 .proc-step {
   display: flex; flex-direction: column; align-items: center; gap: 5px;
   background: none; border: none; padding: 0 2px;
-  font-family: 'Roboto', sans-serif; cursor: default; text-decoration: none;
+  font-family: var(--font-main); cursor: default; text-decoration: none;
   min-width: 64px;
 }
 button.proc-step { cursor: pointer; }
@@ -97,18 +96,7 @@ html[data-theme="dark"] .proc-annule-badge  { background: rgba(220,38,38,.15); b
 
 /* ── o-subheader fixe ── */
 .o-subheader {
-  position: fixed;
-  top: calc(var(--topbar-h, 62px) + 38px); /* topbar + o-nav ; affiné par JS */
-  left: 0;
-  right: 0;
-  z-index: 199;
   box-shadow: 0 2px 8px rgba(0,0,0,.06);
-}
-
-/* Fallback CSS immédiat : pousse le contenu sous topbar + o-nav + o-subheader
-   avant que le JS calcule la valeur exacte. Le JS écrase cette valeur en inline !important. */
-#page-wrap {
-  padding-top: calc(38px + 50px) !important; /* o-nav (38) + subheader (~50) */
 }
 
 /* ── Layout avec aside ── */
@@ -138,12 +126,10 @@ html[data-theme="dark"] .proc-annule-badge  { background: rgba(220,38,38,.15); b
 {% block content %}
 <div id="page-wrap" data-fixed-subheader="1">
 
-{% include 'soins/includes/nav.html' %}
-
 {% with current_statut=form.statut.value|default:'brouillon' %}
 
 <!-- ══ SUBHEADER ══ -->
-<div class="o-subheader" id="subheader">
+<div class="o-subheader" data-fixed="1" id="subheader">
   <div class="o-subheader-row">
     <a href="{% if is_new %}{% url 'soins:procedure_list' %}{% else %}{% url 'soins:procedure_detail' proc.pk %}{% endif %}"
       class="o-ctrl-btn" style="padding:3px 7px;">
@@ -313,7 +299,7 @@ html[data-theme="dark"] .proc-annule-badge  { background: rgba(220,38,38,.15); b
           <span class="art-field-label">Patient <span class="f-required">*</span></span>
         </div>
         <input type="hidden" name="patient" id="pat-hidden" value="{{ form.patient.value|default:'' }}">
-        <div class="svc-select" id="pat-select" style="z-index:200;">
+        <div class="svc-select" id="pat-select" style="z-index:185;">
           <div class="svc-display" id="pat-display" tabindex="0">
             {% if form.patient.value %}
               {% for p in form.patient.field.queryset %}{% if form.patient.value|stringformat:"s" == p.pk|stringformat:"s" %}<span>{{ p.nom }} {{ p.prenoms }}</span>{% endif %}{% endfor %}
@@ -361,7 +347,7 @@ html[data-theme="dark"] .proc-annule-badge  { background: rgba(220,38,38,.15); b
         {% if not is_new %}
         <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);width:100%;text-align:right;">
           <div class="art-date-label" style="margin-bottom:3px;">Numéro</div>
-          <span style="font-family:monospace;font-size:13px;color:var(--accent);font-weight:700;">{{ proc.numero }}</span>
+          <span style="font-family: var(--font-mono);font-size:13px;color:var(--accent);font-weight:700;">{{ proc.numero }}</span>
         </div>
         {% endif %}
       </div>
@@ -852,7 +838,7 @@ makeDrop({
     var wrap  = document.getElementById('page-wrap');
     var aside = document.querySelector('.proc-frm-aside');
     if (!tb || !onav || !sub || !wrap) return;
-    var navBottom = tb.offsetHeight + onav.offsetHeight;
+    var navBottom = tb.offsetHeight;
     sub.style.top = navBottom + 'px';
     var subH  = sub.getBoundingClientRect().height || sub.offsetHeight || 48;
     var bodyPT = parseInt(getComputedStyle(document.body).paddingTop) || 0;
