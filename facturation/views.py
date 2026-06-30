@@ -4,6 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Q, Sum
 from django.core.paginator import Paginator
 from django.urls import reverse
+from django.http import JsonResponse
 
 from .models import Facture, LigneFacture, Acte, Paiement
 from .forms import FactureForm
@@ -52,6 +53,33 @@ def facturation_list(request):
 
     paginator = Paginator(qs, 25)
     page_obj  = paginator.get_page(request.GET.get('page'))
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        rows = []
+        for f in page_obj.object_list:
+            rows.append({
+                'pk':           f.pk,
+                'numero':       f.numero,
+                'patient':      f'{f.patient.nom} {f.patient.prenoms}',
+                'type_display': f.get_type_facture_display(),
+                'date':         f.date_emission.strftime('%d/%m/%Y'),
+                'montant_total': float(f.montant_total),
+                'montant_paye':  float(f.montant_paye),
+                'solde_restant': float(f.solde_restant),
+                'statut':        f.statut,
+                'statut_display': f.get_statut_display(),
+                'url':           reverse('facturation:detail', args=[f.pk]),
+            })
+        return JsonResponse({
+            'rows':         rows,
+            'total':        total,
+            'has_previous': page_obj.has_previous(),
+            'has_next':     page_obj.has_next(),
+            'start_index':  page_obj.start_index() if page_obj.object_list else 0,
+            'end_index':    page_obj.end_index(),
+            'count':        page_obj.paginator.count,
+            'page':         page_obj.number,
+        })
 
     return render(request, 'facturation/list.html', {
         'page_obj':       page_obj,
@@ -223,6 +251,7 @@ def facture_create(request):
         'rdv':                  rdv_obj,
         'demande':              demande_obj,
         'ordonnance':           ordonnance_obj,
+        'hospitalisation':      hosp_obj,
         'initial_ligne_libelle': initial_ligne_libelle,
         'initial_lignes':       initial_lignes,
         'back_url':             back_url,

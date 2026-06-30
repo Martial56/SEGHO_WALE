@@ -1,41 +1,18 @@
 {% extends 'base.html' %}
-{% load i18n %}
+{% load i18n static %}
 {% block topbar_title %}Laboratoire{% endblock %}
 
 {% block extra_css %}
+<link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
 <style>
-  .content { padding-top: 0 !important; }
   .breadcrumb { display: none !important; }
+  .main    { height: calc(100vh - var(--header-h)); display: flex; flex-direction: column; min-width: 0; }
+  .content { flex: 1; min-height: 0; padding-top: 0 !important; overflow-x: clip; overflow-y: auto; }
 </style>
-<script>
-  (function () {
-    function syncTopbarH() {
-      var topbar = document.querySelector('.topbar');
-      if (topbar) {
-        document.documentElement.style.setProperty('--topbar-h', topbar.getBoundingClientRect().height + 'px');
-      }
-    }
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', syncTopbarH);
-    } else {
-      syncTopbarH();
-    }
-    window.addEventListener('resize', syncTopbarH);
-  })();
-</script>
 {% endblock %}
 
 {% block module_navbar %}
-<nav class="o-nav">
-  <a href="{% url 'dashboard' %}" class="o-nav-grid" title="Accueil">
-    <i class="bi bi-grid-3x3-gap-fill"></i>
-  </a>
-  <span class="o-nav-brand">
-    <i class="bi bi-eyedropper"></i>
-    Laboratoire
-  </span>
-  <a href="{% url 'laboratoire_list' %}" class="o-nav-link {% if request.resolver_match.url_name == 'laboratoire_list' or request.resolver_match.url_name == 'laboratoire_create' %}active{% endif %}">Analyses</a>
-</nav>
+{% include 'laboratoire/includes/nav.html' %}
 {% endblock %}
 
 {% block breadcrumb %}{% endblock %}

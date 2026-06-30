@@ -83,7 +83,7 @@
   .o-subheader {
     background: #fff; border-bottom: 1px solid var(--border);
     padding: 6px 16px; display: flex; flex-direction: column; gap: 4px;
-    position: sticky; top: calc(var(--topbar-h, 90px) + 38px); z-index: 190;
+    position: sticky; top: var(--header-h, 101px); z-index: 190;
   }
   .o-subheader-row { display: flex; align-items: center; gap: 8px; }
   .o-subheader-row-right { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -316,21 +316,20 @@
 
   <!-- Ligne 1 : titre | recherche -->
   <div class="o-subheader-row">
-    <span class="o-page-title">Factures <span>({{ total }})</span></span>
+    <span class="o-page-title">Factures <span id="page-count">({{ total }})</span></span>
     <div class="o-subheader-row-right">
-      <form method="get" id="search-form" style="display:flex;align-items:center;">
-        <input type="hidden" name="statut" id="fi-statut" value="{{ statut }}">
-        <input type="hidden" name="type_f" id="fi-type"   value="{{ type_f }}">
-        <div class="o-search-bar">
-          <input class="o-search-input" id="search-input" type="text" name="q"
-                 value="{{ q }}" placeholder="N° facture, patient…" autocomplete="off">
-          {% if q %}
-          <button type="button" class="o-search-btn" onclick="clearQ()" title="Effacer"><i class="bi bi-x"></i></button>
-          {% else %}
-          <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
-          {% endif %}
-        </div>
-      </form>
+      <div class="o-search-bar">
+        <input class="o-search-input" id="search-input" type="text"
+               value="{{ q }}" placeholder="N° facture, patient…" autocomplete="off">
+        <button type="button" class="o-search-btn" id="btn-clear" title="Effacer"
+                style="display:{% if q %}inline-flex{% else %}none{% endif %};">
+          <i class="bi bi-x"></i>
+        </button>
+        <span class="o-search-btn" id="btn-icon"
+              style="display:{% if q %}none{% else %}inline-flex{% endif %};pointer-events:none;">
+          <i class="bi bi-search"></i>
+        </span>
+      </div>
     </div>
   </div>
 
@@ -374,12 +373,12 @@
 
       <!-- Pagination -->
       <div class="o-pagination">
-        <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
+        <a id="pag-prev" class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
            href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if statut %}&statut={{ statut }}{% endif %}{% if type_f %}&type_f={{ type_f }}{% endif %}{% else %}#{% endif %}">
           <i class="bi bi-chevron-left"></i>
         </a>
-        <span>{{ page_obj.start_index }}–{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
-        <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
+        <span id="pag-info">{{ page_obj.start_index }}–{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
+        <a id="pag-next" class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
            href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if statut %}&statut={{ statut }}{% endif %}{% if type_f %}&type_f={{ type_f }}{% endif %}{% else %}#{% endif %}">
           <i class="bi bi-chevron-right"></i>
         </a>
@@ -388,9 +387,8 @@
   </div>
 
   <!-- Tags filtres actifs -->
-  {% if q or statut or type_f %}
-  <div class="o-filter-tags">
-    {% if q %}<span class="o-filter-tag">«&nbsp;{{ q }}&nbsp;» <a onclick="clearQ()">×</a></span>{% endif %}
+  {% if statut or type_f %}
+  <div class="o-filter-tags" id="filter-tags-row">
     {% if statut %}<span class="o-filter-tag">{% for s,l in statut_choices %}{% if s == statut %}{{ l }}{% endif %}{% endfor %} <a onclick="setFiltre('statut','')">×</a></span>{% endif %}
     {% if type_f %}<span class="o-filter-tag">{% for s,l in type_choices %}{% if s == type_f %}{{ l }}{% endif %}{% endfor %} <a onclick="setFiltre('type','')">×</a></span>{% endif %}
   </div>
@@ -400,7 +398,6 @@
 
 <!-- ══ Table ══ -->
 <div class="o-list-wrap">
-  {% if page_obj.object_list %}
   <table class="o-list">
     <thead>
       <tr>
@@ -414,7 +411,7 @@
         <th>Statut</th>
       </tr>
     </thead>
-    <tbody>
+    <tbody id="fac-tbody">
       {% for facture in page_obj %}
       <tr onclick="window.location='{% url 'facturation:detail' facture.pk %}'" style="cursor:pointer;">
         <td class="td-num">{{ facture.numero }}</td>
@@ -428,43 +425,55 @@
         </td>
         <td><span class="badge-statut badge-{{ facture.statut }}">{{ facture.get_statut_display }}</span></td>
       </tr>
+      {% empty %}
+      <tr><td colspan="8" style="text-align:center;padding:48px 20px;color:var(--text-muted);font-size:13px;">
+        {% if q or statut or type_f %}Aucune facture pour ces critères.
+        {% else %}Aucune facture — <a href="{% url 'facturation:create' %}" style="color:var(--teal-600);">créer la première</a>.{% endif %}
+      </td></tr>
       {% endfor %}
     </tbody>
   </table>
-
-  {% else %}
-  <div class="o-empty-state">
-    <div class="o-empty-illo"><i class="bi bi-receipt"></i></div>
-    <div class="o-empty-title">
-      Aucune facture{% if q %} pour «&nbsp;{{ q }}&nbsp;»{% endif %}
-    </div>
-    <div class="o-empty-sub">
-      {% if q or statut or type_f %}Modifiez les filtres ou la recherche.
-      {% else %}Commencez par créer la première facture.{% endif %}
-    </div>
-    {% if not q and not statut and not type_f %}
-    <a href="{% url 'facturation:create' %}" class="o-empty-btn">
-      <i class="bi bi-plus-lg"></i> NOUVELLE FACTURE
-    </a>
-    {% endif %}
-  </div>
-  {% endif %}
 </div>
 
 <script>
 (function () {
-  /* Recherche auto */
-  var input = document.getElementById('search-input');
-  var form  = document.getElementById('search-form');
-  var timer = null;
+  var input     = document.getElementById('search-input');
+  var btnClear  = document.getElementById('btn-clear');
+  var btnIcon   = document.getElementById('btn-icon');
+  var tbody     = document.getElementById('fac-tbody');
+  var pagInfo   = document.getElementById('pag-info');
+  var pagPrev   = document.getElementById('pag-prev');
+  var pagNext   = document.getElementById('pag-next');
+  var pageCount = document.getElementById('page-count');
+  var timer     = null;
+  var curStatut = '{{ statut|escapejs }}';
+  var curType   = '{{ type_f|escapejs }}';
+
+  /* ── Recherche (AJAX) ── */
   if (input) {
     input.addEventListener('input', function () {
+      setIcons(input.value);
       clearTimeout(timer);
-      timer = setTimeout(function () { form.submit(); }, 380);
+      timer = setTimeout(function () { doSearch(input.value.trim(), curStatut, curType, 1); }, 320);
+    });
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { input.value = ''; setIcons(''); doSearch('', curStatut, curType, 1); }
+    });
+  }
+  if (btnClear) {
+    btnClear.addEventListener('click', function () {
+      if (input) { input.value = ''; input.focus(); }
+      setIcons('');
+      doSearch('', curStatut, curType, 1);
     });
   }
 
-  /* Dropdowns */
+  function setIcons(val) {
+    if (btnClear) btnClear.style.display = val ? 'inline-flex' : 'none';
+    if (btnIcon)  btnIcon.style.display  = val ? 'none' : 'inline-flex';
+  }
+
+  /* ── Dropdowns ── */
   window.toggleDd = function (id) {
     var el = document.getElementById(id);
     if (!el) return;
@@ -473,29 +482,109 @@
     if (!open) el.classList.add('open');
   };
   document.addEventListener('click', function (e) {
-    if (!e.target.closest('.o-dd')) {
+    if (!e.target.closest('.o-dd'))
       document.querySelectorAll('.o-dd.open').forEach(function (d) { d.classList.remove('open'); });
-    }
   });
 
-  /* Filtres */
+  /* ── Filtres (rechargement — intentionnel) ── */
   window.setFiltre = function (key, val) {
     var url = new URL(window.location.href);
     url.searchParams.set('page', '1');
-    if (key === 'statut') {
-      val ? url.searchParams.set('statut', val) : url.searchParams.delete('statut');
-    } else if (key === 'type') {
-      val ? url.searchParams.set('type_f', val) : url.searchParams.delete('type_f');
-    }
+    if (key === 'statut') val ? url.searchParams.set('statut', val) : url.searchParams.delete('statut');
+    else if (key === 'type') val ? url.searchParams.set('type_f', val) : url.searchParams.delete('type_f');
     window.location.href = url.toString();
   };
 
+  /* ── Effacer recherche (AJAX) ── */
   window.clearQ = function () {
-    var url = new URL(window.location.href);
-    url.searchParams.delete('q');
-    url.searchParams.set('page', '1');
-    window.location.href = url.toString();
+    if (input) { input.value = ''; input.focus(); }
+    setIcons('');
+    doSearch('', curStatut, curType, 1);
   };
+
+  /* ── Fetch AJAX ── */
+  function buildParams(q, statut, type_f, page) {
+    var p = new URLSearchParams();
+    if (q)        p.set('q', q);
+    if (statut)   p.set('statut', statut);
+    if (type_f)   p.set('type_f', type_f);
+    if (page > 1) p.set('page', String(page));
+    return p;
+  }
+
+  function doSearch(q, statut, type_f, page) {
+    var params = buildParams(q, statut, type_f, page);
+    history.replaceState(null, '', params.toString() ? '?' + params : location.pathname);
+    if (tbody) tbody.style.opacity = '0.35';
+
+    fetch(location.pathname + (params.toString() ? '?' + params : ''), {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (d) { render(d, q, statut, type_f); })
+    .catch(function () { if (tbody) tbody.style.opacity = ''; });
+  }
+
+  function fmt(n) { return Math.round(n).toLocaleString('fr-FR') + ' F'; }
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                    .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  function render(data, q, statut, type_f) {
+    /* Tableau */
+    if (tbody) {
+      tbody.style.opacity = '';
+      if (!data.rows.length) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:48px 20px;'
+          + 'color:var(--text-muted);font-size:13px;">'
+          + (q ? 'Aucune facture pour « ' + esc(q) + ' »' : 'Aucune facture pour ces critères.')
+          + '</td></tr>';
+      } else {
+        var html = '';
+        data.rows.forEach(function (f) {
+          var sc = f.solde_restant > 0 ? '#e89a1a' : 'var(--text-muted)';
+          var fw = f.solde_restant > 0 ? '600' : '400';
+          html += '<tr onclick="window.location=\'' + f.url + '\'" style="cursor:pointer;">'
+            + '<td class="td-num">'     + esc(f.numero) + '</td>'
+            + '<td class="td-patient">' + esc(f.patient) + '</td>'
+            + '<td><span class="badge-type">' + esc(f.type_display) + '</span></td>'
+            + '<td style="color:var(--text-muted);white-space:nowrap;font-size:12px;">' + esc(f.date) + '</td>'
+            + '<td class="td-montant">' + fmt(f.montant_total) + '</td>'
+            + '<td class="td-montant" style="color:#16a96b;">' + fmt(f.montant_paye) + '</td>'
+            + '<td class="td-montant" style="color:' + sc + ';font-weight:' + fw + ';">' + fmt(f.solde_restant) + '</td>'
+            + '<td><span class="badge-statut badge-' + esc(f.statut) + '">' + esc(f.statut_display) + '</span></td>'
+            + '</tr>';
+        });
+        tbody.innerHTML = html;
+      }
+    }
+
+    /* Compteur */
+    if (pageCount) pageCount.textContent = '(' + data.total + ')';
+
+    /* Pagination info */
+    if (pagInfo) pagInfo.textContent = data.count
+      ? (data.start_index + '–' + data.end_index + ' / ' + data.count)
+      : '0 / 0';
+
+    /* Boutons pagination */
+    var base = buildParams(q, statut, type_f, 1);
+    if (pagPrev) {
+      if (data.has_previous) {
+        var pp = new URLSearchParams(base); pp.set('page', String(data.page - 1));
+        pagPrev.setAttribute('href', '?' + pp); pagPrev.classList.remove('disabled');
+      } else { pagPrev.setAttribute('href', '#'); pagPrev.classList.add('disabled'); }
+    }
+    if (pagNext) {
+      if (data.has_next) {
+        var pn = new URLSearchParams(base); pn.set('page', String(data.page + 1));
+        pagNext.setAttribute('href', '?' + pn); pagNext.classList.remove('disabled');
+      } else { pagNext.setAttribute('href', '#'); pagNext.classList.add('disabled'); }
+    }
+
+  }
 })();
 </script>
 {% endblock %}

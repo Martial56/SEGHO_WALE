@@ -3,389 +3,813 @@
 {% block topbar_title %}Nouvelle demande d'examen{% endblock %}
 
 {% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <style>
-/* ── Page wrapper ── */
-.dem-page { display: flex; flex-direction: column; gap: 0; }
+    /* ── Control panel ── */
+    .control-panel {
+        background: #fff;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+        position: sticky;
+        top: 0;
+        z-index: 490;
+        margin: 0 -32px;
+    }
 
-/* ── Top bar ── */
-.dem-topbar {
-    background: #fff;
-    border-bottom: 1px solid rgba(0,0,0,0.08);
-    position: sticky; top: 0; z-index: 100;
-}
-.dem-topbar-inner {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 10px 24px; gap: 12px; flex-wrap: wrap;
-}
-.dem-breadcrumb {
-    font-size: 13px; font-weight: 600; color: rgba(0,0,0,0.45);
-    display: flex; align-items: center; gap: 6px;
-}
-.dem-breadcrumb a { color: var(--teal-600); text-decoration: none; }
-.dem-breadcrumb a:hover { color: var(--teal-500); }
-.dem-breadcrumb .sep { color: #ccc; }
-.dem-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .cp-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 6px 16px;
+        gap: 12px;
+    }
 
-.btn-envoyer {
-    background: var(--teal-600); color: #fff;
-    border: none; border-radius: 6px; padding: 8px 18px;
-    font-size: 13px; font-weight: 700; cursor: pointer;
-    font-family: inherit; transition: background .15s; letter-spacing: .03em;
-}
-.btn-envoyer:hover { background: var(--teal-700); }
-.btn-brouillon {
-    background: #f0f4f8; color: rgba(0,0,0,0.6);
-    border: 1px solid rgba(0,0,0,0.12); border-radius: 6px; padding: 8px 16px;
-    font-size: 13px; font-weight: 600; cursor: pointer;
-    font-family: inherit; transition: all .15s;
-}
-.btn-brouillon:hover { border-color: var(--teal-400); color: var(--teal-700); }
-.btn-cancel {
-    background: transparent; color: rgba(0,0,0,0.5);
-    border: 1px solid rgba(0,0,0,0.13); border-radius: 6px; padding: 8px 14px;
-    font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
-    text-decoration: none; transition: all .15s;
-}
-.btn-cancel:hover { border-color: #e84545; color: #e84545; }
+    .cp-save-group {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
 
-/* ── Pipeline / status bar ── */
-.pipeline-bar {
-    background: #f8fbfd;
-    border-bottom: 1px solid rgba(0,0,0,0.07);
-    padding: 0 24px;
-    display: flex; align-items: stretch; gap: 0;
-    overflow-x: auto;
-}
-.pipeline-step {
-    display: flex; align-items: center; gap: 8px;
-    padding: 10px 20px 10px 14px;
-    font-size: 12px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: .04em; color: rgba(0,0,0,0.35);
-    position: relative; white-space: nowrap;
-    border-bottom: 3px solid transparent;
-    cursor: default; user-select: none;
-}
-.pipeline-step .step-num {
-    width: 20px; height: 20px; border-radius: 50%;
-    background: rgba(0,0,0,0.1); color: rgba(0,0,0,0.4);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 10px; font-weight: 800; flex-shrink: 0;
-}
-.pipeline-step.active {
-    color: var(--teal-700);
-    border-bottom-color: var(--teal-500);
-}
-.pipeline-step.active .step-num {
-    background: var(--teal-500); color: #fff;
-}
-.pipeline-step.done { color: rgba(0,0,0,0.4); }
-.pipeline-step.done .step-num {
-    background: #b8d4e8; color: var(--teal-700);
-}
-.pipeline-arrow {
-    align-self: center; color: rgba(0,0,0,0.2);
-    font-size: 16px; padding: 0 2px; flex-shrink: 0;
-}
+    .btn-save {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        background: var(--teal-500);
+        color: #fff;
+        border: none;
+        border-radius: var(--radius-xs, 4px);
+        padding: 6px 14px;
+        font-size: 12.5px;
+        font-weight: 600;
+        cursor: pointer;
+        font-family: inherit;
+        text-decoration: none;
+        transition: background 0.15s;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
 
-/* ── Main layout ── */
-.dem-body { background: #fff; padding: 24px 28px; }
+    .btn-save:hover {
+        background: var(--teal-600);
+        color: #fff;
+    }
 
-/* ── Patient zone ── */
-.patient-zone { margin-bottom: 24px; }
-.patient-search-wrap { max-width: 440px; }
-.psearch-label {
-    font-size: 11px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: .06em; color: rgba(0,0,0,0.4);
-    display: block; margin-bottom: 7px;
-}
-.psearch-input-wrap { position: relative; }
-.psearch-icon {
-    position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
-    color: rgba(0,0,0,0.35); pointer-events: none;
-}
-.psearch-input {
-    width: 100%; padding: 9px 12px 9px 36px;
-    border: 1.5px solid #d1dde3; border-radius: 8px;
-    font-size: 13px; font-family: inherit; outline: none;
-    color: var(--teal-900); transition: border-color .2s;
-}
-.psearch-input:focus { border-color: var(--teal-500); }
-.psearch-dropdown {
-    position: absolute; top: calc(100% + 4px); left: 0; right: 0;
-    background: #fff; border: 1px solid rgba(0,0,0,0.1);
-    border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-    z-index: 200; max-height: 220px; overflow-y: auto; display: none;
-}
-.psearch-item {
-    padding: 10px 14px; cursor: pointer;
-    border-bottom: 1px solid rgba(0,0,0,0.05); font-size: 13px;
-}
-.psearch-item:last-child { border-bottom: none; }
-.psearch-item:hover { background: #f0f5fa; }
-.psearch-item .pi-name { font-weight: 700; color: var(--teal-900); }
-.psearch-item .pi-meta { font-size: 11px; color: rgba(0,0,0,0.45); margin-top: 1px; }
+    .btn-discard {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        border: 1px solid var(--border, rgba(0, 0, 0, 0.15));
+        border-radius: 4px;
+        background: var(--surface, #fff);
+        color: var(--text-muted, rgba(0, 0, 0, 0.55));
+        padding: 5px 14px;
+        font-size: 12.5px;
+        font-weight: 500;
+        cursor: pointer;
+        font-family: inherit;
+        text-decoration: none;
+        transition: border-color 0.15s, color 0.15s, background 0.15s;
+        white-space: nowrap;
+    }
 
-.patient-card {
-    background: linear-gradient(135deg, #f0faff, #e8f5ff);
-    border: 1px solid rgba(33,136,171,0.2); border-radius: 12px;
-    padding: 16px 20px;
-    display: flex; align-items: center; gap: 14px;
-}
-.pat-avatar {
-    width: 48px; height: 48px; border-radius: 50%;
-    background: linear-gradient(135deg, var(--teal-600), var(--teal-400));
-    display: flex; align-items: center; justify-content: center;
-    font-size: 17px; font-weight: 800; color: #fff; flex-shrink: 0;
-    overflow: hidden;
-}
-.pat-avatar img { width: 100%; height: 100%; object-fit: cover; }
-.pat-info { flex: 1; }
-.pat-fullname { font-size: 15px; font-weight: 800; color: var(--teal-900); margin-bottom: 6px; }
-.pat-meta { display: flex; gap: 20px; flex-wrap: wrap; }
-.pat-meta-item { display: flex; flex-direction: column; gap: 1px; }
-.pat-meta-label { font-size: 10px; font-weight: 700; text-transform: uppercase;
-                  letter-spacing: .06em; color: rgba(0,0,0,0.35); }
-.pat-meta-value { font-size: 12px; font-weight: 600; color: var(--teal-900); }
-.pat-code { font-family: monospace; color: var(--teal-600); }
-.btn-change-pat {
-    background: none; border: 1px solid rgba(0,0,0,0.13); border-radius: 6px;
-    padding: 5px 11px; font-size: 11px; font-weight: 600; cursor: pointer;
-    color: rgba(0,0,0,0.45); font-family: inherit; flex-shrink: 0;
-    transition: all .15s;
-}
-.btn-change-pat:hover { border-color: var(--teal-400); color: var(--teal-600); }
+    .btn-discard:hover {
+        border-color: #aaa;
+        color: var(--text, rgba(0, 0, 0, 0.75));
+        background: rgba(0, 0, 0, .03);
+    }
 
-/* ── Two-column fields ── */
-.fields-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0 48px;
-    padding-bottom: 24px;
-    border-bottom: 1px solid rgba(0,0,0,0.07);
-    margin-bottom: 24px;
-}
-.field-col { display: flex; flex-direction: column; gap: 14px; }
-.field-row {
-    display: grid; grid-template-columns: 170px 1fr;
-    align-items: center; gap: 10px; min-height: 34px;
-}
-.field-row label {
-    font-size: 13px; font-weight: 600;
-    color: rgba(0,0,0,0.5); text-align: right;
-}
-.req { color: #e84545; margin-left: 2px; }
-.field-ul {
-    width: 100%; background: transparent;
-    border: none; border-bottom: 1.5px solid #d1dde3; border-radius: 0;
-    padding: 5px 2px; font-size: 13px; color: var(--teal-900);
-    transition: border-color .2s; outline: none; font-family: inherit;
-}
-.field-ul:focus { border-bottom-color: var(--teal-500); }
-.field-ul::placeholder { color: #bfcdd4; }
-select.field-ul {
-    appearance: none; -webkit-appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23839aaa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-    background-repeat: no-repeat; background-position: right 4px center;
-    padding-right: 20px; cursor: pointer; background-color: transparent;
-}
-textarea.field-ul {
-    resize: vertical; border: 1.5px solid #d1dde3;
-    border-radius: 6px; padding: 8px 10px; min-height: 68px;
-}
-textarea.field-ul:focus { border-color: var(--teal-500); }
+    /* ── Workflow row (action buttons + status bar) ── */
+    .cp-workflow-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 0 16px;
+        margin: 0;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+        gap: 12px;
+        flex-wrap: wrap;
+    }
 
-/* ── Urgent toggle ── */
-.toggle-wrap { display: flex; align-items: center; gap: 10px; }
-.tog { position: relative; width: 40px; height: 22px; flex-shrink: 0; }
-.tog input { opacity: 0; width: 0; height: 0; }
-.tog-slider {
-    position: absolute; cursor: pointer; inset: 0;
-    background: #d1dde3; border-radius: 22px; transition: .2s;
-}
-.tog-slider:before {
-    content: ""; position: absolute;
-    width: 16px; height: 16px; left: 3px; top: 3px;
-    background: #fff; border-radius: 50%; transition: .2s;
-}
-input:checked + .tog-slider { background: #e84545; }
-input:checked + .tog-slider:before { transform: translateX(18px); }
-.tog-lbl { font-size: 13px; font-weight: 600; color: rgba(0,0,0,0.5); }
+    .cp-actions {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
 
-/* ── Section title ── */
-.section-title {
-    font-size: 11px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: .08em; color: rgba(0,0,0,0.35);
-    margin-bottom: 12px; display: flex; align-items: center; gap: 10px;
-}
-.section-title::after {
-    content: ''; flex: 1; height: 1px;
-    background: linear-gradient(to right, rgba(0,0,0,0.1), transparent);
-}
+    /* ── Status bar (progress) ── */
+    .status-bar {
+        display: flex;
+        align-items: center;
+        gap: 0;
+        flex-shrink: 0;
+    }
 
-/* ── Combobox examen ── */
-.ex-combo { position: relative; width: 100%; }
-.ex-combo-inner { position: relative; display: flex; align-items: center; }
-.ex-input {
-    flex: 1; padding: 5px 22px 5px 2px;
-    border: none; border-bottom: 1.5px solid #d1dde3;
-    border-radius: 0; font-size: 12px; font-family: inherit;
-    background: transparent; outline: none; color: var(--teal-900);
-    transition: border-color .2s; width: 100%;
-}
-.ex-input:focus { border-bottom-color: var(--teal-500); }
-.ex-input::placeholder { color: #bfcdd4; }
-.ex-arrow {
-    position: absolute; right: 3px; top: 50%; transform: translateY(-50%);
-    pointer-events: none; color: #aaa; font-size: 10px; line-height: 1;
-}
-.ex-preloaded .ex-input { color: var(--teal-700); font-weight: 500; }
-.ex-dropdown {
-    display: none; position: fixed;
-    background: #fff; border: 1px solid #d1dde3;
-    border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,0.14);
-    max-height: 220px; overflow-y: auto;
-    z-index: 99999; font-size: 12px; font-family: inherit;
-    min-width: 260px;
-}
-.ex-opt { padding: 7px 12px; cursor: pointer; color: var(--teal-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ex-opt:hover, .ex-opt.focused { background: #daeaf5; color: var(--teal-700); }
-.ex-opt.is-selected { background: #f0f5fa; font-weight: 600; }
-.ex-empty { padding: 10px 12px; color: rgba(0,0,0,0.35); font-style: italic; }
+    .status-sep {
+        font-size: 15px;
+        color: rgba(0, 0, 0, 0.2);
+        padding: 0 1px;
+        line-height: 1;
+        font-weight: 400;
+        user-select: none;
+    }
 
-/* ── Tests table ── */
-.tests-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.tests-table thead th {
-    padding: 8px 10px; text-align: left;
-    font-size: 11px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: .05em; color: rgba(0,0,0,0.4);
-    border-bottom: 2px solid rgba(0,0,0,0.07);
-    background: #f8fbfd;
-}
-.tests-table tbody td { padding: 6px 7px; vertical-align: middle; }
-.tests-table tbody tr:hover td { background: #f8fbfd; }
-.tests-table input, .tests-table select {
-    width: 100%; padding: 5px 6px;
-    border: none; border-bottom: 1.5px solid #d1dde3; border-radius: 0;
-    font-size: 12px; font-family: inherit; background: transparent;
-    outline: none; color: var(--teal-900);
-}
-.tests-table input:focus, .tests-table select:focus { border-bottom-color: var(--teal-500); }
-.tests-table input[readonly] { color: rgba(0,0,0,0.4); border-bottom-color: transparent; cursor: default; }
-.col-test      { min-width: 220px; }
-.col-delai     { width: 120px; }
-.col-prix      { width: 110px; }
-.col-instr     { min-width: 180px; }
-.col-del       { width: 36px; text-align: center; }
-.btn-del {
-    background: none; border: none; cursor: pointer;
-    color: rgba(0,0,0,0.25); padding: 4px; border-radius: 4px;
-    font-size: 16px; transition: all .15s;
-}
-.btn-del:hover { color: #e84545; background: #fff0f0; }
-.btn-add-ligne {
-    display: inline-flex; align-items: center; gap: 6px;
-    margin-top: 10px; background: none; border: 1.5px dashed rgba(0,0,0,0.15);
-    border-radius: 8px; padding: 7px 16px; font-size: 13px; font-weight: 600;
-    color: var(--teal-600); cursor: pointer; font-family: inherit;
-    transition: all .15s;
-}
-.btn-add-ligne:hover { border-color: var(--teal-400); background: #f0faff; }
+    .status-step {
+        display: flex;
+        align-items: center;
+        padding: 5px 10px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: rgba(0, 0, 0, 0.28);
+        cursor: default;
+        white-space: nowrap;
+        border-radius: 3px;
+        transition: background 0.15s, color 0.15s;
+    }
 
-/* ── Total ── */
-.total-wrap {
-    display: flex; justify-content: flex-end; margin-top: 18px;
-    padding-top: 14px; border-top: 1px solid rgba(0,0,0,0.07);
-}
-.total-box {
-    display: flex; align-items: center; gap: 16px;
-}
-.total-label {
-    font-size: 13px; font-weight: 700; color: rgba(0,0,0,0.45);
-    text-transform: uppercase; letter-spacing: .06em;
-}
-.total-value {
-    font-size: 20px; font-weight: 800; color: var(--teal-700);
-    min-width: 130px; text-align: right;
-}
+    .status-step.done {
+        color: rgba(0, 0, 0, 0.5);
+    }
 
-@media (max-width: 860px) {
-    .fields-grid { grid-template-columns: 1fr; gap: 14px; }
-    .field-row { grid-template-columns: 130px 1fr; }
-    .pat-meta { gap: 12px; }
-}
-@media (max-width: 540px) {
-    .field-row { grid-template-columns: 1fr; }
-    .field-row label { text-align: left; }
-    .pipeline-step { padding: 10px 12px; font-size: 11px; }
-}
+    .status-step.active {
+        background: var(--teal-600);
+        color: #fff;
+    }
+
+    /* ── Form body ── */
+    .form-body {
+        background: #fff;
+        margin-top: 16px;
+        padding: 24px 28px 28px;
+        border-radius: 8px 8px 0 0;
+    }
+
+    /* ── Patient zone ── */
+    .patient-zone {
+        margin-bottom: 24px;
+        padding-top: 20px;
+    }
+
+    .patient-search-wrap {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        max-width: 500px;
+    }
+
+    .psearch-label {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .06em;
+        color: rgba(0, 0, 0, 0.4);
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+    .psearch-input-wrap {
+        position: relative;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .psearch-icon {
+        position: absolute;
+        left: 11px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: rgba(0, 0, 0, 0.35);
+        pointer-events: none;
+    }
+
+    .psearch-input {
+        width: 100%;
+        padding: 5px 4px 5px 28px;
+        border: none;
+        border-bottom: 1.5px solid #d1dde3;
+        border-radius: 0;
+        font-size: 13px;
+        font-family: inherit;
+        outline: none;
+        background: transparent;
+        color: var(--teal-900);
+        transition: border-color .2s;
+    }
+
+    .psearch-input:focus {
+        border-bottom-color: var(--teal-500);
+    }
+
+    .psearch-dropdown {
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        right: 0;
+        background: #fff;
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        border-radius: 8px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+        z-index: 200;
+        max-height: 220px;
+        overflow-y: auto;
+        display: none;
+    }
+
+    .psearch-item {
+        padding: 10px 14px;
+        cursor: pointer;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        font-size: 13px;
+    }
+
+    .psearch-item:last-child {
+        border-bottom: none;
+    }
+
+    .psearch-item:hover {
+        background: #f0f5fa;
+    }
+
+    .psearch-item .pi-name {
+        font-weight: 700;
+        color: var(--teal-900);
+    }
+
+    .psearch-item .pi-meta {
+        font-size: 11px;
+        color: rgba(0, 0, 0, 0.45);
+        margin-top: 1px;
+    }
+
+    .patient-card {
+        background: linear-gradient(135deg, #f0faff, #e8f5ff);
+        border: 1px solid rgba(33, 136, 171, 0.2);
+        border-radius: 12px;
+        padding: 16px 20px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+    }
+
+    .pat-avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--teal-600), var(--teal-400));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 17px;
+        font-weight: 800;
+        color: #fff;
+        flex-shrink: 0;
+        overflow: hidden;
+    }
+
+    .pat-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .pat-info {
+        flex: 1;
+    }
+
+    .pat-fullname {
+        font-size: 15px;
+        font-weight: 800;
+        color: var(--teal-900);
+        margin-bottom: 6px;
+    }
+
+    .pat-meta {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+    }
+
+    .pat-meta-item {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+    }
+
+    .pat-meta-label {
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .06em;
+        color: rgba(0, 0, 0, 0.35);
+    }
+
+    .pat-meta-value {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--teal-900);
+    }
+
+    .pat-code {
+        font-family: var(--font-mono);
+        color: var(--teal-600);
+    }
+
+    .btn-change-pat {
+        background: none;
+        border: 1px solid rgba(0, 0, 0, 0.13);
+        border-radius: 6px;
+        padding: 5px 11px;
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        color: rgba(0, 0, 0, 0.45);
+        font-family: inherit;
+        flex-shrink: 0;
+        transition: all .15s;
+    }
+
+    .btn-change-pat:hover {
+        border-color: var(--teal-400);
+        color: var(--teal-600);
+    }
+
+    /* ── Two-column fields ── */
+    .fields-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0 48px;
+        padding-bottom: 24px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.07);
+        margin-bottom: 24px;
+    }
+
+    .field-col {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+    }
+
+    .field-row {
+        display: grid;
+        grid-template-columns: 170px 1fr;
+        align-items: center;
+        gap: 10px;
+        min-height: 34px;
+    }
+
+    .field-row label {
+        font-size: 13px;
+        font-weight: 600;
+        color: rgba(0, 0, 0, 0.5);
+        text-align: right;
+    }
+
+    .req {
+        color: #e84545;
+        margin-left: 2px;
+    }
+
+    .field-ul {
+        width: 100%;
+        background: transparent;
+        border: none;
+        border-bottom: 1.5px solid #d1dde3;
+        border-radius: 0;
+        padding: 5px 2px;
+        font-size: 13px;
+        color: var(--teal-900);
+        transition: border-color .2s;
+        outline: none;
+        font-family: inherit;
+    }
+
+    .field-ul:focus {
+        border-bottom-color: var(--teal-500);
+    }
+
+    .field-ul::placeholder {
+        color: #bfcdd4;
+    }
+
+    select.field-ul {
+        appearance: none;
+        -webkit-appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23839aaa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 4px center;
+        padding-right: 20px;
+        cursor: pointer;
+        background-color: transparent;
+    }
+
+    textarea.field-ul {
+        resize: vertical;
+        border: 1.5px solid #d1dde3;
+        border-radius: 6px;
+        padding: 8px 10px;
+        min-height: 68px;
+    }
+
+    textarea.field-ul:focus {
+        border-color: var(--teal-500);
+    }
+
+    /* ── Urgent toggle ── */
+    .toggle-wrap {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .tog {
+        position: relative;
+        width: 40px;
+        height: 22px;
+        flex-shrink: 0;
+    }
+
+    .tog input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .tog-slider {
+        position: absolute;
+        cursor: pointer;
+        inset: 0;
+        background: #d1dde3;
+        border-radius: 22px;
+        transition: .2s;
+    }
+
+    .tog-slider:before {
+        content: "";
+        position: absolute;
+        width: 16px;
+        height: 16px;
+        left: 3px;
+        top: 3px;
+        background: #fff;
+        border-radius: 50%;
+        transition: .2s;
+    }
+
+    input:checked+.tog-slider {
+        background: #e84545;
+    }
+
+    input:checked+.tog-slider:before {
+        transform: translateX(18px);
+    }
+
+    .tog-lbl {
+        font-size: 13px;
+        font-weight: 600;
+        color: rgba(0, 0, 0, 0.5);
+    }
+
+    /* ── Section title ── */
+    .section-title {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .08em;
+        color: rgba(0, 0, 0, 0.35);
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .section-title::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: linear-gradient(to right, rgba(0, 0, 0, 0.1), transparent);
+    }
+
+    /* ── Combobox examen ── */
+    .ex-combo {
+        position: relative;
+        width: 100%;
+    }
+
+    .ex-combo-inner {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+
+    .ex-input {
+        flex: 1;
+        padding: 5px 22px 5px 2px;
+        border: none;
+        border-bottom: 1.5px solid #d1dde3;
+        border-radius: 0;
+        font-size: 12px;
+        font-family: inherit;
+        background: transparent;
+        outline: none;
+        color: var(--teal-900);
+        transition: border-color .2s;
+        width: 100%;
+    }
+
+    .ex-input:focus {
+        border-bottom-color: var(--teal-500);
+    }
+
+    .ex-input::placeholder {
+        color: #bfcdd4;
+    }
+
+    .ex-arrow {
+        position: absolute;
+        right: 3px;
+        top: 50%;
+        transform: translateY(-50%);
+        pointer-events: none;
+        color: #aaa;
+        font-size: 10px;
+        line-height: 1;
+    }
+
+    .ex-preloaded .ex-input {
+        color: var(--teal-700);
+        font-weight: 500;
+    }
+
+    .ex-dropdown {
+        display: none;
+        position: fixed;
+        background: #fff;
+        border: 1px solid #d1dde3;
+        border-radius: 6px;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14);
+        max-height: 220px;
+        overflow-y: auto;
+        z-index: 99999;
+        font-size: 12px;
+        font-family: inherit;
+        min-width: 260px;
+    }
+
+    .ex-opt {
+        padding: 7px 12px;
+        cursor: pointer;
+        color: var(--teal-900);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .ex-opt:hover,
+    .ex-opt.focused {
+        background: #daeaf5;
+        color: var(--teal-700);
+    }
+
+    .ex-opt.is-selected {
+        background: #f0f5fa;
+        font-weight: 600;
+    }
+
+    .ex-empty {
+        padding: 10px 12px;
+        color: rgba(0, 0, 0, 0.35);
+        font-style: italic;
+    }
+
+    /* ── Tests table ── */
+    .tests-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+    }
+
+    .tests-table thead th {
+        padding: 8px 10px;
+        text-align: left;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .05em;
+        color: rgba(0, 0, 0, 0.4);
+        border-bottom: 2px solid rgba(0, 0, 0, 0.07);
+        background: #f8fbfd;
+    }
+
+    .tests-table tbody td {
+        padding: 6px 7px;
+        vertical-align: middle;
+    }
+
+    .tests-table tbody tr:hover td {
+        background: #f8fbfd;
+    }
+
+    .tests-table input,
+    .tests-table select {
+        width: 100%;
+        padding: 5px 6px;
+        border: none;
+        border-bottom: 1.5px solid #d1dde3;
+        border-radius: 0;
+        font-size: 12px;
+        font-family: inherit;
+        background: transparent;
+        outline: none;
+        color: var(--teal-900);
+    }
+
+    .tests-table input:focus,
+    .tests-table select:focus {
+        border-bottom-color: var(--teal-500);
+    }
+
+    .tests-table input[readonly] {
+        color: rgba(0, 0, 0, 0.4);
+        border-bottom-color: transparent;
+        cursor: default;
+    }
+
+    .col-test {
+        min-width: 220px;
+    }
+
+    .col-delai {
+        width: 120px;
+    }
+
+    .col-prix {
+        width: 110px;
+    }
+
+    .col-instr {
+        min-width: 180px;
+    }
+
+    .col-del {
+        width: 36px;
+        text-align: center;
+    }
+
+    .btn-del {
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: rgba(0, 0, 0, 0.25);
+        padding: 4px;
+        border-radius: 4px;
+        font-size: 16px;
+        transition: all .15s;
+    }
+
+    .btn-del:hover {
+        color: #e84545;
+        background: #fff0f0;
+    }
+
+    .btn-add-ligne {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 10px;
+        background: none;
+        border: 1.5px dashed rgba(0, 0, 0, 0.15);
+        border-radius: 8px;
+        padding: 7px 16px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--teal-600);
+        cursor: pointer;
+        font-family: inherit;
+        transition: all .15s;
+    }
+
+    .btn-add-ligne:hover {
+        border-color: var(--teal-400);
+        background: #f0faff;
+    }
+
+    /* ── Total ── */
+    .total-wrap {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 18px;
+        padding-top: 14px;
+        border-top: 1px solid rgba(0, 0, 0, 0.07);
+    }
+
+    .total-box {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .total-label {
+        font-size: 13px;
+        font-weight: 700;
+        color: rgba(0, 0, 0, 0.45);
+        text-transform: uppercase;
+        letter-spacing: .06em;
+    }
+
+    .total-value {
+        font-size: 20px;
+        font-weight: 800;
+        color: var(--teal-700);
+        min-width: 130px;
+        text-align: right;
+    }
+
+    @media (max-width: 860px) {
+        .fields-grid {
+            grid-template-columns: 1fr;
+            gap: 14px;
+        }
+
+        .field-row {
+            grid-template-columns: 130px 1fr;
+        }
+
+        .pat-meta {
+            gap: 12px;
+        }
+    }
+
+    @media (max-width: 540px) {
+        .field-row {
+            grid-template-columns: 1fr;
+        }
+
+        .field-row label {
+            text-align: left;
+        }
+
+        .cp-top {
+            flex-wrap: wrap;
+        }
+
+        .status-bar {
+            flex-wrap: wrap;
+        }
+    }
+
+    .content {
+        padding-top: 0 !important;
+        overflow-x: hidden;
+    }
 </style>
 {% endblock %}
 
-{% block breadcrumb %}
-<nav class="breadcrumb">
-    <a href="{% url 'dashboard' %}">
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24"
-             stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px">
-            <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z"/>
-            <polyline points="9 21 9 12 15 12 15 21"/>
-        </svg>Accueil
-    </a>
-    <span class="breadcrumb-sep">›</span>
-    <a href="{% url 'laboratoire_list' %}">Laboratoire</a>
-    <span class="breadcrumb-sep">›</span>
-    <span>Nouvelle demande d'examen</span>
-</nav>
-{% endblock %}
+{% block breadcrumb %}{% endblock %}
 
 {% block content %}
 <form method="post" id="dem-form" novalidate>
-{% csrf_token %}
-<input type="hidden" name="patient_id" id="patient-id-input" value="{{ patient.pk|default:'' }}">
+    {% csrf_token %}
+    <input type="hidden" name="patient_id" id="patient-id-input" value="{{ patient.pk|default:'' }}">
 
-<div class="dem-page">
-
-    <!-- ══ TOP BAR ══ -->
-    <div class="dem-topbar">
-        <div class="dem-topbar-inner">
-            <div class="dem-breadcrumb">
-                <a href="{% url 'laboratoire_list' %}">Demandes de lab</a>
-                <span class="sep">/</span>
-                <span>Nouveau</span>
-            </div>
-            <div class="dem-actions">
-                <button type="submit" name="action" value="brouillon" class="btn-envoyer">
-                    Sauvegarder la demande
-                </button>
-                <a href="{% url 'laboratoire_list' %}" class="btn-cancel">Ignorer</a>
-            </div>
-        </div>
-
-        <!-- Pipeline -->
-        <div class="pipeline-bar">
-            <div class="pipeline-step active">
-                <span class="step-num">1</span> Brouillon
-            </div>
-            <span class="pipeline-arrow">›</span>
-            <div class="pipeline-step">
-                <span class="step-num">2</span> Demandé
-            </div>
-            <span class="pipeline-arrow">›</span>
-            <div class="pipeline-step">
-                <span class="step-num">3</span> Accepté
-            </div>
-            <span class="pipeline-arrow">›</span>
-            <div class="pipeline-step">
-                <span class="step-num">4</span> En cours
-            </div>
-            <span class="pipeline-arrow">›</span>
-            <div class="pipeline-step">
-                <span class="step-num">5</span> Terminé
+    <!-- ══ PANNEAU DE CONTRÔLE ══ -->
+    <div class="control-panel">
+        <div class="cp-top">
+            <a href="{% url 'laboratoire_list' %}" class="o-ctrl-btn" style="padding:3px 7px;"
+                title="Retour aux analyses">
+                <i class="bi bi-arrow-left"></i>
+            </a>
+            <span style="font-size:13.5px;color:var(--text-muted);">
+                <a href="{% url 'laboratoire_list' %}"
+                    style="color:var(--teal-600);text-decoration:none;font-weight:500;">Laboratoire</a>
+                <span style="margin:0 5px;opacity:.4;">/</span>
+                <span style="color:var(--text);">Nouvelle demande</span>
+            </span>
+            <div style="flex:1;"></div>
+            <div class="cp-save-group">
+                <button type="submit" name="action" value="brouillon" class="btn-save">Sauvegarder la demande</button>
+                <a href="{% url 'laboratoire_list' %}" class="btn-discard">Ignorer</a>
             </div>
         </div>
     </div>
 
-    <!-- ══ BODY ══ -->
-    <div class="dem-body">
+    <!-- ══ CORPS DU FORMULAIRE ══ -->
+    <div class="form-body">
+
+        <div class="cp-workflow-row">
+            <div class="cp-actions"></div>
+            <div class="status-bar" id="status-bar">
+                <div class="status-step active" data-step="brouillon">Brouillon</div>
+                <span class="status-sep">›</span>
+                <div class="status-step" data-step="demande">Demandé</div>
+                <span class="status-sep">›</span>
+                <div class="status-step" data-step="accepte">Accepté</div>
+                <span class="status-sep">›</span>
+                <div class="status-step" data-step="en_cours">En cours</div>
+                <span class="status-sep">›</span>
+                <div class="status-step" data-step="termine">Terminé</div>
+            </div>
+        </div>
 
         <!-- ── Patient ── -->
         <div class="patient-zone">
@@ -394,24 +818,25 @@ input:checked + .tog-slider:before { transform: translateX(18px); }
             <div class="patient-search-wrap" id="search-wrap">
                 <span class="psearch-label">Patient <span class="req">*</span></span>
                 <div class="psearch-input-wrap">
-                    <svg class="psearch-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14"
-                         fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    <svg class="psearch-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8" />
+                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
                     </svg>
                     <input type="text" id="patient-search" class="psearch-input"
-                           placeholder="Chercher par nom, code patient ou téléphone…" autocomplete="off">
+                        placeholder="Chercher par nom, code patient ou téléphone…" autocomplete="off">
                     <div class="psearch-dropdown" id="patient-dropdown"></div>
                 </div>
             </div>
             {% endif %}
 
-            <div id="patient-card-zone" {% if not patient %}style="display:none;margin-top:12px"{% endif %}>
+            <div id="patient-card-zone" {% if not patient %}style="display:none;margin-top:12px" {% endif %}>
                 <div class="patient-card">
                     <div class="pat-avatar" id="pat-avatar">
                         {% if patient %}
-                            {% if patient.photo %}<img src="{{ patient.photo.url }}" alt="">
-                            {% else %}{{ patient.nom|slice:":1"|upper }}{{ patient.prenoms|slice:":1"|upper }}
-                            {% endif %}
+                        {% if patient.photo %}<img src="{{ patient.photo.url }}" alt="">
+                        {% else %}{{ patient.nom|slice:":1"|upper }}{{ patient.prenoms|slice:":1"|upper }}
+                        {% endif %}
                         {% endif %}
                     </div>
                     <div class="pat-info">
@@ -493,7 +918,7 @@ input:checked + .tog-slider:before { transform: translateX(18px); }
                 <div class="field-row" style="align-items:flex-start;padding-top:4px;">
                     <label for="id_commentaire">Instructions / Notes</label>
                     <textarea name="commentaire" id="id_commentaire" class="field-ul"
-                              placeholder="Contexte clinique, précautions particulières…"></textarea>
+                        placeholder="Contexte clinique, précautions particulières…"></textarea>
                 </div>
 
             </div>
@@ -519,8 +944,8 @@ input:checked + .tog-slider:before { transform: translateX(18px); }
                         <td class="col-test">
                             <div class="ex-combo" data-idx="0">
                                 <div class="ex-combo-inner">
-                                    <input type="text" class="ex-input"
-                                           placeholder="Chercher un examen…" autocomplete="off">
+                                    <input type="text" class="ex-input" placeholder="Chercher un examen…"
+                                        autocomplete="off">
                                     <span class="ex-arrow">▼</span>
                                 </div>
                                 <input type="hidden" name="ligne_examen_0" class="ex-hidden">
@@ -531,8 +956,8 @@ input:checked + .tog-slider:before { transform: translateX(18px); }
                             <input type="text" name="ligne_delai_0" id="delai-0" placeholder="—">
                         </td>
                         <td class="col-prix">
-                            <input type="number" name="ligne_prix_0" id="prix-0"
-                                   min="0" step="1" value="0" oninput="recalcTotal()">
+                            <input type="number" name="ligne_prix_0" id="prix-0" min="0" step="1" value="0"
+                                oninput="recalcTotal()">
                         </td>
                         <td class="col-instr">
                             <input type="text" name="ligne_instructions_0" placeholder="Précisions…">
@@ -547,8 +972,9 @@ input:checked + .tog-slider:before { transform: translateX(18px); }
 
         <button type="button" class="btn-add-ligne" onclick="addLigne()">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24"
-                 stroke="currentColor" stroke-width="2.5">
-                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                stroke="currentColor" stroke-width="2.5">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
             Ajouter une ligne
         </button>
@@ -561,20 +987,20 @@ input:checked + .tog-slider:before { transform: translateX(18px); }
             </div>
         </div>
 
-    </div><!-- /.dem-body -->
-</div><!-- /.dem-page -->
+    </div><!-- /.form-body -->
+
 </form>
 
 <script>
-// @ts-nocheck
-(function () {
-    var lineCount = 1;
+    // @ts-nocheck
+    (function () {
+        var lineCount = 1;
 
-    /* ── Données examens (services catégorie EX) ── */
-    var _EXAMENS = [
-        {% for svc in services_examens %}
+        /* ── Données examens (services catégorie EX) ── */
+        var _EXAMENS = [
+            {% for svc in services_examens %}
         { nom: "{{ svc.nom|escapejs }}", prix: {{ svc.prix_vente }} },
-        {% endfor %}
+    {% endfor %}
     ];
 
     /* ── Recalc total ── */
@@ -589,15 +1015,15 @@ input:checked + .tog-slider:before { transform: translateX(18px); }
 
     /* ── Combobox : attacher comportement sur un .ex-combo ── */
     window.buildExCombo = function (wrapper) {
-        var idx      = parseInt(wrapper.dataset.idx, 10);
-        var input    = wrapper.querySelector('.ex-input');
-        var hidden   = wrapper.querySelector('.ex-hidden');
+        var idx = parseInt(wrapper.dataset.idx, 10);
+        var input = wrapper.querySelector('.ex-input');
+        var hidden = wrapper.querySelector('.ex-hidden');
         var dropdown = wrapper.querySelector('.ex-dropdown');
 
         function positionDropdown() {
             var rect = input.getBoundingClientRect();
-            dropdown.style.top   = rect.bottom + 'px';
-            dropdown.style.left  = rect.left   + 'px';
+            dropdown.style.top = rect.bottom + 'px';
+            dropdown.style.left = rect.left + 'px';
             dropdown.style.width = Math.max(rect.width, 260) + 'px';
         }
 
@@ -606,7 +1032,7 @@ input:checked + .tog-slider:before { transform: translateX(18px); }
             var list = (q && q !== current)
                 ? _EXAMENS.filter(function (s) {
                     return s.nom.toLowerCase().indexOf(q.toLowerCase()) !== -1;
-                  })
+                })
                 : _EXAMENS;
             if (!list.length) {
                 dropdown.innerHTML = '<div class="ex-empty">Aucun résultat pour "' + q + '"</div>';
@@ -614,8 +1040,8 @@ input:checked + .tog-slider:before { transform: translateX(18px); }
                 dropdown.innerHTML = list.map(function (s) {
                     var sel = s.nom === current ? ' is-selected' : '';
                     return '<div class="ex-opt' + sel + '" data-nom="' +
-                           s.nom.replace(/"/g, '&quot;') + '" data-prix="' + s.prix + '">' +
-                           s.nom + '</div>';
+                        s.nom.replace(/"/g, '&quot;') + '" data-prix="' + s.prix + '">' +
+                        s.nom + '</div>';
                 }).join('');
             }
             positionDropdown();
@@ -624,7 +1050,7 @@ input:checked + .tog-slider:before { transform: translateX(18px); }
 
         function selectExamen(nom, prix) {
             hidden.value = nom;
-            input.value  = nom;
+            input.value = nom;
             wrapper.classList.add('ex-preloaded');
             var prixInput = document.querySelector('[name="ligne_prix_' + idx + '"]');
             if (prixInput) { prixInput.value = prix; recalcTotal(); }
@@ -659,24 +1085,24 @@ input:checked + .tog-slider:before { transform: translateX(18px); }
 
     /* ── Ajouter ligne ── */
     window.addLigne = function () {
-        var idx  = lineCount++;
+        var idx = lineCount++;
         var body = document.getElementById('tests-body');
-        var tr   = document.createElement('tr');
+        var tr = document.createElement('tr');
         tr.className = 'test-row';
         tr.innerHTML =
             '<td class="col-test">' +
-              '<div class="ex-combo" data-idx="' + idx + '">' +
-                '<div class="ex-combo-inner">' +
-                  '<input type="text" class="ex-input" placeholder="Chercher un examen…" autocomplete="off">' +
-                  '<span class="ex-arrow">▼</span>' +
-                '</div>' +
-                '<input type="hidden" name="ligne_examen_' + idx + '" class="ex-hidden">' +
-                '<div class="ex-dropdown"></div>' +
-              '</div>' +
+            '<div class="ex-combo" data-idx="' + idx + '">' +
+            '<div class="ex-combo-inner">' +
+            '<input type="text" class="ex-input" placeholder="Chercher un examen…" autocomplete="off">' +
+            '<span class="ex-arrow">▼</span>' +
+            '</div>' +
+            '<input type="hidden" name="ligne_examen_' + idx + '" class="ex-hidden">' +
+            '<div class="ex-dropdown"></div>' +
+            '</div>' +
             '</td>' +
             '<td class="col-delai"><input type="text" name="ligne_delai_' + idx + '" id="delai-' + idx + '" placeholder="—"></td>' +
             '<td class="col-prix"><input type="number" name="ligne_prix_' + idx + '" id="prix-' + idx +
-                '" min="0" step="1" value="0" oninput="recalcTotal()"></td>' +
+            '" min="0" step="1" value="0" oninput="recalcTotal()"></td>' +
             '<td class="col-instr"><input type="text" name="ligne_instructions_' + idx + '" placeholder="Précisions…"></td>' +
             '<td class="col-del"><button type="button" class="btn-del" onclick="removeLigne(this)">×</button></td>';
         body.appendChild(tr);
@@ -708,9 +1134,9 @@ input:checked + .tog-slider:before { transform: translateX(18px); }
 
     /* ── Recherche patient ── */
     var searchInput = document.getElementById('patient-search');
-    var dropdown    = document.getElementById('patient-dropdown');
-    var patIdInput  = document.getElementById('patient-id-input');
-    var cardZone    = document.getElementById('patient-card-zone');
+    var dropdown = document.getElementById('patient-dropdown');
+    var patIdInput = document.getElementById('patient-id-input');
+    var cardZone = document.getElementById('patient-card-zone');
 
     if (searchInput) {
         var timer;
@@ -752,20 +1178,17 @@ input:checked + .tog-slider:before { transform: translateX(18px); }
         document.getElementById('pat-fullname').textContent = p.nom_complet;
         document.getElementById('pat-code').textContent = p.code;
         document.getElementById('pat-tel').textContent = p.telephone || '—';
+        var ageEl = document.getElementById('pat-age');
+        var sexeEl = document.getElementById('pat-sexe');
+        if (ageEl) ageEl.textContent = p.age !== undefined ? p.age + ' ans' : '—';
+        if (sexeEl) sexeEl.textContent = p.sexe_display || '—';
         var initials = p.nom_complet.split(' ').map(function (w) { return w[0] || ''; }).slice(0, 2).join('').toUpperCase();
         var av = document.getElementById('pat-avatar');
         av.innerHTML = '';
         av.textContent = initials;
 
-        fetch('/patients/' + p.id + '/info/')
-            .then(function (r) { return r.json(); })
-            .then(function (d) {
-                var ageEl = document.getElementById('pat-age');
-                var sexeEl = document.getElementById('pat-sexe');
-                if (ageEl && d.age !== undefined) ageEl.textContent = d.age + ' ans';
-                if (sexeEl && d.sexe !== undefined) sexeEl.textContent = d.sexe;
-            }).catch(function () {});
-
+        var searchWrap = document.getElementById('search-wrap');
+        if (searchWrap) searchWrap.style.display = 'none';
         cardZone.style.display = '';
         if (searchInput) searchInput.value = '';
         dropdown.style.display = 'none';
@@ -774,6 +1197,8 @@ input:checked + .tog-slider:before { transform: translateX(18px); }
     window.resetPatient = function () {
         patIdInput.value = '';
         cardZone.style.display = 'none';
+        var searchWrap = document.getElementById('search-wrap');
+        if (searchWrap) searchWrap.style.display = '';
         if (searchInput) { searchInput.value = ''; searchInput.focus(); }
     };
 
@@ -795,7 +1220,7 @@ input:checked + .tog-slider:before { transform: translateX(18px); }
         }
     });
 
-})();
+}) ();
 </script>
 
 {% endblock %}

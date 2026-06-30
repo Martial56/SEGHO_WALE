@@ -6,7 +6,7 @@ class FactureForm(forms.ModelForm):
     class Meta:
         model = Facture
         fields = ['type_facture', 'date_echeance', 'montant_assurance',
-                  'ticket_moderateur', 'notes', 'statut']
+                  'ticket_moderateur', 'notes']
         widgets = {
             'date_echeance': forms.DateInput(
                 attrs={'type': 'date'},
@@ -24,5 +24,4 @@ class FactureForm(forms.ModelForm):
         if 'type_facture' in self.fields:
             self.fields['type_facture'].widget.attrs['autocomplete'] = 'off'
         if not is_admin:
-            self.fields.pop('statut', None)
             self.fields.pop('type_facture', None)

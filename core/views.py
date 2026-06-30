@@ -474,7 +474,12 @@ def laboratoire_list(request):
     from laboratoire.models import DemandeExamen
     from django.core.paginator import Paginator
 
-    q = request.GET.get('q', '').strip()
+    q      = request.GET.get('q', '').strip()
+    statut = request.GET.get('statut', '')
+
+    statut_choices = DemandeExamen.STATUT
+    statut_label   = dict(statut_choices).get(statut, statut)
+
     demandes = DemandeExamen.objects.select_related(
         'patient', 'technicien', 'facture'
     ).prefetch_related('lignes').order_by('-date_creation')
@@ -488,55 +493,31 @@ def laboratoire_list(request):
             Q(lignes__libelle__icontains=q)
         ).distinct()
 
+    if statut:
+        demandes = demandes.filter(statut=statut)
+
     now = timezone.now()
     stats = {
         'en_attente': DemandeExamen.objects.filter(statut__in=['brouillon', 'demande']).count(),
-        'en_cours': DemandeExamen.objects.filter(statut__in=['accepte', 'en_cours']).count(),
-        'terminees': DemandeExamen.objects.filter(statut='termine').count(),
-        'ce_mois': DemandeExamen.objects.filter(date_creation__month=now.month, date_creation__year=now.year).count(),
+        'en_cours':   DemandeExamen.objects.filter(statut__in=['accepte', 'en_cours']).count(),
+        'terminees':  DemandeExamen.objects.filter(statut='termine').count(),
+        'ce_mois':    DemandeExamen.objects.filter(date_creation__month=now.month, date_creation__year=now.year).count(),
     }
-    paginator = Paginator(demandes, 25)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
 
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        rows = []
-        for d in page_obj:
-            lignes_all = list(d.lignes.all())
-            rows.append({
-                'pk': d.pk,
-                'url': f'/laboratoire/{d.pk}/',
-                'numero': d.numero,
-                'urgent': d.urgent,
-                'patient_nom': d.patient.nom.upper(),
-                'patient_prenoms': d.patient.prenoms,
-                'patient_code': d.patient.code_patient,
-                'lignes': [l.libelle[:30] for l in lignes_all[:3]],
-                'lignes_extra': max(0, len(lignes_all) - 3),
-                'date_creation': d.date_creation.strftime('%d/%m/%Y'),
-                'heure_creation': d.date_creation.strftime('%H:%M'),
-                'montant_total': str(int(d.montant_total)) if d.montant_total else '',
-                'facture_numero': d.facture.numero if d.facture else '',
-                'statut': d.statut,
-                'statut_display': d.get_statut_display(),
-            })
-        return JsonResponse({
-            'rows': rows,
-            'count': page_obj.paginator.count,
-            'start': page_obj.start_index(),
-            'end': page_obj.end_index(),
-            'has_previous': page_obj.has_previous(),
-            'has_next': page_obj.has_next(),
-            'previous_page': page_obj.previous_page_number() if page_obj.has_previous() else None,
-            'next_page': page_obj.next_page_number() if page_obj.has_next() else None,
-        })
+    paginator   = Paginator(demandes, 25)
+    page_number = request.GET.get('page')
+    page_obj    = paginator.get_page(page_number)
 
     breadcrumb = [{'title': 'Accueil', 'url': '/'}, {'title': 'Laboratoire'}]
     return render(request, 'laboratoire/list.html', {
-        'page_obj': page_obj,
-        'stats': stats,
-        'q': q,
-        'breadcrumb': breadcrumb,
+        'page_obj':       page_obj,
+        'stats':          stats,
+        'q':              q,
+        'statut':         statut,
+        'statut_label':   statut_label,
+        'statut_choices': statut_choices,
+        'total':          page_obj.paginator.count,
+        'breadcrumb':     breadcrumb,
     })
 
 

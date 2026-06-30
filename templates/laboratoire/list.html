@@ -1,441 +1,915 @@
-﻿{% extends 'laboratoire/base.html' %}
+{% extends 'laboratoire/base.html' %}
 {% load static %}
 
 {% block extra_css %}
 {{ block.super }}
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <style>
-  .o-badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; }
-  .badge-brouillon { background: #f0f4f8; color: rgba(0,0,0,0.5); }
-  .badge-demande   { background: #eff6ff; color: #1d4ed8; }
-  .badge-accepte   { background: #e8f2f7; color: #1a6d8c; }
-  .badge-en_cours  { background: #fffbeb; color: #b45309; }
-  .badge-termine   { background: #e2eef5; color: var(--teal-700,#1a6d8c); }
-
-  .badge-urgent { background: #fee2e2; color: #b91c1c; border-radius: 20px; padding: 2px 7px; font-size: 10px; font-weight: 700; }
-  .badge-facture-ok { background: #f0f5fa; color: var(--teal-600,#1a6d8c); border-radius: 20px; padding: 2px 7px; font-size: 10px; font-weight: 600; }
-
-  .tests-list { font-size: 12px; color: rgba(0,0,0,0.55); }
-  .tests-list span { display: inline-block; background: #f0f6fa; border-radius: 4px; padding: 1px 7px; margin: 1px 2px 1px 0; font-size: 11px; }
-  .tests-more { color: rgba(0,0,0,0.35); font-size: 11px; margin-left: 2px; }
-
-  html[data-theme="dark"] .o-list tbody tr:hover { background: rgba(33,136,171,0.2); }
-  html[data-theme="dark"] .o-list thead th { background: var(--surface); }
-  html[data-theme="dark"] .o-search-input { color: var(--text); }
-  html[data-theme="dark"] .o-search-bar { border-bottom-color: #3a4a62; }
-  html[data-theme="dark"] .o-pag-btn { background: var(--surface); border-color: var(--border); color: var(--text-muted); }
-  html[data-theme="dark"] .o-empty-state { background: var(--bg); }
-
-  .o-list-wrap { overflow-x: auto; overflow-y: auto; background: #fff; margin: 0 -32px; }
-  .o-list { width: 100%; border-collapse: collapse; font-size: 12px; }
-  .o-list thead th {
-    background: #f5f5f5; border-bottom: 1px solid var(--border);
-    padding: 6px 10px; font-weight: 500; font-size: 11.5px;
-    color: var(--text-muted); text-align: left;
-    position: sticky; top: 0; z-index: 2; user-select: none;
+  /* ── Layout ── */
+  .content {
+    padding: 0 !important;
   }
-  .o-list tbody tr { border-bottom: 1px solid #f0f0f0; transition: background 0.1s; cursor: pointer; }
-  .o-list tbody tr:hover { background: var(--teal-50); }
-  .o-list tbody td { padding: 6px 10px; color: var(--text); vertical-align: middle; }
-  .o-list tbody td.td-num { color: var(--teal-600); font-weight: 700; font-family: monospace; }
-  .o-list tbody td.td-patient { white-space: normal; font-weight: 500; }
-  .o-list tbody td.td-montant { font-weight: 600; color: var(--teal-700,#1a6d8c); }
-  .o-list tbody td.td-actions { text-align: center; white-space: nowrap; width: 80px; }
 
-  .btn-icon {
-    width: 26px; height: 26px; border: 1px solid var(--border); border-radius: 3px;
-    background: var(--surface); display: inline-flex; align-items: center; justify-content: center;
-    color: var(--text-muted); font-size: 12px; text-decoration: none; cursor: pointer;
-    transition: background 0.15s, color 0.15s;
+  .breadcrumb {
+    display: none !important;
   }
-  .btn-icon:hover { background: var(--teal-600); color: #fff; border-color: var(--teal-600); }
 
-  .o-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 20px; }
-  .o-empty-illo {
-    width: 88px; height: 88px; border-radius: 50%;
-    background: linear-gradient(135deg, var(--teal-600) 0%, var(--teal-400) 100%);
-    display: flex; align-items: center; justify-content: center; margin-bottom: 20px;
+  /* ── Badges statut ── */
+  .o-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
   }
-  .o-empty-illo svg { color: #fff; opacity: 0.9; }
-  .o-empty-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
-  .o-empty-sub { font-size: 12.5px; color: var(--text-muted); margin-bottom: 20px; }
-  .o-empty-btn {
-    background: var(--teal-500); color: #fff; border: none; padding: 7px 20px; border-radius: 4px;
-    font-size: 12.5px; font-weight: 500; cursor: pointer; text-decoration: none;
-    display: inline-flex; align-items: center; gap: 6px; transition: background 0.15s;
-  }
-  .o-empty-btn:hover { background: var(--teal-600); }
 
-  .fac-stats { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
-  .fac-stat-card {
-    flex: 1; min-width: 160px; background: #fff; border: 1px solid var(--border);
-    border-radius: 6px; padding: 10px 14px;
+  .badge-brouillon {
+    background: #f3f4f6;
+    color: #6b7280;
   }
-  .fac-stat-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
-  .fac-stat-value { font-size: 18px; font-weight: 600; color: var(--text); }
 
+  .badge-demande {
+    background: #dbeafe;
+    color: #1d4ed8;
+  }
+
+  .badge-accepte {
+    background: #e8f2f7;
+    color: #1a6d8c;
+  }
+
+  .badge-en_cours {
+    background: #fffbeb;
+    color: #b45309;
+  }
+
+  .badge-termine {
+    background: #d1fae5;
+    color: #065f46;
+  }
+
+  .badge-urgent {
+    display: inline-block;
+    background: #fee2e2;
+    color: #b91c1c;
+    border-radius: 20px;
+    padding: 2px 7px;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .badge-facture-ok {
+    display: inline-block;
+    background: #f0f5fa;
+    color: var(--teal-600, #1a6d8c);
+    border-radius: 20px;
+    padding: 2px 7px;
+    font-size: 10px;
+    font-weight: 600;
+  }
+
+  html[data-theme="dark"] .badge-brouillon {
+    background: rgba(107, 114, 128, .2);
+    color: #9ca3af;
+  }
+
+  html[data-theme="dark"] .badge-demande {
+    background: rgba(29, 78, 216, .2);
+    color: #93c5fd;
+  }
+
+  html[data-theme="dark"] .badge-accepte {
+    background: rgba(26, 109, 140, .2);
+    color: #7ecae0;
+  }
+
+  html[data-theme="dark"] .badge-en_cours {
+    background: rgba(180, 83, 9, .2);
+    color: #fcd34d;
+  }
+
+  html[data-theme="dark"] .badge-termine {
+    background: rgba(6, 95, 70, .2);
+    color: #6ee7b7;
+  }
+
+  /* ── Subheader ── */
   .o-subheader {
-    background: #fff; border-bottom: 1px solid var(--border);
-    padding: 6px 16px; display: flex; flex-direction: column; gap: 5px;
-    position: sticky; top: 44px; z-index: 190; margin: 0 -32px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 6px 16px;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    position: sticky;
+    top: 0;
+    z-index: 190;
   }
-  .o-subheader-row { display: flex; align-items: center; gap: 8px; }
-  .o-subheader-row-right { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-  .o-page-title { font-size: 17px; font-weight: 400; color: var(--text); }
+
+  .o-subheader-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .o-subheader-row-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  html[data-theme="dark"] .o-subheader {
+    background: var(--surface);
+    border-bottom-color: var(--border);
+  }
+
+  .o-page-title {
+    font-size: 17px;
+    font-weight: 400;
+    color: var(--text);
+  }
+
+  .o-page-count {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 400;
+    margin-left: 3px;
+  }
+
   .o-btn-create {
-    background: var(--teal-500); color: #fff; border: none; padding: 5px 14px; border-radius: 4px;
-    font-size: 12.5px; font-weight: 500; cursor: pointer;
-    text-decoration: none; display: inline-flex; align-items: center;
-    letter-spacing: 0.5px; transition: background 0.15s;
+    background: var(--teal-500, #2188ab);
+    color: #fff;
+    border: none;
+    padding: 5px 14px;
+    border-radius: 4px;
+    font-size: 12.5px;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    letter-spacing: .5px;
+    transition: background .15s;
+    white-space: nowrap;
   }
-  .o-btn-create:hover { background: var(--teal-600); }
+
+  .o-btn-create:hover {
+    background: var(--teal-600, #1a6d8c);
+    color: #fff;
+  }
+
   .o-search-bar {
-    display: flex; align-items: center; border: none; border-bottom: 1px solid #bbb;
-    background: transparent; min-height: 28px; padding: 2px 4px; gap: 4px; width: 320px;
+    display: flex;
+    align-items: center;
+    border: none;
+    border-bottom: 1px solid #bbb;
+    background: transparent;
+    min-height: 28px;
+    padding: 2px 4px;
+    gap: 4px;
+    width: 260px;
+    max-width: calc(100vw - 180px);
+    min-width: 120px;
   }
+
   .o-search-input {
-    border: none; outline: none; font-size: 12px;
-    color: var(--text); flex: 1; min-width: 60px; background: transparent;
+    border: none;
+    outline: none;
+    font-size: 12px;
+    font-family: inherit;
+    color: var(--text);
+    flex: 1;
+    min-width: 60px;
+    background: transparent;
   }
-  .o-search-btn { background: none; border: none; cursor: pointer; color: #888; font-size: 13px; padding: 2px; }
-  .o-ctrl-sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }
-  .o-pagination { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+
+  .o-search-input::placeholder {
+    color: var(--text-muted);
+    opacity: .7;
+  }
+
+  .o-search-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 13px;
+    padding: 2px;
+  }
+
+  html[data-theme="dark"] .o-search-bar {
+    border-bottom-color: #3a4a62;
+  }
+
+  html[data-theme="dark"] .o-search-input {
+    color: var(--text);
+  }
+
+  .o-ctrl-btn {
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 13px;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: border-color .15s, color .15s, background .15s;
+    white-space: nowrap;
+  }
+
+  .o-ctrl-btn:hover,
+  .o-ctrl-btn.active {
+    border-color: var(--border);
+    color: var(--text);
+    background: rgba(0, 0, 0, .04);
+  }
+
+  html[data-theme="dark"] .o-ctrl-btn:hover,
+  html[data-theme="dark"] .o-ctrl-btn.active {
+    background: rgba(255, 255, 255, .06);
+    color: var(--text);
+    border-color: var(--border);
+  }
+
+  .o-ctrl-sep {
+    width: 1px;
+    height: 18px;
+    background: var(--border);
+    margin: 0 3px;
+    flex-shrink: 0;
+  }
+
+  .o-filter-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: rgba(20, 87, 112, .08);
+    color: var(--teal-700, #145770);
+    border: 1px solid rgba(20, 87, 112, .2);
+    border-radius: 3px;
+    padding: 1px 6px;
+    font-size: 11.5px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .o-filter-tag a {
+    color: #888;
+    text-decoration: none;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    margin-left: 2px;
+  }
+
+  .o-filter-tag a:hover {
+    color: #333;
+  }
+
+  html[data-theme="dark"] .o-filter-tag {
+    background: rgba(33, 136, 171, .15);
+    color: #7aaec7;
+    border-color: rgba(33, 136, 171, .3);
+  }
+
+  /* ── Pagination ── */
+  .o-pag-label {
+    font-size: 12px;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
   .o-pag-btn {
-    color: #555; text-decoration: none; font-size: 15px;
-    display: inline-flex; align-items: center; padding: 0 2px;
-    transition: color 0.15s;
+    width: 24px;
+    height: 24px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background .15s, color .15s;
   }
-  .o-pag-btn:hover { color: var(--teal-600); }
-  .o-pag-btn.disabled { opacity: 0.3; pointer-events: none; }
 
-  /* ══ GYN NAV ══ */
-  .gyn-nav {
-    background: #fff; border-bottom: 1px solid rgba(0,0,0,0.08);
-    margin: 0 -32px 0; padding: 0 32px;
-    display: flex; align-items: stretch; height: 44px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    position: sticky; top: 0; z-index: 250;
+  .o-pag-btn:hover {
+    background: var(--teal-600, #1a6d8c);
+    color: #fff;
+    border-color: var(--teal-600, #1a6d8c);
   }
-  .gyn-nav-link {
-    padding: 11px 16px; font-size: 13px; font-weight: 500;
-    color: rgba(0,0,0,0.5); text-decoration: none;
-    border-bottom: 2px solid transparent;
-    display: inline-flex; align-items: center; gap: 6px;
-    transition: color 0.15s, border-color 0.15s; white-space: nowrap;
-  }
-  .gyn-nav-link:hover { color: var(--teal-600); }
-  .gyn-nav-link.active { color: var(--teal-600); border-bottom-color: var(--teal-500); font-weight: 600; }
-  html[data-theme="dark"] .gyn-nav { background: #171616; border-bottom-color: rgba(255,255,255,0.06); }
-  html[data-theme="dark"] .gyn-nav-link { color: rgba(255,255,255,0.4); }
-  html[data-theme="dark"] .gyn-nav-link:hover { color: var(--teal-300); }
-  html[data-theme="dark"] .gyn-nav-link.active { color: var(--teal-300); border-bottom-color: var(--teal-400); }
 
-  /* ── Config dropdown ── */
-  .gyn-nav-dd { position: relative; display: inline-flex; align-items: stretch; }
-  .gyn-nav-dd-panel {
-    display: none; position: absolute; top: 100%; left: 0;
-    background: #fff; border: 1px solid #dde3ec;
-    border-radius: 6px; box-shadow: 0 8px 28px rgba(0,0,0,0.16);
-    min-width: 200px; padding: 5px 0; z-index: 9999;
+  .o-pag-btn.disabled {
+    opacity: .35;
+    pointer-events: none;
   }
-  .gyn-nav-dd:hover .gyn-nav-dd-panel,
-  .gyn-nav-dd-panel:hover { display: block; }
-  .gyn-nav-dd-item {
-    display: flex; align-items: center; gap: 8px;
-    padding: 8px 16px; font-size: 12.5px; color: var(--text);
-    text-decoration: none; transition: background 0.1s; white-space: nowrap;
+
+  html[data-theme="dark"] .o-pag-btn {
+    background: var(--surface);
+    border-color: var(--border);
+    color: var(--text-muted);
   }
-  .gyn-nav-dd-item:hover { background: var(--teal-50); color: var(--teal-600); }
-  .gyn-nav-dd-item.active { background: #ede7f6; color: var(--teal-600); font-weight: 500; }
-  html[data-theme="dark"] .gyn-nav-dd-panel { background: #201d1d; border-color: #2e3f58; }
-  html[data-theme="dark"] .gyn-nav-dd-item { color: var(--text); }
-  html[data-theme="dark"] .gyn-nav-dd-item:hover { background: rgba(33,136,171,0.2); color: var(--teal-300); }
+
+  /* ── Vue toggle ── */
+  .o-view-btns {
+    display: flex;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .o-view-btn {
+    width: 26px;
+    height: 24px;
+    border: none;
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 13px;
+    cursor: pointer;
+    transition: background .15s, color .15s;
+  }
+
+  .o-view-btn:not(:last-child) {
+    border-right: 1px solid var(--border);
+  }
+
+  .o-view-btn.active,
+  .o-view-btn:hover {
+    background: var(--teal-600, #1a6d8c);
+    color: #fff;
+  }
+
+  html[data-theme="dark"] .o-view-btns {
+    border-color: var(--border);
+  }
+
+  html[data-theme="dark"] .o-view-btn {
+    background: var(--surface);
+    color: var(--text-muted);
+  }
+
+  /* ── Stats ── */
+  .h-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .h-stat {
+    padding: 14px 20px;
+    border-right: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .h-stat:last-child {
+    border-right: none;
+  }
+
+  .h-stat-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .h-stat-icon.blue {
+    background: #eff6ff;
+    color: #2563eb;
+  }
+
+  .h-stat-icon.amber {
+    background: #fffbeb;
+    color: #d97706;
+  }
+
+  .h-stat-icon.teal {
+    background: #f0fdfa;
+    color: #0d9488;
+  }
+
+  .h-stat-icon.violet {
+    background: #f5f3ff;
+    color: #7c3aed;
+  }
+
+  .h-stat-num {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1;
+  }
+
+  .h-stat-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 3px;
+  }
+
+  html[data-theme="dark"] .h-stats {
+    background: var(--surface);
+    border-bottom-color: var(--border);
+  }
+
+  html[data-theme="dark"] .h-stat {
+    border-right-color: var(--border);
+  }
+
+  html[data-theme="dark"] .h-stat-icon.blue {
+    background: rgba(37, 99, 235, .15);
+    color: #93c5fd;
+  }
+
+  html[data-theme="dark"] .h-stat-icon.amber {
+    background: rgba(217, 119, 6, .15);
+    color: #fcd34d;
+  }
+
+  html[data-theme="dark"] .h-stat-icon.teal {
+    background: rgba(13, 148, 136, .15);
+    color: #5eead4;
+  }
+
+  html[data-theme="dark"] .h-stat-icon.violet {
+    background: rgba(124, 58, 237, .15);
+    color: #c4b5fd;
+  }
+
+  /* ── Dropdown filtre ── */
+  .o-dd-wrap {
+    position: relative;
+  }
+
+  .o-dd-panel {
+    display: none;
+    position: fixed;
+    z-index: 9999;
+    background: #fff;
+    border: 1px solid #dde3ec;
+    border-radius: 8px;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .16);
+    min-width: 210px;
+    padding: 5px 0;
+  }
+
+  .o-dd-panel.open {
+    display: block;
+  }
+
+  .o-dd-section {
+    padding: 7px 14px 4px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+
+  .o-dd-item {
+    display: flex;
+    align-items: center;
+    padding: 7px 14px;
+    font-size: 13px;
+    color: var(--text);
+    cursor: pointer;
+    text-decoration: none;
+    transition: background .1s;
+    white-space: nowrap;
+  }
+
+  .o-dd-item:hover {
+    background: rgba(20, 87, 112, .06);
+    color: var(--teal-700, #145770);
+  }
+
+  .o-dd-item.active {
+    background: rgba(20, 87, 112, .08);
+    color: var(--teal-700, #145770);
+    font-weight: 600;
+  }
+
+  .o-dd-sep {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 4px 0;
+  }
+
+  html[data-theme="dark"] .o-dd-panel {
+    background: #1a2535;
+    border-color: #2e3f58;
+  }
+
+  html[data-theme="dark"] .o-dd-item {
+    color: var(--text);
+  }
+
+  html[data-theme="dark"] .o-dd-item:hover {
+    background: rgba(33, 136, 171, .15);
+    color: #7aaec7;
+  }
+
+  html[data-theme="dark"] .o-dd-item.active {
+    background: rgba(33, 136, 171, .2);
+    color: #7aaec7;
+  }
+
+  /* ── Table ── */
+  .o-list-wrap {
+    overflow-x: auto;
+  }
+
+  .o-list {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    background: var(--surface);
+  }
+
+  .o-list thead th {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 9px 14px;
+    text-align: left;
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--text-muted);
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    user-select: none;
+  }
+
+  .o-list tbody tr {
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background .1s;
+  }
+
+  .o-list tbody tr:hover {
+    background: #f0f7fb;
+  }
+
+  .o-list tbody td {
+    padding: 9px 14px;
+    color: var(--text);
+    vertical-align: middle;
+  }
+
+  .o-list tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .td-num {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--teal-600, #1a6d8c);
+    letter-spacing: .03em;
+  }
+
+  .td-patient {
+    white-space: normal;
+    font-weight: 600;
+  }
+
+  .td-montant {
+    font-weight: 600;
+    color: var(--teal-700, #1a6d8c);
+  }
+
+  .td-actions {
+    text-align: center;
+    white-space: nowrap;
+    width: 80px;
+  }
+
+  html[data-theme="dark"] .o-list thead th {
+    background: var(--surface);
+    border-bottom-color: var(--border);
+  }
+
+  html[data-theme="dark"] .o-list tbody tr {
+    border-bottom-color: var(--border);
+  }
+
+  html[data-theme="dark"] .o-list tbody tr:hover {
+    background: rgba(255, 255, 255, .04);
+  }
+
+  /* ── Tests list ── */
+  .tests-list {
+    font-size: 12px;
+    color: rgba(0, 0, 0, .55);
+  }
+
+  .tests-list span {
+    display: inline-block;
+    background: #f0f6fa;
+    border-radius: 4px;
+    padding: 1px 7px;
+    margin: 1px 2px 1px 0;
+    font-size: 11px;
+  }
+
+  .tests-more {
+    color: rgba(0, 0, 0, .35);
+    font-size: 11px;
+    margin-left: 2px;
+  }
+
+  /* ── Btn action ── */
+  .btn-icon {
+    width: 26px;
+    height: 26px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: var(--surface);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 12px;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background .15s, color .15s;
+  }
+
+  .btn-icon:hover {
+    background: var(--teal-600, #1a6d8c);
+    color: #fff;
+    border-color: var(--teal-600, #1a6d8c);
+  }
+
+  /* ── État vide ── */
+  .h-empty {
+    text-align: center;
+    padding: 64px 20px;
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+
+  .h-empty i {
+    font-size: 42px;
+    display: block;
+    margin-bottom: 12px;
+    opacity: .3;
+  }
+
+  .h-empty p {
+    margin-top: 4px;
+    font-size: 12px;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 800px) {
+    .h-stats {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .h-stat:nth-child(2) {
+      border-right: none;
+    }
+
+    .h-stat:nth-child(3) {
+      border-right: 1px solid var(--border);
+    }
+  }
 </style>
 {% endblock %}
 
-{% block breadcrumb %}
-<nav class="breadcrumb">
-  <a href="{% url 'dashboard' %}"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z"/><polyline points="9 21 9 12 15 12 15 21"/></svg>Accueil</a>
-  <span class="breadcrumb-sep">›</span>
-  <span>Laboratoire</span>
-</nav>
-{% endblock %}
+{% block breadcrumb %}{% endblock %}
 
 {% block content %}
+<div id="page-wrap">
 
-<div class="o-subheader">
-  <div class="o-subheader-row">
-    <span class="o-page-title">Demandes <span style="font-size:13px;color:var(--text-muted);font-weight:400;">({{ page_obj.paginator.count }})</span></span>
-    <div class="o-subheader-row-right">
-      <form method="get" id="search-form" style="display:flex;align-items:center;">
-        <div class="o-search-bar">
-          <input class="o-search-input" id="search-input" type="text" name="q"
-                 value="{{ q }}" placeholder="Rechercher un patient, numéro ou examen…" autocomplete="off">
-          <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
+  <!-- ══ SUBHEADER ══ -->
+  <div class="o-subheader" id="subheader" data-fixed="1">
+
+    <!-- Ligne 1 : titre + recherche -->
+    <div class="o-subheader-row">
+      <span class="o-page-title">Demandes <span class="o-page-count">{{ total }}</span></span>
+      <div class="o-subheader-row-right">
+        <form method="get" id="filter-form" style="display:flex;align-items:center;">
+          <input type="hidden" name="statut" id="fi-statut" value="{{ statut }}">
+          <div class="o-search-bar">
+            <input class="o-search-input" id="search-input" type="text" name="q" value="{{ q }}"
+              placeholder="Rechercher patient, numéro…" autocomplete="off">
+            <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Ligne 2 : créer + filtres + pagination + vue -->
+    <div class="o-subheader-row">
+      <a href="{% url 'laboratoire_create' %}" class="o-btn-create">
+        <i class="bi bi-plus-lg"></i> Nouvelle demande
+      </a>
+
+      <div class="o-subheader-row-right">
+
+        <!-- Tags filtres actifs -->
+        {% if q %}<span class="o-filter-tag">{{ q }} <a onclick="clearQ()" title="Supprimer">×</a></span>{% endif %}
+        {% if statut %}<span class="o-filter-tag">{{ statut_label }} <a onclick="setFiltre('')"
+            title="Supprimer">×</a></span>{% endif %}
+
+        <!-- Dropdown Filtres -->
+        <div class="o-dd-wrap">
+          <button class="o-ctrl-btn {% if statut %}active{% endif %}" id="btn-filtres"
+            onclick="toggleDd('dd-filtres', this)">
+            <i class="bi bi-funnel{% if statut %}-fill{% endif %}"></i>
+            Filtres{% if statut %}&nbsp;<span style="background:var(--teal-500,#2188ab);color:#fff;border-radius:10px;font-size:10px;padding:0 5px;vertical-align:middle;">1</span>{% endif %}
+          </button>
+          <div class="o-dd-panel" id="dd-filtres">
+            <div class="o-dd-section">Filtrer par statut</div>
+            {% for val, label in statut_choices %}
+            <a class="o-dd-item {% if statut == val %}active{% endif %}" onclick="setFiltre('{{ val }}')">{{ label }}</a>
+            {% endfor %}
+            {% if statut %}
+            <hr class="o-dd-sep">
+            <a class="o-dd-item" onclick="setFiltre('')" style="color:#b71c1c;">
+              <i class="bi bi-x-circle" style="font-size:11px;margin-right:6px;"></i> Effacer
+            </a>
+            {% endif %}
+          </div>
         </div>
-      </form>
-      <div class="o-ctrl-sep"></div>
-      <div class="o-pagination">
+
+        <div class="o-ctrl-sep"></div>
+
+        <!-- Pagination -->
+        <span class="o-pag-label">{% if page_obj.paginator.count > 0 %}{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}{% else %}0{% endif %}</span>
         <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
-           href="#"
-           data-page="{% if page_obj.has_previous %}{{ page_obj.previous_page_number }}{% endif %}">
+          href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}&q={{ q }}&statut={{ statut }}{% else %}#{% endif %}">
           <i class="bi bi-chevron-left"></i>
         </a>
-        <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
         <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
-           href="#"
-           data-page="{% if page_obj.has_next %}{{ page_obj.next_page_number }}{% endif %}">
+          href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}&q={{ q }}&statut={{ statut }}{% else %}#{% endif %}">
           <i class="bi bi-chevron-right"></i>
         </a>
+
+        <div class="o-ctrl-sep"></div>
+
+        <!-- Vue liste (seule vue disponible pour le labo) -->
+        <div class="o-view-btns">
+          <button type="button" class="o-view-btn active" title="Vue liste">
+            <i class="bi bi-list-ul"></i>
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+  </div><!-- /o-subheader -->
+
+  <!-- ══ STATS ══ -->
+  <div class="h-stats" style="margin: 0;">
+    <div class="h-stat">
+      <div class="h-stat-icon blue"><i class="bi bi-clock"></i></div>
+      <div>
+        <div class="h-stat-num">{{ stats.en_attente }}</div>
+        <div class="h-stat-label">En attente</div>
+      </div>
+    </div>
+    <div class="h-stat">
+      <div class="h-stat-icon amber"><i class="bi bi-hourglass-split"></i></div>
+      <div>
+        <div class="h-stat-num">{{ stats.en_cours }}</div>
+        <div class="h-stat-label">En cours</div>
+      </div>
+    </div>
+    <div class="h-stat">
+      <div class="h-stat-icon teal"><i class="bi bi-check-circle"></i></div>
+      <div>
+        <div class="h-stat-num">{{ stats.terminees }}</div>
+        <div class="h-stat-label">Terminées</div>
+      </div>
+    </div>
+    <div class="h-stat">
+      <div class="h-stat-icon violet"><i class="bi bi-calendar-month"></i></div>
+      <div>
+        <div class="h-stat-num">{{ stats.ce_mois }}</div>
+        <div class="h-stat-label">Ce mois</div>
       </div>
     </div>
   </div>
-  <div class="o-subheader-row">
-    <a href="{% url 'laboratoire_create' %}" class="o-btn-create">CRÉER</a>
-  </div>
-</div>
 
-<!-- ══ STATS ══ -->
-<div class="fac-stats">
-  <div class="fac-stat-card">
-    <div class="fac-stat-label">En attente</div>
-    <div class="fac-stat-value">{{ stats.en_attente }}</div>
-  </div>
-  <div class="fac-stat-card">
-    <div class="fac-stat-label">En cours</div>
-    <div class="fac-stat-value" style="color:var(--amber,#e65100);">{{ stats.en_cours }}</div>
-  </div>
-  <div class="fac-stat-card">
-    <div class="fac-stat-label">Terminées</div>
-    <div class="fac-stat-value" style="color:var(--teal-600,#1a6d8c);">{{ stats.terminees }}</div>
-  </div>
-  <div class="fac-stat-card">
-    <div class="fac-stat-label">Demandes ce mois</div>
-    <div class="fac-stat-value">{{ stats.ce_mois }}</div>
-  </div>
-</div>
-
-<!-- ══ TABLE ══ -->
-<div class="o-list-wrap">
-  {% if page_obj %}
-  <table class="o-list">
-    <thead>
-      <tr>
-        <th style="width:40px;text-align:center;">#</th>
-        <th>N° Demande</th>
-        <th>Patient</th>
-        <th>Tests demandés</th>
-        <th>Date de création</th>
-        <th>Montant (CFA)</th>
-        <th>Facture</th>
-        <th>Statut</th>
-        <th style="width:80px;text-align:center;">Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for demande in page_obj %}
-      <tr onclick="window.location='{% url 'laboratoire_detail' demande.pk %}'">
-        <td style="text-align:center;color:var(--text-muted);font-size:11px;">{{ forloop.counter0|add:page_obj.start_index }}</td>
-        <td class="td-num">
-          {{ demande.numero }}
-          {% if demande.urgent %}<span class="badge-urgent" style="margin-left:4px;">URGENT</span>{% endif %}
-        </td>
-        <td class="td-patient">
-          {{ demande.patient.nom|upper }} {{ demande.patient.prenoms }}
-          <div style="font-size:11px;color:rgba(0,0,0,0.4);font-family:monospace;">{{ demande.patient.code_patient }}</div>
-        </td>
-        <td>
-          {% with lignes=demande.lignes.all %}
-          {% if lignes %}
+  <!-- ══ TABLE ══ -->
+  <div class="o-list-wrap">
+    <table class="o-list">
+      <thead>
+        <tr>
+          <th style="width:40px;text-align:center;">#</th>
+          <th>N° Demande</th>
+          <th>Patient</th>
+          <th>Tests demandés</th>
+          <th>Date de création</th>
+          <th>Montant (CFA)</th>
+          <th>Statut</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for demande in page_obj %}
+        <tr onclick="window.location='{% url 'laboratoire_detail' demande.pk %}'">
+          <td style="text-align:center;color:var(--text-muted);font-size:11px;">{{ forloop.counter0|add:page_obj.start_index }}</td>
+          <td class="td-num">
+            {{ demande.numero }}
+            {% if demande.urgent %}<span class="badge-urgent" style="margin-left:4px;">URGENT</span>{% endif %}
+          </td>
+          <td class="td-patient">
+            {{ demande.patient.nom|upper }} {{ demande.patient.prenoms }}
+            <div style="font-size:10.5px;color:var(--text-muted);font-family:var(--font-mono);">{{ demande.patient.code_patient }}</div>
+          </td>
+          <td>
+            {% with lignes=demande.lignes.all %}
+            {% if lignes %}
             <div class="tests-list">
-              {% for l in lignes|slice:":3" %}
-                <span>{{ l.libelle|truncatechars:30 }}</span>
-              {% endfor %}
-              {% if lignes|length > 3 %}
-                <span class="tests-more">+{{ lignes|length|add:"-3" }} autres</span>
+              {% for l in lignes|slice:":3" %}<span>{{ l.libelle|truncatechars:28 }}</span>{% endfor %}
+              {% if lignes|length > 3 %}<span class="tests-more">+{{ lignes|length|add:"-3" }} autres</span>{% endif %}
+            </div>
+            {% else %}
+            <span style="color:rgba(0,0,0,.3);font-size:12px;">—</span>
+            {% endif %}
+            {% endwith %}
+          </td>
+          <td>
+            {{ demande.date_creation|date:"d/m/Y" }}<br>
+            <span style="font-size:10.5px;color:var(--text-muted);">{{ demande.date_creation|date:"H:i" }}</span>
+          </td>
+          <td class="td-montant">
+            {% if demande.montant_total %}{{ demande.montant_total|floatformat:0 }}{% else %}—{% endif %}
+          </td>
+          <td><span class="o-badge badge-{{ demande.statut }}">{{ demande.get_statut_display }}</span></td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7">
+            <div class="h-empty">
+              <i class="bi bi-eyedropper"></i>
+              Aucune demande{% if q %} pour "{{ q }}"{% endif %}{% if statut %} avec ce statut{% endif %}
+              {% if q or statut %}
+              <p>Modifiez vos filtres de recherche.</p>
+              {% else %}
+              <p><a href="{% url 'laboratoire_create' %}" style="color:var(--teal-600,#1a6d8c);font-weight:600;">Créer
+                  la première demande d'examen</a></p>
               {% endif %}
             </div>
-          {% else %}
-            <span style="color:rgba(0,0,0,0.3);font-size:12px;">—</span>
-          {% endif %}
-          {% endwith %}
-        </td>
-        <td style="font-size:12px;">
-          {{ demande.date_creation|date:"d/m/Y" }}
-          <div style="font-size:11px;color:var(--text-muted);">{{ demande.date_creation|date:"H:i" }}</div>
-        </td>
-        <td class="td-montant">
-          {% if demande.montant_total %}{{ demande.montant_total|floatformat:0 }}{% else %}—{% endif %}
-        </td>
-        <td>
-          {% if demande.facture %}
-            <span class="badge-facture-ok">{{ demande.facture.numero }}</span>
-          {% else %}
-            <span style="color:rgba(0,0,0,0.25);font-size:12px;">—</span>
-          {% endif %}
-        </td>
-        <td><span class="o-badge badge-{{ demande.statut }}">{{ demande.get_statut_display }}</span></td>
-        <td class="td-actions" onclick="event.stopPropagation()">
-          <a href="{% url 'laboratoire_detail' demande.pk %}" class="btn-icon" title="Voir le détail"><i class="bi bi-eye"></i></a>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <div class="o-empty-state">
-    <div class="o-empty-illo">
-      <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M9 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9"/><polyline points="9 3 9 9 15 9"/>
-        <line x1="12" y1="12" x2="12" y2="18"/><line x1="9" y1="15" x2="15" y2="15"/>
-      </svg>
-    </div>
-    <div class="o-empty-title">Aucune demande{% if q %} pour "{{ q }}"{% endif %}</div>
-    <div class="o-empty-sub">{% if q %}Essayez avec un autre terme de recherche.{% else %}Créez la première demande d'examen.{% endif %}</div>
-    {% if not q %}
-    <a href="{% url 'laboratoire_create' %}" class="o-empty-btn">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-      NOUVELLE DEMANDE
-    </a>
-    {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
-  {% endif %}
-</div>
+
+</div><!-- /#page-wrap -->
 
 <script>
-(function () {
-    var input    = document.getElementById('search-input');
-    var tbody    = document.querySelector('.o-list tbody');
-    var emptyBox = document.querySelector('.o-empty-state');
-    var tableWrap = document.querySelector('.o-list-wrap');
-    var timer    = null;
-    var currentQ = '{{ q|escapejs }}';
-    var currentPage = 1;
-
-    /* ── Pagination DOM refs ── */
-    var pagInfo    = document.querySelector('.o-pagination span');
-    var pagPrev    = document.querySelector('.o-pag-btn:first-child');
-    var pagNext    = document.querySelector('.o-pag-btn:last-child');
-
-    if (!input) return;
-
-    function esc(str) {
-        var d = document.createElement('div');
-        d.appendChild(document.createTextNode(str));
-        return d.innerHTML;
+  function toggleDd(id, btn) {
+    const panel = document.getElementById(id);
+    document.querySelectorAll('.o-dd-panel').forEach(p => { if (p.id !== id) p.classList.remove('open'); });
+    if (!panel) return;
+    const open = panel.classList.toggle('open');
+    if (open) {
+      const r = btn.getBoundingClientRect();
+      panel.style.top = (r.bottom + window.scrollY + 4) + 'px';
+      panel.style.left = r.left + 'px';
     }
+  }
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('.o-dd-wrap') && !e.target.closest('.o-dd-panel'))
+      document.querySelectorAll('.o-dd-panel').forEach(p => p.classList.remove('open'));
+  });
+  function setFiltre(val) {
+    document.getElementById('fi-statut').value = val;
+    document.getElementById('filter-form').submit();
+  }
+  function clearQ() {
+    document.getElementById('search-input').value = '';
+    document.getElementById('filter-form').submit();
+  }
 
-    function renderRows(data) {
-        /* Mettre à jour le compteur de pagination */
-        if (pagInfo) {
-            pagInfo.textContent = data.start + '-' + data.end + ' / ' + data.count;
-        }
-        if (pagPrev) {
-            if (data.has_previous) {
-                pagPrev.classList.remove('disabled');
-                pagPrev.dataset.page = data.previous_page;
-            } else {
-                pagPrev.classList.add('disabled');
-                pagPrev.dataset.page = '';
-            }
-        }
-        if (pagNext) {
-            if (data.has_next) {
-                pagNext.classList.remove('disabled');
-                pagNext.dataset.page = data.next_page;
-            } else {
-                pagNext.classList.add('disabled');
-                pagNext.dataset.page = '';
-            }
-        }
-
-        if (!data.rows.length) {
-            if (tbody) tbody.innerHTML = '';
-            if (tableWrap) tableWrap.querySelector('table') && (tableWrap.querySelector('table').style.display = 'none');
-            if (!tableWrap.querySelector('.o-empty-state')) {
-                var msg = document.createElement('div');
-                msg.className = 'o-empty-state';
-                msg.id = 'ajax-empty';
-                msg.innerHTML =
-                    '<div class="o-empty-illo"><svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9"/><polyline points="9 3 9 9 15 9"/><line x1="12" y1="12" x2="12" y2="18"/><line x1="9" y1="15" x2="15" y2="15"/></svg></div>' +
-                    '<div class="o-empty-title">Aucune demande pour "' + esc(currentQ) + '"</div>' +
-                    '<div class="o-empty-sub">Essayez avec un autre terme de recherche.</div>';
-                tableWrap.appendChild(msg);
-            }
-            return;
-        }
-
-        /* Supprimer un éventuel état vide AJAX */
-        var prevEmpty = tableWrap.querySelector('#ajax-empty');
-        if (prevEmpty) prevEmpty.remove();
-        var tbl = tableWrap.querySelector('table');
-        if (tbl) tbl.style.display = '';
-
-        var html = '';
-        data.rows.forEach(function (d, i) {
-            var testsHtml = '';
-            if (d.lignes.length) {
-                testsHtml = '<div class="tests-list">';
-                d.lignes.forEach(function (l) { testsHtml += '<span>' + esc(l) + '</span>'; });
-                if (d.lignes_extra > 0) testsHtml += '<span class="tests-more">+' + d.lignes_extra + ' autres</span>';
-                testsHtml += '</div>';
-            } else {
-                testsHtml = '<span style="color:rgba(0,0,0,0.3);font-size:12px;">—</span>';
-            }
-            var factureHtml = d.facture_numero
-                ? '<span class="badge-facture-ok">' + esc(d.facture_numero) + '</span>'
-                : '<span style="color:rgba(0,0,0,0.25);font-size:12px;">—</span>';
-            var urgentHtml = d.urgent ? '<span class="badge-urgent" style="margin-left:4px;">URGENT</span>' : '';
-
-            html +=
-                '<tr onclick="window.location=\'' + esc(d.url) + '\'">' +
-                '<td style="text-align:center;color:var(--text-muted);font-size:11px;">' + (data.start + i) + '</td>' +
-                '<td class="td-num">' + esc(d.numero) + urgentHtml + '</td>' +
-                '<td class="td-patient">' + esc(d.patient_nom) + ' ' + esc(d.patient_prenoms) +
-                    '<div style="font-size:11px;color:rgba(0,0,0,0.4);font-family:monospace;">' + esc(d.patient_code) + '</div></td>' +
-                '<td>' + testsHtml + '</td>' +
-                '<td style="font-size:12px;">' + esc(d.date_creation) +
-                    '<div style="font-size:11px;color:var(--text-muted);">' + esc(d.heure_creation) + '</div></td>' +
-                '<td class="td-montant">' + (d.montant_total ? esc(d.montant_total) : '—') + '</td>' +
-                '<td>' + factureHtml + '</td>' +
-                '<td><span class="o-badge badge-' + esc(d.statut) + '">' + esc(d.statut_display) + '</span></td>' +
-                '<td class="td-actions" onclick="event.stopPropagation()">' +
-                    '<a href="' + esc(d.url) + '" class="btn-icon" title="Voir le détail"><i class="bi bi-eye"></i></a>' +
-                '</td>' +
-                '</tr>';
-        });
-        if (tbody) tbody.innerHTML = html;
-    }
-
-    function fetchRows(q, page) {
-        currentQ   = q;
-        currentPage = page || 1;
-        var url = '/laboratoire/?q=' + encodeURIComponent(q) + '&page=' + currentPage;
-        history.replaceState(null, '', url);
-        fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-            .then(function (r) { return r.json(); })
-            .then(renderRows)
-            .catch(function () {});
-    }
-
-    /* Recherche en saisie */
-    input.addEventListener('input', function () {
-        clearTimeout(timer);
-        var q = this.value;
-        timer = setTimeout(function () { fetchRows(q, 1); }, 280);
-    });
-
-    /* Pagination AJAX */
-    function bindPagBtn(btn) {
-        if (!btn) return;
-        btn.addEventListener('click', function (e) {
-            e.preventDefault();
-            var p = parseInt(this.dataset.page, 10);
-            if (p) fetchRows(currentQ, p);
-        });
-    }
-    bindPagBtn(pagPrev);
-    bindPagBtn(pagNext);
-})();
+  /* Le subheader sticky colle au sommet du scroll container (.content).
+     Aucune compensation JS nécessaire — la sticky tient dans le flux. */
 </script>
 {% endblock %}
