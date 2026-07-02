@@ -32,9 +32,19 @@ def get_actions_disponibles(hosp, user):
     su = user.is_superuser or user.is_staff
 
     if su:
-        return {k: {'visible': True, 'enabled': True, 'raison_blocage': ''}
-                for k in ('confirmer', 'creer_facture', 'installer',
-                          'decharger', 'terminer', 'annuler')}
+        result = {k: {'visible': True, 'enabled': True, 'raison_blocage': ''}
+                  for k in ('confirmer', 'creer_facture', 'installer',
+                            'decharger', 'terminer', 'annuler')}
+        # Même pour le superuser, "Créer la facture" doit rester caché
+        # quand il n'y a plus aucun service non facturé à facturer.
+        nb_saf_nf = hosp.services_a_facturer.filter(
+            facture__isnull=True, service__isnull=False
+        ).count()
+        if nb_saf_nf == 0:
+            result['creer_facture'] = {
+                'visible': False, 'enabled': False, 'raison_blocage': '',
+            }
+        return result
 
     def perm(codename):
         return user.has_perm(f'hospitalisation.{codename}')
@@ -89,7 +99,7 @@ def get_actions_disponibles(hosp, user):
             f"Statut actuel : {hosp.get_statut_display()}"
         )
     elif nb_saf_nf == 0:
-        result['creer_facture'] = _act(True, False, "Aucun service à facturer")
+        result['creer_facture'] = _act(False, False)
     else:
         result['creer_facture'] = _act(True, True)
 

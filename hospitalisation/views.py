@@ -944,13 +944,22 @@ def hospitalisation_edit(request, pk):
     facture_blocage = _get_facture_blocage(hosp)
     facture_payee   = Facture.objects.filter(hospitalisation=hosp, statut='payee').exists()
     factures_impayees = Facture.objects.filter(hospitalisation=hosp).exclude(statut__in=['payee', 'annulee']).count()
+    tab_param = request.GET.get('tab', '')
 
     # Mode attribution chambre : confirme + facture payée — seul chambre_lit est modifiable.
-    mode_chambre_seule = (not is_admin) and hosp.statut == 'confirme' and facture_payee
+    mode_chambre_seule = hosp.statut == 'confirme' and facture_payee
     # Mode soins seuls : patient hospitalisé — seuls les soins/visites sont modifiables.
-    mode_soins_seuls = (not is_admin) and hosp.statut == 'hospitalise' and peut_soins and not peut_changer and not peut_decharger
+    # Non-admin : narrowé par permission (n'a que le droit d'ajouter un soin).
+    # Admin : a toutes les permissions, donc narrowé seulement s'il arrive via le
+    # lien "Ajouter un soin" (?tab=soins) plutôt que via "Modifier".
+    mode_soins_seuls = hosp.statut == 'hospitalise' and peut_soins and (
+        tab_param == 'soins' if is_admin else (not peut_changer and not peut_decharger)
+    )
     # Mode décharge : toutes factures payées — seul l'onglet résumé de décharge est modifiable.
-    mode_decharge_seule = (not is_admin) and hosp.statut == 'hospitalise' and peut_decharger and factures_impayees == 0 and not peut_changer
+    # Même logique : admin narrowé seulement via le lien "Décharger" (?tab=resume).
+    mode_decharge_seule = hosp.statut == 'hospitalise' and peut_decharger and factures_impayees == 0 and (
+        tab_param == 'resume' if is_admin else not peut_changer
+    )
 
     # Vérification d'accès
     if not peut_changer:
@@ -1411,10 +1420,9 @@ def hospitalisation_detail(request, pk):
         and hosp.statut == 'confirme'
         and facture_payee
     )
-    # Bouton Attribuer une chambre : utilisateurs can_installer_patient (confirme + facture payée)
+    # Bouton Attribuer une chambre : utilisateurs can_installer_patient ou admin (confirme + facture payée)
     peut_attribuer_chambre = (
-        not is_admin
-        and request.user.has_perm('hospitalisation.can_installer_patient')
+        request.user.has_perm('hospitalisation.can_installer_patient')
         and hosp.statut == 'confirme'
         and facture_payee
     )

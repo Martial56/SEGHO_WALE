@@ -554,21 +554,11 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
   </a>
   {% endif %}
 
-  {# ─ Installer le patient / Attribuer une chambre ─ #}
+  {# ─ Attribuer une chambre ─ #}
   {% if peut_attribuer_chambre %}
   <a href="{% url 'hospitalisation:edit' hosp.pk %}" class="abtn abtn-info">
     <i class="bi bi-door-open"></i> Attribuer une chambre
   </a>
-  {% elif actions.installer.visible and hosp.statut == 'confirme' %}
-  <button type="button"
-          class="abtn abtn-info {% if not actions.installer.enabled %}off{% endif %}"
-          {% if actions.installer.enabled %}
-            onclick="doTransition('{% url 'hospitalisation:installer' hosp.pk %}')"
-          {% else %}
-            disabled title="{{ actions.installer.raison_blocage }}"
-          {% endif %}>
-    <i class="bi bi-hospital"></i> Installer le patient
-  </button>
   {% endif %}
 
   {# ─ Décharger ─ #}
@@ -1093,7 +1083,6 @@ if (m) CSRF = m[1];
 
 /* ══ URLs Django ═══════════════════════════════════════════════════════════════ */
 var URL_CONFIRMER  = '{% url "hospitalisation:confirmer"  hosp.pk %}';
-var URL_INSTALLER  = '{% url "hospitalisation:installer"  hosp.pk %}';
 var URL_DECHARGER  = '{% url "hospitalisation:decharger"  hosp.pk %}';
 var URL_TERMINER   = '{% url "hospitalisation:terminer"   hosp.pk %}';
 var URL_ANNULER    = '{% url "hospitalisation:annuler"    hosp.pk %}';
@@ -1228,9 +1217,6 @@ function renderActionBar(data) {
     }
   }
 
-  html += abtn('installer', 'abtn-info', 'bi-hospital', 'Installer le patient',
-               "doTransition('" + URL_INSTALLER + "')");
-
   html += abtn('decharger', 'abtn-violet', 'bi-door-open', 'Décharger',
                "doTransition('" + URL_DECHARGER + "')");
 
@@ -1356,7 +1342,6 @@ window.doTransition  = doTransition;
 window.switchTab     = switchTab;
 /* URLs exposées pour les scripts hors IIFE (ex: confirmAnnul) */
 window.URL_CONFIRMER = URL_CONFIRMER;
-window.URL_INSTALLER = URL_INSTALLER;
 window.URL_DECHARGER = URL_DECHARGER;
 window.URL_TERMINER  = URL_TERMINER;
 window.URL_ANNULER   = URL_ANNULER;
