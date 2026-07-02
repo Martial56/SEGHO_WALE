@@ -6,11 +6,17 @@
 {% block extra_css %}
 {{ block.super }}
 <style>
-/* ── Pleine page ── */
-.cl-page {
+/* ── Conteneur pleine page ── */
+.cl-wrap {
   display:flex; flex-direction:column;
-  height:calc(100vh - var(--topbar-h) - 44px);
+  height:calc(100vh - var(--topbar-h));
   overflow:hidden;
+}
+
+/* ── Corps de page ── */
+.cl-page {
+  flex:1; display:flex; flex-direction:column;
+  overflow:hidden; min-height:0;
 }
 
 /* ── En-tête compact ── */
@@ -139,10 +145,10 @@ html[data-theme="dark"] .cl-footer { background:rgba(26,109,140,.04); }
 {% endblock %}
 
 {% block content %}
-<div class="cl-page">
+<div class="cl-wrap">
 
-  <!-- ── En-tête ── -->
-  <div class="cl-head">
+  <!-- ── En-tête juste sous le nav ── -->
+  <div class="cl-head" id="subheader">
     <div class="cl-title">
       <i class="bi bi-list-ul" style="color:var(--cg-600);margin-right:6px;"></i>Liste des congés
     </div>
@@ -157,6 +163,7 @@ html[data-theme="dark"] .cl-footer { background:rgba(26,109,140,.04); }
     </div>
   </div>
 
+<div class="cl-page">
   <!-- ── KPIs cliquables ── -->
   <div class="cl-kpis">
     <a href="?q={{ q }}&type_conge={{ f_type }}&employe={{ f_employe }}&annee={{ f_annee }}"
@@ -344,5 +351,6 @@ html[data-theme="dark"] .cl-footer { background:rgba(26,109,140,.04); }
     {% endif %}
   </div>
 
-</div>
+</div><!-- /cl-page -->
+</div><!-- /cl-wrap -->
 {% endblock %}

@@ -8,7 +8,7 @@
 /* ── Pleine page ── */
 .rp-page {
   display:flex; flex-direction:column;
-  height:calc(100vh - var(--topbar-h) - 44px);
+  height:calc(100vh - var(--topbar-h));
   overflow:hidden;
 }
 
@@ -119,7 +119,7 @@ html[data-theme="dark"] .data-bar { background:#243447; }
 <div class="rp-page">
 
   <!-- ── En-tête ── -->
-  <div class="rp-head no-print">
+  <div class="rp-head no-print" id="subheader">
     <div>
       <div class="rp-title">
         <i class="bi bi-file-earmark-bar-graph-fill" style="color:var(--cg-600);margin-right:6px;"></i>
@@ -352,7 +352,7 @@ html[data-theme="dark"] .data-bar { background:#243447; }
               <a href="{% url 'conge_historique_employe' item.emp.pk %}" style="font-weight:700;color:var(--cg-text);text-decoration:none;">
                 {{ item.emp.nom_complet }}
               </a>
-              <div style="font-size:10.5px;color:var(--cg-muted);font-family:monospace;">{{ item.emp.matricule }}</div>
+              <div style="font-size:10.5px;color:var(--cg-muted);font-family: var(--font-mono);">{{ item.emp.matricule }}</div>
             </td>
             <td class="muted">{{ item.emp.service.nom|default:"—" }}</td>
             <td class="num">{{ item.nb }}</td>
@@ -417,6 +417,7 @@ html[data-theme="dark"] .data-bar { background:#243447; }
 {% endblock %}
 
 {% block extra_js %}
+{{ block.super }}
 {{ chart_type|json_script:"data-type" }}
 {{ chart_mensuel|json_script:"data-mensuel" }}
 {{ chart_service|json_script:"data-service" }}

@@ -2,135 +2,164 @@
 
 {% block title %}Nouvel inventaire physique — {{ label }}{% endblock %}
 
+{% block extra_ph_css %}<style>
+.ph-page-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 11px 32px;
+  background: var(--ph-surface); border-bottom: 1px solid var(--ph-border);
+  position: sticky; top: var(--topbar-h); z-index: 100;
+}
+.ph-qte-field {
+  border: none; border-bottom: 1.5px solid rgba(0,0,0,.15); background: transparent;
+  padding: 5px 4px; font-size: 13px; text-align: center; width: 90px;
+  font-family: inherit; color: var(--ph-text); transition: border-color .15s;
+}
+.ph-qte-field:focus { outline: none; border-bottom-color: var(--ph-500); }
+.ph-type-sep {
+  background: var(--ph-100); padding: 8px 14px;
+  font-size: 10.5px; font-weight: 700; color: var(--ph-700);
+  text-transform: uppercase; letter-spacing: .5px;
+  border-bottom: 1px solid var(--ph-border);
+}
+</style>{% endblock %}
+
 {% block content %}
 <form method="post" id="form-inventaire">
   {% csrf_token %}
 
-  {# ===== En-tête sticky ===== #}
-  <div style="position:sticky; top:calc(var(--topbar-h) + 44px); z-index:100;
-              background:var(--ph-surface); border-bottom:1px solid var(--ph-border);
-              box-shadow:0 2px 8px rgba(0,0,0,.06); padding:10px 20px 10px 32px;
-              display:flex; align-items:center; justify-content:space-between; gap:12px;">
-    <div style="font-size:14px; font-weight:800; color:var(--ph-900);">Nouvel inventaire physique</div>
-    <button type="submit" class="btn-ph" style="font-size:11.5px; padding:5px 14px;">
-      <i class="bi bi-save me-1"></i>Enregistrer
+  <!-- En-tête sticky -->
+  <div class="ph-page-head">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div style="width:34px;height:34px;border-radius:8px;background:var(--ph-100);display:flex;align-items:center;justify-content:center;font-size:17px;color:var(--ph-600);">
+        <i class="bi bi-clipboard2-check"></i>
+      </div>
+      <div>
+        <div style="font-size:15px;font-weight:800;color:var(--ph-900);">Nouvel inventaire physique</div>
+        <div style="font-size:11px;color:var(--ph-muted);">{{ label }}</div>
+      </div>
+    </div>
+    <button type="submit" class="btn-ph">
+      <i class="bi bi-save"></i> Enregistrer
     </button>
   </div>
 
-  <div class="container-fluid px-3 py-3">
-
-    {# ===== Message d'information ===== #}
-    <div class="alert alert-info d-flex align-items-start gap-2" role="alert">
-      <i class="bi bi-info-circle-fill flex-shrink-0 mt-1"></i>
-      <span>Saisissez les quantités physiquement comptées. Le stock théorique est pré-rempli.</span>
+  <!-- Explication -->
+  <div style="display:flex;align-items:flex-start;gap:10px;background:var(--ph-50);border-bottom:1px solid var(--ph-border);padding:14px 32px;margin:0;">
+    <i class="bi bi-info-circle-fill" style="color:var(--ph-500);font-size:18px;flex-shrink:0;margin-top:1px;"></i>
+    <div style="font-size:12.5px;color:var(--ph-muted);line-height:1.5;">
+      Saisissez les quantités physiquement comptées. Le stock théorique est pré-rempli.
     </div>
+  </div>
 
-    {# ===== Section date et notes ===== #}
-    <div class="card mb-3">
-      <div class="card-body row g-3 align-items-start">
-        <div class="col-12 col-md-3">
-          <label for="date_inventaire" class="form-label fw-semibold">Date de l'inventaire</label>
-          <input
-            type="date"
-            id="date_inventaire"
-            name="date_inventaire"
-            class="form-control"
-            value="{{ today|date:'Y-m-d' }}"
-            required
-          >
-        </div>
-        <div class="col-12 col-md-9">
-          <label for="notes" class="form-label fw-semibold">Notes</label>
-          <textarea
-            id="notes"
-            name="notes"
-            class="form-control"
-            rows="3"
-            placeholder="Observations, conditions de comptage…"
-          ></textarea>
+  <div style="padding:16px 32px 28px;">
+
+    <!-- Date et notes -->
+    <div class="ph-card" style="border:1px solid var(--ph-border);border-radius:12px;overflow:hidden;">
+      <div class="ph-card-body">
+        <div style="display:grid;grid-template-columns:200px 1fr;gap:24px;">
+          <div class="ph-field" style="margin-bottom:0;">
+            <label for="date_inventaire" class="ph-label">Date de l'inventaire</label>
+            <input
+              type="date"
+              id="date_inventaire"
+              name="date_inventaire"
+              class="ph-input"
+              value="{{ today|date:'Y-m-d' }}"
+              required
+            >
+          </div>
+          <div class="ph-field" style="margin-bottom:0;">
+            <label for="notes" class="ph-label">Notes</label>
+            <textarea
+              id="notes"
+              name="notes"
+              class="ph-input"
+              style="resize:vertical;"
+              rows="2"
+              placeholder="Observations, conditions de comptage…"
+            ></textarea>
+          </div>
         </div>
       </div>
     </div>
 
-    {# ===== Tableau des produits ===== #}
-    <div class="table-responsive" style="overflow-x:auto;">
-      <div style="padding:12px 20px 12px 32px;font-weight:600;font-size:.95rem;border-bottom:1px solid #dee2e6;">Produits en stock</div>
-      <table class="table table-bordered table-hover align-middle mb-3 w-100">
-        <thead class="table-dark sticky-top" style="top:56px;">
-          <tr>
-            <th scope="col" style="width:120px">Code</th>
-            <th scope="col">Produit</th>
-            <th scope="col" class="text-center text-muted" style="width:180px;">
-              Stock théorique
-              <small class="d-block fw-normal fst-italic">(lecture seule)</small>
-            </th>
-            <th scope="col" class="text-center" style="width:200px">Stock réel constaté</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for sp in stock_items %}
-
-            {# Séparateur de groupe par type de produit #}
-            {% ifchanged sp.produit.type_produit %}
-            <tr class="table-secondary">
-              <td colspan="4" class="fw-bold text-uppercase small py-1 px-3" style="letter-spacing:.05em;">
-                {{ sp.produit.get_type_produit_display|default:sp.produit.type_produit }}
-              </td>
-            </tr>
-            {% endifchanged %}
-
+    <!-- Produits -->
+    <div class="ph-card" style="margin-top:16px;border:1px solid var(--ph-border);border-radius:12px;overflow:hidden;">
+      <div class="ph-card-header">
+        <div class="ph-card-title"><i class="bi bi-box-seam" style="color:var(--ph-600);"></i> Produits en stock</div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="ph-table">
+          <thead>
             <tr>
-              <td class="font-monospace small" style="">{{ sp.produit.code }}</td>
-              <td>
-                <span class="fw-semibold">{{ sp.produit.nom }}</span>
-                {% if sp.produit.unite %}
-                  <small class="text-muted ms-1">({{ sp.produit.unite }})</small>
-                {% endif %}
-              </td>
-              <td class="text-center bg-light text-muted">
-                <input
-                  type="number"
-                  class="form-control form-control-sm text-center bg-light text-muted border-0"
-                  value="{{ sp.quantite|floatformat:0 }}"
-                  readonly
-                  tabindex="-1"
-                  aria-label="Stock théorique — lecture seule"
-                  style="pointer-events:none;"
-                >
-              </td>
-              <td class="text-center" style="">
-                <input
-                  type="number"
-                  name="reel_{{ sp.produit.pk }}"
-                  id="reel_{{ sp.produit.pk }}"
-                  class="form-control form-control-sm text-center"
-                  value="{{ sp.quantite|floatformat:0 }}"
-                  min="0"
-                  step="1"
-                  required
-                  aria-label="Stock réel constaté pour {{ sp.produit.nom }}"
-                >
-              </td>
+              <th style="width:120px;">Code</th>
+              <th>Produit</th>
+              <th style="text-align:center;width:180px;">Stock théorique<br><small style="font-weight:400;font-style:italic;text-transform:none;">(lecture seule)</small></th>
+              <th style="text-align:center;width:180px;">Stock réel constaté</th>
             </tr>
+          </thead>
+          <tbody>
+            {% for sp in stock_items %}
 
-          {% empty %}
+              {% ifchanged sp.produit.type_produit %}
+              <tr class="ph-type-sep">
+                <td colspan="4">{{ sp.produit.get_type_produit_display|default:sp.produit.type_produit }}</td>
+              </tr>
+              {% endifchanged %}
+
+              <tr>
+                <td><span style="font-family: var(--font-mono);font-size:11.5px;color:var(--ph-600);">{{ sp.produit.code }}</span></td>
+                <td>
+                  <span style="font-weight:600;">{{ sp.produit.nom }}</span>
+                  {% if sp.produit.unite %}
+                  <span style="font-size:10.5px;color:var(--ph-muted);"> ({{ sp.produit.unite }})</span>
+                  {% endif %}
+                </td>
+                <td style="text-align:center;">
+                  <input
+                    type="number"
+                    class="ph-qte-field"
+                    value="{{ sp.quantite|floatformat:0 }}"
+                    readonly
+                    tabindex="-1"
+                    aria-label="Stock théorique — lecture seule"
+                    style="pointer-events:none;color:var(--ph-muted);"
+                  >
+                </td>
+                <td style="text-align:center;">
+                  <input
+                    type="number"
+                    name="reel_{{ sp.produit.pk }}"
+                    id="reel_{{ sp.produit.pk }}"
+                    class="ph-qte-field"
+                    value="{{ sp.quantite|floatformat:0 }}"
+                    min="0"
+                    step="1"
+                    required
+                    aria-label="Stock réel constaté pour {{ sp.produit.nom }}"
+                  >
+                </td>
+              </tr>
+
+            {% empty %}
             <tr>
-              <td colspan="4" class="text-center text-muted py-4">
+              <td colspan="4" style="text-align:center;padding:32px;color:var(--ph-muted);">
                 Aucun produit en stock pour cette pharmacie.
               </td>
             </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
 
-    {# ===== Bouton submit bas de page ===== #}
-    <div class="d-flex justify-content-end pb-4">
-      <button type="submit" class="btn btn-primary btn-lg">
-        <i class="bi bi-save me-1"></i>Enregistrer l'inventaire
+    <!-- Bouton bas de page -->
+    <div style="display:flex;justify-content:flex-end;margin-top:16px;">
+      <button type="submit" class="btn-ph">
+        <i class="bi bi-save"></i> Enregistrer l'inventaire
       </button>
     </div>
 
-  </div>{# /container-fluid #}
+  </div>
 </form>
 {% endblock %}

@@ -1,6 +1,5 @@
 {% extends 'gynecologie/base.html' %}
 {% load static %}
-{% block nav_rdv %}active{% endblock %}
 
 {% block content %}
 <style>
@@ -17,7 +16,7 @@
   .badge-absent          { background: #fff3e0; color: #e65100; }
 </style>
 
-{% include 'includes/subheader.html' with subheader_title="Rendez-vous" subheader_placeholder="Rechercher un patient…" subheader_sticky_top="var(--gyn-nav-h)" subheader_filters_tpl="includes/subheader_filters_rdv_gyn.html" subheader_groups_tpl="includes/subheader_groups_rdv_gyn.html" %}
+{% include 'includes/subheader.html' with subheader_title="Rendez-vous" subheader_placeholder="Rechercher un patient…" subheader_filters_tpl="includes/subheader_filters_rdv_gyn.html" subheader_groups_tpl="includes/subheader_groups_rdv_gyn.html" %}
 
 <!-- ══ TABLE ══ -->
 <div class="o-list-wrap {% if request.GET.filter or request.GET.group %}has-tags{% endif %}">
@@ -47,8 +46,8 @@
         <td class="td-name">{{ rdv.patient.nom|upper }} {{ rdv.patient.prenoms }}</td>
         <td>{{ rdv.date_heure|date:"d/m/Y H:i" }}</td>
         <td class="td-doctor">{% if rdv.medecin %}{{ rdv.medecin }}{% else %}<span style="color:#ddd">—</span>{% endif %}</td>
-        <td>{{ rdv.type_consultation.nom|default:"—" }}</td>
-        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;color:var(--text-muted);">{% with diag=rdv.registre_curatif.diagnostic_display %}{{ diag|default:rdv.maladies|truncatechars:45|default:"—" }}{% endwith %}</td>
+        <td class="td-type">{{ rdv.type_consultation.nom|default:"—" }}</td>
+        <td class="td-diagnostic">{% with diag=rdv.registre_curatif.diagnostic_display %}{{ diag|default:rdv.maladies|truncatechars:45|default:"—" }}{% endwith %}</td>
         <td>{% if rdv.patient.date_naissance %}{{ age }} ans{% else %}<span style="color:#ddd">—</span>{% endif %}</td>
         <td>{% if rdv.patient.sexe == 'F' %}Femme{% elif rdv.patient.sexe == 'M' %}Homme{% else %}<span style="color:#ddd">—</span>{% endif %}</td>
         <td><span class="o-badge badge-{{ rdv.statut }}">{{ rdv.get_statut_display }}</span></td>

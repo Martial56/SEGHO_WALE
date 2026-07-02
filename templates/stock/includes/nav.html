@@ -1,0 +1,112 @@
+{% with uname=request.resolver_match.url_name %}
+<nav class="o-nav">
+  <a href="{% url 'dashboard' %}" class="o-nav-grid" title="Accueil">
+    <i class="bi bi-grid-3x3-gap-fill"></i>
+  </a>
+  <span class="o-nav-brand">
+    <i class="bi bi-box-seam"></i>
+    Stock
+  </span>
+
+  <a href="{% url 'stock_dashboard' %}"
+     class="o-nav-link {% if uname == 'stock_dashboard' %}active{% endif %}">
+    Tableau de bord
+  </a>
+
+  <a href="{% url 'stock_produits' %}"
+     class="o-nav-link {% if uname == 'stock_produits' %}active{% endif %}">
+    Produits
+  </a>
+
+  <a href="{% url 'stock_fiche_list' %}"
+     class="o-nav-link {% if uname == 'stock_fiche_list' %}active{% endif %}">
+    Fiches besoins
+  </a>
+
+  <a href="{% url 'stock_receptions_a_integrer' %}"
+     class="o-nav-link {% if uname == 'stock_receptions_a_integrer' %}active{% endif %}" style="position:relative;">
+    Réceptions achats
+    {% if stock_receptions_a_integrer %}
+    <span style="position:absolute;top:6px;right:2px;min-width:16px;height:16px;border-radius:8px;background:#d97706;color:#fff;font-size:9px;font-weight:800;line-height:16px;text-align:center;padding:0 3px;border:2px solid #fff;">{{ stock_receptions_a_integrer }}</span>
+    {% endif %}
+  </a>
+
+  <a href="{% url 'stock_dotation_list' %}"
+     class="o-nav-link {% if uname == 'stock_dotation_list' %}active{% endif %}" style="position:relative;">
+    Dotation
+    {% if stock_demandes_en_attente %}
+    <span style="position:absolute;top:6px;right:2px;min-width:16px;height:16px;border-radius:8px;background:#e84545;color:#fff;font-size:9px;font-weight:800;line-height:16px;text-align:center;padding:0 3px;border:2px solid #fff;">{{ stock_demandes_en_attente }}</span>
+    {% endif %}
+  </a>
+
+  <div style="flex:1;"></div>
+
+  <button onclick="toggleStMenu()" class="o-nav-link" id="st-grid-btn" style="border:none;cursor:pointer;background:none;" title="Autres modules">
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
+      <rect x="0" y="0" width="5" height="5" rx="1"/><rect x="6.5" y="0" width="5" height="5" rx="1"/><rect x="13" y="0" width="5" height="5" rx="1"/>
+      <rect x="0" y="6.5" width="5" height="5" rx="1"/><rect x="6.5" y="6.5" width="5" height="5" rx="1"/><rect x="13" y="6.5" width="5" height="5" rx="1"/>
+      <rect x="0" y="13" width="5" height="5" rx="1"/><rect x="6.5" y="13" width="5" height="5" rx="1"/><rect x="13" y="13" width="5" height="5" rx="1"/>
+    </svg>
+  </button>
+</nav>
+
+<!-- Popup menu grille : tous les modules stock -->
+<div id="st-menu-overlay" onclick="toggleStMenu()" style="display:none;position:fixed;inset:0;z-index:8000;background:rgba(0,0,0,.25);"></div>
+<div id="st-menu-popup" style="display:none;position:fixed;top:var(--header-h);right:8px;z-index:8001;background:#fff;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,.18);padding:16px;width:420px;max-width:96vw;max-height:80vh;overflow-y:auto;">
+  <div style="font-size:11px;font-weight:700;color:var(--st-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;padding-left:4px;">Tous les modules stock</div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
+    {% url 'stock_mouvements' as url_mv %}{% url 'stock_transfert' as url_tr %}
+    {% url 'stock_inventaire_list' as url_iv %}{% url 'stock_peremptions' as url_pe %}
+    {% url 'stock_valorisation' as url_vl %}
+    {% url 'stock_rapports_besoins' as url_rb %}
+    {% url 'stock_rapports_indicateurs' as url_ri %}{% url 'stock_rapports_consommation' as url_rc %}
+    {% url 'stock_rapports_dotations' as url_rd %}
+    {% url 'stock_elimination_create' as url_elim %}
+    {% url 'stock_retour_create' as url_retour %}
+    {% url 'stock_rapports_peremptions' as url_rp %}
+    {% url 'stock_rapports_bilan' as url_bilan %}
+    {% url 'stock_rapports_fournisseurs_prix' as url_frn %}
+
+    <div style="font-size:10px;font-weight:800;color:var(--st-muted);text-transform:uppercase;letter-spacing:.5px;padding:4px 6px 2px;grid-column:1/-1;">Gestion</div>
+    <a href="{{ url_mv }}" class="st-menu-item"><i class="bi bi-journal-text"></i><span>Journal</span></a>
+    <a href="{{ url_iv }}" class="st-menu-item"><i class="bi bi-clipboard2-check"></i><span>Inventaires</span></a>
+    <a href="{{ url_pe }}" class="st-menu-item"><i class="bi bi-calendar-x"></i><span>Péremptions</span></a>
+    <a href="{{ url_elim }}" class="st-menu-item"><i class="bi bi-trash3"></i><span>Éliminations</span></a>
+    <a href="{{ url_retour }}" class="st-menu-item"><i class="bi bi-box-arrow-in-left"></i><span>Retour pharma</span></a>
+    <a href="{{ url_vl }}" class="st-menu-item"><i class="bi bi-graph-up-arrow"></i><span>Valorisation</span></a>
+    <a href="{{ url_tr }}" class="st-menu-item"><i class="bi bi-shuffle"></i><span>Distribution</span></a>
+    <div style="font-size:10px;font-weight:800;color:var(--st-muted);text-transform:uppercase;letter-spacing:.5px;padding:4px 6px 2px;grid-column:1/-1;">Rapports</div>
+    <a href="{{ url_rb }}" class="st-menu-item"><i class="bi bi-clipboard2-data"></i><span>Besoins</span></a>
+    <a href="{{ url_ri }}" class="st-menu-item"><i class="bi bi-speedometer2"></i><span>Indicateurs</span></a>
+    <a href="{{ url_rc }}" class="st-menu-item"><i class="bi bi-box-arrow-right"></i><span>Dotations</span></a>
+    <a href="{{ url_rd }}" class="st-menu-item"><i class="bi bi-graph-up"></i><span>Tendances</span></a>
+    <a href="{{ url_rp }}" class="st-menu-item"><i class="bi bi-trash3-fill"></i><span>Élim. rapport</span></a>
+    <a href="{{ url_bilan }}" class="st-menu-item"><i class="bi bi-file-earmark-bar-graph"></i><span>Bilan mensuel</span></a>
+    <a href="{{ url_frn }}" class="st-menu-item"><i class="bi bi-currency-exchange"></i><span>Prix fourn.</span></a>
+  </div>
+</div>
+
+<style>
+.st-menu-item {
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:6px;padding:12px 8px;border-radius:10px;text-decoration:none;
+  color:var(--st-text);font-size:11.5px;font-weight:500;text-align:center;
+  transition:background .15s;
+}
+.st-menu-item:hover { background:var(--st-50);color:var(--st-600); }
+.st-menu-item i { font-size:22px;color:var(--st-500); }
+.st-menu-item:hover i { color:var(--st-600); }
+</style>
+<script>
+function toggleStMenu(){
+  var popup   = document.getElementById('st-menu-popup');
+  var overlay = document.getElementById('st-menu-overlay');
+  var btn     = document.getElementById('st-grid-btn');
+  var open = popup.style.display !== 'none';
+  popup.style.display   = open ? 'none' : 'block';
+  overlay.style.display = open ? 'none' : 'block';
+  btn.style.background  = open ? '' : 'rgba(15,67,88,.1)';
+  btn.style.borderRadius= open ? '' : '6px';
+}
+</script>
+{% endwith %}

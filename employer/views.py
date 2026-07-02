@@ -1584,8 +1584,8 @@ def _wba_rp(request):
 @require_POST
 def bio_enroll_options(request):
     import json as _j
-    from webauthn import generate_registration_options, options_to_json, bytes_to_base64url
-    from webauthn.helpers import base64url_to_bytes
+    from webauthn import generate_registration_options, options_to_json
+    from webauthn.helpers import base64url_to_bytes, bytes_to_base64url
     from webauthn.helpers.structs import (
         AuthenticatorSelectionCriteria, AuthenticatorAttachment,
         ResidentKeyRequirement, UserVerificationRequirement,
@@ -1701,7 +1701,8 @@ def bio_enroll_verify(request):
 
 
 def bio_auth_options(request):
-    from webauthn import generate_authentication_options, options_to_json, bytes_to_base64url
+    from webauthn import generate_authentication_options, options_to_json
+    from webauthn.helpers import bytes_to_base64url
     from webauthn.helpers.structs import UserVerificationRequirement
 
     rp_id, _, _ = _wba_rp(request)

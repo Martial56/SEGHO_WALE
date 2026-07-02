@@ -1,19 +1,34 @@
 {% extends "pharmacie/base.html" %}
 
-{% block nav_inventaire %}active{% endblock %}
-
 {% block title %}Inventaire {{ inv.numero }} - Pharmacie{% endblock %}
+
+{% block extra_ph_css %}<style>
+.ph-page-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 11px 32px;
+  background: var(--ph-surface); border-bottom: 1px solid var(--ph-border);
+  position: sticky; top: var(--topbar-h); z-index: 100;
+  flex-wrap: wrap;
+}
+.inv-stats { display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px; }
+@media (max-width:720px) { .inv-stats { grid-template-columns:repeat(2,1fr); } }
+.inv-stat-box { background:var(--ph-surface);border:1px solid var(--ph-border);border-radius:12px;padding:16px;text-align:center; }
+.inv-stat-val { font-size:26px;font-weight:800;line-height:1; }
+.inv-stat-lbl { font-size:11px;color:var(--ph-muted);margin-top:5px; }
+.ph-qte-field {
+  border: none; border-bottom: 1.5px solid rgba(0,0,0,.15); background: transparent;
+  padding: 5px 4px; font-size: 13px; text-align: right; width: 90px;
+  font-family: inherit; color: var(--ph-text); transition: border-color .15s;
+}
+.ph-qte-field:focus { outline: none; border-bottom-color: var(--ph-500); }
+</style>{% endblock %}
 
 {% block content %}
 <div class="hist-wrapper"><div class="hist-main">
 <a class="o-back-btn" href="javascript:history.back()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 5l-7 7 7 7"/></svg> Retour</a>
-<div class="container-fluid px-0">
 
   {# ── En-tête sticky ── #}
-  <div style="position:sticky; top:calc(var(--topbar-h) + 44px); z-index:100;
-              background:var(--ph-surface); border-bottom:1px solid var(--ph-border);
-              box-shadow:0 2px 8px rgba(0,0,0,.06); padding:10px 20px 10px 32px;
-              margin-bottom:16px; display:flex; flex-wrap:wrap; align-items:center; gap:10px;">
+  <div class="ph-page-head" style="margin-bottom:16px;">
     <div style="flex:1; min-width:0;">
       <div style="font-size:14px; font-weight:800; color:var(--ph-900);">
         Inventaire n° {{ inv.numero }}
@@ -32,7 +47,7 @@
         <i class="bi bi-arrow-left"></i> Retour
       </a>
       {% if inv.statut == 'brouillon' %}
-      <form method="post" style="display:inline;">
+      <form method="post" id="header-form-save" style="display:inline;">
         {% csrf_token %}
         <input type="hidden" name="action" value="sauvegarder">
         <button type="submit" class="btn-ph-outline" style="font-size:11.5px; padding:5px 12px;">
@@ -51,12 +66,12 @@
     </div>
   </div>
 
-  <div class="px-3">
+  <div style="padding:0 32px 28px;">
 
     {# ── Bandeau validation ── #}
     {% if inv.statut == 'valide' %}
-    <div class="alert alert-success d-flex align-items-center mb-4" role="alert">
-      <i class="bi bi-patch-check-fill fs-5 me-2"></i>
+    <div style="display:flex;align-items:center;gap:10px;background:rgba(22,169,107,.1);border:1px solid rgba(22,169,107,.25);border-radius:10px;padding:12px 16px;margin-bottom:20px;color:#0d7a4c;font-size:13px;">
+      <i class="bi bi-patch-check-fill" style="font-size:18px;"></i>
       <div>
         Inventaire validé le <strong>{{ inv.date_validation|date:"d/m/Y à H:i" }}</strong>
         par <strong>{{ inv.valide_par }}</strong>.
@@ -65,38 +80,22 @@
     {% endif %}
 
     {# ── 4 cartes statistiques ── #}
-    <div class="row g-3 mb-4">
-      <div class="col-6 col-md-3">
-        <div class="card border-0 shadow-sm h-100">
-          <div class="card-body text-center">
-            <div class="fs-1 fw-bold text-primary">{{ stats.total }}</div>
-            <div class="text-muted small">Lignes total</div>
-          </div>
-        </div>
+    <div class="inv-stats">
+      <div class="inv-stat-box">
+        <div class="inv-stat-val" style="color:var(--ph-700);">{{ stats.total }}</div>
+        <div class="inv-stat-lbl">Lignes total</div>
       </div>
-      <div class="col-6 col-md-3">
-        <div class="card border-0 shadow-sm h-100">
-          <div class="card-body text-center">
-            <div class="fs-1 fw-bold text-warning">{{ stats.avec_ecart }}</div>
-            <div class="text-muted small">Avec écart</div>
-          </div>
-        </div>
+      <div class="inv-stat-box">
+        <div class="inv-stat-val" style="color:#8a5c00;">{{ stats.avec_ecart }}</div>
+        <div class="inv-stat-lbl">Avec écart</div>
       </div>
-      <div class="col-6 col-md-3">
-        <div class="card border-0 shadow-sm h-100">
-          <div class="card-body text-center">
-            <div class="fs-1 fw-bold text-danger">{{ stats.manquants }}</div>
-            <div class="text-muted small">Manquants</div>
-          </div>
-        </div>
+      <div class="inv-stat-box">
+        <div class="inv-stat-val" style="color:#b71c1c;">{{ stats.manquants }}</div>
+        <div class="inv-stat-lbl">Manquants</div>
       </div>
-      <div class="col-6 col-md-3">
-        <div class="card border-0 shadow-sm h-100">
-          <div class="card-body text-center">
-            <div class="fs-1 fw-bold text-success">{{ stats.excedents }}</div>
-            <div class="text-muted small">Excédents</div>
-          </div>
-        </div>
+      <div class="inv-stat-box">
+        <div class="inv-stat-val" style="color:#0d7a4c;">{{ stats.excedents }}</div>
+        <div class="inv-stat-lbl">Excédents</div>
       </div>
     </div>
 
@@ -110,75 +109,66 @@
     {% regroup lignes by produit.type as lignes_par_type %}
 
     {% for groupe in lignes_par_type %}
-    <div class="card border-0 shadow-sm mb-4">
-      <div class="card-header bg-light fw-semibold" style="padding:12px 20px 12px 32px;">
-        {{ groupe.grouper|default:"Sans type" }}
+    <div class="ph-card" style="border:1px solid var(--ph-border);border-radius:12px;overflow:hidden;margin-bottom:16px;">
+      <div class="ph-card-header">
+        <div class="ph-card-title">{{ groupe.grouper|default:"Sans type" }}</div>
       </div>
-      <div class="table-responsive" style="overflow-x:auto;">
-        <table class="table table-hover align-middle mb-0">
-          <thead class="table-light">
+      <div style="overflow-x:auto;">
+        <table class="ph-table">
+          <thead>
             <tr>
               <th style="width:120px">Code</th>
               <th>Produit</th>
-              <th class="text-end" style="width:140px;">Stock théorique</th>
-              <th class="text-end" style="width:160px;">Stock réel</th>
-              <th class="text-end" style="width:100px;">Écart</th>
-              <th class="text-center" style="width:160px">Statut</th>
+              <th style="text-align:right;width:140px;">Stock théorique</th>
+              <th style="text-align:right;width:160px;">Stock réel</th>
+              <th style="text-align:right;width:100px;">Écart</th>
+              <th style="text-align:center;width:160px">Statut</th>
             </tr>
           </thead>
           <tbody>
             {% for ligne in groupe.list %}
-            {% with ecart=ligne.stock_reel|add:ligne.stock_theorique|stringformat:"s" %}
-            {# We compute ecart via template filter below #}
             <tr>
-              <td style="">
-                <code class="text-secondary">{{ ligne.produit.code }}</code>
-              </td>
+              <td><span style="font-family:var(--font-mono);font-size:11.5px;color:var(--ph-muted);">{{ ligne.produit.code }}</span></td>
               <td>
-                <div class="fw-medium">{{ ligne.produit.nom }}</div>
+                <div style="font-weight:600;">{{ ligne.produit.nom }}</div>
                 {% if ligne.produit.dosage %}
-                  <small class="text-muted">{{ ligne.produit.dosage }}</small>
+                  <div style="font-size:10.5px;color:var(--ph-muted);">{{ ligne.produit.dosage }}</div>
                 {% endif %}
               </td>
-              <td class="text-end">{{ ligne.stock_theorique }}</td>
-              <td class="text-end">
+              <td style="text-align:right;">{{ ligne.stock_theorique|floatformat:"0" }}</td>
+              <td style="text-align:right;">
                 {% if inv.statut == 'brouillon' %}
                   <input type="number"
                          name="stock_reel_{{ ligne.pk }}"
-                         value="{{ ligne.stock_reel }}"
+                         value="{{ ligne.stock_reel|floatformat:"0" }}"
                          min="0"
                          step="1"
-                         class="form-control form-control-sm text-end ecart-input"
+                         class="ph-qte-field ecart-input"
                          data-pk="{{ ligne.pk }}"
-                         data-theorique="{{ ligne.stock_theorique }}"
-                         style="width:90px; display:inline-block;">
+                         data-theorique="{{ ligne.stock_theorique|floatformat:"0" }}">
                 {% else %}
-                  {{ ligne.stock_reel }}
+                  {{ ligne.stock_reel|floatformat:"0" }}
                 {% endif %}
               </td>
-              <td class="text-end fw-semibold
-                {% if ligne.ecart > 0 %}text-success
-                {% elif ligne.ecart < 0 %}text-danger
-                {% else %}text-success{% endif %}"
+              <td style="text-align:right;font-weight:700;color:{% if ligne.ecart > 0 %}#0d7a4c{% elif ligne.ecart < 0 %}#b71c1c{% else %}#0d7a4c{% endif %};"
                 id="ecart-{{ ligne.pk }}">
                 {% if ligne.ecart > 0 %}+{{ ligne.ecart }}
                 {% elif ligne.ecart < 0 %}{{ ligne.ecart }}
                 {% else %}0{% endif %}
               </td>
-              <td class="text-center" id="statut-{{ ligne.pk }}" style="">
+              <td style="text-align:center;" id="statut-{{ ligne.pk }}">
                 {% if ligne.ecart > 0 %}
-                  <span class="badge bg-success">+{{ ligne.ecart }} excédent</span>
+                  <span class="badge-ph-ok">+{{ ligne.ecart }} excédent</span>
                 {% elif ligne.ecart < 0 %}
-                  <span class="badge bg-danger">{{ ligne.ecart|abs }} manquant</span>
+                  <span class="badge-ph-rupture">{% widthratio ligne.ecart -1 1 %} manquant</span>
                 {% else %}
-                  <span class="badge bg-success">&#10003; Conforme</span>
+                  <span class="badge-ph-ok">&#10003; Conforme</span>
                 {% endif %}
               </td>
             </tr>
-            {% endwith %}
             {% empty %}
             <tr>
-              <td colspan="6" class="text-center text-muted py-3">Aucune ligne pour ce type.</td>
+              <td colspan="6" style="text-align:center;color:var(--ph-muted);padding:16px;">Aucune ligne pour ce type.</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -186,7 +176,9 @@
       </div>
     </div>
     {% empty %}
-    <div class="alert alert-info">Aucune ligne dans cet inventaire.</div>
+    <div style="background:var(--ph-50);border:1px solid var(--ph-border);border-radius:10px;padding:14px 18px;color:var(--ph-muted);font-size:13px;">
+      Aucune ligne dans cet inventaire.
+    </div>
     {% endfor %}
 
     {% if inv.statut == 'brouillon' %}
@@ -195,18 +187,17 @@
 
     {# ── Notes ── #}
     {% if inv.notes %}
-    <div class="card border-0 shadow-sm mb-4">
-      <div class="card-header bg-light fw-semibold py-2">
-        <i class="bi bi-journal-text me-1"></i> Notes
+    <div class="ph-card" style="border:1px solid var(--ph-border);border-radius:12px;overflow:hidden;">
+      <div class="ph-card-header">
+        <div class="ph-card-title"><i class="bi bi-journal-text" style="color:var(--ph-600);"></i> Notes</div>
       </div>
-      <div class="card-body">
-        <p class="mb-0" style="white-space: pre-wrap;">{{ inv.notes }}</p>
+      <div class="ph-card-body">
+        <p style="margin:0;white-space:pre-wrap;font-size:13px;color:var(--ph-text);">{{ inv.notes }}</p>
       </div>
     </div>
     {% endif %}
 
-  </div>{# /px-3 #}
-</div>{# /container-fluid #}
+  </div>
 </div>
 {% load core_tags %}
 {% historique_sidebar inv %}
@@ -232,30 +223,27 @@
       var statutCell = document.getElementById("statut-" + pk);
 
       // Mise à jour de la cellule écart
-      ecartCell.className = "text-end fw-semibold " + (ecart > 0 ? "text-success" : ecart < 0 ? "text-danger" : "text-success");
+      ecartCell.style.color = ecart > 0 ? "#0d7a4c" : ecart < 0 ? "#b71c1c" : "#0d7a4c";
       ecartCell.textContent = ecart > 0 ? "+" + ecart : ecart;
 
       // Mise à jour du badge statut
       if (ecart > 0) {
-        statutCell.innerHTML = '<span class="badge bg-success">+' + ecart + ' excédent</span>';
+        statutCell.innerHTML = '<span class="badge-ph-ok">+' + ecart + ' excédent</span>';
       } else if (ecart < 0) {
-        statutCell.innerHTML = '<span class="badge bg-danger">' + Math.abs(ecart) + ' manquant</span>';
+        statutCell.innerHTML = '<span class="badge-ph-rupture">' + Math.abs(ecart) + ' manquant</span>';
       } else {
-        statutCell.innerHTML = '<span class="badge bg-success">&#10003; Conforme</span>';
+        statutCell.innerHTML = '<span class="badge-ph-ok">&#10003; Conforme</span>';
       }
     });
   });
 
   // Lier le bouton "Sauvegarder" du header au formulaire principal
-  var btnSave = document.querySelector('form[data-action="sauvegarder"] button, .sticky-top form [name="action"][value="sauvegarder"]');
-  // Sync: clicking header save submits the main form
-  var headerSaveForm = document.querySelector('.sticky-top form [name="action"][value="sauvegarder"]');
+  var headerSaveForm = document.getElementById("header-form-save");
   if (headerSaveForm) {
-    headerSaveForm.closest("form").addEventListener("submit", function (e) {
+    headerSaveForm.addEventListener("submit", function (e) {
       e.preventDefault();
       var mainForm = document.getElementById("form-inventaire");
       if (mainForm) {
-        // Copy stock_reel values are already in mainForm; just submit it
         mainForm.querySelector('[name="action"]').value = "sauvegarder";
         mainForm.requestSubmit ? mainForm.requestSubmit() : mainForm.submit();
       }

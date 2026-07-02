@@ -1,4 +1,4 @@
-﻿{% extends 'base.html' %}
+{% extends 'base.html' %}
 {% load i18n %}
 
 {% block topbar_title %}Planning{% endblock %}
@@ -9,7 +9,6 @@
 <style>
 /* ── Palette logo (vert forêt) ── */
 :root {
-  --pl-nav-h: 44px;
   --pl-900: #071e28;
   --pl-800: #0f4358;
   --pl-700: #0f4358;
@@ -30,26 +29,6 @@ html[data-theme="dark"] {
   --text-muted: rgba(255,255,255,0.45); --bg: #171616;
 }
 .content { padding: 0; overflow-x: clip; }
-
-.pl-nav {
-  background: #fff; border-bottom: 1px solid rgba(0,0,0,0.08);
-  padding: 0 32px;
-  display: flex; align-items: stretch; height: 44px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-  position: fixed; top: var(--topbar-h); left:0; right:0; z-index: 250;
-}
-.pl-nav-link {
-  padding: 11px 16px; font-size: 13px; font-weight: 500;
-  color: rgba(0,0,0,0.5); text-decoration: none;
-  border-bottom: 2px solid transparent;
-  display: inline-flex; align-items: center; gap: 6px;
-  transition: color 0.15s, border-color 0.15s; white-space: nowrap;
-}
-.pl-nav-link:hover { color: var(--pl-600); }
-.pl-nav-link.active { color: var(--pl-600); border-bottom-color: var(--pl-500); font-weight: 600; }
-html[data-theme="dark"] .pl-nav { background: #171616; border-bottom-color: rgba(255,255,255,0.06); }
-html[data-theme="dark"] .pl-nav-link { color: rgba(255,255,255,0.4); }
-html[data-theme="dark"] .pl-nav-link.active { color: var(--pl-300); border-bottom-color: var(--pl-400); }
 
 /* ── Boutons communs ── */
 .btn-primary {
@@ -92,82 +71,10 @@ html[data-theme="dark"] .pl-nav-link.active { color: var(--pl-300); border-botto
 }
 .btn-danger-sm:hover { background: #c0392b; color: #fff; }
 
-/* ── Alerte semaines manquantes ── */
-.pl-nav-right-group {
-  margin-left: auto; display: flex; align-items: center;
-}
-.pl-nav-alerte-wrap {
-  display: flex; align-items: center;
-  position: relative; padding: 0 4px;
-}
-.pl-alerte-btn {
-  background: none; border: none; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  height: 44px; padding: 0 8px; position: relative; color: #f9a825;
-  font-size: 17px; transition: color 0.15s;
-}
-.pl-alerte-btn:hover { color: #e65100; }
-.pl-alerte-badge {
-  position: absolute; top: 8px; right: 3px;
-  background: #e65100; color: #fff; border-radius: 10px;
-  font-size: 10px; font-weight: 700; min-width: 16px; height: 16px;
-  display: flex; align-items: center; justify-content: center;
-  padding: 0 3px; line-height: 1;
-}
-.pl-alerte-popup {
-  display: none; position: absolute; top: calc(100% + 4px); right: 0;
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 9px; box-shadow: 0 8px 28px rgba(0,0,0,0.14);
-  min-width: 290px; z-index: 600; overflow: hidden;
-}
-.pl-alerte-popup.open { display: block; }
-.pl-alerte-popup-head {
-  padding: 10px 14px 8px; font-size: 11px; font-weight: 700;
-  color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;
-  border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 7px;
-}
-.pl-alerte-popup-head i { color: #f9a825; font-size: 13px; }
-.pl-alerte-popup-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 14px; font-size: 12.5px; color: var(--text);
-  border-bottom: 1px solid var(--border);
-}
-.pl-alerte-popup-item:last-child { border-bottom: none; }
-.pl-alerte-popup-item i { color: #f9a825; flex-shrink: 0; font-size: 14px; }
-.pl-alerte-popup-item span { flex: 1; line-height: 1.35; }
-.pl-alerte-popup-item a {
-  color: var(--pl-600); font-size: 11.5px; font-weight: 600;
-  text-decoration: none; padding: 3px 9px; border-radius: 4px;
-  border: 1px solid var(--pl-300); white-space: nowrap;
-  transition: background 0.12s;
-}
-.pl-alerte-popup-item a:hover { background: var(--pl-50); }
-html[data-theme="dark"] .pl-alerte-btn { color: #ffd180; }
-html[data-theme="dark"] .pl-alerte-btn:hover { color: #ffab40; }
-
-/* ── Badge notifications ── */
-.pl-notif-btn {
-  background: none; border: none; cursor: pointer; text-decoration: none;
-  display: flex; align-items: center; justify-content: center;
-  height: 44px; padding: 0 8px; position: relative; color: var(--pl-600);
-  font-size: 17px; transition: color 0.15s;
-}
-.pl-notif-btn:hover { color: var(--pl-800); }
-.pl-notif-badge {
-  position: absolute; top: 8px; right: 3px;
-  background: var(--pl-600); color: #fff; border-radius: 10px;
-  font-size: 10px; font-weight: 700; min-width: 16px; height: 16px;
-  display: flex; align-items: center; justify-content: center;
-  padding: 0 3px; line-height: 1;
-}
-html[data-theme="dark"] .pl-notif-btn { color: var(--pl-300); }
-
 /* ── Mobile responsive ── */
 @media (max-width: 768px) {
   .main { height: auto !important; overflow: visible !important; }
   .content { overflow-x: visible; padding: 0 8px !important; }
-  .pl-nav { padding: 0 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; }
-  .pl-nav-link { padding: 10px 10px; font-size: 12px; }
   .pl-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .stats-cards { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
   .monthly-chart { gap: 6px; }
@@ -178,95 +85,34 @@ html[data-theme="dark"] .pl-notif-btn { color: var(--pl-300); }
 </style>
 {% endblock %}
 
-{% block breadcrumb %}
-<nav class="pl-nav">
-  <a href="{% url 'planning_courant' %}" class="pl-nav-link {% block nav_courant %}{% endblock %}">
-    <i class="bi bi-speedometer2"></i> Tableau de bord
-  </a>
-  <a href="{% url 'planning_list' %}" class="pl-nav-link {% block nav_list %}{% endblock %}">
-    <i class="bi bi-list-ul"></i> Liste
-  </a>
-  <a href="{% url 'planning_mensuel' %}" class="pl-nav-link {% block nav_mensuel %}{% endblock %}">
-    <i class="bi bi-calendar3"></i> Mensuel
-  </a>
-  <a href="{% url 'planning_par_medecin' %}" class="pl-nav-link {% block nav_medecin %}{% endblock %}">
-    <i class="bi bi-person-lines-fill"></i> Par médecin
-  </a>
-  <a href="{% url 'planning_stats' %}" class="pl-nav-link {% block nav_stats %}{% endblock %}">
-    <i class="bi bi-bar-chart-line"></i> Statistiques
-  </a>
-  {% if pl_can_manage %}
-  <a href="{% url 'planning_bureaux' %}" class="pl-nav-link {% block nav_bureaux %}{% endblock %}">
-    <i class="bi bi-building"></i> Bureaux
-  </a>
-  <a href="{% url 'planning_nouveau' %}" class="pl-nav-link {% block nav_nouveau %}{% endblock %}">
-    <i class="bi bi-plus-lg"></i> Nouveau
-  </a>
-  {% endif %}
+{% block module_navbar %}
+{% include 'planning/includes/nav.html' %}
+{% endblock %}
 
-  <div class="pl-nav-right-group">
-    {% if pl_notifs_count %}
-    <a href="{% url 'planning_list' %}" class="pl-notif-btn"
-       title="{{ pl_notifs_count }} planning{% if pl_notifs_count > 1 %}s publiés{% else %} publié{% endif %} non consulté{% if pl_notifs_count > 1 %}s{% endif %}">
-      <i class="bi bi-bell-fill"></i>
-      <span class="pl-notif-badge">{{ pl_notifs_count }}</span>
-    </a>
-    {% endif %}
-    {% if planning_alertes %}
-    <div class="pl-nav-alerte-wrap">
-      <button type="button" class="pl-alerte-btn" id="planningAlerteBtn"
-              title="{{ planning_alertes|length }} semaine{% if planning_alertes|length > 1 %}s{% endif %} sans planning publié">
-        <i class="bi bi-exclamation-triangle-fill"></i>
-        <span class="pl-alerte-badge">{{ planning_alertes|length }}</span>
-      </button>
-      <div class="pl-alerte-popup" id="planningAlertePopup">
-        <div class="pl-alerte-popup-head">
-          <i class="bi bi-exclamation-triangle-fill"></i>
-          Semaines sans planning publié
-        </div>
-        {% for a in planning_alertes %}
-        <div class="pl-alerte-popup-item">
-          <i class="bi bi-calendar-x"></i>
-          <span>{{ a.label }}</span>
-          {% if pl_can_manage %}
-          <a href="{% url 'planning_nouveau' %}">Créer</a>
-          {% endif %}
-        </div>
-        {% endfor %}
-      </div>
-    </div>
-    {% endif %}
-  </div>
-</nav>
-<div id="pl-nav-spacer" style="height:44px;"></div>
+{% block breadcrumb %}{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
 <script>
-(function() {
-  function fixNavTop() {
-    var tb  = document.querySelector('.topbar');
-    var nav = document.querySelector('.pl-nav');
-    if (!tb || !nav) return;
-    var h = tb.getBoundingClientRect().height;
-    if (h > 20) {
-      nav.style.top = h + 'px';
-      document.documentElement.style.setProperty('--topbar-h', h + 'px');
-    }
+(function () {
+  function alignSousTopbar() {
+    var topbar = document.querySelector('.topbar');
+    var content = document.querySelector('.content');
+    if (!topbar || !content) return;
+    var tbH = Math.ceil(topbar.getBoundingClientRect().height);
+    if (tbH <= 0) return;
+    document.documentElement.style.setProperty('--header-h', tbH + 'px');
+    document.documentElement.style.setProperty('--topbar-h', '0px');
+    requestAnimationFrame(function () {
+      var contentGap = Math.round(content.getBoundingClientRect().top - topbar.getBoundingClientRect().bottom);
+      if (contentGap !== 0) {
+        document.documentElement.style.setProperty('--header-h', (tbH - contentGap) + 'px');
+      }
+    });
   }
-  fixNavTop();
-  window.addEventListener('load', fixNavTop);
-})();
-(function() {
-  var btn   = document.getElementById('planningAlerteBtn');
-  var popup = document.getElementById('planningAlertePopup');
-  if (!btn || !popup) return;
-  btn.addEventListener('click', function(e) {
-    e.stopPropagation();
-    popup.classList.toggle('open');
-  });
-  document.addEventListener('click', function(e) {
-    if (!popup.contains(e.target) && e.target !== btn) {
-      popup.classList.remove('open');
-    }
-  });
+  if (document.readyState !== 'loading') { alignSousTopbar(); }
+  else { document.addEventListener('DOMContentLoaded', alignSousTopbar); }
+  window.addEventListener('resize', alignSousTopbar);
 })();
 </script>
 {% endblock %}

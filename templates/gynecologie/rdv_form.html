@@ -1,8 +1,6 @@
-﻿{% extends 'gynecologie/base.html' %}
-{% block nav_rdv %}active{% endblock %}
+{% extends 'gynecologie/base.html' %}
 
 {% block extra_gyn_css %}
-<style>
     /* ── Control panel ── */
     .control-panel {
         background: #fff;
@@ -10,36 +8,39 @@
         position: sticky;
         top: 0;
         z-index: 100;
+        margin: 0 -32px;
     }
     .cp-top {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 10px 24px;
+        padding: 6px 16px;
         gap: 12px;
     }
     .cp-breadcrumb {
         display: flex; align-items: center; gap: 6px;
-        font-size: 14px; font-weight: 600;
+        font-size: 13.5px; font-weight: 500;
     }
-    .cp-breadcrumb a { color: var(--teal-600); text-decoration: none; font-weight: 600; }
+    .cp-breadcrumb a { color: var(--teal-600); text-decoration: none; font-weight: 500; }
     .cp-breadcrumb a:hover { color: var(--teal-500); }
     .cp-breadcrumb .sep { color: #bbb; font-weight: 400; }
-    .cp-breadcrumb .current { color: rgba(0,0,0,0.45); font-weight: 500; }
+    .cp-breadcrumb .current { color: rgba(0,0,0,0.45); font-weight: 400; }
 
     .cp-save-group { display: flex; gap: 8px; align-items: center; }
     .btn-save {
+        display: inline-flex; align-items: center; gap: 5px;
         background: var(--teal-500); color: #fff;
-        border: none; border-radius: 6px;
-        padding: 8px 20px; font-size: 13px; font-weight: 700;
+        border: none; border-radius: 4px;
+        padding: 6px 14px; font-size: 12.5px; font-weight: 600;
         cursor: pointer; font-family: 'Sora', sans-serif;
         transition: background 0.15s;
     }
     .btn-save:hover { background: var(--teal-600); }
     .btn-discard {
+        display: inline-flex; align-items: center; gap: 5px;
         background: transparent; color: rgba(0,0,0,0.55);
-        border: 1px solid rgba(0,0,0,0.15); border-radius: 6px;
-        padding: 8px 16px; font-size: 13px; font-weight: 600;
+        border: 1px solid rgba(0,0,0,0.15); border-radius: 4px;
+        padding: 5px 14px; font-size: 12.5px; font-weight: 500;
         cursor: pointer; font-family: 'Sora', sans-serif;
         text-decoration: none; transition: all 0.15s;
     }
@@ -48,8 +49,9 @@
     /* ── Workflow row (action buttons + status bar) ── */
     .cp-workflow-row {
         display: flex; align-items: center; justify-content: space-between;
-        padding: 0 16px 8px;
-        border-top: 1px solid rgba(0,0,0,0.06);
+        padding: 0 0 16px;
+        margin: 0;
+        border-bottom: 1px solid rgba(0,0,0,0.06);
         gap: 12px; flex-wrap: wrap;
     }
 
@@ -116,7 +118,7 @@
     .status-step .step-dot { display: none; }
 
     /* ── Form body ── */
-    .form-body { background: #fff; padding: 28px 28px 0; }
+    .form-body { background: #fff; margin-top: 16px; padding: 24px 28px 0; border-radius: 8px 8px 0 0; }
 
     /* ── Two-column main layout ── */
     .form-main-grid {
@@ -424,7 +426,6 @@
         .status-bar { flex-wrap: wrap; }
         .timing-section { grid-template-columns: 1fr; }
     }
-</style>
 {% endblock %}
 
 {% block content %}
@@ -446,16 +447,25 @@
 <div class="control-panel">
 
     <div class="cp-top">
-        <div class="cp-breadcrumb">
-            <a href="{% url 'gynecologie_rdv' %}">Rendez-vous</a>
-            <span class="sep">/</span>
-            <span class="current">{% if rdv %}{{ rdv.patient.nom }} {{ rdv.patient.prenoms }}{% else %}Nouveau{% endif %}</span>
+        <div style="display:flex;align-items:center;gap:10px;">
+            <a href="{% url 'gynecologie_rdv' %}" class="o-ctrl-btn" style="padding:3px 7px;">
+                <i class="bi bi-arrow-left"></i>
+            </a>
+            <div class="cp-breadcrumb">
+                <a href="{% url 'gynecologie_rdv' %}">Rendez-vous</a>
+                <span class="sep">/</span>
+                <span class="current">{% if rdv %}{{ rdv.patient.nom }} {{ rdv.patient.prenoms }}{% else %}Nouveau{% endif %}</span>
+            </div>
         </div>
         <div class="cp-save-group">
             <button type="submit" class="btn-save">{% if rdv %}Enregistrer{% else %}Sauvegarder et facturer{% endif %}</button>
             <a href="{% url 'gynecologie_rdv' %}" class="btn-discard">Ignorer</a>
         </div>
     </div>
+</div>
+
+<!-- ══════════════ CORPS DU FORMULAIRE ══════════════ -->
+<div class="form-body">
 
     <div class="cp-workflow-row">
 
@@ -506,10 +516,6 @@
         </div>
 
     </div>
-</div>
-
-<!-- ══════════════ CORPS DU FORMULAIRE ══════════════ -->
-<div class="form-body">
 
     <!-- Deux colonnes principales -->
     <div class="form-main-grid">

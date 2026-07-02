@@ -22,6 +22,13 @@
 .content { padding-top: 0 !important; }
 .breadcrumb { display: none !important; }
 
+/* ── Barres sous-nav (toutes les pages) : alignement et padding unifiés ── */
+.fd-head, .rd-head, .bd-head, .ba-head, .pd-head, .pf-head, .cm-head, .fr-head {
+  padding: 6px 16px !important;
+  justify-content: flex-start !important;
+  gap: 8px !important;
+}
+
 /* ── Tous les champs de saisie : bordure de bas uniquement ── */
 input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=submit]):not([type=button]):not([type=reset]),
 select,
@@ -58,42 +65,7 @@ textarea:focus {
 {% endblock %}
 
 {% block module_navbar %}
-{% with uname=request.resolver_match.url_name %}
-<nav class="o-nav">
-  <a href="{% url 'dashboard' %}" class="o-nav-grid" title="Accueil">
-    <i class="bi bi-grid-3x3-gap-fill"></i>
-  </a>
-  <span class="o-nav-brand">
-    <i class="bi bi-cart3"></i>
-    Achats
-  </span>
-
-  <a href="{% url 'achats:dashboard' %}"
-     class="o-nav-link {% if uname == 'dashboard' %}active{% endif %}">
-    Tableau de bord
-  </a>
-
-  <a href="{% url 'achats:fournisseurs_list' %}"
-     class="o-nav-link {% if 'fournisseur' in uname %}active{% endif %}">
-    Fournisseurs
-  </a>
-
-  <a href="{% url 'achats:besoins_list' %}"
-     class="o-nav-link {% if 'besoin' in uname %}active{% endif %}">
-    Besoins
-  </a>
-
-  <a href="{% url 'achats:proformas_list' %}"
-     class="o-nav-link {% if 'proforma' in uname %}active{% endif %}">
-    Proformas
-  </a>
-
-  <a href="{% url 'achats:commandes_list' %}"
-     class="o-nav-link {% if 'commande' in uname or 'reception' in uname %}active{% endif %}">
-    Commandes
-  </a>
-</nav>
-{% endwith %}
+{% include 'achats/includes/nav.html' %}
 {% endblock %}
 
 {% block breadcrumb %}{% endblock %}

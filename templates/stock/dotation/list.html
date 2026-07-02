@@ -1,10 +1,9 @@
 {% extends 'stock/base.html' %}
 {% load static %}
-{% block nav_dotation %}active{% endblock %}
 {% block topbar_title %}Stock — Dotation{% endblock %}
 
 {% block extra_st_css %}<style>
-.st-page-head { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 32px;margin:0 -32px;background:#e8f2f7;border-bottom:1px solid rgba(0,0,0,.05);box-shadow:0 2px 8px rgba(0,0,0,.04);position:sticky;top:calc(var(--topbar-h) + 44px);z-index:100; }
+.st-page-head { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 32px;margin:0 -32px;background:#e8f2f7;border-bottom:1px solid rgba(0,0,0,.05);box-shadow:0 2px 8px rgba(0,0,0,.04);position:sticky;top:var(--topbar-h);z-index:100; }
 .filtre-tabs { display:flex;gap:4px;flex-wrap:wrap;margin-top:16px; }
 .filtre-tab { padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;text-decoration:none;border:1.5px solid var(--st-border);color:var(--st-muted);background:var(--st-surface);transition:all .15s; }
 .filtre-tab:hover { border-color:var(--st-500);color:var(--st-600); }
@@ -26,20 +25,20 @@
 </div>
 
 <!-- Stats rapides -->
-<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;">
-  <div class="st-stat" style="min-width:120px;">
+<div class="st-stats" style="margin-top:16px;">
+  <div class="st-stat">
     <div class="st-stat-icon" style="background:rgba(232,154,26,.1);color:#8a5c00;"><i class="bi bi-hourglass-split"></i></div>
     <div><div class="st-stat-val" style="color:#8a5c00;">{{ stats.en_attente }}</div><div class="st-stat-lbl">En attente</div></div>
   </div>
-  <div class="st-stat" style="min-width:120px;">
+  <div class="st-stat">
     <div class="st-stat-icon" style="background:rgba(26,109,140,.1);color:#1a6d8c;"><i class="bi bi-check-circle"></i></div>
     <div><div class="st-stat-val" style="color:#1a6d8c;">{{ stats.approuvee }}</div><div class="st-stat-lbl">Approuvées</div></div>
   </div>
-  <div class="st-stat" style="min-width:120px;">
+  <div class="st-stat">
     <div class="st-stat-icon" style="background:rgba(45,153,219,.1);color:#1565c0;"><i class="bi bi-check2-all"></i></div>
     <div><div class="st-stat-val" style="color:#1565c0;">{{ stats.partielle }}</div><div class="st-stat-lbl">Partielles</div></div>
   </div>
-  <div class="st-stat" style="min-width:120px;">
+  <div class="st-stat">
     <div class="st-stat-icon" style="background:rgba(232,69,69,.1);color:#b71c1c;"><i class="bi bi-x-circle"></i></div>
     <div><div class="st-stat-val" style="color:#b71c1c;">{{ stats.refusee }}</div><div class="st-stat-lbl">Refusées</div></div>
   </div>
@@ -74,7 +73,7 @@
     <tbody>
     {% for d in demandes %}
     <tr style="cursor:pointer;" onclick="window.location='{% url 'stock_dotation_detail' d.pk %}'">
-      <td style="font-family:monospace;font-size:12px;color:var(--st-600);font-weight:700;">{{ d.numero }}</td>
+      <td style="font-family: var(--font-mono);font-size:12px;color:var(--st-600);font-weight:700;">{{ d.numero }}</td>
       <td><span class="badge-pharma"><i class="bi bi-hospital" style="font-size:10px;"></i> {{ d.get_pharmacie_display }}</span></td>
       <td style="font-size:12px;">{{ d.date_demande|date:"d/m/Y H:i" }}</td>
       <td style="text-align:center;font-weight:700;">{{ d.lignes.count }}</td>

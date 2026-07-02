@@ -13,7 +13,7 @@ from django.dispatch import receiver
 AUDITED_APPS = {
     'patients', 'facturation', 'hospitalisation', 'laboratoire',
     'achats', 'conges', 'employer', 'medecins', 'pharmacie',
-    'services', 'soins', 'stock', 'ressources_humaines', 'rapports',
+    'services', 'soins', 'stock', 'ressources_humaines',
 }
 
 # Model names (lowercase) never auto-logged to avoid loops or noise

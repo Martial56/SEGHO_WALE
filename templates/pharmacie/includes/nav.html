@@ -1,0 +1,85 @@
+{% with uname=request.resolver_match.url_name %}
+<nav class="o-nav">
+  <a href="{% url 'dashboard' %}" class="o-nav-grid" title="Accueil">
+    <i class="bi bi-grid-3x3-gap-fill"></i>
+  </a>
+  <span class="o-nav-brand">
+    <i class="bi bi-hospital-fill"></i>
+    Pharmacie
+  </span>
+
+  <a href="{% url 'pharmacie_accueil' %}"
+     class="o-nav-link {% if uname == 'pharmacie_accueil' %}active{% endif %}" title="Changer de pharmacie" style="font-weight:700;">
+    <i class="bi bi-building" style="font-size:12px;margin-right:6px;"></i> {{ label }}
+  </a>
+
+  <a href="{% url 'pharmacie_dashboard' pharmacie %}"
+     class="o-nav-link {% if uname == 'pharmacie_dashboard' %}active{% endif %}">
+    Dashboard
+  </a>
+
+  <a href="{% url 'pharmacie_ordonnances' pharmacie %}"
+     class="o-nav-link {% if uname == 'pharmacie_ordonnances' or uname == 'pharmacie_dispenser' or uname == 'pharmacie_fiche_dispensation' %}active{% endif %}">
+    Ordonnances
+  </a>
+
+  <a href="{% url 'pharmacie_caisse' pharmacie %}"
+     class="o-nav-link {% if uname == 'pharmacie_caisse' or uname == 'pharmacie_ticket' %}active{% endif %}">
+    Caisse
+  </a>
+
+  <a href="{% url 'pharmacie_stock' pharmacie %}"
+     class="o-nav-link {% if uname == 'pharmacie_stock' %}active{% endif %}">
+    Stock
+  </a>
+
+  <a href="{% url 'pharmacie_livraisons' pharmacie %}"
+     class="o-nav-link {% if uname == 'pharmacie_livraisons' or uname == 'pharmacie_confirmer_livraison' %}active{% endif %}" style="position:relative;">
+    Livraisons
+    {% if ph_livraisons_en_attente %}
+    <span style="position:absolute;top:6px;right:2px;min-width:16px;height:16px;border-radius:8px;background:#e84545;color:#fff;font-size:9px;font-weight:800;line-height:16px;text-align:center;padding:0 3px;border:2px solid #fff;">{{ ph_livraisons_en_attente }}</span>
+    {% endif %}
+  </a>
+
+  <div style="flex:1;"></div>
+
+  <button onclick="togglePhMenu()" class="o-nav-link" id="ph-grid-btn" style="border:none;cursor:pointer;background:none;" title="Autres pages">
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
+      <rect x="0" y="0" width="5" height="5" rx="1"/><rect x="6.5" y="0" width="5" height="5" rx="1"/><rect x="13" y="0" width="5" height="5" rx="1"/>
+      <rect x="0" y="6.5" width="5" height="5" rx="1"/><rect x="6.5" y="6.5" width="5" height="5" rx="1"/><rect x="13" y="6.5" width="5" height="5" rx="1"/>
+      <rect x="0" y="13" width="5" height="5" rx="1"/><rect x="6.5" y="13" width="5" height="5" rx="1"/><rect x="13" y="13" width="5" height="5" rx="1"/>
+    </svg>
+  </button>
+</nav>
+
+<!-- Popup menu grille : autres pages pharmacie -->
+<div id="ph-menu-overlay" onclick="togglePhMenu()" style="display:none;position:fixed;inset:0;z-index:8000;background:rgba(0,0,0,.25);"></div>
+<div id="ph-menu-popup" style="display:none;position:fixed;top:var(--header-h);right:8px;z-index:8001;background:#fff;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,.18);padding:16px;width:420px;max-width:96vw;max-height:80vh;overflow-y:auto;">
+  <div style="font-size:11px;font-weight:700;color:var(--ph-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;padding-left:4px;">Autres pages — {{ label }}</div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
+    <a href="{% url 'pharmacie_demande' pharmacie %}" class="ph-menu-item {% if uname == 'pharmacie_demande' %}active{% endif %}"><i class="bi bi-bag-plus"></i><span>Demande dotation</span></a>
+    <a href="{% url 'pharmacie_alertes_reappro' pharmacie %}" class="ph-menu-item {% if uname == 'pharmacie_alertes_reappro' %}active{% endif %}"><i class="bi bi-bell-fill"></i><span>Alertes réappro</span></a>
+    <a href="{% url 'pharmacie_peremptions' pharmacie %}" class="ph-menu-item {% if uname == 'pharmacie_peremptions' %}active{% endif %}"><i class="bi bi-calendar-x"></i><span>Péremptions</span></a>
+    <a href="{% url 'pharmacie_retours' pharmacie %}" class="ph-menu-item {% if uname == 'pharmacie_retours' %}active{% endif %}"><i class="bi bi-arrow-return-left"></i><span>Retours</span></a>
+    <a href="{% url 'pharmacie_inventaire_list' pharmacie %}" class="ph-menu-item {% if uname == 'pharmacie_inventaire_list' or uname == 'pharmacie_inventaire_nouveau' or uname == 'pharmacie_inventaire_detail' %}active{% endif %}"><i class="bi bi-clipboard2-check"></i><span>Inventaire</span></a>
+    <a href="{% url 'pharmacie_journal' pharmacie %}" class="ph-menu-item {% if uname == 'pharmacie_journal' %}active{% endif %}"><i class="bi bi-journal-text"></i><span>Journal</span></a>
+    <a href="{% url 'pharmacie_recette' pharmacie %}" class="ph-menu-item {% if uname == 'pharmacie_recette' %}active{% endif %}"><i class="bi bi-graph-up"></i><span>Recette</span></a>
+    <a href="{% url 'pharmacie_rapport_journalier' pharmacie %}" class="ph-menu-item {% if uname == 'pharmacie_rapport_journalier' %}active{% endif %}"><i class="bi bi-file-earmark-bar-graph"></i><span>Rapport du jour</span></a>
+    <a href="{% url 'pharmacie_rapport_mensuel' pharmacie %}" class="ph-menu-item {% if uname == 'pharmacie_rapport_mensuel' %}active{% endif %}"><i class="bi bi-bar-chart-line"></i><span>Rapport mensuel</span></a>
+    <a href="{% url 'pharmacie_rapport_dispensation' pharmacie %}" class="ph-menu-item {% if uname == 'pharmacie_rapport_dispensation' %}active{% endif %}"><i class="bi bi-clipboard2-data"></i><span>Dispensations</span></a>
+    <a href="{% url 'pharmacie_comparaison' pharmacie %}" class="ph-menu-item {% if uname == 'pharmacie_comparaison' %}active{% endif %}"><i class="bi bi-columns-gap"></i><span>Comparaison</span></a>
+  </div>
+</div>
+<script>
+function togglePhMenu(){
+  var popup   = document.getElementById('ph-menu-popup');
+  var overlay = document.getElementById('ph-menu-overlay');
+  var btn     = document.getElementById('ph-grid-btn');
+  var open = popup.style.display !== 'none';
+  popup.style.display   = open ? 'none' : 'block';
+  overlay.style.display = open ? 'none' : 'block';
+  btn.style.background  = open ? '' : 'rgba(15,67,88,.1)';
+  btn.style.borderRadius= open ? '' : '6px';
+}
+</script>
+{% endwith %}

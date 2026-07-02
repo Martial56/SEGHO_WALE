@@ -1,9 +1,7 @@
-﻿{% extends 'employer/base.html' %}
+{% extends 'employer/base.html' %}
 {% load i18n %}
 
 {% block topbar_title %}{% if employe %}Modifier — {{ employe.nom_complet|default:employe.nom }}{% else %}Nouvel employé{% endif %}{% endblock %}
-{% block rh_nav_list %}{% if not employe %}{% else %}active{% endif %}{% endblock %}
-{% block rh_nav_nouveau %}{% if not employe %}active{% endif %}{% endblock %}
 
 {% block extra_css %}
 {{ block.super }}
@@ -17,7 +15,7 @@
   
   flex-wrap: wrap;
   position: sticky;
-  top: calc(var(--topbar-h) + 44px);
+  top: var(--topbar-h);
   z-index: 100;
   background: #f0f6fa;
   border-bottom: 1px solid rgba(0,0,0,0.05);
@@ -200,7 +198,7 @@ html[data-theme="dark"] .rh-form-error-banner { color: #f09090; background: rgba
 .rh-mat-auto {
   display: inline-block; padding: 8px 14px; border-radius: 7px;
   font-size: 13px; color: rgba(0,0,0,0.4); background: #f5f5f5;
-  border: 1px solid #e0e0e0; font-style: italic; font-family: monospace;
+  border: 1px solid #e0e0e0; font-style: italic; font-family: var(--font-mono);
 }
 html[data-theme="dark"] .rh-mat-auto {
   background: #243447; border-color: #243447;
@@ -215,7 +213,7 @@ html[data-theme="dark"] .rh-mat-auto {
 {% csrf_token %}
 
 <!-- En-tête formulaire -->
-<div class="rh-form-head">
+<div class="rh-form-head" id="subheader">
   <div class="rh-form-head-left">
     <a href="{% if employe %}{% url 'rh_detail' employe.pk %}{% else %}{% url 'ressources_humaines_list' %}{% endif %}"
        class="rh-back-btn" title="Annuler">
@@ -568,6 +566,7 @@ html[data-theme="dark"] .rh-mat-auto {
 {% endblock %}
 
 {% block extra_js %}
+{{ block.super }}
 <script>
 (function () {
   /* ── Calcul automatique de l'âge ── */

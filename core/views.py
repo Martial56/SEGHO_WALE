@@ -545,10 +545,10 @@ def facturation_list(request):
 
 @login_required(login_url='login')
 def caisse_list(request):
-    from caisse.models import Session
+    from caisse.models import SessionCaisse
     from django.core.paginator import Paginator
 
-    sessions = Session.objects.all().order_by('-date_ouverture')
+    sessions = SessionCaisse.objects.all().order_by('-date_ouverture')
     paginator = Paginator(sessions, 25)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
@@ -569,24 +569,6 @@ def ressources_humaines_list(request):
     stats = {'total_employes': Employe.objects.count(), 'employes_actifs': Employe.objects.filter(actif=True).count(), 'conges_attente': 0, 'taux_presence': 0}
     breadcrumb = [{'title': 'Accueil', 'url': '/'}, {'title': 'Ressources Humaines'}]
     return render(request, 'employer/list.html', {'page_obj': page_obj, 'stats': stats, 'breadcrumb': breadcrumb})
-
-
-@login_required(login_url='login')
-def rapports_list(request):
-    from rapports.models import Rapport
-    from django.core.paginator import Paginator
-
-    rapports = Rapport.objects.all().order_by('-date_creation')
-    paginator = Paginator(rapports, 25)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    stats = {
-        'total_rapports': Rapport.objects.count(),
-        'rapports_mois': Rapport.objects.filter(date_creation__month=timezone.now().month).count(),
-        'rapports_attente': Rapport.objects.filter(statut='en_attente').count(),
-    }
-    breadcrumb = [{'title': 'Accueil', 'url': '/'}, {'title': 'Rapports'}]
-    return render(request, 'rapports/list.html', {'page_obj': page_obj, 'stats': stats, 'breadcrumb': breadcrumb})
 
 
 @login_required(login_url='login')
@@ -1734,232 +1716,6 @@ def gynecologie_rdv(request):
 
 
 @login_required(login_url='login')
-def gynecologie_rdv_calendrier(request):
-    from patients.models import RendezVous
-    from django.db.models import Q
-    from datetime import date as _date, timedelta
-    import calendar, json as _json
-
-    # Mois affiché (défaut : mois courant)
-    today = _date.today()
-    try:
-        year  = int(request.GET.get('year',  today.year))
-        month = int(request.GET.get('month', today.month))
-    except (ValueError, TypeError):
-        year, month = today.year, today.month
-
-    # Bornes du mois
-    first_day = _date(year, month, 1)
-    last_day  = _date(year, month, calendar.monthrange(year, month)[1])
-
-    # Mois précédent / suivant
-    if month == 1:  prev_year, prev_month = year - 1, 12
-    else:           prev_year, prev_month = year, month - 1
-    if month == 12: next_year, next_month = year + 1, 1
-    else:           next_year, next_month = year, month + 1
-
-    rdvs = RendezVous.objects.filter(
-        Q(departement='gynecologie_cpn') | Q(medecin__specialite__nom__icontains='gyn'),
-        date_heure__date__gte=first_day,
-        date_heure__date__lte=last_day,
-    ).select_related('patient', 'medecin').order_by('date_heure')
-
-    # Indexer par jour
-    rdvs_by_day = {}
-    for rdv in rdvs:
-        d = rdv.date_heure.date().day
-        rdvs_by_day.setdefault(d, []).append(rdv)
-
-    # Construire la grille semaines (liste de listes de 7 jours)
-    cal = calendar.monthcalendar(year, month)  # semaines, 0 = hors mois
-
-    breadcrumb = [
-        {'title': 'Accueil', 'url': '/'},
-        {'title': 'Gynécologie', 'url': '/gynecologie/'},
-        {'title': 'Rendez-vous', 'url': '/gynecologie/rdv/'},
-        {'title': 'Calendrier'},
-    ]
-    return render(request, 'gynecologie/rdv_calendrier.html', {
-        'year': year, 'month': month,
-        'month_name': ['', 'Janvier','Février','Mars','Avril','Mai','Juin',
-                       'Juillet','Août','Septembre','Octobre','Novembre','Décembre'][month],
-        'cal': cal,
-        'rdvs_by_day': rdvs_by_day,
-        'today': today,
-        'prev_year': prev_year, 'prev_month': prev_month,
-        'next_year': next_year, 'next_month': next_month,
-        'breadcrumb': breadcrumb,
-    })
-
-
-@login_required(login_url='login')
-def gynecologie_cpn_suivi(request):
-    from patients.models import Patient, RendezVous
-    from django.db.models import Q
-    from datetime import date as _date
-    import calendar as _cal
-
-    q = request.GET.get('q', '').strip()
-
-    # --- Filtre mois/année (défaut : mois courant) ---
-    today = _date.today()
-    try:
-        year  = int(request.GET.get('year',  today.year))
-        month = int(request.GET.get('month', today.month))
-        if not (1 <= month <= 12): raise ValueError
-    except (ValueError, TypeError):
-        year, month = today.year, today.month
-
-    first_day = _date(year, month, 1)
-    last_day  = _date(year, month, _cal.monthrange(year, month)[1])
-
-    if month == 1:  prev_year, prev_month = year - 1, 12
-    else:           prev_year, prev_month = year, month - 1
-    if month == 12: next_year, next_month = year + 1, 1
-    else:           next_year, next_month = year, month + 1
-
-    MOIS = ['','Janvier','Février','Mars','Avril','Mai','Juin',
-            'Juillet','Août','Septembre','Octobre','Novembre','Décembre']
-
-    # Chaque groupe = (clé, types_inclus, libellé)
-    CPN_GROUPS = [
-        ('cpn1',    ['cpn1', 'cpn1_at'],  'CPN 1'),
-        ('cpn2',    ['cpn2', 'cpn2_at'],  'CPN 2'),
-        ('cpn3',    ['cpn3', 'cpn3_at'],  'CPN 3'),
-        ('cpn4',    ['cpn4', 'cpn4_at'],  'CPN 4'),
-        ('cpn5plus', ['cpn5plus'],         'CPN 5+'),
-    ]
-    ALL_CPN_TYPES = [t for _, types, _ in CPN_GROUPS for t in types]
-    PLANNED_STATUTS = {'planifie', 'confirme', 'en_attente', 'en_consultation'}
-
-    # Visites CPN dans le mois sélectionné
-    rdvs_mois = RendezVous.objects.filter(
-        departement='gynecologie_cpn',
-        type_visite_cpn__in=ALL_CPN_TYPES,
-        date_heure__date__gte=first_day,
-        date_heure__date__lte=last_day,
-    ).select_related('patient').order_by('date_heure')
-
-    patient_ids_mois = set(rdvs_mois.values_list('patient_id', flat=True))
-
-    # Toutes les visites CPN (tous mois) pour ces patientes — parcours complet
-    rdvs_all = RendezVous.objects.filter(
-        departement='gynecologie_cpn',
-        type_visite_cpn__in=ALL_CPN_TYPES,
-        patient_id__in=patient_ids_mois,
-    ).order_by('date_heure')
-
-    rdv_map = {}
-    for rdv in rdvs_all:
-        rdv_map.setdefault(rdv.patient_id, {}).setdefault(rdv.type_visite_cpn, []).append(rdv)
-
-    patients = Patient.objects.filter(pk__in=patient_ids_mois).order_by('nom', 'prenoms')
-    if q:
-        patients = patients.filter(
-            Q(nom__icontains=q) | Q(prenoms__icontains=q) | Q(code_patient__icontains=q)
-        )
-
-    rows = []
-    for p in patients:
-        visits = rdv_map.get(p.pk, {})
-        cpn_status = []
-        for grp_key, grp_types, grp_label in CPN_GROUPS:
-            grp_rdvs = sorted(
-                [r for t in grp_types for r in visits.get(t, [])],
-                key=lambda r: r.date_heure,
-            )
-            # Une seule visite représentative : terminée > planifiée > première
-            best = (next((r for r in grp_rdvs if r.statut == 'termine'), None)
-                    or next((r for r in grp_rdvs if r.statut in PLANNED_STATUTS), None)
-                    or next(iter(grp_rdvs), None))
-            cpn_status.append({
-                'group':   grp_key,
-                'label':   grp_label,
-                'done':    best.statut == 'termine' if best else False,
-                'planned': best.statut in PLANNED_STATUTS if best else False,
-                'rdv':     best,
-                'date':    best.date_heure.strftime('%d/%m/%Y') if best else '',
-                'is_at':   best.type_visite_cpn.endswith('_at') if best else False,
-                'count':   len(grp_rdvs),
-            })
-        # Progression sur CPN1–CPN4 uniquement
-        completed = sum(1 for c in cpn_status if c['done'] and c['group'] != 'cpn5plus')
-        rows.append({'patient': p, 'cpn_status': cpn_status, 'completed': completed})
-
-    breadcrumb = [
-        {'title': 'Accueil', 'url': '/'},
-        {'title': 'Gynécologie', 'url': '/gynecologie/'},
-        {'title': 'Suivi CPN'},
-    ]
-    return render(request, 'gynecologie/cpn_suivi.html', {
-        'rows': rows, 'breadcrumb': breadcrumb, 'q': q,
-        'year': year, 'month': month, 'month_name': MOIS[month],
-        'prev_year': prev_year, 'prev_month': prev_month,
-        'next_year': next_year, 'next_month': next_month,
-        'total': len(rows),
-    })
-
-
-@login_required(login_url='login')
-def gynecologie_rdv_kanban(request):
-    from patients.models import RendezVous
-    from django.db.models import Q
-    from datetime import date as _date, timedelta
-
-    today = _date.today()
-    try:
-        date_str = request.GET.get('date', str(today))
-        parts = date_str.split('-')
-        cur_date = _date(int(parts[0]), int(parts[1]), int(parts[2]))
-    except Exception:
-        cur_date = today
-
-    prev_date = cur_date - timedelta(days=1)
-    next_date = cur_date + timedelta(days=1)
-
-    rdvs = RendezVous.objects.filter(
-        Q(departement='gynecologie_cpn') | Q(medecin__specialite__nom__icontains='gyn'),
-        date_heure__date=cur_date,
-    ).select_related('patient', 'medecin').order_by('date_heure')
-
-    STATUTS = [
-        ('planifie',        'Planifié',         '#e3f2fd', '#1565c0'),
-        ('confirme',        'Confirmé',         '#e8f5e9', '#2e7d32'),
-        ('en_attente',      'En attente',       '#fff8e1', '#f57f17'),
-        ('en_consultation', 'En consultation',  '#e0f7fa', '#00838f'),
-        ('termine',         'Terminé',          '#ede7f6', '#4527a0'),
-        ('annule',          'Annulé',           '#fce4ec', '#b71c1c'),
-        ('absent',          'Absent',           '#fff3e0', '#e65100'),
-    ]
-
-    col_map = {val: {'val': val, 'label': lbl, 'bg': bg, 'color': color, 'rdvs': []}
-               for val, lbl, bg, color in STATUTS}
-    for rdv in rdvs:
-        if rdv.statut in col_map:
-            col_map[rdv.statut]['rdvs'].append(rdv)
-
-    # Ordered list so the template can iterate directly
-    column_list = [col_map[val] for val, *_ in STATUTS]
-    for col in column_list:
-        col['count'] = len(col['rdvs'])
-
-    breadcrumb = [
-        {'title': 'Accueil', 'url': '/'},
-        {'title': 'Gynécologie', 'url': '/gynecologie/'},
-        {'title': 'Kanban RDV'},
-    ]
-    return render(request, 'gynecologie/rdv_kanban.html', {
-        'columns':   column_list,
-        'cur_date':  cur_date,
-        'prev_date': prev_date,
-        'next_date': next_date,
-        'today':     today,
-        'total':     rdvs.count(),
-        'breadcrumb': breadcrumb,
-    })
-
-
-@login_required(login_url='login')
 def gynecologie_rdv_set_statut(request, pk):
     from patients.models import RendezVous
     STATUTS = ('planifie', 'confirme', 'en_attente', 'en_consultation', 'termine', 'annule', 'absent')
@@ -2199,6 +1955,9 @@ def kpi_dashboard(request):
     })
 
 
+@login_required(login_url='login')
+def rapports_hub(request):
+    return render(request, 'core/rapports_hub.html', {})
 
 
 # ══════════════════════════════════════════════

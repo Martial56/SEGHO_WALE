@@ -1,8 +1,7 @@
-﻿{% extends 'employer/base.html' %}
+{% extends 'employer/base.html' %}
 {% load i18n %}
 
 {% block topbar_title %}Tableau de bord RH{% endblock %}
-{% block rh_nav_dashboard %}active{% endblock %}
 
 {% block extra_css %}
 {{ block.super }}
@@ -17,7 +16,7 @@
   
   flex-wrap: wrap;
   position: sticky;
-  top: calc(var(--topbar-h) + 44px);
+  top: var(--topbar-h);
   z-index: 100;
   background: #f0f6fa;
   border-bottom: 1px solid rgba(0,0,0,0.05);
@@ -396,7 +395,7 @@ html[data-theme="dark"] .rh-conge-type { background:rgba(74,114,54,0.18); color:
 {% block content %}
 
 <!-- Subheader -->
-<div class="rh-subheader">
+<div class="rh-subheader" id="subheader">
   <h1><i class="bi bi-bar-chart-fill" style="color:var(--rh-500); font-size:20px; margin-right:6px;"></i>Tableau de bord RH</h1>
 </div>
 
@@ -531,7 +530,7 @@ html[data-theme="dark"] .rh-conge-type { background:rgba(74,114,54,0.18); color:
           {% for emp in fin_90j %}
           <tr>
             <td style="font-weight:600;">{{ emp.nom_complet }}</td>
-            <td style="font-family:monospace; font-size:12px; color:var(--rh-600);">{{ emp.matricule }}</td>
+            <td style="font-family: var(--font-mono); font-size:12px; color:var(--rh-600);">{{ emp.matricule }}</td>
             <td style="color:var(--rh-muted); font-size:13px;">{{ emp.service.nom|default:"—" }}</td>
             <td style="font-size:13px;">{{ emp.type_contrat.nom|default:"—" }}</td>
             <td style="font-size:13px;">{{ emp.date_fin_contrat|date:"d/m/Y" }}</td>
@@ -1022,6 +1021,7 @@ html[data-theme="dark"] .rh-conge-type { background:rgba(74,114,54,0.18); color:
 {% endblock %}
 
 {% block extra_js %}
+{{ block.super }}
 <script>
 (function () {
   /* ── Jours restants ── */

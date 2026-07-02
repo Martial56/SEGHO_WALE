@@ -1,11 +1,10 @@
 {% extends 'stock/base.html' %}
 {% load static %}
 {% block topbar_title %}Stock — Indicateurs de performance{% endblock %}
-{% block nav_rapports_kpi %}active{% endblock %}
 
 {% block extra_st_css %}<style>
 .content { padding-top: 0; }
-.rp-head { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 32px;margin:0 -32px;background:#e8f2f7;border-bottom:1px solid rgba(0,0,0,.05);box-shadow:0 2px 8px rgba(0,0,0,.04);position:sticky;top:calc(var(--topbar-h) + 44px);z-index:100; }
+.rp-head { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 32px;margin:0 -32px;background:#e8f2f7;border-bottom:1px solid rgba(0,0,0,.05);box-shadow:0 2px 8px rgba(0,0,0,.04);position:sticky;top:var(--topbar-h);z-index:100; }
 .kpi-grid { display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-top:16px; }
 @media(max-width:1100px){ .kpi-grid{ grid-template-columns:repeat(3,1fr); } }
 .kpi-card { background:var(--st-surface);border:1px solid var(--st-border);border-radius:12px;padding:18px 16px;text-align:center;box-shadow:0 1px 4px rgba(15,67,88,.06); }
@@ -186,7 +185,7 @@
     <tr>
       <td>
         <a href="{% url 'stock_produit_detail' item.produit.pk %}" style="text-decoration:none;color:var(--st-text);font-weight:600;">{{ item.produit.nom }}</a>
-        <div style="font-size:10px;font-family:monospace;color:var(--st-muted);">{{ item.produit.code }}</div>
+        <div style="font-size:10px;font-family: var(--font-mono);color:var(--st-muted);">{{ item.produit.code }}</div>
       </td>
       <td style="text-align:right;color:var(--st-muted);">{{ item.cmm|floatformat:1 }}</td>
       <td style="text-align:right;font-weight:700;color:{% if item.produit.en_rupture %}#b71c1c{% elif item.produit.en_alerte %}#8a5c00{% else %}var(--st-600){% endif %};">{{ item.stock_actuel|floatformat:0 }}</td>
@@ -226,6 +225,7 @@
 {% endblock %}
 
 {% block extra_js %}
+{{ block.super }}
 <script src="{% static 'vendor/chart.umd.min.js' %}"></script>
 <script>
 var svc  = JSON.parse(document.getElementById('data-service').textContent);

@@ -1,7 +1,9 @@
 {% extends 'base.html' %}
+{% load i18n static %}
 {% block topbar_title %}Prestations{% endblock %}
 
 {% block extra_css %}
+<link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
 {% include 'services/includes/layout_css.html' %}
 {% endblock %}
 
@@ -10,3 +12,30 @@
 {% endblock %}
 
 {% block breadcrumb %}{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+(function () {
+  function alignSousTopbar() {
+    var topbar = document.querySelector('.topbar');
+    var sh = document.getElementById('subheader');
+    if (!topbar || !sh) return;
+    var tbH = Math.ceil(topbar.getBoundingClientRect().height);
+    if (tbH <= 0) return;
+    document.body.style.paddingTop = tbH + 'px';
+    document.documentElement.style.setProperty('--header-h', tbH + 'px');
+    requestAnimationFrame(function () {
+      var gap = Math.round(sh.getBoundingClientRect().top - topbar.getBoundingClientRect().bottom);
+      if (gap > 0) {
+        document.body.style.paddingTop = (tbH - gap) + 'px';
+        document.documentElement.style.setProperty('--header-h', (tbH - gap) + 'px');
+      }
+    });
+  }
+  if (document.readyState !== 'loading') { alignSousTopbar(); }
+  else { document.addEventListener('DOMContentLoaded', alignSousTopbar); }
+  window.addEventListener('resize', function () { document.body.style.paddingTop = ''; alignSousTopbar(); });
+})();
+</script>
+{% endblock %}

@@ -1,4 +1,4 @@
-﻿{% extends 'base.html' %}
+{% extends 'base.html' %}
 {% load i18n %}
 
 {% block topbar_title %}Présence{% endblock %}
@@ -7,7 +7,7 @@
 {% load static %}
     <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
 <style>
-.content { padding:0; }
+.content { padding:0; overflow-y: visible; }
 :root {
   --pr-900: #071e28; --pr-800: #071e28; --pr-700: #0f4358;
   --pr-600: #1a6d8c; --pr-500: #1a6d8c; --pr-400: #1a6d8c;
@@ -24,23 +24,6 @@ html[data-theme="dark"] {
   --pr-text:    #b8daf3; --pr-muted:   rgba(255,255,255,0.4);
 }
 
-/* ── Nav ── */
-.pr-nav {
-  background: var(--pr-surface); border-bottom: 1px solid rgba(0,0,0,0.07);
-  margin: 0; padding: 0 32px;
-  display: flex; align-items: stretch; height: 44px;
-  box-shadow: 0 1px 3px rgba(26,109,140,0.07);
-  position: fixed; top: var(--topbar-h); left:0; right:0; z-index: 250; gap: 2px;
-}
-.pr-nav-link {
-  padding: 11px 16px; font-size: 13px; font-weight: 500;
-  color: var(--pr-muted); text-decoration: none;
-  border-bottom: 2px solid transparent;
-  display: inline-flex; align-items: center; gap: 6px;
-  transition: color .15s, border-color .15s; white-space: nowrap; margin-bottom: -1px;
-}
-.pr-nav-link:hover  { color: var(--pr-600); }
-.pr-nav-link.active { color: var(--pr-600); border-bottom-color: var(--pr-500); font-weight: 600; }
 
 /* ── Boutons ── */
 .btn-pr {
@@ -100,65 +83,16 @@ html[data-theme="dark"] {
 /* ── Subheader ── */
 .pr-subheader {
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
-  padding: 14px 32px;  flex-wrap: wrap;
-  position: sticky; top: calc(var(--topbar-h) + 44px); z-index: 100;
+  padding: 10px 24px;
+  position: sticky; top: var(--header-h); z-index: 100;
   background: #f0f5fa; border-bottom: 1px solid rgba(0,0,0,.05);
   box-shadow: 0 2px 8px rgba(0,0,0,.04);
 }
 </style>
-<script>
-  (function () {
-    function syncTopbarH() {
-      var topbar = document.querySelector('.topbar');
-      if (topbar) {
-        document.documentElement.style.setProperty('--topbar-h', topbar.getBoundingClientRect().height + 'px');
-      }
-    }
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', syncTopbarH);
-    } else {
-      syncTopbarH();
-    }
-    window.addEventListener('resize', syncTopbarH);
-  })();
-</script>
 {% endblock %}
 
-{% block breadcrumb %}
-<nav class="pr-nav">
-  {% if can_manage %}
-  <a href="{% url 'presence_registre' %}"
-     class="pr-nav-link {% block pr_nav_registre %}{% endblock %}">
-    <i class="bi bi-clipboard-check"></i> Registre du jour
-  </a>
-  <a href="{% url 'presence_recap' %}"
-     class="pr-nav-link {% block pr_nav_recap %}{% endblock %}">
-    <i class="bi bi-calendar3"></i> Récap mensuel
-  </a>
-  <a href="{% url 'presence_stats' %}"
-     class="pr-nav-link {% block pr_nav_stats %}{% endblock %}">
-    <i class="bi bi-bar-chart-line"></i> Statistiques
-  </a>
-  <a href="{% url 'presence_rapport' %}"
-     class="pr-nav-link {% block pr_nav_rapport %}{% endblock %}">
-    <i class="bi bi-file-earmark-text"></i> Rapport
-  </a>
-  <a href="{% url 'presence_parametres' %}"
-     class="pr-nav-link {% block pr_nav_params %}{% endblock %}">
-    <i class="bi bi-gear-fill"></i> Paramètres
-  </a>
-  <a href="{% url 'presence_pointage' %}" target="_blank"
-     class="pr-nav-link" style="margin-left:auto;">
-    <i class="bi bi-qr-code-scan"></i> Kiosque pointage
-  </a>
-  {% else %}
-  <a href="{% url 'presence_pointage' %}" target="_blank" class="pr-nav-link">
-    <i class="bi bi-qr-code-scan"></i> Kiosque pointage
-  </a>
-  {% endif %}
-</nav>
-<div style="height:44px;"></div>
-<script>(function(){var tb=document.querySelector('.topbar'),nav=document.querySelector('.pr-nav');if(tb&&nav){var h=tb.getBoundingClientRect().height;if(h<30)return;nav.style.top=h+'px';document.documentElement.style.setProperty('--topbar-h',h+'px');}})();
-document.addEventListener('DOMContentLoaded',_fixNavTop);
-window.addEventListener('load',function(){var tb=document.querySelector('.topbar'),nav=document.querySelector('.cg-nav')||document.querySelector('[class*="-nav"]');if(tb&&nav){var h=tb.getBoundingClientRect().height;if(h>=30){nav.style.top=h+'px';document.documentElement.style.setProperty('--topbar-h',h+'px');}}});</script>
+{% block module_navbar %}
+{% include 'presence/includes/nav.html' %}
 {% endblock %}
+
+{% block breadcrumb %}{% endblock %}

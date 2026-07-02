@@ -1,4 +1,4 @@
-﻿{% extends 'base.html' %}
+{% extends 'base.html' %}
 {% load i18n %}
 
 {% block topbar_title %}Congés{% endblock %}
@@ -27,7 +27,7 @@
   --cg-border:  rgba(26,109,140,0.14);
   --cg-text:    #071e28;
   --cg-muted:   rgba(0,0,0,0.45);
-  --cg-bg:      #f0f5fa;
+  --cg-bg:      #f8f9fb;
 }
 html[data-theme="dark"] {
   --cg-50:      #1e1c1c;
@@ -39,41 +39,34 @@ html[data-theme="dark"] {
   --cg-bg:      #0B1220;
 }
 
-/* ── Nav ── */
-.cg-nav {
-  background: var(--cg-surface);
-  border-bottom: 1px solid rgba(0,0,0,0.07);
-  margin: 0; padding: 0;
-  display: flex; align-items: stretch; height: 44px;
-  box-shadow: 0 1px 3px rgba(26,109,140,0.07);
-  position: sticky; top: var(--topbar-h);
-  z-index: 250;
+/* ── Dropdown "Plus" (droite de la nav) ── */
+.cg-more-wrap { position:relative; display:flex; align-items:center; padding:0 2px 0 14px; margin-right:0; border-left:1px solid rgba(0,0,0,.08); }
+.cg-more-btn {
+  background:none; border:none; cursor:pointer; font-family:inherit;
+  display:flex; align-items:center; gap:5px;
+  font-size:12.5px; font-weight:500; color:rgba(0,0,0,.5);
+  padding:4px 8px; border-radius:5px; transition:background .12s, color .12s;
 }
-html[data-theme="dark"] .cg-nav { background: var(--cg-surface); border-bottom-color: var(--cg-border); box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
-
-/* Zone liens — défile si trop étroit */
-.cg-nav-links {
-  display: flex; align-items: stretch;
-  padding: 0 20px; gap: 0;
-  overflow-x: auto; flex: 1; min-width: 0;
-  scrollbar-width: none;
-  scroll-behavior: smooth;
+.cg-more-btn:hover { background:rgba(0,0,0,.06); color:rgba(0,0,0,.75); }
+html[data-theme="dark"] .cg-more-btn { color:#94A3B8; }
+html[data-theme="dark"] .cg-more-btn:hover { background:rgba(255,255,255,.08); color:#e2e8f0; }
+.cg-more-popup {
+  display:none; position:fixed;
+  background:#fff; border:1px solid rgba(0,0,0,.1);
+  border-radius:10px; box-shadow:0 8px 28px rgba(0,0,0,.13);
+  padding:6px; min-width:190px; z-index:9001;
 }
-.cg-nav-links::-webkit-scrollbar { display: none; }
-
-.cg-nav-link {
-  padding: 0 13px; font-size: 12.5px; font-weight: 500;
-  color: var(--cg-muted); text-decoration: none;
-  border-bottom: 2px solid transparent;
-  display: inline-flex; align-items: center; gap: 5px;
-  transition: color 0.15s, border-color 0.15s;
-  white-space: nowrap; height: 44px; flex-shrink: 0;
+html[data-theme="dark"] .cg-more-popup { background:#1e293b; border-color:#334155; }
+.cg-more-popup.open { display:block; }
+.cg-more-item {
+  display:flex; align-items:center; gap:9px;
+  padding:9px 13px; font-size:13px; font-weight:500;
+  color:rgba(0,0,0,.72); text-decoration:none; border-radius:7px;
+  transition:background .12s, color .12s; white-space:nowrap;
 }
-.cg-nav-link:hover  { color: var(--cg-600); background: rgba(26,109,140,.05); }
-.cg-nav-link.active { color: var(--cg-600); border-bottom-color: var(--cg-500); font-weight: 700; }
-html[data-theme="dark"] .cg-nav-link        { color: #94A3B8; }
-html[data-theme="dark"] .cg-nav-link:hover  { color: var(--cg-300); background: rgba(33,150,243,0.1); }
-html[data-theme="dark"] .cg-nav-link.active { color: var(--cg-300); border-bottom-color: var(--cg-400); }
+.cg-more-item:hover { background:rgba(26,109,140,.08); color:#0f4358; }
+html[data-theme="dark"] .cg-more-item { color:#cbd5e1; }
+html[data-theme="dark"] .cg-more-item:hover { background:rgba(122,184,208,.1); color:#7ab8d0; }
 
 /* ── Boutons ── */
 .btn-cg {
@@ -187,49 +180,11 @@ html[data-theme="dark"] .cg-b-refuse   { background:rgba(232,69,69,.18);color:#f
 html[data-theme="dark"] .cg-b-en_cours { background:rgba(45,153,219,.18);color:#80c8ef;border-color:rgba(45,153,219,.3); }
 html[data-theme="dark"] .cg-b-termine  { background:rgba(255,255,255,.06);color:#94A3B8;border-color:#243447; }
 
-/* ── Nav right group (badges) — toujours visible à droite ── */
-.cg-nav-right-group {
-  display: flex; align-items: center;
-  padding: 0 16px; gap: 4px;
-  flex-shrink: 0; border-left: 1px solid rgba(0,0,0,.06);
-  background: var(--cg-surface);
-}
-/* Dropdown Plus */
-.cg-more-item {
-  display:flex; align-items:center; gap:8px;
-  padding:9px 14px; font-size:13px; font-weight:500;
-  color:var(--cg-text); text-decoration:none; border-radius:8px;
-  transition:background .12s; white-space:nowrap;
-}
-.cg-more-item:hover, .cg-more-item.active { background:var(--cg-50); color:var(--cg-700); }
-html[data-theme="dark"] .cg-more-item { color:var(--cg-200); }
-html[data-theme="dark"] .cg-more-item:hover { background:rgba(33,150,243,0.1); }
-.cg-nav-badge-btn {
-  background: none; border: none; cursor: pointer; text-decoration: none;
-  display: flex; align-items: center; justify-content: center;
-  height: 44px; padding: 0 9px; position: relative; font-size: 17px;
-  transition: color 0.15s;
-}
-.cg-nav-badge-btn.bell  { color: var(--cg-600); }
-.cg-nav-badge-btn.pending { color: #e89a1a; }
-.cg-nav-badge-btn:hover { opacity: 0.8; }
-.cg-nav-count {
-  position: absolute; top: 8px; right: 2px;
-  border-radius: 10px; font-size: 10px; font-weight: 700;
-  min-width: 16px; height: 16px; display: flex;
-  align-items: center; justify-content: center;
-  padding: 0 3px; line-height: 1; color: #fff;
-}
-.cg-nav-count.green  { background: var(--cg-600); }
-.cg-nav-count.orange { background: #e89a1a; }
-html[data-theme="dark"] .cg-nav-badge-btn.bell { color: var(--cg-300); }
-html[data-theme="dark"] .cg-nav-right-group { border-left-color: var(--cg-border); }
-
 /* ── Subheader / Form head ── */
 .cg-subheader, .cg-form-head {
   display:flex;align-items:center;justify-content:space-between;gap:16px;
   padding:14px 32px;flex-wrap:wrap;
-  position:sticky;top:calc(var(--topbar-h) + 44px);z-index:100;
+  position:sticky;top:var(--topbar-h);z-index:100;
   background:#f0f6fa;border-bottom:1px solid rgba(0,0,0,0.05);
   box-shadow:0 2px 8px rgba(0,0,0,0.04);
 }
@@ -284,131 +239,62 @@ html[data-theme="dark"] .cg-back-btn:hover { background:rgba(33,150,243,0.15);bo
 }
 .cg-card-body { padding: 20px; }
 </style>
+{% block extra_js %}
+{{ block.super }}
 <script>
-  (function () {
-    function syncTopbarH() {
-      var topbar = document.querySelector('.topbar');
-      if (topbar) {
-        document.documentElement.style.setProperty('--topbar-h', topbar.getBoundingClientRect().height + 'px');
-      }
-    }
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', syncTopbarH);
-    } else {
-      syncTopbarH();
-    }
-    window.addEventListener('resize', syncTopbarH);
-  })();
-</script>
-{% endblock %}
-
-{% block breadcrumb %}
-<nav class="cg-nav">
-  <!-- Zone liens défilante -->
-  <div class="cg-nav-links">
-    <a href="{% url 'conge_dashboard' %}"
-       class="cg-nav-link {% if nav_active == 'dashboard' %}active{% endif %}">
-      <i class="bi bi-speedometer2"></i> Tableau de bord
-    </a>
-    <a href="{% url 'conge_list' %}"
-       class="cg-nav-link {% if nav_active == 'list' %}active{% endif %}">
-      <i class="bi bi-list-ul"></i> Liste des congés
-    </a>
-    <a href="{% url 'conge_suivi_retours' %}"
-       class="cg-nav-link {% if nav_active == 'retours' %}active{% endif %}">
-      <i class="bi bi-arrow-return-left"></i> Suivi retours
-    </a>
-    <a href="{% url 'conge_calendrier' %}"
-       class="cg-nav-link {% if nav_active == 'calendrier' %}active{% endif %}">
-      <i class="bi bi-calendar3"></i> Calendrier
-    </a>
-    <a href="{% url 'conge_nouveau' %}"
-       class="cg-nav-link {% if nav_active == 'nouveau' %}active{% endif %}"
-       style="color:var(--cg-600);font-weight:600;">
-      <i class="bi bi-plus-circle-fill"></i> Enregistrer
-    </a>
-  </div>
-
-  <!-- Groupe droite : dropdown + badges —TOUJOURS VISIBLE-->
-  <div class="cg-nav-right-group">
-
-    {% if can_manage %}
-    <!-- Dropdown "Plus" -->
-    <div style="position:relative;" id="cg-more-wrap">
-      <button onclick="toggleCgMore()" id="cg-more-btn"
-              class="cg-nav-badge-btn"
-              style="color:var(--cg-muted);gap:4px;font-size:12.5px;font-weight:500;padding:0 10px;"
-              title="Plus d'options">
-        <i class="bi bi-grid-3x3-gap-fill"></i> Plus
-      </button>
-      <div id="cg-more-popup"
-           style="display:none;position:fixed;background:var(--cg-surface);border:1px solid var(--cg-border);
-                  border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.14);padding:8px;
-                  min-width:180px;z-index:9001;">
-        <a href="{% url 'conge_soldes' %}" class="cg-more-item">
-          <i class="bi bi-table"></i> Soldes congés
-        </a>
-        <a href="{% url 'conge_planning_equipe' %}" class="cg-more-item">
-          <i class="bi bi-people-fill"></i> Planning équipe
-        </a>
-        <a href="{% url 'conge_rapport' %}" class="cg-more-item">
-          <i class="bi bi-file-earmark-bar-graph"></i> Rapports
-        </a>
-        <a href="{% url 'conge_direction' %}" class="cg-more-item {% if nav_active == 'direction' %}active{% endif %}">
-          <i class="bi bi-graph-up-arrow"></i> Vue direction
-        </a>
-        <a href="{% url 'conge_export_csv' %}" class="cg-more-item">
-          <i class="bi bi-file-earmark-excel"></i> Export CSV
-        </a>
-      </div>
-    </div>
-    {% endif %}
-
-    {% if cg_notifs_count %}
-    <a href="{% url 'conge_notifs_lire' %}" class="cg-nav-badge-btn bell"
-       title="{{ cg_notifs_count }} notification{{ cg_notifs_count|pluralize }} non lue{{ cg_notifs_count|pluralize }}">
-      <i class="bi bi-bell-fill"></i>
-      <span class="cg-nav-count green">{{ cg_notifs_count }}</span>
-    </a>
-    {% endif %}
-    {% if cg_pending_count %}
-    <a href="{% url 'conge_list' %}?statut=demande" class="cg-nav-badge-btn pending"
-       title="{{ cg_pending_count }} demande{{ cg_pending_count|pluralize }} en attente">
-      <i class="bi bi-hourglass-split"></i>
-      <span class="cg-nav-count orange">{{ cg_pending_count }}</span>
-    </a>
-    {% endif %}
-    {% if cg_dans_7j %}
-    <a href="{% url 'conge_dashboard' %}" class="cg-nav-badge-btn"
-       style="color:#2d99db;"
-       title="{{ cg_dans_7j }} congé{{ cg_dans_7j|pluralize }} débutant dans 7 jours">
-      <i class="bi bi-calendar-event-fill"></i>
-      <span class="cg-nav-count" style="background:#2d99db;">{{ cg_dans_7j }}</span>
-    </a>
-    {% endif %}
-  </div>
-</nav>
-<script>
-/* Scroll vers le lien actif dans la nav */
 (function(){
-  var active = document.querySelector('.cg-nav-links .cg-nav-link.active');
-  if(active){ active.scrollIntoView({inline:'nearest', block:'nearest'}); }
+  var btn = document.getElementById('cg-more-btn');
+  var popup = document.getElementById('cg-more-popup');
+  var wrap = document.getElementById('cg-more-wrap');
+  if(!btn || !popup) return;
+  /* Sortir le popup du topbar pour qu'il soit dans le stacking context racine */
+  document.body.appendChild(popup);
+  btn.addEventListener('click', function(e){
+    e.stopPropagation();
+    if(popup.classList.contains('open')){
+      popup.classList.remove('open');
+    } else {
+      var r = btn.getBoundingClientRect();
+      popup.style.top  = (r.bottom + 4) + 'px';
+      popup.style.right = (window.innerWidth - r.right) + 'px';
+      popup.classList.add('open');
+    }
+  });
+  document.addEventListener('click', function(e){
+    if(!wrap.contains(e.target) && !popup.contains(e.target)) popup.classList.remove('open');
+  });
 })();
-
-function toggleCgMore(){
-  var popup=document.getElementById('cg-more-popup');
-  var btn=document.getElementById('cg-more-btn');
-  if(!popup)return;
-  if(popup.style.display==='block'){popup.style.display='none';return;}
-  var r=btn.getBoundingClientRect();
-  popup.style.top=(r.bottom+4)+'px';
-  popup.style.right=(window.innerWidth-r.right)+'px';
-  popup.style.display='block';
-}
-document.addEventListener('click',function(e){
-  var w=document.getElementById('cg-more-wrap');
-  var p=document.getElementById('cg-more-popup');
-  if(w&&p&&!w.contains(e.target))p.style.display='none';
-});
 </script>
 {% endblock %}
+<script>
+(function () {
+  function alignSousTopbar() {
+    var topbar = document.querySelector('.topbar');
+    if (!topbar) return;
+    var tbH = Math.ceil(topbar.getBoundingClientRect().height);
+    if (tbH <= 0) return;
+    document.documentElement.style.setProperty('--topbar-h', tbH + 'px');
+    document.documentElement.style.setProperty('--header-h', tbH + 'px');
+    var sh = document.getElementById('subheader');
+    if (!sh) return;
+    requestAnimationFrame(function () {
+      var gap = Math.round(sh.getBoundingClientRect().top - topbar.getBoundingClientRect().bottom);
+      if (gap > 0) {
+        var adjusted = tbH - gap;
+        document.documentElement.style.setProperty('--topbar-h', adjusted + 'px');
+        document.documentElement.style.setProperty('--header-h', adjusted + 'px');
+      }
+    });
+  }
+  if (document.readyState !== 'loading') { alignSousTopbar(); }
+  else { document.addEventListener('DOMContentLoaded', alignSousTopbar); }
+  window.addEventListener('resize', alignSousTopbar);
+})();
+</script>
+{% endblock %}
+
+{% block module_navbar %}
+{% include 'conges/includes/nav.html' %}
+{% endblock %}
+
+{% block breadcrumb %}{% endblock %}

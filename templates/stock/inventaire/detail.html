@@ -1,10 +1,9 @@
 {% extends 'stock/base.html' %}
 {% load static %}
 {% block topbar_title %}Inventaire {{ inv.numero }}{% endblock %}
-{% block nav_inventaire %}active{% endblock %}
 
 {% block extra_st_css %}<style>
-.st-page-head { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 32px;margin:0 -32px;background:#e8f2f7;border-bottom:1px solid rgba(0,0,0,.05);box-shadow:0 2px 8px rgba(0,0,0,.04);position:sticky;top:calc(var(--topbar-h) + 44px);z-index:100; }
+.st-page-head { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 32px;margin:0 -32px;background:#e8f2f7;border-bottom:1px solid rgba(0,0,0,.05);box-shadow:0 2px 8px rgba(0,0,0,.04);position:sticky;top:var(--topbar-h);z-index:100; }
 .badge-brouillon { background:rgba(232,154,26,.1); color:#8a5c00; border:1px solid rgba(232,154,26,.25); padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; }
 .badge-valide    { background:rgba(26,109,140,.1);  color:#1a6d8c; border:1px solid rgba(26,109,140,.25); padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; }
 .badge-annule    { background:rgba(232,69,69,.1);   color:#b71c1c; border:1px solid rgba(232,69,69,.25);  padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; }
@@ -26,7 +25,7 @@
     <a class="o-back-btn" href="javascript:history.back()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 5l-7 7 7 7"/></svg> Retour</a>
     <div>
       <div style="display:flex;align-items:center;gap:10px;">
-        <span style="font-size:15px;font-weight:800;color:var(--st-900);font-family:monospace;">{{ inv.numero }}</span>
+        <span style="font-size:15px;font-weight:800;color:var(--st-900);font-family: var(--font-mono);">{{ inv.numero }}</span>
         {% if inv.statut == 'brouillon' %}<span class="badge-brouillon"><i class="bi bi-pencil"></i> En cours</span>
         {% elif inv.statut == 'valide' %}<span class="badge-valide"><i class="bi bi-check2-circle"></i> Validé</span>
         {% else %}<span class="badge-annule"><i class="bi bi-x-circle"></i> Annulé</span>{% endif %}
@@ -63,7 +62,7 @@
     <div class="st-card">
       <div class="st-card-header"><div class="st-card-title"><i class="bi bi-info-circle" style="color:var(--st-600);"></i> Informations</div></div>
       <div class="st-card-body">
-        <div class="st-field-row"><span class="st-field-lbl">N° Inventaire</span><span class="st-field-val" style="font-family:monospace;color:var(--st-600);">{{ inv.numero }}</span></div>
+        <div class="st-field-row"><span class="st-field-lbl">N° Inventaire</span><span class="st-field-val" style="font-family: var(--font-mono);color:var(--st-600);">{{ inv.numero }}</span></div>
         <div class="st-field-row"><span class="st-field-lbl">Date</span><span class="st-field-val">{{ inv.date_inventaire|date:"d/m/Y" }}</span></div>
         <div class="st-field-row"><span class="st-field-lbl">Produits</span><span class="st-field-val" style="color:var(--st-700);">{{ stats_ecarts.total }}</span></div>
         <div class="st-field-row"><span class="st-field-lbl">Créé par</span><span class="st-field-val">{{ inv.cree_par.get_full_name|default:inv.cree_par.username|default:"—" }}</span></div>
@@ -132,7 +131,7 @@
       <tr class="{% if ligne.ecart > 0 %}row-excedent{% elif ligne.ecart < 0 %}row-manque{% endif %}">
         <td>
           <a href="{% url 'stock_produit_detail' ligne.produit.pk %}" style="color:var(--st-text);text-decoration:none;font-weight:600;">{{ ligne.produit.nom }}</a>
-          <div style="font-size:10.5px;font-family:monospace;color:var(--st-600);">{{ ligne.produit.code }}</div>
+          <div style="font-size:10.5px;font-family: var(--font-mono);color:var(--st-600);">{{ ligne.produit.code }}</div>
         </td>
         <td style="text-align:right;color:var(--st-muted);">
           {{ ligne.stock_theorique|floatformat:0 }} <span style="font-size:10px;">{{ ligne.produit.unite_mesure }}</span>

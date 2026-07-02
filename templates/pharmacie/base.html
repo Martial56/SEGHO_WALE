@@ -1,4 +1,4 @@
-﻿{% extends 'base.html' %}
+{% extends 'base.html' %}
 {% load static %}
 
 {% block topbar_title %}Pharmacie{% if label %} — {{ label }}{% endif %}{% endblock %}
@@ -18,34 +18,6 @@ html[data-theme="dark"] {
   --ph-border:rgba(255,255,255,.09); --ph-text:#e0dada; --ph-muted:rgba(255,255,255,.4);
 }
 .content { padding-top: 0; padding-left: 0; padding-right: 0; }
-.ph-nav {
-  background:#fff; border-bottom:1px solid rgba(0,0,0,.07);
-  padding:0 32px;
-  display:flex; align-items:stretch; height:44px;
-  position:fixed; top:var(--topbar-h); left:0; right:0; z-index:250;
-  gap:2px; overflow-x:auto;
-}
-html[data-theme="dark"] .ph-nav {
-  background:#201d1d;
-  border-bottom-color:rgba(255,255,255,.08);
-  box-shadow:0 1px 4px rgba(0,0,0,.4);
-}
-.ph-nav-link {
-  padding:0 14px; font-size:12.5px; font-weight:500;
-  color:var(--ph-muted); text-decoration:none;
-  border-bottom:3px solid transparent; height:44px;
-  display:inline-flex; align-items:center; gap:6px;
-  transition:color .15s,background .15s,border-color .15s; white-space:nowrap;
-}
-.ph-nav-link:hover { color:var(--ph-700); background:rgba(15,67,88,.06); }
-.ph-nav-link.active { color:var(--ph-700); font-weight:700; border-bottom-color:var(--ph-600); background:rgba(15,67,88,.07); }
-.ph-nav-link.active i { color:var(--ph-600); }
-html[data-theme="dark"] .ph-nav-link         { color:rgba(255,255,255,.45); }
-html[data-theme="dark"] .ph-nav-link:hover   { color:var(--ph-300); background:rgba(154,184,138,.08); }
-html[data-theme="dark"] .ph-nav-link.active  { color:var(--ph-300); border-bottom-color:var(--ph-400); background:rgba(154,184,138,.08); }
-html[data-theme="dark"] .ph-nav-link.active i{ color:var(--ph-400); }
-.ph-nav-brand { font-weight:700; color:var(--ph-700); }
-html[data-theme="dark"] .ph-nav-brand        { color:var(--ph-300); }
 .btn-ph { background:var(--ph-600); color:#fff; border:none; border-radius:6px; padding:7px 16px; font-size:12.5px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:5px; text-decoration:none; transition:background .15s; }
 .btn-ph:hover { background:var(--ph-700); color:#fff; }
 .btn-ph-outline { border:1.5px solid var(--ph-600); color:var(--ph-600); background:transparent; border-radius:6px; padding:6px 14px; font-size:12.5px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:5px; text-decoration:none; transition:background .15s,color .15s; }
@@ -96,69 +68,36 @@ html[data-theme="dark"] #ph-menu-wrap button { color:rgba(255,255,255,.45); }
 {% block extra_ph_css %}{% endblock %}
 {% endblock %}
 
-{% block breadcrumb %}
+{% block module_navbar %}
 {% if pharmacie %}
-<nav class="ph-nav">
-  <a href="{% url 'pharmacie_accueil' %}" class="ph-nav-link ph-nav-brand">
-    <i class="bi bi-hospital-fill"></i> {{ label }}
-  </a>
-  <span style="display:flex;align-items:center;color:var(--ph-border);padding:0 4px;">›</span>
-  <a href="{% url 'pharmacie_dashboard' pharmacie %}"   class="ph-nav-link {% block nav_dashboard %}{% endblock %}"><i class="bi bi-speedometer2"></i> Dashboard</a>
-  <a href="{% url 'pharmacie_ordonnances' pharmacie %}" class="ph-nav-link {% block nav_ordonnances %}{% endblock %}"><i class="bi bi-prescription2"></i> Ordonnances</a>
-  <a href="{% url 'pharmacie_caisse' pharmacie %}"      class="ph-nav-link {% block nav_caisse %}{% endblock %}"><i class="bi bi-cash-coin"></i> Caisse</a>
-  <a href="{% url 'pharmacie_stock' pharmacie %}"       class="ph-nav-link {% block nav_stock %}{% endblock %}"><i class="bi bi-box-seam"></i> Stock</a>
-  <a href="{% url 'pharmacie_livraisons' pharmacie %}"  class="ph-nav-link {% block nav_livraisons %}{% endblock %}" style="position:relative;">
-    <i class="bi bi-box-arrow-in-down"></i> Livraisons
-    {% if ph_livraisons_en_attente %}
-    <span style="position:absolute;top:8px;right:4px;min-width:16px;height:16px;border-radius:8px;background:#e84545;color:#fff;font-size:9px;font-weight:800;line-height:16px;text-align:center;padding:0 3px;border:2px solid #fff;">{{ ph_livraisons_en_attente }}</span>
-    {% endif %}
-  </a>
-  <div style="position:relative;margin-left:auto;" id="ph-menu-wrap">
-    <button onclick="togglePhMenu()" style="height:44px;padding:0 14px;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:5px;color:var(--ph-muted);font-size:12.5px;font-weight:600;border-bottom:3px solid transparent;transition:color .15s;" onmouseenter="this.style.color='var(--ph-700)'" onmouseleave="this.style.color='var(--ph-muted)'">
-      <svg width="15" height="15" viewBox="0 0 15 15" fill="currentColor"><circle cx="2" cy="2" r="1.5"/><circle cx="7.5" cy="2" r="1.5"/><circle cx="13" cy="2" r="1.5"/><circle cx="2" cy="7.5" r="1.5"/><circle cx="7.5" cy="7.5" r="1.5"/><circle cx="13" cy="7.5" r="1.5"/><circle cx="2" cy="13" r="1.5"/><circle cx="7.5" cy="13" r="1.5"/><circle cx="13" cy="13" r="1.5"/></svg>
-      Plus
-    </button>
-    <div id="ph-menu-popup" style="display:none;position:fixed;top:0;right:0;width:380px;background:var(--ph-surface);border:1px solid var(--ph-border);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.18);padding:12px;z-index:9999;">
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
-        <a href="{% url 'pharmacie_demande' pharmacie %}"              class="ph-menu-item {% block nav_demande %}{% endblock %}"><i class="bi bi-bag-plus"></i><span>Demande dotation</span></a>
-        <a href="{% url 'pharmacie_alertes_reappro' pharmacie %}"      class="ph-menu-item {% block nav_alertes %}{% endblock %}"><i class="bi bi-bell-fill"></i><span>Alertes réappro</span></a>
-        <a href="{% url 'pharmacie_peremptions' pharmacie %}"          class="ph-menu-item {% block nav_peremptions %}{% endblock %}"><i class="bi bi-calendar-x"></i><span>Péremptions</span></a>
-        <a href="{% url 'pharmacie_retours' pharmacie %}"              class="ph-menu-item {% block nav_retours %}{% endblock %}"><i class="bi bi-arrow-return-left"></i><span>Retours</span></a>
-        <a href="{% url 'pharmacie_inventaire_list' pharmacie %}"      class="ph-menu-item {% block nav_inventaire %}{% endblock %}"><i class="bi bi-clipboard2-check"></i><span>Inventaire</span></a>
-        <a href="{% url 'pharmacie_journal' pharmacie %}"              class="ph-menu-item {% block nav_journal %}{% endblock %}"><i class="bi bi-journal-text"></i><span>Journal</span></a>
-        <a href="{% url 'pharmacie_recette' pharmacie %}"              class="ph-menu-item {% block nav_recette %}{% endblock %}"><i class="bi bi-graph-up"></i><span>Recette</span></a>
-        <a href="{% url 'pharmacie_rapport_mensuel' pharmacie %}"      class="ph-menu-item {% block nav_rapport_mensuel %}{% endblock %}"><i class="bi bi-bar-chart-line"></i><span>Rapport mensuel</span></a>
-        <a href="{% url 'pharmacie_rapport_dispensation' pharmacie %}" class="ph-menu-item {% block nav_rapport_disp %}{% endblock %}"><i class="bi bi-clipboard2-data"></i><span>Dispensations</span></a>
-        <a href="{% url 'pharmacie_comparaison' pharmacie %}"          class="ph-menu-item {% block nav_comparaison %}{% endblock %}"><i class="bi bi-columns-gap"></i><span>Comparaison</span></a>
-      </div>
-    </div>
-  </div>
-</nav>
-<div style="height:44px;"></div>
+{% include 'pharmacie/includes/nav.html' %}
+{% endif %}
+{% endblock %}
+
+{% block breadcrumb %}{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
 <script>
-function togglePhMenu(){
-  var p=document.getElementById('ph-menu-popup');
-  var btn=document.getElementById('ph-menu-wrap');
-  if(p.style.display==='none'||p.style.display===''){
-    var r=btn.getBoundingClientRect();
-    p.style.top=(r.bottom+4)+'px';
-    p.style.right=(window.innerWidth-r.right)+'px';
-    p.style.display='block';
-  } else {
-    p.style.display='none';
+(function () {
+  function alignSousTopbar() {
+    var topbar = document.querySelector('.topbar');
+    var content = document.querySelector('.content');
+    if (!topbar || !content) return;
+    var tbH = Math.ceil(topbar.getBoundingClientRect().height);
+    if (tbH <= 0) return;
+    document.documentElement.style.setProperty('--header-h', tbH + 'px');
+    document.documentElement.style.setProperty('--topbar-h', '0px');
+    requestAnimationFrame(function () {
+      var contentGap = Math.round(content.getBoundingClientRect().top - topbar.getBoundingClientRect().bottom);
+      if (contentGap !== 0) {
+        document.documentElement.style.setProperty('--header-h', (tbH - contentGap) + 'px');
+      }
+    });
   }
-}
-document.addEventListener('click',function(e){var w=document.getElementById('ph-menu-wrap');if(w&&!w.contains(e.target)){var p=document.getElementById('ph-menu-popup');if(p)p.style.display='none';}});
-(function(){
-  var tb=document.querySelector('.topbar');
-  var nav=document.querySelector('.ph-nav');
-  if(tb&&nav){
-    var h=tb.getBoundingClientRect().height;
-    if(h<30)return;
-    nav.style.top=h+'px';
-    document.documentElement.style.setProperty('--topbar-h',h+'px');
-  }
+  if (document.readyState !== 'loading') { alignSousTopbar(); }
+  else { document.addEventListener('DOMContentLoaded', alignSousTopbar); }
+  window.addEventListener('resize', alignSousTopbar);
 })();
 </script>
-{% endif %}
 {% endblock %}

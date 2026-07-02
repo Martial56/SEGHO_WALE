@@ -26,7 +26,6 @@ INSTALLED_APPS = [
     'employer',
     'conges',
     'presence',
-    'rapports',
     'planning',
     'core.apps.CoreConfig',
     'modules_permissions',

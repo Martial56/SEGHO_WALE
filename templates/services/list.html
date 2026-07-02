@@ -474,9 +474,7 @@
     }
   }
 
-    {
-    % include 'services/includes/io_styles.html' %
-  }
+{% include 'services/includes/io_styles.html' %}
 </style>
 {% endblock %}
 
@@ -542,20 +540,14 @@
       </a>
       {% endif %}
       {% if q %}<span class="o-filter-tag">{{ q }} <a
-          href="?{% if categorie_id %}categorie={{ categorie_id }}&{% endif %}{% if type_produit %}type_produit={{ type_produit }}&{% endif %}{% if statut %}statut={{ statut }}&{% endif %}vue={{ vue }}">×</a></span>{%
-      endif %}
+          href="?{% if categorie_id %}categorie={{ categorie_id }}&{% endif %}{% if type_produit %}type_produit={{ type_produit }}&{% endif %}{% if statut %}statut={{ statut }}&{% endif %}vue={{ vue }}">×</a></span>{% endif %}
       {% if categorie_id %}{% for cat in categories %}{% if cat.pk|stringformat:"s" == categorie_id %}<span
         class="o-filter-tag">{{ cat.nom }} <a
-          href="?{% if q %}q={{ q }}&{% endif %}{% if type_produit %}type_produit={{ type_produit }}&{% endif %}{% if statut %}statut={{ statut }}&{% endif %}vue={{ vue }}">×</a></span>{%
-      endif %}
-       {% endfor %}
-      {% endif %}
+          href="?{% if q %}q={{ q }}&{% endif %}{% if type_produit %}type_produit={{ type_produit }}&{% endif %}{% if statut %}statut={{ statut }}&{% endif %}vue={{ vue }}">×</a></span>{% endif %}{% endfor %}{% endif %}
       {% if type_produit %}<span class="o-filter-tag">{{ type_produit }} <a
-          href="?{% if q %}q={{ q }}&{% endif %}{% if categorie_id %}categorie={{ categorie_id }}&{% endif %}{% if statut %}statut={{ statut }}&{% endif %}vue={{ vue }}">×</a></span>{%
-      endif %}
+          href="?{% if q %}q={{ q }}&{% endif %}{% if categorie_id %}categorie={{ categorie_id }}&{% endif %}{% if statut %}statut={{ statut }}&{% endif %}vue={{ vue }}">×</a></span>{% endif %}
       {% if statut %}<span class="o-filter-tag">{% if statut == 'actif' %}Actifs{% else %}Inactifs{% endif %} <a
-          href="?{% if q %}q={{ q }}&{% endif %}{% if categorie_id %}categorie={{ categorie_id }}&{% endif %}{% if type_produit %}type_produit={{ type_produit }}&{% endif %}vue={{ vue }}">×</a></span>{%
-      endif %}
+          href="?{% if q %}q={{ q }}&{% endif %}{% if categorie_id %}categorie={{ categorie_id }}&{% endif %}{% if type_produit %}type_produit={{ type_produit }}&{% endif %}vue={{ vue }}">×</a></span>{% endif %}
 
       <div style="flex:1;"></div>
 
@@ -636,8 +628,7 @@
           <div class="o-card-body">
             <div class="o-card-name">{{ art.nom }}</div>
             <div class="o-card-meta">
-              {% if art.reference_interne %}<span style="font-family: var(--font-mono);font-size:10px;">{{
-                art.reference_interne }}</span><br>{% endif %}
+              {% if art.reference_interne %}<span style="font-family: var(--font-mono);font-size:10px;">{{ art.reference_interne }}</span><br>{% endif %}
               {% if art.categorie %}<span class="val">{{ art.categorie.code }}</span><br>{% endif %}
               <span class="val">{{ art.prix_vente|floatformat:0 }} CFA</span>
               &nbsp;
@@ -706,19 +697,14 @@
           <tr data-url="{% url 'services:detail' art.pk %}" onclick="window.location=this.dataset.url"
             style="cursor:pointer;">
             <td style="font-weight:500;" data-col="0">{{ art.nom }}</td>
-            <td data-col="1"><span style="font-family: var(--font-mono);font-size:11px;color:var(--text-muted);">{{
-                art.reference_interne|default:"—" }}</span></td>
+            <td data-col="1"><span style="font-family: var(--font-mono);font-size:11px;color:var(--text-muted);">{{ art.reference_interne|default:"—" }}</span></td>
             <td data-col="2">
-              {% if art.categorie %}<span class="badge-cat">{{ art.categorie.code }} — {{ art.categorie.nom }}</span>{%
-              else %}—{% endif %}
+              {% if art.categorie %}<span class="badge-cat">{{ art.categorie.code }} — {{ art.categorie.nom }}</span>{% else %}—{% endif %}
             </td>
-            <td style="font-size:12px;color:var(--text-muted);" data-col="3">{{
-              art.get_type_produit_hospitalier_display|default:"—" }}</td>
-            <td style="text-align:right;font-weight:700;color:var(--primary);" data-col="4">{{
-              art.prix_vente|floatformat:0 }} CFA</td>
+            <td style="font-size:12px;color:var(--text-muted);" data-col="3">{{ art.get_type_produit_hospitalier_display|default:"—" }}</td>
+            <td style="text-align:right;font-weight:700;color:var(--primary);" data-col="4">{{ art.prix_vente|floatformat:0 }} CFA</td>
             <td data-col="5">
-              {% if art.actif %}<span class="badge-actif">Actif</span>{% else %}<span
-                class="badge-inactif">Inactif</span>{% endif %}
+              {% if art.actif %}<span class="badge-actif">Actif</span>{% else %}<span class="badge-inactif">Inactif</span>{% endif %}
             </td>
           </tr>
           {% endfor %}
@@ -876,29 +862,4 @@
 
 {% endblock %}
 
-{% block extra_js %}
-{{ block.super }}
-<script>
-  (function () {
-    function alignSousTopbar() {
-      var topbar = document.querySelector('.topbar');
-      var sh = document.getElementById('subheader');
-      if (!topbar || !sh) return;
-      var tbH = Math.ceil(topbar.getBoundingClientRect().height);
-      if (tbH <= 0) return;
-      document.body.style.paddingTop = tbH + 'px';
-      document.documentElement.style.setProperty('--header-h', tbH + 'px');
-      requestAnimationFrame(function () {
-        var gap = Math.round(sh.getBoundingClientRect().top - topbar.getBoundingClientRect().bottom);
-        if (gap > 0) {
-          document.body.style.paddingTop = (tbH - gap) + 'px';
-          document.documentElement.style.setProperty('--header-h', (tbH - gap) + 'px');
-        }
-      });
-    }
-    if (document.readyState !== 'loading') { alignSousTopbar(); }
-    else { document.addEventListener('DOMContentLoaded', alignSousTopbar); }
-    window.addEventListener('resize', function () { document.body.style.paddingTop = ''; alignSousTopbar(); });
-  })();
-</script>
-{% endblock %}
+{% block extra_js %}{{ block.super }}{% endblock %}

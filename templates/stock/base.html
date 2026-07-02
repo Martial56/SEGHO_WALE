@@ -1,4 +1,4 @@
-﻿{% extends 'base.html' %}
+{% extends 'base.html' %}
 {% load static %}
 
 {% block topbar_title %}Stock{% endblock %}
@@ -21,45 +21,26 @@ html[data-theme="dark"] {
 /* Supprimer le padding-top du content sur toutes les pages stock */
 .content { padding-top: 0; }
 
-/* Nav */
-.st-nav {
-  background:#fff; border-bottom:1px solid rgba(0,0,0,.07);
-  padding:0 32px;
-  display:flex; align-items:stretch; height:44px;
-  position:fixed; top:var(--topbar-h); left:0; right:0; z-index:250;
-  gap:2px; overflow-x:auto;
-}
-html[data-theme="dark"] .st-nav { background:var(--st-surface); border-bottom-color:var(--st-border); }
-.st-nav-link {
-  padding:0 14px; font-size:12.5px; font-weight:500;
-  color:var(--st-muted); text-decoration:none;
-  border-radius:0; border-bottom:3px solid transparent;
-  display:inline-flex; align-items:center; gap:6px;
-  transition:color .15s, background .15s, border-color .15s;
-  white-space:nowrap; height:44px;
-}
-.st-nav-link:hover {
-  color:var(--st-700);
-  background:rgba(15,67,88,.06);
-}
-.st-nav-link.active {
-  color:var(--st-700);
-  font-weight:700;
-  border-bottom-color:var(--st-600);
-  background:rgba(15,67,88,.07);
-}
-.st-nav-link.active i {
-  color:var(--st-600);
-}
-html[data-theme="dark"] .st-nav-link        { color:var(--st-muted); }
-html[data-theme="dark"] .st-nav-link:hover  { color:var(--st-200); background:rgba(154,184,138,.08); }
-html[data-theme="dark"] .st-nav-link.active { color:var(--st-200); border-bottom-color:var(--st-400); background:rgba(154,184,138,.1); }
-
 /* Boutons */
 .btn-st { background:var(--st-600); color:#fff; border:none; border-radius:6px; padding:7px 16px; font-size:12.5px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:5px; text-decoration:none; transition:background .15s; }
 .btn-st:hover { background:var(--st-700); color:#fff; }
 .btn-st-outline { border:1.5px solid var(--st-600); color:var(--st-600); background:transparent; border-radius:6px; padding:6px 14px; font-size:12.5px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:5px; text-decoration:none; transition:background .15s,color .15s; }
 .btn-st-outline:hover { background:var(--st-600); color:#fff; }
+
+/* Cartes statistiques rapides (KPI) */
+.st-stats { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px; }
+.st-stat {
+  background:var(--st-surface); border:1px solid var(--st-border); border-radius:12px;
+  padding:14px 18px; box-shadow:0 1px 4px rgba(15,67,88,.06);
+  display:flex; align-items:center; gap:14px;
+  transition:box-shadow .15s, transform .15s;
+}
+.st-stat:hover { box-shadow:0 4px 14px rgba(15,67,88,.12); transform:translateY(-1px); }
+.st-stat-icon { width:42px; height:42px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-size:19px; flex-shrink:0; }
+.st-stat-val { font-size:23px; font-weight:800; line-height:1.1; }
+.st-stat-lbl { font-size:10.5px; color:var(--st-muted); text-transform:uppercase; letter-spacing:.3px; margin-top:3px; font-weight:600; }
+html[data-theme="dark"] .st-stat { box-shadow:none; }
+html[data-theme="dark"] .st-stat:hover { box-shadow:0 4px 14px rgba(0,0,0,.3); }
 
 /* Carte */
 .st-card { background:var(--st-surface); border-radius:12px; box-shadow:0 2px 12px rgba(15,67,88,.08); overflow:hidden; margin-bottom:16px; }
@@ -94,118 +75,36 @@ html[data-theme="dark"] .st-table thead tr { background:var(--st-800); color:var
 
 </style>
 {% block extra_st_css %}{% endblock %}
-<script>
-  (function () {
-    function syncTopbarH() {
-      var topbar = document.querySelector('.topbar');
-      if (topbar) {
-        document.documentElement.style.setProperty('--topbar-h', topbar.getBoundingClientRect().height + 'px');
-      }
-    }
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', syncTopbarH);
-    } else {
-      syncTopbarH();
-    }
-    window.addEventListener('resize', syncTopbarH);
-  })();
-</script>
 {% endblock %}
 
-{% block breadcrumb %}
-<nav class="st-nav">
-  <a href="{% url 'stock_dashboard' %}" class="st-nav-link {% block nav_dashboard %}{% endblock %}"><i class="bi bi-speedometer2"></i> Tableau de bord</a>
-  <a href="{% url 'stock_produits' %}" class="st-nav-link {% block nav_produits %}{% endblock %}"><i class="bi bi-box-seam"></i> Produits</a>
-  <a href="{% url 'stock_fiche_list' %}" class="st-nav-link {% block nav_rapports_besoins %}{% endblock %}"><i class="bi bi-file-earmark-text"></i> Fiches besoins</a>
-  <a href="{% url 'stock_receptions_a_integrer' %}" class="st-nav-link {% block nav_receptions_integrer %}{% endblock %}" style="position:relative;">
-    <i class="bi bi-box-arrow-in-down-right"></i> Réceptions achats
-    {% if stock_receptions_a_integrer %}
-    <span style="position:absolute;top:8px;right:4px;min-width:16px;height:16px;border-radius:8px;background:#d97706;color:#fff;font-size:9px;font-weight:800;line-height:16px;text-align:center;padding:0 3px;border:2px solid #fff;">{{ stock_receptions_a_integrer }}</span>
-    {% endif %}
-  </a>
-  <a href="{% url 'stock_dotation_list' %}" class="st-nav-link {% block nav_dotation %}{% endblock %}" style="position:relative;">
-    <i class="bi bi-bag-check"></i> Dotation
-    {% if stock_demandes_en_attente %}
-    <span style="position:absolute;top:8px;right:4px;min-width:16px;height:16px;border-radius:8px;background:#e84545;color:#fff;font-size:9px;font-weight:800;line-height:16px;text-align:center;padding:0 3px;border:2px solid #fff;">{{ stock_demandes_en_attente }}</span>
-    {% endif %}
-  </a>
-  <button onclick="toggleStMenu()" class="st-nav-link" id="st-grid-btn" style="margin-left:auto;border:none;cursor:pointer;background:none;" title="Autres modules">
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
-      <rect x="0" y="0" width="5" height="5" rx="1"/><rect x="6.5" y="0" width="5" height="5" rx="1"/><rect x="13" y="0" width="5" height="5" rx="1"/>
-      <rect x="0" y="6.5" width="5" height="5" rx="1"/><rect x="6.5" y="6.5" width="5" height="5" rx="1"/><rect x="13" y="6.5" width="5" height="5" rx="1"/>
-      <rect x="0" y="13" width="5" height="5" rx="1"/><rect x="6.5" y="13" width="5" height="5" rx="1"/><rect x="13" y="13" width="5" height="5" rx="1"/>
-    </svg>
-  </button>
-</nav>
-<div style="height:44px;"></div>
+{% block module_navbar %}
+{% include 'stock/includes/nav.html' %}
+{% endblock %}
 
-<!-- Popup menu grille -->
-<div id="st-menu-overlay" onclick="toggleStMenu()" style="display:none;position:fixed;inset:0;z-index:8000;background:rgba(0,0,0,.25);"></div>
-<div id="st-menu-popup" style="display:none;position:fixed;top:calc(var(--topbar-h) + 44px);right:8px;z-index:8001;background:#fff;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,.18);padding:16px;width:420px;max-width:96vw;max-height:80vh;overflow-y:auto;">
-  <div style="font-size:11px;font-weight:700;color:var(--st-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;padding-left:4px;">Tous les modules stock</div>
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
-    {% url 'stock_mouvements' as url_mv %}{% url 'stock_transfert' as url_tr %}
-    {% url 'stock_inventaire_list' as url_iv %}{% url 'stock_peremptions' as url_pe %}
-    {% url 'stock_valorisation' as url_vl %}
-    {% url 'stock_rapports_besoins' as url_rb %}
-    {% url 'stock_rapports_indicateurs' as url_ri %}{% url 'stock_rapports_consommation' as url_rc %}
-    {% url 'stock_rapports_dotations' as url_rd %}
-    {% url 'stock_elimination_create' as url_elim %}
-    {% url 'stock_retour_create' as url_retour %}
-    {% url 'stock_rapports_peremptions' as url_rp %}
-    {% url 'stock_rapports_bilan' as url_bilan %}
-    {% url 'stock_rapports_fournisseurs_prix' as url_frn %}
+{% block breadcrumb %}{% endblock %}
 
-    <div style="font-size:10px;font-weight:800;color:var(--st-muted);text-transform:uppercase;letter-spacing:.5px;padding:4px 6px 2px;grid-column:1/-1;">Gestion</div>
-    <a href="{{ url_mv }}" class="st-menu-item"><i class="bi bi-journal-text"></i><span>Journal</span></a>
-    <a href="{{ url_iv }}" class="st-menu-item"><i class="bi bi-clipboard2-check"></i><span>Inventaires</span></a>
-    <a href="{{ url_pe }}" class="st-menu-item"><i class="bi bi-calendar-x"></i><span>Péremptions</span></a>
-    <a href="{{ url_elim }}" class="st-menu-item"><i class="bi bi-trash3"></i><span>Éliminations</span></a>
-    <a href="{{ url_retour }}" class="st-menu-item"><i class="bi bi-box-arrow-in-left"></i><span>Retour pharma</span></a>
-    <a href="{{ url_vl }}" class="st-menu-item"><i class="bi bi-graph-up-arrow"></i><span>Valorisation</span></a>
-    <a href="{{ url_tr }}" class="st-menu-item"><i class="bi bi-shuffle"></i><span>Distribution</span></a>
-    <div style="font-size:10px;font-weight:800;color:var(--st-muted);text-transform:uppercase;letter-spacing:.5px;padding:4px 6px 2px;grid-column:1/-1;">Rapports</div>
-    <a href="{{ url_rb }}" class="st-menu-item"><i class="bi bi-clipboard2-data"></i><span>Besoins</span></a>
-    <a href="{{ url_ri }}" class="st-menu-item"><i class="bi bi-speedometer2"></i><span>Indicateurs</span></a>
-    <a href="{{ url_rc }}" class="st-menu-item"><i class="bi bi-box-arrow-right"></i><span>Dotations</span></a>
-    <a href="{{ url_rd }}" class="st-menu-item"><i class="bi bi-graph-up"></i><span>Tendances</span></a>
-    <a href="{{ url_rp }}" class="st-menu-item"><i class="bi bi-trash3-fill"></i><span>Élim. rapport</span></a>
-    <a href="{{ url_bilan }}" class="st-menu-item"><i class="bi bi-file-earmark-bar-graph"></i><span>Bilan mensuel</span></a>
-    <a href="{{ url_frn }}" class="st-menu-item"><i class="bi bi-currency-exchange"></i><span>Prix fourn.</span></a>
-  </div>
-</div>
-
-<style>
-.st-menu-item {
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:6px;padding:12px 8px;border-radius:10px;text-decoration:none;
-  color:var(--st-text);font-size:11.5px;font-weight:500;text-align:center;
-  transition:background .15s;
-}
-.st-menu-item:hover { background:var(--st-50);color:var(--st-600); }
-.st-menu-item i { font-size:22px;color:var(--st-500); }
-.st-menu-item:hover i { color:var(--st-600); }
-</style>
+{% block extra_js %}
+{{ block.super }}
 <script>
-function toggleStMenu(){
-  var popup   = document.getElementById('st-menu-popup');
-  var overlay = document.getElementById('st-menu-overlay');
-  var btn     = document.getElementById('st-grid-btn');
-  var open = popup.style.display !== 'none';
-  popup.style.display   = open ? 'none' : 'block';
-  overlay.style.display = open ? 'none' : 'block';
-  btn.style.background  = open ? '' : 'rgba(15,67,88,.1)';
-  btn.style.borderRadius= open ? '' : '6px';
-}
-
-(function(){
-  var tb  = document.querySelector('.topbar');
-  var nav = document.querySelector('.st-nav');
-  if (tb && nav) {
-    var h = tb.getBoundingClientRect().height;
-    nav.style.top = h + 'px';
-    document.documentElement.style.setProperty('--topbar-h', h + 'px');
+(function () {
+  function alignSousTopbar() {
+    var topbar = document.querySelector('.topbar');
+    var content = document.querySelector('.content');
+    if (!topbar || !content) return;
+    var tbH = Math.ceil(topbar.getBoundingClientRect().height);
+    if (tbH <= 0) return;
+    document.documentElement.style.setProperty('--header-h', tbH + 'px');
+    document.documentElement.style.setProperty('--topbar-h', '0px');
+    requestAnimationFrame(function () {
+      var contentGap = Math.round(content.getBoundingClientRect().top - topbar.getBoundingClientRect().bottom);
+      if (contentGap !== 0) {
+        document.documentElement.style.setProperty('--header-h', (tbH - contentGap) + 'px');
+      }
+    });
   }
+  if (document.readyState !== 'loading') { alignSousTopbar(); }
+  else { document.addEventListener('DOMContentLoaded', alignSousTopbar); }
+  window.addEventListener('resize', alignSousTopbar);
 })();
 </script>
 {% endblock %}

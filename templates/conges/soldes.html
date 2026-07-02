@@ -11,13 +11,17 @@
 .solde-val{font-size:15px;}
 .solde-ok-inline { font-weight:700; color:var(--cg-600); }
 html[data-theme="dark"] .solde-ok-inline { color:var(--cg-400); }
+.sg-wrap { display:flex; flex-direction:column; height:calc(100vh - var(--topbar-h)); overflow:hidden; }
+.sg-wrap .cg-subheader { position:relative; top:auto; flex-shrink:0; }
+.sg-body { flex:1; overflow:auto; }
 </style>
 {% endblock %}
 
 {% block content %}
+<div class="sg-wrap">
 
 <!-- Subheader -->
-<div class="cg-subheader">
+<div class="cg-subheader" id="subheader">
   <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
     <a href="?year={{ annee_prev }}" class="btn-cg-outline" style="padding:7px 13px;">
       <i class="bi bi-chevron-left"></i>
@@ -57,8 +61,9 @@ html[data-theme="dark"] .solde-ok-inline { color:var(--cg-400); }
   </div>
 </div>
 
+<div class="sg-body">
 <!-- Tableau -->
-<div class="cg-table-wrap" style="margin-top:20px;">
+<div class="cg-table-wrap" style="padding:20px 32px 0;">
   {% if soldes_data %}
   <div style="overflow-x:auto;">
     <table class="cg-table">
@@ -79,7 +84,7 @@ html[data-theme="dark"] .solde-ok-inline { color:var(--cg-400); }
         <tr>
           <td>
             <div style="font-weight:600;color:var(--cg-text);">{{ s.employe.nom_complet }}</div>
-            <div style="font-size:11.5px;color:var(--cg-muted);font-family:monospace;">{{ s.employe.matricule }}</div>
+            <div style="font-size:11.5px;color:var(--cg-muted);font-family: var(--font-mono);">{{ s.employe.matricule }}</div>
           </td>
           <td style="color:var(--cg-muted);font-size:12.5px;">{{ s.employe.service.nom|default:"—" }}</td>
           <td style="text-align:right;font-weight:600;color:var(--cg-text);">{{ s.quota|floatformat:1 }} j</td>
@@ -148,7 +153,7 @@ html[data-theme="dark"] .solde-ok-inline { color:var(--cg-400); }
 </div>
 
 <!-- Légende -->
-<div style="margin-top:12px;display:flex;gap:16px;flex-wrap:wrap;">
+<div style="padding:12px 32px 20px;display:flex;gap:16px;flex-wrap:wrap;">
   <span style="font-size:12px;color:#1a6d8c;font-weight:600;">
     <i class="bi bi-circle-fill" style="font-size:8px;"></i> ≥ 5 jours restants
   </span>
@@ -159,5 +164,7 @@ html[data-theme="dark"] .solde-ok-inline { color:var(--cg-400); }
     <i class="bi bi-circle-fill" style="font-size:8px;"></i> Solde négatif
   </span>
 </div>
+</div><!-- /sg-body -->
+</div><!-- /sg-wrap -->
 
 {% endblock %}

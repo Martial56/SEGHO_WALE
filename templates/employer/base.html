@@ -42,41 +42,6 @@ html[data-theme="dark"] {
   --rh-bg:      #0B1220;
 }
 
-/* ── Nav ── */
-.rh-nav {
-  background: var(--rh-surface);
-  border-bottom: 1px solid rgba(0,0,0,0.07);
-  margin: 0;
-  padding: 0 32px;
-  display: flex;
-  align-items: stretch;
-  height: 44px;
-  box-shadow: 0 1px 3px rgba(26,109,140,0.06);
-  position: fixed; top: var(--topbar-h); left:0; right:0;
-  z-index: 250;
-  gap: 2px;
-}
-.rh-nav-link {
-  padding: 11px 16px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--rh-muted);
-  text-decoration: none;
-  border-bottom: 2px solid transparent;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  transition: color 0.15s, border-color 0.15s;
-  white-space: nowrap;
-  margin-bottom: -1px;
-}
-.rh-nav-link:hover  { color: var(--rh-600); }
-.rh-nav-link.active { color: var(--rh-600); border-bottom-color: var(--rh-500); font-weight: 600; }
-html[data-theme="dark"] .rh-nav { background: var(--rh-surface); border-bottom-color: var(--rh-border); }
-html[data-theme="dark"] .rh-nav-link        { color: #94A3B8; }
-html[data-theme="dark"] .rh-nav-link:hover  { color: var(--rh-300); }
-html[data-theme="dark"] .rh-nav-link.active { color: var(--rh-300); border-bottom-color: var(--rh-400); }
-
 /* ── Boutons RH ── */
 .btn-rh {
   background: var(--rh-600);
@@ -313,50 +278,38 @@ html[data-theme="dark"] .rh-input::placeholder { color: rgba(255,255,255,0.2); }
 .rh-label .req { color: var(--rose); margin-left: 2px; }
 html[data-theme="dark"] .rh-label { color: #94A3B8; }
 
-/* ── Responsive ── */
-@media (max-width: 768px) {
-  .rh-nav { margin: 0; padding: 0 16px; overflow-x: auto; }
-}
 </style>
 {% endblock %}
 
-{% block breadcrumb %}
-<nav class="rh-nav">
-  <a href="{% url 'rh_dashboard' %}"
-     class="rh-nav-link {% block rh_nav_dashboard %}{% endblock %}">
-    <i class="bi bi-bar-chart-fill"></i> Tableau de bord
-  </a>
-  <a href="{% url 'ressources_humaines_list' %}"
-     class="rh-nav-link {% block rh_nav_list %}{% endblock %}">
-    <i class="bi bi-people-fill"></i> Employés
-  </a>
-<a href="{% url 'rh_annuaire' %}"
-     class="rh-nav-link {% block rh_nav_annuaire %}{% endblock %}">
-    <i class="bi bi-person-lines-fill"></i> Annuaire
-  </a>
-  {% block rh_nav_org %}{% endblock %}
-  <a href="{% url 'rh_registre' %}"
-     class="rh-nav-link {% block rh_nav_registre %}{% endblock %}">
-    <i class="bi bi-journal-bookmark-fill"></i> Registre
-  </a>
-  <a href="{% url 'rh_presence_rapport' %}"
-     class="rh-nav-link {% block rh_nav_presence %}{% endblock %}">
-    <i class="bi bi-calendar-check-fill"></i> Présence
-  </a>
-  {% if can_manage %}
-  <a href="{% url 'rh_nouveau' %}"
-     class="rh-nav-link {% block rh_nav_nouveau %}{% endblock %}">
-    <i class="bi bi-person-plus-fill"></i> Nouvel employé
-  </a>
-  <a href="{% url 'rh_import' %}"
-     class="rh-nav-link {% block rh_nav_import %}{% endblock %}">
-    <i class="bi bi-upload"></i> Import
-  </a>
-  {% endif %}
-</nav>
-<div style="height:44px;"></div>
-<script>(function(){var tb=document.querySelector('.topbar'),nav=document.querySelector('.rh-nav');if(tb&&nav){var h=tb.getBoundingClientRect().height;if(h<30)return;nav.style.top=h+'px';document.documentElement.style.setProperty('--topbar-h',h+'px');}})();
-document.addEventListener('DOMContentLoaded',_fixNavTop);
-window.addEventListener('load',function(){var tb=document.querySelector('.topbar'),nav=document.querySelector('.cg-nav')||document.querySelector('[class*="-nav"]');if(tb&&nav){var h=tb.getBoundingClientRect().height;if(h>=30){nav.style.top=h+'px';document.documentElement.style.setProperty('--topbar-h',h+'px');}}});</script>
+{% block module_navbar %}
+{% include 'employer/includes/nav.html' %}
+{% endblock %}
+
+{% block breadcrumb %}{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+(function () {
+  function alignSousTopbar() {
+    var topbar = document.querySelector('.topbar');
+    var content = document.querySelector('.content');
+    if (!topbar || !content) return;
+    var tbH = Math.ceil(topbar.getBoundingClientRect().height);
+    if (tbH <= 0) return;
+    document.documentElement.style.setProperty('--header-h', tbH + 'px');
+    document.documentElement.style.setProperty('--topbar-h', '0px');
+    requestAnimationFrame(function () {
+      var contentGap = Math.round(content.getBoundingClientRect().top - topbar.getBoundingClientRect().bottom);
+      if (contentGap !== 0) {
+        document.documentElement.style.setProperty('--header-h', (tbH - contentGap) + 'px');
+      }
+    });
+  }
+  if (document.readyState !== 'loading') { alignSousTopbar(); }
+  else { document.addEventListener('DOMContentLoaded', alignSousTopbar); }
+  window.addEventListener('resize', alignSousTopbar);
+})();
+</script>
 {% endblock %}
 
