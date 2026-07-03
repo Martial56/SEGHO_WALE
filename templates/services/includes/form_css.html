@@ -527,7 +527,7 @@
     top: calc(100% + 3px);
     left: 0;
     right: 0;
-    min-width: 200px;
+    min-width: min(200px, 100%);
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 4px;
@@ -699,6 +699,11 @@
       /* -- dropdown -- */
       var dropdown = document.createElement('div');
       dropdown.className = 'ss-dropdown';
+      /* position:fixed inline (au lieu du position:absolute de la classe
+         partagée) : ce dropdown est posé sur <body>, positionné en JS via
+         getBoundingClientRect (coordonnées viewport) — ne pas toucher à la
+         règle CSS partagée, réutilisée telle quelle par searchable_select_js.html. */
+      dropdown.style.position = 'fixed';
 
       var searchRow = document.createElement('div');
       searchRow.className = 'ss-search';
@@ -720,8 +725,11 @@
       select.style.cssText = 'position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;';
 
       wrap.appendChild(trigger);
-      wrap.appendChild(dropdown);
       wrap.appendChild(select);
+      /* Le dropdown est posé sur <body> (position:fixed) plutôt que dans wrap :
+         sinon un ancêtre avec overflow:hidden (ex. .f-tabs-wrap, pour ses coins
+         arrondis) le rogne visuellement au lieu de le laisser flotter. */
+      document.body.appendChild(dropdown);
 
       /* -- rendu de la liste -- */
       function renderList(q) {
@@ -765,13 +773,37 @@
         }
       }
 
+      function reposition() {
+        var rect = trigger.getBoundingClientRect();
+        var width = Math.max(rect.width, 200);
+        var left = Math.min(rect.left, window.innerWidth - width - 8);
+        left = Math.max(8, left);
+        /* Toujours ouvrir vers le bas (comme "Catégorie de prestation") :
+           un flip vers le haut recouvre les champs au-dessus au lieu de
+           rester proche du champ cliqué. On borne plutôt la hauteur à
+           l'espace restant sous le champ — la liste interne (.ss-list)
+           défile déjà, donc rien n'est perdu, juste moins de lignes visibles
+           d'un coup. */
+        var spaceBelow = window.innerHeight - rect.bottom - 8;
+        dropdown.style.left = left + 'px';
+        dropdown.style.width = width + 'px';
+        dropdown.style.bottom = 'auto';
+        dropdown.style.top = (rect.bottom + 3) + 'px';
+        var maxH = Math.max(120, spaceBelow);
+        dropdown.style.maxHeight = maxH + 'px';
+        list.style.maxHeight = Math.max(60, maxH - searchRow.offsetHeight) + 'px';
+      }
+
       function open() {
         if (dropdown.classList.contains('open')) return;
+        reposition();
         dropdown.classList.add('open');
         trigger.classList.add('open');
         searchInput.value = '';
         renderList('');
         searchInput.focus();
+        window.addEventListener('scroll', reposition, true);
+        window.addEventListener('resize', reposition);
         setTimeout(function () {
           var sel = list.querySelector('.selected');
           if (sel) sel.scrollIntoView({ block: 'nearest' });
@@ -781,6 +813,8 @@
       function close() {
         dropdown.classList.remove('open');
         trigger.classList.remove('open');
+        window.removeEventListener('scroll', reposition, true);
+        window.removeEventListener('resize', reposition);
       }
 
       trigger.addEventListener('click', function () {
@@ -814,7 +848,7 @@
       });
 
       document.addEventListener('click', function (e) {
-        if (!wrap.contains(e.target)) close();
+        if (!wrap.contains(e.target) && !dropdown.contains(e.target)) close();
       });
 
       updateTrigger();

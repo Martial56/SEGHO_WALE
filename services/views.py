@@ -17,9 +17,9 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from .models import (
     Articleservice, CategorieArticle, FamilleArticle, CompagniePharma,
     LigneFournisseurArticle, ConditionnementArticle, VarianteAttributArticle, ReglePrix,
-    UniteMesure, CategorieUniteMesure, Consommable, Typeservice,
+    UniteMesure, CategorieUniteMesure,
 )
-from .forms import CategorieArticleForm, CategorieUniteMesureForm, UniteMesureForm, ConsommableForm, TypeserviceForm
+from .forms import CategorieArticleForm, CategorieUniteMesureForm, UniteMesureForm
 from achats.models import Fournisseur
 from django.contrib.auth.models import User
 
@@ -182,9 +182,6 @@ def service_form(request, pk=None):
             article.photo = request.FILES['photo']
 
         article.save()
-        # M2M types
-        types_ids = request.POST.getlist('types')
-        article.types.set(types_ids)
         messages.success(request, f"Article « {article.nom} » enregistré avec succès.")
         return redirect('services:detail', pk=article.pk)
 
@@ -201,8 +198,6 @@ def service_form(request, pk=None):
     lignes_conditionnements = article.conditionnements.all() if article else []
     lignes_variantes = article.variantes.all() if article else []
     regles = article.regles_prix.all() if article else []
-    tous_types = Typeservice.objects.filter(actif=True).order_by('nom')
-    types_selectionnes = list(article.types.values_list('pk', flat=True)) if article else []
 
     return render(request, 'services/form.html', {
         'article': article,
@@ -224,8 +219,6 @@ def service_form(request, pk=None):
         'politique_fact_choices': Articleservice.POLITIQUE_FACT_CHOICES,
         'refacturer_choices': Articleservice.REFACTURER_CHOICES,
         'politique_controle_choices': Articleservice.POLITIQUE_CONTROLE_CHOICES,
-        'tous_types': tous_types,
-        'types_selectionnes': types_selectionnes,
         'cat_codes_json': cat_codes_json,
     })
 
@@ -250,113 +243,12 @@ def regles_prix(request, pk):
 
 # ── Vues AJAX pour les lignes dynamiques ─────────────────────
 
-# ── Consommables ──────────────────────────────────────────────────────────
-
-@login_required
-def consommables_list(request):
-    qs = Consommable.objects.select_related('categorie', 'unite_mesure').all()
-
-    q = request.GET.get('q', '').strip()
-    categorie_id = request.GET.get('categorie', '')
-    statut = request.GET.get('statut', '')
-    vue = request.GET.get('vue', 'liste')
-
-    if q:
-        qs = qs.filter(Q(nom__icontains=q) | Q(code__icontains=q) | Q(description__icontains=q))
-    if categorie_id:
-        qs = qs.filter(categorie_id=categorie_id)
-    if statut == 'actif':
-        qs = qs.filter(actif=True)
-    elif statut == 'inactif':
-        qs = qs.filter(actif=False)
-
-    total = qs.count()
-    paginator = Paginator(qs, 24 if vue == 'grille' else 40)
-    page_obj = paginator.get_page(request.GET.get('page'))
-
-    return render(request, 'services/consommables/list.html', {
-        'page_obj': page_obj,
-        'categories': CategorieArticle.objects.all(),
-        'q': q,
-        'categorie_id': categorie_id,
-        'statut': statut,
-        'vue': vue,
-        'total': total,
-    })
-
-
-@login_required
-def consommable_create(request):
-    if request.method == 'POST':
-        form = ConsommableForm(request.POST)
-        if form.is_valid():
-            obj = form.save()
-            messages.success(request, f'Consommable « {obj.nom} » créé avec succès.')
-            return redirect('services:consommables')
-        else:
-            messages.error(request, 'Veuillez corriger les erreurs du formulaire.')
-    else:
-        form = ConsommableForm()
-    return render(request, 'services/consommables/form.html', {
-        'form': form,
-        'titre': 'Nouveau consommable',
-        'edit': False,
-    })
-
-
-@login_required
-def consommable_edit(request, pk):
-    obj = get_object_or_404(Consommable, pk=pk)
-    if request.method == 'POST':
-        form = ConsommableForm(request.POST, instance=obj)
-        if form.is_valid():
-            form.save()
-            messages.success(request, f'Consommable « {obj.nom} » mis à jour.')
-            return redirect('services:consommable_detail', pk=obj.pk)
-        else:
-            messages.error(request, 'Veuillez corriger les erreurs du formulaire.')
-    else:
-        form = ConsommableForm(instance=obj)
-    return render(request, 'services/consommables/form.html', {
-        'form': form,
-        'obj': obj,
-        'titre': f'Modifier — {obj.nom}',
-        'edit': True,
-    })
-
-
-@login_required
-def consommable_detail(request, pk):
-    obj = get_object_or_404(Consommable, pk=pk)
-    return render(request, 'services/consommables/detail.html', {'obj': obj})
-
-
-@login_required
-def consommable_delete(request, pk):
-    obj = get_object_or_404(Consommable, pk=pk)
-    if request.method == 'POST':
-        nom = obj.nom
-        obj.delete()
-        messages.success(request, f'Consommable « {nom} » supprimé.')
-    return redirect('services:consommables')
-
-
 @login_required
 @require_POST
 def service_bulk_delete(request):
     ids = request.POST.getlist('ids[]')
     if ids:
         count, _ = Articleservice.objects.filter(pk__in=ids).delete()
-        return JsonResponse({'ok': True, 'count': count})
-    return JsonResponse({'ok': False, 'error': 'Aucun élément sélectionné'}, status=400)
-
-
-@login_required
-@require_POST
-def consommable_bulk_delete(request):
-    ids = request.POST.getlist('ids[]')
-    if ids:
-        count, _ = Consommable.objects.filter(pk__in=ids).delete()
         return JsonResponse({'ok': True, 'count': count})
     return JsonResponse({'ok': False, 'error': 'Aucun élément sélectionné'}, status=400)
 
@@ -621,93 +513,6 @@ def categorie_unite_bulk_delete(request):
     ids = request.POST.getlist('ids[]')
     if ids:
         count, _ = CategorieUniteMesure.objects.filter(pk__in=ids).delete()
-        return JsonResponse({'ok': True, 'count': count})
-    return JsonResponse({'ok': False}, status=400)
-
-
-# ── Types de service ───────────────────────────────────────────────────────
-
-@login_required
-def types_list(request):
-    q = request.GET.get('q', '').strip()
-    vue = request.GET.get('vue', 'liste')
-    qs = Typeservice.objects.all()
-    if q:
-        qs = qs.filter(nom__icontains=q)
-    total_all = Typeservice.objects.count()
-    paginator = Paginator(qs, 30)
-    page_obj = paginator.get_page(request.GET.get('page'))
-    return render(request, 'services/types/list.html', {
-        'page_obj': page_obj,
-        'q': q,
-        'vue': vue,
-        'total': total_all,
-        'total_filtre': qs.count(),
-    })
-
-
-@login_required
-def type_create(request):
-    if request.method == 'POST':
-        form = TypeserviceForm(request.POST)
-        if form.is_valid():
-            obj = form.save()
-            messages.success(request, f'Type « {obj.nom} » créé.')
-            return redirect('services:types')
-        else:
-            messages.error(request, 'Veuillez corriger les erreurs du formulaire.')
-    else:
-        form = TypeserviceForm()
-    return render(request, 'services/types/form.html', {
-        'form': form,
-        'titre': 'Nouveau type de service',
-        'edit': False,
-    })
-
-
-@login_required
-def type_edit(request, pk):
-    obj = get_object_or_404(Typeservice, pk=pk)
-    if request.method == 'POST':
-        form = TypeserviceForm(request.POST, instance=obj)
-        if form.is_valid():
-            form.save()
-            messages.success(request, f'Type « {obj.nom} » mis à jour.')
-            return redirect('services:type_detail', pk=obj.pk)
-        else:
-            messages.error(request, 'Veuillez corriger les erreurs du formulaire.')
-    else:
-        form = TypeserviceForm(instance=obj)
-    return render(request, 'services/types/form.html', {
-        'form': form,
-        'obj': obj,
-        'titre': f'Modifier — {obj.nom}',
-        'edit': True,
-    })
-
-
-@login_required
-def type_detail(request, pk):
-    obj = get_object_or_404(Typeservice, pk=pk)
-    return render(request, 'services/types/detail.html', {'obj': obj})
-
-
-@login_required
-def type_delete(request, pk):
-    obj = get_object_or_404(Typeservice, pk=pk)
-    if request.method == 'POST':
-        nom = obj.nom
-        obj.delete()
-        messages.success(request, f'Type « {nom} » supprimé.')
-    return redirect('services:types')
-
-
-@login_required
-@require_POST
-def type_bulk_delete(request):
-    ids = request.POST.getlist('ids[]')
-    if ids:
-        count, _ = Typeservice.objects.filter(pk__in=ids).delete()
         return JsonResponse({'ok': True, 'count': count})
     return JsonResponse({'ok': False}, status=400)
 

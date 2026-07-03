@@ -1,28 +1,7 @@
 from django import forms
-from .models import CategorieArticle, CategorieUniteMesure, UniteMesure, Consommable, Typeservice
+from .models import CategorieArticle, CategorieUniteMesure, UniteMesure
 
 _ul = 'field-ul'
-
-
-class TypeserviceForm(forms.ModelForm):
-    class Meta:
-        model = Typeservice
-        fields = ['nom', 'actif']
-        widgets = {
-            'nom': forms.TextInput(attrs={
-                'class': _ul,
-                'placeholder': 'Ex : Consultation, Suivi, Urgence, Tous…',
-                'autofocus': True,
-            }),
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        for field in self.fields.values():
-            field.error_messages = {
-                'required': 'Ce champ est obligatoire.',
-                'unique': 'Ce type existe déjà.',
-            }
 
 
 class CategorieArticleForm(forms.ModelForm):
@@ -133,47 +112,6 @@ class UniteMesureForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['categorie'].empty_label = '— Sélectionner une catégorie —'
-        for field in self.fields.values():
-            field.error_messages = {
-                'required': 'Ce champ est obligatoire.',
-                'unique': 'Cette valeur existe déjà.',
-            }
-
-
-class ConsommableForm(forms.ModelForm):
-    class Meta:
-        model = Consommable
-        fields = ['code', 'nom', 'description', 'categorie', 'unite_mesure',
-                  'prix_achat', 'prix_vente', 'quantite_stock', 'quantite_alerte', 'actif']
-        widgets = {
-            'code': forms.TextInput(attrs={
-                'class': _ul,
-                'placeholder': 'Auto-généré si vide',
-                'style': 'text-transform:uppercase',
-            }),
-            'nom': forms.TextInput(attrs={
-                'class': _ul,
-                'placeholder': 'Nom du consommable',
-            }),
-            'description': forms.Textarea(attrs={
-                'class': _ul,
-                'rows': 3,
-                'placeholder': 'Description optionnelle…',
-            }),
-            'categorie': forms.Select(attrs={'class': _ul}),
-            'unite_mesure': forms.Select(attrs={'class': _ul}),
-            'prix_achat': forms.NumberInput(attrs={'class': _ul, 'placeholder': '0', 'min': '0'}),
-            'prix_vente': forms.NumberInput(attrs={'class': _ul, 'placeholder': '0', 'min': '0'}),
-            'quantite_stock': forms.NumberInput(attrs={'class': _ul, 'placeholder': '0', 'min': '0'}),
-            'quantite_alerte': forms.NumberInput(attrs={'class': _ul, 'placeholder': '0', 'min': '0'}),
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['nom'].required = True
-        for f in ['code', 'description', 'categorie', 'unite_mesure',
-                  'prix_achat', 'prix_vente', 'quantite_stock', 'quantite_alerte']:
-            self.fields[f].required = False
         for field in self.fields.values():
             field.error_messages = {
                 'required': 'Ce champ est obligatoire.',

@@ -2,17 +2,6 @@ from django.db import models
 from django.contrib.auth.models import User
 
 
-class Typeservice(models.Model):
-    nom = models.CharField(max_length=100, unique=True, verbose_name="Nom")
-    actif = models.BooleanField(default=True, verbose_name="Actif")
-
-    def __str__(self): return self.nom
-    class Meta:
-        verbose_name = "Type de service"
-        verbose_name_plural = "Types de service"
-        ordering = ['nom']
-
-
 class CategorieUniteMesure(models.Model):
     nom = models.CharField(max_length=100, unique=True, verbose_name="Nom")
 
@@ -269,12 +258,6 @@ class Articleservice(models.Model):
     compte_charges = models.CharField(max_length=100, blank=True, verbose_name="Compte de charges")
     compte_ecart_prix = models.CharField(max_length=100, blank=True, verbose_name="Compte d'écart de prix")
 
-    # ── Types de service ──────────────────────────────────────
-    types = models.ManyToManyField(
-        'Typeservice', blank=True,
-        related_name='articles', verbose_name="Types de service"
-    )
-
     # ── Meta ─────────────────────────────────────────────────
     actif = models.BooleanField(default=True, verbose_name="Actif")
     date_creation = models.DateTimeField(auto_now_add=True)
@@ -347,44 +330,3 @@ class ReglePrix(models.Model):
     class Meta:
         verbose_name = "Règle de prix"
         ordering = ['liste_prix']
-
-
-class Consommable(models.Model):
-    code = models.CharField(max_length=20, unique=True, blank=True, verbose_name="Code")
-    nom = models.CharField(max_length=300, verbose_name="Nom")
-    description = models.TextField(blank=True, verbose_name="Description")
-    categorie = models.ForeignKey(
-        CategorieArticle, on_delete=models.SET_NULL, null=True, blank=True,
-        verbose_name="Catégorie"
-    )
-    unite_mesure = models.ForeignKey(
-        UniteMesure, on_delete=models.SET_NULL, null=True, blank=True,
-        verbose_name="Unité de mesure"
-    )
-    prix_achat = models.DecimalField(max_digits=12, decimal_places=0, default=0, verbose_name="Prix d'achat (CFA)")
-    prix_vente = models.DecimalField(max_digits=12, decimal_places=0, default=0, verbose_name="Prix de vente (CFA)")
-    quantite_stock = models.IntegerField(default=0, verbose_name="Quantité en stock")
-    quantite_alerte = models.IntegerField(default=0, verbose_name="Quantité d'alerte")
-    actif = models.BooleanField(default=True, verbose_name="Actif")
-    date_creation = models.DateTimeField(auto_now_add=True)
-    date_modification = models.DateTimeField(auto_now=True)
-
-    def save(self, *args, **kwargs):
-        if not self.code:
-            prefix = 'CONS'
-            last = Consommable.objects.filter(code__startswith=prefix).order_by('code').last()
-            if last:
-                try:
-                    seq = int(last.code[len(prefix):]) + 1
-                except (ValueError, IndexError):
-                    seq = 1
-            else:
-                seq = 1
-            self.code = f'{prefix}{seq:04d}'
-        super().save(*args, **kwargs)
-
-    def __str__(self): return self.nom
-    class Meta:
-        verbose_name = "Consommable"
-        verbose_name_plural = "Consommables"
-        ordering = ['nom']

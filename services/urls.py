@@ -35,22 +35,6 @@ urlpatterns = [
     path('unites/categories/<int:pk>/supprimer/', views.categorie_unite_delete, name='categorie_unite_delete'),
     path('unites/categories/supprimer-selection/', views.categorie_unite_bulk_delete, name='categorie_unite_bulk_delete'),
 
-    # Consommables
-    path('consommables/', views.consommables_list, name='consommables'),
-    path('consommables/nouveau/', views.consommable_create, name='consommable_create'),
-    path('consommables/<int:pk>/', views.consommable_detail, name='consommable_detail'),
-    path('consommables/<int:pk>/modifier/', views.consommable_edit, name='consommable_edit'),
-    path('consommables/<int:pk>/supprimer/', views.consommable_delete, name='consommable_delete'),
-    path('consommables/supprimer-selection/', views.consommable_bulk_delete, name='consommable_bulk_delete'),
-
-    # Types de service
-    path('types/', views.types_list, name='types'),
-    path('types/nouveau/', views.type_create, name='type_create'),
-    path('types/<int:pk>/', views.type_detail, name='type_detail'),
-    path('types/<int:pk>/modifier/', views.type_edit, name='type_edit'),
-    path('types/<int:pk>/supprimer/', views.type_delete, name='type_delete'),
-    path('types/supprimer-selection/', views.type_bulk_delete, name='type_bulk_delete'),
-
     path('ajax/fournisseur-ligne/', views.ajax_add_fournisseur, name='ajax_fournisseur'),
     path('ajax/conditionn-ligne/', views.ajax_add_conditionnement, name='ajax_conditionnement'),
     path('ajax/variante-ligne/', views.ajax_add_variante, name='ajax_variante'),

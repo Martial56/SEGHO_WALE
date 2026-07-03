@@ -4,87 +4,31 @@
 
 {% block extra_css %}
 {{ block.super }}
+{% include 'services/includes/form_css.html' %}
+{% include 'services/includes/article_form_css.html' %}
 <style>
-  /* ── PAGE BODY ── */
-  .det-page {
-    width: 100%;
-    padding: 16px 24px 48px;
-  }
-
-  /* ── HEADER CARD ── */
-  .det-header {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    margin-bottom: 12px;
-    overflow: hidden;
-  }
-
-  .det-header-inner {
-    display: flex;
-    align-items: flex-start;
-    gap: 20px;
-    padding: 20px 24px 18px;
-  }
-
-  .det-photo {
-    width: 72px;
-    height: 72px;
-    border-radius: 8px;
-    background: #e8eef2;
-    flex-shrink: 0;
+  /* ── Lecture seule : valeur statique à la place d'un champ éditable ── */
+  .field-static {
     display: flex;
     align-items: center;
-    justify-content: center;
-    overflow: hidden;
-    border: 1px solid var(--border);
-  }
-
-  .det-photo img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-
-  .det-photo svg {
-    width: 36px;
-    fill: #aabbc7;
-  }
-
-  html[data-theme="dark"] .det-photo {
-    background: #2a3a50;
-  }
-
-  html[data-theme="dark"] .det-photo svg {
-    fill: #4a6a80;
-  }
-
-  .det-title-block {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .det-name {
-    font-size: 22px;
-    font-weight: 700;
+    min-height: 34px;
+    padding: 7px 2px;
+    font-size: 13px;
+    font-family: var(--font-roboto);
     color: var(--text);
-    margin-bottom: 4px;
-    line-height: 1.2;
   }
 
-  .det-ref {
-    font-size: 12px;
-    font-family: var(--font-mono);
+  .field-static.muted {
     color: var(--text-muted);
-    margin-bottom: 8px;
+    font-style: italic;
   }
 
-  .det-badges {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
+  .field-static.price {
+    font-weight: 700;
+    color: var(--primary);
   }
 
+  /* ── Badges de statut (repris de l'ancien detail.html) ── */
   .det-badge {
     display: inline-flex;
     align-items: center;
@@ -97,267 +41,207 @@
 
   .det-badge-actif   { background: #e3f9ee; color: #0d8a52; }
   .det-badge-inactif { background: #fdf0f0; color: #c0392b; }
-  .det-badge-info    { background: #e6f2f5; color: var(--primary); }
-  .det-badge-gray    { background: #f0f0f0; color: #555; }
 
   html[data-theme="dark"] .det-badge-actif   { background: rgba(22,169,107,.2); color: #6eddb0; }
   html[data-theme="dark"] .det-badge-inactif { background: rgba(232,69,69,.2);  color: #f09090; }
-  html[data-theme="dark"] .det-badge-info    { background: rgba(33,136,171,.18); color: #7ecae0; }
-  html[data-theme="dark"] .det-badge-gray    { background: #2a3548; color: #8a9ab0; }
 
-  .det-actions {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    flex-shrink: 0;
-  }
-
-  .det-btn-edit {
-    background: var(--accent);
-    color: #fff;
-    border: none;
-    padding: 7px 16px;
-    border-radius: 4px;
-    font-size: 13px;
-    font-weight: 600;
-    font-family: var(--font-roboto);
-    cursor: pointer;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    transition: background .15s;
-    white-space: nowrap;
-  }
-
-  .det-btn-edit:hover { background: var(--primary); }
-
-  /* ── SECTIONS ── */
-  .det-section {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    margin-bottom: 12px;
-    overflow: hidden;
-  }
-
-  .det-section-title {
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: .7px;
-    color: var(--text-muted);
-    padding: 10px 20px;
-    border-bottom: 1px solid var(--border);
-    background: var(--bg);
-  }
-
-  html[data-theme="dark"] .det-section-title {
-    background: rgba(255,255,255,.02);
-  }
-
-  .det-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0;
-  }
-
-  .det-grid-2 {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .det-field {
-    padding: 14px 20px;
-    border-bottom: 1px solid var(--border);
-    border-right: 1px solid var(--border);
-  }
-
-  .det-field:nth-child(3n) { border-right: none; }
-  .det-grid-2 .det-field:nth-child(2n) { border-right: none; }
-
-  .det-field-label {
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: .5px;
-    color: var(--text-muted);
-    margin-bottom: 4px;
-  }
-
-  .det-field-value {
-    font-size: 13.5px;
-    color: var(--text);
-    font-weight: 500;
-    word-break: break-word;
-  }
-
-  .det-field-value.muted {
-    color: var(--text-muted);
-    font-weight: 400;
-    font-style: italic;
-  }
-
-  .det-field-value.price {
-    font-size: 15px;
-    font-weight: 700;
-    color: var(--primary);
-  }
-
-  html[data-theme="dark"] .det-field { border-color: var(--border); }
-
-  /* ── FULL WIDTH FIELD (notes, descriptions) ── */
-  .det-field-full {
-    padding: 14px 20px;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .det-field-full:last-child { border-bottom: none; }
-
-  /* ── VIDE ── */
-  .det-empty {
-    padding: 18px 20px;
-    color: var(--text-muted);
-    font-size: 13px;
-    font-style: italic;
-  }
-
-  /* ── RESPONSIVE ── */
-  @media (max-width: 900px) {
-    .det-grid { grid-template-columns: repeat(2, 1fr); }
-    .det-field:nth-child(3n) { border-right: 1px solid var(--border); }
-    .det-field:nth-child(2n) { border-right: none; }
-  }
-
-  @media (max-width: 600px) {
-    .det-grid, .det-grid-2 { grid-template-columns: 1fr; }
-    .det-field { border-right: none !important; }
-    .det-header-inner { flex-direction: column; }
+  /* ── Photo statique (pas d'upload en lecture seule) ── */
+  .art-photo-zone.readonly {
+    cursor: default;
   }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="hist-wrapper"><div class="hist-main">
-<div id="page-wrap">
 
-
-<!-- ══ SUBHEADER ══ -->
-<div class="o-subheader" id="subheader">
-  <div class="o-subheader-row">
+<!-- ══════════════ PANNEAU DE CONTRÔLE ══════════════ -->
+<div class="control-panel">
+  <div class="cp-top">
     <a href="{% url 'services:list' %}" class="o-ctrl-btn" style="padding:3px 7px;">
       <i class="bi bi-arrow-left"></i>
     </a>
-    <span style="font-size:13px;color:var(--text-muted);">
-      <a href="{% url 'services:list' %}" style="color:var(--accent);text-decoration:none;font-weight:500;">Prestations</a>
+    <span style="font-size:13.5px;color:var(--text-muted);">
+      <a href="{% url 'services:list' %}" style="color:var(--teal-600);text-decoration:none;font-weight:500;">Prestations</a>
       <span style="margin:0 5px;opacity:.4;">/</span>
-      <span style="color:var(--text);">{{ article.nom|truncatechars:50 }}</span>
+      <span style="color:var(--text);">{{ article.nom|truncatechars:30 }}</span>
     </span>
     <div style="flex:1;"></div>
-    <!-- <a href="{% url 'services:edit' article.pk %}" class="det-btn-edit">
-      <i class="bi bi-pencil"></i> Modifier
-    </a> -->
+    <div class="cp-save-group">
+      <a href="{% url 'services:edit' article.pk %}" class="btn-save"><i class="bi bi-pencil"></i> Modifier</a>
+    </div>
   </div>
 </div>
 
-<div class="det-page">
+<!-- ══════════════ CORPS ══════════════ -->
+<div class="form-body">
 
-  <!-- ══ EN-TÊTE ══ -->
-  <div class="det-header">
-    <div class="det-header-inner">
-      <div class="det-photo">
-        {% if article.photo %}
-          <img src="{{ article.photo.url }}" alt="{{ article.nom }}">
-        {% else %}
-          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path d="M20 7h-4V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2H4a1 1 0 0 0-1 1v11a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8a1 1 0 0 0-1-1zM10 5h4v2h-4V5zm1 9v2H9v-2H7v-2h2v-2h2v2h2v2h-2z"/>
-          </svg>
-        {% endif %}
+  <!-- Photo -->
+  <div class="art-photo-block" style="float:right;margin-left:20px;">
+    <div class="art-photo-zone readonly">
+      {% if article.photo %}
+      <img src="{{ article.photo.url }}" alt="Photo" class="art-photo-zone-img">
+      {% else %}
+      <div class="art-photo-zone-empty">
+        <i class="bi bi-image"></i>
+        <span>Photo</span>
       </div>
-      <div class="det-title-block">
-        <div class="det-name">{{ article.nom }}</div>
-        {% if article.reference_interne %}
-          <div class="det-ref">{{ article.reference_interne }}</div>
-        {% endif %}
-        <div class="det-badges">
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Deux colonnes principales -->
+  <div class="form-main-grid">
+
+    <!-- Colonne gauche -->
+    <div class="field-group">
+
+      <div class="field-row">
+        <label>Nom de la prestation</label>
+        <div class="field-static">{{ article.nom }}</div>
+      </div>
+
+      <div class="field-row">
+        <label>Référence interne</label>
+        <div class="field-static {% if not article.reference_interne %}muted{% endif %}">
+          {{ article.reference_interne|default:"—" }}
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Colonne droite -->
+    <div class="field-group">
+
+      <div class="field-row">
+        <label>Catégorie de prestation</label>
+        <div class="field-static {% if not article.categorie %}muted{% endif %}">
+          {% if article.categorie %}{{ article.categorie.nom }}{% else %}—{% endif %}
+        </div>
+      </div>
+
+      <div class="field-row">
+        <label>Statut</label>
+        <div class="field-static">
           {% if article.actif %}
-            <span class="det-badge det-badge-actif"><i class="bi bi-check-circle-fill"></i> Actif</span>
+          <span class="det-badge det-badge-actif"><i class="bi bi-check-circle-fill"></i> Actif</span>
           {% else %}
-            <span class="det-badge det-badge-inactif"><i class="bi bi-x-circle-fill"></i> Inactif</span>
-          {% endif %}
-          {% if article.peut_etre_vendu %}
-            <span class="det-badge det-badge-info">Peut être vendu</span>
-          {% endif %}
-          {% if article.peut_etre_achete %}
-            <span class="det-badge det-badge-gray">Peut être acheté</span>
+          <span class="det-badge det-badge-inactif"><i class="bi bi-x-circle-fill"></i> Inactif</span>
           {% endif %}
         </div>
       </div>
-      <div class="det-actions">
-        <a href="{% url 'services:edit' article.pk %}" class="det-btn-edit">
-          <i class="bi bi-pencil"></i> Modifier
-        </a>
-      </div>
+
     </div>
-  </div>
 
-  <!-- ══ INFORMATIONS GÉNÉRALES ══ -->
-  <div class="det-section">
-    <div class="det-section-title">Informations générales</div>
-    <div class="det-grid">
-      <div class="det-field">
-        <div class="det-field-label">Catégorie</div>
-        <div class="det-field-value {% if not article.categorie %}muted{% endif %}">
-          {% if article.categorie %}{{ article.categorie.code }} — {{ article.categorie.nom }}{% else %}—{% endif %}
+  </div><!-- /.form-main-grid -->
+
+  <!-- ══════════════ ONGLETS ══════════════ -->
+  <div class="f-layout">
+    <div class="f-main">
+      <div class="f-tabs-wrap">
+        <div class="f-tabs">
+          <button type="button" class="f-tab active" data-tab="tab-info">Information Générale</button>
+        </div>
+
+        <div class="f-tab-panel active" id="tab-info">
+          <div class="f-tab-grid">
+            <div class="field-group">
+              <div class="field-row">
+                <label>Type de prestation</label>
+                <div class="field-static">{{ article.get_type_article_display }}</div>
+              </div>
+              <div class="field-row">
+                <label>Unité de mesure</label>
+                <div class="field-static {% if not article.unite_mesure %}muted{% endif %}">
+                  {% if article.unite_mesure %}{{ article.unite_mesure.nom }} ({{ article.unite_mesure.code }}){% else %}—{% endif %}
+                </div>
+              </div>
+            </div>
+            <div class="field-group">
+              <div class="field-row">
+                <label>Prix de vente (CFA)</label>
+                <div class="field-static price">{{ article.prix_vente|floatformat:0 }}</div>
+              </div>
+              <div class="field-row align-top">
+                <label>Options</label>
+                <div style="display:flex;flex-direction:column;gap:6px;padding-top:8px;">
+                  <div class="f-tab-check-row">
+                    <i class="bi {% if article.peut_etre_vendu %}bi-check-square-fill{% else %}bi-square{% endif %}" style="color:{% if article.peut_etre_vendu %}var(--accent){% else %}var(--text-muted){% endif %};"></i>
+                    <span style="font-size:12.5px;">Peut être vendu</span>
+                  </div>
+                  <div class="f-tab-check-row">
+                    <i class="bi {% if article.peut_etre_achete %}bi-check-square-fill{% else %}bi-square{% endif %}" style="color:{% if article.peut_etre_achete %}var(--accent){% else %}var(--text-muted){% endif %};"></i>
+                    <span style="font-size:12.5px;">Peut être acheté</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {% if article.type_article == 'consommable' or article.type_article == 'stockable' %}
+          <div class="art-stock-section art-stock-section--visible">
+            <div class="f-tab-section-title">Gestion du stock</div>
+            <div class="f-tab-grid">
+              <div class="field-group">
+                <div class="field-row">
+                  <label>Prix d'achat (CFA)</label>
+                  <div class="field-static {% if not article.cout %}muted{% endif %}">
+                    {% if article.cout %}{{ article.cout|floatformat:0 }}{% else %}—{% endif %}
+                  </div>
+                </div>
+                <div class="field-row">
+                  <label>Quantité en stock</label>
+                  <div class="field-static">{{ article.quantite_stock }}</div>
+                </div>
+              </div>
+              <div class="field-group">
+                <div class="field-row">
+                  <label>Quantité d'alerte (seuil minimum)</label>
+                  <div class="field-static">{{ article.quantite_alerte }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          {% endif %}
         </div>
       </div>
-      <div class="det-field">
-        <div class="det-field-label">Type de prestation</div>
-        <div class="det-field-value">{{ article.get_type_article_display }}</div>
-      </div>
-      <div class="det-field">
-        <div class="det-field-label">Prix de vente</div>
-        <div class="det-field-value price">{{ article.prix_vente|floatformat:0 }} CFA</div>
-      </div>
-      <div class="det-field">
-        <div class="det-field-label">Prix d'achat</div>
-        <div class="det-field-value {% if not article.cout %}muted{% endif %}">
-          {% if article.cout %}{{ article.cout|floatformat:0 }} CFA{% else %}—{% endif %}
-        </div>
-      </div>
-      <div class="det-field">
-        <div class="det-field-label">Unité de mesure</div>
-        <div class="det-field-value {% if not article.unite_mesure %}muted{% endif %}">
-          {% if article.unite_mesure %}{{ article.unite_mesure.nom }} ({{ article.unite_mesure.code }}){% else %}—{% endif %}
-        </div>
-      </div>
-      <div class="det-field">
-        <div class="det-field-label">Stock disponible</div>
-        <div class="det-field-value {% if not article.quantite_stock %}muted{% endif %}">
-          {% if article.quantite_stock %}{{ article.quantite_stock }}{% else %}0{% endif %}
-          {% if article.unite_mesure %} {{ article.unite_mesure.code }}{% endif %}
-        </div>
-      </div>
-    </div>
-  </div>
+    </div><!-- /f-main -->
 
+    {% load core_tags %}{% historique_sidebar article %}
 
-</div><!-- /.det-page -->
+  </div><!-- /f-layout -->
 
+</div><!-- /.form-body -->
+
+{% endblock %}
+
+{% block extra_js %}
 <script>
-  (function () {
-    function adjustOffsets() {
-      var topbar = document.querySelector('.topbar');
-      var wrap = document.getElementById('page-wrap');
-      if (topbar && wrap) wrap.style.paddingTop = '0';
-    }
-    adjustOffsets();
-    window.addEventListener('resize', adjustOffsets);
-  })();
-</script>
+/* ── Alignement du panneau de contrôle sous la barre de menu ──
+   Identique à templates/services/form.html. */
+(function () {
+  document.documentElement.style.setProperty('--topbar-h', '0px');
 
-</div><!-- /#page-wrap -->
-</div>
-{% load core_tags %}
-{% historique_sidebar article %}
-</div>
+  function alignSousTopbar() {
+    var topbar = document.querySelector('.topbar');
+    var content = document.querySelector('.content');
+    if (!topbar || !content) return;
+    var tbH = Math.ceil(topbar.getBoundingClientRect().height);
+    if (tbH <= 0) return;
+    document.documentElement.style.setProperty('--header-h', tbH + 'px');
+    requestAnimationFrame(function () {
+      var gap = Math.round(content.getBoundingClientRect().top - topbar.getBoundingClientRect().bottom);
+      document.documentElement.style.setProperty('--header-h', (tbH - gap) + 'px');
+    });
+  }
+  if (document.readyState !== 'loading') {
+    alignSousTopbar();
+  } else {
+    document.addEventListener('DOMContentLoaded', alignSousTopbar);
+  }
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(alignSousTopbar);
+  }
+  window.addEventListener('resize', alignSousTopbar);
+})();
+</script>
 {% endblock %}
