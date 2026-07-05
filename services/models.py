@@ -174,7 +174,7 @@ class Articleservice(models.Model):
 
     # ── En-tête ───────────────────────────────────────────────
     nom = models.CharField(max_length=300, verbose_name="Nom de l'article")
-    reference_interne = models.CharField(max_length=100, blank=True, verbose_name="Référence interne")
+    reference_interne = models.CharField(max_length=100, blank=True, null=True, unique=True, verbose_name="Référence interne")
     photo = models.ImageField(upload_to='services/photos/', blank=True, null=True)
     favori = models.BooleanField(default=False, verbose_name="Favori")
     peut_etre_vendu = models.BooleanField(default=True, verbose_name="Peut être vendu")
@@ -268,6 +268,11 @@ class Articleservice(models.Model):
     )
 
     def __str__(self): return self.nom
+
+    def save(self, *args, **kwargs):
+        self.reference_interne = self.reference_interne.strip().upper() or None if self.reference_interne else None
+        super().save(*args, **kwargs)
+
     class Meta:
         verbose_name = "Article / Service"
         verbose_name_plural = "Articles / Services"

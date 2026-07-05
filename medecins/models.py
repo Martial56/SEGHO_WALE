@@ -42,6 +42,7 @@ class Service(models.Model):
     code = models.CharField(max_length=20, unique=True)
     description = models.TextField(blank=True)
     chef_service = models.ForeignKey(Medecin, on_delete=models.SET_NULL, null=True, blank=True, related_name='services_diriges')
+    departement = models.ForeignKey('Departement', on_delete=models.SET_NULL, null=True, blank=True, related_name='services')
     actif = models.BooleanField(default=True)
 
     def __str__(self): return self.nom

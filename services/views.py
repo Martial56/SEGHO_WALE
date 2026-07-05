@@ -100,12 +100,21 @@ def service_form(request, pk=None):
             messages.error(request, "Le nom de l'article est obligatoire.")
             return redirect(request.path)
 
+        reference_interne = data.get('reference_interne', '').strip().upper() or None
+        if reference_interne:
+            doublon = Articleservice.objects.filter(reference_interne=reference_interne)
+            if not is_new:
+                doublon = doublon.exclude(pk=article.pk)
+            if doublon.exists():
+                messages.error(request, f"La référence interne « {reference_interne} » est déjà utilisée par un autre article.")
+                return redirect(request.path)
+
         if is_new:
             article = Articleservice(cree_par=request.user)
 
         # En-tête
         article.nom = nom
-        article.reference_interne = data.get('reference_interne', '')
+        article.reference_interne = reference_interne
         article.favori = 'favori' in data
         article.peut_etre_vendu = 'peut_etre_vendu' in data
         article.peut_etre_achete = 'peut_etre_achete' in data
@@ -827,7 +836,7 @@ def import_articles(request):
 
     for item in data:
         try:
-            ref = _s(item.get('reference_interne', ''))
+            ref = _s(item.get('reference_interne', '')).upper()
             nom = _s(item.get('nom', ''))
             if not ref and not nom:
                 errors += 1

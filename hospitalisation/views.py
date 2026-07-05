@@ -281,7 +281,7 @@ def _transition_confirmer(hosp, user):
     # Ligne MEO automatique (une seule fois)
     from services.models import Articleservice
     from django.utils import timezone as tz
-    meo = Articleservice.objects.filter(categorie__code='MO').first()
+    meo = Articleservice.objects.filter(categorie__code='MO', reference_interne='MO_MEO').first()
     if meo:
         date_adm = hosp.date_admission.date() if hosp.date_admission else tz.now().date()
         ServiceAFacturer.objects.get_or_create(

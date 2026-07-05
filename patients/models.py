@@ -68,10 +68,6 @@ class RendezVous(models.Model):
     STATUT = [('planifie','Planifié'),('confirme','Confirmé'),('en_attente','En attente'),('en_consultation','En consultation'),('termine','Terminé'),('annule','Annulé'),('absent','Absent')]
     TYPE = [('consultation','Consultation'),('controle','Contrôle'),('urgence','Urgence'),('examen','Examen'),('vaccination','Vaccination')]
 
-    DEPARTEMENT = [
-        ('medecine_generale', 'Médecine générale'),
-        ('gynecologie_cpn', 'Gynécologie / CPN'),
-    ]
     URGENCE = [('normal', 'Normal'), ('urgent', 'Urgent'), ('tres_urgent', 'Très urgent')]
     TYPE_VISITE_CPN = [
         ('cpn1',    'CPN 1'),
@@ -90,8 +86,7 @@ class RendezVous(models.Model):
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='rendez_vous')
     medecin = models.ForeignKey('medecins.Medecin', on_delete=models.SET_NULL, null=True, blank=True, related_name='rendez_vous')
     docteur_jr = models.ForeignKey('medecins.Medecin', on_delete=models.SET_NULL, null=True, blank=True, related_name='rdv_docteur_jr', verbose_name='Docteur Jr. responsable')
-    departement = models.CharField(max_length=30, choices=DEPARTEMENT, blank=True, default='')
-    service = models.ForeignKey('medecins.Service', on_delete=models.SET_NULL, null=True, blank=True, related_name='rendez_vous')
+    departement = models.ForeignKey('medecins.Service', on_delete=models.SET_NULL, null=True, blank=True, related_name='rendez_vous', verbose_name='Service')
     type_consultation = models.ForeignKey('services.Articleservice', on_delete=models.SET_NULL, null=True, blank=True, related_name='rendez_vous', verbose_name='Type de consultation')
     salle_consultation = models.CharField(max_length=100, blank=True, verbose_name='Salle de consultation')
     date_heure = models.DateTimeField()

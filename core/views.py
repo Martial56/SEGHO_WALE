@@ -1137,7 +1137,7 @@ def _rdv_gyn_qs():
     from patients.models import RendezVous
     from django.db.models import Q
     return RendezVous.objects.filter(
-        Q(departement='gynecologie_cpn') | Q(medecin__specialite__nom__icontains='gyn')
+        Q(departement__code='GYNECO') | Q(medecin__specialite__nom__icontains='gyn')
     ).select_related('patient', 'medecin').order_by('-date_heure')
 
 
@@ -1159,7 +1159,7 @@ def _rdv_form_post(request, rdv):
         rdv.patient_id = request.POST.get('patient') or rdv.patient_id
         rdv.medecin_id = request.POST.get('medecin') or None
         rdv.docteur_jr_id = request.POST.get('docteur_jr') or None
-        rdv.departement = request.POST.get('departement', rdv.departement)
+        rdv.departement_id = request.POST.get('departement') or rdv.departement_id
         rdv.salle_consultation = request.POST.get('salle_consultation', '')
         rdv.date_heure = date_rdv
         rdv.date_suivi = date_suivi
@@ -1208,9 +1208,11 @@ def gynecologie_rdv_create(request):
             from django.urls import reverse
             return redirect(reverse('facturation:create') + f'?patient={rdv.patient.pk}&rdv={rdv.pk}')
     else:
+        from medecins.models import Service
+        gyn_service = Service.objects.filter(code='GYNECO').first()
         form = RendezVousForm(initial={
             'date_heure': timezone.now().strftime('%Y-%m-%dT%H:%M'),
-            'departement': 'gynecologie_cpn',
+            'departement': gyn_service.pk if gyn_service else None,
         })
 
     breadcrumb = [
@@ -1500,7 +1502,7 @@ def gynecologie_rdv(request):
     type_visite_cpn_val = request.GET.get('type_visite_cpn', '').strip()
 
     rdvs = RendezVous.objects.filter(
-        Q(departement='gynecologie_cpn') |
+        Q(departement__code='GYNECO') |
         Q(medecin__specialite__nom__icontains='gyn')
     ).select_related('patient', 'medecin').order_by('-date_heure')
 
@@ -1687,7 +1689,7 @@ def gynecologie_rdv(request):
 
     # --- Stats du jour (indépendant des filtres) ---
     today_base = RendezVous.objects.filter(
-        Q(departement='gynecologie_cpn') | Q(medecin__specialite__nom__icontains='gyn'),
+        Q(departement__code='GYNECO') | Q(medecin__specialite__nom__icontains='gyn'),
         date_heure__date=_date.today()
     )
     stat_rows = today_base.values('statut').annotate(n=_Count('id'))
@@ -1753,7 +1755,7 @@ def gynecologie_list(request):
     group_val  = request.GET.get('group', '')
 
     patients = Patient.objects.filter(
-        rendez_vous__departement='gynecologie_cpn'
+        rendez_vous__departement__code='GYNECO'
     ).distinct().order_by('nom', 'prenoms')
 
     if q:
@@ -2062,8 +2064,8 @@ def _departement_form_class():
             model = Departement
             fields = ['nom', 'code', 'description', 'actif']
             widgets = {
-                'nom':         forms.TextInput(attrs={'class': 'f-input', 'placeholder': 'Ex : Médecine interne'}),
-                'code':        forms.TextInput(attrs={'class': 'f-input', 'placeholder': 'Ex : MED-INT'}),
+                'nom':         forms.TextInput(attrs={'class': 'f-input', 'placeholder': 'Ex : Département Médical'}),
+                'code':        forms.TextInput(attrs={'class': 'f-input', 'placeholder': 'Ex : DEPT-MED'}),
                 'description': forms.Textarea(attrs={'class': 'f-input', 'rows': 3}),
             }
     return DepartementForm
@@ -2073,10 +2075,11 @@ def _departement_form_class():
 def medecins_departements(request):
     from medecins.models import Departement
     from django.core.paginator import Paginator
+    from django.db.models import Count
 
     q   = request.GET.get('q', '').strip()
     vue = request.GET.get('vue', 'liste')
-    qs  = Departement.objects.order_by('nom')
+    qs  = Departement.objects.annotate(nb_services=Count('services')).order_by('nom')
     if q:
         qs = qs.filter(Q(nom__icontains=q) | Q(code__icontains=q))
     total = Departement.objects.count()
@@ -2094,8 +2097,10 @@ def medecins_departement_detail(request, pk):
     obj = get_object_or_404(Departement, pk=pk)
     pks = list(Departement.objects.order_by('nom').values_list('pk', flat=True))
     pos = pks.index(pk) if pk in pks else None
+    services = obj.services.order_by('nom')
     return render(request, 'medecins/config/departement_detail.html', {
-        'obj':     obj,
+        'obj':      obj,
+        'services': services,
         'prev_pk': pks[pos - 1] if pos and pos > 0 else None,
         'next_pk': pks[pos + 1] if pos is not None and pos < len(pks) - 1 else None,
     })
@@ -2136,4 +2141,106 @@ def medecins_departement_bulk_delete(request):
     ids = request.POST.getlist('ids[]')
     if ids:
         Departement.objects.filter(pk__in=ids).delete()
+    return JsonResponse({'ok': True})
+
+
+# ══════════════════════════════════════════════
+#  MÉDECINS — Configuration : Services
+# ══════════════════════════════════════════════
+
+def _service_form_class():
+    from django import forms
+    from medecins.models import Service, Medecin, Departement
+    class ServiceForm(forms.ModelForm):
+        chef_service = forms.ModelChoiceField(
+            queryset=Medecin.objects.filter(actif=True).order_by('nom', 'prenoms'),
+            required=False,
+            empty_label='— Aucun chef de service —',
+        )
+        departement = forms.ModelChoiceField(
+            queryset=Departement.objects.filter(actif=True).order_by('nom'),
+            required=False,
+            empty_label='— Aucun département —',
+        )
+        class Meta:
+            model = Service
+            fields = ['nom', 'code', 'description', 'departement', 'chef_service', 'actif']
+            widgets = {
+                'nom':         forms.TextInput(attrs={'class': 'f-input', 'placeholder': 'Ex : Médecine interne'}),
+                'code':        forms.TextInput(attrs={'class': 'f-input', 'placeholder': 'Ex : MED-INT'}),
+                'description': forms.Textarea(attrs={'class': 'f-input', 'rows': 3}),
+            }
+    return ServiceForm
+
+
+@login_required(login_url='login')
+def medecins_services(request):
+    from medecins.models import Service
+    from django.core.paginator import Paginator
+    from django.db.models import Count
+
+    q   = request.GET.get('q', '').strip()
+    vue = request.GET.get('vue', 'liste')
+    qs  = Service.objects.select_related('departement').annotate(nb_employes=Count('medecins')).order_by('nom')
+    if q:
+        qs = qs.filter(Q(nom__icontains=q) | Q(code__icontains=q))
+    total = Service.objects.count()
+    paginator = Paginator(qs, 25)
+    page_obj  = paginator.get_page(request.GET.get('page'))
+    return render(request, 'medecins/config/services_list.html', {
+        'page_obj': page_obj, 'total': total,
+        'total_filtre': qs.count(), 'q': q, 'vue': vue,
+    })
+
+
+@login_required(login_url='login')
+def medecins_service_detail(request, pk):
+    from medecins.models import Service, Medecin
+    obj = get_object_or_404(Service.objects.select_related('departement'), pk=pk)
+    pks = list(Service.objects.order_by('nom').values_list('pk', flat=True))
+    pos = pks.index(pk) if pk in pks else None
+    medecins = Medecin.objects.filter(service=obj).order_by('nom', 'prenoms')
+    return render(request, 'medecins/config/service_detail.html', {
+        'obj':      obj,
+        'medecins': medecins,
+        'prev_pk': pks[pos - 1] if pos and pos > 0 else None,
+        'next_pk': pks[pos + 1] if pos is not None and pos < len(pks) - 1 else None,
+    })
+
+
+@login_required(login_url='login')
+def medecins_service_create(request):
+    Form = _service_form_class()
+    form = Form(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(request, 'Service créé.')
+        return redirect('medecins_services')
+    return render(request, 'medecins/config/service_form.html', {
+        'form': form, 'titre': 'Nouveau service',
+    })
+
+
+@login_required(login_url='login')
+def medecins_service_edit(request, pk):
+    from medecins.models import Service
+    obj  = get_object_or_404(Service, pk=pk)
+    Form = _service_form_class()
+    form = Form(request.POST or None, instance=obj)
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(request, 'Service mis à jour.')
+        return redirect('medecins_service_detail', pk=pk)
+    return render(request, 'medecins/config/service_form.html', {
+        'form': form, 'titre': f'Modifier – {obj.nom}', 'obj': obj,
+    })
+
+
+@login_required(login_url='login')
+@require_POST
+def medecins_service_bulk_delete(request):
+    from medecins.models import Service
+    ids = request.POST.getlist('ids[]')
+    if ids:
+        Service.objects.filter(pk__in=ids).delete()
     return JsonResponse({'ok': True})

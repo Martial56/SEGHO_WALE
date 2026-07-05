@@ -152,10 +152,14 @@ class RendezVousForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         from services.models import Articleservice
+        from medecins.models import Service
         super().__init__(*args, **kwargs)
         self.fields['patient'].queryset = Patient.objects.all().order_by('nom', 'prenoms')
         self.fields['medecin'].empty_label = '— Aucun médecin —'
         self.fields['medecin'].required = False
+        self.fields['departement'].queryset = Service.objects.filter(
+            actif=True, departement__code='DEPT-MED'
+        ).order_by('nom')
         self.fields['departement'].empty_label = '— Choisir un département —'
         self.fields['departement'].required = False
         self.fields['type_consultation'].queryset = Articleservice.objects.filter(actif=True, categorie__code__iexact='cs').order_by('nom')

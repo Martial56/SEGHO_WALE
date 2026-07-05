@@ -1,162 +1,172 @@
 {% extends 'medecins/base.html' %}
 {% block topbar_title %}Spécialités{% endblock %}
+{% block breadcrumb %}{% endblock %}
 
 {% block extra_css %}
 {{ block.super }}
+<style>
+  /* ── Style copié de services/list.html (module Prestations) et aligné
+     sur le CRUD Départements, à la demande explicite de généraliser. ── */
+  .o-subheader {
+    background: var(--surface); border-bottom: 1px solid var(--border); padding: 6px 16px;
+    display: flex; flex-direction: column; gap: 5px; position: sticky; top: 0; z-index: 190; margin: 0 -32px;
+  }
+  .o-subheader-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .o-page-title { font-size: 17px; font-weight: 400; color: var(--text); }
+  .o-page-count { font-size: 12px; color: var(--text-muted); font-weight: 400; margin-left: 3px; }
 
+  .o-btn-create {
+    background: var(--md-500); color: #fff; border: none; padding: 5px 14px; border-radius: 4px;
+    font-size: 12.5px; font-weight: 500; font-family: var(--font-roboto); cursor: pointer;
+    text-decoration: none; display: inline-flex; align-items: center; gap: 5px;
+    letter-spacing: 0.5px; transition: background 0.15s; white-space: nowrap;
+  }
+  .o-btn-create:hover { background: var(--md-600); color: #fff; }
+
+  .o-search-bar {
+    display: flex; align-items: center; border: none; border-bottom: 1px solid #bbb;
+    background: transparent; min-height: 28px; padding: 2px 4px; gap: 4px; width: 280px;
+  }
+  .o-search-input { border: none; outline: none; font-size: 12px; font-family: var(--font-roboto); color: var(--text); flex: 1; min-width: 60px; background: transparent; }
+  .o-search-btn { background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 13px; padding: 2px; }
+  html[data-theme="dark"] .o-search-input { color: var(--text); }
+  html[data-theme="dark"] .o-search-bar { border-bottom-color: #3a4a62; }
+
+  .o-ctrl-btn {
+    background: none; border: 1px solid transparent; border-radius: 4px; padding: 4px 8px;
+    font-size: 12px; font-family: var(--font-roboto); color: var(--text-muted); cursor: pointer;
+    display: flex; align-items: center; gap: 4px;
+    transition: border-color 0.15s, color 0.15s, background 0.15s; white-space: nowrap; text-decoration: none;
+  }
+  .o-ctrl-btn:hover { border-color: var(--border); color: var(--text); background: #f3f3f3; }
+  .o-ctrl-btn.disabled { opacity: .4; pointer-events: none; }
+  html[data-theme="dark"] .o-ctrl-btn:hover { background: #28304a; color: var(--text); border-color: var(--border); }
+
+  .o-view-btns { display: flex; border: 1px solid var(--border); border-radius: 3px; overflow: hidden; }
+  .o-view-btn {
+    width: 26px; height: 24px; border: none; background: var(--surface);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted); font-size: 13px; cursor: pointer; transition: background 0.15s, color 0.15s;
+  }
+  .o-view-btn:not(:last-child) { border-right: 1px solid var(--border); }
+  .o-view-btn.active, .o-view-btn:hover { background: var(--md-600); color: #fff; }
+  html[data-theme="dark"] .o-view-btns { border-color: var(--border); }
+  html[data-theme="dark"] .o-view-btn { background: var(--surface); color: var(--text-muted); }
+
+  .o-list-wrap { background: var(--bg); overflow-x: auto; margin: 0 -32px; }
+  .o-list-table th:first-child, .o-list-table td:first-child { padding-left: 32px; }
+  .o-list-table th:last-child, .o-list-table td:last-child { padding-right: 32px; }
+  .o-list-table { width: 100%; border-collapse: collapse; background: var(--surface); }
+  .o-list-table th {
+    padding: 8px 14px; text-align: left; font-size: 11px; font-weight: 600;
+    color: var(--text-muted); border-bottom: 1px solid var(--border); background: var(--surface); white-space: nowrap;
+  }
+  .o-list-table td { padding: 9px 14px; font-size: 13px; border-bottom: 1px solid #f0f0f0; color: var(--text); }
+  .o-list-table tr:last-child td { border-bottom: none; }
+  .o-list-table tbody tr:hover td { background: #f4f9fb; }
+  .o-list-table tbody tr { cursor: pointer; }
+  html[data-theme="dark"] .o-list-table { background: var(--surface); }
+  html[data-theme="dark"] .o-list-table th { background: var(--surface); border-bottom-color: var(--border); color: var(--text-muted); }
+  html[data-theme="dark"] .o-list-table td { border-bottom-color: #2d3550; color: var(--text); }
+  html[data-theme="dark"] .o-list-table tbody tr:hover td { background: rgba(255, 255, 255, 0.04); }
+
+  .o-kanban { padding: 12px 32px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; background: var(--bg); margin: 0 -32px; }
+  @media (max-width: 1200px) { .o-kanban { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 900px) { .o-kanban { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px) { .o-kanban { grid-template-columns: 1fr; } }
+  .o-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 3px; padding: 10px;
+    display: flex; align-items: flex-start; gap: 10px; cursor: pointer; transition: box-shadow 0.15s, border-color 0.15s;
+  }
+  .o-card:hover { box-shadow: 0 3px 10px rgba(0, 0, 0, 0.13); border-color: #bbb; }
+  html[data-theme="dark"] .o-card { background: var(--surface); border-color: var(--border); }
+  html[data-theme="dark"] .o-card:hover { border-color: #4a5a78; }
+  .o-avatar {
+    width: 42px; height: 42px; border-radius: 50%; background: #d5d5d5; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+  }
+  .o-avatar i { font-size: 18px; color: #999; }
+  html[data-theme="dark"] .o-avatar { background: #3a4a5e; }
+  html[data-theme="dark"] .o-avatar i { color: #6c85a0; }
+  .o-card-body { flex: 1; min-width: 0; }
+  .o-card-name { font-size: 12.5px; font-weight: 500; color: var(--text); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .o-card-meta { font-size: 11px; color: var(--text-muted); line-height: 1.7; }
+  .o-card-meta .val { color: var(--text); }
+
+  .badge-code { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+
+  .o-empty { text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: 13px; }
+  .o-empty i { font-size: 36px; display: block; margin-bottom: 10px; opacity: 0.5; }
+
+  .bulk-bar { display: none; align-items: center; gap: 8px; padding: 8px 32px; margin: 0 -32px; background: #fff7e6; border-bottom: 1px solid #ffe0a3; font-size: 12.5px; }
+  .bulk-bar.visible { display: flex; }
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, .4); z-index: 9000; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal-box { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 28px 28px 22px; max-width: 400px; width: 90%; text-align: center; }
+  .modal-icon { font-size: 30px; margin-bottom: 10px; }
+  .modal-title { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+  .modal-msg { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; line-height: 1.5; }
+  .modal-actions { display: flex; gap: 10px; justify-content: center; }
+  .btn-modal-cancel { padding: 7px 18px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface); color: var(--text-muted); font-size: 13px; font-weight: 600; cursor: pointer; }
+  .btn-modal-confirm { padding: 7px 18px; border-radius: 4px; border: none; background: #dc2626; color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; }
+</style>
 {% endblock %}
 
 {% block content %}
 
-<!-- ── En-tête ── -->
-<div class="cfg-head">
-  <div class="cfg-head-left">
-    <div class="cfg-head-icon"><i class="bi bi-award-fill"></i></div>
-    <div class="cfg-head-title">Spécialités</div>
-    <span class="cfg-head-count">{{ total }}</span>
-  </div>
-  <div class="cfg-head-right">
-    <div class="view-toggle">
-      <button class="view-btn {% if vue|default:'liste' == 'liste' %}active{% endif %}" onclick="setVue('liste',this)" title="Vue liste"><i class="bi bi-list-ul"></i></button>
-      <button class="view-btn {% if vue == 'grille' %}active{% endif %}" onclick="setVue('grille',this)" title="Vue grille"><i class="bi bi-grid"></i></button>
+<div class="o-subheader">
+  <div class="o-subheader-row">
+    <span class="o-page-title">Spécialités <span class="o-page-count">{{ total }}</span></span>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+      <form method="get" id="filter-form" style="display:flex;align-items:center;" onsubmit="return false;">
+        <input type="hidden" name="vue" id="vue-input" value="{{ vue|default:'liste' }}">
+        <div class="o-search-bar">
+          <input class="o-search-input" id="search-input" type="text" name="q" value="{{ q }}" placeholder="Rechercher une spécialité…" autocomplete="off">
+          <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
+        </div>
+      </form>
     </div>
-    <a href="{% url 'medecins_specialite_create' %}" class="btn-cfg">
-      <i class="bi bi-plus-lg"></i> Nouvelle spécialité
+  </div>
+  <div class="o-subheader-row">
+    <a href="{% url 'medecins_specialite_create' %}" class="o-btn-create">
+      <i class="bi bi-plus-lg"></i> Créer
     </a>
+    {% if q %}
+    <a href="#" class="o-ctrl-btn" id="clear-search-btn"><i class="bi bi-x"></i> Effacer</a>
+    {% endif %}
+    <div style="flex:1;"></div>
+    <span style="font-size:12px;color:var(--text-muted);" id="count-label">{{ total_filtre }} / {{ total }}</span>
+    <div class="o-view-btns">
+      <button type="button" class="o-view-btn {% if vue|default:'liste' == 'liste' %}active{% endif %}" data-vue="liste" title="Vue Liste">
+        <i class="bi bi-list-ul"></i>
+      </button>
+      <button type="button" class="o-view-btn {% if vue == 'kanban' %}active{% endif %}" data-vue="kanban" title="Vue Kanban">
+        <i class="bi bi-grid"></i>
+      </button>
+    </div>
   </div>
 </div>
 
-<!-- ── Filtres ── -->
-<form method="get" id="filter-form">
-  <input type="hidden" name="vue" id="vue-input" value="{{ vue|default:'liste' }}">
-  <div class="cfg-filters">
-    <i class="bi bi-search" style="color:var(--cfg-accent);font-size:13px;flex-shrink:0;"></i>
-    <input type="text" name="q" id="search-input" value="{{ q }}" placeholder="Rechercher une spécialité…" class="cfg-search">
-    {% if q %}
-    <a href="{% url 'medecins_specialites' %}" class="btn-cfg-outline" style="padding:4px 10px;font-size:11.5px;">
-      <i class="bi bi-x"></i> Effacer
-    </a>
-    {% endif %}
-    <span style="font-size:12px;color:#6b8e8a;margin-left:auto;">{{ total_filtre }} / {{ total }}</span>
-  </div>
-</form>
-
-<!-- ── Bulk bar ── -->
 <div class="bulk-bar" id="bulk-bar">
   <i class="bi bi-check2-square"></i>
   <span id="bulk-count">0</span> sélectionné(s)
-  <button type="button" class="btn-cfg-del" onclick="openBulkModal()"><i class="bi bi-trash"></i> Supprimer</button>
-  <button type="button" class="btn-cfg-outline" style="padding:4px 10px;font-size:12px;" onclick="clearSelection()">Annuler</button>
+  <button type="button" class="o-ctrl-btn" style="color:#c0392b;" onclick="openBulkModal()"><i class="bi bi-trash"></i> Supprimer</button>
+  <button type="button" class="o-ctrl-btn" onclick="clearSelection()">Annuler</button>
 </div>
 
 <div id="list-result">
-{% if total_filtre > 0 %}
-
-<!-- Vue Grille -->
-<div id="view-grille" style="{% if vue != 'grille' %}display:none;{% endif %}">
-  <div class="cfg-grid">
-    {% for sp in page_obj %}
-    <div class="cfg-card" onclick="window.location='{% url 'medecins_specialite_detail' sp.pk %}'">
-      <div class="cfg-card-code">{{ sp.code }}</div>
-      <div class="cfg-card-name">{{ sp.nom }}</div>
-      <div class="cfg-card-desc">{{ sp.description|default:"Aucune description"|truncatechars:70 }}</div>
-    </div>
-    {% endfor %}
-  </div>
+{% include 'medecins/config/includes/specialites_list_result.html' %}
 </div>
 
-<!-- Vue Liste -->
-<div id="view-liste" style="{% if vue == 'grille' %}display:none;{% endif %}">
-  <div class="cfg-table-wrap">
-    <table class="cfg-table">
-      <thead>
-        <tr>
-          <th style="width:36px;padding:9px 10px 9px 14px;">
-            <input type="checkbox" id="select-all" style="width:14px;height:14px;cursor:pointer;accent-color:var(--cfg-accent);" onchange="toggleAll(this)">
-          </th>
-          <th style="width:110px;">Code</th>
-          <th>Nom</th>
-          <th>Description</th>
-          <th style="width:90px;"></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for sp in page_obj %}
-        <tr onclick="if(event.target.type!=='checkbox'&&!event.target.closest('.row-actions'))window.location='{% url 'medecins_specialite_detail' sp.pk %}'">
-          <td style="padding:10px 10px 10px 14px;" onclick="event.stopPropagation()">
-            <input type="checkbox" class="row-check" value="{{ sp.pk }}" style="width:14px;height:14px;cursor:pointer;accent-color:var(--cfg-accent);" onchange="onCheckChange()">
-          </td>
-          <td><span class="badge-code">{{ sp.code }}</span></td>
-          <td style="font-weight:600;">{{ sp.nom }}</td>
-          <td style="color:#6b8e8a;font-size:12.5px;">{{ sp.description|default:"—"|truncatechars:80 }}</td>
-          <td class="row-actions" onclick="event.stopPropagation()">
-            <div style="display:flex;align-items:center;gap:5px;">
-              <a href="{% url 'medecins_specialite_edit' sp.pk %}" class="btn-cfg-outline" style="padding:3px 9px;font-size:11.5px;" title="Modifier">
-                <i class="bi bi-pencil"></i>
-              </a>
-              <button type="button" class="btn-cfg-del" style="padding:3px 9px;font-size:11.5px;" title="Supprimer"
-                      onclick="confirmDelete('{{ sp.pk }}','{{ sp.nom|escapejs }}')">
-                <i class="bi bi-trash"></i>
-              </button>
-            </div>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    <!-- Pagination -->
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:1px solid rgba(13,148,136,.1);font-size:12.5px;color:#6b8e8a;">
-      <span>{{ page_obj.start_index }}–{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
-      <div style="display:flex;gap:4px;">
-        <a class="btn-cfg-outline" style="padding:3px 10px;font-size:12px;{% if not page_obj.has_previous %}opacity:.4;pointer-events:none;{% endif %}"
-           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}&q={{ q }}&vue={{ vue }}{% else %}#{% endif %}">
-          <i class="bi bi-chevron-left"></i>
-        </a>
-        <a class="btn-cfg-outline" style="padding:3px 10px;font-size:12px;{% if not page_obj.has_next %}opacity:.4;pointer-events:none;{% endif %}"
-           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}&q={{ q }}&vue={{ vue }}{% else %}#{% endif %}">
-          <i class="bi bi-chevron-right"></i>
-        </a>
-      </div>
-    </div>
-  </div>
-</div>
-
-{% else %}
-<div class="cfg-empty">
-  <i class="bi bi-award"></i>
-  <div class="cfg-empty-title">{% if q %}Aucun résultat pour « {{ q }} »{% else %}Aucune spécialité enregistrée{% endif %}</div>
-  <div class="cfg-empty-sub">{% if q %}Essayez un autre terme.{% else %}Commencez par créer une spécialité médicale.{% endif %}</div>
-  {% if not q %}
-  <a href="{% url 'medecins_specialite_create' %}" class="btn-cfg"><i class="bi bi-plus-lg"></i> Créer une spécialité</a>
-  {% endif %}
-</div>
-{% endif %}
-</div>
-
-<!-- Modal suppression bulk -->
 <div class="modal-overlay" id="bulk-delete-modal">
   <div class="modal-box">
     <div class="modal-icon">🗑️</div>
     <div class="modal-title">Confirmer la suppression</div>
-    <div class="modal-msg">Vous allez supprimer <strong id="modal-count">0</strong> spécialité(s).<br>
+    <div class="modal-msg">Supprimer <strong id="modal-count">0</strong> spécialité(s) ?<br>
       <span style="font-size:12px;">Cette action est irréversible.</span></div>
     <div class="modal-actions">
       <button type="button" class="btn-modal-cancel" onclick="closeBulkModal()">Annuler</button>
       <button type="button" class="btn-modal-confirm" onclick="executeBulkDelete()">Supprimer</button>
-    </div>
-  </div>
-</div>
-
-<!-- Modal suppression unitaire -->
-<div class="modal-overlay" id="single-delete-modal">
-  <div class="modal-box">
-    <div class="modal-icon">🗑️</div>
-    <div class="modal-title">Supprimer la spécialité</div>
-    <div class="modal-msg">Supprimer <strong id="single-name"></strong> ?<br>
-      <span style="font-size:12px;">Cette action est irréversible.</span></div>
-    <div class="modal-actions">
-      <button type="button" class="btn-modal-cancel" onclick="closeSingleModal()">Annuler</button>
-      <button type="button" class="btn-modal-confirm" id="single-confirm-btn">Supprimer</button>
     </div>
   </div>
 </div>
@@ -167,24 +177,58 @@
 <script>
 const BULK_URL   = "{% url 'medecins_specialite_bulk_delete' %}";
 const CSRF_TOKEN = "{{ csrf_token }}";
+const LIST_URL   = "{% url 'medecins_specialites' %}";
 
-/* ── Vue toggle ── */
-function setVue(v, btn) {
+function setVue(v) {
   document.getElementById('vue-input').value = v;
-  document.getElementById('view-liste').style.display  = v === 'liste'  ? '' : 'none';
-  document.getElementById('view-grille').style.display = v === 'grille' ? '' : 'none';
-  document.querySelectorAll('.view-btn').forEach(function(b){ b.classList.remove('active'); });
-  if (btn) btn.classList.add('active');
+  document.querySelectorAll('.o-view-btn').forEach(function(b){ b.classList.toggle('active', b.dataset.vue === v); });
+  var w1 = document.getElementById('view-liste');
+  var w2 = document.getElementById('view-grille');
+  if (w1) w1.style.display = v === 'liste' ? '' : 'none';
+  if (w2) w2.style.display = v === 'kanban' ? '' : 'none';
+  var params = new URLSearchParams(window.location.search);
+  params.set('vue', v);
+  history.replaceState(null, '', '?' + params.toString());
+}
+document.querySelectorAll('.o-view-btn').forEach(function(btn){
+  btn.addEventListener('click', function(){ setVue(this.dataset.vue); });
+});
+
+function fetchList() {
+  var q = document.getElementById('search-input').value;
+  var vue = document.getElementById('vue-input').value;
+  var params = new URLSearchParams();
+  if (q) params.set('q', q);
+  params.set('vue', vue);
+  var url = LIST_URL + '?' + params.toString();
+  fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
+    .then(function(r){ return r.text(); })
+    .then(function(html){
+      var doc = new DOMParser().parseFromString(html, 'text/html');
+      var fresh = doc.getElementById('list-result');
+      var current = document.getElementById('list-result');
+      if (fresh && current) current.innerHTML = fresh.innerHTML;
+      var freshCount = doc.getElementById('count-label');
+      var curCount = document.getElementById('count-label');
+      if (freshCount && curCount) curCount.textContent = freshCount.textContent;
+      history.replaceState(null, '', url);
+      bindRowEvents();
+    });
 }
 
-/* ── Recherche live ── */
 (function(){
   var inp = document.getElementById('search-input'); if (!inp) return;
   var timer;
-  inp.addEventListener('input', function(){ clearTimeout(timer); timer = setTimeout(function(){ document.getElementById('filter-form').submit(); }, 500); });
+  inp.addEventListener('input', function(){
+    clearTimeout(timer);
+    timer = setTimeout(fetchList, 350);
+  });
+  var form = document.getElementById('filter-form');
+  if (form) form.addEventListener('submit', function(e){ e.preventDefault(); fetchList(); });
+  var clearBtn = document.getElementById('clear-search-btn');
+  if (clearBtn) clearBtn.addEventListener('click', function(e){ e.preventDefault(); inp.value = ''; fetchList(); });
 })();
 
-/* ── Bulk ── */
 function onCheckChange(){
   var n = document.querySelectorAll('.row-check:checked').length;
   document.getElementById('bulk-count').textContent = n;
@@ -192,7 +236,18 @@ function onCheckChange(){
   var all = document.getElementById('select-all');
   if (all){ var t = document.querySelectorAll('.row-check').length; all.indeterminate = n>0&&n<t; all.checked = n===t&&t>0; }
 }
-function toggleAll(m){ document.querySelectorAll('.row-check').forEach(function(cb){ cb.checked = m.checked; }); onCheckChange(); }
+function bindRowEvents() {
+  var all = document.getElementById('select-all');
+  if (all) all.addEventListener('change', function(){
+    document.querySelectorAll('.row-check').forEach(function(cb){ cb.checked = all.checked; });
+    onCheckChange();
+  });
+  document.querySelectorAll('.row-check').forEach(function(cb){
+    cb.addEventListener('change', onCheckChange);
+  });
+}
+bindRowEvents();
+
 function clearSelection(){ document.querySelectorAll('.row-check,#select-all').forEach(function(cb){ cb.checked=false; }); onCheckChange(); }
 function openBulkModal(){ document.getElementById('modal-count').textContent=document.querySelectorAll('.row-check:checked').length; document.getElementById('bulk-delete-modal').classList.add('open'); }
 function closeBulkModal(){ document.getElementById('bulk-delete-modal').classList.remove('open'); }
@@ -201,23 +256,8 @@ function executeBulkDelete(){
   if (!ids.length) return;
   var fd = new FormData(); fd.append('csrfmiddlewaretoken', CSRF_TOKEN);
   ids.forEach(function(id){ fd.append('ids[]', id); });
-  fetch(BULK_URL, {method:'POST', body:fd}).then(function(r){ return r.json(); }).then(function(d){ if(d.ok) window.location.reload(); }).catch(closeBulkModal);
+  fetch(BULK_URL, {method:'POST', body:fd}).then(function(r){ return r.json(); }).then(function(d){ if(d.ok){ closeBulkModal(); fetchList(); } }).catch(closeBulkModal);
 }
 document.getElementById('bulk-delete-modal').addEventListener('click', function(e){ if(e.target===this) closeBulkModal(); });
-
-/* ── Suppression unitaire ── */
-var _singleId = null;
-function confirmDelete(pk, nom){
-  _singleId = pk;
-  document.getElementById('single-name').textContent = nom;
-  document.getElementById('single-delete-modal').classList.add('open');
-}
-function closeSingleModal(){ document.getElementById('single-delete-modal').classList.remove('open'); }
-document.getElementById('single-confirm-btn').addEventListener('click', function(){
-  if (!_singleId) return;
-  var fd = new FormData(); fd.append('csrfmiddlewaretoken', CSRF_TOKEN); fd.append('ids[]', _singleId);
-  fetch(BULK_URL, {method:'POST', body:fd}).then(function(r){ return r.json(); }).then(function(d){ if(d.ok) window.location.reload(); }).catch(closeSingleModal);
-});
-document.getElementById('single-delete-modal').addEventListener('click', function(e){ if(e.target===this) closeSingleModal(); });
 </script>
 {% endblock %}

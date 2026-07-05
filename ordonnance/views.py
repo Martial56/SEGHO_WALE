@@ -115,7 +115,7 @@ def consultation_search(request):
     data = []
     for c in qs[:20]:
         dept = ''
-        if c.rendez_vous and c.rendez_vous.departement == 'gynecologie_cpn':
+        if c.rendez_vous and c.rendez_vous.departement and c.rendez_vous.departement.code == 'GYNECO':
             dept = 'gynecologie'
         data.append({
             'id':       c.pk,

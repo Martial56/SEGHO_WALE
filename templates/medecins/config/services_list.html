@@ -1,30 +1,15 @@
 {% extends 'medecins/base.html' %}
-{% block topbar_title %}Départements{% endblock %}
+{% block topbar_title %}Services{% endblock %}
 {% block breadcrumb %}{% endblock %}
 
 {% block extra_css %}
 {{ block.super }}
 <style>
-  /* ── Style copié de services/list.html (module Prestations), à la
-     demande explicite d'aligner les pages Département dessus.
-     Variables : le module médecins n'a pas --accent/--primary (propres
-     au module services), on utilise donc --md-500/--md-600 (alias de
-     --teal-*, définis dans medecins/base.html) à la place. ── */
-
-  /* ── SUBHEADER ──
-     margin: 0 -32px annule le padding horizontal de .content (base.html)
-     pour que la barre s'étende bord à bord, comme la nav du haut. ── */
+  /* ── Style copié de services/list.html (module Prestations) et aligné
+     sur le CRUD Départements, à la demande explicite de généraliser. ── */
   .o-subheader {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: 6px 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    position: sticky;
-    top: 0;
-    z-index: 190;
-    margin: 0 -32px;
+    background: var(--surface); border-bottom: 1px solid var(--border); padding: 6px 16px;
+    display: flex; flex-direction: column; gap: 5px; position: sticky; top: 0; z-index: 190; margin: 0 -32px;
   }
   .o-subheader-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .o-page-title { font-size: 17px; font-weight: 400; color: var(--text); }
@@ -57,20 +42,17 @@
   .o-ctrl-btn.disabled { opacity: .4; pointer-events: none; }
   html[data-theme="dark"] .o-ctrl-btn:hover { background: #28304a; color: var(--text); border-color: var(--border); }
 
-  /* ── BOUTONS VUE (liste / kanban) ── */
   .o-view-btns { display: flex; border: 1px solid var(--border); border-radius: 3px; overflow: hidden; }
   .o-view-btn {
     width: 26px; height: 24px; border: none; background: var(--surface);
     display: flex; align-items: center; justify-content: center;
-    color: var(--text-muted); font-size: 13px; cursor: pointer;
-    transition: background 0.15s, color 0.15s;
+    color: var(--text-muted); font-size: 13px; cursor: pointer; transition: background 0.15s, color 0.15s;
   }
   .o-view-btn:not(:last-child) { border-right: 1px solid var(--border); }
   .o-view-btn.active, .o-view-btn:hover { background: var(--md-600); color: #fff; }
   html[data-theme="dark"] .o-view-btns { border-color: var(--border); }
   html[data-theme="dark"] .o-view-btn { background: var(--surface); color: var(--text-muted); }
 
-  /* ── TABLE LISTE ── */
   .o-list-wrap { background: var(--bg); overflow-x: auto; margin: 0 -32px; }
   .o-list-table th:first-child, .o-list-table td:first-child { padding-left: 32px; }
   .o-list-table th:last-child, .o-list-table td:last-child { padding-right: 32px; }
@@ -88,15 +70,13 @@
   html[data-theme="dark"] .o-list-table td { border-bottom-color: #2d3550; color: var(--text); }
   html[data-theme="dark"] .o-list-table tbody tr:hover td { background: rgba(255, 255, 255, 0.04); }
 
-  /* ── VUE KANBAN ── */
   .o-kanban { padding: 12px 32px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; background: var(--bg); margin: 0 -32px; }
   @media (max-width: 1200px) { .o-kanban { grid-template-columns: repeat(3, 1fr); } }
   @media (max-width: 900px) { .o-kanban { grid-template-columns: repeat(2, 1fr); } }
   @media (max-width: 600px) { .o-kanban { grid-template-columns: 1fr; } }
   .o-card {
     background: var(--surface); border: 1px solid var(--border); border-radius: 3px; padding: 10px;
-    display: flex; align-items: flex-start; gap: 10px; cursor: pointer;
-    transition: box-shadow 0.15s, border-color 0.15s;
+    display: flex; align-items: flex-start; gap: 10px; cursor: pointer; transition: box-shadow 0.15s, border-color 0.15s;
   }
   .o-card:hover { box-shadow: 0 3px 10px rgba(0, 0, 0, 0.13); border-color: #bbb; }
   html[data-theme="dark"] .o-card { background: var(--surface); border-color: var(--border); }
@@ -110,7 +90,6 @@
   html[data-theme="dark"] .o-avatar i { color: #6c85a0; }
   .o-card-body { flex: 1; min-width: 0; }
   .o-card-name { font-size: 12.5px; font-weight: 500; color: var(--text); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  html[data-theme="dark"] .o-card-name { color: var(--text); }
   .o-card-meta { font-size: 11px; color: var(--text-muted); line-height: 1.7; }
   .o-card-meta .val { color: var(--text); }
 
@@ -140,22 +119,21 @@
 
 {% block content %}
 
-<!-- ══ SUBHEADER ══ -->
 <div class="o-subheader">
   <div class="o-subheader-row">
-    <span class="o-page-title">Départements <span class="o-page-count">{{ total }}</span></span>
+    <span class="o-page-title">Services <span class="o-page-count">{{ total }}</span></span>
     <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
       <form method="get" id="filter-form" style="display:flex;align-items:center;" onsubmit="return false;">
         <input type="hidden" name="vue" id="vue-input" value="{{ vue|default:'liste' }}">
         <div class="o-search-bar">
-          <input class="o-search-input" id="search-input" type="text" name="q" value="{{ q }}" placeholder="Rechercher un département…" autocomplete="off">
+          <input class="o-search-input" id="search-input" type="text" name="q" value="{{ q }}" placeholder="Rechercher un service…" autocomplete="off">
           <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
         </div>
       </form>
     </div>
   </div>
   <div class="o-subheader-row">
-    <a href="{% url 'medecins_departement_create' %}" class="o-btn-create">
+    <a href="{% url 'medecins_service_create' %}" class="o-btn-create">
       <i class="bi bi-plus-lg"></i> Créer
     </a>
     {% if q %}
@@ -174,7 +152,6 @@
   </div>
 </div>
 
-<!-- ══ BULK BAR ══ -->
 <div class="bulk-bar" id="bulk-bar">
   <i class="bi bi-check2-square"></i>
   <span id="bulk-count">0</span> sélectionné(s)
@@ -183,16 +160,15 @@
 </div>
 
 <div id="list-result">
-{% include 'medecins/config/includes/departements_list_result.html' %}
+{% include 'medecins/config/includes/services_list_result.html' %}
 </div>
 
-<!-- Modal suppression bulk -->
 <div class="modal-overlay" id="bulk-delete-modal">
   <div class="modal-box">
     <div class="modal-icon">🗑️</div>
     <div class="modal-title">Confirmer la suppression</div>
-    <div class="modal-msg">Supprimer <strong id="modal-count">0</strong> département(s) ?<br>
-      <span style="font-size:12px;">Les services rattachés ne seront pas supprimés, juste détachés.</span></div>
+    <div class="modal-msg">Supprimer <strong id="modal-count">0</strong> service(s) ?<br>
+      <span style="font-size:12px;">Cette action est irréversible.</span></div>
     <div class="modal-actions">
       <button type="button" class="btn-modal-cancel" onclick="closeBulkModal()">Annuler</button>
       <button type="button" class="btn-modal-confirm" onclick="executeBulkDelete()">Supprimer</button>
@@ -204,11 +180,10 @@
 
 {% block extra_js %}
 <script>
-const BULK_URL   = "{% url 'medecins_departement_bulk_delete' %}";
+const BULK_URL   = "{% url 'medecins_service_bulk_delete' %}";
 const CSRF_TOKEN = "{{ csrf_token }}";
-const LIST_URL   = "{% url 'medecins_departements' %}";
+const LIST_URL   = "{% url 'medecins_services' %}";
 
-/* ── Vue liste / kanban : bascule immédiate, sans rechargement ── */
 function setVue(v) {
   document.getElementById('vue-input').value = v;
   document.querySelectorAll('.o-view-btn').forEach(function(b){ b.classList.toggle('active', b.dataset.vue === v); });
@@ -224,7 +199,6 @@ document.querySelectorAll('.o-view-btn').forEach(function(btn){
   btn.addEventListener('click', function(){ setVue(this.dataset.vue); });
 });
 
-/* ── Recherche dynamique (AJAX, sans rechargement de page) ── */
 function fetchList() {
   var q = document.getElementById('search-input').value;
   var vue = document.getElementById('vue-input').value;
@@ -260,7 +234,6 @@ function fetchList() {
   if (clearBtn) clearBtn.addEventListener('click', function(e){ e.preventDefault(); inp.value = ''; fetchList(); });
 })();
 
-/* ── Sélection multiple + suppression (réattaché après chaque fetch) ── */
 function onCheckChange(){
   var n = document.querySelectorAll('.row-check:checked').length;
   document.getElementById('bulk-count').textContent = n;

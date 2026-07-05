@@ -63,37 +63,50 @@
   .field-ul:focus { border-bottom-color: var(--md-500); }
   .field-ul::placeholder { color: #bfcdd4; }
   textarea.field-ul { resize: vertical; padding: 6px 2px; min-height: 72px; }
+  select.field-ul {
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23839aaa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 4px center; padding-right: 22px; cursor: pointer;
+  }
   html[data-theme="dark"] .field-ul { border-bottom-color: rgba(255, 255, 255, .15); color: var(--text); }
   html[data-theme="dark"] .field-ul:focus { border-bottom-color: var(--md-500); }
   html[data-theme="dark"] .field-ul::placeholder { color: rgba(255, 255, 255, .2); }
 
   .f-error { font-size: 12px; color: #dc2626; margin-top: 4px; }
+
+  .cfg-toggle-wrap { display: flex; align-items: center; gap: 10px; }
+  .cfg-toggle { position: relative; display: inline-block; width: 36px; height: 20px; }
+  .cfg-toggle input { opacity: 0; width: 0; height: 0; }
+  .cfg-toggle-slider { position: absolute; cursor: pointer; inset: 0; background: var(--border); border-radius: 20px; transition: .2s; }
+  .cfg-toggle-slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: .2s; }
+  .cfg-toggle input:checked + .cfg-toggle-slider { background: var(--md-500); }
+  .cfg-toggle input:checked + .cfg-toggle-slider:before { transform: translateX(16px); }
 </style>
 {% endblock %}
 
 {% block content %}
 
-<form method="post" id="specialite-form" novalidate>
+<form method="post" id="service-form" novalidate>
   {% csrf_token %}
 
   <div class="control-panel">
     <div class="cp-top">
-      <a href="{% if obj %}{% url 'medecins_specialite_detail' obj.pk %}{% else %}{% url 'medecins_specialites' %}{% endif %}" class="o-ctrl-btn" style="padding:3px 7px;">
+      <a href="{% if obj %}{% url 'medecins_service_detail' obj.pk %}{% else %}{% url 'medecins_services' %}{% endif %}" class="o-ctrl-btn" style="padding:3px 7px;">
         <i class="bi bi-arrow-left"></i>
       </a>
       <span style="font-size:13.5px;color:var(--text-muted);">
-        <a href="{% url 'medecins_specialites' %}" style="color:var(--teal-600);text-decoration:none;font-weight:500;">Spécialités</a>
+        <a href="{% url 'medecins_services' %}" style="color:var(--teal-600);text-decoration:none;font-weight:500;">Services</a>
         {% if obj %}
         <span style="margin:0 5px;opacity:.4;">/</span>
-        <a href="{% url 'medecins_specialite_detail' obj.pk %}" style="color:var(--teal-600);text-decoration:none;font-weight:500;">{{ obj.nom|truncatechars:30 }}</a>
+        <a href="{% url 'medecins_service_detail' obj.pk %}" style="color:var(--teal-600);text-decoration:none;font-weight:500;">{{ obj.nom|truncatechars:30 }}</a>
         {% endif %}
         <span style="margin:0 5px;opacity:.4;">/</span>
-        <span style="color:var(--text);">{% if obj %}Modifier{% else %}Nouvelle spécialité{% endif %}</span>
+        <span style="color:var(--text);">{% if obj %}Modifier{% else %}Nouveau service{% endif %}</span>
       </span>
       <div style="flex:1;"></div>
       <div class="cp-save-group">
         <button type="submit" class="btn-save">{% if obj %}Enregistrer{% else %}Créer{% endif %}</button>
-        <a href="{% if obj %}{% url 'medecins_specialite_detail' obj.pk %}{% else %}{% url 'medecins_specialites' %}{% endif %}" class="btn-discard">Ignorer</a>
+        <a href="{% if obj %}{% url 'medecins_service_detail' obj.pk %}{% else %}{% url 'medecins_services' %}{% endif %}" class="btn-discard">Ignorer</a>
       </div>
     </div>
   </div>
@@ -102,13 +115,14 @@
 
     <div class="form-main-grid">
 
+      <!-- Colonne gauche -->
       <div class="field-group">
 
         <div class="field-row {% if form.nom.errors %}field-row--error{% endif %}">
           <label>Nom <span class="required-star">*</span></label>
           <div>
             <input type="text" name="nom" id="{{ form.nom.id_for_label }}" class="field-ul"
-              value="{{ form.nom.value|default_if_none:'' }}" placeholder="Ex: Cardiologie" autocomplete="off">
+              value="{{ form.nom.value|default_if_none:'' }}" placeholder="Ex: Médecine interne" autocomplete="off">
             {% if form.nom.errors %}<div class="f-error">{{ form.nom.errors.0 }}</div>{% endif %}
           </div>
         </div>
@@ -117,15 +131,57 @@
           <label>Code <span class="required-star">*</span></label>
           <div>
             <input type="text" name="code" id="{{ form.code.id_for_label }}" class="field-ul"
-              value="{{ form.code.value|default_if_none:'' }}" placeholder="Ex: CARD" autocomplete="off"
+              value="{{ form.code.value|default_if_none:'' }}" placeholder="Ex: MED-INT" autocomplete="off"
               style="font-family: var(--font-mono);text-transform:uppercase;">
             {% if form.code.errors %}<div class="f-error">{{ form.code.errors.0 }}</div>{% endif %}
           </div>
         </div>
 
+        <div class="field-row {% if form.departement.errors %}field-row--error{% endif %}">
+          <label>Département</label>
+          <div>
+            <select name="departement" id="{{ form.departement.id_for_label }}" class="field-ul">
+              <option value="">— Aucun département —</option>
+              {% for dept in form.departement.field.queryset %}
+              <option value="{{ dept.pk }}" {% if form.departement.value|stringformat:"s" == dept.pk|stringformat:"s" %}selected{% endif %}>{{ dept.nom }}</option>
+              {% endfor %}
+            </select>
+            {% if form.departement.errors %}<div class="f-error">{{ form.departement.errors.0 }}</div>{% endif %}
+          </div>
+        </div>
+
       </div>
 
-      <div class="field-group"></div>
+      <!-- Colonne droite -->
+      <div class="field-group">
+
+        <div class="field-row {% if form.chef_service.errors %}field-row--error{% endif %}">
+          <label>Chef de service</label>
+          <div>
+            <select name="chef_service" id="{{ form.chef_service.id_for_label }}" class="field-ul">
+              <option value="">— Aucun chef de service —</option>
+              {% for med in form.chef_service.field.queryset %}
+              <option value="{{ med.pk }}" {% if form.chef_service.value|stringformat:"s" == med.pk|stringformat:"s" %}selected{% endif %}>Dr {{ med.nom }} {{ med.prenoms }}</option>
+              {% endfor %}
+            </select>
+            {% if form.chef_service.errors %}<div class="f-error">{{ form.chef_service.errors.0 }}</div>{% endif %}
+          </div>
+        </div>
+
+        <div class="field-row">
+          <label>Statut</label>
+          <div class="cfg-toggle-wrap">
+            <label class="cfg-toggle">
+              <input type="checkbox" name="actif" id="{{ form.actif.id_for_label }}" {% if form.actif.value %}checked{% endif %}>
+              <span class="cfg-toggle-slider"></span>
+            </label>
+            <span id="actif-label" style="font-size:13px;color:var(--text);">
+              {% if form.actif.value %}Service actif{% else %}Service inactif{% endif %}
+            </span>
+          </div>
+        </div>
+
+      </div>
 
     </div><!-- /.form-main-grid -->
 
@@ -133,7 +189,7 @@
       <label>Description</label>
       <div>
         <textarea name="description" id="{{ form.description.id_for_label }}" class="field-ul"
-          rows="3" placeholder="Description optionnelle de la spécialité…">{{ form.description.value|default_if_none:'' }}</textarea>
+          rows="3" placeholder="Description optionnelle du service…">{{ form.description.value|default_if_none:'' }}</textarea>
         {% if form.description.errors %}<div class="f-error">{{ form.description.errors.0 }}</div>{% endif %}
       </div>
     </div>
@@ -141,6 +197,18 @@
   </div>
 
 </form>
+
+<script>
+(function(){
+  var chk = document.getElementById('{{ form.actif.id_for_label }}');
+  var lbl = document.getElementById('actif-label');
+  if (chk && lbl) {
+    chk.addEventListener('change', function(){
+      lbl.textContent = this.checked ? 'Service actif' : 'Service inactif';
+    });
+  }
+})();
+</script>
 
 {% endblock %}
 
