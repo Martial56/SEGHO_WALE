@@ -44,6 +44,12 @@ def get_actions_disponibles(hosp, user):
             result['creer_facture'] = {
                 'visible': False, 'enabled': False, 'raison_blocage': '',
             }
+        # Même pour le superuser, "Clôturer" n'a de sens qu'une fois le dossier
+        # déchargé — on ne saute pas d'étape, et on ne l'affiche pas en avance.
+        if hosp.statut != 'decharge':
+            result['terminer'] = {'visible': False, 'enabled': False, 'raison_blocage': ''}
+        if hosp.statut in ('decharge', 'termine', 'annule'):
+            result['annuler'] = {'visible': False, 'enabled': False, 'raison_blocage': ''}
         return result
 
     def perm(codename):
@@ -144,10 +150,9 @@ def get_actions_disponibles(hosp, user):
     if not perm('can_cloturer_dossier'):
         result['terminer'] = _act(False, False)
     elif statut != 'decharge':
-        result['terminer'] = _act(
-            True, False,
-            f"Statut actuel : {hosp.get_statut_display()} — déchargé requis"
-        )
+        # Pas encore déchargé (ou déjà clos/annulé) — l'action n'a pas encore
+        # de sens à ce stade, on ne l'affiche pas en avance.
+        result['terminer'] = _act(False, False)
     elif nb_saf_nf > 0:
         result['terminer'] = _act(
             True, False,
@@ -165,11 +170,8 @@ def get_actions_disponibles(hosp, user):
     # Rôle typique : Médecin, Accueil, Major
     if not perm('can_annuler_demande'):
         result['annuler'] = _act(False, False)
-    elif statut not in ('brouillon', 'confirme', 'hospitalise'):
-        result['annuler'] = _act(
-            True, False,
-            f"Statut actuel : {hosp.get_statut_display()} — annulation impossible depuis cet état"
-        )
+    elif statut in ('decharge', 'termine', 'annule'):
+        result['annuler'] = _act(False, False)  # état terminal — annulation impossible, caché
     else:
         result['annuler'] = _act(True, True)
 

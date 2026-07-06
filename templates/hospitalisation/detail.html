@@ -9,80 +9,56 @@
    Charte : palette teal (variables.css), Sora, --radius, --shadow-*
    ══════════════════════════════════════════════════════════════════ */
 
-/* ── Subheader ── */
+/* ── Subheader (une seule rangée : retour, fil d'Ariane, actions à droite) ── */
 .det-subhdr {
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   padding: 6px 16px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   position: fixed; left: 0; right: 0;
   top: calc(var(--topbar-h, 62px) + 38px);
   z-index: 190;
 }
-.det-back {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 28px; height: 28px;
-  border-radius: var(--radius-xs); border: 1px solid var(--border-strong);
-  color: var(--text-muted); text-decoration: none;
-  transition: color .15s, background .15s;
+.o-ctrl-btn {
+  background: none; border: 1px solid transparent; border-radius: 4px;
+  padding: 4px 8px; font-size: 14px; color: var(--text-muted);
+  text-decoration: none; transition: border-color .15s, color .15s, background .15s;
+  display: inline-flex; align-items: center;
 }
-.det-back:hover { color: var(--text); background: var(--surface-muted); }
+.o-ctrl-btn:hover { border-color: var(--border); color: var(--text); background: #f3f3f3; }
 .det-crumb { font-size: 13px; color: var(--text-muted); display: flex; align-items: center; gap: 4px; }
 .det-crumb a { color: var(--teal-500); text-decoration: none; font-weight: 500; }
 .det-crumb a:hover { text-decoration: underline; }
 .det-crumb .sep { opacity: .35; margin: 0 2px; }
 
-/* ── En-tête dossier ── */
-.det-hdr {
+/* ── Bloc unique (comme .form-body de services/form.html) : tout le contenu
+     (en-tête, pipeline, actions, durée, onglets) vit dans UN seul bloc,
+     séparé du sous-en-tête fixe par un espace visible ── */
+.det-block {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-top: 3px solid var(--teal-500);
   border-radius: var(--radius);
-  padding: 18px 24px;
-  margin-top: 0;
-  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
   box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  margin: 18px 0 24px;
 }
-.det-numero {
-  font-size: 11px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .09em; color: var(--text-muted); white-space: nowrap;
-}
-.det-numero strong { font-size: 15px; color: var(--teal-600); letter-spacing: 0; text-transform: none; }
-.det-vdiv { width: 1px; height: 36px; background: var(--border); flex-shrink: 0; }
-.det-patient { flex: 1; min-width: 0; }
-.det-pname {
-  font-size: 18px; font-weight: 700; color: var(--text);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2;
-}
-.det-psub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 
-/* ── Badge statut ── */
-.det-badge {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 5px 14px; border-radius: 100px;
-  font-size: 12px; font-weight: 700; letter-spacing: .05em;
-  color: #fff; white-space: nowrap; text-transform: uppercase;
-  transition: background .25s;
+/* ── Pipeline (rangée dans .det-block, en tout premier) : Modifier à gauche,
+     pipeline à droite — comme .cp-workflow-row de patients/rendez_vous_form.html
+     (cp-actions à gauche, status-bar à droite) ── */
+.det-pipe-row {
+  padding: 14px 20px;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  position: relative;
 }
-.det-badge[data-s="brouillon"]   { background: #6b7280; }
-.det-badge[data-s="confirme"]    { background: var(--color-warning); }
-.det-badge[data-s="hospitalise"] { background: var(--color-info); }
-.det-badge[data-s="decharge"]    { background: var(--color-violet); }
-.det-badge[data-s="termine"]     { background: var(--color-success); }
-.det-badge[data-s="annule"]      { background: var(--color-danger); }
+.det-pipe-row::after, .timing-section::after, .det-fields-section::after {
+  content: ''; position: absolute; left: 20px; right: 20px; bottom: 0;
+  height: 1px; background: var(--border);
+}
 
-/* ── Pipeline statusbar ── */
-.det-pipe-wrap {
-  background: var(--surface);
-  border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 12px 20px; margin-top: 10px;
-  display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;
-  box-shadow: var(--shadow-sm);
-}
+/* ── Pipeline (2e rangée du sous-en-tête fixe, à côté des actions) ── */
 .pipeline {
-  margin-left: 0; display: flex; align-items: stretch;
+  display: flex; align-items: stretch;
   font-size: 11px; font-weight: 700; letter-spacing: .06em; gap: 2px;
   transition: opacity .25s;
 }
@@ -117,16 +93,12 @@
 .branch-bdg.show     { display: inline-flex; }
 .branch-bdg.annule   { background: var(--color-danger); }
 
-/* ── Barre d'actions ── */
-.det-acts {
-  background: var(--surface);
-  border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 10px 16px; margin-top: 10px;
+/* ── Barre d'actions (à droite du sous-en-tête fixe, poussée par le spacer flex:1) ── */
+#action-bar {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  min-height: 52px; box-shadow: var(--shadow-sm);
   transition: opacity .2s;
 }
-.det-acts[data-loading="true"] { opacity: .55; pointer-events: none; }
+#action-bar[data-loading="true"] { opacity: .55; pointer-events: none; }
 .act-ro {
   display: flex; align-items: center; gap: 10px;
   width: 100%; padding: 8px 14px;
@@ -150,26 +122,32 @@
 .abtn:disabled, .abtn.off {
   opacity: .42; cursor: not-allowed; pointer-events: none; filter: grayscale(.2);
 }
-.abtn-primary { background: var(--teal-500); color: #fff; }
-.abtn-primary:not(:disabled):not(.off):hover { background: var(--teal-600); }
-.abtn-success { background: var(--color-success); color: #fff; }
-.abtn-success:not(:disabled):not(.off):hover { background: #0e8c56; }
-.abtn-info    { background: var(--color-info); color: #fff; }
-.abtn-info:not(:disabled):not(.off):hover { background: #1d7ab5; }
-.abtn-violet  { background: var(--color-violet); color: #fff; }
-.abtn-violet:not(:disabled):not(.off):hover { background: #5f41a0; }
-.abtn-coral   { background: var(--color-coral); color: #fff; }
-.abtn-coral:not(:disabled):not(.off):hover { background: #c94e34; }
-.abtn-danger  { background: var(--color-danger); color: #fff; }
-.abtn-danger:not(:disabled):not(.off):hover { background: #c52b2b; }
+/* ── Palette alignée sur patients/rendez_vous_form.html : teal pour les actions
+     qui font avancer le dossier (.btn-teal), marine pour l'action terminale
+     (.btn-dark), ghost pour les actions secondaires (.btn-ghost) ── */
+.abtn-primary { background: var(--teal-600); color: #fff; }
+.abtn-primary:not(:disabled):not(.off):hover { background: var(--teal-700); }
+.abtn-dark    { background: #1a3a5c; color: #fff; }
+.abtn-dark:not(:disabled):not(.off):hover { filter: brightness(0.88); }
+.abtn-ghost {
+  background: transparent; color: var(--text-muted); border: none;
+}
+.abtn-ghost:not(:disabled):not(.off):hover { background: var(--surface-muted); color: var(--text); }
 .abtn-neutral {
   background: var(--surface-muted); color: var(--text);
   border: 1px solid var(--border-strong);
 }
 .abtn-neutral:not(:disabled):not(.off):hover { background: #ddedf5; color: var(--teal-700); }
+/* ── Ignorer (comme .btn-discard de patients/rendez_vous_form.html) ── */
+.abtn-discard {
+  background: var(--surface); color: var(--text-muted);
+  border: 1px solid var(--border); font-weight: 500;
+}
+.abtn-discard:hover { border-color: var(--border-strong); color: var(--text); background: var(--surface-muted); }
 
-/* ── Layout ── */
-.det-layout { padding-top: 16px; }
+/* ── Layout : espace visible à gauche/droite du bloc principal (le sous-en-tête
+     fixe, lui, reste plein écran comme .o-nav) ── */
+.det-layout { padding: 0 20px; }
 .det-main   { min-width: 0; }
 
 /* ── Sidebar sticky offset : topbar(70) + o-nav(38) + subhdr(~44) ── */
@@ -178,25 +156,46 @@
   max-height: calc(100vh - 170px);
 }
 
-/* ── Encart durée ── */
-.dur-card {
-  background: linear-gradient(135deg, var(--teal-50) 0%, var(--surface) 100%);
-  border: 1px solid var(--teal-200); border-radius: var(--radius-sm);
-  padding: 16px 22px; margin-bottom: 14px;
-  display: flex; align-items: center; gap: 20px;
-}
-.dur-card[hidden] { display: none; }
-.dur-icon { font-size: 32px; color: var(--teal-400); flex-shrink: 0; line-height: 1; }
-.dur-row  { display: flex; gap: 32px; flex-wrap: wrap; align-items: center; }
-.dur-divider { width: 1px; height: 36px; background: var(--teal-200); flex-shrink: 0; }
-.dur-lbl  { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); }
-.dur-val  { font-size: 14px; font-weight: 700; color: var(--teal-700); margin-top: 3px; }
-.dur-val.main { font-size: 22px; color: var(--teal-500); }
+/* ── Rangée onglets + historique, nichée dans .det-block (séparée de la
+     rangée du dessus par la bordure déjà présente sur .timing-section) ── */
+.det-block .hist-wrapper { margin-top: 16px; }
+.det-block .hist-aside { margin-right: 20px; margin-bottom: 24px; }
 
-/* ── Card + onglets ── */
+/* ── Chronomètres du dossier (rangée pleine largeur dans .det-block,
+     comme .timing-section de patients/rendez_vous_form.html) ── */
+.timing-section {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 16px 40px; padding: 18px 20px; position: relative;
+}
+.timing-card { display: flex; flex-direction: column; gap: 6px; }
+.timing-label {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--text-muted);
+}
+.timing-value {
+  font-size: 22px; font-weight: 700; color: var(--teal-700);
+  font-variant-numeric: tabular-nums; letter-spacing: .02em;
+}
+.timing-value.zero { color: var(--text-muted); opacity: .5; }
+.timing-value.running { color: var(--teal-600); }
+#dur-sortie { font-size: 16px; }
+.timing-value.running::after {
+  content: ' ●'; font-size: 10px; vertical-align: middle;
+  animation: timing-blink 1s step-start infinite;
+}
+@keyframes timing-blink { 50% { opacity: 0; } }
+@media (max-width: 700px) { .timing-section { grid-template-columns: 1fr; } }
+
+/* ── Champs dossier, hors onglets (comme .form-main-grid de
+     patients/rendez_vous_form.html) ── */
+.det-fields-section { padding: 24px 28px; position: relative; }
+
+/* ── Card onglets (comme .f-tabs-wrap de patients/rendez_vous_form.html —
+     un bloc propre, à côté du bloc historique) ── */
 .det-card {
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-sm);
+  border-radius: var(--radius-sm); overflow: hidden;
+  margin: 0 20px 24px 28px;
 }
 .tab-nav {
   display: flex; border-bottom: 1px solid var(--border);
@@ -233,9 +232,20 @@
   margin-top: 16px; display: flex; align-items: center; gap: 7px;
 }
 .info-section:first-child { margin-top: 0; }
-.info-lbl { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); margin-bottom: 3px; }
-.info-val { font-size: 13.5px; color: var(--text); font-weight: 500; }
-.info-val.empty { color: var(--text-muted); font-style: italic; font-weight: 400; }
+/* ── Rangée label-gauche / valeur-droite (comme .field-row de
+     patients/rendez_vous_form.html) ── */
+.info-row {
+  display: grid; grid-template-columns: 140px 1fr;
+  align-items: center; gap: 12px; min-height: 34px;
+}
+@media (max-width: 500px) { .info-row { grid-template-columns: 1fr; } }
+.info-lbl { font-size: 13px; font-weight: 600; color: var(--text-muted); text-align: left; }
+.info-val {
+  font-size: 13px; color: var(--text-muted); font-weight: 500;
+  display: flex; align-items: center; min-height: 28px;
+  padding: 5px 2px; border-bottom: 1.5px dashed var(--border);
+}
+.info-val.empty { color: var(--text-muted); font-style: italic; font-weight: 400; opacity: .6; }
 
 /* ── Table SAF ── */
 .saf-wrap { border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
@@ -419,16 +429,10 @@
 @media (max-width: 700px) { .dchar-grid { grid-template-columns: 1fr; } }
 
 /* ── Dark ── */
-html[data-theme="dark"] .det-hdr,
-html[data-theme="dark"] .det-pipe-wrap,
-html[data-theme="dark"] .det-acts,
+html[data-theme="dark"] .det-block,
 html[data-theme="dark"] .det-card,
 html[data-theme="dark"] .aside-card,
-html[data-theme="dark"] .fac-row,
-html[data-theme="dark"] .dur-card { background: var(--surface); border-color: var(--border); }
-html[data-theme="dark"] .det-hdr { border-top-color: var(--teal-500); }
-html[data-theme="dark"] .dur-card { background: linear-gradient(135deg, rgba(14,67,88,.3) 0%, var(--surface) 100%); }
-html[data-theme="dark"] .dur-divider { background: rgba(255,255,255,.1); }
+html[data-theme="dark"] .fac-row { background: var(--surface); border-color: var(--border); }
 html[data-theme="dark"] .act-ro { background: #0d1f32; border-color: rgba(255,255,255,.08); border-left-color: var(--teal-400); }
 html[data-theme="dark"] .pip-step { background: #1a2a3e; color: rgba(255,255,255,.28); }
 html[data-theme="dark"] .pip-step.done { background: #0f2e48; color: var(--teal-300); }
@@ -448,12 +452,12 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
 {% endblock %}
 
 {% block content %}
-<div class="hist-wrapper"><div class="hist-main">
 <div id="page-wrap">
 
-{# SUBHEADER / BREADCRUMB #}
+{# SOUS-EN-TÊTE FIXE : retour+fil d'Ariane à gauche, actions à droite (une seule rangée, comme .cp-top de patients/rendez_vous_form.html) ── #}
 <div class="det-subhdr" data-fixed="1">
-  <a href="{% url 'hospitalisation:list' %}" class="det-back" title="Retour">
+
+  <a href="{% url 'hospitalisation:list' %}" class="o-ctrl-btn" style="padding:3px 7px;" title="Retour">
     <i class="bi bi-arrow-left"></i>
   </a>
   <div class="det-crumb">
@@ -461,202 +465,287 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
     <span class="sep">/</span>
     <span>{{ hosp.numero }}</span>
   </div>
-</div>
 
-{# EN-TÊTE DOSSIER #}
-<div class="det-hdr">
-  <div class="det-numero">Dossier <strong>{{ hosp.numero }}</strong></div>
-  <div class="det-vdiv"></div>
-  <div class="det-patient">
-    <div class="det-pname">{{ hosp.patient.nom|upper }} {{ hosp.patient.prenoms }}</div>
-    <div class="det-psub">
-      {% if hosp.patient.date_naissance %}{{ hosp.patient.date_naissance|date:"d/m/Y" }} &middot; {% endif %}
-      Admis le {{ hosp.date_admission|date:"d/m/Y à H:i" }}
+  <div style="flex:1;"></div>
+
+  {# ── Actions contextuelles — cachées pour dossiers en lecture seule totale ── #}
+  {% if not lecture_seule_totale %}
+    <div id="action-bar">
+
+      {# ─ Confirmer (brouillon uniquement) ─ #}
+      {% if actions.confirmer.visible and hosp.statut == 'brouillon' %}
+      <button type="button"
+              class="abtn abtn-primary {% if not actions.confirmer.enabled %}off{% endif %}"
+              {% if actions.confirmer.enabled %}
+                onclick="doTransition('{% url 'hospitalisation:confirmer' hosp.pk %}')"
+              {% else %}
+                disabled title="{{ actions.confirmer.raison_blocage }}"
+              {% endif %}>
+        <i class="bi bi-check2-circle"></i>
+        Confirmer la demande
+      </button>
+      {% endif %}
+
+      {# ─ Créer facture ─ #}
+      {% if actions.creer_facture.visible %}
+        {% if actions.creer_facture.enabled %}
+        <a href="{{ url_facture }}" class="abtn abtn-primary">
+          <i class="bi bi-receipt"></i> Créer la facture
+          {% if saf_non_factures %}<span style="background:rgba(255,255,255,.28);border-radius:100px;padding:0 6px;font-size:10px;">{{ saf_non_factures }}</span>{% endif %}
+        </a>
+        {% else %}
+        <button type="button" class="abtn abtn-primary off" disabled title="{{ actions.creer_facture.raison_blocage }}">
+          <i class="bi bi-receipt"></i> Créer la facture
+        </button>
+        {% endif %}
+      {% endif %}
+
+      {# ─ Ajouter un soin ─ #}
+      {% if peut_ajouter_soin %}
+      <a href="{% url 'hospitalisation:edit' hosp.pk %}?tab=soins" class="abtn abtn-ghost">
+        <i class="bi bi-plus-circle"></i> Ajouter un soin
+      </a>
+      {% endif %}
+
+      {# ─ Attribuer une chambre ─ #}
+      {% if peut_attribuer_chambre %}
+      <a href="{% url 'hospitalisation:edit' hosp.pk %}" class="abtn abtn-primary">
+        <i class="bi bi-door-open"></i> Attribuer une chambre
+      </a>
+      {% endif %}
+
+      {# ─ Décharger ─ #}
+      {% if actions.decharger.visible and hosp.statut == 'hospitalise' %}
+        {% if actions.decharger.enabled %}
+        <a href="{% url 'hospitalisation:edit' hosp.pk %}?tab=resume" class="abtn abtn-primary">
+          <i class="bi bi-door-open"></i> Décharger
+        </a>
+        {% else %}
+        <button type="button" class="abtn abtn-primary off" disabled title="{{ actions.decharger.raison_blocage }}">
+          <i class="bi bi-door-open"></i> Décharger
+        </button>
+        {% endif %}
+      {% endif %}
+
+      {# ─ Clôturer le dossier ─ #}
+      {% if actions.terminer.visible %}
+      <div class="act-sep"></div>
+        {% if actions.terminer.enabled %}
+        <button type="button" class="abtn abtn-dark"
+                onclick="doTransition('{% url 'hospitalisation:terminer' hosp.pk %}')">
+          <i class="bi bi-check-all"></i> Clôturer le dossier
+        </button>
+        {% else %}
+        <button type="button" class="abtn abtn-dark off" disabled title="{{ actions.terminer.raison_blocage }}">
+          <i class="bi bi-check-all"></i> Clôturer le dossier
+        </button>
+        {% endif %}
+      {% endif %}
+
     </div>
-  </div>
-  <span class="det-badge" id="statut-badge" data-s="{{ hosp.statut }}">
-    {% if hosp.statut == 'brouillon' %}<i class="bi bi-circle"></i>
-    {% elif hosp.statut == 'confirme' %}<i class="bi bi-check-circle-fill"></i>
-    {% elif hosp.statut == 'hospitalise' %}<i class="bi bi-hospital-fill"></i>
-    {% elif hosp.statut == 'decharge' %}<i class="bi bi-door-open-fill"></i>
-    {% elif hosp.statut == 'termine' %}<i class="bi bi-check2-all"></i>
-    {% elif hosp.statut == 'annule' %}<i class="bi bi-x-circle-fill"></i>
-    {% endif %}
-    {{ hosp.get_statut_display }}
-  </span>
-</div>
+  {% endif %}{# /not lecture_seule_totale #}
 
-{# PIPELINE STATUSBAR — Annulé = branche hors ligne principale #}
-<div class="det-pipe-wrap">
-  <div class="pipeline" id="pipeline"
-       {% if hosp.statut == 'annule' %}style="opacity:.45;"{% endif %}>
-
-    {% with s=hosp.statut %}
-    <div class="pip-step {% if s == 'brouillon' %}active{% elif s in 'confirme,hospitalise,decharge,termine' %}done{% endif %}"
-         data-step="brouillon">Brouillon</div>
-    <div class="pip-step {% if s == 'confirme' %}active{% elif s in 'hospitalise,decharge,termine' %}done{% endif %}"
-         data-step="confirme">Confirmé</div>
-    <div class="pip-step {% if s == 'hospitalise' %}active{% elif s in 'decharge,termine' %}done{% endif %}"
-         data-step="hospitalise">Hospitalisé</div>
-    <div class="pip-step {% if s == 'decharge' %}active{% elif s == 'termine' %}done{% endif %}"
-         data-step="decharge">Déchargé</div>
-    <div class="pip-step {% if s == 'termine' %}active{% endif %}"
-         data-step="termine">Terminé</div>
-    {% endwith %}
-
-  </div>
-
-  {# Branche hors pipeline #}
-  <span class="branch-bdg annule {% if hosp.statut == 'annule' %}show{% endif %}" id="bdg-annule">
-    <i class="bi bi-x-circle-fill" style="font-size:11px;"></i> Annulé
-  </span>
-</div>
-
-
-{# BARRE D'ACTIONS CONTEXTUELLE — cachée pour dossiers terminés/annulés #}
-{% if not lecture_seule_totale %}
-{% if actions.confirmer.visible or actions.creer_facture.visible or actions.installer.visible or actions.decharger.visible or peut_attribuer_chambre or peut_ajouter_soin or peut_modifier and hosp.statut == 'confirme' %}
-<div class="det-acts" id="action-bar">
-
-  {# ─ Confirmer (brouillon uniquement) ─ #}
-  {% if actions.confirmer.visible and hosp.statut == 'brouillon' %}
-  <button type="button"
-          class="abtn abtn-primary {% if not actions.confirmer.enabled %}off{% endif %}"
-          {% if actions.confirmer.enabled %}
-            onclick="doTransition('{% url 'hospitalisation:confirmer' hosp.pk %}')"
-          {% else %}
-            disabled title="{{ actions.confirmer.raison_blocage }}"
-          {% endif %}>
-    <i class="bi bi-check2-circle"></i>
-    Confirmer la demande
-  </button>
-  {% endif %}
-
-
-  {# ─ Créer facture ─ #}
-  {% if actions.creer_facture.visible %}
-    {% if actions.creer_facture.enabled %}
-    <a href="{{ url_facture }}" class="abtn abtn-success">
-      <i class="bi bi-receipt"></i> Créer la facture
-      {% if saf_non_factures %}<span style="background:rgba(255,255,255,.28);border-radius:100px;padding:0 6px;font-size:10px;">{{ saf_non_factures }}</span>{% endif %}
-    </a>
-    {% else %}
-    <button type="button" class="abtn abtn-success off" disabled title="{{ actions.creer_facture.raison_blocage }}">
-      <i class="bi bi-receipt"></i> Créer la facture
-    </button>
-    {% endif %}
-  {% endif %}
-
-  {# ─ Ajouter un soin ─ #}
-  {% if peut_ajouter_soin %}
-  <a href="{% url 'hospitalisation:edit' hosp.pk %}?tab=soins" class="abtn abtn-neutral">
-    <i class="bi bi-plus-circle"></i> Ajouter un soin
-  </a>
-  {% endif %}
-
-  {# ─ Attribuer une chambre ─ #}
-  {% if peut_attribuer_chambre %}
-  <a href="{% url 'hospitalisation:edit' hosp.pk %}" class="abtn abtn-info">
-    <i class="bi bi-door-open"></i> Attribuer une chambre
-  </a>
-  {% endif %}
-
-  {# ─ Décharger ─ #}
-  {% if actions.decharger.visible and hosp.statut == 'hospitalise' %}
-    {% if actions.decharger.enabled %}
-    <a href="{% url 'hospitalisation:edit' hosp.pk %}?tab=resume" class="abtn abtn-violet">
-      <i class="bi bi-door-open"></i> Décharger
-    </a>
-    {% else %}
-    <button type="button" class="abtn abtn-violet off" disabled title="{{ actions.decharger.raison_blocage }}">
-      <i class="bi bi-door-open"></i> Décharger
-    </button>
-    {% endif %}
-  {% endif %}
-
-
-  {# ─ Clôturer le dossier ─ #}
-  {% if actions.terminer.visible %}
-  <div class="act-sep"></div>
-    {% if actions.terminer.enabled %}
-    <button type="button" class="abtn abtn-success"
-            onclick="doTransition('{% url 'hospitalisation:terminer' hosp.pk %}')">
-      <i class="bi bi-check-all"></i> Clôturer le dossier
-    </button>
-    {% else %}
-    <button type="button" class="abtn abtn-success off" disabled title="{{ actions.terminer.raison_blocage }}">
-      <i class="bi bi-check-all"></i> Clôturer le dossier
-    </button>
-    {% endif %}
-  {% endif %}
-
-  {# ─ Annuler (toujours à droite) ─ #}
-  {% if actions.annuler.visible %}
-  <div style="margin-left:auto;">
-    {% if actions.annuler.enabled %}
-    <button type="button" class="abtn abtn-danger" onclick="openAnnulModal()">
-      <i class="bi bi-x-circle"></i> Annuler
-    </button>
-    {% else %}
-    <button type="button" class="abtn abtn-danger off" disabled title="{{ actions.annuler.raison_blocage }}">
-      <i class="bi bi-x-circle"></i> Annuler
-    </button>
-    {% endif %}
-  </div>
-  {% endif %}
+  {# ─ Ignorer (retour à la liste — toujours visible, même en lecture seule) ─ #}
+  <a href="{% url 'hospitalisation:list' %}" class="abtn abtn-discard">Ignorer</a>
 
 </div>
-{% endif %}{# /actions visibles #}
-{% endif %}{# /not lecture_seule_totale #}
 
-{# CORPS PRINCIPAL : layout 2 colonnes #}
+{# CORPS PRINCIPAL : un seul bloc (.det-block) comme .form-body de services/form.html #}
 <div class="det-layout">
 
   {# ── Colonne principale ── #}
   <div class="det-main">
 
-    {# ── Encart durée d'observation ── #}
-    <div class="dur-card" id="dur-card" {% if not hosp.heure_entree %}hidden{% endif %}>
-      <i class="bi bi-clock-history dur-icon"></i>
-      <div style="flex:1;">
-        <div class="dur-row">
-          <div>
-            <div class="dur-lbl">Entrée</div>
-            <div class="dur-val" id="dur-entree">
-              {% if hosp.heure_entree %}{{ hosp.heure_entree|date:"d/m/Y H:i" }}{% endif %}
-            </div>
-          </div>
-          <div class="dur-divider"></div>
-          {% if hosp.heure_sortie %}
-          <div>
-            <div class="dur-lbl">Sortie</div>
-            <div class="dur-val" id="dur-sortie">{{ hosp.heure_sortie|date:"d/m/Y H:i" }}</div>
-          </div>
-          {% else %}
-          <div id="dur-sortie-wrap" style="display:none;">
-            <div class="dur-lbl">Sortie</div>
-            <div class="dur-val" id="dur-sortie">—</div>
-          </div>
-          {% endif %}
-          <div class="dur-divider"></div>
-          <div>
-            <div class="dur-lbl">Durée d'observation</div>
-            <div class="dur-val main" id="dur-duree">
-              {% if hosp.duree_observation %}{{ hosp.duree_observation|floatformat:1 }} h{% else %}—{% endif %}
-            </div>
+    <div class="det-block">
+
+    {# ── Pipeline — Annulé = branche hors ligne principale ── #}
+    <div class="det-pipe-row">
+      {# ─ Modifier (édition complète du dossier) — à gauche, comme .cp-actions de patients/rendez_vous_form.html ─ #}
+      {% if peut_modifier %}
+      <a href="{% url 'hospitalisation:edit' hosp.pk %}" class="abtn abtn-primary" id="btn-modifier-link" title="Modifier toutes les données">
+        <i class="bi bi-pencil-square"></i> Modifier
+      </a>
+      {% endif %}
+      <div style="flex:1;"></div>
+      <div class="pipeline" id="pipeline"
+           {% if hosp.statut == 'annule' %}style="opacity:.45;"{% endif %}>
+        {% with s=hosp.statut %}
+        <div class="pip-step {% if s == 'brouillon' %}active{% elif s in 'confirme,hospitalise,decharge,termine' %}done{% endif %}"
+             data-step="brouillon">Brouillon</div>
+        <div class="pip-step {% if s == 'confirme' %}active{% elif s in 'hospitalise,decharge,termine' %}done{% endif %}"
+             data-step="confirme">Confirmé</div>
+        <div class="pip-step {% if s == 'hospitalise' %}active{% elif s in 'decharge,termine' %}done{% endif %}"
+             data-step="hospitalise">Hospitalisé</div>
+        <div class="pip-step {% if s == 'decharge' %}active{% elif s == 'termine' %}done{% endif %}"
+             data-step="decharge">Déchargé</div>
+        <div class="pip-step {% if s == 'termine' %}active{% endif %}"
+             data-step="termine">Terminé</div>
+        {% endwith %}
+      </div>
+      {# Branche hors pipeline #}
+      <span class="branch-bdg annule {% if hosp.statut == 'annule' %}show{% endif %}" id="bdg-annule">
+        <i class="bi bi-x-circle-fill" style="font-size:11px;"></i> Annulé
+      </span>
+    </div>
+
+    {# ── Champs dossier (hors onglets — comme .form-main-grid de patients/rendez_vous_form.html) ── #}
+    <div class="det-fields-section">
+      <div class="info-grid">
+
+        <div class="info-section"><i class="bi bi-person-fill"></i>Patient</div>
+
+        <div class="info-row">
+          <div class="info-lbl">Nom complet</div>
+          <div class="info-val" style="font-weight:700;">{{ hosp.patient.nom|upper }} {{ hosp.patient.prenoms }}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-lbl">Date de naissance</div>
+          <div class="info-val {% if not hosp.patient.date_naissance %}empty{% endif %}">
+            {{ hosp.patient.date_naissance|date:"d/m/Y"|default:"—" }}
           </div>
         </div>
+        <div class="info-row">
+          <div class="info-lbl">Sexe</div>
+          <div class="info-val {% if not hosp.patient.sexe %}empty{% endif %}">
+            {{ hosp.patient.sexe|default:"—" }}
+          </div>
+        </div>
+        <div class="info-row">
+          <div class="info-lbl">Téléphone</div>
+          <div class="info-val {% if not hosp.patient.telephone %}empty{% endif %}">
+            {{ hosp.patient.telephone|default:"—" }}
+          </div>
+        </div>
+        {% if hosp.nom_parent_gardien %}
+        <div class="info-row">
+          <div class="info-lbl">Parent / gardien</div>
+          <div class="info-val">{{ hosp.nom_parent_gardien }}{% if hosp.phone_parent_gardien %} — {{ hosp.phone_parent_gardien }}{% endif %}</div>
+        </div>
+        {% endif %}
+
+        <div class="info-section"><i class="bi bi-calendar3"></i>Admission</div>
+
+        <div class="info-row">
+          <div class="info-lbl">Date d'admission</div>
+          <div class="info-val">{{ hosp.date_admission|date:"d/m/Y H:i" }}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-lbl">Maladie</div>
+          <div class="info-val {% if not hosp.maladie %}empty{% endif %}">{{ hosp.maladie|default:"—" }}</div>
+        </div>
+        <div class="info-row full">
+          <div class="info-lbl">Motif d'admission</div>
+          <div class="info-val {% if not hosp.motif_admission %}empty{% endif %}">
+            {{ hosp.motif_admission|default:"—" }}
+          </div>
+        </div>
+        {% if hosp.mise_en_observation %}
+        <div class="info-row full">
+          <div class="info-lbl">Mise en observation</div>
+          <div class="info-val">{{ hosp.mise_en_observation }}</div>
+        </div>
+        {% endif %}
+
+        <div class="info-section"><i class="bi bi-person-lines-fill"></i>Équipe soignante</div>
+
+        <div class="info-row">
+          <div class="info-lbl">Médecin traitant</div>
+          <div class="info-val {% if not hosp.medecin_traitant %}empty{% endif %}">
+            {% if hosp.medecin_traitant %}Dr. {{ hosp.medecin_traitant.nom }} {{ hosp.medecin_traitant.prenoms }}{% else %}—{% endif %}
+          </div>
+        </div>
+        <div class="info-row">
+          <div class="info-lbl">Médecin référent</div>
+          <div class="info-val {% if not hosp.medecin_referent %}empty{% endif %}">
+            {% if hosp.medecin_referent %}Dr. {{ hosp.medecin_referent.nom }} {{ hosp.medecin_referent.prenoms }}{% else %}—{% endif %}
+          </div>
+        </div>
+        <div class="info-row">
+          <div class="info-lbl">Infirmière primaire</div>
+          <div class="info-val {% if not hosp.infirmiere_primaire %}empty{% endif %}">
+            {% if hosp.infirmiere_primaire %}{{ hosp.infirmiere_primaire.nom }} {{ hosp.infirmiere_primaire.prenoms }}{% else %}—{% endif %}
+          </div>
+        </div>
+
+        <div class="info-section"><i class="bi bi-door-closed"></i>Hébergement</div>
+
+        <div class="info-row">
+          <div class="info-lbl">Chambre / Salle</div>
+          <div class="info-val {% if not hosp.chambre %}empty{% endif %}">
+            {% if hosp.chambre %}{{ hosp.chambre.nom }}{% if hosp.numero_lit %} — Lit {{ hosp.numero_lit }}{% endif %} — {{ hosp.chambre.get_type_chambre_display }}{% else %}—{% endif %}
+          </div>
+        </div>
+        {% if hosp.consultation %}
+        <div class="info-row">
+          <div class="info-lbl">Consultation d'origine</div>
+          <div class="info-val">{{ hosp.consultation }}</div>
+        </div>
+        {% endif %}
+
+        {# Transfert vers un autre établissement #}
+        {% if resume.transfert %}
+        <div class="info-section"><i class="bi bi-arrow-right-circle"></i>Transfert</div>
+        <div class="info-row">
+          <div class="info-lbl">Établissement de destination</div>
+          <div class="info-val {% if not hosp.etablissement_destination %}empty{% endif %}">
+            {{ hosp.etablissement_destination|default:"—" }}
+          </div>
+        </div>
+        <div class="info-row full">
+          <div class="info-lbl">Motif du transfert</div>
+          <div class="info-val {% if not hosp.motif_reference %}empty{% endif %}">
+            {{ hosp.motif_reference|default:"—" }}
+          </div>
+        </div>
+        {% endif %}
+
+        {% if hosp.notes %}
+        <div class="info-row full">
+          <div class="info-lbl">Notes</div>
+          <div class="info-val">{{ hosp.notes }}</div>
+        </div>
+        {% endif %}
+
+        {% if hosp.cas_legal %}
+        <div class="info-row">
+          <div class="info-lbl">Cas légal</div>
+          <div class="info-val" style="color:var(--color-danger);">
+            <i class="bi bi-exclamation-triangle-fill"></i> Oui
+            {% if hosp.signale_police %} — Police : {{ hosp.get_signale_police_display }}{% endif %}
+          </div>
+        </div>
+        {% endif %}
+
       </div>
     </div>
+
+    {# ── Chronomètres du dossier (comme .timing-section de patients/rendez_vous_form.html) ── #}
+    <div class="timing-section" id="dur-card"
+         data-statut="{{ hosp.statut }}"
+         data-heure-entree="{{ hosp.date_admission|date:'c' }}"
+         data-heure-sortie="{{ hosp.heure_sortie|date:'c' }}"
+         data-date-termine="{{ hosp.date_termine|date:'c' }}">
+      <div class="timing-card">
+        <div class="timing-label">Date d'entrée</div>
+        <div class="timing-value" style="font-size:16px;">{{ hosp.date_admission|date:"d/m/Y H:i:s" }}</div>
+      </div>
+      <div class="timing-card">
+        <div class="timing-label">Durée d'hospitalisation</div>
+        <div class="timing-value zero" id="dur-duree">—</div>
+      </div>
+      <div class="timing-card">
+        <div class="timing-label" id="dur-sortie-label">{% if hosp.heure_sortie %}Date de sortie{% elif hosp.date_termine %}Date de clôture{% else %}Date de sortie{% endif %}</div>
+        <div class="timing-value zero" id="dur-sortie">—</div>
+      </div>
+    </div>
+
+    {# ── Rangée onglets + historique, séparée par la bordure de la rangée du dessus ── #}
+    <div class="hist-wrapper"><div class="hist-main">
 
     {# ── Card avec onglets ── #}
     <div class="det-card">
       <nav class="tab-nav" id="tab-nav" role="tablist">
-        <button class="tab-btn active" data-tab="infos" role="tab" aria-selected="true">
-          <i class="bi bi-info-circle" style="font-size:13px;"></i>
-          Informations
-        </button>
-        <button class="tab-btn" data-tab="soins" role="tab" aria-selected="false">
+        <button class="tab-btn active" data-tab="soins" role="tab" aria-selected="true">
           <i class="bi bi-heart-pulse" style="font-size:13px;"></i>
           Soins &amp; services
           <span class="tab-bdg" id="bdg-soins">{{ services_a_facturer|length }}</span>
@@ -675,149 +764,10 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
           <i class="bi bi-file-medical" style="font-size:13px;"></i>
           Décharge
         </button>
-        {% if peut_modifier %}
-        <a href="{% url 'hospitalisation:edit' hosp.pk %}" class="abtn abtn-neutral"
-           style="margin-left:auto;align-self:center;font-size:12px;padding:4px 12px;white-space:nowrap;"
-           title="Modifier toutes les données">
-          <i class="bi bi-pencil-square"></i> Modifier
-        </a>
-        {% endif %}
       </nav>
 
-      {# ─────────────────────────── ONGLET : INFORMATIONS ─────────────────────────── #}
-      <div class="tab-pane active" id="tab-infos">
-        <div class="info-grid">
-
-          <div class="info-section"><i class="bi bi-person-fill"></i>Patient</div>
-
-          <div>
-            <div class="info-lbl">Nom complet</div>
-            <div class="info-val" style="font-weight:700;">{{ hosp.patient.nom|upper }} {{ hosp.patient.prenoms }}</div>
-          </div>
-          <div>
-            <div class="info-lbl">Date de naissance</div>
-            <div class="info-val {% if not hosp.patient.date_naissance %}empty{% endif %}">
-              {{ hosp.patient.date_naissance|date:"d/m/Y"|default:"—" }}
-            </div>
-          </div>
-          <div>
-            <div class="info-lbl">Sexe</div>
-            <div class="info-val {% if not hosp.patient.sexe %}empty{% endif %}">
-              {{ hosp.patient.sexe|default:"—" }}
-            </div>
-          </div>
-          <div>
-            <div class="info-lbl">Téléphone</div>
-            <div class="info-val {% if not hosp.patient.telephone %}empty{% endif %}">
-              {{ hosp.patient.telephone|default:"—" }}
-            </div>
-          </div>
-          {% if hosp.nom_parent_gardien %}
-          <div>
-            <div class="info-lbl">Parent / gardien</div>
-            <div class="info-val">{{ hosp.nom_parent_gardien }}{% if hosp.phone_parent_gardien %} — {{ hosp.phone_parent_gardien }}{% endif %}</div>
-          </div>
-          {% endif %}
-
-          <div class="info-section"><i class="bi bi-calendar3"></i>Admission</div>
-
-          <div>
-            <div class="info-lbl">Date d'admission</div>
-            <div class="info-val">{{ hosp.date_admission|date:"d/m/Y H:i" }}</div>
-          </div>
-          <div>
-            <div class="info-lbl">Maladie</div>
-            <div class="info-val {% if not hosp.maladie %}empty{% endif %}">{{ hosp.maladie|default:"—" }}</div>
-          </div>
-          <div class="full">
-            <div class="info-lbl">Motif d'admission</div>
-            <div class="info-val {% if not hosp.motif_admission %}empty{% endif %}">
-              {{ hosp.motif_admission|default:"—" }}
-            </div>
-          </div>
-          {% if hosp.mise_en_observation %}
-          <div class="full">
-            <div class="info-lbl">Mise en observation</div>
-            <div class="info-val">{{ hosp.mise_en_observation }}</div>
-          </div>
-          {% endif %}
-
-          <div class="info-section"><i class="bi bi-person-lines-fill"></i>Équipe soignante</div>
-
-          <div>
-            <div class="info-lbl">Médecin traitant</div>
-            <div class="info-val {% if not hosp.medecin_traitant %}empty{% endif %}">
-              {% if hosp.medecin_traitant %}Dr. {{ hosp.medecin_traitant.nom }} {{ hosp.medecin_traitant.prenoms }}{% else %}—{% endif %}
-            </div>
-          </div>
-          <div>
-            <div class="info-lbl">Médecin référent</div>
-            <div class="info-val {% if not hosp.medecin_referent %}empty{% endif %}">
-              {% if hosp.medecin_referent %}Dr. {{ hosp.medecin_referent.nom }} {{ hosp.medecin_referent.prenoms }}{% else %}—{% endif %}
-            </div>
-          </div>
-          <div>
-            <div class="info-lbl">Infirmière primaire</div>
-            <div class="info-val {% if not hosp.infirmiere_primaire %}empty{% endif %}">
-              {% if hosp.infirmiere_primaire %}{{ hosp.infirmiere_primaire.nom }} {{ hosp.infirmiere_primaire.prenoms }}{% else %}—{% endif %}
-            </div>
-          </div>
-
-          <div class="info-section"><i class="bi bi-door-closed"></i>Hébergement</div>
-
-          <div>
-            <div class="info-lbl">Chambre / Salle</div>
-            <div class="info-val {% if not hosp.chambre %}empty{% endif %}">
-              {% if hosp.chambre %}{{ hosp.chambre.nom }}{% if hosp.numero_lit %} — Lit {{ hosp.numero_lit }}{% endif %} — {{ hosp.chambre.get_type_chambre_display }}{% else %}—{% endif %}
-            </div>
-          </div>
-          {% if hosp.consultation %}
-          <div>
-            <div class="info-lbl">Consultation d'origine</div>
-            <div class="info-val">{{ hosp.consultation }}</div>
-          </div>
-          {% endif %}
-
-          {# Transfert vers un autre établissement #}
-          {% if resume.transfert %}
-          <div class="info-section"><i class="bi bi-arrow-right-circle"></i>Transfert</div>
-          <div>
-            <div class="info-lbl">Établissement de destination</div>
-            <div class="info-val {% if not hosp.etablissement_destination %}empty{% endif %}">
-              {{ hosp.etablissement_destination|default:"—" }}
-            </div>
-          </div>
-          <div class="full">
-            <div class="info-lbl">Motif du transfert</div>
-            <div class="info-val {% if not hosp.motif_reference %}empty{% endif %}">
-              {{ hosp.motif_reference|default:"—" }}
-            </div>
-          </div>
-          {% endif %}
-
-          {% if hosp.notes %}
-          <div class="full">
-            <div class="info-lbl">Notes</div>
-            <div class="info-val">{{ hosp.notes }}</div>
-          </div>
-          {% endif %}
-
-          {% if hosp.cas_legal %}
-          <div>
-            <div class="info-lbl">Cas légal</div>
-            <div class="info-val" style="color:var(--color-danger);">
-              <i class="bi bi-exclamation-triangle-fill"></i> Oui
-              {% if hosp.signale_police %} — Police : {{ hosp.get_signale_police_display }}{% endif %}
-            </div>
-          </div>
-          {% endif %}
-
-        </div>
-
-      </div>
-
       {# ─────────────────── ONGLET : SOINS & SERVICES À FACTURER ─────────────────── #}
-      <div class="tab-pane" id="tab-soins">
+      <div class="tab-pane active" id="tab-soins">
 
         <div id="saf-container">
           {% if services_a_facturer %}
@@ -879,11 +829,6 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
             <i class="bi bi-exclamation-circle" style="color:var(--color-warning);margin-right:4px;"></i>
             <span id="saf-nf-count">{{ saf_non_factures }}</span> service(s) non facturé(s)
           </span>
-          {% if actions.creer_facture.enabled %}
-          <a href="{{ url_facture }}" class="abtn abtn-success" style="font-size:12px;padding:5px 12px;">
-            <i class="bi bi-receipt"></i> Créer la facture
-          </a>
-          {% endif %}
         </div>
         {% endif %}
 
@@ -1055,6 +1000,12 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
       </div>
 
     </div>{# /det-card #}
+
+    </div>{# /hist-main #}
+    {% historique_sidebar hosp %}
+    </div>{# /hist-wrapper #}
+
+    </div>{# /det-block #}
   </div>{# /det-main #}
 
 
@@ -1064,9 +1015,6 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
 <div id="toast-area" aria-live="polite" aria-atomic="true"></div>
 
 </div><!-- /#page-wrap -->
-</div>
-{% historique_sidebar hosp %}
-</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -1085,7 +1033,7 @@ if (m) CSRF = m[1];
 var URL_CONFIRMER  = '{% url "hospitalisation:confirmer"  hosp.pk %}';
 var URL_DECHARGER  = '{% url "hospitalisation:decharger"  hosp.pk %}';
 var URL_TERMINER   = '{% url "hospitalisation:terminer"   hosp.pk %}';
-var URL_ANNULER    = '{% url "hospitalisation:annuler"    hosp.pk %}';
+var URL_EDIT       = '{% url "hospitalisation:edit"       hosp.pk %}';
 
 /* ══ Pipeline ══════════════════════════════════════════════════════════════════ */
 var PIPE_STEPS  = ['brouillon', 'confirme', 'hospitalise', 'decharge', 'termine'];
@@ -1139,28 +1087,10 @@ function updateBadge(statut) {
   el.innerHTML = '<i class="bi ' + c.icon + '"></i> ' + esc(c.label);
 }
 
-/* ══ Durée ══════════════════════════════════════════════════════════════════════ */
-function updateDuration(data) {
-  if (!data.heure_entree) return;
-  var card = document.getElementById('dur-card');
-  if (card) card.removeAttribute('hidden');
-
-  var el;
-  el = document.getElementById('dur-entree');
-  if (el) el.textContent = fmtDatetime(data.heure_entree);
-
-  el = document.getElementById('dur-sortie');
-  if (el && data.heure_sortie) {
-    el.textContent = fmtDatetime(data.heure_sortie);
-    var wrap = document.getElementById('dur-sortie-wrap');
-    if (wrap) wrap.style.display = '';
-  }
-
-  el = document.getElementById('dur-duree');
-  if (el && data.duree_observation != null) {
-    el.textContent = parseFloat(data.duree_observation).toFixed(1) + ' h';
-  }
-}
+/* ══ Durée (chronomètre en direct, comme patients/rendez_vous_form.html) ═══════ */
+var _durEntreeTs = 0;
+var _durSortieTs = 0;
+var _durIvId     = null;
 
 function fmtDatetime(iso) {
   if (!iso) return '—';
@@ -1170,6 +1100,95 @@ function fmtDatetime(iso) {
   return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear()
        + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
 }
+
+function fmtElapsed(sec) {
+  if (sec < 0) sec = 0;
+  var p = function (n) { return n < 10 ? '0' + n : '' + n; };
+  var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = Math.floor(sec % 60);
+  return p(h) + ':' + p(m) + ':' + p(s);
+}
+
+function stopDureeTimer() {
+  if (_durIvId) { clearInterval(_durIvId); _durIvId = null; }
+  var elD = document.getElementById('dur-duree');
+  var elS = document.getElementById('dur-sortie');
+  if (elD) elD.classList.remove('running');
+  if (elS) elS.classList.remove('running');
+}
+
+function fmtNow(d) {
+  var p = function (n) { return n < 10 ? '0' + n : '' + n; };
+  return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear()
+       + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+}
+
+function tickDuree() {
+  var now = new Date();
+  var elapsed = Math.floor(now.getTime() / 1000) - _durEntreeTs;
+  var elD = document.getElementById('dur-duree');
+  var elS = document.getElementById('dur-sortie');
+  if (elD) elD.textContent = fmtElapsed(elapsed);
+  if (elS) elS.textContent = fmtNow(now);
+}
+
+function startDureeTimer() {
+  if (!_durEntreeTs) return;
+  stopDureeTimer();
+  var elD = document.getElementById('dur-duree');
+  var elS = document.getElementById('dur-sortie');
+  if (elD) { elD.classList.remove('zero'); elD.classList.add('running'); }
+  if (elS) { elS.classList.remove('zero'); elS.classList.add('running'); }
+  tickDuree();
+  _durIvId = setInterval(tickDuree, 1000);
+}
+
+function renderFrozenDuree(heureSortieIso, dateTermineIso) {
+  stopDureeTimer();
+  var elD = document.getElementById('dur-duree');
+  var elS = document.getElementById('dur-sortie');
+  var elL = document.getElementById('dur-sortie-label');
+  if (_durEntreeTs && _durSortieTs) {
+    if (elD) { elD.textContent = fmtElapsed(_durSortieTs - _durEntreeTs); elD.classList.remove('zero'); }
+  }
+  if (heureSortieIso) {
+    if (elL) elL.textContent = 'Date de sortie';
+    if (elS) { elS.textContent = fmtDatetime(heureSortieIso); elS.classList.remove('zero'); }
+  } else if (dateTermineIso) {
+    if (elL) elL.textContent = 'Date de clôture';
+    if (elS) { elS.textContent = fmtDatetime(dateTermineIso); elS.classList.remove('zero'); }
+  }
+}
+
+function updateDuration(data) {
+  /* _durEntreeTs (date_admission) ne change jamais après création. Le
+     décompte s'arrête dès que le dossier a une date de fin connue :
+     heure_sortie (Décharger) OU date_termine (Clôturer sans passage par
+     Décharger — ex. dossier clos administrativement). */
+  var fin = data.heure_sortie || data.date_termine;
+  _durSortieTs = fin ? Math.floor(new Date(fin).getTime() / 1000) : 0;
+  if (_durEntreeTs && _durSortieTs) {
+    renderFrozenDuree(data.heure_sortie || null, data.date_termine || null);
+  } else if (_durEntreeTs) {
+    startDureeTimer();
+  }
+}
+
+function initDureeTimer() {
+  var card = document.getElementById('dur-card');
+  if (!card) return;
+  var entree  = card.dataset.heureEntree;
+  var sortie  = card.dataset.heureSortie;
+  var termine = card.dataset.dateTermine;
+  var fin = sortie || termine;
+  _durEntreeTs = entree ? Math.floor(new Date(entree).getTime() / 1000) : 0;
+  _durSortieTs = fin ? Math.floor(new Date(fin).getTime() / 1000) : 0;
+  if (_durEntreeTs && _durSortieTs) {
+    renderFrozenDuree(sortie || null, termine || null);
+  } else if (_durEntreeTs) {
+    startDureeTimer();
+  }
+}
+initDureeTimer();
 
 /* ══ Action bar — re-rendu JS depuis _etat_payload ════════════════════════════ */
 function renderActionBar(data) {
@@ -1207,42 +1226,50 @@ function renderActionBar(data) {
   if (A.creer_facture && A.creer_facture.visible) {
     var sfBadge = (data.saf_non_factures || 0) > 0 ? String(data.saf_non_factures) : '';
     if (A.creer_facture.enabled) {
-      html += '<a href="' + esc(data.url_facture || '') + '" class="abtn abtn-success">'
+      html += '<a href="' + esc(data.url_facture || '') + '" class="abtn abtn-primary">'
             + '<i class="bi bi-receipt"></i> Créer la facture'
             + (sfBadge ? '<span style="background:rgba(255,255,255,.28);border-radius:100px;padding:0 6px;font-size:10px;margin-left:4px;">' + sfBadge + '</span>' : '')
             + '</a>';
     } else {
-      html += '<button class="abtn abtn-success off" disabled title="' + esc(A.creer_facture.raison_blocage || '') + '">'
+      html += '<button class="abtn abtn-primary off" disabled title="' + esc(A.creer_facture.raison_blocage || '') + '">'
             + '<i class="bi bi-receipt"></i> Créer la facture</button>';
     }
   }
 
-  html += abtn('decharger', 'abtn-violet', 'bi-door-open', 'Décharger',
+  /* Ajouter un soin (cohérent avec le "peut_ajouter_soin" du template) */
+  if (data.peut_ajouter_soin) {
+    html += '<a href="' + esc(URL_EDIT) + '?tab=soins" class="abtn abtn-ghost">'
+          + '<i class="bi bi-plus-circle"></i> Ajouter un soin</a>';
+  }
+
+  /* Attribuer une chambre (cohérent avec le "peut_attribuer_chambre" du template) */
+  if (data.peut_attribuer_chambre) {
+    html += '<a href="' + esc(URL_EDIT) + '" class="abtn abtn-primary">'
+          + '<i class="bi bi-door-open"></i> Attribuer une chambre</a>';
+  }
+
+  html += abtn('decharger', 'abtn-primary', 'bi-door-open', 'Décharger',
                "doTransition('" + URL_DECHARGER + "')");
 
   if (A.terminer && A.terminer.visible) {
     html += '<div class="act-sep"></div>';
     if (A.terminer.enabled) {
-      html += '<button class="abtn abtn-success" onclick="doTransition(\'' + URL_TERMINER + '\')">'
+      html += '<button class="abtn abtn-dark" onclick="doTransition(\'' + URL_TERMINER + '\')">'
             + '<i class="bi bi-check-all"></i> Clôturer le dossier</button>';
     } else {
-      html += '<button class="abtn abtn-success off" disabled title="' + esc(A.terminer.raison_blocage || '') + '">'
+      html += '<button class="abtn abtn-dark off" disabled title="' + esc(A.terminer.raison_blocage || '') + '">'
             + '<i class="bi bi-check-all"></i> Clôturer le dossier</button>';
-    }
-  }
-
-  if (A.annuler && A.annuler.visible) {
-    html += '<div style="margin-left:auto;"></div>';
-    if (A.annuler.enabled) {
-      html += '<button class="abtn abtn-danger" onclick="openAnnulModal()">'
-            + '<i class="bi bi-x-circle"></i> Annuler</button>';
-    } else {
-      html += '<button class="abtn abtn-danger off" disabled title="' + esc(A.annuler.raison_blocage || '') + '">'
-            + '<i class="bi bi-x-circle"></i> Annuler</button>';
     }
   }
 
   bar.innerHTML = html;
+}
+
+/* ══ Bouton Modifier (rangée pipeline) — re-rendu JS depuis _etat_payload ══════ */
+function updateModifierBtn(data) {
+  var link = document.getElementById('btn-modifier-link');
+  if (!link) return;
+  link.style.display = data.peut_modifier ? '' : 'none';
 }
 
 /* ══ FETCH TRANSITION ══════════════════════════════════════════════════════════ */
@@ -1269,6 +1296,7 @@ function doTransition(url, extra) {
       updateBadge(data.statut);
       updatePipeline(data.statut);
       renderActionBar(data);
+      updateModifierBtn(data);
       updateDuration(data);
       updateFacBadge(data);
       showToast('Action effectuée avec succès.', 'success');
@@ -1340,86 +1368,7 @@ function esc(s) {
 /* ══ Export global — requis par les attributs onclick du HTML ═══════════════════ */
 window.doTransition  = doTransition;
 window.switchTab     = switchTab;
-/* URLs exposées pour les scripts hors IIFE (ex: confirmAnnul) */
-window.URL_CONFIRMER = URL_CONFIRMER;
-window.URL_DECHARGER = URL_DECHARGER;
-window.URL_TERMINER  = URL_TERMINER;
-window.URL_ANNULER   = URL_ANNULER;
 
 })();
-</script>
-
-{# ── Modale annulation avec motif obligatoire ── #}
-<div id="modal-annul" style="
-  display:none;position:fixed;inset:0;z-index:9999;
-  background:rgba(0,0,0,.45);
-  align-items:center;justify-content:center;
-">
-  <div style="
-    background:var(--surface,#fff);border-radius:10px;width:min(480px,92vw);
-    padding:28px 28px 22px;box-shadow:0 8px 32px rgba(0,0,0,.22);
-  ">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
-      <i class="bi bi-exclamation-triangle-fill" style="color:#dc3545;font-size:20px;flex-shrink:0;"></i>
-      <strong style="font-size:15px;">Confirmer l'annulation</strong>
-    </div>
-    <p style="font-size:13px;color:var(--text-muted,#6b7280);margin-bottom:14px;line-height:1.55;">
-      Cette action est irréversible. Les factures impayées seront annulées
-      et la chambre (si attribuée) sera libérée.
-    </p>
-    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px;">
-      Motif d'annulation <span style="color:#dc3545;">*</span>
-    </label>
-    <textarea id="motif-annul-input" rows="3" placeholder="Saisir le motif…"
-      style="width:100%;box-sizing:border-box;border:1.5px solid var(--border,#d1d5db);
-             border-radius:6px;padding:8px 10px;font-size:13px;font-family:inherit;
-             resize:vertical;background:var(--surface,#fff);color:var(--text,#111);"></textarea>
-    <div id="motif-annul-err" style="color:#dc3545;font-size:12px;margin-top:4px;display:none;">
-      Veuillez saisir un motif.
-    </div>
-    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px;">
-      <button type="button" onclick="closeAnnulModal()"
-        style="padding:7px 18px;border-radius:6px;border:1px solid var(--border,#d1d5db);
-               background:var(--surface,#fff);cursor:pointer;font-size:13px;">
-        Annuler
-      </button>
-      <button type="button" onclick="confirmAnnul()"
-        style="padding:7px 18px;border-radius:6px;border:none;
-               background:#dc3545;color:#fff;cursor:pointer;font-size:13px;font-weight:600;">
-        Confirmer l'annulation
-      </button>
-    </div>
-  </div>
-</div>
-<script>
-function openAnnulModal() {
-  var m = document.getElementById('modal-annul');
-  var ta = document.getElementById('motif-annul-input');
-  var err = document.getElementById('motif-annul-err');
-  if (ta) ta.value = '';
-  if (err) err.style.display = 'none';
-  if (m) { m.style.display = 'flex'; ta && ta.focus(); }
-}
-function closeAnnulModal() {
-  var m = document.getElementById('modal-annul');
-  if (m) m.style.display = 'none';
-}
-function confirmAnnul() {
-  var motif = (document.getElementById('motif-annul-input') || {}).value || '';
-  var err   = document.getElementById('motif-annul-err');
-  if (!motif.trim()) {
-    if (err) err.style.display = '';
-    return;
-  }
-  if (!window.doTransition || !window.URL_ANNULER) {
-    alert("Erreur : fonctions d'annulation non disponibles. Rechargez la page.");
-    return;
-  }
-  closeAnnulModal();
-  window.doTransition(window.URL_ANNULER, { motif_annulation: motif.trim() });
-}
-document.getElementById('modal-annul').addEventListener('click', function(e) {
-  if (e.target === this) closeAnnulModal();
-});
 </script>
 {% endblock %}

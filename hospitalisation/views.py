@@ -1218,6 +1218,43 @@ def hospitalisation_edit(request, pk):
 # Chaque vue est POST-only. Répond en JSON si X-Requested-With: XMLHttpRequest,
 # sinon redirect classique (dégradé gracieux).
 
+def _boutons_extra(hosp, user):
+    """
+    Calcule les boutons liens (hors get_actions_disponibles) : Modifier,
+    Attribuer une chambre, Ajouter un soin. Utilisé au rendu initial de la
+    page ET dans _etat_payload, pour que le re-rendu JS après une transition
+    reste cohérent avec le template.
+    """
+    from facturation.models import Facture
+
+    is_admin = user.is_superuser
+    facture_payee = Facture.objects.filter(hospitalisation=hosp, statut='payee').exists()
+
+    # Bouton Modifier : utilisateurs change_hospitalisation uniquement (confirme + facture payée)
+    peut_modifier = is_admin or (
+        user.has_perm('hospitalisation.change_hospitalisation')
+        and hosp.statut == 'confirme'
+        and facture_payee
+    )
+    # Bouton Attribuer une chambre : utilisateurs can_installer_patient ou admin (confirme + facture payée)
+    peut_attribuer_chambre = (
+        user.has_perm('hospitalisation.can_installer_patient')
+        and hosp.statut == 'confirme'
+        and facture_payee
+    )
+    # Bouton Ajouter un soin : can_ajouter_soin ou admin, mais seulement statut hospitalise
+    # (jamais après décharge/clôture/annulation, même pour l'admin)
+    peut_ajouter_soin = (
+        hosp.statut == 'hospitalise'
+        and (is_admin or user.has_perm('hospitalisation.can_ajouter_soin'))
+    )
+    return {
+        'peut_modifier':          peut_modifier,
+        'peut_attribuer_chambre': peut_attribuer_chambre,
+        'peut_ajouter_soin':      peut_ajouter_soin,
+    }
+
+
 def _etat_payload(hosp, user):
     """Construit le dict d'état courant renvoyé par /etat/ et les transitions."""
     from facturation.models import Facture
@@ -1244,9 +1281,11 @@ def _etat_payload(hosp, user):
         'url_facture':        reverse('hospitalisation:creer_facture', kwargs={'pk': hosp.pk}),
         'heure_entree':       hosp.heure_entree.isoformat() if hosp.heure_entree else None,
         'heure_sortie':       hosp.heure_sortie.isoformat() if hosp.heure_sortie else None,
+        'date_termine':       hosp.date_termine.isoformat() if hosp.date_termine else None,
         'duree_observation':  hosp.duree_observation,
         'factures':           factures,
         'nb_factures':        len(factures),
+        **_boutons_extra(hosp, user),
     }
 
 
@@ -1413,24 +1452,10 @@ def hospitalisation_detail(request, pk):
 
     lecture_seule_totale = (not is_admin and hosp.statut in ('termine', 'annule'))
     facture_blocage = _get_facture_blocage(hosp)
-    facture_payee = Facture.objects.filter(hospitalisation=hosp, statut='payee').exists()
-    # Bouton Modifier : utilisateurs change_hospitalisation uniquement (confirme + facture payée)
-    peut_modifier = is_admin or (
-        request.user.has_perm('hospitalisation.change_hospitalisation')
-        and hosp.statut == 'confirme'
-        and facture_payee
-    )
-    # Bouton Attribuer une chambre : utilisateurs can_installer_patient ou admin (confirme + facture payée)
-    peut_attribuer_chambre = (
-        request.user.has_perm('hospitalisation.can_installer_patient')
-        and hosp.statut == 'confirme'
-        and facture_payee
-    )
-    # Bouton Ajouter un soin : can_ajouter_soin ou admin, statut hospitalise
-    peut_ajouter_soin = is_admin or (
-        request.user.has_perm('hospitalisation.can_ajouter_soin')
-        and hosp.statut == 'hospitalise'
-    )
+    boutons_extra = _boutons_extra(hosp, request.user)
+    peut_modifier = boutons_extra['peut_modifier']
+    peut_attribuer_chambre = boutons_extra['peut_attribuer_chambre']
+    peut_ajouter_soin = boutons_extra['peut_ajouter_soin']
 
     factures_list = list(Facture.objects.filter(hospitalisation=hosp).order_by('-date_emission'))
 
