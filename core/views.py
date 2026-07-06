@@ -241,10 +241,11 @@ def medecins_list(request):
 
 @login_required(login_url='login')
 def medecin_create(request):
-    from medecins.models import Medecin, Specialite
+    from medecins.models import Medecin, Specialite, Service
     from django.contrib.auth.models import User
 
     specialites = Specialite.objects.order_by('nom')
+    services = Service.objects.filter(actif=True).order_by('nom')
     users_disponibles = User.objects.filter(medecin__isnull=True).order_by('last_name', 'first_name')
     errors = {}
 
@@ -252,6 +253,7 @@ def medecin_create(request):
         nom = request.POST.get('nom', '').strip()
         prenoms = request.POST.get('prenoms', '').strip()
         specialite_pk = request.POST.get('specialite', '')
+        service_pk = request.POST.get('service', '')
         telephone = request.POST.get('telephone', '').strip()
         email = request.POST.get('email', '').strip()
         taux_honoraire = request.POST.get('taux_honoraire', '0').strip() or '0'
@@ -303,6 +305,8 @@ def medecin_create(request):
                 except Specialite.DoesNotExist:
                     pass
 
+            med.service = Service.objects.filter(pk=service_pk).first() if service_pk else None
+
             if user_pk:
                 try:
                     med.user = User.objects.get(pk=user_pk)
@@ -323,6 +327,7 @@ def medecin_create(request):
     return render(request, 'medecins/form.html', {
         'mode': 'create',
         'specialites': specialites,
+        'services': services,
         'users_disponibles': users_disponibles,
         'errors': errors,
         'post': post_data,
@@ -331,11 +336,12 @@ def medecin_create(request):
 
 @login_required(login_url='login')
 def medecin_edit(request, pk):
-    from medecins.models import Medecin, Specialite
+    from medecins.models import Medecin, Specialite, Service
     from django.contrib.auth.models import User
 
     med = get_object_or_404(Medecin, pk=pk)
     specialites = Specialite.objects.order_by('nom')
+    services = Service.objects.filter(actif=True).order_by('nom')
     users_disponibles = User.objects.filter(
         Q(medecin__isnull=True) | Q(medecin=med)
     ).order_by('last_name', 'first_name')
@@ -345,6 +351,7 @@ def medecin_edit(request, pk):
         nom = request.POST.get('nom', '').strip()
         prenoms = request.POST.get('prenoms', '').strip()
         specialite_pk = request.POST.get('specialite', '')
+        service_pk = request.POST.get('service', '')
         telephone = request.POST.get('telephone', '').strip()
         email = request.POST.get('email', '').strip()
         taux_honoraire = request.POST.get('taux_honoraire', '0').strip() or '0'
@@ -370,6 +377,7 @@ def medecin_edit(request, pk):
                 med.taux_honoraire = 0
 
             med.specialite = Specialite.objects.filter(pk=specialite_pk).first() if specialite_pk else None
+            med.service = Service.objects.filter(pk=service_pk).first() if service_pk else None
 
             if user_pk:
                 try:
@@ -395,6 +403,7 @@ def medecin_edit(request, pk):
         'mode': 'edit',
         'med': med,
         'specialites': specialites,
+        'services': services,
         'users_disponibles': users_disponibles,
         'errors': errors,
     })

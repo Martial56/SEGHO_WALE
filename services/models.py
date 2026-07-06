@@ -97,7 +97,16 @@ class CategorieArticle(models.Model):
     compte_revenus = models.CharField(max_length=200, blank=True, verbose_name="Compte de revenus")
     compte_charges = models.CharField(max_length=200, blank=True, verbose_name="Compte de charges")
 
+    # Lien avec le service médical (utilisé pour filtrer le "Type de consultation"
+    # du formulaire de rendez-vous selon le "Département" choisi)
+    service_associe = models.ForeignKey(
+        'medecins.Service', on_delete=models.SET_NULL, null=True, blank=True,
+        verbose_name="Service associé"
+    )
+
     def save(self, *args, **kwargs):
+        if self.code:
+            self.code = self.code.strip().upper()
         if not self.code:
             base = ''.join(c for c in self.nom.upper() if c.isalpha())[:6]
             candidate = base[:4]

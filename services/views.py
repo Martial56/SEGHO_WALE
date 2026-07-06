@@ -118,6 +118,7 @@ def service_form(request, pk=None):
         article.favori = 'favori' in data
         article.peut_etre_vendu = 'peut_etre_vendu' in data
         article.peut_etre_achete = 'peut_etre_achete' in data
+        article.actif = 'actif' in data
 
         # Onglet 1 — Détails médicament
         article.forme = data.get('forme', '')
@@ -183,9 +184,6 @@ def service_form(request, pk=None):
         article.compte_charges = data.get('compte_charges', '')
         article.compte_ecart_prix = data.get('compte_ecart_prix', '')
 
-        if not is_new:
-            article.actif = 'actif' in data
-
         # Photo
         if 'photo' in request.FILES:
             article.photo = request.FILES['photo']
@@ -248,38 +246,6 @@ def regles_prix(request, pk):
         'article': article,
         'regles': regles,
     })
-
-
-# ── Vues AJAX pour les lignes dynamiques ─────────────────────
-
-@login_required
-@require_POST
-def service_bulk_delete(request):
-    ids = request.POST.getlist('ids[]')
-    if ids:
-        count, _ = Articleservice.objects.filter(pk__in=ids).delete()
-        return JsonResponse({'ok': True, 'count': count})
-    return JsonResponse({'ok': False, 'error': 'Aucun élément sélectionné'}, status=400)
-
-
-@login_required
-@require_POST
-def categorie_bulk_delete(request):
-    ids = request.POST.getlist('ids[]')
-    if ids:
-        count, _ = CategorieArticle.objects.filter(pk__in=ids).delete()
-        return JsonResponse({'ok': True, 'count': count})
-    return JsonResponse({'ok': False}, status=400)
-
-
-@login_required
-@require_POST
-def unite_bulk_delete(request):
-    ids = request.POST.getlist('ids[]')
-    if ids:
-        count, _ = UniteMesure.objects.filter(pk__in=ids).delete()
-        return JsonResponse({'ok': True, 'count': count})
-    return JsonResponse({'ok': False}, status=400)
 
 
 # ── Catégories de service ──────────────────────────────────────────────────
@@ -514,16 +480,6 @@ def categorie_unite_delete(request, pk):
         obj.delete()
         messages.success(request, f'Catégorie « {nom} » supprimée.')
     return redirect('services:categories_unites')
-
-
-@login_required
-@require_POST
-def categorie_unite_bulk_delete(request):
-    ids = request.POST.getlist('ids[]')
-    if ids:
-        count, _ = CategorieUniteMesure.objects.filter(pk__in=ids).delete()
-        return JsonResponse({'ok': True, 'count': count})
-    return JsonResponse({'ok': False}, status=400)
 
 
 @login_required
