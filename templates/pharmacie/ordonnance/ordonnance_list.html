@@ -270,8 +270,8 @@
           {% endwith %}
         </td>
         <td>
-          {% if ord.medecin %}Dr. {{ ord.medecin.nom }}
-          {% elif ord.consultation.medecin %}Dr. {{ ord.consultation.medecin.nom }}
+          {% if ord.medecin %}{{ ord.medecin }}
+          {% elif ord.consultation and ord.consultation.medecin %}{{ ord.consultation.medecin }}
           {% else %}<span style="color:rgba(0,0,0,0.3);">—</span>{% endif %}
         </td>
         <td>
@@ -279,7 +279,7 @@
           {% if lignes %}
             <div class="meds-list">
               {% for l in lignes|slice:":3" %}
-                <span>{{ l.medicament_libre|default:l.medicament|truncatechars:25 }}</span>
+                <span>{{ l.medicament_libre|default:l.produit|default:l.medicament|truncatechars:25 }}</span>
               {% endfor %}
               {% if lignes|length > 3 %}
                 <span class="meds-more">+{{ lignes|length|add:"-3" }} autres</span>

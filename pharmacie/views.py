@@ -222,7 +222,11 @@ def pharmacie_dispenser(request, pharmacie, pk):
         produit    = None
         stock_item = None
         nom_med    = ''
-        if ligne.medicament:
+        # Priorité 1 : FK direct vers stock.Produit (cas le plus courant)
+        if ligne.produit_id:
+            produit = ligne.produit
+            nom_med = ligne.produit.nom
+        elif ligne.medicament:
             nom_med = ligne.medicament.designation
             produit = Produit.objects.filter(
                 nom__icontains=nom_med[:20], type='medicament', actif=True
@@ -302,17 +306,42 @@ def pharmacie_dispenser(request, pharmacie, pk):
             )
             if item['stock_item'] and qte > 0:
                 sp    = item['stock_item']
-                avant = float(sp.quantite)
-                apres = max(0, avant - qte)
-                MouvementPharmacie.objects.create(
-                    pharmacie=pharmacie, produit=sp.produit,
-                    type='dispensation', quantite=qte,
-                    stock_avant=avant, stock_apres=apres,
-                    reference=ordonnance.numero,
-                    cree_par=request.user,
-                )
-                sp.quantite = apres
-                sp.save(update_fields=['quantite'])
+
+                # Vérifier si le stock a déjà été réservé au moment
+                # de la création de l'ordonnance (signal LigneOrdonnance).
+                pre_ref = f'ORD:{ordonnance.numero}'
+                deja_reserve = MouvementPharmacie.objects.filter(
+                    produit=sp.produit,
+                    type='dispensation',
+                    reference=pre_ref,
+                ).exists()
+
+                if deja_reserve:
+                    # Stock déjà réservé : on enregistre uniquement la
+                    # confirmation de dispensation sans re-déduire.
+                    avant = float(sp.quantite)
+                    MouvementPharmacie.objects.filter(
+                        produit=sp.produit,
+                        type='dispensation',
+                        reference=pre_ref,
+                    ).update(
+                        reference=ordonnance.numero,
+                        notes='Dispensation confirmée (réservation ordonnance)',
+                        cree_par=request.user,
+                    )
+                else:
+                    # Pas de pré-réservation : déduction normale.
+                    avant = float(sp.quantite)
+                    apres = max(0, avant - qte)
+                    MouvementPharmacie.objects.create(
+                        pharmacie=pharmacie, produit=sp.produit,
+                        type='dispensation', quantite=qte,
+                        stock_avant=avant, stock_apres=apres,
+                        reference=ordonnance.numero,
+                        cree_par=request.user,
+                    )
+                    sp.quantite = apres
+                    sp.save(update_fields=['quantite'])
 
         dispensation.statut = statut_global
         dispensation.save(update_fields=['statut'])

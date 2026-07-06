@@ -3,6 +3,25 @@
 from django.db import migrations, models
 
 
+def clean_reference_interne(apps, schema_editor):
+    """Convert blank/empty reference_interne to NULL and deduplicate non-null values."""
+    ArticleService = apps.get_model('services', 'ArticleService')
+
+    # Step 1: convert blank strings to NULL
+    ArticleService.objects.filter(reference_interne='').update(reference_interne=None)
+
+    # Step 2: deduplicate non-null values by appending a suffix
+    seen = {}
+    for obj in ArticleService.objects.exclude(reference_interne=None).order_by('id'):
+        ref = obj.reference_interne
+        if ref in seen:
+            seen[ref] += 1
+            obj.reference_interne = f"{ref}_{seen[ref]}"
+            obj.save(update_fields=['reference_interne'])
+        else:
+            seen[ref] = 1
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -10,6 +29,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.RunPython(clean_reference_interne, migrations.RunPython.noop),
         migrations.AlterField(
             model_name='articleservice',
             name='reference_interne',
