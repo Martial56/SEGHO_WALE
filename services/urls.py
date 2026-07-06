@@ -9,7 +9,6 @@ urlpatterns = [
     path('<int:pk>/', views.service_detail, name='detail'),
     path('<int:pk>/modifier/', views.service_form, name='edit'),
     path('<int:pk>/regles-prix/', views.regles_prix, name='regles_prix'),
-    path('supprimer-selection/', views.service_bulk_delete, name='service_bulk_delete'),
 
     # Catégories de service
     path('categories/', views.categories_list, name='categories'),
@@ -17,7 +16,6 @@ urlpatterns = [
     path('categories/<int:pk>/', views.categorie_detail, name='categorie_detail'),
     path('categories/<int:pk>/modifier/', views.categorie_edit, name='categorie_edit'),
     path('categories/<int:pk>/supprimer/', views.categorie_delete, name='categorie_delete'),
-    path('categories/supprimer-selection/', views.categorie_bulk_delete, name='categorie_bulk_delete'),
 
     # Unités de mesure
     path('unites/', views.unites_list, name='unites'),
@@ -25,7 +23,6 @@ urlpatterns = [
     path('unites/<int:pk>/', views.unite_detail, name='unite_detail'),
     path('unites/<int:pk>/modifier/', views.unite_edit, name='unite_edit'),
     path('unites/<int:pk>/supprimer/', views.unite_delete, name='unite_delete'),
-    path('unites/supprimer-selection/', views.unite_bulk_delete, name='unite_bulk_delete'),
 
     # Catégories d'unités de mesure
     path('unites/categories/', views.categories_unites_list, name='categories_unites'),
@@ -33,7 +30,6 @@ urlpatterns = [
     path('unites/categories/<int:pk>/', views.categorie_unite_detail, name='categorie_unite_detail'),
     path('unites/categories/<int:pk>/modifier/', views.categorie_unite_edit, name='categorie_unite_edit'),
     path('unites/categories/<int:pk>/supprimer/', views.categorie_unite_delete, name='categorie_unite_delete'),
-    path('unites/categories/supprimer-selection/', views.categorie_unite_bulk_delete, name='categorie_unite_bulk_delete'),
 
     path('ajax/fournisseur-ligne/', views.ajax_add_fournisseur, name='ajax_fournisseur'),
     path('ajax/conditionn-ligne/', views.ajax_add_conditionnement, name='ajax_conditionnement'),
