@@ -575,12 +575,19 @@ def ajax_delete_ligne(request, model, pk):
 # ── Helpers partagés ────────────────────────────────────────────────────────
 
 def _csv_dl(filename, headers, rows):
-    resp = HttpResponse(content_type='text/csv; charset=utf-8-sig')
-    resp['Content-Disposition'] = f'attachment; filename="{filename}.csv"'
-    w = csv.writer(resp)
+    # Construit le CSV en mémoire (StringIO) puis encode une seule fois avec un
+    # unique BOM en tête. Écrire directement sur HttpResponse (charset=utf-8-sig)
+    # fait ré-encoder chaque writerow() séparément, ce qui injecte un BOM devant
+    # CHAQUE ligne — corrompant la première colonne de chaque ligne de données
+    # (ex. "﻿CARD" au lieu de "CARD") et cassant la déduplication à l'import.
+    buf = io.StringIO()
+    w = csv.writer(buf)
     w.writerow(headers)
     for row in rows:
         w.writerow(['' if v is None else v for v in row])
+    content = '﻿' + buf.getvalue()
+    resp = HttpResponse(content.encode('utf-8'), content_type='text/csv; charset=utf-8')
+    resp['Content-Disposition'] = f'attachment; filename="{filename}.csv"'
     return resp
 
 
@@ -650,13 +657,28 @@ def _parse_upload(upload):
 
 
 def _s(v):
-    return str(v).strip() if v is not None else ''
+    if v is None:
+        return ''
+    return str(v).replace('﻿', '').strip()
 
 
 def _b(v):
     if isinstance(v, bool):
         return v
     return str(v).strip().lower() in ('1', 'true', 'oui', 'yes')
+
+
+def _fk_warning(parts):
+    """
+    parts : liste de (label, set_de_codes_manquants). Construit un suffixe de
+    message signalant les références (catégorie, unité, département…) non
+    trouvées lors d'un import — utile quand l'ordre d'import ne respecte pas
+    les dépendances (ex. importer les prestations avant les catégories).
+    """
+    bits = [f"{label} introuvable(s) : {', '.join(sorted(codes))}" for label, codes in parts if codes]
+    if not bits:
+        return ''
+    return ' ⚠ ' + ' — '.join(bits) + " Importez-les d'abord, puis réimportez ce fichier avec « Mettre à jour »."
 
 
 _TYPE_ART_MAP = {
@@ -789,6 +811,8 @@ def import_articles(request):
 
     do_update = 'update' in request.POST
     created = updated = skipped = errors = 0
+    cat_manquantes = set()
+    um_manquantes = set()
 
     for item in data:
         try:
@@ -798,17 +822,20 @@ def import_articles(request):
                 errors += 1
                 continue
 
-            cat = CategorieArticle.objects.filter(
-                code=_s(item.get('categorie', ''))
-            ).first() if item.get('categorie') else None
+            cat_code = _s(item.get('categorie', ''))
+            cat = CategorieArticle.objects.filter(code=cat_code).first() if cat_code else None
+            if cat_code and not cat:
+                cat_manquantes.add(cat_code)
 
-            um = UniteMesure.objects.filter(
-                code=_s(item.get('unite_mesure', ''))
-            ).first() if item.get('unite_mesure') else None
+            um_code = _s(item.get('unite_mesure', ''))
+            um = UniteMesure.objects.filter(code=um_code).first() if um_code else None
+            if um_code and not um:
+                um_manquantes.add(um_code)
 
-            ua = UniteMesure.objects.filter(
-                code=_s(item.get('unite_achat', ''))
-            ).first() if item.get('unite_achat') else None
+            ua_code = _s(item.get('unite_achat', ''))
+            ua = UniteMesure.objects.filter(code=ua_code).first() if ua_code else None
+            if ua_code and not ua:
+                um_manquantes.add(ua_code)
 
             defaults = {
                 'nom': nom,
@@ -842,8 +869,15 @@ def import_articles(request):
             }
 
             if ref:
-                obj, was_created = Articleservice.objects.get_or_create(
-                    reference_interne=ref, defaults=defaults)
+                # Recherche insensible à la casse : ref est normalisée en
+                # majuscules, mais des enregistrements existants peuvent avoir
+                # une casse différente (saisie manuelle) — un get_or_create
+                # strict sur reference_interne=ref créerait un doublon au lieu
+                # de mettre à jour l'enregistrement existant.
+                obj = Articleservice.objects.filter(reference_interne__iexact=ref).first()
+                was_created = obj is None
+                if was_created:
+                    obj = Articleservice.objects.create(reference_interne=ref, **defaults)
             else:
                 obj, was_created = Articleservice.objects.get_or_create(
                     nom=nom, defaults=defaults)
@@ -860,8 +894,10 @@ def import_articles(request):
         except Exception:
             errors += 1
 
-    if errors:
-        messages.warning(request, f'{created} créé(s), {updated} mis à jour, {skipped} ignoré(s), {errors} erreur(s).')
+    fk_msg = _fk_warning([('Catégorie(s)', cat_manquantes), ('Unité(s) de mesure', um_manquantes)])
+    if errors or fk_msg:
+        messages.warning(request, f'{created} créé(s), {updated} mis à jour, {skipped} ignoré(s)'
+                          + (f', {errors} erreur(s)' if errors else '') + '.' + fk_msg)
     else:
         messages.success(request, f'{created} prestation(s) importée(s), {updated} mise(s) à jour, {skipped} ignorée(s).')
     return redirect('services:list')
@@ -922,6 +958,7 @@ def import_categories(request):
             errors += 1
 
     # Passe 2 — résolution des parents
+    parent_manquants = set()
     for item in data:
         raw_parent = item.get('parent') or item.get('parent_id')
         if not raw_parent:
@@ -935,11 +972,15 @@ def import_categories(request):
                 if enfant and parent and enfant.parent_id != parent.pk:
                     enfant.parent = parent
                     enfant.save()
+                elif enfant and not parent:
+                    parent_manquants.add(parent_code)
         except Exception:
             pass
 
-    if errors:
-        messages.warning(request, f'{created} créée(s), {updated} mise(s) à jour, {skipped} ignorée(s), {errors} erreur(s).')
+    fk_msg = _fk_warning([('Catégorie(s) parente(s)', parent_manquants)])
+    if errors or fk_msg:
+        messages.warning(request, f'{created} créée(s), {updated} mise(s) à jour, {skipped} ignorée(s)'
+                          + (f', {errors} erreur(s)' if errors else '') + '.' + fk_msg)
     else:
         messages.success(request, f'{created} catégorie(s) importée(s), {updated} mise(s) à jour, {skipped} ignorée(s).')
     return redirect('services:categories')

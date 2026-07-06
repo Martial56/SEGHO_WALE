@@ -2061,6 +2061,72 @@ def medecins_specialite_bulk_delete(request):
     return JsonResponse({'ok': True})
 
 
+_SPEC_HDR = ['code', 'nom', 'description']
+
+
+def _spec_row(s):
+    return [s.code, s.nom, s.description]
+
+
+@login_required(login_url='login')
+def medecins_export_specialites(request):
+    from medecins.models import Specialite
+    from services.views import _export_file
+    fmt = request.GET.get('format', 'json')
+    qs = Specialite.objects.order_by('nom')
+    rows = [_spec_row(s) for s in qs]
+    return _export_file(fmt, 'specialites', _SPEC_HDR, rows,
+                        [dict(zip(_SPEC_HDR, r)) for r in rows])
+
+
+@login_required(login_url='login')
+@require_POST
+def medecins_import_specialites(request):
+    from medecins.models import Specialite
+    from services.views import _parse_upload, _s
+
+    upload = request.FILES.get('fichier')
+    if not upload:
+        messages.error(request, 'Aucun fichier sélectionné.')
+        return redirect('medecins_specialites')
+
+    data, err = _parse_upload(upload)
+    if err:
+        messages.error(request, err)
+        return redirect('medecins_specialites')
+
+    do_update = 'update' in request.POST
+    created = updated = skipped = errors = 0
+    for item in data:
+        try:
+            code = _s(item.get('code', ''))
+            if not code:
+                errors += 1
+                continue
+            defaults = {
+                'nom': _s(item.get('nom', code)),
+                'description': _s(item.get('description', '')),
+            }
+            obj, was_created = Specialite.objects.get_or_create(code=code, defaults=defaults)
+            if was_created:
+                created += 1
+            elif do_update:
+                for k, v in defaults.items():
+                    setattr(obj, k, v)
+                obj.save()
+                updated += 1
+            else:
+                skipped += 1
+        except Exception:
+            errors += 1
+
+    if errors:
+        messages.warning(request, f'{created} créée(s), {updated} mise(s) à jour, {skipped} ignorée(s), {errors} erreur(s).')
+    else:
+        messages.success(request, f'{created} spécialité(s) importée(s), {updated} mise(s) à jour, {skipped} ignorée(s).')
+    return redirect('medecins_specialites')
+
+
 # ══════════════════════════════════════════════
 #  MÉDECINS — Configuration : Départements
 # ══════════════════════════════════════════════
@@ -2151,6 +2217,73 @@ def medecins_departement_bulk_delete(request):
     if ids:
         Departement.objects.filter(pk__in=ids).delete()
     return JsonResponse({'ok': True})
+
+
+_DEPT_HDR = ['code', 'nom', 'description', 'actif']
+
+
+def _dept_row(d):
+    return [d.code, d.nom, d.description, int(d.actif)]
+
+
+@login_required(login_url='login')
+def medecins_export_departements(request):
+    from medecins.models import Departement
+    from services.views import _export_file
+    fmt = request.GET.get('format', 'json')
+    qs = Departement.objects.order_by('nom')
+    rows = [_dept_row(d) for d in qs]
+    return _export_file(fmt, 'departements', _DEPT_HDR, rows,
+                        [dict(zip(_DEPT_HDR, r)) for r in rows])
+
+
+@login_required(login_url='login')
+@require_POST
+def medecins_import_departements(request):
+    from medecins.models import Departement
+    from services.views import _parse_upload, _s, _b
+
+    upload = request.FILES.get('fichier')
+    if not upload:
+        messages.error(request, 'Aucun fichier sélectionné.')
+        return redirect('medecins_departements')
+
+    data, err = _parse_upload(upload)
+    if err:
+        messages.error(request, err)
+        return redirect('medecins_departements')
+
+    do_update = 'update' in request.POST
+    created = updated = skipped = errors = 0
+    for item in data:
+        try:
+            code = _s(item.get('code', ''))
+            if not code:
+                errors += 1
+                continue
+            defaults = {
+                'nom': _s(item.get('nom', code)),
+                'description': _s(item.get('description', '')),
+                'actif': _b(item.get('actif', True)),
+            }
+            obj, was_created = Departement.objects.get_or_create(code=code, defaults=defaults)
+            if was_created:
+                created += 1
+            elif do_update:
+                for k, v in defaults.items():
+                    setattr(obj, k, v)
+                obj.save()
+                updated += 1
+            else:
+                skipped += 1
+        except Exception:
+            errors += 1
+
+    if errors:
+        messages.warning(request, f'{created} créé(s), {updated} mis à jour, {skipped} ignoré(s), {errors} erreur(s).')
+    else:
+        messages.success(request, f'{created} département(s) importé(s), {updated} mis à jour, {skipped} ignoré(s).')
+    return redirect('medecins_departements')
 
 
 # ══════════════════════════════════════════════
@@ -2253,3 +2386,91 @@ def medecins_service_bulk_delete(request):
     if ids:
         Service.objects.filter(pk__in=ids).delete()
     return JsonResponse({'ok': True})
+
+
+_SVC_HDR = ['code', 'nom', 'description', 'departement', 'chef_service', 'actif']
+
+
+def _svc_row(s):
+    return [
+        s.code, s.nom, s.description,
+        s.departement.code if s.departement else '',
+        s.chef_service.matricule if s.chef_service else '',
+        int(s.actif),
+    ]
+
+
+@login_required(login_url='login')
+def medecins_export_services(request):
+    from medecins.models import Service
+    from services.views import _export_file
+    fmt = request.GET.get('format', 'json')
+    qs = Service.objects.select_related('departement', 'chef_service').order_by('nom')
+    rows = [_svc_row(s) for s in qs]
+    return _export_file(fmt, 'services_medicaux', _SVC_HDR, rows,
+                        [dict(zip(_SVC_HDR, r)) for r in rows])
+
+
+@login_required(login_url='login')
+@require_POST
+def medecins_import_services(request):
+    from medecins.models import Service, Departement, Medecin
+    from services.views import _parse_upload, _s, _b, _fk_warning
+
+    upload = request.FILES.get('fichier')
+    if not upload:
+        messages.error(request, 'Aucun fichier sélectionné.')
+        return redirect('medecins_services')
+
+    data, err = _parse_upload(upload)
+    if err:
+        messages.error(request, err)
+        return redirect('medecins_services')
+
+    do_update = 'update' in request.POST
+    created = updated = skipped = errors = 0
+    dept_manquants = set()
+    chef_manquants = set()
+    for item in data:
+        try:
+            code = _s(item.get('code', ''))
+            if not code:
+                errors += 1
+                continue
+            dept_code = _s(item.get('departement', ''))
+            departement = Departement.objects.filter(code=dept_code).first() if dept_code else None
+            if dept_code and not departement:
+                dept_manquants.add(dept_code)
+
+            chef_matricule = _s(item.get('chef_service', ''))
+            chef_service = Medecin.objects.filter(matricule=chef_matricule).first() if chef_matricule else None
+            if chef_matricule and not chef_service:
+                chef_manquants.add(chef_matricule)
+
+            defaults = {
+                'nom': _s(item.get('nom', code)),
+                'description': _s(item.get('description', '')),
+                'departement': departement,
+                'chef_service': chef_service,
+                'actif': _b(item.get('actif', True)),
+            }
+            obj, was_created = Service.objects.get_or_create(code=code, defaults=defaults)
+            if was_created:
+                created += 1
+            elif do_update:
+                for k, v in defaults.items():
+                    setattr(obj, k, v)
+                obj.save()
+                updated += 1
+            else:
+                skipped += 1
+        except Exception:
+            errors += 1
+
+    fk_msg = _fk_warning([('Département(s)', dept_manquants), ('Médecin(s) chef de service', chef_manquants)])
+    if errors or fk_msg:
+        messages.warning(request, f'{created} créé(s), {updated} mis à jour, {skipped} ignoré(s)'
+                          + (f', {errors} erreur(s)' if errors else '') + '.' + fk_msg)
+    else:
+        messages.success(request, f'{created} service(s) importé(s), {updated} mis à jour, {skipped} ignoré(s).')
+    return redirect('medecins_services')
