@@ -325,161 +325,161 @@ def categorie_delete(request, pk):
     return redirect('services:categories')
 
 
-# ── Unités de mesure ───────────────────────────────────────────────────────
+# # ── Unités de mesure ───────────────────────────────────────────────────────
 
-@login_required
-def unites_list(request):
-    q = request.GET.get('q', '').strip()
-    categorie_id = request.GET.get('categorie', '')
-    vue = request.GET.get('vue', 'liste')
-    qs = UniteMesure.objects.select_related('categorie').all()
-    if q:
-        qs = qs.filter(Q(nom__icontains=q) | Q(code__icontains=q))
-    if categorie_id:
-        qs = qs.filter(categorie_id=categorie_id)
-    total_all = UniteMesure.objects.count()
-    paginator = Paginator(qs, 30)
-    page_obj = paginator.get_page(request.GET.get('page'))
-    return render(request, 'services/unites/list.html', {
-        'page_obj': page_obj,
-        'categories_um': CategorieUniteMesure.objects.all(),
-        'q': q,
-        'categorie_id': categorie_id,
-        'vue': vue,
-        'total': total_all,
-        'total_filtre': qs.count(),
-    })
-
-
-@login_required
-def unite_create(request):
-    if request.method == 'POST':
-        form = UniteMesureForm(request.POST)
-        if form.is_valid():
-            obj = form.save()
-            messages.success(request, f'Unité « {obj.nom} » créée.')
-            return redirect('services:unites')
-        else:
-            messages.error(request, 'Veuillez corriger les erreurs du formulaire.')
-    else:
-        form = UniteMesureForm()
-    return render(request, 'services/unites/form.html', {
-        'form': form,
-        'titre': 'Nouvelle unité de mesure',
-        'edit': False,
-    })
+# @login_required
+# def unites_list(request):
+#     q = request.GET.get('q', '').strip()
+#     categorie_id = request.GET.get('categorie', '')
+#     vue = request.GET.get('vue', 'liste')
+#     qs = UniteMesure.objects.select_related('categorie').all()
+#     if q:
+#         qs = qs.filter(Q(nom__icontains=q) | Q(code__icontains=q))
+#     if categorie_id:
+#         qs = qs.filter(categorie_id=categorie_id)
+#     total_all = UniteMesure.objects.count()
+#     paginator = Paginator(qs, 30)
+#     page_obj = paginator.get_page(request.GET.get('page'))
+#     return render(request, 'services/unites/list.html', {
+#         'page_obj': page_obj,
+#         'categories_um': CategorieUniteMesure.objects.all(),
+#         'q': q,
+#         'categorie_id': categorie_id,
+#         'vue': vue,
+#         'total': total_all,
+#         'total_filtre': qs.count(),
+#     })
 
 
-@login_required
-def unite_edit(request, pk):
-    obj = get_object_or_404(UniteMesure, pk=pk)
-    if request.method == 'POST':
-        form = UniteMesureForm(request.POST, instance=obj)
-        if form.is_valid():
-            form.save()
-            messages.success(request, f'Unité « {obj.nom} » mise à jour.')
-            return redirect('services:unite_detail', pk=obj.pk)
-        else:
-            messages.error(request, 'Veuillez corriger les erreurs du formulaire.')
-    else:
-        form = UniteMesureForm(instance=obj)
-    return render(request, 'services/unites/form.html', {
-        'form': form,
-        'obj': obj,
-        'titre': f'Modifier — {obj.nom}',
-        'edit': True,
-    })
+# @login_required
+# def unite_create(request):
+#     if request.method == 'POST':
+#         form = UniteMesureForm(request.POST)
+#         if form.is_valid():
+#             obj = form.save()
+#             messages.success(request, f'Unité « {obj.nom} » créée.')
+#             return redirect('services:unites')
+#         else:
+#             messages.error(request, 'Veuillez corriger les erreurs du formulaire.')
+#     else:
+#         form = UniteMesureForm()
+#     return render(request, 'services/unites/form.html', {
+#         'form': form,
+#         'titre': 'Nouvelle unité de mesure',
+#         'edit': False,
+#     })
 
 
-@login_required
-def unite_detail(request, pk):
-    obj = get_object_or_404(UniteMesure, pk=pk)
-    return render(request, 'services/unites/detail.html', {'obj': obj})
+# @login_required
+# def unite_edit(request, pk):
+#     obj = get_object_or_404(UniteMesure, pk=pk)
+#     if request.method == 'POST':
+#         form = UniteMesureForm(request.POST, instance=obj)
+#         if form.is_valid():
+#             form.save()
+#             messages.success(request, f'Unité « {obj.nom} » mise à jour.')
+#             return redirect('services:unite_detail', pk=obj.pk)
+#         else:
+#             messages.error(request, 'Veuillez corriger les erreurs du formulaire.')
+#     else:
+#         form = UniteMesureForm(instance=obj)
+#     return render(request, 'services/unites/form.html', {
+#         'form': form,
+#         'obj': obj,
+#         'titre': f'Modifier — {obj.nom}',
+#         'edit': True,
+#     })
 
 
-@login_required
-def unite_delete(request, pk):
-    obj = get_object_or_404(UniteMesure, pk=pk)
-    if request.method == 'POST':
-        nom = obj.nom
-        obj.delete()
-        messages.success(request, f'Unité « {nom} » supprimée.')
-    return redirect('services:unites')
+# @login_required
+# def unite_detail(request, pk):
+#     obj = get_object_or_404(UniteMesure, pk=pk)
+#     return render(request, 'services/unites/detail.html', {'obj': obj})
 
 
-@login_required
-def categories_unites_list(request):
-    q = request.GET.get('q', '').strip()
-    vue = request.GET.get('vue', 'liste')
-    qs = CategorieUniteMesure.objects.all()
-    if q:
-        qs = qs.filter(nom__icontains=q)
-    total_all = CategorieUniteMesure.objects.count()
-    paginator = Paginator(qs, 30)
-    page_obj = paginator.get_page(request.GET.get('page'))
-    return render(request, 'services/unites/categories/list.html', {
-        'page_obj': page_obj,
-        'q': q,
-        'vue': vue,
-        'total': total_all,
-        'total_filtre': qs.count(),
-    })
+# @login_required
+# def unite_delete(request, pk):
+#     obj = get_object_or_404(UniteMesure, pk=pk)
+#     if request.method == 'POST':
+#         nom = obj.nom
+#         obj.delete()
+#         messages.success(request, f'Unité « {nom} » supprimée.')
+#     return redirect('services:unites')
 
 
-@login_required
-def categorie_unite_create(request):
-    if request.method == 'POST':
-        form = CategorieUniteMesureForm(request.POST)
-        if form.is_valid():
-            obj = form.save()
-            messages.success(request, f'Catégorie « {obj.nom} » créée.')
-            return redirect('services:categories_unites')
-        else:
-            messages.error(request, 'Veuillez corriger les erreurs du formulaire.')
-    else:
-        form = CategorieUniteMesureForm()
-    return render(request, 'services/unites/categories/form.html', {
-        'form': form,
-        'titre': "Nouvelle catégorie d'unité",
-        'edit': False,
-    })
+# @login_required
+# def categories_unites_list(request):
+#     q = request.GET.get('q', '').strip()
+#     vue = request.GET.get('vue', 'liste')
+#     qs = CategorieUniteMesure.objects.all()
+#     if q:
+#         qs = qs.filter(nom__icontains=q)
+#     total_all = CategorieUniteMesure.objects.count()
+#     paginator = Paginator(qs, 30)
+#     page_obj = paginator.get_page(request.GET.get('page'))
+#     return render(request, 'services/unites/categories/list.html', {
+#         'page_obj': page_obj,
+#         'q': q,
+#         'vue': vue,
+#         'total': total_all,
+#         'total_filtre': qs.count(),
+#     })
 
 
-@login_required
-def categorie_unite_detail(request, pk):
-    obj = get_object_or_404(CategorieUniteMesure, pk=pk)
-    return render(request, 'services/unites/categories/detail.html', {'obj': obj})
+# @login_required
+# def categorie_unite_create(request):
+#     if request.method == 'POST':
+#         form = CategorieUniteMesureForm(request.POST)
+#         if form.is_valid():
+#             obj = form.save()
+#             messages.success(request, f'Catégorie « {obj.nom} » créée.')
+#             return redirect('services:categories_unites')
+#         else:
+#             messages.error(request, 'Veuillez corriger les erreurs du formulaire.')
+#     else:
+#         form = CategorieUniteMesureForm()
+#     return render(request, 'services/unites/categories/form.html', {
+#         'form': form,
+#         'titre': "Nouvelle catégorie d'unité",
+#         'edit': False,
+#     })
 
 
-@login_required
-def categorie_unite_edit(request, pk):
-    obj = get_object_or_404(CategorieUniteMesure, pk=pk)
-    if request.method == 'POST':
-        form = CategorieUniteMesureForm(request.POST, instance=obj)
-        if form.is_valid():
-            form.save()
-            messages.success(request, f'Catégorie « {obj.nom} » mise à jour.')
-            return redirect('services:categorie_unite_detail', pk=obj.pk)
-        else:
-            messages.error(request, 'Veuillez corriger les erreurs du formulaire.')
-    else:
-        form = CategorieUniteMesureForm(instance=obj)
-    return render(request, 'services/unites/categories/form.html', {
-        'form': form,
-        'obj': obj,
-        'titre': f'Modifier — {obj.nom}',
-        'edit': True,
-    })
+# @login_required
+# def categorie_unite_detail(request, pk):
+#     obj = get_object_or_404(CategorieUniteMesure, pk=pk)
+#     return render(request, 'services/unites/categories/detail.html', {'obj': obj})
 
 
-@login_required
-def categorie_unite_delete(request, pk):
-    obj = get_object_or_404(CategorieUniteMesure, pk=pk)
-    if request.method == 'POST':
-        nom = obj.nom
-        obj.delete()
-        messages.success(request, f'Catégorie « {nom} » supprimée.')
-    return redirect('services:categories_unites')
+# @login_required
+# def categorie_unite_edit(request, pk):
+#     obj = get_object_or_404(CategorieUniteMesure, pk=pk)
+#     if request.method == 'POST':
+#         form = CategorieUniteMesureForm(request.POST, instance=obj)
+#         if form.is_valid():
+#             form.save()
+#             messages.success(request, f'Catégorie « {obj.nom} » mise à jour.')
+#             return redirect('services:categorie_unite_detail', pk=obj.pk)
+#         else:
+#             messages.error(request, 'Veuillez corriger les erreurs du formulaire.')
+#     else:
+#         form = CategorieUniteMesureForm(instance=obj)
+#     return render(request, 'services/unites/categories/form.html', {
+#         'form': form,
+#         'obj': obj,
+#         'titre': f'Modifier — {obj.nom}',
+#         'edit': True,
+#     })
+
+
+# @login_required
+# def categorie_unite_delete(request, pk):
+#     obj = get_object_or_404(CategorieUniteMesure, pk=pk)
+#     if request.method == 'POST':
+#         nom = obj.nom
+#         obj.delete()
+#         messages.success(request, f'Catégorie « {nom} » supprimée.')
+#     return redirect('services:categories_unites')
 
 
 @login_required
@@ -758,40 +758,40 @@ def export_categories(request):
                         [dict(zip(_CAT_HDR, r)) for r in rows])
 
 
-# ── Export Unités de mesure ──────────────────────────────────────────────────
+# # ── Export Unités de mesure ──────────────────────────────────────────────────
 
-_UM_HDR = ['code', 'nom', 'categorie', 'type_unite', 'ratio', 'precision_arrondi', 'actif']
-
-
-def _um_row(u):
-    return [
-        u.code, u.nom,
-        u.categorie.nom if u.categorie else '',
-        u.type_unite, float(u.ratio), float(u.precision_arrondi), int(u.actif),
-    ]
+# _UM_HDR = ['code', 'nom', 'categorie', 'type_unite', 'ratio', 'precision_arrondi', 'actif']
 
 
-@login_required
-def export_unites(request):
-    fmt = request.GET.get('format', 'json')
-    qs  = UniteMesure.objects.select_related('categorie')
-    rows = [_um_row(u) for u in qs]
-    return _export_file(fmt, 'unites_mesure', _UM_HDR, rows,
-                        [dict(zip(_UM_HDR, r)) for r in rows])
+# def _um_row(u):
+#     return [
+#         u.code, u.nom,
+#         u.categorie.nom if u.categorie else '',
+#         u.type_unite, float(u.ratio), float(u.precision_arrondi), int(u.actif),
+#     ]
 
 
-# ── Export Catégories unités ─────────────────────────────────────────────────
+# @login_required
+# def export_unites(request):
+#     fmt = request.GET.get('format', 'json')
+#     qs  = UniteMesure.objects.select_related('categorie')
+#     rows = [_um_row(u) for u in qs]
+#     return _export_file(fmt, 'unites_mesure', _UM_HDR, rows,
+#                         [dict(zip(_UM_HDR, r)) for r in rows])
 
-_CU_HDR = ['nom']
+
+# # ── Export Catégories unités ─────────────────────────────────────────────────
+
+# _CU_HDR = ['nom']
 
 
-@login_required
-def export_categories_unites(request):
-    fmt = request.GET.get('format', 'json')
-    qs  = CategorieUniteMesure.objects.all()
-    rows = [[c.nom] for c in qs]
-    return _export_file(fmt, 'categories_unites', _CU_HDR, rows,
-                        [{'nom': c.nom} for c in qs])
+# @login_required
+# def export_categories_unites(request):
+#     fmt = request.GET.get('format', 'json')
+#     qs  = CategorieUniteMesure.objects.all()
+#     rows = [[c.nom] for c in qs]
+#     return _export_file(fmt, 'categories_unites', _CU_HDR, rows,
+#                         [{'nom': c.nom} for c in qs])
 
 
 # ── Import Articles ──────────────────────────────────────────────────────────
@@ -986,94 +986,94 @@ def import_categories(request):
     return redirect('services:categories')
 
 
-# ── Import Unités de mesure ──────────────────────────────────────────────────
+# # ── Import Unités de mesure ──────────────────────────────────────────────────
 
-@login_required
-@require_POST
-def import_unites(request):
-    upload = request.FILES.get('fichier')
-    if not upload:
-        messages.error(request, 'Aucun fichier sélectionné.')
-        return redirect('services:unites')
+# @login_required
+# @require_POST
+# def import_unites(request):
+#     upload = request.FILES.get('fichier')
+#     if not upload:
+#         messages.error(request, 'Aucun fichier sélectionné.')
+#         return redirect('services:unites')
 
-    data, err = _parse_upload(upload)
-    if err:
-        messages.error(request, err)
-        return redirect('services:unites')
+#     data, err = _parse_upload(upload)
+#     if err:
+#         messages.error(request, err)
+#         return redirect('services:unites')
 
-    do_update = 'update' in request.POST
-    created = updated = skipped = errors = 0
+#     do_update = 'update' in request.POST
+#     created = updated = skipped = errors = 0
 
-    for item in data:
-        try:
-            code = _s(item.get('code', ''))
-            if not code:
-                errors += 1
-                continue
-            cat_nom = _s(item.get('categorie', ''))
-            cat = None
-            if cat_nom:
-                cat, _ = CategorieUniteMesure.objects.get_or_create(nom=cat_nom)
-            defaults = {
-                'nom': _s(item.get('nom', code)),
-                'categorie': cat,
-                'type_unite': _s(item.get('type_unite', 'umrc')),
-                'ratio': item.get('ratio') or 1,
-                'precision_arrondi': item.get('precision_arrondi') or 0.01,
-                'actif': _b(item.get('actif', True)),
-            }
-            obj, was_created = UniteMesure.objects.get_or_create(code=code, defaults=defaults)
-            if was_created:
-                created += 1
-            elif do_update:
-                for k, v in defaults.items():
-                    setattr(obj, k, v)
-                obj.save()
-                updated += 1
-            else:
-                skipped += 1
-        except Exception:
-            errors += 1
+#     for item in data:
+#         try:
+#             code = _s(item.get('code', ''))
+#             if not code:
+#                 errors += 1
+#                 continue
+#             cat_nom = _s(item.get('categorie', ''))
+#             cat = None
+#             if cat_nom:
+#                 cat, _ = CategorieUniteMesure.objects.get_or_create(nom=cat_nom)
+#             defaults = {
+#                 'nom': _s(item.get('nom', code)),
+#                 'categorie': cat,
+#                 'type_unite': _s(item.get('type_unite', 'umrc')),
+#                 'ratio': item.get('ratio') or 1,
+#                 'precision_arrondi': item.get('precision_arrondi') or 0.01,
+#                 'actif': _b(item.get('actif', True)),
+#             }
+#             obj, was_created = UniteMesure.objects.get_or_create(code=code, defaults=defaults)
+#             if was_created:
+#                 created += 1
+#             elif do_update:
+#                 for k, v in defaults.items():
+#                     setattr(obj, k, v)
+#                 obj.save()
+#                 updated += 1
+#             else:
+#                 skipped += 1
+#         except Exception:
+#             errors += 1
 
-    if errors:
-        messages.warning(request, f'{created} créée(s), {updated} mise(s) à jour, {skipped} ignorée(s), {errors} erreur(s).')
-    else:
-        messages.success(request, f'{created} unité(s) importée(s), {updated} mise(s) à jour, {skipped} ignorée(s).')
-    return redirect('services:unites')
+#     if errors:
+#         messages.warning(request, f'{created} créée(s), {updated} mise(s) à jour, {skipped} ignorée(s), {errors} erreur(s).')
+#     else:
+#         messages.success(request, f'{created} unité(s) importée(s), {updated} mise(s) à jour, {skipped} ignorée(s).')
+#     return redirect('services:unites')
 
 
-# ── Import Catégories unités ─────────────────────────────────────────────────
+# # ── Import Catégories unités ─────────────────────────────────────────────────
 
-@login_required
-@require_POST
-def import_categories_unites(request):
-    upload = request.FILES.get('fichier')
-    if not upload:
-        messages.error(request, 'Aucun fichier sélectionné.')
-        return redirect('services:categories_unites')
+# @login_required
+# @require_POST
+# def import_categories_unites(request):
+#     upload = request.FILES.get('fichier')
+#     if not upload:
+#         messages.error(request, 'Aucun fichier sélectionné.')
+#         return redirect('services:categories_unites')
 
-    data, err = _parse_upload(upload)
-    if err:
-        messages.error(request, err)
-        return redirect('services:categories_unites')
+#     data, err = _parse_upload(upload)
+#     if err:
+#         messages.error(request, err)
+#         return redirect('services:categories_unites')
 
-    created = skipped = errors = 0
-    for item in data:
-        try:
-            nom = _s(item.get('nom', ''))
-            if not nom:
-                errors += 1
-                continue
-            _, was_created = CategorieUniteMesure.objects.get_or_create(nom=nom)
-            if was_created:
-                created += 1
-            else:
-                skipped += 1
-        except Exception:
-            errors += 1
+#     created = skipped = errors = 0
+#     for item in data:
+#         try:
+#             nom = _s(item.get('nom', ''))
+#             if not nom:
+#                 errors += 1
+#                 continue
+#             _, was_created = CategorieUniteMesure.objects.get_or_create(nom=nom)
+#             if was_created:
+#                 created += 1
+#             else:
+#                 skipped += 1
+#         except Exception:
+#             errors += 1
 
-    if errors:
-        messages.warning(request, f'{created} créée(s), {skipped} ignorée(s), {errors} erreur(s).')
-    else:
-        messages.success(request, f'{created} catégorie(s) importée(s), {skipped} ignorée(s).')
-    return redirect('services:categories_unites')
+#     if errors:
+#         messages.warning(request, f'{created} créée(s), {skipped} ignorée(s), {errors} erreur(s).')
+#     else:
+#         messages.success(request, f'{created} catégorie(s) importée(s), {skipped} ignorée(s).')
+#     return redirect('services:categories_unites')

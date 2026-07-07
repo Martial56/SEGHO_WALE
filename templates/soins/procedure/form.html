@@ -1,5 +1,6 @@
 {% extends 'soins/base.html' %}
 {% load static %}
+{% load core_tags %}
 {% block breadcrumb %}{% endblock %}
 
 {% block extra_css %}
@@ -102,24 +103,8 @@ html[data-theme="dark"] .proc-annule-badge  { background: rgba(220,38,38,.15); b
 /* ── Layout avec aside ── */
 .proc-frm-layout { display: flex; align-items: flex-start; gap: 14px; }
 .proc-frm-main   { flex: 1; min-width: 0; }
-.proc-frm-aside  { width: 260px; flex-shrink: 0; position: sticky; top: 220px; }
-@media (max-width: 900px) { .proc-frm-layout { flex-direction: column; } .proc-frm-aside { width: 100%; position: static; } }
-
-/* ── Activité latérale ── */
-.f-activity { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-.f-activity-head { padding: 10px 14px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
-.f-activity-list { max-height: 480px; overflow-y: auto; }
-.f-activity-item { display: flex; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
-.f-activity-item:last-child { border-bottom: none; }
-.f-avatar { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: #fff; flex-shrink: 0; }
-.f-avatar-teal   { background: var(--accent); }
-.f-avatar-blue   { background: #2563eb; }
-.f-avatar-green  { background: #16a34a; }
-.f-activity-body { flex: 1; }
-.f-activity-who  { font-size: 12px; font-weight: 500; color: var(--text); }
-.f-activity-time { font-size: 11px; color: var(--text-muted); }
-.f-activity-change { font-size: 11.5px; color: var(--text-muted); margin-top: 3px; display: flex; align-items: center; gap: 4px; }
-.f-activity-change i { font-size: 11px; }
+.hist-aside { top: 0 !important; }
+@media (max-width: 900px) { .proc-frm-layout { flex-direction: column; } }
 </style>
 {% endblock %}
 
@@ -565,52 +550,7 @@ html[data-theme="dark"] .proc-annule-badge  { background: rgba(220,38,38,.15); b
 </form>
 </div><!-- /.proc-frm-main -->
 
-<!-- ══ ASIDE ACTIVITÉ ══ -->
-<div class="proc-frm-aside">
-  <div class="f-activity">
-    <div class="f-activity-head">
-      <span>Activité</span>
-      {% if not is_new %}<span style="font-size:11px;">{{ proc.date_creation|date:"d/m/Y" }}</span>{% endif %}
-    </div>
-    <div class="f-activity-list">
-      {% if not is_new %}
-        <div class="f-activity-item">
-          <div class="f-avatar f-avatar-teal">
-            {% if proc.cree_par %}{{ proc.cree_par.username|first|upper }}{% else %}<i class="bi bi-person" style="font-size:13px;"></i>{% endif %}
-          </div>
-          <div class="f-activity-body">
-            <div class="f-activity-who">{% if proc.cree_par %}{{ proc.cree_par.get_full_name|default:proc.cree_par.username }}{% else %}—{% endif %}</div>
-            <div class="f-activity-time">{{ proc.date_creation|date:"d/m/Y H:i" }}</div>
-            <div class="f-activity-change"><i class="bi bi-dot" style="color:var(--accent);"></i> Soin créé</div>
-          </div>
-        </div>
-        {% if proc.modifie_par %}
-        <div class="f-activity-item">
-          <div class="f-avatar f-avatar-blue">{{ proc.modifie_par.username|first|upper }}</div>
-          <div class="f-activity-body">
-            <div class="f-activity-who">{{ proc.modifie_par.get_full_name|default:proc.modifie_par.username }}</div>
-            <div class="f-activity-time">{% if proc.date_modification %}{{ proc.date_modification|date:"d/m/Y H:i" }}{% else %}—{% endif %}</div>
-            <div class="f-activity-change"><i class="bi bi-pencil"></i> État : <strong>{{ proc.get_statut_display }}</strong></div>
-          </div>
-        </div>
-        {% endif %}
-        {% if proc.facture %}
-        <div class="f-activity-item">
-          <div class="f-avatar f-avatar-green"><i class="bi bi-receipt" style="font-size:12px;"></i></div>
-          <div class="f-activity-body">
-            <div class="f-activity-who">Facture liée</div>
-            <div class="f-activity-change"><i class="bi bi-link-45deg"></i> {{ proc.facture.numero }}</div>
-          </div>
-        </div>
-        {% endif %}
-      {% else %}
-        <div style="padding:14px;color:var(--text-muted);font-size:12px;">
-          L'activité apparaîtra après la création.
-        </div>
-      {% endif %}
-    </div>
-  </div>
-</div><!-- /.proc-frm-aside -->
+{% historique_sidebar proc %}
 
 </div><!-- /.proc-frm-layout -->
 </div><!-- /.f-page-body -->
@@ -836,7 +776,6 @@ makeDrop({
     var onav  = document.querySelector('.o-nav');
     var sub   = document.getElementById('subheader');
     var wrap  = document.getElementById('page-wrap');
-    var aside = document.querySelector('.proc-frm-aside');
     if (!tb || !onav || !sub || !wrap) return;
     var navBottom = tb.offsetHeight;
     sub.style.top = navBottom + 'px';
@@ -844,7 +783,6 @@ makeDrop({
     var bodyPT = parseInt(getComputedStyle(document.body).paddingTop) || 0;
     var pt = Math.max(0, navBottom + subH - bodyPT);
     wrap.style.setProperty('padding-top', pt + 'px', 'important');
-    if (aside) aside.style.top = (navBottom + subH + 8) + 'px';
   }
   document.addEventListener('DOMContentLoaded', function() {
     adj();
