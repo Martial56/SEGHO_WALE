@@ -21,6 +21,10 @@ class Facture(models.Model):
     patient = models.ForeignKey('patients.Patient', on_delete=models.CASCADE, related_name='factures')
     consultation = models.ForeignKey('consultations.Consultation', on_delete=models.SET_NULL, null=True, blank=True)
     hospitalisation = models.ForeignKey('hospitalisation.Hospitalisation', on_delete=models.SET_NULL, null=True, blank=True)
+    rendez_vous = models.ForeignKey(
+        'patients.RendezVous', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='factures', verbose_name='Rendez-vous',
+    )
     type_facture = models.CharField(max_length=20, choices=TYPE, default='consultation')
     date_emission = models.DateTimeField(auto_now_add=True)
     date_echeance = models.DateField(null=True, blank=True)
@@ -63,6 +67,9 @@ class Facture(models.Model):
     class Meta:
         verbose_name = "Facture"
         ordering = ['-date_emission']
+        permissions = [
+            ('can_valider_facture', 'Peut valider une facture (brouillon → émise)'),
+        ]
 
 
 class LigneFacture(models.Model):

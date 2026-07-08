@@ -191,6 +191,13 @@ def facture_create(request):
         if not patient:
             messages.error(request, 'Patient introuvable.')
             return redirect('facturation:list')
+        has_ligne = any(
+            k.startswith('ligne_libelle_') and v.strip()
+            for k, v in request.POST.items()
+        )
+        if not has_ligne:
+            messages.error(request, "Ajoutez au moins une ligne avec une désignation avant d'enregistrer.")
+            return redirect(request.get_full_path())
         if form.is_valid():
             facture = form.save(commit=False)
             facture.patient  = patient
@@ -198,6 +205,8 @@ def facture_create(request):
             if hosp_obj:
                 facture.hospitalisation = hosp_obj
                 facture.type_facture    = 'hospitalisation'
+            if rdv_obj:
+                facture.rendez_vous = rdv_obj
             facture.save()
 
             total = _save_lignes(facture, request.POST)
@@ -266,11 +275,23 @@ def facture_detail(request, pk):
     paiements = facture.paiements.order_by('date_paiement') if hasattr(facture, 'paiements') else []
     logs      = get_logs(facture)
     back_url  = request.GET.get('next', reverse('facturation:list'))
+
+    # Médecin associé à la facture — selon l'origine (rendez-vous, consultation,
+    # hospitalisation). Ne pas prendre depuis `soins.Soin` (infirmier, sans rapport).
+    docteur = None
+    if facture.rendez_vous_id and facture.rendez_vous.medecin_id:
+        docteur = facture.rendez_vous.medecin
+    elif facture.consultation_id and facture.consultation.medecin_id:
+        docteur = facture.consultation.medecin
+    elif facture.hospitalisation_id and facture.hospitalisation.medecin_traitant_id:
+        docteur = facture.hospitalisation.medecin_traitant
+
     return render(request, 'facturation/detail.html', {
         'facture':   facture,
         'lignes':    lignes,
         'paiements': paiements,
         'logs':      logs,
+        'docteur':   docteur,
         'is_admin':  request.user.is_superuser or request.user.is_staff,
         'back_url':  back_url,
     })
@@ -281,10 +302,13 @@ def facture_valider(request, pk):
     facture  = get_object_or_404(Facture, pk=pk)
     back_url = request.POST.get('next', reverse('facturation:list'))
     if request.method == 'POST' and facture.statut == 'brouillon':
-        facture.statut = 'emise'
-        facture.save()
-        log_event(facture, request.user, 'Statut changé : émise', type='statut')
-        messages.success(request, f"Facture {facture.numero} validée et émise.")
+        if not request.user.has_perm('facturation.can_valider_facture'):
+            messages.error(request, "Vous n'avez pas la permission de valider une facture.")
+        else:
+            facture.statut = 'emise'
+            facture.save()
+            log_event(facture, request.user, 'Statut changé : émise', type='statut')
+            messages.success(request, f"Facture {facture.numero} validée et émise.")
     return redirect(f"{reverse('facturation:detail', kwargs={'pk': pk})}?next={back_url}")
 
 
@@ -339,6 +363,10 @@ def facture_print(request, pk):
 @login_required(login_url='login')
 def facture_apercu(request, pk):
     facture = get_object_or_404(Facture.objects.select_related('patient', 'cree_par'), pk=pk)
+    if facture.statut != 'payee':
+        messages.error(request, "L'aperçu n'est disponible qu'une fois la facture entièrement payée.")
+        back_url = request.GET.get('next') or reverse('facturation:list')
+        return redirect(f"{reverse('facturation:detail', kwargs={'pk': pk})}?next={back_url}")
     return render(request, 'facturation/apercu.html', {
         'facture':   facture,
         'lignes':    facture.lignes.select_related('acte').all(),
@@ -353,6 +381,9 @@ def facture_edit(request, pk):
     from services.models import Articleservice
 
     facture  = get_object_or_404(Facture, pk=pk)
+    if not request.user.has_perm('facturation.change_facture'):
+        messages.error(request, "Vous n'avez pas la permission de modifier une facture.")
+        return redirect(f"{reverse('facturation:detail', kwargs={'pk': pk})}?next={request.GET.get('next') or reverse('facturation:list')}")
     actes    = Acte.objects.filter(actif=True).order_by('categorie', 'libelle')
     caisses  = Caisse.objects.filter(actif=True).order_by('nom')
     services = Articleservice.objects.select_related('categorie').filter(actif=True).order_by('nom')
@@ -365,7 +396,9 @@ def facture_edit(request, pk):
 
         # ── Actions workflow ────────────────────────────────────────────────
         if 'action_emettre' in request.POST:
-            if facture.statut == 'brouillon' or is_admin:
+            if not request.user.has_perm('facturation.can_valider_facture'):
+                messages.error(request, "Vous n'avez pas la permission de valider une facture.")
+            elif facture.statut == 'brouillon' or is_admin:
                 facture.statut = 'emise'
                 facture.save()
                 log_event(facture, request.user, 'Statut changé : Émise', type='statut')

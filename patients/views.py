@@ -313,7 +313,7 @@ def rdv_edit(request, pk):
 
     try:
         from facturation.models import Facture
-        facture_payee = Facture.objects.filter(patient=rdv.patient).exclude(statut='annulee').exists()
+        facture_payee = Facture.objects.filter(rendez_vous=rdv, statut='payee').exists()
     except Exception:
         facture_payee = False
 

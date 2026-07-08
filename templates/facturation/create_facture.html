@@ -63,6 +63,7 @@
     cursor: pointer; font-family: inherit; transition: background 0.15s;
 }
 .btn-save:hover { background: var(--teal-600); }
+.btn-save:disabled { background: #b0b8bd; cursor: not-allowed; }
 .btn-discard {
     background: transparent; color: rgba(0,0,0,0.55);
     border: 1px solid rgba(0,0,0,0.15); border-radius: 6px;
@@ -364,7 +365,7 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
             {% if edit %}
             <button type="submit" form="facture-form" class="btn-save">Enregistrer les modifications</button>
             {% else %}
-            <button type="button" class="btn-save" onclick="openPaymentModal()">Enregistrer la facture</button>
+            <button type="button" id="btn-save-facture" class="btn-save" onclick="openPaymentModal()" disabled title="Ajoutez au moins une ligne avec une désignation">Enregistrer la facture</button>
             {% endif %}
             {% endif %}
             {% if edit %}
@@ -826,6 +827,16 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
         return Number(n).toLocaleString('fr-FR') + ' CFA';
     }
 
+    window.updateSaveButtonState = function () {
+        var btn = document.getElementById('btn-save-facture');
+        if (!btn) return;
+        var hasValid = false;
+        document.querySelectorAll('[name^="ligne_libelle_"]').forEach(function (inp) {
+            if (inp.value.trim()) hasValid = true;
+        });
+        btn.disabled = !hasValid;
+    };
+
     window.recalcRow = function (idx) {
         var qte   = parseFloat(document.querySelector('[name="ligne_qte_'   + idx + '"]').value) || 0;
         var prix  = parseFloat(document.querySelector('[name="ligne_prix_'  + idx + '"]').value) || 0;
@@ -834,6 +845,7 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
         var el = document.getElementById('total-' + idx);
         if (el) el.textContent = fmt(total);
         recalcTotaux();
+        updateSaveButtonState();
     };
 
     window.recalcTotaux = function () {
@@ -906,6 +918,7 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
             wrapper.classList.remove('svc-preloaded');
             hidden.value = '';
             render(input.value);
+            updateSaveButtonState();
         });
         input.addEventListener('keydown', function (e) {
             if (e.key === 'Escape') { close(); input.blur(); }
@@ -970,6 +983,7 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
         if (document.querySelectorAll('.ligne-row').length > 1) {
             row.remove();
             recalcTotaux();
+            updateSaveButtonState();
         }
     };
 

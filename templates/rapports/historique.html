@@ -1,0 +1,98 @@
+{% extends 'rapports/base.html' %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+:root { --rap-surface:#fff; --rap-border:#e8edf2; --rap-text:#0d3040; --rap-muted:rgba(0,0,0,.5); }
+html[data-theme="dark"] { --rap-surface:#132033; --rap-border:#243044; --rap-text:#d4e6f5; --rap-muted:rgba(255,255,255,.45); }
+
+.hist-wrap { max-width: 1180px; margin: 0 auto; padding: 24px 32px 60px; }
+
+.hist-filters {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: end;
+  background: var(--rap-surface); border: 1px solid var(--rap-border); border-radius: 10px;
+  padding: 14px 16px; margin-bottom: 18px;
+}
+.hist-filters .f-field { display: flex; flex-direction: column; gap: 4px; }
+.hist-filters label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--rap-muted); }
+.hist-filters select, .hist-filters input {
+  border: 1.5px solid var(--rap-border); border-radius: 6px; padding: 6px 9px;
+  font-size: 12.5px; color: var(--rap-text); background: transparent; font-family: inherit;
+}
+.hist-filters button {
+  background: var(--teal-500); color: #fff; border: none; border-radius: 6px;
+  padding: 7px 16px; font-size: 12.5px; font-weight: 600; cursor: pointer; height: 32px;
+}
+.hist-filters button:hover { background: var(--teal-600); }
+
+.hist-table-wrap {
+  background: var(--rap-surface); border: 1px solid var(--rap-border); border-radius: 10px;
+  overflow: hidden; padding: 6px 16px;
+}
+.hist-row {
+  display: grid; grid-template-columns: 1.6fr 1.2fr 1.2fr 1fr;
+  align-items: center; gap: 14px; padding: 12px 8px; border-bottom: 1px solid var(--rap-border);
+  font-size: 13px; text-decoration: none; color: inherit; margin: 0 -8px; border-radius: 6px;
+  transition: background .12s;
+}
+.hist-row:last-child { border-bottom: none; }
+.hist-row:hover { background: var(--teal-50); }
+html[data-theme="dark"] .hist-row:hover { background: rgba(33,136,171,.1); }
+.hist-nom { font-weight: 600; color: var(--rap-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hist-periode, .hist-user, .hist-date { color: var(--rap-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hist-empty { text-align: center; padding: 60px 20px; color: var(--rap-muted); font-size: 13px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="hist-wrap">
+
+  <form method="get" class="hist-filters">
+    <div class="f-field">
+      <label>Rapport</label>
+      <select name="rapport">
+        <option value="">Tous</option>
+        {% for s, r in rapports_disponibles.items %}
+        <option value="{{ s }}" {% if s == slug %}selected{% endif %}>{{ r.nom }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="f-field">
+      <label>Utilisateur</label>
+      <select name="utilisateur">
+        <option value="">Tous</option>
+        {% for u in utilisateurs %}
+        <option value="{{ u.id }}" {% if u.id|stringformat:"s" == utilisateur_id %}selected{% endif %}>{{ u.get_full_name|default:u.username }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="f-field">
+      <label>Généré depuis le</label>
+      <input type="date" name="date_debut" value="{{ date_debut }}">
+    </div>
+    <div class="f-field">
+      <label>Jusqu'au</label>
+      <input type="date" name="date_fin" value="{{ date_fin }}">
+    </div>
+    <button type="submit"><i class="bi bi-funnel"></i> Filtrer</button>
+  </form>
+
+  <div class="hist-table-wrap">
+    {% if page_obj.object_list %}
+    {% for h in page_obj %}
+    <a href="{% url 'rapports:retelecharger' h.pk %}" class="hist-row" title="Cliquer pour retélécharger">
+      <span class="hist-nom">{{ h.nom }}</span>
+      <span class="hist-periode">{{ h.periode_debut|date:"d/m/Y" }}–{{ h.periode_fin|date:"d/m/Y" }}</span>
+      <span class="hist-user">{{ h.utilisateur.get_full_name|default:h.utilisateur.username|default:"—" }}</span>
+      <span class="hist-date">{{ h.date_generation|date:"d/m/Y H:i" }}</span>
+    </a>
+    {% endfor %}
+    {% else %}
+    <div class="hist-empty">Aucun rapport généré pour le moment.</div>
+    {% endif %}
+  </div>
+
+  {% include 'includes/pagination.html' %}
+
+</div>
+{% endblock %}
