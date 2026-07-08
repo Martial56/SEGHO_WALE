@@ -8,9 +8,11 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 :root {
-  --kpi-900: #0d3040; --kpi-800: #0f4358; --kpi-700: #145770;
-  --kpi-600: #1a6d8c; --kpi-500: #2188ab; --kpi-400: #34a8cc;
-  --kpi-300: #6ecae3; --kpi-50: #eef9fd;
+  /* Alias vers la couleur d'accent globale (logo par défaut, ou choix utilisateur) */
+  --kpi-900: var(--teal-900); --kpi-800: var(--teal-800); --kpi-700: var(--teal-700);
+  --kpi-600: var(--teal-600); --kpi-500: var(--teal-500); --kpi-400: var(--teal-400);
+  --kpi-300: var(--teal-300); --kpi-50: var(--teal-50);
+  --kpi-900-rgb: var(--teal-900-rgb); --kpi-700-rgb: var(--teal-700-rgb); --kpi-600-rgb: var(--teal-600-rgb);
   --kpi-surface: #fff; --kpi-border: rgba(0,0,0,0.08);
   --kpi-text: #0d3040; --kpi-muted: rgba(0,0,0,0.45);
   --kpi-radius: 14px;
@@ -29,9 +31,9 @@ html[data-theme="dark"] {
   position: sticky; top: var(--topbar-h); z-index: 100;
 }
 .kpi-filter-label { font-size: 12.5px; font-weight: 600; color: var(--kpi-muted); }
-.period-tabs { display: flex; align-items: center; gap: 4px; background: rgba(26,109,140,0.07); border-radius: 12px; padding: 4px; }
+.period-tabs { display: flex; align-items: center; gap: 4px; background: rgba(var(--kpi-600-rgb),0.07); border-radius: 12px; padding: 4px; }
 .period-tab { padding: 5px 13px; border-radius: 9px; font-size: 12px; font-weight: 600; color: var(--kpi-700); text-decoration: none; transition: all 0.15s; white-space: nowrap; }
-.period-tab:hover { background: rgba(26,109,140,0.12); }
+.period-tab:hover { background: rgba(var(--kpi-600-rgb),0.12); }
 .period-tab.active { background: var(--kpi-600); color: #fff; }
 html[data-theme="dark"] .period-tabs { background: rgba(255,255,255,0.05); }
 html[data-theme="dark"] .period-tab { color: #7aaec7; }
@@ -45,7 +47,7 @@ html[data-theme="dark"] .period-tab { color: #7aaec7; }
   transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
   animation: kpiFadeUp 0.4s ease both;
 }
-a.kpi-card:hover { border-color: var(--kpi-400); transform: translateY(-2px); box-shadow: 0 6px 18px rgba(15,67,88,0.1); }
+a.kpi-card:hover { border-color: var(--kpi-400); transform: translateY(-2px); box-shadow: 0 6px 18px rgba(var(--kpi-700-rgb),0.1); }
 .kpi-top { display: flex; align-items: flex-start; gap: 14px; }
 .kpi-ico-box { width: 46px; height: 46px; border-radius: 12px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: #fff; }
 .kpi-ico { width: 22px; height: 22px; }
@@ -101,7 +103,7 @@ a.kpi-card:hover { border-color: var(--kpi-400); transform: translateY(-2px); bo
 .tbl-doc  { color: var(--kpi-muted); font-size: 11px; }
 
 .kpi-badge { display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 10px; font-weight: 700; }
-.kpi-badge-planifie        { background: #e8f4fd; color: #1a6d8c; }
+.kpi-badge-planifie        { background: #e8f4fd; color: var(--kpi-600); }
 .kpi-badge-confirme        { background: #e3f9ee; color: #0d8a52; }
 .kpi-badge-en_attente      { background: #fff4e0; color: #c27a10; }
 .kpi-badge-en_consultation { background: #ffe8e8; color: #b82020; }
@@ -125,7 +127,7 @@ a.kpi-card:hover { border-color: var(--kpi-400); transform: translateY(-2px); bo
 .recent-item:last-child { border-bottom: none; }
 .recent-item:hover { background: var(--kpi-50); }
 .recent-dot  { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-.recent-dot.en_cours { background: #e89a1a; }
+.recent-dot.en_cours { background: var(--amber); }
 .recent-dot.termine  { background: #16a96b; }
 .recent-dot.other    { background: var(--kpi-400); }
 .recent-name { font-size: 11px; font-weight: 600; color: var(--kpi-text); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -502,7 +504,7 @@ html[data-theme="dark"] .recent-item:hover { background: #1D2C44; }
       pBg:      isDark() ? 'rgba(52,168,204,0.18)' : 'rgba(33,136,171,0.12)',
       rdvBar:   isDark() ? 'rgba(232,168,42,0.75)' : 'rgba(194,122,16,0.72)',
       rdvHover: isDark() ? 'rgba(232,168,42,0.95)' : 'rgba(194,122,16,0.92)',
-      tooltip:  isDark() ? '#0d2035' : '#0f4358',
+      tooltip:  isDark() ? '#0d2035' : 'var(--kpi-700)',
     };
     var baseOpts = {
       responsive: true, maintainAspectRatio: false,

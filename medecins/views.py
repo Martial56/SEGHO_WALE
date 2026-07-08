@@ -464,8 +464,7 @@ def medecin_detail(request, pk):
 
 @login_required(login_url='login')
 def medecins_export_csv(request):
-    import csv
-    from django.http import HttpResponse
+    from core.utils import csv_response
 
     qs = Medecin.objects.select_related('specialite', 'service').order_by('nom')
     q          = request.GET.get('q', '').strip()
@@ -480,13 +479,9 @@ def medecins_export_csv(request):
     elif statut == 'inactif':
         qs = qs.filter(actif=False)
 
-    response = HttpResponse(content_type='text/csv; charset=utf-8')
-    response['Content-Disposition'] = 'attachment; filename="medecins.csv"'
-    response.write('﻿')  # BOM pour Excel
-    writer = csv.writer(response, delimiter=';')
-    writer.writerow(['Matricule', 'Nom', 'Prénoms', 'Spécialité', 'Département', 'Téléphone', 'Email', 'Honoraire (FCFA)', 'Statut'])
-    for med in qs:
-        writer.writerow([
+    headers = ['Matricule', 'Nom', 'Prénoms', 'Spécialité', 'Département', 'Téléphone', 'Email', 'Honoraire (FCFA)', 'Statut']
+    rows = [
+        [
             med.matricule,
             med.nom,
             med.prenoms,
@@ -496,8 +491,10 @@ def medecins_export_csv(request):
             med.email or '',
             med.taux_honoraire or 0,
             'Actif' if med.actif else 'Inactif',
-        ])
-    return response
+        ]
+        for med in qs
+    ]
+    return csv_response('medecins', headers, rows)
 
 
 @login_required(login_url='login')

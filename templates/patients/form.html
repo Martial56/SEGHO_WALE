@@ -427,10 +427,10 @@
 
         <div class="patient-photo-block">
             {% if edit and patient.photo %}
-                <img src="{{ patient.photo.url }}" alt="Photo" class="photo-large" id="photo-preview">
+                <img src="{{ patient.photo.url }}" alt="Photo" class="photo-large" data-photo-preview="patient">
             {% else %}
-                <div class="photo-placeholder" id="photo-placeholder">📷</div>
-                <img src="" alt="Photo" class="photo-large" id="photo-preview" style="display:none;">
+                <div class="photo-placeholder" data-photo-placeholder="patient">📷</div>
+                <img src="" alt="Photo" class="photo-large" data-photo-preview="patient" style="display:none;">
             {% endif %}
             <label for="{{ form.photo.id_for_label }}" class="photo-label-btn">
                 {% if edit and patient.photo %}Changer la photo{% else %}Ajouter une photo{% endif %}
@@ -649,24 +649,6 @@
             : age + ' ans';
     }
     if (dateInput) { dateInput.addEventListener('change', updateAge); updateAge(); }
-
-    /* ── Aperçu photo ── */
-    var photoInput = document.getElementById('{{ form.photo.id_for_label }}');
-    if (photoInput) {
-        photoInput.style.display = 'none';
-        photoInput.addEventListener('change', function () {
-            var file = this.files[0];
-            if (!file) return;
-            var reader = new FileReader();
-            reader.onload = function (e) {
-                var placeholder = document.getElementById('photo-placeholder');
-                var preview = document.getElementById('photo-preview');
-                if (placeholder) placeholder.style.display = 'none';
-                if (preview) { preview.src = e.target.result; preview.style.display = 'block'; }
-            };
-            reader.readAsDataURL(file);
-        });
-    }
 })();
 </script>
 

@@ -4,7 +4,7 @@
 {% block extra_ph_css %}<style>
 .ticket-wrap {
   max-width: 480px; margin: 24px auto; background: var(--ph-surface);
-  border-radius: 12px; box-shadow: 0 4px 24px rgba(15,67,88,.12); overflow: hidden;
+  border-radius: 12px; box-shadow: 0 4px 24px rgba(var(--ph-700-rgb),.12); overflow: hidden;
 }
 .ticket-header {
   background: var(--ph-600); color: #fff; padding: 22px 28px; text-align: center;
@@ -24,8 +24,10 @@
 .ticket-actions { display: flex; gap: 10px; justify-content: center; padding: 14px 28px; border-top: 1px solid var(--ph-border); }
 @media print {
   .ph-nav, .topbar, .ticket-actions, .ph-page-head { display: none !important; }
-  .ticket-wrap { box-shadow: none; margin: 0; max-width: 100%; }
+  .ticket-wrap { box-shadow: none; margin: 0 auto; max-width: 480px; }
   body { background: #fff !important; }
+  .content { padding: 10mm !important; }
+  @page { margin: 0; }
 }
 </style>{% endblock %}
 
@@ -87,7 +89,7 @@
         <tr>
           <td>
             <div style="font-weight:600;font-size:12px;">{{ ligne.produit.nom }}</div>
-            {% if ligne.produit.unite_mesure %}<div style="font-size:10px;color:var(--ph-muted);">{{ ligne.produit.unite_mesure }}</div>{% endif %}
+            {% if ligne.produit.unite_mesure %}<div style="font-size:10px;color:var(--ph-muted);">{{ ligne.produit.unite_mesure.nom }}</div>{% endif %}
           </td>
           <td style="text-align:center;font-weight:700;">{{ ligne.quantite|floatformat:0 }}</td>
           <td style="text-align:right;font-size:12px;">{{ ligne.prix_unitaire|floatformat:0 }} F</td>
@@ -107,7 +109,7 @@
     </div>
     <div class="ticket-total">
       <span style="color:var(--ph-muted);">Remise</span>
-      <span style="color:#b71c1c;">- {{ vente.remise|floatformat:0 }} F CFA</span>
+      <span style="color:var(--rose-text);">- {{ vente.remise|floatformat:0 }} F CFA</span>
     </div>
     {% endif %}
     <div class="ticket-total net">

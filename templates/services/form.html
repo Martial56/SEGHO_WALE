@@ -47,24 +47,24 @@
     <div class="art-photo-block" style="float:right;margin-left:20px;">
       <label for="photo-input" class="art-photo-zone" id="photo-zone">
         {% if article and article.photo %}
-        <img src="{{ article.photo.url }}" alt="Photo" class="art-photo-zone-img" id="photo-preview">
+        <img src="{{ article.photo.url }}" alt="Photo" class="art-photo-zone-img" data-photo-preview="article">
         <div class="art-photo-zone-overlay">
           <i class="bi bi-camera-fill"></i>
           <span>Changer</span>
         </div>
         {% else %}
-        <div class="art-photo-zone-empty" id="photo-placeholder">
+        <div class="art-photo-zone-empty" data-photo-placeholder="article">
           <i class="bi bi-image"></i>
           <span>Photo</span>
         </div>
-        <img src="" alt="Photo" class="art-photo-zone-img" id="photo-preview" style="display:none;">
-        <div class="art-photo-zone-overlay" id="photo-overlay" style="display:none;">
+        <img src="" alt="Photo" class="art-photo-zone-img" data-photo-preview="article" style="display:none;">
+        <div class="art-photo-zone-overlay" data-photo-overlay="article" style="display:none;">
           <i class="bi bi-camera-fill"></i>
           <span>Changer</span>
         </div>
         {% endif %}
       </label>
-      <input type="file" name="photo" id="photo-input" accept="image/*" style="display:none">
+      <input type="file" name="photo" id="photo-input" data-photo-input="article" accept="image/*" style="display:none">
     </div>
 
     <!-- Deux colonnes principales -->
@@ -223,25 +223,6 @@ document.querySelectorAll('.f-tab').forEach(function(btn) {
     document.getElementById(btn.dataset.tab).classList.add('active');
   });
 });
-
-/* ── Aperçu photo ── */
-var photoInput = document.getElementById('photo-input');
-if (photoInput) {
-  photoInput.addEventListener('change', function() {
-    var file = this.files[0];
-    if (!file) return;
-    var reader = new FileReader();
-    reader.onload = function(e) {
-      var placeholder = document.getElementById('photo-placeholder');
-      var preview = document.getElementById('photo-preview');
-      var overlay = document.getElementById('photo-overlay');
-      if (placeholder) placeholder.style.display = 'none';
-      if (preview) { preview.src = e.target.result; preview.style.display = 'block'; }
-      if (overlay) overlay.style.display = 'flex';
-    };
-    reader.readAsDataURL(file);
-  });
-}
 
 /* ── Alignement du panneau de contrôle sous la barre de menu ──
    Même méthode que templates/employer/base.html (canonique) : on mesure

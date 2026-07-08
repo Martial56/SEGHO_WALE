@@ -1,4 +1,5 @@
 {% extends 'employer/base.html' %}
+{% load static %}
 
 {% block topbar_title %}Registre unique du personnel{% endblock %}
 
@@ -43,7 +44,7 @@ html[data-theme="dark"] .reg-filter select{color:var(--rh-text);}
 .reg-table thead th:last-child{border-right:none;}
 .reg-table tbody tr{border-bottom:1px solid var(--rh-border);}
 .reg-table tbody tr:nth-child(even){background:var(--rh-50);}
-.reg-table tbody tr:hover{background:rgba(26,109,140,0.07);}
+.reg-table tbody tr:hover{background:rgba(var(--rh-600-rgb),0.07);}
 .reg-table tbody td{padding:7px 10px;color:var(--rh-text);vertical-align:middle;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .reg-table tbody td.obs{white-space:normal;font-size:11px;color:var(--rh-muted);}
@@ -86,10 +87,16 @@ html[data-theme="dark"] .rh-page-link.active { background:var(--rh-600); color:#
   .reg-table{font-size:9pt;}
   .reg-table thead tr{background:#071e28!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   .reg-table tbody tr:nth-child(even){background:#e8f2f8!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-  h2.reg-print-title{display:block!important;}
-  @page{size:A3 landscape;margin:10mm;}
+  .print-header{display:block!important;margin-bottom:14px;}
+  .content{padding:10mm 12mm !important;}
+  @page{size:A3 landscape;margin:0;}
 }
-h2.reg-print-title{display:none;font-size:14pt;text-align:center;margin-bottom:8px;}
+.print-header{display:none;}
+.print-header-inner{display:flex;align-items:center;gap:14px;padding-bottom:10px;border-bottom:2.5px solid var(--rh-700);}
+.print-header-logo{height:56px;width:auto;flex-shrink:0;}
+.print-header-org{font-size:15px;font-weight:800;color:#071e28;text-transform:uppercase;letter-spacing:.06em;line-height:1.2;}
+.print-header-subtitle{font-size:9.5px;color:#666;margin-top:1px;letter-spacing:.03em;}
+.print-header-doc{font-size:12px;font-weight:700;color:var(--rh-700);margin-top:5px;text-transform:uppercase;letter-spacing:.05em;}
 </style>
 {% endblock %}
 
@@ -118,7 +125,7 @@ h2.reg-print-title{display:none;font-size:14pt;text-align:center;margin-bottom:8
     <!-- Export Excel -->
     <a href="{% url 'rh_registre_export' %}{% if statut_filtre %}?statut={{ statut_filtre }}{% endif %}"
        class="btn-rh-outline print-hide">
-      <i class="bi bi-file-earmark-excel-fill" style="color:#0f4358;"></i> Export Excel
+      <i class="bi bi-file-earmark-excel-fill" style="color:var(--rh-700);"></i> Export Excel
     </a>
     <!-- Imprimer -->
     <button onclick="window.print()" class="btn-rh print-hide">
@@ -145,8 +152,17 @@ h2.reg-print-title{display:none;font-size:14pt;text-align:center;margin-bottom:8
   {% endif %}
 </div>
 
-<!-- Titre impression -->
-<h2 class="reg-print-title">REGISTRE UNIQUE DU PERSONNEL — Centre Médico-Social WALÉ</h2>
+<!-- En-tête impression -->
+<div class="print-header">
+  <div class="print-header-inner">
+    <img src="{% static 'img/logo.png' %}" alt="Logo WALÉ" class="print-header-logo">
+    <div>
+      <div class="print-header-org">Centre Médico-Social WALÉ</div>
+      <div class="print-header-subtitle">Yamoussoukro — Côte d'Ivoire</div>
+      <div class="print-header-doc">Registre unique du personnel</div>
+    </div>
+  </div>
+</div>
 
 <!-- Tableau -->
 <div class="reg-wrap">

@@ -162,8 +162,15 @@ html[data-theme="dark"] .o-nav-link.active {
 }
 
 @media (max-width: 680px) {
-    .o-nav-link:not(.active) {
-        display: none;
+    /* Les liens restent tous accessibles : la barre défile horizontalement
+       plutôt que de masquer les onglets non actifs (les rendait injoignables). */
+    .o-nav {
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+    }
+    .o-nav-link {
+        flex-shrink: 0;
     }
 }
 
@@ -846,8 +853,10 @@ html[data-theme="dark"] .card-meta {
 .table-container {
     background: var(--surface);
     border-radius: var(--radius);
-    overflow: hidden;
+    overflow-x: auto;
+    overflow-y: hidden;
     box-shadow: var(--shadow-sm);
+    -webkit-overflow-scrolling: touch;
 }
 
 table {
@@ -973,24 +982,32 @@ html[data-theme="dark"] .alert-info {
 }
 
 .badge-primary {
-    background: rgba(33, 136, 171, 0.15);
+    background: rgba(var(--teal-600-rgb), 0.15);
     color: var(--teal-600);
 }
 
 .badge-success {
-    background: rgba(22, 169, 107, 0.15);
+    background: rgba(var(--teal-600-rgb), 0.15);
     color: var(--green);
 }
 
 .badge-warning {
-    background: rgba(232, 154, 26, 0.15);
+    background: rgba(var(--amber-rgb), 0.15);
     color: var(--amber);
 }
 
 .badge-danger {
-    background: rgba(232, 69, 69, 0.15);
+    background: rgba(var(--rose-rgb), 0.15);
     color: var(--rose);
 }
+
+/* Badges statut stock/pharmacie (partagés — mêmes valeurs dans les deux modules) */
+.badge-ok, .badge-ph-ok           { background:rgba(var(--teal-600-rgb),.1); color:var(--teal-600); border:1px solid rgba(var(--teal-600-rgb),.25); padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
+.badge-alerte, .badge-ph-alerte   { background:rgba(var(--amber-rgb),.1); color:var(--amber-text); border:1px solid rgba(var(--amber-rgb),.25); padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
+.badge-rupture, .badge-ph-rupture { background:rgba(var(--rose-rgb),.1); color:var(--rose-text); border:1px solid rgba(var(--rose-rgb),.25); padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
+html[data-theme="dark"] .badge-ok, html[data-theme="dark"] .badge-ph-ok           { background:rgba(var(--teal-600-rgb),.22); color:var(--teal-300); border-color:rgba(var(--teal-600-rgb),.35); }
+html[data-theme="dark"] .badge-alerte, html[data-theme="dark"] .badge-ph-alerte   { background:rgba(var(--amber-rgb),.18); color:#f0c060; border-color:rgba(var(--amber-rgb),.3); }
+html[data-theme="dark"] .badge-rupture, html[data-theme="dark"] .badge-ph-rupture { background:rgba(var(--rose-rgb),.18); color:#f09090; border-color:rgba(var(--rose-rgb),.3); }
 
 /* ══════════════════════════════════════
    FORMULAIRES (basiques — .form-group)

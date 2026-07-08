@@ -1,5 +1,4 @@
 import calendar
-import csv
 from datetime import date as _d, timedelta as timedelta
 
 from django.shortcuts import render, redirect, get_object_or_404
@@ -1338,19 +1337,15 @@ def conge_export_csv(request):
             Q(employe__nom__icontains=q) | Q(employe__prenoms__icontains=q)
         )
 
-    response = HttpResponse(content_type='text/csv; charset=utf-8')
-    response['Content-Disposition'] = 'attachment; filename="conges_export.csv"'
-    response.write('﻿')  # BOM UTF-8 pour Excel
-
-    writer = csv.writer(response, delimiter=';')
-    writer.writerow([
+    from core.utils import csv_response
+    headers = [
         'Matricule', 'Nom', 'Prénom', 'Service',
         'Type', 'Date début', 'Date fin',
         'Jours calendaires', 'Jours ouvrés',
         'Statut', 'Demandé le', 'Approuvé par',
-    ])
-    for c in qs:
-        writer.writerow([
+    ]
+    rows = [
+        [
             c.employe.matricule,
             c.employe.nom,
             c.employe.prenoms,
@@ -1363,8 +1358,10 @@ def conge_export_csv(request):
             c.get_statut_display(),
             c.date_demande.strftime('%d/%m/%Y'),
             str(c.approuve_par) if c.approuve_par else '',
-        ])
-    return response
+        ]
+        for c in qs
+    ]
+    return csv_response('conges_export', headers, rows)
 
 
 # ── Statistiques par service ──────────────────────────────────────────────────
@@ -1614,13 +1611,10 @@ def conge_rapport(request):
 
     # Export CSV du rapport
     if request.GET.get('export') == 'csv':
-        response = HttpResponse(content_type='text/csv; charset=utf-8')
-        response['Content-Disposition'] = f'attachment; filename="rapport_conges_{year}.csv"'
-        response.write('﻿')
-        writer = csv.writer(response, delimiter=';')
-        writer.writerow(['Employé', 'Matricule', 'Service', 'Type', 'Début', 'Fin', 'Jours ouvrés', 'Statut'])
-        for c in qs:
-            writer.writerow([
+        from core.utils import csv_response
+        headers = ['Employé', 'Matricule', 'Service', 'Type', 'Début', 'Fin', 'Jours ouvrés', 'Statut']
+        rows = [
+            [
                 c.employe.nom_complet,
                 c.employe.matricule,
                 c.employe.service.nom if c.employe.service else '',
@@ -1629,8 +1623,10 @@ def conge_rapport(request):
                 c.date_fin.strftime('%d/%m/%Y'),
                 c.nb_jours_ouvres,
                 c.get_statut_display(),
-            ])
-        return response
+            ]
+            for c in qs
+        ]
+        return csv_response(f'rapport_conges_{year}', headers, rows)
 
     # Statistiques par type
     from collections import defaultdict

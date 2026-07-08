@@ -4,15 +4,8 @@
 
 {% block extra_st_css %}<style>
 .content { padding-top: 0; }
-.st-page-head {
-  display:flex; align-items:center; justify-content:space-between; gap:16px;
-  padding:12px 32px; margin:0 -32px;
-  background:#e8f2f7; border-bottom:1px solid rgba(0,0,0,.05);
-  box-shadow:0 2px 8px rgba(0,0,0,.04);
-  position:sticky; top:var(--topbar-h); z-index:100;
-}
-.badge-pharma { background:rgba(15,67,88,.1);color:var(--st-700);border:1px solid rgba(15,67,88,.2);padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600; }
-.badge-soumis  { background:rgba(232,154,26,.1);color:#8a5c00;border:1px solid rgba(232,154,26,.25);padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600; }
+.badge-pharma { background:rgba(var(--st-700-rgb),.1);color:var(--st-700);border:1px solid rgba(var(--st-700-rgb),.2);padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600; }
+.badge-soumis  { background:rgba(var(--amber-rgb),.1);color:var(--amber-text);border:1px solid rgba(var(--amber-rgb),.25);padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600; }
 .qte-input {
   border:none; border-bottom:2px solid var(--st-400);
   background:transparent; padding:4px 6px; font-size:13px;
@@ -21,19 +14,19 @@
   transition:border-color .15s;
 }
 .qte-input:focus { outline:none; border-bottom-color:var(--st-600); }
-.stock-dispo-cell { text-align:center;font-weight:700;color:var(--st-700);background:rgba(15,67,88,.04); }
+.stock-dispo-cell { text-align:center;font-weight:700;color:var(--st-700);background:rgba(var(--st-700-rgb),.04); }
 .type-header td {
   background:var(--st-50);
   font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.4px;
   color:var(--st-600); padding:6px 12px; border-bottom:1px solid var(--st-border);
 }
 .btn-rejeter {
-  border:1.5px solid #c0392b; color:#c0392b; background:transparent;
+  border:1.5px solid var(--rose-btn); color:var(--rose-btn); background:transparent;
   border-radius:6px; padding:7px 16px; font-size:12.5px; font-weight:600;
   cursor:pointer; display:inline-flex; align-items:center; gap:5px;
   font-family:inherit; transition:all .15s;
 }
-.btn-rejeter:hover { background:#c0392b; color:#fff; }
+.btn-rejeter:hover { background:var(--rose-btn); color:#fff; }
 </style>{% endblock %}
 
 {% block content %}
@@ -41,40 +34,29 @@
 {% csrf_token %}
 <input type="hidden" name="action" id="form-action" value="valider">
 
-<!-- En-tête sticky -->
-<div class="st-page-head">
-  <div style="display:flex;align-items:center;gap:12px;">
-    <a href="{% url 'stock_fiche_detail' fiche.pk %}" class="btn-st-outline" style="padding:6px 12px;">
-      <i class="bi bi-arrow-left"></i>
-    </a>
-    <div>
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-        <span style="font-size:15px;font-weight:800;color:var(--st-900);">
-          <i class="bi bi-check2-square" style="color:var(--st-600);"></i> Valider la fiche
-        </span>
-        <span style="font-family: var(--font-mono);font-size:13px;color:var(--st-600);font-weight:700;">{{ fiche.numero }}</span>
-        
-        <span class="badge-soumis"><i class="bi bi-hourglass-split"></i> Soumis</span>
-      </div>
-      <div style="font-size:11.5px;color:var(--st-muted);margin-top:2px;">
-        <i class="bi bi-calendar3"></i>
-        Période du {{ fiche.periode_debut|date:"d/m/Y" }} au {{ fiche.periode_fin|date:"d/m/Y" }}
-        &nbsp;·&nbsp;
-        <i class="bi bi-person"></i> Créée par
-        {% if fiche.cree_par %}{{ fiche.cree_par.get_full_name|default:fiche.cree_par.username }}{% else %}—{% endif %}
-      </div>
-    </div>
+<div class="action-bar">
+  <div class="action-bar-breadcrumb">
+    <a href="{% url 'stock_fiche_detail' fiche.pk %}"><i class="bi bi-arrow-left"></i> Fiche {{ fiche.numero }}</a>
+    <span class="sep">/</span>
+    <span class="current">Valider <span class="badge-soumis"><i class="bi bi-hourglass-split"></i> Soumis</span></span>
   </div>
-  <div style="display:flex;gap:8px;align-items:center;">
+  <div class="action-bar-buttons">
     <button type="button" class="btn-rejeter"
       onclick="if(confirm('Rejeter cette fiche de besoins ? Cette action est définitive.'))
                { document.getElementById('form-action').value='rejeter'; document.getElementById('form-valider').submit(); }">
       <i class="bi bi-x-lg"></i> Rejeter
     </button>
-    <button type="submit" class="btn-st" onclick="document.getElementById('form-action').value='valider'">
+    <button type="submit" class="btn-form-submit" onclick="document.getElementById('form-action').value='valider'">
       <i class="bi bi-check-circle-fill"></i> Valider et approuver
     </button>
   </div>
+</div>
+<div style="font-size:11.5px;color:var(--st-muted);margin:-10px 0 6px;">
+  <i class="bi bi-calendar3"></i>
+  Période du {{ fiche.periode_debut|date:"d/m/Y" }} au {{ fiche.periode_fin|date:"d/m/Y" }}
+  &nbsp;·&nbsp;
+  <i class="bi bi-person"></i> Créée par
+  {% if fiche.cree_par %}{{ fiche.cree_par.get_full_name|default:fiche.cree_par.username }}{% else %}—{% endif %}
 </div>
 
 <!-- Infos résumées -->
@@ -114,10 +96,10 @@
           <th style="text-align:center;">Stock initial</th>
           <th style="text-align:center;">Qté reçue</th>
           <th style="text-align:center;">Qté dispensée</th>
-          <th style="text-align:center;background:rgba(15,67,88,.07);">Stock dispo</th>
+          <th style="text-align:center;background:rgba(var(--st-700-rgb),.07);">Stock dispo</th>
           <th style="text-align:center;">CMM</th>
           <th style="text-align:center;">Qté demandée</th>
-          <th style="text-align:center;background:rgba(26,109,140,.08);color:#1a6d8c;">Qté accordée</th>
+          <th style="text-align:center;background:rgba(var(--st-600-rgb),.08);color:var(--st-600);">Qté accordée</th>
         </tr>
       </thead>
       <tbody>
@@ -140,14 +122,14 @@
           <div style="font-weight:600;">{{ ligne.produit.nom }}</div>
           {% if ligne.produit.dci %}<div style="font-size:10.5px;color:var(--st-muted);">{{ ligne.produit.dci }}</div>{% endif %}
         </td>
-        <td style="font-size:12px;color:var(--st-muted);">{{ ligne.produit.unite_mesure|default:"—" }}</td>
+        <td style="font-size:12px;color:var(--st-muted);">{{ ligne.produit.unite_mesure.nom|default:"—" }}</td>
         <td style="text-align:center;font-size:12.5px;">{{ ligne.stock_initial|floatformat:0|default:"—" }}</td>
         <td style="text-align:center;font-size:12.5px;">{{ ligne.qte_recue|floatformat:0|default:"0" }}</td>
         <td style="text-align:center;font-size:12.5px;">{{ ligne.qte_dispensee|floatformat:0|default:"0" }}</td>
         <td class="stock-dispo-cell">{{ ligne.stock_disponible|floatformat:0|default:"—" }}</td>
         <td style="text-align:center;font-size:12.5px;color:var(--st-muted);">{{ ligne.cmm|floatformat:0|default:"—" }}</td>
         <td style="text-align:center;font-weight:700;font-size:13px;">{{ ligne.qte_commander|floatformat:0|default:"0" }}</td>
-        <td style="text-align:center;background:rgba(26,109,140,.04);">
+        <td style="text-align:center;background:rgba(var(--st-600-rgb),.04);">
           <input type="number" name="accorde_{{ ligne.pk }}" class="qte-input"
             value="{{ ligne.qte_commander|default:0 }}"
             min="0" step="1"
@@ -167,18 +149,18 @@
     <div class="st-card-title"><i class="bi bi-chat-quote" style="color:var(--st-600);"></i> Notes de la direction</div>
   </div>
   <div class="st-card-body">
-    <div class="st-field" style="margin-bottom:0;">
-      <label class="st-label" for="id_notes_direction">Commentaire / Décision (visible sur la fiche)</label>
-      <textarea name="notes_direction" id="id_notes_direction" class="st-input"
-        rows="3" style="resize:vertical;"
+    <div class="form-field" style="margin-bottom:0;">
+      <label class="field-label" for="id_notes_direction">Commentaire / Décision (visible sur la fiche)</label>
+      <textarea name="notes_direction" id="id_notes_direction" class="field-ul"
+        rows="3"
         placeholder="Expliquez votre décision ou ajoutez des instructions pour le gestionnaire…">{{ fiche.notes_direction|default:'' }}</textarea>
     </div>
   </div>
 </div>
 
 <!-- Boutons de bas de page -->
-<div style="display:flex;justify-content:flex-end;gap:10px;padding:16px 0;border-top:1px solid var(--st-border);margin-top:4px;">
-  <a href="{% url 'stock_fiche_detail' fiche.pk %}" class="btn-st-outline">
+<div class="form-actions">
+  <a href="{% url 'stock_fiche_detail' fiche.pk %}" class="btn-form-cancel">
     <i class="bi bi-x-lg"></i> Annuler
   </a>
   <button type="button" class="btn-rejeter"
@@ -186,7 +168,7 @@
              { document.getElementById('form-action').value='rejeter'; document.getElementById('form-valider').submit(); }">
     <i class="bi bi-x-circle"></i> Rejeter la fiche
   </button>
-  <button type="submit" class="btn-st" onclick="document.getElementById('form-action').value='valider'">
+  <button type="submit" class="btn-form-submit" onclick="document.getElementById('form-action').value='valider'">
     <i class="bi bi-check-circle-fill"></i> Valider et approuver
   </button>
 </div>

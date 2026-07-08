@@ -100,6 +100,11 @@ class Soin(models.Model):
         verbose_name_plural = "Soins"
         ordering = ['-date_creation']
         permissions = [
+            # Attention : 'can_creer_facture' existe aussi sur hospitalisation.Hospitalisation
+            # (codename dupliqué entre apps). Toujours qualifier par app_label :
+            # user.has_perm('soins.can_creer_facture'), jamais un
+            # Permission.objects.get(codename='can_creer_facture') non qualifié
+            # (lève MultipleObjectsReturned).
             ('can_creer_facture', 'Peut créer une facture de soin'),
             ('can_administrer_soin', 'Peut administrer un soin'),
         ]

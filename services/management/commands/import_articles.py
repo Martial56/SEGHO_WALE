@@ -14,9 +14,10 @@ import json
 from pathlib import Path
 from django.core.management.base import BaseCommand, CommandError
 from services.models import (
-    Articleservice, CategorieArticle, UniteMesure,
+    Articleservice, CategorieArticle,
     FamilleArticle, CompagniePharma,
 )
+from stock.models import UniteMesure
 from django.contrib.auth.models import User
 
 # Valeurs du JSON source → choix valides du modèle

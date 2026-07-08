@@ -79,7 +79,7 @@
       <div class="caisse-stat-lbl">Ventes ce jour</div>
     </div>
     <div class="caisse-stat">
-      <div class="caisse-stat-val" style="color:#1a6d8c;">{{ stats_jour.total|floatformat:0 }} F</div>
+      <div class="caisse-stat-val" style="color:var(--ph-600);">{{ stats_jour.total|floatformat:0 }} F</div>
       <div class="caisse-stat-lbl">CA du jour</div>
     </div>
     <a href="{% url 'pharmacie_recette' pharmacie %}" class="btn-ph-outline" style="font-size:12px;padding:5px 12px;">
@@ -95,8 +95,8 @@
 {% if messages %}
 {% for msg in messages %}
 <div style="margin:12px 0;padding:8px 16px;border-radius:6px;font-size:12.5px;
-  {% if msg.tags == 'error' %}background:rgba(232,69,69,.1);color:#b71c1c;border:1px solid rgba(232,69,69,.2);
-  {% else %}background:rgba(26,109,140,.1);color:#1a6d8c;border:1px solid rgba(26,109,140,.2);{% endif %}">
+  {% if msg.tags == 'error' %}background:rgba(var(--rose-rgb),.1);color:var(--rose-text);border:1px solid rgba(var(--rose-rgb),.2);
+  {% else %}background:rgba(var(--ph-600-rgb),.1);color:var(--ph-600);border:1px solid rgba(var(--ph-600-rgb),.2);{% endif %}">
   <i class="bi bi-{% if msg.tags == 'error' %}exclamation-triangle{% else %}check-circle{% endif %}-fill"></i> {{ msg }}
 </div>
 {% endfor %}
@@ -143,13 +143,13 @@
         <td>
           <div style="font-weight:600;">{{ item.produit.nom }}</div>
           {% if item.produit.dci %}<div style="font-size:10.5px;color:var(--ph-muted);">{{ item.produit.dci }}</div>{% endif %}
-          {% if item.produit.unite_mesure %}<div style="font-size:10.5px;color:var(--ph-muted);">Unité : {{ item.produit.unite_mesure }}</div>{% endif %}
+          {% if item.produit.unite_mesure %}<div style="font-size:10.5px;color:var(--ph-muted);">Unité : {{ item.produit.unite_mesure.nom }}</div>{% endif %}
         </td>
         <td style="text-align:center;">
-          <span style="font-weight:700;color:{% if item.quantite <= 5 %}#8a5c00{% else %}#1a6d8c{% endif %};">
+          <span style="font-weight:700;color:{% if item.quantite <= 5 %}var(--amber-text){% else %}var(--ph-600){% endif %};">
             {{ item.quantite|floatformat:0 }}
           </span>
-          {% if item.produit.unite_mesure %}<span style="font-size:10.5px;color:var(--ph-muted);"> {{ item.produit.unite_mesure }}</span>{% endif %}
+          {% if item.produit.unite_mesure %}<span style="font-size:10.5px;color:var(--ph-muted);"> {{ item.produit.unite_mesure.nom }}</span>{% endif %}
         </td>
         <td style="text-align:right;font-weight:700;color:var(--ph-800);">
           {{ item.produit.prix_vente|floatformat:0 }}<span style="font-size:10px;font-weight:400;color:var(--ph-muted);"> F</span>

@@ -1,0 +1,139 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
+<title>SEGHO-WALE</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html { background:#2e592b; }
+body {
+  font-family:'Sora',sans-serif;
+  min-height:100vh;
+  background-color:#2e592b;
+  background-image:linear-gradient(135deg, #071e28 0%, #2e592b 50%, #4f9b4b 100%);
+  background-size:180% 180%;
+  animation:driftBg 12s ease-in-out infinite;
+  display:flex; align-items:center; justify-content:center;
+  overflow:hidden;
+  cursor:pointer;
+  transition:opacity 0.4s ease;
+}
+body.leaving { opacity:0; }
+.intro-wrap { text-align:center; position:relative; }
+.logo-glow {
+  position:absolute; top:-40px; left:50%; width:220px; height:220px;
+  transform:translateX(-50%); border-radius:50%;
+  background:radial-gradient(circle, rgba(191,232,187,0.35) 0%, rgba(191,232,187,0) 70%);
+  opacity:0;
+  animation:glowIn 1.8s ease 0.15s forwards, breathe 3.2s ease-in-out 1.95s infinite;
+}
+.logo-icon {
+  display:block; margin:0 auto 26px; width:110px; height:110px; object-fit:contain;
+  filter:brightness(0) invert(1);
+  opacity:0; transform:scale(0.6);
+  animation:popIn 0.7s cubic-bezier(.34,1.56,.64,1) 0.15s forwards;
+  position:relative;
+}
+.title {
+  color:#fff; font-size:40px; font-weight:800; letter-spacing:1px;
+}
+.title span {
+  display:inline-block;
+  opacity:0; transform:translateY(14px) scale(0.85);
+  filter:blur(4px);
+  animation:riseIn 0.5s cubic-bezier(.2,.8,.3,1) forwards;
+}
+.subtitle {
+  margin-top:18px; color:rgba(255,255,255,0.65); font-size:14.5px; line-height:1.7;
+  opacity:0; transform:translateY(10px);
+  animation:riseInSimple 0.6s ease 1.75s forwards;
+}
+.subtitle strong { color:rgba(255,255,255,0.9); font-weight:600; }
+.locale {
+  margin-top:14px; color:rgba(255,255,255,0.35); font-size:12px; letter-spacing:0.5px; text-transform:uppercase;
+  opacity:0;
+  animation:fadeInOnly 0.6s ease 2.1s forwards;
+}
+.progress-track {
+  margin:34px auto 0; width:180px; height:3px; border-radius:3px;
+  background:rgba(255,255,255,0.15); overflow:hidden;
+  opacity:0;
+  animation:fadeInOnly 0.4s ease 2.1s forwards;
+}
+.progress-bar {
+  height:100%; width:0%; border-radius:3px;
+  background:linear-gradient(90deg, #4f9b4b, #bfe8bb);
+  animation:fillBar 1.7s ease 2.1s forwards;
+}
+.skip-hint {
+  margin-top:20px; color:rgba(255,255,255,0.25); font-size:11.5px;
+  opacity:0;
+  animation:fadeInOnly 0.5s ease 2.4s forwards, pulse 2s ease-in-out 2.9s infinite;
+}
+@keyframes driftBg {
+  0%, 100% { background-position:0% 50%; }
+  50% { background-position:100% 50%; }
+}
+@keyframes popIn { from { opacity:0; transform:scale(0.6); } to { opacity:1; transform:scale(1); } }
+@keyframes glowIn { from { opacity:0; } to { opacity:1; } }
+@keyframes breathe { 0%, 100% { transform:translateX(-50%) scale(1); opacity:0.7; } 50% { transform:translateX(-50%) scale(1.12); opacity:1; } }
+@keyframes riseIn { to { opacity:1; transform:translateY(0) scale(1); filter:blur(0); } }
+@keyframes riseInSimple { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+@keyframes fadeInOnly { from { opacity:0; } to { opacity:1; } }
+@keyframes fillBar { from { width:0%; } to { width:100%; } }
+@keyframes pulse { 0%, 100% { opacity:0.25; } 50% { opacity:0.55; } }
+
+@media (prefers-reduced-motion: reduce) {
+  body { animation:none; }
+  .logo-glow { display:none; }
+  .logo-icon, .title span, .subtitle, .locale, .progress-track, .progress-bar, .skip-hint {
+    animation:none !important; opacity:1 !important; transform:none !important; filter:none !important;
+  }
+  .progress-bar { width:100%; }
+}
+</style>
+</head>
+<body>
+<div class="intro-wrap">
+  <div class="logo-glow"></div>
+  <img src="{% static 'img/logo.png' %}" alt="Logo SEGHO-WALE" class="logo-icon">
+  <div class="title" id="intro-title"></div>
+  <div class="subtitle">
+    <strong>S</strong>ystème <strong>E</strong>lectronique de <strong>G</strong>estion <strong>H</strong>ospitalière<br>
+    Centre Médico-Social <strong>WALÉ</strong>
+  </div>
+  <div class="locale">Yamoussoukro · Côte d'Ivoire</div>
+  <div class="progress-track"><div class="progress-bar"></div></div>
+  <div class="skip-hint">Cliquez pour continuer</div>
+</div>
+<script>
+(function () {
+  var titleEl = document.getElementById('intro-title');
+  var text = 'SEGHO-WALE';
+  var baseDelay = 0.55, stagger = 0.07;
+  for (var i = 0; i < text.length; i++) {
+    var span = document.createElement('span');
+    span.textContent = text[i];
+    span.style.animationDelay = (baseDelay + i * stagger) + 's';
+    titleEl.appendChild(span);
+  }
+
+  var next = "{% url 'dashboard' %}";
+  var done = false;
+  function go() {
+    if (done) return;
+    done = true;
+    document.body.classList.add('leaving');
+    setTimeout(function () { window.location.href = next; }, 400);
+  }
+  document.addEventListener('click', go);
+  document.addEventListener('keydown', go);
+  setTimeout(go, 4200);
+})();
+</script>
+</body>
+</html>

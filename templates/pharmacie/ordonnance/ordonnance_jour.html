@@ -1,0 +1,265 @@
+{% extends 'pharmacie/base.html' %}
+{% load static %}
+
+{% block topbar_title %}Ordonnances — {{ label }}{% endblock %}
+
+{% block extra_ph_css %}<style>
+.ph-page-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 11px 32px;
+  background: var(--ph-surface); border-bottom: 1px solid var(--ph-border);
+  position: sticky; top: var(--topbar-h); z-index: 100;
+  flex-wrap: wrap;
+}
+.ph-date-form { display: flex; align-items: center; gap: 8px; }
+.ph-date-form input[type="date"] {
+  border: none; border-bottom: 1.5px solid var(--ph-300); background: transparent;
+  padding: 5px 4px; font-size: 12.5px; cursor: pointer; color: var(--ph-text);
+}
+.ph-stats-grid {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px;
+  padding: 16px 32px 0;
+}
+.ph-stat-card {
+  background: var(--ph-surface); border: 1px solid var(--ph-border);
+  border-radius: 10px; padding: 12px 16px; border-top: 3px solid var(--ph-400);
+}
+.ph-stat-card.v-total    { border-top-color: var(--ph-500); }
+.ph-stat-card.v-attente  { border-top-color: var(--amber); }
+.ph-stat-card.v-servies  { border-top-color: var(--ph-600); }
+.ph-stat-card.v-servis   { border-top-color: var(--ph-600); }
+.ph-stat-card.v-ailleurs { border-top-color: var(--rose); }
+.ph-stat-label { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--ph-muted); margin-bottom: 4px; }
+.ph-stat-value { font-size: 20px; font-weight: 800; color: var(--ph-text); }
+
+.ph-meds-panels { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 16px 32px 0; }
+.ph-meds-panel { background: var(--ph-surface); border: 1px solid var(--ph-border); border-radius: 10px; overflow: hidden; }
+.ph-meds-panel-head {
+  padding: 10px 16px; font-size: 11.5px; font-weight: 700; display: flex; align-items: center; gap: 6px;
+}
+.ph-meds-panel-head.servis   { background: rgba(var(--ph-600-rgb),.08); color: var(--ph-700); }
+.ph-meds-panel-head.ailleurs { background: rgba(var(--rose-rgb),.08); color: var(--rose-text); }
+.ph-meds-panel-body { max-height: 180px; overflow-y: auto; }
+.ph-meds-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 7px 16px; font-size: 12.5px; border-bottom: 1px solid var(--ph-border);
+}
+.ph-meds-row:last-child { border-bottom: none; }
+.ph-meds-empty { padding: 16px; text-align: center; font-size: 12px; color: var(--ph-muted); }
+.ph-meds-qty { font-weight: 700; color: var(--ph-600); font-family: var(--font-mono); }
+.ph-meds-count { font-weight: 700; color: var(--rose-text); font-family: var(--font-mono); }
+
+.ph-filter-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 32px; margin-top: 16px;
+  background: var(--ph-50); border-bottom: 1px solid var(--ph-border);
+  flex-wrap: wrap;
+}
+.ph-filter-btn {
+  padding: 4px 13px; border-radius: 20px; font-size: 11.5px; font-weight: 600;
+  border: 1.5px solid transparent; cursor: pointer; text-decoration: none;
+  color: var(--ph-muted); background: transparent; transition: all .15s;
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.ph-filter-btn:hover { color: var(--ph-700); border-color: var(--ph-300); background: var(--ph-surface); }
+.ph-filter-btn.active { color: var(--ph-700); border-color: var(--ph-500); background: var(--ph-surface); }
+
+.ph-table-bord { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.ph-table-bord thead tr { background: var(--ph-100); border-bottom: 2px solid var(--ph-300); }
+.ph-table-bord thead th { padding: 9px 14px; font-weight: 700; font-size: 10.5px; text-transform: uppercase; letter-spacing: .4px; color: var(--ph-800); text-align: left; white-space: nowrap; }
+.ph-table-bord thead th:first-child { padding-left: 32px; }
+.ph-table-bord thead th:last-child  { padding-right: 32px; }
+.ph-table-bord tbody tr { border-bottom: 1px solid var(--ph-border); transition: background .12s; cursor: pointer; }
+.ph-table-bord tbody tr:hover { background: var(--ph-50); }
+.ph-table-bord tbody td { padding: 8px 14px; color: var(--ph-text); vertical-align: middle; }
+.ph-table-bord tbody td:first-child { padding-left: 32px; }
+.ph-table-bord tbody td:last-child  { padding-right: 32px; text-align: center; }
+.ph-meds-list { font-size: 11.5px; color: var(--ph-muted); }
+.ph-meds-list span { display: inline-block; background: var(--ph-50); border-radius: 4px; padding: 1px 7px; margin: 1px 2px 1px 0; font-size: 11px; }
+.o-badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.badge-emise     { background: rgba(var(--amber-rgb),.12); color: var(--amber-text); }
+.badge-delivree  { background: rgba(var(--ph-600-rgb),.12); color: var(--ph-600); }
+.badge-partielle { background: rgba(var(--amber-rgb),.12); color: var(--amber-text); }
+.badge-expiree   { background: rgba(var(--rose-rgb),.12); color: var(--rose-text); }
+.ph-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; color: var(--ph-muted); }
+</style>{% endblock %}
+
+{% block content %}
+
+<!-- En-tête sticky -->
+<div class="ph-page-head">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <div style="width:34px;height:34px;border-radius:8px;background:var(--ph-100);display:flex;align-items:center;justify-content:center;font-size:17px;color:var(--ph-600);">
+      <i class="bi bi-prescription2"></i>
+    </div>
+    <div>
+      <div style="font-size:15px;font-weight:800;color:var(--ph-900);">Ordonnances du jour</div>
+      <div style="font-size:11px;color:var(--ph-muted);">{{ selected_date|date:"l d F Y" }}</div>
+    </div>
+  </div>
+  <form method="get" class="ph-date-form">
+    {% if statut_filtre %}<input type="hidden" name="statut" value="{{ statut_filtre }}">{% endif %}
+    <input type="date" name="date" value="{{ selected_date|date:'Y-m-d' }}" onchange="this.form.submit()">
+    {% if selected_date != today %}
+    <a href="?" class="ph-filter-btn active"><i class="bi bi-calendar-check"></i> Aujourd'hui</a>
+    {% endif %}
+  </form>
+</div>
+
+<!-- ══ STATS ══ -->
+<div class="ph-stats-grid">
+  <div class="ph-stat-card v-total">
+    <div class="ph-stat-label">Ordonnances du jour</div>
+    <div class="ph-stat-value">{{ stats.total }}</div>
+  </div>
+  <div class="ph-stat-card v-attente">
+    <div class="ph-stat-label">En attente</div>
+    <div class="ph-stat-value" style="color:var(--amber-text);">{{ stats.en_attente }}</div>
+  </div>
+  <div class="ph-stat-card v-servies">
+    <div class="ph-stat-label">Ordonnances servies</div>
+    <div class="ph-stat-value" style="color:var(--ph-600);">{{ stats.servies }}</div>
+  </div>
+  <div class="ph-stat-card v-servis">
+    <div class="ph-stat-label">Médicaments servis</div>
+    <div class="ph-stat-value" style="color:var(--ph-600);">{{ stats.nb_meds_servis }}</div>
+  </div>
+  <div class="ph-stat-card v-ailleurs">
+    <div class="ph-stat-label">Achetés ailleurs</div>
+    <div class="ph-stat-value" style="color:var(--rose-text);">{{ stats.nb_meds_ailleurs }}</div>
+  </div>
+</div>
+
+<!-- ══ DÉTAIL MÉDICAMENTS ══ -->
+<div class="ph-meds-panels">
+  <div class="ph-meds-panel">
+    <div class="ph-meds-panel-head servis"><i class="bi bi-check-circle-fill"></i> Médicaments servis à cette pharmacie</div>
+    <div class="ph-meds-panel-body">
+      {% for m in meds_servis %}
+      <div class="ph-meds-row">
+        <span>{{ m.produit__nom|default:m.medicament_libre|default:"—" }}</span>
+        <span class="ph-meds-qty">{{ m.qte_totale|floatformat:0 }}</span>
+      </div>
+      {% empty %}
+      <div class="ph-meds-empty">Aucun médicament servi pour cette date.</div>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="ph-meds-panel">
+    <div class="ph-meds-panel-head ailleurs"><i class="bi bi-box-arrow-up-right"></i> Non disponibles — achetés dans une autre pharmacie</div>
+    <div class="ph-meds-panel-body">
+      {% for m in meds_ailleurs %}
+      <div class="ph-meds-row">
+        <span>{{ m.produit__nom|default:m.medicament_libre|default:"—" }}</span>
+        <span class="ph-meds-count">{{ m.nb_ordonnances }} ordo.</span>
+      </div>
+      {% empty %}
+      <div class="ph-meds-empty">Aucun médicament acheté ailleurs pour cette date.</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- ══ FILTRES + RECHERCHE ══ -->
+<div class="ph-filter-bar">
+  <span style="font-size:10.5px;font-weight:700;color:var(--ph-muted);text-transform:uppercase;letter-spacing:.4px;margin-right:4px;">Statut :</span>
+  <a href="?date={{ selected_date|date:'Y-m-d' }}{% if q %}&q={{ q }}{% endif %}"
+     class="ph-filter-btn {% if not statut_filtre %}active{% endif %}">Toutes</a>
+  <a href="?date={{ selected_date|date:'Y-m-d' }}&statut=emise{% if q %}&q={{ q }}{% endif %}"
+     class="ph-filter-btn {% if statut_filtre == 'emise' %}active{% endif %}">
+    <i class="bi bi-hourglass-split" style="color:var(--amber-text);"></i> En attente
+  </a>
+  <a href="?date={{ selected_date|date:'Y-m-d' }}&statut=delivree{% if q %}&q={{ q }}{% endif %}"
+     class="ph-filter-btn {% if statut_filtre == 'delivree' %}active{% endif %}">
+    <i class="bi bi-check-circle-fill" style="color:var(--ph-600);"></i> Délivrée
+  </a>
+  <a href="?date={{ selected_date|date:'Y-m-d' }}&statut=partielle{% if q %}&q={{ q }}{% endif %}"
+     class="ph-filter-btn {% if statut_filtre == 'partielle' %}active{% endif %}">
+    <i class="bi bi-exclamation-triangle-fill" style="color:var(--amber-text);"></i> Partielle
+  </a>
+  <span style="flex:1;"></span>
+  <form method="get" style="display:flex;gap:6px;align-items:center;">
+    <input type="hidden" name="date" value="{{ selected_date|date:'Y-m-d' }}">
+    {% if statut_filtre %}<input type="hidden" name="statut" value="{{ statut_filtre }}">{% endif %}
+    <input type="text" name="q" value="{{ q|default:'' }}" placeholder="Rechercher un patient, un numéro…"
+           style="border:none;border-bottom:1.5px solid var(--ph-300);background:transparent;padding:4px 4px;font-size:12.5px;min-width:220px;">
+    <button type="submit" class="btn-ph-outline" style="padding:4px 10px;font-size:12px;"><i class="bi bi-search"></i></button>
+  </form>
+</div>
+
+<!-- ══ TABLE ══ -->
+{% if page_obj %}
+<div style="overflow-x:auto;">
+  <table class="ph-table-bord">
+    <thead>
+      <tr>
+        <th>N° Ordonnance</th>
+        <th>Patient</th>
+        <th>Médecin</th>
+        <th>Médicaments</th>
+        <th>Heure</th>
+        <th>Statut</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ord in page_obj %}
+      {% if ord.consultation %}{% firstof ord.consultation.patient as pat %}{% firstof ord.medecin ord.consultation.medecin as med %}
+      {% else %}{% firstof ord.patient as pat %}{% firstof ord.medecin as med %}{% endif %}
+      <tr onclick="window.location='{% if ord.statut == 'emise' %}{% url 'pharmacie_dispenser' pharmacie ord.pk %}{% else %}{% url 'ordonnance_detail' ord.pk %}{% endif %}'">
+        <td style="font-family:var(--font-mono);font-weight:700;color:var(--ph-700);">{{ ord.numero }}</td>
+        <td>
+          {% if pat %}{{ pat.nom|upper }} {{ pat.prenoms }}
+          {% else %}<span style="color:var(--ph-muted);">—</span>{% endif %}
+        </td>
+        <td>{% if med %}Dr. {{ med.nom }}{% else %}<span style="color:var(--ph-muted);">—</span>{% endif %}</td>
+        <td>
+          <div class="ph-meds-list">
+            {% for l in ord.lignes.all|slice:":3" %}
+            <span>{{ l.medicament_libre|default:l.medicament|truncatechars:22 }}</span>
+            {% empty %}<span style="color:var(--ph-muted);">—</span>{% endfor %}
+            {% if ord.lignes.all|length > 3 %}<span style="color:var(--ph-muted);">+{{ ord.lignes.all|length|add:"-3" }}</span>{% endif %}
+          </div>
+        </td>
+        <td>{{ ord.date_emission|date:"H:i" }}</td>
+        <td><span class="o-badge badge-{{ ord.statut }}">{{ ord.get_statut_display }}</span></td>
+        <td onclick="event.stopPropagation();">
+          {% if ord.statut == 'emise' %}
+          <a href="{% url 'pharmacie_dispenser' pharmacie ord.pk %}" class="btn-ph-outline" style="padding:3px 10px;font-size:11.5px;">
+            <i class="bi bi-capsule"></i> Servir
+          </a>
+          {% elif ord.dispensation %}
+          <a href="{% url 'pharmacie_fiche_dispensation' pharmacie ord.dispensation.pk %}" class="btn-ph-outline" style="padding:3px 10px;font-size:11.5px;">
+            <i class="bi bi-file-earmark-text"></i> Fiche
+          </a>
+          {% else %}
+          <span style="color:var(--ph-muted);font-size:11px;">—</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if page_obj.paginator.num_pages > 1 %}
+<div class="ph-pagination" style="display:flex;justify-content:center;gap:6px;margin:20px 0;">
+  {% if page_obj.has_previous %}
+  <a class="ph-page-btn" href="?page={{ page_obj.previous_page_number }}&date={{ selected_date|date:'Y-m-d' }}{% if statut_filtre %}&statut={{ statut_filtre }}{% endif %}{% if q %}&q={{ q }}{% endif %}">Précédent</a>
+  {% endif %}
+  <span style="align-self:center;font-size:12px;color:var(--ph-muted);">Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+  {% if page_obj.has_next %}
+  <a class="ph-page-btn" href="?page={{ page_obj.next_page_number }}&date={{ selected_date|date:'Y-m-d' }}{% if statut_filtre %}&statut={{ statut_filtre }}{% endif %}{% if q %}&q={{ q }}{% endif %}">Suivant</a>
+  {% endif %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="ph-empty-state">
+  <i class="bi bi-prescription2" style="font-size:38px;margin-bottom:12px;opacity:.4;"></i>
+  <div style="font-size:14px;font-weight:600;color:var(--ph-text);margin-bottom:4px;">Aucune ordonnance{% if q %} pour "{{ q }}"{% endif %}</div>
+  <div style="font-size:12.5px;">Aucune ordonnance émise le {{ selected_date|date:"d/m/Y" }}{% if statut_filtre %} avec ce statut{% endif %}.</div>
+</div>
+{% endif %}
+
+{% endblock %}

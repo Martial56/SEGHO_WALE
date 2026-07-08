@@ -1,7 +1,8 @@
 {% extends 'planning/base.html' %}
-{% load i18n %}
+{% load i18n static %}
 
 {% block extra_planning_css %}
+.print-header { display: none; }
 .pl-actions { display: flex; align-items: center; gap: 10px; padding: 14px 0 16px 0; flex-wrap: wrap; }
 .pl-title-block {
   position: sticky; top: var(--topbar-h); z-index: 180;
@@ -50,7 +51,7 @@
   padding: 4px 6px; outline: none; font-family: inherit; color: var(--text);
   box-sizing: border-box;
 }
-.perm-input:focus { background: rgba(26,109,140,0.08); outline: 1px solid var(--pl-400); border-radius: 3px; }
+.perm-input:focus { background: rgba(var(--pl-600-rgb),0.08); outline: 1px solid var(--pl-400); border-radius: 3px; }
 html[data-theme="dark"] .td-perm-label { background: var(--pl-900); }
 html[data-theme="dark"] .td-perm { background: var(--pl-100) !important; border-color: var(--pl-300) !important; }
 html[data-theme="dark"] .perm-input { color: var(--text); }
@@ -61,7 +62,7 @@ html[data-theme="dark"] .perm-input { color: var(--text); }
   padding: 4px 4px; outline: none; font-family: inherit; color: var(--text);
   box-sizing: border-box;
 }
-.grid-input:focus { background: rgba(26,109,140,0.06); outline: 1px solid var(--pl-400); border-radius: 3px; }
+.grid-input:focus { background: rgba(var(--pl-600-rgb),0.06); outline: 1px solid var(--pl-400); border-radius: 3px; }
 
 /* Modale de sélection médecin */
 .med-overlay {
@@ -106,7 +107,7 @@ html[data-theme="dark"] .med-item:hover { background: var(--pl-100); }
 .med-empty { padding: 20px 18px; font-size: 13px; color: var(--text-muted); text-align: center; }
 .med-absent-tag {
   display: inline-flex; align-items: center; gap: 4px;
-  font-size: 11px; color: #c0392b; background: #fce4ec;
+  font-size: 11px; color: var(--rose-btn); background: #fce4ec;
   border-radius: 20px; padding: 2px 8px; white-space: nowrap; flex-shrink: 0;
 }
 html[data-theme="dark"] .med-absent-tag { background: #3d0010; color: #ff8a80; }
@@ -130,7 +131,7 @@ html[data-theme="dark"] .med-absent-tag { background: #3d0010; color: #ff8a80; }
   color: var(--pl-400); font-size: 14px; line-height: 1; flex-shrink: 0;
   display: flex; align-items: center; border-radius: 50%;
 }
-.chip-x:hover { color: #c0392b; background: #fce4ec; }
+.chip-x:hover { color: var(--rose-btn); background: #fce4ec; }
 .chip-add {
   background: transparent; border: 1.5px dashed var(--pl-300);
   border-radius: 20px; padding: 2px 9px; font-size: 11px;
@@ -159,7 +160,7 @@ html[data-theme="dark"] .chip-x:hover { background: rgba(192,57,43,0.2); color: 
   outline: none; font-family: inherit; color: var(--text-muted);
   font-style: italic; box-sizing: border-box;
 }
-.note-input:focus { color: var(--text); background: rgba(26,109,140,0.04); }
+.note-input:focus { color: var(--text); background: rgba(var(--pl-600-rgb),0.04); }
 
 /* Gabarits */
 .btn-gabarit {
@@ -210,7 +211,7 @@ html[data-theme="dark"] .chip-x:hover { background: rgba(192,57,43,0.2); color: 
 }
 .btn-cancel:hover { background: var(--bg); color: var(--text); }
 .alert-success {
-  background: #c8dce8; color: #0f4358; border: 1px solid #b8d4e8;
+  background: #c8dce8; color: var(--pl-700); border: 1px solid #b8d4e8;
   border-radius: 6px; padding: 10px 16px; margin-bottom: 14px;
   font-size: 13px; display: flex; align-items: center; gap: 8px;
 }
@@ -230,13 +231,44 @@ html[data-theme="dark"] .chip-x:hover { background: rgba(192,57,43,0.2); color: 
 .conflict-banner ul { margin: 0; padding-left: 16px; }
 
 @media print {
-  .pl-nav, .pl-actions, nav, #top-bar, .topbar, .sidebar,
+  .pl-nav, .pl-actions, .pl-title-block, nav, #top-bar, .topbar, .sidebar,
   .sidebar-wrapper, .topbar-wrapper, #sidebar { display: none !important; }
-  @page { size: A4 landscape; margin: 10mm; }
+
+  .print-header { display: block; margin-bottom: 14px; }
+  .print-header-inner {
+    display: flex; align-items: center; gap: 14px;
+    padding-bottom: 10px; border-bottom: 2.5px solid var(--pl-700);
+  }
+  .print-header-logo { height: 64px; width: auto; flex-shrink: 0; }
+  .print-header-center { flex: 1; }
+  .print-header-org {
+    font-size: 15px; font-weight: 800; color: #071e28;
+    text-transform: uppercase; letter-spacing: 0.06em; line-height: 1.2;
+  }
+  .print-header-subtitle { font-size: 9.5px; color: #666; margin-top: 1px; letter-spacing: 0.03em; }
+  .print-header-doc {
+    font-size: 12px; font-weight: 700; color: var(--pl-700);
+    margin-top: 5px; text-transform: uppercase; letter-spacing: 0.05em;
+  }
+
+  .content { padding: 10mm 12mm !important; }
+
+  @page { size: A4 landscape; margin: 0; }
 }
 {% endblock %}
 
 {% block content %}
+<div class="print-header">
+  <div class="print-header-inner">
+    <img src="{% static 'img/logo.png' %}" alt="Logo WALÉ" class="print-header-logo">
+    <div class="print-header-center">
+      <div class="print-header-org">Centre Médico-Social WALÉ</div>
+      <div class="print-header-subtitle">Yamoussoukro — Côte d'Ivoire</div>
+      <div class="print-header-doc">Modification du planning — semaine du {{ planning.semaine_debut|date:"d/m/Y" }}</div>
+    </div>
+  </div>
+</div>
+
 <div class="pl-title-block">
   <h2><i class="bi bi-pencil-square" style="color:var(--pl-600);margin-right:6px;"></i>Modifier le planning — semaine du {{ planning.semaine_debut|date:"d/m/Y" }}</h2>
   <div class="subtitle">Centre Médico-Social WALÉ</div>

@@ -10,9 +10,9 @@
   position:sticky;top:var(--topbar-h);z-index:100;flex-wrap:wrap;
 }
 .al-stats { display:flex;gap:12px;margin:16px 0; }
-.al-stat { background:var(--ph-surface);border-radius:10px;box-shadow:0 2px 8px rgba(15,67,88,.08);padding:14px 20px;flex:1;border-left:4px solid; }
-.al-stat.rupture { border-left-color:#b71c1c; }
-.al-stat.alerte  { border-left-color:#8a5c00; }
+.al-stat { background:var(--ph-surface);border-radius:10px;box-shadow:0 2px 8px rgba(var(--ph-700-rgb),.08);padding:14px 20px;flex:1;border-left:4px solid; }
+.al-stat.rupture { border-left-color:var(--rose-text); }
+.al-stat.alerte  { border-left-color:var(--amber-text); }
 .al-stat-val { font-size:22px;font-weight:800;line-height:1; }
 .al-stat-lbl { font-size:10.5px;font-weight:700;color:var(--ph-muted);text-transform:uppercase;margin-top:4px; }
 .al-section-head {
@@ -20,8 +20,8 @@
   padding:12px 20px 12px 32px;margin-top:14px;
   font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;
 }
-.al-section-head.rupt { background:rgba(232,69,69,.07);color:#b71c1c;border-top:1px solid rgba(232,69,69,.2);border-bottom:1px solid rgba(232,69,69,.2); }
-.al-section-head.ale  { background:rgba(232,154,26,.07);color:#8a5c00;border-top:1px solid rgba(232,154,26,.2);border-bottom:1px solid rgba(232,154,26,.2); }
+.al-section-head.rupt { background:rgba(var(--rose-rgb),.07);color:var(--rose-text);border-top:1px solid rgba(var(--rose-rgb),.2);border-bottom:1px solid rgba(var(--rose-rgb),.2); }
+.al-section-head.ale  { background:rgba(var(--amber-rgb),.07);color:var(--amber-text);border-top:1px solid rgba(var(--amber-rgb),.2);border-bottom:1px solid rgba(var(--amber-rgb),.2); }
 .al-table-wrap {overflow-x:auto; }
 .al-table { width:100%;border-collapse:collapse;font-size:12.5px; }
 .al-table thead tr { background:var(--ph-100);border-bottom:2px solid var(--ph-300); }
@@ -44,7 +44,7 @@
 <!-- En-tête sticky -->
 <div class="ph-page-head">
   <div style="display:flex;align-items:center;gap:12px;">
-    <div style="width:34px;height:34px;border-radius:8px;background:rgba(232,69,69,.1);display:flex;align-items:center;justify-content:center;font-size:17px;color:#b71c1c;">
+    <div style="width:34px;height:34px;border-radius:8px;background:rgba(var(--rose-rgb),.1);display:flex;align-items:center;justify-content:center;font-size:17px;color:var(--rose-text);">
       <i class="bi bi-bell-fill"></i>
     </div>
     <div>
@@ -62,19 +62,19 @@
 <!-- Stats -->
 <div class="al-stats">
   <div class="al-stat rupture">
-    <div class="al-stat-val" style="color:#b71c1c;">{{ ruptures|length }}</div>
+    <div class="al-stat-val" style="color:var(--rose-text);">{{ ruptures|length }}</div>
     <div class="al-stat-lbl"><i class="bi bi-x-circle-fill"></i> Rupture{{ ruptures|length|pluralize }}</div>
   </div>
   <div class="al-stat alerte">
-    <div class="al-stat-val" style="color:#8a5c00;">{{ alertes|length }}</div>
+    <div class="al-stat-val" style="color:var(--amber-text);">{{ alertes|length }}</div>
     <div class="al-stat-lbl"><i class="bi bi-exclamation-triangle-fill"></i> Alerte{{ alertes|length|pluralize }} stock bas</div>
   </div>
 </div>
 
 {% if not ruptures and not alertes %}
 <div style="text-align:center;padding:60px 0;color:var(--ph-muted);">
-  <i class="bi bi-shield-check" style="font-size:40px;display:block;margin-bottom:12px;color:#1a6d8c;"></i>
-  <div style="font-size:14px;font-weight:700;color:#1a6d8c;">Aucune alerte — stock nominal</div>
+  <i class="bi bi-shield-check" style="font-size:40px;display:block;margin-bottom:12px;color:var(--ph-600);"></i>
+  <div style="font-size:14px;font-weight:700;color:var(--ph-600);">Aucune alerte — stock nominal</div>
   <div style="font-size:12px;margin-top:6px;">Tous les produits sont au-dessus de leur seuil d'alerte.</div>
 </div>
 
@@ -94,11 +94,11 @@
     </tr></thead>
     <tbody>
     {% for sp in ruptures %}
-    <tr style="background:rgba(232,69,69,.03);">
+    <tr style="background:rgba(var(--rose-rgb),.03);">
       <td><span style="font-family: var(--font-mono);font-size:11px;color:var(--ph-600);background:var(--ph-50);padding:2px 6px;border-radius:4px;border:1px solid var(--ph-200);">{{ sp.produit.code }}</span></td>
       <td>
         <div style="font-weight:600;">{{ sp.produit.nom }}</div>
-        {% if sp.produit.unite_mesure %}<div style="font-size:10.5px;color:var(--ph-muted);">{{ sp.produit.unite_mesure }}</div>{% endif %}
+        {% if sp.produit.unite_mesure %}<div style="font-size:10.5px;color:var(--ph-muted);">{{ sp.produit.unite_mesure.nom }}</div>{% endif %}
       </td>
       <td style="text-align:center;"><span class="badge-ph-rupture">{{ sp.quantite|floatformat:0 }}</span></td>
       <td style="text-align:center;">
@@ -131,11 +131,11 @@
     </tr></thead>
     <tbody>
     {% for sp in alertes %}
-    <tr style="background:rgba(232,154,26,.03);">
+    <tr style="background:rgba(var(--amber-rgb),.03);">
       <td><span style="font-family: var(--font-mono);font-size:11px;color:var(--ph-600);background:var(--ph-50);padding:2px 6px;border-radius:4px;border:1px solid var(--ph-200);">{{ sp.produit.code }}</span></td>
       <td>
         <div style="font-weight:600;">{{ sp.produit.nom }}</div>
-        {% if sp.produit.unite_mesure %}<div style="font-size:10.5px;color:var(--ph-muted);">{{ sp.produit.unite_mesure }}</div>{% endif %}
+        {% if sp.produit.unite_mesure %}<div style="font-size:10.5px;color:var(--ph-muted);">{{ sp.produit.unite_mesure.nom }}</div>{% endif %}
       </td>
       <td style="text-align:center;"><span class="badge-ph-alerte">{{ sp.quantite|floatformat:0 }}</span></td>
       <td style="text-align:center;font-size:12px;color:var(--ph-muted);">{{ sp.produit.stock_alerte }}</td>

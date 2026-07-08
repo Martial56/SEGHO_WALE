@@ -31,13 +31,27 @@
 .btn-add { margin-top:10px; padding:6px 14px; border:1px dashed #d1d5db; border-radius:6px; background:#fafafa; font-size:13px; cursor:pointer; width:100%; text-align:center; color:#666; }
 .btn-add:hover { background:#f0f4f8; border-color:var(--teal-400); color:var(--teal-700); }
 .remove-btn { color:#ef4444; cursor:pointer; font-size:14px; border:none; background:none; padding:0 4px; }
+
+/* ── Mode sombre ── */
+html[data-theme="dark"] .pff-head { background:var(--surface); border-bottom-color:var(--border); }
+html[data-theme="dark"] .pff-head h1 { color:var(--text-strong,#eef3f8); }
+html[data-theme="dark"] .pff-card { background:var(--surface); border-color:var(--border); }
+html[data-theme="dark"] .pff-card-head { background:var(--surface-muted); border-bottom-color:var(--border); color:var(--text-strong,#eef3f8); }
+html[data-theme="dark"] .pff-field label { color:var(--text-muted); }
+html[data-theme="dark"] .pff-field input, html[data-theme="dark"] .pff-field select, html[data-theme="dark"] .pff-field textarea { border-bottom-color:var(--border); color:var(--text); }
+html[data-theme="dark"] .lig-table th { color:var(--text-faint); background:var(--surface-muted); border-bottom-color:var(--border); }
+html[data-theme="dark"] .lig-table td { border-bottom-color:var(--border); color:var(--text); }
+html[data-theme="dark"] .lig-table input, html[data-theme="dark"] .lig-table select { border-bottom-color:var(--border); color:var(--text); }
+html[data-theme="dark"] .btn-add { background:var(--surface-muted); border-color:var(--border); color:var(--text-muted); }
+html[data-theme="dark"] .pff-besoin-summary { background:var(--surface-muted); border-color:var(--border); color:var(--text); }
+html[data-theme="dark"] .pff-btn-cancel { background:var(--surface); border-color:var(--border); color:var(--text); }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="pff-page">
   <div class="pff-head">
-    <a href="{% url 'achats:besoin_detail' besoin.pk %}" style="color:#888;text-decoration:none;font-size:13px;"><i class="bi bi-arrow-left"></i></a>
+    <a href="{% url 'achats:besoin_detail' besoin.pk %}" style="color:var(--text-muted);text-decoration:none;font-size:13px;"><i class="bi bi-arrow-left"></i></a>
     <h1>{% if action == 'create' %}Nouveau proforma — {{ besoin.numero }}{% else %}Modifier {{ proforma.numero }}{% endif %}</h1>
   </div>
 
@@ -46,10 +60,10 @@
       {% csrf_token %}
 
       <!-- Besoin résumé -->
-      <div style="background:#f0f5fa;border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:rgba(0,0,0,.7);">
+      <div class="pff-besoin-summary" style="background:#f0f5fa;border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:rgba(0,0,0,.7);">
         <i class="bi bi-list-check" style="margin-right:6px;color:var(--teal-600);"></i>
         Besoin : <strong>{{ besoin.numero }}</strong> — {{ besoin.titre }}
-        <span style="margin-left:12px;color:#888;">({{ lignes_besoin.count }} article{{ lignes_besoin.count|pluralize }})</span>
+        <span style="margin-left:12px;color:var(--text-muted);">({{ lignes_besoin.count }} article{{ lignes_besoin.count|pluralize }})</span>
       </div>
 
       <div class="pff-card">
@@ -162,7 +176,7 @@
         <button type="submit" style="padding:9px 24px;border-radius:6px;background:var(--teal-600);color:#fff;border:none;font-size:14px;font-weight:600;cursor:pointer;">
           {% if action == 'create' %}<i class="bi bi-plus-lg"></i> Soumettre le proforma{% else %}<i class="bi bi-check-lg"></i> Enregistrer{% endif %}
         </button>
-        <a href="{% url 'achats:besoin_detail' besoin.pk %}" style="padding:9px 20px;border-radius:6px;border:1px solid #d1d5db;background:#fff;font-size:14px;text-decoration:none;color:rgba(0,0,0,.7);">Annuler</a>
+        <a href="{% url 'achats:besoin_detail' besoin.pk %}" class="pff-btn-cancel" style="padding:9px 20px;border-radius:6px;border:1px solid #d1d5db;background:#fff;font-size:14px;text-decoration:none;color:rgba(0,0,0,.7);">Annuler</a>
       </div>
     </form>
   </div>

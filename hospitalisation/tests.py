@@ -74,6 +74,11 @@ class TestGetActionsDisponibles(TestCase):
 
     def test_superuser_voit_et_active_tout(self):
         hosp = self._hosp()
+        # "Créer la facture" reste caché pour tout le monde, superuser inclus,
+        # s'il n'y a aucun service non facturé — il faut donc en créer un ici.
+        ServiceAFacturer.objects.create(
+            hospitalisation=hosp, service=_article(), quantite=1, source='manuel'
+        )
         actions = get_actions_disponibles(hosp, self.superuser)
         for key in ('confirmer', 'creer_facture', 'installer', 'decharger', 'terminer', 'annuler'):
             self.assertTrue(actions[key]['visible'], f"{key} devrait être visible pour le superuser")

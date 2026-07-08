@@ -4,15 +4,6 @@
 
 {% block extra_st_css %}<style>
 .content { padding-top: 0; }
-.st-page-head {
-  display:flex; align-items:center; justify-content:space-between;
-  padding:12px 32px; margin:0 -32px;
-  background:#e8f2f7; border-bottom:1px solid rgba(0,0,0,.05);
-  box-shadow:0 2px 8px rgba(0,0,0,.04);
-  position:sticky; top:var(--topbar-h); z-index:100;
-}
-.st-textarea { width:100%; border:none; border-bottom:1.5px solid rgba(0,0,0,.18); border-radius:0; background:transparent; padding:8px 4px; font-size:13px; color:var(--st-text); outline:none; font-family:inherit; resize:vertical; min-height:70px; }
-.st-textarea:focus { border-bottom-color:var(--st-500); }
 .inv-section { background:var(--st-100); padding:8px 20px; font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--st-700); border-top:1px solid var(--st-200); border-bottom:1px solid var(--st-200); display:flex; align-items:center; gap:7px; }
 .inv-input { width:90px; border:none; border-bottom:1.5px solid rgba(0,0,0,.18); background:transparent; padding:5px 4px; font-size:13px; font-weight:700; color:var(--st-text); text-align:right; font-family:inherit; outline:none; transition:border-color .15s; }
 .inv-input:focus { border-bottom-color:var(--st-500); }
@@ -23,18 +14,15 @@
 <form id="inv-form" method="post" novalidate>
 {% csrf_token %}
 
-<!-- En-tête sticky -->
-<div class="st-page-head">
-  <div style="display:flex;align-items:center;gap:12px;">
-    <a href="{% url 'stock_inventaire_list' %}" class="btn-st-outline" style="padding:6px 12px;"><i class="bi bi-arrow-left"></i></a>
-    <div>
-      <div style="font-size:15px;font-weight:800;color:var(--st-900);"><i class="bi bi-clipboard-plus" style="color:var(--st-600);"></i> Nouvel inventaire physique</div>
-      <div style="font-size:11.5px;color:var(--st-muted);">Saisissez les quantités constatées lors du comptage</div>
-    </div>
+<div class="action-bar">
+  <div class="action-bar-breadcrumb">
+    <a href="{% url 'stock_inventaire_list' %}"><i class="bi bi-arrow-left"></i> Inventaires</a>
+    <span class="sep">/</span>
+    <span class="current">Nouvel inventaire physique</span>
   </div>
-  <div style="display:flex;gap:8px;">
-    <a href="{% url 'stock_inventaire_list' %}" class="btn-st-outline">Annuler</a>
-    <button type="submit" class="btn-st"><i class="bi bi-clipboard-check"></i> Créer l'inventaire</button>
+  <div class="action-bar-buttons">
+    <a href="{% url 'stock_inventaire_list' %}" class="btn-form-cancel">Annuler</a>
+    <button type="submit" class="btn-form-submit"><i class="bi bi-clipboard-check"></i> Créer l'inventaire</button>
   </div>
 </div>
 
@@ -45,7 +33,7 @@
 </div>
 
 <!-- Tableau produits -->
-<div style="margin-top:16px;margin-left:-32px;margin-right:-32px;background:var(--st-surface);box-shadow:0 2px 12px rgba(15,67,88,.08);overflow:hidden;">
+<div style="margin-top:16px;margin-left:-32px;margin-right:-32px;background:var(--st-surface);box-shadow:0 2px 12px rgba(var(--st-700-rgb),.08);overflow:hidden;">
   <div style="padding:12px 20px;border-bottom:1px solid var(--st-border);display:flex;align-items:center;justify-content:space-between;">
     <div class="st-card-title"><i class="bi bi-boxes" style="color:var(--st-600);"></i> Saisie des stocks réels</div>
     <span style="font-size:11.5px;color:var(--st-muted);">Laissez vide pour exclure un produit</span>
@@ -86,7 +74,7 @@
       </td>
       <td style="text-align:right;">
         <span class="stock-sys">{{ p.stock_actuel|floatformat:0 }}</span>
-        <span style="font-size:10px;color:var(--st-muted);margin-left:3px;">{{ p.unite_mesure }}</span>
+        <span style="font-size:10px;color:var(--st-muted);margin-left:3px;">{{ p.unite_mesure.nom }}</span>
       </td>
       <td style="text-align:right;">
         <input type="number" name="reel_{{ p.pk }}" class="inv-input"
@@ -117,13 +105,13 @@
 <div class="st-card" style="margin-top:16px;">
   <div class="st-card-header"><div class="st-card-title"><i class="bi bi-journal-text" style="color:var(--st-600);"></i> Notes / Observations</div></div>
   <div class="st-card-body">
-    <textarea name="notes" class="st-textarea" placeholder="Contexte du comptage, anomalies constatées, zone vérifiée…"></textarea>
+    <textarea name="notes" class="field-ul" placeholder="Contexte du comptage, anomalies constatées, zone vérifiée…"></textarea>
   </div>
 </div>
 
-<div style="display:flex;justify-content:flex-end;gap:10px;margin:16px 0 24px;">
-  <a href="{% url 'stock_inventaire_list' %}" class="btn-st-outline">Annuler</a>
-  <button type="submit" class="btn-st"><i class="bi bi-clipboard-check"></i> Créer l'inventaire</button>
+<div class="form-actions">
+  <a href="{% url 'stock_inventaire_list' %}" class="btn-form-cancel">Annuler</a>
+  <button type="submit" class="btn-form-submit"><i class="bi bi-clipboard-check"></i> Créer l'inventaire</button>
 </div>
 
 </form>

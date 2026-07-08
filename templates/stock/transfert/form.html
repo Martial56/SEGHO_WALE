@@ -3,30 +3,6 @@
 {% block topbar_title %}Stock — Dotation{% endblock %}
 
 {% block extra_st_css %}<style>
-.st-page-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 32px; margin: 0 -32px;
-  background: #e8f2f7; border-bottom: 1px solid rgba(0,0,0,.05);
-  box-shadow: 0 2px 8px rgba(0,0,0,.04);
-  position: sticky; top: var(--topbar-h); z-index: 100;
-}
-.st-select {
-  width: 100%; border: none; border-bottom: 1.5px solid rgba(0,0,0,.18);
-  border-radius: 0; background: transparent; padding: 8px 4px;
-  font-size: 13px; color: var(--st-text); outline: none; cursor: pointer;
-  font-family: inherit; appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-  background-repeat: no-repeat; background-position: right 6px center;
-  padding-right: 24px;
-}
-.st-select:focus { border-bottom-color: var(--st-500); }
-.st-textarea {
-  width: 100%; border: none; border-bottom: 1.5px solid rgba(0,0,0,.18);
-  border-radius: 0; background: transparent; padding: 8px 4px;
-  font-size: 13px; color: var(--st-text); outline: none;
-  font-family: inherit; resize: vertical; min-height: 80px;
-}
-.st-textarea:focus { border-bottom-color: var(--st-500); }
 .st-info-box {
   background: rgba(45,153,219,.07);
   border-left: 3px solid rgba(45,153,219,.5);
@@ -51,40 +27,29 @@ html[data-theme="dark"] .st-info-box {
 
 {% block content %}
 
-<!-- En-tête sticky -->
-<div class="st-page-header">
-  <div style="display:flex;align-items:center;gap:14px;">
-    <a href="{% url 'stock_mouvements' %}" style="color:var(--st-muted);font-size:13px;text-decoration:none;" title="Retour aux mouvements">
-      <i class="bi bi-arrow-left"></i>
-    </a>
-    <div>
-      <div style="font-size:15px;font-weight:800;color:var(--st-900);">
-        <i class="bi bi-bag-check" style="color:var(--st-600);"></i> Dotation
-      </div>
-      <div style="font-size:11.5px;color:var(--st-muted);">Sortie du stock général vers un service ou une pharmacie</div>
-    </div>
+<div class="action-bar">
+  <div class="action-bar-breadcrumb">
+    <a href="{% url 'stock_mouvements' %}"><i class="bi bi-arrow-left"></i> Mouvements</a>
+    <span class="sep">/</span>
+    <span class="current">Dotation</span>
   </div>
-  <a href="{% url 'stock_mouvements' %}" class="btn-st-outline" style="font-size:12px;">
-    <i class="bi bi-list-ul"></i> Voir les mouvements
-  </a>
+  <div class="action-bar-buttons">
+    <a href="{% url 'stock_mouvements' %}" class="btn-form-cancel">
+      <i class="bi bi-list-ul"></i> Voir les mouvements
+    </a>
+  </div>
 </div>
 
 <!-- Formulaire -->
-<div class="st-card" style="margin-top:20px;max-width:600px;">
-  <div class="st-card-header">
-    <div class="st-card-title">
-      <i class="bi bi-shop" style="color:var(--st-600);"></i> Livraison pharmacie
-    </div>
-  </div>
-  <div class="st-card-body">
+<div class="form-simple-card" style="max-width:600px;">
 
     {% if errors %}
-    <div style="margin-bottom:16px;padding:10px 14px;background:rgba(232,69,69,.08);border:1px solid rgba(232,69,69,.25);border-radius:8px;">
-      <div style="font-size:12px;font-weight:700;color:#b71c1c;margin-bottom:4px;"><i class="bi bi-exclamation-triangle-fill"></i> Veuillez corriger les erreurs suivantes :</div>
+    <div style="margin-bottom:16px;padding:10px 14px;background:rgba(var(--rose-rgb),.08);border:1px solid rgba(var(--rose-rgb),.25);border-radius:8px;">
+      <div style="font-size:12px;font-weight:700;color:var(--rose-text);margin-bottom:4px;"><i class="bi bi-exclamation-triangle-fill"></i> Veuillez corriger les erreurs suivantes :</div>
       <ul style="margin:0;padding-left:18px;">
         {% for champ, msgs in errors.items %}
           {% for msg in msgs %}
-          <li style="font-size:12px;color:#b71c1c;">{{ msg }}</li>
+          <li style="font-size:12px;color:var(--rose-text);">{{ msg }}</li>
           {% endfor %}
         {% endfor %}
       </ul>
@@ -95,17 +60,17 @@ html[data-theme="dark"] .st-info-box {
       {% csrf_token %}
 
       <!-- Produit -->
-      <div class="st-field">
-        <label class="st-label" for="id_produit">Produit <span class="req">*</span></label>
+      <div class="form-field">
+        <label class="field-label" for="id_produit">Produit <span class="required-star">*</span></label>
         {% if errors.produit %}
-          {% for err in errors.produit %}<div class="st-error">{{ err }}</div>{% endfor %}
+          {% for err in errors.produit %}<div class="field-error">{{ err }}</div>{% endfor %}
         {% endif %}
-        <select name="produit" id="id_produit" class="st-select" required onchange="showStock(this)">
+        <select name="produit" id="id_produit" class="field-ul" required onchange="showStock(this)">
           <option value="">— Sélectionner un produit —</option>
           {% for p in produits %}
           <option value="{{ p.pk }}"
             data-stock="{{ p.stock_actuel|floatformat:0 }}"
-            data-unite="{{ p.unite_mesure }}"
+            data-unite="{{ p.unite_mesure.nom }}"
             {% if post.produit == p.pk|stringformat:'s' %}selected{% endif %}>
             {{ p.code }} — {{ p.nom }}
           </option>
@@ -115,24 +80,24 @@ html[data-theme="dark"] .st-info-box {
           <i class="bi bi-info-circle"></i>
           Stock actuel : <strong id="stock-val">—</strong> <span id="stock-unite"></span>
         </div>
-        {% if errors.produit %}<div class="st-error">{{ errors.produit|join:", " }}</div>{% endif %}
+        {% if errors.produit %}<div class="field-error">{{ errors.produit|join:", " }}</div>{% endif %}
       </div>
 
       <!-- Quantité -->
-      <div class="st-field">
-        <label class="st-label" for="id_quantite">Quantité <span class="req">*</span></label>
+      <div class="form-field">
+        <label class="field-label" for="id_quantite">Quantité <span class="required-star">*</span></label>
         {% if errors.quantite %}
-          {% for err in errors.quantite %}<div class="st-error">{{ err }}</div>{% endfor %}
+          {% for err in errors.quantite %}<div class="field-error">{{ err }}</div>{% endfor %}
         {% endif %}
-        <input type="number" name="quantite" id="id_quantite" class="st-input"
+        <input type="number" name="quantite" id="id_quantite" class="field-ul"
                value="{{ post.quantite|default:'' }}"
                min="1" step="1" placeholder="0" required>
       </div>
 
       <!-- Pharmacie destinataire -->
-      <div class="st-field">
-        <label class="st-label" for="id_pharmacie">Pharmacie destinataire <span style="color:#c0392b;">*</span></label>
-        {% if errors.pharmacie %}<div class="st-error">{{ errors.pharmacie }}</div>{% endif %}
+      <div class="form-field">
+        <label class="field-label" for="id_pharmacie">Pharmacie destinataire <span class="required-star">*</span></label>
+        {% if errors.pharmacie %}<div class="field-error">{{ errors.pharmacie }}</div>{% endif %}
         <div style="display:flex;gap:12px;margin-top:6px;flex-wrap:wrap;">
           {% for val, lbl in pharmacies %}
           <label style="flex:1;min-width:180px;display:flex;align-items:center;gap:10px;border:2px solid var(--st-border);border-radius:10px;padding:12px 16px;cursor:pointer;transition:all .15s;"
@@ -140,7 +105,7 @@ html[data-theme="dark"] .st-info-box {
                  onclick="selectPharma('{{ val }}')">
             <input type="radio" name="pharmacie" value="{{ val }}" id="pharma-{{ val }}" style="display:none;"
               {% if post and post.pharmacie == val %}checked{% endif %}>
-            <div style="width:36px;height:36px;border-radius:8px;background:rgba(15,67,88,.1);color:var(--st-600);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">
+            <div style="width:36px;height:36px;border-radius:8px;background:rgba(var(--st-700-rgb),.1);color:var(--st-600);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">
               <i class="bi bi-hospital"></i>
             </div>
             <div>
@@ -153,12 +118,12 @@ html[data-theme="dark"] .st-info-box {
       </div>
 
       <!-- Notes -->
-      <div class="st-field">
-        <label class="st-label" for="id_notes">Notes</label>
+      <div class="form-field">
+        <label class="field-label" for="id_notes">Notes</label>
         {% if errors.notes %}
-          {% for err in errors.notes %}<div class="st-error">{{ err }}</div>{% endfor %}
+          {% for err in errors.notes %}<div class="field-error">{{ err }}</div>{% endfor %}
         {% endif %}
-        <textarea name="notes" id="id_notes" class="st-textarea"
+        <textarea name="notes" id="id_notes" class="field-ul"
                   placeholder="Motif du transfert, remarques…">{{ post.notes|default:'' }}</textarea>
       </div>
 
@@ -169,17 +134,16 @@ html[data-theme="dark"] .st-info-box {
       </div>
 
       <!-- Boutons -->
-      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:24px;padding-top:16px;border-top:1px solid var(--st-border);">
-        <a href="{% url 'stock_mouvements' %}" class="btn-st-outline">
+      <div class="form-actions">
+        <a href="{% url 'stock_mouvements' %}" class="btn-form-cancel">
           <i class="bi bi-x-lg"></i> Annuler
         </a>
-        <button type="submit" class="btn-st">
+        <button type="submit" class="btn-form-submit">
           <i class="bi bi-arrow-left-right"></i> Enregistrer le transfert
         </button>
       </div>
 
     </form>
-  </div>
 </div>
 
 <script>
@@ -211,7 +175,7 @@ function selectPharma(val) {
   var input = document.getElementById('pharma-' + val);
   var label = document.getElementById('pharma-label-' + val);
   if (input) input.checked = true;
-  if (label) { label.style.borderColor = 'var(--st-600)'; label.style.background = 'rgba(15,67,88,.06)'; }
+  if (label) { label.style.borderColor = 'var(--st-600)'; label.style.background = 'rgba(var(--st-700-rgb),.06)'; }
 }
 </script>
 

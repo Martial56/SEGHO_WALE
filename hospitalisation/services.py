@@ -80,6 +80,8 @@ def get_actions_disponibles(hosp, user):
             result['confirmer'] = _act(True, False, "Sélectionnez un patient avant de confirmer")
         elif not hosp.medecin_traitant_id:
             result['confirmer'] = _act(True, False, "Sélectionnez un docteur avant de confirmer")
+        elif not hosp.soins_apportes.exists():
+            result['confirmer'] = _act(True, False, "Ajoutez au moins un soin avant de confirmer")
         else:
             result['confirmer'] = _act(True, True)
     else:  # confirme, hospitalise
@@ -130,6 +132,11 @@ def get_actions_disponibles(hosp, user):
         result['decharger'] = _act(
             True, False,
             f"Statut actuel : {hosp.get_statut_display()} — hospitalisé requis"
+        )
+    elif not resume_ok:
+        result['decharger'] = _act(
+            True, False,
+            "Renseignez le diagnostic de sortie avant de décharger"
         )
     elif nb_fac_imp > 0:
         result['decharger'] = _act(

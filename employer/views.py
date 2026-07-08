@@ -570,6 +570,8 @@ def employe_renouveler(request, pk):
 
 @login_required(login_url='login')
 def employe_export_excel(request):
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
     import openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     from openpyxl.utils import get_column_letter
@@ -653,6 +655,8 @@ def employe_export_excel(request):
 @login_required(login_url='login')
 def employe_qrcode(request, pk):
     """Retourne le QR code de l'employé en PNG (contenu = matricule)."""
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
     employe = get_object_or_404(Employe, pk=pk)
     import qrcode, io, base64
     qr = qrcode.QRCode(version=1, box_size=8, border=2,
@@ -669,6 +673,8 @@ def employe_qrcode(request, pk):
 @login_required(login_url='login')
 def employe_badge(request, pk):
     """Page badge imprimable avec photo + QR + infos."""
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
     employe = get_object_or_404(
         Employe.objects.select_related('service', 'fonction'), pk=pk
     )
@@ -705,6 +711,8 @@ def employe_biometric_save(request, pk):
 
 @login_required(login_url='login')
 def employe_fiche_pdf(request, pk):
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
     employe = get_object_or_404(
         Employe.objects.select_related('service', 'fonction', 'grade', 'type_contrat')
                        .prefetch_related('documents'),
@@ -739,6 +747,8 @@ def rh_registre(request):
 
 @login_required(login_url='login')
 def rh_registre_export(request):
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
     import openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     from django.http import HttpResponse

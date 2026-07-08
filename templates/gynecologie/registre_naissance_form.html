@@ -3,47 +3,10 @@
 
 {% block content %}
 <style>
-  :root {
-    --accent: var(--teal-500);
-  }
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  /* ── DARK MODE ── */
-  html[data-theme="dark"] .f-header { background: var(--surface); border-bottom-color: var(--border); }
-  html[data-theme="dark"] .f-statusbar { background: var(--surface); border-bottom-color: var(--border); }
-  html[data-theme="dark"] .f-card { background: var(--surface); box-shadow: 0 1px 4px rgba(0,0,0,0.3); }
-  html[data-theme="dark"] .f-field { border-bottom-color: #2a3448; }
-  html[data-theme="dark"] .f-input, html[data-theme="dark"] select.f-input, html[data-theme="dark"] textarea.f-input { background: transparent; color: var(--text); }
-  html[data-theme="dark"] .f-step { color: var(--text-muted); }
-  html[data-theme="dark"] .f-step:not(.active):hover { background: #28304a; }
-  html[data-theme="dark"] .f-btn-ignore { background: var(--surface); color: var(--text-muted); border-color: var(--border); }
-
-  /* FORM HEADER */
-  .f-header {
-    background: var(--surface); border-bottom: 1px solid var(--border);
-    padding: 8px 20px; display: flex; align-items: center; gap: 12px;
-    margin: 0 -32px 0;
-    position: sticky; top: 0; z-index: 200;
-  }
-  .f-title {
-    font-size: 14px; color: var(--text-muted); flex: 1;
-  }
-  .f-title span { color: var(--text); font-weight: 500; }
-  .f-btn {
-    padding: 5px 16px; border-radius: 4px; font-size: 12.5px; font-weight: 500;
-    cursor: pointer; border: 1px solid transparent;
-    text-decoration: none; display: inline-flex; align-items: center; transition: all 0.15s;
-  }
-  .f-btn-save { background: var(--teal-500); color: #fff; border-color: var(--teal-500); }
-  .f-btn-save:hover { background: var(--teal-600); }
-  .f-btn-ignore { background: #fff; color: var(--text-muted); border-color: var(--border); }
-  .f-btn-ignore:hover { background: #f5f5f5; color: var(--text); }
-
   /* STATUS BAR */
   .f-statusbar {
-    background: var(--surface); border-bottom: 1px solid var(--border);
-    padding: 6px 20px; display: flex; align-items: center; gap: 0;
-    margin: 0 -32px;
+    display: flex; align-items: center; gap: 0;
+    padding: 8px 0 0;
   }
   .f-status-done-btn {
     background: var(--teal-600); color: #fff; border: none;
@@ -61,62 +24,25 @@
     padding: 4px 24px;
   }
   .f-step.active:first-child { clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%); }
-
-  /* FORM CARD */
-  .f-body { padding: 20px 0; margin-top: 0; }
-  .f-card {
-    background: var(--surface); border-radius: 8px; padding: 20px 28px;
-    max-width: 820px; margin: 0 auto; box-shadow: 0 1px 4px rgba(0,0,0,0.09);
-  }
-  .f-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 40px; }
-  .f-field {
-    display: flex; flex-direction: column; gap: 4px;
-    padding: 10px 0; border-bottom: 1px solid #f0f0f0;
-  }
-  .f-label {
-    font-size: 11px; font-weight: 700; color: #111;
-    text-transform: uppercase; letter-spacing: 0.05em;
-  }
-  html[data-theme="dark"] .f-label { color: var(--text); }
-  .f-input {
-    width: 100%; border: none; outline: none;
-    font-size: 12.5px;
-    color: var(--text); background: transparent; padding: 4px 0;
-  }
-  .f-select {
-    width: 100%; border: none; outline: none;
-    font-size: 12.5px;
-    color: var(--text); background: transparent; padding: 4px 0;
-    cursor: pointer; appearance: none; -webkit-appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23999'/%3E%3C/svg%3E");
-    background-repeat: no-repeat; background-position: right 4px center;
-  }
-  .f-divider { grid-column: 1/-1; border: none; border-top: 1px solid var(--border); margin: 10px 0; }
-  .f-section { grid-column: 1/-1; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin: 12px 0 2px; }
-  .f-full { grid-column: 1/-1; }
-  .f-textarea {
-    width: 100%; border: none; border-bottom: 1px solid #ccc;
-    outline: none; font-size: 12.5px;
-    color: var(--text); background: transparent; resize: none; padding: 4px 0;
-    min-height: 60px;
-  }
-  .f-textarea:focus { border-bottom-color: var(--teal-600); }
+  html[data-theme="dark"] .f-step { color: var(--text-muted); }
+  html[data-theme="dark"] .f-step:not(.active):hover { background: #28304a; }
 </style>
 
 <form method="post">
 {% csrf_token %}
 
-<!-- HEADER -->
-<div class="f-header">
-  <a href="{% url 'gynecologie_naissances' %}" class="o-ctrl-btn" style="padding:3px 7px;">
-    <i class="bi bi-arrow-left"></i>
-  </a>
-  <div class="f-title">Registre des naissances / <span>Nouveau</span></div>
-  <button type="submit" name="action" value="brouillon" class="f-btn f-btn-save">SAUVEGARDER</button>
-  <a href="{% url 'gynecologie_naissances' %}" class="f-btn f-btn-ignore">IGNORER</a>
+<div class="action-bar">
+  <div class="action-bar-breadcrumb">
+    <a href="{% url 'gynecologie_naissances' %}"><i class="bi bi-arrow-left"></i> Registre des naissances</a>
+    <span class="sep">/</span>
+    <span class="current">Nouveau</span>
+  </div>
+  <div class="action-bar-buttons">
+    <a href="{% url 'gynecologie_naissances' %}" class="btn-form-cancel">Ignorer</a>
+    <button type="submit" name="action" value="brouillon" class="btn-form-submit">Sauvegarder</button>
+  </div>
 </div>
 
-<!-- STATUS BAR -->
 <div class="f-statusbar">
   <button type="submit" name="action" value="termine" class="f-status-done-btn">TERMINÉ</button>
   <div class="f-statusbar-steps">
@@ -126,136 +52,143 @@
 </div>
 
 {% if error %}
-<div style="background:#fce4ec;color:#b71c1c;padding:8px 20px;font-size:12.5px;border-bottom:1px solid #f8b4c4;">
+<div class="alert-error" style="margin-top:12px;">
   <i class="bi bi-exclamation-triangle-fill"></i> Erreur lors de la sauvegarde : {{ error }}
 </div>
 {% endif %}
 
 <!-- FORM -->
-<div class="f-body">
-  <div class="f-card">
-    <div class="f-grid">
+<div class="form-simple-card">
+  <div class="tab-two-col">
 
-      <!-- Colonne gauche -->
-      <div>
-        <div class="f-field">
-          <label class="f-label">Date de naissance</label>
-          <input type="datetime-local" name="date_accouchement" class="f-input" required>
-        </div>
-        <div class="f-field">
-          <label class="f-label">Lieu de naissance</label>
-          <input type="text" name="lieu_naissance" class="f-input">
-        </div>
-        <div class="f-field">
-          <label class="f-label">Poids à la naissance</label>
-          <input type="number" name="poids_naissance" class="f-input" step="0.01">
-        </div>
-        <div class="f-field">
-          <label class="f-label">Genre</label>
-          <select name="sexe_enfant" class="f-select" required><option value="" disabled selected hidden></option>            <option value="F">Féminin</option>
-            <option value="M">Masculin</option>
-          </select>
-        </div>
-        <div class="f-field">
-          <label class="f-label">Groupe sanguin</label>
-          <select name="groupe_sanguin_enfant" class="f-select"><option value="" disabled selected hidden></option>            <option value="A+">A+</option><option value="A-">A-</option>
-            <option value="B+">B+</option><option value="B-">B-</option>
-            <option value="AB+">AB+</option><option value="AB-">AB-</option>
-            <option value="O+">O+</option><option value="O-">O-</option>
-          </select>
-        </div>
-        <div class="f-field">
-          <label class="f-label">Taux d'hémoglobine</label>
-          <input type="number" name="taux_hemoglobine" class="f-input" step="0.01">
-        </div>
+    <!-- Colonne gauche -->
+    <div>
+      <div class="form-field">
+        <label class="field-label">Date de naissance</label>
+        <input type="datetime-local" name="date_accouchement" class="field-ul" required>
       </div>
-
-      <!-- Colonne droite -->
-      <div>
-        <div class="f-field">
-          <label class="f-label">Nom de la mère</label>
-          <select name="mere" class="f-select" required><option value="" disabled selected hidden></option>            {% for p in patients %}
-            <option value="{{ p.pk }}">{{ p.nom|upper }} {{ p.prenoms }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="f-field">
-          <label class="f-label">Médecin</label>
-          <select name="medecin" class="f-select"><option value="" disabled selected hidden></option>            {% for m in medecins %}
-            <option value="{{ m.pk }}">{{ m }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="f-field">
-          <label class="f-label">Statut naissance</label>
-          <select name="statut" class="f-select"><option value="" disabled selected hidden></option>
-            <option value="vivant">Vivant</option>
-            <option value="mort_ne">Mort-né</option>
-          </select>
-        </div>
-        <div class="f-field">
-          <label class="f-label">Nom de l'enfant</label>
-          <input type="text" name="nom_enfant" class="f-input">
-        </div>
-        <div class="f-field">
-          <label class="f-label">Prénoms de l'enfant</label>
-          <input type="text" name="prenoms_enfant" class="f-input">
-        </div>
+      <div class="form-field">
+        <label class="field-label">Lieu de naissance</label>
+        <input type="text" name="lieu_naissance" class="field-ul">
       </div>
-
-      <hr class="f-divider">
-
-      <!-- Section parents (pleine largeur, 2 colonnes) -->
-      <div>
-        <div class="f-field">
-          <label class="f-label">Info sur les parents</label>
-          <input type="text" name="info_parents" class="f-input">
-        </div>
-        <div class="f-field">
-          <label class="f-label">Éducation du patient</label>
-          <select name="education_mere" class="f-select"><option value="" disabled selected hidden></option>            <option value="aucun">Aucun</option>
-            <option value="primaire">Primaire</option>
-            <option value="secondaire">Secondaire</option>
-            <option value="superieur">Supérieur</option>
-          </select>
-        </div>
-        <div class="f-field">
-          <label class="f-label">Âge de la mère</label>
-          <input type="number" name="age_mere" class="f-input">
-        </div>
-        <div class="f-field">
-          <label class="f-label">Mode d'accouchement</label>
-          <select name="mode_accouchement" class="f-select"><option value="" disabled selected hidden></option>
-            <option value="voie_basse">Voie basse</option>
-            <option value="cesarienne">Césarienne</option>
-            <option value="forceps">Forceps</option>
-            <option value="ventouse">Ventouse</option>
-          </select>
-        </div>
-        <div class="f-field">
-          <label class="f-label">Parité</label>
-          <input type="number" name="parite" class="f-input" value="0" min="0">
-        </div>
-        <div class="f-field">
-          <label class="f-label">Garçon(s)</label>
-          <input type="number" name="nombre_garcons" class="f-input" value="0" min="0">
-        </div>
-        <div class="f-field">
-          <label class="f-label">Fille(s)</label>
-          <input type="number" name="nombre_filles" class="f-input" value="0" min="0">
-        </div>
+      <div class="form-field">
+        <label class="field-label">Poids à la naissance</label>
+        <input type="number" name="poids_naissance" class="field-ul" step="0.01">
       </div>
-
-      <div>
-        <div class="f-field" style="flex-direction:column;align-items:flex-start;gap:4px;">
-          <label class="f-label">Remarques</label>
-          <textarea name="remarques" class="f-textarea" rows="6"></textarea>
-        </div>
+      <div class="form-field">
+        <label class="field-label">Genre</label>
+        <select name="sexe_enfant" class="field-ul" required><option value="" disabled selected hidden></option>
+          <option value="F">Féminin</option>
+          <option value="M">Masculin</option>
+        </select>
       </div>
+      <div class="form-field">
+        <label class="field-label">Groupe sanguin</label>
+        <select name="groupe_sanguin_enfant" class="field-ul"><option value="" disabled selected hidden></option>
+          <option value="A+">A+</option><option value="A-">A-</option>
+          <option value="B+">B+</option><option value="B-">B-</option>
+          <option value="AB+">AB+</option><option value="AB-">AB-</option>
+          <option value="O+">O+</option><option value="O-">O-</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <label class="field-label">Taux d'hémoglobine</label>
+        <input type="number" name="taux_hemoglobine" class="field-ul" step="0.01">
+      </div>
+    </div>
 
-    </div><!-- /f-grid -->
-  </div><!-- /f-card -->
-</div><!-- /f-body -->
+    <!-- Colonne droite -->
+    <div>
+      <div class="form-field">
+        <label class="field-label">Nom de la mère</label>
+        <select name="mere" class="field-ul" required><option value="" disabled selected hidden></option>
+          {% for p in patients %}
+          <option value="{{ p.pk }}">{{ p.nom|upper }} {{ p.prenoms }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-field">
+        <label class="field-label">Médecin</label>
+        <select name="medecin" class="field-ul"><option value="" disabled selected hidden></option>
+          {% for m in medecins %}
+          <option value="{{ m.pk }}">{{ m }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-field">
+        <label class="field-label">Statut naissance</label>
+        <select name="statut" class="field-ul"><option value="" disabled selected hidden></option>
+          <option value="vivant">Vivant</option>
+          <option value="mort_ne">Mort-né</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <label class="field-label">Nom de l'enfant</label>
+        <input type="text" name="nom_enfant" class="field-ul">
+      </div>
+      <div class="form-field">
+        <label class="field-label">Prénoms de l'enfant</label>
+        <input type="text" name="prenoms_enfant" class="field-ul">
+      </div>
+    </div>
+
+  </div>
+
+  <hr style="border:none;border-top:1px solid var(--border);margin:6px 0 18px;">
+
+  <div class="tab-two-col">
+
+    <!-- Section parents -->
+    <div>
+      <div class="form-field">
+        <label class="field-label">Info sur les parents</label>
+        <input type="text" name="info_parents" class="field-ul">
+      </div>
+      <div class="form-field">
+        <label class="field-label">Éducation du patient</label>
+        <select name="education_mere" class="field-ul"><option value="" disabled selected hidden></option>
+          <option value="aucun">Aucun</option>
+          <option value="primaire">Primaire</option>
+          <option value="secondaire">Secondaire</option>
+          <option value="superieur">Supérieur</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <label class="field-label">Âge de la mère</label>
+        <input type="number" name="age_mere" class="field-ul">
+      </div>
+      <div class="form-field">
+        <label class="field-label">Mode d'accouchement</label>
+        <select name="mode_accouchement" class="field-ul"><option value="" disabled selected hidden></option>
+          <option value="voie_basse">Voie basse</option>
+          <option value="cesarienne">Césarienne</option>
+          <option value="forceps">Forceps</option>
+          <option value="ventouse">Ventouse</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <label class="field-label">Parité</label>
+        <input type="number" name="parite" class="field-ul" value="0" min="0">
+      </div>
+      <div class="form-field">
+        <label class="field-label">Garçon(s)</label>
+        <input type="number" name="nombre_garcons" class="field-ul" value="0" min="0">
+      </div>
+      <div class="form-field">
+        <label class="field-label">Fille(s)</label>
+        <input type="number" name="nombre_filles" class="field-ul" value="0" min="0">
+      </div>
+    </div>
+
+    <div>
+      <div class="form-field">
+        <label class="field-label">Remarques</label>
+        <textarea name="remarques" class="field-ul" rows="6"></textarea>
+      </div>
+    </div>
+
+  </div>
+</div>
 
 </form>
 {% endblock %}

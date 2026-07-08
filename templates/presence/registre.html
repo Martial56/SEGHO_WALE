@@ -30,7 +30,7 @@
   background:#fff; color:var(--pr-text); transition:border-color .15s;
 }
 .time-inp:focus { outline:none; border-color:var(--pr-500);
-                  box-shadow:0 0 0 2px rgba(26,109,140,.15); }
+                  box-shadow:0 0 0 2px rgba(var(--pr-600-rgb),.15); }
 /* Heure verrouillée (pointage kiosk) */
 .locked-time {
   display:inline-flex; align-items:center; gap:4px;
@@ -52,28 +52,28 @@
   transition:all .15s; user-select:none; white-space:nowrap;
 }
 .present-label.absent {
-  background:rgba(232,69,69,.08); border-color:rgba(232,69,69,.25); color:#c0392b;
+  background:rgba(var(--rose-rgb),.08); border-color:rgba(var(--rose-rgb),.25); color:var(--rose-btn);
 }
 .present-toggle:checked + .present-label {
-  background:rgba(26,109,140,.1); border-color:rgba(26,109,140,.3); color:#0f4358;
+  background:rgba(var(--pr-600-rgb),.1); border-color:rgba(var(--pr-600-rgb),.3); color:var(--pr-700);
 }
 
 /* Motif (visible si absent) */
 .motif-cell { display:none; }
 .motif-visible { display:block; margin-top:4px; }
 .motif-inp {
-  width:100%; padding:5px 8px; border:1.5px solid rgba(232,69,69,.3);
+  width:100%; padding:5px 8px; border:1.5px solid rgba(var(--rose-rgb),.3);
   border-radius:6px; font-size:12px; background:#fff;
 }
-.motif-inp:focus { outline:none; border-color:#e84545; }
+.motif-inp:focus { outline:none; border-color:var(--rose); }
 
 /* Stat chips */
 .stat-chip {
   display:inline-flex; align-items:center; gap:5px; padding:4px 12px;
   border-radius:20px; font-size:12.5px; font-weight:700;
 }
-.chip-p { background:rgba(26,109,140,.1); color:#0f4358; border:1px solid rgba(26,109,140,.2); }
-.chip-a { background:rgba(232,69,69,.1);  color:#c0392b; border:1px solid rgba(232,69,69,.2); }
+.chip-p { background:rgba(var(--pr-600-rgb),.1); color:var(--pr-700); border:1px solid rgba(var(--pr-600-rgb),.2); }
+.chip-a { background:rgba(var(--rose-rgb),.1);  color:var(--rose-btn); border:1px solid rgba(var(--rose-rgb),.2); }
 
 @media print {
   .pr-nav, .pr-subheader, .no-print { display:none !important; }
@@ -81,11 +81,32 @@
   body { font-size:11px; }
   .time-inp { border:none; background:transparent; }
   .present-label { border:none; }
+  .print-header { display:block !important; margin-bottom:14px; }
+  .content { padding:10mm 12mm !important; }
+  @page { size:A4 landscape; margin:0; }
 }
+.print-header { display:none; }
+.print-header-inner { display:flex; align-items:center; gap:14px; padding-bottom:10px; border-bottom:2.5px solid var(--pr-700); }
+.print-header-logo { height:56px; width:auto; flex-shrink:0; }
+.print-header-org { font-size:15px; font-weight:800; color:var(--pr-900); text-transform:uppercase; letter-spacing:.06em; line-height:1.2; }
+.print-header-subtitle { font-size:9.5px; color:#666; margin-top:1px; letter-spacing:.03em; }
+.print-header-doc { font-size:12px; font-weight:700; color:var(--pr-700); margin-top:5px; text-transform:uppercase; letter-spacing:.05em; }
 </style>
 {% endblock %}
 
 {% block content %}
+
+<!-- En-tête impression -->
+<div class="print-header">
+  <div class="print-header-inner">
+    <img src="{% static 'img/logo.png' %}" alt="Logo WALÉ" class="print-header-logo">
+    <div>
+      <div class="print-header-org">Centre Médico-Social WALÉ</div>
+      <div class="print-header-subtitle">Yamoussoukro — Côte d'Ivoire</div>
+      <div class="print-header-doc">Registre des présences — {{ selected_date|date:"d/m/Y" }}</div>
+    </div>
+  </div>
+</div>
 
 <!-- Subheader : navigation dates + filtres -->
 <div class="pr-subheader" id="subheader">
@@ -135,8 +156,8 @@
   </div>
   {% if jour_ferie %}
   <div style="display:inline-flex;align-items:center;gap:6px;margin-top:8px;
-              background:rgba(232,154,26,.12);border:1px solid rgba(232,154,26,.3);
-              border-radius:20px;padding:4px 14px;font-size:12.5px;font-weight:700;color:#8a5c00;">
+              background:rgba(var(--amber-rgb),.12);border:1px solid rgba(var(--amber-rgb),.3);
+              border-radius:20px;padding:4px 14px;font-size:12.5px;font-weight:700;color:var(--amber-text);">
     <i class="bi bi-star-fill" style="font-size:11px;"></i>
     Jour férié — {{ jour_ferie.nom }}
   </div>
@@ -177,7 +198,7 @@
                 Permanence {% if planning_perm %}{{ planning_perm.heure_debut|time:"H:i" }}–{{ planning_perm.heure_fin|time:"H:i" }}{% else %}8h–15h{% endif %}
               </span>
               {% elif ligne.perm_planifiee %}
-              <span style="background:rgba(232,154,26,.08);color:#8a5c00;border:1px solid rgba(232,154,26,.25);border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700;">
+              <span style="background:rgba(var(--amber-rgb),.08);color:var(--amber-text);border:1px solid rgba(var(--amber-rgb),.25);border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700;">
                 <i class="bi bi-calendar-check" style="font-size:9px;"></i> Planifié
               </span>
               {% endif %}

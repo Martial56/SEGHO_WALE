@@ -3,12 +3,6 @@
 {% block title %}Nouvel inventaire physique — {{ label }}{% endblock %}
 
 {% block extra_ph_css %}<style>
-.ph-page-head {
-  display: flex; align-items: center; justify-content: space-between; gap: 16px;
-  padding: 11px 32px;
-  background: var(--ph-surface); border-bottom: 1px solid var(--ph-border);
-  position: sticky; top: var(--topbar-h); z-index: 100;
-}
 .ph-qte-field {
   border: none; border-bottom: 1.5px solid rgba(0,0,0,.15); background: transparent;
   padding: 5px 4px; font-size: 13px; text-align: center; width: 90px;
@@ -27,20 +21,16 @@
 <form method="post" id="form-inventaire">
   {% csrf_token %}
 
-  <!-- En-tête sticky -->
-  <div class="ph-page-head">
-    <div style="display:flex;align-items:center;gap:12px;">
-      <div style="width:34px;height:34px;border-radius:8px;background:var(--ph-100);display:flex;align-items:center;justify-content:center;font-size:17px;color:var(--ph-600);">
-        <i class="bi bi-clipboard2-check"></i>
-      </div>
-      <div>
-        <div style="font-size:15px;font-weight:800;color:var(--ph-900);">Nouvel inventaire physique</div>
-        <div style="font-size:11px;color:var(--ph-muted);">{{ label }}</div>
-      </div>
+  <div class="action-bar" style="padding:0 32px;margin-top:11px;">
+    <div class="action-bar-breadcrumb">
+      <i class="bi bi-clipboard2-check"></i>
+      <span class="current">Nouvel inventaire physique — {{ label }}</span>
     </div>
-    <button type="submit" class="btn-ph">
-      <i class="bi bi-save"></i> Enregistrer
-    </button>
+    <div class="action-bar-buttons">
+      <button type="submit" class="btn-form-submit">
+        <i class="bi bi-save"></i> Enregistrer
+      </button>
+    </div>
   </div>
 
   <!-- Explication -->
@@ -57,24 +47,23 @@
     <div class="ph-card" style="border:1px solid var(--ph-border);border-radius:12px;overflow:hidden;">
       <div class="ph-card-body">
         <div style="display:grid;grid-template-columns:200px 1fr;gap:24px;">
-          <div class="ph-field" style="margin-bottom:0;">
-            <label for="date_inventaire" class="ph-label">Date de l'inventaire</label>
+          <div class="form-field" style="margin-bottom:0;">
+            <label for="date_inventaire" class="field-label">Date de l'inventaire</label>
             <input
               type="date"
               id="date_inventaire"
               name="date_inventaire"
-              class="ph-input"
+              class="field-ul"
               value="{{ today|date:'Y-m-d' }}"
               required
             >
           </div>
-          <div class="ph-field" style="margin-bottom:0;">
-            <label for="notes" class="ph-label">Notes</label>
+          <div class="form-field" style="margin-bottom:0;">
+            <label for="notes" class="field-label">Notes</label>
             <textarea
               id="notes"
               name="notes"
-              class="ph-input"
-              style="resize:vertical;"
+              class="field-ul"
               rows="2"
               placeholder="Observations, conditions de comptage…"
             ></textarea>
@@ -101,9 +90,9 @@
           <tbody>
             {% for sp in stock_items %}
 
-              {% ifchanged sp.produit.type_produit %}
+              {% ifchanged sp.produit.type %}
               <tr class="ph-type-sep">
-                <td colspan="4">{{ sp.produit.get_type_produit_display|default:sp.produit.type_produit }}</td>
+                <td colspan="4">{{ sp.produit.get_type_display|default:sp.produit.type }}</td>
               </tr>
               {% endifchanged %}
 
@@ -154,8 +143,8 @@
     </div>
 
     <!-- Bouton bas de page -->
-    <div style="display:flex;justify-content:flex-end;margin-top:16px;">
-      <button type="submit" class="btn-ph">
+    <div class="form-actions">
+      <button type="submit" class="btn-form-submit">
         <i class="bi bi-save"></i> Enregistrer l'inventaire
       </button>
     </div>

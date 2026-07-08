@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.core.exceptions import PermissionDenied
 from django.contrib import messages
-from django.db.models import Q, F
+from django.db.models import Q, F, Sum, Count
 from django.utils import timezone
 from django.core.paginator import Paginator
 import datetime
@@ -17,6 +17,15 @@ from .models import (
 from stock.models import Produit, DemandePharmacie, LigneDemande
 
 PHARMACIES_DICT = dict(PHARMACIES_WALE)
+
+# Rôles autorisés à consulter les rapports de recettes (chiffre d'affaires,
+# répartition par mode de paiement) — même logique que le groupe "Caisse"
+# défini pour l'hospitalisation et la facturation.
+CAISSE_MANAGE_GROUPS = {'Caisse', 'Pharmacien', 'Administrateur', 'Directeur'}
+
+
+def can_view_rapport_financier(user):
+    return user.is_superuser or user.groups.filter(name__in=CAISSE_MANAGE_GROUPS).exists()
 
 
 def get_pharmacie_or_404(pharmacie):
@@ -163,18 +172,24 @@ def pharmacie_ordonnances(request, pharmacie):
     label = PHARMACIES_DICT[pharmacie]
 
     from consultations.models import Ordonnance
-    statut_filtre = request.GET.get('statut', 'emise')
-    type_filtre   = request.GET.get('type', '')
+    today = timezone.now().date()
+    date_str = request.GET.get('date', str(today))
+    try:
+        selected_date = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
+    except Exception:
+        selected_date = today
+
+    statut_filtre = request.GET.get('statut', '')
     q             = request.GET.get('q', '').strip()
 
-    qs = Ordonnance.objects.select_related(
-        'consultation__patient', 'consultation__medecin'
+    qs = Ordonnance.objects.filter(
+        date_emission__date=selected_date
+    ).select_related(
+        'consultation__patient', 'consultation__medecin', 'patient', 'medecin', 'dispensation'
     ).prefetch_related('lignes__medicament').order_by('-date_emission')
 
     if statut_filtre:
         qs = qs.filter(statut=statut_filtre)
-    if type_filtre:
-        qs = qs.filter(type_ordonnance=type_filtre)
     if q:
         qs = qs.filter(
             Q(consultation__patient__nom__icontains=q) |
@@ -185,21 +200,43 @@ def pharmacie_ordonnances(request, pharmacie):
     paginator = Paginator(qs, 25)
     page_obj  = paginator.get_page(request.GET.get('page'))
 
-    all_ords = Ordonnance.objects.all()
+    ords_jour = Ordonnance.objects.filter(date_emission__date=selected_date)
     stats = {
-        'total':    all_ords.count(),
-        'emises':   all_ords.filter(statut='emise').count(),
-        'delivrees': all_ords.filter(statut='delivree').count(),
-        'expirees': all_ords.filter(statut='expiree').count(),
+        'total':      ords_jour.count(),
+        'en_attente': ords_jour.filter(statut='emise').count(),
+        'servies':    ords_jour.filter(dispensation__pharmacie=pharmacie).count(),
     }
 
-    return render(request, 'pharmacie/ordonnance/ordonnance_list.html', {
-        'pharmacie':     pharmacie, 'label': label,
-        'page_obj':      page_obj,
-        'statut_filtre': statut_filtre,
-        'type_filtre':   type_filtre,
-        'q':             q,
-        'stats':         stats,
+    lignes_pharmacie = LigneDispensation.objects.filter(
+        dispensation__ordonnance__date_emission__date=selected_date,
+        dispensation__pharmacie=pharmacie,
+    ).select_related('produit')
+
+    meds_servis = list(
+        lignes_pharmacie.filter(quantite_dispensee__gt=0)
+        .values('produit__nom', 'medicament_libre')
+        .annotate(qte_totale=Sum('quantite_dispensee'), nb_ordonnances=Count('dispensation', distinct=True))
+        .order_by('-qte_totale')
+    )
+    meds_ailleurs = list(
+        lignes_pharmacie.filter(achete_ailleurs=True)
+        .values('produit__nom', 'medicament_libre')
+        .annotate(nb_ordonnances=Count('dispensation', distinct=True))
+        .order_by('-nb_ordonnances')
+    )
+    stats['nb_meds_servis']   = sum(m['nb_ordonnances'] for m in meds_servis)
+    stats['nb_meds_ailleurs'] = sum(m['nb_ordonnances'] for m in meds_ailleurs)
+
+    return render(request, 'pharmacie/ordonnance/ordonnance_jour.html', {
+        'pharmacie':      pharmacie, 'label': label,
+        'page_obj':       page_obj,
+        'statut_filtre':  statut_filtre,
+        'q':              q,
+        'stats':          stats,
+        'selected_date':  selected_date,
+        'today':          today,
+        'meds_servis':    meds_servis,
+        'meds_ailleurs':  meds_ailleurs,
     })
 
 
@@ -215,14 +252,19 @@ def pharmacie_dispenser(request, pharmacie, pk):
         messages.info(request, 'Cette ordonnance a déjà été dispensée.')
         return redirect('pharmacie_ordonnances', pharmacie=pharmacie)
 
-    lignes = ordonnance.lignes.select_related('medicament').all()
+    lignes = ordonnance.lignes.select_related('produit', 'medicament').all()
 
     lignes_enrichies = []
     for ligne in lignes:
         produit    = None
         stock_item = None
         nom_med    = ''
-        if ligne.medicament:
+        if ligne.produit:
+            # Le produit a déjà été identifié à la création de l'ordonnance —
+            # ne pas le re-chercher par nom (recherche floue non fiable).
+            produit = ligne.produit
+            nom_med = produit.nom
+        elif ligne.medicament:
             nom_med = ligne.medicament.designation
             produit = Produit.objects.filter(
                 nom__icontains=nom_med[:20], type='medicament', actif=True
@@ -285,11 +327,12 @@ def pharmacie_dispenser(request, pharmacie, pk):
         statut_global = 'complete'
         for item in lignes_enrichies:
             ligne = item['ligne']
+            ailleurs = request.POST.get(f'ailleurs_{ligne.pk}') == 'on'
             try:
                 qte = int(request.POST.get(f'qte_{ligne.pk}', 0) or 0)
             except ValueError:
                 qte = 0
-            qte = max(0, min(qte, ligne.quantite))
+            qte = 0 if ailleurs else max(0, min(qte, ligne.quantite))
             if qte < ligne.quantite:
                 statut_global = 'partielle'
 
@@ -299,6 +342,7 @@ def pharmacie_dispenser(request, pharmacie, pk):
                 medicament_libre=item['nom_med'],
                 quantite_prescrite=ligne.quantite,
                 quantite_dispensee=qte,
+                achete_ailleurs=ailleurs,
             )
             if item['stock_item'] and qte > 0:
                 sp    = item['stock_item']
@@ -632,6 +676,8 @@ def pharmacie_recette(request, pharmacie):
 
 @login_required(login_url='login')
 def pharmacie_rapport_journalier(request, pharmacie):
+    if not can_view_rapport_financier(request.user):
+        raise PermissionDenied
     from decimal import Decimal
     from django.db.models import Sum, Count
     from datetime import datetime
@@ -864,7 +910,7 @@ def pharmacie_retours(request, pharmacie):
         )
         sp.quantite = Decimal(str(apres))
         sp.save(update_fields=['quantite'])
-        messages.success(request, f'Retour de {qte} {sp.produit.unite_mesure} de « {sp.produit.nom} » enregistré.')
+        messages.success(request, f'Retour de {qte} {sp.produit.unite_mesure.nom if sp.produit.unite_mesure else ""} de « {sp.produit.nom} » enregistré.')
         return redirect('pharmacie_retours', pharmacie=pharmacie)
 
     return render(request, 'pharmacie/retours.html', {
@@ -1004,6 +1050,8 @@ def pharmacie_inventaire_supprimer(request, pharmacie, pk):
 
 @login_required(login_url='login')
 def pharmacie_rapport_mensuel(request, pharmacie):
+    if not can_view_rapport_financier(request.user):
+        raise PermissionDenied
     from decimal import Decimal
     from django.db.models import Sum, Count
     from datetime import date as date_type
@@ -1066,6 +1114,8 @@ def pharmacie_rapport_mensuel(request, pharmacie):
 
 @login_required(login_url='login')
 def pharmacie_rapport_dispensation(request, pharmacie):
+    if not can_view_rapport_financier(request.user):
+        raise PermissionDenied
     from django.db.models import Count
     get_pharmacie_or_404(pharmacie)
     label = PHARMACIES_DICT[pharmacie]

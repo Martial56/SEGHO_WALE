@@ -36,18 +36,38 @@
 .s-brouillon { background:#f3f4f6; color:#6b7280; }
 .s-soumis { background:#dbeafe; color:#1d4ed8; }
 .s-en_cours { background:#fef3c7; color:#92400e; }
-.s-satisfait { background:#c0d8e8; color:#0f4358; }
+.s-satisfait { background:#c0d8e8; color:var(--teal-700); }
 .s-annule { background:#fee2e2; color:#991b1b; }
 .s-en_attente { background:#fef3c7; color:#92400e; }
-.s-valide { background:#c0d8e8; color:#0f4358; }
+.s-valide { background:#c0d8e8; color:var(--teal-700); }
 .s-rejete { background:#fee2e2; color:#991b1b; }
 .s-envoyee { background:#dbeafe; color:#1d4ed8; }
 .s-en_livraison { background:#fef3c7; color:#92400e; }
-.s-recue { background:#c0d8e8; color:#0f4358; }
+.s-recue { background:#c0d8e8; color:var(--teal-700); }
 .s-annulee { background:#fee2e2; color:#991b1b; }
 /* Alertes livraison en retard */
 .retard { background:#fee2e2!important; }
 .retard td { color:#991b1b!important; }
+
+/* ── Mode sombre ── */
+html[data-theme="dark"] .ac-kpis { background:var(--surface); border-bottom-color:var(--border); }
+html[data-theme="dark"] .ac-kpi { background:var(--surface-muted); border-color:var(--border); }
+html[data-theme="dark"] .ac-kpi:hover { box-shadow:0 4px 16px rgba(0,0,0,.35); }
+html[data-theme="dark"] .ac-kpi-label { color:var(--text-muted); }
+html[data-theme="dark"] .ac-kpi-icon { filter:brightness(.75) saturate(.85); }
+html[data-theme="dark"] .ac-card { background:var(--surface); border-color:var(--border); box-shadow:0 1px 4px rgba(0,0,0,.25); }
+html[data-theme="dark"] .ac-card-head { border-bottom-color:var(--border); }
+html[data-theme="dark"] .ac-card-head h2 { color:var(--text-strong); }
+html[data-theme="dark"] .ac-card table th { background:var(--surface-muted); color:var(--text-faint); border-bottom-color:var(--border); }
+html[data-theme="dark"] .ac-card table td { color:var(--text); border-bottom-color:var(--border); }
+html[data-theme="dark"] .ac-empty { color:var(--text-faint); }
+html[data-theme="dark"] .s-brouillon { background:rgba(107,114,128,.25); color:#d1d5db; }
+html[data-theme="dark"] .s-soumis, html[data-theme="dark"] .s-envoyee { background:rgba(29,78,216,.25); color:#93c5fd; }
+html[data-theme="dark"] .s-en_cours, html[data-theme="dark"] .s-en_attente { background:rgba(146,64,14,.3); color:#fcd34d; }
+html[data-theme="dark"] .s-satisfait, html[data-theme="dark"] .s-valide, html[data-theme="dark"] .s-recue { background:rgba(var(--teal-700-rgb),.4); color:#7dd3fc; }
+html[data-theme="dark"] .s-annule, html[data-theme="dark"] .s-rejete, html[data-theme="dark"] .s-annulee { background:rgba(153,27,27,.3); color:#fca5a5; }
+html[data-theme="dark"] .retard { background:rgba(153,27,27,.18)!important; }
+html[data-theme="dark"] .retard td { color:#fca5a5!important; }
 </style>
 {% endblock %}
 
@@ -78,16 +98,16 @@
       </div>
     </a>
     <a href="{% url 'achats:commandes_list' %}" class="ac-kpi">
-      <div class="ac-kpi-icon" style="background:#c0d8e8;"><i class="bi bi-bag-check" style="color:#0f4358;"></i></div>
+      <div class="ac-kpi-icon" style="background:#c0d8e8;"><i class="bi bi-bag-check" style="color:var(--teal-700);"></i></div>
       <div class="ac-kpi-info">
-        <span class="ac-kpi-val" style="color:#0f4358;">{{ stats.commandes_en_cours }}</span>
+        <span class="ac-kpi-val" style="color:var(--teal-700);">{{ stats.commandes_en_cours }}</span>
         <span class="ac-kpi-label">Commandes en cours</span>
       </div>
     </a>
     <a href="{% url 'achats:commandes_list' %}?statut=recue" class="ac-kpi">
-      <div class="ac-kpi-icon" style="background:#e8f2f7;"><i class="bi bi-box-seam" style="color:#1a6d8c;"></i></div>
+      <div class="ac-kpi-icon" style="background:#e8f2f7;"><i class="bi bi-box-seam" style="color:var(--teal-600);"></i></div>
       <div class="ac-kpi-info">
-        <span class="ac-kpi-val" style="color:#1a6d8c;">{{ stats.receptions_recentes }}</span>
+        <span class="ac-kpi-val" style="color:var(--teal-600);">{{ stats.receptions_recentes }}</span>
         <span class="ac-kpi-label">Réceptions (30 j)</span>
       </div>
     </a>
@@ -246,10 +266,14 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
 (function(){
-  var labels = {{ chart_labels|safe }};
-  var data   = {{ chart_data|safe }};
-  var ctx    = document.getElementById('chartDepenses');
+  var labels   = {{ chart_labels|safe }};
+  var data     = {{ chart_data|safe }};
+  var ctx      = document.getElementById('chartDepenses');
   if (!ctx) return;
+  var isDark   = document.documentElement.getAttribute('data-theme') === 'dark';
+  var tickColor = isDark ? '#6b7884' : undefined;
+  var gridColor = isDark ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.05)';
+  var tealRgb  = getComputedStyle(document.documentElement).getPropertyValue('--teal-600-rgb').trim();
   new Chart(ctx, {
     type: 'bar',
     data: {
@@ -257,8 +281,8 @@
       datasets: [{
         label: 'Dépenses (FCFA)',
         data: data,
-        backgroundColor: 'rgba(26,109,140,.18)',
-        borderColor: 'rgba(26,109,140,.7)',
+        backgroundColor: 'rgba(' + tealRgb + ',.45)',
+        borderColor: 'rgba(' + tealRgb + ',1)',
         borderWidth: 2,
         borderRadius: 6,
       }]
@@ -270,10 +294,10 @@
       scales: {
         y: {
           beginAtZero: true,
-          ticks: { callback: function(v){ return (v/1000).toFixed(0)+'k'; }, font:{size:10} },
-          grid: { color:'rgba(0,0,0,.05)' }
+          ticks: { callback: function(v){ return (v/1000).toFixed(0)+'k'; }, font:{size:10}, color: tickColor },
+          grid: { color: gridColor }
         },
-        x: { grid: { display:false }, ticks:{ font:{size:11} } }
+        x: { grid: { display:false }, ticks:{ font:{size:11}, color: tickColor } }
       }
     }
   });

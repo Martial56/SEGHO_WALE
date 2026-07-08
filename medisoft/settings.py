@@ -46,6 +46,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'core.middleware.CurrentUserMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    'core.middleware.SessionTimeoutMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 

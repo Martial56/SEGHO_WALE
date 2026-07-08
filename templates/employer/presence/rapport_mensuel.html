@@ -139,9 +139,17 @@ html[data-theme="dark"] .svc-sep td { background: rgba(255,255,255,.03); color: 
   .pr-kpi-grid { padding: 8px; gap: 6px; grid-template-columns: repeat(5,1fr) !important; }
   .pr-kpi-card { padding: 8px 10px; box-shadow: none; border: 1px solid #ddd; }
   .pr-table-wrap { margin: 8px; box-shadow: none; border: 1px solid #ddd; }
-  .print-only { display: block !important; font-size: 14pt; font-weight: 800; padding: 16px 32px 0; }
+  .print-header { display: block !important; margin-bottom: 14px; }
+  .content { padding: 10mm 12mm !important; }
+  @page { size: A4; margin: 0; }
 }
 .print-only { display: none !important; }
+.print-header { display: none; }
+.print-header-inner { display:flex; align-items:center; gap:14px; padding-bottom:10px; border-bottom:2.5px solid var(--rh-700); }
+.print-header-logo { height:56px; width:auto; flex-shrink:0; }
+.print-header-org { font-size:15px; font-weight:800; color:#071e28; text-transform:uppercase; letter-spacing:.06em; line-height:1.2; }
+.print-header-subtitle { font-size:9.5px; color:#666; margin-top:1px; letter-spacing:.03em; }
+.print-header-doc { font-size:12px; font-weight:700; color:var(--rh-700); margin-top:5px; text-transform:uppercase; letter-spacing:.05em; }
 </style>
 {% endblock %}
 
@@ -192,7 +200,7 @@ html[data-theme="dark"] .svc-sep td { background: rgba(255,255,255,.03); color: 
         {% endfor %}
       </select>
     </form>
-    <a href="{% url 'rh_presence_kiosk' %}" class="btn-rh-sm" target="_blank" title="Ouvrir le kiosk de pointage">
+    <a href="{% url 'rh_presence_kiosk' %}" class="btn-rh-sm" title="Ouvrir le kiosk de pointage">
       <i class="bi bi-fingerprint"></i> Kiosk pointage
     </a>
     {% if can_manage %}
@@ -207,7 +215,16 @@ html[data-theme="dark"] .svc-sep td { background: rgba(255,255,255,.03); color: 
 </div>
 
 <!-- Titre impression -->
-<div class="print-only">Rapport de présence — {{ mois_nom }} {{ annee }}</div>
+<div class="print-header">
+  <div class="print-header-inner">
+    <img src="{% static 'img/logo.png' %}" alt="Logo WALÉ" class="print-header-logo">
+    <div>
+      <div class="print-header-org">Centre Médico-Social WALÉ</div>
+      <div class="print-header-subtitle">Yamoussoukro — Côte d'Ivoire</div>
+      <div class="print-header-doc">Rapport de présence — {{ mois_nom }} {{ annee }}</div>
+    </div>
+  </div>
+</div>
 
 <!-- ══ Cartes KPI ══ -->
 <div class="pr-kpi-grid">

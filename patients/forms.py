@@ -85,6 +85,10 @@ class PatientForm(forms.ModelForm):
                 'class': _ul,
                 'placeholder': '+225 07 00 00 00 00',
             }),
+            'photo': forms.ClearableFileInput(attrs={
+                'data-photo-input': 'patient',
+                'style': 'display:none',
+            }),
         }
 
     def __init__(self, *args, **kwargs):

@@ -135,18 +135,17 @@ class Employe(models.Model):
             if isinstance(d, str):
                 from datetime import date as _date
                 d = _date.fromisoformat(d)
-            annee = d.year % 100
-            prefix = f'{ini_nom}{ini_prenom}{annee:02d}'
-            last = Employe.objects.filter(
-                matricule__startswith=prefix
+            prefix = f'{d.year:04d}'
+            dernier = Employe.objects.filter(
+                matricule__startswith=prefix, matricule__regex=r'^\d{7}'
             ).order_by('matricule').last()
             seq = 1
-            if last:
+            if dernier:
                 try:
-                    seq = int(last.matricule[4:]) + 1
+                    seq = int(dernier.matricule[4:7]) + 1
                 except (ValueError, IndexError):
                     seq = 1
-            self.matricule = f'{prefix}{seq:04d}'
+            self.matricule = f'{prefix}{seq:03d}{ini_nom}{ini_prenom}'
         super().save(*args, **kwargs)
 
     @property

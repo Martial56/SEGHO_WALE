@@ -1,0 +1,336 @@
+/* ══════════════════════════════════════════════════════════════
+   SYSTÈME DE FORMULAIRE PARTAGÉ — champs soulignés ("field-ul")
+   Design de référence : templates/patients/form.html
+   Chargé globalement (templates/base.html) — utilisable par tout
+   formulaire de création/modification du projet.
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Champs soulignés ── */
+.field-ul {
+    width: 100%;
+    background: transparent;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    border-bottom: 1.5px solid #d1dde3;
+    border-radius: 0;
+    padding: 7px 2px;
+    font-size: 13px;
+    color: var(--text-primary);
+    transition: border-color .2s;
+    box-shadow: none;
+    outline: none;
+    font-family: inherit;
+}
+.field-ul:focus {
+    border-bottom-color: var(--teal-500);
+    box-shadow: none;
+    outline: none;
+}
+.field-ul.error { border-bottom-color: var(--rose); }
+.field-ul::placeholder { color: #bfcdd4; }
+.field-ul:disabled { color: var(--text-muted); cursor: not-allowed; }
+
+textarea.field-ul {
+    resize: vertical;
+    border-bottom-width: 1.5px;
+    padding: 6px 2px;
+}
+
+select.field-ul {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23839aaa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 4px center;
+    padding-right: 22px;
+    cursor: pointer;
+}
+
+/* Champ "nom" mis en avant (titre du formulaire) */
+.field-ul-name {
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--teal-900);
+    border-bottom-width: 2px;
+    padding: 4px 0 6px;
+    margin-bottom: 6px;
+}
+.field-ul-name::placeholder { color: #c5d4d8; font-weight: 600; }
+
+.field-ul-prenom {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    padding: 3px 0 5px;
+}
+.field-ul-prenom::placeholder { color: #c5d4d8; }
+
+/* ── Labels ── */
+.field-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    margin-bottom: 4px;
+}
+.required-star { color: var(--rose); margin-left: 2px; }
+.field-error { font-size: 12px; color: var(--rose); margin-top: 3px; }
+.f-hint { font-size: 11px; color: var(--text-muted); margin-top: 4px; opacity: .8; }
+.form-field { margin-bottom: 18px; }
+.form-field:last-child { margin-bottom: 0; }
+
+/* ── Code / badge ── */
+.code-badge {
+    display: inline-flex;
+    align-items: center;
+    background: var(--teal-50);
+    border: 1px solid var(--teal-200);
+    color: var(--teal-700);
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 14px;
+    font-family: var(--font-mono);
+    white-space: nowrap;
+}
+.code-badge.auto {
+    color: #aaa;
+    border-color: #e0e0e0;
+    background: #f8f8f8;
+    font-style: italic;
+    font-weight: 400;
+    font-family: inherit;
+    font-size: 13px;
+}
+
+/* ── Barre d'action (haut de page) ── */
+.action-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    gap: 12px;
+}
+.action-bar-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+}
+.action-bar-breadcrumb a { color: var(--teal-700); text-decoration: none; }
+.action-bar-breadcrumb .sep { color: #bbb; }
+.action-bar-breadcrumb .current { color: var(--text-secondary); font-weight: 500; }
+.action-bar-buttons { display: flex; gap: 8px; }
+
+.btn-form-cancel {
+    display: inline-flex; align-items: center; gap: 5px;
+    border: 1px solid var(--border); border-radius: 4px;
+    background: var(--surface); color: var(--text-muted);
+    padding: 5px 13px; font-size: 12px; font-weight: 500;
+    text-decoration: none; transition: border-color .15s, color .15s;
+    font-family: inherit; cursor: pointer;
+}
+.btn-form-submit {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: var(--teal-600); color: #fff;
+    border: none; border-radius: 4px; padding: 6px 14px;
+    font-size: 12px; font-weight: 600; cursor: pointer;
+    font-family: inherit; transition: background .15s;
+}
+.btn-form-submit:hover { background: var(--teal-700); }
+
+/* ── En-tête de fiche (nom + photo + méta) ──
+   Réutilisable par toute entité qui veut mettre son "nom" en avant
+   (patient, employé, médecin, fournisseur, produit…). */
+.form-header-card {
+    background: #fff;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    margin-top: 16px;
+    margin-bottom: 0;
+    overflow: hidden;
+}
+.form-identity-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 24px 28px 0;
+    gap: 24px;
+}
+.form-name-block { flex: 1; min-width: 0; }
+
+.form-photo-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+.photo-large {
+    width: 96px;
+    height: 96px;
+    border-radius: 14px;
+    object-fit: cover;
+    border: 2px solid rgba(0,0,0,0.08);
+}
+.photo-placeholder {
+    width: 96px;
+    height: 96px;
+    border-radius: 14px;
+    background: #f0f4f6;
+    border: 2px dashed #c8d8e0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    color: #9aaab5;
+}
+.photo-label-btn {
+    font-size: 12px;
+    color: var(--teal-600);
+    cursor: pointer;
+    text-decoration: underline;
+    background: none;
+    border: none;
+    padding: 0;
+    font-family: inherit;
+}
+
+.form-meta-row {
+    display: grid;
+    grid-template-columns: auto 1fr 1fr 1fr;
+    gap: 24px;
+    padding: 20px 28px;
+    border-bottom: 1px solid rgba(0,0,0,0.07);
+}
+.form-extra-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 24px;
+    padding: 16px 28px 22px;
+}
+.age-display {
+    font-size: 14px;
+    color: var(--text-secondary);
+    padding: 7px 0;
+    font-weight: 500;
+    border-bottom: 1.5px solid transparent;
+}
+
+/* ── Onglets ── */
+.tabs-wrapper {
+    background: #fff;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    margin-top: 16px;
+    overflow: hidden;
+}
+.tabs-nav {
+    display: flex;
+    border-bottom: 2px solid #e8edf0;
+    padding: 0 20px;
+    flex-wrap: wrap;
+}
+.tab-btn {
+    padding: 14px 20px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    cursor: pointer;
+    transition: color .15s, border-color .15s;
+    white-space: nowrap;
+    font-family: inherit;
+}
+.tab-btn:hover { color: var(--teal-700); }
+.tab-btn.active { color: var(--teal-700); border-bottom-color: var(--teal-500); }
+.tab-panel { display: none; padding: 26px 28px; }
+.tab-panel.active { display: block; }
+
+.tab-two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+    margin-bottom: 24px;
+}
+.tab-three-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 24px;
+}
+
+/* Formulaire simple sans en-tête/onglets (petites entités : catégorie, pathologie…) */
+.form-simple-card {
+    background: #fff;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    margin-top: 16px;
+    padding: 26px 28px;
+}
+
+/* ── Actions bas de page ── */
+.form-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    padding: 18px 0 6px;
+}
+
+/* ── Alerte erreur ── */
+.alert-error {
+    display: flex;
+    gap: 10px;
+    background: #fff0f0;
+    border: 1px solid #fca5a5;
+    color: #b91c1c;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    font-size: 13px;
+}
+
+@media (max-width: 768px) {
+    .form-meta-row { grid-template-columns: 1fr 1fr; }
+    .form-extra-row { grid-template-columns: 1fr; }
+    .tab-two-col { grid-template-columns: 1fr; gap: 0; }
+    .tab-three-col { grid-template-columns: 1fr; }
+    .field-ul-name { font-size: 20px; }
+}
+
+/* ── Mode sombre ── */
+html[data-theme="dark"] .form-header-card,
+html[data-theme="dark"] .tabs-wrapper,
+html[data-theme="dark"] .form-simple-card {
+    background: #141b22;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.5);
+}
+html[data-theme="dark"] .form-meta-row { border-bottom-color: #1f2933; }
+html[data-theme="dark"] .tabs-nav { border-bottom-color: #1f2933; }
+html[data-theme="dark"] .tab-btn { color: #6b7884; }
+html[data-theme="dark"] .tab-btn:hover { color: #dce3ea; }
+html[data-theme="dark"] .tab-btn.active { color: #85b7eb; border-bottom-color: #378add; }
+html[data-theme="dark"] .field-ul { border-bottom-color: #1f2933; color: #dce3ea; }
+html[data-theme="dark"] .field-ul:focus { border-bottom-color: #378add; }
+html[data-theme="dark"] .field-ul::placeholder { color: #4a5560; }
+html[data-theme="dark"] .field-ul-name { color: #eef3f8; }
+html[data-theme="dark"] .field-label { color: #6b7884; }
+html[data-theme="dark"] .age-display { color: #6b7884; }
+html[data-theme="dark"] .code-badge.auto {
+    background: #0c447c; border-color: #185fa5; color: #4a5560; font-style: normal;
+}
+html[data-theme="dark"] .photo-placeholder {
+    background: #0f1419; border-color: #1f2933; color: #4a5560;
+}
+html[data-theme="dark"] select.field-ul {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7884' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+html[data-theme="dark"] .alert-error {
+    background: rgba(80,19,19,0.4); border-color: rgba(247,193,193,0.2); color: #f7c1c1;
+}

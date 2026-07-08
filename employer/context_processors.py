@@ -40,10 +40,14 @@ def alertes_contrat(request):
                 alerte.lue = False
                 alerte.save(update_fields=['date_fin_contrat', 'lue'])
 
+    from core.utils import current_module
+    module = current_module(request)
+
     alertes_c = (
         AlerteContrat.objects.filter(lue=False)
         .select_related('employe')
         .order_by('date_fin_contrat')[:30]
+        if module == 'employer' else AlerteContrat.objects.none()
     )
 
     # ── Alertes documents expirés ──────────────────────────────────────────────
@@ -79,23 +83,28 @@ def alertes_contrat(request):
         AlerteDocument.objects.filter(lue=False)
         .select_related('document__employe')
         .order_by('date_expiration')[:30]
+        if module == 'employer' else AlerteDocument.objects.none()
     )
 
     # ── Notifications congés (pour l'utilisateur courant) ─────────────────────
-    notifs_conge = (
-        NotificationConge.objects.filter(destinataire=request.user, lue=False)
-        .select_related('conge__employe')
-        .order_by('-cree_le')[:20]
-    )
-    notifs_conge_count = NotificationConge.objects.filter(
-        destinataire=request.user, lue=False
-    ).count()
+    # Module distinct de "Employés" (/conges/ a sa propre icône) : n'afficher
+    # ces notifications que lorsqu'on est effectivement dans le module congés.
+    if module == 'conges':
+        notifs_conge = (
+            NotificationConge.objects.filter(destinataire=request.user, lue=False)
+            .select_related('conge__employe')
+            .order_by('-cree_le')[:20]
+        )
+        notifs_conge_count = NotificationConge.objects.filter(
+            destinataire=request.user, lue=False
+        ).count()
+    else:
+        notifs_conge = NotificationConge.objects.none()
+        notifs_conge_count = 0
 
-    total = (
-        AlerteContrat.objects.filter(lue=False).count() +
-        AlerteDocument.objects.filter(lue=False).count() +
-        notifs_conge_count
-    )
+    alertes_contrat_count = AlerteContrat.objects.filter(lue=False).count() if module == 'employer' else 0
+    alertes_document_count = AlerteDocument.objects.filter(lue=False).count() if module == 'employer' else 0
+    total = alertes_contrat_count + alertes_document_count + notifs_conge_count
 
     return {
         'alertes_contrat':    alertes_c,

@@ -13,8 +13,10 @@ urlpatterns = [
     path('tableau-de-bord/', views.kpi_dashboard, name='kpi_dashboard'),
     path('tableau-de-bord/rapports/', views.rapports_hub, name='rapports_hub'),
     path('login/', views.login_view, name='login'),
+    path('bienvenue/', views.intro, name='intro'),
     path('logout/', views.logout_view, name='logout'),
     path('compte/', views.mon_compte, name='mon_compte'),
+    path('compte/couleur-accent/', views.accent_color_set, name='accent_color_set'),
 
     # URLs des modules
     path('patients/', include('patients.urls')),

@@ -228,7 +228,8 @@ def hospitalisation_create(request):
                 pass
         form = HospitalisationForm(initial=initial)
     from medecins.models import Medecin
-    from services.models import Articleservice, UniteMesure
+    from services.models import Articleservice
+    from stock.models import UniteMesure
     ctx = {
         'form':          form,
         'titre':         'Nouveau',
@@ -504,7 +505,8 @@ def _save_evaluation_clinique(hosp, POST):
 
 
 def _save_services_a_facturer(hosp, POST):
-    from services.models import Articleservice, UniteMesure
+    from services.models import Articleservice
+    from stock.models import UniteMesure
     ids      = POST.getlist('saf_id[]')
     services = POST.getlist('saf_service[]')
     unites   = POST.getlist('saf_unite[]')
@@ -690,7 +692,8 @@ def _sync_procedure_soin(hosp, article, quantite, date_obj, user):
 
 def _save_visites_infirmieres(hosp, POST, user=None):
     from medecins.models import Medecin
-    from services.models import UniteMesure, Articleservice
+    from stock.models import UniteMesure
+    from services.models import Articleservice
     ids         = POST.getlist('vi_id[]')
     dates       = POST.getlist('vi_date[]')
     soins       = POST.getlist('vi_soin[]')
@@ -927,7 +930,8 @@ def hospitalisation_creer_facture(request, pk):
 def hospitalisation_edit(request, pk):
     from .forms import HospitalisationForm
     from medecins.models import Medecin
-    from services.models import UniteMesure, Articleservice
+    from stock.models import UniteMesure
+    from services.models import Articleservice
     from facturation.models import Facture
     from laboratoire.models import AnalyseLaboratoire
 

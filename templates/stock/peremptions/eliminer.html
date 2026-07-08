@@ -5,36 +5,6 @@
 {% block extra_st_css %}<style>
 .content { padding-top: 0; }
 
-.st-page-head {
-  display:flex; align-items:center; justify-content:space-between; gap:16px;
-  padding:12px 32px; margin:0 -32px; flex-wrap:wrap;
-  background:#f2f7ee; border-bottom:1px solid rgba(0,0,0,.05);
-  box-shadow:0 2px 8px rgba(0,0,0,.04);
-  position:sticky; top:var(--topbar-h); z-index:100;
-}
-html[data-theme="dark"] .st-page-head {
-  background:var(--st-100); border-bottom-color:var(--st-border);
-}
-
-/* Bouton retour (icône seule) */
-.st-page-head .o-back-btn {
-  width:30px; height:30px; padding:0;
-  justify-content:center;
-  border:none;
-  border-radius:7px;
-  color:var(--st-600);
-  background:transparent;
-}
-.st-page-head .o-back-btn:hover {
-  background:rgba(15,67,88,.08); color:var(--st-700);
-}
-html[data-theme="dark"] .st-page-head .o-back-btn {
-  color:var(--st-300);
-}
-html[data-theme="dark"] .st-page-head .o-back-btn:hover {
-  background:rgba(154,184,138,.12); color:var(--st-200);
-}
-
 /* Alerte bannière */
 .elim-alert {
   display:flex; align-items:flex-start; gap:12px;
@@ -46,10 +16,10 @@ html[data-theme="dark"] .elim-alert {
   background:rgba(183,28,28,.12); border-color:rgba(183,28,28,.3); color:#f48fb1;
 }
 .elim-alert-icon {
-  font-size:22px; color:#b71c1c; flex-shrink:0; margin-top:1px;
+  font-size:22px; color:var(--rose-text); flex-shrink:0; margin-top:1px;
 }
 .elim-alert-title {
-  font-size:13px; font-weight:800; color:#b71c1c; margin-bottom:4px;
+  font-size:13px; font-weight:800; color:var(--rose-text); margin-bottom:4px;
 }
 .elim-alert-body {
   font-size:12.5px; line-height:1.55;
@@ -59,30 +29,21 @@ html[data-theme="dark"] .elim-alert {
 .qte-input {
   width:90px; border:none; border-bottom:2px solid rgba(183,28,28,.35);
   border-radius:0; background:transparent; padding:5px 4px;
-  font-size:14px; font-weight:700; color:#b71c1c; font-family:inherit;
+  font-size:14px; font-weight:700; color:var(--rose-text); font-family:inherit;
   text-align:right; transition:border-color .15s;
 }
-.qte-input:focus { outline:none; border-bottom-color:#b71c1c; }
+.qte-input:focus { outline:none; border-bottom-color:var(--rose-text); }
 .qte-input::-webkit-outer-spin-button,
 .qte-input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
 .qte-input[type=number] { -moz-appearance:textfield; }
 
 /* Dates péremption colorées */
-.date-expire { color:#b71c1c; font-weight:700; display:inline-flex; align-items:center; gap:4px; }
-.date-alerte  { color:#8a5c00; font-weight:600; display:inline-flex; align-items:center; gap:4px; }
-
-/* Notes textarea */
-.st-textarea {
-  width:100%; border:1.5px solid var(--st-border); border-radius:8px;
-  background:var(--st-surface); padding:10px 14px;
-  font-size:13px; color:var(--st-text); font-family:inherit;
-  resize:vertical; min-height:80px; transition:border-color .15s;
-}
-.st-textarea:focus { outline:none; border-color:var(--st-500); }
+.date-expire { color:var(--rose-text); font-weight:700; display:inline-flex; align-items:center; gap:4px; }
+.date-alerte  { color:var(--amber-text); font-weight:600; display:inline-flex; align-items:center; gap:4px; }
 
 /* Bouton submit rouge */
 .btn-danger {
-  background:#b71c1c; color:#fff; border:none; border-radius:6px;
+  background:var(--rose-text); color:#fff; border:none; border-radius:6px;
   padding:9px 20px; font-size:13px; font-weight:700; cursor:pointer;
   display:inline-flex; align-items:center; gap:6px; text-decoration:none;
   transition:background .15s;
@@ -92,19 +53,14 @@ html[data-theme="dark"] .elim-alert {
 
 {% block content %}
 
-<!-- En-tête sticky -->
-<div class="st-page-head">
-  <div>
-    <div style="display:flex;align-items:center;gap:12px;">
-      <a class="o-back-btn" href="javascript:history.back()" title="Retour"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 5l-7 7 7 7"/></svg></a>
-      <div style="font-size:15px;font-weight:800;color:var(--st-900);">
-        <i class="bi bi-trash3" style="color:#b71c1c;"></i> Saisie des éliminations
-      </div>
-    </div>
-    <div style="font-size:11.5px;color:var(--st-muted);margin-left:42px;margin-top:2px;">Lots périmés ou expirant dans 30 jours</div>
+<div class="action-bar">
+  <div class="action-bar-breadcrumb">
+    <a href="{% url 'stock_peremptions' %}"><i class="bi bi-arrow-left"></i> Péremptions</a>
+    <span class="sep">/</span>
+    <span class="current">Saisie des éliminations</span>
   </div>
-  <div style="display:flex;align-items:center;gap:8px;">
-    <a href="{% url 'stock_peremptions' %}" class="btn-st-outline">
+  <div class="action-bar-buttons">
+    <a href="{% url 'stock_peremptions' %}" class="btn-form-cancel">
       <i class="bi bi-x-lg"></i> Annuler
     </a>
   </div>
@@ -169,7 +125,7 @@ html[data-theme="dark"] .elim-alert {
               <i class="bi bi-x-circle-fill"></i>
               {{ lot.date_peremption|date:"d/m/Y" }}
             </span>
-            <div style="font-size:10.5px;color:#b71c1c;font-weight:600;margin-top:2px;">
+            <div style="font-size:10.5px;color:var(--rose-text);font-weight:600;margin-top:2px;">
               Expiré depuis {{ lot.date_peremption|timesince:today }}
             </div>
           {% else %}
@@ -177,7 +133,7 @@ html[data-theme="dark"] .elim-alert {
               <i class="bi bi-exclamation-triangle-fill"></i>
               {{ lot.date_peremption|date:"d/m/Y" }}
             </span>
-            <div style="font-size:10.5px;color:#8a5c00;margin-top:2px;">
+            <div style="font-size:10.5px;color:var(--amber-text);margin-top:2px;">
               Expire dans {{ lot.date_peremption|timeuntil:today }}
             </div>
           {% endif %}
@@ -188,7 +144,7 @@ html[data-theme="dark"] .elim-alert {
           <span style="font-size:15px;font-weight:800;color:var(--st-700);">
             {{ lot.quantite_actuelle|floatformat:0 }}
           </span>
-          <span style="font-size:10.5px;color:var(--st-muted);"> {{ lot.produit.unite_mesure }}</span>
+          <span style="font-size:10.5px;color:var(--st-muted);"> {{ lot.produit.unite_mesure.nom }}</span>
         </td>
 
         <!-- Input quantité à éliminer -->
@@ -206,7 +162,7 @@ html[data-theme="dark"] .elim-alert {
             autocomplete="off"
           >
           <div style="font-size:10px;color:var(--st-muted);margin-top:2px;text-align:right;">
-            max {{ lot.quantite_actuelle|floatformat:0 }} {{ lot.produit.unite_mesure }}
+            max {{ lot.quantite_actuelle|floatformat:0 }} {{ lot.produit.unite_mesure.nom }}
           </div>
         </td>
 
@@ -227,12 +183,12 @@ html[data-theme="dark"] .elim-alert {
 
   <!-- Notes + boutons -->
   <div style="margin-top:20px;max-width:680px;">
-    <div class="st-field">
-      <label for="notes" class="st-label">Notes / motif d'élimination</label>
+    <div class="form-field">
+      <label for="notes" class="field-label">Notes / motif d'élimination</label>
       <textarea
         id="notes"
         name="notes"
-        class="st-textarea"
+        class="field-ul"
         placeholder="Ex. : Lots retrouvés périmés lors de l'inventaire du {{ today|date:'d/m/Y' }}…"
         rows="3"
       ></textarea>
@@ -240,11 +196,11 @@ html[data-theme="dark"] .elim-alert {
   </div>
 
   <!-- Boutons d'action -->
-  <div style="display:flex;align-items:center;gap:12px;margin-top:10px;padding-bottom:24px;">
+  <div class="form-actions" style="justify-content:flex-start;padding-bottom:24px;">
     <button type="submit" class="btn-danger">
       <i class="bi bi-trash3-fill"></i> Enregistrer les éliminations
     </button>
-    <a href="{% url 'stock_peremptions' %}" class="btn-st-outline">
+    <a href="{% url 'stock_peremptions' %}" class="btn-form-cancel">
       <i class="bi bi-arrow-left"></i> Annuler
     </a>
   </div>

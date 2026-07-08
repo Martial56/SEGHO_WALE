@@ -19,10 +19,15 @@ def login_view(request):
         user = authenticate(request, username=username, password=password)
         if user is not None:
             login(request, user)
-            return redirect(request.GET.get('next', 'dashboard'))
+            return redirect('intro')
         else:
             error = "Identifiant ou mot de passe incorrect."
     return render(request, 'registration/login.html', {'error': error})
+
+
+@login_required(login_url='login')
+def intro(request):
+    return render(request, 'core/intro.html')
 
 
 @require_POST
@@ -68,6 +73,16 @@ def mon_compte(request):
                 messages.success(request, 'Photo supprimée.')
             return redirect('mon_compte')
 
+        elif action == 'session_timeout':
+            try:
+                minutes = int(request.POST.get('session_timeout_minutes', 30))
+            except ValueError:
+                minutes = 30
+            profile.session_timeout_minutes = max(0, minutes)
+            profile.save(update_fields=['session_timeout_minutes'])
+            messages.success(request, 'Préférence de déconnexion automatique enregistrée.')
+            return redirect('mon_compte')
+
         elif action == 'password':
             current = request.POST.get('current_password', '')
             new_pw  = request.POST.get('new_password', '')
@@ -87,6 +102,28 @@ def mon_compte(request):
                 return redirect('mon_compte')
 
     return render(request, 'utilisateur/mon_compte.html', {'errors': errors, 'profile': profile})
+
+
+@login_required(login_url='login')
+@require_POST
+def accent_color_set(request):
+    from core.models import UserProfile
+    from core.utils import build_accent_css, is_valid_hex_color, DEFAULT_ACCENT_COLOR
+
+    color = (request.POST.get('color') or '').strip()
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+
+    if not color:
+        profile.accent_color = None
+        profile.save(update_fields=['accent_color'])
+        return JsonResponse({'ok': True, 'color': None, 'default': DEFAULT_ACCENT_COLOR})
+
+    if not is_valid_hex_color(color):
+        return JsonResponse({'ok': False, 'error': 'Couleur invalide.'}, status=400)
+
+    profile.accent_color = color
+    profile.save(update_fields=['accent_color'])
+    return JsonResponse({'ok': True, 'color': color, 'css': build_accent_css(color)})
 
 
 def _get_dashboard_stats():
@@ -545,8 +582,13 @@ def facturation_list(request):
 
 @login_required(login_url='login')
 def caisse_list(request):
+    from django.core.exceptions import PermissionDenied
     from caisse.models import SessionCaisse
     from django.core.paginator import Paginator
+    from facturation.views import can_manage_paiement
+
+    if not can_manage_paiement(request.user):
+        raise PermissionDenied
 
     sessions = SessionCaisse.objects.all().order_by('-date_ouverture')
     paginator = Paginator(sessions, 25)

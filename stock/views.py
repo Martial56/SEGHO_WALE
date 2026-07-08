@@ -6,7 +6,7 @@ from django.utils import timezone
 from django.core.paginator import Paginator
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
-from .models import Produit, CategorieStock, LotProduit, MouvementStock, CommandeStock, LigneCommande, Inventaire, LigneInventaire, DemandePharmacie, LigneDemande, PHARMACIES, FicheBesoins, LigneFicheBesoins
+from .models import Produit, CategorieStock, LotProduit, MouvementStock, CommandeStock, LigneCommande, Inventaire, LigneInventaire, DemandePharmacie, LigneDemande, PHARMACIES, FicheBesoins, LigneFicheBesoins, UniteMesure
 from achats.models import Fournisseur
 
 
@@ -154,7 +154,7 @@ def stock_dashboard(request):
 
 @login_required(login_url='login')
 def produits_list(request):
-    qs = Produit.objects.select_related('categorie').prefetch_related('lots').filter(actif=True)
+    qs = Produit.objects.select_related('categorie', 'unite_mesure').prefetch_related('lots').filter(actif=True)
     type_filtre      = request.GET.get('type', '')
     statut_filtre    = request.GET.get('statut', '')
     categorie_filtre = request.GET.get('categorie', '')
@@ -200,7 +200,7 @@ def produits_list(request):
 
 @login_required(login_url='login')
 def produit_detail(request, pk):
-    produit = get_object_or_404(Produit, pk=pk)
+    produit = get_object_or_404(Produit.objects.select_related('categorie', 'unite_mesure', 'fournisseur_principal'), pk=pk)
     lots = produit.lots.order_by('date_peremption')
     mouvements = produit.mouvements.order_by('-date')[:20]
     return render(request, 'stock/produits/detail.html', {
@@ -215,6 +215,7 @@ def produit_detail(request, pk):
 def produit_create(request):
     categories  = CategorieStock.objects.filter(actif=True).order_by('nom')
     fournisseurs = Fournisseur.objects.filter(actif=True).order_by('nom')
+    unites_mesure = UniteMesure.objects.filter(actif=True).select_related('categorie').order_by('categorie__nom', 'nom')
     errors = {}
 
     if request.method == 'POST':
@@ -228,10 +229,11 @@ def produit_create(request):
                 dci=request.POST.get('dci', '').strip(),
                 dosage=request.POST.get('dosage', '').strip(),
                 forme=request.POST.get('forme', ''),
-                unite_mesure=request.POST.get('unite_mesure', 'unité').strip() or 'unité',
                 description=request.POST.get('description', '').strip(),
                 prescription_obligatoire=request.POST.get('prescription_obligatoire') == 'on',
             )
+            um_pk = request.POST.get('unite_mesure', '')
+            p.unite_mesure = UniteMesure.objects.filter(pk=um_pk).first() if um_pk else None
             try: p.stock_alerte  = float(request.POST.get('stock_alerte',  10) or 10)
             except ValueError: p.stock_alerte = 10
             try: p.stock_minimum = float(request.POST.get('stock_minimum', 5) or 5)
@@ -254,6 +256,7 @@ def produit_create(request):
         'mode':         'create',
         'categories':   categories,
         'fournisseurs': fournisseurs,
+        'unites_mesure': unites_mesure,
         'errors':       errors,
         'post':         request.POST if request.method == 'POST' else None,
     })
@@ -264,6 +267,7 @@ def produit_edit(request, pk):
     produit = get_object_or_404(Produit, pk=pk)
     categories   = CategorieStock.objects.filter(actif=True).order_by('nom')
     fournisseurs = Fournisseur.objects.filter(actif=True).order_by('nom')
+    unites_mesure = UniteMesure.objects.filter(actif=True).select_related('categorie').order_by('categorie__nom', 'nom')
     errors = {}
 
     if request.method == 'POST':
@@ -276,7 +280,8 @@ def produit_edit(request, pk):
             produit.dci   = request.POST.get('dci', '').strip()
             produit.dosage = request.POST.get('dosage', '').strip()
             produit.forme  = request.POST.get('forme', '')
-            produit.unite_mesure = request.POST.get('unite_mesure', 'unité').strip() or 'unité'
+            um_pk = request.POST.get('unite_mesure', '')
+            produit.unite_mesure = UniteMesure.objects.filter(pk=um_pk).first() if um_pk else None
             produit.description  = request.POST.get('description', '').strip()
             produit.prescription_obligatoire = request.POST.get('prescription_obligatoire') == 'on'
             produit.actif = request.POST.get('actif') != 'off'
@@ -301,6 +306,7 @@ def produit_edit(request, pk):
         'produit':      produit,
         'categories':   categories,
         'fournisseurs': fournisseurs,
+        'unites_mesure': unites_mesure,
         'errors':       errors,
     })
 
@@ -1496,7 +1502,7 @@ def retour_create(request):
             lot.quantite_actuelle = float(lot.quantite_actuelle) + qte
             lot.save(update_fields=['quantite_actuelle'])
 
-        messages.success(request, f'Retour de {qte:.0f} {produit.unite_mesure} enregistré pour « {produit.nom} ».')
+        messages.success(request, f'Retour de {qte:.0f} {produit.unite_mesure.nom if produit.unite_mesure else ""} enregistré pour « {produit.nom} ».')
         return redirect('stock_mouvements')
 
     produits  = Produit.objects.filter(actif=True).order_by('nom')
@@ -1513,27 +1519,24 @@ def retour_create(request):
 
 @login_required(login_url='login')
 def export_stock_excel(request):
-    import csv
-    from django.http import HttpResponse
+    from core.utils import csv_response
     type_filtre = request.GET.get('type', '')
-    qs = Produit.objects.filter(actif=True).select_related('categorie')
+    qs = Produit.objects.filter(actif=True).select_related('categorie', 'unite_mesure')
     if type_filtre:
         qs = qs.filter(type=type_filtre)
     qs = qs.order_by('type', 'nom')
 
-    response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
-    response['Content-Disposition'] = 'attachment; filename="stock.csv"'
-    writer = csv.writer(response, delimiter=';')
-    writer.writerow(['Code', 'Nom', 'Type', 'Catégorie', 'Unité', 'Stock actuel', 'Seuil alerte', 'Prix achat', 'Prix vente', 'État'])
+    headers = ['Code', 'Nom', 'Type', 'Catégorie', 'Unité', 'Stock actuel', 'Seuil alerte', 'Prix achat', 'Prix vente', 'État']
+    rows = []
     for p in qs:
         etat = 'Rupture' if p.en_rupture else ('Alerte' if p.en_alerte else 'OK')
-        writer.writerow([
+        rows.append([
             p.code, p.nom, p.get_type_display(),
             p.categorie.nom if p.categorie else '',
-            p.unite_mesure, p.stock_actuel, p.stock_alerte,
+            p.unite_mesure.nom if p.unite_mesure else '', p.stock_actuel, p.stock_alerte,
             p.prix_achat, p.prix_vente, etat,
         ])
-    return response
+    return csv_response('stock', headers, rows)
 
 
 # ---------------------------------------------------------------------------
@@ -1562,7 +1565,7 @@ def transfert_create(request):
         if quantite <= 0:
             errors['quantite'] = 'La quantité doit être supérieure à 0.'
         elif produit and float(produit.stock_actuel) < quantite:
-            errors['quantite'] = f'Stock insuffisant — disponible : {produit.stock_actuel} {produit.unite_mesure}.'
+            errors['quantite'] = f'Stock insuffisant — disponible : {produit.stock_actuel} {produit.unite_mesure.nom if produit.unite_mesure else ""}.'
 
         if not errors:
             stock_avant = float(produit.stock_actuel)
@@ -1577,7 +1580,7 @@ def transfert_create(request):
             )
             produit.stock_actuel = stock_apres
             produit.save(update_fields=['stock_actuel'])
-            messages.success(request, f'{quantite} {produit.unite_mesure} de « {produit.nom} » livrés à {pharma_label}.')
+            messages.success(request, f'{quantite} {produit.unite_mesure.nom if produit.unite_mesure else ""} de « {produit.nom} » livrés à {pharma_label}.')
             return redirect('stock_mouvements')
 
     return render(request, 'stock/transfert/form.html', {
@@ -1889,7 +1892,7 @@ def fiche_envoyer_achats(request, pk):
         LigneBesoin.objects.create(
             besoin=besoin, produit=ligne.produit,
             quantite=qte,
-            unite=ligne.produit.unite_mesure or 'unité',
+            unite=ligne.produit.unite_mesure.nom if ligne.produit.unite_mesure else 'unité',
         )
         lignes_creees += 1
 
@@ -1989,3 +1992,306 @@ def integrer_reception(request, pk):
 
     messages.success(request, f'Réception {reception.numero} intégrée dans le stock.')
     return redirect('stock_receptions_a_integrer')
+
+
+# ── Unités de mesure ───────────────────────────────────────────────────────
+
+from .models import CategorieUniteMesure
+from .forms import UniteMesureForm, CategorieUniteMesureForm
+from services.views import _export_file, _parse_upload, _s, _b
+
+
+@login_required(login_url='login')
+def unites_list(request):
+    q = request.GET.get('q', '').strip()
+    categorie_id = request.GET.get('categorie', '')
+    vue = request.GET.get('vue', 'liste')
+    qs = UniteMesure.objects.select_related('categorie').all()
+    if q:
+        qs = qs.filter(Q(nom__icontains=q) | Q(code__icontains=q))
+    if categorie_id:
+        qs = qs.filter(categorie_id=categorie_id)
+    total_all = UniteMesure.objects.count()
+    paginator = Paginator(qs, 30)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    return render(request, 'stock/unites/list.html', {
+        'page_obj': page_obj,
+        'categories_um': CategorieUniteMesure.objects.all(),
+        'q': q,
+        'categorie_id': categorie_id,
+        'vue': vue,
+        'total': total_all,
+        'total_filtre': qs.count(),
+    })
+
+
+@login_required(login_url='login')
+def unite_create(request):
+    if request.method == 'POST':
+        form = UniteMesureForm(request.POST)
+        if form.is_valid():
+            obj = form.save()
+            messages.success(request, f'Unité « {obj.nom} » créée.')
+            return redirect('stock_unites')
+        else:
+            messages.error(request, 'Veuillez corriger les erreurs du formulaire.')
+    else:
+        form = UniteMesureForm()
+    return render(request, 'stock/unites/form.html', {
+        'form': form,
+        'titre': 'Nouvelle unité de mesure',
+        'edit': False,
+    })
+
+
+@login_required(login_url='login')
+def unite_edit(request, pk):
+    obj = get_object_or_404(UniteMesure, pk=pk)
+    if request.method == 'POST':
+        form = UniteMesureForm(request.POST, instance=obj)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'Unité « {obj.nom} » mise à jour.')
+            return redirect('stock_unite_detail', pk=obj.pk)
+        else:
+            messages.error(request, 'Veuillez corriger les erreurs du formulaire.')
+    else:
+        form = UniteMesureForm(instance=obj)
+    return render(request, 'stock/unites/form.html', {
+        'form': form,
+        'obj': obj,
+        'titre': f'Modifier — {obj.nom}',
+        'edit': True,
+    })
+
+
+@login_required(login_url='login')
+def unite_detail(request, pk):
+    obj = get_object_or_404(UniteMesure, pk=pk)
+    return render(request, 'stock/unites/detail.html', {'obj': obj})
+
+
+@login_required(login_url='login')
+def unite_delete(request, pk):
+    obj = get_object_or_404(UniteMesure, pk=pk)
+    if request.method == 'POST':
+        nom = obj.nom
+        obj.delete()
+        messages.success(request, f'Unité « {nom} » supprimée.')
+    return redirect('stock_unites')
+
+
+@login_required(login_url='login')
+@require_POST
+def unite_bulk_delete(request):
+    ids = request.POST.getlist('ids[]')
+    if ids:
+        count, _ = UniteMesure.objects.filter(pk__in=ids).delete()
+        return JsonResponse({'ok': True, 'count': count})
+    return JsonResponse({'ok': False}, status=400)
+
+
+@login_required(login_url='login')
+def categories_unites_list(request):
+    q = request.GET.get('q', '').strip()
+    vue = request.GET.get('vue', 'liste')
+    qs = CategorieUniteMesure.objects.all()
+    if q:
+        qs = qs.filter(nom__icontains=q)
+    total_all = CategorieUniteMesure.objects.count()
+    paginator = Paginator(qs, 30)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    return render(request, 'stock/unites/categories/list.html', {
+        'page_obj': page_obj,
+        'q': q,
+        'vue': vue,
+        'total': total_all,
+        'total_filtre': qs.count(),
+    })
+
+
+@login_required(login_url='login')
+def categorie_unite_create(request):
+    if request.method == 'POST':
+        form = CategorieUniteMesureForm(request.POST)
+        if form.is_valid():
+            obj = form.save()
+            messages.success(request, f'Catégorie « {obj.nom} » créée.')
+            return redirect('stock_categories_unites')
+        else:
+            messages.error(request, 'Veuillez corriger les erreurs du formulaire.')
+    else:
+        form = CategorieUniteMesureForm()
+    return render(request, 'stock/unites/categories/form.html', {
+        'form': form,
+        'titre': "Nouvelle catégorie d'unité",
+        'edit': False,
+    })
+
+
+@login_required(login_url='login')
+def categorie_unite_detail(request, pk):
+    obj = get_object_or_404(CategorieUniteMesure, pk=pk)
+    return render(request, 'stock/unites/categories/detail.html', {'obj': obj})
+
+
+@login_required(login_url='login')
+def categorie_unite_edit(request, pk):
+    obj = get_object_or_404(CategorieUniteMesure, pk=pk)
+    if request.method == 'POST':
+        form = CategorieUniteMesureForm(request.POST, instance=obj)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'Catégorie « {obj.nom} » mise à jour.')
+            return redirect('stock_categorie_unite_detail', pk=obj.pk)
+        else:
+            messages.error(request, 'Veuillez corriger les erreurs du formulaire.')
+    else:
+        form = CategorieUniteMesureForm(instance=obj)
+    return render(request, 'stock/unites/categories/form.html', {
+        'form': form,
+        'obj': obj,
+        'titre': f'Modifier — {obj.nom}',
+        'edit': True,
+    })
+
+
+@login_required(login_url='login')
+def categorie_unite_delete(request, pk):
+    obj = get_object_or_404(CategorieUniteMesure, pk=pk)
+    if request.method == 'POST':
+        nom = obj.nom
+        obj.delete()
+        messages.success(request, f'Catégorie « {nom} » supprimée.')
+    return redirect('stock_categories_unites')
+
+
+@login_required(login_url='login')
+@require_POST
+def categorie_unite_bulk_delete(request):
+    ids = request.POST.getlist('ids[]')
+    if ids:
+        count, _ = CategorieUniteMesure.objects.filter(pk__in=ids).delete()
+        return JsonResponse({'ok': True, 'count': count})
+    return JsonResponse({'ok': False}, status=400)
+
+
+_UM_HDR = ['code', 'nom', 'categorie', 'type_unite', 'ratio', 'precision_arrondi', 'actif']
+
+
+def _um_row(u):
+    return [
+        u.code, u.nom,
+        u.categorie.nom if u.categorie else '',
+        u.type_unite, float(u.ratio), float(u.precision_arrondi), int(u.actif),
+    ]
+
+
+@login_required(login_url='login')
+def export_unites(request):
+    fmt = request.GET.get('format', 'json')
+    qs = UniteMesure.objects.select_related('categorie')
+    rows = [_um_row(u) for u in qs]
+    return _export_file(fmt, 'unites_mesure', _UM_HDR, rows,
+                        [dict(zip(_UM_HDR, r)) for r in rows])
+
+
+_CU_HDR = ['nom']
+
+
+@login_required(login_url='login')
+def export_categories_unites(request):
+    fmt = request.GET.get('format', 'json')
+    qs = CategorieUniteMesure.objects.all()
+    rows = [[c.nom] for c in qs]
+    return _export_file(fmt, 'categories_unites', _CU_HDR, rows,
+                        [{'nom': c.nom} for c in qs])
+
+
+@login_required(login_url='login')
+@require_POST
+def import_unites(request):
+    upload = request.FILES.get('fichier')
+    if not upload:
+        messages.error(request, 'Aucun fichier sélectionné.')
+        return redirect('stock_unites')
+
+    data, err = _parse_upload(upload)
+    if err:
+        messages.error(request, err)
+        return redirect('stock_unites')
+
+    do_update = 'update' in request.POST
+    created = updated = skipped = errors = 0
+
+    for item in data:
+        try:
+            code = _s(item.get('code', ''))
+            if not code:
+                errors += 1
+                continue
+            cat_nom = _s(item.get('categorie', ''))
+            cat = None
+            if cat_nom:
+                cat, _ = CategorieUniteMesure.objects.get_or_create(nom=cat_nom)
+            defaults = {
+                'nom': _s(item.get('nom', code)),
+                'categorie': cat,
+                'type_unite': _s(item.get('type_unite', 'umrc')),
+                'ratio': item.get('ratio') or 1,
+                'precision_arrondi': item.get('precision_arrondi') or 0.01,
+                'actif': _b(item.get('actif', True)),
+            }
+            obj, was_created = UniteMesure.objects.get_or_create(code=code, defaults=defaults)
+            if was_created:
+                created += 1
+            elif do_update:
+                for k, v in defaults.items():
+                    setattr(obj, k, v)
+                obj.save()
+                updated += 1
+            else:
+                skipped += 1
+        except Exception:
+            errors += 1
+
+    if errors:
+        messages.warning(request, f'{created} créée(s), {updated} mise(s) à jour, {skipped} ignorée(s), {errors} erreur(s).')
+    else:
+        messages.success(request, f'{created} unité(s) importée(s), {updated} mise(s) à jour, {skipped} ignorée(s).')
+    return redirect('stock_unites')
+
+
+@login_required(login_url='login')
+@require_POST
+def import_categories_unites(request):
+    upload = request.FILES.get('fichier')
+    if not upload:
+        messages.error(request, 'Aucun fichier sélectionné.')
+        return redirect('stock_categories_unites')
+
+    data, err = _parse_upload(upload)
+    if err:
+        messages.error(request, err)
+        return redirect('stock_categories_unites')
+
+    created = skipped = errors = 0
+    for item in data:
+        try:
+            nom = _s(item.get('nom', ''))
+            if not nom:
+                errors += 1
+                continue
+            _, was_created = CategorieUniteMesure.objects.get_or_create(nom=nom)
+            if was_created:
+                created += 1
+            else:
+                skipped += 1
+        except Exception:
+            errors += 1
+
+    if errors:
+        messages.warning(request, f'{created} créée(s), {skipped} ignorée(s), {errors} erreur(s).')
+    else:
+        messages.success(request, f'{created} catégorie(s) importée(s), {skipped} ignorée(s).')
+    return redirect('stock_categories_unites')

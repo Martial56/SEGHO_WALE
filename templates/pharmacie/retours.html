@@ -20,8 +20,8 @@
 }
 .ret-stat i { font-size:18px;color:var(--ph-600); }
 .ph-note-box { margin-bottom:20px;padding:14px 16px;border-radius:12px;font-size:13px;line-height:1.5; }
-.ph-note-box.error { background:rgba(232,69,69,.1);color:#b71c1c;border:1px solid rgba(232,69,69,.2); }
-.ph-note-box.success { background:rgba(26,109,140,.1);color:#1a6d8c;border:1px solid rgba(26,109,140,.2); }
+.ph-note-box.error { background:rgba(var(--rose-rgb),.1);color:var(--rose-text);border:1px solid rgba(var(--rose-rgb),.2); }
+.ph-note-box.success { background:rgba(var(--ph-600-rgb),.1);color:var(--ph-600);border:1px solid rgba(var(--ph-600-rgb),.2); }
 .ph-input {
   border:none;
   border-bottom:1.5px solid rgba(0,0,0,.18);
@@ -109,27 +109,27 @@
 
       <form method="post" novalidate>
         {% csrf_token %}
-        <div class="ph-field">
-          <label class="ph-label">Produit</label>
-          <select name="produit_id" class="ret-select" required>
+        <div class="form-field">
+          <label class="field-label">Produit</label>
+          <select name="produit_id" class="field-ul" required>
             <option value="" disabled selected>— Sélectionner un produit —</option>
             {% for item in stock_items %}
-              <option value="{{ item.produit.pk }}">{{ item.produit.nom }}{% if item.produit.unite_mesure %} ({{ item.produit.unite_mesure }}){% endif %} — stock actuel : {{ item.quantite|floatformat:0 }}</option>
+              <option value="{{ item.produit.pk }}">{{ item.produit.nom }}{% if item.produit.unite_mesure %} ({{ item.produit.unite_mesure.nom }}){% endif %} — stock actuel : {{ item.quantite|floatformat:0 }}</option>
             {% empty %}
               <option value="" disabled>Aucun produit dans le stock</option>
             {% endfor %}
           </select>
         </div>
-        <div class="ph-field">
-          <label class="ph-label">Quantité à retourner</label>
-          <input type="number" name="quantite" class="ph-input" min="1" step="1" placeholder="Ex : 5" required>
+        <div class="form-field">
+          <label class="field-label">Quantité à retourner</label>
+          <input type="number" name="quantite" class="field-ul" min="1" step="1" placeholder="Ex : 5" required>
         </div>
-        <div class="ph-field">
-          <label class="ph-label">Motif du retour</label>
-          <input type="text" name="motif" class="ph-input" placeholder="Ex : périmé, erreur de commande, surplus…">
+        <div class="form-field">
+          <label class="field-label">Motif du retour</label>
+          <input type="text" name="motif" class="field-ul" placeholder="Ex : périmé, erreur de commande, surplus…">
         </div>
-        <div style="display:flex;justify-content:flex-end;margin-top:20px;">
-          <button type="submit" class="btn-ph"><i class="bi bi-check2-circle"></i> Enregistrer le retour</button>
+        <div class="form-actions">
+          <button type="submit" class="btn-form-submit"><i class="bi bi-check2-circle"></i> Enregistrer le retour</button>
         </div>
       </form>
     </div>

@@ -2,6 +2,40 @@ from django.db import models
 from django.utils import timezone
 
 
+class CategorieUniteMesure(models.Model):
+    nom = models.CharField(max_length=100, unique=True, verbose_name="Nom")
+
+    def __str__(self): return self.nom
+    class Meta:
+        verbose_name = "Catégorie d'unité de mesure"
+        verbose_name_plural = "Catégories d'unités de mesure"
+        ordering = ['nom']
+
+
+class UniteMesure(models.Model):
+    TYPE_CHOICES = [
+        ('pgumr', "Plus grande que l'unité de mesure de référence"),
+        ('umrc', "Unité de mesure de référence pour cette catégorie"),
+        ('ppumr', "Plus petite que l'unité de mesure de référence"),
+    ]
+    nom = models.CharField(max_length=100, unique=True, verbose_name="Nom")
+    code = models.CharField(max_length=20, unique=True, verbose_name="Abréviation")
+    categorie = models.ForeignKey(
+        CategorieUniteMesure, on_delete=models.SET_NULL, null=True, blank=True,
+        verbose_name="Catégorie", related_name='unites'
+    )
+    type_unite = models.CharField(max_length=10, choices=TYPE_CHOICES, default='umrc', verbose_name="Type")
+    ratio = models.DecimalField(max_digits=12, decimal_places=6, default=1, verbose_name="Ratio")
+    precision_arrondi = models.DecimalField(max_digits=8, decimal_places=5, default=0.01000, verbose_name="Précision d'arrondi")
+    actif = models.BooleanField(default=True, verbose_name="Actif")
+
+    def __str__(self): return f"{self.nom} ({self.code})"
+    class Meta:
+        verbose_name = "Unité de mesure"
+        verbose_name_plural = "Unités de mesure"
+        ordering = ['nom']
+
+
 class CategorieStock(models.Model):
     TYPE_CHOICES = [
         ('medicament',  'Médicament'),
@@ -45,7 +79,10 @@ class Produit(models.Model):
         'achats.Fournisseur', on_delete=models.SET_NULL, null=True, blank=True
     )
     description  = models.TextField(blank=True)
-    unite_mesure = models.CharField(max_length=30, default='unité')
+    unite_mesure = models.ForeignKey(
+        'UniteMesure', on_delete=models.SET_NULL, null=True, blank=True,
+        verbose_name='Unité de mesure',
+    )
 
     # Champs spécifiques médicaments
     dci    = models.CharField("DCI / Principe actif", max_length=200, blank=True)

@@ -1,9 +1,10 @@
-{% extends 'services/base.html' %}
+{% extends 'stock/base.html' %}
 
 {% block breadcrumb %}{% endblock %}
 
 {% block extra_css %}
 {{ block.super }}
+{% include 'services/includes/layout_css.html' %}
 <style>
   /* ── TABLE ── */
   .o-list-wrap {
@@ -245,6 +246,12 @@
     display: flex;
   }
 
+  html[data-theme="dark"] .bulk-bar {
+    background: rgba(255,193,7,.15);
+    border-color: rgba(255,193,7,.4);
+    color: #ffd873;
+  }
+
   .btn-bulk-delete {
     display: flex;
     align-items: center;
@@ -402,7 +409,7 @@
       </div>
     </div>
     <div class="o-subheader-row">
-      <a href="{% url 'services:categorie_unite_create' %}" class="o-btn-create">
+      <a href="{% url 'stock_categorie_unite_create' %}" class="o-btn-create">
         <i class="bi bi-plus-lg"></i> Créer
       </a>
       <div class="io-page-wrap" id="io-page-wrap">
@@ -412,17 +419,17 @@
         </button>
         <div class="io-page-menu" id="io-page-menu">
           <div class="io-pm-section">Exporter les catégories</div>
-          <a class="io-pm-item" href="{% url 'services:export_categories_unites' %}?format=json"><i class="bi bi-filetype-json" style="color:#c97a00;"></i> JSON</a>
-          <a class="io-pm-item" href="{% url 'services:export_categories_unites' %}?format=csv"><i class="bi bi-filetype-csv" style="color:#1a7a4a;"></i> CSV</a>
-          <a class="io-pm-item" href="{% url 'services:export_categories_unites' %}?format=xlsx"><i class="bi bi-file-earmark-excel" style="color:#217346;"></i> Excel</a>
+          <a class="io-pm-item" href="{% url 'stock_export_categories_unites' %}?format=json"><i class="bi bi-filetype-json" style="color:#c97a00;"></i> JSON</a>
+          <a class="io-pm-item" href="{% url 'stock_export_categories_unites' %}?format=csv"><i class="bi bi-filetype-csv" style="color:#1a7a4a;"></i> CSV</a>
+          <a class="io-pm-item" href="{% url 'stock_export_categories_unites' %}?format=xlsx"><i class="bi bi-file-earmark-excel" style="color:#217346;"></i> Excel</a>
           <div class="io-pm-sep"></div>
           <div class="io-pm-section">Importer</div>
           <button type="button" class="io-pm-item" onclick="openImportModal()"><i class="bi bi-upload" style="color:#2188ab;"></i> Importer un fichier…</button>
         </div>
       </div>
       {% if q %}
-      <a href="{% url 'services:categories_unites' %}" class="o-ctrl-btn"><i class="bi bi-x"></i> Effacer</a>
-      <span class="o-filter-tag">{{ q }} <a href="{% url 'services:categories_unites' %}?vue={{ vue }}">×</a></span>
+      <a href="{% url 'stock_categories_unites' %}" class="o-ctrl-btn"><i class="bi bi-x"></i> Effacer</a>
+      <span class="o-filter-tag">{{ q }} <a href="{% url 'stock_categories_unites' %}?vue={{ vue }}">×</a></span>
       {% endif %}
       <div style="flex:1;"></div>
       <div class="o-ctrl-sep"></div>
@@ -456,7 +463,7 @@
   <!-- ── VUE GRILLE ── -->
   <div class="o-kanban" id="main-content">
     {% for cat in page_obj %}
-    <div class="o-card" onclick="window.location='{% url 'services:categorie_unite_detail' cat.pk %}'" style="cursor:pointer;">
+    <div class="o-card" onclick="window.location='{% url 'stock_categorie_unite_detail' cat.pk %}'" style="cursor:pointer;">
       <div class="o-card-name">{{ cat.nom }}</div>
       <div class="o-card-count">{{ cat.unites.count }} unité{{ cat.unites.count|pluralize }}</div>
     </div>
@@ -493,7 +500,7 @@
       </thead>
       <tbody>
         {% for cat in page_obj %}
-        <tr onclick="if(event.target.type!=='checkbox'){window.location='{% url 'services:categorie_unite_detail' cat.pk %}'}" style="cursor:pointer;">
+        <tr onclick="if(event.target.type!=='checkbox'){window.location='{% url 'stock_categorie_unite_detail' cat.pk %}'}" style="cursor:pointer;">
           <td style="padding:9px 8px 9px 14px;" onclick="event.stopPropagation()">
             <input type="checkbox" class="row-check" value="{{ cat.pk }}"
               style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent);" onchange="onCheckChange()">
@@ -523,11 +530,11 @@
     <i class="bi bi-tags"></i>
     {% if q %}
     Aucune catégorie ne correspond à « {{ q }} ».<br>
-    <a href="{% url 'services:categories_unites' %}"
+    <a href="{% url 'stock_categories_unites' %}"
       style="color:var(--accent);font-weight:600;margin-top:8px;display:inline-block;">Effacer</a>
     {% else %}
     Aucune catégorie d'unité enregistrée.<br>
-    <a href="{% url 'services:categorie_unite_create' %}"
+    <a href="{% url 'stock_categorie_unite_create' %}"
       style="color:var(--accent);font-weight:600;margin-top:8px;display:inline-block;">Créer une catégorie</a>
     {% endif %}
   </div>
@@ -552,7 +559,7 @@
 </div><!-- /#page-wrap -->
 
 <script>
-  const BULK_URL = "{% url 'services:categorie_unite_bulk_delete' %}";
+  const BULK_URL = "{% url 'stock_categorie_unite_bulk_delete' %}";
   const CSRF_TOKEN = "{{ csrf_token }}";
 
   function setVue(v) {
@@ -690,7 +697,7 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')closeImportM
     <span><i class="bi bi-upload"></i> Importer des Catégories d'unités</span>
     <button type="button" class="io-modal-close" onclick="closeImportModal()">×</button>
   </div>
-  <form method="post" action="{% url 'services:import_categories_unites' %}" enctype="multipart/form-data">
+  <form method="post" action="{% url 'stock_import_categories_unites' %}" enctype="multipart/form-data">
     {% csrf_token %}
     <div class="io-modal-body">
       <label class="io-file-label" for="io-file-input">

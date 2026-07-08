@@ -1,5 +1,5 @@
 {% extends 'presence/base.html' %}
-{% load i18n %}
+{% load i18n static %}
 {% block topbar_title %}Rapport de présence — {{ mois_fr }} {{ year }}{% endblock %}
 
 {% block extra_css %}
@@ -29,8 +29,8 @@
 .rp-table td { padding:8px 12px; border-bottom:1px solid var(--pr-50); color:var(--pr-text); }
 .rp-table td.num { text-align:center; font-weight:700; }
 .rp-table tbody tr:hover { background:var(--pr-50); }
-.col-p  { color:#0f4358; }
-.col-a  { color:#c0392b; }
+.col-p  { color:var(--pr-700); }
+.col-a  { color:var(--rose-btn); }
 .col-ns { color:var(--pr-muted); }
 .col-r  { color:#c47a00; }
 
@@ -38,18 +38,18 @@
 .bar-track { flex:1; background:var(--pr-100); border-radius:20px; height:7px; overflow:hidden; min-width:60px; }
 .bar-fill { height:100%; border-radius:20px; }
 .bar-fill.good { background:var(--pr-500); }
-.bar-fill.warn { background:#e89a1a; }
-.bar-fill.bad  { background:#e84545; }
+.bar-fill.warn { background:var(--amber); }
+.bar-fill.bad  { background:var(--rose); }
 
 /* ── Badge retard ── */
 .badge-retard-sm {
-  display:inline-block; background:rgba(232,154,26,.15); color:#c47a00;
-  border:1px solid rgba(232,154,26,.3); border-radius:10px;
+  display:inline-block; background:rgba(var(--amber-rgb),.15); color:#c47a00;
+  border:1px solid rgba(var(--amber-rgb),.3); border-radius:10px;
   padding:1px 7px; font-size:10.5px; font-weight:700;
 }
 .badge-retard-lg {
-  display:inline-block; background:rgba(232,154,26,.12); color:#c47a00;
-  border:1px solid rgba(232,154,26,.25); border-radius:12px;
+  display:inline-block; background:rgba(var(--amber-rgb),.12); color:#c47a00;
+  border:1px solid rgba(var(--amber-rgb),.25); border-radius:12px;
   padding:3px 10px; font-size:12px; font-weight:700;
 }
 
@@ -61,8 +61,17 @@
   body { font-size:11px; }
   .rp-table td, .rp-table th { padding:5px 8px; }
   h2.print-title { display:block !important; font-size:14px; margin-bottom:8px; }
+  .print-header { display:block !important; margin-bottom:14px; }
+  .content { padding:10mm 12mm !important; }
+  @page { size:A4; margin:0; }
 }
 h2.print-title { display:none; }
+.print-header { display:none; }
+.print-header-inner { display:flex; align-items:center; gap:14px; padding-bottom:10px; border-bottom:2.5px solid var(--pr-700); }
+.print-header-logo { height:56px; width:auto; flex-shrink:0; }
+.print-header-org { font-size:15px; font-weight:800; color:var(--pr-900); text-transform:uppercase; letter-spacing:.06em; line-height:1.2; }
+.print-header-subtitle { font-size:9.5px; color:#666; margin-top:1px; letter-spacing:.03em; }
+.print-header-doc { font-size:12px; font-weight:700; color:var(--pr-700); margin-top:5px; text-transform:uppercase; letter-spacing:.05em; }
 .pr-pagination { display:flex;justify-content:center;align-items:center;gap:6px;padding:16px 0;flex-wrap:wrap; }
 .pr-page-link { display:inline-flex;align-items:center;justify-content:center;min-width:32px;height:32px;padding:0 8px;border-radius:6px;font-size:13px;font-weight:600;text-decoration:none;color:var(--pr-700);background:#fff;border:1px solid var(--pr-200);transition:all .15s; }
 .pr-page-link:hover { background:var(--pr-50); }
@@ -74,6 +83,18 @@ html[data-theme="dark"] .pr-page-link.active { background:var(--pr-600);color:#f
 {% endblock %}
 
 {% block content %}
+
+<!-- En-tête impression -->
+<div class="print-header">
+  <div class="print-header-inner">
+    <img src="{% static 'img/logo.png' %}" alt="Logo WALÉ" class="print-header-logo">
+    <div>
+      <div class="print-header-org">Centre Médico-Social WALÉ</div>
+      <div class="print-header-subtitle">Yamoussoukro — Côte d'Ivoire</div>
+      <div class="print-header-doc">Rapport de présence — {{ mois_fr }} {{ year }}</div>
+    </div>
+  </div>
+</div>
 
 <!-- Sub-header -->
 <div class="pr-subheader" id="subheader">
@@ -103,7 +124,7 @@ html[data-theme="dark"] .pr-page-link.active { background:var(--pr-600);color:#f
        class="btn-pr-outline" style="padding:6px 11px;"><i class="bi bi-chevron-right"></i></a>
     <a href="{% url 'presence_rapport_export' %}?year={{ year }}&month={{ month }}{% if service_sel %}&service={{ service_sel.pk }}{% endif %}"
        class="btn-pr-outline" style="margin-left:8px;">
-      <i class="bi bi-file-earmark-excel-fill" style="color:#0f4358;"></i> Excel
+      <i class="bi bi-file-earmark-excel-fill" style="color:var(--pr-700);"></i> Excel
     </a>
     <button onclick="window.print()" class="btn-pr" style="margin-left:4px;">
       <i class="bi bi-printer"></i> Imprimer
@@ -121,7 +142,7 @@ html[data-theme="dark"] .pr-page-link.active { background:var(--pr-600);color:#f
     <div style="font-size:24px;font-weight:800;color:var(--pr-700);line-height:1;">{{ nb_jouvres }}</div>
     <div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:rgba(0,0,0,.45);margin-top:4px;font-weight:700;">Jours ouvrés</div>
   </div>
-  <div style="background:rgba(232,154,26,.08);border:1px solid rgba(232,154,26,.2);border-radius:10px;padding:14px 18px;text-align:center;">
+  <div style="background:rgba(var(--amber-rgb),.08);border:1px solid rgba(var(--amber-rgb),.2);border-radius:10px;padding:14px 18px;text-align:center;">
     <div style="font-size:24px;font-weight:800;color:#c47a00;line-height:1;">{{ retards_all|length }}</div>
     <div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:rgba(0,0,0,.45);margin-top:4px;font-weight:700;">Retards détectés</div>
   </div>
@@ -141,13 +162,13 @@ html[data-theme="dark"] .pr-page-link.active { background:var(--pr-600);color:#f
   <button class="rp-tab" onclick="showTab('retards',this)">
     <i class="bi bi-clock-history"></i> Retards
     {% if retards_all %}
-    <span style="background:rgba(232,154,26,.2);color:#c47a00;border-radius:10px;padding:1px 7px;font-size:11px;margin-left:4px;">{{ retards_all|length }}</span>
+    <span style="background:rgba(var(--amber-rgb),.2);color:#c47a00;border-radius:10px;padding:1px 7px;font-size:11px;margin-left:4px;">{{ retards_all|length }}</span>
     {% endif %}
   </button>
   <button class="rp-tab" onclick="showTab('motifs',this)">
     <i class="bi bi-bar-chart-fill"></i> Absences par motif
     {% if motifs_list %}
-    <span style="background:rgba(232,69,69,.15);color:#b71c1c;border-radius:10px;padding:1px 7px;font-size:11px;margin-left:4px;">{{ motifs_list|length }}</span>
+    <span style="background:rgba(var(--rose-rgb),.15);color:var(--rose-text);border-radius:10px;padding:1px 7px;font-size:11px;margin-left:4px;">{{ motifs_list|length }}</span>
     {% endif %}
   </button>
 </div>
@@ -208,7 +229,7 @@ html[data-theme="dark"] .pr-page-link.active { background:var(--pr-600);color:#f
                   <div class="bar-fill {% if s.taux >= 90 %}good{% elif s.taux >= 75 %}warn{% else %}bad{% endif %}"
                        data-w="{{ s.taux }}"></div>
                 </div>
-                <span style="font-size:12px;font-weight:700;color:{% if s.taux >= 90 %}var(--pr-600){% elif s.taux >= 75 %}#c47a00{% else %}#c0392b{% endif %};min-width:38px;">
+                <span style="font-size:12px;font-weight:700;color:{% if s.taux >= 90 %}var(--pr-600){% elif s.taux >= 75 %}#c47a00{% else %}var(--rose-btn){% endif %};min-width:38px;">
                   {{ s.taux }}%
                 </span>
               </div>
@@ -290,7 +311,7 @@ html[data-theme="dark"] .pr-page-link.active { background:var(--pr-600);color:#f
               <span class="badge-retard-lg">{{ r.type }}</span>
             </td>
             <td style="font-family: var(--font-mono);color:var(--pr-muted);">{{ r.ref }}</td>
-            <td style="font-family: var(--font-mono);font-weight:700;color:#c0392b;">{{ r.heure_arrivee|time:"H:i" }}</td>
+            <td style="font-family: var(--font-mono);font-weight:700;color:var(--rose-btn);">{{ r.heure_arrivee|time:"H:i" }}</td>
             <td class="num">
               <span class="badge-retard-sm">+{{ r.minutes }} min</span>
             </td>
