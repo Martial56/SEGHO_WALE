@@ -683,7 +683,7 @@
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
                   <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
                 </svg>
-                {% with nb_sys=header_stats.medicaments_alerte|add:header_stats.factures_impayees|add:header_stats.analyses_pending|add:planning_notifs_total|add:cg_rh_notifs_total|default:0 %}{% with nb_tot=alertes_count|default:0|add:nb_sys %}{% if nb_tot %}
+                {% with nb_sys=header_stats.medicaments_alerte|add:header_stats.factures_impayees|add:header_stats.analyses_pending|add:planning_notifs_total|add:cg_rh_notifs_total|add:soins_en_attente_count|default:0 %}{% with nb_tot=alertes_count|default:0|add:nb_sys %}{% if nb_tot %}
                 <span id="notif-badge" style="
                   position:absolute;top:4px;right:4px;
                   min-width:16px;height:16px;border-radius:8px;
@@ -904,7 +904,24 @@
                   {% endfor %}
                   {% endif %}
 
-                  {% if not alertes_contrat and not alertes_document and not notifs_conge and not cg_demandes_attente and not cg_debut_proche and not header_stats.medicaments_alerte and not header_stats.factures_impayees and not header_stats.analyses_pending and not planning_non_publiees and not planning_non_vues %}
+                  {% if soins_en_attente %}
+                  <div style="padding:8px 16px 4px;font-size:10.5px;font-weight:800;color:rgba(0,0,0,0.35);text-transform:uppercase;letter-spacing:.5px;{% if alertes_contrat or alertes_document or notifs_conge or cg_demandes_attente or cg_debut_proche or header_stats.medicaments_alerte or header_stats.factures_impayees or header_stats.analyses_pending or planning_non_publiees or planning_non_vues %}border-top:1px solid rgba(0,0,0,0.06);margin-top:4px;{% endif %}">
+                    Soins
+                  </div>
+                  {% for s in soins_en_attente %}
+                  <a href="{% url 'soins:detail' s.pk %}" style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(0,0,0,0.04);text-decoration:none;">
+                    <div style="width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:rgba(var(--teal-600-rgb),0.12);">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--teal-700)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                    </div>
+                    <div style="flex:1;">
+                      <div style="font-size:12.5px;font-weight:600;color:#1a3020;">Soin en attente de paiement</div>
+                      <div style="font-size:11.5px;color:rgba(0,0,0,0.55);margin-top:2px;">{{ s.patient.nom }} {{ s.patient.prenoms }} — {{ s.date_heure|date:"d/m/Y" }}</div>
+                    </div>
+                  </a>
+                  {% endfor %}
+                  {% endif %}
+
+                  {% if not alertes_contrat and not alertes_document and not notifs_conge and not cg_demandes_attente and not cg_debut_proche and not header_stats.medicaments_alerte and not header_stats.factures_impayees and not header_stats.analyses_pending and not planning_non_publiees and not planning_non_vues and not soins_en_attente %}
                   <div style="padding:28px 16px;text-align:center;color:rgba(0,0,0,0.35);">
                     <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 8px;display:block;opacity:.4">
                       <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>

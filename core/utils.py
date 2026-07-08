@@ -14,6 +14,7 @@ MODULE_URL_PREFIXES = {
     'facturation': '/facturation/',
     'laboratoire': '/laboratoire/',
     'planning': '/planning/',
+    'soins': '/soins/',
 }
 
 

@@ -70,6 +70,7 @@ TEMPLATES = [
                 'core.context_processors.user_profile',
                 'stock.context_processors.stock_alertes',
                 'pharmacie.context_processors.pharmacie_alertes',
+                'soins.context_processors.soins_alertes',
             ],
         },
     },
