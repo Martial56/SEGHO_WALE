@@ -9,7 +9,6 @@ urlpatterns = [
     path('<int:pk>/', views.service_detail, name='detail'),
     path('<int:pk>/modifier/', views.service_form, name='edit'),
     path('<int:pk>/regles-prix/', views.regles_prix, name='regles_prix'),
-    path('supprimer-selection/', views.service_bulk_delete, name='service_bulk_delete'),
 
     # Catégories de service
     path('categories/', views.categories_list, name='categories'),
@@ -17,7 +16,6 @@ urlpatterns = [
     path('categories/<int:pk>/', views.categorie_detail, name='categorie_detail'),
     path('categories/<int:pk>/modifier/', views.categorie_edit, name='categorie_edit'),
     path('categories/<int:pk>/supprimer/', views.categorie_delete, name='categorie_delete'),
-    path('categories/supprimer-selection/', views.categorie_bulk_delete, name='categorie_bulk_delete'),
 
     path('ajax/fournisseur-ligne/', views.ajax_add_fournisseur, name='ajax_fournisseur'),
     path('ajax/conditionn-ligne/', views.ajax_add_conditionnement, name='ajax_conditionnement'),

@@ -474,16 +474,6 @@
     </div>
   </div>
 
-  <!-- ══ BARRE SÉLECTION BULK ══ -->
-  <div class="bulk-bar" id="bulk-bar">
-    <i class="bi bi-check2-square"></i>
-    <span id="bulk-count">0</span> élément(s) sélectionné(s)
-    <button type="button" class="btn-bulk-delete" onclick="openBulkModal()">
-      <i class="bi bi-trash"></i> Supprimer
-    </button>
-    <button type="button" class="btn-bulk-cancel" onclick="clearSelection()">Annuler</button>
-  </div>
-
   <div id="list-result">
   {% if total_filtre > 0 %}
 
@@ -505,10 +495,6 @@
     <table class="o-list-table">
       <thead>
         <tr>
-          <th style="width:36px;padding:8px 8px 8px 14px;">
-            <input type="checkbox" id="select-all"
-              style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent);" onchange="toggleAll(this)">
-          </th>
           <th class="col-u-code sortable" data-col-idx="1"><span class="col-label">Abréviation</span><span
               class="sort-icon"></span>
             <div class="col-resizer"></div>
@@ -588,22 +574,6 @@
   {% endif %}
   </div><!-- /.list-result -->
 
-  <!-- ══ MODAL SUPPRESSION ══ -->
-  <div class="modal-overlay" id="bulk-delete-modal">
-    <div class="modal-box">
-      <div class="modal-icon">🗑️</div>
-      <div class="modal-title">Confirmer la suppression</div>
-      <div class="modal-msg">Vous allez supprimer <strong id="modal-count">0</strong> unité(s) de mesure.<br>
-        <span style="font-size:12px;color:var(--text-muted);">Cette action est irréversible.</span>
-      </div>
-      <div class="modal-actions">
-        <button type="button" class="btn-modal-cancel" onclick="closeBulkModal()">Annuler</button>
-        <button type="button" class="btn-modal-confirm" onclick="executeBulkDelete()">Supprimer</button>
-      </div>
-    </div>
-  </div>
-
-
 </div><!-- /#page-wrap -->
 
 <script>
@@ -629,47 +599,6 @@
       timer = setTimeout(window.liveLoad, 350);
     });
   })();
-
-  /* ── Sélection ── */
-  function onCheckChange() {
-    var count = document.querySelectorAll('.row-check:checked').length;
-    document.getElementById('bulk-count').textContent = count;
-    document.getElementById('bulk-bar').classList.toggle('visible', count > 0);
-    var all = document.getElementById('select-all');
-    if (all) {
-      var total = document.querySelectorAll('.row-check').length;
-      all.indeterminate = count > 0 && count < total;
-      all.checked = count === total && total > 0;
-    }
-  }
-  function toggleAll(master) {
-    document.querySelectorAll('.row-check').forEach(function (cb) { cb.checked = master.checked; });
-    onCheckChange();
-  }
-  function clearSelection() {
-    document.querySelectorAll('.row-check, #select-all').forEach(function (cb) { cb.checked = false; });
-    onCheckChange();
-  }
-
-  /* ── Bulk delete ── */
-  function openBulkModal() {
-    document.getElementById('modal-count').textContent = document.querySelectorAll('.row-check:checked').length;
-    document.getElementById('bulk-delete-modal').classList.add('open');
-  }
-  function closeBulkModal() { document.getElementById('bulk-delete-modal').classList.remove('open'); }
-  function executeBulkDelete() {
-    var ids = Array.from(document.querySelectorAll('.row-check:checked')).map(function (cb) { return cb.value; });
-    if (!ids.length) return;
-    var fd = new FormData();
-    fd.append('csrfmiddlewaretoken', CSRF_TOKEN);
-    ids.forEach(function (id) { fd.append('ids[]', id); });
-    fetch(BULK_URL, { method: 'POST', body: fd })
-      .then(function (r) { return r.json(); })
-      .then(function (d) { if (d.ok) window.location.reload(); })
-      .catch(function () { closeBulkModal(); });
-  }
-  document.getElementById('bulk-delete-modal').addEventListener('click', function (e) { if (e.target === this) closeBulkModal(); });
-
 </script>
 {% include 'services/includes/list_live_js.html' %}
 {% include 'services/includes/sort_resize_js.html' %}

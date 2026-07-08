@@ -80,9 +80,18 @@ class TestGetActionsDisponibles(TestCase):
             hospitalisation=hosp, service=_article(), quantite=1, source='manuel'
         )
         actions = get_actions_disponibles(hosp, self.superuser)
-        for key in ('confirmer', 'creer_facture', 'installer', 'decharger', 'terminer', 'annuler'):
+        for key in ('confirmer', 'creer_facture', 'installer', 'decharger', 'annuler'):
             self.assertTrue(actions[key]['visible'], f"{key} devrait être visible pour le superuser")
             self.assertTrue(actions[key]['enabled'], f"{key} devrait être activé pour le superuser")
+
+        # "Clôturer" (terminer) n'a de sens qu'une fois le dossier déchargé,
+        # même pour le superuser (on ne saute pas d'étape) — et ce statut
+        # masque "annuler" en retour, donc vérifié à part avec un statut cohérent.
+        hosp.statut = 'decharge'
+        hosp.save(update_fields=['statut'])
+        actions = get_actions_disponibles(hosp, self.superuser)
+        self.assertTrue(actions['terminer']['visible'], "terminer devrait être visible pour le superuser une fois déchargé")
+        self.assertTrue(actions['terminer']['enabled'], "terminer devrait être activé pour le superuser une fois déchargé")
 
     def test_user_sans_permission_tout_invisible(self):
         hosp = self._hosp()

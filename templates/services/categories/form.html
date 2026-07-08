@@ -28,19 +28,38 @@
   </div>
 </div>
 
-<form method="post" novalidate id="categorie-form">
-  {% csrf_token %}
-  <div class="form-simple-card">
-    <div class="tab-two-col">
-      <div class="form-field">
-        <label class="field-label" for="{{ form.nom.id_for_label }}">Nom de la catégorie <span class="required-star">*</span></label>
-        {{ form.nom }}
-        {% if form.nom.errors %}<div class="field-error">{{ form.nom.errors.0 }}</div>{% endif %}
+<!-- ══════════════ CORPS DU FORMULAIRE ══════════════ -->
+<div class="form-body">
+
+  <form method="post" novalidate id="categorie-form">
+    {% csrf_token %}
+
+    <div class="form-main-grid">
+
+      <div class="field-group">
+        <div class="field-row">
+          <label>Nom de la catégorie <span class="required-star">*</span></label>
+          {{ form.nom }}
+        </div>
+        {% if form.nom.errors %}<div class="f-error">{{ form.nom.errors.0 }}</div>{% endif %}
+        <div class="field-row">
+          <label>Code</label>
+          {{ form.code }}
+        </div>
+        {% if form.code.errors %}<div class="f-error">{{ form.code.errors.0 }}</div>{% endif %}
       </div>
-      <div class="form-field">
-        <label class="field-label" for="{{ form.parent.id_for_label }}">Catégorie parente</label>
-        {{ form.parent }}
-        {% if form.parent.errors %}<div class="field-error">{{ form.parent.errors.0 }}</div>{% endif %}
+
+      <div class="field-group">
+        <div class="field-row">
+          <label>Catégorie parente</label>
+          {{ form.parent }}
+        </div>
+        {% if form.parent.errors %}<div class="f-error">{{ form.parent.errors.0 }}</div>{% endif %}
+        <div class="field-row">
+          <label>Service associé</label>
+          {{ form.service_associe }}
+        </div>
+        {% if form.service_associe.errors %}<div class="f-error">{{ form.service_associe.errors.0 }}</div>{% endif %}
       </div>
     </div>
 
@@ -96,6 +115,13 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+  var codeInput = document.getElementById('id_code');
+  if (codeInput) codeInput.addEventListener('input', function () {
+    var pos = this.selectionStart;
+    this.value = this.value.toUpperCase();
+    this.setSelectionRange(pos, pos);
+  });
+
   var modal = document.getElementById('delete-modal');
   if (modal) modal.addEventListener('click', function (e) {
     if (e.target === this) this.classList.remove('open');

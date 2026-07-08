@@ -2012,4 +2012,28 @@
 })();
 </script>
 
+<script>
+/* ── Filtre "Type de consultation" selon le "Département" choisi ── */
+(function () {
+  var dept = document.getElementById('id_departement');
+  var typeCons = document.getElementById('id_type_consultation');
+  if (!dept || !typeCons) return;
+
+  function filterTypeConsultation() {
+    var serviceId = dept.value;
+    var stillValid = false;
+    typeCons.querySelectorAll('option').forEach(function (opt) {
+      if (!opt.value) return;
+      var visible = !!serviceId && opt.dataset.serviceId === serviceId;
+      opt.hidden = !visible;
+      if (visible && opt.selected) stillValid = true;
+    });
+    if (!stillValid) typeCons.value = '';
+  }
+
+  dept.addEventListener('change', filterTypeConsultation);
+  filterTypeConsultation();
+})();
+</script>
+
 {% endblock %}

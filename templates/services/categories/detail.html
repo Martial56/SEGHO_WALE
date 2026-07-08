@@ -48,6 +48,25 @@
   }
 
   .sub-cat-row:last-child { border-bottom: none; }
+
+  .det-badge-actif { background: #e3f9ee; color: #0d8a52; }
+  .det-badge-inactif { background: #fdf0f0; color: #c0392b; }
+  html[data-theme="dark"] .det-badge-actif { background: rgba(22,169,107,.2); color: #6eddb0; }
+  html[data-theme="dark"] .det-badge-inactif { background: rgba(232,69,69,.2); color: #f09090; }
+
+  .presta-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .presta-row:last-child { border-bottom: none; }
+  .presta-row a { color: var(--text); text-decoration: none; font-weight: 500; }
+  .presta-row a:hover { color: var(--accent); }
+  .presta-row-meta { display: flex; align-items: center; gap: 14px; flex-shrink: 0; color: var(--text-muted); font-size: 12px; }
 </style>
 {% endblock %}
 
@@ -97,7 +116,13 @@
         </div>
       </div>
       <div class="field-row">
-        <label>Services</label>
+        <label>Service associé</label>
+        <div class="field-static {% if not obj.service_associe %}muted{% endif %}">
+          {{ obj.service_associe|default:"—" }}
+        </div>
+      </div>
+      <div class="field-row">
+        <label>Prestations</label>
         <div class="field-static">
           <span class="det-badge det-badge-gray">{{ obj.articleservice_set.count }} service{{ obj.articleservice_set.count|pluralize }}</span>
         </div>
@@ -111,6 +136,7 @@
       <div class="f-tabs-wrap">
         <div class="f-tabs">
           <button type="button" class="f-tab active" data-tab="tab-info">Informations</button>
+          <button type="button" class="f-tab" data-tab="tab-prestations">Prestations associées ({{ obj.articleservice_set.count }})</button>
         </div>
         <div class="f-tab-panel active" id="tab-info">
 
@@ -136,6 +162,29 @@
           {% endif %}
 
         </div>
+
+        <div class="f-tab-panel" id="tab-prestations">
+          {% with prestations=obj.articleservice_set.all|dictsort:"nom" %}
+          {% if prestations %}
+          {% for presta in prestations %}
+          <div class="presta-row">
+            <a href="{% url 'services:detail' presta.pk %}">{{ presta.nom }}</a>
+            <div class="presta-row-meta">
+              <span style="font-family:var(--font-mono);">{{ presta.reference_interne|default:"—" }}</span>
+              <span>{{ presta.prix_vente|floatformat:0 }} CFA</span>
+              {% if presta.actif %}
+              <span class="det-badge det-badge-actif"><i class="bi bi-check-circle-fill"></i> Actif</span>
+              {% else %}
+              <span class="det-badge det-badge-inactif"><i class="bi bi-x-circle-fill"></i> Inactif</span>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+          {% else %}
+          <div class="field-static muted">Aucune prestation associée à cette catégorie.</div>
+          {% endif %}
+          {% endwith %}
+        </div>
       </div>
     </div><!-- /f-main -->
 
@@ -149,6 +198,16 @@
 
 {% block extra_js %}
 <script>
+/* ── Onglets ── */
+document.querySelectorAll('.f-tab').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.f-tab').forEach(function(b) { b.classList.remove('active'); });
+    document.querySelectorAll('.f-tab-panel').forEach(function(p) { p.classList.remove('active'); });
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.add('active');
+  });
+});
+
 (function () {
   document.documentElement.style.setProperty('--topbar-h', '0px');
   function alignSousTopbar() {
