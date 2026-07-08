@@ -236,6 +236,14 @@ class TestVuesPermissions(TestCase):
         self.assertEqual(facture.statut, 'payee')
 
     def test_facture_edit_action_payer_refuse_sans_groupe_caisse(self):
+        from django.contrib.auth.models import Permission
+        # facture_edit exige désormais la permission 'change_facture' pour être
+        # accessible du tout (sinon redirection 302) — on l'accorde ici pour
+        # exercer spécifiquement le blocage plus profond de l'action "payer"
+        # (réservée au groupe Caisse), qui est bien l'objet de ce test.
+        self.plain.user_permissions.add(
+            Permission.objects.get(codename='change_facture', content_type__app_label='facturation')
+        )
         facture = _facture(self.patient, statut='emise', montant_total=Decimal('5000'))
         client = Client()
         client.login(username='u_vp_plain', password='x')

@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     'soins',
     'stock',
     'achats',
+    'rapports',
     'django_browser_reload',
 ]
 

@@ -2008,11 +2008,6 @@ def kpi_dashboard(request):
     })
 
 
-@login_required(login_url='login')
-def rapports_hub(request):
-    return render(request, 'core/rapports_hub.html', {})
-
-
 # ══════════════════════════════════════════════
 #  MÉDECINS — Configuration : Spécialités
 # ══════════════════════════════════════════════

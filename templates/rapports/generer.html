@@ -1,0 +1,166 @@
+{% extends 'rapports/base.html' %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+:root { --rap-surface:#fff; --rap-border:#e8edf2; --rap-text:#0d3040; --rap-muted:rgba(0,0,0,.5); }
+html[data-theme="dark"] { --rap-surface:#132033; --rap-border:#243044; --rap-text:#d4e6f5; --rap-muted:rgba(255,255,255,.45); }
+
+.gen-page { max-width: 1180px; margin: 0 auto; padding: 24px 0 60px; }
+.gen-layout { display: grid; grid-template-columns: 400px 1fr; gap: 20px; align-items: start; }
+@media (max-width: 900px) { .gen-layout { grid-template-columns: 1fr; } }
+
+.gen-card {
+  background: var(--rap-surface); border: 1px solid var(--rap-border); border-radius: 12px;
+  padding: 28px 26px;
+}
+.gen-head { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+.gen-icon {
+  width: 40px; height: 40px; border-radius: 9px; background: var(--teal-50); color: var(--teal-600);
+  display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0;
+}
+.gen-title { font-size: 17px; font-weight: 700; color: var(--rap-text); }
+.gen-desc { font-size: 12.5px; color: var(--rap-muted); margin: 4px 0 22px; }
+
+.gen-row { display: flex; gap: 16px; margin-bottom: 18px; }
+.gen-field { flex: 1; }
+.gen-label {
+  display: block; font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--rap-muted); margin-bottom: 6px;
+}
+.gen-input {
+  width: 100%; border: 1.5px solid var(--rap-border); border-radius: 6px;
+  padding: 8px 10px; font-size: 13px; color: var(--rap-text); background: transparent;
+  font-family: inherit;
+}
+.gen-input:focus { outline: none; border-color: var(--teal-500); }
+
+.gen-format { display: flex; gap: 10px; margin-bottom: 24px; }
+.gen-format label {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
+  border: 1.5px solid var(--rap-border); border-radius: 8px; padding: 10px; cursor: pointer;
+  font-size: 13px; font-weight: 600; color: var(--rap-muted); transition: all .15s;
+}
+.gen-format input { display: none; }
+.gen-format input:checked + span, .gen-format label:has(input:checked) {
+  border-color: var(--teal-500); background: var(--teal-50); color: var(--teal-700);
+}
+
+.gen-error {
+  background: #fde8e8; color: #7b1c1c; border-radius: 6px; padding: 9px 12px;
+  font-size: 12.5px; margin-bottom: 18px;
+}
+
+.gen-submit {
+  width: 100%; background: var(--teal-500); color: #fff; border: none; border-radius: 7px;
+  padding: 11px; font-size: 13.5px; font-weight: 600; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 8px; transition: background .15s;
+}
+.gen-submit:hover { background: var(--teal-600); }
+
+/* ── Historique de ce rapport ── */
+.gen-history {
+  background: var(--rap-surface); border: 1px solid var(--rap-border); border-radius: 12px;
+  padding: 20px 22px; display: flex; flex-direction: column; gap: 4px;
+}
+.gen-history-title {
+  font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--teal-700); margin-bottom: 10px;
+}
+.gen-history-list { display: flex; flex-direction: column; }
+.gen-history-row {
+  display: grid; grid-template-columns: 1.3fr 1.2fr 1fr 0.9fr;
+  align-items: center; gap: 8px; padding: 10px 8px; border-bottom: 1px solid var(--rap-border);
+  font-size: 12px; text-decoration: none; color: inherit; margin: 0 -8px; border-radius: 6px;
+  transition: background .12s;
+}
+.gen-history-row:last-child { border-bottom: none; }
+.gen-history-row:hover { background: var(--teal-50); }
+html[data-theme="dark"] .gen-history-row:hover { background: rgba(33,136,171,.1); }
+.gen-history-nom { font-weight: 600; color: var(--rap-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gen-history-periode, .gen-history-user, .gen-history-date { color: var(--rap-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gen-history-all {
+  font-size: 12px; color: var(--teal-600); text-decoration: none; margin-top: 14px; display: inline-block;
+}
+.gen-history-all:hover { text-decoration: underline; }
+.gen-history-empty { font-size: 12.5px; color: var(--rap-muted); padding: 14px 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="o-subheader">
+  <div class="o-subheader-row">
+    <a href="{% url 'rapports:hub' %}" class="o-back-btn" title="Retour au catalogue">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <span style="font-size:13px;color:var(--text-muted);">
+      <a href="{% url 'rapports:hub' %}" style="color:var(--teal-600);text-decoration:none;font-weight:500;">Catalogue</a>
+      <span style="margin:0 4px;opacity:.4;">/</span>
+      <span style="color:var(--text);">{{ rapport.nom }}</span>
+    </span>
+  </div>
+</div>
+
+<div class="gen-page">
+  <div class="gen-layout">
+
+    <div class="gen-card">
+      <div class="gen-head">
+        <div class="gen-icon"><i class="bi {{ rapport.icone }}"></i></div>
+        <div class="gen-title">{{ rapport.nom }}</div>
+      </div>
+      <div class="gen-desc">{{ rapport.description }}</div>
+
+      {% if erreur %}<div class="gen-error">{{ erreur }}</div>{% endif %}
+
+      <form method="post">
+        {% csrf_token %}
+        <div class="gen-row">
+          <div class="gen-field">
+            <label class="gen-label" for="periode_debut">Date de début</label>
+            <input class="gen-input" type="date" id="periode_debut" name="periode_debut" value="{{ periode_debut }}" required>
+          </div>
+          <div class="gen-field">
+            <label class="gen-label" for="periode_fin">Date de fin</label>
+            <input class="gen-input" type="date" id="periode_fin" name="periode_fin" value="{{ periode_fin }}" required>
+          </div>
+        </div>
+
+        <label class="gen-label">Format du fichier</label>
+        <div class="gen-format">
+          <label>
+            <input type="radio" name="format" value="xlsx" {% if format_fichier == 'xlsx' or not format_fichier %}checked{% endif %}>
+            <span><i class="bi bi-file-earmark-excel-fill"></i> Excel (.xlsx)</span>
+          </label>
+          <label>
+            <input type="radio" name="format" value="csv" {% if format_fichier == 'csv' %}checked{% endif %}>
+            <span><i class="bi bi-filetype-csv"></i> CSV (.csv)</span>
+          </label>
+        </div>
+
+        <button type="submit" class="gen-submit"><i class="bi bi-download"></i> Télécharger le rapport</button>
+      </form>
+    </div>
+
+    <div class="gen-history">
+      <div class="gen-history-title">Historique de ce rapport</div>
+      {% if historique_rapport %}
+      <div class="gen-history-list">
+        {% for h in historique_rapport %}
+        <a href="{% url 'rapports:retelecharger' h.pk %}" class="gen-history-row" title="Cliquer pour retélécharger">
+          <span class="gen-history-nom">{{ h.nom }}</span>
+          <span class="gen-history-periode">{{ h.periode_debut|date:"d/m/Y" }}–{{ h.periode_fin|date:"d/m/Y" }}</span>
+          <span class="gen-history-user">{{ h.utilisateur.get_full_name|default:h.utilisateur.username|default:"—" }}</span>
+          <span class="gen-history-date">{{ h.date_generation|date:"d/m/Y H:i" }}</span>
+        </a>
+        {% endfor %}
+      </div>
+      <a href="{% url 'rapports:historique' %}?rapport={{ rapport.slug }}" class="gen-history-all">Voir tout l'historique de ce rapport →</a>
+      {% else %}
+      <div class="gen-history-empty">Aucune génération pour ce rapport pour le moment.</div>
+      {% endif %}
+    </div>
+
+  </div>
+</div>
+{% endblock %}

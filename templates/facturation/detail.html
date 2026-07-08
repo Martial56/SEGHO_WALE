@@ -5,7 +5,7 @@
 {% block extra_css %}
 {{ block.super }}
 <style>
-.fac-page { width: 100%; padding: 50px 20px 48px; } /* 12 + 38px subheader fixe */
+.fac-page { width: 100%; padding: 12px 20px 48px; } /* le +38px "subheader fixe" est déjà couvert par le padding-top dynamique de #page-wrap (script de sync nav) — ne pas le recompter ici */
 
 /* Subheader pleine largeur — top ajusté dynamiquement par JS */
 #subheader {
@@ -231,7 +231,7 @@ html[data-theme="dark"] .fac-tab-btn:hover:not(.active) { background: rgba(255,2
 .fac-main   { flex: 1; min-width: 0; }
 /* overflow-x:clip coupe les débordements sans casser position:sticky */
 .content { overflow-x: clip !important; }
-.hist-aside { margin-left: -10px !important; margin-right: 14px !important; margin-top: 90px !important; width: 245px !important; scrollbar-width: none; }
+.hist-aside { margin-left: -10px !important; margin-right: 14px !important; margin-top: 50px !important; width: 245px !important; scrollbar-width: none; }
 .hist-aside::-webkit-scrollbar { display: none; }
 .hist-list { scrollbar-width: none; }
 .hist-list::-webkit-scrollbar { display: none; }
@@ -353,6 +353,7 @@ html[data-theme="dark"] .fac-ro-field.grey-field { background: rgba(255,255,255,
       {% endwith %}
       <div class="fac-action-btns">
         {% if facture.statut == 'brouillon' %}
+        {% if perms.facturation.can_valider_facture %}
         <form method="post" action="{% url 'facturation:valider' facture.pk %}" style="display:inline;margin:0;">
           {% csrf_token %}
           <input type="hidden" name="next" value="{{ back_url }}">
@@ -360,27 +361,34 @@ html[data-theme="dark"] .fac-ro-field.grey-field { background: rgba(255,255,255,
             <i class="bi bi-check-circle"></i> Valider la facture
           </button>
         </form>
+        {% endif %}
+        {% if perms.facturation.change_facture %}
         <a href="{% url 'facturation:edit' facture.pk %}?next={{ back_url }}" class="fac-btn fac-btn-edit" style="text-decoration:none;">
           <i class="bi bi-pencil"></i> Modifier la facture
         </a>
+        {% endif %}
         {% elif facture.statut == 'emise' %}
         {% if can_manage_paiement %}
         <button type="button" class="fac-btn fac-btn-validate" onclick="document.getElementById('modal-paiement').style.display='flex'">
           <i class="bi bi-cash-coin"></i> Enregistrer un paiement
         </button>
         {% endif %}
+        {% if perms.facturation.change_facture %}
         <a href="{% url 'facturation:edit' facture.pk %}?next={{ back_url }}" class="fac-btn fac-btn-edit" style="text-decoration:none;">
           <i class="bi bi-pencil"></i> Modifier la facture
         </a>
+        {% endif %}
         {% endif %}
         {% if is_admin and facture.statut != 'brouillon' and facture.statut != 'emise' %}
         <a href="{% url 'facturation:edit' facture.pk %}?next={{ back_url }}" class="fac-btn fac-btn-edit" style="text-decoration:none;" title="Modification administrateur">
           <i class="bi bi-pencil"></i> Modifier
         </a>
         {% endif %}
-<a href="{% url 'facturation:apercu' facture.pk %}?next={{ back_url }}" class="fac-btn fac-btn-secondary" style="text-decoration:none;">
+        {% if facture.statut == 'payee' %}
+        <a href="{% url 'facturation:apercu' facture.pk %}?next={{ back_url }}" class="fac-btn fac-btn-secondary" target="_blank" style="text-decoration:none;">
           <i class="bi bi-eye"></i> Aperçu
         </a>
+        {% endif %}
         <a href="{{ back_url }}" class="fac-btn fac-btn-back" style="text-decoration:none;">
           <i class="bi bi-arrow-left"></i> Retour
         </a>
@@ -607,20 +615,18 @@ html[data-theme="dark"] .fac-ro-field.grey-field { background: rgba(255,255,255,
     <div class="fac-tab-panel" id="tab-medical" style="display:none;">
       <div class="fac-inner-section">
         <div class="fac-ro-grid">
-          {% with soin=facture.soins.first %}
           <div class="fac-ro-field">
             <div class="fac-ro-label">Docteur</div>
-            <div class="fac-ro-value {% if not soin.infirmier %}muted{% endif %}">
-              {% if soin and soin.infirmier %}{{ soin.infirmier.nom_complet|default:soin.infirmier }}{% else %}—{% endif %}
+            <div class="fac-ro-value {% if not docteur %}muted{% endif %}">
+              {% if docteur %}{{ docteur }}{% else %}—{% endif %}
             </div>
           </div>
           <div class="fac-ro-field">
             <div class="fac-ro-label">Rendez-vous</div>
-            <div class="fac-ro-value {% if not soin.rendez_vous %}muted{% endif %}">
-              {% if soin and soin.rendez_vous %}{{ soin.rendez_vous }}{% else %}—{% endif %}
+            <div class="fac-ro-value {% if not facture.rendez_vous %}muted{% endif %}">
+              {% if facture.rendez_vous %}{{ facture.rendez_vous }}{% else %}—{% endif %}
             </div>
           </div>
-          {% endwith %}
           <div class="fac-ro-field">
             <div class="fac-ro-label">Hospitalisation</div>
             <div class="fac-ro-value {% if not facture.hospitalisation %}muted{% endif %}">
