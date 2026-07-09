@@ -1,42 +1,26 @@
-{% extends 'medecins/base.html' %}
-{% block topbar_title %}Départements{% endblock %}
+{% extends 'employer/base.html' %}
+{% block topbar_title %}Services{% endblock %}
 {% block breadcrumb %}{% endblock %}
 
 {% block extra_css %}
 {{ block.super }}
 <style>
-  /* ── Style copié de services/list.html (module Prestations), à la
-     demande explicite d'aligner les pages Département dessus.
-     Variables : le module médecins n'a pas --accent/--primary (propres
-     au module services), on utilise donc --md-500/--md-600 (alias de
-     --teal-*, définis dans medecins/base.html) à la place. ── */
-
-  /* ── SUBHEADER ──
-     margin: 0 -32px annule le padding horizontal de .content (base.html)
-     pour que la barre s'étende bord à bord, comme la nav du haut. ── */
   .o-subheader {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: 6px 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    position: sticky;
-    top: 0;
-    z-index: 190;
-    margin: 0 -32px;
+    background: var(--surface); border-bottom: 1px solid var(--border); padding: 6px 16px;
+    display: flex; flex-direction: column; gap: 5px; position: sticky; top: 0; z-index: 190;
+    margin: 0;
   }
   .o-subheader-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .o-page-title { font-size: 17px; font-weight: 400; color: var(--text); }
   .o-page-count { font-size: 12px; color: var(--text-muted); font-weight: 400; margin-left: 3px; }
 
   .o-btn-create {
-    background: var(--md-500); color: #fff; border: none; padding: 5px 14px; border-radius: 4px;
+    background: var(--rh-500); color: #fff; border: none; padding: 5px 14px; border-radius: 4px;
     font-size: 12.5px; font-weight: 500; font-family: var(--font-roboto); cursor: pointer;
     text-decoration: none; display: inline-flex; align-items: center; gap: 5px;
     letter-spacing: 0.5px; transition: background 0.15s; white-space: nowrap;
   }
-  .o-btn-create:hover { background: var(--md-600); color: #fff; }
+  .o-btn-create:hover { background: var(--rh-600); color: #fff; }
 
   .o-search-bar {
     display: flex; align-items: center; border: none; border-bottom: 1px solid #bbb;
@@ -57,21 +41,18 @@
   .o-ctrl-btn.disabled { opacity: .4; pointer-events: none; }
   html[data-theme="dark"] .o-ctrl-btn:hover { background: #28304a; color: var(--text); border-color: var(--border); }
 
-  /* ── BOUTONS VUE (liste / kanban) ── */
   .o-view-btns { display: flex; border: 1px solid var(--border); border-radius: 3px; overflow: hidden; }
   .o-view-btn {
     width: 26px; height: 24px; border: none; background: var(--surface);
     display: flex; align-items: center; justify-content: center;
-    color: var(--text-muted); font-size: 13px; cursor: pointer;
-    transition: background 0.15s, color 0.15s;
+    color: var(--text-muted); font-size: 13px; cursor: pointer; transition: background 0.15s, color 0.15s;
   }
   .o-view-btn:not(:last-child) { border-right: 1px solid var(--border); }
-  .o-view-btn.active, .o-view-btn:hover { background: var(--md-600); color: #fff; }
+  .o-view-btn.active, .o-view-btn:hover { background: var(--rh-600); color: #fff; }
   html[data-theme="dark"] .o-view-btns { border-color: var(--border); }
   html[data-theme="dark"] .o-view-btn { background: var(--surface); color: var(--text-muted); }
 
-  /* ── TABLE LISTE ── */
-  .o-list-wrap { background: var(--bg); overflow-x: auto; margin: 0 -32px; }
+  .o-list-wrap { background: var(--bg); overflow-x: auto; margin: 0; }
   .o-list-table th:first-child, .o-list-table td:first-child { padding-left: 32px; }
   .o-list-table th:last-child, .o-list-table td:last-child { padding-right: 32px; }
   .o-list-table { width: 100%; border-collapse: collapse; background: var(--surface); }
@@ -88,15 +69,13 @@
   html[data-theme="dark"] .o-list-table td { border-bottom-color: #2d3550; color: var(--text); }
   html[data-theme="dark"] .o-list-table tbody tr:hover td { background: rgba(255, 255, 255, 0.04); }
 
-  /* ── VUE KANBAN ── */
-  .o-kanban { padding: 12px 32px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; background: var(--bg); margin: 0 -32px; }
+  .o-kanban { padding: 12px 32px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; background: var(--bg); }
   @media (max-width: 1200px) { .o-kanban { grid-template-columns: repeat(3, 1fr); } }
   @media (max-width: 900px) { .o-kanban { grid-template-columns: repeat(2, 1fr); } }
   @media (max-width: 600px) { .o-kanban { grid-template-columns: 1fr; } }
   .o-card {
     background: var(--surface); border: 1px solid var(--border); border-radius: 3px; padding: 10px;
-    display: flex; align-items: flex-start; gap: 10px; cursor: pointer;
-    transition: box-shadow 0.15s, border-color 0.15s;
+    display: flex; align-items: flex-start; gap: 10px; cursor: pointer; transition: box-shadow 0.15s, border-color 0.15s;
   }
   .o-card:hover { box-shadow: 0 3px 10px rgba(0, 0, 0, 0.13); border-color: #bbb; }
   html[data-theme="dark"] .o-card { background: var(--surface); border-color: var(--border); }
@@ -110,7 +89,6 @@
   html[data-theme="dark"] .o-avatar i { color: #6c85a0; }
   .o-card-body { flex: 1; min-width: 0; }
   .o-card-name { font-size: 12.5px; font-weight: 500; color: var(--text); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  html[data-theme="dark"] .o-card-name { color: var(--text); }
   .o-card-meta { font-size: 11px; color: var(--text-muted); line-height: 1.7; }
   .o-card-meta .val { color: var(--text); }
 
@@ -124,7 +102,7 @@
   .o-empty { text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: 13px; }
   .o-empty i { font-size: 36px; display: block; margin-bottom: 10px; opacity: 0.5; }
 
-  .bulk-bar { display: none; align-items: center; gap: 8px; padding: 8px 32px; margin: 0 -32px; background: #fff7e6; border-bottom: 1px solid #ffe0a3; font-size: 12.5px; }
+  .bulk-bar { display: none; align-items: center; gap: 8px; padding: 8px 32px; background: #fff7e6; border-bottom: 1px solid #ffe0a3; font-size: 12.5px; }
   .bulk-bar.visible { display: flex; }
   .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, .4); z-index: 9000; align-items: center; justify-content: center; }
   .modal-overlay.open { display: flex; }
@@ -141,22 +119,21 @@
 
 {% block content %}
 
-<!-- ══ SUBHEADER ══ -->
 <div class="o-subheader">
   <div class="o-subheader-row">
-    <span class="o-page-title">Départements <span class="o-page-count">{{ total }}</span></span>
+    <span class="o-page-title">Services <span class="o-page-count">{{ total }}</span></span>
     <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
       <form method="get" id="filter-form" style="display:flex;align-items:center;" onsubmit="return false;">
         <input type="hidden" name="vue" id="vue-input" value="{{ vue|default:'liste' }}">
         <div class="o-search-bar">
-          <input class="o-search-input" id="search-input" type="text" name="q" value="{{ q }}" placeholder="Rechercher un département…" autocomplete="off">
+          <input class="o-search-input" id="search-input" type="text" name="q" value="{{ q }}" placeholder="Rechercher un service…" autocomplete="off">
           <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
         </div>
       </form>
     </div>
   </div>
   <div class="o-subheader-row">
-    <a href="{% url 'medecins_departement_create' %}" class="o-btn-create">
+    <a href="{% url 'employer_service_create' %}" class="o-btn-create">
       <i class="bi bi-plus-lg"></i> Créer
     </a>
 
@@ -167,14 +144,14 @@
         <i class="bi bi-chevron-down" style="font-size:9px;margin-left:2px;"></i>
       </button>
       <div class="io-page-menu" id="io-page-menu">
-        <div class="io-pm-section">Exporter les départements</div>
-        <a class="io-pm-item" href="{% url 'medecins_export_departements' %}?format=json">
+        <div class="io-pm-section">Exporter les services</div>
+        <a class="io-pm-item" href="{% url 'employer_export_services' %}?format=json">
           <i class="bi bi-filetype-json" style="color:#c97a00;"></i> JSON
         </a>
-        <a class="io-pm-item" href="{% url 'medecins_export_departements' %}?format=csv">
+        <a class="io-pm-item" href="{% url 'employer_export_services' %}?format=csv">
           <i class="bi bi-filetype-csv" style="color:#1a7a4a;"></i> CSV
         </a>
-        <a class="io-pm-item" href="{% url 'medecins_export_departements' %}?format=xlsx">
+        <a class="io-pm-item" href="{% url 'employer_export_services' %}?format=xlsx">
           <i class="bi bi-file-earmark-excel" style="color:#217346;"></i> Excel
         </a>
         <div class="io-pm-sep"></div>
@@ -201,7 +178,6 @@
   </div>
 </div>
 
-<!-- ══ BULK BAR ══ -->
 <div class="bulk-bar" id="bulk-bar">
   <i class="bi bi-check2-square"></i>
   <span id="bulk-count">0</span> sélectionné(s)
@@ -210,16 +186,15 @@
 </div>
 
 <div id="list-result">
-{% include 'medecins/config/includes/departements_list_result.html' %}
+{% include 'employer/config/includes/services_list_result.html' %}
 </div>
 
-<!-- Modal suppression bulk -->
 <div class="modal-overlay" id="bulk-delete-modal">
   <div class="modal-box">
     <div class="modal-icon">🗑️</div>
     <div class="modal-title">Confirmer la suppression</div>
-    <div class="modal-msg">Supprimer <strong id="modal-count">0</strong> département(s) ?<br>
-      <span style="font-size:12px;">Les médecins rattachés ne seront pas supprimés, juste détachés.</span></div>
+    <div class="modal-msg">Supprimer <strong id="modal-count">0</strong> service(s) ?<br>
+      <span style="font-size:12px;">Cette action est irréversible.</span></div>
     <div class="modal-actions">
       <button type="button" class="btn-modal-cancel" onclick="closeBulkModal()">Annuler</button>
       <button type="button" class="btn-modal-confirm" onclick="executeBulkDelete()">Supprimer</button>
@@ -231,10 +206,10 @@
 <div class="io-modal-backdrop" id="io-modal-backdrop" onclick="closeImportModal()"></div>
 <div class="io-modal" id="io-modal">
   <div class="io-modal-header">
-    <span><i class="bi bi-upload"></i> Importer des Départements</span>
+    <span><i class="bi bi-upload"></i> Importer des Services</span>
     <button type="button" class="io-modal-close" onclick="closeImportModal()">×</button>
   </div>
-  <form method="post" action="{% url 'medecins_import_departements' %}" enctype="multipart/form-data">
+  <form method="post" action="{% url 'employer_import_services' %}" enctype="multipart/form-data">
     {% csrf_token %}
     <div class="io-modal-body">
       <label class="io-file-label" for="io-file-input">
@@ -250,7 +225,10 @@
         <input type="checkbox" name="update"> Mettre à jour les enregistrements existants
       </label>
       <p class="io-hint">Le fichier doit utiliser les mêmes colonnes que l'export. La clé de déduplication est
-        <strong>code</strong>.
+        <strong>code</strong>. La colonne <strong>chef_service</strong>
+        attend le matricule du médecin —
+        <strong>importez d'abord les Médecins</strong> si cette colonne est renseignée,
+        sinon la référence sera ignorée (un avertissement vous listera les codes introuvables).
       </p>
     </div>
     <div class="io-modal-footer">
@@ -263,12 +241,12 @@
 {% endblock %}
 
 {% block extra_js %}
+{{ block.super }}
 <script>
-const BULK_URL   = "{% url 'medecins_departement_bulk_delete' %}";
+const BULK_URL   = "{% url 'employer_service_bulk_delete' %}";
 const CSRF_TOKEN = "{{ csrf_token }}";
-const LIST_URL   = "{% url 'medecins_departements' %}";
+const LIST_URL   = "{% url 'employer_services' %}";
 
-/* ── Vue liste / kanban : bascule immédiate, sans rechargement ── */
 function setVue(v) {
   document.getElementById('vue-input').value = v;
   document.querySelectorAll('.o-view-btn').forEach(function(b){ b.classList.toggle('active', b.dataset.vue === v); });
@@ -284,7 +262,6 @@ document.querySelectorAll('.o-view-btn').forEach(function(btn){
   btn.addEventListener('click', function(){ setVue(this.dataset.vue); });
 });
 
-/* ── Recherche dynamique (AJAX, sans rechargement de page) ── */
 function fetchList() {
   var q = document.getElementById('search-input').value;
   var vue = document.getElementById('vue-input').value;
@@ -320,7 +297,6 @@ function fetchList() {
   if (clearBtn) clearBtn.addEventListener('click', function(e){ e.preventDefault(); inp.value = ''; fetchList(); });
 })();
 
-/* ── Sélection multiple + suppression (réattaché après chaque fetch) ── */
 function onCheckChange(){
   var n = document.querySelectorAll('.row-check:checked').length;
   document.getElementById('bulk-count').textContent = n;

@@ -169,7 +169,7 @@ html[data-theme="dark"] .o-dd-item.active { background: rgba(33,136,171,.2);  co
 
   <!-- Ligne 1 : titre + recherche -->
   <div class="o-subheader-row">
-    <span class="o-page-title">Hospitalisations <span class="o-page-count">{{ total }}</span></span>
+    <span class="o-page-title">Hospitalisations <span class="o-page-count" id="page-count">{{ total }}</span></span>
     <div class="o-subheader-row-right">
       <form method="get" id="filter-form" style="display:flex;align-items:center;">
         <input type="hidden" name="statut" id="fi-statut" value="{{ statut }}">
@@ -191,184 +191,16 @@ html[data-theme="dark"] .o-dd-item.active { background: rgba(33,136,171,.2);  co
     </a>
     {% endif %}
 
-    <div class="o-subheader-row-right">
-
-      <!-- Tags filtres actifs -->
-      {% if q %}<span class="o-filter-tag">{{ q }} <a onclick="clearQ()" style="cursor:pointer;" title="Supprimer">×</a></span>{% endif %}
-      {% if statut %}<span class="o-filter-tag">{{ statut }} <a onclick="setFiltre('')" style="cursor:pointer;" title="Supprimer">×</a></span>{% endif %}
-
-      <!-- Filtres dropdown -->
-      <div class="o-dd-wrap">
-        <button class="o-ctrl-btn {% if statut %}active{% endif %}"
-                id="btn-filtres" onclick="toggleDd('dd-filtres', this)">
-          <i class="bi bi-funnel{% if statut %}-fill{% endif %}"></i>
-          Filtres{% if statut %}&nbsp;<span style="background:var(--accent);color:#fff;border-radius:10px;font-size:10px;padding:0 5px;vertical-align:middle;">1</span>{% endif %}
-        </button>
-        <div class="o-dd-panel" id="dd-filtres">
-          <div class="o-dd-section">Filtrer par statut</div>
-          {% for val, label in statut_choices %}
-          <a class="o-dd-item {% if statut == val %}active{% endif %}"
-             onclick="setFiltre('{{ val }}')">{{ label }}</a>
-          {% endfor %}
-          {% if statut %}
-          <hr class="o-dd-sep">
-          <a class="o-dd-item" onclick="setFiltre('')" style="color:#b71c1c;">
-            <i class="bi bi-x-circle" style="font-size:11px;margin-right:6px;"></i> Effacer
-          </a>
-          {% endif %}
-        </div>
-      </div>
-
-      <div class="o-ctrl-sep"></div>
-
-      <!-- Pagination -->
-      <div class="o-pagination-top">
-        <span>{% if page_obj.paginator.count > 0 %}{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}{% else %}0{% endif %}</span>
-        <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
-           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}&q={{ q }}&statut={{ statut }}&vue={{ vue }}{% else %}#{% endif %}">
-          <i class="bi bi-chevron-left"></i>
-        </a>
-        <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
-           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}&q={{ q }}&statut={{ statut }}&vue={{ vue }}{% else %}#{% endif %}">
-          <i class="bi bi-chevron-right"></i>
-        </a>
-      </div>
-
-      <div class="o-ctrl-sep"></div>
-
-      <!-- Vue -->
-      <div class="o-view-btns">
-        <button type="button" class="o-view-btn {% if vue == 'liste' %}active{% endif %}" onclick="setVue('liste')" title="Vue liste">
-          <i class="bi bi-list-ul"></i>
-        </button>
-        <button type="button" class="o-view-btn {% if vue == 'kanban' %}active{% endif %}" onclick="setVue('kanban')" title="Vue kanban">
-          <i class="bi bi-grid"></i>
-        </button>
-      </div>
-
+    <div class="o-subheader-row-right" id="subheader-controls">
+      {% include 'hospitalisation/includes/_list_controls.html' %}
     </div>
   </div>
 
 </div><!-- /o-subheader -->
 
-<!-- ══ STATS ══ -->
-<div class="h-stats">
-  <div class="h-stat">
-    <div class="h-stat-icon blue"><i class="bi bi-hospital"></i></div>
-    <div>
-      <div class="h-stat-num">{{ stats.patients_hospitalises }}</div>
-      <div class="h-stat-label">Hospitalisés</div>
-    </div>
-  </div>
-  <div class="h-stat">
-    <div class="h-stat-icon teal"><i class="bi bi-door-open"></i></div>
-    <div>
-      <div class="h-stat-num">{{ stats.chambres_disponibles }}</div>
-      <div class="h-stat-label">Chambres disponibles</div>
-    </div>
-  </div>
-  <div class="h-stat">
-    <div class="h-stat-icon amber"><i class="bi bi-percent"></i></div>
-    <div>
-      <div class="h-stat-num">{{ stats.taux_occupation }}%</div>
-      <div class="h-stat-label">Taux d'occupation</div>
-    </div>
-  </div>
-  <div class="h-stat">
-    <div class="h-stat-icon violet"><i class="bi bi-calendar-range"></i></div>
-    <div>
-      <div class="h-stat-num">{{ stats.duree_moyenne }}</div>
-      <div class="h-stat-label">Durée moy. (jours)</div>
-    </div>
-  </div>
+<div id="list-results">
+  {% include 'hospitalisation/includes/_list_results.html' %}
 </div>
-
-{% if vue == 'kanban' %}
-<!-- ══ VUE KANBAN ══ -->
-<div class="h-kanban">
-  {% for hosp in page_obj %}
-  <a class="h-kcard" href="{% url 'hospitalisation:detail' hosp.pk %}">
-    <div class="h-kcard-head">
-      <span class="h-badge h-badge-{{ hosp.statut }}">{{ hosp.get_statut_display }}</span>
-      <span class="h-kcard-num">{{ hosp.numero }}</span>
-    </div>
-    <div class="h-kcard-patient">{{ hosp.patient.nom }} {{ hosp.patient.prenoms }}</div>
-    <div class="h-kcard-code">{{ hosp.patient.code_patient }}</div>
-    <hr class="h-kcard-sep">
-    <div class="h-kcard-row">
-      <i class="bi bi-door-closed"></i>
-      {% if hosp.chambre %}{{ hosp.chambre.nom }}{% if hosp.numero_lit %} — Lit {{ hosp.numero_lit }}{% endif %}{% if hosp.chambre.type_chambre %} — {{ hosp.chambre.get_type_chambre_display }}{% endif %}{% else %}<span style="opacity:.5;">Chambre non assignée</span>{% endif %}
-    </div>
-    <div class="h-kcard-row">
-      <i class="bi bi-person-badge"></i>
-      {% if hosp.medecin_traitant %}Dr {{ hosp.medecin_traitant.nom }} {{ hosp.medecin_traitant.prenoms }}{% else %}<span style="opacity:.5;">Médecin non assigné</span>{% endif %}
-    </div>
-    <div class="h-kcard-date">
-      <i class="bi bi-calendar3"></i> Admis le {{ hosp.date_admission|date:"d/m/Y à H:i" }}
-    </div>
-  </a>
-  {% empty %}
-  <div class="h-empty" style="grid-column:1/-1;">
-    <i class="bi bi-hospital"></i>
-    Aucune hospitalisation trouvée
-    {% if q or statut %}<p>Modifiez vos filtres de recherche.</p>{% endif %}
-  </div>
-  {% endfor %}
-</div>
-
-{% else %}
-<!-- ══ VUE LISTE ══ -->
-<div class="h-table-wrap">
-  <table class="h-table">
-    <thead>
-      <tr>
-        <th style="width:130px;">N° Dossier</th>
-        <th style="width:210px;">Patient</th>
-        <th style="width:170px;">Chambre</th>
-        <th style="width:170px;">Médecin traitant</th>
-        <th style="width:130px;">Admission</th>
-        <th style="width:120px;">Statut</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for hosp in page_obj %}
-      <tr onclick="window.location='{% url 'hospitalisation:detail' hosp.pk %}'">
-        <td><span class="h-num">{{ hosp.numero }}</span></td>
-        <td>
-          <div class="h-patient-name">{{ hosp.patient.nom }} {{ hosp.patient.prenoms }}</div>
-          <div class="h-patient-code">{{ hosp.patient.code_patient }}</div>
-        </td>
-        <td>
-          {% if hosp.chambre %}
-          <div class="h-chambre-nom">{{ hosp.chambre.nom }}{% if hosp.numero_lit %} — Lit {{ hosp.numero_lit }}{% endif %}</div>
-          <div class="h-chambre-type">{{ hosp.chambre.get_type_chambre_display }}</div>
-          {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
-        </td>
-        <td>
-          {% if hosp.medecin_traitant %}{{ hosp.medecin_traitant.nom }} {{ hosp.medecin_traitant.prenoms }}
-          {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
-        </td>
-        <td>
-          {{ hosp.date_admission|date:"d/m/Y" }}<br>
-          <span style="font-size:10.5px;color:var(--text-muted);">{{ hosp.date_admission|date:"H:i" }}</span>
-        </td>
-        <td><span class="h-badge h-badge-{{ hosp.statut }}">{{ hosp.get_statut_display }}</span></td>
-      </tr>
-      {% empty %}
-      <tr>
-        <td colspan="6">
-          <div class="h-empty">
-            <i class="bi bi-hospital"></i>
-            Aucune hospitalisation trouvée
-            {% if q or statut %}<p>Modifiez vos filtres de recherche.</p>{% endif %}
-          </div>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-{% endif %}
 
 </div><!-- /#page-wrap -->
 {% endblock %}
@@ -391,22 +223,85 @@ document.addEventListener('click', function(e) {
   if (!e.target.closest('.o-dd-wrap') && !e.target.closest('.o-dd-panel'))
     document.querySelectorAll('.o-dd-panel').forEach(p => p.classList.remove('open'));
 });
+
+/* ══ Rafraîchissement AJAX de la liste (sans rechargement de page) ═════════════ */
+var LIST_URL = '{% url "hospitalisation:list" %}';
+
+function refreshList(params) {
+  var url = LIST_URL + '?' + new URLSearchParams(params).toString();
+  fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      document.getElementById('subheader-controls').innerHTML = data.controls_html;
+      document.getElementById('list-results').innerHTML = data.results_html;
+      document.getElementById('page-count').textContent = data.total;
+      document.querySelectorAll('.o-dd-panel').forEach(function (p) { p.classList.remove('open'); });
+      history.pushState(null, '', url);
+    })
+    .catch(function () {
+      // Repli : navigation classique si l'AJAX échoue
+      window.location = url;
+    });
+}
+
+function currentParams(overrides) {
+  var params = {
+    q:      document.getElementById('search-input').value,
+    statut: document.getElementById('fi-statut').value,
+    vue:    document.getElementById('vue-input').value,
+  };
+  Object.assign(params, overrides || {});
+  Object.keys(params).forEach(function (k) { if (!params[k]) delete params[k]; });
+  return params;
+}
+
 function setVue(v) {
   document.getElementById('vue-input').value = v;
-  document.getElementById('filter-form').submit();
+  refreshList(currentParams({ vue: v }));
 }
 function setFiltre(val) {
   document.getElementById('fi-statut').value = val;
-  document.getElementById('filter-form').submit();
+  refreshList(currentParams({ statut: val }));
 }
 function clearQ() {
   document.getElementById('search-input').value = '';
-  document.getElementById('filter-form').submit();
+  refreshList(currentParams({ q: '' }));
 }
 function clearAll() {
   document.getElementById('search-input').value = '';
   document.getElementById('fi-statut').value = '';
-  document.getElementById('filter-form').submit();
+  refreshList(currentParams({ q: '', statut: '' }));
 }
+
+document.getElementById('filter-form').addEventListener('submit', function (e) {
+  e.preventDefault();
+  refreshList(currentParams());
+});
+
+/* Pagination — délégation d'événement car les liens sont remplacés à chaque rafraîchissement */
+document.addEventListener('click', function (e) {
+  var link = e.target.closest('.o-pag-btn');
+  if (!link || link.classList.contains('disabled')) return;
+  e.preventDefault();
+  var page = link.dataset.page;
+  if (!page) return;
+  refreshList(currentParams({ page: page }));
+});
+
+/* Navigation précédent/suivant du navigateur */
+window.addEventListener('popstate', function () {
+  var params = {};
+  new URLSearchParams(window.location.search).forEach(function (v, k) { params[k] = v; });
+  fetch(LIST_URL + '?' + new URLSearchParams(params).toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      document.getElementById('subheader-controls').innerHTML = data.controls_html;
+      document.getElementById('list-results').innerHTML = data.results_html;
+      document.getElementById('page-count').textContent = data.total;
+      document.getElementById('search-input').value = params.q || '';
+      document.getElementById('fi-statut').value = params.statut || '';
+      document.getElementById('vue-input').value = params.vue || 'liste';
+    });
+});
 </script>
 {% endblock %}

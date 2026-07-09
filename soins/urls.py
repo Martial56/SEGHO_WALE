@@ -21,11 +21,6 @@ urlpatterns = [
     path('procedures/<int:pk>/terminer/', views.procedure_terminer, name='procedure_terminer'),
     path('procedures/<int:pk>/annuler/', views.procedure_annuler, name='procedure_annuler'),
 
-    # Rendez-vous dans le module soins
-    path('rendez-vous/nouveau/', views.soins_rdv_create, name='rdv_create'),
-    path('rendez-vous/', views.soins_rdv_list, name='rdv_list'),
-    path('rendez-vous/<int:pk>/', views.soins_rdv_detail, name='rdv_detail'),
-
     # Actions sur un soin
     path('<int:pk>/enregistrer/', views.soins_creer_facture, name='creer_facture'),
     path('<int:pk>/administrer/', views.soins_administrer, name='administrer'),

@@ -97,13 +97,6 @@ class CategorieArticle(models.Model):
     compte_revenus = models.CharField(max_length=200, blank=True, verbose_name="Compte de revenus")
     compte_charges = models.CharField(max_length=200, blank=True, verbose_name="Compte de charges")
 
-    # Lien avec le service médical (utilisé pour filtrer le "Type de consultation"
-    # du formulaire de rendez-vous selon le "Département" choisi)
-    service_associe = models.ForeignKey(
-        'medecins.Service', on_delete=models.SET_NULL, null=True, blank=True,
-        verbose_name="Service associé"
-    )
-
     def save(self, *args, **kwargs):
         if self.code:
             self.code = self.code.strip().upper()
@@ -230,6 +223,10 @@ class Articleservice(models.Model):
     categorie = models.ForeignKey(
         CategorieArticle, on_delete=models.SET_NULL, null=True, blank=True,
         verbose_name="Catégorie d'article"
+    )
+    departement = models.ForeignKey(
+        'medecins.Departement', on_delete=models.SET_NULL, null=True, blank=True,
+        verbose_name="Département"
     )
     code_barres = models.CharField(max_length=100, blank=True, verbose_name="Code-barres")
     famille = models.ForeignKey(

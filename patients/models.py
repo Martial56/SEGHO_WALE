@@ -86,7 +86,7 @@ class RendezVous(models.Model):
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='rendez_vous')
     medecin = models.ForeignKey('medecins.Medecin', on_delete=models.SET_NULL, null=True, blank=True, related_name='rendez_vous')
     docteur_jr = models.ForeignKey('medecins.Medecin', on_delete=models.SET_NULL, null=True, blank=True, related_name='rdv_docteur_jr', verbose_name='Docteur Jr. responsable')
-    departement = models.ForeignKey('medecins.Service', on_delete=models.SET_NULL, null=True, blank=True, related_name='rendez_vous', verbose_name='Service')
+    departement = models.ForeignKey('medecins.Departement', on_delete=models.SET_NULL, null=True, blank=True, related_name='rendez_vous', verbose_name='Département')
     type_consultation = models.ForeignKey('services.Articleservice', on_delete=models.SET_NULL, null=True, blank=True, related_name='rendez_vous', verbose_name='Type de consultation')
     salle_consultation = models.CharField(max_length=100, blank=True, verbose_name='Salle de consultation')
     date_heure = models.DateTimeField()

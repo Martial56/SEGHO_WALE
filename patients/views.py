@@ -550,7 +550,7 @@ def gynecologie_rdv_list(request):
     date_to    = request.GET.get('date_to', '')
 
     qs = RendezVous.objects.select_related('patient', 'medecin', 'type_consultation').prefetch_related('registre_curatif').filter(
-        departement__code='GYNECO'
+        departement__modules_specialises__code='gynecologie'
     ).order_by('-date_heure')
 
     if q:
@@ -595,7 +595,7 @@ def gynecologie_rdv_list(request):
 @login_required
 def gynecologie_patient_list(request):
     gyne_ids = RendezVous.objects.filter(
-        departement__code='GYNECO'
+        departement__modules_specialises__code='gynecologie'
     ).values_list('patient_id', flat=True).distinct()
 
     qs = Patient.objects.filter(pk__in=gyne_ids).order_by('nom', 'prenoms')
