@@ -121,7 +121,7 @@ class RendezVous(models.Model):
     ]
     cpn_mode_entree = models.CharField(max_length=30, choices=MODE_ENTREE, blank=True, default='', verbose_name="Mode d'entrée CPN")
     cpn_mode_entree_autre = models.CharField(max_length=200, blank=True, default='', verbose_name="Mode d'entrée CPN (préciser)")
-    cpn_type_visite = models.ForeignKey('TypeVisite', on_delete=models.SET_NULL, null=True, blank=True, related_name='rendez_vous_cpn', verbose_name='Type de visite CPN')
+    cpn_type_visite = models.ForeignKey('gynecologie.TypeVisite', on_delete=models.SET_NULL, null=True, blank=True, related_name='rendez_vous_cpn', verbose_name='Type de visite CPN')
 
     CUR_MODE_ENTREE = [
         ('venu_lui_meme', 'Patient venu de lui-même'),
@@ -131,7 +131,7 @@ class RendezVous(models.Model):
     ]
     cur_mode_entree = models.CharField(max_length=30, choices=CUR_MODE_ENTREE, blank=True, default='', verbose_name="Mode d'entrée curatif")
     cur_mode_entree_autre = models.CharField(max_length=200, blank=True, default='', verbose_name="Mode d'entrée curatif (préciser)")
-    cur_type_visite = models.ForeignKey('TypeVisite', on_delete=models.SET_NULL, null=True, blank=True, related_name='rendez_vous_curatifs', verbose_name='Type de visite curative')
+    cur_type_visite = models.ForeignKey('gynecologie.TypeVisite', on_delete=models.SET_NULL, null=True, blank=True, related_name='rendez_vous_curatifs', verbose_name='Type de visite curative')
 
     def save(self, *args, **kwargs):
         if not self.code_rdv:
@@ -238,19 +238,6 @@ class Pathologie(models.Model):
     def __str__(self): return self.nom
     class Meta:
         verbose_name = "Pathologie"
-        ordering = ['nom']
-
-
-class TypeVisite(models.Model):
-    nom           = models.CharField(max_length=200, verbose_name='Nom')
-    code          = models.CharField(max_length=50, unique=True, verbose_name='Code')
-    description   = models.TextField(blank=True, verbose_name='Description')
-    actif         = models.BooleanField(default=True)
-    date_creation = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self): return self.nom
-    class Meta:
-        verbose_name = "Type de visite"
         ordering = ['nom']
 
 

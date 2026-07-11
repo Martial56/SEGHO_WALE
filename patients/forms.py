@@ -1,5 +1,6 @@
 from django import forms
-from .models import Patient, Assurance, RendezVous, Pathologie, TypeVisite
+from .models import Patient, Assurance, RendezVous, Pathologie
+from gynecologie.models import TypeVisite
 
 _ul = 'field-ul'          # underline (bottom border only)
 _ul_name = 'field-ul field-ul-name'

@@ -29,10 +29,20 @@ html[data-theme="dark"] { --surface:#132033; --border:#243044; --text:#d4e6f5; -
 .det-crumb a:hover { text-decoration: underline; }
 .det-crumb .sep { color: var(--text-muted); }
 
+/* ── Bloc unique : en-tête + toutes les sections vivent DANS ce bloc,
+   comme .det-block de hospitalisation/detail.html — plus de petites
+   cartes séparées avec des marges entre elles. ── */
+.det-block {
+  background: var(--surface);
+  border-radius: var(--radius, 12px);
+  overflow: hidden;
+  margin: 18px 0 24px;
+}
+
 /* ── En-tête ── */
 .det-hdr {
   display: flex; align-items: center; gap: 16px;
-  padding: 18px 0 14px; border-bottom: 1px solid var(--border);
+  padding: 20px 24px 16px; border-bottom: 1px solid var(--border);
 }
 .det-hdr-icon {
   width: 48px; height: 48px; border-radius: 10px;
@@ -54,14 +64,13 @@ html[data-theme="dark"] { --surface:#132033; --border:#243044; --text:#d4e6f5; -
 .badge-prive   { background: #e9d5ff; color: #5b21b6; }
 .badge-type    { background: #e0f2fe; color: #0369a1; }
 
-/* ── Sections ── */
-.det-card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 8px; margin-top: 20px; overflow: hidden;
-}
+/* ── Sections (imbriquées dans .det-block — plus de carte propre à
+   chacune, juste un séparateur entre sections) ── */
+.det-card { overflow: hidden; }
+.det-card + .det-card { border-top: 1px solid var(--border); }
 .det-card-title {
   display: flex; align-items: center; gap: 8px;
-  padding: 12px 16px; border-bottom: 1px solid var(--border);
+  padding: 12px 24px; border-bottom: 1px solid var(--border);
   font-size: 12px; font-weight: 700; text-transform: uppercase;
   letter-spacing: .07em; color: var(--teal-700);
   background: #f8fafb;
@@ -72,7 +81,7 @@ html[data-theme="dark"] .det-card-title { background: #0f1e30; color: var(--teal
   gap: 0; padding: 0;
 }
 .det-field {
-  padding: 12px 16px; border-bottom: 1px solid var(--border);
+  padding: 12px 24px; border-bottom: 1px solid var(--border);
   border-right: 1px solid var(--border);
 }
 .det-field:nth-child(3n) { border-right: none; }
@@ -86,7 +95,7 @@ html[data-theme="dark"] .det-card-title { background: #0f1e30; color: var(--teal
 /* ── Équipements ── */
 .equip-grid {
   display: flex; flex-wrap: wrap; gap: 8px;
-  padding: 14px 16px;
+  padding: 16px 24px;
 }
 .equip-chip {
   display: inline-flex; align-items: center; gap: 5px;
@@ -107,12 +116,22 @@ html[data-theme="dark"] .det-card-title { background: #0f1e30; color: var(--teal
 .abtn-neutral:hover { background: #e0e8ef; }
 
 /* Dark */
-html[data-theme="dark"] .det-card { background: var(--surface); border-color: var(--border); }
 html[data-theme="dark"] .det-field { border-color: var(--border); }
 html[data-theme="dark"] .equip-oui  { background: rgba(26,107,60,.25); color: #6fcf97; }
 html[data-theme="dark"] .equip-non  { background: rgba(107,114,128,.1); color: #6b7280; }
 html[data-theme="dark"] .abtn-neutral { background: #1a2d42; color: var(--text); border-color: var(--border); }
 html[data-theme="dark"] .abtn-neutral:hover { background: #1f3550; }
+
+/* ── Historique : sans bordure/ombre, colonne un peu plus large, même
+   hauteur que le bloc de gauche (propre à cette page) ── */
+.hist-wrapper { align-items: stretch; }
+.hist-main { flex: 0 1 1350px; padding-left: 20px; }
+.hist-aside {
+  position: static; max-height: none;
+  width: 320px; margin-top: 65px;
+}
+.hist-panel { height: 100%; border: none; box-shadow: none; }
+html[data-theme="dark"] .hist-panel { border: none; }
 </style>
 {% endblock %}
 
@@ -138,102 +157,107 @@ html[data-theme="dark"] .abtn-neutral:hover { background: #1f3550; }
   </div>
 </div>
 
-{# EN-TÊTE #}
-<div class="det-hdr">
-  <div class="det-hdr-icon"><i class="bi bi-door-closed-fill"></i></div>
-  <div>
-    <div class="det-hdr-num">Salle N° {{ chambre.salle_no }}</div>
-    <div class="det-hdr-nom">{{ chambre.nom|default:"—" }}</div>
-    <div class="det-hdr-badges">
-      {% if chambre.statut %}
-      <span class="badge badge-dispo"><i class="bi bi-check-circle-fill"></i> Disponible</span>
-      {% else %}
-      <span class="badge badge-occupe"><i class="bi bi-x-circle-fill"></i> Occupée</span>
-      {% endif %}
-      <span class="badge badge-type">{{ chambre.get_type_chambre_display }}</span>
-      {% if chambre.prive %}<span class="badge badge-prive">Privé</span>{% endif %}
+{# Bloc unique : en-tête + toutes les sections, comme .det-block de hospitalisation/detail.html #}
+<div class="det-block">
+
+  {# EN-TÊTE #}
+  <div class="det-hdr">
+    <div class="det-hdr-icon"><i class="bi bi-door-closed-fill"></i></div>
+    <div>
+      <div class="det-hdr-num">Salle N° {{ chambre.salle_no }}</div>
+      <div class="det-hdr-nom">{{ chambre.nom|default:"—" }}</div>
+      <div class="det-hdr-badges">
+        {% if chambre.statut %}
+        <span class="badge badge-dispo"><i class="bi bi-check-circle-fill"></i> Disponible</span>
+        {% else %}
+        <span class="badge badge-occupe"><i class="bi bi-x-circle-fill"></i> Occupée</span>
+        {% endif %}
+        <span class="badge badge-type">{{ chambre.get_type_chambre_display }}</span>
+        {% if chambre.prive %}<span class="badge badge-prive">Privé</span>{% endif %}
+      </div>
     </div>
   </div>
-</div>
 
-{# IDENTIFICATION #}
-<div class="det-card">
-  <div class="det-card-title"><i class="bi bi-info-circle"></i> Identification</div>
-  <div class="det-grid">
-    <div class="det-field">
-      <div class="det-lbl">Nom</div>
-      <div class="det-val">{{ chambre.nom|default:"—" }}</div>
-    </div>
-    <div class="det-field">
-      <div class="det-lbl">Salle N°</div>
-      <div class="det-val">{{ chambre.salle_no }}</div>
-    </div>
-    <div class="det-field">
-      <div class="det-lbl">Type</div>
-      <div class="det-val">{{ chambre.get_type_chambre_display }}</div>
-    </div>
-    <div class="det-field">
-      <div class="det-lbl">Genre</div>
-      <div class="det-val">{{ chambre.get_genre_display }}</div>
-    </div>
-    <div class="det-field">
-      <div class="det-lbl">Nombre de lits</div>
-      <div class="det-val">{{ chambre.nombre_lits }}</div>
-    </div>
-    <div class="det-field">
-      <div class="det-lbl">Statut</div>
-      <div class="det-val">{% if chambre.statut %}Disponible{% else %}Occupée{% endif %}</div>
-    </div>
-    <div class="det-field">
-      <div class="det-lbl">Privé</div>
-      <div class="det-val">{% if chambre.prive %}Oui{% else %}Non{% endif %}</div>
+  {# IDENTIFICATION #}
+  <div class="det-card">
+    <div class="det-card-title"><i class="bi bi-info-circle"></i> Identification</div>
+    <div class="det-grid">
+      <div class="det-field">
+        <div class="det-lbl">Nom</div>
+        <div class="det-val">{{ chambre.nom|default:"—" }}</div>
+      </div>
+      <div class="det-field">
+        <div class="det-lbl">Salle N°</div>
+        <div class="det-val">{{ chambre.salle_no }}</div>
+      </div>
+      <div class="det-field">
+        <div class="det-lbl">Type</div>
+        <div class="det-val">{{ chambre.get_type_chambre_display }}</div>
+      </div>
+      <div class="det-field">
+        <div class="det-lbl">Genre</div>
+        <div class="det-val">{{ chambre.get_genre_display }}</div>
+      </div>
+      <div class="det-field">
+        <div class="det-lbl">Nombre de lits</div>
+        <div class="det-val">{{ chambre.nombre_lits }}</div>
+      </div>
+      <div class="det-field">
+        <div class="det-lbl">Statut</div>
+        <div class="det-val">{% if chambre.statut %}Disponible{% else %}Occupée{% endif %}</div>
+      </div>
+      <div class="det-field">
+        <div class="det-lbl">Privé</div>
+        <div class="det-val">{% if chambre.prive %}Oui{% else %}Non{% endif %}</div>
+      </div>
     </div>
   </div>
-</div>
 
-{# ÉQUIPEMENTS #}
-<div class="det-card">
-  <div class="det-card-title"><i class="bi bi-grid-3x3"></i> Équipements</div>
-  <div class="equip-grid">
-    {% with equips=chambre.acces_internet|yesno:"oui,non" %}
-    <span class="equip-chip {% if chambre.acces_internet %}equip-oui{% else %}equip-non{% endif %}">
-      <i class="bi bi-wifi{% if not chambre.acces_internet %}-off{% endif %}"></i> Accès Internet
-    </span>
-    {% endwith %}
-    <span class="equip-chip {% if chambre.climatisation %}equip-oui{% else %}equip-non{% endif %}">
-      <i class="bi bi-thermometer-snow"></i> Climatisation
-    </span>
-    <span class="equip-chip {% if chambre.salle_bains_privee %}equip-oui{% else %}equip-non{% endif %}">
-      <i class="bi bi-droplet"></i> Salle de bains privée
-    </span>
-    <span class="equip-chip {% if chambre.television %}equip-oui{% else %}equip-non{% endif %}">
-      <i class="bi bi-tv"></i> Télévision
-    </span>
-    <span class="equip-chip {% if chambre.telephone_chambre %}equip-oui{% else %}equip-non{% endif %}">
-      <i class="bi bi-telephone"></i> Téléphone
-    </span>
-    <span class="equip-chip {% if chambre.lit_visiteur %}equip-oui{% else %}equip-non{% endif %}">
-      <i class="bi bi-person-bed"></i> Lit de visiteur
-    </span>
-    <span class="equip-chip {% if chambre.four_micro_onde %}equip-oui{% else %}equip-non{% endif %}">
-      <i class="bi bi-box2"></i> Four micro-onde
-    </span>
-    <span class="equip-chip {% if chambre.danger_biologique %}equip-oui{% else %}equip-non{% endif %}">
-      <i class="bi bi-exclamation-triangle"></i> Danger biologique
-    </span>
-    <span class="equip-chip {% if chambre.refrigerateur %}equip-oui{% else %}equip-non{% endif %}">
-      <i class="bi bi-snow2"></i> Réfrigérateur
-    </span>
+  {# ÉQUIPEMENTS #}
+  <div class="det-card">
+    <div class="det-card-title"><i class="bi bi-grid-3x3"></i> Équipements</div>
+    <div class="equip-grid">
+      {% with equips=chambre.acces_internet|yesno:"oui,non" %}
+      <span class="equip-chip {% if chambre.acces_internet %}equip-oui{% else %}equip-non{% endif %}">
+        <i class="bi bi-wifi{% if not chambre.acces_internet %}-off{% endif %}"></i> Accès Internet
+      </span>
+      {% endwith %}
+      <span class="equip-chip {% if chambre.climatisation %}equip-oui{% else %}equip-non{% endif %}">
+        <i class="bi bi-thermometer-snow"></i> Climatisation
+      </span>
+      <span class="equip-chip {% if chambre.salle_bains_privee %}equip-oui{% else %}equip-non{% endif %}">
+        <i class="bi bi-droplet"></i> Salle de bains privée
+      </span>
+      <span class="equip-chip {% if chambre.television %}equip-oui{% else %}equip-non{% endif %}">
+        <i class="bi bi-tv"></i> Télévision
+      </span>
+      <span class="equip-chip {% if chambre.telephone_chambre %}equip-oui{% else %}equip-non{% endif %}">
+        <i class="bi bi-telephone"></i> Téléphone
+      </span>
+      <span class="equip-chip {% if chambre.lit_visiteur %}equip-oui{% else %}equip-non{% endif %}">
+        <i class="bi bi-person-bed"></i> Lit de visiteur
+      </span>
+      <span class="equip-chip {% if chambre.four_micro_onde %}equip-oui{% else %}equip-non{% endif %}">
+        <i class="bi bi-box2"></i> Four micro-onde
+      </span>
+      <span class="equip-chip {% if chambre.danger_biologique %}equip-oui{% else %}equip-non{% endif %}">
+        <i class="bi bi-exclamation-triangle"></i> Danger biologique
+      </span>
+      <span class="equip-chip {% if chambre.refrigerateur %}equip-oui{% else %}equip-non{% endif %}">
+        <i class="bi bi-snow2"></i> Réfrigérateur
+      </span>
+    </div>
   </div>
-</div>
 
-{# NOTES #}
-{% if chambre.description %}
-<div class="det-card">
-  <div class="det-card-title"><i class="bi bi-sticky"></i> Notes</div>
-  <div style="padding:14px 16px;font-size:13px;color:var(--text);white-space:pre-wrap;">{{ chambre.description }}</div>
-</div>
-{% endif %}
+  {# NOTES #}
+  {% if chambre.description %}
+  <div class="det-card">
+    <div class="det-card-title"><i class="bi bi-sticky"></i> Notes</div>
+    <div style="padding:16px 24px;font-size:13px;color:var(--text);white-space:pre-wrap;">{{ chambre.description }}</div>
+  </div>
+  {% endif %}
+
+</div><!-- /det-block -->
 
 
 </div><!-- /page-wrap -->

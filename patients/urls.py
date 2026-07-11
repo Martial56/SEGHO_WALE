@@ -27,8 +27,4 @@ urlpatterns = [
     path('pathologies/nouveau/', views.pathologie_create, name='pathologie_create'),
     path('pathologies/<int:pk>/modifier/', views.pathologie_edit, name='pathologie_edit'),
     path('pathologies/<int:pk>/supprimer/', views.pathologie_delete, name='pathologie_delete'),
-    path('types-visite/', views.typevisite_list, name='typevisite_list'),
-    path('types-visite/nouveau/', views.typevisite_create, name='typevisite_create'),
-    path('types-visite/<int:pk>/modifier/', views.typevisite_edit, name='typevisite_edit'),
-    path('types-visite/<int:pk>/supprimer/', views.typevisite_delete, name='typevisite_delete'),
 ]

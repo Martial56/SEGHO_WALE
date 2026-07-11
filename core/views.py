@@ -1230,7 +1230,8 @@ def gynecologie_rdv_create(request):
         {'title': 'Rendez-vous', 'url': '/gynecologie/rdv/'},
         {'title': 'Nouveau'},
     ]
-    from patients.models import Pathologie, TypeVisite
+    from patients.models import Pathologie
+    from gynecologie.models import TypeVisite
     return render(request, 'gynecologie/rdv_form.html', {
         'form': form,
         'rdv': None,
@@ -1384,7 +1385,7 @@ def gynecologie_rdv_detail(request, pk):
             code = request.POST.get('code_confirmation', '').strip()
             if code:
                 rdv.code_confirmation = code
-            from patients.models import TypeVisite
+            from gynecologie.models import TypeVisite
             rdv.cpn_mode_entree = request.POST.get('cpn_mode_entree', '').strip()
             rdv.cpn_mode_entree_autre = request.POST.get('cpn_mode_entree_autre', '').strip()
             cpn_tv_pk = request.POST.get('cpn_type_visite', '').strip()
@@ -1434,7 +1435,8 @@ def gynecologie_rdv_detail(request, pk):
         {'title': 'Rendez-vous', 'url': '/gynecologie/rdv/'},
         {'title': rdv.code_rdv or rdv.patient.code_patient},
     ]
-    from patients.models import Pathologie, TypeVisite, RegistreCPN, RegistreAccouchement, RegistrePostnatale, RegistreCuratif
+    from patients.models import Pathologie, RegistreCPN, RegistreAccouchement, RegistrePostnatale, RegistreCuratif
+    from gynecologie.models import TypeVisite
     def _get_reg(Model):
         try:
             return Model.objects.get(rdv=rdv)
