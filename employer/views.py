@@ -1831,3 +1831,176 @@ def bio_auth_verify(request):
         'photo_url':  photo_url,
         'message':    f'Pointage enregistré — {slot_label} : {heure:%H:%M}',
     })
+
+
+# ══════════════════════════════════════════════
+#  EMPLOYÉS — Configuration : Services
+# ══════════════════════════════════════════════
+
+def _service_form_class():
+    from django import forms
+    from medecins.models import Medecin
+    class ServiceForm(forms.ModelForm):
+        chef_service = forms.ModelChoiceField(
+            queryset=Medecin.objects.filter(actif=True).order_by('nom', 'prenoms'),
+            required=False,
+            empty_label='— Aucun chef de service —',
+        )
+        class Meta:
+            model = Service
+            fields = ['nom', 'code', 'description', 'chef_service', 'actif']
+            widgets = {
+                'nom':         forms.TextInput(attrs={'class': 'f-input', 'placeholder': 'Ex : Médecine interne'}),
+                'code':        forms.TextInput(attrs={'class': 'f-input', 'placeholder': 'Ex : MED-INT'}),
+                'description': forms.Textarea(attrs={'class': 'f-input', 'rows': 3}),
+            }
+    return ServiceForm
+
+
+@login_required(login_url='login')
+def employer_services(request):
+    q   = request.GET.get('q', '').strip()
+    vue = request.GET.get('vue', 'liste')
+    qs  = Service.objects.annotate(nb_employes=Count('employes')).order_by('nom')
+    if q:
+        qs = qs.filter(Q(nom__icontains=q) | Q(code__icontains=q))
+    total = Service.objects.count()
+    paginator = Paginator(qs, 25)
+    page_obj  = paginator.get_page(request.GET.get('page'))
+    return render(request, 'employer/config/services_list.html', {
+        'page_obj': page_obj, 'total': total,
+        'total_filtre': qs.count(), 'q': q, 'vue': vue,
+        'can_manage': can_manage_rh(request.user),
+    })
+
+
+@login_required(login_url='login')
+def employer_service_detail(request, pk):
+    obj = get_object_or_404(Service, pk=pk)
+    pks = list(Service.objects.order_by('nom').values_list('pk', flat=True))
+    pos = pks.index(pk) if pk in pks else None
+    employes = obj.employes.order_by('nom', 'prenoms')
+    return render(request, 'employer/config/service_detail.html', {
+        'obj':      obj,
+        'employes': employes,
+        'prev_pk': pks[pos - 1] if pos and pos > 0 else None,
+        'next_pk': pks[pos + 1] if pos is not None and pos < len(pks) - 1 else None,
+        'can_manage': can_manage_rh(request.user),
+    })
+
+
+@login_required(login_url='login')
+def employer_service_create(request):
+    Form = _service_form_class()
+    form = Form(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(request, 'Service créé.')
+        return redirect('employer_services')
+    return render(request, 'employer/config/service_form.html', {
+        'form': form, 'titre': 'Nouveau service',
+        'can_manage': can_manage_rh(request.user),
+    })
+
+
+@login_required(login_url='login')
+def employer_service_edit(request, pk):
+    obj  = get_object_or_404(Service, pk=pk)
+    Form = _service_form_class()
+    form = Form(request.POST or None, instance=obj)
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(request, 'Service mis à jour.')
+        return redirect('employer_service_detail', pk=pk)
+    return render(request, 'employer/config/service_form.html', {
+        'form': form, 'titre': f'Modifier – {obj.nom}', 'obj': obj,
+        'can_manage': can_manage_rh(request.user),
+    })
+
+
+@login_required(login_url='login')
+@require_POST
+def employer_service_bulk_delete(request):
+    ids = request.POST.getlist('ids[]')
+    if ids:
+        Service.objects.filter(pk__in=ids).delete()
+    return JsonResponse({'ok': True})
+
+
+_SVC_HDR = ['code', 'nom', 'description', 'chef_service', 'actif']
+
+
+def _svc_row(s):
+    return [
+        s.code, s.nom, s.description,
+        s.chef_service.matricule if s.chef_service else '',
+        int(s.actif),
+    ]
+
+
+@login_required(login_url='login')
+def employer_export_services(request):
+    from services.views import _export_file
+    fmt = request.GET.get('format', 'json')
+    qs = Service.objects.select_related('chef_service').order_by('nom')
+    rows = [_svc_row(s) for s in qs]
+    return _export_file(fmt, 'services', _SVC_HDR, rows,
+                        [dict(zip(_SVC_HDR, r)) for r in rows])
+
+
+@login_required(login_url='login')
+@require_POST
+def employer_import_services(request):
+    from medecins.models import Medecin
+    from services.views import _parse_upload, _s, _b, _fk_warning
+
+    upload = request.FILES.get('fichier')
+    if not upload:
+        messages.error(request, 'Aucun fichier sélectionné.')
+        return redirect('employer_services')
+
+    data, err = _parse_upload(upload)
+    if err:
+        messages.error(request, err)
+        return redirect('employer_services')
+
+    do_update = 'update' in request.POST
+    created = updated = skipped = errors = 0
+    chef_manquants = set()
+    for item in data:
+        try:
+            code = _s(item.get('code', ''))
+            if not code:
+                errors += 1
+                continue
+            chef_matricule = _s(item.get('chef_service', ''))
+            chef_service = Medecin.objects.filter(matricule=chef_matricule).first() if chef_matricule else None
+            if chef_matricule and not chef_service:
+                chef_manquants.add(chef_matricule)
+
+            defaults = {
+                'nom': _s(item.get('nom', code)),
+                'description': _s(item.get('description', '')),
+                'chef_service': chef_service,
+                'actif': _b(item.get('actif', True)),
+            }
+            obj, was_created = Service.objects.get_or_create(code=code, defaults=defaults)
+            if was_created:
+                created += 1
+            elif do_update:
+                for k, v in defaults.items():
+                    setattr(obj, k, v)
+                obj.save()
+                updated += 1
+            else:
+                skipped += 1
+        except Exception:
+            errors += 1
+
+    fk_msg = _fk_warning([('Médecin(s) chef de service', chef_manquants)])
+    if errors or fk_msg:
+        messages.warning(request, f'{created} créé(s), {updated} mis à jour, {skipped} ignoré(s)'
+                          + (f', {errors} erreur(s)' if errors else '') + '.' + fk_msg)
+    else:
+        messages.success(request, f'{created} service(s) importé(s), {updated} mis à jour, {skipped} ignoré(s).')
+    return redirect('employer_services')

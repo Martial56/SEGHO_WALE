@@ -2,7 +2,7 @@ from django import forms
 from .models import Soin, ProcedureSoin
 from patients.models import Patient, RendezVous, Pathologie
 from employer.models import Employe
-from medecins.models import Service as Departement
+from medecins.models import Departement
 from services.models import Articleservice
 from facturation.models import Facture
 
@@ -66,7 +66,7 @@ class ProcedureSoinForm(forms.ModelForm):
         label="Soin",
     )
     departement = forms.ModelChoiceField(
-        queryset=Departement.objects.order_by('nom'),
+        queryset=Departement.objects.filter(actif=True).order_by('nom'),
         required=False,
         empty_label="— Sélectionner un département —",
     )

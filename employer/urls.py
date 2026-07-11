@@ -8,6 +8,15 @@ urlpatterns = [
     path('nouveau/',                                  views.employe_nouveau,       name='rh_nouveau'),
     path('import/',                                   views.employe_import,        name='rh_import'),
     path('export/excel/',                             views.employe_export_excel,  name='rh_export_excel'),
+
+    path('config/services/',                          views.employer_services,             name='employer_services'),
+    path('config/services/export/',                   views.employer_export_services,      name='employer_export_services'),
+    path('config/services/import/',                   views.employer_import_services,      name='employer_import_services'),
+    path('config/services/nouveau/',                  views.employer_service_create,       name='employer_service_create'),
+    path('config/services/bulk-delete/',              views.employer_service_bulk_delete,  name='employer_service_bulk_delete'),
+    path('config/services/<int:pk>/',                 views.employer_service_detail,       name='employer_service_detail'),
+    path('config/services/<int:pk>/modifier/',        views.employer_service_edit,         name='employer_service_edit'),
+
     path('<int:pk>/',                                 views.employe_detail,        name='rh_detail'),
     path('<int:pk>/vers-medecin/',                    views.employe_vers_medecin,  name='rh_vers_medecin'),
     path('<int:pk>/supprimer/',                       views.employe_supprimer,     name='rh_supprimer'),

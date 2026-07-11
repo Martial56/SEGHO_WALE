@@ -1,31 +1,28 @@
-{% extends 'medecins/base.html' %}
+{% extends 'employer/base.html' %}
 {% block topbar_title %}{{ obj.nom }}{% endblock %}
 {% block breadcrumb %}{% endblock %}
 
 {% block extra_css %}
 {{ block.super }}
 <style>
-  /* ── Style copié de services/detail.html (module Prestations), à la
-     demande explicite d'aligner les pages Service dessus. ── */
   .control-panel {
     background: #fff;
     border-bottom: 1px solid rgba(0, 0, 0, 0.08);
     position: sticky;
     top: 0;
     z-index: 190;
-    margin: 0 -32px;
   }
   .cp-top { display: flex; align-items: center; justify-content: space-between; padding: 6px 16px; gap: 12px; }
   .cp-save-group { display: flex; gap: 8px; align-items: center; }
   .btn-save {
     display: inline-flex; align-items: center; gap: 5px;
-    background: var(--teal-500); color: #fff; border: none;
+    background: var(--rh-500); color: #fff; border: none;
     border-radius: var(--radius-xs, 4px); padding: 6px 14px;
     font-size: 12.5px; font-weight: 600; cursor: pointer;
     font-family: var(--font-roboto); text-decoration: none;
     transition: background 0.15s; white-space: nowrap; flex-shrink: 0;
   }
-  .btn-save:hover { background: var(--teal-600); color: #fff; }
+  .btn-save:hover { background: var(--rh-600); color: #fff; }
   html[data-theme="dark"] .control-panel { background: var(--surface); }
 
   .form-body { background: #fff; margin: 16px 0 0; padding: 24px 28px; border-radius: 8px; }
@@ -41,7 +38,7 @@
 
   .field-static { display: flex; align-items: center; min-height: 34px; padding: 7px 2px; font-size: 13px; font-family: var(--font-roboto); color: var(--text); }
   .field-static.muted { color: var(--text-muted); font-style: italic; }
-  .field-static a { color: var(--md-500); text-decoration: none; font-weight: 600; }
+  .field-static a { color: var(--rh-500); text-decoration: none; font-weight: 600; }
   .field-static a:hover { text-decoration: underline; }
 
   .det-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 20px; }
@@ -50,7 +47,6 @@
   html[data-theme="dark"] .det-badge-actif   { background: rgba(22,169,107,.2); color: #6eddb0; }
   html[data-theme="dark"] .det-badge-inactif { background: rgba(232,69,69,.2);  color: #f09090; }
 
-  /* ── ONGLETS / LAYOUT (copié : f-layout/f-main pour accueillir l'historique) ── */
   .f-layout { display: flex; align-items: flex-start; gap: 0; padding: 16px 0; }
   @media (max-width: 900px) { .f-layout { flex-direction: column; } }
   .f-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
@@ -76,17 +72,17 @@
 <!-- ══════════════ PANNEAU DE CONTRÔLE ══════════════ -->
 <div class="control-panel">
   <div class="cp-top">
-    <a href="{% url 'medecins_services' %}" class="o-ctrl-btn" style="padding:3px 7px;">
+    <a href="{% url 'employer_services' %}" class="o-ctrl-btn" style="padding:3px 7px;">
       <i class="bi bi-arrow-left"></i>
     </a>
     <span style="font-size:13.5px;color:var(--text-muted);">
-      <a href="{% url 'medecins_services' %}" style="color:var(--teal-600);text-decoration:none;font-weight:500;">Services</a>
+      <a href="{% url 'employer_services' %}" style="color:var(--rh-600);text-decoration:none;font-weight:500;">Services</a>
       <span style="margin:0 5px;opacity:.4;">/</span>
       <span style="color:var(--text);">{{ obj.nom|truncatechars:30 }}</span>
     </span>
     <div style="flex:1;"></div>
     <div class="cp-save-group">
-      <a href="{% url 'medecins_service_edit' obj.pk %}" class="btn-save"><i class="bi bi-pencil"></i> Modifier</a>
+      <a href="{% url 'employer_service_edit' obj.pk %}" class="btn-save"><i class="bi bi-pencil"></i> Modifier</a>
     </div>
   </div>
 </div>
@@ -105,12 +101,6 @@
         <label>Code</label>
         <div class="field-static" style="font-family:var(--font-mono);">{{ obj.code }}</div>
       </div>
-      <div class="field-row">
-        <label>Département</label>
-        <div class="field-static {% if not obj.departement %}muted{% endif %}">
-          {% if obj.departement %}<a href="{% url 'medecins_departement_detail' obj.departement.pk %}">{{ obj.departement.nom }}</a>{% else %}—{% endif %}
-        </div>
-      </div>
     </div>
 
     <div class="field-group">
@@ -119,8 +109,8 @@
         <div class="field-static {% if not obj.chef_service %}muted{% endif %}">{{ obj.chef_service|default:"—" }}</div>
       </div>
       <div class="field-row">
-        <label>Médecins</label>
-        <div class="field-static">{{ medecins|length }} médecin{{ medecins|length|pluralize }}</div>
+        <label>Employés</label>
+        <div class="field-static">{{ employes|length }} employé{{ employes|length|pluralize }}</div>
       </div>
       <div class="field-row">
         <label>Statut</label>
@@ -148,28 +138,28 @@
     <div class="f-main">
       <div class="f-tabs-wrap">
         <div class="f-tab-panel">
-          <div class="f-tab-section-title">Médecins dans ce service ({{ medecins|length }})</div>
-          {% if medecins %}
+          <div class="f-tab-section-title">Employés dans ce service ({{ employes|length }})</div>
+          {% if employes %}
           <table class="o-list-table">
             <thead>
               <tr>
-                <th>Médecin</th>
+                <th>Employé</th>
                 <th>Matricule</th>
-                <th>Spécialité</th>
+                <th>Fonction</th>
                 <th>Téléphone</th>
                 <th style="width:90px;">Statut</th>
               </tr>
             </thead>
             <tbody>
-              {% for med in medecins %}
-              <tr onclick="window.location='{% url 'medecin_detail' med.pk %}'">
-                <td style="font-weight:600;">Dr {{ med.nom }} {{ med.prenoms }}</td>
-                <td><span class="badge-code">{{ med.matricule }}</span></td>
-                <td style="color:var(--text-muted);">{{ med.specialite|default:"—" }}</td>
-                <td style="color:var(--text-muted);">{{ med.telephone|default:"—" }}</td>
+              {% for emp in employes %}
+              <tr onclick="window.location='{% url 'rh_detail' emp.pk %}'">
+                <td style="font-weight:600;">{{ emp.nom }} {{ emp.prenoms }}</td>
+                <td><span class="badge-code">{{ emp.matricule }}</span></td>
+                <td style="color:var(--text-muted);">{{ emp.fonction|default:"—" }}</td>
+                <td style="color:var(--text-muted);">{{ emp.telephone|default:"—" }}</td>
                 <td>
-                  {% if med.actif %}<span class="det-badge det-badge-actif">Actif</span>
-                  {% else %}<span class="det-badge det-badge-inactif">Inactif</span>{% endif %}
+                  {% if emp.statut == 'actif' %}<span class="det-badge det-badge-actif">Actif</span>
+                  {% else %}<span class="det-badge det-badge-inactif">{{ emp.get_statut_display }}</span>{% endif %}
                 </td>
               </tr>
               {% endfor %}
@@ -178,7 +168,7 @@
           {% else %}
           <div class="o-empty">
             <i class="bi bi-person-x"></i>
-            Aucun médecin dans ce service.
+            Aucun employé dans ce service.
           </div>
           {% endif %}
         </div>
@@ -191,27 +181,4 @@
 
 </div><!-- /.form-body -->
 
-{% endblock %}
-
-{% block extra_js %}
-{{ block.super }}
-<script>
-(function () {
-  function alignSousTopbar() {
-    var topbar = document.querySelector('.topbar');
-    var content = document.querySelector('.content');
-    if (!topbar || !content) return;
-    var tbH = Math.ceil(topbar.getBoundingClientRect().height);
-    if (tbH <= 0) return;
-    document.documentElement.style.setProperty('--header-h', tbH + 'px');
-    requestAnimationFrame(function () {
-      var gap = Math.round(content.getBoundingClientRect().top - topbar.getBoundingClientRect().bottom);
-      document.documentElement.style.setProperty('--header-h', (tbH - gap) + 'px');
-    });
-  }
-  if (document.readyState !== 'loading') { alignSousTopbar(); }
-  else { document.addEventListener('DOMContentLoaded', alignSousTopbar); }
-  window.addEventListener('resize', alignSousTopbar);
-})();
-</script>
 {% endblock %}

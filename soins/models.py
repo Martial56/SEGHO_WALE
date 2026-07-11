@@ -44,7 +44,7 @@ class Soin(models.Model):
 
     photo = models.ImageField(upload_to='soins/photos/', blank=True, null=True, verbose_name="Photo")
     departement = models.ForeignKey(
-        'medecins.Service', on_delete=models.SET_NULL, null=True, blank=True,
+        'medecins.Departement', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='soins', verbose_name="Département"
     )
     statut_maladie = models.CharField(max_length=20, choices=STATUT_MALADIE, blank=True, verbose_name="Statut de la maladie")
@@ -133,7 +133,7 @@ class ProcedureSoin(models.Model):
     )
     prix = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="Prix")
     departement = models.ForeignKey(
-        'medecins.Service', on_delete=models.SET_NULL, null=True, blank=True,
+        'medecins.Departement', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='procedures_soins', verbose_name="Département"
     )
     date = models.DateTimeField(default=timezone.now, verbose_name="Date")

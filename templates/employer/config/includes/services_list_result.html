@@ -3,14 +3,13 @@
 <!-- ── VUE KANBAN ── -->
 <div class="o-kanban" id="view-grille" style="{% if vue|default:'liste' != 'kanban' %}display:none;{% endif %}">
   {% for svc in page_obj %}
-  <div class="o-card" onclick="window.location='{% url 'medecins_service_detail' svc.pk %}'">
+  <div class="o-card" onclick="window.location='{% url 'employer_service_detail' svc.pk %}'">
     <div class="o-avatar"><i class="bi bi-building"></i></div>
     <div class="o-card-body">
       <div class="o-card-name">{{ svc.nom }}</div>
       <div class="o-card-meta">
         <span class="val">{{ svc.code }}</span><br>
-        {{ svc.departement.nom|default:"Sans département" }}<br>
-        <i class="bi bi-people"></i> {{ svc.nb_employes }} médecin{{ svc.nb_employes|pluralize }}
+        <i class="bi bi-people"></i> {{ svc.nb_employes }} employé{{ svc.nb_employes|pluralize }}
         &nbsp;
         {% if svc.actif %}<span class="badge-actif">Actif</span>{% else %}<span class="badge-inactif">Inactif</span>{% endif %}
       </div>
@@ -29,28 +28,26 @@
         </th>
         <th style="width:110px;">Code</th>
         <th>Nom</th>
-        <th>Département</th>
-        <th style="width:110px;">Médecins</th>
+        <th style="width:110px;">Employés</th>
         <th style="width:90px;">Statut</th>
         <th style="width:90px;"></th>
       </tr>
     </thead>
     <tbody>
       {% for svc in page_obj %}
-      <tr onclick="if(event.target.type!=='checkbox'&&!event.target.closest('.row-actions'))window.location='{% url 'medecins_service_detail' svc.pk %}'">
+      <tr onclick="if(event.target.type!=='checkbox'&&!event.target.closest('.row-actions'))window.location='{% url 'employer_service_detail' svc.pk %}'">
         <td onclick="event.stopPropagation()">
           <input type="checkbox" class="row-check" value="{{ svc.pk }}" style="width:14px;height:14px;cursor:pointer;">
         </td>
         <td><span class="badge-code">{{ svc.code }}</span></td>
         <td style="font-weight:600;">{{ svc.nom }}</td>
-        <td style="color:var(--text-muted);">{{ svc.departement.nom|default:"—" }}</td>
         <td style="color:var(--text-muted);"><i class="bi bi-people" style="margin-right:4px;"></i>{{ svc.nb_employes }}</td>
         <td>
           {% if svc.actif %}<span class="badge-actif">Actif</span>
           {% else %}<span class="badge-inactif">Inactif</span>{% endif %}
         </td>
         <td class="row-actions" onclick="event.stopPropagation()">
-          <a href="{% url 'medecins_service_edit' svc.pk %}" class="o-ctrl-btn" title="Modifier">
+          <a href="{% url 'employer_service_edit' svc.pk %}" class="o-ctrl-btn" title="Modifier">
             <i class="bi bi-pencil"></i>
           </a>
         </td>
@@ -78,7 +75,7 @@
   <i class="bi bi-building"></i>
   {% if q %}Aucun résultat pour « {{ q }} »{% else %}Aucun service enregistré{% endif %}<br>
   {% if not q %}
-  <a href="{% url 'medecins_service_create' %}" style="color:var(--md-500);font-weight:600;margin-top:8px;display:inline-block;">Créer un premier service</a>
+  <a href="{% url 'employer_service_create' %}" style="color:var(--rh-500);font-weight:600;margin-top:8px;display:inline-block;">Créer un premier service</a>
   {% endif %}
 </div>
 {% endif %}

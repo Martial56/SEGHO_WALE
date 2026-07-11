@@ -22,7 +22,7 @@ class Medecin(models.Model):
     nom = models.CharField(max_length=100)
     prenoms = models.CharField(max_length=200)
     specialite = models.ForeignKey(Specialite, on_delete=models.SET_NULL, null=True, blank=True)
-    service = models.ForeignKey('Service', on_delete=models.SET_NULL, null=True, blank=True, related_name='medecins', verbose_name="Département")
+    departement = models.ForeignKey('Departement', on_delete=models.SET_NULL, null=True, blank=True, related_name='medecins', verbose_name="Département")
     telephone = models.CharField(max_length=20)
     email = models.EmailField(blank=True)
     ordre_medecin = models.CharField(max_length=50, blank=True)
@@ -42,7 +42,6 @@ class Service(models.Model):
     code = models.CharField(max_length=20, unique=True)
     description = models.TextField(blank=True)
     chef_service = models.ForeignKey(Medecin, on_delete=models.SET_NULL, null=True, blank=True, related_name='services_diriges')
-    departement = models.ForeignKey('Departement', on_delete=models.SET_NULL, null=True, blank=True, related_name='services')
     actif = models.BooleanField(default=True)
 
     def __str__(self): return self.nom
@@ -58,4 +57,19 @@ class Departement(models.Model):
     def __str__(self): return self.nom
     class Meta:
         verbose_name = "Département"
+        ordering = ['nom']
+
+
+class ModuleSpecialise(models.Model):
+    """Associe un module métier (ex: Gynécologie) à un ou plusieurs départements,
+    pour piloter dynamiquement les vues spécialisées (ex: liste RDV Gynécologie)
+    sans avoir à modifier le code."""
+    code = models.CharField(max_length=30, unique=True)
+    nom = models.CharField(max_length=100)
+    departements = models.ManyToManyField(Departement, blank=True, related_name='modules_specialises')
+    actif = models.BooleanField(default=True)
+
+    def __str__(self): return self.nom
+    class Meta:
+        verbose_name = "Module spécialisé"
         ordering = ['nom']

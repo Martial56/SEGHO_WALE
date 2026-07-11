@@ -26,7 +26,7 @@ def medecins_export_csv(request):
     import csv
     from django.http import HttpResponse
 
-    qs = Medecin.objects.select_related('specialite', 'service').order_by('nom')
+    qs = Medecin.objects.select_related('specialite', 'departement').order_by('nom')
     q          = request.GET.get('q', '').strip()
     specialite = request.GET.get('specialite', '')
     statut     = request.GET.get('statut', '')
@@ -50,7 +50,7 @@ def medecins_export_csv(request):
             med.nom,
             med.prenoms,
             str(med.specialite) if med.specialite else '',
-            str(med.service) if med.service else '',
+            str(med.departement) if med.departement else '',
             med.telephone or '',
             med.email or '',
             med.taux_honoraire or 0,

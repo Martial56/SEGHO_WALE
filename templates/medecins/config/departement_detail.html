@@ -113,8 +113,8 @@
 
     <div class="field-group">
       <div class="field-row">
-        <label>Services rattachés</label>
-        <div class="field-static">{{ services|length }} service{{ services|length|pluralize }}</div>
+        <label>Médecins rattachés</label>
+        <div class="field-static">{{ medecins|length }} médecin{{ medecins|length|pluralize }}</div>
       </div>
       <div class="field-row">
         <label>Statut</label>
@@ -142,25 +142,25 @@
     <div class="f-main">
       <div class="f-tabs-wrap">
         <div class="f-tab-panel">
-          <div class="f-tab-section-title">Services rattachés ({{ services|length }})</div>
-          {% if services %}
+          <div class="f-tab-section-title">Médecins rattachés ({{ medecins|length }})</div>
+          {% if medecins %}
           <table class="o-list-table">
             <thead>
               <tr>
-                <th style="width:110px;">Code</th>
-                <th>Nom</th>
-                <th>Chef de service</th>
+                <th style="width:110px;">Matricule</th>
+                <th>Médecin</th>
+                <th>Spécialité</th>
                 <th style="width:90px;">Statut</th>
               </tr>
             </thead>
             <tbody>
-              {% for svc in services %}
-              <tr onclick="window.location='{% url 'medecins_service_detail' svc.pk %}'">
-                <td><span class="badge-code">{{ svc.code }}</span></td>
-                <td style="font-weight:600;">{{ svc.nom }}</td>
-                <td style="color:var(--text-muted);">{{ svc.chef_service|default:"—" }}</td>
+              {% for med in medecins %}
+              <tr onclick="window.location='{% url 'medecin_detail' med.pk %}'">
+                <td><span class="badge-code">{{ med.matricule }}</span></td>
+                <td style="font-weight:600;">Dr {{ med.nom }} {{ med.prenoms }}</td>
+                <td style="color:var(--text-muted);">{{ med.specialite|default:"—" }}</td>
                 <td>
-                  {% if svc.actif %}<span class="det-badge det-badge-actif">Actif</span>
+                  {% if med.actif %}<span class="det-badge det-badge-actif">Actif</span>
                   {% else %}<span class="det-badge det-badge-inactif">Inactif</span>{% endif %}
                 </td>
               </tr>
@@ -169,9 +169,8 @@
           </table>
           {% else %}
           <div class="o-empty">
-            <i class="bi bi-building"></i>
-            Aucun service rattaché à ce département.<br>
-            <a href="{% url 'medecins_service_create' %}" style="color:var(--md-500);font-weight:600;margin-top:8px;display:inline-block;">Créer un service</a>
+            <i class="bi bi-person-x"></i>
+            Aucun médecin rattaché à ce département.
           </div>
           {% endif %}
         </div>

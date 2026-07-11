@@ -16,6 +16,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.contrib.humanize',
     'patients',
+    'gynecologie',
     'medecins',
     'consultations.apps.ConsultationsConfig',
     'pharmacie',

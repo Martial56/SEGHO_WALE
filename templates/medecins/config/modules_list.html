@@ -1,15 +1,21 @@
 {% extends 'medecins/base.html' %}
-{% block topbar_title %}Services{% endblock %}
+{% block topbar_title %}Modules spécialisés{% endblock %}
 {% block breadcrumb %}{% endblock %}
 
 {% block extra_css %}
 {{ block.super }}
 <style>
-  /* ── Style copié de services/list.html (module Prestations) et aligné
-     sur le CRUD Départements, à la demande explicite de généraliser. ── */
   .o-subheader {
-    background: var(--surface); border-bottom: 1px solid var(--border); padding: 6px 16px;
-    display: flex; flex-direction: column; gap: 5px; position: sticky; top: 0; z-index: 190; margin: 0 -32px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 6px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    position: sticky;
+    top: 0;
+    z-index: 190;
+    margin: 0 -32px;
   }
   .o-subheader-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .o-page-title { font-size: 17px; font-weight: 400; color: var(--text); }
@@ -46,7 +52,8 @@
   .o-view-btn {
     width: 26px; height: 24px; border: none; background: var(--surface);
     display: flex; align-items: center; justify-content: center;
-    color: var(--text-muted); font-size: 13px; cursor: pointer; transition: background 0.15s, color 0.15s;
+    color: var(--text-muted); font-size: 13px; cursor: pointer;
+    transition: background 0.15s, color 0.15s;
   }
   .o-view-btn:not(:last-child) { border-right: 1px solid var(--border); }
   .o-view-btn.active, .o-view-btn:hover { background: var(--md-600); color: #fff; }
@@ -76,7 +83,8 @@
   @media (max-width: 600px) { .o-kanban { grid-template-columns: 1fr; } }
   .o-card {
     background: var(--surface); border: 1px solid var(--border); border-radius: 3px; padding: 10px;
-    display: flex; align-items: flex-start; gap: 10px; cursor: pointer; transition: box-shadow 0.15s, border-color 0.15s;
+    display: flex; align-items: flex-start; gap: 10px; cursor: pointer;
+    transition: box-shadow 0.15s, border-color 0.15s;
   }
   .o-card:hover { box-shadow: 0 3px 10px rgba(0, 0, 0, 0.13); border-color: #bbb; }
   html[data-theme="dark"] .o-card { background: var(--surface); border-color: var(--border); }
@@ -90,6 +98,7 @@
   html[data-theme="dark"] .o-avatar i { color: #6c85a0; }
   .o-card-body { flex: 1; min-width: 0; }
   .o-card-name { font-size: 12.5px; font-weight: 500; color: var(--text); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  html[data-theme="dark"] .o-card-name { color: var(--text); }
   .o-card-meta { font-size: 11px; color: var(--text-muted); line-height: 1.7; }
   .o-card-meta .val { color: var(--text); }
 
@@ -114,7 +123,6 @@
   .modal-actions { display: flex; gap: 10px; justify-content: center; }
   .btn-modal-cancel { padding: 7px 18px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface); color: var(--text-muted); font-size: 13px; font-weight: 600; cursor: pointer; }
   .btn-modal-confirm { padding: 7px 18px; border-radius: 4px; border: none; background: #dc2626; color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; }
-{% include 'services/includes/io_styles.html' %}
 </style>
 {% endblock %}
 
@@ -122,47 +130,21 @@
 
 <div class="o-subheader">
   <div class="o-subheader-row">
-    <span class="o-page-title">Services <span class="o-page-count">{{ total }}</span></span>
+    <span class="o-page-title">Modules spécialisés <span class="o-page-count">{{ total }}</span></span>
     <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
       <form method="get" id="filter-form" style="display:flex;align-items:center;" onsubmit="return false;">
         <input type="hidden" name="vue" id="vue-input" value="{{ vue|default:'liste' }}">
         <div class="o-search-bar">
-          <input class="o-search-input" id="search-input" type="text" name="q" value="{{ q }}" placeholder="Rechercher un service…" autocomplete="off">
+          <input class="o-search-input" id="search-input" type="text" name="q" value="{{ q }}" placeholder="Rechercher un module…" autocomplete="off">
           <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
         </div>
       </form>
     </div>
   </div>
   <div class="o-subheader-row">
-    <a href="{% url 'medecins_service_create' %}" class="o-btn-create">
+    <a href="{% url 'medecins_module_create' %}" class="o-btn-create">
       <i class="bi bi-plus-lg"></i> Créer
     </a>
-
-    <!-- Export / Import dropdown -->
-    <div class="io-page-wrap" id="io-page-wrap">
-      <button type="button" class="o-ctrl-btn io-toggle-btn" onclick="toggleIOPage(event)">
-        <i class="bi bi-arrow-left-right"></i> Export / Import
-        <i class="bi bi-chevron-down" style="font-size:9px;margin-left:2px;"></i>
-      </button>
-      <div class="io-page-menu" id="io-page-menu">
-        <div class="io-pm-section">Exporter les services</div>
-        <a class="io-pm-item" href="{% url 'medecins_export_services' %}?format=json">
-          <i class="bi bi-filetype-json" style="color:#c97a00;"></i> JSON
-        </a>
-        <a class="io-pm-item" href="{% url 'medecins_export_services' %}?format=csv">
-          <i class="bi bi-filetype-csv" style="color:#1a7a4a;"></i> CSV
-        </a>
-        <a class="io-pm-item" href="{% url 'medecins_export_services' %}?format=xlsx">
-          <i class="bi bi-file-earmark-excel" style="color:#217346;"></i> Excel
-        </a>
-        <div class="io-pm-sep"></div>
-        <div class="io-pm-section">Importer</div>
-        <button type="button" class="io-pm-item" onclick="openImportModal()">
-          <i class="bi bi-upload" style="color:#2188ab;"></i> Importer un fichier…
-        </button>
-      </div>
-    </div>
-
     {% if q %}
     <a href="#" class="o-ctrl-btn" id="clear-search-btn"><i class="bi bi-x"></i> Effacer</a>
     {% endif %}
@@ -187,14 +169,14 @@
 </div>
 
 <div id="list-result">
-{% include 'medecins/config/includes/services_list_result.html' %}
+{% include 'medecins/config/includes/modules_list_result.html' %}
 </div>
 
 <div class="modal-overlay" id="bulk-delete-modal">
   <div class="modal-box">
     <div class="modal-icon">🗑️</div>
     <div class="modal-title">Confirmer la suppression</div>
-    <div class="modal-msg">Supprimer <strong id="modal-count">0</strong> service(s) ?<br>
+    <div class="modal-msg">Supprimer <strong id="modal-count">0</strong> module(s) ?<br>
       <span style="font-size:12px;">Cette action est irréversible.</span></div>
     <div class="modal-actions">
       <button type="button" class="btn-modal-cancel" onclick="closeBulkModal()">Annuler</button>
@@ -203,49 +185,14 @@
   </div>
 </div>
 
-<!-- ═══ MODAL IMPORT ═══ -->
-<div class="io-modal-backdrop" id="io-modal-backdrop" onclick="closeImportModal()"></div>
-<div class="io-modal" id="io-modal">
-  <div class="io-modal-header">
-    <span><i class="bi bi-upload"></i> Importer des Services</span>
-    <button type="button" class="io-modal-close" onclick="closeImportModal()">×</button>
-  </div>
-  <form method="post" action="{% url 'medecins_import_services' %}" enctype="multipart/form-data">
-    {% csrf_token %}
-    <div class="io-modal-body">
-      <label class="io-file-label" for="io-file-input">
-        <i class="bi bi-cloud-upload" style="font-size:28px;color:#2188ab;display:block;margin-bottom:6px;"></i>
-        <strong>Choisir un fichier</strong>
-        <span style="font-size:11px;color:var(--text-muted);display:block;margin-top:3px;">JSON, CSV ou Excel
-          (.xlsx)</span>
-        <input type="file" id="io-file-input" name="fichier" accept=".json,.csv,.xlsx,.xls" required
-          onchange="updateFileName(this)">
-      </label>
-      <div class="io-filename" id="io-filename" style="display:none;"></div>
-      <label class="io-checkbox-label">
-        <input type="checkbox" name="update"> Mettre à jour les enregistrements existants
-      </label>
-      <p class="io-hint">Le fichier doit utiliser les mêmes colonnes que l'export. La clé de déduplication est
-        <strong>code</strong>. Les colonnes <strong>departement</strong> et <strong>chef_service</strong>
-        attendent respectivement le code du département et le matricule du médecin —
-        <strong>importez d'abord les Départements et les Médecins</strong> si ces colonnes sont renseignées,
-        sinon la référence sera ignorée (un avertissement vous listera les codes introuvables).
-      </p>
-    </div>
-    <div class="io-modal-footer">
-      <button type="button" class="io-btn-cancel" onclick="closeImportModal()">Annuler</button>
-      <button type="submit" class="io-btn-submit"><i class="bi bi-upload"></i> Importer</button>
-    </div>
-  </form>
-</div>
-
 {% endblock %}
 
 {% block extra_js %}
+{{ block.super }}
 <script>
-const BULK_URL   = "{% url 'medecins_service_bulk_delete' %}";
+const BULK_URL   = "{% url 'medecins_module_bulk_delete' %}";
 const CSRF_TOKEN = "{{ csrf_token }}";
-const LIST_URL   = "{% url 'medecins_services' %}";
+const LIST_URL   = "{% url 'medecins_modules' %}";
 
 function setVue(v) {
   document.getElementById('vue-input').value = v;
@@ -327,39 +274,5 @@ function executeBulkDelete(){
   fetch(BULK_URL, {method:'POST', body:fd}).then(function(r){ return r.json(); }).then(function(d){ if(d.ok){ closeBulkModal(); fetchList(); } }).catch(closeBulkModal);
 }
 document.getElementById('bulk-delete-modal').addEventListener('click', function(e){ if(e.target===this) closeBulkModal(); });
-
-/* ── IO Dropdown ── */
-function toggleIOPage(e) {
-  e.stopPropagation();
-  document.getElementById('io-page-wrap').classList.toggle('open');
-}
-document.addEventListener('click', function () {
-  var w = document.getElementById('io-page-wrap');
-  if (w) w.classList.remove('open');
-});
-/* ── IO Modal ── */
-function openImportModal() {
-  document.getElementById('io-modal-backdrop').classList.add('active');
-  document.getElementById('io-modal').classList.add('active');
-  var w = document.getElementById('io-page-wrap');
-  if (w) w.classList.remove('open');
-}
-function closeImportModal() {
-  document.getElementById('io-modal-backdrop').classList.remove('active');
-  document.getElementById('io-modal').classList.remove('active');
-}
-function updateFileName(input) {
-  var el = document.getElementById('io-filename');
-  if (input.files && input.files[0]) {
-    el.textContent = input.files[0].name;
-    el.style.display = 'block';
-  }
-}
-document.addEventListener('keydown', function (e) {
-  if (e.key === 'Escape') closeImportModal();
-});
-{% if request.GET.action == 'import' %}
-document.addEventListener('DOMContentLoaded', openImportModal);
-{% endif %}
 </script>
 {% endblock %}

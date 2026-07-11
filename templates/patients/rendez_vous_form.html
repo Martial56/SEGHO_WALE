@@ -279,7 +279,8 @@
 
     /* ── Onglets f-tab ── */
     .f-tabs-wrap { background: #fff; border: 1px solid rgba(0,0,0,0.08); border-radius: 4px; overflow: hidden; }
-    .f-tabs { display: flex; border-bottom: 1px solid rgba(0,0,0,0.08); overflow-x: auto; }
+    .f-tabs { display: flex; border-bottom: 1px solid rgba(0,0,0,0.08); overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
+    .f-tabs::-webkit-scrollbar { display: none; }
     .f-tab {
         padding: 8px 14px; font-size: 12.5px; color: rgba(0,0,0,0.45);
         border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap;
@@ -2296,26 +2297,34 @@
 </script>
 
 <script>
-/* ── Filtre "Type de consultation" selon le "Département" choisi ── */
+/* ── Filtre "Médecin" et "Type de consultation" selon le "Département" choisi ── */
 (function () {
   var dept = document.getElementById('id_departement');
-  var typeCons = document.getElementById('id_type_consultation');
-  if (!dept || !typeCons) return;
+  if (!dept) return;
+  var targets = [
+    document.getElementById('id_medecin'),
+    document.getElementById('id_type_consultation'),
+  ].filter(Boolean);
+  if (!targets.length) return;
 
-  function filterTypeConsultation() {
-    var serviceId = dept.value;
+  function filterByDepartement(select) {
+    var departementId = dept.value;
     var stillValid = false;
-    typeCons.querySelectorAll('option').forEach(function (opt) {
+    select.querySelectorAll('option').forEach(function (opt) {
       if (!opt.value) return;
-      var visible = !!serviceId && opt.dataset.serviceId === serviceId;
+      var visible = !!departementId && opt.dataset.departementId === departementId;
       opt.hidden = !visible;
       if (visible && opt.selected) stillValid = true;
     });
-    if (!stillValid) typeCons.value = '';
+    if (!stillValid) select.value = '';
   }
 
-  dept.addEventListener('change', filterTypeConsultation);
-  filterTypeConsultation();
+  function filterAll() {
+    targets.forEach(filterByDepartement);
+  }
+
+  dept.addEventListener('change', filterAll);
+  filterAll();
 })();
 </script>
 

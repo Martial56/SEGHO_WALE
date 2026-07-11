@@ -34,15 +34,41 @@
   </a>
 
   {% if can_manage %}
+  <div class="o-nav-dropdown">
+    <button type="button"
+      class="o-nav-link {% if uname in 'employer_services,employer_service_detail,employer_service_create,employer_service_edit' %}active{% endif %}"
+      style="background:none;border:none;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;"
+      onclick="toggleEmpNavDropdown(event, this)">
+      Configuration
+      <i class="bi bi-chevron-down" style="font-size:10px;"></i>
+    </button>
+    <div class="o-nav-dropdown-menu" id="emp-nav-config-dropdown">
+      <a href="{% url 'employer_services' %}"><i class="bi bi-building"></i> Services</a>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if can_manage %}
   <div style="flex:1;"></div>
-  <a href="{% url 'rh_nouveau' %}"
-     class="o-nav-link {% if uname == 'rh_nouveau' %}active{% endif %}">
-    <i class="bi bi-person-plus-fill"></i> Nouvel employé
-  </a>
-  <a href="{% url 'rh_import' %}"
-     class="o-nav-link {% if uname == 'rh_import' %}active{% endif %}">
+  <a href="{% url 'rh_import' %}" class="o-nav-btn">
     <i class="bi bi-upload"></i> Import
   </a>
   {% endif %}
 </nav>
+<script>
+function toggleEmpNavDropdown(e, btn) {
+  e.stopPropagation();
+  var menu = document.getElementById('emp-nav-config-dropdown');
+  menu.classList.toggle('open');
+  if (menu.classList.contains('open')) {
+    function close(ev) {
+      if (!btn.closest('.o-nav-dropdown').contains(ev.target)) {
+        menu.classList.remove('open');
+        document.removeEventListener('click', close);
+      }
+    }
+    setTimeout(function () { document.addEventListener('click', close); }, 0);
+  }
+}
+</script>
 {% endwith %}

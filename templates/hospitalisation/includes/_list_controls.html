@@ -1,0 +1,55 @@
+{# Contrôles dynamiques du sous-en-tête — réutilisé au rendu initial et en AJAX. #}
+
+<!-- Tags filtres actifs -->
+{% if q %}<span class="o-filter-tag">{{ q }} <a onclick="clearQ()" style="cursor:pointer;" title="Supprimer">×</a></span>{% endif %}
+
+<!-- Filtres dropdown -->
+<div class="o-dd-wrap">
+  <button class="o-ctrl-btn {% if statut %}active{% endif %}"
+          id="btn-filtres" onclick="toggleDd('dd-filtres', this)">
+    <i class="bi bi-funnel{% if statut %}-fill{% endif %}"></i>
+    Filtres{% if statut %}&nbsp;<span style="background:var(--accent);color:#fff;border-radius:10px;font-size:10px;padding:0 5px;vertical-align:middle;">1</span>{% endif %}
+  </button>
+  <div class="o-dd-panel" id="dd-filtres">
+    <div class="o-dd-section">Filtrer par statut</div>
+    {% for val, label in statut_choices %}
+    <a class="o-dd-item {% if statut == val %}active{% endif %}"
+       onclick="setFiltre('{{ val }}')">{{ label }}</a>
+    {% endfor %}
+    {% if statut %}
+    <hr class="o-dd-sep">
+    <a class="o-dd-item" onclick="setFiltre('')" style="color:#b71c1c;">
+      <i class="bi bi-x-circle" style="font-size:11px;margin-right:6px;"></i> Effacer
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="o-ctrl-sep"></div>
+
+<!-- Pagination -->
+<div class="o-pagination-top">
+  <span>{% if page_obj.paginator.count > 0 %}{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}{% else %}0{% endif %}</span>
+  <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
+     data-page="{% if page_obj.has_previous %}{{ page_obj.previous_page_number }}{% endif %}"
+     href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}&q={{ q }}&statut={{ statut }}&vue={{ vue }}{% else %}#{% endif %}">
+    <i class="bi bi-chevron-left"></i>
+  </a>
+  <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
+     data-page="{% if page_obj.has_next %}{{ page_obj.next_page_number }}{% endif %}"
+     href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}&q={{ q }}&statut={{ statut }}&vue={{ vue }}{% else %}#{% endif %}">
+    <i class="bi bi-chevron-right"></i>
+  </a>
+</div>
+
+<div class="o-ctrl-sep"></div>
+
+<!-- Vue -->
+<div class="o-view-btns">
+  <button type="button" class="o-view-btn {% if vue == 'liste' %}active{% endif %}" onclick="setVue('liste')" title="Vue liste">
+    <i class="bi bi-list-ul"></i>
+  </button>
+  <button type="button" class="o-view-btn {% if vue == 'kanban' %}active{% endif %}" onclick="setVue('kanban')" title="Vue kanban">
+    <i class="bi bi-grid"></i>
+  </button>
+</div>
