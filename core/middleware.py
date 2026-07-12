@@ -24,20 +24,31 @@ def get_current_user():
 
 
 class SessionTimeoutMiddleware:
-    """Déconnecte automatiquement un utilisateur après sa durée d'inactivité
-    personnelle (UserProfile.session_timeout_minutes). 0 = désactivé."""
+    """Verrouille automatiquement la session d'un utilisateur après sa durée
+    d'inactivité personnelle (UserProfile.session_timeout_minutes). 0 = désactivé.
+
+    Contrairement à une déconnexion, le verrouillage NE détruit PAS la session :
+    l'utilisateur reste authentifié, il doit juste ressaisir son mot de passe
+    (voir core.views.lock_session / unlock_session) pour continuer — ce qui
+    permet de revenir exactement à la page/au formulaire en cours sans rien
+    perdre, tant que l'onglet n'a pas été rechargé ou fermé.
+    """
+
+    # Chemins qui doivent rester accessibles même verrouillé (sinon impossible
+    # de se déverrouiller, ou de se déconnecter depuis l'écran de verrouillage).
+    UNLOCK_EXEMPT_PATHS = {'/verrouiller/', '/deverrouiller/', '/logout/'}
 
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
         user = getattr(request, 'user', None)
-        if user is not None and user.is_authenticated:
-            from django.contrib import messages
-            from django.contrib.auth import logout
-            from django.shortcuts import redirect
+        if user is not None and user.is_authenticated and request.path not in self.UNLOCK_EXEMPT_PATHS:
             from django.utils import timezone
             from core.models import UserProfile
+
+            if request.session.get('locked'):
+                return self._locked_response(request)
 
             try:
                 timeout_minutes = user.profile.session_timeout_minutes
@@ -48,9 +59,16 @@ class SessionTimeoutMiddleware:
                 now_ts = timezone.now().timestamp()
                 last_activity = request.session.get('last_activity')
                 if last_activity is not None and (now_ts - last_activity) > timeout_minutes * 60:
-                    logout(request)
-                    messages.info(request, "Vous avez été déconnecté automatiquement pour inactivité.")
-                    return redirect('login')
+                    request.session['locked'] = True
+                    return self._locked_response(request)
                 request.session['last_activity'] = now_ts
 
         return self.get_response(request)
+
+    def _locked_response(self, request):
+        from django.http import JsonResponse
+        from django.shortcuts import render
+
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({'locked': True}, status=423)
+        return render(request, 'registration/locked.html', {'next': request.get_full_path()}, status=423)

@@ -320,7 +320,9 @@ html[data-theme="dark"] .rh-all-good { background: #233A5A; border-color: #2F4B6
 /* ── Genre H/F ── */
 .rh-genre-split { display:flex; height:24px; border-radius:8px; overflow:hidden; margin:14px 0 10px; }
 .rh-genre-split .bar-h { background:#3b82f6; transition:width .6s ease; min-width:2px; }
-.rh-genre-split .bar-f { background:#ec4899; flex:1; min-width:2px; }
+.rh-genre-split .bar-f { background:#ec4899; transition:width .6s ease; min-width:2px; }
+.rh-genre-split .bar-nr { background:var(--rh-200); flex:1; min-width:2px; }
+html[data-theme="dark"] .rh-genre-split .bar-nr { background:rgba(255,255,255,0.12); }
 .rh-genre-legend { display:flex; gap:24px; justify-content:center; margin-top:10px; }
 .rh-genre-legend-item { display:flex; align-items:center; gap:6px; font-size:13px; font-weight:600; color:var(--rh-text); }
 .rh-genre-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
@@ -389,6 +391,23 @@ html[data-theme="dark"] .rh-conge-type { background:rgba(74,114,54,0.18); color:
 .rh-pyramid-col:nth-child(8n+6) .rh-pyramid-bar { background:linear-gradient(180deg,#22d3ee,#0891b2); }
 .rh-pyramid-col:nth-child(8n+7) .rh-pyramid-bar { background:linear-gradient(180deg,#f472b6,#be185d); }
 .rh-pyramid-col:nth-child(8n+8) .rh-pyramid-bar { background:linear-gradient(180deg,#34d399,#065f46); }
+
+/* ── Pagination (carte Documents manquants) ── */
+.rh-pagination { display: flex; justify-content: center; align-items: center; gap: 6px; padding: 14px 0 2px; flex-wrap: wrap; }
+.rh-page-link {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 30px; height: 30px; padding: 0 7px;
+  border-radius: 6px; font-size: 12.5px; font-weight: 600; text-decoration: none;
+  color: var(--rh-700); background: #fff; border: 1px solid var(--rh-200); transition: all .15s;
+}
+.rh-page-link:hover { background: var(--rh-50); border-color: var(--rh-400); color: var(--rh-600); }
+.rh-page-link.active { background: var(--rh-600); color: #fff; border-color: var(--rh-600); }
+.rh-page-link.disabled { opacity: 0.35; pointer-events: none; }
+html[data-theme="dark"] .rh-page-link { background: var(--rh-surface); border-color: var(--rh-border); color: var(--rh-300); }
+html[data-theme="dark"] .rh-page-link:hover  { background: rgba(var(--rh-600-rgb),0.15); border-color: var(--rh-400); color: var(--rh-200); }
+html[data-theme="dark"] .rh-page-link.active { background: var(--rh-600); color: #fff; border-color: var(--rh-600); }
+
+@keyframes spin { to { transform: rotate(360deg); } }
 </style>
 {% endblock %}
 
@@ -397,6 +416,9 @@ html[data-theme="dark"] .rh-conge-type { background:rgba(74,114,54,0.18); color:
 <!-- Subheader -->
 <div class="rh-subheader" id="subheader">
   <h1><i class="bi bi-bar-chart-fill" style="color:var(--rh-500); font-size:20px; margin-right:6px;"></i>Tableau de bord RH</h1>
+  <a href="{% url 'rh_dashboard' %}" class="btn-rh-sm" id="btn-refresh-dashboard">
+    <i class="bi bi-arrow-clockwise"></i> Actualiser
+  </a>
 </div>
 
 <!-- ── 1. Stat cards ── -->
@@ -430,6 +452,8 @@ html[data-theme="dark"] .rh-conge-type { background:rgba(74,114,54,0.18); color:
     </div>
   </div>
 </div>
+
+<!-- ════════════ GRAPHES ════════════ -->
 
 <!-- ── 2. Répartition par contrat et service ── -->
 <div class="rh-2col">
@@ -500,8 +524,232 @@ html[data-theme="dark"] .rh-conge-type { background:rgba(74,114,54,0.18); color:
 
 </div>
 
-<!-- ── 3. Contrats expirant dans 90 jours ── -->
-<div class="rh-card">
+<!-- ── 3. Pyramide des âges + Ancienneté des employés ── -->
+<div class="rh-2col" style="margin-top:20px;">
+
+  <!-- Pyramide des âges -->
+  <div class="rh-card">
+    <div class="rh-card-header">
+      <div class="rh-card-title">
+        <i class="bi bi-bar-chart-steps" style="color:var(--rh-500);"></i>
+        Pyramide des âges
+      </div>
+    </div>
+    <div class="rh-card-body">
+      {% if pyramide %}
+        {% with pmax=pyramide.0.n %}
+        {% comment %}Find the actual max by iterating — we'll do it client-side via the bars{% endcomment %}
+        <div class="rh-pyramid" id="pyramid-chart">
+          {% for bracket in pyramide %}
+          <div class="rh-pyramid-col">
+            <div class="rh-pyramid-count">{{ bracket.n }}</div>
+            <div class="rh-pyramid-bar-wrap">
+              <div class="rh-pyramid-bar"
+                   data-n="{{ bracket.n }}"
+                   style="height: 4px;"></div>
+            </div>
+            <div class="rh-pyramid-label">{{ bracket.label }}</div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endwith %}
+      {% else %}
+        <div class="rh-empty-inline">
+          <i class="bi bi-bar-chart"></i>
+          <p>Aucune donnée disponible</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Ancienneté par tranches -->
+  <div class="rh-card">
+    <div class="rh-card-header">
+      <div class="rh-card-title">
+        <i class="bi bi-hourglass-split" style="color:var(--rh-500);"></i>
+        Ancienneté des employés
+      </div>
+      {% if anciennete_moy is not None %}
+      <span style="font-size:12px;color:var(--rh-muted);">Moyenne : <strong>{{ anciennete_moy }} an{% if anciennete_moy != 1 %}s{% endif %}</strong></span>
+      {% endif %}
+    </div>
+    <div class="rh-card-body">
+      {% if anciennete_tranches %}
+        <div class="rh-pyramid" id="anciennete-chart">
+          {% for tranche in anciennete_tranches %}
+          <div class="rh-pyramid-col">
+            <div class="rh-pyramid-count">{{ tranche.n }}</div>
+            <div class="rh-pyramid-bar-wrap">
+              <div class="rh-pyramid-bar" data-n="{{ tranche.n }}" style="height:4px;"></div>
+            </div>
+            <div class="rh-pyramid-label">{{ tranche.label }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="rh-empty-inline">
+          <i class="bi bi-hourglass"></i>
+          <p>Aucune donnée disponible</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<!-- ── 4. Répartition H/F + Taux de présence ── -->
+<div class="rh-2col" style="margin-top:20px;">
+
+  <!-- Répartition Homme / Femme -->
+  <div class="rh-card">
+    <div class="rh-card-header">
+      <div class="rh-card-title">
+        <i class="bi bi-gender-ambiguous" style="color:var(--rh-500);"></i>
+        Répartition Homme / Femme
+      </div>
+      {% if genre_data.total > 0 %}
+      <span style="font-size:12px;color:var(--rh-muted);">{{ genre_data.total }} actif{{ genre_data.total|pluralize:"s" }}</span>
+      {% endif %}
+    </div>
+    <div class="rh-card-body">
+      {% if genre_data.total > 0 %}
+        <div class="rh-genre-split">
+          <div class="bar-h" style="width:{% widthratio genre_data.hommes genre_data.total 100 %}%;"></div>
+          <div class="bar-f" style="width:{% widthratio genre_data.femmes genre_data.total 100 %}%;"></div>
+          {% if genre_data.non_renseigne %}
+          <div class="bar-nr"></div>
+          {% endif %}
+        </div>
+        <div class="rh-genre-legend">
+          <div class="rh-genre-legend-item">
+            <div class="rh-genre-dot" style="background:#3b82f6;"></div>
+            Hommes &mdash; <strong>{{ genre_data.hommes }}</strong>&nbsp;({% widthratio genre_data.hommes genre_data.total 100 %}&nbsp;%)
+          </div>
+          <div class="rh-genre-legend-item">
+            <div class="rh-genre-dot" style="background:#ec4899;"></div>
+            Femmes &mdash; <strong>{{ genre_data.femmes }}</strong>&nbsp;({% widthratio genre_data.femmes genre_data.total 100 %}&nbsp;%)
+          </div>
+          {% if genre_data.non_renseigne %}
+          <div class="rh-genre-legend-item">
+            <div class="rh-genre-dot" style="background:var(--rh-200);"></div>
+            Non renseigné &mdash; <strong>{{ genre_data.non_renseigne }}</strong>&nbsp;({% widthratio genre_data.non_renseigne genre_data.total 100 %}&nbsp;%)
+          </div>
+          {% endif %}
+        </div>
+      {% else %}
+        <div class="rh-empty-inline">
+          <i class="bi bi-person"></i>
+          <p>Aucune donnée disponible</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Taux de présence du mois -->
+  <div class="rh-card">
+    <div class="rh-card-header">
+      <div class="rh-card-title">
+        <i class="bi bi-check2-circle" style="color:var(--rh-500);"></i>
+        Taux de présence &mdash; {{ mois_label|capfirst }} {{ annee }}
+      </div>
+    </div>
+    <div class="rh-card-body">
+      {% if taux_presence is not None %}
+        <div class="rh-presence-big">
+          <div class="rh-presence-pct">{{ taux_presence }}&nbsp;%</div>
+          <div class="rh-presence-sub">{{ presents_count }} présent{{ presents_count|pluralize:"s" }} sur {{ total_presences }} pointage{{ total_presences|pluralize:"s" }}</div>
+        </div>
+        <div class="rh-presence-track">
+          <div class="rh-presence-fill" style="width:{{ taux_presence }}%;"></div>
+        </div>
+      {% else %}
+        <div class="rh-empty-inline">
+          <i class="bi bi-clipboard-check"></i>
+          <p>Aucune donnée de présence ce mois-ci</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- ── 5. Mouvement du personnel + Alertes documents par service ── -->
+<div class="rh-2col" style="margin-top:20px;">
+  <div class="rh-card">
+    <div class="rh-card-header">
+      <div class="rh-card-title">
+        <i class="bi bi-arrow-left-right" style="color:var(--rh-500);"></i>
+        Mouvement du personnel — {{ annee }}
+      </div>
+    </div>
+    <div class="rh-card-body" style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;">
+      <!-- Entrées -->
+      <div style="flex:1;min-width:110px;text-align:center;padding:10px;background:rgba(var(--rh-600-rgb),.07);border-radius:10px;border:1px solid rgba(var(--rh-600-rgb),.15);">
+        <div style="font-size:32px;font-weight:800;color:var(--rh-600);line-height:1;">{{ entrees_annee }}</div>
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--rh-muted);margin-top:4px;font-weight:700;">Embauches</div>
+      </div>
+      <!-- Départs -->
+      <div style="flex:1;min-width:110px;text-align:center;padding:10px;background:rgba(var(--rose-rgb),.07);border-radius:10px;border:1px solid rgba(var(--rose-rgb),.12);">
+        <div style="font-size:32px;font-weight:800;color:var(--rose);line-height:1;">{{ departs_annee }}</div>
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--rh-muted);margin-top:4px;font-weight:700;">Départs</div>
+      </div>
+      <!-- Taux de turnover -->
+      <div style="flex:1;min-width:110px;text-align:center;padding:10px;background:var(--rh-50);border-radius:10px;border:1px solid var(--rh-100);">
+        <div style="font-size:28px;font-weight:800;color:var(--rh-600);line-height:1;">{{ taux_turnover }}%</div>
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--rh-muted);margin-top:4px;font-weight:700;">Taux turnover</div>
+      </div>
+      <!-- Ancienneté moyenne -->
+      {% if anciennete_moy is not None %}
+      <div style="flex:1;min-width:110px;text-align:center;padding:10px;background:rgba(45,153,219,.07);border-radius:10px;border:1px solid rgba(45,153,219,.12);">
+        <div style="font-size:28px;font-weight:800;color:#2d99db;line-height:1;">{{ anciennete_moy }}<span style="font-size:14px;">an{{ anciennete_moy|floatformat:0|length|pluralize:"s" }}</span></div>
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--rh-muted);margin-top:4px;font-weight:700;">Ancienneté moy.</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Alertes documents par service -->
+  <div class="rh-card">
+    <div class="rh-card-header">
+      <div class="rh-card-title">
+        <i class="bi bi-file-earmark-x-fill" style="color:var(--rose);"></i>
+        Alertes documents
+      </div>
+      {% if alertes_docs_par_service %}
+      <span style="font-size:12px;color:var(--rose-btn);font-weight:700;">
+        {{ employes_docs_manquants|length }} employé{{ employes_docs_manquants|length|pluralize:"s" }} concerné{{ employes_docs_manquants|length|pluralize:"s" }}
+      </span>
+      {% endif %}
+    </div>
+    <div class="rh-card-body">
+      {% if alertes_docs_par_service %}
+        {% with max_docs=alertes_docs_par_service.0.docs %}
+        <div class="rh-bar-list">
+          {% for svc in alertes_docs_par_service %}
+          <div class="rh-bar-item">
+            <span class="rh-bar-label" title="{{ svc.service }}">{{ svc.service }}</span>
+            <div class="rh-bar-track">
+              <div class="rh-bar-fill" style="width:{% widthratio svc.docs max_docs 100 %}%;"></div>
+            </div>
+            <span class="rh-bar-count" style="color:var(--rose-btn);">{{ svc.docs }}</span>
+            <span class="rh-svc-pct" title="{{ svc.employes }} employé(s)">{{ svc.employes }}&nbsp;emp.</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endwith %}
+      {% else %}
+        <div class="rh-all-good">
+          <i class="bi bi-check-circle-fill"></i>
+          Tous les documents sont à jour
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ TABLEAUX ════════════ -->
+
+<!-- ── 6. Contrats expirant dans 90 jours ── -->
+<div class="rh-card" style="margin-top:20px;">
   <div class="rh-card-header">
     <div class="rh-card-title">
       <i class="bi bi-clock-history" style="color:var(--rh-500);"></i>
@@ -559,101 +807,11 @@ html[data-theme="dark"] .rh-conge-type { background:rgba(74,114,54,0.18); color:
   </div>
 </div>
 
-<!-- ── 3b. Mouvement du personnel (turnover) ── -->
-<div class="rh-2col" style="margin-bottom:20px;">
-  <div class="rh-card">
-    <div class="rh-card-header">
-      <div class="rh-card-title">
-        <i class="bi bi-arrow-left-right" style="color:var(--rh-500);"></i>
-        Mouvement du personnel — {{ annee }}
-      </div>
-    </div>
-    <div class="rh-card-body" style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;">
-      <!-- Entrées -->
-      <div style="flex:1;min-width:110px;text-align:center;padding:10px;background:rgba(var(--rh-600-rgb),.07);border-radius:10px;border:1px solid rgba(var(--rh-600-rgb),.15);">
-        <div style="font-size:32px;font-weight:800;color:var(--rh-600);line-height:1;">{{ entrees_annee }}</div>
-        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--rh-muted);margin-top:4px;font-weight:700;">Embauches</div>
-      </div>
-      <!-- Départs -->
-      <div style="flex:1;min-width:110px;text-align:center;padding:10px;background:rgba(var(--rose-rgb),.07);border-radius:10px;border:1px solid rgba(var(--rose-rgb),.12);">
-        <div style="font-size:32px;font-weight:800;color:var(--rose);line-height:1;">{{ departs_annee }}</div>
-        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--rh-muted);margin-top:4px;font-weight:700;">Départs</div>
-      </div>
-      <!-- Taux de turnover -->
-      <div style="flex:1;min-width:110px;text-align:center;padding:10px;background:var(--rh-50);border-radius:10px;border:1px solid var(--rh-100);">
-        <div style="font-size:28px;font-weight:800;color:var(--rh-600);line-height:1;">{{ taux_turnover }}%</div>
-        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--rh-muted);margin-top:4px;font-weight:700;">Taux turnover</div>
-      </div>
-      <!-- Ancienneté moyenne -->
-      {% if anciennete_moy is not None %}
-      <div style="flex:1;min-width:110px;text-align:center;padding:10px;background:rgba(45,153,219,.07);border-radius:10px;border:1px solid rgba(45,153,219,.12);">
-        <div style="font-size:28px;font-weight:800;color:#2d99db;line-height:1;">{{ anciennete_moy }}<span style="font-size:14px;">an{{ anciennete_moy|floatformat:0|length|pluralize:"s" }}</span></div>
-        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--rh-muted);margin-top:4px;font-weight:700;">Ancienneté moy.</div>
-      </div>
-      {% endif %}
-    </div>
-  </div>
-
-  <!-- Congés en cours (bonus utile) -->
-  <div class="rh-card">
-    <div class="rh-card-header">
-      <div class="rh-card-title">
-        <i class="bi bi-calendar-week" style="color:var(--rh-500);"></i>
-        Congés du jour
-      </div>
-    </div>
-    <div class="rh-card-body" style="padding:14px 20px;">
-      {% load static %}
-      <div style="font-size:13px;color:var(--rh-muted);">
-        <a href="{% url 'conge_dashboard' %}" style="color:var(--rh-600);font-weight:600;text-decoration:none;">
-          <i class="bi bi-box-arrow-up-right" style="font-size:11px;"></i> Aller au module Congés
-        </a>
-        pour voir les absences du jour, les soldes et le planning équipe.
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ── 4. Pyramide des âges + Documents manquants ── -->
-<div class="rh-2col">
-
-  <!-- Pyramide des âges -->
-  <div class="rh-card">
-    <div class="rh-card-header">
-      <div class="rh-card-title">
-        <i class="bi bi-bar-chart-steps" style="color:var(--rh-500);"></i>
-        Pyramide des âges
-      </div>
-    </div>
-    <div class="rh-card-body">
-      {% if pyramide %}
-        {% with pmax=pyramide.0.n %}
-        {% comment %}Find the actual max by iterating — we'll do it client-side via the bars{% endcomment %}
-        <div class="rh-pyramid" id="pyramid-chart">
-          {% for bracket in pyramide %}
-          <div class="rh-pyramid-col">
-            <div class="rh-pyramid-count">{{ bracket.n }}</div>
-            <div class="rh-pyramid-bar-wrap">
-              <div class="rh-pyramid-bar"
-                   data-n="{{ bracket.n }}"
-                   style="height: 4px;"></div>
-            </div>
-            <div class="rh-pyramid-label">{{ bracket.label }}</div>
-          </div>
-          {% endfor %}
-        </div>
-        {% endwith %}
-      {% else %}
-        <div class="rh-empty-inline">
-          <i class="bi bi-bar-chart"></i>
-          <p>Aucune donnée disponible</p>
-        </div>
-      {% endif %}
-    </div>
-  </div>
+<!-- ── 7. Documents manquants + Période d'essai ── -->
+<div class="rh-2col" style="margin-top:20px;">
 
   <!-- Documents manquants -->
-  <div class="rh-card">
+  <div class="rh-card" id="docs-manquants">
     <div class="rh-card-header">
       <div class="rh-card-title">
         <i class="bi bi-folder-x" style="color:var(--rh-500);"></i>
@@ -666,7 +824,7 @@ html[data-theme="dark"] .rh-conge-type { background:rgba(74,114,54,0.18); color:
     <div class="rh-card-body">
       {% if employes_docs_manquants %}
         <div class="rh-docs-missing-list">
-          {% for emp in employes_docs_manquants %}
+          {% for emp in docs_page_obj %}
           <a href="{% url 'rh_detail' emp.pk %}" class="rh-docs-missing-item">
             <i class="bi bi-person-fill" style="color:var(--rh-400); font-size:16px; flex-shrink:0;"></i>
             <span class="rh-docs-missing-name">{{ emp.nom_complet }}</span>
@@ -687,202 +845,31 @@ html[data-theme="dark"] .rh-conge-type { background:rgba(74,114,54,0.18); color:
           </a>
           {% endfor %}
         </div>
+        {% if docs_page_obj.paginator.num_pages > 1 %}
+        <div class="rh-pagination">
+          {% if docs_page_obj.has_previous %}
+            <a href="?docs_page={{ docs_page_obj.previous_page_number }}#docs-manquants" class="rh-page-link"><i class="bi bi-chevron-left"></i></a>
+          {% else %}
+            <span class="rh-page-link disabled"><i class="bi bi-chevron-left"></i></span>
+          {% endif %}
+          {% for num in docs_page_obj.paginator.page_range %}
+            {% if num == docs_page_obj.number %}
+              <span class="rh-page-link active">{{ num }}</span>
+            {% elif num > docs_page_obj.number|add:"-3" and num < docs_page_obj.number|add:"3" %}
+              <a href="?docs_page={{ num }}#docs-manquants" class="rh-page-link">{{ num }}</a>
+            {% endif %}
+          {% endfor %}
+          {% if docs_page_obj.has_next %}
+            <a href="?docs_page={{ docs_page_obj.next_page_number }}#docs-manquants" class="rh-page-link"><i class="bi bi-chevron-right"></i></a>
+          {% else %}
+            <span class="rh-page-link disabled"><i class="bi bi-chevron-right"></i></span>
+          {% endif %}
+        </div>
+        {% endif %}
       {% else %}
         <div class="rh-all-good">
           <i class="bi bi-patch-check-fill" style="font-size:20px;"></i>
           Tous les documents sont complets
-        </div>
-      {% endif %}
-    </div>
-  </div>
-
-</div>
-
-<!-- ── 5. Ancienneté par tranches ── -->
-<div class="rh-card" style="margin-top:20px;">
-  <div class="rh-card-header">
-    <div class="rh-card-title">
-      <i class="bi bi-hourglass-split" style="color:var(--rh-500);"></i>
-      Ancienneté des employés
-    </div>
-    {% if anciennete_moy is not None %}
-    <span style="font-size:12px;color:var(--rh-muted);">Moyenne : <strong>{{ anciennete_moy }} an{% if anciennete_moy != 1 %}s{% endif %}</strong></span>
-    {% endif %}
-  </div>
-  <div class="rh-card-body">
-    {% if anciennete_tranches %}
-      <div class="rh-pyramid" id="anciennete-chart">
-        {% for tranche in anciennete_tranches %}
-        <div class="rh-pyramid-col">
-          <div class="rh-pyramid-count">{{ tranche.n }}</div>
-          <div class="rh-pyramid-bar-wrap">
-            <div class="rh-pyramid-bar" data-n="{{ tranche.n }}" style="height:4px;"></div>
-          </div>
-          <div class="rh-pyramid-label">{{ tranche.label }}</div>
-        </div>
-        {% endfor %}
-      </div>
-    {% else %}
-      <div class="rh-empty-inline">
-        <i class="bi bi-hourglass"></i>
-        <p>Aucune donnée disponible</p>
-      </div>
-    {% endif %}
-  </div>
-</div>
-
-<!-- ── 6. Anniversaires du mois ── -->
-<div class="rh-card" style="margin-top:20px;">
-  <div class="rh-card-header">
-    <div class="rh-card-title">
-      <i class="bi bi-cake2-fill" style="color:var(--amber);"></i>
-      Anniversaires — {{ mois_label|capfirst }} {{ annee }}
-    </div>
-    {% if anniversaires %}
-    <span style="font-size:12px;color:var(--rh-muted);">{{ anniversaires|length }} employé{% if anniversaires|length != 1 %}s{% endif %}</span>
-    {% endif %}
-  </div>
-  <div class="rh-card-body" style="padding:0;">
-    {% if anniversaires %}
-    <ul style="list-style:none;margin:0;padding:0;">
-      {% for item in anniversaires %}
-      <li style="display:flex;align-items:center;gap:12px;padding:10px 20px;border-bottom:1px solid var(--rh-border);{% if item.aujourd_hui %}background:rgba(var(--amber-rgb),.07);{% endif %}">
-        {% if item.employe.photo %}
-        <img src="{{ item.employe.photo.url }}" alt="" style="width:34px;height:34px;border-radius:50%;object-fit:cover;flex-shrink:0;">
-        {% else %}
-        <div style="width:34px;height:34px;border-radius:50%;background:var(--rh-100);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--rh-600);flex-shrink:0;">
-          {{ item.employe.nom|first|upper }}
-        </div>
-        {% endif %}
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:13px;font-weight:600;color:var(--rh-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-            {% if item.aujourd_hui %}<i class="bi bi-cake2" style="color:var(--amber);margin-right:4px;"></i>{% endif %}
-            {{ item.employe.nom_complet }}
-          </div>
-          <div style="font-size:11.5px;color:var(--rh-muted);">
-            {{ item.employe.service.nom|default:"—" }}
-          </div>
-        </div>
-        <div style="text-align:right;flex-shrink:0;">
-          <div style="font-size:13px;font-weight:700;color:{% if item.aujourd_hui %}var(--amber){% else %}var(--rh-600){% endif %};">
-            {{ item.jour }} {{ mois_label }}
-          </div>
-          <div style="font-size:11px;color:var(--rh-muted);">{{ item.age }} ans</div>
-        </div>
-      </li>
-      {% endfor %}
-    </ul>
-    {% else %}
-    <div class="rh-empty-inline">
-      <i class="bi bi-cake2" style="font-size:28px;opacity:.3;"></i>
-      <p>Aucun anniversaire ce mois-ci</p>
-    </div>
-    {% endif %}
-  </div>
-</div>
-
-<!-- ── 7. Répartition H/F + Taux de présence ── -->
-<div class="rh-2col" style="margin-top:20px;">
-
-  <!-- Répartition Homme / Femme -->
-  <div class="rh-card">
-    <div class="rh-card-header">
-      <div class="rh-card-title">
-        <i class="bi bi-gender-ambiguous" style="color:var(--rh-500);"></i>
-        Répartition Homme / Femme
-      </div>
-      {% if genre_data.total > 0 %}
-      <span style="font-size:12px;color:var(--rh-muted);">{{ genre_data.total }} actif{{ genre_data.total|pluralize:"s" }}</span>
-      {% endif %}
-    </div>
-    <div class="rh-card-body">
-      {% if genre_data.total > 0 %}
-        <div class="rh-genre-split">
-          <div class="bar-h" style="width:{% widthratio genre_data.hommes genre_data.total 100 %}%;"></div>
-          <div class="bar-f"></div>
-        </div>
-        <div class="rh-genre-legend">
-          <div class="rh-genre-legend-item">
-            <div class="rh-genre-dot" style="background:#3b82f6;"></div>
-            Hommes &mdash; <strong>{{ genre_data.hommes }}</strong>&nbsp;({% widthratio genre_data.hommes genre_data.total 100 %}&nbsp;%)
-          </div>
-          <div class="rh-genre-legend-item">
-            <div class="rh-genre-dot" style="background:#ec4899;"></div>
-            Femmes &mdash; <strong>{{ genre_data.femmes }}</strong>&nbsp;({% widthratio genre_data.femmes genre_data.total 100 %}&nbsp;%)
-          </div>
-        </div>
-      {% else %}
-        <div class="rh-empty-inline">
-          <i class="bi bi-person"></i>
-          <p>Aucune donnée disponible</p>
-        </div>
-      {% endif %}
-    </div>
-  </div>
-
-  <!-- Taux de présence du mois -->
-  <div class="rh-card">
-    <div class="rh-card-header">
-      <div class="rh-card-title">
-        <i class="bi bi-check2-circle" style="color:var(--rh-500);"></i>
-        Taux de présence &mdash; {{ mois_label|capfirst }} {{ annee }}
-      </div>
-    </div>
-    <div class="rh-card-body">
-      {% if taux_presence is not None %}
-        <div class="rh-presence-big">
-          <div class="rh-presence-pct">{{ taux_presence }}&nbsp;%</div>
-          <div class="rh-presence-sub">{{ presents_count }} présent{{ presents_count|pluralize:"s" }} sur {{ total_presences }} pointage{{ total_presences|pluralize:"s" }}</div>
-        </div>
-        <div class="rh-presence-track">
-          <div class="rh-presence-fill" style="width:{{ taux_presence }}%;"></div>
-        </div>
-      {% else %}
-        <div class="rh-empty-inline">
-          <i class="bi bi-clipboard-check"></i>
-          <p>Aucune donnée de présence ce mois-ci</p>
-        </div>
-      {% endif %}
-    </div>
-  </div>
-</div>
-
-<!-- ── 8. Nouveaux du mois + Période d'essai ── -->
-<div class="rh-2col" style="margin-top:20px;">
-
-  <!-- Nouveaux employés du mois -->
-  <div class="rh-card">
-    <div class="rh-card-header">
-      <div class="rh-card-title">
-        <i class="bi bi-person-plus-fill" style="color:var(--rh-500);"></i>
-        Nouveaux employés &mdash; {{ mois_label|capfirst }} {{ annee }}
-      </div>
-      {% if nouveaux_mois %}
-      <span style="font-size:12px;color:var(--rh-muted);">{{ nouveaux_mois|length }}</span>
-      {% endif %}
-    </div>
-    <div class="rh-card-body">
-      {% if nouveaux_mois %}
-        <div class="rh-nv-list">
-          {% for emp in nouveaux_mois %}
-          <a href="{% url 'rh_detail' emp.pk %}" class="rh-nv-item">
-            {% if emp.photo %}
-              <img src="{{ emp.photo.url }}" alt="" class="rh-nv-avatar" style="object-fit:cover;">
-            {% else %}
-              <div class="rh-nv-avatar">{{ emp.nom|first|upper }}</div>
-            {% endif %}
-            <div class="rh-nv-info">
-              <div class="rh-nv-name">{{ emp.nom_complet }}</div>
-              <div class="rh-nv-sub">{{ emp.service.nom|default:"Sans service" }}{% if emp.fonction %} &middot; {{ emp.fonction.nom }}{% endif %}</div>
-            </div>
-            <div class="rh-nv-badge">{{ emp.date_embauche|date:"d/m" }}</div>
-          </a>
-          {% endfor %}
-        </div>
-      {% else %}
-        <div class="rh-empty-inline">
-          <i class="bi bi-person-plus"></i>
-          <p>Aucun recrutement ce mois-ci</p>
         </div>
       {% endif %}
     </div>
@@ -925,10 +912,11 @@ html[data-theme="dark"] .rh-conge-type { background:rgba(74,114,54,0.18); color:
       {% endif %}
     </div>
   </div>
+
 </div>
 
-<!-- ── 9. Congés en cours + Carte des services ── -->
-<div class="rh-2col" style="margin-top:20px;margin-bottom:20px;">
+<!-- ── 8. Congés en cours + Nouveaux employés du mois ── -->
+<div class="rh-2col" style="margin-top:20px;">
 
   <!-- Congés en cours -->
   <div class="rh-card">
@@ -979,41 +967,114 @@ html[data-theme="dark"] .rh-conge-type { background:rgba(74,114,54,0.18); color:
     </div>
   </div>
 
-  <!-- Alertes documents par service -->
+  <!-- Nouveaux employés du mois -->
   <div class="rh-card">
     <div class="rh-card-header">
       <div class="rh-card-title">
-        <i class="bi bi-file-earmark-x-fill" style="color:var(--rose);"></i>
-        Alertes documents
+        <i class="bi bi-person-plus-fill" style="color:var(--rh-500);"></i>
+        Nouveaux employés &mdash; {{ mois_label|capfirst }} {{ annee }}
       </div>
-      {% if alertes_docs_par_service %}
-      <span style="font-size:12px;color:var(--rose-btn);font-weight:700;">
-        {{ employes_docs_manquants|length }} employé{{ employes_docs_manquants|length|pluralize:"s" }} concerné{{ employes_docs_manquants|length|pluralize:"s" }}
-      </span>
+      {% if nouveaux_mois %}
+      <span style="font-size:12px;color:var(--rh-muted);">{{ nouveaux_mois|length }}</span>
       {% endif %}
     </div>
     <div class="rh-card-body">
-      {% if alertes_docs_par_service %}
-        {% with max_docs=alertes_docs_par_service.0.docs %}
-        <div class="rh-bar-list">
-          {% for svc in alertes_docs_par_service %}
-          <div class="rh-bar-item">
-            <span class="rh-bar-label" title="{{ svc.service }}">{{ svc.service }}</span>
-            <div class="rh-bar-track">
-              <div class="rh-bar-fill" style="width:{% widthratio svc.docs max_docs 100 %}%;"></div>
+      {% if nouveaux_mois %}
+        <div class="rh-nv-list">
+          {% for emp in nouveaux_mois %}
+          <a href="{% url 'rh_detail' emp.pk %}" class="rh-nv-item">
+            {% if emp.photo %}
+              <img src="{{ emp.photo.url }}" alt="" class="rh-nv-avatar" style="object-fit:cover;">
+            {% else %}
+              <div class="rh-nv-avatar">{{ emp.nom|first|upper }}</div>
+            {% endif %}
+            <div class="rh-nv-info">
+              <div class="rh-nv-name">{{ emp.nom_complet }}</div>
+              <div class="rh-nv-sub">{{ emp.service.nom|default:"Sans service" }}{% if emp.fonction %} &middot; {{ emp.fonction.nom }}{% endif %}</div>
             </div>
-            <span class="rh-bar-count" style="color:var(--rose-btn);">{{ svc.docs }}</span>
-            <span class="rh-svc-pct" title="{{ svc.employes }} employé(s)">{{ svc.employes }}&nbsp;emp.</span>
-          </div>
+            <div class="rh-nv-badge">{{ emp.date_embauche|date:"d/m" }}</div>
+          </a>
           {% endfor %}
         </div>
-        {% endwith %}
       {% else %}
-        <div class="rh-all-good">
-          <i class="bi bi-check-circle-fill"></i>
-          Tous les documents sont à jour
+        <div class="rh-empty-inline">
+          <i class="bi bi-person-plus"></i>
+          <p>Aucun recrutement ce mois-ci</p>
         </div>
       {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- ── 9. Anniversaires du mois + Congés du jour ── -->
+<div class="rh-2col" style="margin-top:20px;margin-bottom:20px;">
+
+  <!-- Anniversaires -->
+  <div class="rh-card">
+    <div class="rh-card-header">
+      <div class="rh-card-title">
+        <i class="bi bi-cake2-fill" style="color:var(--amber);"></i>
+        Anniversaires — {{ mois_label|capfirst }} {{ annee }}
+      </div>
+      {% if anniversaires %}
+      <span style="font-size:12px;color:var(--rh-muted);">{{ anniversaires|length }} employé{% if anniversaires|length != 1 %}s{% endif %}</span>
+      {% endif %}
+    </div>
+    <div class="rh-card-body" style="padding:0;">
+      {% if anniversaires %}
+      <ul style="list-style:none;margin:0;padding:0;">
+        {% for item in anniversaires %}
+        <li style="display:flex;align-items:center;gap:12px;padding:10px 20px;border-bottom:1px solid var(--rh-border);{% if item.aujourd_hui %}background:rgba(var(--amber-rgb),.07);{% endif %}">
+          {% if item.employe.photo %}
+          <img src="{{ item.employe.photo.url }}" alt="" style="width:34px;height:34px;border-radius:50%;object-fit:cover;flex-shrink:0;">
+          {% else %}
+          <div style="width:34px;height:34px;border-radius:50%;background:var(--rh-100);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--rh-600);flex-shrink:0;">
+            {{ item.employe.nom|first|upper }}
+          </div>
+          {% endif %}
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:600;color:var(--rh-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+              {% if item.aujourd_hui %}<i class="bi bi-cake2" style="color:var(--amber);margin-right:4px;"></i>{% endif %}
+              {{ item.employe.nom_complet }}
+            </div>
+            <div style="font-size:11.5px;color:var(--rh-muted);">
+              {{ item.employe.service.nom|default:"—" }}
+            </div>
+          </div>
+          <div style="text-align:right;flex-shrink:0;">
+            <div style="font-size:13px;font-weight:700;color:{% if item.aujourd_hui %}var(--amber){% else %}var(--rh-600){% endif %};">
+              {{ item.jour }} {{ mois_label }}
+            </div>
+            <div style="font-size:11px;color:var(--rh-muted);">{{ item.age }} ans</div>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="rh-empty-inline">
+        <i class="bi bi-cake2" style="font-size:28px;opacity:.3;"></i>
+        <p>Aucun anniversaire ce mois-ci</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Congés du jour (lien module Congés) -->
+  <div class="rh-card">
+    <div class="rh-card-header">
+      <div class="rh-card-title">
+        <i class="bi bi-calendar-week" style="color:var(--rh-500);"></i>
+        Congés du jour
+      </div>
+    </div>
+    <div class="rh-card-body" style="padding:14px 20px;">
+      {% load static %}
+      <div style="font-size:13px;color:var(--rh-muted);">
+        <a href="{% url 'conge_dashboard' %}" style="color:var(--rh-600);font-weight:600;text-decoration:none;">
+          <i class="bi bi-box-arrow-up-right" style="font-size:11px;"></i> Aller au module Congés
+        </a>
+        pour voir les absences du jour, les soldes et le planning équipe.
+      </div>
     </div>
   </div>
 </div>
@@ -1024,6 +1085,15 @@ html[data-theme="dark"] .rh-conge-type { background:rgba(74,114,54,0.18); color:
 {{ block.super }}
 <script>
 (function () {
+  /* ── Bouton Actualiser ── */
+  var refreshBtn = document.getElementById('btn-refresh-dashboard');
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', function () {
+      var icon = refreshBtn.querySelector('i');
+      if (icon) icon.style.animation = 'spin .6s linear infinite';
+    });
+  }
+
   /* ── Jours restants ── */
   var today = new Date();
   today.setHours(0, 0, 0, 0);

@@ -3,6 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.core.exceptions import PermissionDenied
 from django.contrib import messages
+from django.db import transaction
 from django.db.models import Q, F, Sum, Count
 from django.utils import timezone
 from django.core.paginator import Paginator
@@ -25,6 +26,10 @@ CAISSE_MANAGE_GROUPS = {'Caisse', 'Pharmacien', 'Administrateur', 'Directeur'}
 
 
 def can_view_rapport_financier(user):
+    return user.is_superuser or user.groups.filter(name__in=CAISSE_MANAGE_GROUPS).exists()
+
+
+def can_valider_vente(user):
     return user.is_superuser or user.groups.filter(name__in=CAISSE_MANAGE_GROUPS).exists()
 
 
@@ -556,6 +561,8 @@ def pharmacie_confirmer_livraison(request, pharmacie, pk):
 def pharmacie_caisse(request, pharmacie):
     from decimal import Decimal
     from django.db.models import Sum, Count
+    if not can_valider_vente(request.user):
+        raise PermissionDenied
     get_pharmacie_or_404(pharmacie)
     label = PHARMACIES_DICT[pharmacie]
     today = timezone.now().date()
@@ -606,36 +613,37 @@ def pharmacie_caisse(request, pharmacie):
         if not lignes_data:
             messages.error(request, 'Saisissez au moins une quantité.')
         else:
-            montant_total = sum(sp.produit.prix_vente * qte for sp, qte in lignes_data)
-            vente = VentePharmacie.objects.create(
-                pharmacie=pharmacie,
-                mode_paiement=mode_paiement,
-                montant_total=montant_total,
-                remise=remise,
-                notes=notes,
-                cree_par=request.user,
-            )
-            for sp, qte in lignes_data:
-                LigneVente.objects.create(
-                    vente=vente,
-                    produit=sp.produit,
-                    quantite=qte,
-                    prix_unitaire=sp.produit.prix_vente,
-                )
-                avant = float(sp.quantite)
-                apres = max(0.0, avant - float(qte))
-                MouvementPharmacie.objects.create(
+            with transaction.atomic():
+                montant_total = sum(sp.produit.prix_vente * qte for sp, qte in lignes_data)
+                vente = VentePharmacie.objects.create(
                     pharmacie=pharmacie,
-                    produit=sp.produit,
-                    type='vente',
-                    quantite=qte,
-                    stock_avant=avant,
-                    stock_apres=apres,
-                    reference=vente.numero,
+                    mode_paiement=mode_paiement,
+                    montant_total=montant_total,
+                    remise=remise,
+                    notes=notes,
                     cree_par=request.user,
                 )
-                sp.quantite = Decimal(str(apres))
-                sp.save(update_fields=['quantite'])
+                for sp, qte in lignes_data:
+                    LigneVente.objects.create(
+                        vente=vente,
+                        produit=sp.produit,
+                        quantite=qte,
+                        prix_unitaire=sp.produit.prix_vente,
+                    )
+                    avant = float(sp.quantite)
+                    apres = max(0.0, avant - float(qte))
+                    MouvementPharmacie.objects.create(
+                        pharmacie=pharmacie,
+                        produit=sp.produit,
+                        type='vente',
+                        quantite=qte,
+                        stock_avant=avant,
+                        stock_apres=apres,
+                        reference=vente.numero,
+                        cree_par=request.user,
+                    )
+                    sp.quantite = Decimal(str(apres))
+                    sp.save(update_fields=['quantite'])
             messages.success(request, f'Vente {vente.numero} enregistrée — {vente.montant_net} F CFA.')
             return redirect('pharmacie_ticket', pharmacie=pharmacie, pk=vente.pk)
 

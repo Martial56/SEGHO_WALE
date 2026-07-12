@@ -240,10 +240,9 @@ html[data-theme="dark"] .badge-optional { background: rgba(255,255,255,0.06); co
 
       <!-- Download template -->
       <div style="margin-bottom: 22px;">
-        <a href="#" class="btn-rh-template" title="Modèle Excel disponible prochainement">
+        <a href="{% url 'rh_import_modele' %}" class="btn-rh-template">
           <i class="bi bi-download"></i>
           Télécharger le modèle Excel
-          <small>(Disponible prochainement)</small>
         </a>
       </div>
 
@@ -332,19 +331,28 @@ html[data-theme="dark"] .badge-optional { background: rgba(255,255,255,0.06); co
           </tr>
           <tr>
             <td><span class="rh-col-letter">E</span></td>
-            <td style="font-weight:600;">Type de contrat</td>
+            <td style="font-weight:600;">Fonction</td>
             <td><span class="badge-optional">Optionnel</span></td>
-            <td class="rh-col-example">
-              <code style="font-size:11px; background:rgba(0,0,0,0.06); padding:1px 4px; border-radius:3px;">Vacataire</code>
-              <code style="font-size:11px; background:rgba(0,0,0,0.06); padding:1px 4px; border-radius:3px;">CDD</code>
-              <code style="font-size:11px; background:rgba(0,0,0,0.06); padding:1px 4px; border-radius:3px;">CDI</code>
-              <code style="font-size:11px; background:rgba(0,0,0,0.06); padding:1px 4px; border-radius:3px;">Contractuel</code>
-              <code style="font-size:11px; background:rgba(0,0,0,0.06); padding:1px 4px; border-radius:3px;">Prestataire</code>
-              <code style="font-size:11px; background:rgba(0,0,0,0.06); padding:1px 4px; border-radius:3px;">Autre</code>
-            </td>
+            <td class="rh-col-example">Nom exact de la fonction (ex. Sage-femme, Comptable…) — voir Configuration</td>
           </tr>
           <tr>
             <td><span class="rh-col-letter">F</span></td>
+            <td style="font-weight:600;">Grade</td>
+            <td><span class="badge-optional">Optionnel</span></td>
+            <td class="rh-col-example">Nom exact du grade — voir Configuration</td>
+          </tr>
+          <tr>
+            <td><span class="rh-col-letter">G</span></td>
+            <td style="font-weight:600;">Type de contrat</td>
+            <td><span class="badge-optional">Optionnel</span></td>
+            <td class="rh-col-example">
+              Nom exact du type de contrat — voir Configuration
+              (ex. <code style="font-size:11px; background:rgba(0,0,0,0.06); padding:1px 4px; border-radius:3px;">CDI</code>
+              <code style="font-size:11px; background:rgba(0,0,0,0.06); padding:1px 4px; border-radius:3px;">CDD</code>)
+            </td>
+          </tr>
+          <tr>
+            <td><span class="rh-col-letter">H</span></td>
             <td style="font-weight:600;">Statut</td>
             <td><span class="badge-optional">Optionnel</span></td>
             <td class="rh-col-example">
@@ -352,6 +360,25 @@ html[data-theme="dark"] .badge-optional { background: rgba(255,255,255,0.06); co
               <code style="font-size:11px; background:rgba(0,0,0,0.06); padding:1px 4px; border-radius:3px;">suspendu</code>
               <code style="font-size:11px; background:rgba(0,0,0,0.06); padding:1px 4px; border-radius:3px;">quitte</code>
               (défaut : actif)
+            </td>
+          </tr>
+          <tr>
+            <td><span class="rh-col-letter">I</span></td>
+            <td style="font-weight:600;">Matricule</td>
+            <td><span class="badge-optional">Optionnel</span></td>
+            <td class="rh-col-example">
+              Matricule déjà attribué à l'employé (import d'un effectif existant) — laissez vide pour qu'il soit
+              généré automatiquement (nouvelle embauche).
+            </td>
+          </tr>
+          <tr>
+            <td><span class="rh-col-letter">J</span></td>
+            <td style="font-weight:600;">Sexe</td>
+            <td><span class="badge-optional">Optionnel</span></td>
+            <td class="rh-col-example">
+              <code style="font-size:11px; background:rgba(0,0,0,0.06); padding:1px 4px; border-radius:3px;">M</code>
+              <code style="font-size:11px; background:rgba(0,0,0,0.06); padding:1px 4px; border-radius:3px;">F</code>
+              (ou « Homme »/« Femme » — laissé vide si non renseigné, apparaîtra dans la répartition H/F du tableau de bord)
             </td>
           </tr>
         </tbody>
@@ -363,7 +390,10 @@ html[data-theme="dark"] .badge-optional { background: rgba(255,255,255,0.06); co
   <div style="padding: 13px 16px; background: var(--rh-50); border: 1px solid var(--rh-100); border-radius: 8px; font-size:12.5px; color: var(--rh-700); margin-top: 4px; margin-bottom: 20px; line-height: 1.6;">
     <i class="bi bi-lightbulb-fill" style="color:var(--amber); margin-right:6px;"></i>
     <strong>Conseils :</strong> La première ligne est considérée comme l'en-tête et sera ignorée.
-    Les services et types de contrat inexistants seront ignorés (vérifiez l'orthographe exacte).
+    Si un service, une fonction, un grade ou un type de contrat indiqué n'existe pas encore, il est
+    <strong>créé automatiquement</strong> lors de l'import (vérifiez tout de même l'orthographe pour éviter les doublons —
+    ex. « Sage-femme » et « Sage femme » créeraient deux fonctions distinctes) ; retrouvez-les ensuite dans <strong>Configuration</strong>.
+    Un matricule déjà utilisé par un autre employé sera rejeté (ligne signalée dans le rapport).
     En cas d'erreur, un rapport vous indiquera les lignes problématiques.
   </div>
 

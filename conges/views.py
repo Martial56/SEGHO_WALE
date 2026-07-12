@@ -7,6 +7,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.contrib import messages
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.db.models import Q, Sum
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
@@ -1197,17 +1198,18 @@ def conge_soldes(request):
     employes = _employes_eligibles().select_related('service').order_by('nom')
 
     soldes_data = []
-    for emp in employes:
-        s = get_or_create_solde(emp, year)
-        # Solde prévisionnel : quota + reportés - total congés planifiés/pris/en cours cette année
-        total_planifie = Conge.objects.filter(
-            employe=emp,
-            statut__in=['demande', 'valide_service', 'approuve', 'en_cours', 'termine'],
-            date_debut__year=year,
-            type_conge__in=TYPES_DEDUCTIBLES,
-        ).aggregate(t=Sum('nb_jours_ouvres'))['t'] or 0
-        previsionnel = round(float(s.quota) + float(s.jours_reporter) - float(total_planifie), 1)
-        soldes_data.append({'solde': s, 'previsionnel': previsionnel})
+    with transaction.atomic():
+        for emp in employes:
+            s = get_or_create_solde(emp, year)
+            # Solde prévisionnel : quota + reportés - total congés planifiés/pris/en cours cette année
+            total_planifie = Conge.objects.filter(
+                employe=emp,
+                statut__in=['demande', 'valide_service', 'approuve', 'en_cours', 'termine'],
+                date_debut__year=year,
+                type_conge__in=TYPES_DEDUCTIBLES,
+            ).aggregate(t=Sum('nb_jours_ouvres'))['t'] or 0
+            previsionnel = round(float(s.quota) + float(s.jours_reporter) - float(total_planifie), 1)
+            soldes_data.append({'solde': s, 'previsionnel': previsionnel})
 
     total_quota = sum(float(d['solde'].quota) for d in soldes_data)
     total_pris  = sum(float(d['solde'].jours_pris) for d in soldes_data)
@@ -1239,21 +1241,22 @@ def conge_solde_recalc(request):
 
         employes = _employes_eligibles()
         count = 0
-        for emp in employes:
-            solde, _ = SoldeConge.objects.get_or_create(
-                employe=emp, annee=year,
-                defaults={'quota': quota_annuel(emp)},
-            )
-            solde.quota = quota_annuel(emp)
-            total = Conge.objects.filter(
-                employe=emp,
-                statut__in=['approuve', 'en_cours', 'termine'],
-                date_debut__year=year,
-                type_conge__in=TYPES_DEDUCTIBLES,
-            ).aggregate(total=Sum('nb_jours_ouvres'))['total'] or 0
-            solde.jours_pris = total
-            solde.save()
-            count += 1
+        with transaction.atomic():
+            for emp in employes:
+                solde, _ = SoldeConge.objects.get_or_create(
+                    employe=emp, annee=year,
+                    defaults={'quota': quota_annuel(emp)},
+                )
+                solde.quota = quota_annuel(emp)
+                total = Conge.objects.filter(
+                    employe=emp,
+                    statut__in=['approuve', 'en_cours', 'termine'],
+                    date_debut__year=year,
+                    type_conge__in=TYPES_DEDUCTIBLES,
+                ).aggregate(total=Sum('nb_jours_ouvres'))['total'] or 0
+                solde.jours_pris = total
+                solde.save()
+                count += 1
 
         messages.success(request, f"Soldes recalculés pour {count} employé(s) — année {year}.")
         from django.urls import reverse
@@ -1274,22 +1277,23 @@ def conge_report_solde_annuel(request):
         next_year = year + 1
         employes = _employes_eligibles()
         count = 0
-        for emp in employes:
-            # Récupérer ou créer le solde de l'année N
-            solde_n = get_or_create_solde(emp, year)
-            restant = solde_n.solde  # quota + reporter - pris
-            if restant <= 0:
-                continue
-            # Plafonner à 15 jours selon Art. 25.10 CODI
-            reportable = min(float(restant), 15.0)
-            # Mettre à jour le solde N+1
-            solde_n1, _ = SoldeConge.objects.get_or_create(
-                employe=emp, annee=next_year,
-                defaults={'quota': quota_annuel(emp)},
-            )
-            solde_n1.jours_reporter = float(solde_n1.jours_reporter) + reportable
-            solde_n1.save(update_fields=['jours_reporter', 'mis_a_jour_le'])
-            count += 1
+        with transaction.atomic():
+            for emp in employes:
+                # Récupérer ou créer le solde de l'année N
+                solde_n = get_or_create_solde(emp, year)
+                restant = solde_n.solde  # quota + reporter - pris
+                if restant <= 0:
+                    continue
+                # Plafonner à 15 jours selon Art. 25.10 CODI
+                reportable = min(float(restant), 15.0)
+                # Mettre à jour le solde N+1
+                solde_n1, _ = SoldeConge.objects.get_or_create(
+                    employe=emp, annee=next_year,
+                    defaults={'quota': quota_annuel(emp)},
+                )
+                solde_n1.jours_reporter = float(solde_n1.jours_reporter) + reportable
+                solde_n1.save(update_fields=['jours_reporter', 'mis_a_jour_le'])
+                count += 1
 
         messages.success(
             request,
@@ -1805,10 +1809,11 @@ def conge_direction(request):
 
     # ── Soldes critiques (< 5j) ──
     soldes_critiques = []
-    for emp in employes_qs.select_related('service'):
-        s = get_or_create_solde(emp, year)
-        if float(s.solde) < 5:
-            soldes_critiques.append({'emp': emp, 'solde': s})
+    with transaction.atomic():
+        for emp in employes_qs.select_related('service'):
+            s = get_or_create_solde(emp, year)
+            if float(s.solde) < 5:
+                soldes_critiques.append({'emp': emp, 'solde': s})
     soldes_critiques.sort(key=lambda x: float(x['solde'].solde))
 
     # ── KPIs globaux ──

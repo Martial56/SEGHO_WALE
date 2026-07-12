@@ -14,6 +14,8 @@ urlpatterns = [
     path('login/', views.login_view, name='login'),
     path('bienvenue/', views.intro, name='intro'),
     path('logout/', views.logout_view, name='logout'),
+    path('verrouiller/', views.lock_session, name='lock_session'),
+    path('deverrouiller/', views.unlock_session, name='unlock_session'),
     path('compte/', views.mon_compte, name='mon_compte'),
     path('compte/couleur-accent/', views.accent_color_set, name='accent_color_set'),
 
@@ -23,6 +25,7 @@ urlpatterns = [
     path('medecins/dashboard/',              _medecin_dashboard_view,      name='medecin_dashboard'),
     path('medecins/export/csv/',             _medecins_export_csv_view,    name='medecins_export_csv'),
     path('medecins/nouveau/',                views.medecin_create,         name='medecin_create'),
+    path('medecins/rechercher-employe/',     views.medecin_lookup_employe, name='medecin_lookup_employe'),
     path('medecins/<int:pk>/',               views.medecin_detail,         name='medecin_detail'),
     path('medecins/<int:pk>/modifier/',      views.medecin_edit,           name='medecin_edit'),
     path('medecins/<int:pk>/supprimer/',     _medecin_supprimer_view,      name='medecin_supprimer'),

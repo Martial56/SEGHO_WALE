@@ -170,20 +170,32 @@ html[data-theme="dark"] .svc-sep td { background: rgba(255,255,255,.03); color: 
     </div>
     <!-- Nav mois -->
     <div style="display:flex;align-items:center;gap:6px;">
-      <a href="?mois={{ prev_mois }}&annee={{ prev_annee }}{% if service_id %}&service={{ service_id }}{% endif %}" class="mn-btn">
+      <a href="?mois={{ prev_mois }}&annee={{ prev_annee }}{% if service_id %}&service={{ service_id }}{% endif %}{% if employe_filtre %}&employe={{ employe_filtre.pk }}{% endif %}" class="mn-btn">
         <i class="bi bi-chevron-left"></i>
       </a>
       <span class="mn-label">{{ mois_nom }} {{ annee }}</span>
-      <a href="?mois={{ next_mois }}&annee={{ next_annee }}{% if service_id %}&service={{ service_id }}{% endif %}" class="mn-btn">
+      <a href="?mois={{ next_mois }}&annee={{ next_annee }}{% if service_id %}&service={{ service_id }}{% endif %}{% if employe_filtre %}&employe={{ employe_filtre.pk }}{% endif %}" class="mn-btn">
         <i class="bi bi-chevron-right"></i>
       </a>
     </div>
   </div>
 
+  {% if employe_filtre %}
+  <div style="display:flex;align-items:center;gap:8px;padding:8px 0;">
+    <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(var(--rh-600-rgb),0.1);color:var(--rh-700);border-radius:20px;padding:5px 14px;font-size:12.5px;font-weight:600;">
+      <i class="bi bi-funnel-fill"></i> Filtré sur : {{ employe_filtre.nom_complet|default:employe_filtre.nom }}
+    </span>
+    <a href="?mois={{ mois }}&annee={{ annee }}{% if service_id %}&service={{ service_id }}{% endif %}" style="font-size:12px;color:var(--rh-muted);text-decoration:underline;">
+      Voir tous les employés
+    </a>
+  </div>
+  {% endif %}
+
   <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
     <form method="get" style="display:contents;">
       <input type="hidden" name="mois" value="{{ mois }}">
       <input type="hidden" name="annee" value="{{ annee }}">
+      {% if employe_filtre %}<input type="hidden" name="employe" value="{{ employe_filtre.pk }}">{% endif %}
       <select name="service" class="pr-select" onchange="this.form.submit()">
         <option value="">Tous les services</option>
         {% for svc in services %}
@@ -194,6 +206,7 @@ html[data-theme="dark"] .svc-sep td { background: rgba(255,255,255,.03); color: 
     <form method="get" style="display:contents;">
       <input type="hidden" name="mois" value="{{ mois }}">
       {% if service_id %}<input type="hidden" name="service" value="{{ service_id }}">{% endif %}
+      {% if employe_filtre %}<input type="hidden" name="employe" value="{{ employe_filtre.pk }}">{% endif %}
       <select name="annee" class="pr-select" onchange="this.form.submit()">
         {% for y in annees_dispo %}
         <option value="{{ y }}" {% if annee == y %}selected{% endif %}>{{ y }}</option>

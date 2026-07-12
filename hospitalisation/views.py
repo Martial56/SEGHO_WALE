@@ -234,7 +234,7 @@ def hospitalisation_create(request):
         'form':          form,
         'titre':         'Nouveau',
         'edit':          False,
-        'medecins_list': list(Medecin.objects.filter(actif=True).order_by('nom')),
+        'medecins_list': list(Medecin.objects.filter(actif=True).order_by('employe__nom')),
         'unites_list':   list(UniteMesure.objects.filter(actif=True).order_by('nom')),
         'services_list': list(Articleservice.objects.filter(actif=True, categorie__code='SN').order_by('nom')),
     }
@@ -1133,7 +1133,7 @@ def hospitalisation_edit(request, pk):
     nb_attribution = 1 if hosp.chambre else 0
     nb_evaluations = hosp.fiches_visite.count()
 
-    medecins_list  = list(Medecin.objects.filter(actif=True).order_by('nom'))
+    medecins_list  = list(Medecin.objects.filter(actif=True).order_by('employe__nom'))
     unites_list    = list(UniteMesure.objects.filter(actif=True).order_by('nom'))
     services_list  = list(Articleservice.objects.filter(actif=True, categorie__code='SN').order_by('nom'))
 

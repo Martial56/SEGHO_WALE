@@ -652,7 +652,7 @@
     <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
     {% block extra_css %}{% endblock %}
 </head>
-<body><div id="page-loader" style="position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:#f0f5fa;transition:opacity .4s ease;"><div style="position:relative;width:90px;height:90px;display:flex;align-items:center;justify-content:center;"><svg width="90" height="90" viewBox="0 0 90 90" style="position:absolute;top:0;left:0;animation:spin 1.2s linear infinite;"><circle cx="45" cy="45" r="40" fill="none" stroke="#e2eef5" stroke-width="5"/><circle cx="45" cy="45" r="40" fill="none" stroke="var(--teal-600)" stroke-width="5" stroke-dasharray="60 192" stroke-linecap="round"/></svg><img src="{% static 'img/logo.png' %}" alt="WALÉ" style="width:50px;height:50px;object-fit:contain;"></div></div><div class="main">
+<body><div id="page-loader" style="position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#f0f5fa;transition:opacity .4s ease;"><div style="position:relative;width:90px;height:90px;display:flex;align-items:center;justify-content:center;"><svg width="90" height="90" viewBox="0 0 90 90" style="position:absolute;top:0;left:0;animation:spin 1.2s linear infinite;"><circle cx="45" cy="45" r="40" fill="none" stroke="#e2eef5" stroke-width="5"/><circle cx="45" cy="45" r="40" fill="none" stroke="var(--teal-600)" stroke-width="5" stroke-dasharray="60 192" stroke-linecap="round"/></svg><img src="{% static 'img/logo.png' %}" alt="WALÉ" style="width:50px;height:50px;object-fit:contain;"></div><div id="page-loader-text" style="font:600 14px 'Segoe UI',sans-serif;color:#375a72;min-height:18px;"></div></div><div class="main">
         <div class="topbar">
         <div class="topbar-inner">
         <div class="topbar-left" style="display:flex;align-items:center;gap:16px;">
@@ -947,26 +947,6 @@
                 </svg>
             </button>
 
-            {% if user.is_authenticated %}
-            <!-- Couleur d'accent -->
-            <div style="position:relative;" id="accent-picker-wrap">
-              <button class="icon-btn" id="accent-picker-btn" title="Couleur du logiciel" onclick="toggleAccentPicker(event)">
-                <span id="accent-swatch" style="width:16px;height:16px;border-radius:50%;background:var(--teal-600);border:1.5px solid rgba(0,0,0,.15);display:block;"></span>
-              </button>
-              <div id="accent-picker-panel" style="display:none;position:fixed;z-index:2000;background:var(--surface,#fff);border:1px solid var(--border,rgba(0,0,0,.1));border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.18);padding:14px 16px;width:220px;">
-                <div style="font-size:12px;font-weight:700;color:var(--text,#333);margin-bottom:10px;">Couleur du logiciel</div>
-                <div style="display:flex;align-items:center;gap:10px;">
-                  <input type="color" id="accent-color-input" value="{{ user_profile.accent_color|default:'#3e6f3e' }}" style="width:38px;height:38px;border:none;border-radius:8px;cursor:pointer;padding:0;background:none;">
-                  <span style="font-size:12px;color:var(--text-muted,#888);flex:1;">Choisissez une couleur, elle s'applique immédiatement.</span>
-                </div>
-                <button type="button" id="accent-reset-btn" style="margin-top:12px;width:100%;display:flex;align-items:center;justify-content:center;gap:6px;background:none;border:1px solid var(--border,rgba(0,0,0,.12));border-radius:6px;padding:6px 10px;font-size:12px;color:var(--text-muted,#888);cursor:pointer;">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 3 3 8 8 8"/></svg>
-                  Couleur par défaut (logo)
-                </button>
-              </div>
-            </div>
-            {% endif %}
-
             <!-- Utilisateur -->
             {% if user.is_authenticated %}
             <div style="position:relative;" id="user-menu-wrap">
@@ -1036,110 +1016,6 @@
         });
     })();
 
-    // Couleur d'accent personnalisée
-    (function() {
-        var wrap  = document.getElementById('accent-picker-wrap');
-        var btn   = document.getElementById('accent-picker-btn');
-        var panel = document.getElementById('accent-picker-panel');
-        var input = document.getElementById('accent-color-input');
-        var swatch = document.getElementById('accent-swatch');
-        var resetBtn = document.getElementById('accent-reset-btn');
-        if (!wrap) return;
-
-        var TEAL_STEPS = {950:0.07,900:0.11,800:0.16,700:0.26,600:0.34,500:0.42,400:0.54,300:0.68,200:0.80,100:0.90,50:0.955};
-
-        function hexToHsl(hex) {
-            var r = parseInt(hex.substr(1,2),16)/255, g = parseInt(hex.substr(3,2),16)/255, b = parseInt(hex.substr(5,2),16)/255;
-            var max = Math.max(r,g,b), min = Math.min(r,g,b), h, s, l = (max+min)/2;
-            if (max === min) { h = s = 0; }
-            else {
-                var d = max - min;
-                s = l > 0.5 ? d/(2-max-min) : d/(max+min);
-                if (max === r) h = (g-b)/d + (g < b ? 6 : 0);
-                else if (max === g) h = (b-r)/d + 2;
-                else h = (r-g)/d + 4;
-                h /= 6;
-            }
-            return [h, s, l];
-        }
-        function hueToRgb(p, q, t) {
-            if (t < 0) t += 1; if (t > 1) t -= 1;
-            if (t < 1/6) return p + (q-p)*6*t;
-            if (t < 1/2) return q;
-            if (t < 2/3) return p + (q-p)*(2/3-t)*6;
-            return p;
-        }
-        function hslToHex(h, s, l) {
-            var r, g, b;
-            if (s === 0) { r = g = b = l; }
-            else {
-                var q = l < 0.5 ? l*(1+s) : l+s-l*s;
-                var p = 2*l - q;
-                r = hueToRgb(p, q, h + 1/3);
-                g = hueToRgb(p, q, h);
-                b = hueToRgb(p, q, h - 1/3);
-            }
-            var toHex = function(x) { var v = Math.round(x*255).toString(16); return v.length === 1 ? '0'+v : v; };
-            return '#' + toHex(r) + toHex(g) + toHex(b);
-        }
-        function hexToRgbTriplet(hex) {
-            return parseInt(hex.substr(1,2),16) + ',' + parseInt(hex.substr(3,2),16) + ',' + parseInt(hex.substr(5,2),16);
-        }
-        function applyAccent(hex) {
-            var hsl = hexToHsl(hex);
-            var root = document.documentElement.style;
-            var computed = {};
-            Object.keys(TEAL_STEPS).forEach(function(step) {
-                // La nuance 600 (bouton principal) = exactement la couleur choisie, sans arrondi HSL.
-                var value = step === '600' ? hex : hslToHex(hsl[0], hsl[1], TEAL_STEPS[step]);
-                computed[step] = value;
-                root.setProperty('--teal-' + step, value);
-            });
-            Object.keys(TEAL_STEPS).forEach(function(step) {
-                root.setProperty('--teal-' + step + '-rgb', hexToRgbTriplet(computed[step]));
-            });
-            if (swatch) swatch.style.background = hex;
-        }
-
-        function positionPanel() {
-            var r = btn.getBoundingClientRect();
-            panel.style.top = (r.bottom + 6) + 'px';
-            panel.style.right = (window.innerWidth - r.right) + 'px';
-        }
-        window.toggleAccentPicker = function(e) {
-            e.stopPropagation();
-            var open = panel.style.display === 'block';
-            if (open) { panel.style.display = 'none'; }
-            else { positionPanel(); panel.style.display = 'block'; }
-        };
-        document.addEventListener('click', function(e) {
-            if (wrap && panel && !wrap.contains(e.target)) panel.style.display = 'none';
-        });
-
-        function save(color) {
-            var body = new URLSearchParams();
-            body.set('color', color || '');
-            return fetch("{% url 'accent_color_set' %}", {
-                method: 'POST',
-                headers: { 'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: body.toString()
-            });
-        }
-
-        if (input) {
-            input.addEventListener('input', function() {
-                applyAccent(input.value);
-            });
-            input.addEventListener('change', function() {
-                save(input.value);
-            });
-        }
-        if (resetBtn) {
-            resetBtn.addEventListener('click', function() {
-                save('').then(function() { location.reload(); });
-            });
-        }
-    })();
     </script>
     <script>
     (function () {
@@ -1226,6 +1102,17 @@
         setTimeout(function(){ loader.style.display = 'none'; }, 420);
       }
     });
+    // Réaffiche le loader global avec un message, avant une action bloquante
+    // (ex: soumission de formulaire) qui va recharger/naviguer la page.
+    window.showPageLoader = function(message) {
+      var loader = document.getElementById('page-loader');
+      var text = document.getElementById('page-loader-text');
+      if (text) text.textContent = message || '';
+      if (loader) {
+        loader.style.display = 'flex';
+        loader.style.opacity = '1';
+      }
+    };
     </script>
     <script>
     // ── Panneau notifications ──────────────────────────────────────────────────
@@ -1309,24 +1196,51 @@
     }
     </script>
     {% if user.is_authenticated and user_profile.session_timeout_minutes %}
-    <form id="idle-logout-form" method="post" action="{% url 'logout' %}" style="display:none;">
-        {% csrf_token %}
-    </form>
+    <div id="lock-overlay" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(7,30,40,0.92);backdrop-filter:blur(6px);align-items:center;justify-content:center;font-family:'Sora',sans-serif;">
+      <div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:20px;padding:40px;width:340px;text-align:center;">
+        <div style="display:flex;align-items:center;justify-content:center;width:56px;height:56px;margin:0 auto 16px;border-radius:50%;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
+        <div style="color:#fff;font-size:17px;font-weight:700;margin-bottom:4px;">Session verrouillée</div>
+        <div style="color:rgba(255,255,255,0.5);font-size:12px;margin-bottom:22px;">{{ user.get_full_name|default:user.username }}, entrez votre mot de passe pour continuer.</div>
+        <form id="lock-unlock-form">
+          <input type="password" id="lock-password" placeholder="Mot de passe" autocomplete="current-password"
+            style="width:100%;padding:12px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.08);color:#fff;font-family:'Sora',sans-serif;font-size:14px;outline:none;margin-bottom:10px;box-sizing:border-box;">
+          <div id="lock-error" style="display:none;color:#ff9090;font-size:11.5px;margin-bottom:10px;text-align:left;"></div>
+          <button type="submit" style="width:100%;padding:12px;border:none;border-radius:10px;background:#4f9b4b;color:#fff;font-family:'Sora',sans-serif;font-size:14px;font-weight:700;cursor:pointer;">Déverrouiller →</button>
+        </form>
+      </div>
+    </div>
     <script>
     (function () {
         var timeoutMinutes = {{ user_profile.session_timeout_minutes }};
         if (!timeoutMinutes || timeoutMinutes <= 0) return;
         var timeoutMs = timeoutMinutes * 60 * 1000;
         var idleTimer = null;
+        var overlay = document.getElementById('lock-overlay');
+        var csrftoken = "{{ csrf_token }}";
 
-        function doLogout() {
-            var form = document.getElementById('idle-logout-form');
-            if (form) form.submit();
+        function isLocked() { return overlay.style.display === 'flex'; }
+
+        function showOverlay() {
+            overlay.style.display = 'flex';
+            setTimeout(function () {
+                var pwd = document.getElementById('lock-password');
+                if (pwd) pwd.focus();
+            }, 30);
+        }
+
+        function lockSession() {
+            fetch("{% url 'lock_session' %}", {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrftoken },
+            }).finally(showOverlay);
         }
 
         function resetIdleTimer() {
+            if (isLocked()) return;
             clearTimeout(idleTimer);
-            idleTimer = setTimeout(doLogout, timeoutMs);
+            idleTimer = setTimeout(lockSession, timeoutMs);
         }
 
         ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'].forEach(function (evt) {
@@ -1334,6 +1248,39 @@
         });
 
         resetIdleTimer();
+
+        document.getElementById('lock-unlock-form').addEventListener('submit', function (e) {
+            e.preventDefault();
+            var pwdInput = document.getElementById('lock-password');
+            var errEl = document.getElementById('lock-error');
+            errEl.style.display = 'none';
+            fetch("{% url 'unlock_session' %}", {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrftoken,
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'password=' + encodeURIComponent(pwdInput.value),
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.ok) {
+                    overlay.style.display = 'none';
+                    pwdInput.value = '';
+                    resetIdleTimer();
+                } else {
+                    errEl.textContent = data.error || 'Mot de passe incorrect.';
+                    errEl.style.display = 'block';
+                    pwdInput.value = '';
+                    pwdInput.focus();
+                }
+            })
+            .catch(function () {
+                errEl.textContent = 'Erreur réseau, réessayez.';
+                errEl.style.display = 'block';
+            });
+        });
     })();
     </script>
     {% endif %}

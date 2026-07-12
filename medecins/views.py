@@ -25,12 +25,12 @@ def medecin_supprimer(request, pk):
 def medecins_export_csv(request):
     from core.utils import csv_response
 
-    qs = Medecin.objects.select_related('specialite', 'service').order_by('nom')
+    qs = Medecin.objects.select_related('specialite', 'service', 'employe').order_by('employe__nom')
     q          = request.GET.get('q', '').strip()
     specialite = request.GET.get('specialite', '')
     statut     = request.GET.get('statut', '')
     if q:
-        qs = qs.filter(Q(nom__icontains=q) | Q(prenoms__icontains=q) | Q(matricule__icontains=q))
+        qs = qs.filter(Q(employe__nom__icontains=q) | Q(employe__prenoms__icontains=q) | Q(employe__matricule__icontains=q))
     if specialite:
         qs = qs.filter(specialite__pk=specialite)
     if statut == 'actif':
@@ -102,7 +102,7 @@ def medecin_dashboard(request):
     # Top 8 médecins par consultations (6 derniers mois)
     top_medecins = list(
         Consultation.objects.filter(date_heure__date__gte=six_mois_ago, medecin__isnull=False)
-        .values('medecin__pk', 'medecin__nom', 'medecin__prenoms')
+        .values('medecin__pk', 'medecin__employe__nom', 'medecin__employe__prenoms')
         .annotate(n=Count('id'))
         .order_by('-n')[:8]
     )

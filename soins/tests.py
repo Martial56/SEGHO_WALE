@@ -287,11 +287,12 @@ class TestSoinsEditLocking(TestCase):
     def test_edit_bloque_si_hospitalisation_liee_pour_non_superuser(self):
         from hospitalisation.models import Hospitalisation
         from medecins.models import Medecin, Specialite
+        from employer.models import Employe
         specialite, _ = Specialite.objects.get_or_create(nom='Généraliste', code='GEN')
-        medecin = Medecin.objects.create(
-            matricule='MEDSE001', nom='Doc', prenoms='Test',
-            specialite=specialite, telephone='0700000001',
+        employe = Employe.objects.create(
+            nom='Doc', prenoms='Test', telephone='0700000001', date_embauche='2020-01-01',
         )
+        medecin = Medecin.objects.create(employe=employe, specialite=specialite)
         hosp = Hospitalisation.objects.create(
             patient=self.patient, medecin_traitant=medecin,
             date_admission=timezone.now(), statut='hospitalise',
@@ -309,11 +310,12 @@ class TestSoinsEditLocking(TestCase):
     def test_edit_autorise_pour_superuser_malgre_hospitalisation(self):
         from hospitalisation.models import Hospitalisation
         from medecins.models import Medecin, Specialite
+        from employer.models import Employe
         specialite, _ = Specialite.objects.get_or_create(nom='Généraliste', code='GEN')
-        medecin = Medecin.objects.create(
-            matricule='MEDSE002', nom='Doc', prenoms='Test2',
-            specialite=specialite, telephone='0700000001',
+        employe = Employe.objects.create(
+            nom='Doc', prenoms='Test2', telephone='0700000001', date_embauche='2020-01-01',
         )
+        medecin = Medecin.objects.create(employe=employe, specialite=specialite)
         hosp = Hospitalisation.objects.create(
             patient=self.patient, medecin_traitant=medecin,
             date_admission=timezone.now(), statut='hospitalise',

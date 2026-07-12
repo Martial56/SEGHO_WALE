@@ -11,7 +11,7 @@ from django.db.models import Q, Count
 from django.http import JsonResponse, HttpResponse
 
 from django.utils import timezone
-from .models import (Employe, Fonction, Grade, TypeContrat,
+from .models import (Employe, Fonction, Grade, TypeContrat, Nationalite,
                      DocumentEmploye, InfoSupplementaire, AlerteContrat,
                      AlerteDocument, HistoriqueEmploye, Conge, Presence,
                      JourFerie, CredentialBiometrique, DOCS_OBLIGATOIRES)
@@ -19,16 +19,66 @@ from medecins.models import Service
 
 RH_MANAGE_GROUPS = {'Médecin Chef', 'Médecin Chef Adjoint', 'Administrateur', 'Directeur', 'RH'}
 
+
+def _generate_service_code(nom):
+    """Code unique pour un Service créé à la volée (import Excel) — Service.code est unique."""
+    import re
+    base = re.sub(r'[^A-Z0-9]', '', nom.upper())[:16] or 'SVC'
+    code = base
+    n = 1
+    while Service.objects.filter(code=code).exists():
+        n += 1
+        code = f'{base[:16 - len(str(n))]}{n}'
+    return code
+
+
+def _upper_no_accent(s):
+    """Majuscules sans accent — imposé sur le champ « nom » des formulaires de
+    saisie Grade/Fonction/Type de contrat (Configuration)."""
+    import unicodedata
+    s = unicodedata.normalize('NFKD', s)
+    s = ''.join(c for c in s if not unicodedata.combining(c))
+    return s.upper()
+
+
+def _normalize_nom(s):
+    """Clé de comparaison insensible à la casse/accents/ponctuation — évite de créer un
+    doublon « DIRECTEUR GENERAL » quand « Directeur Général » existe déjà (import Excel)."""
+    import re
+    import unicodedata
+    s = unicodedata.normalize('NFKD', s)
+    s = ''.join(c for c in s if not unicodedata.combining(c))
+    s = re.sub(r'[^A-Za-z0-9]+', '', s)
+    return s.upper()
+
+
+def _find_or_create_ref(model, nom, extra_create=None):
+    """Cherche un objet (Service/Fonction/Grade/TypeContrat) par nom en ignorant
+    casse/accents/ponctuation avant d'en créer un nouveau — utilisé par l'import Excel."""
+    cible = _normalize_nom(nom)
+    for obj in model.objects.all():
+        if _normalize_nom(obj.nom) == cible:
+            return obj
+    kwargs = {'nom': nom}
+    if extra_create:
+        kwargs.update(extra_create)
+    return model.objects.create(**kwargs)
+
 LABELS_DOCS = {'cni': "Carte d'identité", 'contrat': 'Contrat signé', 'diplome': 'Diplôme'}
 
-_EMPTY_FORM = {
-    'nom': '', 'prenoms': '', 'sexe': 'M', 'date_naissance': '',
-    'lieu_naissance': '', 'nationalite': 'Ivoirienne', 'situation_matrimoniale': '',
-    'nombre_enfants': '0', 'telephone': '', 'telephone2': '', 'email': '',
-    'adresse': '', 'service': '', 'fonction': '', 'grade': '', 'type_contrat': '',
-    'date_embauche': '', 'date_fin_contrat': '', 'salaire_base': '', 'statut': 'actif',
-    'notes': '',
-}
+def _empty_form():
+    d = {
+        'nom': '', 'prenoms': '', 'sexe': 'M', 'date_naissance': '',
+        'lieu_naissance': '', 'nationalite': '', 'situation_matrimoniale': '',
+        'nombre_enfants': '0', 'telephone': '', 'telephone2': '', 'email': '',
+        'adresse': '', 'service': '', 'fonction': '', 'grade': '', 'type_contrat': '',
+        'date_embauche': '', 'date_fin_contrat': '', 'salaire_base': '', 'statut': 'actif',
+        'notes': '',
+    }
+    defaut = Nationalite.objects.filter(nom__iexact='Ivoirienne').first()
+    if defaut:
+        d['nationalite'] = str(defaut.pk)
+    return d
 
 
 def _employe_to_form(e):
@@ -39,7 +89,7 @@ def _employe_to_form(e):
         'sexe':                   e.sexe or 'M',
         'date_naissance':         fmt(e.date_naissance),
         'lieu_naissance':         e.lieu_naissance or '',
-        'nationalite':            e.nationalite or 'Ivoirienne',
+        'nationalite':            str(e.nationalite_id) if e.nationalite_id else '',
         'situation_matrimoniale': e.situation_matrimoniale or '',
         'nombre_enfants':         str(e.nombre_enfants) if e.nombre_enfants is not None else '0',
         'telephone':              e.telephone or '',
@@ -84,6 +134,7 @@ def _rh_selects(user):
         'fonctions_groupes': groupes,
         'grades':            Grade.objects.all(),
         'types_contrat':     TypeContrat.objects.all(),
+        'nationalites':      Nationalite.objects.all(),
         'services':          Service.objects.filter(actif=True).order_by('nom'),
         'can_manage':        can_manage_rh(user),
     }
@@ -154,6 +205,12 @@ def rh_dashboard(request):
             if amin <= e.age <= amax
         )
         pyramide.append({'label': label, 'n': n})
+    # Employés actifs sans date de naissance renseignée — affiché à part pour
+    # que le total de la pyramide corresponde bien à l'effectif actif réel
+    # (sinon ils disparaissent silencieusement du graphique).
+    nb_age_non_renseigne = Employe.objects.filter(statut='actif', date_naissance__isnull=True).count()
+    if nb_age_non_renseigne:
+        pyramide.append({'label': 'Non renseigné', 'n': nb_age_non_renseigne})
 
     # Docs manquants
     employes_docs_manquants = [
@@ -169,11 +226,13 @@ def rh_dashboard(request):
         _alertes_svc[_svc]['docs'] += len(_e.docs_manquants)
     alertes_docs_par_service = sorted(_alertes_svc.values(), key=lambda x: -x['docs'])
 
+    docs_paginator = Paginator(employes_docs_manquants, 5)
+    docs_page_obj = docs_paginator.get_page(request.GET.get('docs_page'))
+
     # ── Turnover ─────────────────────────────────────────────────────────────
     annee = today.year
     entrees_annee = Employe.objects.filter(date_embauche__year=annee).count()
-    # Approximation : départs = employés quittés dont la fiche a été modifiée cette année
-    departs_annee = Employe.objects.filter(statut='quitte', modifie_le__year=annee).count()
+    departs_annee = Employe.objects.filter(statut='quitte', date_depart__year=annee).count()
     # Taux de turnover (formule simplifiée BTP/RH) : départs / effectif actif * 100
     taux_turnover = round(departs_annee / actifs * 100, 1) if actifs > 0 else 0
     # Ancienneté moyenne + tranches
@@ -219,7 +278,12 @@ def rh_dashboard(request):
     # ── Répartition Homme / Femme ─────────────────────────────────────────────
     nb_hommes  = Employe.objects.filter(statut='actif', sexe='M').count()
     nb_femmes  = Employe.objects.filter(statut='actif', sexe='F').count()
-    genre_data = {'hommes': nb_hommes, 'femmes': nb_femmes, 'total': nb_hommes + nb_femmes}
+    nb_sexe_non_renseigne = actifs - nb_hommes - nb_femmes
+    genre_data = {
+        'hommes': nb_hommes, 'femmes': nb_femmes,
+        'non_renseigne': nb_sexe_non_renseigne,
+        'total': actifs,
+    }
 
     # ── Nouveaux employés du mois ─────────────────────────────────────────────
     nouveaux_mois = list(
@@ -259,6 +323,7 @@ def rh_dashboard(request):
         'fin_90j': fin_90j,
         'pyramide': pyramide,
         'employes_docs_manquants': employes_docs_manquants,
+        'docs_page_obj': docs_page_obj,
         'annee':          annee,
         'entrees_annee':  entrees_annee,
         'departs_annee':  departs_annee,
@@ -300,22 +365,12 @@ def employe_vers_medecin(request, pk):
 
     employe = get_object_or_404(Employe, pk=pk)
 
-    # Déjà lié : rediriger directement
+    # Déjà lié : rester sur la fiche employé
     if hasattr(employe, 'fiche_medecin'):
-        return redirect('medecin_detail', pk=employe.fiche_medecin.pk)
-
-    # Générer matricule MED[ANNEE][seq]
-    annee = timezone.now().year
-    dernier = Medecin.objects.filter(matricule__startswith=f'MED{annee}').order_by('-matricule').first()
-    seq = 1
-    if dernier:
-        try:
-            seq = int(dernier.matricule[-4:]) + 1
-        except ValueError:
-            pass
-    matricule = f'MED{annee}{seq:04d}'
+        return redirect('rh_detail', pk=employe.pk)
 
     # Générer numéro d'ordre
+    annee = timezone.now().year
     dernier_ord = Medecin.objects.filter(ordre_medecin__startswith=f'ORD{annee}').order_by('-ordre_medecin').first()
     seq_ord = 1
     if dernier_ord:
@@ -326,11 +381,6 @@ def employe_vers_medecin(request, pk):
     ordre_medecin = f'ORD{annee}{seq_ord:04d}'
 
     med = Medecin(
-        matricule=matricule,
-        nom=employe.nom,
-        prenoms=employe.prenoms,
-        telephone=employe.telephone or '',
-        email=employe.email or '',
         ordre_medecin=ordre_medecin,
         actif=(employe.statut == 'actif'),
         employe=employe,
@@ -340,10 +390,10 @@ def employe_vers_medecin(request, pk):
 
     messages.success(
         request,
-        f"Fiche médecin créée pour {employe.nom_complet} ({matricule}). "
-        f"Complétez la spécialité et le taux honoraire."
+        f"Fiche médecin créée pour {employe.nom_complet} ({employe.matricule}). "
+        f"Complétez la spécialité et le taux honoraire depuis le module Médecins."
     )
-    return redirect('medecin_detail', pk=med.pk)
+    return redirect('rh_detail', pk=employe.pk)
 
 
 # ── Liste ─────────────────────────────────────────────────────────────────────
@@ -365,7 +415,7 @@ def employe_list(request):
     if f_statut:
         qs = qs.filter(statut=f_statut)
 
-    paginator = Paginator(qs, 20)
+    paginator = Paginator(qs, 10)
     page_obj  = paginator.get_page(request.GET.get('page'))
 
     stats = {
@@ -420,9 +470,10 @@ def employe_nouveau(request):
     if not can_manage_rh(request.user):
         raise PermissionDenied
     ctx = _rh_selects(request.user)
-    form_data = dict(_EMPTY_FORM)
+    form_data = _empty_form()
+    form_errors = {}
     if request.method == 'POST':
-        employe = _save_employe(request, None)
+        employe, form_errors = _save_employe(request, None)
         if employe:
             HistoriqueEmploye.objects.create(
                 employe=employe, type_changement='creation',
@@ -430,9 +481,10 @@ def employe_nouveau(request):
             )
             messages.success(request, f'Employé {employe.nom_complet} créé avec succès.')
             return redirect('rh_detail', pk=employe.pk)
+        messages.error(request, 'Veuillez corriger les erreurs signalées ci-dessous.')
         form_data = request.POST
     return render(request, 'employer/form.html', {
-        **ctx, 'employe': None, 'form_data': form_data, 'form_errors': {},
+        **ctx, 'employe': None, 'form_data': form_data, 'form_errors': form_errors,
     })
 
 
@@ -445,13 +497,14 @@ def employe_modifier(request, pk):
     employe = get_object_or_404(Employe, pk=pk)
     ctx = _rh_selects(request.user)
     form_data = _employe_to_form(employe)
+    form_errors = {}
     if request.method == 'POST':
         # Snapshot avant modif
         old_statut  = employe.statut
         old_salaire = str(int(employe.salaire_base)) if employe.salaire_base else '0'
         old_service = str(employe.service) if employe.service else ''
 
-        updated = _save_employe(request, employe)
+        updated, form_errors = _save_employe(request, employe)
         if updated:
             _enregistrer_historique(updated, 'statut', old_statut, updated.statut,
                                     '', request.user)
@@ -463,38 +516,51 @@ def employe_modifier(request, pk):
                                     '', request.user)
             messages.success(request, 'Dossier mis à jour avec succès.')
             return redirect('rh_detail', pk=employe.pk)
+        messages.error(request, 'Veuillez corriger les erreurs signalées ci-dessous.')
         form_data = request.POST
     return render(request, 'employer/form.html', {
-        **ctx, 'employe': employe, 'form_data': form_data, 'form_errors': {},
+        **ctx, 'employe': employe, 'form_data': form_data, 'form_errors': form_errors,
     })
 
 
 def _save_employe(request, employe):
+    """Retourne (employe, errors) — employe est None et errors non-vide si la
+    validation échoue ; errors est un dict {nom_du_champ: message} affiché
+    directement sous le champ concerné dans le template."""
     p = request.POST
     nom           = p.get('nom', '').strip()
     prenoms       = p.get('prenoms', '').strip()
     date_embauche = p.get('date_embauche', '').strip()
-    if not nom or not prenoms:
-        messages.error(request, 'Le nom et les prénoms sont obligatoires.')
-        return None
+
+    errors = {}
+    if not nom:
+        errors['nom'] = 'Le nom est obligatoire.'
+    if not prenoms:
+        errors['prenoms'] = 'Les prénoms sont obligatoires.'
     if not date_embauche:
-        messages.error(request, "La date d'embauche est obligatoire.")
-        return None
+        errors['date_embauche'] = "La date d'embauche est obligatoire."
     if not p.get('sexe'):
-        messages.error(request, 'Le sexe est obligatoire.')
-        return None
+        errors['sexe'] = 'Le sexe est obligatoire.'
     if not p.get('date_naissance'):
-        messages.error(request, 'La date de naissance est obligatoire.')
-        return None
-    if not p.get('nationalite', '').strip():
-        messages.error(request, 'La nationalité est obligatoire.')
-        return None
+        errors['date_naissance'] = 'La date de naissance est obligatoire.'
+    if not p.get('nationalite'):
+        errors['nationalite'] = 'La nationalité est obligatoire.'
     if not p.get('telephone', '').strip():
-        messages.error(request, 'Le téléphone principal est obligatoire.')
-        return None
+        errors['telephone'] = 'Le téléphone principal est obligatoire.'
     if not p.get('fonction'):
-        messages.error(request, 'La fonction est obligatoire.')
-        return None
+        errors['fonction'] = 'La fonction est obligatoire.'
+    if errors:
+        return None, errors
+
+    nom_norm = _normalize_nom(nom)
+    prenoms_norm = _normalize_nom(prenoms)
+    qs_dup = Employe.objects.all()
+    if employe is not None and employe.pk:
+        qs_dup = qs_dup.exclude(pk=employe.pk)
+    for autre in qs_dup:
+        if _normalize_nom(autre.nom) == nom_norm and _normalize_nom(autre.prenoms) == prenoms_norm:
+            msg = f'Un employé nommé « {nom} {prenoms} » existe déjà (matricule {autre.matricule}).'
+            return None, {'nom': msg, 'prenoms': msg}
 
     if employe is None:
         employe = Employe()
@@ -504,7 +570,6 @@ def _save_employe(request, employe):
     employe.sexe    = p.get('sexe', '')
     employe.date_naissance         = p.get('date_naissance') or None
     employe.lieu_naissance         = p.get('lieu_naissance', '').strip()
-    employe.nationalite            = p.get('nationalite', 'Ivoirienne').strip() or 'Ivoirienne'
     employe.situation_matrimoniale = p.get('situation_matrimoniale', '')
     employe.nombre_enfants         = int(p.get('nombre_enfants') or 0)
     employe.telephone  = p.get('telephone', '').strip()
@@ -522,6 +587,7 @@ def _save_employe(request, employe):
     employe.fonction     = fk_or_none(Fonction, p.get('fonction'))
     employe.grade        = fk_or_none(Grade, p.get('grade'))
     employe.type_contrat = fk_or_none(TypeContrat, p.get('type_contrat'))
+    employe.nationalite  = fk_or_none(Nationalite, p.get('nationalite'))
     employe.date_embauche    = p.get('date_embauche') or None
     employe.date_fin_contrat = p.get('date_fin_contrat') or None
     employe.salaire_base     = p.get('salaire_base') or 0
@@ -532,9 +598,12 @@ def _save_employe(request, employe):
         if employe.photo:
             employe.photo.delete(save=False)
         employe.photo = request.FILES['photo']
+    elif p.get('photo_supprimer') == '1' and employe.photo:
+        employe.photo.delete(save=False)
+        employe.photo = None
 
     employe.save()
-    return employe
+    return employe, {}
 
 
 # â"€â"€ Renouvellement de contrat â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
@@ -619,7 +688,7 @@ def employe_export_excel(request):
             emp.matricule, emp.nom, emp.prenoms,
             'M' if emp.sexe == 'M' else 'F',
             emp.date_naissance.strftime('%d/%m/%Y') if emp.date_naissance else '',
-            emp.nationalite,
+            emp.nationalite.nom if emp.nationalite else '',
             emp.telephone, emp.email,
             emp.service.nom if emp.service else '',
             emp.fonction.nom if emp.fonction else '',
@@ -805,7 +874,7 @@ def rh_registre_export(request):
             emp.get_sexe_display() if emp.sexe else '-',
             fmt_date(emp.date_naissance),
             emp.lieu_naissance or '-',
-            emp.nationalite or '-',
+            emp.nationalite.nom if emp.nationalite else '-',
             emp.fonction.nom if emp.fonction else '-',
             emp.service.nom if emp.service else '-',
             emp.type_contrat.nom if emp.type_contrat else '-',
@@ -868,18 +937,61 @@ def employe_import(request):
                         errors.append(f'Ligne {i} : date d\'embauche manquante.')
                         continue
 
-                    service_nom = str(row[3]).strip() if len(row) > 3 and row[3] else ''
-                    contrat_nom = str(row[4]).strip() if len(row) > 4 and row[4] else ''
-                    statut_val  = str(row[5]).strip().lower() if len(row) > 5 and row[5] else 'actif'
+                    service_nom  = str(row[3]).strip() if len(row) > 3 and row[3] else ''
+                    fonction_nom = str(row[4]).strip() if len(row) > 4 and row[4] else ''
+                    grade_nom    = str(row[5]).strip() if len(row) > 5 and row[5] else ''
+                    contrat_nom  = str(row[6]).strip() if len(row) > 6 and row[6] else ''
+                    statut_val   = str(row[7]).strip().lower() if len(row) > 7 and row[7] else 'actif'
+                    matricule_val = str(row[8]).strip() if len(row) > 8 and row[8] else ''
+                    sexe_raw = str(row[9]).strip().lower() if len(row) > 9 and row[9] else ''
+                    sexe_val = {
+                        'm': 'M', 'masculin': 'M', 'homme': 'M',
+                        'f': 'F', 'féminin': 'F', 'feminin': 'F', 'femme': 'F',
+                    }.get(sexe_raw, '')
 
-                    service = Service.objects.filter(nom__iexact=service_nom).first() if service_nom else None
-                    contrat = TypeContrat.objects.filter(nom__iexact=contrat_nom).first() if contrat_nom else None
+                    if matricule_val and Employe.objects.filter(matricule=matricule_val).exists():
+                        errors.append(f'Ligne {i} : le matricule « {matricule_val} » est déjà utilisé.')
+                        continue
+
+                    nom_norm = _normalize_nom(nom)
+                    prenoms_norm = _normalize_nom(prenoms)
+                    doublon = any(
+                        _normalize_nom(e.nom) == nom_norm and _normalize_nom(e.prenoms) == prenoms_norm
+                        for e in Employe.objects.all()
+                    )
+                    if doublon:
+                        errors.append(f'Ligne {i} : un employé nommé « {nom} {prenoms} » existe déjà.')
+                        continue
+
+                    service = None
+                    if service_nom:
+                        service = _find_or_create_ref(
+                            Service, service_nom,
+                            extra_create={'code': _generate_service_code(service_nom)},
+                        )
+
+                    fonction = None
+                    if fonction_nom:
+                        fonction = _find_or_create_ref(Fonction, fonction_nom)
+
+                    grade = None
+                    if grade_nom:
+                        grade = _find_or_create_ref(Grade, grade_nom)
+
+                    contrat = None
+                    if contrat_nom:
+                        contrat = _find_or_create_ref(TypeContrat, contrat_nom)
+
+                    nationalite = _find_or_create_ref(Nationalite, 'Ivoirienne')
 
                     emp = Employe(
-                        nom=nom, prenoms=prenoms, date_embauche=date_emb,
-                        service=service, type_contrat=contrat,
+                        nom=nom, prenoms=prenoms, date_embauche=date_emb, sexe=sexe_val,
+                        service=service, fonction=fonction, grade=grade, type_contrat=contrat,
+                        nationalite=nationalite,
                         statut=statut_val if statut_val in ('actif', 'suspendu', 'quitte') else 'actif',
                     )
+                    if matricule_val:
+                        emp.matricule = matricule_val
                     emp.save()
                     HistoriqueEmploye.objects.create(
                         employe=emp, type_changement='creation',
@@ -900,6 +1012,54 @@ def employe_import(request):
     return render(request, 'employer/import.html', {
         'can_manage': can_manage_rh(request.user),
     })
+
+
+@login_required(login_url='login')
+def employe_import_modele(request):
+    """Modèle Excel vierge pour l'import — mêmes colonnes que celles lues
+    par employe_import (dans le même ordre)."""
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Employés"
+
+    header_fill = PatternFill('solid', fgColor='4A7236')
+    header_font = Font(bold=True, color='FFFFFF', size=11)
+    thin = Border(
+        left=Side(style='thin', color='D0D0D0'), right=Side(style='thin', color='D0D0D0'),
+        top=Side(style='thin', color='D0D0D0'),  bottom=Side(style='thin', color='D0D0D0'),
+    )
+
+    headers = ['Nom', 'Prénoms', "Date d'embauche", 'Service', 'Fonction', 'Grade', 'Type de contrat', 'Statut', 'Matricule', 'Sexe']
+    exemple = ['KONÉ', 'Aminata', '2024-01-15', 'Maternité', 'Sage-femme', 'Agent 2ème échelon', 'CDI', 'actif', '', 'F']
+
+    for col, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=h)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+        cell.border = thin
+    ws.row_dimensions[1].height = 20
+
+    for col, val in enumerate(exemple, 1):
+        cell = ws.cell(row=2, column=col, value=val)
+        cell.border = thin
+        cell.font = Font(italic=True, color='888888')
+
+    for col in range(1, len(headers) + 1):
+        ws.column_dimensions[openpyxl.utils.get_column_letter(col)].width = 20
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    resp = HttpResponse(buf.read(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    resp['Content-Disposition'] = 'attachment; filename="modele_import_employes.xlsx"'
+    return resp
 
 
 # â"€â"€ Organigramme â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
@@ -1177,9 +1337,14 @@ def presence_rapport_mensuel(request):
     )
 
     service_id  = request.GET.get('service') or None
+    employe_id  = request.GET.get('employe') or None
     employes_qs = Employe.objects.filter(statut='actif').select_related('service', 'fonction')
     if service_id:
         employes_qs = employes_qs.filter(service_id=service_id)
+    employe_filtre = None
+    if employe_id:
+        employes_qs = employes_qs.filter(pk=employe_id)
+        employe_filtre = employes_qs.first()
 
     presences_mois = list(
         Presence.objects.filter(date__year=annee, date__month=mois).select_related('employe')
@@ -1267,6 +1432,7 @@ def presence_rapport_mensuel(request):
         'next_mois':       next_mois, 'next_annee': next_annee,
         'services':        services,
         'service_id':      service_id,
+        'employe_filtre':  employe_filtre,
         'total_presents':  sum(e['nb_presents'] for e in employes_stats),
         'total_absents':   sum(e['nb_absents_non_just'] for e in employes_stats),
         'total_conge':     sum(e['nb_absents_conge'] for e in employes_stats),
@@ -1841,3 +2007,205 @@ def bio_auth_verify(request):
         'photo_url':  photo_url,
         'message':    f'Pointage enregistré — {slot_label} : {heure:%H:%M}',
     })
+
+
+# ── Configuration : Grades / Fonctions / Types de contrat ──────────────────
+# Trois tables de référence utilisées par le formulaire employé (menus
+# déroulants Grade/Fonction/Type de contrat, voir _rh_selects ci-dessus).
+# CRUD générique paramétré par "slug" plutôt que 3 vues quasi-identiques.
+
+RH_CONFIG_MODELS = {
+    'grade': {
+        'model': Grade, 'fields': ['nom', 'code', 'description'],
+        'label': 'Grade', 'label_plural': 'Grades', 'icone': 'bi-award',
+        'sort_fields': ['nom', 'code'],
+    },
+    'fonction': {
+        'model': Fonction, 'fields': ['nom', 'code', 'categorie', 'description'],
+        'label': 'Fonction', 'label_plural': 'Fonctions', 'icone': 'bi-briefcase',
+        'sort_fields': ['nom', 'code', 'categorie'],
+    },
+    'type_contrat': {
+        'model': TypeContrat, 'fields': ['nom', 'code', 'droit_au_conge', 'description'],
+        'label': 'Type de contrat', 'label_plural': 'Types de contrat', 'icone': 'bi-file-earmark-text',
+        'sort_fields': ['nom', 'code', 'droit_au_conge'],
+    },
+    'nationalite': {
+        'model': Nationalite, 'fields': ['nom'],
+        'label': 'Nationalité', 'label_plural': 'Nationalités', 'icone': 'bi-flag',
+        'sort_fields': ['nom'],
+    },
+}
+
+
+def _rh_config_or_404(slug):
+    from django.http import Http404
+    cfg = RH_CONFIG_MODELS.get(slug)
+    if not cfg:
+        raise Http404("Configuration inconnue.")
+    return cfg
+
+
+def _rh_config_form_class(cfg):
+    from django import forms
+    from django.forms.widgets import CheckboxInput
+
+    class ConfigForm(forms.ModelForm):
+        class Meta:
+            model = cfg['model']
+            fields = cfg['fields']
+
+        def clean_nom(self):
+            nom = self.cleaned_data.get('nom', '')
+            nom = _upper_no_accent(nom) if nom else nom
+            if cfg['model'] is Fonction and nom:
+                qs = Fonction.objects.filter(nom=nom)
+                if self.instance.pk:
+                    qs = qs.exclude(pk=self.instance.pk)
+                if qs.exists():
+                    raise forms.ValidationError('Cette fonction existe déjà.')
+            return nom
+
+        if cfg['model'] is Fonction:
+            def clean_code(self):
+                import re
+                base = re.sub(r'[^A-Z0-9]', '', self.cleaned_data.get('nom', '')[:3]) or 'XXX'
+                code = f'FON-{base}'
+                qs = Fonction.objects.filter(code=code)
+                if self.instance.pk:
+                    qs = qs.exclude(pk=self.instance.pk)
+                n = 2
+                original = code
+                while qs.exists():
+                    code = f'{original}{n}'
+                    n += 1
+                    qs = Fonction.objects.filter(code=code)
+                    if self.instance.pk:
+                        qs = qs.exclude(pk=self.instance.pk)
+                return code
+
+        if cfg['model'] is TypeContrat:
+            def clean_code(self):
+                if self.instance.pk and self.instance.code:
+                    return self.instance.code
+                import re
+                max_n = 0
+                qs = TypeContrat.objects.all()
+                if self.instance.pk:
+                    qs = qs.exclude(pk=self.instance.pk)
+                for c in qs.values_list('code', flat=True):
+                    m = re.match(r'^CON-(\d{3})$', c or '')
+                    if m:
+                        max_n = max(max_n, int(m.group(1)))
+                return f'CON-{max_n + 1:03d}'
+
+    if cfg['model'] is Fonction:
+        ConfigForm.base_fields['code'].required = False
+        ConfigForm.base_fields['code'].widget.attrs['readonly'] = True
+        ConfigForm.base_fields['code'].help_text = 'Généré automatiquement : FON- + 3 premières lettres du nom.'
+
+    if cfg['model'] is TypeContrat:
+        ConfigForm.base_fields['code'].required = False
+        ConfigForm.base_fields['code'].widget.attrs['readonly'] = True
+        ConfigForm.base_fields['code'].help_text = 'Généré automatiquement : CON- + numéro d\'ordre sur 3 chiffres.'
+
+    for name in cfg['fields']:
+        widget = ConfigForm.base_fields[name].widget
+        if not isinstance(widget, CheckboxInput):
+            widget.attrs.setdefault('class', 'rh-input')
+    return ConfigForm
+
+
+@login_required(login_url='login')
+def rh_config_list(request, slug):
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
+    cfg = _rh_config_or_404(slug)
+    q = request.GET.get('q', '').strip()
+    qs = cfg['model'].objects.all()
+    if q:
+        qs = qs.filter(nom__icontains=q)
+
+    sort = request.GET.get('sort', 'nom')
+    if sort not in cfg['sort_fields']:
+        sort = 'nom'
+    direction = request.GET.get('dir', 'asc')
+    if direction not in ('asc', 'desc'):
+        direction = 'asc'
+    order = sort if direction == 'asc' else f'-{sort}'
+
+    paginator = Paginator(qs.order_by(order), 12)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    return render(request, 'employer/config/list.html', {
+        'slug': slug, 'cfg': cfg, 'page_obj': page_obj, 'q': q,
+        'sort': sort, 'dir': direction,
+        'can_manage': True,
+    })
+
+
+def _rh_config_is_ajax(request):
+    return request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
+
+@login_required(login_url='login')
+def rh_config_create(request, slug):
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
+    cfg = _rh_config_or_404(slug)
+    Form = _rh_config_form_class(cfg)
+    is_ajax = _rh_config_is_ajax(request)
+    if request.method == 'POST':
+        form = Form(request.POST)
+        if form.is_valid():
+            obj = form.save()
+            if is_ajax:
+                return JsonResponse({'ok': True, 'message': f"{cfg['label']} « {obj} » créé(e)."})
+            messages.success(request, f"{cfg['label']} « {obj} » créé(e).")
+            return redirect('rh_config_list', slug=slug)
+    else:
+        form = Form()
+    template = 'employer/config/form_modal.html' if is_ajax else 'employer/config/form.html'
+    return render(request, template, {
+        'slug': slug, 'cfg': cfg, 'form': form,
+        'titre': f"Nouveau — {cfg['label']}", 'edit': False,
+        'can_manage': True,
+    })
+
+
+@login_required(login_url='login')
+def rh_config_edit(request, slug, pk):
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
+    cfg = _rh_config_or_404(slug)
+    obj = get_object_or_404(cfg['model'], pk=pk)
+    Form = _rh_config_form_class(cfg)
+    is_ajax = _rh_config_is_ajax(request)
+    if request.method == 'POST':
+        form = Form(request.POST, instance=obj)
+        if form.is_valid():
+            form.save()
+            if is_ajax:
+                return JsonResponse({'ok': True, 'message': f"{cfg['label']} « {obj} » mis à jour."})
+            messages.success(request, f"{cfg['label']} « {obj} » mis à jour.")
+            return redirect('rh_config_list', slug=slug)
+    else:
+        form = Form(instance=obj)
+    template = 'employer/config/form_modal.html' if is_ajax else 'employer/config/form.html'
+    return render(request, template, {
+        'slug': slug, 'cfg': cfg, 'form': form, 'obj': obj,
+        'titre': f"Modifier — {obj}", 'edit': True,
+        'can_manage': True,
+    })
+
+
+@login_required(login_url='login')
+@require_POST
+def rh_config_delete(request, slug, pk):
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
+    cfg = _rh_config_or_404(slug)
+    obj = get_object_or_404(cfg['model'], pk=pk)
+    nom = str(obj)
+    obj.delete()
+    messages.success(request, f"{cfg['label']} « {nom} » supprimé(e).")
+    return redirect('rh_config_list', slug=slug)

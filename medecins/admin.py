@@ -10,7 +10,7 @@ class SpecialiteAdmin(admin.ModelAdmin):
 @admin.register(Medecin)
 class MedecinAdmin(admin.ModelAdmin):
     list_display = ['matricule', 'nom', 'prenoms', 'specialite', 'telephone', 'actif']
-    search_fields = ['nom', 'prenoms', 'matricule']
+    search_fields = ['employe__nom', 'employe__prenoms', 'employe__matricule']
     list_filter = ['specialite', 'actif']
 
 

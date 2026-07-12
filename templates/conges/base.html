@@ -186,7 +186,7 @@ html[data-theme="dark"] .cg-b-termine  { background:rgba(255,255,255,.06);color:
 .cg-subheader, .cg-form-head {
   display:flex;align-items:center;justify-content:space-between;gap:16px;
   padding:14px 32px;flex-wrap:wrap;
-  position:sticky;top:var(--topbar-h);z-index:100;
+  position:sticky;top:0;z-index:100;
   background:#f0f6fa;border-bottom:1px solid rgba(0,0,0,0.05);
   box-shadow:0 2px 8px rgba(0,0,0,0.04);
 }
@@ -241,6 +241,8 @@ html[data-theme="dark"] .cg-back-btn:hover { background:rgba(33,150,243,0.15);bo
 }
 .cg-card-body { padding: 20px; }
 </style>
+{% endblock %}
+
 {% block extra_js %}
 {{ block.super }}
 <script>
@@ -267,30 +269,18 @@ html[data-theme="dark"] .cg-back-btn:hover { background:rgba(33,150,243,0.15);bo
   });
 })();
 </script>
-{% endblock %}
 <script>
 (function () {
-  function alignSousTopbar() {
+  function syncTopbarH() {
     var topbar = document.querySelector('.topbar');
-    if (!topbar) return;
-    var tbH = Math.ceil(topbar.getBoundingClientRect().height);
-    if (tbH <= 0) return;
-    document.documentElement.style.setProperty('--topbar-h', tbH + 'px');
-    document.documentElement.style.setProperty('--header-h', tbH + 'px');
-    var sh = document.getElementById('subheader');
-    if (!sh) return;
-    requestAnimationFrame(function () {
-      var gap = Math.round(sh.getBoundingClientRect().top - topbar.getBoundingClientRect().bottom);
-      if (gap > 0) {
-        var adjusted = tbH - gap;
-        document.documentElement.style.setProperty('--topbar-h', adjusted + 'px');
-        document.documentElement.style.setProperty('--header-h', adjusted + 'px');
-      }
-    });
+    if (topbar) {
+      var h = topbar.getBoundingClientRect().height;
+      if (h > 0) document.documentElement.style.setProperty('--topbar-h', h + 'px');
+    }
   }
-  if (document.readyState !== 'loading') { alignSousTopbar(); }
-  else { document.addEventListener('DOMContentLoaded', alignSousTopbar); }
-  window.addEventListener('resize', alignSousTopbar);
+  syncTopbarH();
+  document.addEventListener('DOMContentLoaded', syncTopbarH);
+  window.addEventListener('resize', syncTopbarH);
 })();
 </script>
 {% endblock %}

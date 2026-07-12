@@ -159,7 +159,7 @@ def ordonnance_create(request, consultation_pk):
 
     types = Ordonnance._meta.get_field('type_ordonnance').choices
 
-    medecins = Medecin.objects.select_related('specialite').order_by('nom')
+    medecins = Medecin.objects.select_related('specialite', 'employe').order_by('employe__nom')
 
     if request.method == 'POST':
         type_ord   = request.POST.get('type_ordonnance', 'interne')
@@ -250,7 +250,7 @@ def _medicaments_dispo_json():
 def ordonnance_create_libre(request):
     """Create an ordonnance directly from the pharmacy list, without a pre-existing consultation."""
     types = Ordonnance._meta.get_field('type_ordonnance').choices
-    medecins = Medecin.objects.select_related('specialite').order_by('nom')
+    medecins = Medecin.objects.select_related('specialite', 'employe').order_by('employe__nom')
 
     patient = None
     consultation = None

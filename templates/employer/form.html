@@ -107,6 +107,8 @@ html[data-theme="dark"] .rh-form-card-title { color: var(--rh-300); }
 .rh-fgroup .rh-error {
   font-size: 11.5px; color: var(--rose); display: flex; align-items: center; gap: 4px;
 }
+.rh-input-error { border-color: var(--rose) !important; }
+.rh-input-error:focus { box-shadow: 0 0 0 3px rgba(var(--rose-rgb),0.15) !important; }
 
 /* ── Radio sex ── */
 .rh-radio-group {
@@ -126,31 +128,61 @@ html[data-theme="dark"] .rh-form-card-title { color: var(--rh-300); }
 }
 html[data-theme="dark"] .rh-radio-item span { color: var(--rh-text); }
 
-/* ── Photo preview ── */
-.rh-photo-block {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
+/* ── Layout formulaire + aperçu ── */
+.rh-form-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 20px;
+  align-items: start;
 }
-.rh-photo-preview {
-  width: 80px; height: 80px; border-radius: 10px; object-fit: cover;
-  border: 2px solid var(--rh-200);
-}
-.rh-photo-placeholder {
-  width: 80px; height: 80px; border-radius: 10px;
-  background: var(--rh-50); border: 2px dashed var(--rh-300);
+@media (max-width: 860px) { .rh-form-layout { grid-template-columns: 1fr; } }
+
+.rh-aside { display: flex; flex-direction: column; gap: 20px; }
+
+/* ── Avatar aperçu ── */
+.rh-avatar-preview {
+  width: 90px; height: 90px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--rh-600), var(--rh-400));
+  margin: 0 auto 10px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 28px; color: var(--rh-300);
+  overflow: hidden; position: relative;
+  border: 3px solid rgba(var(--rh-600-rgb),.18);
 }
-html[data-theme="dark"] .rh-photo-placeholder { background: rgba(33,150,243,0.1); border-color: var(--rh-400); }
+.rh-avatar-preview img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.rh-avatar-initials { font-size: 30px; font-weight: 800; color: #fff; }
+html[data-theme="dark"] .rh-avatar-preview { border-color: rgba(var(--teal-400-rgb),.25); }
+
+.rh-photo-actions { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 10px; }
 .rh-photo-label {
-  font-size: 12px; color: var(--rh-600); cursor: pointer;
-  text-decoration: underline; text-underline-offset: 2px;
-  background: none; border: none; padding: 0;
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12px; font-weight: 500; color: var(--rh-600); cursor: pointer;
+  padding: 4px 10px; border: 1px solid var(--rh-200); border-radius: 20px;
+  background: none; transition: all 0.15s;
   font-family: 'Sora', sans-serif;
-  transition: color 0.15s;
 }
-.rh-photo-label:hover { color: var(--rh-800); }
-html[data-theme="dark"] .rh-photo-label { color: var(--rh-300); }
-html[data-theme="dark"] .rh-photo-label:hover { color: var(--rh-200); }
+.rh-photo-label:hover { background: var(--rh-600); color: #fff; border-color: var(--rh-600); }
+html[data-theme="dark"] .rh-photo-label { color: var(--rh-300); border-color: var(--rh-border); }
+html[data-theme="dark"] .rh-photo-label:hover { background: var(--rh-600); color: #fff; border-color: var(--rh-600); }
+
+.rh-photo-del {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; padding: 4px 9px; border-radius: 20px;
+  border: 1px solid rgba(var(--rose-rgb),.3); color: var(--rose-btn);
+  background: none; cursor: pointer; transition: background 0.15s;
+  font-family: 'Sora', sans-serif;
+}
+.rh-photo-del:hover { background: rgba(var(--rose-rgb),.08); }
+
+.rh-preview-nom {
+  font-size: 15px; font-weight: 800; color: var(--rh-text); margin-top: 4px;
+}
+
+.rh-matricule-badge {
+  font-family: var(--font-mono); font-size: 12px; font-weight: 700;
+  background: rgba(var(--rh-600-rgb),.1); color: var(--rh-700);
+  padding: 4px 12px; border-radius: 20px; display: inline-block; margin-top: 8px;
+}
+html[data-theme="dark"] .rh-matricule-badge { background: rgba(var(--teal-400-rgb),.12); color: var(--rh-300); }
 
 /* ── Select ── */
 select.rh-input {
@@ -239,6 +271,60 @@ html[data-theme="dark"] .rh-mat-auto {
 
 <div class="rh-form-sections">
 
+<div class="rh-form-layout">
+
+  <!-- ── Colonne gauche : aperçu ── -->
+  <aside class="rh-aside">
+    <div class="rh-form-card">
+      <div class="rh-form-card-header">
+        <div class="rh-form-card-title">
+          <i class="bi bi-person-circle" style="color:var(--rh-500);"></i>
+          Aperçu
+        </div>
+      </div>
+      <div class="rh-form-card-body" style="text-align:center;">
+
+        <label for="id_photo" style="cursor:pointer;">
+          <div class="rh-avatar-preview" id="rh-avatar-preview">
+            {% if employe and employe.photo %}
+              <img src="{{ employe.photo.url }}" alt="" id="rh-photo-img" data-photo-preview="employe">
+              <span class="rh-avatar-initials" id="rh-avatar-initials" data-photo-placeholder="employe" style="display:none;">{% if form_data.nom %}{{ form_data.nom|first|upper }}{% else %}?{% endif %}{% if form_data.prenoms %}{{ form_data.prenoms|first|upper }}{% else %}?{% endif %}</span>
+            {% else %}
+              <img src="" alt="" id="rh-photo-img" data-photo-preview="employe" style="display:none;">
+              <span class="rh-avatar-initials" id="rh-avatar-initials" data-photo-placeholder="employe">{% if form_data.nom %}{{ form_data.nom|first|upper }}{% else %}?{% endif %}{% if form_data.prenoms %}{{ form_data.prenoms|first|upper }}{% else %}?{% endif %}</span>
+            {% endif %}
+          </div>
+        </label>
+
+        <input type="file" id="id_photo" name="photo" accept="image/*" data-photo-input="employe" style="display:none;">
+        <input type="hidden" name="photo_supprimer" id="photo_supprimer" value="0">
+
+        <div class="rh-photo-actions">
+          <label for="id_photo" class="rh-photo-label">
+            <i class="bi bi-camera"></i> {% if employe and employe.photo %}Changer{% else %}Ajouter{% endif %}
+          </label>
+          {% if employe and employe.photo %}
+          <button type="button" class="rh-photo-del" id="btn-del-photo" onclick="rhSupprimerPhoto()">
+            <i class="bi bi-trash3"></i>
+          </button>
+          {% endif %}
+        </div>
+
+        <div class="rh-preview-nom" id="rh-preview-nom">{{ form_data.nom|default:"—" }} {{ form_data.prenoms|default:"—" }}</div>
+
+        {% if employe %}
+          <div class="rh-matricule-badge">{{ employe.matricule }}</div>
+        {% else %}
+          <div style="font-size:11px;color:var(--rh-muted);margin-top:8px;">Le matricule sera généré automatiquement</div>
+        {% endif %}
+
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Colonne droite : informations ── -->
+  <div class="rh-form-sections">
+
   <!-- ════════════════════════════════════════
        SECTION 1 — Informations personnelles
   ════════════════════════════════════════ -->
@@ -251,35 +337,25 @@ html[data-theme="dark"] .rh-mat-auto {
     </div>
     <div class="rh-form-card-body">
 
-      <!-- Matricule (read-only) -->
-      <div class="rh-form-row" style="margin-bottom:18px;">
-        <div class="rh-fgroup">
-          <label class="rh-label">Matricule</label>
-          {% if employe %}
-            <div class="rh-mat-auto">{{ employe.matricule }}</div>
-          {% else %}
-            <div class="rh-mat-auto">Généré automatiquement</div>
-          {% endif %}
-        </div>
-      </div>
-
       <!-- Nom / Prénoms -->
       <div class="rh-form-row cols-2">
         <div class="rh-fgroup">
           <label class="rh-label" for="id_nom">Nom <span style="color:var(--rose);">*</span></label>
           <input type="text" id="id_nom" name="nom"
                  value="{{ form_data.nom }}"
-                 class="rh-input"
+                 class="rh-input{% if form_errors.nom %} rh-input-error{% endif %}"
                  placeholder="Nom de famille" required maxlength="100"
                  autocomplete="family-name">
+          {% if form_errors.nom %}<div class="rh-error"><i class="bi bi-exclamation-circle"></i> {{ form_errors.nom }}</div>{% endif %}
         </div>
         <div class="rh-fgroup">
           <label class="rh-label" for="id_prenoms">Prénoms <span style="color:var(--rose);">*</span></label>
           <input type="text" id="id_prenoms" name="prenoms"
                  value="{{ form_data.prenoms }}"
-                 class="rh-input"
+                 class="rh-input{% if form_errors.prenoms %} rh-input-error{% endif %}"
                  placeholder="Prénoms" required maxlength="150"
                  autocomplete="given-name">
+          {% if form_errors.prenoms %}<div class="rh-error"><i class="bi bi-exclamation-circle"></i> {{ form_errors.prenoms }}</div>{% endif %}
         </div>
       </div>
 
@@ -299,13 +375,15 @@ html[data-theme="dark"] .rh-mat-auto {
               <span><i class="bi bi-gender-female" style="color:var(--violet);"></i> Féminin</span>
             </label>
           </div>
+          {% if form_errors.sexe %}<div class="rh-error"><i class="bi bi-exclamation-circle"></i> {{ form_errors.sexe }}</div>{% endif %}
         </div>
         <div class="rh-fgroup">
           <label class="rh-label" for="id_date_naissance">Date de naissance <span style="color:var(--rose);">*</span></label>
           <input type="date" id="id_date_naissance" name="date_naissance"
                  value="{{ form_data.date_naissance }}"
-                 class="rh-input" max="{% now 'Y-m-d' %}" required>
+                 class="rh-input{% if form_errors.date_naissance %} rh-input-error{% endif %}" max="{% now 'Y-m-d' %}" required>
           <small id="age-display" style="font-size:11.5px; color:var(--rh-muted); margin-top:2px;"></small>
+          {% if form_errors.date_naissance %}<div class="rh-error"><i class="bi bi-exclamation-circle"></i> {{ form_errors.date_naissance }}</div>{% endif %}
         </div>
         <div class="rh-fgroup">
           <label class="rh-label" for="id_lieu_naissance">Lieu de naissance</label>
@@ -319,9 +397,16 @@ html[data-theme="dark"] .rh-mat-auto {
       <div class="rh-form-row cols-3">
         <div class="rh-fgroup">
           <label class="rh-label" for="id_nationalite">Nationalité <span style="color:var(--rose);">*</span></label>
-          <input type="text" id="id_nationalite" name="nationalite"
-                 value="{{ form_data.nationalite }}"
-                 class="rh-input" placeholder="Ivoirienne" required>
+          <select id="id_nationalite" name="nationalite" class="rh-input{% if form_errors.nationalite %} rh-input-error{% endif %}" required>
+            <option value="">— Sélectionner —</option>
+            {% for nat in nationalites %}
+            <option value="{{ nat.pk }}"
+              {% if form_data.nationalite == nat.pk|stringformat:"s" %}selected{% endif %}>
+              {{ nat.nom }}
+            </option>
+            {% endfor %}
+          </select>
+          {% if form_errors.nationalite %}<div class="rh-error"><i class="bi bi-exclamation-circle"></i> {{ form_errors.nationalite }}</div>{% endif %}
         </div>
         <div class="rh-fgroup">
           <label class="rh-label" for="id_situation_matrimoniale">Situation matrimoniale</label>
@@ -338,29 +423,6 @@ html[data-theme="dark"] .rh-mat-auto {
           <input type="number" id="id_nombre_enfants" name="nombre_enfants" min="0" max="20"
                  value="{{ form_data.nombre_enfants }}"
                  class="rh-input">
-        </div>
-      </div>
-
-      <!-- Photo -->
-      <div class="rh-form-row">
-        <div class="rh-fgroup">
-          <label class="rh-label">Photo</label>
-          <div class="rh-photo-block">
-            {% if employe and employe.photo %}
-              <img src="{{ employe.photo.url }}" alt="Photo actuelle"
-                   class="rh-photo-preview" data-photo-preview="employe">
-            {% else %}
-              <div class="rh-photo-placeholder" data-photo-placeholder="employe">
-                <i class="bi bi-camera"></i>
-              </div>
-              <img src="" alt="" class="rh-photo-preview" data-photo-preview="employe" style="display:none;">
-            {% endif %}
-            <label for="id_photo" class="rh-photo-label">
-              {% if employe and employe.photo %}Changer la photo{% else %}Ajouter une photo{% endif %}
-            </label>
-            <input type="file" id="id_photo" name="photo" accept="image/*"
-                   data-photo-input="employe" style="display:none;">
-          </div>
         </div>
       </div>
 
@@ -384,8 +446,9 @@ html[data-theme="dark"] .rh-mat-auto {
           <label class="rh-label" for="id_telephone">Téléphone principal <span style="color:var(--rose);">*</span></label>
           <input type="tel" id="id_telephone" name="telephone"
                  value="{{ form_data.telephone }}"
-                 class="rh-input" placeholder="Ex. +225 07 00 00 00 00"
+                 class="rh-input{% if form_errors.telephone %} rh-input-error{% endif %}" placeholder="Ex. +225 07 00 00 00 00"
                  autocomplete="tel" required>
+          {% if form_errors.telephone %}<div class="rh-error"><i class="bi bi-exclamation-circle"></i> {{ form_errors.telephone }}</div>{% endif %}
         </div>
         <div class="rh-fgroup">
           <label class="rh-label" for="id_telephone2">Téléphone 2</label>
@@ -443,7 +506,7 @@ html[data-theme="dark"] .rh-mat-auto {
         </div>
         <div class="rh-fgroup">
           <label class="rh-label" for="id_fonction">Fonction <span style="color:var(--rose);">*</span></label>
-          <select id="id_fonction" name="fonction" class="rh-input" required>
+          <select id="id_fonction" name="fonction" class="rh-input{% if form_errors.fonction %} rh-input-error{% endif %}" required>
             <option value="">— Sélectionner une fonction —</option>
             {% for groupe in fonctions_groupes %}
             <optgroup label="{{ groupe.label }}">
@@ -456,6 +519,7 @@ html[data-theme="dark"] .rh-mat-auto {
             </optgroup>
             {% endfor %}
           </select>
+          {% if form_errors.fonction %}<div class="rh-error"><i class="bi bi-exclamation-circle"></i> {{ form_errors.fonction }}</div>{% endif %}
         </div>
       </div>
 
@@ -491,7 +555,8 @@ html[data-theme="dark"] .rh-mat-auto {
           <label class="rh-label" for="id_date_embauche">Date d'embauche <span style="color:var(--rose);">*</span></label>
           <input type="date" id="id_date_embauche" name="date_embauche"
                  value="{{ form_data.date_embauche }}"
-                 class="rh-input" required>
+                 class="rh-input{% if form_errors.date_embauche %} rh-input-error{% endif %}" required>
+          {% if form_errors.date_embauche %}<div class="rh-error"><i class="bi bi-exclamation-circle"></i> {{ form_errors.date_embauche }}</div>{% endif %}
         </div>
         <div class="rh-fgroup">
           <label class="rh-label" for="id_date_fin_contrat">Date fin de contrat</label>
@@ -539,6 +604,10 @@ html[data-theme="dark"] .rh-mat-auto {
     </div>
   </div>
 
+  </div><!-- /colonne droite -->
+
+</div><!-- /rh-form-layout -->
+
   <!-- ════════════════════════════════════════
        FOOTER
   ════════════════════════════════════════ -->
@@ -585,7 +654,45 @@ html[data-theme="dark"] .rh-mat-auto {
     updateAge();
   }
 
+  /* ── Aperçu en direct (nom + initiales) ── */
+  var nomInput     = document.getElementById('id_nom');
+  var prenomsInput = document.getElementById('id_prenoms');
+  var previewNom   = document.getElementById('rh-preview-nom');
+  var initialsSpan = document.getElementById('rh-avatar-initials');
+
+  function getInitials() {
+    var i1 = (nomInput.value.trim()[0] || '?').toUpperCase();
+    var i2 = (prenomsInput.value.trim()[0] || '?').toUpperCase();
+    return i1 + i2;
+  }
+
+  function updatePreview() {
+    var n = nomInput.value.trim() || '—';
+    var p = prenomsInput.value.trim() || '—';
+    if (previewNom) previewNom.textContent = n + ' ' + p;
+    if (initialsSpan) initialsSpan.textContent = getInitials();
+  }
+
+  if (nomInput && prenomsInput) {
+    nomInput.addEventListener('input', updatePreview);
+    prenomsInput.addEventListener('input', updatePreview);
+  }
+
 })();
+
+/* ── Suppression de la photo ── */
+function rhSupprimerPhoto() {
+  document.getElementById('photo_supprimer').value = '1';
+  document.getElementById('id_photo').value = '';
+  var img = document.getElementById('rh-photo-img');
+  var initials = document.getElementById('rh-avatar-initials');
+  if (img) { img.style.display = 'none'; img.src = ''; }
+  if (initials) initials.style.display = '';
+  var delBtn = document.getElementById('btn-del-photo');
+  if (delBtn) delBtn.style.display = 'none';
+  var label = document.querySelector('.rh-photo-label');
+  if (label) label.innerHTML = '<i class="bi bi-camera"></i> Ajouter';
+}
 </script>
 {% endblock %}
 

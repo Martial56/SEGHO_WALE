@@ -10,7 +10,7 @@
 .cg-page-head {
   display:flex;align-items:center;justify-content:space-between;gap:16px;
   padding:14px 32px;flex-wrap:wrap;
-  position:sticky;top:var(--topbar-h);z-index:100;
+  position:sticky;top:0;z-index:100;
   background:#f0f6fa;border-bottom:1px solid rgba(0,0,0,0.05);
   box-shadow:0 2px 8px rgba(0,0,0,0.04);
 }
@@ -349,31 +349,38 @@ html[data-theme="dark"] .motif-block{background:rgba(33,150,243,0.1);}
       {% endif %}
     </div>
 
+    <!-- Historique des actions -->
+    {% if historique %}
+    <div class="cg-card" style="margin-top:8px;">
+      <div class="cg-card-header">
+        <div class="cg-card-title"><i class="bi bi-clock-history"></i> Historique des actions</div>
+      </div>
+      <div class="cg-card-body">
+        <div class="hist-timeline">
+          {% for h in historique %}
+          <div class="hist-item">
+            <div class="hist-dot"></div>
+            <div class="hist-body">
+              <div class="hist-action">{{ h.get_action_display }}</div>
+              <div class="hist-meta">
+                {{ h.date|date:"d/m/Y à H:i" }}
+                {% if h.fait_par %}&nbsp;—&nbsp;<strong>{{ h.fait_par }}</strong>{% endif %}
+              </div>
+              {% if h.commentaire %}
+              <div class="hist-comment">{{ h.commentaire }}</div>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
   </div>
 
   <!-- Colonne droite -->
   <div>
-
-    <!-- Annuler -->
-    {% if can_manage and conge.statut in 'approuve,en_cours' %}
-    <div class="cg-card">
-      <div class="cg-card-header">
-        <div class="cg-card-title"><i class="bi bi-slash-circle"></i> Annulation</div>
-      </div>
-      <div class="cg-card-body">
-        <form method="post" action="{% url 'conge_annuler' conge.pk %}">
-          {% csrf_token %}
-          <label class="cg-label">Motif d'annulation</label>
-          <input type="text" name="motif_annulation" class="cg-input"
-                 placeholder="Raison…" style="margin-bottom:12px;">
-          <button type="submit" class="btn-danger-sm" style="width:100%;padding:9px;justify-content:center;"
-                  onclick="return confirm('Annuler cette demande de congé ?')">
-            <i class="bi bi-trash3"></i> Annuler la demande
-          </button>
-        </form>
-      </div>
-    </div>
-    {% endif %}
 
     <!-- Fiche employé (mini) -->
     <div class="cg-card">
@@ -408,6 +415,27 @@ html[data-theme="dark"] .motif-block{background:rgba(33,150,243,0.1);}
         </button>
       </div>
     </div>
+
+    <!-- Annuler -->
+    {% if can_manage and conge.statut in 'approuve,en_cours' %}
+    <div class="cg-card">
+      <div class="cg-card-header">
+        <div class="cg-card-title"><i class="bi bi-slash-circle"></i> Annulation</div>
+      </div>
+      <div class="cg-card-body">
+        <form method="post" action="{% url 'conge_annuler' conge.pk %}">
+          {% csrf_token %}
+          <label class="cg-label">Motif d'annulation</label>
+          <input type="text" name="motif_annulation" class="cg-input"
+                 placeholder="Raison…" style="margin-bottom:12px;">
+          <button type="submit" class="btn-danger-sm" style="width:100%;padding:9px;justify-content:center;"
+                  onclick="return confirm('Annuler cette demande de congé ?')">
+            <i class="bi bi-trash3"></i> Annuler la demande
+          </button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
 
   </div>
 </div>
@@ -515,34 +543,6 @@ html[data-theme="dark"] .motif-block{background:rgba(33,150,243,0.1);}
   </div>
 </div>
 
-<!-- ── Historique des actions ── -->
-{% if historique %}
-<div class="cg-card" style="margin-top:8px;">
-  <div class="cg-card-header">
-    <div class="cg-card-title"><i class="bi bi-clock-history"></i> Historique des actions</div>
-  </div>
-  <div class="cg-card-body">
-    <div class="hist-timeline">
-      {% for h in historique %}
-      <div class="hist-item">
-        <div class="hist-dot"></div>
-        <div class="hist-body">
-          <div class="hist-action">{{ h.get_action_display }}</div>
-          <div class="hist-meta">
-            {{ h.date|date:"d/m/Y à H:i" }}
-            {% if h.fait_par %}&nbsp;—&nbsp;<strong>{{ h.fait_par }}</strong>{% endif %}
-          </div>
-          {% if h.commentaire %}
-          <div class="hist-comment">{{ h.commentaire }}</div>
-          {% endif %}
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-  </div>
-</div>
-{% endif %}
-
 <!-- ── Congé fractionné ── -->
 {% if conge.conge_parent %}
 <div class="cg-card" style="margin-top:8px;border-left:3px solid var(--cg-500);">
@@ -580,7 +580,6 @@ html[data-theme="dark"] .motif-block{background:rgba(33,150,243,0.1);}
 {% endwith %}
 
 </div>
-{% load core_tags %}{% historique_sidebar conge %}
 </div>
 
 {% endblock %}

@@ -37,6 +37,40 @@ def logout_view(request):
 
 
 @login_required(login_url='login')
+@require_POST
+def lock_session(request):
+    """Verrouille la session courante (appelé par le minuteur d'inactivité
+    JS) sans détruire la session — voir core.middleware.SessionTimeoutMiddleware."""
+    request.session['locked'] = True
+    return JsonResponse({'ok': True})
+
+
+@login_required(login_url='login')
+def unlock_session(request):
+    """Déverrouille la session après vérification du mot de passe de
+    l'utilisateur déjà authentifié (pas de login()/logout() — la session et
+    tout son contenu, y compris la page/le formulaire en cours côté client,
+    restent intacts)."""
+    is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
+    error = None
+    if request.method == 'POST':
+        password = request.POST.get('password', '')
+        if request.user.check_password(password):
+            request.session['locked'] = False
+            request.session['last_activity'] = timezone.now().timestamp()
+            if is_ajax:
+                return JsonResponse({'ok': True})
+            return redirect(request.POST.get('next') or 'dashboard')
+        error = "Mot de passe incorrect."
+        if is_ajax:
+            return JsonResponse({'ok': False, 'error': error}, status=400)
+    return render(request, 'registration/locked.html', {
+        'error': error,
+        'next': request.GET.get('next', ''),
+    })
+
+
+@login_required(login_url='login')
 def mon_compte(request):
     from django.contrib.auth import update_session_auth_hash
     from core.models import UserProfile
@@ -229,7 +263,7 @@ def medecins_list(request):
     from medecins.models import Medecin, Specialite
     from django.core.paginator import Paginator
 
-    qs = Medecin.objects.select_related('specialite').order_by('nom')
+    qs = Medecin.objects.select_related('specialite', 'employe').order_by('employe__nom')
 
     q          = request.GET.get('q', '').strip()
     specialite = request.GET.get('specialite', '')
@@ -238,7 +272,7 @@ def medecins_list(request):
 
     if q:
         qs = qs.filter(
-            Q(nom__icontains=q) | Q(prenoms__icontains=q) | Q(matricule__icontains=q)
+            Q(employe__nom__icontains=q) | Q(employe__prenoms__icontains=q) | Q(employe__matricule__icontains=q)
         )
     if specialite:
         qs = qs.filter(specialite__pk=specialite)
@@ -277,45 +311,75 @@ def medecins_list(request):
 
 
 @login_required(login_url='login')
+def medecin_lookup_employe(request):
+    """Recherche AJAX d'un employé par matricule — utilisée par le formulaire de
+    création de médecin pour charger et afficher ses informations (lecture seule) :
+    un médecin est avant tout un employé, créé une seule fois dans le module RH."""
+    from employer.models import Employe
+
+    matricule = request.GET.get('matricule', '').strip()
+    if not matricule:
+        return JsonResponse({'ok': False})
+
+    employe = Employe.objects.filter(matricule=matricule).first()
+    if not employe:
+        return JsonResponse({'ok': False, 'message': 'Aucun employé trouvé avec ce matricule.'})
+    if hasattr(employe, 'fiche_medecin'):
+        return JsonResponse({'ok': False, 'message': f'{employe.nom_complet} est déjà enregistré(e) comme médecin.'})
+
+    return JsonResponse({
+        'ok': True,
+        'nom': employe.nom,
+        'prenoms': employe.prenoms,
+        'telephone': employe.telephone or '—',
+        'email': employe.email or '—',
+        'service': employe.service.nom if employe.service else '—',
+        'photo_url': employe.photo.url if employe.photo else '',
+    })
+
+
+@login_required(login_url='login')
 def medecin_create(request):
-    from medecins.models import Medecin, Specialite, Service
+    from medecins.models import Medecin, Specialite, Service, Departement
+    from employer.models import Employe
     from django.contrib.auth.models import User
 
     specialites = Specialite.objects.order_by('nom')
-    services = Service.objects.filter(actif=True).order_by('nom')
+    departements = Departement.objects.filter(actif=True).order_by('nom')
+    services = Service.objects.filter(actif=True).select_related('departement').order_by('nom')
     users_disponibles = User.objects.filter(medecin__isnull=True).order_by('last_name', 'first_name')
     errors = {}
+    employe_trouve = None
 
     if request.method == 'POST':
-        nom = request.POST.get('nom', '').strip()
-        prenoms = request.POST.get('prenoms', '').strip()
+        matricule = request.POST.get('matricule', '').strip()
         specialite_pk = request.POST.get('specialite', '')
+        departement_pk = request.POST.get('departement', '')
         service_pk = request.POST.get('service', '')
-        telephone = request.POST.get('telephone', '').strip()
-        email = request.POST.get('email', '').strip()
         taux_honoraire = request.POST.get('taux_honoraire', '0').strip() or '0'
         actif = request.POST.get('actif') == 'on'
         user_pk = request.POST.get('user', '')
 
-        if not nom:
-            errors['nom'] = 'Le nom est obligatoire.'
-        if not prenoms:
-            errors['prenoms'] = 'Les prénoms sont obligatoires.'
-        if not telephone:
-            errors['telephone'] = 'Le téléphone est obligatoire.'
+        if not matricule:
+            errors['matricule'] = 'Le matricule employé est obligatoire.'
+        else:
+            employe_trouve = Employe.objects.filter(matricule=matricule).first()
+            if not employe_trouve:
+                errors['matricule'] = 'Aucun employé trouvé avec ce matricule.'
+            elif hasattr(employe_trouve, 'fiche_medecin'):
+                errors['matricule'] = f'{employe_trouve.nom_complet} est déjà enregistré(e) comme médecin.'
+
+        if not specialite_pk:
+            errors['specialite'] = 'La spécialité est obligatoire.'
+        elif not Specialite.objects.filter(pk=specialite_pk).exists():
+            errors['specialite'] = 'Spécialité invalide.'
+        if not departement_pk:
+            errors['departement'] = 'Le département est obligatoire.'
+        elif not Departement.objects.filter(pk=departement_pk).exists():
+            errors['departement'] = 'Département invalide.'
 
         if not errors:
             annee = timezone.now().year
-            dernier = Medecin.objects.filter(matricule__startswith=f'MED{annee}').order_by('-matricule').first()
-            if dernier:
-                try:
-                    seq = int(dernier.matricule[-4:]) + 1
-                except ValueError:
-                    seq = 1
-            else:
-                seq = 1
-            matricule = f'MED{annee}{seq:04d}'
-
             dernier_ord = Medecin.objects.filter(ordre_medecin__startswith=f'ORD{annee}').order_by('-ordre_medecin').first()
             if dernier_ord:
                 try:
@@ -326,11 +390,9 @@ def medecin_create(request):
                 seq_ord = 1
             ordre_medecin = f'ORD{annee}{seq_ord:04d}'
 
-            med = Medecin(
-                matricule=matricule, nom=nom, prenoms=prenoms,
-                telephone=telephone, email=email,
-                ordre_medecin=ordre_medecin, actif=actif,
-            )
+            service_obj = Service.objects.filter(pk=service_pk).first() if service_pk else employe_trouve.service
+
+            med = Medecin(employe=employe_trouve, ordre_medecin=ordre_medecin, actif=actif, service=service_obj)
             try:
                 med.taux_honoraire = float(taux_honoraire)
             except ValueError:
@@ -342,16 +404,13 @@ def medecin_create(request):
                 except Specialite.DoesNotExist:
                     pass
 
-            med.service = Service.objects.filter(pk=service_pk).first() if service_pk else None
+            med.departement = Departement.objects.filter(pk=departement_pk).first() if departement_pk else None
 
             if user_pk:
                 try:
                     med.user = User.objects.get(pk=user_pk)
                 except User.DoesNotExist:
                     pass
-
-            if request.FILES.get('photo'):
-                med.photo = request.FILES['photo']
 
             med.save()
             messages.success(request, f'Médecin {med} enregistré avec succès (matricule : {med.matricule}).')
@@ -364,49 +423,47 @@ def medecin_create(request):
     return render(request, 'medecins/form.html', {
         'mode': 'create',
         'specialites': specialites,
+        'departements': departements,
         'services': services,
         'users_disponibles': users_disponibles,
         'errors': errors,
         'post': post_data,
+        'employe_trouve': employe_trouve,
     })
 
 
 @login_required(login_url='login')
 def medecin_edit(request, pk):
-    from medecins.models import Medecin, Specialite, Service
+    from medecins.models import Medecin, Specialite, Service, Departement
     from django.contrib.auth.models import User
 
     med = get_object_or_404(Medecin, pk=pk)
     specialites = Specialite.objects.order_by('nom')
-    services = Service.objects.filter(actif=True).order_by('nom')
+    departements = Departement.objects.filter(actif=True).order_by('nom')
+    services = Service.objects.filter(actif=True).select_related('departement').order_by('nom')
     users_disponibles = User.objects.filter(
         Q(medecin__isnull=True) | Q(medecin=med)
     ).order_by('last_name', 'first_name')
     errors = {}
 
     if request.method == 'POST':
-        nom = request.POST.get('nom', '').strip()
-        prenoms = request.POST.get('prenoms', '').strip()
         specialite_pk = request.POST.get('specialite', '')
+        departement_pk = request.POST.get('departement', '')
         service_pk = request.POST.get('service', '')
-        telephone = request.POST.get('telephone', '').strip()
-        email = request.POST.get('email', '').strip()
         taux_honoraire = request.POST.get('taux_honoraire', '0').strip() or '0'
         actif = request.POST.get('actif') == 'on'
         user_pk = request.POST.get('user', '')
 
-        if not nom:
-            errors['nom'] = 'Le nom est obligatoire.'
-        if not prenoms:
-            errors['prenoms'] = 'Les prénoms sont obligatoires.'
-        if not telephone:
-            errors['telephone'] = 'Le téléphone est obligatoire.'
+        if not specialite_pk:
+            errors['specialite'] = 'La spécialité est obligatoire.'
+        elif not Specialite.objects.filter(pk=specialite_pk).exists():
+            errors['specialite'] = 'Spécialité invalide.'
+        if not departement_pk:
+            errors['departement'] = 'Le département est obligatoire.'
+        elif not Departement.objects.filter(pk=departement_pk).exists():
+            errors['departement'] = 'Département invalide.'
 
         if not errors:
-            med.nom = nom
-            med.prenoms = prenoms
-            med.telephone = telephone
-            med.email = email
             med.actif = actif
             try:
                 med.taux_honoraire = float(taux_honoraire)
@@ -414,6 +471,7 @@ def medecin_edit(request, pk):
                 med.taux_honoraire = 0
 
             med.specialite = Specialite.objects.filter(pk=specialite_pk).first() if specialite_pk else None
+            med.departement = Departement.objects.filter(pk=departement_pk).first() if departement_pk else None
             med.service = Service.objects.filter(pk=service_pk).first() if service_pk else None
 
             if user_pk:
@@ -424,14 +482,6 @@ def medecin_edit(request, pk):
             else:
                 med.user = None
 
-            if request.FILES.get('photo'):
-                if med.photo:
-                    med.photo.delete(save=False)
-                med.photo = request.FILES['photo']
-            elif request.POST.get('photo_supprimer') == '1' and med.photo:
-                med.photo.delete(save=False)
-                med.photo = None
-
             med.save()
             messages.success(request, f'Médecin {med} mis à jour avec succès.')
             return redirect('medecins_list')
@@ -440,6 +490,7 @@ def medecin_edit(request, pk):
         'mode': 'edit',
         'med': med,
         'specialites': specialites,
+        'departements': departements,
         'services': services,
         'users_disponibles': users_disponibles,
         'errors': errors,
@@ -926,7 +977,7 @@ def gynecologie_naissance_create(request):
     from medecins.models import Medecin
 
     patients = Patient.objects.filter(actif=True).order_by('nom')
-    medecins = Medecin.objects.all().order_by('nom')
+    medecins = Medecin.objects.all().order_by('employe__nom')
     error = None
 
     if request.method == 'POST':
@@ -1032,7 +1083,7 @@ def gynecologie_registre_naissance(request):
         'semaine':       'date_accouchement',
         'jour':          'date_accouchement',
         'mere':          'mere__nom',
-        'medecin':       'medecin__nom',
+        'medecin':       'medecin__employe__nom',
         'mode':          'mode_accouchement',
         'statut':        'statut',
         'genre':         'sexe_enfant',
@@ -1241,7 +1292,7 @@ def gynecologie_rdv_create(request):
     from patients.forms import RendezVousForm
     from medecins.models import Medecin
 
-    medecins = Medecin.objects.all().order_by('nom')
+    medecins = Medecin.objects.all().order_by('employe__nom')
 
     if request.method == 'POST':
         form = RendezVousForm(request.POST)
@@ -1298,7 +1349,7 @@ def gynecologie_rdv_detail(request, pk):
     from medecins.models import Medecin
 
     rdv = get_object_or_404(RendezVous, pk=pk)
-    medecins = Medecin.objects.all().order_by('nom')
+    medecins = Medecin.objects.all().order_by('employe__nom')
 
     try:
         from facturation.models import Facture
@@ -1613,7 +1664,7 @@ def gynecologie_rdv(request):
     SORT_FIELDS = {
         'date':    ['date_heure'],
         'patient': ['patient__nom', 'patient__prenoms'],
-        'medecin': ['medecin__nom'],
+        'medecin': ['medecin__employe__nom'],
         'statut':  ['statut'],
         'type':    ['type_rdv'],
         'age':     ['patient__date_naissance'],
@@ -1664,9 +1715,9 @@ def gynecologie_rdv(request):
         rows = rdvs.values('departement').annotate(n=_Count('id'))
         group_counts = {r['departement'] or '': r['n'] for r in rows}
     elif group_val in ('medecin', 'referent'):
-        rows = rdvs.values('medecin__nom', 'medecin__prenoms').annotate(n=_Count('id'))
+        rows = rdvs.values('medecin__employe__nom', 'medecin__employe__prenoms').annotate(n=_Count('id'))
         group_counts = {
-            (f"Dr {r['medecin__nom']} {r['medecin__prenoms']}" if r['medecin__nom'] else '—'): r['n']
+            (f"Dr {r['medecin__employe__nom']} {r['medecin__employe__prenoms']}" if r['medecin__employe__nom'] else '—'): r['n']
             for r in rows
         }
     elif group_val == 'assurance':
@@ -2062,13 +2113,17 @@ def medecins_specialite_detail(request, pk):
 
 @login_required(login_url='login')
 def medecins_specialite_create(request):
+    is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
     Form = _specialite_form_class()
     form = Form(request.POST or None)
     if request.method == 'POST' and form.is_valid():
-        form.save()
+        obj = form.save()
+        if is_ajax:
+            return JsonResponse({'ok': True, 'message': f'Spécialité « {obj} » créée.'})
         messages.success(request, 'Spécialité créée.')
         return redirect('medecins_specialites')
-    return render(request, 'medecins/config/specialite_form.html', {
+    template = 'medecins/config/specialite_form_modal.html' if is_ajax else 'medecins/config/specialite_form.html'
+    return render(request, template, {
         'form': form, 'titre': 'Nouvelle spécialité',
     })
 
@@ -2076,14 +2131,18 @@ def medecins_specialite_create(request):
 @login_required(login_url='login')
 def medecins_specialite_edit(request, pk):
     from medecins.models import Specialite
+    is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
     obj  = get_object_or_404(Specialite, pk=pk)
     Form = _specialite_form_class()
     form = Form(request.POST or None, instance=obj)
     if request.method == 'POST' and form.is_valid():
         form.save()
+        if is_ajax:
+            return JsonResponse({'ok': True, 'message': f'Spécialité « {obj} » mise à jour.'})
         messages.success(request, 'Spécialité mise à jour.')
         return redirect('medecins_specialite_detail', pk=pk)
-    return render(request, 'medecins/config/specialite_form.html', {
+    template = 'medecins/config/specialite_form_modal.html' if is_ajax else 'medecins/config/specialite_form.html'
+    return render(request, template, {
         'form': form, 'titre': f'Modifier – {obj.nom}', 'obj': obj,
     })
 
@@ -2220,13 +2279,17 @@ def medecins_departement_detail(request, pk):
 
 @login_required(login_url='login')
 def medecins_departement_create(request):
+    is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
     Form = _departement_form_class()
     form = Form(request.POST or None)
     if request.method == 'POST' and form.is_valid():
-        form.save()
+        obj = form.save()
+        if is_ajax:
+            return JsonResponse({'ok': True, 'message': f'Département « {obj} » créé.'})
         messages.success(request, 'Département créé.')
         return redirect('medecins_departements')
-    return render(request, 'medecins/config/departement_form.html', {
+    template = 'medecins/config/departement_form_modal.html' if is_ajax else 'medecins/config/departement_form.html'
+    return render(request, template, {
         'form': form, 'titre': 'Nouveau département',
     })
 
@@ -2234,14 +2297,18 @@ def medecins_departement_create(request):
 @login_required(login_url='login')
 def medecins_departement_edit(request, pk):
     from medecins.models import Departement
+    is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
     obj  = get_object_or_404(Departement, pk=pk)
     Form = _departement_form_class()
     form = Form(request.POST or None, instance=obj)
     if request.method == 'POST' and form.is_valid():
         form.save()
+        if is_ajax:
+            return JsonResponse({'ok': True, 'message': f'Département « {obj} » mis à jour.'})
         messages.success(request, 'Département mis à jour.')
         return redirect('medecins_departement_detail', pk=pk)
-    return render(request, 'medecins/config/departement_form.html', {
+    template = 'medecins/config/departement_form_modal.html' if is_ajax else 'medecins/config/departement_form.html'
+    return render(request, template, {
         'form': form, 'titre': f'Modifier – {obj.nom}', 'obj': obj,
     })
 
@@ -2332,7 +2399,7 @@ def _service_form_class():
     from medecins.models import Service, Medecin, Departement
     class ServiceForm(forms.ModelForm):
         chef_service = forms.ModelChoiceField(
-            queryset=Medecin.objects.filter(actif=True).order_by('nom', 'prenoms'),
+            queryset=Medecin.objects.filter(actif=True).order_by('employe__nom', 'employe__prenoms'),
             required=False,
             empty_label='— Aucun chef de service —',
         )
@@ -2378,7 +2445,7 @@ def medecins_service_detail(request, pk):
     obj = get_object_or_404(Service.objects.select_related('departement'), pk=pk)
     pks = list(Service.objects.order_by('nom').values_list('pk', flat=True))
     pos = pks.index(pk) if pk in pks else None
-    medecins = Medecin.objects.filter(service=obj).order_by('nom', 'prenoms')
+    medecins = Medecin.objects.filter(service=obj).order_by('employe__nom', 'employe__prenoms')
     return render(request, 'medecins/config/service_detail.html', {
         'obj':      obj,
         'medecins': medecins,
@@ -2389,13 +2456,17 @@ def medecins_service_detail(request, pk):
 
 @login_required(login_url='login')
 def medecins_service_create(request):
+    is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
     Form = _service_form_class()
     form = Form(request.POST or None)
     if request.method == 'POST' and form.is_valid():
-        form.save()
+        obj = form.save()
+        if is_ajax:
+            return JsonResponse({'ok': True, 'message': f'Service « {obj} » créé.'})
         messages.success(request, 'Service créé.')
         return redirect('medecins_services')
-    return render(request, 'medecins/config/service_form.html', {
+    template = 'medecins/config/service_form_modal.html' if is_ajax else 'medecins/config/service_form.html'
+    return render(request, template, {
         'form': form, 'titre': 'Nouveau service',
     })
 
@@ -2403,14 +2474,18 @@ def medecins_service_create(request):
 @login_required(login_url='login')
 def medecins_service_edit(request, pk):
     from medecins.models import Service
+    is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
     obj  = get_object_or_404(Service, pk=pk)
     Form = _service_form_class()
     form = Form(request.POST or None, instance=obj)
     if request.method == 'POST' and form.is_valid():
         form.save()
+        if is_ajax:
+            return JsonResponse({'ok': True, 'message': f'Service « {obj} » mis à jour.'})
         messages.success(request, 'Service mis à jour.')
         return redirect('medecins_service_detail', pk=pk)
-    return render(request, 'medecins/config/service_form.html', {
+    template = 'medecins/config/service_form_modal.html' if is_ajax else 'medecins/config/service_form.html'
+    return render(request, template, {
         'form': form, 'titre': f'Modifier – {obj.nom}', 'obj': obj,
     })
 
@@ -2480,7 +2555,7 @@ def medecins_import_services(request):
                 dept_manquants.add(dept_code)
 
             chef_matricule = _s(item.get('chef_service', ''))
-            chef_service = Medecin.objects.filter(matricule=chef_matricule).first() if chef_matricule else None
+            chef_service = Medecin.objects.filter(employe__matricule=chef_matricule).first() if chef_matricule else None
             if chef_matricule and not chef_service:
                 chef_manquants.add(chef_matricule)
 

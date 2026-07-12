@@ -153,7 +153,7 @@ class TestStockMovementViews(TestCase):
     def test_vente_diminue_stock_pharmacie_et_cree_mouvement(self):
         produit = _produit('VTE')
         sp = _stock_pharmacie('wale_toumbokro', produit, Decimal('10'))
-        User.objects.create_user('u_vte', password='x')
+        _groupe_user('u_vte', 'Pharmacien')
         client = Client()
         client.login(username='u_vte', password='x')
         resp = client.post(reverse('pharmacie_caisse', kwargs={'pharmacie': 'wale_toumbokro'}), {

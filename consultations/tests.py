@@ -25,11 +25,12 @@ def _patient(suffix=''):
 
 
 def _medecin(suffix=''):
-    return Medecin.objects.create(
-        matricule=f'MED{suffix}{Medecin.objects.count():03d}',
+    from employer.models import Employe
+    employe = Employe.objects.create(
         nom='Docteur', prenoms=f'Test{suffix}',
-        specialite=_specialite(), telephone='0700000001',
+        telephone='0700000001', date_embauche='2020-01-01',
     )
+    return Medecin.objects.create(employe=employe, specialite=_specialite())
 
 
 def _rdv(patient=None, statut='en_attente'):

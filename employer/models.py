@@ -40,6 +40,7 @@ class Grade(models.Model):
 
 class TypeContrat(models.Model):
     nom = models.CharField(max_length=100)
+    code = models.CharField(max_length=20, blank=True)
     description = models.TextField(blank=True)
     droit_au_conge = models.BooleanField(
         default=True,
@@ -53,6 +54,17 @@ class TypeContrat(models.Model):
         ordering = ['nom']
         verbose_name = "Type de contrat"
         verbose_name_plural = "Types de contrat"
+
+
+class Nationalite(models.Model):
+    nom = models.CharField(max_length=100)
+
+    def __str__(self): return self.nom
+    class Meta:
+        db_table = 'ressources_humaines_nationalite'
+        ordering = ['nom']
+        verbose_name = "Nationalité"
+        verbose_name_plural = "Nationalités"
 
 
 class Employe(models.Model):
@@ -77,7 +89,10 @@ class Employe(models.Model):
     sexe = models.CharField(max_length=1, choices=SEXE_CHOICES, blank=True)
     date_naissance = models.DateField(null=True, blank=True)
     lieu_naissance = models.CharField(max_length=150, blank=True)
-    nationalite = models.CharField(max_length=50, blank=True, default='Ivoirienne')
+    nationalite = models.ForeignKey(
+        Nationalite, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='employes'
+    )
     situation_matrimoniale = models.CharField(max_length=20, choices=SITUATION_CHOICES, blank=True)
     nombre_enfants = models.PositiveSmallIntegerField(default=0)
     photo = models.ImageField(upload_to='employes/photos/', null=True, blank=True)
@@ -109,6 +124,10 @@ class Employe(models.Model):
     date_fin_contrat = models.DateField(null=True, blank=True)
     salaire_base = models.DecimalField(max_digits=12, decimal_places=0, default=0)
     statut = models.CharField(max_length=20, choices=STATUT_CHOICES, default='actif')
+    date_depart = models.DateField(
+        null=True, blank=True, verbose_name="Date de départ",
+        help_text="Renseignée automatiquement lors du passage au statut « quitté ».",
+    )
 
     # Identification pointage
     biometric_id = models.CharField(
@@ -136,15 +155,15 @@ class Employe(models.Model):
                 from datetime import date as _date
                 d = _date.fromisoformat(d)
             prefix = f'{d.year:04d}'
-            dernier = Employe.objects.filter(
-                matricule__startswith=prefix, matricule__regex=r'^\d{7}'
-            ).order_by('matricule').last()
-            seq = 1
-            if dernier:
+            max_seq = 0
+            for m in Employe.objects.filter(matricule__regex=r'^\d{7}').values_list('matricule', flat=True):
                 try:
-                    seq = int(dernier.matricule[4:7]) + 1
+                    n = int(m[4:7])
                 except (ValueError, IndexError):
-                    seq = 1
+                    continue
+                if n > max_seq:
+                    max_seq = n
+            seq = max_seq + 1
             self.matricule = f'{prefix}{seq:03d}{ini_nom}{ini_prenom}'
         super().save(*args, **kwargs)
 

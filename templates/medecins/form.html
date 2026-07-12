@@ -32,7 +32,7 @@
 </div>
 {% endif %}
 
-<form id="medecin-form" method="post" enctype="multipart/form-data" novalidate>
+<form id="medecin-form" method="post" novalidate>
 {% csrf_token %}
 
 <div class="md-form-layout">
@@ -44,25 +44,11 @@
         <div class="md-card-title"><i class="bi bi-person-circle" style="color:var(--md-600);"></i> Aperçu</div>
       </div>
       <div class="md-card-body" style="text-align:center;">
-        <label for="photo" style="cursor:pointer;">
-          <div class="md-avatar-preview" id="avatar-preview">
-            {% if mode == 'edit' and med.photo %}
-            <img src="{{ med.photo.url }}" id="photo-img" alt="Photo">
-            {% else %}
-            <span id="avatar-initials">{% if mode == 'edit' %}{{ med.nom|first|upper }}{{ med.prenoms|first|upper }}{% else %}DR{% endif %}</span>
-            {% endif %}
-          </div>
-        </label>
-
-        <input type="file" name="photo" id="photo" accept="image/*" style="display:none;">
-        <input type="hidden" name="photo_supprimer" id="photo_supprimer" value="0">
-
-        <div class="md-photo-actions">
-          <label for="photo" class="md-photo-label"><i class="bi bi-camera"></i> Changer</label>
+        <div class="md-avatar-preview" id="avatar-preview">
           {% if mode == 'edit' and med.photo %}
-          <button type="button" class="md-photo-del" id="btn-del-photo" onclick="supprimerPhoto()">
-            <i class="bi bi-trash3"></i>
-          </button>
+          <img src="{{ med.photo.url }}" id="photo-img" alt="Photo">
+          {% else %}
+          <span id="avatar-initials">{% if mode == 'edit' %}{{ med.nom|first|upper }}{{ med.prenoms|first|upper }}{% else %}DR{% endif %}</span>
           {% endif %}
         </div>
 
@@ -70,9 +56,12 @@
           {% if mode == 'edit' %}Dr {{ med.nom }} {{ med.prenoms }}{% else %}Dr — —{% endif %}
         </div>
         {% if mode == 'edit' %}
-        <div class="md-matricule-badge">{{ med.matricule }}</div>
+        <div class="md-matricule-badge" id="matricule-badge">{{ med.matricule }}</div>
         {% else %}
-        <div style="font-size:11px;color:var(--md-muted);margin-top:8px;">Le matricule sera généré automatiquement</div>
+        <div class="md-matricule-badge" id="matricule-badge" style="display:none;"></div>
+        <div style="font-size:11px;color:var(--md-muted);margin-top:8px;" id="matricule-hint">
+          Renseignez le matricule de l'employé pour charger sa fiche.
+        </div>
         {% endif %}
       </div>
     </div>
@@ -126,26 +115,52 @@
         <div class="md-card-title"><i class="bi bi-person-vcard" style="color:var(--md-600);"></i> Identité</div>
       </div>
       <div class="md-card-body">
-        <div class="tab-two-col" style="margin-bottom:0;">
-          <div class="form-field">
-            <label class="field-label" for="nom">Nom <span class="required-star">*</span></label>
-            <input type="text" name="nom" id="nom" class="field-ul{% if errors.nom %} error{% endif %}"
-              value="{% if mode == 'edit' %}{{ med.nom }}{% elif post %}{{ post.nom }}{% endif %}"
-              placeholder="Nom de famille" autocomplete="off">
-            {% if errors.nom %}<div class="field-error">{{ errors.nom }}</div>{% endif %}
-          </div>
-          <div class="form-field">
-            <label class="field-label" for="prenoms">Prénoms <span class="required-star">*</span></label>
-            <input type="text" name="prenoms" id="prenoms" class="field-ul{% if errors.prenoms %} error{% endif %}"
-              value="{% if mode == 'edit' %}{{ med.prenoms }}{% elif post %}{{ post.prenoms }}{% endif %}"
-              placeholder="Prénoms" autocomplete="off">
-            {% if errors.prenoms %}<div class="field-error">{{ errors.prenoms }}</div>{% endif %}
-          </div>
+
+        {% if mode == 'create' %}
+        <div class="form-field">
+          <label class="field-label" for="matricule">Matricule employé <span class="required-star">*</span></label>
+          <input type="text" name="matricule" id="matricule" class="field-ul{% if errors.matricule %} error{% endif %}"
+            value="{% if post %}{{ post.matricule }}{% endif %}"
+            placeholder="Ex : 2026015KJ" autocomplete="off">
+          <div class="f-hint">Un médecin est avant tout un employé — renseignez son matricule pour charger sa fiche RH. Ses informations ne sont plus modifiables depuis ce module.</div>
+          {% if errors.matricule %}<div class="field-error">{{ errors.matricule }}</div>{% endif %}
+          <div class="field-error" id="matricule-lookup-error" style="display:none;"></div>
         </div>
 
+        <div id="employe-trouve-block" style="display:none; padding:12px 14px; background:var(--md-100); border-radius:8px; margin-top:4px; margin-bottom:14px;">
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:.4px; color:var(--md-muted); font-weight:700; margin-bottom:6px;">
+            <i class="bi bi-check-circle-fill" style="color:var(--md-600);"></i> Fiche employé trouvée
+          </div>
+          <div style="font-size:13px; color:var(--md-text); line-height:1.8;">
+            <div><strong id="et-nom-prenoms"></strong></div>
+            <div><i class="bi bi-telephone" style="width:16px;display:inline-block;"></i> <span id="et-telephone"></span></div>
+            <div><i class="bi bi-envelope" style="width:16px;display:inline-block;"></i> <span id="et-email"></span></div>
+            <div><i class="bi bi-building" style="width:16px;display:inline-block;"></i> <span id="et-service"></span></div>
+          </div>
+        </div>
+        {% else %}
         <div class="form-field">
-          <label class="field-label" for="specialite">Spécialité</label>
-          <select name="specialite" id="specialite" class="field-ul">
+          <label class="field-label">Matricule employé</label>
+          <div style="font-family: var(--font-mono);font-size:13.5px;font-weight:700;color:var(--md-600);padding:9px 4px;border-bottom:1.5px solid var(--md-200);">
+            {{ med.matricule }}
+          </div>
+        </div>
+        <div class="tab-two-col" style="margin-bottom:0;">
+          <div class="form-field">
+            <label class="field-label">Nom</label>
+            <div style="font-size:13.5px;color:var(--md-text);padding:9px 4px;border-bottom:1.5px solid var(--md-200);">{{ med.nom }}</div>
+          </div>
+          <div class="form-field">
+            <label class="field-label">Prénoms</label>
+            <div style="font-size:13.5px;color:var(--md-text);padding:9px 4px;border-bottom:1.5px solid var(--md-200);">{{ med.prenoms }}</div>
+          </div>
+        </div>
+        <div class="f-hint" style="margin-bottom:14px;">Ces informations proviennent de la fiche employé — modifiez-les depuis le module Employés.</div>
+        {% endif %}
+
+        <div class="form-field">
+          <label class="field-label" for="specialite">Spécialité <span class="required-star">*</span></label>
+          <select name="specialite" id="specialite" class="field-ul{% if errors.specialite %} error{% endif %}">
             <option value="">— Aucune spécialité —</option>
             {% for sp in specialites %}
             <option value="{{ sp.pk }}"
@@ -154,15 +169,30 @@
               {% endif %}>{{ sp.nom }}</option>
             {% endfor %}
           </select>
+          {% if errors.specialite %}<div class="field-error">{{ errors.specialite }}</div>{% endif %}
         </div>
 
         <div class="form-field">
-          <label class="field-label" for="service">Département / Service</label>
-          <select name="service" id="service" class="field-ul">
+          <label class="field-label" for="departement">Département <span class="required-star">*</span></label>
+          <select name="departement" id="departement" class="field-ul{% if errors.departement %} error{% endif %}">
             <option value="">— Aucun département —</option>
+            {% for dept in departements %}
+            <option value="{{ dept.pk }}"
+              {% if mode == 'edit' and med.departement_id == dept.pk %}selected
+              {% elif post and post.departement == dept.pk|stringformat:"s" %}selected
+              {% endif %}>{{ dept.nom }}</option>
+            {% endfor %}
+          </select>
+          {% if errors.departement %}<div class="field-error">{{ errors.departement }}</div>{% endif %}
+        </div>
+
+        <div class="form-field">
+          <label class="field-label" for="service">Service</label>
+          <select name="service" id="service" class="field-ul">
+            <option value="">— Aucun service —</option>
             {% for svc in services %}
-            <option value="{{ svc.pk }}"
-              {% if mode == 'edit' and med.service and med.service.pk == svc.pk %}selected
+            <option value="{{ svc.pk }}" data-departement="{{ svc.departement_id|default:'' }}"
+              {% if mode == 'edit' and med.service_id == svc.pk %}selected
               {% elif post and post.service == svc.pk|stringformat:"s" %}selected
               {% endif %}>{{ svc.nom }}</option>
             {% endfor %}
@@ -190,21 +220,21 @@
         <div class="md-card-title"><i class="bi bi-telephone" style="color:var(--md-600);"></i> Contact</div>
       </div>
       <div class="md-card-body">
+        {% if mode == 'edit' %}
         <div class="tab-two-col" style="margin-bottom:0;">
           <div class="form-field">
-            <label class="field-label" for="telephone">Téléphone <span class="required-star">*</span></label>
-            <input type="tel" name="telephone" id="telephone" class="field-ul{% if errors.telephone %} error{% endif %}"
-              value="{% if mode == 'edit' %}{{ med.telephone }}{% elif post %}{{ post.telephone }}{% endif %}"
-              placeholder="+225 07 00 00 00 00">
-            {% if errors.telephone %}<div class="field-error">{{ errors.telephone }}</div>{% endif %}
+            <label class="field-label">Téléphone</label>
+            <div style="font-size:13.5px;color:var(--md-text);padding:9px 4px;border-bottom:1.5px solid var(--md-200);">{{ med.telephone|default:"—" }}</div>
           </div>
           <div class="form-field">
-            <label class="field-label" for="email">Email</label>
-            <input type="email" name="email" id="email" class="field-ul"
-              value="{% if mode == 'edit' %}{{ med.email }}{% elif post %}{{ post.email }}{% endif %}"
-              placeholder="email@exemple.com">
+            <label class="field-label">Email</label>
+            <div style="font-size:13.5px;color:var(--md-text);padding:9px 4px;border-bottom:1.5px solid var(--md-200);">{{ med.email|default:"—" }}</div>
           </div>
         </div>
+        <div class="f-hint">Modifiables depuis la fiche employé (module Employés).</div>
+        {% else %}
+        <div class="f-hint" style="margin:0;">S'affichera automatiquement une fois le matricule renseigné.</div>
+        {% endif %}
       </div>
     </div>
 
@@ -240,65 +270,110 @@
 
 <script>
 (function(){
-  const nomInput    = document.getElementById('nom');
-  const prenomsInput= document.getElementById('prenoms');
-  const preview     = document.getElementById('preview-nom');
-  const avatarPrev  = document.getElementById('avatar-preview');
   const actifCheck  = document.getElementById('actif');
   const actifLabel  = document.getElementById('actif-label');
-  const photoInput  = document.getElementById('photo');
-
-  function getInitials(){
-    const ini1 = nomInput.value.trim()[0] || 'D';
-    const ini2 = prenomsInput.value.trim()[0] || 'R';
-    return ini1.toUpperCase() + ini2.toUpperCase();
-  }
-
-  function showInitials(){
-    avatarPrev.innerHTML = '<span id="avatar-initials">' + getInitials() + '</span>';
-  }
-
-  function updatePreview(){
-    const n = nomInput.value.trim().toUpperCase() || '—';
-    const p = prenomsInput.value.trim() || '—';
-    preview.textContent = 'Dr ' + n + ' ' + p;
-    const img = avatarPrev.querySelector('img');
-    if (!img) showInitials();
-    else {
-      const span = document.getElementById('avatar-initials');
-      if (span) span.textContent = getInitials();
-    }
-  }
-
-  nomInput.addEventListener('input', updatePreview);
-  prenomsInput.addEventListener('input', updatePreview);
 
   actifCheck.addEventListener('change', function(){
     actifLabel.textContent = this.checked ? 'Actif' : 'Inactif';
   });
 
-  photoInput.addEventListener('change', function(){
-    if (!this.files || !this.files[0]) return;
-    const reader = new FileReader();
-    reader.onload = function(e){
-      avatarPrev.innerHTML = '<img src="' + e.target.result + '" id="photo-img" alt="Photo">';
-      document.getElementById('photo_supprimer').value = '0';
-      const delBtn = document.getElementById('btn-del-photo');
-      if (delBtn) delBtn.style.display = 'inline-flex';
-    };
-    reader.readAsDataURL(this.files[0]);
-  });
-})();
+  /* ── Recherche employé par matricule (mode création uniquement) ── */
+  const matriculeInput = document.getElementById('matricule');
+  if (matriculeInput) {
+    const avatarPrev   = document.getElementById('avatar-preview');
+    const previewNom   = document.getElementById('preview-nom');
+    const matBadge     = document.getElementById('matricule-badge');
+    const matHint      = document.getElementById('matricule-hint');
+    const lookupError  = document.getElementById('matricule-lookup-error');
+    const etBlock      = document.getElementById('employe-trouve-block');
+    const etNomPrenoms = document.getElementById('et-nom-prenoms');
+    const etTelephone  = document.getElementById('et-telephone');
+    const etEmail      = document.getElementById('et-email');
+    const etService    = document.getElementById('et-service');
+    let lookupTimer = null;
 
-function supprimerPhoto(){
-  document.getElementById('photo_supprimer').value = '1';
-  document.getElementById('photo').value = '';
-  const av = document.getElementById('avatar-preview');
-  const nom = document.getElementById('nom').value.trim()[0] || 'D';
-  const pre = document.getElementById('prenoms').value.trim()[0] || 'R';
-  av.innerHTML = '<span id="avatar-initials">' + nom.toUpperCase() + pre.toUpperCase() + '</span>';
-  const delBtn = document.getElementById('btn-del-photo');
-  if (delBtn) delBtn.style.display = 'none';
-}
+    function resetPreview() {
+      avatarPrev.innerHTML = '<span id="avatar-initials">DR</span>';
+      previewNom.textContent = 'Dr — —';
+      matBadge.style.display = 'none';
+      etBlock.style.display = 'none';
+      matHint.style.display = 'block';
+    }
+
+    function afficherEmploye(data) {
+      lookupError.style.display = 'none';
+      matHint.style.display = 'none';
+      matBadge.textContent = matriculeInput.value.trim();
+      matBadge.style.display = 'inline-block';
+      previewNom.textContent = 'Dr ' + data.nom + ' ' + data.prenoms;
+      if (data.photo_url) {
+        avatarPrev.innerHTML = '<img src="' + data.photo_url + '" alt="Photo">';
+      } else {
+        const ini = (data.nom[0] || 'D').toUpperCase() + (data.prenoms[0] || 'R').toUpperCase();
+        avatarPrev.innerHTML = '<span id="avatar-initials">' + ini + '</span>';
+      }
+      etNomPrenoms.textContent = data.nom + ' ' + data.prenoms;
+      etTelephone.textContent = data.telephone;
+      etEmail.textContent = data.email;
+      etService.textContent = data.service;
+      etBlock.style.display = 'block';
+    }
+
+    function afficherErreur(message) {
+      lookupError.textContent = message;
+      lookupError.style.display = 'block';
+      etBlock.style.display = 'none';
+      resetPreview();
+      lookupError.style.display = 'block';
+    }
+
+    function rechercher() {
+      const val = matriculeInput.value.trim();
+      if (!val) { resetPreview(); lookupError.style.display = 'none'; return; }
+      fetch('{% url "medecin_lookup_employe" %}?matricule=' + encodeURIComponent(val))
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (data.ok) afficherEmploye(data);
+          else afficherErreur(data.message || 'Employé introuvable.');
+        })
+        .catch(function () { afficherErreur('Erreur lors de la recherche.'); });
+    }
+
+    matriculeInput.addEventListener('input', function () {
+      clearTimeout(lookupTimer);
+      lookupTimer = setTimeout(rechercher, 400);
+    });
+    matriculeInput.addEventListener('blur', rechercher);
+    if (matriculeInput.value.trim()) rechercher();
+  }
+
+  /* ── Département → Service (filtre en cascade) ──
+     Le médecin est rattaché à la fois à un département et à un service ;
+     le menu Département restreint la liste des services proposés ci-dessous. */
+  const deptSelect = document.getElementById('departement');
+  const svcSelect  = document.getElementById('service');
+  if (deptSelect && svcSelect) {
+    const svcOptions = Array.from(svcSelect.options);
+
+    function filterServices(isInitial) {
+      const deptVal = deptSelect.value;
+      const selectedSvc = svcSelect.value;
+      let stillVisible = false;
+      svcOptions.forEach(function (opt) {
+        if (!opt.value) { opt.hidden = false; return; }
+        const match = !deptVal || opt.dataset.departement === deptVal;
+        opt.hidden = !match;
+        if (match && opt.value === selectedSvc) stillVisible = true;
+      });
+      // Ne pas effacer une sélection existante (mode édition) juste parce
+      // qu'elle ne correspond pas au département — seulement sur un vrai
+      // changement de département fait par l'utilisateur.
+      if (selectedSvc && !stillVisible && !isInitial) svcSelect.value = '';
+    }
+
+    deptSelect.addEventListener('change', function () { filterServices(false); });
+    filterServices(true);
+  }
+})();
 </script>
 {% endblock %}

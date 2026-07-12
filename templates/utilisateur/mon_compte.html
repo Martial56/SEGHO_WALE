@@ -307,6 +307,28 @@ html[data-theme="dark"] .cpt-pw-toggle:hover { color:var(--teal-400); }
       </form>
     </div>
   </div>
+
+  <!-- Couleur du logiciel -->
+  <div class="cpt-card">
+    <div class="cpt-card-head">
+      <i class="bi bi-palette" style="font-size:16px;color:var(--teal-600);"></i>
+      <span style="font-size:13px;font-weight:700;color:var(--teal-900);">Couleur du logiciel</span>
+    </div>
+    <div class="cpt-card-body">
+      <p style="font-size:12.5px;color:rgba(0,0,0,.5);margin-bottom:16px;">
+        Choisis la couleur d'accent utilisée dans toute l'application. Elle s'applique immédiatement.
+      </p>
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+        <input type="color" id="accent-color-input" value="{{ profile.accent_color|default:'#4f9b4b' }}"
+          style="width:44px;height:44px;border:none;border-radius:8px;cursor:pointer;padding:0;background:none;flex-shrink:0;">
+        <button type="button" id="accent-reset-btn"
+          style="display:flex;align-items:center;gap:6px;background:none;border:1px solid rgba(0,0,0,.12);border-radius:8px;padding:9px 16px;font-size:12.5px;font-weight:600;color:var(--text-muted,#888);cursor:pointer;font-family:inherit;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 3 3 8 8 8"/></svg>
+          Couleur par défaut (logo)
+        </button>
+      </div>
+    </div>
+  </div>
 </div>
 
 {% if profile.photo %}
@@ -328,6 +350,90 @@ function togglePw(inputId, btn) {
     ? '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
     : '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
 }
+</script>
+<script>
+/* Couleur d'accent personnalisée */
+(function() {
+    var input = document.getElementById('accent-color-input');
+    var resetBtn = document.getElementById('accent-reset-btn');
+    if (!input) return;
+
+    var TEAL_STEPS = {950:0.07,900:0.11,800:0.16,700:0.26,600:0.34,500:0.42,400:0.54,300:0.68,200:0.80,100:0.90,50:0.955};
+
+    function hexToHsl(hex) {
+        var r = parseInt(hex.substr(1,2),16)/255, g = parseInt(hex.substr(3,2),16)/255, b = parseInt(hex.substr(5,2),16)/255;
+        var max = Math.max(r,g,b), min = Math.min(r,g,b), h, s, l = (max+min)/2;
+        if (max === min) { h = s = 0; }
+        else {
+            var d = max - min;
+            s = l > 0.5 ? d/(2-max-min) : d/(max+min);
+            if (max === r) h = (g-b)/d + (g < b ? 6 : 0);
+            else if (max === g) h = (b-r)/d + 2;
+            else h = (r-g)/d + 4;
+            h /= 6;
+        }
+        return [h, s, l];
+    }
+    function hueToRgb(p, q, t) {
+        if (t < 0) t += 1; if (t > 1) t -= 1;
+        if (t < 1/6) return p + (q-p)*6*t;
+        if (t < 1/2) return q;
+        if (t < 2/3) return p + (q-p)*(2/3-t)*6;
+        return p;
+    }
+    function hslToHex(h, s, l) {
+        var r, g, b;
+        if (s === 0) { r = g = b = l; }
+        else {
+            var q = l < 0.5 ? l*(1+s) : l+s-l*s;
+            var p = 2*l - q;
+            r = hueToRgb(p, q, h + 1/3);
+            g = hueToRgb(p, q, h);
+            b = hueToRgb(p, q, h - 1/3);
+        }
+        var toHex = function(x) { var v = Math.round(x*255).toString(16); return v.length === 1 ? '0'+v : v; };
+        return '#' + toHex(r) + toHex(g) + toHex(b);
+    }
+    function hexToRgbTriplet(hex) {
+        return parseInt(hex.substr(1,2),16) + ',' + parseInt(hex.substr(3,2),16) + ',' + parseInt(hex.substr(5,2),16);
+    }
+    function applyAccent(hex) {
+        var hsl = hexToHsl(hex);
+        var root = document.documentElement.style;
+        var computed = {};
+        Object.keys(TEAL_STEPS).forEach(function(step) {
+            // La nuance 600 (bouton principal) = exactement la couleur choisie, sans arrondi HSL.
+            var value = step === '600' ? hex : hslToHex(hsl[0], hsl[1], TEAL_STEPS[step]);
+            computed[step] = value;
+            root.setProperty('--teal-' + step, value);
+        });
+        Object.keys(TEAL_STEPS).forEach(function(step) {
+            root.setProperty('--teal-' + step + '-rgb', hexToRgbTriplet(computed[step]));
+        });
+    }
+
+    function save(color) {
+        var body = new URLSearchParams();
+        body.set('color', color || '');
+        return fetch("{% url 'accent_color_set' %}", {
+            method: 'POST',
+            headers: { 'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: body.toString()
+        });
+    }
+
+    input.addEventListener('input', function() {
+        applyAccent(input.value);
+    });
+    input.addEventListener('change', function() {
+        save(input.value);
+    });
+    if (resetBtn) {
+        resetBtn.addEventListener('click', function() {
+            save('').then(function() { location.reload(); });
+        });
+    }
+})();
 </script>
 {% if profile.photo %}
 <script>

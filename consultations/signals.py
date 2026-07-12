@@ -3,7 +3,6 @@ from decimal import Decimal
 from django.db.models.signals import post_save, pre_save, post_delete
 from django.dispatch import receiver
 
-
 # ──────────────────────────────────────────────────────────────
 # Consultation → synchronisation statut RendezVous
 # ──────────────────────────────────────────────────────────────
@@ -46,7 +45,6 @@ def ligne_ordonnance_post_delete(sender, instance, **kwargs):
 
 # ──────────────────────────────────────────────────────────────
 # LigneOrdonnance → déduction StockPharmacie.quantite
-#
 # Le module Pharmacie affiche StockPharmacie.quantite (stock
 # local par pharmacie). On décrémente ce champ dès la création
 # de l'ordonnance pour que la pharmacie voie immédiatement la
