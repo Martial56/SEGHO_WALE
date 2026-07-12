@@ -6,11 +6,11 @@
 {% block extra_css %}
 {{ block.super }}
 <style>
-.prol-warn { background:rgba(232,154,26,.08); border:1px solid rgba(232,154,26,.2); border-radius:8px; padding:12px 14px; font-size:12.5px; color:#7a4e00; margin-bottom:20px; }
-html[data-theme="dark"] .prol-warn { background:rgba(232,154,26,.1); border-color:rgba(232,154,26,.25); color:#f0c060; }
+.prol-warn { background:rgba(var(--amber-rgb),.08); border:1px solid rgba(var(--amber-rgb),.2); border-radius:8px; padding:12px 14px; font-size:12.5px; color:#7a4e00; margin-bottom:20px; }
+html[data-theme="dark"] .prol-warn { background:rgba(var(--amber-rgb),.1); border-color:rgba(var(--amber-rgb),.25); color:#f0c060; }
 .solde-ok  { font-size:15px; font-weight:700; color:var(--cg-600); }
 html[data-theme="dark"] .solde-ok  { color:var(--cg-400); }
-.solde-bad { font-size:15px; font-weight:700; color:#e84545; }
+.solde-bad { font-size:15px; font-weight:700; color:var(--rose); }
 </style>
 {% endblock %}
 
@@ -43,7 +43,7 @@ html[data-theme="dark"] .solde-ok  { color:var(--cg-400); }
       </div>
       <div>
         <div class="cg-label">Fin prévue</div>
-        <div style="font-size:15px;font-weight:700;color:#e89a1a;">{{ conge.date_fin|date:"d/m/Y" }}</div>
+        <div style="font-size:15px;font-weight:700;color:var(--amber);">{{ conge.date_fin|date:"d/m/Y" }}</div>
       </div>
       <div>
         <div class="cg-label">Jours ouvrés</div>
@@ -63,41 +63,33 @@ html[data-theme="dark"] .solde-ok  { color:var(--cg-400); }
   <!-- Formulaire prolongation -->
   <form method="post">
     {% csrf_token %}
-    <div class="cg-card">
-      <div class="cg-card-header">
-        <div class="cg-card-title"><i class="bi bi-pencil-square"></i> Nouvelle date de fin</div>
+    <div class="form-simple-card">
+
+      <div class="form-field">
+        <label class="field-label" for="nouvelle_date_fin">Nouvelle date de fin <span class="required-star">*</span></label>
+        <input type="date" id="nouvelle_date_fin" name="nouvelle_date_fin"
+               min="{{ conge.date_fin|date:'Y-m-d' }}"
+               class="field-ul" required>
+        <div class="f-hint">Doit être postérieure au {{ conge.date_fin|date:"d/m/Y" }}.</div>
       </div>
-      <div class="cg-card-body" style="padding:20px;">
 
-        <div style="margin-bottom:18px;">
-          <label class="cg-label" for="nouvelle_date_fin">Nouvelle date de fin *</label>
-          <input type="date" id="nouvelle_date_fin" name="nouvelle_date_fin"
-                 min="{{ conge.date_fin|date:'Y-m-d' }}"
-                 class="cg-input" required>
-          <div style="font-size:12px;color:var(--cg-muted);margin-top:4px;">
-            Doit être postérieure au {{ conge.date_fin|date:"d/m/Y" }}.
-          </div>
-        </div>
+      <div class="form-field">
+        <label class="field-label" for="motif">Motif de prolongation</label>
+        <textarea id="motif" name="motif" rows="3"
+                  class="field-ul" placeholder="Maladie, événement familial, accord des parties…"></textarea>
+      </div>
 
-        <div style="margin-bottom:20px;">
-          <label class="cg-label" for="motif">Motif de prolongation</label>
-          <textarea id="motif" name="motif" rows="3"
-                    class="cg-input" placeholder="Maladie, événement familial, accord des parties…"
-                    style="resize:vertical;"></textarea>
-        </div>
+      <div class="prol-warn">
+        <i class="bi bi-info-circle-fill"></i>
+        Les jours ouvrés supplémentaires seront automatiquement déduits du solde de congé
+        et des présences (absent) seront créées pour la période ajoutée.
+      </div>
 
-        <div class="prol-warn">
-          <i class="bi bi-info-circle-fill"></i>
-          Les jours ouvrés supplémentaires seront automatiquement déduits du solde de congé
-          et des présences (absent) seront créées pour la période ajoutée.
-        </div>
-
-        <div style="display:flex;gap:10px;justify-content:flex-end;">
-          <a href="{% url 'conge_detail' conge.pk %}" class="btn-cg-outline">Annuler</a>
-          <button type="submit" class="btn-cg">
-            <i class="bi bi-calendar-plus"></i> Confirmer la prolongation
-          </button>
-        </div>
+      <div class="form-actions">
+        <a href="{% url 'conge_detail' conge.pk %}" class="btn-form-cancel">Annuler</a>
+        <button type="submit" class="btn-form-submit">
+          <i class="bi bi-calendar-plus"></i> Confirmer la prolongation
+        </button>
       </div>
     </div>
   </form>

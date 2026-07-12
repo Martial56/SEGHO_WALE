@@ -3,7 +3,6 @@ from decimal import Decimal
 from django.db.models.signals import post_save, pre_save, post_delete
 from django.dispatch import receiver
 
-
 # ──────────────────────────────────────────────────────────────
 # Consultation → synchronisation statut RendezVous
 # ──────────────────────────────────────────────────────────────
@@ -32,9 +31,20 @@ def sync_rdv_statut(sender, instance, created, **kwargs):
             rdv.save(update_fields=['statut'])
 
 
+@receiver(post_delete, sender='consultations.LigneOrdonnance')
+def ligne_ordonnance_post_delete(sender, instance, **kwargs):
+    """Restitue le stock réservé quand une ligne est supprimée."""
+    if not instance.produit_id:
+        return
+    qte = Decimal(str(instance.quantite or 0))
+    if qte <= 0:
+        return
+    ref = _ref_pre(_get_ordonnance_numero(instance))
+    _restituer_stock(instance.produit_id, qte, ref)
+
+
 # ──────────────────────────────────────────────────────────────
 # LigneOrdonnance → déduction StockPharmacie.quantite
-#
 # Le module Pharmacie affiche StockPharmacie.quantite (stock
 # local par pharmacie). On décrémente ce champ dès la création
 # de l'ordonnance pour que la pharmacie voie immédiatement la
@@ -180,15 +190,3 @@ def ligne_ordonnance_post_save(sender, instance, created, **kwargs):
                 _reserver_stock(new_pid, diff, ref)
             elif diff < 0:
                 _restituer_stock(new_pid, abs(diff), ref)
-
-
-@receiver(post_delete, sender='consultations.LigneOrdonnance')
-def ligne_ordonnance_post_delete(sender, instance, **kwargs):
-    """Restitue le stock réservé quand une ligne est supprimée."""
-    if not instance.produit_id:
-        return
-    qte = Decimal(str(instance.quantite or 0))
-    if qte <= 0:
-        return
-    ref = _ref_pre(_get_ordonnance_numero(instance))
-    _restituer_stock(instance.produit_id, qte, ref)

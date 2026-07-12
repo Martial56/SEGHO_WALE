@@ -1,0 +1,35 @@
+<form method="post" id="mdcfgConfigForm" data-url="{{ request.path }}" novalidate>
+{% csrf_token %}
+
+<div class="mdcfg-modal-body">
+
+  <div class="form-field">
+    <label class="field-label" for="{{ form.nom.id_for_label }}">Nom <span class="required-star">*</span></label>
+    <input type="text" name="nom" id="{{ form.nom.id_for_label }}" class="field-ul"
+      value="{{ form.nom.value|default_if_none:'' }}" placeholder="Ex: Cardiologie" autocomplete="off">
+    {% if form.nom.errors %}<div class="field-error">{{ form.nom.errors.0 }}</div>{% endif %}
+  </div>
+
+  <div class="form-field">
+    <label class="field-label" for="{{ form.code.id_for_label }}">Code <span class="required-star">*</span></label>
+    <input type="text" name="code" id="{{ form.code.id_for_label }}" class="field-ul"
+      value="{{ form.code.value|default_if_none:'' }}" placeholder="Ex: CARD" autocomplete="off"
+      style="font-family: var(--font-mono);text-transform:uppercase;">
+    {% if form.code.errors %}<div class="field-error">{{ form.code.errors.0 }}</div>{% endif %}
+  </div>
+
+  <div class="form-field">
+    <label class="field-label" for="{{ form.description.id_for_label }}">Description</label>
+    <textarea name="description" id="{{ form.description.id_for_label }}" class="field-ul"
+      rows="3" placeholder="Description optionnelle de la spécialité…">{{ form.description.value|default_if_none:'' }}</textarea>
+    {% if form.description.errors %}<div class="field-error">{{ form.description.errors.0 }}</div>{% endif %}
+  </div>
+
+</div>
+
+<div class="mdcfg-modal-footer">
+  <button type="button" class="btn-md-outline" onclick="mdCloseConfigModal()">Annuler</button>
+  <button type="submit" class="btn-md">{% if obj %}Enregistrer{% else %}Créer{% endif %}</button>
+</div>
+
+</form>

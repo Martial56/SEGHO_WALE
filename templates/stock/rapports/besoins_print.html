@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Fiche de besoins — {{ today|date:"d/m/Y" }}</title>
 <style>
+:root {
+  --font-print: 'Segoe UI', Arial, sans-serif; --font-mono: 'Courier New', monospace;
+  --st-600: #4f9b4b; --st-700: #2e592b;
+  --amber-text: #8a5c00; --rose-text: #b71c1c;
+}
+
 * { box-sizing:border-box; margin:0; padding:0; }
 body { font-family: var(--font-print); font-size:11.5px; color:#111; background:#fff; }
 
@@ -12,7 +18,7 @@ body { font-family: var(--font-print); font-size:11.5px; color:#111; background:
   body { background:#e8edf0; padding:20px; }
   .page { background:#fff; max-width:960px; margin:0 auto; padding:28px 36px 36px; box-shadow:0 4px 24px rgba(0,0,0,.15); border-radius:4px; }
   .print-btn-bar { max-width:960px; margin:0 auto 12px; display:flex; gap:8px; justify-content:flex-end; }
-  .print-btn { background:#0f4358; color:#fff; border:none; border-radius:6px; padding:8px 20px; font-size:13px; font-weight:600; cursor:pointer; }
+  .print-btn { background:var(--st-700); color:#fff; border:none; border-radius:6px; padding:8px 20px; font-size:13px; font-weight:600; cursor:pointer; }
   .print-btn:hover { background:#071e28; }
   .print-btn-back { background:#fff; color:#555; border:1px solid #ddd; border-radius:6px; padding:8px 16px; font-size:13px; font-weight:500; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:6px; }
 }
@@ -21,40 +27,40 @@ body { font-family: var(--font-print); font-size:11.5px; color:#111; background:
   body { background:#fff; padding:0; font-size:10px; }
   .page { padding:8mm 10mm; width:100%; max-width:none; box-shadow:none; }
   .no-print { display:none !important; }
-  @page { size:A4 landscape; margin:8mm; }
+  @page { size:A4 landscape; margin:0; }
 }
 
 /* En-tête */
-.header { display:flex; justify-content:space-between; align-items:center; padding-bottom:12px; border-bottom:3px solid #0f4358; margin-bottom:16px; }
+.header { display:flex; justify-content:space-between; align-items:center; padding-bottom:12px; border-bottom:3px solid var(--st-700); margin-bottom:16px; }
 .header-left { display:flex; align-items:center; gap:12px; }
 .header-left img { width:48px; height:48px; object-fit:contain; }
-.clinic-name { font-size:15px; font-weight:800; color:#0f4358; }
+.clinic-name { font-size:15px; font-weight:800; color:var(--st-700); }
 .clinic-sub  { font-size:10px; color:#555; margin-top:2px; }
 .doc-info { text-align:right; }
-.doc-title { font-size:16px; font-weight:800; color:#0f4358; }
+.doc-title { font-size:16px; font-weight:800; color:var(--st-700); }
 .doc-sub   { font-size:10px; color:#888; margin-top:3px; }
 
 /* Tableau */
 table { width:100%; border-collapse:collapse; font-size:10.5px; }
-thead tr { background:#0f4358; color:#fff; }
+thead tr { background:var(--st-700); color:#fff; }
 thead th { padding:6px 8px; font-weight:700; font-size:9.5px; text-transform:uppercase; letter-spacing:.3px; text-align:left; white-space:nowrap; }
 thead th.right { text-align:right; }
 thead th.center { text-align:center; }
 tbody tr { border-bottom:1px solid #e2eef5; }
 tbody tr:nth-child(even) { background:#f0f5fa; }
-tbody tr.type-header td { background:#c8dce8; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#0f4358; padding:4px 8px; }
+tbody tr.type-header td { background:#c8dce8; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--st-700); padding:4px 8px; }
 tbody td { padding:5px 8px; vertical-align:middle; }
 tbody td.right { text-align:right; font-family: var(--font-mono); }
 tbody td.center { text-align:center; }
-tfoot tr { background:#e8f2f8; border-top:2px solid #0f4358; }
+tfoot tr { background:#e8f2f8; border-top:2px solid var(--st-700); }
 tfoot td { padding:6px 8px; font-weight:700; font-size:10.5px; }
 
 /* Badges couverture */
-.cov-ok       { color:#1a6d8c; font-weight:700; }
-.cov-alerte   { color:#8a5c00; font-weight:700; }
-.cov-critique { color:#b71c1c; font-weight:800; }
-.badge-cmd { background:#0f4358; color:#fff; border-radius:10px; padding:1px 7px; font-size:9px; font-weight:700; }
-.badge-ok  { color:#1a6d8c; font-size:11px; }
+.cov-ok       { color:var(--st-600); font-weight:700; }
+.cov-alerte   { color:var(--amber-text); font-weight:700; }
+.cov-critique { color:var(--rose-text); font-weight:800; }
+.badge-cmd { background:var(--st-700); color:#fff; border-radius:10px; padding:1px 7px; font-size:9px; font-weight:700; }
+.badge-ok  { color:var(--st-600); font-size:11px; }
 
 /* Légende */
 .legend { display:flex; gap:20px; flex-wrap:wrap; margin-top:12px; font-size:10px; color:#666; }
@@ -65,7 +71,7 @@ tfoot td { padding:6px 8px; font-weight:700; font-size:10.5px; }
 
 <div class="no-print print-btn-bar">
   <a href="{% url 'stock_rapports_besoins' %}?type={{ type_filtre }}" class="print-btn-back">&#8592; Retour</a>
-  <button class="print-btn" onclick="window.print()">&#0f4358; Imprimer / Exporter PDF</button>
+  <button class="print-btn" onclick="window.print()">&#128424; Imprimer / Exporter PDF</button>
 </div>
 
 <div class="page">
@@ -119,8 +125,8 @@ tfoot td { padding:6px 8px; font-weight:700; font-size:10.5px; }
         <strong>{{ d.produit.nom }}</strong>
         {% if d.produit.dci %}<div style="font-size:9px;color:#888;">{{ d.produit.dci }}</div>{% endif %}
       </td>
-      <td style="color:#888;">{{ d.produit.unite_mesure }}</td>
-      <td class="right" style="font-weight:700;{% if d.stock <= 0 %}color:#b71c1c;{% elif d.produit.en_alerte %}color:#8a5c00;{% else %}color:#1a6d8c;{% endif %}">{{ d.stock|floatformat:0 }}</td>
+      <td style="color:#888;">{{ d.produit.unite_mesure.nom }}</td>
+      <td class="right" style="font-weight:700;{% if d.stock <= 0 %}color:var(--rose-text);{% elif d.produit.en_alerte %}color:var(--amber-text);{% else %}color:var(--st-600);{% endif %}">{{ d.stock|floatformat:0 }}</td>
       <td class="right">{{ d.cmm|floatformat:1 }}</td>
       <td class="right" style="color:#888;">{{ d.produit.stock_minimum|floatformat:0 }}</td>
       <td class="right" style="color:#888;">{{ d.produit.point_commande|floatformat:0 }}</td>
@@ -145,7 +151,7 @@ tfoot td { padding:6px 8px; font-weight:700; font-size:10.5px; }
         <td colspan="4">TOTAL — {{ produits_data|length }} produit{{ produits_data|length|pluralize }}</td>
         <td class="right">{{ stats.rupture|default:0 }} rupture{{ stats.rupture|default:0|pluralize }}</td>
         <td colspan="3"></td>
-        <td colspan="2" style="text-align:center;color:#0f4358;">
+        <td colspan="2" style="text-align:center;color:var(--st-700);">
           {% with nb=0 %}{% for d in produits_data %}{% if d.qte_cmd > 0 %}{{ forloop.counter }}{% endif %}{% endfor %}{% endwith %}
           produits à commander
         </td>
@@ -155,9 +161,9 @@ tfoot td { padding:6px 8px; font-weight:700; font-size:10.5px; }
 
   <!-- Légende -->
   <div class="legend">
-    <span><span style="color:#b71c1c;font-weight:700;">■</span> Couverture &lt; 30j — critique</span>
-    <span><span style="color:#8a5c00;font-weight:700;">■</span> Couverture &lt; 60j — alerte</span>
-    <span><span style="color:#1a6d8c;font-weight:700;">■</span> Couverture ≥ 60j — OK</span>
+    <span><span style="color:var(--rose-text);font-weight:700;">■</span> Couverture &lt; 30j — critique</span>
+    <span><span style="color:var(--amber-text);font-weight:700;">■</span> Couverture &lt; 60j — alerte</span>
+    <span><span style="color:var(--st-600);font-weight:700;">■</span> Couverture ≥ 60j — OK</span>
     <span style="margin-left:10px;"><strong>CMM</strong> = Consommation Mensuelle Moyenne (3 mois)</span>
     <span><strong>Point cmd.</strong> = CMM + Stock sécurité</span>
     <span><strong>Qté à cmd.</strong> = (CMM×3) − Stock + Stock sécu.</span>

@@ -6,38 +6,6 @@
 {% block extra_css %}
 {{ block.super }}
 <style>
-/* ── Subheader ── */
-.rh-subheader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 14px 32px;
-  
-  flex-wrap: wrap;
-  position: sticky;
-  top: var(--topbar-h);
-  z-index: 100;
-  background: #f0f6fa;
-  border-bottom: 1px solid rgba(0,0,0,0.05);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-}
-html[data-theme="dark"] .rh-subheader {
-  background: #0B1220;
-  border-bottom-color: rgba(255,255,255,0.05);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-}
-@media (max-width: 1024px) {
-  .rh-subheader { margin: 0 -20px; padding-left: 20px; padding-right: 20px; }
-}
-.rh-subheader h1 {
-  font-size: 22px;
-  font-weight: 800;
-  color: var(--rh-900);
-  letter-spacing: -0.3px;
-}
-html[data-theme="dark"] .rh-subheader h1 { color: var(--rh-text); }
-
 /* ── Centered import card layout ── */
 .rh-import-wrap {
   max-width: 640px;
@@ -113,12 +81,12 @@ html[data-theme="dark"] .btn-rh-template small { color: rgba(255,255,255,0.3); }
 }
 html[data-theme="dark"] .rh-file-zone {
   border-color: var(--rh-border);
-  background: rgba(26,109,140,0.06);
+  background: rgba(var(--rh-600-rgb),0.06);
 }
 html[data-theme="dark"] .rh-file-zone:hover,
 html[data-theme="dark"] .rh-file-zone.dragover {
   border-color: var(--rh-400);
-  background: rgba(26,109,140,0.12);
+  background: rgba(var(--rh-600-rgb),0.12);
 }
 .rh-file-zone input[type="file"] {
   position: absolute;
@@ -169,7 +137,7 @@ html[data-theme="dark"] .rh-file-selected-name { color: var(--rh-300); }
 .rh-col-table thead {
   background: var(--rh-50);
 }
-html[data-theme="dark"] .rh-col-table thead { background: rgba(26,109,140,0.1); }
+html[data-theme="dark"] .rh-col-table thead { background: rgba(var(--rh-600-rgb),0.1); }
 .rh-col-table th {
   padding: 9px 14px;
   text-align: left;
@@ -189,8 +157,8 @@ html[data-theme="dark"] .rh-col-table th { color: var(--rh-300); border-bottom-c
   vertical-align: middle;
 }
 html[data-theme="dark"] .rh-col-table td { border-bottom-color: rgba(255,255,255,0.04); color: var(--rh-text); }
-.rh-col-table tbody tr:hover { background: rgba(26,109,140,0.03); }
-html[data-theme="dark"] .rh-col-table tbody tr:hover { background: rgba(26,109,140,0.07); }
+.rh-col-table tbody tr:hover { background: rgba(var(--rh-600-rgb),0.03); }
+html[data-theme="dark"] .rh-col-table tbody tr:hover { background: rgba(var(--rh-600-rgb),0.07); }
 .rh-col-table tbody tr:last-child td { border-bottom: none; }
 
 .rh-col-letter {
@@ -203,7 +171,7 @@ html[data-theme="dark"] .rh-col-table tbody tr:hover { background: rgba(26,109,1
   font-size: 12px;
   font-family: var(--font-mono);
 }
-html[data-theme="dark"] .rh-col-letter { background: rgba(26,109,140,0.2); color: var(--rh-300); }
+html[data-theme="dark"] .rh-col-letter { background: rgba(var(--rh-600-rgb),0.2); color: var(--rh-300); }
 
 .badge-required {
   display: inline-block;
@@ -212,11 +180,11 @@ html[data-theme="dark"] .rh-col-letter { background: rgba(26,109,140,0.2); color
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
-  background: rgba(232,69,69,0.1);
-  color: #c0392b;
-  border: 1px solid rgba(232,69,69,0.2);
+  background: rgba(var(--rose-rgb),0.1);
+  color: var(--rose-btn);
+  border: 1px solid rgba(var(--rose-rgb),0.2);
 }
-html[data-theme="dark"] .badge-required { background: rgba(232,69,69,0.15); color: #f09090; border-color: rgba(232,69,69,0.25); }
+html[data-theme="dark"] .badge-required { background: rgba(var(--rose-rgb),0.15); color: #f09090; border-color: rgba(var(--rose-rgb),0.25); }
 
 .badge-optional {
   display: inline-block;
@@ -241,12 +209,12 @@ html[data-theme="dark"] .badge-optional { background: rgba(255,255,255,0.06); co
 
 {% block content %}
 
-<!-- Subheader -->
-<div class="rh-subheader" id="subheader">
-  <h1>
-    <i class="bi bi-upload" style="color:var(--rh-500); font-size:19px; margin-right:6px;"></i>
-    Import employés
-  </h1>
+<div class="action-bar">
+  <div class="action-bar-breadcrumb">
+    <a href="{% url 'ressources_humaines_list' %}"><i class="bi bi-arrow-left"></i> Employés</a>
+    <span class="sep">/</span>
+    <span class="current"><i class="bi bi-upload"></i> Import employés</span>
+  </div>
 </div>
 
 <div class="rh-import-wrap">
@@ -272,10 +240,9 @@ html[data-theme="dark"] .badge-optional { background: rgba(255,255,255,0.06); co
 
       <!-- Download template -->
       <div style="margin-bottom: 22px;">
-        <a href="#" class="btn-rh-template" title="Modèle Excel disponible prochainement">
+        <a href="{% url 'rh_import_modele' %}" class="btn-rh-template">
           <i class="bi bi-download"></i>
           Télécharger le modèle Excel
-          <small>(Disponible prochainement)</small>
         </a>
       </div>
 
@@ -310,7 +277,7 @@ html[data-theme="dark"] .badge-optional { background: rgba(255,255,255,0.06); co
         </div>
       </form>
       {% else %}
-      <div style="padding:14px 18px; background:rgba(232,154,26,0.1); border-left:4px solid var(--amber); border-radius:8px; font-size:13.5px; color:var(--rh-text);">
+      <div style="padding:14px 18px; background:rgba(var(--amber-rgb),0.1); border-left:4px solid var(--amber); border-radius:8px; font-size:13.5px; color:var(--rh-text);">
         <i class="bi bi-lock-fill" style="margin-right:6px;"></i>
         Vous n'avez pas les permissions nécessaires pour importer des employés.
       </div>
@@ -364,19 +331,28 @@ html[data-theme="dark"] .badge-optional { background: rgba(255,255,255,0.06); co
           </tr>
           <tr>
             <td><span class="rh-col-letter">E</span></td>
-            <td style="font-weight:600;">Type de contrat</td>
+            <td style="font-weight:600;">Fonction</td>
             <td><span class="badge-optional">Optionnel</span></td>
-            <td class="rh-col-example">
-              <code style="font-size:11px; background:rgba(0,0,0,0.06); padding:1px 4px; border-radius:3px;">Vacataire</code>
-              <code style="font-size:11px; background:rgba(0,0,0,0.06); padding:1px 4px; border-radius:3px;">CDD</code>
-              <code style="font-size:11px; background:rgba(0,0,0,0.06); padding:1px 4px; border-radius:3px;">CDI</code>
-              <code style="font-size:11px; background:rgba(0,0,0,0.06); padding:1px 4px; border-radius:3px;">Contractuel</code>
-              <code style="font-size:11px; background:rgba(0,0,0,0.06); padding:1px 4px; border-radius:3px;">Prestataire</code>
-              <code style="font-size:11px; background:rgba(0,0,0,0.06); padding:1px 4px; border-radius:3px;">Autre</code>
-            </td>
+            <td class="rh-col-example">Nom exact de la fonction (ex. Sage-femme, Comptable…) — voir Configuration</td>
           </tr>
           <tr>
             <td><span class="rh-col-letter">F</span></td>
+            <td style="font-weight:600;">Grade</td>
+            <td><span class="badge-optional">Optionnel</span></td>
+            <td class="rh-col-example">Nom exact du grade — voir Configuration</td>
+          </tr>
+          <tr>
+            <td><span class="rh-col-letter">G</span></td>
+            <td style="font-weight:600;">Type de contrat</td>
+            <td><span class="badge-optional">Optionnel</span></td>
+            <td class="rh-col-example">
+              Nom exact du type de contrat — voir Configuration
+              (ex. <code style="font-size:11px; background:rgba(0,0,0,0.06); padding:1px 4px; border-radius:3px;">CDI</code>
+              <code style="font-size:11px; background:rgba(0,0,0,0.06); padding:1px 4px; border-radius:3px;">CDD</code>)
+            </td>
+          </tr>
+          <tr>
+            <td><span class="rh-col-letter">H</span></td>
             <td style="font-weight:600;">Statut</td>
             <td><span class="badge-optional">Optionnel</span></td>
             <td class="rh-col-example">
@@ -384,6 +360,25 @@ html[data-theme="dark"] .badge-optional { background: rgba(255,255,255,0.06); co
               <code style="font-size:11px; background:rgba(0,0,0,0.06); padding:1px 4px; border-radius:3px;">suspendu</code>
               <code style="font-size:11px; background:rgba(0,0,0,0.06); padding:1px 4px; border-radius:3px;">quitte</code>
               (défaut : actif)
+            </td>
+          </tr>
+          <tr>
+            <td><span class="rh-col-letter">I</span></td>
+            <td style="font-weight:600;">Matricule</td>
+            <td><span class="badge-optional">Optionnel</span></td>
+            <td class="rh-col-example">
+              Matricule déjà attribué à l'employé (import d'un effectif existant) — laissez vide pour qu'il soit
+              généré automatiquement (nouvelle embauche).
+            </td>
+          </tr>
+          <tr>
+            <td><span class="rh-col-letter">J</span></td>
+            <td style="font-weight:600;">Sexe</td>
+            <td><span class="badge-optional">Optionnel</span></td>
+            <td class="rh-col-example">
+              <code style="font-size:11px; background:rgba(0,0,0,0.06); padding:1px 4px; border-radius:3px;">M</code>
+              <code style="font-size:11px; background:rgba(0,0,0,0.06); padding:1px 4px; border-radius:3px;">F</code>
+              (ou « Homme »/« Femme » — laissé vide si non renseigné, apparaîtra dans la répartition H/F du tableau de bord)
             </td>
           </tr>
         </tbody>
@@ -395,7 +390,10 @@ html[data-theme="dark"] .badge-optional { background: rgba(255,255,255,0.06); co
   <div style="padding: 13px 16px; background: var(--rh-50); border: 1px solid var(--rh-100); border-radius: 8px; font-size:12.5px; color: var(--rh-700); margin-top: 4px; margin-bottom: 20px; line-height: 1.6;">
     <i class="bi bi-lightbulb-fill" style="color:var(--amber); margin-right:6px;"></i>
     <strong>Conseils :</strong> La première ligne est considérée comme l'en-tête et sera ignorée.
-    Les services et types de contrat inexistants seront ignorés (vérifiez l'orthographe exacte).
+    Si un service, une fonction, un grade ou un type de contrat indiqué n'existe pas encore, il est
+    <strong>créé automatiquement</strong> lors de l'import (vérifiez tout de même l'orthographe pour éviter les doublons —
+    ex. « Sage-femme » et « Sage femme » créeraient deux fonctions distinctes) ; retrouvez-les ensuite dans <strong>Configuration</strong>.
+    Un matricule déjà utilisé par un autre employé sera rejeté (ligne signalée dans le rapport).
     En cas d'erreur, un rapport vous indiquera les lignes problématiques.
   </div>
 

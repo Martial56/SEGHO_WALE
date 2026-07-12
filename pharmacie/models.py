@@ -167,6 +167,7 @@ class LigneDispensation(models.Model):
     medicament_libre   = models.CharField(max_length=200, blank=True)
     quantite_prescrite = models.IntegerField(default=1)
     quantite_dispensee = models.IntegerField(default=0)
+    achete_ailleurs    = models.BooleanField(default=False, help_text="Le patient a obtenu ce médicament dans une autre pharmacie")
     notes              = models.CharField(max_length=200, blank=True)
 
     def __str__(self): return f"{self.produit or self.medicament_libre} × {self.quantite_dispensee}"
@@ -201,8 +202,9 @@ class VentePharmacie(models.Model):
         if not self.numero:
             from django.utils import timezone
             annee = timezone.now().year
-            count = VentePharmacie.objects.filter(date_vente__year=annee).count() + 1
-            self.numero = f"VNT{annee}{count:04d}"
+            dernier = VentePharmacie.objects.filter(numero__startswith=f'VNT{annee}').order_by('-numero').first()
+            seq = (int(dernier.numero[-4:]) + 1) if dernier else 1
+            self.numero = f"VNT{annee}{seq:04d}"
         self.montant_net = self.montant_total - self.remise
         super().save(*args, **kwargs)
 
@@ -243,8 +245,9 @@ class InventairePharmacie(models.Model):
         if not self.numero:
             from django.utils import timezone
             annee = timezone.now().year
-            count = InventairePharmacie.objects.filter(date_inventaire__year=annee).count() + 1
-            self.numero = f"INV-PH{annee}{count:04d}"
+            dernier = InventairePharmacie.objects.filter(numero__startswith=f'INV-PH{annee}').order_by('-numero').first()
+            seq = (int(dernier.numero[-4:]) + 1) if dernier else 1
+            self.numero = f"INV-PH{annee}{seq:04d}"
         super().save(*args, **kwargs)
 
     def __str__(self): return f"Inventaire {self.numero}"

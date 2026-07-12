@@ -107,6 +107,30 @@
 .cd-modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1000; align-items:center; justify-content:center; }
 .cd-modal-bg.open { display:flex; }
 .cd-modal { background:#fff; border-radius:12px; padding:22px 24px; width:360px; box-shadow:0 20px 60px rgba(0,0,0,.2); }
+
+/* ── Mode sombre ── */
+html[data-theme="dark"] .cd-retard { background:rgba(153,27,27,.15); border-bottom-color:rgba(252,165,165,.3); color:#fca5a5; }
+html[data-theme="dark"] .cd-card { background:var(--surface); border-color:var(--border); }
+html[data-theme="dark"] .cd-card-head { background:var(--surface-muted); border-bottom-color:var(--border); color:var(--text-strong,#eef3f8); }
+html[data-theme="dark"] .cd-tbl thead th { color:var(--text-faint); background:var(--surface-muted); border-bottom-color:var(--border); }
+html[data-theme="dark"] .cd-tbl tbody td { border-bottom-color:var(--border); color:var(--text); }
+html[data-theme="dark"] .cd-tbl tbody tr:hover td { background:var(--surface-muted); }
+html[data-theme="dark"] .cd-tbl tfoot td { background:rgba(var(--teal-700-rgb),.25); border-top-color:var(--border); color:var(--text-strong,#eef3f8); }
+html[data-theme="dark"] .cd-montant-cell { color:var(--text-strong,#eef3f8)!important; }
+html[data-theme="dark"] .rec-row { border-bottom-color:var(--border); }
+html[data-theme="dark"] .cd-sbox { background:var(--surface); border-color:var(--border); }
+html[data-theme="dark"] .cd-sbox-title { color:var(--text-faint); }
+html[data-theme="dark"] .cd-srow { border-bottom-color:var(--border); }
+html[data-theme="dark"] .cd-srow .lbl { color:var(--text-muted); }
+html[data-theme="dark"] .cd-srow .val { color:var(--text); }
+html[data-theme="dark"] .trace-link { border-color:var(--border); }
+html[data-theme="dark"] .trace-link.tl-green  { background:rgba(16,185,129,.12)!important; }
+html[data-theme="dark"] .trace-link.tl-purple { background:rgba(124,58,237,.15)!important; }
+html[data-theme="dark"] .trace-link.tl-amber  { background:rgba(217,119,6,.15)!important; }
+html[data-theme="dark"] .cd-modal { background:var(--surface); color:var(--text); }
+html[data-theme="dark"] .cd-modal h2 { color:var(--text-strong,#eef3f8); }
+html[data-theme="dark"] .cd-modal-cancel { background:var(--surface-muted)!important; border-color:var(--border)!important; color:var(--text)!important; }
+html[data-theme="dark"] .cd-modal-notice { background:rgba(146,64,14,.2)!important; border-color:rgba(252,211,77,.3)!important; color:#fcd34d!important; }
 </style>
 {% endblock %}
 
@@ -146,7 +170,7 @@
             <i class="bi bi-box-arrow-in-down"></i> Réception
           </a>
         {% endif %}
-        <a href="{% url 'achats:commande_imprimer' commande.pk %}" target="_blank" class="cd-btn cd-btn-outline">
+        <a href="{% url 'achats:commande_imprimer' commande.pk %}" class="cd-btn cd-btn-outline">
           <i class="bi bi-printer"></i> Imprimer
         </a>
       </div>
@@ -207,7 +231,7 @@
       <div class="cd-card">
         <div class="cd-card-head">
           <span><i class="bi bi-table hi"></i>Articles commandés</span>
-          <span style="font-size:11px;color:#aaa;font-weight:500;">{{ lignes|length }} ligne{{ lignes|length|pluralize }}</span>
+          <span style="font-size:11px;color:var(--text-faint);font-weight:500;">{{ lignes|length }} ligne{{ lignes|length|pluralize }}</span>
         </div>
         <div style="overflow-x:auto;">
           <table class="cd-tbl">
@@ -223,21 +247,21 @@
             <tbody>
             {% for l in lignes %}
             <tr>
-              <td style="text-align:center;color:#ddd;font-size:11px;font-weight:700;">{{ forloop.counter }}</td>
+              <td style="text-align:center;color:var(--text-faint);font-size:11px;font-weight:700;">{{ forloop.counter }}</td>
               <td>
-                <div style="font-weight:600;color:rgba(0,0,0,.8);">{{ l.designation }}</div>
-                {% if l.notes %}<div style="font-size:11px;color:#aaa;">{{ l.notes }}</div>{% endif %}
+                <div style="font-weight:600;color:var(--text);">{{ l.designation }}</div>
+                {% if l.notes %}<div style="font-size:11px;color:var(--text-faint);">{{ l.notes }}</div>{% endif %}
               </td>
               <td style="text-align:right;font-weight:700;">{{ l.quantite_commandee|floatformat:0 }}</td>
-              <td style="text-align:right;color:#888;font-size:12px;">{{ l.prix_unitaire|floatformat:0 }}</td>
-              <td style="text-align:right;font-weight:700;color:var(--teal-800);">{{ l.montant|floatformat:0 }}</td>
+              <td style="text-align:right;color:var(--text-muted);font-size:12px;">{{ l.prix_unitaire|floatformat:0 }}</td>
+              <td class="cd-montant-cell" style="text-align:right;font-weight:700;color:var(--teal-800);">{{ l.montant|floatformat:0 }}</td>
             </tr>
             {% endfor %}
             </tbody>
             <tfoot>
               <tr>
-                <td colspan="4" style="text-align:right;color:#888;font-size:12px;">Total</td>
-                <td style="text-align:right;font-size:16px;font-weight:900;color:var(--teal-800);">{{ montant_calc|floatformat:0 }} <span style="font-size:11px;font-weight:600;">FCFA</span></td>
+                <td colspan="4" style="text-align:right;color:var(--text-muted);font-size:12px;">Total</td>
+                <td class="cd-montant-cell" style="text-align:right;font-size:16px;font-weight:900;color:var(--teal-800);">{{ montant_calc|floatformat:0 }} <span style="font-size:11px;font-weight:600;">FCFA</span></td>
               </tr>
             </tfoot>
           </table>
@@ -263,8 +287,8 @@
             </div>
             <div class="rec-info">
               <div style="display:flex;align-items:center;gap:8px;">
-                <span style="font-weight:700;font-size:12.5px;color:rgba(0,0,0,.8);font-family: var(--font-mono);">{{ r.numero }}</span>
-                <span style="font-size:11px;color:#bbb;">{{ r.date_reception|date:"d/m/Y" }}</span>
+                <span style="font-weight:700;font-size:12.5px;color:var(--text);font-family: var(--font-mono);">{{ r.numero }}</span>
+                <span style="font-size:11px;color:var(--text-faint);">{{ r.date_reception|date:"d/m/Y" }}</span>
               </div>
               <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:4px;">
                 {% if r.statut == 'conforme' %}
@@ -282,7 +306,7 @@
               </div>
             </div>
             <div style="text-align:right;flex-shrink:0;">
-              <div style="font-size:10.5px;color:#bbb;margin-bottom:4px;">{{ r.receptionne_par.get_full_name|default:r.receptionne_par.username|default:"—" }}</div>
+              <div style="font-size:10.5px;color:var(--text-faint);margin-bottom:4px;">{{ r.receptionne_par.get_full_name|default:r.receptionne_par.username|default:"—" }}</div>
               <a href="{% url 'achats:reception_detail' r.pk %}"
                  style="width:28px;height:28px;border-radius:6px;background:var(--teal-50);border:1px solid rgba(0,0,0,.08);display:inline-flex;align-items:center;justify-content:center;color:var(--teal-600);text-decoration:none;font-size:13px;">
                 <i class="bi bi-eye"></i>
@@ -291,9 +315,9 @@
           </div>
           {% endfor %}
         {% else %}
-          <div style="padding:28px;text-align:center;color:#ccc;">
+          <div style="padding:28px;text-align:center;color:var(--text-faint);">
             <i class="bi bi-box-seam" style="font-size:26px;display:block;margin-bottom:8px;"></i>
-            <div style="font-size:12.5px;color:#aaa;">Aucune réception enregistrée</div>
+            <div style="font-size:12.5px;color:var(--text-faint);">Aucune réception enregistrée</div>
             {% if commande.statut == 'envoyee' or commande.statut == 'en_livraison' %}
             <a href="{% url 'achats:reception_create' commande.pk %}"
                style="margin-top:10px;display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:7px;background:var(--teal-600);color:#fff;text-decoration:none;font-size:12px;font-weight:600;">
@@ -351,32 +375,32 @@
           {% if proforma.besoin %}
             {% with besoin=proforma.besoin %}
               {% if besoin.fiche_besoins %}
-              <a href="{% url 'stock_fiche_detail' besoin.fiche_besoins.pk %}" class="trace-link" style="background:#f0fdf4;">
+              <a href="{% url 'stock_fiche_detail' besoin.fiche_besoins.pk %}" class="trace-link tl-green" style="background:#f0fdf4;">
                 <i class="bi bi-clipboard2-data" style="color:#10b981;font-size:14px;flex-shrink:0;"></i>
                 <div>
-                  <div style="font-size:9.5px;font-weight:700;color:#aaa;text-transform:uppercase;">Fiche besoins</div>
+                  <div style="font-size:9.5px;font-weight:700;color:var(--text-faint);text-transform:uppercase;">Fiche besoins</div>
                   <div style="font-size:12px;font-weight:700;color:#059669;">{{ besoin.fiche_besoins.numero }}</div>
                 </div>
-                <i class="bi bi-chevron-right" style="color:#ccc;margin-left:auto;font-size:10px;"></i>
+                <i class="bi bi-chevron-right" style="color:var(--text-faint);margin-left:auto;font-size:10px;"></i>
               </a>
               {% endif %}
-              <a href="{% url 'achats:besoin_detail' besoin.pk %}" class="trace-link" style="background:#f5f3ff;">
+              <a href="{% url 'achats:besoin_detail' besoin.pk %}" class="trace-link tl-purple" style="background:#f5f3ff;">
                 <i class="bi bi-list-check" style="color:#7c3aed;font-size:14px;flex-shrink:0;"></i>
                 <div>
-                  <div style="font-size:9.5px;font-weight:700;color:#aaa;text-transform:uppercase;">Besoin</div>
+                  <div style="font-size:9.5px;font-weight:700;color:var(--text-faint);text-transform:uppercase;">Besoin</div>
                   <div style="font-size:12px;font-weight:700;color:#7c3aed;">{{ besoin.numero }}</div>
                 </div>
-                <i class="bi bi-chevron-right" style="color:#ccc;margin-left:auto;font-size:10px;"></i>
+                <i class="bi bi-chevron-right" style="color:var(--text-faint);margin-left:auto;font-size:10px;"></i>
               </a>
             {% endwith %}
           {% endif %}
-          <a href="{% url 'achats:proforma_detail' proforma.pk %}" class="trace-link" style="background:#fffbeb;">
+          <a href="{% url 'achats:proforma_detail' proforma.pk %}" class="trace-link tl-amber" style="background:#fffbeb;">
             <i class="bi bi-file-earmark-text" style="color:#d97706;font-size:14px;flex-shrink:0;"></i>
             <div>
-              <div style="font-size:9.5px;font-weight:700;color:#aaa;text-transform:uppercase;">Proforma</div>
+              <div style="font-size:9.5px;font-weight:700;color:var(--text-faint);text-transform:uppercase;">Proforma</div>
               <div style="font-size:12px;font-weight:700;color:#d97706;">{{ proforma.numero }}</div>
             </div>
-            <i class="bi bi-chevron-right" style="color:#ccc;margin-left:auto;font-size:10px;"></i>
+            <i class="bi bi-chevron-right" style="color:var(--text-faint);margin-left:auto;font-size:10px;"></i>
           </a>
         {% endwith %}
       </div>
@@ -386,7 +410,7 @@
       {% if commande.notes %}
       <div class="cd-sbox">
         <div class="cd-sbox-title">Notes</div>
-        <p style="font-size:12.5px;color:rgba(0,0,0,.7);margin:0;white-space:pre-wrap;line-height:1.5;">{{ commande.notes }}</p>
+        <p style="font-size:12.5px;color:var(--text);margin:0;white-space:pre-wrap;line-height:1.5;">{{ commande.notes }}</p>
       </div>
       {% endif %}
 
@@ -401,29 +425,29 @@
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
       <h2 style="font-size:14px;font-weight:800;margin:0;color:var(--teal-800);">Changer le statut</h2>
       <button onclick="document.getElementById('modal-statut').classList.remove('open')"
-              style="background:none;border:none;cursor:pointer;color:#bbb;font-size:18px;line-height:1;padding:0;">×</button>
+              style="background:none;border:none;cursor:pointer;color:var(--text-faint);font-size:18px;line-height:1;padding:0;">×</button>
     </div>
     <form method="post" action="{% url 'achats:commande_statut' commande.pk %}">
       {% csrf_token %}
       {% if commande.statut == 'brouillon' %}
         <input type="hidden" name="statut" value="envoyee">
-        <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12.5px;color:#92400e;">
+        <div class="cd-modal-notice" style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12.5px;color:#92400e;">
           <i class="bi bi-send-fill" style="margin-right:5px;"></i>
           Confirmer que <strong>{{ commande.numero }}</strong> a été envoyée au fournisseur <strong>{{ commande.fournisseur.nom }}</strong> ?
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;">
-          <button type="button" style="padding:6px 14px;border-radius:7px;border:1px solid #e5e7eb;background:#fff;font-size:12px;cursor:pointer;font-weight:600;color:#666;"
+          <button type="button" class="cd-modal-cancel" style="padding:6px 14px;border-radius:7px;border:1px solid #e5e7eb;background:#fff;font-size:12px;cursor:pointer;font-weight:600;color:#666;"
                   onclick="document.getElementById('modal-statut').classList.remove('open')">Annuler</button>
           <button type="submit" class="cd-btn cd-btn-amber"><i class="bi bi-send"></i> Marquer envoyée</button>
         </div>
       {% elif commande.statut == 'envoyee' %}
         <input type="hidden" name="statut" value="en_livraison">
-        <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12.5px;color:#92400e;">
+        <div class="cd-modal-notice" style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12.5px;color:#92400e;">
           <i class="bi bi-truck" style="margin-right:5px;"></i>
           Confirmer que <strong>{{ commande.numero }}</strong> est en cours de livraison ?
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;">
-          <button type="button" style="padding:6px 14px;border-radius:7px;border:1px solid #e5e7eb;background:#fff;font-size:12px;cursor:pointer;font-weight:600;color:#666;"
+          <button type="button" class="cd-modal-cancel" style="padding:6px 14px;border-radius:7px;border:1px solid #e5e7eb;background:#fff;font-size:12px;cursor:pointer;font-weight:600;color:#666;"
                   onclick="document.getElementById('modal-statut').classList.remove('open')">Annuler</button>
           <button type="submit" class="cd-btn cd-btn-amber"><i class="bi bi-truck"></i> En livraison</button>
         </div>

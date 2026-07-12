@@ -1,0 +1,91 @@
+{% extends 'stock/base.html' %}
+{% block breadcrumb %}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'services/includes/layout_css.html' %}
+{% include 'services/includes/form_css.html' %}
+{% include 'services/includes/article_form_css.html' %}
+{% endblock %}
+
+{% block content %}
+
+<div class="action-bar">
+  <div class="action-bar-breadcrumb">
+    <a href="{% if edit and obj %}{% url 'stock_categorie_unite_detail' obj.pk %}{% else %}{% url 'stock_categories_unites' %}{% endif %}" class="btn-form-cancel" style="padding:3px 7px;">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <a href="{% url 'stock_unites' %}">Unités de mesure</a>
+    <span class="sep">/</span>
+    <a href="{% url 'stock_categories_unites' %}">Catégories</a>
+    {% if edit and obj %}
+    <span class="sep">/</span>
+    <a href="{% url 'stock_categorie_unite_detail' obj.pk %}">{{ obj.nom|truncatechars:30 }}</a>
+    {% endif %}
+    <span class="sep">/</span>
+    <span class="current">{{ titre }}</span>
+  </div>
+  <div class="action-bar-buttons">
+    <a href="{% if edit and obj %}{% url 'stock_categorie_unite_detail' obj.pk %}{% else %}{% url 'stock_categories_unites' %}{% endif %}" class="btn-form-cancel">Annuler</a>
+    <button type="submit" form="cat-unite-form" class="btn-form-submit">Enregistrer</button>
+  </div>
+</div>
+
+<form method="post" novalidate id="cat-unite-form">
+  {% csrf_token %}
+  <div class="form-simple-card" style="max-width:600px;">
+    <div class="form-field">
+      <label class="field-label" for="{{ form.nom.id_for_label }}">Nom <span class="required-star">*</span></label>
+      {{ form.nom }}
+      {% if form.nom.errors %}<div class="field-error">{{ form.nom.errors.0 }}</div>{% endif %}
+    </div>
+  </div>
+</form>
+
+{% if edit and obj %}
+<div class="f-danger" style="margin-top:16px;">
+  <div class="f-danger-text">
+    <strong>Zone de danger</strong>
+    La suppression est irréversible. Les unités liées n'auront plus de catégorie.
+  </div>
+  <button type="button" class="o-btn-danger"
+    onclick="document.getElementById('delete-modal').classList.add('open')">
+    <i class="bi bi-trash"></i> Supprimer
+  </button>
+</div>
+
+<div class="modal-overlay" id="delete-modal">
+  <div class="modal-box">
+    <div class="modal-icon">🗑️</div>
+    <div class="modal-title">Confirmer la suppression</div>
+    <div class="modal-msg">
+      Voulez-vous vraiment supprimer la catégorie<br>
+      <strong>{{ obj.nom }}</strong> ?<br>
+      <span style="font-size:11px;color:var(--text-muted);">Les unités liées n'auront plus de catégorie.</span>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn-modal-cancel"
+        onclick="document.getElementById('delete-modal').classList.remove('open')">
+        Annuler
+      </button>
+      <form method="post" action="{% url 'stock_categorie_unite_delete' obj.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="btn-modal-confirm">Supprimer</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var modal = document.getElementById('delete-modal');
+  if (modal) modal.addEventListener('click', function (e) {
+    if (e.target === this) this.classList.remove('open');
+  });
+});
+</script>
+{% endblock %}

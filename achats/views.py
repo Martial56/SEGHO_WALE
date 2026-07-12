@@ -723,8 +723,8 @@ def _integrer_stock(reception, commande, user):
 @login_required(login_url='login')
 def api_produits(request):
     q = request.GET.get('q', '').strip()
-    qs = Produit.objects.filter(actif=True)
+    qs = Produit.objects.filter(actif=True).select_related('unite_mesure')
     if q:
         qs = qs.filter(Q(nom__icontains=q) | Q(code__icontains=q))
-    data = [{'id': p.pk, 'text': f'{p.nom} ({p.code})', 'unite': p.unite_mesure} for p in qs[:30]]
+    data = [{'id': p.pk, 'text': f'{p.nom} ({p.code})', 'unite': p.unite_mesure.nom if p.unite_mesure else ''} for p in qs[:30]]
     return JsonResponse({'results': data})

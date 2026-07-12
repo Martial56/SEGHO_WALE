@@ -30,11 +30,12 @@ def _patient(suffix=''):
 
 
 def _medecin(suffix=''):
-    return Medecin.objects.create(
-        matricule=f'MED{suffix}{Medecin.objects.count():03d}',
+    from employer.models import Employe
+    employe = Employe.objects.create(
         nom='Docteur', prenoms=f'Test{suffix}',
-        specialite=_specialite(), telephone='0700000001',
+        telephone='0700000001', date_embauche='2020-01-01',
     )
+    return Medecin.objects.create(employe=employe, specialite=_specialite())
 
 
 def _article():
@@ -74,10 +75,79 @@ class TestGetActionsDisponibles(TestCase):
 
     def test_superuser_voit_et_active_tout(self):
         hosp = self._hosp()
+        # "Créer la facture" reste caché pour tout le monde, superuser inclus,
+        # s'il n'y a aucun service non facturé — il faut donc en créer un ici.
+        ServiceAFacturer.objects.create(
+            hospitalisation=hosp, service=_article(), quantite=1, source='manuel'
+        )
         actions = get_actions_disponibles(hosp, self.superuser)
-        for key in ('confirmer', 'creer_facture', 'installer', 'decharger', 'terminer', 'annuler'):
+        # "installer"/"decharger" ne sont plus testés ici à statut brouillon : le
+        # garde-fou anti-régression (voir test_superuser_transitions_verrouillees_
+        # hors_statut_precedent) les masque désormais tant que le statut qui les
+        # précède directement (confirme/hospitalise) n'est pas atteint.
+        for key in ('confirmer', 'creer_facture', 'annuler'):
             self.assertTrue(actions[key]['visible'], f"{key} devrait être visible pour le superuser")
             self.assertTrue(actions[key]['enabled'], f"{key} devrait être activé pour le superuser")
+
+        # "Clôturer" (terminer) n'a de sens qu'une fois le dossier déchargé,
+        # même pour le superuser (on ne saute pas d'étape) — et ce statut
+        # masque "annuler" en retour, donc vérifié à part avec un statut cohérent.
+        hosp.statut = 'decharge'
+        hosp.save(update_fields=['statut'])
+        actions = get_actions_disponibles(hosp, self.superuser)
+        self.assertTrue(actions['terminer']['visible'], "terminer devrait être visible pour le superuser une fois déchargé")
+        self.assertTrue(actions['terminer']['enabled'], "terminer devrait être activé pour le superuser une fois déchargé")
+
+    def test_superuser_bypasse_permissions_et_regles_metier(self):
+        """Le superuser ignore les permissions ET les règles métier « souples »
+        (facture payée, chambre attribuée, services non facturés...), mais reste
+        soumis aux mêmes préconditions de statut que les autres utilisateurs."""
+        hosp = self._hosp(statut='brouillon')
+        actions = get_actions_disponibles(hosp, self.superuser)
+        self.assertTrue(actions['confirmer']['visible'])
+        self.assertTrue(actions['confirmer']['enabled'])
+        self.assertTrue(actions['annuler']['visible'])
+        self.assertTrue(actions['annuler']['enabled'])
+
+        # confirme : installer actif même sans facture payée ni chambre attribuée
+        hosp = self._hosp(statut='confirme')
+        actions = get_actions_disponibles(hosp, self.superuser)
+        self.assertTrue(actions['installer']['visible'])
+        self.assertTrue(actions['installer']['enabled'])
+
+        # hospitalise : decharger actif même avec des factures impayées
+        hosp = self._hosp(statut='hospitalise')
+        actions = get_actions_disponibles(hosp, self.superuser)
+        self.assertTrue(actions['decharger']['visible'])
+        self.assertTrue(actions['decharger']['enabled'])
+
+        # decharge : terminer actif même avec SAF non facturés / factures impayées
+        hosp = self._hosp(statut='decharge')
+        actions = get_actions_disponibles(hosp, self.superuser)
+        self.assertTrue(actions['terminer']['visible'])
+        self.assertTrue(actions['terminer']['enabled'])
+
+    def test_superuser_transitions_verrouillees_hors_statut_precedent(self):
+        """Même pour le superuser, chaque transition doit rester cachée hors du
+        statut qui la précède directement — sinon un clic (ou un POST direct)
+        régresse un dossier déjà avancé (ex. ré-hospitaliser un dossier Terminé,
+        ré-occuper une chambre déjà libérée)."""
+        cas = (
+            ('brouillon',   ('installer', 'decharger', 'terminer')),
+            ('confirme',    ('confirmer', 'decharger', 'terminer')),
+            ('hospitalise', ('confirmer', 'installer', 'terminer')),
+            ('decharge',    ('confirmer', 'installer', 'decharger', 'annuler')),
+            ('termine',     ('confirmer', 'installer', 'decharger', 'terminer', 'annuler')),
+            ('annule',      ('confirmer', 'installer', 'decharger', 'terminer', 'annuler')),
+        )
+        for statut, locked_keys in cas:
+            hosp = self._hosp(statut=statut)
+            actions = get_actions_disponibles(hosp, self.superuser)
+            for key in locked_keys:
+                self.assertFalse(
+                    actions[key]['visible'],
+                    f"{key} devrait être caché pour le superuser au statut {statut}"
+                )
 
     def test_user_sans_permission_tout_invisible(self):
         hosp = self._hosp()
@@ -86,13 +156,14 @@ class TestGetActionsDisponibles(TestCase):
             self.assertFalse(actions[key]['visible'],
                              f"{key} devrait être invisible pour un user sans permission")
 
-    def test_confirmer_bloque_sans_soin(self):
+    def test_confirmer_actif_meme_sans_soin(self):
+        """Avoir déjà ajouté un soin n'est pas une condition pour confirmer
+        (décision produit) : patient + médecin traitant suffisent."""
         perm = Permission.objects.get(codename='can_confirmer_demande')
         self.user.user_permissions.add(perm)
         hosp = self._hosp(statut='brouillon')
         actions = get_actions_disponibles(hosp, self.user)
-        self.assertFalse(actions['confirmer']['enabled'])
-        self.assertIn('soin', actions['confirmer']['raison_blocage'].lower())
+        self.assertTrue(actions['confirmer']['enabled'])
 
     def test_confirmer_visible_mais_desactive_pour_confirme(self):
         perm = Permission.objects.get(codename='can_confirmer_demande')
@@ -143,16 +214,16 @@ class TestGetActionsDisponibles(TestCase):
         self.assertFalse(actions['installer']['enabled'])
         self.assertIn('chambre', actions['installer']['raison_blocage'].lower())
 
-    def test_decharger_bloque_sans_diagnostic(self):
+    def test_decharger_actif_meme_sans_diagnostic(self):
+        """Le diagnostic de décharge est facultatif (décision produit) :
+        Décharger reste actif même sans ResumeDecharge rempli."""
         perm = Permission.objects.get(codename='can_decharger_patient')
         self.user.user_permissions.add(perm)
         hosp = self._hosp(statut='hospitalise')
-        # Pas de ResumeDecharge créé → resume_ok = False
         actions = get_actions_disponibles(hosp, self.user)
-        self.assertFalse(actions['decharger']['enabled'])
-        self.assertIn('diagnostic', actions['decharger']['raison_blocage'].lower())
+        self.assertTrue(actions['decharger']['enabled'])
 
-    def test_decharger_activé_avec_diagnostic(self):
+    def test_decharger_actif_avec_diagnostic(self):
         perm = Permission.objects.get(codename='can_decharger_patient')
         self.user.user_permissions.add(perm)
         hosp = self._hosp(statut='hospitalise')

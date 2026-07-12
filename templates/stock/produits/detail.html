@@ -13,6 +13,7 @@
 .st-layout-2col {
   display: grid; grid-template-columns: 1fr 1.4fr; gap: 16px; margin-top: 20px;
 }
+html[data-theme="dark"] .stat-box-alerte { background:rgba(var(--amber-rgb),.1)!important; }
 @media(max-width:900px){ .st-layout-2col{ grid-template-columns:1fr; } }
 .st-info-row {
   display: flex; justify-content: space-between; align-items: flex-start;
@@ -21,7 +22,7 @@
 .st-info-row:last-child { border-bottom: none; }
 .st-info-label { color: var(--st-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .3px; }
 .st-info-val { font-weight: 600; color: var(--st-text); text-align: right; }
-.lot-perime { background: rgba(232,69,69,.06); }
+.lot-perime { background: rgba(var(--rose-rgb),.06); }
 </style>{% endblock %}
 
 {% block content %}
@@ -86,7 +87,7 @@
         </div>
         <div class="st-info-row">
           <span class="st-info-label">Unité de mesure</span>
-          <span class="st-info-val">{{ produit.unite_mesure }}</span>
+          <span class="st-info-val">{{ produit.unite_mesure.nom }}</span>
         </div>
         {% if produit.type == 'medicament' %}
         {% if produit.dci %}
@@ -111,7 +112,7 @@
           <span class="st-info-label">Prescription obligatoire</span>
           <span class="st-info-val">
             {% if produit.prescription_obligatoire %}
-              <span style="color:#b71c1c;"><i class="bi bi-check-circle-fill"></i> Oui</span>
+              <span style="color:var(--rose-text);"><i class="bi bi-check-circle-fill"></i> Oui</span>
             {% else %}
               <span style="color:var(--st-muted);">Non</span>
             {% endif %}
@@ -139,21 +140,21 @@
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;text-align:center;">
           <div style="padding:12px;background:var(--st-50);border-radius:8px;border:1px solid var(--st-200);">
             <div style="font-size:24px;font-weight:800;
-              {% if produit.en_rupture %}color:#b71c1c;
-              {% elif produit.en_alerte %}color:#8a5c00;
+              {% if produit.en_rupture %}color:var(--rose-text);
+              {% elif produit.en_alerte %}color:var(--amber-text);
               {% else %}color:var(--st-600);{% endif %}">
               {{ produit.stock_actuel|floatformat:0 }}
             </div>
             <div style="font-size:10.5px;color:var(--st-muted);text-transform:uppercase;letter-spacing:.3px;margin-top:3px;">Stock actuel</div>
           </div>
-          <div style="padding:12px;background:#fff8e1;border-radius:8px;border:1px solid rgba(232,154,26,.2);">
-            <div style="font-size:24px;font-weight:800;color:#8a5c00;">
+          <div class="stat-box-alerte" style="padding:12px;background:#fff8e1;border-radius:8px;border:1px solid rgba(var(--amber-rgb),.2);">
+            <div style="font-size:24px;font-weight:800;color:var(--amber-text);">
               {{ produit.stock_alerte|floatformat:0 }}
             </div>
             <div style="font-size:10.5px;color:var(--st-muted);text-transform:uppercase;letter-spacing:.3px;margin-top:3px;">Seuil alerte</div>
           </div>
-          <div style="padding:12px;background:rgba(232,69,69,.05);border-radius:8px;border:1px solid rgba(232,69,69,.15);">
-            <div style="font-size:24px;font-weight:800;color:#b71c1c;">
+          <div style="padding:12px;background:rgba(var(--rose-rgb),.05);border-radius:8px;border:1px solid rgba(var(--rose-rgb),.15);">
+            <div style="font-size:24px;font-weight:800;color:var(--rose-text);">
               {{ produit.stock_minimum|floatformat:0 }}
             </div>
             <div style="font-size:10.5px;color:var(--st-muted);text-transform:uppercase;letter-spacing:.3px;margin-top:3px;">Stock minimum</div>
@@ -212,7 +213,7 @@
         <tr {% if lot.est_perime %}class="lot-perime"{% endif %}>
           <td style="font-family: var(--font-mono);font-size:11.5px;font-weight:600;">{{ lot.numero_lot }}</td>
           <td style="font-size:11.5px;color:var(--st-muted);">{{ lot.date_reception|date:"d/m/Y" }}</td>
-          <td style="font-size:12px;{% if lot.est_perime %}color:#b71c1c;font-weight:700;{% elif lot.date_peremption %}color:#8a5c00;{% endif %}">
+          <td style="font-size:12px;{% if lot.est_perime %}color:var(--rose-text);font-weight:700;{% elif lot.date_peremption %}color:var(--amber-text);{% endif %}">
             {% if lot.date_peremption %}
               {{ lot.date_peremption|date:"d/m/Y" }}
               {% if lot.est_perime %}
@@ -228,7 +229,7 @@
           </td>
           <td style="text-align:right;font-weight:700;">
             {{ lot.quantite_actuelle|floatformat:0 }}
-            <span style="font-size:10.5px;font-weight:400;color:var(--st-muted);">{{ produit.unite_mesure }}</span>
+            <span style="font-size:10.5px;font-weight:400;color:var(--st-muted);">{{ produit.unite_mesure.nom }}</span>
           </td>
           <td style="text-align:right;font-size:12px;">
             {% if lot.prix_achat_lot %}
@@ -287,19 +288,19 @@
           </td>
           <td>
             {% if mv.type == 'entree' %}
-              <span style="color:#1a6d8c;font-size:11.5px;font-weight:700;">
+              <span style="color:var(--st-600);font-size:11.5px;font-weight:700;">
                 <i class="bi bi-arrow-down-circle-fill"></i> Entrée
               </span>
             {% elif mv.type == 'sortie' %}
-              <span style="color:#b71c1c;font-size:11.5px;font-weight:700;">
+              <span style="color:var(--rose-text);font-size:11.5px;font-weight:700;">
                 <i class="bi bi-arrow-up-circle-fill"></i> Sortie
               </span>
             {% elif mv.type == 'ajustement' %}
-              <span style="color:#8a5c00;font-size:11.5px;font-weight:700;">
+              <span style="color:var(--amber-text);font-size:11.5px;font-weight:700;">
                 <i class="bi bi-sliders"></i> Ajust.
               </span>
             {% elif mv.type == 'peremption' %}
-              <span style="color:#b71c1c;font-size:11.5px;font-weight:700;">
+              <span style="color:var(--rose-text);font-size:11.5px;font-weight:700;">
                 <i class="bi bi-calendar-x"></i> Péremption
               </span>
             {% else %}
@@ -310,7 +311,7 @@
             {{ mv.get_motif_display|default:"—" }}
           </td>
           <td style="text-align:right;font-weight:700;
-            {% if mv.type == 'entree' %}color:#1a6d8c;{% elif mv.type == 'sortie' or mv.type == 'peremption' %}color:#b71c1c;{% endif %}">
+            {% if mv.type == 'entree' %}color:var(--st-600);{% elif mv.type == 'sortie' or mv.type == 'peremption' %}color:var(--rose-text);{% endif %}">
             {% if mv.type == 'sortie' or mv.type == 'peremption' %}-{% else %}+{% endif %}{{ mv.quantite|floatformat:0 }}
           </td>
           <td style="text-align:center;font-size:11.5px;white-space:nowrap;color:var(--st-muted);">

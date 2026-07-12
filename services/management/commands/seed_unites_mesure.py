@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand
-from services.models import CategorieUniteMesure, UniteMesure
+from stock.models import CategorieUniteMesure, UniteMesure
 
 
 # (categorie_nom, nom, code, type_unite, ratio, precision_arrondi)

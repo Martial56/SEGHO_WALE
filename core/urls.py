@@ -6,14 +6,24 @@ from medecins.views import (
     medecins_export_csv as _medecins_export_csv_view,
     medecin_supprimer as _medecin_supprimer_view,
 )
+from patients.views import (
+    typevisite_list as _gyn_typevisite_list_view,
+    typevisite_create as _gyn_typevisite_create_view,
+    typevisite_edit as _gyn_typevisite_edit_view,
+    typevisite_delete as _gyn_typevisite_delete_view,
+)
 
 urlpatterns = [
     path('', views.dashboard, name='dashboard'),
     path('api/dashboard-stats/', views.dashboard_stats_json, name='dashboard_stats_json'),
     path('tableau-de-bord/', views.kpi_dashboard, name='kpi_dashboard'),
     path('login/', views.login_view, name='login'),
+    path('bienvenue/', views.intro, name='intro'),
     path('logout/', views.logout_view, name='logout'),
+    path('verrouiller/', views.lock_session, name='lock_session'),
+    path('deverrouiller/', views.unlock_session, name='unlock_session'),
     path('compte/', views.mon_compte, name='mon_compte'),
+    path('compte/couleur-accent/', views.accent_color_set, name='accent_color_set'),
 
     # URLs des modules
     path('patients/', include('patients.urls')),
@@ -21,6 +31,7 @@ urlpatterns = [
     path('medecins/dashboard/',              _medecin_dashboard_view,      name='medecin_dashboard'),
     path('medecins/export/csv/',             _medecins_export_csv_view,    name='medecins_export_csv'),
     path('medecins/nouveau/',                views.medecin_create,         name='medecin_create'),
+    path('medecins/rechercher-employe/',     views.medecin_lookup_employe, name='medecin_lookup_employe'),
     path('medecins/<int:pk>/',               views.medecin_detail,         name='medecin_detail'),
     path('medecins/<int:pk>/modifier/',      views.medecin_edit,           name='medecin_edit'),
     path('medecins/<int:pk>/supprimer/',     _medecin_supprimer_view,      name='medecin_supprimer'),
@@ -43,14 +54,13 @@ urlpatterns = [
     path('medecins/config/departements/<int:pk>/',           views.medecins_departement_detail,        name='medecins_departement_detail'),
     path('medecins/config/departements/<int:pk>/modifier/',  views.medecins_departement_edit,          name='medecins_departement_edit'),
 
-    # Services
-    path('medecins/config/services/',                    views.medecins_services,             name='medecins_services'),
-    path('medecins/config/services/export/',             views.medecins_export_services,       name='medecins_export_services'),
-    path('medecins/config/services/import/',             views.medecins_import_services,       name='medecins_import_services'),
-    path('medecins/config/services/nouveau/',            views.medecins_service_create,        name='medecins_service_create'),
-    path('medecins/config/services/bulk-delete/',        views.medecins_service_bulk_delete,   name='medecins_service_bulk_delete'),
-    path('medecins/config/services/<int:pk>/',           views.medecins_service_detail,        name='medecins_service_detail'),
-    path('medecins/config/services/<int:pk>/modifier/',  views.medecins_service_edit,          name='medecins_service_edit'),
+    # Modules spécialisés
+    path('medecins/config/modules/',                    views.medecins_modules,             name='medecins_modules'),
+    path('medecins/config/modules/nouveau/',            views.medecins_module_create,       name='medecins_module_create'),
+    path('medecins/config/modules/bulk-delete/',        views.medecins_module_bulk_delete,   name='medecins_module_bulk_delete'),
+    path('medecins/config/modules/<int:pk>/',           views.medecins_module_detail,        name='medecins_module_detail'),
+    path('medecins/config/modules/<int:pk>/modifier/',  views.medecins_module_edit,          name='medecins_module_edit'),
+
     path('consultations/', views.consultations_list, name='consultations_list'),
     path('soins/', include('soins.urls')),
     path('services/', include('services.urls')),
@@ -82,4 +92,8 @@ urlpatterns = [
     path('gynecologie/rdv/<int:pk>/consultation/', views.gynecologie_demarrer_consultation, name='gynecologie_demarrer_consultation'),
     path('gynecologie/naissances/', views.gynecologie_registre_naissance, name='gynecologie_naissances'),
     path('gynecologie/naissances/nouveau/', views.gynecologie_naissance_create, name='gynecologie_naissance_create'),
+    path('gynecologie/types-visite/', _gyn_typevisite_list_view, name='gynecologie_typevisite_list'),
+    path('gynecologie/types-visite/nouveau/', _gyn_typevisite_create_view, name='gynecologie_typevisite_create'),
+    path('gynecologie/types-visite/<int:pk>/modifier/', _gyn_typevisite_edit_view, name='gynecologie_typevisite_edit'),
+    path('gynecologie/types-visite/<int:pk>/supprimer/', _gyn_typevisite_delete_view, name='gynecologie_typevisite_delete'),
 ]

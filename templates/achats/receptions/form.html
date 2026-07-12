@@ -8,17 +8,10 @@
 <style>
 .content { padding:0; }
 .rf-page { display:flex; flex-direction:column; height:calc(100vh - var(--topbar-h) - 44px); overflow:hidden; }
-.rf-head { display:flex; align-items:center; gap:12px; padding:14px 28px; background:#fff; border-bottom:1px solid rgba(0,0,0,.07); flex-shrink:0; }
-.rf-head h1 { font-size:16px; font-weight:700; color:var(--teal-800); margin:0; }
 .rf-body { flex:1; overflow:auto; min-height:0; padding:20px 28px; }
 .rf-card { background:#fff; border-radius:10px; border:1px solid rgba(0,0,0,.08); margin-bottom:16px; overflow:hidden; max-width:1000px; }
 .rf-card-head { padding:12px 16px; background:#fafafa; border-bottom:1px solid rgba(0,0,0,.06); font-size:13px; font-weight:700; color:var(--teal-800); display:flex; align-items:center; gap:8px; }
 .rf-card-body { padding:16px; }
-.rf-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px; }
-.rf-field { display:flex; flex-direction:column; gap:4px; }
-.rf-field label { font-size:12px; font-weight:600; color:rgba(0,0,0,.6); }
-.rf-field input, .rf-field textarea { border:none; border-bottom:1px solid #d1d5db; border-radius:0; padding:8px 4px; font-size:13px; font-family:inherit; background:transparent; width:100%; }
-.rf-field input:focus, .rf-field textarea:focus { outline:none; border-bottom-color:var(--teal-600); }
 .rf-table { width:100%; border-collapse:collapse; font-size:13px; }
 .rf-table th { padding:9px 12px; font-size:11px; font-weight:700; color:#888; text-transform:uppercase; background:#fafafa; border-bottom:1px solid rgba(0,0,0,.08); }
 .rf-table td { padding:8px 12px; border-bottom:1px solid rgba(0,0,0,.05); vertical-align:middle; }
@@ -29,32 +22,39 @@
 .qte-cmd { color:#888; font-size:12px; }
 .ecart-neg { color:#ef4444; font-weight:600; }
 .ecart-ok { color:#2d99db; font-weight:600; }
+
+/* ── Mode sombre ── */
+html[data-theme="dark"] .rf-card { background:var(--surface); border-color:var(--border); }
+html[data-theme="dark"] .rf-card-head { background:var(--surface-muted); border-bottom-color:var(--border); color:var(--text-strong,#eef3f8); }
+html[data-theme="dark"] .rf-table th { color:var(--text-faint); background:var(--surface-muted); border-bottom-color:var(--border); }
+html[data-theme="dark"] .rf-table td { border-bottom-color:var(--border); color:var(--text); }
+html[data-theme="dark"] .rf-table input[type=number], html[data-theme="dark"] .rf-table input[type=text], html[data-theme="dark"] .rf-table input[type=date] { border-bottom-color:var(--border); color:var(--text); }
+html[data-theme="dark"] .qte-cmd { color:var(--text-faint); }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="rf-page">
-  <div class="rf-head">
-    <a href="{% url 'achats:commande_detail' commande.pk %}" style="color:#888;text-decoration:none;font-size:13px;"><i class="bi bi-arrow-left"></i></a>
-    <h1>Réception — {{ commande.numero }}</h1>
+  <div class="action-bar" style="margin:14px 28px 0;">
+    <div class="action-bar-breadcrumb">
+      <a href="{% url 'achats:commande_detail' commande.pk %}"><i class="bi bi-arrow-left"></i> {{ commande.numero }}</a>
+      <span class="sep">/</span>
+      <span class="current">Réception</span>
+    </div>
   </div>
 
   <div class="rf-body">
     <form method="post" style="max-width:1000px;">
       {% csrf_token %}
-      <div class="rf-card">
-        <div class="rf-card-head"><i class="bi bi-info-circle"></i> Informations de réception</div>
-        <div class="rf-card-body">
-          <div class="rf-row">
-            <div class="rf-field">
-              <label>Date de réception *</label>
-              <input type="date" name="date_reception" required>
-            </div>
-          </div>
-          <div class="rf-field">
-            <label>Notes / Observations</label>
-            <textarea name="notes" placeholder="État de la livraison, anomalies constatées…" style="min-height:60px;resize:vertical;"></textarea>
-          </div>
+      <div class="form-simple-card" style="margin-bottom:16px;">
+        <div class="rf-card-head" style="margin:-26px -28px 16px;"><i class="bi bi-info-circle"></i> Informations de réception</div>
+        <div class="form-field">
+          <label class="field-label">Date de réception <span class="required-star">*</span></label>
+          <input type="date" name="date_reception" class="field-ul" required>
+        </div>
+        <div class="form-field">
+          <label class="field-label">Notes / Observations</label>
+          <textarea name="notes" class="field-ul" placeholder="État de la livraison, anomalies constatées…"></textarea>
         </div>
       </div>
 
@@ -96,11 +96,11 @@
         </table>
       </div>
 
-      <div style="display:flex;gap:10px;padding-bottom:20px;">
-        <button type="submit" style="padding:9px 24px;border-radius:6px;background:var(--teal-600);color:#fff;border:none;font-size:14px;font-weight:600;cursor:pointer;">
+      <div class="form-actions" style="justify-content:flex-start;padding-bottom:20px;">
+        <button type="submit" class="btn-form-submit">
           <i class="bi bi-check-circle"></i> Confirmer la réception
         </button>
-        <a href="{% url 'achats:commande_detail' commande.pk %}" style="padding:9px 20px;border-radius:6px;border:1px solid #d1d5db;background:#fff;font-size:14px;text-decoration:none;color:rgba(0,0,0,.7);">Annuler</a>
+        <a href="{% url 'achats:commande_detail' commande.pk %}" class="btn-form-cancel">Annuler</a>
       </div>
     </form>
   </div>

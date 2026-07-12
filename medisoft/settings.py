@@ -16,6 +16,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.contrib.humanize',
     'patients',
+    'gynecologie',
     'medecins',
     'consultations.apps.ConsultationsConfig',
     'pharmacie',
@@ -47,6 +48,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'core.middleware.CurrentUserMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    'core.middleware.SessionTimeoutMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
@@ -70,6 +72,7 @@ TEMPLATES = [
                 'core.context_processors.user_profile',
                 'stock.context_processors.stock_alertes',
                 'pharmacie.context_processors.pharmacie_alertes',
+                'soins.context_processors.soins_alertes',
             ],
         },
     },
@@ -96,6 +99,9 @@ else:
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / 'db.sqlite3',
+            'OPTIONS': {
+                'timeout': 20,
+            },
         }
     }
 

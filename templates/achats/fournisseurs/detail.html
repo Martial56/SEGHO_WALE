@@ -24,15 +24,31 @@
 .fd-table tr:last-child td { border-bottom:none; }
 .badge { display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600; }
 .s-en_attente { background:#fef3c7; color:#92400e; }
-.s-valide { background:#c0d8e8; color:#0f4358; }
+.s-valide { background:#c0d8e8; color:var(--teal-700); }
 .s-rejete { background:#fee2e2; color:#991b1b; }
 .s-brouillon { background:#f3f4f6; color:#6b7280; }
 .s-envoyee { background:#dbeafe; color:#1d4ed8; }
 .s-en_livraison { background:#fef3c7; color:#92400e; }
-.s-recue { background:#c0d8e8; color:#0f4358; }
+.s-recue { background:#c0d8e8; color:var(--teal-700); }
 .s-annulee { background:#fee2e2; color:#991b1b; }
 .btn { display:inline-flex; align-items:center; gap:5px; padding:6px 14px; border-radius:6px; font-size:13px; font-weight:600; text-decoration:none; }
 .btn-secondary { background:#fff; color:rgba(0,0,0,.7); border:1px solid #d1d5db; }
+
+/* ── Mode sombre ── */
+html[data-theme="dark"] .fd-head { background:var(--surface); border-bottom-color:var(--border); }
+html[data-theme="dark"] .fd-head h1 { color:var(--text-strong); }
+html[data-theme="dark"] .fd-card { background:var(--surface); border-color:var(--border); }
+html[data-theme="dark"] .fd-card-head { background:var(--surface-muted); border-bottom-color:var(--border); color:var(--text-strong); }
+html[data-theme="dark"] .fd-info-label { color:var(--text-faint); }
+html[data-theme="dark"] .fd-info-val { color:var(--text); }
+html[data-theme="dark"] .fd-table th { background:var(--surface-muted); color:var(--text-faint); border-bottom-color:var(--border); }
+html[data-theme="dark"] .fd-table td { border-bottom-color:var(--border); color:var(--text); }
+html[data-theme="dark"] .btn-secondary { background:var(--surface); color:var(--text); border-color:var(--border); }
+html[data-theme="dark"] .s-brouillon { background:rgba(107,114,128,.25); color:#d1d5db; }
+html[data-theme="dark"] .s-envoyee { background:rgba(29,78,216,.25); color:#93c5fd; }
+html[data-theme="dark"] .s-en_cours, html[data-theme="dark"] .s-en_attente, html[data-theme="dark"] .s-en_livraison { background:rgba(146,64,14,.3); color:#fcd34d; }
+html[data-theme="dark"] .s-valide, html[data-theme="dark"] .s-recue { background:rgba(var(--teal-700-rgb),.4); color:#7dd3fc; }
+html[data-theme="dark"] .s-rejete, html[data-theme="dark"] .s-annulee { background:rgba(153,27,27,.3); color:#fca5a5; }
 </style>
 {% endblock %}
 
@@ -121,8 +137,8 @@
         {% for p in proformas %}
         <tr>
           <td style="font-weight:700;"><a href="{% url 'achats:proforma_detail' p.pk %}" style="color:var(--teal-700);text-decoration:none;">{{ p.numero }}</a></td>
-          <td style="color:#888;">{{ p.besoin.titre|truncatechars:50 }}</td>
-          <td style="color:#888;">{{ p.date_reception }}</td>
+          <td style="color:var(--text-muted);">{{ p.besoin.titre|truncatechars:50 }}</td>
+          <td style="color:var(--text-muted);">{{ p.date_reception }}</td>
           <td><span class="badge s-{{ p.statut }}">{{ p.get_statut_display }}</span></td>
           <td style="text-align:right;font-weight:600;white-space:nowrap;">{{ p.montant_total|floatformat:0 }}&nbsp;FCFA</td>
           <td><a href="{% url 'achats:proforma_detail' p.pk %}" style="color:var(--teal-600);font-size:13px;"><i class="bi bi-eye"></i></a></td>
@@ -131,7 +147,7 @@
         </tbody>
       </table>
       {% else %}
-      <div style="padding:24px;text-align:center;color:#ccc;font-size:13px;"><i class="bi bi-file-earmark-text" style="display:block;font-size:28px;margin-bottom:8px;"></i>Aucun proforma</div>
+      <div style="padding:24px;text-align:center;color:var(--text-faint);font-size:13px;"><i class="bi bi-file-earmark-text" style="display:block;font-size:28px;margin-bottom:8px;"></i>Aucun proforma</div>
       {% endif %}
     </div>
 
@@ -148,9 +164,9 @@
         {% for c in commandes %}
         <tr>
           <td style="font-weight:700;"><a href="{% url 'achats:commande_detail' c.pk %}" style="color:var(--teal-700);text-decoration:none;">{{ c.numero }}</a></td>
-          <td style="color:#888;">{{ c.date_commande }}</td>
+          <td style="color:var(--text-muted);">{{ c.date_commande }}</td>
           <td><span class="badge s-{{ c.statut }}">{{ c.get_statut_display }}</span></td>
-          <td style="color:#888;">{{ c.date_livraison_prevue|default:"—" }}</td>
+          <td style="color:var(--text-muted);">{{ c.date_livraison_prevue|default:"—" }}</td>
           <td style="text-align:right;font-weight:600;white-space:nowrap;">{{ c.montant_total|floatformat:0 }}&nbsp;FCFA</td>
           <td><a href="{% url 'achats:commande_detail' c.pk %}" style="color:var(--teal-600);font-size:13px;"><i class="bi bi-eye"></i></a></td>
         </tr>
@@ -158,7 +174,7 @@
         </tbody>
       </table>
       {% else %}
-      <div style="padding:24px;text-align:center;color:#ccc;font-size:13px;"><i class="bi bi-bag-check" style="display:block;font-size:28px;margin-bottom:8px;"></i>Aucune commande</div>
+      <div style="padding:24px;text-align:center;color:var(--text-faint);font-size:13px;"><i class="bi bi-bag-check" style="display:block;font-size:28px;margin-bottom:8px;"></i>Aucune commande</div>
       {% endif %}
     </div>
 

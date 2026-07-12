@@ -1,7 +1,8 @@
 {% extends 'planning/base.html' %}
-{% load i18n %}
+{% load i18n static %}
 
 {% block extra_planning_css %}
+.print-header { display: none; }
 .pl-cal-header {
   position: sticky; top: var(--topbar-h); z-index: 180;
   background: var(--surface); border-bottom: 1px solid var(--border);
@@ -55,11 +56,42 @@ html[data-theme="dark"] .cal-pl-badge.brouillon { background: #3d2e00; color: #f
 @media print {
   .pl-nav, .pl-cal-nav .btn-nav-month, nav, #top-bar, .topbar,
   .sidebar, .sidebar-wrapper, .topbar-wrapper, #sidebar { display: none !important; }
-  @page { size: A4 landscape; margin: 10mm; }
+
+  .print-header { display: block; margin-bottom: 14px; }
+  .print-header-inner {
+    display: flex; align-items: center; gap: 14px;
+    padding-bottom: 10px; border-bottom: 2.5px solid var(--pl-700);
+  }
+  .print-header-logo { height: 64px; width: auto; flex-shrink: 0; }
+  .print-header-center { flex: 1; }
+  .print-header-org {
+    font-size: 15px; font-weight: 800; color: #071e28;
+    text-transform: uppercase; letter-spacing: 0.06em; line-height: 1.2;
+  }
+  .print-header-subtitle { font-size: 9.5px; color: #666; margin-top: 1px; letter-spacing: 0.03em; }
+  .print-header-doc {
+    font-size: 12px; font-weight: 700; color: var(--pl-700);
+    margin-top: 5px; text-transform: uppercase; letter-spacing: 0.05em;
+  }
+
+  .content { padding: 10mm 12mm !important; }
+
+  @page { size: A4 landscape; margin: 0; }
 }
 {% endblock %}
 
 {% block content %}
+<div class="print-header">
+  <div class="print-header-inner">
+    <img src="{% static 'img/logo.png' %}" alt="Logo WALÉ" class="print-header-logo">
+    <div class="print-header-center">
+      <div class="print-header-org">Centre Médico-Social WALÉ</div>
+      <div class="print-header-subtitle">Yamoussoukro — Côte d'Ivoire</div>
+      <div class="print-header-doc">Planning mensuel — {{ mois_nom }} {{ annee }}</div>
+    </div>
+  </div>
+</div>
+
 <div class="pl-cal-header">
   <div class="pl-cal-nav">
     <a href="?annee={{ prev_annee }}&mois={{ prev_mois }}" class="btn-nav-month">

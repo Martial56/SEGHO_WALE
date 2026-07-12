@@ -3,33 +3,6 @@
 {% block topbar_title %}Stock — Nouveau mouvement{% endblock %}
 
 {% block extra_st_css %}<style>
-.st-page-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 32px; margin: 0 -32px;
-  background: #e8f2f7; border-bottom: 1px solid rgba(0,0,0,.05);
-  box-shadow: 0 2px 8px rgba(0,0,0,.04);
-  position: sticky; top: var(--topbar-h); z-index: 100;
-}
-.st-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; }
-@media(max-width:700px){ .st-form-grid { grid-template-columns:1fr; } }
-.st-form-grid .st-field-full { grid-column: 1 / -1; }
-.st-select {
-  width: 100%; border: none; border-bottom: 1.5px solid rgba(0,0,0,.18);
-  border-radius: 0; background: transparent; padding: 8px 4px;
-  font-size: 13px; color: var(--st-text); outline: none; cursor: pointer;
-  font-family: inherit; appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-  background-repeat: no-repeat; background-position: right 6px center;
-  padding-right: 24px;
-}
-.st-select:focus { border-bottom-color: var(--st-500); }
-.st-textarea {
-  width: 100%; border: none; border-bottom: 1.5px solid rgba(0,0,0,.18);
-  border-radius: 0; background: transparent; padding: 8px 4px;
-  font-size: 13px; color: var(--st-text); outline: none;
-  font-family: inherit; resize: vertical; min-height: 80px;
-}
-.st-textarea:focus { border-bottom-color: var(--st-500); }
 #produit-stock-info {
   font-size: 12px; margin-top: 6px; padding: 6px 10px;
   border-radius: 6px; background: var(--st-50);
@@ -40,57 +13,43 @@
 
 {% block content %}
 
-<!-- En-tête sticky -->
-<div class="st-page-header">
-  <div style="display:flex;align-items:center;gap:14px;">
-    <a href="{% url 'stock_mouvements' %}" style="color:var(--st-muted);font-size:13px;text-decoration:none;">
-      <i class="bi bi-arrow-left"></i>
-    </a>
-    <div>
-      <div style="font-size:15px;font-weight:800;color:var(--st-900);">
-        <i class="bi bi-arrow-left-right" style="color:var(--st-600);"></i> Nouveau mouvement de stock
-      </div>
-      <div style="font-size:11.5px;color:var(--st-muted);">Enregistrer une entrée, sortie ou ajustement</div>
-    </div>
+<div class="action-bar">
+  <div class="action-bar-breadcrumb">
+    <a href="{% url 'stock_mouvements' %}"><i class="bi bi-arrow-left"></i> Mouvements</a>
+    <span class="sep">/</span>
+    <span class="current">Nouveau mouvement de stock</span>
   </div>
 </div>
 
 <!-- Formulaire -->
-<div class="st-card" style="margin-top:20px;max-width:750px;">
-  <div class="st-card-header">
-    <div class="st-card-title"><i class="bi bi-pencil-square" style="color:var(--st-600);"></i> Correction manuelle</div>
-  </div>
-  <div class="st-card-body">
+<div class="form-simple-card" style="max-width:750px;">
     <form method="post" novalidate>
       {% csrf_token %}
 
-      <div class="st-form-grid">
-
-        <!-- Produit -->
-        <div class="st-field st-field-full">
-          <label class="st-label" for="id_produit">Produit <span style="color:#c0392b;">*</span></label>
-          <select name="produit" id="id_produit" class="st-select" required onchange="showStock(this)">
-            <option value="">— Sélectionner un produit —</option>
-            {% for p in produits %}
-            <option value="{{ p.pk }}"
-              data-stock="{{ p.stock_actuel|floatformat:0 }}"
-              data-unite="{{ p.unite_mesure }}"
-              data-alerte="{{ p.stock_alerte|floatformat:0 }}">
-              {{ p.code }} — {{ p.nom }}
-            </option>
-            {% endfor %}
-          </select>
-          <div id="produit-stock-info">
-            <i class="bi bi-info-circle"></i>
-            Stock actuel : <strong id="stock-val">—</strong> <span id="stock-unite"></span>
-            &nbsp;·&nbsp; Seuil alerte : <strong id="stock-alerte">—</strong>
-          </div>
+      <div class="form-field">
+        <label class="field-label" for="id_produit">Produit <span class="required-star">*</span></label>
+        <select name="produit" id="id_produit" class="field-ul" required onchange="showStock(this)">
+          <option value="">— Sélectionner un produit —</option>
+          {% for p in produits %}
+          <option value="{{ p.pk }}"
+            data-stock="{{ p.stock_actuel|floatformat:0 }}"
+            data-unite="{{ p.unite_mesure.nom }}"
+            data-alerte="{{ p.stock_alerte|floatformat:0 }}">
+            {{ p.code }} — {{ p.nom }}
+          </option>
+          {% endfor %}
+        </select>
+        <div id="produit-stock-info">
+          <i class="bi bi-info-circle"></i>
+          Stock actuel : <strong id="stock-val">—</strong> <span id="stock-unite"></span>
+          &nbsp;·&nbsp; Seuil alerte : <strong id="stock-alerte">—</strong>
         </div>
+      </div>
 
-        <!-- Type -->
-        <div class="st-field">
-          <label class="st-label" for="id_type">Type <span style="color:#c0392b;">*</span></label>
-          <select name="type" id="id_type" class="st-select" required>
+      <div class="tab-two-col">
+        <div class="form-field">
+          <label class="field-label" for="id_type">Type <span class="required-star">*</span></label>
+          <select name="type" id="id_type" class="field-ul" required>
             <option value="">— Sélectionner —</option>
             <option value="entree">↓ Entrée en stock</option>
             <option value="ajustement">⇄ Ajustement inventaire</option>
@@ -99,10 +58,9 @@
           </select>
         </div>
 
-        <!-- Motif -->
-        <div class="st-field">
-          <label class="st-label" for="id_motif">Motif</label>
-          <select name="motif" id="id_motif" class="st-select">
+        <div class="form-field">
+          <label class="field-label" for="id_motif">Motif</label>
+          <select name="motif" id="id_motif" class="field-ul">
             <option value="">— Sélectionner un motif —</option>
             <option value="achat">Achat fournisseur</option>
             <option value="inventaire">Correction inventaire</option>
@@ -113,41 +71,35 @@
           </select>
         </div>
 
-        <!-- Quantité -->
-        <div class="st-field">
-          <label class="st-label" for="id_quantite">Quantité <span style="color:#c0392b;">*</span></label>
-          <input type="number" name="quantite" id="id_quantite" class="st-input"
+        <div class="form-field">
+          <label class="field-label" for="id_quantite">Quantité <span class="required-star">*</span></label>
+          <input type="number" name="quantite" id="id_quantite" class="field-ul"
                  min="1" step="1" placeholder="0" required>
         </div>
 
-        <!-- Référence -->
-        <div class="st-field">
-          <label class="st-label" for="id_reference">Référence</label>
-          <input type="text" name="reference" id="id_reference" class="st-input"
+        <div class="form-field">
+          <label class="field-label" for="id_reference">Référence</label>
+          <input type="text" name="reference" id="id_reference" class="field-ul"
                  placeholder="N° bon, référence document…">
         </div>
+      </div>
 
-        <!-- Notes -->
-        <div class="st-field st-field-full">
-          <label class="st-label" for="id_notes">Notes</label>
-          <textarea name="notes" id="id_notes" class="st-textarea"
-                    placeholder="Explication du mouvement…"></textarea>
-        </div>
+      <div class="form-field">
+        <label class="field-label" for="id_notes">Notes</label>
+        <textarea name="notes" id="id_notes" class="field-ul"
+                  placeholder="Explication du mouvement…"></textarea>
+      </div>
 
-      </div><!-- /grid -->
-
-      <!-- Boutons -->
-      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:24px;padding-top:16px;border-top:1px solid var(--st-border);">
-        <a href="{% url 'stock_mouvements' %}" class="btn-st-outline">
+      <div class="form-actions">
+        <a href="{% url 'stock_mouvements' %}" class="btn-form-cancel">
           <i class="bi bi-x-lg"></i> Annuler
         </a>
-        <button type="submit" class="btn-st">
+        <button type="submit" class="btn-form-submit">
           <i class="bi bi-check-lg"></i> Enregistrer le mouvement
         </button>
       </div>
 
     </form>
-  </div>
 </div>
 
 <script>

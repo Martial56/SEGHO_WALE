@@ -32,8 +32,14 @@ class LogActivite(models.Model):
 
 
 class UserProfile(models.Model):
-    user  = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
-    photo = models.ImageField(upload_to='profiles/', blank=True, null=True)
+    user         = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    photo        = models.ImageField(upload_to='profiles/', blank=True, null=True)
+    accent_color = models.CharField(max_length=7, blank=True, null=True,
+                                     help_text="Couleur d'accent personnalisée (hex, ex: #3e6f3e). Vide = couleur par défaut du logo.")
+    session_timeout_minutes = models.PositiveIntegerField(
+        default=30,
+        help_text="Délai d'inactivité avant déconnexion automatique, en minutes. 0 = désactivé.",
+    )
 
     def __str__(self):
         return f"Profil de {self.user.username}"

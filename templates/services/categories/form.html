@@ -9,26 +9,22 @@
 
 {% block content %}
 
-<!-- ══════════════ PANNEAU DE CONTRÔLE ══════════════ -->
-<div class="control-panel">
-  <div class="cp-top">
-    <a href="{% if edit and obj %}{% url 'services:categorie_detail' obj.pk %}{% else %}{% url 'services:categories' %}{% endif %}" class="o-ctrl-btn" style="padding:3px 7px;">
+<div class="action-bar">
+  <div class="action-bar-breadcrumb">
+    <a href="{% if edit and obj %}{% url 'services:categorie_detail' obj.pk %}{% else %}{% url 'services:categories' %}{% endif %}" class="btn-form-cancel" style="padding:3px 7px;">
       <i class="bi bi-arrow-left"></i>
     </a>
-    <span style="font-size:13.5px;color:var(--text-muted);">
-      <a href="{% url 'services:categories' %}" style="color:var(--teal-600);text-decoration:none;font-weight:500;">Catégories de prestation</a>
-      {% if edit and obj %}
-      <span style="margin:0 5px;opacity:.4;">/</span>
-      <a href="{% url 'services:categorie_detail' obj.pk %}" style="color:var(--teal-600);text-decoration:none;font-weight:500;">{{ obj.nom }}</a>
-      {% endif %}
-      <span style="margin:0 5px;opacity:.4;">/</span>
-      <span style="color:var(--text);">{{ titre }}</span>
-    </span>
-    <div style="flex:1;"></div>
-    <div class="cp-save-group">
-      <button type="submit" form="categorie-form" class="btn-save">Enregistrer</button>
-      <a href="{% if edit and obj %}{% url 'services:categorie_detail' obj.pk %}{% else %}{% url 'services:categories' %}{% endif %}" class="btn-discard">Annuler</a>
-    </div>
+    <a href="{% url 'services:categories' %}">Catégories de prestation</a>
+    {% if edit and obj %}
+    <span class="sep">/</span>
+    <a href="{% url 'services:categorie_detail' obj.pk %}">{{ obj.nom }}</a>
+    {% endif %}
+    <span class="sep">/</span>
+    <span class="current">{{ titre }}</span>
+  </div>
+  <div class="action-bar-buttons">
+    <a href="{% if edit and obj %}{% url 'services:categorie_detail' obj.pk %}{% else %}{% url 'services:categories' %}{% endif %}" class="btn-form-cancel">Annuler</a>
+    <button type="submit" form="categorie-form" class="btn-form-submit">Enregistrer</button>
   </div>
 </div>
 
@@ -59,56 +55,33 @@
           {{ form.parent }}
         </div>
         {% if form.parent.errors %}<div class="f-error">{{ form.parent.errors.0 }}</div>{% endif %}
-        <div class="field-row">
-          <label>Service associé</label>
-          {{ form.service_associe }}
-        </div>
-        {% if form.service_associe.errors %}<div class="f-error">{{ form.service_associe.errors.0 }}</div>{% endif %}
       </div>
+    </div>
 
-    </div><!-- /.form-main-grid -->
-
-    <div class="f-layout">
-      <div class="f-main">
-        <div class="f-tabs-wrap">
-          <div class="f-tabs">
-            <button type="button" class="f-tab active" data-tab="tab-info">Informations</button>
-          </div>
-          <div class="f-tab-panel active" id="tab-info">
-            <div class="field-group">
-              <div class="field-row align-top">
-                <label>Description</label>
-                {{ form.description }}
-              </div>
-              {% if form.description.errors %}<div class="f-error">{{ form.description.errors.0 }}</div>{% endif %}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div><!-- /f-layout -->
+    <div class="field-row align-top">
+      <label>Description</label>
+      {{ form.description }}
+    </div>
+    {% if form.description.errors %}<div class="f-error">{{ form.description.errors.0 }}</div>{% endif %}
 
     <!-- Séquence de code-barres, Logistique, Valorisation & Comptabilité :
          champs présents dans CategorieArticleForm mais non exposés dans ce
          formulaire (héritage de la maquette Odoo d'origine) — inchangé. -->
-
   </form>
-
-  {% if edit and obj %}
-  <div class="f-danger" style="margin-top:16px;">
-    <div class="f-danger-text">
-      <strong>Zone de danger</strong>
-      La suppression de cette catégorie est irréversible. Les articles associés perdront leur catégorie.
-    </div>
-    <button type="button" class="o-btn-danger"
-      onclick="document.getElementById('delete-modal').classList.add('open')">
-      <i class="bi bi-trash"></i> Supprimer
-    </button>
-  </div>
-  {% endif %}
-
-</div><!-- /.form-body -->
+</div>
 
 {% if edit and obj %}
+<div class="f-danger" style="margin-top:16px;">
+  <div class="f-danger-text">
+    <strong>Zone de danger</strong>
+    La suppression de cette catégorie est irréversible. Les articles associés perdront leur catégorie.
+  </div>
+  <button type="button" class="o-btn-danger"
+    onclick="document.getElementById('delete-modal').classList.add('open')">
+    <i class="bi bi-trash"></i> Supprimer
+  </button>
+</div>
+
 <div class="modal-overlay" id="delete-modal">
   <div class="modal-box">
     <div class="modal-icon">🗑️</div>
@@ -136,26 +109,6 @@
 
 {% block extra_js %}
 <script>
-(function () {
-  document.documentElement.style.setProperty('--topbar-h', '0px');
-  function alignSousTopbar() {
-    var topbar = document.querySelector('.topbar');
-    var content = document.querySelector('.content');
-    if (!topbar || !content) return;
-    var tbH = Math.ceil(topbar.getBoundingClientRect().height);
-    if (tbH <= 0) return;
-    document.documentElement.style.setProperty('--header-h', tbH + 'px');
-    requestAnimationFrame(function () {
-      var gap = Math.round(content.getBoundingClientRect().top - topbar.getBoundingClientRect().bottom);
-      document.documentElement.style.setProperty('--header-h', (tbH - gap) + 'px');
-    });
-  }
-  if (document.readyState !== 'loading') { alignSousTopbar(); }
-  else { document.addEventListener('DOMContentLoaded', alignSousTopbar); }
-  if (document.fonts && document.fonts.ready) { document.fonts.ready.then(alignSousTopbar); }
-  window.addEventListener('resize', alignSousTopbar);
-})();
-
 document.addEventListener('DOMContentLoaded', function () {
   var codeInput = document.getElementById('id_code');
   if (codeInput) codeInput.addEventListener('input', function () {

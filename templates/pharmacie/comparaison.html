@@ -7,11 +7,11 @@
   padding:11px 32px;
   background:var(--ph-surface);border-bottom:1px solid var(--ph-border);
 
-  position:sticky;top:var(--topbar-h);z-index:100;flex-wrap:wrap;
+  position:sticky;top:0;z-index:100;flex-wrap:wrap;
 }
 .cmp-stats { display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0; }
 @media(max-width:700px){ .cmp-stats{ grid-template-columns:1fr; } }
-.cmp-stat { background:var(--ph-surface);border-radius:12px;box-shadow:0 2px 12px rgba(15,67,88,.08);padding:16px 20px;border-left:4px solid var(--ph-400); }
+.cmp-stat { background:var(--ph-surface);border-radius:12px;box-shadow:0 2px 12px rgba(var(--ph-700-rgb),.08);padding:16px 20px;border-left:4px solid var(--ph-400); }
 .cmp-stat-label { font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--ph-muted);margin-bottom:5px; }
 .cmp-stat-value { font-size:20px;font-weight:800; }
 .cmp-table-wrap {overflow-x:auto; }
@@ -26,9 +26,9 @@
 .cmp-table tbody td:first-child { padding-left:12px; }
 .cmp-table tbody td:last-child  { padding-right:12px; }
 .cmp-sep-row td { background:var(--ph-100);padding:7px 32px;font-size:10.5px;font-weight:700;color:var(--ph-700);text-transform:uppercase;letter-spacing:.5px; }
-.cmp-badge-ok   { font-weight:700;color:#1a6d8c; }
-.cmp-badge-rupt { background:rgba(232,69,69,.1);color:#b71c1c;border:1px solid rgba(232,69,69,.25);padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700; }
-.cmp-badge-alrt { background:rgba(232,154,26,.1);color:#8a5c00;border:1px solid rgba(232,154,26,.25);padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700; }
+.cmp-badge-ok   { font-weight:700;color:var(--ph-600); }
+.cmp-badge-rupt { background:rgba(var(--rose-rgb),.1);color:var(--rose-text);border:1px solid rgba(var(--rose-rgb),.25);padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700; }
+.cmp-badge-alrt { background:rgba(var(--amber-rgb),.1);color:var(--amber-text);border:1px solid rgba(var(--amber-rgb),.25);padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700; }
 .filter-btn { padding:4px 12px;border-radius:20px;font-size:11.5px;font-weight:600;text-decoration:none;border:1.5px solid var(--ph-200);color:var(--ph-700);background:transparent;transition:all .15s; }
 .filter-btn:hover,.filter-btn.actif { background:var(--ph-600);color:#fff;border-color:var(--ph-600); }
 </style>{% endblock %}
@@ -115,18 +115,18 @@
           {% if item.qte1 == 0 %}
             <span class="cmp-badge-rupt"><i class="bi bi-x-circle-fill"></i> Rupture</span>
           {% elif item.produit.stock_alerte and item.qte1 <= item.produit.stock_alerte %}
-            <span class="cmp-badge-alrt"><i class="bi bi-exclamation-triangle-fill"></i> {{ item.qte1|floatformat:0 }}{% if item.produit.unite_mesure %} {{ item.produit.unite_mesure }}{% endif %}</span>
+            <span class="cmp-badge-alrt"><i class="bi bi-exclamation-triangle-fill"></i> {{ item.qte1|floatformat:0 }}{% if item.produit.unite_mesure %} {{ item.produit.unite_mesure.nom }}{% endif %}</span>
           {% else %}
-            <span class="cmp-badge-ok">{{ item.qte1|floatformat:0 }}{% if item.produit.unite_mesure %} <span style="font-size:10px;font-weight:400;color:var(--ph-muted);">{{ item.produit.unite_mesure }}</span>{% endif %}</span>
+            <span class="cmp-badge-ok">{{ item.qte1|floatformat:0 }}{% if item.produit.unite_mesure %} <span style="font-size:10px;font-weight:400;color:var(--ph-muted);">{{ item.produit.unite_mesure.nom }}</span>{% endif %}</span>
           {% endif %}
         </td>
         <td style="text-align:center;">
           {% if item.qte2 == 0 %}
             <span class="cmp-badge-rupt"><i class="bi bi-x-circle-fill"></i> Rupture</span>
           {% elif item.produit.stock_alerte and item.qte2 <= item.produit.stock_alerte %}
-            <span class="cmp-badge-alrt"><i class="bi bi-exclamation-triangle-fill"></i> {{ item.qte2|floatformat:0 }}{% if item.produit.unite_mesure %} {{ item.produit.unite_mesure }}{% endif %}</span>
+            <span class="cmp-badge-alrt"><i class="bi bi-exclamation-triangle-fill"></i> {{ item.qte2|floatformat:0 }}{% if item.produit.unite_mesure %} {{ item.produit.unite_mesure.nom }}{% endif %}</span>
           {% else %}
-            <span class="cmp-badge-ok">{{ item.qte2|floatformat:0 }}{% if item.produit.unite_mesure %} <span style="font-size:10px;font-weight:400;color:var(--ph-muted);">{{ item.produit.unite_mesure }}</span>{% endif %}</span>
+            <span class="cmp-badge-ok">{{ item.qte2|floatformat:0 }}{% if item.produit.unite_mesure %} <span style="font-size:10px;font-weight:400;color:var(--ph-muted);">{{ item.produit.unite_mesure.nom }}</span>{% endif %}</span>
           {% endif %}
         </td>
         <td style="text-align:center;font-weight:700;">{{ item.total|floatformat:0 }}</td>

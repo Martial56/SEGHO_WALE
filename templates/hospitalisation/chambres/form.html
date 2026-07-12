@@ -4,26 +4,6 @@
 {% block extra_css %}
 {{ block.super }}
 <style>
-/* ── Layout ── */
-.content    { padding: 0 !important; }
-.breadcrumb { display: none !important; }
-
-/* ── Subheader ── */
-.o-subheader { position: fixed; left: 0; right: 0; top: 0; z-index: 190; }
-.btn-save {
-  background:var(--teal-500); color:#fff; border:none;
-  padding:6px 20px; border-radius:4px; font-size:13px; font-weight:500; font-family:inherit;
-  cursor:pointer; transition:background .15s; display:inline-flex; align-items:center; gap:6px;
-}
-.btn-save:hover { background:var(--teal-600); }
-.btn-cancel {
-  background:none; border:1px solid var(--border); color:var(--text-muted);
-  padding:6px 16px; border-radius:4px; font-size:13px; font-family:inherit;
-  cursor:pointer; text-decoration:none; display:inline-flex; align-items:center;
-  transition:background .15s, color .15s;
-}
-.btn-cancel:hover { background:#f5f5f5; color:var(--text); }
-
 /* ── Form card ── */
 .form-card {
   background:var(--surface); border:1px solid var(--border);
@@ -46,26 +26,6 @@
   font-family: var(--font-mono); font-style:italic; margin-bottom:10px;
 }
 .salle-badge strong { color:var(--teal-700); font-style:normal; font-size:13px; }
-
-/* Inputs underline */
-.field-ul {
-  width:100%; background:transparent; border:none;
-  border-bottom:1.5px solid #d1dde3; border-radius:0;
-  padding:7px 2px; font-size:13px; color:var(--text);
-  transition:border-color .2s; box-shadow:none; outline:none; font-family:inherit;
-}
-.field-ul:focus { border-bottom-color:var(--teal-500); }
-.field-ul::placeholder { color:#bfcdd4; }
-.field-ul-name { font-size:24px; font-weight:700; border-bottom-width:2px; padding:4px 0 6px; }
-.field-ul-name::placeholder { color:#c5d4d8; font-weight:600; }
-textarea.field-ul { resize:vertical; min-height:72px; padding:6px 2px; }
-select.field-ul {
-  appearance:none; -webkit-appearance:none; background-color:transparent;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23839aaa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-  background-repeat:no-repeat; background-position:right 4px center; padding-right:22px; cursor:pointer;
-}
-.field-label { display:block; font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px; }
-.field-error { font-size:12px; color:#e53935; margin-top:3px; }
 
 /* ── Statut toggle ── */
 .statut-toggle {
@@ -185,17 +145,14 @@ html[data-theme="dark"] .equip-icon  { background:#1a2535; color:#4a6a80; }
 html[data-theme="dark"] .equip-card.active { background:#0a2535; border-color:var(--teal-400); }
 html[data-theme="dark"] .equip-card.active .equip-icon { background:rgba(21,136,171,.2); color:var(--teal-300); }
 html[data-theme="dark"] .equip-card.active .equip-label { color:var(--teal-300); }
-html[data-theme="dark"] .btn-cancel  { border-color:var(--border); }
 html[data-theme="dark"] .o-ctrl-btn:hover { background:rgba(255,255,255,.05); }
-html[data-theme="dark"] .field-ul   { color:var(--text); border-bottom-color:rgba(255,255,255,.15); }
-html[data-theme="dark"] .field-ul:focus { border-bottom-color:var(--teal-400); }
 html[data-theme="dark"] .ts-wrapper .ts-control { border-bottom-color:rgba(255,255,255,.15) !important; }
 html[data-theme="dark"] .ts-wrapper.focus .ts-control { border-bottom-color:var(--teal-400) !important; }
 html[data-theme="dark"] .ts-dropdown { background:#1a2535 !important; border-color:#2e3f58 !important; }
 html[data-theme="dark"] .ts-dropdown .option { color:#c5d4e2 !important; }
 html[data-theme="dark"] .ts-dropdown .option:hover,
 html[data-theme="dark"] .ts-dropdown .option.active,
-html[data-theme="dark"] .ts-dropdown .option.selected { background:rgba(33,136,171,.2) !important; }
+html[data-theme="dark"] .ts-dropdown .option.selected { background:rgba(var(--teal-500-rgb),.2) !important; }
 html[data-theme="dark"] .toggle-row-label { color:var(--text); }
 </style>
 {% endblock %}
@@ -203,26 +160,21 @@ html[data-theme="dark"] .toggle-row-label { color:var(--text); }
 {% block content %}
 <div id="page-wrap">
 
-<!-- ── Subheader ── -->
-<div class="o-subheader" data-fixed="1">
-  <div class="o-subheader-row">
-    <a href="{% url 'hospitalisation:chambres_list' %}" class="o-ctrl-btn" style="padding:3px 7px;">
-      <i class="bi bi-arrow-left"></i>
-    </a>
-    <span style="font-size:13px;color:var(--text-muted);">
-      <a href="{% url 'hospitalisation:chambres_list' %}" style="color:var(--accent,var(--teal-600));text-decoration:none;font-weight:500;">Salles/Chambres</a>
-      <span style="margin:0 4px;opacity:.4;">/</span>
-      <span style="color:var(--text);">{% if edit %}{{ chambre.nom|default:chambre.salle_no }}{% else %}Nouveau{% endif %}</span>
-    </span>
-    <div style="flex:1;"></div>
-    <a href="{% url 'hospitalisation:chambres_list' %}" class="btn-cancel">Ignorer</a>
-    <button type="submit" form="chambre-form" class="btn-save">
+<div class="action-bar">
+  <div class="action-bar-breadcrumb">
+    <a href="{% url 'hospitalisation:chambres_list' %}"><i class="bi bi-arrow-left"></i> Salles/Chambres</a>
+    <span class="sep">/</span>
+    <span class="current">{% if edit %}{{ chambre.nom|default:chambre.salle_no }}{% else %}Nouveau{% endif %}</span>
+  </div>
+  <div class="action-bar-buttons">
+    <a href="{% url 'hospitalisation:chambres_list' %}" class="btn-form-cancel">Ignorer</a>
+    <button type="submit" form="chambre-form" class="btn-form-submit">
       <i class="bi bi-check2"></i> Enregistrer
     </button>
   </div>
 </div>
 
-<form method="post" id="chambre-form" novalidate style="padding: 16px 24px;">
+<form method="post" id="chambre-form" novalidate>
   {% csrf_token %}
 
   <div class="form-card">

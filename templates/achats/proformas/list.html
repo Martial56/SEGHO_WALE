@@ -21,8 +21,27 @@
 .pf-table tr:hover td { background:#f8fafb; }
 .badge { display:inline-block; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:600; }
 .s-en_attente { background:#fef3c7; color:#92400e; }
-.s-valide { background:#c0d8e8; color:#0f4358; }
+.s-valide { background:#c0d8e8; color:var(--teal-700); }
 .s-rejete { background:#fee2e2; color:#991b1b; }
+.kpi-c-attente { color:#92400e; }
+.kpi-c-valide { color:var(--teal-700); }
+.kpi-c-rejete { color:#991b1b; }
+
+/* ── Mode sombre ── */
+html[data-theme="dark"] .kpi-c-attente { color:#fcd34d; }
+html[data-theme="dark"] .kpi-c-valide { color:#7dd3fc; }
+html[data-theme="dark"] .kpi-c-rejete { color:#fca5a5; }
+html[data-theme="dark"] .pf-head { background:var(--surface); border-bottom-color:var(--border); }
+html[data-theme="dark"] .pf-head h1 { color:var(--text-strong); }
+html[data-theme="dark"] .pf-kpis { background:var(--surface-muted); border-bottom-color:var(--border); }
+html[data-theme="dark"] .pf-kpi { background:var(--surface); border-color:var(--border); color:var(--text); }
+html[data-theme="dark"] .pf-filters { background:var(--surface); border-bottom-color:var(--border); }
+html[data-theme="dark"] .pf-table th { background:var(--surface-muted); color:var(--text-faint); border-bottom-color:var(--border); }
+html[data-theme="dark"] .pf-table td { border-bottom-color:var(--border); color:var(--text); }
+html[data-theme="dark"] .pf-table tr:hover td { background:var(--surface-muted); }
+html[data-theme="dark"] .s-en_attente { background:rgba(146,64,14,.3); color:#fcd34d; }
+html[data-theme="dark"] .s-valide { background:rgba(var(--teal-700-rgb),.4); color:#7dd3fc; }
+html[data-theme="dark"] .s-rejete { background:rgba(153,27,27,.3); color:#fca5a5; }
 </style>
 {% endblock %}
 
@@ -39,9 +58,9 @@
 
   <div class="pf-kpis">
     <a href="?" class="pf-kpi"><span class="val">{{ stats.total }}</span> Total</a>
-    <a href="?statut=en_attente" class="pf-kpi"><span class="val" style="color:#92400e;">{{ stats.en_attente }}</span> En attente</a>
-    <a href="?statut=valide" class="pf-kpi"><span class="val" style="color:#0f4358;">{{ stats.valide }}</span> Validés</a>
-    <a href="?statut=rejete" class="pf-kpi"><span class="val" style="color:#991b1b;">{{ stats.rejete }}</span> Rejetés</a>
+    <a href="?statut=en_attente" class="pf-kpi"><span class="val kpi-c-attente">{{ stats.en_attente }}</span> En attente</a>
+    <a href="?statut=valide" class="pf-kpi"><span class="val kpi-c-valide">{{ stats.valide }}</span> Validés</a>
+    <a href="?statut=rejete" class="pf-kpi"><span class="val kpi-c-rejete">{{ stats.rejete }}</span> Rejetés</a>
   </div>
 
   <div class="pf-filters">
@@ -53,8 +72,8 @@
         <option value="{{ val }}" {% if statut == val %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
       </select>
-      <button type="submit" style="padding:6px 14px;border-radius:6px;border:1px solid #d1d5db;background:#fff;font-size:13px;cursor:pointer;"><i class="bi bi-search"></i></button>
-      {% if q or statut %}<a href="{% url 'achats:proformas_list' %}" style="font-size:13px;color:#888;">Effacer</a>{% endif %}
+      <button type="submit" style="padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;cursor:pointer;"><i class="bi bi-search"></i></button>
+      {% if q or statut %}<a href="{% url 'achats:proformas_list' %}" style="font-size:13px;color:var(--text-muted);">Effacer</a>{% endif %}
     </form>
   </div>
 
@@ -71,7 +90,7 @@
           <a href="{% url 'achats:proforma_detail' p.pk %}" style="color:inherit;text-decoration:none;">{{ p.numero }}</a>
         </td>
         <td>
-          <a href="{% url 'achats:besoin_detail' p.besoin.pk %}" style="color:rgba(0,0,0,.7);text-decoration:none;font-size:12px;">
+          <a href="{% url 'achats:besoin_detail' p.besoin.pk %}" style="color:var(--text-muted);text-decoration:none;font-size:12px;">
             {{ p.besoin.numero }} — {{ p.besoin.titre|truncatechars:30 }}
           </a>
         </td>
@@ -79,7 +98,7 @@
         <td style="white-space:nowrap;font-weight:600;">{{ p.montant_total|floatformat:0 }} FCFA</td>
         <td><span class="badge s-{{ p.statut }}">{{ p.get_statut_display }}</span></td>
         <td>{{ p.date_reception }}</td>
-        <td style="color:#888;">{{ p.soumis_par.get_full_name|default:p.soumis_par.username|default:"—" }}</td>
+        <td style="color:var(--text-muted);">{{ p.soumis_par.get_full_name|default:p.soumis_par.username|default:"—" }}</td>
         <td>
           <a href="{% url 'achats:proforma_detail' p.pk %}" style="color:var(--teal-600);font-size:13px;"><i class="bi bi-eye"></i></a>
         </td>
@@ -88,7 +107,7 @@
       </tbody>
     </table>
     {% else %}
-    <div style="padding:48px;text-align:center;color:#aaa;">
+    <div style="padding:48px;text-align:center;color:var(--text-faint);">
       <i class="bi bi-file-earmark-text" style="font-size:36px;display:block;margin-bottom:12px;"></i>
       Aucun proforma trouvé.
     </div>

@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Ordonnance {{ ordonnance.numero }}</title>
 <style>
+:root {
+  --font-print: 'Segoe UI', Arial, sans-serif; --font-mono: 'Courier New', monospace;
+  --ph-600: #4f9b4b; --ph-700: #2e592b; --ph-600-rgb: 79,155,75;
+  --amber-rgb: 232,154,26; --amber-text: #8a5c00; --rose-btn: #c0392b;
+}
+
 * { box-sizing:border-box; margin:0; padding:0; }
 body { font-family: var(--font-print); font-size:13px; color:#111; background:#fff; }
 
@@ -12,8 +18,8 @@ body { font-family: var(--font-print); font-size:13px; color:#111; background:#f
   body { background:#e8eaf0; padding:20px; }
   .page { background:#fff; max-width:680px; margin:0 auto; padding:32px 40px 40px; box-shadow:0 4px 24px rgba(0,0,0,.15); border-radius:4px; }
   .print-btn-bar { max-width:680px; margin:0 auto 12px; text-align:right; }
-  .print-btn { background:#1a6d8c; color:#fff; border:none; border-radius:6px; padding:8px 20px; font-size:13px; font-weight:600; cursor:pointer; }
-  .print-btn:hover { background:#0f4358; }
+  .print-btn { background:var(--ph-600); color:#fff; border:none; border-radius:6px; padding:8px 20px; font-size:13px; font-weight:600; cursor:pointer; }
+  .print-btn:hover { background:var(--ph-700); }
   .no-print { }
 }
 
@@ -21,20 +27,20 @@ body { font-family: var(--font-print); font-size:13px; color:#111; background:#f
   body { background:#fff; padding:0; }
   .page { padding:10mm 14mm; width:100%; max-width:none; box-shadow:none; }
   .no-print { display:none !important; }
-  @page { size:A4 portrait; margin:10mm; }
+  @page { size:A4 portrait; margin:0; }
 }
 
 /* En-tête */
-.header { display:flex; justify-content:space-between; align-items:flex-start; padding-bottom:14px; border-bottom:2px solid #1a6d8c; margin-bottom:18px; }
+.header { display:flex; justify-content:space-between; align-items:flex-start; padding-bottom:14px; border-bottom:2px solid var(--ph-600); margin-bottom:18px; }
 .header-left .clinic-name { font-size:17px; font-weight:800; color:#071e28; }
 .header-left .clinic-sub  { font-size:11px; color:#555; margin-top:2px; }
 .header-right { text-align:right; }
-.header-right .ordo-num { font-size:14px; font-weight:800; color:#1a6d8c; font-family: var(--font-mono); }
+.header-right .ordo-num { font-size:14px; font-weight:800; color:var(--ph-600); font-family: var(--font-mono); }
 .header-right .ordo-date { font-size:11px; color:#555; margin-top:2px; }
 
 /* Section patient */
 .section { margin-bottom:16px; }
-.section-title { font-size:10px; font-weight:700; color:#1a6d8c; text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px; border-left:3px solid #1a6d8c; padding-left:7px; }
+.section-title { font-size:10px; font-weight:700; color:var(--ph-600); text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px; border-left:3px solid var(--ph-600); padding-left:7px; }
 
 .patient-row { display:flex; gap:20px; flex-wrap:wrap; }
 .patient-field { flex:1; min-width:140px; }
@@ -43,12 +49,12 @@ body { font-family: var(--font-print); font-size:13px; color:#111; background:#f
 
 /* Rx area */
 .rx-header { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
-.rx-symbol { font-size:32px; font-weight:900; color:#1a6d8c; line-height:1; font-family:Georgia,serif; }
+.rx-symbol { font-size:32px; font-weight:900; color:var(--ph-600); line-height:1; font-family:Georgia,serif; }
 .rx-label  { font-size:11px; color:#888; text-transform:uppercase; letter-spacing:.5px; font-weight:600; }
 
 /* Table medicaments */
 .med-table { width:100%; border-collapse:collapse; font-size:12.5px; }
-.med-table thead tr { background:#0f4358; color:#fff; }
+.med-table thead tr { background:var(--ph-700); color:#fff; }
 .med-table thead th { padding:7px 10px; font-weight:700; font-size:10.5px; text-transform:uppercase; letter-spacing:.3px; text-align:left; }
 .med-table tbody tr { border-bottom:1px solid #e0e8f4; }
 .med-table tbody tr:nth-child(even) { background:#e8f2f7; }
@@ -64,7 +70,7 @@ body { font-family: var(--font-print); font-size:13px; color:#111; background:#f
 /* Signature */
 .signature-area { display:flex; justify-content:flex-end; margin-top:28px; }
 .signature-box { text-align:center; min-width:180px; }
-.signature-line { border-top:1px solid #1a6d8c; margin-top:40px; padding-top:5px; font-size:11.5px; color:#333; font-weight:600; }
+.signature-line { border-top:1px solid var(--ph-600); margin-top:40px; padding-top:5px; font-size:11.5px; color:#333; font-weight:600; }
 .signature-sub  { font-size:10.5px; color:#888; margin-top:2px; }
 
 /* Pied de page */
@@ -73,16 +79,16 @@ body { font-family: var(--font-print); font-size:13px; color:#111; background:#f
 .footer-right { font-size:10px; color:#aaa; text-align:right; }
 
 /* Badge statut */
-.badge-emise    { background:rgba(26,109,140,.12); color:#0f4358; border:1px solid rgba(26,109,140,.28); padding:2px 8px; border-radius:20px; font-size:10.5px; font-weight:700; }
-.badge-delivree { background:rgba(26,109,140,.1);  color:#1a6d8c; border:1px solid rgba(26,109,140,.25); padding:2px 8px; border-radius:20px; font-size:10.5px; font-weight:700; }
-.badge-partielle{ background:rgba(232,154,26,.1);  color:#8a5c00; border:1px solid rgba(232,154,26,.25); padding:2px 8px; border-radius:20px; font-size:10.5px; font-weight:700; }
+.badge-emise    { background:rgba(var(--ph-600-rgb),.12); color:var(--ph-700); border:1px solid rgba(var(--ph-600-rgb),.28); padding:2px 8px; border-radius:20px; font-size:10.5px; font-weight:700; }
+.badge-delivree { background:rgba(var(--ph-600-rgb),.1);  color:var(--ph-600); border:1px solid rgba(var(--ph-600-rgb),.25); padding:2px 8px; border-radius:20px; font-size:10.5px; font-weight:700; }
+.badge-partielle{ background:rgba(var(--amber-rgb),.1);  color:var(--amber-text); border:1px solid rgba(var(--amber-rgb),.25); padding:2px 8px; border-radius:20px; font-size:10.5px; font-weight:700; }
 .badge-expiree  { background:rgba(0,0,0,.06);      color:rgba(0,0,0,.5); border:1px solid rgba(0,0,0,.1); padding:2px 8px; border-radius:20px; font-size:10.5px; font-weight:700; }
 </style>
 </head>
 <body>
 
 <div class="no-print print-btn-bar">
-  <button class="print-btn" style="background:#1a6d8c;" onclick="window.print()">&#0f4358; Imprimer</button>
+  <button class="print-btn" style="background:var(--ph-600);" onclick="window.print()">&#128424; Imprimer</button>
 </div>
 
 <div class="page">
@@ -146,7 +152,7 @@ body { font-family: var(--font-print); font-size:13px; color:#111; background:#f
     <div class="patient-row">
       <div class="patient-field">
         <div class="lbl">N° Consultation</div>
-        <div class="val" style="font-family: var(--font-mono);color:#1a6d8c;">{{ ordonnance.consultation.numero }}</div>
+        <div class="val" style="font-family: var(--font-mono);color:var(--ph-600);">{{ ordonnance.consultation.numero }}</div>
       </div>
       <div class="patient-field">
         <div class="lbl">Date</div>
@@ -198,7 +204,7 @@ body { font-family: var(--font-print); font-size:13px; color:#111; background:#f
   </div>
 
   {% if ordonnance.date_expiration %}
-  <div style="margin-top:10px;font-size:11.5px;color:{% if ordonnance.date_expiration < today %}#c0392b{% else %}#555{% endif %};">
+  <div style="margin-top:10px;font-size:11.5px;color:{% if ordonnance.date_expiration < today %}var(--rose-btn){% else %}#555{% endif %};">
     <strong>Validite :</strong> jusqu'au {{ ordonnance.date_expiration|date:"d/m/Y" }}
     {% if ordonnance.date_expiration < today %} <em>(Expiree)</em>{% endif %}
   </div>

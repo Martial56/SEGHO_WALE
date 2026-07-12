@@ -3,26 +3,30 @@
 {% block topbar_title %}Stock — Tableau de bord{% endblock %}
 
 {% block extra_st_css %}<style>
+.st-page-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 32px; background: #e8f2f7; border-bottom: 1px solid rgba(0,0,0,.05);
+}
 .st-layout { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:20px; }
 @media(max-width:900px){ .st-layout{ grid-template-columns:1fr; } }
 
 .st-progress { display:flex; align-items:center; gap:8px; }
 .st-bar { flex:1; height:5px; background:rgba(0,0,0,.08); border-radius:3px; overflow:hidden; }
 .st-bar-fill { height:100%; border-radius:3px; background:var(--st-500); }
-.val-rupture { color:#b71c1c; font-weight:700; }
-.val-alerte  { color:#8a5c00; font-weight:700; }
-.val-perime  { color:#b71c1c; font-weight:700; }
-.val-proche  { color:#8a5c00; }
+.val-rupture { color:var(--rose-text); font-weight:700; }
+.val-alerte  { color:var(--amber-text); font-weight:700; }
+.val-perime  { color:var(--rose-text); font-weight:700; }
+.val-proche  { color:var(--amber-text); }
 .charts-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px; }
 @media(max-width:900px){ .charts-grid{ grid-template-columns:1fr; } }
-.chart-card { background:var(--st-surface); border:1px solid var(--st-border); border-radius:12px; padding:18px 20px; box-shadow:0 2px 10px rgba(15,67,88,.07); }
+.chart-card { background:var(--st-surface); border:1px solid var(--st-border); border-radius:12px; padding:18px 20px; box-shadow:0 2px 10px rgba(var(--st-700-rgb),.07); }
 .chart-title { font-size:13px; font-weight:700; color:var(--st-text); margin-bottom:14px; display:flex; align-items:center; gap:7px; border-left:3px solid var(--st-600); padding-left:10px; }
 
 /* Alerte banner */
-.alert-banner { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin-top:16px; padding:12px 18px; background:rgba(232,69,69,.05); border:1px solid rgba(232,69,69,.2); border-radius:10px; }
+.alert-banner { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin-top:16px; padding:12px 18px; background:rgba(var(--rose-rgb),.05); border:1px solid rgba(var(--rose-rgb),.2); border-radius:10px; }
 .alert-pill { display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border-radius:20px; font-size:12px; font-weight:700; }
-.alert-pill.rupture  { background:rgba(232,69,69,.12); color:#b71c1c; border:1px solid rgba(232,69,69,.3); }
-.alert-pill.min      { background:rgba(232,154,26,.12); color:#7a4d00; border:1px solid rgba(232,154,26,.3); }
+.alert-pill.rupture  { background:rgba(var(--rose-rgb),.12); color:var(--rose-text); border:1px solid rgba(var(--rose-rgb),.3); }
+.alert-pill.min      { background:rgba(var(--amber-rgb),.12); color:#7a4d00; border:1px solid rgba(var(--amber-rgb),.3); }
 .alert-pill.expir    { background:rgba(200,100,0,.1); color:#7a3800; border:1px solid rgba(200,100,0,.25); }
 
 /* KPI band */
@@ -31,11 +35,12 @@
 .kpi-card { background:var(--st-surface); border:1px solid var(--st-border); border-radius:10px; padding:14px 18px; box-shadow:0 1px 4px rgba(58,89,36,.06); }
 .kpi-label { font-size:10.5px; color:var(--st-muted); text-transform:uppercase; letter-spacing:.3px; margin-bottom:4px; }
 .kpi-val   { font-size:20px; font-weight:800; line-height:1; }
+html[data-theme="dark"] .badge-cmd-brouillon-dash { background:rgba(255,255,255,.08)!important; color:rgba(255,255,255,.6)!important; border-color:rgba(255,255,255,.15)!important; }
 </style>{% endblock %}
 
 {% block content %}
 <!-- En-tête -->
-<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 32px;margin:0 -32px;background:#e8f2f7;border-bottom:1px solid rgba(0,0,0,.05);box-shadow:0 2px 8px rgba(0,0,0,.04);position:sticky;top:var(--topbar-h);z-index:100;">
+<div class="st-page-header" style="margin:0 -32px;box-shadow:0 2px 8px rgba(0,0,0,.04);position:sticky;top:var(--topbar-h);z-index:100;">
   <div>
     <div style="font-size:15px;font-weight:800;color:var(--st-900);"><i class="bi bi-boxes" style="color:var(--st-600);"></i> Gestion du stock</div>
     <div style="font-size:11.5px;color:var(--st-muted);">Vue d'ensemble — {{ today|date:"d/m/Y" }}</div>
@@ -49,7 +54,7 @@
 <!-- Alertes critiques (Point 1) -->
 {% if stats.ruptures > 0 or produits_sous_minimum or lots_expiration_30 %}
 <div class="alert-banner">
-  <span style="font-size:12px;font-weight:700;color:#b71c1c;margin-right:4px;"><i class="bi bi-exclamation-triangle-fill"></i> Alertes :</span>
+  <span style="font-size:12px;font-weight:700;color:var(--rose-text);margin-right:4px;"><i class="bi bi-exclamation-triangle-fill"></i> Alertes :</span>
   {% if stats.ruptures > 0 %}
   <a href="{% url 'stock_produits' %}?statut=rupture" class="alert-pill rupture" style="text-decoration:none;">
     <i class="bi bi-x-circle-fill" style="font-size:10px;"></i> {{ stats.ruptures }} rupture{{ stats.ruptures|pluralize }}
@@ -71,11 +76,11 @@
 <!-- Stats -->
 <div class="st-stats" style="margin-top:20px;">
   <div class="st-stat">
-    <div class="st-stat-icon" style="background:rgba(15,67,88,.1);color:var(--st-700);"><i class="bi bi-box-seam"></i></div>
+    <div class="st-stat-icon" style="background:rgba(var(--st-700-rgb),.1);color:var(--st-700);"><i class="bi bi-box-seam"></i></div>
     <div><div class="st-stat-val" style="color:var(--st-700);">{{ stats.total_produits }}</div><div class="st-stat-lbl">Produits actifs</div></div>
   </div>
   <div class="st-stat">
-    <div class="st-stat-icon" style="background:rgba(15,67,88,.1);color:var(--st-600);"><i class="bi bi-capsule-pill"></i></div>
+    <div class="st-stat-icon" style="background:rgba(var(--st-700-rgb),.1);color:var(--st-600);"><i class="bi bi-capsule-pill"></i></div>
     <div><div class="st-stat-val" style="color:var(--st-600);">{{ stats.medicaments }}</div><div class="st-stat-lbl">Médicaments</div></div>
   </div>
   <div class="st-stat">
@@ -87,20 +92,20 @@
     <div><div class="st-stat-val" style="color:#4527a0;">{{ stats.equipements }}</div><div class="st-stat-lbl">Équipements</div></div>
   </div>
   <div class="st-stat">
-    <div class="st-stat-icon" style="background:rgba(232,69,69,.1);color:#b71c1c;"><i class="bi bi-exclamation-triangle-fill"></i></div>
-    <div><div class="st-stat-val" style="color:#b71c1c;">{{ stats.ruptures }}</div><div class="st-stat-lbl">Ruptures</div></div>
+    <div class="st-stat-icon" style="background:rgba(var(--rose-rgb),.1);color:var(--rose-text);"><i class="bi bi-exclamation-triangle-fill"></i></div>
+    <div><div class="st-stat-val" style="color:var(--rose-text);">{{ stats.ruptures }}</div><div class="st-stat-lbl">Ruptures</div></div>
   </div>
   <div class="st-stat">
-    <div class="st-stat-icon" style="background:rgba(232,154,26,.1);color:#8a5c00;"><i class="bi bi-bell-fill"></i></div>
-    <div><div class="st-stat-val" style="color:#8a5c00;">{{ stats.alertes }}</div><div class="st-stat-lbl">En alerte</div></div>
+    <div class="st-stat-icon" style="background:rgba(var(--amber-rgb),.1);color:var(--amber-text);"><i class="bi bi-bell-fill"></i></div>
+    <div><div class="st-stat-val" style="color:var(--amber-text);">{{ stats.alertes }}</div><div class="st-stat-lbl">En alerte</div></div>
   </div>
   <div class="st-stat">
-    <div class="st-stat-icon" style="background:rgba(15,67,88,.1);color:var(--st-600);"><i class="bi bi-cart3"></i></div>
+    <div class="st-stat-icon" style="background:rgba(var(--st-700-rgb),.1);color:var(--st-600);"><i class="bi bi-cart3"></i></div>
     <div><div class="st-stat-val" style="color:var(--st-600);">{{ stats.commandes_en_cours }}</div><div class="st-stat-lbl">Commandes en cours</div></div>
   </div>
   <div class="st-stat">
-    <div class="st-stat-icon" style="background:rgba(232,69,69,.08);color:#c0392b;"><i class="bi bi-calendar-x"></i></div>
-    <div><div class="st-stat-val" style="color:#c0392b;">{{ stats.lots_perimes }}</div><div class="st-stat-lbl">Lots périmés</div></div>
+    <div class="st-stat-icon" style="background:rgba(var(--rose-rgb),.08);color:var(--rose-btn);"><i class="bi bi-calendar-x"></i></div>
+    <div><div class="st-stat-val" style="color:var(--rose-btn);">{{ stats.lots_perimes }}</div><div class="st-stat-lbl">Lots périmés</div></div>
   </div>
 </div>
 
@@ -109,7 +114,7 @@
 <div class="kpi-band">
   <div class="kpi-card">
     <div class="kpi-label"><i class="bi bi-check2-circle" style="color:#0d7a4c;"></i> Taux de service</div>
-    <div class="kpi-val" style="color:{% if kpi_taux_service >= 80 %}#0d7a4c{% elif kpi_taux_service >= 60 %}#8a5c00{% else %}#b71c1c{% endif %};">{{ kpi_taux_service }}%</div>
+    <div class="kpi-val" style="color:{% if kpi_taux_service >= 80 %}#0d7a4c{% elif kpi_taux_service >= 60 %}var(--amber-text){% else %}var(--rose-text){% endif %};">{{ kpi_taux_service }}%</div>
     <div style="font-size:10.5px;color:var(--st-muted);margin-top:4px;">Demandes satisfaites</div>
   </div>
   <div class="kpi-card">
@@ -123,8 +128,8 @@
     <div style="font-size:10.5px;color:var(--st-muted);margin-top:4px;">Livraisons / stock actuel</div>
   </div>
   <div class="kpi-card">
-    <div class="kpi-label"><i class="bi bi-hourglass-split" style="color:#8a5c00;"></i> Lots anciens (&gt;6 mois)</div>
-    <div class="kpi-val" style="color:{% if lots_obsoletes_count > 0 %}#8a5c00{% else %}#0d7a4c{% endif %};">{{ lots_obsoletes_count }}</div>
+    <div class="kpi-label"><i class="bi bi-hourglass-split" style="color:var(--amber-text);"></i> Lots anciens (&gt;6 mois)</div>
+    <div class="kpi-val" style="color:{% if lots_obsoletes_count > 0 %}var(--amber-text){% else %}#0d7a4c{% endif %};">{{ lots_obsoletes_count }}</div>
     <div style="font-size:10.5px;color:var(--st-muted);margin-top:4px;">En stock sans mouvement</div>
   </div>
 </div>
@@ -160,7 +165,7 @@
 
   <!-- Bar : top livrés 30 jours -->
   <div class="chart-card" style="grid-column:1/-1;">
-    <div class="chart-title"><i class="bi bi-trophy-fill" style="color:#e89a1a;"></i> Top produits livrés aux pharmacies — 30 jours</div>
+    <div class="chart-title"><i class="bi bi-trophy-fill" style="color:var(--amber);"></i> Top produits livrés aux pharmacies — 30 jours</div>
     <canvas id="chartTop" height="70"></canvas>
   </div>
 
@@ -172,7 +177,7 @@
   <!-- Produits en alerte -->
   <div class="st-card">
     <div class="st-card-header">
-      <div class="st-card-title"><i class="bi bi-exclamation-circle" style="color:#e89a1a;"></i> Stock critique</div>
+      <div class="st-card-title"><i class="bi bi-exclamation-circle" style="color:var(--amber);"></i> Stock critique</div>
       <a href="{% url 'stock_produits' %}?statut=rupture" class="btn-st-outline" style="padding:3px 10px;font-size:11.5px;">Voir tout</a>
     </div>
     {% if produits_alerte %}
@@ -195,7 +200,7 @@
     </table>
     {% else %}
     <div class="st-card-body" style="text-align:center;color:var(--st-muted);font-style:italic;padding:32px;">
-      <i class="bi bi-check-circle-fill" style="font-size:24px;color:#1a6d8c;display:block;margin-bottom:8px;"></i>
+      <i class="bi bi-check-circle-fill" style="font-size:24px;color:var(--st-600);display:block;margin-bottom:8px;"></i>
       Aucun produit en rupture ou alerte
     </div>
     {% endif %}
@@ -204,7 +209,7 @@
   <!-- Lots à surveiller -->
   <div class="st-card">
     <div class="st-card-header">
-      <div class="st-card-title"><i class="bi bi-calendar-x" style="color:#c0392b;"></i> Lots à surveiller</div>
+      <div class="st-card-title"><i class="bi bi-calendar-x" style="color:var(--rose-btn);"></i> Lots à surveiller</div>
       <span style="font-size:11.5px;color:var(--st-muted);">90 prochains jours</span>
     </div>
     {% if lots_a_surveiller %}
@@ -243,8 +248,8 @@
         <td style="font-size:11.5px;white-space:nowrap;">{{ mv.date|date:"d/m H:i" }}</td>
         <td style="font-weight:500;">{{ mv.produit.nom|truncatechars:25 }}</td>
         <td>
-          {% if mv.type == 'entree' %}<span style="color:#1a6d8c;font-size:11px;font-weight:600;"><i class="bi bi-arrow-down-circle-fill"></i> Entrée</span>
-          {% elif mv.type == 'sortie' %}<span style="color:#b71c1c;font-size:11px;font-weight:600;"><i class="bi bi-arrow-up-circle-fill"></i> Sortie</span>
+          {% if mv.type == 'entree' %}<span style="color:var(--st-600);font-size:11px;font-weight:600;"><i class="bi bi-arrow-down-circle-fill"></i> Entrée</span>
+          {% elif mv.type == 'sortie' %}<span style="color:var(--rose-text);font-size:11px;font-weight:600;"><i class="bi bi-arrow-up-circle-fill"></i> Sortie</span>
           {% else %}<span style="color:var(--st-muted);font-size:11px;">{{ mv.get_type_display }}</span>{% endif %}
         </td>
         <td style="text-align:right;font-weight:700;">{{ mv.quantite|floatformat:0 }}</td>
@@ -273,7 +278,7 @@
         <td style="font-weight:500;">{{ cmd.fournisseur.nom|truncatechars:20 }}</td>
         <td style="font-size:11.5px;">{{ cmd.date_commande|date:"d/m/Y" }}</td>
         <td>
-          {% if cmd.statut == 'brouillon' %}<span style="background:rgba(0,0,0,.06);color:rgba(0,0,0,.45);border:1px solid rgba(0,0,0,.1);padding:2px 8px;border-radius:20px;font-size:10.5px;font-weight:600;">Brouillon</span>
+          {% if cmd.statut == 'brouillon' %}<span class="badge-cmd-brouillon-dash" style="background:rgba(0,0,0,.06);color:rgba(0,0,0,.45);border:1px solid rgba(0,0,0,.1);padding:2px 8px;border-radius:20px;font-size:10.5px;font-weight:600;">Brouillon</span>
           {% elif cmd.statut == 'envoye' %}<span class="badge-type-cons">Envoyée</span>
           {% elif cmd.statut == 'partiel' %}<span class="badge-alerte">Partiel</span>
           {% elif cmd.statut == 'recu' %}<span class="badge-ok">Reçue</span>
@@ -313,14 +318,14 @@
           <div style="font-size:10.5px;font-family: var(--font-mono);color:var(--st-600);">{{ item.produit.code }}</div>
         </td>
         <td style="text-align:right;">
-          <span style="font-weight:700;color:{% if item.produit.en_rupture %}#b71c1c{% else %}#8a5c00{% endif %};">{{ item.stock|floatformat:0 }}</span>
-          <span style="font-size:10px;color:var(--st-muted);"> {{ item.produit.unite_mesure }}</span>
+          <span style="font-weight:700;color:{% if item.produit.en_rupture %}var(--rose-text){% else %}var(--amber-text){% endif %};">{{ item.stock|floatformat:0 }}</span>
+          <span style="font-size:10px;color:var(--st-muted);"> {{ item.produit.unite_mesure.nom }}</span>
         </td>
         <td style="text-align:right;color:var(--st-muted);font-size:12px;">{{ item.minimum|floatformat:0 }}</td>
         <td style="text-align:right;color:var(--st-muted);font-size:12px;">{{ item.produit.cmm|floatformat:1 }}</td>
         <td style="text-align:right;">
           <span style="font-size:16px;font-weight:800;color:#0d7a4c;">{{ item.qte|floatformat:0 }}</span>
-          <span style="font-size:10px;color:var(--st-muted);"> {{ item.produit.unite_mesure }}</span>
+          <span style="font-size:10px;color:var(--st-muted);"> {{ item.produit.unite_mesure.nom }}</span>
         </td>
       </tr>
       {% endfor %}
@@ -351,10 +356,16 @@ var types      = JSON.parse(document.getElementById('data-types').textContent);
 Chart.defaults.font.family = "'Sora', sans-serif";
 Chart.defaults.font.size   = 12;
 
+var isDarkMode  = document.documentElement.getAttribute('data-theme') === 'dark';
+var chartTick   = isDarkMode ? '#6b7884' : undefined;
+var chartGrid   = isDarkMode ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.05)';
+var donutBorder = isDarkMode ? '#0f0e0e' : '#fff';
+Chart.defaults.color = chartTick;
+
 /* 1. Donut statut */
 new Chart(document.getElementById('chartStatut'), {
   type: 'doughnut',
-  data: { labels: statut.labels, datasets: [{ data: statut.data, backgroundColor: statut.colors, borderWidth: 2, borderColor: '#fff' }] },
+  data: { labels: statut.labels, datasets: [{ data: statut.data, backgroundColor: statut.colors, borderWidth: 2, borderColor: donutBorder }] },
   options: {
     cutout: '68%', plugins: { legend: { display: false }, tooltip: { callbacks: {
       label: function(c){ return ' ' + c.label + ' : ' + c.raw; }
@@ -385,7 +396,7 @@ new Chart(document.getElementById('chartTypes'), {
     plugins: { legend: { display: false } },
     scales: {
       x: { grid: { display: false } },
-      y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: 'rgba(0,0,0,.05)' } }
+      y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: chartGrid } }
     }
   }
 });
@@ -408,7 +419,7 @@ new Chart(document.getElementById('chartMouvements'), {
     plugins: { legend: { position: 'top', labels: { usePointStyle: true, pointStyleWidth: 10, padding: 16 } } },
     scales: {
       x: { grid: { display: false } },
-      y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: 'rgba(0,0,0,.05)' } }
+      y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: chartGrid } }
     }
   }
 });
@@ -428,7 +439,7 @@ if(topChart.labels.length > 0){
       plugins: { legend: { display: false } },
       scales: {
         x: { grid: { display: false } },
-        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,.05)' } }
+        y: { beginAtZero: true, grid: { color: chartGrid } }
       }
     }
   });

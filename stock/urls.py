@@ -80,4 +80,26 @@ urlpatterns = [
     path('rapports/peremptions/',                views.rapports_peremptions,       name='stock_rapports_peremptions'),
     path('rapports/bilan/',                      views.rapports_bilan_mensuel,     name='stock_rapports_bilan'),
     path('rapports/fournisseurs-prix/',          views.rapports_fournisseurs_prix, name='stock_rapports_fournisseurs_prix'),
+
+    # Unités de mesure
+    path('unites/', views.unites_list, name='stock_unites'),
+    path('unites/nouveau/', views.unite_create, name='stock_unite_create'),
+    path('unites/<int:pk>/', views.unite_detail, name='stock_unite_detail'),
+    path('unites/<int:pk>/modifier/', views.unite_edit, name='stock_unite_edit'),
+    path('unites/<int:pk>/supprimer/', views.unite_delete, name='stock_unite_delete'),
+    path('unites/supprimer-selection/', views.unite_bulk_delete, name='stock_unite_bulk_delete'),
+
+    # Catégories d'unités de mesure
+    path('unites/categories/', views.categories_unites_list, name='stock_categories_unites'),
+    path('unites/categories/nouveau/', views.categorie_unite_create, name='stock_categorie_unite_create'),
+    path('unites/categories/<int:pk>/', views.categorie_unite_detail, name='stock_categorie_unite_detail'),
+    path('unites/categories/<int:pk>/modifier/', views.categorie_unite_edit, name='stock_categorie_unite_edit'),
+    path('unites/categories/<int:pk>/supprimer/', views.categorie_unite_delete, name='stock_categorie_unite_delete'),
+    path('unites/categories/supprimer-selection/', views.categorie_unite_bulk_delete, name='stock_categorie_unite_bulk_delete'),
+
+    # Export / Import unités de mesure
+    path('export/unites/',            views.export_unites,            name='stock_export_unites'),
+    path('export/categories-unites/', views.export_categories_unites, name='stock_export_categories_unites'),
+    path('importer/unites/',            views.import_unites,            name='stock_import_unites'),
+    path('importer/categories-unites/', views.import_categories_unites, name='stock_import_categories_unites'),
 ]

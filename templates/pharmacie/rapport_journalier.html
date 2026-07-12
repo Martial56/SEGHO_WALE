@@ -7,7 +7,7 @@
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
   padding: 11px 32px;
   background: var(--ph-surface); border-bottom: 1px solid var(--ph-border);
-  position: sticky; top: var(--topbar-h); z-index: 100;
+  position: sticky; top: 0; z-index: 100;
   flex-wrap: wrap;
 }
 .rj-body { max-width: 900px; margin: 0 auto; padding: 24px 0 48px; }
@@ -36,7 +36,7 @@
 }
 .rj-stat.v-total   { border-top-color: var(--ph-600); }
 .rj-stat.v-nb      { border-top-color: #2980b9; }
-.rj-stat.v-esp     { border-top-color: #1a6d8c; }
+.rj-stat.v-esp     { border-top-color: var(--ph-600); }
 .rj-stat.v-mobile  { border-top-color: #8e44ad; }
 .rj-stat.v-assur   { border-top-color: #e67e22; }
 .rj-stat-label     { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--ph-muted); margin-bottom: 4px; }
@@ -101,12 +101,13 @@
 /* ── Print ────────────────────────────────────────────── */
 @media print {
   .rj-topbar, .ph-nav, .topbar, .rj-print-actions { display: none !important; }
-  body, .content { background: #fff !important; padding: 0 !important; }
+  body { background: #fff !important; }
+  .content { background: #fff !important; padding: 10mm 12mm !important; }
   .rj-body { max-width: 100% !important; padding: 0 !important; }
   .rj-header { border-radius: 0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .rj-stats-grid { grid-template-columns: repeat(5,1fr) !important; }
   .rj-vente-block { break-inside: avoid; }
-  @page { size: A4 portrait; margin: 12mm 15mm; }
+  @page { size: A4 portrait; margin: 0; }
 }
 </style>{% endblock %}
 
@@ -166,7 +167,7 @@
   </div>
   <div class="rj-stat v-esp">
     <div class="rj-stat-label">Espèces</div>
-    <div class="rj-stat-value" style="color:#1a6d8c;">{{ stats.especes|floatformat:0 }} F</div>
+    <div class="rj-stat-value" style="color:var(--ph-600);">{{ stats.especes|floatformat:0 }} F</div>
     <div class="rj-stat-sub">Cash</div>
   </div>
   <div class="rj-stat v-mobile">
@@ -193,13 +194,13 @@
         {{ vente.patient|default:"Client anonyme" }}
       </span>
       {% if vente.statut == 'annulee' %}
-      <span style="font-size:10px;background:rgba(232,69,69,.1);color:#b71c1c;border:1px solid rgba(232,69,69,.25);padding:2px 8px;border-radius:12px;font-weight:700;">ANNULÉE</span>
+      <span style="font-size:10px;background:rgba(var(--rose-rgb),.1);color:var(--rose-text);border:1px solid rgba(var(--rose-rgb),.25);padding:2px 8px;border-radius:12px;font-weight:700;">ANNULÉE</span>
       {% endif %}
     </div>
     <div class="rj-vente-meta">
       <span><i class="bi bi-clock"></i> {{ vente.date_vente|date:"H:i" }}</span>
       <span>
-        {% if vente.mode_paiement == 'especes' %}<i class="bi bi-cash-coin" style="color:#1a6d8c;"></i> Espèces
+        {% if vente.mode_paiement == 'especes' %}<i class="bi bi-cash-coin" style="color:var(--ph-600);"></i> Espèces
         {% elif vente.mode_paiement == 'mobile_money' %}<i class="bi bi-phone" style="color:#8e44ad;"></i> Mobile Money
         {% else %}<i class="bi bi-shield-check" style="color:#e67e22;"></i> Assurance{% endif %}
       </span>
@@ -224,11 +225,11 @@
           {% if ligne.produit.dci %}<div style="font-size:10.5px;color:var(--ph-muted);">{{ ligne.produit.dci }}</div>{% endif %}
         </td>
         <td style="text-align:center;">
-          {% if ligne.produit.type == 'medicament' %}<span style="font-size:10.5px;background:rgba(26,109,140,.1);color:var(--ph-700);padding:1px 7px;border-radius:10px;font-weight:600;">Médicament</span>
+          {% if ligne.produit.type == 'medicament' %}<span style="font-size:10.5px;background:rgba(var(--ph-600-rgb),.1);color:var(--ph-700);padding:1px 7px;border-radius:10px;font-weight:600;">Médicament</span>
           {% elif ligne.produit.type == 'consommable' %}<span style="font-size:10.5px;background:rgba(41,128,185,.1);color:#1565c0;padding:1px 7px;border-radius:10px;font-weight:600;">Consommable</span>
           {% else %}<span style="font-size:10.5px;background:rgba(142,68,173,.1);color:#4a235a;padding:1px 7px;border-radius:10px;font-weight:600;">Équipement</span>{% endif %}
         </td>
-        <td style="text-align:center;font-weight:700;">{{ ligne.quantite|floatformat:0 }} {% if ligne.produit.unite_mesure %}<span style="font-size:10px;font-weight:400;color:var(--ph-muted);">{{ ligne.produit.unite_mesure }}</span>{% endif %}</td>
+        <td style="text-align:center;font-weight:700;">{{ ligne.quantite|floatformat:0 }} {% if ligne.produit.unite_mesure %}<span style="font-size:10px;font-weight:400;color:var(--ph-muted);">{{ ligne.produit.unite_mesure.nom }}</span>{% endif %}</td>
         <td style="text-align:right;font-size:12px;">{{ ligne.prix_unitaire|floatformat:0 }} F</td>
         <td>{{ ligne.montant|floatformat:0 }} F</td>
       </tr>
@@ -280,7 +281,7 @@
         </td>
         <td style="text-align:center;font-weight:700;">
           {{ r.qte_totale|floatformat:0 }}
-          {% if r.produit.unite_mesure %}<span style="font-size:10px;color:var(--ph-muted);"> {{ r.produit.unite_mesure }}</span>{% endif %}
+          {% if r.produit.unite_mesure %}<span style="font-size:10px;color:var(--ph-muted);"> {{ r.produit.unite_mesure.nom }}</span>{% endif %}
         </td>
         <td style="font-weight:700;color:var(--ph-700);">{{ r.montant_total|floatformat:0 }} F</td>
       </tr>

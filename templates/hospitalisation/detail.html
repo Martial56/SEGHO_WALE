@@ -35,9 +35,7 @@
      séparé du sous-en-tête fixe par un espace visible ── */
 .det-block {
   background: var(--surface);
-  border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
   overflow: hidden;
   margin: 18px 0 24px;
 }
@@ -80,7 +78,6 @@
   border-radius: 0 4px 4px 0;
 }
 .pip-step.done { background: var(--teal-100); color: var(--teal-700); }
-.pip-step.done::before { content: '✓ '; font-size: 10px; }
 .pip-step.active { background: var(--teal-500); color: #fff; }
 
 /* ── Branch badges ── */
@@ -128,6 +125,8 @@
 .abtn-primary:not(:disabled):not(.off):hover { background: var(--teal-700); }
 .abtn-dark    { background: #1a3a5c; color: #fff; }
 .abtn-dark:not(:disabled):not(.off):hover { filter: brightness(0.88); }
+.abtn-danger  { background: var(--color-danger); color: #fff; }
+.abtn-danger:not(:disabled):not(.off):hover { filter: brightness(0.9); }
 .abtn-ghost {
   background: transparent; color: var(--text-muted); border: none;
 }
@@ -211,6 +210,7 @@
 }
 .tab-btn.active { color: var(--teal-600); border-bottom-color: var(--teal-500); font-weight: 700; }
 .tab-btn:hover:not(.active) { color: var(--text); }
+.tab-btn.tab-locked { opacity: .4; cursor: not-allowed; pointer-events: none; }
 .tab-bdg {
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 18px; height: 18px; padding: 0 5px;
@@ -285,6 +285,14 @@
   display: block; font-size: 10.5px; font-weight: 600; letter-spacing: .05em;
   text-transform: uppercase; color: var(--text-muted); margin-bottom: 3px;
 }
+.fld {
+  width: 100%; box-sizing: border-box;
+  border: 1px solid var(--border); border-radius: var(--radius-xs);
+  padding: 8px 10px; font-size: 13px; font-family: inherit;
+  background: var(--surface); color: var(--text);
+  resize: vertical; outline: none; transition: border-color .15s;
+}
+.fld:focus { border-color: var(--teal-500); }
 
 /* ── Liste factures ── */
 .fac-list { display: flex; flex-direction: column; gap: 10px; }
@@ -428,7 +436,6 @@
 @media (max-width: 700px) { .dchar-grid { grid-template-columns: 1fr; } }
 
 /* ── Dark ── */
-html[data-theme="dark"] .det-block,
 html[data-theme="dark"] .det-card,
 html[data-theme="dark"] .aside-card,
 html[data-theme="dark"] .fac-row { background: var(--surface); border-color: var(--border); }
@@ -440,7 +447,7 @@ html[data-theme="dark"] .saf-tbl th { background: #0f2035; }
 html[data-theme="dark"] .saf-tbl tbody tr:hover td { background: #0c1e30; }
 html[data-theme="dark"] .saf-add-bar { background: #0d1f32; }
 html[data-theme="dark"] .chip-none { background: #1e2d40; color: #9aa8b5; }
-html[data-theme="dark"] .src-chip { background: rgba(33,136,171,.12); color: var(--teal-300); }
+html[data-theme="dark"] .src-chip { background: rgba(var(--teal-500-rgb),.12); color: var(--teal-300); }
 html[data-theme="dark"] .modal-box { background: var(--surface); }
 html[data-theme="dark"] .fld { background: #0d1f32; border-color: rgba(255,255,255,.1); color: var(--text); }
 html[data-theme="dark"] .fld:focus { border-color: var(--teal-400); }
@@ -561,9 +568,15 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
     <div class="det-pipe-row">
       {# ─ Modifier (édition complète du dossier) — à gauche, comme .cp-actions de patients/rendez_vous_form.html ─ #}
       {% if peut_modifier %}
-      <a href="{% url 'hospitalisation:edit' hosp.pk %}" class="abtn abtn-primary" id="btn-modifier-link" title="Modifier toutes les données">
-        <i class="bi bi-pencil-square"></i> Modifier
-      </a>
+        {% if modifier_enabled %}
+        <a href="{% url 'hospitalisation:edit' hosp.pk %}" class="abtn abtn-primary" id="btn-modifier-link" title="Modifier toutes les données">
+          <i class="bi bi-pencil-square"></i> Modifier
+        </a>
+        {% else %}
+        <button type="button" class="abtn abtn-primary off" id="btn-modifier-link" disabled title="{{ modifier_raison }}">
+          <i class="bi bi-pencil-square"></i> Modifier
+        </button>
+        {% endif %}
       {% endif %}
       <div style="flex:1;"></div>
       <div class="pipeline" id="pipeline"
@@ -581,6 +594,18 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
              data-step="termine">Terminé</div>
         {% endwith %}
       </div>
+      {# ─ Annuler (icône seule, juste après l'étape Terminé) ─ #}
+      {% if actions.annuler.visible %}
+        {% if actions.annuler.enabled %}
+        <button type="button" class="abtn abtn-danger" id="btn-annuler-pipe" style="padding:6px 10px;" onclick="openAnnulModal()" title="Annuler la demande d'hospitalisation">
+          <i class="bi bi-x-circle"></i>
+        </button>
+        {% else %}
+        <button type="button" class="abtn abtn-danger off" id="btn-annuler-pipe" style="padding:6px 10px;" disabled title="{{ actions.annuler.raison_blocage }}">
+          <i class="bi bi-x-circle"></i>
+        </button>
+        {% endif %}
+      {% endif %}
       {# Branche hors pipeline #}
       <span class="branch-bdg annule {% if hosp.statut == 'annule' %}show{% endif %}" id="bdg-annule">
         <i class="bi bi-x-circle-fill" style="font-size:11px;"></i> Annulé
@@ -759,7 +784,8 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
           Facturation
           <span class="tab-bdg" id="bdg-factures">{{ nb_factures }}</span>
         </button>
-        <button class="tab-btn" data-tab="decharge" role="tab" aria-selected="false">
+        <button class="tab-btn{% if hosp.statut not in 'decharge,termine' %} tab-locked{% endif %}" data-tab="decharge" role="tab" aria-selected="false"
+                {% if hosp.statut not in 'decharge,termine' %}title="Disponible une fois le patient déchargé"{% endif %}>
           <i class="bi bi-file-medical" style="font-size:13px;"></i>
           Décharge
         </button>
@@ -1010,6 +1036,31 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
 
 </div>{# /det-layout #}
 
+{# ── Modale annulation avec motif obligatoire ── #}
+<div class="modal-overlay" id="modal-annul">
+  <div class="modal-box">
+    <div class="modal-hdr">
+      <span class="modal-title"><i class="bi bi-exclamation-triangle-fill" style="color:var(--color-danger);"></i> Confirmer l'annulation</span>
+      <button type="button" class="modal-cls" onclick="closeAnnulModal()">&times;</button>
+    </div>
+    <div class="modal-bdy">
+      <p style="font-size:13px;color:var(--text-muted);line-height:1.55;margin:0;">
+        Cette action est irréversible. Les factures impayées seront annulées
+        et la chambre (si attribuée) sera libérée.
+      </p>
+      <div>
+        <label class="fld-lbl">Motif d'annulation <span style="color:var(--color-danger);">*</span></label>
+        <textarea id="motif-annul-input" class="fld" rows="3" placeholder="Saisir le motif…"></textarea>
+        <div class="field-err" id="motif-annul-err">Veuillez saisir un motif.</div>
+      </div>
+    </div>
+    <div class="modal-ftr">
+      <button type="button" class="abtn abtn-discard" onclick="closeAnnulModal()">Retour</button>
+      <button type="button" class="abtn abtn-danger" onclick="confirmAnnul()">Confirmer l'annulation</button>
+    </div>
+  </div>
+</div>
+
 {# Zone de toasts #}
 <div id="toast-area" aria-live="polite" aria-atomic="true"></div>
 
@@ -1032,6 +1083,7 @@ if (m) CSRF = m[1];
 var URL_CONFIRMER  = '{% url "hospitalisation:confirmer"  hosp.pk %}';
 var URL_DECHARGER  = '{% url "hospitalisation:decharger"  hosp.pk %}';
 var URL_TERMINER   = '{% url "hospitalisation:terminer"   hosp.pk %}';
+var URL_ANNULER    = '{% url "hospitalisation:annuler"    hosp.pk %}';
 var URL_EDIT       = '{% url "hospitalisation:edit"       hosp.pk %}';
 
 /* ══ Pipeline ══════════════════════════════════════════════════════════════════ */
@@ -1268,8 +1320,65 @@ function renderActionBar(data) {
 function updateModifierBtn(data) {
   var link = document.getElementById('btn-modifier-link');
   if (!link) return;
-  link.style.display = data.peut_modifier ? '' : 'none';
+  if (!data.peut_modifier) {
+    link.style.display = 'none';
+    return;
+  }
+  link.style.display = '';
+  if (data.modifier_enabled) {
+    link.outerHTML = '<a href="' + esc(URL_EDIT) + '" class="abtn abtn-primary" id="btn-modifier-link" title="Modifier toutes les données">'
+      + '<i class="bi bi-pencil-square"></i> Modifier</a>';
+  } else {
+    link.outerHTML = '<button type="button" class="abtn abtn-primary off" id="btn-modifier-link" disabled title="' + esc(data.modifier_raison || '') + '">'
+      + '<i class="bi bi-pencil-square"></i> Modifier</button>';
+  }
 }
+
+/* ══ Bouton Annuler (rangée pipeline) — re-rendu JS depuis _etat_payload ═══════ */
+function updateAnnulBtn(data) {
+  var btn = document.getElementById('btn-annuler-pipe');
+  var A = (data.actions || {}).annuler;
+  if (!btn || !A) return;
+  if (!A.visible) {
+    btn.style.display = 'none';
+    return;
+  }
+  btn.style.display = '';
+  if (A.enabled) {
+    btn.outerHTML = '<button type="button" class="abtn abtn-danger" id="btn-annuler-pipe" style="padding:6px 10px;" onclick="openAnnulModal()" title="Annuler la demande d\'hospitalisation">'
+      + '<i class="bi bi-x-circle"></i></button>';
+  } else {
+    btn.outerHTML = '<button type="button" class="abtn abtn-danger off" id="btn-annuler-pipe" style="padding:6px 10px;" disabled title="' + esc(A.raison_blocage || '') + '">'
+      + '<i class="bi bi-x-circle"></i></button>';
+  }
+}
+
+/* ══ Modale annulation ═════════════════════════════════════════════════════════ */
+function openAnnulModal() {
+  var ta  = document.getElementById('motif-annul-input');
+  var err = document.getElementById('motif-annul-err');
+  if (ta) ta.value = '';
+  if (err) err.classList.remove('on');
+  document.getElementById('modal-annul').classList.add('open');
+  if (ta) ta.focus();
+}
+function closeAnnulModal() {
+  document.getElementById('modal-annul').classList.remove('open');
+}
+function confirmAnnul() {
+  var ta  = document.getElementById('motif-annul-input');
+  var err = document.getElementById('motif-annul-err');
+  var motif = (ta && ta.value || '').trim();
+  if (!motif) {
+    if (err) err.classList.add('on');
+    return;
+  }
+  closeAnnulModal();
+  doTransition(URL_ANNULER, { motif_annulation: motif });
+}
+document.getElementById('modal-annul').addEventListener('click', function (e) {
+  if (e.target === this) closeAnnulModal();
+});
 
 /* ══ FETCH TRANSITION ══════════════════════════════════════════════════════════ */
 function doTransition(url, extra) {
@@ -1296,6 +1405,7 @@ function doTransition(url, extra) {
       updatePipeline(data.statut);
       renderActionBar(data);
       updateModifierBtn(data);
+      updateAnnulBtn(data);
       updateDuration(data);
       updateFacBadge(data);
       showToast('Action effectuée avec succès.', 'success');
@@ -1365,8 +1475,11 @@ function esc(s) {
 }
 
 /* ══ Export global — requis par les attributs onclick du HTML ═══════════════════ */
-window.doTransition  = doTransition;
-window.switchTab     = switchTab;
+window.doTransition    = doTransition;
+window.switchTab       = switchTab;
+window.openAnnulModal  = openAnnulModal;
+window.closeAnnulModal = closeAnnulModal;
+window.confirmAnnul    = confirmAnnul;
 
 })();
 </script>

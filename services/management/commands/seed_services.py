@@ -1,5 +1,6 @@
 from django.core.management.base import BaseCommand
-from services.models import CategorieArticle, UniteMesure, Articleservice
+from services.models import CategorieArticle, Articleservice
+from stock.models import UniteMesure
 
 
 CATEGORIES = [

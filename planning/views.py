@@ -331,7 +331,7 @@ def planning_modifier(request, pk):
         messages.error(request, 'Ce planning est publié et ne peut plus être modifié.')
         return redirect('planning_detail', pk=pk)
     bureaux  = get_bureaux()
-    medecins = Medecin.objects.filter(actif=True).select_related('specialite').order_by('nom')
+    medecins = Medecin.objects.filter(actif=True).select_related('specialite', 'employe').order_by('employe__nom')
     absents  = _conges_semaine(planning.semaine_debut, planning.semaine_fin)
 
     if request.method == 'POST':
@@ -659,9 +659,9 @@ def planning_par_medecin(request):
 @login_required(login_url='login')
 def planning_medecins_json(request):
     q  = request.GET.get('q', '').strip()
-    qs = Medecin.objects.filter(actif=True).select_related('specialite')
+    qs = Medecin.objects.filter(actif=True).select_related('specialite', 'employe')
     if q:
-        qs = qs.filter(Q(nom__icontains=q) | Q(prenoms__icontains=q))
+        qs = qs.filter(Q(employe__nom__icontains=q) | Q(employe__prenoms__icontains=q))
     data = [
         {
             'label':      f"Dr {m.nom} {m.prenoms}",
@@ -679,7 +679,7 @@ def _send_publication_email(planning, published_by):
     from django.contrib.auth.models import User as AuthUser
     from django.db.models import Q as DQ
     # Collect emails: all active médecins + all users in write groups
-    med_emails = set(Medecin.objects.filter(actif=True).exclude(email='').values_list('email', flat=True))
+    med_emails = set(Medecin.objects.filter(actif=True).exclude(employe__email='').values_list('employe__email', flat=True))
     user_emails = set(AuthUser.objects.filter(
         is_active=True, email__gt=''
     ).filter(

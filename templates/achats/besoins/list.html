@@ -23,8 +23,35 @@
 .s-brouillon { background:#f3f4f6; color:#6b7280; }
 .s-soumis { background:#dbeafe; color:#1d4ed8; }
 .s-en_cours { background:#fef3c7; color:#92400e; }
-.s-satisfait { background:#c0d8e8; color:#0f4358; }
+.s-satisfait { background:#c0d8e8; color:var(--teal-700); }
 .s-annule { background:#fee2e2; color:#991b1b; }
+.ba-kpi-alert { background:#fef3c7; border-color:#fcd34d; color:#92400e; }
+.ba-kpi-alert-val { color:#92400e; }
+.ba-import-banner { margin:12px 0 0; background:#fffbeb; border-bottom:2px solid #fcd34d; }
+.ba-import-banner-head { display:flex; align-items:center; gap:10px; padding:10px 28px 8px; background:#fef3c7; border-bottom:1px solid #fcd34d; }
+.ba-import-thead { background:#fef9ec; }
+
+/* ── Mode sombre ── */
+html[data-theme="dark"] .ba-info-tag { background:var(--surface-muted); border-color:var(--border); color:var(--text-muted); }
+html[data-theme="dark"] .ba-kpi-alert { background:rgba(146,64,14,.25); border-color:rgba(252,211,77,.35); color:#fcd34d; }
+html[data-theme="dark"] .ba-kpi-alert-val { color:#fcd34d; }
+html[data-theme="dark"] .ba-import-banner { background:rgba(146,64,14,.12); border-bottom-color:rgba(252,211,77,.35); }
+html[data-theme="dark"] .ba-import-banner-head { background:rgba(146,64,14,.2); border-bottom-color:rgba(252,211,77,.3); }
+html[data-theme="dark"] .ba-import-banner-head span { color:#fcd34d!important; }
+html[data-theme="dark"] .ba-import-thead { background:rgba(146,64,14,.15); }
+html[data-theme="dark"] .ba-head { background:var(--surface); border-bottom-color:var(--border); }
+html[data-theme="dark"] .ba-head h1 { color:var(--text-strong); }
+html[data-theme="dark"] .ba-kpis { background:var(--surface-muted); border-bottom-color:var(--border); }
+html[data-theme="dark"] .ba-kpi { background:var(--surface); border-color:var(--border); color:var(--text); }
+html[data-theme="dark"] .ba-filters { background:var(--surface); border-bottom-color:var(--border); }
+html[data-theme="dark"] .ba-table th { background:var(--surface-muted); color:var(--text-faint); border-bottom-color:var(--border); }
+html[data-theme="dark"] .ba-table td { border-bottom-color:var(--border); color:var(--text); }
+html[data-theme="dark"] .ba-table tr:hover td { background:var(--surface-muted); }
+html[data-theme="dark"] .s-brouillon { background:rgba(107,114,128,.25); color:#d1d5db; }
+html[data-theme="dark"] .s-soumis { background:rgba(29,78,216,.25); color:#93c5fd; }
+html[data-theme="dark"] .s-en_cours { background:rgba(146,64,14,.3); color:#fcd34d; }
+html[data-theme="dark"] .s-satisfait { background:rgba(var(--teal-700-rgb),.4); color:#7dd3fc; }
+html[data-theme="dark"] .s-annule { background:rgba(153,27,27,.3); color:#fca5a5; }
 </style>
 {% endblock %}
 
@@ -38,7 +65,7 @@
       <span style="color:var(--text);font-weight:500;">Besoins d'achat</span>
     </span>
     <div style="flex:1;"></div>
-    <span style="font-size:12px;color:#888;padding:4px 10px;border-radius:6px;background:#f0f5fa;border:1px solid rgba(0,0,0,.08);">
+    <span class="ba-info-tag" style="font-size:12px;color:var(--text-muted);padding:4px 10px;border-radius:6px;background:var(--surface-muted);border:1px solid var(--border);">
       <i class="bi bi-info-circle"></i> Transmis depuis le module Stock
     </span>
   </div>
@@ -49,9 +76,9 @@
     <a href="?statut=en_cours" class="ba-kpi"><span class="val">{{ stats.en_cours }}</span> En cours</a>
     <a href="?statut=satisfait" class="ba-kpi"><span class="val">{{ stats.satisfait }}</span> Satisfaits</a>
     {% if fiches_a_importer %}
-    <span class="ba-kpi" style="background:#fef3c7;border-color:#fcd34d;color:#92400e;">
+    <span class="ba-kpi ba-kpi-alert">
       <i class="bi bi-arrow-down-circle-fill"></i>
-      <span class="val" style="color:#92400e;">{{ fiches_a_importer|length }}</span> fiche{{ fiches_a_importer|length|pluralize }} à importer
+      <span class="val ba-kpi-alert-val">{{ fiches_a_importer|length }}</span> fiche{{ fiches_a_importer|length|pluralize }} à importer
     </span>
     {% endif %}
   </div>
@@ -65,22 +92,22 @@
         <option value="{{ val }}" {% if statut == val %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
       </select>
-      <button type="submit" style="padding:6px 14px;border-radius:6px;border:1px solid #d1d5db;background:#fff;font-size:13px;cursor:pointer;"><i class="bi bi-search"></i></button>
-      {% if q or statut %}<a href="{% url 'achats:besoins_list' %}" style="font-size:13px;color:#888;">Effacer</a>{% endif %}
+      <button type="submit" style="padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;cursor:pointer;"><i class="bi bi-search"></i></button>
+      {% if q or statut %}<a href="{% url 'achats:besoins_list' %}" style="font-size:13px;color:var(--text-muted);">Effacer</a>{% endif %}
     </form>
   </div>
 
   <div class="ba-body">
 
     {% if fiches_a_importer %}
-    <div style="margin:12px 0 0;background:#fffbeb;border-bottom:2px solid #fcd34d;">
-      <div style="display:flex;align-items:center;gap:10px;padding:10px 28px 8px;background:#fef3c7;border-bottom:1px solid #fcd34d;">
+    <div class="ba-import-banner">
+      <div class="ba-import-banner-head">
         <i class="bi bi-arrow-down-circle-fill" style="color:#d97706;font-size:15px;"></i>
         <span style="font-size:12px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.4px;">Fiches stock à importer ({{ fiches_a_importer|length }})</span>
       </div>
       <table class="ba-table">
         <thead>
-          <tr style="background:#fef9ec;">
+          <tr class="ba-import-thead">
             <th>N° Fiche</th>
             <th>Pharmacie</th>
             <th>Période</th>
@@ -105,8 +132,8 @@
               <span class="badge s-soumis">Soumise</span>
             {% endif %}
           </td>
-          <td style="color:#666;">{{ fiche.lignes.count }} produit{{ fiche.lignes.count|pluralize }}</td>
-          <td style="color:#888;font-size:12px;">{{ fiche.cree_par.get_full_name|default:fiche.cree_par.username|default:"—" }}</td>
+          <td style="color:var(--text-muted);">{{ fiche.lignes.count }} produit{{ fiche.lignes.count|pluralize }}</td>
+          <td style="color:var(--text-muted);font-size:12px;">{{ fiche.cree_par.get_full_name|default:fiche.cree_par.username|default:"—" }}</td>
           <td>
             <form method="post" action="{% url 'stock_fiche_envoyer_achats' fiche.pk %}" style="display:inline;"
                   onsubmit="return confirm('Importer la fiche {{ fiche.numero }} dans les achats ?');">
@@ -136,18 +163,18 @@
         <td style="font-weight:700;color:var(--teal-700);">
           <a href="{% url 'achats:besoin_detail' b.pk %}" style="color:inherit;text-decoration:none;">{{ b.numero }}</a>
         </td>
-        <td><a href="{% url 'achats:besoin_detail' b.pk %}" style="color:rgba(0,0,0,.8);text-decoration:none;font-weight:500;">{{ b.titre }}</a></td>
+        <td><a href="{% url 'achats:besoin_detail' b.pk %}" style="color:var(--text);text-decoration:none;font-weight:500;">{{ b.titre }}</a></td>
         <td>
           {% if b.fiche_besoins %}
-            <a href="{% url 'stock_fiche_detail' b.fiche_besoins.pk %}" style="font-size:12px;color:var(--teal-700);text-decoration:none;display:inline-flex;align-items:center;gap:4px;background:rgba(15,67,88,.08);padding:2px 8px;border-radius:10px;">
+            <a href="{% url 'stock_fiche_detail' b.fiche_besoins.pk %}" style="font-size:12px;color:var(--teal-700);text-decoration:none;display:inline-flex;align-items:center;gap:4px;background:rgba(var(--teal-700-rgb),.08);padding:2px 8px;border-radius:10px;">
               <i class="bi bi-box-seam" style="font-size:10px;"></i> {{ b.fiche_besoins.numero }}
             </a>
           {% else %}
-            <span style="font-size:11px;color:#aaa;">Manuel</span>
+            <span style="font-size:11px;color:var(--text-faint);">Manuel</span>
           {% endif %}
         </td>
         <td><span class="badge s-{{ b.statut }}">{{ b.get_statut_display }}</span></td>
-        <td style="color:#666;">{{ b.lignes.count }}</td>
+        <td style="color:var(--text-muted);">{{ b.lignes.count }}</td>
         <td style="color:#888;white-space:nowrap;">{{ b.date_creation|date:"d/m/Y" }}</td>
         <td>
           <a href="{% url 'achats:besoin_detail' b.pk %}" style="color:var(--teal-600);font-size:13px;"><i class="bi bi-eye"></i></a>
@@ -157,7 +184,7 @@
       </tbody>
     </table>
     {% else %}
-    <div style="padding:48px;text-align:center;color:#aaa;">
+    <div style="padding:48px;text-align:center;color:var(--text-faint);">
       <i class="bi bi-list-check" style="font-size:36px;display:block;margin-bottom:12px;"></i>
       Aucun besoin trouvé.
     </div>

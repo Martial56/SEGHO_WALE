@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
 from django.db.models import Q, Sum
 from django.core.paginator import Paginator
 from django.urls import reverse
@@ -9,6 +10,14 @@ from django.http import JsonResponse
 from .models import Facture, LigneFacture, Acte, Paiement
 from .forms import FactureForm
 from core.views import log_event, get_logs
+
+# Rôles autorisés à enregistrer un encaissement (voir aussi hospitalisation
+# management/commands/init_groupes_hospitalisation.py qui définit "Caisse").
+CAISSE_MANAGE_GROUPS = {'Caisse', 'Administrateur', 'Directeur'}
+
+
+def can_manage_paiement(user):
+    return user.is_superuser or user.groups.filter(name__in=CAISSE_MANAGE_GROUPS).exists()
 
 
 @login_required(login_url='login')
@@ -223,7 +232,10 @@ def facture_create(request):
 
             log_event(facture, request.user, 'Facture créée.', type='system')
 
-            facture = _handle_paiement(facture, request.POST, request.user, total)
+            if request.POST.get('pay_montant', '').strip() and not can_manage_paiement(request.user):
+                messages.warning(request, "Facture créée, mais le paiement n'a pas été enregistré : cette action est réservée à la Caisse.")
+            else:
+                facture = _handle_paiement(facture, request.POST, request.user, total)
 
             messages.success(request, f'Facture {facture.numero} créée avec succès.')
             if hosp_pk:
@@ -297,6 +309,7 @@ def facture_detail(request, pk):
         'logs':      logs,
         'docteur':   docteur,
         'is_admin':  request.user.is_superuser or request.user.is_staff,
+        'can_manage_paiement': can_manage_paiement(request.user),
         'back_url':  back_url,
     })
 
@@ -318,6 +331,8 @@ def facture_valider(request, pk):
 
 @login_required(login_url='login')
 def facture_payer(request, pk):
+    if not can_manage_paiement(request.user):
+        raise PermissionDenied
     from soins.models import Soin
     facture  = get_object_or_404(Facture, pk=pk)
     if request.method != 'POST':
@@ -410,6 +425,8 @@ def facture_edit(request, pk):
             return redirect(f'{detail_url}?next={back_url}')
 
         if 'action_payer' in request.POST:
+            if not can_manage_paiement(request.user):
+                raise PermissionDenied
             if facture.statut in ('emise', 'brouillon') or is_admin:
                 facture.statut = 'payee'
                 facture.save()
@@ -515,6 +532,8 @@ def _save_lignes(facture, POST):
 def _handle_paiement(facture, POST, user, total):
     pay_montant_raw = POST.get('pay_montant', '').strip()
     if not pay_montant_raw:
+        return facture
+    if not can_manage_paiement(user):
         return facture
     pay_montant = _parse_float(pay_montant_raw, 0)
     if pay_montant <= 0:

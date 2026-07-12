@@ -14,27 +14,37 @@ class Specialite(models.Model):
 class Medecin(models.Model):
     user = models.OneToOneField(User, on_delete=models.SET_NULL, null=True, blank=True)
     employe = models.OneToOneField(
-        'employer.Employe', on_delete=models.SET_NULL,
-        null=True, blank=True, related_name='fiche_medecin',
+        'employer.Employe', on_delete=models.CASCADE,
+        related_name='fiche_medecin',
         verbose_name="Employé lié",
     )
-    matricule = models.CharField(max_length=20, unique=True)
-    nom = models.CharField(max_length=100)
-    prenoms = models.CharField(max_length=200)
     specialite = models.ForeignKey(Specialite, on_delete=models.SET_NULL, null=True, blank=True)
-    service = models.ForeignKey('Service', on_delete=models.SET_NULL, null=True, blank=True, related_name='medecins', verbose_name="Département")
-    telephone = models.CharField(max_length=20)
-    email = models.EmailField(blank=True)
+    departement = models.ForeignKey('Departement', on_delete=models.SET_NULL, null=True, blank=True, related_name='medecins', verbose_name="Département")
+    service = models.ForeignKey('Service', on_delete=models.SET_NULL, null=True, blank=True, related_name='medecins', verbose_name="Service")
     ordre_medecin = models.CharField(max_length=50, blank=True)
-    photo = models.ImageField(upload_to='medecins/photos/', blank=True, null=True)
     taux_honoraire = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     actif = models.BooleanField(default=True)
     date_creation = models.DateTimeField(auto_now_add=True)
 
+    # Identité et coordonnées désormais portées par l'Employé lié — un médecin
+    # est avant tout un employé, pas une fiche d'identité séparée.
+    @property
+    def matricule(self): return self.employe.matricule
+    @property
+    def nom(self): return self.employe.nom
+    @property
+    def prenoms(self): return self.employe.prenoms
+    @property
+    def telephone(self): return self.employe.telephone
+    @property
+    def email(self): return self.employe.email
+    @property
+    def photo(self): return self.employe.photo
+
     def __str__(self): return f"Dr {self.nom} {self.prenoms}"
     class Meta:
         verbose_name = "Médecin"
-        ordering = ['nom']
+        ordering = ['employe__nom']
 
 
 class Service(models.Model):
@@ -42,7 +52,6 @@ class Service(models.Model):
     code = models.CharField(max_length=20, unique=True)
     description = models.TextField(blank=True)
     chef_service = models.ForeignKey(Medecin, on_delete=models.SET_NULL, null=True, blank=True, related_name='services_diriges')
-    departement = models.ForeignKey('Departement', on_delete=models.SET_NULL, null=True, blank=True, related_name='services')
     actif = models.BooleanField(default=True)
 
     def __str__(self): return self.nom
@@ -58,4 +67,19 @@ class Departement(models.Model):
     def __str__(self): return self.nom
     class Meta:
         verbose_name = "Département"
+        ordering = ['nom']
+
+
+class ModuleSpecialise(models.Model):
+    """Associe un module métier (ex: Gynécologie) à un ou plusieurs départements,
+    pour piloter dynamiquement les vues spécialisées (ex: liste RDV Gynécologie)
+    sans avoir à modifier le code."""
+    code = models.CharField(max_length=30, unique=True)
+    nom = models.CharField(max_length=100)
+    departements = models.ManyToManyField(Departement, blank=True, related_name='modules_specialises')
+    actif = models.BooleanField(default=True)
+
+    def __str__(self): return self.nom
+    class Meta:
+        verbose_name = "Module spécialisé"
         ordering = ['nom']

@@ -23,15 +23,14 @@ def medecin_supprimer(request, pk):
 
 @login_required(login_url='login')
 def medecins_export_csv(request):
-    import csv
-    from django.http import HttpResponse
+    from core.utils import csv_response
 
-    qs = Medecin.objects.select_related('specialite', 'service').order_by('nom')
+    qs = Medecin.objects.select_related('specialite', 'service', 'employe').order_by('employe__nom')
     q          = request.GET.get('q', '').strip()
     specialite = request.GET.get('specialite', '')
     statut     = request.GET.get('statut', '')
     if q:
-        qs = qs.filter(Q(nom__icontains=q) | Q(prenoms__icontains=q) | Q(matricule__icontains=q))
+        qs = qs.filter(Q(employe__nom__icontains=q) | Q(employe__prenoms__icontains=q) | Q(employe__matricule__icontains=q))
     if specialite:
         qs = qs.filter(specialite__pk=specialite)
     if statut == 'actif':
@@ -39,24 +38,22 @@ def medecins_export_csv(request):
     elif statut == 'inactif':
         qs = qs.filter(actif=False)
 
-    response = HttpResponse(content_type='text/csv; charset=utf-8')
-    response['Content-Disposition'] = 'attachment; filename="medecins.csv"'
-    response.write('﻿')  # BOM pour Excel
-    writer = csv.writer(response, delimiter=';')
-    writer.writerow(['Matricule', 'Nom', 'Prénoms', 'Spécialité', 'Département', 'Téléphone', 'Email', 'Honoraire (FCFA)', 'Statut'])
-    for med in qs:
-        writer.writerow([
+    headers = ['Matricule', 'Nom', 'Prénoms', 'Spécialité', 'Département', 'Téléphone', 'Email', 'Honoraire (FCFA)', 'Statut']
+    rows = [
+        [
             med.matricule,
             med.nom,
             med.prenoms,
             str(med.specialite) if med.specialite else '',
-            str(med.service) if med.service else '',
+            str(med.departement) if med.departement else '',
             med.telephone or '',
             med.email or '',
             med.taux_honoraire or 0,
             'Actif' if med.actif else 'Inactif',
-        ])
-    return response
+        ]
+        for med in qs
+    ]
+    return csv_response('medecins', headers, rows)
 
 
 @login_required(login_url='login')
@@ -105,7 +102,7 @@ def medecin_dashboard(request):
     # Top 8 médecins par consultations (6 derniers mois)
     top_medecins = list(
         Consultation.objects.filter(date_heure__date__gte=six_mois_ago, medecin__isnull=False)
-        .values('medecin__pk', 'medecin__nom', 'medecin__prenoms')
+        .values('medecin__pk', 'medecin__employe__nom', 'medecin__employe__prenoms')
         .annotate(n=Count('id'))
         .order_by('-n')[:8]
     )

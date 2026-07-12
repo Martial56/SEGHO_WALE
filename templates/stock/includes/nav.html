@@ -35,7 +35,7 @@
      class="o-nav-link {% if uname == 'stock_dotation_list' %}active{% endif %}" style="position:relative;">
     Dotation
     {% if stock_demandes_en_attente %}
-    <span style="position:absolute;top:6px;right:2px;min-width:16px;height:16px;border-radius:8px;background:#e84545;color:#fff;font-size:9px;font-weight:800;line-height:16px;text-align:center;padding:0 3px;border:2px solid #fff;">{{ stock_demandes_en_attente }}</span>
+    <span style="position:absolute;top:6px;right:2px;min-width:16px;height:16px;border-radius:8px;background:var(--rose);color:#fff;font-size:9px;font-weight:800;line-height:16px;text-align:center;padding:0 3px;border:2px solid #fff;">{{ stock_demandes_en_attente }}</span>
     {% endif %}
   </a>
 
@@ -52,7 +52,7 @@
 
 <!-- Popup menu grille : tous les modules stock -->
 <div id="st-menu-overlay" onclick="toggleStMenu()" style="display:none;position:fixed;inset:0;z-index:8000;background:rgba(0,0,0,.25);"></div>
-<div id="st-menu-popup" style="display:none;position:fixed;top:var(--header-h);right:8px;z-index:8001;background:#fff;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,.18);padding:16px;width:420px;max-width:96vw;max-height:80vh;overflow-y:auto;">
+<div id="st-menu-popup" class="st-menu-popup" style="display:none;position:fixed;top:var(--header-h);right:8px;z-index:8001;background:#fff;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,.18);padding:16px;width:420px;max-width:96vw;max-height:80vh;overflow-y:auto;">
   <div style="font-size:11px;font-weight:700;color:var(--st-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;padding-left:4px;">Tous les modules stock</div>
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
     {% url 'stock_mouvements' as url_mv %}{% url 'stock_transfert' as url_tr %}
@@ -66,6 +66,7 @@
     {% url 'stock_rapports_peremptions' as url_rp %}
     {% url 'stock_rapports_bilan' as url_bilan %}
     {% url 'stock_rapports_fournisseurs_prix' as url_frn %}
+    {% url 'stock_unites' as url_um %}{% url 'stock_categories_unites' as url_cum %}
 
     <div style="font-size:10px;font-weight:800;color:var(--st-muted);text-transform:uppercase;letter-spacing:.5px;padding:4px 6px 2px;grid-column:1/-1;">Gestion</div>
     <a href="{{ url_mv }}" class="st-menu-item"><i class="bi bi-journal-text"></i><span>Journal</span></a>
@@ -75,6 +76,8 @@
     <a href="{{ url_retour }}" class="st-menu-item"><i class="bi bi-box-arrow-in-left"></i><span>Retour pharma</span></a>
     <a href="{{ url_vl }}" class="st-menu-item"><i class="bi bi-graph-up-arrow"></i><span>Valorisation</span></a>
     <a href="{{ url_tr }}" class="st-menu-item"><i class="bi bi-shuffle"></i><span>Distribution</span></a>
+    <a href="{{ url_um }}" class="st-menu-item"><i class="bi bi-rulers"></i><span>Unités de mesure</span></a>
+    <a href="{{ url_cum }}" class="st-menu-item"><i class="bi bi-diagram-3"></i><span>Catégories d'unités</span></a>
     <div style="font-size:10px;font-weight:800;color:var(--st-muted);text-transform:uppercase;letter-spacing:.5px;padding:4px 6px 2px;grid-column:1/-1;">Rapports</div>
     <a href="{{ url_rb }}" class="st-menu-item"><i class="bi bi-clipboard2-data"></i><span>Besoins</span></a>
     <a href="{{ url_ri }}" class="st-menu-item"><i class="bi bi-speedometer2"></i><span>Indicateurs</span></a>
@@ -96,6 +99,7 @@
 .st-menu-item:hover { background:var(--st-50);color:var(--st-600); }
 .st-menu-item i { font-size:22px;color:var(--st-500); }
 .st-menu-item:hover i { color:var(--st-600); }
+html[data-theme="dark"] .st-menu-popup { background:var(--st-surface)!important; }
 </style>
 <script>
 function toggleStMenu(){
@@ -105,7 +109,7 @@ function toggleStMenu(){
   var open = popup.style.display !== 'none';
   popup.style.display   = open ? 'none' : 'block';
   overlay.style.display = open ? 'none' : 'block';
-  btn.style.background  = open ? '' : 'rgba(15,67,88,.1)';
+  btn.style.background  = open ? '' : 'rgba(var(--st-700-rgb),.1)';
   btn.style.borderRadius= open ? '' : '6px';
 }
 </script>

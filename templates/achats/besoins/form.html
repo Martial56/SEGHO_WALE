@@ -8,20 +8,11 @@
 <style>
 .content { padding:0; }
 .bf-page { display:flex; flex-direction:column; height:calc(100vh - var(--topbar-h) - 44px); overflow:hidden; }
-.bf-head { display:flex; align-items:center; gap:12px; padding:14px 28px; background:#fff; border-bottom:1px solid rgba(0,0,0,.07); flex-shrink:0; }
-.bf-head h1 { font-size:16px; font-weight:700; color:var(--teal-800); margin:0; }
 .bf-body { flex:1; overflow:auto; min-height:0; padding:20px 28px; }
 .bf-form { max-width:900px; }
 .bf-card { background:#fff; border-radius:10px; border:1px solid rgba(0,0,0,.08); margin-bottom:16px; overflow:hidden; }
 .bf-card-head { padding:12px 16px; background:#fafafa; border-bottom:1px solid rgba(0,0,0,.06); font-size:13px; font-weight:700; color:var(--teal-800); display:flex; align-items:center; gap:8px; }
 .bf-card-body { padding:16px; }
-.bf-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px; }
-.bf-row.one { grid-template-columns:1fr; }
-.bf-field { display:flex; flex-direction:column; gap:4px; }
-.bf-field label { font-size:12px; font-weight:600; color:rgba(0,0,0,.6); }
-.bf-field input, .bf-field select, .bf-field textarea { border:none; border-bottom:1px solid #d1d5db; border-radius:0; padding:8px 4px; font-size:13px; font-family:inherit; background:transparent; width:100%; }
-.bf-field input:focus, .bf-field select:focus, .bf-field textarea:focus { outline:none; border-bottom-color:var(--teal-600); }
-.bf-field textarea { resize:vertical; min-height:60px; }
 /* Lignes */
 .lignes-table { width:100%; border-collapse:collapse; font-size:13px; }
 .lignes-table th { padding:8px 10px; font-size:11px; font-weight:700; color:#888; text-transform:uppercase; background:#f9fafb; border-bottom:1px solid rgba(0,0,0,.08); }
@@ -31,40 +22,45 @@
 .btn-add-ligne { margin-top:10px; padding:6px 14px; border:1px dashed #d1d5db; border-radius:6px; background:#fafafa; font-size:13px; cursor:pointer; width:100%; text-align:center; color:#666; }
 .btn-add-ligne:hover { background:#f0f4f8; border-color:var(--teal-400); color:var(--teal-700); }
 .remove-ligne { color:#ef4444; cursor:pointer; font-size:14px; border:none; background:none; padding:0 4px; }
-.bf-footer { padding:14px 0 0; display:flex; gap:10px; }
+
+/* ── Mode sombre ── */
+html[data-theme="dark"] .bf-card { background:var(--surface); border-color:var(--border); }
+html[data-theme="dark"] .bf-card-head { background:var(--surface-muted); border-bottom-color:var(--border); color:var(--text-strong,#eef3f8); }
+html[data-theme="dark"] .lignes-table th { color:var(--text-faint); background:var(--surface-muted); border-bottom-color:var(--border); }
+html[data-theme="dark"] .lignes-table td { border-bottom-color:var(--border); }
+html[data-theme="dark"] .btn-add-ligne { background:var(--surface-muted); border-color:var(--border); color:var(--text-muted); }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="bf-page">
-  <div class="bf-head">
-    <a href="{% url 'achats:besoins_list' %}" style="color:#888;text-decoration:none;font-size:13px;"><i class="bi bi-arrow-left"></i></a>
-    <h1>{% if action == 'create' %}Nouveau besoin d'achat{% else %}Modifier {{ besoin.numero }}{% endif %}</h1>
+  <div class="action-bar" style="margin:14px 28px 0;">
+    <div class="action-bar-breadcrumb">
+      <a href="{% url 'achats:besoins_list' %}"><i class="bi bi-arrow-left"></i> Besoins</a>
+      <span class="sep">/</span>
+      <span class="current">{% if action == 'create' %}Nouveau besoin d'achat{% else %}Modifier {{ besoin.numero }}{% endif %}</span>
+    </div>
   </div>
 
   <div class="bf-body">
     <form method="post" class="bf-form">
       {% csrf_token %}
 
-      <div class="bf-card">
-        <div class="bf-card-head"><i class="bi bi-info-circle"></i> Informations générales</div>
-        <div class="bf-card-body">
-          <div class="bf-row">
-            <div class="bf-field">
-              <label>Titre du besoin *</label>
-              <input type="text" name="titre" value="{{ besoin.titre|default:'' }}" required placeholder="Ex: Commande médicaments octobre 2026">
-            </div>
-            <div class="bf-field">
-              <label>Date de livraison souhaitée</label>
-              <input type="date" name="date_besoin_souhaite" value="{{ besoin.date_besoin_souhaite|default:'' }}">
-            </div>
+      <div class="form-simple-card">
+        <div class="bf-card-head" style="margin:-26px -28px 16px;"><i class="bi bi-info-circle"></i> Informations générales</div>
+        <div class="tab-two-col">
+          <div class="form-field">
+            <label class="field-label">Titre du besoin <span class="required-star">*</span></label>
+            <input type="text" name="titre" class="field-ul" value="{{ besoin.titre|default:'' }}" required placeholder="Ex: Commande médicaments octobre 2026">
           </div>
-          <div class="bf-row one">
-            <div class="bf-field">
-              <label>Notes</label>
-              <textarea name="notes" placeholder="Informations complémentaires…">{{ besoin.notes|default:'' }}</textarea>
-            </div>
+          <div class="form-field">
+            <label class="field-label">Date de livraison souhaitée</label>
+            <input type="date" name="date_besoin_souhaite" class="field-ul" value="{{ besoin.date_besoin_souhaite|default:'' }}">
           </div>
+        </div>
+        <div class="form-field">
+          <label class="field-label">Notes</label>
+          <textarea name="notes" class="field-ul" placeholder="Informations complémentaires…">{{ besoin.notes|default:'' }}</textarea>
         </div>
       </div>
 
@@ -119,11 +115,11 @@
         </div>
       </div>
 
-      <div class="bf-footer">
-        <button type="submit" style="padding:9px 24px;border-radius:6px;background:var(--teal-600);color:#fff;border:none;font-size:14px;font-weight:600;cursor:pointer;">
+      <div class="form-actions" style="justify-content:flex-start;">
+        <button type="submit" class="btn-form-submit">
           {% if action == 'create' %}<i class="bi bi-plus-lg"></i> Créer{% else %}<i class="bi bi-check-lg"></i> Enregistrer{% endif %}
         </button>
-        <a href="{% url 'achats:besoins_list' %}" style="padding:9px 20px;border-radius:6px;border:1px solid #d1d5db;background:#fff;font-size:14px;text-decoration:none;color:rgba(0,0,0,.7);">Annuler</a>
+        <a href="{% url 'achats:besoins_list' %}" class="btn-form-cancel">Annuler</a>
       </div>
     </form>
   </div>

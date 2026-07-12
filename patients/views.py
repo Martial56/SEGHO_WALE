@@ -7,9 +7,10 @@ from django.http import JsonResponse
 from django.utils import timezone
 from datetime import timedelta
 
-from .models import Patient, RendezVous, Pathologie, TypeVisite
+from .models import Patient, RendezVous, Pathologie
 from .forms import PatientForm, RendezVousForm, PathologieForm, TypeVisiteForm
 from core.views import log_event
+from gynecologie.models import TypeVisite
 
 
 @login_required
@@ -552,7 +553,7 @@ def gynecologie_rdv_list(request):
     date_to    = request.GET.get('date_to', '')
 
     qs = RendezVous.objects.select_related('patient', 'medecin', 'type_consultation').prefetch_related('registre_curatif').filter(
-        departement__code='GYNECO'
+        departement__modules_specialises__code='gynecologie'
     ).order_by('-date_heure')
 
     if q:
@@ -597,7 +598,7 @@ def gynecologie_rdv_list(request):
 @login_required
 def gynecologie_patient_list(request):
     gyne_ids = RendezVous.objects.filter(
-        departement__code='GYNECO'
+        departement__modules_specialises__code='gynecologie'
     ).values_list('patient_id', flat=True).distinct()
 
     qs = Patient.objects.filter(pk__in=gyne_ids).order_by('nom', 'prenoms')
@@ -922,7 +923,7 @@ def typevisite_create(request):
         if form.is_valid():
             tv = form.save()
             messages.success(request, f'Type de visite "{tv.nom}" enregistré.')
-            return redirect('patients:typevisite_list')
+            return redirect('gynecologie_typevisite_list')
     else:
         form = TypeVisiteForm()
     return render(request, 'patients/typevisite_form.html', {
@@ -938,7 +939,7 @@ def typevisite_edit(request, pk):
         if form.is_valid():
             form.save()
             messages.success(request, 'Type de visite mis à jour.')
-            return redirect('patients:typevisite_list')
+            return redirect('gynecologie_typevisite_list')
     else:
         form = TypeVisiteForm(instance=tv)
     return render(request, 'patients/typevisite_form.html', {
@@ -953,4 +954,4 @@ def typevisite_delete(request, pk):
         nom = tv.nom
         tv.delete()
         messages.success(request, f'Type de visite "{nom}" supprimé.')
-    return redirect('patients:typevisite_list')
+    return redirect('gynecologie_typevisite_list')

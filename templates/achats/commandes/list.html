@@ -25,10 +25,38 @@
 .s-brouillon { background:#f3f4f6; color:#6b7280; }
 .s-envoyee { background:#dbeafe; color:#1d4ed8; }
 .s-en_livraison { background:#fef3c7; color:#92400e; }
-.s-recue { background:#c0d8e8; color:#0f4358; }
+.s-recue { background:#c0d8e8; color:var(--teal-700); }
 .s-annulee { background:#fee2e2; color:#991b1b; }
 .retard-row td { background:#fff5f5 !important; }
 .retard-date { color:#dc2626 !important; font-weight:700 !important; }
+.kpi-c-brouillon { color:#6b7280; }
+.kpi-c-envoyee { color:#1d4ed8; }
+.kpi-c-en_livraison { color:#92400e; }
+.kpi-c-recue { color:var(--teal-700); }
+.kpi-c-retard { color:#dc2626; }
+
+/* ── Mode sombre ── */
+html[data-theme="dark"] .cm-head { background:var(--surface); border-bottom-color:var(--border); }
+html[data-theme="dark"] .cm-head h1 { color:var(--text-strong,#eef3f8); }
+html[data-theme="dark"] .cm-kpis { background:var(--surface-muted); border-bottom-color:var(--border); }
+html[data-theme="dark"] .cm-kpi { background:var(--surface); border-color:var(--border); color:var(--text); }
+html[data-theme="dark"] .cm-kpi.active { background:rgba(var(--teal-600-rgb),.2); border-color:var(--teal-500); color:var(--text-strong,#eef3f8); }
+html[data-theme="dark"] .cm-filters { background:var(--surface); border-bottom-color:var(--border); }
+html[data-theme="dark"] .cm-table th { background:var(--surface-muted); color:var(--text-faint); border-bottom-color:var(--border); }
+html[data-theme="dark"] .cm-table td { border-bottom-color:var(--border); color:var(--text); }
+html[data-theme="dark"] .cm-table tr:hover td { background:var(--surface-muted); }
+html[data-theme="dark"] .s-brouillon { background:rgba(107,114,128,.25); color:#d1d5db; }
+html[data-theme="dark"] .s-envoyee { background:rgba(29,78,216,.25); color:#93c5fd; }
+html[data-theme="dark"] .s-en_livraison { background:rgba(146,64,14,.3); color:#fcd34d; }
+html[data-theme="dark"] .s-recue { background:rgba(var(--teal-700-rgb),.4); color:#7dd3fc; }
+html[data-theme="dark"] .s-annulee { background:rgba(153,27,27,.3); color:#fca5a5; }
+html[data-theme="dark"] .retard-row td { background:rgba(153,27,27,.15)!important; }
+html[data-theme="dark"] .retard-date { color:#fca5a5!important; }
+html[data-theme="dark"] .kpi-c-brouillon { color:#d1d5db; }
+html[data-theme="dark"] .kpi-c-envoyee { color:#93c5fd; }
+html[data-theme="dark"] .kpi-c-en_livraison { color:#fcd34d; }
+html[data-theme="dark"] .kpi-c-recue { color:#7dd3fc; }
+html[data-theme="dark"] .kpi-c-retard { color:#fca5a5; }
 </style>
 {% endblock %}
 
@@ -42,17 +70,17 @@
       <span style="color:var(--text);font-weight:500;">Commandes d'achat</span>
     </span>
     <div style="flex:1;"></div>
-    <span style="font-size:12px;color:#888;">{{ commandes|length }} commande{{ commandes|length|pluralize }}</span>
+    <span style="font-size:12px;color:var(--text-muted);">{{ commandes|length }} commande{{ commandes|length|pluralize }}</span>
   </div>
 
   <div class="cm-kpis">
     <a href="?" class="cm-kpi {% if not statut %}active{% endif %}"><span class="val">{{ stats.total }}</span> Toutes</a>
-    <a href="?statut=brouillon{% if q %}&q={{ q }}{% endif %}" class="cm-kpi {% if statut == 'brouillon' %}active{% endif %}"><span class="val" style="color:#6b7280;">{{ stats.brouillon }}</span> Brouillon</a>
-    <a href="?statut=envoyee{% if q %}&q={{ q }}{% endif %}" class="cm-kpi {% if statut == 'envoyee' %}active{% endif %}"><span class="val" style="color:#1d4ed8;">{{ stats.envoyee }}</span> Envoyées</a>
-    <a href="?statut=en_livraison{% if q %}&q={{ q }}{% endif %}" class="cm-kpi {% if statut == 'en_livraison' %}active{% endif %}"><span class="val" style="color:#92400e;">{{ stats.en_livraison }}</span> En livraison</a>
-    <a href="?statut=recue{% if q %}&q={{ q }}{% endif %}" class="cm-kpi {% if statut == 'recue' %}active{% endif %}"><span class="val" style="color:#0f4358;">{{ stats.recue }}</span> Reçues</a>
+    <a href="?statut=brouillon{% if q %}&q={{ q }}{% endif %}" class="cm-kpi {% if statut == 'brouillon' %}active{% endif %}"><span class="val kpi-c-brouillon">{{ stats.brouillon }}</span> Brouillon</a>
+    <a href="?statut=envoyee{% if q %}&q={{ q }}{% endif %}" class="cm-kpi {% if statut == 'envoyee' %}active{% endif %}"><span class="val kpi-c-envoyee">{{ stats.envoyee }}</span> Envoyées</a>
+    <a href="?statut=en_livraison{% if q %}&q={{ q }}{% endif %}" class="cm-kpi {% if statut == 'en_livraison' %}active{% endif %}"><span class="val kpi-c-en_livraison">{{ stats.en_livraison }}</span> En livraison</a>
+    <a href="?statut=recue{% if q %}&q={{ q }}{% endif %}" class="cm-kpi {% if statut == 'recue' %}active{% endif %}"><span class="val kpi-c-recue">{{ stats.recue }}</span> Reçues</a>
     {% if stats.retard > 0 %}
-    <a href="?retard=1" class="cm-kpi" style="border-color:#fca5a5;"><span class="val" style="color:#dc2626;"><i class="bi bi-exclamation-triangle-fill"></i> {{ stats.retard }}</span> En retard</a>
+    <a href="?retard=1" class="cm-kpi" style="border-color:#fca5a5;"><span class="val kpi-c-retard"><i class="bi bi-exclamation-triangle-fill"></i> {{ stats.retard }}</span> En retard</a>
     {% endif %}
   </div>
 
@@ -65,8 +93,8 @@
         <option value="{{ val }}" {% if statut == val %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
       </select>
-      <button type="submit" style="height:34px;padding:0 14px;border-radius:6px;border:1px solid #d1d5db;background:#fff;font-size:13px;cursor:pointer;"><i class="bi bi-search"></i></button>
-      {% if q or statut %}<a href="{% url 'achats:commandes_list' %}" style="font-size:13px;color:#888;text-decoration:none;">Effacer</a>{% endif %}
+      <button type="submit" style="height:34px;padding:0 14px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;cursor:pointer;"><i class="bi bi-search"></i></button>
+      {% if q or statut %}<a href="{% url 'achats:commandes_list' %}" style="font-size:13px;color:var(--text-muted);text-decoration:none;">Effacer</a>{% endif %}
     </form>
   </div>
 
@@ -94,24 +122,24 @@
         <td style="font-weight:500;">{{ c.fournisseur.nom }}</td>
         <td style="text-align:right;font-weight:600;white-space:nowrap;">{{ c.montant_total|floatformat:0 }}&nbsp;FCFA</td>
         <td><span class="badge s-{{ c.statut }}">{{ c.get_statut_display }}</span></td>
-        <td style="color:#888;">{{ c.date_commande }}</td>
-        <td class="{% if c.est_en_retard %}retard-date{% else %}{% endif %}" style="color:#888;">
+        <td style="color:var(--text-muted);">{{ c.date_commande }}</td>
+        <td class="{% if c.est_en_retard %}retard-date{% else %}{% endif %}" style="color:var(--text-muted);">
           {{ c.date_livraison_prevue|default:"—" }}
           {% if c.est_en_retard %}<i class="bi bi-exclamation-triangle-fill" style="margin-left:4px;" title="Retard de livraison"></i>{% endif %}
         </td>
-        <td style="color:#888;font-size:12px;">
+        <td style="color:var(--text-muted);font-size:12px;">
           <a href="{% url 'achats:proforma_detail' c.proforma.pk %}" style="color:var(--teal-600);text-decoration:none;">{{ c.proforma.numero }}</a>
         </td>
         <td style="white-space:nowrap;">
           <a href="{% url 'achats:commande_detail' c.pk %}" style="color:var(--teal-600);font-size:13px;margin-right:6px;" title="Voir"><i class="bi bi-eye"></i></a>
-          <a href="{% url 'achats:commande_imprimer' c.pk %}" target="_blank" style="color:#888;font-size:13px;" title="Imprimer"><i class="bi bi-printer"></i></a>
+          <a href="{% url 'achats:commande_imprimer' c.pk %}" style="color:var(--text-muted);font-size:13px;" title="Imprimer"><i class="bi bi-printer"></i></a>
         </td>
       </tr>
       {% endfor %}
       </tbody>
     </table>
     {% else %}
-    <div style="padding:60px;text-align:center;color:#ccc;">
+    <div style="padding:60px;text-align:center;color:var(--text-faint);">
       <i class="bi bi-bag-check" style="font-size:40px;display:block;margin-bottom:14px;"></i>
       Aucune commande trouvée.
       {% if q or statut %}<br><a href="{% url 'achats:commandes_list' %}" style="font-size:13px;color:var(--teal-600);text-decoration:none;">Effacer les filtres</a>{% endif %}

@@ -1,79 +1,21 @@
 {% extends 'hospitalisation/base.html' %}
 
-{% block extra_css %}
-{{ block.super }}
-<style>
-/* ── Layout ── */
-.content    { padding: 0 !important; }
-.breadcrumb { display: none !important; }
-
-/* ── Subheader ── */
-.o-subheader { position: fixed; left: 0; right: 0; top: 0; z-index: 190; }
-
-/* ── Boutons ── */
-.btn-save {
-  background: var(--teal-500); color: #fff; border: none;
-  padding: 6px 18px; border-radius: 4px; font-size: 12.5px; font-weight: 600;
-  font-family: inherit; cursor: pointer; display: inline-flex; align-items: center;
-  gap: 6px; transition: background .15s; letter-spacing: .4px;
-}
-.btn-save:hover { background: var(--teal-600); }
-.btn-cancel {
-  background: none; border: none; color: var(--text-muted);
-  padding: 6px 10px; font-size: 12.5px; font-family: inherit;
-  cursor: pointer; text-decoration: none; transition: color .15s;
-}
-.btn-cancel:hover { color: var(--text); }
-
-/* ── Champs ── */
-.field-ul {
-  width: 100%; background: transparent; border: none;
-  border-bottom: 1.5px solid #d1dde3; border-radius: 0;
-  padding: 7px 2px; font-size: 13px; color: var(--text);
-  transition: border-color .2s; box-shadow: none; outline: none; font-family: inherit;
-}
-.field-ul:focus { border-bottom-color: var(--teal-500); }
-.field-ul::placeholder { color: #bfcdd4; }
-.field-label {
-  display: block; font-size: 11px; font-weight: 700; color: var(--text-muted);
-  text-transform: uppercase; letter-spacing: .05em; margin-bottom: 4px;
-}
-.field-error { font-size: 12px; color: #e53935; margin-top: 3px; }
-
-/* ── Carte formulaire ── */
-.form-card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 8px; overflow: hidden; margin: 16px 24px;
-}
-.form-body { padding: 24px 28px; max-width: 600px; }
-
-html[data-theme="dark"] .form-card { background: var(--surface); border-color: var(--border); }
-html[data-theme="dark"] .field-ul { color: var(--text); border-bottom-color: rgba(255,255,255,.15); }
-html[data-theme="dark"] .field-ul:focus { border-bottom-color: var(--teal-400); }
-html[data-theme="dark"] .field-ul::placeholder { color: rgba(255,255,255,.25); }
-html[data-theme="dark"] .btn-cancel { color: var(--text-muted); }
-</style>
-{% endblock %}
+{% block breadcrumb %}{% endblock %}
 
 {% block content %}
-<div id="page-wrap">
 
-<div class="o-subheader" data-fixed="1">
-  <div class="o-subheader-row">
-    <a href="{% url 'hospitalisation:config_liste_service' %}" class="o-ctrl-btn" style="padding:3px 7px;">
+<div class="action-bar">
+  <div class="action-bar-breadcrumb">
+    <a href="{% url 'hospitalisation:config_liste_service' %}" class="btn-form-cancel" style="padding:3px 7px;">
       <i class="bi bi-arrow-left"></i>
     </a>
-    <span style="font-size:13px; color:var(--text-muted);">
-      <a href="{% url 'hospitalisation:config_liste_service' %}"
-         style="color:var(--accent,var(--teal-600)); text-decoration:none; font-weight:500;">
-        Liste de vérification avant le service
-      </a>
-      <span style="margin:0 4px; opacity:.4;">/</span>
-      <span style="color:var(--text);">{{ titre }}</span>
-    </span>
-    <div style="flex:1;"></div>
-    <a href="{% url 'hospitalisation:config_liste_service' %}" class="btn-cancel">Ignorer</a>
-    <button type="submit" form="service-form" class="btn-save">
+    <a href="{% url 'hospitalisation:config_liste_service' %}">Liste de vérification avant le service</a>
+    <span class="sep">/</span>
+    <span class="current">{{ titre }}</span>
+  </div>
+  <div class="action-bar-buttons">
+    <a href="{% url 'hospitalisation:config_liste_service' %}" class="btn-form-cancel">Ignorer</a>
+    <button type="submit" form="service-form" class="btn-form-submit">
       <i class="bi bi-check2"></i> Sauvegarder
     </button>
   </div>
@@ -81,16 +23,13 @@ html[data-theme="dark"] .btn-cancel { color: var(--text-muted); }
 
 <form method="post" id="service-form" novalidate>
   {% csrf_token %}
-  <div class="form-card">
-    <div class="form-body">
-      <div>
-        <label class="field-label" for="{{ form.item.id_for_label }}">Élément de la liste de contrôle de salle</label>
-        {{ form.item }}
-        {% if form.item.errors %}<div class="field-error">{{ form.item.errors|join:", " }}</div>{% endif %}
-      </div>
+  <div class="form-simple-card" style="max-width:600px;">
+    <div class="form-field">
+      <label class="field-label" for="{{ form.item.id_for_label }}">Élément de la liste de contrôle de salle</label>
+      {{ form.item }}
+      {% if form.item.errors %}<div class="field-error">{{ form.item.errors|join:", " }}</div>{% endif %}
     </div>
   </div>
 </form>
 
-</div><!-- /page-wrap -->
 {% endblock %}

@@ -9,7 +9,7 @@
       <div class="o-card-name">{{ dep.nom }}</div>
       <div class="o-card-meta">
         <span class="val">{{ dep.code }}</span><br>
-        <i class="bi bi-building"></i> {{ dep.nb_services }} service{{ dep.nb_services|pluralize }}
+        <i class="bi bi-person-badge"></i> {{ dep.nb_medecins }} médecin{{ dep.nb_medecins|pluralize }}
         &nbsp;
         {% if dep.actif %}<span class="badge-actif">Actif</span>{% else %}<span class="badge-inactif">Inactif</span>{% endif %}
       </div>
@@ -28,7 +28,7 @@
         </th>
         <th style="width:130px;">Code</th>
         <th>Nom</th>
-        <th style="width:120px;">Services</th>
+        <th style="width:120px;">Médecins</th>
         <th style="width:90px;">Statut</th>
         <th style="width:90px;"></th>
       </tr>
@@ -41,13 +41,14 @@
         </td>
         <td><span class="badge-code">{{ dep.code }}</span></td>
         <td style="font-weight:600;">{{ dep.nom }}</td>
-        <td style="color:var(--text-muted);"><i class="bi bi-building" style="margin-right:4px;"></i>{{ dep.nb_services }}</td>
+        <td style="color:var(--text-muted);"><i class="bi bi-person-badge" style="margin-right:4px;"></i>{{ dep.nb_medecins }}</td>
         <td>
           {% if dep.actif %}<span class="badge-actif">Actif</span>
           {% else %}<span class="badge-inactif">Inactif</span>{% endif %}
         </td>
         <td class="row-actions" onclick="event.stopPropagation()">
-          <a href="{% url 'medecins_departement_edit' dep.pk %}" class="o-ctrl-btn" title="Modifier">
+          <a href="{% url 'medecins_departement_edit' dep.pk %}" class="o-ctrl-btn" title="Modifier"
+             onclick="return mdOpenConfigModal(event, this.href, 'Modifier — {{ dep.nom }}', 'bi-diagram-3');">
             <i class="bi bi-pencil"></i>
           </a>
         </td>
@@ -75,7 +76,8 @@
   <i class="bi bi-diagram-3"></i>
   {% if q %}Aucun résultat pour « {{ q }} »{% else %}Aucun département enregistré{% endif %}<br>
   {% if not q %}
-  <a href="{% url 'medecins_departement_create' %}" style="color:var(--md-500);font-weight:600;margin-top:8px;display:inline-block;">Créer un premier département</a>
+  <a href="{% url 'medecins_departement_create' %}" style="color:var(--md-500);font-weight:600;margin-top:8px;display:inline-block;"
+     onclick="return mdOpenConfigModal(event, this.href, 'Nouveau département', 'bi-diagram-3');">Créer un premier département</a>
   {% endif %}
 </div>
 {% endif %}
