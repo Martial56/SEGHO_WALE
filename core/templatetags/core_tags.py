@@ -18,6 +18,20 @@ def range_tag(n):
     return range(n)
 
 
+@register.filter
+def duree_hms(secondes):
+    """3723 -> '01:02:03' ; 65 -> '01:05' ; None -> '—'. Même format que
+    RendezVous._fmt_sec (patients/models.py) pour rester cohérent."""
+    if secondes is None:
+        return '—'
+    secondes = max(0, int(secondes))
+    h, rem = divmod(secondes, 3600)
+    m, s = divmod(rem, 60)
+    if h > 0:
+        return f"{h:02d}:{m:02d}:{s:02d}"
+    return f"{m:02d}:{s:02d}"
+
+
 @register.inclusion_tag('includes/historique_sidebar.html')
 def historique_sidebar(obj):
     from core.models import LogActivite

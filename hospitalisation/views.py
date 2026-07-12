@@ -129,6 +129,12 @@ def hospitalisation_create(request):
         if form.is_valid():
             hosp = form.save(commit=False)
             hosp.cree_par = request.user
+            consultation_pk = request.POST.get('consultation_origine')
+            if consultation_pk:
+                try:
+                    hosp.consultation_id = int(consultation_pk)
+                except (TypeError, ValueError):
+                    pass
             hosp.save()
             form.save_m2m()
             for i, item in enumerate(ListeControleAdmission.objects.all()):
@@ -147,6 +153,10 @@ def hospitalisation_create(request):
             _save_services_a_facturer(hosp, request.POST)
             log_event(hosp, request.user, 'Hospitalisation créée.', type='system')
             _sync_soins_services(hosp)
+            # Ligne facturable Mise en observation générée dès la création (mode
+            # direct ou depuis une consultation) : la caisse doit pouvoir créer
+            # la facture immédiatement depuis la fiche, avant toute confirmation.
+            _generer_ligne_meo(hosp)
             if 'action_confirmer' in request.POST:
                 ok, err = _transition_confirmer(hosp, request.user)
                 if ok:
@@ -162,6 +172,7 @@ def hospitalisation_create(request):
         eval_prefill = None
         is_mo = False
         mo_patient = mo_medecin = mo_maladie = None
+        mo_consultation_id = None
         # Pré-remplissage depuis les paramètres URL (ex. depuis rendez-vous)
         try:
             if request.GET.get('medecin'):
@@ -184,6 +195,10 @@ def hospitalisation_create(request):
                 is_mo = True
                 mo_patient = rdv.patient
                 mo_medecin = rdv.medecin
+                try:
+                    mo_consultation_id = rdv.consultation.pk
+                except AttributeError:
+                    mo_consultation_id = None
                 # Maladie : premier diagnostic retenu du registre curatif
                 try:
                     reg = rdv.registre_curatif
@@ -234,6 +249,7 @@ def hospitalisation_create(request):
         ctx['mo_patient'] = mo_patient
         ctx['mo_medecin'] = mo_medecin
         ctx['mo_maladie'] = mo_maladie
+        ctx['mo_consultation_id'] = mo_consultation_id
     return render(request, 'hospitalisation/form.html', ctx)
 
 
@@ -262,14 +278,8 @@ def _sync_soins_services(hosp):
 # Chaque helper retourne (ok: bool, erreur: str|None).
 # La vue appelante affiche le message et redirige.
 
-def _transition_confirmer(hosp, user):
-    """brouillon → confirme : crée la ligne MEO et synchronise les SAF depuis soins_apportes."""
-    from .services import check_action
-    ok, err = check_action(hosp, user, 'confirmer')
-    if not ok:
-        return False, err
-    _sync_soins_services(hosp)
-    # Ligne MEO automatique (une seule fois)
+def _generer_ligne_meo(hosp):
+    """Crée (une seule fois) la ligne facturable Mise en observation."""
     from services.models import Articleservice
     from django.utils import timezone as tz
     meo = Articleservice.objects.filter(categorie__code='MO', reference_interne='MO_MEO').first()
@@ -280,6 +290,18 @@ def _transition_confirmer(hosp, user):
             source='meo',
             defaults={'service': meo, 'quantite': 1, 'date': date_adm},
         )
+
+
+def _transition_confirmer(hosp, user):
+    """brouillon → confirme : crée la ligne MEO (si pas déjà fait) et synchronise
+    les SAF depuis soins_apportes."""
+    from .services import check_action
+    from django.utils import timezone as tz
+    ok, err = check_action(hosp, user, 'confirmer')
+    if not ok:
+        return False, err
+    _sync_soins_services(hosp)
+    _generer_ligne_meo(hosp)
     hosp.statut = 'confirme'
     hosp.modifie_par = user
     hosp.date_modification = tz.now()

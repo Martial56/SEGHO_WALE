@@ -1,5 +1,5 @@
 {% extends 'hospitalisation/base.html' %}
-{% load i18n core_tags %}
+{% load i18n core_tags l10n %}
 
 {% block extra_css %}
 {{ block.super }}
@@ -382,6 +382,7 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
 <!-- ── Carte principale ── -->
 <form method="post" id="hosp-form" enctype="multipart/form-data" novalidate>
   {% csrf_token %}
+  {% if not edit and mo_consultation_id %}<input type="hidden" name="consultation_origine" value="{{ mo_consultation_id }}">{% endif %}
   <div class="hosp-card">
 
     <!-- ── Pipeline (comme .det-pipe-row de hospitalisation/detail.html) ── -->
@@ -781,19 +782,19 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
             <div class="ev-field">
               <span class="ev-label">Poids</span>
               <input type="number" name="eval_poids" class="ev-input" step="0.01" min="0"
-                     value="{{ e.poids|default:'0' }}" id="ev-poids">
+                     value="{{ e.poids|default:'0'|unlocalize }}" id="ev-poids">
               <span class="ev-unit">kg</span>
             </div>
             <div class="ev-field">
               <span class="ev-label">Taille</span>
               <input type="number" name="eval_taille" class="ev-input" step="0.01" min="0"
-                     value="{{ e.taille|default:'0' }}" id="ev-taille">
+                     value="{{ e.taille|default:'0'|unlocalize }}" id="ev-taille">
               <span class="ev-unit">m</span>
             </div>
             <div class="ev-field">
               <span class="ev-label">Temp</span>
               <input type="number" name="eval_temperature" class="ev-input" step="0.1" min="0"
-                     value="{{ e.temperature|default:'0' }}">
+                     value="{{ e.temperature|default:'0'|unlocalize }}">
               <span class="ev-unit">°C</span>
             </div>
             <div class="ev-field" style="border-bottom:none;">
@@ -827,13 +828,13 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
             <div class="ev-field">
               <span class="ev-label">Saturation d'O2</span>
               <input type="number" name="eval_sat_o2" class="ev-input" step="0.01" min="0" max="100"
-                     value="{{ e.saturation_o2|default:'0' }}">
+                     value="{{ e.saturation_o2|default:'0'|unlocalize }}">
               <span class="ev-unit">%</span>
             </div>
             <div class="ev-field">
               <span class="ev-label">Glycémie aléatoire</span>
               <input type="number" name="eval_glycemie" class="ev-input" step="0.01" min="0"
-                     value="{{ e.glycemie|default:'0' }}">
+                     value="{{ e.glycemie|default:'0'|unlocalize }}">
               <span class="ev-unit">g/L</span>
             </div>
             <div class="ev-field" style="border-bottom:none;">

@@ -162,7 +162,7 @@
 /* ── Chronomètres du dossier (rangée pleine largeur dans .det-block,
      comme .timing-section de patients/rendez_vous_form.html) ── */
 .timing-section {
-  display: grid; grid-template-columns: repeat(3, 1fr);
+  display: grid; grid-template-columns: repeat(4, 1fr);
   gap: 16px 40px; padding: 18px 20px; position: relative;
 }
 .timing-card { display: flex; flex-direction: column; gap: 6px; }
@@ -699,13 +699,6 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
             {% if hosp.chambre %}{{ hosp.chambre.nom }}{% if hosp.numero_lit %} — Lit {{ hosp.numero_lit }}{% endif %} — {{ hosp.chambre.get_type_chambre_display }}{% else %}—{% endif %}
           </div>
         </div>
-        {% if hosp.consultation %}
-        <div class="info-row">
-          <div class="info-lbl">Consultation d'origine</div>
-          <div class="info-val">{{ hosp.consultation }}</div>
-        </div>
-        {% endif %}
-
         {# Transfert vers un autre établissement #}
         {% if resume.transfert %}
         <div class="info-section"><i class="bi bi-arrow-right-circle"></i>Transfert</div>
@@ -746,12 +739,21 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
     {# ── Chronomètres du dossier (comme .timing-section de patients/rendez_vous_form.html) ── #}
     <div class="timing-section" id="dur-card"
          data-statut="{{ hosp.statut }}"
-         data-heure-entree="{{ hosp.date_admission|date:'c' }}"
+         data-heure-entree="{{ hosp.heure_entree|date:'c' }}"
          data-heure-sortie="{{ hosp.heure_sortie|date:'c' }}"
-         data-date-termine="{{ hosp.date_termine|date:'c' }}">
+         data-date-termine="{{ hosp.date_termine|date:'c' }}"
+         data-date-confirme="{{ hosp.date_confirme|date:'c' }}">
       <div class="timing-card">
         <div class="timing-label">Date d'entrée</div>
         <div class="timing-value" style="font-size:16px;">{{ hosp.date_admission|date:"d/m/Y H:i:s" }}</div>
+      </div>
+      <div class="timing-card">
+        <div class="timing-label">Temps avant hospitalisation</div>
+        {% if hosp.heure_entree %}
+        <div class="timing-value" id="dur-avant">{{ hosp.temps_avant_hospitalisation|duree_hms }}</div>
+        {% else %}
+        <div class="timing-value zero" id="dur-avant">—</div>
+        {% endif %}
       </div>
       <div class="timing-card">
         <div class="timing-label">Durée d'hospitalisation</div>
@@ -778,6 +780,10 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
           <i class="bi bi-person-badge" style="font-size:13px;"></i>
           Visites
           <span class="tab-bdg">{{ visites_inf|length|add:visites_doc|length }}</span>
+        </button>
+        <button class="tab-btn" data-tab="evaluation" role="tab" aria-selected="false">
+          <i class="bi bi-heart-pulse" style="font-size:13px;"></i>
+          Évaluation clinique
         </button>
         <button class="tab-btn" data-tab="facturation" role="tab" aria-selected="false">
           <i class="bi bi-receipt" style="font-size:13px;"></i>
@@ -916,6 +922,86 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
         </div>
         {% endif %}
 
+      </div>
+
+      {# ─────────────────────── ONGLET : ÉVALUATION CLINIQUE ─────────────────────── #}
+      <div class="tab-pane" id="tab-evaluation">
+        <div class="info-grid">
+
+          <div class="info-section"><i class="bi bi-clipboard2-pulse"></i>Constantes</div>
+
+          <div class="info-row">
+            <div class="info-lbl">Poids</div>
+            <div class="info-val {% if not eval_clin.poids %}empty{% endif %}">
+              {% if eval_clin.poids %}{{ eval_clin.poids }} kg{% else %}—{% endif %}
+            </div>
+          </div>
+          <div class="info-row">
+            <div class="info-lbl">Taille</div>
+            <div class="info-val {% if not eval_clin.taille %}empty{% endif %}">
+              {% if eval_clin.taille %}{{ eval_clin.taille }} m{% else %}—{% endif %}
+            </div>
+          </div>
+          <div class="info-row">
+            <div class="info-lbl">IMC</div>
+            <div class="info-val {% if not eval_clin.imc %}empty{% endif %}">
+              {% if eval_clin.imc %}{{ eval_clin.imc }} ({{ eval_clin.imc_statut }}){% else %}—{% endif %}
+            </div>
+          </div>
+          <div class="info-row">
+            <div class="info-lbl">Température</div>
+            <div class="info-val {% if not eval_clin.temperature %}empty{% endif %}">
+              {% if eval_clin.temperature %}{{ eval_clin.temperature }} °C{% else %}—{% endif %}
+            </div>
+          </div>
+
+          <div class="info-section"><i class="bi bi-activity"></i>Signes vitaux</div>
+
+          <div class="info-row">
+            <div class="info-lbl">Fréquence respiratoire</div>
+            <div class="info-val {% if not eval_clin.frequence_respiratoire %}empty{% endif %}">
+              {{ eval_clin.frequence_respiratoire|default:"—" }}
+            </div>
+          </div>
+          <div class="info-row">
+            <div class="info-lbl">Tension artérielle</div>
+            <div class="info-val {% if not eval_clin.tension_systolique %}empty{% endif %}">
+              {% if eval_clin.tension_systolique %}{{ eval_clin.tension_systolique }}/{{ eval_clin.tension_diastolique }}{% else %}—{% endif %}
+            </div>
+          </div>
+          <div class="info-row">
+            <div class="info-lbl">Saturation O2</div>
+            <div class="info-val {% if not eval_clin.saturation_o2 %}empty{% endif %}">
+              {% if eval_clin.saturation_o2 %}{{ eval_clin.saturation_o2 }} %{% else %}—{% endif %}
+            </div>
+          </div>
+          <div class="info-row">
+            <div class="info-lbl">Glycémie aléatoire</div>
+            <div class="info-val {% if not eval_clin.glycemie %}empty{% endif %}">
+              {{ eval_clin.glycemie|default:"—" }}
+            </div>
+          </div>
+          <div class="info-row">
+            <div class="info-lbl">Niveau de douleur</div>
+            <div class="info-val {% if eval_clin.niveau_douleur is None %}empty{% endif %}">
+              {% if eval_clin.niveau_douleur is not None %}{{ eval_clin.niveau_douleur }}/10{% else %}—{% endif %}
+            </div>
+          </div>
+          <div class="info-row">
+            <div class="info-lbl">Dernière saisie</div>
+            <div class="info-val">{{ eval_clin.date_saisie|date:"d/m/Y H:i" }}</div>
+          </div>
+
+        </div>
+
+        {% if peut_modifier %}
+        <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border);text-align:right;">
+          <a href="{% url 'hospitalisation:edit' hosp.pk %}#tab-evaluation"
+             class="abtn abtn-neutral" style="font-size:12px;">
+            <i class="bi bi-pencil"></i> Modifier dans le formulaire
+          </a>
+        </div>
+        {% endif %}
       </div>
 
       {# ─────────────────────────── ONGLET : FACTURATION ─────────────────────────── #}
@@ -1156,7 +1242,7 @@ function fmtElapsed(sec) {
   if (sec < 0) sec = 0;
   var p = function (n) { return n < 10 ? '0' + n : '' + n; };
   var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = Math.floor(sec % 60);
-  return p(h) + ':' + p(m) + ':' + p(s);
+  return (h > 0 ? p(h) + ':' : '') + p(m) + ':' + p(s);
 }
 
 function stopDureeTimer() {
@@ -1211,10 +1297,15 @@ function renderFrozenDuree(heureSortieIso, dateTermineIso) {
 }
 
 function updateDuration(data) {
-  /* _durEntreeTs (date_admission) ne change jamais après création. Le
-     décompte s'arrête dès que le dossier a une date de fin connue :
-     heure_sortie (Décharger) OU date_termine (Clôturer sans passage par
-     Décharger — ex. dossier clos administrativement). */
+  /* _durEntreeTs vient de heure_entree — vide tant que le patient n'est pas
+     physiquement installé (transition confirmé → hospitalisé), auquel cas
+     data.heure_entree est renseigné pour la première fois ici (sans
+     recharger la page). Le décompte s'arrête dès que le dossier a une date
+     de fin connue : heure_sortie (Décharger) OU date_termine (Clôturer sans
+     passage par Décharger — ex. dossier clos administrativement). */
+  if (data.heure_entree) {
+    _durEntreeTs = Math.floor(new Date(data.heure_entree).getTime() / 1000);
+  }
   var fin = data.heure_sortie || data.date_termine;
   _durSortieTs = fin ? Math.floor(new Date(fin).getTime() / 1000) : 0;
   if (_durEntreeTs && _durSortieTs) {
@@ -1222,6 +1313,7 @@ function updateDuration(data) {
   } else if (_durEntreeTs) {
     startDureeTimer();
   }
+  updateAvant(data);
 }
 
 function initDureeTimer() {
@@ -1240,6 +1332,52 @@ function initDureeTimer() {
   }
 }
 initDureeTimer();
+
+/* ══ Temps avant hospitalisation (confirmé → installé), en attente uniquement :
+   une fois heure_entree figée, la valeur est déjà affichée côté serveur (ou,
+   sans rechargement, gelée par updateAvant() au moment de la transition) ══ */
+var _avantEntreeTs = 0;
+var _avantIvId = null;
+
+function tickAvant() {
+  var now = new Date();
+  var elapsed = Math.floor(now.getTime() / 1000) - _avantEntreeTs;
+  var el = document.getElementById('dur-avant');
+  if (el) el.textContent = fmtElapsed(elapsed);
+}
+
+function stopAvantTimer() {
+  if (_avantIvId) { clearInterval(_avantIvId); _avantIvId = null; }
+}
+
+function updateAvant(data) {
+  if (!_avantEntreeTs || !data.heure_entree) return;
+  stopAvantTimer();
+  var entreeTs = Math.floor(new Date(data.heure_entree).getTime() / 1000);
+  var el = document.getElementById('dur-avant');
+  if (el) {
+    el.textContent = fmtElapsed(entreeTs - _avantEntreeTs);
+    el.classList.remove('running');
+  }
+}
+
+function initAvantTimer() {
+  var card = document.getElementById('dur-card');
+  if (!card) return;
+  if (card.dataset.heureEntree) return; // déjà figé, affiché côté serveur
+  // Ne compte que si le dossier est réellement en attente d'installation —
+  // un dossier clôturé/annulé/déchargé sans avoir jamais été installé
+  // (anomalie de données) ne doit pas faire tourner ce chronomètre indéfiniment.
+  if (card.dataset.statut !== 'confirme') return;
+  var confirme = card.dataset.dateConfirme;
+  if (!confirme) return; // pas encore confirmé
+  _avantEntreeTs = Math.floor(new Date(confirme).getTime() / 1000);
+  var el = document.getElementById('dur-avant');
+  if (el) { el.classList.remove('zero'); el.classList.add('running'); }
+  tickAvant();
+  _avantIvId = setInterval(tickAvant, 1000);
+}
+initAvantTimer();
 
 /* ══ Action bar — re-rendu JS depuis _etat_payload ════════════════════════════ */
 function renderActionBar(data) {
