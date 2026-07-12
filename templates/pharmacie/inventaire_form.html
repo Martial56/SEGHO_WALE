@@ -1,0 +1,154 @@
+{% extends "pharmacie/base.html" %}
+
+{% block title %}Nouvel inventaire physique — {{ label }}{% endblock %}
+
+{% block extra_ph_css %}<style>
+.ph-qte-field {
+  border: none; border-bottom: 1.5px solid rgba(0,0,0,.15); background: transparent;
+  padding: 5px 4px; font-size: 13px; text-align: center; width: 90px;
+  font-family: inherit; color: var(--ph-text); transition: border-color .15s;
+}
+.ph-qte-field:focus { outline: none; border-bottom-color: var(--ph-500); }
+.ph-type-sep {
+  background: var(--ph-100); padding: 8px 14px;
+  font-size: 10.5px; font-weight: 700; color: var(--ph-700);
+  text-transform: uppercase; letter-spacing: .5px;
+  border-bottom: 1px solid var(--ph-border);
+}
+</style>{% endblock %}
+
+{% block content %}
+<form method="post" id="form-inventaire">
+  {% csrf_token %}
+
+  <div class="action-bar" style="padding:0 32px;margin-top:11px;">
+    <div class="action-bar-breadcrumb">
+      <i class="bi bi-clipboard2-check"></i>
+      <span class="current">Nouvel inventaire physique — {{ label }}</span>
+    </div>
+    <div class="action-bar-buttons">
+      <button type="submit" class="btn-form-submit">
+        <i class="bi bi-save"></i> Enregistrer
+      </button>
+    </div>
+  </div>
+
+  <!-- Explication -->
+  <div style="display:flex;align-items:flex-start;gap:10px;background:var(--ph-50);border-bottom:1px solid var(--ph-border);padding:14px 32px;margin:0;">
+    <i class="bi bi-info-circle-fill" style="color:var(--ph-500);font-size:18px;flex-shrink:0;margin-top:1px;"></i>
+    <div style="font-size:12.5px;color:var(--ph-muted);line-height:1.5;">
+      Saisissez les quantités physiquement comptées. Le stock théorique est pré-rempli.
+    </div>
+  </div>
+
+  <div style="padding:16px 32px 28px;">
+
+    <!-- Date et notes -->
+    <div class="ph-card" style="border:1px solid var(--ph-border);border-radius:12px;overflow:hidden;">
+      <div class="ph-card-body">
+        <div style="display:grid;grid-template-columns:200px 1fr;gap:24px;">
+          <div class="form-field" style="margin-bottom:0;">
+            <label for="date_inventaire" class="field-label">Date de l'inventaire</label>
+            <input
+              type="date"
+              id="date_inventaire"
+              name="date_inventaire"
+              class="field-ul"
+              value="{{ today|date:'Y-m-d' }}"
+              required
+            >
+          </div>
+          <div class="form-field" style="margin-bottom:0;">
+            <label for="notes" class="field-label">Notes</label>
+            <textarea
+              id="notes"
+              name="notes"
+              class="field-ul"
+              rows="2"
+              placeholder="Observations, conditions de comptage…"
+            ></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Produits -->
+    <div class="ph-card" style="margin-top:16px;border:1px solid var(--ph-border);border-radius:12px;overflow:hidden;">
+      <div class="ph-card-header">
+        <div class="ph-card-title"><i class="bi bi-box-seam" style="color:var(--ph-600);"></i> Produits en stock</div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="ph-table">
+          <thead>
+            <tr>
+              <th style="width:120px;">Code</th>
+              <th>Produit</th>
+              <th style="text-align:center;width:180px;">Stock théorique<br><small style="font-weight:400;font-style:italic;text-transform:none;">(lecture seule)</small></th>
+              <th style="text-align:center;width:180px;">Stock réel constaté</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for sp in stock_items %}
+
+              {% ifchanged sp.produit.type %}
+              <tr class="ph-type-sep">
+                <td colspan="4">{{ sp.produit.get_type_display|default:sp.produit.type }}</td>
+              </tr>
+              {% endifchanged %}
+
+              <tr>
+                <td><span style="font-family: var(--font-mono);font-size:11.5px;color:var(--ph-600);">{{ sp.produit.code }}</span></td>
+                <td>
+                  <span style="font-weight:600;">{{ sp.produit.nom }}</span>
+                  {% if sp.produit.unite %}
+                  <span style="font-size:10.5px;color:var(--ph-muted);"> ({{ sp.produit.unite }})</span>
+                  {% endif %}
+                </td>
+                <td style="text-align:center;">
+                  <input
+                    type="number"
+                    class="ph-qte-field"
+                    value="{{ sp.quantite|floatformat:0 }}"
+                    readonly
+                    tabindex="-1"
+                    aria-label="Stock théorique — lecture seule"
+                    style="pointer-events:none;color:var(--ph-muted);"
+                  >
+                </td>
+                <td style="text-align:center;">
+                  <input
+                    type="number"
+                    name="reel_{{ sp.produit.pk }}"
+                    id="reel_{{ sp.produit.pk }}"
+                    class="ph-qte-field"
+                    value="{{ sp.quantite|floatformat:0 }}"
+                    min="0"
+                    step="1"
+                    required
+                    aria-label="Stock réel constaté pour {{ sp.produit.nom }}"
+                  >
+                </td>
+              </tr>
+
+            {% empty %}
+            <tr>
+              <td colspan="4" style="text-align:center;padding:32px;color:var(--ph-muted);">
+                Aucun produit en stock pour cette pharmacie.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Bouton bas de page -->
+    <div class="form-actions">
+      <button type="submit" class="btn-form-submit">
+        <i class="bi bi-save"></i> Enregistrer l'inventaire
+      </button>
+    </div>
+
+  </div>
+</form>
+{% endblock %}

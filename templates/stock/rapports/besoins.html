@@ -1,0 +1,120 @@
+{% extends 'stock/base.html' %}
+{% load static %}
+{% block topbar_title %}Stock — Rapport besoins{% endblock %}
+
+{% block extra_st_css %}<style>
+.content { padding-top: 0; }
+.rp-head { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 32px;margin:0 -32px;background:#e8f2f7;border-bottom:1px solid rgba(0,0,0,.05);box-shadow:0 2px 8px rgba(0,0,0,.04);position:sticky;top:var(--topbar-h);z-index:100; }
+.cov-ok       { color:var(--st-600); font-weight:700; }
+.cov-alerte   { color:var(--amber-text); font-weight:700; }
+.cov-critique { color:var(--rose-text); font-weight:800; }
+.qte-cmd      { background:rgba(26,35,126,.08);color:#1a237e;border:1px solid rgba(26,35,126,.2);padding:3px 10px;border-radius:20px;font-weight:700;font-size:12px; }
+</style>{% endblock %}
+
+{% block content %}
+<div class="rp-head">
+  <div>
+    <div style="font-size:15px;font-weight:800;color:var(--st-900);"><i class="bi bi-clipboard2-data" style="color:var(--st-600);"></i> Rapport des besoins mensuels</div>
+    <div style="font-size:11.5px;color:var(--st-muted);">CMM · Couverture · Quantités à commander — {{ today|date:"d/m/Y" }}</div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <form method="get" style="display:flex;gap:6px;">
+      <select name="type" class="st-input" style="width:auto;padding:5px 8px;font-size:12.5px;" onchange="this.form.submit()">
+        <option value="">Tous les types</option>
+        <option value="medicament"  {% if type_filtre == 'medicament' %}selected{% endif %}>Médicaments</option>
+        <option value="consommable" {% if type_filtre == 'consommable' %}selected{% endif %}>Consommables</option>
+        <option value="equipement"  {% if type_filtre == 'equipement' %}selected{% endif %}>Équipements</option>
+      </select>
+    </form>
+    <a href="{% url 'stock_rapports_besoins_print' %}?type={{ type_filtre }}" class="btn-st" style="font-size:12px;"><i class="bi bi-printer"></i> Exporter PDF</a>
+  </div>
+</div>
+
+<!-- Stats rapides -->
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px;">
+  <div class="st-card" style="padding:14px 18px;text-align:center;margin-bottom:0;">
+    <div style="font-size:22px;font-weight:800;color:var(--st-700);">{{ stats.total }}</div>
+    <div style="font-size:10.5px;color:var(--st-muted);text-transform:uppercase;letter-spacing:.3px;">Produits actifs</div>
+  </div>
+  <div class="st-card" style="padding:14px 18px;text-align:center;margin-bottom:0;">
+    <div style="font-size:22px;font-weight:800;color:var(--rose-text);">{{ stats.rupture }}</div>
+    <div style="font-size:10.5px;color:var(--st-muted);text-transform:uppercase;letter-spacing:.3px;">Ruptures</div>
+  </div>
+  <div class="st-card" style="padding:14px 18px;text-align:center;margin-bottom:0;">
+    <div style="font-size:22px;font-weight:800;color:var(--amber-text);">{{ stats.critique }}</div>
+    <div style="font-size:10.5px;color:var(--st-muted);text-transform:uppercase;letter-spacing:.3px;">Stock critique</div>
+  </div>
+  <div class="st-card" style="padding:14px 18px;text-align:center;margin-bottom:0;">
+    <div style="font-size:22px;font-weight:800;color:#1a237e;">{{ stats.besoin }}</div>
+    <div style="font-size:10.5px;color:var(--st-muted);text-transform:uppercase;letter-spacing:.3px;">À commander</div>
+  </div>
+</div>
+
+<!-- Tableau -->
+<div style="margin-top:14px;margin-left:-32px;margin-right:-32px;background:var(--st-surface);box-shadow:0 2px 12px rgba(var(--st-700-rgb),.08);overflow:hidden;">
+  <table class="st-table">
+    <thead>
+      <tr>
+        <th>Code</th>
+        <th>Désignation</th>
+        <th>Type</th>
+        <th style="text-align:right;">Stock actuel</th>
+        <th style="text-align:right;">CMM</th>
+        <th style="text-align:right;">Couverture</th>
+        <th style="text-align:right;">Stock sécurité</th>
+        <th style="text-align:right;">Point commande</th>
+        <th style="text-align:center;">Qté à commander</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for d in produits_data %}
+    <tr>
+      <td style="font-family: var(--font-mono);font-size:11px;color:var(--st-600);">{{ d.produit.code }}</td>
+      <td>
+        <a href="{% url 'stock_produit_detail' d.produit.pk %}" style="font-weight:600;color:var(--st-text);text-decoration:none;">{{ d.produit.nom }}</a>
+        {% if d.produit.dci %}<div style="font-size:10px;color:var(--st-muted);">{{ d.produit.dci }}</div>{% endif %}
+      </td>
+      <td>
+        {% if d.produit.type == 'medicament' %}<span class="badge-type-med" style="font-size:9.5px;padding:1px 7px;"><i class="bi bi-capsule-pill"></i> Méd.</span>
+        {% elif d.produit.type == 'consommable' %}<span class="badge-type-cons" style="font-size:9.5px;padding:1px 7px;"><i class="bi bi-bandaid"></i> Cons.</span>
+        {% else %}<span class="badge-type-eqp" style="font-size:9.5px;padding:1px 7px;"><i class="bi bi-tools"></i> Éqp.</span>{% endif %}
+      </td>
+      <td style="text-align:right;font-weight:700;" class="{% if d.stock <= 0 %}badge-rupture{% elif d.produit.en_alerte %}val-alerte{% else %}val-ok{% endif %}" style="font-weight:700;">
+        {{ d.stock|floatformat:0 }} <span style="font-size:10px;font-weight:400;color:var(--st-muted);">{{ d.produit.unite_mesure.nom }}</span>
+      </td>
+      <td style="text-align:right;font-size:13px;font-weight:600;">
+        {{ d.cmm|floatformat:1 }}
+        <div style="font-size:10px;color:var(--st-muted);">{{ d.produit.unite_mesure.nom }}/mois</div>
+      </td>
+      <td style="text-align:right;">
+        {% if d.couverture is not None %}
+        <span class="{% if d.couverture < 30 %}cov-critique{% elif d.couverture < 60 %}cov-alerte{% else %}cov-ok{% endif %}">
+          {{ d.couverture }} j
+        </span>
+        {% else %}<span style="color:var(--st-muted);">—</span>{% endif %}
+      </td>
+      <td style="text-align:right;color:var(--st-muted);">{{ d.produit.stock_minimum|floatformat:0 }}</td>
+      <td style="text-align:right;color:var(--st-muted);">{{ d.produit.point_commande|floatformat:0 }}</td>
+      <td style="text-align:center;">
+        {% if d.qte_cmd > 0 %}
+        <span class="qte-cmd">{{ d.qte_cmd }}</span>
+        {% else %}
+        <span style="color:var(--st-600);font-size:11px;"><i class="bi bi-check-circle-fill"></i></span>
+        {% endif %}
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="9" style="text-align:center;padding:40px;color:var(--st-muted);">Aucun produit</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div style="margin-top:10px;font-size:11px;color:var(--st-muted);padding:0 4px;">
+  <i class="bi bi-info-circle"></i>
+  <strong>CMM</strong> = Consommation Mensuelle Moyenne (3 derniers mois) ·
+  <strong>Couverture</strong> = Stock actuel ÷ (CMM/30) ·
+  <strong>Point de commande</strong> = CMM + Stock sécurité ·
+  <strong>Qté à commander</strong> = (CMM × 3) - Stock actuel + Stock sécurité
+</div>
+{% endblock %}

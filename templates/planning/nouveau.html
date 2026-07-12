@@ -1,0 +1,60 @@
+{% extends 'planning/base.html' %}
+{% load i18n %}
+
+{% block extra_planning_css %}
+.pl-card-wrap {
+  display: flex; justify-content: center; align-items: flex-start;
+  padding: 40px 16px;
+}
+.pl-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 36px 40px; width: 100%; max-width: 480px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+}
+.pl-card h2 {
+  font-size: 20px; font-weight: 700; color: var(--text);
+  margin: 0 0 6px 0;
+}
+.pl-card .subtitle {
+  font-size: 13px; color: var(--text-muted); margin-bottom: 28px;
+}
+.back-link {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 13px; color: var(--text-muted); text-decoration: none;
+  margin-top: 18px;
+}
+.back-link:hover { color: var(--text); }
+{% endblock %}
+
+{% block content %}
+<div class="pl-card-wrap">
+  <div class="pl-card">
+    <h2><i class="bi bi-calendar-plus" style="color:var(--pl-600);margin-right:8px;"></i>Nouveau planning hebdomadaire</h2>
+    <p class="subtitle">Sélectionnez la semaine de début pour créer ou ouvrir le planning correspondant.</p>
+
+    <form method="post">
+      {% csrf_token %}
+      <div class="form-field">
+        <label class="field-label" for="semaine_debut">Semaine du (lundi)</label>
+        <input type="date" id="semaine_debut" name="semaine_debut"
+               class="field-ul" value="{{ default_date }}" required>
+      </div>
+      <div class="form-field">
+        <label class="field-label" for="signataire">Signataire <span class="f-hint" style="text-transform:none;letter-spacing:0;display:inline;">(optionnel)</span></label>
+        <input type="text" id="signataire" name="signataire"
+               class="field-ul"
+               value="{{ default_signataire }}"
+               placeholder="Directrice Médicale Adjointe — Dr Mme X">
+      </div>
+      <button type="submit" class="btn-form-submit" style="width:100%;justify-content:center;margin-top:8px;">
+        <i class="bi bi-arrow-right-circle"></i>
+        Créer et remplir le planning
+      </button>
+    </form>
+
+    <a href="{% url 'planning_list' %}" class="back-link">
+      <i class="bi bi-arrow-left"></i> Retour à la liste
+    </a>
+  </div>
+</div>
+{% endblock %}

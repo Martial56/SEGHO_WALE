@@ -1,24 +1,31 @@
 {% extends 'soins/base.html' %}
 {% load static %}
+{% load core_tags %}
 {% block breadcrumb %}{% endblock %}
-{% block module_navbar %}{% endblock %}
 
 {% block extra_css %}
 {{ block.super }}
 <style>
-  .det-page { width:100%;padding:12px 20px 48px; }
+  .det-page { width:100%;padding:12px 20px 48px;display:flex;align-items:flex-start;gap:14px; }
+  .det-main  { flex:1;min-width:0; }
+  /* Historique (.hist-aside) : styles globaux dans base.html — le top:70px
+     par défaut (pensé pour un layout sans sous-en-tête additionnel) décale
+     l'aside sous cette page ; on le ramène à l'alignement naturel avec
+     .det-main (tous deux enfants flex de .det-page). */
+  .hist-aside { top: 0 !important; }
+  @media(max-width:900px){ .det-page{flex-direction:column;} }
 
   .det-header { background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:10px; }
 
   .det-btn {
     padding:5px 13px;border-radius:4px;font-size:12px;font-weight:600;
-    font-family:'Roboto',sans-serif;cursor:pointer;text-decoration:none;
+    font-family: var(--font-roboto);cursor:pointer;text-decoration:none;
     display:inline-flex;align-items:center;gap:5px;transition:all .15s;border:none;
   }
   .det-btn-edit    { background:var(--accent);color:#fff; }
   .det-btn-edit:hover { filter:brightness(1.1); }
-  .det-btn-invoice { background:#16a34a;color:#fff; }
-  .det-btn-invoice:hover { background:#15803d; }
+  .det-btn-invoice { background:var(--primary);color:#fff; }
+  .det-btn-invoice:hover { background:var(--primary-dark); }
 
   /* Stepper dans la page détail */
   .det-status-bar {
@@ -37,7 +44,7 @@
   .proc-step {
     display: flex; flex-direction: column; align-items: center; gap: 5px;
     background: none; border: none; padding: 0 2px;
-    font-family: 'Roboto', sans-serif; cursor: default;
+    font-family: var(--font-roboto); cursor: default;
     min-width: 60px;
   }
   .proc-step-node {
@@ -53,18 +60,18 @@
     flex: 0 1 44px; min-width: 18px; height: 2px;
     background: var(--border); margin-top: 13px;
   }
-  .connector-done { background: #16a34a; }
-  .step-node-done   { background: #16a34a; color: #fff; }
+  .connector-done { background: var(--primary); }
+  .step-node-done   { background: var(--primary); color: #fff; }
   .step-node-active { background: var(--accent); color: #fff; box-shadow: 0 0 0 3px rgba(var(--accent-rgb),.18); }
   .step-node-next   { background: var(--bg); color: var(--accent); border: 2px dashed var(--accent); }
   .step-node-future { background: var(--bg); color: #9ca3af; border: 2px solid var(--border); }
-  .step-node-done-green { background: #16a34a; color: #fff; box-shadow: 0 0 0 3px rgba(22,163,74,.18); }
+  .step-node-done-green { background: var(--primary); color: #fff; box-shadow: 0 0 0 3px rgba(var(--teal-600-rgb),.18); }
   .step-node-cancelled  { background: #f3f4f6; color: #9ca3af; border: 2px solid #e5e7eb; }
-  .step-done .proc-step-label   { color: #16a34a; }
+  .step-done .proc-step-label   { color: var(--primary); }
   .step-active .proc-step-label { color: var(--accent); font-weight: 700; }
   .step-future .proc-step-label { color: #9ca3af; }
   .step-cancelled .proc-step-label { color: #9ca3af; }
-  .step-active-termine .proc-step-label { color: #16a34a; font-weight: 700; }
+  .step-active-termine .proc-step-label { color: var(--primary); font-weight: 700; }
   .proc-annule-badge {
     display: inline-flex; align-items: center; gap: 5px;
     padding: 3px 10px; background: #fef2f2; color: #dc2626;
@@ -73,8 +80,8 @@
   }
   /* Boutons détail supplémentaires */
   .det-action-btns { display:flex;align-items:center;gap:7px;flex-wrap:wrap; }
-  .det-btn-termine-ok   { background: #16a34a; color: #fff; }
-  .det-btn-termine-ok:hover { background: #15803d; }
+  .det-btn-termine-ok   { background: var(--primary); color: #fff; }
+  .det-btn-termine-ok:hover { background: var(--primary-dark); }
   .det-btn-termine-warn { background: #d97706; color: #fff; }
   .det-btn-termine-warn:hover { background: #b45309; }
   .det-btn-cancel { background: none; border: 1.5px solid var(--border); color: var(--text-muted); }
@@ -88,7 +95,7 @@
   .det-identity { display:flex;align-items:flex-start;gap:24px;padding:18px 22px; }
   .det-num-badge {
     background:var(--accent);color:#fff;border-radius:8px;
-    padding:10px 18px;font-family:monospace;font-size:16px;font-weight:700;
+    padding:10px 18px;font-family: var(--font-mono);font-size:16px;font-weight:700;
     white-space:nowrap;flex-shrink:0;
   }
   .det-main-info { flex:1;min-width:0; }
@@ -109,12 +116,11 @@
 {% endblock %}
 
 {% block content %}
+<div class="hist-wrapper"><div class="hist-main">
 <div id="page-wrap">
 
-{% include 'soins/includes/nav.html' %}
-
 <!-- ══ SUBHEADER ══ -->
-<div class="o-subheader" id="subheader">
+<div class="o-subheader" data-fixed="1" id="subheader">
   <div class="o-subheader-row">
     <a href="{% url 'soins:procedure_list' %}" class="o-ctrl-btn" style="padding:3px 7px;">
       <i class="bi bi-arrow-left"></i>
@@ -128,6 +134,7 @@
 </div>
 
 <div class="det-page">
+<div class="det-main">
 
   <!-- ══ CARTE HEADER ══ -->
   <div class="det-header">
@@ -214,7 +221,7 @@
           </form>
         {% endif %}
 
-        {% if request.user.is_staff %}
+        {% if request.user.is_staff and not proc.facture %}
         <a href="{% url 'soins:procedure_facturer' proc.pk %}" class="det-btn det-btn-invoice" style="text-decoration:none;">
           <i class="bi bi-receipt"></i> Facturer <small style="opacity:.6;font-size:9px;">(ad)</small>
         </a>
@@ -228,13 +235,12 @@
       <div class="det-num-badge">{{ proc.numero }}</div>
       <div class="det-main-info">
         <div class="det-main-name">{{ proc.patient.nom }} {{ proc.patient.prenoms }}</div>
-        <div class="det-main-sub">
-          {{ proc.patient.code_patient }}
-          {% if proc.soin_type %}
-          &nbsp;·&nbsp; <strong>{{ proc.soin_type.nom }}</strong>
-          {% endif %}
-          &nbsp;·&nbsp; {{ proc.date|date:"d/m/Y H:i" }}
-        </div>
+        <div class="det-main-sub">{{ proc.patient.code_patient }}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:3px;">Enregistré le</div>
+        <div style="font-size:13px;font-weight:600;color:var(--text);">{{ proc.date_creation|date:"d/m/Y" }}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:1px;">{{ proc.date_creation|date:"H:i" }}</div>
       </div>
     </div>
 
@@ -266,6 +272,7 @@
           </div>
         </div>
 
+        {% comment %}
         <div>
           <div class="det-field-label">Département</div>
           <div class="det-field-value">
@@ -282,13 +289,13 @@
           </div>
         </div>
 
-        <div>
+        {# <div>
           <div class="det-field-label">Rendez-vous</div>
           <div class="det-field-value">
             {% if proc.rendez_vous %}{{ proc.rendez_vous }}
             {% else %}<span class="det-field-empty">—</span>{% endif %}
           </div>
-        </div>
+        </div> #}
 
         <div>
           <div class="det-field-label">Facture</div>
@@ -297,28 +304,22 @@
             {% else %}<span class="det-field-empty">—</span>{% endif %}
           </div>
         </div>
+        {% endcomment %}
 
-        <div>
-          <div class="det-field-label">Enregistré le</div>
-          <div class="det-field-value">{{ proc.date_creation|date:"d/m/Y à H:i" }}</div>
-        </div>
+        {# Enregistré le déplacé dans l'en-tête identité (coin droit) #}
 
       </div>
     </div>
 
   </div><!-- /.det-header -->
 
+</div><!-- /.det-main -->
+
+{% historique_sidebar proc %}
+
 </div><!-- /.det-page -->
 
-<script>
-(function(){
-  function adj(){
-    var tb=document.querySelector('.topbar'),wp=document.getElementById('page-wrap');
-    if(tb&&wp) wp.style.paddingTop=tb.offsetHeight+'px';
-  }
-  adj(); window.addEventListener('resize',adj);
-})();
-</script>
 
+</div>
 </div>
 {% endblock %}

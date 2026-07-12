@@ -1,0 +1,103 @@
+{% extends 'stock/base.html' %}
+{% load static %}
+{% block topbar_title %}Stock — Fiches de besoins{% endblock %}
+
+{% block extra_st_css %}<style>
+.content { padding-top: 0; }
+.st-page-head {
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  padding:12px 32px; margin:0 -32px;
+  background:#e8f2f7; border-bottom:1px solid rgba(0,0,0,.05);
+  box-shadow:0 2px 8px rgba(0,0,0,.04);
+  position:sticky; top:var(--topbar-h); z-index:100;
+}
+html[data-theme="dark"] .st-page-head { background:var(--st-surface); }
+.badge-transmis  { background:rgba(var(--st-600-rgb),.1); color:var(--st-600);  border:1px solid rgba(var(--st-600-rgb),.25); padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
+.badge-attente   { background:rgba(var(--amber-rgb),.1); color:var(--amber-text);  border:1px solid rgba(var(--amber-rgb),.25); padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
+</style>{% endblock %}
+
+{% block content %}
+<div class="st-page-head">
+  <div>
+    <div style="font-size:15px;font-weight:800;color:var(--st-900);">
+      <i class="bi bi-clipboard2-data" style="color:var(--st-600);"></i> Fiches de besoins
+    </div>
+    <div style="font-size:11.5px;color:var(--st-muted);">Besoins du dépôt central transmis aux achats</div>
+  </div>
+  <a href="{% url 'stock_fiche_create' %}" class="btn-st">
+    <i class="bi bi-plus-lg"></i> Exprimer des besoins
+  </a>
+</div>
+
+<div style="margin-top:14px;margin-left:-32px;margin-right:-32px;background:var(--st-surface);box-shadow:0 2px 12px rgba(var(--st-700-rgb),.08);overflow:hidden;">
+  {% if fiches %}
+  <table class="st-table">
+    <thead>
+      <tr>
+        <th>N° Fiche</th>
+        <th>Période</th>
+        <th style="text-align:center;">Produits</th>
+        <th>Statut</th>
+        <th>Créée par</th>
+        <th>Besoin achats</th>
+        <th style="width:80px;"></th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for fiche in fiches %}
+    {% with besoin=fiche.besoins_achats.first %}
+    <tr style="cursor:pointer;" onclick="window.location='{% url 'stock_fiche_detail' fiche.pk %}'">
+      <td style="font-family: var(--font-mono);font-size:12px;color:var(--st-600);font-weight:700;">
+        {{ fiche.numero }}
+      </td>
+      <td style="font-size:12px;">
+        <i class="bi bi-calendar3" style="color:var(--st-muted);font-size:10px;"></i>
+        du {{ fiche.periode_debut|date:"d/m/Y" }} au {{ fiche.periode_fin|date:"d/m/Y" }}
+      </td>
+      <td style="text-align:center;font-weight:700;">{{ fiche.lignes.count }}</td>
+      <td>
+        {% if fiche.statut == 'brouillon' %}
+          <span class="badge-attente"><i class="bi bi-pencil" style="font-size:9px;"></i> Non envoyée</span>
+        {% else %}
+          <span class="badge-transmis"><i class="bi bi-send-check" style="font-size:9px;"></i> Transmise</span>
+        {% endif %}
+      </td>
+      <td style="font-size:12px;color:var(--st-muted);">
+        {% if fiche.cree_par %}{{ fiche.cree_par.get_full_name|default:fiche.cree_par.username }}{% else %}—{% endif %}
+      </td>
+      <td>
+        {% if besoin %}
+          <a href="{% url 'achats:besoin_detail' besoin.pk %}" class="badge-transmis" onclick="event.stopPropagation()">
+            <i class="bi bi-send-check" style="font-size:9px;"></i> {{ besoin.numero }}
+          </a>
+        {% else %}
+          <span style="color:var(--st-muted);font-size:12px;">—</span>
+        {% endif %}
+      </td>
+      <td style="display:flex;gap:4px;align-items:center;">
+        <a href="{% url 'stock_fiche_detail' fiche.pk %}" class="btn-st-outline"
+           style="padding:3px 10px;font-size:11.5px;" onclick="event.stopPropagation()">
+          <i class="bi bi-eye"></i>
+        </a>
+        <a href="{% url 'stock_fiche_print' fiche.pk %}" class="btn-st-outline"
+           style="padding:3px 8px;font-size:11.5px;" onclick="event.stopPropagation()" title="Imprimer">
+          <i class="bi bi-printer"></i>
+        </a>
+      </td>
+    </tr>
+    {% endwith %}
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="text-align:center;padding:60px 32px;color:var(--st-muted);">
+    <i class="bi bi-clipboard2-x" style="font-size:40px;display:block;margin-bottom:14px;opacity:.35;"></i>
+    <div style="font-size:14px;font-weight:600;margin-bottom:6px;color:var(--st-text);">Aucune fiche de besoins</div>
+    <div style="font-size:12.5px;margin-bottom:18px;">Exprimez les besoins du dépôt pour les transmettre aux achats.</div>
+    <a href="{% url 'stock_fiche_create' %}" class="btn-st">
+      <i class="bi bi-plus-lg"></i> Exprimer des besoins
+    </a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

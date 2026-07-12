@@ -1,0 +1,195 @@
+{% extends 'pharmacie/base.html' %}
+{% load static %}
+
+{% block extra_ph_css %}<style>
+.ph-page-head {
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:14px 32px;
+  background:var(--ph-surface);border-bottom:1px solid var(--ph-border);
+  position:sticky;top:0;z-index:100;flex-wrap:wrap;
+}
+.ret-layout { display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;padding:0 32px; }
+@media (max-width:960px) { .ret-layout { grid-template-columns:1fr; } }
+.ret-layout .ph-card { border:1px solid var(--ph-border); border-radius:14px; overflow:hidden; }
+.ret-layout .ph-card-header { border-radius:14px 14px 0 0; }
+.ret-summary { display:grid;grid-template-columns:repeat(2,minmax(120px,1fr));gap:12px;margin-bottom:18px; }
+.ret-stat {
+  display:flex;align-items:center;gap:12px;
+  padding:14px 16px;background:var(--ph-50);border:1px solid var(--ph-border);
+  border-radius:14px;font-size:13px;color:var(--ph-text);
+}
+.ret-stat i { font-size:18px;color:var(--ph-600); }
+.ph-note-box { margin-bottom:20px;padding:14px 16px;border-radius:12px;font-size:13px;line-height:1.5; }
+.ph-note-box.error { background:rgba(var(--rose-rgb),.1);color:var(--rose-text);border:1px solid rgba(var(--rose-rgb),.2); }
+.ph-note-box.success { background:rgba(var(--ph-600-rgb),.1);color:var(--ph-600);border:1px solid rgba(var(--ph-600-rgb),.2); }
+.ph-input {
+  border:none;
+  border-bottom:1.5px solid rgba(0,0,0,.18);
+  border-radius:0;
+  background:transparent;
+  padding:8px 4px;
+  transition:border-color .15s;
+}
+.ph-input:focus {
+  outline:none;
+  border-bottom-color:var(--ph-500);
+}
+.ret-select {
+  border:none;
+  border-bottom:1.5px solid rgba(0,0,0,.15);
+  border-radius:0;
+  background:transparent;
+  padding:8px 4px;font-size:13px;width:100%;font-family:inherit;
+  color:var(--ph-text);transition:border-color .15s;cursor:pointer;
+  appearance:none;
+}
+.ret-select:focus {
+  outline:none;
+  border-bottom-color:var(--ph-500);
+}
+.hist-table-wrap {overflow-x:auto; }
+.hist-table { width:100%;border-collapse:collapse;font-size:12.5px; }
+.hist-table thead tr { background:var(--ph-100);border-bottom:2px solid var(--ph-300); }
+.hist-table thead th { padding:10px 14px;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--ph-800); }
+.hist-table tbody tr { border-bottom:1px solid var(--ph-border);transition:background .12s; }
+.hist-table tbody tr:hover { background:var(--ph-50); }
+.hist-table tbody td { padding:12px 14px;color:var(--ph-text);vertical-align:middle; }
+@media (max-width:720px) {
+  .hist-table thead th, .hist-table tbody td { padding:10px 8px; }
+}
+</style>{% endblock %}
+
+{% block content %}
+{% if messages %}
+  {% for msg in messages %}
+    <div class="ph-note-box {% if msg.tags == 'error' %}error{% else %}success{% endif %}">
+      {{ msg }}
+    </div>
+  {% endfor %}
+{% endif %}
+
+<div class="ph-page-head">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <div style="width:38px;height:38px;border-radius:10px;background:var(--ph-100);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--ph-600);">
+      <i class="bi bi-arrow-return-left"></i>
+    </div>
+    <div>
+      <div style="font-size:16px;font-weight:800;color:var(--ph-text);">Retours de produits — {{ label }}</div>
+      <div style="font-size:12px;color:var(--ph-muted);margin-top:2px;">Enregistrer un retour au stock de la pharmacie</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+    <span class="badge-ph-ok">{{ stock_items|length }} produits</span>
+    <span class="badge-ph-emise">{{ historique|length }} retours</span>
+  </div>
+</div>
+
+<div class="ret-layout">
+  <div class="ph-card">
+    <div class="ph-card-header">
+      <div class="ph-card-title"><i class="bi bi-arrow-return-left" style="color:var(--ph-600);"></i> Enregistrer un retour</div>
+    </div>
+    <div class="ph-card-body">
+      <div class="ret-summary">
+        <div class="ret-stat">
+          <i class="bi bi-box-seam"></i>
+          <div>
+            <div style="font-weight:700;">{{ stock_items|length }} articles</div>
+            <div style="font-size:12px;color:var(--ph-muted);">en stock</div>
+          </div>
+        </div>
+        <div class="ret-stat">
+          <i class="bi bi-clock-history"></i>
+          <div>
+            <div style="font-weight:700;">{{ historique|length }} retours</div>
+            <div style="font-size:12px;color:var(--ph-muted);">dernier en haut</div>
+          </div>
+        </div>
+      </div>
+
+      <form method="post" novalidate>
+        {% csrf_token %}
+        <div class="form-field">
+          <label class="field-label">Produit</label>
+          <select name="produit_id" class="field-ul" required>
+            <option value="" disabled selected>— Sélectionner un produit —</option>
+            {% for item in stock_items %}
+              <option value="{{ item.produit.pk }}">{{ item.produit.nom }}{% if item.produit.unite_mesure %} ({{ item.produit.unite_mesure.nom }}){% endif %} — stock actuel : {{ item.quantite|floatformat:0 }}</option>
+            {% empty %}
+              <option value="" disabled>Aucun produit dans le stock</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-field">
+          <label class="field-label">Quantité à retourner</label>
+          <input type="number" name="quantite" class="field-ul" min="1" step="1" placeholder="Ex : 5" required>
+        </div>
+        <div class="form-field">
+          <label class="field-label">Motif du retour</label>
+          <input type="text" name="motif" class="field-ul" placeholder="Ex : périmé, erreur de commande, surplus…">
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn-form-submit"><i class="bi bi-check2-circle"></i> Enregistrer le retour</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="ph-card">
+    <div class="ph-card-header">
+      <div class="ph-card-title"><i class="bi bi-clock-history" style="color:var(--ph-600);"></i> Historique des retours</div>
+    </div>
+    <div class="ph-card-body" style="padding-bottom:0;">
+      <form method="get" style="display:grid;grid-template-columns:1fr 1fr auto;gap:12px;align-items:end;">
+        <div class="ph-field" style="margin-bottom:0;">
+          <label class="ph-label">Recherche</label>
+          <input type="search" name="q" class="ph-input" placeholder="Produit, motif..." value="{{ request.GET.q|default:'' }}">
+        </div>
+        <div class="ph-field" style="margin-bottom:0;">
+          <label class="ph-label">Période</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <input type="date" name="start_date" class="ph-input" value="{{ request.GET.start_date|default:'' }}">
+            <input type="date" name="end_date" class="ph-input" value="{{ request.GET.end_date|default:'' }}">
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+          <button type="submit" class="btn-ph" style="height:42px;">Filtrer</button>
+          <a href="{% url 'pharmacie_retours' pharmacie %}" class="btn-ph-outline" style="height:42px;display:inline-flex;align-items:center;">Réinitialiser</a>
+        </div>
+      </form>
+    </div>
+    {% if historique %}
+      <div class="hist-table-wrap">
+        <table class="hist-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Produit</th>
+              <th style="text-align:center;">Qté</th>
+              <th>Motif</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for mvt in historique %}
+              <tr>
+                <td style="white-space:nowrap;font-size:11.5px;">
+                  <div style="font-weight:600;">{{ mvt.date|date:"d/m/Y" }}</div>
+                  <div style="color:var(--ph-muted);">{{ mvt.date|date:"H:i" }}</div>
+                </td>
+                <td style="font-weight:600;">{{ mvt.produit.nom }}</td>
+                <td style="text-align:center;"><span class="badge-ph-emise">+{{ mvt.quantite|floatformat:0 }}</span></td>
+                <td style="font-size:12px;color:var(--ph-muted);">{{ mvt.reference|default:"—" }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="ph-card-body" style="text-align:center;padding:32px;color:var(--ph-muted);">
+        <i class="bi bi-inbox" style="font-size:24px;display:block;margin-bottom:8px;color:var(--ph-200);"></i>
+        Aucun retour enregistré.
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

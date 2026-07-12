@@ -1,0 +1,63 @@
+{% extends 'achats/base.html' %}
+{% load i18n %}
+
+{% block title %}Créer la commande — {{ proforma.numero }}{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+
+<div class="action-bar">
+  <div class="action-bar-breadcrumb">
+    <a href="{% url 'achats:proforma_detail' proforma.pk %}" class="btn-form-cancel" style="padding:3px 7px;">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <a href="{% url 'achats:proforma_detail' proforma.pk %}">Proforma {{ proforma.numero }}</a>
+    <span class="sep">/</span>
+    <span class="current">Créer la commande</span>
+  </div>
+</div>
+
+<!-- Résumé proforma -->
+<div class="cmd-proforma-summary" style="background:#f0f5fa;border:1px solid rgba(0,128,80,.2);border-radius:8px;padding:14px 16px;margin-bottom:16px;max-width:600px;font-size:13px;">
+  <strong style="color:var(--teal-800);">Proforma {{ proforma.numero }}</strong> — Validé
+  <table style="width:100%;border-collapse:collapse;margin-top:10px;">
+    <tr><td class="cmd-ps-label" style="padding:5px 8px;border-bottom:1px solid rgba(0,0,0,.06);font-weight:600;color:rgba(0,0,0,.5);font-size:11px;text-transform:uppercase;">Fournisseur</td><td class="cmd-ps-val" style="padding:5px 8px;border-bottom:1px solid rgba(0,0,0,.06);">{{ proforma.fournisseur.nom }}</td></tr>
+    <tr><td class="cmd-ps-label" style="padding:5px 8px;border-bottom:1px solid rgba(0,0,0,.06);font-weight:600;color:rgba(0,0,0,.5);font-size:11px;text-transform:uppercase;">Montant</td><td style="padding:5px 8px;border-bottom:1px solid rgba(0,0,0,.06);font-weight:700;color:var(--teal-700);">{{ proforma.montant_total|floatformat:0 }} FCFA</td></tr>
+    <tr><td class="cmd-ps-label" style="padding:5px 8px;font-weight:600;color:rgba(0,0,0,.5);font-size:11px;text-transform:uppercase;">Besoin</td><td class="cmd-ps-val" style="padding:5px 8px;">{{ proforma.besoin.numero }} — {{ proforma.besoin.titre }}</td></tr>
+  </table>
+</div>
+<style>
+html[data-theme="dark"] .cmd-proforma-summary { background:var(--surface-muted); border-color:var(--border); color:var(--text); }
+html[data-theme="dark"] .cmd-proforma-summary strong { color:var(--text-strong,#eef3f8); }
+html[data-theme="dark"] .cmd-proforma-summary td { border-bottom-color:var(--border)!important; }
+html[data-theme="dark"] .cmd-ps-label { color:var(--text-faint)!important; }
+html[data-theme="dark"] .cmd-ps-val { color:var(--text); }
+</style>
+
+<form method="post">
+  {% csrf_token %}
+  <div class="form-simple-card" style="max-width:600px;">
+    <div class="tab-two-col">
+      <div class="form-field">
+        <label class="field-label">Date de commande <span class="required-star">*</span></label>
+        <input type="date" name="date_commande" class="field-ul" required>
+      </div>
+      <div class="form-field">
+        <label class="field-label">Date de livraison prévue</label>
+        <input type="date" name="date_livraison_prevue" class="field-ul">
+      </div>
+    </div>
+    <div class="form-field">
+      <label class="field-label">Notes</label>
+      <textarea name="notes" class="field-ul" placeholder="Instructions particulières, références, etc."></textarea>
+    </div>
+
+    <div class="form-actions">
+      <a href="{% url 'achats:proforma_detail' proforma.pk %}" class="btn-form-cancel">Annuler</a>
+      <button type="submit" class="btn-form-submit">
+        <i class="bi bi-bag-plus"></i> Générer la commande
+      </button>
+    </div>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,149 @@
+{% extends 'conges/base.html' %}
+{% load static %}
+
+{% block topbar_title %}Dépassement de congé — {{ conge.employe.nom_complet }}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+.abs-warn-title { font-weight:700; font-size:14px; color:var(--rose-btn); margin-bottom:4px; }
+html[data-theme="dark"] .abs-warn-title { color:#f09090; }
+.abs-warn-text  { font-size:13px; color:rgba(0,0,0,.6); }
+html[data-theme="dark"] .abs-warn-text  { color:var(--cg-muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="cg-form-head" id="subheader">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <a href="{% url 'conge_detail' conge.pk %}" class="cg-back-btn"><i class="bi bi-arrow-left"></i></a>
+    <div>
+      <h1 style="font-size:18px;font-weight:800;color:var(--cg-text);margin:0;">
+        <i class="bi bi-exclamation-triangle" style="color:var(--rose);"></i> Dépassement de congé
+      </h1>
+      <div style="font-size:12px;color:var(--cg-muted);">{{ conge.employe.nom_complet }} · {{ conge.get_type_conge_display }}</div>
+    </div>
+  </div>
+</div>
+
+<div style="max-width:620px;margin:28px auto 0;">
+
+  <!-- Alerte dépassement -->
+  <div style="background:rgba(var(--rose-rgb),.08);border:1.5px solid rgba(var(--rose-rgb),.25);border-radius:10px;
+              padding:16px 20px;margin-bottom:24px;display:flex;gap:14px;align-items:flex-start;">
+    <i class="bi bi-exclamation-triangle-fill" style="color:var(--rose);font-size:22px;flex-shrink:0;margin-top:2px;"></i>
+    <div>
+      <div class="abs-warn-title">
+        Dépassement de {{ jours_depasses }} jour{{ jours_depasses|pluralize }} ouvré{{ jours_depasses|pluralize }}
+      </div>
+      <div class="abs-warn-text">
+        Le congé de <strong>{{ conge.employe.nom_complet }}</strong> devait se terminer
+        le <strong>{{ conge.date_fin|date:"d/m/Y" }}</strong>.
+        Le retour prévu était le <strong>{{ date_retour_prevue|date:"d/m/Y" }}</strong>.
+        Nous sommes le <strong>{{ today|date:"d/m/Y" }}</strong>.
+      </div>
+    </div>
+  </div>
+
+  <!-- Détail congé -->
+  <div class="cg-card" style="margin-bottom:20px;">
+    <div class="cg-card-header">
+      <div class="cg-card-title"><i class="bi bi-calendar-x"></i> Congé concerné</div>
+      <span class="cg-badge cg-b-en_cours">En cours</span>
+    </div>
+    <div class="cg-card-body" style="display:flex;gap:24px;flex-wrap:wrap;padding:14px 20px;">
+      <div><div class="cg-label">Début</div><div style="font-size:14px;font-weight:700;">{{ conge.date_debut|date:"d/m/Y" }}</div></div>
+      <div><div class="cg-label">Fin prévue</div><div style="font-size:14px;font-weight:700;color:var(--rose);">{{ conge.date_fin|date:"d/m/Y" }}</div></div>
+      <div><div class="cg-label">Jours prévus</div><div style="font-size:14px;font-weight:700;">{{ conge.nb_jours_ouvres }} j</div></div>
+      <div><div class="cg-label">Jours dépassés</div><div style="font-size:14px;font-weight:700;color:var(--rose);">+{{ jours_depasses }} j</div></div>
+    </div>
+  </div>
+
+  <!-- Formulaire traitement -->
+  <form method="post">
+    {% csrf_token %}
+    <div class="cg-card">
+      <div class="cg-card-header">
+        <div class="cg-card-title"><i class="bi bi-sliders"></i> Traitement des jours dépassés</div>
+      </div>
+      <div class="cg-card-body" style="padding:20px;">
+
+        <!-- Choix du traitement -->
+        <div style="margin-bottom:20px;">
+          <label class="cg-label">Traitement *</label>
+          <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px;">
+
+            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;
+                          padding:12px 14px;border:1.5px solid var(--cg-200);border-radius:8px;
+                          transition:border-color .15s;"
+                   onmouseover="this.style.borderColor='var(--cg-400)'"
+                   onmouseout="this.style.borderColor='var(--cg-200)'"
+                   id="lbl-injustifiee">
+              <input type="radio" name="action" value="injustifiee" checked
+                     onchange="document.getElementById('lbl-injustifiee').style.borderColor='var(--cg-600)';
+                               document.getElementById('lbl-sans-solde').style.borderColor='var(--cg-200)';"
+                     style="margin-top:3px;accent-color:var(--cg-600);">
+              <div>
+                <div style="font-weight:700;font-size:13px;color:var(--cg-text);">
+                  <i class="bi bi-x-circle-fill" style="color:var(--rose);"></i> Absence non justifiée
+                </div>
+                <div style="font-size:12px;color:var(--cg-muted);margin-top:2px;">
+                  Les jours dépassés sont consignés comme absences non justifiées.
+                  Aucune déduction supplémentaire de solde.
+                </div>
+              </div>
+            </label>
+
+            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;
+                          padding:12px 14px;border:1.5px solid var(--cg-200);border-radius:8px;
+                          transition:border-color .15s;"
+                   onmouseover="this.style.borderColor='var(--cg-400)'"
+                   onmouseout="this.style.borderColor='var(--cg-200)'"
+                   id="lbl-sans-solde">
+              <input type="radio" name="action" value="sans_solde"
+                     onchange="document.getElementById('lbl-sans-solde').style.borderColor='var(--cg-600)';
+                               document.getElementById('lbl-injustifiee').style.borderColor='var(--cg-200)';"
+                     style="margin-top:3px;accent-color:var(--cg-600);">
+              <div>
+                <div style="font-weight:700;font-size:13px;color:var(--cg-text);">
+                  <i class="bi bi-calendar-minus" style="color:var(--amber);"></i> Congé sans solde
+                </div>
+                <div style="font-size:12px;color:var(--cg-muted);margin-top:2px;">
+                  Un congé sans solde est créé automatiquement pour les {{ jours_depasses }} jour{{ jours_depasses|pluralize }} dépassé{{ jours_depasses|pluralize }}.
+                  Consigné dans l'historique.
+                </div>
+              </div>
+            </label>
+
+          </div>
+        </div>
+
+        <!-- Observation -->
+        <div class="form-field">
+          <label class="field-label" for="motif">Observation / remarque</label>
+          <textarea id="motif" name="motif" rows="3"
+                    class="field-ul"
+                    placeholder="Motif invoqué par l'employé, circonstances…"></textarea>
+        </div>
+
+        <div style="background:var(--cg-50);border-radius:8px;padding:11px 14px;
+                    font-size:12px;color:var(--cg-muted);margin-bottom:20px;">
+          <i class="bi bi-info-circle"></i>
+          Dans les deux cas, les jours dépassés seront marqués comme absents dans le module de présence
+          et le congé sera automatiquement clôturé.
+        </div>
+
+        <div class="form-actions">
+          <a href="{% url 'conge_detail' conge.pk %}" class="btn-form-cancel">Annuler</a>
+          <button type="submit" class="btn-form-submit" style="background:var(--rose);"
+                  onclick="return confirm('Confirmer le traitement du dépassement de {{ jours_depasses }} jour(s) ?')">
+            <i class="bi bi-check-lg"></i> Confirmer
+          </button>
+        </div>
+      </div>
+    </div>
+  </form>
+
+</div>
+{% endblock %}

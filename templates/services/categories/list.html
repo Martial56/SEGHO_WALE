@@ -1,6 +1,5 @@
 {% extends 'services/base.html' %}
 
-{% block module_navbar %}{% endblock %}
 {% block breadcrumb %}{% endblock %}
 
 {% block extra_css %}
@@ -94,7 +93,7 @@
   }
 
   .o-card-code {
-    font-family: monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     font-weight: 700;
     color: var(--accent);
@@ -148,7 +147,7 @@
   /* ── BADGES ── */
   .badge-code {
     display: inline-block;
-    font-family: monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     background: rgba(33, 136, 171, 0.08);
     color: var(--primary);
@@ -229,139 +228,6 @@
     color: var(--text);
   }
 
-  /* ── BULK BAR ── */
-  .bulk-bar {
-    display: none;
-    align-items: center;
-    gap: 12px;
-    background: #fff3cd;
-    border: 1px solid #ffc107;
-    padding: 8px 16px;
-    font-size: 13px;
-    font-weight: 600;
-    color: #856404;
-  }
-
-  .bulk-bar.visible {
-    display: flex;
-  }
-
-  .btn-bulk-delete {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 5px 12px;
-    background: #dc2626;
-    color: #fff;
-    border: none;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: 700;
-    cursor: pointer;
-  }
-
-  .btn-bulk-delete:hover {
-    background: #b91c1c;
-  }
-
-  .btn-bulk-cancel {
-    padding: 5px 10px;
-    background: transparent;
-    border: 1px solid rgba(0, 0, 0, .15);
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    color: #856404;
-  }
-
-  html[data-theme="dark"] .bulk-bar {
-    background: rgba(255, 193, 7, .1);
-    border-color: rgba(255, 193, 7, .3);
-    color: #fbbf24;
-  }
-
-  html[data-theme="dark"] .btn-bulk-cancel {
-    border-color: rgba(255, 255, 255, .15);
-    color: #fbbf24;
-  }
-
-  /* ── MODAL ── */
-  .modal-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.4);
-    z-index: 9000;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .modal-overlay.open {
-    display: flex;
-  }
-
-  .modal-box {
-    background: var(--surface);
-    border-radius: 8px;
-    padding: 28px;
-    max-width: 400px;
-    width: 90%;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
-    text-align: center;
-  }
-
-  .modal-icon {
-    font-size: 36px;
-    margin-bottom: 10px;
-  }
-
-  .modal-title {
-    font-size: 16px;
-    font-weight: 700;
-    color: var(--text);
-    margin-bottom: 8px;
-  }
-
-  .modal-msg {
-    font-size: 13px;
-    color: var(--text-muted);
-    margin-bottom: 20px;
-    line-height: 1.5;
-  }
-
-  .modal-actions {
-    display: flex;
-    gap: 10px;
-    justify-content: center;
-  }
-
-  .btn-modal-cancel {
-    padding: 8px 20px;
-    border-radius: 4px;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--text-muted);
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-
-  .btn-modal-confirm {
-    padding: 8px 20px;
-    border-radius: 4px;
-    border: none;
-    background: #dc2626;
-    color: #fff;
-    font-size: 13px;
-    font-weight: 700;
-    cursor: pointer;
-  }
-
-  .btn-modal-confirm:hover {
-    background: #b91c1c;
-  }
-
   @media (max-width:1000px) {
     .o-kanban {
       grid-template-columns: repeat(3, 1fr);
@@ -379,13 +245,14 @@
       grid-template-columns: 1fr;
     }
   }
+
+  {% include 'services/includes/io_styles.html' %}
 </style>
 {% endblock %}
 
 {% block content %}
 <div id="page-wrap">
 
-  {% include 'services/includes/nav.html' %}
 
   <!-- ══ SUBHEADER ══ -->
   <div class="o-subheader" id="subheader">
@@ -405,6 +272,21 @@
       <a href="{% url 'services:categorie_create' %}" class="o-btn-create">
         <i class="bi bi-plus-lg"></i> Créer
       </a>
+      <div class="io-page-wrap" id="io-page-wrap">
+        <button type="button" class="o-ctrl-btn io-toggle-btn" onclick="toggleIOPage(event)">
+          <i class="bi bi-arrow-left-right"></i> Export / Import
+          <i class="bi bi-chevron-down" style="font-size:9px;margin-left:2px;"></i>
+        </button>
+        <div class="io-page-menu" id="io-page-menu">
+          <div class="io-pm-section">Exporter les catégories</div>
+          <a class="io-pm-item" href="{% url 'services:export_categories' %}?format=json"><i class="bi bi-filetype-json" style="color:#c97a00;"></i> JSON</a>
+          <a class="io-pm-item" href="{% url 'services:export_categories' %}?format=csv"><i class="bi bi-filetype-csv" style="color:#1a7a4a;"></i> CSV</a>
+          <a class="io-pm-item" href="{% url 'services:export_categories' %}?format=xlsx"><i class="bi bi-file-earmark-excel" style="color:#217346;"></i> Excel</a>
+          <div class="io-pm-sep"></div>
+          <div class="io-pm-section">Importer</div>
+          <button type="button" class="io-pm-item" onclick="openImportModal()"><i class="bi bi-upload" style="color:var(--teal-500);"></i> Importer un fichier…</button>
+        </div>
+      </div>
       {% if q %}
       <a href="{% url 'services:categories' %}" class="o-ctrl-btn"><i class="bi bi-x"></i> Effacer</a>
       <span class="o-filter-tag">{{ q }} <a href="{% url 'services:categories' %}?vue={{ vue }}">×</a></span>
@@ -422,16 +304,6 @@
         </button>
       </div>
     </div>
-  </div>
-
-  <!-- ══ BARRE SÉLECTION BULK ══ -->
-  <div class="bulk-bar" id="bulk-bar">
-    <i class="bi bi-check2-square"></i>
-    <span id="bulk-count">0</span> élément(s) sélectionné(s)
-    <button type="button" class="btn-bulk-delete" onclick="openBulkModal()">
-      <i class="bi bi-trash"></i> Supprimer
-    </button>
-    <button type="button" class="btn-bulk-cancel" onclick="clearSelection()">Annuler</button>
   </div>
 
   <div id="list-result">
@@ -456,10 +328,6 @@
     <table class="o-list-table">
       <thead>
         <tr>
-          <th style="width:36px;padding:8px 8px 8px 14px;">
-            <input type="checkbox" id="select-all"
-              style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent);" onchange="toggleAll(this)">
-          </th>
           <th class="col-code sortable" data-col-idx="1"><span class="col-label">Code</span><span
               class="sort-icon"></span>
             <div class="col-resizer"></div>
@@ -490,11 +358,7 @@
       </thead>
       <tbody>
         {% for cat in page_obj %}
-        <tr onclick="if(event.target.type!=='checkbox'){window.location='{% url 'services:categorie_detail' cat.pk %}'}">
-          <td style="padding:9px 8px 9px 14px;" onclick="event.stopPropagation()">
-            <input type="checkbox" class="row-check" value="{{ cat.pk }}"
-              style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent);" onchange="onCheckChange()">
-          </td>
+        <tr onclick="window.location='{% url 'services:categorie_detail' cat.pk %}'">
           <td class="col-code"><span class="badge-code">{{ cat.code }}</span></td>
           <td class="col-nom" style="font-weight:500;">{{ cat.nom }}</td>
           <td class="col-desc" style="font-size:12px;color:var(--text-muted);">{{ cat.description|default:"—"|truncatechars:60 }}</td>
@@ -533,28 +397,9 @@
   {% endif %}
   </div><!-- /.list-result -->
 
-  <!-- ══ MODAL SUPPRESSION ══ -->
-  <div class="modal-overlay" id="bulk-delete-modal">
-    <div class="modal-box">
-      <div class="modal-icon">🗑️</div>
-      <div class="modal-title">Confirmer la suppression</div>
-      <div class="modal-msg">Vous allez supprimer <strong id="modal-count">0</strong> catégorie(s).<br>
-        <span style="font-size:12px;color:var(--text-muted);">Les services liés perdront leur catégorie.</span>
-      </div>
-      <div class="modal-actions">
-        <button type="button" class="btn-modal-cancel" onclick="closeBulkModal()">Annuler</button>
-        <button type="button" class="btn-modal-confirm" onclick="executeBulkDelete()">Supprimer</button>
-      </div>
-    </div>
-  </div>
-
-
 </div><!-- /#page-wrap -->
 
 <script>
-  const BULK_URL = "{% url 'services:categorie_bulk_delete' %}";
-  const CSRF_TOKEN = "{{ csrf_token }}";
-
   function setVue(v) {
     document.getElementById('vue-input').value = v;
     window.liveLoad();
@@ -570,48 +415,47 @@
       timer = setTimeout(window.liveLoad, 350);
     });
   })();
-
-  /* ── Sélection ── */
-  function onCheckChange() {
-    var count = document.querySelectorAll('.row-check:checked').length;
-    document.getElementById('bulk-count').textContent = count;
-    document.getElementById('bulk-bar').classList.toggle('visible', count > 0);
-    var all = document.getElementById('select-all');
-    if (all) {
-      var total = document.querySelectorAll('.row-check').length;
-      all.indeterminate = count > 0 && count < total;
-      all.checked = count === total && total > 0;
-    }
-  }
-  function toggleAll(master) {
-    document.querySelectorAll('.row-check').forEach(function (cb) { cb.checked = master.checked; });
-    onCheckChange();
-  }
-  function clearSelection() {
-    document.querySelectorAll('.row-check, #select-all').forEach(function (cb) { cb.checked = false; });
-    onCheckChange();
-  }
-
-  /* ── Bulk delete ── */
-  function openBulkModal() {
-    document.getElementById('modal-count').textContent = document.querySelectorAll('.row-check:checked').length;
-    document.getElementById('bulk-delete-modal').classList.add('open');
-  }
-  function closeBulkModal() { document.getElementById('bulk-delete-modal').classList.remove('open'); }
-  function executeBulkDelete() {
-    var ids = Array.from(document.querySelectorAll('.row-check:checked')).map(function (cb) { return cb.value; });
-    if (!ids.length) return;
-    var fd = new FormData();
-    fd.append('csrfmiddlewaretoken', CSRF_TOKEN);
-    ids.forEach(function (id) { fd.append('ids[]', id); });
-    fetch(BULK_URL, { method: 'POST', body: fd })
-      .then(function (r) { return r.json(); })
-      .then(function (d) { if (d.ok) window.location.reload(); })
-      .catch(function () { closeBulkModal(); });
-  }
-  document.getElementById('bulk-delete-modal').addEventListener('click', function (e) { if (e.target === this) closeBulkModal(); });
-
 </script>
 {% include 'services/includes/list_live_js.html' %}
 {% include 'services/includes/sort_resize_js.html' %}
+
+<script>
+function toggleIOPage(e){e.stopPropagation();document.getElementById('io-page-wrap').classList.toggle('open');}
+document.addEventListener('click',function(){var w=document.getElementById('io-page-wrap');if(w)w.classList.remove('open');});
+function openImportModal(){document.getElementById('io-modal-backdrop').classList.add('active');document.getElementById('io-modal').classList.add('active');var w=document.getElementById('io-page-wrap');if(w)w.classList.remove('open');}
+function closeImportModal(){document.getElementById('io-modal-backdrop').classList.remove('active');document.getElementById('io-modal').classList.remove('active');}
+function updateFileName(input){var el=document.getElementById('io-filename');if(input.files&&input.files[0]){el.textContent=input.files[0].name;el.style.display='block';}}
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeImportModal();});
+{% if request.GET.action == 'import' %}document.addEventListener('DOMContentLoaded',openImportModal);{% endif %}
+</script>
+
+<div class="io-modal-backdrop" id="io-modal-backdrop" onclick="closeImportModal()"></div>
+<div class="io-modal" id="io-modal">
+  <div class="io-modal-header">
+    <span><i class="bi bi-upload"></i> Importer des Catégories</span>
+    <button type="button" class="io-modal-close" onclick="closeImportModal()">×</button>
+  </div>
+  <form method="post" action="{% url 'services:import_categories' %}" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div class="io-modal-body">
+      <label class="io-file-label" for="io-file-input">
+        <i class="bi bi-cloud-upload" style="font-size:28px;color:var(--teal-500);display:block;margin-bottom:6px;"></i>
+        <strong>Choisir un fichier</strong>
+        <span style="font-size:11px;color:var(--text-muted);display:block;margin-top:3px;">JSON, CSV ou Excel (.xlsx)</span>
+        <input type="file" id="io-file-input" name="fichier" accept=".json,.csv,.xlsx,.xls" required onchange="updateFileName(this)">
+      </label>
+      <div class="io-filename" id="io-filename" style="display:none;"></div>
+      <label class="io-checkbox-label"><input type="checkbox" name="update"> Mettre à jour les enregistrements existants</label>
+      <p class="io-hint">Clé de déduplication : <strong>code</strong>. Colonnes attendues : code, nom, description, parent, methode_cout…
+        La colonne <strong>parent</strong> attend le code de la catégorie parente — <strong>importez d'abord les
+        catégories parentes</strong> (ou incluez-les dans le même fichier, avant leurs enfants), sinon la référence
+        sera ignorée (un avertissement vous listera les codes introuvables).</p>
+    </div>
+    <div class="io-modal-footer">
+      <button type="button" class="io-btn-cancel" onclick="closeImportModal()">Annuler</button>
+      <button type="submit" class="io-btn-submit"><i class="bi bi-upload"></i> Importer</button>
+    </div>
+  </form>
+</div>
+
 {% endblock %}

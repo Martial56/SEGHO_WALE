@@ -1,0 +1,224 @@
+{% extends 'stock/base.html' %}
+{% load static %}
+{% block topbar_title %}Élimination de lots{% endblock %}
+
+{% block extra_st_css %}<style>
+.content { padding-top: 0; }
+
+/* Alerte bannière */
+.elim-alert {
+  display:flex; align-items:flex-start; gap:12px;
+  background:rgba(183,28,28,.07); border:1.5px solid rgba(183,28,28,.2);
+  border-radius:10px; padding:14px 18px; margin:16px 0;
+  color:#7f1111;
+}
+html[data-theme="dark"] .elim-alert {
+  background:rgba(183,28,28,.12); border-color:rgba(183,28,28,.3); color:#f48fb1;
+}
+.elim-alert-icon {
+  font-size:22px; color:var(--rose-text); flex-shrink:0; margin-top:1px;
+}
+.elim-alert-title {
+  font-size:13px; font-weight:800; color:var(--rose-text); margin-bottom:4px;
+}
+.elim-alert-body {
+  font-size:12.5px; line-height:1.55;
+}
+
+/* Input quantité */
+.qte-input {
+  width:90px; border:none; border-bottom:2px solid rgba(183,28,28,.35);
+  border-radius:0; background:transparent; padding:5px 4px;
+  font-size:14px; font-weight:700; color:var(--rose-text); font-family:inherit;
+  text-align:right; transition:border-color .15s;
+}
+.qte-input:focus { outline:none; border-bottom-color:var(--rose-text); }
+.qte-input::-webkit-outer-spin-button,
+.qte-input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+.qte-input[type=number] { -moz-appearance:textfield; }
+
+/* Dates péremption colorées */
+.date-expire { color:var(--rose-text); font-weight:700; display:inline-flex; align-items:center; gap:4px; }
+.date-alerte  { color:var(--amber-text); font-weight:600; display:inline-flex; align-items:center; gap:4px; }
+
+/* Bouton submit rouge */
+.btn-danger {
+  background:var(--rose-text); color:#fff; border:none; border-radius:6px;
+  padding:9px 20px; font-size:13px; font-weight:700; cursor:pointer;
+  display:inline-flex; align-items:center; gap:6px; text-decoration:none;
+  transition:background .15s;
+}
+.btn-danger:hover { background:#8b0000; color:#fff; }
+</style>{% endblock %}
+
+{% block content %}
+
+<div class="action-bar">
+  <div class="action-bar-breadcrumb">
+    <a href="{% url 'stock_peremptions' %}"><i class="bi bi-arrow-left"></i> Péremptions</a>
+    <span class="sep">/</span>
+    <span class="current">Saisie des éliminations</span>
+  </div>
+  <div class="action-bar-buttons">
+    <a href="{% url 'stock_peremptions' %}" class="btn-form-cancel">
+      <i class="bi bi-x-lg"></i> Annuler
+    </a>
+  </div>
+</div>
+
+{% if lots %}
+
+<!-- Bannière avertissement -->
+<div class="elim-alert">
+  <i class="bi bi-exclamation-triangle-fill elim-alert-icon"></i>
+  <div>
+    <div class="elim-alert-title">Attention — Produits à éliminer</div>
+    <div class="elim-alert-body">
+      Ces produits sont <strong>périmés</strong> ou <strong>expirent dans les 30 prochains jours</strong>.
+      Entrez la quantité à éliminer pour chaque lot concerné. Laissez le champ à <strong>0</strong> pour ignorer un lot.
+      Les mouvements de stock seront enregistrés et les quantités déduites automatiquement.
+    </div>
+  </div>
+</div>
+
+<!-- Formulaire -->
+<form method="post" action="{% url 'stock_elimination_create' %}">
+  {% csrf_token %}
+
+  <!-- Tableau des lots -->
+  <div style="margin-top:0;margin-left:-32px;margin-right:-32px;background:var(--st-surface);box-shadow:0 2px 12px rgba(58,89,36,.08);overflow:hidden;">
+    <table class="st-table">
+      <thead>
+        <tr>
+          <th>Produit</th>
+          <th>Lot N°</th>
+          <th style="text-align:center;">Date péremption</th>
+          <th style="text-align:right;">Stock actuel</th>
+          <th style="text-align:right;">Qté à éliminer</th>
+          <th>Fournisseur</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for lot in lots %}
+      <tr>
+
+        <!-- Produit -->
+        <td>
+          <div style="font-weight:700;color:var(--st-text);">{{ lot.produit.nom }}</div>
+          <div style="font-size:10.5px;font-family: var(--font-mono);color:var(--st-600);margin-top:2px;">
+            {{ lot.produit.code }}
+          </div>
+        </td>
+
+        <!-- N° Lot -->
+        <td>
+          <span style="font-family: var(--font-mono);font-size:11.5px;background:var(--st-50);
+                       border:1px solid var(--st-200);padding:2px 7px;border-radius:4px;">
+            {{ lot.numero_lot }}
+          </span>
+        </td>
+
+        <!-- Date péremption -->
+        <td style="text-align:center;">
+          {% if lot.est_perime %}
+            <span class="date-expire">
+              <i class="bi bi-x-circle-fill"></i>
+              {{ lot.date_peremption|date:"d/m/Y" }}
+            </span>
+            <div style="font-size:10.5px;color:var(--rose-text);font-weight:600;margin-top:2px;">
+              Expiré depuis {{ lot.date_peremption|timesince:today }}
+            </div>
+          {% else %}
+            <span class="date-alerte">
+              <i class="bi bi-exclamation-triangle-fill"></i>
+              {{ lot.date_peremption|date:"d/m/Y" }}
+            </span>
+            <div style="font-size:10.5px;color:var(--amber-text);margin-top:2px;">
+              Expire dans {{ lot.date_peremption|timeuntil:today }}
+            </div>
+          {% endif %}
+        </td>
+
+        <!-- Stock actuel -->
+        <td style="text-align:right;">
+          <span style="font-size:15px;font-weight:800;color:var(--st-700);">
+            {{ lot.quantite_actuelle|floatformat:0 }}
+          </span>
+          <span style="font-size:10.5px;color:var(--st-muted);"> {{ lot.produit.unite_mesure.nom }}</span>
+        </td>
+
+        <!-- Input quantité à éliminer -->
+        <td style="text-align:right;">
+          <input
+            type="number"
+            class="qte-input"
+            name="qte_{{ lot.pk }}"
+            id="qte_{{ lot.pk }}"
+            min="0"
+            max="{{ lot.quantite_actuelle|floatformat:0 }}"
+            step="1"
+            placeholder="0"
+            value=""
+            autocomplete="off"
+          >
+          <div style="font-size:10px;color:var(--st-muted);margin-top:2px;text-align:right;">
+            max {{ lot.quantite_actuelle|floatformat:0 }} {{ lot.produit.unite_mesure.nom }}
+          </div>
+        </td>
+
+        <!-- Fournisseur -->
+        <td style="font-size:12px;color:var(--st-muted);">
+          {% if lot.fournisseur %}
+            {{ lot.fournisseur.nom }}
+          {% else %}
+            <span style="font-style:italic;">—</span>
+          {% endif %}
+        </td>
+
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Notes + boutons -->
+  <div style="margin-top:20px;max-width:680px;">
+    <div class="form-field">
+      <label for="notes" class="field-label">Notes / motif d'élimination</label>
+      <textarea
+        id="notes"
+        name="notes"
+        class="field-ul"
+        placeholder="Ex. : Lots retrouvés périmés lors de l'inventaire du {{ today|date:'d/m/Y' }}…"
+        rows="3"
+      ></textarea>
+    </div>
+  </div>
+
+  <!-- Boutons d'action -->
+  <div class="form-actions" style="justify-content:flex-start;padding-bottom:24px;">
+    <button type="submit" class="btn-danger">
+      <i class="bi bi-trash3-fill"></i> Enregistrer les éliminations
+    </button>
+    <a href="{% url 'stock_peremptions' %}" class="btn-form-cancel">
+      <i class="bi bi-arrow-left"></i> Annuler
+    </a>
+  </div>
+
+</form>
+
+{% else %}
+<!-- État vide -->
+<div style="text-align:center;padding:72px 32px;margin-top:20px;background:var(--st-surface);border-radius:12px;box-shadow:0 2px 12px rgba(58,89,36,.08);">
+  <i class="bi bi-check-circle-fill" style="font-size:40px;display:block;margin-bottom:16px;color:var(--st-400);"></i>
+  <div style="font-size:16px;font-weight:800;color:var(--st-600);margin-bottom:8px;">Aucun lot à éliminer actuellement</div>
+  <div style="font-size:13px;color:var(--st-muted);margin-bottom:24px;">
+    Il n'y a aucun lot périmé ou expirant dans les 30 prochains jours.
+  </div>
+  <a href="{% url 'stock_peremptions' %}" class="btn-st-outline">
+    <i class="bi bi-calendar-x"></i> Voir les péremptions
+  </a>
+</div>
+{% endif %}
+
+{% endblock %}

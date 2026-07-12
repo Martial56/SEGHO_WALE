@@ -1,9 +1,26 @@
 from django import forms
-from .models import Patient, Assurance, RendezVous, Pathologie, TypeVisite
+from .models import Patient, Assurance, RendezVous, Pathologie
+from gynecologie.models import TypeVisite
 
 _ul = 'field-ul'          # underline (bottom border only)
 _ul_name = 'field-ul field-ul-name'
 _ul_prenom = 'field-ul field-ul-prenom'
+
+
+class DepartementFiltreSelect(forms.Select):
+    """Select dont chaque <option> porte data-departement-id, utilisé côté JS
+    pour ne montrer que les prestations liées au département choisi."""
+
+    def __init__(self, *args, departement_map=None, **kwargs):
+        self.departement_map = departement_map or {}
+        super().__init__(*args, **kwargs)
+
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex, attrs)
+        departement_id = self.departement_map.get(str(value))
+        if departement_id:
+            option['attrs']['data-departement-id'] = departement_id
+        return option
 
 
 class PatientForm(forms.ModelForm):
@@ -23,7 +40,7 @@ class PatientForm(forms.ModelForm):
             'date_naissance': forms.DateInput(attrs={
                 'class': _ul,
                 'type': 'date',
-            }),
+            }, format='%Y-%m-%d'),
             'lieu_naissance': forms.TextInput(attrs={
                 'class': _ul,
                 'placeholder': 'Ville, pays',
@@ -76,7 +93,7 @@ class PatientForm(forms.ModelForm):
             'date_expiration_assurance': forms.DateInput(attrs={
                 'class': _ul,
                 'type': 'date',
-            }),
+            }, format='%Y-%m-%d'),
             'contact_urgence_nom': forms.TextInput(attrs={
                 'class': _ul,
                 'placeholder': 'Nom et lien de parenté',
@@ -84,6 +101,10 @@ class PatientForm(forms.ModelForm):
             'contact_urgence_telephone': forms.TextInput(attrs={
                 'class': _ul,
                 'placeholder': '+225 07 00 00 00 00',
+            }),
+            'photo': forms.ClearableFileInput(attrs={
+                'data-photo-input': 'patient',
+                'style': 'display:none',
             }),
         }
 
@@ -132,8 +153,8 @@ class RendezVousForm(forms.ModelForm):
         widgets = {
             'patient': forms.Select(attrs={'class': _ul, 'id': 'id_patient'}),
             'departement': forms.Select(attrs={'class': _ul}),
-            'medecin': forms.Select(attrs={'class': _ul}),
-            'type_consultation': forms.Select(attrs={'class': _ul}),
+            'medecin': DepartementFiltreSelect(attrs={'class': _ul}),
+            'type_consultation': DepartementFiltreSelect(attrs={'class': _ul}),
             'date_heure': forms.DateTimeInput(
                 attrs={'class': _ul, 'type': 'datetime-local'},
                 format='%Y-%m-%dT%H:%M',
@@ -152,15 +173,32 @@ class RendezVousForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         from services.models import Articleservice
+        from medecins.models import Departement, Medecin
         super().__init__(*args, **kwargs)
         self.fields['patient'].queryset = Patient.objects.all().order_by('nom', 'prenoms')
-        self.fields['medecin'].empty_label = '— Aucun médecin —'
-        self.fields['medecin'].required = False
+        self.fields['departement'].queryset = Departement.objects.filter(actif=True).order_by('nom')
         self.fields['departement'].empty_label = '— Choisir un département —'
         self.fields['departement'].required = False
-        self.fields['type_consultation'].queryset = Articleservice.objects.filter(actif=True, categorie__code__iexact='cs').order_by('nom')
+
+        medecin_qs = Medecin.objects.filter(actif=True).order_by('nom', 'prenoms')
+        self.fields['medecin'].queryset = medecin_qs
+        self.fields['medecin'].empty_label = '— Aucun médecin —'
+        self.fields['medecin'].required = False
+        self.fields['medecin'].widget.departement_map = {
+            str(pk): departement_id
+            for pk, departement_id in medecin_qs.values_list('pk', 'departement_id')
+        }
+
+        type_consultation_qs = Articleservice.objects.filter(
+            actif=True, categorie__code='CS'
+        ).select_related('departement').order_by('nom')
+        self.fields['type_consultation'].queryset = type_consultation_qs
         self.fields['type_consultation'].empty_label = '— Choisir un type de consultation —'
         self.fields['type_consultation'].required = False
+        self.fields['type_consultation'].widget.departement_map = {
+            str(pk): departement_id
+            for pk, departement_id in type_consultation_qs.values_list('pk', 'departement_id')
+        }
 
 
 class PathologieForm(forms.ModelForm):

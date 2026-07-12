@@ -1,11 +1,9 @@
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap');
-
   :root {
-    --primary: #1a5c4a;
-    --primary-dark: #134438;
-    --nav-bg: #ffffff;
-    --accent: #22896b;
+    /* Alias vers la couleur d'accent globale (logo par défaut, ou choix utilisateur) */
+    --primary: var(--teal-700);
+    --primary-dark: var(--teal-800);
+    --accent: var(--teal-600);
     --bg: #f9f9f9;
     --surface: #ffffff;
     --border: #d9d9d9;
@@ -24,7 +22,6 @@
   *, *::before, *::after { box-sizing: border-box; }
 
   body {
-    font-family: 'Roboto', sans-serif;
     background: var(--bg) !important;
     color: var(--text);
   }
@@ -42,62 +39,17 @@
   .breadcrumb { display: none !important; }
 
   .content { padding: 0 !important; overflow-x: hidden; }
-
-  /* ── O-NAV ── */
-  .o-nav {
-    background: var(--nav-bg);
-    display: flex;
-    align-items: center;
-    height: 38px;
-    padding: 0 10px;
-    border-bottom: 1px solid #e0e0e0;
-    box-shadow: 0 1px 3px rgba(0,0,0,.07);
-  }
-
-  .o-nav-grid {
-    width: 32px; height: 32px;
-    display: flex; align-items: center; justify-content: center;
-    color: rgba(0,0,0,.45); font-size: 17px; cursor: pointer;
-    border-radius: 4px; margin-right: 4px;
-    transition: background .15s; text-decoration: none;
-  }
-
-  .o-nav-grid:hover { background: rgba(0,0,0,.06); color: var(--primary); }
-
-  .o-nav-brand {
-    font-size: 14px; font-weight: 600; color: var(--primary);
-    padding: 0 12px 0 4px; margin-right: 2px;
-    border-right: 1px solid rgba(0,0,0,.12);
-    white-space: nowrap; display: flex; align-items: center; gap: 6px;
-  }
-
-  .o-nav-link {
-    color: rgba(0,0,0,.58); text-decoration: none; font-size: 13px;
-    padding: 0 12px; height: 38px; display: flex; align-items: center;
-    border-bottom: 2px solid transparent;
-    transition: color .15s, background .15s, border-color .15s;
-    white-space: nowrap;
-  }
-
-  .o-nav-link:hover, .o-nav-link.active {
-    color: var(--primary);
-    background: rgba(26,92,74,.06);
-    border-bottom-color: var(--primary);
-  }
-
-  html[data-theme="dark"] .o-nav { background: #0a1e2e; border-bottom-color: rgba(255,255,255,.06); box-shadow: none; }
-  html[data-theme="dark"] .o-nav-grid { color: rgba(255,255,255,.5); }
-  html[data-theme="dark"] .o-nav-grid:hover { background: rgba(255,255,255,.08); color: #7ac4a7; }
-  html[data-theme="dark"] .o-nav-brand { color: #7ac4a7; border-right-color: rgba(255,255,255,.1); }
-  html[data-theme="dark"] .o-nav-link { color: rgba(255,255,255,.6); }
-  html[data-theme="dark"] .o-nav-link:hover,
-  html[data-theme="dark"] .o-nav-link.active { color: #cce8f4; background: rgba(34,137,107,.1); border-bottom-color: #4aaa87; }
+  .o-list-wrap { margin: 0 !important; }
 
   /* ── SUBHEADER ── */
   .o-subheader {
+    position: fixed;
+    left: 0; right: 0; top: 0;
+    z-index: 190;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
     padding: 6px 16px;
+    margin: 0;
     display: flex; flex-direction: column; gap: 5px;
   }
 
@@ -112,7 +64,7 @@
   .o-btn-create {
     background: var(--accent); color: #fff; border: none;
     padding: 5px 14px; border-radius: 4px; font-size: 12.5px;
-    font-weight: 500; font-family: 'Roboto', sans-serif;
+    font-weight: 500; font-family: var(--font-main);
     cursor: pointer; text-decoration: none;
     display: inline-flex; align-items: center; gap: 5px;
     letter-spacing: .5px; transition: background .15s; white-space: nowrap;
@@ -129,7 +81,7 @@
 
   .o-search-input {
     border: none; outline: none; font-size: 12px;
-    font-family: 'Roboto', sans-serif; color: var(--text); flex: 1;
+    font-family: var(--font-main); color: var(--text); flex: 1;
     min-width: 60px; background: transparent;
   }
 
@@ -141,7 +93,7 @@
   /* ── BOUTONS CONTRÔLE ── */
   .o-ctrl-btn {
     background: none; border: 1px solid transparent; border-radius: 4px;
-    padding: 4px 8px; font-size: 12px; font-family: 'Roboto', sans-serif;
+    padding: 4px 8px; font-size: 12px; font-family: var(--font-main);
     color: var(--text-muted); cursor: pointer;
     display: flex; align-items: center; gap: 4px;
     transition: border-color .15s, color .15s, background .15s;
@@ -219,12 +171,20 @@
 </style>
 <script>
   document.addEventListener('DOMContentLoaded', function () {
-    function adjustOffsets() {
-      var topbar = document.querySelector('.topbar');
-      var wrap = document.getElementById('page-wrap');
-      if (topbar && wrap) wrap.style.paddingTop = topbar.offsetHeight + 'px';
+    var topbar = document.querySelector('.topbar');
+    var wrap   = document.getElementById('page-wrap');
+    var sub    = document.querySelector('.o-subheader');
+    if (!topbar) return;
+    function adjust() {
+      var topbarH = topbar.offsetHeight;
+      var bodyPT  = parseInt(getComputedStyle(document.body).paddingTop) || 0;
+      if (sub) sub.style.top = topbarH + 'px';
+      var subH = (sub && sub.dataset.fixed) ? sub.offsetHeight : 0;
+      var target = wrap || document.querySelector('.content');
+      if (target) target.style.paddingTop = Math.max(0, topbarH + subH - bodyPT) + 'px';
     }
-    adjustOffsets();
-    window.addEventListener('resize', adjustOffsets);
+    adjust();
+    window.addEventListener('resize', adjust);
+    window.addEventListener('load', adjust);
   });
 </script>

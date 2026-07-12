@@ -1,0 +1,466 @@
+{% extends 'achats/base.html' %}
+{% load i18n %}
+
+{% block title %}{{ commande.numero }} — Commande{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+.content { padding:0; }
+.cd-page { display:flex; flex-direction:column; height:calc(100vh - var(--topbar-h) - 38px); overflow:hidden; }
+
+/* ── Header ── */
+.cd-header {
+  background: linear-gradient(135deg, var(--teal-800) 0%, var(--teal-700) 100%);
+  padding: 16px 28px 0;
+  flex-shrink: 0;
+}
+.cd-header-top { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+.cd-header-left { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.cd-back-btn { color:rgba(255,255,255,.65); text-decoration:none; font-size:12.5px; display:flex; align-items:center; gap:5px; transition:color .15s; }
+.cd-back-btn:hover { color:#fff; }
+.cd-sep { width:1px; height:20px; background:rgba(255,255,255,.2); }
+.cd-numero { font-size:20px; font-weight:900; color:#fff; letter-spacing:-.3px; font-family: var(--font-mono); }
+.cd-badge { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; }
+.cb-brouillon    { background:rgba(255,255,255,.2); color:#fff; }
+.cb-envoyee      { background:rgba(59,130,246,.3); color:#bfdbfe; border:1px solid rgba(59,130,246,.4); }
+.cb-en_livraison { background:rgba(245,158,11,.3); color:#fde68a; border:1px solid rgba(245,158,11,.4); }
+.cb-recue        { background:rgba(16,185,129,.3); color:#a7f3d0; border:1px solid rgba(16,185,129,.4); }
+.cb-annulee      { background:rgba(239,68,68,.3);  color:#fecaca; border:1px solid rgba(239,68,68,.4); }
+.cd-header-actions { display:flex; gap:8px; align-items:center; padding-top:2px; flex-wrap:wrap; }
+.cd-btn { display:inline-flex; align-items:center; gap:6px; padding:6px 14px; border-radius:7px; font-size:12px; font-weight:700; text-decoration:none; border:none; cursor:pointer; transition:opacity .15s; white-space:nowrap; }
+.cd-btn:hover { opacity:.85; text-decoration:none; }
+.cd-btn-white   { background:#fff; color:var(--teal-800); }
+.cd-btn-outline { background:rgba(255,255,255,.15); color:#fff; border:1px solid rgba(255,255,255,.3); }
+.cd-btn-green   { background:#10b981; color:#fff; }
+.cd-btn-amber   { background:#f59e0b; color:#fff; }
+
+/* ── Timeline ── */
+.cd-timeline { display:flex; align-items:center; padding:12px 28px 0; }
+.cd-step { display:flex; align-items:center; flex:1; }
+.cd-step:last-child { flex:0; }
+.cd-step-dot {
+  width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-size:10.5px; font-weight:800; flex-shrink:0;
+  background:rgba(255,255,255,.12); color:rgba(255,255,255,.5); border:2px solid rgba(255,255,255,.3);
+}
+.cd-step-dot.done  { background:#10b981; border-color:#10b981; color:#fff; }
+.cd-step-dot.active{ background:#fff; border-color:#fff; color:var(--teal-800); box-shadow:0 0 0 3px rgba(255,255,255,.2); }
+.cd-step-label { font-size:10px; font-weight:600; padding:0 6px; white-space:nowrap; color:rgba(255,255,255,.5); }
+.cd-step-label.done   { color:rgba(255,255,255,.85); }
+.cd-step-label.active { color:#fff; font-weight:800; }
+.cd-step-line { flex:1; height:2px; background:rgba(255,255,255,.2); min-width:12px; }
+.cd-step-line.done { background:#10b981; }
+.cd-timeline-spacer { height:12px; }
+
+/* ── Retard banner ── */
+.cd-retard { background:#fef2f2; border-bottom:2px solid #fca5a5; padding:7px 28px; display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600; color:#b91c1c; flex-shrink:0; }
+
+/* ── Body ── */
+.cd-body { flex:1; overflow:auto; min-height:0; padding:16px 28px; display:grid; grid-template-columns:1fr 300px; gap:14px; align-content:start; }
+@media (max-width:900px) { .cd-body { grid-template-columns:1fr; } }
+.cd-main  { display:flex; flex-direction:column; gap:12px; }
+.cd-side  { display:flex; flex-direction:column; gap:12px; }
+
+/* ── Cards ── */
+.cd-card { background:#fff; border-radius:10px; border:1px solid rgba(0,0,0,.07); overflow:hidden; }
+.cd-card-head { padding:10px 16px; background:#fafafa; border-bottom:1px solid rgba(0,0,0,.06); font-size:12px; font-weight:700; color:var(--teal-800); display:flex; align-items:center; justify-content:space-between; }
+.cd-card-head .hi { margin-right:6px; }
+
+/* ── Articles table ── */
+.cd-tbl { width:100%; border-collapse:collapse; font-size:12.5px; }
+.cd-tbl thead th { padding:8px 14px; font-size:10px; font-weight:700; color:#aaa; text-transform:uppercase; letter-spacing:.3px; border-bottom:1px solid rgba(0,0,0,.07); background:#f8fafb; }
+.cd-tbl tbody td { padding:9px 14px; border-bottom:1px solid rgba(0,0,0,.04); vertical-align:middle; }
+.cd-tbl tbody tr:last-child td { border-bottom:none; }
+.cd-tbl tbody tr:hover td { background:#f8fafb; }
+.cd-tbl tfoot td { padding:10px 14px; background:#f0f8f4; font-weight:700; border-top:1px solid rgba(0,0,0,.08); }
+
+/* ── Réception rows ── */
+.rec-row { display:flex; align-items:center; gap:10px; padding:11px 16px; border-bottom:1px solid rgba(0,0,0,.05); }
+.rec-row:last-child { border-bottom:none; }
+.rec-icon { width:34px; height:34px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; }
+.rec-info { flex:1; min-width:0; }
+.rbadge { display:inline-flex; align-items:center; gap:4px; padding:2px 7px; border-radius:12px; font-size:10.5px; font-weight:700; }
+.rb-conforme   { background:rgba(16,185,129,.1);  color:#065f46; border:1px solid rgba(16,185,129,.2); }
+.rb-partielle  { background:rgba(245,158,11,.1);  color:#92400e; border:1px solid rgba(245,158,11,.2); }
+.rb-nc         { background:rgba(239,68,68,.1);   color:#991b1b; border:1px solid rgba(239,68,68,.2); }
+.rb-integre    { background:rgba(16,185,129,.1);  color:#065f46; border:1px solid rgba(16,185,129,.2); }
+.rb-pending    { background:rgba(245,158,11,.1);  color:#92400e; border:1px solid rgba(245,158,11,.25); }
+
+/* ── Side boxes ── */
+.cd-sbox { background:#fff; border-radius:10px; border:1px solid rgba(0,0,0,.07); padding:12px 14px; }
+.cd-sbox-title { font-size:10.5px; font-weight:700; color:#bbb; text-transform:uppercase; letter-spacing:.3px; margin-bottom:8px; }
+.cd-srow { display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid rgba(0,0,0,.04); font-size:12.5px; gap:8px; }
+.cd-srow:last-child { border-bottom:none; }
+.cd-srow .lbl { color:#999; flex-shrink:0; }
+.cd-srow .val { font-weight:600; color:rgba(0,0,0,.8); font-size:12px; text-align:right; }
+
+/* ── Total box ── */
+.cd-total { background:linear-gradient(135deg, var(--teal-800), var(--teal-700)); border-radius:10px; padding:16px; text-align:center; }
+
+/* ── Tracabilité ── */
+.trace-link { display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:7px; text-decoration:none; margin-bottom:4px; border:1px solid rgba(0,0,0,.06); transition:opacity .15s; }
+.trace-link:hover { opacity:.82; text-decoration:none; }
+.trace-link:last-child { margin-bottom:0; }
+
+/* ── Modal statut ── */
+.cd-modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1000; align-items:center; justify-content:center; }
+.cd-modal-bg.open { display:flex; }
+.cd-modal { background:#fff; border-radius:12px; padding:22px 24px; width:360px; box-shadow:0 20px 60px rgba(0,0,0,.2); }
+
+/* ── Mode sombre ── */
+html[data-theme="dark"] .cd-retard { background:rgba(153,27,27,.15); border-bottom-color:rgba(252,165,165,.3); color:#fca5a5; }
+html[data-theme="dark"] .cd-card { background:var(--surface); border-color:var(--border); }
+html[data-theme="dark"] .cd-card-head { background:var(--surface-muted); border-bottom-color:var(--border); color:var(--text-strong,#eef3f8); }
+html[data-theme="dark"] .cd-tbl thead th { color:var(--text-faint); background:var(--surface-muted); border-bottom-color:var(--border); }
+html[data-theme="dark"] .cd-tbl tbody td { border-bottom-color:var(--border); color:var(--text); }
+html[data-theme="dark"] .cd-tbl tbody tr:hover td { background:var(--surface-muted); }
+html[data-theme="dark"] .cd-tbl tfoot td { background:rgba(var(--teal-700-rgb),.25); border-top-color:var(--border); color:var(--text-strong,#eef3f8); }
+html[data-theme="dark"] .cd-montant-cell { color:var(--text-strong,#eef3f8)!important; }
+html[data-theme="dark"] .rec-row { border-bottom-color:var(--border); }
+html[data-theme="dark"] .cd-sbox { background:var(--surface); border-color:var(--border); }
+html[data-theme="dark"] .cd-sbox-title { color:var(--text-faint); }
+html[data-theme="dark"] .cd-srow { border-bottom-color:var(--border); }
+html[data-theme="dark"] .cd-srow .lbl { color:var(--text-muted); }
+html[data-theme="dark"] .cd-srow .val { color:var(--text); }
+html[data-theme="dark"] .trace-link { border-color:var(--border); }
+html[data-theme="dark"] .trace-link.tl-green  { background:rgba(16,185,129,.12)!important; }
+html[data-theme="dark"] .trace-link.tl-purple { background:rgba(124,58,237,.15)!important; }
+html[data-theme="dark"] .trace-link.tl-amber  { background:rgba(217,119,6,.15)!important; }
+html[data-theme="dark"] .cd-modal { background:var(--surface); color:var(--text); }
+html[data-theme="dark"] .cd-modal h2 { color:var(--text-strong,#eef3f8); }
+html[data-theme="dark"] .cd-modal-cancel { background:var(--surface-muted)!important; border-color:var(--border)!important; color:var(--text)!important; }
+html[data-theme="dark"] .cd-modal-notice { background:rgba(146,64,14,.2)!important; border-color:rgba(252,211,77,.3)!important; color:#fcd34d!important; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="hist-wrapper">
+<div class="hist-main">
+<div class="cd-page">
+
+  {# ── Header ── #}
+  <div class="cd-header">
+    <div class="cd-header-top">
+      <div class="cd-header-left">
+        <a href="{% url 'achats:commandes_list' %}" class="cd-back-btn"><i class="bi bi-arrow-left"></i> Retour</a>
+        <div class="cd-sep"></div>
+        <span class="cd-numero">{{ commande.numero }}</span>
+        <span class="cd-badge cb-{{ commande.statut }}">
+          {% if commande.statut == 'brouillon' %}<i class="bi bi-pencil"></i>
+          {% elif commande.statut == 'envoyee' %}<i class="bi bi-send-fill"></i>
+          {% elif commande.statut == 'en_livraison' %}<i class="bi bi-truck"></i>
+          {% elif commande.statut == 'recue' %}<i class="bi bi-check-circle-fill"></i>
+          {% else %}<i class="bi bi-x-circle-fill"></i>{% endif %}
+          {{ commande.get_statut_display }}
+        </span>
+      </div>
+      <div class="cd-header-actions">
+        {% if commande.statut == 'brouillon' %}
+          <button class="cd-btn cd-btn-amber" onclick="document.getElementById('modal-statut').classList.add('open')">
+            <i class="bi bi-send"></i> Marquer envoyée
+          </button>
+        {% elif commande.statut == 'envoyee' %}
+          <button class="cd-btn cd-btn-amber" onclick="document.getElementById('modal-statut').classList.add('open')">
+            <i class="bi bi-truck"></i> En livraison
+          </button>
+        {% endif %}
+        {% if commande.statut == 'envoyee' or commande.statut == 'en_livraison' %}
+          <a href="{% url 'achats:reception_create' commande.pk %}" class="cd-btn cd-btn-green">
+            <i class="bi bi-box-arrow-in-down"></i> Réception
+          </a>
+        {% endif %}
+        <a href="{% url 'achats:commande_imprimer' commande.pk %}" class="cd-btn cd-btn-outline">
+          <i class="bi bi-printer"></i> Imprimer
+        </a>
+      </div>
+    </div>
+
+    {# ── Timeline ── #}
+    {% with s=commande.statut %}
+    <div class="cd-timeline">
+      {# Brouillon #}
+      <div class="cd-step">
+        <div class="cd-step-dot {% if s == 'brouillon' %}active{% elif s != 'annulee' %}done{% endif %}">
+          {% if s != 'brouillon' and s != 'annulee' %}<i class="bi bi-check-lg" style="font-size:11px;"></i>{% else %}1{% endif %}
+        </div>
+        <span class="cd-step-label {% if s == 'brouillon' %}active{% elif s != 'annulee' %}done{% endif %}">Brouillon</span>
+        <div class="cd-step-line {% if s != 'brouillon' and s != 'annulee' %}done{% endif %}"></div>
+      </div>
+      {# Envoyée #}
+      <div class="cd-step">
+        <div class="cd-step-dot {% if s == 'envoyee' %}active{% elif s == 'en_livraison' or s == 'recue' %}done{% endif %}">
+          {% if s == 'en_livraison' or s == 'recue' %}<i class="bi bi-check-lg" style="font-size:11px;"></i>{% else %}2{% endif %}
+        </div>
+        <span class="cd-step-label {% if s == 'envoyee' %}active{% elif s == 'en_livraison' or s == 'recue' %}done{% endif %}">Envoyée</span>
+        <div class="cd-step-line {% if s == 'en_livraison' or s == 'recue' %}done{% endif %}"></div>
+      </div>
+      {# En livraison #}
+      <div class="cd-step">
+        <div class="cd-step-dot {% if s == 'en_livraison' %}active{% elif s == 'recue' %}done{% endif %}">
+          {% if s == 'recue' %}<i class="bi bi-check-lg" style="font-size:11px;"></i>{% else %}3{% endif %}
+        </div>
+        <span class="cd-step-label {% if s == 'en_livraison' %}active{% elif s == 'recue' %}done{% endif %}">En livraison</span>
+        <div class="cd-step-line {% if s == 'recue' %}done{% endif %}"></div>
+      </div>
+      {# Reçue #}
+      <div class="cd-step">
+        <div class="cd-step-dot {% if s == 'recue' %}done{% endif %}">
+          {% if s == 'recue' %}<i class="bi bi-check-lg" style="font-size:11px;"></i>{% else %}4{% endif %}
+        </div>
+        <span class="cd-step-label {% if s == 'recue' %}done{% endif %}">Reçue</span>
+      </div>
+    </div>
+    {% endwith %}
+    <div class="cd-timeline-spacer"></div>
+  </div>
+
+  {# ── Alerte retard ── #}
+  {% if est_en_retard %}
+  <div class="cd-retard">
+    <i class="bi bi-exclamation-triangle-fill"></i>
+    Livraison prévue le {{ commande.date_livraison_prevue|date:"d/m/Y" }} — en retard
+  </div>
+  {% endif %}
+
+  {# ── Corps ── #}
+  <div class="cd-body">
+    <div class="cd-main">
+
+      {# Articles commandés #}
+      <div class="cd-card">
+        <div class="cd-card-head">
+          <span><i class="bi bi-table hi"></i>Articles commandés</span>
+          <span style="font-size:11px;color:var(--text-faint);font-weight:500;">{{ lignes|length }} ligne{{ lignes|length|pluralize }}</span>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="cd-tbl">
+            <thead>
+              <tr>
+                <th style="width:32px;text-align:center;">#</th>
+                <th>Désignation</th>
+                <th style="text-align:right;">Qté</th>
+                <th style="text-align:right;">Prix unit.</th>
+                <th style="text-align:right;">Montant (FCFA)</th>
+              </tr>
+            </thead>
+            <tbody>
+            {% for l in lignes %}
+            <tr>
+              <td style="text-align:center;color:var(--text-faint);font-size:11px;font-weight:700;">{{ forloop.counter }}</td>
+              <td>
+                <div style="font-weight:600;color:var(--text);">{{ l.designation }}</div>
+                {% if l.notes %}<div style="font-size:11px;color:var(--text-faint);">{{ l.notes }}</div>{% endif %}
+              </td>
+              <td style="text-align:right;font-weight:700;">{{ l.quantite_commandee|floatformat:0 }}</td>
+              <td style="text-align:right;color:var(--text-muted);font-size:12px;">{{ l.prix_unitaire|floatformat:0 }}</td>
+              <td class="cd-montant-cell" style="text-align:right;font-weight:700;color:var(--teal-800);">{{ l.montant|floatformat:0 }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="4" style="text-align:right;color:var(--text-muted);font-size:12px;">Total</td>
+                <td class="cd-montant-cell" style="text-align:right;font-size:16px;font-weight:900;color:var(--teal-800);">{{ montant_calc|floatformat:0 }} <span style="font-size:11px;font-weight:600;">FCFA</span></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      {# Réceptions #}
+      <div class="cd-card">
+        <div class="cd-card-head">
+          <span><i class="bi bi-box-arrow-in-down hi"></i>Réceptions ({{ receptions|length }})</span>
+          {% if commande.statut == 'envoyee' or commande.statut == 'en_livraison' %}
+          <a href="{% url 'achats:reception_create' commande.pk %}" style="font-size:11.5px;color:var(--teal-600);text-decoration:none;font-weight:600;">
+            <i class="bi bi-plus-lg"></i> Ajouter
+          </a>
+          {% endif %}
+        </div>
+        {% if receptions %}
+          {% for r in receptions %}
+          <div class="rec-row">
+            <div class="rec-icon" style="background:{% if r.statut == 'conforme' %}rgba(16,185,129,.1){% elif r.statut == 'partielle' %}rgba(245,158,11,.1){% else %}rgba(239,68,68,.1){% endif %};">
+              <i class="bi {% if r.statut == 'conforme' %}bi-check-circle-fill{% elif r.statut == 'partielle' %}bi-exclamation-circle-fill{% else %}bi-x-circle-fill{% endif %}"
+                 style="color:{% if r.statut == 'conforme' %}#10b981{% elif r.statut == 'partielle' %}#f59e0b{% else %}#ef4444{% endif %};"></i>
+            </div>
+            <div class="rec-info">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-weight:700;font-size:12.5px;color:var(--text);font-family: var(--font-mono);">{{ r.numero }}</span>
+                <span style="font-size:11px;color:var(--text-faint);">{{ r.date_reception|date:"d/m/Y" }}</span>
+              </div>
+              <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:4px;">
+                {% if r.statut == 'conforme' %}
+                  <span class="rbadge rb-conforme"><i class="bi bi-check-circle-fill"></i> Conforme</span>
+                {% elif r.statut == 'partielle' %}
+                  <span class="rbadge rb-partielle"><i class="bi bi-exclamation-circle-fill"></i> Partielle</span>
+                {% else %}
+                  <span class="rbadge rb-nc"><i class="bi bi-x-circle-fill"></i> Non conforme</span>
+                {% endif %}
+                {% if r.integre_en_stock %}
+                  <span class="rbadge rb-integre"><i class="bi bi-box-seam"></i> Intégré le {{ r.date_integration|date:"d/m" }}</span>
+                {% else %}
+                  <span class="rbadge rb-pending"><i class="bi bi-hourglass-split"></i> En attente intégration</span>
+                {% endif %}
+              </div>
+            </div>
+            <div style="text-align:right;flex-shrink:0;">
+              <div style="font-size:10.5px;color:var(--text-faint);margin-bottom:4px;">{{ r.receptionne_par.get_full_name|default:r.receptionne_par.username|default:"—" }}</div>
+              <a href="{% url 'achats:reception_detail' r.pk %}"
+                 style="width:28px;height:28px;border-radius:6px;background:var(--teal-50);border:1px solid rgba(0,0,0,.08);display:inline-flex;align-items:center;justify-content:center;color:var(--teal-600);text-decoration:none;font-size:13px;">
+                <i class="bi bi-eye"></i>
+              </a>
+            </div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div style="padding:28px;text-align:center;color:var(--text-faint);">
+            <i class="bi bi-box-seam" style="font-size:26px;display:block;margin-bottom:8px;"></i>
+            <div style="font-size:12.5px;color:var(--text-faint);">Aucune réception enregistrée</div>
+            {% if commande.statut == 'envoyee' or commande.statut == 'en_livraison' %}
+            <a href="{% url 'achats:reception_create' commande.pk %}"
+               style="margin-top:10px;display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:7px;background:var(--teal-600);color:#fff;text-decoration:none;font-size:12px;font-weight:600;">
+              <i class="bi bi-plus-lg"></i> Saisir une réception
+            </a>
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
+
+    </div>{# /main #}
+
+    <div class="cd-side">
+
+      {# Montant total #}
+      <div class="cd-total">
+        <div style="font-size:10.5px;font-weight:700;color:rgba(255,255,255,.65);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;">Montant total</div>
+        <div style="font-size:28px;font-weight:900;color:#fff;line-height:1;">{{ commande.montant_total|floatformat:0 }}</div>
+        <div style="font-size:12px;color:rgba(255,255,255,.65);margin-top:2px;">FCFA</div>
+      </div>
+
+      {# Informations #}
+      <div class="cd-sbox">
+        <div class="cd-sbox-title">Informations</div>
+        <div class="cd-srow">
+          <span class="lbl">N°</span>
+          <span class="val" style="font-family: var(--font-mono);font-size:11.5px;">{{ commande.numero }}</span>
+        </div>
+        <div class="cd-srow">
+          <span class="lbl">Fournisseur</span>
+          <a href="{% url 'achats:fournisseur_detail' commande.fournisseur.pk %}"
+             style="font-weight:600;color:var(--teal-600);text-decoration:none;font-size:12px;max-width:160px;text-align:right;">{{ commande.fournisseur.nom }}</a>
+        </div>
+        <div class="cd-srow">
+          <span class="lbl">Date commande</span>
+          <span class="val">{{ commande.date_commande|date:"d/m/Y" }}</span>
+        </div>
+        <div class="cd-srow">
+          <span class="lbl">Livraison prévue</span>
+          <span class="val"{% if est_en_retard %} style="color:#dc2626;"{% endif %}>
+            {{ commande.date_livraison_prevue|date:"d/m/Y"|default:"—" }}
+          </span>
+        </div>
+        <div class="cd-srow">
+          <span class="lbl">Créé par</span>
+          <span class="val" style="font-size:11.5px;">{{ commande.cree_par.get_full_name|default:commande.cree_par.username|default:"—" }}</span>
+        </div>
+      </div>
+
+      {# Traçabilité #}
+      {% if commande.proforma %}
+      <div class="cd-sbox">
+        <div class="cd-sbox-title">Traçabilité</div>
+        {% with proforma=commande.proforma %}
+          {% if proforma.besoin %}
+            {% with besoin=proforma.besoin %}
+              {% if besoin.fiche_besoins %}
+              <a href="{% url 'stock_fiche_detail' besoin.fiche_besoins.pk %}" class="trace-link tl-green" style="background:#f0fdf4;">
+                <i class="bi bi-clipboard2-data" style="color:#10b981;font-size:14px;flex-shrink:0;"></i>
+                <div>
+                  <div style="font-size:9.5px;font-weight:700;color:var(--text-faint);text-transform:uppercase;">Fiche besoins</div>
+                  <div style="font-size:12px;font-weight:700;color:#059669;">{{ besoin.fiche_besoins.numero }}</div>
+                </div>
+                <i class="bi bi-chevron-right" style="color:var(--text-faint);margin-left:auto;font-size:10px;"></i>
+              </a>
+              {% endif %}
+              <a href="{% url 'achats:besoin_detail' besoin.pk %}" class="trace-link tl-purple" style="background:#f5f3ff;">
+                <i class="bi bi-list-check" style="color:#7c3aed;font-size:14px;flex-shrink:0;"></i>
+                <div>
+                  <div style="font-size:9.5px;font-weight:700;color:var(--text-faint);text-transform:uppercase;">Besoin</div>
+                  <div style="font-size:12px;font-weight:700;color:#7c3aed;">{{ besoin.numero }}</div>
+                </div>
+                <i class="bi bi-chevron-right" style="color:var(--text-faint);margin-left:auto;font-size:10px;"></i>
+              </a>
+            {% endwith %}
+          {% endif %}
+          <a href="{% url 'achats:proforma_detail' proforma.pk %}" class="trace-link tl-amber" style="background:#fffbeb;">
+            <i class="bi bi-file-earmark-text" style="color:#d97706;font-size:14px;flex-shrink:0;"></i>
+            <div>
+              <div style="font-size:9.5px;font-weight:700;color:var(--text-faint);text-transform:uppercase;">Proforma</div>
+              <div style="font-size:12px;font-weight:700;color:#d97706;">{{ proforma.numero }}</div>
+            </div>
+            <i class="bi bi-chevron-right" style="color:var(--text-faint);margin-left:auto;font-size:10px;"></i>
+          </a>
+        {% endwith %}
+      </div>
+      {% endif %}
+
+      {# Notes #}
+      {% if commande.notes %}
+      <div class="cd-sbox">
+        <div class="cd-sbox-title">Notes</div>
+        <p style="font-size:12.5px;color:var(--text);margin:0;white-space:pre-wrap;line-height:1.5;">{{ commande.notes }}</p>
+      </div>
+      {% endif %}
+
+    </div>{# /side #}
+  </div>
+
+</div>{# /cd-page #}
+
+{# ── Modal changement de statut ── #}
+<div class="cd-modal-bg" id="modal-statut">
+  <div class="cd-modal">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <h2 style="font-size:14px;font-weight:800;margin:0;color:var(--teal-800);">Changer le statut</h2>
+      <button onclick="document.getElementById('modal-statut').classList.remove('open')"
+              style="background:none;border:none;cursor:pointer;color:var(--text-faint);font-size:18px;line-height:1;padding:0;">×</button>
+    </div>
+    <form method="post" action="{% url 'achats:commande_statut' commande.pk %}">
+      {% csrf_token %}
+      {% if commande.statut == 'brouillon' %}
+        <input type="hidden" name="statut" value="envoyee">
+        <div class="cd-modal-notice" style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12.5px;color:#92400e;">
+          <i class="bi bi-send-fill" style="margin-right:5px;"></i>
+          Confirmer que <strong>{{ commande.numero }}</strong> a été envoyée au fournisseur <strong>{{ commande.fournisseur.nom }}</strong> ?
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+          <button type="button" class="cd-modal-cancel" style="padding:6px 14px;border-radius:7px;border:1px solid #e5e7eb;background:#fff;font-size:12px;cursor:pointer;font-weight:600;color:#666;"
+                  onclick="document.getElementById('modal-statut').classList.remove('open')">Annuler</button>
+          <button type="submit" class="cd-btn cd-btn-amber"><i class="bi bi-send"></i> Marquer envoyée</button>
+        </div>
+      {% elif commande.statut == 'envoyee' %}
+        <input type="hidden" name="statut" value="en_livraison">
+        <div class="cd-modal-notice" style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12.5px;color:#92400e;">
+          <i class="bi bi-truck" style="margin-right:5px;"></i>
+          Confirmer que <strong>{{ commande.numero }}</strong> est en cours de livraison ?
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+          <button type="button" class="cd-modal-cancel" style="padding:6px 14px;border-radius:7px;border:1px solid #e5e7eb;background:#fff;font-size:12px;cursor:pointer;font-weight:600;color:#666;"
+                  onclick="document.getElementById('modal-statut').classList.remove('open')">Annuler</button>
+          <button type="submit" class="cd-btn cd-btn-amber"><i class="bi bi-truck"></i> En livraison</button>
+        </div>
+      {% endif %}
+    </form>
+  </div>
+</div>
+<script>
+document.getElementById('modal-statut').addEventListener('click', function(e){
+  if (e.target === this) this.classList.remove('open');
+});
+</script>
+</div>
+{% load core_tags %}{% historique_sidebar commande %}
+</div>
+{% endblock %}

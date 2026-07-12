@@ -1,0 +1,300 @@
+{% extends 'medecins/base.html' %}
+{% load static %}
+
+{% block topbar_title %}{{ med }}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
+
+{% endblock %}
+
+{% block content %}
+<!-- ══ Subheader ══ -->
+<div class="o-subheader">
+  <div class="o-subheader-row">
+    <a href="{% url 'medecins_list' %}" class="o-ctrl-btn" style="padding:3px 7px;">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <span style="font-size:13px;color:var(--text-muted);">
+      <a href="{% url 'medecins_list' %}" style="color:var(--md-600);text-decoration:none;font-weight:500;">Médecins</a>
+      <span style="margin:0 5px;opacity:.4;">/</span>
+      <span style="color:var(--text);">{{ med }}</span>
+    </span>
+    {% if med.actif %}<span class="badge-actif"><i class="bi bi-circle-fill" style="font-size:7px;"></i> Actif</span>
+    {% else %}<span class="badge-inactif">Inactif</span>{% endif %}
+    <div style="flex:1;"></div>
+    <button onclick="window.print()" class="o-ctrl-btn" title="Imprimer la fiche" style="padding:3px 7px;">
+      <i class="bi bi-printer"></i>
+    </button>
+    <a href="{% url 'medecin_edit' med.pk %}" class="btn-md">
+      <i class="bi bi-pencil-square"></i> Modifier
+    </a>
+  </div>
+</div>
+
+<div class="md-layout">
+
+  <!-- ── Colonne gauche ── -->
+  <aside>
+
+    <!-- Profil -->
+    <div class="md-card">
+      <div class="md-card-body" style="text-align:center;padding-top:24px;">
+        <div class="md-profile-photo">
+          {% if med.photo %}
+          <img src="{{ med.photo.url }}" alt="">
+          {% else %}
+          {{ med.nom|first|upper }}{{ med.prenoms|first|upper }}
+          {% endif %}
+        </div>
+        <div style="font-size:17px;font-weight:800;color:var(--md-text);">Dr {{ med.nom }}</div>
+        <div style="font-size:13px;color:var(--md-muted);margin-top:2px;">{{ med.prenoms }}</div>
+        {% if med.specialite %}
+        <div style="margin-top:8px;">
+          <span style="background:rgba(var(--teal-700-rgb),.1);color:var(--md-700);border:1px solid rgba(var(--teal-700-rgb),.2);padding:3px 10px;border-radius:20px;font-size:11.5px;font-weight:600;">{{ med.specialite }}</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Statistiques -->
+    <div class="md-card">
+      <div class="md-card-header">
+        <div class="md-card-title"><i class="bi bi-bar-chart-fill" style="color:var(--md-600);"></i> Activité</div>
+      </div>
+      <div class="md-card-body">
+        <div class="md-stat-row">
+          <div class="md-stat-box">
+            <div class="val">{{ stats.total_consultations }}</div>
+            <div class="lbl">Consultations</div>
+          </div>
+          <div class="md-stat-box">
+            <div class="val" style="color:var(--md-600);">{{ stats.consultations_mois }}</div>
+            <div class="lbl">Ce mois</div>
+          </div>
+          <div class="md-stat-box">
+            <div class="val">{{ stats.rdv_total }}</div>
+            <div class="lbl">RDV total</div>
+          </div>
+          <div class="md-stat-box">
+            <div class="val" style="color:var(--teal-600);">{{ stats.rdv_a_venir }}</div>
+            <div class="lbl">À venir</div>
+          </div>
+        </div>
+        {% if stats.taux_presence is not None %}
+        <div style="background:var(--md-50);border:1px solid var(--md-border);border-radius:10px;padding:12px 16px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;">
+            <span style="font-size:10px;color:var(--md-muted);text-transform:uppercase;letter-spacing:.3px;font-weight:700;">Taux de présence</span>
+            <span style="font-size:16px;font-weight:800;color:{% if stats.taux_presence >= 75 %}#0d7a4c{% elif stats.taux_presence >= 50 %}var(--md-600){% else %}var(--rose-btn){% endif %};">{{ stats.taux_presence }}%</span>
+          </div>
+          <div style="height:6px;background:rgba(0,0,0,.08);border-radius:4px;overflow:hidden;">
+            <div style="height:100%;width:{{ stats.taux_presence }}%;border-radius:4px;background:{% if stats.taux_presence >= 75 %}#16a34a{% elif stats.taux_presence >= 50 %}var(--md-600){% else %}var(--rose-btn){% endif %};transition:width .4s;"></div>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Informations -->
+    <div class="md-card">
+      <div class="md-card-header">
+        <div class="md-card-title"><i class="bi bi-person-vcard" style="color:var(--md-600);"></i> Informations</div>
+      </div>
+      <div class="md-card-body">
+        <div class="md-field">
+          <div class="lbl">Matricule</div>
+          <div class="val" style="font-family: var(--font-mono);color:var(--md-600);font-weight:700;">{{ med.matricule }}</div>
+        </div>
+        <div class="md-field">
+          <div class="lbl">N° Ordre</div>
+          <div class="val" style="font-family: var(--font-mono);">{{ med.ordre_medecin|default:"—" }}</div>
+        </div>
+        {% if med.telephone %}
+        <div class="md-field">
+          <div class="lbl">Téléphone</div>
+          <div class="val"><i class="bi bi-telephone" style="font-size:11px;color:var(--md-muted);"></i> {{ med.telephone }}</div>
+        </div>
+        {% endif %}
+        {% if med.email %}
+        <div class="md-field">
+          <div class="lbl">Email</div>
+          <div class="val" style="font-size:12px;"><i class="bi bi-envelope" style="font-size:11px;color:var(--md-muted);"></i> {{ med.email }}</div>
+        </div>
+        {% endif %}
+        {% if med.taux_honoraire %}
+        <div class="md-field">
+          <div class="lbl">Honoraire / consultation</div>
+          <div class="val">{{ med.taux_honoraire|floatformat:0 }} FCFA</div>
+        </div>
+        {% endif %}
+        <div class="md-field">
+          <div class="lbl">Compte utilisateur</div>
+          <div class="val">
+            {% if med.user %}
+            <i class="bi bi-person-check" style="color:var(--teal-600);"></i> {{ med.user.get_full_name|default:med.user.username }}
+            {% else %}
+            <span style="color:var(--md-muted);font-size:12px;">Non lié</span>
+            {% endif %}
+          </div>
+        </div>
+        <div class="md-field">
+          <div class="lbl">Enregistré le</div>
+          <div class="val" style="font-size:12px;">{{ med.date_creation|date:"d/m/Y" }}</div>
+        </div>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- ── Colonne droite ── -->
+  <div>
+
+    <!-- RDV à venir -->
+    <div class="md-card">
+      <div class="md-card-header">
+        <div class="md-card-title"><i class="bi bi-calendar2-check" style="color:var(--md-600);"></i> Prochains rendez-vous</div>
+        <span style="font-size:11.5px;color:var(--md-muted);">{{ stats.rdv_a_venir }} en attente</span>
+      </div>
+      <div class="md-card-body">
+        {% if rdv_a_venir %}
+        {% for rdv in rdv_a_venir %}
+        <div class="rdv-item">
+          <div class="rdv-dot"></div>
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:700;color:var(--md-text);">{{ rdv.patient.nom }} {{ rdv.patient.prenoms }}</div>
+            <div style="font-size:11.5px;color:var(--md-muted);">{{ rdv.date_heure|date:"d/m/Y à H:i" }}{% if rdv.motif %} &mdash; {{ rdv.motif|truncatechars:40 }}{% endif %}</div>
+          </div>
+          <span style="font-size:10.5px;background:rgba(var(--teal-700-rgb),.1);color:var(--md-700);padding:2px 8px;border-radius:12px;white-space:nowrap;">{{ rdv.get_statut_display }}</span>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div style="text-align:center;padding:24px;color:var(--md-muted);font-style:italic;font-size:13px;">
+          Aucun rendez-vous à venir
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Consultations récentes -->
+    <div class="md-card">
+      <div class="md-card-header">
+        <div class="md-card-title"><i class="bi bi-clipboard2-pulse" style="color:var(--md-600);"></i> Consultations récentes</div>
+        <span style="font-size:11.5px;color:var(--md-muted);">{{ stats.total_consultations }} au total</span>
+      </div>
+      {% if consultations_recentes %}
+      <table class="md-table">
+        <thead>
+          <tr>
+            <th>N° Consultation</th>
+            <th>Patient</th>
+            <th>Date</th>
+            <th>Motif</th>
+            <th style="text-align:center;">Statut</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for cons in consultations_recentes %}
+          <tr>
+            <td style="font-family: var(--font-mono);font-size:11.5px;color:var(--md-600);">{{ cons.numero }}</td>
+            <td style="font-weight:600;">{{ cons.patient.nom }} {{ cons.patient.prenoms }}</td>
+            <td style="white-space:nowrap;font-size:11.5px;">{{ cons.date_heure|date:"d/m/Y H:i" }}</td>
+            <td style="font-size:12px;color:var(--md-muted);">{{ cons.motif|truncatechars:35|default:"—" }}</td>
+            <td style="text-align:center;">
+              <span style="font-size:10.5px;padding:2px 8px;border-radius:12px;
+                {% if cons.statut == 'termine' %}background:rgba(var(--teal-600-rgb),.1);color:var(--teal-600);
+                {% elif cons.statut == 'en_cours' %}background:rgba(var(--teal-700-rgb),.1);color:var(--md-700);
+                {% else %}background:rgba(0,0,0,.06);color:rgba(0,0,0,.45);{% endif %}">
+                {{ cons.get_statut_display }}
+              </span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% if consultations_recentes.paginator.num_pages > 1 %}
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:1px solid var(--md-border);font-size:12px;color:var(--md-muted);">
+        <span>Page {{ consultations_recentes.number }} / {{ consultations_recentes.paginator.num_pages }}</span>
+        <div style="display:flex;gap:4px;">
+          {% if consultations_recentes.has_previous %}
+          <a href="?cons_page={{ consultations_recentes.previous_page_number }}"
+             style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;background:rgba(58,89,36,.08);color:var(--md-600);text-decoration:none;font-size:13px;"
+             title="Précédent"><i class="bi bi-chevron-left"></i></a>
+          {% endif %}
+          {% if consultations_recentes.has_next %}
+          <a href="?cons_page={{ consultations_recentes.next_page_number }}"
+             style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;background:rgba(58,89,36,.08);color:var(--md-600);text-decoration:none;font-size:13px;"
+             title="Suivant"><i class="bi bi-chevron-right"></i></a>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+      {% else %}
+      <div class="md-card-body" style="text-align:center;padding:32px;color:var(--md-muted);font-style:italic;">
+        Aucune consultation enregistrée
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Planning semaine courante -->
+    <div class="md-card">
+      <div class="md-card-header">
+        <div class="md-card-title"><i class="bi bi-calendar3-week" style="color:var(--md-600);"></i> Planning semaine courante</div>
+        {% if planning_grid %}
+        <span style="font-size:11.5px;color:var(--md-muted);">
+          Semaine du {{ planning_grid.semaine.semaine_debut|date:"d/m/Y" }}
+        </span>
+        {% endif %}
+      </div>
+      {% if planning_grid %}
+      <div style="overflow-x:auto;">
+        <table class="md-table" style="min-width:520px;">
+          <thead>
+            <tr>
+              <th>Bureau / Plage</th>
+              {% for j in planning_grid.jours %}<th style="text-align:center;white-space:nowrap;">{{ j }}</th>{% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in planning_grid.grid %}
+            <tr>
+              <td style="font-weight:600;white-space:nowrap;">
+                <span style="font-size:10px;color:var(--md-muted);display:block;">{{ row.plage.bureau.nom }}</span>
+                {{ row.plage.code }}
+              </td>
+              {% for cell in row.jours %}
+              <td style="text-align:center;">
+                {% if cell.aff %}
+                <span style="display:inline-block;background:rgba(58,89,36,.1);color:var(--md-700);
+                             border:1px solid rgba(58,89,36,.2);border-radius:4px;
+                             padding:2px 8px;font-size:11px;font-weight:600;white-space:nowrap;">
+                  <i class="bi bi-check2" style="font-size:10px;"></i>
+                  {% if cell.aff.note %}<span title="{{ cell.aff.note }}">{{ cell.aff.note|truncatechars:18 }}</span>
+                  {% else %}Présent{% endif %}
+                </span>
+                {% else %}
+                <span style="color:var(--md-muted);font-size:11px;">—</span>
+                {% endif %}
+              </td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="md-card-body" style="text-align:center;padding:24px;color:var(--md-muted);font-style:italic;font-size:13px;">
+        {% if planning_grid is None %}
+        Aucun planning publié pour cette semaine
+        {% else %}
+        Aucune affectation trouvée pour ce médecin cette semaine
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+
+  </div>
+</div>
+{% load core_tags %}
+{% historique_sidebar med %}
+{% endblock %}

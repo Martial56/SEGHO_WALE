@@ -1,11 +1,42 @@
 from django.contrib import admin
-from .models import Chambre, Hospitalisation, FicheVisite, ProtocoleHospitalisation
+from .models import Batiment, Chambre, Hospitalisation, FicheVisite
+
+
+@admin.register(Batiment)
+class BatimentAdmin(admin.ModelAdmin):
+    list_display  = ['nom', 'description']
+    search_fields = ['nom']
 
 
 @admin.register(Chambre)
 class ChambreAdmin(admin.ModelAdmin):
-    list_display = ['numero', 'type_chambre', 'service', 'capacite', 'prix_jour', 'disponible']
-    list_filter = ['type_chambre', 'service', 'disponible']
+    list_display  = ['nom', 'salle_no', 'type_chambre', 'nombre_lits', 'statut']
+    list_filter   = ['type_chambre', 'statut', 'prive', 'genre']
+    search_fields = ['nom', 'salle_no']
+    readonly_fields = ['salle_no']
+
+    fieldsets = (
+        (None, {
+            'fields': (
+                ('nom', 'salle_no'),
+                ('type_chambre', 'nombre_lits', 'statut'),
+                ('prive', 'genre'),
+            )
+        }),
+        ('Établissement', {
+            'fields': (
+                ('acces_internet',     'lit_visiteur'),
+                ('climatisation',      'four_micro_onde'),
+                ('salle_bains_privee', 'danger_biologique'),
+                ('television',         'refrigerateur'),
+                ('telephone_chambre',),
+            )
+        }),
+        ('Détails', {
+            'fields': ('description',),
+            'classes': ('collapse',),
+        }),
+    )
 
 
 class FicheVisiteInline(admin.TabularInline):
@@ -16,8 +47,8 @@ class FicheVisiteInline(admin.TabularInline):
 
 @admin.register(Hospitalisation)
 class HospitalisationAdmin(admin.ModelAdmin):
-    list_display = ['numero', 'patient', 'medecin_traitant', 'chambre', 'date_admission', 'statut', 'duree_sejour']
-    search_fields = ['numero', 'patient__nom', 'patient__prenoms']
-    list_filter = ['statut', 'medecin_traitant']
+    list_display    = ['numero', 'patient', 'medecin_traitant', 'chambre', 'date_admission', 'statut', 'duree_observation']
+    search_fields   = ['numero', 'patient__nom', 'patient__prenoms']
+    list_filter     = ['statut', 'medecin_traitant']
     readonly_fields = ['numero', 'date_admission']
-    inlines = [FicheVisiteInline]
+    inlines         = [FicheVisiteInline]

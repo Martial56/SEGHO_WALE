@@ -1,0 +1,214 @@
+{% extends 'conges/base.html' %}
+{% block topbar_title %}Historique congés — {{ employe.nom_complet }}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+.he-head {
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  padding:14px 32px; flex-wrap:wrap;
+  position:sticky; top:0; z-index:100;
+  background:#f0f6fa; border-bottom:1px solid rgba(0,0,0,.05);
+  box-shadow:0 2px 8px rgba(0,0,0,.04);
+}
+html[data-theme="dark"] .he-head { background:#0B1220; }
+
+.he-profile {
+  display:flex; align-items:center; gap:16px;
+  background:var(--cg-surface); border:1px solid var(--cg-border);
+  border-radius:12px; padding:16px 24px; margin:16px 32px 0;
+}
+.he-avatar {
+  width:52px; height:52px; border-radius:50%; flex-shrink:0;
+  background:linear-gradient(135deg,var(--cg-600),var(--cg-400));
+  display:flex; align-items:center; justify-content:center;
+  font-size:18px; font-weight:800; color:#fff; overflow:hidden;
+}
+.he-avatar img { width:100%; height:100%; object-fit:cover; }
+.he-name { font-size:16px; font-weight:800; color:var(--cg-900); }
+html[data-theme="dark"] .he-name { color:var(--cg-200); }
+.he-sub  { font-size:12px; color:var(--cg-muted); margin-top:2px; }
+
+.he-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:14px 32px 0; }
+@media(max-width:900px){ .he-stats{ grid-template-columns:repeat(2,1fr); } }
+.he-stat { background:var(--cg-surface); border-radius:10px; padding:12px 16px; box-shadow:var(--shadow-sm); text-align:center; }
+.he-stat-val { font-size:22px; font-weight:800; color:var(--cg-700); }
+html[data-theme="dark"] .he-stat-val { color:var(--cg-300); }
+.he-stat-val.v-ok   { color:var(--cg-600); }
+.he-stat-val.v-warn { color:#c47a00; }
+.he-stat-val.v-bad  { color:var(--rose-text); }
+html[data-theme="dark"] .he-stat-val.v-ok   { color:#42A5F5; }
+html[data-theme="dark"] .he-stat-val.v-warn { color:#f0c060; }
+html[data-theme="dark"] .he-stat-val.v-bad  { color:#f09090; }
+.he-solde-inline.v-ok   { color:var(--cg-600); }
+.he-solde-inline.v-bad  { color:var(--rose-text); }
+html[data-theme="dark"] .he-solde-inline.v-ok  { color:#42A5F5; }
+html[data-theme="dark"] .he-solde-inline.v-bad { color:#f09090; }
+.he-stat-lbl { font-size:10.5px; color:var(--cg-muted); text-transform:uppercase; letter-spacing:.3px; font-weight:600; margin-top:2px; }
+
+.he-filters { display:flex; gap:10px; flex-wrap:wrap; padding:14px 32px 0; align-items:center; }
+
+.he-table { width:100%; border-collapse:collapse; font-size:13px; background:var(--cg-surface); }
+.he-table thead { background:var(--cg-700); }
+.he-table thead th { padding:9px 14px; color:#fff; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; text-align:left; }
+.he-table tbody tr { border-bottom:1px solid var(--cg-border); transition:background .1s; }
+.he-table tbody tr:hover { background:var(--cg-50); }
+html[data-theme="dark"] .he-table tbody tr:hover { background:rgba(255,255,255,.04); }
+.he-table tbody td { padding:10px 14px; color:var(--cg-text); vertical-align:middle; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="he-head" id="subheader">
+  <div style="display:flex;align-items:center;gap:10px;">
+    <a href="{% url 'conge_list' %}" style="color:var(--cg-muted);text-decoration:none;font-size:13px;">
+      <i class="bi bi-arrow-left"></i> Retour
+    </a>
+    <div style="font-size:16px;font-weight:800;color:var(--cg-text);">
+      Historique — {{ employe.nom_complet }}
+    </div>
+  </div>
+  <a href="{% url 'conge_nouveau' %}?employe={{ employe.pk }}" class="btn-cg">
+    <i class="bi bi-plus-circle-fill"></i> Nouveau congé
+  </a>
+</div>
+
+<!-- Profil employé -->
+<div class="he-profile">
+  <div class="he-avatar">
+    {% if employe.photo %}<img src="{{ employe.photo.url }}" alt="">
+    {% else %}{{ employe.initiales|default:"?" }}{% endif %}
+  </div>
+  <div>
+    <div class="he-name">{{ employe.nom_complet }}</div>
+    <div class="he-sub">
+      {{ employe.matricule }}
+      {% if employe.service %} · {{ employe.service.nom }}{% endif %}
+      {% if employe.fonction %} · {{ employe.fonction.nom }}{% endif %}
+    </div>
+    {% if employe.date_embauche %}
+    <div class="he-sub" style="margin-top:2px;">
+      <i class="bi bi-calendar3" style="font-size:10px;"></i>
+      Embauché le {{ employe.date_embauche|date:"d/m/Y" }}
+      · {{ employe.anciennete.label }}
+    </div>
+    {% endif %}
+  </div>
+  <div style="margin-left:auto;text-align:right;">
+    <div style="font-size:11px;color:var(--cg-muted);text-transform:uppercase;font-weight:700;">Solde {{ today.year }}</div>
+    <div class="he-solde-inline {% if solde.solde >= 0 %}v-ok{% else %}v-bad{% endif %}"
+         style="font-size:22px;font-weight:800;">
+      {{ solde.solde|floatformat:1 }}j
+    </div>
+    <div style="font-size:11px;color:var(--cg-muted);">Quota: {{ solde.quota }}j · Pris: {{ solde.jours_pris|floatformat:1 }}j</div>
+  </div>
+</div>
+
+<!-- Stats -->
+<div class="he-stats">
+  <div class="he-stat">
+    <div class="he-stat-val">{{ nb_conges }}</div>
+    <div class="he-stat-lbl">Congés enregistrés</div>
+  </div>
+  <div class="he-stat">
+    <div class="he-stat-val">{{ total_jours }}</div>
+    <div class="he-stat-lbl">Jours ouvrés pris</div>
+  </div>
+  <div class="he-stat">
+    <div class="he-stat-val {% if solde.solde >= 5 %}v-ok{% elif solde.solde >= 0 %}v-warn{% else %}v-bad{% endif %}">
+      {{ solde.solde|floatformat:1 }}j
+    </div>
+    <div class="he-stat-lbl">Solde restant {{ today.year }}</div>
+  </div>
+  <div class="he-stat">
+    <div class="he-stat-val">{{ solde.quota|floatformat:1 }}j</div>
+    <div class="he-stat-lbl">Quota annuel</div>
+  </div>
+</div>
+
+<!-- Filtres -->
+<form method="get" class="he-filters">
+  <select name="annee" onchange="this.form.submit()" class="cg-input" style="max-width:140px;">
+    <option value="">Toutes les années</option>
+    {% for an in annees %}
+    <option value="{{ an }}" {% if f_annee == an|stringformat:"s" %}selected{% endif %}>{{ an }}</option>
+    {% endfor %}
+  </select>
+  <select name="type_conge" onchange="this.form.submit()" class="cg-input" style="max-width:200px;">
+    <option value="">Tous les types</option>
+    {% for code,label in types %}
+    <option value="{{ code }}" {% if f_type == code %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  {% if f_annee or f_type %}
+  <a href="{% url 'conge_historique_employe' employe.pk %}" class="btn-cg-outline" style="padding:6px 12px;font-size:12px;">
+    <i class="bi bi-x"></i> Effacer
+  </a>
+  {% endif %}
+</form>
+
+<!-- Tableau -->
+<div style="margin-top:12px;">
+{% if page_obj.object_list %}
+<table class="he-table">
+  <thead><tr>
+    <th>Type</th><th>Période</th><th>Durée</th><th>Statut</th>
+    <th>Enregistré par</th><th>Motif</th><th></th>
+  </tr></thead>
+  <tbody>
+  {% for c in page_obj %}
+  <tr>
+    <td><span class="cg-type-badge">{{ c.get_type_conge_display }}</span></td>
+    <td style="white-space:nowrap;">{{ c.date_debut|date:"d/m/Y" }} → {{ c.date_fin|date:"d/m/Y" }}</td>
+    <td style="font-weight:700;">{{ c.nb_jours_ouvres }}j ouvrés <span style="color:var(--cg-muted);font-weight:400;">({{ c.duree }}j cal.)</span></td>
+    <td>
+      <span class="cg-badge cg-b-{{ c.statut }}">
+        <span></span>{{ c.get_statut_display }}
+      </span>
+    </td>
+    <td style="color:var(--cg-muted);font-size:12px;">
+      {% if c.approuve_par %}{{ c.approuve_par.get_full_name|default:c.approuve_par.username }}{% else %}—{% endif %}
+      {% if c.date_approbation %}<br><span style="font-size:11px;">{{ c.date_approbation|date:"d/m/Y" }}</span>{% endif %}
+    </td>
+    <td style="color:var(--cg-muted);font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+      {{ c.motif|default:"—"|truncatechars:40 }}
+    </td>
+    <td><a href="{% url 'conge_detail' c.pk %}" class="btn-cg-sm"><i class="bi bi-eye"></i></a></td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+{% if page_obj.has_other_pages %}
+<div class="rh-pagination" style="padding:16px 0;">
+  {% if page_obj.has_previous %}
+    <a href="?page=1{% if f_annee %}&annee={{ f_annee }}{% endif %}{% if f_type %}&type_conge={{ f_type }}{% endif %}" class="rh-page-link"><i class="bi bi-chevron-double-left"></i></a>
+    <a href="?page={{ page_obj.previous_page_number }}{% if f_annee %}&annee={{ f_annee }}{% endif %}{% if f_type %}&type_conge={{ f_type }}{% endif %}" class="rh-page-link"><i class="bi bi-chevron-left"></i></a>
+  {% else %}
+    <span class="rh-page-link disabled"><i class="bi bi-chevron-double-left"></i></span>
+    <span class="rh-page-link disabled"><i class="bi bi-chevron-left"></i></span>
+  {% endif %}
+  {% for num in page_obj.paginator.page_range %}
+    {% if num == page_obj.number %}<span class="rh-page-link active">{{ num }}</span>
+    {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
+      <a href="?page={{ num }}{% if f_annee %}&annee={{ f_annee }}{% endif %}{% if f_type %}&type_conge={{ f_type }}{% endif %}" class="rh-page-link">{{ num }}</a>
+    {% endif %}
+  {% endfor %}
+  {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}{% if f_annee %}&annee={{ f_annee }}{% endif %}{% if f_type %}&type_conge={{ f_type }}{% endif %}" class="rh-page-link"><i class="bi bi-chevron-right"></i></a>
+    <a href="?page={{ page_obj.paginator.num_pages }}{% if f_annee %}&annee={{ f_annee }}{% endif %}{% if f_type %}&type_conge={{ f_type }}{% endif %}" class="rh-page-link"><i class="bi bi-chevron-double-right"></i></a>
+  {% else %}
+    <span class="rh-page-link disabled"><i class="bi bi-chevron-right"></i></span>
+    <span class="rh-page-link disabled"><i class="bi bi-chevron-double-right"></i></span>
+  {% endif %}
+</div>
+{% endif %}
+
+{% else %}
+<div style="text-align:center;padding:48px;color:var(--cg-muted);">
+  <i class="bi bi-calendar-x" style="font-size:36px;display:block;margin-bottom:12px;opacity:.3;"></i>
+  Aucun congé enregistré{% if f_annee or f_type %} pour ces critères{% endif %}.
+</div>
+{% endif %}
+</div>
+{% endblock %}

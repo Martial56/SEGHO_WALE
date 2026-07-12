@@ -1,0 +1,125 @@
+{% extends 'stock/base.html' %}
+{% load static %}
+{% block topbar_title %}Stock — Nouveau mouvement{% endblock %}
+
+{% block extra_st_css %}<style>
+#produit-stock-info {
+  font-size: 12px; margin-top: 6px; padding: 6px 10px;
+  border-radius: 6px; background: var(--st-50);
+  border-left: 3px solid var(--st-400);
+  color: var(--st-700); display: none;
+}
+</style>{% endblock %}
+
+{% block content %}
+
+<div class="action-bar">
+  <div class="action-bar-breadcrumb">
+    <a href="{% url 'stock_mouvements' %}"><i class="bi bi-arrow-left"></i> Mouvements</a>
+    <span class="sep">/</span>
+    <span class="current">Nouveau mouvement de stock</span>
+  </div>
+</div>
+
+<!-- Formulaire -->
+<div class="form-simple-card" style="max-width:750px;">
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      <div class="form-field">
+        <label class="field-label" for="id_produit">Produit <span class="required-star">*</span></label>
+        <select name="produit" id="id_produit" class="field-ul" required onchange="showStock(this)">
+          <option value="">— Sélectionner un produit —</option>
+          {% for p in produits %}
+          <option value="{{ p.pk }}"
+            data-stock="{{ p.stock_actuel|floatformat:0 }}"
+            data-unite="{{ p.unite_mesure.nom }}"
+            data-alerte="{{ p.stock_alerte|floatformat:0 }}">
+            {{ p.code }} — {{ p.nom }}
+          </option>
+          {% endfor %}
+        </select>
+        <div id="produit-stock-info">
+          <i class="bi bi-info-circle"></i>
+          Stock actuel : <strong id="stock-val">—</strong> <span id="stock-unite"></span>
+          &nbsp;·&nbsp; Seuil alerte : <strong id="stock-alerte">—</strong>
+        </div>
+      </div>
+
+      <div class="tab-two-col">
+        <div class="form-field">
+          <label class="field-label" for="id_type">Type <span class="required-star">*</span></label>
+          <select name="type" id="id_type" class="field-ul" required>
+            <option value="">— Sélectionner —</option>
+            <option value="entree">↓ Entrée en stock</option>
+            <option value="ajustement">⇄ Ajustement inventaire</option>
+            <option value="peremption">✕ Péremption / Perte</option>
+            <option value="retour">← Retour fournisseur</option>
+          </select>
+        </div>
+
+        <div class="form-field">
+          <label class="field-label" for="id_motif">Motif</label>
+          <select name="motif" id="id_motif" class="field-ul">
+            <option value="">— Sélectionner un motif —</option>
+            <option value="achat">Achat fournisseur</option>
+            <option value="inventaire">Correction inventaire</option>
+            <option value="peremption">Péremption / Perte</option>
+            <option value="retour">Retour fournisseur</option>
+            <option value="don">Don / Subvention</option>
+            <option value="autre">Autre</option>
+          </select>
+        </div>
+
+        <div class="form-field">
+          <label class="field-label" for="id_quantite">Quantité <span class="required-star">*</span></label>
+          <input type="number" name="quantite" id="id_quantite" class="field-ul"
+                 min="1" step="1" placeholder="0" required>
+        </div>
+
+        <div class="form-field">
+          <label class="field-label" for="id_reference">Référence</label>
+          <input type="text" name="reference" id="id_reference" class="field-ul"
+                 placeholder="N° bon, référence document…">
+        </div>
+      </div>
+
+      <div class="form-field">
+        <label class="field-label" for="id_notes">Notes</label>
+        <textarea name="notes" id="id_notes" class="field-ul"
+                  placeholder="Explication du mouvement…"></textarea>
+      </div>
+
+      <div class="form-actions">
+        <a href="{% url 'stock_mouvements' %}" class="btn-form-cancel">
+          <i class="bi bi-x-lg"></i> Annuler
+        </a>
+        <button type="submit" class="btn-form-submit">
+          <i class="bi bi-check-lg"></i> Enregistrer le mouvement
+        </button>
+      </div>
+
+    </form>
+</div>
+
+<script>
+function showStock(sel) {
+  const opt = sel.selectedOptions[0];
+  const info = document.getElementById('produit-stock-info');
+  if (opt && opt.value) {
+    document.getElementById('stock-val').textContent    = opt.dataset.stock || '—';
+    document.getElementById('stock-unite').textContent  = opt.dataset.unite || '';
+    document.getElementById('stock-alerte').textContent = opt.dataset.alerte || '—';
+    info.style.display = 'block';
+  } else {
+    info.style.display = 'none';
+  }
+}
+// Afficher dès le chargement si valeur déjà sélectionnée
+document.addEventListener('DOMContentLoaded', function() {
+  const sel = document.getElementById('id_produit');
+  if (sel && sel.value) showStock(sel);
+});
+</script>
+
+{% endblock %}

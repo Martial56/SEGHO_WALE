@@ -1,0 +1,43 @@
+{% extends 'hospitalisation/base.html' %}
+
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+
+<div class="action-bar">
+  <div class="action-bar-breadcrumb">
+    <a href="{% url 'hospitalisation:config_liste_admission' %}" class="btn-form-cancel" style="padding:3px 7px;">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <a href="{% url 'hospitalisation:config_liste_admission' %}">Liste de contrôle d'admission</a>
+    <span class="sep">/</span>
+    <span class="current">{{ titre }}</span>
+  </div>
+  <div class="action-bar-buttons">
+    <a href="{% url 'hospitalisation:config_liste_admission' %}" class="btn-form-cancel">Ignorer</a>
+    <button type="submit" form="admission-form" class="btn-form-submit">
+      <i class="bi bi-check2"></i> Sauvegarder
+    </button>
+  </div>
+</div>
+
+<form method="post" id="admission-form" novalidate>
+  {% csrf_token %}
+  <div class="form-simple-card" style="max-width:600px;">
+
+    <div class="form-field">
+      <label class="field-label" for="{{ form.item.id_for_label }}">Vérifier l'élément de la liste</label>
+      {{ form.item }}
+      {% if form.item.errors %}<div class="field-error">{{ form.item.errors|join:", " }}</div>{% endif %}
+    </div>
+
+    <div class="form-field">
+      <label class="field-label" for="{{ form.remarques.id_for_label }}">Remarques</label>
+      {{ form.remarques }}
+      {% if form.remarques.errors %}<div class="field-error">{{ form.remarques.errors|join:", " }}</div>{% endif %}
+    </div>
+
+  </div>
+</form>
+
+{% endblock %}

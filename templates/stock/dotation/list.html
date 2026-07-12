@@ -1,0 +1,122 @@
+{% extends 'stock/base.html' %}
+{% load static %}
+{% block topbar_title %}Stock — Dotation{% endblock %}
+
+{% block extra_st_css %}<style>
+.st-page-head { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 32px;margin:0 -32px;background:#e8f2f7;border-bottom:1px solid rgba(0,0,0,.05);box-shadow:0 2px 8px rgba(0,0,0,.04);position:sticky;top:var(--topbar-h);z-index:100; }
+.filtre-tabs { display:flex;gap:4px;flex-wrap:wrap;margin-top:16px; }
+.filtre-tab { padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;text-decoration:none;border:1.5px solid var(--st-border);color:var(--st-muted);background:var(--st-surface);transition:all .15s; }
+.filtre-tab:hover { border-color:var(--st-500);color:var(--st-600); }
+.filtre-tab.active { background:var(--st-600);border-color:var(--st-600);color:#fff; }
+.badge-en_attente { background:rgba(var(--amber-rgb),.1);color:var(--amber-text);border:1px solid rgba(var(--amber-rgb),.25);padding:2px 9px;border-radius:20px;font-size:10.5px;font-weight:600; }
+.badge-approuvee  { background:rgba(var(--st-600-rgb),.1);color:var(--st-600);border:1px solid rgba(var(--st-600-rgb),.25);padding:2px 9px;border-radius:20px;font-size:10.5px;font-weight:600; }
+.badge-partielle  { background:rgba(45,153,219,.1);color:#1565c0;border:1px solid rgba(45,153,219,.25);padding:2px 9px;border-radius:20px;font-size:10.5px;font-weight:600; }
+.badge-refusee    { background:rgba(var(--rose-rgb),.1);color:var(--rose-text);border:1px solid rgba(var(--rose-rgb),.25);padding:2px 9px;border-radius:20px;font-size:10.5px;font-weight:600; }
+.badge-pharma     { background:rgba(var(--st-700-rgb),.1);color:var(--st-700);border:1px solid rgba(var(--st-700-rgb),.2);padding:2px 9px;border-radius:20px;font-size:10.5px;font-weight:600; }
+</style>{% endblock %}
+
+{% block content %}
+<div class="st-page-head">
+  <div>
+    <div style="font-size:15px;font-weight:800;color:var(--st-900);"><i class="bi bi-bag-check" style="color:var(--st-600);"></i> Dotation pharmacies</div>
+    <div style="font-size:11.5px;color:var(--st-muted);">Demandes d'approvisionnement des pharmacies Walé</div>
+  </div>
+  <span style="font-size:12px;color:var(--st-muted);font-style:italic;"><i class="bi bi-info-circle"></i> Les demandes arrivent depuis le module Pharmacie</span>
+</div>
+
+<!-- Stats rapides -->
+<div class="st-stats" style="margin-top:16px;">
+  <div class="st-stat">
+    <div class="st-stat-icon" style="background:rgba(var(--amber-rgb),.1);color:var(--amber-text);"><i class="bi bi-hourglass-split"></i></div>
+    <div><div class="st-stat-val" style="color:var(--amber-text);">{{ stats.en_attente }}</div><div class="st-stat-lbl">En attente</div></div>
+  </div>
+  <div class="st-stat">
+    <div class="st-stat-icon" style="background:rgba(var(--st-600-rgb),.1);color:var(--st-600);"><i class="bi bi-check-circle"></i></div>
+    <div><div class="st-stat-val" style="color:var(--st-600);">{{ stats.approuvee }}</div><div class="st-stat-lbl">Approuvées</div></div>
+  </div>
+  <div class="st-stat">
+    <div class="st-stat-icon" style="background:rgba(45,153,219,.1);color:#1565c0;"><i class="bi bi-check2-all"></i></div>
+    <div><div class="st-stat-val" style="color:#1565c0;">{{ stats.partielle }}</div><div class="st-stat-lbl">Partielles</div></div>
+  </div>
+  <div class="st-stat">
+    <div class="st-stat-icon" style="background:rgba(var(--rose-rgb),.1);color:var(--rose-text);"><i class="bi bi-x-circle"></i></div>
+    <div><div class="st-stat-val" style="color:var(--rose-text);">{{ stats.refusee }}</div><div class="st-stat-lbl">Refusées</div></div>
+  </div>
+</div>
+
+<!-- Filtres statut -->
+<div class="filtre-tabs">
+  <a href="?statut=en_attente" class="filtre-tab {% if statut_filtre == 'en_attente' %}active{% endif %}">
+    <i class="bi bi-hourglass-split"></i> En attente {% if stats.en_attente %}<span style="background:rgba(255,255,255,.3);border-radius:10px;padding:0 6px;">{{ stats.en_attente }}</span>{% endif %}
+  </a>
+  <a href="?statut=approuvee" class="filtre-tab {% if statut_filtre == 'approuvee' %}active{% endif %}">Approuvées</a>
+  <a href="?statut=partielle" class="filtre-tab {% if statut_filtre == 'partielle' %}active{% endif %}">Partielles</a>
+  <a href="?statut=refusee"   class="filtre-tab {% if statut_filtre == 'refusee' %}active{% endif %}">Refusées</a>
+  <a href="?statut=tous"      class="filtre-tab {% if statut_filtre == 'tous' %}active{% endif %}">Toutes</a>
+</div>
+
+<!-- Tableau -->
+<div style="margin-top:14px;margin-left:-32px;margin-right:-32px;background:var(--st-surface);box-shadow:0 2px 12px rgba(var(--st-700-rgb),.08);overflow:hidden;">
+  {% if demandes %}
+  <table class="st-table">
+    <thead>
+      <tr>
+        <th>N° Demande</th>
+        <th>Pharmacie</th>
+        <th>Date demande</th>
+        <th style="text-align:center;">Nb produits</th>
+        <th>Statut</th>
+        <th>Traitée le</th>
+        <th style="width:60px;"></th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for d in demandes %}
+    <tr style="cursor:pointer;" onclick="window.location='{% url 'stock_dotation_detail' d.pk %}'">
+      <td style="font-family: var(--font-mono);font-size:12px;color:var(--st-600);font-weight:700;">{{ d.numero }}</td>
+      <td><span class="badge-pharma"><i class="bi bi-hospital" style="font-size:10px;"></i> {{ d.get_pharmacie_display }}</span></td>
+      <td style="font-size:12px;">{{ d.date_demande|date:"d/m/Y H:i" }}</td>
+      <td style="text-align:center;font-weight:700;">{{ d.lignes.count }}</td>
+      <td>
+        {% if d.statut == 'en_attente' %}<span class="badge-en_attente"><i class="bi bi-hourglass-split" style="font-size:9px;"></i> En attente</span>
+        {% elif d.statut == 'approuvee' %}<span class="badge-approuvee"><i class="bi bi-check-circle-fill" style="font-size:9px;"></i> Approuvée</span>
+        {% elif d.statut == 'partielle' %}<span class="badge-partielle"><i class="bi bi-check2-all" style="font-size:9px;"></i> Partielle</span>
+        {% else %}<span class="badge-refusee"><i class="bi bi-x-circle-fill" style="font-size:9px;"></i> Refusée</span>{% endif %}
+      </td>
+      <td style="font-size:11.5px;color:var(--st-muted);">
+        {% if d.date_traitement %}{{ d.date_traitement|date:"d/m/Y H:i" }}{% else %}—{% endif %}
+      </td>
+      <td>
+        <a href="{% url 'stock_dotation_detail' d.pk %}" class="btn-st-outline" style="padding:3px 10px;font-size:11.5px;" onclick="event.stopPropagation()">
+          {% if d.statut == 'en_attente' %}<i class="bi bi-check2-square"></i> Traiter{% else %}<i class="bi bi-eye"></i>{% endif %}
+        </a>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="st-card-body" style="text-align:center;padding:48px;color:var(--st-muted);">
+    <i class="bi bi-bag-x" style="font-size:32px;display:block;margin-bottom:12px;opacity:.4;"></i>
+    {% if statut_filtre == 'en_attente' %}
+    Aucune demande en attente — les pharmacies n'ont pas encore soumis de demande.
+    {% else %}Aucune demande pour ce statut.{% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{% if page_obj.has_other_pages %}
+<div style="display:flex;justify-content:center;align-items:center;gap:6px;padding:14px 0;">
+  {% if page_obj.has_previous %}
+  <a href="?page=1&statut={{ statut_filtre }}" class="btn-st-outline" style="padding:4px 10px;font-size:12px;"><i class="bi bi-chevron-double-left"></i></a>
+  <a href="?page={{ page_obj.previous_page_number }}&statut={{ statut_filtre }}" class="btn-st-outline" style="padding:4px 10px;font-size:12px;"><i class="bi bi-chevron-left"></i></a>
+  {% endif %}
+  <span style="font-size:12px;color:var(--st-muted);padding:0 8px;">Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} &nbsp;&middot;&nbsp; {{ page_obj.paginator.count }} enregistrement{{ page_obj.paginator.count|pluralize }}</span>
+  {% if page_obj.has_next %}
+  <a href="?page={{ page_obj.next_page_number }}&statut={{ statut_filtre }}" class="btn-st-outline" style="padding:4px 10px;font-size:12px;"><i class="bi bi-chevron-right"></i></a>
+  <a href="?page={{ page_obj.paginator.num_pages }}&statut={{ statut_filtre }}" class="btn-st-outline" style="padding:4px 10px;font-size:12px;"><i class="bi bi-chevron-double-right"></i></a>
+  {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}

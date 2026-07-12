@@ -1,19 +1,26 @@
+import csv
+import io
 import json
+
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Q
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.views.decorators.http import require_POST
+
+import openpyxl
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Font, PatternFill
 
 from .models import (
     Articleservice, CategorieArticle, FamilleArticle, CompagniePharma,
     LigneFournisseurArticle, ConditionnementArticle, VarianteAttributArticle, ReglePrix,
-    UniteMesure, CategorieUniteMesure, Consommable, Typeservice,
 )
-from .forms import CategorieArticleForm, CategorieUniteMesureForm, UniteMesureForm, ConsommableForm, TypeserviceForm
-from pharmacie.models import Fournisseur
+from stock.models import UniteMesure
+from .forms import CategorieArticleForm
+from achats.models import Fournisseur
 from django.contrib.auth.models import User
 
 
@@ -26,6 +33,7 @@ def services_list(request):
     categorie_id = request.GET.get('categorie', '')
     type_produit = request.GET.get('type_produit', '')
     statut = request.GET.get('statut', '')
+    filtre = request.GET.get('filtre', '')
     vue = request.GET.get('vue', 'liste')  # kanban ou liste
 
     if q:
@@ -41,6 +49,20 @@ def services_list(request):
     if statut == 'actif':
         qs = qs.filter(actif=True)
     elif statut == 'inactif':
+        qs = qs.filter(actif=False)
+    if filtre == 'services':
+        qs = qs.filter(type_produit_hospitalier='service')
+    elif filtre == 'articles':
+        qs = qs.exclude(type_produit_hospitalier='service')
+    elif filtre == 'peut_etre_vendu':
+        qs = qs.filter(peut_etre_vendu=True)
+    elif filtre == 'peut_etre_achete':
+        qs = qs.filter(peut_etre_achete=True)
+    elif filtre == 'favori':
+        qs = qs.filter(favori=True)
+    elif filtre == 'avertissement':
+        qs = qs.filter(Q(avertissement_grossesse=True) | Q(avertissement_lactation=True))
+    elif filtre == 'archive':
         qs = qs.filter(actif=False)
 
     total = qs.count()
@@ -58,6 +80,7 @@ def services_list(request):
         'categorie_id': categorie_id,
         'type_produit': type_produit,
         'statut': statut,
+        'filtre': filtre,
         'vue': vue,
         'total': total,
     })
@@ -77,15 +100,25 @@ def service_form(request, pk=None):
             messages.error(request, "Le nom de l'article est obligatoire.")
             return redirect(request.path)
 
+        reference_interne = data.get('reference_interne', '').strip().upper() or None
+        if reference_interne:
+            doublon = Articleservice.objects.filter(reference_interne=reference_interne)
+            if not is_new:
+                doublon = doublon.exclude(pk=article.pk)
+            if doublon.exists():
+                messages.error(request, f"La référence interne « {reference_interne} » est déjà utilisée par un autre article.")
+                return redirect(request.path)
+
         if is_new:
             article = Articleservice(cree_par=request.user)
 
         # En-tête
         article.nom = nom
-        article.reference_interne = data.get('reference_interne', '')
+        article.reference_interne = reference_interne
         article.favori = 'favori' in data
         article.peut_etre_vendu = 'peut_etre_vendu' in data
         article.peut_etre_achete = 'peut_etre_achete' in data
+        article.actif = 'actif' in data
 
         # Onglet 1 — Détails médicament
         article.forme = data.get('forme', '')
@@ -119,6 +152,8 @@ def service_form(request, pk=None):
         article.cout = data.get('cout') or 0
         categorie_id = data.get('categorie')
         article.categorie_id = categorie_id if categorie_id else None
+        departement_id = data.get('departement')
+        article.departement_id = departement_id if departement_id else None
         article.code_barres = data.get('code_barres', '')
         famille_id = data.get('famille')
         article.famille_id = famille_id if famille_id else None
@@ -151,24 +186,20 @@ def service_form(request, pk=None):
         article.compte_charges = data.get('compte_charges', '')
         article.compte_ecart_prix = data.get('compte_ecart_prix', '')
 
-        if not is_new:
-            article.actif = 'actif' in data
-
         # Photo
         if 'photo' in request.FILES:
             article.photo = request.FILES['photo']
 
         article.save()
-        # M2M types
-        types_ids = request.POST.getlist('types')
-        article.types.set(types_ids)
         messages.success(request, f"Article « {article.nom} » enregistré avec succès.")
         return redirect('services:detail', pk=article.pk)
 
     # GET — préparer le contexte
+    from medecins.models import Departement
     fournisseurs = Fournisseur.objects.filter(actif=True).order_by('nom')
     categories = CategorieArticle.objects.all()
     cat_codes_json = json.dumps({str(c.pk): c.code for c in categories})
+    departements = Departement.objects.filter(actif=True).order_by('nom')
     familles = FamilleArticle.objects.all()
     compagnies = CompagniePharma.objects.all()
     users = User.objects.filter(is_active=True).order_by('last_name')
@@ -178,14 +209,13 @@ def service_form(request, pk=None):
     lignes_conditionnements = article.conditionnements.all() if article else []
     lignes_variantes = article.variantes.all() if article else []
     regles = article.regles_prix.all() if article else []
-    tous_types = Typeservice.objects.filter(actif=True).order_by('nom')
-    types_selectionnes = list(article.types.values_list('pk', flat=True)) if article else []
 
     return render(request, 'services/form.html', {
         'article': article,
         'is_new': is_new,
         'fournisseurs': fournisseurs,
         'categories': categories,
+        'departements': departements,
         'familles': familles,
         'compagnies': compagnies,
         'users': users,
@@ -201,8 +231,6 @@ def service_form(request, pk=None):
         'politique_fact_choices': Articleservice.POLITIQUE_FACT_CHOICES,
         'refacturer_choices': Articleservice.REFACTURER_CHOICES,
         'politique_controle_choices': Articleservice.POLITIQUE_CONTROLE_CHOICES,
-        'tous_types': tous_types,
-        'types_selectionnes': types_selectionnes,
         'cat_codes_json': cat_codes_json,
     })
 
@@ -227,93 +255,6 @@ def regles_prix(request, pk):
 
 # ── Vues AJAX pour les lignes dynamiques ─────────────────────
 
-# ── Consommables ──────────────────────────────────────────────────────────
-
-@login_required
-def consommables_list(request):
-    qs = Consommable.objects.select_related('categorie', 'unite_mesure').all()
-
-    q = request.GET.get('q', '').strip()
-    categorie_id = request.GET.get('categorie', '')
-    statut = request.GET.get('statut', '')
-    vue = request.GET.get('vue', 'liste')
-
-    if q:
-        qs = qs.filter(Q(nom__icontains=q) | Q(code__icontains=q) | Q(description__icontains=q))
-    if categorie_id:
-        qs = qs.filter(categorie_id=categorie_id)
-    if statut == 'actif':
-        qs = qs.filter(actif=True)
-    elif statut == 'inactif':
-        qs = qs.filter(actif=False)
-
-    total = qs.count()
-    paginator = Paginator(qs, 24 if vue == 'grille' else 40)
-    page_obj = paginator.get_page(request.GET.get('page'))
-
-    return render(request, 'services/consommables/list.html', {
-        'page_obj': page_obj,
-        'categories': CategorieArticle.objects.all(),
-        'q': q,
-        'categorie_id': categorie_id,
-        'statut': statut,
-        'vue': vue,
-        'total': total,
-    })
-
-
-@login_required
-def consommable_create(request):
-    if request.method == 'POST':
-        form = ConsommableForm(request.POST)
-        if form.is_valid():
-            obj = form.save()
-            messages.success(request, f'Consommable « {obj.nom} » créé avec succès.')
-            return redirect('services:consommables')
-    else:
-        form = ConsommableForm()
-    return render(request, 'services/consommables/form.html', {
-        'form': form,
-        'titre': 'Nouveau consommable',
-        'edit': False,
-    })
-
-
-@login_required
-def consommable_edit(request, pk):
-    obj = get_object_or_404(Consommable, pk=pk)
-    if request.method == 'POST':
-        form = ConsommableForm(request.POST, instance=obj)
-        if form.is_valid():
-            form.save()
-            messages.success(request, f'Consommable « {obj.nom} » mis à jour.')
-            return redirect('services:consommable_detail', pk=obj.pk)
-    else:
-        form = ConsommableForm(instance=obj)
-    return render(request, 'services/consommables/form.html', {
-        'form': form,
-        'obj': obj,
-        'titre': f'Modifier — {obj.nom}',
-        'edit': True,
-    })
-
-
-@login_required
-def consommable_detail(request, pk):
-    obj = get_object_or_404(Consommable, pk=pk)
-    return render(request, 'services/consommables/detail.html', {'obj': obj})
-
-
-@login_required
-def consommable_delete(request, pk):
-    obj = get_object_or_404(Consommable, pk=pk)
-    if request.method == 'POST':
-        nom = obj.nom
-        obj.delete()
-        messages.success(request, f'Consommable « {nom} » supprimé.')
-    return redirect('services:consommables')
-
-
 @login_required
 @require_POST
 def service_bulk_delete(request):
@@ -326,30 +267,10 @@ def service_bulk_delete(request):
 
 @login_required
 @require_POST
-def consommable_bulk_delete(request):
-    ids = request.POST.getlist('ids[]')
-    if ids:
-        count, _ = Consommable.objects.filter(pk__in=ids).delete()
-        return JsonResponse({'ok': True, 'count': count})
-    return JsonResponse({'ok': False, 'error': 'Aucun élément sélectionné'}, status=400)
-
-
-@login_required
-@require_POST
 def categorie_bulk_delete(request):
     ids = request.POST.getlist('ids[]')
     if ids:
         count, _ = CategorieArticle.objects.filter(pk__in=ids).delete()
-        return JsonResponse({'ok': True, 'count': count})
-    return JsonResponse({'ok': False}, status=400)
-
-
-@login_required
-@require_POST
-def unite_bulk_delete(request):
-    ids = request.POST.getlist('ids[]')
-    if ids:
-        count, _ = UniteMesure.objects.filter(pk__in=ids).delete()
         return JsonResponse({'ok': True, 'count': count})
     return JsonResponse({'ok': False}, status=400)
 
@@ -383,6 +304,8 @@ def categorie_create(request):
             obj = form.save()
             messages.success(request, f'Catégorie « {obj.nom} » créée.')
             return redirect('services:categories')
+        else:
+            messages.error(request, 'Veuillez corriger les erreurs du formulaire.')
     else:
         form = CategorieArticleForm()
     return render(request, 'services/categories/form.html', {
@@ -401,6 +324,8 @@ def categorie_edit(request, pk):
             form.save()
             messages.success(request, f'Catégorie « {obj.nom} » mise à jour.')
             return redirect('services:categorie_detail', pk=obj.pk)
+        else:
+            messages.error(request, 'Veuillez corriger les erreurs du formulaire.')
     else:
         form = CategorieArticleForm(instance=obj)
     return render(request, 'services/categories/form.html', {
@@ -425,248 +350,6 @@ def categorie_delete(request, pk):
         obj.delete()
         messages.success(request, f'Catégorie « {nom} » supprimée.')
     return redirect('services:categories')
-
-
-# ── Unités de mesure ───────────────────────────────────────────────────────
-
-@login_required
-def unites_list(request):
-    q = request.GET.get('q', '').strip()
-    categorie_id = request.GET.get('categorie', '')
-    vue = request.GET.get('vue', 'liste')
-    qs = UniteMesure.objects.select_related('categorie').all()
-    if q:
-        qs = qs.filter(Q(nom__icontains=q) | Q(code__icontains=q))
-    if categorie_id:
-        qs = qs.filter(categorie_id=categorie_id)
-    total_all = UniteMesure.objects.count()
-    paginator = Paginator(qs, 30)
-    page_obj = paginator.get_page(request.GET.get('page'))
-    return render(request, 'services/unites/list.html', {
-        'page_obj': page_obj,
-        'categories_um': CategorieUniteMesure.objects.all(),
-        'q': q,
-        'categorie_id': categorie_id,
-        'vue': vue,
-        'total': total_all,
-        'total_filtre': qs.count(),
-    })
-
-
-@login_required
-def unite_create(request):
-    if request.method == 'POST':
-        form = UniteMesureForm(request.POST)
-        if form.is_valid():
-            obj = form.save()
-            messages.success(request, f'Unité « {obj.nom} » créée.')
-            return redirect('services:unites')
-    else:
-        form = UniteMesureForm()
-    return render(request, 'services/unites/form.html', {
-        'form': form,
-        'titre': 'Nouvelle unité de mesure',
-        'edit': False,
-    })
-
-
-@login_required
-def unite_edit(request, pk):
-    obj = get_object_or_404(UniteMesure, pk=pk)
-    if request.method == 'POST':
-        form = UniteMesureForm(request.POST, instance=obj)
-        if form.is_valid():
-            form.save()
-            messages.success(request, f'Unité « {obj.nom} » mise à jour.')
-            return redirect('services:unite_detail', pk=obj.pk)
-    else:
-        form = UniteMesureForm(instance=obj)
-    return render(request, 'services/unites/form.html', {
-        'form': form,
-        'obj': obj,
-        'titre': f'Modifier — {obj.nom}',
-        'edit': True,
-    })
-
-
-@login_required
-def unite_detail(request, pk):
-    obj = get_object_or_404(UniteMesure, pk=pk)
-    return render(request, 'services/unites/detail.html', {'obj': obj})
-
-
-@login_required
-def unite_delete(request, pk):
-    obj = get_object_or_404(UniteMesure, pk=pk)
-    if request.method == 'POST':
-        nom = obj.nom
-        obj.delete()
-        messages.success(request, f'Unité « {nom} » supprimée.')
-    return redirect('services:unites')
-
-
-@login_required
-def categories_unites_list(request):
-    q = request.GET.get('q', '').strip()
-    vue = request.GET.get('vue', 'liste')
-    qs = CategorieUniteMesure.objects.all()
-    if q:
-        qs = qs.filter(nom__icontains=q)
-    total_all = CategorieUniteMesure.objects.count()
-    paginator = Paginator(qs, 30)
-    page_obj = paginator.get_page(request.GET.get('page'))
-    return render(request, 'services/unites/categories/list.html', {
-        'page_obj': page_obj,
-        'q': q,
-        'vue': vue,
-        'total': total_all,
-        'total_filtre': qs.count(),
-    })
-
-
-@login_required
-def categorie_unite_create(request):
-    if request.method == 'POST':
-        form = CategorieUniteMesureForm(request.POST)
-        if form.is_valid():
-            obj = form.save()
-            messages.success(request, f'Catégorie « {obj.nom} » créée.')
-            return redirect('services:categories_unites')
-    else:
-        form = CategorieUniteMesureForm()
-    return render(request, 'services/unites/categories/form.html', {
-        'form': form,
-        'titre': "Nouvelle catégorie d'unité",
-        'edit': False,
-    })
-
-
-@login_required
-def categorie_unite_detail(request, pk):
-    obj = get_object_or_404(CategorieUniteMesure, pk=pk)
-    return render(request, 'services/unites/categories/detail.html', {'obj': obj})
-
-
-@login_required
-def categorie_unite_edit(request, pk):
-    obj = get_object_or_404(CategorieUniteMesure, pk=pk)
-    if request.method == 'POST':
-        form = CategorieUniteMesureForm(request.POST, instance=obj)
-        if form.is_valid():
-            form.save()
-            messages.success(request, f'Catégorie « {obj.nom} » mise à jour.')
-            return redirect('services:categorie_unite_detail', pk=obj.pk)
-    else:
-        form = CategorieUniteMesureForm(instance=obj)
-    return render(request, 'services/unites/categories/form.html', {
-        'form': form,
-        'obj': obj,
-        'titre': f'Modifier — {obj.nom}',
-        'edit': True,
-    })
-
-
-@login_required
-def categorie_unite_delete(request, pk):
-    obj = get_object_or_404(CategorieUniteMesure, pk=pk)
-    if request.method == 'POST':
-        nom = obj.nom
-        obj.delete()
-        messages.success(request, f'Catégorie « {nom} » supprimée.')
-    return redirect('services:categories_unites')
-
-
-@login_required
-@require_POST
-def categorie_unite_bulk_delete(request):
-    ids = request.POST.getlist('ids[]')
-    if ids:
-        count, _ = CategorieUniteMesure.objects.filter(pk__in=ids).delete()
-        return JsonResponse({'ok': True, 'count': count})
-    return JsonResponse({'ok': False}, status=400)
-
-
-# ── Types de service ───────────────────────────────────────────────────────
-
-@login_required
-def types_list(request):
-    q = request.GET.get('q', '').strip()
-    vue = request.GET.get('vue', 'liste')
-    qs = Typeservice.objects.all()
-    if q:
-        qs = qs.filter(nom__icontains=q)
-    total_all = Typeservice.objects.count()
-    paginator = Paginator(qs, 30)
-    page_obj = paginator.get_page(request.GET.get('page'))
-    return render(request, 'services/types/list.html', {
-        'page_obj': page_obj,
-        'q': q,
-        'vue': vue,
-        'total': total_all,
-        'total_filtre': qs.count(),
-    })
-
-
-@login_required
-def type_create(request):
-    if request.method == 'POST':
-        form = TypeserviceForm(request.POST)
-        if form.is_valid():
-            obj = form.save()
-            messages.success(request, f'Type « {obj.nom} » créé.')
-            return redirect('services:types')
-    else:
-        form = TypeserviceForm()
-    return render(request, 'services/types/form.html', {
-        'form': form,
-        'titre': 'Nouveau type de service',
-        'edit': False,
-    })
-
-
-@login_required
-def type_edit(request, pk):
-    obj = get_object_or_404(Typeservice, pk=pk)
-    if request.method == 'POST':
-        form = TypeserviceForm(request.POST, instance=obj)
-        if form.is_valid():
-            form.save()
-            messages.success(request, f'Type « {obj.nom} » mis à jour.')
-            return redirect('services:type_detail', pk=obj.pk)
-    else:
-        form = TypeserviceForm(instance=obj)
-    return render(request, 'services/types/form.html', {
-        'form': form,
-        'obj': obj,
-        'titre': f'Modifier — {obj.nom}',
-        'edit': True,
-    })
-
-
-@login_required
-def type_detail(request, pk):
-    obj = get_object_or_404(Typeservice, pk=pk)
-    return render(request, 'services/types/detail.html', {'obj': obj})
-
-
-@login_required
-def type_delete(request, pk):
-    obj = get_object_or_404(Typeservice, pk=pk)
-    if request.method == 'POST':
-        nom = obj.nom
-        obj.delete()
-        messages.success(request, f'Type « {nom} » supprimé.')
-    return redirect('services:types')
-
-
-@login_required
-@require_POST
-def type_bulk_delete(request):
-    ids = request.POST.getlist('ids[]')
-    if ids:
-        count, _ = Typeservice.objects.filter(pk__in=ids).delete()
-        return JsonResponse({'ok': True, 'count': count})
-    return JsonResponse({'ok': False}, status=400)
 
 
 @login_required
@@ -753,3 +436,373 @@ def ajax_delete_ligne(request, model, pk):
     obj = get_object_or_404(Model, pk=pk)
     obj.delete()
     return JsonResponse({'ok': True})
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  EXPORT / IMPORT
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ── Helpers partagés ────────────────────────────────────────────────────────
+
+def _csv_dl(filename, headers, rows):
+    from core.utils import csv_response
+    return csv_response(filename, headers, rows, delimiter=',')
+
+
+def _xlsx_dl(filename, headers, rows):
+    wb = Workbook()
+    ws = wb.active
+    ws.title = filename[:31]
+    fill = PatternFill(start_color='1F6E8C', end_color='1F6E8C', fill_type='solid')
+    fnt  = Font(color='FFFFFF', bold=True)
+    ws.append(headers)
+    for cell in ws[1]:
+        cell.fill, cell.font = fill, fnt
+        cell.alignment = Alignment(horizontal='center')
+    for row in rows:
+        ws.append(['' if v is None else str(v) for v in row])
+    for col in ws.columns:
+        w = max((len(str(c.value or '')) for c in col), default=0)
+        ws.column_dimensions[col[0].column_letter].width = min(w + 4, 55)
+    buf = io.BytesIO()
+    wb.save(buf)
+    resp = HttpResponse(
+        buf.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    resp['Content-Disposition'] = f'attachment; filename="{filename}.xlsx"'
+    return resp
+
+
+def _json_dl(filename, data):
+    resp = HttpResponse(
+        json.dumps(data, ensure_ascii=False, indent=2, default=str),
+        content_type='application/json',
+    )
+    resp['Content-Disposition'] = f'attachment; filename="{filename}.json"'
+    return resp
+
+
+def _export_file(fmt, filename, headers, rows, json_data):
+    if fmt == 'csv':
+        return _csv_dl(filename, headers, rows)
+    if fmt == 'xlsx':
+        return _xlsx_dl(filename, headers, rows)
+    return _json_dl(filename, json_data)
+
+
+def _parse_upload(upload):
+    name = upload.name.lower()
+    try:
+        if name.endswith('.json'):
+            return json.loads(upload.read().decode('utf-8')), None
+        if name.endswith('.csv'):
+            text = upload.read().decode('utf-8-sig')
+            reader = csv.DictReader(io.StringIO(text))
+            return list(reader), None
+        if name.endswith(('.xlsx', '.xls')):
+            wb = openpyxl.load_workbook(io.BytesIO(upload.read()), data_only=True)
+            ws = wb.active
+            rows = list(ws.iter_rows(values_only=True))
+            if not rows:
+                return None, 'Fichier Excel vide.'
+            hdrs = [str(h) if h is not None else '' for h in rows[0]]
+            data = [dict(zip(hdrs, r)) for r in rows[1:] if any(v is not None for v in r)]
+            return data, None
+        return None, 'Format non supporté (.json, .csv ou .xlsx uniquement)'
+    except Exception as e:
+        return None, f'Erreur lecture fichier : {e}'
+
+
+def _s(v):
+    if v is None:
+        return ''
+    return str(v).replace('﻿', '').strip()
+
+
+def _b(v):
+    if isinstance(v, bool):
+        return v
+    return str(v).strip().lower() in ('1', 'true', 'oui', 'yes')
+
+
+def _fk_warning(parts):
+    """
+    parts : liste de (label, set_de_codes_manquants). Construit un suffixe de
+    message signalant les références (catégorie, unité, département…) non
+    trouvées lors d'un import — utile quand l'ordre d'import ne respecte pas
+    les dépendances (ex. importer les prestations avant les catégories).
+    """
+    bits = [f"{label} introuvable(s) : {', '.join(sorted(codes))}" for label, codes in parts if codes]
+    if not bits:
+        return ''
+    return ' ⚠ ' + ' — '.join(bits) + " Importez-les d'abord, puis réimportez ce fichier avec « Mettre à jour »."
+
+
+_TYPE_ART_MAP = {
+    'service': 'prestation', 'prestation': 'prestation',
+    'consommable': 'consommable', 'stockable': 'stockable', 'autre': 'autre',
+}
+
+# ── Export Articles ──────────────────────────────────────────────────────────
+
+_ART_HDR = [
+    'reference_interne', 'nom', 'prix_vente', 'cout',
+    'type_article', 'type_produit_hospitalier',
+    'actif', 'peut_etre_vendu', 'peut_etre_achete',
+    'categorie', 'unite_mesure', 'unite_achat', 'code_barres',
+    'forme', 'voie_administration', 'dosage', 'dosage_unite',
+    'composant_actif', 'effet_therapeutique', 'indications',
+    'avertissement_grossesse', 'avertissement_lactation',
+    'quantite_stock', 'quantite_alerte',
+    'politique_facturation', 'refacturer_depenses', 'politique_controle',
+    'notes_internes', 'compte_revenus', 'compte_charges', 'compte_ecart_prix',
+]
+
+
+def _art_row(a):
+    return [
+        a.reference_interne, a.nom, a.prix_vente, a.cout,
+        a.type_article, a.type_produit_hospitalier,
+        int(a.actif), int(a.peut_etre_vendu), int(a.peut_etre_achete),
+        a.categorie.code if a.categorie else '',
+        a.unite_mesure.code if a.unite_mesure else '',
+        a.unite_achat.code if a.unite_achat else '',
+        a.code_barres, a.forme, a.voie_administration,
+        a.dosage, a.dosage_unite, a.composant_actif,
+        a.effet_therapeutique, a.indications,
+        int(a.avertissement_grossesse), int(a.avertissement_lactation),
+        a.quantite_stock, a.quantite_alerte,
+        a.politique_facturation, a.refacturer_depenses, a.politique_controle,
+        a.notes_internes, a.compte_revenus, a.compte_charges, a.compte_ecart_prix,
+    ]
+
+
+@login_required
+def export_articles(request):
+    fmt = request.GET.get('format', 'json')
+    qs  = Articleservice.objects.select_related('categorie', 'unite_mesure', 'unite_achat')
+    rows = [_art_row(a) for a in qs]
+    return _export_file(fmt, 'prestations', _ART_HDR, rows,
+                        [dict(zip(_ART_HDR, r)) for r in rows])
+
+
+# ── Export Catégories articles ───────────────────────────────────────────────
+
+_CAT_HDR = [
+    'code', 'nom', 'description', 'parent',
+    'methode_cout', 'valorisation_inventaire', 'reservation_conditionnement',
+    'bloquer_serie_lot', 'routes', 'strategie_enlevement',
+    'sequence_code_barres', 'compte_revenus', 'compte_charges',
+]
+
+
+def _cat_row(c):
+    return [
+        c.code, c.nom, c.description,
+        c.parent.code if c.parent else '',
+        c.methode_cout, c.valorisation_inventaire, c.reservation_conditionnement,
+        int(c.bloquer_serie_lot), c.routes, c.strategie_enlevement,
+        c.sequence_code_barres, c.compte_revenus, c.compte_charges,
+    ]
+
+
+@login_required
+def export_categories(request):
+    fmt = request.GET.get('format', 'json')
+    qs  = CategorieArticle.objects.select_related('parent')
+    rows = [_cat_row(c) for c in qs]
+    return _export_file(fmt, 'categories_articles', _CAT_HDR, rows,
+                        [dict(zip(_CAT_HDR, r)) for r in rows])
+
+
+# ── Import Articles ──────────────────────────────────────────────────────────
+
+@login_required
+@require_POST
+def import_articles(request):
+    upload = request.FILES.get('fichier')
+    if not upload:
+        messages.error(request, 'Aucun fichier sélectionné.')
+        return redirect('services:list')
+
+    data, err = _parse_upload(upload)
+    if err:
+        messages.error(request, err)
+        return redirect('services:list')
+
+    do_update = 'update' in request.POST
+    created = updated = skipped = errors = 0
+    cat_manquantes = set()
+    um_manquantes = set()
+
+    for item in data:
+        try:
+            ref = _s(item.get('reference_interne', '')).upper()
+            nom = _s(item.get('nom', ''))
+            if not ref and not nom:
+                errors += 1
+                continue
+
+            cat_code = _s(item.get('categorie', ''))
+            cat = CategorieArticle.objects.filter(code=cat_code).first() if cat_code else None
+            if cat_code and not cat:
+                cat_manquantes.add(cat_code)
+
+            um_code = _s(item.get('unite_mesure', ''))
+            um = UniteMesure.objects.filter(code=um_code).first() if um_code else None
+            if um_code and not um:
+                um_manquantes.add(um_code)
+
+            ua_code = _s(item.get('unite_achat', ''))
+            ua = UniteMesure.objects.filter(code=ua_code).first() if ua_code else None
+            if ua_code and not ua:
+                um_manquantes.add(ua_code)
+
+            defaults = {
+                'nom': nom,
+                'prix_vente': item.get('prix_vente') or 0,
+                'cout': item.get('cout') or 0,
+                'type_article': _TYPE_ART_MAP.get(_s(item.get('type_article', '')), 'prestation'),
+                'type_produit_hospitalier': _s(item.get('type_produit_hospitalier', '')),
+                'actif': _b(item.get('actif', True)),
+                'peut_etre_vendu': _b(item.get('peut_etre_vendu', True)),
+                'peut_etre_achete': _b(item.get('peut_etre_achete', False)),
+                'categorie': cat, 'unite_mesure': um, 'unite_achat': ua,
+                'code_barres': _s(item.get('code_barres', '')),
+                'forme': _s(item.get('forme', '')),
+                'voie_administration': _s(item.get('voie_administration', '')),
+                'dosage': _s(item.get('dosage', '')),
+                'dosage_unite': _s(item.get('dosage_unite', '')),
+                'composant_actif': _s(item.get('composant_actif', '')),
+                'effet_therapeutique': _s(item.get('effet_therapeutique', '')),
+                'indications': _s(item.get('indications', '')),
+                'avertissement_grossesse': _b(item.get('avertissement_grossesse', False)),
+                'avertissement_lactation': _b(item.get('avertissement_lactation', False)),
+                'quantite_stock': int(item.get('quantite_stock') or 0),
+                'quantite_alerte': int(item.get('quantite_alerte') or 0),
+                'politique_facturation': _s(item.get('politique_facturation', 'qtes_commandees')),
+                'refacturer_depenses': _s(item.get('refacturer_depenses', 'non')),
+                'politique_controle': _s(item.get('politique_controle', 'qtes_recues')),
+                'notes_internes': _s(item.get('notes_internes', '')),
+                'compte_revenus': _s(item.get('compte_revenus', '')),
+                'compte_charges': _s(item.get('compte_charges', '')),
+                'compte_ecart_prix': _s(item.get('compte_ecart_prix', '')),
+            }
+
+            if ref:
+                # Recherche insensible à la casse : ref est normalisée en
+                # majuscules, mais des enregistrements existants peuvent avoir
+                # une casse différente (saisie manuelle) — un get_or_create
+                # strict sur reference_interne=ref créerait un doublon au lieu
+                # de mettre à jour l'enregistrement existant.
+                obj = Articleservice.objects.filter(reference_interne__iexact=ref).first()
+                was_created = obj is None
+                if was_created:
+                    obj = Articleservice.objects.create(reference_interne=ref, **defaults)
+            else:
+                obj, was_created = Articleservice.objects.get_or_create(
+                    nom=nom, defaults=defaults)
+
+            if was_created:
+                created += 1
+            elif do_update:
+                for k, v in defaults.items():
+                    setattr(obj, k, v)
+                obj.save()
+                updated += 1
+            else:
+                skipped += 1
+        except Exception:
+            errors += 1
+
+    fk_msg = _fk_warning([('Catégorie(s)', cat_manquantes), ('Unité(s) de mesure', um_manquantes)])
+    if errors or fk_msg:
+        messages.warning(request, f'{created} créé(s), {updated} mis à jour, {skipped} ignoré(s)'
+                          + (f', {errors} erreur(s)' if errors else '') + '.' + fk_msg)
+    else:
+        messages.success(request, f'{created} prestation(s) importée(s), {updated} mise(s) à jour, {skipped} ignorée(s).')
+    return redirect('services:list')
+
+
+# ── Import Catégories articles ───────────────────────────────────────────────
+
+@login_required
+@require_POST
+def import_categories(request):
+    upload = request.FILES.get('fichier')
+    if not upload:
+        messages.error(request, 'Aucun fichier sélectionné.')
+        return redirect('services:categories')
+
+    data, err = _parse_upload(upload)
+    if err:
+        messages.error(request, err)
+        return redirect('services:categories')
+
+    do_update = 'update' in request.POST
+    id_to_code = {item.get('id'): item.get('code') for item in data if item.get('id')}
+    created = updated = skipped = errors = 0
+
+    for item in data:
+        try:
+            code = _s(item.get('code', ''))
+            if not code:
+                errors += 1
+                continue
+            defaults = {
+                'nom': _s(item.get('nom', code)),
+                'description': _s(item.get('description', '')),
+                'methode_cout': _s(item.get('methode_cout', 'prix_standard')),
+                'valorisation_inventaire': _s(item.get('valorisation_inventaire', 'manuelle')),
+                'reservation_conditionnement': _s(item.get('reservation_conditionnement', 'partiels')),
+                'bloquer_serie_lot': _b(item.get('bloquer_serie_lot', False)),
+                'routes': _s(item.get('routes', '')),
+                'strategie_enlevement': _s(item.get('strategie_enlevement', '')),
+                'sequence_code_barres': _s(item.get('sequence_code_barres', '')),
+                'compte_revenus': _s(item.get('compte_revenus', '')),
+                'compte_charges': _s(item.get('compte_charges', '')),
+                'parent': None,
+            }
+            obj, was_created = CategorieArticle.objects.get_or_create(code=code, defaults=defaults)
+            if was_created:
+                created += 1
+            elif do_update:
+                for k, v in defaults.items():
+                    if k == 'parent':
+                        continue
+                    setattr(obj, k, v)
+                obj.save()
+                updated += 1
+            else:
+                skipped += 1
+        except Exception:
+            errors += 1
+
+    # Passe 2 — résolution des parents
+    parent_manquants = set()
+    for item in data:
+        raw_parent = item.get('parent') or item.get('parent_id')
+        if not raw_parent:
+            continue
+        try:
+            code = _s(item.get('code', ''))
+            parent_code = id_to_code.get(raw_parent) or id_to_code.get(int(raw_parent)) or _s(raw_parent)
+            if parent_code:
+                enfant = CategorieArticle.objects.filter(code=code).first()
+                parent = CategorieArticle.objects.filter(code=parent_code).first()
+                if enfant and parent and enfant.parent_id != parent.pk:
+                    enfant.parent = parent
+                    enfant.save()
+                elif enfant and not parent:
+                    parent_manquants.add(parent_code)
+        except Exception:
+            pass
+
+    fk_msg = _fk_warning([('Catégorie(s) parente(s)', parent_manquants)])
+    if errors or fk_msg:
+        messages.warning(request, f'{created} créée(s), {updated} mise(s) à jour, {skipped} ignorée(s)'
+                          + (f', {errors} erreur(s)' if errors else '') + '.' + fk_msg)
+    else:
+        messages.success(request, f'{created} catégorie(s) importée(s), {updated} mise(s) à jour, {skipped} ignorée(s).')
+    return redirect('services:categories')

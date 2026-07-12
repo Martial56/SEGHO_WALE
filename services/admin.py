@@ -1,6 +1,7 @@
 from django.contrib import admin
+from stock.models import UniteMesure
 from .models import (
-    UniteMesure, CategorieArticle, FamilleArticle, CompagniePharma,
+    CategorieArticle, FamilleArticle, CompagniePharma,
     Articleservice, LigneFournisseurArticle, ConditionnementArticle,
     VarianteAttributArticle, ReglePrix,
 )

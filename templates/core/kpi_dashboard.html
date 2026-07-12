@@ -1,0 +1,548 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block topbar_title %}Tableau de bord{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  /* Alias vers la couleur d'accent globale (logo par défaut, ou choix utilisateur) */
+  --kpi-900: var(--teal-900); --kpi-800: var(--teal-800); --kpi-700: var(--teal-700);
+  --kpi-600: var(--teal-600); --kpi-500: var(--teal-500); --kpi-400: var(--teal-400);
+  --kpi-300: var(--teal-300); --kpi-50: var(--teal-50);
+  --kpi-900-rgb: var(--teal-900-rgb); --kpi-700-rgb: var(--teal-700-rgb); --kpi-600-rgb: var(--teal-600-rgb);
+  --kpi-surface: #fff; --kpi-border: rgba(0,0,0,0.08);
+  --kpi-text: #0d3040; --kpi-muted: rgba(0,0,0,0.45);
+  --kpi-radius: 14px;
+}
+html[data-theme="dark"] {
+  --kpi-surface: #141b22; --kpi-border: #1f2933;
+  --kpi-text: #dce3ea; --kpi-muted: #6b7884;
+}
+
+/* ══ Filtres de période (barre collée sous la nav) ══ */
+.kpi-filter-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  flex-wrap: wrap;
+  padding: 10px 32px; margin: 0 -32px 24px;
+  background: var(--kpi-surface); border-bottom: 1px solid var(--kpi-border);
+  position: sticky; top: var(--topbar-h); z-index: 100;
+}
+.kpi-filter-label { font-size: 12.5px; font-weight: 600; color: var(--kpi-muted); }
+.period-tabs { display: flex; align-items: center; gap: 4px; background: rgba(var(--kpi-600-rgb),0.07); border-radius: 12px; padding: 4px; }
+.period-tab { padding: 5px 13px; border-radius: 9px; font-size: 12px; font-weight: 600; color: var(--kpi-700); text-decoration: none; transition: all 0.15s; white-space: nowrap; }
+.period-tab:hover { background: rgba(var(--kpi-600-rgb),0.12); }
+.period-tab.active { background: var(--kpi-600); color: #fff; }
+html[data-theme="dark"] .period-tabs { background: rgba(255,255,255,0.05); }
+html[data-theme="dark"] .period-tab { color: #7aaec7; }
+
+/* ══ Cartes KPI ══ */
+.kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; max-width: 1400px; margin: 0 auto 24px; }
+.kpi-card {
+  background: var(--kpi-surface); border: 1px solid var(--kpi-border); border-radius: var(--kpi-radius);
+  padding: 18px; display: flex; flex-direction: column; gap: 14px;
+  text-decoration: none; color: inherit;
+  transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+  animation: kpiFadeUp 0.4s ease both;
+}
+a.kpi-card:hover { border-color: var(--kpi-400); transform: translateY(-2px); box-shadow: 0 6px 18px rgba(var(--kpi-700-rgb),0.1); }
+.kpi-top { display: flex; align-items: flex-start; gap: 14px; }
+.kpi-ico-box { width: 46px; height: 46px; border-radius: 12px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: #fff; }
+.kpi-ico { width: 22px; height: 22px; }
+.kpi-vals { flex: 1; min-width: 0; }
+
+.kv-main  { display: block; font-size: 26px; font-weight: 800; line-height: 1.1; color: var(--kpi-text); }
+.kv-label { display: block; font-size: 12px; font-weight: 600; color: var(--kpi-muted); margin-top: 3px; }
+.kv-sub   { display: block; font-size: 11px; color: var(--kpi-muted); margin-top: 2px; }
+
+.two-vals { display: flex; gap: 14px; align-items: center; }
+.kv-sep   { width: 1px; height: 32px; background: var(--kpi-border); flex-shrink: 0; }
+
+.kpi-foot {
+  padding-top: 12px; border-top: 1px solid var(--kpi-border);
+  font-size: 11px; font-weight: 700; color: var(--kpi-600);
+  display: flex; align-items: center; justify-content: space-between;
+}
+
+.ic-teal   { background: linear-gradient(135deg, #0e8fae, #2bb5d8); }
+.ic-sky    { background: linear-gradient(135deg, #1a6eb0, #2d99db); }
+.ic-amber  { background: linear-gradient(135deg, #c27a10, #e8a82a); }
+.ic-blue   { background: linear-gradient(135deg, #0277BD, #29B6F6); }
+.ic-coral  { background: linear-gradient(135deg, #b83c1e, #e66144); }
+.ic-indigo { background: linear-gradient(135deg, #2d3eb0, #4b61db); }
+.ic-green  { background: linear-gradient(135deg, #0d8a52, #16c977); }
+
+.kpi-card:nth-child(1) { animation-delay: 0.03s; } .kpi-card:nth-child(2) { animation-delay: 0.06s; }
+.kpi-card:nth-child(3) { animation-delay: 0.09s; } .kpi-card:nth-child(4) { animation-delay: 0.12s; }
+.kpi-card:nth-child(5) { animation-delay: 0.15s; } .kpi-card:nth-child(6) { animation-delay: 0.18s; }
+.kpi-card:nth-child(7) { animation-delay: 0.21s; }
+
+/* ══ Corps : RDV + sidebar ══ */
+.dash-body { display: grid; grid-template-columns: 1fr 300px; gap: 20px; max-width: 1400px; margin: 0 auto 24px; }
+
+.rdv-panel { background: var(--kpi-surface); border: 1px solid var(--kpi-border); border-radius: var(--kpi-radius); overflow: hidden; }
+.rdv-panel-head { background: var(--kpi-600); color: #fff; padding: 14px 20px; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.rdv-panel-link { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.8); text-decoration: none; transition: color 0.15s; }
+.rdv-panel-link:hover { color: #fff; }
+
+.rdv-table-wrap { overflow-x: auto; }
+.rdv-tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+.rdv-tbl thead th { background: var(--kpi-50); color: var(--kpi-muted); font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; padding: 10px 16px; text-align: left; border-bottom: 1px solid var(--kpi-border); }
+.rdv-tbl tbody tr { border-bottom: 1px solid var(--kpi-border); transition: background 0.15s; }
+.rdv-tbl tbody tr:last-child { border-bottom: none; }
+.rdv-tbl tbody tr:hover { background: var(--kpi-50); }
+.rdv-tbl td { padding: 11px 16px; color: var(--kpi-text); }
+
+.tbl-patient { display: flex; align-items: center; gap: 9px; }
+.tbl-avatar { width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, var(--kpi-500), var(--kpi-300)); color: #fff; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.tbl-name { font-weight: 600; font-size: 12px; }
+.tbl-code { font-size: 10px; color: var(--kpi-muted); }
+.tbl-time { font-weight: 700; color: var(--kpi-700); font-size: 12px; font-variant-numeric: tabular-nums; }
+.tbl-doc  { color: var(--kpi-muted); font-size: 11px; }
+
+.kpi-badge { display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 10px; font-weight: 700; }
+.kpi-badge-planifie        { background: #e8f4fd; color: var(--kpi-600); }
+.kpi-badge-confirme        { background: #e3f9ee; color: #0d8a52; }
+.kpi-badge-en_attente      { background: #fff4e0; color: #c27a10; }
+.kpi-badge-en_consultation { background: #ffe8e8; color: #b82020; }
+
+.kpi-empty-state { padding: 38px 20px; text-align: center; color: var(--kpi-muted); font-size: 13px; }
+.kpi-empty-icon  { font-size: 26px; margin-bottom: 10px; display: block; opacity: 0.5; }
+
+.dash-side { display: flex; flex-direction: column; gap: 16px; }
+
+.anniv-card { background: linear-gradient(135deg, #0a7a5a, #14b88a); color: #fff; border-radius: var(--kpi-radius); padding: 20px; }
+.anniv-head { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; margin-bottom: 16px; opacity: 0.92; }
+.anniv-vals { display: flex; }
+.anniv-val  { flex: 1; text-align: center; }
+.anniv-val .n { display: block; font-size: 32px; font-weight: 800; line-height: 1; }
+.anniv-val .l { display: block; font-size: 11px; opacity: 0.82; margin-top: 4px; }
+.anniv-sep  { width: 1px; background: rgba(255,255,255,0.25); align-self: stretch; margin: 0 6px; }
+
+.recents-panel { background: var(--kpi-surface); border: 1px solid var(--kpi-border); border-radius: var(--kpi-radius); overflow: hidden; flex: 1; }
+.recents-head  { padding: 13px 16px; border-bottom: 1px solid var(--kpi-border); font-size: 12px; font-weight: 700; color: var(--kpi-800); display: flex; align-items: center; gap: 6px; }
+.recent-item   { padding: 10px 14px; display: flex; align-items: center; gap: 9px; border-bottom: 1px solid var(--kpi-border); transition: background 0.15s; }
+.recent-item:last-child { border-bottom: none; }
+.recent-item:hover { background: var(--kpi-50); }
+.recent-dot  { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.recent-dot.en_cours { background: var(--amber); }
+.recent-dot.termine  { background: #16a96b; }
+.recent-dot.other    { background: var(--kpi-400); }
+.recent-name { font-size: 11px; font-weight: 600; color: var(--kpi-text); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.recent-time { font-size: 10px; color: var(--kpi-muted); white-space: nowrap; }
+
+.staff-card { background: linear-gradient(135deg, var(--kpi-600), var(--kpi-500)); border-radius: var(--kpi-radius); padding: 18px; color: #fff; }
+
+/* ══ Graphiques ══ */
+.charts-section { max-width: 1400px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.chart-card { background: var(--kpi-surface); border: 1px solid var(--kpi-border); border-radius: var(--kpi-radius); padding: 20px; }
+.chart-title { font-size: 13px; font-weight: 700; color: var(--kpi-800); margin-bottom: 16px; display: flex; align-items: center; gap: 7px; }
+.chart-canvas-wrap { position: relative; height: 200px; }
+
+@keyframes kpiFadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+html[data-theme="dark"] .rdv-tbl tbody tr:hover { background: #1D2C44; }
+html[data-theme="dark"] .recent-item:hover { background: #1D2C44; }
+
+@media (max-width: 1024px) {
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .dash-body { grid-template-columns: 1fr; }
+  .charts-section { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) { .kpi-grid { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block module_navbar %}
+{% include 'core/includes/nav.html' %}
+{% endblock %}
+
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+
+<!-- ══ Filtres de période ══ -->
+<div class="kpi-filter-bar">
+  <span class="kpi-filter-label">{{ period_label }}</span>
+  <div class="period-tabs">
+    <a href="?period=jour"    class="period-tab {% if period == 'jour' %}active{% endif %}">Aujourd'hui</a>
+    <a href="?period=semaine" class="period-tab {% if period == 'semaine' %}active{% endif %}">Cette semaine</a>
+    <a href="?period=mois"   class="period-tab {% if period == 'mois' %}active{% endif %}">Ce mois</a>
+    <a href="?period=tout"   class="period-tab {% if period == 'tout' %}active{% endif %}">Jusqu'à maintenant</a>
+  </div>
+</div>
+
+<!-- ══ Cartes KPI ══ -->
+<div class="kpi-grid">
+
+  <!-- Patients -->
+  {% if 'patients' in accessible_codes %}<a href="{% url 'patients:list' %}" class="kpi-card">{% else %}<div class="kpi-card">{% endif %}
+    <div class="kpi-top">
+      <div class="kpi-ico-box ic-teal">
+        <svg class="kpi-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+      </div>
+      <div class="kpi-vals">
+        <span class="kv-main">{{ stats.patients_total }}</span>
+        <span class="kv-label">Patients actifs</span>
+        <span class="kv-sub">+{{ stats.patients_periode }} sur la période</span>
+      </div>
+    </div>
+    <div class="kpi-foot">
+      <span>Afficher les détails</span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+    </div>
+  {% if 'patients' in accessible_codes %}</a>{% else %}</div>{% endif %}
+
+  <!-- Médecins -->
+  {% if 'medecins' in accessible_codes %}<a href="{% url 'medecins_list' %}" class="kpi-card">{% else %}<div class="kpi-card">{% endif %}
+    <div class="kpi-top">
+      <div class="kpi-ico-box ic-sky">
+        <svg class="kpi-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/>
+          <path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4"/><circle cx="20" cy="10" r="2"/>
+        </svg>
+      </div>
+      <div class="kpi-vals">
+        <div class="two-vals">
+          <div><span class="kv-main">{{ stats.medecins_actifs }}</span><span class="kv-label">Actifs</span></div>
+          <div class="kv-sep"></div>
+          <div><span class="kv-main">{{ stats.medecins_total }}</span><span class="kv-label">Total</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="kpi-foot"><span>Corps médical</span></div>
+  {% if 'medecins' in accessible_codes %}</a>{% else %}</div>{% endif %}
+
+  <!-- Rendez-vous -->
+  {% if 'rendezvous' in accessible_codes %}<a href="{% url 'patients:rdv_global' %}" class="kpi-card">{% else %}<div class="kpi-card">{% endif %}
+    <div class="kpi-top">
+      <div class="kpi-ico-box ic-amber">
+        <svg class="kpi-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+          <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+        </svg>
+      </div>
+      <div class="kpi-vals">
+        <span class="kv-main">{{ stats.rdv_periode }}</span>
+        <span class="kv-label">Rendez-vous</span>
+        <span class="kv-sub">{{ period_label }}</span>
+      </div>
+    </div>
+    <div class="kpi-foot">
+      <span>Afficher les détails</span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+    </div>
+  {% if 'rendezvous' in accessible_codes %}</a>{% else %}</div>{% endif %}
+
+  <!-- Consultations & Soins -->
+  {% if 'consultations' in accessible_codes %}<a href="{% url 'soins:list' %}" class="kpi-card">{% else %}<div class="kpi-card">{% endif %}
+    <div class="kpi-top">
+      <div class="kpi-ico-box ic-blue">
+        <svg class="kpi-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+        </svg>
+      </div>
+      <div class="kpi-vals">
+        <div class="two-vals">
+          <div><span class="kv-main">{{ stats.consultations_periode }}</span><span class="kv-label">Consult.</span></div>
+          <div class="kv-sep"></div>
+          <div><span class="kv-main">{{ stats.soins_periode }}</span><span class="kv-label">Soins</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="kpi-foot"><span>Activité — {{ period_label }}</span></div>
+  {% if 'consultations' in accessible_codes %}</a>{% else %}</div>{% endif %}
+
+  <!-- Hospitalisés -->
+  {% if 'hospitalisation' in accessible_codes %}<a href="{% url 'hospitalisation:list' %}" class="kpi-card">{% else %}<div class="kpi-card">{% endif %}
+    <div class="kpi-top">
+      <div class="kpi-ico-box ic-coral">
+        <svg class="kpi-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/>
+          <path d="M2 17h20"/><path d="M6 8v9"/>
+        </svg>
+      </div>
+      <div class="kpi-vals">
+        <span class="kv-main">{{ stats.hospitalisations }}</span>
+        <span class="kv-label">Hospitalisés</span>
+        <span class="kv-sub">En cours</span>
+      </div>
+    </div>
+    <div class="kpi-foot">
+      <span>Afficher les détails</span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+    </div>
+  {% if 'hospitalisation' in accessible_codes %}</a>{% else %}</div>{% endif %}
+
+  <!-- Laboratoire -->
+  {% if 'laboratoire' in accessible_codes %}<a href="{% url 'laboratoire_list' %}" class="kpi-card">{% else %}<div class="kpi-card">{% endif %}
+    <div class="kpi-top">
+      <div class="kpi-ico-box ic-indigo">
+        <svg class="kpi-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10 2v7.527a2 2 0 0 1-.211.896L4.72 20.55a1 1 0 0 0 .9 1.45h12.76a1 1 0 0 0 .9-1.45l-5.069-10.127A2 2 0 0 1 14 9.527V2"/>
+          <path d="M8.5 2h7"/><path d="M7 16h10"/>
+        </svg>
+      </div>
+      <div class="kpi-vals">
+        <span class="kv-main">{{ stats.analyses_pending }}</span>
+        <span class="kv-label">Analyses</span>
+        <span class="kv-sub">En attente</span>
+      </div>
+    </div>
+    <div class="kpi-foot"><span>Laboratoire</span></div>
+  {% if 'laboratoire' in accessible_codes %}</a>{% else %}</div>{% endif %}
+
+  <!-- Pharmacie -->
+  {% if 'pharmacie' in accessible_codes %}<a href="{% url 'pharmacie_accueil' %}" class="kpi-card">{% else %}<div class="kpi-card">{% endif %}
+    <div class="kpi-top">
+      <div class="kpi-ico-box ic-green">
+        <svg class="kpi-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/>
+          <path d="m8.5 8.5 7 7"/>
+        </svg>
+      </div>
+      <div class="kpi-vals">
+        <span class="kv-main">{{ stats.medicaments_alerte }}</span>
+        <span class="kv-label">Alertes stock</span>
+        <span class="kv-sub">{% if stats.medicaments_alerte > 0 %}Action requise{% else %}Stock OK{% endif %}</span>
+      </div>
+    </div>
+    <div class="kpi-foot"><span>Pharmacie</span></div>
+  {% if 'pharmacie' in accessible_codes %}</a>{% else %}</div>{% endif %}
+
+</div>
+
+<!-- ══ BODY : RDV + SIDEBAR ══ -->
+<div class="dash-body">
+
+  <!-- Tableau RDV du jour -->
+  <div class="rdv-panel">
+    <div class="rdv-panel-head">
+      <span style="display:flex;align-items:center;gap:8px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+          <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+        </svg>
+        Rendez-vous &mdash; {{ today|date:"d/m/Y" }}
+      </span>
+      {% if 'rendezvous' in accessible_codes %}
+      <a href="{% url 'patients:rdv_global' %}" class="rdv-panel-link">Voir tout &rarr;</a>
+      {% endif %}
+    </div>
+
+    {% if rdv_auj %}
+    <div class="rdv-table-wrap">
+      <table class="rdv-tbl">
+        <thead>
+          <tr>
+            <th>#</th><th>Patient</th><th>Heure</th><th>Médecin</th><th>Motif</th><th>État</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for rdv in rdv_auj %}
+          <tr>
+            <td style="color:var(--kpi-muted);font-size:11px;">{{ forloop.counter }}</td>
+            <td>
+              <div class="tbl-patient">
+                <div class="tbl-avatar">{{ rdv.patient.nom|first|upper }}</div>
+                <div>
+                  <div class="tbl-name">{{ rdv.patient.nom }} {{ rdv.patient.prenoms }}</div>
+                  <div class="tbl-code">{{ rdv.patient.code_patient }}</div>
+                </div>
+              </div>
+            </td>
+            <td><span class="tbl-time">{{ rdv.date_heure|time:"H:i" }}</span></td>
+            <td><span class="tbl-doc">{% if rdv.medecin %}Dr {{ rdv.medecin.nom }}{% else %}&mdash;{% endif %}</span></td>
+            <td style="font-size:11px;max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ rdv.motif|default:"&mdash;"|truncatechars:28 }}</td>
+            <td><span class="kpi-badge kpi-badge-{{ rdv.statut }}">{{ rdv.get_statut_display }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="kpi-empty-state">
+      <i class="bi bi-calendar-x kpi-empty-icon"></i>
+      Aucun rendez-vous planifié aujourd'hui
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Sidebar -->
+  <div class="dash-side">
+
+    <!-- Anniversaires -->
+    <div class="anniv-card">
+      <div class="anniv-head">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8"/>
+          <path d="M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1"/>
+          <path d="M2 21h20"/><path d="M7 8v2"/><path d="M12 8v2"/><path d="M17 8v2"/>
+          <path d="M7 4 8 2l1 2"/><path d="M12 4l1-2 1 2"/><path d="M17 4l1-2 1 2"/>
+        </svg>
+        Anniversaires du {{ today|date:"j F" }}
+      </div>
+      <div class="anniv-vals">
+        <div class="anniv-val">
+          <span class="n">{{ stats.employes_anniversaires }}</span>
+          <span class="l">Employé(s)</span>
+        </div>
+        <div class="anniv-sep"></div>
+        <div class="anniv-val">
+          <span class="n">{{ stats.patients_anniversaires }}</span>
+          <span class="l">Patient(s)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dernières consultations -->
+    <div class="recents-panel">
+      <div class="recents-head">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+        </svg>
+        Dernières consultations
+      </div>
+      {% if last_cons %}
+        {% for c in last_cons %}
+        <div class="recent-item">
+          <div class="recent-dot {% if c.statut == 'en_cours' %}en_cours{% elif c.statut == 'termine' %}termine{% else %}other{% endif %}"></div>
+          <div class="recent-name">{{ c.patient.nom }} {{ c.patient.prenoms }}</div>
+          <div class="recent-time">{{ c.date_heure|date:"d/m H:i" }}</div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div style="padding:22px 16px;text-align:center;font-size:12px;color:var(--kpi-muted);">Aucune consultation</div>
+      {% endif %}
+    </div>
+
+    <!-- Personnel -->
+    <div class="staff-card">
+      <div style="font-size:11px;font-weight:700;opacity:0.85;margin-bottom:10px;display:flex;align-items:center;gap:7px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+        Personnel actif
+      </div>
+      <div style="font-size:36px;font-weight:800;line-height:1;color:#fff;">{{ stats.employes_actifs }}</div>
+      <div style="font-size:11px;opacity:0.75;margin-top:4px;color:#fff;">employés actifs</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══ CHARTS ══ -->
+<div class="charts-section">
+  <div class="chart-card">
+    <div class="chart-title">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+      Nouveaux patients &mdash; 8 dernières semaines
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="chartPatients"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-title">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+        <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+      </svg>
+      Rendez-vous &mdash; 8 dernières semaines
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="chartRdv"></canvas></div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+(function () {
+  function alignSousTopbar() {
+    var topbar = document.querySelector('.topbar');
+    var content = document.querySelector('.content');
+    if (!topbar || !content) return;
+    var tbH = Math.ceil(topbar.getBoundingClientRect().height);
+    if (tbH <= 0) return;
+    document.documentElement.style.setProperty('--header-h', tbH + 'px');
+    document.documentElement.style.setProperty('--topbar-h', '0px');
+    requestAnimationFrame(function () {
+      var contentGap = Math.round(content.getBoundingClientRect().top - topbar.getBoundingClientRect().bottom);
+      if (contentGap !== 0) {
+        document.documentElement.style.setProperty('--header-h', (tbH - contentGap) + 'px');
+      }
+    });
+  }
+  if (document.readyState !== 'loading') { alignSousTopbar(); }
+  else { document.addEventListener('DOMContentLoaded', alignSousTopbar); }
+  window.addEventListener('resize', alignSousTopbar);
+})();
+</script>
+<script>
+(function () {
+  var chartData = {{ chart_data|safe }};
+  var pChart, rChart;
+
+  function isDark() { return document.documentElement.getAttribute('data-theme') === 'dark'; }
+
+  function initCharts() {
+    var c = {
+      grid:     isDark() ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
+      tick:     isDark() ? '#5a8aaa' : '#8aafbf',
+      pLine:    isDark() ? '#34a8cc' : '#2188ab',
+      pBg:      isDark() ? 'rgba(52,168,204,0.18)' : 'rgba(33,136,171,0.12)',
+      rdvBar:   isDark() ? 'rgba(232,168,42,0.75)' : 'rgba(194,122,16,0.72)',
+      rdvHover: isDark() ? 'rgba(232,168,42,0.95)' : 'rgba(194,122,16,0.92)',
+      tooltip:  isDark() ? '#0d2035' : 'var(--kpi-700)',
+    };
+    var baseOpts = {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { backgroundColor: c.tooltip, titleColor: '#fff', bodyColor: '#aae1f2', cornerRadius: 8, padding: 10 },
+      },
+      scales: {
+        y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0, color: c.tick, font: { family: "'Sora', sans-serif", size: 10 } }, grid: { color: c.grid } },
+        x: { ticks: { color: c.tick, font: { family: "'Sora', sans-serif", size: 10 } }, grid: { display: false } },
+      },
+      animation: { duration: 700, easing: 'easeOutQuart' },
+    };
+
+    if (pChart) pChart.destroy();
+    if (rChart) rChart.destroy();
+
+    var pCanvas = document.getElementById('chartPatients');
+    var rCanvas = document.getElementById('chartRdv');
+    if (!pCanvas || !rCanvas) return;
+
+    pChart = new Chart(pCanvas.getContext('2d'), {
+      type: 'line',
+      data: { labels: chartData.labels, datasets: [{ label: 'Nouveaux patients', data: chartData.patients, borderColor: c.pLine, backgroundColor: c.pBg, fill: true, tension: 0.4, pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: c.pLine, borderWidth: 2 }] },
+      options: baseOpts,
+    });
+
+    rChart = new Chart(rCanvas.getContext('2d'), {
+      type: 'bar',
+      data: { labels: chartData.labels, datasets: [{ label: 'Rendez-vous', data: chartData.rdv, backgroundColor: c.rdvBar, hoverBackgroundColor: c.rdvHover, borderRadius: 6, borderSkipped: false }] },
+      options: baseOpts,
+    });
+  }
+
+  initCharts();
+
+  var themeBtn = document.getElementById('theme-toggle');
+  if (themeBtn) themeBtn.addEventListener('click', function () { setTimeout(initCharts, 60); });
+})();
+</script>
+{% endblock %}

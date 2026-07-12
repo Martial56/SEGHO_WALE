@@ -1,0 +1,201 @@
+{% load static %}<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Bon de commande {{ commande.numero }}</title>
+<style>
+:root { --font-print: 'Segoe UI', Arial, sans-serif; --font-mono: 'Courier New', monospace; }
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-print); font-size: 12px; color: #1a1a1a; background: #fff; }
+.page { max-width: 800px; margin: 0 auto; padding: 32px 40px; }
+
+/* En-tête */
+.header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px; border-bottom: 3px solid #071e28; padding-bottom: 20px; }
+.header-logo { display: flex; align-items: center; gap: 12px; }
+.header-logo img { width: 48px; height: 48px; object-fit: contain; }
+.header-logo h1 { font-size: 18px; font-weight: 900; color: #071e28; letter-spacing: -0.5px; }
+.header-logo p { font-size: 10px; color: #666; margin-top: 2px; }
+.header-doc { text-align: right; }
+.header-doc .doc-title { font-size: 18px; font-weight: 900; color: #071e28; text-transform: uppercase; letter-spacing: 1px; }
+.header-doc .doc-num { font-size: 13px; font-weight: 700; color: #1a1a1a; margin-top: 4px; }
+.header-doc .doc-date { font-size: 10px; color: #888; margin-top: 2px; }
+
+/* Blocs info */
+.info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 22px; }
+.info-box { border: 1px solid #ddd; border-radius: 6px; padding: 12px 14px; }
+.info-box h3 { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: #888; margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+.info-row { display: flex; gap: 8px; margin-bottom: 4px; font-size: 11.5px; }
+.info-label { color: #666; min-width: 90px; flex-shrink: 0; }
+.info-value { font-weight: 600; color: #1a1a1a; }
+
+/* Tableau articles */
+.articles-title { font-size: 10px; font-weight: 800; text-transform: uppercase; color: #888; letter-spacing: .08em; margin-bottom: 8px; }
+table.articles { width: 100%; border-collapse: collapse; margin-bottom: 0; }
+table.articles thead tr { background: #071e28; color: #fff; }
+table.articles th { padding: 9px 10px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; text-align: left; }
+table.articles th:last-child, table.articles th:nth-last-child(2), table.articles th:nth-last-child(3) { text-align: right; }
+table.articles tbody tr:nth-child(even) { background: #f9fafb; }
+table.articles td { padding: 8px 10px; font-size: 11.5px; border-bottom: 1px solid #eee; vertical-align: middle; }
+table.articles td:last-child, table.articles td:nth-last-child(2), table.articles td:nth-last-child(3) { text-align: right; }
+
+/* Total */
+.total-box { display: flex; justify-content: flex-end; margin-top: 0; border-top: 2px solid #071e28; }
+.total-inner { min-width: 260px; padding: 10px 10px; }
+.total-row { display: flex; justify-content: space-between; font-size: 11.5px; padding: 3px 0; }
+.total-row.grand { font-size: 14px; font-weight: 900; color: #071e28; border-top: 1px solid #ddd; padding-top: 6px; margin-top: 4px; }
+
+/* Notes */
+.notes-box { margin-top: 16px; border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px 14px; background: #fafafa; }
+.notes-box h3 { font-size: 9px; font-weight: 800; text-transform: uppercase; color: #888; letter-spacing: .08em; margin-bottom: 6px; }
+.notes-box p { font-size: 11.5px; color: #444; line-height: 1.5; }
+
+/* Signatures */
+.signatures { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-top: 32px; }
+.sig-box { border: 1px solid #ddd; border-radius: 6px; padding: 10px 12px; }
+.sig-box h4 { font-size: 9px; font-weight: 800; text-transform: uppercase; color: #888; letter-spacing: .08em; margin-bottom: 6px; }
+.sig-line { margin-top: 40px; border-top: 1px solid #bbb; font-size: 9px; color: #aaa; padding-top: 4px; text-align: center; }
+
+/* Pied de page */
+.footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid #eee; text-align: center; font-size: 9px; color: #aaa; }
+
+/* Boutons impression (masqués à l'impression) */
+.print-actions { max-width: 800px; margin: 20px auto 0; padding: 0 40px; display: flex; gap: 10px; }
+.btn-print { padding: 9px 20px; background: #071e28; color: #fff; border: none; border-radius: 6px; font-size: 13px; font-weight: 700; cursor: pointer; }
+.btn-back { padding: 9px 20px; background: #fff; color: #1a1a1a; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: none; }
+
+@media print {
+  .print-actions { display: none !important; }
+  body { font-size: 11px; }
+}
+@page { size: A4; margin: 0; }
+</style>
+</head>
+<body>
+
+<div class="print-actions">
+  <button class="btn-print" onclick="window.print()">🖨️ Imprimer</button>
+  <a href="{% url 'achats:commande_detail' commande.pk %}" class="btn-back">← Retour</a>
+</div>
+
+<div class="page">
+
+  <!-- En-tête -->
+  <div class="header">
+    <div class="header-logo">
+      <img src="{% static 'img/logo.png' %}" alt="WALÉ">
+      <div>
+        <h1>Centre Médico-Social WALÉ</h1>
+        <p>Yamoussoukro, Côte d'Ivoire</p>
+        <p style="margin-top:2px;">BP — Tél. : —</p>
+      </div>
+    </div>
+    <div class="header-doc">
+      <div class="doc-title">Bon de commande</div>
+      <div class="doc-num">{{ commande.numero }}</div>
+      <div class="doc-date">Date : {{ commande.date_commande }}</div>
+      {% if commande.date_livraison_prevue %}
+      <div class="doc-date">Livraison prévue : {{ commande.date_livraison_prevue }}</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Infos -->
+  <div class="info-grid">
+    <div class="info-box">
+      <h3>Émetteur</h3>
+      <div class="info-row"><span class="info-label">Établissement</span><span class="info-value">Centre Médico-Social WALÉ</span></div>
+      <div class="info-row"><span class="info-label">Ville</span><span class="info-value">Yamoussoukro</span></div>
+      <div class="info-row"><span class="info-label">Créé par</span><span class="info-value">{{ commande.cree_par.get_full_name|default:commande.cree_par.username }}</span></div>
+      <div class="info-row"><span class="info-label">Proforma</span><span class="info-value">{{ commande.proforma.numero }}</span></div>
+    </div>
+    <div class="info-box">
+      <h3>Fournisseur</h3>
+      <div class="info-row"><span class="info-label">Nom</span><span class="info-value">{{ commande.fournisseur.nom }}</span></div>
+      {% if commande.fournisseur.adresse %}
+      <div class="info-row"><span class="info-label">Adresse</span><span class="info-value">{{ commande.fournisseur.adresse }}</span></div>
+      {% endif %}
+      {% if commande.fournisseur.ville %}
+      <div class="info-row"><span class="info-label">Ville</span><span class="info-value">{{ commande.fournisseur.ville }}</span></div>
+      {% endif %}
+      {% if commande.fournisseur.telephone %}
+      <div class="info-row"><span class="info-label">Téléphone</span><span class="info-value">{{ commande.fournisseur.telephone }}</span></div>
+      {% endif %}
+      {% if commande.fournisseur.contact_nom %}
+      <div class="info-row"><span class="info-label">Contact</span><span class="info-value">{{ commande.fournisseur.contact_nom }}</span></div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Articles -->
+  <p class="articles-title">Détail des articles commandés</p>
+  <table class="articles">
+    <thead>
+      <tr>
+        <th style="width:32px;">#</th>
+        <th>Désignation</th>
+        <th style="width:70px;">Qté</th>
+        <th style="width:110px;">Prix unit. (FCFA)</th>
+        <th style="width:120px;">Montant (FCFA)</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for l in lignes %}
+    <tr>
+      <td style="color:#aaa;">{{ forloop.counter }}</td>
+      <td>{{ l.designation }}</td>
+      <td>{{ l.quantite_commandee|floatformat:"-2" }}</td>
+      <td>{{ l.prix_unitaire|floatformat:0 }}</td>
+      <td style="font-weight:700;">{{ l.montant|floatformat:0 }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Total -->
+  <div class="total-box">
+    <div class="total-inner">
+      <div class="total-row grand">
+        <span>TOTAL GÉNÉRAL</span>
+        <span>{{ commande.montant_total|floatformat:0 }} FCFA</span>
+      </div>
+    </div>
+  </div>
+
+  {% if commande.notes %}
+  <div class="notes-box" style="margin-top:14px;">
+    <h3>Notes / Instructions</h3>
+    <p>{{ commande.notes }}</p>
+  </div>
+  {% endif %}
+
+  {% if commande.proforma.besoin %}
+  <div class="notes-box" style="margin-top:10px;">
+    <h3>Objet du besoin</h3>
+    <p>{{ commande.proforma.besoin.titre }}</p>
+  </div>
+  {% endif %}
+
+  <!-- Signatures -->
+  <div class="signatures">
+    <div class="sig-box">
+      <h4>Chargée de commandes</h4>
+      <div class="sig-line">Signature &amp; cachet</div>
+    </div>
+    <div class="sig-box">
+      <h4>Direction / Validation</h4>
+      <div class="sig-line">Signature &amp; cachet</div>
+    </div>
+    <div class="sig-box">
+      <h4>Fournisseur (accusé réception)</h4>
+      <div class="sig-line">Signature &amp; cachet</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Document généré par SEGHO-WALE — {{ commande.numero }} — {{ commande.date_commande }}
+  </div>
+</div>
+
+</body>
+</html>

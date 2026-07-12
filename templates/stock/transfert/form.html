@@ -1,0 +1,182 @@
+{% extends 'stock/base.html' %}
+{% load static %}
+{% block topbar_title %}Stock — Dotation{% endblock %}
+
+{% block extra_st_css %}<style>
+.st-info-box {
+  background: rgba(45,153,219,.07);
+  border-left: 3px solid rgba(45,153,219,.5);
+  border-radius: 0 6px 6px 0;
+  padding: 10px 14px;
+  font-size: 12.5px;
+  color: #1565c0;
+  margin-top: 8px;
+}
+html[data-theme="dark"] .st-info-box {
+  background: rgba(45,153,219,.12);
+  color: #90caf9;
+}
+#produit-stock-info {
+  font-size: 12px; margin-top: 6px; padding: 6px 10px;
+  border-radius: 6px; background: var(--st-50);
+  border-left: 3px solid var(--st-400);
+  color: var(--st-700); display: none;
+}
+.content { padding-top: 0; }
+</style>{% endblock %}
+
+{% block content %}
+
+<div class="action-bar">
+  <div class="action-bar-breadcrumb">
+    <a href="{% url 'stock_mouvements' %}"><i class="bi bi-arrow-left"></i> Mouvements</a>
+    <span class="sep">/</span>
+    <span class="current">Dotation</span>
+  </div>
+  <div class="action-bar-buttons">
+    <a href="{% url 'stock_mouvements' %}" class="btn-form-cancel">
+      <i class="bi bi-list-ul"></i> Voir les mouvements
+    </a>
+  </div>
+</div>
+
+<!-- Formulaire -->
+<div class="form-simple-card" style="max-width:600px;">
+
+    {% if errors %}
+    <div style="margin-bottom:16px;padding:10px 14px;background:rgba(var(--rose-rgb),.08);border:1px solid rgba(var(--rose-rgb),.25);border-radius:8px;">
+      <div style="font-size:12px;font-weight:700;color:var(--rose-text);margin-bottom:4px;"><i class="bi bi-exclamation-triangle-fill"></i> Veuillez corriger les erreurs suivantes :</div>
+      <ul style="margin:0;padding-left:18px;">
+        {% for champ, msgs in errors.items %}
+          {% for msg in msgs %}
+          <li style="font-size:12px;color:var(--rose-text);">{{ msg }}</li>
+          {% endfor %}
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      <!-- Produit -->
+      <div class="form-field">
+        <label class="field-label" for="id_produit">Produit <span class="required-star">*</span></label>
+        {% if errors.produit %}
+          {% for err in errors.produit %}<div class="field-error">{{ err }}</div>{% endfor %}
+        {% endif %}
+        <select name="produit" id="id_produit" class="field-ul" required onchange="showStock(this)">
+          <option value="">— Sélectionner un produit —</option>
+          {% for p in produits %}
+          <option value="{{ p.pk }}"
+            data-stock="{{ p.stock_actuel|floatformat:0 }}"
+            data-unite="{{ p.unite_mesure.nom }}"
+            {% if post.produit == p.pk|stringformat:'s' %}selected{% endif %}>
+            {{ p.code }} — {{ p.nom }}
+          </option>
+          {% endfor %}
+        </select>
+        <div id="produit-stock-info">
+          <i class="bi bi-info-circle"></i>
+          Stock actuel : <strong id="stock-val">—</strong> <span id="stock-unite"></span>
+        </div>
+        {% if errors.produit %}<div class="field-error">{{ errors.produit|join:", " }}</div>{% endif %}
+      </div>
+
+      <!-- Quantité -->
+      <div class="form-field">
+        <label class="field-label" for="id_quantite">Quantité <span class="required-star">*</span></label>
+        {% if errors.quantite %}
+          {% for err in errors.quantite %}<div class="field-error">{{ err }}</div>{% endfor %}
+        {% endif %}
+        <input type="number" name="quantite" id="id_quantite" class="field-ul"
+               value="{{ post.quantite|default:'' }}"
+               min="1" step="1" placeholder="0" required>
+      </div>
+
+      <!-- Pharmacie destinataire -->
+      <div class="form-field">
+        <label class="field-label" for="id_pharmacie">Pharmacie destinataire <span class="required-star">*</span></label>
+        {% if errors.pharmacie %}<div class="field-error">{{ errors.pharmacie }}</div>{% endif %}
+        <div style="display:flex;gap:12px;margin-top:6px;flex-wrap:wrap;">
+          {% for val, lbl in pharmacies %}
+          <label style="flex:1;min-width:180px;display:flex;align-items:center;gap:10px;border:2px solid var(--st-border);border-radius:10px;padding:12px 16px;cursor:pointer;transition:all .15s;"
+                 id="pharma-label-{{ val }}"
+                 onclick="selectPharma('{{ val }}')">
+            <input type="radio" name="pharmacie" value="{{ val }}" id="pharma-{{ val }}" style="display:none;"
+              {% if post and post.pharmacie == val %}checked{% endif %}>
+            <div style="width:36px;height:36px;border-radius:8px;background:rgba(var(--st-700-rgb),.1);color:var(--st-600);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">
+              <i class="bi bi-hospital"></i>
+            </div>
+            <div>
+              <div style="font-size:13px;font-weight:700;color:var(--st-text);">{{ lbl }}</div>
+              <div style="font-size:11px;color:var(--st-muted);">Pharmacie Walé</div>
+            </div>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <div class="form-field">
+        <label class="field-label" for="id_notes">Notes</label>
+        {% if errors.notes %}
+          {% for err in errors.notes %}<div class="field-error">{{ err }}</div>{% endfor %}
+        {% endif %}
+        <textarea name="notes" id="id_notes" class="field-ul"
+                  placeholder="Motif du transfert, remarques…">{{ post.notes|default:'' }}</textarea>
+      </div>
+
+      <!-- Info box -->
+      <div class="st-info-box">
+        <i class="bi bi-info-circle-fill" style="margin-right:6px;"></i>
+        <strong>Livraison pharmacie :</strong> La quantité livrée sera <strong>déduite du stock général</strong> et affectée à la pharmacie sélectionnée.
+      </div>
+
+      <!-- Boutons -->
+      <div class="form-actions">
+        <a href="{% url 'stock_mouvements' %}" class="btn-form-cancel">
+          <i class="bi bi-x-lg"></i> Annuler
+        </a>
+        <button type="submit" class="btn-form-submit">
+          <i class="bi bi-arrow-left-right"></i> Enregistrer le transfert
+        </button>
+      </div>
+
+    </form>
+</div>
+
+<script>
+function showStock(sel) {
+  var opt = sel.selectedOptions[0];
+  var info = document.getElementById('produit-stock-info');
+  if (opt && opt.value) {
+    document.getElementById('stock-val').textContent   = opt.dataset.stock || '—';
+    document.getElementById('stock-unite').textContent = opt.dataset.unite || '';
+    info.style.display = 'block';
+  } else {
+    info.style.display = 'none';
+  }
+}
+document.addEventListener('DOMContentLoaded', function() {
+  var sel = document.getElementById('id_produit');
+  if (sel && sel.value) showStock(sel);
+  // Restaurer la sélection pharmacie au rechargement
+  document.querySelectorAll('input[name="pharmacie"]').forEach(function(r) {
+    if (r.checked) selectPharma(r.value);
+  });
+});
+function selectPharma(val) {
+  document.querySelectorAll('input[name="pharmacie"]').forEach(function(r) { r.checked = false; });
+  document.querySelectorAll('[id^="pharma-label-"]').forEach(function(el) {
+    el.style.borderColor = 'var(--st-border)';
+    el.style.background = '';
+  });
+  var input = document.getElementById('pharma-' + val);
+  var label = document.getElementById('pharma-label-' + val);
+  if (input) input.checked = true;
+  if (label) { label.style.borderColor = 'var(--st-600)'; label.style.background = 'rgba(var(--st-700-rgb),.06)'; }
+}
+</script>
+
+{% endblock %}

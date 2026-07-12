@@ -1,0 +1,297 @@
+{% extends 'pharmacie/base.html' %}
+{% load static %}
+
+{% block extra_ph_css %}<style>
+.ph-page-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 12px 32px;
+  background: var(--ph-surface); border-bottom: 1px solid var(--ph-border);
+
+  position: sticky; top: 0; z-index: 100;
+}
+.ph-stats-row {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin: 0 0 14px;
+}
+.ph-stat-box {
+  background: var(--ph-surface); border-radius: 10px;
+  border: 1px solid var(--ph-border);
+  padding: 16px 20px;
+  box-shadow: 0 1px 6px rgba(36,113,163,.06);
+}
+.ph-stat-label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: var(--ph-muted); margin-bottom: 6px; }
+.ph-stat-value { font-size: 26px; font-weight: 800; line-height: 1; }
+.ph-dash-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;
+}
+@media (max-width: 900px) { .ph-dash-grid { grid-template-columns: 1fr; } }
+.ph-alert-info {
+  background: rgba(36,113,163,.08); border: 1px solid rgba(36,113,163,.22);
+  border-radius: 8px; padding: 10px 16px; margin-bottom: 16px;
+  display: flex; align-items: center; gap: 10px;
+  font-size: 12.5px; color: var(--ph-700); font-weight: 600;
+}
+</style>{% endblock %}
+
+{% block content %}
+<!-- En-tête sticky -->
+<div class="ph-page-head">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <div style="width:36px;height:36px;border-radius:8px;background:var(--ph-100);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--ph-600);">
+      <i class="bi bi-speedometer2"></i>
+    </div>
+    <div>
+      <div style="font-size:15px;font-weight:800;color:var(--ph-900);">{{ label }} — Tableau de bord</div>
+      <div style="font-size:11px;color:var(--ph-muted);">{{ today }}</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <a href="{% url 'pharmacie_ordonnances' pharmacie %}?statut=emise" class="btn-ph">
+      <i class="bi bi-prescription2"></i> Dispenser une ordonnance
+    </a>
+    <a href="{% url 'pharmacie_demande' pharmacie %}" class="btn-ph-outline">
+      <i class="bi bi-bag-plus"></i> Demande dotation
+    </a>
+  </div>
+</div>
+
+<!-- Alerte demandes en attente -->
+{% if demandes_en_attente > 0 %}
+<div class="ph-alert-info" style="margin-top:20px;">
+  <i class="bi bi-info-circle-fill" style="font-size:16px;flex-shrink:0;"></i>
+  <span>{{ demandes_en_attente }} demande{{ demandes_en_attente|pluralize }} en attente de traitement par le stock central</span>
+</div>
+{% endif %}
+
+<!-- Stats cards -->
+<div class="ph-stats-row">
+  <div class="ph-stat-box">
+    <div class="ph-stat-label"><i class="bi bi-box-seam"></i> Références en stock</div>
+    <div class="ph-stat-value" style="color:var(--ph-600);">{{ stats.total_refs|default:"0" }}</div>
+  </div>
+  <div class="ph-stat-box">
+    <div class="ph-stat-label"><i class="bi bi-x-circle-fill"></i> Ruptures</div>
+    <div class="ph-stat-value" style="color:var(--rose-text);">{{ stats.ruptures|default:"0" }}</div>
+  </div>
+  <div class="ph-stat-box">
+    <div class="ph-stat-label"><i class="bi bi-exclamation-triangle-fill"></i> En alerte</div>
+    <div class="ph-stat-value" style="color:var(--amber-text);">{{ stats.alertes|default:"0" }}</div>
+  </div>
+  <div class="ph-stat-box">
+    <div class="ph-stat-label"><i class="bi bi-cash-stack"></i> CA du mois (FCFA)</div>
+    <div class="ph-stat-value" style="color:#0d7a4c;font-size:20px;">{{ ca_mois|default:"0"|floatformat:0 }}</div>
+  </div>
+  <div class="ph-stat-box">
+    <div class="ph-stat-label"><i class="bi bi-receipt"></i> Ventes du mois</div>
+    <div class="ph-stat-value" style="color:var(--ph-700);">{{ nb_ventes_mois|default:"0" }}</div>
+  </div>
+</div>
+
+<!-- Layout 2 colonnes -->
+<div class="ph-dash-grid">
+  <!-- Ordonnances à dispenser -->
+  <div class="ph-card">
+    <div class="ph-card-header" style="padding:12px 20px 12px 32px;">
+      <div class="ph-card-title"><i class="bi bi-prescription2" style="color:var(--ph-600);"></i> Ordonnances à dispenser</div>
+      <a href="{% url 'pharmacie_ordonnances' pharmacie %}" class="btn-ph-outline" style="font-size:11px;padding:4px 10px;">Voir toutes</a>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="ph-table">
+        <thead>
+          <tr>
+            <th style="">Patient</th>
+            <th>Date</th>
+            <th>Médecin</th>
+            <th style="text-align:center;">Médicaments</th>
+            <th style=""></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ord in ordonnances_attente %}
+          <tr>
+            <td style="">
+              <div style="font-weight:600;">{{ ord.consultation.patient }}</div>
+              <div style="font-size:10.5px;color:var(--ph-muted);">{{ ord.numero }}</div>
+            </td>
+            <td style="white-space:nowrap;">{{ ord.date }}</td>
+            <td>{{ ord.consultation.medecin }}</td>
+            <td style="text-align:center;">
+              <span class="badge-ph-emise">{{ ord.lignes.count }} méd.</span>
+            </td>
+            <td style="">
+              <a href="{% url 'pharmacie_dispenser' pharmacie ord.pk %}" class="btn-ph" style="font-size:11px;padding:4px 10px;">
+                <i class="bi bi-check2-circle"></i> Dispenser
+              </a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" style="text-align:center;padding:28px;color:var(--ph-muted);">
+              <i class="bi bi-check-circle" style="font-size:22px;display:block;margin-bottom:6px;color:var(--ph-300);"></i>
+              Aucune ordonnance en attente
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Stock critique -->
+  <div class="ph-card">
+    <div class="ph-card-header" style="padding:12px 20px 12px 32px;">
+      <div class="ph-card-title"><i class="bi bi-exclamation-triangle" style="color:var(--amber-text);"></i> Stock critique</div>
+      <a href="{% url 'pharmacie_stock' pharmacie %}?statut=alerte" class="btn-ph-outline" style="font-size:11px;padding:4px 10px;">Voir tout</a>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="ph-table">
+        <thead>
+          <tr>
+            <th style="">Produit</th>
+            <th style="text-align:center;">Quantité</th>
+            <th style="text-align:center">État</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in stock_critique %}
+          <tr>
+            <td style="">
+              <div style="font-weight:600;">{{ item.produit.nom }}</div>
+              <div style="font-size:10.5px;font-family: var(--font-mono);color:var(--ph-600);">{{ item.produit.code }}</div>
+            </td>
+            <td style="text-align:center;font-weight:700;
+              color:{% if item.quantite <= 0 %}var(--rose-text){% else %}var(--amber-text){% endif %};">
+              {{ item.quantite }} {{ item.produit.unite_mesure.nom }}
+            </td>
+            <td style="text-align:center">
+              {% if item.quantite <= 0 %}
+                <span class="badge-ph-rupture">Rupture</span>
+              {% elif item.quantite <= item.produit.stock_alerte %}
+                <span class="badge-ph-alerte">Alerte</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="3" style="text-align:center;padding:28px;color:var(--ph-muted);">
+              <i class="bi bi-shield-check" style="font-size:22px;display:block;margin-bottom:6px;color:var(--ph-300);"></i>
+              Stock nominal
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Top produits + Ventes par mode -->
+<div class="ph-dash-grid">
+  <!-- Top produits vendus -->
+  <div class="ph-card">
+    <div class="ph-card-header" style="padding:12px 20px 12px 32px;">
+      <div class="ph-card-title"><i class="bi bi-bar-chart-fill" style="color:var(--ph-600);"></i> Top produits du mois</div>
+    </div>
+    <div style="padding:16px 24px;">
+      {% if top_produits %}
+      {% for prod in top_produits %}
+      {% with max_qte=top_produits.0.qte %}
+      <div style="margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+          <span style="font-size:12px;font-weight:600;color:var(--ph-900);max-width:70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ prod.produit__nom }}</span>
+          <span style="font-size:11.5px;color:var(--ph-muted);">{{ prod.qte }} unités</span>
+        </div>
+        <div style="height:7px;background:var(--ph-100);border-radius:4px;overflow:hidden;">
+          <div style="height:100%;border-radius:4px;
+            background:{% cycle 'var(--ph-500)' '#0d7a4c' 'var(--amber-text)' '#5c3d8f' 'var(--rose-text)' %};
+            width:{% if max_qte %}{% widthratio prod.qte max_qte 100 %}%{% else %}0%{% endif %};"></div>
+        </div>
+      </div>
+      {% endwith %}
+      {% endfor %}
+      {% else %}
+      <div style="text-align:center;padding:28px;color:var(--ph-muted);">
+        <i class="bi bi-bar-chart" style="font-size:22px;display:block;margin-bottom:6px;color:var(--ph-300);"></i>
+        Aucune vente ce mois
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Ventes par mode de paiement -->
+  <div class="ph-card">
+    <div class="ph-card-header" style="padding:12px 20px 12px 32px;">
+      <div class="ph-card-title"><i class="bi bi-pie-chart-fill" style="color:var(--ph-600);"></i> Ventes par mode — mois en cours</div>
+      <a href="{% url 'pharmacie_recette' pharmacie %}" class="btn-ph-outline" style="font-size:11px;padding:4px 10px;">Recette</a>
+    </div>
+    <div style="padding:16px 24px;">
+      {% if ventes_par_mode %}
+      {% for vm in ventes_par_mode %}
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--ph-border);">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:10px;height:10px;border-radius:50%;flex-shrink:0;
+            background:{% cycle 'var(--ph-500)' '#0d7a4c' 'var(--amber-text)' '#5c3d8f' %};"></div>
+          <span style="font-size:12.5px;font-weight:600;color:var(--ph-900);text-transform:capitalize;">
+            {{ vm.mode_paiement|default:"Non spécifié" }}
+          </span>
+          <span style="font-size:11px;color:var(--ph-muted);">({{ vm.nb }} vente{{ vm.nb|pluralize }})</span>
+        </div>
+        <span style="font-size:13px;font-weight:700;color:var(--ph-700);">{{ vm.total|floatformat:0 }} FCFA</span>
+      </div>
+      {% endfor %}
+      {% else %}
+      <div style="text-align:center;padding:28px;color:var(--ph-muted);">
+        <i class="bi bi-pie-chart" style="font-size:22px;display:block;margin-bottom:6px;color:var(--ph-300);"></i>
+        Aucune vente ce mois
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Dernières opérations -->
+<div class="ph-card">
+  <div class="ph-card-header" style="padding:12px 20px 12px 32px;">
+    <div class="ph-card-title"><i class="bi bi-clock-history" style="color:var(--ph-600);"></i> Dernières opérations</div>
+    <a href="{% url 'pharmacie_journal' pharmacie %}" class="btn-ph-outline" style="font-size:11px;padding:4px 10px;">Journal complet</a>
+  </div>
+  <div style="overflow-x:auto;">
+    <table class="ph-table">
+      <thead>
+        <tr>
+          <th style="">Date</th>
+          <th>Produit</th>
+          <th>Type</th>
+          <th style="text-align:center">Quantité</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for mvt in derniers_mvts %}
+        <tr>
+          <td style="white-space:nowrap;color:var(--ph-muted);font-size:11.5px">{{ mvt.date }}</td>
+          <td style="font-weight:600;">{{ mvt.produit }}</td>
+          <td>
+            {% if mvt.type == 'dispensation' %}
+              <span class="badge-ph-emise"><i class="bi bi-prescription2"></i> Dispensation</span>
+            {% elif mvt.type == 'entree' %}
+              <span class="badge-ph-ok"><i class="bi bi-box-arrow-in-down"></i> Entrée</span>
+            {% elif mvt.type == 'ajustement' %}
+              <span class="badge-ph-alerte"><i class="bi bi-sliders"></i> Ajustement</span>
+            {% else %}
+              <span class="badge-ph-emise">{{ mvt.type }}</span>
+            {% endif %}
+          </td>
+          <td style="text-align:center;font-weight:700;
+            color:{% if mvt.quantite < 0 %}var(--rose-text){% else %}var(--ph-600){% endif %};">
+            {% if mvt.quantite > 0 %}+{% endif %}{{ mvt.quantite }}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="4" style="text-align:center;padding:24px;color:var(--ph-muted);">Aucun mouvement récent</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

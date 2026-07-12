@@ -17,6 +17,7 @@ urlpatterns = [
     path('<int:pk>/modifier/', views.patient_edit, name='edit'),
     path('<int:pk>/rendez-vous/', views.patient_rdv_list, name='rdv_list'),
     path('<int:pk>/consultations/', views.patient_consultation_list, name='consultation_list'),
+    path('<int:pk>/soins/', views.patient_soin_list, name='soin_list'),
     path('<int:pk>/ordonnances/', views.patient_ordonnance_list, name='ordonnance_list'),
     path('<int:pk>/ordonnances/creer/', views.ordonnance_create, name='ordonnance_create'),
     path('<int:pk>/hospitalisations/', views.patient_hospitalisation_list, name='hospitalisation_list'),
@@ -26,8 +27,4 @@ urlpatterns = [
     path('pathologies/nouveau/', views.pathologie_create, name='pathologie_create'),
     path('pathologies/<int:pk>/modifier/', views.pathologie_edit, name='pathologie_edit'),
     path('pathologies/<int:pk>/supprimer/', views.pathologie_delete, name='pathologie_delete'),
-    path('types-visite/', views.typevisite_list, name='typevisite_list'),
-    path('types-visite/nouveau/', views.typevisite_create, name='typevisite_create'),
-    path('types-visite/<int:pk>/modifier/', views.typevisite_edit, name='typevisite_edit'),
-    path('types-visite/<int:pk>/supprimer/', views.typevisite_delete, name='typevisite_delete'),
 ]

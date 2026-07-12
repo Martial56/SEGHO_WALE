@@ -1,0 +1,379 @@
+{% extends 'conges/base.html' %}
+{% block topbar_title %}Tableau de bord — Congés{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+/* ── Conteneur pleine page ── */
+.db-wrap {
+  display:flex; flex-direction:column;
+  height:calc(100vh - var(--header-h));
+  overflow:hidden;
+}
+
+/* ── En-tête (subheader sticky juste sous le nav) ── */
+.db-head {
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  padding:5px 20px; flex-shrink:0;
+  background:var(--cg-surface); border-bottom:1px solid var(--cg-border);
+}
+
+/* ── Corps de page ── */
+.db-page {
+  flex:1; display:flex; flex-direction:column;
+  overflow:hidden; min-height:0;
+}
+.db-title { font-size:16px; font-weight:800; color:var(--cg-900); }
+html[data-theme="dark"] .db-title { color:var(--cg-200); }
+
+/* ── KPIs ── */
+.db-kpis {
+  display:grid; grid-template-columns:repeat(5,1fr);
+  flex-shrink:0; border-bottom:1px solid var(--cg-border);
+}
+@media(max-width:900px){ .db-kpis{ grid-template-columns:repeat(3,1fr); } }
+.db-kpi {
+  display:flex; align-items:center; gap:12px;
+  padding:10px 18px; border-right:1px solid var(--cg-border);
+  text-decoration:none; transition:background .15s;
+}
+.db-kpi:last-child { border-right:none; }
+.db-kpi:hover { background:var(--cg-50); }
+html[data-theme="dark"] .db-kpi:hover { background:#1D2C44; }
+.db-kpi-icon {
+  width:36px; height:36px; border-radius:9px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center; font-size:15px;
+}
+.ki-venir  { background:rgba(var(--cg-600-rgb),.1);  color:var(--cg-700); }
+.ki-cours  { background:rgba(45,153,219,.1);  color:#1a4d6d; }
+.ki-retard { background:rgba(var(--rose-rgb),.1);   color:var(--rose-text); }
+.ki-7j     { background:rgba(var(--amber-rgb),.1);  color:var(--amber-text); }
+.ki-an     { background:rgba(var(--cg-600-rgb),.1);   color:var(--cg-700); }
+html[data-theme="dark"] .ki-venir  { color:#7ab8d0; }
+html[data-theme="dark"] .ki-cours  { color:#80c8ef; }
+html[data-theme="dark"] .ki-retard { color:#f09090; }
+html[data-theme="dark"] .ki-7j     { color:#f0c060; }
+html[data-theme="dark"] .ki-an     { color:var(--cg-300); }
+.db-kpi-val { font-size:22px; font-weight:800; line-height:1; }
+.kv-venir  { color:var(--cg-700); }
+.kv-cours  { color:#1a4d6d; }
+.kv-retard { color:var(--rose-text); }
+.kv-7j     { color:var(--amber-text); }
+.kv-an     { color:var(--cg-700); }
+html[data-theme="dark"] .kv-venir  { color:#7ab8d0; }
+html[data-theme="dark"] .kv-cours  { color:#80c8ef; }
+html[data-theme="dark"] .kv-retard { color:#f09090; }
+html[data-theme="dark"] .kv-7j     { color:#f0c060; }
+html[data-theme="dark"] .kv-an     { color:var(--cg-300); }
+.db-count-badge { background:var(--cg-100); color:var(--cg-700); border-radius:20px; padding:1px 8px; font-size:10.5px; font-weight:700; }
+html[data-theme="dark"] .db-count-badge { background:rgba(33,150,243,0.15); color:var(--cg-300); }
+.db-kpi-lbl { font-size:10.5px; color:var(--cg-muted); font-weight:600; text-transform:uppercase; letter-spacing:.3px; margin-top:1px; }
+
+/* ── Corps ── */
+.db-body { flex:1; overflow:auto; min-height:0; display:grid; grid-template-columns:1fr 1fr; gap:0; }
+.db-col { padding:14px 16px; border-right:1px solid var(--cg-border); overflow-y:auto; }
+.db-col:last-child { border-right:none; }
+
+/* ── Sections ── */
+.db-section { margin-bottom:16px; }
+.db-section-title {
+  font-size:10.5px; font-weight:800; color:var(--cg-600);
+  text-transform:uppercase; letter-spacing:.5px;
+  display:flex; align-items:center; gap:6px; margin-bottom:10px;
+  padding-bottom:6px; border-bottom:1px solid var(--cg-border);
+}
+html[data-theme="dark"] .db-section-title { color:var(--cg-300); }
+.db-count-badge {
+  background:var(--cg-100); color:var(--cg-700); border-radius:20px;
+  padding:1px 8px; font-size:10.5px; font-weight:700;
+}
+
+/* ── Lignes congé ── */
+.db-item {
+  display:flex; align-items:center; gap:10px; padding:8px 10px;
+  border-radius:8px; margin-bottom:4px; transition:background .1s;
+  text-decoration:none; border:1px solid transparent;
+}
+.db-item:hover { background:var(--cg-50); border-color:var(--cg-200); }
+html[data-theme="dark"] .db-item:hover { background:#1D2C44; }
+.db-item-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.db-item-name { font-size:13px; font-weight:700; color:var(--cg-text); }
+.db-item-sub  { font-size:11px; color:var(--cg-muted); margin-top:1px; }
+.db-item-right { margin-left:auto; text-align:right; flex-shrink:0; }
+.db-item-date  { font-size:11.5px; color:var(--cg-muted); }
+.db-item-badge { font-size:11px; font-weight:700; padding:2px 8px; border-radius:20px; display:inline-block; }
+
+/* ── Répartition ── */
+.rep-row { margin-bottom:8px; }
+.rep-label { display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px; color:var(--cg-text); }
+.rep-track { background:rgba(var(--cg-600-rgb),.1); border-radius:3px; height:6px; overflow:hidden; }
+.rep-fill  { height:100%; border-radius:3px; background:var(--cg-500); transition:width .4s; }
+
+/* ── Anniversaires ── */
+.ann-item {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:7px 10px; border-radius:8px; margin-bottom:4px;
+  border:1px solid rgba(var(--amber-rgb),.2); background:rgba(var(--amber-rgb),.04);
+}
+.ann-item.urgent { border-color:rgba(var(--rose-rgb),.25); background:rgba(var(--rose-rgb),.04); }
+
+/* Vide */
+.db-empty { text-align:center; padding:24px 16px; color:var(--cg-muted); font-size:12px; }
+.db-empty i { font-size:28px; display:block; margin-bottom:8px; opacity:.3; }
+
+/* ── Variantes sémantiques ── */
+.db-section-title.t-danger { color:var(--rose-text); border-bottom-color:rgba(var(--rose-rgb),.2); }
+.db-section-title.t-warn   { color:var(--amber-text); border-bottom-color:rgba(var(--amber-rgb),.2); }
+html[data-theme="dark"] .db-section-title.t-danger { color:#f09090; border-bottom-color:rgba(var(--rose-rgb),.25); }
+html[data-theme="dark"] .db-section-title.t-warn   { color:#f0c060; border-bottom-color:rgba(var(--amber-rgb),.25); }
+
+.db-count-badge.c-danger { background:rgba(var(--rose-rgb),.1);  color:var(--rose-text); }
+.db-count-badge.c-info   { background:rgba(45,153,219,.1); color:#1a4d6d; }
+.db-count-badge.c-warn   { background:rgba(var(--amber-rgb),.1); color:var(--amber-text); }
+html[data-theme="dark"] .db-count-badge.c-danger { background:rgba(var(--rose-rgb),.18);  color:#f09090; }
+html[data-theme="dark"] .db-count-badge.c-info   { background:rgba(45,153,219,.18); color:#80c8ef; }
+html[data-theme="dark"] .db-count-badge.c-warn   { background:rgba(var(--amber-rgb),.18); color:#f0c060; }
+
+.db-item-badge.c-danger { background:rgba(var(--rose-rgb),.1);  color:var(--rose-text); }
+.db-item-badge.c-info   { background:rgba(45,153,219,.1); color:#1a4d6d; }
+html[data-theme="dark"] .db-item-badge.c-danger { background:rgba(var(--rose-rgb),.18);  color:#f09090; }
+html[data-theme="dark"] .db-item-badge.c-info   { background:rgba(45,153,219,.18); color:#80c8ef; }
+
+.db-date-warn { font-weight:700; color:var(--amber-text); }
+html[data-theme="dark"] .db-date-warn { color:#f0c060; }
+
+.rep-value { font-weight:700; color:var(--cg-700); }
+html[data-theme="dark"] .rep-value { color:var(--cg-300); }
+
+.db-planifie { font-size:10px; color:var(--cg-700); font-weight:700; }
+html[data-theme="dark"] .db-planifie { color:#7ab8d0; }
+
+.db-ann-date.urgent { color:var(--rose-text); font-size:11px; font-weight:700; }
+.db-ann-date.normal { color:var(--amber-text); font-size:11px; font-weight:700; }
+html[data-theme="dark"] .db-ann-date.urgent { color:#f09090; }
+html[data-theme="dark"] .db-ann-date.normal { color:#f0c060; }
+
+.db-note-legale { font-size:10.5px; color:var(--amber-text); margin-top:6px; padding:5px 8px; background:rgba(var(--amber-rgb),.05); border-radius:6px; }
+html[data-theme="dark"] .db-note-legale { color:#f0c060; background:rgba(var(--amber-rgb),.1); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="db-wrap">
+
+  <!-- ── En-tête juste sous le nav ── -->
+  <div class="db-head" id="subheader">
+    <div>
+      <div class="db-title">
+        <i class="bi bi-graph-up" style="color:var(--cg-600);margin-right:6px;font-size:12px;"></i>Tableau de bord
+      </div>
+      <div style="font-size:11px;color:var(--cg-muted);">{{ today|date:"l d F Y" }} · Année {{ annee }}</div>
+    </div>
+    <a href="{% url 'conge_nouveau' %}" class="btn-cg" style="padding:6px 14px;font-size:12.5px;">
+      <i class="bi bi-plus-circle-fill"></i> Enregistrer un congé
+    </a>
+  </div>
+
+<div class="db-page">
+  <!-- ── KPIs ── -->
+  <div class="db-kpis">
+    <a href="{% url 'conge_list' %}?statut=approuve" class="db-kpi">
+      <div class="db-kpi-icon ki-venir"><i class="bi bi-calendar-event-fill"></i></div>
+      <div><div class="db-kpi-val kv-venir">{{ a_venir }}</div><div class="db-kpi-lbl">À venir</div></div>
+    </a>
+    <a href="{% url 'conge_list' %}?statut=en_cours" class="db-kpi">
+      <div class="db-kpi-icon ki-cours"><i class="bi bi-play-circle-fill"></i></div>
+      <div><div class="db-kpi-val kv-cours">{{ en_cours }}</div><div class="db-kpi-lbl">En cours</div></div>
+    </a>
+    <a href="{% url 'conge_suivi_retours' %}" class="db-kpi">
+      <div class="db-kpi-icon ki-retard"><i class="bi bi-exclamation-triangle-fill"></i></div>
+      <div><div class="db-kpi-val kv-retard">{{ en_retard|length }}</div><div class="db-kpi-lbl">En retard</div></div>
+    </a>
+    <a href="{% url 'conge_suivi_retours' %}" class="db-kpi">
+      <div class="db-kpi-icon ki-7j"><i class="bi bi-calendar-week-fill"></i></div>
+      <div><div class="db-kpi-val kv-7j">{{ nb_dans_7j }}</div><div class="db-kpi-lbl">Retour dans 7j</div></div>
+    </a>
+    <a href="{% url 'conge_list' %}?annee={{ annee }}" class="db-kpi">
+      <div class="db-kpi-icon ki-an"><i class="bi bi-calendar-check-fill"></i></div>
+      <div><div class="db-kpi-val kv-an">{{ total_jours_annee }}</div><div class="db-kpi-lbl">Jours pris {{ annee }}</div></div>
+    </a>
+  </div>
+
+  <!-- ── Corps 2 colonnes ── -->
+  <div class="db-body">
+
+    <!-- ── Colonne gauche ── -->
+    <div class="db-col">
+
+      <!-- Retards urgents -->
+      {% if en_retard %}
+      <div class="db-section">
+        <div class="db-section-title t-danger">
+          <i class="bi bi-exclamation-triangle-fill" style="color:var(--rose);"></i>
+          Retards constatés
+          <span class="db-count-badge c-danger">{{ en_retard|length }}</span>
+        </div>
+        {% for c in en_retard %}
+        <a href="{% url 'conge_detail' c.pk %}" class="db-item">
+          <span class="db-item-dot" style="background:var(--rose);"></span>
+          <div>
+            <div class="db-item-name">{{ c.employe.nom_complet|truncatechars:22 }}</div>
+            <div class="db-item-sub">{{ c.get_type_conge_display }}</div>
+          </div>
+          <div class="db-item-right">
+            <span class="db-item-badge c-danger">+{{ c.jours_retard }}j</span>
+            <div class="db-item-date">prévu {{ c.date_fin|date:"d/m" }}</div>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <!-- Congés aujourd'hui -->
+      <div class="db-section">
+        <div class="db-section-title">
+          <i class="bi bi-calendar-day-fill" style="color:#2d99db;"></i>
+          En congé aujourd'hui
+          {% if conges_aujourd_hui %}<span class="db-count-badge c-info">{{ conges_aujourd_hui|length }}</span>{% endif %}
+        </div>
+        {% if conges_aujourd_hui %}
+        {% for c in conges_aujourd_hui %}
+        <a href="{% url 'conge_detail' c.pk %}" class="db-item">
+          <span class="db-item-dot" style="background:#2d99db;"></span>
+          <div>
+            <div class="db-item-name">{{ c.employe.nom_complet|truncatechars:22 }}</div>
+            <div class="db-item-sub">{{ c.get_type_conge_display }} · {{ c.employe.service.nom|default:"—" }}</div>
+          </div>
+          <div class="db-item-right">
+            <span class="db-item-badge c-info">{{ c.nb_jours_ouvres }}j</span>
+            <div class="db-item-date">jusqu'au {{ c.date_fin|date:"d/m" }}</div>
+          </div>
+        </a>
+        {% endfor %}
+        {% else %}
+        <div class="db-empty">
+          <i class="bi bi-sun"></i>
+          Aucun congé en cours aujourd'hui
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Dans 7 jours -->
+      {% if dans_7j %}
+      <div class="db-section">
+        <div class="db-section-title">
+          <i class="bi bi-calendar-week" style="color:var(--amber);"></i>
+          Départs dans 7 jours
+          <span class="db-count-badge c-warn">{{ nb_dans_7j }}</span>
+        </div>
+        {% for c in dans_7j %}
+        <a href="{% url 'conge_detail' c.pk %}" class="db-item">
+          <span class="db-item-dot" style="background:var(--amber);"></span>
+          <div>
+            <div class="db-item-name">{{ c.employe.nom_complet|truncatechars:22 }}</div>
+            <div class="db-item-sub">{{ c.get_type_conge_display }}</div>
+          </div>
+          <div class="db-item-right">
+            <div class="db-item-date db-date-warn">{{ c.date_debut|date:"d/m/Y" }}</div>
+            <div class="db-item-date">{{ c.nb_jours_ouvres }}j ouvrés</div>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+    </div><!-- /db-col gauche -->
+
+    <!-- ── Colonne droite ── -->
+    <div class="db-col">
+
+      <!-- Répartition par type -->
+      {% if repartition %}
+      <div class="db-section">
+        <div class="db-section-title">
+          <i class="bi bi-bar-chart-fill"></i> Répartition par type — {{ annee }}
+          <span class="db-count-badge">{{ total_jours_annee }}j</span>
+        </div>
+        {% for label, count, pct in repartition %}
+        <div class="rep-row">
+          <div class="rep-label">
+            <span>{{ label }}</span>
+            <span class="rep-value">{{ count }} · {{ pct }}%</span>
+          </div>
+          <div class="rep-track"><div class="rep-fill" style="width:{{ pct }}%;"></div></div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <!-- Prochains congés (30j) -->
+      <div class="db-section">
+        <div class="db-section-title">
+          <i class="bi bi-calendar-plus"></i> Prochains congés (30 jours)
+          {% if prochains_conges %}<span class="db-count-badge">{{ prochains_conges|length }}</span>{% endif %}
+        </div>
+        {% if prochains_conges %}
+        {% for c in prochains_conges %}
+        <a href="{% url 'conge_detail' c.pk %}" class="db-item">
+          <span class="db-item-dot" style="background:var(--cg-500);"></span>
+          <div>
+            <div class="db-item-name">{{ c.employe.nom_complet|truncatechars:20 }}</div>
+            <div class="db-item-sub">{{ c.get_type_conge_display }}</div>
+          </div>
+          <div class="db-item-right">
+            <div class="db-item-date" style="font-weight:600;">{{ c.date_debut|date:"d/m" }} → {{ c.date_fin|date:"d/m/Y" }}</div>
+            <div class="db-item-date">{{ c.nb_jours_ouvres }}j ouvrés</div>
+          </div>
+        </a>
+        {% endfor %}
+        {% else %}
+        <div class="db-empty">
+          <i class="bi bi-calendar-check"></i>
+          Aucun congé prévu dans les 30 jours
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Anniversaires d'embauche -->
+      {% if conges_a_venir %}
+      <div class="db-section">
+        <div class="db-section-title t-warn">
+          <i class="bi bi-bell-fill" style="color:var(--amber);"></i>
+          Droits congé annuel — 60 jours
+          <span class="db-count-badge c-warn">{{ conges_a_venir|length }}</span>
+        </div>
+        {% for a in conges_a_venir %}
+        <div class="ann-item {% if a.jours_restants <= 7 %}urgent{% endif %}">
+          <div>
+            <div style="font-size:12.5px;font-weight:700;color:var(--cg-text);">{{ a.employe.nom_complet|truncatechars:20 }}</div>
+            <div style="font-size:11px;color:var(--cg-muted);">{{ a.employe.service.nom|default:"—" }} · {{ a.annees }}an{% if a.annees > 1 %}s{% endif %}</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="db-ann-date {% if a.jours_restants <= 7 %}urgent{% else %}normal{% endif %}">
+              {{ a.date_anniversaire|date:"d/m/Y" }}
+            </div>
+            <div style="font-size:10.5px;color:var(--cg-muted);">
+              {% if a.jours_restants == 0 %}Aujourd'hui{% else %}dans {{ a.jours_restants }}j{% endif %}
+            </div>
+            {% if not a.conge_existant %}
+            <a href="{% url 'conge_nouveau' %}?employe={{ a.employe.pk }}" class="btn-cg-sm" style="font-size:10px;padding:2px 7px;margin-top:3px;">
+              <i class="bi bi-plus"></i> Planifier
+            </a>
+            {% else %}
+            <span class="db-planifie"><i class="bi bi-check-circle-fill"></i> Planifié</span>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+        <div class="db-note-legale">
+          <i class="bi bi-info-circle"></i> Art. 25.10 CODI — congé à accorder dans les 12 mois suivant l'ouverture du droit.
+        </div>
+      </div>
+      {% endif %}
+
+    </div><!-- /db-col droite -->
+
+  </div><!-- /db-body -->
+</div><!-- /db-page -->
+</div><!-- /db-wrap -->
+{% endblock %}

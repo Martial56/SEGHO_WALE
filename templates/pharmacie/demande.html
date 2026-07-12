@@ -1,0 +1,135 @@
+{% extends 'pharmacie/base.html' %}
+{% load static %}
+
+{% block extra_ph_css %}<style>
+.ph-qte-field {
+  border: none; border-bottom: 1.5px solid rgba(0,0,0,.15); background: transparent;
+  padding: 5px 4px; font-size: 13px; text-align: center; width: 90px;
+  font-family: inherit; color: var(--ph-text); transition: border-color .15s;
+}
+.ph-qte-field:focus { outline: none; border-bottom-color: var(--ph-500); }
+.ph-type-sep {
+  background: var(--ph-100); padding: 8px 14px;
+  font-size: 10.5px; font-weight: 700; color: var(--ph-700);
+  text-transform: uppercase; letter-spacing: .5px;
+  border-bottom: 1px solid var(--ph-border);
+}
+.ph-error { background: rgba(var(--rose-rgb),.08); color: var(--rose-text); border: 1px solid rgba(var(--rose-rgb),.2); border-radius: 6px; padding: 8px 14px; font-size: 12px; margin-bottom: 12px; }
+</style>{% endblock %}
+
+{% block content %}
+<div class="action-bar" style="padding:11px 32px;">
+  <div class="action-bar-breadcrumb">
+    <i class="bi bi-bag-plus"></i>
+    <span class="current">Demande de dotation — {{ label }}</span>
+  </div>
+  <div class="action-bar-buttons">
+    <a href="{% url 'pharmacie_dashboard' pharmacie %}" class="btn-form-cancel">Annuler</a>
+    <button type="submit" form="form-demande" class="btn-form-submit">
+      <i class="bi bi-send"></i> Soumettre la demande
+    </button>
+  </div>
+</div>
+
+<!-- Explication -->
+<div style="display:flex;align-items:flex-start;gap:10px;background:var(--ph-50);border-bottom:1px solid var(--ph-border);padding:14px 32px;margin:0;">
+  <i class="bi bi-info-circle-fill" style="color:var(--ph-500);font-size:18px;flex-shrink:0;margin-top:1px;"></i>
+  <div>
+    <div style="font-size:13px;font-weight:700;color:var(--ph-text);margin-bottom:3px;">Comment faire une demande</div>
+    <div style="font-size:12.5px;color:var(--ph-muted);line-height:1.5;">
+      Saisissez les produits dont vous avez besoin en renseignant uniquement les quantités souhaitées.
+      La demande sera transmise au gestionnaire de stock central pour traitement.
+      Laissez vide ou mettez <strong>0</strong> pour les produits non demandés.
+    </div>
+  </div>
+</div>
+
+{% if errors and errors.global %}
+<div class="ph-error"><i class="bi bi-exclamation-triangle-fill"></i> {{ errors.global }}</div>
+{% endif %}
+
+<form id="form-demande" method="post" novalidate>
+{% csrf_token %}
+<input type="hidden" name="pharmacie" value="{{ pharmacie }}">
+
+<!-- Tableau produits -->
+<div class="ph-card" style="margin-bottom:14px;">
+  <div class="ph-card-header" style="padding:12px 20px 12px 32px;">
+    <div class="ph-card-title"><i class="bi bi-box-seam" style="color:var(--ph-600);"></i> Produits à demander</div>
+    <span style="font-size:11.5px;color:var(--ph-muted);">Saisissez uniquement les quantités souhaitées</span>
+  </div>
+  <div style="overflow-x:auto;">
+    <table class="ph-table" style="font-size:12.5px;">
+      <thead>
+        <tr>
+          <th style="">Produit</th>
+          <th style="text-align:center;">Stock pharmacie</th>
+          <th style="text-align:center">Qté demandée</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in produits %}
+        {% ifchanged p.produit.type %}
+        <tr class="ph-type-sep">
+          <td colspan="3">
+            {% if p.produit.type == 'medicament' %}<i class="bi bi-capsule-pill"></i> Médicaments
+            {% elif p.produit.type == 'consommable' %}<i class="bi bi-bandaid"></i> Consommables médicaux
+            {% else %}<i class="bi bi-tools"></i> Équipements{% endif %}
+          </td>
+        </tr>
+        {% endifchanged %}
+        <tr>
+          <td style="">
+            <div style="font-weight:600;">{{ p.produit.nom }}</div>
+            <div style="font-size:10.5px;font-family: var(--font-mono);color:var(--ph-600);">{{ p.produit.code }}</div>
+            {% if p.produit.unite_mesure %}
+            <div style="font-size:10.5px;color:var(--ph-muted);">Unité : {{ p.produit.unite_mesure.nom }}</div>
+            {% endif %}
+          </td>
+          <td style="text-align:center;">
+            <span style="font-weight:700;color:{% if p.en_rupture %}var(--rose-text){% elif p.en_alerte %}var(--amber-text){% else %}var(--ph-600){% endif %};">
+              {{ p.stock_pharmacie|floatformat:0 }}
+            </span>
+            {% if p.produit.unite_mesure %}
+            <span style="font-size:10.5px;color:var(--ph-muted);"> {{ p.produit.unite_mesure.nom }}</span>
+            {% endif %}
+            {% if p.en_rupture %}<br><span class="badge-ph-rupture" style="font-size:9.5px;">Rupture</span>
+            {% elif p.en_alerte %}<br><span class="badge-ph-alerte" style="font-size:9.5px;">Alerte</span>{% endif %}
+          </td>
+          <td style="text-align:center">
+            <input type="number" name="qte_{{ p.produit.pk }}" class="ph-qte-field"
+              min="0" step="1" placeholder="—"
+              value="{{ p.qte_saisie|default:'' }}">
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="3" style="text-align:center;padding:32px;color:var(--ph-muted);">
+            Aucun produit disponible.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Notes -->
+<div class="ph-card" style="max-width:600px;margin-bottom:14px;">
+  <div class="ph-card-header">
+    <div class="ph-card-title"><i class="bi bi-chat-text" style="color:var(--ph-600);"></i> Notes</div>
+  </div>
+  <div class="ph-card-body">
+    <textarea name="notes" class="field-ul"
+      rows="3" placeholder="Motif de la demande, urgence, remarques…">{{ post.notes|default:'' }}</textarea>
+  </div>
+</div>
+
+<div class="form-actions" style="margin-bottom:28px;">
+  <a href="{% url 'pharmacie_dashboard' pharmacie %}" class="btn-form-cancel">Annuler</a>
+  <button type="submit" form="form-demande" class="btn-form-submit">
+    <i class="bi bi-send"></i> Soumettre la demande
+  </button>
+</div>
+</form>
+{% endblock %}

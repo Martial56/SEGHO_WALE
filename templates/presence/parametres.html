@@ -1,0 +1,380 @@
+{% extends 'presence/base.html' %}
+{% load static %}
+{% block topbar_title %}Paramètres — Permanences{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+/* ══ SUBHEADER ══ */
+.pm-head {
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  padding:12px 32px; flex-wrap:wrap;
+  position:sticky; top:var(--header-h); z-index:100;
+  background:var(--pr-surface); border-bottom:2px solid var(--pr-200);
+  box-shadow:0 2px 10px rgba(var(--pr-600-rgb),.08);
+}
+html[data-theme="dark"] .pm-head { background:var(--pr-surface); border-bottom-color:var(--pr-border); }
+.pm-head-title { font-size:15px; font-weight:800; color:var(--pr-900); }
+html[data-theme="dark"] .pm-head-title { color:var(--pr-200); }
+.pm-head-sub { font-size:11.5px; color:var(--pr-muted); margin-top:1px; }
+
+/* ══ CONFIG ROW ══ */
+.pm-config-row {
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  padding:14px 32px;
+}
+.pm-config-row .pm-card { flex-shrink:0; }
+
+.pm-card {
+  background:var(--pr-surface); border:1px solid var(--pr-border);
+  border-radius:12px; padding:14px 20px;
+  box-shadow:0 1px 4px rgba(var(--pr-600-rgb),.05);
+  display:flex; align-items:center; gap:20px;
+}
+html[data-theme="dark"] .pm-card { background:var(--pr-surface); }
+
+.pm-section-label {
+  font-size:10px; font-weight:800; color:var(--pr-600);
+  text-transform:uppercase; letter-spacing:.6px;
+  margin-bottom:0; display:flex; align-items:center; gap:5px; flex-shrink:0;
+}
+
+/* Semaine nav */
+.week-nav { display:flex; align-items:center; gap:8px; }
+.week-pill {
+  text-align:center; background:var(--pr-50);
+  border:1px solid var(--pr-200); border-radius:8px; padding:7px 16px;
+  display:flex; align-items:center; gap:10px;
+}
+html[data-theme="dark"] .week-pill { background:rgba(var(--pr-600-rgb),.1); border-color:var(--pr-border); }
+.week-range { font-size:14px; font-weight:800; color:var(--pr-900); white-space:nowrap; }
+html[data-theme="dark"] .week-range { color:var(--pr-200); }
+.week-badge { font-size:11px; font-weight:700; border-radius:6px; padding:2px 9px; display:inline-block; }
+.week-badge.current { background:var(--rose); color:#fff; }
+.week-badge.next    { background:var(--pr-100); color:var(--pr-700); }
+.week-badge.past    { background:rgba(0,0,0,.06); color:rgba(0,0,0,.4); }
+.btn-nav {
+  width:34px; height:34px; border-radius:8px; border:1px solid var(--pr-200);
+  background:var(--pr-surface); color:var(--pr-600); text-decoration:none;
+  display:inline-flex; align-items:center; justify-content:center;
+  font-size:15px; transition:all .15s; flex-shrink:0;
+}
+.btn-nav:hover { background:var(--pr-600); color:#fff; border-color:var(--pr-600); }
+
+/* Heures */
+.hours-row { display:flex; align-items:center; gap:12px; }
+.hour-block { text-align:center; }
+.hour-label { font-size:10px; font-weight:700; color:var(--pr-muted); text-transform:uppercase; letter-spacing:.4px; margin-bottom:4px; }
+.hour-input {
+  width:110px; border:none; border-bottom:2px solid var(--pr-300); background:transparent;
+  font-size:18px; font-weight:800; color:var(--pr-700); font-family:inherit;
+  text-align:center; outline:none; transition:border-color .15s; display:block;
+}
+.hour-input:focus { border-bottom-color:var(--pr-600); }
+html[data-theme="dark"] .hour-input { color:var(--pr-300); border-bottom-color:var(--pr-500); }
+.hours-arrow { font-size:18px; color:var(--pr-300); flex-shrink:0; }
+.hours-duration {
+  font-size:11px; color:var(--pr-600); font-weight:700;
+  background:var(--pr-50); border-radius:6px; padding:3px 10px; white-space:nowrap;
+}
+
+.pm-count-badge {
+  background:var(--pr-100); color:var(--pr-700); border:1px solid var(--pr-200);
+  border-radius:20px; padding:3px 12px; font-size:12px; font-weight:700;
+}
+
+/* ══ GRILLE ══ */
+.pm-table-wrap { margin-top:16px; overflow-x:auto; }
+.pm-table {
+  width:100%; border-collapse:collapse; font-size:13px;
+  background:var(--pr-surface);
+}
+
+/* En-têtes jours */
+.pm-table thead tr.tr-days { background:var(--pr-700); }
+.pm-table thead th {
+  padding:0; border-right:1px solid rgba(255,255,255,.1); color:#fff;
+  font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:.3px;
+}
+.pm-table thead th:last-child { border-right:none; }
+.th-emp { text-align:left; padding:12px 16px; min-width:200px; }
+.th-day {
+  text-align:center; min-width:90px;
+  padding:8px 6px 4px;
+}
+.th-day.today { background:rgba(255,255,255,.18); }
+.th-day.samedi { background:rgba(0,0,0,.12); }
+.day-name { font-size:12px; font-weight:800; }
+.day-date { font-size:10px; opacity:.8; margin-top:1px; }
+.th-total { text-align:center; min-width:60px; padding:12px 8px; }
+
+/* Bouton tout cocher */
+.btn-all {
+  display:block; margin:4px auto 0;
+  background:rgba(255,255,255,.15); border:none; border-radius:5px;
+  color:#fff; cursor:pointer; font-size:9.5px; padding:2px 8px;
+  transition:background .15s; font-family:inherit; white-space:nowrap;
+}
+.btn-all:hover { background:rgba(255,255,255,.3); }
+
+/* Lignes corps */
+.pm-table tbody tr { border-bottom:1px solid var(--pr-border); transition:background .1s; }
+.pm-table tbody tr:hover { background:var(--pr-50); }
+html[data-theme="dark"] .pm-table tbody tr:hover { background:rgba(var(--pr-600-rgb),.07); }
+.pm-table tbody tr:nth-child(even) { background:rgba(var(--pr-600-rgb),.02); }
+html[data-theme="dark"] .pm-table tbody tr:nth-child(even) { background:rgba(var(--pr-600-rgb),.04); }
+
+.td-emp-name { font-weight:600; color:var(--pr-text); }
+.td-emp-sub  { font-size:11px; color:var(--pr-muted); margin-top:1px; }
+.td-check { text-align:center; padding:8px 6px; }
+.td-check.col-sam { background:rgba(0,0,0,.02); }
+html[data-theme="dark"] .td-check.col-sam { background:rgba(255,255,255,.02); }
+.td-total { text-align:center; padding:8px 8px; font-weight:800; font-size:13px; color:var(--pr-700); }
+
+/* Toggle checkbox */
+.perm-check {
+  width:20px; height:20px; cursor:pointer;
+  accent-color:var(--pr-700);
+}
+
+/* Pied de tableau */
+.pm-table tfoot tr { background:var(--pr-100); border-top:2px solid var(--pr-200); }
+html[data-theme="dark"] .pm-table tfoot tr { background:rgba(var(--pr-600-rgb),.1); }
+.pm-table tfoot td {
+  padding:8px 6px; text-align:center;
+  font-size:13px; font-weight:800; color:var(--pr-700);
+}
+.pm-table tfoot td:first-child {
+  text-align:left; padding:8px 16px; font-size:10.5px; font-weight:700;
+  color:var(--pr-muted); text-transform:uppercase; letter-spacing:.4px;
+}
+
+/* Vide */
+.pm-empty { text-align:center; padding:60px; color:var(--pr-muted); }
+.pm-empty i { font-size:40px; display:block; margin-bottom:12px; opacity:.3; }
+</style>
+{% endblock %}
+
+{% block content %}
+<form method="post" id="perm-form"
+      data-semaine="{{ semaine|date:'Y-m-d' }}">
+{% csrf_token %}
+
+<!-- ══ SUBHEADER STICKY ══ -->
+<div class="pm-head">
+  <div>
+    <div class="pm-head-title">
+      <i class="bi bi-calendar2-week-fill" style="color:var(--pr-600);margin-right:6px;"></i>
+      Planification des permanences
+    </div>
+    <div class="pm-head-sub">
+      Semaine du {{ semaine|date:"d/m/Y" }} — {{ grid|length }} employé{{ grid|length|pluralize }} · Horaire {{ planning.heure_debut|time:"H:i" }}–{{ planning.heure_fin|time:"H:i" }}
+    </div>
+  </div>
+  <button type="submit" class="btn-pr" style="gap:8px;">
+    <i class="bi bi-floppy-fill"></i> Enregistrer le planning
+  </button>
+</div>
+
+<!-- ══ CONFIG : SEMAINE + HEURES + FILTRE ══ -->
+<div class="pm-config-row">
+
+  <!-- Semaine -->
+  <div class="pm-card">
+    <div class="pm-section-label"><i class="bi bi-calendar3"></i> Semaine</div>
+    <div class="week-nav">
+      <a href="?semaine={{ prev_sem|date:'Y-m-d' }}{% if service_id %}&service={{ service_id }}{% endif %}"
+         class="btn-nav" title="Semaine précédente"><i class="bi bi-chevron-left"></i></a>
+      <div class="week-pill">
+        <div class="week-range">{{ semaine|date:"d/m" }} → {{ jours.5|date:"d/m/Y" }}</div>
+        {% if semaine <= today and today <= jours.5 %}
+        <span class="week-badge current">Cette semaine</span>
+        {% elif semaine > today %}
+        <span class="week-badge next"> Semaine prochaine</span>
+        {% else %}
+        <span class="week-badge past">Semaine passée</span>
+        {% endif %}
+      </div>
+      <a href="?semaine={{ next_sem|date:'Y-m-d' }}{% if service_id %}&service={{ service_id }}{% endif %}"
+         class="btn-nav" title="Semaine suivante"><i class="bi bi-chevron-right"></i></a>
+    </div>
+  </div>
+
+  <!-- Heures -->
+  <div class="pm-card">
+    <div class="pm-section-label"><i class="bi bi-clock-fill"></i> Horaire</div>
+    <div class="hours-row">
+      <div class="hour-block">
+        <div class="hour-label">Arrivée</div>
+        <input type="time" name="heure_debut" id="heure_debut" class="hour-input"
+               value="{{ planning.heure_debut|time:'H:i' }}">
+      </div>
+      <div class="hours-arrow">→</div>
+      <div class="hour-block">
+        <div class="hour-label">Départ</div>
+        <input type="time" name="heure_fin" id="heure_fin" class="hour-input"
+               value="{{ planning.heure_fin|time:'H:i' }}">
+      </div>
+    </div>
+    <div class="hours-duration" id="duree-display">
+      <i class="bi bi-hourglass-split"></i>
+      {{ planning.heure_debut|time:"H:i" }} – {{ planning.heure_fin|time:"H:i" }}
+    </div>
+  </div>
+
+  <!-- Filtre service -->
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:auto;">
+    <select onchange="applyFilter(this.value)" class="pr-input" style="max-width:200px;">
+      <option value="">Tous les services</option>
+      {% for svc in services %}
+      <option value="{{ svc.pk }}" {% if service_id == svc.pk|stringformat:"s" %}selected{% endif %}>
+        {{ svc.nom }}
+      </option>
+      {% endfor %}
+    </select>
+    {% if service_id %}
+    <a href="?semaine={{ semaine|date:'Y-m-d' }}" class="btn-pr-outline" style="padding:6px 10px;font-size:12px;">
+      <i class="bi bi-x"></i>
+    </a>
+    {% endif %}
+    <span class="pm-count-badge">{{ grid|length }} employé{{ grid|length|pluralize }}</span>
+  </div>
+
+</div>
+
+<!-- ══ GRILLE ══ -->
+<div class="pm-table-wrap">
+{% if grid %}
+<table class="pm-table">
+  <thead>
+    <tr class="tr-days">
+      <th class="th-emp">Employé &amp; Service</th>
+      {% for jour in jours %}
+      <th class="th-day {% if jour == today %}today{% elif jour.weekday == 5 %}samedi{% endif %}">
+        <div class="day-name">{{ jour|date:"l"|slice:":3"|upper }}</div>
+        <div class="day-date">{{ jour|date:"d/m" }}</div>
+        <button type="button" class="btn-all"
+                data-date="{{ jour|date:'Y-m-d' }}">
+          ☑ Tous
+        </button>
+      </th>
+      {% endfor %}
+      <th class="th-total">Total</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in grid %}
+    <tr>
+      <td style="padding:10px 16px;">
+        <div class="td-emp-name">{{ row.emp.nom_complet }}</div>
+        <div class="td-emp-sub">
+          <i class="bi bi-building" style="font-size:10px;"></i>
+          {{ row.emp.service.nom|default:"Sans service" }}
+          {% if row.emp.fonction %}
+          &nbsp;·&nbsp; {{ row.emp.fonction.nom }}
+          {% endif %}
+        </div>
+      </td>
+      {% for jour, checked in row.jours %}
+      <td class="td-check {% if jour.weekday == 5 %}col-sam{% elif jour == today %}col-today{% endif %}">
+        <input type="checkbox"
+               name="perm_{{ row.emp.pk }}_{{ jour|date:'Y-m-d' }}"
+               value="1"
+               class="perm-check perm-col-{{ jour|date:'Y-m-d' }}"
+               data-emp="{{ row.emp.pk }}"
+               data-date="{{ jour|date:'Y-m-d' }}"
+               {% if checked %}checked{% endif %}>
+      </td>
+      {% endfor %}
+      <td class="td-total" id="row-count-{{ row.emp.pk }}">—</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+  <tfoot>
+    <tr>
+      <td><i class="bi bi-sigma"></i> Total / jour</td>
+      {% for jour in jours %}
+      <td id="col-count-{{ jour|date:'Y-m-d' }}">—</td>
+      {% endfor %}
+      <td></td>
+    </tr>
+  </tfoot>
+</table>
+{% else %}
+<div class="pm-empty">
+  <i class="bi bi-people"></i>
+  <div style="font-size:14px;font-weight:600;">Aucun employé actif</div>
+  <div style="font-size:12px;margin-top:4px;">Vérifiez le filtre de service</div>
+</div>
+{% endif %}
+</div>
+
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+var SEMAINE = document.getElementById('perm-form').dataset.semaine;
+
+function applyFilter(svcId) {
+  window.location.href = '?semaine=' + SEMAINE + '&service=' + svcId;
+}
+
+function updateRowCount(empId) {
+  var n = document.querySelectorAll('input[name^="perm_' + empId + '_"]:checked').length;
+  var el = document.getElementById('row-count-' + empId);
+  if (el) el.textContent = n || '—';
+}
+
+function updateColCount(dateStr) {
+  var n = document.querySelectorAll('.perm-col-' + dateStr + ':checked').length;
+  var el = document.getElementById('col-count-' + dateStr);
+  if (el) el.textContent = n || '—';
+}
+
+function toggleColonne(dateStr, btn) {
+  var checks = document.querySelectorAll('.perm-col-' + dateStr);
+  var allChecked = Array.from(checks).every(function(c) { return c.checked; });
+  checks.forEach(function(c) { c.checked = !allChecked; });
+  btn.textContent = allChecked ? '☑ Tous' : '☐ Aucun';
+  updateColCount(dateStr);
+  checks.forEach(function(c) { updateRowCount(c.dataset.emp); });
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  /* Boutons "Tous" par colonne */
+  document.querySelectorAll('.btn-all').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      toggleColonne(this.dataset.date, this);
+    });
+  });
+
+  /* Checkboxes permanence */
+  document.querySelectorAll('.perm-check').forEach(function(chk) {
+    chk.addEventListener('change', function() {
+      updateRowCount(this.dataset.emp);
+      updateColCount(this.dataset.date);
+    });
+  });
+
+  /* Initialise les compteurs */
+  document.querySelectorAll('[id^="col-count-"]').forEach(function(el) {
+    updateColCount(el.id.replace('col-count-', ''));
+  });
+  document.querySelectorAll('[id^="row-count-"]').forEach(function(el) {
+    updateRowCount(el.id.replace('row-count-', ''));
+  });
+
+  /* Label durée live */
+  var hd  = document.getElementById('heure_debut');
+  var hf  = document.getElementById('heure_fin');
+  var lbl = document.getElementById('duree-display');
+  function refreshDuree() {
+    if (hd && hf && lbl)
+      lbl.textContent = hd.value + ' – ' + hf.value;
+  }
+  if (hd) hd.addEventListener('input', refreshDuree);
+  if (hf) hf.addEventListener('input', refreshDuree);
+});
+</script>
+{% endblock %}

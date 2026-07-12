@@ -1,0 +1,98 @@
+{% extends 'conges/base.html' %}
+{% load static %}
+
+{% block topbar_title %}Prolonger le congé — {{ conge.employe.nom_complet }}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+.prol-warn { background:rgba(var(--amber-rgb),.08); border:1px solid rgba(var(--amber-rgb),.2); border-radius:8px; padding:12px 14px; font-size:12.5px; color:#7a4e00; margin-bottom:20px; }
+html[data-theme="dark"] .prol-warn { background:rgba(var(--amber-rgb),.1); border-color:rgba(var(--amber-rgb),.25); color:#f0c060; }
+.solde-ok  { font-size:15px; font-weight:700; color:var(--cg-600); }
+html[data-theme="dark"] .solde-ok  { color:var(--cg-400); }
+.solde-bad { font-size:15px; font-weight:700; color:var(--rose); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="cg-form-head" id="subheader">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <a href="{% url 'conge_detail' conge.pk %}" class="cg-back-btn"><i class="bi bi-arrow-left"></i></a>
+    <div>
+      <h1 style="font-size:18px;font-weight:800;color:var(--cg-text);margin:0;">
+        <i class="bi bi-calendar-plus" style="color:var(--cg-600);"></i> Prolonger le congé
+      </h1>
+      <div style="font-size:12px;color:var(--cg-muted);">{{ conge.employe.nom_complet }} · {{ conge.get_type_conge_display }}</div>
+    </div>
+  </div>
+</div>
+
+<div style="max-width:600px;margin:28px auto 0;">
+
+  <!-- Info congé actuel -->
+  <div class="cg-card" style="margin-bottom:20px;">
+    <div class="cg-card-header">
+      <div class="cg-card-title"><i class="bi bi-calendar-check"></i> Congé en cours</div>
+      <span class="cg-badge cg-b-en_cours">En cours</span>
+    </div>
+    <div class="cg-card-body" style="display:flex;gap:24px;flex-wrap:wrap;padding:16px 20px;">
+      <div>
+        <div class="cg-label">Début</div>
+        <div style="font-size:15px;font-weight:700;color:var(--cg-text);">{{ conge.date_debut|date:"d/m/Y" }}</div>
+      </div>
+      <div>
+        <div class="cg-label">Fin prévue</div>
+        <div style="font-size:15px;font-weight:700;color:var(--amber);">{{ conge.date_fin|date:"d/m/Y" }}</div>
+      </div>
+      <div>
+        <div class="cg-label">Jours ouvrés</div>
+        <div style="font-size:15px;font-weight:700;color:var(--cg-600);">{{ conge.nb_jours_ouvres }} j</div>
+      </div>
+      {% if solde %}
+      <div>
+        <div class="cg-label">Solde restant</div>
+        <div class="{% if solde.solde >= 0 %}solde-ok{% else %}solde-bad{% endif %}">
+          {{ solde.solde|floatformat:1 }} j
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Formulaire prolongation -->
+  <form method="post">
+    {% csrf_token %}
+    <div class="form-simple-card">
+
+      <div class="form-field">
+        <label class="field-label" for="nouvelle_date_fin">Nouvelle date de fin <span class="required-star">*</span></label>
+        <input type="date" id="nouvelle_date_fin" name="nouvelle_date_fin"
+               min="{{ conge.date_fin|date:'Y-m-d' }}"
+               class="field-ul" required>
+        <div class="f-hint">Doit être postérieure au {{ conge.date_fin|date:"d/m/Y" }}.</div>
+      </div>
+
+      <div class="form-field">
+        <label class="field-label" for="motif">Motif de prolongation</label>
+        <textarea id="motif" name="motif" rows="3"
+                  class="field-ul" placeholder="Maladie, événement familial, accord des parties…"></textarea>
+      </div>
+
+      <div class="prol-warn">
+        <i class="bi bi-info-circle-fill"></i>
+        Les jours ouvrés supplémentaires seront automatiquement déduits du solde de congé
+        et des présences (absent) seront créées pour la période ajoutée.
+      </div>
+
+      <div class="form-actions">
+        <a href="{% url 'conge_detail' conge.pk %}" class="btn-form-cancel">Annuler</a>
+        <button type="submit" class="btn-form-submit">
+          <i class="bi bi-calendar-plus"></i> Confirmer la prolongation
+        </button>
+      </div>
+    </div>
+  </form>
+
+</div>
+{% endblock %}

@@ -1,225 +1,590 @@
 {% extends 'facturation/base.html' %}
+{% load humanize %}
 
 {% block topbar_title %}Facturation{% endblock %}
 
 {% block extra_css %}
 {{ block.super }}
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  /* ══════════════════════════════════════════════════
+     DARK MODE
+  ══════════════════════════════════════════════════ */
+  html[data-theme="dark"] .fac-stats          { background: var(--surface); border-bottom-color: var(--border); }
+  html[data-theme="dark"] .fac-stat-card:hover { background: rgba(255,255,255,.03); }
+  html[data-theme="dark"] .fac-stat-card::after { background: var(--border) !important; }
+  html[data-theme="dark"] .fac-stat-card.card-total   .fac-stat-icon { background: rgba(var(--teal-500-rgb),.15); }
+  html[data-theme="dark"] .fac-stat-card.card-recu    .fac-stat-icon { background: rgba(22,169,107,.12); }
+  html[data-theme="dark"] .fac-stat-card.card-attente .fac-stat-icon { background: rgba(var(--amber-rgb),.12); }
+  html[data-theme="dark"] .fac-stat-card.card-recu    .fac-stat-value { color: #4cde9a; }
+  html[data-theme="dark"] .fac-stat-card.card-attente .fac-stat-value { color: #f6c05a; }
+  html[data-theme="dark"] .o-subheader        { background: var(--surface); border-bottom-color: var(--border); }
+  html[data-theme="dark"] .o-list-wrap        { background: var(--surface); }
+  html[data-theme="dark"] .o-list thead th    { background: #111c2d; color: var(--text-muted); border-bottom-color: var(--border); }
+  html[data-theme="dark"] .o-list tbody tr    { border-bottom-color: var(--border); }
+  html[data-theme="dark"] .o-list tbody tr:hover { background: rgba(var(--teal-500-rgb),.10); }
+  html[data-theme="dark"] .o-search-input     { color: var(--text); }
+  html[data-theme="dark"] .o-search-bar       { border-bottom-color: rgba(255,255,255,.15); }
+  html[data-theme="dark"] .o-dd-menu          { background: #1a2a3e; border-color: var(--border); }
+  html[data-theme="dark"] .o-dd-item:hover    { background: rgba(var(--teal-500-rgb),.15); }
+  html[data-theme="dark"] .o-filter-tag       { background: rgba(20,87,112,.25); border-color: rgba(var(--teal-500-rgb),.35); color: #7ac9e2; }
+  html[data-theme="dark"] .badge-brouillon    { background: rgba(150,150,150,.12); color: #8a9ab0; border-color: rgba(150,150,150,.2); }
+  html[data-theme="dark"] .badge-emise        { background: rgba(21,101,192,.18); color: #90caf9; border-color: rgba(21,101,192,.3); }
+  html[data-theme="dark"] .badge-payee        { background: rgba(22,169,107,.15); color: #4cde9a; border-color: rgba(22,169,107,.25); }
+  html[data-theme="dark"] .badge-annulee      { background: rgba(var(--rose-rgb),.15); color: #f48b8b; border-color: rgba(var(--rose-rgb),.25); }
+  html[data-theme="dark"] .badge-type         { background: rgba(255,255,255,.06); color: var(--text-muted); border-color: transparent; }
+  html[data-theme="dark"] .td-num             { color: var(--teal-300); }
+  html[data-theme="dark"] .row-num            { background: rgba(255,255,255,.06); color: var(--text-muted); }
+  html[data-theme="dark"] .btn-icon           { background: rgba(255,255,255,.04); border-color: var(--border); }
+  html[data-theme="dark"] .btn-icon:hover     { background: var(--teal-600); border-color: var(--teal-600); color: #fff; }
 
-  html[data-theme="dark"] .o-list tbody tr:hover { background: rgba(33,136,171,0.2); }
-  html[data-theme="dark"] .o-list thead th { background: var(--surface); }
-  html[data-theme="dark"] .o-search-input { color: var(--text); }
-  html[data-theme="dark"] .o-search-bar { border-bottom-color: #3a4a62; }
-  html[data-theme="dark"] .o-pag-btn { background: var(--surface); border-color: var(--border); color: var(--text-muted); }
-  html[data-theme="dark"] .o-empty-state { background: var(--bg); }
+  /* ══════════════════════════════════════════════════
+     STATS
+  ══════════════════════════════════════════════════ */
+  .fac-stats {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    background: #fff;
+    border-bottom: 1px solid var(--border);
+  }
+  .fac-stat-card {
+    padding: 20px 28px; display: flex; align-items: center; gap: 16px;
+    position: relative; transition: background .15s;
+  }
+  .fac-stat-card:not(:last-child)::after {
+    content: ''; position: absolute; right: 0; top: 20%; bottom: 20%;
+    width: 1px; background: var(--border);
+  }
+  .fac-stat-card::before {
+    content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 3px;
+  }
+  .fac-stat-card.card-total::before  { background: linear-gradient(90deg, var(--teal-500), var(--teal-400)); }
+  .fac-stat-card.card-recu::before   { background: linear-gradient(90deg, #16a96b, #34d399); }
+  .fac-stat-card.card-attente::before{ background: linear-gradient(90deg, var(--amber), #fbbf24); }
+  .fac-stat-card:hover { background: #fafcfd; }
 
+  .fac-stat-icon {
+    width: 46px; height: 46px; border-radius: 12px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+  }
+  .fac-stat-card.card-total   .fac-stat-icon { background: var(--teal-50);  color: var(--teal-600); }
+  .fac-stat-card.card-recu    .fac-stat-icon { background: #eafaf3; color: var(--color-success); }
+  .fac-stat-card.card-attente .fac-stat-icon { background: #fff8eb; color: var(--color-warning); }
+
+  .fac-stat-body { display: flex; flex-direction: column; min-width: 0; }
+  .fac-stat-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .7px; margin-bottom: 5px; font-weight: 600; }
+  .fac-stat-value { font-size: 22px; font-weight: 800; color: var(--text); line-height: 1; white-space: nowrap; }
+  .fac-stat-card.card-recu    .fac-stat-value { color: var(--color-success); }
+  .fac-stat-card.card-attente .fac-stat-value { color: var(--color-warning); }
+  .fac-stat-sub { font-size: 11px; color: var(--text-muted); margin-top: 5px; }
+
+  /* ══════════════════════════════════════════════════
+     SUBHEADER
+  ══════════════════════════════════════════════════ */
   .o-subheader {
     background: #fff; border-bottom: 1px solid var(--border);
-    padding: 6px 16px; display: flex; flex-direction: column; gap: 5px;
-    position: sticky; top: 0; z-index: 190; margin: 0 -32px 16px;
+    padding: 6px 16px; display: flex; flex-direction: column; gap: 4px;
+    position: sticky; top: var(--header-h, 101px); z-index: 190;
   }
   .o-subheader-row { display: flex; align-items: center; gap: 8px; }
   .o-subheader-row-right { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-  .o-page-title { font-size: 17px; font-weight: 400; color: var(--text); }
+  .o-page-title { font-size: 15px; font-weight: 600; color: var(--text); }
+  .o-page-title span { font-size: 12px; color: var(--text-muted); font-weight: 400; margin-left: 4px; }
+
   .o-btn-create {
-    background: var(--teal-500); color: #fff; border: none; padding: 5px 14px; border-radius: 4px;
-    font-size: 12.5px; font-weight: 500; cursor: pointer;
-    text-decoration: none; display: inline-flex; align-items: center;
-    letter-spacing: 0.5px; transition: background 0.15s;
+    background: var(--teal-600); color: #fff; border: none; padding: 5px 14px;
+    border-radius: 5px; font-size: 11.5px; font-weight: 600; cursor: pointer;
+    text-decoration: none; display: inline-flex; align-items: center; gap: 5px;
+    letter-spacing: .4px; transition: background .15s, box-shadow .15s;
+    box-shadow: 0 1px 4px rgba(var(--teal-600-rgb),.3);
   }
-  .o-btn-create:hover { background: var(--teal-600); }
+  .o-btn-create:hover { background: var(--teal-700); color: #fff; box-shadow: 0 3px 8px rgba(var(--teal-600-rgb),.4); }
+
+  /* ══════════════════════════════════════════════════
+     RECHERCHE
+  ══════════════════════════════════════════════════ */
   .o-search-bar {
-    display: flex; align-items: center; border: none; border-bottom: 1px solid #bbb;
-    background: transparent; min-height: 28px; padding: 2px 4px; gap: 4px; width: 320px;
+    display: flex; align-items: center; border: none;
+    border-bottom: 1.5px solid #bbb;
+    background: transparent; min-height: 28px; padding: 2px 4px; gap: 4px; width: 240px;
+    transition: border-color .15s;
   }
-  .o-search-input {
-    border: none; outline: none; font-size: 12px;
-    color: var(--text); flex: 1; min-width: 60px; background: transparent;
+  .o-search-bar:focus-within { border-bottom-color: var(--teal-500); }
+  .o-search-input { border: none; outline: none; font-size: 12px; color: var(--text); flex: 1; min-width: 60px; background: transparent; }
+  .o-search-btn   { background: none; border: none; cursor: pointer; color: #888; font-size: 13px; padding: 2px; transition: color .15s; }
+  .o-search-btn:hover { color: var(--teal-600); }
+  .o-ctrl-sep     { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }
+
+  /* ══════════════════════════════════════════════════
+     DROPDOWN FILTRE
+  ══════════════════════════════════════════════════ */
+  .o-ctrl-btn {
+    background: none; border: 1px solid var(--border); border-radius: 5px; color: var(--text-muted);
+    font-size: 11.5px; padding: 4px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
+    transition: border-color .15s, color .15s, background .15s; text-decoration: none; white-space: nowrap;
   }
-  .o-search-btn { background: none; border: none; cursor: pointer; color: #888; font-size: 13px; padding: 2px; }
-  .o-ctrl-sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }
+  .o-ctrl-btn:hover  { border-color: var(--teal-400); color: var(--teal-600); }
+  .o-ctrl-btn.active { border-color: var(--teal-500); color: var(--teal-600); background: var(--teal-50); }
+
+  .o-dd { position: relative; display: inline-block; }
+  .o-dd-menu {
+    display: none; position: absolute; top: calc(100% + 5px); right: 0; min-width: 175px;
+    background: #fff; border: 1px solid var(--border); border-radius: 7px;
+    box-shadow: 0 6px 20px rgba(0,0,0,.12); z-index: 300; padding: 5px 0;
+  }
+  .o-dd.open .o-dd-menu { display: block; animation: ddFadeIn .12s ease; }
+  @keyframes ddFadeIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }
+  .o-dd-item {
+    display: block; padding: 7px 14px; font-size: 12px; color: var(--text);
+    text-decoration: none; cursor: pointer; transition: background .1s;
+  }
+  .o-dd-item:hover  { background: var(--teal-50); color: var(--teal-600); }
+  .o-dd-item.active { color: var(--teal-600); font-weight: 600; }
+
+  /* ══════════════════════════════════════════════════
+     PAGINATION
+  ══════════════════════════════════════════════════ */
   .o-pagination { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
-  .o-pag-btn {
-    color: #555; text-decoration: none; font-size: 15px;
-    display: inline-flex; align-items: center; padding: 0 2px;
-    transition: color 0.15s;
-  }
+  .o-pag-btn { color: #888; text-decoration: none; font-size: 15px; display: inline-flex; align-items: center; padding: 0 2px; transition: color .15s; }
   .o-pag-btn:hover { color: var(--teal-600); }
-  .o-pag-btn.disabled { opacity: 0.3; pointer-events: none; }
+  .o-pag-btn.disabled { opacity: .3; pointer-events: none; }
 
-  .o-list-wrap { overflow-x: auto; overflow-y: auto; background: #fff; margin: 0 -32px; }
-  .o-list { width: 100%; border-collapse: collapse; font-size: 12px; }
+  /* ══════════════════════════════════════════════════
+     FILTER TAGS
+  ══════════════════════════════════════════════════ */
+  .o-filter-tags { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 2px 0; min-height: 22px; }
+  .o-filter-tag {
+    background: var(--teal-50); border: 1px solid var(--teal-200, #b2dfdb); color: var(--teal-700, #00796b);
+    border-radius: 12px; font-size: 11px; padding: 2px 10px;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .o-filter-tag a { color: inherit; text-decoration: none; font-weight: 700; line-height: 1; cursor: pointer; opacity: .7; transition: opacity .1s; }
+  .o-filter-tag a:hover { opacity: 1; }
+
+  /* ══════════════════════════════════════════════════
+     TABLE
+  ══════════════════════════════════════════════════ */
+  .o-list-wrap { overflow-x: auto; background: #fff; margin: 0 !important; }
+  .o-list { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+
   .o-list thead th {
-    background: #f5f5f5; border-bottom: 1px solid var(--border);
-    padding: 6px 10px; font-weight: 500; font-size: 11.5px;
-    color: var(--text-muted); text-align: left;
-    position: sticky; top: 0; z-index: 2; user-select: none;
+    background: #f6f8fa;
+    border-bottom: 1px solid var(--border);
+    padding: 8px 12px; font-weight: 600; font-size: 10.5px; color: var(--text-muted);
+    text-align: left; text-transform: uppercase; letter-spacing: .5px;
+    position: sticky; top: 0; z-index: 2; white-space: nowrap; user-select: none;
   }
-  .o-list tbody tr { border-bottom: 1px solid #f0f0f0; transition: background 0.1s; cursor: pointer; }
-  .o-list tbody tr:hover { background: var(--teal-50); }
-  .o-list tbody td { padding: 6px 10px; color: var(--text); vertical-align: middle; }
-  .o-list tbody td.td-num { color: var(--teal-600); font-weight: 500; font-size: 12px; }
-  .o-list tbody td.td-patient { white-space: normal; font-weight: 500; }
-  .o-list tbody td.td-montant { font-weight: 500; }
-  .o-list tbody td.td-actions { text-align: center; white-space: nowrap; width: 100px; }
+  .o-list thead th:first-child { border-radius: 0; }
 
+  .o-list tbody tr {
+    border-bottom: 1px solid #f2f4f7;
+    transition: background .1s; cursor: pointer;
+  }
+  .o-list tbody tr:hover { background: #f0f9fd; }
+  .o-list tbody tr:last-child { border-bottom: none; }
+  .o-list tbody td { padding: 9px 12px; color: var(--text); vertical-align: middle; }
+
+  /* Numéro de ligne */
+  .row-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; border-radius: 5px;
+    background: #f0f0f0; color: var(--text-muted); font-size: 10px; font-weight: 500;
+  }
+
+  .td-num     { font-weight: 700; font-size: 12px; white-space: nowrap; color: var(--teal-700); letter-spacing: .3px; }
+  .td-patient { font-weight: 500; }
+  .td-montant { font-weight: 500; white-space: nowrap; text-align: right; }
+  .td-actions { text-align: center; white-space: nowrap; width: 60px; }
+
+  /* ══════════════════════════════════════════════════
+     BADGES STATUT
+  ══════════════════════════════════════════════════ */
+  .badge-statut {
+    display: inline-flex; align-items: center; gap: 4px;
+    border-radius: 12px; font-size: 10.5px; font-weight: 600;
+    padding: 2px 10px; white-space: nowrap;
+    border: 1px solid transparent;
+  }
+  .badge-statut::before { content: ''; width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+
+  .badge-brouillon { background: #f0f2f5; color: #6b7280; border-color: #e2e5ea; }
+  .badge-brouillon::before { background: #9ca3af; }
+
+  .badge-emise { background: #eff6ff; color: #1d4ed8; border-color: #dbeafe; }
+  .badge-emise::before { background: #3b82f6; }
+
+  .badge-payee { background: rgba(var(--green-rgb),.1); color: var(--green); border-color: rgba(var(--green-rgb),.25); }
+  .badge-payee::before { background: var(--green); }
+
+  .badge-annulee { background: rgba(var(--rose-rgb),.1); color: var(--rose); border-color: rgba(var(--rose-rgb),.25); }
+  .badge-annulee::before { background: var(--rose); }
+
+  /* ── Badge type ── */
+  .badge-type {
+    display: inline-flex; align-items: center; border-radius: 4px;
+    font-size: 10px; font-weight: 500; padding: 2px 8px; white-space: nowrap;
+    background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0;
+  }
+
+  /* ══════════════════════════════════════════════════
+     ACTION BUTTONS
+  ══════════════════════════════════════════════════ */
   .btn-icon {
-    width: 26px; height: 26px; border: 1px solid var(--border); border-radius: 3px;
-    background: var(--surface); display: inline-flex; align-items: center; justify-content: center;
-    color: var(--text-muted); font-size: 12px; text-decoration: none; cursor: pointer;
-    transition: background 0.15s, color 0.15s;
+    width: 28px; height: 28px; border: 1px solid var(--border); border-radius: 5px;
+    background: #fff; display: inline-flex; align-items: center; justify-content: center;
+    color: var(--text-muted); font-size: 12.5px; text-decoration: none; cursor: pointer;
+    transition: background .15s, color .15s, border-color .15s, box-shadow .15s;
   }
-  .btn-icon:hover { background: var(--teal-600); color: #fff; border-color: var(--teal-600); }
-  .btn-icon.btn-danger:hover { background: #b71c1c; border-color: #b71c1c; }
+  .btn-icon:hover {
+    background: var(--teal-600); color: #fff;
+    border-color: var(--teal-600);
+    box-shadow: 0 2px 6px rgba(var(--teal-600-rgb),.35);
+  }
 
-  .o-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 20px; }
+  /* ══════════════════════════════════════════════════
+     EMPTY STATE
+  ══════════════════════════════════════════════════ */
+  .o-empty-state {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; padding: 80px 20px;
+  }
   .o-empty-illo {
-    width: 88px; height: 88px; border-radius: 50%;
+    width: 72px; height: 72px; border-radius: 16px;
     background: linear-gradient(135deg, var(--teal-600) 0%, var(--teal-400) 100%);
-    display: flex; align-items: center; justify-content: center; margin-bottom: 20px;
+    display: flex; align-items: center; justify-content: center; margin-bottom: 18px;
+    box-shadow: 0 6px 20px rgba(var(--teal-600-rgb),.3);
   }
-  .o-empty-illo svg { color: #fff; opacity: 0.9; }
+  .o-empty-illo i { color: #fff; font-size: 28px; }
   .o-empty-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
-  .o-empty-sub { font-size: 12.5px; color: var(--text-muted); margin-bottom: 20px; }
+  .o-empty-sub   { font-size: 12px; color: var(--text-muted); margin-bottom: 20px; text-align: center; }
   .o-empty-btn {
-    background: var(--teal-500); color: #fff; border: none; padding: 7px 20px; border-radius: 4px;
-    font-size: 12.5px; font-weight: 500; cursor: pointer; text-decoration: none;
-    display: inline-flex; align-items: center; gap: 6px; transition: background 0.15s;
+    background: var(--teal-600); color: #fff; border: none; padding: 7px 20px;
+    border-radius: 5px; font-size: 12.5px; font-weight: 500; cursor: pointer;
+    text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+    transition: background .15s; box-shadow: 0 2px 8px rgba(var(--teal-600-rgb),.3);
   }
-  .o-empty-btn:hover { background: var(--teal-600); }
+  .o-empty-btn:hover { background: var(--teal-700); color: #fff; }
 
-  .fac-stats { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
-  .fac-stat-card {
-    flex: 1; min-width: 160px; background: #fff; border: 1px solid var(--border);
-    border-radius: 6px; padding: 10px 14px;
-  }
-  .fac-stat-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
-  .fac-stat-value { font-size: 18px; font-weight: 600; color: var(--text); }
+  /* ══════════════════════════════════════════════════
+     DARK MODE — STAT ICONS
+  ══════════════════════════════════════════════════ */
+  html[data-theme="dark"] .fac-stat-card.card-total   .fac-stat-icon { background: rgba(var(--teal-500-rgb),.15); }
+  html[data-theme="dark"] .fac-stat-card.card-recu    .fac-stat-icon { background: rgba(var(--green-rgb),.15); }
+  html[data-theme="dark"] .fac-stat-card.card-attente .fac-stat-icon { background: rgba(var(--amber-rgb),.15); }
+  html[data-theme="dark"] .fac-stat-card.card-recu    .fac-stat-value { color: #4cde9a; }
+  html[data-theme="dark"] .fac-stat-card.card-attente .fac-stat-value { color: #f6c05a; }
+  html[data-theme="dark"] .o-list tbody tr:last-child { border-bottom: none; }
+  html[data-theme="dark"] .badge-brouillon { background: rgba(120,130,150,.1); color: #7a8a9a; border-color: rgba(120,130,150,.2); }
+  html[data-theme="dark"] .badge-emise     { background: rgba(59,130,246,.12); color: #93c5fd; border-color: rgba(59,130,246,.25); }
+  html[data-theme="dark"] .badge-payee     { background: rgba(var(--green-rgb),.18); color: #4ade80; border-color: rgba(var(--green-rgb),.3); }
+  html[data-theme="dark"] .badge-annulee   { background: rgba(var(--rose-rgb),.18); color: #fca5a5; border-color: rgba(var(--rose-rgb),.3); }
+  html[data-theme="dark"] .badge-type      { background: rgba(255,255,255,.05); color: var(--text-muted); border-color: rgba(255,255,255,.08); }
 </style>
 {% endblock %}
 
 {% block content %}
 
+<!-- ══ Stats ══ -->
 <div class="fac-stats">
-  <div class="fac-stat-card">
-    <div class="fac-stat-label">Montant total facturé</div>
-    <div class="fac-stat-value">{{ stats.montant_total }} CFA</div>
+  <div class="fac-stat-card card-total">
+    <div class="fac-stat-icon"><i class="bi bi-receipt-cutoff"></i></div>
+    <div class="fac-stat-body">
+      <div class="fac-stat-label">Total facturé</div>
+      <div class="fac-stat-value">{{ stats.montant_total|intcomma }} F</div>
+      <div class="fac-stat-sub">{{ stats.nb_factures }} facture{{ stats.nb_factures|pluralize }}</div>
+    </div>
   </div>
-  <div class="fac-stat-card">
-    <div class="fac-stat-label">Montant reçu</div>
-    <div class="fac-stat-value" style="color:var(--green,#2e7d32);">{{ stats.montant_recu }} CFA</div>
+  <div class="fac-stat-card card-recu">
+    <div class="fac-stat-icon"><i class="bi bi-check2-circle"></i></div>
+    <div class="fac-stat-body">
+      <div class="fac-stat-label">Reçu</div>
+      <div class="fac-stat-value">{{ stats.montant_recu|intcomma }} F</div>
+      <div class="fac-stat-sub">{{ stats.nb_payees }} payée{{ stats.nb_payees|pluralize }}</div>
+    </div>
   </div>
-  <div class="fac-stat-card">
-    <div class="fac-stat-label">Montant en attente</div>
-    <div class="fac-stat-value" style="color:var(--amber,#e65100);">{{ stats.montant_attente }} CFA</div>
-  </div>
-  <div class="fac-stat-card">
-    <div class="fac-stat-label">Taux de recouvrement</div>
-    <div class="fac-stat-value">{{ stats.taux_recouvrement }}%</div>
+  <div class="fac-stat-card card-attente">
+    <div class="fac-stat-icon"><i class="bi bi-hourglass-split"></i></div>
+    <div class="fac-stat-body">
+      <div class="fac-stat-label">En attente</div>
+      <div class="fac-stat-value">{{ stats.montant_attente|intcomma }} F</div>
+      <div class="fac-stat-sub">{{ stats.nb_emises }} émise{{ stats.nb_emises|pluralize }}</div>
+    </div>
   </div>
 </div>
 
+<!-- ══ Subheader ══ -->
 <div class="o-subheader">
+
+  <!-- Ligne 1 : titre | recherche -->
   <div class="o-subheader-row">
-    <span class="o-page-title">Factures <span style="font-size:13px;color:var(--text-muted);font-weight:400;">({{ total }})</span></span>
+    <span class="o-page-title">Factures <span id="page-count">({{ total }})</span></span>
     <div class="o-subheader-row-right">
-      <form method="get" id="search-form" style="display:flex;align-items:center;">
-        <div class="o-search-bar">
-          <input class="o-search-input" id="search-input" type="text" name="q"
-                 value="{{ q }}" placeholder="Rechercher par numéro ou patient…" autocomplete="off">
-          <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
+      <div class="o-search-bar">
+        <input class="o-search-input" id="search-input" type="text"
+               value="{{ q }}" placeholder="N° facture, patient…" autocomplete="off">
+        <button type="button" class="o-search-btn" id="btn-clear" title="Effacer"
+                style="display:{% if q %}inline-flex{% else %}none{% endif %};">
+          <i class="bi bi-x"></i>
+        </button>
+        <span class="o-search-btn" id="btn-icon"
+              style="display:{% if q %}none{% else %}inline-flex{% endif %};pointer-events:none;">
+          <i class="bi bi-search"></i>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ligne 2 : bouton créer | filtres + pagination -->
+  <div class="o-subheader-row">
+    <a href="{% url 'facturation:create' %}" class="o-btn-create">
+      <i class="bi bi-plus-lg"></i> Nouvelle facture
+    </a>
+    <div class="o-subheader-row-right">
+
+      <!-- Filtres -->
+      <div class="o-dd" id="dd-statut">
+        <button class="o-ctrl-btn {% if statut %}active{% endif %}"
+                onclick="toggleDd('dd-statut')" type="button">
+          <i class="bi bi-funnel{% if statut %}-fill{% endif %}"></i>
+          {% if statut %}{% for s,l in statut_choices %}{% if s == statut %}{{ l }}{% endif %}{% endfor %}{% else %}Filtres{% endif %}
+        </button>
+        <div class="o-dd-menu">
+          <a class="o-dd-item {% if not statut %}active{% endif %}" onclick="setFiltre('statut','')">Tous les statuts</a>
+          {% for s, l in statut_choices %}
+          <a class="o-dd-item {% if statut == s %}active{% endif %}" onclick="setFiltre('statut','{{ s }}')">{{ l }}</a>
+          {% endfor %}
         </div>
-      </form>
+      </div>
+
+      <div class="o-dd" id="dd-type">
+        <button class="o-ctrl-btn {% if type_f %}active{% endif %}"
+                onclick="toggleDd('dd-type')" type="button">
+          <i class="bi bi-tag{% if type_f %}-fill{% endif %}"></i>
+          {% if type_f %}{% for s,l in type_choices %}{% if s == type_f %}{{ l }}{% endif %}{% endfor %}{% else %}Type{% endif %}
+        </button>
+        <div class="o-dd-menu">
+          <a class="o-dd-item {% if not type_f %}active{% endif %}" onclick="setFiltre('type','')">Tous les types</a>
+          {% for s, l in type_choices %}
+          <a class="o-dd-item {% if type_f == s %}active{% endif %}" onclick="setFiltre('type','{{ s }}')">{{ l }}</a>
+          {% endfor %}
+        </div>
+      </div>
+
       <div class="o-ctrl-sep"></div>
+
+      <!-- Pagination -->
       <div class="o-pagination">
-        <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
-           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% else %}#{% endif %}">
+        <a id="pag-prev" class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
+           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if statut %}&statut={{ statut }}{% endif %}{% if type_f %}&type_f={{ type_f }}{% endif %}{% else %}#{% endif %}">
           <i class="bi bi-chevron-left"></i>
         </a>
-        <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
-        <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
-           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% else %}#{% endif %}">
+        <span id="pag-info">{{ page_obj.start_index }}–{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
+        <a id="pag-next" class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
+           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if statut %}&statut={{ statut }}{% endif %}{% if type_f %}&type_f={{ type_f }}{% endif %}{% else %}#{% endif %}">
           <i class="bi bi-chevron-right"></i>
         </a>
       </div>
     </div>
   </div>
-  <div class="o-subheader-row">
-    <a href="/admin/facturation/facture/add/" class="o-btn-create">CRÉER</a>
+
+  <!-- Tags filtres actifs -->
+  {% if statut or type_f %}
+  <div class="o-filter-tags" id="filter-tags-row">
+    {% if statut %}<span class="o-filter-tag">{% for s,l in statut_choices %}{% if s == statut %}{{ l }}{% endif %}{% endfor %} <a onclick="setFiltre('statut','')">×</a></span>{% endif %}
+    {% if type_f %}<span class="o-filter-tag">{% for s,l in type_choices %}{% if s == type_f %}{{ l }}{% endif %}{% endfor %} <a onclick="setFiltre('type','')">×</a></span>{% endif %}
   </div>
+  {% endif %}
+
 </div>
 
+<!-- ══ Table ══ -->
 <div class="o-list-wrap">
-  {% if page_obj %}
   <table class="o-list">
     <thead>
       <tr>
-        <th style="width:40px;text-align:center;">#</th>
-        <th>Numéro Facture</th>
+        <th>N° Facture</th>
         <th>Patient</th>
-        <th>Date Émission</th>
-        <th>Montant Total</th>
-        <th>Montant Payé</th>
-        <th>Montant Dû</th>
-        <th style="width:100px;">Statut</th>
-        <th style="width:100px;text-align:center;">Actions</th>
+        <th>Type</th>
+        <th>Date</th>
+        <th style="text-align:right;">Total</th>
+        <th style="text-align:right;">Payé</th>
+        <th style="text-align:right;">Reste</th>
+        <th>Statut</th>
       </tr>
     </thead>
-    <tbody>
+    <tbody id="fac-tbody">
       {% for facture in page_obj %}
-      <tr onclick="window.location='{% url 'facture_create' %}?patient={{ facture.patient.pk }}'">
-        <td style="text-align:center;color:var(--text-muted);font-size:11px;">{{ forloop.counter0|add:page_obj.start_index }}</td>
-        <td class="td-num">{{ facture.numero_facture }}</td>
+      <tr onclick="window.location='{% url 'facturation:detail' facture.pk %}'" style="cursor:pointer;">
+        <td class="td-num">{{ facture.numero }}</td>
         <td class="td-patient">{{ facture.patient.nom }} {{ facture.patient.prenoms }}</td>
-        <td>{{ facture.date_emission|date:"d/m/Y" }}</td>
-        <td class="td-montant">{{ facture.montant_total }} CFA</td>
-        <td style="color:var(--green,#2e7d32);">{{ facture.montant_paye }} CFA</td>
-        <td style="color:var(--amber,#e65100);">{{ facture.montant_restant }} CFA</td>
-        <td>
-          <span class="badge badge-{% if facture.statut == 'payee' %}success{% elif facture.statut == 'partielle' %}warning{% else %}primary{% endif %}">
-            {{ facture.get_statut_display }}
-          </span>
+        <td><span class="badge-type">{{ facture.get_type_facture_display }}</span></td>
+        <td style="color:var(--text-muted);white-space:nowrap;font-size:12px;">{{ facture.date_emission|date:"d/m/Y" }}</td>
+        <td class="td-montant">{{ facture.montant_total|floatformat:0|intcomma }} F</td>
+        <td class="td-montant" style="color:#16a96b;">{{ facture.montant_paye|floatformat:0|intcomma }} F</td>
+        <td class="td-montant" style="color:{% if facture.solde_restant > 0 %}var(--amber){% else %}var(--text-muted){% endif %};font-weight:{% if facture.solde_restant > 0 %}600{% else %}400{% endif %};">
+          {{ facture.solde_restant|floatformat:0|intcomma }} F
         </td>
-        <td class="td-actions" onclick="event.stopPropagation()">
-          <a href="/admin/facturation/facture/{{ facture.id }}/change/" class="btn-icon" title="Voir / Modifier"><i class="bi bi-pencil"></i></a>
-          <button type="button" class="btn-icon" onclick="window.print()" title="Imprimer"><i class="bi bi-printer"></i></button>
-          <a href="{% url 'facture_create' %}?patient={{ facture.patient.pk }}" class="btn-icon" title="Nouvelle facture"><i class="bi bi-plus-lg"></i></a>
-        </td>
+        <td><span class="badge-statut badge-{{ facture.statut }}">{{ facture.get_statut_display }}</span></td>
       </tr>
+      {% empty %}
+      <tr><td colspan="8" style="text-align:center;padding:48px 20px;color:var(--text-muted);font-size:13px;">
+        {% if q or statut or type_f %}Aucune facture pour ces critères.
+        {% else %}Aucune facture — <a href="{% url 'facturation:create' %}" style="color:var(--teal-600);">créer la première</a>.{% endif %}
+      </td></tr>
       {% endfor %}
     </tbody>
   </table>
-  {% else %}
-  <div class="o-empty-state">
-    <div class="o-empty-illo">
-      <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <rect x="3" y="4" width="18" height="16" rx="2"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="13" y2="13"/>
-      </svg>
-    </div>
-    <div class="o-empty-title">Aucune facture{% if q %} pour "{{ q }}"{% endif %}</div>
-    <div class="o-empty-sub">{% if q %}Essayez avec un autre terme.{% else %}Créez la première facture.{% endif %}</div>
-    {% if not q %}
-    <a href="/admin/facturation/facture/add/" class="o-empty-btn">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-      CRÉER UNE FACTURE
-    </a>
-    {% endif %}
-  </div>
-  {% endif %}
 </div>
 
 <script>
-  (function() {
-    var input = document.getElementById('search-input');
-    var form  = document.getElementById('search-form');
-    var timer = null;
-    if (!input) return;
-    input.addEventListener('input', function() {
+(function () {
+  var input     = document.getElementById('search-input');
+  var btnClear  = document.getElementById('btn-clear');
+  var btnIcon   = document.getElementById('btn-icon');
+  var tbody     = document.getElementById('fac-tbody');
+  var pagInfo   = document.getElementById('pag-info');
+  var pagPrev   = document.getElementById('pag-prev');
+  var pagNext   = document.getElementById('pag-next');
+  var pageCount = document.getElementById('page-count');
+  var timer     = null;
+  var curStatut = '{{ statut|escapejs }}';
+  var curType   = '{{ type_f|escapejs }}';
+
+  /* ── Recherche (AJAX) ── */
+  if (input) {
+    input.addEventListener('input', function () {
+      setIcons(input.value);
       clearTimeout(timer);
-      timer = setTimeout(function() { form.submit(); }, 350);
+      timer = setTimeout(function () { doSearch(input.value.trim(), curStatut, curType, 1); }, 320);
     });
-  })();
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { input.value = ''; setIcons(''); doSearch('', curStatut, curType, 1); }
+    });
+  }
+  if (btnClear) {
+    btnClear.addEventListener('click', function () {
+      if (input) { input.value = ''; input.focus(); }
+      setIcons('');
+      doSearch('', curStatut, curType, 1);
+    });
+  }
+
+  function setIcons(val) {
+    if (btnClear) btnClear.style.display = val ? 'inline-flex' : 'none';
+    if (btnIcon)  btnIcon.style.display  = val ? 'none' : 'inline-flex';
+  }
+
+  /* ── Dropdowns ── */
+  window.toggleDd = function (id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    var open = el.classList.contains('open');
+    document.querySelectorAll('.o-dd.open').forEach(function (d) { d.classList.remove('open'); });
+    if (!open) el.classList.add('open');
+  };
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('.o-dd'))
+      document.querySelectorAll('.o-dd.open').forEach(function (d) { d.classList.remove('open'); });
+  });
+
+  /* ── Filtres (rechargement — intentionnel) ── */
+  window.setFiltre = function (key, val) {
+    var url = new URL(window.location.href);
+    url.searchParams.set('page', '1');
+    if (key === 'statut') val ? url.searchParams.set('statut', val) : url.searchParams.delete('statut');
+    else if (key === 'type') val ? url.searchParams.set('type_f', val) : url.searchParams.delete('type_f');
+    window.location.href = url.toString();
+  };
+
+  /* ── Effacer recherche (AJAX) ── */
+  window.clearQ = function () {
+    if (input) { input.value = ''; input.focus(); }
+    setIcons('');
+    doSearch('', curStatut, curType, 1);
+  };
+
+  /* ── Fetch AJAX ── */
+  function buildParams(q, statut, type_f, page) {
+    var p = new URLSearchParams();
+    if (q)        p.set('q', q);
+    if (statut)   p.set('statut', statut);
+    if (type_f)   p.set('type_f', type_f);
+    if (page > 1) p.set('page', String(page));
+    return p;
+  }
+
+  function doSearch(q, statut, type_f, page) {
+    var params = buildParams(q, statut, type_f, page);
+    history.replaceState(null, '', params.toString() ? '?' + params : location.pathname);
+    if (tbody) tbody.style.opacity = '0.35';
+
+    fetch(location.pathname + (params.toString() ? '?' + params : ''), {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (d) { render(d, q, statut, type_f); })
+    .catch(function () { if (tbody) tbody.style.opacity = ''; });
+  }
+
+  function fmt(n) { return Math.round(n).toLocaleString('fr-FR') + ' F'; }
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                    .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  function render(data, q, statut, type_f) {
+    /* Tableau */
+    if (tbody) {
+      tbody.style.opacity = '';
+      if (!data.rows.length) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:48px 20px;'
+          + 'color:var(--text-muted);font-size:13px;">'
+          + (q ? 'Aucune facture pour « ' + esc(q) + ' »' : 'Aucune facture pour ces critères.')
+          + '</td></tr>';
+      } else {
+        var html = '';
+        data.rows.forEach(function (f) {
+          var sc = f.solde_restant > 0 ? 'var(--amber)' : 'var(--text-muted)';
+          var fw = f.solde_restant > 0 ? '600' : '400';
+          html += '<tr onclick="window.location=\'' + f.url + '\'" style="cursor:pointer;">'
+            + '<td class="td-num">'     + esc(f.numero) + '</td>'
+            + '<td class="td-patient">' + esc(f.patient) + '</td>'
+            + '<td><span class="badge-type">' + esc(f.type_display) + '</span></td>'
+            + '<td style="color:var(--text-muted);white-space:nowrap;font-size:12px;">' + esc(f.date) + '</td>'
+            + '<td class="td-montant">' + fmt(f.montant_total) + '</td>'
+            + '<td class="td-montant" style="color:#16a96b;">' + fmt(f.montant_paye) + '</td>'
+            + '<td class="td-montant" style="color:' + sc + ';font-weight:' + fw + ';">' + fmt(f.solde_restant) + '</td>'
+            + '<td><span class="badge-statut badge-' + esc(f.statut) + '">' + esc(f.statut_display) + '</span></td>'
+            + '</tr>';
+        });
+        tbody.innerHTML = html;
+      }
+    }
+
+    /* Compteur */
+    if (pageCount) pageCount.textContent = '(' + data.total + ')';
+
+    /* Pagination info */
+    if (pagInfo) pagInfo.textContent = data.count
+      ? (data.start_index + '–' + data.end_index + ' / ' + data.count)
+      : '0 / 0';
+
+    /* Boutons pagination */
+    var base = buildParams(q, statut, type_f, 1);
+    if (pagPrev) {
+      if (data.has_previous) {
+        var pp = new URLSearchParams(base); pp.set('page', String(data.page - 1));
+        pagPrev.setAttribute('href', '?' + pp); pagPrev.classList.remove('disabled');
+      } else { pagPrev.setAttribute('href', '#'); pagPrev.classList.add('disabled'); }
+    }
+    if (pagNext) {
+      if (data.has_next) {
+        var pn = new URLSearchParams(base); pn.set('page', String(data.page + 1));
+        pagNext.setAttribute('href', '?' + pn); pagNext.classList.remove('disabled');
+      } else { pagNext.setAttribute('href', '#'); pagNext.classList.add('disabled'); }
+    }
+
+  }
+})();
 </script>
 {% endblock %}

@@ -1,0 +1,241 @@
+{% extends 'stock/base.html' %}
+{% load static %}
+{% block topbar_title %}Stock — Journal de stock{% endblock %}
+
+{% block extra_st_css %}<style>
+.st-page-head {
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  padding:12px 32px; margin:0 -32px;
+  background:#e8f2f7; border-bottom:1px solid rgba(0,0,0,.05);
+  box-shadow:0 2px 8px rgba(0,0,0,.04);
+  position:sticky; top:var(--topbar-h); z-index:100;
+}
+html[data-theme="dark"] .st-page-head { background:#0f0e0e; }
+
+/* Filtres rapides période */
+.periode-tabs { display:flex; gap:4px; flex-wrap:wrap; margin-top:14px; }
+.periode-tab {
+  padding:4px 13px; border-radius:20px; font-size:12px; font-weight:600;
+  text-decoration:none; border:1.5px solid var(--st-border);
+  color:var(--st-muted); background:var(--st-surface); transition:all .15s;
+}
+.periode-tab:hover { border-color:var(--st-500); color:var(--st-600); }
+.periode-tab.active { background:var(--st-600); border-color:var(--st-600); color:#fff; }
+
+/* Filtres type */
+.type-tabs { display:flex; gap:4px; flex-wrap:wrap; margin-top:8px; }
+.type-tab {
+  padding:3px 11px; border-radius:20px; font-size:11.5px; font-weight:600;
+  text-decoration:none; border:1.5px solid var(--st-border);
+  color:var(--st-muted); background:var(--st-surface); transition:all .15s;
+  display:inline-flex; align-items:center; gap:4px;
+}
+.type-tab.active-entree   { background:rgba(var(--st-600-rgb),.12);  border-color:var(--st-600); color:var(--st-600); }
+.type-tab.active-livraison{ background:rgba(45,153,219,.12);  border-color:#1976d2; color:#1565c0; }
+.type-tab.active-ajust    { background:rgba(var(--amber-rgb),.12);  border-color:var(--amber); color:var(--amber-text); }
+.type-tab.active-peremption{ background:rgba(123,87,194,.12); border-color:#7b57c2; color:#4527a0; }
+.type-tab.active-retour   { background:rgba(0,0,0,.06);       border-color:#999;    color:#555; }
+
+/* Ligne du journal */
+.mv-row { border-left:3px solid transparent; transition:background .12s; }
+.mv-row:hover { background:var(--st-50) !important; }
+.mv-row.t-entree    { border-left-color:var(--st-600); }
+.mv-row.t-livraison { border-left-color:#1976d2; }
+.mv-row.t-ajust     { border-left-color:var(--amber); }
+.mv-row.t-peremption{ border-left-color:#7b57c2; }
+.mv-row.t-retour    { border-left-color:#999; }
+
+/* Badge type */
+.mv-badge { display:inline-flex; align-items:center; gap:4px; padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; white-space:nowrap; }
+.mv-badge-entree    { background:rgba(var(--st-600-rgb),.1);  color:var(--st-600); border:1px solid rgba(var(--st-600-rgb),.25); }
+.mv-badge-livraison { background:rgba(45,153,219,.1);  color:#1565c0; border:1px solid rgba(45,153,219,.25); }
+.mv-badge-ajust     { background:rgba(var(--amber-rgb),.1);  color:var(--amber-text); border:1px solid rgba(var(--amber-rgb),.25); }
+.mv-badge-peremption{ background:rgba(123,87,194,.1);  color:#4527a0; border:1px solid rgba(123,87,194,.2); }
+.mv-badge-retour    { background:rgba(0,0,0,.06);      color:#555;    border:1px solid rgba(0,0,0,.12); }
+
+/* Variation stock */
+.delta-plus  { color:var(--st-600); font-weight:800; font-size:13px; }
+.delta-moins { color:var(--rose-text); font-weight:800; font-size:13px; }
+.delta-neut  { color:var(--amber-text); font-weight:800; font-size:13px; }
+
+/* Barre stock avant→après */
+.stock-arrow { display:inline-flex; align-items:center; gap:5px; font-size:12px; }
+.stock-arrow .avant { color:var(--st-muted); }
+.stock-arrow .apres { color:var(--st-text); font-weight:700; }
+</style>{% endblock %}
+
+{% block content %}
+
+<!-- En-tête -->
+<div class="st-page-head">
+  <div>
+    <div style="font-size:15px;font-weight:800;color:var(--st-900);">
+      <i class="bi bi-journal-text" style="color:var(--st-600);"></i> Journal de stock
+    </div>
+    <div style="font-size:11.5px;color:var(--st-muted);">Traçabilité de toutes les entrées et sorties</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <form method="get" style="display:flex;align-items:center;gap:0;border-bottom:1.5px solid rgba(0,0,0,.18);padding:4px 6px;">
+      <i class="bi bi-search" style="color:var(--st-muted);font-size:13px;margin-right:5px;"></i>
+      <input type="text" name="q" value="{{ q }}" placeholder="Produit, référence…"
+        style="border:none;background:transparent;font-size:12.5px;color:var(--st-text);outline:none;width:200px;">
+      {% if type_filtre %}<input type="hidden" name="type" value="{{ type_filtre }}">{% endif %}
+      {% if periode %}<input type="hidden" name="periode" value="{{ periode }}">{% endif %}
+    </form>
+    <a href="{% url 'stock_mouvement_create' %}" class="btn-st-outline" style="font-size:12px;border-color:rgba(0,0,0,.2);color:var(--st-muted);" title="Correction exceptionnelle uniquement">
+      <i class="bi bi-pencil-square"></i> Correction manuelle
+    </a>
+  </div>
+</div>
+
+<!-- Filtres période -->
+<div class="periode-tabs">
+  <a href="?periode=today{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
+     class="periode-tab {% if periode == 'today' %}active{% endif %}">Aujourd'hui</a>
+  <a href="?periode=week{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
+     class="periode-tab {% if periode == 'week' %}active{% endif %}">Cette semaine</a>
+  <a href="?periode=month{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
+     class="periode-tab {% if periode == 'month' %}active{% endif %}">Ce mois</a>
+  <a href="?{% if type_filtre %}type={{ type_filtre }}&{% endif %}{% if q %}q={{ q }}{% endif %}"
+     class="periode-tab {% if not periode %}active{% endif %}">Tout l'historique</a>
+</div>
+
+<!-- Filtres type -->
+<div class="type-tabs">
+  <a href="?{% if periode %}periode={{ periode }}&{% endif %}{% if q %}q={{ q }}{% endif %}"
+     class="type-tab {% if not type_filtre %}active{% endif %}" style="{% if not type_filtre %}background:var(--st-600);border-color:var(--st-600);color:#fff;{% endif %}">
+    Tous les types
+  </a>
+  <a href="?type=entree{% if periode %}&periode={{ periode }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
+     class="type-tab {% if type_filtre == 'entree' %}active-entree{% endif %}">
+    <i class="bi bi-arrow-down-circle-fill" style="font-size:10px;"></i> Entrées
+  </a>
+  <a href="?type=livraison{% if periode %}&periode={{ periode }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
+     class="type-tab {% if type_filtre == 'livraison' %}active-livraison{% endif %}">
+    <i class="bi bi-bag-check" style="font-size:10px;"></i> Dotations
+  </a>
+  <a href="?type=ajustement{% if periode %}&periode={{ periode }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
+     class="type-tab {% if type_filtre == 'ajustement' %}active-ajust{% endif %}">
+    <i class="bi bi-sliders" style="font-size:10px;"></i> Ajustements
+  </a>
+  <a href="?type=peremption{% if periode %}&periode={{ periode }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
+     class="type-tab {% if type_filtre == 'peremption' %}active-peremption{% endif %}">
+    <i class="bi bi-calendar-x" style="font-size:10px;"></i> Péremptions
+  </a>
+  <a href="?type=retour{% if periode %}&periode={{ periode }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
+     class="type-tab {% if type_filtre == 'retour' %}active-retour{% endif %}">
+    <i class="bi bi-arrow-return-left" style="font-size:10px;"></i> Retours
+  </a>
+</div>
+
+<!-- Tableau -->
+<div style="margin-top:14px;margin-left:-32px;margin-right:-32px;background:var(--st-surface);box-shadow:0 2px 12px rgba(var(--st-700-rgb),.08);overflow:hidden;">
+  {% if page_obj %}
+
+  <!-- Résumé rapide -->
+  <div style="padding:10px 20px;border-bottom:1px solid var(--st-border);display:flex;gap:20px;flex-wrap:wrap;background:var(--st-50);">
+    <span style="font-size:12px;color:var(--st-muted);">
+      <strong style="color:var(--st-text);">{{ page_obj.paginator.count }}</strong> mouvement{{ page_obj.paginator.count|pluralize }}
+    </span>
+    {% if type_filtre or periode %}<span style="font-size:12px;color:var(--st-muted);">— filtre actif</span>{% endif %}
+    <span style="margin-left:auto;font-size:11.5px;color:var(--st-muted);">{{ page_obj.start_index }}–{{ page_obj.end_index }} affichés</span>
+  </div>
+
+  <table class="st-table" style="border-radius:0;">
+    <thead>
+      <tr>
+        <th style="width:100px;">Date & heure</th>
+        <th>Produit</th>
+        <th>Type</th>
+        <th>Motif</th>
+        <th style="text-align:right;">Variation</th>
+        <th style="text-align:center;">Stock avant → après</th>
+        <th>Référence</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for mv in page_obj %}
+    <tr class="mv-row t-{% if mv.type == 'ajustement' %}ajust{% else %}{{ mv.type }}{% endif %}">
+      <td style="font-size:11px;white-space:nowrap;">
+        <div style="font-weight:600;color:var(--st-text);">{{ mv.date|date:"d/m/Y" }}</div>
+        <div style="color:var(--st-muted);">{{ mv.date|time:"H:i" }}</div>
+      </td>
+      <td>
+        <a href="{% url 'stock_produit_detail' mv.produit.pk %}" style="color:var(--st-text);text-decoration:none;font-weight:600;font-size:12.5px;">
+          {{ mv.produit.nom|truncatechars:32 }}
+        </a>
+        <div style="font-size:10px;color:var(--st-600);font-family: var(--font-mono);">{{ mv.produit.code }}</div>
+      </td>
+      <td>
+        {% if mv.type == 'entree' %}
+          <span class="mv-badge mv-badge-entree"><i class="bi bi-arrow-down-circle-fill" style="font-size:9px;"></i> Entrée</span>
+        {% elif mv.type == 'livraison' %}
+          <span class="mv-badge mv-badge-livraison"><i class="bi bi-bag-check" style="font-size:9px;"></i> Dotation
+            {% if mv.pharmacie %}<span style="font-size:9px;opacity:.8;">· {{ mv.get_pharmacie_display }}</span>{% endif %}
+          </span>
+        {% elif mv.type == 'ajustement' %}
+          <span class="mv-badge mv-badge-ajust"><i class="bi bi-sliders" style="font-size:9px;"></i> Ajustement</span>
+        {% elif mv.type == 'peremption' %}
+          <span class="mv-badge mv-badge-peremption"><i class="bi bi-calendar-x" style="font-size:9px;"></i> Péremption</span>
+        {% elif mv.type == 'retour' %}
+          <span class="mv-badge mv-badge-retour"><i class="bi bi-arrow-return-left" style="font-size:9px;"></i> Retour</span>
+        {% else %}
+          <span style="font-size:11px;color:var(--st-muted);">{{ mv.get_type_display }}</span>
+        {% endif %}
+      </td>
+      <td style="font-size:11.5px;color:var(--st-muted);">{{ mv.get_motif_display|default:"—" }}</td>
+      <td style="text-align:right;">
+        {% if mv.type == 'entree' %}
+          <span class="delta-plus"><i class="bi bi-arrow-up" style="font-size:10px;"></i> +{{ mv.quantite|floatformat:0 }}</span>
+        {% elif mv.type in 'livraison,peremption,retour' or mv.type == 'livraison' or mv.type == 'peremption' or mv.type == 'retour' %}
+          <span class="delta-moins"><i class="bi bi-arrow-down" style="font-size:10px;"></i> −{{ mv.quantite|floatformat:0 }}</span>
+        {% else %}
+          <span class="delta-neut">{{ mv.quantite|floatformat:0 }}</span>
+        {% endif %}
+        <div style="font-size:10px;color:var(--st-muted);">{{ mv.produit.unite_mesure.nom }}</div>
+      </td>
+      <td style="text-align:center;">
+        <div class="stock-arrow">
+          <span class="avant">{{ mv.stock_avant|floatformat:0 }}</span>
+          <i class="bi bi-arrow-right" style="font-size:9px;color:var(--st-muted);"></i>
+          <span class="apres" style="color:{% if mv.stock_apres > mv.stock_avant %}var(--st-600){% elif mv.stock_apres < mv.stock_avant %}var(--rose-text){% else %}var(--st-text){% endif %};">
+            {{ mv.stock_apres|floatformat:0 }}
+          </span>
+        </div>
+      </td>
+      <td style="font-size:10.5px;font-family: var(--font-mono);color:var(--st-muted);">{{ mv.reference|default:"—"|truncatechars:18 }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Pagination -->
+  {% if page_obj.has_other_pages %}
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 20px;border-top:1px solid var(--st-border);">
+    <div style="display:flex;gap:4px;">
+      {% if page_obj.has_previous %}
+      <a href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% if periode %}&periode={{ periode }}{% endif %}"
+         class="btn-st-outline" style="padding:4px 10px;font-size:12px;"><i class="bi bi-chevron-left"></i></a>
+      {% endif %}
+      {% if page_obj.has_next %}
+      <a href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% if periode %}&periode={{ periode }}{% endif %}"
+         class="btn-st-outline" style="padding:4px 10px;font-size:12px;"><i class="bi bi-chevron-right"></i></a>
+      {% endif %}
+    </div>
+    <span style="font-size:11.5px;color:var(--st-muted);">
+      Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+      &nbsp;·&nbsp; {{ page_obj.paginator.count }} entrée{{ page_obj.paginator.count|pluralize }}
+    </span>
+  </div>
+  {% endif %}
+
+  {% else %}
+  <div style="text-align:center;padding:56px;color:var(--st-muted);">
+    <i class="bi bi-journal" style="font-size:36px;display:block;margin-bottom:12px;opacity:.3;"></i>
+    <div style="font-size:14px;font-weight:600;margin-bottom:6px;">Aucun mouvement enregistré</div>
+    <div style="font-size:12.5px;">Les mouvements sont enregistrés automatiquement lors des réceptions de commandes, dotations pharmacies et validations d'inventaire.</div>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

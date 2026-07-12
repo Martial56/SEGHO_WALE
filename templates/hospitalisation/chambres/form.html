@@ -1,0 +1,405 @@
+{% extends 'hospitalisation/base.html' %}
+{% load i18n %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+/* ── Form card ── */
+.form-card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:8px; margin-top:8px; overflow:hidden;
+}
+
+/* ── Identity (en-tête) ── */
+.fc-identity {
+  padding:20px 24px 16px;
+  display:flex; align-items:flex-start; gap:24px;
+  border-bottom:1px solid var(--border);
+}
+.fc-identity-left { flex:1; min-width:0; }
+.fc-identity-right { display:flex; flex-direction:column; align-items:flex-end; gap:12px; flex-shrink:0; }
+
+.salle-badge {
+  display:inline-flex; align-items:center; gap:6px;
+  background:#f5f7fa; border:1px solid #dde3ec; color:#7a8fa0;
+  border-radius:4px; padding:4px 12px; font-size:12px;
+  font-family: var(--font-mono); font-style:italic; margin-bottom:10px;
+}
+.salle-badge strong { color:var(--teal-700); font-style:normal; font-size:13px; }
+
+/* ── Statut toggle ── */
+.statut-toggle {
+  display:flex; border-radius:6px; overflow:hidden;
+  border:1.5px solid var(--border);
+}
+.statut-btn {
+  padding:7px 16px; font-size:12px; font-weight:600; font-family:inherit;
+  border:none; cursor:pointer; display:flex; align-items:center; gap:5px;
+  background:#f8fafc; color:var(--text-muted); transition:all .15s; white-space:nowrap;
+}
+.statut-btn:first-child { border-right:1px solid var(--border); }
+.statut-btn.active.dispo  { background:#d4edda; color:#1a6b3c; }
+.statut-btn.active.occupe { background:#fde8e8; color:#7b1c1c; }
+
+/* ── Config (type, genre, privé) ── */
+.fc-config {
+  padding:16px 24px;
+  display:grid; grid-template-columns:1fr 1fr 1fr;
+  gap:16px 28px; border-bottom:1px solid var(--border);
+}
+
+/* Toggle privé */
+.toggle-row { margin-top:6px; display:flex; align-items:center; gap:10px; cursor:pointer; }
+.toggle-track {
+  width:36px; height:20px; background:#d1dde3; border-radius:10px;
+  position:relative; transition:background .2s; flex-shrink:0;
+}
+.toggle-thumb {
+  position:absolute; top:2px; left:2px; width:16px; height:16px;
+  background:#fff; border-radius:50%; transition:transform .2s;
+  box-shadow:0 1px 3px rgba(0,0,0,.2);
+}
+.toggle-row.is-on .toggle-track { background:var(--teal-500); }
+.toggle-row.is-on .toggle-thumb { transform:translateX(16px); }
+.toggle-row-label { font-size:13px; color:var(--text); }
+
+
+/* ── Section title ── */
+.section-title {
+  font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase;
+  letter-spacing:.06em; margin-bottom:12px; display:flex; align-items:center; gap:8px;
+}
+.section-title::after { content:''; flex:1; height:1px; background:var(--border); }
+
+/* ── Équipements ── */
+.fc-equipements { padding:16px 24px; border-bottom:1px solid var(--border); }
+.equip-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+
+.equip-card {
+  display:flex; align-items:center; gap:10px;
+  padding:10px 14px; border:1.5px solid var(--border); border-radius:8px;
+  cursor:pointer; transition:all .15s; background:var(--surface); user-select:none;
+}
+.equip-card input { display:none; }
+.equip-icon {
+  width:32px; height:32px; border-radius:6px;
+  display:flex; align-items:center; justify-content:center;
+  background:#f0f4f8; font-size:15px; color:#9eb3c2; flex-shrink:0; transition:all .15s;
+}
+.equip-label { font-size:12.5px; font-weight:500; color:var(--text-muted); transition:color .15s; line-height:1.3; }
+.equip-card.active { border-color:var(--teal-400); background:#f0fbf9; }
+.equip-card.active .equip-icon { background:#cdf2ea; color:var(--teal-600); }
+.equip-card.active .equip-label { color:var(--teal-700); font-weight:600; }
+.equip-card.danger.active { border-color:#f87171; background:#fff5f5; }
+.equip-card.danger.active .equip-icon { background:#fee2e2; color:#dc2626; }
+.equip-card.danger.active .equip-label { color:#b91c1c; }
+
+/* Override field-ul dans les widgets custom */
+.prix-input-wrap .field-ul {
+  border-bottom:none; padding:0; width:90px; font-size:15px; font-weight:700;
+  color:var(--teal-700);
+}
+
+/* ── Notes ── */
+.fc-notes { padding:16px 24px; }
+
+/* ── TomSelect underline ── */
+.ts-wrapper { padding:0 !important; }
+.ts-wrapper .ts-control {
+  background:transparent !important; border:none !important;
+  border-bottom:1.5px solid #d1dde3 !important; border-radius:0 !important;
+  box-shadow:none !important; padding:7px 24px 7px 2px !important;
+  font-size:13px !important; font-family:inherit !important; min-height:unset !important; cursor:pointer;
+}
+.ts-wrapper.focus .ts-control { border-bottom-color:var(--teal-500) !important; box-shadow:none !important; }
+.ts-wrapper .ts-control .item { font-size:13px !important; font-family:inherit !important; color:var(--text) !important; padding:0 !important; margin:0 !important; }
+.ts-wrapper .ts-control input { font-size:13px !important; font-family:inherit !important; color:var(--text) !important; padding:0 !important; margin:0 !important; }
+.ts-wrapper .ts-control input::placeholder { color:#bfcdd4; }
+.ts-wrapper.single .ts-control::after {
+  content:'' !important; width:12px !important; height:8px !important;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23839aaa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat !important;
+  border:none !important; position:absolute !important; right:4px !important;
+  top:50% !important; transform:translateY(-50%) !important; margin:0 !important;
+}
+.ts-wrapper.single.input-active .ts-control::after { transform:translateY(-50%) rotate(180deg) !important; }
+.ts-dropdown {
+  font-size:13px !important; font-family:inherit !important;
+  border:1px solid #dde3ec !important; border-radius:6px !important;
+  box-shadow:0 8px 24px rgba(0,0,0,.14) !important; margin-top:3px !important; background:#fff !important;
+}
+.ts-dropdown .ts-dropdown-content { max-height:200px; }
+.ts-dropdown .option { padding:7px 14px !important; font-size:13px !important; color:var(--text) !important; cursor:pointer; }
+.ts-dropdown .option:hover, .ts-dropdown .option.selected, .ts-dropdown .option.active { background:#e8f4f8 !important; color:var(--teal-600) !important; }
+.ts-dropdown .no-results { padding:8px 14px; color:#999; font-size:12px; }
+
+/* Dark */
+html[data-theme="dark"] .form-card   { background:var(--surface); border-color:var(--border); }
+html[data-theme="dark"] .salle-badge { background:#0d2035; border-color:#243044; color:#7a9ab5; }
+html[data-theme="dark"] .salle-badge strong { color:var(--teal-300); }
+html[data-theme="dark"] .statut-btn  { background:#1a2535; color:var(--text-muted); }
+html[data-theme="dark"] .statut-btn.active.dispo  { background:rgba(26,107,60,.3); color:#6fcf97; }
+html[data-theme="dark"] .statut-btn.active.occupe { background:rgba(123,28,28,.3); color:#f48787; }
+
+html[data-theme="dark"] .equip-card  { background:var(--surface); border-color:var(--border); }
+html[data-theme="dark"] .equip-icon  { background:#1a2535; color:#4a6a80; }
+html[data-theme="dark"] .equip-card.active { background:#0a2535; border-color:var(--teal-400); }
+html[data-theme="dark"] .equip-card.active .equip-icon { background:rgba(21,136,171,.2); color:var(--teal-300); }
+html[data-theme="dark"] .equip-card.active .equip-label { color:var(--teal-300); }
+html[data-theme="dark"] .o-ctrl-btn:hover { background:rgba(255,255,255,.05); }
+html[data-theme="dark"] .ts-wrapper .ts-control { border-bottom-color:rgba(255,255,255,.15) !important; }
+html[data-theme="dark"] .ts-wrapper.focus .ts-control { border-bottom-color:var(--teal-400) !important; }
+html[data-theme="dark"] .ts-dropdown { background:#1a2535 !important; border-color:#2e3f58 !important; }
+html[data-theme="dark"] .ts-dropdown .option { color:#c5d4e2 !important; }
+html[data-theme="dark"] .ts-dropdown .option:hover,
+html[data-theme="dark"] .ts-dropdown .option.active,
+html[data-theme="dark"] .ts-dropdown .option.selected { background:rgba(var(--teal-500-rgb),.2) !important; }
+html[data-theme="dark"] .toggle-row-label { color:var(--text); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="page-wrap">
+
+<div class="action-bar">
+  <div class="action-bar-breadcrumb">
+    <a href="{% url 'hospitalisation:chambres_list' %}"><i class="bi bi-arrow-left"></i> Salles/Chambres</a>
+    <span class="sep">/</span>
+    <span class="current">{% if edit %}{{ chambre.nom|default:chambre.salle_no }}{% else %}Nouveau{% endif %}</span>
+  </div>
+  <div class="action-bar-buttons">
+    <a href="{% url 'hospitalisation:chambres_list' %}" class="btn-form-cancel">Ignorer</a>
+    <button type="submit" form="chambre-form" class="btn-form-submit">
+      <i class="bi bi-check2"></i> Enregistrer
+    </button>
+  </div>
+</div>
+
+<form method="post" id="chambre-form" novalidate>
+  {% csrf_token %}
+
+  <div class="form-card">
+
+    <!-- ── En-tête : nom + statut + capacité ── -->
+    <div class="fc-identity">
+
+      <div class="fc-identity-left">
+        <div class="salle-badge">
+          <i class="bi bi-hash"></i> Salle No. :
+          {% if edit %}<strong>{{ chambre.salle_no }}</strong>{% else %}<span>auto</span>{% endif %}
+        </div>
+        {{ form.nom }}
+        {% if form.nom.errors %}<div class="field-error">{{ form.nom.errors|join:", " }}</div>{% endif %}
+      </div>
+
+      <div class="fc-identity-right">
+
+        <!-- Statut visuel -->
+        <div>
+          <div class="field-label">Statut</div>
+          <div class="statut-toggle">
+            <button type="button" class="statut-btn dispo" id="btn-dispo" onclick="setStatut(true)">
+              <i class="bi bi-check-circle-fill"></i> Disponible
+            </button>
+            <button type="button" class="statut-btn occupe" id="btn-occupe" onclick="setStatut(false)">
+              <i class="bi bi-x-circle-fill"></i> Occupée
+            </button>
+          </div>
+          <div style="display:none;">{{ form.statut }}</div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── Type, Genre, Privé ── -->
+    <div class="fc-config">
+
+      <div>
+        <label class="field-label" for="{{ form.type_chambre.id_for_label }}">
+          <i class="bi bi-door-closed" style="margin-right:4px;"></i>Type de chambre
+        </label>
+        {{ form.type_chambre }}
+        {% if form.type_chambre.errors %}<div class="field-error">{{ form.type_chambre.errors|join:", " }}</div>{% endif %}
+      </div>
+
+      <div>
+        <label class="field-label" for="{{ form.nombre_lits.id_for_label }}">
+          <i class="bi bi-hospital" style="margin-right:4px;"></i>Nombre de lits
+        </label>
+        {{ form.nombre_lits }}
+        {% if form.nombre_lits.errors %}<div class="field-error">{{ form.nombre_lits.errors|join:", " }}</div>{% endif %}
+      </div>
+
+      <div>
+        <label class="field-label" for="{{ form.genre.id_for_label }}">
+          <i class="bi bi-people" style="margin-right:4px;"></i>Genre
+        </label>
+        {{ form.genre }}
+        {% if form.genre.errors %}<div class="field-error">{{ form.genre.errors|join:", " }}</div>{% endif %}
+      </div>
+
+      <div>
+        <div class="field-label"><i class="bi bi-shield-lock" style="margin-right:4px;"></i>Chambre privée</div>
+        <div class="toggle-row" id="prive-toggle" onclick="togglePrive()">
+          {{ form.prive }}
+          <div class="toggle-track"><div class="toggle-thumb"></div></div>
+          <span class="toggle-row-label" id="prive-label">Non</span>
+        </div>
+        {% if form.prive.errors %}<div class="field-error">{{ form.prive.errors|join:", " }}</div>{% endif %}
+      </div>
+
+    </div>
+
+
+    <!-- ── Équipements ── -->
+    <div class="fc-equipements">
+      <div class="section-title"><i class="bi bi-buildings"></i> Équipements</div>
+      <div class="equip-grid">
+
+        <label class="equip-card">
+          {{ form.acces_internet }}
+          <div class="equip-icon"><i class="bi bi-wifi"></i></div>
+          <span class="equip-label">Accès Internet</span>
+        </label>
+
+        <label class="equip-card">
+          {{ form.lit_visiteur }}
+          <div class="equip-icon"><i class="bi bi-person-arms-up"></i></div>
+          <span class="equip-label">Lit visiteur</span>
+        </label>
+
+        <label class="equip-card">
+          {{ form.climatisation }}
+          <div class="equip-icon"><i class="bi bi-thermometer-snow"></i></div>
+          <span class="equip-label">Climatisation</span>
+        </label>
+
+        <label class="equip-card">
+          {{ form.four_micro_onde }}
+          <div class="equip-icon"><i class="bi bi-bounding-box"></i></div>
+          <span class="equip-label">Four micro-onde</span>
+        </label>
+
+        <label class="equip-card">
+          {{ form.salle_bains_privee }}
+          <div class="equip-icon"><i class="bi bi-droplet-half"></i></div>
+          <span class="equip-label">Salle de bains</span>
+        </label>
+
+        <label class="equip-card">
+          {{ form.television }}
+          <div class="equip-icon"><i class="bi bi-tv"></i></div>
+          <span class="equip-label">Télévision</span>
+        </label>
+
+        <label class="equip-card">
+          {{ form.refrigerateur }}
+          <div class="equip-icon"><i class="bi bi-snow2"></i></div>
+          <span class="equip-label">Réfrigérateur</span>
+        </label>
+
+        <label class="equip-card">
+          {{ form.telephone_chambre }}
+          <div class="equip-icon"><i class="bi bi-telephone"></i></div>
+          <span class="equip-label">Téléphone</span>
+        </label>
+
+        <label class="equip-card danger">
+          {{ form.danger_biologique }}
+          <div class="equip-icon"><i class="bi bi-exclamation-triangle-fill"></i></div>
+          <span class="equip-label">Danger biologique</span>
+        </label>
+
+      </div>
+    </div>
+
+    <!-- ── Notes ── -->
+    <div class="fc-notes">
+      <label class="field-label" for="{{ form.description.id_for_label }}">
+        <i class="bi bi-chat-text" style="margin-right:4px;"></i>Notes / Remarques
+      </label>
+      {{ form.description }}
+      {% if form.description.errors %}<div class="field-error">{{ form.description.errors|join:", " }}</div>{% endif %}
+    </div>
+
+  </div>
+</form>
+
+</div><!-- /page-wrap -->
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+/* ── Statut toggle ── */
+(function () {
+  const statSelect = document.querySelector('[name="statut"]');
+  const btnDispo   = document.getElementById('btn-dispo');
+  const btnOccupe  = document.getElementById('btn-occupe');
+
+  function setStatut(isDispo, updateField) {
+    if (updateField !== false && statSelect) {
+      statSelect.value = isDispo ? 'True' : 'False';
+    }
+    btnDispo.classList.toggle('active', isDispo);
+    btnOccupe.classList.toggle('active', !isDispo);
+  }
+  window.setStatut = setStatut;
+
+  // Init based on current value
+  const val = statSelect ? statSelect.value : 'True';
+  setStatut(val === 'True' || val === '', false);
+})();
+
+/* ── Privé toggle ── */
+(function () {
+  const cb     = document.querySelector('[name="prive"]');
+  const toggle = document.getElementById('prive-toggle');
+  const lbl    = document.getElementById('prive-label');
+  if (!cb || !toggle) return;
+
+  function updateUI() {
+    toggle.classList.toggle('is-on', cb.checked);
+    lbl.textContent = cb.checked ? 'Oui' : 'Non';
+  }
+  window.togglePrive = function () {
+    cb.checked = !cb.checked;
+    updateUI();
+  };
+
+  // Prevent label double-trigger
+  cb.addEventListener('change', updateUI);
+
+  // Hide native checkbox visually (keep in DOM for form submission)
+  cb.style.cssText = 'position:absolute;opacity:0;pointer-events:none;width:0;height:0;';
+
+  updateUI();
+})();
+
+/* ── Équipements — cartes actives ── */
+document.querySelectorAll('.equip-card').forEach(function (card) {
+  var cb = card.querySelector('input[type="checkbox"]');
+  if (!cb) return;
+  if (cb.checked) card.classList.add('active');
+  cb.addEventListener('change', function () {
+    card.classList.toggle('active', cb.checked);
+  });
+});
+
+/* ── TomSelect (type_chambre, genre seulement) ── */
+document.querySelectorAll('select.field-ul').forEach(function (el) {
+  if (el.name === 'statut') return; // géré manuellement
+  var emptyOpt   = el.querySelector('option[value=""]');
+  var placeholder = emptyOpt ? emptyOpt.textContent.trim() : 'Sélectionner…';
+  new TomSelect(el, {
+    allowEmptyOption: false,
+    placeholder: placeholder,
+    maxOptions: 200,
+    render: {
+      no_results: function () {
+        return '<div class="no-results" style="padding:8px 12px;color:#999;font-size:12px;">Aucun résultat</div>';
+      }
+    }
+  });
+});
+</script>
+{% endblock %}

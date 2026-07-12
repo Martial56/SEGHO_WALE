@@ -1,0 +1,174 @@
+{% extends 'pharmacie/base.html' %}
+{% load static %}
+
+{% block extra_ph_css %}<style>
+.ph-page-head {
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:11px 32px;
+  background:var(--ph-surface);border-bottom:1px solid var(--ph-border);
+
+  position:sticky;top:0;z-index:100;flex-wrap:wrap;
+}
+.al-stats { display:flex;gap:12px;margin:16px 0; }
+.al-stat { background:var(--ph-surface);border-radius:10px;box-shadow:0 2px 8px rgba(var(--ph-700-rgb),.08);padding:14px 20px;flex:1;border-left:4px solid; }
+.al-stat.rupture { border-left-color:var(--rose-text); }
+.al-stat.alerte  { border-left-color:var(--amber-text); }
+.al-stat-val { font-size:22px;font-weight:800;line-height:1; }
+.al-stat-lbl { font-size:10.5px;font-weight:700;color:var(--ph-muted);text-transform:uppercase;margin-top:4px; }
+.al-section-head {
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 20px 12px 32px;margin-top:14px;
+  font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;
+}
+.al-section-head.rupt { background:rgba(var(--rose-rgb),.07);color:var(--rose-text);border-top:1px solid rgba(var(--rose-rgb),.2);border-bottom:1px solid rgba(var(--rose-rgb),.2); }
+.al-section-head.ale  { background:rgba(var(--amber-rgb),.07);color:var(--amber-text);border-top:1px solid rgba(var(--amber-rgb),.2);border-bottom:1px solid rgba(var(--amber-rgb),.2); }
+.al-table-wrap {overflow-x:auto; }
+.al-table { width:100%;border-collapse:collapse;font-size:12.5px; }
+.al-table thead tr { background:var(--ph-100);border-bottom:2px solid var(--ph-300); }
+.al-table thead th { padding:8px 14px;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--ph-800);text-align:left;white-space:nowrap; }
+.al-table thead th:first-child { padding-left:12px; }
+.al-table thead th:last-child  { padding-right:12px; }
+.al-table tbody tr { border-bottom:1px solid var(--ph-border);transition:background .12s; }
+.al-table tbody tr:hover { background:var(--ph-50); }
+.al-table tbody td { padding:9px 14px;color:var(--ph-text);vertical-align:middle; }
+.al-table tbody td:first-child { padding-left:12px; }
+.al-table tbody td:last-child  { padding-right:12px; }
+.al-qte-input { border:none;border-bottom:1.5px solid rgba(0,0,0,.15);background:transparent;padding:4px;font-size:13px;text-align:center;width:80px;font-family:inherit;color:var(--ph-text); }
+.al-qte-input:focus { outline:none;border-bottom-color:var(--ph-500); }
+</style>{% endblock %}
+
+{% block content %}
+<form method="post" id="form-dotation" novalidate>
+{% csrf_token %}
+
+<!-- En-tête sticky -->
+<div class="ph-page-head">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <div style="width:34px;height:34px;border-radius:8px;background:rgba(var(--rose-rgb),.1);display:flex;align-items:center;justify-content:center;font-size:17px;color:var(--rose-text);">
+      <i class="bi bi-bell-fill"></i>
+    </div>
+    <div>
+      <div style="font-size:15px;font-weight:800;color:var(--ph-900);">Alertes réapprovisionnement — {{ label }}</div>
+      <div style="font-size:11px;color:var(--ph-muted);">Produits sous le seuil d'alerte</div>
+    </div>
+  </div>
+  {% if ruptures or alertes %}
+  <button type="submit" form="form-dotation" class="btn-ph">
+    <i class="bi bi-send"></i> Créer une demande de dotation
+  </button>
+  {% endif %}
+</div>
+
+<!-- Stats -->
+<div class="al-stats">
+  <div class="al-stat rupture">
+    <div class="al-stat-val" style="color:var(--rose-text);">{{ ruptures|length }}</div>
+    <div class="al-stat-lbl"><i class="bi bi-x-circle-fill"></i> Rupture{{ ruptures|length|pluralize }}</div>
+  </div>
+  <div class="al-stat alerte">
+    <div class="al-stat-val" style="color:var(--amber-text);">{{ alertes|length }}</div>
+    <div class="al-stat-lbl"><i class="bi bi-exclamation-triangle-fill"></i> Alerte{{ alertes|length|pluralize }} stock bas</div>
+  </div>
+</div>
+
+{% if not ruptures and not alertes %}
+<div style="text-align:center;padding:60px 0;color:var(--ph-muted);">
+  <i class="bi bi-shield-check" style="font-size:40px;display:block;margin-bottom:12px;color:var(--ph-600);"></i>
+  <div style="font-size:14px;font-weight:700;color:var(--ph-600);">Aucune alerte — stock nominal</div>
+  <div style="font-size:12px;margin-top:6px;">Tous les produits sont au-dessus de leur seuil d'alerte.</div>
+</div>
+
+{% else %}
+
+{% if ruptures %}
+<div class="al-section-head rupt">
+  <span><i class="bi bi-x-circle-fill"></i> Ruptures de stock — {{ ruptures|length }} produit{{ ruptures|length|pluralize }}</span>
+</div>
+<div class="al-table-wrap">
+  <table class="al-table">
+    <thead><tr>
+      <th>Code</th><th>Produit</th>
+      <th style="text-align:center;">Stock actuel</th>
+      <th style="text-align:center;">Qté à demander</th>
+      <th style="text-align:center;">Sélect.</th>
+    </tr></thead>
+    <tbody>
+    {% for sp in ruptures %}
+    <tr style="background:rgba(var(--rose-rgb),.03);">
+      <td><span style="font-family: var(--font-mono);font-size:11px;color:var(--ph-600);background:var(--ph-50);padding:2px 6px;border-radius:4px;border:1px solid var(--ph-200);">{{ sp.produit.code }}</span></td>
+      <td>
+        <div style="font-weight:600;">{{ sp.produit.nom }}</div>
+        {% if sp.produit.unite_mesure %}<div style="font-size:10.5px;color:var(--ph-muted);">{{ sp.produit.unite_mesure.nom }}</div>{% endif %}
+      </td>
+      <td style="text-align:center;"><span class="badge-ph-rupture">{{ sp.quantite|floatformat:0 }}</span></td>
+      <td style="text-align:center;">
+        <input type="number" name="qte_{{ sp.produit.pk }}" class="al-qte-input" min="1"
+          value="{{ sp.produit.qte_a_commander|floatformat:0|default:'10' }}">
+      </td>
+      <td style="text-align:center;">
+        <input type="checkbox" name="produits" value="{{ sp.produit.pk }}" checked
+          style="width:16px;height:16px;accent-color:var(--ph-600);cursor:pointer;">
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if alertes %}
+<div class="al-section-head ale" style="margin-top:{% if ruptures %}20px{% else %}14px{% endif %};">
+  <span><i class="bi bi-exclamation-triangle-fill"></i> Stock bas — {{ alertes|length }} produit{{ alertes|length|pluralize }}</span>
+</div>
+<div class="al-table-wrap">
+  <table class="al-table">
+    <thead><tr>
+      <th>Code</th><th>Produit</th>
+      <th style="text-align:center;">Stock actuel</th>
+      <th style="text-align:center;">Seuil alerte</th>
+      <th style="text-align:center;">Qté à demander</th>
+      <th style="text-align:center;">Sélect.</th>
+    </tr></thead>
+    <tbody>
+    {% for sp in alertes %}
+    <tr style="background:rgba(var(--amber-rgb),.03);">
+      <td><span style="font-family: var(--font-mono);font-size:11px;color:var(--ph-600);background:var(--ph-50);padding:2px 6px;border-radius:4px;border:1px solid var(--ph-200);">{{ sp.produit.code }}</span></td>
+      <td>
+        <div style="font-weight:600;">{{ sp.produit.nom }}</div>
+        {% if sp.produit.unite_mesure %}<div style="font-size:10.5px;color:var(--ph-muted);">{{ sp.produit.unite_mesure.nom }}</div>{% endif %}
+      </td>
+      <td style="text-align:center;"><span class="badge-ph-alerte">{{ sp.quantite|floatformat:0 }}</span></td>
+      <td style="text-align:center;font-size:12px;color:var(--ph-muted);">{{ sp.produit.stock_alerte }}</td>
+      <td style="text-align:center;">
+        <input type="number" name="qte_{{ sp.produit.pk }}" class="al-qte-input" min="1"
+          value="{{ sp.produit.qte_a_commander|floatformat:0|default:'10' }}">
+      </td>
+      <td style="text-align:center;">
+        <input type="checkbox" name="produits" value="{{ sp.produit.pk }}" checked
+          style="width:16px;height:16px;accent-color:var(--ph-600);cursor:pointer;">
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<!-- Notes + submit bas -->
+<div class="ph-card" style="max-width:600px;margin-top:20px;">
+  <div class="ph-card-header">
+    <div class="ph-card-title"><i class="bi bi-chat-text" style="color:var(--ph-600);"></i> Notes</div>
+  </div>
+  <div class="ph-card-body">
+    <textarea name="notes" class="ph-input"
+      style="resize:vertical;border:none;border-bottom:1.5px solid rgba(0,0,0,.15);width:100%;padding:8px 4px;font-size:13px;background:transparent;font-family:inherit;"
+      rows="3" placeholder="Informations utiles pour la demande de dotation…"></textarea>
+  </div>
+</div>
+<div style="display:flex;justify-content:flex-end;margin:14px 0 28px;">
+  <button type="submit" class="btn-ph"><i class="bi bi-send"></i> Créer une demande de dotation</button>
+</div>
+
+{% endif %}
+</form>
+{% endblock %}

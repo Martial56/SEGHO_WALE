@@ -1,0 +1,99 @@
+{% extends 'employer/base.html' %}
+{% block topbar_title %}{{ titre }}{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+
+<form method="post" id="service-form" novalidate>
+  {% csrf_token %}
+
+  <div class="action-bar">
+    <div class="action-bar-breadcrumb">
+      <a href="{% if obj %}{% url 'employer_service_detail' obj.pk %}{% else %}{% url 'employer_services' %}{% endif %}" class="btn-form-cancel" style="padding:3px 7px;">
+        <i class="bi bi-arrow-left"></i>
+      </a>
+      <a href="{% url 'employer_services' %}">Services</a>
+      {% if obj %}
+      <span class="sep">/</span>
+      <a href="{% url 'employer_service_detail' obj.pk %}">{{ obj.nom|truncatechars:30 }}</a>
+      {% endif %}
+      <span class="sep">/</span>
+      <span class="current">{% if obj %}Modifier{% else %}Nouveau service{% endif %}</span>
+    </div>
+    <div class="action-bar-buttons">
+      <a href="{% if obj %}{% url 'employer_service_detail' obj.pk %}{% else %}{% url 'employer_services' %}{% endif %}" class="btn-form-cancel">Ignorer</a>
+      <button type="submit" class="btn-form-submit">{% if obj %}Enregistrer{% else %}Créer{% endif %}</button>
+    </div>
+  </div>
+
+  <div class="form-simple-card">
+    <div class="tab-two-col">
+
+      <!-- Colonne gauche -->
+      <div>
+        <div class="form-field">
+          <label class="field-label" for="{{ form.nom.id_for_label }}">Nom <span class="required-star">*</span></label>
+          <input type="text" name="nom" id="{{ form.nom.id_for_label }}" class="field-ul"
+            value="{{ form.nom.value|default_if_none:'' }}" placeholder="Ex: Médecine interne" autocomplete="off">
+          {% if form.nom.errors %}<div class="field-error">{{ form.nom.errors.0 }}</div>{% endif %}
+        </div>
+
+        <div class="form-field">
+          <label class="field-label" for="{{ form.code.id_for_label }}">Code <span class="required-star">*</span></label>
+          <input type="text" name="code" id="{{ form.code.id_for_label }}" class="field-ul"
+            value="{{ form.code.value|default_if_none:'' }}" placeholder="Ex: MED-INT" autocomplete="off"
+            style="font-family: var(--font-mono);text-transform:uppercase;">
+          {% if form.code.errors %}<div class="field-error">{{ form.code.errors.0 }}</div>{% endif %}
+        </div>
+
+      </div>
+
+      <!-- Colonne droite -->
+      <div>
+        <div class="form-field">
+          <label class="field-label" for="{{ form.chef_service.id_for_label }}">Chef de service</label>
+          <select name="chef_service" id="{{ form.chef_service.id_for_label }}" class="field-ul">
+            <option value="">— Aucun chef de service —</option>
+            {% for med in form.chef_service.field.queryset %}
+            <option value="{{ med.pk }}" {% if form.chef_service.value|stringformat:"s" == med.pk|stringformat:"s" %}selected{% endif %}>Dr {{ med.nom }} {{ med.prenoms }}</option>
+            {% endfor %}
+          </select>
+          {% if form.chef_service.errors %}<div class="field-error">{{ form.chef_service.errors.0 }}</div>{% endif %}
+        </div>
+
+        <div class="form-field">
+          <span class="field-label">Statut</span>
+          <label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer;padding-top:7px;">
+            <input type="checkbox" name="actif" id="{{ form.actif.id_for_label }}" {% if form.actif.value %}checked{% endif %}>
+            <span id="actif-label" style="font-size:13px;color:var(--text-primary);">
+              {% if form.actif.value %}Service actif{% else %}Service inactif{% endif %}
+            </span>
+          </label>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="form-field">
+      <label class="field-label" for="{{ form.description.id_for_label }}">Description</label>
+      <textarea name="description" id="{{ form.description.id_for_label }}" class="field-ul"
+        rows="3" placeholder="Description optionnelle du service…">{{ form.description.value|default_if_none:'' }}</textarea>
+      {% if form.description.errors %}<div class="field-error">{{ form.description.errors.0 }}</div>{% endif %}
+    </div>
+  </div>
+
+</form>
+
+<script>
+(function(){
+  var chk = document.getElementById('{{ form.actif.id_for_label }}');
+  var lbl = document.getElementById('actif-label');
+  if (chk && lbl) {
+    chk.addEventListener('change', function(){
+      lbl.textContent = this.checked ? 'Service actif' : 'Service inactif';
+    });
+  }
+})();
+</script>
+
+{% endblock %}

@@ -1,0 +1,341 @@
+{% extends 'stock/base.html' %}
+{% load static %}
+{% block topbar_title %}Stock — {{ produit.nom }}{% endblock %}
+
+{% block extra_st_css %}<style>
+.st-page-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 32px; margin: 0 -32px;
+  background: #e8f2f7; border-bottom: 1px solid rgba(0,0,0,.05);
+  box-shadow: 0 2px 8px rgba(0,0,0,.04);
+  position: sticky; top: var(--topbar-h); z-index: 100;
+}
+.st-layout-2col {
+  display: grid; grid-template-columns: 1fr 1.4fr; gap: 16px; margin-top: 20px;
+}
+html[data-theme="dark"] .stat-box-alerte { background:rgba(var(--amber-rgb),.1)!important; }
+@media(max-width:900px){ .st-layout-2col{ grid-template-columns:1fr; } }
+.st-info-row {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 9px 0; border-bottom: 1px solid var(--st-border); font-size: 12.5px;
+}
+.st-info-row:last-child { border-bottom: none; }
+.st-info-label { color: var(--st-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .3px; }
+.st-info-val { font-weight: 600; color: var(--st-text); text-align: right; }
+.lot-perime { background: rgba(var(--rose-rgb),.06); }
+</style>{% endblock %}
+
+{% block content %}
+<div class="hist-wrapper"><div class="hist-main">
+
+<!-- En-tête sticky -->
+<div class="st-page-header">
+  <div style="display:flex;align-items:center;gap:14px;">
+    <a class="o-back-btn" href="javascript:history.back()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 5l-7 7 7 7"/></svg> Retour</a>
+    <div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:15px;font-weight:800;color:var(--st-900);">{{ produit.nom }}</span>
+        {% if produit.type == 'medicament' %}
+          <span class="badge-type-med"><i class="bi bi-capsule-pill"></i> Médicament</span>
+        {% elif produit.type == 'consommable' %}
+          <span class="badge-type-cons"><i class="bi bi-bandaid"></i> Consommable</span>
+        {% else %}
+          <span class="badge-type-eqp"><i class="bi bi-tools"></i> Équipement</span>
+        {% endif %}
+        {% if produit.en_rupture %}
+          <span class="badge-rupture"><i class="bi bi-exclamation-triangle-fill"></i> Rupture</span>
+        {% elif produit.en_alerte %}
+          <span class="badge-alerte"><i class="bi bi-bell-fill"></i> Alerte</span>
+        {% else %}
+          <span class="badge-ok"><i class="bi bi-check-circle-fill"></i> OK</span>
+        {% endif %}
+      </div>
+      <div style="font-size:11.5px;color:var(--st-muted);font-family: var(--font-mono);margin-top:2px;">
+        {{ produit.code }}
+      </div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <a href="{% url 'stock_mouvement_create' %}?produit={{ produit.pk }}" class="btn-st-outline">
+      <i class="bi bi-arrow-left-right"></i> Mouvement
+    </a>
+    <a href="{% url 'stock_produit_edit' produit.pk %}" class="btn-st">
+      <i class="bi bi-pencil"></i> Modifier
+    </a>
+  </div>
+</div>
+
+<!-- Layout 2 colonnes -->
+<div class="st-layout-2col">
+
+  <!-- Colonne gauche : infos + stats stock -->
+  <div>
+
+    <!-- Informations générales -->
+    <div class="st-card">
+      <div class="st-card-header">
+        <div class="st-card-title"><i class="bi bi-info-circle" style="color:var(--st-600);"></i> Informations</div>
+      </div>
+      <div class="st-card-body">
+        <div class="st-info-row">
+          <span class="st-info-label">Code</span>
+          <span class="st-info-val" style="font-family: var(--font-mono);color:var(--st-600);">{{ produit.code }}</span>
+        </div>
+        <div class="st-info-row">
+          <span class="st-info-label">Catégorie</span>
+          <span class="st-info-val">{{ produit.categorie.nom|default:"—" }}</span>
+        </div>
+        <div class="st-info-row">
+          <span class="st-info-label">Unité de mesure</span>
+          <span class="st-info-val">{{ produit.unite_mesure.nom }}</span>
+        </div>
+        {% if produit.type == 'medicament' %}
+        {% if produit.dci %}
+        <div class="st-info-row">
+          <span class="st-info-label">DCI / Principe actif</span>
+          <span class="st-info-val">{{ produit.dci }}</span>
+        </div>
+        {% endif %}
+        {% if produit.dosage %}
+        <div class="st-info-row">
+          <span class="st-info-label">Dosage</span>
+          <span class="st-info-val">{{ produit.dosage }}</span>
+        </div>
+        {% endif %}
+        {% if produit.forme %}
+        <div class="st-info-row">
+          <span class="st-info-label">Forme</span>
+          <span class="st-info-val">{{ produit.get_forme_display }}</span>
+        </div>
+        {% endif %}
+        <div class="st-info-row">
+          <span class="st-info-label">Prescription obligatoire</span>
+          <span class="st-info-val">
+            {% if produit.prescription_obligatoire %}
+              <span style="color:var(--rose-text);"><i class="bi bi-check-circle-fill"></i> Oui</span>
+            {% else %}
+              <span style="color:var(--st-muted);">Non</span>
+            {% endif %}
+          </span>
+        </div>
+        {% endif %}
+        <div class="st-info-row">
+          <span class="st-info-label">Fournisseur principal</span>
+          <span class="st-info-val">{{ produit.fournisseur_principal.nom|default:"—" }}</span>
+        </div>
+        {% if produit.description %}
+        <div style="margin-top:10px;font-size:12.5px;color:var(--st-muted);font-style:italic;">
+          {{ produit.description }}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Stats stock -->
+    <div class="st-card">
+      <div class="st-card-header">
+        <div class="st-card-title"><i class="bi bi-bar-chart-fill" style="color:var(--st-600);"></i> Niveaux de stock</div>
+      </div>
+      <div class="st-card-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;text-align:center;">
+          <div style="padding:12px;background:var(--st-50);border-radius:8px;border:1px solid var(--st-200);">
+            <div style="font-size:24px;font-weight:800;
+              {% if produit.en_rupture %}color:var(--rose-text);
+              {% elif produit.en_alerte %}color:var(--amber-text);
+              {% else %}color:var(--st-600);{% endif %}">
+              {{ produit.stock_actuel|floatformat:0 }}
+            </div>
+            <div style="font-size:10.5px;color:var(--st-muted);text-transform:uppercase;letter-spacing:.3px;margin-top:3px;">Stock actuel</div>
+          </div>
+          <div class="stat-box-alerte" style="padding:12px;background:#fff8e1;border-radius:8px;border:1px solid rgba(var(--amber-rgb),.2);">
+            <div style="font-size:24px;font-weight:800;color:var(--amber-text);">
+              {{ produit.stock_alerte|floatformat:0 }}
+            </div>
+            <div style="font-size:10.5px;color:var(--st-muted);text-transform:uppercase;letter-spacing:.3px;margin-top:3px;">Seuil alerte</div>
+          </div>
+          <div style="padding:12px;background:rgba(var(--rose-rgb),.05);border-radius:8px;border:1px solid rgba(var(--rose-rgb),.15);">
+            <div style="font-size:24px;font-weight:800;color:var(--rose-text);">
+              {{ produit.stock_minimum|floatformat:0 }}
+            </div>
+            <div style="font-size:10.5px;color:var(--st-muted);text-transform:uppercase;letter-spacing:.3px;margin-top:3px;">Stock minimum</div>
+          </div>
+        </div>
+        <div style="margin-top:16px;" class="st-info-row">
+          <span class="st-info-label">Prix d'achat</span>
+          <span class="st-info-val">{{ produit.prix_achat|floatformat:0 }} F</span>
+        </div>
+        <div class="st-info-row">
+          <span class="st-info-label">Prix de vente</span>
+          <span class="st-info-val" style="color:var(--st-600);">{{ produit.prix_vente|floatformat:0 }} F</span>
+        </div>
+        <div class="st-info-row">
+          <span class="st-info-label">Date de création</span>
+          <span class="st-info-val">{{ produit.date_creation|date:"d/m/Y" }}</span>
+        </div>
+        <div class="st-info-row">
+          <span class="st-info-label">Statut</span>
+          <span class="st-info-val">
+            {% if produit.actif %}
+              <span class="badge-ok">Actif</span>
+            {% else %}
+              <span class="badge-rupture">Inactif</span>
+            {% endif %}
+          </span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /colonne gauche -->
+
+  <!-- Colonne droite : lots + mouvements -->
+  <div>
+
+    <!-- Lots -->
+    <div class="st-card">
+      <div class="st-card-header">
+        <div class="st-card-title"><i class="bi bi-layers" style="color:var(--st-600);"></i> Lots en stock</div>
+        <span style="font-size:11.5px;color:var(--st-muted);">{{ lots|length }} lot{{ lots|length|pluralize }}</span>
+      </div>
+      {% if lots %}
+      <table class="st-table">
+        <thead>
+          <tr>
+            <th>N° Lot</th>
+            <th>Réception</th>
+            <th>Date péremption</th>
+            <th style="text-align:right;">Qté actuelle</th>
+            <th style="text-align:right;">Prix achat</th>
+            <th>État</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for lot in lots %}
+        <tr {% if lot.est_perime %}class="lot-perime"{% endif %}>
+          <td style="font-family: var(--font-mono);font-size:11.5px;font-weight:600;">{{ lot.numero_lot }}</td>
+          <td style="font-size:11.5px;color:var(--st-muted);">{{ lot.date_reception|date:"d/m/Y" }}</td>
+          <td style="font-size:12px;{% if lot.est_perime %}color:var(--rose-text);font-weight:700;{% elif lot.date_peremption %}color:var(--amber-text);{% endif %}">
+            {% if lot.date_peremption %}
+              {{ lot.date_peremption|date:"d/m/Y" }}
+              {% if lot.est_perime %}
+                <span style="font-size:10px;"> (périmé)</span>
+              {% else %}
+                {% with diff=lot.date_peremption|timeuntil %}
+                <span style="font-size:10px;color:var(--st-muted);">dans {{ diff }}</span>
+                {% endwith %}
+              {% endif %}
+            {% else %}
+              <span style="color:var(--st-muted);">—</span>
+            {% endif %}
+          </td>
+          <td style="text-align:right;font-weight:700;">
+            {{ lot.quantite_actuelle|floatformat:0 }}
+            <span style="font-size:10.5px;font-weight:400;color:var(--st-muted);">{{ produit.unite_mesure.nom }}</span>
+          </td>
+          <td style="text-align:right;font-size:12px;">
+            {% if lot.prix_achat_lot %}
+              <span style="font-weight:700;color:var(--st-700);">{{ lot.prix_achat_lot|floatformat:0 }}</span>
+              <span style="font-size:10px;color:var(--st-muted);"> F</span>
+            {% else %}
+              <span style="color:var(--st-muted);">—</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if lot.est_perime %}
+              <span class="badge-rupture"><i class="bi bi-calendar-x-fill"></i> Périmé</span>
+            {% elif lot.quantite_actuelle <= 0 %}
+              <span class="badge-rupture">Épuisé</span>
+            {% else %}
+              <span class="badge-ok"><i class="bi bi-check-circle-fill"></i> OK</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="st-card-body" style="text-align:center;padding:32px;color:var(--st-muted);font-style:italic;">
+        <i class="bi bi-inbox" style="font-size:20px;display:block;margin-bottom:6px;"></i>
+        Aucun lot enregistré
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Mouvements récents -->
+    <div class="st-card">
+      <div class="st-card-header">
+        <div class="st-card-title"><i class="bi bi-arrow-left-right" style="color:var(--st-600);"></i> Derniers mouvements</div>
+        <a href="{% url 'stock_mouvements' %}?produit={{ produit.pk }}" style="font-size:11.5px;color:var(--st-600);text-decoration:none;font-weight:600;">
+          Voir tout <i class="bi bi-arrow-right"></i>
+        </a>
+      </div>
+      {% if mouvements %}
+      <table class="st-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Type</th>
+            <th>Motif</th>
+            <th style="text-align:right;">Qté</th>
+            <th style="text-align:center;">Avant → Après</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for mv in mouvements %}
+        <tr>
+          <td style="font-size:11px;white-space:nowrap;color:var(--st-muted);">
+            {{ mv.date|date:"d/m/Y" }}<br>
+            <span style="font-size:10px;">{{ mv.date|time:"H:i" }}</span>
+          </td>
+          <td>
+            {% if mv.type == 'entree' %}
+              <span style="color:var(--st-600);font-size:11.5px;font-weight:700;">
+                <i class="bi bi-arrow-down-circle-fill"></i> Entrée
+              </span>
+            {% elif mv.type == 'sortie' %}
+              <span style="color:var(--rose-text);font-size:11.5px;font-weight:700;">
+                <i class="bi bi-arrow-up-circle-fill"></i> Sortie
+              </span>
+            {% elif mv.type == 'ajustement' %}
+              <span style="color:var(--amber-text);font-size:11.5px;font-weight:700;">
+                <i class="bi bi-sliders"></i> Ajust.
+              </span>
+            {% elif mv.type == 'peremption' %}
+              <span style="color:var(--rose-text);font-size:11.5px;font-weight:700;">
+                <i class="bi bi-calendar-x"></i> Péremption
+              </span>
+            {% else %}
+              <span style="color:var(--st-muted);font-size:11.5px;">{{ mv.get_type_display }}</span>
+            {% endif %}
+          </td>
+          <td style="font-size:11.5px;color:var(--st-muted);">
+            {{ mv.get_motif_display|default:"—" }}
+          </td>
+          <td style="text-align:right;font-weight:700;
+            {% if mv.type == 'entree' %}color:var(--st-600);{% elif mv.type == 'sortie' or mv.type == 'peremption' %}color:var(--rose-text);{% endif %}">
+            {% if mv.type == 'sortie' or mv.type == 'peremption' %}-{% else %}+{% endif %}{{ mv.quantite|floatformat:0 }}
+          </td>
+          <td style="text-align:center;font-size:11.5px;white-space:nowrap;color:var(--st-muted);">
+            {{ mv.stock_avant|floatformat:0 }}
+            <i class="bi bi-arrow-right" style="font-size:10px;"></i>
+            <span style="font-weight:700;color:var(--st-text);">{{ mv.stock_apres|floatformat:0 }}</span>
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="st-card-body" style="text-align:center;padding:32px;color:var(--st-muted);font-style:italic;">
+        <i class="bi bi-inbox" style="font-size:20px;display:block;margin-bottom:6px;"></i>
+        Aucun mouvement enregistré
+      </div>
+      {% endif %}
+    </div>
+
+  </div><!-- /colonne droite -->
+</div>
+
+</div>
+{% load core_tags %}
+{% historique_sidebar produit %}
+</div>
+{% endblock %}

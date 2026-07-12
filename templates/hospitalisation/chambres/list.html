@@ -1,0 +1,266 @@
+{% extends 'hospitalisation/base.html' %}
+{% load i18n %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+/* ── Layout ────────────────────────────────────── */
+.content    { padding: 0 !important; }
+.breadcrumb { display: none !important; }
+
+/* ── Subheader ────────────────────────────────── */
+.o-subheader { position: fixed; left: 0; right: 0; top: 0; z-index: 190; }
+.o-subheader-row-right { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+/* ── Dropdown ─────────────────────────────────── */
+.o-dd-wrap  { position: relative; }
+.o-dd-panel {
+  display: none; position: fixed; z-index: 9999;
+  background: #fff; border: 1px solid #dde3ec;
+  border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,.16);
+  min-width: 210px; padding: 5px 0;
+}
+.o-dd-panel.open  { display: block; }
+.o-dd-section     { padding: 7px 14px 4px; font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; }
+.o-dd-item {
+  display: flex; align-items: center; padding: 7px 14px;
+  font-size: 13px; color: var(--text); cursor: pointer;
+  text-decoration: none; transition: background .1s; white-space: nowrap;
+}
+.o-dd-item:hover  { background: rgba(20,87,112,.06); color: var(--primary); }
+.o-dd-item.active { background: rgba(20,87,112,.08); color: var(--primary); font-weight: 600; }
+.o-dd-sep         { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+html[data-theme="dark"] .o-dd-panel   { background: #1a2535; border-color: #2e3f58; }
+html[data-theme="dark"] .o-dd-item    { color: var(--text); }
+html[data-theme="dark"] .o-dd-item:hover  { background: rgba(var(--teal-500-rgb),.15); color: #7aaec7; }
+html[data-theme="dark"] .o-dd-item.active { background: rgba(var(--teal-500-rgb),.2);  color: #7aaec7; }
+
+/* ── Table ────────────────────────────────────── */
+.ch-table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--surface); }
+
+.ch-table thead th {
+  padding: 9px 14px; text-align: left;
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--text-muted); border-bottom: 1px solid var(--border);
+  background: var(--surface); white-space: nowrap;
+}
+.ch-table thead th.col-check { width: 36px; text-align: center; }
+.ch-table thead th.col-phone { text-align: center; }
+
+.ch-table tbody tr {
+  border-bottom: 1px solid var(--border);
+  cursor: pointer; transition: background .1s;
+}
+.ch-table tbody tr:hover  { background: #f0f7fb; }
+.ch-table tbody tr:last-child td { border-bottom: none; }
+.ch-table tbody td { padding: 10px 14px; color: var(--text); font-size: 13px; vertical-align: middle; }
+.ch-table tbody td.col-check { text-align: center; }
+.ch-table tbody td.col-phone { text-align: center; }
+
+.ch-check { width: 15px; height: 15px; cursor: pointer; accent-color: var(--accent); }
+
+.ch-nom   { font-weight: 600; color: var(--accent); }
+.ch-type  { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+.badge-dispo  { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; background: #d1fae5; color: #065f46; }
+.badge-occupe { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; background: #fee2e2; color: #b91c1c; }
+
+html[data-theme="dark"] .ch-table thead th   { background: var(--surface); border-bottom-color: var(--border); }
+html[data-theme="dark"] .ch-table tbody tr   { border-bottom-color: var(--border); }
+html[data-theme="dark"] .ch-table tbody tr:hover { background: rgba(255,255,255,.04); }
+html[data-theme="dark"] .ch-nom              { color: var(--teal-300,#4dd0e1); }
+html[data-theme="dark"] .badge-dispo  { background: rgba(6,95,70,.2);    color: #6ee7b7; }
+html[data-theme="dark"] .badge-occupe { background: rgba(185,28,28,.2);  color: #fca5a5; }
+
+/* ── Vide ─────────────────────────────────────── */
+.h-empty   { text-align: center; padding: 64px 20px; color: var(--text-muted); font-size: 13px; }
+.h-empty i { font-size: 42px; display: block; margin-bottom: 12px; opacity: .3; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="page-wrap">
+
+<!-- ══ SUBHEADER ══ -->
+<div class="o-subheader" data-fixed="1">
+
+  <!-- Ligne 1 : titre + search -->
+  <div class="o-subheader-row">
+    <span class="o-page-title">Salles &amp; Chambres <span class="o-page-count">{{ page_obj.paginator.count }}</span></span>
+    <div class="o-subheader-row-right">
+      <form method="get" id="search-form" style="display:flex;align-items:center;">
+        {% if type_chambre %}<input type="hidden" name="type"  value="{{ type_chambre }}">{% endif %}
+        {% if dispo       %}<input type="hidden" name="dispo" value="{{ dispo }}">{% endif %}
+        <div class="o-search-bar">
+          <input class="o-search-input" type="text" name="q"
+                 value="{{ q }}" placeholder="Rechercher une chambre…" id="search-q">
+          <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Ligne 2 : créer + filtres + pagination -->
+  <div class="o-subheader-row">
+    <a href="{% url 'hospitalisation:chambre_create' %}" class="o-btn-create">
+      <i class="bi bi-plus-lg"></i> Créer
+    </a>
+    <div class="o-subheader-row-right">
+
+      <!-- Tags filtres actifs -->
+      {% if q %}
+      <span class="o-filter-tag">
+        {{ q }}
+        <a href="?{% if type_chambre %}type={{ type_chambre }}&{% endif %}{% if dispo %}dispo={{ dispo }}{% endif %}" title="Supprimer">×</a>
+      </span>
+      {% endif %}
+      {% if type_chambre %}
+      <span class="o-filter-tag">
+        {% for val, label in types %}{% if val == type_chambre %}{{ label }}{% endif %}{% endfor %}
+        <a href="?{% if q %}q={{ q }}&{% endif %}{% if dispo %}dispo={{ dispo }}{% endif %}" title="Supprimer">×</a>
+      </span>
+      {% endif %}
+      {% if dispo %}
+      <span class="o-filter-tag">
+        {% if dispo == '1' %}Disponible{% else %}Occupée{% endif %}
+        <a href="?{% if q %}q={{ q }}&{% endif %}{% if type_chambre %}type={{ type_chambre }}{% endif %}" title="Supprimer">×</a>
+      </span>
+      {% endif %}
+
+      <!-- Filtres dropdown -->
+      <div class="o-dd-wrap">
+        <button class="o-ctrl-btn {% if type_chambre or dispo %}active{% endif %}"
+                onclick="toggleDd('dd-filtres', this)" id="btn-filtres">
+          <i class="bi bi-funnel{% if type_chambre or dispo %}-fill{% endif %}"></i>
+          Filtres{% if type_chambre or dispo %}&nbsp;<span style="background:var(--accent);color:#fff;border-radius:10px;font-size:10px;padding:0 5px;vertical-align:middle;">{% if type_chambre and dispo %}2{% else %}1{% endif %}</span>{% endif %}
+        </button>
+        <div class="o-dd-panel" id="dd-filtres">
+          <div class="o-dd-section">Disponibilité</div>
+          <a class="o-dd-item {% if dispo == '1' %}active{% endif %}"
+             href="?dispo=1{% if q %}&q={{ q }}{% endif %}{% if type_chambre %}&type={{ type_chambre }}{% endif %}">
+            <i class="bi bi-check-circle" style="font-size:11px;margin-right:6px;color:#065f46;"></i> Disponible
+          </a>
+          <a class="o-dd-item {% if dispo == '0' %}active{% endif %}"
+             href="?dispo=0{% if q %}&q={{ q }}{% endif %}{% if type_chambre %}&type={{ type_chambre }}{% endif %}">
+            <i class="bi bi-x-circle" style="font-size:11px;margin-right:6px;color:#b91c1c;"></i> Occupée
+          </a>
+          <div class="o-dd-section">Type de chambre</div>
+          {% for val, label in types %}
+          <a class="o-dd-item {% if type_chambre == val %}active{% endif %}"
+             href="?type={{ val }}{% if q %}&q={{ q }}{% endif %}{% if dispo %}&dispo={{ dispo }}{% endif %}">
+            {{ label }}
+          </a>
+          {% endfor %}
+          {% if type_chambre or dispo %}
+          <hr class="o-dd-sep">
+          <a class="o-dd-item" href="?{% if q %}q={{ q }}&{% endif %}" style="color:var(--rose-text);">
+            <i class="bi bi-x-circle" style="font-size:11px;margin-right:6px;"></i> Supprimer les filtres
+          </a>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="o-ctrl-sep"></div>
+
+      <!-- Pagination -->
+      <div class="o-pagination-top">
+        {% if page_obj.paginator.count > 0 %}
+        <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
+        {% else %}
+        <span>0</span>
+        {% endif %}
+        <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
+           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if type_chambre %}&type={{ type_chambre }}{% endif %}{% if dispo %}&dispo={{ dispo }}{% endif %}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-left"></i>
+        </a>
+        <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
+           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if type_chambre %}&type={{ type_chambre }}{% endif %}{% if dispo %}&dispo={{ dispo }}{% endif %}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-right"></i>
+        </a>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+<!-- ══ fin subheader ══ -->
+
+
+<!-- ══ TABLEAU ══ -->
+<div style="overflow-x:auto;">
+  <table class="ch-table" id="ch-table">
+    <thead>
+      <tr>
+        <th class="col-check">
+          <input type="checkbox" class="ch-check" id="chk-all" onchange="toggleAll(this)">
+        </th>
+        <th>Nom</th>
+        <th>Type</th>
+        <th>Genre</th>
+        <th class="col-phone">Téléphone</th>
+        <th>Statut</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for chambre in page_obj %}
+      <tr onclick="window.location='{% url 'hospitalisation:chambre_detail' chambre.id %}'">
+        <td class="col-check" onclick="event.stopPropagation()">
+          <input type="checkbox" class="ch-check row-check">
+        </td>
+        <td>
+          <div class="ch-nom">{{ chambre.nom|default:chambre.salle_no }}</div>
+        </td>
+        <td>{{ chambre.get_type_chambre_display }}</td>
+        <td>{{ chambre.get_genre_display }}</td>
+        <td class="col-phone" style="color:{% if chambre.telephone_chambre %}#1a6b3c{% else %}var(--text-muted){% endif %};">
+          <i class="bi bi-telephone{% if not chambre.telephone_chambre %}-x{% endif %}" style="font-size:14px;"></i>
+        </td>
+        <td>
+          {% if chambre.statut %}
+          <span class="badge-dispo"><i class="bi bi-circle-fill" style="font-size:7px;"></i> Disponible</span>
+          {% else %}
+          <span class="badge-occupe"><i class="bi bi-circle-fill" style="font-size:7px;"></i> Occupée</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="6">
+          <div class="h-empty">
+            <i class="bi bi-door-closed"></i>
+            Aucune chambre trouvée{% if q %} pour « {{ q }} »{% endif %}
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+</div><!-- /page-wrap -->
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+function toggleDd(id, btn) {
+  const panel = document.getElementById(id);
+  document.querySelectorAll('.o-dd-panel').forEach(p => { if (p.id !== id) p.classList.remove('open'); });
+  if (!panel) return;
+  const open = panel.classList.toggle('open');
+  if (open) {
+    const r = btn.getBoundingClientRect();
+    panel.style.top  = (r.bottom + window.scrollY + 4) + 'px';
+    panel.style.left = r.left + 'px';
+  }
+}
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.o-dd-wrap') && !e.target.closest('.o-dd-panel')) {
+    document.querySelectorAll('.o-dd-panel').forEach(p => p.classList.remove('open'));
+  }
+});
+function toggleAll(master) {
+  document.querySelectorAll('.row-check').forEach(c => c.checked = master.checked);
+}
+</script>
+{% endblock %}

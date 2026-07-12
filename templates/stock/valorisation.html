@@ -1,0 +1,249 @@
+{% extends 'stock/base.html' %}
+{% load static %}
+{% block topbar_title %}Stock — Valorisation{% endblock %}
+
+{% block extra_st_css %}<style>
+.content { padding-top: 0; }
+
+.st-page-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 32px; margin: 0 -32px;
+  background: #e8f2f7; border-bottom: 1px solid rgba(0,0,0,.05);
+  box-shadow: 0 2px 8px rgba(0,0,0,.04);
+  position: sticky; top: var(--topbar-h); z-index: 100;
+}
+html[data-theme="dark"] .st-page-header {
+  background: var(--st-100); border-bottom-color: var(--st-border);
+}
+
+/* Cartes stats grandes */
+.val-stat-grid {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px;
+  margin: 16px 0;
+}
+@media(max-width:1100px){ .val-stat-grid{ grid-template-columns:repeat(3,1fr); } }
+@media(max-width:700px){  .val-stat-grid{ grid-template-columns:1fr 1fr; } }
+.val-stat-card {
+  background: var(--st-surface); border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(var(--st-700-rgb),.08);
+  padding: 20px 22px;
+  border-left: 4px solid var(--st-400);
+}
+.val-stat-card.v-achat  { border-left-color: var(--st-600); }
+.val-stat-card.v-vente  { border-left-color: var(--st-600); }
+.val-stat-card.v-marge  { border-left-color: #2980b9; }
+.val-stat-label {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .5px; color: var(--st-muted); margin-bottom: 6px;
+}
+.val-stat-value {
+  font-size: 24px; font-weight: 800; line-height: 1.1; margin-bottom: 2px;
+}
+.val-stat-value.green  { color: var(--st-600); }
+.val-stat-value.forest { color: var(--st-700); }
+.val-stat-value.blue   { color: #2980b9; }
+.val-stat-sub { font-size: 11px; color: var(--st-muted); }
+
+/* Cartes par type */
+.val-type-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+  margin: 0 0 16px;
+}
+.val-type-card {
+  background: var(--st-surface); border-radius: 10px;
+  box-shadow: 0 1px 6px rgba(var(--st-700-rgb),.07);
+  padding: 14px 18px;
+  display: flex; align-items: center; gap: 14px;
+}
+.val-type-icon {
+  width: 40px; height: 40px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+}
+.icon-med  { background: rgba(var(--st-700-rgb),.1);  color: var(--st-700); }
+.icon-cons { background: rgba(45,153,219,.1); color: #1565c0; }
+.icon-eqp  { background: rgba(123,87,194,.1); color: #4527a0; }
+.val-type-info { min-width: 0; }
+.val-type-name { font-size: 12px; font-weight: 700; color: var(--st-text); margin-bottom: 3px; }
+.val-type-val  { font-size: 15px; font-weight: 800; color: var(--st-800); }
+.val-type-nb   { font-size: 10.5px; color: var(--st-muted); margin-top: 1px; }
+
+/* Colonne valeur en gras vert */
+.val-green { color: var(--st-600); font-weight: 700; }
+
+@media (max-width: 900px) {
+  .val-stat-grid, .val-type-grid { grid-template-columns: 1fr; }
+}
+</style>{% endblock %}
+
+{% block content %}
+
+<!-- En-tête sticky -->
+<div class="st-page-header">
+  <div>
+    <div style="font-size:15px;font-weight:800;color:var(--st-900);">
+      <i class="bi bi-graph-up-arrow" style="color:var(--st-600);"></i> Valorisation du stock
+    </div>
+    <div style="font-size:11.5px;color:var(--st-muted);">
+      Valeur financière de l'inventaire actuel
+    </div>
+  </div>
+  <div>
+    <a href="{% url 'stock_export_excel' %}" class="btn-st">
+      <i class="bi bi-file-earmark-excel"></i> Exporter Excel
+    </a>
+  </div>
+</div>
+
+<!-- 5 cartes sur une seule ligne -->
+<div class="val-stat-grid" style="margin-top:16px;">
+
+  <div class="val-stat-card v-achat">
+    <div class="val-stat-label"><i class="bi bi-wallet2"></i> Valeur totale</div>
+    <div class="val-stat-value green">{{ valeur_totale|floatformat:0 }}<span style="font-size:12px;font-weight:500;"> F</span></div>
+    <div class="val-stat-sub">Prix d'achat × stock actuel</div>
+  </div>
+
+  <div class="val-stat-card" style="border-left-color:var(--st-400);">
+    <div class="val-stat-label"><i class="bi bi-box-seam"></i> Références</div>
+    <div class="val-stat-value forest">{{ produits|length }}<span style="font-size:12px;font-weight:500;"> produits</span></div>
+    <div class="val-stat-sub">Stock disponible &gt; 0</div>
+  </div>
+
+  <div class="val-stat-card" style="border-left-color:var(--st-600);">
+    <div class="val-stat-label"><i class="bi bi-capsule-pill" style="color:var(--st-600);"></i> Médicaments</div>
+    <div class="val-stat-value forest">{{ par_type.medicament.valeur|default:0|floatformat:0 }}<span style="font-size:12px;font-weight:500;"> F</span></div>
+    <div class="val-stat-sub">{{ par_type.medicament.nb|default:0 }} référence{{ par_type.medicament.nb|default:0|pluralize }}</div>
+  </div>
+
+  <div class="val-stat-card" style="border-left-color:#1565c0;">
+    <div class="val-stat-label"><i class="bi bi-bandaid" style="color:#1565c0;"></i> Consommables</div>
+    <div class="val-stat-value" style="color:#1565c0;">{{ par_type.consommable.valeur|default:0|floatformat:0 }}<span style="font-size:12px;font-weight:500;"> F</span></div>
+    <div class="val-stat-sub">{{ par_type.consommable.nb|default:0 }} référence{{ par_type.consommable.nb|default:0|pluralize }}</div>
+  </div>
+
+  <div class="val-stat-card" style="border-left-color:#4527a0;">
+    <div class="val-stat-label"><i class="bi bi-tools" style="color:#4527a0;"></i> Équipements</div>
+    <div class="val-stat-value" style="color:#4527a0;">{{ par_type.equipement.valeur|default:0|floatformat:0 }}<span style="font-size:12px;font-weight:500;"> F</span></div>
+    <div class="val-stat-sub">{{ par_type.equipement.nb|default:0 }} référence{{ par_type.equipement.nb|default:0|pluralize }}</div>
+  </div>
+
+</div>
+
+<!-- Tableau produits (triés par valeur décroissante) -->
+<div style="margin-left:-32px;margin-right:-32px;background:var(--st-surface);box-shadow:0 2px 12px rgba(var(--st-700-rgb),.08);overflow:hidden;border-radius:0;">
+  <div class="st-card-header">
+    <div class="st-card-title">
+      <i class="bi bi-table"></i> Détail par produit
+      <span style="font-size:11px;font-weight:400;color:var(--st-muted);">
+        trié par valeur décroissante
+      </span>
+    </div>
+    <span style="font-size:11.5px;color:var(--st-muted);">
+      {{ produits|length }} produit{{ produits|length|pluralize }}
+    </span>
+  </div>
+  {% if produits %}
+  <table class="st-table">
+    <thead>
+      <tr>
+        <th>Code</th>
+        <th>Nom</th>
+        <th>Type</th>
+        <th style="text-align:right;">Stock actuel</th>
+        <th style="text-align:right;">Prix achat</th>
+        <th style="text-align:right;">Valeur stock</th>
+        <th style="text-align:right;">Prix vente</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for produit in produits %}
+    <tr>
+      <!-- Code -->
+      <td>
+        <span style="font-family: var(--font-mono);font-size:11px;color:var(--st-600);
+                     background:var(--st-50);padding:2px 6px;border-radius:4px;
+                     border:1px solid var(--st-200);">
+          {{ produit.code }}
+        </span>
+      </td>
+
+      <!-- Nom -->
+      <td>
+        <div style="font-weight:600;">{{ produit.nom }}</div>
+        {% if produit.dci %}
+          <div style="font-size:10.5px;color:var(--st-muted);">{{ produit.dci }}</div>
+        {% endif %}
+      </td>
+
+      <!-- Type -->
+      <td>
+        {% if produit.type == 'medicament' %}
+          <span class="badge-type-med"><i class="bi bi-capsule-pill"></i> Médicament</span>
+        {% elif produit.type == 'consommable' %}
+          <span class="badge-type-cons"><i class="bi bi-bandaid"></i> Consommable</span>
+        {% else %}
+          <span class="badge-type-eqp"><i class="bi bi-tools"></i> Équipement</span>
+        {% endif %}
+      </td>
+
+      <!-- Stock actuel -->
+      <td style="text-align:right;font-weight:600;">
+        {{ produit.stock_actuel|floatformat:0 }}
+        <span style="font-size:10px;font-weight:400;color:var(--st-muted);">{{ produit.unite_mesure.nom }}</span>
+      </td>
+
+      <!-- Prix achat -->
+      <td style="text-align:right;font-size:12.5px;">
+        {{ produit.prix_achat|floatformat:0 }}
+        <span style="font-size:10px;color:var(--st-muted);">F</span>
+      </td>
+
+      <!-- Valeur stock = stock × prix_achat (en gras vert) -->
+      <td style="text-align:right;">
+        <span class="val-green" style="font-size:13px;">
+          {% widthratio produit.stock_actuel 1 produit.prix_achat %}
+          <span style="font-size:10px;font-weight:400;color:var(--st-600);">F</span>
+        </span>
+      </td>
+
+      <!-- Prix vente -->
+      <td style="text-align:right;font-size:12.5px;">
+        {{ produit.prix_vente|floatformat:0 }}
+        <span style="font-size:10px;color:var(--st-muted);">F</span>
+      </td>
+    </tr>
+    {% empty %}
+    <tr>
+      <td colspan="7" style="text-align:center;padding:40px;color:var(--st-muted);font-style:italic;">
+        <i class="bi bi-inbox" style="font-size:24px;display:block;margin-bottom:8px;"></i>
+        Aucun produit en stock.
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="st-card-body" style="text-align:center;padding:48px;color:var(--st-muted);">
+    <i class="bi bi-inbox" style="font-size:26px;display:block;margin-bottom:10px;"></i>
+    Aucun produit enregistré dans le stock.
+  </div>
+  {% endif %}
+</div>
+
+
+{% if page_obj.has_other_pages %}
+<div style="display:flex;justify-content:center;align-items:center;gap:6px;padding:14px 0;">
+  {% if page_obj.has_previous %}
+  <a href="?page=1&" class="btn-st-outline" style="padding:4px 10px;font-size:12px;"><i class="bi bi-chevron-double-left"></i></a>
+  <a href="?page={{ page_obj.previous_page_number }}&" class="btn-st-outline" style="padding:4px 10px;font-size:12px;"><i class="bi bi-chevron-left"></i></a>
+  {% endif %}
+  <span style="font-size:12px;color:var(--st-muted);padding:0 8px;">Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} &nbsp;&middot;&nbsp; {{ page_obj.paginator.count }} enregistrement{{ page_obj.paginator.count|pluralize }}</span>
+  {% if page_obj.has_next %}
+  <a href="?page={{ page_obj.next_page_number }}&" class="btn-st-outline" style="padding:4px 10px;font-size:12px;"><i class="bi bi-chevron-right"></i></a>
+  <a href="?page={{ page_obj.paginator.num_pages }}&" class="btn-st-outline" style="padding:4px 10px;font-size:12px;"><i class="bi bi-chevron-double-right"></i></a>
+  {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}

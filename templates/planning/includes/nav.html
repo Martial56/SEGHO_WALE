@@ -1,0 +1,163 @@
+{% with uname=request.resolver_match.url_name %}
+<nav class="o-nav">
+  <a href="{% url 'dashboard' %}" class="o-nav-grid" title="Accueil">
+    <i class="bi bi-grid-3x3-gap-fill"></i>
+  </a>
+  <span class="o-nav-brand">
+    <i class="bi bi-calendar2-week-fill"></i>
+    Planning
+  </span>
+
+  <a href="{% url 'planning_courant' %}"
+     class="o-nav-link {% if uname == 'planning_courant' %}active{% endif %}">
+    Tableau de bord
+  </a>
+
+  <a href="{% url 'planning_list' %}"
+     class="o-nav-link {% if uname == 'planning_list' or uname == 'planning_detail' or uname == 'planning_modifier' or uname == 'planning_dupliquer' or uname == 'planning_publier' or uname == 'planning_supprimer' or uname == 'planning_export_excel' or 'gabarit' in uname %}active{% endif %}">
+    Liste
+  </a>
+
+  <a href="{% url 'planning_mensuel' %}"
+     class="o-nav-link {% if uname == 'planning_mensuel' %}active{% endif %}">
+    Mensuel
+  </a>
+
+  <a href="{% url 'planning_par_medecin' %}"
+     class="o-nav-link {% if uname == 'planning_par_medecin' %}active{% endif %}">
+    Par médecin
+  </a>
+
+  <a href="{% url 'planning_stats' %}"
+     class="o-nav-link {% if uname == 'planning_stats' %}active{% endif %}">
+    Statistiques
+  </a>
+
+  {% if pl_can_manage %}
+  <a href="{% url 'planning_bureaux' %}"
+     class="o-nav-link {% if uname == 'planning_bureaux' or 'bureau' in uname or 'plage' in uname %}active{% endif %}">
+    Bureaux
+  </a>
+  {% endif %}
+
+  <div style="flex:1;"></div>
+
+  {% if pl_notifs_count %}
+  <a href="{% url 'planning_list' %}" class="pl-notif-btn"
+     title="{{ pl_notifs_count }} planning{% if pl_notifs_count > 1 %}s publiés{% else %} publié{% endif %} non consulté{{ pl_notifs_count|pluralize }}">
+    <i class="bi bi-bell-fill"></i>
+    <span class="pl-notif-badge">{{ pl_notifs_count }}</span>
+  </a>
+  {% endif %}
+
+  {% if planning_alertes %}
+  <div class="pl-alerte-wrap" id="plAlerteWrap">
+    <button type="button" class="pl-alerte-btn" id="plAlerteBtn"
+            title="{{ planning_alertes|length }} semaine{{ planning_alertes|length|pluralize }} sans planning publié">
+      <i class="bi bi-exclamation-triangle-fill"></i>
+      <span class="pl-alerte-badge">{{ planning_alertes|length }}</span>
+    </button>
+    <div class="pl-alerte-popup" id="plAlertePopup">
+      <div class="pl-alerte-popup-head">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        Semaines sans planning publié
+      </div>
+      {% for a in planning_alertes %}
+      <div class="pl-alerte-popup-item">
+        <i class="bi bi-calendar-x"></i>
+        <span>{{ a.label }}</span>
+        <a href="{% url 'planning_nouveau' %}">Créer</a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</nav>
+
+<style>
+.pl-notif-btn {
+  background: none; border: none; cursor: pointer; text-decoration: none;
+  display: flex; align-items: center; justify-content: center;
+  height: 38px; padding: 0 8px; position: relative; color: var(--pl-600);
+  font-size: 15px; transition: color 0.15s;
+}
+.pl-notif-btn:hover { color: var(--pl-800); }
+.pl-notif-badge {
+  position: absolute; top: 5px; right: 1px;
+  background: var(--pl-600); color: #fff; border-radius: 10px;
+  font-size: 9px; font-weight: 700; min-width: 15px; height: 15px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 3px; line-height: 1;
+}
+html[data-theme="dark"] .pl-notif-btn { color: var(--pl-300); }
+
+.pl-alerte-wrap { display: flex; align-items: center; position: relative; padding: 0 2px; }
+.pl-alerte-btn {
+  background: none; border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  height: 38px; padding: 0 8px; position: relative; color: #f9a825;
+  font-size: 15px; transition: color 0.15s;
+}
+.pl-alerte-btn:hover { color: #e65100; }
+.pl-alerte-badge {
+  position: absolute; top: 5px; right: 1px;
+  background: #e65100; color: #fff; border-radius: 10px;
+  font-size: 9px; font-weight: 700; min-width: 15px; height: 15px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 3px; line-height: 1;
+}
+html[data-theme="dark"] .pl-alerte-btn { color: #ffd180; }
+html[data-theme="dark"] .pl-alerte-btn:hover { color: #ffab40; }
+.pl-alerte-popup {
+  display: none; position: fixed;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 9px; box-shadow: 0 8px 28px rgba(0,0,0,0.14);
+  min-width: 290px; z-index: 9001; overflow: hidden;
+}
+.pl-alerte-popup.open { display: block; }
+.pl-alerte-popup-head {
+  padding: 10px 14px 8px; font-size: 11px; font-weight: 700;
+  color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 7px;
+}
+.pl-alerte-popup-head i { color: #f9a825; font-size: 13px; }
+.pl-alerte-popup-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; font-size: 12.5px; color: var(--text);
+  border-bottom: 1px solid var(--border);
+}
+.pl-alerte-popup-item:last-child { border-bottom: none; }
+.pl-alerte-popup-item i { color: #f9a825; flex-shrink: 0; font-size: 14px; }
+.pl-alerte-popup-item span { flex: 1; line-height: 1.35; }
+.pl-alerte-popup-item a {
+  color: var(--pl-600); font-size: 11.5px; font-weight: 600;
+  text-decoration: none; padding: 3px 9px; border-radius: 4px;
+  border: 1px solid var(--pl-300); white-space: nowrap;
+  transition: background .12s;
+}
+.pl-alerte-popup-item a:hover { background: var(--pl-50); }
+</style>
+<script>
+(function () {
+  var wrap  = document.getElementById('plAlerteWrap');
+  var btn   = document.getElementById('plAlerteBtn');
+  var popup = document.getElementById('plAlertePopup');
+  if (!btn || !popup) return;
+  document.body.appendChild(popup);
+  btn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    if (popup.classList.contains('open')) {
+      popup.classList.remove('open');
+    } else {
+      var r = btn.getBoundingClientRect();
+      popup.style.top = (r.bottom + 4) + 'px';
+      popup.style.right = (window.innerWidth - r.right) + 'px';
+      popup.classList.add('open');
+    }
+  });
+  document.addEventListener('click', function (e) {
+    if (!wrap.contains(e.target) && !popup.contains(e.target)) popup.classList.remove('open');
+  });
+})();
+</script>
+{% endwith %}

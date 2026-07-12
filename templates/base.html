@@ -1,11 +1,15 @@
-{% load static %}
+﻿{% load static django_browser_reload %}
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}SEGHO-WALE{% endblock %}</title>
+    <link rel="icon" href="{% static 'img/logo.png' %}" type="image/png">
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=Lora:ital,wght@0,600;1,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/variables.css' %}">
+    <link rel="stylesheet" href="{% static 'css/global.css' %}">
+    <link rel="stylesheet" href="{% static 'css/form-ul.css' %}">
     <script>
       if (localStorage.getItem('segho-theme') === 'dark') {
         document.documentElement.setAttribute('data-theme', 'dark');
@@ -17,52 +21,86 @@
         ═══════════════════════════════════════ */
         *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
         :root {
-            --teal-950: #071e28; --teal-900: #0d3040; --teal-800: #0f4358;
-            --teal-700: #145770; --teal-600: #1a6d8c; --teal-500: #2188ab;
-            --teal-400: #34a8cc; --teal-300: #6ecae3; --teal-200: #aae1f2;
-            --teal-100: #d6f3fb; --teal-50: #eef9fd;
-            --green: #16a96b; --amber: #e89a1a; --rose: #e84545;
+            /* Couleur d'accent par défaut = couleur du logo (vert sauge).
+               Surchargée ci-dessous si l'utilisateur a choisi sa propre couleur
+               (voir core.context_processors.user_profile → accent_css). */
+            --teal-950: #0c180c; --teal-900: #132612; --teal-800: #1c371b;
+            --teal-700: #2e592b; --teal-600: #4f9b4b; --teal-500: #4a9046;
+            --teal-400: #65b261; --teal-300: #94ca91; --teal-200: #bcdeba;
+            --teal-100: #deeedd; --teal-50:  #f0f8f0;
+            /* Variantes "R,G,B" pour les rgba(var(--teal-600-rgb), .1) dans les modules */
+            --teal-950-rgb: 12,24,12; --teal-900-rgb: 19,38,18; --teal-800-rgb: 28,55,27;
+            --teal-700-rgb: 46,89,43; --teal-600-rgb: 79,155,75; --teal-500-rgb: 74,144,70;
+            --teal-400-rgb: 101,178,97; --teal-300-rgb: 148,202,145; --teal-200-rgb: 188,222,186;
+            --teal-100-rgb: 222,238,221; --teal-50-rgb: 240,248,240;
+            --green: #4a9046; --amber: #e89a1a; --rose: #e84545;
+            --green-rgb: 74,144,70; --amber-rgb: 232,154,26; --rose-rgb: 232,69,69;
+            /* Nuances lisibles en texte sur fond teinté (contraste WCAG) */
+            --amber-text: #8a5c00; --rose-text: #b71c1c;
+            --rose-btn: #c0392b; --rose-deep: #6b1f1f; --amber-deep: #6b4a0f;
             --violet: #7b57c2; --coral: #e66144; --sky: #2d99db;
             --radius: 16px;
             --shadow-sm: 0 2px 8px rgba(0,0,0,0.08);
             --shadow-md: 0 4px 16px rgba(0,0,0,0.1);
             --shadow-lg: 0 8px 32px rgba(0,0,0,0.15);
+            --topbar-h: 62px;
+            --header-h: 101px;
         }
-        html { font-size: 16px; }
+        {% if accent_css %}:root { {{ accent_css|safe }} }{% endif %}
+        html { font-size: 16px; min-height: 100vh; background: #f8f9fb; }
         body {
-            font-family: 'Sora', sans-serif;
-            background: #f0f6fa;
+            margin: 0;
+            font-family: var(--font-main);
+            background: transparent;
             color: var(--teal-900);
-            min-height: 100vh;
             display: flex;
             flex-direction: column;
         }
-        input, select, textarea, button { font-family: 'Sora', sans-serif; }
+        input, select, textarea, button { font-family: var(--font-main); }
 
         /* ═══════════════════════════════════════
            TOPBAR / HEADER
         ═══════════════════════════════════════ */
         .topbar {
             display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 14px 36px;
+            flex-direction: column;
+            align-items: stretch;
+            padding: 0;
             background: #ffffff;
             border-bottom: 1px solid rgba(0,0,0,0.07);
-            position: sticky; top: 0; z-index: 100;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+            box-shadow: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 500;
         }
+        .topbar-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 28px;
+            height: 62px;
+            flex-shrink: 0;
+            border-bottom: 1px solid rgba(0,0,0,0.07);
+        }
+        .topbar .o-nav {
+            margin: 0;
+            position: static;
+            border-bottom: none;
+        }
+        body { padding-top: var(--header-h); }
 
-        .brand { display: flex; align-items: center; gap: 14px; text-decoration: none; }
+        .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
         .brand-logo {
-            width: 64px; height: 64px; flex-shrink: 0;
+            width: 42px; height: 42px; flex-shrink: 0;
             display: flex; align-items: center; justify-content: center;
         }
         .brand-logo img { width: 100%; height: 100%; object-fit: contain; }
         .brand-text h1 {
-            font-size: 17px; font-weight: 800; letter-spacing: -0.3px; color: var(--teal-900);
+            font-size: 15px; font-weight: 800; letter-spacing: -0.3px; color: var(--teal-900);
         }
-        .brand-text p { font-size: 11px; color: rgba(0,0,0,0.45); margin-top: 1px; }
+        .brand-text p { font-size: 10px; color: rgba(0,0,0,0.45); margin-top: 1px; }
 
         .topbar-right { display: flex; align-items: center; gap: 20px; }
 
@@ -85,8 +123,8 @@
             display: flex; align-items: center; justify-content: center;
             font-size: 9px; font-weight: 800; color: #fff; flex-shrink: 0;
         }
-        .dot-rose  { background: #e84545; }
-        .dot-amber { background: #e89a1a; }
+        .dot-rose  { background: var(--rose); }
+        .dot-amber { background: var(--amber); }
         .dot-teal  { background: #2d99db; }
 
         /* Icon buttons */
@@ -96,11 +134,11 @@
             display: flex; align-items: center; justify-content: center;
             cursor: pointer; transition: all 0.15s; position: relative; flex-shrink: 0;
         }
-        .icon-btn:hover { background: rgba(33,136,171,0.08); color: var(--teal-700); }
+        .icon-btn:hover { background: rgba(var(--teal-600-rgb),0.08); color: var(--teal-700); }
         .icon-btn .notif-dot {
             position: absolute; top: 6px; right: 6px;
             width: 7px; height: 7px; border-radius: 50%;
-            background: #e84545; border: 2px solid #fff; pointer-events: none;
+            background: var(--rose); border: 2px solid #fff; pointer-events: none;
         }
 
         /* Theme toggle */
@@ -119,9 +157,32 @@
         /* User chip */
         .user-chip {
             display: flex; align-items: center; gap: 10px;
-            background: #f7fcff; border: 1px solid rgba(33,136,171,0.12);
-            border-radius: 30px; padding: 6px 14px 6px 7px;
+            background: #f0f5fa; border: 1px solid rgba(var(--teal-600-rgb),0.12);
+            border-radius: 30px; padding: 5px 12px 5px 6px;
+            cursor: pointer; font-family: inherit;
+            transition: background .15s, border-color .15s;
         }
+        .user-chip:hover { background: #e2eef5; border-color: rgba(var(--teal-600-rgb),0.25); }
+        .user-dropdown {
+            display: none; position: fixed; z-index: 9000;
+            background: #fff; border: 1px solid rgba(0,0,0,.1);
+            border-radius: 12px; box-shadow: 0 8px 28px rgba(0,0,0,.14);
+            min-width: 200px; overflow: hidden;
+        }
+        html[data-theme="dark"] .user-dropdown { background: #111C2E; border-color: rgba(33,150,243,.2); }
+        .user-dropdown a, .user-dropdown button.udrop-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 11px 16px; font-size: 13px; font-weight: 500;
+            color: var(--teal-900); text-decoration: none;
+            width: 100%; background: none; border: none; font-family: inherit;
+            cursor: pointer; text-align: left; transition: background .12s;
+        }
+        html[data-theme="dark"] .user-dropdown a,
+        html[data-theme="dark"] .user-dropdown button.udrop-item { color: #F1F5F9; }
+        .user-dropdown a:hover, .user-dropdown button.udrop-item:hover { background: rgba(var(--teal-600-rgb),.07); }
+        .udrop-sep { height: 1px; background: rgba(0,0,0,.07); margin: 4px 0; }
+        html[data-theme="dark"] .udrop-sep { background: rgba(33,150,243,.12); }
+        .udrop-logout { color: var(--rose-text) !important; }
         .user-avatar {
             width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
             background: linear-gradient(135deg, var(--teal-600), var(--teal-400));
@@ -133,18 +194,17 @@
 
         /* Logout button */
         .btn-logout {
-            background: rgba(33,136,171,0.08); border: none; border-radius: 10px;
-            color: var(--teal-800); width: 36px; height: 36px; padding: 0;
+            background: rgba(var(--teal-600-rgb),0.08); border: none; border-radius: 10px;
+            color: var(--teal-800); width: 34px; height: 34px; padding: 0;
             cursor: pointer; transition: all 0.15s;
             display: flex; align-items: center; justify-content: center; flex-shrink: 0;
         }
-        .btn-logout:hover { background: rgba(232,69,69,0.1); color: #c0392b; }
+        .btn-logout:hover { background: rgba(var(--rose-rgb),0.1); color: var(--rose-btn); }
 
-        /* ═══════════════════════════════════════
-           MAIN CONTENT
-        ═══════════════════════════════════════ */
-        .main { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-        .content { flex: 1; padding: 32px; overflow-y: auto; }
+        .content {
+            flex: 1;
+            padding: 0 32px 32px;
+        }
 
         /* ═══════════════════════════════════════
            BREADCRUMB
@@ -159,9 +219,16 @@
             padding: 3px 6px; border-radius: 5px;
             transition: background .15s, color .15s;
         }
-        .breadcrumb a:hover { background: rgba(33,136,171,.08); color: var(--teal-600); }
+        .breadcrumb a:hover {
+            background: rgba(var(--teal-600-rgb),.08);
+            color: var(--teal-600);
+        }
         .breadcrumb span { color: rgba(0,0,0,0.4); }
         .breadcrumb-sep { color: rgba(0,0,0,0.25); font-size: 15px; line-height: 1; }
+        html[data-theme="dark"] .breadcrumb a { color: var(--teal-300); }
+        html[data-theme="dark"] .breadcrumb a:hover { background: rgba(33,150,243,0.15); color: var(--teal-200); }
+        html[data-theme="dark"] .breadcrumb span,
+        html[data-theme="dark"] .breadcrumb-sep { color: #64748B; }
 
         /* ═══════════════════════════════════════
            PAGE HEADER
@@ -207,7 +274,9 @@
         /* ═══════════════════════════════════════
            TABLES
         ═══════════════════════════════════════ */
-        .table-container { background: #fff; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-sm); }
+        /* Tables pleine largeur — pas d'espace gauche/droite */
+        .table-container { background: #fff; border-radius: 0; overflow-x: auto; overflow-y: hidden; box-shadow: var(--shadow-sm); margin: 0 -32px; -webkit-overflow-scrolling: touch; }
+        .o-list-wrap { margin: 0 -32px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
         table { width: 100%; border-collapse: collapse; }
         thead { background: rgba(0,0,0,0.03); border-bottom: 2px solid rgba(0,0,0,0.08); }
         th { padding: 14px 20px; text-align: left; font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--teal-900); letter-spacing: 0.3px; }
@@ -215,13 +284,93 @@
         tbody tr:hover { background: rgba(0,0,0,0.02); }
 
         /* ═══════════════════════════════════════
-           ALERTS
+           ALERTS (kept for any inline usage)
         ═══════════════════════════════════════ */
         .alert { padding: 14px 18px; border-radius: 10px; font-size: 14px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; }
-        .alert-success { background: rgba(22,169,107,0.1);  color: #0d5b3d; border-left: 4px solid var(--green); }
-        .alert-error   { background: rgba(232,69,69,0.1);   color: #6b1f1f; border-left: 4px solid var(--rose); }
-        .alert-warning { background: rgba(232,154,26,0.1);  color: #6b4a0f; border-left: 4px solid var(--amber); }
+        .alert-success { background: rgba(var(--teal-600-rgb),0.1);  color: var(--teal-700); border-left: 4px solid var(--green); }
+        .alert-error   { background: rgba(var(--rose-rgb),0.1);   color: var(--rose-deep); border-left: 4px solid var(--rose); }
+        .alert-warning { background: rgba(var(--amber-rgb),0.1);  color: var(--amber-deep); border-left: 4px solid var(--amber); }
         .alert-info    { background: rgba(45,153,219,0.1);  color: #1a4d6d; border-left: 4px solid var(--sky); }
+
+        /* ═══════════════════════════════════════
+           TOASTS
+        ═══════════════════════════════════════ */
+        #toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+        }
+        .toast {
+            pointer-events: all;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            min-width: 300px;
+            max-width: 420px;
+            padding: 14px 16px;
+            border-radius: 10px;
+            background: #fff;
+            box-shadow: 0 6px 24px rgba(0,0,0,0.14);
+            border-left: 4px solid #ccc;
+            font-size: 13.5px;
+            opacity: 1;
+            transform: translateX(0);
+            transition: opacity 0.35s ease, transform 0.35s ease;
+            overflow: hidden;
+            position: relative;
+        }
+        .toast.toast-hide {
+            opacity: 0;
+            transform: translateX(30px);
+        }
+        .toast-success { border-left-color: var(--green); }
+        .toast-error   { border-left-color: var(--rose); }
+        .toast-warning { border-left-color: var(--amber); }
+        .toast-info    { border-left-color: var(--sky); }
+        .toast-icon {
+            font-size: 18px;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+        .toast-success .toast-icon { color: var(--green); }
+        .toast-error   .toast-icon { color: var(--rose); }
+        .toast-warning .toast-icon { color: var(--amber); }
+        .toast-info    .toast-icon { color: var(--sky); }
+        .toast-body { flex: 1; color: var(--teal-900); line-height: 1.45; }
+        .toast-close {
+            background: none; border: none; cursor: pointer;
+            color: #999; font-size: 16px; padding: 0; line-height: 1;
+            flex-shrink: 0; margin-top: 1px;
+        }
+        .toast-close:hover { color: var(--teal-900); }
+        .toast-progress {
+            position: absolute;
+            bottom: 0; left: 0;
+            height: 3px;
+            width: 100%;
+            transform-origin: left;
+            animation: toast-shrink 4s linear forwards;
+        }
+        .toast-success .toast-progress { background: var(--green); }
+        .toast-error   .toast-progress { background: var(--rose); }
+        .toast-warning .toast-progress { background: var(--amber); }
+        .toast-info    .toast-progress { background: var(--sky); }
+        @keyframes toast-shrink {
+            from { transform: scaleX(1); }
+            to   { transform: scaleX(0); }
+        }
+        html[data-theme="dark"] .toast {
+            background: #111C2E;
+            box-shadow: 0 6px 24px rgba(0,0,0,0.4);
+        }
+        html[data-theme="dark"] .toast-body { color: #F1F5F9; }
+        html[data-theme="dark"] .toast-close { color: #666; }
+        html[data-theme="dark"] .toast-close:hover { color: #daeaf5; }
 
         /* ═══════════════════════════════════════
            FORMS
@@ -230,27 +379,104 @@
         .form-group label { display: block; font-size: 13px; font-weight: 600; color: var(--teal-900); margin-bottom: 8px; }
         .form-group input,
         .form-group textarea,
-        .form-group select { width: 100%; padding: 10px 14px; border: 1px solid rgba(0,0,0,0.12); border-radius: 8px; font-family: 'Sora', sans-serif; font-size: 14px; transition: border-color 0.2s; }
+        .form-group select {
+            width: 100%;
+            padding: 10px 4px;
+            border: none;
+            border-bottom: 1.5px solid rgba(0,0,0,0.18);
+            border-radius: 0;
+            background: transparent;
+            font-family: var(--font-main);
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
         .form-group input:focus,
         .form-group textarea:focus,
-        .form-group select:focus { outline: none; border-color: var(--teal-500); box-shadow: 0 0 0 3px rgba(33,136,171,0.1); }
+        .form-group select:focus {
+            outline: none;
+            border-bottom-color: var(--teal-500);
+            box-shadow: none;
+        }
 
         /* ═══════════════════════════════════════
-           BADGES & TAGS
+           HISTORIQUE UTILISATEUR SIDEBAR
         ═══════════════════════════════════════ */
-        .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.2px; }
-        .badge-primary { background: rgba(33,136,171,0.15); color: var(--teal-600); }
-        .badge-success { background: rgba(22,169,107,0.15); color: var(--green); }
-        .badge-warning { background: rgba(232,154,26,0.15); color: var(--amber); }
-        .badge-danger  { background: rgba(232,69,69,0.15);  color: var(--rose); }
+        .hist-wrapper { display: flex; align-items: flex-start; gap: 0; }
+        .hist-main { flex: 1; min-width: 0; }
+        .hist-aside {
+            width: 280px;
+            flex-shrink: 0;
+            margin-left: 14px;
+            position: sticky;
+            top: 70px;
+            max-height: calc(100vh - 90px);
+            overflow-y: auto;
+        }
+        .hist-panel {
+            background: #fff;
+            border: 1px solid rgba(0,0,0,0.08);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .hist-panel-head {
+            padding: 10px 14px;
+            font-size: 11px;
+            font-weight: 600;
+            color: rgba(0,0,0,0.45);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #f3f3f3;
+        }
+        .hist-list { max-height: 70vh; overflow-y: auto; }
+        .hist-item {
+            display: flex;
+            gap: 10px;
+            padding: 10px 14px;
+            border-bottom: 1px solid #f9f9f9;
+        }
+        .hist-item:last-child { border-bottom: none; }
+        .hist-avatar {
+            width: 30px; height: 30px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0;
+            background: var(--teal-600);
+        }
+        .hist-avatar.hist-av-statut  { background: #1565c0; }
+        .hist-avatar.hist-av-modif   { background: #f57c00; }
+        .hist-avatar.hist-av-system  { background: #546e7a; }
+        .hist-avatar.hist-av-note    { background: var(--teal-600); }
+        .hist-body { flex: 1; min-width: 0; }
+        .hist-who { font-size: 12px; font-weight: 600; color: var(--teal-900,#004d40); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .hist-time { font-size: 11px; color: rgba(0,0,0,0.38); margin-top: 1px; }
+        .hist-msg  { font-size: 11.5px; color: rgba(0,0,0,0.55); margin-top: 3px; line-height: 1.4; }
+        .hist-empty {
+            padding: 18px 14px;
+            font-size: 12px;
+            color: rgba(0,0,0,0.32);
+            font-style: italic;
+            text-align: center;
+        }
+        html[data-theme="dark"] .hist-panel { background: var(--surface,#1a2535); border-color: rgba(255,255,255,0.08); }
+        html[data-theme="dark"] .hist-panel-head { border-color: rgba(255,255,255,0.06); color: rgba(255,255,255,0.4); }
+        html[data-theme="dark"] .hist-item { border-color: rgba(255,255,255,0.04); }
+        html[data-theme="dark"] .hist-who { color: #e0f2f1; }
+        html[data-theme="dark"] .hist-msg { color: rgba(255,255,255,0.55); }
+        @media (max-width: 1100px) {
+            .hist-aside { width: 240px; }
+        }
+        @media (max-width: 900px) {
+            .hist-wrapper { flex-direction: column; }
+            .hist-aside { width: 100%; margin-left: 0; margin-top: 14px; position: static; max-height: none; }
+        }
 
         /* ═══════════════════════════════════════
            RESPONSIVE
         ═══════════════════════════════════════ */
         @media (max-width: 1024px) {
-            .content { padding: 20px; }
+            .content { padding: 0 20px 20px; }
+            .table-container, .o-list-wrap { margin: 0 -20px; }
             .page-header { flex-direction: column; }
-            .topbar { padding: 12px 20px; }
+            .topbar-inner { padding: 6px 16px; }
         }
         @media (max-width: 768px) {
             .grid { grid-template-columns: 1fr; }
@@ -262,242 +488,802 @@
         /* ═══════════════════════════════════════
            DARK THEME
         ═══════════════════════════════════════ */
-        html[data-theme="dark"] body { background: #071e28; color: #cce8f4; }
-        html[data-theme="dark"] .topbar { background: #091d2e; border-bottom-color: rgba(255,255,255,0.06); box-shadow: 0 2px 12px rgba(0,0,0,0.4); }
-        html[data-theme="dark"] .brand-text h1 { color: #cce8f4; }
-        html[data-theme="dark"] .brand-text p  { color: rgba(255,255,255,0.35); }
-        html[data-theme="dark"] .top-alert-badge { background: #0d2035; border-color: rgba(255,255,255,0.08); color: var(--teal-300); }
-        html[data-theme="dark"] .icon-btn { color: #4a7a90; }
-        html[data-theme="dark"] .icon-btn:hover { background: rgba(33,136,171,0.12); color: #cce8f4; }
-        html[data-theme="dark"] .icon-btn .notif-dot { border-color: #091d2e; }
-        html[data-theme="dark"] .top-clock { color: rgba(255,255,255,0.35); }
-        html[data-theme="dark"] .top-clock .time { color: var(--teal-300); }
-        html[data-theme="dark"] .user-chip { background: rgba(33,136,171,0.12); border-color: rgba(33,136,171,0.2); }
-        html[data-theme="dark"] .user-info .uname { color: #cce8f4; }
-        html[data-theme="dark"] .user-info .urole { color: rgba(255,255,255,0.35); }
-        html[data-theme="dark"] .btn-logout { background: rgba(33,136,171,0.12); color: #7aaec7; }
-        html[data-theme="dark"] .btn-logout:hover { background: rgba(232,69,69,0.15); color: #e87070; }
-        html[data-theme="dark"] .breadcrumb a   { color: var(--teal-300); }
-        html[data-theme="dark"] .breadcrumb a:hover { background: rgba(33,136,171,.15); color: var(--teal-200); }
-        html[data-theme="dark"] .breadcrumb span,
-        html[data-theme="dark"] .breadcrumb-sep { color: rgba(255,255,255,0.3); }
-        html[data-theme="dark"] .page-header-left h1 { color: #cce8f4; }
-        html[data-theme="dark"] .page-header-left p  { color: rgba(255,255,255,0.4); }
-        html[data-theme="dark"] .table-container { background: #0d2035; }
-        html[data-theme="dark"] thead  { background: rgba(255,255,255,0.03); border-bottom-color: rgba(255,255,255,0.08); }
-        html[data-theme="dark"] th     { color: #7aaec7; }
-        html[data-theme="dark"] td     { border-bottom-color: rgba(255,255,255,0.04); color: #b8dff0; }
-        html[data-theme="dark"] tbody tr:hover { background: rgba(33,136,171,0.06); }
-        html[data-theme="dark"] .card  { background: #0d2035; }
-        html[data-theme="dark"] .card-title { color: #cce8f4; }
-        html[data-theme="dark"] .card-meta  { color: rgba(255,255,255,0.4); }
-        html[data-theme="dark"] .btn-secondary { background: rgba(255,255,255,0.08); color: #cce8f4; }
-        html[data-theme="dark"] .btn-secondary:hover { background: rgba(255,255,255,0.12); }
-        html[data-theme="dark"] .alert-success { background: rgba(22,169,107,0.12); color: #6eddb0; }
-        html[data-theme="dark"] .alert-error   { background: rgba(232,69,69,0.12);  color: #f09090; }
-        html[data-theme="dark"] .alert-warning { background: rgba(232,154,26,0.12); color: #f0c070; }
-        html[data-theme="dark"] .alert-info    { background: rgba(45,153,219,0.12); color: #80c8ef; }
-        html[data-theme="dark"] .form-group label { color: rgba(255,255,255,0.55); text-transform: uppercase; }
+        html[data-theme="dark"] {
+            background: #0f1419;
+            --surface:       #141b22;
+            --surface-muted: #0f1419;
+            --border:        #1f2933;
+            --border-strong: #2a3a4a;
+            --text:          #dce3ea;
+            --text-strong:   #eef3f8;
+            --text-muted:    #6b7884;
+            --text-faint:    #4a5560;
+        }
+        html[data-theme="dark"] body {
+            background: #0f1419;
+            color: #dce3ea;
+        }
+        html[data-theme="dark"] .topbar {
+            background: #141b22;
+            border-bottom: 1px solid #1f2933;
+        }
+        html[data-theme="dark"] .topbar-inner {
+            border-bottom-color: #1f2933;
+        }
+        html[data-theme="dark"] .topbar-title { color: #eef3f8; }
+        html[data-theme="dark"] .brand-text h1 { color: #eef3f8; }
+        html[data-theme="dark"] .brand-text p { color: #6b7884; }
+        html[data-theme="dark"] .topbar-action { color: #85b7eb; }
+        html[data-theme="dark"] .topbar-action:hover { color: #b5d4f4; }
+        html[data-theme="dark"] .icon-btn { color: #85b7eb; }
+        html[data-theme="dark"] .icon-btn:hover { background: rgba(24,95,165,0.2); color: #eef3f8; }
+        html[data-theme="dark"] .icon-btn .notif-dot { border-color: #141b22; }
+        html[data-theme="dark"] .user-chip { background: #0c447c; border-color: #185fa5; }
+        html[data-theme="dark"] .user-info .uname { color: #eef3f8; }
+        html[data-theme="dark"] .user-info .urole { color: #6b7884; }
+        html[data-theme="dark"] .top-clock .time { color: #85b7eb; }
+        html[data-theme="dark"] .top-clock { color: #6b7884; }
+        html[data-theme="dark"] .btn-logout { background: rgba(24,95,165,0.2); color: #85b7eb; }
+        html[data-theme="dark"] .btn-logout:hover { background: rgba(80,19,19,0.4); color: #f7c1c1; }
+        html[data-theme="dark"] .top-alert-badge {
+            background: #0c447c;
+            border-color: #185fa5;
+            color: #85b7eb;
+        }
+        html[data-theme="dark"] .top-alert-badge:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.4); }
+
+        html[data-theme="dark"] .breadcrumb span { color: #4a5560; }
+        html[data-theme="dark"] .breadcrumb a { color: #85b7eb; }
+
+        html[data-theme="dark"] .page-header-left h1 { color: #eef3f8; }
+        html[data-theme="dark"] .page-header-left p  { color: #6b7884; }
+
+        html[data-theme="dark"] .table-container { background: #141b22; }
+        html[data-theme="dark"] thead { background: rgba(255,255,255,0.02); border-bottom-color: #1f2933; }
+        html[data-theme="dark"] th { color: #85b7eb; }
+        html[data-theme="dark"] td { border-bottom-color: #1f2933; color: #dce3ea; }
+        html[data-theme="dark"] tbody tr:hover { background: rgba(24,95,165,0.08); }
+
+        html[data-theme="dark"] .card { background: #141b22; }
+        html[data-theme="dark"] .card-title { color: #eef3f8; }
+        html[data-theme="dark"] .card-meta { color: #6b7884; }
+
+        html[data-theme="dark"] .btn-secondary { background: rgba(255,255,255,0.06); color: #dce3ea; border: 1px solid #1f2933; }
+        html[data-theme="dark"] .btn-secondary:hover { background: rgba(255,255,255,0.1); }
+        html[data-theme="dark"] .alert-success { background: rgba(8,80,65,0.35);  color: #9fe1cb; border-color: rgba(93,202,165,0.2); }
+        html[data-theme="dark"] .alert-error   { background: rgba(80,19,19,0.4);  color: #f7c1c1; border-color: rgba(247,193,193,0.2); }
+        html[data-theme="dark"] .alert-warning { background: rgba(80,50,10,0.4);  color: #f5d08a; border-color: rgba(245,208,138,0.2); }
+        html[data-theme="dark"] .alert-info    { background: rgba(12,68,124,0.4); color: #85b7eb; border-color: rgba(133,183,235,0.2); }
+        html[data-theme="dark"] .form-group label { color: #6b7884; text-transform: uppercase; }
         html[data-theme="dark"] .form-group input,
         html[data-theme="dark"] .form-group textarea,
-        html[data-theme="dark"] .form-group select { background: #091d2e; border-color: rgba(255,255,255,0.1); color: #cce8f4; }
+        html[data-theme="dark"] .form-group select {
+            background: transparent;
+            border-bottom-color: #1f2933;
+            color: #dce3ea;
+        }
         html[data-theme="dark"] .form-group input:focus,
         html[data-theme="dark"] .form-group textarea:focus,
-        html[data-theme="dark"] .form-group select:focus { border-color: var(--teal-400); box-shadow: 0 0 0 3px rgba(33,136,171,0.2); }
+        html[data-theme="dark"] .form-group select:focus {
+            border-bottom-color: #378add;
+            box-shadow: none;
+        }
 
-        /* Composants réutilisables dark */
-        html[data-theme="dark"] .action-bar { background: #0d2035; }
-        html[data-theme="dark"] .status-step { background: #091d2e; border-color: rgba(255,255,255,0.1); color: rgba(255,255,255,0.3); }
-        html[data-theme="dark"] .status-step.active { background: var(--teal-600); color: #fff; border-color: var(--teal-600); }
+        /* ── Composants réutilisables (dark) ───────────────────────────────── */
+
+        html[data-theme="dark"] .action-bar { background: #141b22; }
+
+        html[data-theme="dark"] .status-step { background: #0f1419; border-color: #1f2933; color: #4a5560; }
+        html[data-theme="dark"] .status-step.active { background: #185fa5; color: #e6f1fb; border-color: #185fa5; }
         html[data-theme="dark"] .form-card,
-        html[data-theme="dark"] .detail-card { background: #0d2035; }
+        html[data-theme="dark"] .detail-card { background: #141b22; }
         html[data-theme="dark"] .form-section,
-        html[data-theme="dark"] .detail-section { border-top-color: rgba(255,255,255,0.06) !important; }
-        html[data-theme="dark"] .detail-field .lbl { color: rgba(255,255,255,0.45); text-transform: uppercase; }
-        html[data-theme="dark"] .detail-field .val { color: #cce8f4; }
-        html[data-theme="dark"] .detail-field .val.empty { color: rgba(255,255,255,0.2); }
-        html[data-theme="dark"] .form-check label { color: #cce8f4; }
-        html[data-theme="dark"] .form-input { background: #091d2e; border-color: rgba(255,255,255,0.1); color: #cce8f4; }
-        html[data-theme="dark"] .form-input:focus { border-color: var(--teal-400); box-shadow: 0 0 0 3px rgba(33,136,171,0.2); }
-        html[data-theme="dark"] .tabs { background: #0d2035; border-bottom-color: rgba(255,255,255,0.06); }
-        html[data-theme="dark"] .tab-btn { color: rgba(255,255,255,0.35); background: none; }
-        html[data-theme="dark"] .tab-btn.active { color: var(--teal-300); border-bottom-color: var(--teal-300); }
-        html[data-theme="dark"] .tab-pane { background: #0d2035; }
-        html[data-theme="dark"] .lignes-table th { color: rgba(255,255,255,0.4); border-bottom-color: rgba(255,255,255,0.08); }
-        html[data-theme="dark"] .lignes-table td { border-bottom-color: rgba(255,255,255,0.04); color: #b8dff0; }
-        html[data-theme="dark"] .lignes-table input,
-        html[data-theme="dark"] .lignes-table select { background: #091d2e; border-color: rgba(255,255,255,0.1); color: #cce8f4; }
-        html[data-theme="dark"] .lignes-table .qte-totale,
-        html[data-theme="dark"] .qte-totale-cell { color: var(--teal-300); }
-        html[data-theme="dark"] .btn-add-line { background: rgba(33,136,171,0.1); color: var(--teal-300); border-color: rgba(33,136,171,0.3); }
-        html[data-theme="dark"] .btn-del-line { background: rgba(232,69,69,0.15); color: #f09090; }
-        html[data-theme="dark"] .stat-box { background: #0d2035; }
-        html[data-theme="dark"] .stat-box .val { color: var(--teal-300); }
-        html[data-theme="dark"] .stat-box .lbl { color: rgba(255,255,255,0.4); }
-        html[data-theme="dark"] .toolbar input,
-        html[data-theme="dark"] .toolbar select { background: #0d2035; border-color: rgba(255,255,255,0.1); color: #cce8f4; font-family: 'Sora', sans-serif; }
-        html[data-theme="dark"] .badge-brouillon { background: rgba(232,154,26,0.2); color: #f0c060; }
-        html[data-theme="dark"] .badge-prescrit  { background: rgba(22,169,107,0.2); color: #6eddb0; }
-        html[data-theme="dark"] .badge-code      { background: rgba(33,136,171,0.2); color: var(--teal-300); }
-        html[data-theme="dark"] .section-title { color: var(--teal-300); border-bottom-color: rgba(255,255,255,0.06); }
-        html[data-theme="dark"] #config-dropdown { background: #0d2035; border-color: rgba(255,255,255,0.08); }
-        html[data-theme="dark"] #config-dropdown a { color: #cce8f4; border-bottom-color: rgba(255,255,255,0.06); }
-        html[data-theme="dark"] #config-dropdown a:hover { background: rgba(33,136,171,0.1); }
+        html[data-theme="dark"] .detail-section { border-top-color: #1f2933 !important; }
+        html[data-theme="dark"] .detail-field .lbl { color: #6b7884; text-transform: uppercase; }
+        html[data-theme="dark"] .detail-field .val { color: #dce3ea; }
+        html[data-theme="dark"] .detail-field .val.empty { color: #4a5560; }
+        html[data-theme="dark"] .form-check label { color: #dce3ea; }
 
-        /* Scrollbar */
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 3px; }
-        html[data-theme="dark"] ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); }
+        html[data-theme="dark"] .form-input { background: transparent; border-bottom-color: #1f2933; color: #dce3ea; }
+        html[data-theme="dark"] .form-input:focus { border-bottom-color: #378add; box-shadow: none; }
+
+        html[data-theme="dark"] .tabs { background: #141b22; border-bottom-color: #1f2933; }
+        html[data-theme="dark"] .tab-btn { color: #6b7884; background: none; }
+        html[data-theme="dark"] .tab-btn.active { color: #85b7eb; border-bottom-color: #378add; }
+        html[data-theme="dark"] .tab-pane { background: #141b22; }
+
+        html[data-theme="dark"] .lignes-table th { color: #6b7884; border-bottom-color: #1f2933; }
+        html[data-theme="dark"] .lignes-table td { border-bottom-color: #1f2933; color: #dce3ea; }
+        html[data-theme="dark"] .lignes-table input,
+        html[data-theme="dark"] .lignes-table select { background: #0f1419; border-color: #1f2933; color: #dce3ea; }
+        html[data-theme="dark"] .lignes-table .qte-totale,
+        html[data-theme="dark"] .qte-totale-cell { color: #85b7eb; }
+        html[data-theme="dark"] .btn-add-line { background: #0c447c; color: #85b7eb; border-color: #185fa5; }
+        html[data-theme="dark"] .btn-del-line { background: rgba(80,19,19,0.4); color: #f7c1c1; }
+
+        html[data-theme="dark"] .stat-box { background: #141b22; }
+        html[data-theme="dark"] .stat-box .val { color: #85b7eb; }
+        html[data-theme="dark"] .stat-box .lbl { color: #6b7884; }
+        html[data-theme="dark"] .toolbar input,
+        html[data-theme="dark"] .toolbar select { background: #141b22; border-color: #1f2933; color: #dce3ea; font-family: var(--font-main); }
+
+        html[data-theme="dark"] .badge-brouillon { background: rgba(80,50,10,0.4);  color: #f5d08a; }
+        html[data-theme="dark"] .badge-prescrit  { background: #0c447c;             color: #85b7eb; }
+        html[data-theme="dark"] .badge-code      { background: #0c447c;             color: #b5d4f4; }
+
+        html[data-theme="dark"] .section-title { color: #85b7eb; border-bottom-color: #1f2933; }
+
+        html[data-theme="dark"] #config-dropdown { background: #141b22; border-color: #1f2933; }
+        html[data-theme="dark"] #config-dropdown a { color: #dce3ea; border-bottom-color: #1f2933; }
+        html[data-theme="dark"] #config-dropdown a:hover { background: rgba(24,95,165,0.15); }
+
+        /* ── fin composants réutilisables ─────────────────────────────────── */
+
+        /* Toggle button */
+        .theme-toggle {
+            background: none; border: none;
+            color: var(--teal-600); cursor: pointer;
+            font-size: 18px; padding: 4px 8px;
+            border-radius: 8px; transition: all 0.15s;
+            display: flex; align-items: center;
+        }
+        .theme-toggle:hover { background: rgba(var(--teal-600-rgb),0.1); color: var(--teal-400); }
+        .theme-toggle .icon-sun  { display:block; }
+        .theme-toggle .icon-moon { display:none; }
+        html[data-theme="dark"] .theme-toggle .icon-sun  { display:none; }
+        html[data-theme="dark"] .theme-toggle .icon-moon { display:block; }
+        html[data-theme="dark"] .theme-toggle { color: var(--teal-300); }
+
+        /* ═══════════════════════════════════════
+           IMPRESSION — filet de sécurité global :
+           le bandeau applicatif (logo, notifs, thème, compte)
+           et une éventuelle barre latérale ne doivent jamais
+           apparaître sur un document imprimé/PDF, même si la
+           page ne le masque pas elle-même explicitement.
+        ═══════════════════════════════════════ */
+        @media print {
+            .topbar, .sidebar, .sidebar-wrapper, #sidebar { display: none !important; }
+            /* body est décalé vers le bas en écran pour laisser place au bandeau
+               fixe (padding-top: var(--header-h)) — ce bandeau n'existe plus à
+               l'impression, donc ce décalage doit disparaître lui aussi. */
+            body { padding-top: 0 !important; }
+        }
     </style>
+    <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
     {% block extra_css %}{% endblock %}
 </head>
-<body>
+<body><div id="page-loader" style="position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#f0f5fa;transition:opacity .4s ease;"><div style="position:relative;width:90px;height:90px;display:flex;align-items:center;justify-content:center;"><svg width="90" height="90" viewBox="0 0 90 90" style="position:absolute;top:0;left:0;animation:spin 1.2s linear infinite;"><circle cx="45" cy="45" r="40" fill="none" stroke="#e2eef5" stroke-width="5"/><circle cx="45" cy="45" r="40" fill="none" stroke="var(--teal-600)" stroke-width="5" stroke-dasharray="60 192" stroke-linecap="round"/></svg><img src="{% static 'img/logo.png' %}" alt="WALÉ" style="width:50px;height:50px;object-fit:contain;"></div><div id="page-loader-text" style="font:600 14px 'Segoe UI',sans-serif;color:#375a72;min-height:18px;"></div></div><div class="main">
+        <div class="topbar">
+        <div class="topbar-inner">
+        <div class="topbar-left" style="display:flex;align-items:center;gap:16px;">
+            <a href="/" style="text-decoration:none;" class="brand">
+                <div class="brand-logo">
+                    <img src="{% static 'img/logo.png' %}" alt="Logo WALÉ">
+                </div>
+                <div class="brand-text">
+                    <h1>SEGHO-WALE</h1>
+                    <p>Système Electronique de Gestion Hospitalière - Walé</p>
+                    {% block brand_subtitle %}{% endblock %}
+                </div>
+            </a>
+            <!--{% block topbar_title %}{% endblock %}-->
+        </div>
+        <div class="topbar-right">
+            <!-- Messagerie -->
+            <button class="icon-btn" title="Messagerie">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+            </button>
 
-<!-- ══════════════ TOPBAR ══════════════ -->
-<header class="topbar">
-  <a href="/" class="brand">
-    <div class="brand-logo">
-      <img src="{% static 'logo.png' %}" alt="Logo WALÉ">
+            <!-- Notifications -->
+            <div style="position:relative;" id="notif-wrapper">
+              <button class="icon-btn" id="notif-btn" title="Notifications" onclick="toggleNotifPanel(event)" style="position:relative;">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                </svg>
+                {% with nb_sys=header_stats.medicaments_alerte|add:header_stats.factures_impayees|add:header_stats.analyses_pending|add:planning_notifs_total|add:cg_rh_notifs_total|add:soins_en_attente_count|default:0 %}{% with nb_tot=alertes_count|default:0|add:nb_sys %}{% if nb_tot %}
+                <span id="notif-badge" style="
+                  position:absolute;top:4px;right:4px;
+                  min-width:16px;height:16px;border-radius:8px;
+                  background:var(--rose);color:#fff;
+                  font-size:9px;font-weight:800;line-height:16px;
+                  text-align:center;padding:0 3px;
+                  border:2px solid #fff;
+                  pointer-events:none;
+                ">{{ nb_tot }}</span>
+                {% endif %}{% endwith %}{% endwith %}
+              </button>
+
+              <!-- Panneau notifications -->
+              <div id="notif-panel" style="
+                display:none;
+                position:absolute;top:calc(100% + 10px);right:0;
+                width:340px;
+                background:#fff;
+                border:1px solid rgba(0,0,0,0.1);
+                border-radius:12px;
+                box-shadow:0 8px 32px rgba(0,0,0,0.14);
+                z-index:1000;
+                overflow:hidden;
+              ">
+                <div style="padding:12px 16px 10px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(0,0,0,0.07);">
+                  <span style="font-size:13px;font-weight:700;color:#1a3020;">Notifications</span>
+                  {% if alertes_count %}
+                  <button onclick="toutLire()" style="font-size:11px;color:var(--teal-700);background:none;border:none;cursor:pointer;font-weight:600;padding:2px 6px;border-radius:4px;" onmouseover="this.style.background='rgba(var(--teal-600-rgb),0.08)'" onmouseout="this.style.background='none'">
+                    Tout marquer lu
+                  </button>
+                  {% endif %}
+                </div>
+
+                <div id="notif-list" style="max-height:420px;overflow-y:auto;">
+                  {% if alertes_contrat %}
+                  <div style="padding:8px 16px 4px;font-size:10.5px;font-weight:800;color:rgba(0,0,0,0.35);text-transform:uppercase;letter-spacing:.5px;">
+                    Fin de contrat
+                  </div>
+                  {% for alerte in alertes_contrat %}
+                  <div id="notif-item-{{ alerte.id }}" style="padding:10px 16px;border-bottom:1px solid rgba(0,0,0,0.04);display:flex;align-items:flex-start;gap:10px;">
+                    <div style="width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;{% if alerte.echeance == '1_mois' %}background:rgba(var(--rose-rgb),0.12);{% else %}background:rgba(var(--amber-rgb),0.12);{% endif %}">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="{% if alerte.echeance == '1_mois' %}var(--rose){% else %}var(--amber){% endif %}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                      </svg>
+                    </div>
+                    <div style="flex:1;min-width:0;">
+                      <div style="font-size:12.5px;font-weight:600;color:#1a3020;line-height:1.3;">{{ alerte.employe.nom }} {{ alerte.employe.prenoms }}</div>
+                      <div style="font-size:11.5px;color:rgba(0,0,0,0.55);margin-top:2px;">
+                        {% with j=alerte.jours_restants %}
+                        {% if j < 0 %}
+                        Contrat — expiré depuis le <strong>{{ alerte.date_fin_contrat|date:"d/m/Y" }}</strong>
+                        <span style="margin-left:3px;padding:1px 5px;border-radius:8px;font-size:10px;font-weight:700;background:rgba(var(--rose-rgb),0.12);color:var(--rose-btn);">{{ j|cut:"-" }}j</span>
+                        {% else %}
+                        Contrat — fin le <strong>{{ alerte.date_fin_contrat|date:"d/m/Y" }}</strong>
+                        <span style="margin-left:3px;padding:1px 5px;border-radius:8px;font-size:10px;font-weight:700;{% if j <= 30 %}background:rgba(var(--rose-rgb),0.12);color:var(--rose-btn);{% else %}background:rgba(var(--amber-rgb),0.12);color:var(--amber-text);{% endif %}">{{ j }}j</span>
+                        {% endif %}
+                        {% endwith %}
+                      </div>
+                    </div>
+                    <button onclick="marquerLue({{ alerte.id }}, this)" title="Marquer comme lu" style="background:none;border:none;cursor:pointer;color:rgba(0,0,0,0.25);padding:4px;border-radius:4px;flex-shrink:0;" onmouseover="this.style.color='var(--teal-700)'" onmouseout="this.style.color='rgba(0,0,0,0.25)'">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    </button>
+                  </div>
+                  {% endfor %}
+                  {% endif %}
+
+                  {% if alertes_document %}
+                  <div style="padding:8px 16px 4px;font-size:10.5px;font-weight:800;color:rgba(0,0,0,0.35);text-transform:uppercase;letter-spacing:.5px;{% if alertes_contrat %}border-top:1px solid rgba(0,0,0,0.06);margin-top:4px;{% endif %}">
+                    Documents expirés
+                  </div>
+                  {% for alerte in alertes_document %}
+                  <div id="notif-doc-{{ alerte.id }}" style="padding:10px 16px;border-bottom:1px solid rgba(0,0,0,0.04);display:flex;align-items:flex-start;gap:10px;">
+                    <div style="width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;{% if alerte.echeance == '1_mois' %}background:rgba(123,87,194,0.12);{% else %}background:rgba(45,153,219,0.12);{% endif %}">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="{% if alerte.echeance == '1_mois' %}#7b57c2{% else %}#2d99db{% endif %}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="12" y1="9" x2="12.01" y2="9"/>
+                      </svg>
+                    </div>
+                    <div style="flex:1;min-width:0;">
+                      <div style="font-size:12.5px;font-weight:600;color:#1a3020;line-height:1.3;">{{ alerte.document.employe.nom }} {{ alerte.document.employe.prenoms }}</div>
+                      <div style="font-size:11.5px;color:rgba(0,0,0,0.55);margin-top:2px;">
+                        {% with j=alerte.jours_restants %}
+                        {% if j < 0 %}
+                        {{ alerte.document.titre }} — expiré depuis le <strong>{{ alerte.date_expiration|date:"d/m/Y" }}</strong>
+                        <span style="margin-left:3px;padding:1px 5px;border-radius:8px;font-size:10px;font-weight:700;background:rgba(var(--rose-rgb),0.12);color:var(--rose-btn);">{{ j|cut:"-" }}j</span>
+                        {% else %}
+                        {{ alerte.document.titre }} — exp. <strong>{{ alerte.date_expiration|date:"d/m/Y" }}</strong>
+                        <span style="margin-left:3px;padding:1px 5px;border-radius:8px;font-size:10px;font-weight:700;{% if j <= 30 %}background:rgba(123,87,194,0.12);color:#5b3fa0;{% else %}background:rgba(45,153,219,0.12);color:var(--teal-600);{% endif %}">{{ j }}j</span>
+                        {% endif %}
+                        {% endwith %}
+                      </div>
+                    </div>
+                    <button onclick="marquerLueDoc({{ alerte.id }}, this)" title="Marquer comme lu" style="background:none;border:none;cursor:pointer;color:rgba(0,0,0,0.25);padding:4px;border-radius:4px;flex-shrink:0;" onmouseover="this.style.color='var(--teal-700)'" onmouseout="this.style.color='rgba(0,0,0,0.25)'">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    </button>
+                  </div>
+                  {% endfor %}
+                  {% endif %}
+
+                  {% if notifs_conge or cg_demandes_attente or cg_debut_proche %}
+                  <div style="padding:8px 16px 4px;font-size:10.5px;font-weight:800;color:rgba(0,0,0,0.35);text-transform:uppercase;letter-spacing:.5px;{% if alertes_contrat or alertes_document %}border-top:1px solid rgba(0,0,0,0.06);margin-top:4px;{% endif %}display:flex;align-items:center;justify-content:space-between;">
+                    <span>Congés</span>
+                    {% if notifs_conge %}
+                    <form method="post" action="/conges/notifs/lire/" style="display:inline;">
+                      <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+                      <button type="submit" style="font-size:10px;color:var(--teal-700);background:none;border:none;cursor:pointer;font-weight:600;padding:1px 5px;border-radius:4px;">Tout lire</button>
+                    </form>
+                    {% endif %}
+                  </div>
+                  {% for notif in notifs_conge %}
+                  <div id="notif-conge-{{ notif.id }}" style="padding:10px 16px;border-bottom:1px solid rgba(0,0,0,0.04);display:flex;align-items:flex-start;gap:10px;">
+                    <div style="width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:rgba(var(--teal-600-rgb),0.12);">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--teal-700)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                      </svg>
+                    </div>
+                    <div style="flex:1;min-width:0;">
+                      <a href="/conges/notifs/{{ notif.id }}/lire/" style="display:block;text-decoration:none;" onclick="event.preventDefault();marquerLueConge({{ notif.id }}, '{{ notif.conge.pk }}', this)">
+                        <div style="font-size:12.5px;font-weight:600;color:#1a3020;line-height:1.3;">{{ notif.get_type_notif_display }}</div>
+                        <div style="font-size:11.5px;color:rgba(0,0,0,0.55);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ notif.message }}</div>
+                        <div style="font-size:10.5px;color:rgba(0,0,0,0.4);margin-top:2px;">{{ notif.cree_le|date:"d/m/Y à H:i" }}</div>
+                      </a>
+                    </div>
+                    <button onclick="marquerLueConge({{ notif.id }}, '{{ notif.conge.pk }}', this)" title="Marquer comme lu" style="background:none;border:none;cursor:pointer;color:rgba(0,0,0,0.25);padding:4px;border-radius:4px;flex-shrink:0;" onmouseover="this.style.color='var(--teal-700)'" onmouseout="this.style.color='rgba(0,0,0,0.25)'">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    </button>
+                  </div>
+                  {% endfor %}
+                  {% for c in cg_demandes_attente %}
+                  <a href="{% url 'conge_detail' c.pk %}" style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(0,0,0,0.04);text-decoration:none;">
+                    <div style="width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:rgba(var(--amber-rgb),0.12);">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    </div>
+                    <div style="flex:1;">
+                      <div style="font-size:12.5px;font-weight:600;color:#1a3020;">Demande de congé en attente</div>
+                      <div style="font-size:11.5px;color:rgba(0,0,0,0.55);margin-top:2px;">{{ c.employe.nom }} {{ c.employe.prenoms }} — {{ c.get_type_conge_display }}</div>
+                    </div>
+                  </a>
+                  {% endfor %}
+                  {% for c in cg_debut_proche %}
+                  <a href="{% url 'conge_detail' c.pk %}" style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(0,0,0,0.04);text-decoration:none;">
+                    <div style="width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:rgba(var(--teal-600-rgb),0.12);">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--teal-700)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    </div>
+                    <div style="flex:1;">
+                      <div style="font-size:12.5px;font-weight:600;color:#1a3020;">Congé débute bientôt</div>
+                      <div style="font-size:11.5px;color:rgba(0,0,0,0.55);margin-top:2px;">{{ c.employe.nom }} {{ c.employe.prenoms }} — dès le {{ c.date_debut|date:"d/m/Y" }}</div>
+                    </div>
+                  </a>
+                  {% endfor %}
+                  {% endif %}
+
+                  {% if header_stats.medicaments_alerte or header_stats.factures_impayees or header_stats.analyses_pending %}
+                  <div style="padding:8px 16px 4px;font-size:10.5px;font-weight:800;color:rgba(0,0,0,0.35);text-transform:uppercase;letter-spacing:.5px;{% if alertes_contrat or alertes_document or notifs_conge or cg_demandes_attente or cg_debut_proche %}border-top:1px solid rgba(0,0,0,0.06);margin-top:4px;{% endif %}">
+                    Système
+                  </div>
+                  {% if header_stats.medicaments_alerte %}
+                  <a href="{% url 'stock_produits' %}?statut=alerte" style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(0,0,0,0.04);text-decoration:none;">
+                    <div style="width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:rgba(var(--amber-rgb),0.12);">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    </div>
+                    <div style="flex:1;">
+                      <div style="font-size:12.5px;font-weight:600;color:#1a3020;">Stock en alerte</div>
+                      <div style="font-size:11.5px;color:rgba(0,0,0,0.55);margin-top:2px;"><span style="padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700;background:rgba(var(--amber-rgb),0.12);color:var(--amber-text);">{{ header_stats.medicaments_alerte }} produit(s)</span></div>
+                    </div>
+                  </a>
+                  {% endif %}
+                  {% if header_stats.factures_impayees %}
+                  <a href="{% url 'facturation_list' %}" style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(0,0,0,0.04);text-decoration:none;">
+                    <div style="width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:rgba(var(--rose-rgb),0.12);">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--rose)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                    </div>
+                    <div style="flex:1;">
+                      <div style="font-size:12.5px;font-weight:600;color:#1a3020;">Factures impayées</div>
+                      <div style="font-size:11.5px;color:rgba(0,0,0,0.55);margin-top:2px;"><span style="padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700;background:rgba(var(--rose-rgb),0.12);color:var(--rose-btn);">{{ header_stats.factures_impayees }} facture(s)</span></div>
+                    </div>
+                  </a>
+                  {% endif %}
+                  {% if header_stats.analyses_pending %}
+                  <a href="{% url 'laboratoire_list' %}" style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(0,0,0,0.04);text-decoration:none;">
+                    <div style="width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:rgba(45,153,219,0.12);">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2d99db" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                    </div>
+                    <div style="flex:1;">
+                      <div style="font-size:12.5px;font-weight:600;color:#1a3020;">Analyses en attente</div>
+                      <div style="font-size:11.5px;color:rgba(0,0,0,0.55);margin-top:2px;"><span style="padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700;background:rgba(45,153,219,0.12);color:#1a5276;">{{ header_stats.analyses_pending }} analyse(s)</span></div>
+                    </div>
+                  </a>
+                  {% endif %}
+                  {% endif %}
+
+                  {% if planning_non_publiees or planning_non_vues %}
+                  <div style="padding:8px 16px 4px;font-size:10.5px;font-weight:800;color:rgba(0,0,0,0.35);text-transform:uppercase;letter-spacing:.5px;{% if alertes_contrat or alertes_document or notifs_conge or cg_demandes_attente or cg_debut_proche or header_stats.medicaments_alerte or header_stats.factures_impayees or header_stats.analyses_pending %}border-top:1px solid rgba(0,0,0,0.06);margin-top:4px;{% endif %}">
+                    Planning
+                  </div>
+                  {% for a in planning_non_publiees %}
+                  <a href="{% url 'planning_courant' %}" style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(0,0,0,0.04);text-decoration:none;">
+                    <div style="width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:rgba(var(--amber-rgb),0.12);">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    </div>
+                    <div style="flex:1;">
+                      <div style="font-size:12.5px;font-weight:600;color:#1a3020;">Planning non publié</div>
+                      <div style="font-size:11.5px;color:rgba(0,0,0,0.55);margin-top:2px;">{{ a.label }}</div>
+                    </div>
+                  </a>
+                  {% endfor %}
+                  {% for p in planning_non_vues %}
+                  <a href="{% url 'planning_detail' p.pk %}" style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(0,0,0,0.04);text-decoration:none;">
+                    <div style="width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:rgba(var(--teal-600-rgb),0.12);">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--teal-700)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                      </svg>
+                    </div>
+                    <div style="flex:1;">
+                      <div style="font-size:12.5px;font-weight:600;color:#1a3020;">Nouveau planning publié</div>
+                      <div style="font-size:11.5px;color:rgba(0,0,0,0.55);margin-top:2px;">Semaine du {{ p.semaine_debut|date:"d/m/Y" }}</div>
+                    </div>
+                  </a>
+                  {% endfor %}
+                  {% endif %}
+
+                  {% if soins_en_attente %}
+                  <div style="padding:8px 16px 4px;font-size:10.5px;font-weight:800;color:rgba(0,0,0,0.35);text-transform:uppercase;letter-spacing:.5px;{% if alertes_contrat or alertes_document or notifs_conge or cg_demandes_attente or cg_debut_proche or header_stats.medicaments_alerte or header_stats.factures_impayees or header_stats.analyses_pending or planning_non_publiees or planning_non_vues %}border-top:1px solid rgba(0,0,0,0.06);margin-top:4px;{% endif %}">
+                    Soins
+                  </div>
+                  {% for s in soins_en_attente %}
+                  <a href="{% url 'soins:detail' s.pk %}" style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(0,0,0,0.04);text-decoration:none;">
+                    <div style="width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:rgba(var(--teal-600-rgb),0.12);">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--teal-700)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                    </div>
+                    <div style="flex:1;">
+                      <div style="font-size:12.5px;font-weight:600;color:#1a3020;">Soin en attente de paiement</div>
+                      <div style="font-size:11.5px;color:rgba(0,0,0,0.55);margin-top:2px;">{{ s.patient.nom }} {{ s.patient.prenoms }} — {{ s.date_heure|date:"d/m/Y" }}</div>
+                    </div>
+                  </a>
+                  {% endfor %}
+                  {% endif %}
+
+                  {% if not alertes_contrat and not alertes_document and not notifs_conge and not cg_demandes_attente and not cg_debut_proche and not header_stats.medicaments_alerte and not header_stats.factures_impayees and not header_stats.analyses_pending and not planning_non_publiees and not planning_non_vues and not soins_en_attente %}
+                  <div style="padding:28px 16px;text-align:center;color:rgba(0,0,0,0.35);">
+                    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 8px;display:block;opacity:.4">
+                      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                    </svg>
+                    <div style="font-size:12px;">Aucune alerte</div>
+                  </div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+
+            <!-- Thème -->
+            <button class="theme-toggle" id="theme-toggle" title="Thème sombre / clair">
+                <svg class="icon-sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="5"/>
+                    <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                    <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                </svg>
+                <svg class="icon-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                </svg>
+            </button>
+
+            <!-- Utilisateur -->
+            {% if user.is_authenticated %}
+            <div style="position:relative;" id="user-menu-wrap">
+              <button onclick="toggleUserMenu()" class="user-chip" id="user-chip-btn">
+                <div class="user-avatar">
+                  {% if user_profile.photo %}
+                  <img src="{{ user_profile.photo.url }}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+                  {% else %}{{ user.username|first|upper }}{% endif %}
+                </div>
+                <div class="user-info">
+                  <div class="uname">{{ user.get_full_name|default:user.username }}</div>
+                  <div class="urole">{% if user.is_superuser %}Administrateur{% elif user.is_staff %}Staff{% else %}Utilisateur{% endif %}</div>
+                </div>
+                <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" style="color:rgba(0,0,0,.35);flex-shrink:0;"><polyline points="1,1 5,5 9,1"/></svg>
+              </button>
+              <div class="user-dropdown" id="user-dropdown">
+                <a href="{% url 'mon_compte' %}">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+                  Mon compte
+                </a>
+                <div class="udrop-sep"></div>
+                <form method="post" action="{% url 'logout' %}" style="margin:0;">
+                  {% csrf_token %}
+                  <button type="submit" class="udrop-item udrop-logout">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                    Déconnexion
+                  </button>
+                </form>
+              </div>
+            </div>
+            {% endif %}
+        </div>
+        </div>
+        {% block module_navbar %}{% endblock %}
     </div>
-    <div class="brand-text">
-      <h1>SEGHO-WALE</h1>
-      <p>Système Electronique de Gestion Hospitalière de WALE &mdash; Yamoussoukro</p>
-    </div>
-  </a>
 
-  <div class="topbar-right">
+    <script>
+    function toggleUserMenu() {
+      var drop = document.getElementById('user-dropdown');
+      var btn  = document.getElementById('user-chip-btn');
+      if (!drop) return;
+      if (drop.style.display === 'block') {
+        drop.style.display = 'none';
+      } else {
+        var r = btn.getBoundingClientRect();
+        drop.style.top   = (r.bottom + 6) + 'px';
+        drop.style.right = (window.innerWidth - r.right) + 'px';
+        drop.style.display = 'block';
+      }
+    }
+    document.addEventListener('click', function(e) {
+      var wrap = document.getElementById('user-menu-wrap');
+      var drop = document.getElementById('user-dropdown');
+      if (wrap && drop && !wrap.contains(e.target)) drop.style.display = 'none';
+    });
+    </script>
+    <script>
+    // Thème
+    (function() {
+        var btn = document.getElementById('theme-toggle');
+        if (!btn) return;
+        btn.addEventListener('click', function() {
+            var html = document.documentElement;
+            var isDark = html.getAttribute('data-theme') === 'dark';
+            if (isDark) { html.removeAttribute('data-theme'); localStorage.setItem('segho-theme', 'light'); }
+            else { html.setAttribute('data-theme', 'dark'); localStorage.setItem('segho-theme', 'dark'); }
+        });
+    })();
 
-    <!-- Alertes rapides -->
-    <div class="top-alerts">
-      {% if header_stats.medicaments_alerte > 0 %}
-      <a href="{% url 'pharmacie_list' %}" class="top-alert-badge">
-        <span class="dot dot-amber">{{ header_stats.medicaments_alerte }}</span>
-        Stock alerte
-      </a>
-      {% endif %}
-      {% if header_stats.factures_impayees > 0 %}
-      <a href="{% url 'facturation_list' %}" class="top-alert-badge">
-        <span class="dot dot-rose">{{ header_stats.factures_impayees }}</span>
-        Impayées
-      </a>
-      {% endif %}
-      {% if header_stats.analyses_pending > 0 %}
-      <a href="{% url 'laboratoire_list' %}" class="top-alert-badge">
-        <span class="dot dot-teal">{{ header_stats.analyses_pending }}</span>
-        Labo
-      </a>
-      {% endif %}
-    </div>
+    </script>
+    <script>
+    (function () {
+        function syncTopbarH() {
+            var topbar = document.querySelector('.topbar');
+            if (topbar) {
+                var h = topbar.getBoundingClientRect().height;
+                if (h > 0) document.documentElement.style.setProperty('--header-h', h + 'px');
+            }
+        }
+        syncTopbarH();
+        document.addEventListener('DOMContentLoaded', syncTopbarH);
+        window.addEventListener('resize', syncTopbarH);
+    })();
+    </script>
 
-    <!-- Messagerie -->
-    <button class="icon-btn" title="Messagerie">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-      </svg>
-    </button>
-
-    <!-- Cloche notifications -->
-    <button class="icon-btn" title="Notifications">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-        <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-      </svg>
-      {% if header_stats.medicaments_alerte > 0 or header_stats.factures_impayees > 0 or header_stats.analyses_pending > 0 %}
-      <span class="notif-dot"></span>
-      {% endif %}
-    </button>
-
-    <!-- Bascule thème -->
-    <button class="icon-btn" id="theme-toggle" title="Thème sombre / clair">
-      <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="5"/>
-        <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
-        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-        <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
-        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-      </svg>
-      <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-      </svg>
-    </button>
-
-    <!-- Horloge -->
-    <div class="top-clock">
-      <div class="time" id="live-time">--:--:--</div>
-      <div>{% now "l j F Y" %}</div>
+        <div class="content">
+            {% block breadcrumb %}{% endblock %}
+            {% block content %}{% endblock %}
+        </div>
     </div>
 
-    <!-- Utilisateur -->
-    {% if user.is_authenticated %}
-    <div class="user-chip">
-      <div class="user-avatar">{{ user.username|first|upper }}</div>
-      <div class="user-info">
-        <div class="uname">{{ user.get_full_name|default:user.username }}</div>
-        <div class="urole">{% if user.is_superuser %}Administrateur{% elif user.is_staff %}Staff{% else %}Utilisateur{% endif %}</div>
+    <!-- ══ TOAST CONTAINER ══ -->
+    <div id="toast-container"></div>
+
+    {% if messages %}
+    <script>
+    (function(){
+        var icons = {
+            success: 'bi-check-circle-fill',
+            error:   'bi-x-circle-fill',
+            warning: 'bi-exclamation-triangle-fill',
+            info:    'bi-info-circle-fill'
+        };
+        var messages = [
+            {% for message in messages %}
+            { text: "{{ message|escapejs }}", tag: "{{ message.tags|default:'info'|cut:' ' }}" }{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ];
+        var container = document.getElementById('toast-container');
+
+        function showToast(text, tag) {
+            var validTags = ['success','error','warning','info'];
+            var safeTag = validTags.indexOf(tag) !== -1 ? tag : 'info';
+            var icon = icons[safeTag] || icons.info;
+
+            var toast = document.createElement('div');
+            toast.className = 'toast toast-' + safeTag;
+            toast.innerHTML =
+                '<i class="bi ' + icon + ' toast-icon"></i>' +
+                '<span class="toast-body"></span>' +
+                '<button class="toast-close" aria-label="Fermer">&#x2715;</button>' +
+                '<span class="toast-progress"></span>';
+            toast.querySelector('.toast-body').textContent = text;
+            container.appendChild(toast);
+
+            var timer = setTimeout(function(){ dismissToast(toast); }, 4000);
+
+            toast.querySelector('.toast-close').addEventListener('click', function(){
+                clearTimeout(timer);
+                dismissToast(toast);
+            });
+        }
+
+        function dismissToast(toast) {
+            toast.classList.add('toast-hide');
+            setTimeout(function(){ if (toast.parentNode) toast.parentNode.removeChild(toast); }, 380);
+        }
+
+        messages.forEach(function(m){ showToast(m.text, m.tag); });
+    })();
+    </script>
+    {% endif %}
+
+    <script src="{% static 'js/form-ul.js' %}"></script>
+
+    {% block extra_js %}{% endblock %}
+
+    <script>
+    window.addEventListener('load', function() {
+      var loader = document.getElementById('page-loader');
+      if (loader) {
+        loader.style.opacity = '0';
+        setTimeout(function(){ loader.style.display = 'none'; }, 420);
+      }
+    });
+    // Réaffiche le loader global avec un message, avant une action bloquante
+    // (ex: soumission de formulaire) qui va recharger/naviguer la page.
+    window.showPageLoader = function(message) {
+      var loader = document.getElementById('page-loader');
+      var text = document.getElementById('page-loader-text');
+      if (text) text.textContent = message || '';
+      if (loader) {
+        loader.style.display = 'flex';
+        loader.style.opacity = '1';
+      }
+    };
+    </script>
+    <script>
+    // ── Panneau notifications ──────────────────────────────────────────────────
+    function toggleNotifPanel(e) {
+        e.stopPropagation();
+        var panel = document.getElementById('notif-panel');
+        panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    }
+    document.addEventListener('click', function(e) {
+        var wrapper = document.getElementById('notif-wrapper');
+        if (wrapper && !wrapper.contains(e.target)) {
+            var panel = document.getElementById('notif-panel');
+            if (panel) panel.style.display = 'none';
+        }
+    });
+
+    function getCsrfToken() {
+        var name = 'csrftoken';
+        var cookies = document.cookie.split(';');
+        for (var i = 0; i < cookies.length; i++) {
+            var c = cookies[i].trim();
+            if (c.startsWith(name + '=')) return decodeURIComponent(c.slice(name.length + 1));
+        }
+        return '';
+    }
+
+    function marquerLue(id, btn) {
+        fetch('/ressources-humaines/alertes/' + id + '/lue/', {
+            method: 'POST',
+            headers: {'X-CSRFToken': getCsrfToken()},
+        }).then(function() {
+            var item = document.getElementById('notif-item-' + id);
+            if (item) item.remove();
+            updateBadge(-1);
+        });
+    }
+
+    function marquerLueDoc(id, btn) {
+        fetch('/ressources-humaines/alertes/doc/' + id + '/lue/', {
+            method: 'POST',
+            headers: {'X-CSRFToken': getCsrfToken()},
+        }).then(function() {
+            var item = document.getElementById('notif-doc-' + id);
+            if (item) item.remove();
+            updateBadge(-1);
+        });
+    }
+
+    function toutLire() {
+        fetch('/ressources-humaines/alertes/tout-lire/', {
+            method: 'POST',
+            headers: {'X-CSRFToken': getCsrfToken()},
+        }).then(function() {
+            var list = document.getElementById('notif-list');
+            if (list) list.innerHTML = '<div style="padding:32px 16px;text-align:center;color:rgba(0,0,0,0.35);"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 8px;display:block;opacity:.4"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><div style="font-size:12px;">Aucune alerte</div></div>';
+            var badge = document.getElementById('notif-badge');
+            if (badge) badge.remove();
+            var btn = document.querySelector('#notif-panel button[onclick="toutLire()"]');
+            if (btn) btn.remove();
+        });
+    }
+
+    function updateBadge(delta) {
+        var badge = document.getElementById('notif-badge');
+        if (!badge) return;
+        var count = parseInt(badge.textContent) + delta;
+        if (count <= 0) { badge.remove(); }
+        else { badge.textContent = count; }
+    }
+
+    function marquerLueConge(id, congeId, btn) {
+        fetch('/conges/notifs/' + id + '/lire/', {
+            method: 'POST',
+            headers: {'X-CSRFToken': getCsrfToken()},
+        }).then(function() {
+            var item = document.getElementById('notif-conge-' + id);
+            if (item) item.remove();
+            updateBadge(-1);
+            window.location.href = '/conges/' + congeId + '/';
+        });
+    }
+    </script>
+    {% if user.is_authenticated and user_profile.session_timeout_minutes %}
+    <div id="lock-overlay" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(7,30,40,0.92);backdrop-filter:blur(6px);align-items:center;justify-content:center;font-family:'Sora',sans-serif;">
+      <div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:20px;padding:40px;width:340px;text-align:center;">
+        <div style="display:flex;align-items:center;justify-content:center;width:56px;height:56px;margin:0 auto 16px;border-radius:50%;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
+        <div style="color:#fff;font-size:17px;font-weight:700;margin-bottom:4px;">Session verrouillée</div>
+        <div style="color:rgba(255,255,255,0.5);font-size:12px;margin-bottom:22px;">{{ user.get_full_name|default:user.username }}, entrez votre mot de passe pour continuer.</div>
+        <form id="lock-unlock-form">
+          <input type="password" id="lock-password" placeholder="Mot de passe" autocomplete="current-password"
+            style="width:100%;padding:12px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.08);color:#fff;font-family:'Sora',sans-serif;font-size:14px;outline:none;margin-bottom:10px;box-sizing:border-box;">
+          <div id="lock-error" style="display:none;color:#ff9090;font-size:11.5px;margin-bottom:10px;text-align:left;"></div>
+          <button type="submit" style="width:100%;padding:12px;border:none;border-radius:10px;background:#4f9b4b;color:#fff;font-family:'Sora',sans-serif;font-size:14px;font-weight:700;cursor:pointer;">Déverrouiller →</button>
+        </form>
       </div>
     </div>
+    <script>
+    (function () {
+        var timeoutMinutes = {{ user_profile.session_timeout_minutes }};
+        if (!timeoutMinutes || timeoutMinutes <= 0) return;
+        var timeoutMs = timeoutMinutes * 60 * 1000;
+        var idleTimer = null;
+        var overlay = document.getElementById('lock-overlay');
+        var csrftoken = "{{ csrf_token }}";
+
+        function isLocked() { return overlay.style.display === 'flex'; }
+
+        function showOverlay() {
+            overlay.style.display = 'flex';
+            setTimeout(function () {
+                var pwd = document.getElementById('lock-password');
+                if (pwd) pwd.focus();
+            }, 30);
+        }
+
+        function lockSession() {
+            fetch("{% url 'lock_session' %}", {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrftoken },
+            }).finally(showOverlay);
+        }
+
+        function resetIdleTimer() {
+            if (isLocked()) return;
+            clearTimeout(idleTimer);
+            idleTimer = setTimeout(lockSession, timeoutMs);
+        }
+
+        ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'].forEach(function (evt) {
+            document.addEventListener(evt, resetIdleTimer, { passive: true });
+        });
+
+        resetIdleTimer();
+
+        document.getElementById('lock-unlock-form').addEventListener('submit', function (e) {
+            e.preventDefault();
+            var pwdInput = document.getElementById('lock-password');
+            var errEl = document.getElementById('lock-error');
+            errEl.style.display = 'none';
+            fetch("{% url 'unlock_session' %}", {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrftoken,
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'password=' + encodeURIComponent(pwdInput.value),
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.ok) {
+                    overlay.style.display = 'none';
+                    pwdInput.value = '';
+                    resetIdleTimer();
+                } else {
+                    errEl.textContent = data.error || 'Mot de passe incorrect.';
+                    errEl.style.display = 'block';
+                    pwdInput.value = '';
+                    pwdInput.focus();
+                }
+            })
+            .catch(function () {
+                errEl.textContent = 'Erreur réseau, réessayez.';
+                errEl.style.display = 'block';
+            });
+        });
+    })();
+    </script>
     {% endif %}
-
-    <!-- Déconnexion -->
-    {% if user.is_authenticated %}
-    <form method="post" action="{% url 'logout' %}" style="margin:0;">
-      {% csrf_token %}
-      <button type="submit" class="btn-logout" title="Déconnexion">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-          <polyline points="16 17 21 12 16 7"/>
-          <line x1="21" y1="12" x2="9" y2="12"/>
-        </svg>
-      </button>
-    </form>
-    {% endif %}
-
-  </div>
-</header>
-
-<!-- Bloc de compatibilité (non affiché) -->
-<div style="display:none">{% block topbar_title %}{% endblock %}</div>
-
-<div class="main">
-  <div class="content">
-    {% if messages %}
-      {% for message in messages %}
-        <div class="alert alert-{{ message.tags|default:'info' }}">
-          <span>{{ message }}</span>
-        </div>
-      {% endfor %}
-    {% endif %}
-
-    {% block breadcrumb %}{% endblock %}
-    {% block content %}{% endblock %}
-  </div>
-</div>
-
-<script>
-// Horloge live
-function updateTime() {
-  const pad = n => String(n).padStart(2, '0');
-  const now = new Date();
-  const el = document.getElementById('live-time');
-  if (el) el.textContent = pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
-}
-updateTime();
-setInterval(updateTime, 1000);
-
-// Thème sombre / clair
-(function() {
-  const btn = document.getElementById('theme-toggle');
-  if (!btn) return;
-  btn.addEventListener('click', function() {
-    const html = document.documentElement;
-    const isDark = html.getAttribute('data-theme') === 'dark';
-    if (isDark) { html.removeAttribute('data-theme'); localStorage.setItem('segho-theme', 'light'); }
-    else        { html.setAttribute('data-theme', 'dark'); localStorage.setItem('segho-theme', 'dark'); }
-  });
-})();
-</script>
-
-{% block extra_js %}{% endblock %}
+    {% django_browser_reload_script %}
 </body>
 </html>

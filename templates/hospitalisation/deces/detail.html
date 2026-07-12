@@ -1,0 +1,222 @@
+{% extends 'hospitalisation/base.html' %}
+{% load i18n %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+.content    { padding: 0 !important; }
+.breadcrumb { display: none !important; }
+
+:root { --surface:#fff; --border:#e8edf2; --text:#0d3040; --text-muted:rgba(0,0,0,.45); }
+html[data-theme="dark"] { --surface:#132033; --border:#243044; --text:#d4e6f5; --text-muted:rgba(255,255,255,.45); }
+
+/* ── Subheader ── */
+.det-subhdr {
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 6px 16px; display: flex; align-items: center; gap: 8px;
+  position: fixed; left: 0; right: 0;
+  top: calc(var(--topbar-h, 62px) + 38px); z-index: 190;
+}
+.det-back {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 4px;
+  border: 1px solid var(--border); color: var(--text-muted);
+  text-decoration: none; transition: color .15s, background .15s;
+}
+.det-back:hover { background: var(--teal-50); color: var(--teal-600); border-color: var(--teal-300); }
+.det-crumb { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.det-crumb a { color: var(--teal-600); text-decoration: none; }
+.det-crumb a:hover { text-decoration: underline; }
+.det-crumb .sep { color: var(--text-muted); }
+
+/* ── En-tête ── */
+.det-hdr {
+  display: flex; align-items: center; gap: 16px;
+  padding: 18px 0 14px; border-bottom: 1px solid var(--border);
+}
+.det-hdr-icon {
+  width: 48px; height: 48px; border-radius: 10px;
+  background: #fde8e8; color: #7b1c1c;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; flex-shrink: 0;
+}
+.det-hdr-num { font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+.det-hdr-nom { font-size: 20px; font-weight: 700; color: var(--text); line-height: 1.2; }
+.det-hdr-badges { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+
+/* ── Badges ── */
+.badge { display: inline-block; padding: 2px 10px; border-radius: 3px; font-size: 11.5px; font-weight: 600; }
+.badge-brouillon { background: #fff3cd; color: #5c4a1e; }
+.badge-termine   { background: #d4edda; color: #1a6b3c; }
+
+/* ── Sections ── */
+.det-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; margin-top: 20px; overflow: hidden;
+}
+.det-card-title {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 16px; border-bottom: 1px solid var(--border);
+  font-size: 12px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--teal-700); background: #f8fafb;
+}
+html[data-theme="dark"] .det-card-title { background: #0f1e30; color: var(--teal-300); }
+.det-grid { display: grid; grid-template-columns: repeat(3, 1fr); }
+.det-field {
+  padding: 12px 16px; border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+}
+.det-field:nth-child(3n) { border-right: none; }
+.det-field:nth-last-child(-n+3) { border-bottom: none; }
+.det-field.half { grid-column: span 2; }
+.det-field.full { grid-column: 1 / -1; border-right: none; }
+.det-field.full:last-child, .det-field.half:last-child { border-bottom: none; }
+.det-lbl { font-size: 10.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 3px; }
+.det-val { font-size: 13px; color: var(--text); }
+.det-val.pre { white-space: pre-wrap; }
+.det-val.empty { color: var(--text-muted); font-style: italic; }
+
+/* ── Actions ── */
+.det-actions { margin-top: 20px; display: flex; justify-content: flex-end; gap: 8px; }
+.abtn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 16px; border-radius: 5px; font-size: 13px;
+  font-weight: 500; font-family: inherit; cursor: pointer;
+  text-decoration: none; border: none; transition: background .15s, color .15s;
+}
+.abtn-neutral { background: #f0f4f7; color: var(--text); border: 1px solid var(--border); }
+.abtn-neutral:hover { background: #e0e8ef; }
+
+/* Dark */
+html[data-theme="dark"] .det-card { background: var(--surface); border-color: var(--border); }
+html[data-theme="dark"] .det-field { border-color: var(--border); }
+html[data-theme="dark"] .abtn-neutral { background: #1a2d42; color: var(--text); border-color: var(--border); }
+html[data-theme="dark"] .abtn-neutral:hover { background: #1f3550; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="hist-wrapper"><div class="hist-main">
+<div id="page-wrap">
+
+{# BREADCRUMB #}
+<div class="det-subhdr" data-fixed="1">
+  <a href="{% url 'hospitalisation:deces_list' %}" class="det-back" title="Retour">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <div class="det-crumb">
+    <a href="{% url 'hospitalisation:deces_list' %}">Registre des décès</a>
+    <span class="sep">/</span>
+    <span>{{ deces.code }}</span>
+  </div>
+  <div style="margin-left:auto;">
+    {% if peut_modifier %}
+    <a href="{% url 'hospitalisation:deces_edit' deces.pk %}" class="abtn abtn-neutral"
+       style="font-size:11.5px;padding:4px 12px;">
+      <i class="bi bi-pencil-square"></i> Modifier
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+{# EN-TÊTE #}
+<div class="det-hdr">
+  <div class="det-hdr-icon"><i class="bi bi-journal-x"></i></div>
+  <div>
+    <div class="det-hdr-num">Code {{ deces.code }}</div>
+    <div class="det-hdr-nom">{{ deces.patient.nom }} {{ deces.patient.prenoms }}</div>
+    <div class="det-hdr-badges">
+      {% if deces.statut == 'termine' %}
+      <span class="badge badge-termine"><i class="bi bi-check-circle-fill"></i> Terminé</span>
+      {% else %}
+      <span class="badge badge-brouillon"><i class="bi bi-pencil"></i> Brouillon</span>
+      {% endif %}
+      <span style="font-size:12px;color:var(--text-muted);">Enregistré le {{ deces.cree_le|date:"d/m/Y à H:i" }}</span>
+    </div>
+  </div>
+</div>
+
+{# PATIENT #}
+<div class="det-card">
+  <div class="det-card-title"><i class="bi bi-person"></i> Patient</div>
+  <div class="det-grid">
+    <div class="det-field half">
+      <div class="det-lbl">Nom complet</div>
+      <div class="det-val">{{ deces.patient.nom }} {{ deces.patient.prenoms }}</div>
+    </div>
+    <div class="det-field">
+      <div class="det-lbl">N° Dossier patient</div>
+      <div class="det-val" style="font-family: var(--font-mono);">
+        <a href="{% url 'patients:detail' deces.patient.pk %}" style="color:var(--teal-600);text-decoration:none;">
+          {{ deces.patient.code_patient }}
+        </a>
+      </div>
+    </div>
+    <div class="det-field">
+      <div class="det-lbl">Genre</div>
+      <div class="det-val">{{ deces.patient.get_sexe_display }}</div>
+    </div>
+    <div class="det-field">
+      <div class="det-lbl">Âge</div>
+      <div class="det-val">{{ deces.patient.age }} ans</div>
+    </div>
+  </div>
+</div>
+
+{# DÉCÈS #}
+<div class="det-card">
+  <div class="det-card-title"><i class="bi bi-calendar-x"></i> Informations sur le décès</div>
+  <div class="det-grid">
+    <div class="det-field">
+      <div class="det-lbl">Date de décès</div>
+      <div class="det-val">{{ deces.date_deces|date:"d/m/Y" }}</div>
+    </div>
+    <div class="det-field half">
+      <div class="det-lbl">Docteur</div>
+      <div class="det-val">
+        {% if deces.medecin %}Dr. {{ deces.medecin.nom }} {{ deces.medecin.prenoms }}
+        {% else %}<span class="empty">—</span>{% endif %}
+      </div>
+    </div>
+    <div class="det-field full">
+      <div class="det-lbl">Raison du décès</div>
+      <div class="det-val pre">{{ deces.raison_deces|default:"—" }}</div>
+    </div>
+    {% if deces.remarques %}
+    <div class="det-field full">
+      <div class="det-lbl">Remarques</div>
+      <div class="det-val pre">{{ deces.remarques }}</div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{# HOSPITALISATION LIÉE #}
+{% if deces.hospitalisation %}
+<div class="det-card">
+  <div class="det-card-title"><i class="bi bi-hospital"></i> Hospitalisation liée</div>
+  <div style="padding:14px 16px;">
+    <a href="{% url 'hospitalisation:detail' deces.hospitalisation.pk %}"
+       style="color:var(--teal-600);font-weight:600;text-decoration:none;font-size:13px;">
+      <i class="bi bi-box-arrow-up-right" style="font-size:11px;"></i>
+      {{ deces.hospitalisation.numero }} — {{ deces.hospitalisation.get_statut_display }}
+    </a>
+  </div>
+</div>
+{% endif %}
+
+{# ACTIONS #}
+<div class="det-actions">
+  {% if peut_modifier %}
+  <a href="{% url 'hospitalisation:deces_edit' deces.pk %}" class="abtn abtn-neutral">
+    <i class="bi bi-pencil"></i> Modifier cet enregistrement
+  </a>
+  {% endif %}
+</div>
+
+</div><!-- /page-wrap -->
+</div>
+{% load core_tags %}
+{% historique_sidebar deces %}
+</div>
+{% endblock %}

@@ -1,0 +1,146 @@
+{% extends 'stock/base.html' %}
+{% block breadcrumb %}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'services/includes/layout_css.html' %}
+{% include 'services/includes/form_css.html' %}
+{% include 'services/includes/article_form_css.html' %}
+{% endblock %}
+
+{% block content %}
+
+<div class="action-bar">
+  <div class="action-bar-breadcrumb">
+    <a href="{% if edit and obj %}{% url 'stock_unite_detail' obj.pk %}{% else %}{% url 'stock_unites' %}{% endif %}" class="btn-form-cancel" style="padding:3px 7px;">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <a href="{% url 'stock_unites' %}">Unités de mesure</a>
+    {% if edit and obj %}
+    <span class="sep">/</span>
+    <a href="{% url 'stock_unite_detail' obj.pk %}">{{ obj.nom }}</a>
+    {% endif %}
+    <span class="sep">/</span>
+    <span class="current">{{ titre }}</span>
+    {% if edit and obj %}<span class="code-badge" style="margin-left:6px;">{{ obj.code }}</span>{% endif %}
+  </div>
+  <div class="action-bar-buttons">
+    <a href="{% if edit and obj %}{% url 'stock_unite_detail' obj.pk %}{% else %}{% url 'stock_unites' %}{% endif %}" class="btn-form-cancel">Annuler</a>
+    <button type="submit" form="unite-form" class="btn-form-submit">Enregistrer</button>
+  </div>
+</div>
+
+<form method="post" novalidate id="unite-form">
+  {% csrf_token %}
+  <div class="form-simple-card">
+
+    <div class="tab-two-col">
+      <div>
+        <div class="form-field">
+          <label class="field-label" for="{{ form.nom.id_for_label }}">Nom <span class="required-star">*</span></label>
+          {{ form.nom }}
+          {% if form.nom.errors %}<div class="field-error">{{ form.nom.errors.0 }}</div>{% endif %}
+        </div>
+
+        <div class="form-field">
+          <label class="field-label" for="{{ form.code.id_for_label }}">Abréviation <span class="required-star">*</span></label>
+          {{ form.code }}
+          {% if form.code.errors %}<div class="field-error">{{ form.code.errors.0 }}</div>{% endif %}
+          <div class="f-hint">Exemple : ml, mg, cp, L, kg…</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="form-field">
+          <label class="field-label" for="{{ form.categorie.id_for_label }}">Catégorie</label>
+          {{ form.categorie }}
+          {% if form.categorie.errors %}<div class="field-error">{{ form.categorie.errors.0 }}</div>{% endif %}
+          <div class="f-hint">
+            <a href="{% url 'stock_categorie_unite_create' %}" style="color:var(--accent);">+ Créer une catégorie d'unité</a>
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label class="field-label" for="{{ form.type_unite.id_for_label }}">Type <span class="required-star">*</span></label>
+          {{ form.type_unite }}
+          {% if form.type_unite.errors %}<div class="field-error">{{ form.type_unite.errors.0 }}</div>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-two-col">
+      <div class="form-field">
+        <label class="field-label" for="{{ form.ratio.id_for_label }}">Ratio <span class="required-star">*</span></label>
+        {{ form.ratio }}
+        {% if form.ratio.errors %}<div class="field-error">{{ form.ratio.errors.0 }}</div>{% endif %}
+        <div class="f-hint">1.000000 pour l'unité de référence de la catégorie.</div>
+      </div>
+      <div class="form-field">
+        <label class="field-label" for="{{ form.precision_arrondi.id_for_label }}">Précision d'arrondi</label>
+        {{ form.precision_arrondi }}
+        {% if form.precision_arrondi.errors %}<div class="field-error">{{ form.precision_arrondi.errors.0 }}</div>{% endif %}
+        <div class="f-hint">Ex : 0.01000 pour 2 décimales.</div>
+      </div>
+    </div>
+
+    <div class="form-field" style="display:flex;align-items:center;gap:10px;">
+      <label class="toggle-switch">
+        {{ form.actif }}
+        <span class="toggle-slider"></span>
+      </label>
+      <span style="font-size:12.5px;color:var(--text-muted);">Unité active</span>
+    </div>
+
+  </div>
+</form>
+
+{% if edit and obj %}
+<div class="f-danger" style="margin-top:16px;">
+  <div class="f-danger-text">
+    <strong>Zone de danger</strong>
+    La suppression de cette unité est irréversible. Elle ne sera plus disponible dans les formulaires.
+  </div>
+  <button type="button" class="o-btn-danger"
+    onclick="document.getElementById('delete-modal').classList.add('open')">
+    <i class="bi bi-trash"></i> Supprimer
+  </button>
+</div>
+
+<div class="modal-overlay" id="delete-modal">
+  <div class="modal-box">
+    <div class="modal-icon">🗑️</div>
+    <div class="modal-title">Confirmer la suppression</div>
+    <div class="modal-msg">
+      Voulez-vous vraiment supprimer l'unité<br>
+      <strong>{{ obj.nom }} ({{ obj.code }})</strong> ?<br>
+      <span style="font-size:11px;color:var(--text-muted);">Cette action est irréversible.</span>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn-modal-cancel"
+        onclick="document.getElementById('delete-modal').classList.remove('open')">
+        Annuler
+      </button>
+      <form method="post" action="{% url 'stock_unite_delete' obj.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="btn-modal-confirm">Supprimer</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var cb = document.getElementById('{{ form.actif.id_for_label }}');
+  if (cb) cb.style.cssText = 'position:absolute;opacity:0;width:0;height:0;';
+
+  var modal = document.getElementById('delete-modal');
+  if (modal) modal.addEventListener('click', function (e) {
+    if (e.target === this) this.classList.remove('open');
+  });
+});
+</script>
+{% endblock %}

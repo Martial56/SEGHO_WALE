@@ -1,0 +1,258 @@
+{% extends 'employer/base.html' %}
+{% load static %}
+
+{% block topbar_title %}Registre unique du personnel{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+.reg-head {
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:14px 32px;flex-wrap:wrap;
+  position:sticky;top:var(--topbar-h);z-index:100;
+  background:#f0f6fa;border-bottom:1px solid rgba(0,0,0,0.05);
+  box-shadow:0 2px 8px rgba(0,0,0,0.04);
+}
+html[data-theme="dark"] .reg-head{background:#171616;border-bottom-color:rgba(255,255,255,0.05);}
+
+.reg-title{font-size:17px;font-weight:800;color:var(--rh-900);}
+html[data-theme="dark"] .reg-title{color:var(--rh-200);}
+
+.reg-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+
+.reg-filter{
+  display:flex;align-items:center;gap:6px;
+  background:var(--rh-surface);border:1px solid var(--rh-border);
+  border-radius:8px;padding:5px 12px;font-size:13px;
+}
+.reg-filter select{border:none;background:transparent;color:var(--rh-text);
+  font-size:13px;font-family:'Sora',sans-serif;outline:none;cursor:pointer;}
+html[data-theme="dark"] .reg-filter{background:var(--rh-surface);border-color:var(--rh-border);}
+html[data-theme="dark"] .reg-filter select{color:var(--rh-text);}
+
+/* ── Tableau ── */
+.reg-wrap{margin-top:20px;box-shadow:0 2px 16px rgba(27,67,50,0.08);}
+.reg-table{width:100%;border-collapse:collapse;font-size:11.5px;
+  background:var(--rh-surface);table-layout:fixed;}
+.reg-table thead tr{background:var(--rh-500);color:#fff;}
+.reg-table thead th{
+  padding:8px 10px;font-weight:700;font-size:10.5px;
+  text-transform:uppercase;letter-spacing:0.3px;text-align:left;
+  border-right:1px solid rgba(255,255,255,0.1);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.reg-table thead th:last-child{border-right:none;}
+.reg-table tbody tr{border-bottom:1px solid var(--rh-border);}
+.reg-table tbody tr:nth-child(even){background:var(--rh-50);}
+.reg-table tbody tr:hover{background:rgba(var(--rh-600-rgb),0.07);}
+.reg-table tbody td{padding:7px 10px;color:var(--rh-text);vertical-align:middle;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.reg-table tbody td.obs{white-space:normal;font-size:11px;color:var(--rh-muted);}
+
+.reg-num{font-size:10.5px;color:var(--rh-muted);text-align:center;}
+.reg-mat{font-weight:700;font-family: var(--font-mono);font-size:11px;color:var(--rh-600);}
+.reg-nom{font-weight:600;}
+.reg-date{font-variant-numeric:tabular-nums;font-size:12px;}
+
+html[data-theme="dark"] .reg-table thead tr{background:var(--rh-800);}
+html[data-theme="dark"] .reg-table tbody tr:nth-child(even){background:var(--rh-100);}
+html[data-theme="dark"] .reg-table tbody tr:hover{background:rgba(122,170,98,0.1);}
+
+/* ── Stats ── */
+.reg-stats{display:flex;gap:12px;flex-wrap:wrap;margin-top:16px;}
+.reg-stat{
+  background:var(--rh-surface);border:1px solid var(--rh-border);
+  border-radius:10px;padding:10px 18px;display:flex;flex-direction:column;gap:2px;
+  box-shadow:0 1px 4px rgba(27,67,50,0.06);
+}
+.reg-stat-val{font-size:22px;font-weight:800;color:var(--rh-700);}
+.reg-stat-lbl{font-size:11px;color:var(--rh-muted);text-transform:uppercase;letter-spacing:0.3px;}
+html[data-theme="dark"] .reg-stat{background:var(--rh-surface);border-color:var(--rh-border);}
+html[data-theme="dark"] .reg-stat-val{color:var(--rh-300);}
+
+/* ── Pagination ── */
+.rh-pagination { display:flex; justify-content:center; align-items:center; gap:6px; padding:20px 32px; flex-wrap:wrap; }
+.rh-page-link { display:inline-flex;align-items:center;justify-content:center; min-width:32px;height:32px;padding:0 8px; border-radius:6px; font-size:13px;font-weight:600; text-decoration:none; color:var(--rh-700); background:#fff; border:1px solid var(--rh-200); transition:all .15s; }
+.rh-page-link:hover { background:var(--rh-50); border-color:var(--rh-400); }
+.rh-page-link.active { background:var(--rh-600); color:#fff; border-color:var(--rh-600); }
+.rh-page-link.disabled { opacity:.35; pointer-events:none; }
+html[data-theme="dark"] .rh-page-link { background:var(--rh-surface); border-color:var(--rh-border); color:var(--rh-300); }
+html[data-theme="dark"] .rh-page-link.active { background:var(--rh-600); color:#fff; border-color:var(--rh-600); }
+
+/* ── Impression ── */
+@media print {
+  .reg-head,.o-nav,.reg-stats,.print-hide{display:none!important;}
+  body,html{background:#fff!important;}
+  .reg-wrap{box-shadow:none;border-radius:0;overflow:visible;}
+  .reg-table{font-size:9pt;}
+  .reg-table thead tr{background:#071e28!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .reg-table tbody tr:nth-child(even){background:#e8f2f8!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .print-header{display:block!important;margin-bottom:14px;}
+  .content{padding:10mm 12mm !important;}
+  @page{size:A3 landscape;margin:0;}
+}
+.print-header{display:none;}
+.print-header-inner{display:flex;align-items:center;gap:14px;padding-bottom:10px;border-bottom:2.5px solid var(--rh-700);}
+.print-header-logo{height:56px;width:auto;flex-shrink:0;}
+.print-header-org{font-size:15px;font-weight:800;color:#071e28;text-transform:uppercase;letter-spacing:.06em;line-height:1.2;}
+.print-header-subtitle{font-size:9.5px;color:#666;margin-top:1px;letter-spacing:.03em;}
+.print-header-doc{font-size:12px;font-weight:700;color:var(--rh-700);margin-top:5px;text-transform:uppercase;letter-spacing:.05em;}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="reg-head" id="subheader">
+  <div>
+    <div class="reg-title"><i class="bi bi-journal-bookmark-fill" style="color:var(--rh-600);"></i> Registre unique du personnel</div>
+    <div style="font-size:12px;color:var(--rh-muted);margin-top:2px;">
+      Conformément au Code du Travail ivoirien — {% now "d/m/Y" %}
+    </div>
+  </div>
+  <div class="reg-actions">
+    <!-- Filtre statut -->
+    <form method="get" style="display:contents;">
+      <div class="reg-filter">
+        <i class="bi bi-funnel" style="color:var(--rh-600);font-size:13px;"></i>
+        <select name="statut" onchange="this.form.submit()">
+          <option value="" {% if not statut_filtre %}selected{% endif %}>Tous les statuts</option>
+          <option value="actif"    {% if statut_filtre == 'actif' %}selected{% endif %}>Actifs</option>
+          <option value="suspendu" {% if statut_filtre == 'suspendu' %}selected{% endif %}>Suspendus</option>
+          <option value="quitte"   {% if statut_filtre == 'quitte' %}selected{% endif %}>Quittés</option>
+        </select>
+      </div>
+    </form>
+    <!-- Export Excel -->
+    <a href="{% url 'rh_registre_export' %}{% if statut_filtre %}?statut={{ statut_filtre }}{% endif %}"
+       class="btn-rh-outline print-hide">
+      <i class="bi bi-file-earmark-excel-fill" style="color:var(--rh-700);"></i> Export Excel
+    </a>
+    <!-- Imprimer -->
+    <button onclick="window.print()" class="btn-rh print-hide">
+      <i class="bi bi-printer-fill"></i> Imprimer
+    </button>
+  </div>
+</div>
+
+<!-- Stats -->
+<div class="reg-stats">
+  {% with actifs=employes|length %}
+  <div class="reg-stat">
+    <span class="reg-stat-val">{{ employes|length }}</span>
+    <span class="reg-stat-lbl">{% if statut_filtre %}Filtrés{% else %}Total{% endif %}</span>
+  </div>
+  {% endwith %}
+  {% if not statut_filtre %}
+  <div class="reg-stat">
+    <span class="reg-stat-val">
+      {{ employes|dictsort:"statut"|length }}
+    </span>
+    <span class="reg-stat-lbl">Actifs</span>
+  </div>
+  {% endif %}
+</div>
+
+<!-- En-tête impression -->
+<div class="print-header">
+  <div class="print-header-inner">
+    <img src="{% static 'img/logo.png' %}" alt="Logo WALÉ" class="print-header-logo">
+    <div>
+      <div class="print-header-org">Centre Médico-Social WALÉ</div>
+      <div class="print-header-subtitle">Yamoussoukro — Côte d'Ivoire</div>
+      <div class="print-header-doc">Registre unique du personnel</div>
+    </div>
+  </div>
+</div>
+
+<!-- Tableau -->
+<div class="reg-wrap">
+  <table class="reg-table">
+    <thead>
+      <tr>
+        <th style="width:2.5%;text-align:center;">N°</th>
+        <th style="width:7%;">Matricule</th>
+        <th style="width:13%;">Nom & Prénoms</th>
+        <th style="width:2.5%;text-align:center;">Sx</th>
+        <th style="width:6%;">Dt. naiss.</th>
+        <th style="width:7%;">Lieu naiss.</th>
+        <th style="width:6%;">Nationalité</th>
+        <th style="width:8%;">Fonction</th>
+        <th style="width:8%;">Service</th>
+        <th style="width:7%;">Contrat</th>
+        <th style="width:6%;">Dt. emb.</th>
+        <th style="width:6%;">Dt. fin</th>
+        <th style="width:7%;">Statut</th>
+        <th style="width:13%;">Observations</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for emp in employes %}
+      <tr>
+        <td class="reg-num">{{ forloop.counter }}</td>
+        <td class="reg-mat">{{ emp.matricule }}</td>
+        <td class="reg-nom">{{ emp.nom }} {{ emp.prenoms }}</td>
+        <td style="text-align:center;">{{ emp.get_sexe_display|first|default:"—" }}</td>
+        <td class="reg-date">{{ emp.date_naissance|date:"d/m/Y"|default:"—" }}</td>
+        <td>{{ emp.lieu_naissance|default:"—" }}</td>
+        <td>{{ emp.nationalite|default:"—" }}</td>
+        <td>{{ emp.fonction.nom|default:"—" }}</td>
+        <td>{{ emp.service.nom|default:"—" }}</td>
+        <td>{{ emp.type_contrat.nom|default:"—" }}</td>
+        <td class="reg-date">{{ emp.date_embauche|date:"d/m/Y"|default:"—" }}</td>
+        <td class="reg-date">{{ emp.date_fin_contrat|date:"d/m/Y"|default:"—" }}</td>
+        <td>
+          {% if emp.statut == 'actif' %}
+            <span class="badge-actif">Actif</span>
+          {% elif emp.statut == 'suspendu' %}
+            <span class="badge-suspendu">Suspendu</span>
+          {% else %}
+            <span class="badge-quitte">Quitté</span>
+          {% endif %}
+        </td>
+        <td class="obs">{{ emp.notes|default:""|truncatechars:60 }}</td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="14" style="text-align:center;padding:32px;color:var(--rh-muted);font-style:italic;">
+          Aucun employé trouvé
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if page_obj.has_other_pages %}
+<div class="rh-pagination">
+  {% if page_obj.has_previous %}
+    <a href="?{% if statut_filtre %}statut={{ statut_filtre }}&{% endif %}page=1" class="rh-page-link" title="Première page"><i class="bi bi-chevron-double-left"></i></a>
+    <a href="?{% if statut_filtre %}statut={{ statut_filtre }}&{% endif %}page={{ page_obj.previous_page_number }}" class="rh-page-link"><i class="bi bi-chevron-left"></i></a>
+  {% else %}
+    <span class="rh-page-link disabled"><i class="bi bi-chevron-double-left"></i></span>
+    <span class="rh-page-link disabled"><i class="bi bi-chevron-left"></i></span>
+  {% endif %}
+
+  {% for num in page_obj.paginator.page_range %}
+    {% if num == page_obj.number %}
+      <span class="rh-page-link active">{{ num }}</span>
+    {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
+      <a href="?{% if statut_filtre %}statut={{ statut_filtre }}&{% endif %}page={{ num }}" class="rh-page-link">{{ num }}</a>
+    {% endif %}
+  {% endfor %}
+
+  {% if page_obj.has_next %}
+    <a href="?{% if statut_filtre %}statut={{ statut_filtre }}&{% endif %}page={{ page_obj.next_page_number }}" class="rh-page-link"><i class="bi bi-chevron-right"></i></a>
+    <a href="?{% if statut_filtre %}statut={{ statut_filtre }}&{% endif %}page={{ page_obj.paginator.num_pages }}" class="rh-page-link" title="Dernière page"><i class="bi bi-chevron-double-right"></i></a>
+  {% else %}
+    <span class="rh-page-link disabled"><i class="bi bi-chevron-right"></i></span>
+    <span class="rh-page-link disabled"><i class="bi bi-chevron-double-right"></i></span>
+  {% endif %}
+
+  <span style="font-size:12px;color:var(--rh-muted);margin-left:8px;">
+    Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+    &nbsp;·&nbsp; {{ page_obj.paginator.count }} employé{% if page_obj.paginator.count != 1 %}s{% endif %}
+  </span>
+</div>
+{% endif %}
+
+{% endblock %}

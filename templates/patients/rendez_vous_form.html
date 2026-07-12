@@ -3,6 +3,7 @@
 {% block topbar_title %}{{ titre }}{% endblock %}
 
 {% block extra_css %}
+{{ block.super }}
 <style>
     /* ── Control panel ── */
     .control-panel {
@@ -10,47 +11,43 @@
         border-bottom: 1px solid rgba(0,0,0,0.08);
         position: sticky;
         top: 0;
-        z-index: 100;
+        z-index: 490;
+        margin: 0 -32px;
     }
     .cp-top {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 10px 24px;
+        padding: 6px 16px;
         gap: 12px;
     }
-    .cp-breadcrumb {
-        display: flex; align-items: center; gap: 6px;
-        font-size: 14px; font-weight: 600;
-    }
-    .cp-breadcrumb a { color: var(--teal-600); text-decoration: none; font-weight: 600; }
-    .cp-breadcrumb a:hover { color: var(--teal-500); }
-    .cp-breadcrumb .sep { color: #bbb; font-weight: 400; }
-    .cp-breadcrumb .current { color: rgba(0,0,0,0.45); font-weight: 500; }
 
     .cp-save-group { display: flex; gap: 8px; align-items: center; }
     .btn-save {
+        display: inline-flex; align-items: center; gap: 5px;
         background: var(--teal-500); color: #fff;
-        border: none; border-radius: 6px;
-        padding: 8px 20px; font-size: 13px; font-weight: 700;
+        border: none; border-radius: var(--radius-xs, 4px);
+        padding: 6px 14px; font-size: 12.5px; font-weight: 600;
         cursor: pointer; font-family: 'Sora', sans-serif;
-        transition: background 0.15s;
+        text-decoration: none; transition: background 0.15s; white-space: nowrap; flex-shrink: 0;
     }
-    .btn-save:hover { background: var(--teal-600); }
+    .btn-save:hover { background: var(--teal-600); color: #fff; }
     .btn-discard {
-        background: transparent; color: rgba(0,0,0,0.55);
-        border: 1px solid rgba(0,0,0,0.15); border-radius: 6px;
-        padding: 8px 16px; font-size: 13px; font-weight: 600;
+        display: inline-flex; align-items: center; gap: 5px;
+        border: 1px solid var(--border); border-radius: 4px;
+        background: var(--surface); color: var(--text-muted);
+        padding: 5px 14px; font-size: 12.5px; font-weight: 500;
         cursor: pointer; font-family: 'Sora', sans-serif;
-        text-decoration: none; transition: all 0.15s;
+        text-decoration: none; transition: border-color 0.15s, color 0.15s, background 0.15s; white-space: nowrap;
     }
-    .btn-discard:hover { border-color: var(--rose); color: var(--rose); }
+    .btn-discard:hover { border-color: #aaa; color: var(--text); background: rgba(0,0,0,.03); }
 
     /* ── Workflow row (action buttons + status bar) ── */
     .cp-workflow-row {
         display: flex; align-items: center; justify-content: space-between;
-        padding: 0 16px 8px;
-        border-top: 1px solid rgba(0,0,0,0.06);
+        padding: 0 0 16px;
+        margin: 0;
+        border-bottom: 1px solid rgba(0,0,0,0.06);
         gap: 12px; flex-wrap: wrap;
     }
 
@@ -87,8 +84,8 @@
     .eval-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid rgba(0,0,0,0.06); }
     .eval-status { font-size: 12px; color: rgba(0,0,0,0.4); font-style: italic; }
     .btn-eval { background: var(--teal-600); color: #fff; border: none; border-radius: 6px; padding: 6px 14px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'Sora', sans-serif; letter-spacing: 0.03em; transition: background 0.15s; }
-    .btn-eval:hover { background: var(--teal-700,#00796b); }
-    .eval-field:not(:disabled) { border-bottom: 1px solid var(--teal-300,#80cbc4) !important; background: transparent; }
+    .btn-eval:hover { background: var(--teal-700,var(--teal-600)); }
+    .eval-field:not(:disabled) { border-bottom: 1px solid var(--teal-300,#7ab8d0) !important; background: transparent; }
     .eval-edit-hint { display: none; align-items: center; gap: 6px; font-size: 11.5px; color: var(--teal-600); font-style: italic; }
     .f-tab-val-row { display: flex; align-items: center; gap: 6px; }
 
@@ -116,7 +113,7 @@
     .status-step .step-dot { display: none; }
 
     /* ── Form body ── */
-    .form-body { background: #fff; padding: 28px 28px 0; }
+    .form-body { background: #fff; margin-top: 16px; padding: 24px 28px 0; border-radius: 8px 8px 0 0; }
 
     /* ── Two-column main layout ── */
     .form-main-grid {
@@ -124,6 +121,7 @@
         grid-template-columns: 1fr 1fr;
         gap: 32px 48px;
         padding-bottom: 28px;
+        margin-top: 20px;
         border-bottom: 1px solid rgba(0,0,0,0.07);
     }
 
@@ -281,7 +279,8 @@
 
     /* ── Onglets f-tab ── */
     .f-tabs-wrap { background: #fff; border: 1px solid rgba(0,0,0,0.08); border-radius: 4px; overflow: hidden; }
-    .f-tabs { display: flex; border-bottom: 1px solid rgba(0,0,0,0.08); overflow-x: auto; }
+    .f-tabs { display: flex; border-bottom: 1px solid rgba(0,0,0,0.08); overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
+    .f-tabs::-webkit-scrollbar { display: none; }
     .f-tab {
         padding: 8px 14px; font-size: 12.5px; color: rgba(0,0,0,0.45);
         border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap;
@@ -312,7 +311,7 @@
     .f-tab-pain-label { font-size: 11.5px; color: rgba(0,0,0,0.4); margin-top: 2px; }
     .f-tab-sep { border: none; border-top: 1px solid rgba(0,0,0,0.08); margin: 14px 0 10px; }
     .f-tab-user-chip { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 500; color: var(--teal-900); }
-    .f-tab-user-av { width: 24px; height: 24px; border-radius: 50%; background: #2e7d32; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 10px; font-weight: 700; flex-shrink: 0; }
+    .f-tab-user-av { width: 24px; height: 24px; border-radius: 50%; background: var(--teal-600); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 10px; font-weight: 700; flex-shrink: 0; }
     .f-select { width: 100%; border: none; outline: none; font-size: 12.5px; color: var(--teal-900); background: transparent; padding: 3px 0; cursor: pointer; appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23999'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 4px center; }
 
     /* ── Activité latérale ── */
@@ -322,7 +321,7 @@
     .f-activity-item { display: flex; gap: 10px; padding: 10px 14px; border-bottom: 1px solid #f9f9f9; }
     .f-avatar { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: #fff; flex-shrink: 0; }
     .f-avatar-purple { background: var(--teal-600); }
-    .f-avatar-green  { background: #2e7d32; }
+    .f-avatar-green  { background: var(--teal-600); }
     .f-avatar-teal   { background: var(--teal-500); }
     .f-activity-body { flex: 1; }
     .f-activity-who { font-size: 12px; font-weight: 500; color: var(--teal-900); }
@@ -341,7 +340,7 @@
     .cpn-sel { border: none; outline: none; font-size: 12.5px; color: var(--teal-900); background: transparent; padding: 3px 0; width: 100%; cursor: pointer; appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23999'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 4px center; font-family: 'Sora', sans-serif; }
     .cpn-unit { font-size: 11px; color: rgba(0,0,0,0.4); white-space: nowrap; flex-shrink: 0; }
     .cpn-inp-ro { color: var(--text-muted) !important; cursor: not-allowed; background: transparent; border: none; outline: none; font-size: 12.5px; padding: 3px 0; width: 100%; font-family: 'Sora', sans-serif; }
-    .cpn-ro-badge { font-size: 10px; color: var(--teal-600); background: var(--teal-50); border: 1px solid var(--teal-200,#b2dfdb); border-radius: 3px; padding: 1px 5px; white-space: nowrap; margin-left: 4px; }
+    .cpn-ro-badge { font-size: 10px; color: var(--teal-600); background: var(--teal-50); border: 1px solid var(--teal-200,#a8c8d8); border-radius: 3px; padding: 1px 5px; white-space: nowrap; margin-left: 4px; }
     .cpn-radios { display: flex; align-items: center; gap: 14px; }
     .cpn-radios label { display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--teal-900); cursor: pointer; white-space: nowrap; }
     .cpn-sep { border: none; border-top: 1px solid rgba(0,0,0,0.08); margin: 16px 0; }
@@ -357,13 +356,13 @@
     .patho-ms-placeholder { font-size: 12.5px; color: #aaa; }
     .patho-ms-tag {
       display: inline-flex; align-items: center; gap: 3px;
-      background: var(--teal-50); border: 1px solid var(--teal-200,#b2dfdb);
-      color: var(--teal-700,#00695c); border-radius: 3px;
+      background: var(--teal-50); border: 1px solid var(--teal-200,#a8c8d8);
+      color: var(--teal-700,var(--teal-700)); border-radius: 3px;
       font-size: 11.5px; padding: 1px 5px; max-width: 180px;
     }
     .patho-ms-tag span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .patho-ms-tag-rm { cursor: pointer; font-size: 13px; line-height: 1; color: var(--teal-500); flex-shrink: 0; }
-    .patho-ms-tag-rm:hover { color: #b71c1c; }
+    .patho-ms-tag-rm:hover { color: var(--rose-text); }
     .patho-ms-arrow { font-size: 10px; color: #999; flex-shrink: 0; transition: transform 0.15s; }
     .patho-ms.open .patho-ms-arrow { transform: rotate(180deg); }
     .patho-ms-panel {
@@ -390,7 +389,7 @@
     html[data-theme="dark"] .patho-ms-panel { background: #1a2535; border-color: #2e3f58; }
     html[data-theme="dark"] .patho-ms-search { background: #0f1b2b; border-color: #2e3f58; color: var(--text); }
     html[data-theme="dark"] .patho-ms-item { color: var(--text); }
-    html[data-theme="dark"] .patho-ms-item:hover { background: rgba(33,136,171,0.18); }
+    html[data-theme="dark"] .patho-ms-item:hover { background: rgba(var(--teal-500-rgb),0.18); }
 
     /* ── Table APGAR ── */
     .acc-apgar { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-bottom: 4px; }
@@ -446,18 +445,11 @@
         .status-bar { flex-wrap: wrap; }
         .timing-section { grid-template-columns: 1fr; }
     }
+    .content { padding-top: 0 !important; overflow-x: hidden; }
 </style>
 {% endblock %}
 
-{% block breadcrumb %}
-<nav class="breadcrumb">
-    <a href="{% url 'dashboard' %}"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z"/><polyline points="9 21 9 12 15 12 15 21"/></svg>Accueil</a>
-    <span class="breadcrumb-sep">›</span>
-    <a href="{% url 'patients:rdv_global' %}">Rendez-vous</a>
-    <span class="breadcrumb-sep">›</span>
-    <span>{% if rdv %}{{ rdv.patient.nom }} {{ rdv.patient.prenoms }}{% else %}Nouveau{% endif %}</span>
-</nav>
-{% endblock %}
+{% block breadcrumb %}{% endblock %}
 
 {% block content %}
 
@@ -471,23 +463,31 @@
 <form method="post" novalidate id="rdv-form"
       data-is-new="{{ is_new|yesno:'1,0' }}"
       data-confirme-facture="{% if rdv and rdv.statut == 'confirme' and facture_payee %}1{% else %}0{% endif %}"
-      data-statut="{{ rdv.statut|default:'' }}">
+      data-statut="{{ rdv.statut|default:'' }}"
+      data-has-consultation="{% if consultation %}1{% else %}0{% endif %}">
 {% csrf_token %}
 
 <!-- ══════════════ PANNEAU DE CONTRÔLE ══════════════ -->
 <div class="control-panel">
-
     <div class="cp-top">
-        <div class="cp-breadcrumb">
-            <a href="{% url 'patients:rdv_global' %}">Rendez-vous</a>
-            <span class="sep">/</span>
-            <span class="current">{% if rdv %}{{ rdv.patient.nom }} {{ rdv.patient.prenoms }}{% else %}Nouveau{% endif %}</span>
-        </div>
+        <a href="{% url 'patients:rdv_global' %}" class="o-ctrl-btn" style="padding:3px 7px;" title="Retour aux rendez-vous">
+            <i class="bi bi-arrow-left"></i>
+        </a>
+        <span style="font-size:13.5px;color:var(--text-muted);">
+            <a href="{% url 'patients:rdv_global' %}" style="color:var(--teal-600);text-decoration:none;font-weight:500;">Rendez-vous</a>
+            <span style="margin:0 5px;opacity:.4;">/</span>
+            <span style="color:var(--text);">{% if rdv %}{{ rdv.patient.nom }} {{ rdv.patient.prenoms }}{% else %}Nouveau{% endif %}</span>
+        </span>
+        <div style="flex:1;"></div>
         <div class="cp-save-group">
             <button type="submit" class="btn-save">{% if rdv %}Enregistrer{% else %}Sauvegarder et facturer{% endif %}</button>
             <a href="{% url 'patients:rdv_global' %}" class="btn-discard">Ignorer</a>
         </div>
     </div>
+</div>
+
+<!-- ══════════════ CORPS DU FORMULAIRE ══════════════ -->
+<div class="form-body">
 
     <div class="cp-workflow-row">
 
@@ -496,28 +496,30 @@
                 {# Nouveau RDV — pas encore de boutons d'action #}
             {% elif rdv.statut == 'planifie' %}
                 <button type="submit" name="_action" value="confirmer" class="btn-action btn-teal"
-                    {% if not facture_payee %}disabled title="Une facture payée est requise pour confirmer ce rendez-vous"{% endif %}>Confirmer</button>
-                <button type="submit" name="_action" value="créer une facture" class="btn-action">Créer une facture</button>
+                    {% if not facture_payee %}disabled title="Sauvegardez et créez d'abord une facture pour confirmer ce rendez-vous"{% endif %}>Confirmer</button>
             {% elif rdv.statut == 'confirme' %}
-                <button type="button" class="btn-action btn-teal" id="btn-modifier">
-                    <i class="bi bi-pencil"></i> Modifier
-                </button>
-                <div id="edit-actions" style="display:none;gap:6px;align-items:center;">
-                    <button type="submit" name="_action" value="en_attente" class="btn-action btn-waiting"
-                        {% if not consultation %}disabled title="L'évaluation clinique doit être enregistrée d'abord"{% endif %}>En Attente</button>
-                    <!-- <button type="submit" name="_action" value="créer une facture" class="btn-action">Créer une facture</button> -->
-                    <button type="button" class="btn-action btn-danger-outline" id="btn-cancel-edit">
-                        <i class="bi bi-x-lg"></i> Annuler
+                {% if consultation and rdv.medecin %}
+                    <button type="submit" name="_action" value="en_attente" class="btn-action btn-waiting">En Attente</button>
+                {% else %}
+                    <button type="button" class="btn-action btn-teal" id="btn-modifier">
+                        <i class="bi bi-pencil"></i> Modifier
                     </button>
-                </div>
+                    <div id="edit-actions" style="display:none;gap:6px;align-items:center;">
+                        <button type="submit" name="_action" value="en_attente" class="btn-action btn-waiting"
+                            id="btn-en-attente-edit" disabled>En Attente</button>
+                        <button type="button" class="btn-action btn-danger-outline" id="btn-cancel-edit">
+                            <i class="bi bi-x-lg"></i> Annuler
+                        </button>
+                    </div>
+                {% endif %}
             {% elif rdv.statut == 'en_attente' %}
-                <button type="submit" name="_action" value="en_consultation" class="btn-action btn-teal">Consultation</button>
+                <button type="submit" name="_action" value="en_consultation" class="btn-action btn-teal">En consultation</button>
             {% elif rdv.statut == 'en_consultation' %}
                 <button type="button" class="btn-action" id="btn-pause"><i class="bi bi-pause-fill"></i> Pause</button>
-                <a href="{% url 'patients:ordonnance_create' rdv.patient.pk %}{% if consultation %}?consultation={{ consultation.pk }}{% else %}?rdv={{ rdv.pk }}{% endif %}" class="btn-action btn-ghost"><i class="bi bi-file-earmark-medical"></i> Créer une ordonnance</a>
+                <a href="{% url 'ordonnance_create_libre' %}?patient_id={{ rdv.patient.pk }}{% if consultation %}&consultation_id={{ consultation.pk }}{% elif rdv.medecin %}&medecin_id={{ rdv.medecin.pk }}{% endif %}" class="btn-action btn-ghost"><i class="bi bi-file-earmark-medical"></i> Créer une ordonnance</a>
                 <a href="{% url 'laboratoire_create' %}?patient={{ rdv.patient.pk }}" class="btn-action btn-ghost"><i class="bi bi-flask"></i> Demande de lab</a>
                 <a href="{% url 'soins:create' %}?patient_id={{ rdv.patient.pk }}" class="btn-action btn-ghost"><i class="bi bi-bandaid"></i> Soins</a>
-                <a href="{% url 'patients:hospitalisation_list' rdv.patient.pk %}" class="btn-action btn-ghost"><i class="bi bi-clipboard2-pulse"></i> M.O</a>
+                <a href="{% url 'hospitalisation:create' %}?patient={{ rdv.patient.pk }}{% if rdv.medecin %}&medecin={{ rdv.medecin.pk }}{% endif %}&rdv={{ rdv.pk }}" class="btn-action btn-ghost"><i class="bi bi-clipboard2-pulse"></i> M.O</a>
                 <button type="submit" name="_action" value="terminer" class="btn-action btn-dark">Consultation terminée</button>
                 <button type="submit" name="_action" value="annuler" class="btn-action btn-danger-outline">Annuler</button>
             {% endif %}
@@ -536,10 +538,6 @@
         </div>
 
     </div>
-</div>
-
-<!-- ══════════════ CORPS DU FORMULAIRE ══════════════ -->
-<div class="form-body">
 
     <!-- Deux colonnes principales -->
     <div class="form-main-grid">
@@ -799,7 +797,7 @@
               <div class="f-tab-val">
                 {% if constante and constante.imc %}
                   {% if constante.imc < 18.5 %}<span style="color:#e65100;">Insuffisance pondérale</span>
-                  {% elif constante.imc < 25 %}<span style="color:#2e7d32;">Normale</span>
+                  {% elif constante.imc < 25 %}<span style="color:var(--teal-600);">Normale</span>
                   {% elif constante.imc < 30 %}<span style="color:#f57c00;">Surpoids</span>
                   {% else %}<span style="color:#c62828;">Obésité</span>{% endif %}
                 {% else %}<span class="empty">—</span>{% endif %}
@@ -1420,75 +1418,7 @@
   </div><!-- /f-main -->
 
   <!-- ASIDE ACTIVITY -->
-  <div class="f-aside">
-    <div class="f-activity">
-      <div class="f-activity-head">
-        <span>Activité</span>
-        {% if not is_new %}
-        <span style="font-size:11px;">{{ rdv.date_creation|date:"d/m/Y" }}</span>
-        {% endif %}
-      </div>
-      <div class="f-activity-list">
-        {% if rdv %}
-          <!-- Current status indicator -->
-          <div class="f-activity-item">
-            <div class="f-avatar f-avatar-purple">{{ request.user.username|first|upper }}</div>
-            <div class="f-activity-body">
-              <div class="f-activity-who">{{ request.user.get_full_name|default:request.user.username }}</div>
-              <div class="f-activity-time">{{ rdv.date_creation|date:"d/m/Y H:i" }}</div>
-              <div class="f-activity-change">
-                <i class="bi bi-dot" style="color:var(--teal-600);"></i>
-                Rendez-vous créé(e)
-              </div>
-            </div>
-          </div>
-          {% if rdv.statut != 'planifie' %}
-          <div class="f-activity-item">
-            <div class="f-avatar f-avatar-teal">{{ request.user.username|first|upper }}</div>
-            <div class="f-activity-body">
-              <div class="f-activity-who">{{ request.user.get_full_name|default:request.user.username }}</div>
-              <div class="f-activity-time">Mis à jour</div>
-              <div class="f-activity-change">
-                <i class="bi bi-arrow-right"></i>
-                État :
-                <strong>{{ rdv.get_statut_display }}</strong>
-              </div>
-            </div>
-          </div>
-          {% endif %}
-          {% if rdv.medecin %}
-          <div class="f-activity-item">
-            <div class="f-avatar f-avatar-green">{{ rdv.medecin.nom|first|upper }}</div>
-            <div class="f-activity-body">
-              <div class="f-activity-who">{{ rdv.medecin }}</div>
-              <div class="f-activity-time">Médecin assigné</div>
-              <div class="f-activity-change">
-                <i class="bi bi-person-check"></i>
-                Docteur : <strong>{{ rdv.medecin }}</strong>
-              </div>
-            </div>
-          </div>
-          {% endif %}
-          {% if rdv.statut == 'termine' %}
-          <div class="f-activity-item">
-            <div class="f-avatar f-avatar-green">T</div>
-            <div class="f-activity-body">
-              <div class="f-activity-who">Consultation terminée</div>
-              <div class="f-activity-time">
-                Durée : {{ rdv.duree_display }}
-                &nbsp;·&nbsp; Attente : {{ rdv.temps_attente_display }}
-              </div>
-            </div>
-          </div>
-          {% endif %}
-        {% else %}
-          <div style="padding:14px;color:var(--text-muted);font-size:12px;">
-            L'activité apparaîtra après la création du dossier.
-          </div>
-        {% endif %}
-      </div>
-    </div>
-  </div>
+  {% load core_tags %}{% historique_sidebar rdv %}
 
 </div><!-- /f-layout -->
 
@@ -1610,164 +1540,7 @@
         });
     });
 
-    /* ── Autocomplete patient (AJAX) ── */
-    var patientHidden    = document.getElementById('id_patient');
-    var codeHidden       = document.getElementById('id_code_confirmation');
-    var codeDisplay      = document.getElementById('code-confirmation');
-    var searchInput      = document.getElementById('patient-search');
-    var dropdown         = document.getElementById('ac-dropdown');
-    var focusedIdx       = -1;
-    var searchTimer      = null;
-    var SEARCH_URL       = '{% url "patients:patient_search" %}';
-    var INFO_URL         = '{% url "patients:patient_info" 0 %}';
-
-    function generateConfirmCode() {
-        var now = new Date();
-        var pad = function(n) { return String(n).padStart(2, '0'); };
-        var d = String(now.getFullYear()).slice(-2) + pad(now.getMonth()+1) + pad(now.getDate());
-        var t = pad(now.getHours()) + pad(now.getMinutes());
-        var r = Math.floor(Math.random() * 9000 + 1000);
-        return 'RDV' + d + '-' + t + r;
-    }
-
-    function highlight(text, q) {
-        if (!q) return text;
-        var i = text.toLowerCase().indexOf(q.toLowerCase());
-        if (i < 0) return text;
-        return text.slice(0, i) +
-               '<mark class="ac-mark">' + text.slice(i, i + q.length) + '</mark>' +
-               text.slice(i + q.length);
-    }
-
-    function renderResults(results, q) {
-        dropdown.innerHTML = '';
-        focusedIdx = -1;
-        if (!results.length) {
-            dropdown.innerHTML = '<div class="ac-empty">Aucun patient trouvé</div>';
-            dropdown.style.display = 'block';
-            return;
-        }
-        results.forEach(function(p) {
-            var div = document.createElement('div');
-            div.className = 'ac-item';
-            div.innerHTML =
-                '<strong>' + highlight(p.nom_complet, q) + '</strong>' +
-                '<br><span style="font-size:11px;color:rgba(0,0,0,0.4);">' +
-                highlight(p.code, q) +
-                (p.telephone ? ' · ' + highlight(p.telephone, q) : '') +
-                '</span>';
-            div.addEventListener('mousedown', function(e) {
-                e.preventDefault();
-                selectPatient(p.id, p.nom_complet);
-            });
-            dropdown.appendChild(div);
-        });
-        dropdown.style.display = 'block';
-    }
-
-    function doSearch(q) {
-        if (!q) { dropdown.style.display = 'none'; return; }
-        fetch(SEARCH_URL + '?q=' + encodeURIComponent(q))
-            .then(function(r){ return r.json(); })
-            .then(function(d){ renderResults(d.results, q); });
-    }
-
-    function selectPatient(id, nom) {
-        patientHidden.value = id;
-        searchInput.value   = nom;
-        dropdown.style.display = 'none';
-        fetchPatientInfo(id);
-        /* Générer le code de confirmation si pas déjà présent */
-        if (!codeHidden.value) {
-            var code = generateConfirmCode();
-            codeHidden.value = code;
-            codeDisplay.textContent = code;
-            codeDisplay.classList.remove('placeholder');
-        }
-    }
-
-    function moveFocus(dir) {
-        var items = dropdown.querySelectorAll('.ac-item');
-        if (!items.length) return;
-        focusedIdx = Math.max(0, Math.min(focusedIdx + dir, items.length - 1));
-        items.forEach(function(el, i){ el.classList.toggle('focused', i === focusedIdx); });
-        items[focusedIdx].scrollIntoView({ block: 'nearest' });
-    }
-
-    if (searchInput) {
-        searchInput.addEventListener('input', function() {
-            clearTimeout(searchTimer);
-            var q = this.value.trim();
-            patientHidden.value = '';
-            /* Réinitialiser le code si le patient est désélectionné */
-            if (!q) {
-                codeHidden.value = '';
-                codeDisplay.textContent = 'Sélectionnez un patient…';
-                codeDisplay.classList.add('placeholder');
-            }
-            searchTimer = setTimeout(function(){ doSearch(q); }, 220);
-        });
-        searchInput.addEventListener('keydown', function(e) {
-            if (e.key === 'ArrowDown')  { e.preventDefault(); moveFocus(1); }
-            else if (e.key === 'ArrowUp')   { e.preventDefault(); moveFocus(-1); }
-            else if (e.key === 'Enter') {
-                var items = dropdown.querySelectorAll('.ac-item');
-                if (focusedIdx >= 0 && items[focusedIdx]) {
-                    e.preventDefault();
-                    items[focusedIdx].dispatchEvent(new MouseEvent('mousedown'));
-                }
-            }
-            else if (e.key === 'Escape') { dropdown.style.display = 'none'; }
-        });
-        searchInput.addEventListener('blur', function(){
-            setTimeout(function(){ dropdown.style.display = 'none'; }, 200);
-        });
-
-        /* Pré-remplir si patient passé en paramètre (mode création uniquement) */
-        {% if patient_prefill and not rdv %}
-        searchInput.value = '{{ patient_prefill.nom }} {{ patient_prefill.prenoms }}';
-        patientHidden.value = '{{ patient_prefill.pk }}';
-        fetchPatientInfo('{{ patient_prefill.pk }}');
-        if (!codeHidden.value) {
-            var code = generateConfirmCode();
-            codeHidden.value = code;
-            codeDisplay.textContent = code;
-            codeDisplay.classList.remove('placeholder');
-        }
-        {% endif %}
-    }
-
-    /* ── Info patient (âge + téléphone) ── */
-    function fetchPatientInfo(pk) {
-        if (!pk) { setPlaceholder('patient-age', '—'); setPlaceholder('patient-tel', '—'); return; }
-        fetch(INFO_URL.replace('/0/', '/' + pk + '/'))
-            .then(function(r){ return r.json(); })
-            .then(function(d) {
-                var ageEl = document.getElementById('patient-age');
-                var telEl = document.getElementById('patient-tel');
-                ageEl.textContent = d.age + ' ans';
-                ageEl.classList.remove('placeholder');
-                telEl.textContent = d.telephone || '—';
-                telEl.classList.remove('placeholder');
-            });
-    }
-
-    function setPlaceholder(id, text) {
-        var el = document.getElementById(id);
-        if (el) { el.textContent = text; el.classList.add('placeholder'); }
-    }
-
-    if (patientHidden && patientHidden.value) fetchPatientInfo(patientHidden.value);
-
-    /* En mode édition : générer le code si absent */
-    {% if rdv and not rdv.code_confirmation %}
-    if (!codeHidden.value) {
-        var editCode = generateConfirmCode();
-        codeHidden.value = editCode;
-        codeDisplay.textContent = editCode;
-        codeDisplay.classList.remove('placeholder');
-    }
-    {% endif %}
+    {% include "patients/includes/_autocomplete_patient_script.html" %}
 
     /* ── Date de validité = date_heure + 14 jours ── */
     var dateHeureInput = document.getElementById('{{ form.date_heure.id_for_label }}');
@@ -2060,7 +1833,7 @@
           {% else %}<svg width="28" height="28" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" fill="#ccc"/><path d="M4 20c0-4 3.6-6 8-6s8 2 8 6" stroke="#ccc" stroke-width="1.5" fill="none"/><path d="M9 6.5a3.5 3.5 0 016 2.3" stroke="#bbb" stroke-width="1.2" fill="none"/></svg>{% endif %}
         </div>
         <div class="em-pgrid">
-          <div class="em-prow"><span class="em-plbl">Patient</span><span class="em-pval">{{ rdv.patient.nom }} {{ rdv.patient.prenoms }}</span><span class="em-plbl">Docteur</span><span class="em-pval">{% if rdv.medecin %}Dr. {{ rdv.medecin.nom }}{% else %}—{% endif %}</span></div>
+          <div class="em-prow"><span class="em-plbl">Patient</span><span class="em-pval">{{ rdv.patient.nom }} {{ rdv.patient.prenoms }}</span><span class="em-plbl">Médecin <span style="color:#e53935;">*</span></span><span class="em-pval"><select name="eval_medecin" style="border:none;border-bottom:1px solid #ccc;outline:none;font-size:12.5px;background:transparent;padding:2px 0;font-family:'Sora',sans-serif;min-width:140px;"><option value="">— Sélectionner —</option>{% for m in medecins %}<option value="{{ m.pk }}"{% if rdv.medecin_id == m.pk %} selected{% endif %}>Dr. {{ m.nom }}</option>{% endfor %}</select></span></div>
           <div class="em-prow"><span class="em-plbl">Âge</span><span class="em-pval">{{ rdv.patient.age|default:"—" }}</span><span class="em-plbl">Date</span><span class="em-pval">{{ rdv.date_heure|date:"d/m/Y H:i:s" }}</span></div>
           <div class="em-prow"><span class="em-plbl"></span><span class="em-pval"></span><span class="em-plbl">Rendez-vous</span><span class="em-pval">{{ rdv.code_rdv }}</span></div>
         </div>
@@ -2111,7 +1884,7 @@
 .em-close:hover{background:#f0f0f0;color:#111;}
 .em-bar{display:flex;align-items:center;justify-content:space-between;background:#29b6f6;padding:8px 16px;flex-shrink:0;}
 .em-bar-left{display:flex;gap:8px;}
-.em-btn-done{background:#26a69a;color:#fff;border:none;border-radius:3px;padding:5px 16px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;letter-spacing:.05em;}
+.em-btn-done{background:var(--teal-600);color:#fff;border:none;border-radius:3px;padding:5px 16px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;letter-spacing:.05em;}
 .em-btn-cancel{background:none;color:#fff;border:1px solid rgba(255,255,255,.65);border-radius:3px;padding:5px 14px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;letter-spacing:.05em;}
 .em-bar-progress{display:flex;align-items:center;gap:6px;font-size:11px;}
 .em-prog{padding:3px 10px;border-radius:2px;color:rgba(255,255,255,.6);font-weight:700;letter-spacing:.05em;}
@@ -2287,6 +2060,8 @@
     var editActions  = document.getElementById('edit-actions');
     var btnModifier  = document.getElementById('btn-modifier');
     var btnCancel    = document.getElementById('btn-cancel-edit');
+    var btnEnAttenteEdit = document.getElementById('btn-en-attente-edit');
+    var hasConsultation  = rdvForm.dataset.hasConsultation === '1';
 
     function lock() {
         if (formBody)   formBody.classList.add('rdv-locked');
@@ -2302,13 +2077,91 @@
         if (discardBtn) discardBtn.style.display = '';
         if (editActions) { editActions.style.display = 'flex'; }
         if (btnModifier) btnModifier.style.display = 'none';
+        syncEnAttenteBtn();
     }
 
-    /* Départ en mode verrouillé */
-    lock();
+    /* Activer/désactiver le bouton En Attente :
+       les deux conditions doivent être remplies — évaluation clinique ET médecin */
+    var medSelect = document.getElementById('id_medecin');
+    function syncEnAttenteBtn() {
+        if (!btnEnAttenteEdit) return;
+        var medecinOk = !!(medSelect && medSelect.value);
+        btnEnAttenteEdit.disabled = !(hasConsultation && medecinOk);
+    }
+    if (medSelect) medSelect.addEventListener('change', syncEnAttenteBtn);
+
+    /* Départ : verrouillé sauf si ?edit=1 OU si l'évaluation clinique est déjà enregistrée */
+    var urlParams = new URLSearchParams(window.location.search);
+    if ((urlParams.get('edit') === '1' || hasConsultation) && editActions) {
+        unlock();
+    } else {
+        lock();
+    }
 
     if (btnModifier) btnModifier.addEventListener('click', unlock);
     if (btnCancel)   btnCancel.addEventListener('click', lock);
+})();
+</script>
+
+<script>
+(function () {
+  function alignControlPanel() {
+    var topbar = document.querySelector('.topbar');
+    var cp = document.querySelector('.control-panel');
+    if (!topbar || !cp) return;
+    var tbH = Math.ceil(topbar.getBoundingClientRect().height);
+    if (tbH <= 0) return;
+    document.body.style.paddingTop = tbH + 'px';
+    document.documentElement.style.setProperty('--header-h', tbH + 'px');
+    requestAnimationFrame(function () {
+      var gap = Math.round(cp.getBoundingClientRect().top - topbar.getBoundingClientRect().bottom);
+      if (gap > 0) {
+        document.body.style.paddingTop = (tbH - gap) + 'px';
+        document.documentElement.style.setProperty('--header-h', (tbH - gap) + 'px');
+      }
+    });
+  }
+  if (document.readyState !== 'loading') {
+    alignControlPanel();
+  } else {
+    document.addEventListener('DOMContentLoaded', alignControlPanel);
+  }
+  window.addEventListener('resize', function () {
+    document.body.style.paddingTop = '';
+    alignControlPanel();
+  });
+})();
+</script>
+
+<script>
+/* ── Filtre "Médecin" et "Type de consultation" selon le "Département" choisi ── */
+(function () {
+  var dept = document.getElementById('id_departement');
+  if (!dept) return;
+  var targets = [
+    document.getElementById('id_medecin'),
+    document.getElementById('id_type_consultation'),
+  ].filter(Boolean);
+  if (!targets.length) return;
+
+  function filterByDepartement(select) {
+    var departementId = dept.value;
+    var stillValid = false;
+    select.querySelectorAll('option').forEach(function (opt) {
+      if (!opt.value) return;
+      var visible = !!departementId && opt.dataset.departementId === departementId;
+      opt.hidden = !visible;
+      if (visible && opt.selected) stillValid = true;
+    });
+    if (!stillValid) select.value = '';
+  }
+
+  function filterAll() {
+    targets.forEach(filterByDepartement);
+  }
+
+  dept.addEventListener('change', filterAll);
+  filterAll();
 })();
 </script>
 

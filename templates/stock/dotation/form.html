@@ -1,0 +1,124 @@
+{% extends 'stock/base.html' %}
+{% load static %}
+{% block topbar_title %}Stock — Nouvelle demande{% endblock %}
+
+{% block extra_st_css %}<style>
+.pharma-btn { border:2px solid var(--st-border);background:var(--st-surface);border-radius:10px;padding:12px 18px;cursor:pointer;display:flex;align-items:center;gap:10px;font-size:13px;font-weight:500;color:var(--st-muted);transition:all .15s;flex:1;min-width:180px; }
+.pharma-btn.selected { border-color:var(--st-600);background:rgba(var(--st-700-rgb),.07);color:var(--st-700);font-weight:700; }
+.qte-field { border:none;border-bottom:1.5px solid rgba(0,0,0,.15);background:transparent;padding:5px 4px;font-size:13px;text-align:center;width:90px;font-family:inherit;color:var(--st-text); }
+.qte-field:focus { outline:none;border-bottom-color:var(--st-600); }
+.type-sep { background:var(--st-100);padding:8px 14px;font-size:10.5px;font-weight:700;color:var(--st-700);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--st-border); }
+</style>{% endblock %}
+
+{% block content %}
+<div class="action-bar">
+  <div class="action-bar-breadcrumb">
+    <a href="{% url 'stock_dotation_list' %}"><i class="bi bi-arrow-left"></i> Dotations</a>
+    <span class="sep">/</span>
+    <span class="current">Nouvelle demande de dotation</span>
+  </div>
+  <div class="action-bar-buttons">
+    <a href="{% url 'stock_dotation_list' %}" class="btn-form-cancel">Annuler</a>
+    <button type="submit" form="form-demande" class="btn-form-submit"><i class="bi bi-send"></i> Soumettre la demande</button>
+  </div>
+</div>
+
+<form id="form-demande" method="post" novalidate>
+{% csrf_token %}
+
+<!-- Pharmacie -->
+<div class="st-card" style="margin-top:20px;">
+  <div class="st-card-header"><div class="st-card-title"><i class="bi bi-hospital" style="color:var(--st-600);"></i> Pharmacie</div></div>
+  <div class="st-card-body">
+    {% if errors.pharmacie %}<div class="st-error" style="margin-bottom:10px;">{{ errors.pharmacie }}</div>{% endif %}
+    <div style="display:flex;gap:12px;flex-wrap:wrap;">
+      {% for val, lbl in pharmacies %}
+      <label class="pharma-btn" id="pharma-label-{{ val }}" onclick="selectPharma('{{ val }}')">
+        <input type="radio" name="pharmacie" value="{{ val }}" id="pharma-{{ val }}" style="display:none;"
+          {% if post and post.pharmacie == val %}checked{% endif %}>
+        <i class="bi bi-hospital" style="font-size:20px;color:var(--st-600);"></i>
+        <div>
+          <div style="font-size:13.5px;font-weight:700;">{{ lbl }}</div>
+          <div style="font-size:11px;color:var(--st-muted);">Pharmacie Walé</div>
+        </div>
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Produits -->
+<div class="st-card" style="margin-top:14px;">
+  <div class="st-card-header">
+    <div class="st-card-title"><i class="bi bi-box-seam" style="color:var(--st-600);"></i> Produits à demander</div>
+    <span style="font-size:11.5px;color:var(--st-muted);">Saisissez uniquement les quantités souhaitées</span>
+  </div>
+  <table class="st-table">
+    <thead>
+      <tr>
+        <th>Produit</th>
+        <th style="text-align:center;">Stock actuel</th>
+        <th style="text-align:center;">Qté demandée</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for p in produits %}
+    {% ifchanged p.type %}
+    <tr class="type-sep">
+      <td colspan="3">
+        {% if p.type == 'medicament' %}<i class="bi bi-capsule-pill"></i> Médicaments
+        {% elif p.type == 'consommable' %}<i class="bi bi-bandaid"></i> Consommables médicaux
+        {% else %}<i class="bi bi-tools"></i> Équipements{% endif %}
+      </td>
+    </tr>
+    {% endifchanged %}
+    <tr>
+      <td>
+        <div style="font-weight:600;">{{ p.nom }}</div>
+        <div style="font-size:10.5px;font-family: var(--font-mono);color:var(--st-600);">{{ p.code }}</div>
+      </td>
+      <td style="text-align:center;">
+        <span style="font-weight:700;color:{% if p.en_rupture %}var(--rose-text){% elif p.en_alerte %}var(--amber-text){% else %}var(--st-600){% endif %};">
+          {{ p.stock_actuel|floatformat:0 }}
+        </span>
+        <span style="font-size:10.5px;color:var(--st-muted);"> {{ p.unite_mesure.nom }}</span>
+      </td>
+      <td style="text-align:center;">
+        <input type="number" name="qte_{{ p.pk }}" class="qte-field" min="0" step="1" placeholder="—"
+          value="{% if post %}{{ post|default_if_none:'' }}{% endif %}">
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Notes -->
+<div class="st-card" style="margin-top:14px;max-width:600px;">
+  <div class="st-card-header"><div class="st-card-title"><i class="bi bi-chat-text" style="color:var(--st-600);"></i> Notes</div></div>
+  <div class="st-card-body">
+    <textarea name="notes" class="field-ul" rows="3" placeholder="Motif de la demande, urgence, remarques…"></textarea>
+  </div>
+</div>
+
+<div class="form-actions">
+  <a href="{% url 'stock_dotation_list' %}" class="btn-form-cancel">Annuler</a>
+  <button type="submit" form="form-demande" class="btn-form-submit"><i class="bi bi-send"></i> Soumettre la demande</button>
+</div>
+</form>
+
+<script>
+function selectPharma(val) {
+  document.querySelectorAll('input[name="pharmacie"]').forEach(function(r){ r.checked = false; });
+  document.querySelectorAll('[id^="pharma-label-"]').forEach(function(el){ el.classList.remove('selected'); });
+  var input = document.getElementById('pharma-' + val);
+  var label = document.getElementById('pharma-label-' + val);
+  if(input) input.checked = true;
+  if(label) label.classList.add('selected');
+}
+document.addEventListener('DOMContentLoaded', function(){
+  var checked = document.querySelector('input[name="pharmacie"]:checked');
+  if(checked) selectPharma(checked.value);
+});
+</script>
+{% endblock %}

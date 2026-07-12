@@ -1,12 +1,12 @@
 <style>
   /* ── DARK MODE ── */
   html[data-theme="dark"] .o-list tbody tr:hover { background: rgba(33,136,171,0.2); }
-  html[data-theme="dark"] .o-list thead th:hover { background: #28304a; }
+  html[data-theme="dark"] .o-list thead th:hover { background: #201d1d; }
   html[data-theme="dark"] .o-list thead th { background: var(--surface); }
   html[data-theme="dark"] .o-search-input { color: var(--text); }
   html[data-theme="dark"] .o-search-bar { border-bottom-color: #3a4a62; }
   html[data-theme="dark"] .o-ctrl-btn { color: var(--text-muted); }
-  html[data-theme="dark"] .o-ctrl-btn:hover { background: #28304a; color: var(--text); border-color: var(--border); }
+  html[data-theme="dark"] .o-ctrl-btn:hover { background: #201d1d; color: var(--text); border-color: var(--border); }
   html[data-theme="dark"] .o-pag-btn { background: var(--surface); border-color: var(--border); color: var(--text-muted); }
   html[data-theme="dark"] .o-view-btn { background: var(--surface); color: var(--text-muted); border-color: var(--border); }
   html[data-theme="dark"] .o-view-btns { border-color: var(--border); }
@@ -19,7 +19,7 @@
     background: var(--surface); border-bottom: 1px solid var(--border);
     padding: 6px 16px; display: flex; flex-direction: column; gap: 5px;
     position: sticky; top: 0; z-index: 190;
-    margin: 0 -32px 16px;
+    margin: 0 -32px 0;
   }
   .o-subheader-row { display: flex; align-items: center; gap: 8px; }
   .o-subheader-row-right { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -32,12 +32,12 @@
   }
   .o-btn-create:hover { background: var(--teal-600); }
   .o-btn-excel {
-    width: 28px; height: 28px; border: 1px solid #d0e9d1; border-radius: 4px;
-    background: #f0faf0; color: #217346; font-size: 15px;
+    width: 28px; height: 28px; border: 1px solid #c0d8e8; border-radius: 4px;
+    background: #f0f5fa; color: var(--teal-700); font-size: 15px;
     display: inline-flex; align-items: center; justify-content: center;
     text-decoration: none; transition: background 0.15s, border-color 0.15s;
   }
-  .o-btn-excel:hover { background: #217346; color: #fff; border-color: #217346; }
+  .o-btn-excel:hover { background: var(--teal-700); color: #fff; border-color: var(--teal-700); }
   .o-search-bar {
     display: flex; align-items: center; border: none; border-bottom: 1px solid #bbb;
     background: transparent; min-height: 28px; padding: 2px 4px; gap: 4px; width: 320px;
@@ -78,13 +78,16 @@
   .o-list-wrap {
     overflow-x: auto; overflow-y: auto; background: var(--surface);
     margin: 0 -32px;
+    scrollbar-width: none;
   }
+  .o-list-wrap::-webkit-scrollbar { display: none; }
   .o-list { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
   .o-list thead th {
     background: #f5f5f5; border-bottom: 1px solid var(--border);
     padding: 6px 10px; font-weight: 500; font-size: 11.5px;
     color: var(--text-muted); text-align: left;
     position: sticky; top: 0; z-index: 2; cursor: pointer; user-select: none;
+    white-space: normal; line-height: 1.3;
   }
   .o-list thead th:hover { background: #f5f5f5; }
   .o-list thead th.th-center { text-align: center; }
@@ -101,6 +104,8 @@
   .o-list tbody td.td-code { color: var(--teal-500); font-weight: 500; font-size: 12px; }
   .o-list tbody td.td-name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
   .o-list tbody td.td-doctor { max-width: 130px; overflow: hidden; text-overflow: ellipsis; color: var(--text-muted); }
+  .o-list tbody td.td-type { max-width: 170px; overflow: hidden; text-overflow: ellipsis; }
+  .o-list tbody td.td-diagnostic { max-width: 200px; overflow: hidden; text-overflow: ellipsis; color: var(--text-muted); }
 
   /* Checkbox col */
   .o-cb { width: 16px; height: 16px; cursor: pointer; accent-color: var(--teal-600); }
@@ -197,7 +202,7 @@
   }
   .o-dd-clear-btn:hover { border-color: #999; color: var(--text); }
 
-  html[data-theme="dark"] .o-dd-panel, html[data-theme="dark"] .o-dd-sub { background: #1a2535; border-color: #2e3f58; }
+  html[data-theme="dark"] .o-dd-panel, html[data-theme="dark"] .o-dd-sub { background: #201d1d; border-color: #2e3f58; }
   html[data-theme="dark"] .o-dd-item:hover { background: rgba(33,136,171,0.2); color: #c5d4e2; }
   html[data-theme="dark"] .o-dd-item.active { background: rgba(33,136,171,0.3); color: var(--teal-300); }
   html[data-theme="dark"] .o-filter-tag { background: rgba(33,136,171,0.25); border-color: rgba(33,136,171,0.5); color: var(--teal-300); }
@@ -230,7 +235,7 @@
 
   <!-- Ligne 2 : CRÉER + contrôles + pagination -->
   <div class="o-subheader-row">
-    <a href="{{ subheader_create_url }}" class="o-btn-create">CRÉER</a>
+    {% if subheader_create_url %}<a href="{{ subheader_create_url }}" class="o-btn-create">CRÉER</a>{% endif %}
 
     <div class="o-subheader-row-right">
 
@@ -279,7 +284,7 @@
           <a class="o-dd-item" href="#">Ajouter un groupe personnalisé <span class="o-dd-arr">›</span></a>
           {% if request.GET.group %}
           <hr class="o-dd-sep">
-          <a class="o-dd-item" href="?{% if request.GET.q %}q={{ request.GET.q }}{% endif %}" style="color:#b71c1c;">
+          <a class="o-dd-item" href="?{% if request.GET.q %}q={{ request.GET.q }}{% endif %}" style="color:var(--rose-text);">
             <i class="bi bi-x-circle" style="font-size:11px;"></i> Supprimer le regroupement
           </a>
           {% endif %}

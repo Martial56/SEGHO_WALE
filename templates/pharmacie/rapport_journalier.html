@@ -1,0 +1,325 @@
+{% extends 'pharmacie/base.html' %}
+{% load static %}
+
+{% block extra_ph_css %}<style>
+/* ── Layout écran ─────────────────────────────────────── */
+.rj-topbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 11px 32px;
+  background: var(--ph-surface); border-bottom: 1px solid var(--ph-border);
+  position: sticky; top: 0; z-index: 100;
+  flex-wrap: wrap;
+}
+.rj-body { max-width: 900px; margin: 0 auto; padding: 24px 0 48px; }
+
+/* ── En-tête rapport ──────────────────────────────────── */
+.rj-header {
+  background: var(--ph-600); color: #fff;
+  border-radius: 12px; padding: 24px 32px; margin-bottom: 20px;
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;
+}
+.rj-header-left .centre   { font-size: 11px; font-weight: 700; letter-spacing: 1px; opacity: .8; text-transform: uppercase; }
+.rj-header-left .pharmacie{ font-size: 22px; font-weight: 900; line-height: 1.1; }
+.rj-header-left .adresse  { font-size: 11.5px; opacity: .75; margin-top: 3px; }
+.rj-header-right          { text-align: right; }
+.rj-header-right .titre-doc { font-size: 16px; font-weight: 800; }
+.rj-header-right .date-doc  { font-size: 24px; font-weight: 900; }
+.rj-header-right .meta      { font-size: 11px; opacity: .75; margin-top: 2px; }
+
+/* ── Résumé financier ─────────────────────────────────── */
+.rj-stats-grid {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 20px;
+}
+.rj-stat {
+  background: var(--ph-surface); border: 1px solid var(--ph-border);
+  border-radius: 10px; padding: 14px 16px; border-top: 3px solid var(--ph-400);
+}
+.rj-stat.v-total   { border-top-color: var(--ph-600); }
+.rj-stat.v-nb      { border-top-color: #2980b9; }
+.rj-stat.v-esp     { border-top-color: var(--ph-600); }
+.rj-stat.v-mobile  { border-top-color: #8e44ad; }
+.rj-stat.v-assur   { border-top-color: #e67e22; }
+.rj-stat-label     { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--ph-muted); margin-bottom: 4px; }
+.rj-stat-value     { font-size: 18px; font-weight: 800; }
+.rj-stat-sub       { font-size: 10px; color: var(--ph-muted); margin-top: 2px; }
+
+/* ── Section titres ───────────────────────────────────── */
+.rj-section-title {
+  font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .6px;
+  color: var(--ph-700); border-left: 3px solid var(--ph-600); padding-left: 10px;
+  margin: 22px 0 12px;
+}
+
+/* ── Tableau ventes détaillé ─────────────────────────── */
+.rj-vente-block {
+  background: var(--ph-surface); border: 1px solid var(--ph-border);
+  border-radius: 8px; overflow-x: auto; margin-bottom: 10px;
+}
+.rj-vente-head {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+  padding: 12px 20px 12px 32px; background: var(--ph-50);
+  border-bottom: 1px solid var(--ph-border); gap: 10px;
+}
+.rj-vente-num  { font-family: var(--font-mono); font-size: 12px; font-weight: 800; color: var(--ph-700); background: var(--ph-100); padding: 2px 8px; border-radius: 4px; }
+.rj-vente-meta { font-size: 11.5px; color: var(--ph-muted); display: flex; align-items: center; gap: 12px; }
+.rj-lignes-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.rj-lignes-table th { padding: 6px 16px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: var(--ph-muted); text-align: left; border-bottom: 1px solid var(--ph-border); }
+.rj-lignes-table th:first-child { padding-left: 12px; }
+.rj-lignes-table th:last-child { text-align: right; padding-right: 12px; }
+.rj-lignes-table td { padding: 7px 16px; border-bottom: 1px solid rgba(0,0,0,.04); }
+.rj-lignes-table td:first-child { padding-left: 12px; }
+.rj-lignes-table td:last-child { text-align: right; font-weight: 700; padding-right: 12px; }
+.rj-vente-total-row td { padding: 7px 16px; font-weight: 700; font-size: 12.5px; background: var(--ph-50); }
+
+/* ── Tableau récap produits ───────────────────────────── */
+.rj-recap-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.rj-recap-table thead tr { background: var(--ph-100); }
+.rj-recap-table thead th { padding: 8px 12px; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: .4px; color: var(--ph-800); text-align: left; border-bottom: 2px solid var(--ph-300); }
+.rj-recap-table thead th:first-child { padding-left: 12px; }
+.rj-recap-table thead th:last-child { text-align: right; padding-right: 12px; }
+.rj-recap-table th:last-child, .rj-recap-table td:last-child { text-align: right; }
+.rj-recap-table tbody tr { border-bottom: 1px solid var(--ph-border); }
+.rj-recap-table tbody td { padding: 7px 12px; }
+.rj-recap-table tbody td:first-child { padding-left: 12px; }
+.rj-recap-table tbody td:last-child { padding-right: 12px; }
+.rj-total-final {
+  display: flex; justify-content: flex-end;
+  padding: 12px 0; margin-top: 10px;
+  border-top: 2px solid var(--ph-600);
+  font-size: 16px; font-weight: 800; color: var(--ph-700);
+}
+
+/* ── Signature ────────────────────────────────────────── */
+.rj-signature {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 40px;
+  margin-top: 32px; padding-top: 20px; border-top: 1px dashed var(--ph-300);
+}
+.rj-sign-box { text-align: center; }
+.rj-sign-line { border-bottom: 1.5px solid var(--ph-400); margin: 30px 20px 6px; }
+.rj-sign-label { font-size: 11px; color: var(--ph-muted); font-weight: 700; text-transform: uppercase; letter-spacing: .4px; }
+
+/* ── Print ────────────────────────────────────────────── */
+@media print {
+  .rj-topbar, .ph-nav, .topbar, .rj-print-actions { display: none !important; }
+  body { background: #fff !important; }
+  .content { background: #fff !important; padding: 10mm 12mm !important; }
+  .rj-body { max-width: 100% !important; padding: 0 !important; }
+  .rj-header { border-radius: 0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .rj-stats-grid { grid-template-columns: repeat(5,1fr) !important; }
+  .rj-vente-block { break-inside: avoid; }
+  @page { size: A4 portrait; margin: 0; }
+}
+</style>{% endblock %}
+
+{% block content %}
+
+<!-- Barre d'actions (masquée à l'impression) -->
+<div class="rj-topbar rj-print-actions">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <a href="{% url 'pharmacie_recette' pharmacie %}?date={{ selected_date|date:'Y-m-d' }}" class="btn-ph-outline" style="padding:5px 10px;font-size:12px;" title="Retour recette">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <div>
+      <div style="font-size:14px;font-weight:800;color:var(--ph-900);">Rapport journalier — {{ label }}</div>
+      <div style="font-size:11px;color:var(--ph-muted);">{{ selected_date|date:"l d F Y" }}</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <form method="get" style="display:flex;align-items:center;gap:8px;">
+      <input type="date" name="date" value="{{ selected_date|date:'Y-m-d' }}"
+        style="border:none;border-bottom:1.5px solid rgba(0,0,0,.18);background:transparent;padding:5px 4px;font-size:12.5px;cursor:pointer;"
+        onchange="this.form.submit()">
+    </form>
+    <button onclick="window.print()" class="btn-ph">
+      <i class="bi bi-printer-fill"></i> Imprimer / PDF
+    </button>
+  </div>
+</div>
+
+<div class="rj-body">
+
+<!-- ══ En-tête du rapport ══ -->
+<div class="rj-header">
+  <div class="rj-header-left">
+    <div class="centre">Centre Médico-Social</div>
+    <div class="pharmacie"><i class="bi bi-hospital-fill"></i> WALÉ — {{ label }}</div>
+    <div class="adresse">Yamoussoukro, Côte d'Ivoire</div>
+  </div>
+  <div class="rj-header-right">
+    <div class="titre-doc">Rapport de vente journalier</div>
+    <div class="date-doc">{{ selected_date|date:"d/m/Y" }}</div>
+    <div class="meta">Généré le {{ generated_at|date:"d/m/Y à H:i" }} par {{ generated_by }}</div>
+  </div>
+</div>
+
+<!-- ══ Résumé financier ══ -->
+<div class="rj-section-title"><i class="bi bi-wallet2"></i> Résumé financier</div>
+<div class="rj-stats-grid">
+  <div class="rj-stat v-total">
+    <div class="rj-stat-label">Recette totale</div>
+    <div class="rj-stat-value" style="color:var(--ph-700);">{{ stats.total|floatformat:0 }} F</div>
+    <div class="rj-stat-sub">Net encaissé</div>
+  </div>
+  <div class="rj-stat v-nb">
+    <div class="rj-stat-label">Transactions</div>
+    <div class="rj-stat-value" style="color:#2980b9;">{{ stats.nb }}</div>
+    <div class="rj-stat-sub">Vente{{ stats.nb|pluralize }} payée{{ stats.nb|pluralize }}</div>
+  </div>
+  <div class="rj-stat v-esp">
+    <div class="rj-stat-label">Espèces</div>
+    <div class="rj-stat-value" style="color:var(--ph-600);">{{ stats.especes|floatformat:0 }} F</div>
+    <div class="rj-stat-sub">Cash</div>
+  </div>
+  <div class="rj-stat v-mobile">
+    <div class="rj-stat-label">Mobile Money</div>
+    <div class="rj-stat-value" style="color:#8e44ad;">{{ stats.mobile|floatformat:0 }} F</div>
+    <div class="rj-stat-sub">Orange / Wave / MTN</div>
+  </div>
+  <div class="rj-stat v-assur">
+    <div class="rj-stat-label">Assurance</div>
+    <div class="rj-stat-value" style="color:#e67e22;">{{ stats.assurance|floatformat:0 }} F</div>
+    <div class="rj-stat-sub">Prise en charge</div>
+  </div>
+</div>
+
+<!-- ══ Détail des transactions ══ -->
+<div class="rj-section-title"><i class="bi bi-list-ul"></i> Détail des transactions</div>
+
+{% for vente in ventes %}
+<div class="rj-vente-block">
+  <div class="rj-vente-head">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span class="rj-vente-num">{{ vente.numero }}</span>
+      <span style="font-size:12.5px;font-weight:600;color:var(--ph-text);">
+        {{ vente.patient|default:"Client anonyme" }}
+      </span>
+      {% if vente.statut == 'annulee' %}
+      <span style="font-size:10px;background:rgba(var(--rose-rgb),.1);color:var(--rose-text);border:1px solid rgba(var(--rose-rgb),.25);padding:2px 8px;border-radius:12px;font-weight:700;">ANNULÉE</span>
+      {% endif %}
+    </div>
+    <div class="rj-vente-meta">
+      <span><i class="bi bi-clock"></i> {{ vente.date_vente|date:"H:i" }}</span>
+      <span>
+        {% if vente.mode_paiement == 'especes' %}<i class="bi bi-cash-coin" style="color:var(--ph-600);"></i> Espèces
+        {% elif vente.mode_paiement == 'mobile_money' %}<i class="bi bi-phone" style="color:#8e44ad;"></i> Mobile Money
+        {% else %}<i class="bi bi-shield-check" style="color:#e67e22;"></i> Assurance{% endif %}
+      </span>
+      <span><i class="bi bi-person"></i> {{ vente.cree_par|default:"—" }}</span>
+    </div>
+  </div>
+  <table class="rj-lignes-table">
+    <thead>
+      <tr>
+        <th style="width:40%;">Produit</th>
+        <th style="text-align:center;">Type</th>
+        <th style="text-align:center;">Qté</th>
+        <th style="text-align:right;">Prix unitaire</th>
+        <th>Montant</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ligne in vente.lignes.all %}
+      <tr>
+        <td>
+          <div style="font-weight:600;">{{ ligne.produit.nom }}</div>
+          {% if ligne.produit.dci %}<div style="font-size:10.5px;color:var(--ph-muted);">{{ ligne.produit.dci }}</div>{% endif %}
+        </td>
+        <td style="text-align:center;">
+          {% if ligne.produit.type == 'medicament' %}<span style="font-size:10.5px;background:rgba(var(--ph-600-rgb),.1);color:var(--ph-700);padding:1px 7px;border-radius:10px;font-weight:600;">Médicament</span>
+          {% elif ligne.produit.type == 'consommable' %}<span style="font-size:10.5px;background:rgba(41,128,185,.1);color:#1565c0;padding:1px 7px;border-radius:10px;font-weight:600;">Consommable</span>
+          {% else %}<span style="font-size:10.5px;background:rgba(142,68,173,.1);color:#4a235a;padding:1px 7px;border-radius:10px;font-weight:600;">Équipement</span>{% endif %}
+        </td>
+        <td style="text-align:center;font-weight:700;">{{ ligne.quantite|floatformat:0 }} {% if ligne.produit.unite_mesure %}<span style="font-size:10px;font-weight:400;color:var(--ph-muted);">{{ ligne.produit.unite_mesure.nom }}</span>{% endif %}</td>
+        <td style="text-align:right;font-size:12px;">{{ ligne.prix_unitaire|floatformat:0 }} F</td>
+        <td>{{ ligne.montant|floatformat:0 }} F</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr class="rj-vente-total-row">
+        <td colspan="3" style="color:var(--ph-muted);">
+          {% if vente.remise > 0 %}Sous-total : {{ vente.montant_total|floatformat:0 }} F — Remise : {{ vente.remise|floatformat:0 }} F{% endif %}
+        </td>
+        <td style="text-align:right;color:var(--ph-muted);">TOTAL</td>
+        <td style="color:var(--ph-700);font-size:13px;">{{ vente.montant_net|floatformat:0 }} F CFA</td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+{% empty %}
+<div style="text-align:center;padding:40px;color:var(--ph-muted);border:1px solid var(--ph-border);border-radius:8px;">
+  <i class="bi bi-receipt" style="font-size:28px;display:block;margin-bottom:8px;color:var(--ph-200);"></i>
+  Aucune vente enregistrée pour le {{ selected_date|date:"d/m/Y" }}
+</div>
+{% endfor %}
+
+<!-- ══ Récapitulatif par produit ══ -->
+{% if recap_list %}
+<div class="rj-section-title" style="margin-top:28px;"><i class="bi bi-bar-chart"></i> Récapitulatif par produit</div>
+<div style="background:var(--ph-surface);border:1px solid var(--ph-border);border-radius:10px;overflow-x:auto;margin-bottom:20px;">
+  <div style="padding:12px 20px 12px 32px;background:var(--ph-50);border-bottom:1px solid var(--ph-border);"></div>
+  <table class="rj-recap-table">
+    <thead>
+      <tr>
+        <th style="width:40%;">Produit</th>
+        <th>Type</th>
+        <th style="text-align:center;">Qté totale vendue</th>
+        <th>Montant total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in recap_list %}
+      <tr>
+        <td>
+          <div style="font-weight:600;">{{ r.produit.nom }}</div>
+          {% if r.produit.dci %}<div style="font-size:10.5px;color:var(--ph-muted);">{{ r.produit.dci }}</div>{% endif %}
+        </td>
+        <td style="font-size:11px;">
+          {% if r.produit.type == 'medicament' %}Médicament
+          {% elif r.produit.type == 'consommable' %}Consommable
+          {% else %}Équipement{% endif %}
+        </td>
+        <td style="text-align:center;font-weight:700;">
+          {{ r.qte_totale|floatformat:0 }}
+          {% if r.produit.unite_mesure %}<span style="font-size:10px;color:var(--ph-muted);"> {{ r.produit.unite_mesure.nom }}</span>{% endif %}
+        </td>
+        <td style="font-weight:700;color:var(--ph-700);">{{ r.montant_total|floatformat:0 }} F</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="rj-total-final" style="padding-right:12px;">
+    TOTAL GÉNÉRAL &nbsp; {{ stats.total|floatformat:0 }} F CFA
+  </div>
+</div>
+{% endif %}
+
+<!-- ══ Signatures ══ -->
+<div class="rj-signature">
+  <div class="rj-sign-box">
+    <div class="rj-sign-line"></div>
+    <div class="rj-sign-label">Le/La pharmacien(ne) responsable</div>
+  </div>
+  <div class="rj-sign-box">
+    <div class="rj-sign-line"></div>
+    <div class="rj-sign-label">Le directeur / La directrice</div>
+  </div>
+</div>
+
+<!-- ══ Pied de page ══ -->
+<div style="text-align:center;font-size:10.5px;color:var(--ph-muted);margin-top:20px;padding-top:12px;border-top:1px solid var(--ph-border);">
+  Centre Médico-Social Walé — Yamoussoukro, Côte d'Ivoire — Document généré le {{ generated_at|date:"d/m/Y à H:i" }}
+</div>
+
+<!-- Bouton imprimer (masqué à l'impression) -->
+<div class="rj-print-actions" style="display:flex;justify-content:center;gap:12px;margin-top:24px;">
+  <a href="{% url 'pharmacie_recette' pharmacie %}?date={{ selected_date|date:'Y-m-d' }}" class="btn-ph-outline">
+    <i class="bi bi-arrow-left"></i> Retour
+  </a>
+  <button onclick="window.print()" class="btn-ph" style="padding:9px 28px;">
+    <i class="bi bi-printer-fill"></i> Imprimer / Enregistrer en PDF
+  </button>
+</div>
+
+</div>
+{% endblock %}

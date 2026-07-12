@@ -1,0 +1,194 @@
+{% extends 'achats/base.html' %}
+{% load i18n %}
+
+{% block title %}Besoins d'achat{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+.content { padding:0; }
+.ba-page { display:flex; flex-direction:column; height:calc(100vh - var(--topbar-h) - 44px); overflow:hidden; }
+.ba-head { display:flex; align-items:center; justify-content:space-between; padding:14px 28px 10px; background:#fff; border-bottom:1px solid rgba(0,0,0,.07); flex-shrink:0; }
+.ba-head h1 { font-size:16px; font-weight:700; color:var(--teal-800); margin:0; }
+.ba-kpis { display:flex; gap:10px; padding:10px 28px; background:#f8fafb; border-bottom:1px solid rgba(0,0,0,.06); flex-shrink:0; }
+.ba-kpi { padding:7px 16px; background:#fff; border-radius:8px; border:1px solid rgba(0,0,0,.08); font-size:13px; cursor:pointer; text-decoration:none; color:rgba(0,0,0,.7); display:flex; align-items:center; gap:8px; }
+.ba-kpi .val { font-weight:800; color:var(--teal-700); }
+.ba-filters { display:flex; align-items:center; gap:10px; padding:10px 28px; background:#fff; border-bottom:1px solid rgba(0,0,0,.07); flex-shrink:0; }
+.ba-body { flex:1; overflow:auto; min-height:0; }
+.ba-table { width:100%; border-collapse:collapse; font-size:13px; }
+.ba-table th { padding:10px 14px; font-size:11px; font-weight:700; color:#888; text-transform:uppercase; background:#fafafa; border-bottom:2px solid rgba(0,0,0,.08); position:sticky; top:0; }
+.ba-table td { padding:10px 14px; border-bottom:1px solid rgba(0,0,0,.05); vertical-align:middle; }
+.ba-table tr:hover td { background:#f8fafb; }
+.badge { display:inline-block; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:600; }
+.s-brouillon { background:#f3f4f6; color:#6b7280; }
+.s-soumis { background:#dbeafe; color:#1d4ed8; }
+.s-en_cours { background:#fef3c7; color:#92400e; }
+.s-satisfait { background:#c0d8e8; color:var(--teal-700); }
+.s-annule { background:#fee2e2; color:#991b1b; }
+.ba-kpi-alert { background:#fef3c7; border-color:#fcd34d; color:#92400e; }
+.ba-kpi-alert-val { color:#92400e; }
+.ba-import-banner { margin:12px 0 0; background:#fffbeb; border-bottom:2px solid #fcd34d; }
+.ba-import-banner-head { display:flex; align-items:center; gap:10px; padding:10px 28px 8px; background:#fef3c7; border-bottom:1px solid #fcd34d; }
+.ba-import-thead { background:#fef9ec; }
+
+/* ── Mode sombre ── */
+html[data-theme="dark"] .ba-info-tag { background:var(--surface-muted); border-color:var(--border); color:var(--text-muted); }
+html[data-theme="dark"] .ba-kpi-alert { background:rgba(146,64,14,.25); border-color:rgba(252,211,77,.35); color:#fcd34d; }
+html[data-theme="dark"] .ba-kpi-alert-val { color:#fcd34d; }
+html[data-theme="dark"] .ba-import-banner { background:rgba(146,64,14,.12); border-bottom-color:rgba(252,211,77,.35); }
+html[data-theme="dark"] .ba-import-banner-head { background:rgba(146,64,14,.2); border-bottom-color:rgba(252,211,77,.3); }
+html[data-theme="dark"] .ba-import-banner-head span { color:#fcd34d!important; }
+html[data-theme="dark"] .ba-import-thead { background:rgba(146,64,14,.15); }
+html[data-theme="dark"] .ba-head { background:var(--surface); border-bottom-color:var(--border); }
+html[data-theme="dark"] .ba-head h1 { color:var(--text-strong); }
+html[data-theme="dark"] .ba-kpis { background:var(--surface-muted); border-bottom-color:var(--border); }
+html[data-theme="dark"] .ba-kpi { background:var(--surface); border-color:var(--border); color:var(--text); }
+html[data-theme="dark"] .ba-filters { background:var(--surface); border-bottom-color:var(--border); }
+html[data-theme="dark"] .ba-table th { background:var(--surface-muted); color:var(--text-faint); border-bottom-color:var(--border); }
+html[data-theme="dark"] .ba-table td { border-bottom-color:var(--border); color:var(--text); }
+html[data-theme="dark"] .ba-table tr:hover td { background:var(--surface-muted); }
+html[data-theme="dark"] .s-brouillon { background:rgba(107,114,128,.25); color:#d1d5db; }
+html[data-theme="dark"] .s-soumis { background:rgba(29,78,216,.25); color:#93c5fd; }
+html[data-theme="dark"] .s-en_cours { background:rgba(146,64,14,.3); color:#fcd34d; }
+html[data-theme="dark"] .s-satisfait { background:rgba(var(--teal-700-rgb),.4); color:#7dd3fc; }
+html[data-theme="dark"] .s-annule { background:rgba(153,27,27,.3); color:#fca5a5; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ba-page">
+  <div class="ba-head">
+    <a href="{% url 'achats:dashboard' %}" class="o-ctrl-btn" style="padding:3px 7px;"><i class="bi bi-arrow-left"></i></a>
+    <span style="font-size:13px;color:var(--text-muted);">
+      <a href="{% url 'achats:dashboard' %}" style="color:var(--teal-700);text-decoration:none;font-weight:500;">Achats</a>
+      <span style="margin:0 5px;opacity:.4;">/</span>
+      <span style="color:var(--text);font-weight:500;">Besoins d'achat</span>
+    </span>
+    <div style="flex:1;"></div>
+    <span class="ba-info-tag" style="font-size:12px;color:var(--text-muted);padding:4px 10px;border-radius:6px;background:var(--surface-muted);border:1px solid var(--border);">
+      <i class="bi bi-info-circle"></i> Transmis depuis le module Stock
+    </span>
+  </div>
+
+  <div class="ba-kpis">
+    <a href="?" class="ba-kpi"><span class="val">{{ stats.total }}</span> Total</a>
+    <a href="?statut=soumis" class="ba-kpi"><span class="val">{{ stats.soumis }}</span> Soumis</a>
+    <a href="?statut=en_cours" class="ba-kpi"><span class="val">{{ stats.en_cours }}</span> En cours</a>
+    <a href="?statut=satisfait" class="ba-kpi"><span class="val">{{ stats.satisfait }}</span> Satisfaits</a>
+    {% if fiches_a_importer %}
+    <span class="ba-kpi ba-kpi-alert">
+      <i class="bi bi-arrow-down-circle-fill"></i>
+      <span class="val ba-kpi-alert-val">{{ fiches_a_importer|length }}</span> fiche{{ fiches_a_importer|length|pluralize }} à importer
+    </span>
+    {% endif %}
+  </div>
+
+  <div class="ba-filters">
+    <form method="get" style="display:flex;gap:10px;align-items:center;">
+      <input type="search" name="q" value="{{ q }}" placeholder="Rechercher…" style="height:34px;border:1px solid #d1d5db;border-radius:6px;padding:0 12px;font-size:13px;width:260px;">
+      <select name="statut" onchange="this.form.submit()" style="height:34px;border:1px solid #d1d5db;border-radius:6px;padding:0 10px;font-size:13px;">
+        <option value="">Tous les statuts</option>
+        {% for val, label in statut_choices %}
+        <option value="{{ val }}" {% if statut == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" style="padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;cursor:pointer;"><i class="bi bi-search"></i></button>
+      {% if q or statut %}<a href="{% url 'achats:besoins_list' %}" style="font-size:13px;color:var(--text-muted);">Effacer</a>{% endif %}
+    </form>
+  </div>
+
+  <div class="ba-body">
+
+    {% if fiches_a_importer %}
+    <div class="ba-import-banner">
+      <div class="ba-import-banner-head">
+        <i class="bi bi-arrow-down-circle-fill" style="color:#d97706;font-size:15px;"></i>
+        <span style="font-size:12px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.4px;">Fiches stock à importer ({{ fiches_a_importer|length }})</span>
+      </div>
+      <table class="ba-table">
+        <thead>
+          <tr class="ba-import-thead">
+            <th>N° Fiche</th>
+            <th>Pharmacie</th>
+            <th>Période</th>
+            <th>Statut</th>
+            <th>Lignes</th>
+            <th>Soumis par</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for fiche in fiches_a_importer %}
+        <tr>
+          <td style="font-weight:700;color:var(--teal-700);">
+            <a href="{% url 'stock_fiche_detail' fiche.pk %}" style="color:inherit;text-decoration:none;">{{ fiche.numero }}</a>
+          </td>
+          <td style="font-size:12px;">{{ fiche.get_pharmacie_display|default:"—" }}</td>
+          <td style="font-size:12px;white-space:nowrap;">{{ fiche.periode_debut|date:"d/m/Y" }} → {{ fiche.periode_fin|date:"d/m/Y" }}</td>
+          <td>
+            {% if fiche.statut == 'valide' %}
+              <span class="badge s-satisfait">Validée</span>
+            {% else %}
+              <span class="badge s-soumis">Soumise</span>
+            {% endif %}
+          </td>
+          <td style="color:var(--text-muted);">{{ fiche.lignes.count }} produit{{ fiche.lignes.count|pluralize }}</td>
+          <td style="color:var(--text-muted);font-size:12px;">{{ fiche.cree_par.get_full_name|default:fiche.cree_par.username|default:"—" }}</td>
+          <td>
+            <form method="post" action="{% url 'stock_fiche_envoyer_achats' fiche.pk %}" style="display:inline;"
+                  onsubmit="return confirm('Importer la fiche {{ fiche.numero }} dans les achats ?');">
+              {% csrf_token %}
+              <button type="submit" style="padding:4px 12px;border-radius:6px;background:var(--teal-600);color:#fff;border:none;font-size:12px;font-weight:600;cursor:pointer;">
+                <i class="bi bi-arrow-down-circle"></i> Importer
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    {% if besoins %}
+    <table class="ba-table">
+      <thead>
+        <tr>
+          <th>N°</th><th>Titre</th><th>Source</th><th>Statut</th><th>Lignes</th><th>Date</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for b in besoins %}
+      <tr>
+        <td style="font-weight:700;color:var(--teal-700);">
+          <a href="{% url 'achats:besoin_detail' b.pk %}" style="color:inherit;text-decoration:none;">{{ b.numero }}</a>
+        </td>
+        <td><a href="{% url 'achats:besoin_detail' b.pk %}" style="color:var(--text);text-decoration:none;font-weight:500;">{{ b.titre }}</a></td>
+        <td>
+          {% if b.fiche_besoins %}
+            <a href="{% url 'stock_fiche_detail' b.fiche_besoins.pk %}" style="font-size:12px;color:var(--teal-700);text-decoration:none;display:inline-flex;align-items:center;gap:4px;background:rgba(var(--teal-700-rgb),.08);padding:2px 8px;border-radius:10px;">
+              <i class="bi bi-box-seam" style="font-size:10px;"></i> {{ b.fiche_besoins.numero }}
+            </a>
+          {% else %}
+            <span style="font-size:11px;color:var(--text-faint);">Manuel</span>
+          {% endif %}
+        </td>
+        <td><span class="badge s-{{ b.statut }}">{{ b.get_statut_display }}</span></td>
+        <td style="color:var(--text-muted);">{{ b.lignes.count }}</td>
+        <td style="color:#888;white-space:nowrap;">{{ b.date_creation|date:"d/m/Y" }}</td>
+        <td>
+          <a href="{% url 'achats:besoin_detail' b.pk %}" style="color:var(--teal-600);font-size:13px;"><i class="bi bi-eye"></i></a>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="padding:48px;text-align:center;color:var(--text-faint);">
+      <i class="bi bi-list-check" style="font-size:36px;display:block;margin-bottom:12px;"></i>
+      Aucun besoin trouvé.
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -68,24 +68,32 @@ class RendezVous(models.Model):
     STATUT = [('planifie','Planifié'),('confirme','Confirmé'),('en_attente','En attente'),('en_consultation','En consultation'),('termine','Terminé'),('annule','Annulé'),('absent','Absent')]
     TYPE = [('consultation','Consultation'),('controle','Contrôle'),('urgence','Urgence'),('examen','Examen'),('vaccination','Vaccination')]
 
-    DEPARTEMENT = [
-        ('medecine_generale', 'Médecine générale'),
-        ('gynecologie_cpn', 'Gynécologie / CPN'),
-    ]
     URGENCE = [('normal', 'Normal'), ('urgent', 'Urgent'), ('tres_urgent', 'Très urgent')]
+    TYPE_VISITE_CPN = [
+        ('cpn1',    'CPN 1'),
+        ('cpn1_at', 'CPN 1 – Autre trimestre'),
+        ('cpn2',    'CPN 2'),
+        ('cpn2_at', 'CPN 2 – Autre trimestre'),
+        ('cpn3',    'CPN 3'),
+        ('cpn3_at', 'CPN 3 – Autre trimestre'),
+        ('cpn4',    'CPN 4'),
+        ('cpn4_at',  'CPN 4 – Autre trimestre'),
+        ('cpn5plus', 'CPN 5 et plus'),
+        ('autre',    'Autre'),
+    ]
 
     code_rdv = models.CharField(max_length=20, blank=True, default='', verbose_name='Code RDV')
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='rendez_vous')
     medecin = models.ForeignKey('medecins.Medecin', on_delete=models.SET_NULL, null=True, blank=True, related_name='rendez_vous')
     docteur_jr = models.ForeignKey('medecins.Medecin', on_delete=models.SET_NULL, null=True, blank=True, related_name='rdv_docteur_jr', verbose_name='Docteur Jr. responsable')
-    departement = models.CharField(max_length=30, choices=DEPARTEMENT, blank=True, default='')
-    service = models.ForeignKey('medecins.Service', on_delete=models.SET_NULL, null=True, blank=True, related_name='rendez_vous')
+    departement = models.ForeignKey('medecins.Departement', on_delete=models.SET_NULL, null=True, blank=True, related_name='rendez_vous', verbose_name='Département')
     type_consultation = models.ForeignKey('services.Articleservice', on_delete=models.SET_NULL, null=True, blank=True, related_name='rendez_vous', verbose_name='Type de consultation')
     salle_consultation = models.CharField(max_length=100, blank=True, verbose_name='Salle de consultation')
     date_heure = models.DateTimeField()
     date_suivi = models.DateTimeField(null=True, blank=True, verbose_name='Date de suivi')
     duree_minutes = models.IntegerField(default=30)
     type_rdv = models.CharField(max_length=20, choices=TYPE, default='consultation')
+    type_visite_cpn = models.CharField(max_length=10, choices=TYPE_VISITE_CPN, blank=True, default='', verbose_name='Type de visite CPN')
     niveau_urgence = models.CharField(max_length=20, choices=URGENCE, default='normal', verbose_name="Niveau d'urgence")
     motif = models.TextField(blank=True)
     statut = models.CharField(max_length=20, choices=STATUT, default='planifie')
@@ -113,7 +121,7 @@ class RendezVous(models.Model):
     ]
     cpn_mode_entree = models.CharField(max_length=30, choices=MODE_ENTREE, blank=True, default='', verbose_name="Mode d'entrée CPN")
     cpn_mode_entree_autre = models.CharField(max_length=200, blank=True, default='', verbose_name="Mode d'entrée CPN (préciser)")
-    cpn_type_visite = models.ForeignKey('TypeVisite', on_delete=models.SET_NULL, null=True, blank=True, related_name='rendez_vous_cpn', verbose_name='Type de visite CPN')
+    cpn_type_visite = models.ForeignKey('gynecologie.TypeVisite', on_delete=models.SET_NULL, null=True, blank=True, related_name='rendez_vous_cpn', verbose_name='Type de visite CPN')
 
     CUR_MODE_ENTREE = [
         ('venu_lui_meme', 'Patient venu de lui-même'),
@@ -123,7 +131,7 @@ class RendezVous(models.Model):
     ]
     cur_mode_entree = models.CharField(max_length=30, choices=CUR_MODE_ENTREE, blank=True, default='', verbose_name="Mode d'entrée curatif")
     cur_mode_entree_autre = models.CharField(max_length=200, blank=True, default='', verbose_name="Mode d'entrée curatif (préciser)")
-    cur_type_visite = models.ForeignKey('TypeVisite', on_delete=models.SET_NULL, null=True, blank=True, related_name='rendez_vous_curatifs', verbose_name='Type de visite curative')
+    cur_type_visite = models.ForeignKey('gynecologie.TypeVisite', on_delete=models.SET_NULL, null=True, blank=True, related_name='rendez_vous_curatifs', verbose_name='Type de visite curative')
 
     def save(self, *args, **kwargs):
         if not self.code_rdv:
@@ -230,19 +238,6 @@ class Pathologie(models.Model):
     def __str__(self): return self.nom
     class Meta:
         verbose_name = "Pathologie"
-        ordering = ['nom']
-
-
-class TypeVisite(models.Model):
-    nom           = models.CharField(max_length=200, verbose_name='Nom')
-    code          = models.CharField(max_length=50, unique=True, verbose_name='Code')
-    description   = models.TextField(blank=True, verbose_name='Description')
-    actif         = models.BooleanField(default=True)
-    date_creation = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self): return self.nom
-    class Meta:
-        verbose_name = "Type de visite"
         ordering = ['nom']
 
 

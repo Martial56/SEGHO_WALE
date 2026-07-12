@@ -1,0 +1,119 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block topbar_title %}Planning{% endblock %}
+
+{% block extra_css %}
+{% load static %}
+    <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
+<style>
+/* ── Palette logo — alias vers la couleur d'accent globale ── */
+:root {
+  --pl-900: var(--teal-900);
+  --pl-800: var(--teal-800);
+  --pl-700: var(--teal-700);
+  --pl-600: var(--teal-600);   /* couleur principale du logo (ou choix utilisateur) */
+  --pl-500: var(--teal-500);
+  --pl-400: var(--teal-400);
+  --pl-300: var(--teal-300);
+  --pl-200: var(--teal-200);
+  --pl-100: var(--teal-100);
+  --pl-50:  var(--teal-50);
+  --pl-900-rgb: var(--teal-900-rgb); --pl-700-rgb: var(--teal-700-rgb); --pl-600-rgb: var(--teal-600-rgb);
+
+  --surface: #fff; --border: #e2eef5; --text: #071e28;
+  --text-muted: rgba(0,0,0,0.45); --bg: #f0f5fa;
+}
+html[data-theme="dark"] {
+  --pl-50: #1a2715; --pl-100: #223320;
+  --surface: #152010; --border: #071e28; --text: #c8dce8;
+  --text-muted: rgba(255,255,255,0.45); --bg: #171616;
+}
+.content { padding: 0; overflow-x: clip; }
+
+/* ── Boutons communs ── */
+.btn-primary {
+  background: var(--pl-600); color: #fff; border: none; border-radius: 6px;
+  padding: 7px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+  text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+  transition: background 0.15s;
+}
+.btn-primary:hover { background: var(--pl-700); color: #fff; }
+
+.btn-outline {
+  border: 1px solid var(--pl-600); color: var(--pl-600); background: transparent;
+  border-radius: 6px; padding: 7px 14px; font-size: 13px; font-weight: 500;
+  text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+  transition: background 0.15s, color 0.15s; cursor: pointer;
+}
+.btn-outline:hover { background: var(--pl-600); color: #fff; }
+
+.btn-secondary {
+  border: 1px solid var(--border); color: var(--text); background: var(--surface);
+  border-radius: 6px; padding: 7px 14px; font-size: 13px; font-weight: 500;
+  text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+  transition: background 0.15s; cursor: pointer;
+}
+.btn-secondary:hover { background: var(--pl-50); color: var(--pl-700); }
+
+.btn-outline-sm {
+  border: 1px solid var(--pl-600); color: var(--pl-600); background: transparent;
+  border-radius: 5px; padding: 4px 10px; font-size: 12px; font-weight: 500;
+  text-decoration: none; display: inline-flex; align-items: center; gap: 4px;
+  transition: background 0.15s, color 0.15s;
+}
+.btn-outline-sm:hover { background: var(--pl-600); color: #fff; }
+
+.btn-danger-sm {
+  border: 1px solid var(--rose-btn); color: var(--rose-btn); background: transparent;
+  border-radius: 5px; padding: 4px 10px; font-size: 12px; font-weight: 500;
+  cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
+  transition: background 0.15s, color 0.15s;
+}
+.btn-danger-sm:hover { background: var(--rose-btn); color: #fff; }
+
+/* ── Mobile responsive ── */
+@media (max-width: 768px) {
+  .main { height: auto !important; overflow: visible !important; }
+  .content { overflow-x: visible; padding: 0 8px !important; }
+  .pl-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .stats-cards { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+  .monthly-chart { gap: 6px; }
+  .monthly-bar-col { min-width: 32px; }
+}
+
+{% block extra_planning_css %}{% endblock %}
+</style>
+{% endblock %}
+
+{% block module_navbar %}
+{% include 'planning/includes/nav.html' %}
+{% endblock %}
+
+{% block breadcrumb %}{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+(function () {
+  function alignSousTopbar() {
+    var topbar = document.querySelector('.topbar');
+    var content = document.querySelector('.content');
+    if (!topbar || !content) return;
+    var tbH = Math.ceil(topbar.getBoundingClientRect().height);
+    if (tbH <= 0) return;
+    document.documentElement.style.setProperty('--header-h', tbH + 'px');
+    document.documentElement.style.setProperty('--topbar-h', '0px');
+    requestAnimationFrame(function () {
+      var contentGap = Math.round(content.getBoundingClientRect().top - topbar.getBoundingClientRect().bottom);
+      if (contentGap !== 0) {
+        document.documentElement.style.setProperty('--header-h', (tbH - contentGap) + 'px');
+      }
+    });
+  }
+  if (document.readyState !== 'loading') { alignSousTopbar(); }
+  else { document.addEventListener('DOMContentLoaded', alignSousTopbar); }
+  window.addEventListener('resize', alignSousTopbar);
+})();
+</script>
+{% endblock %}

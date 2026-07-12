@@ -1,0 +1,76 @@
+{% extends 'stock/base.html' %}
+{% load static %}
+{% block topbar_title %}Stock — Nouvelle commande{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+
+<div class="action-bar">
+  <div class="action-bar-breadcrumb">
+    <a href="{% url 'stock_commandes' %}" class="btn-form-cancel" style="padding:3px 7px;">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <a href="{% url 'stock_commandes' %}">Commandes</a>
+    <span class="sep">/</span>
+    <span class="current">Nouvelle commande fournisseur</span>
+  </div>
+</div>
+
+<form method="post" novalidate>
+  {% csrf_token %}
+  <div class="form-simple-card" style="max-width:600px;">
+
+    <!-- Fournisseur -->
+    <div class="form-field">
+      <label class="field-label" for="id_fournisseur">
+        Fournisseur <span class="required-star">*</span>
+      </label>
+      <select name="fournisseur" id="id_fournisseur" class="field-ul" required>
+        <option value="">— Sélectionner un fournisseur —</option>
+        {% for f in fournisseurs %}
+        <option value="{{ f.pk }}">{{ f.code }} — {{ f.nom }}{% if f.telephone %} · {{ f.telephone }}{% endif %}</option>
+        {% empty %}
+        <option disabled>Aucun fournisseur enregistré</option>
+        {% endfor %}
+      </select>
+      {% if not fournisseurs %}
+      <div class="f-hint" style="color:var(--amber-text);">
+        <i class="bi bi-exclamation-triangle"></i>
+        Aucun fournisseur actif. <a href="{% url 'achats:fournisseur_create' %}" style="color:var(--st-600);">Créer un fournisseur</a>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Date de livraison prévue -->
+    <div class="form-field">
+      <label class="field-label" for="id_date_livraison_prevue">Date de livraison prévue</label>
+      <input type="date" name="date_livraison_prevue" id="id_date_livraison_prevue" class="field-ul">
+    </div>
+
+    <!-- Notes -->
+    <div class="form-field">
+      <label class="field-label" for="id_notes">Notes / Observations</label>
+      <textarea name="notes" id="id_notes" class="field-ul"
+                placeholder="Instructions particulières, conditions, remarques…"></textarea>
+    </div>
+
+    <!-- Infos -->
+    <div style="background:var(--st-50);border:1px solid var(--st-200);border-radius:8px;padding:12px 16px;font-size:12px;color:var(--st-700);margin-bottom:18px;">
+      <i class="bi bi-info-circle" style="color:var(--st-500);"></i>
+      La commande sera créée au statut <strong>Brouillon</strong>. Vous pourrez ensuite ajouter des lignes de produits depuis la page de détail.
+    </div>
+
+    <!-- Boutons -->
+    <div class="form-actions">
+      <a href="{% url 'stock_commandes' %}" class="btn-form-cancel">
+        <i class="bi bi-x-lg"></i> Annuler
+      </a>
+      <button type="submit" class="btn-form-submit">
+        <i class="bi bi-check-lg"></i> Créer la commande
+      </button>
+    </div>
+
+  </div>
+</form>
+
+{% endblock %}

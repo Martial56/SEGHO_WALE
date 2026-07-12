@@ -1,90 +1,307 @@
 {% extends 'hospitalisation/base.html' %}
+{% load static %}
+{% block extra_css %}
+{{ block.super }}
+<style>
+/* ── Variables ── */
+:root {
+  --surface: #fff;
+  --border:  #e8edf2;
+  --text:    #0d3040;
+  --text-muted: rgba(0,0,0,.45);
+}
+html[data-theme="dark"] {
+  --surface: #132033;
+  --border:  #243044;
+  --text:    #d4e6f5;
+  --text-muted: rgba(255,255,255,.4);
+}
+
+/* ── Layout ── */
+.content    { padding: 0 !important; overflow: visible !important; }
+.breadcrumb { display: none !important; }
+
+/* ── Subheader ── */
+.o-subheader {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 6px 16px;
+  margin: 0;
+  display: flex; flex-direction: column; gap: 5px;
+  position: fixed; left: 0; right: 0; top: 0;
+  z-index: 190;
+}
+.o-subheader-row        { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.o-subheader-row-right  { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+html[data-theme="dark"] .o-subheader { background: var(--surface); border-bottom-color: var(--border); }
+
+/* ── Stats ── */
+.h-stats {
+  display: grid; grid-template-columns: repeat(4,1fr);
+  background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.h-stat {
+  padding: 14px 20px; border-right: 1px solid var(--border);
+  display: flex; align-items: center; gap: 14px;
+}
+.h-stat:last-child { border-right: none; }
+.h-stat-icon {
+  width: 40px; height: 40px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+}
+.h-stat-icon.blue   { background: #eff6ff; color: #2563eb; }
+.h-stat-icon.teal   { background: #f0fdfa; color: #0d9488; }
+.h-stat-icon.amber  { background: #fffbeb; color: #d97706; }
+.h-stat-icon.violet { background: #f5f3ff; color: #7c3aed; }
+.h-stat-num   { font-size: 24px; font-weight: 700; color: var(--text); line-height: 1; }
+.h-stat-label { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+
+html[data-theme="dark"] .h-stats { background: var(--surface); border-bottom-color: var(--border); }
+html[data-theme="dark"] .h-stat  { border-right-color: var(--border); }
+html[data-theme="dark"] .h-stat-icon.blue   { background: rgba(37,99,235,.15);  color: #93c5fd; }
+html[data-theme="dark"] .h-stat-icon.teal   { background: rgba(13,148,136,.15); color: #5eead4; }
+html[data-theme="dark"] .h-stat-icon.amber  { background: rgba(217,119,6,.15);  color: #fcd34d; }
+html[data-theme="dark"] .h-stat-icon.violet { background: rgba(124,58,237,.15); color: #c4b5fd; }
+
+/* ── Table ── */
+.h-table-wrap { overflow-x: auto; }
+.h-table {
+  width: 100%; border-collapse: collapse;
+  background: var(--surface); table-layout: fixed;
+}
+.h-table thead th {
+  padding: 9px 14px; text-align: left;
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--text-muted); border-bottom: 1px solid var(--border);
+  background: var(--surface); white-space: nowrap;
+}
+.h-table tbody tr {
+  border-bottom: 1px solid var(--border);
+  cursor: pointer; transition: background .1s;
+}
+.h-table tbody tr:hover  { background: #f0f7fb; }
+.h-table tbody td {
+  padding: 10px 14px; color: var(--text); font-size: 13px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  vertical-align: middle;
+}
+.h-table tbody tr:last-child td { border-bottom: none; }
+
+.h-num  {
+  font-family: var(--font-mono); font-size: 12px; font-weight: 700;
+  color: var(--teal-600); letter-spacing: .03em;
+}
+.h-patient-name { font-weight: 600; font-size: 13px; }
+.h-patient-code { font-size: 10.5px; color: var(--text-muted); margin-top: 1px; }
+.h-chambre-nom  { font-weight: 500; }
+.h-chambre-type { font-size: 10.5px; color: var(--text-muted); margin-top: 1px; }
+
+html[data-theme="dark"] .h-table thead th   { background: var(--surface); border-bottom-color: var(--border); }
+html[data-theme="dark"] .h-table tbody tr   { border-bottom-color: var(--border); }
+html[data-theme="dark"] .h-table tbody tr:hover { background: rgba(255,255,255,.04); }
+
+/* ── Badges statut ── */
+.h-badge {
+  display: inline-flex; align-items: center;
+  padding: 3px 10px; border-radius: 20px;
+  font-size: 11px; font-weight: 600; white-space: nowrap;
+}
+.h-badge-brouillon   { background: #f3f4f6; color: #6b7280; }
+.h-badge-confirme    { background: #ede9fe; color: #5b21b6; }
+.h-badge-hospitalise { background: #dbeafe; color: #1d4ed8; }
+.h-badge-decharge    { background: #d1fae5; color: #065f46; }
+.h-badge-termine     { background: #dcfce7; color: #15803d; }
+.h-badge-annule      { background: #fee2e2; color: #b91c1c; }
+
+html[data-theme="dark"] .h-badge-brouillon   { background: rgba(107,114,128,.2); color: #9ca3af; }
+html[data-theme="dark"] .h-badge-confirme    { background: rgba(91,33,182,.2);   color: #c4b5fd; }
+html[data-theme="dark"] .h-badge-hospitalise { background: rgba(29,78,216,.2);   color: #93c5fd; }
+html[data-theme="dark"] .h-badge-decharge    { background: rgba(6,95,70,.2);     color: #6ee7b7; }
+html[data-theme="dark"] .h-badge-termine     { background: rgba(21,128,61,.2);   color: #86efac; }
+html[data-theme="dark"] .h-badge-annule      { background: rgba(185,28,28,.2);   color: #fca5a5; }
+
+/* ── Dropdown filtre ── */
+.o-dd-wrap  { position: relative; }
+.o-dd-panel {
+  display: none; position: fixed; z-index: 9999;
+  background: #fff; border: 1px solid #dde3ec;
+  border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,.16);
+  min-width: 210px; padding: 5px 0;
+}
+.o-dd-panel.open  { display: block; }
+.o-dd-section     { padding: 7px 14px 4px; font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; }
+.o-dd-item {
+  display: flex; align-items: center; padding: 7px 14px;
+  font-size: 13px; color: var(--text); cursor: pointer;
+  text-decoration: none; transition: background .1s; white-space: nowrap;
+}
+.o-dd-item:hover  { background: rgba(20,87,112,.06); color: var(--teal-700); }
+.o-dd-item.active { background: rgba(20,87,112,.08); color: var(--teal-700); font-weight: 600; }
+.o-dd-sep         { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+
+html[data-theme="dark"] .o-dd-panel   { background: #1a2535; border-color: #2e3f58; }
+html[data-theme="dark"] .o-dd-item    { color: var(--text); }
+html[data-theme="dark"] .o-dd-item:hover  { background: rgba(var(--teal-500-rgb),.15); color: #7aaec7; }
+html[data-theme="dark"] .o-dd-item.active { background: rgba(var(--teal-500-rgb),.2);  color: #7aaec7; }
+
+/* ── Vide ── */
+.h-empty     { text-align: center; padding: 64px 20px; color: var(--text-muted); font-size: 13px; }
+.h-empty i   { font-size: 42px; display: block; margin-bottom: 12px; opacity: .3; }
+.h-empty p   { margin-top: 4px; font-size: 12px; }
+
+/* ── Pagination label ── */
+.o-pag-label { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+
+@media (max-width: 800px) {
+  .h-stats { grid-template-columns: repeat(2,1fr); }
+  .h-stat:nth-child(2) { border-right: none; }
+  .h-stat:nth-child(3) { border-right: 1px solid var(--border); }
+}
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <div class="page-header-left">
-        <h1>🛏️ Gestion de l'Hospitalisation</h1>
-        <p>Gestion des admissions, chambres et soins</p>
+<div id="page-wrap">
+
+<!-- ══ SUBHEADER ══ -->
+<div class="o-subheader" data-fixed="1">
+
+  <!-- Ligne 1 : titre + recherche -->
+  <div class="o-subheader-row">
+    <span class="o-page-title">Hospitalisations <span class="o-page-count" id="page-count">{{ total }}</span></span>
+    <div class="o-subheader-row-right">
+      <form method="get" id="filter-form" style="display:flex;align-items:center;">
+        <input type="hidden" name="statut" id="fi-statut" value="{{ statut }}">
+        <input type="hidden" name="vue"    id="vue-input" value="{{ vue }}">
+        <div class="o-search-bar">
+          <input class="o-search-input" id="search-input" type="text" name="q" value="{{ q }}"
+                 placeholder="Rechercher patient, numéro…">
+          <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
+        </div>
+      </form>
     </div>
-    <div class="page-header-right">
-        <a href="/admin/hospitalisation/hospitalisation/add/" class="btn btn-primary">
-            <span>+</span> Nouvelle admission
-        </a>
+  </div>
+
+  <!-- Ligne 2 : créer + contrôles -->
+  <div class="o-subheader-row">
+    {% if perms.hospitalisation.add_hospitalisation or user.is_superuser %}
+    <a href="{% url 'hospitalisation:create' %}" class="o-btn-create">
+      <i class="bi bi-plus-lg"></i> Nouvelle admission
+    </a>
+    {% endif %}
+
+    <div class="o-subheader-row-right" id="subheader-controls">
+      {% include 'hospitalisation/includes/_list_controls.html' %}
     </div>
+  </div>
+
+</div><!-- /o-subheader -->
+
+<div id="list-results">
+  {% include 'hospitalisation/includes/_list_results.html' %}
 </div>
 
-<div style="display: flex; gap: 16px; margin-bottom: 24px;">
-    <input type="text" placeholder="Rechercher par patient ou numéro de chambre..." style="flex: 1; padding: 10px 14px; border: 1px solid rgba(0,0,0,0.12); border-radius: 8px; font-size: 14px;">
-    <select style="padding: 10px 14px; border: 1px solid rgba(0,0,0,0.12); border-radius: 8px; font-size: 14px;">
-        <option>Tous les services</option>
-        <option>Médecine générale</option>
-        <option>Chirurgie</option>
-        <option>Maternité</option>
-    </select>
-</div>
+</div><!-- /#page-wrap -->
+{% endblock %}
 
-<div class="grid">
-    <div class="card">
-        <p class="card-meta">Patients hospitalisés</p>
-        <div class="card-stat">{{ stats.patients_hospitalises }}</div>
-    </div>
-    <div class="card">
-        <p class="card-meta">Taux d'occupation</p>
-        <div class="card-stat">{{ stats.taux_occupation }}%</div>
-    </div>
-    <div class="card">
-        <p class="card-meta">Chambres disponibles</p>
-        <div class="card-stat" style="color: var(--green);">{{ stats.chambres_disponibles }}</div>
-    </div>
-    <div class="card">
-        <p class="card-meta">Durée moyenne (jours)</p>
-        <div class="card-stat">{{ stats.duree_moyenne }}</div>
-    </div>
-</div>
+{% block extra_js %}
+{{ block.super }}
+<script>
+function toggleDd(id, btn) {
+  const panel = document.getElementById(id);
+  document.querySelectorAll('.o-dd-panel').forEach(p => { if (p.id !== id) p.classList.remove('open'); });
+  if (!panel) return;
+  const open = panel.classList.toggle('open');
+  if (open) {
+    const r = btn.getBoundingClientRect();
+    panel.style.top  = (r.bottom + window.scrollY + 4) + 'px';
+    panel.style.left = r.left + 'px';
+  }
+}
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.o-dd-wrap') && !e.target.closest('.o-dd-panel'))
+    document.querySelectorAll('.o-dd-panel').forEach(p => p.classList.remove('open'));
+});
 
-<div class="table-container">
-    <table>
-        <thead>
-            <tr>
-                <th>Code Hospitalisation</th>
-                <th>Patient</th>
-                <th>Chambre</th>
-                <th>Service</th>
-                <th>Date Admission</th>
-                <th>Médecin Traitant</th>
-                <th>Statut</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for hospitalisation in page_obj %}
-            <tr>
-                <td>{{ hospitalisation.code_hospitalisation }}</td>
-                <td>{{ hospitalisation.patient.nom }} {{ hospitalisation.patient.prenoms }}</td>
-                <td>{{ hospitalisation.chambre.numero }} - {{ hospitalisation.chambre.type_chambre }}</td>
-                <td>{{ hospitalisation.service }}</td>
-                <td>{{ hospitalisation.date_admission|date:"d/m/Y" }}</td>
-                <td>{{ hospitalisation.medecin_traitant.nom }} {{ hospitalisation.medecin_traitant.prenoms }}</td>
-                <td>
-                    <span class="badge badge-{% if hospitalisation.statut == 'admis' %}success{% elif hospitalisation.statut == 'en_soins' %}warning{% else %}secondary{% endif %}">
-                        {{ hospitalisation.get_statut_display }}
-                    </span>
-                </td>
-                <td>
-                    <a href="/admin/hospitalisation/hospitalisation/{{ hospitalisation.id }}/change/" class="btn btn-secondary btn-small">Voir</a>
-                    <a href="/admin/hospitalisation/hospitalisation/{{ hospitalisation.id }}/change/" class="btn btn-primary btn-small">Modifier</a>
-                </td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="8" style="text-align: center; padding: 40px; color: rgba(0,0,0,0.4);">
-                    Aucune hospitalisation enregistrée
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
+/* ══ Rafraîchissement AJAX de la liste (sans rechargement de page) ═════════════ */
+var LIST_URL = '{% url "hospitalisation:list" %}';
 
-{% include 'includes/pagination.html' %}
+function refreshList(params) {
+  var url = LIST_URL + '?' + new URLSearchParams(params).toString();
+  fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      document.getElementById('subheader-controls').innerHTML = data.controls_html;
+      document.getElementById('list-results').innerHTML = data.results_html;
+      document.getElementById('page-count').textContent = data.total;
+      document.querySelectorAll('.o-dd-panel').forEach(function (p) { p.classList.remove('open'); });
+      history.pushState(null, '', url);
+    })
+    .catch(function () {
+      // Repli : navigation classique si l'AJAX échoue
+      window.location = url;
+    });
+}
+
+function currentParams(overrides) {
+  var params = {
+    q:      document.getElementById('search-input').value,
+    statut: document.getElementById('fi-statut').value,
+    vue:    document.getElementById('vue-input').value,
+  };
+  Object.assign(params, overrides || {});
+  Object.keys(params).forEach(function (k) { if (!params[k]) delete params[k]; });
+  return params;
+}
+
+function setVue(v) {
+  document.getElementById('vue-input').value = v;
+  refreshList(currentParams({ vue: v }));
+}
+function setFiltre(val) {
+  document.getElementById('fi-statut').value = val;
+  refreshList(currentParams({ statut: val }));
+}
+function clearQ() {
+  document.getElementById('search-input').value = '';
+  refreshList(currentParams({ q: '' }));
+}
+function clearAll() {
+  document.getElementById('search-input').value = '';
+  document.getElementById('fi-statut').value = '';
+  refreshList(currentParams({ q: '', statut: '' }));
+}
+
+document.getElementById('filter-form').addEventListener('submit', function (e) {
+  e.preventDefault();
+  refreshList(currentParams());
+});
+
+/* Pagination — délégation d'événement car les liens sont remplacés à chaque rafraîchissement */
+document.addEventListener('click', function (e) {
+  var link = e.target.closest('.o-pag-btn');
+  if (!link || link.classList.contains('disabled')) return;
+  e.preventDefault();
+  var page = link.dataset.page;
+  if (!page) return;
+  refreshList(currentParams({ page: page }));
+});
+
+/* Navigation précédent/suivant du navigateur */
+window.addEventListener('popstate', function () {
+  var params = {};
+  new URLSearchParams(window.location.search).forEach(function (v, k) { params[k] = v; });
+  fetch(LIST_URL + '?' + new URLSearchParams(params).toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      document.getElementById('subheader-controls').innerHTML = data.controls_html;
+      document.getElementById('list-results').innerHTML = data.results_html;
+      document.getElementById('page-count').textContent = data.total;
+      document.getElementById('search-input').value = params.q || '';
+      document.getElementById('fi-statut').value = params.statut || '';
+      document.getElementById('vue-input').value = params.vue || 'liste';
+    });
+});
+</script>
 {% endblock %}

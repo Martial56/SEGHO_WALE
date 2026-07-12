@@ -1,0 +1,514 @@
+{% extends 'conges/base.html' %}
+{% load static %}
+{% block topbar_title %}Rapport congés — {{ year }}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+/* ── Pleine page ── */
+.rp-page {
+  display:flex; flex-direction:column;
+  height:calc(100vh - var(--topbar-h));
+  overflow:hidden;
+}
+
+/* ── En-tête ── */
+.rp-head {
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  padding:8px 20px; flex-shrink:0;
+  background:var(--cg-surface); border-bottom:1px solid var(--cg-border);
+}
+.rp-title { font-size:16px; font-weight:800; color:var(--cg-900); }
+html[data-theme="dark"] .rp-title { color:var(--cg-200); }
+.rp-subtitle { font-size:11.5px; color:var(--cg-muted); }
+
+/* ── Filtres ── */
+.rp-filters {
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  padding:8px 20px; flex-shrink:0;
+  background:var(--cg-50); border-bottom:1px solid var(--cg-border);
+}
+html[data-theme="dark"] .rp-filters { background:rgba(var(--cg-600-rgb),.04); }
+
+/* ── KPIs ── */
+.rp-kpis {
+  display:flex; gap:0; flex-shrink:0; border-bottom:1px solid var(--cg-border);
+}
+.rp-kpi {
+  flex:1; display:flex; align-items:center; gap:10px;
+  padding:10px 20px; border-right:1px solid var(--cg-border);
+}
+.rp-kpi:last-child { border-right:none; }
+.rp-kpi-icon {
+  width:36px; height:36px; border-radius:9px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center; font-size:15px;
+  background:rgba(var(--cg-600-rgb),.1); color:var(--cg-600);
+}
+.rp-kpi-val { font-size:22px; font-weight:800; color:var(--cg-700); line-height:1; }
+html[data-theme="dark"] .rp-kpi-val { color:var(--cg-300); }
+.rp-kpi-lbl { font-size:10.5px; color:var(--cg-muted); font-weight:600; text-transform:uppercase; letter-spacing:.3px; margin-top:1px; }
+
+/* ── Corps ── */
+.rp-body { flex:1; overflow:auto; min-height:0; }
+
+/* ── Sections ── */
+.rp-section { padding:0; border-bottom:1px solid var(--cg-border); }
+.rp-section:last-child { border-bottom:none; }
+.rp-section-head {
+  display:flex; align-items:center; gap:10px; padding:10px 20px;
+  background:var(--cg-50); border-bottom:1px solid var(--cg-border);
+  position:sticky; top:0; z-index:3;
+}
+html[data-theme="dark"] .rp-section-head { background:rgba(var(--cg-600-rgb),.04); }
+.rp-section-title { font-size:12px; font-weight:800; color:var(--cg-900); text-transform:uppercase; letter-spacing:.4px; }
+html[data-theme="dark"] .rp-section-title { color:var(--cg-200); }
+
+/* ── Tableau ── */
+.rp-table { width:100%; border-collapse:collapse; font-size:13px; }
+.rp-table thead th {
+  background:var(--cg-700); color:#fff; padding:9px 16px;
+  text-align:left; font-size:10.5px; font-weight:700; text-transform:uppercase;
+  letter-spacing:.3px; border-right:1px solid rgba(255,255,255,.08);
+}
+.rp-table thead th:last-child { border-right:none; }
+.rp-table thead th.num { text-align:right; }
+.rp-table tbody tr { border-bottom:1px solid var(--cg-border); transition:background .1s; }
+.rp-table tbody tr:hover { background:var(--cg-50); }
+html[data-theme="dark"] .rp-table tbody tr:hover { background:#1D2C44; }
+.rp-table td { padding:10px 16px; color:var(--cg-text); vertical-align:middle; }
+.rp-table td.num { text-align:right; font-weight:700; color:var(--cg-700); }
+html[data-theme="dark"] .rp-table td.num { color:var(--cg-300); }
+.rp-table td.muted { color:var(--cg-muted); font-size:12px; }
+
+/* Barre de données inline */
+.data-bar-wrap { display:flex; align-items:center; gap:8px; }
+.data-bar { flex:1; height:6px; background:rgba(0,0,0,.07); border-radius:3px; overflow:hidden; min-width:60px; }
+html[data-theme="dark"] .data-bar { background:#243447; }
+.data-bar-fill { height:100%; border-radius:3px; background:var(--cg-500); }
+
+/* Badge rang */
+.rank-badge {
+  width:22px; height:22px; border-radius:50%;
+  background:var(--cg-600); color:#fff; font-size:10.5px; font-weight:800;
+  display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;
+}
+.rank-badge.gold   { background:var(--amber); }
+.rank-badge.silver { background:#9e9e9e; }
+.rank-badge.bronze { background:#c47a2a; }
+
+/* ── Print ── */
+@media print {
+  .rp-page { height:auto; overflow:visible; }
+  .rp-head, .rp-filters, .no-print { display:none !important; }
+  .rp-kpis { border:1px solid #ddd; border-radius:8px; margin-bottom:16px; }
+  .rp-section-head { position:static; background:#f5f5f5 !important; }
+  .rp-table thead th { background:var(--cg-700) !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .rp-body { overflow:visible; }
+  body { background:#fff !important; }
+  .content { padding:10mm 12mm !important; }
+  .print-header { display:flex !important; }
+  @page { size:A4; margin:0; }
+}
+.print-header {
+  display:none; align-items:center; gap:14px;
+  padding-bottom:14px; margin:14px 20px; border-bottom:2px solid var(--cg-600);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="rp-page">
+
+  <!-- ── En-tête ── -->
+  <div class="rp-head no-print" id="subheader">
+    <div>
+      <div class="rp-title">
+        <i class="bi bi-file-earmark-bar-graph-fill" style="color:var(--cg-600);margin-right:6px;"></i>
+        Rapport de congés
+      </div>
+      <div class="rp-subtitle">
+        Année {{ year }}{% if nom_mois %} · {{ nom_mois }}{% endif %}{% if service_sel %} · {{ service_sel.nom }}{% endif %}
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-left:auto;">
+      <a href="?year={{ year }}{% if mois %}&mois={{ mois }}{% endif %}{% if service_sel %}&service={{ service_sel.pk }}{% endif %}&export=csv"
+         class="btn-cg-outline" style="padding:6px 14px;font-size:12.5px;">
+        <i class="bi bi-download"></i> CSV
+      </a>
+      <button onclick="window.print()" class="btn-cg-outline" style="padding:6px 14px;font-size:12.5px;">
+        <i class="bi bi-printer"></i> Imprimer
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Filtres ── -->
+  <div class="rp-filters no-print">
+    <form method="get" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <input type="number" name="year" value="{{ year }}" min="2020" max="2099"
+             class="cg-input" style="width:90px;">
+      <select name="mois" class="cg-input" style="width:130px;" onchange="this.form.submit()">
+        <option value="">Toute l'année</option>
+        <option value="1"  {% if mois == 1  %}selected{% endif %}>Janvier</option>
+        <option value="2"  {% if mois == 2  %}selected{% endif %}>Février</option>
+        <option value="3"  {% if mois == 3  %}selected{% endif %}>Mars</option>
+        <option value="4"  {% if mois == 4  %}selected{% endif %}>Avril</option>
+        <option value="5"  {% if mois == 5  %}selected{% endif %}>Mai</option>
+        <option value="6"  {% if mois == 6  %}selected{% endif %}>Juin</option>
+        <option value="7"  {% if mois == 7  %}selected{% endif %}>Juillet</option>
+        <option value="8"  {% if mois == 8  %}selected{% endif %}>Août</option>
+        <option value="9"  {% if mois == 9  %}selected{% endif %}>Septembre</option>
+        <option value="10" {% if mois == 10 %}selected{% endif %}>Octobre</option>
+        <option value="11" {% if mois == 11 %}selected{% endif %}>Novembre</option>
+        <option value="12" {% if mois == 12 %}selected{% endif %}>Décembre</option>
+      </select>
+      <select name="service" class="cg-input" style="width:160px;" onchange="this.form.submit()">
+        <option value="">Tous les services</option>
+        {% for svc in services %}
+        <option value="{{ svc.pk }}" {% if service_sel and service_sel.pk == svc.pk %}selected{% endif %}>{{ svc.nom }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn-cg" style="padding:7px 14px;font-size:12.5px;">
+        <i class="bi bi-search"></i> Générer
+      </button>
+      {% if mois or service_sel %}
+      <a href="?year={{ year }}" class="btn-cg-outline" style="padding:7px 12px;font-size:12.5px;">
+        <i class="bi bi-x"></i>
+      </a>
+      {% endif %}
+    </form>
+  </div>
+
+  <!-- ── KPIs ── -->
+  <div class="rp-kpis">
+    <div class="rp-kpi">
+      <div class="rp-kpi-icon"><i class="bi bi-calendar-check-fill"></i></div>
+      <div><div class="rp-kpi-val">{{ total_conges }}</div><div class="rp-kpi-lbl">Total congés</div></div>
+    </div>
+    <div class="rp-kpi">
+      <div class="rp-kpi-icon"><i class="bi bi-briefcase-fill"></i></div>
+      <div><div class="rp-kpi-val">{{ total_jours }}</div><div class="rp-kpi-lbl">Jours ouvrés</div></div>
+    </div>
+    <div class="rp-kpi">
+      <div class="rp-kpi-icon"><i class="bi bi-tags-fill"></i></div>
+      <div><div class="rp-kpi-val">{{ stats_type|length }}</div><div class="rp-kpi-lbl">Types utilisés</div></div>
+    </div>
+    <div class="rp-kpi">
+      <div class="rp-kpi-icon"><i class="bi bi-building"></i></div>
+      <div><div class="rp-kpi-val">{{ stats_service_list|length }}</div><div class="rp-kpi-lbl">Services concernés</div></div>
+    </div>
+    <div class="rp-kpi">
+      <div class="rp-kpi-icon"><i class="bi bi-person-lines-fill"></i></div>
+      <div><div class="rp-kpi-val">{{ top_absences|length }}</div><div class="rp-kpi-lbl">Employés concernés</div></div>
+    </div>
+  </div>
+
+  <!-- En-tête impression -->
+  <div class="print-header" style="display:none;">
+    <img src="{% static 'img/logo.png' %}" style="width:50px;height:50px;object-fit:contain;">
+    <div>
+      <div style="font-size:18px;font-weight:800;color:var(--cg-700);">Centre Médico-Social WALÉ</div>
+      <div style="font-size:13px;color:#555;">
+        Rapport de congés — {{ year }}{% if nom_mois %} / {{ nom_mois }}{% endif %}{% if service_sel %} — {{ service_sel.nom }}{% endif %}
+      </div>
+      <div style="font-size:11px;color:#888;">Généré le {% now "d/m/Y à H:i" %}</div>
+    </div>
+  </div>
+
+  <!-- ── Corps ── -->
+  <div class="rp-body">
+
+    <!-- 1. Par type -->
+    <div class="rp-section">
+      <div class="rp-section-head">
+        <i class="bi bi-tags-fill" style="color:var(--cg-600);"></i>
+        <span class="rp-section-title">Répartition par type de congé</span>
+      </div>
+      <table class="rp-table">
+        <thead><tr>
+          <th>Type de congé</th>
+          <th class="num">Nb congés</th>
+          <th class="num">Jours ouvrés</th>
+          <th class="num">Moy. / congé</th>
+          <th style="min-width:120px;">Part</th>
+        </tr></thead>
+        <tbody>
+          {% for t in stats_type %}
+          <tr>
+            <td style="font-weight:600;">{{ t.type_label }}</td>
+            <td class="num">{{ t.nb }}</td>
+            <td class="num">{{ t.jours }}j</td>
+            <td class="muted num">{% if t.nb > 0 %}{% widthratio t.jours t.nb 1 %}j{% else %}—{% endif %}</td>
+            <td>
+              {% if total_jours > 0 %}
+              <div class="data-bar-wrap">
+                <div class="data-bar"><div class="data-bar-fill" style="width:{% widthratio t.jours total_jours 100 %}%;"></div></div>
+                <span style="font-size:11px;color:var(--cg-muted);width:30px;text-align:right;">{% widthratio t.jours total_jours 100 %}%</span>
+              </div>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" style="text-align:center;padding:28px;color:var(--cg-muted);">Aucune donnée</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 2. Par service -->
+    <div class="rp-section">
+      <div class="rp-section-head">
+        <i class="bi bi-building" style="color:var(--cg-600);"></i>
+        <span class="rp-section-title">Répartition par service</span>
+      </div>
+      <table class="rp-table">
+        <thead><tr>
+          <th>Service</th>
+          <th class="num">Employés</th>
+          <th class="num">Nb congés</th>
+          <th class="num">Jours ouvrés</th>
+          <th style="min-width:120px;">Part</th>
+        </tr></thead>
+        <tbody>
+          {% for s in stats_service_list %}
+          <tr>
+            <td style="font-weight:600;">{{ s.service }}</td>
+            <td class="muted num">{{ s.nb_employes }}</td>
+            <td class="num">{{ s.nb }}</td>
+            <td class="num">{{ s.jours }}j</td>
+            <td>
+              {% if total_jours > 0 %}
+              <div class="data-bar-wrap">
+                <div class="data-bar"><div class="data-bar-fill" style="background:#2d99db;width:{% widthratio s.jours total_jours 100 %}%;"></div></div>
+                <span style="font-size:11px;color:var(--cg-muted);width:30px;text-align:right;">{% widthratio s.jours total_jours 100 %}%</span>
+              </div>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" style="text-align:center;padding:28px;color:var(--cg-muted);">Aucune donnée</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 3. Répartition mensuelle -->
+    <div class="rp-section">
+      <div class="rp-section-head">
+        <i class="bi bi-calendar3" style="color:var(--cg-600);"></i>
+        <span class="rp-section-title">Répartition mensuelle</span>
+      </div>
+      <table class="rp-table">
+        <thead><tr>
+          <th>Mois</th>
+          <th class="num">Nb congés</th>
+          <th class="num">Jours ouvrés</th>
+          <th style="min-width:180px;">Activité</th>
+        </tr></thead>
+        <tbody>
+          {% for rm in repartition_mensuelle %}
+          <tr {% if rm.nb == 0 %}style="opacity:.4;"{% endif %}>
+            <td style="font-weight:{% if rm.nb > 0 %}600{% else %}400{% endif %};">{{ rm.mois }}</td>
+            <td class="num">{% if rm.nb > 0 %}{{ rm.nb }}{% else %}<span style="color:var(--cg-muted);">—</span>{% endif %}</td>
+            <td class="num">{% if rm.jours > 0 %}{{ rm.jours }}j{% else %}<span style="color:var(--cg-muted);">—</span>{% endif %}</td>
+            <td>
+              {% if rm.jours > 0 and total_jours > 0 %}
+              <div class="data-bar-wrap">
+                <div class="data-bar" style="max-width:200px;">
+                  <div class="data-bar-fill" style="background:{% if rm.mois_num >= 6 and rm.mois_num <= 8 %}var(--rose){% else %}var(--cg-500){% endif %};width:{% widthratio rm.jours total_jours 100 %}%;"></div>
+                </div>
+                <span style="font-size:11px;color:var(--cg-muted);">{% widthratio rm.jours total_jours 100 %}%</span>
+              </div>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 4. Top employés -->
+    <div class="rp-section">
+      <div class="rp-section-head">
+        <i class="bi bi-trophy-fill" style="color:var(--amber);"></i>
+        <span class="rp-section-title">Top employés — Jours de congé pris</span>
+      </div>
+      <table class="rp-table">
+        <thead><tr>
+          <th style="width:44px;text-align:center;">#</th>
+          <th>Employé</th>
+          <th>Service</th>
+          <th class="num">Nb congés</th>
+          <th class="num">Jours ouvrés</th>
+          <th style="min-width:120px;">Part</th>
+        </tr></thead>
+        <tbody>
+          {% for item in top_absences %}
+          <tr>
+            <td style="text-align:center;">
+              <span class="rank-badge {% if forloop.counter == 1 %}gold{% elif forloop.counter == 2 %}silver{% elif forloop.counter == 3 %}bronze{% endif %}">
+                {{ forloop.counter }}
+              </span>
+            </td>
+            <td>
+              <a href="{% url 'conge_historique_employe' item.emp.pk %}" style="font-weight:700;color:var(--cg-text);text-decoration:none;">
+                {{ item.emp.nom_complet }}
+              </a>
+              <div style="font-size:10.5px;color:var(--cg-muted);font-family: var(--font-mono);">{{ item.emp.matricule }}</div>
+            </td>
+            <td class="muted">{{ item.emp.service.nom|default:"—" }}</td>
+            <td class="num">{{ item.nb }}</td>
+            <td class="num">{{ item.jours }}j</td>
+            <td>
+              {% if total_jours > 0 %}
+              <div class="data-bar-wrap">
+                <div class="data-bar"><div class="data-bar-fill" style="background:var(--amber);width:{% widthratio item.jours total_jours 100 %}%;"></div></div>
+                <span style="font-size:11px;color:var(--cg-muted);width:30px;text-align:right;">{% widthratio item.jours total_jours 100 %}%</span>
+              </div>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" style="text-align:center;padding:28px;color:var(--cg-muted);">Aucune donnée</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ── Graphes ── -->
+    <div class="rp-section no-print">
+      <div class="rp-section-head">
+        <i class="bi bi-bar-chart-fill" style="color:var(--cg-600);"></i>
+        <span class="rp-section-title">Visualisations</span>
+      </div>
+      <div style="display:grid;grid-template-columns:260px 1fr 1fr;gap:0;">
+        <!-- Doughnut : par type -->
+        <div style="padding:16px;border-right:1px solid var(--cg-border);display:flex;flex-direction:column;align-items:center;">
+          <div style="font-size:10.5px;font-weight:800;color:var(--cg-600);text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px;">
+            <i class="bi bi-pie-chart-fill"></i> Par type
+          </div>
+          <div style="position:relative;width:140px;height:140px;">
+            <canvas id="chartType"></canvas>
+          </div>
+          <div id="legendType" style="font-size:10px;margin-top:8px;display:flex;flex-direction:column;gap:3px;width:100%;"></div>
+        </div>
+        <!-- Barres : mensuel -->
+        <div style="padding:16px;border-right:1px solid var(--cg-border);">
+          <div style="font-size:10.5px;font-weight:800;color:var(--cg-600);text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px;">
+            <i class="bi bi-bar-chart-fill"></i> Jours par mois
+          </div>
+          <canvas id="chartMensuel" height="120"></canvas>
+        </div>
+        <!-- Barres horizontales : par service -->
+        <div style="padding:16px;">
+          <div style="font-size:10.5px;font-weight:800;color:var(--cg-600);text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px;">
+            <i class="bi bi-building"></i> Jours par service
+          </div>
+          <canvas id="chartService" height="120"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pied -->
+    <div style="padding:10px 20px;text-align:right;font-size:11px;color:var(--cg-muted);">
+      Rapport généré le {% now "d/m/Y à H:i" %} — Centre Médico-Social WALÉ
+    </div>
+
+  </div><!-- /rp-body -->
+</div><!-- /rp-page -->
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+{{ chart_type|json_script:"data-type" }}
+{{ chart_mensuel|json_script:"data-mensuel" }}
+{{ chart_service|json_script:"data-service" }}
+<script src="{% static 'vendor/chart.umd.min.js' %}"></script>
+<script>
+var dataType    = JSON.parse(document.getElementById('data-type').textContent);
+var dataMensuel = JSON.parse(document.getElementById('data-mensuel').textContent);
+var dataSvc     = JSON.parse(document.getElementById('data-service').textContent);
+
+Chart.defaults.font.family = "'Sora', sans-serif";
+Chart.defaults.font.size   = 11;
+var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+var gridColor = isDark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.05)';
+Chart.defaults.color = isDark ? 'rgba(255,255,255,.45)' : 'rgba(0,0,0,.55)';
+var roseRgb = getComputedStyle(document.documentElement).getPropertyValue('--rose-rgb').trim();
+var cgRgb   = getComputedStyle(document.documentElement).getPropertyValue('--cg-600-rgb').trim();
+
+/* 1. Doughnut par type */
+if (document.getElementById('chartType') && dataType.data.some(function(v){ return v > 0; })) {
+  new Chart(document.getElementById('chartType'), {
+    type: 'doughnut',
+    data: {
+      labels: dataType.labels,
+      datasets: [{ data: dataType.data, backgroundColor: dataType.colors, borderWidth: 2, borderColor: '#fff' }]
+    },
+    options: {
+      cutout: '65%',
+      plugins: { legend: { display: false }, tooltip: { callbacks: {
+        label: function(c){ return ' ' + c.label + ' : ' + c.raw + 'j'; }
+      }}}
+    }
+  });
+  var leg = document.getElementById('legendType');
+  dataType.labels.forEach(function(lbl, i) {
+    if (dataType.data[i] > 0) {
+      leg.innerHTML += '<div style="display:flex;align-items:center;gap:5px;">' +
+        '<span style="width:8px;height:8px;border-radius:50%;background:' + dataType.colors[i] + ';flex-shrink:0;"></span>' +
+        '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--cg-text);">' + lbl + '</span>' +
+        '<strong style="color:' + (isDark ? 'var(--cg-300)' : 'var(--cg-700)') + ';">' + dataType.data[i] + 'j</strong></div>';
+    }
+  });
+}
+
+/* 2. Barres mensuelles */
+if (document.getElementById('chartMensuel')) {
+  new Chart(document.getElementById('chartMensuel'), {
+    type: 'bar',
+    data: {
+      labels: dataMensuel.labels,
+      datasets: [{
+        data: dataMensuel.data,
+        backgroundColor: dataMensuel.data.map(function(v, i) {
+          return (i >= 5 && i <= 7) ? 'rgba(' + roseRgb + ',.6)' : 'rgba(' + cgRgb + ',.65)';
+        }),
+        borderRadius: 4, borderSkipped: false,
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 9 } } },
+        y: { beginAtZero: true, grid: { color: gridColor },
+             ticks: { callback: function(v){ return v + 'j'; }, stepSize: 1 } }
+      }
+    }
+  });
+}
+
+/* 3. Barres horizontales par service */
+if (document.getElementById('chartService') && dataSvc.labels.length > 0) {
+  new Chart(document.getElementById('chartService'), {
+    type: 'bar',
+    data: {
+      labels: dataSvc.labels,
+      datasets: [{
+        data: dataSvc.data,
+        backgroundColor: 'rgba(45,153,219,.65)',
+        borderRadius: 4, borderSkipped: false,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { beginAtZero: true, grid: { color: gridColor },
+             ticks: { callback: function(v){ return v + 'j'; } } },
+        y: { grid: { display: false }, ticks: { font: { size: 10 } } }
+      }
+    }
+  });
+}
+</script>
+{% endblock %}

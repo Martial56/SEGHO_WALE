@@ -1,0 +1,490 @@
+{% extends 'employer/base.html' %}
+{% load i18n %}
+
+{% block topbar_title %}Employés{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+/* ── Subheader ── */
+.rh-subheader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 32px 14px;
+  
+  flex-wrap: wrap;
+  position: sticky;
+  top: var(--topbar-h);
+  z-index: 100;
+  background: #f0f6fa;
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+html[data-theme="dark"] .rh-subheader {
+  background: #171616;
+  border-bottom-color: rgba(255,255,255,0.05);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+@media (max-width: 1024px) {
+  .rh-subheader { margin: 0 -20px; padding-left: 20px; padding-right: 20px; }
+}
+.rh-subheader-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.rh-subheader-left h1 {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--rh-900);
+  letter-spacing: -0.3px;
+}
+html[data-theme="dark"] .rh-subheader-left h1 { color: var(--rh-text); }
+
+.rh-count-badge {
+  background: var(--rh-100);
+  color: var(--rh-700);
+  border: 1px solid var(--rh-200);
+  border-radius: 20px;
+  padding: 3px 12px;
+  font-size: 13px;
+  font-weight: 700;
+}
+html[data-theme="dark"] .rh-count-badge {
+  background: rgba(var(--rh-600-rgb),0.18);
+  color: var(--rh-300);
+  border-color: rgba(var(--rh-600-rgb),0.3);
+}
+
+/* ── Stats ── */
+.rh-stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  padding: 16px 32px 0;
+  margin-bottom: 16px;
+}
+@media (max-width: 900px)  { .rh-stats-row { grid-template-columns: repeat(2,1fr); } }
+@media (max-width: 500px)  { .rh-stats-row { grid-template-columns: 1fr; } }
+
+.rh-stat-card {
+  background: #fff;
+  border-radius: 11px;
+  padding: 16px 20px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-top: 3px solid transparent;
+  transition: box-shadow 0.18s;
+}
+.rh-stat-card:hover { box-shadow: var(--shadow-md); }
+.rh-stat-card.total   { border-top-color: var(--rh-500); }
+.rh-stat-card.actif   { border-top-color: var(--green); }
+.rh-stat-card.suspendu{ border-top-color: var(--amber); }
+.rh-stat-card.quitte  { border-top-color: #aaa; }
+.rh-stat-val {
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1;
+}
+.rh-stat-card.total   .rh-stat-val { color: var(--rh-600); }
+.rh-stat-card.actif   .rh-stat-val { color: var(--rh-600); }
+.rh-stat-card.suspendu .rh-stat-val{ color: var(--amber-text); }
+.rh-stat-card.quitte  .rh-stat-val { color: #777; }
+.rh-stat-lbl {
+  font-size: 11.5px;
+  color: rgba(0,0,0,0.45);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  font-weight: 600;
+}
+html[data-theme="dark"] .rh-stat-card { background: var(--rh-surface); }
+html[data-theme="dark"] .rh-stat-card.actif   .rh-stat-val { color: #7ab8d0; }
+html[data-theme="dark"] .rh-stat-card.suspendu .rh-stat-val{ color: #f0c060; }
+html[data-theme="dark"] .rh-stat-card.quitte  .rh-stat-val { color: rgba(255,255,255,0.35); }
+html[data-theme="dark"] .rh-stat-lbl { color: rgba(255,255,255,0.35); }
+
+/* ── Filter row ── */
+.rh-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 32px;
+  flex-wrap: wrap;
+}
+.rh-filter-row .rh-input { max-width: 280px; }
+.rh-filter-row select.rh-input { max-width: 200px; }
+.rh-clear-link {
+  font-size: 12.5px;
+  color: rgba(0,0,0,0.4);
+  text-decoration: none;
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 8px; border-radius: 5px;
+  transition: color 0.15s, background 0.15s;
+}
+.rh-clear-link:hover { color: var(--rose); background: rgba(var(--rose-rgb),0.06); }
+html[data-theme="dark"] .rh-clear-link { color: rgba(255,255,255,0.3); }
+html[data-theme="dark"] .rh-clear-link:hover { color: #e87070; }
+
+/* ── Table ── */
+.rh-table-wrap {
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+html[data-theme="dark"] .rh-table-wrap { background: var(--rh-surface); }
+
+.rh-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.rh-table thead {
+  background: var(--rh-50);
+  border-bottom: 2px solid var(--rh-100);
+}
+html[data-theme="dark"] .rh-table thead { background: rgba(var(--rh-600-rgb),0.1); border-bottom-color: var(--rh-border); }
+.rh-table th {
+  padding: 9px 12px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--rh-800);
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+html[data-theme="dark"] .rh-table th { color: var(--rh-300); }
+.rh-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+  font-size: 13px;
+  color: var(--rh-text);
+  vertical-align: middle;
+}
+html[data-theme="dark"] .rh-table td { border-bottom-color: rgba(255,255,255,0.04); color: var(--rh-text); }
+.rh-table tbody tr:hover { background: rgba(var(--rh-600-rgb),0.03); }
+html[data-theme="dark"] .rh-table tbody tr:hover { background: rgba(var(--rh-600-rgb),0.08); }
+.rh-table tbody tr:last-child td { border-bottom: none; }
+
+/* ── Avatar ── */
+.rh-avatar {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 800; color: #fff;
+  flex-shrink: 0;
+  letter-spacing: 0.5px;
+}
+.rh-avatar.av-actif    { background: linear-gradient(135deg, var(--rh-600), var(--rh-400)); }
+.rh-avatar.av-suspendu { background: linear-gradient(135deg, #d4830a, #f0a830); }
+.rh-avatar.av-quitte   { background: linear-gradient(135deg, #8a9298, #b0bec5); }
+
+.rh-name-cell { display: flex; align-items: center; gap: 10px; }
+.rh-name-cell .nom { font-weight: 600; font-size: 13.5px; }
+.rh-name-cell .mat { font-size: 11px; color: rgba(0,0,0,0.38); margin-top: 1px; font-family: var(--font-mono); }
+html[data-theme="dark"] .rh-name-cell .mat { color: rgba(255,255,255,0.28); }
+
+.rh-text-muted { color: rgba(0,0,0,0.45); font-size: 13px; }
+html[data-theme="dark"] .rh-text-muted { color: rgba(255,255,255,0.35); }
+
+/* ── Actions cell ── */
+.rh-actions { display: flex; align-items: center; gap: 4px; }
+.rh-icon-btn {
+  width:30px; height:30px; border-radius:7px;
+  display:inline-flex; align-items:center; justify-content:center;
+  color:var(--rh-600); text-decoration:none; font-size:14px;
+  background:var(--rh-50); border:1px solid var(--rh-200);
+  transition:background .15s, color .15s;
+}
+.rh-icon-btn:hover { background:var(--rh-600); color:#fff; border-color:var(--rh-600); }
+html[data-theme="dark"] .rh-icon-btn { background:rgba(var(--rh-600-rgb),.15); border-color:var(--rh-border); color:var(--rh-300); }
+html[data-theme="dark"] .rh-icon-btn:hover { background:var(--rh-600); color:#fff; }
+.rh-icon-btn-del { color:#dc2626; background:rgba(220,38,38,.06); border-color:rgba(220,38,38,.2); }
+.rh-icon-btn-del:hover { background:#dc2626; color:#fff; border-color:#dc2626; }
+html[data-theme="dark"] .rh-icon-btn-del { background:rgba(220,38,38,.1); border-color:rgba(220,38,38,.25); color:#f87171; }
+
+/* ── Empty state ── */
+.rh-empty {
+  padding: 60px 20px;
+  text-align: center;
+  color: rgba(0,0,0,0.35);
+}
+.rh-empty i { font-size: 44px; color: var(--rh-200); display: block; margin-bottom: 14px; }
+.rh-empty p { font-size: 15px; font-weight: 600; margin-bottom: 6px; color: rgba(0,0,0,0.4); }
+.rh-empty small { font-size: 13px; color: rgba(0,0,0,0.28); }
+html[data-theme="dark"] .rh-empty i { color: rgba(var(--rh-600-rgb),0.3); }
+html[data-theme="dark"] .rh-empty p { color: rgba(255,255,255,0.3); }
+html[data-theme="dark"] .rh-empty small { color: rgba(255,255,255,0.2); }
+
+/* ── Pagination RH ── */
+.rh-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  padding: 20px;
+}
+.rh-page-link {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 32px; height: 32px; padding: 0 8px;
+  border-radius: 6px;
+  font-size: 13px; font-weight: 600;
+  text-decoration: none;
+  color: var(--rh-700);
+  background: #fff;
+  border: 1px solid var(--rh-200);
+  transition: all 0.15s;
+}
+.rh-page-link:hover { background: var(--rh-50); border-color: var(--rh-400); color: var(--rh-600); }
+.rh-page-link.active { background: var(--rh-600); color: #fff; border-color: var(--rh-600); }
+.rh-page-link.disabled { opacity: 0.35; pointer-events: none; }
+html[data-theme="dark"] .rh-page-link {
+  background: var(--rh-surface);
+  border-color: var(--rh-border);
+  color: var(--rh-300);
+}
+html[data-theme="dark"] .rh-page-link:hover  { background: rgba(var(--rh-600-rgb),0.15); border-color: var(--rh-400); color: var(--rh-200); }
+html[data-theme="dark"] .rh-page-link.active { background: var(--rh-600); color: #fff; border-color: var(--rh-600); }
+
+@media (max-width: 1100px) {
+  .rh-table th:nth-child(4),
+  .rh-table td:nth-child(4) { display: none; } /* grade */
+}
+@media (max-width: 900px) {
+  .rh-table th:nth-child(5),
+  .rh-table td:nth-child(5) { display: none; } /* contrat */
+  .rh-filter-row .rh-input  { max-width: 100%; }
+}
+@media (max-width: 700px) {
+  .rh-table th:nth-child(6),
+  .rh-table td:nth-child(6) { display: none; } /* ancienneté */
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Subheader -->
+<div class="rh-subheader" id="subheader">
+  <div class="rh-subheader-left">
+    <h1>Employés</h1>
+    <span class="rh-count-badge">{{ page_obj.paginator.count }} personne{% if page_obj.paginator.count != 1 %}s{% endif %}</span>
+  </div>
+  <div style="display:flex; gap:8px; align-items:center;">
+    <a href="{% url 'rh_export_excel' %}?q={{ q }}&service={{ f_service }}&statut={{ f_statut }}"
+       class="btn-rh-outline" title="Exporter en Excel">
+      <i class="bi bi-file-earmark-excel"></i> Excel
+    </a>
+    {% if can_manage %}
+    <a href="{% url 'rh_nouveau' %}" class="btn-rh">
+      <i class="bi bi-person-plus-fill"></i> Nouvel employé
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Stats -->
+<div class="rh-stats-row">
+  <div class="rh-stat-card total">
+    <div class="rh-stat-val">{{ stats.total|default:"0" }}</div>
+    <div class="rh-stat-lbl">Total</div>
+  </div>
+  <div class="rh-stat-card actif">
+    <div class="rh-stat-val">{{ stats.actifs|default:"0" }}</div>
+    <div class="rh-stat-lbl">Actifs</div>
+  </div>
+  <div class="rh-stat-card suspendu">
+    <div class="rh-stat-val">{{ stats.suspendus|default:"0" }}</div>
+    <div class="rh-stat-lbl">Suspendus</div>
+  </div>
+  <div class="rh-stat-card quitte">
+    <div class="rh-stat-val">{{ stats.quittes|default:"0" }}</div>
+    <div class="rh-stat-lbl">Quittés</div>
+  </div>
+</div>
+
+<!-- Filtres -->
+<form method="get" class="rh-filter-row" id="filterForm">
+  <input type="search" name="q" value="{{ q|default:'' }}"
+         placeholder="Rechercher par nom, matricule…"
+         class="rh-input" style="min-width:220px; max-width:280px;"
+         aria-label="Rechercher">
+  <select name="f_service" class="rh-input" style="max-width:200px;"
+          onchange="this.form.submit()">
+    <option value="">Tous les services</option>
+    {% for svc in services %}
+    <option value="{{ svc.pk }}" {% if f_service == svc.pk|stringformat:"s" %}selected{% endif %}>
+      {{ svc.nom }}
+    </option>
+    {% endfor %}
+  </select>
+  <select name="f_statut" class="rh-input" style="max-width:160px;"
+          onchange="this.form.submit()">
+    <option value="">Tous les statuts</option>
+    {% for code, label in statuts %}
+    <option value="{{ code }}" {% if f_statut == code %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit" class="btn-rh" style="padding:8px 16px;">
+    <i class="bi bi-search"></i> Filtrer
+  </button>
+  {% if q or f_service or f_statut %}
+  <a href="{% url 'ressources_humaines_list' %}" class="rh-clear-link" title="Effacer les filtres">
+    <i class="bi bi-x-circle"></i> Effacer
+  </a>
+  {% endif %}
+</form>
+
+<!-- Table -->
+<div class="rh-table-wrap">
+  {% if page_obj.object_list %}
+  <table class="rh-table">
+    <thead>
+      <tr>
+        <th>Employé</th>
+        <th>Service</th>
+        <th>Fonction</th>
+        <th>Grade</th>
+        <th>Contrat</th>
+        <th>Ancienneté</th>
+        <th>Statut</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for emp in page_obj %}
+      <tr>
+        <!-- Avatar + Nom -->
+        <td>
+          <div class="rh-name-cell">
+            <div class="rh-avatar av-{{ emp.statut }}">
+              {{ emp.initiales|default:emp.nom|first|upper }}{% if emp.prenoms %}{{ emp.prenoms|first|upper }}{% endif %}
+            </div>
+            <div>
+              <div class="nom">{{ emp.nom_complet|default:emp.nom }}</div>
+              <div class="mat">{{ emp.matricule }}</div>
+            </div>
+          </div>
+        </td>
+
+        <!-- Service -->
+        <td class="rh-text-muted">{{ emp.service.nom|default:"—" }}</td>
+
+        <!-- Fonction -->
+        <td class="rh-text-muted">{{ emp.fonction.nom|default:"—" }}</td>
+
+        <!-- Grade -->
+        <td class="rh-text-muted">{{ emp.grade.nom|default:"—" }}</td>
+
+        <!-- Type contrat -->
+        <td class="rh-text-muted">{{ emp.type_contrat.nom|default:"—" }}</td>
+
+        <!-- Ancienneté -->
+        <td class="rh-text-muted" style="white-space:nowrap;">{{ emp.anciennete.label }}</td>
+
+        <!-- Statut -->
+        <td>
+          {% if emp.statut == 'actif' %}
+            <span class="badge-actif">Actif</span>
+          {% elif emp.statut == 'suspendu' %}
+            <span class="badge-suspendu">Suspendu</span>
+          {% else %}
+            <span class="badge-quitte">Quitté</span>
+          {% endif %}
+        </td>
+
+        <!-- Actions -->
+        <td style="white-space:nowrap;">
+          <div class="rh-actions" style="justify-content:flex-end;">
+            <a href="{% url 'rh_detail' emp.pk %}" class="rh-icon-btn" title="Voir le profil">
+              <i class="bi bi-eye"></i>
+            </a>
+            {% if can_manage %}
+            <a href="{% url 'rh_modifier' emp.pk %}" class="rh-icon-btn" title="Modifier">
+              <i class="bi bi-pencil"></i>
+            </a>
+            <form method="post" action="{% url 'rh_supprimer' emp.pk %}" style="display:inline;"
+                  onsubmit="return confirm('Supprimer {{ emp.nom_complet }} ?\nCette action est irréversible.')">
+              {% csrf_token %}
+              <button type="submit" class="rh-icon-btn rh-icon-btn-del" title="Supprimer">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Pagination -->
+  {% if page_obj.has_other_pages %}
+  <div class="rh-pagination">
+    {% if page_obj.has_previous %}
+      <a href="?{% if q %}q={{ q }}&{% endif %}{% if f_service %}f_service={{ f_service }}&{% endif %}{% if f_statut %}f_statut={{ f_statut }}&{% endif %}page=1"
+         class="rh-page-link" title="Première page">
+        <i class="bi bi-chevron-double-left"></i>
+      </a>
+      <a href="?{% if q %}q={{ q }}&{% endif %}{% if f_service %}f_service={{ f_service }}&{% endif %}{% if f_statut %}f_statut={{ f_statut }}&{% endif %}page={{ page_obj.previous_page_number }}"
+         class="rh-page-link"><i class="bi bi-chevron-left"></i></a>
+    {% else %}
+      <span class="rh-page-link disabled"><i class="bi bi-chevron-double-left"></i></span>
+      <span class="rh-page-link disabled"><i class="bi bi-chevron-left"></i></span>
+    {% endif %}
+
+    {% for num in page_obj.paginator.page_range %}
+      {% if num == page_obj.number %}
+        <span class="rh-page-link active">{{ num }}</span>
+      {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
+        <a href="?{% if q %}q={{ q }}&{% endif %}{% if f_service %}f_service={{ f_service }}&{% endif %}{% if f_statut %}f_statut={{ f_statut }}&{% endif %}page={{ num }}"
+           class="rh-page-link">{{ num }}</a>
+      {% endif %}
+    {% endfor %}
+
+    {% if page_obj.has_next %}
+      <a href="?{% if q %}q={{ q }}&{% endif %}{% if f_service %}f_service={{ f_service }}&{% endif %}{% if f_statut %}f_statut={{ f_statut }}&{% endif %}page={{ page_obj.next_page_number }}"
+         class="rh-page-link"><i class="bi bi-chevron-right"></i></a>
+      <a href="?{% if q %}q={{ q }}&{% endif %}{% if f_service %}f_service={{ f_service }}&{% endif %}{% if f_statut %}f_statut={{ f_statut }}&{% endif %}page={{ page_obj.paginator.num_pages }}"
+         class="rh-page-link" title="Dernière page">
+        <i class="bi bi-chevron-double-right"></i>
+      </a>
+    {% else %}
+      <span class="rh-page-link disabled"><i class="bi bi-chevron-right"></i></span>
+      <span class="rh-page-link disabled"><i class="bi bi-chevron-double-right"></i></span>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% else %}
+  <!-- Empty state -->
+  <div class="rh-empty">
+    <i class="bi bi-people"></i>
+    <p>Aucun employé trouvé</p>
+    {% if q or f_service or f_statut %}
+      <small>Essayez d'élargir vos critères de recherche.</small>
+      <div style="margin-top:16px;">
+        <a href="{% url 'ressources_humaines_list' %}" class="btn-rh-outline">
+          <i class="bi bi-x-circle"></i> Effacer les filtres
+        </a>
+      </div>
+    {% else %}
+      <small>Aucun dossier employé n'a encore été créé.</small>
+      {% if can_manage %}
+      <div style="margin-top:16px;">
+        <a href="{% url 'rh_nouveau' %}" class="btn-rh">
+          <i class="bi bi-person-plus-fill"></i> Créer le premier dossier
+        </a>
+      </div>
+      {% endif %}
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}
+

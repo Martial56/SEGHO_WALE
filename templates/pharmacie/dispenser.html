@@ -1,0 +1,380 @@
+{% extends 'pharmacie/base.html' %}
+{% load static %}
+
+{% block extra_ph_css %}<style>
+.ph-patient-info {
+  display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start;
+  padding: 14px 20px; background: var(--ph-50); border-radius: 10px;
+  border: 1px solid var(--ph-border); margin: 20px 0 14px;
+}
+.ph-patient-field { display: flex; flex-direction: column; gap: 2px; }
+.ph-patient-field-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: var(--ph-muted); }
+.ph-patient-field-value { font-size: 13px; font-weight: 600; color: var(--ph-text); }
+
+/* Barre de disponibilité */
+.dispo-bar {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 12px 20px; border-radius: 10px; margin-bottom: 14px;
+  border: 1px solid;
+}
+.dispo-bar.all-ok    { background: rgba(var(--ph-600-rgb),.07); border-color: rgba(var(--ph-600-rgb),.25); }
+.dispo-bar.partial   { background: rgba(var(--amber-rgb),.07); border-color: rgba(var(--amber-rgb),.25); }
+.dispo-bar.no-stock  { background: rgba(var(--rose-rgb),.07);  border-color: rgba(var(--rose-rgb),.25); }
+.dispo-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 12px; border-radius: 20px; font-size: 11.5px; font-weight: 700;
+}
+.dispo-ok   { background: rgba(var(--ph-600-rgb),.12); color: var(--ph-600); border: 1px solid rgba(var(--ph-600-rgb),.3); }
+.dispo-part { background: rgba(var(--amber-rgb),.12); color: var(--amber-text); border: 1px solid rgba(var(--amber-rgb),.3); }
+.dispo-rupt { background: rgba(var(--rose-rgb),.12);  color: var(--rose-text); border: 1px solid rgba(var(--rose-rgb),.3); }
+.dispo-nf   { background: rgba(0,0,0,.06);      color: var(--ph-muted); border: 1px solid rgba(0,0,0,.12); }
+.progress-dispo { flex: 1; min-width: 160px; height: 8px; background: rgba(0,0,0,.08); border-radius: 4px; overflow: hidden; }
+.progress-fill  { height: 100%; border-radius: 4px; transition: width .4s; }
+
+/* Tableau comparaison */
+.disp-table-wrap { overflow-x: auto; }
+.disp-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.disp-table thead tr { background: var(--ph-100); border-bottom: 2px solid var(--ph-300); }
+.disp-table thead th { padding: 9px 14px; font-weight: 700; font-size: 10.5px; text-transform: uppercase; letter-spacing: .4px; color: var(--ph-800); text-align: left; white-space: nowrap; }
+.disp-table thead th:first-child { padding-left: 12px; }
+.disp-table thead th:last-child  { padding-right: 12px; }
+.disp-table tbody td { padding: 10px 14px; vertical-align: middle; }
+.disp-table tbody td:first-child { padding-left: 12px; }
+.disp-table tbody td:last-child  { padding-right: 12px; }
+.row-ok   { background: rgba(var(--ph-600-rgb),.04); border-bottom: 1px solid rgba(var(--ph-600-rgb),.15) !important; }
+.row-part { background: rgba(var(--amber-rgb),.05); border-bottom: 1px solid rgba(var(--amber-rgb),.2) !important; }
+.row-rupt { background: rgba(var(--rose-rgb),.05);  border-bottom: 1px solid rgba(var(--rose-rgb),.15) !important; }
+.row-nf   { background: rgba(0,0,0,.03);      border-bottom: 1px solid rgba(0,0,0,.06) !important; }
+.qte-col-val { font-size: 15px; font-weight: 800; }
+.qte-label   { font-size: 10px; font-weight: 600; text-transform: uppercase; color: var(--ph-muted); margin-bottom: 2px; }
+.ph-qte-input { border: none; border-bottom: 1.5px solid var(--ph-300); background: transparent; padding: 5px 4px; font-size: 14px; text-align: center; width: 80px; font-family: inherit; color: var(--ph-text); font-weight: 700; transition: border-color .15s; }
+.ph-qte-input:focus { outline: none; border-bottom-color: var(--ph-500); }
+.hist-collapse{background:var(--ph-50);border:1px solid var(--ph-border);border-radius:8px;margin-bottom:14px;overflow:hidden;}
+.hist-summary{padding:10px 16px;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--ph-700);display:flex;align-items:center;gap:8px;list-style:none;}
+.hist-summary::-webkit-details-marker{display:none;}
+.hist-inner{padding:0 16px 12px;}
+.hist-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--ph-border);font-size:12px;}
+.hist-row:last-child{border:none;}
+.subst-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:600;background:rgba(var(--ph-600-rgb),.1);color:var(--ph-700);border:1px solid var(--ph-200);margin:2px;}
+</style>{% endblock %}
+
+{% block content %}
+<div class="action-bar" style="padding:11px 32px;">
+  <div class="action-bar-breadcrumb">
+    <a href="{% url 'pharmacie_ordonnances' pharmacie %}"><i class="bi bi-arrow-left"></i> Ordonnances</a>
+    <span class="sep">/</span>
+    <span class="current">Dispensation — {{ ordonnance.numero }}</span>
+  </div>
+  <div class="action-bar-buttons">
+    <button type="button" onclick="remplirAuto()" class="btn-form-cancel" style="font-size:12px;">
+      <i class="bi bi-magic"></i> Remplir auto
+    </button>
+    <a href="{% url 'pharmacie_ordonnances' pharmacie %}" class="btn-form-cancel">Annuler</a>
+    <button type="submit" form="form-dispenser" class="btn-form-submit">
+      <i class="bi bi-check2-circle"></i> Valider la dispensation
+    </button>
+  </div>
+</div>
+
+<!-- Info patient -->
+<div class="ph-patient-info">
+  <div class="ph-patient-field">
+    <span class="ph-patient-field-label">Patient</span>
+    <span class="ph-patient-field-value"><i class="bi bi-person-fill" style="color:var(--ph-600);"></i> {{ ordonnance.consultation.patient }}</span>
+  </div>
+  <div class="ph-patient-field">
+    <span class="ph-patient-field-label">N° ordonnance</span>
+    <span class="ph-patient-field-value" style="font-family: var(--font-mono);color:var(--ph-700);">{{ ordonnance.numero }}</span>
+  </div>
+  <div class="ph-patient-field">
+    <span class="ph-patient-field-label">Date émission</span>
+    <span class="ph-patient-field-value">{{ ordonnance.date_emission }}</span>
+  </div>
+  <div class="ph-patient-field">
+    <span class="ph-patient-field-label">Médecin prescripteur</span>
+    <span class="ph-patient-field-value">{{ ordonnance.consultation.medecin }}</span>
+  </div>
+  <div class="ph-patient-field">
+    <span class="ph-patient-field-label">Motif consultation</span>
+    <span class="ph-patient-field-value" style="font-size:12px;color:var(--ph-muted);">{{ ordonnance.consultation.motif|default:"—"|truncatechars:50 }}</span>
+  </div>
+</div>
+
+{% if historique_patient %}
+<details class="hist-collapse">
+  <summary class="hist-summary">
+    <i class="bi bi-clock-history" style="color:var(--ph-600);"></i>
+    Historique dispensations pour ce patient ({{ historique_patient|length }} récente{{ historique_patient|length|pluralize }})
+  </summary>
+  <div class="hist-inner">
+    {% for d in historique_patient %}
+    <div class="hist-row">
+      <div>
+        <span style="font-family: var(--font-mono);font-size:11px;color:var(--ph-700);">{{ d.ordonnance.numero }}</span>
+        <span style="font-size:11px;color:var(--ph-muted);margin-left:8px;">{{ d.date|date:"d/m/Y" }}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:11px;">{{ d.lignes.count }} méd.</span>
+        {% if d.statut == 'complete' %}
+          <span style="font-size:10px;background:rgba(var(--ph-600-rgb),.1);color:var(--ph-600);padding:1px 7px;border-radius:10px;font-weight:700;">Complète</span>
+        {% else %}
+          <span style="font-size:10px;background:rgba(var(--amber-rgb),.1);color:var(--amber-text);padding:1px 7px;border-radius:10px;font-weight:700;">Partielle</span>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</details>
+{% endif %}
+
+<!-- Barre de disponibilité -->
+{% if nb_complets == total_lignes %}
+<div class="dispo-bar all-ok">
+{% elif nb_complets == 0 and nb_partiels == 0 %}
+<div class="dispo-bar no-stock">
+{% else %}
+<div class="dispo-bar partial">
+{% endif %}
+  <div>
+    <div style="font-size:12px;font-weight:800;color:var(--ph-text);margin-bottom:6px;">
+      <i class="bi bi-clipboard2-pulse" style="color:var(--ph-600);"></i>
+      Disponibilité du stock — {{ total_lignes }} médicament{{ total_lignes|pluralize }} prescrit{{ total_lignes|pluralize }}
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      {% if nb_complets > 0 %}
+      <span class="dispo-badge dispo-ok"><i class="bi bi-check-circle-fill"></i> {{ nb_complets }} complet{{ nb_complets|pluralize }}</span>
+      {% endif %}
+      {% if nb_partiels > 0 %}
+      <span class="dispo-badge dispo-part"><i class="bi bi-exclamation-triangle-fill"></i> {{ nb_partiels }} insuffisant{{ nb_partiels|pluralize }}</span>
+      {% endif %}
+      {% if nb_rupture > 0 %}
+      <span class="dispo-badge dispo-rupt"><i class="bi bi-x-circle-fill"></i> {{ nb_rupture }} en rupture</span>
+      {% endif %}
+      {% if nb_non_trouves > 0 %}
+      <span class="dispo-badge dispo-nf"><i class="bi bi-question-circle"></i> {{ nb_non_trouves }} non identifié{{ nb_non_trouves|pluralize }}</span>
+      {% endif %}
+    </div>
+  </div>
+  <div style="flex:1;min-width:160px;">
+    <div style="font-size:10px;color:var(--ph-muted);margin-bottom:4px;font-weight:600;">
+      {{ nb_complets }}/{{ total_lignes }} médicament{{ nb_complets|pluralize }} avec stock suffisant
+    </div>
+    <div class="progress-dispo">
+      <div class="progress-fill" style="width:{% if total_lignes > 0 %}{% widthratio nb_complets total_lignes 100 %}{% else %}0{% endif %}%;
+        background:{% if nb_complets == total_lignes %}var(--ph-600){% elif nb_complets > 0 %}var(--amber){% else %}var(--rose){% endif %};"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Tableau comparaison + formulaire -->
+<form id="form-dispenser" method="post" novalidate>
+{% csrf_token %}
+
+<div class="disp-table-wrap">
+  <div style="padding:12px 20px 12px 32px;background:var(--ph-100);border-bottom:2px solid var(--ph-300);"></div>
+  <table class="disp-table">
+    <thead>
+      <tr>
+        <th style="min-width:220px;">Médicament prescrit</th>
+        <th style="text-align:center;min-width:110px;">Qté prescrite</th>
+        <th style="text-align:center;min-width:130px;">Stock pharmacie</th>
+        <th style="text-align:center;min-width:110px;">Écart</th>
+        <th style="text-align:center;min-width:120px;">Qté à dispenser</th>
+        <th style="text-align:center;">Disponibilité</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ligne in lignes_enrichies %}
+      {% if not ligne.produit %}
+      <tr class="row-nf">
+      {% elif ligne.stock_dispo == 0 %}
+      <tr class="row-rupt">
+      {% elif not ligne.suffisant %}
+      <tr class="row-part">
+      {% else %}
+      <tr class="row-ok">
+      {% endif %}
+        <!-- Médicament -->
+        <td>
+          <div style="font-weight:700;font-size:13px;">{{ ligne.nom_med }}</div>
+          {% if ligne.produit %}
+          <div style="font-size:10.5px;font-family: var(--font-mono);color:var(--ph-600);">{{ ligne.produit.code }}</div>
+          {% if ligne.produit.unite_mesure %}<div style="font-size:10.5px;color:var(--ph-muted);">{{ ligne.produit.unite_mesure.nom }}</div>{% endif %}
+          {% else %}
+          <div style="font-size:10.5px;color:var(--ph-muted);font-style:italic;">Produit non identifié dans le stock</div>
+          {% endif %}
+          {% if ligne.ligne.posologie %}<div style="font-size:10.5px;color:var(--ph-muted);">Posologie : {{ ligne.ligne.posologie }}</div>{% endif %}
+          {% if ligne.substituts %}
+          <div style="margin-top:5px;">
+            <span style="font-size:10px;font-weight:700;color:var(--ph-muted);text-transform:uppercase;">Substituts disponibles :</span><br>
+            {% for s in ligne.substituts %}
+            <span class="subst-badge"><i class="bi bi-arrow-right-circle"></i> {{ s.produit.nom }} ({{ s.quantite|floatformat:0 }})</span>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </td>
+
+        <!-- Prescrit -->
+        <td style="text-align:center;">
+          <div class="qte-label">Prescrit</div>
+          <div class="qte-col-val" style="color:var(--ph-700);">
+            {{ ligne.ligne.quantite }}
+            {% if ligne.produit %}<span style="font-size:10.5px;font-weight:400;color:var(--ph-muted);"> {{ ligne.produit.unite_mesure.nom }}</span>{% endif %}
+          </div>
+        </td>
+
+        <!-- Stock dispo -->
+        <td style="text-align:center;">
+          <div class="qte-label">En stock</div>
+          {% if not ligne.produit %}
+          <div style="font-size:12px;color:var(--ph-muted);font-style:italic;">—</div>
+          {% else %}
+          <div class="qte-col-val" style="color:{% if ligne.stock_dispo == 0 %}var(--rose-text){% elif not ligne.suffisant %}var(--amber-text){% else %}var(--ph-600){% endif %};">
+            {{ ligne.stock_dispo|floatformat:0 }}
+            {% if ligne.produit %}<span style="font-size:10.5px;font-weight:400;color:var(--ph-muted);"> {{ ligne.produit.unite_mesure.nom }}</span>{% endif %}
+          </div>
+          {% endif %}
+        </td>
+
+        <!-- Écart -->
+        <td style="text-align:center;">
+          <div class="qte-label">Écart</div>
+          {% if not ligne.produit %}
+          <div style="font-size:12px;color:var(--ph-muted);">—</div>
+          {% else %}
+          {% with ecart=ligne.stock_dispo|floatformat:0 %}
+          {% if ligne.suffisant %}
+          <div style="font-size:13px;font-weight:700;color:var(--ph-600);">
+            <i class="bi bi-check-circle-fill" style="font-size:15px;"></i>
+          </div>
+          {% elif ligne.stock_dispo == 0 %}
+          <div style="font-size:13px;font-weight:700;color:var(--rose-text);">
+            <i class="bi bi-x-circle-fill" style="font-size:15px;"></i> Rupture
+          </div>
+          {% else %}
+          <div style="font-size:12px;font-weight:700;color:var(--amber-text);">
+            <i class="bi bi-dash-circle-fill" style="font-size:13px;"></i>
+            Manque {{ ligne.ligne.quantite|add:"-0"|floatformat:0 }}
+          </div>
+          {% endif %}
+          {% endwith %}
+          {% endif %}
+        </td>
+
+        <!-- Input dispensation -->
+        <td style="text-align:center;">
+          <div class="qte-label">À dispenser</div>
+          {% if ligne.produit %}
+          <input type="number"
+            name="qte_{{ ligne.ligne.pk }}"
+            id="qte_{{ ligne.ligne.pk }}"
+            class="ph-qte-input"
+            data-defaut="{{ ligne.qte_defaut|floatformat:0 }}"
+            data-max="{{ ligne.stock_dispo|floatformat:0 }}"
+            min="0" step="1"
+            max="{{ ligne.stock_dispo|floatformat:0 }}"
+            value="{{ ligne.qte_defaut|floatformat:0 }}"
+            placeholder="0">
+          {% else %}
+          <input type="number"
+            name="qte_{{ ligne.ligne.pk }}"
+            id="qte_{{ ligne.ligne.pk }}"
+            class="ph-qte-input"
+            min="0" step="1"
+            value="0"
+            placeholder="0"
+            style="opacity:.5;">
+          {% endif %}
+          {% if not ligne.suffisant %}
+          <label style="display:flex;align-items:center;justify-content:center;gap:4px;margin-top:6px;font-size:10.5px;color:var(--ph-muted);cursor:pointer;white-space:nowrap;">
+            <input type="checkbox" name="ailleurs_{{ ligne.ligne.pk }}"
+                   class="ph-ailleurs-check" data-target="qte_{{ ligne.ligne.pk }}"
+                   style="width:13px;height:13px;cursor:pointer;">
+            Acheté ailleurs
+          </label>
+          {% endif %}
+        </td>
+
+        <!-- État -->
+        <td style="text-align:center;">
+          {% if not ligne.produit %}
+          <span class="dispo-badge dispo-nf" style="font-size:10px;"><i class="bi bi-question-circle"></i> Non identifié</span>
+          {% elif ligne.stock_dispo == 0 %}
+          <span class="dispo-badge dispo-rupt" style="font-size:10px;"><i class="bi bi-x-circle-fill"></i> Rupture</span>
+          {% elif not ligne.suffisant %}
+          <span class="dispo-badge dispo-part" style="font-size:10px;"><i class="bi bi-exclamation-triangle-fill"></i> Insuffisant</span>
+          {% else %}
+          <span class="dispo-badge dispo-ok" style="font-size:10px;"><i class="bi bi-check-circle-fill"></i> Suffisant</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="6" style="text-align:center;padding:32px;color:var(--ph-muted);">Aucun médicament dans cette ordonnance.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Info médicaments non identifiés -->
+{% for ligne in lignes_enrichies %}{% if not ligne.produit %}
+<div style="display:flex;align-items:flex-start;gap:10px;background:rgba(0,0,0,.04);border:1px solid rgba(0,0,0,.1);border-radius:8px;padding:10px 16px;margin:10px 0 0;font-size:12px;color:var(--ph-muted);">
+  <i class="bi bi-info-circle-fill" style="font-size:15px;flex-shrink:0;margin-top:1px;"></i>
+  <span>Les médicaments <strong>"Non identifiés"</strong> n'ont pas d'entrée dans le stock informatique. Ils seront dispensés manuellement sans déduction de stock.</span>
+</div>
+{% endif %}{% endfor %}
+
+<!-- Notes -->
+<div class="ph-card" style="max-width:600px;margin-top:16px;">
+  <div class="ph-card-header">
+    <div class="ph-card-title"><i class="bi bi-chat-text" style="color:var(--ph-600);"></i> Notes de dispensation</div>
+  </div>
+  <div class="ph-card-body">
+    <textarea name="notes" class="field-ul" rows="3"
+      placeholder="Substitutions effectuées, observations, remarques…"></textarea>
+  </div>
+</div>
+
+<div class="form-actions" style="justify-content:flex-end;align-items:center;margin:14px 0 28px;">
+  <span style="font-size:11.5px;color:var(--ph-muted);">
+    <i class="bi bi-info-circle"></i>
+    Si des quantités sont inférieures au prescrit, la dispensation sera marquée <strong>partielle</strong>.
+  </span>
+  <a href="{% url 'pharmacie_ordonnances' pharmacie %}" class="btn-form-cancel">Annuler</a>
+  <button type="submit" form="form-dispenser" class="btn-form-submit">
+    <i class="bi bi-check2-circle"></i> Valider la dispensation
+  </button>
+  {% if ordonnance.statut == 'delivree' or ordonnance.statut == 'partielle' %}
+  {% if ordonnance.dispensation %}
+  <a href="{% url 'pharmacie_fiche_dispensation' pharmacie ordonnance.dispensation.pk %}" class="btn-form-cancel" style="font-size:12px;">
+    <i class="bi bi-file-earmark-text"></i> Fiche de dispensation
+  </a>
+  {% endif %}
+  {% endif %}
+</div>
+
+</form>
+
+<script>
+function remplirAuto() {
+  document.querySelectorAll('.ph-qte-input[data-defaut]').forEach(function(inp) {
+    if (!inp.disabled) inp.value = inp.dataset.defaut;
+  });
+}
+document.querySelectorAll('.ph-ailleurs-check').forEach(function(chk) {
+  chk.addEventListener('change', function() {
+    var qteInput = document.getElementById(this.dataset.target);
+    if (!qteInput) return;
+    if (this.checked) {
+      qteInput.value = 0;
+      qteInput.disabled = true;
+      qteInput.style.opacity = '.4';
+    } else {
+      qteInput.disabled = false;
+      qteInput.style.opacity = '';
+    }
+  });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,81 @@
+{% extends 'stock/base.html' %}
+{% load static %}
+{% block topbar_title %}{% if mode == 'create' %}Nouveau fournisseur{% else %}Modifier {{ fournisseur.nom }}{% endif %}{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+
+<div class="action-bar">
+  <div class="action-bar-breadcrumb">
+    <a href="{% url 'stock_fournisseurs' %}" class="btn-form-cancel" style="padding:3px 7px;">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <a href="{% url 'stock_fournisseurs' %}">Fournisseurs</a>
+    <span class="sep">/</span>
+    <span class="current">{% if mode == 'create' %}Nouveau fournisseur{% else %}{{ fournisseur.nom }}{% endif %}</span>
+    {% if mode == 'edit' %}<span class="code-badge" style="margin-left:6px;">{{ fournisseur.code }}</span>{% endif %}
+  </div>
+  <div class="action-bar-buttons">
+    <a href="{% url 'stock_fournisseurs' %}" class="btn-form-cancel">Annuler</a>
+    <button type="submit" form="fournisseur-form" class="btn-form-submit">
+      <i class="bi bi-check-lg"></i> {% if mode == 'create' %}Enregistrer{% else %}Mettre à jour{% endif %}
+    </button>
+  </div>
+</div>
+
+{% if messages %}
+<div style="margin-bottom:14px;">
+  {% for msg in messages %}
+  <div style="background:rgba(var(--st-600-rgb),.1);border:1px solid rgba(var(--st-600-rgb),.3);border-radius:8px;padding:10px 16px;font-size:13px;color:var(--st-600);display:flex;align-items:center;gap:8px;">
+    <i class="bi bi-check-circle-fill"></i> {{ msg }}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<form id="fournisseur-form" method="post" novalidate>
+  {% csrf_token %}
+  <div class="form-simple-card" style="max-width:600px;">
+
+    <div class="form-field">
+      <label class="field-label" for="nom">Nom <span class="required-star">*</span></label>
+      <input type="text" name="nom" id="nom"
+        class="field-ul{% if errors.nom %} error{% endif %}"
+        value="{% if mode == 'edit' %}{{ fournisseur.nom }}{% elif post %}{{ post.nom }}{% endif %}"
+        placeholder="Nom du fournisseur" autocomplete="off">
+      {% if errors.nom %}<div class="field-error">{{ errors.nom }}</div>{% endif %}
+    </div>
+
+    <div class="tab-two-col">
+      <div class="form-field">
+        <label class="field-label" for="telephone">Téléphone <span class="required-star">*</span></label>
+        <input type="tel" name="telephone" id="telephone"
+          class="field-ul{% if errors.telephone %} error{% endif %}"
+          value="{% if mode == 'edit' %}{{ fournisseur.telephone }}{% elif post %}{{ post.telephone }}{% endif %}"
+          placeholder="+225 07 00 00 00 00">
+        {% if errors.telephone %}<div class="field-error">{{ errors.telephone }}</div>{% endif %}
+      </div>
+      <div class="form-field">
+        <label class="field-label" for="email">Email</label>
+        <input type="email" name="email" id="email" class="field-ul"
+          value="{% if mode == 'edit' %}{{ fournisseur.email }}{% elif post %}{{ post.email }}{% endif %}"
+          placeholder="email@fournisseur.com">
+      </div>
+    </div>
+
+    <div class="form-field">
+      <label class="field-label" for="adresse">Adresse</label>
+      <textarea name="adresse" id="adresse" class="field-ul" rows="3"
+        placeholder="Adresse complète du fournisseur…">{% if mode == 'edit' %}{{ fournisseur.adresse }}{% elif post %}{{ post.adresse }}{% endif %}</textarea>
+    </div>
+
+    {% if mode == 'edit' %}
+    <div class="form-field" style="display:flex;align-items:center;gap:10px;">
+      <input type="checkbox" name="actif" id="actif" {% if fournisseur.actif %}checked{% endif %}>
+      <label for="actif" style="font-size:13px;color:var(--text-primary);margin:0;">Fournisseur actif</label>
+    </div>
+    {% endif %}
+
+  </div>
+</form>
+{% endblock %}

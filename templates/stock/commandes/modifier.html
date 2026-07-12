@@ -1,0 +1,55 @@
+{% extends 'stock/base.html' %}
+{% load static %}
+{% block topbar_title %}Modifier commande {{ commande.numero }}{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+
+<div class="action-bar">
+  <div class="action-bar-breadcrumb">
+    <a href="{% url 'stock_commande_detail' commande.pk %}" class="btn-form-cancel" style="padding:3px 7px;">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <a href="{% url 'stock_commandes' %}">Commandes</a>
+    <span class="sep">/</span>
+    <a href="{% url 'stock_commande_detail' commande.pk %}">{{ commande.numero }}</a>
+    <span class="sep">/</span>
+    <span class="current">Modifier</span>
+  </div>
+  <div class="action-bar-buttons">
+    <a href="{% url 'stock_commande_detail' commande.pk %}" class="btn-form-cancel">Annuler</a>
+    <button type="submit" form="form-modifier" class="btn-form-submit"><i class="bi bi-check-lg"></i> Enregistrer</button>
+  </div>
+</div>
+
+<form id="form-modifier" method="post" action="{% url 'stock_commande_modifier' commande.pk %}" novalidate>
+{% csrf_token %}
+<div class="form-simple-card" style="max-width:580px;">
+
+  <div class="form-field">
+    <label class="field-label">Fournisseur <span class="required-star">*</span></label>
+    {% if errors.fournisseur %}<div class="field-error">{{ errors.fournisseur }}</div>{% endif %}
+    <select name="fournisseur" class="field-ul" required>
+      <option value="">— Sélectionner —</option>
+      {% for f in fournisseurs %}
+      <option value="{{ f.pk }}" {% if f.pk == commande.fournisseur.pk %}selected{% endif %}>
+        {{ f.code }} — {{ f.nom }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="form-field">
+    <label class="field-label">Date de livraison prévue</label>
+    <input type="date" name="date_livraison_prevue" class="field-ul"
+      value="{% if commande.date_livraison_prevue %}{{ commande.date_livraison_prevue|date:'Y-m-d' }}{% endif %}">
+  </div>
+
+  <div class="form-field">
+    <label class="field-label">Notes</label>
+    <textarea name="notes" class="field-ul" rows="3">{{ commande.notes }}</textarea>
+  </div>
+
+</div>
+</form>
+{% endblock %}

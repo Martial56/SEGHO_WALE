@@ -1,4 +1,4 @@
-{% extends 'patients/base.html' %}
+{% extends 'gynecologie/base.html' %}
 
 {% block topbar_title %}Types de visite{% endblock %}
 
@@ -8,7 +8,7 @@
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  html[data-theme="dark"] .o-list tbody tr:hover { background: rgba(33,136,171,0.2); }
+  html[data-theme="dark"] .o-list tbody tr:hover { background: rgba(var(--teal-500-rgb),0.2); }
   html[data-theme="dark"] .o-list thead th { background: var(--surface); }
   html[data-theme="dark"] .o-search-input { color: var(--text); }
   html[data-theme="dark"] .o-search-bar { border-bottom-color: #3a4a62; }
@@ -18,7 +18,7 @@
   .o-subheader {
     background: #fff; border-bottom: 1px solid var(--border);
     padding: 6px 16px; display: flex; flex-direction: column; gap: 5px;
-    position: sticky; top: 0; z-index: 190; margin: 0 -32px 16px;
+    position: sticky; top: 0; z-index: 190; margin: 0 -32px 0;
   }
   .o-subheader-row { display: flex; align-items: center; gap: 8px; }
   .o-subheader-row-right { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -52,11 +52,12 @@
   .o-list-wrap { overflow-x: auto; overflow-y: auto; background: #fff; margin: 0 -32px; }
   .o-list { width: 100%; border-collapse: collapse; font-size: 12px; }
   .o-list thead th {
-    background: #f5f5f5; border-bottom: 1px solid var(--border);
-    padding: 6px 10px; font-weight: 500; font-size: 11.5px;
-    color: var(--text-muted); text-align: left;
-    position: sticky; top: 0; z-index: 2; user-select: none;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 8px 14px; font-weight: 600; font-size: 11px;
+    color: var(--text-muted); text-align: left; text-transform: uppercase;
+    white-space: nowrap; position: sticky; top: 0; z-index: 2; user-select: none;
   }
+  html[data-theme="dark"] .o-list thead th { background: var(--surface); border-bottom-color: var(--border); }
   .o-list tbody tr { border-bottom: 1px solid #f0f0f0; transition: background 0.1s; cursor: pointer; }
   .o-list tbody tr:hover { background: var(--teal-50); }
   .o-list tbody td { padding: 6px 10px; color: var(--text); vertical-align: middle; }
@@ -72,7 +73,7 @@
     transition: background 0.15s, color 0.15s;
   }
   .btn-icon:hover { background: var(--teal-600); color: #fff; border-color: var(--teal-600); }
-  .btn-icon.btn-danger:hover { background: #b71c1c; border-color: #b71c1c; }
+  .btn-icon.btn-danger:hover { background: var(--rose-text); border-color: var(--rose-text); }
 
   .o-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 20px; }
   .o-empty-illo {
@@ -128,38 +129,14 @@
   .gyn-nav-dd-item.active { background: #ede7f6; color: var(--teal-600); font-weight: 500; }
   html[data-theme="dark"] .gyn-nav-dd-panel { background: #1a2535; border-color: #2e3f58; }
   html[data-theme="dark"] .gyn-nav-dd-item { color: var(--text); }
-  html[data-theme="dark"] .gyn-nav-dd-item:hover { background: rgba(33,136,171,0.2); color: var(--teal-300); }
+  html[data-theme="dark"] .gyn-nav-dd-item:hover { background: rgba(var(--teal-500-rgb),0.2); color: var(--teal-300); }
 
   .main { height: 100vh; overflow: hidden; }
   .content { min-height: 0; padding-top: 0; overflow-x: hidden; }
 </style>
 {% endblock %}
 
-{% block breadcrumb %}
-<nav class="gyn-nav">
-  <div class="gyn-nav-dd">
-    <span class="gyn-nav-link active" style="cursor:pointer;">
-      Configurations <i class="bi bi-chevron-down" style="font-size:10px;"></i>
-    </span>
-    <div class="gyn-nav-dd-panel">
-      <a href="{% url 'patients:pathologie_list' %}" class="gyn-nav-dd-item">
-        <i class="bi bi-clipboard2-pulse" style="font-size:13px;"></i> Diagnostic retenu
-      </a>
-      <a href="{% url 'patients:typevisite_list' %}" class="gyn-nav-dd-item active">
-        <i class="bi bi-card-list" style="font-size:13px;"></i> Type de visite
-      </a>
-    </div>
-  </div>
-</nav>
-<nav class="breadcrumb">
-  <a href="{% url 'dashboard' %}">
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z"/><polyline points="9 21 9 12 15 12 15 21"/></svg>
-    Accueil
-  </a>
-  <span class="breadcrumb-sep">›</span>
-  <span>Types de visite</span>
-</nav>
-{% endblock %}
+{% block breadcrumb %}{% endblock %}
 
 {% block content %}
 
@@ -174,7 +151,11 @@
           <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
         </div>
       </form>
-      <div class="o-ctrl-sep"></div>
+    </div>
+  </div>
+  <div class="o-subheader-row">
+    <a href="{% url 'gynecologie_typevisite_create' %}" class="o-btn-create">CRÉER</a>
+    <div class="o-subheader-row-right">
       <div class="o-pagination">
         <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
            href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% else %}#{% endif %}">
@@ -188,9 +169,6 @@
       </div>
     </div>
   </div>
-  <div class="o-subheader-row">
-    <a href="{% url 'patients:typevisite_create' %}" class="o-btn-create">CRÉER</a>
-  </div>
 </div>
 
 <div class="o-list-wrap">
@@ -198,7 +176,6 @@
   <table class="o-list">
     <thead>
       <tr>
-        <th style="width:40px;text-align:center;">#</th>
         <th>Nom</th>
         <th style="width:120px;">Code</th>
         <th>Description</th>
@@ -208,8 +185,7 @@
     </thead>
     <tbody>
       {% for tv in page_obj %}
-      <tr onclick="window.location='{% url 'patients:typevisite_edit' tv.pk %}'">
-        <td style="text-align:center;color:var(--text-muted);font-size:11px;">{{ forloop.counter0|add:page_obj.start_index }}</td>
+      <tr onclick="window.location='{% url 'gynecologie_typevisite_edit' tv.pk %}'">
         <td class="td-nom">{{ tv.nom }}</td>
         <td class="td-code">{{ tv.code }}</td>
         <td class="td-desc">{{ tv.description|truncatechars:80|default:"—" }}</td>
@@ -221,8 +197,8 @@
           {% endif %}
         </td>
         <td class="td-actions" onclick="event.stopPropagation()">
-          <a href="{% url 'patients:typevisite_edit' tv.pk %}" class="btn-icon" title="Modifier"><i class="bi bi-pencil"></i></a>
-          <form method="post" action="{% url 'patients:typevisite_delete' tv.pk %}" style="display:inline;"
+          <a href="{% url 'gynecologie_typevisite_edit' tv.pk %}" class="btn-icon" title="Modifier"><i class="bi bi-pencil"></i></a>
+          <form method="post" action="{% url 'gynecologie_typevisite_delete' tv.pk %}" style="display:inline;"
                 onsubmit="return confirm('Supprimer « {{ tv.nom|escapejs }} » ?')">
             {% csrf_token %}
             <button type="submit" class="btn-icon btn-danger" title="Supprimer"><i class="bi bi-trash"></i></button>
@@ -242,7 +218,7 @@
     <div class="o-empty-title">Aucun type de visite{% if q %} pour "{{ q }}"{% endif %}</div>
     <div class="o-empty-sub">{% if q %}Essayez avec un autre terme.{% else %}Créez le premier type de visite.{% endif %}</div>
     {% if not q %}
-    <a href="{% url 'patients:typevisite_create' %}" class="o-empty-btn">
+    <a href="{% url 'gynecologie_typevisite_create' %}" class="o-empty-btn">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       CRÉER UN TYPE DE VISITE
     </a>

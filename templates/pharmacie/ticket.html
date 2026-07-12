@@ -1,0 +1,146 @@
+{% extends 'pharmacie/base.html' %}
+{% load static %}
+
+{% block extra_ph_css %}<style>
+.ticket-wrap {
+  max-width: 480px; margin: 24px auto; background: var(--ph-surface);
+  border-radius: 12px; box-shadow: 0 4px 24px rgba(var(--ph-700-rgb),.12); overflow: hidden;
+}
+.ticket-header {
+  background: var(--ph-600); color: #fff; padding: 22px 28px; text-align: center;
+}
+.ticket-body { padding: 20px 28px; }
+.ticket-row { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 6px; font-size: 13px; }
+.ticket-label { color: var(--ph-muted); font-size: 11px; font-weight: 700; text-transform: uppercase; }
+.ticket-divider { border: none; border-top: 1.5px dashed var(--ph-200); margin: 14px 0; }
+.ticket-table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin: 10px 0; }
+.ticket-table th { font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: var(--ph-muted); padding: 5px 4px; border-bottom: 1.5px solid var(--ph-200); text-align: left; }
+.ticket-table th:last-child { text-align: right; }
+.ticket-table td { padding: 6px 4px; border-bottom: 1px solid var(--ph-border); vertical-align: middle; }
+.ticket-table td:last-child { text-align: right; font-weight: 700; }
+.ticket-total { display: flex; justify-content: space-between; padding: 8px 0; }
+.ticket-total.net { font-size: 16px; font-weight: 800; color: var(--ph-700); border-top: 2px solid var(--ph-600); padding-top: 10px; margin-top: 6px; }
+.ticket-footer { text-align: center; padding: 14px 28px 20px; background: var(--ph-50); border-top: 1px solid var(--ph-border); font-size: 12px; color: var(--ph-muted); }
+.ticket-actions { display: flex; gap: 10px; justify-content: center; padding: 14px 28px; border-top: 1px solid var(--ph-border); }
+@media print {
+  .ph-nav, .topbar, .ticket-actions, .ph-page-head { display: none !important; }
+  .ticket-wrap { box-shadow: none; margin: 0 auto; max-width: 480px; }
+  body { background: #fff !important; }
+  .content { padding: 10mm !important; }
+  @page { margin: 0; }
+}
+</style>{% endblock %}
+
+{% block content %}
+<div style="padding: 16px 0;">
+
+<div class="ticket-wrap">
+  <!-- En-tête -->
+  <div class="ticket-header">
+    <div style="font-size:11px;font-weight:600;letter-spacing:1px;opacity:.8;margin-bottom:4px;">CENTRE MÉDICO-SOCIAL WALÉ</div>
+    <div style="font-size:18px;font-weight:800;margin-bottom:2px;">{{ label }}</div>
+    <div style="font-size:12px;opacity:.8;">Yamoussoukro, Côte d'Ivoire</div>
+  </div>
+
+  <!-- Infos vente -->
+  <div class="ticket-body">
+    <div style="text-align:center;margin-bottom:16px;">
+      <div style="font-size:12px;color:var(--ph-muted);">Ticket de caisse</div>
+      <div style="font-size:22px;font-weight:800;color:var(--ph-700);font-family: var(--font-mono);">{{ vente.numero }}</div>
+      <div style="font-size:12px;color:var(--ph-muted);">{{ vente.date_vente|date:"d/m/Y à H:i" }}</div>
+    </div>
+
+    <div class="ticket-row">
+      <div>
+        <div class="ticket-label">Mode de paiement</div>
+        <div style="font-weight:600;">
+          {% if vente.mode_paiement == 'especes' %}<i class="bi bi-cash-coin" style="color:var(--ph-600);"></i> Espèces
+          {% elif vente.mode_paiement == 'mobile_money' %}<i class="bi bi-phone" style="color:var(--ph-600);"></i> Mobile Money
+          {% else %}<i class="bi bi-shield-check" style="color:var(--ph-600);"></i> Assurance{% endif %}
+        </div>
+      </div>
+      <div style="text-align:right;">
+        <div class="ticket-label">Caissier(ère)</div>
+        <div style="font-weight:600;">{{ vente.cree_par|default:"—" }}</div>
+      </div>
+    </div>
+
+    {% if vente.patient %}
+    <div style="margin-top:8px;">
+      <div class="ticket-label">Patient</div>
+      <div style="font-weight:600;">{{ vente.patient }}</div>
+    </div>
+    {% endif %}
+
+    <hr class="ticket-divider">
+
+    <!-- Lignes produits -->
+    <table class="ticket-table">
+      <thead>
+        <tr>
+          <th style="width:40%;">Produit</th>
+          <th style="text-align:center;">Qté</th>
+          <th style="text-align:right;">P.U.</th>
+          <th>Montant</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ligne in vente.lignes.all %}
+        <tr>
+          <td>
+            <div style="font-weight:600;font-size:12px;">{{ ligne.produit.nom }}</div>
+            {% if ligne.produit.unite_mesure %}<div style="font-size:10px;color:var(--ph-muted);">{{ ligne.produit.unite_mesure.nom }}</div>{% endif %}
+          </td>
+          <td style="text-align:center;font-weight:700;">{{ ligne.quantite|floatformat:0 }}</td>
+          <td style="text-align:right;font-size:12px;">{{ ligne.prix_unitaire|floatformat:0 }} F</td>
+          <td>{{ ligne.montant|floatformat:0 }} F</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <hr class="ticket-divider">
+
+    <!-- Totaux -->
+    {% if vente.remise > 0 %}
+    <div class="ticket-total">
+      <span style="color:var(--ph-muted);">Sous-total</span>
+      <span>{{ vente.montant_total|floatformat:0 }} F CFA</span>
+    </div>
+    <div class="ticket-total">
+      <span style="color:var(--ph-muted);">Remise</span>
+      <span style="color:var(--rose-text);">- {{ vente.remise|floatformat:0 }} F CFA</span>
+    </div>
+    {% endif %}
+    <div class="ticket-total net">
+      <span>NET À PAYER</span>
+      <span>{{ vente.montant_net|floatformat:0 }} F CFA</span>
+    </div>
+
+    {% if vente.notes %}
+    <div style="margin-top:12px;font-size:11.5px;color:var(--ph-muted);font-style:italic;">
+      <i class="bi bi-chat-text"></i> {{ vente.notes }}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Footer -->
+  <div class="ticket-footer">
+    <i class="bi bi-heart-fill" style="color:var(--ph-500);"></i>
+    Merci pour votre confiance<br>
+    <span style="font-size:11px;">Centre Médico-Social Walé — Yamoussoukro</span>
+  </div>
+
+  <!-- Actions -->
+  <div class="ticket-actions">
+    <button onclick="window.print()" class="btn-ph-outline" style="font-size:12px;">
+      <i class="bi bi-printer"></i> Imprimer
+    </button>
+    <a href="{% url 'pharmacie_caisse' pharmacie %}" class="btn-ph" style="font-size:12px;">
+      <i class="bi bi-plus-circle"></i> Nouvelle vente
+    </a>
+  </div>
+</div>
+
+</div>
+{% endblock %}

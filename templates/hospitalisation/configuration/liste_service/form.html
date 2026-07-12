@@ -1,0 +1,35 @@
+{% extends 'hospitalisation/base.html' %}
+
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+
+<div class="action-bar">
+  <div class="action-bar-breadcrumb">
+    <a href="{% url 'hospitalisation:config_liste_service' %}" class="btn-form-cancel" style="padding:3px 7px;">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <a href="{% url 'hospitalisation:config_liste_service' %}">Liste de vérification avant le service</a>
+    <span class="sep">/</span>
+    <span class="current">{{ titre }}</span>
+  </div>
+  <div class="action-bar-buttons">
+    <a href="{% url 'hospitalisation:config_liste_service' %}" class="btn-form-cancel">Ignorer</a>
+    <button type="submit" form="service-form" class="btn-form-submit">
+      <i class="bi bi-check2"></i> Sauvegarder
+    </button>
+  </div>
+</div>
+
+<form method="post" id="service-form" novalidate>
+  {% csrf_token %}
+  <div class="form-simple-card" style="max-width:600px;">
+    <div class="form-field">
+      <label class="field-label" for="{{ form.item.id_for_label }}">Élément de la liste de contrôle de salle</label>
+      {{ form.item }}
+      {% if form.item.errors %}<div class="field-error">{{ form.item.errors|join:", " }}</div>{% endif %}
+    </div>
+  </div>
+</form>
+
+{% endblock %}

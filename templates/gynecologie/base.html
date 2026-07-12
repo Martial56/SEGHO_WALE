@@ -13,7 +13,6 @@
     --text: #0d3040;
     --text-muted: rgba(0,0,0,0.45);
     --bg: #f0f6fa;
-    --gyn-nav-h: 44px;
 }
 html[data-theme="dark"] {
     --surface: #132033;
@@ -23,51 +22,55 @@ html[data-theme="dark"] {
     --bg: #0b1929;
 }
 /* Layout borné : .content scroll en interne → position sticky fonctionne */
-.main { height: 100vh; overflow: hidden; }
-.content { min-height: 0; padding-top: 0; overflow-x: hidden; }
+.main { flex: none; height: calc(100vh - var(--topbar-h)); overflow: hidden; display: flex; flex-direction: column; }
+.content { flex: 1; min-height: 0; padding-top: 0; overflow-x: hidden; overflow-y: auto; }
 
-.gyn-nav {
-    background: #fff;
-    border-bottom: 1px solid rgba(0,0,0,0.08);
-    margin: 0 -32px 0;
-    padding: 0 32px;
-    display: flex;
-    align-items: stretch;
-    height: var(--gyn-nav-h);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    position: sticky; top: 0; z-index: 250;
-}
-.gyn-nav-link {
-    padding: 11px 16px;
-    font-size: 13px;
-    font-weight: 500;
-    color: rgba(0,0,0,0.5);
-    text-decoration: none;
-    border-bottom: 2px solid transparent;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    transition: color 0.15s, border-color 0.15s;
-    white-space: nowrap;
-}
-.gyn-nav-link:hover { color: var(--teal-600); }
-.gyn-nav-link.active { color: var(--teal-600); border-bottom-color: var(--teal-500); font-weight: 600; }
-html[data-theme="dark"] .gyn-nav { background: #091d2e; border-bottom-color: rgba(255,255,255,0.06); }
-html[data-theme="dark"] .gyn-nav-link { color: rgba(255,255,255,0.4); }
-html[data-theme="dark"] .gyn-nav-link:hover { color: var(--teal-300); }
-html[data-theme="dark"] .gyn-nav-link.active { color: var(--teal-300); border-bottom-color: var(--teal-400); }
 /* Empêcher le tableau d'étirer toute la page horizontalement */
 .main { min-width: 0; }
+
+/* ── Dropdown dans la nav gynécologie ── */
+.o-nav-dd { position: relative; display: inline-flex; align-items: stretch; }
+.o-nav-dd-trigger { cursor: pointer; user-select: none; }
+.o-nav-dd-panel {
+  display: none; position: absolute; top: 100%; left: 0;
+  background: #fff; border: 1px solid #dde3ec;
+  border-radius: 6px; box-shadow: 0 8px 28px rgba(0,0,0,0.16);
+  min-width: 200px; padding: 5px 0; z-index: 9999;
+}
+.o-nav-dd:hover .o-nav-dd-panel { display: block; }
+.o-nav-dd-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 16px; font-size: 12.5px; color: var(--text);
+  text-decoration: none; transition: background 0.1s; white-space: nowrap;
+}
+.o-nav-dd-item:hover { background: var(--teal-50); color: var(--teal-600); }
+.o-nav-dd-item.active { background: var(--teal-50); color: var(--teal-600); font-weight: 600; }
+html[data-theme="dark"] .o-nav-dd-panel { background: #1a2535; border-color: #2e3f58; }
+html[data-theme="dark"] .o-nav-dd-item { color: var(--text); }
+html[data-theme="dark"] .o-nav-dd-item:hover { background: rgba(33,136,171,0.2); color: var(--teal-300); }
 {% block extra_gyn_css %}{% endblock %}
 </style>
 {% endblock %}
 
-{% block breadcrumb %}
-<nav class="gyn-nav">
-    <a href="{% url 'gynecologie_list' %}" class="gyn-nav-link {% block nav_patients %}{% endblock %}">Les patients</a>
-    <a href="{% url 'gynecologie_rdv' %}" class="gyn-nav-link {% block nav_rdv %}{% endblock %}">Rendez-vous</a>
-    <a href="{% url 'gynecologie_naissances' %}" class="gyn-nav-link {% block nav_naissances %}{% endblock %}">Registre des naissances</a>
-    <a href="#" class="gyn-nav-link">Rapports</a>
-</nav>
-{% if breadcrumb %}{% include 'includes/breadcrumb.html' %}{% endif %}
+{% block module_navbar %}
+{% include 'gynecologie/includes/nav.html' %}
+{% endblock %}
+
+{% block breadcrumb %}{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+(function () {
+  function syncTopbarH() {
+    var topbar = document.querySelector('.topbar');
+    if (!topbar) return;
+    var h = topbar.getBoundingClientRect().height;
+    if (h > 0) document.documentElement.style.setProperty('--topbar-h', h + 'px');
+  }
+  if (document.readyState !== 'loading') { syncTopbarH(); }
+  else { document.addEventListener('DOMContentLoaded', syncTopbarH); }
+  window.addEventListener('resize', syncTopbarH);
+})();
+</script>
 {% endblock %}

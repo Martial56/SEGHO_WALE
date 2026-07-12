@@ -1,7 +1,6 @@
 {% extends 'services/base.html' %}
 {% load static %}
 {% block breadcrumb %}{% endblock %}
-{% block module_navbar %}{% endblock %}
 
 {% block extra_css %}
 {{ block.super }}
@@ -10,655 +9,219 @@
 {% endblock %}
 
 {% block content %}
-<div id="page-wrap">
-
-{% include 'services/includes/nav.html' %}
-
-<div class="o-subheader" id="subheader">
-  <div class="o-subheader-row">
-    <a href="{% if is_new %}{% url 'services:list' %}{% else %}{% url 'services:detail' article.pk %}{% endif %}" class="o-ctrl-btn" style="padding:3px 7px;">
-      <i class="bi bi-arrow-left"></i>
-    </a>
-    <span style="font-size:13.5px;color:var(--text-muted);">
-      <a href="{% url 'services:list' %}" style="color:var(--accent);text-decoration:none;font-weight:500;">Prestations</a>
-      {% if not is_new %}
-      <span style="margin:0 5px;opacity:.4;">/</span>
-      <a href="{% url 'services:detail' article.pk %}" style="color:var(--accent);text-decoration:none;font-weight:500;">{{ article.nom|truncatechars:30 }}</a>
-      {% endif %}
-      <span style="margin:0 5px;opacity:.4;">/</span>
-      <span style="color:var(--text);">{% if is_new %}Nouvelle prestation{% else %}Modifier{% endif %}</span>
-    </span>
-    <div style="flex:1;"></div>
-  </div>
-</div>
-
-<div class="f-page-body">
 
 <form method="post" enctype="multipart/form-data" id="article-form" novalidate>
   {% csrf_token %}
 
-  <!-- ── EN-TÊTE ARTICLE ── -->
-  <div class="art-header">
-    <div class="art-identity-row">
-      <div class="art-name-block">
-        <div style="margin-bottom:4px;">
-          <!-- <button type="button" class="favori-star {% if article and article.favori %}active{% endif %}" id="favori-btn">★</button>
-          <input type="hidden" name="favori" id="favori-input"
-            value="{% if article and article.favori %}on{% endif %}"> -->
-          <span class="field-label" style="display:inline;text-transform:none;font-size:12px;color:var(--f-required,#dc2626);font-weight:600;letter-spacing:0;">
-            Nom de la prestation <span class="f-required">*</span>
-          </span>
-        </div>
-        <input type="text" name="nom" class="art-name-input" placeholder="Nom de la prestation…"
-          value="{% if article %}{{ article.nom }}{% endif %}" required>
-        <div class="ref-split-row" id="ref-split-row">
-          <span class="ref-prefix-badge" id="ref-prefix-badge"></span>
-          <input type="text" id="ref-suffix-input" class="ref-suffix-input"
-            placeholder="Référence interne…">
-          <input type="hidden" name="reference_interne" id="ref-hidden"
-            value="{% if article %}{{ article.reference_interne }}{% endif %}">
-        </div>
-        <div class="art-checks">
-          <label class="art-check-label">
-            <input type="checkbox" name="peut_etre_vendu"
-              {% if not article or article.peut_etre_vendu %}checked{% endif %}>
-            Peut être vendu
-          </label>
-          <label class="art-check-label">
-            <input type="checkbox" name="peut_etre_achete"
-              {% if not article or article.peut_etre_achete %}checked{% endif %}>
-            Peut être acheté
-          </label>
-        </div>
-        <!-- {% if tous_types %}
-        <div class="art-types-section">
-          <div class="art-types-title">
-            Types de prestation
-            <a href="{% url 'services:types' %}" target="_blank" class="art-types-link">+ gérer</a>
-          </div>
-          <div class="art-types-chips">
-            {% for type in tous_types %}
-            <label class="art-type-chip">
-              <input type="checkbox" name="types" value="{{ type.pk }}"
-                {% if type.pk in types_selectionnes %}checked{% endif %}>
-              {{ type.nom }}
-            </label>
-            {% endfor %}
-          </div>
-        </div>
+  <!-- ══════════════ PANNEAU DE CONTRÔLE ══════════════ -->
+  <div class="control-panel">
+    <div class="cp-top">
+      <a href="{% if is_new %}{% url 'services:list' %}{% else %}{% url 'services:detail' article.pk %}{% endif %}" class="o-ctrl-btn" style="padding:3px 7px;">
+        <i class="bi bi-arrow-left"></i>
+      </a>
+      <span style="font-size:13.5px;color:var(--text-muted);">
+        <a href="{% url 'services:list' %}" style="color:var(--teal-600);text-decoration:none;font-weight:500;">Prestations</a>
+        {% if not is_new %}
+        <span style="margin:0 5px;opacity:.4;">/</span>
+        <a href="{% url 'services:detail' article.pk %}" style="color:var(--teal-600);text-decoration:none;font-weight:500;">{{ article.nom|truncatechars:30 }}</a>
+        {% endif %}
+        <span style="margin:0 5px;opacity:.4;">/</span>
+        <span style="color:var(--text);">{% if is_new %}Nouvelle prestation{% else %}Modifier{% endif %}</span>
+      </span>
+      <div style="flex:1;"></div>
+      <div class="cp-save-group">
+        <button type="submit" class="btn-save">{% if is_new %}Créer{% else %}Enregistrer{% endif %}</button>
+        {% if is_new %}
+        <a href="{% url 'services:list' %}" class="btn-discard">Ignorer</a>
         {% else %}
-        <div class="art-types-empty">
-          Aucun type configuré —
-          <a href="{% url 'services:types' %}" target="_blank">Créer des types de prestation</a>
-        </div>
-        {% endif %} -->
-      </div>
-
-      <div class="art-photo-block">
-        <label for="photo-input" class="art-photo-zone" id="photo-zone">
-          {% if article and article.photo %}
-          <img src="{{ article.photo.url }}" alt="Photo" class="art-photo-zone-img" id="photo-preview">
-          <div class="art-photo-zone-overlay">
-            <i class="bi bi-camera-fill"></i>
-            <span>Changer</span>
-          </div>
-          {% else %}
-          <div class="art-photo-zone-empty" id="photo-placeholder">
-            <i class="bi bi-image"></i>
-            <span>Ajouter une photo</span>
-          </div>
-          <img src="" alt="Photo" class="art-photo-zone-img" id="photo-preview" style="display:none;">
-          <div class="art-photo-zone-overlay" id="photo-overlay" style="display:none;">
-            <i class="bi bi-camera-fill"></i>
-            <span>Changer</span>
-          </div>
-          {% endif %}
-        </label>
-        <input type="file" name="photo" id="photo-input" accept="image/*" style="display:none">
+        <a href="{% url 'services:detail' article.pk %}" class="btn-discard">Ignorer</a>
+        {% endif %}
       </div>
     </div>
   </div>
 
-  <!-- ── ONGLETS ── -->
-  <div class="art-tabs">
-    <div class="art-tabs-nav">
-      <!-- <button type="button" class="art-tab-btn active" data-tab="tab-medic">Détails du médicament</button> -->
-      <button type="button" class="art-tab-btn active" data-tab="tab-info">Information Générale</button>
-      <!-- <button type="button" class="art-tab-btn" data-tab="tab-variantes">Attributs &amp; Variantes</button>
-      <button type="button" class="art-tab-btn" data-tab="tab-vente">Vente</button>
-      <button type="button" class="art-tab-btn" data-tab="tab-achats">Achats</button>
-      <button type="button" class="art-tab-btn" data-tab="tab-stock">Stock</button>
-      <button type="button" class="art-tab-btn" data-tab="tab-compta">Comptabilité</button> -->
+  <!-- ══════════════ CORPS DU FORMULAIRE ══════════════ -->
+  <div class="form-body">
+
+    <!-- Photo (pas d'équivalent dans le formulaire RDV — style propre conservé) -->
+    <div class="art-photo-block" style="float:right;margin-left:20px;">
+      <label for="photo-input" class="art-photo-zone" id="photo-zone">
+        {% if article and article.photo %}
+        <img src="{{ article.photo.url }}" alt="Photo" class="art-photo-zone-img" data-photo-preview="article">
+        <div class="art-photo-zone-overlay">
+          <i class="bi bi-camera-fill"></i>
+          <span>Changer</span>
+        </div>
+        {% else %}
+        <div class="art-photo-zone-empty" data-photo-placeholder="article">
+          <i class="bi bi-image"></i>
+          <span>Photo</span>
+        </div>
+        <img src="" alt="Photo" class="art-photo-zone-img" data-photo-preview="article" style="display:none;">
+        <div class="art-photo-zone-overlay" data-photo-overlay="article" style="display:none;">
+          <i class="bi bi-camera-fill"></i>
+          <span>Changer</span>
+        </div>
+        {% endif %}
+      </label>
+      <input type="file" name="photo" id="photo-input" data-photo-input="article" accept="image/*" style="display:none">
     </div>
 
-    <!-- ═══ ONGLET 1 : Détails du médicament ═══ -->
-    <!-- <div class="art-tab-panel active" id="tab-medic">
-      <div class="f-two-col">
-        <div>
-          <div class="f-field">
-            <label class="field-label">Forme</label>
-            <select name="forme" class="field-ul">
-              <option value="">—</option>
-              {% for val, label in forme_choices %}
-              <option value="{{ val }}" {% if article and article.forme == val %}selected{% endif %}>{{ label }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="f-field">
-            <label class="field-label">Voie d'administration</label>
-            <select name="voie_administration" class="field-ul">
-              <option value="">—</option>
-              {% for val, label in voie_choices %}
-              <option value="{{ val }}" {% if article and article.voie_administration == val %}selected{% endif %}>{{ label }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="f-field">
-            <label class="field-label">Dosage</label>
-            <div style="display:flex;gap:8px;">
-              <input type="text" name="dosage" class="field-ul" placeholder="ex : 500"
-                value="{% if article %}{{ article.dosage }}{% endif %}" style="flex:2;">
-              <input type="text" name="dosage_unite" class="field-ul" placeholder="mg / ml"
-                value="{% if article %}{{ article.dosage_unite }}{% endif %}" style="flex:1;">
-            </div>
-          </div>
-          <div class="f-field">
-            <label class="art-cb-row">
-              <input type="checkbox" name="quantite_prescription_manuelle"
-                {% if article and article.quantite_prescription_manuelle %}checked{% endif %}>
-              Quantité de prescription manuelle
-            </label>
+    <!-- Deux colonnes principales -->
+    <div class="form-main-grid">
+
+      <!-- Colonne gauche -->
+      <div class="field-group">
+
+        <div class="field-row">
+          <label>Nom de la prestation <span class="required-star">*</span></label>
+          <input type="text" name="nom" class="field-ul" placeholder="Nom de la prestation…"
+            value="{% if article %}{{ article.nom }}{% endif %}" required>
+        </div>
+
+        <div class="field-row">
+          <label>Référence interne</label>
+          <div class="ref-split-row" id="ref-split-row">
+            <span class="ref-prefix-badge" id="ref-prefix-badge"></span>
+            <input type="text" id="ref-suffix-input" class="ref-suffix-input" placeholder="Référence interne…">
+            <input type="hidden" name="reference_interne" id="ref-hidden"
+              value="{% if article %}{{ article.reference_interne }}{% endif %}">
           </div>
         </div>
-        <div>
-          <div class="f-field">
-            <label class="field-label">Fréquence</label>
-            <input type="text" name="frequence" class="field-ul" placeholder="ex : 3 fois / jour"
-              value="{% if article %}{{ article.frequence }}{% endif %}">
-          </div>
-          <div class="f-field">
-            <label class="field-label">Composant actif</label>
-            <input type="text" name="composant_actif" class="field-ul"
-              value="{% if article %}{{ article.composant_actif }}{% endif %}">
-          </div>
-          <div class="f-field">
-            <label class="field-label">Effet thérapeutique</label>
-            <input type="text" name="effet_therapeutique" class="field-ul"
-              value="{% if article %}{{ article.effet_therapeutique }}{% endif %}">
-          </div>
-          <div class="f-field">
-            <label class="field-label">Effets indésirables</label>
-            <input type="text" name="effets_indesirables" class="field-ul"
-              value="{% if article %}{{ article.effets_indesirables }}{% endif %}">
-          </div>
-        </div>
+
       </div>
 
-      <span class="art-section-title">Détails sur le fabricant (compagnie pharmaceutique)</span>
-      <div class="f-two-col">
-        <div>
-          <div class="f-field">
-            <label class="field-label">Compagnie pharmaceutique</label>
-            <select name="compagnie_pharmaceutique" class="field-ul">
-              <option value="">—</option>
-              {% for cp in compagnies %}
-              <option value="{{ cp.pk }}" {% if article and article.compagnie_pharmaceutique_id == cp.pk %}selected{% endif %}>{{ cp.nom }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="f-field">
-            <label class="field-label">Nom du produit</label>
-            <input type="text" name="nom_produit_fabricant" class="field-ul"
-              value="{% if article %}{{ article.nom_produit_fabricant }}{% endif %}">
-          </div>
-        </div>
-        <div>
-          <div class="f-field">
-            <label class="field-label">Code produit</label>
-            <input type="text" name="code_produit" class="field-ul"
-              value="{% if article %}{{ article.code_produit }}{% endif %}">
-          </div>
-          <div class="f-field">
-            <label class="field-label">URL du produit</label>
-            <input type="url" name="url_produit" class="field-ul"
-              value="{% if article %}{{ article.url_produit }}{% endif %}">
-          </div>
-        </div>
-      </div>
+      <!-- Colonne droite -->
+      <div class="field-group">
 
-      <span class="art-section-title">Grossesse</span>
-      <div class="f-two-col" style="margin-bottom:16px;">
-        <div class="f-field">
-          <label class="art-cb-row">
-            <input type="checkbox" name="avertissement_grossesse"
-              {% if article and article.avertissement_grossesse %}checked{% endif %}>
-            Avertissement de grossesse
-          </label>
-        </div>
-        <div class="f-field">
-          <label class="art-cb-row">
-            <input type="checkbox" name="avertissement_lactation"
-              {% if article and article.avertissement_lactation %}checked{% endif %}>
-            Avertissement de lactation
-          </label>
-        </div>
-      </div>
-      <div class="f-field">
-        <label class="field-label">Indications</label>
-        <textarea name="indications" class="field-ul">{% if article %}{{ article.indications }}{% endif %}</textarea>
-      </div>
-      <div class="f-field" style="margin-top:14px;">
-        <label class="field-label">Remarques</label>
-        <textarea name="remarques" class="field-ul">{% if article %}{{ article.remarques }}{% endif %}</textarea>
-      </div>
-    </div> -->
-
-    <!-- ═══ ONGLET 2 : Information Générale ═══ -->
-    <div class="art-tab-panel active" id="tab-info">
-      <div class="f-two-col">
         <div>
-          <div class="f-field">
-            <label class="field-label">Type de prestation</label>
-            <select name="type_article" class="field-ul">
-              <option value="">— Choisir —</option>
-              {% for val, label in type_article_choices %}
-              <option value="{{ val }}"
-                {% if article and article.type_article == val %}selected{% endif %}>
-                {{ label }}
-              </option>
-              {% endfor %}
-            </select>
-          </div>
-          <!-- <div class="f-field">
-            <label class="field-label">Type de produit hospitalier</label>
-            <select name="type_produit_hospitalier" class="field-ul">
-              <option value="">—</option>
-              {% for val, label in type_produit_choices %}
-              <option value="{{ val }}" {% if article and article.type_produit_hospitalier == val %}selected{% endif %}>{{ label }}</option>
-              {% endfor %}
-            </select>
-          </div> -->
-          <!-- <div class="f-field">
-            <label class="field-label">Politique de facturation</label>
-            <select name="politique_facturation" class="field-ul">
-              {% for val, label in politique_fact_choices %}
-              <option value="{{ val }}" {% if article and article.politique_facturation == val %}selected{% endif %}>{{ label }}</option>
-              {% endfor %}
-            </select>
-          </div> -->
-          <!-- <div class="f-field">
-            <label class="field-label">Re-facturer les dépenses</label>
-            <div class="art-radio-group">
-              {% for val, label in refacturer_choices %}
-              <label class="art-radio-label">
-                <input type="radio" name="refacturer_depenses" value="{{ val }}"
-                  {% if article and article.refacturer_depenses == val %}checked{% elif not article and val == 'non' %}checked{% endif %}>
-                {{ label }}
-              </label>
-              {% endfor %}
-            </div>
-          </div> -->
-          <!-- <p class="art-note">Les consommables sont des produits physiques dont vous ne gérez pas le niveau de stock : ils sont toujours disponibles.</p> -->
-          <div class="f-field">
-            <label class="field-label">Unité de mesure</label>
-            <select name="unite_mesure" class="field-ul">
-              <option value="">—</option>
-              {% for um in unites_mesure %}
-              <option value="{{ um.pk }}" {% if article and article.unite_mesure_id == um.pk %}selected{% endif %}>{{ um.nom }} ({{ um.code }})</option>
-              {% endfor %}
-            </select>
-          </div>
-          <!-- <div class="f-field">
-            <label class="field-label">Unité d'achat</label>
-            <select name="unite_achat" class="field-ul">
-              <option value="">—</option>
-              {% for um in unites_mesure %}
-              <option value="{{ um.pk }}" {% if article and article.unite_achat_id == um.pk %}selected{% endif %}>{{ um.nom }} ({{ um.code }})</option>
-              {% endfor %}
-            </select>
-          </div> -->
-        </div>
-        <div>
-          <div class="f-field">
-            <label class="field-label">Prix de vente (CFA)</label>
-            <div class="art-prix-inline">
-              <input type="number" name="prix_vente" class="field-ul" min="0" step="1"
-                value="{% if article %}{{ article.prix_vente }}{% else %}0{% endif %}">
-              <span class="art-prix-unit">CFA</span>
-            </div>
-          </div>
-          <!-- <div class="f-field">
-            <label class="field-label">Taxes à la vente</label>
-            <input type="text" name="taxes_vente" class="field-ul"
-              value="{% if article %}{{ article.taxes_vente }}{% endif %}">
-          </div> -->
-          <!-- <div class="f-field">
-            <label class="field-label">Coût</label>
-            <input type="number" name="cout" class="field-ul" min="0" step="1"
-              value="{% if article %}{{ article.cout }}{% else %}0{% endif %}">
-          </div> -->
-          <div class="f-field">
-            <label class="field-label">Catégorie de prestation <span class="f-required">*</span></label>
-            <select name="categorie" id="categorie-select" class="field-ul" required
-              data-catcodes="{{ cat_codes_json }}">
+          <div class="field-row">
+            <label>Catégorie de prestation <span class="required-star">*</span></label>
+            <select name="categorie" id="categorie-select" class="field-ul" required data-catcodes="{{ cat_codes_json }}">
               <option value="">— Choisir une catégorie —</option>
               {% for cat in categories %}
               <option value="{{ cat.pk }}" {% if article and article.categorie_id == cat.pk %}selected{% endif %}>{{ cat.nom }}</option>
               {% endfor %}
             </select>
           </div>
-          <!-- <div class="f-field f-field--readonly">
-            <label class="field-label">Référence interne</label>
-            <input type="text" class="field-ul"
-              value="{% if article %}{{ article.reference_interne }}{% endif %}" disabled tabindex="-1">
-          </div> -->
-          <!-- <div class="f-field">
-            <label class="field-label">Code-barres</label>
-            <input type="text" name="code_barres" class="field-ul"
-              value="{% if article %}{{ article.code_barres }}{% endif %}">
-          </div> -->
-          <!-- <div class="f-field">
-            <label class="field-label">Famille</label>
-            <select name="famille" class="field-ul">
-              <option value="">—</option>
-              {% for fam in familles %}
-              <option value="{{ fam.pk }}" {% if article and article.famille_id == fam.pk %}selected{% endif %}>{{ fam.nom }}</option>
+          <div class="field-row">
+            <label>Département</label>
+            <select name="departement" id="departement-select" class="field-ul">
+              <option value="">— Aucun département —</option>
+              {% for dept in departements %}
+              <option value="{{ dept.pk }}" {% if article and article.departement_id == dept.pk %}selected{% endif %}>{{ dept.nom }}</option>
               {% endfor %}
             </select>
-          </div> -->
+          </div>
         </div>
+
       </div>
-      <!-- ── Section stock (visible uniquement pour Consommable / Stockable) ── -->
-      <div class="art-stock-section" id="art-stock-section">
-        <div class="art-stock-divider">
-          <i class="bi bi-archive"></i>
-          Gestion du stock
-        </div>
-        <div class="f-two-col">
-          <div>
-            <div class="f-field">
-              <label class="field-label">Prix d'achat (CFA)</label>
-              <div class="art-prix-inline">
-                <input type="number" name="cout" class="field-ul" min="0" step="1"
-                  value="{% if article %}{{ article.cout }}{% else %}0{% endif %}">
-                <span class="art-prix-unit">CFA</span>
+
+    </div><!-- /.form-main-grid -->
+
+    <!-- ══════════════ ONGLETS ══════════════ -->
+    <div class="f-layout">
+      <div class="f-main">
+        <div class="f-tabs-wrap">
+          <div class="f-tabs">
+            <button type="button" class="f-tab active" data-tab="tab-info">Information Générale</button>
+          </div>
+
+          <div class="f-tab-panel active" id="tab-info">
+            <div class="f-tab-grid">
+              <div class="field-group">
+                <div class="field-row">
+                  <label>Type de prestation</label>
+                  <select name="type_article" class="field-ul">
+                    <option value="">— Choisir —</option>
+                    {% for val, label in type_article_choices %}
+                    <option value="{{ val }}" {% if article and article.type_article == val %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="field-row">
+                  <label>Unité de mesure</label>
+                  <select name="unite_mesure" class="field-ul">
+                    <option value="">—</option>
+                    {% for um in unites_mesure %}
+                    <option value="{{ um.pk }}" {% if article and article.unite_mesure_id == um.pk %}selected{% endif %}>{{ um.nom }} ({{ um.code }})</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="field-row">
+                  <label>Type de produit hospitalier</label>
+                  <select name="type_produit_hospitalier" class="field-ul">
+                    <option value="">— Choisir —</option>
+                    {% for val, label in type_produit_choices %}
+                    <option value="{{ val }}" {% if article and article.type_produit_hospitalier == val %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+              </div>
+              <div class="field-group">
+                <div class="field-row">
+                  <label>Prix de vente (CFA)</label>
+                  <input type="number" name="prix_vente" class="field-ul" min="0" step="1"
+                    value="{% if article %}{{ article.prix_vente }}{% else %}0{% endif %}">
+                </div>
+                <div class="field-row align-top">
+                  <label>Options</label>
+                  <div style="display:flex;flex-direction:column;gap:6px;padding-top:2px;">
+                    <div class="f-tab-check-row">
+                      <input type="checkbox" name="peut_etre_vendu" id="cb-vendu" class="f-check"
+                        {% if not article or article.peut_etre_vendu %}checked{% endif %}>
+                      <label for="cb-vendu" style="font-size:12.5px;font-weight:400;cursor:pointer;">Peut être vendu</label>
+                    </div>
+                    <div class="f-tab-check-row">
+                      <input type="checkbox" name="peut_etre_achete" id="cb-achete" class="f-check"
+                        {% if not article or article.peut_etre_achete %}checked{% endif %}>
+                      <label for="cb-achete" style="font-size:12.5px;font-weight:400;cursor:pointer;">Peut être acheté</label>
+                    </div>
+                    <div class="f-tab-check-row">
+                      <input type="checkbox" name="actif" id="cb-actif" class="f-check"
+                        {% if not article or article.actif %}checked{% endif %}>
+                      <label for="cb-actif" style="font-size:12.5px;font-weight:400;cursor:pointer;">Actif</label>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-            <div class="f-field">
-              <label class="field-label">Quantité en stock</label>
-              <input type="number" name="quantite_stock" class="field-ul" min="0" step="1"
-                value="{% if article %}{{ article.quantite_stock }}{% else %}0{% endif %}">
-            </div>
-          </div>
-          <div>
-            <div class="f-field">
-              <label class="field-label">Quantité d'alerte
-                <span class="f-hint" style="display:inline;font-size:10px;text-transform:none;margin-left:4px;">(seuil minimum)</span>
-              </label>
-              <input type="number" name="quantite_alerte" class="field-ul" min="0" step="1"
-                value="{% if article %}{{ article.quantite_alerte }}{% else %}0{% endif %}">
-            </div>
-          </div>
-        </div>
-      </div>
 
-      <!-- <div class="f-field" style="margin-top:20px;">
-        <label class="field-label">Notes internes</label>
-        <textarea name="notes_internes" class="field-ul" style="min-height:80px;">{% if article %}{{ article.notes_internes }}{% endif %}</textarea>
-      </div> -->
-    </div>
-
-    <!-- ═══ ONGLET 3 : Attributs et Variantes ═══ -->
-    <!-- <div class="art-tab-panel" id="tab-variantes">
-      <table class="art-inline-table">
-        <thead>
-          <tr>
-            <th>Caractéristique</th>
-            <th>Valeurs</th>
-            <th width="36"></th>
-          </tr>
-        </thead>
-        <tbody id="variantes-body">
-          {% for v in lignes_variantes %}
-          <tr data-id="{{ v.pk }}">
-            <td>{{ v.caracteristique }}</td>
-            <td>{{ v.valeurs }}</td>
-            <td>
-              <button type="button" class="art-btn-del-line" onclick="deleteLigne('variante','{{ v.pk }}',this)">
-                <i class="bi bi-x"></i>
-              </button>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-      <button type="button" class="art-btn-add-line" onclick="showAddVariante()">
-        <i class="bi bi-plus"></i> Ajouter une ligne
-      </button>
-      <p class="art-variante-warn"><strong>Avertissement :</strong> l'ajout ou la suppression des attributs supprimeront et recréeront des variantes existantes.</p>
-    </div> -->
-
-    <!-- ═══ ONGLET 4 : Vente ═══ -->
-    <!-- <div class="art-tab-panel" id="tab-vente">
-      <span class="art-section-title">Ventes additionnelles et croisées</span>
-      <div class="f-field">
-        <label class="field-label">Description vente</label>
-        <textarea name="description_vente" class="field-ul" style="min-height:120px;">{% if article %}{{ article.description_vente }}{% endif %}</textarea>
-      </div>
-    </div> -->
-
-    <!-- ═══ ONGLET 5 : Achats ═══ -->
-    <!-- <div class="art-tab-panel" id="tab-achats">
-      <table class="art-inline-table" style="margin-bottom:6px;">
-        <thead>
-          <tr>
-            <th>Fournisseur</th>
-            <th>Nom article fourn.</th>
-            <th>Référence fourn.</th>
-            <th>Date début</th>
-            <th>Date fin</th>
-            <th>Quantité</th>
-            <th>Unité</th>
-            <th>Prix</th>
-            <th>Délai (j)</th>
-            <th width="36"></th>
-          </tr>
-        </thead>
-        <tbody id="fournisseurs-body">
-          {% for lf in lignes_fournisseurs %}
-          <tr data-id="{{ lf.pk }}">
-            <td>{{ lf.fournisseur.nom }}</td>
-            <td>{{ lf.nom_article_fournisseur|default:"—" }}</td>
-            <td>{{ lf.reference_fournisseur|default:"—" }}</td>
-            <td>{{ lf.date_debut|default:"—" }}</td>
-            <td>{{ lf.date_fin|default:"—" }}</td>
-            <td>{{ lf.quantite_min }}</td>
-            <td>{{ lf.unite_mesure.nom|default:"—" }}</td>
-            <td>{{ lf.prix|floatformat:0 }}</td>
-            <td>{{ lf.delai_livraison }}</td>
-            <td>
-              <button type="button" class="art-btn-del-line" onclick="deleteLigne('fournisseur','{{ lf.pk }}',this)">
-                <i class="bi bi-x"></i>
-              </button>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-      <button type="button" class="art-btn-add-line" onclick="showAddFournisseur()">
-        <i class="bi bi-plus"></i> Ajouter une ligne
-      </button>
-
-      <span class="art-section-title" style="margin-top:20px;">Factures fournisseurs</span>
-      <div class="f-two-col">
-        <div>
-          <div class="f-field">
-            <label class="field-label">Taxes fournisseur</label>
-            <input type="text" name="taxes_fournisseur" class="field-ul" placeholder="ex : TVA 18%"
-              value="{% if article %}{{ article.taxes_fournisseur }}{% endif %}">
-          </div>
-          <div class="f-field">
-            <label class="field-label">Politique de contrôle</label>
-            <div class="art-radio-group">
-              {% for val, label in politique_controle_choices %}
-              <label class="art-radio-label">
-                <input type="radio" name="politique_controle" value="{{ val }}"
-                  {% if article and article.politique_controle == val %}checked{% elif not article and val == 'qtes_recues' %}checked{% endif %}>
-                {{ label }}
-              </label>
-              {% endfor %}
+            <div class="art-stock-section" id="art-stock-section">
+              <div class="f-tab-section-title">Gestion du stock</div>
+              <div class="f-tab-grid">
+                <div class="field-group">
+                  <div class="field-row">
+                    <label>Prix d'achat (CFA)</label>
+                    <input type="number" name="cout" class="field-ul" min="0" step="1"
+                      value="{% if article %}{{ article.cout }}{% else %}0{% endif %}">
+                  </div>
+                  <div class="field-row">
+                    <label>Quantité en stock</label>
+                    <input type="number" name="quantite_stock" class="field-ul" min="0" step="1"
+                      value="{% if article %}{{ article.quantite_stock }}{% else %}0{% endif %}">
+                  </div>
+                </div>
+                <div class="field-group">
+                  <div class="field-row">
+                    <label>Quantité d'alerte (seuil minimum)</label>
+                    <input type="number" name="quantite_alerte" class="field-ul" min="0" step="1"
+                      value="{% if article %}{{ article.quantite_alerte }}{% else %}0{% endif %}">
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-        <div></div>
-      </div>
-      <div class="f-field" style="margin-top:14px;">
-        <label class="field-label">Description achat</label>
-        <textarea name="description_achat" class="field-ul" style="min-height:80px;">{% if article %}{{ article.description_achat }}{% endif %}</textarea>
-      </div>
-    </div> -->
+      </div><!-- /f-main -->
 
-    <!-- ═══ ONGLET 6 : Stock ═══ -->
-    <!-- <div class="art-tab-panel" id="tab-stock">
-      <div class="f-two-col" style="margin-bottom:20px;">
-        <div>
-          <span class="art-section-title">Opérations</span>
-          <div class="f-field">
-            <label class="field-label" style="margin-bottom:8px;">Routes</label>
-            <label class="art-cb-row">
-              <input type="checkbox" checked disabled>
-              Acheter
-            </label>
-          </div>
-        </div>
-        <div>
-          <span class="art-section-title">Logistique</span>
-          <div class="f-field">
-            <label class="field-label">Responsable</label>
-            <select name="responsable" class="field-ul">
-              <option value="">—</option>
-              {% for u in users %}
-              <option value="{{ u.pk }}" {% if article and article.responsable_id == u.pk %}selected{% endif %}>
-                {{ u.get_full_name|default:u.username }}
-              </option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="f-field">
-            <label class="field-label">Poids</label>
-            <input type="number" name="poids" class="field-ul" min="0" step="0.001"
-              value="{% if article %}{{ article.poids }}{% else %}0{% endif %}">
-          </div>
-          <div class="f-field">
-            <label class="field-label">Volume</label>
-            <input type="number" name="volume" class="field-ul" min="0" step="0.001"
-              value="{% if article %}{{ article.volume }}{% else %}0{% endif %}">
-          </div>
-          <div class="f-field">
-            <label class="field-label">Délai de livraison au client</label>
-            <div class="art-prix-inline">
-              <input type="number" name="delai_livraison_client" class="field-ul" min="0" step="0.1"
-                value="{% if article %}{{ article.delai_livraison_client }}{% else %}0{% endif %}">
-              <span class="art-prix-unit">jours</span>
-            </div>
-          </div>
-        </div>
-      </div>
+      {% load core_tags %}{% historique_sidebar article %}
 
-      <span class="art-section-title">Conditionnement</span>
-      <table class="art-inline-table" style="margin-bottom:6px;">
-        <thead>
-          <tr>
-            <th>Conditionnement</th>
-            <th>Quantité contenue</th>
-            <th>Unité de mesure</th>
-            <th>Ventes</th>
-            <th>Achats</th>
-            <th width="36"></th>
-          </tr>
-        </thead>
-        <tbody id="conditionnements-body">
-          {% for c in lignes_conditionnements %}
-          <tr data-id="{{ c.pk }}">
-            <td>{{ c.conditionnement }}</td>
-            <td>{{ c.quantite }}</td>
-            <td>{{ c.unite_mesure.nom|default:"—" }}</td>
-            <td>{% if c.pour_vente %}✓{% endif %}</td>
-            <td>{% if c.pour_achat %}✓{% endif %}</td>
-            <td>
-              <button type="button" class="art-btn-del-line" onclick="deleteLigne('conditionnement','{{ c.pk }}',this)">
-                <i class="bi bi-x"></i>
-              </button>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-      <button type="button" class="art-btn-add-line" onclick="showAddConditionnement()">
-        <i class="bi bi-plus"></i> Ajouter une ligne
-      </button>
+    </div><!-- /f-layout -->
 
-      <div class="f-two-col" style="margin-top:20px;">
-        <div class="f-field">
-          <label class="field-label">Description pour les réceptions</label>
-          <textarea name="description_reception" class="field-ul">{% if article %}{{ article.description_reception }}{% endif %}</textarea>
-        </div>
-        <div class="f-field">
-          <label class="field-label">Description pour les bons de livraison</label>
-          <textarea name="description_livraison" class="field-ul">{% if article %}{{ article.description_livraison }}{% endif %}</textarea>
-        </div>
-      </div>
-      <div class="f-field" style="margin-top:14px;">
-        <label class="field-label">Description pour les transferts internes</label>
-        <textarea name="description_transfert" class="field-ul">{% if article %}{{ article.description_transfert }}{% endif %}</textarea>
-      </div>
-    </div> -->
-
-    <!-- ═══ ONGLET 7 : Comptabilité ═══ -->
-    <!-- <div class="art-tab-panel" id="tab-compta">
-      <div class="f-two-col">
-        <div>
-          <span class="art-section-title">Créances</span>
-          <div class="f-field">
-            <label class="field-label">Compte de revenus</label>
-            <input type="text" name="compte_revenus" class="field-ul" placeholder="ex : 706000"
-              value="{% if article %}{{ article.compte_revenus }}{% endif %}">
-          </div>
-        </div>
-        <div>
-          <span class="art-section-title">Dettes</span>
-          <div class="f-field">
-            <label class="field-label">Compte de charges</label>
-            <input type="text" name="compte_charges" class="field-ul" placeholder="ex : 600000"
-              value="{% if article %}{{ article.compte_charges }}{% endif %}">
-          </div>
-          <div class="f-field">
-            <label class="field-label">Compte d'écart de prix</label>
-            <input type="text" name="compte_ecart_prix" class="field-ul" placeholder="ex : 603000"
-              value="{% if article %}{{ article.compte_ecart_prix }}{% endif %}">
-          </div>
-        </div>
-      </div>
-    </div> -->
-
-  </div><!-- /art-tabs -->
-
-  <!-- ── PIED DE FORMULAIRE ── -->
-  <div class="art-form-footer">
-    <button type="submit" class="o-btn-create">
-      <i class="bi bi-check-lg"></i>
-      {% if is_new %}Créer{% else %}Enregistrer{% endif %}
-    </button>
-    {% if is_new %}
-    <a href="{% url 'services:list' %}" class="o-btn-secondary">Annuler</a>
-    {% else %}
-    <a href="{% url 'services:detail' article.pk %}" class="o-btn-secondary">Annuler</a>
-    {% endif %}
-  </div>
+  </div><!-- /.form-body -->
 
 </form>
-
-</div><!-- /.f-page-body -->
 
 <!-- ── MODAL GLOBAL ── -->
 <div id="modal-overlay" class="modal-overlay">
@@ -667,7 +230,6 @@
   </div>
 </div>
 
-</div><!-- /#page-wrap -->
 {% endblock %}
 
 {% block extra_js %}
@@ -676,43 +238,46 @@ const ARTICLE_ID = "{% if article %}{{ article.pk }}{% else %}{% endif %}";
 const CSRF = "{{ csrf_token }}";
 
 /* ── Onglets ── */
-document.querySelectorAll('.art-tab-btn').forEach(function(btn) {
+document.querySelectorAll('.f-tab').forEach(function(btn) {
   btn.addEventListener('click', function() {
-    document.querySelectorAll('.art-tab-btn').forEach(function(b) { b.classList.remove('active'); });
-    document.querySelectorAll('.art-tab-panel').forEach(function(p) { p.classList.remove('active'); });
+    document.querySelectorAll('.f-tab').forEach(function(b) { b.classList.remove('active'); });
+    document.querySelectorAll('.f-tab-panel').forEach(function(p) { p.classList.remove('active'); });
     btn.classList.add('active');
     document.getElementById(btn.dataset.tab).classList.add('active');
   });
 });
 
-/* ── Favori ── */
-var favoriBtn = document.getElementById('favori-btn');
-var favoriInput = document.getElementById('favori-input');
-if (favoriBtn) {
-  favoriBtn.addEventListener('click', function() {
-    favoriBtn.classList.toggle('active');
-    favoriInput.value = favoriBtn.classList.contains('active') ? 'on' : '';
-  });
-}
+/* ── Alignement du panneau de contrôle sous la barre de menu ──
+   Même méthode que templates/employer/base.html (canonique) : on mesure
+   l'écart réel entre .content et .topbar (pas .control-panel), et on
+   corrige --header-h de cet écart exact. --topbar-h reste à 0px, le
+   panneau de contrôle n'a besoin d'aucun offset sticky supplémentaire
+   une fois que .content démarre pile sous la topbar. */
+(function () {
+  document.documentElement.style.setProperty('--topbar-h', '0px');
 
-/* ── Aperçu photo ── */
-var photoInput = document.getElementById('photo-input');
-if (photoInput) {
-  photoInput.addEventListener('change', function() {
-    var file = this.files[0];
-    if (!file) return;
-    var reader = new FileReader();
-    reader.onload = function(e) {
-      var placeholder = document.getElementById('photo-placeholder');
-      var preview = document.getElementById('photo-preview');
-      var overlay = document.getElementById('photo-overlay');
-      if (placeholder) placeholder.style.display = 'none';
-      if (preview) { preview.src = e.target.result; preview.style.display = 'block'; }
-      if (overlay) overlay.style.display = 'flex';
-    };
-    reader.readAsDataURL(file);
-  });
-}
+  function alignSousTopbar() {
+    var topbar = document.querySelector('.topbar');
+    var content = document.querySelector('.content');
+    if (!topbar || !content) return;
+    var tbH = Math.ceil(topbar.getBoundingClientRect().height);
+    if (tbH <= 0) return;
+    document.documentElement.style.setProperty('--header-h', tbH + 'px');
+    requestAnimationFrame(function () {
+      var gap = Math.round(content.getBoundingClientRect().top - topbar.getBoundingClientRect().bottom);
+      document.documentElement.style.setProperty('--header-h', (tbH - gap) + 'px');
+    });
+  }
+  if (document.readyState !== 'loading') {
+    alignSousTopbar();
+  } else {
+    document.addEventListener('DOMContentLoaded', alignSousTopbar);
+  }
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(alignSousTopbar);
+  }
+  window.addEventListener('resize', alignSousTopbar);
+})();
 
 /* ── Section stock (consommable / stockable) ── */
 (function() {
@@ -753,6 +318,12 @@ if (photoInput) {
     hiddenRef.value = prefix + suffixInput.value;
   }
 
+  suffixInput.addEventListener('input', function() {
+    var pos = this.selectionStart;
+    this.value = this.value.toUpperCase();
+    this.setSelectionRange(pos, pos);
+  });
+
   function applyPrefix(pk) {
     var prefix = getPrefix(pk);
     if (prefix) {
@@ -785,12 +356,12 @@ if (photoInput) {
   document.getElementById('article-form').addEventListener('submit', function(e) {
     if (!catSelect.value) {
       e.preventDefault();
-      catSelect.closest('.f-field').classList.add('f-field--error');
-      catSelect.closest('.f-field').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      catSelect.closest('.field-row').classList.add('field-row--error');
+      catSelect.closest('.field-row').scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   });
   catSelect.addEventListener('change', function() {
-    if (this.value) catSelect.closest('.f-field').classList.remove('f-field--error');
+    if (this.value) catSelect.closest('.field-row').classList.remove('field-row--error');
   });
 })();
 
@@ -807,7 +378,7 @@ document.getElementById('modal-overlay').addEventListener('click', function(e) {
 });
 
 function modalInputStyle() {
-  return 'width:100%;padding:7px 2px;border:none;border-bottom:1.5px solid var(--border);background:transparent;font-size:13px;color:var(--text);outline:none;font-family:Roboto,sans-serif;margin-top:3px;';
+  return 'width:100%;padding:7px 2px;border:none;border-bottom:1.5px solid var(--border);background:transparent;font-size:13px;color:var(--text);outline:none;font-family:var(--font-roboto);margin-top:3px;';
 }
 function modalLabel(txt) {
   return '<label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">' + txt + '</label>';

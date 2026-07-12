@@ -1,0 +1,117 @@
+{% extends 'achats/base.html' %}
+{% load i18n %}
+
+{% block title %}Proformas{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+.content { padding:0; }
+.pf-page { display:flex; flex-direction:column; height:calc(100vh - var(--topbar-h) - 44px); overflow:hidden; }
+.pf-head { display:flex; align-items:center; justify-content:space-between; padding:14px 28px 10px; background:#fff; border-bottom:1px solid rgba(0,0,0,.07); flex-shrink:0; }
+.pf-head h1 { font-size:16px; font-weight:700; color:var(--teal-800); margin:0; }
+.pf-kpis { display:flex; gap:10px; padding:10px 28px; background:#f8fafb; border-bottom:1px solid rgba(0,0,0,.06); flex-shrink:0; }
+.pf-kpi { padding:7px 16px; background:#fff; border-radius:8px; border:1px solid rgba(0,0,0,.08); font-size:13px; cursor:pointer; text-decoration:none; color:rgba(0,0,0,.7); display:flex; align-items:center; gap:8px; }
+.pf-kpi .val { font-weight:800; color:var(--teal-700); }
+.pf-filters { display:flex; align-items:center; gap:10px; padding:10px 28px; background:#fff; border-bottom:1px solid rgba(0,0,0,.07); flex-shrink:0; }
+.pf-body { flex:1; overflow:auto; min-height:0; }
+.pf-table { width:100%; border-collapse:collapse; font-size:13px; }
+.pf-table th { padding:10px 14px; font-size:11px; font-weight:700; color:#888; text-transform:uppercase; background:#fafafa; border-bottom:2px solid rgba(0,0,0,.08); position:sticky; top:0; }
+.pf-table td { padding:10px 14px; border-bottom:1px solid rgba(0,0,0,.05); vertical-align:middle; }
+.pf-table tr:hover td { background:#f8fafb; }
+.badge { display:inline-block; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:600; }
+.s-en_attente { background:#fef3c7; color:#92400e; }
+.s-valide { background:#c0d8e8; color:var(--teal-700); }
+.s-rejete { background:#fee2e2; color:#991b1b; }
+.kpi-c-attente { color:#92400e; }
+.kpi-c-valide { color:var(--teal-700); }
+.kpi-c-rejete { color:#991b1b; }
+
+/* ── Mode sombre ── */
+html[data-theme="dark"] .kpi-c-attente { color:#fcd34d; }
+html[data-theme="dark"] .kpi-c-valide { color:#7dd3fc; }
+html[data-theme="dark"] .kpi-c-rejete { color:#fca5a5; }
+html[data-theme="dark"] .pf-head { background:var(--surface); border-bottom-color:var(--border); }
+html[data-theme="dark"] .pf-head h1 { color:var(--text-strong); }
+html[data-theme="dark"] .pf-kpis { background:var(--surface-muted); border-bottom-color:var(--border); }
+html[data-theme="dark"] .pf-kpi { background:var(--surface); border-color:var(--border); color:var(--text); }
+html[data-theme="dark"] .pf-filters { background:var(--surface); border-bottom-color:var(--border); }
+html[data-theme="dark"] .pf-table th { background:var(--surface-muted); color:var(--text-faint); border-bottom-color:var(--border); }
+html[data-theme="dark"] .pf-table td { border-bottom-color:var(--border); color:var(--text); }
+html[data-theme="dark"] .pf-table tr:hover td { background:var(--surface-muted); }
+html[data-theme="dark"] .s-en_attente { background:rgba(146,64,14,.3); color:#fcd34d; }
+html[data-theme="dark"] .s-valide { background:rgba(var(--teal-700-rgb),.4); color:#7dd3fc; }
+html[data-theme="dark"] .s-rejete { background:rgba(153,27,27,.3); color:#fca5a5; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pf-page">
+  <div class="pf-head">
+    <a href="{% url 'achats:dashboard' %}" class="o-ctrl-btn" style="padding:3px 7px;"><i class="bi bi-arrow-left"></i></a>
+    <span style="font-size:13px;color:var(--text-muted);">
+      <a href="{% url 'achats:dashboard' %}" style="color:var(--teal-700);text-decoration:none;font-weight:500;">Achats</a>
+      <span style="margin:0 5px;opacity:.4;">/</span>
+      <span style="color:var(--text);font-weight:500;">Proformas</span>
+    </span>
+  </div>
+
+  <div class="pf-kpis">
+    <a href="?" class="pf-kpi"><span class="val">{{ stats.total }}</span> Total</a>
+    <a href="?statut=en_attente" class="pf-kpi"><span class="val kpi-c-attente">{{ stats.en_attente }}</span> En attente</a>
+    <a href="?statut=valide" class="pf-kpi"><span class="val kpi-c-valide">{{ stats.valide }}</span> Validés</a>
+    <a href="?statut=rejete" class="pf-kpi"><span class="val kpi-c-rejete">{{ stats.rejete }}</span> Rejetés</a>
+  </div>
+
+  <div class="pf-filters">
+    <form method="get" style="display:flex;gap:10px;align-items:center;">
+      <input type="search" name="q" value="{{ q }}" placeholder="Rechercher (n°, fournisseur…)" style="height:34px;border:1px solid #d1d5db;border-radius:6px;padding:0 12px;font-size:13px;width:280px;">
+      <select name="statut" onchange="this.form.submit()" style="height:34px;border:1px solid #d1d5db;border-radius:6px;padding:0 10px;font-size:13px;">
+        <option value="">Tous les statuts</option>
+        {% for val, label in statut_choices %}
+        <option value="{{ val }}" {% if statut == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" style="padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;cursor:pointer;"><i class="bi bi-search"></i></button>
+      {% if q or statut %}<a href="{% url 'achats:proformas_list' %}" style="font-size:13px;color:var(--text-muted);">Effacer</a>{% endif %}
+    </form>
+  </div>
+
+  <div class="pf-body">
+    {% if proformas %}
+    <table class="pf-table">
+      <thead>
+        <tr><th>N°</th><th>Besoin</th><th>Fournisseur</th><th>Montant</th><th>Statut</th><th>Réception doc.</th><th>Soumis par</th><th></th></tr>
+      </thead>
+      <tbody>
+      {% for p in proformas %}
+      <tr>
+        <td style="font-weight:700;color:var(--teal-700);">
+          <a href="{% url 'achats:proforma_detail' p.pk %}" style="color:inherit;text-decoration:none;">{{ p.numero }}</a>
+        </td>
+        <td>
+          <a href="{% url 'achats:besoin_detail' p.besoin.pk %}" style="color:var(--text-muted);text-decoration:none;font-size:12px;">
+            {{ p.besoin.numero }} — {{ p.besoin.titre|truncatechars:30 }}
+          </a>
+        </td>
+        <td style="font-weight:500;">{{ p.fournisseur.nom }}</td>
+        <td style="white-space:nowrap;font-weight:600;">{{ p.montant_total|floatformat:0 }} FCFA</td>
+        <td><span class="badge s-{{ p.statut }}">{{ p.get_statut_display }}</span></td>
+        <td>{{ p.date_reception }}</td>
+        <td style="color:var(--text-muted);">{{ p.soumis_par.get_full_name|default:p.soumis_par.username|default:"—" }}</td>
+        <td>
+          <a href="{% url 'achats:proforma_detail' p.pk %}" style="color:var(--teal-600);font-size:13px;"><i class="bi bi-eye"></i></a>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="padding:48px;text-align:center;color:var(--text-faint);">
+      <i class="bi bi-file-earmark-text" style="font-size:36px;display:block;margin-bottom:12px;"></i>
+      Aucun proforma trouvé.
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

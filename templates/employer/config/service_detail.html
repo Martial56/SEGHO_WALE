@@ -1,0 +1,184 @@
+{% extends 'employer/base.html' %}
+{% block topbar_title %}{{ obj.nom }}{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+  .control-panel {
+    background: #fff;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    position: sticky;
+    top: 0;
+    z-index: 190;
+  }
+  .cp-top { display: flex; align-items: center; justify-content: space-between; padding: 6px 16px; gap: 12px; }
+  .cp-save-group { display: flex; gap: 8px; align-items: center; }
+  .btn-save {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: var(--rh-500); color: #fff; border: none;
+    border-radius: var(--radius-xs, 4px); padding: 6px 14px;
+    font-size: 12.5px; font-weight: 600; cursor: pointer;
+    font-family: var(--font-roboto); text-decoration: none;
+    transition: background 0.15s; white-space: nowrap; flex-shrink: 0;
+  }
+  .btn-save:hover { background: var(--rh-600); color: #fff; }
+  html[data-theme="dark"] .control-panel { background: var(--surface); }
+
+  .form-body { background: #fff; margin: 16px 0 0; padding: 24px 28px; border-radius: 8px; }
+  html[data-theme="dark"] .form-body { background: var(--surface); }
+
+  .form-main-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px 48px; padding-bottom: 28px; border-bottom: 1px solid rgba(0, 0, 0, 0.07); }
+  @media (max-width: 900px) { .form-main-grid { grid-template-columns: 1fr; gap: 0; } }
+  .field-group { display: flex; flex-direction: column; gap: 16px; }
+  .field-row { display: grid; grid-template-columns: 170px 1fr; align-items: center; gap: 12px; min-height: 34px; }
+  .field-row label { font-size: 13px; font-weight: 600; color: rgba(0, 0, 0, 0.55); text-align: left; }
+  html[data-theme="dark"] .field-row label { color: var(--text-muted); }
+  @media (max-width: 600px) { .field-row { grid-template-columns: 1fr; } .field-row label { text-align: left; } }
+
+  .field-static { display: flex; align-items: center; min-height: 34px; padding: 7px 2px; font-size: 13px; font-family: var(--font-roboto); color: var(--text); }
+  .field-static.muted { color: var(--text-muted); font-style: italic; }
+  .field-static a { color: var(--rh-500); text-decoration: none; font-weight: 600; }
+  .field-static a:hover { text-decoration: underline; }
+
+  .det-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 20px; }
+  .det-badge-actif   { background: #e3f9ee; color: #0d8a52; }
+  .det-badge-inactif { background: #fdf0f0; color: var(--rose-btn); }
+  html[data-theme="dark"] .det-badge-actif   { background: rgba(22,169,107,.2); color: #6eddb0; }
+  html[data-theme="dark"] .det-badge-inactif { background: rgba(var(--rose-rgb),.2);  color: #f09090; }
+
+  .f-layout { display: flex; align-items: flex-start; gap: 0; padding: 16px 0; }
+  @media (max-width: 900px) { .f-layout { flex-direction: column; } }
+  .f-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+  .f-tabs-wrap { background: #fff; border: 1px solid rgba(0, 0, 0, 0.08); border-radius: 4px; overflow: hidden; }
+  html[data-theme="dark"] .f-tabs-wrap { background: var(--surface); border-color: var(--border); }
+  .f-tab-panel { padding: 20px; }
+  .f-tab-section-title { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 12px; }
+
+  .o-list-table { width: 100%; border-collapse: collapse; background: var(--surface); }
+  .o-list-table th { padding: 8px 14px; text-align: left; font-size: 11px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border); background: var(--surface); white-space: nowrap; }
+  .o-list-table td { padding: 9px 14px; font-size: 13px; border-bottom: 1px solid #f0f0f0; color: var(--text); }
+  .o-list-table tr:last-child td { border-bottom: none; }
+  .o-list-table tbody tr:hover td { background: #f4f9fb; }
+  .o-list-table tbody tr { cursor: pointer; }
+  .badge-code { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+  .o-empty { text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: 13px; }
+  .o-empty i { font-size: 32px; display: block; margin-bottom: 8px; opacity: 0.4; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ══════════════ PANNEAU DE CONTRÔLE ══════════════ -->
+<div class="control-panel">
+  <div class="cp-top">
+    <a href="{% url 'employer_services' %}" class="o-ctrl-btn" style="padding:3px 7px;">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <span style="font-size:13.5px;color:var(--text-muted);">
+      <a href="{% url 'employer_services' %}" style="color:var(--rh-600);text-decoration:none;font-weight:500;">Services</a>
+      <span style="margin:0 5px;opacity:.4;">/</span>
+      <span style="color:var(--text);">{{ obj.nom|truncatechars:30 }}</span>
+    </span>
+    <div style="flex:1;"></div>
+    <div class="cp-save-group">
+      <a href="{% url 'employer_service_edit' obj.pk %}" class="btn-save"><i class="bi bi-pencil"></i> Modifier</a>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ CORPS ══════════════ -->
+<div class="form-body">
+
+  <div class="form-main-grid">
+
+    <div class="field-group">
+      <div class="field-row">
+        <label>Nom</label>
+        <div class="field-static">{{ obj.nom }}</div>
+      </div>
+      <div class="field-row">
+        <label>Code</label>
+        <div class="field-static" style="font-family:var(--font-mono);">{{ obj.code }}</div>
+      </div>
+    </div>
+
+    <div class="field-group">
+      <div class="field-row">
+        <label>Chef de service</label>
+        <div class="field-static {% if not obj.chef_service %}muted{% endif %}">{{ obj.chef_service|default:"—" }}</div>
+      </div>
+      <div class="field-row">
+        <label>Employés</label>
+        <div class="field-static">{{ employes|length }} employé{{ employes|length|pluralize }}</div>
+      </div>
+      <div class="field-row">
+        <label>Statut</label>
+        <div class="field-static">
+          {% if obj.actif %}
+          <span class="det-badge det-badge-actif"><i class="bi bi-check-circle-fill"></i> Actif</span>
+          {% else %}
+          <span class="det-badge det-badge-inactif"><i class="bi bi-x-circle-fill"></i> Inactif</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /.form-main-grid -->
+
+  {% if obj.description %}
+  <div class="field-row" style="padding-top:16px;align-items:flex-start;">
+    <label>Description</label>
+    <div class="field-static">{{ obj.description }}</div>
+  </div>
+  {% endif %}
+
+  <!-- ══════════════ ONGLETS + HISTORIQUE ══════════════ -->
+  <div class="f-layout">
+    <div class="f-main">
+      <div class="f-tabs-wrap">
+        <div class="f-tab-panel">
+          <div class="f-tab-section-title">Employés dans ce service ({{ employes|length }})</div>
+          {% if employes %}
+          <table class="o-list-table">
+            <thead>
+              <tr>
+                <th>Employé</th>
+                <th>Matricule</th>
+                <th>Fonction</th>
+                <th>Téléphone</th>
+                <th style="width:90px;">Statut</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for emp in employes %}
+              <tr onclick="window.location='{% url 'rh_detail' emp.pk %}'">
+                <td style="font-weight:600;">{{ emp.nom }} {{ emp.prenoms }}</td>
+                <td><span class="badge-code">{{ emp.matricule }}</span></td>
+                <td style="color:var(--text-muted);">{{ emp.fonction|default:"—" }}</td>
+                <td style="color:var(--text-muted);">{{ emp.telephone|default:"—" }}</td>
+                <td>
+                  {% if emp.statut == 'actif' %}<span class="det-badge det-badge-actif">Actif</span>
+                  {% else %}<span class="det-badge det-badge-inactif">{{ emp.get_statut_display }}</span>{% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div class="o-empty">
+            <i class="bi bi-person-x"></i>
+            Aucun employé dans ce service.
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div><!-- /f-main -->
+
+    {% load core_tags %}{% historique_sidebar obj %}
+
+  </div><!-- /f-layout -->
+
+</div><!-- /.form-body -->
+
+{% endblock %}

@@ -1,0 +1,400 @@
+{% extends 'conges/base.html' %}
+{% block topbar_title %}Suivi des retours{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+/* ── Pleine page ── */
+.sr-page {
+  display:flex; flex-direction:column;
+  height:calc(100vh - var(--topbar-h));
+  overflow:hidden;
+}
+
+/* ── En-tête ── */
+.sr-head {
+  display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+  padding:8px 20px; flex-shrink:0;
+  background:var(--cg-surface); border-bottom:1px solid var(--cg-border);
+}
+.sr-date { font-size:11.5px; color:var(--cg-muted); }
+
+/* ── KPIs ── */
+.sr-kpis {
+  display:flex; gap:0; flex-shrink:0;
+  border-bottom:1px solid var(--cg-border);
+}
+.sr-kpi {
+  flex:1; display:flex; align-items:center; gap:12px;
+  padding:10px 20px; border-right:1px solid var(--cg-border);
+  cursor:pointer; transition:background .15s; text-decoration:none;
+}
+.sr-kpi:last-child { border-right:none; }
+.sr-kpi:hover, .sr-kpi.active { background:var(--cg-50); }
+html[data-theme="dark"] .sr-kpi:hover,
+html[data-theme="dark"] .sr-kpi.active { background:#1D2C44; }
+.sr-kpi.active { border-bottom:2px solid var(--cg-600); margin-bottom:-1px; }
+.sr-kpi-icon {
+  width:38px; height:38px; border-radius:10px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:16px; flex-shrink:0;
+}
+.sri-retard { background:rgba(var(--rose-rgb),.1);  color:var(--rose); }
+.sri-aujd   { background:rgba(45,153,219,.1); color:#2d99db; }
+.sri-proche { background:rgba(var(--amber-rgb),.1); color:var(--amber); }
+.sri-cours  { background:rgba(var(--cg-600-rgb),.1); color:var(--cg-600); }
+.sr-kpi-val { font-size:22px; font-weight:800; line-height:1; }
+.k-retard .sr-kpi-val { color:var(--rose-text); }
+.k-aujd   .sr-kpi-val { color:#1a4d6d; }
+.k-proche .sr-kpi-val { color:var(--amber-text); }
+.k-cours  .sr-kpi-val { color:var(--cg-700); }
+html[data-theme="dark"] .k-retard .sr-kpi-val { color:#f09090; }
+html[data-theme="dark"] .k-aujd   .sr-kpi-val { color:#80c8ef; }
+html[data-theme="dark"] .k-proche .sr-kpi-val { color:#f0c060; }
+html[data-theme="dark"] .k-cours  .sr-kpi-val { color:#42A5F5; }
+.sr-kpi-lbl { font-size:11px; color:var(--cg-muted); font-weight:600; text-transform:uppercase; letter-spacing:.3px; margin-top:1px; }
+
+/* ── Corps ── */
+.sr-body { flex:1; overflow:auto; min-height:0; }
+
+/* ── Sections ── */
+.sr-section { display:none; }
+.sr-section.active { display:block; }
+
+.sr-section-head {
+  display:flex; align-items:center; gap:10px;
+  padding:12px 20px; border-bottom:1px solid var(--cg-border);
+  position:sticky; top:0; z-index:4;
+  background:var(--cg-surface);
+}
+.sr-section-head .sh-title { font-size:14px; font-weight:800; color:var(--cg-900); }
+html[data-theme="dark"] .sr-section-head .sh-title { color:var(--cg-200); }
+.sr-section-head .sh-count {
+  background:var(--cg-100); color:var(--cg-700);
+  border-radius:20px; padding:2px 10px; font-size:12px; font-weight:700;
+}
+html[data-theme="dark"] .sr-section-head .sh-count { background:#243447; color:var(--cg-300); }
+
+/* ── Tableau ── */
+.sr-table { width:100%; border-collapse:collapse; font-size:13px; }
+.sr-table thead { position:sticky; top:49px; z-index:3; }
+.sr-table thead th {
+  background:var(--cg-700); color:#fff;
+  padding:9px 14px; text-align:left; font-size:10.5px;
+  font-weight:700; text-transform:uppercase; letter-spacing:.3px;
+  border-right:1px solid rgba(255,255,255,.08);
+}
+.sr-table thead th:last-child { border-right:none; }
+.sr-table tbody tr { border-bottom:1px solid var(--cg-border); transition:background .1s; }
+.sr-table tbody tr:hover { background:var(--cg-50); }
+html[data-theme="dark"] .sr-table tbody tr:hover { background:#1D2C44; }
+.sr-table td { padding:10px 14px; color:var(--cg-text); vertical-align:middle; }
+
+/* Employé cell */
+.emp-cell { display:flex; align-items:center; gap:10px; }
+.emp-ini {
+  width:32px; height:32px; border-radius:50%; flex-shrink:0;
+  background:linear-gradient(135deg,var(--cg-600),var(--cg-400));
+  display:flex; align-items:center; justify-content:center;
+  font-size:11px; font-weight:800; color:#fff;
+}
+
+/* Badges */
+.badge-retard { background:rgba(var(--rose-rgb),.12); color:var(--rose-text); border:1px solid rgba(var(--rose-rgb),.25); padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; display:inline-flex; align-items:center; gap:4px; }
+.badge-aujd   { background:rgba(45,153,219,.12); color:#1a4d6d; border:1px solid rgba(45,153,219,.25); padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; }
+.badge-proche { background:rgba(var(--amber-rgb),.12); color:var(--amber-text); border:1px solid rgba(var(--amber-rgb),.25); padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; }
+html[data-theme="dark"] .badge-retard { background:rgba(var(--rose-rgb),.18); color:#f09090; border-color:rgba(var(--rose-rgb),.3); }
+html[data-theme="dark"] .badge-aujd   { background:rgba(45,153,219,.18); color:#80c8ef; border-color:rgba(45,153,219,.3); }
+html[data-theme="dark"] .badge-proche { background:rgba(var(--amber-rgb),.18); color:#f0c060; border-color:rgba(var(--amber-rgb),.3); }
+.cg-type-badge { font-size:11px; color:var(--cg-600); background:var(--cg-50); border:1px solid var(--cg-200); padding:2px 8px; border-radius:6px; font-weight:600; }
+html[data-theme="dark"] .cg-type-badge { background:rgba(33,150,243,0.15); color:var(--cg-300); border-color:var(--cg-border); }
+
+/* Barre de progression */
+.prog-wrap { display:flex; align-items:center; gap:8px; min-width:120px; }
+.prog-track { flex:1; height:6px; background:rgba(0,0,0,.08); border-radius:3px; overflow:hidden; }
+html[data-theme="dark"] .prog-track { background:#243447; }
+.prog-fill { height:100%; border-radius:3px; transition:width .4s ease; }
+
+/* Vide */
+.sr-empty { text-align:center; padding:60px; color:var(--cg-muted); }
+.sr-empty i { font-size:40px; display:block; margin-bottom:12px; opacity:.3; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="sr-page">
+
+  <!-- ── En-tête ── -->
+  <div class="sr-head" id="subheader">
+    <div>
+      <div style="font-size:16px;font-weight:800;color:var(--cg-text);">
+        <i class="bi bi-arrow-return-left" style="color:var(--cg-600);margin-right:6px;"></i>Suivi des retours
+      </div>
+      <div class="sr-date">{{ today|date:"l d F Y" }}</div>
+    </div>
+  </div>
+
+  <!-- ── KPIs / Onglets ── -->
+  <div class="sr-kpis">
+    <a href="#" class="sr-kpi k-retard {% if en_retard %}active{% else %}{% if not retour_aujd and not dans_7j %}active{% endif %}{% endif %}"
+       onclick="showSection('retard',this);return false;">
+      <div class="sr-kpi-icon sri-retard"><i class="bi bi-exclamation-triangle-fill"></i></div>
+      <div>
+        <div class="sr-kpi-val">{{ en_retard|length }}</div>
+        <div class="sr-kpi-lbl">En retard</div>
+      </div>
+    </a>
+    <a href="#" class="sr-kpi k-aujd {% if not en_retard and retour_aujd %}active{% endif %}"
+       onclick="showSection('aujd',this);return false;">
+      <div class="sr-kpi-icon sri-aujd"><i class="bi bi-calendar-check-fill"></i></div>
+      <div>
+        <div class="sr-kpi-val">{{ retour_aujd|length }}</div>
+        <div class="sr-kpi-lbl">Retour aujourd'hui</div>
+      </div>
+    </a>
+    <a href="#" class="sr-kpi k-proche {% if not en_retard and not retour_aujd and dans_7j %}active{% endif %}"
+       onclick="showSection('proche',this);return false;">
+      <div class="sr-kpi-icon sri-proche"><i class="bi bi-calendar-week-fill"></i></div>
+      <div>
+        <div class="sr-kpi-val">{{ dans_7j|length }}</div>
+        <div class="sr-kpi-lbl">Dans 7 jours</div>
+      </div>
+    </a>
+    <a href="#" class="sr-kpi k-cours {% if not en_retard and not retour_aujd and not dans_7j %}active{% endif %}"
+       onclick="showSection('cours',this);return false;">
+      <div class="sr-kpi-icon sri-cours"><i class="bi bi-person-check-fill"></i></div>
+      <div>
+        <div class="sr-kpi-val">{{ en_cours|length }}</div>
+        <div class="sr-kpi-lbl">En congé</div>
+      </div>
+    </a>
+  </div>
+
+  <!-- ── Corps avec sections ── -->
+  <div class="sr-body">
+
+    <!-- Section : En retard -->
+    <div id="section-retard" class="sr-section {% if en_retard %}active{% endif %}">
+      <div class="sr-section-head">
+        <i class="bi bi-exclamation-triangle-fill" style="color:var(--rose);font-size:16px;"></i>
+        <span class="sh-title">Retards constatés</span>
+        <span class="sh-count badge-retard">{{ en_retard|length }}</span>
+        {% if en_retard %}
+        <span style="font-size:11.5px;color:var(--cg-muted);margin-left:4px;">— Employés non rentrés après la date de fin</span>
+        {% endif %}
+      </div>
+      {% if en_retard %}
+      <table class="sr-table">
+        <thead><tr>
+          <th>Employé</th><th>Service</th><th>Type de congé</th>
+          <th>Retour prévu le</th><th>Retard</th><th style="text-align:right;">Actions</th>
+        </tr></thead>
+        <tbody>
+        {% for c in en_retard %}
+        <tr>
+          <td>
+            <div class="emp-cell">
+              <div class="emp-ini">{{ c.employe.initiales|default:c.employe.nom|first|upper }}</div>
+              <div>
+                <a href="{% url 'conge_historique_employe' c.employe.pk %}" style="font-weight:700;color:var(--cg-text);text-decoration:none;">{{ c.employe.nom_complet }}</a>
+                <div style="font-size:10.5px;color:var(--cg-muted);">{{ c.employe.matricule }}</div>
+              </div>
+            </div>
+          </td>
+          <td style="color:var(--cg-muted);">{{ c.employe.service.nom|default:"—" }}</td>
+          <td><span class="cg-type-badge">{{ c.get_type_conge_display }}</span></td>
+          <td style="font-weight:600;">{{ c.date_fin|date:"d/m/Y" }}</td>
+          <td>
+            <span class="badge-retard">
+              <i class="bi bi-clock-fill" style="font-size:10px;"></i>
+              +{{ c.jours_retard }} jour{{ c.jours_retard|pluralize }}
+            </span>
+          </td>
+          <td style="text-align:right;">
+            <a href="{% url 'conge_detail' c.pk %}" class="btn-cg-sm" title="Voir le congé"><i class="bi bi-eye"></i></a>
+            <a href="{% url 'conge_absence_injustifiee' c.pk %}" class="btn-cg-sm"
+               style="margin-left:4px;border-color:var(--rose);color:var(--rose-text);" title="Traiter l'absence">
+              <i class="bi bi-flag-fill"></i> Traiter
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="sr-empty">
+        <i class="bi bi-check-circle-fill" style="color:var(--cg-400);"></i>
+        <div style="font-size:14px;font-weight:600;">Aucun retard</div>
+        <div style="font-size:12px;margin-top:4px;">Tous les employés sont rentrés à temps</div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Section : Retour aujourd'hui -->
+    <div id="section-aujd" class="sr-section {% if not en_retard and retour_aujd %}active{% endif %}">
+      <div class="sr-section-head">
+        <i class="bi bi-calendar-check-fill" style="color:#2d99db;font-size:16px;"></i>
+        <span class="sh-title">Retour aujourd'hui</span>
+        <span class="sh-count badge-aujd">{{ retour_aujd|length }}</span>
+      </div>
+      {% if retour_aujd %}
+      <table class="sr-table">
+        <thead><tr>
+          <th>Employé</th><th>Service</th><th>Type de congé</th>
+          <th>Début du congé</th><th>Durée</th><th></th>
+        </tr></thead>
+        <tbody>
+        {% for c in retour_aujd %}
+        <tr>
+          <td>
+            <div class="emp-cell">
+              <div class="emp-ini">{{ c.employe.initiales|default:c.employe.nom|first|upper }}</div>
+              <div>
+                <a href="{% url 'conge_historique_employe' c.employe.pk %}" style="font-weight:700;color:var(--cg-text);text-decoration:none;">{{ c.employe.nom_complet }}</a>
+                <div style="font-size:10.5px;color:var(--cg-muted);">{{ c.employe.matricule }}</div>
+              </div>
+            </div>
+          </td>
+          <td style="color:var(--cg-muted);">{{ c.employe.service.nom|default:"—" }}</td>
+          <td><span class="cg-type-badge">{{ c.get_type_conge_display }}</span></td>
+          <td>{{ c.date_debut|date:"d/m/Y" }}</td>
+          <td><span class="badge-aujd">{{ c.nb_jours_ouvres }}j ouvrés</span></td>
+          <td><a href="{% url 'conge_detail' c.pk %}" class="btn-cg-sm"><i class="bi bi-eye"></i></a></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="sr-empty">
+        <i class="bi bi-calendar-check"></i>
+        <div style="font-size:14px;font-weight:600;">Aucun retour aujourd'hui</div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Section : Dans 7 jours -->
+    <div id="section-proche" class="sr-section {% if not en_retard and not retour_aujd and dans_7j %}active{% endif %}">
+      <div class="sr-section-head">
+        <i class="bi bi-calendar-week-fill" style="color:var(--amber);font-size:16px;"></i>
+        <span class="sh-title">Retours dans les 7 prochains jours</span>
+        <span class="sh-count badge-proche">{{ dans_7j|length }}</span>
+      </div>
+      {% if dans_7j %}
+      <table class="sr-table">
+        <thead><tr>
+          <th>Employé</th><th>Service</th><th>Type de congé</th>
+          <th>Retour prévu</th><th>Jours restants</th><th></th>
+        </tr></thead>
+        <tbody>
+        {% for c in dans_7j %}
+        <tr>
+          <td>
+            <div class="emp-cell">
+              <div class="emp-ini">{{ c.employe.initiales|default:c.employe.nom|first|upper }}</div>
+              <div>
+                <a href="{% url 'conge_historique_employe' c.employe.pk %}" style="font-weight:700;color:var(--cg-text);text-decoration:none;">{{ c.employe.nom_complet }}</a>
+                <div style="font-size:10.5px;color:var(--cg-muted);">{{ c.employe.service.nom|default:"—" }}</div>
+              </div>
+            </div>
+          </td>
+          <td style="color:var(--cg-muted);">{{ c.employe.service.nom|default:"—" }}</td>
+          <td><span class="cg-type-badge">{{ c.get_type_conge_display }}</span></td>
+          <td style="font-weight:600;">{{ c.date_fin|date:"d/m/Y" }}</td>
+          <td><span class="badge-proche">{{ c.date_fin|timeuntil:today }}</span></td>
+          <td><a href="{% url 'conge_detail' c.pk %}" class="btn-cg-sm"><i class="bi bi-eye"></i></a></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="sr-empty">
+        <i class="bi bi-calendar-week"></i>
+        <div style="font-size:14px;font-weight:600;">Aucun retour prévu dans les 7 jours</div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Section : Tous en congé -->
+    <div id="section-cours" class="sr-section {% if not en_retard and not retour_aujd and not dans_7j %}active{% endif %}">
+      <div class="sr-section-head">
+        <i class="bi bi-person-check-fill" style="color:var(--cg-600);font-size:16px;"></i>
+        <span class="sh-title">Employés actuellement en congé</span>
+        <span class="sh-count">{{ en_cours|length }}</span>
+      </div>
+      {% if en_cours %}
+      <table class="sr-table">
+        <thead><tr>
+          <th>Employé</th><th>Service</th><th>Type de congé</th>
+          <th>Début</th><th>Retour prévu</th><th style="min-width:160px;">Progression</th><th></th>
+        </tr></thead>
+        <tbody>
+        {% for c in en_cours %}
+        <tr>
+          <td>
+            <div class="emp-cell">
+              <div class="emp-ini">{{ c.employe.initiales|default:c.employe.nom|first|upper }}</div>
+              <div>
+                <a href="{% url 'conge_historique_employe' c.employe.pk %}" style="font-weight:700;color:var(--cg-text);text-decoration:none;">{{ c.employe.nom_complet }}</a>
+                <div style="font-size:10.5px;color:var(--cg-muted);">{{ c.employe.matricule }}</div>
+              </div>
+            </div>
+          </td>
+          <td style="color:var(--cg-muted);">{{ c.employe.service.nom|default:"—" }}</td>
+          <td><span class="cg-type-badge">{{ c.get_type_conge_display }}</span></td>
+          <td>{{ c.date_debut|date:"d/m/Y" }}</td>
+          <td>{{ c.date_fin|date:"d/m/Y" }}</td>
+          <td>
+            <div class="prog-wrap">
+              <div class="prog-track">
+                <div class="prog-fill" style="background:var(--cg-500);"
+                     data-debut="{{ c.date_debut|date:'Y-m-d' }}"
+                     data-fin="{{ c.date_fin|date:'Y-m-d' }}"></div>
+              </div>
+              <span style="font-size:10.5px;color:var(--cg-muted);width:28px;text-align:right;" class="prog-pct"></span>
+            </div>
+          </td>
+          <td><a href="{% url 'conge_detail' c.pk %}" class="btn-cg-sm"><i class="bi bi-eye"></i></a></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="sr-empty">
+        <i class="bi bi-person-check-fill" style="color:var(--cg-400);"></i>
+        <div style="font-size:14px;font-weight:600;">Aucun employé en congé actuellement</div>
+      </div>
+      {% endif %}
+    </div>
+
+  </div><!-- /sr-body -->
+</div><!-- /sr-page -->
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+/* ── Onglets ── */
+function showSection(name, kpi) {
+  document.querySelectorAll('.sr-section').forEach(function(s){ s.classList.remove('active'); });
+  document.querySelectorAll('.sr-kpi').forEach(function(k){ k.classList.remove('active'); });
+  var sec = document.getElementById('section-' + name);
+  if (sec) sec.classList.add('active');
+  if (kpi) kpi.classList.add('active');
+}
+
+/* ── Progression réelle ── */
+document.addEventListener('DOMContentLoaded', function() {
+  var today = new Date('{{ today|date:"Y-m-d" }}');
+  document.querySelectorAll('.prog-fill[data-debut]').forEach(function(bar) {
+    var debut = new Date(bar.dataset.debut);
+    var fin   = new Date(bar.dataset.fin);
+    var total = (fin - debut) / 86400000 || 1;
+    var done  = (today - debut) / 86400000;
+    var pct   = Math.max(0, Math.min(100, Math.round(done / total * 100)));
+    bar.style.width = pct + '%';
+    var pctEl = bar.closest('.prog-wrap').querySelector('.prog-pct');
+    if (pctEl) pctEl.textContent = pct + '%';
+  });
+});
+</script>
+{% endblock %}

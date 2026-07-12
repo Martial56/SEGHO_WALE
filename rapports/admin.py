@@ -1,17 +1,15 @@
 from django.contrib import admin
-from .models import RapportMedical, Vaccination
+
+from .models import HistoriqueRapport
 
 
-@admin.register(RapportMedical)
-class RapportMedicalAdmin(admin.ModelAdmin):
-    list_display = ['titre', 'type_rapport', 'periode_debut', 'periode_fin', 'redige_par', 'valide']
-    list_filter = ['type_rapport', 'valide']
-    search_fields = ['titre']
+@admin.register(HistoriqueRapport)
+class HistoriqueRapportAdmin(admin.ModelAdmin):
+    list_display = ('nom', 'utilisateur', 'periode_debut', 'periode_fin', 'format_fichier', 'nb_lignes', 'date_generation')
+    list_filter = ('slug', 'format_fichier', 'date_generation')
+    search_fields = ('nom', 'utilisateur__username')
+    date_hierarchy = 'date_generation'
+    readonly_fields = [f.name for f in HistoriqueRapport._meta.fields]
 
-
-@admin.register(Vaccination)
-class VaccinationAdmin(admin.ModelAdmin):
-    list_display = ['patient', 'vaccin', 'date_vaccination', 'dose', 'prochain_rappel']
-    search_fields = ['patient__nom', 'vaccin']
-    list_filter = ['vaccin']
-    date_hierarchy = 'date_vaccination'
+    def has_add_permission(self, request):
+        return False

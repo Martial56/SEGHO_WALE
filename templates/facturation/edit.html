@@ -1,0 +1,496 @@
+{% extends 'facturation/base.html' %}
+{% load static %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+.fac-page { width: 100%; padding: 12px 20px 48px; }
+
+.fac-btn {
+  padding: 6px 16px; border-radius: 4px; font-size: 13px; font-weight: 600;
+  font-family: var(--font-roboto); cursor: pointer; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 5px;
+  transition: all .15s; border: none; white-space: nowrap;
+}
+.fac-btn-save   { background: var(--accent); color: #fff; }
+.fac-btn-save:hover { background: var(--primary); }
+.fac-btn-cancel {
+  background: transparent; color: var(--text-muted);
+  border: 1px solid var(--border) !important;
+}
+.fac-btn-cancel:hover { border-color: #fca5a5 !important; color: #dc2626; }
+
+/* ── PATIENT CARD ── */
+.fac-patient-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 14px 18px; margin-bottom: 12px;
+  display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: flex-start;
+}
+.fac-patient-avatar {
+  width: 50px; height: 50px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; font-weight: 800; color: #fff; flex-shrink: 0; overflow: hidden;
+  margin-top: 2px;
+}
+.fac-patient-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.fac-patient-name { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 10px; }
+.patient-info-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 24px; }
+@media(max-width:680px){ .patient-info-grid { grid-template-columns: repeat(2, 1fr); } }
+.pi-item { display: flex; flex-direction: column; gap: 2px; }
+.pi-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
+.pi-value { font-size: 13px; font-weight: 600; color: var(--text); }
+.pi-code { font-family: var(--font-mono); font-size: 12px; color: var(--accent); }
+
+/* ── SECTION CARDS ── */
+.fac-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; margin-bottom: 12px;
+}
+.fac-card-head {
+  display: flex; align-items: center; gap: 7px;
+  padding: 9px 16px; border-bottom: 1px solid var(--border);
+  font-size: 11px; font-weight: 700; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: .05em;
+}
+.fac-card-head i { font-size: 13px; color: var(--accent); }
+.fac-card-body { padding: 16px 20px; }
+
+/* ── FORM FIELDS ── */
+.fac-fields-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px 28px;
+}
+@media(max-width:860px){ .fac-fields-grid{ grid-template-columns: repeat(2,1fr); } }
+@media(max-width:560px){ .fac-fields-grid{ grid-template-columns: 1fr; } }
+.fac-field { display: flex; flex-direction: column; gap: 5px; }
+.fac-field label {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .5px; color: var(--text-muted);
+}
+.field-ul {
+  width: 100%; background: transparent;
+  border: none; border-bottom: 1.5px solid var(--border); border-radius: 0;
+  padding: 5px 2px; font-size: 13px; color: var(--text);
+  transition: border-color .2s; outline: none; font-family: inherit;
+}
+.field-ul:focus { border-bottom-color: var(--accent); }
+.field-ul::placeholder { color: var(--text-muted); opacity: .6; }
+select.field-ul {
+  appearance: none; -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23839aaa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 4px center;
+  padding-right: 20px; cursor: pointer; background-color: transparent;
+}
+textarea.field-ul {
+  resize: vertical; border: 1.5px solid var(--border);
+  border-radius: 6px; padding: 8px 10px;
+}
+textarea.field-ul:focus { border-color: var(--accent); }
+html[data-theme="dark"] .field-ul { color: var(--text); border-bottom-color: var(--border); }
+html[data-theme="dark"] select.field-ul { background-color: transparent; }
+
+/* ── TABLE LIGNES ── */
+.fac-table-wrap { overflow-x: auto; }
+.fac-lignes-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.fac-lignes-table thead th {
+  padding: 8px 10px; text-align: left;
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--text-muted);
+  border-bottom: 2px solid var(--border); background: var(--bg);
+}
+.fac-lignes-table tbody td { padding: 6px 6px; vertical-align: middle; }
+.fac-lignes-table tbody tr:hover td { background: rgba(26,92,74,.04); }
+html[data-theme="dark"] .fac-lignes-table tbody tr:hover td { background: rgba(34,137,107,.07); }
+.fac-lignes-table input, .fac-lignes-table select {
+  width: 100%; padding: 5px 6px;
+  border: none; border-bottom: 1.5px solid var(--border); border-radius: 0;
+  font-size: 12px; font-family: inherit; background: transparent;
+  outline: none; color: var(--text);
+}
+.fac-lignes-table input:focus, .fac-lignes-table select:focus { border-bottom-color: var(--accent); }
+.col-libelle { min-width: 200px; }
+.col-qte     { width: 70px; }
+.col-prix    { width: 110px; }
+.col-remise  { width: 80px; }
+.col-total   { width: 110px; font-weight: 600; color: var(--accent); text-align: right; }
+.col-del     { width: 36px; text-align: center; }
+.btn-del-ligne {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-muted); padding: 4px; border-radius: 4px;
+  transition: all 0.15s; font-size: 15px;
+}
+.btn-del-ligne:hover { color: #dc2626; background: #fef2f2; }
+.btn-add-ligne {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 10px;
+  background: none; border: 1.5px dashed var(--border); border-radius: 8px;
+  padding: 7px 16px; font-size: 13px; font-weight: 600; color: var(--accent);
+  cursor: pointer; font-family: inherit; transition: all 0.15s;
+}
+.btn-add-ligne:hover { border-color: var(--accent); background: rgba(26,92,74,.04); }
+
+/* ── TOTAUX ── */
+.fac-totaux-wrap { display: flex; justify-content: flex-end; margin-top: 16px; }
+.fac-totaux-box {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 8px; padding: 14px 18px; min-width: 270px;
+}
+.fac-totaux-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 5px 0; font-size: 13px; color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+.fac-totaux-row:last-child { border-bottom: none; }
+.fac-totaux-row.grand-total {
+  font-size: 15px; font-weight: 800; color: var(--text);
+  margin-top: 6px; padding-top: 10px;
+  border-top: 2px solid var(--border); border-bottom: none;
+}
+.fac-totaux-row span:last-child { font-weight: 700; color: var(--accent); }
+.fac-totaux-row.grand-total span:last-child { font-size: 18px; }
+
+/* ── ALERTE ERREUR ── */
+.fac-alert-error {
+  background: #fef2f2; border: 1px solid #fca5a5; color: #b91c1c;
+  border-radius: 6px; padding: 10px 14px; margin-bottom: 14px; font-size: 13px;
+}
+html[data-theme="dark"] .fac-alert-error {
+  background: rgba(220,38,38,.12); border-color: rgba(220,38,38,.3); color: #fca5a5;
+}
+
+/* ── ONGLETS EDIT ── */
+.fac-edit-tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--bg); }
+.fac-edit-tab-btn {
+  padding: 10px 20px; font-size: 12px; font-weight: 600;
+  border: none; background: none; cursor: pointer;
+  color: var(--text-muted); border-bottom: 2px solid transparent;
+  transition: all .15s; font-family: inherit; white-space: nowrap;
+}
+.fac-edit-tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); background: var(--surface); }
+.fac-edit-tab-btn:hover:not(.active) { color: var(--text); background: rgba(0,0,0,.03); }
+.fac-edit-panel { display: none; padding: 20px; }
+.fac-edit-panel.active { display: block; }
+
+/* ── SECTION HEADER ── */
+.edit-section-title {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--text-muted); margin-bottom: 14px;
+  display: flex; align-items: center; gap: 6px;
+}
+.edit-section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="page-wrap">
+
+<!-- ══ SUBHEADER ══ -->
+<div class="o-subheader" id="subheader">
+  <div class="o-subheader-row">
+    <a href="{% url 'facturation:detail' facture.pk %}?next={{ back_url }}" class="o-ctrl-btn" style="padding:3px 7px;">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <span style="font-size:13px;color:var(--text-muted);">
+      <a href="{{ back_url }}" style="color:var(--accent);text-decoration:none;font-weight:500;">Retour</a>
+      <span style="margin:0 5px;opacity:.4;">/</span>
+      <a href="{% url 'facturation:detail' facture.pk %}?next={{ back_url }}" style="color:var(--accent);text-decoration:none;font-weight:500;">{{ facture.numero }}</a>
+      <span style="margin:0 5px;opacity:.4;">/</span>
+      <span style="color:var(--text);">Modifier</span>
+    </span>
+    <div style="flex:1;"></div>
+    <button type="submit" form="facture-form" class="fac-btn fac-btn-save">
+      <i class="bi bi-check-lg"></i> Enregistrer les modifications
+    </button>
+    <a href="{% url 'facturation:detail' facture.pk %}?next={{ back_url }}" class="fac-btn fac-btn-cancel" style="text-decoration:none;">
+      Annuler
+    </a>
+  </div>
+</div>
+
+<div class="fac-page">
+
+  {% if messages %}
+  {% for msg in messages %}
+  <div class="fac-alert-error">{{ msg }}</div>
+  {% endfor %}
+  {% endif %}
+
+  <form method="post" id="facture-form" novalidate>
+  {% csrf_token %}
+  <input type="hidden" name="next" value="{{ back_url }}">
+
+  <!-- ══ CARTE PATIENT ══ -->
+  <div class="fac-patient-card">
+    <div class="fac-patient-avatar">
+      {% if facture.patient.photo %}
+        <img src="{{ facture.patient.photo.url }}" alt="{{ facture.patient.nom }}">
+      {% else %}
+        {{ facture.patient.nom|slice:":1"|upper }}{{ facture.patient.prenoms|slice:":1"|upper }}
+      {% endif %}
+    </div>
+    <div>
+      <div class="fac-patient-name">{{ facture.patient.nom }} {{ facture.patient.prenoms }}</div>
+      <div class="patient-info-grid">
+        <div class="pi-item">
+          <span class="pi-label">Code patient</span>
+          <span class="pi-value pi-code">{{ facture.patient.code_patient }}</span>
+        </div>
+        <div class="pi-item">
+          <span class="pi-label">Âge</span>
+          <span class="pi-value">{{ facture.patient.age_display|default:"—" }}</span>
+        </div>
+        <div class="pi-item">
+          <span class="pi-label">Sexe</span>
+          <span class="pi-value">{{ facture.patient.get_sexe_display|default:"—" }}</span>
+        </div>
+        <div class="pi-item">
+          <span class="pi-label">Téléphone</span>
+          <span class="pi-value">{{ facture.patient.telephone|default:"—" }}</span>
+        </div>
+        <div class="pi-item">
+          <span class="pi-label">Adresse</span>
+          <span class="pi-value">{{ facture.patient.adresse|default:facture.patient.ville|default:"—" }}</span>
+        </div>
+        <div class="pi-item">
+          <span class="pi-label">Assurance</span>
+          <span class="pi-value">{% if facture.patient.assurance %}{{ facture.patient.assurance.nom }}{% else %}—{% endif %}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ ONGLETS ══ -->
+  <div class="fac-card" style="overflow:hidden;">
+    <div class="fac-edit-tabs">
+      <button type="button" class="fac-edit-tab-btn active" data-etab="etab-lignes">
+        <i class="bi bi-list-ul"></i> Lignes de facture
+      </button>
+      <button type="button" class="fac-edit-tab-btn" data-etab="etab-infos">
+        <i class="bi bi-info-circle"></i> Autres informations
+      </button>
+    </div>
+
+    <!-- ── Onglet Lignes ── -->
+    <div class="fac-edit-panel active" id="etab-lignes">
+      <div class="edit-section-title"><i class="bi bi-list-ul"></i> Prestations / Actes</div>
+
+      <div class="fac-table-wrap">
+        <table class="fac-lignes-table" id="lignes-table">
+          <thead>
+            <tr>
+              <th class="col-libelle">Désignation <span style="color:#dc2626;">*</span></th>
+              <th class="col-qte">Qté</th>
+              <th class="col-prix">Prix unit. (CFA)</th>
+              <th class="col-remise">Remise %</th>
+              <th class="col-total">Total (CFA)</th>
+              <th class="col-del"></th>
+            </tr>
+          </thead>
+          <tbody id="lignes-body">
+            {% for ligne in lignes %}
+            <tr class="ligne-row">
+              <td class="col-libelle">
+                <input type="text" name="ligne_libelle_{{ forloop.counter0 }}" value="{{ ligne.libelle }}">
+              </td>
+              <td class="col-qte">
+                <input type="number" name="ligne_qte_{{ forloop.counter0 }}" value="{{ ligne.quantite }}" min="1" step="1" oninput="recalcRow({{ forloop.counter0 }})">
+              </td>
+              <td class="col-prix">
+                <input type="number" name="ligne_prix_{{ forloop.counter0 }}" value="{{ ligne.prix_unitaire }}" min="0" step="1" oninput="recalcRow({{ forloop.counter0 }})">
+              </td>
+              <td class="col-remise">
+                <input type="number" name="ligne_remise_{{ forloop.counter0 }}" value="{{ ligne.remise }}" min="0" max="100" step="0.01" oninput="recalcRow({{ forloop.counter0 }})">
+              </td>
+              <td class="col-total" id="total-{{ forloop.counter0 }}">0 CFA</td>
+              <td class="col-del">
+                <button type="button" class="btn-del-ligne" onclick="removeLigne(this)">×</button>
+              </td>
+            </tr>
+            {% empty %}
+            <tr class="ligne-row">
+              <td class="col-libelle">
+                <input type="text" name="ligne_libelle_0" placeholder="Ex : Soin infirmier…">
+              </td>
+              <td class="col-qte">
+                <input type="number" name="ligne_qte_0" value="1" min="1" step="1" oninput="recalcRow(0)">
+              </td>
+              <td class="col-prix">
+                <input type="number" name="ligne_prix_0" value="0" min="0" step="1" oninput="recalcRow(0)">
+              </td>
+              <td class="col-remise">
+                <input type="number" name="ligne_remise_0" value="0" min="0" max="100" step="0.01" oninput="recalcRow(0)">
+              </td>
+              <td class="col-total" id="total-0">0 CFA</td>
+              <td class="col-del">
+                <button type="button" class="btn-del-ligne" onclick="removeLigne(this)">×</button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <button type="button" class="btn-add-ligne" onclick="addLigne()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24"
+             stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Ajouter une ligne
+      </button>
+
+      <div class="fac-totaux-wrap">
+        <div class="fac-totaux-box">
+          <div class="fac-totaux-row">
+            <span>Sous-total HT</span>
+            <span id="disp-subtotal">0 CFA</span>
+          </div>
+          <div class="fac-totaux-row">
+            <span>Part assurance</span>
+            <span id="disp-assurance">0 CFA</span>
+          </div>
+          <div class="fac-totaux-row">
+            <span>Ticket modérateur</span>
+            <span id="disp-ticket">0 CFA</span>
+          </div>
+          <div class="fac-totaux-row grand-total">
+            <span>Total à payer</span>
+            <span id="disp-total">0 CFA</span>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /etab-lignes -->
+
+    <!-- ── Onglet Autres informations ── -->
+    <div class="fac-edit-panel" id="etab-infos">
+      <div class="fac-fields-grid">
+        <div class="fac-field">
+          <label for="{{ form.type_facture.id_for_label }}">Type de facture <span style="color:#dc2626;">*</span></label>
+          {{ form.type_facture }}
+          {% if form.type_facture.errors %}<span style="font-size:11px;color:#dc2626;">{{ form.type_facture.errors.0 }}</span>{% endif %}
+        </div>
+        <div class="fac-field">
+          <label for="{{ form.date_echeance.id_for_label }}">Date d'échéance</label>
+          {{ form.date_echeance }}
+        </div>
+        <div class="fac-field">
+          <label for="{{ form.montant_assurance.id_for_label }}">Part assurance (CFA)</label>
+          {{ form.montant_assurance }}
+        </div>
+        <div class="fac-field">
+          <label for="{{ form.ticket_moderateur.id_for_label }}">Ticket modérateur (CFA)</label>
+          {{ form.ticket_moderateur }}
+        </div>
+        <div class="fac-field" style="grid-column: span 3;">
+          <label for="{{ form.notes.id_for_label }}">Notes</label>
+          {{ form.notes }}
+        </div>
+      </div>
+    </div><!-- /etab-infos -->
+
+
+  </div><!-- /.fac-card onglets -->
+
+  </form>
+</div><!-- /.fac-page -->
+
+<script>
+(function () {
+  var lineCount = {{ lignes.count }};
+  if (lineCount === 0) lineCount = 1;
+
+  function fmt(n) {
+    return Number(n).toLocaleString('fr-FR') + ' CFA';
+  }
+
+  window.recalcRow = function (idx) {
+    var qte   = parseFloat(document.querySelector('[name="ligne_qte_'   + idx + '"]').value) || 0;
+    var prix  = parseFloat(document.querySelector('[name="ligne_prix_'  + idx + '"]').value) || 0;
+    var rem   = parseFloat(document.querySelector('[name="ligne_remise_'+ idx + '"]').value) || 0;
+    var total = qte * prix * (1 - rem / 100);
+    var el = document.getElementById('total-' + idx);
+    if (el) el.textContent = fmt(total);
+    recalcTotaux();
+  };
+
+  window.recalcTotaux = function () {
+    var subtotal = 0;
+    document.querySelectorAll('[name^="ligne_qte_"]').forEach(function (qteEl) {
+      var idx  = qteEl.name.replace('ligne_qte_', '');
+      var qte  = parseFloat(qteEl.value) || 0;
+      var prix = parseFloat((document.querySelector('[name="ligne_prix_'  + idx + '"]') || {}).value) || 0;
+      var rem  = parseFloat((document.querySelector('[name="ligne_remise_'+ idx + '"]') || {}).value) || 0;
+      subtotal += qte * prix * (1 - rem / 100);
+    });
+
+    var assEl  = document.getElementById('{{ form.montant_assurance.id_for_label }}');
+    var tickEl = document.getElementById('{{ form.ticket_moderateur.id_for_label }}');
+    var assurance = assEl  ? (parseFloat(assEl.value)  || 0) : 0;
+    var ticket    = tickEl ? (parseFloat(tickEl.value) || 0) : 0;
+
+    document.getElementById('disp-subtotal').textContent  = fmt(subtotal);
+    document.getElementById('disp-assurance').textContent = fmt(assurance);
+    document.getElementById('disp-ticket').textContent    = fmt(ticket);
+    document.getElementById('disp-total').textContent     = fmt(subtotal);
+  };
+
+  window.addLigne = function () {
+    var idx  = lineCount++;
+    var body = document.getElementById('lignes-body');
+    var tr   = document.createElement('tr');
+    tr.className = 'ligne-row';
+
+    tr.innerHTML =
+      '<td class="col-libelle"><input type="text" name="ligne_libelle_' + idx + '" placeholder="Désignation…"></td>' +
+      '<td class="col-qte"><input type="number" name="ligne_qte_' + idx + '" value="1" min="1" step="1" oninput="recalcRow(' + idx + ')"></td>' +
+      '<td class="col-prix"><input type="number" name="ligne_prix_' + idx + '" value="0" min="0" step="1" oninput="recalcRow(' + idx + ')"></td>' +
+      '<td class="col-remise"><input type="number" name="ligne_remise_' + idx + '" value="0" min="0" max="100" step="0.01" oninput="recalcRow(' + idx + ')"></td>' +
+      '<td class="col-total" id="total-' + idx + '">0 CFA</td>' +
+      '<td class="col-del"><button type="button" class="btn-del-ligne" onclick="removeLigne(this)">×</button></td>';
+    body.appendChild(tr);
+  };
+
+  window.removeLigne = function (btn) {
+    var row = btn.closest('tr');
+    if (document.querySelectorAll('.ligne-row').length > 1) {
+      row.remove();
+      recalcTotaux();
+    }
+  };
+
+  var assEl  = document.getElementById('{{ form.montant_assurance.id_for_label }}');
+  var tickEl = document.getElementById('{{ form.ticket_moderateur.id_for_label }}');
+  if (assEl)  assEl.addEventListener('input', recalcTotaux);
+  if (tickEl) tickEl.addEventListener('input', recalcTotaux);
+
+  // Recalc toutes les lignes existantes au chargement
+  for (var i = 0; i < {{ lignes.count }}; i++) {
+    recalcRow(i);
+  }
+
+  (function adj() {
+    var tb = document.querySelector('.topbar');
+    var wp = document.getElementById('page-wrap');
+    if (tb && wp) wp.style.paddingTop = '0';
+  })();
+  window.addEventListener('resize', function () {
+    var tb = document.querySelector('.topbar');
+    var wp = document.getElementById('page-wrap');
+    if (tb && wp) wp.style.paddingTop = '0';
+  });
+})();
+</script>
+
+<script>
+/* ── Onglets edit ── */
+document.querySelectorAll('.fac-edit-tab-btn').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var target = this.dataset.etab;
+    document.querySelectorAll('.fac-edit-tab-btn').forEach(function(b){ b.classList.remove('active'); });
+    document.querySelectorAll('.fac-edit-panel').forEach(function(p){ p.classList.remove('active'); });
+    this.classList.add('active');
+    var panel = document.getElementById(target);
+    if (panel) panel.classList.add('active');
+  });
+});
+</script>
+
+</div><!-- /#page-wrap -->
+{% endblock %}

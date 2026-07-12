@@ -1,0 +1,22 @@
+from django.db import migrations, models
+import django.db.models.deletion
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('achats', '0001_initial'),
+        ('services', '0008_add_quantite_stock_to_articleservice'),
+    ]
+
+    operations = [
+        migrations.AlterField(
+            model_name='lignefournisseurarticle',
+            name='fournisseur',
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE,
+                to='achats.fournisseur',
+                verbose_name='Fournisseur',
+            ),
+        ),
+    ]

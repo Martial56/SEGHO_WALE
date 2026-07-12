@@ -9,16 +9,6 @@ class CategorieMedicament(models.Model):
     class Meta: verbose_name = "Catégorie médicament"
 
 
-class Fournisseur(models.Model):
-    nom = models.CharField(max_length=200)
-    code = models.CharField(max_length=50, unique=True)
-    telephone = models.CharField(max_length=20, blank=True)
-    email = models.EmailField(blank=True)
-    adresse = models.TextField(blank=True)
-    actif = models.BooleanField(default=True)
-    def __str__(self): return self.nom
-    class Meta: verbose_name = "Fournisseur"
-
 
 class Medicament(models.Model):
     FORME = [('comprime','Comprimé'),('sirop','Sirop'),('injectable','Injectable'),('pommade','Pommade'),('gelule','Gélule'),('solution','Solution'),('autre','Autre')]
@@ -49,7 +39,7 @@ class LotMedicament(models.Model):
     date_peremption = models.DateField()
     quantite_initiale = models.IntegerField()
     quantite_actuelle = models.IntegerField()
-    fournisseur = models.ForeignKey(Fournisseur, on_delete=models.SET_NULL, null=True, blank=True)
+    fournisseur = models.ForeignKey('achats.Fournisseur', on_delete=models.SET_NULL, null=True, blank=True)
     date_reception = models.DateField(auto_now_add=True)
 
     def __str__(self): return f"{self.medicament} - Lot {self.numero_lot}"
@@ -81,7 +71,7 @@ class CommandePharmacies(models.Model):
     STATUT = [('brouillon','Brouillon'),('envoye','Envoyé'),('recu','Reçu'),('partiel','Partiel'),('annule','Annulé')]
 
     numero = models.CharField(max_length=20, unique=True, editable=False)
-    fournisseur = models.ForeignKey(Fournisseur, on_delete=models.SET_NULL, null=True)
+    fournisseur = models.ForeignKey('achats.Fournisseur', on_delete=models.SET_NULL, null=True)
     date_commande = models.DateField(auto_now_add=True)
     date_livraison_prevue = models.DateField(null=True, blank=True)
     statut = models.CharField(max_length=20, choices=STATUT, default='brouillon')
@@ -93,9 +83,190 @@ class CommandePharmacies(models.Model):
         if not self.numero:
             from django.utils import timezone
             annee = timezone.now().year
-            count = CommandePharmacies.objects.filter(date_commande__year=annee).count() + 1
-            self.numero = f"CMD{annee}{count:05d}"
+            prefix = f"CMD{annee}"
+            last = CommandePharmacies.objects.filter(numero__startswith=prefix).order_by('-pk').first()
+            count = (int(last.numero[len(prefix):]) + 1) if last else 1
+            self.numero = f"{prefix}{count:05d}"
         super().save(*args, **kwargs)
 
     def __str__(self): return f"Commande {self.numero}"
     class Meta: verbose_name = "Commande pharmacie"
+
+
+# ── Module Pharmacie Walé ─────────────────────────────────────────────────
+
+PHARMACIES_WALE = [
+    ('wale_toumbokro',    'Walé Toumbokro'),
+    ('wale_yamoussoukro', 'Walé Yamoussoukro'),
+]
+
+
+class StockPharmacie(models.Model):
+    """Stock disponible dans chaque pharmacie (alimenté par les dotations)."""
+    pharmacie   = models.CharField(max_length=30, choices=PHARMACIES_WALE)
+    produit     = models.ForeignKey('stock.Produit', on_delete=models.CASCADE, related_name='stocks_pharmacie')
+    quantite    = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    date_maj    = models.DateTimeField(auto_now=True)
+
+    def __str__(self): return f"{self.get_pharmacie_display()} — {self.produit.nom} ({self.quantite})"
+    class Meta:
+        verbose_name = "Stock pharmacie"
+        unique_together = ('pharmacie', 'produit')
+        ordering = ['pharmacie', 'produit__nom']
+
+
+class MouvementPharmacie(models.Model):
+    """Traçabilité des mouvements internes à chaque pharmacie."""
+    TYPE_CHOICES = [
+        ('entree',      'Entrée (dotation)'),
+        ('dispensation','Dispensation ordonnance'),
+        ('vente',       'Vente caisse'),
+        ('retour',      'Retour produit'),
+        ('ajustement',  'Ajustement'),
+    ]
+    pharmacie   = models.CharField(max_length=30, choices=PHARMACIES_WALE)
+    produit     = models.ForeignKey('stock.Produit', on_delete=models.CASCADE, related_name='mouvements_pharmacie')
+    type        = models.CharField(max_length=20, choices=TYPE_CHOICES)
+    quantite    = models.DecimalField(max_digits=12, decimal_places=2)
+    stock_avant = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    stock_apres = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    date        = models.DateTimeField(auto_now_add=True)
+    reference   = models.CharField(max_length=100, blank=True)
+    notes       = models.TextField(blank=True)
+    cree_par    = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='mouvements_pharmacie')
+
+    def __str__(self): return f"{self.get_pharmacie_display()} — {self.produit.nom} ({self.get_type_display()})"
+    class Meta:
+        verbose_name = "Mouvement pharmacie"
+        ordering = ['-date']
+
+
+class DispensationOrdonnance(models.Model):
+    """Lien entre une ordonnance et sa dispensation dans une pharmacie."""
+    STATUT_CHOICES = [
+        ('complete',  'Complète'),
+        ('partielle', 'Partielle'),
+    ]
+    pharmacie    = models.CharField(max_length=30, choices=PHARMACIES_WALE)
+    ordonnance   = models.OneToOneField('consultations.Ordonnance', on_delete=models.CASCADE, related_name='dispensation')
+    statut       = models.CharField(max_length=20, choices=STATUT_CHOICES, default='complete')
+    date         = models.DateTimeField(auto_now_add=True)
+    notes        = models.TextField(blank=True)
+    dispense_par = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='dispensations')
+
+    def __str__(self): return f"Dispensation {self.ordonnance.numero} — {self.get_pharmacie_display()}"
+    class Meta:
+        verbose_name = "Dispensation ordonnance"
+        ordering = ['-date']
+
+
+class LigneDispensation(models.Model):
+    """Détail des produits dispensés pour une ordonnance."""
+    dispensation       = models.ForeignKey(DispensationOrdonnance, on_delete=models.CASCADE, related_name='lignes')
+    produit            = models.ForeignKey('stock.Produit', on_delete=models.PROTECT, null=True, blank=True)
+    medicament_libre   = models.CharField(max_length=200, blank=True)
+    quantite_prescrite = models.IntegerField(default=1)
+    quantite_dispensee = models.IntegerField(default=0)
+    achete_ailleurs    = models.BooleanField(default=False, help_text="Le patient a obtenu ce médicament dans une autre pharmacie")
+    notes              = models.CharField(max_length=200, blank=True)
+
+    def __str__(self): return f"{self.produit or self.medicament_libre} × {self.quantite_dispensee}"
+    class Meta:
+        verbose_name = "Ligne de dispensation"
+
+
+class VentePharmacie(models.Model):
+    MODES_PAIEMENT = [
+        ('especes',      'Espèces'),
+        ('mobile_money', 'Mobile Money'),
+        ('assurance',    'Assurance'),
+    ]
+    STATUTS = [
+        ('payee',   'Payée'),
+        ('annulee', 'Annulée'),
+    ]
+    pharmacie     = models.CharField(max_length=30, choices=PHARMACIES_WALE)
+    numero        = models.CharField(max_length=20, unique=True, editable=False)
+    patient       = models.ForeignKey('patients.Patient', on_delete=models.SET_NULL, null=True, blank=True, related_name='ventes_pharmacie')
+    ordonnance    = models.ForeignKey('consultations.Ordonnance', on_delete=models.SET_NULL, null=True, blank=True, related_name='ventes_pharmacie')
+    date_vente    = models.DateTimeField(auto_now_add=True)
+    mode_paiement = models.CharField(max_length=20, choices=MODES_PAIEMENT, default='especes')
+    montant_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    remise        = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    montant_net   = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    statut        = models.CharField(max_length=20, choices=STATUTS, default='payee')
+    notes         = models.TextField(blank=True)
+    cree_par      = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='ventes_pharmacie')
+
+    def save(self, *args, **kwargs):
+        if not self.numero:
+            from django.utils import timezone
+            annee = timezone.now().year
+            dernier = VentePharmacie.objects.filter(numero__startswith=f'VNT{annee}').order_by('-numero').first()
+            seq = (int(dernier.numero[-4:]) + 1) if dernier else 1
+            self.numero = f"VNT{annee}{seq:04d}"
+        self.montant_net = self.montant_total - self.remise
+        super().save(*args, **kwargs)
+
+    def __str__(self): return f"Vente {self.numero}"
+    class Meta:
+        verbose_name = "Vente pharmacie"
+        ordering = ['-date_vente']
+
+
+class LigneVente(models.Model):
+    vente         = models.ForeignKey(VentePharmacie, on_delete=models.CASCADE, related_name='lignes')
+    produit       = models.ForeignKey('stock.Produit', on_delete=models.PROTECT)
+    quantite      = models.DecimalField(max_digits=10, decimal_places=2)
+    prix_unitaire = models.DecimalField(max_digits=12, decimal_places=2)
+    montant       = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    def save(self, *args, **kwargs):
+        self.montant = self.quantite * self.prix_unitaire
+        super().save(*args, **kwargs)
+
+    def __str__(self): return f"{self.produit.nom} x {self.quantite}"
+    class Meta:
+        verbose_name = "Ligne de vente"
+
+
+class InventairePharmacie(models.Model):
+    STATUTS = [('brouillon', 'Brouillon'), ('valide', 'Validé')]
+    pharmacie         = models.CharField(max_length=30, choices=PHARMACIES_WALE)
+    numero            = models.CharField(max_length=20, unique=True, editable=False)
+    date_inventaire   = models.DateField()
+    statut            = models.CharField(max_length=20, choices=STATUTS, default='brouillon')
+    notes             = models.TextField(blank=True)
+    cree_par          = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='inventaires_pharmacie')
+    valide_par        = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='inventaires_pharmacie_valides')
+    date_validation   = models.DateTimeField(null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        if not self.numero:
+            from django.utils import timezone
+            annee = timezone.now().year
+            dernier = InventairePharmacie.objects.filter(numero__startswith=f'INV-PH{annee}').order_by('-numero').first()
+            seq = (int(dernier.numero[-4:]) + 1) if dernier else 1
+            self.numero = f"INV-PH{annee}{seq:04d}"
+        super().save(*args, **kwargs)
+
+    def __str__(self): return f"Inventaire {self.numero}"
+    class Meta:
+        verbose_name = "Inventaire pharmacie"
+        ordering = ['-date_inventaire']
+
+
+class LigneInventairePharmacie(models.Model):
+    inventaire      = models.ForeignKey(InventairePharmacie, on_delete=models.CASCADE, related_name='lignes')
+    produit         = models.ForeignKey('stock.Produit', on_delete=models.PROTECT)
+    stock_theorique = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    stock_reel      = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    notes           = models.CharField(max_length=200, blank=True)
+
+    @property
+    def ecart(self):
+        return self.stock_reel - self.stock_theorique
+
+    def __str__(self): return f"{self.produit.nom} — écart {self.ecart}"
+    class Meta:
+        verbose_name = "Ligne inventaire pharmacie"

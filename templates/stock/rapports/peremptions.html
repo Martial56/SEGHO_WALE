@@ -1,0 +1,265 @@
+{% extends 'stock/base.html' %}
+{% load static %}
+{% block topbar_title %}Stock — Rapport péremptions{% endblock %}
+
+{% block extra_st_css %}<style>
+.content { padding-top: 0; }
+
+.st-page-head {
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  padding:12px 32px; margin:0 -32px; flex-wrap:wrap;
+  background:#f2f7ee; border-bottom:1px solid rgba(0,0,0,.05);
+  box-shadow:0 2px 8px rgba(0,0,0,.04);
+  position:sticky; top:var(--topbar-h); z-index:100;
+}
+html[data-theme="dark"] .st-page-head {
+  background:var(--st-100); border-bottom-color:var(--st-border);
+}
+
+.mois-nav { display:flex; align-items:center; gap:8px; }
+.mois-nav-btn {
+  width:30px; height:30px; border-radius:6px;
+  border:1.5px solid var(--st-border); background:var(--st-surface);
+  color:var(--st-muted); display:flex; align-items:center; justify-content:center;
+  text-decoration:none; font-size:13px; transition:all .15s;
+}
+.mois-nav-btn:hover { border-color:var(--st-500); color:var(--st-600); }
+.mois-label {
+  font-size:14px; font-weight:800; color:var(--st-text);
+  min-width:160px; text-align:center;
+}
+.annee-select {
+  border:none; border-bottom:1.5px solid rgba(0,0,0,.2);
+  background:transparent; padding:5px 22px 5px 4px;
+  font-size:13px; font-weight:600; color:var(--st-text); font-family:inherit;
+  cursor:pointer; appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 4px center;
+}
+.annee-select:focus { outline:none; border-bottom-color:var(--st-500); }
+
+.perm-val-cell { font-weight:700; color:var(--rose-text); }
+.lot-badge {
+  font-family: var(--font-mono); font-size:11.5px;
+  background:var(--st-50); border:1px solid var(--st-200);
+  padding:2px 7px; border-radius:4px; display:inline-block;
+}
+
+@media print {
+  .st-nav, .st-page-head, .btn-st, .btn-st-outline, .o-back-btn,
+  #st-menu-overlay, #st-menu-popup { display:none !important; }
+  .content { padding:10mm 12mm !important; }
+  body { font-size:11pt; }
+  .st-table { font-size:10pt; }
+  .print-header { display:block !important; margin-bottom:14px; }
+  @page { size:A4 landscape; margin:0; }
+}
+.print-header { display:none; }
+.print-header-inner { display:flex; align-items:center; gap:14px; padding-bottom:10px; border-bottom:2.5px solid var(--st-700); }
+.print-header-logo { height:56px; width:auto; flex-shrink:0; }
+.print-header-org { font-size:15px; font-weight:800; color:#071e28; text-transform:uppercase; letter-spacing:.06em; line-height:1.2; }
+.print-header-subtitle { font-size:9.5px; color:#666; margin-top:1px; letter-spacing:.03em; }
+.print-header-doc { font-size:12px; font-weight:700; color:var(--st-700); margin-top:5px; text-transform:uppercase; letter-spacing:.05em; }
+</style>{% endblock %}
+
+{% block content %}
+
+<!-- En-tête impression -->
+<div class="print-header">
+  <div class="print-header-inner">
+    <img src="{% static 'img/logo.png' %}" alt="Logo WALÉ" class="print-header-logo">
+    <div>
+      <div class="print-header-org">Centre Médico-Social WALÉ</div>
+      <div class="print-header-subtitle">Yamoussoukro — Côte d'Ivoire</div>
+      <div class="print-header-doc">Rapport des péremptions</div>
+    </div>
+  </div>
+</div>
+
+<!-- En-tête sticky -->
+<div class="st-page-head">
+  <!-- Gauche : retour + titre + nav mois -->
+  <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+    <a class="o-back-btn" href="javascript:history.back()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 5l-7 7 7 7"/></svg> Retour</a>
+    <div>
+      <div style="font-size:15px;font-weight:800;color:var(--st-900);">
+        <i class="bi bi-calendar-x" style="color:var(--rose-text);"></i> Rapport des éliminations
+      </div>
+      <div style="font-size:11.5px;color:var(--st-muted);">Mouvements de type péremption</div>
+    </div>
+    <div class="mois-nav">
+      <a href="?mois={{ prev_mois }}&annee={{ prev_annee }}" class="mois-nav-btn" title="Mois précédent">
+        <i class="bi bi-chevron-left"></i>
+      </a>
+      <span class="mois-label">{{ mois_nom }} {{ annee }}</span>
+      <a href="?mois={{ next_mois }}&annee={{ next_annee }}" class="mois-nav-btn" title="Mois suivant">
+        <i class="bi bi-chevron-right"></i>
+      </a>
+    </div>
+  </div>
+
+  <!-- Droite : sélecteur année + boutons -->
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+    <form method="get" style="display:inline;">
+      <input type="hidden" name="mois" value="{{ mois }}">
+      <select name="annee" class="annee-select" onchange="this.form.submit()" title="Changer d'année">
+        {% for y in annees_dispo %}
+        <option value="{{ y }}" {% if annee == y %}selected{% endif %}>{{ y }}</option>
+        {% endfor %}
+      </select>
+    </form>
+    <a href="{% url 'stock_elimination_create' %}" class="btn-st">
+      <i class="bi bi-plus-circle"></i> Enregistrer des éliminations
+    </a>
+    <button class="btn-st-outline" onclick="window.print()" type="button">
+      <i class="bi bi-printer"></i> Imprimer
+    </button>
+  </div>
+</div>
+
+<!-- Titre visible à l'impression uniquement -->
+<div class="print-title">Rapport des éliminations — {{ mois_nom }} {{ annee }}</div>
+
+<!-- Cartes statistiques -->
+<div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap;">
+  <div class="st-stat" style="min-width:150px;">
+    <div class="st-stat-icon" style="background:rgba(183,28,28,.1);color:var(--rose-text);">
+      <i class="bi bi-journal-x"></i>
+    </div>
+    <div>
+      <div class="st-stat-val" style="color:var(--rose-text);">{{ mouvements|length }}</div>
+      <div class="st-stat-lbl">Élimination{{ mouvements|length|pluralize }} enregistrée{{ mouvements|length|pluralize }}</div>
+    </div>
+  </div>
+
+  <div class="st-stat" style="min-width:150px;">
+    <div class="st-stat-icon" style="background:rgba(138,92,0,.1);color:var(--amber-text);">
+      <i class="bi bi-boxes"></i>
+    </div>
+    <div>
+      <div class="st-stat-val" style="color:var(--amber-text);">{{ total_quantite|floatformat:0 }}</div>
+      <div class="st-stat-lbl">Unités éliminées</div>
+    </div>
+  </div>
+
+  <div class="st-stat" style="min-width:180px;">
+    <div class="st-stat-icon" style="background:rgba(183,28,28,.08);color:var(--rose-text);">
+      <i class="bi bi-currency-exchange"></i>
+    </div>
+    <div>
+      <div class="st-stat-val" style="color:var(--rose-text);">{{ total_valeur|floatformat:0 }} F</div>
+      <div class="st-stat-lbl">Valeur perdue estimée</div>
+    </div>
+  </div>
+</div>
+
+<!-- Tableau des mouvements de péremption -->
+<div style="margin-top:16px;margin-left:-32px;margin-right:-32px;background:var(--st-surface);box-shadow:0 2px 12px rgba(58,89,36,.08);overflow:hidden;">
+  {% if mouvements %}
+  <table class="st-table">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Produit</th>
+        <th>Lot N°</th>
+        <th style="text-align:right;">Qté éliminée</th>
+        <th style="text-align:right;">Valeur perdue</th>
+        <th>Notes</th>
+        <th>Responsable</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for mv in mouvements %}
+    <tr>
+      <!-- Date -->
+      <td style="white-space:nowrap;font-size:12px;color:var(--st-muted);">
+        {{ mv.date|date:"d/m/Y" }}
+      </td>
+
+      <!-- Produit -->
+      <td>
+        <div style="font-weight:600;color:var(--st-text);">{{ mv.produit.nom }}</div>
+        <div style="font-size:10.5px;color:var(--st-muted);">{{ mv.produit.unite_mesure.nom }}</div>
+      </td>
+
+      <!-- Lot N° -->
+      <td>
+        {% if mv.lot and mv.lot.numero_lot %}
+          <span class="lot-badge">{{ mv.lot.numero_lot }}</span>
+        {% else %}
+          <span style="color:var(--st-muted);">—</span>
+        {% endif %}
+      </td>
+
+      <!-- Quantité éliminée -->
+      <td style="text-align:right;">
+        <span style="font-size:15px;font-weight:800;color:var(--rose-text);">{{ mv.quantite|floatformat:0 }}</span>
+        <span style="font-size:10px;color:var(--st-muted);"> {{ mv.produit.unite_mesure.nom }}</span>
+      </td>
+
+      <!-- Valeur perdue -->
+      <td style="text-align:right;">
+        {% if mv.lot %}
+          <span class="perm-val-cell">
+            {% widthratio mv.quantite 1 mv.lot.prix_achat_lot as val_lot %}
+            {{ val_lot|floatformat:0 }} F
+          </span>
+        {% elif mv.produit.prix_achat %}
+          <span class="perm-val-cell">
+            {% widthratio mv.quantite 1 mv.produit.prix_achat as val_prod %}
+            {{ val_prod|floatformat:0 }} F
+          </span>
+        {% else %}
+          <span style="color:var(--st-muted);">—</span>
+        {% endif %}
+      </td>
+
+      <!-- Notes -->
+      <td style="font-size:12px;color:var(--st-muted);max-width:200px;">
+        {% if mv.notes %}
+          <span title="{{ mv.notes }}">{{ mv.notes|truncatechars:60 }}</span>
+        {% else %}
+          <span style="font-style:italic;opacity:.6;">—</span>
+        {% endif %}
+      </td>
+
+      <!-- Responsable -->
+      <td style="font-size:12px;white-space:nowrap;">
+        {% if mv.cree_par %}
+          <i class="bi bi-person-fill" style="color:var(--st-400);font-size:11px;"></i>
+          {{ mv.cree_par.get_full_name }}
+        {% else %}
+          <span style="color:var(--st-muted);">—</span>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr style="background:var(--st-50);border-top:2px solid var(--st-200);">
+        <td colspan="3" style="padding:8px 12px;font-size:11.5px;font-weight:700;color:var(--st-700);text-align:right;">
+          TOTAUX
+        </td>
+        <td style="text-align:right;padding:8px 12px;">
+          <span style="font-weight:800;font-size:14px;color:var(--rose-text);">{{ total_quantite|floatformat:0 }}</span>
+        </td>
+        <td style="text-align:right;padding:8px 12px;">
+          <span style="font-weight:800;font-size:14px;color:var(--rose-text);">{{ total_valeur|floatformat:0 }} F</span>
+        </td>
+        <td colspan="2"></td>
+      </tr>
+    </tfoot>
+  </table>
+  {% else %}
+  <div style="text-align:center;padding:64px 32px;color:var(--st-muted);">
+    <i class="bi bi-calendar-check" style="font-size:36px;display:block;margin-bottom:14px;color:var(--st-300);"></i>
+    <div style="font-size:15px;font-weight:700;margin-bottom:6px;color:var(--st-600);">Aucune élimination enregistrée pour ce mois</div>
+    <div style="font-size:13px;margin-bottom:20px;">Aucun mouvement de type péremption pour {{ mois_nom }} {{ annee }}.</div>
+    <a href="{% url 'stock_elimination_create' %}" class="btn-st">
+      <i class="bi bi-plus-circle"></i> Enregistrer des éliminations
+    </a>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

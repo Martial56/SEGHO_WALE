@@ -1,0 +1,221 @@
+{% load static %}<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bon de commande {{ commande.numero }}</title>
+<style>
+:root {
+  --font-print: 'Segoe UI', Arial, sans-serif; --font-mono: 'Courier New', monospace;
+  --st-600: #4f9b4b; --st-700: #2e592b;
+}
+
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family: var(--font-print); font-size:13px; color:#111; background:#fff; }
+
+@media screen {
+  body { background:#e8edf0; padding:20px; }
+  .page { background:#fff; max-width:720px; margin:0 auto; padding:32px 40px 40px; box-shadow:0 4px 24px rgba(0,0,0,.15); border-radius:4px; }
+  .print-btn-bar { max-width:720px; margin:0 auto 12px; text-align:right; display:flex; gap:8px; justify-content:flex-end; }
+  .print-btn { background:var(--st-700); color:#fff; border:none; border-radius:6px; padding:8px 20px; font-size:13px; font-weight:600; cursor:pointer; }
+  .print-btn:hover { background:#071e28; }
+  .print-btn-back { background:#fff; color:#555; border:1px solid #ddd; border-radius:6px; padding:8px 16px; font-size:13px; font-weight:500; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:6px; }
+}
+
+@media print {
+  body { background:#fff; padding:0; }
+  .page { padding:10mm 14mm; width:100%; max-width:none; box-shadow:none; }
+  .no-print { display:none !important; }
+  @page { size:A4 portrait; margin:0; }
+}
+
+/* En-tête */
+.header { display:flex; justify-content:space-between; align-items:flex-start; padding-bottom:14px; border-bottom:3px solid var(--st-700); margin-bottom:20px; }
+.header-left { display:flex; align-items:center; gap:14px; }
+.header-left img { width:52px; height:52px; object-fit:contain; }
+.clinic-name { font-size:16px; font-weight:800; color:var(--st-700); }
+.clinic-sub  { font-size:11px; color:#555; margin-top:2px; }
+.header-right { text-align:right; }
+.doc-title { font-size:18px; font-weight:800; color:var(--st-700); letter-spacing:-.3px; }
+.doc-num   { font-size:13px; font-weight:700; color:#555; margin-top:3px; font-family: var(--font-mono); }
+.doc-date  { font-size:11px; color:#888; margin-top:2px; }
+
+/* Infos fournisseur + commande */
+.info-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px; }
+.info-box { border:1px solid #e0e0e0; border-radius:6px; padding:12px 16px; }
+.info-box-title { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#888; margin-bottom:8px; }
+.info-row { display:flex; justify-content:space-between; font-size:12px; padding:3px 0; border-bottom:1px solid #f0f0f0; }
+.info-row:last-child { border-bottom:none; }
+.info-lbl { color:#888; }
+.info-val { font-weight:600; color:#111; }
+
+/* Tableau produits */
+.section-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--st-700); margin-bottom:8px; border-left:3px solid var(--st-700); padding-left:8px; }
+table { width:100%; border-collapse:collapse; font-size:12px; }
+thead tr { background:var(--st-700); color:#fff; }
+thead th { padding:8px 10px; font-weight:700; font-size:10.5px; text-transform:uppercase; letter-spacing:.3px; text-align:left; }
+thead th:last-child { text-align:right; }
+tbody tr { border-bottom:1px solid #eee; }
+tbody tr:nth-child(even) { background:#f0f5fa; }
+tbody td { padding:8px 10px; vertical-align:middle; }
+tbody td:last-child { text-align:right; font-weight:700; }
+.td-code { font-family: var(--font-mono); font-size:11px; color:#888; }
+.td-name { font-weight:600; }
+.td-num  { text-align:right; font-family: var(--font-mono); }
+tfoot tr { background:#e8f2f8; border-top:2px solid var(--st-700); }
+tfoot td { padding:10px 10px; font-weight:800; font-size:13px; text-align:right; color:var(--st-700); }
+tfoot td:first-child { text-align:left; }
+
+/* Notes */
+.notes-box { background:#f0f5fa; border:1px solid #a8c8d8; border-radius:6px; padding:10px 14px; font-size:12px; color:#333; margin-top:16px; }
+
+/* Signature */
+.signature-area { display:flex; justify-content:space-between; margin-top:36px; }
+.signature-box { text-align:center; min-width:160px; }
+.signature-line { border-top:1px solid var(--st-700); margin-top:40px; padding-top:5px; font-size:11px; color:#333; font-weight:600; }
+
+/* Pied de page */
+.footer { margin-top:24px; padding-top:10px; border-top:1px solid #ddd; display:flex; justify-content:space-between; font-size:10px; color:#aaa; }
+
+/* Statut badge */
+.badge-statut { display:inline-block; padding:3px 10px; border-radius:12px; font-size:10.5px; font-weight:700; }
+.badge-brouillon { background:#f5f5f5; color:#555; }
+.badge-envoye    { background:#e8f2f8; color:var(--st-700); }
+.badge-recu      { background:#e2eef5; color:var(--st-600); }
+.badge-partiel   { background:#fff3e0; color:#e65100; }
+.badge-annule    { background:#fce4ec; color:#c62828; }
+</style>
+</head>
+<body>
+
+<div class="no-print print-btn-bar">
+  <a href="{% url 'stock_commande_detail' commande.pk %}" class="print-btn-back">&#8592; Retour</a>
+  <button class="print-btn" onclick="window.print()">&#128424; Imprimer / Exporter PDF</button>
+</div>
+
+<div class="page">
+
+  <!-- En-tête -->
+  <div class="header">
+    <div class="header-left">
+      <img src="{% static 'img/logo.png' %}" alt="Logo WALÉ">
+      <div>
+        <div class="clinic-name">Centre Médico-Social WALÉ</div>
+        <div class="clinic-sub">Yamoussoukro, Côte d'Ivoire</div>
+        <div class="clinic-sub" style="margin-top:3px;">Gestion du stock</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="doc-title">BON DE COMMANDE</div>
+      <div class="doc-num">{{ commande.numero }}</div>
+      <div class="doc-date">Émis le {{ today|date:"d/m/Y" }}</div>
+      <div style="margin-top:6px;">
+        {% if commande.statut == 'brouillon' %}<span class="badge-statut badge-brouillon">Brouillon</span>
+        {% elif commande.statut == 'envoye' %}<span class="badge-statut badge-envoye">Envoyée</span>
+        {% elif commande.statut == 'recu' %}<span class="badge-statut badge-recu">Reçue</span>
+        {% elif commande.statut == 'partiel' %}<span class="badge-statut badge-partiel">Partielle</span>
+        {% elif commande.statut == 'annule' %}<span class="badge-statut badge-annule">Annulée</span>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Infos fournisseur + commande -->
+  <div class="info-grid">
+    <div class="info-box">
+      <div class="info-box-title">Fournisseur</div>
+      <div class="info-row"><span class="info-lbl">Nom</span><span class="info-val">{{ commande.fournisseur.nom }}</span></div>
+      <div class="info-row"><span class="info-lbl">Code</span><span class="info-val" style="font-family: var(--font-mono);">{{ commande.fournisseur.code }}</span></div>
+      {% if commande.fournisseur.telephone %}
+      <div class="info-row"><span class="info-lbl">Téléphone</span><span class="info-val">{{ commande.fournisseur.telephone }}</span></div>
+      {% endif %}
+      {% if commande.fournisseur.email %}
+      <div class="info-row"><span class="info-lbl">Email</span><span class="info-val">{{ commande.fournisseur.email }}</span></div>
+      {% endif %}
+    </div>
+    <div class="info-box">
+      <div class="info-box-title">Informations commande</div>
+      <div class="info-row"><span class="info-lbl">N° Commande</span><span class="info-val" style="font-family: var(--font-mono);color:var(--st-700);">{{ commande.numero }}</span></div>
+      <div class="info-row"><span class="info-lbl">Date commande</span><span class="info-val">{{ commande.date_commande|date:"d/m/Y" }}</span></div>
+      {% if commande.date_livraison_prevue %}
+      <div class="info-row"><span class="info-lbl">Livraison prévue</span><span class="info-val">{{ commande.date_livraison_prevue|date:"d/m/Y" }}</span></div>
+      {% endif %}
+      {% if commande.cree_par %}
+      <div class="info-row"><span class="info-lbl">Établi par</span><span class="info-val">{{ commande.cree_par.get_full_name|default:commande.cree_par.username }}</span></div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Tableau produits -->
+  <div class="section-title">Produits commandés</div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:28px;">#</th>
+        <th>Code</th>
+        <th>Désignation du produit</th>
+        <th style="text-align:right;">Qté commandée</th>
+        <th style="text-align:right;">Prix unitaire (F CFA)</th>
+        <th>Total (F CFA)</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for ligne in lignes %}
+    <tr>
+      <td style="color:#aaa;font-size:11px;text-align:center;">{{ forloop.counter }}</td>
+      <td class="td-code">{{ ligne.produit.code }}</td>
+      <td class="td-name">
+        {{ ligne.produit.nom }}
+        {% if ligne.produit.dci %}<div style="font-size:10.5px;color:#888;">{{ ligne.produit.dci }}</div>{% endif %}
+      </td>
+      <td class="td-num">{{ ligne.quantite_commandee|floatformat:0 }} <span style="font-size:10px;font-weight:400;color:#888;">{{ ligne.produit.unite_mesure.nom }}</span></td>
+      <td class="td-num">{{ ligne.prix_unitaire|floatformat:0 }}</td>
+      <td class="td-num">{{ ligne.montant|floatformat:0 }}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="6" style="text-align:center;padding:20px;color:#aaa;font-style:italic;">Aucun produit dans cette commande</td></tr>
+    {% endfor %}
+    </tbody>
+    {% if lignes %}
+    <tfoot>
+      <tr>
+        <td colspan="5">MONTANT TOTAL</td>
+        <td>{{ commande.montant_total|floatformat:0 }} F CFA</td>
+      </tr>
+    </tfoot>
+    {% endif %}
+  </table>
+
+  <!-- Notes -->
+  {% if commande.notes %}
+  <div class="notes-box" style="margin-top:16px;">
+    <strong style="font-size:10.5px;color:#888;text-transform:uppercase;letter-spacing:.4px;">Notes :</strong>
+    <div style="margin-top:4px;">{{ commande.notes }}</div>
+  </div>
+  {% endif %}
+
+  <!-- Signatures -->
+  <div class="signature-area">
+    <div class="signature-box">
+      <div class="signature-line">Le Gestionnaire de stock</div>
+      <div style="font-size:10px;color:#888;margin-top:3px;">Nom & Signature</div>
+    </div>
+    <div class="signature-box">
+      <div class="signature-line">Le Directeur</div>
+      <div style="font-size:10px;color:#888;margin-top:3px;">Nom & Signature</div>
+    </div>
+    <div class="signature-box">
+      <div class="signature-line">Le Fournisseur</div>
+      <div style="font-size:10px;color:#888;margin-top:3px;">Cachet & Signature</div>
+    </div>
+  </div>
+
+  <!-- Pied de page -->
+  <div class="footer">
+    <div>Centre Médico-Social WALÉ — Yamoussoukro</div>
+    <div>{{ commande.numero }} — Document généré le {{ today|date:"d/m/Y" }}</div>
+    <div>Confidentiel — Usage interne</div>
+  </div>
+
+</div>
+</body>
+</html>

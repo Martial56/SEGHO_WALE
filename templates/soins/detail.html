@@ -1,12 +1,16 @@
 {% extends 'soins/base.html' %}
 {% load static %}
+{% load core_tags %}
 {% block breadcrumb %}{% endblock %}
-{% block module_navbar %}{% endblock %}
 
 {% block extra_css %}
 {{ block.super }}
 <style>
-  .det-page { width: 100%; padding: 12px 20px 48px; }
+  .det-page { width: 100%; padding: 12px 20px 48px; display: flex; align-items: flex-start; gap: 14px; }
+  .det-main  { flex: 1; min-width: 0; }
+  /* Historique (.hist-aside) : styles globaux dans base.html — s'aligne
+     naturellement avec .det-main (tous deux enfants flex de .det-page). */
+  @media (max-width: 900px) { .det-page { flex-direction: column; } }
 
   /* ── CARTE HEADER ── */
   .det-header {
@@ -22,13 +26,13 @@
   .det-action-btns { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
   .det-btn {
     padding: 5px 13px; border-radius: 4px; font-size: 12px; font-weight: 600;
-    font-family: 'Roboto', sans-serif; cursor: pointer; text-decoration: none;
+    font-family: var(--font-roboto); cursor: pointer; text-decoration: none;
     display: inline-flex; align-items: center; gap: 5px; transition: all .15s; border: none;
   }
   .det-btn-edit    { background: var(--accent); color: #fff; }
   .det-btn-edit:hover { filter: brightness(1.1); }
-  .det-btn-invoice { background: #16a34a; color: #fff; }
-  .det-btn-invoice:hover { background: #15803d; }
+  .det-btn-invoice { background: var(--primary); color: #fff; }
+  .det-btn-invoice:hover { background: var(--primary-dark); }
   .det-btn-delete  { background: none; border: 1.5px solid #fca5a5 !important; color: #dc2626; }
   .det-btn-delete:hover { background: #fef2f2; }
 
@@ -46,7 +50,7 @@
     background: var(--accent); color: #fff; line-height: 1;
   }
   .qnav-count-gray  { background: #9ca3af; }
-  .qnav-count-green { background: #16a34a; }
+  .qnav-count-green { background: var(--primary); }
   .det-qnav-link {
     display: inline-flex; align-items: center; gap: 5px;
     padding: 10px 16px; font-size: 12px; font-weight: 500; color: var(--text-muted);
@@ -77,7 +81,7 @@
   .det-meta-item { display: inline-flex; align-items: center; gap: 5px; }
   .det-meta-item i { font-size: 13px; color: var(--accent); }
   .det-numero-badge {
-    font-family: monospace; font-size: 12px; font-weight: 700;
+    font-family: var(--font-mono); font-size: 12px; font-weight: 700;
     color: var(--accent); letter-spacing: .5px;
   }
   .det-date-block {
@@ -155,6 +159,30 @@
     font-size: 13px; font-style: italic;
   }
 
+  /* ── Stepper (même style que les procédures) ── */
+  .det-status-bar { display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);border-radius:8px 8px 0 0;gap:12px; }
+  .det-status-bar .det-action-btns { display:flex;align-items:center;gap:7px;flex-wrap:wrap;flex-shrink:0; }
+  .proc-steps { display:flex;align-items:flex-start;flex-wrap:nowrap; }
+  .proc-step { display:flex;flex-direction:column;align-items:center;gap:5px;background:none;border:none;padding:0 2px;font-family: var(--font-roboto);cursor:default;min-width:60px; }
+  .proc-step-node { width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0; }
+  .proc-step-label { font-size:10px;font-weight:600;white-space:nowrap;text-transform:uppercase;letter-spacing:.04em;text-align:center; }
+  .proc-step-connector { flex:0 1 44px;min-width:18px;height:2px;background:var(--border);margin-top:13px; }
+  .connector-done { background:var(--primary); }
+  .step-node-done   { background:var(--primary);color:#fff; }
+  .step-node-active { background:var(--accent);color:#fff;box-shadow:0 0 0 3px rgba(26,92,74,.18); }
+  .step-node-future { background:var(--bg);color:#9ca3af;border:2px solid var(--border); }
+  .step-node-done-green { background:var(--primary);color:#fff;box-shadow:0 0 0 3px rgba(var(--teal-600-rgb),.18); }
+  .step-node-cancelled { background:#f3f4f6;color:#9ca3af;border:2px solid #e5e7eb; }
+  .step-done .proc-step-label   { color:var(--primary); }
+  .step-active .proc-step-label { color:var(--accent);font-weight:700; }
+  .step-future .proc-step-label { color:#9ca3af; }
+  .step-cancelled .proc-step-label { color:#9ca3af; }
+  .step-active-termine .proc-step-label { color:var(--primary);font-weight:700; }
+  .proc-annule-badge { display:inline-flex;align-items:center;gap:5px;padding:3px 10px;background:#fef2f2;color:#dc2626;border:1.5px solid #fecaca;border-radius:20px;font-size:11px;font-weight:600;margin-left:12px;align-self:flex-start;margin-top:5px; }
+  html[data-theme="dark"] .step-node-future { background:var(--surface);border-color:rgba(255,255,255,.2);color:rgba(255,255,255,.3); }
+  html[data-theme="dark"] .step-node-cancelled { background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.15); }
+  html[data-theme="dark"] .proc-annule-badge { background:rgba(220,38,38,.15);border-color:rgba(220,38,38,.35);color:#fca5a5; }
+
   @media (max-width: 860px) {
     .det-grid { grid-template-columns: repeat(2, 1fr); }
     .det-grid .det-field:nth-child(3n) { border-right: 1px solid var(--border); }
@@ -170,12 +198,11 @@
 {% endblock %}
 
 {% block content %}
+<div class="hist-wrapper"><div class="hist-main">
 <div id="page-wrap">
 
-{% include 'soins/includes/nav.html' %}
-
 <!-- ══ SUBHEADER ══ -->
-<div class="o-subheader" id="subheader">
+<div class="o-subheader" data-fixed="1" id="subheader">
   <div class="o-subheader-row">
     <a href="{% url 'soins:list' %}" class="o-ctrl-btn" style="padding:3px 7px;">
       <i class="bi bi-arrow-left"></i>
@@ -190,109 +217,122 @@
 </div>
 
 <div class="det-page">
+<div class="det-main">
 
   <!-- ══ CARTE EN-TÊTE ══ -->
   <div class="det-header">
 
-    <!-- 1. Stepper statut (pleine largeur) -->
+    <!-- Statut + actions -->
     <div class="det-status-bar">
-      <div class="stp-stepper" id="stp-stepper" data-active="{{ soin.statut }}">
-        <div class="stp-flow">
-          <div class="stp-step" data-val="brouillon">
-            <i class="bi bi-pencil stp-icon"></i>
-            <span class="stp-label">Brouillon</span>
+
+      <!-- Stepper -->
+      <div class="proc-steps">
+        {% with s=soin.statut %}
+        {% if s == 'annule' %}
+          <div class="proc-step step-cancelled">
+            <div class="proc-step-node step-node-cancelled"><span>1</span></div>
+            <span class="proc-step-label">Brouillon</span>
           </div>
-          <div class="stp-step" data-val="en_attente_de_paiement">
-            <i class="bi bi-clock stp-icon"></i>
-            <span class="stp-label">Attente paiement</span>
+          <div class="proc-step-connector"></div>
+          <div class="proc-step step-cancelled">
+            <div class="proc-step-node step-node-cancelled"><span>2</span></div>
+            <span class="proc-step-label">Paiement en attente</span>
           </div>
-          <div class="stp-step" data-val="en_cours">
-            <i class="bi bi-activity stp-icon"></i>
-            <span class="stp-label">En cours</span>
+          <div class="proc-step-connector"></div>
+          <div class="proc-step step-cancelled">
+            <div class="proc-step-node step-node-cancelled"><span>3</span></div>
+            <span class="proc-step-label">Soins en cours</span>
           </div>
-          <div class="stp-step" data-val="termine">
-            <i class="bi bi-check2-circle stp-icon"></i>
-            <span class="stp-label">Terminé</span>
+          <div class="proc-step-connector"></div>
+          <div class="proc-step step-cancelled">
+            <div class="proc-step-node step-node-cancelled"><span>4</span></div>
+            <span class="proc-step-label">Terminé</span>
           </div>
-        </div>
-        <div class="stp-sep"></div>
-        <div class="stp-annule" data-val="annule">
-          <i class="bi bi-x-circle stp-icon"></i>
-          <span class="stp-label">Annulé</span>
-        </div>
+          <span class="proc-annule-badge"><i class="bi bi-x-circle-fill"></i> Annulé</span>
+        {% else %}
+          <div class="proc-step {% if s == 'brouillon' %}step-active{% else %}step-done{% endif %}">
+            <div class="proc-step-node {% if s == 'brouillon' %}step-node-active{% else %}step-node-done{% endif %}">
+              {% if s != 'brouillon' %}<i class="bi bi-check-lg"></i>{% else %}<span>1</span>{% endif %}
+            </div>
+            <span class="proc-step-label">Brouillon</span>
+          </div>
+          <div class="proc-step-connector {% if s != 'brouillon' %}connector-done{% endif %}"></div>
+          <div class="proc-step {% if s == 'en_attente_de_paiement' %}step-active{% elif s == 'en_cours' or s == 'termine' %}step-done{% else %}step-future{% endif %}">
+            <div class="proc-step-node {% if s == 'en_attente_de_paiement' %}step-node-active{% elif s == 'en_cours' or s == 'termine' %}step-node-done{% else %}step-node-future{% endif %}">
+              {% if s == 'en_cours' or s == 'termine' %}<i class="bi bi-check-lg"></i>{% else %}<span>2</span>{% endif %}
+            </div>
+            <span class="proc-step-label">Paiement en attente</span>
+          </div>
+          <div class="proc-step-connector {% if s == 'en_cours' or s == 'termine' %}connector-done{% endif %}"></div>
+          <div class="proc-step {% if s == 'en_cours' %}step-active{% elif s == 'termine' %}step-done{% else %}step-future{% endif %}">
+            <div class="proc-step-node {% if s == 'en_cours' %}step-node-active{% elif s == 'termine' %}step-node-done{% else %}step-node-future{% endif %}">
+              {% if s == 'termine' %}<i class="bi bi-check-lg"></i>{% else %}<span>3</span>{% endif %}
+            </div>
+            <span class="proc-step-label">Soins en cours</span>
+          </div>
+          <div class="proc-step-connector {% if s == 'termine' %}connector-done{% endif %}"></div>
+          <div class="proc-step {% if s == 'termine' %}step-active-termine{% else %}step-future{% endif %}">
+            <div class="proc-step-node {% if s == 'termine' %}step-node-done-green{% else %}step-node-future{% endif %}">
+              {% if s == 'termine' %}<i class="bi bi-check-lg"></i>{% else %}<span>4</span>{% endif %}
+            </div>
+            <span class="proc-step-label">Terminé</span>
+          </div>
+        {% endif %}
+        {% endwith %}
       </div>
-    </div>
 
-    <!-- 2. Boutons d'action -->
-    <div class="det-actions-bar">
-      {# Modifier — seulement en brouillon (ou admin) #}
-      {% if soin.statut == 'brouillon' or request.user.is_superuser %}
-      <a href="{% url 'soins:edit' soin.pk %}" class="det-btn det-btn-edit" style="text-decoration:none;">
-        <i class="bi bi-pencil"></i> Modifier
-      </a>
-      {% endif %}
+      <!-- Actions droite -->
+      <div class="det-action-btns">
+        {% if soin.statut == 'brouillon' or request.user.is_superuser %}
+        <a href="{% url 'soins:edit' soin.pk %}" class="det-btn det-btn-edit" style="text-decoration:none;">
+          <i class="bi bi-pencil"></i> Modifier
+        </a>
+        {% endif %}
+        {% if peut_creer_facture %}
+        <a href="{% url 'soins:creer_facture' soin.pk %}" class="det-btn det-btn-invoice" style="text-decoration:none;">
+          <i class="bi bi-receipt"></i> Créer une facture
+        </a>
+        {% endif %}
+        {% if peut_voir_facture %}
+        <a href="{% url 'facturation:detail' soin.facture.pk %}?next={% url 'soins:detail' soin.pk %}" class="det-btn"
+          style="background:#1d4ed8;color:#fff;text-decoration:none;">
+          <i class="bi bi-receipt-cutoff"></i> Voir la facture
+        </a>
+        {% endif %}
+        {% if peut_voir_facture and peut_creer_facture %}
+        <a href="{% url 'facturation:detail' soin.facture.pk %}?next={% url 'soins:detail' soin.pk %}" class="det-btn det-btn-invoice" style="text-decoration:none;">
+          <i class="bi bi-cash-coin"></i> Encaisser
+        </a>
+        {% endif %}
+        {% if peut_administrer %}
+        <form method="post" action="{% url 'soins:administrer' soin.pk %}" style="display:inline;">
+          {% csrf_token %}
+          <button type="submit" class="det-btn" style="background:var(--primary);color:#fff;">
+            <i class="bi bi-check-circle-fill"></i> Administrer
+          </button>
+        </form>
+        {% endif %}
+        <a href="{% url 'soins:list' %}" class="det-btn det-btn-delete" style="text-decoration:none;border:1.5px solid #fca5a5;">
+          <i class="bi bi-arrow-left"></i> Retour
+        </a>
+      </div>
 
-      {# Créer une facture — Caisse uniquement, soin en attente, pas encore de facture #}
-      {% if peut_creer_facture %}
-      <a href="{% url 'soins:creer_facture' soin.pk %}" class="det-btn det-btn-invoice" style="text-decoration:none;">
-        <i class="bi bi-receipt"></i> Créer une facture
-      </a>
-      {% endif %}
-
-      {# Voir la facture — tout le monde, si facture existante #}
-      {% if peut_voir_facture %}
-      <a href="{% url 'soins:facture_paiement' soin.facture.pk %}" class="det-btn"
-        style="background:#1d4ed8;color:#fff;text-decoration:none;" target="_blank">
-        <i class="bi bi-receipt-cutoff"></i> Voir la facture
-      </a>
-      {% endif %}
-
-      {# Encaisser si facture créée mais pas encore payée #}
-      {% if peut_voir_facture and peut_creer_facture %}
-      <a href="{% url 'soins:facture_paiement' soin.facture.pk %}" class="det-btn det-btn-invoice" style="text-decoration:none;">
-        <i class="bi bi-cash-coin"></i> Encaisser
-      </a>
-      {% endif %}
-
-      {# Administrer — Soins uniquement, soin en cours + facture payée #}
-      {% if peut_administrer %}
-      <form method="post" action="{% url 'soins:administrer' soin.pk %}" style="display:inline;">
-        {% csrf_token %}
-        <button type="submit" class="det-btn" style="background:#16a34a;color:#fff;">
-          <i class="bi bi-check-circle-fill"></i> Administrer
-        </button>
-      </form>
-      {% endif %}
-
-      <a href="{% url 'soins:list' %}" class="det-btn det-btn-delete" style="text-decoration:none;border:1.5px solid #fca5a5;">
-        <i class="bi bi-arrow-left"></i> Retour
-      </a>
     </div>
 
     <!-- 2. Navigation rapide avec compteurs -->
-    <div class="det-quick-nav">
+    <!-- <div class="det-quick-nav">
       <div style="flex:1;"></div>
-      <div class="det-qnav-sep"></div>
-      <a href="#" class="det-qnav-link">
-        <i class="bi bi-calendar-check"></i> Rendez-vous
-        <span class="qnav-count">{{ counts.rdv|default:0 }}</span>
-      </a>
       <div class="det-qnav-sep"></div>
       <a href="{% url 'soins:procedure_list' %}?patient_id={{ soin.patient.pk }}" class="det-qnav-link">
         <i class="bi bi-bandaid"></i> Liste des soins
         <span class="qnav-count qnav-count-gray">{{ counts.soins|default:0 }}</span>
       </a>
       <div class="det-qnav-sep"></div>
-      <a href="{% url 'soins:demande_examen_list' %}?patient_id={{ soin.patient.pk }}" class="det-qnav-link">
-        <i class="bi bi-clipboard2-pulse"></i> Demandes d'examen
-        <span class="qnav-count">{{ counts.examens|default:0 }}</span>
-      </a>
-      <div class="det-qnav-sep"></div>
       <a href="#" class="det-qnav-link">
         <i class="bi bi-graph-up"></i> Résultats de traitement
         <span class="qnav-count qnav-count-green">{{ counts.analyses|default:0 }}</span>
       </a>
-    </div>
+    </div> -->
 
     <!-- 3. Identité -->
     <div class="det-identity-row">
@@ -310,24 +350,6 @@
             <i class="bi bi-person-badge"></i>
             <span class="det-numero-badge">{{ soin.numero }}</span>
           </span>
-          {% if soin.infirmier %}
-          <span class="det-meta-item">
-            <i class="bi bi-person-heart"></i>
-            {{ soin.infirmier.nom }} {{ soin.infirmier.prenoms }}
-          </span>
-          {% endif %}
-          {% if soin.departement %}
-          <span class="det-meta-item">
-            <i class="bi bi-building"></i>
-            {{ soin.departement.nom }}
-          </span>
-          {% endif %}
-          {% if soin.service_inscription %}
-          <span class="det-meta-item">
-            <i class="bi bi-hospital"></i>
-            {{ soin.service_inscription.nom }}
-          </span>
-          {% endif %}
         </div>
         {% if soin.motif %}
         <div style="font-size:13px;color:var(--text-muted);font-style:italic;">
@@ -337,8 +359,12 @@
       </div>
       <div class="det-date-block">
         <div class="det-date-label">Date &amp; Heure</div>
-        <div class="det-date-val">{{ soin.date_heure|date:"d/m/Y" }}</div>
-        <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">{{ soin.date_heure|date:"H:i" }}</div>
+        {% if procedures %}
+        <div class="det-date-val">{{ procedures.0.date|date:"d/m/Y" }}</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">{{ procedures.0.date|date:"H:i" }}</div>
+        {% else %}
+        <div class="det-date-val muted" style="font-size:13px;font-style:italic;">—</div>
+        {% endif %}
         <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);">
           <div class="det-date-label">Enregistré le</div>
           <div style="font-size:12px;color:var(--text-muted);">{{ soin.date_creation|date:"d/m/Y" }}</div>
@@ -348,46 +374,6 @@
 
   </div><!-- /.det-header -->
 
-  <!-- ══ INFORMATIONS CLINIQUES ══ -->
-  <div class="det-section">
-    <div class="det-section-head">
-      <i class="bi bi-clipboard2-pulse"></i> Informations cliniques
-    </div>
-    <div class="det-grid">
-      <div class="det-field">
-        <div class="det-field-label">Patient</div>
-        <div class="det-field-value">{{ soin.patient.nom }} {{ soin.patient.prenoms }}</div>
-      </div>
-      <div class="det-field">
-        <div class="det-field-label">Infirmier / Agent</div>
-        <div class="det-field-value {% if not soin.infirmier %}muted{% endif %}">
-          {% if soin.infirmier %}{{ soin.infirmier.nom }} {{ soin.infirmier.prenoms }}{% else %}—{% endif %}
-        </div>
-      </div>
-      <div class="det-field">
-        <div class="det-field-label">Statut</div>
-        <div class="det-field-value">{{ soin.get_statut_display }}</div>
-      </div>
-      <div class="det-field">
-        <div class="det-field-label">Département</div>
-        <div class="det-field-value {% if not soin.departement %}muted{% endif %}">
-          {% if soin.departement %}{{ soin.departement.nom }}{% else %}—{% endif %}
-        </div>
-      </div>
-      <div class="det-field">
-        <div class="det-field-label">Service d'inscription</div>
-        <div class="det-field-value {% if not soin.service_inscription %}muted{% endif %}">
-          {% if soin.service_inscription %}{{ soin.service_inscription.nom }}{% else %}—{% endif %}
-        </div>
-      </div>
-      <div class="det-field">
-        <div class="det-field-label">Rendez-vous lié</div>
-        <div class="det-field-value {% if not soin.rendez_vous %}muted{% endif %}">
-          {% if soin.rendez_vous %}{{ soin.rendez_vous.date_heure|date:"d/m/Y H:i" }}{% else %}—{% endif %}
-        </div>
-      </div>
-    </div>
-  </div>
 
   <!-- ══ ÉTAT DE LA MALADIE ══ -->
   {% if soin.statut_maladie or soin.severite or soin.date_guerison %}
@@ -479,7 +465,7 @@
         <tbody>
           {% for proc in procedures %}
           <tr>
-            <td style="font-family:monospace;font-size:11.5px;font-weight:600;color:var(--accent);">{{ proc.numero }}</td>
+            <td style="font-family: var(--font-mono);font-size:11.5px;font-weight:600;color:var(--accent);">{{ proc.numero }}</td>
             <td style="font-size:12px;color:var(--text-muted);">{{ proc.soin_type.nom|default:"—" }}</td>
             <td style="white-space:nowrap;font-size:12px;">{{ proc.prix|floatformat:0 }} CFA</td>
             <td style="font-size:12px;color:var(--text-muted);">
@@ -491,7 +477,7 @@
             </td>
             <td style="white-space:nowrap;">
               {% if proc.facture %}
-              <a href="{% url 'soins:facture_detail' proc.facture.pk %}?next={% url 'soins:detail' soin.pk %}"
+              <a href="{% url 'facturation:detail' proc.facture.pk %}?next={% url 'soins:detail' soin.pk %}"
                  style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--accent);text-decoration:none;padding:3px 8px;border:1px solid var(--accent);border-radius:4px;white-space:nowrap;"
                  title="Voir la facture {{ proc.facture.numero }}">
                 <i class="bi bi-receipt"></i> {{ proc.facture.numero }}
@@ -515,35 +501,14 @@
     </div>
   </div>
 
+</div><!-- /.det-main -->
+
+{% historique_sidebar soin %}
+
 </div><!-- /.det-page -->
 
-<script>
-  (function () {
-    var tb = document.querySelector('.topbar');
-    var wp = document.getElementById('page-wrap');
-    if (tb && wp) wp.style.paddingTop = tb.offsetHeight + 'px';
-    window.addEventListener('resize', function () {
-      if (tb && wp) wp.style.paddingTop = tb.offsetHeight + 'px';
-    });
-  })();
-
-  /* ── Stepper statut ── */
-  (function(){
-    var bar = document.getElementById('stp-stepper');
-    if (!bar) return;
-    var active = bar.dataset.active;
-    var order = ['brouillon','en_attente_de_paiement','en_cours','termine'];
-    var activeIdx = order.indexOf(active);
-    bar.querySelectorAll('.stp-step').forEach(function(s){
-      var val = s.dataset.val, idx = order.indexOf(val);
-      if (val === active) s.classList.add('stp-active');
-      else if (activeIdx >= 0 && idx < activeIdx) s.classList.add('stp-done');
-      else s.classList.add('stp-pending');
-    });
-    var ann = bar.querySelector('.stp-annule');
-    if (ann) ann.classList.add(active === 'annule' ? 'stp-active' : 'stp-pending');
-  })();
-</script>
 
 </div><!-- /#page-wrap -->
+</div>
+</div>
 {% endblock %}

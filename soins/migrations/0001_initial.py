@@ -13,7 +13,7 @@ class Migration(migrations.Migration):
         ('facturation', '0001_initial'),
         ('medecins', '0001_initial'),
         ('patients', '0001_initial'),
-        ('ressources_humaines', '0001_initial'),
+        ('employer', '0001_initial'),
         ('services', '0008_add_quantite_stock_to_articleservice'),
     ]
 
@@ -52,7 +52,7 @@ class Migration(migrations.Migration):
                 ('lactation', models.BooleanField(default=False, verbose_name='Lactation')),
                 ('avertissement_grossesse', models.BooleanField(default=False, verbose_name='Avertissement de grossesse')),
                 ('departement', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='soins', to='medecins.service', verbose_name='Département')),
-                ('infirmier', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='soins_effectues', to='ressources_humaines.employe', verbose_name='Infirmier/Agent de soins')),
+                ('infirmier', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='soins_effectues', to='employer.employe', verbose_name='Infirmier/Agent de soins')),
                 ('patient', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='soins', to='patients.patient', verbose_name='Patient')),
                 ('rendez_vous', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='soins', to='patients.rendezvous', verbose_name='Rendez-vous')),
                 ('service_inscription', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='soins_inscrits', to='services.articleservice', verbose_name="Service d'inscription")),
@@ -74,7 +74,7 @@ class Migration(migrations.Migration):
                 ('date_creation', models.DateTimeField(auto_now_add=True)),
                 ('departement', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='procedures_soins', to='medecins.service', verbose_name='Département')),
                 ('facture', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='procedures_soins', to='facturation.facture', verbose_name='Facture')),
-                ('infirmier', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='procedures_effectuees', to='ressources_humaines.employe', verbose_name='Infirmier')),
+                ('infirmier', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='procedures_effectuees', to='employer.employe', verbose_name='Infirmier')),
                 ('maladie', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='soins.maladie', verbose_name='Maladie')),
                 ('patient', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='procedures_soins', to='patients.patient', verbose_name='Patient')),
                 ('rendez_vous', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='procedures_soins', to='patients.rendezvous', verbose_name='Rendez-vous')),

@@ -1,0 +1,211 @@
+{% extends 'stock/base.html' %}
+{% load static %}
+{% block topbar_title %}Fiche {{ fiche.numero }}{% endblock %}
+
+{% block extra_st_css %}<style>
+.content { padding-top: 0; }
+.st-page-head {
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  padding:12px 32px; margin:0 -32px;
+  background:#e8f2f7; border-bottom:1px solid rgba(0,0,0,.05);
+  box-shadow:0 2px 8px rgba(0,0,0,.04);
+  position:sticky; top:var(--topbar-h); z-index:100;
+}
+.badge-brouillon { background:rgba(var(--amber-rgb),.1); color:var(--amber-text);        border:1px solid rgba(var(--amber-rgb),.25); padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; }
+.badge-valide    { background:rgba(var(--st-600-rgb),.1); color:var(--st-600);        border:1px solid rgba(var(--st-600-rgb),.25); padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; }
+.info-row { padding:8px 0; border-bottom:1px solid var(--st-border); display:flex; justify-content:space-between; align-items:baseline; font-size:12.5px; }
+.info-row:last-child { border-bottom:none; }
+.info-lbl { color:var(--st-muted); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.3px; }
+.tbl-input { border:none; border-bottom:1.5px solid var(--st-300); background:transparent; padding:3px 5px; font-size:12.5px; text-align:center; width:72px; border-radius:0; font-family:inherit; color:var(--st-text); }
+.tbl-input:focus { outline:none; border-bottom-color:var(--st-600); }
+</style>{% endblock %}
+
+{% block content %}
+<div class="hist-wrapper"><div class="hist-main">
+<!-- En-tête sticky -->
+<div class="st-page-head">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <a class="o-back-btn" href="javascript:history.back()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 5l-7 7 7 7"/></svg> Retour</a>
+    <div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span style="font-size:15px;font-weight:800;color:var(--st-900);font-family: var(--font-mono);">{{ fiche.numero }}</span>
+        {% if fiche.statut == 'brouillon' %}
+          <span class="badge-brouillon"><i class="bi bi-pencil"></i> Non envoyée</span>
+        {% else %}
+          <span class="badge-valide"><i class="bi bi-send-check"></i> Transmis aux achats</span>
+        {% endif %}
+      </div>
+      <div style="font-size:11.5px;color:var(--st-muted);margin-top:2px;">
+        <i class="bi bi-calendar3"></i>
+        du {{ fiche.periode_debut|date:"d/m/Y" }} au {{ fiche.periode_fin|date:"d/m/Y" }}
+      </div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    {% if fiche.statut == 'brouillon' %}
+      <a href="{% url 'stock_fiche_edit' fiche.pk %}" class="btn-st-outline">
+        <i class="bi bi-pencil"></i> Modifier
+      </a>
+      <form method="post" action="{% url 'stock_fiche_envoyer_achats' fiche.pk %}" style="display:inline;">
+        {% csrf_token %}
+        <button type="submit" class="btn-st"
+          onclick="return confirm('Envoyer cette fiche aux achats ? Elle ne sera plus modifiable.')">
+          <i class="bi bi-send-arrow-up"></i> Envoyer aux achats
+        </button>
+      </form>
+    {% else %}
+      {% with besoin=fiche.besoins_achats.first %}
+      {% if besoin %}
+        <a href="{% url 'achats:besoin_detail' besoin.pk %}" class="btn-st">
+          <i class="bi bi-send-check"></i> Voir dans Achats — {{ besoin.numero }}
+        </a>
+      {% endif %}
+      {% endwith %}
+    {% endif %}
+    <a href="{% url 'stock_fiche_print' fiche.pk %}" class="btn-st-outline" title="Imprimer">
+      <i class="bi bi-printer"></i> Imprimer
+    </a>
+  </div>
+</div>
+
+{% if messages %}
+<div style="margin-top:14px;">
+  {% for msg in messages %}
+  <div style="background:rgba(var(--st-600-rgb),.1);border:1px solid rgba(var(--st-600-rgb),.3);border-radius:8px;padding:10px 16px;font-size:13px;color:var(--st-600);display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+    <i class="bi bi-check-circle-fill"></i> {{ msg }}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if fiche.notes_direction and fiche.statut != 'brouillon' %}
+<div style="margin-top:16px;background:rgba(var(--amber-rgb),.08);border:1px solid rgba(var(--amber-rgb),.3);border-radius:8px;padding:12px 16px;font-size:13px;color:var(--amber-text);">
+  <div style="font-weight:700;margin-bottom:4px;"><i class="bi bi-chat-quote-fill"></i> Note de la direction</div>
+  <div style="font-style:italic;">{{ fiche.notes_direction }}</div>
+</div>
+{% endif %}
+
+<!-- Layout 2 colonnes -->
+<div style="display:grid;grid-template-columns:260px 1fr;gap:16px;margin-top:16px;align-items:start;">
+
+  <!-- Colonne gauche : informations -->
+  <div>
+    <div class="st-card">
+      <div class="st-card-header">
+        <div class="st-card-title"><i class="bi bi-info-circle" style="color:var(--st-600);"></i> Informations</div>
+      </div>
+      <div class="st-card-body" style="padding:0 20px;">
+        <div class="info-row">
+          <span class="info-lbl">Période</span>
+          <span style="font-size:12px;">{{ fiche.periode_debut|date:"d/m/Y" }}<br>au {{ fiche.periode_fin|date:"d/m/Y" }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-lbl">Créée par</span>
+          <span style="font-size:12px;">
+            {% if fiche.cree_par %}{{ fiche.cree_par.get_full_name|default:fiche.cree_par.username }}{% else %}—{% endif %}
+          </span>
+        </div>
+        <div class="info-row">
+          <span class="info-lbl">Date création</span>
+          <span style="font-size:12px;">{{ fiche.date_creation|date:"d/m/Y" }}</span>
+        </div>
+        {% if fiche.valide_par %}
+        <div class="info-row">
+          <span class="info-lbl">Validée par</span>
+          <span style="font-size:12px;">{{ fiche.valide_par.get_full_name|default:fiche.valide_par.username }}</span>
+        </div>
+        {% endif %}
+        {% if fiche.date_validation %}
+        <div class="info-row">
+          <span class="info-lbl">Date validation</span>
+          <span style="font-size:12px;">{{ fiche.date_validation|date:"d/m/Y" }}</span>
+        </div>
+        {% endif %}
+        {% if fiche.notes %}
+        <div style="padding:10px 0;font-size:12.5px;">
+          <div class="info-lbl" style="margin-bottom:4px;">Notes</div>
+          <div style="font-style:italic;color:var(--st-text);">{{ fiche.notes }}</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Colonne droite : tableau produits -->
+  <div>
+    <div class="st-card">
+      <div class="st-card-header">
+        <div class="st-card-title"><i class="bi bi-list-check" style="color:var(--st-600);"></i> Produits</div>
+        <span style="font-size:11.5px;color:var(--st-muted);">{{ lignes|length }} ligne{{ lignes|length|pluralize }}</span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="st-table" style="min-width:820px;">
+          <thead>
+            <tr>
+              <th>Désignation / DCI</th>
+              <th>Unité</th>
+              <th style="text-align:center;">Stock actuel</th>
+              <th style="text-align:center;">CMM</th>
+              <th style="text-align:center;">Qté commander</th>
+              {% if fiche.statut == 'valide' or fiche.statut == 'rejete' %}
+              <th style="text-align:center;color:var(--st-600);">Qté accordée</th>
+              {% endif %}
+            </tr>
+          </thead>
+          <tbody>
+          {% regroup lignes by produit.categorie as lignes_par_cat %}
+          {% if lignes_par_cat %}
+            {% for cat_group in lignes_par_cat %}
+            <tr style="background:var(--st-50);">
+              <td colspan="{% if fiche.statut == 'valide' or fiche.statut == 'rejete' %}6{% else %}5{% endif %}"
+                style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--st-600);padding:6px 12px;border-bottom:1px solid var(--st-border);">
+                {% if cat_group.grouper %}
+                  {% with t=cat_group.grouper.type %}
+                    {% if t == 'medicament' %}<i class="bi bi-capsule"></i>
+                    {% elif t == 'consommable' %}<i class="bi bi-bandaid"></i>
+                    {% else %}<i class="bi bi-tools"></i>{% endif %}
+                  {% endwith %}
+                  {{ cat_group.grouper.nom }}
+                {% else %}
+                  <i class="bi bi-question-circle"></i> Sans catégorie
+                {% endif %}
+                <span style="font-weight:400;color:var(--st-muted);margin-left:8px;">{{ cat_group.list|length }} ligne{{ cat_group.list|length|pluralize }}</span>
+              </td>
+            </tr>
+            {% for ligne in cat_group.list %}
+            <tr>
+              <td>
+                <div style="font-weight:600;">{{ ligne.produit.nom }}</div>
+                {% if ligne.produit.dci %}<div style="font-size:10.5px;color:var(--st-muted);">{{ ligne.produit.dci }}</div>{% endif %}
+              </td>
+              <td style="font-size:12px;color:var(--st-muted);">{{ ligne.produit.unite_mesure.nom|default:"—" }}</td>
+              <td style="text-align:center;font-weight:700;color:var(--st-700);">{{ ligne.produit.stock_actuel|floatformat:0|default:"—" }}</td>
+              <td style="text-align:center;color:var(--st-muted);">{{ ligne.cmm|floatformat:0|default:"—" }}</td>
+              <td style="text-align:center;font-weight:700;">{{ ligne.qte_commander|floatformat:0|default:"—" }}</td>
+              {% if fiche.statut == 'valide' or fiche.statut == 'rejete' %}
+              <td style="text-align:center;font-weight:800;color:{% if ligne.qte_accordee > 0 %}var(--st-600){% else %}var(--rose-text){% endif %};">
+                {{ ligne.qte_accordee|floatformat:0|default:"0" }}
+              </td>
+              {% endif %}
+            </tr>
+            {% endfor %}
+            {% endfor %}
+          {% else %}
+          <tr>
+            <td colspan="5" style="text-align:center;padding:28px;color:var(--st-muted);font-style:italic;">
+              Aucun produit dans cette fiche
+            </td>
+          </tr>
+          {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+{% load core_tags %}
+{% historique_sidebar fiche %}
+</div>
+{% endblock %}

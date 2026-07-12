@@ -1,0 +1,353 @@
+{% extends 'pharmacie/base.html' %}
+{% load static %}
+
+{% block extra_ph_css %}
+<style>
+/* ── Page header sticky ── */
+.per-header {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  background: var(--ph-surface);
+  border-bottom: 1px solid var(--ph-border);
+ 
+  padding: 12px 32px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.per-header-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--ph-text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.per-header-title i { font-size: 18px; color: #c62828; }
+
+/* ── Stat cards ── */
+.per-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin: 20px 0 18px;
+}
+.per-stat {
+  border-radius: 10px;
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.per-stat-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  opacity: .8;
+}
+.per-stat-value {
+  font-size: 30px;
+  font-weight: 900;
+  line-height: 1;
+}
+.per-stat-sub { font-size: 10.5px; opacity: .65; font-weight: 500; }
+
+.per-stat-perime    { background: var(--rose-text); color: #fff; }
+.per-stat-critique  { background: var(--rose); color: #fff; }
+.per-stat-alerte    { background: var(--amber); color: #fff; }
+.per-stat-attention { background: #f9c53b; color: #5a3e00; }
+
+/* ── Table wrapper ── */
+.per-table-wrap {
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(var(--ph-700-rgb),.08);
+  overflow: hidden;
+  background: var(--ph-surface);
+}
+.per-table-head {
+  padding: 12px 20px 12px 32px;
+  border-bottom: 1px solid var(--ph-border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.per-table-head-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ph-text);
+  border-left: 3px solid #c62828;
+  padding-left: 10px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+/* ── Table ── */
+.per-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.per-table thead tr {
+  background: #fdecea;
+  border-bottom: 2px solid #ef9a9a;
+}
+html[data-theme="dark"] .per-table thead tr {
+  background: rgba(183,28,28,.18);
+  border-bottom-color: rgba(183,28,28,.4);
+}
+.per-table thead th {
+  padding: 9px 14px;
+  font-weight: 700;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  color: var(--rose-text);
+  text-align: left;
+  white-space: nowrap;
+}
+.per-table thead th:first-child { padding-left: 12px; }
+.per-table thead th:last-child  { padding-right: 12px; }
+html[data-theme="dark"] .per-table thead th { color: #ef9a9a; }
+.per-table tbody tr {
+  border-bottom: 1px solid var(--ph-border);
+  transition: filter .12s;
+}
+.per-table tbody tr:hover { filter: brightness(.96); }
+.per-table tbody td { padding: 8px 14px; vertical-align: middle; }
+.per-table tbody td:first-child { padding-left: 12px; }
+.per-table tbody td:last-child  { padding-right: 12px; }
+
+/* Row background by niveau */
+.per-row-perime    { background: rgba(183,28,28,.09); }
+.per-row-critique  { background: rgba(var(--rose-rgb),.07); }
+.per-row-alerte    { background: rgba(var(--amber-rgb),.07); }
+.per-row-attention { background: rgba(249,197,59,.06); }
+
+/* Badge niveau */
+.per-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.per-badge-perime    { background: var(--rose-text); color: #fff; }
+.per-badge-critique  { background: var(--rose); color: #fff; }
+.per-badge-alerte    { background: var(--amber); color: #fff; }
+.per-badge-attention { background: #f9c53b; color: #5a3e00; }
+
+/* Jours restants chip */
+.per-jours {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 800;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.per-jours-perime    { color: var(--rose-text); background: rgba(183,28,28,.12); }
+.per-jours-critique  { color: #c62828; background: rgba(var(--rose-rgb),.12); }
+.per-jours-alerte    { color: var(--amber-text); background: rgba(var(--amber-rgb),.14); }
+.per-jours-attention { color: #5a3e00; background: rgba(249,197,59,.2); }
+
+/* Empty state */
+.per-empty {
+  padding: 64px 20px;
+  text-align: center;
+  color: var(--ph-muted);
+}
+.per-empty i {
+  font-size: 50px;
+  display: block;
+  margin-bottom: 14px;
+  color: #8ab8d0;
+  opacity: .55;
+}
+.per-empty p { font-size: 13.5px; font-weight: 600; margin: 0; }
+
+@media (max-width: 900px) {
+  .per-stats { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 600px) {
+  .per-header { margin: 0 -16px; padding: 10px 16px; }
+  .per-stats  { grid-template-columns: 1fr 1fr; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ── Sticky page header ── #}
+<div class="per-header">
+  <div class="per-header-title">
+    <i class="bi bi-calendar-x"></i>
+    Suivi des péremptions
+  </div>
+  <span style="margin-left:auto;font-size:11px;color:var(--ph-muted);font-weight:600;">
+    Au {{ today|date:"d/m/Y" }}
+  </span>
+</div>
+
+<div style="padding: 0 0 32px;">
+
+  {# ── Stat cards — values injected by JS after DOM is ready ── #}
+  <div class="per-stats">
+    <div class="per-stat per-stat-perime">
+      <div class="per-stat-label">Périmés</div>
+      <div class="per-stat-value" id="cnt-perime">—</div>
+      <div class="per-stat-sub">Date dépassée</div>
+    </div>
+    <div class="per-stat per-stat-critique">
+      <div class="per-stat-label">Critiques</div>
+      <div class="per-stat-value" id="cnt-critique">—</div>
+      <div class="per-stat-sub">≤ 30 jours</div>
+    </div>
+    <div class="per-stat per-stat-alerte">
+      <div class="per-stat-label">Alertes</div>
+      <div class="per-stat-value" id="cnt-alerte">—</div>
+      <div class="per-stat-sub">31 – 60 jours</div>
+    </div>
+    <div class="per-stat per-stat-attention">
+      <div class="per-stat-label">Attention</div>
+      <div class="per-stat-value" id="cnt-attention">—</div>
+      <div class="per-stat-sub">61 – 90 jours</div>
+    </div>
+  </div>
+
+  {# ── Table ── #}
+  <div class="per-table-wrap">
+    <div class="per-table-head">
+      <div class="per-table-head-title">
+        <i class="bi bi-calendar-x"></i>
+        Lots en cours de péremption
+        {% if lots_enrichis %}
+        <span style="font-size:11px;font-weight:600;color:var(--ph-muted);margin-left:4px;">
+          ({{ lots_enrichis|length }})
+        </span>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if lots_enrichis %}
+    <div style="overflow-x:auto;">
+      <table class="per-table">
+        <thead>
+          <tr>
+            <th>Produit</th>
+            <th>N° Lot</th>
+            <th>Date péremption</th>
+            <th>Jours restants</th>
+            <th>Quantité</th>
+            <th>Niveau</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in lots_enrichis %}
+          <tr class="per-row-{{ item.niveau }}" data-niveau="{{ item.niveau }}">
+
+            {# Produit #}
+            <td>
+              <div style="font-weight:700;color:var(--ph-text);line-height:1.3;">
+                {{ item.lot.produit.nom }}
+              </div>
+              {% if item.lot.produit.forme %}
+              <div style="font-size:10.5px;color:var(--ph-muted);margin-top:1px;">
+                {{ item.lot.produit.forme }}
+              </div>
+              {% endif %}
+            </td>
+
+            {# N° lot #}
+            <td>
+              <span style="font-family: var(--font-mono);font-size:12px;font-weight:600;color:var(--ph-text);">
+                {{ item.lot.numero_lot|default:"—" }}
+              </span>
+            </td>
+
+            {# Date péremption #}
+            <td>
+              <span style="font-weight:600;">
+                {{ item.lot.date_peremption|date:"d/m/Y" }}
+              </span>
+            </td>
+
+            {# Jours restants #}
+            <td>
+              {% if item.niveau == 'perime' %}
+                <span class="per-jours per-jours-perime">
+                  <i class="bi bi-x-circle-fill" style="font-size:10px;"></i>
+                  Périmé ({{ item.jours }}j)
+                </span>
+              {% else %}
+                <span class="per-jours per-jours-{{ item.niveau }}">
+                  {{ item.jours }} j
+                </span>
+              {% endif %}
+            </td>
+
+            {# Quantité #}
+            <td>
+              <span style="font-weight:700;">{{ item.lot.quantite }}</span>
+              {% if item.lot.produit.unite %}
+              <span style="font-size:10.5px;color:var(--ph-muted);"> {{ item.lot.produit.unite }}</span>
+              {% endif %}
+            </td>
+
+            {# Badge niveau #}
+            <td>
+              {% if item.niveau == 'perime' %}
+                <span class="per-badge per-badge-perime">
+                  <i class="bi bi-x-circle-fill" style="font-size:9px;"></i> Périmé
+                </span>
+              {% elif item.niveau == 'critique' %}
+                <span class="per-badge per-badge-critique">
+                  <i class="bi bi-exclamation-circle-fill" style="font-size:9px;"></i> Critique
+                </span>
+              {% elif item.niveau == 'alerte' %}
+                <span class="per-badge per-badge-alerte">
+                  <i class="bi bi-exclamation-triangle-fill" style="font-size:9px;"></i> Alerte
+                </span>
+              {% elif item.niveau == 'attention' %}
+                <span class="per-badge per-badge-attention">
+                  <i class="bi bi-info-circle-fill" style="font-size:9px;"></i> Attention
+                </span>
+              {% endif %}
+            </td>
+
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% else %}
+    <div class="per-empty">
+      <i class="bi bi-calendar-check"></i>
+      <p>Aucun produit en cours de péremption dans les 90 prochains jours.</p>
+    </div>
+    {% endif %}
+
+  </div>{# /per-table-wrap #}
+
+</div>
+
+{# ── Compute stat card counts from rendered rows ── #}
+<script>
+(function () {
+  var counts = { perime: 0, critique: 0, alerte: 0, attention: 0 };
+  document.querySelectorAll('[data-niveau]').forEach(function (row) {
+    var n = row.getAttribute('data-niveau');
+    if (Object.prototype.hasOwnProperty.call(counts, n)) counts[n]++;
+  });
+  ['perime', 'critique', 'alerte', 'attention'].forEach(function (key) {
+    var el = document.getElementById('cnt-' + key);
+    if (el) el.textContent = counts[key];
+  });
+})();
+</script>
+
+{% endblock %}

@@ -1,0 +1,218 @@
+{% extends 'hospitalisation/base.html' %}
+{% load i18n %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+/* ── Layout ── */
+.content    { padding: 0 !important; }
+.breadcrumb { display: none !important; }
+
+/* ── Subheader ── */
+.o-subheader { position: fixed; left: 0; right: 0; top: 0; z-index: 190; }
+.o-subheader-row-right { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.o-pagination { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+
+/* ── Dropdown ── */
+.o-dd-wrap  { position: relative; }
+.o-dd-panel {
+  display: none; position: fixed; z-index: 9999; background: #fff; border: 1px solid #dde3ec;
+  border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,.16); min-width: 190px; padding: 5px 0;
+}
+.o-dd-panel.open { display: block; }
+.o-dd-section { padding: 7px 14px 4px; font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; }
+.o-dd-item {
+  display: flex; align-items: center; padding: 7px 14px; font-size: 13px; color: var(--text);
+  cursor: pointer; text-decoration: none; transition: background .1s; white-space: nowrap;
+}
+.o-dd-item:hover  { background: rgba(20,87,112,.06); color: var(--primary); }
+.o-dd-item.active { background: rgba(20,87,112,.08); color: var(--primary); font-weight: 600; }
+.o-dd-sep { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+html[data-theme="dark"] .o-dd-panel   { background: #1a2535; border-color: #2e3f58; }
+html[data-theme="dark"] .o-dd-item    { color: var(--text); }
+html[data-theme="dark"] .o-dd-item:hover  { background: rgba(var(--teal-500-rgb),.15); color: #7aaec7; }
+html[data-theme="dark"] .o-dd-item.active { background: rgba(var(--teal-500-rgb),.2);  color: #7aaec7; }
+
+/* ── Table ── */
+.dc-table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--surface); }
+.dc-table thead th {
+  border-bottom: 1px solid var(--border); padding: 9px 14px; text-align: left;
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--text-muted); white-space: nowrap; background: var(--surface);
+}
+.dc-table thead th.col-check { width: 36px; text-align: center; }
+.dc-table tbody tr { border-bottom: 1px solid var(--border); cursor: pointer; transition: background .1s; }
+.dc-table tbody tr:hover { background: #f0f7fb; }
+.dc-table tbody tr:last-child td { border-bottom: none; }
+.dc-table tbody td { padding: 10px 14px; color: var(--text); font-size: 13px; vertical-align: middle; }
+.dc-table tbody td.col-check { text-align: center; }
+.dc-table tbody td.col-code  { font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--accent); }
+.dc-table tbody td.col-name  { font-weight: 500; }
+.dc-check { width: 15px; height: 15px; cursor: pointer; accent-color: var(--accent); }
+
+.badge-brouillon { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; color: #92400e; background: #fef3c7; }
+.badge-termine   { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; color: #065f46; background: #d1fae5; }
+
+.h-empty   { text-align: center; padding: 64px 20px; color: var(--text-muted); font-size: 13px; }
+.h-empty i { font-size: 42px; display: block; margin-bottom: 12px; opacity: .3; }
+
+html[data-theme="dark"] .dc-table thead th  { background: var(--surface); border-bottom-color: var(--border); }
+html[data-theme="dark"] .dc-table tbody tr  { border-bottom-color: var(--border); }
+html[data-theme="dark"] .dc-table tbody tr:hover { background: rgba(255,255,255,.04); }
+html[data-theme="dark"] .dc-table tbody td.col-code { color: var(--teal-300,#4dd0e1); }
+html[data-theme="dark"] .badge-brouillon { background: rgba(146,64,14,.2); color: #fcd34d; }
+html[data-theme="dark"] .badge-termine   { background: rgba(6,95,70,.2);  color: #6ee7b7; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="page-wrap">
+
+<div class="o-subheader" data-fixed="1">
+  <div class="o-subheader-row">
+    <span class="o-page-title">Registre des décès de patients</span>
+    <div class="o-subheader-row-right">
+      <form method="get" style="display:flex;align-items:center;">
+        {% if statut %}<input type="hidden" name="statut" value="{{ statut }}">{% endif %}
+        <div class="o-search-bar">
+          <input class="o-search-input" type="text" name="q" value="{{ q }}" placeholder="Rechercher…">
+          <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="o-subheader-row">
+    <a href="{% url 'hospitalisation:deces_create' %}" class="o-btn-create">
+      <i class="bi bi-plus-lg"></i> Créer
+    </a>
+    <div class="o-subheader-row-right">
+      <div class="o-dd-wrap">
+        <button class="o-ctrl-btn {% if statut %}active{% endif %}" onclick="toggleDd('dd-filtres', this)">
+          <i class="bi bi-funnel{% if statut %}-fill{% endif %}"></i> Filtres
+        </button>
+        <div class="o-dd-panel" id="dd-filtres">
+          <div class="o-dd-section">Statut</div>
+          <a class="o-dd-item {% if statut == 'brouillon' %}active{% endif %}"
+             href="?statut=brouillon{% if q %}&q={{ q }}{% endif %}">Brouillon</a>
+          <a class="o-dd-item {% if statut == 'termine' %}active{% endif %}"
+             href="?statut=termine{% if q %}&q={{ q }}{% endif %}">Terminé</a>
+          {% if statut %}
+          <hr class="o-dd-sep">
+          <a class="o-dd-item" href="?{% if q %}q={{ q }}{% endif %}" style="color:var(--rose-text);">
+            <i class="bi bi-x-circle" style="font-size:11px;margin-right:4px;"></i> Supprimer le filtre
+          </a>
+          {% endif %}
+        </div>
+      </div>
+      <button class="o-ctrl-btn"><i class="bi bi-star"></i> Favoris</button>
+      <div class="o-ctrl-sep"></div>
+      <div class="o-pagination">
+        {% if page_obj.paginator.count > 0 %}
+        <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
+        {% else %}<span>0</span>{% endif %}
+        <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
+           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if statut %}&statut={{ statut }}{% endif %}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-left"></i>
+        </a>
+        <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
+           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if statut %}&statut={{ statut }}{% endif %}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-right"></i>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  {% if q or statut %}
+  <div class="o-subheader-row" style="gap:6px;flex-wrap:wrap;padding-top:0;">
+    {% if q %}
+    <span style="font-size:11px;color:var(--text-muted);">Recherche :</span>
+    <span class="o-filter-tag">{{ q }}
+      <a href="?{% if statut %}statut={{ statut }}{% endif %}" title="Supprimer">×</a>
+    </span>
+    {% endif %}
+    {% if statut %}
+    <span style="font-size:11px;color:var(--text-muted);">Statut :</span>
+    <span class="o-filter-tag">
+      {% if statut == 'brouillon' %}Brouillon{% else %}Terminé{% endif %}
+      <a href="?{% if q %}q={{ q }}{% endif %}" title="Supprimer">×</a>
+    </span>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<div style="overflow-x:auto;">
+  <table class="dc-table">
+    <thead>
+      <tr>
+        <th class="col-check">
+          <input type="checkbox" class="dc-check" onchange="toggleAll(this)">
+        </th>
+        <th>Code</th>
+        <th>Patient</th>
+        <th>Genre</th>
+        <th>Âge</th>
+        <th>Date de décès</th>
+        <th>Docteur</th>
+        <th>Statut</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for d in page_obj %}
+      <tr onclick="window.location='{% url 'hospitalisation:deces_detail' d.pk %}'">
+        <td class="col-check" onclick="event.stopPropagation()">
+          <input type="checkbox" class="dc-check row-check">
+        </td>
+        <td class="col-code">{{ d.code }}</td>
+        <td class="col-name">{{ d.patient.nom }} {{ d.patient.prenoms }}</td>
+        <td>{{ d.patient.get_sexe_display }}</td>
+        <td>{{ d.patient.age }} ans</td>
+        <td>{{ d.date_deces|date:"d/m/Y" }}</td>
+        <td>{% if d.medecin %}Dr. {{ d.medecin.nom }} {{ d.medecin.prenoms }}{% endif %}</td>
+        <td>
+          {% if d.statut == 'termine' %}
+          <span class="badge-termine">Terminé</span>
+          {% else %}
+          <span class="badge-brouillon">Brouillon</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="8">
+          <div class="h-empty">
+            <i class="bi bi-journal-x"></i>
+            Aucun enregistrement{% if q %} pour « {{ q }} »{% endif %}
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+</div><!-- /page-wrap -->
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+function toggleDd(id, btn) {
+  const panel = document.getElementById(id);
+  document.querySelectorAll('.o-dd-panel').forEach(p => { if (p.id !== id) p.classList.remove('open'); });
+  if (!panel) return;
+  const open = panel.classList.toggle('open');
+  if (open) {
+    const r = btn.getBoundingClientRect();
+    panel.style.top  = (r.bottom + window.scrollY + 4) + 'px';
+    panel.style.left = r.left + 'px';
+  }
+}
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.o-dd-wrap') && !e.target.closest('.o-dd-panel'))
+    document.querySelectorAll('.o-dd-panel').forEach(p => p.classList.remove('open'));
+});
+function toggleAll(m) { document.querySelectorAll('.row-check').forEach(c => c.checked = m.checked); }
+</script>
+{% endblock %}

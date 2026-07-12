@@ -1,0 +1,81 @@
+{% if page_obj.object_list %}
+
+<!-- ── VUE KANBAN ── -->
+<div class="o-kanban" id="view-grille" style="{% if vue|default:'liste' != 'kanban' %}display:none;{% endif %}">
+  {% for svc in page_obj %}
+  <div class="o-card" onclick="window.location='{% url 'employer_service_detail' svc.pk %}'">
+    <div class="o-avatar"><i class="bi bi-building"></i></div>
+    <div class="o-card-body">
+      <div class="o-card-name">{{ svc.nom }}</div>
+      <div class="o-card-meta">
+        <span class="val">{{ svc.code }}</span><br>
+        <i class="bi bi-people"></i> {{ svc.nb_employes }} employé{{ svc.nb_employes|pluralize }}
+        &nbsp;
+        {% if svc.actif %}<span class="badge-actif">Actif</span>{% else %}<span class="badge-inactif">Inactif</span>{% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- ── VUE LISTE ── -->
+<div class="o-list-wrap" id="view-liste" style="{% if vue == 'kanban' %}display:none;{% endif %}">
+  <table class="o-list-table">
+    <thead>
+      <tr>
+        <th style="width:36px;">
+          <input type="checkbox" id="select-all" style="width:14px;height:14px;cursor:pointer;">
+        </th>
+        <th style="width:110px;">Code</th>
+        <th>Nom</th>
+        <th style="width:110px;">Employés</th>
+        <th style="width:90px;">Statut</th>
+        <th style="width:90px;"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for svc in page_obj %}
+      <tr onclick="if(event.target.type!=='checkbox'&&!event.target.closest('.row-actions'))window.location='{% url 'employer_service_detail' svc.pk %}'">
+        <td onclick="event.stopPropagation()">
+          <input type="checkbox" class="row-check" value="{{ svc.pk }}" style="width:14px;height:14px;cursor:pointer;">
+        </td>
+        <td><span class="badge-code">{{ svc.code }}</span></td>
+        <td style="font-weight:600;">{{ svc.nom }}</td>
+        <td style="color:var(--text-muted);"><i class="bi bi-people" style="margin-right:4px;"></i>{{ svc.nb_employes }}</td>
+        <td>
+          {% if svc.actif %}<span class="badge-actif">Actif</span>
+          {% else %}<span class="badge-inactif">Inactif</span>{% endif %}
+        </td>
+        <td class="row-actions" onclick="event.stopPropagation()">
+          <a href="{% url 'employer_service_edit' svc.pk %}" class="o-ctrl-btn" title="Modifier">
+            <i class="bi bi-pencil"></i>
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 32px;border-top:1px solid var(--border);font-size:12.5px;color:var(--text-muted);">
+    <span>{{ page_obj.start_index }}–{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
+    <div style="display:flex;gap:4px;">
+      <a class="o-ctrl-btn {% if not page_obj.has_previous %}disabled{% endif %}"
+         href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}&q={{ q }}&vue={{ vue }}{% else %}#{% endif %}">
+        <i class="bi bi-chevron-left"></i>
+      </a>
+      <a class="o-ctrl-btn {% if not page_obj.has_next %}disabled{% endif %}"
+         href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}&q={{ q }}&vue={{ vue }}{% else %}#{% endif %}">
+        <i class="bi bi-chevron-right"></i>
+      </a>
+    </div>
+  </div>
+</div>
+
+{% else %}
+<div class="o-empty">
+  <i class="bi bi-building"></i>
+  {% if q %}Aucun résultat pour « {{ q }} »{% else %}Aucun service enregistré{% endif %}<br>
+  {% if not q %}
+  <a href="{% url 'employer_service_create' %}" style="color:var(--rh-500);font-weight:600;margin-top:8px;display:inline-block;">Créer un premier service</a>
+  {% endif %}
+</div>
+{% endif %}

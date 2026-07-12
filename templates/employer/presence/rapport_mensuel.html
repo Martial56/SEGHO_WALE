@@ -1,0 +1,409 @@
+{% extends 'employer/base.html' %}
+{% load static %}
+{% block topbar_title %}Présence — Rapport mensuel{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+/* ── En-tête sticky (même pattern que rh-subheader de list.html) ── */
+.pr-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 12px 32px; flex-wrap: wrap;
+  position: sticky; top: var(--topbar-h); z-index: 100;
+  background: var(--rh-surface);
+  border-bottom: 2px solid var(--rh-border);
+  box-shadow: 0 2px 10px rgba(74,114,54,.06);
+}
+html[data-theme="dark"] .pr-head { background: var(--rh-surface); }
+
+/* Mois nav */
+.mn-btn {
+  width: 28px; height: 28px; border-radius: 6px;
+  border: 1.5px solid var(--rh-200); background: var(--rh-50);
+  color: var(--rh-500); display: inline-flex; align-items: center; justify-content: center;
+  text-decoration: none; font-size: 12px; transition: all .15s;
+}
+.mn-btn:hover { border-color: var(--rh-500); background: var(--rh-100); color: var(--rh-700); }
+.mn-label { font-size: 15px; font-weight: 800; color: var(--rh-800); min-width: 148px; text-align: center; }
+
+/* Selects */
+.pr-select {
+  border: 1.5px solid var(--rh-200); border-radius: 6px;
+  background: var(--rh-50); padding: 5px 26px 5px 10px;
+  font-size: 12.5px; color: var(--rh-text); font-family: inherit;
+  cursor: pointer; appearance: none; outline: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%235e8e47'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 7px center;
+  transition: border-color .15s;
+}
+.pr-select:focus { border-color: var(--rh-500); }
+html[data-theme="dark"] .pr-select { background-color: var(--rh-100); border-color: var(--rh-border); }
+
+/* ── Bandeau KPI — même pattern que rh-stats-row ── */
+.pr-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
+  padding: 24px 32px 8px;
+}
+@media (max-width: 1100px) { .pr-kpi-grid { grid-template-columns: repeat(3,1fr); } }
+@media (max-width: 700px)  { .pr-kpi-grid { grid-template-columns: repeat(2,1fr); } }
+
+.pr-kpi-card {
+  background: var(--rh-surface);
+  border-radius: 11px; padding: 16px 18px;
+  box-shadow: var(--shadow-sm);
+  display: flex; align-items: center; gap: 12px;
+  border-left: 4px solid transparent;
+  transition: box-shadow .18s, transform .15s;
+}
+.pr-kpi-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.pr-kpi-icon {
+  width: 42px; height: 42px; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 19px; flex-shrink: 0;
+}
+.pr-kpi-val { font-size: 26px; font-weight: 800; line-height: 1; }
+.pr-kpi-lbl { font-size: 11px; color: var(--rh-muted); font-weight: 600;
+              text-transform: uppercase; letter-spacing: .3px; margin-top: 3px; }
+
+.kpi-present { border-left-color: #16a34a; }
+.kpi-present .pr-kpi-icon { background: rgba(22,163,74,.1); color: #16a34a; }
+.kpi-present .pr-kpi-val  { color: #15803d; }
+
+.kpi-absent { border-left-color: #dc2626; }
+.kpi-absent .pr-kpi-icon { background: rgba(220,38,38,.1); color: #dc2626; }
+.kpi-absent .pr-kpi-val  { color: #b91c1c; }
+
+.kpi-conge { border-left-color: #2563eb; }
+.kpi-conge .pr-kpi-icon { background: rgba(37,99,235,.1); color: #2563eb; }
+.kpi-conge .pr-kpi-val  { color: #1d4ed8; }
+
+.kpi-retard { border-left-color: #d97706; }
+.kpi-retard .pr-kpi-icon { background: rgba(217,119,6,.1); color: #d97706; }
+.kpi-retard .pr-kpi-val  { color: #b45309; }
+
+.kpi-employes { border-left-color: var(--rh-500); }
+.kpi-employes .pr-kpi-icon { background: var(--rh-50); color: var(--rh-600); }
+.kpi-employes .pr-kpi-val  { color: var(--rh-700); }
+
+/* ── Tableau — même pattern que rh-table-wrap ── */
+.pr-table-wrap {
+  margin: 16px 32px 32px;
+  background: var(--rh-surface);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+html[data-theme="dark"] .pr-table-wrap { background: var(--rh-surface); }
+
+.pr-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.pr-table thead { background: var(--rh-50); border-bottom: 2px solid var(--rh-200); }
+html[data-theme="dark"] .pr-table thead { background: rgba(74,114,54,.1); border-bottom-color: var(--rh-border); }
+.pr-table th {
+  padding: 9px 12px; text-align: left; font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .4px; color: var(--rh-700); white-space: nowrap;
+}
+html[data-theme="dark"] .pr-table th { color: var(--rh-300); }
+.pr-table td { padding: 9px 12px; border-bottom: 1px solid rgba(0,0,0,.04); vertical-align: middle; }
+html[data-theme="dark"] .pr-table td { border-bottom-color: rgba(255,255,255,.04); }
+.pr-table tbody tr:hover td { background: rgba(74,114,54,.03); }
+.pr-table tbody tr:last-child td { border-bottom: none; }
+.pr-table tfoot td {
+  background: var(--rh-50); font-weight: 700; padding: 10px 12px;
+  border-top: 2px solid var(--rh-200);
+}
+
+/* Service separator */
+.svc-sep td {
+  background: var(--rh-50); padding: 7px 12px;
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .5px; color: var(--rh-600);
+  border-top: 2px solid var(--rh-200);
+}
+html[data-theme="dark"] .svc-sep td { background: rgba(255,255,255,.03); color: var(--rh-300); }
+
+/* Taux bar */
+.taux-wrap { display: flex; align-items: center; gap: 7px; }
+.taux-bar  { height: 7px; border-radius: 99px; width: 50px; background: var(--rh-100); overflow: hidden; flex-shrink: 0; }
+.taux-fill { height: 100%; border-radius: 99px; }
+.taux-pct  { font-size: 12.5px; font-weight: 700; min-width: 36px; text-align: right; }
+
+/* Num cells */
+.num-big { font-size: 16px; font-weight: 800; }
+.num-sub { font-size: 10px; color: var(--rh-muted); font-weight: 400; margin-left: 2px; }
+
+@media print {
+  .o-nav, .pr-head, .btn-rh-sm, .btn-rh { display: none !important; }
+  body { font-size: 9pt; }
+  .pr-kpi-grid { padding: 8px; gap: 6px; grid-template-columns: repeat(5,1fr) !important; }
+  .pr-kpi-card { padding: 8px 10px; box-shadow: none; border: 1px solid #ddd; }
+  .pr-table-wrap { margin: 8px; box-shadow: none; border: 1px solid #ddd; }
+  .print-header { display: block !important; margin-bottom: 14px; }
+  .content { padding: 10mm 12mm !important; }
+  @page { size: A4; margin: 0; }
+}
+.print-only { display: none !important; }
+.print-header { display: none; }
+.print-header-inner { display:flex; align-items:center; gap:14px; padding-bottom:10px; border-bottom:2.5px solid var(--rh-700); }
+.print-header-logo { height:56px; width:auto; flex-shrink:0; }
+.print-header-org { font-size:15px; font-weight:800; color:#071e28; text-transform:uppercase; letter-spacing:.06em; line-height:1.2; }
+.print-header-subtitle { font-size:9.5px; color:#666; margin-top:1px; letter-spacing:.03em; }
+.print-header-doc { font-size:12px; font-weight:700; color:var(--rh-700); margin-top:5px; text-transform:uppercase; letter-spacing:.05em; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ══ En-tête sticky ══ -->
+<div class="pr-head" id="subheader">
+  <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+    <a href="{% url 'rh_dashboard' %}" class="o-back-btn"><i class="bi bi-arrow-left"></i></a>
+    <div>
+      <div style="font-size:15px;font-weight:800;color:var(--rh-900);">
+        <i class="bi bi-calendar2-check" style="color:#2563eb;margin-right:5px;"></i>Rapport mensuel de présence
+      </div>
+      <div style="font-size:11.5px;color:var(--rh-muted);margin-top:1px;">
+        {{ nb_ouvrables }} jour{{ nb_ouvrables|pluralize }} ouvrable{{ nb_ouvrables|pluralize }}
+        · {{ employes_stats|length }} employé{{ employes_stats|length|pluralize }} actif{{ employes_stats|length|pluralize }}
+      </div>
+    </div>
+    <!-- Nav mois -->
+    <div style="display:flex;align-items:center;gap:6px;">
+      <a href="?mois={{ prev_mois }}&annee={{ prev_annee }}{% if service_id %}&service={{ service_id }}{% endif %}{% if employe_filtre %}&employe={{ employe_filtre.pk }}{% endif %}" class="mn-btn">
+        <i class="bi bi-chevron-left"></i>
+      </a>
+      <span class="mn-label">{{ mois_nom }} {{ annee }}</span>
+      <a href="?mois={{ next_mois }}&annee={{ next_annee }}{% if service_id %}&service={{ service_id }}{% endif %}{% if employe_filtre %}&employe={{ employe_filtre.pk }}{% endif %}" class="mn-btn">
+        <i class="bi bi-chevron-right"></i>
+      </a>
+    </div>
+  </div>
+
+  {% if employe_filtre %}
+  <div style="display:flex;align-items:center;gap:8px;padding:8px 0;">
+    <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(var(--rh-600-rgb),0.1);color:var(--rh-700);border-radius:20px;padding:5px 14px;font-size:12.5px;font-weight:600;">
+      <i class="bi bi-funnel-fill"></i> Filtré sur : {{ employe_filtre.nom_complet|default:employe_filtre.nom }}
+    </span>
+    <a href="?mois={{ mois }}&annee={{ annee }}{% if service_id %}&service={{ service_id }}{% endif %}" style="font-size:12px;color:var(--rh-muted);text-decoration:underline;">
+      Voir tous les employés
+    </a>
+  </div>
+  {% endif %}
+
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+    <form method="get" style="display:contents;">
+      <input type="hidden" name="mois" value="{{ mois }}">
+      <input type="hidden" name="annee" value="{{ annee }}">
+      {% if employe_filtre %}<input type="hidden" name="employe" value="{{ employe_filtre.pk }}">{% endif %}
+      <select name="service" class="pr-select" onchange="this.form.submit()">
+        <option value="">Tous les services</option>
+        {% for svc in services %}
+        <option value="{{ svc.pk }}" {% if service_id == svc.pk|stringformat:"s" %}selected{% endif %}>{{ svc.nom }}</option>
+        {% endfor %}
+      </select>
+    </form>
+    <form method="get" style="display:contents;">
+      <input type="hidden" name="mois" value="{{ mois }}">
+      {% if service_id %}<input type="hidden" name="service" value="{{ service_id }}">{% endif %}
+      {% if employe_filtre %}<input type="hidden" name="employe" value="{{ employe_filtre.pk }}">{% endif %}
+      <select name="annee" class="pr-select" onchange="this.form.submit()">
+        {% for y in annees_dispo %}
+        <option value="{{ y }}" {% if annee == y %}selected{% endif %}>{{ y }}</option>
+        {% endfor %}
+      </select>
+    </form>
+    <a href="{% url 'rh_presence_kiosk' %}" class="btn-rh-sm" title="Ouvrir le kiosk de pointage">
+      <i class="bi bi-fingerprint"></i> Kiosk pointage
+    </a>
+    {% if can_manage %}
+    <a href="{% url 'rh_presence_import' %}" class="btn-rh-sm">
+      <i class="bi bi-upload"></i> Import pointeuse
+    </a>
+    {% endif %}
+    <button onclick="window.print()" class="btn-rh-sm" type="button">
+      <i class="bi bi-printer"></i> Imprimer
+    </button>
+  </div>
+</div>
+
+<!-- Titre impression -->
+<div class="print-header">
+  <div class="print-header-inner">
+    <img src="{% static 'img/logo.png' %}" alt="Logo WALÉ" class="print-header-logo">
+    <div>
+      <div class="print-header-org">Centre Médico-Social WALÉ</div>
+      <div class="print-header-subtitle">Yamoussoukro — Côte d'Ivoire</div>
+      <div class="print-header-doc">Rapport de présence — {{ mois_nom }} {{ annee }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Cartes KPI ══ -->
+<div class="pr-kpi-grid">
+
+  <div class="pr-kpi-card kpi-present">
+    <div class="pr-kpi-icon"><i class="bi bi-person-check-fill"></i></div>
+    <div>
+      <div class="pr-kpi-val">{{ total_presents }}</div>
+      <div class="pr-kpi-lbl">Présences</div>
+    </div>
+  </div>
+
+  <div class="pr-kpi-card kpi-absent">
+    <div class="pr-kpi-icon"><i class="bi bi-person-x-fill"></i></div>
+    <div>
+      <div class="pr-kpi-val">{{ total_absents }}</div>
+      <div class="pr-kpi-lbl">Absences injustifiées</div>
+    </div>
+  </div>
+
+  <div class="pr-kpi-card kpi-conge">
+    <div class="pr-kpi-icon"><i class="bi bi-calendar-week-fill"></i></div>
+    <div>
+      <div class="pr-kpi-val">{{ total_conge }}</div>
+      <div class="pr-kpi-lbl">Jours en congé</div>
+    </div>
+  </div>
+
+  <div class="pr-kpi-card kpi-retard">
+    <div class="pr-kpi-icon"><i class="bi bi-clock-fill"></i></div>
+    <div>
+      <div class="pr-kpi-val">{{ total_retards }}</div>
+      <div class="pr-kpi-lbl">Retards</div>
+    </div>
+  </div>
+
+  <div class="pr-kpi-card kpi-employes">
+    <div class="pr-kpi-icon"><i class="bi bi-people-fill"></i></div>
+    <div>
+      <div class="pr-kpi-val">{{ employes_stats|length }}</div>
+      <div class="pr-kpi-lbl">Employés actifs</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══ Tableau ══ -->
+<div class="pr-table-wrap">
+  {% if employes_stats %}
+  <table class="pr-table">
+    <thead>
+      <tr>
+        <th style="min-width:170px;">Employé</th>
+        <th>Fonction</th>
+        <th style="text-align:center;min-width:95px;">Présents / {{ nb_ouvrables }}j</th>
+        <th style="text-align:center;">Absences</th>
+        <th style="text-align:center;">Congés</th>
+        <th style="text-align:center;">Retards</th>
+        <th style="text-align:center;">Heures</th>
+        <th style="text-align:center;min-width:105px;">Taux</th>
+        <th style="width:44px;"></th>
+      </tr>
+    </thead>
+    <tbody>
+    {% regroup employes_stats by employe.service as groupes_services %}
+    {% for groupe in groupes_services %}
+    <tr class="svc-sep">
+      <td colspan="9">
+        <i class="bi bi-building" style="margin-right:6px;"></i>{% if groupe.grouper %}{{ groupe.grouper.nom }}{% else %}Sans service{% endif %}
+      </td>
+    </tr>
+    {% for e in groupe.list %}
+    <tr>
+
+      <td>
+        <div style="font-weight:700;color:var(--rh-900);">{{ e.employe.nom }} {{ e.employe.prenoms }}</div>
+        {% if e.employe.matricule %}
+        <div style="font-size:10.5px;font-family: var(--font-mono);color:var(--rh-400);margin-top:1px;">{{ e.employe.matricule }}</div>
+        {% endif %}
+      </td>
+
+      <td style="font-size:12px;color:var(--rh-muted);">
+        {% if e.employe.fonction %}{{ e.employe.fonction.nom }}{% else %}—{% endif %}
+      </td>
+
+      <td style="text-align:center;">
+        <span class="num-big" style="color:{% if e.nb_presents == nb_ouvrables %}#15803d{% elif e.nb_presents >= nb_ouvrables|add:"-2" %}#374151{% else %}#b91c1c{% endif %};">{{ e.nb_presents }}</span>
+      </td>
+
+      <td style="text-align:center;">
+        {% if e.nb_absents_non_just > 0 %}
+          <span class="num-big" style="color:#b91c1c;">{{ e.nb_absents_non_just }}</span>
+        {% else %}
+          <span style="color:var(--rh-300);">0</span>
+        {% endif %}
+      </td>
+
+      <td style="text-align:center;">
+        {% if e.nb_absents_conge > 0 %}
+          <span class="num-big" style="color:#1d4ed8;">{{ e.nb_absents_conge }}</span>
+        {% else %}
+          <span style="color:var(--rh-300);">0</span>
+        {% endif %}
+      </td>
+
+      <td style="text-align:center;">
+        {% if e.nb_retards > 0 %}
+          <span class="num-big" style="color:#b45309;">{{ e.nb_retards }}</span>
+          <span class="num-sub">({{ e.total_retard_min }}')</span>
+        {% else %}
+          <span style="color:var(--rh-300);">—</span>
+        {% endif %}
+      </td>
+
+      <td style="text-align:center;">
+        {% if e.total_heures or e.total_min_reste %}
+          <span style="font-size:13px;font-weight:700;font-family: var(--font-mono);color:var(--rh-800);">
+            {{ e.total_heures }}h{{ e.total_min_reste|stringformat:"02d" }}
+          </span>
+        {% else %}
+          <span style="color:var(--rh-300);">—</span>
+        {% endif %}
+      </td>
+
+      <td style="text-align:center;">
+        {% if e.taux is not None %}
+        <div class="taux-wrap">
+          <div class="taux-bar">
+            <div class="taux-fill" style="width:{{ e.taux }}%;background:{% if e.taux >= 90 %}#22c55e{% elif e.taux >= 75 %}#f59e0b{% else %}#ef4444{% endif %};"></div>
+          </div>
+          <span class="taux-pct" style="color:{% if e.taux >= 90 %}#15803d{% elif e.taux >= 75 %}#92400e{% else %}#b91c1c{% endif %};">{{ e.taux }}%</span>
+        </div>
+        {% else %}<span style="color:var(--rh-300);">—</span>{% endif %}
+      </td>
+
+      <td style="text-align:center;">
+        <a href="{% url 'rh_presence_historique' e.employe.pk %}?mois={{ mois }}&annee={{ annee }}"
+           class="btn-rh-sm" title="Historique de présence">
+          <i class="bi bi-eye"></i>
+        </a>
+      </td>
+
+    </tr>
+    {% endfor %}
+    {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="2" style="font-size:11.5px;color:var(--rh-600);">
+          TOTAUX — {{ employes_stats|length }} employé{{ employes_stats|length|pluralize }}
+        </td>
+        <td style="text-align:center;font-size:16px;color:#15803d;">{{ total_presents }}</td>
+        <td style="text-align:center;font-size:16px;color:#b91c1c;">{{ total_absents }}</td>
+        <td style="text-align:center;font-size:16px;color:#1d4ed8;">{{ total_conge }}</td>
+        <td style="text-align:center;font-size:16px;color:#b45309;">{{ total_retards }}</td>
+        <td colspan="3"></td>
+      </tr>
+    </tfoot>
+  </table>
+  {% else %}
+  <div style="text-align:center;padding:72px 20px;color:var(--rh-muted);">
+    <i class="bi bi-calendar2-x" style="font-size:40px;display:block;margin-bottom:16px;color:var(--rh-300);"></i>
+    <div style="font-size:16px;font-weight:700;margin-bottom:8px;color:var(--rh-600);">Aucune donnée de présence</div>
+    <div style="font-size:13px;">Aucun employé actif ou aucune présence saisie pour {{ mois_nom }} {{ annee }}.</div>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

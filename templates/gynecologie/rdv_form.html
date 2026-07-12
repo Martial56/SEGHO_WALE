@@ -1,8 +1,6 @@
 {% extends 'gynecologie/base.html' %}
-{% block nav_rdv %}active{% endblock %}
 
 {% block extra_gyn_css %}
-<style>
     /* ── Control panel ── */
     .control-panel {
         background: #fff;
@@ -10,36 +8,39 @@
         position: sticky;
         top: 0;
         z-index: 100;
+        margin: 0 -32px;
     }
     .cp-top {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 10px 24px;
+        padding: 6px 16px;
         gap: 12px;
     }
     .cp-breadcrumb {
         display: flex; align-items: center; gap: 6px;
-        font-size: 14px; font-weight: 600;
+        font-size: 13.5px; font-weight: 500;
     }
-    .cp-breadcrumb a { color: var(--teal-600); text-decoration: none; font-weight: 600; }
+    .cp-breadcrumb a { color: var(--teal-600); text-decoration: none; font-weight: 500; }
     .cp-breadcrumb a:hover { color: var(--teal-500); }
     .cp-breadcrumb .sep { color: #bbb; font-weight: 400; }
-    .cp-breadcrumb .current { color: rgba(0,0,0,0.45); font-weight: 500; }
+    .cp-breadcrumb .current { color: rgba(0,0,0,0.45); font-weight: 400; }
 
     .cp-save-group { display: flex; gap: 8px; align-items: center; }
     .btn-save {
+        display: inline-flex; align-items: center; gap: 5px;
         background: var(--teal-500); color: #fff;
-        border: none; border-radius: 6px;
-        padding: 8px 20px; font-size: 13px; font-weight: 700;
+        border: none; border-radius: 4px;
+        padding: 6px 14px; font-size: 12.5px; font-weight: 600;
         cursor: pointer; font-family: 'Sora', sans-serif;
         transition: background 0.15s;
     }
     .btn-save:hover { background: var(--teal-600); }
     .btn-discard {
+        display: inline-flex; align-items: center; gap: 5px;
         background: transparent; color: rgba(0,0,0,0.55);
-        border: 1px solid rgba(0,0,0,0.15); border-radius: 6px;
-        padding: 8px 16px; font-size: 13px; font-weight: 600;
+        border: 1px solid rgba(0,0,0,0.15); border-radius: 4px;
+        padding: 5px 14px; font-size: 12.5px; font-weight: 500;
         cursor: pointer; font-family: 'Sora', sans-serif;
         text-decoration: none; transition: all 0.15s;
     }
@@ -48,8 +49,9 @@
     /* ── Workflow row (action buttons + status bar) ── */
     .cp-workflow-row {
         display: flex; align-items: center; justify-content: space-between;
-        padding: 0 16px 8px;
-        border-top: 1px solid rgba(0,0,0,0.06);
+        padding: 0 0 16px;
+        margin: 0;
+        border-bottom: 1px solid rgba(0,0,0,0.06);
         gap: 12px; flex-wrap: wrap;
     }
 
@@ -78,6 +80,8 @@
     .btn-action.btn-danger-outline:hover { background: #fff0f0; border-color: #fca5a5; color: var(--rose); filter: none; }
     .btn-action:disabled { opacity: 0.38; cursor: not-allowed; filter: none; }
     .btn-action.btn-waiting { background: #f57c00; }
+    .btn-action.btn-ghost { background: transparent; color: rgba(0,0,0,0.55); border: none; }
+    .btn-action.btn-ghost:hover { background: rgba(0,0,0,0.05); filter: none; }
     .f-tab-disabled { opacity: 0.38; cursor: not-allowed; pointer-events: none; }
 
     /* ── Évaluation clinique ── */
@@ -93,6 +97,7 @@
     .status-bar {
         display: flex; align-items: center; gap: 0;
         flex-shrink: 0;
+        margin-left: auto;
     }
     .status-sep {
         font-size: 15px; color: rgba(0,0,0,0.2);
@@ -113,7 +118,7 @@
     .status-step .step-dot { display: none; }
 
     /* ── Form body ── */
-    .form-body { background: #fff; padding: 28px 28px 0; }
+    .form-body { background: #fff; margin-top: 16px; padding: 24px 28px 0; border-radius: 8px 8px 0 0; }
 
     /* ── Two-column main layout ── */
     .form-main-grid {
@@ -137,7 +142,7 @@
     .field-row label {
         font-size: 13px; font-weight: 600;
         color: rgba(0,0,0,0.55);
-        text-align: right;
+        text-align: left;
     }
     .field-row .required-star { color: var(--rose); margin-left: 2px; }
     .field-row .field-error {
@@ -278,7 +283,8 @@
 
     /* ── Onglets f-tab ── */
     .f-tabs-wrap { background: #fff; border: 1px solid rgba(0,0,0,0.08); border-radius: 4px; overflow: hidden; }
-    .f-tabs { display: flex; border-bottom: 1px solid rgba(0,0,0,0.08); overflow-x: auto; }
+    .f-tabs { display: flex; border-bottom: 1px solid rgba(0,0,0,0.08); overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
+    .f-tabs::-webkit-scrollbar { display: none; }
     .f-tab {
         padding: 8px 14px; font-size: 12.5px; color: rgba(0,0,0,0.45);
         border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap;
@@ -347,7 +353,7 @@
     .patho-ms-tag { display: inline-flex; align-items: center; gap: 3px; background: var(--teal-50); border: 1px solid var(--teal-200,#b2dfdb); color: var(--teal-700,#00695c); border-radius: 3px; font-size: 11.5px; padding: 1px 5px; max-width: 180px; }
     .patho-ms-tag span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .patho-ms-tag-rm { cursor: pointer; font-size: 13px; line-height: 1; color: var(--teal-500); flex-shrink: 0; }
-    .patho-ms-tag-rm:hover { color: #b71c1c; }
+    .patho-ms-tag-rm:hover { color: var(--rose-text); }
     .patho-ms-arrow { font-size: 10px; color: #999; flex-shrink: 0; transition: transform 0.15s; }
     .patho-ms.open .patho-ms-arrow { transform: rotate(180deg); }
     .patho-ms-panel { position: absolute; top: calc(100% + 2px); left: 0; right: 0; background: #fff; border: 1px solid #dde3ec; border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,0.13); z-index: 9000; min-width: 220px; }
@@ -361,7 +367,7 @@
     html[data-theme="dark"] .patho-ms-panel { background: #1a2535; border-color: #2e3f58; }
     html[data-theme="dark"] .patho-ms-search { background: #0f1b2b; border-color: #2e3f58; color: var(--text); }
     html[data-theme="dark"] .patho-ms-item { color: var(--text); }
-    html[data-theme="dark"] .patho-ms-item:hover { background: rgba(33,136,171,0.18); }
+    html[data-theme="dark"] .patho-ms-item:hover { background: rgba(var(--teal-500-rgb),0.18); }
     .cpn-radios { display: flex; align-items: center; gap: 14px; }
     .cpn-radios label { display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--teal-900); cursor: pointer; white-space: nowrap; }
     .cpn-sep { border: none; border-top: 1px solid rgba(0,0,0,0.08); margin: 16px 0; }
@@ -396,6 +402,11 @@
     .rdv-locked .patho-ms-trigger,
     .rdv-locked .f-check,
     .rdv-locked .cpn-radios input { pointer-events: none !important; }
+    .rdv-locked .form-body::after {
+        content: '';
+        position: fixed; inset: 0;
+        pointer-events: none;
+    }
 
     /* ── Alert ── */
     .alert-form-error {
@@ -416,7 +427,6 @@
         .status-bar { flex-wrap: wrap; }
         .timing-section { grid-template-columns: 1fr; }
     }
-</style>
 {% endblock %}
 
 {% block content %}
@@ -438,16 +448,25 @@
 <div class="control-panel">
 
     <div class="cp-top">
-        <div class="cp-breadcrumb">
-            <a href="{% url 'gynecologie_rdv' %}">Rendez-vous</a>
-            <span class="sep">/</span>
-            <span class="current">{% if rdv %}{{ rdv.patient.nom }} {{ rdv.patient.prenoms }}{% else %}Nouveau{% endif %}</span>
+        <div style="display:flex;align-items:center;gap:10px;">
+            <a href="{% url 'gynecologie_rdv' %}" class="o-ctrl-btn" style="padding:3px 7px;">
+                <i class="bi bi-arrow-left"></i>
+            </a>
+            <div class="cp-breadcrumb">
+                <a href="{% url 'gynecologie_rdv' %}">Rendez-vous</a>
+                <span class="sep">/</span>
+                <span class="current">{% if rdv %}{{ rdv.patient.nom }} {{ rdv.patient.prenoms }}{% else %}Nouveau{% endif %}</span>
+            </div>
         </div>
         <div class="cp-save-group">
             <button type="submit" class="btn-save">{% if rdv %}Enregistrer{% else %}Sauvegarder et facturer{% endif %}</button>
             <a href="{% url 'gynecologie_rdv' %}" class="btn-discard">Ignorer</a>
         </div>
     </div>
+</div>
+
+<!-- ══════════════ CORPS DU FORMULAIRE ══════════════ -->
+<div class="form-body">
 
     <div class="cp-workflow-row">
 
@@ -455,27 +474,31 @@
             {% if not rdv %}
                 {# Nouveau RDV — pas encore de boutons d'action #}
             {% elif rdv.statut == 'planifie' %}
-               <button type="submit" name="_action" value="confirmer" class="btn-action btn-teal"
-                    {% if not facture_payee %}disabled title="Une facture payée est requise pour confirmer ce rendez-vous"{% endif %}>Confirmer</button>
-                <button type="submit" name="_action" value="créer une facture" class="btn-action">Créer une facture</button>
+                <button type="submit" name="_action" value="confirmer" class="btn-action btn-teal"
+                    {% if not facture_payee %}disabled title="Sauvegardez et créez d'abord une facture pour confirmer ce rendez-vous"{% endif %}>Confirmer</button>
             {% elif rdv.statut == 'confirme' %}
-                <button type="button" class="btn-action btn-teal" id="btn-modifier">
-                    <i class="bi bi-pencil"></i> Modifier
-                </button>
-                <div id="edit-actions" style="display:none;gap:6px;align-items:center;">
-                    <button type="submit" name="_action" value="en_attente" class="btn-action btn-waiting"
-                        {% if not consultation %}disabled title="L'évaluation clinique doit être enregistrée d'abord"{% endif %}>En Attente</button>
-                    <!-- <button type="submit" name="_action" value="créer une facture" class="btn-action">Créer une facture</button> -->
-                    <button type="button" class="btn-action btn-danger-outline" id="btn-cancel-edit">
-                        <i class="bi bi-x-lg"></i> Annuler
+                {% if consultation and rdv.medecin %}
+                    <button type="submit" name="_action" value="en_attente" class="btn-action btn-waiting">En Attente</button>
+                {% else %}
+                    <button type="button" class="btn-action btn-teal" id="btn-modifier">
+                        <i class="bi bi-pencil"></i> Modifier
                     </button>
-                </div>
+                    <div id="edit-actions" style="display:none;gap:6px;align-items:center;">
+                        <button type="submit" name="_action" value="en_attente" class="btn-action btn-waiting"
+                            disabled title="{% if not consultation %}Créez l'évaluation clinique{% elif not rdv.medecin %}Sélectionnez un médecin{% endif %}">En Attente</button>
+                        <button type="button" class="btn-action btn-danger-outline" id="btn-cancel-edit">
+                            <i class="bi bi-x-lg"></i> Annuler
+                        </button>
+                    </div>
+                {% endif %}
             {% elif rdv.statut == 'en_attente' %}
-                <button type="submit" name="_action" value="en_consultation" class="btn-action btn-teal">Consultation</button>
+                <button type="submit" name="_action" value="en_consultation" class="btn-action btn-teal">En consultation</button>
             {% elif rdv.statut == 'en_consultation' %}
                 <button type="button" class="btn-action" id="btn-pause"><i class="bi bi-pause-fill"></i> Pause</button>
-                <button type="button" class="btn-action btn-blue"><i class="bi bi-person-fill"></i> Créer une ordonnance</button>
-                <a href="{% url 'laboratoire_create' %}?patient={{ rdv.patient.pk }}" class="btn-action btn-teal"><i class="bi bi-eyedropper"></i> Demande de lab</a>
+                <a href="{% url 'ordonnance_create_libre' %}?patient_id={{ rdv.patient.pk }}{% if consultation %}&consultation_id={{ consultation.pk }}{% elif rdv.medecin %}&medecin_id={{ rdv.medecin.pk }}{% endif %}" class="btn-action btn-ghost"><i class="bi bi-file-earmark-medical"></i> Créer une ordonnance</a>
+                <a href="{% url 'laboratoire_create' %}?patient={{ rdv.patient.pk }}" class="btn-action btn-ghost"><i class="bi bi-flask"></i> Demande de lab</a>
+                <a href="{% url 'soins:create' %}?patient_id={{ rdv.patient.pk }}" class="btn-action btn-ghost"><i class="bi bi-bandaid"></i> Soins</a>
+                <a href="{% url 'hospitalisation:create' %}?patient={{ rdv.patient.pk }}{% if rdv.medecin %}&medecin={{ rdv.medecin.pk }}{% endif %}&rdv={{ rdv.pk }}" class="btn-action btn-ghost"><i class="bi bi-clipboard2-pulse"></i> M.O</a>
                 <button type="submit" name="_action" value="terminer" class="btn-action btn-dark">Consultation terminée</button>
                 <button type="submit" name="_action" value="annuler" class="btn-action btn-danger-outline">Annuler</button>
             {% endif %}
@@ -494,10 +517,6 @@
         </div>
 
     </div>
-</div>
-
-<!-- ══════════════ CORPS DU FORMULAIRE ══════════════ -->
-<div class="form-body">
 
     <!-- Deux colonnes principales -->
     <div class="form-main-grid">
@@ -651,11 +670,16 @@
         <div class="f-tabs-wrap">
       <div class="f-tabs">
         <button type="button" class="f-tab active" data-tab="infos">Informations générales</button>
-        <button type="button" class="f-tab" data-tab="clinique">Évaluation clinique</button>
-        <button type="button" class="f-tab" data-tab="cpn">Consultation prénatale</button>
-        <button type="button" class="f-tab" data-tab="accouchement">Accouchement</button>
-        <button type="button" class="f-tab" data-tab="postnatale">Consultation postnatale</button>
-        <button type="button" class="f-tab" data-tab="curative">Consultation curative</button>
+        <button type="button" class="f-tab" data-tab="clinique"
+          title="Disponible après confirmation du rendez-vous">Évaluation clinique</button>
+        <button type="button" class="f-tab" data-tab="cpn"
+          title="Disponible en cours de consultation">Consultation prénatale</button>
+        <button type="button" class="f-tab" data-tab="accouchement"
+          title="Disponible en cours de consultation">Accouchement</button>
+        <button type="button" class="f-tab" data-tab="postnatale"
+          title="Disponible en cours de consultation">Consultation postnatale</button>
+        <button type="button" class="f-tab" data-tab="curative"
+          title="Disponible en cours de consultation">Consultation curative</button>
         <button type="button" class="f-tab" data-tab="autres">Autres informations</button>
       </div>
 
@@ -1229,14 +1253,14 @@
             <div class="cpn-row"><span class="cpn-lbl">Mode d'entrée</span><select name="cur_mode_entree" id="cur_mode_entree" class="cpn-sel editable"><option value=""></option><option value="venu_lui_meme" {% if rdv and rdv.cur_mode_entree == 'venu_lui_meme' %}selected{% endif %}>Patient venu de lui-même</option><option value="reference_centre" {% if rdv and rdv.cur_mode_entree == 'reference_centre' %}selected{% endif %}>Référence d'un centre de santé</option><option value="refere_tradipraticien" {% if rdv and rdv.cur_mode_entree == 'refere_tradipraticien' %}selected{% endif %}>Référé par un tradipraticien</option><option value="autre" {% if rdv and rdv.cur_mode_entree == 'autre' %}selected{% endif %}>Autre</option></select></div>
             <div class="cpn-row" id="cur_mode_entree_autre_row" {% if not rdv or rdv.cur_mode_entree != 'autre' %}style="display:none;"{% endif %}><span class="cpn-lbl">Préciser</span><input type="text" name="cur_mode_entree_autre" class="cpn-inp editable" value="{% if rdv %}{{ rdv.cur_mode_entree_autre|default:'' }}{% endif %}" placeholder="Préciser le mode d'entrée..."></div>
             <div class="cpn-row"><span class="cpn-lbl">Type de population</span><select name="cur_type_population" class="cpn-sel editable"><option value=""></option><option value="pop_generale">Population générale</option><option value="ts">TS</option><option value="ud">UD</option><option value="hsh">HSH</option><option value="pc">PC</option><option value="autre_risque">Autre à risque</option></select></div>
-            <div class="cpn-row"><span class="cpn-lbl">Type de visite curative</span><select name="cur_type_visite" class="cpn-sel editable"><option value=""></option><option value="consultant">Consultant</option><option value="controle">Contrôle</option><option value="soins">Soins</option></select></div><div class="cpn-row"><span class="cpn-lbl">Type de visite curative</span><select name="cur_type_visite" class="cpn-sel editable"><option value=""></option><option value="consultant">Consultant</option><option value="controle">Contrôle</option><option value="soins">Soins</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Type de visite curative</span><select name="cur_type_visite" class="cpn-sel editable"><option value=""></option><option value="consultant">Consultant</option><option value="controle">Contrôle</option><option value="soins">Soins</option></select></div>
             <div class="cpn-section">Examens cliniques et constantes <!--: <a href="#" style="color:var(--teal-600);font-size:12.5px;text-decoration:none;margin-left:8px;">Créer</a>--></div>
             <div class="cpn-row"><span class="cpn-lbl">Poids</span><div class="cpn-val"><input type="text" class="cpn-inp-ro" readonly value="{{ constante.poids|default:'—' }}" style="max-width:90px;"><span class="cpn-unit">kg</span></div></div>
             <div class="cpn-row"><span class="cpn-lbl">Taille</span><div class="cpn-val"><input type="text" class="cpn-inp-ro" readonly value="{{ constante.taille|default:'—' }}" style="max-width:90px;"><span class="cpn-unit">m</span></div></div>
             <div class="cpn-row"><span class="cpn-lbl">Température</span><div class="cpn-val"><input type="text" class="cpn-inp-ro" readonly value="{{ constante.temperature|default:'—' }}" style="max-width:90px;"><span class="cpn-unit">°C</span></div></div>
             <div class="cpn-row"><span class="cpn-lbl">Pouls</span><div class="cpn-val"><input type="text" class="cpn-inp-ro" readonly value="{{ constante.pouls|default:'—' }}" style="max-width:90px;"><span class="cpn-unit">bpm</span></div></div>
             <div class="cpn-row"><span class="cpn-lbl">Fréquence respiratoire</span><div class="cpn-val"><input type="text" class="cpn-inp-ro" readonly value="{{ constante.frequence_respiratoire|default:'—' }}" style="max-width:90px;"><span class="cpn-unit">cpm</span></div></div>
-            <div class="cpn-row"><span class="cpn-lbl">Motif de consultation</span><input type="text" name="cur_motif_consultation" class="cpn-inp editable"></div>
+            <div class="cpn-row" style="align-items:flex-start;"><span class="cpn-lbl" style="padding-top:4px;">Motif de consultation</span><textarea name="cur_motif_consultation" class="cpn-inp editable" rows="3" style="resize:vertical;padding:3px 0;"></textarea></div>
             <div class="cpn-row"><span class="cpn-lbl">IMC</span><div class="cpn-val"><input type="text" class="cpn-inp-ro" readonly value="{{ constante.imc|default:'—' }}"></div></div>
             <div class="cpn-row"><span class="cpn-lbl">Zscore</span><div class="cpn-val"><input type="text" class="cpn-inp-ro" readonly value="—"></div></div>
             <div class="cpn-row"><span class="cpn-lbl">TA Bras gauche (mmHg)</span><div class="cpn-val"><input type="text" class="cpn-inp-ro" readonly value="{% if constante and constante.tension_systolique %}{{ constante.tension_systolique }}/{{ constante.tension_diastolique }}{% else %}—{% endif %}"></div></div>
@@ -1306,7 +1330,7 @@
             <div class="cpn-row"><span class="cpn-lbl">CDIP proposé</span><div class="cpn-radios"><label><input type="radio" name="cur_cdip_propose" value="oui" class="editable"> Oui</label><label><input type="radio" name="cur_cdip_propose" value="na" class="editable"> NA</label></div></div>
             <div class="cpn-row"><span class="cpn-lbl">CDIP réalisé</span><div class="cpn-radios"><label><input type="radio" name="cur_cdip_realise" value="oui" class="editable"> Oui</label><label><input type="radio" name="cur_cdip_realise" value="non" class="editable"> Non</label><label><input type="radio" name="cur_cdip_realise" value="na" class="editable"> NA</label></div></div>
             <div class="cpn-row"><span class="cpn-lbl">Code dépistage client</span><input type="text" name="cur_code_depistage" class="cpn-inp editable"></div>
-            <div class="cpn-row"><span class="cpn-lbl">Glycémie</span><input type="text" name="cur_glycemie" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Glycémie</span><input type="text" name="cur_glycemie" class="cpn-inp editable" value="{{ constante.glycemie|default:'' }}"></div>
             <div class="cpn-row"><span class="cpn-lbl">Autres Examens</span><input type="text" name="cur_autres_examens" class="cpn-inp editable"></div>
 
             <hr class="cpn-sep" style="margin:16px 0;">
@@ -1380,75 +1404,7 @@
   </div><!-- /f-main -->
 
   <!-- ASIDE ACTIVITY -->
-  <div class="f-aside">
-    <div class="f-activity">
-      <div class="f-activity-head">
-        <span>Activité</span>
-        {% if not is_new %}
-        <span style="font-size:11px;">{{ rdv.date_creation|date:"d/m/Y" }}</span>
-        {% endif %}
-      </div>
-      <div class="f-activity-list">
-        {% if rdv %}
-          <!-- Current status indicator -->
-          <div class="f-activity-item">
-            <div class="f-avatar f-avatar-purple">{{ request.user.username|first|upper }}</div>
-            <div class="f-activity-body">
-              <div class="f-activity-who">{{ request.user.get_full_name|default:request.user.username }}</div>
-              <div class="f-activity-time">{{ rdv.date_creation|date:"d/m/Y H:i" }}</div>
-              <div class="f-activity-change">
-                <i class="bi bi-dot" style="color:var(--teal-600);"></i>
-                Rendez-vous créé(e)
-              </div>
-            </div>
-          </div>
-          {% if rdv.statut != 'planifie' %}
-          <div class="f-activity-item">
-            <div class="f-avatar f-avatar-teal">{{ request.user.username|first|upper }}</div>
-            <div class="f-activity-body">
-              <div class="f-activity-who">{{ request.user.get_full_name|default:request.user.username }}</div>
-              <div class="f-activity-time">Mis à jour</div>
-              <div class="f-activity-change">
-                <i class="bi bi-arrow-right"></i>
-                État :
-                <strong>{{ rdv.get_statut_display }}</strong>
-              </div>
-            </div>
-          </div>
-          {% endif %}
-          {% if rdv.medecin %}
-          <div class="f-activity-item">
-            <div class="f-avatar f-avatar-green">{{ rdv.medecin.nom|first|upper }}</div>
-            <div class="f-activity-body">
-              <div class="f-activity-who">{{ rdv.medecin }}</div>
-              <div class="f-activity-time">Médecin assigné</div>
-              <div class="f-activity-change">
-                <i class="bi bi-person-check"></i>
-                Docteur : <strong>{{ rdv.medecin }}</strong>
-              </div>
-            </div>
-          </div>
-          {% endif %}
-          {% if rdv.statut == 'termine' %}
-          <div class="f-activity-item">
-            <div class="f-avatar f-avatar-green">T</div>
-            <div class="f-activity-body">
-              <div class="f-activity-who">Consultation terminée</div>
-              <div class="f-activity-time">
-                Durée : {{ rdv.duree_display }}
-                &nbsp;·&nbsp; Attente : {{ rdv.temps_attente_display }}
-              </div>
-            </div>
-          </div>
-          {% endif %}
-        {% else %}
-          <div style="padding:14px;color:var(--text-muted);font-size:12px;">
-            L'activité apparaîtra après la création du dossier.
-          </div>
-        {% endif %}
-      </div>
-    </div>
-  </div>
+  {% load core_tags %}{% historique_sidebar rdv %}
 
 </div><!-- /f-layout -->
 
@@ -1478,174 +1434,7 @@
         statut.addEventListener('change', function () { highlightStatus(this.value); });
     }
 
-    /* ── Onglets ── */
-    document.querySelectorAll('.tab-btn').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            document.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
-            document.querySelectorAll('.tab-pane').forEach(function (p) { p.classList.remove('active'); });
-            btn.classList.add('active');
-            document.getElementById(btn.dataset.tab).classList.add('active');
-        });
-    });
-
-    /* ── Autocomplete patient (AJAX) ── */
-    var patientHidden    = document.getElementById('id_patient');
-    var codeHidden       = document.getElementById('id_code_confirmation');
-    var codeDisplay      = document.getElementById('code-confirmation');
-    var searchInput      = document.getElementById('patient-search');
-    var dropdown         = document.getElementById('ac-dropdown');
-    var focusedIdx       = -1;
-    var searchTimer      = null;
-    var SEARCH_URL       = '{% url "patients:patient_search" %}';
-    var INFO_URL         = '{% url "patients:patient_info" 0 %}';
-
-    function generateConfirmCode() {
-        var now = new Date();
-        var pad = function(n) { return String(n).padStart(2, '0'); };
-        var d = String(now.getFullYear()).slice(-2) + pad(now.getMonth()+1) + pad(now.getDate());
-        var t = pad(now.getHours()) + pad(now.getMinutes());
-        var r = Math.floor(Math.random() * 9000 + 1000);
-        return 'RDV' + d + '-' + t + r;
-    }
-
-    function highlight(text, q) {
-        if (!q) return text;
-        var i = text.toLowerCase().indexOf(q.toLowerCase());
-        if (i < 0) return text;
-        return text.slice(0, i) +
-               '<mark class="ac-mark">' + text.slice(i, i + q.length) + '</mark>' +
-               text.slice(i + q.length);
-    }
-
-    function renderResults(results, q) {
-        dropdown.innerHTML = '';
-        focusedIdx = -1;
-        if (!results.length) {
-            dropdown.innerHTML = '<div class="ac-empty">Aucun patient trouvé</div>';
-            dropdown.style.display = 'block';
-            return;
-        }
-        results.forEach(function(p) {
-            var div = document.createElement('div');
-            div.className = 'ac-item';
-            div.innerHTML =
-                '<strong>' + highlight(p.nom_complet, q) + '</strong>' +
-                '<br><span style="font-size:11px;color:rgba(0,0,0,0.4);">' +
-                highlight(p.code, q) +
-                (p.telephone ? ' · ' + highlight(p.telephone, q) : '') +
-                '</span>';
-            div.addEventListener('mousedown', function(e) {
-                e.preventDefault();
-                selectPatient(p.id, p.nom_complet);
-            });
-            dropdown.appendChild(div);
-        });
-        dropdown.style.display = 'block';
-    }
-
-    function doSearch(q) {
-        if (!q) { dropdown.style.display = 'none'; return; }
-        fetch(SEARCH_URL + '?q=' + encodeURIComponent(q))
-            .then(function(r){ return r.json(); })
-            .then(function(d){ renderResults(d.results, q); });
-    }
-
-    function selectPatient(id, nom) {
-        patientHidden.value = id;
-        searchInput.value   = nom;
-        dropdown.style.display = 'none';
-        fetchPatientInfo(id);
-        /* Générer le code de confirmation si pas déjà présent */
-        if (!codeHidden.value) {
-            var code = generateConfirmCode();
-            codeHidden.value = code;
-            codeDisplay.textContent = code;
-            codeDisplay.classList.remove('placeholder');
-        }
-    }
-
-    function moveFocus(dir) {
-        var items = dropdown.querySelectorAll('.ac-item');
-        if (!items.length) return;
-        focusedIdx = Math.max(0, Math.min(focusedIdx + dir, items.length - 1));
-        items.forEach(function(el, i){ el.classList.toggle('focused', i === focusedIdx); });
-        items[focusedIdx].scrollIntoView({ block: 'nearest' });
-    }
-
-    if (searchInput) {
-        searchInput.addEventListener('input', function() {
-            clearTimeout(searchTimer);
-            var q = this.value.trim();
-            patientHidden.value = '';
-            /* Réinitialiser le code si le patient est désélectionné */
-            if (!q) {
-                codeHidden.value = '';
-                codeDisplay.textContent = 'Sélectionnez un patient…';
-                codeDisplay.classList.add('placeholder');
-            }
-            searchTimer = setTimeout(function(){ doSearch(q); }, 220);
-        });
-        searchInput.addEventListener('keydown', function(e) {
-            if (e.key === 'ArrowDown')  { e.preventDefault(); moveFocus(1); }
-            else if (e.key === 'ArrowUp')   { e.preventDefault(); moveFocus(-1); }
-            else if (e.key === 'Enter') {
-                var items = dropdown.querySelectorAll('.ac-item');
-                if (focusedIdx >= 0 && items[focusedIdx]) {
-                    e.preventDefault();
-                    items[focusedIdx].dispatchEvent(new MouseEvent('mousedown'));
-                }
-            }
-            else if (e.key === 'Escape') { dropdown.style.display = 'none'; }
-        });
-        searchInput.addEventListener('blur', function(){
-            setTimeout(function(){ dropdown.style.display = 'none'; }, 200);
-        });
-
-        /* Pré-remplir si patient passé en paramètre (mode création uniquement) */
-        {% if patient_prefill and not rdv %}
-        searchInput.value = '{{ patient_prefill.nom }} {{ patient_prefill.prenoms }}';
-        patientHidden.value = '{{ patient_prefill.pk }}';
-        fetchPatientInfo('{{ patient_prefill.pk }}');
-        if (!codeHidden.value) {
-            var code = generateConfirmCode();
-            codeHidden.value = code;
-            codeDisplay.textContent = code;
-            codeDisplay.classList.remove('placeholder');
-        }
-        {% endif %}
-    }
-
-    /* ── Info patient (âge + téléphone) ── */
-    function fetchPatientInfo(pk) {
-        if (!pk) { setPlaceholder('patient-age', '—'); setPlaceholder('patient-tel', '—'); return; }
-        fetch(INFO_URL.replace('/0/', '/' + pk + '/'))
-            .then(function(r){ return r.json(); })
-            .then(function(d) {
-                var ageEl = document.getElementById('patient-age');
-                var telEl = document.getElementById('patient-tel');
-                ageEl.textContent = d.age + ' ans';
-                ageEl.classList.remove('placeholder');
-                telEl.textContent = d.telephone || '—';
-                telEl.classList.remove('placeholder');
-            });
-    }
-
-    function setPlaceholder(id, text) {
-        var el = document.getElementById(id);
-        if (el) { el.textContent = text; el.classList.add('placeholder'); }
-    }
-
-    if (patientHidden && patientHidden.value) fetchPatientInfo(patientHidden.value);
-
-    /* En mode édition : générer le code si absent */
-    {% if rdv and not rdv.code_confirmation %}
-    if (!codeHidden.value) {
-        var editCode = generateConfirmCode();
-        codeHidden.value = editCode;
-        codeDisplay.textContent = editCode;
-        codeDisplay.classList.remove('placeholder');
-    }
-    {% endif %}
+    {% include "patients/includes/_autocomplete_patient_script.html" %}
 
     /* ── Date de validité = date_heure + 14 jours ── */
     var dateHeureInput = document.getElementById('{{ form.date_heure.id_for_label }}');
@@ -1836,30 +1625,30 @@
     }());
 
     /* ── Onglets médicaux ── */
-    var REGISTER_TABS = ['cpn', 'accouchement', 'postnatale', 'curative'];
     var rdvForm = document.getElementById('rdv-form');
     var isNew = rdvForm.dataset.isNew === '1';
     var confirmeFacture = rdvForm.dataset.confirmeFacture === '1';
     var currentStatut = rdvForm.dataset.statut || '';
     // Évaluation clinique accessible dès que le RDV est confirmé
     var evalAccessible = ['confirme', 'en_attente', 'en_consultation', 'termine'].indexOf(currentStatut) !== -1;
-    // Registres (CPN, accouchement, postnatale, curative) accessibles uniquement en consultation
     var consultationStarted = (currentStatut === 'en_consultation' || currentStatut === 'termine');
+
+    var CONSULT_TABS = ['cpn', 'accouchement', 'postnatale', 'curative'];
 
     document.querySelectorAll('.f-tab').forEach(function(tab) {
         var tabId = tab.dataset.tab;
-        var isClinic  = (tabId === 'clinique');
-        var isRegister = REGISTER_TABS.indexOf(tabId) !== -1;
+        var isClinic = (tabId === 'clinique');
+        var isConsultTab = CONSULT_TABS.indexOf(tabId) !== -1;
 
-        if (isClinic  && !evalAccessible)     tab.classList.add('f-tab-disabled');
-        if (isRegister && !consultationStarted) tab.classList.add('f-tab-disabled');
+        if (isClinic && !evalAccessible)       tab.classList.add('f-tab-disabled');
+        if (isConsultTab && !consultationStarted) tab.classList.add('f-tab-disabled');
 
         tab.addEventListener('click', function() {
             var id = this.dataset.tab;
             if (id === 'clinique' && !evalAccessible) return;
-            if (REGISTER_TABS.indexOf(id) !== -1 && !consultationStarted) return;
-            document.querySelectorAll('.f-tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.f-tab-panel').forEach(p => p.classList.remove('active'));
+            if (CONSULT_TABS.indexOf(id) !== -1 && !consultationStarted) return;
+            document.querySelectorAll('.f-tab').forEach(function(t) { t.classList.remove('active'); });
+            document.querySelectorAll('.f-tab-panel').forEach(function(p) { p.classList.remove('active'); });
             this.classList.add('active');
             document.getElementById('tab-' + id).classList.add('active');
         });
@@ -1963,7 +1752,7 @@
           {% else %}<svg width="28" height="28" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" fill="#ccc"/><path d="M4 20c0-4 3.6-6 8-6s8 2 8 6" stroke="#ccc" stroke-width="1.5" fill="none"/><path d="M9 6.5a3.5 3.5 0 016 2.3" stroke="#bbb" stroke-width="1.2" fill="none"/></svg>{% endif %}
         </div>
         <div class="em-pgrid">
-          <div class="em-prow"><span class="em-plbl">Patient</span><span class="em-pval">{{ rdv.patient.nom }} {{ rdv.patient.prenoms }}</span><span class="em-plbl">Docteur</span><span class="em-pval">{% if rdv.medecin %}Dr. {{ rdv.medecin.nom }}{% else %}—{% endif %}</span></div>
+          <div class="em-prow"><span class="em-plbl">Patient</span><span class="em-pval">{{ rdv.patient.nom }} {{ rdv.patient.prenoms }}</span><span class="em-plbl">Médecin <span style="color:#e53935;">*</span></span><span class="em-pval"><select name="eval_medecin" style="border:none;border-bottom:1px solid #ccc;outline:none;font-size:12.5px;background:transparent;padding:2px 0;font-family:'Sora',sans-serif;min-width:140px;"><option value="">— Sélectionner —</option>{% for m in medecins %}<option value="{{ m.pk }}"{% if rdv.medecin_id == m.pk %} selected{% endif %}>Dr. {{ m.nom }}</option>{% endfor %}</select></span></div>
           <div class="em-prow"><span class="em-plbl">Âge</span><span class="em-pval">{{ rdv.patient.age|default:"—" }}</span><span class="em-plbl">Date</span><span class="em-pval">{{ rdv.date_heure|date:"d/m/Y H:i:s" }}</span></div>
           <div class="em-prow"><span class="em-plbl"></span><span class="em-pval"></span><span class="em-plbl">Rendez-vous</span><span class="em-pval">{{ rdv.code_rdv }}</span></div>
         </div>
@@ -2221,6 +2010,38 @@
 
     if (btnModifier) btnModifier.addEventListener('click', unlock);
     if (btnCancel)   btnCancel.addEventListener('click', lock);
+})();
+</script>
+
+<script>
+/* ── Filtre "Médecin" et "Type de consultation" selon le "Département" choisi ── */
+(function () {
+  var dept = document.getElementById('id_departement');
+  if (!dept) return;
+  var targets = [
+    document.getElementById('id_medecin'),
+    document.getElementById('id_type_consultation'),
+  ].filter(Boolean);
+  if (!targets.length) return;
+
+  function filterByDepartement(select) {
+    var departementId = dept.value;
+    var stillValid = false;
+    select.querySelectorAll('option').forEach(function (opt) {
+      if (!opt.value) return;
+      var visible = !!departementId && opt.dataset.departementId === departementId;
+      opt.hidden = !visible;
+      if (visible && opt.selected) stillValid = true;
+    });
+    if (!stillValid) select.value = '';
+  }
+
+  function filterAll() {
+    targets.forEach(filterByDepartement);
+  }
+
+  dept.addEventListener('change', filterAll);
+  filterAll();
 })();
 </script>
 

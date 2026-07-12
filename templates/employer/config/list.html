@@ -1,0 +1,369 @@
+{% extends 'employer/base.html' %}
+{% load static %}
+
+{% block topbar_title %}Configuration — {{ cfg.label_plural }}{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+.rh-table-wrap {
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+html[data-theme="dark"] .rh-table-wrap { background: var(--rh-surface); }
+.rh-table { width: 100%; border-collapse: collapse; }
+.rh-table thead { background: var(--rh-50); border-bottom: 2px solid var(--rh-100); }
+html[data-theme="dark"] .rh-table thead { background: rgba(var(--rh-600-rgb),0.1); border-bottom-color: var(--rh-border); }
+.rh-table th {
+  padding: 9px 12px; text-align: left; font-size: 11px; font-weight: 700;
+  text-transform: uppercase; color: var(--rh-800); letter-spacing: 0.3px; white-space: nowrap;
+}
+html[data-theme="dark"] .rh-table th { color: var(--rh-300); }
+.rh-table td {
+  padding: 9px 12px; border-bottom: 1px solid rgba(0,0,0,0.04);
+  font-size: 13px; color: var(--rh-text); vertical-align: middle;
+}
+html[data-theme="dark"] .rh-table td { border-bottom-color: rgba(255,255,255,0.04); color: var(--rh-text); }
+.rh-table tbody tr:hover { background: rgba(var(--rh-600-rgb),0.03); }
+html[data-theme="dark"] .rh-table tbody tr:hover { background: rgba(var(--rh-600-rgb),0.08); }
+.rh-table tbody tr:last-child td { border-bottom: none; }
+.rh-empty { padding: 40px 20px; text-align: center; color: var(--rh-muted); }
+.rh-row-actions { display: flex; gap: 6px; justify-content: flex-end; }
+.rh-row-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--rh-border);
+  background: #fff; color: var(--rh-600); cursor: pointer; text-decoration: none;
+  transition: background .15s, color .15s;
+}
+.rh-row-btn:hover { background: var(--rh-50); }
+.rh-row-btn.danger { color: var(--rose); }
+.rh-row-btn.danger:hover { background: rgba(var(--rose-rgb),0.08); }
+html[data-theme="dark"] .rh-row-btn { background: var(--rh-surface); border-color: var(--rh-border); }
+
+/* ── Pagination ── */
+.rh-pagination { display: flex; justify-content: center; align-items: center; gap: 6px; padding: 20px 0; flex-wrap: wrap; }
+.rh-page-link {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 32px; height: 32px; padding: 0 8px;
+  border-radius: 6px; font-size: 13px; font-weight: 600; text-decoration: none;
+  color: var(--rh-700); background: #fff; border: 1px solid var(--rh-200); transition: all .15s;
+}
+.rh-page-link:hover { background: var(--rh-50); border-color: var(--rh-400); color: var(--rh-600); }
+.rh-page-link.active { background: var(--rh-600); color: #fff; border-color: var(--rh-600); }
+.rh-page-link.disabled { opacity: 0.35; pointer-events: none; }
+html[data-theme="dark"] .rh-page-link { background: var(--rh-surface); border-color: var(--rh-border); color: var(--rh-300); }
+html[data-theme="dark"] .rh-page-link:hover  { background: rgba(var(--rh-600-rgb),0.15); border-color: var(--rh-400); color: var(--rh-200); }
+html[data-theme="dark"] .rh-page-link.active { background: var(--rh-600); color: #fff; border-color: var(--rh-600); }
+
+/* ── Tri ── */
+.rh-th-sort {
+  display: inline-flex; align-items: center; gap: 5px;
+  color: inherit; text-decoration: none; cursor: pointer;
+}
+.rh-th-sort:hover { color: var(--rh-600); }
+.rh-th-sort .bi { font-size: 9px; }
+
+/* ── Modale Créer/Modifier ── */
+.rh-modal-overlay {
+  position: fixed; inset: 0; z-index: 9000;
+  background: rgba(10,20,15,0.55);
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transition: opacity 0.22s ease, visibility 0.22s ease;
+}
+.rh-modal-overlay.open { opacity: 1; visibility: visible; pointer-events: auto; }
+.rh-modal-box {
+  background: #fff; border-radius: 16px;
+  width: 100%; max-width: 480px; max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 24px 70px rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.08);
+  transform: translateY(14px) scale(0.96);
+  opacity: 0;
+  transition: transform 0.28s cubic-bezier(.22,1,.36,1), opacity 0.22s ease;
+}
+.rh-modal-overlay.open .rh-modal-box { transform: translateY(0) scale(1); opacity: 1; }
+html[data-theme="dark"] .rh-modal-box { background: var(--rh-surface); }
+.rh-modal-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 18px 22px;
+  background: linear-gradient(135deg, rgba(var(--rh-600-rgb),0.09), rgba(var(--rh-600-rgb),0.02));
+  border-bottom: 1px solid var(--rh-border);
+}
+.rh-modal-icon {
+  width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--rh-600), var(--rh-400));
+  color: #fff; display: flex; align-items: center; justify-content: center;
+  font-size: 17px; box-shadow: 0 4px 12px rgba(var(--rh-600-rgb),0.35);
+}
+.rh-modal-title-wrap { flex: 1; min-width: 0; }
+.rh-modal-title { font-size: 16px; font-weight: 800; color: var(--rh-900); letter-spacing: -0.2px; }
+html[data-theme="dark"] .rh-modal-title { color: var(--rh-text); }
+.rh-modal-subtitle { font-size: 11.5px; color: var(--rh-muted); margin-top: 1px; }
+.rh-modal-close {
+  width: 32px; height: 32px; border-radius: 9px; border: none;
+  background: rgba(0,0,0,0.04); color: var(--rh-muted); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, color 0.15s, transform 0.15s;
+  flex-shrink: 0;
+}
+.rh-modal-close:hover { background: rgba(var(--rose-rgb),0.12); color: var(--rose-btn); transform: rotate(90deg); }
+html[data-theme="dark"] .rh-modal-close { background: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .rh-modal-close:hover { background: rgba(var(--rose-rgb),0.18); }
+.rh-modal-loading {
+  padding: 48px 20px; text-align: center; color: var(--rh-muted); font-size: 13.5px;
+}
+.rh-modal-loading i { display: block; font-size: 26px; margin-bottom: 10px; color: var(--rh-500); animation: rh-modal-spin 0.9s linear infinite; }
+@keyframes rh-modal-spin { to { transform: rotate(360deg); } }
+.rh-modal-body { padding: 22px; animation: rh-modal-fade-in 0.25s ease; }
+@keyframes rh-modal-fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.rh-modal-footer {
+  display: flex; justify-content: flex-end; gap: 10px;
+  padding: 16px 22px; border-top: 1px solid var(--rh-border);
+  background: rgba(0,0,0,0.012);
+}
+html[data-theme="dark"] .rh-modal-footer { background: rgba(255,255,255,0.015); }
+
+/* ── Champs du formulaire dans la modale (repris de config/form.html) ── */
+.rh-form-row { display: grid; gap: 14px; margin-bottom: 14px; }
+.rh-form-row:last-child { margin-bottom: 0; }
+.rh-form-row.cols-2 { grid-template-columns: 1fr 1fr; }
+@media (max-width: 600px) { .rh-form-row.cols-2 { grid-template-columns: 1fr; } }
+.rh-fgroup { display: flex; flex-direction: column; gap: 5px; }
+.rh-fgroup .rh-error { font-size: 11.5px; color: var(--rose); display: flex; align-items: center; gap: 4px; }
+.rh-check-row { display: flex; align-items: center; gap: 8px; padding-top: 4px; }
+.rh-check-row input[type="checkbox"] { width: 17px; height: 17px; cursor: pointer; accent-color: var(--rh-600); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="action-bar">
+  <div class="action-bar-breadcrumb">
+    <a href="{% url 'ressources_humaines_list' %}" class="btn-form-cancel" style="padding:3px 7px;">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <span>Configuration</span>
+    <span class="sep">/</span>
+    <span class="current">{{ cfg.label_plural }}</span>
+  </div>
+  <div class="action-bar-buttons">
+    <form method="get" style="display:flex;">
+      <input type="text" name="q" class="rh-input" value="{{ q }}" placeholder="Rechercher..." style="max-width:200px;">
+    </form>
+    <a href="{% url 'rh_config_create' slug %}" class="btn-form-submit" onclick="return rhOpenConfigModal(event, this.href, 'Nouveau — {{ cfg.label }}');">
+      <i class="bi bi-plus-lg"></i> Créer
+    </a>
+  </div>
+</div>
+
+<div class="rh-table-wrap">
+  <table class="rh-table">
+    <thead>
+      <tr>
+        <th>
+          <a href="?sort=nom&dir={% if sort == 'nom' and dir == 'asc' %}desc{% else %}asc{% endif %}{% if q %}&q={{ q }}{% endif %}" class="rh-th-sort">
+            Nom
+            {% if sort == 'nom' %}<i class="bi bi-caret-{% if dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>{% else %}<i class="bi bi-caret-up-fill" style="opacity:.2;"></i>{% endif %}
+          </a>
+        </th>
+        {% if slug == 'fonction' or slug == 'grade' %}
+        <th>
+          <a href="?sort=code&dir={% if sort == 'code' and dir == 'asc' %}desc{% else %}asc{% endif %}{% if q %}&q={{ q }}{% endif %}" class="rh-th-sort">
+            Code
+            {% if sort == 'code' %}<i class="bi bi-caret-{% if dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>{% else %}<i class="bi bi-caret-up-fill" style="opacity:.2;"></i>{% endif %}
+          </a>
+        </th>
+        {% endif %}
+        {% if slug == 'fonction' %}
+        <th>
+          <a href="?sort=categorie&dir={% if sort == 'categorie' and dir == 'asc' %}desc{% else %}asc{% endif %}{% if q %}&q={{ q }}{% endif %}" class="rh-th-sort">
+            Catégorie
+            {% if sort == 'categorie' %}<i class="bi bi-caret-{% if dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>{% else %}<i class="bi bi-caret-up-fill" style="opacity:.2;"></i>{% endif %}
+          </a>
+        </th>
+        {% endif %}
+        {% if slug == 'type_contrat' %}
+        <th>
+          <a href="?sort=droit_au_conge&dir={% if sort == 'droit_au_conge' and dir == 'asc' %}desc{% else %}asc{% endif %}{% if q %}&q={{ q }}{% endif %}" class="rh-th-sort">
+            Droit au congé
+            {% if sort == 'droit_au_conge' %}<i class="bi bi-caret-{% if dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>{% else %}<i class="bi bi-caret-up-fill" style="opacity:.2;"></i>{% endif %}
+          </a>
+        </th>
+        {% endif %}
+        {% if slug != 'nationalite' %}<th>Description</th>{% endif %}
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in page_obj %}
+      <tr>
+        <td style="font-weight:600;">{{ item.nom }}</td>
+        {% if slug == 'fonction' %}
+        <td>{{ item.code|default:'—' }}</td>
+        <td>{{ item.get_categorie_display|default:'—' }}</td>
+        {% endif %}
+        {% if slug == 'grade' %}
+        <td>{{ item.code|default:'—' }}</td>
+        {% endif %}
+        {% if slug == 'type_contrat' %}
+        <td>{% if item.droit_au_conge %}<i class="bi bi-check-lg" style="color:var(--rh-600);"></i> Oui{% else %}<i class="bi bi-x-lg" style="color:var(--rh-muted);"></i> Non{% endif %}</td>
+        {% endif %}
+        {% if slug != 'nationalite' %}<td style="color:var(--rh-muted);">{{ item.description|truncatechars:60|default:'—' }}</td>{% endif %}
+        <td>
+          <div class="rh-row-actions">
+            <a href="{% url 'rh_config_edit' slug item.pk %}" class="rh-row-btn" title="Modifier"
+               onclick="return rhOpenConfigModal(event, this.href, 'Modifier — {{ item.nom }}');">
+              <i class="bi bi-pencil"></i>
+            </a>
+            <form method="post" action="{% url 'rh_config_delete' slug item.pk %}"
+                  onsubmit="return confirm('Supprimer « {{ item.nom }} » ?\nCette action est irréversible.')" style="display:inline;">
+              {% csrf_token %}
+              <button type="submit" class="rh-row-btn danger" title="Supprimer">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="{% if slug == 'fonction' %}5{% elif slug == 'nationalite' %}2{% else %}4{% endif %}">
+        <div class="rh-empty">
+          {% if q %}Aucun résultat pour « {{ q }} ».{% else %}Aucun(e) {{ cfg.label|lower }} enregistré(e) pour l'instant.{% endif %}
+        </div>
+      </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if page_obj.paginator.num_pages > 1 %}
+<div class="rh-pagination">
+  {% if page_obj.has_previous %}
+    <a href="?sort={{ sort }}&dir={{ dir }}{% if q %}&q={{ q }}{% endif %}&page=1" class="rh-page-link" title="Première page">
+      <i class="bi bi-chevron-double-left"></i>
+    </a>
+    <a href="?sort={{ sort }}&dir={{ dir }}{% if q %}&q={{ q }}{% endif %}&page={{ page_obj.previous_page_number }}" class="rh-page-link">
+      <i class="bi bi-chevron-left"></i>
+    </a>
+  {% else %}
+    <span class="rh-page-link disabled"><i class="bi bi-chevron-double-left"></i></span>
+    <span class="rh-page-link disabled"><i class="bi bi-chevron-left"></i></span>
+  {% endif %}
+
+  {% for num in page_obj.paginator.page_range %}
+    {% if num == page_obj.number %}
+      <span class="rh-page-link active">{{ num }}</span>
+    {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
+      <a href="?sort={{ sort }}&dir={{ dir }}{% if q %}&q={{ q }}{% endif %}&page={{ num }}" class="rh-page-link">{{ num }}</a>
+    {% endif %}
+  {% endfor %}
+
+  {% if page_obj.has_next %}
+    <a href="?sort={{ sort }}&dir={{ dir }}{% if q %}&q={{ q }}{% endif %}&page={{ page_obj.next_page_number }}" class="rh-page-link">
+      <i class="bi bi-chevron-right"></i>
+    </a>
+    <a href="?sort={{ sort }}&dir={{ dir }}{% if q %}&q={{ q }}{% endif %}&page={{ page_obj.paginator.num_pages }}" class="rh-page-link" title="Dernière page">
+      <i class="bi bi-chevron-double-right"></i>
+    </a>
+  {% else %}
+    <span class="rh-page-link disabled"><i class="bi bi-chevron-right"></i></span>
+    <span class="rh-page-link disabled"><i class="bi bi-chevron-double-right"></i></span>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- ── Modale Créer/Modifier ── -->
+<div class="rh-modal-overlay" id="rh-config-modal-overlay" onclick="if (event.target === this) rhCloseConfigModal();">
+  <div class="rh-modal-box">
+    <div class="rh-modal-header">
+      <div class="rh-modal-icon"><i class="bi {{ cfg.icone }}"></i></div>
+      <div class="rh-modal-title-wrap">
+        <div class="rh-modal-title" id="rh-config-modal-title"></div>
+        <div class="rh-modal-subtitle">{{ cfg.label_plural }} — Configuration</div>
+      </div>
+      <button type="button" class="rh-modal-close" onclick="rhCloseConfigModal()">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div id="rh-config-modal-content">
+      <div class="rh-modal-loading"><i class="bi bi-arrow-repeat"></i> Chargement…</div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+var rhConfigModalOverlay = document.getElementById('rh-config-modal-overlay');
+var rhConfigModalContent = document.getElementById('rh-config-modal-content');
+var rhConfigModalTitle   = document.getElementById('rh-config-modal-title');
+
+function rhOpenConfigModal(event, url, title) {
+  if (event) event.preventDefault();
+  rhConfigModalTitle.textContent = title;
+  rhConfigModalContent.innerHTML = '<div class="rh-modal-loading"><i class="bi bi-arrow-repeat"></i> Chargement…</div>';
+  rhConfigModalOverlay.classList.add('open');
+  fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
+    .then(function (r) { return r.text(); })
+    .then(function (html) {
+      rhConfigModalContent.innerHTML = html;
+      rhBindConfigForm();
+    })
+    .catch(function () {
+      rhConfigModalContent.innerHTML = '<div class="rh-modal-loading">Erreur de chargement.</div>';
+    });
+  return false;
+}
+
+function rhCloseConfigModal() {
+  rhConfigModalOverlay.classList.remove('open');
+  rhConfigModalContent.innerHTML = '';
+}
+
+function rhBindConfigForm() {
+  var form = document.getElementById('rhConfigModalForm');
+  if (!form) return;
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var url = form.dataset.url;
+    var submitBtn = form.querySelector('button[type="submit"]');
+    if (submitBtn) submitBtn.disabled = true;
+    fetch(url, {
+      method: 'POST',
+      headers: {'X-Requested-With': 'XMLHttpRequest'},
+      body: new FormData(form),
+    })
+      .then(function (r) {
+        var ct = r.headers.get('Content-Type') || '';
+        if (ct.indexOf('application/json') !== -1) {
+          return r.json().then(function (data) { return {json: data}; });
+        }
+        return r.text().then(function (html) { return {html: html}; });
+      })
+      .then(function (result) {
+        if (result.json && result.json.ok) {
+          window.location.reload();
+        } else if (result.html) {
+          rhConfigModalContent.innerHTML = result.html;
+          rhBindConfigForm();
+        }
+        if (submitBtn) submitBtn.disabled = false;
+      })
+      .catch(function () {
+        if (submitBtn) submitBtn.disabled = false;
+      });
+  });
+}
+
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape' && rhConfigModalOverlay.classList.contains('open')) rhCloseConfigModal();
+});
+</script>
+{% endblock %}

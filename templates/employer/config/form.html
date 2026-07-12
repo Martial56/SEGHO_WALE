@@ -1,0 +1,105 @@
+{% extends 'employer/base.html' %}
+{% load static %}
+
+{% block topbar_title %}{{ titre }}{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+.rh-form-card {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+html[data-theme="dark"] .rh-form-card { background: var(--rh-surface); }
+.rh-form-card-body { padding: 22px; }
+.rh-form-row { display: grid; gap: 14px; margin-bottom: 14px; }
+.rh-form-row:last-child { margin-bottom: 0; }
+.rh-form-row.cols-2 { grid-template-columns: 1fr 1fr; }
+@media (max-width: 600px) { .rh-form-row.cols-2 { grid-template-columns: 1fr; } }
+.rh-fgroup { display: flex; flex-direction: column; gap: 5px; }
+.rh-fgroup .rh-error { font-size: 11.5px; color: var(--rose); display: flex; align-items: center; gap: 4px; }
+.rh-check-row { display: flex; align-items: center; gap: 8px; padding-top: 4px; }
+.rh-check-row input[type="checkbox"] { width: 17px; height: 17px; cursor: pointer; accent-color: var(--rh-600); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<form method="post" novalidate id="rhConfigForm">
+{% csrf_token %}
+
+<div class="action-bar">
+  <div class="action-bar-breadcrumb">
+    <a href="{% url 'rh_config_list' slug %}" class="btn-form-cancel" style="padding:3px 7px;">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <a href="{% url 'rh_config_list' slug %}">Configuration / {{ cfg.label_plural }}</a>
+    <span class="sep">/</span>
+    <span class="current">{% if edit %}Modifier{% else %}Nouveau{% endif %}</span>
+  </div>
+  <div class="action-bar-buttons">
+    <a href="{% url 'rh_config_list' slug %}" class="btn-form-cancel">
+      <i class="bi bi-x-lg"></i> Annuler
+    </a>
+    <button type="submit" form="rhConfigForm" class="btn-form-submit">
+      <i class="bi bi-check2-all"></i> {% if edit %}Enregistrer{% else %}Créer{% endif %}
+    </button>
+  </div>
+</div>
+
+<div class="rh-form-card">
+  <div class="rh-form-card-body">
+    <div class="rh-form-row cols-2">
+      <div class="rh-fgroup">
+        <label class="rh-label" for="{{ form.nom.id_for_label }}">Nom <span class="req">*</span></label>
+        {{ form.nom }}
+        {% if form.nom.errors %}<div class="rh-error"><i class="bi bi-exclamation-circle"></i> {{ form.nom.errors.0 }}</div>{% endif %}
+      </div>
+      {% if form.code %}
+      <div class="rh-fgroup">
+        <label class="rh-label" for="{{ form.code.id_for_label }}">Code</label>
+        {{ form.code }}
+        {% if form.code.errors %}<div class="rh-error"><i class="bi bi-exclamation-circle"></i> {{ form.code.errors.0 }}</div>{% endif %}
+      </div>
+      {% endif %}
+    </div>
+
+    {% if form.categorie %}
+    <div class="rh-form-row">
+      <div class="rh-fgroup">
+        <label class="rh-label" for="{{ form.categorie.id_for_label }}">Catégorie</label>
+        {{ form.categorie }}
+        {% if form.categorie.errors %}<div class="rh-error"><i class="bi bi-exclamation-circle"></i> {{ form.categorie.errors.0 }}</div>{% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if form.droit_au_conge %}
+    <div class="rh-form-row">
+      <div class="rh-fgroup">
+        <label class="rh-label">Droit au congé</label>
+        <div class="rh-check-row">
+          {{ form.droit_au_conge }}
+          <span style="font-size:13px;color:var(--rh-text);">Les employés de ce type de contrat ont droit aux congés payés</span>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if form.description %}
+    <div class="rh-form-row">
+      <div class="rh-fgroup">
+        <label class="rh-label" for="{{ form.description.id_for_label }}">Description</label>
+        {{ form.description }}
+        {% if form.description.errors %}<div class="rh-error"><i class="bi bi-exclamation-circle"></i> {{ form.description.errors.0 }}</div>{% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+</form>
+{% endblock %}

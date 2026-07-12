@@ -1,0 +1,184 @@
+{% extends 'stock/base.html' %}
+{% load static %}
+{% block topbar_title %}Stock — Retour pharmacie{% endblock %}
+
+{% block extra_st_css %}<style>
+.content { padding-top: 0; }
+
+/* ── Info banner ── */
+.ret-info {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 11px 16px; margin-bottom: 20px;
+  background: rgba(45,153,219,.07);
+  border-left: 3px solid rgba(45,153,219,.55);
+  border-radius: 0 6px 6px 0;
+  font-size: 12.5px; color: #1565c0;
+}
+html[data-theme="dark"] .ret-info { background: rgba(45,153,219,.12); color: #90caf9; }
+</style>{% endblock %}
+
+{% block content %}
+
+<div class="action-bar">
+  <div class="action-bar-breadcrumb">
+    <a href="javascript:history.back()"><i class="bi bi-arrow-left"></i> Retour</a>
+    <span class="sep">/</span>
+    <span class="current">Enregistrer un retour pharmacie</span>
+  </div>
+</div>
+
+<!-- ══ Formulaire centré ══ -->
+<div style="max-width:640px;margin:0 auto;">
+
+  <!-- Bannière info -->
+  <div class="ret-info">
+    <i class="bi bi-info-circle-fill" style="flex-shrink:0;margin-top:1px;"></i>
+    <span>Un retour pharmacie <strong>réintègre des produits dans le stock central</strong>. La quantité retournée sera ajoutée au stock disponible du lot sélectionné.</span>
+  </div>
+
+  <!-- Carte formulaire -->
+  <div class="form-simple-card">
+
+      <form method="post" action="{% url 'stock_retour_create' %}" novalidate>
+        {% csrf_token %}
+
+        <!-- Pharmacie -->
+        <div class="form-field">
+          <label class="field-label" for="id_pharmacie">
+            Pharmacie <span class="required-star">*</span>
+          </label>
+          <select name="pharmacie" id="id_pharmacie" class="field-ul" required>
+            <option value="">— Sélectionner une pharmacie —</option>
+            {% for code, label in pharmacies %}
+            <option value="{{ code }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Produit -->
+        <div class="form-field">
+          <label class="field-label" for="sel-produit">
+            Produit <span class="required-star">*</span>
+          </label>
+          <select name="produit" id="sel-produit" class="field-ul" required>
+            <option value="">— Sélectionner un produit —</option>
+            {% for p in produits %}
+            <option value="{{ p.pk }}" data-unite="{{ p.unite_mesure.nom }}">
+              {% if p.code %}{{ p.code }} — {% endif %}{{ p.nom }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Lot -->
+        <div class="form-field">
+          <label class="field-label" for="sel-lot">
+            Lot
+            <span class="f-hint" style="text-transform:none;letter-spacing:0;margin-left:4px;display:inline;">facultatif</span>
+          </label>
+          <select name="lot" id="sel-lot" class="field-ul">
+            <option value="">— Aucun lot spécifié —</option>
+          </select>
+          <div id="lot-hint" class="f-hint" style="display:none;">
+            <i class="bi bi-info-circle"></i> Sélectionnez d'abord un produit pour voir ses lots disponibles.
+          </div>
+        </div>
+
+        <!-- Quantité -->
+        <div class="form-field">
+          <label class="field-label" for="id_quantite">
+            Quantité <span class="required-star">*</span>
+          </label>
+          <input
+            type="number" name="quantite" id="id_quantite"
+            class="field-ul" required min="1" step="1"
+            placeholder="0.00">
+          <div id="unite-hint" class="f-hint" style="display:none;"></div>
+        </div>
+
+        <!-- Notes -->
+        <div class="form-field">
+          <label class="field-label" for="id_notes">Notes</label>
+          <textarea name="notes" id="id_notes" class="field-ul" rows="2"
+                    placeholder="Motif du retour, état des produits…"></textarea>
+        </div>
+
+        <!-- Boutons -->
+        <div class="form-actions">
+          <a href="{% url 'stock_mouvements' %}" class="btn-form-cancel">
+            <i class="bi bi-x-lg"></i> Annuler
+          </a>
+          <button type="submit" class="btn-form-submit">
+            <i class="bi bi-arrow-return-left"></i> Enregistrer le retour
+          </button>
+        </div>
+
+      </form>
+  </div>
+
+</div>
+
+<!-- ══ Données lots embarquées ══ -->
+<script>
+/* Mapping produit_pk → [{pk, label}] construit côté serveur */
+var LOTS_PAR_PRODUIT = {
+  {% for p in produits %}
+  "{{ p.pk }}": [
+    {% for lot in p.lots.all %}
+    {
+      "pk": "{{ lot.pk }}",
+      "label": "{{ lot.numero_lot|escapejs }}{% if lot.quantite_actuelle is not None %} — {{ lot.quantite_actuelle|floatformat:0 }} {{ p.unite_mesure.nom|escapejs }}{% endif %}"
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+  ]{% if not forloop.last %},{% endif %}
+  {% endfor %}
+};
+
+(function () {
+  var selProduit = document.getElementById('sel-produit');
+  var selLot     = document.getElementById('sel-lot');
+  var lotHint    = document.getElementById('lot-hint');
+  var uniteHint  = document.getElementById('unite-hint');
+
+  function rebuildLots() {
+    var pk   = selProduit.value;
+    var lots = pk ? (LOTS_PAR_PRODUIT[pk] || []) : [];
+
+    /* Vider et reconstruire le select lot */
+    selLot.innerHTML = '<option value="">— Aucun lot spécifié —</option>';
+    lots.forEach(function (l) {
+      var opt = document.createElement('option');
+      opt.value       = l.pk;
+      opt.textContent = l.label;
+      selLot.appendChild(opt);
+    });
+
+    /* Hint unité */
+    var opt = selProduit.selectedOptions[0];
+    if (opt && opt.dataset.unite) {
+      uniteHint.textContent = 'Unité : ' + opt.dataset.unite;
+      uniteHint.style.display = 'block';
+    } else {
+      uniteHint.style.display = 'none';
+    }
+
+    /* Hint lot */
+    if (pk && lots.length === 0) {
+      lotHint.style.display = 'block';
+      lotHint.innerHTML = '<i class="bi bi-exclamation-circle"></i> Aucun lot enregistré pour ce produit.';
+    } else if (!pk) {
+      lotHint.style.display = 'block';
+      lotHint.innerHTML = '<i class="bi bi-info-circle"></i> Sélectionnez d\'abord un produit pour voir ses lots.';
+    } else {
+      lotHint.style.display = 'none';
+    }
+  }
+
+  selProduit.addEventListener('change', rebuildLots);
+
+  /* Init au chargement si un produit est déjà sélectionné */
+  if (selProduit.value) rebuildLots();
+})();
+</script>
+
+{% endblock %}

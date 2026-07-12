@@ -1,0 +1,143 @@
+{% extends 'achats/base.html' %}
+{% load i18n %}
+
+{% block title %}{{ reception.numero }} — Réception{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+.content { padding:0; }
+.rd-page { display:flex; flex-direction:column; height:calc(100vh - var(--topbar-h) - 44px); overflow:hidden; }
+.rd-head { display:flex; align-items:center; justify-content:space-between; padding:14px 28px; background:#fff; border-bottom:1px solid rgba(0,0,0,.07); flex-shrink:0; gap:12px; }
+.rd-head-left { display:flex; align-items:center; gap:12px; }
+.rd-head h1 { font-size:16px; font-weight:700; color:var(--teal-800); margin:0; }
+.rd-body { flex:1; overflow:auto; min-height:0; padding:20px 28px; display:flex; flex-direction:column; gap:16px; }
+.rd-card { background:#fff; border-radius:10px; border:1px solid rgba(0,0,0,.08); overflow:hidden; }
+.rd-card-head { padding:12px 16px; background:#fafafa; border-bottom:1px solid rgba(0,0,0,.06); font-size:13px; font-weight:700; color:var(--teal-800); display:flex; align-items:center; gap:8px; }
+.rd-info { display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; padding:16px; }
+.rd-info-item { display:flex; flex-direction:column; gap:3px; }
+.rd-info-label { font-size:11px; font-weight:600; color:#888; text-transform:uppercase; }
+.rd-info-val { font-size:13px; color:rgba(0,0,0,.8); font-weight:500; }
+.badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; }
+.s-conforme { background:#c0d8e8; color:var(--teal-700); }
+.s-partielle { background:#fef3c7; color:#92400e; }
+.s-non_conforme { background:#fee2e2; color:#991b1b; }
+.rd-table { width:100%; border-collapse:collapse; font-size:13px; }
+.rd-table th { padding:9px 14px; font-size:11px; font-weight:700; color:#888; text-transform:uppercase; background:#fafafa; border-bottom:1px solid rgba(0,0,0,.08); }
+.rd-table td { padding:9px 14px; border-bottom:1px solid rgba(0,0,0,.05); vertical-align:middle; }
+.rd-table tr:last-child td { border-bottom:none; }
+.ecart-neg { color:#ef4444; font-weight:600; }
+.ecart-ok { color:#2d99db; font-weight:600; }
+
+/* ── Mode sombre ── */
+html[data-theme="dark"] .rd-head { background:var(--surface); border-bottom-color:var(--border); }
+html[data-theme="dark"] .rd-head h1 { color:var(--text-strong,#eef3f8); }
+html[data-theme="dark"] .rd-card { background:var(--surface); border-color:var(--border); }
+html[data-theme="dark"] .rd-card-head { background:var(--surface-muted); border-bottom-color:var(--border); color:var(--text-strong,#eef3f8); }
+html[data-theme="dark"] .rd-info-label { color:var(--text-faint); }
+html[data-theme="dark"] .rd-info-val { color:var(--text); }
+html[data-theme="dark"] .rd-table th { background:var(--surface-muted); color:var(--text-faint); border-bottom-color:var(--border); }
+html[data-theme="dark"] .rd-table td { border-bottom-color:var(--border); color:var(--text); }
+html[data-theme="dark"] .s-conforme { background:rgba(var(--teal-700-rgb),.4); color:#7dd3fc; }
+html[data-theme="dark"] .s-partielle { background:rgba(146,64,14,.3); color:#fcd34d; }
+html[data-theme="dark"] .s-non_conforme { background:rgba(153,27,27,.3); color:#fca5a5; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="hist-wrapper">
+<div class="hist-main">
+<div class="rd-page">
+  <div class="rd-head">
+    <a href="{% url 'achats:commande_detail' reception.commande.pk %}" class="o-ctrl-btn" style="padding:3px 7px;"><i class="bi bi-arrow-left"></i></a>
+    <span style="font-size:13px;color:var(--text-muted);">
+      <a href="{% url 'achats:commandes_list' %}" style="color:var(--teal-700);text-decoration:none;font-weight:500;">Commandes</a>
+      <span style="margin:0 5px;opacity:.4;">/</span>
+      <a href="{% url 'achats:commande_detail' reception.commande.pk %}" style="color:var(--teal-700);text-decoration:none;font-weight:500;">{{ reception.commande.numero }}</a>
+      <span style="margin:0 5px;opacity:.4;">/</span>
+      <span style="color:var(--text);font-weight:500;">{{ reception.numero }}</span>
+    </span>
+    <span class="badge s-{{ reception.statut }}" style="margin-left:8px;">{{ reception.get_statut_display }}</span>
+  </div>
+
+  <div class="rd-body">
+    <div class="rd-card">
+      <div class="rd-card-head"><i class="bi bi-info-circle"></i> Informations</div>
+      <div class="rd-info">
+        <div class="rd-info-item">
+          <span class="rd-info-label">Numéro</span>
+          <span class="rd-info-val">{{ reception.numero }}</span>
+        </div>
+        <div class="rd-info-item">
+          <span class="rd-info-label">Commande</span>
+          <span class="rd-info-val">
+            <a href="{% url 'achats:commande_detail' reception.commande.pk %}" style="color:var(--teal-700);text-decoration:none;">{{ reception.commande.numero }}</a>
+          </span>
+        </div>
+        <div class="rd-info-item">
+          <span class="rd-info-label">Date de réception</span>
+          <span class="rd-info-val">{{ reception.date_reception }}</span>
+        </div>
+        <div class="rd-info-item">
+          <span class="rd-info-label">Réceptionné par</span>
+          <span class="rd-info-val">{{ reception.receptionne_par.get_full_name|default:reception.receptionne_par.username|default:"—" }}</span>
+        </div>
+        {% if reception.notes %}
+        <div class="rd-info-item" style="grid-column:1/-1;">
+          <span class="rd-info-label">Notes</span>
+          <span class="rd-info-val">{{ reception.notes }}</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="rd-card">
+      <div class="rd-card-head"><i class="bi bi-table"></i> Détail des articles reçus</div>
+      <table class="rd-table">
+        <thead>
+          <tr>
+            <th>Désignation</th>
+            <th style="text-align:right;">Qté commandée</th>
+            <th style="text-align:right;">Qté reçue</th>
+            <th style="text-align:right;">Écart</th>
+            <th style="text-align:center;">Conforme</th>
+            <th>N° de lot</th>
+            <th>Date péremption</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for l in lignes %}
+        <tr>
+          <td style="font-weight:500;">{{ l.ligne_commande.designation }}</td>
+          <td style="text-align:right;color:var(--text-muted);">{{ l.ligne_commande.quantite_commandee }}</td>
+          <td style="text-align:right;font-weight:700;">{{ l.quantite_recue }}</td>
+          <td style="text-align:right;">
+            {% with ecart=l.ecart %}
+            {% if ecart < 0 %}
+              <span class="ecart-neg">{{ ecart }}</span>
+            {% elif ecart > 0 %}
+              <span class="ecart-ok">+{{ ecart }}</span>
+            {% else %}
+              <span style="color:#2d99db;">✓</span>
+            {% endif %}
+            {% endwith %}
+          </td>
+          <td style="text-align:center;">
+            {% if l.conforme %}<i class="bi bi-check-circle-fill" style="color:#2d99db;"></i>
+            {% else %}<i class="bi bi-x-circle-fill" style="color:#ef4444;"></i>{% endif %}
+          </td>
+          <td style="color:var(--text-muted);font-family: var(--font-mono);font-size:12px;">{{ l.numero_lot|default:"—" }}</td>
+          <td style="color:var(--text-muted);">{{ l.date_peremption|default:"—" }}</td>
+          <td style="color:var(--text-muted);">{{ l.notes|default:"" }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</div>
+{% load core_tags %}{% historique_sidebar reception %}
+</div>
+{% endblock %}

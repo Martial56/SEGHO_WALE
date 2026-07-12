@@ -1,0 +1,354 @@
+{% extends 'patients/base.html' %}
+{% load static %}
+
+{% block topbar_title %}Ordonnances{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<style>
+  .o-badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .badge-ord-emise     { background: rgba(var(--amber-rgb),.12); color: var(--amber-text); }
+  .badge-ord-delivree  { background: rgba(var(--teal-600-rgb),.12); color: var(--teal-700); }
+  .badge-ord-partielle { background: rgba(var(--amber-rgb),.12); color: var(--amber-text); }
+  .badge-ord-expiree   { background: rgba(var(--rose-rgb),.12); color: var(--rose-text); }
+  html[data-theme="dark"] .badge-ord-emise     { background: rgba(var(--amber-rgb),.18); color: #f0c060; }
+  html[data-theme="dark"] .badge-ord-delivree  { background: rgba(var(--teal-600-rgb),.22); color: var(--teal-300); }
+  html[data-theme="dark"] .badge-ord-partielle { background: rgba(var(--amber-rgb),.18); color: #f0c060; }
+  html[data-theme="dark"] .badge-ord-expiree   { background: rgba(var(--rose-rgb),.18); color: #f09090; }
+
+  .badge-interne { background: #e2eef5; color: var(--teal-700,var(--ph-600)); border-radius: 20px; padding: 2px 7px; font-size: 10px; font-weight: 700; }
+  .badge-externe { background: #f3e5f5; color: #7b1fa2; border-radius: 20px; padding: 2px 7px; font-size: 10px; font-weight: 700; }
+
+  .meds-list { font-size: 12px; color: rgba(0,0,0,0.55); }
+  .meds-list span { display: inline-block; background: #f0f6fa; border-radius: 4px; padding: 1px 7px; margin: 1px 2px 1px 0; font-size: 11px; }
+  .meds-more { color: rgba(0,0,0,0.35); font-size: 11px; margin-left: 2px; }
+
+  html[data-theme="dark"] .o-list tbody tr:hover { background: rgba(33,136,171,0.2); }
+  html[data-theme="dark"] .o-list thead th { background: var(--surface); }
+  html[data-theme="dark"] .o-search-input { color: var(--text); }
+  html[data-theme="dark"] .o-search-bar { border-bottom-color: #3a4a62; }
+  html[data-theme="dark"] .o-pag-btn { background: var(--surface); border-color: var(--border); color: var(--text-muted); }
+  html[data-theme="dark"] .o-empty-state { background: var(--bg); }
+
+  .o-list-wrap { overflow-x: auto; overflow-y: auto; background: #fff; margin: 0 -32px; }
+  .o-list { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .o-list thead th {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 8px 14px; font-weight: 600; font-size: 11px;
+    color: var(--text-muted); text-align: left; text-transform: uppercase;
+    white-space: nowrap; position: sticky; top: 0; z-index: 2; user-select: none;
+  }
+  .o-list tbody tr { border-bottom: 1px solid #f0f0f0; transition: background 0.1s; cursor: pointer; }
+  .o-list tbody tr:hover { background: var(--teal-50); }
+  .o-list tbody td { padding: 6px 10px; color: var(--text); vertical-align: middle; }
+  .o-list tbody td.td-num { color: var(--teal-600); font-weight: 700; font-family: var(--font-mono); }
+  .o-list tbody td.td-patient { white-space: normal; font-weight: 500; }
+  .o-list tbody td.td-actions { text-align: center; white-space: nowrap; width: 80px; }
+
+  .btn-icon {
+    width: 26px; height: 26px; border: 1px solid var(--border); border-radius: 3px;
+    background: var(--surface); display: inline-flex; align-items: center; justify-content: center;
+    color: var(--text-muted); font-size: 12px; text-decoration: none; cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .btn-icon:hover { background: var(--teal-600); color: #fff; border-color: var(--teal-600); }
+
+  .o-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 20px; }
+  .o-empty-illo {
+    width: 88px; height: 88px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--teal-600) 0%, var(--teal-400) 100%);
+    display: flex; align-items: center; justify-content: center; margin-bottom: 20px;
+  }
+  .o-empty-illo svg { color: #fff; opacity: 0.9; }
+  .o-empty-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+  .o-empty-sub { font-size: 12.5px; color: var(--text-muted); }
+
+  .fac-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 16px 0; }
+  .fac-stat-card {
+    background: #fff; border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 16px;
+    border-top: 3px solid transparent;
+    transition: box-shadow .15s;
+  }
+  .fac-stat-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.07); }
+  .fac-stat-card.c-total  { border-top-color: #94a3b8; }
+  .fac-stat-card.c-emises { border-top-color: #1d4ed8; }
+  .fac-stat-card.c-deliv  { border-top-color: var(--teal-500); }
+  .fac-stat-card.c-expir  { border-top-color: #b91c1c; }
+  .fac-stat-label {
+    font-size: 10.5px; font-weight: 600; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: .4px; margin-bottom: 6px;
+  }
+  .fac-stat-value { font-size: 22px; font-weight: 700; color: var(--text); line-height: 1; }
+  html[data-theme="dark"] .fac-stat-card { background: var(--surface); }
+
+  .o-subheader {
+    background: #fff; border-bottom: 1px solid var(--border);
+    padding: 6px 16px; display: flex; flex-direction: column; gap: 5px;
+    position: sticky; top: 0; z-index: 190; margin: 0 -32px 0;
+  }
+  .o-subheader-row { display: flex; align-items: center; gap: 8px; }
+  .o-subheader-row-right { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .o-page-title { font-size: 17px; font-weight: 400; color: var(--text); }
+  .o-search-bar {
+    display: flex; align-items: center; border: none; border-bottom: 1px solid #bbb;
+    background: transparent; min-height: 28px; padding: 2px 4px; gap: 4px; width: 320px;
+  }
+  .o-search-input {
+    border: none; outline: none; font-size: 12px;
+    color: var(--text); flex: 1; min-width: 60px; background: transparent;
+  }
+  .o-search-btn { background: none; border: none; cursor: pointer; color: #888; font-size: 13px; padding: 2px; }
+  html[data-theme="dark"] .o-search-bar { border-bottom-color: #3a4a62; }
+  .o-ctrl-sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }
+  .o-pagination { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+  .o-pag-btn {
+    color: #555; text-decoration: none; font-size: 15px;
+    display: inline-flex; align-items: center; padding: 0 2px;
+    transition: color 0.15s;
+  }
+  .o-pag-btn:hover { color: var(--teal-600); }
+  .o-pag-btn.disabled { opacity: 0.3; pointer-events: none; }
+
+  .o-filter-dd { position: relative; }
+  .o-filter-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    border: 1px solid var(--border); border-radius: var(--radius-xs, 4px);
+    background: var(--surface); color: var(--text-muted);
+    font-size: 12px; padding: 4px 10px; cursor: pointer;
+    transition: border-color .15s, color .15s; white-space: nowrap;
+  }
+  .o-filter-btn:hover { border-color: var(--teal-400); color: var(--teal-600); }
+  .o-filter-btn.active { border-color: var(--teal-500); color: var(--teal-600); background: var(--teal-50); }
+  .o-filter-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--teal-500); display: inline-block;
+  }
+  .o-filter-panel {
+    display: none; position: absolute; top: calc(100% + 6px); right: 0;
+    background: #fff; border: 1px solid var(--border);
+    border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,0.14);
+    min-width: 190px; padding: 8px 0; z-index: 999;
+  }
+  .o-filter-panel.open { display: block; }
+  .o-filter-section-label {
+    display: block; font-size: 10.5px; font-weight: 700; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: .5px;
+    padding: 8px 16px 4px;
+  }
+  .o-filter-section-label:first-child { padding-top: 4px; }
+  .o-filter-option {
+    display: block; padding: 6px 16px; font-size: 13px; color: var(--text);
+    text-decoration: none; cursor: pointer; transition: background .1s;
+    white-space: nowrap;
+  }
+  .o-filter-option:hover { background: var(--teal-50); color: var(--teal-600); }
+  .o-filter-option.active { color: var(--teal-600); font-weight: 600; }
+  .o-filter-sep { border: none; border-top: 1px solid var(--border); margin: 6px 0; }
+  html[data-theme="dark"] .o-filter-panel { background: #1a2535; border-color: #2e3f58; }
+  html[data-theme="dark"] .o-filter-option:hover { background: rgba(33,136,171,0.15); }
+  .o-btn-create {
+    background: var(--teal-500); color: #fff; border: none; padding: 5px 14px; border-radius: 4px;
+    font-size: 12.5px; font-weight: 500; cursor: pointer; text-decoration: none;
+    display: inline-flex; align-items: center; letter-spacing: 0.5px; transition: background 0.15s;
+  }
+  .o-btn-create:hover { background: var(--teal-600); }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+
+<!-- ══ SUBHEADER ══ -->
+<div class="o-subheader">
+  <div class="o-subheader-row">
+    <span class="o-page-title">Ordonnances <span style="font-size:13px;color:var(--text-muted);font-weight:400;">({{ page_obj.paginator.count }})</span></span>
+    <div class="o-subheader-row-right">
+      <form method="get" id="search-form">
+        <div class="o-search-bar">
+          <input class="o-search-input" id="search-input" type="text" name="q"
+                 value="{{ q }}" placeholder="Rechercher une ordonnance…" autocomplete="off">
+          <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
+        </div>
+        {% if statut_filtre %}<input type="hidden" name="statut" value="{{ statut_filtre }}">{% endif %}
+        {% if type_filtre %}<input type="hidden" name="type" value="{{ type_filtre }}">{% endif %}
+
+      </form>
+    </div>
+  </div>
+  <div class="o-subheader-row">
+    <a href="{% url 'ordonnance_create_libre' %}" class="o-btn-create">+ CRÉER</a>
+    <div class="o-subheader-row-right">
+      <div class="o-filter-dd" id="filter-dd">
+        <button type="button" class="o-filter-btn {% if statut_filtre or type_filtre %}active{% endif %}"
+                onclick="document.getElementById('filter-panel').classList.toggle('open')">
+          <i class="bi bi-funnel"></i> Filtres
+          {% if statut_filtre or type_filtre %}<span class="o-filter-dot"></span>{% endif %}
+        </button>
+        <div class="o-filter-panel" id="filter-panel">
+          <span class="o-filter-section-label">Statut</span>
+          <a class="o-filter-option {% if not statut_filtre %}active{% endif %}"
+             href="?{% if q %}q={{ q }}&{% endif %}{% if type_filtre %}type={{ type_filtre }}{% endif %}">Tous</a>
+          <a class="o-filter-option {% if statut_filtre == 'emise' %}active{% endif %}"
+             href="?{% if q %}q={{ q }}&{% endif %}statut=emise{% if type_filtre %}&type={{ type_filtre }}{% endif %}">Émise</a>
+          <a class="o-filter-option {% if statut_filtre == 'delivree' %}active{% endif %}"
+             href="?{% if q %}q={{ q }}&{% endif %}statut=delivree{% if type_filtre %}&type={{ type_filtre }}{% endif %}">Délivrée</a>
+          <a class="o-filter-option {% if statut_filtre == 'partielle' %}active{% endif %}"
+             href="?{% if q %}q={{ q }}&{% endif %}statut=partielle{% if type_filtre %}&type={{ type_filtre }}{% endif %}">Partielle</a>
+          <a class="o-filter-option {% if statut_filtre == 'expiree' %}active{% endif %}"
+             href="?{% if q %}q={{ q }}&{% endif %}statut=expiree{% if type_filtre %}&type={{ type_filtre }}{% endif %}">Expirée</a>
+          <hr class="o-filter-sep">
+          <span class="o-filter-section-label">Type</span>
+          <a class="o-filter-option {% if not type_filtre %}active{% endif %}"
+             href="?{% if q %}q={{ q }}&{% endif %}{% if statut_filtre %}statut={{ statut_filtre }}{% endif %}">Tous</a>
+          <a class="o-filter-option {% if type_filtre == 'interne' %}active{% endif %}"
+             href="?{% if q %}q={{ q }}&{% endif %}{% if statut_filtre %}statut={{ statut_filtre }}&{% endif %}type=interne">Interne</a>
+          <a class="o-filter-option {% if type_filtre == 'externe' %}active{% endif %}"
+             href="?{% if q %}q={{ q }}&{% endif %}{% if statut_filtre %}statut={{ statut_filtre }}&{% endif %}type=externe">Externe</a>
+        </div>
+      </div>
+      <div class="o-ctrl-sep"></div>
+      <div class="o-pagination">
+        <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
+           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if statut_filtre %}&statut={{ statut_filtre }}{% endif %}{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-left"></i>
+        </a>
+        <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
+        <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
+           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if statut_filtre %}&statut={{ statut_filtre }}{% endif %}{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-right"></i>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ STATS ══ -->
+<div class="fac-stats">
+  <div class="fac-stat-card c-total">
+    <div class="fac-stat-label">Total</div>
+    <div class="fac-stat-value">{{ stats.total }}</div>
+  </div>
+  <div class="fac-stat-card c-emises">
+    <div class="fac-stat-label">Émises</div>
+    <div class="fac-stat-value" style="color:#1d4ed8;">{{ stats.emises }}</div>
+  </div>
+  <div class="fac-stat-card c-deliv">
+    <div class="fac-stat-label">Délivrées</div>
+    <div class="fac-stat-value" style="color:var(--teal-600);">{{ stats.delivrees }}</div>
+  </div>
+  <div class="fac-stat-card c-expir">
+    <div class="fac-stat-label">Expirées</div>
+    <div class="fac-stat-value" style="color:#b91c1c;">{{ stats.expirees }}</div>
+  </div>
+</div>
+
+<!-- ══ TABLE ══ -->
+<div class="o-list-wrap">
+  {% if page_obj %}
+  <table class="o-list">
+    <thead>
+      <tr>
+        <th>N° Ordonnance</th>
+        <th>Patient</th>
+        <th>Médecin</th>
+        <th>Médicaments</th>
+        <th>Date d'émission</th>
+        <th>Expiration</th>
+        <th>Type</th>
+        <th>Statut</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ord in page_obj %}
+      <tr onclick="window.location='{% url 'ordonnance_detail' ord.pk %}'">
+        <td class="td-num">{{ ord.numero }}</td>
+        <td class="td-patient">
+          {% with pat=ord.consultation.patient|default:ord.patient %}
+          {% if pat %}
+          {{ pat.nom|upper }} {{ pat.prenoms }}
+          <div style="font-size:11px;color:rgba(0,0,0,0.4);font-family: var(--font-mono);">{{ pat.code }}</div>
+          {% else %}<span style="color:rgba(0,0,0,0.3);">—</span>{% endif %}
+          {% endwith %}
+        </td>
+        <td>
+          {% if ord.medecin %}{{ ord.medecin }}
+          {% elif ord.consultation and ord.consultation.medecin %}{{ ord.consultation.medecin }}
+          {% else %}<span style="color:rgba(0,0,0,0.3);">—</span>{% endif %}
+        </td>
+        <td>
+          {% with lignes=ord.lignes.all %}
+          {% if lignes %}
+            <div class="meds-list">
+              {% for l in lignes|slice:":3" %}
+                <span>{{ l.medicament_libre|default:l.produit|default:l.medicament|truncatechars:25 }}</span>
+              {% endfor %}
+              {% if lignes|length > 3 %}
+                <span class="meds-more">+{{ lignes|length|add:"-3" }} autres</span>
+              {% endif %}
+            </div>
+          {% else %}
+            <span style="color:rgba(0,0,0,0.3);font-size:12px;">—</span>
+          {% endif %}
+          {% endwith %}
+        </td>
+        <td style="font-size:12px;">
+          {{ ord.date_emission|date:"d/m/Y" }}
+          <div style="font-size:11px;color:var(--text-muted);">{{ ord.date_emission|date:"H:i" }}</div>
+        </td>
+        <td style="font-size:12px;">
+          {% if ord.date_expiration %}{{ ord.date_expiration|date:"d/m/Y" }}
+          {% else %}<span style="color:rgba(0,0,0,0.3);">—</span>{% endif %}
+        </td>
+        <td>
+          <span class="badge-{{ ord.type_ordonnance }}">{{ ord.get_type_ordonnance_display }}</span>
+        </td>
+        <td><span class="o-badge badge-ord-{{ ord.statut }}">{{ ord.get_statut_display }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="o-empty-state">
+    <div class="o-empty-illo">
+      <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
+        <polyline points="10 9 9 9 8 9"/>
+      </svg>
+    </div>
+    <div class="o-empty-title">Aucune ordonnance{% if q %} pour "{{ q }}"{% endif %}</div>
+    <div class="o-empty-sub">{% if q %}Essayez avec un autre terme de recherche.{% else %}Les ordonnances apparaîtront ici dès qu'elles seront créées.{% endif %}</div>
+  </div>
+  {% endif %}
+</div>
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+(function() {
+  var input = document.getElementById('search-input');
+  var form  = document.getElementById('search-form');
+  var timer = null;
+  if (input) {
+    input.addEventListener('input', function() {
+      clearTimeout(timer);
+      timer = setTimeout(function() { form.submit(); }, 350);
+    });
+  }
+  document.addEventListener('click', function(e) {
+    var dd = document.getElementById('filter-dd');
+    var panel = document.getElementById('filter-panel');
+    if (dd && panel && !dd.contains(e.target)) {
+      panel.classList.remove('open');
+    }
+  });
+})();
+</script>
+{% endblock %}
+
+{% endblock %}

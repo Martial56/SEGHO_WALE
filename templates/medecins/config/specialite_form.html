@@ -1,0 +1,57 @@
+{% extends 'medecins/base.html' %}
+{% block topbar_title %}{{ titre }}{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+
+<form method="post" id="specialite-form" novalidate>
+  {% csrf_token %}
+
+  <div class="action-bar">
+    <div class="action-bar-breadcrumb">
+      <a href="{% if obj %}{% url 'medecins_specialite_detail' obj.pk %}{% else %}{% url 'medecins_specialites' %}{% endif %}" class="btn-form-cancel" style="padding:3px 7px;">
+        <i class="bi bi-arrow-left"></i>
+      </a>
+      <a href="{% url 'medecins_specialites' %}">Spécialités</a>
+      {% if obj %}
+      <span class="sep">/</span>
+      <a href="{% url 'medecins_specialite_detail' obj.pk %}">{{ obj.nom|truncatechars:30 }}</a>
+      {% endif %}
+      <span class="sep">/</span>
+      <span class="current">{% if obj %}Modifier{% else %}Nouvelle spécialité{% endif %}</span>
+    </div>
+    <div class="action-bar-buttons">
+      <a href="{% if obj %}{% url 'medecins_specialite_detail' obj.pk %}{% else %}{% url 'medecins_specialites' %}{% endif %}" class="btn-form-cancel">Ignorer</a>
+      <button type="submit" class="btn-form-submit">{% if obj %}Enregistrer{% else %}Créer{% endif %}</button>
+    </div>
+  </div>
+
+  <div class="form-simple-card" style="max-width:600px;">
+
+    <div class="form-field">
+      <label class="field-label" for="{{ form.nom.id_for_label }}">Nom <span class="required-star">*</span></label>
+      <input type="text" name="nom" id="{{ form.nom.id_for_label }}" class="field-ul"
+        value="{{ form.nom.value|default_if_none:'' }}" placeholder="Ex: Cardiologie" autocomplete="off">
+      {% if form.nom.errors %}<div class="field-error">{{ form.nom.errors.0 }}</div>{% endif %}
+    </div>
+
+    <div class="form-field">
+      <label class="field-label" for="{{ form.code.id_for_label }}">Code <span class="required-star">*</span></label>
+      <input type="text" name="code" id="{{ form.code.id_for_label }}" class="field-ul"
+        value="{{ form.code.value|default_if_none:'' }}" placeholder="Ex: CARD" autocomplete="off"
+        style="font-family: var(--font-mono);text-transform:uppercase;">
+      {% if form.code.errors %}<div class="field-error">{{ form.code.errors.0 }}</div>{% endif %}
+    </div>
+
+    <div class="form-field">
+      <label class="field-label" for="{{ form.description.id_for_label }}">Description</label>
+      <textarea name="description" id="{{ form.description.id_for_label }}" class="field-ul"
+        rows="3" placeholder="Description optionnelle de la spécialité…">{{ form.description.value|default_if_none:'' }}</textarea>
+      {% if form.description.errors %}<div class="field-error">{{ form.description.errors.0 }}</div>{% endif %}
+    </div>
+
+  </div>
+
+</form>
+
+{% endblock %}

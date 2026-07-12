@@ -1,0 +1,183 @@
+{% extends 'stock/base.html' %}
+{% load static %}
+{% block topbar_title %}Stock — Commandes{% endblock %}
+
+{% block extra_st_css %}<style>
+.st-page-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 32px; margin: 0 -32px;
+  background: #e8f2f7; border-bottom: 1px solid rgba(0,0,0,.05);
+  box-shadow: 0 2px 8px rgba(0,0,0,.04);
+  position: sticky; top: var(--topbar-h); z-index: 100;
+}
+.st-filters {
+  display: flex; align-items: center; gap: 4px;
+  padding: 10px 0 0; flex-wrap: wrap;
+}
+.st-filter-link {
+  padding: 4px 13px; border-radius: 20px; font-size: 12px; font-weight: 600;
+  color: var(--st-muted); text-decoration: none;
+  border: 1.5px solid transparent; transition: all .15s;
+}
+.st-filter-link:hover { color: var(--st-600); border-color: var(--st-300); }
+.st-filter-link.active { background: var(--st-600); color: #fff; border-color: var(--st-600); }
+.badge-cmd-brouillon { background:rgba(0,0,0,.06); color:rgba(0,0,0,.5); border:1px solid rgba(0,0,0,.12); padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
+.badge-cmd-envoye    { background:rgba(45,153,219,.1); color:#1565c0; border:1px solid rgba(45,153,219,.25); padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
+.badge-cmd-partiel   { background:rgba(var(--amber-rgb),.1); color:var(--amber-text); border:1px solid rgba(var(--amber-rgb),.25); padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
+.badge-cmd-recu      { background:rgba(var(--st-600-rgb),.1); color:var(--st-600); border:1px solid rgba(var(--st-600-rgb),.25); padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
+.badge-cmd-annule    { background:rgba(var(--rose-rgb),.1);  color:var(--rose-text); border:1px solid rgba(var(--rose-rgb),.25);  padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
+</style>{% endblock %}
+
+{% block content %}
+
+<!-- En-tête sticky -->
+<div class="st-page-header">
+  <div>
+    <div style="font-size:15px;font-weight:800;color:var(--st-900);">
+      <i class="bi bi-cart3" style="color:var(--st-600);"></i> Commandes fournisseurs
+    </div>
+    <div style="font-size:11.5px;color:var(--st-muted);">
+      Suivi des bons de commande
+    </div>
+  </div>
+  <a href="{% url 'stock_commande_create' %}" class="btn-st">
+    <i class="bi bi-plus-lg"></i> Nouvelle commande
+  </a>
+</div>
+
+<!-- Filtres statut -->
+<div class="st-filters">
+  <a href="{% url 'stock_commandes' %}"
+     class="st-filter-link {% if not statut_filtre %}active{% endif %}">
+    <i class="bi bi-list-ul"></i> Tous
+  </a>
+  <a href="{% url 'stock_commandes' %}?statut=brouillon"
+     class="st-filter-link {% if statut_filtre == 'brouillon' %}active{% endif %}">
+    <i class="bi bi-file-earmark"></i> Brouillon
+  </a>
+  <a href="{% url 'stock_commandes' %}?statut=envoye"
+     class="st-filter-link {% if statut_filtre == 'envoye' %}active{% endif %}">
+    <i class="bi bi-send"></i> Envoyée
+  </a>
+  <a href="{% url 'stock_commandes' %}?statut=partiel"
+     class="st-filter-link {% if statut_filtre == 'partiel' %}active{% endif %}">
+    <i class="bi bi-hourglass-split"></i> Partiel
+  </a>
+  <a href="{% url 'stock_commandes' %}?statut=recu"
+     class="st-filter-link {% if statut_filtre == 'recu' %}active{% endif %}">
+    <i class="bi bi-check2-circle"></i> Reçu
+  </a>
+</div>
+
+<!-- Tableau -->
+<div style="margin-top:14px;margin-left:-32px;margin-right:-32px;background:var(--st-surface);box-shadow:0 2px 12px rgba(var(--st-700-rgb),.08);overflow:hidden;">
+  {% if page_obj %}
+  <table class="st-table">
+    <thead>
+      <tr>
+        <th>N° Commande</th>
+        <th>Fournisseur</th>
+        <th>Date commande</th>
+        <th>Livraison prévue</th>
+        <th>Statut</th>
+        <th style="text-align:right;">Montant total</th>
+        <th style="text-align:center;">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for cmd in page_obj %}
+    <tr>
+      <td>
+        <a href="{% url 'stock_commande_detail' cmd.pk %}"
+           style="font-family: var(--font-mono);font-size:12px;font-weight:700;color:var(--st-600);text-decoration:none;">
+          {{ cmd.numero }}
+        </a>
+      </td>
+      <td style="font-weight:600;">{{ cmd.fournisseur.nom }}</td>
+      <td style="font-size:12px;">{{ cmd.date_commande|date:"d/m/Y" }}</td>
+      <td style="font-size:12px;">
+        {% if cmd.date_livraison_prevue %}
+          {{ cmd.date_livraison_prevue|date:"d/m/Y" }}
+        {% else %}
+          <span style="color:var(--st-muted);">—</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if cmd.statut == 'brouillon' %}
+          <span class="badge-cmd-brouillon"><i class="bi bi-file-earmark"></i> Brouillon</span>
+        {% elif cmd.statut == 'envoye' %}
+          <span class="badge-cmd-envoye"><i class="bi bi-send"></i> Envoyée</span>
+        {% elif cmd.statut == 'partiel' %}
+          <span class="badge-cmd-partiel"><i class="bi bi-hourglass-split"></i> Partiel</span>
+        {% elif cmd.statut == 'recu' %}
+          <span class="badge-cmd-recu"><i class="bi bi-check2-circle"></i> Reçu</span>
+        {% elif cmd.statut == 'annule' %}
+          <span class="badge-cmd-annule"><i class="bi bi-x-circle"></i> Annulée</span>
+        {% endif %}
+      </td>
+      <td style="text-align:right;font-weight:700;font-size:12.5px;">
+        {{ cmd.montant_total|floatformat:0 }}
+        <span style="font-size:10px;font-weight:400;color:var(--st-muted);">F</span>
+      </td>
+      <td style="text-align:center;">
+        <a href="{% url 'stock_commande_detail' cmd.pk %}"
+           style="font-size:11.5px;color:var(--st-600);text-decoration:none;font-weight:600;">
+          <i class="bi bi-eye"></i> Détail
+        </a>
+      </td>
+    </tr>
+    {% empty %}
+    <tr>
+      <td colspan="7" style="text-align:center;padding:40px;color:var(--st-muted);font-style:italic;">
+        <i class="bi bi-cart-x" style="font-size:24px;display:block;margin-bottom:8px;"></i>
+        Aucune commande
+        {% if statut_filtre %} avec le statut « {{ statut_filtre }} »{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Pagination -->
+  {% if page_obj.has_other_pages %}
+  <div style="display:flex;justify-content:center;align-items:center;gap:6px;padding:14px 20px;border-top:1px solid var(--st-border);">
+    {% if page_obj.has_previous %}
+      <a href="?page=1{% if statut_filtre %}&statut={{ statut_filtre }}{% endif %}"
+         class="btn-st-outline" style="padding:4px 10px;font-size:12px;"><i class="bi bi-chevron-double-left"></i></a>
+      <a href="?page={{ page_obj.previous_page_number }}{% if statut_filtre %}&statut={{ statut_filtre }}{% endif %}"
+         class="btn-st-outline" style="padding:4px 10px;font-size:12px;"><i class="bi bi-chevron-left"></i></a>
+    {% endif %}
+    {% for num in page_obj.paginator.page_range %}
+      {% if num == page_obj.number %}
+        <span class="btn-st" style="padding:4px 11px;font-size:12px;min-width:32px;justify-content:center;">{{ num }}</span>
+      {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+        <a href="?page={{ num }}{% if statut_filtre %}&statut={{ statut_filtre }}{% endif %}"
+           class="btn-st-outline" style="padding:4px 11px;font-size:12px;min-width:32px;justify-content:center;">{{ num }}</a>
+      {% endif %}
+    {% endfor %}
+    {% if page_obj.has_next %}
+      <a href="?page={{ page_obj.next_page_number }}{% if statut_filtre %}&statut={{ statut_filtre }}{% endif %}"
+         class="btn-st-outline" style="padding:4px 10px;font-size:12px;"><i class="bi bi-chevron-right"></i></a>
+      <a href="?page={{ page_obj.paginator.num_pages }}{% if statut_filtre %}&statut={{ statut_filtre }}{% endif %}"
+         class="btn-st-outline" style="padding:4px 10px;font-size:12px;"><i class="bi bi-chevron-double-right"></i></a>
+    {% endif %}
+    <span style="font-size:11.5px;color:var(--st-muted);margin-left:8px;">
+      Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+      &nbsp;·&nbsp; {{ page_obj.paginator.count }} commande{{ page_obj.paginator.count|pluralize }}
+    </span>
+  </div>
+  {% endif %}
+
+  {% else %}
+  <div class="st-card-body" style="text-align:center;padding:40px;color:var(--st-muted);">
+    <i class="bi bi-cart-x" style="font-size:24px;display:block;margin-bottom:8px;"></i>
+    Aucune commande enregistrée.
+    <br>
+    <a href="{% url 'stock_commande_create' %}" class="btn-st" style="margin-top:12px;display:inline-flex;">
+      <i class="bi bi-plus-lg"></i> Créer une commande
+    </a>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}
