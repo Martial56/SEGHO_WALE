@@ -217,6 +217,10 @@ def facture_create(request):
                 demande_obj.facture = facture
                 demande_obj.save(update_fields=['facture'])
 
+            if ordonnance_obj:
+                facture.ordonnance = ordonnance_obj
+                facture.save(update_fields=['ordonnance'])
+
             log_event(facture, request.user, 'Facture créée.', type='system')
 
             facture = _handle_paiement(facture, request.POST, request.user, total)
