@@ -45,7 +45,7 @@ def medecins_export_csv(request):
             med.nom,
             med.prenoms,
             str(med.specialite) if med.specialite else '',
-            str(med.service) if med.service else '',
+            str(med.departement) if med.departement else '',
             med.telephone or '',
             med.email or '',
             med.taux_honoraire or 0,

@@ -152,6 +152,8 @@ def service_form(request, pk=None):
         article.cout = data.get('cout') or 0
         categorie_id = data.get('categorie')
         article.categorie_id = categorie_id if categorie_id else None
+        departement_id = data.get('departement')
+        article.departement_id = departement_id if departement_id else None
         article.code_barres = data.get('code_barres', '')
         famille_id = data.get('famille')
         article.famille_id = famille_id if famille_id else None
@@ -193,9 +195,11 @@ def service_form(request, pk=None):
         return redirect('services:detail', pk=article.pk)
 
     # GET — préparer le contexte
+    from medecins.models import Departement
     fournisseurs = Fournisseur.objects.filter(actif=True).order_by('nom')
     categories = CategorieArticle.objects.all()
     cat_codes_json = json.dumps({str(c.pk): c.code for c in categories})
+    departements = Departement.objects.filter(actif=True).order_by('nom')
     familles = FamilleArticle.objects.all()
     compagnies = CompagniePharma.objects.all()
     users = User.objects.filter(is_active=True).order_by('last_name')
@@ -211,6 +215,7 @@ def service_form(request, pk=None):
         'is_new': is_new,
         'fournisseurs': fournisseurs,
         'categories': categories,
+        'departements': departements,
         'familles': familles,
         'compagnies': compagnies,
         'users': users,

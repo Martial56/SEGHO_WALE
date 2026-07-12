@@ -17,8 +17,6 @@ Les vues de transition appellent check_action() pour refuser côté serveur
 toute action dont le bouton aurait été forgé.
 """
 
-from .models import ResumeDecharge
-
 
 def get_actions_disponibles(hosp, user):
     """
@@ -50,6 +48,18 @@ def get_actions_disponibles(hosp, user):
             result['terminer'] = {'visible': False, 'enabled': False, 'raison_blocage': ''}
         if hosp.statut in ('decharge', 'termine', 'annule'):
             result['annuler'] = {'visible': False, 'enabled': False, 'raison_blocage': ''}
+        # Même pour le superuser, chaque transition ne doit rester active qu'au
+        # statut qui la précède réellement. Sans ce garde-fou, _transition_confirmer/
+        # _transition_installer/_transition_decharger (qui ne font confiance qu'à
+        # ce flag "enabled") acceptent la transition depuis n'importe quel statut —
+        # un superuser pouvait ainsi ré-hospitaliser un dossier déjà Terminé/Déchargé
+        # (régression de statut, ré-occupation de chambre, heure_entree/sortie écrasées).
+        if hosp.statut != 'brouillon':
+            result['confirmer'] = {'visible': False, 'enabled': False, 'raison_blocage': ''}
+        if hosp.statut != 'confirme':
+            result['installer'] = {'visible': False, 'enabled': False, 'raison_blocage': ''}
+        if hosp.statut != 'hospitalise':
+            result['decharger'] = {'visible': False, 'enabled': False, 'raison_blocage': ''}
         return result
 
     def perm(codename):
@@ -65,10 +75,6 @@ def get_actions_disponibles(hosp, user):
     nb_fac_imp = Facture.objects.filter(hospitalisation=hosp).exclude(
         statut__in=['payee', 'annulee']
     ).count()
-    try:
-        resume_ok = bool(hosp.resume_decharge.diagnostic_decharge.strip())
-    except (ResumeDecharge.DoesNotExist, AttributeError):
-        resume_ok = False
 
     def _act(visible, enabled, raison=''):
         return {'visible': bool(visible), 'enabled': bool(enabled), 'raison_blocage': raison}
@@ -86,8 +92,6 @@ def get_actions_disponibles(hosp, user):
             result['confirmer'] = _act(True, False, "Sélectionnez un patient avant de confirmer")
         elif not hosp.medecin_traitant_id:
             result['confirmer'] = _act(True, False, "Sélectionnez un docteur avant de confirmer")
-        elif not hosp.soins_apportes.exists():
-            result['confirmer'] = _act(True, False, "Ajoutez au moins un soin avant de confirmer")
         else:
             result['confirmer'] = _act(True, True)
     else:  # confirme, hospitalise
@@ -138,11 +142,6 @@ def get_actions_disponibles(hosp, user):
         result['decharger'] = _act(
             True, False,
             f"Statut actuel : {hosp.get_statut_display()} — hospitalisé requis"
-        )
-    elif not resume_ok:
-        result['decharger'] = _act(
-            True, False,
-            "Renseignez le diagnostic de sortie avant de décharger"
         )
     elif nb_fac_imp > 0:
         result['decharger'] = _act(

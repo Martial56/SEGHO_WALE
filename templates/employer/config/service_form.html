@@ -1,4 +1,4 @@
-{% extends 'medecins/base.html' %}
+{% extends 'employer/base.html' %}
 {% block topbar_title %}{{ titre }}{% endblock %}
 {% block breadcrumb %}{% endblock %}
 
@@ -9,19 +9,19 @@
 
   <div class="action-bar">
     <div class="action-bar-breadcrumb">
-      <a href="{% if obj %}{% url 'medecins_service_detail' obj.pk %}{% else %}{% url 'medecins_services' %}{% endif %}" class="btn-form-cancel" style="padding:3px 7px;">
+      <a href="{% if obj %}{% url 'employer_service_detail' obj.pk %}{% else %}{% url 'employer_services' %}{% endif %}" class="btn-form-cancel" style="padding:3px 7px;">
         <i class="bi bi-arrow-left"></i>
       </a>
-      <a href="{% url 'medecins_services' %}">Services</a>
+      <a href="{% url 'employer_services' %}">Services</a>
       {% if obj %}
       <span class="sep">/</span>
-      <a href="{% url 'medecins_service_detail' obj.pk %}">{{ obj.nom|truncatechars:30 }}</a>
+      <a href="{% url 'employer_service_detail' obj.pk %}">{{ obj.nom|truncatechars:30 }}</a>
       {% endif %}
       <span class="sep">/</span>
       <span class="current">{% if obj %}Modifier{% else %}Nouveau service{% endif %}</span>
     </div>
     <div class="action-bar-buttons">
-      <a href="{% if obj %}{% url 'medecins_service_detail' obj.pk %}{% else %}{% url 'medecins_services' %}{% endif %}" class="btn-form-cancel">Ignorer</a>
+      <a href="{% if obj %}{% url 'employer_service_detail' obj.pk %}{% else %}{% url 'employer_services' %}{% endif %}" class="btn-form-cancel">Ignorer</a>
       <button type="submit" class="btn-form-submit">{% if obj %}Enregistrer{% else %}Créer{% endif %}</button>
     </div>
   </div>
@@ -46,16 +46,6 @@
           {% if form.code.errors %}<div class="field-error">{{ form.code.errors.0 }}</div>{% endif %}
         </div>
 
-        <div class="form-field">
-          <label class="field-label" for="{{ form.departement.id_for_label }}">Département</label>
-          <select name="departement" id="{{ form.departement.id_for_label }}" class="field-ul">
-            <option value="">— Aucun département —</option>
-            {% for dept in form.departement.field.queryset %}
-            <option value="{{ dept.pk }}" {% if form.departement.value|stringformat:"s" == dept.pk|stringformat:"s" %}selected{% endif %}>{{ dept.nom }}</option>
-            {% endfor %}
-          </select>
-          {% if form.departement.errors %}<div class="field-error">{{ form.departement.errors.0 }}</div>{% endif %}
-        </div>
       </div>
 
       <!-- Colonne droite -->

@@ -10,8 +10,13 @@ def _columns(schema_editor):
 
 
 def drop_column_if_exists(apps, schema_editor):
-    # Colonne présente sur les bases existantes (ajoutée hors migration) mais absente
-    # d'une base créée depuis zéro (tests, nouvelle installation) : ne rien faire dans ce cas.
+    """Supprime couleurs_preferences seulement si elle existe.
+
+    La colonne a été ajoutée à la main sur des bases anciennes, jamais via
+    une migration (0001/0002 ne la créent pas) — sur une base neuve
+    (tests, CI, nouvelle install), le DROP COLUMN brut échouait donc avec
+    "no such column".
+    """
     if COLUMN in _columns(schema_editor):
         schema_editor.execute(f"ALTER TABLE {TABLE} DROP COLUMN {COLUMN};")
 

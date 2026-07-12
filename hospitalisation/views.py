@@ -24,25 +24,6 @@ def hospitalisation_list(request):
     q = request.GET.get('q', '').strip()
     statut = request.GET.get('statut', '').strip()
 
-    # Réponse JSON pour la recherche AJAX (filtre soins)
-    if _is_ajax(request):
-        qs = Hospitalisation.objects.select_related('patient').order_by('-date_admission')
-        if q:
-            qs = qs.filter(
-                Q(numero__icontains=q) |
-                Q(patient__nom__icontains=q) |
-                Q(patient__prenoms__icontains=q)
-            )
-        results = [
-            {
-                'id': h.pk,
-                'numero': h.numero,
-                'patient': f"{h.patient.nom} {h.patient.prenoms}",
-            }
-            for h in qs[:10]
-        ]
-        return JsonResponse({'results': results})
-
     qs = Hospitalisation.objects.select_related(
         'patient', 'medecin_traitant', 'chambre'
     ).order_by('-date_admission')
@@ -87,7 +68,7 @@ def hospitalisation_list(request):
     if vue not in ('liste', 'kanban'):
         vue = 'liste'
 
-    return render(request, 'hospitalisation/list.html', {
+    context = {
         'page_obj':      page_obj,
         'total':         qs.count(),
         'stats':         stats,
@@ -95,7 +76,17 @@ def hospitalisation_list(request):
         'statut':        statut,
         'statut_choices': Hospitalisation.STATUT,
         'vue':           vue,
-    })
+    }
+
+    if _is_ajax(request):
+        from django.template.loader import render_to_string
+        return JsonResponse({
+            'controls_html': render_to_string('hospitalisation/includes/_list_controls.html', context, request=request),
+            'results_html':  render_to_string('hospitalisation/includes/_list_results.html', context, request=request),
+            'total':         context['total'],
+        })
+
+    return render(request, 'hospitalisation/list.html', context)
 
 
 def _constante_to_eval_prefill(constante):
@@ -982,14 +973,6 @@ def hospitalisation_edit(request, pk):
         return redirect('hospitalisation:detail', pk=pk)
 
     if request.method == 'POST':
-        # ── ANNULER : transition immédiate, sans sauvegarde de la fiche ────────
-        if 'action_annuler' in request.POST:
-            ok, err = _transition_annuler(hosp, request.user)
-            if err:
-                messages.error(request, err)
-            else:
-                messages.success(request, 'Hospitalisation annulée.')
-            return redirect('hospitalisation:detail', pk=hosp.pk)
 
         # ── DÉCHARGER via modale (decharge-form : champs principaux absents) ───
         if 'action_decharger' in request.POST:
@@ -1234,12 +1217,16 @@ def _boutons_extra(hosp, user):
     is_admin = user.is_superuser
     facture_payee = Facture.objects.filter(hospitalisation=hosp, statut='payee').exists()
 
-    # Bouton Modifier : utilisateurs change_hospitalisation uniquement (confirme + facture payée)
-    peut_modifier = is_admin or (
+    # Bouton Modifier : visible pour les utilisateurs change_hospitalisation dès le statut
+    # confirmé, mais grisé/incliquable tant que la facture n'est pas payée. L'admin reste
+    # inchangé (toujours actif), comme partout ailleurs dans ce module.
+    _peut_modifier_base = (
         user.has_perm('hospitalisation.change_hospitalisation')
         and hosp.statut == 'confirme'
-        and facture_payee
     )
+    peut_modifier = is_admin or _peut_modifier_base
+    modifier_enabled = is_admin or (_peut_modifier_base and facture_payee)
+    modifier_raison = '' if modifier_enabled else "La facture doit être payée avant de modifier le dossier"
     # Bouton Attribuer une chambre : utilisateurs can_installer_patient ou admin (confirme + facture payée)
     peut_attribuer_chambre = (
         user.has_perm('hospitalisation.can_installer_patient')
@@ -1254,6 +1241,8 @@ def _boutons_extra(hosp, user):
     )
     return {
         'peut_modifier':          peut_modifier,
+        'modifier_enabled':       modifier_enabled,
+        'modifier_raison':        modifier_raison,
         'peut_attribuer_chambre': peut_attribuer_chambre,
         'peut_ajouter_soin':      peut_ajouter_soin,
     }
@@ -1458,6 +1447,8 @@ def hospitalisation_detail(request, pk):
     facture_blocage = _get_facture_blocage(hosp)
     boutons_extra = _boutons_extra(hosp, request.user)
     peut_modifier = boutons_extra['peut_modifier']
+    modifier_enabled = boutons_extra['modifier_enabled']
+    modifier_raison = boutons_extra['modifier_raison']
     peut_attribuer_chambre = boutons_extra['peut_attribuer_chambre']
     peut_ajouter_soin = boutons_extra['peut_ajouter_soin']
 
@@ -1488,6 +1479,8 @@ def hospitalisation_detail(request, pk):
         'lecture_seule_totale': lecture_seule_totale,
         'facture_blocage':     facture_blocage,
         'peut_modifier':           peut_modifier,
+        'modifier_enabled':        modifier_enabled,
+        'modifier_raison':         modifier_raison,
         'peut_attribuer_chambre':  peut_attribuer_chambre,
         'peut_ajouter_soin':       peut_ajouter_soin,
         'url_facture':             url_facture,
