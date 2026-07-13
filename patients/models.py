@@ -53,6 +53,8 @@ class Patient(models.Model):
 
     @property
     def age(self):
+        if not self.date_naissance:
+            return None
         from datetime import date
         t = date.today()
         return t.year - self.date_naissance.year - ((t.month, t.day) < (self.date_naissance.month, self.date_naissance.day))

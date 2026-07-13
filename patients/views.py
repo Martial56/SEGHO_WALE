@@ -9,6 +9,7 @@ from datetime import timedelta
 
 from .models import Patient, RendezVous, Pathologie
 from .forms import PatientForm, RendezVousForm, PathologieForm, TypeVisiteForm
+from medecins.models import Medecin
 from core.views import log_event
 from gynecologie.models import TypeVisite
 
@@ -237,7 +238,7 @@ def patient_search_json(request):
             'nom_complet': f"{p.nom} {p.prenoms}",
             'code': p.code_patient,
             'telephone': p.telephone or '',
-            'age': p.age,
+            'age': p.age if p.date_naissance else None,
             'sexe_display': p.get_sexe_display(),
             'adresse': p.adresse or '',
             'assurance_nom': p.assurance.nom if p.assurance_id else '',
@@ -255,14 +256,14 @@ def patient_search_json(request):
     q = request.GET.get('q', '').strip()
     base_qs = Patient.objects.select_related('assurance').order_by('nom', 'prenoms')
     if not q:
-        qs = base_qs[:20]
+        qs = base_qs
     elif len(q) < 2:
         return JsonResponse({'results': []})
     else:
         qs = base_qs.filter(
             Q(nom__icontains=q) | Q(prenoms__icontains=q) |
             Q(code_patient__icontains=q) | Q(telephone__icontains=q)
-        )[:20]
+        )
     return JsonResponse({'results': [_to_dict(p) for p in qs]})
 
 
@@ -305,6 +306,7 @@ def rdv_create(request):
         'consultation':    None,
         'constante':       None,
         'pathologies':     Pathologie.objects.filter(actif=True).order_by('nom'),
+        'medecins':        Medecin.objects.filter(actif=True).select_related('employe').order_by('employe__nom', 'employe__prenoms'),
     })
 
 
@@ -533,6 +535,7 @@ def rdv_edit(request, pk):
         'consultation':  consultation,
         'constante':     constante,
         'pathologies':   Pathologie.objects.filter(actif=True).order_by('nom'),
+        'medecins':      Medecin.objects.filter(actif=True).select_related('employe').order_by('employe__nom', 'employe__prenoms'),
         'registre_cpn':          _get_reg(RegistreCPN),
         'registre_accouchement': _get_reg(RegistreAccouchement),
         'registre_postnatale':   _get_reg(RegistrePostnatale),

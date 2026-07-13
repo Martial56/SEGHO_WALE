@@ -346,7 +346,7 @@ def medecin_create(request):
 
     specialites = Specialite.objects.order_by('nom')
     departements = Departement.objects.filter(actif=True).order_by('nom')
-    services = Service.objects.filter(actif=True).select_related('departement').order_by('nom')
+    services = Service.objects.filter(actif=True).order_by('nom')
     users_disponibles = User.objects.filter(medecin__isnull=True).order_by('last_name', 'first_name')
     errors = {}
     employe_trouve = None
@@ -440,7 +440,7 @@ def medecin_edit(request, pk):
     med = get_object_or_404(Medecin, pk=pk)
     specialites = Specialite.objects.order_by('nom')
     departements = Departement.objects.filter(actif=True).order_by('nom')
-    services = Service.objects.filter(actif=True).select_related('departement').order_by('nom')
+    services = Service.objects.filter(actif=True).order_by('nom')
     users_disponibles = User.objects.filter(
         Q(medecin__isnull=True) | Q(medecin=med)
     ).order_by('last_name', 'first_name')
@@ -2117,7 +2117,7 @@ def medecins_specialite_detail(request, pk):
         'obj':      obj,
         'prev_pk':  pks[pos - 1] if pos and pos > 0 else None,
         'next_pk':  pks[pos + 1] if pos is not None and pos < len(pks) - 1 else None,
-        'medecins': obj.medecin_set.select_related('service').order_by('nom'),
+        'medecins': obj.medecin_set.select_related('employe', 'service').order_by('employe__nom'),
     })
 
 
@@ -2278,7 +2278,7 @@ def medecins_departement_detail(request, pk):
     obj = get_object_or_404(Departement, pk=pk)
     pks = list(Departement.objects.order_by('nom').values_list('pk', flat=True))
     pos = pks.index(pk) if pk in pks else None
-    medecins = obj.medecins.order_by('nom', 'prenoms')
+    medecins = obj.medecins.select_related('employe').order_by('employe__nom', 'employe__prenoms')
     return render(request, 'medecins/config/departement_detail.html', {
         'obj':      obj,
         'medecins': medecins,

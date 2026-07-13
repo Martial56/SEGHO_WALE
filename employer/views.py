@@ -2220,7 +2220,7 @@ def _service_form_class():
     from medecins.models import Medecin
     class ServiceForm(forms.ModelForm):
         chef_service = forms.ModelChoiceField(
-            queryset=Medecin.objects.filter(actif=True).order_by('employe__nom', 'employe__prenoms'),
+            queryset=Medecin.objects.filter(actif=True).select_related('employe').order_by('employe__nom', 'employe__prenoms'),
             required=False,
             empty_label='— Aucun chef de service —',
         )

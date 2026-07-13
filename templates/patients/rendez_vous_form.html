@@ -1540,8 +1540,6 @@
         });
     });
 
-    {% include "patients/includes/_autocomplete_patient_script.html" %}
-
     /* ── Date de validité = date_heure + 14 jours ── */
     var dateHeureInput = document.getElementById('{{ form.date_heure.id_for_label }}');
     var dateValiditeEl = document.getElementById('date-validite');
@@ -1722,6 +1720,8 @@
     }
 })();
 </script>
+
+<script>{% include "patients/includes/_autocomplete_patient_script.html" %}</script>
 
 {% if constante %}
 <script type="application/json" id="constante-data">
@@ -2149,7 +2149,7 @@
     var stillValid = false;
     select.querySelectorAll('option').forEach(function (opt) {
       if (!opt.value) return;
-      var visible = !!departementId && opt.dataset.departementId === departementId;
+      var visible = !departementId || opt.dataset.departementId === departementId;
       opt.hidden = !visible;
       if (visible && opt.selected) stillValid = true;
     });

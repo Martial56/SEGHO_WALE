@@ -176,11 +176,12 @@ class RendezVousForm(forms.ModelForm):
         from medecins.models import Departement, Medecin
         super().__init__(*args, **kwargs)
         self.fields['patient'].queryset = Patient.objects.all().order_by('nom', 'prenoms')
+        self.fields['patient'].empty_label = '— Sélectionner un patient —'
         self.fields['departement'].queryset = Departement.objects.filter(actif=True).order_by('nom')
         self.fields['departement'].empty_label = '— Choisir un département —'
         self.fields['departement'].required = False
 
-        medecin_qs = Medecin.objects.filter(actif=True).order_by('nom', 'prenoms')
+        medecin_qs = Medecin.objects.filter(actif=True).select_related('employe').order_by('employe__nom', 'employe__prenoms')
         self.fields['medecin'].queryset = medecin_qs
         self.fields['medecin'].empty_label = '— Aucun médecin —'
         self.fields['medecin'].required = False

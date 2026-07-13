@@ -9,11 +9,6 @@ urlpatterns = [
     path('import/',                                   views.employe_import,        name='rh_import'),
     path('import/modele/',                            views.employe_import_modele, name='rh_import_modele'),
     path('export/excel/',                             views.employe_export_excel,  name='rh_export_excel'),
-    path('config/<slug:slug>/',                       views.rh_config_list,         name='rh_config_list'),
-    path('config/<slug:slug>/nouveau/',                views.rh_config_create,       name='rh_config_create'),
-    path('config/<slug:slug>/<int:pk>/modifier/',      views.rh_config_edit,         name='rh_config_edit'),
-    path('config/<slug:slug>/<int:pk>/supprimer/',     views.rh_config_delete,       name='rh_config_delete'),
-
     path('config/services/',                          views.employer_services,             name='employer_services'),
     path('config/services/export/',                   views.employer_export_services,      name='employer_export_services'),
     path('config/services/import/',                   views.employer_import_services,      name='employer_import_services'),
@@ -21,6 +16,11 @@ urlpatterns = [
     path('config/services/bulk-delete/',              views.employer_service_bulk_delete,  name='employer_service_bulk_delete'),
     path('config/services/<int:pk>/',                 views.employer_service_detail,       name='employer_service_detail'),
     path('config/services/<int:pk>/modifier/',        views.employer_service_edit,         name='employer_service_edit'),
+
+    path('config/<slug:slug>/',                       views.rh_config_list,         name='rh_config_list'),
+    path('config/<slug:slug>/nouveau/',                views.rh_config_create,       name='rh_config_create'),
+    path('config/<slug:slug>/<int:pk>/modifier/',      views.rh_config_edit,         name='rh_config_edit'),
+    path('config/<slug:slug>/<int:pk>/supprimer/',     views.rh_config_delete,       name='rh_config_delete'),
 
     path('<int:pk>/',                                 views.employe_detail,        name='rh_detail'),
     path('<int:pk>/vers-medecin/',                    views.employe_vers_medecin,  name='rh_vers_medecin'),

@@ -54,9 +54,10 @@ class HospitalisationForm(forms.ModelForm):
         from medecins.models import Medecin
         self.fields['patient'].queryset = PatientModel.objects.all().order_by('nom')
         self.fields['patient'].label_from_instance = lambda p: f"{p.nom} {p.prenoms}"
-        self.fields['medecin_traitant'].queryset = Medecin.objects.filter(actif=True).order_by('employe__nom')
+        _medecins_qs = Medecin.objects.filter(actif=True).select_related('employe').order_by('employe__nom')
+        self.fields['medecin_traitant'].queryset = _medecins_qs
         self.fields['medecin_traitant'].label_from_instance = lambda m: f"{m.nom} {m.prenoms}"
-        self.fields['medecin_referent'].queryset = Medecin.objects.filter(actif=True).order_by('employe__nom')
+        self.fields['medecin_referent'].queryset = _medecins_qs
         self.fields['medecin_referent'].label_from_instance = lambda m: f"{m.nom} {m.prenoms}"
         self.fields['patient'].empty_label          = 'Rechercher un patient…'
         self.fields['medecin_traitant'].empty_label = 'Sélectionner un docteur…'
@@ -163,10 +164,12 @@ class ListeControleAdmissionForm(forms.ModelForm):
 class RegistreDecesForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
+        from medecins.models import Medecin
         super().__init__(*args, **kwargs)
         self.fields['patient'].empty_label        = 'Rechercher un patient…'
         self.fields['hospitalisation'].empty_label = 'Rechercher une hospitalisation…'
         self.fields['medecin'].empty_label         = 'Rechercher un médecin…'
+        self.fields['medecin'].queryset = Medecin.objects.select_related('employe').order_by('employe__nom')
 
     class Meta:
         model = RegistreDeces
