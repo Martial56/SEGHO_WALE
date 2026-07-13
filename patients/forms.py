@@ -149,7 +149,7 @@ class PatientForm(forms.ModelForm):
 class RendezVousForm(forms.ModelForm):
     class Meta:
         model = RendezVous
-        fields = ['patient', 'departement', 'medecin', 'type_consultation', 'date_heure', 'duree_minutes', 'motif', 'statut', 'notes']
+        fields = ['patient', 'departement', 'medecin', 'type_consultation', 'date_heure', 'motif', 'statut', 'notes']
         widgets = {
             'patient': forms.Select(attrs={'class': _ul, 'id': 'id_patient'}),
             'departement': forms.Select(attrs={'class': _ul}),
@@ -159,9 +159,6 @@ class RendezVousForm(forms.ModelForm):
                 attrs={'class': _ul, 'type': 'datetime-local'},
                 format='%Y-%m-%dT%H:%M',
             ),
-            'duree_minutes': forms.NumberInput(attrs={
-                'class': _ul, 'min': '5', 'step': '5', 'placeholder': '30',
-            }),
             'statut': forms.Select(attrs={'class': _ul}),
             'motif': forms.Textarea(attrs={
                 'class': _ul, 'rows': 3, 'placeholder': 'Motif de la visite...',

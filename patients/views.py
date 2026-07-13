@@ -407,7 +407,8 @@ def rdv_edit(request, pk):
             rdv.date_en_attente = now
             if rdv.date_confirme:
                 rdv.temps_constante_minutes = int((now - rdv.date_confirme).total_seconds() / 60)
-            update_fields = ['statut', 'date_en_attente', 'temps_constante_minutes']
+            rdv.duree_minutes = rdv.temps_constante_minutes + rdv.temps_attente_minutes + rdv.temps_consultation_minutes
+            update_fields = ['statut', 'date_en_attente', 'temps_constante_minutes', 'duree_minutes']
             medecin_pk = request.POST.get('medecin', '').strip()
             if medecin_pk:
                 try:
@@ -429,8 +430,9 @@ def rdv_edit(request, pk):
             rdv.date_en_consultation = now
             if rdv.date_en_attente:
                 rdv.temps_attente_minutes = int((now - rdv.date_en_attente).total_seconds() / 60)
+            rdv.duree_minutes = rdv.temps_constante_minutes + rdv.temps_attente_minutes + rdv.temps_consultation_minutes
             rdv._skip_auto_log = True
-            rdv.save(update_fields=['statut', 'date_en_consultation', 'temps_attente_minutes'])
+            rdv.save(update_fields=['statut', 'date_en_consultation', 'temps_attente_minutes', 'duree_minutes'])
             log_event(rdv, request.user, 'État : En Attente → En Consultation', type='statut')
             messages.success(request, 'Consultation démarrée.')
             from django.urls import reverse
@@ -443,8 +445,9 @@ def rdv_edit(request, pk):
             rdv.date_termine = now
             if rdv.date_en_consultation:
                 rdv.temps_consultation_minutes = int((now - rdv.date_en_consultation).total_seconds() / 60)
+            rdv.duree_minutes = rdv.temps_constante_minutes + rdv.temps_attente_minutes + rdv.temps_consultation_minutes
             rdv._skip_auto_log = True
-            rdv.save(update_fields=['statut', 'date_termine', 'temps_consultation_minutes'])
+            rdv.save(update_fields=['statut', 'date_termine', 'temps_consultation_minutes', 'duree_minutes'])
             log_event(rdv, request.user, 'État : En Consultation → Terminé', type='statut')
             messages.success(request, 'Consultation terminée.')
             return redirect('patients:rdv_global')
