@@ -872,7 +872,17 @@ def laboratoire_create(request):
 
     patient_pk = request.GET.get('patient') or request.POST.get('patient_id')
     patient = get_object_or_404(Patient, pk=patient_pk) if patient_pk else None
-    techniciens = User.objects.filter(is_active=True).order_by('last_name', 'first_name')
+
+    from medecins.models import Medecin
+    medecins = Medecin.objects.filter(actif=True).select_related('employe', 'user').order_by('employe__nom')
+
+    prefill_medecin = None
+    medecin_pk = request.GET.get('medecin_id')
+    if medecin_pk:
+        try:
+            prefill_medecin = int(medecin_pk)
+        except (ValueError, TypeError):
+            pass
     from services.models import Articleservice
     services_examens = Articleservice.objects.filter(
         categorie__code='EX', actif=True
@@ -892,10 +902,10 @@ def laboratoire_create(request):
             statut='demande' if action == 'envoyer' else 'brouillon',
             cree_par=request.user,
         )
-        tech_id = request.POST.get('technicien')
-        if tech_id:
+        med_id = request.POST.get('medecin_prescripteur')
+        if med_id:
             try:
-                demande.technicien_id = int(tech_id)
+                demande.medecin_prescripteur_id = int(med_id)
             except ValueError:
                 pass
         raw_date = request.POST.get('date_prelevement', '').strip()
@@ -931,7 +941,8 @@ def laboratoire_create(request):
     return render(request, 'laboratoire/create_analyse.html', {
         'patient': patient,
         'services_examens': services_examens,
-        'techniciens': techniciens,
+        'medecins': medecins,
+        'prefill_medecin': prefill_medecin,
         'type_test_choices': DemandeExamen.TYPE_TEST,
         'breadcrumb': [
             {'title': 'Accueil', 'url': '/'},

@@ -79,6 +79,7 @@ class DemandeExamen(models.Model):
     statut = models.CharField(max_length=20, choices=STATUT, default='brouillon')
     date_prelevement = models.DateTimeField(null=True, blank=True)
     technicien = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='demandes_tech')
+    medecin_prescripteur = models.ForeignKey('medecins.Medecin', on_delete=models.SET_NULL, null=True, blank=True, related_name='demandes_examens')
     commentaire = models.TextField(blank=True)
     urgent = models.BooleanField(default=False)
     cree_par = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='demandes_creees')

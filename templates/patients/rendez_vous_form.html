@@ -464,6 +464,7 @@
       data-is-new="{{ is_new|yesno:'1,0' }}"
       data-confirme-facture="{% if rdv and rdv.statut == 'confirme' and facture_payee %}1{% else %}0{% endif %}"
       data-statut="{{ rdv.statut|default:'' }}"
+      data-rdv-id="{{ rdv.pk|default:'' }}"
       data-has-consultation="{% if consultation %}1{% else %}0{% endif %}">
 {% csrf_token %}
 
@@ -517,7 +518,7 @@
             {% elif rdv.statut == 'en_consultation' %}
                 <button type="button" class="btn-action" id="btn-pause"><i class="bi bi-pause-fill"></i> Pause</button>
                 <a href="{% url 'ordonnance_create_libre' %}?patient_id={{ rdv.patient.pk }}{% if consultation %}&consultation_id={{ consultation.pk }}{% elif rdv.medecin %}&medecin_id={{ rdv.medecin.pk }}{% endif %}" class="btn-action btn-ghost"><i class="bi bi-file-earmark-medical"></i> Créer une ordonnance</a>
-                <a href="{% url 'laboratoire_create' %}?patient={{ rdv.patient.pk }}" class="btn-action btn-ghost"><i class="bi bi-flask"></i> Demande de lab</a>
+                <a href="{% url 'laboratoire_create' %}?patient={{ rdv.patient.pk }}{% if rdv.medecin %}&medecin_id={{ rdv.medecin.pk }}{% endif %}" class="btn-action btn-ghost"><i class="bi bi-flask"></i> Demande de lab</a>
                 <a href="{% url 'soins:create' %}?patient_id={{ rdv.patient.pk }}" class="btn-action btn-ghost"><i class="bi bi-bandaid"></i> Soins</a>
                 <a href="{% url 'hospitalisation:create' %}?patient={{ rdv.patient.pk }}{% if rdv.medecin %}&medecin={{ rdv.medecin.pk }}{% endif %}&rdv={{ rdv.pk }}" class="btn-action btn-ghost"><i class="bi bi-clipboard2-pulse"></i> M.O</a>
                 <button type="submit" name="_action" value="terminer" class="btn-action btn-dark">Consultation terminée</button>
@@ -1571,7 +1572,11 @@
 
     /* ── Chronomètres en temps réel ── */
     (function() {
-        var _statut = (document.getElementById('rdv-form') || {dataset:{}}).dataset.statut || '';
+        var rdvForm = document.getElementById('rdv-form');
+        var _statut = (rdvForm || {dataset:{}}).dataset.statut || '';
+        var _rdvId  = (rdvForm || {dataset:{}}).dataset.rdvId  || '';
+        var _lsKey  = _rdvId ? 'rdv_timer_paused_' + _rdvId : null;
+
         function pad(n) { return n < 10 ? '0' + n : '' + n; }
         function fmt(sec) {
             var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
@@ -1586,6 +1591,12 @@
         var _ivId     = null;
         var _pauseSec = 0;
         var _pauseAt  = null;
+
+        // Lire l'état de pause persisté avant la navigation
+        var _savedPause = null;
+        if (_lsKey) {
+            try { _savedPause = JSON.parse(localStorage.getItem(_lsKey)); } catch(e) {}
+        }
 
         function _tick() {
             var el = live && document.getElementById(live.id);
@@ -1610,20 +1621,43 @@
                 _pauseAt = Math.floor(Date.now() / 1000);
                 var el = live && document.getElementById(live.id);
                 if (el) el.classList.remove('running');
+                // Persister la valeur figée pour la restaurer après rechargement
+                if (_lsKey && live && live.ts) {
+                    var frozen = _pauseAt - live.ts - _pauseSec;
+                    try { localStorage.setItem(_lsKey, JSON.stringify({ frozen: frozen < 0 ? 0 : frozen })); } catch(e) {}
+                }
             },
             resume: function() {
                 if (_pauseAt !== null) {
                     _pauseSec += Math.floor(Date.now() / 1000) - _pauseAt;
                     _pauseAt = null;
+                } else if (_savedPause !== null && live && live.ts) {
+                    // Page rechargée pendant la pause — reprendre à partir de la valeur figée
+                    _pauseSec = Math.floor(Date.now() / 1000) - live.ts - _savedPause.frozen;
+                    _savedPause = null;
                 }
+                if (_lsKey) { try { localStorage.removeItem(_lsKey); } catch(e) {} }
                 var el = live && document.getElementById(live.id);
-                if (el) el.classList.add('running');
+                if (el) { el.classList.remove('zero'); el.classList.add('running'); }
                 _tick();
                 _ivId = setInterval(_tick, 1000);
-            }
+            },
+            isPausedOnLoad: function() { return _savedPause !== null; }
         };
 
-        startLive();
+        if (_savedPause !== null && live && live.ts) {
+            // Restaurer l'affichage figé sans démarrer l'intervalle
+            var el = document.getElementById(live.id);
+            if (el) {
+                el.classList.remove('zero');
+                var frozen = _savedPause.frozen;
+                el.textContent = fmt(frozen < 0 ? 0 : frozen);
+                // Ajuster _pauseSec pour que resume() calcule le bon décalage
+                _pauseSec = Math.floor(Date.now() / 1000) - live.ts - frozen;
+            }
+        } else {
+            startLive();
+        }
 
         ['t-constante', 't-attente', 't-consult'].forEach(function(id) {
             if (live && id === live.id) return;
@@ -2033,7 +2067,17 @@
 
     var formBody  = document.querySelector('.form-body');
     var cpActions = document.querySelector('.cp-actions');
-    var isPaused  = false;
+
+    // Lire l'état de pause persisté (défini par le chronomètre au chargement)
+    var isPaused = window._rdvTimer && window._rdvTimer.isPausedOnLoad ? window._rdvTimer.isPausedOnLoad() : false;
+
+    // Restaurer l'affichage visuel si on était en pause lors du chargement
+    if (isPaused) {
+        btnPause.innerHTML = '<i class="bi bi-play-fill"></i> Démarrer';
+        btnPause.classList.add('btn-teal');
+        if (formBody)  formBody.classList.add('rdv-locked');
+        if (cpActions) cpActions.classList.add('paused');
+    }
 
     btnPause.addEventListener('click', function() {
         isPaused = !isPaused;
@@ -2050,6 +2094,12 @@
             if (cpActions) cpActions.classList.remove('paused');
             if (window._rdvTimer) window._rdvTimer.resume();
         }
+    });
+
+    // Nettoyer localStorage quand le formulaire est soumis (fin de consultation, annulation, etc.)
+    rdvForm.addEventListener('submit', function() {
+        var rdvId = rdvForm.dataset.rdvId || '';
+        if (rdvId) { try { localStorage.removeItem('rdv_timer_paused_' + rdvId); } catch(e) {} }
     });
 })();
 
