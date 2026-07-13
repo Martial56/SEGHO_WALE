@@ -179,6 +179,14 @@ def rh_dashboard(request):
         .order_by('-n')
     )
 
+    # Répartition par nationalité
+    par_nationalite = (
+        Employe.objects.filter(statut='actif')
+        .values('nationalite__nom')
+        .annotate(n=Count('id'))
+        .order_by('-n')
+    )
+
     # Contrats expirant dans 90 jours
     fin_90j = (
         Employe.objects.filter(
@@ -320,6 +328,7 @@ def rh_dashboard(request):
         'total': total, 'actifs': actifs, 'suspendus': suspendus, 'quittes': quittes,
         'par_contrat': list(par_contrat),
         'par_service': list(par_service),
+        'par_nationalite': list(par_nationalite),
         'fin_90j': fin_90j,
         'pyramide': pyramide,
         'employes_docs_manquants': employes_docs_manquants,

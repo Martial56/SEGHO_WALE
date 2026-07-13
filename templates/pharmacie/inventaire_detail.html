@@ -21,6 +21,10 @@
   font-family: inherit; color: var(--ph-text); transition: border-color .15s;
 }
 .ph-qte-field:focus { outline: none; border-bottom-color: var(--ph-500); }
+.lot-badge { display:inline-flex; align-items:center; gap:4px; font-size:10.5px; font-weight:600; font-family: var(--font-mono); padding:2px 7px; border-radius:4px; border:1px solid; white-space:nowrap; }
+.lot-ok      { background:rgba(36,113,163,.08); color:var(--ph-700); border-color:rgba(36,113,163,.2); }
+.lot-bientot { background:rgba(var(--amber-rgb),.1); color:var(--amber-text); border-color:rgba(var(--amber-rgb),.3); }
+.lot-perime  { background:rgba(220,53,69,.1); color:var(--rose-text); border-color:rgba(220,53,69,.3); }
 </style>{% endblock %}
 
 {% block content %}
@@ -35,7 +39,7 @@
         {% if inv.statut == 'brouillon' %}
           <span style="font-size:11px; font-weight:700; background:rgba(var(--amber-rgb),.15); color:var(--amber-text); border:1px solid rgba(var(--amber-rgb),.3); padding:2px 8px; border-radius:12px; margin-left:6px; vertical-align:middle;">Brouillon</span>
         {% elif inv.statut == 'valide' %}
-          <span style="font-size:11px; font-weight:700; background:rgba(22,169,107,.12); color:#0d7a4c; border:1px solid rgba(22,169,107,.25); padding:2px 8px; border-radius:12px; margin-left:6px; vertical-align:middle;">Validé</span>
+          <span style="font-size:11px; font-weight:700; background:rgba(var(--green-rgb),.15); color:var(--green); border:1px solid rgba(var(--green-rgb),.3); padding:2px 8px; border-radius:12px; margin-left:6px; vertical-align:middle;">Validé</span>
         {% endif %}
       </div>
       <div style="font-size:11px; color:var(--ph-muted); margin-top:2px;">
@@ -70,7 +74,7 @@
 
     {# ── Bandeau validation ── #}
     {% if inv.statut == 'valide' %}
-    <div style="display:flex;align-items:center;gap:10px;background:rgba(22,169,107,.1);border:1px solid rgba(22,169,107,.25);border-radius:10px;padding:12px 16px;margin-bottom:20px;color:#0d7a4c;font-size:13px;">
+    <div style="display:flex;align-items:center;gap:10px;background:rgba(var(--green-rgb),.12);border:1px solid rgba(var(--green-rgb),.25);border-radius:10px;padding:12px 16px;margin-bottom:20px;color:var(--green);font-size:13px;">
       <i class="bi bi-patch-check-fill" style="font-size:18px;"></i>
       <div>
         Inventaire validé le <strong>{{ inv.date_validation|date:"d/m/Y à H:i" }}</strong>
@@ -94,7 +98,7 @@
         <div class="inv-stat-lbl">Manquants</div>
       </div>
       <div class="inv-stat-box">
-        <div class="inv-stat-val" style="color:#0d7a4c;">{{ stats.excedents }}</div>
+        <div class="inv-stat-val" style="color:var(--green);">{{ stats.excedents }}</div>
         <div class="inv-stat-lbl">Excédents</div>
       </div>
     </div>
@@ -119,6 +123,8 @@
             <tr>
               <th style="width:120px">Code</th>
               <th>Produit</th>
+              <th>N° Lot(s)</th>
+              <th>Péremption</th>
               <th style="text-align:right;width:140px;">Stock théorique</th>
               <th style="text-align:right;width:160px;">Stock réel</th>
               <th style="text-align:right;width:100px;">Écart</th>
@@ -135,6 +141,25 @@
                   <div style="font-size:10.5px;color:var(--ph-muted);">{{ ligne.produit.dosage }}</div>
                 {% endif %}
               </td>
+              <td style="max-width:150px;">
+                {% for lot in ligne.lots_disponibles %}
+                <span class="lot-badge {% if lot.est_perime %}lot-perime{% elif lot.jours_restants is not None and lot.jours_restants <= 90 %}lot-bientot{% else %}lot-ok{% endif %}">
+                  {{ lot.numero_lot }}
+                </span>
+                {% empty %}
+                <span style="font-size:11px;color:var(--ph-muted);">—</span>
+                {% endfor %}
+              </td>
+              <td style="max-width:150px;">
+                {% for lot in ligne.lots_disponibles %}
+                <span class="lot-badge {% if lot.est_perime %}lot-perime{% elif lot.jours_restants is not None and lot.jours_restants <= 90 %}lot-bientot{% else %}lot-ok{% endif %}"
+                  title="{% if lot.est_perime %}Périmé depuis {{ lot.date_peremption|date:'d/m/Y' }}{% elif lot.jours_restants is not None %}Expire dans {{ lot.jours_restants }} j{% endif %}">
+                  {{ lot.date_peremption|date:"d/m/Y"|default:"—" }}
+                </span>
+                {% empty %}
+                <span style="font-size:11px;color:var(--ph-muted);">—</span>
+                {% endfor %}
+              </td>
               <td style="text-align:right;">{{ ligne.stock_theorique|floatformat:"0" }}</td>
               <td style="text-align:right;">
                 {% if inv.statut == 'brouillon' %}
@@ -150,7 +175,7 @@
                   {{ ligne.stock_reel|floatformat:"0" }}
                 {% endif %}
               </td>
-              <td style="text-align:right;font-weight:700;color:{% if ligne.ecart > 0 %}#0d7a4c{% elif ligne.ecart < 0 %}var(--rose-text){% else %}#0d7a4c{% endif %};"
+              <td style="text-align:right;font-weight:700;color:{% if ligne.ecart > 0 %}var(--green){% elif ligne.ecart < 0 %}var(--rose-text){% else %}var(--green){% endif %};"
                 id="ecart-{{ ligne.pk }}">
                 {% if ligne.ecart > 0 %}+{{ ligne.ecart }}
                 {% elif ligne.ecart < 0 %}{{ ligne.ecart }}
@@ -168,7 +193,7 @@
             </tr>
             {% empty %}
             <tr>
-              <td colspan="6" style="text-align:center;color:var(--ph-muted);padding:16px;">Aucune ligne pour ce type.</td>
+              <td colspan="8" style="text-align:center;color:var(--ph-muted);padding:16px;">Aucune ligne pour ce type.</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -223,7 +248,7 @@
       var statutCell = document.getElementById("statut-" + pk);
 
       // Mise à jour de la cellule écart
-      ecartCell.style.color = ecart > 0 ? "#0d7a4c" : ecart < 0 ? "var(--rose-text)" : "#0d7a4c";
+      ecartCell.style.color = ecart > 0 ? "var(--green)" : ecart < 0 ? "var(--rose-text)" : "var(--green)";
       ecartCell.textContent = ecart > 0 ? "+" + ecart : ecart;
 
       // Mise à jour du badge statut

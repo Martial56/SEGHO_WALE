@@ -1,0 +1,146 @@
+<!-- ── Modale Créer/Modifier (Catégorie de produit) ── -->
+<style>
+.stcfg-modal-overlay {
+  position: fixed; inset: 0; z-index: 9000;
+  background: rgba(10,20,15,0.55);
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transition: opacity 0.22s ease, visibility 0.22s ease;
+}
+.stcfg-modal-overlay.open { opacity: 1; visibility: visible; pointer-events: auto; }
+.stcfg-modal-box {
+  background: var(--st-surface); border-radius: 16px;
+  width: 100%; max-width: 520px; max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 24px 70px rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.08);
+  transform: translateY(14px) scale(0.96);
+  opacity: 0;
+  transition: transform 0.28s cubic-bezier(.22,1,.36,1), opacity 0.22s ease;
+}
+.stcfg-modal-overlay.open .stcfg-modal-box { transform: translateY(0) scale(1); opacity: 1; }
+.stcfg-modal-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 18px 22px;
+  background: linear-gradient(135deg, rgba(var(--st-600-rgb),0.09), rgba(var(--st-600-rgb),0.02));
+  border-bottom: 1px solid var(--st-border);
+}
+.stcfg-modal-icon {
+  width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--st-600), var(--st-400));
+  color: #fff; display: flex; align-items: center; justify-content: center;
+  font-size: 17px; box-shadow: 0 4px 12px rgba(var(--st-600-rgb),0.35);
+}
+.stcfg-modal-title-wrap { flex: 1; min-width: 0; }
+.stcfg-modal-title { font-size: 16px; font-weight: 800; color: var(--st-text); letter-spacing: -0.2px; }
+.stcfg-modal-close {
+  width: 32px; height: 32px; border-radius: 9px; border: none;
+  background: rgba(0,0,0,0.04); color: var(--st-muted); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, color 0.15s, transform 0.15s;
+  flex-shrink: 0;
+}
+.stcfg-modal-close:hover { background: rgba(var(--rose-rgb),0.12); color: var(--rose-btn); transform: rotate(90deg); }
+html[data-theme="dark"] .stcfg-modal-close { background: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .stcfg-modal-close:hover { background: rgba(var(--rose-rgb),0.18); }
+.stcfg-modal-loading {
+  padding: 48px 20px; text-align: center; color: var(--st-muted); font-size: 13.5px;
+}
+.stcfg-modal-loading i { display: block; font-size: 26px; margin-bottom: 10px; color: var(--st-500); animation: stcfg-modal-spin 0.9s linear infinite; }
+@keyframes stcfg-modal-spin { to { transform: rotate(360deg); } }
+.stcfg-modal-body { padding: 22px; animation: stcfg-modal-fade-in 0.25s ease; }
+@keyframes stcfg-modal-fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.stcfg-modal-footer {
+  display: flex; justify-content: flex-end; gap: 10px;
+  padding: 16px 22px; border-top: 1px solid var(--st-border);
+  background: rgba(0,0,0,0.012);
+}
+html[data-theme="dark"] .stcfg-modal-footer { background: rgba(255,255,255,0.015); }
+</style>
+
+<div class="stcfg-modal-overlay" id="stcfg-modal-overlay" onclick="if (event.target === this) stCloseConfigModal();">
+  <div class="stcfg-modal-box">
+    <div class="stcfg-modal-header">
+      <div class="stcfg-modal-icon" id="stcfg-modal-icon"><i class="bi bi-gear"></i></div>
+      <div class="stcfg-modal-title-wrap">
+        <div class="stcfg-modal-title" id="stcfg-modal-title"></div>
+      </div>
+      <button type="button" class="stcfg-modal-close" onclick="stCloseConfigModal()">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div id="stcfg-modal-content">
+      <div class="stcfg-modal-loading"><i class="bi bi-arrow-repeat"></i> Chargement…</div>
+    </div>
+  </div>
+</div>
+
+<script>
+var stcfgModalOverlay = document.getElementById('stcfg-modal-overlay');
+var stcfgModalContent = document.getElementById('stcfg-modal-content');
+var stcfgModalTitle   = document.getElementById('stcfg-modal-title');
+var stcfgModalIcon    = document.getElementById('stcfg-modal-icon');
+
+function stOpenConfigModal(event, url, title, icon) {
+  if (event) event.preventDefault();
+  stcfgModalTitle.textContent = title;
+  stcfgModalIcon.innerHTML = '<i class="bi ' + (icon || 'bi-gear') + '"></i>';
+  stcfgModalContent.innerHTML = '<div class="stcfg-modal-loading"><i class="bi bi-arrow-repeat"></i> Chargement…</div>';
+  stcfgModalOverlay.classList.add('open');
+  fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
+    .then(function (r) { return r.text(); })
+    .then(function (html) {
+      stcfgModalContent.innerHTML = html;
+      stBindConfigForm();
+    })
+    .catch(function () {
+      stcfgModalContent.innerHTML = '<div class="stcfg-modal-loading">Erreur de chargement.</div>';
+    });
+  return false;
+}
+
+function stCloseConfigModal() {
+  stcfgModalOverlay.classList.remove('open');
+  stcfgModalContent.innerHTML = '';
+}
+
+function stBindConfigForm() {
+  var form = document.getElementById('stcfgConfigForm');
+  if (!form) return;
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var url = form.dataset.url;
+    var submitBtn = form.querySelector('button[type="submit"]');
+    if (submitBtn) submitBtn.disabled = true;
+    fetch(url, {
+      method: 'POST',
+      headers: {'X-Requested-With': 'XMLHttpRequest'},
+      body: new FormData(form),
+    })
+      .then(function (r) {
+        var ct = r.headers.get('Content-Type') || '';
+        if (ct.indexOf('application/json') !== -1) {
+          return r.json().then(function (data) { return {json: data}; });
+        }
+        return r.text().then(function (html) { return {html: html}; });
+      })
+      .then(function (result) {
+        if (result.json && result.json.ok) {
+          window.location.reload();
+        } else if (result.html) {
+          stcfgModalContent.innerHTML = result.html;
+          stBindConfigForm();
+        }
+        if (submitBtn) submitBtn.disabled = false;
+      })
+      .catch(function () {
+        if (submitBtn) submitBtn.disabled = false;
+      });
+  });
+}
+
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape' && stcfgModalOverlay.classList.contains('open')) stCloseConfigModal();
+});
+</script>

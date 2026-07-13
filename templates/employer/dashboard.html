@@ -672,6 +672,38 @@ html[data-theme="dark"] .rh-page-link.active { background: var(--rh-600); color:
   </div>
 </div>
 
+<!-- ── Répartition par nationalité ── -->
+<div class="rh-card" style="margin-top:20px;">
+  <div class="rh-card-header">
+    <div class="rh-card-title">
+      <i class="bi bi-flag" style="color:var(--rh-500);"></i>
+      Répartition par nationalité
+    </div>
+  </div>
+  <div class="rh-card-body">
+    {% if par_nationalite %}
+      {% with max_n=par_nationalite.0.n %}
+      <div class="rh-bar-list">
+        {% for item in par_nationalite %}
+        <div class="rh-bar-item">
+          <span class="rh-bar-label" title="{{ item.nationalite__nom }}">{{ item.nationalite__nom|default:"Non renseignée" }}</span>
+          <div class="rh-bar-track">
+            <div class="rh-bar-fill" style="width:{% widthratio item.n max_n 100 %}%;"></div>
+          </div>
+          <span class="rh-bar-count">{{ item.n }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endwith %}
+    {% else %}
+      <div class="rh-empty-inline">
+        <i class="bi bi-flag"></i>
+        <p>Aucune donnée disponible</p>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
 <!-- ── 5. Mouvement du personnel + Alertes documents par service ── -->
 <div class="rh-2col" style="margin-top:20px;">
   <div class="rh-card">

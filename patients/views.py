@@ -342,7 +342,6 @@ def rdv_edit(request, pk):
             medecin_pk = request.POST.get('eval_medecin', '').strip()
             if medecin_pk:
                 try:
-                    from medecins.models import Medecin
                     rdv.medecin = Medecin.objects.get(pk=medecin_pk)
                     rdv.save(update_fields=['medecin'])
                 except Exception:
@@ -412,7 +411,6 @@ def rdv_edit(request, pk):
             medecin_pk = request.POST.get('medecin', '').strip()
             if medecin_pk:
                 try:
-                    from medecins.models import Medecin
                     rdv.medecin = Medecin.objects.get(pk=medecin_pk)
                     update_fields.append('medecin')
                 except Exception:
@@ -556,7 +554,7 @@ def gynecologie_rdv_list(request):
     date_to    = request.GET.get('date_to', '')
 
     qs = RendezVous.objects.select_related('patient', 'medecin', 'type_consultation').prefetch_related('registre_curatif').filter(
-        departement__modules_specialises__code='gynecologie'
+        departement__code='GYN'
     ).order_by('-date_heure')
 
     if q:
@@ -601,7 +599,7 @@ def gynecologie_rdv_list(request):
 @login_required
 def gynecologie_patient_list(request):
     gyne_ids = RendezVous.objects.filter(
-        departement__modules_specialises__code='gynecologie'
+        departement__code='GYN'
     ).values_list('patient_id', flat=True).distinct()
 
     qs = Patient.objects.filter(pk__in=gyne_ids).order_by('nom', 'prenoms')
@@ -852,7 +850,7 @@ def pathologie_list(request):
     if q:
         qs = qs.filter(nom__icontains=q)
 
-    paginator = Paginator(qs, 40)
+    paginator = Paginator(qs, 15)
     page_obj  = paginator.get_page(request.GET.get('page'))
     return render(request, 'patients/pathologie_list.html', {
         'page_obj': page_obj,

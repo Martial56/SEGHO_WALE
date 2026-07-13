@@ -54,13 +54,6 @@ urlpatterns = [
     path('medecins/config/departements/<int:pk>/',           views.medecins_departement_detail,        name='medecins_departement_detail'),
     path('medecins/config/departements/<int:pk>/modifier/',  views.medecins_departement_edit,          name='medecins_departement_edit'),
 
-    # Modules spécialisés
-    path('medecins/config/modules/',                    views.medecins_modules,             name='medecins_modules'),
-    path('medecins/config/modules/nouveau/',            views.medecins_module_create,       name='medecins_module_create'),
-    path('medecins/config/modules/bulk-delete/',        views.medecins_module_bulk_delete,   name='medecins_module_bulk_delete'),
-    path('medecins/config/modules/<int:pk>/',           views.medecins_module_detail,        name='medecins_module_detail'),
-    path('medecins/config/modules/<int:pk>/modifier/',  views.medecins_module_edit,          name='medecins_module_edit'),
-
     path('consultations/', views.consultations_list, name='consultations_list'),
     path('soins/', include('soins.urls')),
     path('services/', include('services.urls')),

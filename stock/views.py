@@ -221,8 +221,14 @@ def produit_create(request):
     if request.method == 'POST':
         nom  = request.POST.get('nom', '').strip()
         type_ = request.POST.get('type', 'medicament')
+        cat_pk = request.POST.get('categorie', '')
+        um_pk = request.POST.get('unite_mesure', '')
         if not nom:
             errors['nom'] = 'Le nom est obligatoire.'
+        if not cat_pk:
+            errors['categorie'] = 'La catégorie est obligatoire.'
+        if not um_pk:
+            errors['unite_mesure'] = "L'unité de mesure est obligatoire."
         if not errors:
             p = Produit(
                 nom=nom, type=type_,
@@ -232,8 +238,7 @@ def produit_create(request):
                 description=request.POST.get('description', '').strip(),
                 prescription_obligatoire=request.POST.get('prescription_obligatoire') == 'on',
             )
-            um_pk = request.POST.get('unite_mesure', '')
-            p.unite_mesure = UniteMesure.objects.filter(pk=um_pk).first() if um_pk else None
+            p.unite_mesure = UniteMesure.objects.filter(pk=um_pk).first()
             try: p.stock_alerte  = float(request.POST.get('stock_alerte',  10) or 10)
             except ValueError: p.stock_alerte = 10
             try: p.stock_minimum = float(request.POST.get('stock_minimum', 5) or 5)
@@ -242,9 +247,7 @@ def produit_create(request):
             except ValueError: p.prix_achat = 0
             try: p.prix_vente    = float(request.POST.get('prix_vente', 0) or 0)
             except ValueError: p.prix_vente = 0
-            cat_pk = request.POST.get('categorie', '')
-            if cat_pk:
-                p.categorie = CategorieStock.objects.filter(pk=cat_pk).first()
+            p.categorie = CategorieStock.objects.filter(pk=cat_pk).first()
             frn_pk = request.POST.get('fournisseur_principal', '')
             if frn_pk:
                 p.fournisseur_principal = Fournisseur.objects.filter(pk=frn_pk).first()
@@ -272,16 +275,21 @@ def produit_edit(request, pk):
 
     if request.method == 'POST':
         nom = request.POST.get('nom', '').strip()
+        cat_pk = request.POST.get('categorie', '')
+        um_pk = request.POST.get('unite_mesure', '')
         if not nom:
             errors['nom'] = 'Le nom est obligatoire.'
+        if not cat_pk:
+            errors['categorie'] = 'La catégorie est obligatoire.'
+        if not um_pk:
+            errors['unite_mesure'] = "L'unité de mesure est obligatoire."
         if not errors:
             produit.nom   = nom
             produit.type  = request.POST.get('type', produit.type)
             produit.dci   = request.POST.get('dci', '').strip()
             produit.dosage = request.POST.get('dosage', '').strip()
             produit.forme  = request.POST.get('forme', '')
-            um_pk = request.POST.get('unite_mesure', '')
-            produit.unite_mesure = UniteMesure.objects.filter(pk=um_pk).first() if um_pk else None
+            produit.unite_mesure = UniteMesure.objects.filter(pk=um_pk).first()
             produit.description  = request.POST.get('description', '').strip()
             produit.prescription_obligatoire = request.POST.get('prescription_obligatoire') == 'on'
             produit.actif = request.POST.get('actif') != 'off'
@@ -293,8 +301,7 @@ def produit_edit(request, pk):
             except ValueError: pass
             try: produit.prix_vente    = float(request.POST.get('prix_vente', produit.prix_vente) or 0)
             except ValueError: pass
-            cat_pk = request.POST.get('categorie', '')
-            produit.categorie = CategorieStock.objects.filter(pk=cat_pk).first() if cat_pk else None
+            produit.categorie = CategorieStock.objects.filter(pk=cat_pk).first()
             frn_pk = request.POST.get('fournisseur_principal', '')
             produit.fournisseur_principal = Fournisseur.objects.filter(pk=frn_pk).first() if frn_pk else None
             produit.save()
@@ -556,6 +563,94 @@ def categorie_create_ajax(request):
         return JsonResponse({'error': 'Le nom est obligatoire.'}, status=400)
     cat, created = CategorieStock.objects.get_or_create(nom=nom, type=type_)
     return JsonResponse({'id': cat.pk, 'nom': cat.nom, 'type': cat.type, 'created': created})
+
+
+# ── Configuration : Type de produit (lecture seule) / Catégorie de produit ──
+
+@login_required(login_url='login')
+def stock_types_produit(request):
+    """Les types de produit sont des choix fixes (pas un modèle séparé) —
+    page de référence en lecture seule, la vraie gestion se fait via les
+    catégories (chacune rattachée à l'un de ces 3 types)."""
+    types = [
+        {
+            'code': code, 'label': label,
+            'nb_categories': CategorieStock.objects.filter(type=code).count(),
+            'nb_produits':   Produit.objects.filter(type=code).count(),
+        }
+        for code, label in Produit.TYPE_CHOICES
+    ]
+    return render(request, 'stock/config/types_list.html', {'types': types})
+
+
+def _categorie_stock_form_class():
+    from django import forms
+
+    class CategorieStockForm(forms.ModelForm):
+        class Meta:
+            model = CategorieStock
+            fields = ['nom', 'type', 'description', 'actif']
+            widgets = {
+                'nom':         forms.TextInput(attrs={'placeholder': 'Ex : Antipaludéens'}),
+                'type':        forms.Select(),
+                'description': forms.Textarea(attrs={'rows': 3, 'placeholder': 'Description optionnelle'}),
+            }
+    return CategorieStockForm
+
+
+@login_required(login_url='login')
+def stock_categories_list(request):
+    q = request.GET.get('q', '').strip()
+    qs = CategorieStock.objects.annotate(nb_produits=Count('produit')).order_by('type', 'nom')
+    if q:
+        qs = qs.filter(Q(nom__icontains=q) | Q(description__icontains=q))
+    paginator = Paginator(qs, 15)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    return render(request, 'stock/config/categories_list.html', {
+        'page_obj': page_obj, 'q': q,
+        'total': CategorieStock.objects.count(), 'total_filtre': qs.count(),
+    })
+
+
+@login_required(login_url='login')
+def stock_categorie_create(request):
+    is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
+    Form = _categorie_stock_form_class()
+    form = Form(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        obj = form.save()
+        if is_ajax:
+            return JsonResponse({'ok': True, 'message': f'Catégorie « {obj} » créée.'})
+        messages.success(request, 'Catégorie créée.')
+        return redirect('stock_categories_list')
+    return render(request, 'stock/config/categorie_form_modal.html', {'form': form, 'titre': 'Nouvelle catégorie de produit'})
+
+
+@login_required(login_url='login')
+def stock_categorie_edit(request, pk):
+    is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
+    obj = get_object_or_404(CategorieStock, pk=pk)
+    Form = _categorie_stock_form_class()
+    form = Form(request.POST or None, instance=obj)
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        if is_ajax:
+            return JsonResponse({'ok': True, 'message': f'Catégorie « {obj} » mise à jour.'})
+        messages.success(request, 'Catégorie mise à jour.')
+        return redirect('stock_categories_list')
+    return render(request, 'stock/config/categorie_form_modal.html', {
+        'form': form, 'titre': f'Modifier — {obj.nom}', 'obj': obj,
+    })
+
+
+@login_required(login_url='login')
+@require_POST
+def stock_categorie_delete(request, pk):
+    obj = get_object_or_404(CategorieStock, pk=pk)
+    nom = obj.nom
+    obj.delete()
+    messages.success(request, f'Catégorie « {nom} » supprimée.')
+    return redirect('stock_categories_list')
 
 
 @login_required(login_url='login')

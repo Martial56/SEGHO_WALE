@@ -580,7 +580,7 @@ def pharmacie_caisse(request, pharmacie):
 
     qs = StockPharmacie.objects.filter(
         pharmacie=pharmacie, quantite__gt=0
-    ).select_related('produit', 'produit__categorie').order_by('produit__type', 'produit__nom')
+    ).select_related('produit', 'produit__categorie').prefetch_related('produit__lots').order_by('produit__type', 'produit__nom')
 
     if type_filtre:
         qs = qs.filter(produit__type=type_filtre)
@@ -647,9 +647,15 @@ def pharmacie_caisse(request, pharmacie):
             messages.success(request, f'Vente {vente.numero} enregistrée — {vente.montant_net} F CFA.')
             return redirect('pharmacie_ticket', pharmacie=pharmacie, pk=vente.pk)
 
+    # Tous les lots avec du stock restant pour chaque produit, du plus proche
+    # au plus lointain (LotProduit.Meta.ordering = ['date_peremption']).
+    stock_items = list(qs)
+    for item in stock_items:
+        item.lots_disponibles = [l for l in item.produit.lots.all() if l.quantite_actuelle > 0]
+
     return render(request, 'pharmacie/caisse.html', {
         'pharmacie': pharmacie, 'label': label,
-        'stock_items': qs,
+        'stock_items': stock_items,
         'stats_jour': stats_jour,
         'type_filtre': type_filtre, 'q': q,
         'today': today,
@@ -972,7 +978,7 @@ def pharmacie_inventaire_nouveau(request, pharmacie):
 
     stock_items = StockPharmacie.objects.filter(
         pharmacie=pharmacie
-    ).select_related('produit').order_by('produit__type', 'produit__nom')
+    ).select_related('produit').prefetch_related('produit__lots').order_by('produit__type', 'produit__nom')
 
     if request.method == 'POST':
         date_str = request.POST.get('date_inventaire', str(timezone.now().date()))
@@ -1000,6 +1006,10 @@ def pharmacie_inventaire_nouveau(request, pharmacie):
         messages.success(request, f'Inventaire {inv.numero} créé.')
         return redirect('pharmacie_inventaire_detail', pharmacie=pharmacie, pk=inv.pk)
 
+    stock_items = list(stock_items)
+    for sp in stock_items:
+        sp.lots_disponibles = [l for l in sp.produit.lots.all() if l.quantite_actuelle > 0]
+
     return render(request, 'pharmacie/inventaire_form.html', {
         'pharmacie': pharmacie, 'label': label,
         'stock_items': stock_items, 'today': timezone.now().date(),
@@ -1012,7 +1022,7 @@ def pharmacie_inventaire_detail(request, pharmacie, pk):
     get_pharmacie_or_404(pharmacie)
     label = PHARMACIES_DICT[pharmacie]
     inv = get_object_or_404(InventairePharmacie, pk=pk, pharmacie=pharmacie)
-    lignes = list(inv.lignes.select_related('produit').order_by('produit__type', 'produit__nom'))
+    lignes = list(inv.lignes.select_related('produit').prefetch_related('produit__lots').order_by('produit__type', 'produit__nom'))
 
     if request.method == 'POST' and inv.statut == 'brouillon':
         for ligne in lignes:
@@ -1050,7 +1060,7 @@ def pharmacie_inventaire_detail(request, pharmacie, pk):
             return redirect('pharmacie_inventaire_detail', pharmacie=pharmacie, pk=inv.pk)
         else:
             messages.success(request, 'Quantités enregistrées.')
-        lignes = list(inv.lignes.select_related('produit').order_by('produit__type', 'produit__nom'))
+        lignes = list(inv.lignes.select_related('produit').prefetch_related('produit__lots').order_by('produit__type', 'produit__nom'))
 
     stats = {
         'total': len(lignes),
@@ -1058,6 +1068,9 @@ def pharmacie_inventaire_detail(request, pharmacie, pk):
         'manquants': sum(1 for l in lignes if l.ecart < 0),
         'excedents': sum(1 for l in lignes if l.ecart > 0),
     }
+
+    for ligne in lignes:
+        ligne.lots_disponibles = [l for l in ligne.produit.lots.all() if l.quantite_actuelle > 0]
 
     return render(request, 'pharmacie/inventaire_detail.html', {
         'pharmacie': pharmacie, 'label': label,

@@ -68,18 +68,3 @@ class Departement(models.Model):
     class Meta:
         verbose_name = "Département"
         ordering = ['nom']
-
-
-class ModuleSpecialise(models.Model):
-    """Associe un module métier (ex: Gynécologie) à un ou plusieurs départements,
-    pour piloter dynamiquement les vues spécialisées (ex: liste RDV Gynécologie)
-    sans avoir à modifier le code."""
-    code = models.CharField(max_length=30, unique=True)
-    nom = models.CharField(max_length=100)
-    departements = models.ManyToManyField(Departement, blank=True, related_name='modules_specialises')
-    actif = models.BooleanField(default=True)
-
-    def __str__(self): return self.nom
-    class Meta:
-        verbose_name = "Module spécialisé"
-        ordering = ['nom']

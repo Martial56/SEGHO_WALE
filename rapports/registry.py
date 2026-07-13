@@ -37,7 +37,7 @@ def _rendez_vous_columns_rows(qs):
 
 def _gyneco_filter(qs):
     from django.db.models import Q
-    return qs.filter(Q(departement__modules_specialises__code='gynecologie') | Q(medecin__specialite__nom__icontains='gyn'))
+    return qs.filter(Q(departement__code='GYN') | Q(medecin__specialite__nom__icontains='gyn'))
 
 
 def _rendez_vous_medecine(periode_debut, periode_fin):
