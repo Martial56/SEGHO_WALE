@@ -124,19 +124,19 @@
 .ph-pl-prix { font-size: 11px; color: var(--ph-muted); }
 .ph-pl-qte { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
 .ph-pl-qte-btn {
-  width: 22px; height: 22px; border-radius: 5px; border: 1px solid var(--ph-200); background: #fff;
+  width: 22px; height: 22px; border-radius: 5px; border: 1px solid var(--ph-200); background: var(--ph-surface);
   color: var(--ph-700); cursor: pointer; font-size: 13px; display: flex; align-items: center; justify-content: center;
   transition: background .12s, opacity .12s;
 }
 .ph-pl-qte-btn:hover { background: var(--ph-50); }
 .ph-pl-qte-btn:disabled { opacity: .3; cursor: not-allowed; }
-.ph-pl-qte-btn:disabled:hover { background: #fff; }
+.ph-pl-qte-btn:disabled:hover { background: var(--ph-surface); }
 .ph-pl-qte-val {
   width: 34px; text-align: center; font-size: 12.5px; font-weight: 700; color: var(--ph-text);
   border: 1px solid transparent; border-radius: 4px; background: transparent; font-family: inherit; padding: 3px 0;
   transition: border-color .15s, background .15s;
 }
-.ph-pl-qte-val:focus { outline: none; border-color: var(--ph-300); background: #fff; }
+.ph-pl-qte-val:focus { outline: none; border-color: var(--ph-300); background: var(--ph-surface); }
 .ph-pl-qte-val::-webkit-outer-spin-button, .ph-pl-qte-val::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .ph-pl-qte-val[type=number] { -moz-appearance: textfield; }
 .ph-pl-soustotal { width: 64px; text-align: right; font-size: 12px; font-weight: 700; color: var(--ph-800); flex-shrink: 0; }
@@ -148,6 +148,10 @@
 }
 .ph-panier-total-sub { font-size: 10.5px; font-weight: 500; color: var(--ph-muted); text-transform: none; margin-top: 2px; }
 #btn-valider-vente:disabled { opacity: .5; cursor: not-allowed; }
+.lot-badge { display:inline-flex; align-items:center; gap:4px; font-size:10.5px; font-weight:600; font-family: var(--font-mono); padding:2px 7px; border-radius:4px; border:1px solid; white-space:nowrap; }
+.lot-ok      { background:rgba(36,113,163,.08); color:var(--ph-700); border-color:rgba(36,113,163,.2); }
+.lot-bientot { background:rgba(var(--amber-rgb),.1); color:var(--amber-text); border-color:rgba(var(--amber-rgb),.3); }
+.lot-perime  { background:rgba(220,53,69,.1); color:var(--rose-text); border-color:rgba(220,53,69,.3); }
 </style>{% endblock %}
 
 {% block content %}
@@ -218,6 +222,8 @@
           <th>Code</th>
           <th>Produit</th>
           <th style="text-align:center;">Stock dispo</th>
+          <th>N° Lot(s)</th>
+          <th>Péremption</th>
           <th style="text-align:right;">Prix unitaire</th>
         </tr>
       </thead>
@@ -225,7 +231,7 @@
         {% for item in stock_items %}
         {% ifchanged item.produit.type %}
         <tr class="ph-type-sep-row" data-sep-type="{{ item.produit.type }}">
-          <td colspan="4">
+          <td colspan="6">
             {% if item.produit.type == 'medicament' %}<i class="bi bi-capsule-pill"></i> Médicaments
             {% elif item.produit.type == 'consommable' %}<i class="bi bi-bandaid"></i> Consommables médicaux
             {% else %}<i class="bi bi-tools"></i> Équipements{% endif %}
@@ -253,20 +259,39 @@
             {% if item.produit.unite_mesure %}<span style="font-size:10.5px;color:var(--ph-muted);"> {{ item.produit.unite_mesure.nom }}</span>{% endif %}
             <span class="ph-stock-restant"></span>
           </td>
+          <td style="max-width:150px;">
+            {% for lot in item.lots_disponibles %}
+            <span class="lot-badge {% if lot.est_perime %}lot-perime{% elif lot.jours_restants is not None and lot.jours_restants <= 90 %}lot-bientot{% else %}lot-ok{% endif %}">
+              {{ lot.numero_lot }}
+            </span>
+            {% empty %}
+            <span style="font-size:11px;color:var(--ph-muted);">—</span>
+            {% endfor %}
+          </td>
+          <td style="max-width:150px;">
+            {% for lot in item.lots_disponibles %}
+            <span class="lot-badge {% if lot.est_perime %}lot-perime{% elif lot.jours_restants is not None and lot.jours_restants <= 90 %}lot-bientot{% else %}lot-ok{% endif %}"
+              title="{% if lot.est_perime %}Périmé depuis {{ lot.date_peremption|date:'d/m/Y' }}{% elif lot.jours_restants is not None %}Expire dans {{ lot.jours_restants }} j{% endif %}">
+              {{ lot.date_peremption|date:"d/m/Y"|default:"—" }}
+            </span>
+            {% empty %}
+            <span style="font-size:11px;color:var(--ph-muted);">—</span>
+            {% endfor %}
+          </td>
           <td style="text-align:right;font-weight:700;color:var(--ph-800);">
             {{ item.produit.prix_vente|floatformat:0 }}<span style="font-size:10px;font-weight:400;color:var(--ph-muted);"> F</span>
           </td>
         </tr>
         {% empty %}
         <tr>
-          <td colspan="4" style="text-align:center;padding:48px;color:var(--ph-muted);">
+          <td colspan="6" style="text-align:center;padding:48px;color:var(--ph-muted);">
             <i class="bi bi-inbox" style="font-size:28px;display:block;margin-bottom:8px;color:var(--ph-200);"></i>
             Aucun produit disponible en stock.
           </td>
         </tr>
         {% endfor %}
         <tr id="aucun-resultat-row" style="display:none;">
-          <td colspan="4" style="text-align:center;padding:48px;color:var(--ph-muted);">
+          <td colspan="6" style="text-align:center;padding:48px;color:var(--ph-muted);">
             <i class="bi bi-search" style="font-size:28px;display:block;margin-bottom:8px;color:var(--ph-200);"></i>
             Aucun produit ne correspond à la recherche.
           </td>

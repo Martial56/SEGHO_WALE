@@ -134,31 +134,32 @@ html[data-theme="dark"] .modal-categorie-box { background:var(--st-surface)!impo
         </div>
         <div class="st-grid-2">
           <div class="st-field">
-            <label class="st-label" for="categorie">Catégorie
+            <label class="st-label" for="categorie">Catégorie <span class="req" style="color:var(--rose-btn);">*</span>
               <button type="button" onclick="ouvrirModalCategorie()" title="Ajouter une catégorie"
                 style="margin-left:6px;background:none;border:none;cursor:pointer;color:var(--st-600);font-size:13px;padding:0;vertical-align:middle;">
                 <i class="bi bi-plus-circle"></i>
               </button>
             </label>
-            <select name="categorie" id="categorie" class="st-input">
-              <option value="">— Aucune —</option>
+            <select name="categorie" id="categorie" class="st-input{% if errors.categorie %} error{% endif %}" required>
+              <option value="">— Sélectionner —</option>
               {% for cat in categories %}
-              <option value="{{ cat.pk }}"
+              <option value="{{ cat.pk }}" data-type="{{ cat.type }}"
                 {% if mode == 'edit' and produit.categorie and produit.categorie.pk == cat.pk %}selected
                 {% elif post and post.categorie == cat.pk|stringformat:"s" %}selected{% endif %}>
                 {{ cat.nom }} ({{ cat.get_type_display }})
               </option>
               {% endfor %}
             </select>
+            {% if errors.categorie %}<div class="st-error">{{ errors.categorie }}</div>{% endif %}
           </div>
           <div class="st-field">
-            <label class="st-label" for="unite_mesure">Unité de mesure
+            <label class="st-label" for="unite_mesure">Unité de mesure <span class="req" style="color:var(--rose-btn);">*</span>
               <a href="{% url 'stock_unites' %}" title="Gérer les unités de mesure"
                 style="margin-left:6px;color:var(--st-600);font-size:13px;vertical-align:middle;">
                 <i class="bi bi-box-arrow-up-right"></i>
               </a>
             </label>
-            <select name="unite_mesure" id="unite_mesure" class="st-input">
+            <select name="unite_mesure" id="unite_mesure" class="st-input{% if errors.unite_mesure %} error{% endif %}" required>
               <option value="">— Sélectionner —</option>
               {% regroup unites_mesure by categorie as unites_par_categorie %}
               {% for groupe in unites_par_categorie %}
@@ -173,6 +174,7 @@ html[data-theme="dark"] .modal-categorie-box { background:var(--st-surface)!impo
               </optgroup>
               {% endfor %}
             </select>
+            {% if errors.unite_mesure %}<div class="st-error">{{ errors.unite_mesure }}</div>{% endif %}
           </div>
         </div>
         <div class="st-field" style="margin-bottom:0;">
@@ -372,6 +374,33 @@ function filtrerUnitesParType(type, reinitialiserSiCache){
   if (reinitialiserSiCache && !valeurDansGroupeCible) select.value = '';
 }
 
+/* ── Filtrage du select Catégorie selon le type de produit choisi ──
+   Chaque <option> porte data-type="medicament|consommable|equipement" (voir
+   stock/models.py::CategorieStock.type, mêmes valeurs que Produit.type) —
+   même logique de préservation de la valeur existante que filtrerUnitesParType. ── */
+function filtrerCategoriesParType(type, reinitialiserSiCache){
+  var select = document.getElementById('categorie');
+  if (!select) return;
+  var valeurActuelle = select.value;
+
+  var valeurCorrespond = false;
+  Array.prototype.forEach.call(select.options, function(opt){
+    var t = opt.dataset.type || '';
+    if ((t === '' || t === type) && opt.value === valeurActuelle) valeurCorrespond = true;
+  });
+
+  Array.prototype.forEach.call(select.options, function(opt){
+    var t = opt.dataset.type || '';
+    var correspond = (t === '' || t === type);
+    var estValeurActuelle = opt.value === valeurActuelle;
+    var afficher = correspond || (estValeurActuelle && !valeurCorrespond && !reinitialiserSiCache);
+    opt.disabled = !afficher;
+    opt.hidden = !afficher;
+  });
+
+  if (reinitialiserSiCache && !valeurCorrespond) select.value = '';
+}
+
 /* ── Type de produit ── */
 document.querySelectorAll('.type-btn').forEach(function(btn){
   btn.addEventListener('click', function(){
@@ -382,6 +411,7 @@ document.querySelectorAll('.type-btn').forEach(function(btn){
     // Synchroniser le type dans le modal catégorie
     document.getElementById('cat-type').value = type;
     filtrerUnitesParType(type, true);
+    filtrerCategoriesParType(type, true);
   });
 });
 
@@ -390,7 +420,10 @@ document.querySelectorAll('.type-btn').forEach(function(btn){
    groupe ne correspond pas au type (données existantes créées avant ce filtrage). ── */
 (function(){
   var typeActif = document.querySelector('.type-btn.selected input');
-  if (typeActif) filtrerUnitesParType(typeActif.value, false);
+  if (typeActif) {
+    filtrerUnitesParType(typeActif.value, false);
+    filtrerCategoriesParType(typeActif.value, false);
+  }
 })();
 
 /* ── Modal catégorie ── */
@@ -432,9 +465,11 @@ function sauvegarderCategorie(){
     var select = document.getElementById('categorie');
     var opt = document.createElement('option');
     opt.value = data.id;
+    opt.dataset.type = data.type;
     opt.textContent = data.nom + ' (' + {'medicament':'Médicament','consommable':'Consommable médical','equipement':'Équipement & matériel'}[data.type] + ')';
     opt.selected = true;
     select.appendChild(opt);
+    filtrerCategoriesParType(data.type, false);
     fermerModalCategorie();
     btn.disabled = false;
     btn.innerHTML = '<i class="bi bi-check-lg"></i> Ajouter';

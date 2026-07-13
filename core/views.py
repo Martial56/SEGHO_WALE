@@ -346,7 +346,7 @@ def medecin_create(request):
 
     specialites = Specialite.objects.order_by('nom')
     departements = Departement.objects.filter(actif=True).order_by('nom')
-    services = Service.objects.filter(actif=True).select_related('departement').order_by('nom')
+    services = Service.objects.filter(actif=True).order_by('nom')
     users_disponibles = User.objects.filter(medecin__isnull=True).order_by('last_name', 'first_name')
     errors = {}
     employe_trouve = None
@@ -440,7 +440,7 @@ def medecin_edit(request, pk):
     med = get_object_or_404(Medecin, pk=pk)
     specialites = Specialite.objects.order_by('nom')
     departements = Departement.objects.filter(actif=True).order_by('nom')
-    services = Service.objects.filter(actif=True).select_related('departement').order_by('nom')
+    services = Service.objects.filter(actif=True).order_by('nom')
     users_disponibles = User.objects.filter(
         Q(medecin__isnull=True) | Q(medecin=med)
     ).order_by('last_name', 'first_name')
@@ -1240,7 +1240,7 @@ def _rdv_gyn_qs():
     from patients.models import RendezVous
     from django.db.models import Q
     return RendezVous.objects.filter(
-        Q(departement__modules_specialises__code='gynecologie') | Q(medecin__specialite__nom__icontains='gyn')
+        Q(departement__code='GYN') | Q(medecin__specialite__nom__icontains='gyn')
     ).select_related('patient', 'medecin').order_by('-date_heure')
 
 
@@ -1312,7 +1312,7 @@ def gynecologie_rdv_create(request):
             return redirect(reverse('facturation:create') + f'?patient={rdv.patient.pk}&rdv={rdv.pk}')
     else:
         from medecins.models import Departement
-        gyn_departement = Departement.objects.filter(modules_specialises__code='gynecologie').first()
+        gyn_departement = Departement.objects.filter(code='GYN').first()
         form = RendezVousForm(initial={
             'date_heure': timezone.now().strftime('%Y-%m-%dT%H:%M'),
             'departement': gyn_departement.pk if gyn_departement else None,
@@ -1607,7 +1607,7 @@ def gynecologie_rdv(request):
     type_visite_cpn_val = request.GET.get('type_visite_cpn', '').strip()
 
     rdvs = RendezVous.objects.filter(
-        Q(departement__modules_specialises__code='gynecologie') |
+        Q(departement__code='GYN') |
         Q(medecin__specialite__nom__icontains='gyn')
     ).select_related('patient', 'medecin').order_by('-date_heure')
 
@@ -1794,7 +1794,7 @@ def gynecologie_rdv(request):
 
     # --- Stats du jour (indépendant des filtres) ---
     today_base = RendezVous.objects.filter(
-        Q(departement__modules_specialises__code='gynecologie') | Q(medecin__specialite__nom__icontains='gyn'),
+        Q(departement__code='GYN') | Q(medecin__specialite__nom__icontains='gyn'),
         date_heure__date=_date.today()
     )
     stat_rows = today_base.values('statut').annotate(n=_Count('id'))
@@ -1860,7 +1860,7 @@ def gynecologie_list(request):
     group_val  = request.GET.get('group', '')
 
     patients = Patient.objects.filter(
-        rendez_vous__departement__modules_specialises__code='gynecologie'
+        rendez_vous__departement__code='GYN'
     ).distinct().order_by('nom', 'prenoms')
 
     if q:
@@ -2391,99 +2391,6 @@ def medecins_import_departements(request):
     else:
         messages.success(request, f'{created} département(s) importé(s), {updated} mis à jour, {skipped} ignoré(s).')
     return redirect('medecins_departements')
-
-
-# ══════════════════════════════════════════════
-#  MÉDECINS — Configuration : Modules spécialisés
-# ══════════════════════════════════════════════
-
-def _module_form_class():
-    from django import forms
-    from medecins.models import ModuleSpecialise, Departement
-    class ModuleSpecialiseForm(forms.ModelForm):
-        departements = forms.ModelMultipleChoiceField(
-            queryset=Departement.objects.filter(actif=True).order_by('nom'),
-            required=False,
-            widget=forms.CheckboxSelectMultiple,
-        )
-        class Meta:
-            model = ModuleSpecialise
-            fields = ['nom', 'code', 'departements', 'actif']
-            widgets = {
-                'nom':  forms.TextInput(attrs={'class': 'field-ul', 'placeholder': 'Ex : Gynécologie'}),
-                'code': forms.TextInput(attrs={'class': 'field-ul', 'placeholder': 'Ex : gynecologie'}),
-            }
-    return ModuleSpecialiseForm
-
-
-@login_required(login_url='login')
-def medecins_modules(request):
-    from medecins.models import ModuleSpecialise
-    from django.core.paginator import Paginator
-
-    q   = request.GET.get('q', '').strip()
-    vue = request.GET.get('vue', 'liste')
-    qs  = ModuleSpecialise.objects.prefetch_related('departements').order_by('nom')
-    if q:
-        qs = qs.filter(Q(nom__icontains=q) | Q(code__icontains=q))
-    total = ModuleSpecialise.objects.count()
-    paginator = Paginator(qs, 25)
-    page_obj  = paginator.get_page(request.GET.get('page'))
-    return render(request, 'medecins/config/modules_list.html', {
-        'page_obj': page_obj, 'total': total,
-        'total_filtre': qs.count(), 'q': q, 'vue': vue,
-    })
-
-
-@login_required(login_url='login')
-def medecins_module_detail(request, pk):
-    from medecins.models import ModuleSpecialise
-    obj = get_object_or_404(ModuleSpecialise.objects.prefetch_related('departements'), pk=pk)
-    pks = list(ModuleSpecialise.objects.order_by('nom').values_list('pk', flat=True))
-    pos = pks.index(pk) if pk in pks else None
-    return render(request, 'medecins/config/module_detail.html', {
-        'obj': obj,
-        'prev_pk': pks[pos - 1] if pos and pos > 0 else None,
-        'next_pk': pks[pos + 1] if pos is not None and pos < len(pks) - 1 else None,
-    })
-
-
-@login_required(login_url='login')
-def medecins_module_create(request):
-    Form = _module_form_class()
-    form = Form(request.POST or None)
-    if request.method == 'POST' and form.is_valid():
-        form.save()
-        messages.success(request, 'Module spécialisé créé.')
-        return redirect('medecins_modules')
-    return render(request, 'medecins/config/module_form.html', {
-        'form': form, 'titre': 'Nouveau module spécialisé',
-    })
-
-
-@login_required(login_url='login')
-def medecins_module_edit(request, pk):
-    from medecins.models import ModuleSpecialise
-    obj  = get_object_or_404(ModuleSpecialise, pk=pk)
-    Form = _module_form_class()
-    form = Form(request.POST or None, instance=obj)
-    if request.method == 'POST' and form.is_valid():
-        form.save()
-        messages.success(request, 'Module spécialisé mis à jour.')
-        return redirect('medecins_module_detail', pk=pk)
-    return render(request, 'medecins/config/module_form.html', {
-        'form': form, 'titre': f'Modifier – {obj.nom}', 'obj': obj,
-    })
-
-
-@login_required(login_url='login')
-@require_POST
-def medecins_module_bulk_delete(request):
-    from medecins.models import ModuleSpecialise
-    ids = request.POST.getlist('ids[]')
-    if ids:
-        ModuleSpecialise.objects.filter(pk__in=ids).delete()
-    return JsonResponse({'ok': True})
 
 
 ### Le CRUD "Services" a été déplacé vers employer/views.py (menu Configuration du module Employé).

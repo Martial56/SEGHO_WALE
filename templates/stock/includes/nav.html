@@ -39,6 +39,36 @@
     {% endif %}
   </a>
 
+  <div class="o-nav-dropdown">
+    <button type="button"
+      class="o-nav-link {% if uname in 'stock_types_produit,stock_categories_list,stock_categorie_create,stock_categorie_edit' %}active{% endif %}"
+      style="background:none;border:none;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;"
+      onclick="toggleStNavDropdown(event, this)">
+      Configuration
+      <i class="bi bi-chevron-down" style="font-size:10px;"></i>
+    </button>
+    <div class="o-nav-dropdown-menu" id="st-nav-config-dropdown">
+      <a href="{% url 'stock_types_produit' %}"><i class="bi bi-tags"></i> Type de produit</a>
+      <a href="{% url 'stock_categories_list' %}"><i class="bi bi-diagram-3"></i> Catégorie de produit</a>
+    </div>
+  </div>
+  <script>
+  function toggleStNavDropdown(e, btn) {
+    e.stopPropagation();
+    var menu = document.getElementById('st-nav-config-dropdown');
+    menu.classList.toggle('open');
+    if (menu.classList.contains('open')) {
+      function close(ev) {
+        if (!btn.closest('.o-nav-dropdown').contains(ev.target)) {
+          menu.classList.remove('open');
+          document.removeEventListener('click', close);
+        }
+      }
+      setTimeout(function () { document.addEventListener('click', close); }, 0);
+    }
+  }
+  </script>
+
   <div style="flex:1;"></div>
 
   <button onclick="toggleStMenu()" class="o-nav-link" id="st-grid-btn" style="border:none;cursor:pointer;background:none;" title="Autres modules">

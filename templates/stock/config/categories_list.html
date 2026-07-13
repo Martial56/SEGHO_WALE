@@ -1,0 +1,102 @@
+{% extends 'stock/base.html' %}
+{% block topbar_title %}Catégories de produit{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'stock/config/includes/_config_modal.html' %}
+<style>
+  .stc-badge-inactif { background: rgba(0,0,0,.06); color: var(--st-muted); padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="page-wrap">
+<div class="o-subheader" id="subheader">
+  <div class="o-subheader-row">
+    <a href="{% url 'stock_dashboard' %}" class="o-ctrl-btn" style="padding:3px 7px;">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <span class="o-page-title">Catégories de produit</span>
+    <span class="o-page-count">{{ total_filtre }} / {{ total }}</span>
+    <div style="flex:1;"></div>
+    <form method="get" class="o-search-bar">
+      <i class="bi bi-search o-search-btn"></i>
+      <input type="text" name="q" value="{{ q }}" placeholder="Rechercher…" class="o-search-input">
+    </form>
+    <a href="{% url 'stock_categorie_create' %}" class="o-btn-create"
+      onclick="return stOpenConfigModal(event, this.href, 'Nouvelle catégorie de produit', 'bi-tags');">
+      <i class="bi bi-plus-lg"></i> Créer
+    </a>
+  </div>
+</div>
+
+<div class="st-card">
+  <div style="overflow-x:auto;">
+  <table class="st-table">
+    <thead>
+      <tr>
+        <th>Nom</th>
+        <th>Type</th>
+        <th>Description</th>
+        <th>Produits</th>
+        <th>Statut</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for cat in page_obj %}
+      <tr>
+        <td style="font-weight:600;">{{ cat.nom }}</td>
+        <td>
+          {% if cat.type == 'medicament' %}<span class="badge-type-med">{{ cat.get_type_display }}</span>
+          {% elif cat.type == 'consommable' %}<span class="badge-type-cons">{{ cat.get_type_display }}</span>
+          {% else %}<span class="badge-type-eqp">{{ cat.get_type_display }}</span>{% endif %}
+        </td>
+        <td style="color:var(--st-muted);">{{ cat.description|default:"—"|truncatechars:60 }}</td>
+        <td>{{ cat.nb_produits }}</td>
+        <td>
+          {% if cat.actif %}<span class="badge-type-med">Active</span>
+          {% else %}<span class="stc-badge-inactif">Inactive</span>{% endif %}
+        </td>
+        <td style="text-align:right;white-space:nowrap;">
+          <a href="{% url 'stock_categorie_edit' cat.pk %}" class="o-ctrl-btn" title="Modifier"
+            onclick="return stOpenConfigModal(event, this.href, 'Modifier — {{ cat.nom }}', 'bi-tags');">
+            <i class="bi bi-pencil"></i>
+          </a>
+          <form method="post" action="{% url 'stock_categorie_delete' cat.pk %}" style="display:inline;"
+            onsubmit="return confirm('Supprimer la catégorie « {{ cat.nom }} » ?');">
+            {% csrf_token %}
+            <button type="submit" class="o-ctrl-btn" title="Supprimer" style="color:var(--rose-btn);">
+              <i class="bi bi-trash"></i>
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="6" style="text-align:center;padding:30px;color:var(--st-muted);font-style:italic;">
+        Aucune catégorie de produit{% if q %} pour « {{ q }} »{% endif %}.
+      </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% if page_obj.paginator.count %}
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 16px;border-top:1px solid var(--st-border);font-size:12px;color:var(--st-muted);">
+    <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
+        href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}&q={{ q }}{% else %}#{% endif %}">
+        <i class="bi bi-chevron-left"></i>
+      </a>
+      <span style="white-space:nowrap;">Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+      <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
+        href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}&q={{ q }}{% else %}#{% endif %}">
+        <i class="bi bi-chevron-right"></i>
+      </a>
+    </div>
+  </div>
+  {% endif %}
+</div>
+</div><!-- /#page-wrap -->
+{% endblock %}

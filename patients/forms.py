@@ -180,7 +180,7 @@ class RendezVousForm(forms.ModelForm):
         self.fields['departement'].empty_label = '— Choisir un département —'
         self.fields['departement'].required = False
 
-        medecin_qs = Medecin.objects.filter(actif=True).order_by('nom', 'prenoms')
+        medecin_qs = Medecin.objects.filter(actif=True).order_by('employe__nom', 'employe__prenoms')
         self.fields['medecin'].queryset = medecin_qs
         self.fields['medecin'].empty_label = '— Aucun médecin —'
         self.fields['medecin'].required = False

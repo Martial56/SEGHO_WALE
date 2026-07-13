@@ -15,6 +15,10 @@
   text-transform: uppercase; letter-spacing: .5px;
   border-bottom: 1px solid var(--ph-border);
 }
+.lot-badge { display:inline-flex; align-items:center; gap:4px; font-size:10.5px; font-weight:600; font-family: var(--font-mono); padding:2px 7px; border-radius:4px; border:1px solid; white-space:nowrap; }
+.lot-ok      { background:rgba(36,113,163,.08); color:var(--ph-700); border-color:rgba(36,113,163,.2); }
+.lot-bientot { background:rgba(var(--amber-rgb),.1); color:var(--amber-text); border-color:rgba(var(--amber-rgb),.3); }
+.lot-perime  { background:rgba(220,53,69,.1); color:var(--rose-text); border-color:rgba(220,53,69,.3); }
 </style>{% endblock %}
 
 {% block content %}
@@ -83,6 +87,8 @@
             <tr>
               <th style="width:120px;">Code</th>
               <th>Produit</th>
+              <th>N° Lot(s)</th>
+              <th>Péremption</th>
               <th style="text-align:center;width:180px;">Stock théorique<br><small style="font-weight:400;font-style:italic;text-transform:none;">(lecture seule)</small></th>
               <th style="text-align:center;width:180px;">Stock réel constaté</th>
             </tr>
@@ -92,7 +98,7 @@
 
               {% ifchanged sp.produit.type %}
               <tr class="ph-type-sep">
-                <td colspan="4">{{ sp.produit.get_type_display|default:sp.produit.type }}</td>
+                <td colspan="6">{{ sp.produit.get_type_display|default:sp.produit.type }}</td>
               </tr>
               {% endifchanged %}
 
@@ -103,6 +109,25 @@
                   {% if sp.produit.unite %}
                   <span style="font-size:10.5px;color:var(--ph-muted);"> ({{ sp.produit.unite }})</span>
                   {% endif %}
+                </td>
+                <td style="max-width:150px;">
+                  {% for lot in sp.lots_disponibles %}
+                  <span class="lot-badge {% if lot.est_perime %}lot-perime{% elif lot.jours_restants is not None and lot.jours_restants <= 90 %}lot-bientot{% else %}lot-ok{% endif %}">
+                    {{ lot.numero_lot }}
+                  </span>
+                  {% empty %}
+                  <span style="font-size:11px;color:var(--ph-muted);">—</span>
+                  {% endfor %}
+                </td>
+                <td style="max-width:150px;">
+                  {% for lot in sp.lots_disponibles %}
+                  <span class="lot-badge {% if lot.est_perime %}lot-perime{% elif lot.jours_restants is not None and lot.jours_restants <= 90 %}lot-bientot{% else %}lot-ok{% endif %}"
+                    title="{% if lot.est_perime %}Périmé depuis {{ lot.date_peremption|date:'d/m/Y' }}{% elif lot.jours_restants is not None %}Expire dans {{ lot.jours_restants }} j{% endif %}">
+                    {{ lot.date_peremption|date:"d/m/Y"|default:"—" }}
+                  </span>
+                  {% empty %}
+                  <span style="font-size:11px;color:var(--ph-muted);">—</span>
+                  {% endfor %}
                 </td>
                 <td style="text-align:center;">
                   <input
@@ -132,7 +157,7 @@
 
             {% empty %}
             <tr>
-              <td colspan="4" style="text-align:center;padding:32px;color:var(--ph-muted);">
+              <td colspan="6" style="text-align:center;padding:32px;color:var(--ph-muted);">
                 Aucun produit en stock pour cette pharmacie.
               </td>
             </tr>

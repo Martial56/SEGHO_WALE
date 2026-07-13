@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Medecin, Specialite, Service, Departement, ModuleSpecialise
+from .models import Medecin, Specialite, Service, Departement
 
 
 @admin.register(Specialite)
@@ -23,10 +23,3 @@ class ServiceAdmin(admin.ModelAdmin):
 class DepartementAdmin(admin.ModelAdmin):
     list_display = ['nom', 'code', 'actif']
     search_fields = ['nom', 'code']
-
-
-@admin.register(ModuleSpecialise)
-class ModuleSpecialiseAdmin(admin.ModelAdmin):
-    list_display = ['nom', 'code', 'actif']
-    search_fields = ['nom', 'code']
-    filter_horizontal = ['departements']

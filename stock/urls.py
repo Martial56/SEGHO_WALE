@@ -69,6 +69,13 @@ urlpatterns = [
     path('dotation/<int:pk>/valider/', views.dotation_valider, name='stock_dotation_valider'),
     path('categories/ajax/',          views.categorie_create_ajax, name='stock_categorie_ajax'),
 
+    # Configuration : Type de produit / Catégorie de produit
+    path('config/types/',                        views.stock_types_produit,   name='stock_types_produit'),
+    path('config/categories/',                   views.stock_categories_list, name='stock_categories_list'),
+    path('config/categories/nouveau/',            views.stock_categorie_create, name='stock_categorie_create'),
+    path('config/categories/<int:pk>/modifier/',  views.stock_categorie_edit,   name='stock_categorie_edit'),
+    path('config/categories/<int:pk>/supprimer/', views.stock_categorie_delete, name='stock_categorie_delete'),
+
     # Réceptions achats à intégrer dans le stock
     path('receptions-achats/',                   views.receptions_a_integrer, name='stock_receptions_a_integrer'),
     path('receptions-achats/<int:pk>/integrer/', views.integrer_reception,    name='stock_integrer_reception'),

@@ -4,7 +4,7 @@
 
 {% block extra_st_css %}<style>
 .content { padding-top: 0; }
-.rp-head { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 32px;margin:0 -32px;background:#e8f2f7;border-bottom:1px solid rgba(0,0,0,.05);box-shadow:0 2px 8px rgba(0,0,0,.04);position:sticky;top:var(--topbar-h);z-index:100; }
+.rp-head { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 32px;margin:0 -32px;background:var(--st-surface);border-bottom:1px solid var(--st-border);box-shadow:0 2px 8px rgba(0,0,0,.04);position:sticky;top:var(--topbar-h);z-index:100; }
 .kpi-grid { display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-top:16px; }
 @media(max-width:1100px){ .kpi-grid{ grid-template-columns:repeat(3,1fr); } }
 .kpi-card { background:var(--st-surface);border:1px solid var(--st-border);border-radius:12px;padding:18px 16px;text-align:center;box-shadow:0 1px 4px rgba(var(--st-700-rgb),.06); }
@@ -53,9 +53,9 @@
   </div>
 
   <div class="kpi-card">
-    <div class="kpi-val" style="color:#1a237e;">{{ taux_rotation }}</div>
+    <div class="kpi-val" style="color:var(--violet);">{{ taux_rotation }}</div>
     <div class="kpi-lbl">Taux de rotation</div>
-    <div class="gauge-bar"><div class="gauge-fill" style="width:{% widthratio taux_rotation 10 100 as pct %}{{ pct|default:0 }}%;background:#1a237e;"></div></div>
+    <div class="gauge-bar"><div class="gauge-fill" style="width:{% widthratio taux_rotation 10 100 as pct %}{{ pct|default:0 }}%;background:var(--violet);"></div></div>
     <div class="kpi-sub">Livraisons / Stock actuel</div>
   </div>
 
@@ -87,7 +87,7 @@
 
   <!-- Bar quantités à commander -->
   <div class="st-card" style="padding:16px;">
-    <div style="font-size:12px;font-weight:700;color:var(--st-700);margin-bottom:12px;"><i class="bi bi-cart-plus" style="color:#1a237e;"></i> Quantités à commander</div>
+    <div style="font-size:12px;font-weight:700;color:var(--st-700);margin-bottom:12px;"><i class="bi bi-cart-plus" style="color:var(--violet);"></i> Quantités à commander</div>
     <canvas id="chartCommander" height="90"></canvas>
   </div>
 
@@ -126,7 +126,7 @@
   <!-- Top produits à commander -->
   <div class="st-card">
     <div class="st-card-header">
-      <div class="st-card-title"><i class="bi bi-cart-plus" style="color:#1a237e;"></i> Produits à commander en priorité</div>
+      <div class="st-card-title"><i class="bi bi-cart-plus" style="color:var(--violet);"></i> Produits à commander en priorité</div>
       {% if a_commander %}
       <form method="post" action="{% url 'stock_besoins_generer_auto' %}" style="margin:0;">
         {% csrf_token %}
@@ -145,7 +145,7 @@
         <td style="font-weight:600;">{{ item.produit.nom|truncatechars:25 }}</td>
         <td style="text-align:right;color:var(--st-muted);">{{ item.cmm|floatformat:1 }}</td>
         <td style="text-align:right;font-weight:700;color:var(--rose-text);">{{ item.produit.stock_actuel|floatformat:0 }}</td>
-        <td style="text-align:center;"><span style="background:rgba(26,35,126,.08);color:#1a237e;border:1px solid rgba(26,35,126,.2);padding:2px 10px;border-radius:20px;font-weight:700;font-size:12px;">{{ item.qte }}</span></td>
+        <td style="text-align:center;"><span style="background:rgba(var(--violet-rgb),.1);color:var(--violet);border:1px solid rgba(var(--violet-rgb),.25);padding:2px 10px;border-radius:20px;font-weight:700;font-size:12px;">{{ item.qte }}</span></td>
       </tr>
       {% endfor %}
       </tbody>
@@ -177,7 +177,7 @@
         <th style="text-align:right;color:#e65100;">Stock M+1</th>
         <th style="text-align:right;color:#c62828;">Stock M+2</th>
         <th style="text-align:right;color:var(--rose-text);">Stock M+3</th>
-        <th style="text-align:right;color:#0d7a4c;">Qté à commander</th>
+        <th style="text-align:right;color:var(--green);">Qté à commander</th>
       </tr>
     </thead>
     <tbody>
@@ -199,7 +199,7 @@
         {% if item.stock_m3 <= 0 %}<i class="bi bi-x-circle-fill" style="font-size:10px;"></i> 0{% else %}{{ item.stock_m3|floatformat:0 }}{% endif %}
       </td>
       <td style="text-align:right;">
-        <span style="background:rgba(22,169,107,.1);color:#0d7a4c;border:1px solid rgba(22,169,107,.25);padding:2px 10px;border-radius:20px;font-weight:700;font-size:12px;">{{ item.qte_a_commander }}</span>
+        <span style="background:rgba(var(--green-rgb),.12);color:var(--green);border:1px solid rgba(var(--green-rgb),.3);padding:2px 10px;border-radius:20px;font-weight:700;font-size:12px;">{{ item.qte_a_commander }}</span>
       </td>
     </tr>
     {% endfor %}
@@ -287,7 +287,7 @@ if (cmd.labels.length > 0) {
     data: {
       labels: cmd.labels,
       datasets: [{ label: 'Qté à commander', data: cmd.data,
-        backgroundColor: '#1a237e',
+        backgroundColor: 'var(--violet)',
         borderRadius: 4, borderSkipped: false }]
     },
     options: {

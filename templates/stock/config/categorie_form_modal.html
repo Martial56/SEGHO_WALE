@@ -1,0 +1,44 @@
+<form method="post" id="stcfgConfigForm" data-url="{{ request.path }}" novalidate>
+{% csrf_token %}
+
+<div class="stcfg-modal-body">
+
+  <div class="form-field">
+    <label class="field-label" for="{{ form.nom.id_for_label }}">Nom <span class="required-star">*</span></label>
+    <input type="text" name="nom" id="{{ form.nom.id_for_label }}" class="field-ul"
+      value="{{ form.nom.value|default_if_none:'' }}" placeholder="Ex : Antipaludéens" autocomplete="off">
+    {% if form.nom.errors %}<div class="field-error">{{ form.nom.errors.0 }}</div>{% endif %}
+  </div>
+
+  <div class="form-field">
+    <label class="field-label" for="{{ form.type.id_for_label }}">Type de produit <span class="required-star">*</span></label>
+    <select name="type" id="{{ form.type.id_for_label }}" class="field-ul">
+      {% for value, label in form.fields.type.choices %}
+      <option value="{{ value }}" {% if form.type.value|stringformat:"s" == value|stringformat:"s" %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    {% if form.type.errors %}<div class="field-error">{{ form.type.errors.0 }}</div>{% endif %}
+  </div>
+
+  <div class="form-field">
+    <label class="field-label" for="{{ form.description.id_for_label }}">Description</label>
+    <textarea name="description" id="{{ form.description.id_for_label }}" class="field-ul"
+      rows="3" placeholder="Description optionnelle…">{{ form.description.value|default_if_none:'' }}</textarea>
+    {% if form.description.errors %}<div class="field-error">{{ form.description.errors.0 }}</div>{% endif %}
+  </div>
+
+  <div class="form-field">
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--st-text);cursor:pointer;">
+      <input type="checkbox" name="actif" {% if form.actif.value %}checked{% endif %} style="width:16px;height:16px;cursor:pointer;">
+      Catégorie active
+    </label>
+  </div>
+
+</div>
+
+<div class="stcfg-modal-footer">
+  <button type="button" class="btn-st-outline" onclick="stCloseConfigModal()">Annuler</button>
+  <button type="submit" class="btn-st">{% if obj %}Enregistrer{% else %}Créer{% endif %}</button>
+</div>
+
+</form>
