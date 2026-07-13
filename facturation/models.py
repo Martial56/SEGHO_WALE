@@ -25,6 +25,10 @@ class Facture(models.Model):
         'patients.RendezVous', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='factures', verbose_name='Rendez-vous',
     )
+    ordonnance = models.ForeignKey(
+        'consultations.Ordonnance', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='factures', verbose_name='Ordonnance',
+    )
     type_facture = models.CharField(max_length=20, choices=TYPE, default='consultation')
     date_emission = models.DateTimeField(auto_now_add=True)
     date_echeance = models.DateField(null=True, blank=True)

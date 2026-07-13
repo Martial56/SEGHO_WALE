@@ -33,6 +33,10 @@
         border: 1px solid var(--border);
     }
     .btn-ghost:hover { border-color: #999; color: var(--text); }
+    .btn-disabled {
+        background: #e9ecef; color: #adb5bd;
+        border: 1px solid #dee2e6; cursor: not-allowed; pointer-events: none;
+    }
 
     .ord-body { background: #f6f8fa; min-height: calc(100vh - 60px); padding: 24px; }
     .ord-card { background: #fff; border: 1px solid rgba(0,0,0,0.08); border-radius: 8px; margin-bottom: 20px; }
@@ -134,10 +138,16 @@
                class="btn-action btn-ghost">
                 <i class="bi bi-arrow-repeat"></i> Renouveler
             </a>
+            {% if facture_existante %}
+            <span class="btn-action btn-disabled" title="Déjà facturée — {{ facture_existante.numero }}">
+                <i class="bi bi-receipt"></i> Facturation
+            </span>
+            {% else %}
             <a href="{% url 'facture_create' %}?patient={% firstof ordonnance.patient.pk ordonnance.consultation.patient.pk %}&ordonnance={{ ordonnance.pk }}"
                class="btn-action btn-primary">
                 <i class="bi bi-receipt"></i> Facturation
             </a>
+            {% endif %}
         </div>
     </div>
 </div>

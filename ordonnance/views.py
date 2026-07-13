@@ -76,10 +76,13 @@ def ordonnance_detail(request, pk):
     patient = ordonnance.patient or (
         ordonnance.consultation.patient if ordonnance.consultation else None
     )
+    from facturation.models import Facture
+    facture_existante = Facture.objects.filter(ordonnance=ordonnance).exclude(statut='annulee').first()
     return render(request, 'pharmacie/ordonnance/ordonnance_detail.html', {
-        'ordonnance': ordonnance,
-        'patient':    patient,
-        'today':      date.today(),
+        'ordonnance':       ordonnance,
+        'patient':          patient,
+        'today':            date.today(),
+        'facture_existante': facture_existante,
     })
 
 

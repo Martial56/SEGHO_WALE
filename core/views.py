@@ -821,6 +821,10 @@ def facture_create(request):
                 demande_obj.facture = facture
                 demande_obj.save(update_fields=['facture'])
 
+            if ordonnance_obj:
+                facture.ordonnance = ordonnance_obj
+                facture.save(update_fields=['ordonnance'])
+
             messages.success(request, f'Facture {facture.numero} créée avec succès.')
             if demande_obj:
                 return redirect('laboratoire_detail', pk=demande_obj.pk)
@@ -1355,8 +1359,11 @@ def gynecologie_rdv_detail(request, pk):
 
     try:
         from facturation.models import Facture
-        facture_payee = Facture.objects.filter(patient=rdv.patient).exclude(statut='annulee').exists()
-    except Exception:
+        facture_payee = Facture.objects.filter(
+            Q(rendez_vous=rdv) | Q(patient=rdv.patient, statut='payee')
+        ).exclude(statut='annulee').exists()
+    except Exception as _e:
+        import logging; logging.getLogger(__name__).warning('facture_payee check failed: %s', _e)
         facture_payee = False
 
     consultation = None
