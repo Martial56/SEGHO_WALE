@@ -41,7 +41,6 @@ class Patient(models.Model):
     contact_urgence_telephone = models.CharField(max_length=20, blank=True)
     date_creation = models.DateTimeField(auto_now_add=True)
     date_modification = models.DateTimeField(auto_now=True)
-    actif = models.BooleanField(default=True)
     photo = models.ImageField(upload_to='patients/', blank=True, null=True)
 
     def save(self, *args, **kwargs):

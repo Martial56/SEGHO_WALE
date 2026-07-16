@@ -19,7 +19,6 @@ def patient_list(request):
     qs = Patient.objects.all()
     stats = {
         'total':        qs.count(),
-        'actifs':       qs.filter(actif=True).count(),
         'nouveaux_30j': qs.filter(date_creation__gte=timezone.now() - timedelta(days=30)).count(),
         'femmes':       qs.filter(sexe='F').count(),
         'hommes':       qs.filter(sexe='M').count(),
@@ -35,9 +34,7 @@ def patient_list(request):
             Q(code_patient__icontains=q) | Q(telephone__icontains=q)
         )
 
-    if filtre == 'actif':
-        qs = qs.filter(actif=True)
-    elif filtre == 'nouveau':
+    if filtre == 'nouveau':
         qs = qs.filter(date_creation__gte=timezone.now() - timedelta(days=30))
     elif filtre == 'femme':
         qs = qs.filter(sexe='F')
@@ -93,10 +90,10 @@ def patient_detail(request, pk):
         hospitalisation_count = 0
 
     try:
-        from laboratoire.models import AnalyseLaboratoire
-        demande_examens_count = AnalyseLaboratoire.objects.filter(patient=patient).count()
+        from laboratoire.models import DemandeExamen, AnalyseLaboratoire
+        demande_examens_count = DemandeExamen.objects.filter(patient=patient).count()
         resultat_examens_count = AnalyseLaboratoire.objects.filter(
-            patient=patient, statut__in=['résultat', 'validé', 'envoyé']
+            patient=patient, statut__in=['resultat', 'valide', 'envoye']
         ).count()
     except Exception:
         demande_examens_count = 0
@@ -242,7 +239,6 @@ def patient_search_json(request):
             'sexe_display': p.get_sexe_display(),
             'adresse': p.adresse or '',
             'assurance_nom': p.assurance.nom if p.assurance_id else '',
-            'actif': p.actif,
         }
 
     pk = request.GET.get('id', '').strip()

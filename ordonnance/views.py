@@ -1,10 +1,12 @@
 from datetime import date
+from decimal import Decimal
 
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Sum, DecimalField
+from django.db.models.functions import Coalesce
 from django.core.paginator import Paginator
 
 import json
@@ -233,7 +235,19 @@ def ordonnance_create(request, consultation_pk):
 
 
 def _medicaments_dispo_json():
-    produits = Produit.objects.filter(type='medicament', actif=True).order_by('nom')
+    """Retourne le stock disponible = somme des StockPharmacie (= ce qu'affiche la page pharmacie)."""
+    produits = (
+        Produit.objects
+        .filter(type='medicament', actif=True)
+        .annotate(
+            stock_pharma=Coalesce(
+                Sum('stocks_pharmacie__quantite'),
+                Decimal('0'),
+                output_field=DecimalField(max_digits=12, decimal_places=2),
+            )
+        )
+        .order_by('nom')
+    )
     return json.dumps([
         {
             'pk': p.pk,
@@ -241,7 +255,7 @@ def _medicaments_dispo_json():
             'forme': p.get_forme_display() if p.forme else '',
             'dosage': p.dosage or '',
             'dci': p.dci or '',
-            'stock_actuel': float(p.stock_actuel),
+            'stock_actuel': float(p.stock_pharma),
             'stock_alerte': float(p.stock_alerte),
             'stock_minimum': float(p.stock_minimum),
         }

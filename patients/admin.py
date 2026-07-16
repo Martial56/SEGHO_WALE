@@ -13,7 +13,7 @@ class AssuranceAdmin(admin.ModelAdmin):
 class PatientAdmin(admin.ModelAdmin):
     list_display = ['code_patient', 'nom', 'prenoms', 'sexe', 'age', 'telephone', 'assurance', 'date_creation']
     search_fields = ['nom', 'prenoms', 'code_patient', 'telephone']
-    list_filter = ['sexe', 'actif', 'assurance', 'ville']
+    list_filter = ['sexe', 'assurance', 'ville']
     readonly_fields = ['code_patient', 'date_creation']
     fieldsets = (
         ('Identification', {'fields': ('code_patient', 'nom', 'prenoms', 'date_naissance', 'lieu_naissance', 'sexe', 'nationalite', 'profession', 'photo')}),

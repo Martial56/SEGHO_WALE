@@ -172,7 +172,7 @@ def _get_dashboard_stats():
 
     today = timezone.now().date()
     return {
-        'patients_total': Patient.objects.filter(actif=True).count(),
+        'patients_total': Patient.objects.count(),
         'patients_today': Patient.objects.filter(date_creation__date=today).count(),
         'consultations_today': Consultation.objects.filter(date_heure__date=today).count(),
         'soins_aujourd_hui': Soin.objects.filter(date_creation__date=today).count(),
@@ -243,15 +243,14 @@ def patients_list(request):
     from patients.models import Patient
     from django.core.paginator import Paginator
 
-    patients = Patient.objects.filter(actif=True).order_by('-date_creation')
+    patients = Patient.objects.all().order_by('-date_creation')
     paginator = Paginator(patients, 25)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
     today = timezone.now().date()
     stats = {
-        'total': Patient.objects.filter(actif=True).count(),
-        'actifs': Patient.objects.filter(actif=True).count(),
+        'total': Patient.objects.count(),
         'nouveaux_30j': Patient.objects.filter(date_creation__date__gte=today - timedelta(days=30)).count(),
     }
     breadcrumb = [{'title': 'Accueil', 'url': '/'}, {'title': 'Patients'}]
@@ -992,7 +991,7 @@ def gynecologie_naissance_create(request):
     from patients.models import Naissance, Patient
     from medecins.models import Medecin
 
-    patients = Patient.objects.filter(actif=True).order_by('nom')
+    patients = Patient.objects.all().order_by('nom')
     medecins = Medecin.objects.all().order_by('employe__nom')
     error = None
 
@@ -2004,7 +2003,7 @@ def kpi_dashboard(request):
     date_to = today
 
     stats = {
-        'patients_total': Patient.objects.filter(actif=True).count(),
+        'patients_total': Patient.objects.count(),
         'patients_periode': Patient.objects.filter(date_creation__date__range=[date_from, date_to]).count(),
         'consultations_periode': Consultation.objects.filter(date_heure__date__range=[date_from, date_to]).count(),
         'rdv_periode': RendezVous.objects.filter(date_heure__date__range=[date_from, date_to]).count(),
@@ -2034,7 +2033,7 @@ def kpi_dashboard(request):
         stats['factures_montant_fmt'] = "0 F"
 
     stats['patients_anniversaires'] = Patient.objects.filter(
-        date_naissance__month=today.month, date_naissance__day=today.day, actif=True
+        date_naissance__month=today.month, date_naissance__day=today.day
     ).count()
     stats['employes_anniversaires'] = Employe.objects.filter(
         date_naissance__month=today.month, date_naissance__day=today.day
