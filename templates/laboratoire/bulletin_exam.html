@@ -1,0 +1,387 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bulletin d'Examens {{ demande.numero }}</title>
+<style>
+:root { --font-print: 'Segoe UI', Arial, sans-serif; --font-mono: 'Courier New', monospace; }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font-print);
+    background: #e5e7eb;
+    color: #1a1a2e;
+    font-size: 12px;
+  }
+
+  /* ── Contrôles écran ── */
+  .print-toolbar {
+    display: flex; align-items: center; gap: 10px;
+    background: #1a5c4a; color: #fff;
+    padding: 10px 24px;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .print-toolbar span { flex: 1; font-size: 13px; font-weight: 600; }
+  .toolbar-btn {
+    padding: 6px 16px; border-radius: 5px; font-size: 12px; font-weight: 600;
+    cursor: pointer; border: none; display: inline-flex; align-items: center; gap: 6px;
+    font-family: inherit; text-decoration: none;
+  }
+  .btn-print { background: #fff; color: #1a5c4a; }
+  .btn-download { background: rgba(255,255,255,.85); color: #1a5c4a; }
+  .btn-back  { background: rgba(255,255,255,.15); color: #fff; }
+  .btn-back:hover { background: rgba(255,255,255,.25); }
+
+  /* ── Page A4 ── */
+  .bulletin-wrap {
+    max-width: 780px; margin: 28px auto; background: #fff;
+    border-radius: 4px; box-shadow: 0 4px 24px rgba(0,0,0,.12);
+    position: relative; overflow: hidden;
+    padding: 40px 48px 56px;
+  }
+
+  /* ── Filigrane ── */
+  .bulletin-wrap::before {
+    content: '';
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 60'%3E%3Ccircle cx='30' cy='30' r='22' fill='none' stroke='%231a5c4a' stroke-width='1.5'/%3E%3Cpath d='M30 8 Q38 16 38 24 Q38 34 30 38 Q22 34 22 24 Q22 16 30 8Z' fill='%231a5c4a' opacity='.06'/%3E%3Cline x1='30' y1='38' x2='30' y2='52' stroke='%231a5c4a' stroke-width='2'/%3E%3Cline x1='24' y1='44' x2='36' y2='44' stroke='%231a5c4a' stroke-width='1.5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center 55%;
+    background-size: 340px;
+    opacity: .07;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Tout le contenu au-dessus du filigrane */
+  .bul-content { position: relative; z-index: 1; }
+
+  /* ── En-tête ── */
+  .bul-header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    margin-bottom: 28px;
+  }
+  .bul-logo {
+    display: flex; align-items: center; gap: 12px;
+  }
+  .bul-logo-circle {
+    width: 64px; height: 64px; border-radius: 50%;
+    border: 2px solid #1a5c4a;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; overflow: hidden; background: #fff;
+  }
+  .bul-logo-circle img { width: 100%; height: 100%; object-fit: contain; padding: 4px; }
+  .bul-logo-text { line-height: 1.3; }
+  .bul-logo-text .brand-top { font-size: 9px; color: #6b7280; letter-spacing: .5px; }
+  .bul-logo-text .brand-mid { font-size: 10px; color: #374151; font-weight: 500; }
+  .bul-logo-text .brand-name {
+    font-size: 18px; font-weight: 800; color: #1a5c4a; letter-spacing: .5px;
+  }
+
+  .bul-company { text-align: right; line-height: 1.7; font-size: 11.5px; }
+  .bul-company strong { font-size: 13px; font-weight: 700; }
+
+  /* ── Patient ── */
+  .bul-patient {
+    text-align: right; margin-bottom: 20px;
+    font-size: 12px; color: #374151;
+    font-weight: 600;
+  }
+
+  /* ── Titre bulletin ── */
+  .bul-title {
+    font-size: 22px; font-weight: 800; color: #1a5c4a; margin-bottom: 6px;
+  }
+
+  /* ── Bande infos ── */
+  .bul-info-bar {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+    border-top: 1.5px solid #d1d5db;
+    border-bottom: 1.5px solid #d1d5db;
+    margin-bottom: 22px; padding: 8px 0;
+  }
+  .bul-info-cell { padding: 0 10px; }
+  .bul-info-cell:first-child { padding-left: 0; }
+  .bul-info-cell:not(:last-child) { border-right: 1px solid #e5e7eb; }
+  .bul-info-cell .lbl {
+    font-size: 9px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .5px; color: #9ca3af; margin-bottom: 3px;
+  }
+  .bul-info-cell .val { font-size: 11px; font-weight: 600; color: #1f2937; }
+
+  /* ── Badge urgent ── */
+  .badge-urgent {
+    display: inline-block;
+    background: #fef2f2; color: #dc2626;
+    border: 1px solid #fecaca;
+    border-radius: 4px; padding: 1px 7px;
+    font-size: 10px; font-weight: 700; letter-spacing: .5px;
+    text-transform: uppercase;
+  }
+
+  /* ── Bloc médecin prescripteur ── */
+  .bul-prescripteur {
+    background: #f0fdf4; border: 1px solid #bbf7d0;
+    border-radius: 6px; padding: 10px 14px;
+    margin-bottom: 20px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .bul-prescripteur .icon {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: #1a5c4a; color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; font-size: 14px; font-weight: 700;
+  }
+  .bul-prescripteur .info { line-height: 1.5; }
+  .bul-prescripteur .info .role { font-size: 9px; color: #6b7280; text-transform: uppercase; letter-spacing: .5px; }
+  .bul-prescripteur .info .nom { font-size: 12px; font-weight: 700; color: #1f2937; }
+  .bul-prescripteur .info .specialite { font-size: 11px; color: #374151; }
+
+  /* ── Table examens ── */
+  .bul-table { width: 100%; border-collapse: collapse; margin-bottom: 0; }
+  .bul-table thead tr {
+    background: #1a5c4a;
+    color: #fff;
+  }
+  .bul-table thead th {
+    padding: 8px 10px; font-size: 9.5px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .5px; text-align: left;
+  }
+  .bul-table thead th.th-center { text-align: center; }
+  .bul-table tbody td {
+    padding: 9px 10px; font-size: 11.5px; color: #374151;
+    border-bottom: 1px solid #f3f4f6; vertical-align: top;
+  }
+  .bul-table tbody td.td-center { text-align: center; }
+  .bul-table tbody td.td-desc { font-weight: 600; }
+  .bul-table tbody tr:last-child td { border-bottom: none; }
+
+  .code-badge {
+    display: inline-block; background: #f0fdf4; color: #1a5c4a;
+    border: 1px solid #bbf7d0; border-radius: 3px;
+    padding: 1px 5px; font-size: 9px; font-weight: 700;
+    font-family: var(--font-mono); letter-spacing: .3px;
+    margin-top: 2px;
+  }
+
+  .categorie-badge {
+    display: inline-block; background: #eff6ff; color: #2563eb;
+    border: 1px solid #bfdbfe; border-radius: 3px;
+    padding: 1px 5px; font-size: 9px; font-weight: 600;
+    text-transform: capitalize;
+  }
+
+  .delai-cell { color: #6b7280; font-size: 10.5px; }
+
+  /* ── Pied ── */
+  .bul-footer { margin-top: 32px; font-size: 11px; color: #374151; line-height: 1.8; }
+  .bul-footer strong { font-weight: 700; }
+
+  .bul-signature {
+    margin-top: 28px;
+    display: flex; justify-content: flex-end;
+  }
+  .bul-signature-box {
+    text-align: center; min-width: 200px;
+  }
+  .bul-signature-box .sig-label {
+    font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 36px;
+  }
+  .bul-signature-box .sig-line {
+    border-top: 1px solid #d1d5db; padding-top: 4px;
+    font-size: 10.5px; font-weight: 600; color: #374151;
+  }
+
+  /* ── Print ── */
+  @media print {
+    body { background: #fff; }
+    .print-toolbar { display: none !important; }
+    .bulletin-wrap {
+      margin: 0; padding: 14mm 16mm 18mm;
+      box-shadow: none; border-radius: 0;
+      max-width: 100%;
+    }
+  }
+  @page { size: A4; margin: 0; }
+</style>
+</head>
+<body>
+
+<!-- ── Barre d'outils (écran seulement) ── -->
+<div class="print-toolbar">
+  <span>Bulletin d'examens {{ demande.numero }}</span>
+  <button class="toolbar-btn btn-print" onclick="window.print()">
+    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>
+    </svg>
+    Imprimer / Télécharger PDF
+  </button>
+  <a class="toolbar-btn btn-back" href="{{ back_url }}" onclick="window.close(); return false;">
+    ← Fermer
+  </a>
+</div>
+
+<!-- ── Page bulletin ── -->
+<div class="bulletin-wrap">
+<div class="bul-content">
+
+  <!-- En-tête -->
+  <div class="bul-header">
+    <div class="bul-logo">
+      <div class="bul-logo-circle">
+        <img src="{% static 'img/logo.png' %}" alt="CMS WALÉ">
+      </div>
+      <div class="bul-logo-text">
+        <div class="brand-top">Centre</div>
+        <div class="brand-mid">Médico-Social</div>
+        <div class="brand-name">WALÉ</div>
+      </div>
+    </div>
+    <div class="bul-company">
+      <strong>CMS WALE</strong><br>
+      Tél. : 0778669554<br>
+      centremedicosocialwale@gmail.com<br>
+      http://www.cmswale.org
+    </div>
+  </div>
+
+  <!-- Patient -->
+  <div class="bul-patient">
+    {{ demande.patient.nom|upper }} {{ demande.patient.prenoms|upper }}
+    &nbsp;|&nbsp; <span style="font-family:var(--font-mono);color:#1a5c4a;">{{ demande.patient.code_patient }}</span>
+  </div>
+
+  <!-- Titre -->
+  <div class="bul-title">Bulletin d'Examens {{ demande.numero }}</div>
+
+  <!-- Bande d'infos -->
+  <div class="bul-info-bar">
+    <div class="bul-info-cell">
+      <div class="lbl">Date de la demande</div>
+      <div class="val">{{ demande.date_creation|date:"d/m/Y" }}</div>
+    </div>
+    <div class="bul-info-cell">
+      <div class="lbl">Type de test</div>
+      <div class="val">{{ demande.get_type_test_display }}</div>
+    </div>
+
+    <div class="bul-info-cell">
+      <div class="lbl">Urgence</div>
+      <div class="val">
+        {% if demande.urgent %}
+          <span class="badge-urgent">Urgent</span>
+        {% else %}
+          Non urgent
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Médecin prescripteur -->
+  {% if demande.medecin_prescripteur %}
+  <div class="bul-prescripteur">
+    <div class="icon">Dr</div>
+    <div class="info">
+      <div class="role">Médecin prescripteur</div>
+      <div class="nom">Dr {{ demande.medecin_prescripteur.prenoms }} {{ demande.medecin_prescripteur.nom }}</div>
+      {% if demande.medecin_prescripteur.specialite %}
+      <div class="specialite">{{ demande.medecin_prescripteur.specialite }}</div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Table des examens -->
+  <table class="bul-table">
+    <thead>
+      <tr>
+        <th style="width:40%">Examen</th>
+        <th>Catégorie</th>
+        <th class="th-center">Délai</th>
+        <th>Instructions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ligne in lignes %}
+      <tr>
+        <td class="td-desc">
+          {{ ligne.libelle|default:ligne.type_examen }}
+          {% if ligne.type_examen and ligne.type_examen.code %}
+          <br><span class="code-badge">{{ ligne.type_examen.code }}</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if ligne.type_examen and ligne.type_examen.categorie %}
+          <span class="categorie-badge">{{ ligne.type_examen.categorie }}</span>
+          {% else %}
+          <span style="color:#9ca3af;">—</span>
+          {% endif %}
+        </td>
+        <td class="td-center delai-cell">
+          {% if ligne.type_examen and ligne.type_examen.delai_resultat_heures %}
+            {% if ligne.type_examen.delai_resultat_heures >= 24 %}
+              {% widthratio ligne.type_examen.delai_resultat_heures 24 1 %} j
+            {% else %}
+              {{ ligne.type_examen.delai_resultat_heures }} h
+            {% endif %}
+          {% else %}
+          —
+          {% endif %}
+        </td>
+        <td>
+          {% if ligne.instructions %}
+            <span style="color:#374151;">{{ ligne.instructions }}</span>
+          {% else %}
+            <span style="color:#9ca3af;font-style:italic;">Aucune</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="4" style="text-align:center;padding:20px;color:#9ca3af;font-style:italic;">Aucun examen enregistré</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Notes -->
+  {% if demande.commentaire %}
+  <div style="margin-top:18px;padding:10px 14px;background:#fffbeb;border:1px solid #fde68a;border-radius:5px;font-size:11px;color:#374151;">
+    <span style="font-weight:700;text-transform:uppercase;font-size:9px;letter-spacing:.5px;color:#9ca3af;">Notes&nbsp;</span>
+    {{ demande.commentaire }}
+  </div>
+  {% endif %}
+
+  <!-- Signature -->
+  <div class="bul-signature">
+    <div class="bul-signature-box">
+      <div class="sig-label">Signature du médecin prescripteur</div>
+      <div class="sig-line">
+        {% if demande.medecin_prescripteur %}
+          Dr {{ demande.medecin_prescripteur.prenoms }} {{ demande.medecin_prescripteur.nom }}
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Pied de page -->
+  <div class="bul-footer">
+    <p>Bulletin généré le <strong>{{ demande.date_creation|date:"d/m/Y" }}</strong> — Référence : <strong>{{ demande.numero }}</strong></p>
+    <p style="margin-top:6px;color:#9ca3af;">Ce document est confidentiel et destiné uniquement au patient et aux professionnels de santé concernés.</p>
+  </div>
+
+</div><!-- /.bul-content -->
+</div><!-- /.bulletin-wrap -->
+
+<script>
+  if (window.location.search.indexOf('auto=1') !== -1) {
+    window.addEventListener('load', function() { window.print(); });
+  }
+</script>
+</body>
+</html>

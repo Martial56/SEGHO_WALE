@@ -987,6 +987,18 @@ def laboratoire_detail(request, pk):
 
 
 @login_required(login_url='login')
+def laboratoire_bulletin(request, pk):
+    from laboratoire.models import DemandeExamen
+    demande = get_object_or_404(DemandeExamen, pk=pk)
+    lignes = demande.lignes.select_related('type_examen').all()
+    return render(request, 'laboratoire/bulletin_exam.html', {
+        'demande': demande,
+        'lignes': lignes,
+        'back_url': f'/laboratoire/{demande.pk}/',
+    })
+
+
+@login_required(login_url='login')
 def gynecologie_naissance_create(request):
     from patients.models import Naissance, Patient
     from medecins.models import Medecin
