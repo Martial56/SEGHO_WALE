@@ -24,9 +24,17 @@
   html[data-theme="dark"] .o-list tbody tr:hover { background: rgba(var(--teal-500-rgb),.10); }
   html[data-theme="dark"] .o-search-input     { color: var(--text); }
   html[data-theme="dark"] .o-search-bar       { border-bottom-color: rgba(255,255,255,.15); }
-  html[data-theme="dark"] .o-dd-menu          { background: #1a2a3e; border-color: var(--border); }
-  html[data-theme="dark"] .o-dd-item:hover    { background: rgba(var(--teal-500-rgb),.15); }
-  html[data-theme="dark"] .o-filter-tag       { background: rgba(20,87,112,.25); border-color: rgba(var(--teal-500-rgb),.35); color: #7ac9e2; }
+  html[data-theme="dark"] .o-ctrl-btn         { color: rgba(255,255,255,.4); }
+  html[data-theme="dark"] .o-ctrl-btn:hover   { background: rgba(24,95,165,0.12); color: var(--text); border-color: var(--border); }
+  html[data-theme="dark"] .o-ctrl-btn.active  { background: rgba(24,95,165,0.18); color: #85b7eb; border-color: #185fa5; }
+  html[data-theme="dark"] .o-pag-btn          { background: var(--surface); border-color: var(--border); color: var(--text-muted); }
+  html[data-theme="dark"] .o-ctrl-sep         { background: var(--border); }
+  html[data-theme="dark"] .o-dd-panel         { background: #1a2a3e; border-color: var(--border); }
+  html[data-theme="dark"] .o-dd-item:hover    { background: rgba(var(--teal-500-rgb),.15); color: var(--text); }
+  html[data-theme="dark"] .o-dd-item.active   { color: #85b7eb; }
+  html[data-theme="dark"] .o-dd-date-input    { border-bottom-color: #3a4a62; color: var(--text); }
+  html[data-theme="dark"] .o-dd-clear-btn     { border-color: var(--border); color: var(--text-muted); }
+  html[data-theme="dark"] .o-dd-sub           { background: #1a2a3e; border-color: var(--border); }
   html[data-theme="dark"] .badge-brouillon    { background: rgba(150,150,150,.12); color: #8a9ab0; border-color: rgba(150,150,150,.2); }
   html[data-theme="dark"] .badge-emise        { background: rgba(21,101,192,.18); color: #90caf9; border-color: rgba(21,101,192,.3); }
   html[data-theme="dark"] .badge-payee        { background: rgba(22,169,107,.15); color: #4cde9a; border-color: rgba(22,169,107,.25); }
@@ -115,30 +123,69 @@
   .o-ctrl-sep     { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }
 
   /* ══════════════════════════════════════════════════
-     DROPDOWN FILTRE
+     CONTRÔLES / DROPDOWN FILTRES
   ══════════════════════════════════════════════════ */
   .o-ctrl-btn {
-    background: none; border: 1px solid var(--border); border-radius: 5px; color: var(--text-muted);
+    background: none; border: 1px solid transparent; border-radius: 5px; color: var(--text-muted);
     font-size: 11.5px; padding: 4px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
     transition: border-color .15s, color .15s, background .15s; text-decoration: none; white-space: nowrap;
   }
-  .o-ctrl-btn:hover  { border-color: var(--teal-400); color: var(--teal-600); }
-  .o-ctrl-btn.active { border-color: var(--teal-500); color: var(--teal-600); background: var(--teal-50); }
+  .o-ctrl-btn:hover  { border-color: var(--border); color: var(--text); background: #f3f3f3; }
+  .o-ctrl-btn.active { background: rgba(21,87,112,.08); color: var(--teal-700); border-color: rgba(21,87,112,.18); font-weight: 600; }
 
-  .o-dd { position: relative; display: inline-block; }
-  .o-dd-menu {
-    display: none; position: absolute; top: calc(100% + 5px); right: 0; min-width: 175px;
-    background: #fff; border: 1px solid var(--border); border-radius: 7px;
-    box-shadow: 0 6px 20px rgba(0,0,0,.12); z-index: 300; padding: 5px 0;
+  .o-dd-wrap { position: relative; }
+  .o-dd-panel {
+    display: none; position: fixed; z-index: 9999; min-width: 210px;
+    background: #fff; border: 1px solid #dde3ec; border-radius: 7px;
+    box-shadow: 0 8px 28px rgba(0,0,0,.16); padding: 5px 0;
   }
-  .o-dd.open .o-dd-menu { display: block; animation: ddFadeIn .12s ease; }
+  .o-dd-panel.open { display: block; animation: ddFadeIn .12s ease; }
   @keyframes ddFadeIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }
+  .o-dd-section {
+    padding: 6px 14px 3px; font-size: 10px; font-weight: 600;
+    color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px;
+  }
   .o-dd-item {
-    display: block; padding: 7px 14px; font-size: 12px; color: var(--text);
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 7px 14px; font-size: 12px; color: var(--text); position: relative;
     text-decoration: none; cursor: pointer; transition: background .1s;
   }
   .o-dd-item:hover  { background: var(--teal-50); color: var(--teal-600); }
   .o-dd-item.active { color: var(--teal-600); font-weight: 600; }
+  .o-dd-sep { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+  .o-dd-arr { font-size: 10px; color: var(--text-muted); flex-shrink: 0; }
+
+  /* Sous-menu déployé au survol (Statut, Type) */
+  .o-dd-sub {
+    display: none; position: absolute; left: 100%; top: -5px; z-index: 10000;
+    min-width: 170px; background: #fff; border: 1px solid #dde3ec;
+    border-radius: 7px; box-shadow: 0 8px 28px rgba(0,0,0,.16); padding: 5px 0;
+  }
+  .o-dd-item:hover > .o-dd-sub { display: block; }
+  .o-dd-sub .o-dd-item { font-size: 12px; }
+
+  /* Bloc date dans le dropdown Filtres */
+  .o-dd-date-block { padding: 8px 14px 10px; }
+  .o-dd-date-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .o-dd-date-row label { font-size: 11.5px; color: var(--text-muted); min-width: 18px; }
+  .o-dd-date-input {
+    flex: 1; border: none; border-bottom: 1px solid #bbb; background: transparent;
+    font-size: 12px; color: var(--text); padding: 2px 2px; outline: none;
+  }
+  .o-dd-date-input:focus { border-bottom-color: var(--teal-600); }
+  .o-dd-date-actions { display: flex; gap: 6px; margin-top: 10px; }
+  .o-dd-apply-btn {
+    flex: 1; background: var(--teal-600); color: #fff; border: none; border-radius: 3px;
+    padding: 5px 0; font-size: 12px; font-weight: 500; cursor: pointer; transition: background .15s;
+  }
+  .o-dd-apply-btn:hover { background: var(--teal-700); }
+  .o-dd-clear-btn {
+    background: none; border: 1px solid var(--border); border-radius: 3px;
+    padding: 5px 10px; font-size: 11.5px; color: var(--text-muted);
+    cursor: pointer; text-decoration: none; display: inline-flex; align-items: center;
+    transition: border-color .15s, color .15s; white-space: nowrap;
+  }
+  .o-dd-clear-btn:hover { border-color: #999; color: var(--text); }
 
   /* ══════════════════════════════════════════════════
      PAGINATION
@@ -147,18 +194,6 @@
   .o-pag-btn { color: #888; text-decoration: none; font-size: 15px; display: inline-flex; align-items: center; padding: 0 2px; transition: color .15s; }
   .o-pag-btn:hover { color: var(--teal-600); }
   .o-pag-btn.disabled { opacity: .3; pointer-events: none; }
-
-  /* ══════════════════════════════════════════════════
-     FILTER TAGS
-  ══════════════════════════════════════════════════ */
-  .o-filter-tags { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 2px 0; min-height: 22px; }
-  .o-filter-tag {
-    background: var(--teal-50); border: 1px solid var(--teal-200, #b2dfdb); color: var(--teal-700, #00796b);
-    border-radius: 12px; font-size: 11px; padding: 2px 10px;
-    display: inline-flex; align-items: center; gap: 5px;
-  }
-  .o-filter-tag a { color: inherit; text-decoration: none; font-weight: 700; line-height: 1; cursor: pointer; opacity: .7; transition: opacity .1s; }
-  .o-filter-tag a:hover { opacity: 1; }
 
   /* ══════════════════════════════════════════════════
      TABLE
@@ -183,7 +218,6 @@
   .o-list tbody tr:last-child { border-bottom: none; }
   .o-list tbody td { padding: 9px 12px; color: var(--text); vertical-align: middle; }
 
-  /* Numéro de ligne */
   .row-num {
     display: inline-flex; align-items: center; justify-content: center;
     width: 22px; height: 22px; border-radius: 5px;
@@ -218,7 +252,6 @@
   .badge-annulee { background: rgba(var(--rose-rgb),.1); color: var(--rose); border-color: rgba(var(--rose-rgb),.25); }
   .badge-annulee::before { background: var(--rose); }
 
-  /* ── Badge type ── */
   .badge-type {
     display: inline-flex; align-items: center; border-radius: 4px;
     font-size: 10px; font-weight: 500; padding: 2px 8px; white-space: nowrap;
@@ -263,21 +296,6 @@
     transition: background .15s; box-shadow: 0 2px 8px rgba(var(--teal-600-rgb),.3);
   }
   .o-empty-btn:hover { background: var(--teal-700); color: #fff; }
-
-  /* ══════════════════════════════════════════════════
-     DARK MODE — STAT ICONS
-  ══════════════════════════════════════════════════ */
-  html[data-theme="dark"] .fac-stat-card.card-total   .fac-stat-icon { background: rgba(var(--teal-500-rgb),.15); }
-  html[data-theme="dark"] .fac-stat-card.card-recu    .fac-stat-icon { background: rgba(var(--green-rgb),.15); }
-  html[data-theme="dark"] .fac-stat-card.card-attente .fac-stat-icon { background: rgba(var(--amber-rgb),.15); }
-  html[data-theme="dark"] .fac-stat-card.card-recu    .fac-stat-value { color: #4cde9a; }
-  html[data-theme="dark"] .fac-stat-card.card-attente .fac-stat-value { color: #f6c05a; }
-  html[data-theme="dark"] .o-list tbody tr:last-child { border-bottom: none; }
-  html[data-theme="dark"] .badge-brouillon { background: rgba(120,130,150,.1); color: #7a8a9a; border-color: rgba(120,130,150,.2); }
-  html[data-theme="dark"] .badge-emise     { background: rgba(59,130,246,.12); color: #93c5fd; border-color: rgba(59,130,246,.25); }
-  html[data-theme="dark"] .badge-payee     { background: rgba(var(--green-rgb),.18); color: #4ade80; border-color: rgba(var(--green-rgb),.3); }
-  html[data-theme="dark"] .badge-annulee   { background: rgba(var(--rose-rgb),.18); color: #fca5a5; border-color: rgba(var(--rose-rgb),.3); }
-  html[data-theme="dark"] .badge-type      { background: rgba(255,255,255,.05); color: var(--text-muted); border-color: rgba(255,255,255,.08); }
 </style>
 {% endblock %}
 
@@ -314,58 +332,77 @@
 <!-- ══ Subheader ══ -->
 <div class="o-subheader">
 
-  <!-- Ligne 1 : titre | recherche -->
+  <!-- Ligne 1 : titre | recherche (jamais remplacée en AJAX pour ne pas perdre le focus) -->
   <div class="o-subheader-row">
-    <span class="o-page-title">Factures <span id="page-count">({{ total }})</span></span>
+    <span class="o-page-title">Factures
+      <span id="page-count-wrap">({{ total }})</span>
+    </span>
     <div class="o-subheader-row-right">
       <div class="o-search-bar">
-        <input class="o-search-input" id="search-input" type="text"
+        <input class="o-search-input" id="search-q" type="text"
                value="{{ q }}" placeholder="N° facture, patient…" autocomplete="off">
-        <button type="button" class="o-search-btn" id="btn-clear" title="Effacer"
-                style="display:{% if q %}inline-flex{% else %}none{% endif %};">
-          <i class="bi bi-x"></i>
+        <button type="button" class="o-search-btn" id="clear-search-btn" title="Effacer la recherche"
+                onclick="clearSearch()" style="{% if not q %}display:none;{% endif %}">
+          <i class="bi bi-x-lg"></i>
         </button>
-        <span class="o-search-btn" id="btn-icon"
-              style="display:{% if q %}none{% else %}inline-flex{% endif %};pointer-events:none;">
-          <i class="bi bi-search"></i>
-        </span>
+        <span class="o-search-btn" style="pointer-events:none;"><i class="bi bi-search"></i></span>
       </div>
     </div>
   </div>
 
-  <!-- Ligne 2 : bouton créer | filtres + pagination -->
+  <!-- Ligne 2+ : contrôles (remplacés en bloc en AJAX, cf. #subheader-controls) -->
+  <div id="subheader-controls">
   <div class="o-subheader-row">
     <a href="{% url 'facturation:create' %}" class="o-btn-create">
       <i class="bi bi-plus-lg"></i> Nouvelle facture
     </a>
     <div class="o-subheader-row-right">
 
-      <!-- Filtres -->
-      <div class="o-dd" id="dd-statut">
-        <button class="o-ctrl-btn {% if statut %}active{% endif %}"
-                onclick="toggleDd('dd-statut')" type="button">
-          <i class="bi bi-funnel{% if statut %}-fill{% endif %}"></i>
-          {% if statut %}{% for s,l in statut_choices %}{% if s == statut %}{{ l }}{% endif %}{% endfor %}{% else %}Filtres{% endif %}
-        </button>
-        <div class="o-dd-menu">
-          <a class="o-dd-item {% if not statut %}active{% endif %}" onclick="setFiltre('statut','')">Tous les statuts</a>
-          {% for s, l in statut_choices %}
-          <a class="o-dd-item {% if statut == s %}active{% endif %}" onclick="setFiltre('statut','{{ s }}')">{{ l }}</a>
-          {% endfor %}
-        </div>
-      </div>
+      <!-- Effacer tout (filtres + date + recherche) -->
+      {% if filters or q or dates_explicites %}
+      <a href="#" class="o-ctrl-btn" style="color:var(--rose-text);" onclick="resetAll(); return false;" title="Effacer les filtres, la date et la recherche">
+        <i class="bi bi-x-circle"></i> Effacer
+      </a>
+      {% endif %}
 
-      <div class="o-dd" id="dd-type">
-        <button class="o-ctrl-btn {% if type_f %}active{% endif %}"
-                onclick="toggleDd('dd-type')" type="button">
-          <i class="bi bi-tag{% if type_f %}-fill{% endif %}"></i>
-          {% if type_f %}{% for s,l in type_choices %}{% if s == type_f %}{{ l }}{% endif %}{% endfor %}{% else %}Type{% endif %}
+      <!-- Filtres (cumulables : Statut + Type + Date) -->
+      <div class="o-dd-wrap">
+        <button class="o-ctrl-btn {% if filters or dates_explicites %}active{% endif %}" id="btn-filtres" onclick="toggleDd('dd-filtres',this)" type="button">
+          <i class="bi bi-funnel{% if filters or dates_explicites %}-fill{% endif %}"></i> Filtres
         </button>
-        <div class="o-dd-menu">
-          <a class="o-dd-item {% if not type_f %}active{% endif %}" onclick="setFiltre('type','')">Tous les types</a>
-          {% for s, l in type_choices %}
-          <a class="o-dd-item {% if type_f == s %}active{% endif %}" onclick="setFiltre('type','{{ s }}')">{{ l }}</a>
-          {% endfor %}
+        <div class="o-dd-panel" id="dd-filtres">
+          <div class="o-dd-item {% if statuts_sel %}active{% endif %}">
+            Statut <span class="o-dd-arr">›</span>
+            <div class="o-dd-sub">
+              {% for s, l in statut_choices %}
+              <a class="o-dd-item {% if s in statuts_sel %}active{% endif %}" href="#" onclick="toggleParam('filter','statut:{{ s }}'); return false;">{{ l }}</a>
+              {% endfor %}
+            </div>
+          </div>
+          <div class="o-dd-item {% if types_sel %}active{% endif %}">
+            Type <span class="o-dd-arr">›</span>
+            <div class="o-dd-sub">
+              {% for s, l in type_choices %}
+              <a class="o-dd-item {% if s in types_sel %}active{% endif %}" href="#" onclick="toggleParam('filter','type:{{ s }}'); return false;">{{ l }}</a>
+              {% endfor %}
+            </div>
+          </div>
+          <hr class="o-dd-sep">
+          <div class="o-dd-section">Par date</div>
+          <div class="o-dd-date-block">
+            <div class="o-dd-date-row">
+              <label>De</label>
+              <input type="date" id="filter-date-from" class="o-dd-date-input" value="{{ date_from }}">
+            </div>
+            <div class="o-dd-date-row">
+              <label>À</label>
+              <input type="date" id="filter-date-to" class="o-dd-date-input" value="{{ date_to }}">
+            </div>
+            <div class="o-dd-date-actions">
+              <button type="button" class="o-dd-apply-btn" onclick="applyDateFilter()">Appliquer</button>
+              <a class="o-dd-clear-btn" href="#" onclick="showAllDates(); return false;">Toutes les dates</a>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -374,26 +411,19 @@
       <!-- Pagination -->
       <div class="o-pagination">
         <a id="pag-prev" class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
-           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if statut %}&statut={{ statut }}{% endif %}{% if type_f %}&type_f={{ type_f }}{% endif %}{% else %}#{% endif %}">
+           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% for f in filters %}&filter={{ f }}{% endfor %}{% if dates_explicites %}&date_from={{ date_from }}&date_to={{ date_to }}{% endif %}{% else %}#{% endif %}">
           <i class="bi bi-chevron-left"></i>
         </a>
         <span id="pag-info">{{ page_obj.start_index }}–{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
         <a id="pag-next" class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
-           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if statut %}&statut={{ statut }}{% endif %}{% if type_f %}&type_f={{ type_f }}{% endif %}{% else %}#{% endif %}">
+           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% for f in filters %}&filter={{ f }}{% endfor %}{% if dates_explicites %}&date_from={{ date_from }}&date_to={{ date_to }}{% endif %}{% else %}#{% endif %}">
           <i class="bi bi-chevron-right"></i>
         </a>
       </div>
     </div>
   </div>
 
-  <!-- Tags filtres actifs -->
-  {% if statut or type_f %}
-  <div class="o-filter-tags" id="filter-tags-row">
-    {% if statut %}<span class="o-filter-tag">{% for s,l in statut_choices %}{% if s == statut %}{{ l }}{% endif %}{% endfor %} <a onclick="setFiltre('statut','')">×</a></span>{% endif %}
-    {% if type_f %}<span class="o-filter-tag">{% for s,l in type_choices %}{% if s == type_f %}{{ l }}{% endif %}{% endfor %} <a onclick="setFiltre('type','')">×</a></span>{% endif %}
-  </div>
-  {% endif %}
-
+  </div><!-- /#subheader-controls -->
 </div>
 
 <!-- ══ Table ══ -->
@@ -427,8 +457,8 @@
       </tr>
       {% empty %}
       <tr><td colspan="8" style="text-align:center;padding:48px 20px;color:var(--text-muted);font-size:13px;">
-        {% if q or statut or type_f %}Aucune facture pour ces critères.
-        {% else %}Aucune facture — <a href="{% url 'facturation:create' %}" style="color:var(--teal-600);">créer la première</a>.{% endif %}
+        {% if q or filters or dates_explicites %}Aucune facture pour ces critères.
+        {% else %}Aucune facture pour aujourd'hui — <a href="#" onclick="showAllDates(); return false;" style="color:var(--teal-600);">voir toutes les dates</a>.{% endif %}
       </td></tr>
       {% endfor %}
     </tbody>
@@ -437,154 +467,157 @@
 
 <script>
 (function () {
-  var input     = document.getElementById('search-input');
-  var btnClear  = document.getElementById('btn-clear');
-  var btnIcon   = document.getElementById('btn-icon');
-  var tbody     = document.getElementById('fac-tbody');
-  var pagInfo   = document.getElementById('pag-info');
-  var pagPrev   = document.getElementById('pag-prev');
-  var pagNext   = document.getElementById('pag-next');
-  var pageCount = document.getElementById('page-count');
-  var timer     = null;
-  var curStatut = '{{ statut|escapejs }}';
-  var curType   = '{{ type_f|escapejs }}';
+  var searchInput   = document.getElementById('search-q');
+  var clearSearchBtn = document.getElementById('clear-search-btn');
+  var searchTimer;
 
-  /* ── Recherche (AJAX) ── */
-  if (input) {
-    input.addEventListener('input', function () {
-      setIcons(input.value);
-      clearTimeout(timer);
-      timer = setTimeout(function () { doSearch(input.value.trim(), curStatut, curType, 1); }, 320);
-    });
-    input.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') { input.value = ''; setIcons(''); doSearch('', curStatut, curType, 1); }
-    });
-  }
-  if (btnClear) {
-    btnClear.addEventListener('click', function () {
-      if (input) { input.value = ''; input.focus(); }
-      setIcons('');
-      doSearch('', curStatut, curType, 1);
-    });
-  }
-
-  function setIcons(val) {
-    if (btnClear) btnClear.style.display = val ? 'inline-flex' : 'none';
-    if (btnIcon)  btnIcon.style.display  = val ? 'none' : 'inline-flex';
-  }
-
-  /* ── Dropdowns ── */
-  window.toggleDd = function (id) {
-    var el = document.getElementById(id);
-    if (!el) return;
-    var open = el.classList.contains('open');
-    document.querySelectorAll('.o-dd.open').forEach(function (d) { d.classList.remove('open'); });
-    if (!open) el.classList.add('open');
-  };
-  document.addEventListener('click', function (e) {
-    if (!e.target.closest('.o-dd'))
-      document.querySelectorAll('.o-dd.open').forEach(function (d) { d.classList.remove('open'); });
-  });
-
-  /* ── Filtres (rechargement — intentionnel) ── */
-  window.setFiltre = function (key, val) {
-    var url = new URL(window.location.href);
-    url.searchParams.set('page', '1');
-    if (key === 'statut') val ? url.searchParams.set('statut', val) : url.searchParams.delete('statut');
-    else if (key === 'type') val ? url.searchParams.set('type_f', val) : url.searchParams.delete('type_f');
-    window.location.href = url.toString();
-  };
-
-  /* ── Effacer recherche (AJAX) ── */
-  window.clearQ = function () {
-    if (input) { input.value = ''; input.focus(); }
-    setIcons('');
-    doSearch('', curStatut, curType, 1);
-  };
-
-  /* ── Fetch AJAX ── */
-  function buildParams(q, statut, type_f, page) {
-    var p = new URLSearchParams();
-    if (q)        p.set('q', q);
-    if (statut)   p.set('statut', statut);
-    if (type_f)   p.set('type_f', type_f);
-    if (page > 1) p.set('page', String(page));
-    return p;
-  }
-
-  function doSearch(q, statut, type_f, page) {
-    var params = buildParams(q, statut, type_f, page);
-    history.replaceState(null, '', params.toString() ? '?' + params : location.pathname);
-    if (tbody) tbody.style.opacity = '0.35';
-
-    fetch(location.pathname + (params.toString() ? '?' + params : ''), {
-      headers: { 'X-Requested-With': 'XMLHttpRequest' }
-    })
-    .then(function (r) { return r.json(); })
-    .then(function (d) { render(d, q, statut, type_f); })
-    .catch(function () { if (tbody) tbody.style.opacity = ''; });
-  }
-
-  function fmt(n) { return Math.round(n).toLocaleString('fr-FR') + ' F'; }
-
-  function esc(s) {
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
-                    .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-  }
-
-  function render(data, q, statut, type_f) {
-    /* Tableau */
-    if (tbody) {
-      tbody.style.opacity = '';
-      if (!data.rows.length) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:48px 20px;'
-          + 'color:var(--text-muted);font-size:13px;">'
-          + (q ? 'Aucune facture pour « ' + esc(q) + ' »' : 'Aucune facture pour ces critères.')
-          + '</td></tr>';
-      } else {
-        var html = '';
-        data.rows.forEach(function (f) {
-          var sc = f.solde_restant > 0 ? 'var(--amber)' : 'var(--text-muted)';
-          var fw = f.solde_restant > 0 ? '600' : '400';
-          html += '<tr onclick="window.location=\'' + f.url + '\'" style="cursor:pointer;">'
-            + '<td class="td-num">'     + esc(f.numero) + '</td>'
-            + '<td class="td-patient">' + esc(f.patient) + '</td>'
-            + '<td><span class="badge-type">' + esc(f.type_display) + '</span></td>'
-            + '<td style="color:var(--text-muted);white-space:nowrap;font-size:12px;">' + esc(f.date) + '</td>'
-            + '<td class="td-montant">' + fmt(f.montant_total) + '</td>'
-            + '<td class="td-montant" style="color:#16a96b;">' + fmt(f.montant_paye) + '</td>'
-            + '<td class="td-montant" style="color:' + sc + ';font-weight:' + fw + ';">' + fmt(f.solde_restant) + '</td>'
-            + '<td><span class="badge-statut badge-' + esc(f.statut) + '">' + esc(f.statut_display) + '</span></td>'
-            + '</tr>';
-        });
-        tbody.innerHTML = html;
+  /* ── Dropdowns (positionnement fixe, comme la page patients) ── */
+  window.toggleDd = function (id, btn) {
+    var panel = document.getElementById(id);
+    var isOpen = panel.classList.contains('open');
+    document.querySelectorAll('.o-dd-panel.open').forEach(function (p) { p.classList.remove('open'); });
+    if (!isOpen) {
+      var rect = btn.getBoundingClientRect();
+      panel.style.top = (rect.bottom + 4) + 'px';
+      panel.style.left = rect.left + 'px';
+      panel.style.right = 'auto';
+      panel.classList.add('open');
+      var pr = panel.getBoundingClientRect();
+      if (pr.right > window.innerWidth - 8) {
+        panel.style.left = 'auto';
+        panel.style.right = (window.innerWidth - rect.right) + 'px';
       }
     }
-
-    /* Compteur */
-    if (pageCount) pageCount.textContent = '(' + data.total + ')';
-
-    /* Pagination info */
-    if (pagInfo) pagInfo.textContent = data.count
-      ? (data.start_index + '–' + data.end_index + ' / ' + data.count)
-      : '0 / 0';
-
-    /* Boutons pagination */
-    var base = buildParams(q, statut, type_f, 1);
-    if (pagPrev) {
-      if (data.has_previous) {
-        var pp = new URLSearchParams(base); pp.set('page', String(data.page - 1));
-        pagPrev.setAttribute('href', '?' + pp); pagPrev.classList.remove('disabled');
-      } else { pagPrev.setAttribute('href', '#'); pagPrev.classList.add('disabled'); }
+  };
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('.o-dd-wrap')) {
+      document.querySelectorAll('.o-dd-panel.open').forEach(function (p) { p.classList.remove('open'); });
     }
-    if (pagNext) {
-      if (data.has_next) {
-        var pn = new URLSearchParams(base); pn.set('page', String(data.page + 1));
-        pagNext.setAttribute('href', '?' + pn); pagNext.classList.remove('disabled');
-      } else { pagNext.setAttribute('href', '#'); pagNext.classList.add('disabled'); }
-    }
+  });
+  document.addEventListener('scroll', function () {
+    document.querySelectorAll('.o-dd-panel.open').forEach(function (p) { p.classList.remove('open'); });
+  }, true);
 
+  /* ── Fetch HTML complet + remplacement des blocs concernés (aucun rechargement) ── */
+  function refreshList(url, pushHistory) {
+    var openPanel = document.querySelector('#subheader-controls .o-dd-panel.open');
+    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { return r.text(); })
+      .then(function (html) {
+        var doc = new DOMParser().parseFromString(html, 'text/html');
+
+        var newTbody = doc.getElementById('fac-tbody');
+        if (newTbody) document.getElementById('fac-tbody').innerHTML = newTbody.innerHTML;
+
+        var newControls = doc.getElementById('subheader-controls');
+        if (newControls) document.getElementById('subheader-controls').outerHTML = newControls.outerHTML;
+
+        var newCount = doc.getElementById('page-count-wrap');
+        if (newCount) document.getElementById('page-count-wrap').outerHTML = newCount.outerHTML;
+
+        if (pushHistory) history.pushState({}, '', url);
+
+        /* Ré-ouvre le dropdown Filtres s'il était ouvert, pour cumuler les clics */
+        if (openPanel) {
+          var btn = document.getElementById('btn-filtres');
+          if (btn) toggleDd('dd-filtres', btn);
+        }
+      });
   }
+  window.refreshList = refreshList;
+
+  /* ── Filtres cumulables (Statut / Type) ── */
+  window.toggleParam = function (key, value) {
+    var params = new URLSearchParams(window.location.search);
+    var values = params.getAll(key);
+    params.delete(key);
+    if (values.includes(value)) {
+      values.filter(function (v) { return v !== value; }).forEach(function (v) { params.append(key, v); });
+    } else {
+      values.forEach(function (v) { params.append(key, v); });
+      params.append(key, value);
+    }
+    params.delete('page');
+    refreshList(window.location.pathname + '?' + params.toString(), true);
+  };
+
+  window.clearParam = function (key) {
+    var params = new URLSearchParams(window.location.search);
+    params.delete(key);
+    params.delete('page');
+    var url = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+    refreshList(url, true);
+  };
+
+  /* ── Filtre par date ── */
+  window.applyDateFilter = function () {
+    var from = document.getElementById('filter-date-from').value;
+    var to   = document.getElementById('filter-date-to').value;
+    var params = new URLSearchParams(window.location.search);
+    params.set('date_from', from);
+    params.set('date_to', to);
+    params.delete('page');
+    refreshList(window.location.pathname + '?' + params.toString(), true);
+  };
+
+  window.showAllDates = function () {
+    var from = document.getElementById('filter-date-from');
+    var to   = document.getElementById('filter-date-to');
+    if (from) from.value = '';
+    if (to)   to.value   = '';
+    window.applyDateFilter();
+  };
+
+  /* ── Recherche (AJAX, debounce) ── */
+  function setIcons(val) {
+    if (clearSearchBtn) clearSearchBtn.style.display = val ? 'inline-flex' : 'none';
+  }
+  window.clearSearch = function () {
+    if (searchInput) { searchInput.value = ''; searchInput.focus(); }
+    setIcons('');
+    clearParam('q');
+  };
+  if (searchInput) {
+    searchInput.addEventListener('input', function () {
+      setIcons(searchInput.value);
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(function () {
+        var params = new URLSearchParams(window.location.search);
+        if (searchInput.value) params.set('q', searchInput.value); else params.delete('q');
+        params.delete('page');
+        var url = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+        refreshList(url, true);
+      }, 300);
+    });
+    searchInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { window.clearSearch(); }
+    });
+  }
+  /* Délégation (les champs date sont recréés à chaque swap de #subheader-controls) */
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && (e.target.id === 'filter-date-from' || e.target.id === 'filter-date-to')) {
+      window.applyDateFilter();
+    }
+  });
+
+  /* ── Effacer tout ── */
+  window.resetAll = function () {
+    if (searchInput) searchInput.value = '';
+    setIcons('');
+    refreshList(window.location.pathname, true);
+  };
+
+  /* ── Interception des liens ?... (pagination) pour éviter le rechargement ── */
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest('#subheader-controls a[href^="?"]');
+    if (!a) return;
+    e.preventDefault();
+    refreshList(a.getAttribute('href'), true);
+  });
+
+  window.addEventListener('popstate', function () {
+    refreshList(window.location.pathname + window.location.search, false);
+  });
 })();
 </script>
 {% endblock %}
