@@ -27,4 +27,6 @@ urlpatterns = [
     path('pathologies/nouveau/', views.pathologie_create, name='pathologie_create'),
     path('pathologies/<int:pk>/modifier/', views.pathologie_edit, name='pathologie_edit'),
     path('pathologies/<int:pk>/supprimer/', views.pathologie_delete, name='pathologie_delete'),
+    path('pathologies/export/', views.export_pathologies, name='export_pathologies'),
+    path('pathologies/import/', views.import_pathologies, name='import_pathologies'),
 ]
