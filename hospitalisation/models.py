@@ -203,13 +203,34 @@ class Hospitalisation(models.Model):
 
     @property
     def duree_observation(self):
-        """Durée en heures (float, 1 décimale) entre heure_entree et heure_sortie (ou maintenant)."""
+        """Durée en secondes entre heure_entree et heure_sortie (ou maintenant)."""
         if not self.heure_entree:
             return None
         from django.utils import timezone
         fin = self.heure_sortie or timezone.now()
-        delta = fin - self.heure_entree
-        return round(delta.total_seconds() / 3600, 1)
+        return int((fin - self.heure_entree).total_seconds())
+
+    @property
+    def date_confirme(self):
+        """Date du passage au statut Confirmé — dérivée du journal d'activité,
+        aucun champ dédié n'existe pour cet horodatage."""
+        from django.contrib.contenttypes.models import ContentType
+        from core.models import LogActivite
+        ct = ContentType.objects.get_for_model(self)
+        log = LogActivite.objects.filter(
+            content_type=ct, object_id=self.pk, type='statut', message__icontains='Confirmé',
+        ).order_by('date').first()
+        return log.date if log else None
+
+    @property
+    def temps_avant_hospitalisation(self):
+        """Durée en secondes entre la confirmation et heure_entree."""
+        if not self.heure_entree:
+            return None
+        confirme = self.date_confirme
+        if not confirme:
+            return None
+        return int((self.heure_entree - confirme).total_seconds())
 
     def __str__(self): return f"Hosp. {self.numero} - {self.patient}"
     class Meta:

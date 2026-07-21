@@ -48,6 +48,13 @@ def _chambre(statut=True):
     return Chambre.objects.create(nom=f'Ch-{Chambre.objects.count()}', statut=statut)
 
 
+def _facture_payee(hosp):
+    return Facture.objects.create(
+        patient=hosp.patient, hospitalisation=hosp,
+        type_facture='hospitalisation', statut='payee',
+    )
+
+
 def _hosp(patient=None, medecin=None, statut='brouillon', chambre=None, creator=None):
     return Hospitalisation.objects.create(
         patient=patient or _patient(),
@@ -73,41 +80,22 @@ class TestGetActionsDisponibles(TestCase):
         return _hosp(self.patient, self.medecin, statut=statut, chambre=chambre,
                      creator=self.superuser)
 
-    def test_superuser_voit_et_active_tout(self):
-        hosp = self._hosp()
-        # "Créer la facture" reste caché pour tout le monde, superuser inclus,
-        # s'il n'y a aucun service non facturé — il faut donc en créer un ici.
-        ServiceAFacturer.objects.create(
-            hospitalisation=hosp, service=_article(), quantite=1, source='manuel'
-        )
-        actions = get_actions_disponibles(hosp, self.superuser)
-        # "installer"/"decharger" ne sont plus testés ici à statut brouillon : le
-        # garde-fou anti-régression (voir test_superuser_transitions_verrouillees_
-        # hors_statut_precedent) les masque désormais tant que le statut qui les
-        # précède directement (confirme/hospitalise) n'est pas atteint.
-        for key in ('confirmer', 'creer_facture', 'annuler'):
-            self.assertTrue(actions[key]['visible'], f"{key} devrait être visible pour le superuser")
-            self.assertTrue(actions[key]['enabled'], f"{key} devrait être activé pour le superuser")
-
-        # "Clôturer" (terminer) n'a de sens qu'une fois le dossier déchargé,
-        # même pour le superuser (on ne saute pas d'étape) — et ce statut
-        # masque "annuler" en retour, donc vérifié à part avec un statut cohérent.
-        hosp.statut = 'decharge'
-        hosp.save(update_fields=['statut'])
-        actions = get_actions_disponibles(hosp, self.superuser)
-        self.assertTrue(actions['terminer']['visible'], "terminer devrait être visible pour le superuser une fois déchargé")
-        self.assertTrue(actions['terminer']['enabled'], "terminer devrait être activé pour le superuser une fois déchargé")
-
     def test_superuser_bypasse_permissions_et_regles_metier(self):
-        """Le superuser ignore les permissions ET les règles métier « souples »
-        (facture payée, chambre attribuée, services non facturés...), mais reste
-        soumis aux mêmes préconditions de statut que les autres utilisateurs."""
+        """Le superuser ignore les permissions ET la plupart des règles métier
+        « souples » (chambre attribuée, services non facturés...), mais reste
+        soumis aux mêmes préconditions de statut que les autres utilisateurs —
+        sauf la facture MEO payée avant de confirmer, une règle financière qui
+        s'applique à tout le monde, y compris aux superusers."""
         hosp = self._hosp(statut='brouillon')
         actions = get_actions_disponibles(hosp, self.superuser)
         self.assertTrue(actions['confirmer']['visible'])
-        self.assertTrue(actions['confirmer']['enabled'])
+        self.assertFalse(actions['confirmer']['enabled'])  # facture MEO pas encore payée
         self.assertTrue(actions['annuler']['visible'])
         self.assertTrue(actions['annuler']['enabled'])
+
+        _facture_payee(hosp)
+        actions = get_actions_disponibles(hosp, self.superuser)
+        self.assertTrue(actions['confirmer']['enabled'])  # payée : se débloque même pour le superuser
 
         # confirme : installer actif même sans facture payée ni chambre attribuée
         hosp = self._hosp(statut='confirme')
@@ -158,10 +146,12 @@ class TestGetActionsDisponibles(TestCase):
 
     def test_confirmer_actif_meme_sans_soin(self):
         """Avoir déjà ajouté un soin n'est pas une condition pour confirmer
-        (décision produit) : patient + médecin traitant suffisent."""
+        (décision produit) : patient + médecin traitant + facture MEO payée
+        suffisent."""
         perm = Permission.objects.get(codename='can_confirmer_demande')
         self.user.user_permissions.add(perm)
         hosp = self._hosp(statut='brouillon')
+        _facture_payee(hosp)
         actions = get_actions_disponibles(hosp, self.user)
         self.assertTrue(actions['confirmer']['enabled'])
 
