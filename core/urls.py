@@ -42,7 +42,6 @@ urlpatterns = [
     path('medecins/config/specialites/import/',             views.medecins_import_specialites,       name='medecins_import_specialites'),
     path('medecins/config/specialites/nouveau/',            views.medecins_specialite_create,        name='medecins_specialite_create'),
     path('medecins/config/specialites/bulk-delete/',        views.medecins_specialite_bulk_delete,   name='medecins_specialite_bulk_delete'),
-    path('medecins/config/specialites/<int:pk>/',           views.medecins_specialite_detail,        name='medecins_specialite_detail'),
     path('medecins/config/specialites/<int:pk>/modifier/',  views.medecins_specialite_edit,          name='medecins_specialite_edit'),
 
     # Départements
@@ -51,7 +50,6 @@ urlpatterns = [
     path('medecins/config/departements/import/',             views.medecins_import_departements,       name='medecins_import_departements'),
     path('medecins/config/departements/nouveau/',            views.medecins_departement_create,        name='medecins_departement_create'),
     path('medecins/config/departements/bulk-delete/',        views.medecins_departement_bulk_delete,   name='medecins_departement_bulk_delete'),
-    path('medecins/config/departements/<int:pk>/',           views.medecins_departement_detail,        name='medecins_departement_detail'),
     path('medecins/config/departements/<int:pk>/modifier/',  views.medecins_departement_edit,          name='medecins_departement_edit'),
 
     path('consultations/', views.consultations_list, name='consultations_list'),

@@ -2118,20 +2118,6 @@ def medecins_specialites(request):
 
 
 @login_required(login_url='login')
-def medecins_specialite_detail(request, pk):
-    from medecins.models import Specialite
-    obj  = get_object_or_404(Specialite, pk=pk)
-    pks  = list(Specialite.objects.order_by('nom').values_list('pk', flat=True))
-    pos  = pks.index(pk) if pk in pks else None
-    return render(request, 'medecins/config/specialite_detail.html', {
-        'obj':      obj,
-        'prev_pk':  pks[pos - 1] if pos and pos > 0 else None,
-        'next_pk':  pks[pos + 1] if pos is not None and pos < len(pks) - 1 else None,
-        'medecins': obj.medecin_set.select_related('employe', 'service').order_by('employe__nom'),
-    })
-
-
-@login_required(login_url='login')
 def medecins_specialite_create(request):
     is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
     Form = _specialite_form_class()
@@ -2160,7 +2146,7 @@ def medecins_specialite_edit(request, pk):
         if is_ajax:
             return JsonResponse({'ok': True, 'message': f'Spécialité « {obj} » mise à jour.'})
         messages.success(request, 'Spécialité mise à jour.')
-        return redirect('medecins_specialite_detail', pk=pk)
+        return redirect('medecins_specialites')
     template = 'medecins/config/specialite_form_modal.html' if is_ajax else 'medecins/config/specialite_form.html'
     return render(request, template, {
         'form': form, 'titre': f'Modifier – {obj.nom}', 'obj': obj,
@@ -2283,21 +2269,6 @@ def medecins_departements(request):
 
 
 @login_required(login_url='login')
-def medecins_departement_detail(request, pk):
-    from medecins.models import Departement
-    obj = get_object_or_404(Departement, pk=pk)
-    pks = list(Departement.objects.order_by('nom').values_list('pk', flat=True))
-    pos = pks.index(pk) if pk in pks else None
-    medecins = obj.medecins.select_related('employe').order_by('employe__nom', 'employe__prenoms')
-    return render(request, 'medecins/config/departement_detail.html', {
-        'obj':      obj,
-        'medecins': medecins,
-        'prev_pk': pks[pos - 1] if pos and pos > 0 else None,
-        'next_pk': pks[pos + 1] if pos is not None and pos < len(pks) - 1 else None,
-    })
-
-
-@login_required(login_url='login')
 def medecins_departement_create(request):
     is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
     Form = _departement_form_class()
@@ -2326,7 +2297,7 @@ def medecins_departement_edit(request, pk):
         if is_ajax:
             return JsonResponse({'ok': True, 'message': f'Département « {obj} » mis à jour.'})
         messages.success(request, 'Département mis à jour.')
-        return redirect('medecins_departement_detail', pk=pk)
+        return redirect('medecins_departements')
     template = 'medecins/config/departement_form_modal.html' if is_ajax else 'medecins/config/departement_form.html'
     return render(request, template, {
         'form': form, 'titre': f'Modifier – {obj.nom}', 'obj': obj,
