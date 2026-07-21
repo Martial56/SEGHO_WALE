@@ -5,8 +5,25 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.contrib import messages
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme, urlencode
+from django.urls import reverse
 from django.db.models import F, Q
 from datetime import timedelta
+
+MAX_UNLOCK_ATTEMPTS = 5
+
+
+def _safe_next_url(request, candidate):
+    if candidate and url_has_allowed_host_and_scheme(
+        candidate, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        return candidate
+    return 'dashboard'
+
+
+def _resolve_next_url(request, candidate):
+    next_url = _safe_next_url(request, candidate)
+    return reverse('dashboard') if next_url == 'dashboard' else next_url
 
 
 def login_view(request):
@@ -19,15 +36,22 @@ def login_view(request):
         user = authenticate(request, username=username, password=password)
         if user is not None:
             login(request, user)
-            return redirect('intro')
+            next_url = _resolve_next_url(request, request.POST.get('next'))
+            return redirect(f"{reverse('intro')}?{urlencode({'next': next_url})}")
         else:
             error = "Identifiant ou mot de passe incorrect."
-    return render(request, 'registration/login.html', {'error': error})
+    next_candidate = request.GET.get('next', '')
+    return render(request, 'registration/login.html', {
+        'error': error,
+        'next': next_candidate if _safe_next_url(request, next_candidate) == next_candidate else '',
+    })
 
 
 @login_required(login_url='login')
 def intro(request):
-    return render(request, 'core/intro.html')
+    return render(request, 'core/intro.html', {
+        'next_url': _resolve_next_url(request, request.GET.get('next')),
+    })
 
 
 @require_POST
@@ -50,7 +74,8 @@ def unlock_session(request):
     """Déverrouille la session après vérification du mot de passe de
     l'utilisateur déjà authentifié (pas de login()/logout() — la session et
     tout son contenu, y compris la page/le formulaire en cours côté client,
-    restent intacts)."""
+    restent intacts). Le nombre de tentatives est limité : au-delà, la session
+    est entièrement détruite (retour à l'écran de connexion classique)."""
     is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
     error = None
     if request.method == 'POST':
@@ -58,15 +83,29 @@ def unlock_session(request):
         if request.user.check_password(password):
             request.session['locked'] = False
             request.session['last_activity'] = timezone.now().timestamp()
+            request.session.pop('unlock_attempts', None)
             if is_ajax:
                 return JsonResponse({'ok': True})
-            return redirect(request.POST.get('next') or 'dashboard')
-        error = "Mot de passe incorrect."
+            return redirect(_safe_next_url(request, request.POST.get('next')))
+
+        attempts = request.session.get('unlock_attempts', 0) + 1
+        request.session['unlock_attempts'] = attempts
+        if attempts >= MAX_UNLOCK_ATTEMPTS:
+            logout(request)
+            error = "Trop de tentatives incorrectes, vous avez été déconnecté."
+            if is_ajax:
+                return JsonResponse({'ok': False, 'logged_out': True, 'error': error}, status=403)
+            messages.error(request, error)
+            return redirect('login')
+
+        error = f"Mot de passe incorrect ({MAX_UNLOCK_ATTEMPTS - attempts} tentative(s) restante(s))."
         if is_ajax:
             return JsonResponse({'ok': False, 'error': error}, status=400)
+
+    next_candidate = request.GET.get('next', '')
     return render(request, 'registration/locked.html', {
         'error': error,
-        'next': request.GET.get('next', ''),
+        'next': next_candidate if _safe_next_url(request, next_candidate) == next_candidate else '',
     })
 
 
@@ -114,7 +153,9 @@ def mon_compte(request):
                 minutes = 30
             profile.session_timeout_minutes = max(0, minutes)
             profile.save(update_fields=['session_timeout_minutes'])
-            messages.success(request, 'Préférence de déconnexion automatique enregistrée.')
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                return JsonResponse({'ok': True, 'session_timeout_minutes': profile.session_timeout_minutes})
+            messages.success(request, 'Délai de verrouillage mis à jour.')
             return redirect('mon_compte')
 
         elif action == 'password':

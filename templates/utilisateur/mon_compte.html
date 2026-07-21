@@ -280,18 +280,20 @@ html[data-theme="dark"] .cpt-pw-toggle:hover { color:var(--teal-400); }
   <div class="cpt-card">
     <div class="cpt-card-head">
       <i class="bi bi-hourglass-split" style="font-size:16px;color:var(--teal-600);"></i>
-      <span style="font-size:13px;font-weight:700;color:var(--teal-900);">Déconnexion automatique</span>
+      <span style="font-size:13px;font-weight:700;color:var(--teal-900);">Verrouillage automatique</span>
     </div>
     <div class="cpt-card-body">
       <p style="font-size:12.5px;color:rgba(0,0,0,.5);margin-bottom:16px;">
-        Après cette durée d'inactivité (aucun clic, aucune saisie), tu seras déconnecté automatiquement.
+        Après ce délai d'inactivité (aucun clic, aucune saisie), ta session se verrouille : un mot de passe est demandé pour continuer, sans rien perdre de la page en cours.
       </p>
-      <form method="post" style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;">
+      <form id="session-timeout-form" method="post" style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;">
         {% csrf_token %}
         <input type="hidden" name="action" value="session_timeout">
         <div class="cpt-field" style="margin-bottom:0;min-width:220px;">
-          <label class="cpt-label">Délai avant déconnexion</label>
-          <select name="session_timeout_minutes" class="cpt-input">
+          <label class="cpt-label">Délai avant verrouillage</label>
+          <select name="session_timeout_minutes" id="session_timeout_minutes" class="cpt-input">
+            <option value="1"   {% if profile.session_timeout_minutes == 1 %}selected{% endif %}>1 minute</option>
+            <option value="2"   {% if profile.session_timeout_minutes == 2 %}selected{% endif %}>2 minutes</option>
             <option value="5"   {% if profile.session_timeout_minutes == 5 %}selected{% endif %}>5 minutes</option>
             <option value="10"  {% if profile.session_timeout_minutes == 10 %}selected{% endif %}>10 minutes</option>
             <option value="15"  {% if profile.session_timeout_minutes == 15 %}selected{% endif %}>15 minutes</option>
@@ -304,6 +306,7 @@ html[data-theme="dark"] .cpt-pw-toggle:hover { color:var(--teal-400); }
         <button type="submit" class="cpt-btn">
           <i class="bi bi-check-lg"></i> Enregistrer
         </button>
+        <span id="session-timeout-saved" style="display:none;font-size:12px;color:var(--color-success);font-weight:600;">✓ Enregistré</span>
       </form>
     </div>
   </div>
@@ -350,6 +353,34 @@ function togglePw(inputId, btn) {
     ? '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
     : '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
 }
+</script>
+<script>
+(function () {
+  var form = document.getElementById('session-timeout-form');
+  if (!form) return;
+  var saved = document.getElementById('session-timeout-saved');
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var minutes = parseInt(document.getElementById('session_timeout_minutes').value, 10);
+    fetch(form.action || window.location.pathname, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': getCsrfToken(),
+        'X-Requested-With': 'XMLHttpRequest',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: 'action=session_timeout&session_timeout_minutes=' + encodeURIComponent(minutes),
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (!data.ok) return;
+      if (window.updateSessionTimeout) window.updateSessionTimeout(data.session_timeout_minutes);
+      saved.style.display = 'inline';
+      setTimeout(function () { saved.style.display = 'none'; }, 2000);
+    });
+  });
+})();
 </script>
 <script>
 /* Couleur d'accent personnalisée */
