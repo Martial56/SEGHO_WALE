@@ -2148,6 +2148,7 @@ def rh_config_list(request, slug):
     return render(request, 'employer/config/list.html', {
         'slug': slug, 'cfg': cfg, 'page_obj': page_obj, 'q': q,
         'sort': sort, 'dir': direction,
+        'total': cfg['model'].objects.count(),
         'can_manage': True,
     })
 
@@ -2280,11 +2281,15 @@ def employer_service_detail(request, pk):
 def employer_service_create(request):
     Form = _service_form_class()
     form = Form(request.POST or None)
+    is_ajax = _rh_config_is_ajax(request)
     if request.method == 'POST' and form.is_valid():
-        form.save()
+        obj = form.save()
+        if is_ajax:
+            return JsonResponse({'ok': True, 'message': f"Service « {obj.nom} » créé."})
         messages.success(request, 'Service créé.')
         return redirect('employer_services')
-    return render(request, 'employer/config/service_form.html', {
+    template = 'employer/config/service_form_modal.html' if is_ajax else 'employer/config/service_form.html'
+    return render(request, template, {
         'form': form, 'titre': 'Nouveau service',
         'can_manage': can_manage_rh(request.user),
     })
@@ -2295,11 +2300,15 @@ def employer_service_edit(request, pk):
     obj  = get_object_or_404(Service, pk=pk)
     Form = _service_form_class()
     form = Form(request.POST or None, instance=obj)
+    is_ajax = _rh_config_is_ajax(request)
     if request.method == 'POST' and form.is_valid():
         form.save()
+        if is_ajax:
+            return JsonResponse({'ok': True, 'message': f"Service « {obj.nom} » mis à jour."})
         messages.success(request, 'Service mis à jour.')
         return redirect('employer_service_detail', pk=pk)
-    return render(request, 'employer/config/service_form.html', {
+    template = 'employer/config/service_form_modal.html' if is_ajax else 'employer/config/service_form.html'
+    return render(request, template, {
         'form': form, 'titre': f'Modifier – {obj.nom}', 'obj': obj,
         'can_manage': can_manage_rh(request.user),
     })
