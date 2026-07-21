@@ -5,20 +5,28 @@ from datetime import datetime
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.files.base import ContentFile
-from django.http import Http404
+from django.http import Http404, HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.utils import timezone
 
 from .export import csv_response, xlsx_response
 from .models import HistoriqueRapport
-from .registry import REPORT_CATALOGUE, REPORTS_BY_SLUG, resolve_external_reports
+from .registry import REPORT_CATALOGUE, REPORTS_BY_SLUG
 
 
 @login_required(login_url='login')
 def rapports_hub(request):
+    tous_rapports = [
+        {**rapport, 'categorie': categorie['nom']}
+        for categorie in REPORT_CATALOGUE
+        for rapport in categorie['rapports']
+    ]
+    recents = HistoriqueRapport.objects.select_related('utilisateur').order_by('-date_generation')[:8]
     return render(request, 'rapports/hub.html', {
         'categories': REPORT_CATALOGUE,
-        'external_categories': resolve_external_reports(),
+        'tous_rapports': tous_rapports,
+        'recents': recents,
     })
 
 
@@ -52,18 +60,30 @@ def rapports_generer(request, slug):
     if request.method == 'POST':
         debut = _parse_date(periode_debut)
         fin = _parse_date(periode_fin)
-        if not debut or not fin:
-            erreur = "Merci de renseigner une date de début et une date de fin valides."
-        elif debut > fin:
+        if not debut and not fin:
+            erreur = "Merci de renseigner au moins une date (début ou fin)."
+        elif debut and fin and debut > fin:
             erreur = "La date de début doit être antérieure ou égale à la date de fin."
         else:
+            if not fin:
+                fin = timezone.now().date()
             columns, rows = rapport['fn'](debut, fin)
             filename = _nom_fichier(rapport)
 
             if format_fichier == 'csv':
                 response, content = csv_response(filename, columns, rows)
+            elif rapport.get('build_xlsx_fn'):
+                content = rapport['build_xlsx_fn'](debut, fin, timezone.now())
+                response = HttpResponse(
+                    content,
+                    content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                )
+                response['Content-Disposition'] = f'attachment; filename="{filename}.xlsx"'
             else:
-                response, content = xlsx_response(filename, rapport['nom'], columns, rows)
+                response, content = xlsx_response(
+                    filename, rapport['nom'], columns, rows,
+                    periode_debut=debut, periode_fin=fin, genere_le=timezone.now(),
+                )
 
             historique = HistoriqueRapport(
                 slug=slug, nom=filename, utilisateur=request.user,

@@ -8,7 +8,7 @@ class HistoriqueRapport(models.Model):
     slug = models.CharField(max_length=50, verbose_name="Rapport")
     nom = models.CharField(max_length=150, verbose_name="Nom du rapport")
     utilisateur = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='rapports_generes')
-    periode_debut = models.DateField(verbose_name="Période — début")
+    periode_debut = models.DateField(null=True, blank=True, verbose_name="Période — début")
     periode_fin = models.DateField(verbose_name="Période — fin")
     format_fichier = models.CharField(max_length=10, choices=FORMAT)
     nb_lignes = models.PositiveIntegerField(default=0)
