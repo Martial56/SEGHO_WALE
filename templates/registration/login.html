@@ -1,101 +1,378 @@
 {% load static django_browser_reload %}
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="color-scheme" content="light">
-<title>SEGHO-WALE — Connexion</title>
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<style>
-* { margin:0; padding:0; box-sizing:border-box; }
-html { background: #2e592b; }
-body {
-  font-family:'Sora',sans-serif;
-  min-height:100vh;
-  background-color: #2e592b;
-  background-image: linear-gradient(135deg, #071e28 0%, #2e592b 50%, #4f9b4b 100%);
-  display:flex; align-items:center; justify-content:center;
-}
-.login-card {
-  background: rgba(255,255,255,0.05);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 24px;
-  padding: 48px;
-  width: 420px;
-  box-shadow: 0 40px 80px rgba(0,0,0,0.4);
-  animation: fadeIn 0.4s ease;
-}
-@keyframes fadeIn { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
-.logo { text-align:center; margin-bottom:36px; }
-.logo-icon { display:block; margin:0 auto 14px; width:92px; height:92px; object-fit:contain; filter:brightness(0) invert(1); }
-.logo h1 { color:#fff; font-size:28px; font-weight:800; letter-spacing:-0.5px; }
-.logo p { color:rgba(255,255,255,0.45); font-size:12.5px; margin-top:6px; line-height:1.5; }
-.form-group { margin-bottom:20px; }
-label { display:block; color:rgba(255,255,255,0.65); font-size:12px; font-weight:600; margin-bottom:8px; letter-spacing:0.3px; text-transform:uppercase; }
-input[type=text], input[type=password] {
-  width:100%; padding:14px 18px;
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.15);
-  border-radius:12px; color:#fff; font-family:'Sora',sans-serif; font-size:15px;
-  transition: border-color 0.2s, background 0.2s;
-  outline: none;
-}
-input[type=text]:focus, input[type=password]:focus {
-  border-color: #4f9b4b; background: rgba(255,255,255,0.12);
-  box-shadow: 0 0 0 3px rgba(79,155,75,0.25);
-}
-input::placeholder { color:rgba(255,255,255,0.25); }
-.btn-login {
-  width:100%; padding:16px;
-  background: linear-gradient(135deg, #4f9b4b, #4f9b4b);
-  border:none; border-radius:12px; color:#fff;
-  font-family:'Sora',sans-serif; font-size:15px; font-weight:700;
-  cursor:pointer; transition: transform 0.15s, box-shadow 0.15s;
-  box-shadow: 0 4px 20px rgba(79,155,75,0.45);
-  margin-top:8px;
-}
-.btn-login:hover { transform:translateY(-2px); box-shadow:0 8px 30px rgba(79,155,75,0.6); }
-.btn-login:active { transform:translateY(0); }
-.error-box {
-  background:rgba(232,69,69,0.12);
-  border:1px solid rgba(232,69,69,0.3);
-  border-radius:10px; padding:12px 16px;
-  margin-bottom:20px; color:#ff9090; font-size:13px;
-  display:flex; align-items:center; gap:8px;
-}
-.footer-note { text-align:center; margin-top:24px; color:rgba(255,255,255,0.2); font-size:11px; }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light">
+  <title>SEGHO-WALE — Connexion</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/variables.css' %}">
+  <style>
+    :root {
+      --login-ink: #0c2340;
+      --login-ink-soft: #3a5578;
+      --login-muted: rgba(12, 35, 64, 0.52);
+      --login-accent: #123a63;
+      --login-accent-hover: #0c2b4a;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      height: 100%;
+    }
+
+    body {
+      font-family: var(--font-main);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      background: linear-gradient(115deg, var(--teal-950) 0%, var(--teal-800) 55%, var(--teal-600) 100%);
+    }
+
+    .page-photo {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      background-image:url('{% static "img/connect.png" %}');
+      background-size: cover;
+      background-position: center;
+    }
+
+    .page-scrim {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      background: linear-gradient(115deg, rgba(7, 30, 40, 0.50) 0%, rgba(15, 67, 88, 0.38) 55%, rgba(26, 109, 140, 0.24) 100%);
+    }
+
+    /* ── Marque en haut à gauche (superposée à la photo de fond) ── */
+    .brand-mark {
+      position: fixed;
+      top: 40px;
+      left: 48px;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(255, 255, 255, 0.223);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 8px 18px 8px 8px;
+      border-radius: 999px;
+      box-shadow: 0 10px 24px rgba(4, 15, 26, 0.3);
+      color: var(--login-ink);
+      font-weight: 800;
+      font-size: 14px;
+      letter-spacing: -0.2px;
+    }
+
+    .brand-mark-icon {
+      width: 36px;
+      height: 36px;
+      flex-shrink: 0;
+      background-color: var(--login-ink);
+      -webkit-mask-image: url('{% static "img/logo.png" %}');
+      mask-image: url('{% static "img/logo.png" %}');
+      -webkit-mask-size: contain;
+      mask-size: contain;
+      -webkit-mask-repeat: no-repeat;
+      mask-repeat: no-repeat;
+      -webkit-mask-position: center;
+      mask-position: center;
+    }
+
+    /* ── Formulaire, centré au milieu de l'écran ── */
+    .form-pane {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 48px;
+    }
+
+    .login-card {
+      background: rgba(255, 255, 255, 0.223);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      border-radius: 24px;
+      padding: 48px;
+      width: 400px;
+      max-width: 100%;
+      min-width: 0;
+      box-shadow: 0 40px 80px rgba(4, 15, 26, 0.45), 0 1px 0 rgba(255, 255, 255, 0.4) inset;
+      animation: fadeIn 0.4s ease;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .logo {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .logo-icon {
+      display: block;
+      margin: 0 auto 14px;
+      width: 72px;
+      height: 72px;
+      background-color: var(--login-ink);
+      -webkit-mask-image: url('{% static "img/logo.png" %}');
+      mask-image: url('{% static "img/logo.png" %}');
+      -webkit-mask-size: contain;
+      mask-size: contain;
+      -webkit-mask-repeat: no-repeat;
+      mask-repeat: no-repeat;
+      -webkit-mask-position: center;
+      mask-position: center;
+    }
+
+    .logo h1 {
+      color: var(--login-ink);
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+
+    .logo p {
+      color: var(--login-ink-soft);
+      font-size: 12px;
+      margin-top: 8px;
+      line-height: 1.5;
+    }
+
+    .form-group {
+      margin-bottom: 18px;
+    }
+
+    label {
+      display: block;
+      color: var(--login-ink);
+      font-size: 10px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+    }
+
+    .input-wrap {
+      position: relative;
+    }
+
+    .input-wrap svg {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      stroke: rgba(12, 35, 64, 0.35);
+      transition: stroke .2s;
+      pointer-events: none;
+    }
+
+    .input-wrap input[type=text],
+    .input-wrap input[type=password] {
+      width: 100%;
+      padding: 14px 16px 14px 46px;
+      background: rgba(12, 35, 64, 0.045);
+      border: 1.5px solid rgba(12, 35, 64, 0.14);
+      border-radius: 12px;
+      color: var(--login-ink);
+      font-family: var(--font-main);
+      font-size: 12px;
+      transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+      outline: none;
+    }
+
+    .input-wrap input:focus {
+      border-color: var(--login-accent);
+      background: #ffffff86;
+      /* box-shadow: 0 0 0 4px rgba(18, 58, 99, 0.12); */
+    }
+
+    .input-wrap input:focus+svg,
+    .input-wrap input:focus~svg {
+      stroke: var(--login-accent);
+    }
+
+    input::placeholder {
+      color: var(--login-muted);
+    }
+
+    .btn-login {
+      width: 100%;
+      padding: 16px;
+      background: var(--login-accent);
+      border: none;
+      border-radius: 12px;
+      color: #fff;
+      font-family: var(--font-main);
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
+      box-shadow: 0 10px 24px rgba(18, 58, 99, 0.35);
+      margin-top: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .btn-login.is-loading {
+      cursor: default;
+      opacity: 0.85;
+    }
+
+    .btn-spinner {
+      display: none;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.35);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: btn-spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+
+    .btn-login.is-loading .btn-spinner {
+      display: inline-block;
+    }
+
+    @keyframes btn-spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .btn-login:hover {
+      background: var(--login-accent-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 14px 32px rgba(18, 58, 99, 0.45);
+    }
+
+    .btn-login:active {
+      transform: translateY(0);
+    }
+
+    .error-box {
+      background: rgba(232, 69, 69, 0.12);
+      border: 1px solid rgba(232, 69, 69, 0.3);
+      border-radius: 10px;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      color: var(--rose);
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .footer-note {
+      text-align: center;
+      margin-top: 24px;
+      color: var(--login-muted);
+      font-size: 11px;
+    }
+
+    @media (max-width: 900px) {
+      .brand-mark {
+        display: none;
+      }
+
+      .form-pane {
+        padding: 24px;
+      }
+
+      .login-card {
+        padding: 32px 28px;
+      }
+    }
+  </style>
 </head>
+
 <body>
-<div class="login-card">
-  <div class="logo">
-    <img src="{% static 'img/logo.png' %}" alt="Logo WALÉ" class="logo-icon">
-    <h1>SEGHO-WALE</h1>
-    <p>Système Electronique de Gestion Hospitalière<br>Centre Médico-Sosial WALE<br>Yamoussoukro, Côte d'Ivoire</p>
+  <div class="page-photo"></div>
+  <div class="page-scrim"></div>
+  <div class="brand-mark">
+    <div class="brand-mark-icon" role="img" aria-label=""></div>
+    SEGHO-WALE
   </div>
 
-  {% if error %}
-  <div class="error-box">⚠️ {{ error }}</div>
-  {% endif %}
+  <section class="form-pane">
+    <div class="login-card">
+      <div class="logo">
+        <div class="logo-icon" role="img" aria-label="Logo WALÉ"></div>
+        <h1>SEGHO-WALE</h1>
+        <p>Système Electronique de Gestion Hospitalière<br>Centre Médico-Social WALÉ<br>Yamoussoukro, Côte d'Ivoire</p>
+      </div>
 
-  <form method="post" action="{% url 'login' %}">
-    {% csrf_token %}
-    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
-    <div class="form-group">
-      <label>Identifiant</label>
-      <input type="text" name="username" placeholder="Votre identifiant" autofocus autocomplete="username">
-    </div>
-    <div class="form-group">
-      <label>Mot de passe</label>
-      <input type="password" name="password" placeholder="••••••••" autocomplete="current-password">
-    </div>
-    <button type="submit" class="btn-login">Se connecter →</button>
-  </form>
+      {% if error %}
+      <div class="error-box">⚠️ {{ error }}</div>
+      {% endif %}
 
-  <div class="footer-note">SEGHO-WALE v1.0 · Accès réservé au personnel autorisé</div>
-</div>
-{% django_browser_reload_script %}
+      <form method="post" action="{% url 'login' %}" id="login-form">
+        {% csrf_token %}
+        {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+        <div class="form-group">
+          <label>Identifiant</label>
+          <div class="input-wrap">
+            <input type="text" name="username" placeholder="Votre identifiant" autofocus autocomplete="username">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Mot de passe</label>
+          <div class="input-wrap">
+            <input type="password" name="password" placeholder="••••••••" autocomplete="current-password">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+          </div>
+        </div>
+        <button type="submit" class="btn-login" id="login-btn">
+          <span class="btn-spinner"></span>
+          <span class="btn-label">Se connecter →</span>
+        </button>
+      </form>
+
+      <div class="footer-note">SEGHO-WALE v1.0 · Accès réservé au personnel autorisé</div>
+    </div>
+  </section>
+  {% django_browser_reload_script %}
+  <script>
+    document.getElementById('login-form').addEventListener('submit', function () {
+      var btn = document.getElementById('login-btn');
+      if (btn.classList.contains('is-loading')) return;
+      btn.classList.add('is-loading');
+      btn.querySelector('.btn-label').textContent = 'Connexion…';
+    });
+  </script>
 </body>
+
 </html>
