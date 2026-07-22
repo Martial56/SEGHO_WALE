@@ -11,6 +11,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .export import csv_response, xlsx_response
+from .maternite import calculer_rapport_maternite
 from .models import HistoriqueRapport
 from .registry import REPORT_CATALOGUE, REPORTS_BY_SLUG
 
@@ -142,6 +143,23 @@ def rapports_historique(request):
         'date_debut': request.GET.get('date_debut', ''),
         'date_fin': request.GET.get('date_fin', ''),
     })
+
+
+@login_required(login_url='login')
+def rapports_maternite(request):
+    today = datetime.now().date()
+    try:
+        annee = int(request.GET.get('annee', today.year))
+    except ValueError:
+        annee = today.year
+    try:
+        mois = int(request.GET.get('mois', today.month))
+    except ValueError:
+        mois = today.month
+    mois = min(max(mois, 1), 12)
+
+    rapport = calculer_rapport_maternite(annee, mois)
+    return render(request, 'rapports/rapport_maternite.html', rapport)
 
 
 @login_required(login_url='login')
