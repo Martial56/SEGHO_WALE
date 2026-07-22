@@ -60,16 +60,31 @@ def calculer_rapport_maternite(annee, mois):
     dernier_jour = date(annee, mois, calendar.monthrange(annee, mois)[1])
     periode = [premier_jour, dernier_jour]
 
-    # ── A-1 : CPN — rang de visite (RendezVous.type_visite_cpn) ──
-    rdv_cpn_periode = RendezVous.objects.filter(date_heure__date__range=periode).exclude(type_visite_cpn='')
+    # ── A-1 : CPN — rang de visite ──
+    # Le rang de la visite CPN est déterminé par RendezVous.cpn_type_visite
+    # (FK vers le catalogue gynecologie.TypeVisite, ex. code='CPN02' / nom='CPN2'),
+    # PAS par RendezVous.type_visite_cpn (un champ enum legacy jamais renseigné
+    # par le formulaire actuel — cpn_type_visite est le seul champ réellement
+    # utilisé par templates/gynecologie/rdv_form.html).
+    CODE_CPN1 = 'CPN01'
+    CODE_CPN1_AT = 'CPNA01'
+    CODE_CPN2 = 'CPN02'
+    CODE_CPN3 = 'CPN03'
+    CODE_CPN4_AT = 'CPNA04'
+    CODE_CPN4 = 'CPN04'
+    CODE_CPN5PLUS = 'CPN05'
 
-    def compte_rang(*rangs):
-        return rdv_cpn_periode.filter(type_visite_cpn__in=rangs).count()
+    rdv_cpn_periode = RendezVous.objects.filter(
+        date_heure__date__range=periode, cpn_type_visite__isnull=False
+    )
 
-    cpn1 = compte_rang('cpn1')
-    cpn1_at = compte_rang('cpn1_at')
+    def compte_rang(*codes):
+        return rdv_cpn_periode.filter(cpn_type_visite__code__in=codes).count()
+
+    cpn1 = compte_rang(CODE_CPN1)
+    cpn1_at = compte_rang(CODE_CPN1_AT)
     premiere_visite_par_patient = (
-        RendezVous.objects.exclude(type_visite_cpn='')
+        RendezVous.objects.filter(cpn_type_visite__isnull=False)
         .values('patient').annotate(premiere=Min('date_heure'))
     )
     nouvelles_patientes = premiere_visite_par_patient.filter(premiere__date__range=periode).count()
@@ -80,12 +95,11 @@ def calculer_rapport_maternite(annee, mois):
         'cpn1': cpn1,
         'cpn1_at': cpn1_at,
         'total_cpn1': cpn1 + cpn1_at,
-        'cpn2': compte_rang('cpn2', 'cpn2_at'),
-        'cpn3': compte_rang('cpn3', 'cpn3_at'),
-        'cpn4_at': compte_rang('cpn4_at'),
-        'cpn4': compte_rang('cpn4'),
-        'cpn5plus': compte_rang('cpn5plus'),
-        'grossesses_a_risque': None,  # aucun champ dédié
+        'cpn2': compte_rang(CODE_CPN2),
+        'cpn3': compte_rang(CODE_CPN3),
+        'cpn4_at': compte_rang(CODE_CPN4_AT),
+        'cpn4': compte_rang(CODE_CPN4),
+        'cpn5plus': compte_rang(CODE_CPN5PLUS),
     }
 
     # ── A-1 (suite) : dépistages/prescriptions CPN (RegistreCPN.donnees) ──
@@ -133,7 +147,10 @@ def calculer_rapport_maternite(annee, mois):
                 depistage_conjoint['negatif_chez_mere_neg'] += 1
 
     # ── VIH/PMTCT : 3 premières lignes, CPN1 uniquement ──
-    registres_cpn1 = registres_cpn.filter(rdv__type_visite_cpn__in=['cpn1', 'cpn1_at'])
+    registres_cpn1 = registres_cpn.filter(rdv__cpn_type_visite__code__in=[CODE_CPN1, CODE_CPN1_AT])
+    cpn['grossesses_a_risque'] = sum(
+        1 for r in registres_cpn1 if r.donnees.get('cpn_resultat_consultation') == 'risque'
+    )
     vih_cpn1_connues = sum(1 for r in registres_cpn1 if r.donnees.get('cpn_statut_vih_accueil') == 'positif')
     vih_cpn1_deja_arv = sum(1 for r in registres_cpn1 if _oui(r.donnees, 'cpn_sous_arv'))
     vih_cpn1_resultat_recu = sum(1 for r in registres_cpn1 if _oui(r.donnees, 'cpn_annonce_resultat'))
