@@ -1,0 +1,379 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rapport mensuel maternité — {{ mois_nom }} {{ annee }}</title>
+<style>
+:root { --font-print: 'Segoe UI', Arial, sans-serif; --font-mono: 'Courier New', monospace; --brand: #1a5c4a; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-print); background: #e5e7eb; color: #1a1a2e; font-size: 12px; }
+
+/* ── Contrôles écran ── */
+.print-toolbar {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  background: var(--brand); color: #fff; padding: 10px 24px;
+  position: sticky; top: 0; z-index: 100;
+}
+.print-toolbar span.tb-title { font-size: 13px; font-weight: 600; margin-right: auto; }
+.periode-form { display: flex; align-items: center; gap: 6px; }
+.periode-form select, .periode-form input {
+  border: none; border-radius: 4px; padding: 5px 8px; font-size: 12px; font-family: inherit;
+}
+.toolbar-btn {
+  padding: 6px 16px; border-radius: 5px; font-size: 12px; font-weight: 600;
+  cursor: pointer; border: none; display: inline-flex; align-items: center; gap: 6px;
+  font-family: inherit; text-decoration: none;
+}
+.btn-print { background: #fff; color: var(--brand); }
+.btn-appliquer { background: rgba(255,255,255,.2); color: #fff; }
+.btn-back { background: rgba(255,255,255,.15); color: #fff; }
+.btn-back:hover { background: rgba(255,255,255,.25); }
+
+/* ── Page A4 ── */
+.rm-page {
+  max-width: 900px; margin: 24px auto; background: #fff;
+  border-radius: 4px; box-shadow: 0 4px 24px rgba(0,0,0,.12);
+  padding: 34px 42px 40px;
+}
+.rm-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.rm-logo { display: flex; align-items: center; gap: 10px; }
+.rm-logo-circle {
+  width: 46px; height: 46px; border-radius: 50%; border: 2px solid var(--brand);
+  display: flex; align-items: center; justify-content: center; overflow: hidden; background: #fff; flex-shrink: 0;
+}
+.rm-logo-circle img { width: 100%; height: 100%; object-fit: contain; padding: 3px; }
+.rm-logo-name { font-size: 14px; font-weight: 800; color: var(--brand); letter-spacing: .3px; }
+.rm-page-num { font-size: 11px; color: #9ca3af; }
+.rm-title { text-align: center; font-size: 16px; font-weight: 800; color: var(--brand); margin: 10px 0 4px; text-transform: uppercase; }
+.rm-subtitle { text-align: center; font-size: 12.5px; color: #374151; margin-bottom: 20px; }
+.rm-subtitle strong { color: var(--brand); }
+
+.rm-section-title {
+  font-size: 12.5px; font-weight: 800; text-transform: uppercase; color: var(--brand);
+  margin: 20px 0 8px; padding-bottom: 4px; border-bottom: 1.5px solid var(--brand);
+}
+.rm-sub-title { font-size: 11.5px; font-weight: 700; color: #374151; margin: 12px 0 6px; text-decoration: underline; }
+
+table.rm-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+table.rm-table th, table.rm-table td {
+  border: 1px solid #9ca3af; padding: 5px 8px; font-size: 11px; text-align: left; vertical-align: middle;
+}
+table.rm-table th { background: #f0fdf4; font-weight: 700; color: #1f2937; text-align: center; }
+table.rm-table td.num { text-align: center; width: 90px; }
+table.rm-table tr.total-row td, table.rm-table tr.total-row th { font-weight: 800; background: #f9fafb; }
+.rm-val { font-weight: 700; color: var(--brand); }
+.rm-blank { display: inline-block; min-width: 34px; border-bottom: 1px solid #9ca3af; height: 14px; }
+
+.rm-legende {
+  margin-top: 10px; font-size: 10px; color: #6b7280; font-style: italic; line-height: 1.6;
+  border-top: 1px dashed #d1d5db; padding-top: 8px;
+}
+.rm-signatures { display: flex; justify-content: space-between; margin-top: 34px; gap: 16px; }
+.rm-signature-box { flex: 1; text-align: center; border: 1px solid #9ca3af; border-radius: 4px; padding: 14px 8px 40px; font-size: 10.5px; font-weight: 700; }
+
+.rm-page-break { page-break-after: always; }
+
+@media print {
+  body { background: #fff; }
+  .print-toolbar { display: none !important; }
+  .rm-page {
+    margin: 0; padding: 12mm 14mm 16mm; box-shadow: none; border-radius: 0; max-width: 100%;
+  }
+}
+@page { size: A4; margin: 0; }
+</style>
+</head>
+<body>
+
+<!-- ── Barre d'outils (écran seulement) ── -->
+<div class="print-toolbar">
+  <span class="tb-title">Rapport mensuel maternité — {{ mois_nom }} {{ annee }}</span>
+  <form class="periode-form" method="get">
+    <select name="mois">
+      <option value="1" {% if mois == 1 %}selected{% endif %}>Janvier</option>
+      <option value="2" {% if mois == 2 %}selected{% endif %}>Février</option>
+      <option value="3" {% if mois == 3 %}selected{% endif %}>Mars</option>
+      <option value="4" {% if mois == 4 %}selected{% endif %}>Avril</option>
+      <option value="5" {% if mois == 5 %}selected{% endif %}>Mai</option>
+      <option value="6" {% if mois == 6 %}selected{% endif %}>Juin</option>
+      <option value="7" {% if mois == 7 %}selected{% endif %}>Juillet</option>
+      <option value="8" {% if mois == 8 %}selected{% endif %}>Août</option>
+      <option value="9" {% if mois == 9 %}selected{% endif %}>Septembre</option>
+      <option value="10" {% if mois == 10 %}selected{% endif %}>Octobre</option>
+      <option value="11" {% if mois == 11 %}selected{% endif %}>Novembre</option>
+      <option value="12" {% if mois == 12 %}selected{% endif %}>Décembre</option>
+    </select>
+    <input type="number" name="annee" value="{{ annee }}" min="2000" max="2100" style="width:80px;">
+    <button type="submit" class="toolbar-btn btn-appliquer">Appliquer</button>
+  </form>
+  <button class="toolbar-btn btn-print" onclick="window.print()">Imprimer / Télécharger PDF</button>
+  <a class="toolbar-btn btn-back" href="{% url 'rapports:hub' %}">← Fermer</a>
+</div>
+
+<!-- ══════════════════════ PAGE 1 : CPN ══════════════════════ -->
+<div class="rm-page rm-page-break">
+  <div class="rm-header">
+    <div class="rm-logo">
+      <div class="rm-logo-circle"><img src="{% static 'img/logo.png' %}" alt="CMS WALÉ"></div>
+      <div class="rm-logo-name">CENTRE MEDICO SOCIAL WALE</div>
+    </div>
+    <div class="rm-page-num">1</div>
+  </div>
+  <div class="rm-title">Rapport mensuel d'activité : Maternité</div>
+  <div class="rm-subtitle">ANNÉE : <strong>{{ annee }}</strong> &nbsp;—&nbsp; MOIS : <strong>{{ mois_nom }}</strong></div>
+
+  <div class="rm-section-title">A — Activités ordinaires</div>
+  <div class="rm-sub-title">A-1 : Consultations prénatales</div>
+  <table class="rm-table">
+    <thead><tr><th style="text-align:left;">Indicateurs</th><th>Nombre</th></tr></thead>
+    <tbody>
+      <tr><td>Nombre de nouvelles patientes</td><td class="num rm-val">{{ cpn.nouvelles_patientes }}</td></tr>
+      <tr><td>Nombre de consultations prénatales</td><td class="num rm-val">{{ cpn.total_consultations }}</td></tr>
+      <tr><td>1ère consultation prénatale au cours du 1er trimestre de la grossesse</td><td class="num rm-val">{{ cpn.cpn1 }}</td></tr>
+      <tr><td>1ère consultation prénatale autre trimestre de la grossesse</td><td class="num rm-val">{{ cpn.cpn1_at }}</td></tr>
+      <tr class="total-row"><td>TOTAL CPN1</td><td class="num rm-val">{{ cpn.total_cpn1 }}</td></tr>
+      <tr><td>2ième consultations prénatales</td><td class="num rm-val">{{ cpn.cpn2 }}</td></tr>
+      <tr><td>3ième consultations prénatales</td><td class="num rm-val">{{ cpn.cpn3 }}</td></tr>
+      <tr><td>4ième consultations prénatales autre trimestre de la grossesse</td><td class="num rm-val">{{ cpn.cpn4_at }}</td></tr>
+      <tr><td>4ième consultations prénatales au 9ème mois de la grossesse</td><td class="num rm-val">{{ cpn.cpn4 }}</td></tr>
+      <tr><td>5ième consultations prénatales et plus</td><td class="num rm-val">{{ cpn.cpn5plus }}</td></tr>
+      <tr><td>Grossesses à risque dépistées CPN1</td><td class="num"><span class="rm-blank"></span></td></tr>
+      <tr><td>Nombre de femmes enceintes malnutris dépistées en CPN</td><td class="num rm-val">{{ cpn_indicateurs.malnutris }}</td></tr>
+      <tr><td>Nombre de femmes enceintes anémiées dépistées en CPN</td><td class="num rm-val">{{ cpn_indicateurs.anemiees }}</td></tr>
+      <tr><td>Nombre de femmes enceintes dépistées positives à la syphilis en CPN</td><td class="num rm-val">{{ cpn_indicateurs.syphilis_positif }}</td></tr>
+      <tr><td>Femmes enceintes dépistées positives à l'AgHBs en CPN</td><td class="num rm-val">{{ cpn_indicateurs.aghbs_positif }}</td></tr>
+      <tr><td>Femmes enceintes mises sous Sulfadoxine pyriméthamine (1ère dose — SP1)</td><td class="num rm-val">{{ cpn_indicateurs.sp1 }}</td></tr>
+      <tr><td>Femmes enceintes mises sous Sulfadoxine pyriméthamine (2ième dose — SP2)</td><td class="num rm-val">{{ cpn_indicateurs.sp2 }}</td></tr>
+      <tr><td>Femmes enceintes mises sous Sulfadoxine pyriméthamine (3ième dose — SP3)</td><td class="num rm-val">{{ cpn_indicateurs.sp3 }}</td></tr>
+      <tr><td>Femmes enceintes mises sous Sulfadoxine pyriméthamine (4ième dose — SP4)</td><td class="num rm-val">{{ cpn_indicateurs.sp4 }}</td></tr>
+      <tr><td>Femmes enceintes mises sous Sulfadoxine pyriméthamine (5ème dose et plus)</td><td class="num rm-val">{{ cpn_indicateurs.sp5 }}</td></tr>
+      <tr><td>Femmes ayant bénéficié d'un counseling PFPP et de conseils nutritionnels</td><td class="num rm-val">{{ cpn_indicateurs.conseil_nutritionnel }}</td></tr>
+      <tr><td>Femmes enceintes vues en CPN et ayant reçu une MILDA</td><td class="num rm-val">{{ cpn_indicateurs.milda }}</td></tr>
+      <tr><td>Femmes enceintes vues en CPN et mises sous fer + folate</td><td class="num rm-val">{{ cpn_indicateurs.fer_folate }}</td></tr>
+      <tr><td>Femmes enceintes vues en CPN et déparasitées</td><td class="num rm-val">{{ cpn_indicateurs.deparasitees }}</td></tr>
+    </tbody>
+  </table>
+  <div class="rm-legende">
+    Malnutris = état nutritionnel renseigné « Mauvais » en CPN. Fer + folate = les deux prescrits lors de la même visite.
+    Les cases vides n'ont pas de champ correspondant dans le dossier informatisé et doivent être complétées manuellement.
+  </div>
+</div>
+
+<!-- ══════════════════════ PAGE 2 : Accouchement ══════════════════════ -->
+<div class="rm-page rm-page-break">
+  <div class="rm-header">
+    <div class="rm-logo">
+      <div class="rm-logo-circle"><img src="{% static 'img/logo.png' %}" alt="CMS WALÉ"></div>
+      <div class="rm-logo-name">CENTRE MEDICO SOCIAL WALE</div>
+    </div>
+    <div class="rm-page-num">2</div>
+  </div>
+
+  <div class="rm-sub-title">Lieu d'accouchement</div>
+  <table class="rm-table">
+    <thead>
+      <tr><th style="text-align:left;">Lieu d'accouchement</th>
+        {% for ligne in lieu_accouchement.lignes %}<th>{{ ligne.label }}</th>{% endfor %}
+        <th>Total</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Accouchement dans l'établissement</td>
+        {% for ligne in lieu_accouchement.lignes %}<td class="num rm-val">{{ ligne.etablissement }}</td>{% endfor %}
+        <td class="num rm-val">{{ lieu_accouchement.total_etablissement }}</td></tr>
+      <tr><td>Accouchement à domicile</td>
+        {% for ligne in lieu_accouchement.lignes %}<td class="num rm-val">{{ ligne.domicile }}</td>{% endfor %}
+        <td class="num rm-val">{{ lieu_accouchement.total_domicile }}</td></tr>
+      <tr class="total-row"><td>Total</td>
+        {% for ligne in lieu_accouchement.lignes %}<td class="num rm-val">{{ ligne.total }}</td>{% endfor %}
+        <td class="num rm-val">{{ lieu_accouchement.grand_total }}</td></tr>
+      <tr><td>Nombre de cas référés vers une autre structure sanitaire</td>
+        {% for ligne in lieu_accouchement.lignes %}<td class="num rm-val">{{ ligne.refere }}</td>{% endfor %}
+        <td class="num rm-val">{{ lieu_accouchement.total_refere }}</td></tr>
+    </tbody>
+  </table>
+
+  <div class="rm-sub-title">A-2-2 : Statut vaccinal antitétanique à l'accouchement</div>
+  <table class="rm-table">
+    <thead><tr><th style="text-align:left;">Indicateurs</th><th>Nombre</th></tr></thead>
+    <tbody>
+      <tr><td>Nombre de mère ayant accouché avec VAT à jour</td><td class="num rm-val">{{ vat_accouchement.a_jour }}</td></tr>
+      <tr><td>Nombre de mère ayant accouché avec VAT non à jour</td><td class="num rm-val">{{ vat_accouchement.non_a_jour }}</td></tr>
+      <tr><td>Nombre de mère ayant accouché sans aucun VAT</td><td class="num rm-val">{{ vat_accouchement.sans_vat }}</td></tr>
+      <tr class="total-row"><td>Total</td><td class="num rm-val">{{ vat_accouchement.total }}</td></tr>
+    </tbody>
+  </table>
+  <div class="rm-legende">« À jour » = 2 doses de VAT ou plus (retenu comme seuil de protection pour la grossesse en cours).</div>
+
+  <div class="rm-sub-title">A-2-3 : Issue de l'accouchement</div>
+  <table class="rm-table">
+    <thead><tr><th style="text-align:left;">Indicateur</th><th>Nombre</th></tr></thead>
+    <tbody>
+      <tr><td>Naissances vivantes</td><td class="num rm-val">{{ issue_accouchement.vivant }}</td></tr>
+      <tr><td>Mort-nés frais</td><td class="num rm-val">{{ issue_accouchement.mort_ne_frais }}</td></tr>
+      <tr><td>Mort-nés macérés</td><td class="num rm-val">{{ issue_accouchement.mort_ne_macere }}</td></tr>
+      <tr><td>Enfants nés vivants dont le poids de naissance est inférieur à 2500 g</td><td class="num rm-val">{{ issue_accouchement.poids_faible }}</td></tr>
+      <tr><td>Prématurés</td><td class="num rm-val">{{ issue_accouchement.prematures }}</td></tr>
+      <tr><td>Nouveau-nés protégés à la naissance contre le tétanos</td><td class="num rm-val">{{ issue_accouchement.proteges_tetanos }}</td></tr>
+      <tr><td>Accouchements multiples</td><td class="num rm-val">{{ issue_accouchement.multiples }}</td></tr>
+      <tr><td>Avortements spontanés</td><td class="num rm-val">{{ issue_accouchement.avortements_spontanes }}</td></tr>
+      <tr><td>Avortement provoqué</td><td class="num rm-val">{{ issue_accouchement.avortements_provoques }}</td></tr>
+      <tr><td>Évacuation des mères avant l'accouchement</td><td class="num"><span class="rm-blank"></span></td></tr>
+      <tr><td>Évacuation des mères après l'accouchement</td><td class="num"><span class="rm-blank"></span></td></tr>
+      <tr><td>Évacuation des nouveau-nés</td><td class="num rm-val">{{ issue_accouchement.evacuation_nn }}</td></tr>
+      <tr><td>Nombre de femmes ayant présenté une CO*</td><td class="num"><span class="rm-blank"></span></td></tr>
+      <tr><td>Nombre de femmes présentant une CO* référées vers une autre structure sanitaire</td><td class="num"><span class="rm-blank"></span></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ══════════════════════ PAGE 3 : Déclaration naissance / Postnatal / VIH ══════════════════════ -->
+<div class="rm-page rm-page-break">
+  <div class="rm-header">
+    <div class="rm-logo">
+      <div class="rm-logo-circle"><img src="{% static 'img/logo.png' %}" alt="CMS WALÉ"></div>
+      <div class="rm-logo-name">CENTRE MEDICO SOCIAL WALE</div>
+    </div>
+    <div class="rm-page-num">3</div>
+  </div>
+
+  <div class="rm-section-title">B : Déclaration de naissance en salle d'accouchement</div>
+  <table class="rm-table">
+    <thead><tr><th style="text-align:left;"></th><th>Sexe masculin</th><th>Sexe féminin</th><th>Total</th></tr></thead>
+    <tbody>
+      <tr><td>Nombre d'enfants nés vivants au cours du mois dont la fiche de déclaration de naissance a été renseignée</td>
+        <td class="num rm-val">{{ declaration_naissance.m }}</td>
+        <td class="num rm-val">{{ declaration_naissance.f }}</td>
+        <td class="num rm-val">{{ declaration_naissance.m|add:declaration_naissance.f }}</td></tr>
+      <tr><td>… dont la fiche renseignée comporte les « informations nécessaires » pour l'attribution d'un numéro d'acte de naissance</td>
+        <td class="num"><span class="rm-blank"></span></td><td class="num"><span class="rm-blank"></span></td><td class="num"><span class="rm-blank"></span></td></tr>
+    </tbody>
+  </table>
+
+  <div class="rm-section-title">Consultations postnatales</div>
+  <table class="rm-table">
+    <thead><tr><th style="text-align:left;">Type</th><th>Nombre</th></tr></thead>
+    <tbody>
+      <tr><td>Consultation postnatale immédiate (dans les 72 heures suivant l'accouchement)</td><td class="num rm-val">{{ postnatales.immediate }}</td></tr>
+      <tr><td>Consultation postnatale (jusqu'au 6ème jour après l'accouchement)</td><td class="num rm-val">{{ postnatales.jusqu_6e_jour }}</td></tr>
+      <tr><td>Consultation postnatale (de 6 à 8 semaines après l'accouchement)</td><td class="num rm-val">{{ postnatales.six_huit_semaines }}</td></tr>
+      <tr class="total-row"><td>Total</td><td class="num rm-val">{{ postnatales.total }}</td></tr>
+    </tbody>
+  </table>
+
+  <div class="rm-section-title">C : Conseil et dépistage en CPN et à la maternité</div>
+  <table class="rm-table">
+    <thead><tr><th style="text-align:left;">Indicateurs</th><th>CPN</th><th>Maternité</th><th>Post-Natal</th><th>Total</th></tr></thead>
+    <tbody>
+      <tr><td>Femmes enceintes reçues en CPN1 et se connaissant déjà séropositives au VIH</td>
+        <td class="num rm-val">{{ vih_cpn1.deja_seropositives }}</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>
+      <tr><td>Femmes enceintes déjà sous traitement ARV et reçues en CPN1</td>
+        <td class="num rm-val">{{ vih_cpn1.deja_sous_arv }}</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>
+      <tr><td>Femmes enceintes conseillées et testées ayant reçu leur résultat du test VIH en CPN1</td>
+        <td class="num rm-val">{{ vih_cpn1.resultat_recu }}</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>
+      <tr><td>Femmes enceintes/allaitantes conseillées et testées pour le VIH, ayant reçu leur résultat</td>
+        <td class="num rm-val">{{ vih_cascade.resultat_recu.cpn }}</td><td class="num rm-val">{{ vih_cascade.resultat_recu.accouchement }}</td>
+        <td class="num rm-val">{{ vih_cascade.resultat_recu.postnatal }}</td><td class="num rm-val">{{ vih_cascade.resultat_recu.total }}</td></tr>
+      <tr><td>Femmes enceintes séronégatives ayant bénéficié d'un « retesting »</td>
+        <td class="num rm-val">{{ vih_cascade.retesting.cpn }}</td><td class="num rm-val">{{ vih_cascade.retesting.accouchement }}</td>
+        <td class="num rm-val">{{ vih_cascade.retesting.postnatal }}</td><td class="num rm-val">{{ vih_cascade.retesting.total }}</td></tr>
+      <tr><td>Femmes enceintes/allaitantes dépistées positives au VIH</td>
+        <td class="num rm-val">{{ vih_cascade.depistees_positives.cpn }}</td><td class="num rm-val">{{ vih_cascade.depistees_positives.accouchement }}</td>
+        <td class="num rm-val">{{ vih_cascade.depistees_positives.postnatal }}</td><td class="num rm-val">{{ vih_cascade.depistees_positives.total }}</td></tr>
+      <tr><td>Femmes enceintes/allaitantes séropositives nouvellement mises sous ARV</td>
+        <td class="num rm-val">{{ vih_cascade.initiation_arv.cpn }}</td><td class="num rm-val">{{ vih_cascade.initiation_arv.accouchement }}</td>
+        <td class="num rm-val">{{ vih_cascade.initiation_arv.postnatal }}</td><td class="num rm-val">{{ vih_cascade.initiation_arv.total }}</td></tr>
+      <tr><td>Femmes séropositives sous ARV dont la charge virale est ≤ 1000 copies/ml au dernier trimestre</td>
+        <td class="num rm-val">{{ charge_virale_ok }}</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ══════════════════════ PAGE 4 : Suivi PMTCT / Conjoints ══════════════════════ -->
+<div class="rm-page rm-page-break">
+  <div class="rm-header">
+    <div class="rm-logo">
+      <div class="rm-logo-circle"><img src="{% static 'img/logo.png' %}" alt="CMS WALÉ"></div>
+      <div class="rm-logo-name">CENTRE MEDICO SOCIAL WALE</div>
+    </div>
+    <div class="rm-page-num">4</div>
+  </div>
+
+  <div class="rm-section-title">Suivi des mères et enfants nés de mères séropositives au VIH</div>
+  <table class="rm-table">
+    <thead><tr><th style="text-align:left;">Informations</th><th>Effectifs</th></tr></thead>
+    <tbody>
+      <tr><td>Femmes enceintes séropositives au VIH dont l'accouchement a été enregistré au cours du mois</td><td class="num rm-val">{{ seropositives_accouchees }}</td></tr>
+      <tr><td>Enfants nés de mères séropositives au VIH ayant reçu des ARV dans les 72 h après la naissance</td><td class="num rm-val">{{ arv_nne_72h }}</td></tr>
+      <tr><td>Enfants nés de mères séropositives au VIH initiant la prophylaxie au cotrimoxazole avant 2 mois</td><td class="num"><span class="rm-blank"></span></td></tr>
+      <tr><td>Mères séropositives au VIH bénéficiant des services de planification familiale en post-natal (6 semaines)</td><td class="num"><span class="rm-blank"></span></td></tr>
+    </tbody>
+  </table>
+
+  <div class="rm-sub-title">Dépistage du VIH chez les enfants nés de mères séropositives au VIH</div>
+  <table class="rm-table">
+    <tbody>
+      <tr><td>Dépistés précocement (avant 2 mois)</td><td class="num"><span class="rm-blank"></span></td></tr>
+      <tr><td>Dépistés tardivement (2 à 18 mois)</td><td class="num"><span class="rm-blank"></span></td></tr>
+      <tr><td>Dépistés VIH positif</td><td class="num"><span class="rm-blank"></span></td></tr>
+      <tr><td>Dépistés VIH positif, nouvellement mis sous traitement ARV</td><td class="num"><span class="rm-blank"></span></td></tr>
+      <tr><td>Dépistés VIH positif et référés vers un autre établissement offrant la PEC*</td><td class="num"><span class="rm-blank"></span></td></tr>
+    </tbody>
+  </table>
+  <div class="rm-legende">Aucun champ de dépistage VIH de l'enfant (précoce/tardif/PCR) n'existe encore dans le dossier — section à compléter manuellement.</div>
+
+  <div class="rm-sub-title">Dépistage des conjoints des femmes enceintes</div>
+  <table class="rm-table">
+    <thead><tr><th style="text-align:left;"></th><th>Positifs</th><th>Négatif</th><th>Total</th></tr></thead>
+    <tbody>
+      <tr><td>Conjoints de femmes enceintes séropositives au VIH dépistés</td>
+        <td class="num rm-val">{{ depistage_conjoint.positif_chez_mere_pos }}</td>
+        <td class="num rm-val">{{ depistage_conjoint.negatif_chez_mere_pos }}</td>
+        <td class="num rm-val">{{ depistage_conjoint.positif_chez_mere_pos|add:depistage_conjoint.negatif_chez_mere_pos }}</td></tr>
+      <tr><td>Conjoints de femmes enceintes séronégatives au VIH dépistés</td>
+        <td class="num rm-val">{{ depistage_conjoint.positif_chez_mere_neg }}</td>
+        <td class="num rm-val">{{ depistage_conjoint.negatif_chez_mere_neg }}</td>
+        <td class="num rm-val">{{ depistage_conjoint.positif_chez_mere_neg|add:depistage_conjoint.negatif_chez_mere_neg }}</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ══════════════════════ PAGE 5 : Organisation ══════════════════════ -->
+<div class="rm-page">
+  <div class="rm-header">
+    <div class="rm-logo">
+      <div class="rm-logo-circle"><img src="{% static 'img/logo.png' %}" alt="CMS WALÉ"></div>
+      <div class="rm-logo-name">CENTRE MEDICO SOCIAL WALE</div>
+    </div>
+    <div class="rm-page-num">5</div>
+  </div>
+
+  <div class="rm-section-title">C : Organisation — Formations — Supervision — Activités annexes</div>
+  <table class="rm-table">
+    <thead><tr><th style="text-align:left;">Indicateurs</th><th>Nombre</th><th>Date</th><th style="text-align:left;">Thème</th><th style="text-align:left;">Autres observations</th></tr></thead>
+    <tbody>
+      <tr><td>Réunions de service</td><td class="num"><span class="rm-blank"></span></td><td><span class="rm-blank"></span></td><td><span class="rm-blank"></span></td><td><span class="rm-blank"></span></td></tr>
+      <tr><td>Supervisions</td><td class="num"><span class="rm-blank"></span></td><td><span class="rm-blank"></span></td><td><span class="rm-blank"></span></td><td><span class="rm-blank"></span></td></tr>
+      <tr><td>Formations internes</td><td class="num"><span class="rm-blank"></span></td><td><span class="rm-blank"></span></td><td><span class="rm-blank"></span></td><td><span class="rm-blank"></span></td></tr>
+      <tr><td>Formations externes</td><td class="num"><span class="rm-blank"></span></td><td><span class="rm-blank"></span></td><td><span class="rm-blank"></span></td><td><span class="rm-blank"></span></td></tr>
+      <tr><td>Autres activités</td><td class="num"><span class="rm-blank"></span></td><td><span class="rm-blank"></span></td><td><span class="rm-blank"></span></td><td><span class="rm-blank"></span></td></tr>
+      <tr><td>Problèmes rencontrés</td><td class="num"><span class="rm-blank"></span></td><td><span class="rm-blank"></span></td><td><span class="rm-blank"></span></td><td><span class="rm-blank"></span></td></tr>
+      <tr><td>Solutions proposées</td><td class="num"><span class="rm-blank"></span></td><td><span class="rm-blank"></span></td><td><span class="rm-blank"></span></td><td><span class="rm-blank"></span></td></tr>
+    </tbody>
+  </table>
+
+  <div class="rm-signatures">
+    <div class="rm-signature-box">Le Responsable du service<br>(Nom, Signature et cachet)</div>
+    <div class="rm-signature-box">Le Gestionnaire de données<br>(Nom, Signature et cachet)</div>
+    <div class="rm-signature-box">Le Directeur Médical<br>(Nom, Signature et cachet)</div>
+  </div>
+</div>
+
+<script>
+  if (window.location.search.indexOf('auto=1') !== -1) {
+    window.addEventListener('load', function() { window.print(); });
+  }
+</script>
+</body>
+</html>
