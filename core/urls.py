@@ -11,6 +11,8 @@ from patients.views import (
     typevisite_create as _gyn_typevisite_create_view,
     typevisite_edit as _gyn_typevisite_edit_view,
     typevisite_delete as _gyn_typevisite_delete_view,
+    export_typevisite as _gyn_typevisite_export_view,
+    import_typevisite as _gyn_typevisite_import_view,
 )
 
 urlpatterns = [
@@ -88,4 +90,6 @@ urlpatterns = [
     path('gynecologie/types-visite/nouveau/', _gyn_typevisite_create_view, name='gynecologie_typevisite_create'),
     path('gynecologie/types-visite/<int:pk>/modifier/', _gyn_typevisite_edit_view, name='gynecologie_typevisite_edit'),
     path('gynecologie/types-visite/<int:pk>/supprimer/', _gyn_typevisite_delete_view, name='gynecologie_typevisite_delete'),
+    path('gynecologie/types-visite/export/', _gyn_typevisite_export_view, name='gynecologie_typevisite_export'),
+    path('gynecologie/types-visite/importer/', _gyn_typevisite_import_view, name='gynecologie_typevisite_import'),
 ]

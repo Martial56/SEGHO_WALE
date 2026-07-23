@@ -1178,3 +1178,107 @@ def typevisite_delete(request, pk):
         tv.delete()
         messages.success(request, f'Type de visite "{nom}" supprimé.')
     return redirect('gynecologie_typevisite_list')
+
+
+# ── Export / Import des types de visite ─────────────────────────────────────
+
+_TYPEVISITE_HDR = ['nom', 'code', 'description', 'actif']
+
+
+def _typevisite_row(tv):
+    return [tv.nom, tv.code, tv.description, int(tv.actif)]
+
+
+@login_required
+def export_typevisite(request):
+    import json as _json
+    from django.http import HttpResponse
+
+    fmt = request.GET.get('format', 'json')
+    qs = TypeVisite.objects.all()
+    rows = [_typevisite_row(tv) for tv in qs]
+
+    if fmt == 'csv':
+        from core.utils import csv_response
+        return csv_response('types_visite', _TYPEVISITE_HDR, rows, delimiter=',')
+    if fmt == 'xlsx':
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment
+        import io as _io
+        wb = Workbook()
+        ws = wb.active
+        ws.title = 'Types de visite'
+        fill = PatternFill(start_color='1F6E8C', end_color='1F6E8C', fill_type='solid')
+        fnt = Font(color='FFFFFF', bold=True)
+        ws.append(_TYPEVISITE_HDR)
+        for cell in ws[1]:
+            cell.fill, cell.font = fill, fnt
+            cell.alignment = Alignment(horizontal='center')
+        for row in rows:
+            ws.append(['' if v is None else v for v in row])
+        for col in ws.columns:
+            w = max((len(str(c.value or '')) for c in col), default=0)
+            ws.column_dimensions[col[0].column_letter].width = min(w + 4, 55)
+        buf = _io.BytesIO()
+        wb.save(buf)
+        resp = HttpResponse(
+            buf.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        resp['Content-Disposition'] = 'attachment; filename="types_visite.xlsx"'
+        return resp
+
+    data = [dict(zip(_TYPEVISITE_HDR, r)) for r in rows]
+    resp = HttpResponse(
+        _json.dumps(data, ensure_ascii=False, indent=2, default=str),
+        content_type='application/json',
+    )
+    resp['Content-Disposition'] = 'attachment; filename="types_visite.json"'
+    return resp
+
+
+@login_required
+def import_typevisite(request):
+    upload = request.FILES.get('fichier')
+    if not upload:
+        messages.error(request, 'Aucun fichier sélectionné.')
+        return redirect('gynecologie_typevisite_list')
+
+    data, err = _parse_pathologie_upload(upload)
+    if err:
+        messages.error(request, err)
+        return redirect('gynecologie_typevisite_list')
+
+    do_update = 'update' in request.POST
+    created = updated = skipped = errors = 0
+
+    for item in data:
+        try:
+            nom = _s(item.get('nom', ''))
+            code = _s(item.get('code', ''))
+            if not nom or not code:
+                errors += 1
+                continue
+            defaults = {
+                'nom': nom,
+                'description': _s(item.get('description', '')),
+                'actif': _b(item.get('actif', True)),
+            }
+            obj, was_created = TypeVisite.objects.get_or_create(code__iexact=code, defaults={**defaults, 'code': code})
+            if was_created:
+                created += 1
+            elif do_update:
+                for k, v in defaults.items():
+                    setattr(obj, k, v)
+                obj.save()
+                updated += 1
+            else:
+                skipped += 1
+        except Exception:
+            errors += 1
+
+    if errors:
+        messages.warning(request, f'{created} créé(s), {updated} mis à jour, {skipped} ignoré(s), {errors} erreur(s).')
+    else:
+        messages.success(request, f'{created} type(s) de visite importé(s), {updated} mis à jour, {skipped} ignoré(s).')
+    return redirect('gynecologie_typevisite_list')
