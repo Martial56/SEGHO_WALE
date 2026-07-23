@@ -32,6 +32,8 @@
 html[data-theme="dark"] .cfg-table thead th  { background: var(--surface); border-bottom-color: var(--border); }
 html[data-theme="dark"] .cfg-table tbody tr  { border-bottom-color: var(--border); }
 html[data-theme="dark"] .cfg-table tbody tr:hover { background: rgba(255,255,255,.04); }
+
+{% include 'services/includes/io_styles.html' %}
 </style>
 {% endblock %}
 
@@ -56,8 +58,22 @@ html[data-theme="dark"] .cfg-table tbody tr:hover { background: rgba(255,255,255
     <a href="{% url 'hospitalisation:liste_service_create' %}" class="o-btn-create">
       <i class="bi bi-plus-lg"></i> Créer
     </a>
+    <div class="io-page-wrap" id="io-page-wrap">
+      <button type="button" class="o-ctrl-btn io-toggle-btn" onclick="toggleIOPage(event)">
+        <i class="bi bi-arrow-left-right"></i> Export / Import
+        <i class="bi bi-chevron-down" style="font-size:9px;margin-left:2px;"></i>
+      </button>
+      <div class="io-page-menu" id="io-page-menu">
+        <div class="io-pm-section">Exporter la liste</div>
+        <a class="io-pm-item" href="{% url 'hospitalisation:liste_service_export' %}?format=json"><i class="bi bi-filetype-json" style="color:#c97a00;"></i> JSON</a>
+        <a class="io-pm-item" href="{% url 'hospitalisation:liste_service_export' %}?format=csv"><i class="bi bi-filetype-csv" style="color:#1a7a4a;"></i> CSV</a>
+        <a class="io-pm-item" href="{% url 'hospitalisation:liste_service_export' %}?format=xlsx"><i class="bi bi-file-earmark-excel" style="color:#217346;"></i> Excel</a>
+        <div class="io-pm-sep"></div>
+        <div class="io-pm-section">Importer</div>
+        <button type="button" class="io-pm-item" onclick="openImportModal()"><i class="bi bi-upload" style="color:var(--accent);"></i> Importer un fichier…</button>
+      </div>
+    </div>
     <div class="o-subheader-row-right">
-      <button class="o-ctrl-btn"><i class="bi bi-funnel"></i> Filtres</button>
       <div class="o-ctrl-sep"></div>
       <div class="o-pagination-top">
         {% if page_obj.paginator.count > 0 %}
@@ -122,4 +138,38 @@ html[data-theme="dark"] .cfg-table tbody tr:hover { background: rgba(255,255,255
 
 {% block extra_js %}
 {{ block.super }}
+<script>
+function toggleIOPage(e){e.stopPropagation();document.getElementById('io-page-wrap').classList.toggle('open');}
+document.addEventListener('click',function(){var w=document.getElementById('io-page-wrap');if(w)w.classList.remove('open');});
+function openImportModal(){document.getElementById('io-modal-backdrop').classList.add('active');document.getElementById('io-modal').classList.add('active');var w=document.getElementById('io-page-wrap');if(w)w.classList.remove('open');}
+function closeImportModal(){document.getElementById('io-modal-backdrop').classList.remove('active');document.getElementById('io-modal').classList.remove('active');}
+function updateFileName(input){var el=document.getElementById('io-filename');if(input.files&&input.files[0]){el.textContent=input.files[0].name;el.style.display='block';}}
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeImportModal();});
+</script>
+
+<div class="io-modal-backdrop" id="io-modal-backdrop" onclick="closeImportModal()"></div>
+<div class="io-modal" id="io-modal">
+  <div class="io-modal-header">
+    <span><i class="bi bi-upload"></i> Importer la liste de vérification avant service</span>
+    <button type="button" class="io-modal-close" onclick="closeImportModal()">×</button>
+  </div>
+  <form method="post" action="{% url 'hospitalisation:liste_service_import' %}" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div class="io-modal-body">
+      <label class="io-file-label" for="io-file-input">
+        <i class="bi bi-cloud-upload" style="font-size:28px;color:var(--accent);display:block;margin-bottom:6px;"></i>
+        <strong>Choisir un fichier</strong>
+        <span style="font-size:11px;color:var(--text-muted);display:block;margin-top:3px;">JSON, CSV ou Excel (.xlsx)</span>
+        <input type="file" id="io-file-input" name="fichier" accept=".json,.csv,.xlsx,.xls" required onchange="updateFileName(this)">
+      </label>
+      <div class="io-filename" id="io-filename" style="display:none;"></div>
+      <label class="io-checkbox-label"><input type="checkbox" name="update"> Mettre à jour les enregistrements existants</label>
+      <p class="io-hint">Clé de déduplication : <strong>item</strong>. Colonne attendue : item.</p>
+    </div>
+    <div class="io-modal-footer">
+      <button type="button" class="io-btn-cancel" onclick="closeImportModal()">Annuler</button>
+      <button type="submit" class="io-btn-submit"><i class="bi bi-upload"></i> Importer</button>
+    </div>
+  </form>
+</div>
 {% endblock %}

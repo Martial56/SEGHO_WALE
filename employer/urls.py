@@ -21,6 +21,8 @@ urlpatterns = [
     path('config/<slug:slug>/nouveau/',                views.rh_config_create,       name='rh_config_create'),
     path('config/<slug:slug>/<int:pk>/modifier/',      views.rh_config_edit,         name='rh_config_edit'),
     path('config/<slug:slug>/<int:pk>/supprimer/',     views.rh_config_delete,       name='rh_config_delete'),
+    path('config/<slug:slug>/export/',                 views.rh_config_export,       name='rh_config_export'),
+    path('config/<slug:slug>/importer/',                views.rh_config_import,       name='rh_config_import'),
 
     path('<int:pk>/',                                 views.employe_detail,        name='rh_detail'),
     path('<int:pk>/vers-medecin/',                    views.employe_vers_medecin,  name='rh_vers_medecin'),

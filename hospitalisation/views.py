@@ -11,6 +11,7 @@ from .models import (Hospitalisation, Chambre, RegistreDeces,
                       VisiteInfirmiere, VisiteDocteur, ResumeDecharge)
 from core.views import log_event, get_logs
 from .forms import ChambreForm, RegistreDecesForm, ListeControleAdmissionForm, ListeVerificationServiceForm
+from services.views import _export_file, _parse_upload, _s, _b
 
 
 
@@ -1595,6 +1596,91 @@ def chambre_edit(request, pk):
     })
 
 
+# ── Export / Import des chambres ─────────────────────────────────────────────
+
+_CHAMBRE_HDR = [
+    'nom', 'salle_no', 'type_chambre', 'statut', 'nombre_lits', 'prive', 'genre',
+    'acces_internet', 'climatisation', 'salle_bains_privee', 'television',
+    'telephone_chambre', 'lit_visiteur', 'four_micro_onde', 'danger_biologique',
+    'refrigerateur', 'description',
+]
+
+_CHAMBRE_BOOL_DEFAULTS = {
+    'statut': True, 'prive': False, 'acces_internet': False, 'climatisation': False,
+    'salle_bains_privee': False, 'television': False, 'telephone_chambre': False,
+    'lit_visiteur': False, 'four_micro_onde': False, 'danger_biologique': False,
+    'refrigerateur': False,
+}
+
+
+def _chambre_row(c):
+    row = []
+    for f in _CHAMBRE_HDR:
+        val = getattr(c, f)
+        row.append(int(val) if f in _CHAMBRE_BOOL_DEFAULTS else val)
+    return row
+
+
+@login_required(login_url='login')
+def chambres_export(request):
+    fmt = request.GET.get('format', 'json')
+    qs = Chambre.objects.order_by('salle_no')
+    rows = [_chambre_row(c) for c in qs]
+    return _export_file(fmt, 'chambres', _CHAMBRE_HDR, rows, [dict(zip(_CHAMBRE_HDR, r)) for r in rows])
+
+
+@login_required(login_url='login')
+def chambres_import(request):
+    upload = request.FILES.get('fichier')
+    if not upload:
+        messages.error(request, 'Aucun fichier sélectionné.')
+        return redirect('hospitalisation:chambres_list')
+
+    data, err = _parse_upload(upload)
+    if err:
+        messages.error(request, err)
+        return redirect('hospitalisation:chambres_list')
+
+    do_update = 'update' in request.POST
+    created = updated = skipped = errors = 0
+
+    for item in data:
+        try:
+            nom = _s(item.get('nom', ''))
+            if not nom:
+                errors += 1
+                continue
+            # salle_no est auto-généré (editable=False, séquence anti-collision dans
+            # Chambre.save()) : on ne le reprend jamais du fichier, ni en création
+            # (laissé à save()) ni en mise à jour (jamais modifié après coup).
+            defaults = {
+                'nom': nom,
+                'type_chambre': _s(item.get('type_chambre', 'general')) or 'general',
+                'genre': _s(item.get('genre', 'unisexe')) or 'unisexe',
+                'nombre_lits': item.get('nombre_lits') or 1,
+                'description': _s(item.get('description', '')),
+            }
+            for f, default_val in _CHAMBRE_BOOL_DEFAULTS.items():
+                defaults[f] = _b(item.get(f, default_val))
+            obj, was_created = Chambre.objects.get_or_create(nom__iexact=nom, defaults=defaults)
+            if was_created:
+                created += 1
+            elif do_update:
+                for k, v in defaults.items():
+                    setattr(obj, k, v)
+                obj.save()
+                updated += 1
+            else:
+                skipped += 1
+        except Exception:
+            errors += 1
+
+    if errors:
+        messages.warning(request, f'{created} créée(s), {updated} mise(s) à jour, {skipped} ignorée(s), {errors} erreur(s).')
+    else:
+        messages.success(request, f'{created} chambre(s) importée(s), {updated} mise(s) à jour, {skipped} ignorée(s).')
+    return redirect('hospitalisation:chambres_list')
+
 
 @login_required(login_url='login')
 def registre_deces(request):
@@ -1678,6 +1764,117 @@ def deces_edit(request, pk):
     })
 
 
+# ── Export / Import du registre des décès ────────────────────────────────────
+
+_RDECES_HDR = ['code', 'patient', 'date_deces', 'hospitalisation', 'medecin', 'raison_deces', 'remarques', 'statut']
+
+
+def _rdeces_row(d):
+    return [
+        d.code,
+        d.patient.code_patient,
+        d.date_deces.isoformat() if d.date_deces else '',
+        d.hospitalisation.numero if d.hospitalisation_id else '',
+        d.medecin.employe.matricule if d.medecin_id else '',
+        d.raison_deces, d.remarques, d.statut,
+    ]
+
+
+@login_required(login_url='login')
+def deces_export(request):
+    fmt = request.GET.get('format', 'json')
+    qs = RegistreDeces.objects.select_related('patient', 'hospitalisation', 'medecin__employe').order_by('-date_deces')
+    rows = [_rdeces_row(d) for d in qs]
+    return _export_file(fmt, 'registre_deces', _RDECES_HDR, rows, [dict(zip(_RDECES_HDR, r)) for r in rows])
+
+
+@login_required(login_url='login')
+def deces_import(request):
+    from datetime import datetime as _dt
+    from patients.models import Patient
+    from medecins.models import Medecin
+
+    upload = request.FILES.get('fichier')
+    if not upload:
+        messages.error(request, 'Aucun fichier sélectionné.')
+        return redirect('hospitalisation:deces_list')
+
+    data, err = _parse_upload(upload)
+    if err:
+        messages.error(request, err)
+        return redirect('hospitalisation:deces_list')
+
+    do_update = 'update' in request.POST
+    created = updated = skipped = errors = 0
+    patients_manquants = set()
+
+    for item in data:
+        try:
+            patient_code = _s(item.get('patient', ''))
+            patient = Patient.objects.filter(code_patient__iexact=patient_code).first() if patient_code else None
+            if not patient:
+                patients_manquants.add(patient_code or '(vide)')
+                errors += 1
+                continue
+
+            try:
+                date_deces = _dt.strptime(_s(item.get('date_deces', '')), '%Y-%m-%d').date()
+            except ValueError:
+                errors += 1
+                continue
+
+            hosp_num = _s(item.get('hospitalisation', ''))
+            hosp = Hospitalisation.objects.filter(numero__iexact=hosp_num).first() if hosp_num else None
+
+            medecin_mat = _s(item.get('medecin', ''))
+            medecin = Medecin.objects.filter(employe__matricule__iexact=medecin_mat).first() if medecin_mat else None
+
+            defaults = {
+                'patient': patient,
+                'date_deces': date_deces,
+                'hospitalisation': hosp,
+                'medecin': medecin,
+                'raison_deces': _s(item.get('raison_deces', '')),
+                'remarques': _s(item.get('remarques', '')),
+                'statut': _s(item.get('statut', 'brouillon')) or 'brouillon',
+            }
+
+            # code auto-généré (editable=False, séquence anti-collision) : jamais
+            # forcé à la création, seulement utilisé pour retrouver un enregistrement
+            # existant à mettre à jour.
+            code = _s(item.get('code', ''))
+            if code:
+                obj = RegistreDeces.objects.filter(code__iexact=code).first()
+                was_created = obj is None
+                if was_created:
+                    obj = RegistreDeces.objects.create(**defaults)
+            else:
+                obj, was_created = RegistreDeces.objects.get_or_create(
+                    patient=patient, date_deces=date_deces, defaults=defaults
+                )
+
+            if was_created:
+                created += 1
+            elif do_update:
+                for k, v in defaults.items():
+                    setattr(obj, k, v)
+                obj.save()
+                updated += 1
+            else:
+                skipped += 1
+        except Exception:
+            errors += 1
+
+    from services.views import _fk_warning
+    fk_msg = _fk_warning([('Patient(s) (code patient)', patients_manquants)])
+    if errors or fk_msg:
+        messages.warning(request, f'{created} créé(s), {updated} mis à jour, {skipped} ignoré(s)'
+                          + (f', {errors} erreur(s)' if errors else '') + fk_msg)
+    else:
+        messages.success(request, f'{created} décès importé(s), {updated} mis à jour, {skipped} ignoré(s).')
+    return redirect('hospitalisation:deces_list')
+
+
 @login_required(login_url='login')
 
 
@@ -1751,6 +1948,62 @@ def liste_admission_delete(request, pk):
     return redirect('hospitalisation:config_liste_admission')
 
 
+# ── Export / Import de la liste de contrôle d'admission ──────────────────────
+
+_LISTE_ADMISSION_HDR = ['item', 'remarques']
+
+
+@login_required(login_url='login')
+def liste_admission_export(request):
+    fmt = request.GET.get('format', 'json')
+    qs = ListeControleAdmission.objects.all()
+    rows = [[o.item, o.remarques] for o in qs]
+    return _export_file(fmt, 'liste_controle_admission', _LISTE_ADMISSION_HDR, rows,
+                        [dict(zip(_LISTE_ADMISSION_HDR, r)) for r in rows])
+
+
+@login_required(login_url='login')
+def liste_admission_import(request):
+    upload = request.FILES.get('fichier')
+    if not upload:
+        messages.error(request, 'Aucun fichier sélectionné.')
+        return redirect('hospitalisation:config_liste_admission')
+
+    data, err = _parse_upload(upload)
+    if err:
+        messages.error(request, err)
+        return redirect('hospitalisation:config_liste_admission')
+
+    do_update = 'update' in request.POST
+    created = updated = skipped = errors = 0
+
+    for item_data in data:
+        try:
+            item = _s(item_data.get('item', ''))
+            if not item:
+                errors += 1
+                continue
+            defaults = {'item': item, 'remarques': _s(item_data.get('remarques', ''))}
+            obj, was_created = ListeControleAdmission.objects.get_or_create(item__iexact=item, defaults=defaults)
+            if was_created:
+                created += 1
+            elif do_update:
+                for k, v in defaults.items():
+                    setattr(obj, k, v)
+                obj.save()
+                updated += 1
+            else:
+                skipped += 1
+        except Exception:
+            errors += 1
+
+    if errors:
+        messages.warning(request, f'{created} créé(s), {updated} mis à jour, {skipped} ignoré(s), {errors} erreur(s).')
+    else:
+        messages.success(request, f'{created} élément(s) importé(s), {updated} mis à jour, {skipped} ignoré(s).')
+    return redirect('hospitalisation:config_liste_admission')
+
+
 @login_required(login_url='login')
 def config_liste_service(request):
     q = request.GET.get('q', '').strip()
@@ -1808,4 +2061,58 @@ def liste_service_delete(request, pk):
         nom = obj.item
         obj.delete()
         messages.success(request, f'Élément « {nom} » supprimé.')
+    return redirect('hospitalisation:config_liste_service')
+
+
+# ── Export / Import de la liste de vérification avant service ────────────────
+
+_LISTE_SERVICE_HDR = ['item']
+
+
+@login_required(login_url='login')
+def liste_service_export(request):
+    fmt = request.GET.get('format', 'json')
+    qs = ListeVerificationService.objects.all()
+    rows = [[o.item] for o in qs]
+    return _export_file(fmt, 'liste_verification_service', _LISTE_SERVICE_HDR, rows,
+                        [{'item': o.item} for o in qs])
+
+
+@login_required(login_url='login')
+def liste_service_import(request):
+    upload = request.FILES.get('fichier')
+    if not upload:
+        messages.error(request, 'Aucun fichier sélectionné.')
+        return redirect('hospitalisation:config_liste_service')
+
+    data, err = _parse_upload(upload)
+    if err:
+        messages.error(request, err)
+        return redirect('hospitalisation:config_liste_service')
+
+    do_update = 'update' in request.POST
+    created = updated = skipped = errors = 0
+
+    for item_data in data:
+        try:
+            item = _s(item_data.get('item', ''))
+            if not item:
+                errors += 1
+                continue
+            obj, was_created = ListeVerificationService.objects.get_or_create(item__iexact=item, defaults={'item': item})
+            if was_created:
+                created += 1
+            elif do_update:
+                obj.item = item
+                obj.save()
+                updated += 1
+            else:
+                skipped += 1
+        except Exception:
+            errors += 1
+
+    if errors:
+        messages.warning(request, f'{created} créé(s), {updated} mis à jour, {skipped} ignoré(s), {errors} erreur(s).')
+    else:
+        messages.success(request, f'{created} élément(s) importé(s), {updated} mis à jour, {skipped} ignoré(s).')
     return redirect('hospitalisation:config_liste_service')
