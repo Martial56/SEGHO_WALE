@@ -1,6 +1,6 @@
 {% extends 'presence/base.html' %}
 {% load static %}
-{% block topbar_title %}Paramètres — Permanences{% endblock %}
+{% block topbar_title %}{% if type_permanence == 'medecins' %}Paramètres — Permanences médecins{% else %}Paramètres — Permanences{% endif %}{% endblock %}
 
 {% block extra_css %}
 {{ block.super }}
@@ -53,6 +53,8 @@ html[data-theme="dark"] .week-range { color:var(--pr-200); }
 .week-badge.current { background:var(--rose); color:#fff; }
 .week-badge.next    { background:var(--pr-100); color:var(--pr-700); }
 .week-badge.past    { background:rgba(0,0,0,.06); color:rgba(0,0,0,.4); }
+html[data-theme="dark"] .week-badge.next { background:rgba(var(--pr-600-rgb),.15); color:var(--pr-300); }
+html[data-theme="dark"] .week-badge.past { background:rgba(255,255,255,.06); color:var(--pr-muted); }
 .btn-nav {
   width:34px; height:34px; border-radius:8px; border:1px solid var(--pr-200);
   background:var(--pr-surface); color:var(--pr-600); text-decoration:none;
@@ -152,6 +154,13 @@ html[data-theme="dark"] .pm-table tfoot tr { background:rgba(var(--pr-600-rgb),.
 /* Vide */
 .pm-empty { text-align:center; padding:60px; color:var(--pr-muted); }
 .pm-empty i { font-size:40px; display:block; margin-bottom:12px; opacity:.3; }
+
+/* Pagination grille */
+#pm-pagination {
+  display:flex; align-items:center; gap:6px; flex-wrap:wrap;
+  padding:10px 4px; font-size:12px; color:var(--pr-muted);
+}
+#pm-pagination .o-pag-btn.active { background:var(--pr-600); color:#fff; border-color:var(--pr-600); }
 </style>
 {% endblock %}
 
@@ -165,10 +174,10 @@ html[data-theme="dark"] .pm-table tfoot tr { background:rgba(var(--pr-600-rgb),.
   <div>
     <div class="pm-head-title">
       <i class="bi bi-calendar2-week-fill" style="color:var(--pr-600);margin-right:6px;"></i>
-      Planification des permanences
+      Planification des permanences{% if type_permanence == 'medecins' %} — Médecins{% endif %}
     </div>
     <div class="pm-head-sub">
-      Semaine du {{ semaine|date:"d/m/Y" }} — {{ grid|length }} employé{{ grid|length|pluralize }} · Horaire {{ planning.heure_debut|time:"H:i" }}–{{ planning.heure_fin|time:"H:i" }}
+      Semaine du {{ semaine|date:"d/m/Y" }} — {{ grid|length }} {% if type_permanence == 'medecins' %}médecin{{ grid|length|pluralize }}{% else %}employé{{ grid|length|pluralize }}{% endif %} · Horaire {{ planning.heure_debut|time:"H:i" }}–{{ planning.heure_fin|time:"H:i" }}
     </div>
   </div>
   <button type="submit" class="btn-pr" style="gap:8px;">
@@ -202,28 +211,39 @@ html[data-theme="dark"] .pm-table tfoot tr { background:rgba(var(--pr-600-rgb),.
 
   <!-- Heures -->
   <div class="pm-card">
-    <div class="pm-section-label"><i class="bi bi-clock-fill"></i> Horaire</div>
+    <div class="pm-section-label">
+      <i class="bi bi-clock-fill"></i> Horaire
+      {% if heures_verrouillees %}
+      <i class="bi bi-lock-fill" style="color:var(--rose-btn);margin-left:4px;" title="Créneau verrouillé — un employé est déjà affecté sur cette permanence"></i>
+      {% endif %}
+    </div>
     <div class="hours-row">
       <div class="hour-block">
         <div class="hour-label">Arrivée</div>
         <input type="time" name="heure_debut" id="heure_debut" class="hour-input"
-               value="{{ planning.heure_debut|time:'H:i' }}">
+               value="{{ planning.heure_debut|time:'H:i' }}" {% if heures_verrouillees %}disabled{% endif %}>
       </div>
       <div class="hours-arrow">→</div>
       <div class="hour-block">
         <div class="hour-label">Départ</div>
         <input type="time" name="heure_fin" id="heure_fin" class="hour-input"
-               value="{{ planning.heure_fin|time:'H:i' }}">
+               value="{{ planning.heure_fin|time:'H:i' }}" {% if heures_verrouillees %}disabled{% endif %}>
       </div>
     </div>
     <div class="hours-duration" id="duree-display">
       <i class="bi bi-hourglass-split"></i>
       {{ planning.heure_debut|time:"H:i" }} – {{ planning.heure_fin|time:"H:i" }}
     </div>
+    {% if heures_verrouillees %}
+    <div style="font-size:10.5px;color:var(--rose-btn);margin-top:6px;">
+      <i class="bi bi-shield-lock-fill"></i> Un employé est déjà affecté sur cette permanence — créneau verrouillé définitivement
+    </div>
+    {% endif %}
   </div>
 
-  <!-- Filtre service -->
+  <!-- Filtre service (non pertinent pour les médecins : toujours tous) -->
   <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:auto;">
+    {% if type_permanence != 'medecins' %}
     <select onchange="applyFilter(this.value)" class="pr-input" style="max-width:200px;">
       <option value="">Tous les services</option>
       {% for svc in services %}
@@ -237,7 +257,8 @@ html[data-theme="dark"] .pm-table tfoot tr { background:rgba(var(--pr-600-rgb),.
       <i class="bi bi-x"></i>
     </a>
     {% endif %}
-    <span class="pm-count-badge">{{ grid|length }} employé{{ grid|length|pluralize }}</span>
+    {% endif %}
+    <span class="pm-count-badge">{{ grid|length }} {% if type_permanence == 'medecins' %}médecin{{ grid|length|pluralize }}{% else %}employé{{ grid|length|pluralize }}{% endif %}</span>
   </div>
 
 </div>
@@ -248,7 +269,7 @@ html[data-theme="dark"] .pm-table tfoot tr { background:rgba(var(--pr-600-rgb),.
 <table class="pm-table">
   <thead>
     <tr class="tr-days">
-      <th class="th-emp">Employé &amp; Service</th>
+      <th class="th-emp">{% if type_permanence == 'medecins' %}Médecin{% else %}Employé{% endif %} &amp; Service</th>
       {% for jour in jours %}
       <th class="th-day {% if jour == today %}today{% elif jour.weekday == 5 %}samedi{% endif %}">
         <div class="day-name">{{ jour|date:"l"|slice:":3"|upper }}</div>
@@ -262,9 +283,9 @@ html[data-theme="dark"] .pm-table tfoot tr { background:rgba(var(--pr-600-rgb),.
       <th class="th-total">Total</th>
     </tr>
   </thead>
-  <tbody>
+  <tbody id="pm-tbody">
     {% for row in grid %}
-    <tr>
+    <tr id="pmrow-{{ row.emp.pk }}">
       <td style="padding:10px 16px;">
         <div class="td-emp-name">{{ row.emp.nom_complet }}</div>
         <div class="td-emp-sub">
@@ -300,10 +321,11 @@ html[data-theme="dark"] .pm-table tfoot tr { background:rgba(var(--pr-600-rgb),.
     </tr>
   </tfoot>
 </table>
+<div id="pm-pagination"></div>
 {% else %}
 <div class="pm-empty">
   <i class="bi bi-people"></i>
-  <div style="font-size:14px;font-weight:600;">Aucun employé actif</div>
+  <div style="font-size:14px;font-weight:600;">{% if type_permanence == 'medecins' %}Aucun médecin actif{% else %}Aucun employé actif{% endif %}</div>
   <div style="font-size:12px;margin-top:4px;">Vérifiez le filtre de service</div>
 </div>
 {% endif %}
@@ -376,5 +398,82 @@ document.addEventListener('DOMContentLoaded', function () {
   if (hd) hd.addEventListener('input', refreshDuree);
   if (hf) hf.addEventListener('input', refreshDuree);
 });
+
+// ── Pagination de la grille (côté client : toutes les lignes/cases restent
+//    dans le formulaire pour ne rien perdre à la sauvegarde, seul
+//    l'affichage est paginé — nombre de lignes calculé dynamiquement selon
+//    la hauteur de fenêtre disponible, comme dans le registre) ──
+(function () {
+  var tbody = document.getElementById('pm-tbody');
+  var pager = document.getElementById('pm-pagination');
+  if (!tbody || !pager) return;
+  var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr[id^="pmrow-"]'));
+  if (!rows.length) return;
+
+  var currentPage = 1;
+  var pageSize = 20;
+
+  function computePageSize() {
+    var thead  = document.querySelector('.pm-table thead');
+    var rowH   = rows[0].getBoundingClientRect().height || 40;
+    var theadH = thead ? thead.getBoundingClientRect().height : 0;
+    var top    = rows[0].closest('.pm-table-wrap').getBoundingClientRect().top;
+    var reserveBottom = 60; // pagination + marges
+    var available = window.innerHeight - top - theadH - reserveBottom;
+    var fit = Math.floor(available / rowH);
+    return Math.max(5, Math.min(80, fit));
+  }
+
+  function renderPage(page) {
+    var totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+    page = Math.max(1, Math.min(totalPages, page));
+    currentPage = page;
+    rows.forEach(function (row, idx) {
+      var pageOf = Math.floor(idx / pageSize) + 1;
+      row.style.display = (pageOf === page) ? '' : 'none';
+    });
+    renderPager(totalPages);
+  }
+
+  function renderPager(totalPages) {
+    if (totalPages <= 1) { pager.innerHTML = ''; return; }
+    var html = '<span style="margin-right:8px;white-space:nowrap;">' + rows.length + ' employés</span>';
+    html += pagBtn('«', 1, currentPage === 1);
+    html += pagBtn('‹', currentPage - 1, currentPage === 1);
+    for (var p = 1; p <= totalPages; p++) {
+      if (p === currentPage) {
+        html += '<span class="o-pag-btn active">' + p + '</span>';
+      } else if (p > currentPage - 3 && p < currentPage + 3) {
+        html += pagBtn(p, p, false);
+      }
+    }
+    html += pagBtn('›', currentPage + 1, currentPage === totalPages);
+    html += pagBtn('»', totalPages, currentPage === totalPages);
+    pager.innerHTML = html;
+  }
+
+  function pagBtn(label, page, disabled) {
+    return '<button type="button" class="o-pag-btn' + (disabled ? ' disabled' : '') +
+           '" onclick="pmGotoPage(' + page + ')">' + label + '</button>';
+  }
+
+  window.pmGotoPage = function (p) {
+    renderPage(p);
+    rows[0].closest('.pm-table-wrap').scrollIntoView({ block: 'start', behavior: 'smooth' });
+  };
+
+  pageSize = computePageSize();
+  renderPage(1);
+
+  // Recalcule le nombre de lignes par page si la fenêtre est redimensionnée
+  var resizeTimer = null;
+  window.addEventListener('resize', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function () {
+      pageSize = computePageSize();
+      renderPage(currentPage);
+    }, 200);
+  });
+})();
 </script>
 {% endblock %}

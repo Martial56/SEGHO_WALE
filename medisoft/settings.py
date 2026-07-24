@@ -73,6 +73,7 @@ TEMPLATES = [
                 'stock.context_processors.stock_alertes',
                 'pharmacie.context_processors.pharmacie_alertes',
                 'soins.context_processors.soins_alertes',
+                'presence.context_processors.permanence_medecins_ctx',
             ],
         },
     },

@@ -1,5 +1,5 @@
 {% extends 'presence/base.html' %}
-{% load i18n static %}
+{% load i18n static l10n %}
 {% block topbar_title %}Rapport de présence — {{ mois_fr }} {{ year }}{% endblock %}
 
 {% block extra_css %}
@@ -136,21 +136,19 @@ html[data-theme="dark"] .pr-page-link.active { background:var(--pr-600);color:#f
 <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:24px 0 20px;">
   <div style="background:var(--pr-50);border:1px solid var(--pr-200);border-radius:10px;padding:14px 18px;text-align:center;">
     <div style="font-size:24px;font-weight:800;color:var(--pr-600);line-height:1;">{{ stats|length }}</div>
-    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:rgba(0,0,0,.45);margin-top:4px;font-weight:700;">Employés</div>
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--pr-muted);margin-top:4px;font-weight:700;">Employés</div>
   </div>
   <div style="background:var(--pr-50);border:1px solid var(--pr-200);border-radius:10px;padding:14px 18px;text-align:center;">
     <div style="font-size:24px;font-weight:800;color:var(--pr-700);line-height:1;">{{ nb_jouvres }}</div>
-    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:rgba(0,0,0,.45);margin-top:4px;font-weight:700;">Jours ouvrés</div>
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--pr-muted);margin-top:4px;font-weight:700;">Jours ouvrés</div>
   </div>
   <div style="background:rgba(var(--amber-rgb),.08);border:1px solid rgba(var(--amber-rgb),.2);border-radius:10px;padding:14px 18px;text-align:center;">
     <div style="font-size:24px;font-weight:800;color:#c47a00;line-height:1;">{{ retards_all|length }}</div>
-    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:rgba(0,0,0,.45);margin-top:4px;font-weight:700;">Retards détectés</div>
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--pr-muted);margin-top:4px;font-weight:700;">Retards détectés</div>
   </div>
   <div style="background:var(--pr-50);border:1px solid var(--pr-200);border-radius:10px;padding:14px 18px;text-align:center;">
-    <div style="font-size:24px;font-weight:800;color:var(--pr-600);line-height:1;">
-      {% if stats %}{% widthratio stats|length 1 1 %}{% endif %}
-    </div>
-    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:rgba(0,0,0,.45);margin-top:4px;font-weight:700;">{{ mois_fr }}</div>
+    <div style="font-size:24px;font-weight:800;color:var(--pr-600);line-height:1;">{{ taux_moyen }}%</div>
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--pr-muted);margin-top:4px;font-weight:700;">Taux moyen</div>
   </div>
 </div>
 
@@ -227,7 +225,7 @@ html[data-theme="dark"] .pr-page-link.active { background:var(--pr-600);color:#f
               <div style="display:flex;align-items:center;gap:8px;">
                 <div class="bar-track">
                   <div class="bar-fill {% if s.taux >= 90 %}good{% elif s.taux >= 75 %}warn{% else %}bad{% endif %}"
-                       data-w="{{ s.taux }}"></div>
+                       data-w="{{ s.taux|unlocalize }}"></div>
                 </div>
                 <span style="font-size:12px;font-weight:700;color:{% if s.taux >= 90 %}var(--pr-600){% elif s.taux >= 75 %}#c47a00{% else %}var(--rose-btn){% endif %};min-width:38px;">
                   {{ s.taux }}%
@@ -342,22 +340,21 @@ html[data-theme="dark"] .pr-page-link.active { background:var(--pr-600);color:#f
         <th>#</th><th>Motif d'absence</th><th class="num">Nb occurrences</th><th style="min-width:150px;">Part</th>
       </tr></thead>
       <tbody>
-      {% with total_abs=motifs_list|length %}
-      {% for motif, nb in motifs_list %}
+      {% for m in motifs_list %}
       <tr>
         <td style="color:var(--pr-muted);font-size:11px;">{{ forloop.counter }}</td>
-        <td style="font-weight:600;">{{ motif }}</td>
-        <td class="num" style="font-weight:700;color:var(--pr-700);">{{ nb }}</td>
+        <td style="font-weight:600;">{{ m.motif }}</td>
+        <td class="num" style="font-weight:700;color:var(--pr-700);">{{ m.nb }}</td>
         <td>
           <div style="display:flex;align-items:center;gap:8px;">
             <div class="bar-track">
-              <div class="bar-fill bad" style="width:{{ nb|add:"0" }}00%; max-width:100%;"></div>
+              <div class="bar-fill bad" data-w="{{ m.pct|unlocalize }}"></div>
             </div>
+            <span style="font-size:11px;color:var(--pr-muted);min-width:32px;">{{ m.pct }}%</span>
           </div>
         </td>
       </tr>
       {% endfor %}
-      {% endwith %}
       </tbody>
     </table>
     {% else %}

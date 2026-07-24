@@ -67,6 +67,13 @@
 }
 .motif-inp:focus { outline:none; border-color:var(--rose); }
 
+/* Pagination registre */
+#reg-pagination {
+  display:flex; align-items:center; gap:6px; flex-wrap:wrap;
+  padding:10px 4px; font-size:12px; color:var(--pr-muted);
+}
+#reg-pagination .o-pag-btn.active { background:var(--pr-600); color:#fff; border-color:var(--pr-600); }
+
 /* Stat chips */
 .stat-chip {
   display:inline-flex; align-items:center; gap:5px; padding:4px 12px;
@@ -164,8 +171,36 @@
   {% endif %}
 </div>
 
-<form method="post">
+{% if verrou %}
+<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+            background:rgba(var(--rose-rgb),.08);border:1px solid rgba(var(--rose-rgb),.3);
+            border-radius:10px;padding:10px 16px;margin-bottom:14px;color:var(--rose-btn);font-size:13px;font-weight:600;">
+  <span>
+    <i class="bi bi-lock-fill"></i>
+    Registre verrouillé le {{ verrou.verrouille_le|date:"d/m/Y à H:i" }}
+    {% if verrou.verrouille_par %}par {{ verrou.verrouille_par.get_full_name|default:verrou.verrouille_par.username }}{% endif %}
+    — aucune modification possible.
+  </span>
+  {% if can_unlock %}
+  <form method="post" action="{% url 'presence_deverrouiller' %}" style="margin:0;">
+    {% csrf_token %}
+    <input type="hidden" name="date" value="{{ selected_date_iso }}">
+    {% if service_sel %}<input type="hidden" name="service" value="{{ service_sel.pk }}">{% endif %}
+    {% with date_fr=selected_date|date:"d/m/Y" %}
+    <button type="submit" class="btn-pr-outline" style="border-color:var(--rose);color:var(--rose-btn);"
+            data-confirm-msg="Déverrouiller le registre du {{ date_fr }} ?"
+            onclick="return confirm(this.dataset.confirmMsg);">
+      <i class="bi bi-unlock-fill"></i> Déverrouiller
+    </button>
+    {% endwith %}
+  </form>
+  {% endif %}
+</div>
+{% endif %}
+
+<form method="post" id="registre-form">
   {% csrf_token %}
+  <input type="hidden" name="confirmer_verrouillage" id="confirmer_verrouillage" value="0">
   <div class="pr-card">
     <div style="overflow-x:auto;">
       <table class="reg-table">
@@ -184,7 +219,7 @@
             <th style="min-width:120px;font-size:10px;">Modifié par</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="registre-tbody">
           {% for ligne in lignes %}
           {% with emp=ligne.emp p=ligne.p %}
           <tr id="row-{{ emp.pk }}">
@@ -195,12 +230,19 @@
               {% if ligne.perm_active %}
               <span style="background:rgba(var(--violet-rgb),.1);color:var(--violet);border:1px solid rgba(var(--violet-rgb),.25);border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700;">
                 <i class="bi bi-clock-fill" style="font-size:9px;"></i>
-                Permanence {% if planning_perm %}{{ planning_perm.heure_debut|time:"H:i" }}–{{ planning_perm.heure_fin|time:"H:i" }}{% else %}8h–15h{% endif %}
+                Permanence {% if ligne.planning_perm %}{{ ligne.planning_perm.heure_debut|time:"H:i" }}–{{ ligne.planning_perm.heure_fin|time:"H:i" }}{% else %}8h–15h{% endif %}
               </span>
               {% elif ligne.perm_planifiee %}
               <span style="background:rgba(var(--amber-rgb),.08);color:var(--amber-text);border:1px solid rgba(var(--amber-rgb),.25);border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700;">
                 <i class="bi bi-calendar-check" style="font-size:9px;"></i> Planifié
               </span>
+              {% endif %}
+              {% if ligne.arrivee_manquante %}
+              <div style="margin-top:3px;">
+                <span style="background:rgba(var(--rose-rgb),.08);color:var(--rose-btn);border:1px solid rgba(var(--rose-rgb),.25);border-radius:10px;padding:1px 8px;font-size:10px;font-weight:700;white-space:nowrap;" title="Arrivée non pointée avant midi — à régulariser manuellement">
+                  <i class="bi bi-exclamation-triangle-fill"></i> Arrivée manquante
+                </span>
+              </div>
               {% endif %}
               {% if ligne.conge %}
               <div style="margin-top:3px;">
@@ -215,15 +257,23 @@
 
             <!-- Présent/Absent toggle -->
             <td style="text-align:center;">
-              <input type="checkbox" class="present-toggle" id="pres_{{ emp.pk }}"
-                     name="present_{{ emp.pk }}" value="1"
-                     {% if ligne.present %}checked{% endif %}
-                     onchange="togglePresent('{{ emp.pk }}', this.checked)">
-              <label for="pres_{{ emp.pk }}" class="present-label {% if not ligne.present %}absent{% endif %}"
-                     id="lbl_{{ emp.pk }}">
-                {% if ligne.present %}<i class="bi bi-check-lg"></i> Présent
-                {% else %}<i class="bi bi-x-lg"></i> Absent{% endif %}
-              </label>
+              {% if ligne.present_locked %}
+                <span class="locked-time" title="Pointé au kiosk — présence non modifiable">
+                  <i class="bi bi-lock-fill"></i> Présent
+                </span>
+                <input type="hidden" name="present_{{ emp.pk }}" value="1">
+              {% else %}
+                <input type="checkbox" class="present-toggle" id="pres_{{ emp.pk }}"
+                       name="present_{{ emp.pk }}" value="1"
+                       {% if ligne.present %}checked{% endif %}
+                       {% if verrou %}disabled{% endif %}
+                       onchange="togglePresent('{{ emp.pk }}', this.checked)">
+                <label for="pres_{{ emp.pk }}" class="present-label {% if not ligne.present %}absent{% endif %}"
+                       id="lbl_{{ emp.pk }}">
+                  {% if ligne.present %}<i class="bi bi-check-lg"></i> Présent
+                  {% else %}<i class="bi bi-x-lg"></i> Absent{% endif %}
+                </label>
+              {% endif %}
             </td>
 
             <!-- Checkbox permanence -->
@@ -231,27 +281,45 @@
               <input type="checkbox" name="perm_{{ emp.pk }}" value="1"
                      id="perm_{{ emp.pk }}"
                      {% if ligne.perm_active %}checked{% endif %}
+                     {% if verrou %}disabled{% endif %}
                      onchange="togglePermanence('{{ emp.pk }}', this.checked)"
                      style="width:16px;height:16px;cursor:pointer;accent-color:var(--violet);">
             </td>
 
             <!-- Zone permanence (2 champs) -->
-            <td class="td-time" colspan="2" id="zone_perm_{{ emp.pk }}"
+            <td class="td-time perm-cell-{{ emp.pk }}" colspan="2" id="zone_perm_{{ emp.pk }}"
                 style="text-align:center;{% if not ligne.perm_active %}display:none;{% endif %}">
               <span style="font-size:9.5px;color:var(--violet);display:block;margin-bottom:2px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;">Arrivée</span>
-              <input type="time" name="h_am_{{ emp.pk }}" class="time-inp"
-                     value="{{ p.heure_arrivee_matin|time:'H:i'|default:'' }}"
-                     placeholder="08:00">
+              {% if p and p.am_in_locked %}
+                <span class="locked-time" title="Enregistré par pointage — non modifiable">
+                  <i class="bi bi-lock-fill"></i> {{ p.heure_arrivee_matin|time:'H:i' }}
+                </span>
+                <input type="hidden" name="h_am_{{ emp.pk }}" value="{{ p.heure_arrivee_matin|time:'H:i'|default:'' }}">
+              {% else %}
+                <input type="time" name="h_am_{{ emp.pk }}" class="time-inp"
+                       data-emp="{{ emp.pk }}"
+                       value="{{ p.heure_arrivee_matin|time:'H:i'|default:'' }}"
+                       placeholder="08:00" {% if not ligne.present or verrou %}disabled{% endif %}>
+              {% endif %}
             </td>
-            <td class="td-time" colspan="2" style="text-align:center;{% if not p or not p.permanence %}display:none;{% endif %}">
+            <td class="td-time perm-cell-{{ emp.pk }}" colspan="2"
+                style="text-align:center;{% if not ligne.perm_active %}display:none;{% endif %}">
               <span style="font-size:9.5px;color:var(--violet);display:block;margin-bottom:2px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;">Départ</span>
-              <input type="time" name="h_ds_{{ emp.pk }}" class="time-inp"
-                     value="{{ p.heure_depart_soir|time:'H:i'|default:'' }}"
-                     placeholder="15:00">
+              {% if p and p.pm_out_locked %}
+                <span class="locked-time" title="Enregistré par pointage — non modifiable">
+                  <i class="bi bi-lock-fill"></i> {{ p.heure_depart_soir|time:'H:i' }}
+                </span>
+                <input type="hidden" name="h_ds_{{ emp.pk }}" value="{{ p.heure_depart_soir|time:'H:i'|default:'' }}">
+              {% else %}
+                <input type="time" name="h_ds_{{ emp.pk }}" class="time-inp"
+                       data-emp="{{ emp.pk }}"
+                       value="{{ p.heure_depart_soir|time:'H:i'|default:'' }}"
+                       placeholder="15:00" {% if not ligne.present or verrou %}disabled{% endif %}>
+              {% endif %}
             </td>
 
             <!-- Zone normale (4 champs) -->
-            <td class="td-time" id="zone_normale_{{ emp.pk }}"
+            <td class="td-time normal-cell-{{ emp.pk }}" id="zone_normale_{{ emp.pk }}"
                 style="{% if ligne.perm_active %}display:none;{% endif %}">
               {% if p and p.am_in_locked %}
                 <span class="locked-time" title="Enregistré par pointage — non modifiable">
@@ -260,10 +328,12 @@
                 <input type="hidden" name="h_am_{{ emp.pk }}" value="{{ p.heure_arrivee_matin|time:'H:i'|default:'' }}">
               {% else %}
                 <input type="time" name="h_am_{{ emp.pk }}" class="time-inp"
-                       value="{{ p.heure_arrivee_matin|time:'H:i'|default:'' }}">
+                       data-emp="{{ emp.pk }}"
+                       value="{{ p.heure_arrivee_matin|time:'H:i'|default:'' }}"
+                       {% if not ligne.present or verrou %}disabled{% endif %}>
               {% endif %}
             </td>
-            <td class="td-time" style="{% if ligne.perm_active %}display:none;{% endif %}">
+            <td class="td-time normal-cell-{{ emp.pk }}" style="{% if ligne.perm_active %}display:none;{% endif %}">
               {% if p and p.am_out_locked %}
                 <span class="locked-time" title="Enregistré par pointage — non modifiable">
                   <i class="bi bi-lock-fill"></i> {{ p.heure_depart_matin|time:'H:i' }}
@@ -271,10 +341,12 @@
                 <input type="hidden" name="h_dm_{{ emp.pk }}" value="{{ p.heure_depart_matin|time:'H:i'|default:'' }}">
               {% else %}
                 <input type="time" name="h_dm_{{ emp.pk }}" class="time-inp"
-                       value="{{ p.heure_depart_matin|time:'H:i'|default:'' }}">
+                       data-emp="{{ emp.pk }}"
+                       value="{{ p.heure_depart_matin|time:'H:i'|default:'' }}"
+                       {% if not ligne.present or verrou %}disabled{% endif %}>
               {% endif %}
             </td>
-            <td class="td-time" style="{% if ligne.perm_active %}display:none;{% endif %}">
+            <td class="td-time normal-cell-{{ emp.pk }}" style="{% if ligne.perm_active %}display:none;{% endif %}">
               {% if p and p.pm_in_locked %}
                 <span class="locked-time" title="Enregistré par pointage — non modifiable">
                   <i class="bi bi-lock-fill"></i> {{ p.heure_arrivee_soir|time:'H:i' }}
@@ -282,10 +354,12 @@
                 <input type="hidden" name="h_as_{{ emp.pk }}" value="{{ p.heure_arrivee_soir|time:'H:i'|default:'' }}">
               {% else %}
                 <input type="time" name="h_as_{{ emp.pk }}" class="time-inp"
-                       value="{{ p.heure_arrivee_soir|time:'H:i'|default:'' }}">
+                       data-emp="{{ emp.pk }}"
+                       value="{{ p.heure_arrivee_soir|time:'H:i'|default:'' }}"
+                       {% if not ligne.present or verrou %}disabled{% endif %}>
               {% endif %}
             </td>
-            <td class="td-time" style="{% if ligne.perm_active %}display:none;{% endif %}">
+            <td class="td-time normal-cell-{{ emp.pk }}" style="{% if ligne.perm_active %}display:none;{% endif %}">
               {% if p and p.pm_out_locked %}
                 <span class="locked-time" title="Enregistré par pointage — non modifiable">
                   <i class="bi bi-lock-fill"></i> {{ p.heure_depart_soir|time:'H:i' }}
@@ -293,7 +367,9 @@
                 <input type="hidden" name="h_ds_{{ emp.pk }}" value="{{ p.heure_depart_soir|time:'H:i'|default:'' }}">
               {% else %}
                 <input type="time" name="h_ds_{{ emp.pk }}" class="time-inp"
-                       value="{{ p.heure_depart_soir|time:'H:i'|default:'' }}">
+                       data-emp="{{ emp.pk }}"
+                       value="{{ p.heure_depart_soir|time:'H:i'|default:'' }}"
+                       {% if not ligne.present or verrou %}disabled{% endif %}>
               {% endif %}
             </td>
 
@@ -302,11 +378,12 @@
               <input type="text" name="rem_{{ emp.pk }}" class="time-inp"
                      style="width:100%;text-align:left;"
                      placeholder="Remarques…"
-                     value="{{ p.remarques|default:'' }}">
+                     value="{{ p.remarques|default:'' }}" {% if verrou %}disabled{% endif %}>
               <div id="motif_wrap_{{ emp.pk }}" class="motif-cell{% if not ligne.present %} motif-visible{% endif %}">
                 <input type="text" name="motif_{{ emp.pk }}" class="motif-inp"
                        placeholder="Motif d'absence…"
-                       value="{% if p %}{{ p.motif_absence }}{% elif ligne.conge %}{{ ligne.conge.get_type_conge_display }}{% endif %}">
+                       value="{% if p %}{{ p.motif_absence }}{% elif ligne.conge %}{{ ligne.conge.get_type_conge_display }}{% endif %}"
+                       {% if verrou %}disabled{% endif %}>
               </div>
             </td>
             <!-- Audit -->
@@ -329,10 +406,13 @@
         </tbody>
       </table>
     </div>
+    {% if lignes %}
+    <div id="reg-pagination" class="no-print"></div>
+    {% endif %}
   </div>
 
   <!-- Bouton sauvegarder -->
-  {% if lignes %}
+  {% if lignes and not verrou %}
   <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:8px;" class="no-print">
     <button type="submit" class="btn-pr">
       <i class="bi bi-floppy-fill"></i> Enregistrer le registre
@@ -345,11 +425,15 @@
 
 {% block extra_js %}
 <script>
+var SELECTED_WEEKDAY = {{ selected_date.weekday }}; // 0=lundi … 5=samedi, 6=dimanche
+
 function togglePermanence(empId, isPerm) {
-  var zoneNormale = document.getElementById('zone_normale_' + empId);
-  var zonePerm    = document.getElementById('zone_perm_' + empId);
-  if (zoneNormale) zoneNormale.style.display = isPerm ? 'none' : '';
-  if (zonePerm)    zonePerm.style.display    = isPerm ? '' : 'none';
+  document.querySelectorAll('.normal-cell-' + empId).forEach(function(td) {
+    td.style.display = isPerm ? 'none' : '';
+  });
+  document.querySelectorAll('.perm-cell-' + empId).forEach(function(td) {
+    td.style.display = isPerm ? '' : 'none';
+  });
 }
 
 function togglePresent(empId, isPresent) {
@@ -364,6 +448,142 @@ function togglePresent(empId, isPresent) {
     lbl.innerHTML = '<i class="bi bi-x-lg"></i> Absent';
     motifWrap.style.display = 'block';
   }
+  // Aucune saisie d'heure possible pour un absent — sans effet sur les
+  // champs déjà verrouillés par un pointage kiosk (ceux-ci sont des <span>,
+  // pas des <input>, donc jamais concernés par ce sélecteur).
+  document.querySelectorAll('.time-inp[data-emp="' + empId + '"]').forEach(function(inp) {
+    inp.disabled = !isPresent;
+    if (!isPresent) inp.value = '';
+  });
 }
+
+// ── Avertissement créneaux non pointés avant enregistrement ────────────────
+// Aide à l'usage côté client : le serveur revérifie tout indépendamment et
+// c'est lui qui décide réellement du verrouillage — ce script n'est là que
+// pour éviter un aller-retour inutile dans le cas courant.
+(function () {
+  var form = document.getElementById('registre-form');
+  var confirmField = document.getElementById('confirmer_verrouillage');
+  if (!form || !confirmField) return;
+
+  form.addEventListener('submit', function (e) {
+    if (confirmField.value === '1') return; // déjà confirmé lors d'une tentative précédente
+
+    var incomplets = [];
+    document.querySelectorAll('#registre-tbody tr[id^="row-"]').forEach(function (tr) {
+      var empId = tr.id.replace('row-', '');
+      var presentInput = tr.querySelector('input[name="present_' + empId + '"]');
+      if (!presentInput) return;
+      var isPresent = presentInput.type === 'hidden' ? presentInput.value === '1' : presentInput.checked;
+      if (!isPresent) return;
+
+      var permInput = tr.querySelector('input[name="perm_' + empId + '"]');
+      var isPerm = permInput && permInput.checked;
+      var scope = isPerm ? '.perm-cell-' + empId : '.normal-cell-' + empId;
+      var prefixes = isPerm
+        ? ['h_am_', 'h_ds_']
+        : (SELECTED_WEEKDAY === 5 ? ['h_am_', 'h_dm_'] : ['h_am_', 'h_dm_', 'h_as_', 'h_ds_']);
+
+      var manque = prefixes.some(function (prefix) {
+        var inp = tr.querySelector(scope + ' input[name="' + prefix + empId + '"]');
+        return inp && inp.type === 'time' && !inp.disabled && !inp.value;
+      });
+      if (manque) {
+        var nomEl = tr.querySelector('.td-nom');
+        incomplets.push(nomEl ? nomEl.textContent.trim().split('\n')[0].trim() : ('Employé ' + empId));
+      }
+    });
+
+    if (incomplets.length) {
+      var poursuivre = confirm(
+        'Créneaux non pointés pour : ' + incomplets.join(', ') + '.\n\n' +
+        'Continuer verrouillera définitivement le registre de cette journée ' +
+        '(plus aucune modification possible ensuite). Continuer ?'
+      );
+      if (!poursuivre) {
+        e.preventDefault();
+        return;
+      }
+      confirmField.value = '1';
+    }
+  });
+})();
+
+// ── Pagination du registre (cote client : toutes les lignes restent dans le
+//    formulaire pour ne rien perdre a la sauvegarde, seul l'affichage est pagine) ──
+(function () {
+  var tbody = document.getElementById('registre-tbody');
+  var pager = document.getElementById('reg-pagination');
+  if (!tbody || !pager) return;
+  var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr[id^="row-"]'));
+  if (!rows.length) return;
+
+  var currentPage = 1;
+  var pageSize = 20;
+
+  function computePageSize() {
+    var thead = document.querySelector('.reg-table thead');
+    var rowH = rows[0].getBoundingClientRect().height || 40;
+    var theadH = thead ? thead.getBoundingClientRect().height : 0;
+    var top = rows[0].closest('.pr-card').getBoundingClientRect().top;
+    var reserveBottom = 90; // bouton "Enregistrer" + marges
+    var available = window.innerHeight - top - theadH - reserveBottom;
+    var fit = Math.floor(available / rowH);
+    return Math.max(5, Math.min(80, fit));
+  }
+
+  function renderPage(page) {
+    var totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+    page = Math.max(1, Math.min(totalPages, page));
+    currentPage = page;
+    rows.forEach(function (row, idx) {
+      var pageOf = Math.floor(idx / pageSize) + 1;
+      row.style.display = (pageOf === page) ? '' : 'none';
+    });
+    renderPager(totalPages);
+  }
+
+  function renderPager(totalPages) {
+    if (totalPages <= 1) { pager.innerHTML = ''; return; }
+    var html = '<span style="margin-right:8px;white-space:nowrap;">' + rows.length + ' employés</span>';
+    html += pagBtn('«', 1, currentPage === 1);
+    html += pagBtn('‹', currentPage - 1, currentPage === 1);
+    for (var p = 1; p <= totalPages; p++) {
+      if (p === currentPage) {
+        html += '<span class="o-pag-btn active">' + p + '</span>';
+      } else if (p > currentPage - 3 && p < currentPage + 3) {
+        html += pagBtn(p, p, false);
+      }
+    }
+    html += pagBtn('›', currentPage + 1, currentPage === totalPages);
+    html += pagBtn('»', totalPages, currentPage === totalPages);
+    pager.innerHTML = html;
+  }
+
+  function pagBtn(label, page, disabled) {
+    return '<button type="button" class="o-pag-btn' + (disabled ? ' disabled' : '') +
+           '" onclick="regGotoPage(' + page + ')">' + label + '</button>';
+  }
+
+  window.regGotoPage = function (p) {
+    renderPage(p);
+    rows[0].closest('.pr-card').scrollIntoView({ block: 'start', behavior: 'smooth' });
+  };
+
+  pageSize = computePageSize();
+  renderPage(1);
+
+  // Recalcule le nombre de lignes par page si la fenêtre est redimensionnée
+  // (rotation tablette, fenêtre restaurée/agrandie) — sinon la pagination
+  // reste figée sur la hauteur disponible au premier chargement.
+  var resizeTimer = null;
+  window.addEventListener('resize', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function () {
+      pageSize = computePageSize();
+      renderPage(currentPage);
+    }, 200);
+  });
+})();
 </script>
 {% endblock %}

@@ -18,15 +18,45 @@
   --g600-rgb:79,155,75;
   --rose-rgb: 232,69,69;
   --rose-btn: #c0392b;
+  --amber: #b45309; --amber-rgb: 180,83,9;
 }
-html { background: var(--g700); }
+html { background: #1b5e20; }
 body {
   font-family:'Sora',sans-serif;
-  background-color: var(--g700);
-  background-image: linear-gradient(135deg, var(--g900) 0%, var(--g700) 50%, var(--g600) 100%);
+  background-color: #1b5e20;
+  background-image: linear-gradient(135deg, #123317 0%, #1b5e20 35%, #2e7d32 65%, #4caf50 100%);
+  background-attachment: fixed;
   min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;
   padding:20px;
+  position: relative;
+  z-index: 0;
+  overflow-x:hidden;
+  overflow-y:auto;
 }
+/* Anneaux concentriques isolés par coin (masqués en fondu pour ne pas déborder
+   sur le reste de la page — éviter la répétition infinie de repeating-radial-gradient) */
+.bg-rings {
+  position:fixed; z-index:-1; pointer-events:none; border-radius:50%;
+  background-image: repeating-radial-gradient(circle at center, rgba(255,255,255,.16) 0 2px, transparent 2px 46px);
+  -webkit-mask-image: radial-gradient(circle, black 50%, transparent 74%);
+          mask-image: radial-gradient(circle, black 50%, transparent 74%);
+}
+.bg-rings.tr { top:-320px; right:-320px; width:680px; height:680px; }
+.bg-rings.br { bottom:-360px; right:-260px; width:720px; height:720px; }
+.bg-rings.tl { top:-300px; left:-300px; width:460px; height:460px; }
+.bg-rings.bl { bottom:-260px; left:-260px; width:420px; height:420px; }
+
+/* Points façon trame (halftone), nichés près de certains anneaux */
+.bg-dots {
+  position:fixed; z-index:-1; pointer-events:none; border-radius:50%;
+  background-image: radial-gradient(rgba(255,255,255,.4) 2.5px, transparent 2.5px);
+  background-size: 13px 13px;
+  -webkit-mask-image: radial-gradient(circle, black 55%, transparent 72%);
+          mask-image: radial-gradient(circle, black 55%, transparent 72%);
+}
+.bg-dots.tl { top:-60px;   left:-60px;   width:220px; height:220px; }
+.bg-dots.tr { top:-50px;   right:60px;   width:170px; height:170px; }
+.bg-dots.bl { bottom:-70px; left:-40px;  width:230px; height:230px; }
 
 /* ── En-tête ── */
 .kiosk-header {
@@ -113,7 +143,7 @@ body {
 #qr-section { margin-top:14px; display:none; }
 #qr-reader { border-radius:12px; overflow:hidden; }
 .btn-stop-scan {
-  width:100%; margin-top:10px; padding:10px; border:1px solid rgba(0,0,0,.1);
+  width:100%; margin-top:10px; padding:10px; min-height:44px; border:1px solid rgba(0,0,0,.1);
   border-radius:10px; background:#fff; color:rgba(0,0,0,.5); font-family:'Sora',sans-serif;
   font-size:12px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;
 }
@@ -168,6 +198,21 @@ body {
   padding:6px 16px; font-size:13px; font-weight:700;
 }
 
+/* ── Notice permanence ── */
+.permanence-notice {
+  display:none; align-items:center; gap:10px;
+  background:rgba(var(--g600-rgb),.1); border:1px solid rgba(var(--g600-rgb),.3);
+  border-radius:12px; padding:12px 16px; margin-bottom:16px;
+  color:var(--g700); font-size:13px; font-weight:600; line-height:1.4;
+}
+.permanence-notice.show { display:flex; }
+.permanence-notice i { font-size:20px; flex-shrink:0; color:var(--g600); }
+.permanence-notice.alerte {
+  background:rgba(var(--amber-rgb),.1); border-color:rgba(var(--amber-rgb),.3);
+  color:var(--amber);
+}
+.permanence-notice.alerte i { color:var(--amber); }
+
 /* ── Bouton valider ── */
 .btn-valider {
   width:100%; padding:18px; background:var(--g600); color:#fff;
@@ -180,7 +225,7 @@ body {
 .btn-valider:disabled { background:rgba(0,0,0,.15); cursor:not-allowed; transform:none; box-shadow:none; }
 
 .btn-annuler {
-  width:100%; padding:12px; background:transparent; color:rgba(0,0,0,.4);
+  width:100%; padding:12px; min-height:44px; background:transparent; color:rgba(0,0,0,.4);
   border:1px solid rgba(0,0,0,.1); border-radius:12px;
   font-family:'Sora',sans-serif; font-size:13px; font-weight:600;
   cursor:pointer; margin-top:8px; transition:all .15s;
@@ -210,6 +255,15 @@ body {
 </style>
 </head>
 <body>
+
+<!-- Décor d'arrière-plan (anneaux + halftone) -->
+<div class="bg-rings tr"></div>
+<div class="bg-rings br"></div>
+<div class="bg-rings tl"></div>
+<div class="bg-rings bl"></div>
+<div class="bg-dots tl"></div>
+<div class="bg-dots tr"></div>
+<div class="bg-dots bl"></div>
 
 <!-- En-tête -->
 <div class="kiosk-header">
@@ -287,6 +341,10 @@ body {
 
   <!-- Fiche employé + validation -->
   <div id="emp-section">
+    <div class="permanence-notice" id="permanence-notice">
+      <i class="bi bi-info-circle-fill" id="permanence-notice-icon"></i>
+      <span id="permanence-notice-text">Vous êtes programmé(e) pour la <strong>permanence</strong> aujourd'hui.</span>
+    </div>
     <div class="emp-card" id="emp-card">
       <div class="emp-avatar" id="emp-avatar"></div>
       <div>
@@ -319,10 +377,12 @@ body {
   {% endif %}
 </div>
 
-<!-- Lien admin discret -->
+<!-- Lien admin discret — visible seulement pour RH/Admin/Directeur/Médecin Chef déjà connectés -->
+{% if can_access_admin %}
 <a href="{% url 'presence_registre' %}" style="margin-top:20px;font-size:11px;color:rgba(255,255,255,.35);text-decoration:none;">
   <i class="bi bi-shield-lock"></i> Accès administration
 </a>
+{% endif %}
 
 <!-- html5-qrcode -->
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
@@ -331,6 +391,16 @@ const CSRF = '{{ csrf_token }}';
 let empData   = null;
 let actionKey = null;
 let html5QrCode = null;
+let idleTimer = null;
+const IDLE_TIMEOUT_MS = 20000; // retour auto à l'écran d'accueil si personne ne valide (poste public)
+
+function startIdleTimer() {
+  clearIdleTimer();
+  idleTimer = setTimeout(resetKiosque, IDLE_TIMEOUT_MS);
+}
+function clearIdleTimer() {
+  if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
+}
 
 // ── Horloge ──────────────────────────────────────────────────────────────────
 (function tickClock() {
@@ -381,6 +451,19 @@ function afficherEmploye(data) {
   document.getElementById('emp-mat').textContent  = data.emp.matricule;
   document.getElementById('emp-info').textContent = [data.emp.service, data.emp.fonction].filter(Boolean).join(' · ');
 
+  const notice     = document.getElementById('permanence-notice');
+  const noticeIcon = document.getElementById('permanence-notice-icon');
+  const noticeTxt  = document.getElementById('permanence-notice-text');
+  notice.classList.toggle('show', !!data.en_permanence);
+  notice.classList.toggle('alerte', !!data.arrivee_manquee);
+  if (data.arrivee_manquee) {
+    noticeIcon.className = 'bi bi-exclamation-triangle-fill';
+    noticeTxt.innerHTML = "Votre <strong>arrivée</strong> n'a pas été enregistrée avant midi. Vous pouvez pointer votre départ ce soir — la RH régularisera votre arrivée.";
+  } else {
+    noticeIcon.className = 'bi bi-info-circle-fill';
+    noticeTxt.innerHTML = "Vous êtes programmé(e) pour la <strong>permanence</strong> aujourd'hui.";
+  }
+
   const lbl = document.getElementById('action-label');
   if (data.complet) {
     lbl.innerHTML = '<span class="complet-badge"><i class="bi bi-check-all"></i> Journée complète — bonne journée !</span>';
@@ -393,11 +476,12 @@ function afficherEmploye(data) {
   document.getElementById('saisie-section').style.display = 'none';
   document.getElementById('emp-section').style.display    = 'block';
   document.getElementById('confirmation').style.display   = 'none';
+  startIdleTimer();
 }
-
 // ── Validation ────────────────────────────────────────────────────────────────
 async function validerPointage() {
   if (!empData || !actionKey) return;
+  clearIdleTimer();
   const btn = document.getElementById('btn-valider');
   btn.disabled = true;
   btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Enregistrement…';
@@ -412,6 +496,7 @@ async function validerPointage() {
       btn.disabled = false;
       btn.innerHTML = '<i class="bi bi-check2-circle"></i> Valider le pointage';
       showErreur(data.erreur);
+      startIdleTimer();
       return;
     }
     showConfirmation(data);
@@ -419,6 +504,7 @@ async function validerPointage() {
     btn.disabled = false;
     btn.innerHTML = '<i class="bi bi-check2-circle"></i> Valider le pointage';
     showErreur('Erreur réseau, réessayez.');
+    startIdleTimer();
   }
 }
 
@@ -451,6 +537,8 @@ function showConfirmation(data) {
 
 function annuler()    { resetKiosque(); }
 function resetKiosque() {
+  clearIdleTimer();
+  stopQR();
   empData = null; actionKey = null;
   document.getElementById('matricule-inp').value = '';
   document.getElementById('saisie-section').style.display = 'block';
