@@ -23,6 +23,7 @@ urlpatterns = [
     # ── Tableaux de bord & Suivi ──────────────────────────────────────────────
     path('tableau-de-bord/',             views.conge_dashboard,           name='conge_dashboard'),
     path('suivi-retours/',               views.conge_suivi_retours,       name='conge_suivi_retours'),
+    path('historique/',                  views.conge_historique_recherche,name='conge_historique_recherche'),
     path('historique/<int:emp_pk>/',     views.conge_historique_employe,  name='conge_historique_employe'),
     path('calendrier/',                  views.conge_calendrier,          name='conge_calendrier'),
     path('planning/equipe/',             views.conge_planning_equipe,     name='conge_planning_equipe'),
@@ -39,4 +40,10 @@ urlpatterns = [
     # ── Notifications ─────────────────────────────────────────────────────────
     path('notifs/lire/',                 views.conge_notifs_lire,         name='conge_notifs_lire'),
     path('notifs/<int:pk>/lire/',        views.conge_notif_lire_une,      name='conge_notif_lire_une'),
+
+    # ── Configuration : Types de congé ────────────────────────────────────────
+    path('config/types/',                    views.conge_type_list,   name='conge_type_list'),
+    path('config/types/nouveau/',            views.conge_type_create, name='conge_type_create'),
+    path('config/types/<int:pk>/modifier/',  views.conge_type_edit,   name='conge_type_edit'),
+    path('config/types/<int:pk>/supprimer/', views.conge_type_delete, name='conge_type_delete'),
 ]

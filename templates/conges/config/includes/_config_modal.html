@@ -1,0 +1,146 @@
+<!-- ── Modale Créer/Modifier (Type de congé) ── -->
+<style>
+.cgcfg-modal-overlay {
+  position: fixed; inset: 0; z-index: 9000;
+  background: rgba(10,20,15,0.55);
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transition: opacity 0.22s ease, visibility 0.22s ease;
+}
+.cgcfg-modal-overlay.open { opacity: 1; visibility: visible; pointer-events: auto; }
+.cgcfg-modal-box {
+  background: var(--cg-surface); border-radius: 16px;
+  width: 100%; max-width: 520px; max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 24px 70px rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.08);
+  transform: translateY(14px) scale(0.96);
+  opacity: 0;
+  transition: transform 0.28s cubic-bezier(.22,1,.36,1), opacity 0.22s ease;
+}
+.cgcfg-modal-overlay.open .cgcfg-modal-box { transform: translateY(0) scale(1); opacity: 1; }
+.cgcfg-modal-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 18px 22px;
+  background: linear-gradient(135deg, rgba(var(--cg-600-rgb),0.09), rgba(var(--cg-600-rgb),0.02));
+  border-bottom: 1px solid var(--cg-border);
+}
+.cgcfg-modal-icon {
+  width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--cg-600), var(--cg-400));
+  color: #fff; display: flex; align-items: center; justify-content: center;
+  font-size: 17px; box-shadow: 0 4px 12px rgba(var(--cg-600-rgb),0.35);
+}
+.cgcfg-modal-title-wrap { flex: 1; min-width: 0; }
+.cgcfg-modal-title { font-size: 16px; font-weight: 800; color: var(--cg-text); letter-spacing: -0.2px; }
+.cgcfg-modal-close {
+  width: 32px; height: 32px; border-radius: 9px; border: none;
+  background: rgba(0,0,0,0.04); color: var(--cg-muted); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, color 0.15s, transform 0.15s;
+  flex-shrink: 0;
+}
+.cgcfg-modal-close:hover { background: rgba(var(--rose-rgb),0.12); color: var(--rose-btn); transform: rotate(90deg); }
+html[data-theme="dark"] .cgcfg-modal-close { background: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .cgcfg-modal-close:hover { background: rgba(var(--rose-rgb),0.18); }
+.cgcfg-modal-loading {
+  padding: 48px 20px; text-align: center; color: var(--cg-muted); font-size: 13.5px;
+}
+.cgcfg-modal-loading i { display: block; font-size: 26px; margin-bottom: 10px; color: var(--cg-500); animation: cgcfg-modal-spin 0.9s linear infinite; }
+@keyframes cgcfg-modal-spin { to { transform: rotate(360deg); } }
+.cgcfg-modal-body { padding: 22px; animation: cgcfg-modal-fade-in 0.25s ease; }
+@keyframes cgcfg-modal-fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.cgcfg-modal-footer {
+  display: flex; justify-content: flex-end; gap: 10px;
+  padding: 16px 22px; border-top: 1px solid var(--cg-border);
+  background: rgba(0,0,0,0.012);
+}
+html[data-theme="dark"] .cgcfg-modal-footer { background: rgba(255,255,255,0.015); }
+</style>
+
+<div class="cgcfg-modal-overlay" id="cgcfg-modal-overlay" onclick="if (event.target === this) cgCloseConfigModal();">
+  <div class="cgcfg-modal-box">
+    <div class="cgcfg-modal-header">
+      <div class="cgcfg-modal-icon" id="cgcfg-modal-icon"><i class="bi bi-tags"></i></div>
+      <div class="cgcfg-modal-title-wrap">
+        <div class="cgcfg-modal-title" id="cgcfg-modal-title"></div>
+      </div>
+      <button type="button" class="cgcfg-modal-close" onclick="cgCloseConfigModal()">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div id="cgcfg-modal-content">
+      <div class="cgcfg-modal-loading"><i class="bi bi-arrow-repeat"></i> Chargement…</div>
+    </div>
+  </div>
+</div>
+
+<script>
+var cgcfgModalOverlay = document.getElementById('cgcfg-modal-overlay');
+var cgcfgModalContent = document.getElementById('cgcfg-modal-content');
+var cgcfgModalTitle   = document.getElementById('cgcfg-modal-title');
+var cgcfgModalIcon    = document.getElementById('cgcfg-modal-icon');
+
+function cgOpenConfigModal(event, url, title, icon) {
+  if (event) event.preventDefault();
+  cgcfgModalTitle.textContent = title;
+  cgcfgModalIcon.innerHTML = '<i class="bi ' + (icon || 'bi-tags') + '"></i>';
+  cgcfgModalContent.innerHTML = '<div class="cgcfg-modal-loading"><i class="bi bi-arrow-repeat"></i> Chargement…</div>';
+  cgcfgModalOverlay.classList.add('open');
+  fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
+    .then(function (r) { return r.text(); })
+    .then(function (html) {
+      cgcfgModalContent.innerHTML = html;
+      cgBindConfigForm();
+    })
+    .catch(function () {
+      cgcfgModalContent.innerHTML = '<div class="cgcfg-modal-loading">Erreur de chargement.</div>';
+    });
+  return false;
+}
+
+function cgCloseConfigModal() {
+  cgcfgModalOverlay.classList.remove('open');
+  cgcfgModalContent.innerHTML = '';
+}
+
+function cgBindConfigForm() {
+  var form = document.getElementById('cgcfgConfigForm');
+  if (!form) return;
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var url = form.dataset.url;
+    var submitBtn = form.querySelector('button[type="submit"]');
+    if (submitBtn) submitBtn.disabled = true;
+    fetch(url, {
+      method: 'POST',
+      headers: {'X-Requested-With': 'XMLHttpRequest'},
+      body: new FormData(form),
+    })
+      .then(function (r) {
+        var ct = r.headers.get('Content-Type') || '';
+        if (ct.indexOf('application/json') !== -1) {
+          return r.json().then(function (data) { return {json: data}; });
+        }
+        return r.text().then(function (html) { return {html: html}; });
+      })
+      .then(function (result) {
+        if (result.json && result.json.ok) {
+          window.location.reload();
+        } else if (result.html) {
+          cgcfgModalContent.innerHTML = result.html;
+          cgBindConfigForm();
+        }
+        if (submitBtn) submitBtn.disabled = false;
+      })
+      .catch(function () {
+        if (submitBtn) submitBtn.disabled = false;
+      });
+  });
+}
+
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape' && cgcfgModalOverlay.classList.contains('open')) cgCloseConfigModal();
+});
+</script>

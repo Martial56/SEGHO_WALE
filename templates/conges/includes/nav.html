@@ -14,7 +14,7 @@
   </a>
 
   <a href="{% url 'conge_list' %}"
-     class="o-nav-link {% if 'list' in uname or 'detail' in uname or uname == 'conge_nouveau' or 'annuler' in uname or 'terminer' in uname or 'prolonger' in uname or 'fractionner' in uname or 'absence' in uname or 'bon' in uname or 'attestation' in uname or 'employe_info' in uname or uname == 'conge_en_cours' or 'historique' in uname %}active{% endif %}">
+     class="o-nav-link {% if 'list' in uname or 'detail' in uname or uname == 'conge_nouveau' or 'annuler' in uname or 'terminer' in uname or 'prolonger' in uname or 'fractionner' in uname or 'absence' in uname or 'bon' in uname or 'attestation' in uname or 'employe_info' in uname or uname == 'conge_en_cours' or uname == 'conge_historique_employe' %}active{% endif %}">
     Liste des congés
   </a>
 
@@ -24,17 +24,28 @@
   </a>
 
   <a href="{% url 'conge_calendrier' %}"
-     class="o-nav-link {% if 'calendrier' in uname or 'planning' in uname %}active{% endif %}">
+     class="o-nav-link {% if 'calendrier' in uname %}active{% endif %}">
     Calendrier
   </a>
+
+  {% if can_manage %}
+  <a href="{% url 'conge_type_list' %}"
+     class="o-nav-link {% if 'conge_type' in uname %}active{% endif %}">
+    Configuration
+  </a>
+  {% endif %}
 
   <div style="flex:1;"></div>
 
   <div class="cg-more-wrap" id="cg-more-wrap">
-    <button class="cg-more-btn" id="cg-more-btn" title="Plus d'options">
+    <button class="cg-more-btn {% if uname == 'conge_historique_recherche' or uname == 'conge_soldes' or uname == 'conge_solde_recalc' or uname == 'conge_report_solde_annuel' or uname == 'conge_planning_equipe' or uname == 'conge_rapport' or uname == 'conge_direction' or uname == 'conge_export_csv' or uname == 'conge_stats_service' %}active{% endif %}"
+            id="cg-more-btn" title="Plus d'options">
       <i class="bi bi-three-dots-vertical"></i>
     </button>
     <div class="cg-more-popup" id="cg-more-popup">
+      <a href="{% url 'conge_historique_recherche' %}" class="cg-more-item">
+        <i class="bi bi-clock-history"></i> Historique employé
+      </a>
       <a href="{% url 'conge_soldes' %}" class="cg-more-item">
         <i class="bi bi-table"></i> Soldes congés
       </a>
@@ -43,6 +54,9 @@
       </a>
       <a href="{% url 'conge_rapport' %}" class="cg-more-item">
         <i class="bi bi-file-earmark-bar-graph"></i> Rapports
+      </a>
+      <a href="{% url 'conge_stats_service' %}" class="cg-more-item">
+        <i class="bi bi-bar-chart-steps"></i> Statistiques par service
       </a>
       <a href="{% url 'conge_direction' %}" class="cg-more-item">
         <i class="bi bi-graph-up-arrow"></i> Vue direction

@@ -11,13 +11,15 @@ from django.db import transaction
 from django.db.models import Q, Sum
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 
 from django.db.models import Q as _Q
 from employer.models import Employe, Conge, SoldeConge, HistoriqueConge, NotificationConge, Presence
+from conges.models import TypeConge
 from conges.utils import (
     compter_jours_ouvres, detecter_conflits, get_or_create_solde,
     jours_feries_ivoire, jours_feries_labels, quota_annuel,
-    TYPES_DEDUCTIBLES, DUREES_EXCEPTIONNELLES,
+    types_deductibles, durees_exceptionnelles,
 )
 
 RH_MANAGE_GROUPS = {'Médecin Chef', 'Médecin Chef Adjoint', 'Administrateur', 'Directeur', 'RH'}
@@ -30,6 +32,11 @@ _MOIS_FR = [
 
 def can_manage_rh(user):
     return user.is_superuser or user.groups.filter(name__in=RH_MANAGE_GROUPS).exists()
+
+
+def _can_view_conge(user, conge):
+    """RH/direction, ou l'employé consultant son propre congé."""
+    return can_manage_rh(user) or conge.employe.user_id == user.pk
 
 
 def _employes_eligibles():
@@ -98,16 +105,17 @@ def _create_presence_for_conge(conge):
     feries = set()
     for y in range(conge.date_debut.year, conge.date_fin.year + 1):
         feries |= jours_feries_ivoire(y)
-    current = conge.date_debut
     motif = f'Congé: {conge.get_type_conge_display()}'
+    jours = []
+    current = conge.date_debut
     while current <= conge.date_fin:
         if current.weekday() < 5 and current not in feries:
-            Presence.objects.get_or_create(
-                employe=conge.employe,
-                date=current,
-                defaults={'present': False, 'motif_absence': motif},
-            )
+            jours.append(current)
         current += timedelta(days=1)
+    Presence.objects.bulk_create(
+        [Presence(employe=conge.employe, date=d, present=False, motif_absence=motif) for d in jours],
+        ignore_conflicts=True,
+    )
 
 
 def _delete_presence_for_conge(conge):
@@ -127,13 +135,19 @@ SEUIL_CHEVAUCHEMENT = 40  # % du service simultanément en congé
 def _auto_approuve_vers_en_cours():
     """Passe en 'en cours' tout congé approuvé dont la date de début est atteinte."""
     today = _d.today()
-    for c in Conge.objects.filter(statut='approuve', date_debut__lte=today):
+    a_passer = list(Conge.objects.filter(statut='approuve', date_debut__lte=today))
+    if not a_passer:
+        return
+    for c in a_passer:
         c.statut = 'en_cours'
-        c.save(update_fields=['statut'])
-        HistoriqueConge.objects.create(
+    Conge.objects.bulk_update(a_passer, ['statut'])
+    HistoriqueConge.objects.bulk_create([
+        HistoriqueConge(
             conge=c, action='mis_en_cours', fait_par=None,
             commentaire='Passage automatique — date de début atteinte',
         )
+        for c in a_passer
+    ])
 
 
 def _check_chevauchement(employe, date_debut, date_fin, exclude_pk=None):
@@ -217,13 +231,14 @@ def conge_list(request):
             Q(employe__nom__icontains=q) | Q(employe__prenoms__icontains=q)
         )
 
-    stats = {
-        'total':    Conge.objects.count(),
-        'demande':  Conge.objects.filter(statut__in=['demande', 'valide_service']).count(),
-        'a_venir':  Conge.objects.filter(statut='approuve').count(),
-        'en_cours': Conge.objects.filter(statut='en_cours').count(),
-        'termine':  Conge.objects.filter(statut='termine').count(),
-    }
+    from django.db.models import Count
+    stats = Conge.objects.aggregate(
+        total=Count('pk'),
+        demande=Count('pk', filter=Q(statut__in=['demande', 'valide_service'])),
+        a_venir=Count('pk', filter=Q(statut='approuve')),
+        en_cours=Count('pk', filter=Q(statut='en_cours')),
+        termine=Count('pk', filter=Q(statut='termine')),
+    )
 
     # Années disponibles pour le filtre
     annees = list(
@@ -240,7 +255,7 @@ def conge_list(request):
         'page_obj':     page_obj,
         'stats':        stats,
         'employes':     _employes_eligibles().order_by('nom'),
-        'types':        Conge.TYPE,
+        'types':        TypeConge.objects.filter(actif=True).values_list('code', 'nom'),
         'statuts':      Conge.STATUT,
         'annees':       annees,
         'f_statut':     f_statut,
@@ -258,6 +273,8 @@ def conge_list(request):
 # ── Nouvelle demande ──────────────────────────────────────────────────────────
 @login_required(login_url='login')
 def conge_nouveau(request):
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
     employe_pk = request.GET.get('employe') or request.POST.get('employe')
     employe_pre = None
     if employe_pk:
@@ -272,6 +289,7 @@ def conge_nouveau(request):
         date_debut = request.POST.get('date_debut', '').strip()
         date_fin   = request.POST.get('date_fin', '').strip()
         motif      = request.POST.get('motif', '').strip()
+        deduit_du_solde = request.POST.get('deduit_du_solde') == 'on'
 
         errors = []
         if not emp_id:     errors.append("Veuillez sélectionner un employé.")
@@ -307,9 +325,37 @@ def conge_nouveau(request):
                     statut_initial = 'approuve'
 
                 nb_ouvres = compter_jours_ouvres(d1, d2)
+                duree_calendaire = (d2 - d1).days + 1
+
+                # Alerte durée forfaitaire dépassée (mariage, décès... Art. 25.6 CODI)
+                duree_legale = durees_exceptionnelles().get(type_conge)
+                if duree_legale and duree_calendaire > duree_legale:
+                    messages.warning(
+                        request,
+                        f"Attention : la durée légale pour ce type de congé est de {duree_legale} "
+                        f"jour(s), la période saisie en fait {duree_calendaire}."
+                    )
+
+                # Alerte chevauchement avec un autre congé actif de cet employé
+                conflits_emp = detecter_conflits(emp, d1, d2)
+                if conflits_emp:
+                    messages.warning(
+                        request,
+                        f"Attention : {emp.nom_complet} a déjà {len(conflits_emp)} congé(s) "
+                        f"sur une période qui chevauche celle-ci."
+                    )
+                # Alerte trop d'absents simultanés dans le service
+                alerte_service = _check_chevauchement(emp, d1, d2)
+                if alerte_service:
+                    messages.warning(
+                        request,
+                        f"Attention : {alerte_service['pct']}% du service {alerte_service['service']} "
+                        f"({alerte_service['nb_absent']}/{alerte_service['nb_total']}) sera déjà en congé "
+                        f"sur cette période."
+                    )
 
                 # Alerte solde insuffisant
-                if type_conge in TYPES_DEDUCTIBLES:
+                if deduit_du_solde:
                     solde_obj = get_or_create_solde(emp, d1.year)
                     if solde_obj.solde < nb_ouvres:
                         messages.warning(
@@ -323,10 +369,11 @@ def conge_nouveau(request):
                     date_debut=d1, date_fin=d2,
                     motif=motif, statut=statut_initial,
                     nb_jours_ouvres=nb_ouvres,
+                    deduit_du_solde=deduit_du_solde,
                     approuve_par=request.user,
                     date_approbation=timezone.now(),
                 )
-                if c.type_conge in TYPES_DEDUCTIBLES:
+                if c.deduit_du_solde:
                     get_or_create_solde(emp, d1.year)
                 _create_presence_for_conge(c)
                 _add_historique(c, 'enregistre', request.user,
@@ -358,18 +405,19 @@ def conge_nouveau(request):
              'fn':  e.fonction.nom if e.fonction else ''}
             for e in _employes_eligibles().select_related('service','fonction').order_by('nom')
         ],
-        'types':                 Conge.TYPE,
+        'types':                 TypeConge.objects.filter(actif=True).values_list('code', 'nom'),
         'employe_pre':           employe_pre,
         'can_manage':            can_manage_rh(request.user),
         'conflits':              conflits,
         'solde':                 solde,
-        'durees_exceptionnelles': DUREES_EXCEPTIONNELLES,
-        'types_deductibles':     list(TYPES_DEDUCTIBLES),
+        'durees_exceptionnelles': durees_exceptionnelles(),
+        'types_deductibles':     list(types_deductibles()),
         'post_data': {
-            'type_conge': request.POST.get('type_conge', ''),
-            'date_debut': request.POST.get('date_debut', ''),
-            'date_fin':   request.POST.get('date_fin', ''),
-            'motif':      request.POST.get('motif', ''),
+            'type_conge':      request.POST.get('type_conge', ''),
+            'date_debut':      request.POST.get('date_debut', ''),
+            'date_fin':        request.POST.get('date_fin', ''),
+            'motif':           request.POST.get('motif', ''),
+            'deduit_du_solde': request.POST.get('deduit_du_solde') == 'on',
         } if request.method == 'POST' else {},
     })
 
@@ -380,7 +428,9 @@ def conge_employe_info(request, emp_pk):
     """Retourne les infos d'un employé en JSON pour le formulaire de congé."""
     if not can_manage_rh(request.user):
         raise PermissionDenied
-    emp = get_object_or_404(Employe.objects.select_related('service', 'fonction', 'grade'), pk=emp_pk)
+    emp = get_object_or_404(
+        Employe.objects.select_related('service', 'fonction', 'grade', 'type_contrat'), pk=emp_pk
+    )
     annee = _d.today().year
     solde = get_or_create_solde(emp, annee)
     # Congés en cours ou à venir
@@ -393,6 +443,10 @@ def conge_employe_info(request, emp_pk):
         'matricule':     emp.matricule,
         'service':       emp.service.nom if emp.service else '—',
         'fonction':      emp.fonction.nom if emp.fonction else '—',
+        'grade':         emp.grade.nom if emp.grade else '—',
+        'type_contrat':  emp.type_contrat.nom if emp.type_contrat else '—',
+        'date_embauche': emp.date_embauche.strftime('%d/%m/%Y') if emp.date_embauche else '—',
+        'anciennete':    emp.anciennete['label'],
         'photo':         emp.photo.url if emp.photo else None,
         'initiales':     emp.initiales or emp.nom[0].upper(),
         'solde_restant': float(solde.solde),
@@ -413,6 +467,8 @@ def conge_detail(request, pk):
                                      'approuve_par', 'valide_par_service'),
         pk=pk
     )
+    if not _can_view_conge(request.user, conge):
+        raise PermissionDenied
     autres_conges = Conge.objects.filter(
         employe=conge.employe
     ).exclude(pk=pk).order_by('-date_demande')[:5]
@@ -525,31 +581,41 @@ def conge_prolonger(request, pk):
             nouveaux_jours = compter_jours_ouvres(conge.date_debut, nouvelle_fin)
             jours_supplementaires = nouveaux_jours - anciens_jours
 
+            # Alerte chevauchement avec un autre congé actif de cet employé sur la période étendue
+            conflits_emp = detecter_conflits(conge.employe, conge.date_debut, nouvelle_fin, exclude_pk=conge.pk)
+            if conflits_emp:
+                messages.warning(
+                    request,
+                    f"Attention : la prolongation chevauche {len(conflits_emp)} autre(s) congé(s) "
+                    f"de {conge.employe.nom_complet}."
+                )
+
             # Créer les présences pour la période supplémentaire
             feries = set()
             for y in range(ancienne_fin.year, nouvelle_fin.year + 1):
                 feries |= jours_feries_ivoire(y)
-            current = ancienne_fin + timedelta(days=1)
             motif_presence = f'Congé prolongé: {conge.get_type_conge_display()}'
+            jours = []
+            current = ancienne_fin + timedelta(days=1)
             while current <= nouvelle_fin:
                 if current.weekday() < 5 and current not in feries:
-                    Presence.objects.get_or_create(
-                        employe=conge.employe, date=current,
-                        defaults={'present': False, 'motif_absence': motif_presence}
-                    )
+                    jours.append(current)
                 current += timedelta(days=1)
+            Presence.objects.bulk_create(
+                [Presence(employe=conge.employe, date=d, present=False, motif_absence=motif_presence) for d in jours],
+                ignore_conflicts=True,
+            )
 
             # Mettre à jour le congé
             conge.date_fin = nouvelle_fin
             conge.nb_jours_ouvres = nouveaux_jours
             conge.save(update_fields=['date_fin', 'nb_jours_ouvres'])
 
-            # Mettre à jour le solde si déductible
-            if conge.type_conge in TYPES_DEDUCTIBLES:
-                solde = get_or_create_solde(conge.employe, conge.date_debut.year)
-                from decimal import Decimal
-                solde.jours_pris = Decimal(str(float(solde.jours_pris) + jours_supplementaires))
-                solde.save(update_fields=['jours_pris'])
+            # Mettre à jour le solde si déductible — get_or_create_solde recalcule déjà
+            # jours_pris depuis les Conge en base (conge.nb_jours_ouvres vient d'être mis à jour ci-dessus),
+            # inutile (et faux) d'ajouter jours_supplementaires en plus.
+            if conge.deduit_du_solde:
+                get_or_create_solde(conge.employe, conge.date_debut.year)
 
             _add_historique(
                 conge, 'prolonge', request.user,
@@ -601,15 +667,17 @@ def conge_absence_injustifiee(request, pk):
         feries = set()
         for y in (conge.date_fin.year, today.year):
             feries |= jours_feries_ivoire(y)
-        current = date_retour_prevue
         libelle_motif = 'Absence non justifiée' if action_choisie == 'injustifiee' else 'Absence — congé sans solde'
+        jours = []
+        current = date_retour_prevue
         while current <= hier:
             if current.weekday() < 5 and current not in feries:
-                Presence.objects.get_or_create(
-                    employe=conge.employe, date=current,
-                    defaults={'present': False, 'motif_absence': libelle_motif}
-                )
+                jours.append(current)
             current += timedelta(days=1)
+        Presence.objects.bulk_create(
+            [Presence(employe=conge.employe, date=d, present=False, motif_absence=libelle_motif) for d in jours],
+            ignore_conflicts=True,
+        )
 
         # Si traitement "sans solde" : créer un congé sans solde pour les jours en trop
         if action_choisie == 'sans_solde' and jours_depasses > 0:
@@ -621,6 +689,7 @@ def conge_absence_injustifiee(request, pk):
                 motif=f"Dépassement du congé #{conge.pk}. {motif}",
                 statut='termine',
                 nb_jours_ouvres=jours_depasses,
+                deduit_du_solde=False,
             )
 
         _add_historique(
@@ -739,6 +808,13 @@ def conge_fractionner(request, pk):
             messages.error(request, e)
 
         if not errors:
+            conflits_emp = detecter_conflits(conge.employe, d1, d2, exclude_pk=conge.pk)
+            if conflits_emp:
+                messages.warning(
+                    request,
+                    f"Attention : la 2e période chevauche {len(conflits_emp)} autre(s) congé(s) "
+                    f"de {conge.employe.nom_complet}."
+                )
             nb_ouvres = compter_jours_ouvres(d1, d2)
             fragment = Conge.objects.create(
                 employe=conge.employe,
@@ -748,11 +824,12 @@ def conge_fractionner(request, pk):
                 motif=f"2e période — congé fractionné (réf. #{conge.pk})",
                 statut='approuve',
                 nb_jours_ouvres=nb_ouvres,
+                deduit_du_solde=conge.deduit_du_solde,
                 conge_parent=conge,
                 approuve_par=request.user,
                 date_approbation=timezone.now(),
             )
-            if fragment.type_conge in TYPES_DEDUCTIBLES:
+            if fragment.deduit_du_solde:
                 get_or_create_solde(fragment.employe, d1.year)
             _create_presence_for_conge(fragment)
             _add_historique(fragment, 'approuve', request.user,
@@ -782,7 +859,7 @@ def _conges_a_venir(horizon_jours=60):
     """
     today = _d.today()
     limite = today + timedelta(days=horizon_jours)
-    alertes = []
+    candidats = []  # (employe, date_anniversaire)
 
     for emp in _employes_eligibles().select_related('service'):
         if not emp.date_embauche:
@@ -797,24 +874,54 @@ def _conges_a_venir(horizon_jours=60):
             except ValueError:
                 ann = hire.replace(year=year, day=28)
             if today <= ann <= limite:
-                conge_existant = Conge.objects.filter(
-                    employe=emp,
-                    type_conge='annuel',
-                    statut__in=['approuve', 'en_cours'],
-                    date_debut__year=ann.year,
-                ).first()
-                alertes.append({
-                    'employe':           emp,
-                    'date_anniversaire': ann,
-                    'jours_restants':    (ann - today).days,
-                    'quota':             quota_annuel(emp),
-                    'annees':            emp.anciennete['annees'] + (1 if ann.year > today.year else 0),
-                    'conge_existant':    conge_existant,
-                })
+                candidats.append((emp, ann))
                 break
 
+    if not candidats:
+        return []
+
+    # Un seul aller-retour DB pour tous les congés annuels existants concernés,
+    # au lieu d'une requête .first() par employé candidat.
+    conges_existants = Conge.objects.filter(
+        employe__in=[emp.pk for emp, _ in candidats],
+        type_conge='annuel',
+        statut__in=['approuve', 'en_cours'],
+        date_debut__year__in={ann.year for _, ann in candidats},
+    ).order_by('date_debut')
+    conge_par_emp_annee = {}
+    for c in conges_existants:
+        conge_par_emp_annee.setdefault((c.employe_id, c.date_debut.year), c)
+
+    alertes = [
+        {
+            'employe':           emp,
+            'date_anniversaire': ann,
+            'jours_restants':    (ann - today).days,
+            'quota':             quota_annuel(emp, ann.year),
+            'annees':            emp.anciennete['annees'] + (1 if ann.year > today.year else 0),
+            'conge_existant':    conge_par_emp_annee.get((emp.pk, ann.year)),
+        }
+        for emp, ann in candidats
+    ]
     alertes.sort(key=lambda x: x['jours_restants'])
     return alertes
+
+
+# ── Recherche d'un employé pour consulter son historique (RH) ────────────────
+@login_required(login_url='login')
+def conge_historique_recherche(request):
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
+    return render(request, 'conges/historique_recherche.html', {
+        'nav_active': 'list',
+        'employes_json': [
+            {'pk': e.pk, 'nom': e.nom_complet,
+             'mat': e.matricule,
+             'svc': e.service.nom if e.service else ''}
+            for e in _employes_eligibles().select_related('service').order_by('nom')
+        ],
+        'can_manage': True,
+    })
 
 
 # ── Historique congés d'un employé (RH) ───────────────────────────────────────
@@ -869,7 +976,7 @@ def conge_historique_employe(request, emp_pk):
         'annees':       annees,
         'f_annee':      f_annee,
         'f_type':       f_type,
-        'types':        Conge.TYPE,
+        'types':        TypeConge.objects.filter(actif=True).values_list('code', 'nom'),
         'today':        today,
         'can_manage':   True,
     })
@@ -979,7 +1086,7 @@ def conge_dashboard(request):
     ).values_list('type_conge', flat=True)
     type_counts = Counter(type_qs)
     total_types = sum(type_counts.values()) or 1
-    type_labels = dict(Conge.TYPE)
+    type_labels = dict(TypeConge.objects.values_list('code', 'nom'))
     repartition = [
         (type_labels.get(code, code), count, round(count * 100 / total_types))
         for code, count in type_counts.most_common()
@@ -1034,6 +1141,9 @@ def conge_calendrier(request):
     sem_debut = date_sel - timedelta(days=date_sel.weekday())
     sem_fin   = sem_debut + timedelta(days=6)
 
+    jour_prev = date_sel - timedelta(days=1)
+    jour_next = date_sel + timedelta(days=1)
+
     first_day = _d(year, mois, 1)
     last_day_num = calendar.monthrange(year, mois)[1]
     last_day = _d(year, mois, last_day_num)
@@ -1046,21 +1156,7 @@ def conge_calendrier(request):
     feries_set  = jours_feries_ivoire(year)
     feries_dict = jours_feries_labels(year)
 
-    type_colors = {
-        'annuel':           'green',
-        'maladie':          'amber',
-        'maternite':        'pink',
-        'paternite':        'pink',
-        'mariage_employe':  'blue',
-        'mariage_enfant':   'blue',
-        'deces_conjoint':   'gray',
-        'deces_enfant':     'gray',
-        'deces_parent':     'gray',
-        'deces_frere_soeur':'gray',
-        'naissance_enfant': 'blue',
-        'exceptionnel':     'blue',
-        'sans_solde':       'gray',
-    }
+    type_colors = dict(TypeConge.objects.values_list('code', 'couleur'))
 
     cal_weeks = calendar.monthcalendar(year, mois)
     weeks = []
@@ -1136,19 +1232,28 @@ def conge_calendrier(request):
     # ── Données vue ANNÉE ──
     annee_months = []
     if vue == 'annee':
-        feries_annee = jours_feries_ivoire(year)
-        all_conges_annee = list(Conge.objects.filter(
-            date_debut__year=year,
+        jan1, dec31 = _d(year, 1, 1), _d(year, 12, 31)
+        all_conges_annee = Conge.objects.filter(
+            date_debut__lte=dec31, date_fin__gte=jan1,
             statut__in=['approuve', 'en_cours', 'termine']
-        ).values_list('date_debut', 'date_fin'))
+        ).values_list('date_debut', 'date_fin')
+        # Jours couverts par au moins un congé — construit à partir des périodes
+        # (bornées à l'année) plutôt qu'en testant chaque jour de l'année contre
+        # chaque congé (O(jours × congés) devient O(jours de congé)).
+        jours_couverts = set()
+        current_iter = None
+        for d_debut, d_fin in all_conges_annee:
+            current_iter = max(d_debut, jan1)
+            borne = min(d_fin, dec31)
+            while current_iter <= borne:
+                jours_couverts.add(current_iter)
+                current_iter += timedelta(days=1)
         # Pour chaque mois : nb de jours avec congés
         for m in range(1, 13):
             ld = calendar.monthrange(year, m)[1]
-            nb_jours_conge = 0
-            for day in range(1, ld + 1):
-                d = _d(year, m, day)
-                if any(c[0] <= d <= c[1] for c in all_conges_annee):
-                    nb_jours_conge += 1
+            nb_jours_conge = sum(
+                1 for day in range(1, ld + 1) if _d(year, m, day) in jours_couverts
+            )
             annee_months.append({
                 'num': m, 'nom': _MOIS_FR[m],
                 'nb_jours': nb_jours_conge,
@@ -1170,6 +1275,8 @@ def conge_calendrier(request):
         'feries_set':          feries_set,
         'today':               today,
         'date_sel':            date_sel,
+        'jour_prev':           jour_prev,
+        'jour_next':           jour_next,
         'sem_debut':           sem_debut,
         'sem_fin':             sem_fin,
         'semaine_days':        semaine_days,
@@ -1195,29 +1302,58 @@ def conge_soldes(request):
     except (ValueError, TypeError):
         year = today.year
 
-    employes = _employes_eligibles().select_related('service').order_by('nom')
+    q          = request.GET.get('q', '').strip()
+    f_service  = request.GET.get('service', '').strip()
+
+    employes = _employes_eligibles().select_related('service')
+    if q:
+        employes = employes.filter(
+            Q(nom__icontains=q) | Q(prenoms__icontains=q) | Q(matricule__icontains=q)
+        )
+    if f_service:
+        employes = employes.filter(service_id=f_service)
+    employes = employes.order_by('service__nom', 'nom')
+
+    from medecins.models import Service
+    services = Service.objects.order_by('nom')
+
+    # Pagination sur les employés AVANT le recalcul de solde — évite de recalculer
+    # (et réécrire en base) le solde des ~200 employés à chaque simple consultation
+    # d'une page ; seuls les employés réellement affichés sont recalculés ici.
+    emp_paginator = Paginator(employes, 25)
+    emp_page      = emp_paginator.get_page(request.GET.get('page'))
 
     soldes_data = []
-    with transaction.atomic():
-        for emp in employes:
-            s = get_or_create_solde(emp, year)
-            # Solde prévisionnel : quota + reportés - total congés planifiés/pris/en cours cette année
-            total_planifie = Conge.objects.filter(
-                employe=emp,
-                statut__in=['demande', 'valide_service', 'approuve', 'en_cours', 'termine'],
-                date_debut__year=year,
-                type_conge__in=TYPES_DEDUCTIBLES,
-            ).aggregate(t=Sum('nb_jours_ouvres'))['t'] or 0
-            previsionnel = round(float(s.quota) + float(s.jours_reporter) - float(total_planifie), 1)
-            soldes_data.append({'solde': s, 'previsionnel': previsionnel})
+    for emp in emp_page:
+        s = get_or_create_solde(emp, year)
+        # Solde prévisionnel : quota + reportés - total congés planifiés/pris/en cours cette année
+        total_planifie = Conge.objects.filter(
+            employe=emp,
+            statut__in=['demande', 'valide_service', 'approuve', 'en_cours', 'termine'],
+            date_debut__year=year,
+            deduit_du_solde=True,
+        ).aggregate(t=Sum('nb_jours_ouvres'))['t'] or 0
+        previsionnel = round(float(s.quota) + float(s.jours_reporter) - float(total_planifie), 1)
+        soldes_data.append({'solde': s, 'previsionnel': previsionnel})
 
-    total_quota = sum(float(d['solde'].quota) for d in soldes_data)
-    total_pris  = sum(float(d['solde'].jours_pris) for d in soldes_data)
-    total_solde = sum(d['solde'].solde for d in soldes_data)
+    # Totaux sur TOUS les employés filtrés (pas seulement la page affichée) — lus depuis
+    # les SoldeConge déjà en base (rafraîchis via "Recalculer" si besoin), sans recalcul complet.
+    totaux = SoldeConge.objects.filter(employe__in=employes, annee=year).aggregate(
+        tq=Sum('quota'), tp=Sum('jours_pris'), tr=Sum('jours_reporter'),
+    )
+    total_quota = float(totaux['tq'] or 0)
+    total_pris  = float(totaux['tp'] or 0)
+    total_solde = total_quota + float(totaux['tr'] or 0) - total_pris
+
+    page_obj = emp_page
+    page_obj.object_list = soldes_data
 
     return render(request, 'conges/soldes.html', {
         'nav_active': 'soldes',
-        'soldes_data':  soldes_data,
+        'page_obj':     page_obj,
+        'q':            q,
+        'f_service':    f_service,
+        'services':     services,
         'year':         year,
         'annee_prev':   year - 1,
         'annee_next':   year + 1,
@@ -1241,22 +1377,9 @@ def conge_solde_recalc(request):
 
         employes = _employes_eligibles()
         count = 0
-        with transaction.atomic():
-            for emp in employes:
-                solde, _ = SoldeConge.objects.get_or_create(
-                    employe=emp, annee=year,
-                    defaults={'quota': quota_annuel(emp)},
-                )
-                solde.quota = quota_annuel(emp)
-                total = Conge.objects.filter(
-                    employe=emp,
-                    statut__in=['approuve', 'en_cours', 'termine'],
-                    date_debut__year=year,
-                    type_conge__in=TYPES_DEDUCTIBLES,
-                ).aggregate(total=Sum('nb_jours_ouvres'))['total'] or 0
-                solde.jours_pris = total
-                solde.save()
-                count += 1
+        for emp in employes:
+            get_or_create_solde(emp, year)
+            count += 1
 
         messages.success(request, f"Soldes recalculés pour {count} employé(s) — année {year}.")
         from django.urls import reverse
@@ -1277,29 +1400,36 @@ def conge_report_solde_annuel(request):
         next_year = year + 1
         employes = _employes_eligibles()
         count = 0
+        deja_reporte = 0
         with transaction.atomic():
             for emp in employes:
                 # Récupérer ou créer le solde de l'année N
                 solde_n = get_or_create_solde(emp, year)
-                restant = solde_n.solde  # quota + reporter - pris
-                if restant <= 0:
+                if solde_n.report_effectue:
+                    deja_reporte += 1
                     continue
-                # Plafonner à 15 jours selon Art. 25.10 CODI
-                reportable = min(float(restant), 15.0)
-                # Mettre à jour le solde N+1
-                solde_n1, _ = SoldeConge.objects.get_or_create(
-                    employe=emp, annee=next_year,
-                    defaults={'quota': quota_annuel(emp)},
-                )
-                solde_n1.jours_reporter = float(solde_n1.jours_reporter) + reportable
-                solde_n1.save(update_fields=['jours_reporter', 'mis_a_jour_le'])
-                count += 1
+                restant = solde_n.solde  # quota + reporter - pris
+                if restant > 0:
+                    # Plafonner à 15 jours selon Art. 25.10 CODI
+                    reportable = min(float(restant), 15.0)
+                    # Mettre à jour le solde N+1
+                    solde_n1, _ = SoldeConge.objects.get_or_create(
+                        employe=emp, annee=next_year,
+                        defaults={'quota': quota_annuel(emp, next_year)},
+                    )
+                    solde_n1.jours_reporter = float(solde_n1.jours_reporter) + reportable
+                    solde_n1.save(update_fields=['jours_reporter', 'mis_a_jour_le'])
+                    count += 1
+                solde_n.report_effectue = True
+                solde_n.save(update_fields=['report_effectue'])
 
-        messages.success(
-            request,
+        message = (
             f"Report effectué pour {count} employé(s) : soldes de {year} → {next_year} "
             f"(max 15 jours/employé selon Art. 25.10 CODI)."
         )
+        if deja_reporte:
+            message += f" {deja_reporte} employé(s) déjà reporté(s) précédemment, ignoré(s)."
+        messages.success(request, message)
         from django.urls import reverse
         return redirect(reverse('conge_soldes') + f'?year={next_year}')
     return redirect('conge_soldes')
@@ -1311,6 +1441,8 @@ def conge_bon(request, pk):
     conge = get_object_or_404(
         Conge.objects.select_related('employe', 'approuve_par'), pk=pk
     )
+    if not _can_view_conge(request.user, conge):
+        raise PermissionDenied
     return render(request, 'conges/bon_conge.html', {
         'conge': conge,
         'today': _d.today(),
@@ -1381,8 +1513,7 @@ def conge_stats_service(request):
         year = today.year
 
     from medecins.models import Service
-
-    services = Service.objects.prefetch_related('employes').order_by('nom')
+    from django.db.models import Count
 
     # Jours ouvrables dans l'année (approximation : 52 semaines * 5 jours - fériés)
     feries_year = jours_feries_ivoire(year)
@@ -1393,39 +1524,49 @@ def conge_stats_service(request):
             total_jours_ouvres_annee += 1
         d += timedelta(days=1)
 
-    stats_services = []
-    for service in services:
-        employes_service = service.employes.filter(statut='actif')
-        nb_employes = employes_service.count()
-        if nb_employes == 0:
-            continue
-        conges_service = Conge.objects.filter(
-            employe__service=service,
+    services = Service.objects.annotate(
+        nb_employes=Count('employes', filter=Q(employes__statut='actif'), distinct=True)
+    ).order_by('nom')
+
+    # Un seul aller-retour DB pour les congés de tous les services, groupés par service,
+    # au lieu d'une requête count()+aggregate() par service.
+    conges_par_service = {
+        row['employe__service']: row
+        for row in Conge.objects.filter(
+            employe__service__isnull=False,
             statut__in=['approuve', 'en_cours', 'termine'],
             date_debut__year=year,
-        )
-        nb_conges   = conges_service.count()
-        total_jours = conges_service.aggregate(t=Sum('nb_jours_ouvres'))['t'] or 0
+        ).values('employe__service').annotate(nb_conges=Count('id'), total_jours=Sum('nb_jours_ouvres'))
+    }
+
+    stats_services = []
+    for service in services:
+        if not service.nb_employes:
+            continue
+        row = conges_par_service.get(service.pk, {})
+        nb_conges   = row.get('nb_conges', 0)
+        total_jours = row.get('total_jours') or 0
         # Taux absentéisme = jours_conge / (nb_employes * jours_ouvrables) * 100
-        capacite = nb_employes * total_jours_ouvres_annee
+        capacite = service.nb_employes * total_jours_ouvres_annee
         taux = round(float(total_jours) / capacite * 100, 1) if capacite else 0
         stats_services.append({
             'service':       service,
-            'nb_employes':   nb_employes,
+            'nb_employes':   service.nb_employes,
             'nb_conges':     nb_conges,
             'total_jours':   total_jours,
             'taux':          taux,
         })
 
-    # Répartition mensuelle
-    repartition_mensuelle = []
-    for m in range(1, 13):
-        nb = Conge.objects.filter(
+    # Répartition mensuelle — un seul aller-retour DB groupé par mois
+    nb_par_mois = dict(
+        Conge.objects.filter(
             statut__in=['approuve', 'en_cours', 'termine'],
             date_debut__year=year,
-            date_debut__month=m,
-        ).count()
-        repartition_mensuelle.append({'mois': _MOIS_FR[m], 'nb': nb})
+        ).values_list('date_debut__month').annotate(nb=Count('id'))
+    )
+    repartition_mensuelle = [
+        {'mois': _MOIS_FR[m], 'nb': nb_par_mois.get(m, 0)} for m in range(1, 13)
+    ]
 
     max_mois = max((r['nb'] for r in repartition_mensuelle), default=1) or 1
 
@@ -1639,7 +1780,7 @@ def conge_rapport(request):
         par_type[c.type_conge]['nb'] += 1
         par_type[c.type_conge]['jours'] += c.nb_jours_ouvres
 
-    type_labels = dict(Conge.TYPE)
+    type_labels = dict(TypeConge.objects.values_list('code', 'nom'))
     stats_type = [
         {
             'type_code':  code,
@@ -1808,12 +1949,15 @@ def conge_direction(request):
     services_stats.sort(key=lambda x: -x['taux'])
 
     # ── Soldes critiques (< 5j) ──
-    soldes_critiques = []
-    with transaction.atomic():
-        for emp in employes_qs.select_related('service'):
-            s = get_or_create_solde(emp, year)
-            if float(s.solde) < 5:
-                soldes_critiques.append({'emp': emp, 'solde': s})
+    # Lecture directe des SoldeConge déjà en base (tenus à jour à chaque création/
+    # modification de congé) plutôt qu'un recalcul complet par employé — évite un
+    # aller-retour DB par employé sur cette page de synthèse.
+    soldes_critiques = [
+        {'emp': s.employe, 'solde': s}
+        for s in SoldeConge.objects.filter(employe__in=employes_qs, annee=year)
+                                   .select_related('employe__service')
+        if s.solde < 5
+    ]
     soldes_critiques.sort(key=lambda x: float(x['solde'].solde))
 
     # ── KPIs globaux ──
@@ -1884,3 +2028,100 @@ def conge_notif_lire_une(request, pk):
         notif.lue = True
         notif.save(update_fields=['lue'])
     return redirect('conge_detail', pk=notif.conge_id)
+
+
+# ── Configuration : Types de congé ────────────────────────────────────────────
+def _type_conge_form_class():
+    from django import forms
+
+    class TypeCongeForm(forms.ModelForm):
+        class Meta:
+            model = TypeConge
+            fields = ['nom', 'code', 'couleur', 'deductible', 'duree_forfaitaire', 'actif']
+            widgets = {
+                'nom':  forms.TextInput(attrs={'placeholder': 'Ex : Congé annuel'}),
+                'code': forms.TextInput(attrs={'placeholder': 'Ex : annuel'}),
+            }
+    return TypeCongeForm
+
+
+@login_required(login_url='login')
+def conge_type_list(request):
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
+    q = request.GET.get('q', '').strip()
+    qs = TypeConge.objects.all()
+    if q:
+        qs = qs.filter(Q(nom__icontains=q) | Q(code__icontains=q))
+    try:
+        page_size = int(request.GET.get('page_size', 10))
+    except (TypeError, ValueError):
+        page_size = 10
+    page_size = max(5, min(50, page_size))
+    paginator = Paginator(qs, page_size)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    return render(request, 'conges/config/types_list.html', {
+        'nav_active':   'config',
+        'page_obj':     page_obj,
+        'q':            q,
+        'page_size':    page_size,
+        'total':        TypeConge.objects.count(),
+        'total_filtre': qs.count(),
+        'can_manage':   True,
+    })
+
+
+@login_required(login_url='login')
+def conge_type_create(request):
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+    Form = _type_conge_form_class()
+    form = Form(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        obj = form.save()
+        if is_ajax:
+            return JsonResponse({'ok': True, 'message': f"Type de congé « {obj} » créé."})
+        messages.success(request, f"Type de congé « {obj} » créé.")
+        return redirect('conge_type_list')
+    return render(request, 'conges/config/type_form_modal.html', {
+        'form': form, 'titre': 'Nouveau type de congé',
+    })
+
+
+@login_required(login_url='login')
+def conge_type_edit(request, pk):
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+    obj = get_object_or_404(TypeConge, pk=pk)
+    Form = _type_conge_form_class()
+    form = Form(request.POST or None, instance=obj)
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        if is_ajax:
+            return JsonResponse({'ok': True, 'message': f"Type de congé « {obj} » mis à jour."})
+        messages.success(request, f"Type de congé « {obj} » mis à jour.")
+        return redirect('conge_type_list')
+    return render(request, 'conges/config/type_form_modal.html', {
+        'form': form, 'titre': f'Modifier — {obj.nom}', 'obj': obj,
+    })
+
+
+@login_required(login_url='login')
+@require_POST
+def conge_type_delete(request, pk):
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
+    obj = get_object_or_404(TypeConge, pk=pk)
+    if Conge.objects.filter(type_conge=obj.code).exists():
+        messages.error(
+            request,
+            f"Impossible de supprimer « {obj.nom} » : des congés existants utilisent ce type. "
+            f"Désactivez-le plutôt pour qu'il n'apparaisse plus dans le formulaire."
+        )
+        return redirect('conge_type_list')
+    nom = obj.nom
+    obj.delete()
+    messages.success(request, f"Type de congé « {nom} » supprimé.")
+    return redirect('conge_type_list')

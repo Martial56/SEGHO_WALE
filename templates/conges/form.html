@@ -1,4 +1,5 @@
 {% extends 'conges/base.html' %}
+{% load static %}
 {% block topbar_title %}Enregistrer un congé{% endblock %}
 
 {% block extra_css %}
@@ -37,7 +38,7 @@ html[data-theme="dark"] .cf-sidebar { background:rgba(33,150,243,.04); }
 /* ── Employé card (info panel) ── */
 #emp-panel {
   background:var(--cg-50); border-radius:10px; padding:14px 16px;
-  margin-top:10px; display:none; gap:12px; align-items:center;
+  margin-top:10px; display:none; gap:12px; align-items:flex-start;
   border:1px solid var(--cg-200);
 }
 html[data-theme="dark"] #emp-panel { background:rgba(33,150,243,0.1); border-color:var(--cg-border); }
@@ -51,6 +52,22 @@ html[data-theme="dark"] #emp-panel { background:rgba(33,150,243,0.1); border-col
 #emp-name { font-size:14px; font-weight:700; color:var(--cg-900); }
 html[data-theme="dark"] #emp-name { color:var(--cg-200); }
 #emp-sub { font-size:12px; color:var(--cg-muted); margin-top:2px; }
+#emp-meta { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.emp-meta-chip {
+  font-size:11px; font-weight:600; color:var(--cg-700);
+  background:var(--cg-100); border:1px solid var(--cg-200);
+  border-radius:6px; padding:3px 8px; display:flex; align-items:center; gap:4px;
+}
+html[data-theme="dark"] .emp-meta-chip { color:var(--cg-300); background:rgba(255,255,255,.05); border-color:var(--cg-border); }
+#emp-solde-projete {
+  display:none; margin-top:8px; font-size:12px; padding:6px 10px;
+  border-radius:8px; align-items:center; justify-content:space-between;
+  background:rgba(0,0,0,.03); border:1px dashed var(--cg-300);
+}
+html[data-theme="dark"] #emp-solde-projete { background:rgba(255,255,255,.04); border-color:var(--cg-border); }
+#emp-solde-projete .val { font-weight:800; }
+#emp-solde-projete .val.ok  { color:var(--cg-600); }
+#emp-solde-projete .val.bad { color:var(--rose-text,#c0392b); }
 
 /* ── Solde bar ── */
 .solde-bar-wrap { margin-top:8px; }
@@ -95,35 +112,7 @@ html[data-theme="dark"] #solde-alerte { background:rgba(var(--rose-rgb),.15); bo
 .cf-actions { display:flex; gap:10px; justify-content:flex-end; padding:12px 18px; background:var(--cg-50); border-top:1px solid var(--cg-border); flex-shrink:0; }
 html[data-theme="dark"] .cf-actions { background:#1D2C44; }
 
-/* ── Recherche employé ── */
-.emp-search-wrap { position:relative; }
-.emp-search-inp {
-  width:100%; padding:9px 4px 9px 26px;
-  border:none; border-bottom:1.5px solid rgba(0,0,0,.18); border-radius:0;
-  font-family:inherit; font-size:13.5px; color:var(--cg-text);
-  background:transparent; transition:border-color .15s;
-  outline:none;
-}
-.emp-search-inp:focus { border-bottom-color:var(--cg-500); }
-html[data-theme="dark"] .emp-search-inp { border-bottom-color:rgba(33,150,243,.25); color:var(--cg-text); }
-.emp-search-icon { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--cg-400); font-size:14px; pointer-events:none; }
-.emp-search-clear { position:absolute; right:10px; top:50%; transform:translateY(-50%); color:var(--cg-muted); font-size:13px; cursor:pointer; display:none; background:none; border:none; padding:2px; }
-.emp-dropdown {
-  position:absolute; top:calc(100% + 4px); left:0; right:0;
-  background:var(--cg-surface); border:1.5px solid var(--cg-300);
-  border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.12);
-  z-index:500; max-height:220px; overflow-y:auto; display:none;
-}
-.emp-dropdown-item {
-  padding:9px 14px; cursor:pointer; display:flex; align-items:center; gap:10px;
-  border-bottom:1px solid var(--cg-border); transition:background .1s;
-}
-.emp-dropdown-item:last-child { border-bottom:none; }
-.emp-dropdown-item:hover, .emp-dropdown-item.focused { background:var(--cg-50); }
-.emp-dropdown-item .emp-di-name { font-size:13px; font-weight:600; color:var(--cg-text); }
-.emp-dropdown-item .emp-di-sub  { font-size:11px; color:var(--cg-muted); margin-top:1px; }
-.emp-dropdown-item .emp-di-mat  { font-size:11px; font-family: var(--font-mono); color:var(--cg-500); margin-left:auto; flex-shrink:0; }
-.emp-no-result { padding:14px; text-align:center; color:var(--cg-muted); font-size:13px; }
+{% include 'conges/includes/emp_search_style.html' %}
 
 /* Side cards */
 .cf-side-card { background:var(--cg-surface); border-radius:10px; border:1px solid var(--cg-border); padding:10px 12px; margin-bottom:10px; }
@@ -198,6 +187,7 @@ html[data-theme="dark"] .cf-legale-val { color:var(--cg-300); }
           <div style="flex:1;min-width:0;">
             <div id="emp-name"></div>
             <div id="emp-sub"></div>
+            <div id="emp-meta"></div>
             <div class="solde-bar-wrap" id="emp-solde-wrap" style="display:none;">
               <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--cg-muted);margin-bottom:2px;">
                 <span>Solde <span id="emp-annee"></span></span>
@@ -206,6 +196,11 @@ html[data-theme="dark"] .cf-legale-val { color:var(--cg-300); }
               <div class="solde-bar-track">
                 <div class="solde-bar-fill ok" id="emp-solde-bar" style="width:0%;"></div>
               </div>
+              <div id="emp-jours-pris" style="font-size:11px;color:var(--cg-muted);margin-top:3px;"></div>
+            </div>
+            <div id="emp-solde-projete">
+              <span>Solde après cette demande</span>
+              <span class="val" id="emp-solde-projete-val">—</span>
             </div>
           </div>
         </div>
@@ -227,6 +222,18 @@ html[data-theme="dark"] .cf-legale-val { color:var(--cg-300); }
         <div class="cf-legal" id="cg-legal">
           <i class="bi bi-info-circle-fill" style="color:#2d99db;flex-shrink:0;"></i>
           <span id="cg-legal-text"></span>
+        </div>
+        <div style="margin-top:10px;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--cg-text);cursor:pointer;">
+            <input type="checkbox" name="deduit_du_solde" id="id_deduit_du_solde"
+                   {% if post_data.deduit_du_solde %}checked{% endif %}
+                   style="width:16px;height:16px;cursor:pointer;">
+            Déduire du solde de congé
+          </label>
+          <div id="deduit-divergence" style="display:none;font-size:12px;color:#c47a00;margin-top:6px;align-items:center;gap:6px;">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+            <span id="deduit-divergence-text"></span>
+          </div>
         </div>
       </div>
 
@@ -340,105 +347,52 @@ html[data-theme="dark"] .cf-legale-val { color:var(--cg-300); }
 {{ block.super }}
 {{ durees_exceptionnelles|json_script:"cg-durees-data" }}
 {{ employes_json|json_script:"cg-employes-data" }}
+<script src="{% static 'js/emp_search.js' %}"></script>
 <script>
 var EMPLOYES_LIST     = JSON.parse(document.getElementById('cg-employes-data').textContent);
 var DUREES_LEGALES    = JSON.parse(document.getElementById('cg-durees-data').textContent);
 var TYPES_DEDUCTIBLES = {{ types_deductibles|safe }};
-var EMP_INFO_URL      = '{% url "conge_employe_info" 0 %}'.replace('/0/', '/');
+var EMP_INFO_URL_TPL  = '{% url "conge_employe_info" 0 %}';
 var currentSolde      = null;
+var IS_POSTBACK       = {% if post_data %}true{% else %}false{% endif %};
+var suppressAutoDeduit = false;
 
-/* ── Recherche employé ── */
-var empInp   = document.getElementById('emp-search-inp');
-var empDrop  = document.getElementById('emp-dropdown');
+/* ── Recherche employé (widget partagé — voir static/js/emp_search.js) ── */
 var empHid   = document.getElementById('id_employe');
 var empClear = document.getElementById('emp-clear');
-var focusIdx = -1;
-
-function renderDropdown(items) {
-  if (!items.length) {
-    empDrop.innerHTML = '<div class="emp-no-result"><i class="bi bi-search"></i> Aucun résultat</div>';
-  } else {
-    empDrop.innerHTML = items.slice(0, 12).map(function(e, i) {
-      return '<div class="emp-dropdown-item" data-pk="' + e.pk + '" data-idx="' + i + '">' +
-        '<div><div class="emp-di-name">' + e.nom + '</div>' +
-        '<div class="emp-di-sub">' + (e.svc || '—') + (e.fn ? ' · ' + e.fn : '') + '</div></div>' +
-        '<span class="emp-di-mat">' + e.mat + '</span></div>';
-    }).join('');
-    empDrop.querySelectorAll('.emp-dropdown-item').forEach(function(item) {
-      item.addEventListener('mousedown', function(ev) {
-        ev.preventDefault();
-        selectEmp(parseInt(this.dataset.pk));
-      });
-    });
-  }
-  empDrop.style.display = 'block';
-  focusIdx = -1;
-}
 
 function selectEmp(pk) {
   var emp = EMPLOYES_LIST.find(function(e){ return e.pk === pk; });
   if (!emp) return;
   empHid.value = pk;
-  empInp.value = emp.nom + (emp.svc ? ' — ' + emp.svc : '');
-  empDrop.style.display = 'none';
+  document.getElementById('emp-search-inp').value = emp.nom + (emp.svc ? ' — ' + emp.svc : '');
+  document.getElementById('emp-dropdown').style.display = 'none';
   empClear.style.display = 'block';
   loadEmpInfo(pk);
 }
 
 function clearEmp() {
   empHid.value = '';
-  empInp.value = '';
+  document.getElementById('emp-search-inp').value = '';
   empClear.style.display = 'none';
-  empDrop.style.display = 'none';
+  document.getElementById('emp-dropdown').style.display = 'none';
   document.getElementById('emp-panel').style.display = 'none';
   document.getElementById('solde-alerte').style.display = 'none';
   currentSolde = null;
-  empInp.focus();
+  document.getElementById('emp-search-inp').focus();
 }
 
-empInp.addEventListener('input', function() {
-  var q = this.value.trim().toLowerCase();
-  if (!q) { empDrop.style.display = 'none'; empClear.style.display = 'none'; return; }
-  var filtered = EMPLOYES_LIST.filter(function(e) {
-    return e.nom.toLowerCase().includes(q) ||
-           e.mat.toLowerCase().includes(q) ||
-           e.svc.toLowerCase().includes(q);
-  });
-  renderDropdown(filtered);
-});
-
-empInp.addEventListener('keydown', function(e) {
-  var items = empDrop.querySelectorAll('.emp-dropdown-item');
-  if (e.key === 'ArrowDown') {
-    e.preventDefault();
-    focusIdx = Math.min(focusIdx + 1, items.length - 1);
-    items.forEach(function(el, i) { el.classList.toggle('focused', i === focusIdx); });
-  } else if (e.key === 'ArrowUp') {
-    e.preventDefault();
-    focusIdx = Math.max(focusIdx - 1, 0);
-    items.forEach(function(el, i) { el.classList.toggle('focused', i === focusIdx); });
-  } else if (e.key === 'Enter' && focusIdx >= 0 && items[focusIdx]) {
-    e.preventDefault();
-    selectEmp(parseInt(items[focusIdx].dataset.pk));
-  } else if (e.key === 'Escape') {
-    empDrop.style.display = 'none';
-  }
-});
-
-empInp.addEventListener('focus', function() {
-  if (this.value && !empHid.value) {
-    var q = this.value.trim().toLowerCase();
-    var filtered = EMPLOYES_LIST.filter(function(e) { return e.nom.toLowerCase().includes(q); });
-    if (filtered.length) renderDropdown(filtered);
-  }
-});
-
-document.addEventListener('click', function(e) {
-  if (!e.target.closest('.emp-search-wrap')) empDrop.style.display = 'none';
+initEmpSearch({
+  inputId: 'emp-search-inp',
+  dropdownId: 'emp-dropdown',
+  employes: EMPLOYES_LIST,
+  onSelect: selectEmp,
+  onClear: function() { empClear.style.display = 'none'; },
+  hasSelection: function() { return !!empHid.value; },
 });
 
 function loadEmpInfo(pk) {
-  fetch(EMP_INFO_URL + pk + '/info/')
+  fetch(EMP_INFO_URL_TPL.replace('/0/', '/' + pk + '/'))
     .then(function(r) { return r.json(); })
     .then(function(data) {
       currentSolde = data;
@@ -447,6 +401,15 @@ function loadEmpInfo(pk) {
       document.getElementById('emp-name').textContent  = data.nom;
       document.getElementById('emp-sub').textContent   = data.matricule + (data.service !== '—' ? ' · ' + data.service : '');
       document.getElementById('emp-annee').textContent = data.annee;
+      var metaItems = [
+        {icon: 'bi-briefcase-fill',      val: data.fonction},
+        {icon: 'bi-award-fill',          val: data.grade},
+        {icon: 'bi-file-earmark-text-fill', val: data.type_contrat},
+        {icon: 'bi-calendar-check-fill', val: data.anciennete !== '—' ? data.anciennete + ' d\'ancienneté' : null},
+      ].filter(function(m) { return m.val && m.val !== '—'; });
+      document.getElementById('emp-meta').innerHTML = metaItems.map(function(m) {
+        return '<span class="emp-meta-chip"><i class="bi ' + m.icon + '"></i> ' + m.val + '</span>';
+      }).join('');
       var restant = parseFloat(data.solde_restant);
       var quota   = parseFloat(data.quota) || 1;
       var pct     = Math.max(0, Math.min(100, Math.round(restant / quota * 100)));
@@ -455,10 +418,14 @@ function loadEmpInfo(pk) {
       var bar = document.getElementById('emp-solde-bar');
       bar.style.width = pct + '%';
       bar.className   = 'solde-bar-fill ' + cls;
+      var jrsPris = parseFloat(data.jours_pris);
+      document.getElementById('emp-jours-pris').textContent =
+        jrsPris > 0 ? jrsPris.toFixed(1) + 'j déjà pris cette année' : 'Aucun jour pris cette année';
       document.getElementById('emp-solde-wrap').style.display = 'block';
       document.getElementById('emp-panel').style.display = 'flex';
       calcDuree();
-    });
+    })
+    .catch(function(err) { console.error('Erreur chargement infos employé :', err); });
 }
 
 /* ── Calcul durée ── */
@@ -468,11 +435,11 @@ function calcDuree() {
   var d1 = document.getElementById('id_debut').value;
   var d2 = document.getElementById('id_fin').value;
   var row = document.getElementById('duree-row');
-  if (!d1 || !d2) { row.style.display = 'none'; return; }
+  if (!d1 || !d2) { row.style.display = 'none'; document.getElementById('emp-solde-projete').style.display = 'none'; return; }
   var dt1 = new Date(d1 + 'T12:00:00');
   var dt2 = new Date(d2 + 'T12:00:00');
   var diff = Math.round((dt2 - dt1) / 86400000) + 1;
-  if (diff <= 0) { row.style.display = 'none'; return; }
+  if (diff <= 0) { row.style.display = 'none'; document.getElementById('emp-solde-projete').style.display = 'none'; return; }
   document.getElementById('val-cal').textContent = diff + ' jour' + (diff > 1 ? 's' : '') + ' calendaires';
   var ouvres = 0, cur = new Date(dt1);
   while (cur <= dt2) { if (!isWeekend(cur)) ouvres++; cur.setDate(cur.getDate() + 1); }
@@ -481,14 +448,19 @@ function calcDuree() {
   checkSolde(ouvres);
 }
 
-/* ── Vérif solde ── */
+/* ── Vérif solde + solde projeté après cette demande ── */
 function checkSolde(ouvres) {
   if (!currentSolde) return;
-  var typeCode = document.getElementById('id_type_conge').value;
-  if (!TYPES_DEDUCTIBLES.includes(typeCode)) {
-    document.getElementById('solde-alerte').style.display = 'none'; return;
-  }
+  var projeteBox = document.getElementById('emp-solde-projete');
+  var deduit = document.getElementById('id_deduit_du_solde').checked;
   var restant = parseFloat(currentSolde.solde_restant);
+
+  if (!deduit) {
+    document.getElementById('solde-alerte').style.display = 'none';
+    projeteBox.style.display = 'none';
+    return;
+  }
+
   if (restant < ouvres) {
     document.getElementById('solde-alerte-txt').textContent =
       'Solde insuffisant : ' + restant.toFixed(1) + 'j restants pour ' + ouvres + 'j demandés.';
@@ -496,7 +468,37 @@ function checkSolde(ouvres) {
   } else {
     document.getElementById('solde-alerte').style.display = 'none';
   }
+
+  var apres = restant - ouvres;
+  var valEl = document.getElementById('emp-solde-projete-val');
+  valEl.textContent = apres.toFixed(1) + 'j';
+  valEl.className   = 'val ' + (apres >= 0 ? 'ok' : 'bad');
+  projeteBox.style.display = 'flex';
 }
+
+/* ── Déduction du solde : pré-remplissage selon le type + détection de dérogation ── */
+var deduitChk = document.getElementById('id_deduit_du_solde');
+
+function updateDeduitDivergence() {
+  var typeCode = document.getElementById('id_type_conge').value;
+  var div = document.getElementById('deduit-divergence');
+  if (!typeCode) { div.style.display = 'none'; return; }
+  var defautDeductible = TYPES_DEDUCTIBLES.includes(typeCode);
+  if (deduitChk.checked !== defautDeductible) {
+    document.getElementById('deduit-divergence-text').textContent = deduitChk.checked
+      ? "Ce congé sera déduit du solde alors que ce type ne l'est pas habituellement."
+      : "Ce congé ne sera pas déduit du solde alors que ce type l'est habituellement.";
+    div.style.display = 'flex';
+    div.style.alignItems = 'center';
+  } else {
+    div.style.display = 'none';
+  }
+}
+
+deduitChk.addEventListener('change', function() {
+  updateDeduitDivergence();
+  calcDuree();
+});
 
 /* ── Changement type ── */
 document.getElementById('id_type_conge').addEventListener('change', function() {
@@ -510,6 +512,10 @@ document.getElementById('id_type_conge').addEventListener('change', function() {
   } else {
     note.style.display = 'none';
   }
+  if (!suppressAutoDeduit) {
+    deduitChk.checked = this.value ? TYPES_DEDUCTIBLES.includes(this.value) : true;
+  }
+  updateDeduitDivergence();
   calcDuree();
 });
 
@@ -522,7 +528,11 @@ window.addEventListener('DOMContentLoaded', function() {
   var pk = document.getElementById('id_employe').value;
   if (pk) { loadEmpInfo(parseInt(pk)); empClear.style.display = 'block'; }
   var type = document.getElementById('id_type_conge');
-  if (type.value) type.dispatchEvent(new Event('change'));
+  if (type.value) {
+    suppressAutoDeduit = IS_POSTBACK;
+    type.dispatchEvent(new Event('change'));
+    suppressAutoDeduit = false;
+  }
   calcDuree();
 });
 </script>

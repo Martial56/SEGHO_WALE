@@ -143,13 +143,16 @@ def compter_jours_ouvres(date_debut, date_fin) -> int:
     return count
 
 
-def quota_annuel(employe) -> float:
+def quota_annuel(employe, annee=None) -> float:
     """
     Calcule le quota annuel de congés selon le Code du travail ivoirien Art. 25.10.
     Base : 2,2 jours ouvrés par mois travaillé (min 26,4 jours/an).
-    Bonus d'ancienneté à partir de 5 ans.
+    Bonus d'ancienneté à partir de 5 ans, évalué au 31/12 de `annee`
+    (année en cours par défaut) — pour ne pas appliquer rétroactivement
+    un bonus d'ancienneté acquis après l'année du solde recalculé.
     """
-    anc = employe.anciennete
+    ref_date = date(annee, 12, 31) if annee else date.today()
+    anc = employe.anciennete_a(ref_date)
     annees = anc.get('annees', 0)
     mois = anc.get('mois', 0)
     total_mois = annees * 12 + mois
@@ -193,51 +196,59 @@ def detecter_conflits(employe, date_debut, date_fin, exclude_pk=None) -> list:
     return list(qs)
 
 
-# ── Constantes légales ────────────────────────────────────────────────────────
-DUREES_EXCEPTIONNELLES = {
-    'mariage_employe':  5,
-    'mariage_enfant':   2,
-    'deces_conjoint':   5,
-    'deces_enfant':     5,
-    'deces_parent':     3,
-    'deces_frere_soeur':2,
-    'naissance_enfant': 3,
-    'paternite':        3,
-    'maternite':        98,
-}
+# ── Types de congé (configurables — voir conges.models.TypeConge) ───────────
+def durees_exceptionnelles() -> dict:
+    """{code: nb_jours} pour les types de congé à durée forfaitaire (mariage, décès...)."""
+    from conges.models import TypeConge
+    return dict(TypeConge.objects.exclude(duree_forfaitaire__isnull=True).values_list('code', 'duree_forfaitaire'))
 
-# Types qui déduisent du solde annuel
-TYPES_DEDUCTIBLES = {
-    'annuel', 'mariage_employe', 'mariage_enfant', 'deces_conjoint',
-    'deces_enfant', 'deces_parent', 'deces_frere_soeur',
-    'naissance_enfant', 'paternite', 'exceptionnel',
-}
+
+def types_deductibles() -> set:
+    """Codes des types de congé qui déduisent du solde annuel."""
+    from conges.models import TypeConge
+    return set(TypeConge.objects.filter(deductible=True).values_list('code', flat=True))
+
+
+def jours_pris_annee(employe, annee) -> float:
+    """
+    Jours ouvrés déductibles pris par l'employé pour `annee`.
+    Un congé à cheval sur deux années civiles (ex: 22/12 → 06/01) n'est compté
+    que pour sa portion réellement dans `annee`, pas pour la totalité de sa durée.
+    """
+    from employer.models import Conge
+    jan1  = date(annee, 1, 1)
+    dec31 = date(annee, 12, 31)
+    conges = Conge.objects.filter(
+        employe=employe,
+        statut__in=['approuve', 'en_cours', 'termine'],
+        deduit_du_solde=True,
+        date_debut__lte=dec31,
+        date_fin__gte=jan1,
+    ).values_list('date_debut', 'date_fin', 'nb_jours_ouvres')
+
+    total = 0
+    for d_debut, d_fin, nb in conges:
+        if d_debut >= jan1 and d_fin <= dec31:
+            total += nb
+        else:
+            total += compter_jours_ouvres(max(d_debut, jan1), min(d_fin, dec31))
+    return total
 
 
 def get_or_create_solde(employe, annee) -> 'SoldeConge':
     """
     Récupère ou crée le SoldeConge pour un employé et une année.
-    Recalcule jours_pris depuis les congés approuvés.
+    Recalcule quota et jours_pris à chaque appel.
     """
-    from employer.models import Conge, SoldeConge
+    from employer.models import SoldeConge
 
+    quota = quota_annuel(employe, annee)
     solde, created = SoldeConge.objects.get_or_create(
         employe=employe,
         annee=annee,
-        defaults={'quota': quota_annuel(employe)},
+        defaults={'quota': quota},
     )
-    if created:
-        solde.quota = quota_annuel(employe)
-
-    # Recalculer jours_pris
-    from django.db.models import Sum
-    total = Conge.objects.filter(
-        employe=employe,
-        statut__in=['approuve', 'en_cours', 'termine'],
-        date_debut__year=annee,
-        type_conge__in=TYPES_DEDUCTIBLES,
-    ).aggregate(total=Sum('nb_jours_ouvres'))['total'] or 0
-
-    solde.jours_pris = total
+    solde.quota = quota
+    solde.jours_pris = jours_pris_annee(employe, annee)
     solde.save()
     return solde

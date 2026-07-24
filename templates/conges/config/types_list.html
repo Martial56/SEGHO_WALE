@@ -1,0 +1,172 @@
+{% extends 'conges/base.html' %}
+{% block topbar_title %}Types de congé{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'conges/config/includes/_config_modal.html' %}
+<style>
+  .cgcfg-wrap { display:flex; flex-direction:column; height:calc(100vh - var(--topbar-h)); overflow:hidden; }
+  .cgcfg-head {
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    padding:8px 20px; flex-shrink:0;
+    background:var(--cg-surface); border-bottom:1px solid var(--cg-border);
+  }
+  .cgcfg-body { flex:1; overflow:auto; min-height:0; min-width:0; }
+  .cgcfg-footer {
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:10px 16px; flex-shrink:0;
+    border-top:1px solid var(--cg-border); background:var(--cg-surface);
+    font-size:12px; color:var(--cg-muted);
+  }
+  .cg-cfg-badge-inactif { background: rgba(0,0,0,.06); color: var(--cg-muted); padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
+  .cg-cfg-badge-actif { background: rgba(var(--cg-600-rgb),.12); color: var(--cg-700); padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
+  html[data-theme="dark"] .cg-cfg-badge-actif { background: rgba(var(--cg-600-rgb),.2); color: #7ab8d0; }
+  html[data-theme="dark"] .cg-cfg-badge-inactif { background: rgba(255,255,255,.06); color: var(--cg-muted); }
+  .cg-cfg-table { width:100%; border-collapse:collapse; font-size:13px; table-layout:fixed; }
+  .cg-cfg-table col.c-action { width:90px; }
+  .cg-cfg-table thead { position:sticky; top:0; z-index:5; }
+  .cg-cfg-table thead th {
+    background:var(--cg-700); color:#fff;
+    padding:9px 14px; text-align:left; font-size:10.5px;
+    font-weight:700; text-transform:uppercase; letter-spacing:.3px;
+    white-space:nowrap; border-right:1px solid rgba(255,255,255,.08);
+  }
+  .cg-cfg-table thead th:last-child { border-right:none; }
+  .cg-cfg-table tbody tr { border-bottom:1px solid var(--cg-border); }
+  .cg-cfg-table tbody tr:hover { background:var(--cg-50); }
+  html[data-theme="dark"] .cg-cfg-table tbody tr:hover { background:#1D2C44; }
+  .cg-cfg-table td { padding:10px 14px; color:var(--cg-text); vertical-align:middle; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cgcfg-wrap">
+
+<div class="cgcfg-head">
+  <a href="{% url 'conge_dashboard' %}" class="o-ctrl-btn" style="padding:3px 7px;">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <span class="o-page-title">Types de congé</span>
+  <span class="o-page-count">{{ total_filtre }} / {{ total }}</span>
+  <div style="flex:1;"></div>
+  <form method="get" class="o-search-bar">
+    <i class="bi bi-search o-search-btn"></i>
+    <input type="text" name="q" value="{{ q }}" placeholder="Rechercher…" class="o-search-input">
+    <input type="hidden" name="page_size" value="{{ page_size }}">
+  </form>
+  <a href="{% url 'conge_type_create' %}" class="o-btn-create"
+    onclick="return cgOpenConfigModal(event, this.href, 'Nouveau type de congé', 'bi-tags');">
+    <i class="bi bi-plus-lg"></i> Créer
+  </a>
+</div>
+
+<div class="cgcfg-body">
+  <table class="cg-cfg-table">
+    <colgroup>
+      <col style="width:24%;">
+      <col style="width:20%;">
+      <col style="width:14%;">
+      <col style="width:18%;">
+      <col style="width:14%;">
+      <col class="c-action">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Nom</th>
+        <th>Code</th>
+        <th>Déductible</th>
+        <th>Durée forfaitaire</th>
+        <th>Statut</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in page_obj %}
+      <tr>
+        <td style="font-weight:600;">{{ t.nom }}</td>
+        <td style="color:var(--cg-muted);font-family:monospace;">{{ t.code }}</td>
+        <td>{% if t.deductible %}<i class="bi bi-check-lg" style="color:var(--cg-600);"></i>{% else %}<i class="bi bi-dash" style="color:var(--cg-muted);"></i>{% endif %}</td>
+        <td>{{ t.duree_forfaitaire|default:"—" }}{% if t.duree_forfaitaire %}j{% endif %}</td>
+        <td>
+          {% if t.actif %}<span class="cg-cfg-badge-actif">Actif</span>
+          {% else %}<span class="cg-cfg-badge-inactif">Inactif</span>{% endif %}
+        </td>
+        <td style="text-align:right;white-space:nowrap;">
+          <a href="{% url 'conge_type_edit' t.pk %}" class="o-ctrl-btn" title="Modifier"
+            onclick="return cgOpenConfigModal(event, this.href, 'Modifier — {{ t.nom }}', 'bi-tags');">
+            <i class="bi bi-pencil"></i>
+          </a>
+          <form method="post" action="{% url 'conge_type_delete' t.pk %}" style="display:inline;"
+            onsubmit="return confirm('Supprimer le type « {{ t.nom }} » ?');">
+            {% csrf_token %}
+            <button type="submit" class="o-ctrl-btn" title="Supprimer" style="color:var(--rose-btn);">
+              <i class="bi bi-trash"></i>
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="6" style="text-align:center;padding:30px;color:var(--cg-muted);font-style:italic;">
+        Aucun type de congé{% if q %} pour « {{ q }} »{% endif %}.
+      </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if page_obj.paginator.count %}
+<div class="cgcfg-footer">
+  <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
+      href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}&q={{ q }}&page_size={{ page_size }}{% else %}#{% endif %}">
+      <i class="bi bi-chevron-left"></i>
+    </a>
+    <span style="white-space:nowrap;">Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+    <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
+      href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}&q={{ q }}&page_size={{ page_size }}{% else %}#{% endif %}">
+      <i class="bi bi-chevron-right"></i>
+    </a>
+  </div>
+</div>
+{% endif %}
+
+</div><!-- /cgcfg-wrap -->
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+{% if page_obj.object_list %}
+<script>
+(function () {
+  var STORAGE_KEY = 'cg_typeconge_page_size';
+  var currentSize = {{ page_size }};
+
+  // Ne recalcule qu'une fois par onglet (pas a chaque resize, pour ne pas perturber la navigation)
+  if (sessionStorage.getItem(STORAGE_KEY)) return;
+
+  var body = document.querySelector('.cgcfg-body');
+  var thead = document.querySelector('.cg-cfg-table thead');
+  var firstRow = document.querySelector('.cg-cfg-table tbody tr');
+  if (!body || !firstRow) return;
+
+  var headerH = thead ? thead.getBoundingClientRect().height : 0;
+  var rowH = firstRow.getBoundingClientRect().height;
+  if (!rowH) return;
+
+  var available = body.clientHeight - headerH;
+  var fit = Math.floor(available / rowH);
+  fit = Math.max(5, Math.min(50, fit));
+
+  sessionStorage.setItem(STORAGE_KEY, fit);
+
+  if (fit !== currentSize) {
+    var params = new URLSearchParams(window.location.search);
+    params.set('page_size', fit);
+    params.set('page', '1');
+    window.location.search = params.toString();
+  }
+})();
+</script>
+{% endif %}
+{% endblock %}

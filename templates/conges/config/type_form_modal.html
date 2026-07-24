@@ -1,0 +1,58 @@
+<form method="post" id="cgcfgConfigForm" data-url="{{ request.path }}" novalidate>
+{% csrf_token %}
+
+<div class="cgcfg-modal-body">
+
+  <div class="form-field">
+    <label class="field-label" for="{{ form.nom.id_for_label }}">Nom <span class="required-star">*</span></label>
+    <input type="text" name="nom" id="{{ form.nom.id_for_label }}" class="field-ul"
+      value="{{ form.nom.value|default_if_none:'' }}" placeholder="Ex : Congé annuel" autocomplete="off">
+    {% if form.nom.errors %}<div class="field-error">{{ form.nom.errors.0 }}</div>{% endif %}
+  </div>
+
+  <div class="form-field">
+    <label class="field-label" for="{{ form.code.id_for_label }}">Code <span class="required-star">*</span></label>
+    <input type="text" name="code" id="{{ form.code.id_for_label }}" class="field-ul"
+      value="{{ form.code.value|default_if_none:'' }}" placeholder="Ex : annuel" autocomplete="off">
+    {% if form.code.errors %}<div class="field-error">{{ form.code.errors.0 }}</div>{% endif %}
+    <div style="font-size:11px;color:var(--cg-muted);margin-top:4px;">
+      Identifiant technique unique (lettres, chiffres, tirets/underscores). Ne pas modifier après création si des congés existants utilisent déjà ce type.
+    </div>
+  </div>
+
+  <div class="form-field">
+    <label class="field-label" for="{{ form.couleur.id_for_label }}">Couleur (calendrier)</label>
+    <input type="text" name="couleur" id="{{ form.couleur.id_for_label }}" class="field-ul"
+      value="{{ form.couleur.value|default_if_none:'' }}" placeholder="Ex : green, blue, amber, gray, pink…" autocomplete="off">
+    {% if form.couleur.errors %}<div class="field-error">{{ form.couleur.errors.0 }}</div>{% endif %}
+  </div>
+
+  <div class="form-field">
+    <label class="field-label" for="{{ form.duree_forfaitaire.id_for_label }}">Durée forfaitaire (jours)</label>
+    <input type="number" min="0" name="duree_forfaitaire" id="{{ form.duree_forfaitaire.id_for_label }}" class="field-ul"
+      value="{{ form.duree_forfaitaire.value|default_if_none:'' }}" placeholder="Laisser vide si durée libre">
+    {% if form.duree_forfaitaire.errors %}<div class="field-error">{{ form.duree_forfaitaire.errors.0 }}</div>{% endif %}
+  </div>
+
+  <div class="form-field">
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--cg-text);cursor:pointer;">
+      <input type="checkbox" name="deductible" {% if form.deductible.value %}checked{% endif %} style="width:16px;height:16px;cursor:pointer;">
+      Déductible du solde annuel
+    </label>
+  </div>
+
+  <div class="form-field">
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--cg-text);cursor:pointer;">
+      <input type="checkbox" name="actif" {% if form.actif.value %}checked{% endif %} style="width:16px;height:16px;cursor:pointer;">
+      Type actif (visible dans le formulaire de saisie)
+    </label>
+  </div>
+
+</div>
+
+<div class="cgcfg-modal-footer">
+  <button type="button" class="btn-cg-outline" onclick="cgCloseConfigModal()">Annuler</button>
+  <button type="submit" class="btn-cg">{% if obj %}Enregistrer{% else %}Créer{% endif %}</button>
+</div>
+
+</form>

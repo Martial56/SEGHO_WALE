@@ -1,0 +1,62 @@
+{% extends 'conges/base.html' %}
+{% load static %}
+
+{% block topbar_title %}Historique employé{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+.hr-wrap {
+  display:flex; align-items:flex-start; justify-content:center;
+  padding:60px 20px;
+}
+.hr-card {
+  width:100%; max-width:520px;
+  background:var(--cg-surface); border:1px solid var(--cg-border);
+  border-radius:14px; padding:28px 28px 24px; box-shadow:var(--shadow-sm);
+}
+.hr-title { font-size:17px; font-weight:800; color:var(--cg-text); margin-bottom:4px; display:flex; align-items:center; gap:8px; }
+.hr-sub { font-size:13px; color:var(--cg-muted); margin-bottom:18px; }
+
+{% include 'conges/includes/emp_search_style.html' %}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="hr-wrap">
+  <div class="hr-card">
+    <div class="hr-title"><i class="bi bi-clock-history"></i> Historique d'un employé</div>
+    <div class="hr-sub">Recherchez un employé pour consulter l'ensemble de ses congés depuis son embauche.</div>
+
+    <div class="emp-search-wrap">
+      <i class="bi bi-search emp-search-icon"></i>
+      <input type="text" id="emp-search-inp" class="emp-search-inp"
+             placeholder="Nom, matricule ou service…" autocomplete="off">
+      <div class="emp-dropdown" id="emp-dropdown"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+{{ employes_json|json_script:"hr-employes-data" }}
+<script src="{% static 'js/emp_search.js' %}"></script>
+<script>
+var EMPLOYES_LIST = JSON.parse(document.getElementById('hr-employes-data').textContent);
+var HIST_URL_TPL   = '{% url "conge_historique_employe" 0 %}';
+
+function goToHistorique(pk) {
+  window.location.href = HIST_URL_TPL.replace('/0/', '/' + pk + '/');
+}
+
+initEmpSearch({
+  inputId: 'emp-search-inp',
+  dropdownId: 'emp-dropdown',
+  employes: EMPLOYES_LIST,
+  onSelect: goToHistorique,
+});
+
+document.getElementById('emp-search-inp').focus();
+</script>
+{% endblock %}
