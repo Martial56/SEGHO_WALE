@@ -118,6 +118,9 @@ html[data-theme="dark"] .cd-tbl tbody tr:hover td { background:var(--surface-mut
 html[data-theme="dark"] .cd-tbl tfoot td { background:rgba(var(--teal-700-rgb),.25); border-top-color:var(--border); color:var(--text-strong,#eef3f8); }
 html[data-theme="dark"] .cd-montant-cell { color:var(--text-strong,#eef3f8)!important; }
 html[data-theme="dark"] .rec-row { border-bottom-color:var(--border); }
+html[data-theme="dark"] .rb-conforme, html[data-theme="dark"] .rb-integre { background:rgba(16,185,129,.18); color:#6ee7b7; border-color:rgba(16,185,129,.3); }
+html[data-theme="dark"] .rb-partielle, html[data-theme="dark"] .rb-pending { background:rgba(245,158,11,.18); color:#fcd34d; border-color:rgba(245,158,11,.3); }
+html[data-theme="dark"] .rb-nc { background:rgba(239,68,68,.18); color:#fca5a5; border-color:rgba(239,68,68,.3); }
 html[data-theme="dark"] .cd-sbox { background:var(--surface); border-color:var(--border); }
 html[data-theme="dark"] .cd-sbox-title { color:var(--text-faint); }
 html[data-theme="dark"] .cd-srow { border-bottom-color:var(--border); }
@@ -135,8 +138,6 @@ html[data-theme="dark"] .cd-modal-notice { background:rgba(146,64,14,.2)!importa
 {% endblock %}
 
 {% block content %}
-<div class="hist-wrapper">
-<div class="hist-main">
 <div class="cd-page">
 
   {# ── Header ── #}
@@ -157,6 +158,9 @@ html[data-theme="dark"] .cd-modal-notice { background:rgba(146,64,14,.2)!importa
       </div>
       <div class="cd-header-actions">
         {% if commande.statut == 'brouillon' %}
+          <a href="{% url 'achats:commande_edit' commande.pk %}" class="cd-btn cd-btn-outline">
+            <i class="bi bi-pencil"></i> Modifier
+          </a>
           <button class="cd-btn cd-btn-amber" onclick="document.getElementById('modal-statut').classList.add('open')">
             <i class="bi bi-send"></i> Marquer envoyée
           </button>
@@ -223,6 +227,8 @@ html[data-theme="dark"] .cd-modal-notice { background:rgba(146,64,14,.2)!importa
   </div>
   {% endif %}
 
+  <div class="hist-wrapper" style="flex:1;min-height:0;">
+  <div class="hist-main" style="display:flex;flex-direction:column;min-height:0;">
   {# ── Corps ── #}
   <div class="cd-body">
     <div class="cd-main">
@@ -306,7 +312,7 @@ html[data-theme="dark"] .cd-modal-notice { background:rgba(146,64,14,.2)!importa
               </div>
             </div>
             <div style="text-align:right;flex-shrink:0;">
-              <div style="font-size:10.5px;color:var(--text-faint);margin-bottom:4px;">{{ r.receptionne_par.get_full_name|default:r.receptionne_par.username|default:"—" }}</div>
+              <div style="font-size:10.5px;color:var(--text-faint);margin-bottom:4px;">{% if r.receptionne_par %}{{ r.receptionne_par.get_full_name|default:r.receptionne_par.username }}{% else %}—{% endif %}</div>
               <a href="{% url 'achats:reception_detail' r.pk %}"
                  style="width:28px;height:28px;border-radius:6px;background:var(--teal-50);border:1px solid rgba(0,0,0,.08);display:inline-flex;align-items:center;justify-content:center;color:var(--teal-600);text-decoration:none;font-size:13px;">
                 <i class="bi bi-eye"></i>
@@ -363,7 +369,7 @@ html[data-theme="dark"] .cd-modal-notice { background:rgba(146,64,14,.2)!importa
         </div>
         <div class="cd-srow">
           <span class="lbl">Créé par</span>
-          <span class="val" style="font-size:11.5px;">{{ commande.cree_par.get_full_name|default:commande.cree_par.username|default:"—" }}</span>
+          <span class="val" style="font-size:11.5px;">{% if commande.cree_par %}{{ commande.cree_par.get_full_name|default:commande.cree_par.username }}{% else %}—{% endif %}</span>
         </div>
       </div>
 
@@ -416,8 +422,9 @@ html[data-theme="dark"] .cd-modal-notice { background:rgba(146,64,14,.2)!importa
 
     </div>{# /side #}
   </div>
-
-</div>{# /cd-page #}
+  </div>
+  {% load core_tags %}{% historique_sidebar commande %}
+  </div>
 
 {# ── Modal changement de statut ── #}
 <div class="cd-modal-bg" id="modal-statut">
@@ -460,7 +467,5 @@ document.getElementById('modal-statut').addEventListener('click', function(e){
   if (e.target === this) this.classList.remove('open');
 });
 </script>
-</div>
-{% load core_tags %}{% historique_sidebar commande %}
-</div>
+</div>{# /cd-page #}
 {% endblock %}

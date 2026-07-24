@@ -1,5 +1,22 @@
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
+
+
+def _numero_auto(model, prefixe, field='numero'):
+    """
+    Génère un numéro séquentiel PREFIXAAAANNNN pour `model` (champ `field`).
+    select_for_update() sur la dernière ligne du préfixe sérialise les créations
+    concurrentes (utile en production PostgreSQL ; sans effet mais sans risque
+    sur SQLite, qui sérialise déjà les écritures au niveau de la connexion).
+    """
+    annee = timezone.now().year
+    prefixe_annee = f'{prefixe}{annee}'
+    with transaction.atomic():
+        dernier = model.objects.select_for_update().filter(
+            **{f'{field}__startswith': prefixe_annee}
+        ).order_by(f'-{field}').first()
+        seq = (int(getattr(dernier, field)[-4:]) + 1) if dernier else 1
+        return f'{prefixe_annee}{seq:04d}'
 
 
 class Fournisseur(models.Model):
@@ -25,10 +42,7 @@ class Fournisseur(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.code:
-            annee = timezone.now().year
-            dernier = Fournisseur.objects.filter(code__startswith=f'FRN{annee}').order_by('-code').first()
-            seq = (int(dernier.code[-4:]) + 1) if dernier else 1
-            self.code = f'FRN{annee}{seq:04d}'
+            self.code = _numero_auto(Fournisseur, 'FRN', field='code')
         super().save(*args, **kwargs)
 
     class Meta:
@@ -61,10 +75,7 @@ class BesoinAchat(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.numero:
-            annee = timezone.now().year
-            dernier = BesoinAchat.objects.filter(numero__startswith=f'BAC{annee}').order_by('-numero').first()
-            seq = (int(dernier.numero[-4:]) + 1) if dernier else 1
-            self.numero = f'BAC{annee}{seq:04d}'
+            self.numero = _numero_auto(BesoinAchat, 'BAC')
         super().save(*args, **kwargs)
 
     class Meta:
@@ -118,10 +129,7 @@ class Proforma(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.numero:
-            annee = timezone.now().year
-            dernier = Proforma.objects.filter(numero__startswith=f'PRF{annee}').order_by('-numero').first()
-            seq = (int(dernier.numero[-4:]) + 1) if dernier else 1
-            self.numero = f'PRF{annee}{seq:04d}'
+            self.numero = _numero_auto(Proforma, 'PRF')
         super().save(*args, **kwargs)
 
     class Meta:
@@ -170,10 +178,7 @@ class CommandeAchat(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.numero:
-            annee = timezone.now().year
-            dernier = CommandeAchat.objects.filter(numero__startswith=f'CAC{annee}').order_by('-numero').first()
-            seq = (int(dernier.numero[-4:]) + 1) if dernier else 1
-            self.numero = f'CAC{annee}{seq:04d}'
+            self.numero = _numero_auto(CommandeAchat, 'CAC')
         super().save(*args, **kwargs)
 
     class Meta:
@@ -221,10 +226,7 @@ class ReceptionAchat(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.numero:
-            annee = timezone.now().year
-            dernier = ReceptionAchat.objects.filter(numero__startswith=f'REC{annee}').order_by('-numero').first()
-            seq = (int(dernier.numero[-4:]) + 1) if dernier else 1
-            self.numero = f'REC{annee}{seq:04d}'
+            self.numero = _numero_auto(ReceptionAchat, 'REC')
         super().save(*args, **kwargs)
 
     class Meta:

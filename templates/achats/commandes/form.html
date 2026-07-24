@@ -1,63 +1,165 @@
 {% extends 'achats/base.html' %}
 {% load i18n %}
 
-{% block title %}Créer la commande — {{ proforma.numero }}{% endblock %}
+{% block title %}{% if action == 'create' %}Créer la commande — {{ proforma.numero }}{% else %}Modifier {{ commande.numero }}{% endif %}{% endblock %}
 {% block breadcrumb %}{% endblock %}
 
-{% block content %}
-
-<div class="action-bar">
-  <div class="action-bar-breadcrumb">
-    <a href="{% url 'achats:proforma_detail' proforma.pk %}" class="btn-form-cancel" style="padding:3px 7px;">
-      <i class="bi bi-arrow-left"></i>
-    </a>
-    <a href="{% url 'achats:proforma_detail' proforma.pk %}">Proforma {{ proforma.numero }}</a>
-    <span class="sep">/</span>
-    <span class="current">Créer la commande</span>
-  </div>
-</div>
-
-<!-- Résumé proforma -->
-<div class="cmd-proforma-summary" style="background:#f0f5fa;border:1px solid rgba(0,128,80,.2);border-radius:8px;padding:14px 16px;margin-bottom:16px;max-width:600px;font-size:13px;">
-  <strong style="color:var(--teal-800);">Proforma {{ proforma.numero }}</strong> — Validé
-  <table style="width:100%;border-collapse:collapse;margin-top:10px;">
-    <tr><td class="cmd-ps-label" style="padding:5px 8px;border-bottom:1px solid rgba(0,0,0,.06);font-weight:600;color:rgba(0,0,0,.5);font-size:11px;text-transform:uppercase;">Fournisseur</td><td class="cmd-ps-val" style="padding:5px 8px;border-bottom:1px solid rgba(0,0,0,.06);">{{ proforma.fournisseur.nom }}</td></tr>
-    <tr><td class="cmd-ps-label" style="padding:5px 8px;border-bottom:1px solid rgba(0,0,0,.06);font-weight:600;color:rgba(0,0,0,.5);font-size:11px;text-transform:uppercase;">Montant</td><td style="padding:5px 8px;border-bottom:1px solid rgba(0,0,0,.06);font-weight:700;color:var(--teal-700);">{{ proforma.montant_total|floatformat:0 }} FCFA</td></tr>
-    <tr><td class="cmd-ps-label" style="padding:5px 8px;font-weight:600;color:rgba(0,0,0,.5);font-size:11px;text-transform:uppercase;">Besoin</td><td class="cmd-ps-val" style="padding:5px 8px;">{{ proforma.besoin.numero }} — {{ proforma.besoin.titre }}</td></tr>
-  </table>
-</div>
+{% block extra_css %}
+{{ block.super }}
 <style>
+.lig-table { width:100%; border-collapse:collapse; font-size:13px; margin-top:14px; }
+.lig-table th { padding:8px 10px; font-size:11px; font-weight:700; color:#888; text-transform:uppercase; background:#f9fafb; border-bottom:1px solid rgba(0,0,0,.08); }
+.lig-table td { padding:6px 8px; border-bottom:1px solid rgba(0,0,0,.05); vertical-align:middle; }
+.lig-table input { border:none; border-bottom:1px solid #e5e7eb; border-radius:0; padding:5px 4px; font-size:12.5px; width:100%; font-family:inherit; background:transparent; }
+.lig-table input:focus { outline:none; border-bottom-color:var(--teal-600); }
+.montant-cell { font-weight:600; text-align:right; }
+.btn-add { margin-top:10px; padding:6px 14px; border:1px dashed #d1d5db; border-radius:6px; background:#fafafa; font-size:13px; cursor:pointer; width:100%; text-align:center; color:#666; }
+.btn-add:hover { background:#f0f4f8; border-color:var(--teal-400); color:var(--teal-700); }
+.remove-btn { color:#ef4444; cursor:pointer; font-size:14px; border:none; background:none; padding:0 4px; }
+
+html[data-theme="dark"] .lig-table th { color:var(--text-faint); background:var(--surface-muted); border-bottom-color:var(--border); }
+html[data-theme="dark"] .lig-table td { border-bottom-color:var(--border); color:var(--text); }
+html[data-theme="dark"] .lig-table input { border-bottom-color:var(--border); color:var(--text); }
+html[data-theme="dark"] .btn-add { background:var(--surface-muted); border-color:var(--border); color:var(--text-muted); }
 html[data-theme="dark"] .cmd-proforma-summary { background:var(--surface-muted); border-color:var(--border); color:var(--text); }
 html[data-theme="dark"] .cmd-proforma-summary strong { color:var(--text-strong,#eef3f8); }
 html[data-theme="dark"] .cmd-proforma-summary td { border-bottom-color:var(--border)!important; }
 html[data-theme="dark"] .cmd-ps-label { color:var(--text-faint)!important; }
 html[data-theme="dark"] .cmd-ps-val { color:var(--text); }
 </style>
+{% endblock %}
+
+{% block content %}
+
+<div class="action-bar">
+  <div class="action-bar-breadcrumb">
+    {% if action == 'create' %}
+    <a href="{% url 'achats:proforma_detail' proforma.pk %}" class="btn-form-cancel" style="padding:3px 7px;"><i class="bi bi-arrow-left"></i></a>
+    <a href="{% url 'achats:proforma_detail' proforma.pk %}">Proforma {{ proforma.numero }}</a>
+    <span class="sep">/</span>
+    <span class="current">Créer la commande</span>
+    {% else %}
+    <a href="{% url 'achats:commande_detail' commande.pk %}" class="btn-form-cancel" style="padding:3px 7px;"><i class="bi bi-arrow-left"></i></a>
+    <a href="{% url 'achats:commande_detail' commande.pk %}">Commande {{ commande.numero }}</a>
+    <span class="sep">/</span>
+    <span class="current">Modifier</span>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Résumé proforma -->
+<div class="cmd-proforma-summary" style="background:#f0f5fa;border:1px solid rgba(0,128,80,.2);border-radius:8px;padding:14px 16px;margin-bottom:16px;max-width:800px;font-size:13px;">
+  <strong style="color:var(--teal-800);">Proforma {{ proforma.numero }}</strong> — Validé
+  <table style="width:100%;border-collapse:collapse;margin-top:10px;">
+    <tr><td class="cmd-ps-label" style="padding:5px 8px;border-bottom:1px solid rgba(0,0,0,.06);font-weight:600;color:rgba(0,0,0,.5);font-size:11px;text-transform:uppercase;">Fournisseur</td><td class="cmd-ps-val" style="padding:5px 8px;border-bottom:1px solid rgba(0,0,0,.06);">{{ proforma.fournisseur.nom }}</td></tr>
+    <tr><td class="cmd-ps-label" style="padding:5px 8px;border-bottom:1px solid rgba(0,0,0,.06);font-weight:600;color:rgba(0,0,0,.5);font-size:11px;text-transform:uppercase;">Montant proforma</td><td style="padding:5px 8px;border-bottom:1px solid rgba(0,0,0,.06);font-weight:700;color:var(--teal-700);">{{ proforma.montant_total|floatformat:0 }} FCFA</td></tr>
+    <tr><td class="cmd-ps-label" style="padding:5px 8px;font-weight:600;color:rgba(0,0,0,.5);font-size:11px;text-transform:uppercase;">Besoin</td><td class="cmd-ps-val" style="padding:5px 8px;">{{ proforma.besoin.numero }} — {{ proforma.besoin.titre }}</td></tr>
+  </table>
+</div>
 
 <form method="post">
   {% csrf_token %}
-  <div class="form-simple-card" style="max-width:600px;">
+  <div class="form-simple-card" style="max-width:800px;">
     <div class="tab-two-col">
       <div class="form-field">
         <label class="field-label">Date de commande <span class="required-star">*</span></label>
-        <input type="date" name="date_commande" class="field-ul" required>
+        <input type="date" name="date_commande" class="field-ul" value="{{ commande.date_commande|date:'Y-m-d' }}" required>
       </div>
       <div class="form-field">
         <label class="field-label">Date de livraison prévue</label>
-        <input type="date" name="date_livraison_prevue" class="field-ul">
+        <input type="date" name="date_livraison_prevue" class="field-ul" value="{{ commande.date_livraison_prevue|date:'Y-m-d' }}">
       </div>
     </div>
     <div class="form-field">
       <label class="field-label">Notes</label>
-      <textarea name="notes" class="field-ul" placeholder="Instructions particulières, références, etc."></textarea>
+      <textarea name="notes" class="field-ul" placeholder="Instructions particulières, références, etc.">{{ commande.notes|default:'' }}</textarea>
     </div>
 
+    {% if action == 'edit' %}
+    <table class="lig-table" id="lig-table">
+      <thead>
+        <tr>
+          <th style="width:45%;">Désignation</th>
+          <th style="width:15%;">Quantité</th>
+          <th style="width:20%;">Prix unitaire (FCFA)</th>
+          <th style="width:15%;text-align:right;">Montant</th>
+          <th style="width:5%;"></th>
+        </tr>
+      </thead>
+      <tbody id="lig-body">
+      {% for l in lignes %}
+      <tr class="lig-row">
+        <td><input type="text" name="designation" value="{{ l.designation }}" required></td>
+        <td><input type="number" name="quantite" value="{{ l.quantite_commandee }}" step="1" min="0" class="qte" onchange="calcMontant(this)"></td>
+        <td><input type="number" name="prix_unitaire" value="{{ l.prix_unitaire }}" step="0.01" min="0" class="pu" onchange="calcMontant(this)"></td>
+        <td class="montant-cell"><span class="montant">{{ l.montant|floatformat:0 }}</span></td>
+        <td><button type="button" class="remove-btn" onclick="removeRow(this)"><i class="bi bi-trash"></i></button></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <button type="button" class="btn-add" onclick="addRow()"><i class="bi bi-plus-lg"></i> Ajouter une ligne</button>
+    <div style="margin-top:12px;text-align:right;font-size:15px;font-weight:700;color:var(--teal-700);">
+      Total : <span id="total-global">0</span> FCFA
+    </div>
+    {% endif %}
+
     <div class="form-actions">
+      {% if action == 'create' %}
       <a href="{% url 'achats:proforma_detail' proforma.pk %}" class="btn-form-cancel">Annuler</a>
       <button type="submit" class="btn-form-submit">
         <i class="bi bi-bag-plus"></i> Générer la commande
       </button>
+      {% else %}
+      <a href="{% url 'achats:commande_detail' commande.pk %}" class="btn-form-cancel">Annuler</a>
+      <button type="submit" class="btn-form-submit">
+        <i class="bi bi-check-lg"></i> Enregistrer
+      </button>
+      {% endif %}
     </div>
   </div>
 </form>
+
+{% if action == 'edit' %}
+<script>
+function calcMontant(input) {
+  var row = input.closest('tr');
+  var qte = parseFloat(row.querySelector('.qte').value) || 0;
+  var pu = parseFloat(row.querySelector('.pu').value) || 0;
+  row.querySelector('.montant').textContent = Math.round(qte * pu).toLocaleString('fr-FR');
+  updateTotal();
+}
+
+function updateTotal() {
+  var total = 0;
+  document.querySelectorAll('.montant').forEach(function(el) {
+    total += parseFloat(el.textContent.replace(/\s/g, '')) || 0;
+  });
+  document.getElementById('total-global').textContent = Math.round(total).toLocaleString('fr-FR');
+}
+
+function addRow() {
+  var tbody = document.getElementById('lig-body');
+  var tr = document.createElement('tr');
+  tr.className = 'lig-row';
+  tr.innerHTML = `
+    <td><input type="text" name="designation" placeholder="Désignation…" required></td>
+    <td><input type="number" name="quantite" value="1" step="1" min="0" class="qte" onchange="calcMontant(this)"></td>
+    <td><input type="number" name="prix_unitaire" value="0" step="0.01" min="0" class="pu" onchange="calcMontant(this)"></td>
+    <td class="montant-cell"><span class="montant">0</span></td>
+    <td><button type="button" class="remove-btn" onclick="removeRow(this)"><i class="bi bi-trash"></i></button></td>
+  `;
+  tbody.appendChild(tr);
+}
+
+function removeRow(btn) {
+  var rows = document.querySelectorAll('.lig-row');
+  if (rows.length <= 1) { alert('Il faut au moins une ligne.'); return; }
+  btn.closest('tr').remove();
+  updateTotal();
+}
+
+updateTotal();
+</script>
+{% endif %}
 {% endblock %}

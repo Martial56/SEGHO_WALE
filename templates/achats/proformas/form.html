@@ -1,5 +1,5 @@
 {% extends 'achats/base.html' %}
-{% load i18n %}
+{% load i18n l10n %}
 
 {% block title %}{% if action == 'create' %}Nouveau proforma{% else %}Modifier {{ proforma.numero }}{% endif %}{% endblock %}
 
@@ -122,15 +122,15 @@ html[data-theme="dark"] .pff-btn-cancel { background:var(--surface); border-colo
               <tr class="lig-row">
                 <td><input type="text" name="designation" value="{{ l.designation }}" required></td>
                 <td>
-                  <select name="ligne_besoin_id">
+                  <select name="ligne_besoin_id" onchange="onLigneBesoinChange(this)">
                     <option value="">—</option>
                     {% for lb in lignes_besoin %}
-                    <option value="{{ lb.pk }}" {% if l.ligne_besoin_id == lb.pk %}selected{% endif %}>{{ lb.libelle }}</option>
+                    <option value="{{ lb.pk }}" data-qte="{{ lb.quantite|unlocalize }}" {% if l.ligne_besoin_id == lb.pk %}selected{% endif %}>{{ lb.libelle }}</option>
                     {% endfor %}
                   </select>
                 </td>
-                <td><input type="number" name="quantite" value="{{ l.quantite }}" step="1" min="0" class="qte" onchange="calcMontant(this)"></td>
-                <td><input type="number" name="prix_unitaire" value="{{ l.prix_unitaire }}" step="0.01" min="0" class="pu" onchange="calcMontant(this)"></td>
+                <td><input type="number" name="quantite" value="{{ l.quantite|unlocalize }}" step="1" min="0" class="qte" onchange="calcMontant(this)"></td>
+                <td><input type="number" name="prix_unitaire" value="{{ l.prix_unitaire|unlocalize }}" step="0.01" min="0" class="pu" onchange="calcMontant(this)"></td>
                 <td class="montant-cell"><span class="montant">{{ l.montant|floatformat:0 }}</span></td>
                 <td><button type="button" class="remove-btn" onclick="removeRow(this)"><i class="bi bi-trash"></i></button></td>
               </tr>
@@ -140,14 +140,14 @@ html[data-theme="dark"] .pff-btn-cancel { background:var(--surface); border-colo
               <tr class="lig-row">
                 <td><input type="text" name="designation" value="{{ lb.libelle }}" required></td>
                 <td>
-                  <select name="ligne_besoin_id">
+                  <select name="ligne_besoin_id" onchange="onLigneBesoinChange(this)">
                     <option value="">—</option>
                     {% for lbx in lignes_besoin %}
-                    <option value="{{ lbx.pk }}" {% if lbx.pk == lb.pk %}selected{% endif %}>{{ lbx.libelle }}</option>
+                    <option value="{{ lbx.pk }}" data-qte="{{ lbx.quantite|unlocalize }}" {% if lbx.pk == lb.pk %}selected{% endif %}>{{ lbx.libelle }}</option>
                     {% endfor %}
                   </select>
                 </td>
-                <td><input type="number" name="quantite" value="{{ lb.quantite }}" step="1" min="0" class="qte" onchange="calcMontant(this)"></td>
+                <td><input type="number" name="quantite" value="{{ lb.quantite|unlocalize }}" step="1" min="0" class="qte" onchange="calcMontant(this)"></td>
                 <td><input type="number" name="prix_unitaire" value="0" step="0.01" min="0" class="pu" onchange="calcMontant(this)"></td>
                 <td class="montant-cell"><span class="montant">0</span></td>
                 <td><button type="button" class="remove-btn" onclick="removeRow(this)"><i class="bi bi-trash"></i></button></td>
@@ -155,7 +155,7 @@ html[data-theme="dark"] .pff-btn-cancel { background:var(--surface); border-colo
               {% empty %}
               <tr class="lig-row">
                 <td><input type="text" name="designation" placeholder="Désignation…" required></td>
-                <td><select name="ligne_besoin_id"><option value="">—</option>{% for lb in lignes_besoin %}<option value="{{ lb.pk }}">{{ lb.libelle }}</option>{% endfor %}</select></td>
+                <td><select name="ligne_besoin_id" onchange="onLigneBesoinChange(this)"><option value="">—</option>{% for lb in lignes_besoin %}<option value="{{ lb.pk }}" data-qte="{{ lb.quantite|unlocalize }}">{{ lb.libelle }}</option>{% endfor %}</select></td>
                 <td><input type="number" name="quantite" value="1" step="1" min="0" class="qte" onchange="calcMontant(this)"></td>
                 <td><input type="number" name="prix_unitaire" value="0" step="0.01" min="0" class="pu" onchange="calcMontant(this)"></td>
                 <td class="montant-cell"><span class="montant">0</span></td>
@@ -183,7 +183,17 @@ html[data-theme="dark"] .pff-btn-cancel { background:var(--surface); border-colo
 </div>
 
 <script>
-var lignesBesoinsOpts = `<option value="">—</option>{% for lb in lignes_besoin %}<option value="{{ lb.pk }}">{{ lb.libelle }}</option>{% endfor %}`;
+var lignesBesoinsOpts = `<option value="">—</option>{% for lb in lignes_besoin %}<option value="{{ lb.pk }}" data-qte="{{ lb.quantite|unlocalize }}">{{ lb.libelle }}</option>{% endfor %}`;
+
+function onLigneBesoinChange(select) {
+  var opt = select.options[select.selectedIndex];
+  var qte = opt ? opt.dataset.qte : '';
+  if (!qte) return;
+  var row = select.closest('tr');
+  var qteInput = row.querySelector('.qte');
+  qteInput.value = qte;
+  calcMontant(qteInput);
+}
 
 function calcMontant(input) {
   var row = input.closest('tr');
@@ -207,7 +217,7 @@ function addRow() {
   tr.className = 'lig-row';
   tr.innerHTML = `
     <td><input type="text" name="designation" placeholder="Désignation…" required></td>
-    <td><select name="ligne_besoin_id">${lignesBesoinsOpts}</select></td>
+    <td><select name="ligne_besoin_id" onchange="onLigneBesoinChange(this)">${lignesBesoinsOpts}</select></td>
     <td><input type="number" name="quantite" value="1" step="1" min="0" class="qte" onchange="calcMontant(this)"></td>
     <td><input type="number" name="prix_unitaire" value="0" step="0.01" min="0" class="pu" onchange="calcMontant(this)"></td>
     <td class="montant-cell"><span class="montant">0</span></td>

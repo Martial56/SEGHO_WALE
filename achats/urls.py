@@ -12,9 +12,12 @@ urlpatterns = [
     path('fournisseurs/<int:pk>/', views.fournisseur_detail, name='fournisseur_detail'),
     path('fournisseurs/<int:pk>/modifier/', views.fournisseur_edit, name='fournisseur_edit'),
 
-    # Besoins d'achat (lecture seule — les besoins viennent du module Stock)
+    # Besoins d'achat — soit importés depuis une Fiche de besoins du module Stock,
+    # soit créés directement ici.
     path('besoins/', views.besoins_list, name='besoins_list'),
+    path('besoins/nouveau/', views.besoin_create, name='besoin_create'),
     path('besoins/<int:pk>/', views.besoin_detail, name='besoin_detail'),
+    path('besoins/<int:pk>/modifier/', views.besoin_edit, name='besoin_edit'),
     path('besoins/<int:pk>/statut/', views.besoin_changer_statut, name='besoin_statut'),
 
     # Proformas
@@ -29,6 +32,7 @@ urlpatterns = [
     path('commandes/', views.commandes_list, name='commandes_list'),
     path('commandes/creer/<int:proforma_pk>/', views.commande_create, name='commande_create'),
     path('commandes/<int:pk>/', views.commande_detail, name='commande_detail'),
+    path('commandes/<int:pk>/modifier/', views.commande_edit, name='commande_edit'),
     path('commandes/<int:pk>/statut/', views.commande_changer_statut, name='commande_statut'),
     path('commandes/<int:pk>/imprimer/', views.commande_imprimer, name='commande_imprimer'),
 

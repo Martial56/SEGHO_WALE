@@ -65,9 +65,9 @@ html[data-theme="dark"] .s-annule { background:rgba(153,27,27,.3); color:#fca5a5
       <span style="color:var(--text);font-weight:500;">Besoins d'achat</span>
     </span>
     <div style="flex:1;"></div>
-    <span class="ba-info-tag" style="font-size:12px;color:var(--text-muted);padding:4px 10px;border-radius:6px;background:var(--surface-muted);border:1px solid var(--border);">
-      <i class="bi bi-info-circle"></i> Transmis depuis le module Stock
-    </span>
+    <a href="{% url 'achats:besoin_create' %}" class="btn btn-primary" style="font-size:13px;">
+      <i class="bi bi-plus-lg"></i> Nouveau besoin
+    </a>
   </div>
 
   <div class="ba-kpis">
@@ -133,7 +133,7 @@ html[data-theme="dark"] .s-annule { background:rgba(153,27,27,.3); color:#fca5a5
             {% endif %}
           </td>
           <td style="color:var(--text-muted);">{{ fiche.lignes.count }} produit{{ fiche.lignes.count|pluralize }}</td>
-          <td style="color:var(--text-muted);font-size:12px;">{{ fiche.cree_par.get_full_name|default:fiche.cree_par.username|default:"—" }}</td>
+          <td style="color:var(--text-muted);font-size:12px;">{% if fiche.cree_par %}{{ fiche.cree_par.get_full_name|default:fiche.cree_par.username }}{% else %}—{% endif %}</td>
           <td>
             <form method="post" action="{% url 'stock_fiche_envoyer_achats' fiche.pk %}" style="display:inline;"
                   onsubmit="return confirm('Importer la fiche {{ fiche.numero }} dans les achats ?');">

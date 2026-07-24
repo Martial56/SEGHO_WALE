@@ -45,8 +45,6 @@ html[data-theme="dark"] .s-non_conforme { background:rgba(153,27,27,.3); color:#
 {% endblock %}
 
 {% block content %}
-<div class="hist-wrapper">
-<div class="hist-main">
 <div class="rd-page">
   <div class="rd-head">
     <a href="{% url 'achats:commande_detail' reception.commande.pk %}" class="o-ctrl-btn" style="padding:3px 7px;"><i class="bi bi-arrow-left"></i></a>
@@ -60,6 +58,8 @@ html[data-theme="dark"] .s-non_conforme { background:rgba(153,27,27,.3); color:#
     <span class="badge s-{{ reception.statut }}" style="margin-left:8px;">{{ reception.get_statut_display }}</span>
   </div>
 
+  <div class="hist-wrapper" style="flex:1;min-height:0;">
+  <div class="hist-main" style="display:flex;flex-direction:column;min-height:0;">
   <div class="rd-body">
     <div class="rd-card">
       <div class="rd-card-head"><i class="bi bi-info-circle"></i> Informations</div>
@@ -80,7 +80,7 @@ html[data-theme="dark"] .s-non_conforme { background:rgba(153,27,27,.3); color:#
         </div>
         <div class="rd-info-item">
           <span class="rd-info-label">Réceptionné par</span>
-          <span class="rd-info-val">{{ reception.receptionne_par.get_full_name|default:reception.receptionne_par.username|default:"—" }}</span>
+          <span class="rd-info-val">{% if reception.receptionne_par %}{{ reception.receptionne_par.get_full_name|default:reception.receptionne_par.username }}{% else %}—{% endif %}</span>
         </div>
         {% if reception.notes %}
         <div class="rd-info-item" style="grid-column:1/-1;">
@@ -88,6 +88,25 @@ html[data-theme="dark"] .s-non_conforme { background:rgba(153,27,27,.3); color:#
           <span class="rd-info-val">{{ reception.notes }}</span>
         </div>
         {% endif %}
+      </div>
+    </div>
+
+    <div class="rd-card">
+      <div class="rd-card-head"><i class="bi bi-box-seam"></i> Intégration stock</div>
+      <div class="rd-info">
+        <div class="rd-info-item" style="grid-column:1/-1;">
+          {% if reception.integre_en_stock %}
+          <span class="rd-info-val" style="color:#2d99db;">
+            <i class="bi bi-check-circle-fill"></i> Intégrée en stock le {{ reception.date_integration|date:"d/m/Y H:i" }}
+            {% if reception.integre_par %}par {{ reception.integre_par.get_full_name|default:reception.integre_par.username }}{% endif %}
+          </span>
+          {% else %}
+          <span class="rd-info-val" style="color:#92400e;">
+            <i class="bi bi-exclamation-triangle-fill"></i> Pas encore intégrée en stock —
+            <a href="{% url 'stock_receptions_a_integrer' %}" style="color:var(--teal-700);font-weight:600;">intégrer depuis le module Stock</a>
+          </span>
+          {% endif %}
+        </div>
       </div>
     </div>
 
@@ -136,8 +155,8 @@ html[data-theme="dark"] .s-non_conforme { background:rgba(153,27,27,.3); color:#
       </table>
     </div>
   </div>
-</div>
-</div>
-{% load core_tags %}{% historique_sidebar reception %}
+  </div>
+  {% load core_tags %}{% historique_sidebar reception %}
+  </div>
 </div>
 {% endblock %}

@@ -59,8 +59,6 @@ html[data-theme="dark"] .s-annule, html[data-theme="dark"] .s-rejete { backgroun
 {% endblock %}
 
 {% block content %}
-<div class="hist-wrapper">
-<div class="hist-main">
 <div class="bd-page">
   <div class="bd-head">
     <a href="{% url 'achats:besoins_list' %}" class="o-ctrl-btn" style="padding:3px 7px;"><i class="bi bi-arrow-left"></i></a>
@@ -71,6 +69,16 @@ html[data-theme="dark"] .s-annule, html[data-theme="dark"] .s-rejete { backgroun
     </span>
     <span class="badge s-{{ besoin.statut }}" style="margin-left:8px;">{{ besoin.get_statut_display }}</span>
     <div style="flex:1;"></div>
+    {% if besoin.statut == 'brouillon' or besoin.statut == 'soumis' %}
+      <a href="{% url 'achats:besoin_edit' besoin.pk %}" class="btn btn-secondary"><i class="bi bi-pencil"></i> Modifier</a>
+    {% endif %}
+    {% if besoin.statut == 'brouillon' %}
+      <form method="post" action="{% url 'achats:besoin_statut' besoin.pk %}" style="display:inline;">
+        {% csrf_token %}
+        <input type="hidden" name="statut" value="soumis">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-send"></i> Soumettre</button>
+      </form>
+    {% endif %}
     {% if besoin.statut == 'soumis' %}
       <a href="{% url 'achats:proforma_create' besoin.pk %}" class="btn btn-primary"><i class="bi bi-file-earmark-plus"></i> Ajouter un proforma</a>
     {% elif besoin.statut == 'en_cours' %}
@@ -78,6 +86,8 @@ html[data-theme="dark"] .s-annule, html[data-theme="dark"] .s-rejete { backgroun
     {% endif %}
   </div>
 
+  <div class="hist-wrapper" style="flex:1;min-height:0;">
+  <div class="hist-main" style="display:flex;flex-direction:column;min-height:0;">
   <div class="bd-body">
     <!-- Informations -->
     <div class="bd-card">
@@ -97,7 +107,7 @@ html[data-theme="dark"] .s-annule, html[data-theme="dark"] .s-rejete { backgroun
         </div>
         <div class="bd-info-item">
           <span class="bd-info-label">Créé par</span>
-          <span class="bd-info-val">{{ besoin.cree_par.get_full_name|default:besoin.cree_par.username|default:"—" }}</span>
+          <span class="bd-info-val">{% if besoin.cree_par %}{{ besoin.cree_par.get_full_name|default:besoin.cree_par.username }}{% else %}—{% endif %}</span>
         </div>
         <div class="bd-info-item">
           <span class="bd-info-label">Source</span>
@@ -191,8 +201,8 @@ html[data-theme="dark"] .s-annule, html[data-theme="dark"] .s-rejete { backgroun
       {% endif %}
     </div>
   </div>
-</div>
-</div>
-{% load core_tags %}{% historique_sidebar besoin %}
+  </div>
+  {% load core_tags %}{% historique_sidebar besoin %}
+  </div>
 </div>
 {% endblock %}

@@ -1,16 +1,15 @@
 {% extends 'achats/base.html' %}
-{% load i18n %}
+{% load i18n l10n %}
 
 {% block title %}Achats — Tableau de bord{% endblock %}
 
 {% block extra_css %}
 {{ block.super }}
 <style>
-.content { padding: 0; }
-.ac-page { display:flex; flex-direction:column; height:calc(100vh - var(--topbar-h) - 44px); overflow:hidden; }
+.ac-page { padding:18px 28px 40px; width:100%; }
 
 /* ── Barre KPI ── */
-.ac-kpis { display:flex; gap:10px; padding:12px 28px; background:#fff; border-bottom:1px solid rgba(0,0,0,.07); flex-shrink:0; flex-wrap:wrap; }
+.ac-kpis { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px; }
 .ac-kpi { display:flex; align-items:center; gap:12px; padding:10px 18px; background:#f8fafb; border-radius:10px; border:1px solid rgba(0,0,0,.07); min-width:145px; cursor:pointer; text-decoration:none; transition:box-shadow .15s,transform .15s; }
 .ac-kpi:hover { box-shadow:0 4px 16px rgba(0,0,0,.1); transform:translateY(-1px); }
 .ac-kpi-icon { width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0; }
@@ -18,21 +17,23 @@
 .ac-kpi-val { font-size:20px; font-weight:800; line-height:1; }
 .ac-kpi-label { font-size:11px; color:#777; font-weight:500; }
 
-/* ── Corps ── */
-.ac-body { flex:1; overflow:auto; min-height:0; padding:18px 28px; display:grid; grid-template-columns:1fr 1fr 1fr; grid-auto-rows:auto; gap:14px; align-content:start; }
+/* ── Sections : chaque bloc est empilé verticalement, largeur pleine ── */
+.ac-section { margin-bottom:18px; }
+.ac-row { display:flex; flex-wrap:wrap; gap:18px; margin-bottom:18px; }
+.ac-row > .ac-card { flex:1 1 320px; min-width:0; }
 
 /* ── Cards ── */
 .ac-card { background:#fff; border-radius:10px; border:1px solid rgba(0,0,0,.08); box-shadow:0 1px 4px rgba(0,0,0,.04); overflow:hidden; }
-.ac-card-head { display:flex; align-items:center; justify-content:space-between; padding:11px 16px; border-bottom:1px solid rgba(0,0,0,.06); }
+.ac-card-head { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:11px 16px; border-bottom:1px solid rgba(0,0,0,.06); flex-wrap:wrap; }
 .ac-card-head h2 { font-size:13px; font-weight:700; color:var(--teal-800); margin:0; display:flex;align-items:center;gap:7px; }
 .ac-card-head a { font-size:12px; color:var(--teal-600); text-decoration:none; font-weight:600; }
-.ac-card-body { }
+.ac-card-body { overflow-x:auto; }
 .ac-card table { width:100%; border-collapse:collapse; font-size:12.5px; }
-.ac-card table th { padding:7px 12px; font-size:10px; font-weight:700; color:#aaa; text-transform:uppercase; letter-spacing:.04em; background:#fafafa; border-bottom:1px solid rgba(0,0,0,.06); }
+.ac-card table th { padding:7px 12px; font-size:10px; font-weight:700; color:#aaa; text-transform:uppercase; letter-spacing:.04em; background:#fafafa; border-bottom:1px solid rgba(0,0,0,.06); white-space:nowrap; }
 .ac-card table td { padding:8px 12px; border-bottom:1px solid rgba(0,0,0,.04); color:rgba(0,0,0,.75); vertical-align:middle; }
 .ac-card table tr:last-child td { border-bottom:none; }
 .ac-empty { padding:28px; text-align:center; color:#bbb; font-size:13px; }
-.badge-s { display:inline-block; padding:2px 8px; border-radius:20px; font-size:10.5px; font-weight:700; }
+.badge-s { display:inline-block; padding:2px 8px; border-radius:20px; font-size:10.5px; font-weight:700; white-space:nowrap; }
 .s-brouillon { background:#f3f4f6; color:#6b7280; }
 .s-soumis { background:#dbeafe; color:#1d4ed8; }
 .s-en_cours { background:#fef3c7; color:#92400e; }
@@ -49,8 +50,33 @@
 .retard { background:#fee2e2!important; }
 .retard td { color:#991b1b!important; }
 
+/* Flux d'achat */
+.ac-flux-row { display:flex; align-items:center; justify-content:space-between; padding:6px 0; }
+.ac-flux-label { display:flex; align-items:center; gap:8px; font-size:12.5px; color:rgba(0,0,0,.7); }
+.ac-flux-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.ac-flux-val { font-size:14px; font-weight:800; text-decoration:none; }
+
+/* Alertes opérationnelles */
+.ac-alert-grid { display:flex; flex-wrap:wrap; gap:20px; padding:14px 16px; }
+.ac-alert-col { flex:1 1 220px; min-width:0; }
+.ac-alert-label { font-size:12px; color:#888; font-weight:600; text-transform:uppercase; margin-bottom:6px; }
+.ac-alert-count { font-size:22px; font-weight:800; color:#92400e; margin-bottom:6px; }
+.ac-alert-list { list-style:none; padding:0; margin:0; font-size:12px; color:#888; }
+.ac-alert-ok { font-size:13px; color:#22c55e; }
+
+/* Répartition des dépenses */
+.ac-repart-row { margin-bottom:10px; }
+.ac-repart-row:last-child { margin-bottom:0; }
+.ac-repart-head { display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:4px; }
+.ac-repart-label { color:rgba(0,0,0,.7); font-weight:600; }
+.ac-repart-val { color:#888; }
+.ac-repart-track { height:7px; border-radius:4px; background:#f1f1f1; overflow:hidden; }
+.ac-repart-fill { height:100%; background:var(--teal-600); border-radius:4px; }
+
+.ac-chart-wrap { position:relative; height:220px; padding:12px 16px; }
+.ac-evolution { font-size:12px; font-weight:700; }
+
 /* ── Mode sombre ── */
-html[data-theme="dark"] .ac-kpis { background:var(--surface); border-bottom-color:var(--border); }
 html[data-theme="dark"] .ac-kpi { background:var(--surface-muted); border-color:var(--border); }
 html[data-theme="dark"] .ac-kpi:hover { box-shadow:0 4px 16px rgba(0,0,0,.35); }
 html[data-theme="dark"] .ac-kpi-label { color:var(--text-muted); }
@@ -68,6 +94,13 @@ html[data-theme="dark"] .s-satisfait, html[data-theme="dark"] .s-valide, html[da
 html[data-theme="dark"] .s-annule, html[data-theme="dark"] .s-rejete, html[data-theme="dark"] .s-annulee { background:rgba(153,27,27,.3); color:#fca5a5; }
 html[data-theme="dark"] .retard { background:rgba(153,27,27,.18)!important; }
 html[data-theme="dark"] .retard td { color:#fca5a5!important; }
+html[data-theme="dark"] .ac-flux-label { color:var(--text); }
+html[data-theme="dark"] .ac-alert-label { color:var(--text-muted); }
+html[data-theme="dark"] .ac-alert-count { color:#fcd34d; }
+html[data-theme="dark"] .ac-alert-list { color:var(--text-muted); }
+html[data-theme="dark"] .ac-repart-label { color:var(--text); }
+html[data-theme="dark"] .ac-repart-val { color:var(--text-muted); }
+html[data-theme="dark"] .ac-repart-track { background:var(--surface-muted); }
 </style>
 {% endblock %}
 
@@ -76,7 +109,7 @@ html[data-theme="dark"] .retard td { color:#fca5a5!important; }
 
   <!-- KPIs -->
   <div class="ac-kpis">
-    <a href="{% url 'achats:fournisseurs_list' %}" class="ac-kpi">
+    <a href="{% url 'achats:fournisseurs_list' %}?filtre=actif" class="ac-kpi">
       <div class="ac-kpi-icon" style="background:#e0f2fe;"><i class="bi bi-building" style="color:#0369a1;"></i></div>
       <div class="ac-kpi-info">
         <span class="ac-kpi-val" style="color:#0369a1;">{{ stats.fournisseurs }}</span>
@@ -97,7 +130,7 @@ html[data-theme="dark"] .retard td { color:#fca5a5!important; }
         <span class="ac-kpi-label">Proformas à valider</span>
       </div>
     </a>
-    <a href="{% url 'achats:commandes_list' %}" class="ac-kpi">
+    <a href="{% url 'achats:commandes_list' %}?statut=en_cours" class="ac-kpi">
       <div class="ac-kpi-icon" style="background:#c0d8e8;"><i class="bi bi-bag-check" style="color:var(--teal-700);"></i></div>
       <div class="ac-kpi-info">
         <span class="ac-kpi-val" style="color:var(--teal-700);">{{ stats.commandes_en_cours }}</span>
@@ -131,72 +164,125 @@ html[data-theme="dark"] .retard td { color:#fca5a5!important; }
     </a>
   </div>
 
-  <!-- Corps -->
-  <div class="ac-body">
-
-    <!-- Graphique dépenses mensuelles -->
-    <div class="ac-card" style="grid-column:1/3;display:flex;flex-direction:column;">
+  {% if alertes.nb_proformas_stagnantes or alertes.nb_besoins_sans_proforma or alertes.nb_receptions_non_integrees %}
+  <!-- Alertes opérationnelles -->
+  <div class="ac-section">
+    <div class="ac-card">
       <div class="ac-card-head">
-        <h2><i class="bi bi-bar-chart-line"></i> Dépenses mensuelles (6 mois)</h2>
+        <h2><i class="bi bi-exclamation-triangle-fill" style="color:#d97706;"></i> Alertes opérationnelles</h2>
       </div>
-      <div class="ac-card-body" style="padding:12px 16px;flex:1;min-height:0;">
-        <div style="position:relative;height:100%;min-height:160px;">
-          <canvas id="chartDepenses"></canvas>
-        </div>
-      </div>
-    </div>
-
-    <!-- Colonne droite : Flux + Besoins empilés (pas de vide entre eux) -->
-    <div style="display:flex;flex-direction:column;gap:14px;">
-
-      <!-- Flux rapide -->
-      <div class="ac-card">
-        <div class="ac-card-head">
-          <h2><i class="bi bi-activity"></i> Flux d'achat</h2>
-        </div>
-        <div class="ac-card-body" style="padding:10px 16px;display:grid;gap:8px;">
-          {% for step in workflow_steps %}
-          <div style="display:flex;align-items:center;justify-content:space-between;">
-            <div style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:rgba(0,0,0,.7);">
-              <div style="width:8px;height:8px;border-radius:50%;background:{{ step.color }};flex-shrink:0;"></div>
-              {{ step.label }}
-            </div>
-            <a href="{{ step.url }}" style="font-size:14px;font-weight:800;color:{{ step.color }};text-decoration:none;">{{ step.count }}</a>
-          </div>
-          {% endfor %}
-        </div>
-      </div>
-
-      <!-- Besoins récents -->
-      <div class="ac-card">
-        <div class="ac-card-head">
-          <h2><i class="bi bi-list-check"></i> Derniers besoins</h2>
-          <a href="{% url 'achats:besoins_list' %}">Voir tout <i class="bi bi-arrow-right"></i></a>
-        </div>
-        <div class="ac-card-body">
-          {% if besoins_recents %}
-          <table>
-            <thead><tr><th>N°</th><th>Titre</th><th>Statut</th></tr></thead>
-            <tbody>
-            {% for b in besoins_recents %}
-            <tr>
-              <td><a href="{% url 'achats:besoin_detail' b.pk %}" style="color:var(--teal-700);font-weight:700;text-decoration:none;">{{ b.numero }}</a></td>
-              <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ b.titre }}</td>
-              <td><span class="badge-s s-{{ b.statut }}">{{ b.get_statut_display }}</span></td>
-            </tr>
+      <div class="ac-alert-grid">
+        <div class="ac-alert-col">
+          <div class="ac-alert-label"><i class="bi bi-hourglass-split"></i> Proformas en attente depuis +7j</div>
+          {% if alertes.nb_proformas_stagnantes %}
+          <div class="ac-alert-count">{{ alertes.nb_proformas_stagnantes }}</div>
+          <ul class="ac-alert-list">
+            {% for p in alertes.proformas_stagnantes %}
+            <li style="margin-bottom:3px;"><a href="{% url 'achats:proforma_detail' p.pk %}" style="color:var(--teal-700);text-decoration:none;font-weight:600;">{{ p.numero }}</a> — {{ p.fournisseur.nom|truncatechars:20 }}</li>
             {% endfor %}
-            </tbody>
-          </table>
+          </ul>
           {% else %}
-          <div class="ac-empty"><i class="bi bi-list-check" style="font-size:28px;display:block;margin-bottom:8px;opacity:.3;"></i>Aucun besoin</div>
+          <div class="ac-alert-ok"><i class="bi bi-check-circle"></i> Aucune</div>
+          {% endif %}
+        </div>
+        <div class="ac-alert-col">
+          <div class="ac-alert-label"><i class="bi bi-file-earmark-x"></i> Besoins soumis sans proforma depuis +7j</div>
+          {% if alertes.nb_besoins_sans_proforma %}
+          <div class="ac-alert-count">{{ alertes.nb_besoins_sans_proforma }}</div>
+          <ul class="ac-alert-list">
+            {% for b in alertes.besoins_sans_proforma %}
+            <li style="margin-bottom:3px;"><a href="{% url 'achats:besoin_detail' b.pk %}" style="color:var(--teal-700);text-decoration:none;font-weight:600;">{{ b.numero }}</a> — {{ b.titre|truncatechars:22 }}</li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <div class="ac-alert-ok"><i class="bi bi-check-circle"></i> Aucun</div>
+          {% endif %}
+        </div>
+        <div class="ac-alert-col">
+          <div class="ac-alert-label"><i class="bi bi-box-seam"></i> Réceptions non intégrées en stock</div>
+          {% if alertes.nb_receptions_non_integrees %}
+          <div class="ac-alert-count">{{ alertes.nb_receptions_non_integrees }}</div>
+          <ul class="ac-alert-list">
+            {% for r in alertes.receptions_non_integrees %}
+            <li style="margin-bottom:3px;"><a href="{% url 'achats:reception_detail' r.pk %}" style="color:var(--teal-700);text-decoration:none;font-weight:600;">{{ r.numero }}</a> — {{ r.commande.fournisseur.nom|truncatechars:18 }}</li>
+            {% endfor %}
+          </ul>
+          <a href="{% url 'stock_receptions_a_integrer' %}" style="font-size:12px;color:var(--teal-600);font-weight:600;text-decoration:none;">Aller intégrer →</a>
+          {% else %}
+          <div class="ac-alert-ok"><i class="bi bi-check-circle"></i> Aucune</div>
           {% endif %}
         </div>
       </div>
+    </div>
+  </div>
+  {% endif %}
 
+  <!-- Dépenses mensuelles (pleine largeur) -->
+  <div class="ac-section">
+    <div class="ac-card">
+      <div class="ac-card-head">
+        <h2><i class="bi bi-bar-chart-line"></i> Dépenses mensuelles (6 mois)</h2>
+        {% if evolution_pct is not None %}
+        <span class="ac-evolution" style="{% if evolution_pct > 0 %}color:#dc2626;{% elif evolution_pct < 0 %}color:#16a34a;{% else %}color:#888;{% endif %}">
+          <i class="bi {% if evolution_pct > 0 %}bi-arrow-up-short{% elif evolution_pct < 0 %}bi-arrow-down-short{% else %}bi-dash{% endif %}"></i>
+          {{ evolution_pct }}% vs {{ annee_precedente }}
+        </span>
+        {% endif %}
+      </div>
+      <div class="ac-chart-wrap" style="height:320px;">
+        <canvas id="chartDepenses"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Flux d'achat + Derniers besoins -->
+  <div class="ac-row">
+    <div class="ac-card">
+      <div class="ac-card-head">
+        <h2><i class="bi bi-activity"></i> Flux d'achat</h2>
+      </div>
+      <div class="ac-card-body" style="padding:6px 16px;">
+        {% for step in workflow_steps %}
+        <div class="ac-flux-row">
+          <div class="ac-flux-label">
+            <div class="ac-flux-dot" style="background:{{ step.color }};"></div>
+            {{ step.label }}
+          </div>
+          <a href="{{ step.url }}" class="ac-flux-val" style="color:{{ step.color }};">{{ step.count }}</a>
+        </div>
+        {% endfor %}
+      </div>
     </div>
 
-    <!-- Proformas en attente (pleine largeur) -->
-    <div class="ac-card" style="grid-column:1/-1;">
+    <div class="ac-card">
+      <div class="ac-card-head">
+        <h2><i class="bi bi-list-check"></i> Derniers besoins</h2>
+        <a href="{% url 'achats:besoins_list' %}">Voir tout <i class="bi bi-arrow-right"></i></a>
+      </div>
+      <div class="ac-card-body">
+        {% if besoins_recents %}
+        <table>
+          <thead><tr><th>N°</th><th>Titre</th><th>Statut</th></tr></thead>
+          <tbody>
+          {% for b in besoins_recents %}
+          <tr>
+            <td><a href="{% url 'achats:besoin_detail' b.pk %}" style="color:var(--teal-700);font-weight:700;text-decoration:none;">{{ b.numero }}</a></td>
+            <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ b.titre }}</td>
+            <td><span class="badge-s s-{{ b.statut }}">{{ b.get_statut_display }}</span></td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="ac-empty"><i class="bi bi-list-check" style="font-size:28px;display:block;margin-bottom:8px;opacity:.3;"></i>Aucun besoin</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Proformas à valider -->
+  <div class="ac-section">
+    <div class="ac-card">
       <div class="ac-card-head">
         <h2><i class="bi bi-file-earmark-text"></i> Proformas à valider</h2>
         <a href="{% url 'achats:proformas_list' %}?statut=en_attente">Voir tout <i class="bi bi-arrow-right"></i></a>
@@ -213,7 +299,7 @@ html[data-theme="dark"] .retard td { color:#fca5a5!important; }
             <td style="font-weight:500;">{{ p.fournisseur.nom }}</td>
             <td style="color:#888;">{{ p.reference_fournisseur|default:"—" }}</td>
             <td style="color:#888;">{{ p.date_reception }}</td>
-            <td style="color:#888;">{{ p.soumis_par.get_full_name|default:p.soumis_par.username|default:"—" }}</td>
+            <td style="color:#888;">{% if p.soumis_par %}{{ p.soumis_par.get_full_name|default:p.soumis_par.username }}{% else %}—{% endif %}</td>
             <td style="text-align:right;font-weight:600;white-space:nowrap;">{{ p.montant_total|floatformat:0 }}&nbsp;FCFA</td>
             <td><a href="{% url 'achats:proforma_detail' p.pk %}" style="color:var(--teal-600);font-size:13px;"><i class="bi bi-eye"></i></a></td>
           </tr>
@@ -225,9 +311,11 @@ html[data-theme="dark"] .retard td { color:#fca5a5!important; }
         {% endif %}
       </div>
     </div>
+  </div>
 
-    <!-- Commandes actives (pleine largeur) -->
-    <div class="ac-card" style="grid-column:1/-1;">
+  <!-- Commandes actives -->
+  <div class="ac-section">
+    <div class="ac-card">
       <div class="ac-card-head">
         <h2><i class="bi bi-bag-check"></i> Commandes actives</h2>
         <a href="{% url 'achats:commandes_list' %}">Voir tout <i class="bi bi-arrow-right"></i></a>
@@ -259,8 +347,62 @@ html[data-theme="dark"] .retard td { color:#fca5a5!important; }
         {% endif %}
       </div>
     </div>
-
   </div>
+
+  <!-- Top fournisseurs + Répartition par catégorie -->
+  <div class="ac-row">
+    <div class="ac-card" style="flex:2 1 480px;">
+      <div class="ac-card-head">
+        <h2><i class="bi bi-trophy"></i> Top fournisseurs</h2>
+        <a href="{% url 'achats:fournisseurs_list' %}">Voir tout <i class="bi bi-arrow-right"></i></a>
+      </div>
+      <div class="ac-card-body">
+        {% if top_fournisseurs %}
+        <table>
+          <thead><tr><th>Fournisseur</th><th style="text-align:right;">Commandes</th><th style="text-align:right;">Montant</th><th style="text-align:right;">Taux de retard</th></tr></thead>
+          <tbody>
+          {% for fs in top_fournisseurs %}
+          <tr>
+            <td style="font-weight:600;"><a href="{% url 'achats:fournisseur_detail' fs.fournisseur.pk %}" style="color:var(--teal-700);text-decoration:none;">{{ fs.fournisseur.nom }}</a></td>
+            <td style="text-align:right;color:#888;">{{ fs.nb_commandes }}</td>
+            <td style="text-align:right;font-weight:600;white-space:nowrap;">{{ fs.montant_total|floatformat:0 }}&nbsp;FCFA</td>
+            <td style="text-align:right;{% if fs.taux_retard > 30 %}color:#dc2626;font-weight:700;{% elif fs.taux_retard > 0 %}color:#92400e;{% else %}color:#22c55e;{% endif %}">
+              {{ fs.taux_retard }}%
+            </td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="ac-empty"><i class="bi bi-trophy" style="font-size:28px;display:block;margin-bottom:8px;opacity:.3;"></i>Aucune commande enregistrée</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="ac-card" style="flex:1 1 280px;">
+      <div class="ac-card-head">
+        <h2><i class="bi bi-pie-chart"></i> Dépenses {{ annee_courante }} par catégorie</h2>
+      </div>
+      <div class="ac-card-body" style="padding:14px 16px;">
+        {% if repartition_categories %}
+        {% for r in repartition_categories %}
+        <div class="ac-repart-row">
+          <div class="ac-repart-head">
+            <span class="ac-repart-label">{{ r.label }}</span>
+            <span class="ac-repart-val">{{ r.montant|floatformat:0 }}&nbsp;FCFA ({{ r.pct }}%)</span>
+          </div>
+          <div class="ac-repart-track">
+            <div class="ac-repart-fill" style="width:{{ r.pct|unlocalize }}%;"></div>
+          </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="ac-empty"><i class="bi bi-pie-chart" style="font-size:28px;display:block;margin-bottom:8px;opacity:.3;"></i>Aucune dépense cette année</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
