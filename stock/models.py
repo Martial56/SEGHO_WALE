@@ -1,3 +1,5 @@
+from functools import cached_property
+
 from django.db import models
 from django.utils import timezone
 
@@ -101,6 +103,8 @@ class Produit(models.Model):
 
     actif         = models.BooleanField(default=True)
     date_creation = models.DateTimeField(auto_now_add=True)
+    modifie_par   = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    modifie_le    = models.DateTimeField(null=True, blank=True)
 
     @property
     def en_rupture(self):
@@ -110,9 +114,12 @@ class Produit(models.Model):
     def en_alerte(self):
         return 0 < self.stock_actuel <= self.stock_alerte
 
-    @property
+    @cached_property
     def cmm(self):
-        """Consommation Mensuelle Moyenne sur les 3 derniers mois."""
+        """Consommation Mensuelle Moyenne sur les 3 derniers mois.
+        Mémorisé sur l'instance : couverture_jours/point_commande/
+        qte_a_commander en dépendent tous et ne doivent pas chacun
+        redéclencher la requête d'agrégation."""
         from django.db.models import Sum
         today = timezone.now().date()
         debut = today.replace(day=1)
@@ -164,6 +171,9 @@ class Produit(models.Model):
     class Meta:
         verbose_name = "Produit"
         ordering = ['type', 'nom']
+        indexes = [
+            models.Index(fields=['actif', 'type']),
+        ]
 
 
 class LotProduit(models.Model):
@@ -193,6 +203,9 @@ class LotProduit(models.Model):
     class Meta:
         verbose_name = "Lot"
         ordering = ['date_peremption']
+        indexes = [
+            models.Index(fields=['date_peremption', 'quantite_actuelle']),
+        ]
 
 
 PHARMACIES = [
@@ -235,6 +248,9 @@ class MouvementStock(models.Model):
     class Meta:
         verbose_name = "Mouvement de stock"
         ordering = ['-date']
+        indexes = [
+            models.Index(fields=['type', 'date']),
+        ]
 
 
 class CommandeStock(models.Model):
@@ -267,6 +283,9 @@ class CommandeStock(models.Model):
     class Meta:
         verbose_name = "Commande de stock"
         ordering = ['-date_creation']
+        indexes = [
+            models.Index(fields=['statut']),
+        ]
 
 
 class LigneCommande(models.Model):
@@ -311,6 +330,9 @@ class Inventaire(models.Model):
     class Meta:
         verbose_name = "Inventaire"
         ordering = ['-date_creation']
+        indexes = [
+            models.Index(fields=['statut']),
+        ]
 
 
 class LigneInventaire(models.Model):
@@ -360,6 +382,9 @@ class DemandePharmacie(models.Model):
     class Meta:
         verbose_name = "Demande pharmacie"
         ordering = ['-date_demande']
+        indexes = [
+            models.Index(fields=['pharmacie', 'statut']),
+        ]
 
 
 class LigneDemande(models.Model):
@@ -406,6 +431,9 @@ class FicheBesoins(models.Model):
     class Meta:
         verbose_name = 'Fiche de besoins'
         ordering = ['-date_creation']
+        indexes = [
+            models.Index(fields=['statut', 'pharmacie']),
+        ]
 
 
 class LigneFicheBesoins(models.Model):

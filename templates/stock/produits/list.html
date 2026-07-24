@@ -48,6 +48,8 @@
 .stock-rupture { color: var(--rose-text); font-weight: 700; }
 .action-link { font-size: 11.5px; color: var(--st-600); text-decoration: none; font-weight: 600; }
 .action-link:hover { text-decoration: underline; }
+
+{% include 'services/includes/io_styles.html' %}
 </style>{% endblock %}
 
 {% block content %}
@@ -95,7 +97,10 @@
       </a>
       {% endif %}
     </form>
-    <a href="{% url 'stock_produit_create' %}" class="btn-st" style="margin-left:auto;">
+    <button type="button" class="btn-st-outline" style="margin-left:auto;" onclick="openImportModal()">
+      <i class="bi bi-upload"></i> Importer
+    </button>
+    <a href="{% url 'stock_produit_create' %}" class="btn-st">
       <i class="bi bi-plus-lg"></i> Nouveau produit
     </a>
   </div>
@@ -121,7 +126,7 @@
     </thead>
     <tbody>
     {% for produit in page_obj %}
-    {% with lots=produit.lots.all nb_lots=produit.lots.count %}
+    {% with lots=produit.lots.all nb_lots=produit.lots.all|length %}
 
     <!-- Ligne produit -->
     <tr style="cursor:{% if nb_lots %}pointer{% else %}default{% endif %};"
@@ -280,5 +285,40 @@ function toggleLots(pk){
   row.style.display = open ? 'none' : '';
   if(ico) ico.style.transform = open ? '' : 'rotate(90deg)';
 }
+
+function openImportModal(){document.getElementById('io-modal-backdrop').classList.add('active');document.getElementById('io-modal').classList.add('active');}
+function closeImportModal(){document.getElementById('io-modal-backdrop').classList.remove('active');document.getElementById('io-modal').classList.remove('active');}
+function updateFileName(input){var el=document.getElementById('io-filename');if(input.files&&input.files[0]){el.textContent=input.files[0].name;el.style.display='block';}}
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeImportModal();});
+{% if request.GET.action == 'import' %}document.addEventListener('DOMContentLoaded',openImportModal);{% endif %}
 </script>
+
+<div class="io-modal-backdrop" id="io-modal-backdrop" onclick="closeImportModal()"></div>
+<div class="io-modal" id="io-modal">
+  <div class="io-modal-header">
+    <span><i class="bi bi-upload"></i> Importer des produits</span>
+    <button type="button" class="io-modal-close" onclick="closeImportModal()">×</button>
+  </div>
+  <form method="post" action="{% url 'stock_import_produits' %}" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div class="io-modal-body">
+      <a href="{% url 'stock_import_produits_modele' %}" style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:var(--st-600);text-decoration:none;margin-bottom:14px;">
+        <i class="bi bi-download"></i> Télécharger le modèle Excel
+      </a>
+      <label class="io-file-label" for="io-file-input">
+        <i class="bi bi-cloud-upload" style="font-size:28px;color:#2188ab;display:block;margin-bottom:6px;"></i>
+        <strong>Choisir un fichier</strong>
+        <span style="font-size:11px;color:var(--text-muted);display:block;margin-top:3px;">JSON, CSV ou Excel (.xlsx)</span>
+        <input type="file" id="io-file-input" name="fichier" accept=".json,.csv,.xlsx,.xls" required onchange="updateFileName(this)">
+      </label>
+      <div class="io-filename" id="io-filename" style="display:none;"></div>
+      <label class="io-checkbox-label"><input type="checkbox" name="update"> Mettre à jour les enregistrements existants</label>
+      <p class="io-hint">Clé de déduplication : <strong>code</strong> (facultatif — si absent, un nouveau produit est créé avec un code auto-généré). Colonnes attendues : code, nom, type (medicament/consommable/equipement), categorie, unite_mesure (code), dci, dosage, forme, prescription_obligatoire, stock_actuel, stock_alerte, stock_minimum, prix_achat, prix_vente, actif, numero_lot, date_peremption (AAAA-MM-JJ). Si numero_lot est renseigné, un lot est créé avec la quantité de la ligne (nouveau produit : un mouvement d'entrée est aussi enregistré).</p>
+    </div>
+    <div class="io-modal-footer">
+      <button type="button" class="io-btn-cancel" onclick="closeImportModal()">Annuler</button>
+      <button type="submit" class="io-btn-submit"><i class="bi bi-upload"></i> Importer</button>
+    </div>
+  </form>
+</div>
 {% endblock %}

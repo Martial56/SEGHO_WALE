@@ -83,6 +83,19 @@ def build_accent_css(base_hex, var_prefix='teal'):
     return ' '.join(declarations)
 
 
+_FORMULA_LEAD_CHARS = ('=', '+', '-', '@', '\t', '\r')
+
+
+def _csv_safe_cell(value):
+    """Neutralise l'injection de formule Excel/DDE (=CMD(), =HYPERLINK(), etc.)
+    en préfixant d'une apostrophe toute valeur texte commençant par un
+    caractère déclencheur de formule — Excel l'interprète alors comme du
+    texte forcé, les autres tableurs/CSV l'ignorent silencieusement."""
+    if isinstance(value, str) and value and value[0] in _FORMULA_LEAD_CHARS:
+        return "'" + value
+    return value
+
+
 def csv_response(filename, headers, rows, delimiter=';'):
     """Génère une réponse CSV téléchargeable, avec BOM UTF-8 pour un affichage
     correct des accents dans Excel. `rows` est un itérable de listes/tuples ;
@@ -93,5 +106,5 @@ def csv_response(filename, headers, rows, delimiter=';'):
     writer = csv.writer(response, delimiter=delimiter)
     writer.writerow(headers)
     for row in rows:
-        writer.writerow(['' if v is None else v for v in row])
+        writer.writerow([_csv_safe_cell('' if v is None else v) for v in row])
     return response

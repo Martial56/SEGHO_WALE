@@ -10,6 +10,8 @@ urlpatterns = [
     path('produits/<int:pk>/',        views.produit_detail,        name='stock_produit_detail'),
     path('produits/<int:pk>/modifier/', views.produit_edit,        name='stock_produit_edit'),
     path('produits/export/',          views.export_stock_excel,    name='stock_export_excel'),
+    path('produits/importer/',        views.import_produits,       name='stock_import_produits'),
+    path('produits/importer/modele/', views.import_produits_modele, name='stock_import_produits_modele'),
 
     # Mouvements
     path('mouvements/',               views.mouvements_list,       name='stock_mouvements'),

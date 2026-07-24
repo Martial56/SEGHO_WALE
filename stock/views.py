@@ -1,13 +1,21 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import transaction
 from django.db.models import Q, Sum, Count, F
 from django.utils import timezone
 from django.core.paginator import Paginator
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_POST
 from .models import Produit, CategorieStock, LotProduit, MouvementStock, CommandeStock, LigneCommande, Inventaire, LigneInventaire, DemandePharmacie, LigneDemande, PHARMACIES, FicheBesoins, LigneFicheBesoins, UniteMesure
 from achats.models import Fournisseur
+
+STOCK_MANAGE_GROUPS = {'Gestionnaire stock', 'Pharmacien', 'Administrateur', 'Directeur'}
+
+
+def can_manage_stock(user):
+    return user.is_superuser or user.is_staff or user.groups.filter(name__in=STOCK_MANAGE_GROUPS).exists()
 
 
 @login_required(login_url='login')
@@ -71,31 +79,34 @@ def stock_dashboard(request):
         'data':   [t[1] for t in top_items],
     }
 
-    # ── Graphe 4 : Répartition par type (bar) ──
+    # ── Graphe 4 : Répartition par type (bar) — réutilise les comptages déjà
+    # faits dans `stats`, au lieu de refaire les 3 mêmes requêtes.
     chart_types = {
         'labels': ['Médicaments', 'Consommables', 'Équipements'],
-        'data':   [
-            Produit.objects.filter(type='medicament', actif=True).count(),
-            Produit.objects.filter(type='consommable', actif=True).count(),
-            Produit.objects.filter(type='equipement', actif=True).count(),
-        ],
+        'data':   [stats['medicaments'], stats['consommables'], stats['equipements']],
         'colors': ['#4a6741', '#1a237e', '#4527a0'],
     }
 
+    # Fenêtre plus large que l'affichage réel (5/page) : cartes paginées côté
+    # client dans le template, il faut donc plus de lignes que ce qu'une
+    # seule page en montre.
     produits_alerte = Produit.objects.filter(
         actif=True, stock_actuel__lte=F('stock_alerte')
-    ).order_by('stock_actuel')[:10]
+    ).order_by('stock_actuel')[:30]
 
     lots_a_surveiller = LotProduit.objects.filter(
         quantite_actuelle__gt=0,
         date_peremption__lte=today + timezone.timedelta(days=90)
-    ).select_related('produit').order_by('date_peremption')[:10]
+    ).select_related('produit').order_by('date_peremption')[:30]
 
-    derniers_mouvements = MouvementStock.objects.select_related('produit').order_by('-date')[:10]
+    # Fenêtre plus large que l'affichage réel (5/page) : les deux cartes sont
+    # paginées côté client dans le template, il faut donc plus de lignes que
+    # ce qu'une seule page en montre.
+    derniers_mouvements = MouvementStock.objects.select_related('produit', 'produit__unite_mesure').order_by('-date')[:30]
 
     commandes_recentes = CommandeStock.objects.select_related('fournisseur').exclude(
         statut='annule'
-    ).order_by('-date_creation')[:5]
+    ).order_by('-date_creation')[:20]
 
     # Point 1 — Alertes critiques (ruptures, sous seuil minimum, lots périmant dans 30j)
     produits_rupture      = Produit.objects.filter(actif=True, stock_actuel__lte=0).order_by('nom')[:5]
@@ -109,12 +120,12 @@ def stock_dashboard(request):
     ).select_related('produit').order_by('date_peremption')[:5]
 
     # Points 3 & 6 — À commander + KPIs (une seule requête produits partagée)
-    produits_all = list(Produit.objects.filter(actif=True))
+    produits_all = list(Produit.objects.filter(actif=True).select_related('unite_mesure'))
     a_commander_dash = sorted(
         [{'produit': p, 'qte': p.qte_a_commander, 'stock': p.stock_actuel, 'minimum': p.stock_minimum}
          for p in produits_all if p.qte_a_commander > 0],
         key=lambda x: x['qte'], reverse=True
-    )[:8]
+    )[:30]
     kpi_valeur_stock     = round(sum(float(p.stock_actuel) * float(p.prix_achat) for p in produits_all))
     total_livr_kpi       = float(MouvementStock.objects.filter(type='livraison').aggregate(t=Sum('quantite'))['t'] or 0)
     stock_total_kpi      = sum(float(p.stock_actuel) for p in produits_all)
@@ -213,6 +224,8 @@ def produit_detail(request, pk):
 
 @login_required(login_url='login')
 def produit_create(request):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
     categories  = CategorieStock.objects.filter(actif=True).order_by('nom')
     fournisseurs = Fournisseur.objects.filter(actif=True).order_by('nom')
     unites_mesure = UniteMesure.objects.filter(actif=True).select_related('categorie').order_by('categorie__nom', 'nom')
@@ -251,9 +264,16 @@ def produit_create(request):
             frn_pk = request.POST.get('fournisseur_principal', '')
             if frn_pk:
                 p.fournisseur_principal = Fournisseur.objects.filter(pk=frn_pk).first()
-            p.save()
-            messages.success(request, f'Produit « {p.nom} » créé (code : {p.code}).')
-            return redirect('stock_produit_detail', pk=p.pk)
+            p.modifie_par = request.user
+            p.modifie_le  = timezone.now()
+            try:
+                p.full_clean()
+            except ValidationError as e:
+                errors.update({k: ' '.join(v) for k, v in e.message_dict.items()})
+            else:
+                p.save()
+                messages.success(request, f'Produit « {p.nom} » créé (code : {p.code}).')
+                return redirect('stock_produit_detail', pk=p.pk)
 
     return render(request, 'stock/produits/form.html', {
         'mode':         'create',
@@ -267,6 +287,8 @@ def produit_create(request):
 
 @login_required(login_url='login')
 def produit_edit(request, pk):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
     produit = get_object_or_404(Produit, pk=pk)
     categories   = CategorieStock.objects.filter(actif=True).order_by('nom')
     fournisseurs = Fournisseur.objects.filter(actif=True).order_by('nom')
@@ -304,9 +326,16 @@ def produit_edit(request, pk):
             produit.categorie = CategorieStock.objects.filter(pk=cat_pk).first()
             frn_pk = request.POST.get('fournisseur_principal', '')
             produit.fournisseur_principal = Fournisseur.objects.filter(pk=frn_pk).first() if frn_pk else None
-            produit.save()
-            messages.success(request, f'Produit « {produit.nom} » mis à jour.')
-            return redirect('stock_produit_detail', pk=produit.pk)
+            produit.modifie_par = request.user
+            produit.modifie_le  = timezone.now()
+            try:
+                produit.full_clean()
+            except ValidationError as e:
+                errors.update({k: ' '.join(v) for k, v in e.message_dict.items()})
+            else:
+                produit.save()
+                messages.success(request, f'Produit « {produit.nom} » mis à jour.')
+                return redirect('stock_produit_detail', pk=produit.pk)
 
     return render(request, 'stock/produits/form.html', {
         'mode':         'edit',
@@ -320,7 +349,7 @@ def produit_edit(request, pk):
 
 @login_required(login_url='login')
 def mouvements_list(request):
-    qs = MouvementStock.objects.select_related('produit').order_by('-date')
+    qs = MouvementStock.objects.select_related('produit', 'produit__unite_mesure').order_by('-date')
     type_filtre = request.GET.get('type', '')
     periode     = request.GET.get('periode', '')
     q           = request.GET.get('q', '').strip()
@@ -351,6 +380,8 @@ def mouvements_list(request):
 
 @login_required(login_url='login')
 def mouvement_create(request):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
     produits = Produit.objects.filter(actif=True).order_by('nom')
     if request.method == 'POST':
         produit_pk = request.POST.get('produit', '')
@@ -363,26 +394,34 @@ def mouvement_create(request):
         notes    = request.POST.get('notes', '').strip()
         reference = request.POST.get('reference', '').strip()
 
-        produit = Produit.objects.filter(pk=produit_pk).first()
-        if produit and quantite > 0 and type_:
-            stock_avant = float(produit.stock_actuel)
-            if type_ == 'entree':
-                stock_apres = stock_avant + quantite
-            elif type_ in ('sortie', 'peremption', 'retour'):
-                stock_apres = max(0, stock_avant - quantite)
-            else:
-                stock_apres = quantite  # ajustement
+        type_valide = type_ in dict(MouvementStock.TYPE_CHOICES)
+        produit = None
+        if produit_pk and quantite > 0 and type_valide:
+            with transaction.atomic():
+                produit = Produit.objects.select_for_update().filter(pk=produit_pk).first()
+                if produit:
+                    stock_avant = float(produit.stock_actuel)
+                    if type_ == 'entree':
+                        stock_apres = stock_avant + quantite
+                    elif type_ in ('livraison', 'peremption', 'retour'):
+                        stock_apres = max(0, stock_avant - quantite)
+                    else:
+                        stock_apres = quantite  # ajustement
 
-            MouvementStock.objects.create(
-                produit=produit, type=type_, motif=motif,
-                quantite=quantite, stock_avant=stock_avant,
-                stock_apres=stock_apres, notes=notes, reference=reference,
-                cree_par=request.user,
-            )
-            produit.stock_actuel = stock_apres
-            produit.save(update_fields=['stock_actuel'])
-            messages.success(request, f'Mouvement enregistré pour « {produit.nom} ».')
-            return redirect('stock_mouvements')
+                    MouvementStock.objects.create(
+                        produit=produit, type=type_, motif=motif,
+                        quantite=quantite, stock_avant=stock_avant,
+                        stock_apres=stock_apres, notes=notes, reference=reference,
+                        cree_par=request.user,
+                    )
+                    produit.stock_actuel = stock_apres
+                    produit.save(update_fields=['stock_actuel'])
+            if produit:
+                messages.success(request, f'Mouvement enregistré pour « {produit.nom} ».')
+                return redirect('stock_mouvements')
+            messages.error(request, 'Produit introuvable.')
+        else:
+            messages.error(request, 'Produit, type et quantité valides requis.')
 
     return render(request, 'stock/mouvements/form.html', {'produits': produits})
 
@@ -403,6 +442,8 @@ def commandes_list(request):
 
 @login_required(login_url='login')
 def commande_create(request):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
     fournisseurs = Fournisseur.objects.filter(actif=True).order_by('nom')
     produits     = Produit.objects.filter(actif=True).order_by('nom')
     if request.method == 'POST':
@@ -425,6 +466,8 @@ def commande_create(request):
 @login_required(login_url='login')
 @require_POST
 def commande_ajouter_ligne(request, pk):
+    if not can_manage_stock(request.user):
+        return JsonResponse({'error': 'Permission refusée.'}, status=403)
     commande = get_object_or_404(CommandeStock, pk=pk)
     if commande.statut != 'brouillon':
         return JsonResponse({'error': 'La commande n\'est plus modifiable.'}, status=400)
@@ -471,11 +514,17 @@ def commande_ajouter_ligne(request, pk):
 @require_POST
 def commande_ajouter_lot(request, pk):
     """Ajoute plusieurs produits à la commande en une seule soumission."""
+    if not can_manage_stock(request.user):
+        return JsonResponse({'error': 'Permission refusée.'}, status=403)
     commande = get_object_or_404(CommandeStock, pk=pk)
     if commande.statut != 'brouillon':
         return JsonResponse({'error': 'Non modifiable.'}, status=400)
 
     produits = Produit.objects.filter(actif=True)
+    deja_liste = set(
+        LigneCommande.objects.filter(commande=commande).values_list('produit_id', flat=True)
+    )
+    nouvelles_lignes = []
     ajouts = []
     deja_presents = []
     for p in produits:
@@ -495,16 +544,21 @@ def commande_ajouter_lot(request, pk):
             prix = float(p.prix_achat)
 
         # Un produit ne peut apparaître qu'une seule fois par commande
-        if LigneCommande.objects.filter(commande=commande, produit=p).exists():
+        if p.pk in deja_liste:
             deja_presents.append(p.nom)
             continue
-        LigneCommande.objects.create(
+        nouvelles_lignes.append(LigneCommande(
             commande=commande, produit=p,
             quantite_commandee=qte, prix_unitaire=prix,
-        )
+        ))
         ajouts.append(p.nom)
 
-    total = sum(float(l.quantite_commandee) * float(l.prix_unitaire) for l in commande.lignes.all())
+    if nouvelles_lignes:
+        LigneCommande.objects.bulk_create(nouvelles_lignes)
+
+    total = commande.lignes.aggregate(
+        t=Sum(F('quantite_commandee') * F('prix_unitaire'))
+    )['t'] or 0
     commande.montant_total = total
     commande.save(update_fields=['montant_total'])
 
@@ -519,13 +573,14 @@ def commande_ajouter_lot(request, pk):
 @login_required(login_url='login')
 @require_POST
 def commande_supprimer_ligne(request, pk, ligne_pk):
+    if not can_manage_stock(request.user):
+        return JsonResponse({'error': 'Permission refusée.'}, status=403)
     commande = get_object_or_404(CommandeStock, pk=pk)
     if commande.statut != 'brouillon':
         return JsonResponse({'error': 'Non modifiable.'}, status=400)
     ligne = get_object_or_404(LigneCommande, pk=ligne_pk, commande=commande)
     ligne.delete()
-    total = sum(float(l.quantite_commandee) * float(l.prix_unitaire)
-                for l in commande.lignes.all())
+    total = commande.lignes.aggregate(t=Sum(F('quantite_commandee') * F('prix_unitaire')))['t'] or 0
     commande.montant_total = total
     commande.save(update_fields=['montant_total'])
     return JsonResponse({'total': float(total), 'nb_lignes': commande.lignes.count()})
@@ -557,6 +612,8 @@ def commande_detail(request, pk):
 @login_required(login_url='login')
 @require_POST
 def categorie_create_ajax(request):
+    if not can_manage_stock(request.user):
+        return JsonResponse({'error': 'Permission refusée.'}, status=403)
     nom  = request.POST.get('nom', '').strip()
     type_ = request.POST.get('type', 'medicament')
     if not nom:
@@ -614,6 +671,8 @@ def stock_categories_list(request):
 
 @login_required(login_url='login')
 def stock_categorie_create(request):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
     is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
     Form = _categorie_stock_form_class()
     form = Form(request.POST or None)
@@ -628,6 +687,8 @@ def stock_categorie_create(request):
 
 @login_required(login_url='login')
 def stock_categorie_edit(request, pk):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
     is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
     obj = get_object_or_404(CategorieStock, pk=pk)
     Form = _categorie_stock_form_class()
@@ -646,6 +707,8 @@ def stock_categorie_edit(request, pk):
 @login_required(login_url='login')
 @require_POST
 def stock_categorie_delete(request, pk):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
     obj = get_object_or_404(CategorieStock, pk=pk)
     nom = obj.nom
     obj.delete()
@@ -655,6 +718,8 @@ def stock_categorie_delete(request, pk):
 
 @login_required(login_url='login')
 def fournisseur_create(request):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
     errors = {}
     if request.method == 'POST':
         nom       = request.POST.get('nom', '').strip()
@@ -679,6 +744,8 @@ def fournisseur_create(request):
 
 @login_required(login_url='login')
 def fournisseur_edit(request, pk):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
     fournisseur = get_object_or_404(Fournisseur, pk=pk)
     errors = {}
     if request.method == 'POST':
@@ -727,6 +794,8 @@ def fournisseurs_list(request):
 @login_required(login_url='login')
 @require_POST
 def commande_envoyer(request, pk):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
     commande = get_object_or_404(CommandeStock, pk=pk)
     if commande.statut != 'brouillon':
         messages.error(request, 'Seule une commande en brouillon peut être envoyée.')
@@ -742,6 +811,8 @@ def commande_envoyer(request, pk):
 
 @login_required(login_url='login')
 def commande_modifier(request, pk):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
     commande = get_object_or_404(CommandeStock, pk=pk)
     if commande.statut != 'brouillon':
         messages.error(request, 'Seule une commande en brouillon peut être modifiée.')
@@ -771,6 +842,9 @@ def commande_modifier(request, pk):
 @login_required(login_url='login')
 @require_POST
 def commande_receptionner(request, pk):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
+    from decimal import Decimal
     commande = get_object_or_404(CommandeStock, pk=pk)
     if commande.statut not in ('envoye', 'partiel'):
         messages.error(request, 'Cette commande ne peut pas être réceptionnée.')
@@ -779,49 +853,54 @@ def commande_receptionner(request, pk):
     lignes = commande.lignes.select_related('produit').all()
     tout_recu = True
 
-    for ligne in lignes:
-        key = f'recu_{ligne.pk}'
-        try:
-            qte_recue = float(request.POST.get(key, 0) or 0)
-        except ValueError:
-            qte_recue = 0
-        if qte_recue <= 0:
-            continue
+    with transaction.atomic():
+        for ligne in lignes:
+            key = f'recu_{ligne.pk}'
+            try:
+                qte_recue = float(request.POST.get(key, 0) or 0)
+            except ValueError:
+                qte_recue = 0
+            if qte_recue <= 0:
+                continue
 
-        # Mettre à jour la ligne
-        from decimal import Decimal
-        ligne.quantite_recue = min(ligne.quantite_recue + Decimal(str(qte_recue)), ligne.quantite_commandee)
-        ligne.save(update_fields=['quantite_recue'])
+            # Verrouille la ligne produit pour la durée de la transaction —
+            # évite qu'une autre réception/mouvement concurrent sur le même
+            # produit lise le même stock_actuel avant cette écriture.
+            produit = Produit.objects.select_for_update().get(pk=ligne.produit_id)
 
-        # Créer un lot
-        num_lot = request.POST.get(f'lot_{ligne.pk}', '').strip() or f'LOT-{commande.numero}'
-        date_peremption = request.POST.get(f'peremption_{ligne.pk}', '') or None
-        lot = LotProduit.objects.create(
-            produit=ligne.produit, numero_lot=num_lot,
-            quantite_initiale=qte_recue, quantite_actuelle=qte_recue,
-            fournisseur=commande.fournisseur, date_reception=timezone.now().date(),
-            prix_achat_lot=ligne.prix_unitaire,
-            date_peremption=date_peremption if date_peremption else None,
-        )
+            # Mettre à jour la ligne
+            ligne.quantite_recue = min(ligne.quantite_recue + Decimal(str(qte_recue)), ligne.quantite_commandee)
+            ligne.save(update_fields=['quantite_recue'])
 
-        # Mouvement de stock
-        stock_avant = float(ligne.produit.stock_actuel)
-        stock_apres = stock_avant + qte_recue
-        MouvementStock.objects.create(
-            produit=ligne.produit, lot=lot, type='entree', motif='achat',
-            quantite=qte_recue, stock_avant=stock_avant, stock_apres=stock_apres,
-            reference=commande.numero, cree_par=request.user,
-        )
-        ligne.produit.stock_actuel = stock_apres
-        ligne.produit.save(update_fields=['stock_actuel'])
+            # Créer un lot
+            num_lot = request.POST.get(f'lot_{ligne.pk}', '').strip() or f'LOT-{commande.numero}'
+            date_peremption = request.POST.get(f'peremption_{ligne.pk}', '') or None
+            lot = LotProduit.objects.create(
+                produit=produit, numero_lot=num_lot,
+                quantite_initiale=qte_recue, quantite_actuelle=qte_recue,
+                fournisseur=commande.fournisseur, date_reception=timezone.now().date(),
+                prix_achat_lot=ligne.prix_unitaire,
+                date_peremption=date_peremption if date_peremption else None,
+            )
 
-        if ligne.quantite_recue < ligne.quantite_commandee:
-            tout_recu = False
+            # Mouvement de stock
+            stock_avant = float(produit.stock_actuel)
+            stock_apres = stock_avant + qte_recue
+            MouvementStock.objects.create(
+                produit=produit, lot=lot, type='entree', motif='achat',
+                quantite=qte_recue, stock_avant=stock_avant, stock_apres=stock_apres,
+                reference=commande.numero, cree_par=request.user,
+            )
+            produit.stock_actuel = stock_apres
+            produit.save(update_fields=['stock_actuel'])
 
-    # Mettre à jour le statut commande
-    commande.statut = 'recu' if tout_recu else 'partiel'
-    commande.date_reception = timezone.now().date()
-    commande.save(update_fields=['statut', 'date_reception'])
+            if ligne.quantite_recue < ligne.quantite_commandee:
+                tout_recu = False
+
+        # Mettre à jour le statut commande
+        commande.statut = 'recu' if tout_recu else 'partiel'
+        commande.date_reception = timezone.now().date()
+        commande.save(update_fields=['statut', 'date_reception'])
 
     messages.success(request, f'Réception enregistrée pour la commande {commande.numero}.')
     return redirect('stock_commande_detail', pk=pk)
@@ -833,7 +912,9 @@ def commande_receptionner(request, pk):
 
 @login_required(login_url='login')
 def inventaire_list(request):
-    qs = Inventaire.objects.order_by('-date_creation')
+    qs = Inventaire.objects.select_related('cree_par').annotate(
+        nb_lignes=Count('lignes')
+    ).order_by('-date_creation')
     paginator = Paginator(qs, 20)
     page_obj  = paginator.get_page(request.GET.get('page'))
     return render(request, 'stock/inventaire/list.html', {
@@ -844,12 +925,16 @@ def inventaire_list(request):
 
 @login_required(login_url='login')
 def inventaire_create(request):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
     produits = Produit.objects.filter(actif=True).order_by('type', 'nom')
     if request.method == 'POST':
+        from decimal import Decimal
         inv = Inventaire.objects.create(
             notes=request.POST.get('notes', '').strip(),
             cree_par=request.user,
         )
+        nouvelles_lignes = []
         for p in produits:
             val = request.POST.get(f'reel_{p.pk}', '')
             if val != '':
@@ -858,12 +943,18 @@ def inventaire_create(request):
                 except ValueError:
                     stock_reel = float(p.stock_actuel)
                 peremption = request.POST.get(f'peremption_{p.pk}', '').strip() or None
-                LigneInventaire.objects.create(
+                # LigneInventaire.save() calcule normalement l'écart — bulk_create
+                # n'appelle pas save(), donc on le calcule ici explicitement.
+                ecart = Decimal(str(stock_reel)) - Decimal(str(p.stock_actuel))
+                nouvelles_lignes.append(LigneInventaire(
                     inventaire=inv, produit=p,
                     stock_theorique=p.stock_actuel,
                     stock_reel=stock_reel,
+                    ecart=ecart,
                     date_peremption=peremption,
-                )
+                ))
+        if nouvelles_lignes:
+            LigneInventaire.objects.bulk_create(nouvelles_lignes)
         messages.success(request, f'Inventaire {inv.numero} créé.')
         return redirect('stock_inventaire_detail', pk=inv.pk)
     return render(request, 'stock/inventaire/form.html', {'produits': produits})
@@ -872,32 +963,36 @@ def inventaire_create(request):
 @login_required(login_url='login')
 def inventaire_detail(request, pk):
     inv = get_object_or_404(Inventaire, pk=pk)
-    lignes = inv.lignes.select_related('produit').all()
+    lignes = inv.lignes.select_related('produit', 'produit__unite_mesure').all()
 
     if request.method == 'POST' and request.POST.get('action') == 'valider' and inv.statut == 'brouillon':
-        for ligne in lignes:
-            if ligne.ecart != 0:
-                type_mvt = 'entree' if ligne.ecart > 0 else 'ajustement'
-                stock_avant = float(ligne.produit.stock_actuel)
-                stock_apres = float(ligne.stock_reel)
-                MouvementStock.objects.create(
-                    produit=ligne.produit, type=type_mvt, motif='inventaire',
-                    quantite=abs(float(ligne.ecart)),
-                    stock_avant=stock_avant, stock_apres=stock_apres,
-                    reference=inv.numero, cree_par=request.user,
-                )
-                ligne.produit.stock_actuel = stock_apres
-                ligne.produit.save(update_fields=['stock_actuel'])
+        if not can_manage_stock(request.user):
+            raise PermissionDenied
+        with transaction.atomic():
+            for ligne in lignes:
+                if ligne.ecart != 0:
+                    produit = Produit.objects.select_for_update().get(pk=ligne.produit_id)
+                    type_mvt = 'entree' if ligne.ecart > 0 else 'ajustement'
+                    stock_avant = float(produit.stock_actuel)
+                    stock_apres = float(ligne.stock_reel)
+                    MouvementStock.objects.create(
+                        produit=produit, type=type_mvt, motif='inventaire',
+                        quantite=abs(float(ligne.ecart)),
+                        stock_avant=stock_avant, stock_apres=stock_apres,
+                        reference=inv.numero, cree_par=request.user,
+                    )
+                    produit.stock_actuel = stock_apres
+                    produit.save(update_fields=['stock_actuel'])
 
-            # Mettre à jour la date de péremption sur le lot principal si renseignée
-            if ligne.date_peremption:
-                lot = ligne.produit.lots.order_by('-date_reception').first()
-                if lot:
-                    lot.date_peremption = ligne.date_peremption
-                    lot.save(update_fields=['date_peremption'])
-        inv.statut = 'valide'
-        inv.date_validation = timezone.now()
-        inv.save(update_fields=['statut', 'date_validation'])
+                # Mettre à jour la date de péremption sur le lot principal si renseignée
+                if ligne.date_peremption:
+                    lot = ligne.produit.lots.order_by('-date_reception').first()
+                    if lot:
+                        lot.date_peremption = ligne.date_peremption
+                        lot.save(update_fields=['date_peremption'])
+            inv.statut = 'valide'
+            inv.date_validation = timezone.now()
+            inv.save(update_fields=['statut', 'date_validation'])
         messages.success(request, f'Inventaire {inv.numero} validé. Les stocks ont été mis à jour.')
         return redirect('stock_inventaire_detail', pk=pk)
 
@@ -934,7 +1029,7 @@ def peremptions_list(request):
     else:
         lots = LotProduit.objects.filter(date_peremption__lte=today + timezone.timedelta(days=90), quantite_actuelle__gt=0)
 
-    lots = lots.select_related('produit', 'fournisseur').order_by('date_peremption')
+    lots = lots.select_related('produit', 'produit__unite_mesure', 'fournisseur').order_by('date_peremption')
     stats = {
         'expires': LotProduit.objects.filter(date_peremption__lt=today, quantite_actuelle__gt=0).count(),
         'j30':     LotProduit.objects.filter(date_peremption__lte=today + timezone.timedelta(days=30), date_peremption__gte=today, quantite_actuelle__gt=0).count(),
@@ -995,7 +1090,7 @@ def rapports_consommation(request):
     mouvements = MouvementStock.objects.filter(
         type='livraison',
         date__month=mois, date__year=annee,
-    ).select_related('produit', 'lot')
+    ).select_related('produit', 'produit__unite_mesure', 'lot')
 
     if type_filtre:
         mouvements = mouvements.filter(produit__type=type_filtre)
@@ -1169,7 +1264,7 @@ def rapports_besoins(request):
     type_filtre = request.GET.get('type', '')
     today = timezone.now().date()
 
-    qs = Produit.objects.filter(actif=True).order_by('type', 'nom')
+    qs = Produit.objects.filter(actif=True).select_related('unite_mesure').order_by('type', 'nom')
     if type_filtre:
         qs = qs.filter(type=type_filtre)
 
@@ -1208,7 +1303,7 @@ def rapports_besoins_print(request):
     """Version imprimable / PDF de la fiche de besoins."""
     type_filtre = request.GET.get('type', '')
     today = timezone.now().date()
-    qs = Produit.objects.filter(actif=True).order_by('type', 'nom')
+    qs = Produit.objects.filter(actif=True).select_related('unite_mesure').order_by('type', 'nom')
     if type_filtre:
         qs = qs.filter(type=type_filtre)
     produits_data = []
@@ -1225,6 +1320,7 @@ def rapports_besoins_print(request):
         'type_filtre':   type_filtre,
         'today':         today,
         'type_label': {'medicament': 'Médicaments', 'consommable': 'Consommables', 'equipement': 'Équipements'}.get(type_filtre, 'Tous les produits'),
+        'nb_a_commander': sum(1 for d in produits_data if d['qte_cmd'] > 0),
     })
 
 
@@ -1331,7 +1427,7 @@ def rapports_peremptions(request):
     mouvements = MouvementStock.objects.filter(
         type='peremption',
         date__month=mois, date__year=annee,
-    ).select_related('produit', 'lot', 'cree_par').order_by('-date')
+    ).select_related('produit', 'produit__unite_mesure', 'lot', 'cree_par').order_by('-date')
 
     total_quantite = sum(float(mv.quantite) for mv in mouvements)
     total_valeur   = sum(
@@ -1362,51 +1458,55 @@ def rapports_peremptions(request):
 
 @login_required(login_url='login')
 def elimination_create(request):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
     today = timezone.now().date()
 
     if request.method == 'POST':
         nb = 0
         notes_global = request.POST.get('notes', '').strip()
-        for key, val in request.POST.items():
-            if not key.startswith('qte_'):
-                continue
-            lot_pk = key[4:]
-            try:
-                qte = float(val)
-            except (ValueError, TypeError):
-                continue
-            if qte <= 0:
-                continue
-            try:
-                lot = LotProduit.objects.select_related('produit').get(pk=lot_pk)
-            except LotProduit.DoesNotExist:
-                continue
-            qte = min(qte, float(lot.quantite_actuelle))
-            if qte <= 0:
-                continue
-            sv = float(lot.produit.stock_actuel)
-            sa = max(0, sv - qte)
-            MouvementStock.objects.create(
-                produit=lot.produit, lot=lot,
-                type='peremption', motif='peremption',
-                quantite=qte, stock_avant=sv, stock_apres=sa,
-                notes=notes_global, cree_par=request.user,
-            )
-            lot.quantite_actuelle = max(0, float(lot.quantite_actuelle) - qte)
-            lot.save(update_fields=['quantite_actuelle'])
-            lot.produit.stock_actuel = sa
-            lot.produit.save(update_fields=['stock_actuel'])
-            nb += 1
+        with transaction.atomic():
+            for key, val in request.POST.items():
+                if not key.startswith('qte_'):
+                    continue
+                lot_pk = key[4:]
+                try:
+                    qte = float(val)
+                except (ValueError, TypeError):
+                    continue
+                if qte <= 0:
+                    continue
+                try:
+                    lot = LotProduit.objects.select_for_update().get(pk=lot_pk)
+                except LotProduit.DoesNotExist:
+                    continue
+                qte = min(qte, float(lot.quantite_actuelle))
+                if qte <= 0:
+                    continue
+                produit = Produit.objects.select_for_update().get(pk=lot.produit_id)
+                sv = float(produit.stock_actuel)
+                sa = max(0, sv - qte)
+                MouvementStock.objects.create(
+                    produit=produit, lot=lot,
+                    type='peremption', motif='peremption',
+                    quantite=qte, stock_avant=sv, stock_apres=sa,
+                    notes=notes_global, cree_par=request.user,
+                )
+                lot.quantite_actuelle = max(0, float(lot.quantite_actuelle) - qte)
+                lot.save(update_fields=['quantite_actuelle'])
+                produit.stock_actuel = sa
+                produit.save(update_fields=['stock_actuel'])
+                nb += 1
         if nb:
             messages.success(request, f'{nb} lot(s) éliminé(s) et enregistré(s).')
         return redirect('stock_peremptions')
 
-    # GET : lots périmés ou expirant dans 30 jours
+    # GET : lots périmés ou expirant dans 30 jours (la 1re condition est un
+    # sous-ensemble de la 2e, donc un simple <= 30j suffit)
     lots = LotProduit.objects.filter(
-        quantite_actuelle__gt=0
-    ).filter(
-        Q(date_peremption__lt=today) | Q(date_peremption__lte=today + timezone.timedelta(days=30))
-    ).select_related('produit', 'fournisseur').order_by('date_peremption')
+        quantite_actuelle__gt=0,
+        date_peremption__lte=today + timezone.timedelta(days=30),
+    ).select_related('produit', 'produit__unite_mesure', 'fournisseur').order_by('date_peremption')
 
     return render(request, 'stock/peremptions/eliminer.html', {
         'lots': lots, 'today': today,
@@ -1420,6 +1520,8 @@ def elimination_create(request):
 @login_required(login_url='login')
 @require_POST
 def besoins_generer_auto(request):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
     import datetime as _dt
     today = timezone.now().date()
     debut = today.replace(day=1)
@@ -1440,13 +1542,15 @@ def besoins_generer_auto(request):
         cree_par=request.user,
         notes='Généré automatiquement depuis les indicateurs de stock.',
     )
-    for p in a_commander:
-        LigneFicheBesoins.objects.create(
+    LigneFicheBesoins.objects.bulk_create([
+        LigneFicheBesoins(
             fiche=fiche, produit=p,
             stock_initial=p.stock_actuel,
             cmm=p.cmm,
             qte_commander=p.qte_a_commander,
         )
+        for p in a_commander
+    ])
     messages.success(request, f'Fiche {fiche.numero} créée avec {len(a_commander)} produit(s).')
     return redirect('stock_fiche_detail', pk=fiche.pk)
 
@@ -1565,6 +1669,8 @@ def rapports_fournisseurs_prix(request):
 
 @login_required(login_url='login')
 def retour_create(request):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
     if request.method == 'POST':
         produit_pk = request.POST.get('produit', '')
         lot_pk     = request.POST.get('lot', '')
@@ -1579,23 +1685,24 @@ def retour_create(request):
             messages.error(request, 'Produit et quantité requis.')
             return redirect('stock_retour_create')
 
-        produit = get_object_or_404(Produit, pk=produit_pk)
-        lot = LotProduit.objects.filter(pk=lot_pk, produit=produit).first() if lot_pk else None
+        with transaction.atomic():
+            produit = get_object_or_404(Produit.objects.select_for_update(), pk=produit_pk)
+            lot = LotProduit.objects.select_for_update().filter(pk=lot_pk, produit=produit).first() if lot_pk else None
 
-        sv = float(produit.stock_actuel)
-        sa = sv + qte
-        MouvementStock.objects.create(
-            produit=produit, lot=lot,
-            type='retour', motif='retour',
-            pharmacie=pharmacie, quantite=qte,
-            stock_avant=sv, stock_apres=sa,
-            notes=notes, cree_par=request.user,
-        )
-        produit.stock_actuel = sa
-        produit.save(update_fields=['stock_actuel'])
-        if lot:
-            lot.quantite_actuelle = float(lot.quantite_actuelle) + qte
-            lot.save(update_fields=['quantite_actuelle'])
+            sv = float(produit.stock_actuel)
+            sa = sv + qte
+            MouvementStock.objects.create(
+                produit=produit, lot=lot,
+                type='retour', motif='retour',
+                pharmacie=pharmacie, quantite=qte,
+                stock_avant=sv, stock_apres=sa,
+                notes=notes, cree_par=request.user,
+            )
+            produit.stock_actuel = sa
+            produit.save(update_fields=['stock_actuel'])
+            if lot:
+                lot.quantite_actuelle = float(lot.quantite_actuelle) + qte
+                lot.save(update_fields=['quantite_actuelle'])
 
         messages.success(request, f'Retour de {qte:.0f} {produit.unite_mesure.nom if produit.unite_mesure else ""} enregistré pour « {produit.nom} ».')
         return redirect('stock_mouvements')
@@ -1614,6 +1721,8 @@ def retour_create(request):
 
 @login_required(login_url='login')
 def export_stock_excel(request):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
     from core.utils import csv_response
     type_filtre = request.GET.get('type', '')
     qs = Produit.objects.filter(actif=True).select_related('categorie', 'unite_mesure')
@@ -1634,12 +1743,271 @@ def export_stock_excel(request):
     return csv_response('stock', headers, rows)
 
 
+_PRODUIT_HDR = [
+    'code', 'nom', 'type', 'categorie', 'unite_mesure', 'dci', 'dosage', 'forme',
+    'prescription_obligatoire', 'stock_actuel', 'stock_alerte', 'stock_minimum',
+    'prix_achat', 'prix_vente', 'actif', 'numero_lot', 'date_peremption',
+]
+
+
+def _parse_date_cell(value):
+    """Accepte aussi bien une vraie date Excel (openpyxl la lit comme
+    datetime/date) qu'une chaîne 'AAAA-MM-JJ' (CSV/JSON)."""
+    import datetime
+    if not value:
+        return None
+    if isinstance(value, datetime.datetime):
+        return value.date()
+    if isinstance(value, datetime.date):
+        return value
+    value = str(value).strip()
+    if not value:
+        return None
+    try:
+        return datetime.datetime.strptime(value, '%Y-%m-%d').date()
+    except ValueError:
+        return None
+
+
+@login_required(login_url='login')
+@require_POST
+def import_produits(request):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
+    upload = request.FILES.get('fichier')
+    if not upload:
+        messages.error(request, 'Aucun fichier sélectionné.')
+        return redirect('stock_produits')
+
+    data, err = _parse_upload(upload)
+    if err:
+        messages.error(request, err)
+        return redirect('stock_produits')
+
+    do_update = 'update' in request.POST
+    types_valides  = dict(Produit.TYPE_CHOICES)
+    formes_valides = dict(Produit.FORME_CHOICES)
+    created = updated = skipped = errors = 0
+    unites_manquantes = set()
+
+    for item in data:
+        try:
+            nom = _s(item.get('nom', ''))
+            if not nom:
+                errors += 1
+                continue
+
+            code = _s(item.get('code', ''))
+            existing = Produit.objects.filter(code=code).first() if code else None
+            if existing and not do_update:
+                skipped += 1
+                continue
+
+            type_produit = _s(item.get('type', 'medicament')) or 'medicament'
+            if type_produit not in types_valides:
+                type_produit = 'medicament'
+            forme = _s(item.get('forme', ''))
+            if forme not in formes_valides:
+                forme = ''
+
+            cat_nom = _s(item.get('categorie', ''))
+            categorie = None
+            if cat_nom:
+                categorie, _created_cat = CategorieStock.objects.get_or_create(
+                    nom=cat_nom, defaults={'type': type_produit}
+                )
+
+            um_code = _s(item.get('unite_mesure', ''))
+            unite = None
+            if um_code:
+                unite = UniteMesure.objects.filter(code=um_code).first()
+                if not unite:
+                    unites_manquantes.add(um_code)
+
+            with transaction.atomic():
+                obj = existing or Produit()
+                if code:
+                    obj.code = code
+                obj.nom       = nom
+                obj.type      = type_produit
+                obj.categorie = categorie
+                obj.unite_mesure = unite
+                obj.dci    = _s(item.get('dci', ''))
+                obj.dosage = _s(item.get('dosage', ''))
+                obj.forme  = forme
+                obj.prescription_obligatoire = _b(item.get('prescription_obligatoire', False))
+                obj.stock_actuel  = item.get('stock_actuel') or 0
+                obj.stock_alerte  = item.get('stock_alerte') or 10
+                obj.stock_minimum = item.get('stock_minimum') or 5
+                obj.prix_achat = item.get('prix_achat') or 0
+                obj.prix_vente = item.get('prix_vente') or 0
+                obj.actif = _b(item.get('actif', True))
+                obj.modifie_par = request.user
+                obj.modifie_le  = timezone.now()
+
+                obj.full_clean()
+                obj.save()
+
+                # ── Lot + traçabilité (numero_lot / date_peremption facultatifs) ──
+                # Une ligne = un produit = au plus un lot initial. La quantité du
+                # lot suit le même principe « déclaratif » que stock_actuel :
+                # elle est fixée à la valeur de la ligne, pas cumulée.
+                numero_lot = _s(item.get('numero_lot', ''))
+                if numero_lot:
+                    date_peremption = _parse_date_cell(item.get('date_peremption'))
+                    lot, lot_created = LotProduit.objects.get_or_create(
+                        produit=obj, numero_lot=numero_lot,
+                        defaults={
+                            'date_peremption':   date_peremption,
+                            'date_reception':    timezone.now().date(),
+                            'quantite_initiale': obj.stock_actuel,
+                            'quantite_actuelle': obj.stock_actuel,
+                            'prix_achat_lot':    obj.prix_achat,
+                        }
+                    )
+                    if not lot_created:
+                        lot.quantite_initiale = obj.stock_actuel
+                        lot.quantite_actuelle = obj.stock_actuel
+                        if date_peremption:
+                            lot.date_peremption = date_peremption
+                        lot.save(update_fields=['quantite_initiale', 'quantite_actuelle', 'date_peremption'])
+                    elif not existing:
+                        # Nouveau produit + nouveau lot : trace le mouvement d'entrée
+                        # correspondant, comme pour toute autre entrée en stock.
+                        MouvementStock.objects.create(
+                            produit=obj, lot=lot, type='entree', motif='inventaire',
+                            quantite=obj.stock_actuel, stock_avant=0, stock_apres=obj.stock_actuel,
+                            notes='Import de produits (fichier)', cree_par=request.user,
+                        )
+
+            if existing:
+                updated += 1
+            else:
+                created += 1
+        except ValidationError:
+            errors += 1
+        except Exception:
+            errors += 1
+
+    base = f'{created} créé(s), {updated} mis à jour, {skipped} ignoré(s)'
+    if errors:
+        base += f', {errors} erreur(s)'
+    base += '.'
+    suffix = _fk_warning([('Unité de mesure', unites_manquantes)])
+    if errors or unites_manquantes:
+        messages.warning(request, base + suffix)
+    else:
+        messages.success(request, base)
+    return redirect('stock_produits')
+
+
+@login_required(login_url='login')
+def import_produits_modele(request):
+    """Modèle Excel vierge pour l'import — mêmes colonnes que celles lues
+    par import_produits (dans le même ordre)."""
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
+    import io
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.worksheet.datavalidation import DataValidation
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Produits"
+
+    header_fill = PatternFill('solid', fgColor='2E7D32')
+    header_font = Font(bold=True, color='FFFFFF', size=11)
+    thin = Border(
+        left=Side(style='thin', color='D0D0D0'), right=Side(style='thin', color='D0D0D0'),
+        top=Side(style='thin', color='D0D0D0'),  bottom=Side(style='thin', color='D0D0D0'),
+    )
+
+    headers = _PRODUIT_HDR
+    exemple = [
+        '', 'Paracétamol 500mg', 'medicament', 'Antalgiques', 'CP',
+        'Paracétamol', '500mg', 'comprime', '0',
+        '100', '20', '10', '150', '250', '1',
+        'LOT2026-001', '2027-06-30',
+    ]
+
+    for col, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=h)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+        cell.border = thin
+    ws.row_dimensions[1].height = 20
+
+    for col, val in enumerate(exemple, 1):
+        cell = ws.cell(row=2, column=col, value=val)
+        cell.border = thin
+        cell.font = Font(italic=True, color='888888')
+
+    for col in range(1, len(headers) + 1):
+        ws.column_dimensions[openpyxl.utils.get_column_letter(col)].width = 20
+
+    # Colonne date_peremption : format date pour guider la saisie
+    date_peremption_col = openpyxl.utils.get_column_letter(headers.index('date_peremption') + 1)
+    for row in range(2, 501):
+        ws[f'{date_peremption_col}{row}'].number_format = 'YYYY-MM-DD'
+
+    # ── Feuille cachée listant les valeurs valides, référencée par les
+    # validations de données (listes déroulantes) ci-dessous.
+    listes = wb.create_sheet("Listes")
+    listes.sheet_state = 'hidden'
+
+    types_vals      = [k for k, _ in Produit.TYPE_CHOICES]
+    formes_vals     = [k for k, _ in Produit.FORME_CHOICES]
+    bool_vals       = ['0', '1']
+    categories_vals = list(CategorieStock.objects.order_by('nom').values_list('nom', flat=True)) or ['']
+    unites_vals     = list(UniteMesure.objects.order_by('code').values_list('code', flat=True)) or ['']
+
+    _listes_cols = [
+        ('A', types_vals), ('B', formes_vals), ('C', bool_vals),
+        ('D', categories_vals), ('E', unites_vals),
+    ]
+    for col_letter, values in _listes_cols:
+        for i, v in enumerate(values, 1):
+            listes[f'{col_letter}{i}'] = v
+
+    NB_LIGNES = 500  # nombre de lignes du fichier couvertes par les listes déroulantes
+
+    def _add_dropdown(col_letter, listes_col, count):
+        dv = DataValidation(
+            type='list',
+            formula1=f"'Listes'!${listes_col}$1:${listes_col}${max(count, 1)}",
+            allow_blank=True, showErrorMessage=False,
+        )
+        ws.add_data_validation(dv)
+        dv.add(f'{col_letter}2:{col_letter}{NB_LIGNES}')
+
+    # code, nom, dci, dosage : texte libre — pas de liste déroulante pertinente
+    _add_dropdown('C', 'A', len(types_vals))       # type
+    _add_dropdown('D', 'D', len(categories_vals))  # categorie (existantes — une nouvelle valeur reste acceptée)
+    _add_dropdown('E', 'E', len(unites_vals))       # unite_mesure (existantes)
+    _add_dropdown('H', 'B', len(formes_vals))      # forme
+    _add_dropdown('I', 'C', len(bool_vals))        # prescription_obligatoire
+    _add_dropdown('O', 'C', len(bool_vals))        # actif
+    # stock_actuel, stock_alerte, stock_minimum, prix_achat, prix_vente : numériques — pas de liste déroulante
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    resp = HttpResponse(buf.read(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    resp['Content-Disposition'] = 'attachment; filename="modele_import_produits.xlsx"'
+    return resp
+
+
 # ---------------------------------------------------------------------------
 # Transfert interne
 # ---------------------------------------------------------------------------
 
 @login_required(login_url='login')
 def transfert_create(request):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
     from .models import PHARMACIES
     produits = Produit.objects.filter(actif=True, stock_actuel__gt=0).order_by('nom')
     errors = {}
@@ -1663,20 +2031,26 @@ def transfert_create(request):
             errors['quantite'] = f'Stock insuffisant — disponible : {produit.stock_actuel} {produit.unite_mesure.nom if produit.unite_mesure else ""}.'
 
         if not errors:
-            stock_avant = float(produit.stock_actuel)
-            stock_apres = stock_avant - quantite
-            pharma_label = dict(PHARMACIES).get(pharmacie, pharmacie)
-            MouvementStock.objects.create(
-                produit=produit, type='livraison', motif='livraison',
-                pharmacie=pharmacie,
-                quantite=quantite, stock_avant=stock_avant, stock_apres=stock_apres,
-                notes=notes, cree_par=request.user,
-                reference=f'Livraison → {pharma_label}',
-            )
-            produit.stock_actuel = stock_apres
-            produit.save(update_fields=['stock_actuel'])
-            messages.success(request, f'{quantite} {produit.unite_mesure.nom if produit.unite_mesure else ""} de « {produit.nom} » livrés à {pharma_label}.')
-            return redirect('stock_mouvements')
+            with transaction.atomic():
+                produit = Produit.objects.select_for_update().get(pk=produit.pk)
+                if float(produit.stock_actuel) < quantite:
+                    errors['quantite'] = 'Stock insuffisant (modifié entre-temps).'
+                else:
+                    stock_avant = float(produit.stock_actuel)
+                    stock_apres = stock_avant - quantite
+                    pharma_label = dict(PHARMACIES).get(pharmacie, pharmacie)
+                    MouvementStock.objects.create(
+                        produit=produit, type='livraison', motif='livraison',
+                        pharmacie=pharmacie,
+                        quantite=quantite, stock_avant=stock_avant, stock_apres=stock_apres,
+                        notes=notes, cree_par=request.user,
+                        reference=f'Livraison → {pharma_label}',
+                    )
+                    produit.stock_actuel = stock_apres
+                    produit.save(update_fields=['stock_actuel'])
+            if not errors:
+                messages.success(request, f'{quantite} {produit.unite_mesure.nom if produit.unite_mesure else ""} de « {produit.nom} » livrés à {pharma_label}.')
+                return redirect('stock_mouvements')
 
     return render(request, 'stock/transfert/form.html', {
         'produits':   produits,
@@ -1691,7 +2065,7 @@ def transfert_create(request):
 @login_required(login_url='login')
 def dotation_list(request):
     statut_filtre = request.GET.get('statut', 'en_attente')
-    qs = DemandePharmacie.objects.order_by('-date_demande')
+    qs = DemandePharmacie.objects.annotate(nb_lignes=Count('lignes')).order_by('-date_demande')
     if statut_filtre and statut_filtre != 'tous':
         qs = qs.filter(statut=statut_filtre)
     stats = {
@@ -1714,7 +2088,7 @@ def dotation_list(request):
 @login_required(login_url='login')
 def dotation_detail(request, pk):
     demande = get_object_or_404(DemandePharmacie, pk=pk)
-    lignes  = demande.lignes.select_related('produit').all()
+    lignes  = demande.lignes.select_related('produit', 'produit__unite_mesure').all()
     lignes_enrichies = []
     for l in lignes:
         stock = float(l.produit.stock_actuel)
@@ -1735,6 +2109,8 @@ def dotation_detail(request, pk):
 @login_required(login_url='login')
 @require_POST
 def dotation_valider(request, pk):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
     demande = get_object_or_404(DemandePharmacie, pk=pk)
     if demande.statut != 'en_attente':
         messages.error(request, 'Cette demande a déjà été traitée.')
@@ -1751,71 +2127,103 @@ def dotation_valider(request, pk):
         messages.success(request, f'Demande {demande.numero} refusée.')
         return redirect('stock_dotation_list')
 
+    today = timezone.now().date()
     lignes = demande.lignes.select_related('produit').all()
     tout_approuve = True
-    for ligne in lignes:
-        try:
-            qte = float(request.POST.get(f'approuve_{ligne.pk}', 0) or 0)
-        except ValueError:
-            qte = 0
-        qte = max(0, min(qte, float(ligne.quantite_demandee)))
-        ligne.quantite_approuvee = qte
-        ligne.save(update_fields=['quantite_approuvee'])
-        if qte < float(ligne.quantite_demandee):
-            tout_approuve = False
-        if qte > 0:
-            # FIFO: déduit depuis les lots les plus anciens en premier
-            qte_restante = qte
-            lots_dispo = LotProduit.objects.filter(
-                produit=ligne.produit, quantite_actuelle__gt=0,
-            ).order_by('date_reception')
-            for lot in lots_dispo:
-                if qte_restante <= 0:
-                    break
-                qte_lot = min(float(lot.quantite_actuelle), qte_restante)
-                sv = float(ligne.produit.stock_actuel)
-                sa = max(0, sv - qte_lot)
-                MouvementStock.objects.create(
-                    produit=ligne.produit, lot=lot,
-                    type='livraison', motif='livraison',
-                    pharmacie=demande.pharmacie, quantite=qte_lot,
-                    stock_avant=sv, stock_apres=sa,
-                    reference=demande.numero,
-                    notes=f'Dotation {demande.get_pharmacie_display()} — Lot {lot.numero_lot}',
-                    cree_par=request.user,
-                )
-                lot.quantite_actuelle = max(0, float(lot.quantite_actuelle) - qte_lot)
-                lot.save(update_fields=['quantite_actuelle'])
-                ligne.produit.stock_actuel = sa
-                ligne.produit.save(update_fields=['stock_actuel'])
-                qte_restante -= qte_lot
-            # Fallback si aucun lot enregistré
-            if qte_restante > 0:
-                sv = float(ligne.produit.stock_actuel)
-                sa = max(0, sv - qte_restante)
-                MouvementStock.objects.create(
-                    produit=ligne.produit, type='livraison', motif='livraison',
-                    pharmacie=demande.pharmacie, quantite=qte_restante,
-                    stock_avant=sv, stock_apres=sa,
-                    reference=demande.numero,
-                    notes=f'Dotation {demande.get_pharmacie_display()}',
-                    cree_par=request.user,
-                )
-                ligne.produit.stock_actuel = sa
-                ligne.produit.save(update_fields=['stock_actuel'])
+    manque_stock = []
 
-    # Le stock passe en "en_livraison" — la pharmacie doit confirmer la réception
-    demande.statut          = 'en_livraison'
-    demande.notes_stock     = request.POST.get('notes_stock', '').strip()
-    demande.traite_par      = request.user
-    demande.date_traitement = timezone.now()
-    demande.save()
+    with transaction.atomic():
+        for ligne in lignes:
+            try:
+                qte = float(request.POST.get(f'approuve_{ligne.pk}', 0) or 0)
+            except ValueError:
+                qte = 0
+            qte = max(0, min(qte, float(ligne.quantite_demandee)))
+
+            if qte > 0:
+                produit = Produit.objects.select_for_update().get(pk=ligne.produit_id)
+                # FEFO (First-Expired-First-Out) : déduit d'abord les lots qui
+                # périment le plus tôt, jamais un lot déjà périmé — évite de
+                # distribuer un produit périmé aux pharmacies alors que des
+                # lots valides existent en stock.
+                qte_restante = qte
+                lots_dispo = LotProduit.objects.select_for_update().filter(
+                    produit=produit, quantite_actuelle__gt=0,
+                ).filter(
+                    Q(date_peremption__isnull=True) | Q(date_peremption__gte=today)
+                ).order_by(F('date_peremption').asc(nulls_last=True))
+                for lot in lots_dispo:
+                    if qte_restante <= 0:
+                        break
+                    qte_lot = min(float(lot.quantite_actuelle), qte_restante)
+                    sv = float(produit.stock_actuel)
+                    sa = max(0, sv - qte_lot)
+                    MouvementStock.objects.create(
+                        produit=produit, lot=lot,
+                        type='livraison', motif='livraison',
+                        pharmacie=demande.pharmacie, quantite=qte_lot,
+                        stock_avant=sv, stock_apres=sa,
+                        reference=demande.numero,
+                        notes=f'Dotation {demande.get_pharmacie_display()} — Lot {lot.numero_lot}',
+                        cree_par=request.user,
+                    )
+                    lot.quantite_actuelle = max(0, float(lot.quantite_actuelle) - qte_lot)
+                    lot.save(update_fields=['quantite_actuelle'])
+                    produit.stock_actuel = sa
+                    produit.save(update_fields=['stock_actuel'])
+                    qte_restante -= qte_lot
+
+                # Repli si les lots ne couvrent pas la totalité : le mouvement
+                # ne doit JAMAIS prétendre sortir plus que le stock réellement
+                # disponible (sinon stock_avant-stock_apres ne correspond plus
+                # à la quantité enregistrée — un mensonge dans le journal).
+                if qte_restante > 0:
+                    sv = float(produit.stock_actuel)
+                    qte_reelle = min(qte_restante, sv)
+                    if qte_reelle > 0:
+                        sa = sv - qte_reelle
+                        MouvementStock.objects.create(
+                            produit=produit, type='livraison', motif='livraison',
+                            pharmacie=demande.pharmacie, quantite=qte_reelle,
+                            stock_avant=sv, stock_apres=sa,
+                            reference=demande.numero,
+                            notes=f'Dotation {demande.get_pharmacie_display()}',
+                            cree_par=request.user,
+                        )
+                        produit.stock_actuel = sa
+                        produit.save(update_fields=['stock_actuel'])
+                    if qte_reelle < qte_restante:
+                        # Stock réellement insuffisant : la quantité
+                        # effectivement livrée est revue à la baisse pour que
+                        # la ligne de demande ne mente jamais sur ce qui est parti.
+                        qte = qte - (qte_restante - qte_reelle)
+                        manque_stock.append(ligne.produit.nom)
+
+            ligne.quantite_approuvee = qte
+            ligne.save(update_fields=['quantite_approuvee'])
+            if qte < float(ligne.quantite_demandee):
+                tout_approuve = False
+
+        # Le stock passe en "en_livraison" — la pharmacie doit confirmer la réception
+        demande.statut          = 'en_livraison'
+        demande.notes_stock     = request.POST.get('notes_stock', '').strip()
+        demande.traite_par      = request.user
+        demande.date_traitement = timezone.now()
+        demande.save()
+
+    if manque_stock:
+        messages.warning(
+            request,
+            f"Stock insuffisant pour : {', '.join(manque_stock)} — quantité livrée réduite en conséquence."
+        )
     messages.success(request, f'Demande {demande.numero} traitée — {demande.get_statut_display()}.')
     return redirect('stock_dotation_list')
 
 
 @login_required(login_url='login')
 def dotation_creer(request):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
     produits = Produit.objects.filter(actif=True).order_by('type', 'nom')
     errors = {}
     if request.method == 'POST':
@@ -1827,17 +2235,20 @@ def dotation_creer(request):
             demande = DemandePharmacie.objects.create(
                 pharmacie=pharmacie, notes=notes, cree_par=request.user,
             )
+            nouvelles_lignes = []
             for p in produits:
                 val = request.POST.get(f'qte_{p.pk}', '').strip()
                 if val:
                     try:
                         qte = float(val)
                         if qte > 0:
-                            LigneDemande.objects.create(
+                            nouvelles_lignes.append(LigneDemande(
                                 demande=demande, produit=p, quantite_demandee=qte,
-                            )
+                            ))
                     except ValueError:
                         pass
+            if nouvelles_lignes:
+                LigneDemande.objects.bulk_create(nouvelles_lignes)
             if demande.lignes.exists():
                 messages.success(request, f'Demande {demande.numero} créée.')
                 return redirect('stock_dotation_detail', pk=demande.pk)
@@ -1853,12 +2264,18 @@ def dotation_creer(request):
 
 @login_required(login_url='login')
 def fiche_list(request):
-    fiches = FicheBesoins.objects.order_by('-date_creation')
-    return render(request, 'stock/fiches/list.html', {'fiches': fiches})
+    qs = FicheBesoins.objects.select_related('cree_par').prefetch_related(
+        'besoins_achats'
+    ).annotate(nb_lignes=Count('lignes')).order_by('-date_creation')
+    paginator = Paginator(qs, 25)
+    page_obj  = paginator.get_page(request.GET.get('page'))
+    return render(request, 'stock/fiches/list.html', {'fiches': page_obj, 'page_obj': page_obj})
 
 
 @login_required(login_url='login')
 def fiche_create(request):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
     produits = Produit.objects.filter(actif=True).select_related('categorie').order_by('categorie__type', 'categorie__nom', 'nom')
     if request.method == 'POST':
         periode_debut = request.POST.get('periode_debut', '')
@@ -1877,14 +2294,15 @@ def fiche_create(request):
                 periode_debut=periode_debut, periode_fin=periode_fin,
                 notes=notes, cree_par=request.user, statut='brouillon',
             )
-            for p, qte_cmd in lignes_data:
-                qte = Decimal(qte_cmd)
-                LigneFicheBesoins.objects.create(
+            LigneFicheBesoins.objects.bulk_create([
+                LigneFicheBesoins(
                     fiche=fiche, produit=p,
                     stock_initial=Decimal(str(p.stock_actuel or 0)),
                     cmm=Decimal(str(p.cmm or 0)),
-                    qte_commander=qte, qte_accordee=qte,
+                    qte_commander=Decimal(qte_cmd), qte_accordee=Decimal(qte_cmd),
                 )
+                for p, qte_cmd in lignes_data
+            ])
 
             messages.success(request, f'Fiche {fiche.numero} créée. Vérifiez et envoyez aux achats.')
             return redirect('stock_fiche_detail', pk=fiche.pk)
@@ -1900,7 +2318,7 @@ def fiche_create(request):
 @login_required(login_url='login')
 def fiche_detail(request, pk):
     fiche  = get_object_or_404(FicheBesoins, pk=pk)
-    lignes = fiche.lignes.select_related('produit__categorie').order_by('produit__categorie__type', 'produit__categorie__nom', 'produit__nom')
+    lignes = fiche.lignes.select_related('produit__categorie', 'produit__unite_mesure').order_by('produit__categorie__type', 'produit__categorie__nom', 'produit__nom')
     return render(request, 'stock/fiches/detail.html', {
         'fiche': fiche, 'lignes': lignes,
     })
@@ -1908,11 +2326,13 @@ def fiche_detail(request, pk):
 
 @login_required(login_url='login')
 def fiche_edit(request, pk):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
     fiche  = get_object_or_404(FicheBesoins, pk=pk)
     if fiche.statut not in ('brouillon',):
         messages.error(request, 'Seule une fiche en brouillon est modifiable.')
         return redirect('stock_fiche_detail', pk=pk)
-    lignes = fiche.lignes.select_related('produit__categorie').order_by('produit__categorie__type', 'produit__categorie__nom', 'produit__nom')
+    lignes = fiche.lignes.select_related('produit__categorie', 'produit__unite_mesure').order_by('produit__categorie__type', 'produit__categorie__nom', 'produit__nom')
     if request.method == 'POST':
         from decimal import Decimal
         for ligne in lignes:
@@ -1931,6 +2351,8 @@ def fiche_edit(request, pk):
 @login_required(login_url='login')
 @require_POST
 def fiche_soumettre(request, pk):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
     fiche = get_object_or_404(FicheBesoins, pk=pk)
     if fiche.statut == 'brouillon':
         fiche.statut = 'soumis'
@@ -1942,8 +2364,10 @@ def fiche_soumettre(request, pk):
 @login_required(login_url='login')
 def fiche_valider(request, pk):
     fiche  = get_object_or_404(FicheBesoins, pk=pk)
-    lignes = fiche.lignes.select_related('produit').all()
+    lignes = fiche.lignes.select_related('produit', 'produit__unite_mesure').all()
     if request.method == 'POST':
+        if not can_manage_stock(request.user):
+            raise PermissionDenied
         from decimal import Decimal
         action = request.POST.get('action', 'valider')
         for ligne in lignes:
@@ -1964,6 +2388,8 @@ def fiche_valider(request, pk):
 @login_required(login_url='login')
 @require_POST
 def fiche_envoyer_achats(request, pk):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
     from achats.models import BesoinAchat, LigneBesoin
     fiche = get_object_or_404(FicheBesoins, pk=pk)
 
@@ -1972,8 +2398,12 @@ def fiche_envoyer_achats(request, pk):
         messages.warning(request, f"Cette fiche a déjà été transmise ({besoin_existant.numero}).")
         return redirect('achats:besoin_detail', pk=besoin_existant.pk)
 
-    if fiche.statut not in ('soumis', 'valide'):
-        messages.error(request, "La fiche doit être soumise ou validée avant de pouvoir être transmise aux achats.")
+    if fiche.statut == 'rejete':
+        messages.error(request, "Cette fiche a été rejetée et ne peut pas être transmise aux achats.")
+        return redirect('stock_fiche_detail', pk=pk)
+
+    if not fiche.lignes.exists():
+        messages.error(request, "Cette fiche ne contient aucun produit à transmettre.")
         return redirect('stock_fiche_detail', pk=pk)
 
     besoin = BesoinAchat.objects.create(
@@ -1982,7 +2412,7 @@ def fiche_envoyer_achats(request, pk):
         notes=f"Généré depuis la fiche {fiche.numero}",
     )
     lignes_creees = 0
-    for ligne in fiche.lignes.select_related('produit').all():
+    for ligne in fiche.lignes.select_related('produit', 'produit__unite_mesure').all():
         qte = ligne.qte_accordee if ligne.qte_accordee else ligne.qte_commander
         LigneBesoin.objects.create(
             besoin=besoin, produit=ligne.produit,
@@ -1991,6 +2421,11 @@ def fiche_envoyer_achats(request, pk):
         )
         lignes_creees += 1
 
+    fiche.statut          = 'valide'
+    fiche.valide_par       = request.user
+    fiche.date_validation  = timezone.now()
+    fiche.save(update_fields=['statut', 'valide_par', 'date_validation'])
+
     messages.success(request, f"Besoin {besoin.numero} transmis aux achats ({lignes_creees} produit(s)).")
     return redirect('achats:besoin_detail', pk=besoin.pk)
 
@@ -1998,7 +2433,7 @@ def fiche_envoyer_achats(request, pk):
 @login_required(login_url='login')
 def fiche_print(request, pk):
     fiche  = get_object_or_404(FicheBesoins, pk=pk)
-    lignes = fiche.lignes.select_related('produit').all()
+    lignes = fiche.lignes.select_related('produit', 'produit__unite_mesure').all()
     return render(request, 'stock/fiches/print.html', {
         'fiche': fiche, 'lignes': lignes, 'today': timezone.now().date(),
     })
@@ -2027,65 +2462,87 @@ def receptions_a_integrer(request):
 @login_required(login_url='login')
 @require_POST
 def integrer_reception(request, pk):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
     from achats.models import ReceptionAchat, LigneReceptionAchat
-    reception = get_object_or_404(ReceptionAchat, pk=pk, integre_en_stock=False)
-    commande = reception.commande
 
-    for lr in reception.lignes.select_related(
-        'ligne_commande__ligne_proforma__ligne_besoin__produit'
-    ).all():
-        if lr.quantite_recue <= 0:
-            continue
-        lc = lr.ligne_commande
-        produit = None
-        if (lc.ligne_proforma and
-                lc.ligne_proforma.ligne_besoin and
-                lc.ligne_proforma.ligne_besoin.produit):
-            produit = lc.ligne_proforma.ligne_besoin.produit
-        if produit is None:
-            continue
-
-        numero_lot = lr.numero_lot or reception.numero
-        lot = LotProduit.objects.filter(produit=produit, numero_lot=numero_lot).first()
-        if lot:
-            lot.quantite_actuelle += lr.quantite_recue
-            lot.quantite_initiale += lr.quantite_recue
-            update_lot_fields = ['quantite_actuelle', 'quantite_initiale']
-            if not lot.date_peremption and lr.date_peremption:
-                lot.date_peremption = lr.date_peremption
-                update_lot_fields.append('date_peremption')
-            lot.save(update_fields=update_lot_fields)
-        else:
-            lot = LotProduit.objects.create(
-                produit=produit,
-                numero_lot=numero_lot,
-                date_reception=reception.date_reception,
-                date_peremption=lr.date_peremption,
-                quantite_initiale=lr.quantite_recue,
-                quantite_actuelle=lr.quantite_recue,
-                fournisseur=commande.fournisseur,
-                prix_achat_lot=lc.prix_unitaire,
-            )
-        stock_avant = produit.stock_actuel
-        produit.stock_actuel = produit.stock_actuel + lr.quantite_recue
-        produit.save(update_fields=['stock_actuel'])
-        MouvementStock.objects.create(
-            produit=produit, lot=lot,
-            type='entree', motif='achat',
-            quantite=lr.quantite_recue,
-            stock_avant=stock_avant,
-            stock_apres=produit.stock_actuel,
-            reference=reception.numero,
-            notes=f'Réception {reception.numero} — Commande {commande.numero}',
-            cree_par=request.user,
+    with transaction.atomic():
+        # select_for_update() + le filtre integre_en_stock=False dans la même transaction
+        # empêchent un double clic/double soumission d'intégrer deux fois la même réception.
+        reception = get_object_or_404(
+            ReceptionAchat.objects.select_for_update(), pk=pk, integre_en_stock=False
         )
+        commande = reception.commande
+        lignes_ignorees = []
 
-    reception.integre_en_stock = True
-    reception.date_integration = timezone.now()
-    reception.integre_par = request.user
-    reception.save(update_fields=['integre_en_stock', 'date_integration', 'integre_par'])
+        for lr in reception.lignes.select_related(
+            'ligne_commande__ligne_proforma__ligne_besoin__produit'
+        ).all():
+            if lr.quantite_recue <= 0:
+                continue
+            lc = lr.ligne_commande
+            produit = None
+            if (lc.ligne_proforma and
+                    lc.ligne_proforma.ligne_besoin and
+                    lc.ligne_proforma.ligne_besoin.produit):
+                produit = lc.ligne_proforma.ligne_besoin.produit
+            if produit is None:
+                lignes_ignorees.append(lc.designation)
+                continue
 
-    messages.success(request, f'Réception {reception.numero} intégrée dans le stock.')
+            numero_lot = lr.numero_lot or reception.numero
+            lot = LotProduit.objects.filter(produit=produit, numero_lot=numero_lot).first()
+            if lot:
+                lot.quantite_actuelle += lr.quantite_recue
+                lot.quantite_initiale += lr.quantite_recue
+                update_lot_fields = ['quantite_actuelle', 'quantite_initiale']
+                if not lot.date_peremption and lr.date_peremption:
+                    lot.date_peremption = lr.date_peremption
+                    update_lot_fields.append('date_peremption')
+                lot.save(update_fields=update_lot_fields)
+            else:
+                lot = LotProduit.objects.create(
+                    produit=produit,
+                    numero_lot=numero_lot,
+                    date_reception=reception.date_reception,
+                    date_peremption=lr.date_peremption,
+                    quantite_initiale=lr.quantite_recue,
+                    quantite_actuelle=lr.quantite_recue,
+                    fournisseur=commande.fournisseur,
+                    prix_achat_lot=lc.prix_unitaire,
+                )
+            stock_avant = produit.stock_actuel
+            produit.stock_actuel = produit.stock_actuel + lr.quantite_recue
+            produit.save(update_fields=['stock_actuel'])
+            MouvementStock.objects.create(
+                produit=produit, lot=lot,
+                type='entree', motif='achat',
+                quantite=lr.quantite_recue,
+                stock_avant=stock_avant,
+                stock_apres=produit.stock_actuel,
+                reference=reception.numero,
+                notes=f'Réception {reception.numero} — Commande {commande.numero}',
+                cree_par=request.user,
+            )
+
+        reception.integre_en_stock = True
+        reception.date_integration = timezone.now()
+        reception.integre_par = request.user
+        if lignes_ignorees:
+            note = f"Non intégré en stock (produit non résolu) : {', '.join(lignes_ignorees)}"
+            reception.notes = f"{reception.notes}\n{note}".strip()
+            reception.save(update_fields=['integre_en_stock', 'date_integration', 'integre_par', 'notes'])
+        else:
+            reception.save(update_fields=['integre_en_stock', 'date_integration', 'integre_par'])
+
+    if lignes_ignorees:
+        messages.warning(
+            request,
+            f"Réception {reception.numero} intégrée, mais {len(lignes_ignorees)} ligne(s) ignorée(s) "
+            f"faute de produit identifiable : {', '.join(lignes_ignorees)}. Vérifiez manuellement le stock pour ces articles."
+        )
+    else:
+        messages.success(request, f'Réception {reception.numero} intégrée dans le stock.')
     return redirect('stock_receptions_a_integrer')
 
 
@@ -2093,7 +2550,7 @@ def integrer_reception(request, pk):
 
 from .models import CategorieUniteMesure
 from .forms import UniteMesureForm, CategorieUniteMesureForm
-from services.views import _export_file, _parse_upload, _s, _b
+from services.views import _export_file, _parse_upload, _s, _b, _fk_warning
 
 
 @login_required(login_url='login')
@@ -2122,6 +2579,8 @@ def unites_list(request):
 
 @login_required(login_url='login')
 def unite_create(request):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
     if request.method == 'POST':
         form = UniteMesureForm(request.POST)
         if form.is_valid():
@@ -2141,6 +2600,8 @@ def unite_create(request):
 
 @login_required(login_url='login')
 def unite_edit(request, pk):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
     obj = get_object_or_404(UniteMesure, pk=pk)
     if request.method == 'POST':
         form = UniteMesureForm(request.POST, instance=obj)
@@ -2168,6 +2629,8 @@ def unite_detail(request, pk):
 
 @login_required(login_url='login')
 def unite_delete(request, pk):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
     obj = get_object_or_404(UniteMesure, pk=pk)
     if request.method == 'POST':
         nom = obj.nom
@@ -2179,6 +2642,8 @@ def unite_delete(request, pk):
 @login_required(login_url='login')
 @require_POST
 def unite_bulk_delete(request):
+    if not can_manage_stock(request.user):
+        return JsonResponse({'error': 'Permission refusée.'}, status=403)
     ids = request.POST.getlist('ids[]')
     if ids:
         count, _ = UniteMesure.objects.filter(pk__in=ids).delete()
@@ -2207,6 +2672,8 @@ def categories_unites_list(request):
 
 @login_required(login_url='login')
 def categorie_unite_create(request):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
     if request.method == 'POST':
         form = CategorieUniteMesureForm(request.POST)
         if form.is_valid():
@@ -2232,6 +2699,8 @@ def categorie_unite_detail(request, pk):
 
 @login_required(login_url='login')
 def categorie_unite_edit(request, pk):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
     obj = get_object_or_404(CategorieUniteMesure, pk=pk)
     if request.method == 'POST':
         form = CategorieUniteMesureForm(request.POST, instance=obj)
@@ -2253,6 +2722,8 @@ def categorie_unite_edit(request, pk):
 
 @login_required(login_url='login')
 def categorie_unite_delete(request, pk):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
     obj = get_object_or_404(CategorieUniteMesure, pk=pk)
     if request.method == 'POST':
         nom = obj.nom
@@ -2264,6 +2735,8 @@ def categorie_unite_delete(request, pk):
 @login_required(login_url='login')
 @require_POST
 def categorie_unite_bulk_delete(request):
+    if not can_manage_stock(request.user):
+        return JsonResponse({'error': 'Permission refusée.'}, status=403)
     ids = request.POST.getlist('ids[]')
     if ids:
         count, _ = CategorieUniteMesure.objects.filter(pk__in=ids).delete()
@@ -2306,6 +2779,8 @@ def export_categories_unites(request):
 @login_required(login_url='login')
 @require_POST
 def import_unites(request):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
     upload = request.FILES.get('fichier')
     if not upload:
         messages.error(request, 'Aucun fichier sélectionné.')
@@ -2360,6 +2835,8 @@ def import_unites(request):
 @login_required(login_url='login')
 @require_POST
 def import_categories_unites(request):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
     upload = request.FILES.get('fichier')
     if not upload:
         messages.error(request, 'Aucun fichier sélectionné.')

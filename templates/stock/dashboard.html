@@ -28,6 +28,8 @@
 .alert-pill.rupture  { background:rgba(var(--rose-rgb),.12); color:var(--rose-text); border:1px solid rgba(var(--rose-rgb),.3); }
 .alert-pill.min      { background:rgba(var(--amber-rgb),.12); color:#7a4d00; border:1px solid rgba(var(--amber-rgb),.3); }
 .alert-pill.expir    { background:rgba(200,100,0,.1); color:#7a3800; border:1px solid rgba(200,100,0,.25); }
+html[data-theme="dark"] .alert-pill.min   { color:var(--amber-text); }
+html[data-theme="dark"] .alert-pill.expir { color:var(--amber-text); }
 
 /* KPI band */
 .kpi-band { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:16px; }
@@ -36,6 +38,13 @@
 .kpi-label { font-size:10.5px; color:var(--st-muted); text-transform:uppercase; letter-spacing:.3px; margin-bottom:4px; }
 .kpi-val   { font-size:20px; font-weight:800; line-height:1; }
 html[data-theme="dark"] .badge-cmd-brouillon-dash { background:rgba(255,255,255,.08)!important; color:rgba(255,255,255,.6)!important; border-color:rgba(255,255,255,.15)!important; }
+
+/* Pagination des cartes tableau de bord (5 lignes/page) */
+.dash-pagination {
+  display:flex; align-items:center; justify-content:center; gap:6px;
+  padding:10px 4px; font-size:11.5px; color:var(--st-muted);
+}
+.dash-pagination .o-pag-btn.active { background:var(--st-600); color:#fff; border-color:var(--st-600); }
 </style>{% endblock %}
 
 {% block content %}
@@ -183,7 +192,7 @@ html[data-theme="dark"] .badge-cmd-brouillon-dash { background:rgba(255,255,255,
     {% if produits_alerte %}
     <table class="st-table">
       <thead><tr><th>Produit</th><th>Type</th><th style="text-align:right;">Stock</th><th style="text-align:right;">Seuil</th><th>État</th></tr></thead>
-      <tbody>
+      <tbody id="dash-alerte-tbody">
       {% for p in produits_alerte %}
       <tr>
         <td><a href="{% url 'stock_produit_detail' p.pk %}" style="text-decoration:none;color:var(--st-text);font-weight:600;">{{ p.nom }}</a>
@@ -198,6 +207,7 @@ html[data-theme="dark"] .badge-cmd-brouillon-dash { background:rgba(255,255,255,
       {% endfor %}
       </tbody>
     </table>
+    <div id="dash-alerte-pagination" class="dash-pagination"></div>
     {% else %}
     <div class="st-card-body" style="text-align:center;color:var(--st-muted);font-style:italic;padding:32px;">
       <i class="bi bi-check-circle-fill" style="font-size:24px;color:var(--st-600);display:block;margin-bottom:8px;"></i>
@@ -215,7 +225,7 @@ html[data-theme="dark"] .badge-cmd-brouillon-dash { background:rgba(255,255,255,
     {% if lots_a_surveiller %}
     <table class="st-table">
       <thead><tr><th>Produit</th><th>Lot</th><th>Qté</th><th>Péremption</th></tr></thead>
-      <tbody>
+      <tbody id="dash-lots-tbody">
       {% for lot in lots_a_surveiller %}
       <tr>
         <td style="font-weight:600;">{{ lot.produit.nom|truncatechars:25 }}</td>
@@ -228,6 +238,7 @@ html[data-theme="dark"] .badge-cmd-brouillon-dash { background:rgba(255,255,255,
       {% endfor %}
       </tbody>
     </table>
+    <div id="dash-lots-pagination" class="dash-pagination"></div>
     {% else %}
     <div class="st-card-body" style="text-align:center;color:var(--st-muted);font-style:italic;padding:32px;">Aucun lot à surveiller</div>
     {% endif %}
@@ -242,7 +253,7 @@ html[data-theme="dark"] .badge-cmd-brouillon-dash { background:rgba(255,255,255,
     {% if derniers_mouvements %}
     <table class="st-table">
       <thead><tr><th>Date</th><th>Produit</th><th>Type</th><th style="text-align:right;">Qté</th></tr></thead>
-      <tbody>
+      <tbody id="dash-mouvements-tbody">
       {% for mv in derniers_mouvements %}
       <tr>
         <td style="font-size:11.5px;white-space:nowrap;">{{ mv.date|date:"d/m H:i" }}</td>
@@ -257,6 +268,7 @@ html[data-theme="dark"] .badge-cmd-brouillon-dash { background:rgba(255,255,255,
       {% endfor %}
       </tbody>
     </table>
+    <div id="dash-mouvements-pagination" class="dash-pagination"></div>
     {% else %}
     <div class="st-card-body" style="text-align:center;color:var(--st-muted);font-style:italic;padding:32px;">Aucun mouvement enregistré</div>
     {% endif %}
@@ -271,7 +283,7 @@ html[data-theme="dark"] .badge-cmd-brouillon-dash { background:rgba(255,255,255,
     {% if commandes_recentes %}
     <table class="st-table">
       <thead><tr><th>N°</th><th>Fournisseur</th><th>Date</th><th>Statut</th></tr></thead>
-      <tbody>
+      <tbody id="dash-commandes-tbody">
       {% for cmd in commandes_recentes %}
       <tr>
         <td style="font-family: var(--font-mono);font-size:11.5px;color:var(--st-600);"><a href="{% url 'stock_commande_detail' cmd.pk %}" style="text-decoration:none;">{{ cmd.numero }}</a></td>
@@ -288,6 +300,7 @@ html[data-theme="dark"] .badge-cmd-brouillon-dash { background:rgba(255,255,255,
       {% endfor %}
       </tbody>
     </table>
+    <div id="dash-commandes-pagination" class="dash-pagination"></div>
     {% else %}
     <div class="st-card-body" style="text-align:center;color:var(--st-muted);font-style:italic;padding:32px;">Aucune commande récente</div>
     {% endif %}
@@ -310,7 +323,7 @@ html[data-theme="dark"] .badge-cmd-brouillon-dash { background:rgba(255,255,255,
           <th style="text-align:right;color:#0d7a4c;">Qté à commander</th>
         </tr>
       </thead>
-      <tbody>
+      <tbody id="dash-commander-tbody">
       {% for item in a_commander_dash %}
       <tr>
         <td>
@@ -331,6 +344,7 @@ html[data-theme="dark"] .badge-cmd-brouillon-dash { background:rgba(255,255,255,
       {% endfor %}
       </tbody>
     </table>
+    <div id="dash-commander-pagination" class="dash-pagination"></div>
     {% else %}
     <div class="st-card-body" style="text-align:center;color:#0d7a4c;font-style:italic;padding:32px;">
       <i class="bi bi-check-circle-fill" style="font-size:24px;display:block;margin-bottom:8px;"></i>
@@ -447,5 +461,68 @@ if(topChart.labels.length > 0){
   var el = document.getElementById('chartTop');
   if(el){ el.parentElement.innerHTML += '<div style="text-align:center;padding:20px;color:var(--st-muted);font-style:italic;font-size:13px;">Aucune livraison aux pharmacies ces 30 derniers jours</div>'; el.style.display='none'; }
 }
+</script>
+
+<!-- Pagination des cartes tableaux (hors graphes) — 5 lignes par page,
+     tout reste dans le DOM (les lignes ne sont jamais rechargées depuis
+     le serveur, juste montrées/masquées). -->
+<script>
+(function () {
+  function paginateCard(tbodyId, pagerId, pageSize) {
+    var tbody = document.getElementById(tbodyId);
+    var pager = document.getElementById(pagerId);
+    if (!tbody || !pager) return;
+    var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+    if (!rows.length) return;
+    var currentPage = 1;
+
+    function renderPage(page) {
+      var totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+      page = Math.max(1, Math.min(totalPages, page));
+      currentPage = page;
+      rows.forEach(function (row, idx) {
+        var pageOf = Math.floor(idx / pageSize) + 1;
+        row.style.display = (pageOf === page) ? '' : 'none';
+      });
+      renderPager(totalPages);
+    }
+
+    function renderPager(totalPages) {
+      if (totalPages <= 1) { pager.innerHTML = ''; return; }
+      var html = pagBtn('«', 1, currentPage === 1);
+      html += pagBtn('‹', currentPage - 1, currentPage === 1);
+      for (var p = 1; p <= totalPages; p++) {
+        if (p === currentPage) {
+          html += '<span class="o-pag-btn active">' + p + '</span>';
+        } else if (p > currentPage - 2 && p < currentPage + 2) {
+          html += pagBtn(p, p, false);
+        }
+      }
+      html += pagBtn('›', currentPage + 1, currentPage === totalPages);
+      html += pagBtn('»', totalPages, currentPage === totalPages);
+      html += '<span style="margin-left:8px;">' + rows.length + ' ligne' + (rows.length > 1 ? 's' : '') + '</span>';
+      pager.innerHTML = html;
+    }
+
+    function pagBtn(label, page, disabled) {
+      return '<button type="button" class="o-pag-btn' + (disabled ? ' disabled' : '') +
+             '" data-page="' + page + '">' + label + '</button>';
+    }
+
+    pager.addEventListener('click', function (e) {
+      var btn = e.target.closest('button[data-page]');
+      if (!btn) return;
+      renderPage(parseInt(btn.dataset.page, 10));
+    });
+
+    renderPage(1);
+  }
+
+  paginateCard('dash-mouvements-tbody', 'dash-mouvements-pagination', 5);
+  paginateCard('dash-commandes-tbody', 'dash-commandes-pagination', 5);
+  paginateCard('dash-alerte-tbody', 'dash-alerte-pagination', 5);
+  paginateCard('dash-lots-tbody', 'dash-lots-pagination', 5);
+  paginateCard('dash-commander-tbody', 'dash-commander-pagination', 5);
+})();
 </script>
 {% endblock %}

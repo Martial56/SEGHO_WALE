@@ -68,7 +68,6 @@ html[data-theme="dark"] .modal-box { background: var(--st-surface); }
 </style>{% endblock %}
 
 {% block content %}
-<div class="hist-wrapper"><div class="hist-main">
 <!-- En-tête sticky -->
 <div class="st-page-header">
   <div style="display:flex;align-items:center;gap:14px;">
@@ -137,6 +136,7 @@ html[data-theme="dark"] .modal-box { background: var(--st-surface); }
 </div>
 {% endif %}
 
+<div class="hist-wrapper"><div class="hist-main">
 <!-- Layout : infos + lignes -->
 <div style="display:grid;grid-template-columns:280px 1fr;gap:16px;margin-top:16px;align-items:start;">
 
@@ -421,15 +421,21 @@ function majSelectionCount(){
 
 function supprimerLigne(ligneId, btn){
   if(!confirm('Supprimer cette ligne ?')) return;
+  if(btn) btn.disabled = true;
   fetch('/stock/commandes/{{ commande.pk }}/ligne/'+ligneId+'/supprimer/', {
     method:'POST', headers:{'X-CSRFToken':CSRF}
   })
   .then(function(r){ return r.json(); })
   .then(function(data){
+    if(data.error){ alert(data.error); if(btn) btn.disabled = false; return; }
     var tr = document.getElementById('ligne-'+ligneId);
     if(tr) tr.remove();
     document.getElementById('total-commande').textContent = data.total.toLocaleString('fr-FR')+' F';
     if(data.nb_lignes===0){ document.getElementById('lignes-table').style.display='none'; document.getElementById('empty-state').style.display=''; }
+  })
+  .catch(function(){
+    alert('Erreur réseau — la ligne n\'a pas été supprimée. Réessayez.');
+    if(btn) btn.disabled = false;
   });
 }
 

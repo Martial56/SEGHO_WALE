@@ -450,6 +450,7 @@ def _csv_dl(filename, headers, rows):
 
 
 def _xlsx_dl(filename, headers, rows):
+    from core.utils import _csv_safe_cell
     wb = Workbook()
     ws = wb.active
     ws.title = filename[:31]
@@ -460,7 +461,7 @@ def _xlsx_dl(filename, headers, rows):
         cell.fill, cell.font = fill, fnt
         cell.alignment = Alignment(horizontal='center')
     for row in rows:
-        ws.append(['' if v is None else str(v) for v in row])
+        ws.append([_csv_safe_cell('' if v is None else str(v)) for v in row])
     for col in ws.columns:
         w = max((len(str(c.value or '')) for c in col), default=0)
         ws.column_dimensions[col[0].column_letter].width = min(w + 4, 55)
