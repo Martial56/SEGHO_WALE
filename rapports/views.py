@@ -14,6 +14,7 @@ from .export import csv_response, xlsx_response
 from .maternite import calculer_rapport_maternite
 from .soins import calculer_rapport_soins
 from .gynecologie import calculer_rapport_gynecologie
+from .med_generale import calculer_rapport_med_generale
 from .models import HistoriqueRapport
 from .registry import REPORT_CATALOGUE, REPORTS_BY_SLUG
 
@@ -196,6 +197,23 @@ def rapports_gynecologie(request):
 
     rapport = calculer_rapport_gynecologie(annee, mois)
     return render(request, 'rapports/rapport_gynecologie.html', rapport)
+
+
+@login_required(login_url='login')
+def rapports_med_generale(request):
+    today = datetime.now().date()
+    try:
+        annee = int(request.GET.get('annee', today.year))
+    except ValueError:
+        annee = today.year
+    try:
+        mois = int(request.GET.get('mois', today.month))
+    except ValueError:
+        mois = today.month
+    mois = min(max(mois, 1), 12)
+
+    rapport = calculer_rapport_med_generale(annee, mois)
+    return render(request, 'rapports/rapport_med_generale.html', rapport)
 
 
 @login_required(login_url='login')

@@ -25,7 +25,7 @@ body {
 
 /* ── Badge portrait ── */
 .badge {
-  width: 86mm; height: 120mm;
+  width: 84mm; height: 120mm;
   background: #fff;
   border-radius: 5mm;
   display: flex;
@@ -47,7 +47,7 @@ body {
   filter: brightness(0) invert(1);
 }
 .badge-side-text {
-  font-size: 13px; font-weight: 800; color: #fff;
+  font-size: 18px; font-weight: 800; color: #fff;
   text-transform: uppercase; letter-spacing: 1.5px;
   writing-mode: vertical-rl; text-orientation: mixed;
   transform: rotate(180deg);
@@ -61,6 +61,20 @@ body {
 .badge-main {
   flex: 1; display: flex; flex-direction: column;
   padding: 8mm 4mm 4mm 3mm;
+  position: relative;
+  z-index: 0;
+}
+.badge-main::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url('{% static "img/logo.png" %}');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 180mm;
+  opacity: 0.07;
+  z-index: -1;
+  pointer-events: none;
 }
 
 /* Photo */
@@ -75,8 +89,8 @@ body {
 .badge-photo .initials { font-size: 30px; font-weight: 800; color: var(--rh-700); }
 
 /* Nom */
-.badge-nom   { font-size: 16px; font-weight: 800; color: #111; line-height: 1.2; text-align: center; }
-.badge-prenom{ font-size: 12px; color: #555; font-weight: 500; text-align: center; margin-top: 1mm; }
+.badge-nom   { font-size: 18px; font-weight: 800; color: #111; line-height: 1.2; text-align: center; }
+.badge-prenom{ font-size: 13px; color: #555; font-weight: 500; text-align: center; margin-top: 1mm; }
 
 /* Séparateur */
 .badge-sep { width: 14mm; height: 0.7mm; background: var(--rh-700); margin: 2.5mm auto; }
@@ -190,40 +204,12 @@ body {
           </div>
         </div>
         {% endif %}
-        {% if employe.grade %}
+        {% if employe.adresse %}
         <div class="badge-info-row">
-          <span class="badge-info-icon"><i class="bi bi-award-fill"></i></span>
+          <span class="badge-info-icon"><i class="bi bi-geo-alt-fill"></i></span>
           <div>
-            <div class="badge-info-sub">Grade</div>
-            <div class="badge-info-text">{{ employe.grade.nom }}</div>
-          </div>
-        </div>
-        {% endif %}
-
-        {% if employe.telephone %}
-        <div class="badge-info-row">
-          <span class="badge-info-icon"><i class="bi bi-telephone-fill"></i></span>
-          <div>
-            <div class="badge-info-sub">Téléphone</div>
-            <div class="badge-info-text">{{ employe.telephone }}</div>
-          </div>
-        </div>
-        {% endif %}
-        {% if employe.email %}
-        <div class="badge-info-row">
-          <span class="badge-info-icon"><i class="bi bi-envelope-fill"></i></span>
-          <div>
-            <div class="badge-info-sub">Email</div>
-            <div class="badge-info-text">{{ employe.email }}</div>
-          </div>
-        </div>
-        {% endif %}
-        {% if employe.biometric_id %}
-        <div class="badge-info-row">
-          <span class="badge-info-icon"><i class="bi bi-fingerprint"></i></span>
-          <div>
-            <div class="badge-info-sub">Biométrie</div>
-            <div class="badge-info-text" style="color:var(--rh-700);">✓ Enregistrée</div>
+            <div class="badge-info-sub">Adresse</div>
+            <div class="badge-info-text">{{ employe.adresse }}</div>
           </div>
         </div>
         {% endif %}
@@ -234,9 +220,6 @@ body {
         <div class="badge-mat-block">
           <div class="badge-mat-lbl">Matricule</div>
           <div class="badge-mat-val">{{ employe.matricule }}</div>
-          {% if employe.biometric_id %}
-          <div style="font-size:5.5px;color:var(--rh-700);margin-top:1mm;font-weight:700;">✓ Biométrie enregistrée</div>
-          {% endif %}
         </div>
         <img src="data:image/png;base64,{{ qr_b64 }}" alt="QR" class="badge-qr-mini">
       </div>

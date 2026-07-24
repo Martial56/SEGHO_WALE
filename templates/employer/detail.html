@@ -275,7 +275,6 @@ html[data-theme="dark"] .biometric-ok { color:var(--rh-300); }
 {% endblock %}
 
 {% block content %}
-<div class="hist-wrapper"><div class="hist-main">
 <a class="o-back-btn" href="javascript:history.back()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 5l-7 7 7 7"/></svg> Retour</a>
 
 <!-- Page header -->
@@ -303,12 +302,12 @@ html[data-theme="dark"] .biometric-ok { color:var(--rh-300); }
         <i class="bi bi-heart-pulse-fill"></i> Médecin
       </span>
       {% else %}
-      <a href="{% url 'rh_vers_medecin' employe.pk %}"
+      <button type="button"
          class="btn-rh-outline"
          title="Identifier cet employé comme médecin"
-         onclick="return confirm('Créer une fiche médecin pour {{ employe.nom_complet }} ?')">
+         onclick="document.getElementById('modal-identifier-medecin').style.display='flex'">
         <i class="bi bi-heart-pulse"></i> Identifier médecin
-      </a>
+      </button>
       {% endif %}
     {% endif %}
     <a href="{% url 'rh_fiche_pdf' employe.pk %}" class="btn-rh-outline" title="Imprimer la fiche">
@@ -376,6 +375,37 @@ html[data-theme="dark"] .biometric-ok { color:var(--rh-300); }
 </div>
 {% endif %}
 
+<!-- Modal identifier médecin -->
+{% if can_manage and not employe.fiche_medecin %}
+<div id="modal-identifier-medecin" style="
+  display:none; position:fixed; inset:0; z-index:2000;
+  background:rgba(0,0,0,0.45); align-items:center; justify-content:center;
+" onclick="if(event.target===this)this.style.display='none'">
+  <div style="
+    background:var(--rh-surface); border-radius:14px; padding:28px 32px; width:100%; max-width:420px;
+    box-shadow:0 16px 48px rgba(0,0,0,0.35);
+  ">
+    <div style="font-size:16px; font-weight:800; color:var(--rh-text); margin-bottom:6px;">
+      <i class="bi bi-heart-pulse" style="color:var(--rh-600);"></i> Identifier comme médecin
+    </div>
+    <div style="font-size:13px; color:var(--rh-muted); margin-bottom:20px;">
+      Créer une fiche médecin pour <strong>{{ employe.nom_complet }}</strong> ?
+    </div>
+    <form method="post" action="{% url 'rh_vers_medecin' employe.pk %}">
+      {% csrf_token %}
+      <div style="display:flex; gap:10px; justify-content:flex-end;">
+        <button type="button" onclick="document.getElementById('modal-identifier-medecin').style.display='none'"
+                class="btn-rh-outline" style="padding:8px 18px;">Non</button>
+        <button type="submit" class="btn-rh">
+          <i class="bi bi-check-lg"></i> Oui
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<div class="hist-wrapper"><div class="hist-main">
 <!-- Layout -->
 <div class="rh-detail-layout">
 
