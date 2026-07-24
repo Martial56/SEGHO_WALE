@@ -1,0 +1,208 @@
+{% extends 'planning/base.html' %}
+{% load i18n %}
+
+{% block extra_planning_css %}
+.pl-subheader {
+  position: sticky; top: 0; z-index: 180;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 10px 0 0;
+}
+.pl-subheader-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 32px 10px;
+}
+.pl-subheader h1 { font-size: 18px; font-weight: 700; color: var(--text); margin: 0; }
+
+.cfg-section {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 20px 22px; margin-bottom: 18px;
+}
+.cfg-section h3 {
+  font-size: 14px; font-weight: 700; color: var(--text);
+  margin: 0 0 4px; display: flex; align-items: center; gap: 7px;
+}
+.cfg-section .cfg-hint { font-size: 12.5px; color: var(--text-muted); margin: 0 0 16px; }
+
+.form-row { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; }
+.form-field { display: flex; flex-direction: column; gap: 4px; }
+.form-field label { font-size: 12px; font-weight: 600; color: var(--text); }
+.form-field select, .form-field input[type="text"] {
+  padding: 7px 8px; font-size: 13px; min-width: 260px;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: var(--surface); color: var(--text); outline: none;
+}
+.form-field select:focus, .form-field input[type="text"]:focus { border-color: var(--pl-500); }
+.form-field-check { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
+.form-field-check label { font-size: 13px; font-weight: 500; color: var(--text); }
+
+.medecin-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.medecin-table thead th {
+  background: var(--pl-700); color: #fff; padding: 8px 12px;
+  font-weight: 600; font-size: 11.5px; text-align: left;
+}
+.medecin-table tbody tr { border-bottom: 1px solid var(--border); }
+.medecin-table tbody td { padding: 8px 12px; vertical-align: middle; color: var(--text); }
+.badge-actif {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: var(--pl-100); color: var(--pl-800); border-radius: 20px;
+  padding: 2px 9px; font-size: 11px; font-weight: 600;
+}
+.badge-inactif {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: #fff3cd; color: #856404; border-radius: 20px;
+  padding: 2px 9px; font-size: 11px; font-weight: 600;
+}
+html[data-theme="dark"] .badge-inactif { background: #3d2e00; color: #ffd666; }
+.medecin-edit-row td { background: var(--pl-50); padding: 14px 12px; }
+{% endblock %}
+
+{% block content %}
+
+<div class="pl-subheader">
+  <div class="pl-subheader-row">
+    <h1><i class="bi bi-gear" style="color:var(--pl-600);margin-right:8px;"></i>Configuration du planning</h1>
+  </div>
+</div>
+
+<div style="padding: 20px 32px 32px;">
+
+  <!-- ══ FONCTION DU SIGNATAIRE ══ -->
+  <div class="cfg-section">
+    <h3><i class="bi bi-patch-check" style="color:var(--pl-600);"></i> Signataire</h3>
+    <p class="cfg-hint">Fonction affichée au-dessus du nom sur les plannings imprimés/publiés, et médecin proposé par défaut à la création d'un nouveau planning.</p>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="form" value="signataire">
+      <div class="form-row">
+        <div class="form-field">
+          <label for="fonction_signataire">Fonction</label>
+          <select id="fonction_signataire" name="fonction_signataire">
+            {% for value, label in fonction_choices %}
+            <option value="{{ value }}" {% if value == config.fonction_signataire %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-field">
+          <label for="medecin_defaut">Médecin par défaut</label>
+          <select id="medecin_defaut" name="medecin_defaut">
+            <option value="">— Aucun —</option>
+            {% for m in medecins %}
+            <option value="{{ m.pk }}" {% if config.medecin_defaut_id == m.pk %}selected{% endif %}>{{ m.nom }}{% if not m.actif %} (inactif){% endif %}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <button type="submit" class="btn-primary" style="align-self:flex-end;">
+          <i class="bi bi-check-lg"></i> Enregistrer
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ══ MÉDECINS SIGNATAIRES ══ -->
+  <div class="cfg-section">
+    <h3><i class="bi bi-people" style="color:var(--pl-600);"></i> Médecins signataires
+      <span style="font-size:12px;color:var(--text-muted);font-weight:400;">({{ medecins|length }})</span>
+    </h3>
+    <p class="cfg-hint">Noms proposés au moment de créer ou modifier un planning.</p>
+
+    {% if medecins %}
+    <div class="pl-table-wrap" style="overflow-x:auto;">
+      <table class="medecin-table">
+        <thead>
+          <tr>
+            <th>Nom</th>
+            <th>État</th>
+            <th>Plannings liés</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in medecins %}
+          <tr>
+            <td>{{ m.nom }}</td>
+            <td>
+              {% if m.actif %}
+                <span class="badge-actif"><i class="bi bi-check-circle-fill"></i> Actif</span>
+              {% else %}
+                <span class="badge-inactif"><i class="bi bi-pause-circle"></i> Inactif</span>
+              {% endif %}
+            </td>
+            <td>{{ m.plannings.count }}</td>
+            <td>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+                <button type="button" class="btn-outline-sm"
+                        onclick="toggleEdit('medecin-edit-{{ m.pk }}')">
+                  <i class="bi bi-pencil"></i> Modifier
+                </button>
+                <form method="post" action="{% url 'planning_medecin_delete' m.pk %}"
+                      style="display:inline"
+                      onsubmit="return confirm('Supprimer « {{ m.nom }} » ?')">
+                  {% csrf_token %}
+                  <button type="submit" class="btn-danger-sm"><i class="bi bi-trash"></i></button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          <tr id="medecin-edit-{{ m.pk }}" class="medecin-edit-row" style="display:none;">
+            <td colspan="4">
+              <form method="post" action="{% url 'planning_medecin_save' %}">
+                {% csrf_token %}
+                <input type="hidden" name="pk" value="{{ m.pk }}">
+                <div class="form-row">
+                  <div class="form-field">
+                    <label for="nom-{{ m.pk }}">Nom</label>
+                    <input type="text" id="nom-{{ m.pk }}" name="nom" value="{{ m.nom }}" required>
+                  </div>
+                  <div class="form-field" style="justify-content:flex-end;">
+                    <div class="form-field-check">
+                      <input type="checkbox" id="actif-{{ m.pk }}" name="actif" value="1" {% if m.actif %}checked{% endif %}>
+                      <label for="actif-{{ m.pk }}">Actif</label>
+                    </div>
+                  </div>
+                  <button type="submit" class="btn-primary" style="align-self:flex-end;">
+                    <i class="bi bi-check-lg"></i> Enregistrer
+                  </button>
+                  <button type="button" class="btn-secondary" style="align-self:flex-end;"
+                          onclick="toggleEdit('medecin-edit-{{ m.pk }}')">
+                    Annuler
+                  </button>
+                </div>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p style="font-size:13px;color:var(--text-muted);font-style:italic;">Aucun médecin signataire enregistré.</p>
+    {% endif %}
+
+    <form method="post" action="{% url 'planning_medecin_save' %}" class="form-row" style="margin-top:18px;padding-top:16px;border-top:1px dashed var(--border);">
+      {% csrf_token %}
+      <div class="form-field">
+        <label for="new-medecin-nom">Nom du médecin</label>
+        <input type="text" id="new-medecin-nom" name="nom" placeholder="ex: Dr KOUAME Jean" required>
+      </div>
+      <div class="form-field" style="justify-content:flex-end;">
+        <div class="form-field-check">
+          <input type="checkbox" id="new-medecin-actif" name="actif" value="1" checked>
+          <label for="new-medecin-actif">Actif</label>
+        </div>
+      </div>
+      <button type="submit" class="btn-primary" style="align-self:flex-end;">
+        <i class="bi bi-plus-lg"></i> Ajouter
+      </button>
+    </form>
+  </div>
+
+</div>
+
+<script>
+function toggleEdit(id) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = (el.style.display === 'none' || el.style.display === '') ? 'table-row' : 'none';
+}
+</script>
+{% endblock %}

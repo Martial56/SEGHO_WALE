@@ -16,7 +16,8 @@ logger = logging.getLogger(__name__)
 
 from .models import (Bureau, PlageHoraire, PlanningHebdomadaire,
                      Affectation, PlanningVu, PlanningModification, PlanningConfig,
-                     PlanningGabarit, GabaritAffectation, LignePermanence)
+                     PlanningGabarit, GabaritAffectation, LignePermanence,
+                     MedecinSignataire, FONCTION_SIGNATAIRE_CHOICES)
 from medecins.models import Medecin
 
 JOURS_LABELS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi']
@@ -117,6 +118,35 @@ def _conges_semaine(semaine_debut, semaine_fin):
         return []
 
 
+def _conges_conflicts(planning, absents):
+    """Affectations dont le personnel correspond à un employé en congé cette semaine —
+    même heuristique de correspondance que le surlignage JS de modifier.html
+    (nom du congé inclus dans le libellé de l'affectation, insensible à la casse).
+    Contrairement à `absents`, qui n'est utilisé que côté client sur la page d'édition,
+    ce signal doit aussi être visible sur un planning déjà publié (`planning_detail`),
+    où aucune alerte n'existait auparavant."""
+    if not absents:
+        return []
+    conflicts = []
+    affectations = (
+        planning.affectations.exclude(personnel='')
+        .select_related('plage__bureau')
+    )
+    for aff in affectations:
+        for name in split_names(aff.personnel):
+            name_low = name.lower()
+            match = next((a for a in absents if a['key'] in name_low), None)
+            if match:
+                conflicts.append({
+                    'jour':      JOURS_LABELS[aff.jour],
+                    'bureau':    aff.plage.bureau.nom,
+                    'plage':     aff.plage.code,
+                    'personnel': name,
+                    'type':      match['type'],
+                })
+    return conflicts
+
+
 def build_grid_rows(bureaux, aff_map):
     rows = []
     for bureau in bureaux:
@@ -183,6 +213,14 @@ def validate_planning(posted, bureaux):
     return errors
 
 
+def _posted_from_affectations(affectations):
+    """Reconstruit un dict façon POST ({cell_<plage>_<jour>: personnel}) à partir
+    d'un queryset/liste d'Affectation ou GabaritAffectation — pour pouvoir repasser
+    par validate_planning() lors d'une application de gabarit ou d'une duplication,
+    qui sinon contournaient entièrement la détection de conflits."""
+    return {f'cell_{a.plage_id}_{a.jour}': a.personnel for a in affectations}
+
+
 def build_grid_rows_from_posted(bureaux, posted):
     """Reconstruit les lignes du tableau à partir des valeurs POST."""
     rows = []
@@ -211,6 +249,11 @@ def build_grid_rows_from_posted(bureaux, posted):
 @login_required(login_url='login')
 def planning_list(request):
     plannings = PlanningHebdomadaire.objects.select_related('cree_par').all()
+    if not can_manage_planning(request.user):
+        # Les brouillons (non publiés) restent internes à la hiérarchie tant
+        # qu'ils ne sont pas publiés — un utilisateur sans droit de gestion ne
+        # doit voir que les plannings déjà publiés.
+        plannings = plannings.filter(publie=True)
 
     annee   = request.GET.get('annee',   '').strip()
     mois    = request.GET.get('mois',    '').strip()
@@ -254,8 +297,9 @@ def planning_nouveau(request):
     if not can_manage_planning(request.user):
         raise PermissionDenied
     if request.method == 'POST':
-        date_str   = request.POST.get('semaine_debut', '').strip()
-        signataire = request.POST.get('signataire', '').strip()
+        date_str      = request.POST.get('semaine_debut', '').strip()
+        signataire_pk = request.POST.get('signataire', '').strip()
+        signataire    = get_object_or_404(MedecinSignataire, pk=signataire_pk) if signataire_pk else None
         try:
             d = date.fromisoformat(date_str)
         except (ValueError, TypeError):
@@ -265,15 +309,32 @@ def planning_nouveau(request):
             semaine_debut=monday,
             defaults={'cree_par': request.user, 'signataire': signataire}
         )
-        if not created and signataire:
-            planning.signataire = signataire
-            planning.save()
+        if not created and signataire and signataire.pk != planning.signataire_id:
+            if planning.publie:
+                # Un planning publié ne doit être modifiable (y compris son signataire)
+                # que via planning_modifier, qui refuse justement les plannings publiés —
+                # laisser passer ici contournait silencieusement cette règle, sans trace d'audit.
+                messages.warning(
+                    request,
+                    f"Un planning existe déjà pour cette semaine et est publié — "
+                    f"son signataire n'a pas été modifié."
+                )
+            else:
+                ancien = planning.signataire
+                planning.signataire = signataire
+                planning.save(update_fields=['signataire'])
+                PlanningModification.objects.create(
+                    planning=planning,
+                    modifie_par=request.user,
+                    resume=f"Signataire: «{ancien.nom if ancien else '—'}»→«{signataire.nom}» (via création).",
+                )
         return redirect('planning_modifier', pk=planning.pk)
     today  = date.today()
     monday = today - timedelta(days=today.weekday())
     return render(request, 'planning/nouveau.html', {
         'default_date': monday.isoformat(),
-        'default_signataire': PlanningConfig.get().signataire_defaut,
+        'medecins_signataires': MedecinSignataire.objects.filter(actif=True),
+        'default_signataire_id': PlanningConfig.get().medecin_defaut_id,
         **_base_ctx(request),
     })
 
@@ -283,6 +344,8 @@ def planning_nouveau(request):
 @login_required(login_url='login')
 def planning_detail(request, pk):
     planning = get_object_or_404(PlanningHebdomadaire, pk=pk)
+    if not planning.publie and not can_manage_planning(request.user):
+        raise PermissionDenied
     bureaux  = get_bureaux()
     aff_map  = {(a.plage_id, a.jour): a for a in planning.affectations.all()}
     rows     = build_grid_rows(bureaux, aff_map)
@@ -304,6 +367,9 @@ def planning_detail(request, pk):
     perm_map  = {p.jour: p.personnel for p in planning.permanences.all()}
     perm_list = [perm_map.get(j, '') for j in range(6)]
 
+    absents          = _conges_semaine(planning.semaine_debut, planning.semaine_fin)
+    conflits_conges  = _conges_conflicts(planning, absents)
+
     return render(request, 'planning/hebdomadaire.html', {
         'planning':        planning,
         'rows':            rows,
@@ -316,6 +382,10 @@ def planning_detail(request, pk):
         'modifications':   planning.modifications.select_related('modifie_par')[:10],
         'confirm_publish': confirm_publish,
         'pub_empty_days':  pub_empty_days,
+        'conflits_conges': conflits_conges,
+        'fonction_signataire': dict(FONCTION_SIGNATAIRE_CHOICES).get(
+            PlanningConfig.get().fonction_signataire, ''
+        ),
         **_base_ctx(request),
     })
 
@@ -353,46 +423,62 @@ def planning_modifier(request, pk):
                 **_base_ctx(request),
             })
 
+        # Un seul aller-retour DB pour charger l'existant, puis diff en mémoire —
+        # remplace ~200-300 requêtes (1 SELECT + 1-2 write par cellule) par
+        # quelques requêtes en tout (1 SELECT, 1 bulk_update, 1 bulk_create, 1 delete).
+        old_aff_map = {(a.plage_id, a.jour): a for a in planning.affectations.all()}
+
         changes = []
+        to_create = []
+        to_update = []
+        to_delete_ids = []
         for bureau in bureaux:
             for plage in bureau.plages.all():
                 for j in range(6):
                     val      = posted[f'cell_{plage.pk}_{j}']
                     note_val = request.POST.get(f'note_{plage.pk}_{j}', '').strip()
-                    old_aff  = Affectation.objects.filter(
-                        planning=planning, plage=plage, jour=j
-                    ).first()
-                    old_val = old_aff.personnel if old_aff else ''
+                    old_aff  = old_aff_map.get((plage.pk, j))
+                    old_val  = old_aff.personnel if old_aff else ''
                     if val != old_val:
                         changes.append(
                             f"{bureau.nom}/{plage.code}/{JOURS_LABELS[j]}: «{old_val}»→«{val}»"
                         )
                     if val or note_val:
-                        Affectation.objects.update_or_create(
-                            planning=planning, plage=plage, jour=j,
-                            defaults={'personnel': val, 'note': note_val}
-                        )
-                    else:
-                        Affectation.objects.filter(
-                            planning=planning, plage=plage, jour=j
-                        ).delete()
+                        if old_aff:
+                            old_aff.personnel = val
+                            old_aff.note = note_val
+                            to_update.append(old_aff)
+                        else:
+                            to_create.append(Affectation(
+                                planning=planning, plage=plage, jour=j,
+                                personnel=val, note=note_val,
+                            ))
+                    elif old_aff:
+                        to_delete_ids.append(old_aff.pk)
 
-        signataire = request.POST.get('signataire', '').strip()
-        if signataire != planning.signataire:
-            changes.append(f"Signataire: «{planning.signataire}»→«{signataire}»")
+        signataire_pk = request.POST.get('signataire', '').strip()
+        signataire    = get_object_or_404(MedecinSignataire, pk=signataire_pk) if signataire_pk else None
+        if signataire_pk != str(planning.signataire_id or ''):
+            ancien_nom = planning.signataire.nom if planning.signataire else '—'
+            nouveau_nom = signataire.nom if signataire else '—'
+            changes.append(f"Signataire: «{ancien_nom}»→«{nouveau_nom}»")
         planning.signataire = signataire
-        planning.save()
-        if signataire:
-            cfg = PlanningConfig.get()
-            cfg.signataire_defaut = signataire
-            cfg.save()
 
-        if changes:
-            PlanningModification.objects.create(
-                planning=planning,
-                modifie_par=request.user,
-                resume='; '.join(changes[:30]),
-            )
+        with transaction.atomic():
+            planning.save()
+            if to_create:
+                Affectation.objects.bulk_create(to_create)
+            if to_update:
+                Affectation.objects.bulk_update(to_update, ['personnel', 'note'])
+            if to_delete_ids:
+                Affectation.objects.filter(pk__in=to_delete_ids).delete()
+
+            if changes:
+                PlanningModification.objects.create(
+                    planning=planning,
+                    modifie_par=request.user,
+                    resume='; '.join(changes[:30]),
+                )
 
         # Permanence
         for j in range(6):
@@ -420,6 +506,7 @@ def planning_modifier(request, pk):
         'perm_list':      perm_list,
         'medecins':       medecins,
         'medecins_json':  _medecins_json(medecins),
+        'medecins_signataires': MedecinSignataire.objects.filter(actif=True),
         'absents_json':   absents,
         'gabarits':       gabarits,
         **_base_ctx(request),
@@ -444,21 +531,42 @@ def planning_dupliquer(request, pk):
         if monday == source.semaine_debut:
             messages.error(request, 'Choisissez une semaine différente de la source.')
             return redirect('planning_detail', pk=pk)
+
+        bureaux = get_bureaux()
+        posted  = _posted_from_affectations(source.affectations.all())
+        errors  = validate_planning(posted, bureaux)
+        if errors:
+            for err in errors:
+                messages.error(request, err)
+            messages.error(
+                request,
+                'Le planning source contient des conflits (ci-dessus) — duplication annulée. '
+                'Corrigez le planning source avant de réessayer.'
+            )
+            return redirect('planning_detail', pk=pk)
+
         new_pl, created = PlanningHebdomadaire.objects.get_or_create(
             semaine_debut=monday,
             defaults={'cree_par': request.user, 'signataire': source.signataire}
         )
         if created:
-            for aff in source.affectations.all():
-                Affectation.objects.create(
-                    planning=new_pl, plage=aff.plage,
-                    jour=aff.jour, personnel=aff.personnel,
+            with transaction.atomic():
+                Affectation.objects.bulk_create([
+                    Affectation(
+                        planning=new_pl, plage=aff.plage,
+                        jour=aff.jour, personnel=aff.personnel, note=aff.note,
+                    )
+                    for aff in source.affectations.all()
+                ])
+                LignePermanence.objects.bulk_create([
+                    LignePermanence(planning=new_pl, jour=perm.jour, personnel=perm.personnel)
+                    for perm in source.permanences.all()
+                ])
+                PlanningModification.objects.create(
+                    planning=new_pl,
+                    modifie_par=request.user,
+                    resume=f'Dupliqué depuis la semaine du {source.semaine_debut.strftime("%d/%m/%Y")}.',
                 )
-            PlanningModification.objects.create(
-                planning=new_pl,
-                modifie_par=request.user,
-                resume=f'Dupliqué depuis la semaine du {source.semaine_debut.strftime("%d/%m/%Y")}.',
-            )
             messages.success(request, f'Planning dupliqué pour la semaine du {monday.strftime("%d/%m/%Y")}.')
             return redirect('planning_modifier', pk=new_pl.pk)
         else:
@@ -482,6 +590,10 @@ def planning_publier(request, pk):
     if planning.publie:
         planning.publie = False
         planning.save()
+        # Efface les "vus" existants : si le contenu change avant republication,
+        # les utilisateurs doivent être re-notifiés au lieu que le planning reste
+        # marqué comme déjà consulté indéfiniment.
+        planning.vus_par.all().delete()
         PlanningModification.objects.create(
             planning=planning, modifie_par=request.user, resume='Planning dépublié.',
         )
@@ -729,8 +841,8 @@ def planning_courant(request):
     )
 
     # Stats rapides
-    active_bureaux = Bureau.objects.filter(actif=True).prefetch_related('plages')
-    total_cells_week = sum(b.plages.count() * 6 for b in active_bureaux)
+    active_bureaux = list(Bureau.objects.filter(actif=True).prefetch_related('plages'))
+    total_cells_week = sum(len(b.plages.all()) * 6 for b in active_bureaux)
     filled_courant = 0
     if planning_courant_:
         filled_courant = planning_courant_.affectations.exclude(personnel='').count()
@@ -879,6 +991,78 @@ def planning_plage_delete(request, pk):
     return redirect('planning_bureaux')
 
 
+# ── Configuration (signataire) ────────────────────────────────────────────────
+
+@login_required(login_url='login')
+def planning_configuration(request):
+    if not can_manage_planning(request.user):
+        raise PermissionDenied
+    config = PlanningConfig.get()
+    if request.method == 'POST' and request.POST.get('form') == 'signataire':
+        fonction = request.POST.get('fonction_signataire', '').strip()
+        medecin_pk = request.POST.get('medecin_defaut', '').strip()
+        if fonction not in dict(FONCTION_SIGNATAIRE_CHOICES):
+            messages.error(request, 'Fonction de signataire invalide.')
+        else:
+            config.fonction_signataire = fonction
+            config.medecin_defaut = (
+                get_object_or_404(MedecinSignataire, pk=medecin_pk) if medecin_pk else None
+            )
+            config.save(update_fields=['fonction_signataire', 'medecin_defaut'])
+            messages.success(request, 'Configuration du signataire enregistrée.')
+        return redirect('planning_configuration')
+    return render(request, 'planning/configuration.html', {
+        'config': config,
+        'fonction_choices': FONCTION_SIGNATAIRE_CHOICES,
+        'medecins': MedecinSignataire.objects.all(),
+        'can_manage': True,
+        **_base_ctx(request),
+    })
+
+
+@login_required(login_url='login')
+def planning_medecin_save(request):
+    if not can_manage_planning(request.user):
+        raise PermissionDenied
+    if request.method == 'POST':
+        pk    = request.POST.get('pk', '').strip()
+        nom   = request.POST.get('nom', '').strip()
+        actif = request.POST.get('actif') == '1'
+        if not nom:
+            messages.error(request, 'Le nom du médecin signataire est obligatoire.')
+            return redirect('planning_configuration')
+        if pk:
+            medecin = get_object_or_404(MedecinSignataire, pk=pk)
+            medecin.nom   = nom
+            medecin.actif = actif
+            medecin.save()
+            messages.success(request, f'Médecin signataire « {nom} » mis à jour.')
+        else:
+            max_ordre = MedecinSignataire.objects.aggregate(m=models.Max('ordre'))['m'] or 0
+            MedecinSignataire.objects.create(nom=nom, actif=actif, ordre=max_ordre + 1)
+            messages.success(request, f'Médecin signataire « {nom} » ajouté.')
+    return redirect('planning_configuration')
+
+
+@login_required(login_url='login')
+def planning_medecin_delete(request, pk):
+    if not can_manage_planning(request.user):
+        raise PermissionDenied
+    if request.method == 'POST':
+        medecin = get_object_or_404(MedecinSignataire, pk=pk)
+        if medecin.plannings.exists():
+            messages.error(
+                request,
+                f'Impossible de supprimer « {medecin.nom} » : il est lié à au moins un planning. '
+                f'Vous pouvez le désactiver à la place.'
+            )
+        else:
+            nom = medecin.nom
+            medecin.delete()
+            messages.success(request, f'Médecin signataire « {nom} » supprimé.')
+    return redirect('planning_configuration')
+
+
 # ── Statistiques de couverture ─────────────────────────────────────────────────
 
 @login_required(login_url='login')
@@ -892,13 +1076,15 @@ def planning_stats(request):
     )
     plannings_list = list(plannings_qs)
 
-    active_bureaux = Bureau.objects.filter(actif=True).prefetch_related('plages')
+    active_bureaux = list(Bureau.objects.filter(actif=True).prefetch_related('plages'))
+    # Indépendant de `pl` — calculé une seule fois au lieu de 12 fois (et len() sur
+    # une liste déjà préchargée plutôt que .count(), qui ignore toujours le cache prefetch).
+    total_cells = sum(len(bureau.plages.all()) * 6 for bureau in active_bureaux)
 
     stats = []
     for pl in plannings_list:
-        total_cells = sum(bureau.plages.count() * 6 for bureau in active_bureaux)
-        filled      = pl.affectations.exclude(personnel='').count()
-        pct         = round(filled * 100 / total_cells) if total_cells else 0
+        filled = sum(1 for a in pl.affectations.all() if a.personnel)
+        pct    = round(filled * 100 / total_cells) if total_cells else 0
         stats.append({
             'planning':    pl,
             'total_cells': total_cells,
@@ -942,7 +1128,7 @@ def planning_stats(request):
 
     bureau_stats = []
     for bureau in active_bureaux:
-        total = bureau.plages.count() * 6 * len(plannings_list)
+        total = len(bureau.plages.all()) * 6 * len(plannings_list)
         filled_count = bureau_filled[bureau.pk]
         pct = round(filled_count * 100 / total) if total else 0
         bureau_stats.append({
@@ -989,10 +1175,13 @@ def planning_gabarit_sauvegarder(request, pk):
             messages.error(request, 'Le nom du gabarit est obligatoire.')
             return redirect('planning_detail', pk=pk)
         gabarit = PlanningGabarit.objects.create(nom=nom, cree_par=request.user)
-        for aff in planning.affectations.exclude(personnel=''):
-            GabaritAffectation.objects.create(
-                gabarit=gabarit, plage=aff.plage, jour=aff.jour, personnel=aff.personnel
+        GabaritAffectation.objects.bulk_create([
+            GabaritAffectation(
+                gabarit=gabarit, plage=aff.plage, jour=aff.jour,
+                personnel=aff.personnel, note=aff.note,
             )
+            for aff in planning.affectations.exclude(personnel='')
+        ])
         messages.success(request, f'Gabarit « {nom} » enregistré.')
     return redirect('planning_detail', pk=pk)
 
@@ -1008,12 +1197,27 @@ def planning_gabarit_appliquer(request, pk):
     if request.method == 'POST':
         gabarit_pk = request.POST.get('gabarit_pk', '').strip()
         gabarit = get_object_or_404(PlanningGabarit, pk=gabarit_pk)
+
+        bureaux = get_bureaux()
+        posted  = _posted_from_affectations(gabarit.affectations.all())
+        errors  = validate_planning(posted, bureaux)
+        if errors:
+            for err in errors:
+                messages.error(request, err)
+            messages.error(
+                request,
+                f"Le gabarit « {gabarit.nom} » contient des conflits (ci-dessus) — "
+                f"il n'a pas été appliqué. Corrigez le gabarit avant de réessayer."
+            )
+            return redirect('planning_modifier', pk=pk)
+
         try:
             with transaction.atomic():
                 planning.affectations.all().delete()
                 Affectation.objects.bulk_create([
                     Affectation(
-                        planning=planning, plage=ga.plage, jour=ga.jour, personnel=ga.personnel
+                        planning=planning, plage=ga.plage, jour=ga.jour,
+                        personnel=ga.personnel, note=ga.note,
                     )
                     for ga in gabarit.affectations.all()
                 ])
@@ -1049,6 +1253,8 @@ def planning_export_excel(request, pk):
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 
     planning = get_object_or_404(PlanningHebdomadaire, pk=pk)
+    if not planning.publie and not can_manage_planning(request.user):
+        raise PermissionDenied
     bureaux  = get_bureaux()
     aff_map  = {(a.plage_id, a.jour): a for a in planning.affectations.all()}
 
@@ -1117,10 +1323,13 @@ def planning_export_excel(request, pk):
 
     if planning.signataire:
         sig_row = row_num + 2
-        ws.cell(row=sig_row, column=7, value='Signataire :').font = Font(
+        fonction_label = dict(FONCTION_SIGNATAIRE_CHOICES).get(
+            PlanningConfig.get().fonction_signataire, ''
+        )
+        ws.cell(row=sig_row, column=7, value=f'{fonction_label} :').font = Font(
             italic=True, color='888888'
         )
-        ws.cell(row=sig_row, column=8, value=planning.signataire).font = Font(
+        ws.cell(row=sig_row, column=8, value=planning.signataire.nom).font = Font(
             bold=True, color='2B3E22'
         )
 

@@ -96,24 +96,16 @@ html[data-theme="dark"] {
 {{ block.super }}
 <script>
 (function () {
-  function alignSousTopbar() {
+  function syncTopbarH() {
     var topbar = document.querySelector('.topbar');
-    var content = document.querySelector('.content');
-    if (!topbar || !content) return;
-    var tbH = Math.ceil(topbar.getBoundingClientRect().height);
-    if (tbH <= 0) return;
-    document.documentElement.style.setProperty('--header-h', tbH + 'px');
-    document.documentElement.style.setProperty('--topbar-h', '0px');
-    requestAnimationFrame(function () {
-      var contentGap = Math.round(content.getBoundingClientRect().top - topbar.getBoundingClientRect().bottom);
-      if (contentGap !== 0) {
-        document.documentElement.style.setProperty('--header-h', (tbH - contentGap) + 'px');
-      }
-    });
+    if (topbar) {
+      var h = topbar.getBoundingClientRect().height;
+      if (h > 0) document.documentElement.style.setProperty('--topbar-h', h + 'px');
+    }
   }
-  if (document.readyState !== 'loading') { alignSousTopbar(); }
-  else { document.addEventListener('DOMContentLoaded', alignSousTopbar); }
-  window.addEventListener('resize', alignSousTopbar);
+  syncTopbarH();
+  document.addEventListener('DOMContentLoaded', syncTopbarH);
+  window.addEventListener('resize', syncTopbarH);
 })();
 </script>
 {% endblock %}

@@ -5,7 +5,7 @@
 .print-header { display: none; }
 .pl-actions { display: flex; align-items: center; gap: 10px; padding: 14px 0 16px 0; flex-wrap: wrap; }
 .pl-title-block {
-  position: sticky; top: var(--topbar-h); z-index: 180;
+  position: sticky; top: 0; z-index: 180;
   background: var(--surface); border-bottom: 1px solid var(--border);
   text-align: center; padding: 10px 0 8px;
 }
@@ -171,6 +171,28 @@ html[data-theme="dark"] .chip-x:hover { background: rgba(192,57,43,0.2); color: 
 }
 .btn-gabarit:hover { background: var(--pl-50); }
 
+/* Modales Gabarit (enregistrer / appliquer) */
+.pl-modal-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.45); z-index: 9000;
+  align-items: center; justify-content: center; padding: 20px;
+}
+.pl-modal-overlay.open { display: flex; }
+.pl-modal {
+  background: #fff; border-radius: 10px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.22);
+  width: 420px; max-width: 100%;
+  padding: 22px;
+}
+html[data-theme="dark"] .pl-modal { background: #201d1d; }
+.pl-modal h3 {
+  font-size: 15px; font-weight: 700; color: var(--text);
+  margin: 0 0 16px;
+}
+.pl-modal-actions {
+  display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px;
+}
+
 /* Menu contextuel copier-coller */
 .ctx-menu {
   position: fixed; background: #fff; border: 1px solid var(--border);
@@ -229,6 +251,8 @@ html[data-theme="dark"] .chip-x:hover { background: rgba(192,57,43,0.2); color: 
 }
 .conflict-banner.show { display: flex; }
 .conflict-banner ul { margin: 0; padding-left: 16px; }
+html[data-theme="dark"] .error-banner { background: rgba(220,53,69,.18); color: #f09090; border-color: rgba(220,53,69,.3); }
+html[data-theme="dark"] .conflict-banner { background: rgba(255,193,7,.15); color: #fcd34d; border-color: rgba(255,193,7,.3); }
 
 @media print {
   .pl-nav, .pl-actions, .pl-title-block, nav, #top-bar, .topbar, .sidebar,
@@ -356,10 +380,12 @@ html[data-theme="dark"] .chip-x:hover { background: rgba(192,57,43,0.2); color: 
   <div class="pl-footer">
     <div class="form-group">
       <label for="signataire">Signataire</label>
-      <input type="text" id="signataire" name="signataire"
-             class="form-control"
-             value="{{ planning.signataire }}"
-             placeholder="Directrice Médicale Adjointe — Dr Mme X">
+      <select id="signataire" name="signataire" class="form-control">
+        <option value="">— Aucun —</option>
+        {% for m in medecins_signataires %}
+        <option value="{{ m.pk }}" {% if m.pk == planning.signataire_id %}selected{% endif %}>{{ m.nom }}</option>
+        {% endfor %}
+      </select>
     </div>
     <div class="pl-footer-actions">
       <button type="submit" class="btn-primary">

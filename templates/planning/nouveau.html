@@ -41,10 +41,17 @@
       </div>
       <div class="form-field">
         <label class="field-label" for="signataire">Signataire <span class="f-hint" style="text-transform:none;letter-spacing:0;display:inline;">(optionnel)</span></label>
-        <input type="text" id="signataire" name="signataire"
-               class="field-ul"
-               value="{{ default_signataire }}"
-               placeholder="Directrice Médicale Adjointe — Dr Mme X">
+        <select id="signataire" name="signataire" class="field-ul">
+          <option value="">— Aucun —</option>
+          {% for m in medecins_signataires %}
+          <option value="{{ m.pk }}" {% if m.pk == default_signataire_id %}selected{% endif %}>{{ m.nom }}</option>
+          {% endfor %}
+        </select>
+        {% if not medecins_signataires %}
+        <span class="f-hint" style="text-transform:none;letter-spacing:0;display:block;margin-top:4px;">
+          Aucun médecin signataire enregistré — <a href="{% url 'planning_configuration' %}">en ajouter dans la Configuration</a>.
+        </span>
+        {% endif %}
       </div>
       <button type="submit" class="btn-form-submit" style="width:100%;justify-content:center;margin-top:8px;">
         <i class="bi bi-arrow-right-circle"></i>

@@ -18,7 +18,7 @@
 .btn-nav-week.disabled { opacity: 0.35; pointer-events: none; }
 
 .pl-title-block {
-  position: sticky; top: var(--topbar-h); z-index: 180;
+  position: sticky; top: 0; z-index: 180;
   background: var(--surface); border-bottom: 1px solid var(--border);
   padding: 8px 0 0;
 }
@@ -57,6 +57,20 @@
   background: var(--pl-50) !important; border: 1px solid var(--pl-200) !important;
   padding: 5px 8px; font-size: 12px; color: var(--teal-700); vertical-align: middle;
 }
+.conflict-banner {
+  background: #fff3cd; color: #856404; border: 1px solid #ffc107;
+  border-radius: 6px; padding: 9px 14px;
+  font-size: 12px; display: flex; align-items: flex-start; gap: 8px;
+}
+.conflict-banner ul { margin: 0; padding-left: 16px; }
+html[data-theme="dark"] .conflict-banner { background: rgba(255,193,7,.15); color: #fcd34d; border-color: rgba(255,193,7,.3); }
+.btn-cancel {
+  border: 1px solid var(--border); color: var(--text-muted); background: transparent;
+  border-radius: 6px; padding: 8px 14px; font-size: 13px; font-weight: 500;
+  text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+  transition: background 0.15s; cursor: pointer;
+}
+.btn-cancel:hover { background: var(--bg); color: var(--text); }
 html[data-theme="dark"] .td-perm-label { background: #132612; border-color: #1c371b; }
 html[data-theme="dark"] .td-perm { background: var(--pl-100) !important; border-color: var(--pl-300) !important; }
 /* Recherche rapide */
@@ -305,6 +319,20 @@ html[data-theme="dark"] .pl-modal input[type="date"]:focus { border-bottom-color
   {% endif %}
 </div>
 
+{% if conflits_conges %}
+<div class="conflict-banner" style="margin:0 32px 12px;">
+  <i class="bi bi-exclamation-triangle-fill"></i>
+  <div>
+    <strong>{{ conflits_conges|length }} conflit{{ conflits_conges|length|pluralize }} congé/planning :</strong>
+    <ul style="margin:4px 0 0 18px;padding:0;">
+      {% for c in conflits_conges %}
+      <li>{{ c.personnel }} — {{ c.bureau }} / {{ c.plage }} / {{ c.jour }} (en congé : {{ c.type }})</li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endif %}
+
 <div class="pl-table-wrap">
   <table class="pl-table">
     <thead>
@@ -343,8 +371,8 @@ html[data-theme="dark"] .pl-modal input[type="date"]:focus { border-bottom-color
 
 {% if planning.signataire %}
 <div class="pl-signature">
-  <div class="sig-label">Directrice Médicale Adjointe</div>
-  <div class="sig-name">{{ planning.signataire }}</div>
+  <div class="sig-label">{{ fonction_signataire }}</div>
+  <div class="sig-name">{{ planning.signataire.nom }}</div>
 </div>
 {% endif %}
 

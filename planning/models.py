@@ -33,7 +33,10 @@ class PlanningHebdomadaire(models.Model):
     cree_le = models.DateTimeField(auto_now_add=True)
     modifie_le = models.DateTimeField(auto_now=True)
     publie = models.BooleanField(default=False)
-    signataire = models.CharField(max_length=200, blank=True)
+    signataire = models.ForeignKey(
+        'MedecinSignataire', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='plannings',
+    )
     note = models.TextField(blank=True)
 
     @property
@@ -107,6 +110,7 @@ class GabaritAffectation(models.Model):
     plage = models.ForeignKey(PlageHoraire, on_delete=models.CASCADE)
     jour = models.PositiveSmallIntegerField(choices=JOURS)
     personnel = models.CharField(max_length=200, blank=True)
+    note = models.CharField(max_length=300, blank=True)
 
     class Meta:
         unique_together = ['gabarit', 'plage', 'jour']
@@ -127,8 +131,36 @@ class LignePermanence(models.Model):
         return f"Permanence {JOURS[self.jour][1]} — {self.planning}"
 
 
+FONCTION_SIGNATAIRE_CHOICES = [
+    ('directeur_medical', 'Directeur Médical'),
+    ('directrice_medicale', 'Directrice Médicale'),
+    ('directeur_medical_adjoint', 'Directeur Médical Adjoint'),
+    ('directrice_medicale_adjointe', 'Directrice Médicale Adjointe'),
+]
+
+
+class MedecinSignataire(models.Model):
+    nom = models.CharField(max_length=200)
+    actif = models.BooleanField(default=True)
+    ordre = models.PositiveSmallIntegerField(default=0)
+
+    def __str__(self):
+        return self.nom
+
+    class Meta:
+        ordering = ['ordre', 'nom']
+        verbose_name = "Médecin signataire"
+        verbose_name_plural = "Médecins signataires"
+
+
 class PlanningConfig(models.Model):
-    signataire_defaut = models.CharField(max_length=200, blank=True)
+    fonction_signataire = models.CharField(
+        max_length=40, choices=FONCTION_SIGNATAIRE_CHOICES,
+        default='directrice_medicale_adjointe',
+    )
+    medecin_defaut = models.ForeignKey(
+        MedecinSignataire, on_delete=models.SET_NULL, null=True, blank=True,
+    )
 
     class Meta:
         verbose_name = "Configuration planning"
