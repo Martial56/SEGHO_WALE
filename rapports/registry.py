@@ -184,15 +184,20 @@ def _transactions_caisse(periode_debut, periode_fin):
 
 
 def _mouvements_stock_pharmacie(periode_debut, periode_fin):
-    from pharmacie.models import MouvementStock
-    qs = MouvementStock.objects.filter(
-        date_mouvement__date__range=[periode_debut, periode_fin]
-    ).select_related('medicament', 'cree_par').order_by('date_mouvement')
-    columns = ['Médicament', 'Type', 'Motif', 'Quantité', 'Stock avant', 'Stock après', 'Créé par', 'Date']
+    # Les mouvements de stock pharmacie réels passent tous par
+    # MouvementPharmacie (lié à stock.Produit) — MouvementStock (lié à
+    # l'ancien modèle Medicament) n'est écrit par aucun code actif du module
+    # et ne contiendrait donc jamais de données pertinentes ici.
+    from pharmacie.models import MouvementPharmacie
+    qs = MouvementPharmacie.objects.filter(
+        date__date__range=[periode_debut, periode_fin]
+    ).select_related('produit', 'cree_par').order_by('date')
+    columns = ['Pharmacie', 'Produit', 'Type', 'Quantité', 'Stock avant', 'Stock après', 'Référence', 'Créé par', 'Date']
     rows = [[
-        str(m.medicament), m.get_type_mouvement_display(), m.get_motif_display(), m.quantite,
-        m.stock_avant, m.stock_apres, str(m.cree_par) if m.cree_par else '—',
-        m.date_mouvement.strftime('%d/%m/%Y %H:%M'),
+        m.get_pharmacie_display(), str(m.produit), m.get_type_display(), m.quantite,
+        m.stock_avant, m.stock_apres, m.reference or '—',
+        str(m.cree_par) if m.cree_par else '—',
+        m.date.strftime('%d/%m/%Y %H:%M'),
     ] for m in qs]
     return columns, rows
 

@@ -24,6 +24,10 @@ PHARMACIES_DICT = dict(PHARMACIES_WALE)
 # défini pour l'hospitalisation et la facturation.
 CAISSE_MANAGE_GROUPS = {'Caisse', 'Pharmacien', 'Administrateur', 'Directeur'}
 
+# Rôles autorisés à opérer sur le stock d'une pharmacie (dispensation,
+# livraisons, retours, inventaire) — toute action qui modifie StockPharmacie.
+PHARMACIE_MANAGE_GROUPS = {'Pharmacien', 'Administrateur', 'Directeur'}
+
 
 def can_view_rapport_financier(user):
     return user.is_superuser or user.groups.filter(name__in=CAISSE_MANAGE_GROUPS).exists()
@@ -31,6 +35,22 @@ def can_view_rapport_financier(user):
 
 def can_valider_vente(user):
     return user.is_superuser or user.groups.filter(name__in=CAISSE_MANAGE_GROUPS).exists()
+
+
+def can_manage_pharmacie(user):
+    return user.is_superuser or user.groups.filter(name__in=PHARMACIE_MANAGE_GROUPS).exists()
+
+
+def _stock_entierement_perime(produit):
+    """True si le produit est suivi par lots mais qu'aucun n'est à la fois en
+    stock et non périmé — sert à bloquer une vente/dispensation sur un stock
+    100% périmé au lieu de se fier au seul badge visuel informatif. Un
+    produit non suivi par lots (aucun LotProduit) n'est jamais bloqué ici."""
+    lots = list(produit.lots.all())
+    if not lots:
+        return False
+    today = timezone.now().date()
+    return not any(l.quantite_actuelle > 0 and l.date_peremption >= today for l in lots)
 
 
 def get_pharmacie_or_404(pharmacie):
@@ -74,14 +94,12 @@ def pharmacie_dashboard(request, pharmacie):
 
     from django.db.models import Sum, Count
 
-    ruptures = stock_items.filter(quantite__lte=0).count()
-    alertes  = stock_items.filter(quantite__gt=0, quantite__lte=F('produit__stock_alerte')).count()
-
-    stats = {
-        'total_refs': stock_items.count(),
-        'ruptures':   ruptures,
-        'alertes':    alertes,
-    }
+    stock_stats = stock_items.aggregate(
+        total_refs=Count('id'),
+        ruptures=Count('id', filter=Q(quantite__lte=0)),
+        alertes=Count('id', filter=Q(quantite__gt=0, quantite__lte=F('produit__stock_alerte'))),
+    )
+    stats = stock_stats
 
     month_start = today.replace(day=1)
     ca_data = VentePharmacie.objects.filter(
@@ -121,6 +139,7 @@ def pharmacie_dashboard(request, pharmacie):
         'pharmacie':           pharmacie,
         'label':               label,
         'stats':               stats,
+        'can_view_finances':   can_view_rapport_financier(request.user),
         'ca_mois':             ca_mois,
         'nb_ventes_mois':      nb_ventes_mois,
         'ventes_par_mode':     ventes_par_mode,
@@ -158,11 +177,11 @@ def pharmacie_stock(request, pharmacie):
     paginator = Paginator(qs, 30)
     page_obj  = paginator.get_page(request.GET.get('page'))
 
-    stats = {
-        'total':    StockPharmacie.objects.filter(pharmacie=pharmacie).count(),
-        'ruptures': StockPharmacie.objects.filter(pharmacie=pharmacie, quantite__lte=0).count(),
-        'alertes':  StockPharmacie.objects.filter(pharmacie=pharmacie, quantite__gt=0, quantite__lte=F('produit__stock_alerte')).count(),
-    }
+    stats = StockPharmacie.objects.filter(pharmacie=pharmacie).aggregate(
+        total=Count('id'),
+        ruptures=Count('id', filter=Q(quantite__lte=0)),
+        alertes=Count('id', filter=Q(quantite__gt=0, quantite__lte=F('produit__stock_alerte'))),
+    )
 
     return render(request, 'pharmacie/stock.html', {
         'pharmacie': pharmacie, 'label': label,
@@ -206,11 +225,11 @@ def pharmacie_ordonnances(request, pharmacie):
     page_obj  = paginator.get_page(request.GET.get('page'))
 
     ords_jour = Ordonnance.objects.filter(date_emission__date=selected_date)
-    stats = {
-        'total':      ords_jour.count(),
-        'en_attente': ords_jour.filter(statut='emise').count(),
-        'servies':    ords_jour.filter(dispensation__pharmacie=pharmacie).count(),
-    }
+    stats = ords_jour.aggregate(
+        total=Count('id'),
+        en_attente=Count('id', filter=Q(statut='emise')),
+        servies=Count('id', filter=Q(dispensation__pharmacie=pharmacie)),
+    )
 
     lignes_pharmacie = LigneDispensation.objects.filter(
         dispensation__ordonnance__date_emission__date=selected_date,
@@ -247,6 +266,8 @@ def pharmacie_ordonnances(request, pharmacie):
 
 @login_required(login_url='login')
 def pharmacie_dispenser(request, pharmacie, pk):
+    if not can_manage_pharmacie(request.user):
+        raise PermissionDenied
     get_pharmacie_or_404(pharmacie)
     label = PHARMACIES_DICT[pharmacie]
 
@@ -283,14 +304,16 @@ def pharmacie_dispenser(request, pharmacie, pk):
         if produit:
             stock_item = StockPharmacie.objects.filter(pharmacie=pharmacie, produit=produit).first()
 
+        stock_dispo = float(stock_item.quantite) if stock_item else 0
         lignes_enrichies.append({
             'ligne':       ligne,
             'nom_med':     nom_med,
             'produit':     produit,
             'stock_item':  stock_item,
-            'stock_dispo': float(stock_item.quantite) if stock_item else 0,
-            'suffisant':   bool(stock_item and float(stock_item.quantite) >= ligne.quantite),
-            'qte_defaut':  min(float(ligne.quantite), float(stock_item.quantite)) if stock_item else 0,
+            'stock_dispo': stock_dispo,
+            'suffisant':   bool(stock_item and stock_dispo >= ligne.quantite),
+            'qte_defaut':  min(float(ligne.quantite), stock_dispo) if stock_item else 0,
+            'manque':      max(0, ligne.quantite - stock_dispo),
         })
 
     nb_complets     = sum(1 for l in lignes_enrichies if l['suffisant'])
@@ -324,75 +347,113 @@ def pharmacie_dispenser(request, pharmacie, pk):
         )
 
     if request.method == 'POST':
-        dispensation = DispensationOrdonnance.objects.create(
-            pharmacie=pharmacie, ordonnance=ordonnance,
-            notes=request.POST.get('notes', '').strip(),
-            dispense_par=request.user,
-        )
-        statut_global = 'complete'
-        for item in lignes_enrichies:
-            ligne = item['ligne']
-            ailleurs = request.POST.get(f'ailleurs_{ligne.pk}') == 'on'
-            try:
-                qte = int(request.POST.get(f'qte_{ligne.pk}', 0) or 0)
-            except ValueError:
-                qte = 0
-            qte = 0 if ailleurs else max(0, min(qte, ligne.quantite))
-            if qte < ligne.quantite:
-                statut_global = 'partielle'
-
-            LigneDispensation.objects.create(
-                dispensation=dispensation,
-                produit=item['produit'],
-                medicament_libre=item['nom_med'],
-                quantite_prescrite=ligne.quantite,
-                quantite_dispensee=qte,
-                achete_ailleurs=ailleurs,
+        alertes_peremption = []
+        with transaction.atomic():
+            dispensation = DispensationOrdonnance.objects.create(
+                pharmacie=pharmacie, ordonnance=ordonnance,
+                notes=request.POST.get('notes', '').strip(),
+                dispense_par=request.user,
             )
-            if item['stock_item'] and qte > 0:
-                sp    = item['stock_item']
+            statut_global = 'complete'
+            for item in lignes_enrichies:
+                ligne = item['ligne']
+                ailleurs = request.POST.get(f'ailleurs_{ligne.pk}') == 'on'
+                try:
+                    qte = int(request.POST.get(f'qte_{ligne.pk}', 0) or 0)
+                except ValueError:
+                    qte = 0
+                qte = 0 if ailleurs else max(0, min(qte, ligne.quantite))
 
-                # Vérifier si le stock a déjà été réservé au moment
-                # de la création de l'ordonnance (signal LigneOrdonnance).
-                pre_ref = f'ORD:{ordonnance.numero}'
-                deja_reserve = MouvementPharmacie.objects.filter(
-                    produit=sp.produit,
-                    type='dispensation',
-                    reference=pre_ref,
-                ).exists()
+                if qte > 0 and item['produit'] and _stock_entierement_perime(item['produit']):
+                    # Le stock affiché n'est en réalité couvert par aucun lot
+                    # non périmé : on refuse de le dispenser malgré la saisie.
+                    alertes_peremption.append(item['produit'].nom)
+                    qte = 0
 
-                if deja_reserve:
-                    # Stock déjà réservé : on enregistre uniquement la
-                    # confirmation de dispensation sans re-déduire.
-                    avant = float(sp.quantite)
-                    MouvementPharmacie.objects.filter(
-                        produit=sp.produit,
-                        type='dispensation',
-                        reference=pre_ref,
-                    ).update(
-                        reference=ordonnance.numero,
-                        notes='Dispensation confirmée (réservation ordonnance)',
-                        cree_par=request.user,
-                    )
-                else:
-                    # Pas de pré-réservation : déduction normale.
-                    avant = float(sp.quantite)
-                    apres = max(0, avant - qte)
-                    MouvementPharmacie.objects.create(
-                        pharmacie=pharmacie, produit=sp.produit,
-                        type='dispensation', quantite=qte,
-                        stock_avant=avant, stock_apres=apres,
-                        reference=ordonnance.numero,
-                        cree_par=request.user,
-                    )
-                    sp.quantite = apres
-                    sp.save(update_fields=['quantite'])
+                if qte < ligne.quantite:
+                    statut_global = 'partielle'
 
-        dispensation.statut = statut_global
-        dispensation.save(update_fields=['statut'])
-        ordonnance.statut = 'delivree' if statut_global == 'complete' else 'partielle'
-        ordonnance.save(update_fields=['statut'])
+                LigneDispensation.objects.create(
+                    dispensation=dispensation,
+                    produit=item['produit'],
+                    medicament_libre=item['nom_med'],
+                    quantite_prescrite=ligne.quantite,
+                    quantite_dispensee=qte,
+                    achete_ailleurs=ailleurs,
+                )
+                if item['stock_item'] and qte > 0:
+                    # Verrouille la ligne de stock pour toute la durée de la
+                    # transaction : sérialise les dispensations/ventes
+                    # concurrentes sur le même produit (évite qu'une écriture
+                    # en écrase une autre après une lecture obsolète).
+                    sp = StockPharmacie.objects.select_for_update().get(pk=item['stock_item'].pk)
 
+                    # Vérifier si le stock a déjà été réservé, et dans quelle
+                    # pharmacie, au moment de la création de l'ordonnance
+                    # (signal LigneOrdonnance) — la réservation peut avoir eu
+                    # lieu dans une AUTRE pharmacie que celle qui dispense
+                    # réellement (stock choisi à la prescription = "la mieux
+                    # fournie", pas forcément celle où le patient se présente).
+                    pre_ref = f'ORD:{ordonnance.numero}'
+                    reservation = MouvementPharmacie.objects.filter(
+                        produit=sp.produit, type='dispensation', reference=pre_ref,
+                    ).first()
+
+                    if reservation and reservation.pharmacie == pharmacie:
+                        # Réservation faite dans CETTE pharmacie : on
+                        # confirme sans re-déduire (déjà fait à la réservation).
+                        reservation.reference = ordonnance.numero
+                        reservation.notes = 'Dispensation confirmée (réservation ordonnance)'
+                        reservation.cree_par = request.user
+                        reservation.save(update_fields=['reference', 'notes', 'cree_par'])
+                    else:
+                        if reservation:
+                            # Réservation faite dans une AUTRE pharmacie que
+                            # celle qui dispense réellement : on l'annule et
+                            # on restitue le stock qui y avait été réservé à
+                            # tort, pour ne pas fausser durablement ce site.
+                            autre_sp = StockPharmacie.objects.select_for_update().filter(
+                                pharmacie=reservation.pharmacie, produit=sp.produit,
+                            ).first()
+                            if autre_sp:
+                                avant_autre = float(autre_sp.quantite)
+                                apres_autre = avant_autre + float(reservation.quantite)
+                                autre_sp.quantite = apres_autre
+                                autre_sp.save(update_fields=['quantite'])
+                                MouvementPharmacie.objects.create(
+                                    pharmacie=reservation.pharmacie, produit=sp.produit,
+                                    type='ajustement', quantite=reservation.quantite,
+                                    stock_avant=avant_autre, stock_apres=apres_autre,
+                                    reference=ordonnance.numero,
+                                    notes=f'Annulation réservation erronée '
+                                          f'(finalement dispensé à {label})',
+                                    cree_par=request.user,
+                                )
+                            reservation.delete()
+
+                        # Déduction normale dans la pharmacie qui dispense réellement.
+                        avant = float(sp.quantite)
+                        apres = max(0, avant - qte)
+                        MouvementPharmacie.objects.create(
+                            pharmacie=pharmacie, produit=sp.produit,
+                            type='dispensation', quantite=qte,
+                            stock_avant=avant, stock_apres=apres,
+                            reference=ordonnance.numero,
+                            cree_par=request.user,
+                        )
+                        sp.quantite = apres
+                        sp.save(update_fields=['quantite'])
+
+            dispensation.statut = statut_global
+            dispensation.save(update_fields=['statut'])
+            ordonnance.statut = 'delivree' if statut_global == 'complete' else 'partielle'
+            ordonnance.save(update_fields=['statut'])
+
+        if alertes_peremption:
+            messages.warning(
+                request,
+                'Non dispensé (stock périmé) : ' + ', '.join(alertes_peremption)
+            )
         messages.success(request, f'Ordonnance {ordonnance.numero} dispensée ({statut_global}).')
         return redirect('pharmacie_ordonnances', pharmacie=pharmacie)
 
@@ -411,6 +472,8 @@ def pharmacie_dispenser(request, pharmacie, pk):
 
 @login_required(login_url='login')
 def pharmacie_demande(request, pharmacie):
+    if not can_manage_pharmacie(request.user):
+        raise PermissionDenied
     get_pharmacie_or_404(pharmacie)
     label    = PHARMACIES_DICT[pharmacie]
     from .models import StockPharmacie
@@ -489,6 +552,8 @@ def pharmacie_livraisons(request, pharmacie):
 def pharmacie_confirmer_livraison(request, pharmacie, pk):
     """La pharmacie confirme la réception d'une livraison → met à jour son stock."""
     from django.views.decorators.http import require_POST as _rp
+    if not can_manage_pharmacie(request.user):
+        raise PermissionDenied
     get_pharmacie_or_404(pharmacie)
     label   = PHARMACIES_DICT[pharmacie]
     demande = get_object_or_404(DemandePharmacie, pk=pk, pharmacie=pharmacie)
@@ -500,40 +565,50 @@ def pharmacie_confirmer_livraison(request, pharmacie, pk):
     lignes = demande.lignes.select_related('produit').all()
 
     if request.method == 'POST':
-        tout_recu = True
-        for ligne in lignes:
-            if not ligne.produit or ligne.quantite_approuvee <= 0:
-                continue
-            try:
-                qte_recue = float(request.POST.get(f'recu_{ligne.pk}', ligne.quantite_approuvee) or ligne.quantite_approuvee)
-            except ValueError:
-                qte_recue = float(ligne.quantite_approuvee)
-            qte_recue = max(0, min(qte_recue, float(ligne.quantite_approuvee)))
+        with transaction.atomic():
+            # Reverrouille et revérifie le statut à l'intérieur de la
+            # transaction : bloque une double soumission concurrente (double
+            # clic, deux onglets) qui aurait passé le contrôle initial avant
+            # que la première requête n'ait committé son changement de statut.
+            demande_verrou = DemandePharmacie.objects.select_for_update().get(pk=demande.pk)
+            if demande_verrou.statut != 'en_livraison':
+                messages.info(request, 'Cette livraison a déjà été traitée.')
+                return redirect('pharmacie_livraisons', pharmacie=pharmacie)
 
-            if qte_recue < float(ligne.quantite_approuvee):
-                tout_recu = False
+            tout_recu = True
+            for ligne in lignes:
+                if not ligne.produit or ligne.quantite_approuvee <= 0:
+                    continue
+                try:
+                    qte_recue = float(request.POST.get(f'recu_{ligne.pk}', ligne.quantite_approuvee) or ligne.quantite_approuvee)
+                except ValueError:
+                    qte_recue = float(ligne.quantite_approuvee)
+                qte_recue = max(0, min(qte_recue, float(ligne.quantite_approuvee)))
 
-            if qte_recue > 0:
-                # Mettre à jour ou créer le StockPharmacie
-                sp, _ = StockPharmacie.objects.get_or_create(
-                    pharmacie=pharmacie, produit=ligne.produit,
-                    defaults={'quantite': 0}
-                )
-                avant = float(sp.quantite)
-                apres = avant + qte_recue
-                MouvementPharmacie.objects.create(
-                    pharmacie=pharmacie, produit=ligne.produit,
-                    type='entree', quantite=qte_recue,
-                    stock_avant=avant, stock_apres=apres,
-                    reference=demande.numero,
-                    notes=f'Livraison dotation {demande.numero}',
-                    cree_par=request.user,
-                )
-                sp.quantite = apres
-                sp.save(update_fields=['quantite'])
+                if qte_recue < float(ligne.quantite_approuvee):
+                    tout_recu = False
 
-        demande.statut = 'approuvee' if tout_recu else 'partielle'
-        demande.save(update_fields=['statut'])
+                if qte_recue > 0:
+                    # Mettre à jour ou créer le StockPharmacie
+                    sp, _ = StockPharmacie.objects.select_for_update().get_or_create(
+                        pharmacie=pharmacie, produit=ligne.produit,
+                        defaults={'quantite': 0}
+                    )
+                    avant = float(sp.quantite)
+                    apres = avant + qte_recue
+                    MouvementPharmacie.objects.create(
+                        pharmacie=pharmacie, produit=ligne.produit,
+                        type='entree', quantite=qte_recue,
+                        stock_avant=avant, stock_apres=apres,
+                        reference=demande.numero,
+                        notes=f'Livraison dotation {demande.numero}',
+                        cree_par=request.user,
+                    )
+                    sp.quantite = apres
+                    sp.save(update_fields=['quantite'])
+
+            demande_verrou.statut = 'approuvee' if tout_recu else 'partielle'
+            demande_verrou.save(update_fields=['statut'])
         messages.success(request, f'Livraison {demande.numero} confirmée — stock mis à jour.')
         return redirect('pharmacie_livraisons', pharmacie=pharmacie)
 
@@ -613,39 +688,77 @@ def pharmacie_caisse(request, pharmacie):
         if not lignes_data:
             messages.error(request, 'Saisissez au moins une quantité.')
         else:
+            erreurs = []
             with transaction.atomic():
-                montant_total = sum(sp.produit.prix_vente * qte for sp, qte in lignes_data)
-                vente = VentePharmacie.objects.create(
-                    pharmacie=pharmacie,
-                    mode_paiement=mode_paiement,
-                    montant_total=montant_total,
-                    remise=remise,
-                    notes=notes,
-                    cree_par=request.user,
-                )
+                # Verrouille toutes les lignes de stock concernées pour la
+                # durée de la transaction : relit une valeur fraîche (sérialise
+                # les ventes/dispensations concurrentes sur le même produit)
+                # et valide qu'il n'y a pas de survente avant d'écrire quoi que
+                # ce soit.
+                sp_ids = [sp.pk for sp, _ in lignes_data]
+                sp_locked = {
+                    sp.pk: sp for sp in
+                    StockPharmacie.objects.select_for_update().filter(pk__in=sp_ids)
+                }
+                lignes_validees = []
                 for sp, qte in lignes_data:
-                    LigneVente.objects.create(
-                        vente=vente,
-                        produit=sp.produit,
-                        quantite=qte,
-                        prix_unitaire=sp.produit.prix_vente,
-                    )
-                    avant = float(sp.quantite)
-                    apres = max(0.0, avant - float(qte))
-                    MouvementPharmacie.objects.create(
+                    sp_frais = sp_locked[sp.pk]
+                    if qte > sp_frais.quantite:
+                        erreurs.append(
+                            f'{sp_frais.produit.nom} : quantité demandée ({qte}) '
+                            f'supérieure au stock disponible ({sp_frais.quantite}).'
+                        )
+                        continue
+                    if _stock_entierement_perime(sp_frais.produit):
+                        erreurs.append(f'{sp_frais.produit.nom} : stock restant entièrement périmé.')
+                        continue
+                    lignes_validees.append((sp_frais, qte))
+
+                if not (erreurs or not lignes_validees):
+                    montant_total = sum(sp.produit.prix_vente * qte for sp, qte in lignes_validees)
+                    vente = VentePharmacie.objects.create(
                         pharmacie=pharmacie,
-                        produit=sp.produit,
-                        type='vente',
-                        quantite=qte,
-                        stock_avant=avant,
-                        stock_apres=apres,
-                        reference=vente.numero,
+                        mode_paiement=mode_paiement,
+                        montant_total=montant_total,
+                        remise=remise,
+                        notes=notes,
                         cree_par=request.user,
                     )
-                    sp.quantite = Decimal(str(apres))
-                    sp.save(update_fields=['quantite'])
-            messages.success(request, f'Vente {vente.numero} enregistrée — {vente.montant_net} F CFA.')
-            return redirect('pharmacie_ticket', pharmacie=pharmacie, pk=vente.pk)
+                    lignes_vente = []
+                    mouvements = []
+                    for sp, qte in lignes_validees:
+                        avant = float(sp.quantite)
+                        apres = max(0.0, avant - float(qte))
+                        lignes_vente.append(LigneVente(
+                            vente=vente, produit=sp.produit,
+                            quantite=qte, prix_unitaire=sp.produit.prix_vente,
+                        ))
+                        mouvements.append(MouvementPharmacie(
+                            pharmacie=pharmacie, produit=sp.produit,
+                            type='vente', quantite=qte,
+                            stock_avant=avant, stock_apres=apres,
+                            reference=vente.numero, cree_par=request.user,
+                        ))
+                        sp.quantite = Decimal(str(apres))
+
+                    # LigneVente.save() calcule `montant` — bulk_create ne
+                    # passe pas par save(), on le pré-calcule ici.
+                    for lv in lignes_vente:
+                        lv.montant = lv.quantite * lv.prix_unitaire
+                    LigneVente.objects.bulk_create(lignes_vente)
+                    MouvementPharmacie.objects.bulk_create(mouvements)
+                    StockPharmacie.objects.bulk_update(
+                        [sp for sp, _ in lignes_validees], ['quantite']
+                    )
+
+            if erreurs:
+                for err in erreurs:
+                    messages.error(request, err)
+            elif not lignes_validees:
+                messages.error(request, 'Aucune ligne valide à encaisser.')
+            else:
+                messages.success(request, f'Vente {vente.numero} enregistrée — {vente.montant_net} F CFA.')
+                return redirect('pharmacie_ticket', pharmacie=pharmacie, pk=vente.pk)
 
     # Tous les lots avec du stock restant pour chaque produit, du plus proche
     # au plus lointain (LotProduit.Meta.ordering = ['date_peremption']).
@@ -670,7 +783,67 @@ def pharmacie_ticket(request, pharmacie, pk):
     return render(request, 'pharmacie/ticket.html', {
         'pharmacie': pharmacie, 'label': label,
         'vente': vente,
+        'can_annuler': can_valider_vente(request.user),
     })
+
+
+@login_required(login_url='login')
+@require_POST
+def pharmacie_annuler_vente(request, pharmacie, pk):
+    """Annule une vente enregistrée par erreur : restitue le stock vendu et
+    marque la vente comme annulée, sans supprimer aucune trace (contrairement
+    à un simple retour, ceci referme réellement la transaction d'origine)."""
+    from decimal import Decimal
+    if not can_valider_vente(request.user):
+        raise PermissionDenied
+    get_pharmacie_or_404(pharmacie)
+    vente = get_object_or_404(VentePharmacie, pk=pk, pharmacie=pharmacie)
+
+    if vente.statut != 'payee':
+        messages.info(request, 'Cette vente est déjà annulée.')
+        return redirect('pharmacie_ticket', pharmacie=pharmacie, pk=vente.pk)
+
+    with transaction.atomic():
+        vente_verrou = VentePharmacie.objects.select_for_update().get(pk=vente.pk)
+        if vente_verrou.statut != 'payee':
+            messages.info(request, 'Cette vente est déjà annulée.')
+            return redirect('pharmacie_ticket', pharmacie=pharmacie, pk=vente.pk)
+
+        lignes = list(vente_verrou.lignes.select_related('produit'))
+        sp_par_produit = {
+            sp.produit_id: sp for sp in
+            StockPharmacie.objects.select_for_update().filter(
+                pharmacie=pharmacie, produit_id__in=[l.produit_id for l in lignes],
+            )
+        }
+        mouvements = []
+        sp_a_maj = []
+        for ligne in lignes:
+            sp = sp_par_produit.get(ligne.produit_id)
+            if not sp:
+                continue
+            avant = float(sp.quantite)
+            apres = avant + float(ligne.quantite)
+            mouvements.append(MouvementPharmacie(
+                pharmacie=pharmacie, produit=ligne.produit,
+                type='ajustement', quantite=ligne.quantite,
+                stock_avant=avant, stock_apres=apres,
+                reference=vente_verrou.numero,
+                notes=f'Annulation de la vente {vente_verrou.numero}',
+                cree_par=request.user,
+            ))
+            sp.quantite = Decimal(str(apres))
+            sp_a_maj.append(sp)
+
+        if mouvements:
+            MouvementPharmacie.objects.bulk_create(mouvements)
+            StockPharmacie.objects.bulk_update(sp_a_maj, ['quantite'])
+
+        vente_verrou.statut = 'annulee'
+        vente_verrou.save(update_fields=['statut'])
+
+    messages.success(request, f'Vente {vente.numero} annulée — stock restitué.')
+    return redirect('pharmacie_ticket', pharmacie=pharmacie, pk=vente.pk)
 
 
 @login_required(login_url='login')
@@ -678,6 +851,8 @@ def pharmacie_recette(request, pharmacie):
     from decimal import Decimal
     from django.db.models import Sum, Count
     from datetime import datetime
+    if not can_view_rapport_financier(request.user):
+        raise PermissionDenied
     get_pharmacie_or_404(pharmacie)
     label = PHARMACIES_DICT[pharmacie]
     today = timezone.now().date()
@@ -794,6 +969,8 @@ def pharmacie_fiche_dispensation(request, pharmacie, pk):
 @login_required(login_url='login')
 def pharmacie_alertes_reappro(request, pharmacie):
     from decimal import Decimal
+    if not can_manage_pharmacie(request.user):
+        raise PermissionDenied
     get_pharmacie_or_404(pharmacie)
     label = PHARMACIES_DICT[pharmacie]
 
@@ -810,24 +987,32 @@ def pharmacie_alertes_reappro(request, pharmacie):
         notes = request.POST.get('notes', 'Demande générée depuis alertes réapprovisionnement')
         produit_ids = request.POST.getlist('produits')
         if produit_ids:
-            demande = DemandePharmacie.objects.create(
-                pharmacie=pharmacie, notes=notes, cree_par=request.user,
+            produits_par_id = Produit.objects.in_bulk(
+                [int(pid) for pid in produit_ids if pid.isdigit()]
             )
-            nb = 0
+            lignes = []
             for pid in produit_ids:
+                produit = produits_par_id.get(int(pid)) if pid.isdigit() else None
+                if not produit:
+                    continue
+                qte_str = request.POST.get(f'qte_{pid}', '1')
                 try:
-                    produit = Produit.objects.get(pk=int(pid))
-                    qte_str = request.POST.get(f'qte_{pid}', '1')
                     qte = Decimal(str(qte_str or '1'))
-                    if qte > 0:
-                        LigneDemande.objects.create(demande=demande, produit=produit, quantite_demandee=qte)
-                        nb += 1
                 except Exception:
-                    pass
-            if nb > 0:
-                messages.success(request, f'Demande {demande.numero} créée ({nb} produit{"s" if nb>1 else ""}).')
+                    continue
+                if qte > 0:
+                    lignes.append(LigneDemande(produit=produit, quantite_demandee=qte))
+
+            if lignes:
+                with transaction.atomic():
+                    demande = DemandePharmacie.objects.create(
+                        pharmacie=pharmacie, notes=notes, cree_par=request.user,
+                    )
+                    for ligne in lignes:
+                        ligne.demande = demande
+                    LigneDemande.objects.bulk_create(lignes)
+                messages.success(request, f'Demande {demande.numero} créée ({len(lignes)} produit{"s" if len(lignes) > 1 else ""}).')
                 return redirect('pharmacie_dashboard', pharmacie=pharmacie)
-            demande.delete()
         messages.error(request, 'Sélectionnez au moins un produit.')
 
     return render(request, 'pharmacie/alertes_reappro.html', {
@@ -886,6 +1071,8 @@ def pharmacie_peremptions(request, pharmacie):
 @login_required(login_url='login')
 def pharmacie_retours(request, pharmacie):
     from decimal import Decimal
+    if not can_manage_pharmacie(request.user):
+        raise PermissionDenied
     get_pharmacie_or_404(pharmacie)
     label = PHARMACIES_DICT[pharmacie]
 
@@ -934,21 +1121,24 @@ def pharmacie_retours(request, pharmacie):
             return redirect('pharmacie_retours', pharmacie=pharmacie)
 
         motif = request.POST.get('motif', '').strip()
-        sp = StockPharmacie.objects.filter(pharmacie=pharmacie, produit_id=produit_id).first()
-        if not sp:
-            messages.error(request, 'Produit introuvable.')
-            return redirect('pharmacie_retours', pharmacie=pharmacie)
+        with transaction.atomic():
+            sp = StockPharmacie.objects.select_for_update().filter(
+                pharmacie=pharmacie, produit_id=produit_id
+            ).first()
+            if not sp:
+                messages.error(request, 'Produit introuvable.')
+                return redirect('pharmacie_retours', pharmacie=pharmacie)
 
-        avant = float(sp.quantite)
-        apres = avant + float(qte)
-        MouvementPharmacie.objects.create(
-            pharmacie=pharmacie, produit=sp.produit,
-            type='retour', quantite=qte,
-            stock_avant=avant, stock_apres=apres,
-            reference=motif, notes=motif, cree_par=request.user,
-        )
-        sp.quantite = Decimal(str(apres))
-        sp.save(update_fields=['quantite'])
+            avant = float(sp.quantite)
+            apres = avant + float(qte)
+            MouvementPharmacie.objects.create(
+                pharmacie=pharmacie, produit=sp.produit,
+                type='retour', quantite=qte,
+                stock_avant=avant, stock_apres=apres,
+                reference=motif, notes=motif, cree_par=request.user,
+            )
+            sp.quantite = Decimal(str(apres))
+            sp.save(update_fields=['quantite'])
         messages.success(request, f'Retour de {qte} {sp.produit.unite_mesure.nom if sp.produit.unite_mesure else ""} de « {sp.produit.nom} » enregistré.')
         return redirect('pharmacie_retours', pharmacie=pharmacie)
 
@@ -967,12 +1157,15 @@ def pharmacie_inventaire_list(request, pharmacie):
     ).select_related('cree_par', 'valide_par').order_by('-date_inventaire')
     return render(request, 'pharmacie/inventaire_list.html', {
         'pharmacie': pharmacie, 'label': label, 'inventaires': inventaires,
+        'can_manage': can_manage_pharmacie(request.user),
     })
 
 
 @login_required(login_url='login')
 def pharmacie_inventaire_nouveau(request, pharmacie):
     from decimal import Decimal
+    if not can_manage_pharmacie(request.user):
+        raise PermissionDenied
     get_pharmacie_or_404(pharmacie)
     label = PHARMACIES_DICT[pharmacie]
 
@@ -989,20 +1182,23 @@ def pharmacie_inventaire_nouveau(request, pharmacie):
         except Exception:
             date_inv = timezone.now().date()
 
-        inv = InventairePharmacie.objects.create(
-            pharmacie=pharmacie, date_inventaire=date_inv,
-            notes=notes, cree_par=request.user,
-        )
-        for sp in stock_items:
-            val = request.POST.get(f'reel_{sp.produit.pk}', '').strip()
-            try:
-                reel = Decimal(str(val)) if val != '' else sp.quantite
-            except Exception:
-                reel = sp.quantite
-            LigneInventairePharmacie.objects.create(
-                inventaire=inv, produit=sp.produit,
-                stock_theorique=sp.quantite, stock_reel=reel,
+        with transaction.atomic():
+            inv = InventairePharmacie.objects.create(
+                pharmacie=pharmacie, date_inventaire=date_inv,
+                notes=notes, cree_par=request.user,
             )
+            lignes_inv = []
+            for sp in stock_items:
+                val = request.POST.get(f'reel_{sp.produit.pk}', '').strip()
+                try:
+                    reel = Decimal(str(val)) if val != '' else sp.quantite
+                except Exception:
+                    reel = sp.quantite
+                lignes_inv.append(LigneInventairePharmacie(
+                    inventaire=inv, produit=sp.produit,
+                    stock_theorique=sp.quantite, stock_reel=reel,
+                ))
+            LigneInventairePharmacie.objects.bulk_create(lignes_inv)
         messages.success(request, f'Inventaire {inv.numero} créé.')
         return redirect('pharmacie_inventaire_detail', pharmacie=pharmacie, pk=inv.pk)
 
@@ -1019,43 +1215,65 @@ def pharmacie_inventaire_nouveau(request, pharmacie):
 @login_required(login_url='login')
 def pharmacie_inventaire_detail(request, pharmacie, pk):
     from decimal import Decimal
+    if not can_manage_pharmacie(request.user):
+        raise PermissionDenied
     get_pharmacie_or_404(pharmacie)
     label = PHARMACIES_DICT[pharmacie]
     inv = get_object_or_404(InventairePharmacie, pk=pk, pharmacie=pharmacie)
     lignes = list(inv.lignes.select_related('produit').prefetch_related('produit__lots').order_by('produit__type', 'produit__nom'))
 
     if request.method == 'POST' and inv.statut == 'brouillon':
+        lignes_modifiees = []
         for ligne in lignes:
             val = request.POST.get(f'reel_{ligne.produit.pk}', '').strip()
             if val:
                 try:
                     ligne.stock_reel = Decimal(str(val))
-                    ligne.save(update_fields=['stock_reel'])
+                    lignes_modifiees.append(ligne)
                 except Exception:
                     pass
+        if lignes_modifiees:
+            LigneInventairePharmacie.objects.bulk_update(lignes_modifiees, ['stock_reel'])
 
         if request.POST.get('action') == 'valider':
-            for ligne in inv.lignes.select_related('produit').all():
-                ecart = ligne.stock_reel - ligne.stock_theorique
-                if ecart != 0:
-                    sp = StockPharmacie.objects.filter(pharmacie=pharmacie, produit=ligne.produit).first()
-                    if sp:
-                        avant = float(sp.quantite)
-                        apres = float(ligne.stock_reel)
-                        MouvementPharmacie.objects.create(
-                            pharmacie=pharmacie, produit=ligne.produit,
-                            type='ajustement', quantite=ecart,
-                            stock_avant=avant, stock_apres=apres,
-                            reference=inv.numero,
-                            notes=f'Ajustement inventaire {inv.numero}',
-                            cree_par=request.user,
-                        )
-                        sp.quantite = Decimal(str(apres))
-                        sp.save(update_fields=['quantite'])
-            inv.statut = 'valide'
-            inv.valide_par = request.user
-            inv.date_validation = timezone.now()
-            inv.save(update_fields=['statut', 'valide_par', 'date_validation'])
+            with transaction.atomic():
+                lignes_ecart = [l for l in lignes if l.ecart != 0]
+                # Verrouille et précharge en une fois tout le stock concerné
+                # au lieu d'une requête + une écriture par ligne en écart.
+                sp_par_produit = {
+                    sp.produit_id: sp for sp in
+                    StockPharmacie.objects.select_for_update().filter(
+                        pharmacie=pharmacie, produit_id__in=[l.produit_id for l in lignes_ecart],
+                    )
+                }
+                mouvements = []
+                sp_a_maj = []
+                for ligne in lignes_ecart:
+                    sp = sp_par_produit.get(ligne.produit_id)
+                    if not sp:
+                        continue
+                    ecart = ligne.stock_reel - ligne.stock_theorique
+                    avant = float(sp.quantite)
+                    apres = float(ligne.stock_reel)
+                    mouvements.append(MouvementPharmacie(
+                        pharmacie=pharmacie, produit=ligne.produit,
+                        type='ajustement', quantite=ecart,
+                        stock_avant=avant, stock_apres=apres,
+                        reference=inv.numero,
+                        notes=f'Ajustement inventaire {inv.numero}',
+                        cree_par=request.user,
+                    ))
+                    sp.quantite = Decimal(str(apres))
+                    sp_a_maj.append(sp)
+
+                if mouvements:
+                    MouvementPharmacie.objects.bulk_create(mouvements)
+                    StockPharmacie.objects.bulk_update(sp_a_maj, ['quantite'])
+
+                inv.statut = 'valide'
+                inv.valide_par = request.user
+                inv.date_validation = timezone.now()
+                inv.save(update_fields=['statut', 'valide_par', 'date_validation'])
             messages.success(request, f'Inventaire {inv.numero} validé. Stock ajusté.')
             return redirect('pharmacie_inventaire_detail', pharmacie=pharmacie, pk=inv.pk)
         else:
@@ -1081,7 +1299,7 @@ def pharmacie_inventaire_detail(request, pharmacie, pk):
 @login_required(login_url='login')
 @require_POST
 def pharmacie_inventaire_supprimer(request, pharmacie, pk):
-    if not (request.user.is_staff or request.user.is_superuser):
+    if not can_manage_pharmacie(request.user):
         raise PermissionDenied
     get_pharmacie_or_404(pharmacie)
     inv = get_object_or_404(InventairePharmacie, pk=pk, pharmacie=pharmacie)
@@ -1114,26 +1332,36 @@ def pharmacie_rapport_mensuel(request, pharmacie):
             m = 12
             y -= 1
 
-    ventes_mois = []
-    for mo in mois_list:
-        agg = VentePharmacie.objects.filter(
-            pharmacie=pharmacie,
-            date_vente__year=mo.year, date_vente__month=mo.month,
-            statut='payee',
-        ).aggregate(total=Sum('montant_net'), nb=Count('id'))
-        ventes_mois.append({
-            'label': mo.strftime('%b %Y'),
-            'total': float(agg['total'] or 0),
-            'nb': agg['nb'] or 0,
-        })
+    borne_debut = mois_list[0]
+    from django.db.models.functions import TruncMonth
 
+    ventes_par_mois = {
+        row['mois'].strftime('%Y-%m'): row for row in
+        VentePharmacie.objects.filter(
+            pharmacie=pharmacie, statut='payee', date_vente__date__gte=borne_debut,
+        ).annotate(mois=TruncMonth('date_vente')).values('mois').annotate(
+            total=Sum('montant_net'), nb=Count('id')
+        )
+    }
+    disp_par_mois = {
+        row['mois'].strftime('%Y-%m'): row for row in
+        DispensationOrdonnance.objects.filter(
+            pharmacie=pharmacie, date__date__gte=borne_debut,
+        ).annotate(mois=TruncMonth('date')).values('mois').annotate(nb=Count('id'))
+    }
+
+    ventes_mois = []
     disp_mois = []
     for mo in mois_list:
-        nb = DispensationOrdonnance.objects.filter(
-            pharmacie=pharmacie,
-            date__year=mo.year, date__month=mo.month,
-        ).count()
-        disp_mois.append({'label': mo.strftime('%b %Y'), 'nb': nb})
+        cle = mo.strftime('%Y-%m')
+        agg = ventes_par_mois.get(cle)
+        ventes_mois.append({
+            'label': mo.strftime('%b %Y'),
+            'total': float(agg['total'] or 0) if agg else 0.0,
+            'nb': (agg['nb'] if agg else 0) or 0,
+        })
+        disp = disp_par_mois.get(cle)
+        disp_mois.append({'label': mo.strftime('%b %Y'), 'nb': (disp['nb'] if disp else 0) or 0})
 
     from .models import LigneVente
     mois_actuel = date_type(today.year, today.month, 1)

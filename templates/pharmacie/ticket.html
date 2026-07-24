@@ -22,6 +22,8 @@
 .ticket-total.net { font-size: 16px; font-weight: 800; color: var(--ph-700); border-top: 2px solid var(--ph-600); padding-top: 10px; margin-top: 6px; }
 .ticket-footer { text-align: center; padding: 14px 28px 20px; background: var(--ph-50); border-top: 1px solid var(--ph-border); font-size: 12px; color: var(--ph-muted); }
 .ticket-actions { display: flex; gap: 10px; justify-content: center; padding: 14px 28px; border-top: 1px solid var(--ph-border); }
+.btn-ph-del { display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600; padding:7px 14px; border-radius:6px; border:1px solid rgba(220,53,69,.35); background:rgba(220,53,69,.07); color:var(--rose-btn); cursor:pointer; transition:background .15s,color .15s; }
+.btn-ph-del:hover { background:rgba(220,53,69,.15); color:var(--rose-btn); }
 @media print {
   .ph-nav, .topbar, .ticket-actions, .ph-page-head { display: none !important; }
   .ticket-wrap { box-shadow: none; margin: 0 auto; max-width: 480px; }
@@ -48,6 +50,13 @@
       <div style="font-size:12px;color:var(--ph-muted);">Ticket de caisse</div>
       <div style="font-size:22px;font-weight:800;color:var(--ph-700);font-family: var(--font-mono);">{{ vente.numero }}</div>
       <div style="font-size:12px;color:var(--ph-muted);">{{ vente.date_vente|date:"d/m/Y à H:i" }}</div>
+      {% if vente.statut == 'annulee' %}
+      <div style="margin-top:6px;">
+        <span class="badge-ph-rupture" style="font-size:11px;">
+          <i class="bi bi-x-circle-fill"></i> Vente annulée
+        </span>
+      </div>
+      {% endif %}
     </div>
 
     <div class="ticket-row">
@@ -139,6 +148,15 @@
     <a href="{% url 'pharmacie_caisse' pharmacie %}" class="btn-ph" style="font-size:12px;">
       <i class="bi bi-plus-circle"></i> Nouvelle vente
     </a>
+    {% if can_annuler and vente.statut == 'payee' %}
+    <form method="post" action="{% url 'pharmacie_annuler_vente' pharmacie vente.pk %}"
+          onsubmit="return confirm('Annuler la vente {{ vente.numero }} ? Le stock vendu sera restitué.')">
+      {% csrf_token %}
+      <button type="submit" class="btn-ph-del">
+        <i class="bi bi-x-circle"></i> Annuler la vente
+      </button>
+    </form>
+    {% endif %}
   </div>
 </div>
 

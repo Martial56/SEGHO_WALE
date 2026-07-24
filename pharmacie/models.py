@@ -1,5 +1,24 @@
-from django.db import models
+from django.db import models, transaction
 from django.contrib.auth.models import User
+from django.utils import timezone
+
+
+def _numero_auto(model, prefixe, field='numero'):
+    """
+    Génère un numéro séquentiel PREFIXAAAANNNN pour `model` (champ `field`).
+    select_for_update() sur la dernière ligne du préfixe sérialise les créations
+    concurrentes (utile en production PostgreSQL ; sans effet mais sans risque
+    sur SQLite, qui sérialise déjà les écritures au niveau de la connexion) —
+    même helper que celui déjà utilisé dans achats/models.py.
+    """
+    annee = timezone.now().year
+    prefixe_annee = f'{prefixe}{annee}'
+    with transaction.atomic():
+        dernier = model.objects.select_for_update().filter(
+            **{f'{field}__startswith': prefixe_annee}
+        ).order_by(f'-{field}').first()
+        seq = (int(getattr(dernier, field)[-4:]) + 1) if dernier else 1
+        return f'{prefixe_annee}{seq:04d}'
 
 
 class CategorieMedicament(models.Model):
@@ -139,6 +158,9 @@ class MouvementPharmacie(models.Model):
     class Meta:
         verbose_name = "Mouvement pharmacie"
         ordering = ['-date']
+        indexes = [
+            models.Index(fields=['pharmacie', '-date']),
+        ]
 
 
 class DispensationOrdonnance(models.Model):
@@ -158,6 +180,9 @@ class DispensationOrdonnance(models.Model):
     class Meta:
         verbose_name = "Dispensation ordonnance"
         ordering = ['-date']
+        indexes = [
+            models.Index(fields=['pharmacie', '-date']),
+        ]
 
 
 class LigneDispensation(models.Model):
@@ -200,11 +225,11 @@ class VentePharmacie(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.numero:
-            from django.utils import timezone
-            annee = timezone.now().year
-            dernier = VentePharmacie.objects.filter(numero__startswith=f'VNT{annee}').order_by('-numero').first()
-            seq = (int(dernier.numero[-4:]) + 1) if dernier else 1
-            self.numero = f"VNT{annee}{seq:04d}"
+            self.numero = _numero_auto(VentePharmacie, 'VNT')
+        # Une remise ne peut ni être négative ni dépasser le montant total —
+        # sinon montant_net devient négatif et fausse tous les rapports
+        # financiers qui en font la somme.
+        self.remise = max(0, min(self.remise, self.montant_total))
         self.montant_net = self.montant_total - self.remise
         super().save(*args, **kwargs)
 
@@ -212,6 +237,9 @@ class VentePharmacie(models.Model):
     class Meta:
         verbose_name = "Vente pharmacie"
         ordering = ['-date_vente']
+        indexes = [
+            models.Index(fields=['pharmacie', 'date_vente']),
+        ]
 
 
 class LigneVente(models.Model):
@@ -243,17 +271,16 @@ class InventairePharmacie(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.numero:
-            from django.utils import timezone
-            annee = timezone.now().year
-            dernier = InventairePharmacie.objects.filter(numero__startswith=f'INV-PH{annee}').order_by('-numero').first()
-            seq = (int(dernier.numero[-4:]) + 1) if dernier else 1
-            self.numero = f"INV-PH{annee}{seq:04d}"
+            self.numero = _numero_auto(InventairePharmacie, 'INV-PH')
         super().save(*args, **kwargs)
 
     def __str__(self): return f"Inventaire {self.numero}"
     class Meta:
         verbose_name = "Inventaire pharmacie"
         ordering = ['-date_inventaire']
+        indexes = [
+            models.Index(fields=['pharmacie', 'statut']),
+        ]
 
 
 class LigneInventairePharmacie(models.Model):

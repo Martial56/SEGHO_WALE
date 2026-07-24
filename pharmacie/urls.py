@@ -11,6 +11,7 @@ urlpatterns = [
     path('<str:pharmacie>/journal/',            views.pharmacie_journal,        name='pharmacie_journal'),
     path('<str:pharmacie>/caisse/',            views.pharmacie_caisse,   name='pharmacie_caisse'),
     path('<str:pharmacie>/caisse/<int:pk>/',   views.pharmacie_ticket,   name='pharmacie_ticket'),
+    path('<str:pharmacie>/caisse/<int:pk>/annuler/', views.pharmacie_annuler_vente, name='pharmacie_annuler_vente'),
     path('<str:pharmacie>/recette/',           views.pharmacie_recette,  name='pharmacie_recette'),
     path('<str:pharmacie>/rapport/', views.pharmacie_rapport_journalier, name='pharmacie_rapport_journalier'),
     path('<str:pharmacie>/livraisons/',         views.pharmacie_livraisons,     name='pharmacie_livraisons'),
