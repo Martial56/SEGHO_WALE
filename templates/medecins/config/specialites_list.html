@@ -319,7 +319,7 @@ function executeBulkDelete(){
   if (!ids.length) return;
   var fd = new FormData(); fd.append('csrfmiddlewaretoken', CSRF_TOKEN);
   ids.forEach(function(id){ fd.append('ids[]', id); });
-  fetch(BULK_URL, {method:'POST', body:fd}).then(function(r){ return r.json(); }).then(function(d){ if(d.ok){ closeBulkModal(); fetchList(); } }).catch(closeBulkModal);
+  fetch(BULK_URL, {method:'POST', body:fd}).then(function(r){ return r.json(); }).then(function(d){ if(d.ok){ closeBulkModal(); if (d.message) alert(d.message); fetchList(); } }).catch(closeBulkModal);
 }
 document.getElementById('bulk-delete-modal').addEventListener('click', function(e){ if(e.target===this) closeBulkModal(); });
 

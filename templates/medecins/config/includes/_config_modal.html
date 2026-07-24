@@ -108,6 +108,18 @@ function mdCloseConfigModal() {
 function mdBindConfigForm() {
   var form = document.getElementById('mdcfgConfigForm');
   if (!form) return;
+
+  // Toggle du libellé "actif/inactif" — le formulaire est injecté via
+  // innerHTML, un <script> qu'il contiendrait ne s'exécuterait jamais ;
+  // ce binding doit donc vivre ici plutôt que dans le fragment de la modale.
+  var actifChk = form.querySelector('input[name="actif"]');
+  var actifLbl = document.getElementById('mdcfg-actif-label');
+  if (actifChk && actifLbl) {
+    actifChk.addEventListener('change', function () {
+      actifLbl.textContent = this.checked ? 'Département actif' : 'Département inactif';
+    });
+  }
+
   form.addEventListener('submit', function (e) {
     e.preventDefault();
     var url = form.dataset.url;

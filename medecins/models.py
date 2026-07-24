@@ -21,7 +21,11 @@ class Medecin(models.Model):
     specialite = models.ForeignKey(Specialite, on_delete=models.SET_NULL, null=True, blank=True)
     departement = models.ForeignKey('Departement', on_delete=models.SET_NULL, null=True, blank=True, related_name='medecins', verbose_name="Département")
     service = models.ForeignKey('Service', on_delete=models.SET_NULL, null=True, blank=True, related_name='medecins', verbose_name="Service")
-    ordre_medecin = models.CharField(max_length=50, blank=True)
+    ordre_medecin = models.CharField(
+        max_length=50, blank=True, null=True, unique=True,
+        verbose_name="Numéro d'ordre",
+        help_text="Numéro d'inscription à l'Ordre des Médecins — saisi, pas généré.",
+    )
     taux_honoraire = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     actif = models.BooleanField(default=True)
     date_creation = models.DateTimeField(auto_now_add=True)

@@ -4,8 +4,9 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.contrib import messages
+from django.core.exceptions import PermissionDenied
 from django.utils import timezone
-from django.db.models import F, Q
+from django.db.models import F, Q, Count
 from datetime import timedelta
 
 
@@ -261,9 +262,10 @@ def patients_list(request):
 @login_required(login_url='login')
 def medecins_list(request):
     from medecins.models import Medecin, Specialite
+    from medecins.views import can_manage_medecins
     from django.core.paginator import Paginator
 
-    qs = Medecin.objects.select_related('specialite', 'employe').order_by('employe__nom')
+    qs = Medecin.objects.select_related('specialite', 'departement', 'employe').order_by('employe__nom')
 
     q          = request.GET.get('q', '').strip()
     specialite = request.GET.get('specialite', '')
@@ -281,8 +283,9 @@ def medecins_list(request):
     elif statut == 'inactif':
         qs = qs.filter(actif=False)
 
-    total       = Medecin.objects.count()
-    actifs      = Medecin.objects.filter(actif=True).count()
+    medecin_counts = Medecin.objects.aggregate(total=Count('pk'), actifs=Count('pk', filter=Q(actif=True)))
+    total       = medecin_counts['total']
+    actifs      = medecin_counts['actifs']
     specialites = Specialite.objects.all().order_by('nom')
 
     paginator = Paginator(qs, 20)
@@ -307,6 +310,7 @@ def medecins_list(request):
         'specialite_filtre': specialite,
         'statut_filtre':    statut,
         'vue_active':       vue,
+        'can_manage':       can_manage_medecins(request.user),
     })
 
 
@@ -341,8 +345,13 @@ def medecin_lookup_employe(request):
 @login_required(login_url='login')
 def medecin_create(request):
     from medecins.models import Medecin, Specialite, Service, Departement
+    from medecins.views import can_manage_medecins
     from employer.models import Employe
     from django.contrib.auth.models import User
+    from django.core.exceptions import PermissionDenied
+
+    if not can_manage_medecins(request.user):
+        raise PermissionDenied
 
     specialites = Specialite.objects.order_by('nom')
     departements = Departement.objects.filter(actif=True).order_by('nom')
@@ -359,6 +368,7 @@ def medecin_create(request):
         taux_honoraire = request.POST.get('taux_honoraire', '0').strip() or '0'
         actif = request.POST.get('actif') == 'on'
         user_pk = request.POST.get('user', '')
+        ordre_medecin = request.POST.get('ordre_medecin', '').strip() or None
 
         if not matricule:
             errors['matricule'] = 'Le matricule employé est obligatoire.'
@@ -377,19 +387,10 @@ def medecin_create(request):
             errors['departement'] = 'Le département est obligatoire.'
         elif not Departement.objects.filter(pk=departement_pk).exists():
             errors['departement'] = 'Département invalide.'
+        if ordre_medecin and Medecin.objects.filter(ordre_medecin=ordre_medecin).exists():
+            errors['ordre_medecin'] = 'Ce numéro d\'ordre est déjà utilisé par un autre médecin.'
 
         if not errors:
-            annee = timezone.now().year
-            dernier_ord = Medecin.objects.filter(ordre_medecin__startswith=f'ORD{annee}').order_by('-ordre_medecin').first()
-            if dernier_ord:
-                try:
-                    seq_ord = int(dernier_ord.ordre_medecin[-4:]) + 1
-                except ValueError:
-                    seq_ord = 1
-            else:
-                seq_ord = 1
-            ordre_medecin = f'ORD{annee}{seq_ord:04d}'
-
             service_obj = Service.objects.filter(pk=service_pk).first() if service_pk else employe_trouve.service
 
             med = Medecin(employe=employe_trouve, ordre_medecin=ordre_medecin, actif=actif, service=service_obj)
@@ -407,10 +408,7 @@ def medecin_create(request):
             med.departement = Departement.objects.filter(pk=departement_pk).first() if departement_pk else None
 
             if user_pk:
-                try:
-                    med.user = User.objects.get(pk=user_pk)
-                except User.DoesNotExist:
-                    pass
+                med.user = users_disponibles.filter(pk=user_pk).first()
 
             med.save()
             messages.success(request, f'Médecin {med} enregistré avec succès (matricule : {med.matricule}).')
@@ -435,7 +433,12 @@ def medecin_create(request):
 @login_required(login_url='login')
 def medecin_edit(request, pk):
     from medecins.models import Medecin, Specialite, Service, Departement
+    from medecins.views import can_manage_medecins
     from django.contrib.auth.models import User
+    from django.core.exceptions import PermissionDenied
+
+    if not can_manage_medecins(request.user):
+        raise PermissionDenied
 
     med = get_object_or_404(Medecin, pk=pk)
     specialites = Specialite.objects.order_by('nom')
@@ -453,6 +456,7 @@ def medecin_edit(request, pk):
         taux_honoraire = request.POST.get('taux_honoraire', '0').strip() or '0'
         actif = request.POST.get('actif') == 'on'
         user_pk = request.POST.get('user', '')
+        ordre_medecin = request.POST.get('ordre_medecin', '').strip() or None
 
         if not specialite_pk:
             errors['specialite'] = 'La spécialité est obligatoire.'
@@ -462,9 +466,12 @@ def medecin_edit(request, pk):
             errors['departement'] = 'Le département est obligatoire.'
         elif not Departement.objects.filter(pk=departement_pk).exists():
             errors['departement'] = 'Département invalide.'
+        if ordre_medecin and Medecin.objects.filter(ordre_medecin=ordre_medecin).exclude(pk=med.pk).exists():
+            errors['ordre_medecin'] = 'Ce numéro d\'ordre est déjà utilisé par un autre médecin.'
 
         if not errors:
             med.actif = actif
+            med.ordre_medecin = ordre_medecin
             try:
                 med.taux_honoraire = float(taux_honoraire)
             except ValueError:
@@ -475,10 +482,7 @@ def medecin_edit(request, pk):
             med.service = Service.objects.filter(pk=service_pk).first() if service_pk else None
 
             if user_pk:
-                try:
-                    med.user = User.objects.get(pk=user_pk)
-                except User.DoesNotExist:
-                    med.user = None
+                med.user = users_disponibles.filter(pk=user_pk).first()
             else:
                 med.user = None
 
@@ -500,10 +504,11 @@ def medecin_edit(request, pk):
 @login_required(login_url='login')
 def medecin_detail(request, pk):
     from medecins.models import Medecin
+    from medecins.views import can_manage_medecins
     from consultations.models import Consultation
     from patients.models import RendezVous
 
-    med = get_object_or_404(Medecin, pk=pk)
+    med = get_object_or_404(Medecin.objects.select_related('employe', 'specialite', 'departement', 'service'), pk=pk)
 
     today = timezone.now().date()
     consultations_recentes = (
@@ -518,26 +523,67 @@ def medecin_detail(request, pk):
         .select_related('patient')
         .order_by('date_heure')[:5]
     )
-    stats = {
-        'total_consultations': Consultation.objects.filter(medecin=med).count(),
-        'consultations_mois':  Consultation.objects.filter(
-            medecin=med,
-            date_heure__month=today.month,
-            date_heure__year=today.year,
-        ).count(),
-        'rdv_total':   RendezVous.objects.filter(medecin=med).count(),
-        'rdv_a_venir': RendezVous.objects.filter(
-            medecin=med, date_heure__date__gte=today,
-            statut__in=['planifie', 'confirme', 'en_attente']
-        ).count(),
-    }
+    stats = Consultation.objects.filter(medecin=med).aggregate(
+        total_consultations=Count('pk'),
+        consultations_mois=Count('pk', filter=Q(date_heure__month=today.month, date_heure__year=today.year)),
+    )
+    stats.update(RendezVous.objects.filter(medecin=med).aggregate(
+        rdv_total=Count('pk'),
+        rdv_a_venir=Count('pk', filter=Q(
+            date_heure__date__gte=today, statut__in=['planifie', 'confirme', 'en_attente']
+        )),
+    ))
     return render(request, 'medecins/detail.html', {
         'med': med,
+        'can_manage': can_manage_medecins(request.user),
         'consultations_recentes': consultations_recentes,
         'rdv_a_venir': rdv_a_venir,
         'stats': stats,
+        'planning_grid': _planning_grid_medecin(med),
         'today': today,
     })
+
+
+def _planning_grid_medecin(med):
+    """Grille des affectations de la semaine courante pour un médecin, à
+    partir du planning publié (module planning) — même heuristique de
+    correspondance nom-libre que planning._conges_conflicts (le champ
+    Affectation.personnel est du texte libre, pas une FK vers Medecin)."""
+    from datetime import date, timedelta
+    from planning.models import PlanningHebdomadaire
+    from planning.views import split_names, JOURS_LABELS
+
+    today = date.today()
+    monday = today - timedelta(days=today.weekday())
+    planning = PlanningHebdomadaire.objects.filter(semaine_debut=monday, publie=True).first()
+    if not planning:
+        return None
+
+    key = med.nom.lower().strip()
+    if not key:
+        return []
+    affectations = (
+        planning.affectations.exclude(personnel='')
+        .select_related('plage__bureau')
+        .order_by('plage__bureau__ordre', 'plage__ordre', 'jour')
+    )
+    matched = [
+        aff for aff in affectations
+        if any(key in n.lower() for n in split_names(aff.personnel))
+    ]
+    if not matched:
+        return []
+
+    rows_map = {}
+    for aff in matched:
+        row = rows_map.setdefault(aff.plage_id, {'plage': aff.plage, 'jours': [None] * 6})
+        row['jours'][aff.jour] = aff
+
+    grid = [
+        {'plage': row['plage'], 'jours': [{'aff': a} for a in row['jours']]}
+        for row in rows_map.values()
+    ]
+    return {'semaine': planning, 'jours': JOURS_LABELS, 'grid': grid}
 
 
 @login_required(login_url='login')
@@ -2107,14 +2153,14 @@ def medecins_specialites(request):
     q   = request.GET.get('q', '').strip()
     vue = request.GET.get('vue', 'liste')
     qs  = Specialite.objects.order_by('nom')
+    total = qs.count()
     if q:
         qs = qs.filter(Q(nom__icontains=q) | Q(code__icontains=q))
-    total = Specialite.objects.count()
     paginator = Paginator(qs, 25)
     page_obj  = paginator.get_page(request.GET.get('page'))
     return render(request, 'medecins/config/specialites_list.html', {
         'page_obj': page_obj, 'total': total,
-        'total_filtre': qs.count(), 'q': q, 'vue': vue,
+        'total_filtre': total if not q else qs.count(), 'q': q, 'vue': vue,
     })
 
 
@@ -2134,6 +2180,9 @@ def medecins_specialite_detail(request, pk):
 
 @login_required(login_url='login')
 def medecins_specialite_create(request):
+    from medecins.views import can_manage_medecins
+    if not can_manage_medecins(request.user):
+        raise PermissionDenied
     is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
     Form = _specialite_form_class()
     form = Form(request.POST or None)
@@ -2152,6 +2201,9 @@ def medecins_specialite_create(request):
 @login_required(login_url='login')
 def medecins_specialite_edit(request, pk):
     from medecins.models import Specialite
+    from medecins.views import can_manage_medecins
+    if not can_manage_medecins(request.user):
+        raise PermissionDenied
     is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
     obj  = get_object_or_404(Specialite, pk=pk)
     Form = _specialite_form_class()
@@ -2171,11 +2223,19 @@ def medecins_specialite_edit(request, pk):
 @login_required(login_url='login')
 @require_POST
 def medecins_specialite_bulk_delete(request):
-    from medecins.models import Specialite
+    from medecins.models import Specialite, Medecin
+    from medecins.views import can_manage_medecins
+    if not can_manage_medecins(request.user):
+        raise PermissionDenied
     ids = request.POST.getlist('ids[]')
+    message = ''
     if ids:
+        nb_medecins = Medecin.objects.filter(specialite_id__in=ids, actif=True).count()
         Specialite.objects.filter(pk__in=ids).delete()
-    return JsonResponse({'ok': True})
+        if nb_medecins:
+            message = (f'{nb_medecins} médecin(s) actif(s) rattaché(s) à ces spécialités '
+                       f'sont désormais « Sans spécialité ».')
+    return JsonResponse({'ok': True, 'message': message})
 
 
 _SPEC_HDR = ['code', 'nom', 'description']
@@ -2200,7 +2260,12 @@ def medecins_export_specialites(request):
 @require_POST
 def medecins_import_specialites(request):
     from medecins.models import Specialite
+    from medecins.views import can_manage_medecins
     from services.views import _parse_upload, _s
+    from django.db import transaction
+
+    if not can_manage_medecins(request.user):
+        raise PermissionDenied
 
     upload = request.FILES.get('fichier')
     if not upload:
@@ -2214,28 +2279,29 @@ def medecins_import_specialites(request):
 
     do_update = 'update' in request.POST
     created = updated = skipped = errors = 0
-    for item in data:
-        try:
-            code = _s(item.get('code', ''))
-            if not code:
+    with transaction.atomic():
+        for item in data:
+            try:
+                code = _s(item.get('code', ''))
+                if not code:
+                    errors += 1
+                    continue
+                defaults = {
+                    'nom': _s(item.get('nom', code)),
+                    'description': _s(item.get('description', '')),
+                }
+                obj, was_created = Specialite.objects.get_or_create(code=code, defaults=defaults)
+                if was_created:
+                    created += 1
+                elif do_update:
+                    for k, v in defaults.items():
+                        setattr(obj, k, v)
+                    obj.save()
+                    updated += 1
+                else:
+                    skipped += 1
+            except Exception:
                 errors += 1
-                continue
-            defaults = {
-                'nom': _s(item.get('nom', code)),
-                'description': _s(item.get('description', '')),
-            }
-            obj, was_created = Specialite.objects.get_or_create(code=code, defaults=defaults)
-            if was_created:
-                created += 1
-            elif do_update:
-                for k, v in defaults.items():
-                    setattr(obj, k, v)
-                obj.save()
-                updated += 1
-            else:
-                skipped += 1
-        except Exception:
-            errors += 1
 
     if errors:
         messages.warning(request, f'{created} créée(s), {updated} mise(s) à jour, {skipped} ignorée(s), {errors} erreur(s).')
@@ -2272,14 +2338,14 @@ def medecins_departements(request):
     q   = request.GET.get('q', '').strip()
     vue = request.GET.get('vue', 'liste')
     qs  = Departement.objects.annotate(nb_medecins=Count('medecins')).order_by('nom')
+    total = qs.count()
     if q:
         qs = qs.filter(Q(nom__icontains=q) | Q(code__icontains=q))
-    total = Departement.objects.count()
     paginator = Paginator(qs, 25)
     page_obj  = paginator.get_page(request.GET.get('page'))
     return render(request, 'medecins/config/departements_list.html', {
         'page_obj': page_obj, 'total': total,
-        'total_filtre': qs.count(), 'q': q, 'vue': vue,
+        'total_filtre': total if not q else qs.count(), 'q': q, 'vue': vue,
     })
 
 
@@ -2289,7 +2355,7 @@ def medecins_departement_detail(request, pk):
     obj = get_object_or_404(Departement, pk=pk)
     pks = list(Departement.objects.order_by('nom').values_list('pk', flat=True))
     pos = pks.index(pk) if pk in pks else None
-    medecins = obj.medecins.select_related('employe').order_by('employe__nom', 'employe__prenoms')
+    medecins = obj.medecins.select_related('employe', 'specialite').order_by('employe__nom', 'employe__prenoms')
     return render(request, 'medecins/config/departement_detail.html', {
         'obj':      obj,
         'medecins': medecins,
@@ -2300,6 +2366,9 @@ def medecins_departement_detail(request, pk):
 
 @login_required(login_url='login')
 def medecins_departement_create(request):
+    from medecins.views import can_manage_medecins
+    if not can_manage_medecins(request.user):
+        raise PermissionDenied
     is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
     Form = _departement_form_class()
     form = Form(request.POST or None)
@@ -2318,6 +2387,9 @@ def medecins_departement_create(request):
 @login_required(login_url='login')
 def medecins_departement_edit(request, pk):
     from medecins.models import Departement
+    from medecins.views import can_manage_medecins
+    if not can_manage_medecins(request.user):
+        raise PermissionDenied
     is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
     obj  = get_object_or_404(Departement, pk=pk)
     Form = _departement_form_class()
@@ -2337,11 +2409,19 @@ def medecins_departement_edit(request, pk):
 @login_required(login_url='login')
 @require_POST
 def medecins_departement_bulk_delete(request):
-    from medecins.models import Departement
+    from medecins.models import Departement, Medecin
+    from medecins.views import can_manage_medecins
+    if not can_manage_medecins(request.user):
+        raise PermissionDenied
     ids = request.POST.getlist('ids[]')
+    message = ''
     if ids:
+        nb_medecins = Medecin.objects.filter(departement_id__in=ids, actif=True).count()
         Departement.objects.filter(pk__in=ids).delete()
-    return JsonResponse({'ok': True})
+        if nb_medecins:
+            message = (f'{nb_medecins} médecin(s) actif(s) rattaché(s) à ces départements '
+                       f'sont désormais « Sans département ».')
+    return JsonResponse({'ok': True, 'message': message})
 
 
 _DEPT_HDR = ['code', 'nom', 'description', 'actif']
@@ -2366,7 +2446,12 @@ def medecins_export_departements(request):
 @require_POST
 def medecins_import_departements(request):
     from medecins.models import Departement
+    from medecins.views import can_manage_medecins
     from services.views import _parse_upload, _s, _b
+    from django.db import transaction
+
+    if not can_manage_medecins(request.user):
+        raise PermissionDenied
 
     upload = request.FILES.get('fichier')
     if not upload:
@@ -2380,29 +2465,30 @@ def medecins_import_departements(request):
 
     do_update = 'update' in request.POST
     created = updated = skipped = errors = 0
-    for item in data:
-        try:
-            code = _s(item.get('code', ''))
-            if not code:
+    with transaction.atomic():
+        for item in data:
+            try:
+                code = _s(item.get('code', ''))
+                if not code:
+                    errors += 1
+                    continue
+                defaults = {
+                    'nom': _s(item.get('nom', code)),
+                    'description': _s(item.get('description', '')),
+                    'actif': _b(item.get('actif', True)),
+                }
+                obj, was_created = Departement.objects.get_or_create(code=code, defaults=defaults)
+                if was_created:
+                    created += 1
+                elif do_update:
+                    for k, v in defaults.items():
+                        setattr(obj, k, v)
+                    obj.save()
+                    updated += 1
+                else:
+                    skipped += 1
+            except Exception:
                 errors += 1
-                continue
-            defaults = {
-                'nom': _s(item.get('nom', code)),
-                'description': _s(item.get('description', '')),
-                'actif': _b(item.get('actif', True)),
-            }
-            obj, was_created = Departement.objects.get_or_create(code=code, defaults=defaults)
-            if was_created:
-                created += 1
-            elif do_update:
-                for k, v in defaults.items():
-                    setattr(obj, k, v)
-                obj.save()
-                updated += 1
-            else:
-                skipped += 1
-        except Exception:
-            errors += 1
 
     if errors:
         messages.warning(request, f'{created} créé(s), {updated} mis à jour, {skipped} ignoré(s), {errors} erreur(s).')

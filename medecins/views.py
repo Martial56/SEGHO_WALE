@@ -8,22 +8,60 @@ from django.core.exceptions import PermissionDenied
 
 from .models import Medecin
 
+# Mêmes rôles que la RH (employer.views.RH_MANAGE_GROUPS) — un médecin est
+# avant tout un employé, et son annuaire (spécialités/départements/services,
+# taux d'honoraire) est une donnée de gestion RH/direction, pas une donnée
+# ouverte à tout utilisateur connecté.
+MEDECIN_MANAGE_GROUPS = {'Médecin Chef', 'Médecin Chef Adjoint', 'Administrateur', 'Directeur', 'RH'}
+
+
+def can_manage_medecins(user):
+    return user.is_superuser or user.groups.filter(name__in=MEDECIN_MANAGE_GROUPS).exists()
+
 
 @login_required(login_url='login')
 @require_POST
 def medecin_supprimer(request, pk):
-    if not (request.user.is_staff or request.user.is_superuser):
+    if not can_manage_medecins(request.user):
         raise PermissionDenied
     med = get_object_or_404(Medecin, pk=pk)
     nom = str(med)
-    med.delete()
-    messages.success(request, f'{nom} a été supprimé.')
+
+    # Un médecin ayant un historique clinique (consultations, ordonnances,
+    # rendez-vous, dossiers d'hospitalisation) ne doit jamais être supprimé
+    # physiquement : toutes les FK vers Medecin sont en SET_NULL, une
+    # suppression déconnecterait silencieusement cet historique de son
+    # médecin. On désactive à la place, et on ne supprime réellement que les
+    # fiches sans aucune trace clinique (créées par erreur, jamais utilisées).
+    from consultations.models import Consultation, Ordonnance
+    from patients.models import RendezVous
+    from hospitalisation.models import Hospitalisation
+    a_un_historique = (
+        Consultation.objects.filter(medecin=med).exists()
+        or Ordonnance.objects.filter(medecin=med).exists()
+        or RendezVous.objects.filter(medecin=med).exists()
+        or Hospitalisation.objects.filter(Q(medecin_traitant=med) | Q(medecin_referent=med)).exists()
+    )
+    if a_un_historique:
+        med.actif = False
+        med.save(update_fields=['actif'])
+        messages.success(
+            request,
+            f'{nom} a un historique clinique — désactivé(e) au lieu d\'être supprimé(e) '
+            f'(consultations/ordonnances/rendez-vous conservés).'
+        )
+    else:
+        med.delete()
+        messages.success(request, f'{nom} a été supprimé(e).')
     return redirect('medecins_list')
 
 
 @login_required(login_url='login')
 def medecins_export_csv(request):
     from core.utils import csv_response
+
+    if not can_manage_medecins(request.user):
+        raise PermissionDenied
 
     qs = Medecin.objects.select_related('specialite', 'service', 'employe').order_by('employe__nom')
     q          = request.GET.get('q', '').strip()
@@ -65,8 +103,9 @@ def medecin_dashboard(request):
     from datetime import date
 
     today = timezone.now().date()
-    total  = Medecin.objects.count()
-    actifs = Medecin.objects.filter(actif=True).count()
+    medecin_counts = Medecin.objects.aggregate(total=Count('pk'), actifs=Count('pk', filter=Q(actif=True)))
+    total  = medecin_counts['total']
+    actifs = medecin_counts['actifs']
 
     # 6 months ago (safe arithmetic)
     m = today.month - 6
@@ -99,9 +138,12 @@ def medecin_dashboard(request):
     chart_labels = [m['mois'].strftime('%b %Y') for m in monthly_raw]
     chart_data   = [m['n'] for m in monthly_raw]
 
-    # Top 8 médecins par consultations (6 derniers mois)
+    # Top 8 médecins par consultations (6 derniers mois) — cohérent avec
+    # par_specialite ci-dessous, on n'y compte que les médecins actifs.
     top_medecins = list(
-        Consultation.objects.filter(date_heure__date__gte=six_mois_ago, medecin__isnull=False)
+        Consultation.objects.filter(
+            date_heure__date__gte=six_mois_ago, medecin__isnull=False, medecin__actif=True,
+        )
         .values('medecin__pk', 'medecin__employe__nom', 'medecin__employe__prenoms')
         .annotate(n=Count('id'))
         .order_by('-n')[:8]

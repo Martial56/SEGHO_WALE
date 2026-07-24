@@ -169,25 +169,3 @@
 
 {% endblock %}
 
-{% block extra_js %}
-{{ block.super }}
-<script>
-(function () {
-  function alignSousTopbar() {
-    var topbar = document.querySelector('.topbar');
-    var content = document.querySelector('.content');
-    if (!topbar || !content) return;
-    var tbH = Math.ceil(topbar.getBoundingClientRect().height);
-    if (tbH <= 0) return;
-    document.documentElement.style.setProperty('--header-h', tbH + 'px');
-    requestAnimationFrame(function () {
-      var gap = Math.round(content.getBoundingClientRect().top - topbar.getBoundingClientRect().bottom);
-      document.documentElement.style.setProperty('--header-h', (tbH - gap) + 'px');
-    });
-  }
-  if (document.readyState !== 'loading') { alignSousTopbar(); }
-  else { document.addEventListener('DOMContentLoaded', alignSousTopbar); }
-  window.addEventListener('resize', alignSousTopbar);
-})();
-</script>
-{% endblock %}
