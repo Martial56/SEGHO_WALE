@@ -1,0 +1,281 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rapport mensuel de consultations gynécologiques — {{ mois_nom }} {{ annee }}</title>
+<style>
+:root { --font-print: 'Segoe UI', Arial, sans-serif; --brand: #1a5c4a; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-print); background: #e5e7eb; color: #1a1a2e; font-size: 12px; }
+
+/* ── Contrôles écran ── */
+.print-toolbar {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  background: var(--brand); color: #fff; padding: 10px 24px;
+  position: sticky; top: 0; z-index: 100;
+}
+.print-toolbar span.tb-title { font-size: 13px; font-weight: 600; margin-right: auto; }
+.periode-form { display: flex; align-items: center; gap: 6px; }
+.periode-form select, .periode-form input {
+  border: none; border-radius: 4px; padding: 5px 8px; font-size: 12px; font-family: inherit;
+}
+.toolbar-btn {
+  padding: 6px 16px; border-radius: 5px; font-size: 12px; font-weight: 600;
+  cursor: pointer; border: none; display: inline-flex; align-items: center; gap: 6px;
+  font-family: inherit; text-decoration: none;
+}
+.btn-print { background: #fff; color: var(--brand); }
+.btn-appliquer { background: rgba(255,255,255,.2); color: #fff; }
+.btn-back { background: rgba(255,255,255,.15); color: #fff; }
+.btn-back:hover { background: rgba(255,255,255,.25); }
+
+/* ── Page (large, la fiche papier est en format paysage) ── */
+.rm-page {
+  max-width: 1500px; margin: 24px auto; background: #fff;
+  border-radius: 4px; box-shadow: 0 4px 24px rgba(0,0,0,.12);
+  padding: 34px 42px 40px; overflow-x: auto;
+}
+.rm-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.rm-logo { display: flex; align-items: center; gap: 10px; }
+.rm-logo-circle {
+  width: 46px; height: 46px; border-radius: 50%; border: 2px solid var(--brand);
+  display: flex; align-items: center; justify-content: center; overflow: hidden; background: #fff; flex-shrink: 0;
+}
+.rm-logo-circle img { width: 100%; height: 100%; object-fit: contain; padding: 3px; }
+.rm-logo-name { font-size: 14px; font-weight: 800; color: var(--brand); letter-spacing: .3px; }
+.rm-page-num { font-size: 11px; color: #9ca3af; }
+.rm-title { text-align: center; font-size: 16px; font-weight: 800; color: var(--brand); margin: 10px 0 4px; text-transform: uppercase; }
+.rm-subtitle { text-align: center; font-size: 12.5px; color: #374151; margin-bottom: 20px; }
+.rm-subtitle strong { color: var(--brand); }
+
+.rm-section-title {
+  font-size: 12.5px; font-weight: 800; text-transform: uppercase; color: var(--brand);
+  margin: 20px 0 8px; padding-bottom: 4px; border-bottom: 1.5px solid var(--brand);
+}
+.rm-sub-title { font-size: 11.5px; font-weight: 700; color: #374151; margin: 12px 0 6px; text-decoration: underline; }
+
+.rm-val { font-weight: 700; color: var(--brand); }
+.rm-blank { display: inline-block; min-width: 20px; border-bottom: 1px solid #9ca3af; height: 12px; }
+
+/* ── Grille âge × sexe (colonnes serrées) ── */
+table.gr-table { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
+table.gr-table th, table.gr-table td {
+  border: 1px solid #9ca3af; padding: 3px 4px; font-size: 9.5px; text-align: center; vertical-align: middle;
+}
+table.gr-table th { background: #f0fdf4; font-weight: 700; color: #1f2937; }
+table.gr-table td.gr-label, table.gr-table th.gr-label { text-align: left; font-size: 10px; font-weight: 600; min-width: 170px; }
+table.gr-table td.num { min-width: 24px; }
+table.gr-table th.gr-refere, table.gr-table td.gr-refere { background: #fef3f2; }
+table.gr-table th.gr-total, table.gr-table td.gr-total { background: #f9fafb; font-weight: 800; }
+
+.rm-legende {
+  margin-top: 10px; font-size: 10px; color: #6b7280; font-style: italic; line-height: 1.6;
+  border-top: 1px dashed #d1d5db; padding-top: 8px;
+}
+
+.rm-signatures { display: flex; justify-content: space-between; margin-top: 34px; gap: 16px; }
+.rm-signature-box { flex: 1; text-align: center; border: 1px solid #9ca3af; border-radius: 4px; padding: 14px 8px 40px; font-size: 10.5px; font-weight: 700; }
+
+.rm-page-break { page-break-after: always; }
+
+@media print {
+  body { background: #fff; }
+  .print-toolbar { display: none !important; }
+  .rm-page {
+    margin: 0; padding: 10mm 8mm 14mm; box-shadow: none; border-radius: 0; max-width: 100%; overflow-x: visible;
+  }
+}
+@page { size: A4 landscape; margin: 0; }
+</style>
+</head>
+<body>
+
+<!-- ── Barre d'outils (écran seulement) ── -->
+<div class="print-toolbar">
+  <span class="tb-title">Rapport mensuel gynécologie — {{ mois_nom }} {{ annee }}</span>
+  <form class="periode-form" method="get">
+    <select name="mois">
+      <option value="1" {% if mois == 1 %}selected{% endif %}>Janvier</option>
+      <option value="2" {% if mois == 2 %}selected{% endif %}>Février</option>
+      <option value="3" {% if mois == 3 %}selected{% endif %}>Mars</option>
+      <option value="4" {% if mois == 4 %}selected{% endif %}>Avril</option>
+      <option value="5" {% if mois == 5 %}selected{% endif %}>Mai</option>
+      <option value="6" {% if mois == 6 %}selected{% endif %}>Juin</option>
+      <option value="7" {% if mois == 7 %}selected{% endif %}>Juillet</option>
+      <option value="8" {% if mois == 8 %}selected{% endif %}>Août</option>
+      <option value="9" {% if mois == 9 %}selected{% endif %}>Septembre</option>
+      <option value="10" {% if mois == 10 %}selected{% endif %}>Octobre</option>
+      <option value="11" {% if mois == 11 %}selected{% endif %}>Novembre</option>
+      <option value="12" {% if mois == 12 %}selected{% endif %}>Décembre</option>
+    </select>
+    <input type="number" name="annee" value="{{ annee }}" min="2000" max="2100" style="width:80px;">
+    <button type="submit" class="toolbar-btn btn-appliquer">Appliquer</button>
+  </form>
+  <button class="toolbar-btn btn-print" onclick="window.print()">Imprimer / Télécharger PDF</button>
+  <a class="toolbar-btn btn-back" href="{% url 'rapports:hub' %}">← Fermer</a>
+</div>
+
+<!-- ══════════════════════ PAGE 1 : Activités + Tableau A ══════════════════════ -->
+<div class="rm-page">
+  <div class="rm-header">
+    <div class="rm-logo">
+      <div class="rm-logo-circle"><img src="{% static 'img/logo.png' %}" alt="CMS WALÉ"></div>
+      <div class="rm-logo-name">CENTRE MEDICO SOCIAL WALE</div>
+    </div>
+    <div class="rm-page-num">1</div>
+  </div>
+  <div class="rm-title">Fiche de rapport mensuel de consultations gynécologiques</div>
+  <div class="rm-subtitle">ANNÉE : <strong>{{ annee }}</strong> &nbsp;—&nbsp; MOIS : <strong>{{ mois_nom }}</strong> &nbsp;—&nbsp; Gynécologie : <span class="rm-blank" style="min-width:140px;"></span></div>
+
+  <div class="rm-sub-title">Activités</div>
+  <table class="gr-table">
+    <thead>
+      <tr>
+        <th rowspan="2" class="gr-label">Activités</th>
+        {% for label in age_brackets %}<th colspan="2">{{ label }}</th>{% endfor %}
+        <th colspan="2" class="gr-total">Total</th>
+      </tr>
+      <tr>
+        {% for label in age_brackets %}<th>F</th><th>M</th>{% endfor %}
+        <th class="gr-total">F</th><th class="gr-total">M</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="gr-label">Nombre de consultant</td>
+        {% for cell in activites.consultant.cells %}<td class="num rm-val">{{ cell.F }}</td><td class="num rm-val">{{ cell.M }}</td>{% endfor %}
+        <td class="num rm-val gr-total">{{ activites.consultant.total.F }}</td><td class="num rm-val gr-total">{{ activites.consultant.total.M }}</td>
+      </tr>
+      <tr>
+        <td class="gr-label">Nombre de consultations</td>
+        {% for cell in activites.consultations.cells %}<td class="num rm-val">{{ cell.F }}</td><td class="num rm-val">{{ cell.M }}</td>{% endfor %}
+        <td class="num rm-val gr-total">{{ activites.consultations.total.F }}</td><td class="num rm-val gr-total">{{ activites.consultations.total.M }}</td>
+      </tr>
+      <tr>
+        <td class="gr-label">Nombre de cas référés</td>
+        {% for cell in activites.referes.cells %}<td class="num rm-val">{{ cell.F }}</td><td class="num rm-val">{{ cell.M }}</td>{% endfor %}
+        <td class="num rm-val gr-total">{{ activites.referes.total.F }}</td><td class="num rm-val gr-total">{{ activites.referes.total.M }}</td>
+      </tr>
+      <tr>
+        <td class="gr-label">Nombre de cas contre référés</td>
+        {% for label in age_brackets %}<td class="num"><span class="rm-blank"></span></td><td class="num"><span class="rm-blank"></span></td>{% endfor %}
+        <td class="num gr-total"><span class="rm-blank"></span></td><td class="num gr-total"><span class="rm-blank"></span></td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="rm-legende">
+    Consultant / Consultations / Cas référés : calculés à partir du champ « Type de visite curative » (Consultant, Contrôle) et « Issue de la consultation »
+    (Référé(e) en externe) saisis dans l'onglet Curatif du formulaire gynécologie. Cas contre référés : aucune source de données — à compléter manuellement.
+  </div>
+
+  <div class="rm-sub-title" style="margin-top:18px;">A- Pathologie sur grossesse</div>
+  <table class="gr-table">
+    <thead>
+      <tr>
+        <th rowspan="2" class="gr-label"></th>
+        {% for label in age_brackets %}<th colspan="2">{{ label }}</th>{% endfor %}
+        <th colspan="2" class="gr-total">Total</th>
+        <th colspan="2" class="gr-refere">Cas référés</th>
+      </tr>
+      <tr>
+        {% for label in age_brackets %}<th>F</th><th>M</th>{% endfor %}
+        <th class="gr-total">F</th><th class="gr-total">M</th>
+        <th class="gr-refere">F</th><th class="gr-refere">M</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ligne in lignes_grossesse %}
+      <tr>
+        <td class="gr-label">{{ ligne.nom }}</td>
+        {% for cell in ligne.cells %}<td class="num">{{ cell.F }}</td><td class="num">{{ cell.M }}</td>{% endfor %}
+        <td class="num gr-total">{{ ligne.total.F }}</td><td class="num gr-total">{{ ligne.total.M }}</td>
+        <td class="num gr-refere">{{ ligne.referes.F }}</td><td class="num gr-refere">{{ ligne.referes.M }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- ══════════════════════ PAGE 2 : Tableau B (infectieuses + autres) ══════════════════════ -->
+<div class="rm-page">
+  <div class="rm-header">
+    <div class="rm-logo">
+      <div class="rm-logo-circle"><img src="{% static 'img/logo.png' %}" alt="CMS WALÉ"></div>
+      <div class="rm-logo-name">CENTRE MEDICO SOCIAL WALE</div>
+    </div>
+    <div class="rm-page-num">2</div>
+  </div>
+
+  <div class="rm-sub-title">B- Maladies infectieuses</div>
+  <table class="gr-table">
+    <thead>
+      <tr>
+        <th rowspan="2" class="gr-label"></th>
+        {% for label in age_brackets %}<th colspan="2">{{ label }}</th>{% endfor %}
+        <th colspan="2" class="gr-total">Total</th>
+        <th colspan="2" class="gr-refere">Cas référés</th>
+      </tr>
+      <tr>
+        {% for label in age_brackets %}<th>F</th><th>M</th>{% endfor %}
+        <th class="gr-total">F</th><th class="gr-total">M</th>
+        <th class="gr-refere">F</th><th class="gr-refere">M</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ligne in lignes_infectieuse %}
+      <tr>
+        <td class="gr-label">{{ ligne.nom }}</td>
+        {% for cell in ligne.cells %}<td class="num">{{ cell.F }}</td><td class="num">{{ cell.M }}</td>{% endfor %}
+        <td class="num gr-total">{{ ligne.total.F }}</td><td class="num gr-total">{{ ligne.total.M }}</td>
+        <td class="num gr-refere">{{ ligne.referes.F }}</td><td class="num gr-refere">{{ ligne.referes.M }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="rm-sub-title" style="margin-top:18px;">C- Autres maladies non infectieuses et facteurs de risque cardiovasculaire</div>
+  <table class="gr-table">
+    <thead>
+      <tr>
+        <th rowspan="2" class="gr-label">Maladies</th>
+        {% for label in age_brackets %}<th colspan="2">{{ label }}</th>{% endfor %}
+        <th colspan="2" class="gr-total">Total</th>
+        <th colspan="2" class="gr-refere">Cas référés</th>
+      </tr>
+      <tr>
+        {% for label in age_brackets %}<th>F</th><th>M</th>{% endfor %}
+        <th class="gr-total">F</th><th class="gr-total">M</th>
+        <th class="gr-refere">F</th><th class="gr-refere">M</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ligne in lignes_autre %}
+      <tr>
+        <td class="gr-label">{{ ligne.nom }}</td>
+        {% for cell in ligne.cells %}<td class="num">{{ cell.F }}</td><td class="num">{{ cell.M }}</td>{% endfor %}
+        <td class="num gr-total">{{ ligne.total.F }}</td><td class="num gr-total">{{ ligne.total.M }}</td>
+        <td class="num gr-refere">{{ ligne.referes.F }}</td><td class="num gr-refere">{{ ligne.referes.M }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="rm-legende">
+    Les pathologies sont classées selon la catégorie renseignée dans le catalogue Pathologies. Chaque consultation curative peut compter dans plusieurs
+    lignes si plusieurs pathologies ont été sélectionnées.
+  </div>
+
+  <div class="rm-signatures">
+    <div class="rm-signature-box">Nom et signature de la gynécologue</div>
+    <div class="rm-signature-box">Nom et signature du gestionnaire de données</div>
+  </div>
+</div>
+
+<script>
+  if (window.location.search.indexOf('auto=1') !== -1) {
+    window.addEventListener('load', function() { window.print(); });
+  }
+</script>
+</body>
+</html>

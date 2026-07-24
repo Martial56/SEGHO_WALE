@@ -12,6 +12,8 @@ from django.utils import timezone
 
 from .export import csv_response, xlsx_response
 from .maternite import calculer_rapport_maternite
+from .soins import calculer_rapport_soins
+from .gynecologie import calculer_rapport_gynecologie
 from .models import HistoriqueRapport
 from .registry import REPORT_CATALOGUE, REPORTS_BY_SLUG
 
@@ -160,6 +162,40 @@ def rapports_maternite(request):
 
     rapport = calculer_rapport_maternite(annee, mois)
     return render(request, 'rapports/rapport_maternite.html', rapport)
+
+
+@login_required(login_url='login')
+def rapports_soins(request):
+    today = datetime.now().date()
+    try:
+        annee = int(request.GET.get('annee', today.year))
+    except ValueError:
+        annee = today.year
+    try:
+        mois = int(request.GET.get('mois', today.month))
+    except ValueError:
+        mois = today.month
+    mois = min(max(mois, 1), 12)
+
+    rapport = calculer_rapport_soins(annee, mois)
+    return render(request, 'rapports/rapport_soins.html', rapport)
+
+
+@login_required(login_url='login')
+def rapports_gynecologie(request):
+    today = datetime.now().date()
+    try:
+        annee = int(request.GET.get('annee', today.year))
+    except ValueError:
+        annee = today.year
+    try:
+        mois = int(request.GET.get('mois', today.month))
+    except ValueError:
+        mois = today.month
+    mois = min(max(mois, 1), 12)
+
+    rapport = calculer_rapport_gynecologie(annee, mois)
+    return render(request, 'rapports/rapport_gynecologie.html', rapport)
 
 
 @login_required(login_url='login')
