@@ -25,6 +25,23 @@ def set_date_depart(sender, instance, **kwargs):
 
 
 @receiver(post_save, sender='employer.Employe')
+def sync_medecin_actif(sender, instance, created, **kwargs):
+    """Désactive automatiquement la fiche médecin liée quand l'employé n'est
+    plus 'actif' (quitté, suspendu) — un employé parti ne doit pas rester
+    indéfiniment listé comme médecin actif (annuaire, dashboard, sélecteurs
+    de chef de service…) tant que personne n'a pensé à décocher sa fiche
+    médecin séparément. Volontairement à sens unique : la réactivation d'une
+    fiche médecin après un retour reste une action délibérée côté module
+    Médecins, pas un effet de bord automatique du statut RH."""
+    if created or instance.statut == 'actif':
+        return
+    medecin = getattr(instance, 'fiche_medecin', None)
+    if medecin is not None and medecin.actif:
+        medecin.actif = False
+        medecin.save(update_fields=['actif'])
+
+
+@receiver(post_save, sender='employer.Employe')
 def init_solde_conge(sender, instance, created, **kwargs):
     """Crée automatiquement un SoldeConge pour l'année en cours lors de l'embauche."""
     if not created or instance.statut != 'actif':
@@ -36,5 +53,5 @@ def init_solde_conge(sender, instance, created, **kwargs):
     SoldeConge.objects.get_or_create(
         employe=instance,
         annee=annee,
-        defaults={'quota': quota_annuel(instance)},
+        defaults={'quota': quota_annuel(instance, annee)},
     )

@@ -170,11 +170,11 @@ html[data-theme="dark"] .svc-sep td { background: rgba(255,255,255,.03); color: 
     </div>
     <!-- Nav mois -->
     <div style="display:flex;align-items:center;gap:6px;">
-      <a href="?mois={{ prev_mois }}&annee={{ prev_annee }}{% if service_id %}&service={{ service_id }}{% endif %}{% if employe_filtre %}&employe={{ employe_filtre.pk }}{% endif %}" class="mn-btn">
+      <a href="?mois={{ prev_mois }}&annee={{ prev_annee }}{% if service_id %}&service={{ service_id }}{% endif %}{% if employe_filtre %}&employe={{ employe_filtre.pk }}{% endif %}&page_size={{ page_size }}" class="mn-btn">
         <i class="bi bi-chevron-left"></i>
       </a>
       <span class="mn-label">{{ mois_nom }} {{ annee }}</span>
-      <a href="?mois={{ next_mois }}&annee={{ next_annee }}{% if service_id %}&service={{ service_id }}{% endif %}{% if employe_filtre %}&employe={{ employe_filtre.pk }}{% endif %}" class="mn-btn">
+      <a href="?mois={{ next_mois }}&annee={{ next_annee }}{% if service_id %}&service={{ service_id }}{% endif %}{% if employe_filtre %}&employe={{ employe_filtre.pk }}{% endif %}&page_size={{ page_size }}" class="mn-btn">
         <i class="bi bi-chevron-right"></i>
       </a>
     </div>
@@ -195,6 +195,7 @@ html[data-theme="dark"] .svc-sep td { background: rgba(255,255,255,.03); color: 
     <form method="get" style="display:contents;">
       <input type="hidden" name="mois" value="{{ mois }}">
       <input type="hidden" name="annee" value="{{ annee }}">
+      <input type="hidden" name="page_size" value="{{ page_size }}">
       {% if employe_filtre %}<input type="hidden" name="employe" value="{{ employe_filtre.pk }}">{% endif %}
       <select name="service" class="pr-select" onchange="this.form.submit()">
         <option value="">Tous les services</option>
@@ -205,6 +206,7 @@ html[data-theme="dark"] .svc-sep td { background: rgba(255,255,255,.03); color: 
     </form>
     <form method="get" style="display:contents;">
       <input type="hidden" name="mois" value="{{ mois }}">
+      <input type="hidden" name="page_size" value="{{ page_size }}">
       {% if service_id %}<input type="hidden" name="service" value="{{ service_id }}">{% endif %}
       {% if employe_filtre %}<input type="hidden" name="employe" value="{{ employe_filtre.pk }}">{% endif %}
       <select name="annee" class="pr-select" onchange="this.form.submit()">
@@ -301,8 +303,8 @@ html[data-theme="dark"] .svc-sep td { background: rgba(255,255,255,.03); color: 
         <th style="width:44px;"></th>
       </tr>
     </thead>
-    <tbody>
-    {% regroup employes_stats by employe.service as groupes_services %}
+    <tbody id="rapport-tbody">
+    {% regroup page_obj.object_list by employe.service as groupes_services %}
     {% for groupe in groupes_services %}
     <tr class="svc-sep">
       <td colspan="9">
@@ -397,6 +399,30 @@ html[data-theme="dark"] .svc-sep td { background: rgba(255,255,255,.03); color: 
       </tr>
     </tfoot>
   </table>
+  {% if page_obj.paginator.num_pages > 1 %}
+  <div id="rapport-pagination" class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 16px;border-top:1px solid var(--rh-border);font-size:12px;color:var(--rh-muted);">
+    <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }} employés</span>
+    <div style="display:flex;align-items:center;gap:10px;">
+      {% if page_obj.has_previous %}
+      <a class="o-pag-btn"
+        href="?mois={{ mois }}&annee={{ annee }}{% if service_id %}&service={{ service_id }}{% endif %}{% if employe_filtre %}&employe={{ employe_filtre.pk }}{% endif %}&page_size={{ page_size }}&page={{ page_obj.previous_page_number }}">
+        <i class="bi bi-chevron-left"></i>
+      </a>
+      {% else %}
+      <span class="o-pag-btn disabled"><i class="bi bi-chevron-left"></i></span>
+      {% endif %}
+      <span style="white-space:nowrap;">Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+      {% if page_obj.has_next %}
+      <a class="o-pag-btn"
+        href="?mois={{ mois }}&annee={{ annee }}{% if service_id %}&service={{ service_id }}{% endif %}{% if employe_filtre %}&employe={{ employe_filtre.pk }}{% endif %}&page_size={{ page_size }}&page={{ page_obj.next_page_number }}">
+        <i class="bi bi-chevron-right"></i>
+      </a>
+      {% else %}
+      <span class="o-pag-btn disabled"><i class="bi bi-chevron-right"></i></span>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
   {% else %}
   <div style="text-align:center;padding:72px 20px;color:var(--rh-muted);">
     <i class="bi bi-calendar2-x" style="font-size:40px;display:block;margin-bottom:16px;color:var(--rh-300);"></i>
@@ -406,4 +432,40 @@ html[data-theme="dark"] .svc-sep td { background: rgba(255,255,255,.03); color: 
   {% endif %}
 </div>
 
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+{% if employes_stats %}
+<script>
+(function () {
+  var STORAGE_KEY = 'rh_rapport_page_size';
+  var currentSize = {{ page_size }};
+  if (sessionStorage.getItem(STORAGE_KEY)) return;
+
+  var tbody = document.getElementById('rapport-tbody');
+  var firstRow = tbody ? tbody.querySelector('tr:not(.svc-sep)') : null;
+  if (!firstRow) return;
+
+  var thead = document.querySelector('.pr-table thead');
+  var wrap = document.querySelector('.pr-table-wrap');
+  var rowH = firstRow.getBoundingClientRect().height || 40;
+  var theadH = thead ? thead.getBoundingClientRect().height : 0;
+  var top = wrap.getBoundingClientRect().top;
+  var reserveBottom = 60; // pied de tableau (totaux) + marge
+  var available = window.innerHeight - top - theadH - reserveBottom;
+  var fit = Math.floor(available / rowH);
+  fit = Math.max(5, Math.min(50, fit));
+
+  sessionStorage.setItem(STORAGE_KEY, fit);
+
+  if (fit !== currentSize) {
+    var params = new URLSearchParams(window.location.search);
+    params.set('page_size', fit);
+    params.set('page', '1');
+    window.location.search = params.toString();
+  }
+})();
+</script>
+{% endif %}
 {% endblock %}

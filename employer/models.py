@@ -189,16 +189,17 @@ class Employe(models.Model):
             (today.month, today.day) < (self.date_naissance.month, self.date_naissance.day)
         )
 
-    @property
-    def anciennete(self):
+    def anciennete_a(self, ref_date):
+        """Ancienneté calculée à une date de référence donnée (ex: 31/12 d'une année passée)."""
         if not self.date_embauche:
             return {'annees': 0, 'mois': 0, 'label': '—'}
-        today = date.today()
         d = self.date_embauche
         if isinstance(d, str):
             d = date.fromisoformat(d)
-        years = today.year - d.year
-        months = today.month - d.month
+        if d > ref_date:
+            return {'annees': 0, 'mois': 0, 'label': '—'}
+        years = ref_date.year - d.year
+        months = ref_date.month - d.month
         if months < 0:
             years -= 1
             months += 12
@@ -207,6 +208,10 @@ class Employe(models.Model):
         else:
             label = f"{months} mois" if months else "< 1 mois"
         return {'annees': years, 'mois': months, 'label': label}
+
+    @property
+    def anciennete(self):
+        return self.anciennete_a(date.today())
 
     @property
     def docs_manquants(self):
@@ -222,6 +227,10 @@ class Employe(models.Model):
         ordering = ['nom', 'prenoms']
         verbose_name = "Employé"
         verbose_name_plural = "Employés"
+        indexes = [
+            models.Index(fields=['biometric_id']),
+            models.Index(fields=['statut']),
+        ]
 
 
 TYPE_DOC_CHOICES = [
@@ -362,22 +371,12 @@ class AlerteContrat(models.Model):
 
 # ── Conservés pour le futur module Congés / Présence ─────────────────────────
 
+def _type_conge_choices():
+    from conges.models import type_conge_choices
+    return type_conge_choices()
+
+
 class Conge(models.Model):
-    TYPE = [
-        ('annuel',          'Congé annuel'),
-        ('maladie',         'Congé maladie'),
-        ('maternite',       'Congé maternité'),
-        ('paternite',       'Congé paternité'),
-        ('exceptionnel',    'Congé exceptionnel'),
-        ('mariage_employe', 'Mariage (employé)'),
-        ('mariage_enfant',  'Mariage (enfant)'),
-        ('deces_conjoint',  'Décès conjoint'),
-        ('deces_enfant',    'Décès enfant'),
-        ('deces_parent',    'Décès parent/beau-parent'),
-        ('deces_frere_soeur','Décès frère/sœur'),
-        ('naissance_enfant','Naissance enfant (père)'),
-        ('sans_solde',      'Congé sans solde'),
-    ]
     STATUT = [
         ('approuve',        'À venir'),
         ('en_cours',        'En cours'),
@@ -388,11 +387,16 @@ class Conge(models.Model):
         ('valide_service',  'Validé service'),
     ]
     employe      = models.ForeignKey(Employe, on_delete=models.CASCADE, related_name='conges')
-    type_conge   = models.CharField(max_length=20, choices=TYPE)
+    type_conge   = models.CharField(max_length=20, choices=_type_conge_choices)
     date_debut   = models.DateField()
     date_fin     = models.DateField()
     motif        = models.TextField(blank=True)
     statut       = models.CharField(max_length=20, choices=STATUT, default='approuve')
+    deduit_du_solde = models.BooleanField(
+        default=True,
+        verbose_name="Déduire du solde de congé",
+        help_text="Pré-rempli selon le type de congé, modifiable au cas par cas pour cette demande précise.",
+    )
     nb_jours_ouvres      = models.PositiveSmallIntegerField(default=0, help_text="Jours ouvrés décomptés du solde")
     approuve_par         = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='conges_approuves')
     date_demande         = models.DateTimeField(auto_now_add=True)
@@ -431,6 +435,11 @@ class Conge(models.Model):
         verbose_name = "Congé"
         verbose_name_plural = "Congés"
         ordering = ['-date_demande']
+        indexes = [
+            models.Index(fields=['statut', 'date_debut']),
+            models.Index(fields=['statut', 'date_fin']),
+            models.Index(fields=['type_conge']),
+        ]
 
 
 class HistoriqueConge(models.Model):
@@ -492,6 +501,11 @@ class SoldeConge(models.Model):
     quota          = models.DecimalField(max_digits=5, decimal_places=1, default=0)
     jours_pris     = models.DecimalField(max_digits=5, decimal_places=1, default=0)
     jours_reporter = models.DecimalField(max_digits=5, decimal_places=1, default=0)
+    report_effectue = models.BooleanField(
+        default=False,
+        verbose_name="Reporté vers l'année suivante",
+        help_text="Coché automatiquement une fois le solde restant de cette année reporté sur N+1, pour éviter un double report.",
+    )
     note           = models.TextField(blank=True)
     mis_a_jour_le  = models.DateTimeField(auto_now=True)
 
@@ -578,13 +592,26 @@ class Presence(models.Model):
 
     @property
     def retard_matin_min(self):
-        """Retard à l'arrivée — référence 08:00, tolérance 15 min."""
+        """Retard à l'arrivée — référence 08:00, tolérance 15 min.
+        Pour les permanences, la référence est l'heure de début réelle du
+        PlanningPermanence de la semaine (configurable), pas 08:00 fixe."""
         if not self.heure_arrivee_matin:
             return 0
-        if self.heure_arrivee_matin <= time(8, 15):
+        ref_heure = time(8, 0)
+        if self.permanence:
+            from datetime import timedelta as _td
+            from presence.models import PlanningPermanence
+            semaine_du = self.date - _td(days=self.date.weekday())
+            type_permanence = 'medecins' if hasattr(self.employe, 'fiche_medecin') else 'personnel'
+            planning = PlanningPermanence.objects.filter(
+                semaine_du=semaine_du, type_permanence=type_permanence
+            ).first()
+            if planning:
+                ref_heure = planning.heure_debut
+        from datetime import datetime as _dt, timedelta as _td
+        ref = _dt.combine(self.date, ref_heure)
+        if self.heure_arrivee_matin <= (ref + _td(minutes=15)).time():
             return 0
-        from datetime import datetime as _dt
-        ref = _dt.combine(self.date, time(8, 0))
         arr = _dt.combine(self.date, self.heure_arrivee_matin)
         return int((arr - ref).total_seconds() // 60)
 
@@ -622,6 +649,9 @@ class Presence(models.Model):
         verbose_name = "Présence"
         unique_together = ['employe', 'date']
         ordering = ['-date']
+        indexes = [
+            models.Index(fields=['date']),
+        ]
 
 
 class JourFerie(models.Model):

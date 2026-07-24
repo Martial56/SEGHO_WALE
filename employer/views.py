@@ -1,5 +1,6 @@
 ﻿from datetime import date, timedelta
 import io
+import re
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
@@ -362,6 +363,21 @@ def employe_supprimer(request, pk):
         raise PermissionDenied
     employe = get_object_or_404(Employe, pk=pk)
     nom = employe.nom_complet
+
+    # Medecin.employe est en CASCADE : supprimer l'employé supprimerait sa
+    # fiche médecin, qui déconnecterait à son tour (SET_NULL) tout son
+    # historique clinique (consultations, ordonnances, rendez-vous,
+    # hospitalisations). On refuse plutôt que de perdre cette traçabilité
+    # silencieusement — il faut d'abord retirer/désactiver la fiche médecin.
+    if hasattr(employe, 'fiche_medecin'):
+        messages.error(
+            request,
+            f"Impossible de supprimer {nom} : cette personne a une fiche médecin "
+            f"active (historique de consultations/ordonnances/rendez-vous). "
+            f"Désactivez d'abord sa fiche médecin depuis le module Médecins."
+        )
+        return redirect('ressources_humaines_list')
+
     employe.delete()
     messages.success(request, f"L'employé {nom} a été supprimé.")
     return redirect('ressources_humaines_list')
@@ -370,7 +386,9 @@ def employe_supprimer(request, pk):
 @login_required(login_url='login')
 def employe_vers_medecin(request, pk):
     from medecins.models import Medecin
-    from django.utils import timezone
+
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
 
     employe = get_object_or_404(Employe, pk=pk)
 
@@ -378,19 +396,7 @@ def employe_vers_medecin(request, pk):
     if hasattr(employe, 'fiche_medecin'):
         return redirect('rh_detail', pk=employe.pk)
 
-    # Générer numéro d'ordre
-    annee = timezone.now().year
-    dernier_ord = Medecin.objects.filter(ordre_medecin__startswith=f'ORD{annee}').order_by('-ordre_medecin').first()
-    seq_ord = 1
-    if dernier_ord:
-        try:
-            seq_ord = int(dernier_ord.ordre_medecin[-4:]) + 1
-        except ValueError:
-            pass
-    ordre_medecin = f'ORD{annee}{seq_ord:04d}'
-
     med = Medecin(
-        ordre_medecin=ordre_medecin,
         actif=(employe.statut == 'actif'),
         employe=employe,
         service=employe.service,
@@ -400,7 +406,7 @@ def employe_vers_medecin(request, pk):
     messages.success(
         request,
         f"Fiche médecin créée pour {employe.nom_complet} ({employe.matricule}). "
-        f"Complétez la spécialité et le taux honoraire depuis le module Médecins."
+        f"Complétez la spécialité, le taux honoraire et le numéro d'ordre depuis le module Médecins."
     )
     return redirect('rh_detail', pk=employe.pk)
 
@@ -554,10 +560,18 @@ def _save_employe(request, employe):
         errors['date_naissance'] = 'La date de naissance est obligatoire.'
     if not p.get('nationalite'):
         errors['nationalite'] = 'La nationalité est obligatoire.'
-    if not p.get('telephone', '').strip():
+    telephone = p.get('telephone', '').strip()
+    if not telephone:
         errors['telephone'] = 'Le téléphone principal est obligatoire.'
+    elif len(re.sub(r'\D', '', telephone)) != 10:
+        errors['telephone'] = 'Le téléphone doit contenir exactement 10 chiffres.'
+    telephone2 = p.get('telephone2', '').strip()
+    if telephone2 and len(re.sub(r'\D', '', telephone2)) != 10:
+        errors['telephone2'] = 'Le téléphone doit contenir exactement 10 chiffres.'
     if not p.get('fonction'):
         errors['fonction'] = 'La fonction est obligatoire.'
+    if not p.get('type_contrat'):
+        errors['type_contrat'] = 'Le type de contrat est obligatoire.'
     if errors:
         return None, errors
 
@@ -1432,8 +1446,18 @@ def presence_rapport_mensuel(request):
 
     services = Service.objects.filter(employes__statut='actif').distinct().order_by('nom')
 
+    try:
+        page_size = int(request.GET.get('page_size', 15))
+    except (TypeError, ValueError):
+        page_size = 15
+    page_size = max(5, min(50, page_size))
+    paginator = Paginator(employes_stats, page_size)
+    page_obj  = paginator.get_page(request.GET.get('page'))
+
     return render(request, 'employer/presence/rapport_mensuel.html', {
         'employes_stats':  employes_stats,
+        'page_obj':        page_obj,
+        'page_size':       page_size,
         'annee':           annee, 'mois': mois,
         'mois_nom':        _MOIS_FR_LONG[mois - 1],
         'nb_ouvrables':    nb_ouvrables,
@@ -1659,7 +1683,9 @@ def presence_import_bio(request):
 
 def presence_kiosk(request):
     """Page kiosk accessible sans connexion RH."""
-    return render(request, 'employer/presence/kiosk.html', {})
+    return render(request, 'employer/presence/kiosk.html', {
+        'can_enroll_bio': request.user.is_authenticated and can_manage_rh(request.user),
+    })
 
 
 def presence_pointer(request):
@@ -1667,9 +1693,19 @@ def presence_pointer(request):
     AJAX POST : enregistre un pointage à l'heure courante.
     Body (JSON ou form) : { "matricule": "EMP001" }
     Retourne JSON : { ok, employe, slot, heure, photo_url, message }
+
+    Délègue la détection de l'action (_detecter_action), le contrôle jour
+    ouvré (_est_jour_ouvre) et le contrôle congé (_conge_du_jour) à
+    presence.views — ce kiosk et celui du module Présence écrivent sur le
+    même modèle Presence ; avoir deux logiques différentes désynchronisait
+    les règles (celle-ci ignorait congés/jours fériés/permanence).
     """
-    from datetime import datetime as _dt, time as _time
     import json as _json
+    from django.db import transaction
+    from presence.views import (
+        _detecter_action, _est_jour_ouvre, _conge_du_jour, _LABELS_ACTION, _date_reference,
+        _est_en_permanence,
+    )
 
     if request.method != 'POST':
         return JsonResponse({'ok': False, 'message': 'Méthode non autorisée.'}, status=405)
@@ -1688,66 +1724,76 @@ def presence_pointer(request):
     if not emp:
         return JsonResponse({'ok': False, 'message': 'Matricule non reconnu ou employé inactif.'})
 
-    now      = timezone.localtime()
-    today    = now.date()
-    heure    = now.time().replace(second=0, microsecond=0)
-    t_cut    = _time(13, 0)
+    heure = timezone.localtime().time().replace(second=0, microsecond=0)
+    today = _date_reference(emp)
 
-    # Récupérer ou créer la présence du jour
-    presence, _ = Presence.objects.get_or_create(
-        employe=emp, date=today,
-        defaults={'present': True}
-    )
+    ouvre, raison = _est_jour_ouvre(today)
+    if not ouvre:
+        return JsonResponse({'ok': False, 'message': raison})
 
-    # Déterminer le slot à remplir
-    if heure < t_cut:
-        if not presence.heure_arrivee_matin:
-            slot = 'arrivee_matin'
-            slot_label = 'Arrivée matin'
-            presence.heure_arrivee_matin = heure
-            presence.am_in_locked = True
-        elif not presence.heure_depart_matin:
-            slot = 'depart_matin'
-            slot_label = 'Départ matin'
-            presence.heure_depart_matin = heure
-            presence.am_out_locked = True
-        else:
-            return JsonResponse({
-                'ok': False,
-                'message': f'Session matin déjà complète ({presence.heure_arrivee_matin:%H:%M} → {presence.heure_depart_matin:%H:%M}).',
-            })
-    else:
-        if not presence.heure_arrivee_soir:
-            slot = 'arrivee_soir'
-            slot_label = 'Arrivée soir'
-            presence.heure_arrivee_soir = heure
-            presence.pm_in_locked = True
-        elif not presence.heure_depart_soir:
-            slot = 'depart_soir'
-            slot_label = 'Départ soir'
-            presence.heure_depart_soir = heure
-            presence.pm_out_locked = True
-        else:
-            return JsonResponse({
-                'ok': False,
-                'message': f'Session soir déjà complète ({presence.heure_arrivee_soir:%H:%M} → {presence.heure_depart_soir:%H:%M}).',
-            })
+    conge = _conge_du_jour(emp, today)
+    if conge:
+        return JsonResponse({
+            'ok': False,
+            'message': f"En congé — {conge.get_type_conge_display()} (jusqu'au {conge.date_fin:%d/%m/%Y})",
+        })
 
-    presence.present    = True
-    presence.modifie_le = timezone.now()
-    presence.save()
+    with transaction.atomic():
+        # select_for_update : sérialise deux pointages quasi simultanés sur le
+        # même employé/jour (même verrou que presence.views.presence_pointer).
+        presence, _created = Presence.objects.select_for_update().get_or_create(
+            employe=emp, date=today,
+            defaults={'present': True}
+        )
+
+        slot = _detecter_action(emp, today)
+        if slot == 'complet':
+            return JsonResponse({'ok': False, 'message': 'Journée déjà complète.'})
+        slot_label = _LABELS_ACTION.get(slot, slot)
+        # Après midi, l'arrivée en permanence n'est plus proposée (elle est
+        # considérée manquée) : slot='depart' est alors renvoyé directement
+        # sans qu'une arrivée n'ait jamais été pointée.
+        arrivee_manquee = (
+            slot == 'depart'
+            and _est_en_permanence(emp, today, presence_obj=presence)
+            and not presence.heure_arrivee_matin
+        )
+
+        champ_heure, champ_locked = {
+            'arrivee_matin': ('heure_arrivee_matin', 'am_in_locked'),
+            'depart_matin':  ('heure_depart_matin',  'am_out_locked'),
+            'arrivee_soir':  ('heure_arrivee_soir',  'pm_in_locked'),
+            'depart_soir':   ('heure_depart_soir',   'pm_out_locked'),
+            'arrivee':       ('heure_arrivee_matin', 'am_in_locked'),
+            'depart':        ('heure_depart_soir',   'pm_out_locked'),
+        }[slot]
+        setattr(presence, champ_heure, heure)
+        setattr(presence, champ_locked, True)
+        presence.present    = True
+        # Sans ce marquage, le registre (qui ne se fie au planning que tant
+        # qu'aucune Presence n'existe) retombait sur permanence=False dès le
+        # premier pointage kiosk du jour.
+        if slot in ('arrivee', 'depart'):
+            presence.permanence = True
+        presence.modifie_le = timezone.now()
+        presence.save()
 
     photo_url = emp.photo.url if emp.photo else None
 
+    message = f'Pointage enregistré — {slot_label} : {heure:%H:%M}'
+    if arrivee_manquee:
+        message += " — Arrivée non pointée avant midi, à régulariser par la RH."
+
     return JsonResponse({
-        'ok':        True,
-        'employe':   emp.nom_complet,
-        'service':   emp.service.nom if emp.service else '',
-        'slot':      slot,
-        'slot_label': slot_label,
-        'heure':     heure.strftime('%H:%M'),
-        'photo_url': photo_url,
-        'message':   f'Pointage enregistré — {slot_label} : {heure:%H:%M}',
+        'ok':              True,
+        'employe':         emp.nom_complet,
+        'service':         emp.service.nom if emp.service else '',
+        'slot':            slot,
+        'slot_label':      slot_label,
+        'heure':           heure.strftime('%H:%M'),
+        'photo_url':       photo_url,
+        'arrivee_manquee': arrivee_manquee,
+        'message':         message,
     })
 
 
@@ -1769,6 +1815,13 @@ def _wba_rp(request):
 @require_POST
 def bio_enroll_options(request):
     import json as _j
+    # L'enrôlement biométrique lie durablement une empreinte à une identité
+    # de pointage — contrairement au pointage quotidien, ce n'est PAS une
+    # opération en libre-service depuis le kiosk public : elle doit être
+    # supervisée par un membre RH connecté (sinon n'importe qui peut lier
+    # sa propre empreinte au matricule d'un collègue).
+    if not (request.user.is_authenticated and can_manage_rh(request.user)):
+        return JsonResponse({'ok': False, 'message': 'Réservé au personnel RH connecté.'}, status=403)
     from webauthn import generate_registration_options, options_to_json
     from webauthn.helpers import base64url_to_bytes, bytes_to_base64url
     from webauthn.helpers.structs import (
@@ -1825,6 +1878,8 @@ def bio_enroll_options(request):
 @require_POST
 def bio_enroll_verify(request):
     import json as _j
+    if not (request.user.is_authenticated and can_manage_rh(request.user)):
+        return JsonResponse({'ok': False, 'message': 'Réservé au personnel RH connecté.'}, status=403)
     from webauthn import verify_registration_response
     from webauthn.helpers import base64url_to_bytes, bytes_to_base64url
     from webauthn.helpers.structs import (
@@ -2233,6 +2288,20 @@ def _service_form_class():
             required=False,
             empty_label='— Aucun chef de service —',
         )
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            # Le chef de service actuel doit rester proposé même s'il est
+            # devenu inactif entre-temps — sinon modifier n'importe quel
+            # autre champ du service (nom, description…) efface silencieusement
+            # cette référence, faute d'être dans la liste déroulante.
+            actuel_id = self.instance.chef_service_id if self.instance else None
+            if actuel_id and not self.fields['chef_service'].queryset.filter(pk=actuel_id).exists():
+                self.fields['chef_service'].queryset = (
+                    Medecin.objects.filter(Q(actif=True) | Q(pk=actuel_id))
+                    .select_related('employe').order_by('employe__nom', 'employe__prenoms')
+                )
+
         class Meta:
             model = Service
             fields = ['nom', 'code', 'description', 'chef_service', 'actif']
