@@ -216,20 +216,22 @@ PHARMACIES = [
 
 class MouvementStock(models.Model):
     TYPE_CHOICES = [
-        ('entree',    'Entrée en stock'),
-        ('livraison', 'Livraison pharmacie'),
-        ('ajustement','Ajustement inventaire'),
-        ('peremption','Péremption'),
-        ('retour',    'Retour fournisseur'),
+        ('entree',        'Entrée en stock'),
+        ('livraison',     'Livraison pharmacie'),
+        ('prescription',  'Dispensation ordonnance'),
+        ('ajustement',    'Ajustement inventaire'),
+        ('peremption',    'Péremption'),
+        ('retour',        'Retour fournisseur'),
     ]
     MOTIF_CHOICES = [
-        ('achat',      'Achat fournisseur'),
-        ('livraison',  'Livraison à une pharmacie'),
-        ('inventaire', 'Inventaire'),
-        ('peremption', 'Péremption / Perte'),
-        ('retour',     'Retour fournisseur'),
-        ('don',        'Don / Subvention'),
-        ('autre',      'Autre'),
+        ('achat',         'Achat fournisseur'),
+        ('livraison',     'Livraison à une pharmacie'),
+        ('prescription',  'Ordonnance médicale'),
+        ('inventaire',    'Inventaire'),
+        ('peremption',    'Péremption / Perte'),
+        ('retour',        'Retour fournisseur'),
+        ('don',           'Don / Subvention'),
+        ('autre',         'Autre'),
     ]
     produit     = models.ForeignKey(Produit, on_delete=models.CASCADE, related_name='mouvements')
     lot         = models.ForeignKey(LotProduit, on_delete=models.SET_NULL, null=True, blank=True)

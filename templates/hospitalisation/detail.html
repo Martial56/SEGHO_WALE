@@ -523,9 +523,9 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
       {# ─ Décharger ─ #}
       {% if actions.decharger.visible and hosp.statut == 'hospitalise' %}
         {% if actions.decharger.enabled %}
-        <a href="{% url 'hospitalisation:edit' hosp.pk %}?tab=resume" class="abtn abtn-primary">
+        <button type="button" class="abtn abtn-primary" onclick="openDechargeModal()">
           <i class="bi bi-door-open"></i> Décharger
-        </a>
+        </button>
         {% else %}
         <button type="button" class="abtn abtn-primary off" disabled title="{{ actions.decharger.raison_blocage }}">
           <i class="bi bi-door-open"></i> Décharger
@@ -1061,6 +1061,43 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
   </div>
 </div>
 
+{# ── Modale décharge (résumé entièrement facultatif) ── #}
+<div class="modal-overlay" id="modal-decharge">
+  <div class="modal-box">
+    <div class="modal-hdr">
+      <span class="modal-title"><i class="bi bi-box-arrow-right" style="color:var(--accent);"></i> Décharger le patient</span>
+      <button type="button" class="modal-cls" onclick="closeDechargeModal()">&times;</button>
+    </div>
+    <div class="modal-bdy">
+      <p style="font-size:13px;color:var(--text-muted);line-height:1.55;margin:0;">
+        La sortie médicale est enregistrée immédiatement. Le résumé ci-dessous
+        est facultatif — laissez-le vide et confirmez directement si vous n'avez
+        rien à préciser.
+      </p>
+      <div>
+        <label class="fld-lbl" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+          <input type="checkbox" id="decharge-transfert-input" onchange="toggleDechargeTransfert()">
+          Transfert vers un autre établissement
+        </label>
+      </div>
+      <div id="decharge-transfert-fields" style="display:none;">
+        <div>
+          <label class="fld-lbl">Établissement de destination <span style="color:var(--color-danger);">*</span></label>
+          <input type="text" id="decharge-etablissement-input" class="fld" placeholder="Nom de l'établissement…">
+        </div>
+        <div>
+          <label class="fld-lbl">Motif du transfert <span style="color:var(--color-danger);">*</span></label>
+          <textarea id="decharge-motif-input" class="fld" rows="2" placeholder="Saisir le motif…"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-ftr">
+      <button type="button" class="abtn abtn-discard" onclick="closeDechargeModal()">Retour</button>
+      <button type="button" class="abtn abtn-primary" onclick="confirmDecharge()">Confirmer la décharge</button>
+    </div>
+  </div>
+</div>
+
 {# Zone de toasts #}
 <div id="toast-area" aria-live="polite" aria-atomic="true"></div>
 
@@ -1300,7 +1337,7 @@ function renderActionBar(data) {
   }
 
   html += abtn('decharger', 'abtn-primary', 'bi-door-open', 'Décharger',
-               "doTransition('" + URL_DECHARGER + "')");
+               "openDechargeModal()");
 
   if (A.terminer && A.terminer.visible) {
     html += '<div class="act-sep"></div>';
@@ -1378,6 +1415,32 @@ function confirmAnnul() {
 }
 document.getElementById('modal-annul').addEventListener('click', function (e) {
   if (e.target === this) closeAnnulModal();
+});
+
+/* ══ Modale décharge ═══════════════════════════════════════════════════════════ */
+function openDechargeModal() {
+  document.getElementById('modal-decharge').classList.add('open');
+}
+function closeDechargeModal() {
+  document.getElementById('modal-decharge').classList.remove('open');
+}
+function toggleDechargeTransfert() {
+  var on = document.getElementById('decharge-transfert-input').checked;
+  document.getElementById('decharge-transfert-fields').style.display = on ? '' : 'none';
+}
+function confirmDecharge() {
+  var transfert = document.getElementById('decharge-transfert-input').checked;
+  var extra = {};
+  if (transfert) {
+    extra.rd_transfert = '1';
+    extra.rd_etablissement_destination = (document.getElementById('decharge-etablissement-input').value || '').trim();
+    extra.rd_motif_reference = (document.getElementById('decharge-motif-input').value || '').trim();
+  }
+  closeDechargeModal();
+  doTransition(URL_DECHARGER, extra);
+}
+document.getElementById('modal-decharge').addEventListener('click', function (e) {
+  if (e.target === this) closeDechargeModal();
 });
 
 /* ══ FETCH TRANSITION ══════════════════════════════════════════════════════════ */

@@ -17,6 +17,7 @@ from .models import (Employe, Fonction, Grade, TypeContrat, Nationalite,
                      AlerteDocument, HistoriqueEmploye, Conge, Presence,
                      JourFerie, CredentialBiometrique, DOCS_OBLIGATOIRES)
 from medecins.models import Service
+from services.views import _export_file, _parse_upload, _s, _b
 
 RH_MANAGE_GROUPS = {'Médecin Chef', 'Médecin Chef Adjoint', 'Administrateur', 'Directeur', 'RH'}
 
@@ -2203,6 +2204,7 @@ def rh_config_list(request, slug):
     return render(request, 'employer/config/list.html', {
         'slug': slug, 'cfg': cfg, 'page_obj': page_obj, 'q': q,
         'sort': sort, 'dir': direction,
+        'total': cfg['model'].objects.count(),
         'can_manage': True,
     })
 
@@ -2272,6 +2274,81 @@ def rh_config_delete(request, slug, pk):
     nom = str(obj)
     obj.delete()
     messages.success(request, f"{cfg['label']} « {nom} » supprimé(e).")
+    return redirect('rh_config_list', slug=slug)
+
+
+# ── Export / Import génériques (Grades, Fonctions, Types de contrat, Nationalités) ──
+
+_RH_CONFIG_BOOL_FIELDS = {'droit_au_conge'}
+
+
+def _rh_config_row(cfg, obj):
+    row = []
+    for f in cfg['fields']:
+        val = getattr(obj, f)
+        row.append(int(val) if f in _RH_CONFIG_BOOL_FIELDS else val)
+    return row
+
+
+@login_required(login_url='login')
+def rh_config_export(request, slug):
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
+    cfg = _rh_config_or_404(slug)
+    fmt = request.GET.get('format', 'json')
+    qs = cfg['model'].objects.all().order_by('nom')
+    headers = cfg['fields']
+    rows = [_rh_config_row(cfg, obj) for obj in qs]
+    return _export_file(fmt, slug, headers, rows, [dict(zip(headers, r)) for r in rows])
+
+
+@login_required(login_url='login')
+@require_POST
+def rh_config_import(request, slug):
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
+    cfg = _rh_config_or_404(slug)
+    upload = request.FILES.get('fichier')
+    if not upload:
+        messages.error(request, 'Aucun fichier sélectionné.')
+        return redirect('rh_config_list', slug=slug)
+
+    data, err = _parse_upload(upload)
+    if err:
+        messages.error(request, err)
+        return redirect('rh_config_list', slug=slug)
+
+    do_update = 'update' in request.POST
+    created = updated = skipped = errors = 0
+
+    for item in data:
+        try:
+            nom = _s(item.get('nom', ''))
+            if not nom:
+                errors += 1
+                continue
+            defaults = {'nom': nom}
+            for f in cfg['fields']:
+                if f == 'nom':
+                    continue
+                defaults[f] = _b(item.get(f, True)) if f in _RH_CONFIG_BOOL_FIELDS else _s(item.get(f, ''))
+            obj, was_created = cfg['model'].objects.get_or_create(nom__iexact=nom, defaults=defaults)
+            if was_created:
+                created += 1
+            elif do_update:
+                for k, v in defaults.items():
+                    setattr(obj, k, v)
+                obj.save()
+                updated += 1
+            else:
+                skipped += 1
+        except Exception:
+            errors += 1
+
+    if errors:
+        messages.warning(request, f'{created} créé(e)(s), {updated} mis(e) à jour, {skipped} ignoré(e)(s), {errors} erreur(s).')
+    else:
+        messages.success(request, f"{created} {cfg['label_plural'].lower()} importé(e)(s), {updated} mis(e) à jour, {skipped} ignoré(e)(s).")
     return redirect('rh_config_list', slug=slug)
 
 
@@ -2349,11 +2426,15 @@ def employer_service_detail(request, pk):
 def employer_service_create(request):
     Form = _service_form_class()
     form = Form(request.POST or None)
+    is_ajax = _rh_config_is_ajax(request)
     if request.method == 'POST' and form.is_valid():
-        form.save()
+        obj = form.save()
+        if is_ajax:
+            return JsonResponse({'ok': True, 'message': f"Service « {obj.nom} » créé."})
         messages.success(request, 'Service créé.')
         return redirect('employer_services')
-    return render(request, 'employer/config/service_form.html', {
+    template = 'employer/config/service_form_modal.html' if is_ajax else 'employer/config/service_form.html'
+    return render(request, template, {
         'form': form, 'titre': 'Nouveau service',
         'can_manage': can_manage_rh(request.user),
     })
@@ -2364,11 +2445,15 @@ def employer_service_edit(request, pk):
     obj  = get_object_or_404(Service, pk=pk)
     Form = _service_form_class()
     form = Form(request.POST or None, instance=obj)
+    is_ajax = _rh_config_is_ajax(request)
     if request.method == 'POST' and form.is_valid():
         form.save()
+        if is_ajax:
+            return JsonResponse({'ok': True, 'message': f"Service « {obj.nom} » mis à jour."})
         messages.success(request, 'Service mis à jour.')
         return redirect('employer_service_detail', pk=pk)
-    return render(request, 'employer/config/service_form.html', {
+    template = 'employer/config/service_form_modal.html' if is_ajax else 'employer/config/service_form.html'
+    return render(request, template, {
         'form': form, 'titre': f'Modifier – {obj.nom}', 'obj': obj,
         'can_manage': can_manage_rh(request.user),
     })

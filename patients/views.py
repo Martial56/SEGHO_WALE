@@ -14,20 +14,28 @@ from core.views import log_event
 from gynecologie.models import TypeVisite
 
 
+def _age_bracket_label(patient, today):
+    if patient.date_naissance > today.replace(year=today.year - 18):
+        return 'Mineurs (< 18 ans)'
+    if patient.date_naissance > today.replace(year=today.year - 60):
+        return 'Adultes (18–60 ans)'
+    return 'Seniors (> 60 ans)'
+
+
 @login_required
 def patient_list(request):
+    from datetime import date
     qs = Patient.objects.all()
     stats = {
         'total':        qs.count(),
-        'actifs':       qs.filter(actif=True).count(),
         'nouveaux_30j': qs.filter(date_creation__gte=timezone.now() - timedelta(days=30)).count(),
         'femmes':       qs.filter(sexe='F').count(),
         'hommes':       qs.filter(sexe='M').count(),
     }
 
-    q      = request.GET.get('q', '').strip()
-    filtre = request.GET.get('filter', '')
-    group  = request.GET.get('group', '')
+    q       = request.GET.get('q', '').strip()
+    filters = request.GET.getlist('filter')
+    groups  = request.GET.getlist('group')
 
     if q:
         qs = qs.filter(
@@ -35,38 +43,94 @@ def patient_list(request):
             Q(code_patient__icontains=q) | Q(telephone__icontains=q)
         )
 
-    if filtre == 'actif':
-        qs = qs.filter(actif=True)
-    elif filtre == 'nouveau':
+    if 'nouveau' in filters:
         qs = qs.filter(date_creation__gte=timezone.now() - timedelta(days=30))
-    elif filtre == 'femme':
-        qs = qs.filter(sexe='F')
-    elif filtre == 'homme':
-        qs = qs.filter(sexe='M')
-    elif filtre == 'mineur':
-        from datetime import date
-        cutoff = date.today().replace(year=date.today().year - 18)
-        qs = qs.filter(date_naissance__gt=cutoff)
-    elif filtre == 'adulte':
-        from datetime import date
-        today = date.today()
-        qs = qs.filter(
-            date_naissance__lte=today.replace(year=today.year - 18),
-            date_naissance__gt=today.replace(year=today.year - 60),
-        )
-    elif filtre == 'senior':
-        from datetime import date
-        cutoff = date.today().replace(year=date.today().year - 60)
-        qs = qs.filter(date_naissance__lte=cutoff)
+
+    sexe_map = {'femme': 'F', 'homme': 'M'}
+    sexes_selectionnes = [sexe_map[f] for f in filters if f in sexe_map]
+    if sexes_selectionnes:
+        qs = qs.filter(sexe__in=sexes_selectionnes)
+
+    today = date.today()
+    tranches_selectionnees = [f for f in filters if f in ('mineur', 'adulte', 'senior')]
+    if tranches_selectionnees:
+        age_q = Q()
+        if 'mineur' in tranches_selectionnees:
+            age_q |= Q(date_naissance__gt=today.replace(year=today.year - 18))
+        if 'adulte' in tranches_selectionnees:
+            age_q |= Q(
+                date_naissance__lte=today.replace(year=today.year - 18),
+                date_naissance__gt=today.replace(year=today.year - 60),
+            )
+        if 'senior' in tranches_selectionnees:
+            age_q |= Q(date_naissance__lte=today.replace(year=today.year - 60))
+        qs = qs.filter(age_q)
+
+    # ── Regroupement (cumulable : Genre + Âge) ──────────────────────────────
+    # Pas de vraie structure imbriquée : on trie pour que les groupes soient
+    # contigus, puis on marque le premier élément de chaque nouveau groupe
+    # d'un en-tête de section combiné (ex. "Féminin — Adultes (18–60 ans)"),
+    # avec le total réel du groupe (toutes pages confondues, pas juste la page
+    # courante) — calculé côté base via une agrégation groupée.
+    group_counts = {}
+    if groups:
+        from django.db.models import Case, When, Value, CharField, Count
+        annotations = {}
+        values_fields = []
+        if 'sexe' in groups:
+            values_fields.append('sexe')
+        if 'age' in groups:
+            annotations['age_bracket'] = Case(
+                When(date_naissance__gt=today.replace(year=today.year - 18), then=Value('Mineurs (< 18 ans)')),
+                When(date_naissance__gt=today.replace(year=today.year - 60), then=Value('Adultes (18–60 ans)')),
+                default=Value('Seniors (> 60 ans)'),
+                output_field=CharField(),
+            )
+            values_fields.append('age_bracket')
+        rows = qs.annotate(**annotations).order_by().values(*values_fields).annotate(n=Count('id'))
+        sexe_labels = dict(Patient.SEXE)
+        for row in rows:
+            parts = []
+            if 'sexe' in groups:
+                parts.append(sexe_labels.get(row['sexe'], row['sexe']))
+            if 'age' in groups:
+                parts.append(row['age_bracket'])
+            group_counts[' — '.join(parts)] = row['n']
+
+    ordering = []
+    if 'sexe' in groups:
+        ordering.append('sexe')
+    if 'age' in groups:
+        ordering.append('-date_naissance')
+    if ordering:
+        qs = qs.order_by(*ordering)
 
     paginator = Paginator(qs, 40)
     page_obj = paginator.get_page(request.GET.get('page'))
+
+    if groups:
+        prev_key = None
+        group_index = -1
+        for p in page_obj:
+            parts = []
+            if 'sexe' in groups:
+                parts.append(p.get_sexe_display())
+            if 'age' in groups:
+                parts.append(_age_bracket_label(p, today))
+            key = ' — '.join(parts)
+            if key != prev_key:
+                group_index += 1
+                p.group_header = key
+                p.group_count = group_counts.get(key, 0)
+            p.group_id = group_index
+            prev_key = key
+
     return render(request, 'patients/list.html', {
         'page_obj':     page_obj,
         'stats':        stats,
         'q':            q,
-        'filtre':       filtre,
-        'group':        group,
+        'filters':      filters,
+        'groups':       groups,
         'total_filtre': qs.count(),
         'breadcrumb':   [{'title': 'Patients'}],
     })
@@ -93,10 +157,10 @@ def patient_detail(request, pk):
         hospitalisation_count = 0
 
     try:
-        from laboratoire.models import AnalyseLaboratoire
-        demande_examens_count = AnalyseLaboratoire.objects.filter(patient=patient).count()
+        from laboratoire.models import DemandeExamen, AnalyseLaboratoire
+        demande_examens_count = DemandeExamen.objects.filter(patient=patient).count()
         resultat_examens_count = AnalyseLaboratoire.objects.filter(
-            patient=patient, statut__in=['résultat', 'validé', 'envoyé']
+            patient=patient, statut__in=['resultat', 'valide', 'envoye']
         ).count()
     except Exception:
         demande_examens_count = 0
@@ -238,11 +302,10 @@ def patient_search_json(request):
             'nom_complet': f"{p.nom} {p.prenoms}",
             'code': p.code_patient,
             'telephone': p.telephone or '',
-            'age': p.age if p.date_naissance else None,
+            'age': p.age,
             'sexe_display': p.get_sexe_display(),
             'adresse': p.adresse or '',
             'assurance_nom': p.assurance.nom if p.assurance_id else '',
-            'actif': p.actif,
         }
 
     pk = request.GET.get('id', '').strip()
@@ -256,14 +319,14 @@ def patient_search_json(request):
     q = request.GET.get('q', '').strip()
     base_qs = Patient.objects.select_related('assurance').order_by('nom', 'prenoms')
     if not q:
-        qs = base_qs
+        qs = base_qs[:20]
     elif len(q) < 2:
         return JsonResponse({'results': []})
     else:
         qs = base_qs.filter(
             Q(nom__icontains=q) | Q(prenoms__icontains=q) |
             Q(code_patient__icontains=q) | Q(telephone__icontains=q)
-        )
+        )[:20]
     return JsonResponse({'results': [_to_dict(p) for p in qs]})
 
 
@@ -407,7 +470,8 @@ def rdv_edit(request, pk):
             rdv.date_en_attente = now
             if rdv.date_confirme:
                 rdv.temps_constante_minutes = int((now - rdv.date_confirme).total_seconds() / 60)
-            update_fields = ['statut', 'date_en_attente', 'temps_constante_minutes']
+            rdv.duree_minutes = rdv.temps_constante_minutes + rdv.temps_attente_minutes + rdv.temps_consultation_minutes
+            update_fields = ['statut', 'date_en_attente', 'temps_constante_minutes', 'duree_minutes']
             medecin_pk = request.POST.get('medecin', '').strip()
             if medecin_pk:
                 try:
@@ -429,8 +493,9 @@ def rdv_edit(request, pk):
             rdv.date_en_consultation = now
             if rdv.date_en_attente:
                 rdv.temps_attente_minutes = int((now - rdv.date_en_attente).total_seconds() / 60)
+            rdv.duree_minutes = rdv.temps_constante_minutes + rdv.temps_attente_minutes + rdv.temps_consultation_minutes
             rdv._skip_auto_log = True
-            rdv.save(update_fields=['statut', 'date_en_consultation', 'temps_attente_minutes'])
+            rdv.save(update_fields=['statut', 'date_en_consultation', 'temps_attente_minutes', 'duree_minutes'])
             log_event(rdv, request.user, 'État : En Attente → En Consultation', type='statut')
             messages.success(request, 'Consultation démarrée.')
             from django.urls import reverse
@@ -443,8 +508,9 @@ def rdv_edit(request, pk):
             rdv.date_termine = now
             if rdv.date_en_consultation:
                 rdv.temps_consultation_minutes = int((now - rdv.date_en_consultation).total_seconds() / 60)
+            rdv.duree_minutes = rdv.temps_constante_minutes + rdv.temps_attente_minutes + rdv.temps_consultation_minutes
             rdv._skip_auto_log = True
-            rdv.save(update_fields=['statut', 'date_termine', 'temps_consultation_minutes'])
+            rdv.save(update_fields=['statut', 'date_termine', 'temps_consultation_minutes', 'duree_minutes'])
             log_event(rdv, request.user, 'État : En Consultation → Terminé', type='statut')
             messages.success(request, 'Consultation terminée.')
             return redirect('patients:rdv_global')
@@ -859,17 +925,25 @@ def pathologie_list(request):
     })
 
 
+def _is_ajax(request):
+    return request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
+
 @login_required
 def pathologie_create(request):
+    is_ajax = _is_ajax(request)
     if request.method == 'POST':
         form = PathologieForm(request.POST)
         if form.is_valid():
             p = form.save()
+            if is_ajax:
+                return JsonResponse({'ok': True, 'message': f'Pathologie "{p.nom}" enregistrée.'})
             messages.success(request, f'Pathologie "{p.nom}" enregistrée.')
             return redirect('patients:pathologie_list')
     else:
         form = PathologieForm()
-    return render(request, 'patients/pathologie_form.html', {
+    template = 'patients/pathologie_form_modal.html' if is_ajax else 'patients/pathologie_form.html'
+    return render(request, template, {
         'form': form, 'titre': 'Nouvelle pathologie', 'edit': False,
     })
 
@@ -877,15 +951,19 @@ def pathologie_create(request):
 @login_required
 def pathologie_edit(request, pk):
     pathologie = get_object_or_404(Pathologie, pk=pk)
+    is_ajax = _is_ajax(request)
     if request.method == 'POST':
         form = PathologieForm(request.POST, instance=pathologie)
         if form.is_valid():
             form.save()
+            if is_ajax:
+                return JsonResponse({'ok': True, 'message': 'Pathologie mise à jour.'})
             messages.success(request, 'Pathologie mise à jour.')
             return redirect('patients:pathologie_list')
     else:
         form = PathologieForm(instance=pathologie)
-    return render(request, 'patients/pathologie_form.html', {
+    template = 'patients/pathologie_form_modal.html' if is_ajax else 'patients/pathologie_form.html'
+    return render(request, template, {
         'form': form, 'titre': 'Modifier la pathologie', 'edit': True, 'object': pathologie,
     })
 
@@ -896,7 +974,151 @@ def pathologie_delete(request, pk):
     if request.method == 'POST':
         nom = pathologie.nom
         pathologie.delete()
+        if _is_ajax(request):
+            return JsonResponse({'ok': True, 'message': f'Pathologie "{nom}" supprimée.'})
         messages.success(request, f'Pathologie "{nom}" supprimée.')
+    return redirect('patients:pathologie_list')
+
+
+# ── Export / Import des pathologies ─────────────────────────────────────────
+
+_PATHOLOGIE_HDR = ['nom', 'description', 'actif']
+
+
+def _pathologie_row(p):
+    return [p.nom, p.description, int(p.actif)]
+
+
+@login_required
+def export_pathologies(request):
+    from core.utils import csv_response
+    import json as _json
+    from django.http import HttpResponse
+
+    fmt = request.GET.get('format', 'json')
+    qs = Pathologie.objects.all()
+    rows = [_pathologie_row(p) for p in qs]
+
+    if fmt == 'csv':
+        return csv_response('pathologies', _PATHOLOGIE_HDR, rows, delimiter=',')
+    if fmt == 'xlsx':
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment
+        import io as _io
+        wb = Workbook()
+        ws = wb.active
+        ws.title = 'Pathologies'
+        fill = PatternFill(start_color='1F6E8C', end_color='1F6E8C', fill_type='solid')
+        fnt = Font(color='FFFFFF', bold=True)
+        ws.append(_PATHOLOGIE_HDR)
+        for cell in ws[1]:
+            cell.fill, cell.font = fill, fnt
+            cell.alignment = Alignment(horizontal='center')
+        for row in rows:
+            ws.append(['' if v is None else v for v in row])
+        for col in ws.columns:
+            w = max((len(str(c.value or '')) for c in col), default=0)
+            ws.column_dimensions[col[0].column_letter].width = min(w + 4, 55)
+        buf = _io.BytesIO()
+        wb.save(buf)
+        resp = HttpResponse(
+            buf.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        resp['Content-Disposition'] = 'attachment; filename="pathologies.xlsx"'
+        return resp
+
+    data = [dict(zip(_PATHOLOGIE_HDR, r)) for r in rows]
+    resp = HttpResponse(
+        _json.dumps(data, ensure_ascii=False, indent=2, default=str),
+        content_type='application/json',
+    )
+    resp['Content-Disposition'] = 'attachment; filename="pathologies.json"'
+    return resp
+
+
+def _parse_pathologie_upload(upload):
+    import csv as _csv
+    import io as _io
+    import json as _json
+
+    name = upload.name.lower()
+    try:
+        if name.endswith('.json'):
+            return _json.loads(upload.read().decode('utf-8')), None
+        if name.endswith('.csv'):
+            text = upload.read().decode('utf-8-sig')
+            reader = _csv.DictReader(_io.StringIO(text))
+            return list(reader), None
+        if name.endswith(('.xlsx', '.xls')):
+            import openpyxl
+            wb = openpyxl.load_workbook(_io.BytesIO(upload.read()), data_only=True)
+            ws = wb.active
+            rows = list(ws.iter_rows(values_only=True))
+            if not rows:
+                return None, 'Fichier Excel vide.'
+            hdrs = [str(h) if h is not None else '' for h in rows[0]]
+            data = [dict(zip(hdrs, r)) for r in rows[1:] if any(v is not None for v in r)]
+            return data, None
+        return None, 'Format non supporté (.json, .csv ou .xlsx uniquement)'
+    except Exception as e:
+        return None, f'Erreur lecture fichier : {e}'
+
+
+def _s(v):
+    if v is None:
+        return ''
+    return str(v).replace('﻿', '').strip()
+
+
+def _b(v):
+    if isinstance(v, bool):
+        return v
+    return str(v).strip().lower() in ('1', 'true', 'oui', 'yes')
+
+
+@login_required
+def import_pathologies(request):
+    upload = request.FILES.get('fichier')
+    if not upload:
+        messages.error(request, 'Aucun fichier sélectionné.')
+        return redirect('patients:pathologie_list')
+
+    data, err = _parse_pathologie_upload(upload)
+    if err:
+        messages.error(request, err)
+        return redirect('patients:pathologie_list')
+
+    do_update = 'update' in request.POST
+    created = updated = skipped = errors = 0
+
+    for item in data:
+        try:
+            nom = _s(item.get('nom', ''))
+            if not nom:
+                errors += 1
+                continue
+            defaults = {
+                'description': _s(item.get('description', '')),
+                'actif': _b(item.get('actif', True)),
+            }
+            obj, was_created = Pathologie.objects.get_or_create(nom=nom, defaults=defaults)
+            if was_created:
+                created += 1
+            elif do_update:
+                for k, v in defaults.items():
+                    setattr(obj, k, v)
+                obj.save()
+                updated += 1
+            else:
+                skipped += 1
+        except Exception:
+            errors += 1
+
+    if errors:
+        messages.warning(request, f'{created} créée(s), {updated} mise(s) à jour, {skipped} ignorée(s), {errors} erreur(s).')
+    else:
+        messages.success(request, f'{created} pathologie(s) importée(s), {updated} mise(s) à jour, {skipped} ignorée(s).')
     return redirect('patients:pathologie_list')
 
 
@@ -955,4 +1177,108 @@ def typevisite_delete(request, pk):
         nom = tv.nom
         tv.delete()
         messages.success(request, f'Type de visite "{nom}" supprimé.')
+    return redirect('gynecologie_typevisite_list')
+
+
+# ── Export / Import des types de visite ─────────────────────────────────────
+
+_TYPEVISITE_HDR = ['nom', 'code', 'description', 'actif']
+
+
+def _typevisite_row(tv):
+    return [tv.nom, tv.code, tv.description, int(tv.actif)]
+
+
+@login_required
+def export_typevisite(request):
+    import json as _json
+    from django.http import HttpResponse
+
+    fmt = request.GET.get('format', 'json')
+    qs = TypeVisite.objects.all()
+    rows = [_typevisite_row(tv) for tv in qs]
+
+    if fmt == 'csv':
+        from core.utils import csv_response
+        return csv_response('types_visite', _TYPEVISITE_HDR, rows, delimiter=',')
+    if fmt == 'xlsx':
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment
+        import io as _io
+        wb = Workbook()
+        ws = wb.active
+        ws.title = 'Types de visite'
+        fill = PatternFill(start_color='1F6E8C', end_color='1F6E8C', fill_type='solid')
+        fnt = Font(color='FFFFFF', bold=True)
+        ws.append(_TYPEVISITE_HDR)
+        for cell in ws[1]:
+            cell.fill, cell.font = fill, fnt
+            cell.alignment = Alignment(horizontal='center')
+        for row in rows:
+            ws.append(['' if v is None else v for v in row])
+        for col in ws.columns:
+            w = max((len(str(c.value or '')) for c in col), default=0)
+            ws.column_dimensions[col[0].column_letter].width = min(w + 4, 55)
+        buf = _io.BytesIO()
+        wb.save(buf)
+        resp = HttpResponse(
+            buf.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        resp['Content-Disposition'] = 'attachment; filename="types_visite.xlsx"'
+        return resp
+
+    data = [dict(zip(_TYPEVISITE_HDR, r)) for r in rows]
+    resp = HttpResponse(
+        _json.dumps(data, ensure_ascii=False, indent=2, default=str),
+        content_type='application/json',
+    )
+    resp['Content-Disposition'] = 'attachment; filename="types_visite.json"'
+    return resp
+
+
+@login_required
+def import_typevisite(request):
+    upload = request.FILES.get('fichier')
+    if not upload:
+        messages.error(request, 'Aucun fichier sélectionné.')
+        return redirect('gynecologie_typevisite_list')
+
+    data, err = _parse_pathologie_upload(upload)
+    if err:
+        messages.error(request, err)
+        return redirect('gynecologie_typevisite_list')
+
+    do_update = 'update' in request.POST
+    created = updated = skipped = errors = 0
+
+    for item in data:
+        try:
+            nom = _s(item.get('nom', ''))
+            code = _s(item.get('code', ''))
+            if not nom or not code:
+                errors += 1
+                continue
+            defaults = {
+                'nom': nom,
+                'description': _s(item.get('description', '')),
+                'actif': _b(item.get('actif', True)),
+            }
+            obj, was_created = TypeVisite.objects.get_or_create(code__iexact=code, defaults={**defaults, 'code': code})
+            if was_created:
+                created += 1
+            elif do_update:
+                for k, v in defaults.items():
+                    setattr(obj, k, v)
+                obj.save()
+                updated += 1
+            else:
+                skipped += 1
+        except Exception:
+            errors += 1
+
+    if errors:
+        messages.warning(request, f'{created} créé(s), {updated} mis à jour, {skipped} ignoré(s), {errors} erreur(s).')
+    else:
+        messages.success(request, f'{created} type(s) de visite importé(s), {updated} mis à jour, {skipped} ignoré(s).')
     return redirect('gynecologie_typevisite_list')

@@ -6,8 +6,25 @@ from django.views.decorators.http import require_POST
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme, urlencode
+from django.urls import reverse
 from django.db.models import F, Q, Count
 from datetime import timedelta
+
+MAX_UNLOCK_ATTEMPTS = 5
+
+
+def _safe_next_url(request, candidate):
+    if candidate and url_has_allowed_host_and_scheme(
+        candidate, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        return candidate
+    return 'dashboard'
+
+
+def _resolve_next_url(request, candidate):
+    next_url = _safe_next_url(request, candidate)
+    return reverse('dashboard') if next_url == 'dashboard' else next_url
 
 
 def login_view(request):
@@ -20,15 +37,22 @@ def login_view(request):
         user = authenticate(request, username=username, password=password)
         if user is not None:
             login(request, user)
-            return redirect('intro')
+            next_url = _resolve_next_url(request, request.POST.get('next'))
+            return redirect(f"{reverse('intro')}?{urlencode({'next': next_url})}")
         else:
             error = "Identifiant ou mot de passe incorrect."
-    return render(request, 'registration/login.html', {'error': error})
+    next_candidate = request.GET.get('next', '')
+    return render(request, 'registration/login.html', {
+        'error': error,
+        'next': next_candidate if _safe_next_url(request, next_candidate) == next_candidate else '',
+    })
 
 
 @login_required(login_url='login')
 def intro(request):
-    return render(request, 'core/intro.html')
+    return render(request, 'core/intro.html', {
+        'next_url': _resolve_next_url(request, request.GET.get('next')),
+    })
 
 
 @require_POST
@@ -51,7 +75,8 @@ def unlock_session(request):
     """Déverrouille la session après vérification du mot de passe de
     l'utilisateur déjà authentifié (pas de login()/logout() — la session et
     tout son contenu, y compris la page/le formulaire en cours côté client,
-    restent intacts)."""
+    restent intacts). Le nombre de tentatives est limité : au-delà, la session
+    est entièrement détruite (retour à l'écran de connexion classique)."""
     is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
     error = None
     if request.method == 'POST':
@@ -59,15 +84,29 @@ def unlock_session(request):
         if request.user.check_password(password):
             request.session['locked'] = False
             request.session['last_activity'] = timezone.now().timestamp()
+            request.session.pop('unlock_attempts', None)
             if is_ajax:
                 return JsonResponse({'ok': True})
-            return redirect(request.POST.get('next') or 'dashboard')
-        error = "Mot de passe incorrect."
+            return redirect(_safe_next_url(request, request.POST.get('next')))
+
+        attempts = request.session.get('unlock_attempts', 0) + 1
+        request.session['unlock_attempts'] = attempts
+        if attempts >= MAX_UNLOCK_ATTEMPTS:
+            logout(request)
+            error = "Trop de tentatives incorrectes, vous avez été déconnecté."
+            if is_ajax:
+                return JsonResponse({'ok': False, 'logged_out': True, 'error': error}, status=403)
+            messages.error(request, error)
+            return redirect('login')
+
+        error = f"Mot de passe incorrect ({MAX_UNLOCK_ATTEMPTS - attempts} tentative(s) restante(s))."
         if is_ajax:
             return JsonResponse({'ok': False, 'error': error}, status=400)
+
+    next_candidate = request.GET.get('next', '')
     return render(request, 'registration/locked.html', {
         'error': error,
-        'next': request.GET.get('next', ''),
+        'next': next_candidate if _safe_next_url(request, next_candidate) == next_candidate else '',
     })
 
 
@@ -115,7 +154,9 @@ def mon_compte(request):
                 minutes = 30
             profile.session_timeout_minutes = max(0, minutes)
             profile.save(update_fields=['session_timeout_minutes'])
-            messages.success(request, 'Préférence de déconnexion automatique enregistrée.')
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                return JsonResponse({'ok': True, 'session_timeout_minutes': profile.session_timeout_minutes})
+            messages.success(request, 'Délai de verrouillage mis à jour.')
             return redirect('mon_compte')
 
         elif action == 'password':
@@ -173,7 +214,7 @@ def _get_dashboard_stats():
 
     today = timezone.now().date()
     return {
-        'patients_total': Patient.objects.filter(actif=True).count(),
+        'patients_total': Patient.objects.count(),
         'patients_today': Patient.objects.filter(date_creation__date=today).count(),
         'consultations_today': Consultation.objects.filter(date_heure__date=today).count(),
         'soins_aujourd_hui': Soin.objects.filter(date_creation__date=today).count(),
@@ -244,15 +285,14 @@ def patients_list(request):
     from patients.models import Patient
     from django.core.paginator import Paginator
 
-    patients = Patient.objects.filter(actif=True).order_by('-date_creation')
+    patients = Patient.objects.all().order_by('-date_creation')
     paginator = Paginator(patients, 25)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
     today = timezone.now().date()
     stats = {
-        'total': Patient.objects.filter(actif=True).count(),
-        'actifs': Patient.objects.filter(actif=True).count(),
+        'total': Patient.objects.count(),
         'nouveaux_30j': Patient.objects.filter(date_creation__date__gte=today - timedelta(days=30)).count(),
     }
     breadcrumb = [{'title': 'Accueil', 'url': '/'}, {'title': 'Patients'}]
@@ -1034,11 +1074,23 @@ def laboratoire_detail(request, pk):
 
 
 @login_required(login_url='login')
+def laboratoire_bulletin(request, pk):
+    from laboratoire.models import DemandeExamen
+    demande = get_object_or_404(DemandeExamen, pk=pk)
+    lignes = demande.lignes.select_related('type_examen').all()
+    return render(request, 'laboratoire/bulletin_exam.html', {
+        'demande': demande,
+        'lignes': lignes,
+        'back_url': f'/laboratoire/{demande.pk}/',
+    })
+
+
+@login_required(login_url='login')
 def gynecologie_naissance_create(request):
     from patients.models import Naissance, Patient
     from medecins.models import Medecin
 
-    patients = Patient.objects.filter(actif=True).order_by('nom')
+    patients = Patient.objects.all().order_by('nom')
     medecins = Medecin.objects.all().order_by('employe__nom')
     error = None
 
@@ -2050,7 +2102,7 @@ def kpi_dashboard(request):
     date_to = today
 
     stats = {
-        'patients_total': Patient.objects.filter(actif=True).count(),
+        'patients_total': Patient.objects.count(),
         'patients_periode': Patient.objects.filter(date_creation__date__range=[date_from, date_to]).count(),
         'consultations_periode': Consultation.objects.filter(date_heure__date__range=[date_from, date_to]).count(),
         'rdv_periode': RendezVous.objects.filter(date_heure__date__range=[date_from, date_to]).count(),
@@ -2080,7 +2132,7 @@ def kpi_dashboard(request):
         stats['factures_montant_fmt'] = "0 F"
 
     stats['patients_anniversaires'] = Patient.objects.filter(
-        date_naissance__month=today.month, date_naissance__day=today.day, actif=True
+        date_naissance__month=today.month, date_naissance__day=today.day
     ).count()
     stats['employes_anniversaires'] = Employe.objects.filter(
         date_naissance__month=today.month, date_naissance__day=today.day
@@ -2165,20 +2217,6 @@ def medecins_specialites(request):
 
 
 @login_required(login_url='login')
-def medecins_specialite_detail(request, pk):
-    from medecins.models import Specialite
-    obj  = get_object_or_404(Specialite, pk=pk)
-    pks  = list(Specialite.objects.order_by('nom').values_list('pk', flat=True))
-    pos  = pks.index(pk) if pk in pks else None
-    return render(request, 'medecins/config/specialite_detail.html', {
-        'obj':      obj,
-        'prev_pk':  pks[pos - 1] if pos and pos > 0 else None,
-        'next_pk':  pks[pos + 1] if pos is not None and pos < len(pks) - 1 else None,
-        'medecins': obj.medecin_set.select_related('employe', 'service').order_by('employe__nom'),
-    })
-
-
-@login_required(login_url='login')
 def medecins_specialite_create(request):
     from medecins.views import can_manage_medecins
     if not can_manage_medecins(request.user):
@@ -2213,7 +2251,7 @@ def medecins_specialite_edit(request, pk):
         if is_ajax:
             return JsonResponse({'ok': True, 'message': f'Spécialité « {obj} » mise à jour.'})
         messages.success(request, 'Spécialité mise à jour.')
-        return redirect('medecins_specialite_detail', pk=pk)
+        return redirect('medecins_specialites')
     template = 'medecins/config/specialite_form_modal.html' if is_ajax else 'medecins/config/specialite_form.html'
     return render(request, template, {
         'form': form, 'titre': f'Modifier – {obj.nom}', 'obj': obj,
@@ -2350,21 +2388,6 @@ def medecins_departements(request):
 
 
 @login_required(login_url='login')
-def medecins_departement_detail(request, pk):
-    from medecins.models import Departement
-    obj = get_object_or_404(Departement, pk=pk)
-    pks = list(Departement.objects.order_by('nom').values_list('pk', flat=True))
-    pos = pks.index(pk) if pk in pks else None
-    medecins = obj.medecins.select_related('employe', 'specialite').order_by('employe__nom', 'employe__prenoms')
-    return render(request, 'medecins/config/departement_detail.html', {
-        'obj':      obj,
-        'medecins': medecins,
-        'prev_pk': pks[pos - 1] if pos and pos > 0 else None,
-        'next_pk': pks[pos + 1] if pos is not None and pos < len(pks) - 1 else None,
-    })
-
-
-@login_required(login_url='login')
 def medecins_departement_create(request):
     from medecins.views import can_manage_medecins
     if not can_manage_medecins(request.user):
@@ -2399,7 +2422,7 @@ def medecins_departement_edit(request, pk):
         if is_ajax:
             return JsonResponse({'ok': True, 'message': f'Département « {obj} » mis à jour.'})
         messages.success(request, 'Département mis à jour.')
-        return redirect('medecins_departement_detail', pk=pk)
+        return redirect('medecins_departements')
     template = 'medecins/config/departement_form_modal.html' if is_ajax else 'medecins/config/departement_form.html'
     return render(request, template, {
         'form': form, 'titre': f'Modifier – {obj.nom}', 'obj': obj,

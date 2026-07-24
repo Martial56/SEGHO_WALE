@@ -28,6 +28,10 @@ def get_actions_disponibles(hosp, user):
     from facturation.models import Facture
 
     su = user.is_superuser or user.is_staff
+    # Calculée avant la branche superuser : la facture MEO payée avant de
+    # confirmer est une règle financière qui s'applique à tout le monde, y
+    # compris aux superusers (contrairement aux autres règles métier).
+    facture_payee = Facture.objects.filter(hospitalisation=hosp, statut='payee').exists()
 
     if su:
         result = {k: {'visible': True, 'enabled': True, 'raison_blocage': ''}
@@ -56,6 +60,11 @@ def get_actions_disponibles(hosp, user):
         # (régression de statut, ré-occupation de chambre, heure_entree/sortie écrasées).
         if hosp.statut != 'brouillon':
             result['confirmer'] = {'visible': False, 'enabled': False, 'raison_blocage': ''}
+        elif not facture_payee:
+            result['confirmer'] = {
+                'visible': True, 'enabled': False,
+                'raison_blocage': "La facture de mise en observation doit être payée avant de confirmer",
+            }
         if hosp.statut != 'confirme':
             result['installer'] = {'visible': False, 'enabled': False, 'raison_blocage': ''}
         if hosp.statut != 'hospitalise':
@@ -68,7 +77,6 @@ def get_actions_disponibles(hosp, user):
     statut = hosp.statut
 
     # ── Données métier (requêtes regroupées) ────────────────────────────────
-    facture_payee = Facture.objects.filter(hospitalisation=hosp, statut='payee').exists()
     nb_saf_nf = hosp.services_a_facturer.filter(
         facture__isnull=True, service__isnull=False
     ).count()
@@ -92,6 +100,11 @@ def get_actions_disponibles(hosp, user):
             result['confirmer'] = _act(True, False, "Sélectionnez un patient avant de confirmer")
         elif not hosp.medecin_traitant_id:
             result['confirmer'] = _act(True, False, "Sélectionnez un docteur avant de confirmer")
+        elif not facture_payee:
+            result['confirmer'] = _act(
+                True, False,
+                "La facture de mise en observation doit être payée avant de confirmer"
+            )
         else:
             result['confirmer'] = _act(True, True)
     else:  # confirme, hospitalise
@@ -105,7 +118,7 @@ def get_actions_disponibles(hosp, user):
     # Rôle typique : Caisse
     if not perm('can_creer_facture'):
         result['creer_facture'] = _act(False, False)
-    elif statut not in ('confirme', 'hospitalise', 'decharge'):
+    elif statut not in ('brouillon', 'confirme', 'hospitalise', 'decharge'):
         result['creer_facture'] = _act(
             True, False,
             f"Statut actuel : {hosp.get_statut_display()}"

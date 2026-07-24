@@ -10,6 +10,7 @@ urlpatterns = [
     path('produits/<int:pk>/',        views.produit_detail,        name='stock_produit_detail'),
     path('produits/<int:pk>/modifier/', views.produit_edit,        name='stock_produit_edit'),
     path('produits/export/',          views.export_stock_excel,    name='stock_export_excel'),
+    path('export/produits/',          views.export_produits,       name='stock_export_produits'),
     path('produits/importer/',        views.import_produits,       name='stock_import_produits'),
     path('produits/importer/modele/', views.import_produits_modele, name='stock_import_produits_modele'),
 
@@ -77,6 +78,8 @@ urlpatterns = [
     path('config/categories/nouveau/',            views.stock_categorie_create, name='stock_categorie_create'),
     path('config/categories/<int:pk>/modifier/',  views.stock_categorie_edit,   name='stock_categorie_edit'),
     path('config/categories/<int:pk>/supprimer/', views.stock_categorie_delete, name='stock_categorie_delete'),
+    path('config/categories/export/',   views.stock_export_categories_produit, name='stock_export_categories_produit'),
+    path('config/categories/importer/', views.stock_import_categories_produit, name='stock_import_categories_produit'),
 
     # Réceptions achats à intégrer dans le stock
     path('receptions-achats/',                   views.receptions_a_integrer, name='stock_receptions_a_integrer'),

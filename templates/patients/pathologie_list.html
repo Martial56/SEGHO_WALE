@@ -136,6 +136,8 @@
   html[data-theme="dark"] .gyn-nav-dd-item:hover { background: rgba(var(--teal-500-rgb),0.2); color: var(--teal-300); }
   .main { height: 100vh; overflow: hidden; }
   .content { min-height: 0; padding-top: 0; overflow-x: hidden; }
+
+  {% include 'services/includes/io_styles.html' %}
 </style>
 {% endblock %}
 
@@ -157,7 +159,23 @@
     </div>
   </div>
   <div class="o-subheader-row">
-    <a href="{% url 'patients:pathologie_create' %}" class="o-btn-create">CRÉER</a>
+    <a href="{% url 'patients:pathologie_create' %}" class="o-btn-create"
+       onclick="return mdOpenConfigModal(event, this.href, 'Nouvelle pathologie', 'bi-clipboard2-pulse');">CRÉER</a>
+    <div class="io-page-wrap" id="io-page-wrap">
+      <button type="button" class="o-ctrl-btn io-toggle-btn" onclick="toggleIOPage(event)">
+        <i class="bi bi-arrow-left-right"></i> Export / Import
+        <i class="bi bi-chevron-down" style="font-size:9px;margin-left:2px;"></i>
+      </button>
+      <div class="io-page-menu" id="io-page-menu">
+        <div class="io-pm-section">Exporter les pathologies</div>
+        <a class="io-pm-item" href="{% url 'patients:export_pathologies' %}?format=json"><i class="bi bi-filetype-json" style="color:#c97a00;"></i> JSON</a>
+        <a class="io-pm-item" href="{% url 'patients:export_pathologies' %}?format=csv"><i class="bi bi-filetype-csv" style="color:#1a7a4a;"></i> CSV</a>
+        <a class="io-pm-item" href="{% url 'patients:export_pathologies' %}?format=xlsx"><i class="bi bi-file-earmark-excel" style="color:#217346;"></i> Excel</a>
+        <div class="io-pm-sep"></div>
+        <div class="io-pm-section">Importer</div>
+        <button type="button" class="io-pm-item" onclick="openImportModal()"><i class="bi bi-upload" style="color:var(--teal-500);"></i> Importer un fichier…</button>
+      </div>
+    </div>
     <div class="o-subheader-row-right">
       <div class="o-pagination">
         <span style="margin-right:6px;">{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
@@ -209,7 +227,7 @@
     </thead>
     <tbody>
       {% for p in page_obj %}
-      <tr onclick="window.location='{% url 'patients:pathologie_edit' p.pk %}'">
+      <tr onclick="mdOpenConfigModal(event, '{% url 'patients:pathologie_edit' p.pk %}', 'Modifier — {{ p.nom|escapejs }}', 'bi-clipboard2-pulse')">
         <td class="td-nom">{{ p.nom }}</td>
         <td style="text-align:center;">
           {% if p.actif %}
@@ -219,12 +237,14 @@
           {% endif %}
         </td>
         <td class="td-actions" onclick="event.stopPropagation()">
-          <a href="{% url 'patients:pathologie_edit' p.pk %}" class="btn-icon" title="Modifier"><i class="bi bi-pencil"></i></a>
-          <form method="post" action="{% url 'patients:pathologie_delete' p.pk %}" style="display:inline;"
-                onsubmit="return confirm('Supprimer « {{ p.nom|escapejs }} » ?')">
-            {% csrf_token %}
-            <button type="submit" class="btn-icon btn-danger" title="Supprimer"><i class="bi bi-trash"></i></button>
-          </form>
+          <a href="{% url 'patients:pathologie_edit' p.pk %}" class="btn-icon" title="Modifier"
+             onclick="return mdOpenConfigModal(event, this.href, 'Modifier — {{ p.nom|escapejs }}', 'bi-clipboard2-pulse');">
+            <i class="bi bi-pencil"></i>
+          </a>
+          <button type="button" class="btn-icon btn-danger" title="Supprimer"
+                  onclick="openDeleteModal('{% url 'patients:pathologie_delete' p.pk %}', '{{ p.nom|escapejs }}')">
+            <i class="bi bi-trash"></i>
+          </button>
         </td>
       </tr>
       {% endfor %}
@@ -240,7 +260,8 @@
     <div class="o-empty-title">Aucune pathologie{% if q %} pour "{{ q }}"{% endif %}</div>
     <div class="o-empty-sub">{% if q %}Essayez avec un autre terme.{% else %}Créez la première pathologie.{% endif %}</div>
     {% if not q %}
-    <a href="{% url 'patients:pathologie_create' %}" class="o-empty-btn">
+    <a href="{% url 'patients:pathologie_create' %}" class="o-empty-btn"
+       onclick="return mdOpenConfigModal(event, this.href, 'Nouvelle pathologie', 'bi-clipboard2-pulse');">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       CRÉER UNE PATHOLOGIE
     </a>
@@ -249,7 +270,63 @@
   {% endif %}
 </div>
 
+{% include 'medecins/config/includes/_config_modal.html' %}
+
+<!-- ── Modale de confirmation de suppression ── -->
+<div class="mdcfg-modal-overlay" id="delete-modal-overlay" onclick="if (event.target === this) closeDeleteModal();">
+  <div class="mdcfg-modal-box" style="max-width:420px;">
+    <div class="mdcfg-modal-header">
+      <div class="mdcfg-modal-icon" style="background:linear-gradient(135deg,#e84545,#c62828);">
+        <i class="bi bi-trash"></i>
+      </div>
+      <div class="mdcfg-modal-title-wrap">
+        <div class="mdcfg-modal-title">Supprimer la pathologie</div>
+      </div>
+      <button type="button" class="mdcfg-modal-close" onclick="closeDeleteModal()">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div class="mdcfg-modal-body">
+      <p style="font-size:13px;color:var(--text-muted);line-height:1.55;margin:0;">
+        Supprimer « <strong id="delete-modal-nom" style="color:var(--text);"></strong> » ? Cette action est irréversible.
+      </p>
+    </div>
+    <div class="mdcfg-modal-footer">
+      <button type="button" class="btn-form-cancel" onclick="closeDeleteModal()">Annuler</button>
+      <button type="button" class="btn-form-submit" style="background:#e84545;" onclick="confirmDelete()">
+        <i class="bi bi-trash"></i> Supprimer
+      </button>
+    </div>
+  </div>
+</div>
+
 <script>
+  var deleteModalUrl = null;
+  function openDeleteModal(url, nom) {
+    deleteModalUrl = url;
+    document.getElementById('delete-modal-nom').textContent = nom;
+    document.getElementById('delete-modal-overlay').classList.add('open');
+  }
+  function closeDeleteModal() {
+    document.getElementById('delete-modal-overlay').classList.remove('open');
+    deleteModalUrl = null;
+  }
+  function confirmDelete() {
+    if (!deleteModalUrl) return;
+    var csrfValue = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1];
+    var fd = new FormData();
+    fd.append('csrfmiddlewaretoken', csrfValue);
+    fetch(deleteModalUrl, {
+      method: 'POST',
+      headers: {'X-Requested-With': 'XMLHttpRequest'},
+      body: fd,
+    })
+      .then(function (r) { return r.json(); })
+      .then(function () {
+        window.location.reload();
+      });
+  }
+
   (function() {
     var input = document.getElementById('search-input');
     var form  = document.getElementById('search-form');
@@ -260,5 +337,38 @@
       timer = setTimeout(function() { form.submit(); }, 350);
     });
   })();
+
+  function toggleIOPage(e){e.stopPropagation();document.getElementById('io-page-wrap').classList.toggle('open');}
+  document.addEventListener('click',function(){var w=document.getElementById('io-page-wrap');if(w)w.classList.remove('open');});
+  function openImportModal(){document.getElementById('io-modal-backdrop').classList.add('active');document.getElementById('io-modal').classList.add('active');var w=document.getElementById('io-page-wrap');if(w)w.classList.remove('open');}
+  function closeImportModal(){document.getElementById('io-modal-backdrop').classList.remove('active');document.getElementById('io-modal').classList.remove('active');}
+  function updateFileName(input){var el=document.getElementById('io-filename');if(input.files&&input.files[0]){el.textContent=input.files[0].name;el.style.display='block';}}
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')closeImportModal();});
 </script>
+
+<div class="io-modal-backdrop" id="io-modal-backdrop" onclick="closeImportModal()"></div>
+<div class="io-modal" id="io-modal">
+  <div class="io-modal-header">
+    <span><i class="bi bi-upload"></i> Importer des pathologies</span>
+    <button type="button" class="io-modal-close" onclick="closeImportModal()">×</button>
+  </div>
+  <form method="post" action="{% url 'patients:import_pathologies' %}" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div class="io-modal-body">
+      <label class="io-file-label" for="io-file-input">
+        <i class="bi bi-cloud-upload" style="font-size:28px;color:var(--teal-500);display:block;margin-bottom:6px;"></i>
+        <strong>Choisir un fichier</strong>
+        <span style="font-size:11px;color:var(--text-muted);display:block;margin-top:3px;">JSON, CSV ou Excel (.xlsx)</span>
+        <input type="file" id="io-file-input" name="fichier" accept=".json,.csv,.xlsx,.xls" required onchange="updateFileName(this)">
+      </label>
+      <div class="io-filename" id="io-filename" style="display:none;"></div>
+      <label class="io-checkbox-label"><input type="checkbox" name="update"> Mettre à jour les enregistrements existants</label>
+      <p class="io-hint">Clé de déduplication : <strong>nom</strong>. Colonnes attendues : nom, description, actif.</p>
+    </div>
+    <div class="io-modal-footer">
+      <button type="button" class="io-btn-cancel" onclick="closeImportModal()">Annuler</button>
+      <button type="submit" class="io-btn-submit"><i class="bi bi-upload"></i> Importer</button>
+    </div>
+  </form>
+</div>
 {% endblock %}

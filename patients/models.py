@@ -41,7 +41,6 @@ class Patient(models.Model):
     contact_urgence_telephone = models.CharField(max_length=20, blank=True)
     date_creation = models.DateTimeField(auto_now_add=True)
     date_modification = models.DateTimeField(auto_now=True)
-    actif = models.BooleanField(default=True)
     photo = models.ImageField(upload_to='patients/', blank=True, null=True)
 
     def save(self, *args, **kwargs):
@@ -93,7 +92,7 @@ class RendezVous(models.Model):
     salle_consultation = models.CharField(max_length=100, blank=True, verbose_name='Salle de consultation')
     date_heure = models.DateTimeField()
     date_suivi = models.DateTimeField(null=True, blank=True, verbose_name='Date de suivi')
-    duree_minutes = models.IntegerField(default=30)
+    duree_minutes = models.IntegerField(default=0)
     type_rdv = models.CharField(max_length=20, choices=TYPE, default='consultation')
     type_visite_cpn = models.CharField(max_length=10, choices=TYPE_VISITE_CPN, blank=True, default='', verbose_name='Type de visite CPN')
     niveau_urgence = models.CharField(max_length=20, choices=URGENCE, default='normal', verbose_name="Niveau d'urgence")
@@ -143,6 +142,9 @@ class RendezVous(models.Model):
                 count += 1
                 candidate = f"AP{count:05d}"
             self.code_rdv = candidate
+        update_fields = kwargs.get('update_fields')
+        if update_fields is None:
+            self.duree_minutes = self.temps_constante_minutes + self.temps_attente_minutes + self.temps_consultation_minutes
         super().save(*args, **kwargs)
 
     @property

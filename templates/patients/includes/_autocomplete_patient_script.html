@@ -1,154 +1,169 @@
-    /* Autocomplete patient : clic = affiche liste, frappe = filtre.
-       DOM requis : #patient-search, #id_patient, #ac-dropdown,
-                   #patient-age, #patient-tel, #id_code_confirmation, #code-confirmation.
-       Contexte Django optionnel : patient_prefill, rdv. */
-    (function () {
-        var inp    = document.getElementById('patient-search');
-        var hidden = document.getElementById('id_patient');
-        var drop   = document.getElementById('ac-dropdown');
+    /* Bloc JS partagé : recherche patient en autocomplétion + code de confirmation RDV.
+       Doit être inclus à l'intérieur d'une IIFE <script> existante (voir usages).
+       Attend dans le DOM : #id_patient, #id_code_confirmation, #code-confirmation,
+       #patient-search, #ac-dropdown, #patient-age, #patient-tel.
+       Attend dans le contexte (optionnels) : patient_prefill, rdv (avec rdv.code_confirmation). */
+    /* ── Autocomplete patient (AJAX) ── */
+    var patientHidden    = document.getElementById('id_patient');
+    var codeHidden       = document.getElementById('id_code_confirmation');
+    var codeDisplay      = document.getElementById('code-confirmation');
+    var searchInput      = document.getElementById('patient-search');
+    var dropdown         = document.getElementById('ac-dropdown');
+    var focusedIdx       = -1;
+    var searchTimer      = null;
+    var SEARCH_URL       = '{% url "patients:patient_search" %}';
+    var INFO_URL         = '{% url "patients:patient_info" 0 %}';
 
-        /* Si les éléments n'existent pas (mode édition), rien à faire. */
-        if (!inp || !drop || !hidden) return;
+    function generateConfirmCode() {
+        var now = new Date();
+        var pad = function(n) { return String(n).padStart(2, '0'); };
+        var d = String(now.getFullYear()).slice(-2) + pad(now.getMonth()+1) + pad(now.getDate());
+        var t = pad(now.getHours()) + pad(now.getMinutes());
+        var r = Math.floor(Math.random() * 9000 + 1000);
+        return 'RDV' + d + '-' + t + r;
+    }
 
-        var SEARCH_URL = '{% url "patients:patient_search" %}';
-        var INFO_URL   = '{% url "patients:patient_info" 0 %}';
-        var timer      = null;
+    function highlight(text, q) {
+        if (!q) return text;
+        var i = text.toLowerCase().indexOf(q.toLowerCase());
+        if (i < 0) return text;
+        return text.slice(0, i) +
+               '<mark class="ac-mark">' + text.slice(i, i + q.length) + '</mark>' +
+               text.slice(i + q.length);
+    }
 
-        /* ── Recherche AJAX ── */
-        function doSearch(q) {
-            if (q.length === 1) return;   /* trop court pour filtrer */
-            fetch(SEARCH_URL + '?q=' + encodeURIComponent(q))
-                .then(function (r) { return r.json(); })
-                .then(function (d) { renderDropdown(d.results, q); })
-                .catch(function () { drop.style.display = 'none'; });
+    function renderResults(results, q) {
+        dropdown.innerHTML = '';
+        focusedIdx = -1;
+        if (!results.length) {
+            dropdown.innerHTML = '<div class="ac-empty">Aucun patient trouvé</div>';
+            dropdown.style.display = 'block';
+            return;
         }
-
-        function renderDropdown(results, q) {
-            drop.innerHTML = '';
-            if (!results || !results.length) {
-                drop.innerHTML = '<div class="ac-empty">Aucun patient trouvé</div>';
-                drop.style.display = 'block';
-                return;
-            }
-            results.forEach(function (p) {
-                var item = document.createElement('div');
-                item.className = 'ac-item';
-                item.innerHTML =
-                    '<strong>' + hl(p.nom_complet, q) + '</strong>' +
-                    '<br><span style="font-size:11px;color:rgba(0,0,0,0.4);">' +
-                    hl(p.code, q) + (p.telephone ? ' · ' + p.telephone : '') + '</span>';
-                item.addEventListener('mousedown', function (e) {
-                    e.preventDefault();   /* empêche le blur de l'input */
-                    selectPatient(p.id, p.nom_complet);
-                });
-                drop.appendChild(item);
+        results.forEach(function(p) {
+            var div = document.createElement('div');
+            div.className = 'ac-item';
+            div.innerHTML =
+                '<strong>' + highlight(p.nom_complet, q) + '</strong>' +
+                '<br><span style="font-size:11px;color:rgba(0,0,0,0.4);">' +
+                highlight(p.code, q) +
+                (p.telephone ? ' · ' + highlight(p.telephone, q) : '') +
+                '</span>';
+            div.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                selectPatient(p.id, p.nom_complet);
             });
-            drop.style.display = 'block';
-        }
-
-        function hl(text, q) {
-            if (!q || !text) return text || '';
-            var i = text.toLowerCase().indexOf(q.toLowerCase());
-            if (i < 0) return text;
-            return text.slice(0, i) +
-                   '<mark class="ac-mark">' + text.slice(i, i + q.length) + '</mark>' +
-                   text.slice(i + q.length);
-        }
-
-        function selectPatient(id, nom) {
-            inp.value    = nom;
-            hidden.value = id;
-            drop.style.display = 'none';
-            fetchInfo(id);
-            genCode();
-        }
-
-        /* ── Infos patient (âge + tél) ── */
-        function fetchInfo(pk) {
-            if (!pk) return;
-            fetch(INFO_URL.replace('/0/', '/' + pk + '/'))
-                .then(function (r) { return r.json(); })
-                .then(function (d) {
-                    var ageEl = document.getElementById('patient-age');
-                    var telEl = document.getElementById('patient-tel');
-                    if (ageEl) { ageEl.textContent = d.age != null ? d.age + ' ans' : '—'; ageEl.classList.remove('placeholder'); }
-                    if (telEl) { telEl.textContent = d.telephone || '—'; telEl.classList.remove('placeholder'); }
-                })
-                .catch(function () {});
-        }
-
-        /* ── Code de confirmation ── */
-        function genCode() {
-            var cH = document.getElementById('id_code_confirmation');
-            var cD = document.getElementById('code-confirmation');
-            if (!cH || cH.value) return;
-            var now = new Date();
-            var pad = function (n) { return String(n).padStart(2, '0'); };
-            var code = 'RDV'
-                + String(now.getFullYear()).slice(-2) + pad(now.getMonth() + 1) + pad(now.getDate())
-                + '-' + pad(now.getHours()) + pad(now.getMinutes())
-                + Math.floor(Math.random() * 9000 + 1000);
-            cH.value = code;
-            if (cD) { cD.textContent = code; cD.classList.remove('placeholder'); }
-        }
-
-        /* ── Événements ── */
-
-        /* Clic sur le champ → affiche les patients (sans filtre) */
-        inp.addEventListener('click', function () {
-            doSearch(this.value.trim());
+            dropdown.appendChild(div);
         });
+        dropdown.style.display = 'block';
+    }
 
-        /* Frappe → recherche filtrée (debounce 220 ms) */
-        inp.addEventListener('input', function () {
-            clearTimeout(timer);
+    function doSearch(q) {
+        fetch(SEARCH_URL + '?q=' + encodeURIComponent(q))
+            .then(function(r){ return r.json(); })
+            .then(function(d){ renderResults(d.results, q); })
+            .catch(function() { dropdown.style.display = 'none'; });
+    }
+
+    function selectPatient(id, nom) {
+        patientHidden.value = id;
+        searchInput.value   = nom;
+        dropdown.style.display = 'none';
+        fetchPatientInfo(id);
+        /* Générer le code de confirmation si pas déjà présent */
+        if (!codeHidden.value) {
+            var code = generateConfirmCode();
+            codeHidden.value = code;
+            codeDisplay.textContent = code;
+            codeDisplay.classList.remove('placeholder');
+        }
+    }
+
+    function moveFocus(dir) {
+        var items = dropdown.querySelectorAll('.ac-item');
+        if (!items.length) return;
+        focusedIdx = Math.max(0, Math.min(focusedIdx + dir, items.length - 1));
+        items.forEach(function(el, i){ el.classList.toggle('focused', i === focusedIdx); });
+        items[focusedIdx].scrollIntoView({ block: 'nearest' });
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener('focus', function() {
+            if (!patientHidden.value) {
+                clearTimeout(searchTimer);
+                searchTimer = setTimeout(function(){ doSearch(searchInput.value.trim()); }, 100);
+            }
+        });
+        searchInput.addEventListener('input', function() {
+            clearTimeout(searchTimer);
             var q = this.value.trim();
-            hidden.value = '';              /* réinitialise la sélection */
-            timer = setTimeout(function () { doSearch(q); }, 220);
-        });
-
-        /* Fermer le dropdown quand on clique ailleurs */
-        document.addEventListener('click', function (e) {
-            if (!inp.contains(e.target) && !drop.contains(e.target)) {
-                drop.style.display = 'none';
+            patientHidden.value = '';
+            /* Réinitialiser le code si le patient est désélectionné */
+            if (!q) {
+                codeHidden.value = '';
+                codeDisplay.textContent = 'Sélectionnez un patient…';
+                codeDisplay.classList.add('placeholder');
             }
+            searchTimer = setTimeout(function(){ doSearch(q); }, 220);
         });
-
-        /* Fermer le dropdown au blur (navigation clavier) */
-        inp.addEventListener('blur', function () {
-            setTimeout(function () { drop.style.display = 'none'; }, 200);
-        });
-
-        /* Navigation clavier dans la liste */
-        var focusIdx = -1;
-        inp.addEventListener('keydown', function (e) {
-            var items = drop.querySelectorAll('.ac-item');
-            if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                focusIdx = Math.min(focusIdx + 1, items.length - 1);
-            } else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                focusIdx = Math.max(focusIdx - 1, 0);
-            } else if (e.key === 'Enter' && focusIdx >= 0 && items[focusIdx]) {
-                e.preventDefault();
-                items[focusIdx].dispatchEvent(new MouseEvent('mousedown'));
-                return;
-            } else if (e.key === 'Escape') {
-                drop.style.display = 'none';
-                return;
+        searchInput.addEventListener('keydown', function(e) {
+            if (e.key === 'ArrowDown')  { e.preventDefault(); moveFocus(1); }
+            else if (e.key === 'ArrowUp')   { e.preventDefault(); moveFocus(-1); }
+            else if (e.key === 'Enter') {
+                var items = dropdown.querySelectorAll('.ac-item');
+                if (focusedIdx >= 0 && items[focusedIdx]) {
+                    e.preventDefault();
+                    items[focusedIdx].dispatchEvent(new MouseEvent('mousedown'));
+                }
             }
-            items.forEach(function (el, i) { el.classList.toggle('focused', i === focusIdx); });
-            if (items[focusIdx]) items[focusIdx].scrollIntoView({ block: 'nearest' });
+            else if (e.key === 'Escape') { dropdown.style.display = 'none'; }
+        });
+        searchInput.addEventListener('blur', function(){
+            setTimeout(function(){ dropdown.style.display = 'none'; }, 200);
         });
 
-        /* ── Préremplissage (arrivée depuis une fiche patient) ── */
+        /* Pré-remplir si patient passé en paramètre (mode création uniquement) */
         {% if patient_prefill and not rdv %}
-        inp.value    = '{{ patient_prefill.nom }} {{ patient_prefill.prenoms }}';
-        hidden.value = '{{ patient_prefill.pk }}';
-        fetchInfo('{{ patient_prefill.pk }}');
-        genCode();
-        {% elif rdv and not rdv.code_confirmation %}
-        genCode();
+        searchInput.value = '{{ patient_prefill.nom }} {{ patient_prefill.prenoms }}';
+        patientHidden.value = '{{ patient_prefill.pk }}';
+        fetchPatientInfo('{{ patient_prefill.pk }}');
+        if (!codeHidden.value) {
+            var code = generateConfirmCode();
+            codeHidden.value = code;
+            codeDisplay.textContent = code;
+            codeDisplay.classList.remove('placeholder');
+        }
         {% endif %}
+    }
 
-    }());
+    /* ── Info patient (âge + téléphone) ── */
+    function fetchPatientInfo(pk) {
+        if (!pk) { setPlaceholder('patient-age', '—'); setPlaceholder('patient-tel', '—'); return; }
+        fetch(INFO_URL.replace('/0/', '/' + pk + '/'))
+            .then(function(r){ return r.json(); })
+            .then(function(d) {
+                var ageEl = document.getElementById('patient-age');
+                var telEl = document.getElementById('patient-tel');
+                ageEl.textContent = d.age + ' ans';
+                ageEl.classList.remove('placeholder');
+                telEl.textContent = d.telephone || '—';
+                telEl.classList.remove('placeholder');
+            });
+    }
+
+    function setPlaceholder(id, text) {
+        var el = document.getElementById(id);
+        if (el) { el.textContent = text; el.classList.add('placeholder'); }
+    }
+
+    if (patientHidden && patientHidden.value) fetchPatientInfo(patientHidden.value);
+
+    /* En mode édition : générer le code si absent */
+    {% if rdv and not rdv.code_confirmation %}
+    if (!codeHidden.value) {
+        var editCode = generateConfirmCode();
+        codeHidden.value = editCode;
+        codeDisplay.textContent = editCode;
+        codeDisplay.classList.remove('placeholder');
+    }
+    {% endif %}

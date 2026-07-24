@@ -716,6 +716,73 @@ def stock_categorie_delete(request, pk):
     return redirect('stock_categories_list')
 
 
+# ── Export / Import des catégories de produit ────────────────────────────────
+
+_CATSTOCK_HDR = ['nom', 'type', 'description', 'actif']
+
+
+def _catstock_row(c):
+    return [c.nom, c.type, c.description, int(c.actif)]
+
+
+@login_required(login_url='login')
+def stock_export_categories_produit(request):
+    fmt = request.GET.get('format', 'json')
+    qs = CategorieStock.objects.order_by('type', 'nom')
+    rows = [_catstock_row(c) for c in qs]
+    return _export_file(fmt, 'categories_produit', _CATSTOCK_HDR, rows,
+                        [dict(zip(_CATSTOCK_HDR, r)) for r in rows])
+
+
+@login_required(login_url='login')
+@require_POST
+def stock_import_categories_produit(request):
+    upload = request.FILES.get('fichier')
+    if not upload:
+        messages.error(request, 'Aucun fichier sélectionné.')
+        return redirect('stock_categories_list')
+
+    data, err = _parse_upload(upload)
+    if err:
+        messages.error(request, err)
+        return redirect('stock_categories_list')
+
+    do_update = 'update' in request.POST
+    created = updated = skipped = errors = 0
+
+    for item in data:
+        try:
+            nom = _s(item.get('nom', ''))
+            type_ = _s(item.get('type', 'medicament')) or 'medicament'
+            if not nom:
+                errors += 1
+                continue
+            defaults = {
+                'nom': nom,
+                'type': type_,
+                'description': _s(item.get('description', '')),
+                'actif': _b(item.get('actif', True)),
+            }
+            obj, was_created = CategorieStock.objects.get_or_create(nom__iexact=nom, type=type_, defaults=defaults)
+            if was_created:
+                created += 1
+            elif do_update:
+                for k, v in defaults.items():
+                    setattr(obj, k, v)
+                obj.save()
+                updated += 1
+            else:
+                skipped += 1
+        except Exception:
+            errors += 1
+
+    if errors:
+        messages.warning(request, f'{created} créée(s), {updated} mise(s) à jour, {skipped} ignorée(s), {errors} erreur(s).')
+    else:
+        messages.success(request, f'{created} catégorie(s) importée(s), {updated} mise(s) à jour, {skipped} ignorée(s).')
+    return redirect('stock_categories_list')
+
+
 @login_required(login_url='login')
 def fournisseur_create(request):
     if not can_manage_stock(request.user):
@@ -1767,6 +1834,39 @@ def _parse_date_cell(value):
         return datetime.datetime.strptime(value, '%Y-%m-%d').date()
     except ValueError:
         return None
+
+
+# ── Export des produits (JSON/CSV/XLSX, comme les unités de mesure) ──
+
+_PRD_HDR = [
+    'code', 'nom', 'type', 'categorie', 'description', 'unite_mesure',
+    'dci', 'dosage', 'forme', 'prescription_obligatoire',
+    'stock_actuel', 'stock_alerte', 'stock_minimum',
+    'prix_achat', 'prix_vente', 'actif',
+]
+
+
+def _prd_row(p):
+    return [
+        p.code, p.nom, p.type,
+        p.categorie.nom if p.categorie else '',
+        p.description,
+        p.unite_mesure.nom if p.unite_mesure else '',
+        p.dci, p.dosage, p.forme, int(p.prescription_obligatoire),
+        float(p.stock_actuel), float(p.stock_alerte), float(p.stock_minimum),
+        float(p.prix_achat), float(p.prix_vente), int(p.actif),
+    ]
+
+
+@login_required(login_url='login')
+def export_produits(request):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
+    fmt = request.GET.get('format', 'json')
+    qs = Produit.objects.select_related('categorie', 'unite_mesure').order_by('type', 'nom')
+    rows = [_prd_row(p) for p in qs]
+    return _export_file(fmt, 'produits', _PRD_HDR, rows,
+                        [dict(zip(_PRD_HDR, r)) for r in rows])
 
 
 @login_required(login_url='login')

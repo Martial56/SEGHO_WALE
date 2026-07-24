@@ -1,3 +1,5 @@
+from datetime import date, datetime as dt
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -5,7 +7,6 @@ from django.core.exceptions import PermissionDenied
 from django.db.models import Q, Sum
 from django.core.paginator import Paginator
 from django.urls import reverse
-from django.http import JsonResponse
 
 from .models import Facture, LigneFacture, Acte, Paiement
 from .forms import FactureForm
@@ -22,9 +23,15 @@ def can_manage_paiement(user):
 
 @login_required(login_url='login')
 def facturation_list(request):
-    q      = request.GET.get('q', '').strip()
-    statut = request.GET.get('statut', '').strip()
-    type_f = request.GET.get('type_f', '').strip()
+    q       = request.GET.get('q', '').strip()
+    filters = request.GET.getlist('filter')
+
+    # Un paramètre présent (même vide) signifie que l'utilisateur a explicitement
+    # touché au filtre de date ; son absence totale signifie "pas encore touché",
+    # auquel cas on applique le filtre par défaut (factures du jour).
+    dates_explicites = 'date_from' in request.GET or 'date_to' in request.GET
+    date_from_s = request.GET.get('date_from', '').strip()
+    date_to_s   = request.GET.get('date_to', '').strip()
 
     qs = Facture.objects.select_related('patient').order_by('-date_emission')
 
@@ -34,10 +41,25 @@ def facturation_list(request):
             Q(patient__nom__icontains=q) |
             Q(patient__prenoms__icontains=q)
         )
-    if statut:
-        qs = qs.filter(statut=statut)
-    if type_f:
-        qs = qs.filter(type_facture=type_f)
+
+    statuts_sel = [f.split(':', 1)[1] for f in filters if f.startswith('statut:')]
+    if statuts_sel:
+        qs = qs.filter(statut__in=statuts_sel)
+
+    types_sel = [f.split(':', 1)[1] for f in filters if f.startswith('type:')]
+    if types_sel:
+        qs = qs.filter(type_facture__in=types_sel)
+
+    if date_from_s or date_to_s:
+        try:
+            if date_from_s:
+                qs = qs.filter(date_emission__date__gte=dt.strptime(date_from_s, '%Y-%m-%d').date())
+            if date_to_s:
+                qs = qs.filter(date_emission__date__lte=dt.strptime(date_to_s, '%Y-%m-%d').date())
+        except ValueError:
+            pass
+    elif not dates_explicites:
+        qs = qs.filter(date_emission__date=date.today())
 
     total = qs.count()
 
@@ -63,42 +85,19 @@ def facturation_list(request):
     paginator = Paginator(qs, 25)
     page_obj  = paginator.get_page(request.GET.get('page'))
 
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        rows = []
-        for f in page_obj.object_list:
-            rows.append({
-                'pk':           f.pk,
-                'numero':       f.numero,
-                'patient':      f'{f.patient.nom} {f.patient.prenoms}',
-                'type_display': f.get_type_facture_display(),
-                'date':         f.date_emission.strftime('%d/%m/%Y'),
-                'montant_total': float(f.montant_total),
-                'montant_paye':  float(f.montant_paye),
-                'solde_restant': float(f.solde_restant),
-                'statut':        f.statut,
-                'statut_display': f.get_statut_display(),
-                'url':           reverse('facturation:detail', args=[f.pk]),
-            })
-        return JsonResponse({
-            'rows':         rows,
-            'total':        total,
-            'has_previous': page_obj.has_previous(),
-            'has_next':     page_obj.has_next(),
-            'start_index':  page_obj.start_index() if page_obj.object_list else 0,
-            'end_index':    page_obj.end_index(),
-            'count':        page_obj.paginator.count,
-            'page':         page_obj.number,
-        })
-
     return render(request, 'facturation/list.html', {
-        'page_obj':       page_obj,
-        'stats':          stats,
-        'q':              q,
-        'statut':         statut,
-        'type_f':         type_f,
-        'total':          total,
-        'statut_choices': Facture.STATUT,
-        'type_choices':   Facture.TYPE,
+        'page_obj':          page_obj,
+        'stats':             stats,
+        'q':                 q,
+        'filters':           filters,
+        'statuts_sel':       statuts_sel,
+        'types_sel':         types_sel,
+        'date_from':         date_from_s,
+        'date_to':           date_to_s,
+        'dates_explicites':  dates_explicites,
+        'total':             total,
+        'statut_choices':    Facture.STATUT,
+        'type_choices':      Facture.TYPE,
     })
 
 
@@ -207,6 +206,9 @@ def facture_create(request):
         if not has_ligne:
             messages.error(request, "Ajoutez au moins une ligne avec une désignation avant d'enregistrer.")
             return redirect(request.get_full_path())
+        if ordonnance_obj and Facture.objects.filter(ordonnance=ordonnance_obj).exclude(statut='annulee').exists():
+            messages.error(request, 'Cette ordonnance a déjà été facturée.')
+            return redirect('ordonnance_detail', pk=ordonnance_obj.pk)
         if form.is_valid():
             facture = form.save(commit=False)
             facture.patient  = patient

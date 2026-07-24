@@ -1203,7 +1203,7 @@
         });
     }
     </script>
-    {% if user.is_authenticated and user_profile.session_timeout_minutes %}
+    {% if user.is_authenticated %}
     <div id="lock-overlay" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(7,30,40,0.92);backdrop-filter:blur(6px);align-items:center;justify-content:center;font-family:'Sora',sans-serif;">
       <div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:20px;padding:40px;width:340px;text-align:center;">
         <div style="display:flex;align-items:center;justify-content:center;width:56px;height:56px;margin:0 auto 16px;border-radius:50%;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);">
@@ -1221,8 +1221,7 @@
     </div>
     <script>
     (function () {
-        var timeoutMinutes = {{ user_profile.session_timeout_minutes }};
-        if (!timeoutMinutes || timeoutMinutes <= 0) return;
+        var timeoutMinutes = {{ user_profile.session_timeout_minutes|default:0 }};
         var timeoutMs = timeoutMinutes * 60 * 1000;
         var idleTimer = null;
         var overlay = document.getElementById('lock-overlay');
@@ -1248,12 +1247,19 @@
         function resetIdleTimer() {
             if (isLocked()) return;
             clearTimeout(idleTimer);
-            idleTimer = setTimeout(lockSession, timeoutMs);
+            if (timeoutMinutes > 0) idleTimer = setTimeout(lockSession, timeoutMs);
         }
 
         ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'].forEach(function (evt) {
             document.addEventListener(evt, resetIdleTimer, { passive: true });
         });
+
+        // Permet à "Mon compte" de répercuter un nouveau délai sans recharger la page.
+        window.updateSessionTimeout = function (minutes) {
+            timeoutMinutes = minutes;
+            timeoutMs = minutes * 60 * 1000;
+            resetIdleTimer();
+        };
 
         resetIdleTimer();
 
@@ -1277,6 +1283,8 @@
                     overlay.style.display = 'none';
                     pwdInput.value = '';
                     resetIdleTimer();
+                } else if (data.logged_out) {
+                    window.location.href = "{% url 'login' %}";
                 } else {
                     errEl.textContent = data.error || 'Mot de passe incorrect.';
                     errEl.style.display = 'block';

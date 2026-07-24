@@ -517,7 +517,7 @@
                 <button type="submit" name="_action" value="en_consultation" class="btn-action btn-teal">En consultation</button>
             {% elif rdv.statut == 'en_consultation' %}
                 <button type="button" class="btn-action" id="btn-pause"><i class="bi bi-pause-fill"></i> Pause</button>
-                <a href="{% url 'ordonnance_create_libre' %}?patient_id={{ rdv.patient.pk }}{% if consultation %}&consultation_id={{ consultation.pk }}{% elif rdv.medecin %}&medecin_id={{ rdv.medecin.pk }}{% endif %}" class="btn-action btn-ghost"><i class="bi bi-file-earmark-medical"></i> Créer une ordonnance</a>
+                <a href="{% url 'ordonnance_create_libre' %}?patient_id={{ rdv.patient.pk }}{% if consultation %}&consultation_id={{ consultation.pk }}{% endif %}{% if rdv.medecin %}&medecin_id={{ rdv.medecin.pk }}{% endif %}" class="btn-action btn-ghost"><i class="bi bi-file-earmark-medical"></i> Créer une ordonnance</a>
                 <a href="{% url 'laboratoire_create' %}?patient={{ rdv.patient.pk }}{% if rdv.medecin %}&medecin_id={{ rdv.medecin.pk }}{% endif %}" class="btn-action btn-ghost"><i class="bi bi-flask"></i> Demande de lab</a>
                 <a href="{% url 'soins:create' %}?patient_id={{ rdv.patient.pk }}" class="btn-action btn-ghost"><i class="bi bi-bandaid"></i> Soins</a>
                 <a href="{% url 'hospitalisation:create' %}?patient={{ rdv.patient.pk }}{% if rdv.medecin %}&medecin={{ rdv.medecin.pk }}{% endif %}&rdv={{ rdv.pk }}" class="btn-action btn-ghost"><i class="bi bi-clipboard2-pulse"></i> M.O</a>
@@ -625,11 +625,11 @@
                 {% endif %}
             </div>
 
-            <!-- Durée -->
+            <!-- Durée (calculée automatiquement) -->
             <div class="field-row">
-                <label for="{{ form.duree_minutes.id_for_label }}">Durée</label>
+                <label>Durée</label>
                 <div style="display:flex;align-items:center;gap:8px;">
-                    {{ form.duree_minutes }}
+                    <div class="field-display" id="duree-display">{% if rdv %}{{ rdv.duree_minutes }}{% else %}0{% endif %}</div>
                     <span style="font-size:12px;color:rgba(0,0,0,0.4);font-weight:600;">minutes</span>
                 </div>
             </div>
@@ -1545,6 +1545,8 @@
         });
     });
 
+    {% include "patients/includes/_autocomplete_patient_script.html" %}
+
     /* ── Date de validité = date_heure + 14 jours ── */
     var dateHeureInput = document.getElementById('{{ form.date_heure.id_for_label }}');
     var dateValiditeEl = document.getElementById('date-validite');
@@ -1758,8 +1760,6 @@
     }
 })();
 </script>
-
-<script>{% include "patients/includes/_autocomplete_patient_script.html" %}</script>
 
 {% if constante %}
 <script type="application/json" id="constante-data">
