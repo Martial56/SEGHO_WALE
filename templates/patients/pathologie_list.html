@@ -177,7 +177,7 @@
       </div>
     </div>
     <div class="o-subheader-row-right">
-      <div class="o-pagination">
+      <div class="o-pagination" id="pathologie-pagination">
         <span style="margin-right:6px;">{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
         {% if page_obj.has_previous %}
           <a href="?{% if q %}q={{ q }}&{% endif %}page=1" class="o-pag-btn" title="Première page">
@@ -215,12 +215,13 @@
   </div>
 </div>
 
-<div class="o-list-wrap">
+<div class="o-list-wrap" id="pathologie-list-wrap">
   {% if page_obj %}
   <table class="o-list">
     <thead>
       <tr>
         <th>Nom de la pathologie</th>
+        <th style="width:170px;">Catégorie</th>
         <th style="width:60px;text-align:center;">Actif</th>
         <th style="width:80px;text-align:center;">Actions</th>
       </tr>
@@ -229,6 +230,7 @@
       {% for p in page_obj %}
       <tr onclick="mdOpenConfigModal(event, '{% url 'patients:pathologie_edit' p.pk %}', 'Modifier — {{ p.nom|escapejs }}', 'bi-clipboard2-pulse')">
         <td class="td-nom">{{ p.nom }}</td>
+        <td style="color:var(--text-muted);font-size:12px;">{{ p.get_categorie_display }}</td>
         <td style="text-align:center;">
           {% if p.actif %}
             <span style="color:#2e7d32;font-size:15px;"><i class="bi bi-check-circle-fill"></i></span>
@@ -344,6 +346,31 @@
   function closeImportModal(){document.getElementById('io-modal-backdrop').classList.remove('active');document.getElementById('io-modal').classList.remove('active');}
   function updateFileName(input){var el=document.getElementById('io-filename');if(input.files&&input.files[0]){el.textContent=input.files[0].name;el.style.display='block';}}
   document.addEventListener('keydown',function(e){if(e.key==='Escape')closeImportModal();});
+
+  // ── Pagination sans rechargement complet ──
+  function refreshPathologieList(url, pushHistory) {
+    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { return r.text(); })
+      .then(function (html) {
+        var doc = new DOMParser().parseFromString(html, 'text/html');
+        var newList = doc.getElementById('pathologie-list-wrap');
+        if (newList) document.getElementById('pathologie-list-wrap').innerHTML = newList.innerHTML;
+        var newPag = doc.getElementById('pathologie-pagination');
+        if (newPag) document.getElementById('pathologie-pagination').outerHTML = newPag.outerHTML;
+        if (pushHistory) history.pushState({}, '', url);
+      });
+  }
+
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest('#pathologie-pagination a[href^="?"]');
+    if (!a) return;
+    e.preventDefault();
+    refreshPathologieList(a.getAttribute('href'), true);
+  });
+
+  window.addEventListener('popstate', function () {
+    refreshPathologieList(window.location.pathname + window.location.search, false);
+  });
 </script>
 
 <div class="io-modal-backdrop" id="io-modal-backdrop" onclick="closeImportModal()"></div>
@@ -363,7 +390,7 @@
       </label>
       <div class="io-filename" id="io-filename" style="display:none;"></div>
       <label class="io-checkbox-label"><input type="checkbox" name="update"> Mettre à jour les enregistrements existants</label>
-      <p class="io-hint">Clé de déduplication : <strong>nom</strong>. Colonnes attendues : nom, description, actif.</p>
+      <p class="io-hint">Clé de déduplication : <strong>nom</strong>. Colonnes attendues : nom, categorie, description, actif.</p>
     </div>
     <div class="io-modal-footer">
       <button type="button" class="io-btn-cancel" onclick="closeImportModal()">Annuler</button>

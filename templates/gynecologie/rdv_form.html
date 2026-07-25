@@ -1974,6 +1974,13 @@
   preremplir('_reg_post');
   preremplir('_reg_cur');
 
+  /* preremplir() coche les cases sans déclencher "change" — sans ça, les
+     pastilles des multi-select de pathologies (.patho-ms) restent vides
+     tant qu'on n'a pas cliqué manuellement dessus. On simule l'event ici. */
+  document.querySelectorAll('.patho-ms-chk:checked').forEach(function (chk) {
+    chk.dispatchEvent(new Event('change'));
+  });
+
   /* Afficher "Préciser" si la valeur chargée est "autre" */
   ['acc_mode_entree', 'cposo_mode_entree'].forEach(function(id) {
     var sel = document.getElementById(id);

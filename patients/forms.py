@@ -202,12 +202,13 @@ class RendezVousForm(forms.ModelForm):
 class PathologieForm(forms.ModelForm):
     class Meta:
         model = Pathologie
-        fields = ['nom', 'description', 'actif']
+        fields = ['nom', 'categorie', 'description', 'actif']
         widgets = {
             'nom': forms.TextInput(attrs={
                 'class': _ul,
                 'placeholder': 'Nom de la pathologie',
             }),
+            'categorie': forms.Select(attrs={'class': _ul}),
             'description': forms.Textarea(attrs={
                 'class': _ul,
                 'rows': 3,

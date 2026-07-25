@@ -1,0 +1,39 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<div style="max-width:900px;">
+  <p><a href="{% url 'admin:auth_group_change' group.pk %}">&larr; Retour au groupe « {{ group.name }} »</a></p>
+
+  <p style="color:#666;margin-bottom:20px;">
+    Un menu coché est visible pour ce groupe. Décoche pour le masquer. Un nouveau menu jamais
+    configuré ici reste visible par défaut.
+  </p>
+
+  {% if not sections %}
+    <p style="color:#c0392b;">
+      Aucun module n'est attribué à ce groupe pour le moment. Retourne sur
+      <a href="{% url 'admin:auth_group_change' group.pk %}">la fiche du groupe</a>, attribue un ou
+      plusieurs modules dans la section « Modules autorisés pour ce groupe », puis reviens ici
+      pour choisir leurs menus.
+    </p>
+  {% endif %}
+  <form method="post">
+    {% csrf_token %}
+    {% for section in sections %}
+      <fieldset style="margin-bottom:18px;border:1px solid var(--border-color, #ccc);border-radius:6px;padding:10px 16px 14px;">
+        <legend style="font-weight:bold;padding:0 6px;">
+          {% if section.module %}{{ section.module.icon }} {{ section.module.name }}{% else %}Autres{% endif %}
+        </legend>
+        {% for entry in section.items %}
+          <label style="display:block;padding:4px 0;">
+            <input type="checkbox" name="nav_{{ entry.item.id }}" {% if entry.checked %}checked{% endif %}>
+            {{ entry.item.label }}
+            <code style="color:#999;font-size:11px;">{{ entry.item.code }}</code>
+          </label>
+        {% endfor %}
+      </fieldset>
+    {% endfor %}
+    <input type="submit" class="default" value="Enregistrer">
+  </form>
+</div>
+{% endblock %}

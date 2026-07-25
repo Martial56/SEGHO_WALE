@@ -1,17 +1,24 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import JsonResponse
 from django.utils import timezone
-from datetime import timedelta
+from datetime import date, timedelta
 
 from .models import Patient, RendezVous, Pathologie
 from .forms import PatientForm, RendezVousForm, PathologieForm, TypeVisiteForm
 from medecins.models import Medecin
 from core.views import log_event
 from gynecologie.models import TypeVisite
+
+
+def _render_related_list(request, context):
+    is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
+    template = 'patients/includes/related_list_body.html' if is_ajax else 'patients/related_list.html'
+    return render(request, template, context)
 
 
 def _age_bracket_label(patient, today):
@@ -134,6 +141,251 @@ def patient_list(request):
         'total_filtre': qs.count(),
         'breadcrumb':   [{'title': 'Patients'}],
     })
+
+
+# ── Export / Import des patients ────────────────────────────────────────────
+
+_PATIENT_HDR = ['code_identifiant', 'nom', 'age', 'genre', 'mobile']
+
+
+def _patient_row(p):
+    return [p.code_patient, f'{p.nom} {p.prenoms}'.strip(), p.age_detail, p.sexe, p.telephone]
+
+
+@login_required
+def export_patients(request):
+    if not request.user.is_superuser:
+        raise PermissionDenied
+    from core.utils import csv_response
+    import json as _json
+    from django.http import HttpResponse
+
+    fmt = request.GET.get('format', 'json')
+    qs = Patient.objects.all()
+    rows = [_patient_row(p) for p in qs]
+
+    if fmt == 'csv':
+        return csv_response('patients', _PATIENT_HDR, rows, delimiter=',')
+    if fmt == 'xlsx':
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment
+        import io as _io
+        wb = Workbook()
+        ws = wb.active
+        ws.title = 'Patients'
+        fill = PatternFill(start_color='1F6E8C', end_color='1F6E8C', fill_type='solid')
+        fnt = Font(color='FFFFFF', bold=True)
+        ws.append(_PATIENT_HDR)
+        for cell in ws[1]:
+            cell.fill, cell.font = fill, fnt
+            cell.alignment = Alignment(horizontal='center')
+        for row in rows:
+            ws.append(['' if v is None else v for v in row])
+        for col in ws.columns:
+            w = max((len(str(c.value or '')) for c in col), default=0)
+            ws.column_dimensions[col[0].column_letter].width = min(w + 4, 55)
+        buf = _io.BytesIO()
+        wb.save(buf)
+        resp = HttpResponse(
+            buf.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        resp['Content-Disposition'] = 'attachment; filename="patients.xlsx"'
+        return resp
+
+    data = [dict(zip(_PATIENT_HDR, r)) for r in rows]
+    resp = HttpResponse(
+        _json.dumps(data, ensure_ascii=False, indent=2, default=str),
+        content_type='application/json',
+    )
+    resp['Content-Disposition'] = 'attachment; filename="patients.json"'
+    return resp
+
+
+@login_required
+def patients_modele_excel(request):
+    """Modèle Excel vierge pour l'import — mêmes colonnes que celles lues par import_patients."""
+    if not request.user.is_superuser:
+        raise PermissionDenied
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    import io as _io
+    from django.http import HttpResponse
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Patients'
+    fill = PatternFill(start_color='1F6E8C', end_color='1F6E8C', fill_type='solid')
+    fnt = Font(color='FFFFFF', bold=True)
+    ws.append(_PATIENT_HDR)
+    for cell in ws[1]:
+        cell.fill, cell.font = fill, fnt
+        cell.alignment = Alignment(horizontal='center')
+    ws.append(['', 'Koné Aminata', 34, 'F', '0708091011'])
+    for col in ws.columns:
+        w = max((len(str(c.value or '')) for c in col), default=0)
+        ws.column_dimensions[col[0].column_letter].width = min(w + 4, 55)
+    buf = _io.BytesIO()
+    wb.save(buf)
+    resp = HttpResponse(
+        buf.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    resp['Content-Disposition'] = 'attachment; filename="modele_patients.xlsx"'
+    return resp
+
+
+def _normalize_nom_patient(s):
+    """Clé de comparaison insensible à la casse/accents/ponctuation, pour éviter les
+    doublons patients à l'import (ex. « Koné » vs « KONE »)."""
+    import re
+    import unicodedata
+    s = unicodedata.normalize('NFKD', str(s or ''))
+    s = ''.join(c for c in s if not unicodedata.combining(c))
+    s = re.sub(r'[^A-Za-z0-9]+', '', s)
+    return s.upper()
+
+
+def _parse_age_to_date(v, today):
+    """
+    Convertit une valeur d'âge en date de naissance approximative. Accepte soit un
+    nombre simple (ex. 34, '34'), soit le format composé « 2Ans4Mois1Jours »
+    (ou tout sous-ensemble : « 30Ans », « 0Ans9Mois11Jours »…) utilisé par certains
+    exports d'autres logiciels — dans ce dernier cas la date est bien plus précise
+    (jusqu'au jour près) qu'un simple nombre d'années.
+    """
+    import re
+    s = str(v or '').strip()
+    if not s:
+        return None
+
+    m = re.fullmatch(r'\d+([.,]\d+)?', s)
+    if m:
+        try:
+            years = int(float(s.replace(',', '.')))
+        except ValueError:
+            return None
+        if years < 0:
+            return None
+        try:
+            return today.replace(year=today.year - years)
+        except ValueError:
+            return today.replace(year=today.year - years, day=28)
+
+    m_y = re.search(r'(\d+)\s*Ans?', s, re.IGNORECASE)
+    m_m = re.search(r'(\d+)\s*Mois', s, re.IGNORECASE)
+    m_d = re.search(r'(\d+)\s*Jours?', s, re.IGNORECASE)
+    if not (m_y or m_m or m_d):
+        return None
+    years = int(m_y.group(1)) if m_y else 0
+    months = int(m_m.group(1)) if m_m else 0
+    days = int(m_d.group(1)) if m_d else 0
+
+    total_months = years * 12 + months
+    year = today.year
+    month = today.month - total_months
+    while month <= 0:
+        month += 12
+        year -= 1
+    day = today.day
+    while True:
+        try:
+            base = date(year, month, day)
+            break
+        except ValueError:
+            day -= 1
+    return base - timedelta(days=days)
+
+
+@login_required
+def import_patients(request):
+    if not request.user.is_superuser:
+        raise PermissionDenied
+    upload = request.FILES.get('fichier')
+    if not upload:
+        messages.error(request, 'Aucun fichier sélectionné.')
+        return redirect('patients:list')
+
+    data, err = _parse_pathologie_upload(upload)
+    if err:
+        messages.error(request, err)
+        return redirect('patients:list')
+
+    do_update = 'update' in request.POST
+    created = updated = skipped = errors = 0
+    today = timezone.now().date()
+
+    for item in data:
+        try:
+            nom_complet = _s(item.get('nom', ''))
+            if not nom_complet:
+                errors += 1
+                continue
+            parts = nom_complet.split(' ', 1)
+            nom = parts[0]
+            prenoms = parts[1] if len(parts) > 1 else parts[0]
+
+            date_naiss = _parse_age_to_date(item.get('age'), today)
+            if not date_naiss:
+                errors += 1
+                continue
+
+            sexe_raw = _s(item.get('genre', '')).lower()
+            sexe = {
+                'm': 'M', 'masculin': 'M', 'homme': 'M', 'male': 'M',
+                'f': 'F', 'féminin': 'F', 'feminin': 'F', 'femme': 'F', 'female': 'F',
+            }.get(sexe_raw, '')
+            if sexe not in ('M', 'F'):
+                errors += 1
+                continue
+
+            telephone = _s(item.get('mobile', ''))
+            if not telephone:
+                errors += 1
+                continue
+
+            defaults = {
+                'nom': nom, 'prenoms': prenoms, 'sexe': sexe,
+                'date_naissance': date_naiss, 'telephone': telephone,
+            }
+
+            code_identifiant = _s(item.get('code_identifiant', ''))
+            existing = Patient.objects.filter(code_patient=code_identifiant).first() if code_identifiant else None
+            matched_by_own_code = existing is not None
+
+            if not existing:
+                nom_norm = _normalize_nom_patient(nom)
+                prenoms_norm = _normalize_nom_patient(prenoms)
+                existing = next((
+                    p for p in Patient.objects.filter(date_naissance=date_naiss)
+                    if _normalize_nom_patient(p.nom) == nom_norm and _normalize_nom_patient(p.prenoms) == prenoms_norm
+                ), None)
+
+            if code_identifiant and not matched_by_own_code:
+                # Ce n'est pas un de nos propres code_patient (ex. réimport de notre
+                # export) : c'est l'identifiant d'un système externe, on le conserve
+                # pour référence future sans l'afficher nulle part.
+                defaults['ancien_identifiant'] = code_identifiant
+
+            if existing:
+                if do_update:
+                    for k, v in defaults.items():
+                        setattr(existing, k, v)
+                    existing.save()
+                    updated += 1
+                else:
+                    skipped += 1
+            else:
+                Patient.objects.create(**defaults)
+                created += 1
+        except Exception:
+            errors += 1
+
+    if errors:
+        messages.warning(request, f'{created} créé(s), {updated} mis à jour, {skipped} ignoré(s), {errors} erreur(s).')
+    else:
+        messages.success(request, f'{created} patient(s) importé(s), {updated} mis à jour, {skipped} ignoré(s).')
+    return redirect('patients:list')
 
 
 @login_required
@@ -698,7 +950,7 @@ def gynecologie_patient_list(request):
 def patient_rdv_list(request, pk):
     patient = get_object_or_404(Patient, pk=pk)
     items = patient.rendez_vous.select_related('medecin').order_by('-date_heure')
-    return render(request, 'patients/related_list.html', {
+    return _render_related_list(request, {
         'patient': patient,
         'view_type': 'rdv',
         'titre': 'Rendez-vous',
@@ -714,7 +966,7 @@ def patient_consultation_list(request, pk):
         items = Consultation.objects.filter(patient=patient).select_related('medecin').order_by('-date_heure')
     except Exception:
         items = []
-    return render(request, 'patients/related_list.html', {
+    return _render_related_list(request, {
         'patient': patient,
         'view_type': 'consultation',
         'titre': 'Consultations',
@@ -737,7 +989,7 @@ def patient_soin_list(request, pk):
         ).order_by('-date_heure')
     except Exception:
         items = []
-    return render(request, 'patients/related_list.html', {
+    return _render_related_list(request, {
         'patient': patient,
         'view_type': 'soin',
         'titre': 'Soins infirmiers',
@@ -755,7 +1007,7 @@ def patient_ordonnance_list(request, pk):
         ).select_related('consultation').order_by('-date_emission')
     except Exception:
         items = []
-    return render(request, 'patients/related_list.html', {
+    return _render_related_list(request, {
         'patient': patient,
         'view_type': 'ordonnance',
         'titre': 'Ordonnances',
@@ -773,7 +1025,7 @@ def patient_hospitalisation_list(request, pk):
         ).order_by('-date_admission')
     except Exception:
         items = []
-    return render(request, 'patients/related_list.html', {
+    return _render_related_list(request, {
         'patient': patient,
         'view_type': 'hospitalisation',
         'titre': 'Hospitalisations',
@@ -789,7 +1041,7 @@ def patient_demande_examens_list(request, pk):
         items = DemandeExamen.objects.filter(patient=patient).prefetch_related('lignes').order_by('-date_creation')
     except Exception:
         items = []
-    return render(request, 'patients/related_list.html', {
+    return _render_related_list(request, {
         'patient': patient,
         'view_type': 'demande_examens',
         'titre': "Demandes d'examens",
@@ -807,7 +1059,7 @@ def patient_resultat_examens_list(request, pk):
         ).order_by('-date_resultat')
     except Exception:
         items = []
-    return render(request, 'patients/related_list.html', {
+    return _render_related_list(request, {
         'patient': patient,
         'view_type': 'resultat_examens',
         'titre': "Résultats d'examens de laboratoire",
@@ -916,7 +1168,7 @@ def pathologie_list(request):
     if q:
         qs = qs.filter(nom__icontains=q)
 
-    paginator = Paginator(qs, 15)
+    paginator = Paginator(qs, 20)
     page_obj  = paginator.get_page(request.GET.get('page'))
     return render(request, 'patients/pathologie_list.html', {
         'page_obj': page_obj,
@@ -982,11 +1234,11 @@ def pathologie_delete(request, pk):
 
 # ── Export / Import des pathologies ─────────────────────────────────────────
 
-_PATHOLOGIE_HDR = ['nom', 'description', 'actif']
+_PATHOLOGIE_HDR = ['nom', 'categorie', 'description', 'actif']
 
 
 def _pathologie_row(p):
-    return [p.nom, p.description, int(p.actif)]
+    return [p.nom, p.categorie, p.description, int(p.actif)]
 
 
 @login_required
@@ -1099,6 +1351,7 @@ def import_pathologies(request):
                 errors += 1
                 continue
             defaults = {
+                'categorie': _s(item.get('categorie', 'generale')) or 'generale',
                 'description': _s(item.get('description', '')),
                 'actif': _b(item.get('actif', True)),
             }

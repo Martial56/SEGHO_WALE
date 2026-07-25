@@ -42,6 +42,10 @@ class Patient(models.Model):
     date_creation = models.DateTimeField(auto_now_add=True)
     date_modification = models.DateTimeField(auto_now=True)
     photo = models.ImageField(upload_to='patients/', blank=True, null=True)
+    ancien_identifiant = models.CharField(
+        max_length=50, blank=True,
+        help_text="Identifiant du patient dans un système externe (conservé lors d'un import, non affiché)."
+    )
 
     def save(self, *args, **kwargs):
         if not self.code_patient:
@@ -57,6 +61,28 @@ class Patient(models.Model):
         from datetime import date
         t = date.today()
         return t.year - self.date_naissance.year - ((t.month, t.day) < (self.date_naissance.month, self.date_naissance.day))
+
+    @property
+    def age_detail(self):
+        """Âge précis 'XAnsYMoisZJours' (années/mois/jours calendaires) — plus
+        parlant que `age` pour les jeunes enfants (ex. nourrissons)."""
+        if not self.date_naissance:
+            return None
+        from datetime import date
+        from calendar import monthrange
+        t = date.today()
+        years = t.year - self.date_naissance.year
+        months = t.month - self.date_naissance.month
+        days = t.day - self.date_naissance.day
+        if days < 0:
+            months -= 1
+            prev_month = t.month - 1 or 12
+            prev_month_year = t.year if t.month > 1 else t.year - 1
+            days += monthrange(prev_month_year, prev_month)[1]
+        if months < 0:
+            years -= 1
+            months += 12
+        return f'{years}Ans{months}Mois{days}Jours'
 
     def __str__(self): return f"{self.nom} {self.prenoms} ({self.code_patient})"
     class Meta:
@@ -234,8 +260,16 @@ class RegistreCuratif(models.Model):
 
 
 class Pathologie(models.Model):
+    CATEGORIE = [
+        ('generale',     'Générale'),
+        ('grossesse',    'Pathologie sur grossesse'),
+        ('infectieuse',  'Maladie infectieuse'),
+        ('autre_gyneco', 'Autre maladie gynécologique'),
+    ]
+
     nom           = models.CharField(max_length=300, verbose_name='Nom')
     description   = models.TextField(blank=True, verbose_name='Description')
+    categorie     = models.CharField(max_length=20, choices=CATEGORIE, default='generale', verbose_name='Catégorie')
     actif         = models.BooleanField(default=True)
     date_creation = models.DateTimeField(auto_now_add=True)
 
