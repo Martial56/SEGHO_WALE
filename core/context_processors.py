@@ -1,3 +1,5 @@
+from datetime import date
+
 from django.db.models import F
 
 
@@ -45,3 +47,13 @@ def _factures_impayees_count():
 def _analyses_pending_count():
     from laboratoire.models import AnalyseLaboratoire
     return AnalyseLaboratoire.objects.filter(statut__in=['recu', 'en_analyse']).count()
+
+
+def logo_saison(request):
+    """Logo avec bonnet de Noël du 1er au 30 décembre (même fenêtre que le
+    thème du kiosque de pointage) — header de l'appli, kiosque de pointage et
+    page de bienvenue. Logo normal le reste de l'année."""
+    today = date.today()
+    if today.month == 12 and today.day <= 30:
+        return {'logo_static': 'img/logo_noel.png'}
+    return {'logo_static': 'img/logo.png'}
