@@ -33,6 +33,7 @@ urlpatterns = [
     path('<int:pk>/badge/',                           views.employe_badge,         name='rh_badge'),
     path('<int:pk>/qrcode/',                          views.employe_qrcode,        name='rh_qrcode'),
     path('<int:pk>/biometric/save/',                  views.employe_biometric_save,name='rh_biometric_save'),
+    path('<int:pk>/ancien-badge/lier/',                views.employe_lier_ancien_badge, name='rh_lier_ancien_badge'),
     path('<int:pk>/document/upload/',                 views.employe_doc_upload,    name='rh_doc_upload'),
     path('<int:pk>/document/<int:doc_pk>/supprimer/', views.employe_doc_delete,    name='rh_doc_delete'),
     path('<int:pk>/info/sauvegarder/',                views.employe_info_save,     name='rh_info_save'),

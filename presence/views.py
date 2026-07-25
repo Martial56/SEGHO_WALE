@@ -1120,6 +1120,24 @@ def presence_pointage(request):
     today = date.today()
     now   = datetime.now()
     ouvre, raison_ferme = _est_jour_ouvre(today)
+    est_reveillon = today.month == 12 and today.day == 31
+    est_janvier   = today.month == 1
+    if est_reveillon:
+        texte_nouvel_an = "Bon réveillon de la Saint-Sylvestre"
+    elif est_janvier:
+        texte_nouvel_an = f"Bonne et heureuse année {today.year}"
+    else:
+        texte_nouvel_an = ""
+    if today.month == 12 and today.day == 24:
+        texte_noel = "Bon réveillon de Noël"
+    elif today.month == 12 and today.day == 1:
+        texte_noel = "1er décembre — Journée mondiale de lutte contre le sida"
+    else:
+        texte_noel = f"Joyeux Noël {today.year}"
+    if today.month == 11 and today.day == 14:
+        texte_novembre = "Novembre Bleu et Journée mondiale du diabète"
+    else:
+        texte_novembre = "Novembre Bleu — Ensemble contre le cancer de la prostate"
     return render(request, 'presence/pointage.html', {
         'today':        today,
         'ouvre':        ouvre,
@@ -1127,6 +1145,13 @@ def presence_pointage(request):
         'jour_fr':      _JOURS_FR[today.weekday()],
         'mois_fr':      _MOIS_FR[today.month],
         'heure_init':   now.strftime('%H:%M'),
+        'est_noel':      today.month == 12 and today.day <= 30,
+        'texte_noel':    texte_noel,
+        'est_nouvel_an': est_reveillon or est_janvier,
+        'texte_nouvel_an': texte_nouvel_an,
+        'est_octobre_rose':  today.month == 10,
+        'est_novembre_bleu': today.month == 11,
+        'texte_novembre':    texte_novembre,
         # Lien "Accès administration" — visible seulement si un RH/Admin/
         # Directeur/Médecin Chef est déjà connecté sur ce poste (can_manage_rh
         # couvre exactement ces rôles), pas au grand public du kiosk.
@@ -1147,12 +1172,23 @@ def presence_chercher(request):
         return JsonResponse({'ok': False, 'erreur': 'Identifiant requis'})
 
     from django.db.models import Q as _Q2
-    try:
-        emp = Employe.objects.select_related('service', 'fonction').get(
-            _Q2(matricule=query) | _Q2(biometric_id=query),
-            statut='actif'
-        )
-    except Employe.DoesNotExist:
+    emp = Employe.objects.select_related('service', 'fonction').filter(
+        _Q2(matricule=query) | _Q2(biometric_id=query),
+        statut='actif'
+    ).first()
+
+    if not emp:
+        # Anciennes cartes (vCard) : ni le matricule ni l'identifiant biométrique
+        # ne correspondent (le QR ne contient pas le matricule) — on retente en
+        # comparant le Nom+Titre normalisés extraits de la vCard scannée.
+        from core.utils import code_ancien_badge_from_vcard
+        code = code_ancien_badge_from_vcard(query)
+        if code:
+            emp = Employe.objects.select_related('service', 'fonction').filter(
+                code_ancien_badge=code, statut='actif'
+            ).first()
+
+    if not emp:
         return JsonResponse({'ok': False, 'erreur': 'Matricule introuvable ou employé inactif'})
 
     today = _date_reference(emp)

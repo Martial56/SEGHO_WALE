@@ -586,8 +586,19 @@ def _save_employe(request, employe):
             msg = f'Un employé nommé « {nom} {prenoms} » existe déjà (matricule {autre.matricule}).'
             return None, {'nom': msg, 'prenoms': msg}
 
+    is_creation = employe is None
     if employe is None:
         employe = Employe()
+
+    if is_creation:
+        # Matricule existant (ex. ancienne carte physique) préservé tel quel si
+        # renseigné — laisse la génération automatique de Employe.save() faire
+        # son travail (inchangée) uniquement quand le champ est vide.
+        matricule_manuel = p.get('matricule', '').strip()
+        if matricule_manuel:
+            if Employe.objects.filter(matricule=matricule_manuel).exists():
+                return None, {'matricule': f'Le matricule « {matricule_manuel} » est déjà utilisé par un autre employé.'}
+            employe.matricule = matricule_manuel
 
     employe.nom     = nom
     employe.prenoms = prenoms
@@ -800,6 +811,48 @@ def employe_biometric_save(request, pk):
     employe.save(update_fields=['biometric_id'])
     messages.success(request, f"Identifiant biométrique mis à jour pour {employe.nom_complet}.")
     return redirect('rh_detail', pk=pk)
+
+
+@login_required(login_url='login')
+@require_POST
+def employe_lier_ancien_badge(request, pk):
+    """Lie l'ancienne carte (vCard scannée à la caméra) à cet employé, en
+    stockant une clé normalisée Nom+Titre comparée plus tard au pointage
+    (voir presence.views.presence_chercher)."""
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
+    from core.utils import parse_vcard_nom_titre, normalize_badge_text, code_ancien_badge_from_vcard
+
+    employe = get_object_or_404(Employe, pk=pk)
+    raw = request.POST.get('raw_text', '').strip()
+    force = request.POST.get('force') == '1'
+    if not raw:
+        return JsonResponse({'ok': False, 'error': "Aucun texte scanné."}, status=400)
+
+    nom_scanne, titre_scanne = parse_vcard_nom_titre(raw)
+    if not nom_scanne:
+        return JsonResponse({
+            'ok': False,
+            'error': "Ce code ne ressemble pas à une ancienne carte reconnue (aucun nom trouvé).",
+        }, status=400)
+
+    if not force and normalize_badge_text(nom_scanne) != normalize_badge_text(employe.nom_complet):
+        return JsonResponse({
+            'ok': False, 'needs_confirm': True,
+            'message': (
+                f"Le nom sur la carte scannée (« {nom_scanne} ») ne correspond pas à "
+                f"cet employé (« {employe.nom_complet} »). Lier quand même ?"
+            ),
+        })
+
+    employe.code_ancien_badge = code_ancien_badge_from_vcard(raw)
+    employe.save(update_fields=['code_ancien_badge'])
+
+    titre_employe = employe.fonction.nom if employe.fonction else ''
+    suffix = ''
+    if titre_scanne and titre_employe and normalize_badge_text(titre_scanne) != normalize_badge_text(titre_employe):
+        suffix = " Le titre sur la carte diffère de la fonction actuelle — à vérifier si besoin."
+    return JsonResponse({'ok': True, 'message': f"Ancien badge lié pour {employe.nom_complet}.{suffix}"})
 
 
 @login_required(login_url='login')

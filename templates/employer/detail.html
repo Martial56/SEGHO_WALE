@@ -310,6 +310,14 @@ html[data-theme="dark"] .biometric-ok { color:var(--rh-300); }
       </button>
       {% endif %}
     {% endif %}
+    {% if can_manage %}
+    <button type="button"
+       class="btn-rh-outline"
+       title="{% if employe.code_ancien_badge %}Re-scanner l'ancienne carte pour la relier{% else %}Lier l'ancienne carte physique de cet employé pour qu'elle fonctionne au pointage{% endif %}"
+       onclick="openLierAncienBadge()">
+      <i class="bi bi-qr-code-scan"></i> {% if employe.code_ancien_badge %}Ancien badge lié{% else %}Lier un ancien badge{% endif %}
+    </button>
+    {% endif %}
     <a href="{% url 'rh_fiche_pdf' employe.pk %}" class="btn-rh-outline" title="Imprimer la fiche">
       <i class="bi bi-printer"></i> Imprimer
     </a>
@@ -403,6 +411,156 @@ html[data-theme="dark"] .biometric-ok { color:var(--rh-300); }
     </form>
   </div>
 </div>
+{% endif %}
+
+<!-- Modal lier un ancien badge -->
+{% if can_manage %}
+<div id="modal-lier-badge" style="
+  display:none; position:fixed; inset:0; z-index:2000;
+  background:rgba(0,0,0,0.45); align-items:center; justify-content:center;
+" onclick="if(event.target===this)closeLierAncienBadge()">
+  <div style="
+    background:var(--rh-surface); border-radius:14px; padding:24px 28px; width:100%; max-width:440px;
+    box-shadow:0 16px 48px rgba(0,0,0,0.35);
+  ">
+    <div style="font-size:16px; font-weight:800; color:var(--rh-text); margin-bottom:6px;">
+      <i class="bi bi-qr-code-scan" style="color:var(--rh-600);"></i> Lier un ancien badge
+    </div>
+    <div style="font-size:12.5px; color:var(--rh-muted); margin-bottom:14px;">
+      Présentez la carte physique de <strong>{{ employe.nom_complet }}</strong> devant la caméra.
+    </div>
+    <div style="border-radius:10px; overflow:hidden; background:#000; aspect-ratio:4/3; position:relative;">
+      <video id="lb-video" autoplay playsinline muted style="width:100%; height:100%; object-fit:cover;"></video>
+    </div>
+    <div id="lb-status" style="font-size:12.5px; margin-top:10px; min-height:18px; color:var(--rh-muted);"></div>
+
+    <div style="margin-top:10px; border-top:1px solid var(--rh-border); padding-top:10px;">
+      <button type="button" onclick="toggleLbPaste()" style="background:none; border:none; padding:0; font-size:12px; color:var(--rh-600); cursor:pointer; text-decoration:underline;">
+        Pas de caméra disponible ? Coller le texte scanné avec un téléphone
+      </button>
+      <div id="lb-paste-zone" style="display:none; margin-top:8px;">
+        <textarea id="lb-paste-input" rows="4" placeholder="Collez ici le texte obtenu en scannant la carte avec un téléphone…"
+          style="width:100%; font-size:12.5px; padding:8px; border:1px solid var(--rh-border); border-radius:8px; background:var(--rh-surface); color:var(--rh-text); resize:vertical;"></textarea>
+        <button type="button" onclick="submitLbPaste()" class="btn-rh-outline" style="margin-top:6px; padding:6px 14px;">
+          <i class="bi bi-check-lg"></i> Valider ce texte
+        </button>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:14px;">
+      <button type="button" onclick="closeLierAncienBadge()" class="btn-rh-outline" style="padding:8px 18px;">Fermer</button>
+    </div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<script>
+(function () {
+  var lbStream = null, lbInterval = null, lbCanvas = null, lbCtx = null, lbLastScan = 0, lbBusy = false;
+  var lbUrl = "{% url 'rh_lier_ancien_badge' employe.pk %}";
+  var lbCsrf = "{{ csrf_token }}";
+
+  window.openLierAncienBadge = function () {
+    document.getElementById('modal-lier-badge').style.display = 'flex';
+    startLbCamera();
+  };
+  window.closeLierAncienBadge = function () {
+    document.getElementById('modal-lier-badge').style.display = 'none';
+    stopLbCamera();
+  };
+  window.toggleLbPaste = function () {
+    var zone = document.getElementById('lb-paste-zone');
+    zone.style.display = zone.style.display === 'none' ? 'block' : 'none';
+  };
+  window.submitLbPaste = function () {
+    var text = document.getElementById('lb-paste-input').value.trim();
+    if (!text) { setStatus('<i class="bi bi-exclamation-triangle-fill"></i> Collez d\'abord le texte scanné.', '#dc2626'); return; }
+    submitScan(text, false);
+  };
+
+  function setStatus(html, color) {
+    var el = document.getElementById('lb-status');
+    el.innerHTML = html;
+    el.style.color = color || 'var(--rh-muted)';
+  }
+
+  function startLbCamera() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setStatus('<i class="bi bi-exclamation-triangle-fill"></i> Caméra non supportée par ce navigateur.', '#dc2626');
+      return;
+    }
+    navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: 'environment',
+        width: { ideal: 1920 }, height: { ideal: 1080 },
+        // Certains navigateurs choisissent une mise au point fixe par défaut ;
+        // demander explicitement l'autofocus continu aide sur un texte aussi
+        // dense qu'un QR de vCard, souvent scanné de plus près qu'un badge normal.
+        advanced: [{ focusMode: 'continuous' }],
+      },
+    }).then(function (stream) {
+      lbStream = stream;
+      var video = document.getElementById('lb-video');
+      video.srcObject = stream;
+      lbCanvas = document.createElement('canvas');
+      lbCtx = lbCanvas.getContext('2d');
+      setStatus('Cadrez le QR bien à plat, sans reflet, à environ 15-20 cm de la caméra.');
+      lbInterval = setInterval(function () {
+        if (lbBusy || video.readyState !== video.HAVE_ENOUGH_DATA) return;
+        if (Date.now() - lbLastScan < 400) return;
+        lbCanvas.width = video.videoWidth;
+        lbCanvas.height = video.videoHeight;
+        lbCtx.drawImage(video, 0, 0, lbCanvas.width, lbCanvas.height);
+        var imageData = lbCtx.getImageData(0, 0, lbCanvas.width, lbCanvas.height);
+        var code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'attemptBoth' });
+        if (code && code.data) {
+          lbLastScan = Date.now();
+          submitScan(code.data, false);
+        }
+      }, 150);
+    }).catch(function (err) {
+      setStatus('<i class="bi bi-exclamation-triangle-fill"></i> ' +
+        (err.name === 'NotAllowedError' ? 'Permission caméra refusée.' : 'Caméra indisponible.'), '#dc2626');
+    });
+  }
+
+  function stopLbCamera() {
+    if (lbInterval) { clearInterval(lbInterval); lbInterval = null; }
+    if (lbStream) { lbStream.getTracks().forEach(function (t) { t.stop(); }); lbStream = null; }
+  }
+
+  function submitScan(rawText, force) {
+    lbBusy = true;
+    setStatus('<i class="bi bi-hourglass-split"></i> Vérification…');
+    var fd = new FormData();
+    fd.append('csrfmiddlewaretoken', lbCsrf);
+    fd.append('raw_text', rawText);
+    if (force) fd.append('force', '1');
+    fetch(lbUrl, { method: 'POST', body: fd })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.ok) {
+          setStatus('<i class="bi bi-check-circle-fill"></i> ' + data.message, '#16a34a');
+          stopLbCamera();
+          setTimeout(function () { window.location.reload(); }, 1200);
+        } else if (data.needs_confirm) {
+          lbBusy = false;
+          if (confirm(data.message)) {
+            submitScan(rawText, true);
+          } else {
+            setStatus('Liaison annulée — présentez la bonne carte.');
+          }
+        } else {
+          lbBusy = false;
+          setStatus('<i class="bi bi-x-circle-fill"></i> ' + (data.error || 'Erreur.'), '#dc2626');
+        }
+      })
+      .catch(function () {
+        lbBusy = false;
+        setStatus('<i class="bi bi-x-circle-fill"></i> Erreur réseau, réessayez.', '#dc2626');
+      });
+  }
+})();
+</script>
 {% endif %}
 
 <div class="hist-wrapper"><div class="hist-main">

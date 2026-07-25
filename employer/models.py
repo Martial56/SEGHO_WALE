@@ -135,6 +135,14 @@ class Employe(models.Model):
         verbose_name="Identifiant biométrique",
         help_text="Identifiant renseigné par le lecteur d'empreinte digitale."
     )
+    code_ancien_badge = models.CharField(
+        max_length=255, blank=True,
+        verbose_name="Ancien badge (nom + titre normalisés)",
+        help_text=(
+            "Clé normalisée (nom complet + titre, majuscules sans accents) extraite de la "
+            "vCard de l'ancienne carte de l'employé — renseignée via « Lier un ancien badge »."
+        ),
+    )
 
     notes = models.TextField(blank=True)
 
@@ -229,6 +237,7 @@ class Employe(models.Model):
         verbose_name_plural = "Employés"
         indexes = [
             models.Index(fields=['biometric_id']),
+            models.Index(fields=['code_ancien_badge']),
             models.Index(fields=['statut']),
         ]
 

@@ -1,6 +1,7 @@
 import colorsys
 import csv
 import re
+import unicodedata
 
 from django.http import HttpResponse
 
@@ -108,3 +109,59 @@ def csv_response(filename, headers, rows, delimiter=';'):
     for row in rows:
         writer.writerow([_csv_safe_cell('' if v is None else v) for v in row])
     return response
+
+
+# ── Anciens badges vCard (module Présence / employer) ───────────────────────
+# Les cartes imprimées avant SEGHO-WALE encodent une vCard (Nom, Téléphone,
+# Adresse, Société, Titre) plutôt que le matricule. Le téléphone et l'adresse
+# sont identiques sur toutes les cartes (pas des identifiants) ; seul le
+# couple Nom complet + Titre diffère d'un employé à l'autre.
+
+_VCARD_FIELD_RE = {
+    'fn':    re.compile(r'^FN:(.*)$', re.IGNORECASE | re.MULTILINE),
+    'n':     re.compile(r'^N:(.*)$', re.IGNORECASE | re.MULTILINE),
+    'titre': re.compile(r'^TITLE:(.*)$', re.IGNORECASE | re.MULTILINE),
+}
+
+
+def normalize_badge_text(value):
+    """Majuscules, sans accents, espaces réduits — pour comparer un texte
+    scanné à une valeur stockée sans être sensible aux variations de casse,
+    d'accents ou d'espacement."""
+    if not value:
+        return ''
+    value = unicodedata.normalize('NFKD', value)
+    value = ''.join(c for c in value if not unicodedata.combining(c))
+    value = value.upper()
+    return ' '.join(value.split())
+
+
+def parse_vcard_nom_titre(raw_text):
+    """Extrait (nom, titre) d'une vCard scannée (BEGIN:VCARD...END:VCARD).
+    Retourne (None, None) si le texte n'est pas une vCard reconnaissable."""
+    if not raw_text or 'BEGIN:VCARD' not in raw_text.upper():
+        return None, None
+    nom = titre = None
+    # FN (nom complet déjà formaté) est prioritaire sur N (structuré
+    # famille;prénoms;...), présent en secours seulement sur certaines vCards.
+    m = _VCARD_FIELD_RE['fn'].search(raw_text)
+    if m:
+        nom = m.group(1).strip()
+    else:
+        m = _VCARD_FIELD_RE['n'].search(raw_text)
+        if m:
+            parts = [p.strip() for p in m.group(1).split(';') if p.strip()]
+            nom = ' '.join(parts) if parts else None
+    m = _VCARD_FIELD_RE['titre'].search(raw_text)
+    if m:
+        titre = m.group(1).strip()
+    return nom, titre
+
+
+def code_ancien_badge_from_vcard(raw_text):
+    """Construit la clé normalisée « NOM|TITRE » à partir du texte brut d'un
+    ancien badge scanné. Retourne None si ce n'est pas une vCard exploitable."""
+    nom, titre = parse_vcard_nom_titre(raw_text)
+    if not nom:
+        return None
+    return f'{normalize_badge_text(nom)}|{normalize_badge_text(titre)}'
