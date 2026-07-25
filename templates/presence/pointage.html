@@ -1,6 +1,6 @@
 {% load static django_browser_reload %}
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr"{% if est_noel %} class="noel"{% elif est_nouvel_an %} class="nouvelan"{% elif est_octobre_rose %} class="octobre-rose"{% elif est_novembre_bleu %} class="novembre-bleu"{% endif %}>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -21,6 +21,7 @@
   --amber: #b45309; --amber-rgb: 180,83,9;
 }
 html { background: #1b5e20; }
+html.noel { background: #5c0f14; }
 body {
   font-family:'Sora',sans-serif;
   background-color: #1b5e20;
@@ -33,37 +34,127 @@ body {
   overflow-x:hidden;
   overflow-y:auto;
 }
-/* Anneaux concentriques isolés par coin (masqués en fondu pour ne pas déborder
-   sur le reste de la page — éviter la répétition infinie de repeating-radial-gradient) */
-.bg-rings {
-  position:fixed; z-index:-1; pointer-events:none; border-radius:50%;
-  background-image: repeating-radial-gradient(circle at center, rgba(255,255,255,.16) 0 2px, transparent 2px 46px);
-  -webkit-mask-image: radial-gradient(circle, black 50%, transparent 74%);
-          mask-image: radial-gradient(circle, black 50%, transparent 74%);
-}
-.bg-rings.tr { top:-320px; right:-320px; width:680px; height:680px; }
-.bg-rings.br { bottom:-360px; right:-260px; width:720px; height:720px; }
-.bg-rings.tl { top:-300px; left:-300px; width:460px; height:460px; }
-.bg-rings.bl { bottom:-260px; left:-260px; width:420px; height:420px; }
 
-/* Points façon trame (halftone), nichés près de certains anneaux */
-.bg-dots {
-  position:fixed; z-index:-1; pointer-events:none; border-radius:50%;
-  background-image: radial-gradient(rgba(255,255,255,.4) 2.5px, transparent 2.5px);
-  background-size: 13px 13px;
-  -webkit-mask-image: radial-gradient(circle, black 55%, transparent 72%);
-          mask-image: radial-gradient(circle, black 55%, transparent 72%);
+/* ── Thème de décembre : le vert cède la place au rouge de Noël ──
+   Les variables --g* pilotant tout le kiosque (boutons, textes, cartes…),
+   les redéfinir ici suffit à teinter toute la page sans dupliquer les règles. */
+body.noel {
+  --g900:#3a0d0d; --g700:#7a1620; --g600:#c62828; --g500:#c62828;
+  --g400:#e05353; --g300:#f0a8a8; --g100:#f8d9d9; --g50:#fdf1f1;
+  --g600-rgb:198,40,40;
+  background-color: #5c0f14;
+  background-image: linear-gradient(135deg, #300707 0%, #5c0f14 35%, #941f1f 65%, #c62828 100%);
 }
-.bg-dots.tl { top:-60px;   left:-60px;   width:220px; height:220px; }
-.bg-dots.tr { top:-50px;   right:60px;   width:170px; height:170px; }
-.bg-dots.bl { bottom:-70px; left:-40px;  width:230px; height:230px; }
+/* Filigrane logo, répété sur toute la page (remplace l'ancien décor
+   d'anneaux/points) */
+.bg-watermark {
+  position:fixed; inset:0; z-index:-2; pointer-events:none;
+  background-image: url('{% static "img/logo.png" %}');
+  background-repeat: repeat;
+  background-size: 150px 150px;
+  opacity:.08;
+  filter: brightness(0) invert(1);
+}
+
+/* ── Filigrane de décembre (mois de Noël) ── */
+.bg-noel-snow {
+  position:fixed; inset:0; z-index:-1; pointer-events:none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56'%3E%3Cg transform='translate(28,28)' stroke='%23000' stroke-width='1.6' stroke-linecap='round' fill='none'%3E%3Cg transform='rotate(0)'%3E%3Cline x1='0' y1='0' x2='13' y2='0'/%3E%3Cline x1='8' y1='0' x2='11' y2='3.2'/%3E%3Cline x1='8' y1='0' x2='11' y2='-3.2'/%3E%3C/g%3E%3Cg transform='rotate(60)'%3E%3Cline x1='0' y1='0' x2='13' y2='0'/%3E%3Cline x1='8' y1='0' x2='11' y2='3.2'/%3E%3Cline x1='8' y1='0' x2='11' y2='-3.2'/%3E%3C/g%3E%3Cg transform='rotate(120)'%3E%3Cline x1='0' y1='0' x2='13' y2='0'/%3E%3Cline x1='8' y1='0' x2='11' y2='3.2'/%3E%3Cline x1='8' y1='0' x2='11' y2='-3.2'/%3E%3C/g%3E%3Cg transform='rotate(180)'%3E%3Cline x1='0' y1='0' x2='13' y2='0'/%3E%3Cline x1='8' y1='0' x2='11' y2='3.2'/%3E%3Cline x1='8' y1='0' x2='11' y2='-3.2'/%3E%3C/g%3E%3Cg transform='rotate(240)'%3E%3Cline x1='0' y1='0' x2='13' y2='0'/%3E%3Cline x1='8' y1='0' x2='11' y2='3.2'/%3E%3Cline x1='8' y1='0' x2='11' y2='-3.2'/%3E%3C/g%3E%3Cg transform='rotate(300)'%3E%3Cline x1='0' y1='0' x2='13' y2='0'/%3E%3Cline x1='8' y1='0' x2='11' y2='3.2'/%3E%3Cline x1='8' y1='0' x2='11' y2='-3.2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 56px 56px;
+  opacity:.14;
+  filter: brightness(0) invert(1);
+}
+.noel-scene {
+  position:fixed; left:6px; bottom:0; z-index:-1; pointer-events:none;
+  color:#fff; opacity:.28; line-height:1;
+  display:flex; align-items:flex-end;
+}
+.noel-scene .noel-tree-wrap { display:flex; flex-direction:column; align-items:center; }
+.noel-scene .bi-stars     { font-size:46px; margin-bottom:-13px; }
+.noel-scene .bi-tree-fill { font-size:300px; }
+.noel-scene .bi-gift-fill { font-size:140px; margin-left:-32px; margin-bottom:16px; }
+
+/* ── Bandeau de vœux (partagé Noël / Nouvel An) ── */
+.periode-banner {
+  text-align:center; color:#fff; font-weight:800; font-size:24px;
+  letter-spacing:.3px; margin:-10px 0 22px; display:flex; align-items:center;
+  justify-content:center; gap:10px; text-shadow:0 2px 10px rgba(0,0,0,.35);
+}
+.periode-banner i { color:var(--g300); font-size:22px; }
+
+/* ── Thème du Nouvel An : 31 décembre → 31 janvier, bleu nuit + doré ── */
+body.nouvelan {
+  --g900:#141b33; --g700:#2c3a66; --g600:#c9a227; --g500:#c9a227;
+  --g400:#dbbf5a; --g300:#ecdba0; --g100:#f7f0d9; --g50:#fdfaf0;
+  --g600-rgb:201,162,39;
+  background-color: #0f1530;
+  background-image: linear-gradient(135deg, #0a0f24 0%, #141b3d 35%, #1f2a5c 65%, #2f3f7a 100%);
+}
+html.nouvelan { background: #0a0f24; }
+
+/* Filigrane confettis/étoiles */
+.bg-confetti {
+  position:fixed; inset:0; z-index:-1; pointer-events:none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='50' height='50'%3E%3Cg transform='translate(25,25)' fill='%23000'%3E%3Cpath d='M0,-9 L2,-2 L9,0 L2,2 L0,9 L-2,2 L-9,0 L-2,-2 Z'/%3E%3C/g%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 50px 50px;
+  opacity:.14;
+  filter: brightness(0) invert(1);
+}
+.nouvelan-scene {
+  position:fixed; left:20px; bottom:0; z-index:-1; pointer-events:none;
+  color:#fff; opacity:.26; line-height:1;
+}
+.nouvelan-scene .bi-balloon-fill { font-size:250px; }
+.nouvelan-scene .spark1 { position:absolute; top:6px;   left:172px; font-size:34px; }
+.nouvelan-scene .spark2 { position:absolute; top:64px;  left:20px;  font-size:24px; }
+.nouvelan-scene .spark3 { position:absolute; top:140px; left:200px; font-size:18px; }
+
+/* ── Octobre Rose : lutte contre le cancer du sein ── */
+body.octobre-rose {
+  --g900:#4a0f2c; --g700:#9c1457; --g600:#e6007e; --g500:#e6007e;
+  --g400:#ec4f9e; --g300:#f4a0c6; --g100:#fbdcec; --g50:#fef4f9;
+  --g600-rgb:230,0,126;
+  background-color: #3a0a22;
+  background-image: linear-gradient(135deg, #3a0a22 0%, #6e0f3f 35%, #b21464 65%, #e6007e 100%);
+}
+html.octobre-rose { background: #3a0a22; }
+
+/* ── Novembre Bleu : lutte contre le cancer de la prostate ── */
+body.novembre-bleu {
+  --g900:#0a1c33; --g700:#123a66; --g600:#1565c0; --g500:#1565c0;
+  --g400:#4a8fdb; --g300:#a9cdf0; --g100:#dcebfa; --g50:#f2f8fd;
+  --g600-rgb:21,101,192;
+  background-color: #050e1f;
+  background-image: linear-gradient(135deg, #050e1f 0%, #0d2547 35%, #14407a 65%, #1565c0 100%);
+}
+html.novembre-bleu { background: #050e1f; }
+
+/* Filigrane ruban de sensibilisation, partagé (couleur pilotée par le thème) */
+.bg-ruban {
+  position:fixed; inset:0; z-index:-1; pointer-events:none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='70' height='84' viewBox='0 0 100 120'%3E%3Cpath fill='%23000' d='M36,8 C24,8 16,16 19,26 C20,30 25,34 33,37 L18,100 L30,92 L38,108 L46,68 L40,50 C34,44 32,36 34,30 C36,24 42,20 50,20 C58,20 64,24 66,30 C68,36 66,44 60,50 L54,68 L62,108 L70,92 L82,100 L67,37 C75,34 80,30 81,26 C84,16 76,8 64,8 C57,8 51,11 50,15 C49,11 43,8 36,8 Z'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 70px 84px;
+  opacity:.14;
+  filter: brightness(0) invert(1);
+}
+.sensibilisation-scene {
+  position:fixed; left:16px; bottom:0; z-index:-1; pointer-events:none;
+  color:#fff; opacity:.26; line-height:1;
+  display:flex; align-items:flex-end;
+}
+.sensibilisation-scene .bi-heart-pulse-fill { font-size:56px; margin-bottom:36px; margin-right:-6px; }
+.sensibilisation-scene .bi-gender-female,
+.sensibilisation-scene .bi-gender-male { font-size:260px; }
 
 /* ── En-tête ── */
 .kiosk-header {
   text-align:center; margin-bottom:28px; color:#fff;
 }
 .kiosk-header img {
-  width:64px; height:64px; object-fit:contain; margin-bottom:10px;
+  width:84px; height:84px; object-fit:contain; margin-bottom:10px;
   filter:brightness(0) invert(1);
 }
 .kiosk-header .etablissement { font-size:13px; opacity:.7; letter-spacing:.3px; }
@@ -254,23 +345,58 @@ body {
                  color:var(--g700);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:700;margin-top:10px;}
 </style>
 </head>
-<body>
+<body{% if est_noel %} class="noel"{% elif est_nouvel_an %} class="nouvelan"{% elif est_octobre_rose %} class="octobre-rose"{% elif est_novembre_bleu %} class="novembre-bleu"{% endif %}>
 
-<!-- Décor d'arrière-plan (anneaux + halftone) -->
-<div class="bg-rings tr"></div>
-<div class="bg-rings br"></div>
-<div class="bg-rings tl"></div>
-<div class="bg-rings bl"></div>
-<div class="bg-dots tl"></div>
-<div class="bg-dots tr"></div>
-<div class="bg-dots bl"></div>
+<!-- Décor d'arrière-plan (filigrane logo, remplacé selon la période) -->
+{% if est_noel %}
+<div class="bg-noel-snow"></div>
+<div class="noel-scene">
+  <div class="noel-tree-wrap">
+    <i class="bi bi-stars"></i>
+    <i class="bi bi-tree-fill"></i>
+  </div>
+  <i class="bi bi-gift-fill"></i>
+</div>
+{% elif est_nouvel_an %}
+<div class="bg-confetti"></div>
+<div class="nouvelan-scene">
+  <i class="bi bi-balloon-fill"></i>
+  <i class="bi bi-stars spark1"></i>
+  <i class="bi bi-stars spark2"></i>
+  <i class="bi bi-stars spark3"></i>
+</div>
+{% elif est_octobre_rose %}
+<div class="bg-ruban"></div>
+<div class="sensibilisation-scene">
+  <i class="bi bi-gender-female"></i>
+  <i class="bi bi-heart-pulse-fill"></i>
+</div>
+{% elif est_novembre_bleu %}
+<div class="bg-ruban"></div>
+<div class="sensibilisation-scene">
+  <i class="bi bi-gender-male"></i>
+  <i class="bi bi-heart-pulse-fill"></i>
+</div>
+{% else %}
+<div class="bg-watermark"></div>
+{% endif %}
 
 <!-- En-tête -->
 <div class="kiosk-header">
-  <img src="{% static 'img/logo.png' %}" alt="Logo">
+  <img src="{% static logo_static %}" alt="Logo">
   <div class="etablissement">Centre Médico-Social</div>
   <div class="nom">WALÉ — Pointage</div>
 </div>
+
+{% if est_noel %}
+<div class="periode-banner"><i class="bi bi-stars"></i> {{ texte_noel }} <i class="bi bi-stars"></i></div>
+{% elif est_nouvel_an %}
+<div class="periode-banner"><i class="bi bi-stars"></i> {{ texte_nouvel_an }} <i class="bi bi-stars"></i></div>
+{% elif est_octobre_rose %}
+<div class="periode-banner"><i class="bi bi-heart-fill"></i> Octobre Rose — Ensemble contre le cancer du sein <i class="bi bi-heart-fill"></i></div>
+{% elif est_novembre_bleu %}
+<div class="periode-banner"><i class="bi bi-heart-fill"></i> {{ texte_novembre }} <i class="bi bi-heart-fill"></i></div>
+{% endif %}
 
 <!-- Horloge live -->
 <div class="kiosk-clock" id="clock">{{ heure_init }}</div>
