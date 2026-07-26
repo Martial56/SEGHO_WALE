@@ -202,19 +202,25 @@ class RendezVousForm(forms.ModelForm):
 class PathologieForm(forms.ModelForm):
     class Meta:
         model = Pathologie
-        fields = ['nom', 'categorie', 'description', 'actif']
+        fields = ['nom', 'categorie', 'departement', 'description', 'actif']
         widgets = {
             'nom': forms.TextInput(attrs={
                 'class': _ul,
                 'placeholder': 'Nom de la pathologie',
             }),
             'categorie': forms.Select(attrs={'class': _ul}),
+            'departement': forms.Select(attrs={'class': _ul}),
             'description': forms.Textarea(attrs={
                 'class': _ul,
                 'rows': 3,
                 'placeholder': 'Description optionnelle...',
             }),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['departement'].queryset = self.fields['departement'].queryset.order_by('nom')
+        self.fields['departement'].empty_label = '— Aucun —'
 
 
 class TypeVisiteForm(forms.ModelForm):

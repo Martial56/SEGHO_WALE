@@ -270,6 +270,7 @@ class Pathologie(models.Model):
     nom           = models.CharField(max_length=300, verbose_name='Nom')
     description   = models.TextField(blank=True, verbose_name='Description')
     categorie     = models.CharField(max_length=20, choices=CATEGORIE, default='generale', verbose_name='Catégorie')
+    departement   = models.ForeignKey('medecins.Departement', on_delete=models.SET_NULL, null=True, blank=True, related_name='pathologies', verbose_name='Département')
     actif         = models.BooleanField(default=True)
     date_creation = models.DateTimeField(auto_now_add=True)
 

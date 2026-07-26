@@ -620,7 +620,7 @@ def rdv_create(request):
         'is_new':          True,
         'consultation':    None,
         'constante':       None,
-        'pathologies':     Pathologie.objects.filter(actif=True).order_by('nom'),
+        'pathologies':     Pathologie.objects.filter(actif=True, departement__code__in=('medg', 'MEDGEN')).order_by('nom'),
         'medecins':        Medecin.objects.filter(actif=True).select_related('employe').order_by('employe__nom', 'employe__prenoms'),
     })
 
@@ -850,7 +850,7 @@ def rdv_edit(request, pk):
         'is_new':        False,
         'consultation':  consultation,
         'constante':     constante,
-        'pathologies':   Pathologie.objects.filter(actif=True).order_by('nom'),
+        'pathologies':   Pathologie.objects.filter(actif=True, departement__code__in=('medg', 'MEDGEN')).order_by('nom'),
         'medecins':      Medecin.objects.filter(actif=True).select_related('employe').order_by('employe__nom', 'employe__prenoms'),
         'registre_cpn':          _get_reg(RegistreCPN),
         'registre_accouchement': _get_reg(RegistreAccouchement),
