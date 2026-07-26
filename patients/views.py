@@ -519,6 +519,16 @@ def rdv_global_list(request):
             pass
     elif filter_val == 'all':
         pass  # pas de filtre date
+    elif filter_val == 'mine':
+        qs = qs.filter(medecin__user=request.user)
+    elif filter_val == 'urgent':
+        qs = qs.filter(niveau_urgence='urgent')
+    elif filter_val == 'urgence_medicale':
+        qs = qs.filter(type_rdv='urgence')
+    elif filter_val == 'consultation':
+        qs = qs.filter(type_rdv='consultation')
+    elif filter_val == 'suivi':
+        qs = qs.filter(type_rdv='controle')
     elif filter_val in ('planifie', 'confirme', 'termine', 'annule', 'absent'):
         qs = qs.filter(statut=filter_val)
     elif filter_val == 'not_done':
@@ -886,6 +896,14 @@ def gynecologie_rdv_list(request):
         qs = qs.filter(date_heure__date=_date.today())
     elif filter_val == 'mine':
         qs = qs.filter(medecin__user=request.user)
+    elif filter_val == 'urgent':
+        qs = qs.filter(niveau_urgence='urgent')
+    elif filter_val == 'urgence_medicale':
+        qs = qs.filter(type_rdv='urgence')
+    elif filter_val == 'consultation':
+        qs = qs.filter(type_rdv='consultation')
+    elif filter_val == 'suivi':
+        qs = qs.filter(type_rdv='controle')
     elif filter_val == 'not_done':
         qs = qs.exclude(statut__in=['termine', 'annule', 'absent'])
 
@@ -1234,11 +1252,11 @@ def pathologie_delete(request, pk):
 
 # ── Export / Import des pathologies ─────────────────────────────────────────
 
-_PATHOLOGIE_HDR = ['nom', 'categorie', 'description', 'actif']
+_PATHOLOGIE_HDR = ['nom', 'categorie', 'departement', 'description', 'actif']
 
 
 def _pathologie_row(p):
-    return [p.nom, p.categorie, p.description, int(p.actif)]
+    return [p.nom, p.categorie, p.departement.code if p.departement_id else '', p.description, int(p.actif)]
 
 
 @login_required
@@ -1248,7 +1266,7 @@ def export_pathologies(request):
     from django.http import HttpResponse
 
     fmt = request.GET.get('format', 'json')
-    qs = Pathologie.objects.all()
+    qs = Pathologie.objects.select_related('departement').all()
     rows = [_pathologie_row(p) for p in qs]
 
     if fmt == 'csv':
@@ -1331,6 +1349,8 @@ def _b(v):
 
 @login_required
 def import_pathologies(request):
+    from medecins.models import Departement
+
     upload = request.FILES.get('fichier')
     if not upload:
         messages.error(request, 'Aucun fichier sélectionné.')
@@ -1342,6 +1362,7 @@ def import_pathologies(request):
         return redirect('patients:pathologie_list')
 
     do_update = 'update' in request.POST
+    departements = {d.code: d for d in Departement.objects.all()}
     created = updated = skipped = errors = 0
 
     for item in data:
@@ -1350,8 +1371,10 @@ def import_pathologies(request):
             if not nom:
                 errors += 1
                 continue
+            departement_code = _s(item.get('departement', ''))
             defaults = {
                 'categorie': _s(item.get('categorie', 'generale')) or 'generale',
+                'departement': departements.get(departement_code),
                 'description': _s(item.get('description', '')),
                 'actif': _b(item.get('actif', True)),
             }

@@ -93,9 +93,9 @@ def calculer_rapport_gynecologie(annee, mois):
     activite_consultations = _grille_vide()
     activite_referes = _grille_vide()
 
-    pathos_grossesse = list(Pathologie.objects.filter(categorie='grossesse').order_by('nom'))
-    pathos_infectieuse = list(Pathologie.objects.filter(categorie='infectieuse').order_by('nom'))
-    pathos_autre = list(Pathologie.objects.filter(categorie='autre_gyneco').order_by('nom'))
+    pathos_grossesse = list(Pathologie.objects.filter(departement__code='GYN', categorie='grossesse').order_by('nom'))
+    pathos_infectieuse = list(Pathologie.objects.filter(departement__code='GYN', categorie='infectieuse').order_by('nom'))
+    pathos_autre = list(Pathologie.objects.filter(departement__code='GYN', categorie='autre_gyneco').order_by('nom'))
 
     patho_grilles = {
         p.pk: {'grille': _grille_vide(), 'referes': {'F': 0, 'M': 0}}

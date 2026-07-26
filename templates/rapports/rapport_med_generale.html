@@ -80,6 +80,7 @@ table.rmg-table thead tr.rmg-bracket-row th { font-size: 9px; }
 table.rmg-table tbody tr:nth-child(even) { background: #fafafa; }
 table.rmg-table td.rmg-val { font-weight: 700; color: var(--brand); }
 table.rmg-table td.rmg-refere { background: #f3f4f6; }
+.rmg-empty-row td { padding: 10px; font-size: 10.5px; font-style: italic; color: #6b7280; text-align: center; }
 
 .rm-legende {
   margin-top: 10px; font-size: 10px; color: #6b7280; font-style: italic; line-height: 1.6;
@@ -225,6 +226,8 @@ table.rmg-table td.rmg-refere { background: #f3f4f6; }
         <td class="rmg-refere rmg-val">{{ ligne.refere.F }}</td>
         <td class="rmg-refere rmg-val">{{ ligne.refere.M }}</td>
       </tr>
+      {% empty %}
+      <tr class="rmg-empty-row"><td colspan="21">Aucune pathologie classée « Maladie infectieuse » dans le catalogue des pathologies.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -232,6 +235,7 @@ table.rmg-table td.rmg-refere { background: #f3f4f6; }
     FE = femme enceinte · CS = cas suspect · IRA = infection respiratoire aiguë · CTA = combinaison thérapeutique à base d'artémisinine.
     Effectifs comptés à partir des diagnostics retenus / autres pathologies associées cochés dans le registre de consultation curative (« Diagnostic retenu »),
     rattachés à l'âge et au sexe du patient au moment de la visite. La colonne « Cas référés » compte, parmi ces mêmes diagnostics, les visites dont l'issue de consultation (« cur_issue_consultation ») est « Référé(e) en externe ».
+    Les pathologies affichées sont celles du catalogue taguées catégorie « Maladie infectieuse » pour le département Médecine Générale — pour ajouter/retirer une ligne, retaguer le catalogue (écran de gestion des pathologies).
   </div>
 </div>
 
@@ -265,24 +269,22 @@ table.rmg-table td.rmg-refere { background: #f3f4f6; }
       <tr>
         <td class="rmg-label-col">{{ ligne.label }}</td>
         {% for cle, label in brackets %}
-          {% if ligne.data %}
-          <td class="rmg-val">{{ ligne.data|get_item:cle|get_item:'F'|default:0 }}</td>
-          <td class="rmg-val">{{ ligne.data|get_item:cle|get_item:'M'|default:0 }}</td>
-          {% else %}
-          <td><span class="rm-blank"></span></td>
-          <td><span class="rm-blank"></span></td>
-          {% endif %}
+        <td class="rmg-val">{{ ligne.data|get_item:cle|get_item:'F'|default:0 }}</td>
+        <td class="rmg-val">{{ ligne.data|get_item:cle|get_item:'M'|default:0 }}</td>
         {% endfor %}
         <td class="rmg-val">{{ ligne.total.F }}</td>
         <td class="rmg-val">{{ ligne.total.M }}</td>
         <td class="rmg-refere rmg-val">{{ ligne.refere.F }}</td>
         <td class="rmg-refere rmg-val">{{ ligne.refere.M }}</td>
       </tr>
+      {% empty %}
+      <tr class="rmg-empty-row"><td colspan="21">Aucune pathologie classée « Autre maladie non infectieuse » dans le catalogue des pathologies.</td></tr>
       {% endfor %}
     </tbody>
   </table>
   <div class="rm-legende">
-    « Evaluation nutritionnelle » ne correspond à aucune pathologie du catalogue et reste à renseigner manuellement.
+    Les pathologies affichées sont celles du catalogue taguées catégorie « Autre maladie non infectieuse » pour le département Médecine Générale —
+    pour ajouter/retirer une ligne (ex. « Evaluation nutritionnelle »), retaguer le catalogue (écran de gestion des pathologies).
   </div>
 </div>
 
@@ -324,6 +326,8 @@ table.rmg-table td.rmg-refere { background: #f3f4f6; }
         <td class="rmg-refere rmg-val">{{ ligne.refere.F }}</td>
         <td class="rmg-refere rmg-val">{{ ligne.refere.M }}</td>
       </tr>
+      {% empty %}
+      <tr class="rmg-empty-row"><td colspan="21">Aucune pathologie classée « IST / MST » dans le catalogue des pathologies.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -364,14 +368,64 @@ table.rmg-table td.rmg-refere { background: #f3f4f6; }
   <div class="rm-legende">Aucun de ces indicateurs ne dispose de champ dédié dans le registre de consultation curative actuel — sections à compléter manuellement, comme sur la fiche papier d'origine.</div>
 </div>
 
-<!-- ══════════════════════ PAGE 5 : Signatures ══════════════════════ -->
-<div class="rm-page">
+<!-- ══════════════════════ PAGE 5 : Maladies à déclaration obligatoire ══════════════════════ -->
+<div class="rm-page rm-page-break">
   <div class="rm-header">
     <div class="rm-logo">
       <div class="rm-logo-circle"><img src="{% static 'img/logo.png' %}" alt="CMS WALÉ"></div>
       <div class="rm-logo-name">CENTRE MEDICO SOCIAL WALE</div>
     </div>
     <div class="rm-page-num">5</div>
+  </div>
+
+  <div class="rm-section-title">Maladies à déclaration obligatoire (surveillance épidémiologique)</div>
+  <table class="rmg-table">
+    <thead>
+      <tr>
+        <th class="rmg-label-col" rowspan="2">Maladies</th>
+        {% for cle, label in brackets %}<th colspan="2">{{ label }}</th>{% endfor %}
+        <th colspan="2">Total</th>
+        <th colspan="2">Cas référés</th>
+      </tr>
+      <tr class="rmg-bracket-row">
+        {% for cle, label in brackets %}<th>F</th><th>M</th>{% endfor %}
+        <th>F</th><th>M</th>
+        <th>F</th><th>M</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ligne in epidemiologie %}
+      <tr>
+        <td class="rmg-label-col">{{ ligne.label }}</td>
+        {% for cle, label in brackets %}
+        <td class="rmg-val">{{ ligne.data|get_item:cle|get_item:'F'|default:0 }}</td>
+        <td class="rmg-val">{{ ligne.data|get_item:cle|get_item:'M'|default:0 }}</td>
+        {% endfor %}
+        <td class="rmg-val">{{ ligne.total.F }}</td>
+        <td class="rmg-val">{{ ligne.total.M }}</td>
+        <td class="rmg-refere rmg-val">{{ ligne.refere.F }}</td>
+        <td class="rmg-refere rmg-val">{{ ligne.refere.M }}</td>
+      </tr>
+      {% empty %}
+      <tr class="rmg-empty-row"><td colspan="21">Aucune pathologie classée « Épidémiologie » dans le catalogue des pathologies.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="rm-legende">
+    PFA = paralysie flasque aiguë (suspicion de poliomyélite).
+    Les pathologies affichées sont celles du catalogue taguées catégorie « Épidémiologie » pour le département Médecine Générale —
+    pour ajouter/retirer une ligne, retaguer le catalogue (écran de gestion des pathologies).
+  </div>
+</div>
+
+<!-- ══════════════════════ PAGE 6 : Signatures ══════════════════════ -->
+<div class="rm-page">
+  <div class="rm-header">
+    <div class="rm-logo">
+      <div class="rm-logo-circle"><img src="{% static 'img/logo.png' %}" alt="CMS WALÉ"></div>
+      <div class="rm-logo-name">CENTRE MEDICO SOCIAL WALE</div>
+    </div>
+    <div class="rm-page-num">6</div>
   </div>
 
   <div class="rm-signatures">

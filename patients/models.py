@@ -261,10 +261,13 @@ class RegistreCuratif(models.Model):
 
 class Pathologie(models.Model):
     CATEGORIE = [
-        ('generale',     'Générale'),
-        ('grossesse',    'Pathologie sur grossesse'),
-        ('infectieuse',  'Maladie infectieuse'),
-        ('autre_gyneco', 'Autre maladie gynécologique'),
+        ('generale',         'Générale'),
+        ('grossesse',        'Pathologie sur grossesse'),
+        ('infectieuse',      'Maladie infectieuse'),
+        ('non_infectieuse',  'Autre maladie non infectieuse'),
+        ('ist',              'IST / MST'),
+        ('epidemiologie',    'Épidémiologie (déclaration obligatoire)'),
+        ('autre_gyneco',     'Autre maladie gynécologique'),
     ]
 
     nom           = models.CharField(max_length=300, verbose_name='Nom')
