@@ -1871,7 +1871,7 @@
           {% else %}<svg width="28" height="28" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" fill="#ccc"/><path d="M4 20c0-4 3.6-6 8-6s8 2 8 6" stroke="#ccc" stroke-width="1.5" fill="none"/><path d="M9 6.5a3.5 3.5 0 016 2.3" stroke="#bbb" stroke-width="1.2" fill="none"/></svg>{% endif %}
         </div>
         <div class="em-pgrid">
-          <div class="em-prow"><span class="em-plbl">Patient</span><span class="em-pval">{{ rdv.patient.nom }} {{ rdv.patient.prenoms }}</span><span class="em-plbl">Médecin <span style="color:#e53935;">*</span></span><span class="em-pval"><select name="eval_medecin" style="border:none;border-bottom:1px solid #ccc;outline:none;font-size:12.5px;background:transparent;padding:2px 0;font-family:'Sora',sans-serif;min-width:140px;"><option value="">— Sélectionner —</option>{% for m in medecins %}<option value="{{ m.pk }}"{% if rdv.medecin_id == m.pk %} selected{% endif %}>Dr. {{ m.nom }}</option>{% endfor %}</select></span></div>
+          <div class="em-prow"><span class="em-plbl">Patient</span><span class="em-pval">{{ rdv.patient.nom }} {{ rdv.patient.prenoms }}</span><span class="em-plbl">Médecin <span style="color:#e53935;">*</span></span><span class="em-pval"><select name="eval_medecin" id="id_eval_medecin" class="em-inp" style="min-width:140px;"><option value="">— Sélectionner —</option>{% for m in medecins %}<option value="{{ m.pk }}" data-departement-id="{{ m.departement_id }}"{% if rdv.medecin_id == m.pk %} selected{% endif %}>{{ m }}</option>{% endfor %}</select></span></div>
           <div class="em-prow"><span class="em-plbl">Âge</span><span class="em-pval">{{ rdv.patient.age|default:"—" }}</span><span class="em-plbl">Date</span><span class="em-pval">{{ rdv.date_heure|date:"d/m/Y H:i:s" }}</span></div>
           <div class="em-prow"><span class="em-plbl"></span><span class="em-pval"></span><span class="em-plbl">Rendez-vous</span><span class="em-pval">{{ rdv.code_rdv }}</span></div>
         </div>
@@ -2195,6 +2195,7 @@
   var targets = [
     document.getElementById('id_medecin'),
     document.getElementById('id_type_consultation'),
+    document.getElementById('id_eval_medecin'),
   ].filter(Boolean);
   if (!targets.length) return;
 

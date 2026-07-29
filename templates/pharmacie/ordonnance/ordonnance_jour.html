@@ -208,19 +208,18 @@ html[data-theme="dark"] .badge-ord-expiree   { background: rgba(var(--rose-rgb),
     </thead>
     <tbody>
       {% for ord in page_obj %}
-      {% if ord.consultation %}{% firstof ord.consultation.patient as pat %}{% firstof ord.medecin ord.consultation.medecin as med %}
-      {% else %}{% firstof ord.patient as pat %}{% firstof ord.medecin as med %}{% endif %}
+      {% with pat=ord.patient|default:ord.consultation.patient med=ord.medecin|default:ord.consultation.medecin %}
       <tr onclick="window.location='{% if ord.statut == 'emise' %}{% url 'pharmacie_dispenser' pharmacie ord.pk %}{% else %}{% url 'ordonnance_detail' ord.pk %}{% endif %}'">
         <td style="font-family:var(--font-mono);font-weight:700;color:var(--ph-700);">{{ ord.numero }}</td>
         <td>
           {% if pat %}{{ pat.nom|upper }} {{ pat.prenoms }}
           {% else %}<span style="color:var(--ph-muted);">—</span>{% endif %}
         </td>
-        <td>{% if med %}Dr. {{ med.nom }}{% else %}<span style="color:var(--ph-muted);">—</span>{% endif %}</td>
+        <td>{% if med %}{{ med }}{% else %}<span style="color:var(--ph-muted);">—</span>{% endif %}</td>
         <td>
           <div class="ph-meds-list">
             {% for l in ord.lignes.all|slice:":3" %}
-            <span>{{ l.medicament_libre|default:l.medicament|truncatechars:22 }}</span>
+            <span>{{ l.medicament_libre|default:l.produit|default:l.medicament|truncatechars:22 }}</span>
             {% empty %}<span style="color:var(--ph-muted);">—</span>{% endfor %}
             {% if ord.lignes.all|length > 3 %}<span style="color:var(--ph-muted);">+{{ ord.lignes.all|length|add:"-3" }}</span>{% endif %}
           </div>
@@ -241,6 +240,7 @@ html[data-theme="dark"] .badge-ord-expiree   { background: rgba(var(--rose-rgb),
           {% endif %}
         </td>
       </tr>
+      {% endwith %}
       {% endfor %}
     </tbody>
   </table>
