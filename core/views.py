@@ -657,8 +657,10 @@ def laboratoire_list(request):
     from laboratoire.models import DemandeExamen
     from django.core.paginator import Paginator
 
-    q      = request.GET.get('q', '').strip()
-    statut = request.GET.get('statut', '')
+    q          = request.GET.get('q', '').strip()
+    statut     = request.GET.get('statut', '')
+    date_debut = request.GET.get('date_debut', '')
+    date_fin   = request.GET.get('date_fin', '')
 
     statut_choices = DemandeExamen.STATUT
     statut_label   = dict(statut_choices).get(statut, statut)
@@ -678,6 +680,14 @@ def laboratoire_list(request):
 
     if statut:
         demandes = demandes.filter(statut=statut)
+
+    if date_debut or date_fin:
+        if date_debut:
+            demandes = demandes.filter(date_creation__date__gte=date_debut)
+        if date_fin:
+            demandes = demandes.filter(date_creation__date__lte=date_fin)
+    else:
+        demandes = demandes.filter(date_creation__date=timezone.now().date())
 
     now = timezone.now()
     stats = {
@@ -699,6 +709,9 @@ def laboratoire_list(request):
         'statut':         statut,
         'statut_label':   statut_label,
         'statut_choices': statut_choices,
+        'date_debut':     date_debut,
+        'date_fin':       date_fin,
+        'today':          timezone.now().date(),
         'total':          page_obj.paginator.count,
         'breadcrumb':     breadcrumb,
     })

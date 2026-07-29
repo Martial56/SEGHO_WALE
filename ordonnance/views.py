@@ -40,10 +40,14 @@ def ordonnance_list(request):
         qs = qs.filter(statut=statut)
     if type_ord:
         qs = qs.filter(type_ordonnance=type_ord)
-    if date_debut:
-        qs = qs.filter(date_emission__date__gte=date_debut)
-    if date_fin:
-        qs = qs.filter(date_emission__date__lte=date_fin)
+
+    if date_debut or date_fin:
+        if date_debut:
+            qs = qs.filter(date_emission__date__gte=date_debut)
+        if date_fin:
+            qs = qs.filter(date_emission__date__lte=date_fin)
+    else:
+        qs = qs.filter(date_emission__date=date.today())
 
     stats = {
         'total':     qs.count(),
