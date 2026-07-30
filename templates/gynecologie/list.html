@@ -10,22 +10,38 @@
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  /* ── DARK MODE ── */
-  html[data-theme="dark"] .pk-card { background: #0d2035; border-color: rgba(255,255,255,0.1); }
-  html[data-theme="dark"] .pk-name { color: #cce8f4; }
-  html[data-theme="dark"] .pk-meta { color: rgba(255,255,255,0.45); }
-  html[data-theme="dark"] .pk-avatar { background: #1a3a50; }
+  /* ── MODE SOMBRE ──
+     Tout passe par les variables de thème, jamais par une couleur écrite en
+     dur : c'est ce qui aligne cette page sur le reste de l'application (même
+     méthode que la page « Mon compte » et le tableau de bord des achats), et
+     ce qui la fait suivre automatiquement la couleur d'accent choisie. */
+  html[data-theme="dark"] .pk-card { background: var(--surface); border-color: var(--border); }
+  html[data-theme="dark"] .pk-name { color: var(--text-strong); }
+  {% comment %}
+  .pk-lbl et .pk-val portent leur propre couleur, plus spécifique que celle de
+  .pk-meta : sans ces deux règles, le contenu des fiches restait en gris foncé
+  (#888) et quasi noir (#444) sur fond sombre — c'était l'essentiel du texte
+  illisible de la page.
+  {% endcomment %}
+  {# Ces libellés font 9 px : --text-faint tombait à 2,3 de contraste. #}
+  html[data-theme="dark"] .pk-meta .pk-lbl { color: var(--text-muted); }
+  html[data-theme="dark"] .pk-meta .pk-val { color: var(--text); }
+  html[data-theme="dark"] .pk-avatar { background: rgba(var(--teal-600-rgb),0.18); }
   html[data-theme="dark"] .o-search-input { color: var(--text); }
-  html[data-theme="dark"] .o-search-bar { border-bottom-color: #3a4a62; }
+  html[data-theme="dark"] .o-search-bar { border-bottom-color: var(--border-strong); }
   html[data-theme="dark"] .o-ctrl-btn { color: var(--text-muted); }
-  html[data-theme="dark"] .o-ctrl-btn:hover { background: #28304a; color: var(--text); border-color: var(--border); }
+  html[data-theme="dark"] .o-ctrl-btn:hover { background: var(--surface-muted); color: var(--text); border-color: var(--border); }
   html[data-theme="dark"] .o-pag-btn { background: var(--surface); border-color: var(--border); color: var(--text-muted); }
   html[data-theme="dark"] .o-view-btn { background: var(--surface); color: var(--text-muted); }
+  /* Sans ce rappel, la regle sombre ci-dessus (plus specifique que
+     .o-view-btn.active) effacait la couleur du bouton de vue actif. */
+  html[data-theme="dark"] .o-view-btn.active,
+  html[data-theme="dark"] .o-view-btn:hover { background: var(--teal-600); color: #fff; }
   html[data-theme="dark"] .o-view-btns { border-color: var(--border); }
   html[data-theme="dark"] .o-ctrl-sep { background: var(--border); }
   html[data-theme="dark"] .o-subheader { background: var(--surface); border-bottom-color: var(--border); }
-  html[data-theme="dark"] .o-dd-panel { background: #1a2535; border-color: #2e3f58; }
-  html[data-theme="dark"] .o-dd-item:hover { background: rgba(var(--teal-500-rgb),0.2); color: #c5d4e2; }
+  html[data-theme="dark"] .o-dd-panel { background: var(--surface); border-color: var(--border); }
+  html[data-theme="dark"] .o-dd-item:hover { background: rgba(var(--teal-500-rgb),0.2); color: var(--text); }
   html[data-theme="dark"] .o-dd-item.active { background: rgba(var(--teal-500-rgb),0.3); color: var(--teal-300); }
   html[data-theme="dark"] .o-filter-tag { background: rgba(var(--teal-500-rgb),0.25); border-color: rgba(var(--teal-500-rgb),0.5); color: var(--teal-300); }
 
@@ -48,8 +64,8 @@
     cursor: pointer; text-decoration: none; transition: background 0.1s;
     white-space: nowrap; gap: 10px;
   }
-  .o-dd-item:hover { background: var(--teal-50); color: var(--teal-600); }
-  .o-dd-item.active { background: #ede7f6; color: var(--teal-600); font-weight: 500; }
+  .o-dd-item:hover { background: var(--teal-50); color: var(--accent-text-soft); }
+  .o-dd-item.active { background: #ede7f6; color: var(--accent-text-soft); font-weight: 500; }
   .o-dd-sep { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
 
   /* ══ SUBHEADER ══ */
@@ -82,7 +98,7 @@
   }
   .o-filter-tag {
     display: inline-flex; align-items: center; gap: 3px;
-    background: var(--teal-50); color: var(--teal-600);
+    background: var(--teal-50); color: var(--accent-text-soft);
     border: 1px solid #b2d8db; border-radius: 3px;
     padding: 1px 6px; font-size: 11.5px; font-weight: 500; white-space: nowrap;
   }
@@ -215,12 +231,14 @@
     display: flex; align-items: center; justify-content: center;
     font-size: 13px; text-decoration: none; transition: background .2s; padding: 0 6px;
   }
-  .pagination-pages a { background: #fff; color: var(--teal-700); box-shadow: 0 1px 4px rgba(0,0,0,0.12); }
+  .pagination-pages a { background: #fff; color: var(--accent-text); box-shadow: 0 1px 4px rgba(0,0,0,0.12); }
   .pagination-pages a:hover { background: var(--teal-50); }
   .pagination-pages span.current { background: var(--teal-500); color: #fff; }
   .pagination-pages span.disabled { color: rgba(0,0,0,0.2); background: rgba(0,0,0,0.04); cursor: default; }
-  html[data-theme="dark"] .pagination-pages a { background: #0d2035; color: #a0c8e0; box-shadow: none; }
-  html[data-theme="dark"] .pagination-pages a:hover { background: #0f3050; }
+  html[data-theme="dark"] .pagination { color: var(--text-muted); }
+  html[data-theme="dark"] .pagination-pages a { background: var(--surface); color: var(--text); box-shadow: none; }
+  html[data-theme="dark"] .pagination-pages a:hover { background: rgba(var(--teal-600-rgb),0.16); }
+  html[data-theme="dark"] .pagination-pages span.disabled { color: var(--text-faint); background: var(--surface-muted); }
 
   /* ── LIST VIEW ── */
   #list-view { display: none; margin: 0 -32px; }
@@ -249,14 +267,40 @@
   #list-view tbody td.lv-code { font-family: var(--font-mono); font-size: 12px; color: #555; white-space: nowrap; }
   #list-view tbody td.lv-name { font-weight: 500; color: #111; }
   #list-view tbody td.lv-muted { color: #666; }
-  html[data-theme="dark"] #list-view thead th { background: #0d2035; color: rgba(255,255,255,0.4); border-bottom-color: #243044; }
-  html[data-theme="dark"] #list-view tbody tr { border-bottom-color: #1a3050; background: #0d2035; }
-  html[data-theme="dark"] #list-view tbody tr:nth-child(even) { background: #0d2035; }
-  html[data-theme="dark"] #list-view tbody tr:hover { background: #0f3050; }
-  html[data-theme="dark"] #list-view table { background: #0d2035; }
-  html[data-theme="dark"] #list-view tbody td { color: #cce8f4; }
-  html[data-theme="dark"] #list-view tbody td.lv-muted { color: rgba(255,255,255,0.45); }
+  html[data-theme="dark"] #list-view thead th { background: var(--surface); color: var(--text-muted); border-bottom-color: var(--border); }
+  html[data-theme="dark"] #list-view tbody tr { border-bottom-color: var(--border); background: var(--surface); }
+  html[data-theme="dark"] #list-view tbody tr:nth-child(even) { background: var(--surface); }
+  html[data-theme="dark"] #list-view tbody tr:hover { background: rgba(var(--teal-600-rgb),0.16); }
+  html[data-theme="dark"] #list-view table { background: var(--surface); }
+  html[data-theme="dark"] #list-view tbody td { color: var(--text); }
+  /* Ces deux-la ecrasaient la couleur du <td> avec du gris fonce et du quasi
+     noir : sans regle sombre, le code patient et le nom restaient illisibles. */
+  html[data-theme="dark"] #list-view tbody td.lv-code { color: var(--text-muted); }
+  html[data-theme="dark"] #list-view tbody td.lv-name { color: var(--text-strong); }
+  html[data-theme="dark"] #list-view tbody td.lv-muted { color: var(--text-muted); }
+
+  /* ── Bandes de groupe de la vue kanban ──
+     Le tableau utilise .lst-groupe de la brique ; le kanban a besoin d'une bande
+     pleine largeur dans la grille. Même classe .lst-groupe (donc même JS de
+     repliage), plus ce qu'il faut pour occuper toute la ligne. */
+  .lst-groupe-bande {
+    grid-column: 1 / -1;
+    display: flex; align-items: center;
+    padding: 9px 4px 7px;
+    border-bottom: 1px solid var(--border);
+    font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+    color: var(--accent-text); cursor: pointer; user-select: none;
+  }
+  .lst-groupe-bande:hover { background: rgba(var(--teal-600-rgb),.06); }
+  .lst-groupe-bande.lst-groupe-fils { font-size: 10.5px; letter-spacing: .3px; opacity: .85; }
+  html[data-theme="dark"] .lst-groupe-bande { color: var(--teal-300); }
+  html[data-theme="dark"] .lst-groupe-bande:hover { background: rgba(var(--teal-600-rgb),.12); }
+  .o-empty { grid-column: 1 / -1; text-align: center; padding: 60px 20px; color: var(--text-muted); }
 </style>
+{% comment %}
+Styles de la brique : en-têtes de groupe du tableau et coches des menus générés.
+{% endcomment %}
+{% include 'includes/listing/styles.html' %}
 
 <!-- ══ SUBHEADER ══ -->
 <div class="o-subheader">
@@ -269,184 +313,47 @@
       </a> -->
     </div>
     <div class="o-subheader-row-right">
-      <form method="get" style="display:flex;align-items:center;">
+      {% comment %}
+      onsubmit désactivé : la recherche part en AJAX 300 ms après la dernière
+      frappe, un envoi natif rechargerait toute la page. La valeur vient du
+      contexte et non de request.GET, pour rester juste après un rafraîchissement.
+      {% endcomment %}
+      <form method="get" style="display:flex;align-items:center;" onsubmit="return false;">
         <div class="o-search-bar">
           <input class="o-search-input" type="text" name="q" id="search-q"
-                 value="{{ request.GET.q }}" placeholder="Rechercher un patient…">
+                 value="{{ q }}" placeholder="Rechercher une patiente…">
+          <button type="button" class="o-search-btn" id="clear-search-btn" title="Effacer la recherche"
+                  onclick="clearSearch()" style="{% if not q %}display:none;{% endif %}">
+            <i class="bi bi-x-lg"></i>
+          </button>
           <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
         </div>
       </form>
     </div>
   </div>
-  <!-- Ligne 2 : filtres + contrôles -->
-  <div class="o-subheader-row">
-    <div class="o-subheader-row-right">
-
-      <!-- ── Filtres ── -->
-      <div class="o-dd-wrap">
-        <button class="o-ctrl-btn {% if request.GET.filter %}active{% endif %}" id="btn-filtres" onclick="toggleDd('dd-filtres',this)">
-          <i class="bi bi-funnel{% if request.GET.filter %}-fill{% endif %}"></i> Filtres{% if request.GET.filter %} <span style="background:var(--teal-600);color:#fff;border-radius:10px;font-size:10px;padding:0 5px;">1</span>{% endif %}
-        </button>
-        <div class="o-dd-panel" id="dd-filtres">
-          <div class="o-dd-section">Genre</div>
-          <a class="o-dd-item {% if request.GET.filter == 'femme' %}active{% endif %}" href="?filter=femme{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}">Femme</a>
-          <a class="o-dd-item {% if request.GET.filter == 'homme' %}active{% endif %}" href="?filter=homme{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}">Homme</a>
-          <hr class="o-dd-sep">
-          <div class="o-dd-section">Tranche d'âge</div>
-          <a class="o-dd-item {% if request.GET.filter == 'mineur' %}active{% endif %}" href="?filter=mineur{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}">Mineur (moins de 18 ans)</a>
-          <a class="o-dd-item {% if request.GET.filter == 'adulte' %}active{% endif %}" href="?filter=adulte{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}">Adulte (18 – 60 ans)</a>
-          <a class="o-dd-item {% if request.GET.filter == 'senior' %}active{% endif %}" href="?filter=senior{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}">Senior (plus de 60 ans)</a>
-          {% if request.GET.filter %}
-          <hr class="o-dd-sep">
-          <a class="o-dd-item" href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.group %}group={{ request.GET.group }}{% endif %}" style="color:var(--rose-text);">
-            <i class="bi bi-x-circle" style="font-size:11px;"></i> Supprimer le filtre
-          </a>
-          {% endif %}
-        </div>
-      </div>
-
-      <!-- ── Regrouper par ── -->
-      <div class="o-dd-wrap">
-        <button class="o-ctrl-btn {% if request.GET.group %}active{% endif %}" id="btn-group" onclick="toggleDd('dd-group',this)">
-          <i class="bi bi-list-ul"></i> Regrouper par{% if request.GET.group %} <span style="background:var(--teal-600);color:#fff;border-radius:10px;font-size:10px;padding:0 5px;">1</span>{% endif %}
-        </button>
-        <div class="o-dd-panel" id="dd-group">
-          <div class="o-dd-section">Regrouper par</div>
-          <a class="o-dd-item {% if request.GET.group == 'sexe' %}active{% endif %}" href="?group=sexe{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}">Genre</a>
-          <a class="o-dd-item {% if request.GET.group == 'age' %}active{% endif %}" href="?group=age{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}">Âge</a>
-          {% if request.GET.group %}
-          <hr class="o-dd-sep">
-          <a class="o-dd-item" href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.filter %}filter={{ request.GET.filter }}{% endif %}" style="color:var(--rose-text);">
-            <i class="bi bi-x-circle" style="font-size:11px;"></i> Supprimer le regroupement
-          </a>
-          {% endif %}
-        </div>
-      </div>
-
-      <button class="o-ctrl-btn"><i class="bi bi-star"></i> Favoris</button>
-      <div class="o-ctrl-sep"></div>
-      <div class="o-pagination">
-        <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
-        <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
-           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}{% else %}#{% endif %}">
-          <i class="bi bi-chevron-left"></i>
-        </a>
-        <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
-           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}{% else %}#{% endif %}">
-          <i class="bi bi-chevron-right"></i>
-        </a>
-      </div>
-      <div class="o-ctrl-sep"></div>
-      <div class="o-view-btns">
-        <button class="o-view-btn active" id="btn-kanban" onclick="setView('kanban')"><i class="bi bi-grid"></i></button>
-        <button class="o-view-btn" id="btn-list" onclick="setView('list')"><i class="bi bi-list-ul"></i></button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Ligne 3 : tags filtres actifs -->
-  {% if request.GET.filter or request.GET.group %}
-  <div class="o-subheader-row" style="padding-top:0;gap:6px;flex-wrap:wrap;">
-    {% if request.GET.filter %}
-    <span style="font-size:11px;color:var(--text-muted);">Filtre :</span>
-    <span class="o-filter-tag">
-      {% if request.GET.filter == 'femme' %}Femme
-      {% elif request.GET.filter == 'homme' %}Homme
-      {% elif request.GET.filter == 'mineur' %}Mineur (< 18 ans)
-      {% elif request.GET.filter == 'adulte' %}Adulte (18–60 ans)
-      {% elif request.GET.filter == 'senior' %}Senior (> 60 ans)
-      {% else %}{{ request.GET.filter }}{% endif %}
-      <a href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.group %}group={{ request.GET.group }}{% endif %}" title="Supprimer">×</a>
-    </span>
-    {% endif %}
-    {% if request.GET.group %}
-    <span style="font-size:11px;color:var(--text-muted);">Groupé par :</span>
-    <span class="o-filter-tag">
-      {% if request.GET.group == 'sexe' %}Genre
-      {% elif request.GET.group == 'age' %}Âge
-      {% else %}{{ request.GET.group }}{% endif %}
-      <a href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.filter %}filter={{ request.GET.filter }}{% endif %}" title="Supprimer">×</a>
-    </span>
-    {% endif %}
-  </div>
-  {% endif %}
+  {% comment %}
+  Ligne 2 : les contrôles. Le contenu des menus Filtres et Regrouper par est
+  généré depuis la déclaration de la liste, pas écrit ici.
+  {% endcomment %}
+  {% include 'gynecologie/includes/list_controls.html' %}
 </div>
 
+{% include 'gynecologie/includes/list_results.html' %}
 
-<!-- ══ KANBAN GRID ══ -->
-<div id="kanban-view" class="o-kanban">
-  {% for patient in page_obj %}
-  <a class="pk-card" href="{% url 'patients:detail' patient.pk %}">
-    <div class="pk-avatar">
-      {% if patient.photo %}
-        <img src="{{ patient.photo.url }}" alt="{{ patient.nom }}">
-      {% else %}
-        <svg xmlns="http://www.w3.org/2000/svg" width="72" height="82" viewBox="0 0 24 24" fill="rgba(0,0,0,0.28)">
-          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-        </svg>
-      {% endif %}
-    </div>
-    <div class="pk-info">
-      <div class="pk-name">{{ patient.nom }} {{ patient.prenoms }}</div>
-      <div class="pk-meta">
-        <span class="pk-lbl">Code:</span><span class="pk-val">{{ patient.code_patient }}</span>
-        <span class="pk-lbl">Âge:</span><span class="pk-val">{% if patient.date_naissance %}{{ patient.age }} ans{% else %}—{% endif %}</span>
-        <span class="pk-lbl">Genre:</span><span class="pk-val">{% if patient.sexe == 'F' %}Femme{% elif patient.sexe == 'M' %}Homme{% else %}—{% endif %}</span>
-        <span class="pk-lbl">Téléphone:</span><span class="pk-val">{{ patient.telephone }}</span>
-      </div>
-    </div>
-  </a>
-  {% empty %}
-  <div class="o-empty">
-    <i class="bi bi-people" style="font-size:36px;display:block;margin-bottom:10px;"></i>
-    Aucun patient trouvé.
-  </div>
-  {% endfor %}
-</div>
-
-<!-- ══ VUE LISTE ══ -->
-<div id="list-view">
-  <table>
-    <thead>
-      <tr>
-        <th>Code d'identification</th>
-        <th>Nom et prénoms</th>
-        <th>Âge</th>
-        <th>Genre</th>
-        <th>Téléphone</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for patient in page_obj %}
-      <tr onclick="window.location='{% url 'patients:detail' patient.pk %}'">
-        <td class="lv-code">{{ patient.code_patient }}</td>
-        <td class="lv-name">{{ patient.nom }} {{ patient.prenoms }}</td>
-        <td class="lv-muted">{% if patient.date_naissance %}{{ patient.age }} ans{% else %}—{% endif %}</td>
-        <td class="lv-muted">{% if patient.sexe == 'F' %}Femme{% elif patient.sexe == 'M' %}Homme{% else %}—{% endif %}</td>
-        <td class="lv-muted">{{ patient.telephone }}</td>
-      </tr>
-      {% empty %}
-      <tr>
-        <td colspan="5" style="text-align:center;padding:48px;color:rgba(0,0,0,0.35)">
-          Aucun patient trouvé
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-
-<!-- ══ PAGINATION ══ -->
+{% comment %}
+Pagination basse numérotée, en AJAX comme le reste : {% querystring %} conserve
+les filtres, le regroupement et la recherche en place.
+{% endcomment %}
 {% if page_obj.has_other_pages %}
 <div class="pagination">
   <span>
     Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
-    &nbsp;·&nbsp; {{ page_obj.paginator.count }} résultat{{ page_obj.paginator.count|pluralize }}
+    &nbsp;·&nbsp; {{ page_obj.paginator.count }} {% if groups %}groupe{{ page_obj.paginator.count|pluralize }}{% else %}résultat{{ page_obj.paginator.count|pluralize }}{% endif %}
   </span>
   <div class="pagination-pages">
     {% if page_obj.has_previous %}
-      <a href="?page=1{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}" title="Première">«</a>
-      <a href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}">‹</a>
+      <a href="{% querystring page=1 %}" title="Première">«</a>
+      <a href="{% querystring page=page_obj.previous_page_number %}">‹</a>
     {% else %}
       <span class="disabled">«</span>
       <span class="disabled">‹</span>
@@ -455,12 +362,12 @@
       {% if num == page_obj.number %}
         <span class="current">{{ num }}</span>
       {% elif num >= page_obj.number|add:"-2" and num <= page_obj.number|add:"2" %}
-        <a href="?page={{ num }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}">{{ num }}</a>
+        <a href="{% querystring page=num %}">{{ num }}</a>
       {% endif %}
     {% endfor %}
     {% if page_obj.has_next %}
-      <a href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}">›</a>
-      <a href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.filter %}&filter={{ request.GET.filter }}{% endif %}{% if request.GET.group %}&group={{ request.GET.group }}{% endif %}" title="Dernière">»</a>
+      <a href="{% querystring page=page_obj.next_page_number %}">›</a>
+      <a href="{% querystring page=page_obj.paginator.num_pages %}" title="Dernière">»</a>
     {% else %}
       <span class="disabled">›</span>
       <span class="disabled">»</span>
@@ -469,6 +376,13 @@
 </div>
 {% endif %}
 
+{% comment %}
+Constructeur de conditions : hors des zones échangées en AJAX, il n'est donc
+chargé qu'une fois (la description des champs pèse une vingtaine de kilo-octets).
+{% endcomment %}
+{% include 'includes/listing/filtre_perso.html' %}
+
+<script src="{% static 'js/listing_groupes.js' %}"></script>
 <script>
 (function () {
   var STORAGE_KEY = 'segho-gyn-patients-view';
@@ -479,16 +393,17 @@
     var list   = document.getElementById('list-view');
     var btnK   = document.getElementById('btn-kanban');
     var btnL   = document.getElementById('btn-list');
+    if (!kanban || !list) return;
     if (mode === 'list') {
       kanban.style.display = 'none';
       list.style.display   = 'block';
-      btnK.classList.remove('active');
-      btnL.classList.add('active');
+      if (btnK) btnK.classList.remove('active');
+      if (btnL) btnL.classList.add('active');
     } else {
       kanban.style.display = 'grid';
       list.style.display   = 'none';
-      btnK.classList.add('active');
-      btnL.classList.remove('active');
+      if (btnK) btnK.classList.add('active');
+      if (btnL) btnL.classList.remove('active');
     }
     currentView = mode;
     localStorage.setItem(STORAGE_KEY, mode);
@@ -496,36 +411,221 @@
   window.setView = setView;
   setView(currentView);
 
-  var searchInput = document.getElementById('search-q');
-  if (searchInput) {
-    var timer;
-    searchInput.addEventListener('input', function () {
-      clearTimeout(timer);
-      timer = setTimeout(function () {
+  // Une seule requête à la fois : enchaîner les clics annule la précédente,
+  // sinon deux réponses peuvent revenir dans le désordre.
+  var enVol = null;
+
+  function refreshList(url, pushHistory) {
+    var ouvert = document.querySelector('#subheader-controls .o-dd-panel.open');
+    var ouvertId = ouvert ? ouvert.id : null;
+
+    if (enVol) enVol.abort();
+    var ctrl = new AbortController();
+    enVol = ctrl;
+
+    fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}, signal: ctrl.signal})
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+      .then(function (html) {
+        var doc = new DOMParser().parseFromString(html, 'text/html');
+        ['kanban-view', 'list-view'].forEach(function (id) {
+          var neuf = doc.getElementById(id), actuel = document.getElementById(id);
+          if (neuf && actuel) actuel.innerHTML = neuf.innerHTML;
+        });
+        var nc = doc.getElementById('subheader-controls');
+        if (nc) document.getElementById('subheader-controls').outerHTML = nc.outerHTML;
+        // La pagination basse apparaît et disparaît selon le nombre de pages.
+        var ancienne = document.querySelector('.pagination');
+        var neuve = doc.querySelector('.pagination');
+        if (ancienne && neuve) ancienne.outerHTML = neuve.outerHTML;
+        else if (ancienne) ancienne.remove();
+        else if (neuve) document.getElementById('list-view').insertAdjacentHTML('afterend', neuve.outerHTML);
+
+        if (pushHistory) history.pushState({}, '', url);
+        setView(currentView);
+        // Le panneau de conditions vit dans la barre remplacée : ses lignes sont
+        // à reconstruire depuis l'URL.
+        if (window.lstfInit) window.lstfInit();
+        // La barre a été remplacée : les boutons sont de nouveaux éléments, leurs
+        // écouteurs de survol sont à rebrancher.
+        brancherSurvolMenus();
+        // Ré-ouvre le menu qui était ouvert, pour cumuler plusieurs clics.
+        if (ouvertId) {
+          var btn = document.getElementById(ouvertId === 'dd-filtres' ? 'btn-filtres' : 'btn-group');
+          if (btn) toggleDd(ouvertId, btn);
+        }
+      })
+      .catch(function (err) {
+        if (err.name === 'AbortError') return;   // remplacée par une plus récente
+        if (window.showToast) showToast('Impossible de rafraîchir la liste. Vérifiez votre connexion.', 'error');
+      })
+      .finally(function () { if (enVol === ctrl) enVol = null; });
+  }
+  window.refreshList = refreshList;
+
+  // Valeurs réellement appliquées : l'URL nue ne reflète pas les défauts posés
+  // par la vue, on lit alors l'état rendu par le serveur.
+  function valeursActuelles(key, params) {
+    if (params.has(key)) return params.getAll(key);
+    var ctrl = document.getElementById('subheader-controls');
+    var brut = ctrl ? (ctrl.dataset[key === 'filter' ? 'filters' : 'groups'] || '') : '';
+    return brut ? brut.split(',') : [];
+  }
+
+  // Ajoute ou retire une valeur : c'est ce qui rend filtres et regroupements
+  // cumulables.
+  function toggleParam(key, value) {
+    var params = new URLSearchParams(window.location.search);
+    var valeurs = valeursActuelles(key, params);
+    params.delete(key);
+    if (valeurs.indexOf(value) !== -1) {
+      valeurs.filter(function (v) { return v !== value; }).forEach(function (v) { params.append(key, v); });
+    } else {
+      valeurs.forEach(function (v) { params.append(key, v); });
+      params.append(key, value);
+    }
+    params.delete('page');
+    refreshList(window.location.pathname + (params.toString() ? '?' + params.toString() : ''), true);
+  }
+  window.toggleParam = toggleParam;
+
+  function clearSearch() {
+    var input = document.getElementById('search-q');
+    var btn = document.getElementById('clear-search-btn');
+    if (input) input.value = '';
+    if (btn) btn.style.display = 'none';
+    var params = new URLSearchParams(window.location.search);
+    params.delete('q'); params.delete('page');
+    refreshList(window.location.pathname + (params.toString() ? '?' + params.toString() : ''), true);
+  }
+  window.clearSearch = clearSearch;
+
+  function resetAll() {
+    var input = document.getElementById('search-q');
+    var btn = document.getElementById('clear-search-btn');
+    if (input) input.value = '';
+    if (btn) btn.style.display = 'none';
+    refreshList(window.location.pathname, true);
+  }
+  window.resetAll = resetAll;
+
+  // Recherche : rafraîchit 300 ms après la dernière frappe.
+  var champ = document.getElementById('search-q');
+  if (champ) {
+    var minuteur;
+    champ.addEventListener('input', function () {
+      var btn = document.getElementById('clear-search-btn');
+      if (btn) btn.style.display = champ.value ? '' : 'none';
+      clearTimeout(minuteur);
+      var val = champ.value;
+      minuteur = setTimeout(function () {
         var params = new URLSearchParams(window.location.search);
-        params.set('q', searchInput.value);
+        if (val) params.set('q', val); else params.delete('q');
         params.delete('page');
-        var url = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
-        fetch(url)
-          .then(function(r){ return r.text(); })
-          .then(function(html) {
-            var doc = new DOMParser().parseFromString(html, 'text/html');
-            var newKanban = doc.getElementById('kanban-view');
-            if (newKanban) document.getElementById('kanban-view').innerHTML = newKanban.innerHTML;
-            var newList = doc.getElementById('list-view');
-            if (newList) document.getElementById('list-view').innerHTML = newList.innerHTML;
-            history.pushState({}, '', url);
-            setView(currentView);
-          });
+        refreshList(window.location.pathname + (params.toString() ? '?' + params.toString() : ''), true);
       }, 300);
     });
   }
+
+  // Liens ?page=… : interceptés pour rester en AJAX.
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest('#subheader-controls a[href^="?"], .pagination a[href^="?"]');
+    if (!a) return;
+    e.preventDefault();
+    refreshList(a.getAttribute('href'), true);
+  });
+
+  window.addEventListener('popstate', function () {
+    refreshList(window.location.pathname + window.location.search, false);
+  });
+
+  // ── Ouverture au survol des menus Filtres et Regrouper par ───────────────
+  // Le clic continue de fonctionner (seul recours au tactile, où il n'y a pas de
+  // survol) : le survol ne fait qu'ouvrir en plus.
+  //
+  // La fermeture est différée : le panneau est posé 4 px sous le bouton, et sans
+  // ce délai la souris ne pourrait pas franchir cet espace — le panneau se
+  // refermerait sous le curseur. Le délai est annulé dès qu'on revient sur le
+  // bouton ou qu'on entre dans le panneau, celui-ci étant un descendant du même
+  // conteneur.
+  var DELAI_FERMETURE = 250;
+  var MENUS_SURVOL = [['btn-filtres', 'dd-filtres'], ['btn-group', 'dd-group']];
+
+  function brancherSurvolMenus() {
+    MENUS_SURVOL.forEach(function (paire) {
+      var btn = document.getElementById(paire[0]);
+      var panneau = document.getElementById(paire[1]);
+      if (!btn || !panneau) return;
+      var wrap = btn.closest('.o-dd-wrap');
+      if (!wrap || wrap.dataset.survolBranche) return;
+      wrap.dataset.survolBranche = '1';
+      var minuteur;
+
+      wrap.addEventListener('mouseenter', function () {
+        clearTimeout(minuteur);
+        if (!panneau.classList.contains('open')) toggleDd(paire[1], btn);
+      });
+      // Réarmement plutôt qu'abandon : un champ du menu qui a le focus (liste
+      // déroulante déployée, date en cours de saisie) ouvre une fenêtre du
+      // système par-dessus, laquelle fait sortir le curseur du menu — refermer
+      // perdrait la saisie. On reprogramme alors le contrôle plutôt que de
+      // l'abandonner, sinon rendre le focus alors que la souris est déjà loin
+      // laisserait le menu ouvert indéfiniment.
+      //
+      // Le seul fait qu'un panneau soit épinglé ne suffit pas à retenir le menu :
+      // il restait autrement ouvert pour de bon dès qu'on avait effleuré
+      // « Ajouter un filtre personnalisé ».
+      function planifierFermeture() {
+        minuteur = setTimeout(function () {
+          if (panneau.contains(document.activeElement)) { planifierFermeture(); return; }
+          panneau.classList.remove('open');
+          // Les panneaux épinglés à l'intérieur perdent leur marque : sans cela
+          // le menu se rouvrirait avec le constructeur de conditions déjà déplié.
+          panneau.querySelectorAll('.lstf-ouvert, .lstg-ouvert').forEach(function (e) {
+            e.classList.remove('lstf-ouvert');
+            e.classList.remove('lstg-ouvert');
+          });
+        }, DELAI_FERMETURE);
+      }
+      wrap.addEventListener('mouseleave', function () {
+        clearTimeout(minuteur);
+        planifierFermeture();
+      });
+    });
+  }
+  window.brancherSurvolMenus = brancherSurvolMenus;
+  // Filet après un échange AJAX : la barre de contrôles est remplacée, et son
+  // nouveau conteneur n'appartient plus à la chaîne de survol du navigateur — il
+  // ne reçoit donc aucun `mouseleave` quand la souris s'en va, si bien que le
+  // menu rouvert restait ouvert jusqu'au clic suivant. Le document, lui, ne
+  // change pas : c'est sur lui qu'on surveille le survol.
+  var minuteurHorsMenu;
+  document.addEventListener('mouseover', function (e) {
+    if (!e.target.closest) return;
+    clearTimeout(minuteurHorsMenu);
+    if (e.target.closest('.o-dd-wrap')) return;
+    minuteurHorsMenu = setTimeout(function () {
+      var ouvert = document.querySelector('.o-dd-panel.open');
+      // Un champ du menu a le focus : une fenêtre du système est peut-être
+      // déployée par-dessus, refermer perdrait la saisie.
+      if (!ouvert || ouvert.contains(document.activeElement)) return;
+      fermerMenus();
+    }, DELAI_FERMETURE);
+  });
+
+  brancherSurvolMenus();
 })();
+
+function fermerMenus() {
+  document.querySelectorAll('.o-dd-panel.open').forEach(function (p) { p.classList.remove('open'); });
+  document.querySelectorAll('.lstf-ouvert').forEach(function (e) { e.classList.remove('lstf-ouvert'); });
+  document.querySelectorAll('.lstg-ouvert').forEach(function (e) { e.classList.remove('lstg-ouvert'); });
+}
 
 function toggleDd(id, btn) {
   var panel = document.getElementById(id);
+  if (!panel) return;
   var isOpen = panel.classList.contains('open');
-  document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
+  fermerMenus();
   if (!isOpen) {
     var rect = btn.getBoundingClientRect();
     panel.style.top = (rect.bottom + 4) + 'px';
@@ -537,15 +637,23 @@ function toggleDd(id, btn) {
       panel.style.left = 'auto';
       panel.style.right = (window.innerWidth - rect.right) + 'px';
     }
+    // Le constructeur de conditions est bien plus large que les autres
+    // sous-menus : on mesure au cas par cas de quel côté le déplier.
+    var restant = window.innerWidth - panel.getBoundingClientRect().right;
+    var besoin = panel.querySelector('.lstf-panneau') ? 345
+               : panel.querySelector('.lstg-panneau') ? 265 : 180;
+    panel.classList.toggle('vers-gauche', restant < besoin);
   }
 }
-document.addEventListener('click', function(e) {
-  if (!e.target.closest('.o-dd-wrap')) {
-    document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
-  }
+
+document.addEventListener('click', function (e) {
+  if (!e.target.closest('.o-dd-wrap')) fermerMenus();
 });
-document.addEventListener('scroll', function() {
-  document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
+// Le défilement décroche un menu positionné en fixed — sauf quand c'est
+// l'intérieur d'un menu qui défile.
+document.addEventListener('scroll', function (e) {
+  if (e.target && e.target.closest && e.target.closest('.o-dd-panel')) return;
+  fermerMenus();
 }, true);
 </script>
 

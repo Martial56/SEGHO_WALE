@@ -1,7 +1,11 @@
 {% extends 'base.html' %}
 {% load static %}
 {% block topbar_title %}
-<a href="{% url 'dashboard' %}" style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:rgba(0,0,0,.4);text-decoration:none;padding:5px 10px;border-radius:8px;transition:background .15s,color .15s;" onmouseover="this.style.background='rgba(0,0,0,.05)';this.style.color='var(--teal-700)'" onmouseout="this.style.background='';this.style.color='rgba(0,0,0,.4)'">
+{% comment %}
+Survol en CSS (.cpt-retour) et non en onmouseover : les couleurs écrites dans
+l'attribut étaient figées en clair, donc illisibles en mode sombre.
+{% endcomment %}
+<a href="{% url 'dashboard' %}" class="cpt-retour">
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15,18 9,12 15,6"/></svg>
   Tableau de bord
 </a>
@@ -10,32 +14,50 @@
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
 <style>
-.cpt-wrap { max-width:860px; margin:40px auto; padding:0 24px; }
+/* Couleurs prises aux variables de thème, jamais écrites en dur : elles
+   basculent seules en mode sombre. Même méthode que le tableau de bord des
+   achats, d'où une page qui appartient visiblement à la même application. */
+/* Pleine largeur avec une marge sobre, comme .ac-page du tableau de bord des
+   achats : les 860 px centrés laissaient de grandes bandes vides sur les côtés
+   et allongeaient la page pour rien. */
+.cpt-wrap { width:100%; padding:18px 28px 40px; }
+/* Rangée de cartes de largeur égale, qui repassent l'une sous l'autre quand la
+   fenêtre est étroite (même primitive que .ac-row). */
+.cpt-row { display:flex; flex-wrap:wrap; gap:18px; margin-bottom:18px; }
+.cpt-row > .cpt-card { flex:1 1 320px; min-width:0; margin-bottom:0; }
+/* Mêmes mesures de carte que .ac-card du tableau de bord des achats : rayon,
+   ombre et épaisseur d'en-tête identiques, pour que les deux pages se lisent
+   comme deux pages du même logiciel. */
 .cpt-card {
-  background:#fff; border-radius:16px; border:1px solid rgba(0,0,0,.08);
-  box-shadow:0 2px 12px rgba(0,0,0,.06); overflow:hidden; margin-bottom:20px;
+  background:var(--surface); border-radius:10px; border:1px solid var(--border);
+  box-shadow:0 1px 4px rgba(0,0,0,.04); overflow:hidden; margin-bottom:18px;
 }
-html[data-theme="dark"] .cpt-card { background:#201d1d; border-color:rgba(154,184,138,.15); }
+html[data-theme="dark"] .cpt-card { box-shadow:0 1px 4px rgba(0,0,0,.25); }
 .cpt-card-head {
-  padding:16px 24px; border-bottom:1px solid rgba(0,0,0,.07);
-  display:flex; align-items:center; gap:12px;
+  padding:11px 16px; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
 }
-html[data-theme="dark"] .cpt-card-head { border-bottom-color:rgba(154,184,138,.12); }
-.cpt-card-body { padding:24px; }
+.cpt-card-body { padding:18px 16px; }
+/* Titre de carte, texte d'explication, lignes d'identité : trois niveaux de
+   lecture, trois variables — au lieu d'un noir translucide invisible en sombre. */
+.cpt-titre { font-size:13px; font-weight:700; color:var(--text-strong); }
+.cpt-desc { font-size:12.5px; color:var(--text-muted); margin-bottom:16px; }
+.cpt-nom { font-size:17px; font-weight:800; color:var(--text-strong); }
+.cpt-meta { font-size:12px; color:var(--text-muted); margin-top:2px; }
+/* --text-faint tombait à 2,3 de contraste : bon pour un en-tête de tableau,
+   pas pour une date d'inscription ni une consigne qu'il faut pouvoir lire. */
+.cpt-meta-faible { font-size:11px; color:var(--text-muted); margin-top:4px; }
 .cpt-label {
-  display:block; font-size:11px; font-weight:700; color:rgba(0,0,0,.4);
+  display:block; font-size:11px; font-weight:700; color:var(--text-muted);
   text-transform:uppercase; letter-spacing:.4px; margin-bottom:6px;
 }
-html[data-theme="dark"] .cpt-label { color:rgba(255,255,255,.35); }
 .cpt-input {
-  width:100%; border:none; border-bottom:1.5px solid rgba(0,0,0,.18); border-radius:0;
-  padding:9px 4px; font-size:13.5px; color:var(--teal-900);
+  width:100%; border:none; border-bottom:1.5px solid var(--border-strong); border-radius:0;
+  padding:9px 4px; font-size:13.5px; color:var(--text);
   font-family:inherit; transition:border-color .15s; background:transparent;
 }
-html[data-theme="dark"] .cpt-input { border-bottom-color:rgba(154,184,138,.25); color:#c0d8e8; }
 .cpt-input:focus { outline:none; border-bottom-color:var(--teal-500); }
-.cpt-input[readonly] { color:rgba(0,0,0,.4); cursor:default; border-bottom-style:dashed; }
-html[data-theme="dark"] .cpt-input[readonly] { color:rgba(255,255,255,.3); }
+.cpt-input[readonly] { color:var(--text-faint); cursor:default; border-bottom-style:dashed; }
 .cpt-field { margin-bottom:16px; }
 .cpt-btn {
   background:var(--teal-600); color:#fff; border:none; border-radius:8px;
@@ -43,6 +65,24 @@ html[data-theme="dark"] .cpt-input[readonly] { color:rgba(255,255,255,.3); }
   font-family:inherit; transition:background .15s; display:inline-flex; align-items:center; gap:7px;
 }
 .cpt-btn:hover { background:var(--teal-700); }
+/* Témoin d'attente et de résultat, comme sur la page de connexion : l'écriture
+   part vers le serveur, sans repère on ne sait pas si le clic a pris. */
+.cpt-btn.is-loading { cursor:default; opacity:.85; }
+.cpt-btn.is-loading .cpt-btn-icone { display:none; }
+.cpt-spinner {
+  display:none; width:14px; height:14px; flex-shrink:0;
+  border:2px solid rgba(255,255,255,.35); border-top-color:#fff;
+  border-radius:50%; animation:cpt-spin .7s linear infinite;
+}
+.cpt-btn.is-loading .cpt-spinner { display:inline-block; }
+@keyframes cpt-spin { to { transform:rotate(360deg); } }
+.cpt-flash {
+  display:none; align-items:center; gap:5px;
+  font-size:12px; font-weight:600;
+}
+.cpt-flash.visible { display:inline-flex; }
+.cpt-flash-ok { color:var(--color-success); }
+.cpt-flash-ko { color:var(--rose-text); }
 .cpt-error {
   background:rgba(var(--rose-rgb),.08); border:1px solid rgba(var(--rose-rgb),.22);
   border-radius:8px; padding:10px 14px; color:var(--rose-text);
@@ -70,7 +110,7 @@ html[data-theme="dark"] .cpt-input[readonly] { color:rgba(255,255,255,.3); }
   display:flex; gap:4px;
 }
 .cpt-photo-btn {
-  width:24px; height:24px; border-radius:50%; border:2px solid #fff;
+  width:24px; height:24px; border-radius:50%; border:2px solid var(--surface);
   display:flex; align-items:center; justify-content:center;
   cursor:pointer; transition:transform .15s;
 }
@@ -79,8 +119,8 @@ html[data-theme="dark"] .cpt-input[readonly] { color:rgba(255,255,255,.3); }
 .photo-lens {
   display:none; position:fixed; width:320px; height:320px;
   border-radius:18px;
-  border:3px solid #fff;
-  box-shadow:0 12px 40px rgba(0,0,0,.35), 0 0 0 1px rgba(0,0,0,.1);
+  border:3px solid var(--surface);
+  box-shadow:0 12px 40px rgba(0,0,0,.35), 0 0 0 1px var(--border);
   background-repeat:no-repeat;
   pointer-events:none;
   z-index:5000;
@@ -90,16 +130,36 @@ html[data-theme="dark"] .cpt-input[readonly] { color:rgba(255,255,255,.3); }
 .cpt-pw-toggle {
   position:absolute; right:4px; top:50%; transform:translateY(-50%);
   background:none; border:none; cursor:pointer; padding:4px;
-  color:rgba(0,0,0,.35); transition:color .15s; line-height:0;
+  color:var(--text-faint); transition:color .15s; line-height:0;
 }
-.cpt-pw-toggle:hover { color:var(--teal-600); }
-html[data-theme="dark"] .cpt-pw-toggle { color:rgba(255,255,255,.3); }
-html[data-theme="dark"] .cpt-pw-toggle:hover { color:var(--teal-400); }
+.cpt-pw-toggle:hover { color:var(--accent-text-soft); }
+/* Bouton secondaire (« Couleur par défaut ») */
+.cpt-btn-neutre {
+  display:flex; align-items:center; gap:6px; background:none;
+  border:1px solid var(--border-strong); border-radius:8px; padding:9px 16px;
+  font-size:12.5px; font-weight:600; color:var(--text-muted);
+  cursor:pointer; font-family:inherit; transition:border-color .15s, color .15s;
+}
+.cpt-btn-neutre:hover { border-color:var(--teal-600); color:var(--accent-text-soft); }
+/* Retour au tableau de bord, dans la barre du haut */
+.cpt-retour {
+  display:inline-flex; align-items:center; gap:6px;
+  font-size:12.5px; font-weight:600; color:var(--text-muted);
+  text-decoration:none; padding:5px 10px; border-radius:8px;
+  transition:background .15s, color .15s;
+}
+.cpt-retour:hover { background:var(--surface-muted); color:var(--accent-text-soft); }
 .cpt-badge {
   display:inline-flex; align-items:center; gap:4px;
-  background:rgba(var(--teal-600-rgb),.1); color:var(--teal-700);
+  background:rgba(var(--teal-600-rgb),.1); color:var(--accent-text);
   border:1px solid rgba(var(--teal-600-rgb),.18); border-radius:20px;
   padding:2px 10px; font-size:11px; font-weight:700;
+}
+/* --teal-700 reste une teinte sombre en mode sombre (seuls 800/900/950 sont
+   renversés) : le texte du badge y devenait presque noir sur presque noir. */
+html[data-theme="dark"] .cpt-badge {
+  background:rgba(var(--teal-600-rgb),.2); color:var(--teal-200);
+  border-color:rgba(var(--teal-600-rgb),.35);
 }
 </style>
 {% endblock %}
@@ -164,10 +224,10 @@ html[data-theme="dark"] .cpt-pw-toggle:hover { color:var(--teal-400); }
       </div>
 
       <div>
-        <div style="font-size:17px;font-weight:800;color:var(--teal-900);">
+        <div class="cpt-nom">
           {{ user.get_full_name|default:user.username }}
         </div>
-        <div style="font-size:12px;color:rgba(0,0,0,.45);margin-top:2px;">
+        <div class="cpt-meta">
           @{{ user.username }}
           &nbsp;·&nbsp;
           <span class="cpt-badge">
@@ -175,25 +235,25 @@ html[data-theme="dark"] .cpt-pw-toggle:hover { color:var(--teal-400); }
             {% if user.is_superuser %}Administrateur{% elif user.is_staff %}Staff{% else %}Utilisateur{% endif %}
           </span>
         </div>
-        <div style="font-size:11px;color:rgba(0,0,0,.35);margin-top:4px;">
+        <div class="cpt-meta-faible">
           <i class="bi bi-calendar3"></i> Membre depuis {{ user.date_joined|date:"d/m/Y" }}
           &nbsp;·&nbsp;
           <i class="bi bi-clock"></i> Dernière connexion : {{ user.last_login|date:"d/m/Y à H:i"|default:"—" }}
         </div>
-        <div style="font-size:11px;color:rgba(0,0,0,.3);margin-top:6px;">
+        <div class="cpt-meta-faible">
           <i class="bi bi-camera"></i> Cliquer sur l'avatar pour changer la photo
         </div>
       </div>
     </div>
   </div>
 
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+  <div class="cpt-row">
 
     <!-- Informations personnelles -->
     <div class="cpt-card">
       <div class="cpt-card-head">
-        <i class="bi bi-person-fill" style="font-size:16px;color:var(--teal-600);"></i>
-        <span style="font-size:13px;font-weight:700;color:var(--teal-900);">Informations personnelles</span>
+        <i class="bi bi-person-fill" style="font-size:16px;color:var(--accent-text-soft);"></i>
+        <span class="cpt-titre">Informations personnelles</span>
       </div>
       <div class="cpt-card-body">
         <form method="post">
@@ -227,8 +287,8 @@ html[data-theme="dark"] .cpt-pw-toggle:hover { color:var(--teal-400); }
     <!-- Changer le mot de passe -->
     <div class="cpt-card">
       <div class="cpt-card-head">
-        <i class="bi bi-shield-lock-fill" style="font-size:16px;color:var(--teal-600);"></i>
-        <span style="font-size:13px;font-weight:700;color:var(--teal-900);">Mot de passe</span>
+        <i class="bi bi-shield-lock-fill" style="font-size:16px;color:var(--accent-text-soft);"></i>
+        <span class="cpt-titre">Mot de passe</span>
       </div>
       <div class="cpt-card-body">
         {% if errors.password %}
@@ -276,14 +336,20 @@ html[data-theme="dark"] .cpt-pw-toggle:hover { color:var(--teal-400); }
 
   </div>
 
+  {% comment %}
+  Ces deux réglages sont courts : côte à côte plutôt qu'empilés sur toute la
+  largeur, où chacun laissait les deux tiers de sa carte vides.
+  {% endcomment %}
+  <div class="cpt-row">
+
   <!-- Sécurité de session -->
   <div class="cpt-card">
     <div class="cpt-card-head">
-      <i class="bi bi-hourglass-split" style="font-size:16px;color:var(--teal-600);"></i>
-      <span style="font-size:13px;font-weight:700;color:var(--teal-900);">Verrouillage automatique</span>
+      <i class="bi bi-hourglass-split" style="font-size:16px;color:var(--accent-text-soft);"></i>
+      <span class="cpt-titre">Verrouillage automatique</span>
     </div>
     <div class="cpt-card-body">
-      <p style="font-size:12.5px;color:rgba(0,0,0,.5);margin-bottom:16px;">
+      <p class="cpt-desc">
         Après ce délai d'inactivité (aucun clic, aucune saisie), ta session se verrouille : un mot de passe est demandé pour continuer, sans rien perdre de la page en cours.
       </p>
       <form id="session-timeout-form" method="post" style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;">
@@ -303,10 +369,17 @@ html[data-theme="dark"] .cpt-pw-toggle:hover { color:var(--teal-400); }
             <option value="0"   {% if profile.session_timeout_minutes == 0 %}selected{% endif %}>Jamais (désactivé)</option>
           </select>
         </div>
-        <button type="submit" class="cpt-btn">
-          <i class="bi bi-check-lg"></i> Enregistrer
+        <button type="submit" class="cpt-btn" id="session-timeout-btn">
+          <span class="cpt-spinner"></span>
+          <i class="bi bi-check-lg cpt-btn-icone"></i>
+          <span class="cpt-btn-label">Enregistrer</span>
         </button>
-        <span id="session-timeout-saved" style="display:none;font-size:12px;color:var(--color-success);font-weight:600;">✓ Enregistré</span>
+        <span id="session-timeout-saved" class="cpt-flash cpt-flash-ok">
+          <i class="bi bi-check-circle-fill"></i> Enregistré
+        </span>
+        <span id="session-timeout-error" class="cpt-flash cpt-flash-ko">
+          <i class="bi bi-exclamation-triangle-fill"></i> <span class="cpt-flash-texte"></span>
+        </span>
       </form>
     </div>
   </div>
@@ -314,23 +387,25 @@ html[data-theme="dark"] .cpt-pw-toggle:hover { color:var(--teal-400); }
   <!-- Couleur du logiciel -->
   <div class="cpt-card">
     <div class="cpt-card-head">
-      <i class="bi bi-palette" style="font-size:16px;color:var(--teal-600);"></i>
-      <span style="font-size:13px;font-weight:700;color:var(--teal-900);">Couleur du logiciel</span>
+      <i class="bi bi-palette" style="font-size:16px;color:var(--accent-text-soft);"></i>
+      <span class="cpt-titre">Couleur du logiciel</span>
     </div>
     <div class="cpt-card-body">
-      <p style="font-size:12.5px;color:rgba(0,0,0,.5);margin-bottom:16px;">
+      <p class="cpt-desc">
         Choisis la couleur d'accent utilisée dans toute l'application. Elle s'applique immédiatement.
       </p>
       <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
         <input type="color" id="accent-color-input" value="{{ profile.accent_color|default:'#4f9b4b' }}"
           style="width:44px;height:44px;border:none;border-radius:8px;cursor:pointer;padding:0;background:none;flex-shrink:0;">
         <button type="button" id="accent-reset-btn"
-          style="display:flex;align-items:center;gap:6px;background:none;border:1px solid rgba(0,0,0,.12);border-radius:8px;padding:9px 16px;font-size:12.5px;font-weight:600;color:var(--text-muted,#888);cursor:pointer;font-family:inherit;">
+          class="cpt-btn-neutre">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 3 3 8 8 8"/></svg>
           Couleur par défaut (logo)
         </button>
       </div>
     </div>
+  </div>
+
   </div>
 </div>
 
@@ -358,12 +433,38 @@ function togglePw(inputId, btn) {
 (function () {
   var form = document.getElementById('session-timeout-form');
   if (!form) return;
-  var saved = document.getElementById('session-timeout-saved');
+  var btn    = document.getElementById('session-timeout-btn');
+  var label  = btn.querySelector('.cpt-btn-label');
+  var ok     = document.getElementById('session-timeout-saved');
+  var ko     = document.getElementById('session-timeout-error');
+  var minuteur;
+
+  function chargement(actif) {
+    btn.classList.toggle('is-loading', actif);
+    btn.disabled = actif;
+    label.textContent = actif ? 'Enregistrement…' : 'Enregistrer';
+  }
+
+  function annoncer(cible, texte) {
+    ok.classList.remove('visible');
+    ko.classList.remove('visible');
+    if (texte) cible.querySelector('.cpt-flash-texte').textContent = texte;
+    cible.classList.add('visible');
+    clearTimeout(minuteur);
+    minuteur = setTimeout(function () { cible.classList.remove('visible'); }, 3000);
+  }
 
   form.addEventListener('submit', function (e) {
     e.preventDefault();
+    if (btn.disabled) return;
     var minutes = parseInt(document.getElementById('session_timeout_minutes').value, 10);
-    fetch(form.action || window.location.pathname, {
+    chargement(true);
+    ok.classList.remove('visible');
+    ko.classList.remove('visible');
+    // Surtout pas form.action : le formulaire porte un champ nommé « action »,
+    // qui masque la propriété de même nom — on récupérerait l'<input> et la
+    // requête partirait sur une URL inexistante.
+    fetch(window.location.pathname, {
       method: 'POST',
       headers: {
         'X-CSRFToken': getCsrfToken(),
@@ -372,13 +473,19 @@ function togglePw(inputId, btn) {
       },
       body: 'action=session_timeout&session_timeout_minutes=' + encodeURIComponent(minutes),
     })
-    .then(function (r) { return r.json(); })
+    .then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
     .then(function (data) {
-      if (!data.ok) return;
+      if (!data.ok) throw new Error('refus');
+      // Le minuteur d'inactivité vit dans base.html : il doit adopter le
+      // nouveau délai sans recharger la page.
       if (window.updateSessionTimeout) window.updateSessionTimeout(data.session_timeout_minutes);
-      saved.style.display = 'inline';
-      setTimeout(function () { saved.style.display = 'none'; }, 2000);
-    });
+      annoncer(ok);
+    })
+    .catch(function () { annoncer(ko, 'Échec de l\'enregistrement, réessayez.'); })
+    .finally(function () { chargement(false); });
   });
 })();
 </script>

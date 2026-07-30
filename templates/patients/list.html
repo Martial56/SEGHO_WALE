@@ -1,4 +1,5 @@
 {% extends 'patients/base.html' %}
+{% load static %}
 
 {% block extra_css %}
 {{ block.super }}
@@ -76,8 +77,8 @@
     color: rgba(0,0,0,0.45);
     transition: background .2s, color .2s;
 }
-.view-btn:hover { background: rgba(0,0,0,0.08); color: var(--teal-700); }
-.view-btn.active { background: #fff; color: var(--teal-600); box-shadow: 0 1px 4px rgba(0,0,0,0.12); }
+.view-btn:hover { background: rgba(0,0,0,0.08); color: var(--accent-text); }
+.view-btn.active { background: #fff; color: var(--accent-text-soft); box-shadow: 0 1px 4px rgba(0,0,0,0.12); }
 
 /* ── Stats strip ───────────────────────────────── */
 .stats-strip {
@@ -95,14 +96,14 @@
     gap: 10px;
     box-shadow: var(--shadow-sm);
     font-size: 13px;
-    color: var(--teal-700);
+    color: var(--accent-text);
     flex: 1;
     min-width: 130px;
 }
 .stat-chip .stat-num {
     font-size: 22px;
     font-weight: 700;
-    color: var(--teal-600);
+    color: var(--accent-text-soft);
     line-height: 1;
 }
 
@@ -131,7 +132,7 @@
     transition: background .2s;
     padding: 0 6px;
 }
-.pagination-pages a { background: #fff; color: var(--teal-700); box-shadow: var(--shadow-sm); }
+.pagination-pages a { background: #fff; color: var(--accent-text); box-shadow: var(--shadow-sm); }
 .pagination-pages a:hover { background: var(--teal-50); }
 .pagination-pages span.current { background: var(--teal-500); color: #fff; }
 .pagination-pages span.disabled { color: rgba(0,0,0,0.2); background: rgba(0,0,0,0.04); cursor: default; }
@@ -145,50 +146,28 @@
     margin-right: 0;
     margin-top: 16px;
 }
-.pk-group-header {
-    grid-column: 1/-1;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--teal-700);
-    padding: 10px 4px;
-    margin-top: 4px;
-    border-bottom: 1px solid rgba(0,0,0,0.08);
-    cursor: pointer;
-    user-select: none;
+{% comment %}
+Bandes de groupe : le tableau utilise .lst-groupe de la brique ; le kanban a
+besoin d'une bande pleine largeur dans la grille. Même classe .lst-groupe — donc
+même JS de repliage — plus ce qu'il faut pour occuper toute la ligne. Les
+anciennes .pk-group-header / tr.lv-group-header, posées sur les objets de la page,
+n'ont plus lieu d'être.
+{% endcomment %}
+.lst-groupe-bande {
+    grid-column: 1 / -1;
+    display: flex; align-items: center;
+    padding: 9px 4px 7px;
+    border-bottom: 1px solid var(--border);
+    font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+    color: var(--accent-text); cursor: pointer; user-select: none;
 }
-#kanban-view > .pk-group-header:first-child { margin-top: 0; }
-html[data-theme="dark"] .pk-group-header { color: #85b7eb; border-bottom-color: #1f2933; }
-.group-chevron { font-size: 10px; transition: transform 0.15s; }
-.pk-group-header.open .group-chevron,
-tr.lv-group-header.open .group-chevron { transform: rotate(90deg); }
-.group-count {
-    font-size: 10.5px;
-    font-weight: 600;
-    color: var(--text-muted);
-    text-transform: none;
-    letter-spacing: normal;
-}
-tr.lv-group-header { cursor: pointer; }
-tr.lv-group-header:hover td { background: var(--teal-50); }
-tr.lv-group-header td {
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--teal-700);
-    background: rgba(0,0,0,0.02);
-    padding: 8px 14px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-html[data-theme="dark"] tr.lv-group-header td { color: #85b7eb; background: rgba(255,255,255,0.03); }
-html[data-theme="dark"] tr.lv-group-header:hover td { background: rgba(24,95,165,0.12); }
+.lst-groupe-bande:hover { background: rgba(var(--teal-600-rgb),.06); }
+.lst-groupe-bande.lst-groupe-fils { font-size: 10.5px; letter-spacing: .3px; opacity: .85; }
+html[data-theme="dark"] .lst-groupe-bande { color: var(--teal-300); }
+html[data-theme="dark"] .lst-groupe-bande:hover { background: rgba(var(--teal-600-rgb),.12); }
+/* Message d'absence de résultat, pleine largeur dans la grille. */
+.pk-vide { grid-column: 1 / -1; text-align: center; padding: 60px 20px; color: var(--text-muted); }
+
 .pk-card {
     background: #fff;
     border-radius: 0;
@@ -278,62 +257,61 @@ html[data-theme="dark"] tr.lv-group-header:hover td { background: rgba(24,95,165
 #list-view tbody td.lv-code { font-family: var(--font-mono); font-size: 12px; color: #555; white-space: nowrap; }
 #list-view tbody td.lv-name { font-weight: 500; color: #111; }
 #list-view tbody td.lv-muted { color: #666; }
-html[data-theme="dark"] #list-view thead th { background: #132033; color: #85b7eb; border-bottom-color: #1f2933; }
-html[data-theme="dark"] #list-view tbody tr { border-bottom-color: #1f2933; background: #132033; }
-html[data-theme="dark"] #list-view tbody tr:nth-child(even) { background: #132033; }
-html[data-theme="dark"] #list-view tbody tr:hover { background: rgba(24,95,165,0.08); }
-html[data-theme="dark"] #list-view table { background: #132033; }
-html[data-theme="dark"] #list-view tbody td { color: #d4e6f5; }
+html[data-theme="dark"] #list-view thead th { background: var(--surface); color: var(--teal-300); border-bottom-color: var(--border); }
+html[data-theme="dark"] #list-view tbody tr { border-bottom-color: var(--border); background: var(--surface); }
+html[data-theme="dark"] #list-view tbody tr:nth-child(even) { background: var(--surface); }
+html[data-theme="dark"] #list-view tbody tr:hover { background: rgba(var(--teal-500-rgb), 0.08); }
+html[data-theme="dark"] #list-view table { background: var(--surface); }
+html[data-theme="dark"] #list-view tbody td { color: var(--text); }
 html[data-theme="dark"] #list-view tbody td.lv-muted { color: rgba(255,255,255,.4); }
 
 /* dark mode */
-html[data-theme="dark"] .pk-card { background: #132033; border-color: #1f2933; }
-html[data-theme="dark"] .pk-name { color: #eef3f8; }
+html[data-theme="dark"] .pk-card { background: var(--surface); border-color: var(--border); }
+html[data-theme="dark"] .pk-name { color: var(--text-strong); }
 html[data-theme="dark"] .pk-meta { color: rgba(255,255,255,.4); }
 html[data-theme="dark"] .pk-meta .pk-lbl { color: rgba(255,255,255,.4); }
 html[data-theme="dark"] .pk-meta .pk-val { color: rgba(255,255,255,.55); }
-html[data-theme="dark"] .pk-avatar { background: #0c447c; color: #b5d4f4; }
-html[data-theme="dark"] .stat-chip { background: #0c447c; color: #85b7eb; }
-html[data-theme="dark"] .stat-chip .stat-num { color: #85b7eb; }
+html[data-theme="dark"] .pk-avatar { background: rgba(var(--teal-500-rgb),0.20); color: var(--teal-300); }
+html[data-theme="dark"] .stat-chip { background: rgba(var(--teal-500-rgb),0.20); color: var(--teal-300); }
+html[data-theme="dark"] .stat-chip .stat-num { color: var(--teal-300); }
 html[data-theme="dark"] .patients-toolbar .search-input-wrap input,
-html[data-theme="dark"] .patients-toolbar select { background: #132033; color: #d4e6f5; border-bottom-color: #1f2933; }
+html[data-theme="dark"] .patients-toolbar select option { background-color: var(--surface); color: var(--text); }
+html[data-theme="dark"] .patients-toolbar select { background-color: var(--surface); color: var(--text); border-bottom-color: var(--border); }
 html[data-theme="dark"] .view-toggle { background: rgba(255,255,255,0.05); }
-html[data-theme="dark"] .view-btn.active { background: #132033; color: #85b7eb; }
-html[data-theme="dark"] .pagination-pages a { background: #132033; color: #85b7eb; box-shadow: none; border-color: #1f2933; }
-html[data-theme="dark"] .pagination-pages a:hover { background: rgba(24,95,165,0.15); }
+html[data-theme="dark"] .view-btn.active { background: var(--surface); color: var(--teal-300); }
+/* La ligne « Page 1 sur 2 · 59 résultats » n'avait pas de règle sombre : du noir
+   translucide sur fond sombre, 1,07 de contraste. */
+html[data-theme="dark"] .pagination { color: rgba(255,255,255,0.55); }
+html[data-theme="dark"] .pagination-pages span.disabled { color: rgba(255,255,255,0.25); background: rgba(255,255,255,0.04); }
+html[data-theme="dark"] .pagination-pages a { background: var(--surface); color: var(--teal-300); box-shadow: none; border-color: var(--border); }
+html[data-theme="dark"] .pagination-pages a:hover { background: rgba(var(--teal-500-rgb),0.15); }
 
-/* ── Variables CSS pour le subheader ── */
-:root {
-    --surface: #fff;
-    --border: #e8edf2;
-    --text: #0d3040;
-    --text-muted: rgba(0,0,0,0.45);
-}
-html[data-theme="dark"] {
-    --surface: #132033;
-    --border:  #1f2933;
-    --text:    #d4e6f5;
-    --text-muted: rgba(255,255,255,.4);
-}
+{% comment %}
+La page redéfinissait ici les variables de thème pour son propre compte : un fond
+bleuté (#132033) et un texte bleuté (var(--teal-100)) là où le reste de l'application
+utilise #141b22 et #dce3ea. La liste des patients ne ressemblait donc à aucune
+autre page en thème sombre. Ces définitions sont retirées : la page suit le thème
+de l'application, comme les listes de gynécologie et de rendez-vous.
+{% endcomment %}
 
 /* ── DARK MODE subheader ── */
-html[data-theme="dark"] .o-search-input { color: #d4e6f5; }
-html[data-theme="dark"] .o-search-bar { border-bottom-color: #1f2933; }
+html[data-theme="dark"] .o-search-input { color: var(--text); }
+html[data-theme="dark"] .o-search-bar { border-bottom-color: var(--border); }
 html[data-theme="dark"] .o-ctrl-btn { color: rgba(255,255,255,.4); }
-html[data-theme="dark"] .o-ctrl-btn:hover { background: rgba(24,95,165,0.12); color: #d4e6f5; border-color: #1f2933; }
-html[data-theme="dark"] .o-ctrl-btn.active { background: rgba(24,95,165,0.18); color: #85b7eb; border-color: #185fa5; }
-html[data-theme="dark"] .o-pag-btn { background: #132033; border-color: #1f2933; color: rgba(255,255,255,.4); }
+html[data-theme="dark"] .o-ctrl-btn:hover { background: rgba(var(--teal-500-rgb),0.12); color: var(--text); border-color: var(--border); }
+html[data-theme="dark"] .o-ctrl-btn.active { background: rgba(var(--teal-500-rgb),0.18); color: var(--teal-300); border-color: rgba(var(--teal-500-rgb),0.45); }
+html[data-theme="dark"] .o-pag-btn { background: var(--surface); border-color: var(--border); color: rgba(255,255,255,.4); }
 html[data-theme="dark"] .o-pag-btn:hover { background: var(--teal-600); border-color: var(--teal-600); color: #fff; }
-html[data-theme="dark"] .o-view-btn { background: #132033; color: rgba(255,255,255,.4); }
+html[data-theme="dark"] .o-view-btn { background: var(--surface); color: rgba(255,255,255,.4); }
 html[data-theme="dark"] .o-view-btn.active,
 html[data-theme="dark"] .o-view-btn:hover { background: var(--teal-600); color: #fff; }
-html[data-theme="dark"] .o-view-btns { border-color: #1f2933; }
-html[data-theme="dark"] .o-ctrl-sep { background: #1f2933; }
-html[data-theme="dark"] .o-subheader { background: #132033; border-bottom-color: #1f2933; }
-html[data-theme="dark"] .o-dd-panel { background: #132033; border-color: #1f2933; }
-html[data-theme="dark"] .o-dd-item:hover { background: rgba(24,95,165,0.15); color: #d4e6f5; }
-html[data-theme="dark"] .o-dd-item.active { background: #0c447c; color: #85b7eb; }
-html[data-theme="dark"] .o-filter-tag { background: #0c447c; border-color: #185fa5; color: #85b7eb; }
+html[data-theme="dark"] .o-view-btns { border-color: var(--border); }
+html[data-theme="dark"] .o-ctrl-sep { background: var(--border); }
+html[data-theme="dark"] .o-subheader { background: var(--surface); border-bottom-color: var(--border); }
+html[data-theme="dark"] .o-dd-panel { background: var(--surface); border-color: var(--border); }
+html[data-theme="dark"] .o-dd-item:hover { background: rgba(var(--teal-500-rgb),0.15); color: var(--text); }
+html[data-theme="dark"] .o-dd-item.active { background: rgba(var(--teal-500-rgb),0.20); color: var(--teal-300); }
+html[data-theme="dark"] .o-filter-tag { background: rgba(var(--teal-500-rgb),0.20); border-color: rgba(var(--teal-500-rgb),0.45); color: var(--teal-300); }
 
 /* ══ DROPDOWNS ══ */
 .o-dd-wrap { position: relative; }
@@ -354,9 +332,9 @@ html[data-theme="dark"] .o-filter-tag { background: #0c447c; border-color: #185f
     cursor: pointer; text-decoration: none; transition: background 0.1s;
     white-space: nowrap; gap: 10px;
 }
-.o-dd-item:hover { background: var(--teal-50); color: var(--teal-600); }
-.o-dd-item.active { background: #185fa5; color: #fff; font-weight: 600; }
-.o-dd-item.active:hover { background: #14508c; color: #fff; }
+.o-dd-item:hover { background: var(--teal-50); color: var(--accent-text-soft); }
+.o-dd-item.active { background: var(--teal-600); color: #fff; font-weight: 600; }
+.o-dd-item.active:hover { background: var(--teal-700); color: #fff; }
 .o-dd-sep { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
 
 /* ══ SUBHEADER ══ */
@@ -389,7 +367,7 @@ html[data-theme="dark"] .o-filter-tag { background: #0c447c; border-color: #185f
 }
 .o-filter-tag {
     display: inline-flex; align-items: center; gap: 3px;
-    background: var(--teal-50); color: var(--teal-600);
+    background: var(--teal-50); color: var(--accent-text-soft);
     border: 1px solid #b2d8db; border-radius: 3px;
     padding: 1px 6px; font-size: 11.5px; font-weight: 500; white-space: nowrap;
 }
@@ -410,7 +388,7 @@ html[data-theme="dark"] .o-filter-tag { background: #0c447c; border-color: #185f
     white-space: nowrap;
 }
 .o-ctrl-btn:hover { border-color: var(--border); color: var(--text); background: #f3f3f3; }
-.o-ctrl-btn.active { background: rgba(21,87,112,0.08); color: var(--teal-700); border-color: rgba(21,87,112,0.18); font-weight: 600; }
+.o-ctrl-btn.active { background: rgba(var(--teal-700-rgb), 0.08); color: var(--accent-text); border-color: rgba(var(--teal-700-rgb), 0.18); font-weight: 600; }
 .o-ctrl-sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }
 .o-pagination { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
 .o-pag-btn {
@@ -432,6 +410,24 @@ html[data-theme="dark"] .o-filter-tag { background: #0c447c; border-color: #185f
 .o-view-btn.active, .o-view-btn:hover { background: var(--teal-600); color: #fff; }
 
 {% include 'services/includes/io_styles.html' %}
+</style>
+{% comment %}
+Styles de la brique : sous-menus des menus générés, coches des entrées retenues et
+bandes de groupe du tableau. Inclus après la feuille de la page, dont les règles
+sombres des bandes doivent l'emporter sur le bleu figé de la brique.
+{% endcomment %}
+{% include 'includes/listing/styles.html' %}
+<style>
+  /* Portées par #list-view, comme les règles de cellules de la page : sans cet
+     identifiant, `#list-view tbody td { color: var(--text) }` l'emportait et la
+     bande de groupe du tableau perdait la couleur choisie. */
+  html[data-theme="dark"] #list-view tbody tr.lst-groupe td {
+    color: var(--teal-300); background: rgba(var(--teal-500-rgb),0.16);
+  }
+  html[data-theme="dark"] #list-view tbody tr.lst-groupe.lst-groupe-fils td { background: rgba(var(--teal-500-rgb),0.09); }
+  html[data-theme="dark"] #list-view tbody tr.lst-groupe:hover td { background: rgba(var(--teal-500-rgb),0.26); }
+  /* Le survol des lignes de données ne doit pas non plus repeindre la bande. */
+  #list-view tbody tr.lst-groupe:hover { background: transparent; }
 </style>
 {% endblock %}
 
@@ -456,210 +452,10 @@ html[data-theme="dark"] .o-filter-tag { background: #0c447c; border-color: #185f
     </div>
   </div>
   <!-- Ligne 2 : créer + filtres + contrôles (rafraîchie en AJAX, cf. #subheader-controls) -->
-  <div id="subheader-controls">
-  <div class="o-subheader-row">
-    <a href="{% url 'patients:create' %}" class="o-btn-create">
-      <i class="bi bi-plus" style="font-size:14px;margin-right:4px;"></i> Créer
-    </a>
-    {% if request.user.is_superuser %}
-    <div class="io-page-wrap" id="io-page-wrap">
-      <button type="button" class="o-ctrl-btn io-toggle-btn" onclick="toggleIOPage(event)">
-        <i class="bi bi-arrow-left-right"></i> Export / Import
-        <i class="bi bi-chevron-down" style="font-size:9px;margin-left:2px;"></i>
-      </button>
-      <div class="io-page-menu" id="io-page-menu">
-        <div class="io-pm-section">Exporter les patients</div>
-        <a class="io-pm-item" href="{% url 'patients:export_patients' %}?format=json"><i class="bi bi-filetype-json" style="color:#c97a00;"></i> JSON</a>
-        <a class="io-pm-item" href="{% url 'patients:export_patients' %}?format=csv"><i class="bi bi-filetype-csv" style="color:#1a7a4a;"></i> CSV</a>
-        <a class="io-pm-item" href="{% url 'patients:export_patients' %}?format=xlsx"><i class="bi bi-file-earmark-excel" style="color:#217346;"></i> Excel</a>
-        <div class="io-pm-sep"></div>
-        <div class="io-pm-section">Importer</div>
-        <a class="io-pm-item" href="{% url 'patients:patients_modele' %}"><i class="bi bi-download" style="color:var(--teal-500);"></i> Télécharger le modèle</a>
-        <button type="button" class="io-pm-item" onclick="openImportModal()"><i class="bi bi-upload" style="color:var(--teal-500);"></i> Importer un fichier…</button>
-      </div>
-    </div>
-    {% endif %}
-    <div class="o-subheader-row-right">
-
-      <!-- ── Effacer tout (filtres + regroupement + recherche) ── -->
-      {% if filters or groups or q %}
-      <a href="#" class="o-ctrl-btn" style="color:var(--rose-text);" onclick="resetAll(); return false;" title="Effacer les filtres, le regroupement et la recherche">
-        <i class="bi bi-x-circle"></i> Effacer
-      </a>
-      {% endif %}
-
-      <!-- ── Filtres (cumulables) ── -->
-      <div class="o-dd-wrap">
-        <button class="o-ctrl-btn {% if filters %}active{% endif %}" id="btn-filtres" onclick="toggleDd('dd-filtres',this)">
-          <i class="bi bi-funnel{% if filters %}-fill{% endif %}"></i> Filtres
-        </button>
-        <div class="o-dd-panel" id="dd-filtres">
-          <div class="o-dd-section">Genre</div>
-          <a class="o-dd-item {% if 'femme' in filters %}active{% endif %}" href="#" onclick="toggleParam('filter','femme'); return false;">Femme</a>
-          <a class="o-dd-item {% if 'homme' in filters %}active{% endif %}" href="#" onclick="toggleParam('filter','homme'); return false;">Homme</a>
-          <hr class="o-dd-sep">
-          <div class="o-dd-section">Tranche d'âge</div>
-          <a class="o-dd-item {% if 'mineur' in filters %}active{% endif %}" href="#" onclick="toggleParam('filter','mineur'); return false;">Mineur (moins de 18 ans)</a>
-          <a class="o-dd-item {% if 'adulte' in filters %}active{% endif %}" href="#" onclick="toggleParam('filter','adulte'); return false;">Adulte (18 – 60 ans)</a>
-          <a class="o-dd-item {% if 'senior' in filters %}active{% endif %}" href="#" onclick="toggleParam('filter','senior'); return false;">Senior (plus de 60 ans)</a>
-        </div>
-      </div>
-
-      <!-- ── Regrouper par (cumulable) ── -->
-      <div class="o-dd-wrap">
-        <button class="o-ctrl-btn {% if groups %}active{% endif %}" id="btn-group" onclick="toggleDd('dd-group',this)">
-          <i class="bi bi-list-ul"></i> Regrouper par
-        </button>
-        <div class="o-dd-panel" id="dd-group">
-          <div class="o-dd-section">Regrouper par</div>
-          <a class="o-dd-item {% if 'sexe' in groups %}active{% endif %}" href="#" onclick="toggleParam('group','sexe'); return false;">Genre</a>
-          <a class="o-dd-item {% if 'age' in groups %}active{% endif %}" href="#" onclick="toggleParam('group','age'); return false;">Âge</a>
-        </div>
-      </div>
-
-      <button class="o-ctrl-btn"><i class="bi bi-star"></i> Favoris</button>
-      <div class="o-ctrl-sep"></div>
-      <div class="o-pagination">
-        <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
-        <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
-           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% for f in filters %}&filter={{ f }}{% endfor %}{% for g in groups %}&group={{ g }}{% endfor %}{% else %}#{% endif %}">
-          <i class="bi bi-chevron-left"></i>
-        </a>
-        <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
-           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% for f in filters %}&filter={{ f }}{% endfor %}{% for g in groups %}&group={{ g }}{% endfor %}{% else %}#{% endif %}">
-          <i class="bi bi-chevron-right"></i>
-        </a>
-      </div>
-      <div class="o-ctrl-sep"></div>
-      <div class="o-view-btns">
-        <button class="o-view-btn active" id="btn-kanban" onclick="setView('kanban')"><i class="bi bi-grid"></i></button>
-        <button class="o-view-btn" id="btn-list" onclick="setView('list')"><i class="bi bi-list-ul"></i></button>
-      </div>
-    </div>
-  </div>
-  </div><!-- /#subheader-controls -->
+  {% include 'patients/includes/list_controls.html' %}
 </div>
 
-<!-- ── Vue Kanban ──────────────────────────────── -->
-<div id="kanban-view">
-    {% for patient in page_obj %}
-    {% if patient.group_header %}
-    <div class="pk-group-header" data-group-header-id="{{ patient.group_id }}" onclick="toggleGroup({{ patient.group_id }}, this)">
-        <i class="bi bi-chevron-right group-chevron"></i>
-        <span>{{ patient.group_header }}</span>
-        <span class="group-count">{{ patient.group_count }}</span>
-    </div>
-    {% endif %}
-    <a href="{% url 'patients:detail' patient.pk %}" class="pk-card{% if groups %} group-collapsed{% endif %}"
-       {% if groups %}data-group-id="{{ patient.group_id }}" style="display:none;"{% endif %}>
-        <div class="pk-avatar">
-            {% if patient.photo %}
-                <img src="{{ patient.photo.url }}" alt="{{ patient.nom }}">
-            {% else %}
-                <svg xmlns="http://www.w3.org/2000/svg" width="72" height="82" viewBox="0 0 24 24" fill="rgba(0,0,0,0.28)">
-                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                </svg>
-            {% endif %}
-        </div>
-        <div class="pk-info">
-            <div class="pk-name">{{ patient.nom }} {{ patient.prenoms }}</div>
-            <div class="pk-meta">
-                <span class="pk-lbl">Code:</span><span class="pk-val">{{ patient.code_patient }}</span>
-                <span class="pk-lbl">Âge:</span><span class="pk-val">{{ patient.age_detail }}</span>
-                <span class="pk-lbl">Genre:</span><span class="pk-val">{{ patient.get_sexe_display }}</span>
-                <span class="pk-lbl">Téléphone:</span><span class="pk-val">{{ patient.telephone }}</span>
-            </div>
-        </div>
-    </a>
-    {% empty %}
-    <div style="grid-column:1/-1; text-align:center; padding:60px 20px; color:rgba(0,0,0,0.35);">
-        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1" style="margin-bottom:12px;opacity:.4"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-        <p style="font-size:15px">Aucun patient trouvé{% if q %} pour « {{ q }} »{% endif %}</p>
-        {% if q or filters or groups %}
-        <a href="{% url 'patients:list' %}" class="btn btn-secondary" style="margin-top:12px"
-           onclick="resetAll(); return false;">Réinitialiser la recherche</a>
-        {% endif %}
-    </div>
-    {% endfor %}
-</div>
-
-<!-- ── Vue Liste ───────────────────────────────── -->
-<div id="list-view">
-    <table>
-        <thead>
-            <tr>
-                <th>Code d'identification</th>
-                <th>Nom et prénoms</th>
-                <th>Âge</th>
-                <th>Genre</th>
-                <th>Téléphone</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for patient in page_obj %}
-            {% if patient.group_header %}
-            <tr class="lv-group-header" data-group-header-id="{{ patient.group_id }}" onclick="toggleGroup({{ patient.group_id }}, this)">
-                <td colspan="5">
-                    <i class="bi bi-chevron-right group-chevron"></i>
-                    {{ patient.group_header }}
-                    <span class="group-count">{{ patient.group_count }}</span>
-                </td>
-            </tr>
-            {% endif %}
-            <tr class="{% if groups %}group-collapsed{% endif %}"
-                {% if groups %}data-group-id="{{ patient.group_id }}" style="display:none;"{% endif %}
-                onclick="window.location='{% url 'patients:detail' patient.pk %}'">
-                <td class="lv-code">{{ patient.code_patient }}</td>
-                <td class="lv-name">{{ patient.nom }} {{ patient.prenoms }}</td>
-                <td class="lv-muted">{{ patient.age_detail }}</td>
-                <td class="lv-muted">{{ patient.get_sexe_display }}</td>
-                <td class="lv-muted">{{ patient.telephone }}</td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="5" style="text-align:center;padding:48px;color:rgba(0,0,0,0.35)">
-                    Aucun patient trouvé
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
-
-<!-- ── Pagination ──────────────────────────────── -->
-{% if page_obj.has_other_pages %}
-<div class="pagination">
-    <span>
-        Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
-        &nbsp;·&nbsp; {{ total_filtre }} résultat{{ total_filtre|pluralize }}
-    </span>
-    <div class="pagination-pages">
-        {% if page_obj.has_previous %}
-            <a href="?page=1{% if q %}&q={{ q }}{% endif %}{% for f in filters %}&filter={{ f }}{% endfor %}{% for g in groups %}&group={{ g }}{% endfor %}" title="Première">«</a>
-            <a href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% for f in filters %}&filter={{ f }}{% endfor %}{% for g in groups %}&group={{ g }}{% endfor %}">‹</a>
-        {% else %}
-            <span class="disabled">«</span>
-            <span class="disabled">‹</span>
-        {% endif %}
-
-        {% for num in page_obj.paginator.page_range %}
-            {% if num == page_obj.number %}
-                <span class="current">{{ num }}</span>
-            {% elif num >= page_obj.number|add:"-2" and num <= page_obj.number|add:"2" %}
-                <a href="?page={{ num }}{% if q %}&q={{ q }}{% endif %}{% for f in filters %}&filter={{ f }}{% endfor %}{% for g in groups %}&group={{ g }}{% endfor %}">{{ num }}</a>
-            {% endif %}
-        {% endfor %}
-
-        {% if page_obj.has_next %}
-            <a href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% for f in filters %}&filter={{ f }}{% endfor %}{% for g in groups %}&group={{ g }}{% endfor %}">›</a>
-            <a href="?page={{ page_obj.paginator.num_pages }}{% if q %}&q={{ q }}{% endif %}{% for f in filters %}&filter={{ f }}{% endfor %}{% for g in groups %}&group={{ g }}{% endfor %}" title="Dernière">»</a>
-        {% else %}
-            <span class="disabled">›</span>
-            <span class="disabled">»</span>
-        {% endif %}
-    </div>
-</div>
-{% endif %}
+{% include 'patients/includes/list_results.html' %}
 
 {% if request.user.is_superuser %}
 <!-- ── Modale d'import ── -->
@@ -697,6 +493,12 @@ html[data-theme="dark"] .o-filter-tag { background: #0c447c; border-color: #185f
 {% endblock %}
 
 {% block extra_js %}
+{% comment %}
+Constructeur de conditions : hors des zones échangées en AJAX, il n'est donc
+chargé qu'une fois (la description des champs pèse quelques kilo-octets).
+{% endcomment %}
+{% include 'includes/listing/filtre_perso.html' %}
+<script src="{% static 'js/listing_groupes.js' %}"></script>
 <script>
 (function () {
     const STORAGE_KEY = 'segho-patients-view';
@@ -724,12 +526,25 @@ html[data-theme="dark"] .o-filter-tag { background: #0c447c; border-color: #185f
     window.setView = setView;
     setView(currentView);
 
+    // Une seule requête de rafraîchissement à la fois : si l'utilisateur
+    // enchaîne les clics de filtre ou tape vite dans la recherche, la requête
+    // précédente est annulée — sinon deux réponses peuvent revenir dans le
+    // désordre et la plus ancienne écraserait la plus récente.
+    let inFlight = null;
+
     function refreshList(url, pushHistory) {
         const openPanel = document.querySelector('#subheader-controls .o-dd-panel.open');
         const openPanelId = openPanel ? openPanel.id : null;
 
-        fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
-            .then(r => r.text())
+        if (inFlight) inFlight.abort();
+        const ctrl = new AbortController();
+        inFlight = ctrl;
+
+        fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}, signal: ctrl.signal})
+            .then(r => {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.text();
+            })
             .then(html => {
                 const doc = new DOMParser().parseFromString(html, 'text/html');
                 const newKanban = doc.getElementById('kanban-view');
@@ -745,6 +560,12 @@ html[data-theme="dark"] .o-filter-tag { background: #0c447c; border-color: #185f
                 else if (!oldPag && newPag) document.querySelector('#list-view').insertAdjacentHTML('afterend', newPag.outerHTML);
                 if (pushHistory) history.pushState({}, '', url);
                 setView(currentView);
+                // Le panneau de conditions vit dans la barre remplacée : ses lignes
+                // sont à reconstruire depuis l'URL.
+                if (window.lstfInit) window.lstfInit();
+                // La barre a été remplacée : les boutons sont de nouveaux éléments,
+                // leurs écouteurs de survol sont à rebrancher.
+                brancherSurvolMenus();
 
                 // Ré-ouvre le menu déroulant qui était ouvert (le swap l'a
                 // remplacé par une version fraîche fermée) — pour pouvoir
@@ -754,20 +575,24 @@ html[data-theme="dark"] .o-filter-tag { background: #0c447c; border-color: #185f
                     const btn = document.getElementById(btnId);
                     if (btn) toggleDd(openPanelId, btn);
                 }
-            });
+            })
+            .catch(err => {
+                // Requête volontairement annulée au profit d'une plus récente :
+                // ce n'est pas une erreur, l'autre réponse va arriver.
+                if (err.name === 'AbortError') return;
+                if (window.showToast) {
+                    showToast('Impossible de rafraîchir la liste. Vérifiez votre connexion.', 'error');
+                }
+            })
+            .finally(() => { if (inFlight === ctrl) inFlight = null; });
     }
     window.refreshList = refreshList;
 
-    function toggleGroup(groupId, headerEl) {
-        const open = !headerEl.classList.contains('open');
-        document.querySelectorAll('[data-group-header-id="' + groupId + '"]').forEach(function (el) {
-            el.classList.toggle('open', open);
-        });
-        document.querySelectorAll('[data-group-id="' + groupId + '"]').forEach(function (el) {
-            el.style.display = open ? '' : 'none';
-        });
-    }
-    window.toggleGroup = toggleGroup;
+    {% comment %}
+    Le repliage des groupes vient maintenant de listing_groupes.js (lstBasculerGroupe) :
+    il travaille sur l'arbre de la brique — plusieurs niveaux, replié en cascade —
+    là où l'ancien toggleGroup ne connaissait qu'un seul niveau de bandes.
+    {% endcomment %}
 
     function toggleParam(key, value) {
         const params = new URLSearchParams(window.location.search);
@@ -839,10 +664,81 @@ html[data-theme="dark"] .o-filter-tag { background: #0c447c; border-color: #185f
     });
 })();
 
+(function () {
+  // ── Ouverture au survol des menus Filtres et Regrouper par ───────────────
+  // Le clic continue de fonctionner (seul recours au tactile, où il n'y a pas de
+  // survol) : le survol ne fait qu'ouvrir en plus.
+  //
+  // La fermeture est différée : le panneau est posé 4 px sous le bouton, et sans
+  // ce délai la souris ne pourrait pas franchir cet espace — le panneau se
+  // refermerait sous le curseur.
+  var DELAI_FERMETURE = 250;
+  var MENUS_SURVOL = [['btn-filtres', 'dd-filtres'], ['btn-group', 'dd-group']];
+
+  function brancherSurvolMenus() {
+    MENUS_SURVOL.forEach(function (paire) {
+      var btn = document.getElementById(paire[0]);
+      var panneau = document.getElementById(paire[1]);
+      if (!btn || !panneau) return;
+      var wrap = btn.closest('.o-dd-wrap');
+      if (!wrap || wrap.dataset.survolBranche) return;
+      wrap.dataset.survolBranche = '1';
+      var minuteur;
+
+      wrap.addEventListener('mouseenter', function () {
+        clearTimeout(minuteur);
+        if (!panneau.classList.contains('open')) toggleDd(paire[1], btn);
+      });
+      // Réarmement plutôt qu'abandon : un champ du menu qui a le focus (liste
+      // déroulante déployée, date en cours de saisie) ouvre une fenêtre du système
+      // par-dessus, laquelle fait sortir le curseur du menu — refermer perdrait la
+      // saisie. Le seul fait qu'un panneau soit épinglé ne retient pas le menu.
+      function planifierFermeture() {
+        minuteur = setTimeout(function () {
+          if (panneau.contains(document.activeElement)) { planifierFermeture(); return; }
+          panneau.classList.remove('open');
+          panneau.querySelectorAll('.lstf-ouvert, .lstg-ouvert').forEach(function (e) {
+            e.classList.remove('lstf-ouvert');
+            e.classList.remove('lstg-ouvert');
+          });
+        }, DELAI_FERMETURE);
+      }
+      wrap.addEventListener('mouseleave', function () {
+        clearTimeout(minuteur);
+        planifierFermeture();
+      });
+    });
+  }
+  window.brancherSurvolMenus = brancherSurvolMenus;
+  brancherSurvolMenus();
+
+  // Filet après un échange AJAX : la barre est remplacée, et son nouveau
+  // conteneur n'appartient plus à la chaîne de survol du navigateur — il ne reçoit
+  // aucun `mouseleave` quand la souris s'en va. Le document, lui, ne change pas.
+  var minuteurHorsMenu;
+  document.addEventListener('mouseover', function (e) {
+    if (!e.target.closest) return;
+    clearTimeout(minuteurHorsMenu);
+    if (e.target.closest('.o-dd-wrap')) return;
+    minuteurHorsMenu = setTimeout(function () {
+      var ouvert = document.querySelector('.o-dd-panel.open');
+      if (!ouvert || ouvert.contains(document.activeElement)) return;
+      fermerMenus();
+    }, DELAI_FERMETURE);
+  });
+})();
+
+function fermerMenus() {
+  document.querySelectorAll('.o-dd-panel.open').forEach(function (p) { p.classList.remove('open'); });
+  document.querySelectorAll('.lstf-ouvert').forEach(function (e) { e.classList.remove('lstf-ouvert'); });
+  document.querySelectorAll('.lstg-ouvert').forEach(function (e) { e.classList.remove('lstg-ouvert'); });
+}
+
 function toggleDd(id, btn) {
     var panel = document.getElementById(id);
+    if (!panel) return;
     var isOpen = panel.classList.contains('open');
-    document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
+    fermerMenus();
     if (!isOpen) {
         var rect = btn.getBoundingClientRect();
         panel.style.top = (rect.bottom + 4) + 'px';
@@ -854,15 +750,24 @@ function toggleDd(id, btn) {
             panel.style.left = 'auto';
             panel.style.right = (window.innerWidth - rect.right) + 'px';
         }
+        // De quel côté déplier les sous-menus : les contrôles sont collés au bord
+        // droit, et un sous-menu ouvert vers la droite sortait de l'écran — le
+        // choix des champs et le constructeur de conditions, les deux plus larges,
+        // s'y retrouvaient tronqués. On mesure la place restante au cas par cas.
+        var restant = window.innerWidth - panel.getBoundingClientRect().right;
+        var besoin = panel.querySelector('.lstf-panneau') ? 345
+                   : panel.querySelector('.lstg-panneau') ? 265 : 180;
+        panel.classList.toggle('vers-gauche', restant < besoin);
     }
 }
 document.addEventListener('click', function(e) {
-    if (!e.target.closest('.o-dd-wrap')) {
-        document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
-    }
+    if (!e.target.closest('.o-dd-wrap')) fermerMenus();
 });
-document.addEventListener('scroll', function() {
-    document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
+// Le défilement décroche un menu positionné en fixed — sauf quand c'est
+// l'intérieur d'un menu qui défile (le constructeur de conditions).
+document.addEventListener('scroll', function(e) {
+    if (e.target && e.target.closest && e.target.closest('.o-dd-panel')) return;
+    fermerMenus();
 }, true);
 
 function toggleIOPage(e){e.stopPropagation();var w=document.getElementById('io-page-wrap');if(w)w.classList.toggle('open');}

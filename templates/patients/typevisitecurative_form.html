@@ -1,0 +1,81 @@
+{% extends 'patients/base.html' %}
+
+{% block topbar_title %}{{ titre }}{% endblock %}
+
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+
+{% if form.non_field_errors %}
+<div class="alert-error">
+    <span>⚠</span>
+    <div>{% for e in form.non_field_errors %}<div>{{ e }}</div>{% endfor %}</div>
+</div>
+{% endif %}
+
+<div class="action-bar">
+  <div class="action-bar-breadcrumb">
+    <a href="{% url 'patients:typevisitecurative_list' %}" class="btn-form-cancel" style="padding:3px 7px;">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <a href="{% url 'patients:typevisitecurative_list' %}">Types de visite curative</a>
+    <span class="sep">/</span>
+    <span class="current">{{ titre }}</span>
+  </div>
+  <div class="action-bar-buttons">
+    <a href="{% url 'patients:typevisitecurative_list' %}" class="btn-form-cancel">Annuler</a>
+    {% if edit %}
+    <button type="button" class="btn-form-cancel" style="border-color:rgba(var(--rose-rgb),.4);color:var(--rose);"
+            onclick="if(confirm('Supprimer ce type de visite ?')) document.getElementById('form-delete').submit();">
+      <i class="bi bi-trash" style="font-size:11px;"></i> Supprimer
+    </button>
+    {% endif %}
+    <button type="submit" form="form-tvc" class="btn-form-submit">
+      <i class="bi bi-check2"></i> {% if edit %}Enregistrer{% else %}Créer{% endif %}
+    </button>
+  </div>
+</div>
+
+<form method="post" id="form-tvc">
+  {% csrf_token %}
+  <div class="form-simple-card" style="max-width:600px;">
+
+    <div class="form-field">
+      <label class="field-label" for="{{ form.nom.id_for_label }}">Nom du type de visite <span class="required-star">*</span></label>
+      {{ form.nom }}
+      {% if form.nom.errors %}<div class="field-error">{{ form.nom.errors.0 }}</div>{% endif %}
+    </div>
+
+    <div class="form-field">
+      <label class="field-label" for="{{ form.code.id_for_label }}">Code <span class="required-star">*</span></label>
+      {{ form.code }}
+      {% if form.code.errors %}<div class="field-error">{{ form.code.errors.0 }}</div>{% endif %}
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">
+        Identifiant technique enregistré dans le registre de consultation et utilisé par les
+        rapports. Le modifier sur un type déjà utilisé faussera leur comptage.
+      </div>
+    </div>
+
+    <div class="form-field">
+      <label class="field-label" for="{{ form.description.id_for_label }}">Description</label>
+      {{ form.description }}
+      {% if form.description.errors %}<div class="field-error">{{ form.description.errors.0 }}</div>{% endif %}
+    </div>
+
+    <div class="form-field" style="display:flex;align-items:center;gap:8px;">
+      {{ form.actif }}
+      <label for="{{ form.actif.id_for_label }}" style="font-size:13px;font-weight:400;color:var(--text-primary);margin:0;">
+        Type de visite actif
+      </label>
+    </div>
+
+  </div>
+</form>
+
+{% if edit %}
+<form id="form-delete" method="post" action="{% url 'patients:typevisitecurative_delete' object.pk %}" style="display:none;">
+  {% csrf_token %}
+</form>
+{% endif %}
+
+{% endblock %}

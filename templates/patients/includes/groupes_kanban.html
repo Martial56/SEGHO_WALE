@@ -1,0 +1,30 @@
+{% comment %}
+Rendu récursif des groupes imbriqués pour la vue kanban.
+
+Même structure de données et même JS de repliage que la version tableau
+(includes/listing/groupes.html) : seules les balises changent, des bandes et des
+fiches au lieu de lignes de tableau. `data-chemin` / `data-parent` sont ce qui
+permet à listing_groupes.js de replier en cascade sans appeler le serveur.
+
+Attend : noeuds.
+{% endcomment %}
+{% for n in noeuds %}
+<div class="lst-groupe lst-groupe-bande{% if n.niveau %} lst-groupe-fils{% endif %}"
+     data-chemin="{{ n.chemin }}" data-parent="{{ n.parent }}"
+     {% if n.niveau %}style="display:none;"{% endif %}
+     onclick="lstBasculerGroupe(this)">
+  <span style="padding-left:{{ n.indent }}px;">
+    <i class="bi bi-chevron-right lst-chevron"></i>
+    {{ n.libelle }}
+    <span class="lst-compte">{{ n.total }}</span>
+  </span>
+</div>
+
+{% if n.enfants %}
+  {% include 'patients/includes/groupes_kanban.html' with noeuds=n.enfants %}
+{% else %}
+  {% for objet in n.lignes %}
+    {% include 'patients/includes/pk_card.html' with objet=objet parent=n.chemin %}
+  {% endfor %}
+{% endif %}
+{% endfor %}

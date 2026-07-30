@@ -1,5 +1,5 @@
 from django import forms
-from .models import Patient, Assurance, RendezVous, Pathologie
+from .models import Patient, Assurance, RendezVous, Pathologie, TypeVisiteCurative
 from gynecologie.models import TypeVisite
 
 _ul = 'field-ul'          # underline (bottom border only)
@@ -240,5 +240,31 @@ class TypeVisiteForm(forms.ModelForm):
                 'class': _ul,
                 'rows': 3,
                 'placeholder': 'Description optionnelle...',
+            }),
+        }
+
+
+class TypeVisiteCurativeForm(forms.ModelForm):
+    """Types de visite des consultations curatives, pendant de TypeVisiteForm
+    (gynécologie). Le code est repris tel quel dans le registre curatif et lu
+    par les rapports : le modifier sur un type déjà utilisé casserait leur
+    comptage."""
+
+    class Meta:
+        model = TypeVisiteCurative
+        fields = ['nom', 'code', 'description', 'actif']
+        widgets = {
+            'nom': forms.TextInput(attrs={
+                'class': _ul,
+                'placeholder': 'Nom du type de visite',
+            }),
+            'code': forms.TextInput(attrs={
+                'class': _ul,
+                'placeholder': 'Ex: consultant',
+            }),
+            'description': forms.Textarea(attrs={
+                'class': _ul,
+                'rows': 2,
+                'placeholder': 'Description (optionnel)',
             }),
         }

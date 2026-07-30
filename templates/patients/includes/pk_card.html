@@ -1,0 +1,28 @@
+{% comment %}
+Une fiche patient de la vue kanban.
+
+`parent` porte le chemin du groupe qui la contient (vide sans regroupement) :
+c'est ce que lit listing_groupes.js pour replier en cascade sans appeler le
+serveur. Masquée au départ dès qu'elle appartient à un groupe.
+{% endcomment %}
+<a href="{% url 'patients:detail' objet.pk %}" class="pk-card"
+   {% if parent %}data-parent="{{ parent }}" style="display:none;"{% endif %}>
+    <div class="pk-avatar">
+        {% if objet.photo %}
+            <img src="{{ objet.photo.url }}" alt="{{ objet.nom }}">
+        {% else %}
+            <svg xmlns="http://www.w3.org/2000/svg" width="72" height="82" viewBox="0 0 24 24" fill="rgba(0,0,0,0.28)">
+                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+            </svg>
+        {% endif %}
+    </div>
+    <div class="pk-info">
+        <div class="pk-name">{{ objet.nom }} {{ objet.prenoms }}</div>
+        <div class="pk-meta">
+            <span class="pk-lbl">Code:</span><span class="pk-val">{{ objet.code_patient }}</span>
+            <span class="pk-lbl">Âge:</span><span class="pk-val">{{ objet.age_detail }}</span>
+            <span class="pk-lbl">Genre:</span><span class="pk-val">{{ objet.get_sexe_display }}</span>
+            <span class="pk-lbl">Téléphone:</span><span class="pk-val">{{ objet.telephone }}</span>
+        </div>
+    </div>
+</a>

@@ -1,0 +1,77 @@
+{% comment %}
+Barre de contrôles des listes de rendez-vous : créer, effacer, filtres,
+regroupement, pagination. Extrait de subheader.html pour pouvoir être renvoyé
+seul en AJAX par refreshList(). Attend dans le contexte : filters, groups, q,
+date_from, date_to, page_obj, subheader_create_url, et les menus générés
+listing_filtres / listing_groupes fournis par la vue.
+{% endcomment %}
+{% comment %}
+data-filters / data-groups exposent l'état réellement appliqué par la vue
+(défauts compris) : toggleParam s'en sert comme point de départ, l'URL nue ne
+reflétant pas les filtres par défaut.
+{% endcomment %}
+<div id="subheader-controls" data-filters="{{ filters|join:"," }}" data-groups="{{ groups|join:"," }}">
+  <div class="o-subheader-row">
+    {% if subheader_create_url %}<a href="{{ subheader_create_url }}" class="o-btn-create">CRÉER</a>{% endif %}
+
+    <div class="o-subheader-row-right">
+
+      {% comment %}
+      Volontairement absent quand seule la période par défaut est active :
+      « Effacer » ramène à cet état, il n'aurait donc aucun effet visible.
+      {% endcomment %}
+      {% if selection_active %}
+      <a href="#" class="o-ctrl-btn" style="color:var(--rose-text);"
+         onclick="resetAll(); return false;"
+         title="Effacer les filtres, le regroupement et la recherche">
+        <i class="bi bi-x-circle"></i> Effacer
+      </a>
+      {% endif %}
+
+      {% if listing_filtres %}
+      <div class="o-dd-wrap">
+        <button class="o-ctrl-btn {% if filtre_pose %}active{% endif %}"
+                id="btn-filtres" onclick="toggleDd('dd-filtres',this)">
+          <i class="bi bi-funnel{% if filtre_pose %}-fill{% endif %}"></i> Filtres
+        </button>
+        {# L'intervalle de dates vit maintenant dans le sous-menu « Période ». #}
+        <div class="o-dd-panel lst-menu" id="dd-filtres">
+          {% include 'includes/listing/menu_filtres.html' %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if listing_groupes %}
+      <div class="o-dd-wrap">
+        <button class="o-ctrl-btn {% if groups %}active{% endif %}"
+                id="btn-group" onclick="toggleDd('dd-group',this)">
+          <i class="bi bi-list-ul"></i> Regrouper par
+        </button>
+        <div class="o-dd-panel lst-menu" id="dd-group">
+          <div class="o-dd-section">Regrouper par</div>
+          {% include 'includes/listing/menu_groupes.html' %}
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="o-ctrl-sep"></div>
+
+      <div class="o-pagination">
+        <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
+        <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
+           href="{% if page_obj.has_previous %}{% querystring page=page_obj.previous_page_number %}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-left"></i>
+        </a>
+        <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
+           href="{% if page_obj.has_next %}{% querystring page=page_obj.next_page_number %}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-right"></i>
+        </a>
+      </div>
+
+      <div class="o-ctrl-sep"></div>
+      <div class="o-view-btns">
+        <button class="o-view-btn active"><i class="bi bi-list-ul"></i></button>
+      </div>
+    </div>
+  </div>
+</div>

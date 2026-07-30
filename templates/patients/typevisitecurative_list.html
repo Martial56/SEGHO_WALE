@@ -1,0 +1,360 @@
+{% extends 'patients/base.html' %}
+
+{% block topbar_title %}Types de visite curative{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html[data-theme="dark"] .o-list tbody tr:hover { background: rgba(var(--teal-500-rgb),0.2); }
+  html[data-theme="dark"] .o-list thead th { background: var(--surface); }
+  html[data-theme="dark"] .o-search-input { color: var(--text); }
+  html[data-theme="dark"] .o-search-bar { border-bottom-color: var(--border-strong); }
+  html[data-theme="dark"] .o-pag-btn { background: var(--surface); border-color: var(--border); color: var(--text-muted); }
+  html[data-theme="dark"] .o-empty-state { background: var(--bg); }
+
+  .o-subheader {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 6px 16px; display: flex; flex-direction: column; gap: 5px;
+    position: sticky; top: 0; z-index: 190; margin: 0 -32px 0;
+  }
+  .o-subheader-row { display: flex; align-items: center; gap: 8px; }
+  .o-subheader-row-right { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .o-page-title { font-size: 17px; font-weight: 400; color: var(--text); }
+  .o-btn-create {
+    background: var(--teal-500); color: #fff; border: none; padding: 5px 14px; border-radius: 4px;
+    font-size: 12.5px; font-weight: 500; cursor: pointer;
+    text-decoration: none; display: inline-flex; align-items: center;
+    letter-spacing: 0.5px; transition: background 0.15s;
+  }
+  .o-btn-create:hover { background: var(--teal-600); }
+  .o-search-bar {
+    display: flex; align-items: center; border: none; border-bottom: 1px solid #bbb;
+    background: transparent; min-height: 28px; padding: 2px 4px; gap: 4px; width: 320px;
+  }
+  .o-search-input {
+    border: none; outline: none; font-size: 12px;
+    color: var(--text); flex: 1; min-width: 60px; background: transparent;
+  }
+  .o-search-btn { background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 13px; padding: 2px; }
+  .o-ctrl-sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }
+  .o-pagination { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+  .o-pag-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 26px; height: 26px; padding: 0 6px; border-radius: 5px;
+    border: 1px solid transparent;
+    color: var(--text-muted); text-decoration: none; font-size: 12.5px; font-weight: 600;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .o-pag-btn:hover { background: var(--teal-50); border-color: var(--teal-200); color: var(--accent-text-soft); }
+  .o-pag-btn.active { background: var(--teal-600); color: #fff; border-color: var(--teal-600); }
+  .o-pag-btn.disabled { opacity: 0.3; pointer-events: none; }
+  html[data-theme="dark"] .o-pag-btn:hover { background: rgba(var(--teal-600-rgb),.15); border-color: rgba(var(--teal-600-rgb),.3); }
+
+  .o-list-wrap { overflow-x: auto; overflow-y: auto; background: var(--surface); margin: 0 -32px; }
+  .o-list { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .o-list thead th {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 8px 14px; font-weight: 600; font-size: 11px;
+    color: var(--text-muted); text-align: left; text-transform: uppercase;
+    white-space: nowrap; position: sticky; top: 0; z-index: 2; user-select: none;
+  }
+  html[data-theme="dark"] .o-list thead th { background: var(--surface); border-bottom-color: var(--border); }
+  .o-list tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; cursor: pointer; }
+  .o-list tbody tr:hover { background: var(--teal-50); }
+  .o-list tbody td { padding: 6px 10px; color: var(--text); vertical-align: middle; }
+  .o-list tbody td.td-nom { white-space: normal; font-weight: 500; }
+  .o-list tbody td.td-actions { text-align: center; white-space: nowrap; width: 80px; }
+
+  .btn-icon {
+    width: 26px; height: 26px; border: 1px solid var(--border); border-radius: 3px;
+    background: var(--surface); display: inline-flex; align-items: center; justify-content: center;
+    color: var(--text-muted); font-size: 12px; text-decoration: none; cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .btn-icon:hover { background: var(--teal-600); color: #fff; border-color: var(--teal-600); }
+  .btn-icon.btn-danger:hover { background: var(--rose-text); border-color: var(--rose-text); }
+
+  .o-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 20px; }
+  .o-empty-illo {
+    width: 88px; height: 88px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--teal-600) 0%, var(--teal-400) 100%);
+    display: flex; align-items: center; justify-content: center; margin-bottom: 20px;
+  }
+  .o-empty-illo svg { color: #fff; opacity: 0.9; }
+  .o-empty-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+  .o-empty-sub { font-size: 12.5px; color: var(--text-muted); margin-bottom: 20px; }
+  .o-empty-btn {
+    background: var(--teal-500); color: #fff; border: none; padding: 7px 20px; border-radius: 4px;
+    font-size: 12.5px; font-weight: 500; cursor: pointer; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 6px; transition: background 0.15s;
+  }
+  .o-empty-btn:hover { background: var(--teal-600); }
+
+  .gyn-nav {
+    background: #fff; border-bottom: 1px solid rgba(0,0,0,0.08);
+    margin: 0 -32px 0; padding: 0 32px;
+    display: flex; align-items: stretch; height: 44px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    position: sticky; top: 0; z-index: 250;
+  }
+  .gyn-nav-link {
+    padding: 11px 16px; font-size: 13px; font-weight: 500;
+    color: rgba(0,0,0,0.5); text-decoration: none;
+    border-bottom: 2px solid transparent;
+    display: inline-flex; align-items: center; gap: 6px;
+    transition: color 0.15s, border-color 0.15s; white-space: nowrap;
+  }
+  .gyn-nav-link:hover { color: var(--accent-text-soft); }
+  .gyn-nav-link.active { color: var(--accent-text-soft); border-bottom-color: var(--teal-500); font-weight: 600; }
+  html[data-theme="dark"] .gyn-nav { background: #091d2e; border-bottom-color: rgba(255,255,255,0.06); }
+  html[data-theme="dark"] .gyn-nav-link { color: rgba(255,255,255,0.4); }
+  html[data-theme="dark"] .gyn-nav-link.active { color: var(--teal-300); border-bottom-color: var(--teal-400); }
+
+  /* ── Config dropdown ── */
+  .gyn-nav-dd { position: relative; display: inline-flex; align-items: stretch; }
+  .gyn-nav-dd-panel {
+    display: none; position: absolute; top: 100%; left: 0;
+    background: #fff; border: 1px solid #dde3ec;
+    border-radius: 6px; box-shadow: 0 8px 28px rgba(0,0,0,0.16);
+    min-width: 200px; padding: 5px 0; z-index: 9999;
+  }
+  .gyn-nav-dd:hover .gyn-nav-dd-panel,
+  .gyn-nav-dd-panel:hover { display: block; }
+  .gyn-nav-dd-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 16px; font-size: 12.5px; color: var(--text);
+    text-decoration: none; transition: background 0.1s; white-space: nowrap;
+  }
+  .gyn-nav-dd-item:hover { background: var(--teal-50); color: var(--accent-text-soft); }
+  .gyn-nav-dd-item.active { background: rgba(var(--teal-500-rgb),.12); color: var(--accent-text-soft); font-weight: 500; }
+  html[data-theme="dark"] .gyn-nav-dd-item.active { background: rgba(var(--teal-500-rgb),.22); color: var(--teal-300); }
+  html[data-theme="dark"] .gyn-nav-dd-panel { background: var(--surface); border-color: var(--border-strong); }
+  html[data-theme="dark"] .gyn-nav-dd-item { color: var(--text); }
+  html[data-theme="dark"] .gyn-nav-dd-item:hover { background: rgba(var(--teal-500-rgb),0.2); color: var(--teal-300); }
+  .main { height: 100vh; overflow: hidden; }
+  .content { min-height: 0; padding-top: 0; overflow-x: hidden; }
+
+</style>
+{% endblock %}
+
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+
+<div class="o-subheader">
+  <div class="o-subheader-row">
+    <span class="o-page-title">Types de visite curative <span style="font-size:13px;color:var(--text-muted);font-weight:400;">({{ total }})</span></span>
+    <div class="o-subheader-row-right">
+      <form method="get" id="search-form" style="display:flex;align-items:center;">
+        <div class="o-search-bar">
+          <input class="o-search-input" id="search-input" type="text" name="q"
+                 value="{{ q }}" placeholder="Rechercher un type de visite…" autocomplete="off">
+          <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <div class="o-subheader-row">
+    <a href="{% url 'patients:typevisitecurative_create' %}" class="o-btn-create"
+       onclick="return mdOpenConfigModal(event, this.href, 'Nouveau type de visite curative', 'bi-clipboard2-pulse');">CRÉER</a>
+    <div class="o-subheader-row-right">
+      <div class="o-pagination" id="tvc-pagination">
+        <span style="margin-right:6px;">{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
+        {% if page_obj.has_previous %}
+          <a href="?{% if q %}q={{ q }}&{% endif %}page=1" class="o-pag-btn" title="Première page">
+            <i class="bi bi-chevron-double-left"></i>
+          </a>
+          <a href="?{% if q %}q={{ q }}&{% endif %}page={{ page_obj.previous_page_number }}" class="o-pag-btn">
+            <i class="bi bi-chevron-left"></i>
+          </a>
+        {% else %}
+          <span class="o-pag-btn disabled"><i class="bi bi-chevron-double-left"></i></span>
+          <span class="o-pag-btn disabled"><i class="bi bi-chevron-left"></i></span>
+        {% endif %}
+
+        {% for num in page_obj.paginator.page_range %}
+          {% if num == page_obj.number %}
+            <span class="o-pag-btn active">{{ num }}</span>
+          {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
+            <a href="?{% if q %}q={{ q }}&{% endif %}page={{ num }}" class="o-pag-btn">{{ num }}</a>
+          {% endif %}
+        {% endfor %}
+
+        {% if page_obj.has_next %}
+          <a href="?{% if q %}q={{ q }}&{% endif %}page={{ page_obj.next_page_number }}" class="o-pag-btn">
+            <i class="bi bi-chevron-right"></i>
+          </a>
+          <a href="?{% if q %}q={{ q }}&{% endif %}page={{ page_obj.paginator.num_pages }}" class="o-pag-btn" title="Dernière page">
+            <i class="bi bi-chevron-double-right"></i>
+          </a>
+        {% else %}
+          <span class="o-pag-btn disabled"><i class="bi bi-chevron-right"></i></span>
+          <span class="o-pag-btn disabled"><i class="bi bi-chevron-double-right"></i></span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="o-list-wrap" id="typevisitecurative-list-wrap">
+  {% if page_obj %}
+  <table class="o-list">
+    <thead>
+      <tr>
+        <th>Nom du type de visite</th>
+        <th style="width:150px;">Code</th>
+        <th>Description</th>
+        <th style="width:60px;text-align:center;">Actif</th>
+        <th style="width:80px;text-align:center;">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in page_obj %}
+      <tr onclick="mdOpenConfigModal(event, '{% url 'patients:typevisitecurative_edit' t.pk %}', 'Modifier — {{ t.nom|escapejs }}', 'bi-clipboard2-pulse')">
+        <td class="td-nom">{{ t.nom }}</td>
+        <td style="color:var(--text-muted);font-size:12px;font-family:var(--font-mono);">{{ t.code }}</td>
+        <td style="color:var(--text-muted);font-size:12px;">{{ t.description|default:"—" }}</td>
+        <td style="text-align:center;">
+          {% if t.actif %}
+            <span style="color:#2e7d32;font-size:15px;"><i class="bi bi-check-circle-fill"></i></span>
+          {% else %}
+            <span style="color:#ccc;font-size:15px;"><i class="bi bi-x-circle"></i></span>
+          {% endif %}
+        </td>
+        <td class="td-actions" onclick="event.stopPropagation()">
+          <a href="{% url 'patients:typevisitecurative_edit' t.pk %}" class="btn-icon" title="Modifier"
+             onclick="return mdOpenConfigModal(event, this.href, 'Modifier — {{ t.nom|escapejs }}', 'bi-clipboard2-pulse');">
+            <i class="bi bi-pencil"></i>
+          </a>
+          <button type="button" class="btn-icon btn-danger" title="Supprimer"
+                  onclick="openDeleteModal('{% url 'patients:typevisitecurative_delete' t.pk %}', '{{ t.nom|escapejs }}')">
+            <i class="bi bi-trash"></i>
+          </button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="o-empty-state">
+    <div class="o-empty-illo">
+      <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+      </svg>
+    </div>
+    <div class="o-empty-title">Aucun type de visite{% if q %} pour "{{ q }}"{% endif %}</div>
+    <div class="o-empty-sub">{% if q %}Essayez avec un autre terme.{% else %}Créez le premier type de visite.{% endif %}</div>
+    {% if not q %}
+    <a href="{% url 'patients:typevisitecurative_create' %}" class="o-empty-btn"
+       onclick="return mdOpenConfigModal(event, this.href, 'Nouveau type de visite curative', 'bi-clipboard2-pulse');">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      CRÉER UN TYPE DE VISITE
+    </a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{% include 'medecins/config/includes/_config_modal.html' %}
+
+<!-- ── Modale de confirmation de suppression ── -->
+<div class="mdcfg-modal-overlay" id="delete-modal-overlay" onclick="if (event.target === this) closeDeleteModal();">
+  <div class="mdcfg-modal-box" style="max-width:420px;">
+    <div class="mdcfg-modal-header">
+      <div class="mdcfg-modal-icon" style="background:linear-gradient(135deg,#e84545,#c62828);">
+        <i class="bi bi-trash"></i>
+      </div>
+      <div class="mdcfg-modal-title-wrap">
+        <div class="mdcfg-modal-title">Supprimer le type de visite</div>
+      </div>
+      <button type="button" class="mdcfg-modal-close" onclick="closeDeleteModal()">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div class="mdcfg-modal-body">
+      <p style="font-size:13px;color:var(--text-muted);line-height:1.55;margin:0;">
+        Supprimer « <strong id="delete-modal-nom" style="color:var(--text);"></strong> » ? Cette action est irréversible.
+      </p>
+    </div>
+    <div class="mdcfg-modal-footer">
+      <button type="button" class="btn-form-cancel" onclick="closeDeleteModal()">Annuler</button>
+      <button type="button" class="btn-form-submit" style="background:#e84545;" onclick="confirmDelete()">
+        <i class="bi bi-trash"></i> Supprimer
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  var deleteModalUrl = null;
+  function openDeleteModal(url, nom) {
+    deleteModalUrl = url;
+    document.getElementById('delete-modal-nom').textContent = nom;
+    document.getElementById('delete-modal-overlay').classList.add('open');
+  }
+  function closeDeleteModal() {
+    document.getElementById('delete-modal-overlay').classList.remove('open');
+    deleteModalUrl = null;
+  }
+  function confirmDelete() {
+    if (!deleteModalUrl) return;
+    var csrfValue = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1];
+    var fd = new FormData();
+    fd.append('csrfmiddlewaretoken', csrfValue);
+    fetch(deleteModalUrl, {
+      method: 'POST',
+      headers: {'X-Requested-With': 'XMLHttpRequest'},
+      body: fd,
+    })
+      .then(function (r) { return r.json(); })
+      .then(function () {
+        window.location.reload();
+      });
+  }
+
+  (function() {
+    var input = document.getElementById('search-input');
+    var form  = document.getElementById('search-form');
+    var timer = null;
+    if (!input) return;
+    input.addEventListener('input', function() {
+      clearTimeout(timer);
+      timer = setTimeout(function() { form.submit(); }, 350);
+    });
+  })();
+
+  function updateFileName(input){var el=document.getElementById('io-filename');if(input.files&&input.files[0]){el.textContent=input.files[0].name;el.style.display='block';}}
+
+  // ── Pagination sans rechargement complet ──
+  // Le tableau porte l'identifiant `typevisitecurative-list-wrap` : le script
+  // visait `tvc-list-wrap`, hérité de la page des pathologies dont il est copié,
+  // et ne remplaçait donc rien.
+  function rafraichirListe(url, pushHistory) {
+    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { return r.text(); })
+      .then(function (html) {
+        var doc = new DOMParser().parseFromString(html, 'text/html');
+        var newList = doc.getElementById('typevisitecurative-list-wrap');
+        if (newList) document.getElementById('typevisitecurative-list-wrap').innerHTML = newList.innerHTML;
+        var newPag = doc.getElementById('tvc-pagination');
+        if (newPag) document.getElementById('tvc-pagination').outerHTML = newPag.outerHTML;
+        if (pushHistory) history.pushState({}, '', url);
+      });
+  }
+
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest('#tvc-pagination a[href^="?"]');
+    if (!a) return;
+    e.preventDefault();
+    rafraichirListe(a.getAttribute('href'), true);
+  });
+
+  window.addEventListener('popstate', function () {
+    rafraichirListe(window.location.pathname + window.location.search, false);
+  });
+</script>
+
+{% endblock %}

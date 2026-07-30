@@ -2,8 +2,13 @@
 {% load static %}
 
 {% block extra_ph_css %}<style>
+{% comment %}
+Le dégradé partait de --ph-900. base.html inverse les paliers 800/900/950 en
+thème sombre : le dégradé démarrait donc en clair sous un texte blanc. Le palier
+700 n'est pas inversé et reste sombre dans les deux thèmes.
+{% endcomment %}
 .ph-hero {
-  background: linear-gradient(135deg, var(--ph-900) 0%, var(--ph-600) 100%);
+  background: linear-gradient(135deg, var(--ph-700) 0%, var(--ph-600) 100%);
   padding: 48px 32px 56px;
   text-align: center;
   color: #fff;
@@ -70,7 +75,10 @@
   background: linear-gradient(90deg, var(--ph-700), var(--ph-600));
 }
 .ph-card-banner.banner-2 {
-  background: linear-gradient(90deg, var(--ph-900), var(--ph-600));
+  /* Palier 700, le plus foncé qui ne soit pas inversé en thème sombre
+     (voir la note en tête de fichier). Le dégradé part donc du sombre dans les
+     deux thèmes ; on écarte les deux bandeaux par le sens, pas par la nuance. */
+  background: linear-gradient(270deg, var(--ph-700), var(--ph-600));
 }
 
 .ph-card-top {
@@ -82,8 +90,8 @@
   display: flex; align-items: center; justify-content: center;
   font-size: 26px; flex-shrink: 0;
 }
-.ph-card-avatar.av-blue  { background: var(--ph-100); color: var(--ph-600); }
-.ph-card-avatar.av-green { background: rgba(var(--ph-600-rgb),.1); color: var(--ph-600); }
+.ph-card-avatar.av-blue  { background: var(--ph-100); color: var(--accent-text-soft); }
+.ph-card-avatar.av-green { background: rgba(var(--ph-600-rgb),.1); color: var(--accent-text-soft); }
 
 .ph-card-name { font-size: 17px; font-weight: 800; color: var(--ph-text); }
 .ph-card-sub  { font-size: 11.5px; color: var(--ph-muted); margin-top: 2px; }
@@ -104,8 +112,8 @@
 .ph-stat-val    { font-size: 20px; font-weight: 800; line-height: 1; }
 .ph-stat-lbl    { font-size: 10px; color: var(--ph-muted); text-transform: uppercase; letter-spacing: .3px; margin-top: 3px; }
 .val-danger  { color: var(--rose-text); }
-.val-ok      { color: var(--ph-600); }
-.val-active  { color: var(--ph-600); }
+.val-ok      { color: var(--accent-text-soft); }
+.val-active  { color: var(--accent-text-soft); }
 .val-muted   { color: var(--ph-muted); }
 
 /* Bouton d'accès */
@@ -115,7 +123,7 @@
   display: flex; align-items: center; justify-content: space-between;
   background: var(--ph-50);
 }
-.ph-card-footer span { font-size: 12.5px; font-weight: 600; color: var(--ph-600); }
+.ph-card-footer span { font-size: 12.5px; font-weight: 600; color: var(--accent-text-soft); }
 </style>{% endblock %}
 
 {% block content %}
@@ -146,7 +154,7 @@
 
     <div class="ph-card-stats">
       <div class="ph-stat-item">
-        <div class="ph-stat-val" style="color:var(--ph-600);">{{ ph.total }}</div>
+        <div class="ph-stat-val" style="color:var(--accent-text-soft);">{{ ph.total }}</div>
         <div class="ph-stat-lbl">Références</div>
       </div>
       <div class="ph-stat-item">

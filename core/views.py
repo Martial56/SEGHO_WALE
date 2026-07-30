@@ -4,6 +4,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.contrib import messages
+from patients.models import TypeVisiteCurative as _TypeVisiteCurative
 from django.core.exceptions import PermissionDenied
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme, urlencode
@@ -1087,10 +1088,38 @@ def laboratoire_bulletin(request, pk):
 
 @login_required(login_url='login')
 def gynecologie_naissance_create(request):
+    return _gynecologie_naissance_fiche(request, None)
+
+
+@login_required(login_url='login')
+def gynecologie_naissance_detail(request, pk):
+    """Fiche d'une naissance déjà enregistrée.
+
+    Le registre renvoyait vers l'administration Django faute de page dédiée.
+    C'est le même écran que la création, rempli avec l'enregistrement : une seule
+    fiche à maintenir pour les deux usages.
+    """
+    from django.shortcuts import get_object_or_404
+
+    from patients.models import Naissance
+    return _gynecologie_naissance_fiche(
+        request, get_object_or_404(Naissance, pk=pk))
+
+
+def _gynecologie_naissance_fiche(request, naissance):
+    """Affiche et enregistre la fiche d'une naissance (création ou modification)."""
+    from django.db.models import Q
+
     from patients.models import Naissance, Patient
     from medecins.models import Medecin
 
-    patients = Patient.objects.all().order_by('nom')
+    # Seules les femmes peuvent être la mère. La fiche déjà enregistrée garde
+    # malgré tout sa mère dans la liste, même si son sexe a été mal saisi :
+    # sinon la modifier viderait le champ à l'enregistrement suivant.
+    meres = Q(sexe='F')
+    if naissance and naissance.mere_id:
+        meres |= Q(pk=naissance.mere_id)
+    patients = Patient.objects.filter(meres).order_by('nom')
     medecins = Medecin.objects.all().order_by('employe__nom')
     error = None
 
@@ -1102,31 +1131,35 @@ def gynecologie_naissance_create(request):
             date_acc = parse_datetime(raw_date) if raw_date else timezone.now()
             if date_acc is None:
                 date_acc = timezone.now()
-            n = Naissance(
-                mere_id=request.POST.get('mere') or None,
-                medecin_id=request.POST.get('medecin') or None,
-                date_accouchement=date_acc,
-                lieu_naissance=request.POST.get('lieu_naissance', ''),
-                mode_accouchement=request.POST.get('mode_accouchement', 'voie_basse'),
-                nom_enfant=request.POST.get('nom_enfant', ''),
-                prenoms_enfant=request.POST.get('prenoms_enfant', ''),
-                sexe_enfant=request.POST.get('sexe_enfant') or 'F',
-                poids_naissance=request.POST.get('poids_naissance') or None,
-                groupe_sanguin_enfant=request.POST.get('groupe_sanguin_enfant', ''),
-                taux_hemoglobine=request.POST.get('taux_hemoglobine') or None,
-                taille_naissance=request.POST.get('taille_naissance') or None,
-                apgar_1min=request.POST.get('apgar_1min') or None,
-                apgar_5min=request.POST.get('apgar_5min') or None,
-                statut=request.POST.get('statut', 'vivant'),
-                info_parents=request.POST.get('info_parents', ''),
-                education_mere=request.POST.get('education_mere', ''),
-                age_mere=request.POST.get('age_mere') or None,
-                parite=int(request.POST.get('parite') or 0),
-                nombre_garcons=int(request.POST.get('nombre_garcons') or 0),
-                nombre_filles=int(request.POST.get('nombre_filles') or 0),
-                remarques=request.POST.get('remarques', ''),
-                statut_dossier='termine' if action == 'termine' else 'brouillon',
-            )
+            n = naissance or Naissance()
+            n.mere_id = request.POST.get('mere') or None
+            n.medecin_id = request.POST.get('medecin') or None
+            n.date_accouchement = date_acc
+            n.lieu_naissance = request.POST.get('lieu_naissance', '')
+            n.mode_accouchement = request.POST.get('mode_accouchement', 'voie_basse')
+            n.nom_enfant = request.POST.get('nom_enfant', '')
+            n.prenoms_enfant = request.POST.get('prenoms_enfant', '')
+            n.sexe_enfant = request.POST.get('sexe_enfant') or 'F'
+            n.poids_naissance = request.POST.get('poids_naissance') or None
+            n.groupe_sanguin_enfant = request.POST.get('groupe_sanguin_enfant', '')
+            n.taux_hemoglobine = request.POST.get('taux_hemoglobine') or None
+            n.taille_naissance = request.POST.get('taille_naissance') or None
+            n.apgar_1min = request.POST.get('apgar_1min') or None
+            n.apgar_5min = request.POST.get('apgar_5min') or None
+            n.statut = request.POST.get('statut', 'vivant')
+            n.info_parents = request.POST.get('info_parents', '')
+            n.education_mere = request.POST.get('education_mere', '')
+            n.age_mere = request.POST.get('age_mere') or None
+            n.parite = int(request.POST.get('parite') or 0)
+            n.nombre_garcons = int(request.POST.get('nombre_garcons') or 0)
+            n.nombre_filles = int(request.POST.get('nombre_filles') or 0)
+            n.remarques = request.POST.get('remarques', '')
+            # Un dossier déjà terminé ne repasse pas en brouillon parce qu'on
+            # l'enregistre : seul le bouton TERMINÉ fait avancer l'état.
+            if action == 'termine':
+                n.statut_dossier = 'termine'
+            elif not naissance:
+                n.statut_dossier = 'brouillon'
             n.save()
             return redirect('gynecologie_naissances')
         except Exception as e:
@@ -1136,10 +1169,13 @@ def gynecologie_naissance_create(request):
         {'title': 'Accueil', 'url': '/'},
         {'title': 'Gynécologie', 'url': '/gynecologie/'},
         {'title': 'Registre des naissances', 'url': '/gynecologie/naissances/'},
+        {'title': naissance.numero if naissance else 'Nouveau'},
     ]
     return render(request, 'gynecologie/registre_naissance_form.html', {
+        'naissance': naissance,
         'patients': patients,
         'medecins': medecins,
+        'groupes_sanguins': [g for g, _ in Naissance.GROUPE_SANGUIN],
         'breadcrumb': breadcrumb,
         'error': error,
         'post': request.POST if request.method == 'POST' else {},
@@ -1148,205 +1184,191 @@ def gynecologie_naissance_create(request):
 
 @login_required(login_url='login')
 def gynecologie_registre_naissance(request):
-    from patients.models import Naissance
+    """Registre des naissances.
+
+    Filtres cumulables, regroupements imbriqués, conditions personnalisées et
+    pagination par groupe viennent tous de core.listing : cette vue ne déclare
+    que le jeu de départ et assemble le contexte. Le registre avait sa propre
+    mécanique — filtres exclusifs, un seul regroupement, des liens qui perdaient
+    les paramètres des autres menus — il se comporte désormais comme les listes
+    de rendez-vous du module.
+    """
+    from datetime import date as _date
+
     from django.core.paginator import Paginator
-    from django.db.models import Q
 
-    export = request.GET.get('export', '')
-    q = request.GET.get('q', '').strip()
-    filter_type  = request.GET.get('filter_type', '')
-    date_precise = request.GET.get('date_precise', '')
-    date_debut   = request.GET.get('date_debut', '')
-    date_fin     = request.GET.get('date_fin', '')
-    filtre_statut = request.GET.get('filtre_statut', '')
+    from core.listing import (Listing, appliquer_conditions, champs_pour_navigateur,
+                              conditions_demandees, menu_filtres, menu_groupes,
+                              paginer_groupes)
+    from patients.models import Naissance
+    from patients.naissance_listing import (CHAMPS_RECHERCHE, champs_naissances,
+                                            construire_dimensions,
+                                            dimensions_personnalisees,
+                                            familles_naissances, libelle_periode)
 
-    group_by = request.GET.get('group_by', '')
+    today     = _date.today()
+    q         = request.GET.get('q', '').strip()
+    date_from = request.GET.get('date_from', '').strip()
+    date_to   = request.GET.get('date_to', '').strip()
+    groupes   = request.GET.getlist('group')
 
-    naissances = Naissance.objects.select_related('mere', 'medecin', 'mere__assurance')
+    base_qs = Naissance.objects.select_related('mere', 'mere__assurance',
+                                               'medecin', 'medecin__employe')
 
-    if q:
-        naissances = naissances.filter(
-            Q(mere__nom__icontains=q) |
-            Q(mere__prenoms__icontains=q) |
-            Q(numero__icontains=q) |
-            Q(nom_enfant__icontains=q)
-        )
+    # Champs établis une fois et partagés : ils servent au regroupement
+    # personnalisé comme au constructeur de conditions.
+    champs     = champs_naissances()
+    dims_perso = dimensions_personnalisees(champs)
+    declarees  = construire_dimensions()
+    listing = Listing(
+        recherche=CHAMPS_RECHERCHE,
+        familles=familles_naissances(),
+        dimensions=list(declarees.values()) + dims_perso,
+        par_page=80,
+        tri_defaut=('-date_accouchement',),
+    )
 
-    if filter_type == 'mois':
-        now = timezone.now()
-        naissances = naissances.filter(
-            date_accouchement__month=now.month,
-            date_accouchement__year=now.year,
-        )
-    elif filter_type == 'date' and date_precise:
-        naissances = naissances.filter(date_accouchement__date=date_precise)
-    elif filter_type == 'plage':
-        if date_debut:
-            naissances = naissances.filter(date_accouchement__date__gte=date_debut)
-        if date_fin:
-            naissances = naissances.filter(date_accouchement__date__lte=date_fin)
-
-    if filtre_statut in ('vivant', 'mort_ne'):
-        naissances = naissances.filter(statut=filtre_statut)
-
-    # Tri selon le regroupement
-    ORDER_MAP = {
-        'annee':         'date_accouchement',
-        'trimestre':     'date_accouchement',
-        'mois':          'date_accouchement',
-        'semaine':       'date_accouchement',
-        'jour':          'date_accouchement',
-        'mere':          'mere__nom',
-        'medecin':       'medecin__employe__nom',
-        'mode':          'mode_accouchement',
-        'statut':        'statut',
-        'genre':         'sexe_enfant',
-        'groupe_sanguin':'groupe_sanguin_enfant',
-        'lieu':          'lieu_naissance',
-        'parite':        'parite',
-        'education':     'education_mere',
-        'cree_le':       'date_creation',
-    }
-    order_field = ORDER_MAP.get(group_by, '-date_accouchement')
-    naissances = naissances.order_by(order_field)
-
-    # Préparer les données groupées
-    from itertools import groupby as py_groupby
-    from django.utils.formats import date_format
-
-    def get_group_key(n):
-        if group_by == 'annee':
-            return str(n.date_accouchement.year)
-        if group_by == 'trimestre':
-            q = (n.date_accouchement.month - 1) // 3 + 1
-            return f"T{q} {n.date_accouchement.year}"
-        if group_by == 'mois':
-            return n.date_accouchement.strftime('%B %Y').capitalize()
-        if group_by == 'semaine':
-            return f"Semaine {n.date_accouchement.strftime('%W')} – {n.date_accouchement.year}"
-        if group_by == 'jour':
-            return n.date_accouchement.strftime('%d/%m/%Y')
-        if group_by == 'mere':
-            return f"{n.mere.nom.upper()} {n.mere.prenoms}"
-        if group_by == 'medecin':
-            return str(n.medecin) if n.medecin else '— Sans médecin'
-        if group_by == 'mode':
-            return n.get_mode_accouchement_display()
-        if group_by == 'statut':
-            return n.get_statut_display()
-        if group_by == 'genre':
-            return 'Féminin' if n.sexe_enfant == 'F' else 'Masculin'
-        if group_by == 'groupe_sanguin':
-            return n.groupe_sanguin_enfant or '—'
-        if group_by == 'lieu':
-            return n.lieu_naissance or '—'
-        if group_by == 'parite':
-            return f"Parité {n.parite}"
-        if group_by == 'education':
-            return n.get_education_mere_display() or '—'
-        if group_by == 'cree_le':
-            return n.date_creation.strftime('%d/%m/%Y')
-        return None
-
-    naissances_list = list(naissances)
-
-    # ── EXPORT EXCEL ──
-    if export == 'excel':
-        import openpyxl
-        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-        from django.http import HttpResponse
-
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = 'Registre des naissances'
-
-        # En-têtes
-        headers = [
-            'Numéro', 'Mère', 'Date d\'accouchement', 'Médecin',
-            'Mode d\'accouchement', 'Nom de l\'enfant', 'Prénoms de l\'enfant',
-            'Sexe', 'Poids (g)', 'Taille (cm)', 'Apgar 1\'', 'Apgar 5\'',
-            'Groupe sanguin', 'Lieu de naissance', 'Parité',
-            'Garçons', 'Filles', 'Éducation mère', 'Statut', 'Remarques',
-        ]
-        header_fill = PatternFill('solid', fgColor='714B67')
-        header_font = Font(bold=True, color='FFFFFF', size=10)
-        thin = Side(style='thin', color='DDDDDD')
-        border = Border(left=thin, right=thin, bottom=thin)
-
-        for col, h in enumerate(headers, 1):
-            cell = ws.cell(row=1, column=col, value=h)
-            cell.fill = header_fill
-            cell.font = header_font
-            cell.alignment = Alignment(horizontal='center', vertical='center')
-            cell.border = border
-        ws.row_dimensions[1].height = 18
-
-        # Données
-        for row_idx, n in enumerate(naissances_list, 2):
-            values = [
-                n.numero,
-                f"{n.mere.nom.upper()} {n.mere.prenoms}",
-                n.date_accouchement.strftime('%d/%m/%Y %H:%M'),
-                str(n.medecin) if n.medecin else '',
-                n.get_mode_accouchement_display(),
-                n.nom_enfant,
-                n.prenoms_enfant,
-                'Féminin' if n.sexe_enfant == 'F' else 'Masculin',
-                float(n.poids_naissance) if n.poids_naissance else '',
-                float(n.taille_naissance) if n.taille_naissance else '',
-                n.apgar_1min if n.apgar_1min is not None else '',
-                n.apgar_5min if n.apgar_5min is not None else '',
-                n.groupe_sanguin_enfant,
-                n.lieu_naissance,
-                n.parite,
-                n.nombre_garcons,
-                n.nombre_filles,
-                n.get_education_mere_display(),
-                n.get_statut_display(),
-                n.remarques,
-            ]
-            for col, val in enumerate(values, 1):
-                cell = ws.cell(row=row_idx, column=col, value=val)
-                cell.border = border
-                if row_idx % 2 == 0:
-                    cell.fill = PatternFill('solid', fgColor='F9F4FC')
-
-        # Largeurs auto
-        col_widths = [14,28,18,22,18,18,20,10,10,10,9,9,12,18,8,8,8,16,10,30]
-        for i, w in enumerate(col_widths, 1):
-            ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = w
-
-        filename = f"naissances_{timezone.now().strftime('%Y%m%d_%H%M')}.xlsx"
-        response = HttpResponse(
-            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
-        response['Content-Disposition'] = f'attachment; filename="{filename}"'
-        wb.save(response)
-        return response
-
-    grouped_data = None
-    if group_by and naissances_list:
-        grouped_data = [(k, list(v)) for k, v in py_groupby(naissances_list, key=get_group_key)]
-
-    paginator = Paginator(naissances_list, 80)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    breadcrumb = [
-        {'title': 'Accueil', 'url': '/'},
-        {'title': 'Gynécologie', 'url': '/gynecologie/'},
-        {'title': 'Registre des naissances'},
-    ]
-    return render(request, 'gynecologie/registre_naissance.html', {
-        'page_obj': page_obj,
-        'grouped_data': grouped_data,
-        'group_by': group_by,
-        'breadcrumb': breadcrumb,
-        'filter_type': filter_type,
-        'date_precise': date_precise,
-        'date_debut': date_debut,
-        'date_fin': date_fin,
-        'filtre_statut': filtre_statut,
+    filtres = listing.filtres_demandes(request)
+    qs = listing.appliquer_recherche(base_qs, q)
+    qs = listing.appliquer_filtres(qs, filtres, {
+        'aujourdhui': today, 'date_from': date_from, 'date_to': date_to,
     })
+    # Conditions personnalisées (champ + opérateur + valeur), validées contre les
+    # champs découverts sur le modèle : une condition inconnue est ignorée.
+    conditions = conditions_demandees(request, champs)
+    mode_conditions = 'ou' if request.GET.get('cm') == 'ou' else 'et'
+    qs = appliquer_conditions(qs, conditions, mode_conditions)
+    qs = listing.trier(qs, groupes)
+
+    # L'export part de la même requête : il reflète donc exactement ce qui est à
+    # l'écran, recherche, filtres et conditions comprises.
+    if request.GET.get('export') == 'excel':
+        return _export_naissances(qs)
+
+    # Avec un regroupement, on pagine les **groupes** et non les lignes : toutes
+    # les lignes des groupes affichés sont chargées, si bien qu'un groupe visible
+    # s'ouvre toujours et que déplier n'appelle jamais le serveur.
+    toutes = dict(declarees)
+    toutes.update({d.cle: d for d in dims_perso})
+    dims = [toutes[g] for g in groupes if g in toutes]
+    arbre = []
+    if dims:
+        arbre, page_obj, nb_groupes = paginer_groupes(qs, dims, request.GET.get('page'))
+    else:
+        nb_groupes = 0
+        page_obj = Paginator(qs, listing.par_page).get_page(request.GET.get('page'))
+
+    # En AJAX on ne renvoie que les zones rafraîchies, pas la page entière.
+    is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
+    filtre_pose = bool(filtres or date_from or date_to)
+
+    return render(request,
+                  'gynecologie/includes/naissances_body.html' if is_ajax
+                  else 'gynecologie/registre_naissance.html', {
+        'page_obj':   page_obj,
+        # `arbre` porte les groupes imbriqués ; vide sans regroupement, la liste
+        # est alors rendue à plat depuis page_obj.
+        'arbre':      arbre,
+        'nb_groupes': nb_groupes,
+        'q':          q,
+        'filters':    filtres,
+        'groups':     groupes,
+        'date_from':  date_from,
+        'date_to':    date_to,
+        'filtre_pose':      filtre_pose,
+        'selection_active': filtre_pose or bool(groupes or q or conditions),
+        'periode_libelle':  libelle_periode(filtres, date_from, date_to),
+        # Menus générés depuis la déclaration : le gabarit ne fait que parcourir.
+        'listing_filtres': menu_filtres(listing.familles, filtres, date_from, date_to),
+        'listing_groupes': menu_groupes(list(declarees.values()) + dims_perso, groupes),
+        'conditions':      conditions,
+        'mode_conditions': mode_conditions,
+        # L'entrée de menu doit survivre au rafraîchissement AJAX : elle dépend de
+        # ce drapeau, pas des données JSON qui n'accompagnent que la page complète.
+        'listing_filtre_perso': True,
+        'listing_champs_json':  None if is_ajax else champs_pour_navigateur(champs),
+        # Fourni par la vue (et non par un {% include with %}) pour que la page
+        # complète et le fragment AJAX rendent exactement le même titre.
+        'subheader_title': 'Registre des naissances',
+        'breadcrumb': [
+            {'title': 'Accueil', 'url': '/'},
+            {'title': 'Gynécologie', 'url': '/gynecologie/'},
+            {'title': 'Registre des naissances'},
+        ],
+    })
+
+
+def _export_naissances(naissances):
+    """Classeur Excel du registre, dans la sélection et l'ordre de l'écran."""
+    import openpyxl
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+
+    from django.http import HttpResponse
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Registre des naissances'
+
+    headers = [
+        'Numéro', 'Mère', 'Date d\'accouchement', 'Médecin',
+        'Mode d\'accouchement', 'Nom de l\'enfant', 'Prénoms de l\'enfant',
+        'Sexe', 'Poids (g)', 'Taille (cm)', 'Apgar 1\'', 'Apgar 5\'',
+        'Groupe sanguin', 'Lieu de naissance', 'Parité',
+        'Garçons', 'Filles', 'Éducation mère', 'Statut', 'Remarques',
+    ]
+    header_fill = PatternFill('solid', fgColor='714B67')
+    header_font = Font(bold=True, color='FFFFFF', size=10)
+    thin = Side(style='thin', color='DDDDDD')
+    border = Border(left=thin, right=thin, bottom=thin)
+
+    for col, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=h)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+        cell.border = border
+    ws.row_dimensions[1].height = 18
+
+    for row_idx, n in enumerate(naissances, 2):
+        values = [
+            n.numero,
+            f"{n.mere.nom.upper()} {n.mere.prenoms}",
+            n.date_accouchement.strftime('%d/%m/%Y %H:%M'),
+            str(n.medecin) if n.medecin else '',
+            n.get_mode_accouchement_display(),
+            n.nom_enfant,
+            n.prenoms_enfant,
+            'Féminin' if n.sexe_enfant == 'F' else 'Masculin',
+            float(n.poids_naissance) if n.poids_naissance else '',
+            float(n.taille_naissance) if n.taille_naissance else '',
+            n.apgar_1min if n.apgar_1min is not None else '',
+            n.apgar_5min if n.apgar_5min is not None else '',
+            n.groupe_sanguin_enfant,
+            n.lieu_naissance,
+            n.parite,
+            n.nombre_garcons,
+            n.nombre_filles,
+            n.get_education_mere_display(),
+            n.get_statut_display(),
+            n.remarques,
+        ]
+        for col, val in enumerate(values, 1):
+            cell = ws.cell(row=row_idx, column=col, value=val)
+            cell.border = border
+            if row_idx % 2 == 0:
+                cell.fill = PatternFill('solid', fgColor='F9F4FC')
+
+    col_widths = [14, 28, 18, 22, 18, 18, 20, 10, 10, 10, 9, 9, 12, 18, 8, 8, 8, 16, 10, 30]
+    for i, w in enumerate(col_widths, 1):
+        ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = w
+
+    filename = f"naissances_{timezone.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    wb.save(response)
+    return response
 
 
 def _rdv_gyn_qs():
@@ -1449,6 +1471,9 @@ def gynecologie_rdv_create(request):
         'medecins': medecins,
         'pathologies': Pathologie.objects.filter(actif=True, departement__code='GYN').order_by('nom'),
         'types_visite': TypeVisite.objects.filter(actif=True).order_by('nom'),
+        # Types de visite curative : configurables depuis le menu Configurations
+        # des rendez-vous (patients.TypeVisiteCurative).
+        'types_visite_curative': _TypeVisiteCurative.objects.filter(actif=True).order_by('nom'),
         'breadcrumb': breadcrumb,
         'registre_cpn': None,
         'registre_accouchement': None,
@@ -1607,14 +1632,14 @@ def gynecologie_rdv_detail(request, pk):
                 rdv.cpn_type_visite = None
             rdv.cur_mode_entree = request.POST.get('cur_mode_entree', '').strip()
             rdv.cur_mode_entree_autre = request.POST.get('cur_mode_entree_autre', '').strip()
-            cur_tv_pk = request.POST.get('cur_type_visite', '').strip()
-            if cur_tv_pk:
-                try:
-                    rdv.cur_type_visite = TypeVisite.objects.get(pk=int(cur_tv_pk))
-                except (ValueError, TypeVisite.DoesNotExist):
-                    rdv.cur_type_visite = None
-            else:
-                rdv.cur_type_visite = None
+            # Le formulaire poste le *code* du type de visite curative (et non son
+            # identifiant) : c'est cette valeur que le registre curatif enregistre
+            # dans son JSON et que lisent les rapports. On la résout ici vers la
+            # table de configuration pour renseigner aussi la clé étrangère.
+            from patients.models import TypeVisiteCurative
+            cur_tv_code = request.POST.get('cur_type_visite', '').strip()
+            rdv.cur_type_visite = (TypeVisiteCurative.objects.filter(code=cur_tv_code).first()
+                                   if cur_tv_code else None)
             rdv._skip_auto_log = True
             rdv.save()
             log_event(rdv, request.user, 'Rendez-vous modifié.', type='modif')
@@ -1663,6 +1688,9 @@ def gynecologie_rdv_detail(request, pk):
         'medecins': medecins,
         'pathologies': Pathologie.objects.filter(actif=True, departement__code='GYN').order_by('nom'),
         'types_visite': TypeVisite.objects.filter(actif=True).order_by('nom'),
+        # Types de visite curative : configurables depuis le menu Configurations
+        # des rendez-vous (patients.TypeVisiteCurative).
+        'types_visite_curative': _TypeVisiteCurative.objects.filter(actif=True).order_by('nom'),
         'breadcrumb': breadcrumb,
         'nav_total': total,
         'nav_pos': nav_pos,
@@ -1709,167 +1737,55 @@ def gynecologie_demarrer_consultation(request, pk):
 
 @login_required(login_url='login')
 def gynecologie_rdv(request):
+    """Liste des rendez-vous de gynécologie.
+
+    Filtrage, regroupement et pagination sont délégués à la logique partagée
+    (patients/rdv_listing.py) pour que cette page, celle des rendez-vous du
+    module patients et l'ancienne route /patients/gynecologie/rendez-vous/ se
+    comportent exactement pareil. Ne restent ici que ce qui est propre à la
+    gynécologie : une sélection plus large (département GYN ou médecin de
+    spécialité gynécologique), deux filtres d'URL spécifiques, et l'export Excel.
+    """
     from patients.models import RendezVous
-    from django.core.paginator import Paginator
+    from patients.views import _rdv_listing
     from django.db.models import Q
-    from datetime import date as _date
+    from django.urls import reverse
 
-    q                 = request.GET.get('q', '').strip()
-    filter_val        = request.GET.get('filter', '')
-    group_val         = request.GET.get('group', '')
-    date_from         = request.GET.get('date_from', '').strip()
-    date_to           = request.GET.get('date_to', '').strip()
-    type_rdv_val      = request.GET.get('type_rdv', '').strip()
-    type_visite_cpn_val = request.GET.get('type_visite_cpn', '').strip()
+    rdvs = (RendezVous.objects
+            .filter(Q(departement__code='GYN') | Q(medecin__specialite__nom__icontains='gyn'))
+            .select_related('patient', 'medecin', 'departement', 'type_consultation',
+                            'cur_type_visite', 'patient__assurance', 'medecin__employe')
+            .prefetch_related('registre_curatif')
+            .order_by('-date_heure'))
 
-    rdvs = RendezVous.objects.filter(
-        Q(departement__code='GYN') |
-        Q(medecin__specialite__nom__icontains='gyn')
-    ).select_related('patient', 'medecin').order_by('-date_heure')
-
-    if q:
-        rdvs = rdvs.filter(
-            Q(patient__nom__icontains=q) |
-            Q(patient__prenoms__icontains=q) |
-            Q(patient__code_patient__icontains=q)
-        )
-
-    # --- Filtre rapide (défaut : aujourd'hui sauf si filter=all ou autre filtre actif) ---
-    no_active_filter = not filter_val and not type_rdv_val and not type_visite_cpn_val and not date_from and not date_to and not q
-    if (filter_val == 'today' or no_active_filter) and not date_from and not date_to:
-        rdvs = rdvs.filter(date_heure__date=_date.today())
-    elif filter_val == 'all':
-        pass  # tout afficher, aucun filtre date
-    elif filter_val == 'mine':
-        rdvs = rdvs.filter(medecin__user=request.user)
-    elif filter_val == 'urgent':
-        rdvs = rdvs.filter(niveau_urgence__in=['urgent', 'tres_urgent'])
-    elif filter_val == 'urgence_medicale':
-        rdvs = rdvs.filter(type_rdv='urgence')
-    elif filter_val == 'consultation':
-        rdvs = rdvs.filter(type_rdv='consultation')
-    elif filter_val == 'suivi':
-        rdvs = rdvs.filter(type_rdv='controle')
-    elif filter_val == 'not_done':
-        rdvs = rdvs.exclude(statut__in=['termine', 'annule', 'absent'])
-
-    # --- Filtre type de visite (type_rdv) ---
+    # Filtres propres à la gynécologie, pilotés par l'URL (pas d'entrée de menu).
+    type_rdv_val = request.GET.get('type_rdv', '').strip()
     if type_rdv_val in ('consultation', 'controle', 'urgence', 'examen', 'vaccination'):
         rdvs = rdvs.filter(type_rdv=type_rdv_val)
-
-    # --- Filtre rang CPN ---
-    if type_visite_cpn_val in ('cpn1', 'cpn2', 'cpn3', 'cpn4', 'autre'):
-        rdvs = rdvs.filter(type_visite_cpn=type_visite_cpn_val)
-
-    # --- Plage de dates ---
-    if date_from:
-        try:
-            rdvs = rdvs.filter(date_heure__date__gte=date_from)
-        except (ValueError, TypeError):
-            pass
-    if date_to:
-        try:
-            rdvs = rdvs.filter(date_heure__date__lte=date_to)
-        except (ValueError, TypeError):
-            pass
-
-    # --- Tri par colonne (priorité sur le tri par groupe) ---
-    sort_val  = request.GET.get('sort', '').strip()
-    order_val = request.GET.get('order', 'asc').strip()
-    if order_val not in ('asc', 'desc'):
-        order_val = 'asc'
-    p = '-' if order_val == 'desc' else ''
-
-    SORT_FIELDS = {
-        'date':    ['date_heure'],
-        'patient': ['patient__nom', 'patient__prenoms'],
-        'medecin': ['medecin__employe__nom'],
-        'statut':  ['statut'],
-        'type':    ['type_rdv'],
-        'age':     ['patient__date_naissance'],
-    }
-    if sort_val in SORT_FIELDS:
-        rdvs = rdvs.order_by(*[p + f for f in SORT_FIELDS[sort_val]])
-    # --- Tri selon regroupement (si pas de tri colonne) ---
-    elif group_val in ('date_jour', 'date_semaine', 'date_mois', 'date_trimestre', 'date_annee'):
-        rdvs = rdvs.order_by('date_heure')
-    elif group_val == 'statut':
-        rdvs = rdvs.order_by('statut', '-date_heure')
-    elif group_val in ('medecin', 'referent'):
-        rdvs = rdvs.order_by('medecin', '-date_heure')
-    elif group_val in ('type_rdv', 'type_visite'):
-        rdvs = rdvs.order_by('type_rdv', '-date_heure')
-    elif group_val == 'patient':
-        rdvs = rdvs.order_by('patient__nom', 'patient__prenoms')
-    elif group_val == 'sexe':
-        rdvs = rdvs.order_by('patient__sexe', '-date_heure')
-    elif group_val == 'age':
-        rdvs = rdvs.order_by('patient__date_naissance')
-    elif group_val == 'type_visite_cpn':
-        rdvs = rdvs.order_by('type_visite_cpn', '-date_heure')
-    elif group_val == 'departement':
-        rdvs = rdvs.order_by('departement', '-date_heure')
-    elif group_val == 'assurance':
-        rdvs = rdvs.order_by('patient__assurance__nom', '-date_heure')
-    elif group_val == 'police':
-        rdvs = rdvs.order_by('patient__numero_assurance', '-date_heure')
-
-    # --- Compte par groupe pour les en-têtes visuels ---
-    from django.db.models import Count as _Count
-    import json as _json
-    group_counts = {}
-    if group_val == 'type_visite_cpn':
-        rows = rdvs.values('type_visite_cpn').annotate(n=_Count('id'))
-        group_counts = {r['type_visite_cpn'] or '': r['n'] for r in rows}
-    elif group_val == 'statut':
-        rows = rdvs.values('statut').annotate(n=_Count('id'))
-        group_counts = {r['statut'] or '': r['n'] for r in rows}
-    elif group_val in ('type_rdv', 'type_visite'):
-        rows = rdvs.values('type_rdv').annotate(n=_Count('id'))
-        group_counts = {r['type_rdv'] or '': r['n'] for r in rows}
-    elif group_val == 'sexe':
-        rows = rdvs.values('patient__sexe').annotate(n=_Count('id'))
-        group_counts = {r['patient__sexe'] or '': r['n'] for r in rows}
-    elif group_val == 'departement':
-        rows = rdvs.values('departement').annotate(n=_Count('id'))
-        group_counts = {r['departement'] or '': r['n'] for r in rows}
-    elif group_val in ('medecin', 'referent'):
-        rows = rdvs.values('medecin__employe__nom', 'medecin__employe__prenoms').annotate(n=_Count('id'))
-        group_counts = {
-            (f"Dr {r['medecin__employe__nom']} {r['medecin__employe__prenoms']}" if r['medecin__employe__nom'] else '—'): r['n']
-            for r in rows
-        }
-    elif group_val == 'assurance':
-        rows = rdvs.values('patient__assurance__nom').annotate(n=_Count('id'))
-        group_counts = {r['patient__assurance__nom'] or '—': r['n'] for r in rows}
-    elif group_val == 'police':
-        rows = rdvs.values('patient__numero_assurance').annotate(n=_Count('id'))
-        group_counts = {r['patient__numero_assurance'] or '—': r['n'] for r in rows}
-    elif group_val == 'date_annee':
-        rows = rdvs.values('date_heure__year').annotate(n=_Count('id'))
-        group_counts = {str(r['date_heure__year']): r['n'] for r in rows}
-    elif group_val == 'date_mois':
-        rows = rdvs.values('date_heure__year', 'date_heure__month').annotate(n=_Count('id'))
-        group_counts = {f"{r['date_heure__year']}-{r['date_heure__month']:02d}": r['n'] for r in rows}
-    elif group_val == 'date_trimestre':
-        rows = rdvs.values('date_heure__year', 'date_heure__month').annotate(n=_Count('id'))
-        qt = {}
-        for r in rows:
-            key = f"{r['date_heure__year']}-T{(r['date_heure__month'] - 1) // 3 + 1}"
-            qt[key] = qt.get(key, 0) + r['n']
-        group_counts = qt
-    elif group_val == 'date_semaine':
-        from django.db.models.functions import ExtractWeek, ExtractIsoYear
-        rows = rdvs.annotate(
-            iso_yr=ExtractIsoYear('date_heure'), wk=ExtractWeek('date_heure')
-        ).values('iso_yr', 'wk').annotate(n=_Count('id'))
-        group_counts = {f"{r['iso_yr']}-{r['wk']}": r['n'] for r in rows}
-    elif group_val == 'date_jour':
-        rows = rdvs.values('date_heure__date').annotate(n=_Count('id'))
-        group_counts = {str(r['date_heure__date']): r['n'] for r in rows}
+    cpn_val = request.GET.get('type_visite_cpn', '').strip()
+    if cpn_val in ('cpn1', 'cpn2', 'cpn3', 'cpn4', 'autre'):
+        rdvs = rdvs.filter(type_visite_cpn=cpn_val)
 
     # --- Export Excel (respecte les filtres actifs) ---
     if request.GET.get('export') == 'excel':
+        # Le classeur doit refléter la même sélection que la liste : on rejoue
+        # ici la recherche et les filtres via la logique partagée.
+        # Même déclaration que la liste : sans cela, l'export et l'écran
+        # finiraient par appliquer des filtres différents.
+        from core.listing import Listing
+        from patients.rdv_listing import FILTRES_PAR_DEFAUT, familles_rdv
+        from datetime import date as _dexp
+        _listing = Listing(
+            recherche=('patient__nom', 'patient__prenoms', 'patient__code_patient'),
+            familles=familles_rdv(contexte_gyneco=True),
+            filtres_defaut=FILTRES_PAR_DEFAUT,
+        )
+        rdvs = _listing.appliquer_recherche(rdvs, request.GET.get('q', '').strip())
+        rdvs = _listing.appliquer_filtres(rdvs, _listing.filtres_demandes(request), {
+            'user': request.user, 'aujourdhui': _dexp.today(),
+            'date_from': request.GET.get('date_from', '').strip(),
+            'date_to': request.GET.get('date_to', '').strip(),
+        })
         import openpyxl
         from openpyxl.styles import Font, PatternFill, Alignment
         from django.http import HttpResponse
@@ -1908,35 +1824,11 @@ def gynecologie_rdv(request):
         wb.save(response)
         return response
 
-    # --- Stats du jour (indépendant des filtres) ---
-    today_base = RendezVous.objects.filter(
-        Q(departement__code='GYN') | Q(medecin__specialite__nom__icontains='gyn'),
-        date_heure__date=_date.today()
-    )
-    stat_rows = today_base.values('statut').annotate(n=_Count('id'))
-    stats_today = {r['statut']: r['n'] for r in stat_rows}
-    stats_today['total'] = sum(stats_today.values())
-
-    paginator = Paginator(rdvs, 80)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    breadcrumb = [
-        {'title': 'Accueil', 'url': '/'},
-        {'title': 'Gynécologie', 'url': '/gynecologie/'},
-        {'title': 'Rendez-vous'},
-    ]
-    return render(request, 'gynecologie/rdv.html', {
-        'page_obj': page_obj,
-        'breadcrumb': breadcrumb,
-        'group_counts_json': _json.dumps(group_counts),
-        'group_val': group_val,
-        'filter_val': 'today' if no_active_filter else ('' if filter_val == 'all' else filter_val),
-        'stats_today': stats_today,
-        'sort_val': sort_val,
-        'order_val': order_val,
-        'statut_choices': [('planifie','Planifié'),('confirme','Confirmé'),('en_attente','En attente'),('en_consultation','En consultation'),('termine','Terminé'),('annule','Annulé'),('absent','Absent')],
-    })
-
+    return _rdv_listing(request, rdvs, 'gynecologie/rdv.html',
+                        contexte_gyneco=True,
+                        rdv_url_name='gynecologie_rdv_detail',
+                        create_url=reverse('gynecologie_rdv_create'),
+                        empty_sub='Aucun rendez-vous gynécologique enregistré.')
 
 @login_required(login_url='login')
 def gynecologie_rdv_set_statut(request, pk):
@@ -1967,55 +1859,100 @@ def gynecologie_rdv_bulk(request):
 
 @login_required(login_url='login')
 def gynecologie_list(request):
-    from patients.models import Patient
-    from django.core.paginator import Paginator
+    """Liste des patientes suivies en gynécologie.
+
+    Filtres, regroupements imbriqués et conditions personnalisées viennent tous
+    de core.listing : cette vue ne fait que déclarer le jeu de départ et
+    assembler le contexte. Mêmes comportements que les listes de rendez-vous —
+    filtres cumulables, pagination par groupe, dépliage sans appel serveur.
+    """
     from datetime import date as _date
 
-    q          = request.GET.get('q', '').strip()
-    filter_val = request.GET.get('filter', '')
-    group_val  = request.GET.get('group', '')
+    from django.core.paginator import Paginator
 
-    patients = Patient.objects.filter(
-        rendez_vous__departement__code='GYN'
-    ).distinct().order_by('nom', 'prenoms')
+    from core.listing import (Listing, appliquer_conditions, champs_pour_navigateur,
+                              conditions_demandees, menu_filtres, menu_groupes,
+                              paginer_groupes)
+    from patients.models import Patient, RendezVous
+    from patients.patient_listing import (CHAMPS_RECHERCHE, construire_dimensions,
+                                          champs_patients, dimensions_personnalisees,
+                                          familles_patients)
 
-    if q:
-        patients = patients.filter(
-            Q(nom__icontains=q) | Q(prenoms__icontains=q) | Q(code_patient__icontains=q) | Q(telephone__icontains=q)
-        )
+    today   = _date.today()
+    q       = request.GET.get('q', '').strip()
+    groupes = request.GET.getlist('group')
 
-    # --- Filtres patients ---
-    today = _date.today()
-    if filter_val == 'femme':
-        patients = patients.filter(sexe='F')
-    elif filter_val == 'homme':
-        patients = patients.filter(sexe='M')
-    elif filter_val == 'mineur':
-        cutoff = today.replace(year=today.year - 18)
-        patients = patients.filter(date_naissance__gt=cutoff)
-    elif filter_val == 'adulte':
-        cutoff_18 = today.replace(year=today.year - 18)
-        cutoff_60 = today.replace(year=today.year - 60)
-        patients = patients.filter(date_naissance__lte=cutoff_18, date_naissance__gt=cutoff_60)
-    elif filter_val == 'senior':
-        cutoff = today.replace(year=today.year - 60)
-        patients = patients.filter(date_naissance__lte=cutoff)
+    # Sous-requête plutôt qu'une jointure suivie de .distinct() : une patiente
+    # ayant plusieurs rendez-vous serait comptée autant de fois par les
+    # agrégations de groupe, que `distinct` ne corrige pas.
+    base_qs = Patient.objects.filter(
+        pk__in=RendezVous.objects.filter(departement__code='GYN').values('patient')
+    )
 
-    # --- Tri selon regroupement ---
-    if group_val == 'sexe':
-        patients = patients.order_by('sexe', 'nom', 'prenoms')
-    elif group_val == 'age':
-        patients = patients.order_by('date_naissance')
+    # Champs établis une fois et partagés : ils servent au regroupement
+    # personnalisé comme au constructeur de conditions.
+    champs     = champs_patients()
+    dims_perso = dimensions_personnalisees(champs)
+    declarees  = construire_dimensions(today)
+    listing = Listing(
+        recherche=CHAMPS_RECHERCHE,
+        familles=familles_patients(),
+        dimensions=list(declarees.values()) + dims_perso,
+        par_page=25,
+        tri_defaut=('nom', 'prenoms'),
+    )
 
-    paginator = Paginator(patients, 25)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    filtres = listing.filtres_demandes(request)
+    qs = listing.appliquer_recherche(base_qs, q)
+    qs = listing.appliquer_filtres(qs, filtres, {'aujourdhui': today})
 
-    breadcrumb = [
-        {'title': 'Gynécologie', 'url': '/gynecologie/'},
-        {'title': 'Patients'},
-    ]
-    return render(request, 'gynecologie/list.html', {'page_obj': page_obj, 'breadcrumb': breadcrumb})
+    # Conditions personnalisées (champ + opérateur + valeur), validées contre les
+    # champs découverts sur le modèle : une condition inconnue est ignorée.
+    conditions = conditions_demandees(request, champs)
+    mode_conditions = 'ou' if request.GET.get('cm') == 'ou' else 'et'
+    qs = appliquer_conditions(qs, conditions, mode_conditions)
+    qs = listing.trier(qs, groupes)
+
+    # Avec un regroupement, on pagine les **groupes** : toutes les lignes des
+    # groupes affichés sont chargées, si bien que déplier n'appelle jamais le
+    # serveur.
+    toutes = dict(declarees)
+    toutes.update({d.cle: d for d in dims_perso})
+    dims = [toutes[g] for g in groupes if g in toutes]
+    arbre = []
+    if dims:
+        arbre, page_obj, nb_groupes = paginer_groupes(qs, dims, request.GET.get('page'))
+    else:
+        nb_groupes = 0
+        page_obj = Paginator(qs, listing.par_page).get_page(request.GET.get('page'))
+
+    is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
+    selection_active = bool(filtres or groupes or q or conditions)
+
+    return render(request,
+                  'gynecologie/includes/list_body.html' if is_ajax else 'gynecologie/list.html', {
+        'page_obj':   page_obj,
+        'arbre':      arbre,
+        'nb_groupes': nb_groupes,
+        'q':          q,
+        'filters':    filtres,
+        'groups':     groupes,
+        'filtre_pose':      bool(filtres),
+        'selection_active': selection_active,
+        # Menus générés depuis la déclaration : le gabarit ne fait que parcourir.
+        'listing_filtres': menu_filtres(listing.familles, filtres),
+        'listing_groupes': menu_groupes(list(declarees.values()) + dims_perso, groupes),
+        'conditions':      conditions,
+        'mode_conditions': mode_conditions,
+        # L'entrée de menu doit survivre au rafraîchissement AJAX : elle dépend de
+        # ce drapeau, pas des données JSON qui n'accompagnent que la page complète.
+        'listing_filtre_perso': True,
+        'listing_champs_json':  None if is_ajax else champs_pour_navigateur(champs),
+        'breadcrumb': [
+            {'title': 'Gynécologie', 'url': '/gynecologie/'},
+            {'title': 'Patients'},
+        ],
+    })
 
 
 # ──────────────────────────────────────────────────────────────────

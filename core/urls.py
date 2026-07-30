@@ -86,6 +86,7 @@ urlpatterns = [
     path('gynecologie/rdv/<int:pk>/consultation/', views.gynecologie_demarrer_consultation, name='gynecologie_demarrer_consultation'),
     path('gynecologie/naissances/', views.gynecologie_registre_naissance, name='gynecologie_naissances'),
     path('gynecologie/naissances/nouveau/', views.gynecologie_naissance_create, name='gynecologie_naissance_create'),
+    path('gynecologie/naissances/<int:pk>/', views.gynecologie_naissance_detail, name='gynecologie_naissance_detail'),
     path('gynecologie/types-visite/', _gyn_typevisite_list_view, name='gynecologie_typevisite_list'),
     path('gynecologie/types-visite/nouveau/', _gyn_typevisite_create_view, name='gynecologie_typevisite_create'),
     path('gynecologie/types-visite/<int:pk>/modifier/', _gyn_typevisite_edit_view, name='gynecologie_typevisite_edit'),

@@ -1,5 +1,15 @@
 {% extends 'gynecologie/base.html' %}
-{% load static %}
+{% load static l10n %}
+
+{% comment %}
+Fiche d'une naissance : sert à la création comme à la consultation/modification.
+Une seule différence, l'objet `naissance` : présent, ses valeurs remplissent le
+formulaire et la barre d'état reflète l'avancement du dossier.
+
+La barre d'actions (flèche de retour, fil d'Ariane, Sauvegarder / Ignorer) est
+celle du module, définie dans gynecologie/base.html — la même que sur la fiche
+d'un rendez-vous.
+{% endcomment %}
 
 {% block content %}
 <style>
@@ -24,32 +34,71 @@
     padding: 4px 24px;
   }
   .f-step.active:first-child { clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%); }
-  html[data-theme="dark"] .f-step { color: var(--text-muted); }
-  html[data-theme="dark"] .f-step:not(.active):hover { background: #28304a; }
+  {% comment %}
+  Sans le :not(.active), cette règle l'emportait sur `.f-step.active` (un
+  sélecteur de moins) : l'étape en cours perdait son texte blanc et devenait
+  gris sourd sur son fond teinté, illisible.
+  {% endcomment %}
+  html[data-theme="dark"] .f-step:not(.active) { color: var(--text-muted); }
+  html[data-theme="dark"] .f-step:not(.active):hover { background: var(--surface); }
+
+  /* Métadonnées d'une fiche existante, à droite du fil d'Ariane. */
+  .f-meta { display: flex; gap: 18px; font-size: 11.5px; color: var(--text-muted); padding: 10px 0 0; }
+  .f-meta b { font-weight: 600; color: var(--text); }
+
+  /* Dossier terminé : le bouton n'est réveillé que par une modification. */
+  .btn-save:disabled { opacity: 0.42; cursor: not-allowed; }
 </style>
 
-<form method="post">
+<form method="post" id="naissance-form"
+      data-termine="{% if naissance.statut_dossier == 'termine' %}1{% else %}0{% endif %}">
 {% csrf_token %}
 
-<div class="action-bar">
-  <div class="action-bar-breadcrumb">
-    <a href="{% url 'gynecologie_naissances' %}"><i class="bi bi-arrow-left"></i> Registre des naissances</a>
-    <span class="sep">/</span>
-    <span class="current">Nouveau</span>
-  </div>
-  <div class="action-bar-buttons">
-    <a href="{% url 'gynecologie_naissances' %}" class="btn-form-cancel">Ignorer</a>
-    <button type="submit" name="action" value="brouillon" class="btn-form-submit">Sauvegarder</button>
+<div class="control-panel">
+  <div class="cp-top">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <a href="{% url 'gynecologie_naissances' %}" class="o-ctrl-btn cp-retour" title="Retour au registre">
+        <i class="bi bi-arrow-left"></i>
+      </a>
+      <div class="cp-breadcrumb">
+        <a href="{% url 'gynecologie_naissances' %}">Registre des naissances</a>
+        <span class="sep">/</span>
+        <span class="current">{% if naissance %}{{ naissance.numero }}{% else %}Nouveau{% endif %}</span>
+      </div>
+    </div>
+    <div class="cp-save-group">
+      {% comment %}
+      Dossier terminé : rien à enregistrer tant que rien n'a bougé. Le bouton part
+      donc inactif et se réveille à la première modification (cf. le script en bas
+      de page). L'attribut est posé côté serveur pour que ce soit vrai dès le
+      premier affichage, sans attendre le script.
+      {% endcomment %}
+      <button type="submit" name="action" value="brouillon" class="btn-save"
+              {% if naissance.statut_dossier == 'termine' %}disabled title="Aucune modification à enregistrer"{% endif %}>
+        {% if naissance %}Enregistrer{% else %}Sauvegarder{% endif %}
+      </button>
+      <a href="{% url 'gynecologie_naissances' %}" class="btn-discard">Ignorer</a>
+    </div>
   </div>
 </div>
 
 <div class="f-statusbar">
+  {% if not naissance or naissance.statut_dossier != 'termine' %}
   <button type="submit" name="action" value="termine" class="f-status-done-btn">TERMINÉ</button>
+  {% endif %}
   <div class="f-statusbar-steps">
-    <div class="f-step active">BROUILLON</div>
-    <div class="f-step">TERMINÉ</div>
+    <div class="f-step {% if not naissance or naissance.statut_dossier == 'brouillon' %}active{% endif %}">BROUILLON</div>
+    <div class="f-step {% if naissance.statut_dossier == 'termine' %}active{% endif %}">TERMINÉ</div>
   </div>
 </div>
+
+{% if naissance %}
+<div class="f-meta">
+  <span>Numéro : <b>{{ naissance.numero }}</b></span>
+  <span>Mère : <b>{{ naissance.mere.nom|upper }} {{ naissance.mere.prenoms }}</b></span>
+  <span>Enregistrée le <b>{{ naissance.date_creation|date:"d/m/Y à H:i" }}</b></span>
+</div>
+{% endif %}
 
 {% if error %}
 <div class="alert-error" style="margin-top:12px;">
@@ -65,35 +114,42 @@
     <div>
       <div class="form-field">
         <label class="field-label">Date de naissance</label>
-        <input type="datetime-local" name="date_accouchement" class="field-ul" required>
+        <input type="datetime-local" name="date_accouchement" class="field-ul" required
+               value="{% if naissance %}{{ naissance.date_accouchement|date:'Y-m-d\TH:i' }}{% endif %}">
       </div>
       <div class="form-field">
         <label class="field-label">Lieu de naissance</label>
-        <input type="text" name="lieu_naissance" class="field-ul">
+        <input type="text" name="lieu_naissance" class="field-ul" value="{{ naissance.lieu_naissance|default:'' }}">
       </div>
       <div class="form-field">
         <label class="field-label">Poids à la naissance</label>
-        <input type="number" name="poids_naissance" class="field-ul" step="0.01">
+        <input type="number" name="poids_naissance" class="field-ul" step="0.01"
+               value="{% if naissance.poids_naissance is not None %}{{ naissance.poids_naissance|unlocalize }}{% endif %}">
       </div>
       <div class="form-field">
         <label class="field-label">Genre</label>
-        <select name="sexe_enfant" class="field-ul" required><option value="" disabled selected hidden></option>
-          <option value="F">Féminin</option>
-          <option value="M">Masculin</option>
+        <select name="sexe_enfant" class="field-ul" required><option value="" disabled {% if not naissance %}selected{% endif %} hidden></option>
+          <option value="F" {% if naissance.sexe_enfant == 'F' %}selected{% endif %}>Féminin</option>
+          <option value="M" {% if naissance.sexe_enfant == 'M' %}selected{% endif %}>Masculin</option>
         </select>
       </div>
       <div class="form-field">
         <label class="field-label">Groupe sanguin</label>
-        <select name="groupe_sanguin_enfant" class="field-ul"><option value="" disabled selected hidden></option>
-          <option value="A+">A+</option><option value="A-">A-</option>
-          <option value="B+">B+</option><option value="B-">B-</option>
-          <option value="AB+">AB+</option><option value="AB-">AB-</option>
-          <option value="O+">O+</option><option value="O-">O-</option>
+        <select name="groupe_sanguin_enfant" class="field-ul"><option value="" disabled {% if not naissance %}selected{% endif %} hidden></option>
+          {% for gs in groupes_sanguins %}
+          <option value="{{ gs }}" {% if naissance.groupe_sanguin_enfant == gs %}selected{% endif %}>{{ gs }}</option>
+          {% endfor %}
         </select>
       </div>
       <div class="form-field">
         <label class="field-label">Taux d'hémoglobine</label>
-        <input type="number" name="taux_hemoglobine" class="field-ul" step="0.01">
+        <input type="number" name="taux_hemoglobine" class="field-ul" step="0.01"
+               value="{% if naissance.taux_hemoglobine is not None %}{{ naissance.taux_hemoglobine|unlocalize }}{% endif %}">
+      </div>
+      <div class="form-field">
+        <label class="field-label">Taille à la naissance (cm)</label>
+        <input type="number" name="taille_naissance" class="field-ul" step="0.1"
+               value="{% if naissance.taille_naissance is not None %}{{ naissance.taille_naissance|unlocalize }}{% endif %}">
       </div>
     </div>
 
@@ -101,34 +157,44 @@
     <div>
       <div class="form-field">
         <label class="field-label">Nom de la mère</label>
-        <select name="mere" class="field-ul" required><option value="" disabled selected hidden></option>
+        <select name="mere" class="field-ul" required><option value="" disabled {% if not naissance %}selected{% endif %} hidden></option>
           {% for p in patients %}
-          <option value="{{ p.pk }}">{{ p.nom|upper }} {{ p.prenoms }}</option>
+          <option value="{{ p.pk }}" {% if naissance.mere_id == p.pk %}selected{% endif %}>{{ p.nom|upper }} {{ p.prenoms }}</option>
           {% endfor %}
         </select>
       </div>
       <div class="form-field">
         <label class="field-label">Médecin</label>
-        <select name="medecin" class="field-ul"><option value="" disabled selected hidden></option>
+        <select name="medecin" class="field-ul"><option value="" disabled {% if not naissance %}selected{% endif %} hidden></option>
           {% for m in medecins %}
-          <option value="{{ m.pk }}">{{ m }}</option>
+          <option value="{{ m.pk }}" {% if naissance.medecin_id == m.pk %}selected{% endif %}>{{ m }}</option>
           {% endfor %}
         </select>
       </div>
       <div class="form-field">
         <label class="field-label">Statut naissance</label>
-        <select name="statut" class="field-ul"><option value="" disabled selected hidden></option>
-          <option value="vivant">Vivant</option>
-          <option value="mort_ne">Mort-né</option>
+        <select name="statut" class="field-ul"><option value="" disabled {% if not naissance %}selected{% endif %} hidden></option>
+          <option value="vivant" {% if naissance.statut == 'vivant' %}selected{% endif %}>Vivant</option>
+          <option value="mort_ne" {% if naissance.statut == 'mort_ne' %}selected{% endif %}>Mort-né</option>
         </select>
       </div>
       <div class="form-field">
         <label class="field-label">Nom de l'enfant</label>
-        <input type="text" name="nom_enfant" class="field-ul">
+        <input type="text" name="nom_enfant" class="field-ul" value="{{ naissance.nom_enfant|default:'' }}">
       </div>
       <div class="form-field">
         <label class="field-label">Prénoms de l'enfant</label>
-        <input type="text" name="prenoms_enfant" class="field-ul">
+        <input type="text" name="prenoms_enfant" class="field-ul" value="{{ naissance.prenoms_enfant|default:'' }}">
+      </div>
+      <div class="form-field">
+        <label class="field-label">Apgar 1 min</label>
+        <input type="number" name="apgar_1min" class="field-ul" min="0" max="10"
+               value="{{ naissance.apgar_1min|default_if_none:'' }}">
+      </div>
+      <div class="form-field">
+        <label class="field-label">Apgar 5 min</label>
+        <input type="number" name="apgar_5min" class="field-ul" min="0" max="10"
+               value="{{ naissance.apgar_5min|default_if_none:'' }}">
       </div>
     </div>
 
@@ -142,48 +208,51 @@
     <div>
       <div class="form-field">
         <label class="field-label">Info sur les parents</label>
-        <input type="text" name="info_parents" class="field-ul">
+        <input type="text" name="info_parents" class="field-ul" value="{{ naissance.info_parents|default:'' }}">
       </div>
       <div class="form-field">
         <label class="field-label">Éducation du patient</label>
-        <select name="education_mere" class="field-ul"><option value="" disabled selected hidden></option>
-          <option value="aucun">Aucun</option>
-          <option value="primaire">Primaire</option>
-          <option value="secondaire">Secondaire</option>
-          <option value="superieur">Supérieur</option>
+        <select name="education_mere" class="field-ul"><option value="" disabled {% if not naissance %}selected{% endif %} hidden></option>
+          <option value="aucun" {% if naissance.education_mere == 'aucun' %}selected{% endif %}>Aucun</option>
+          <option value="primaire" {% if naissance.education_mere == 'primaire' %}selected{% endif %}>Primaire</option>
+          <option value="secondaire" {% if naissance.education_mere == 'secondaire' %}selected{% endif %}>Secondaire</option>
+          <option value="superieur" {% if naissance.education_mere == 'superieur' %}selected{% endif %}>Supérieur</option>
         </select>
       </div>
       <div class="form-field">
         <label class="field-label">Âge de la mère</label>
-        <input type="number" name="age_mere" class="field-ul">
+        <input type="number" name="age_mere" class="field-ul" value="{{ naissance.age_mere|default_if_none:'' }}">
       </div>
       <div class="form-field">
         <label class="field-label">Mode d'accouchement</label>
-        <select name="mode_accouchement" class="field-ul"><option value="" disabled selected hidden></option>
-          <option value="voie_basse">Voie basse</option>
-          <option value="cesarienne">Césarienne</option>
-          <option value="forceps">Forceps</option>
-          <option value="ventouse">Ventouse</option>
+        <select name="mode_accouchement" class="field-ul"><option value="" disabled {% if not naissance %}selected{% endif %} hidden></option>
+          <option value="voie_basse" {% if naissance.mode_accouchement == 'voie_basse' %}selected{% endif %}>Voie basse</option>
+          <option value="cesarienne" {% if naissance.mode_accouchement == 'cesarienne' %}selected{% endif %}>Césarienne</option>
+          <option value="forceps" {% if naissance.mode_accouchement == 'forceps' %}selected{% endif %}>Forceps</option>
+          <option value="ventouse" {% if naissance.mode_accouchement == 'ventouse' %}selected{% endif %}>Ventouse</option>
         </select>
       </div>
       <div class="form-field">
         <label class="field-label">Parité</label>
-        <input type="number" name="parite" class="field-ul" value="0" min="0">
+        <input type="number" name="parite" class="field-ul" min="0"
+               value="{% if naissance %}{{ naissance.parite }}{% else %}0{% endif %}">
       </div>
       <div class="form-field">
         <label class="field-label">Garçon(s)</label>
-        <input type="number" name="nombre_garcons" class="field-ul" value="0" min="0">
+        <input type="number" name="nombre_garcons" class="field-ul" min="0"
+               value="{% if naissance %}{{ naissance.nombre_garcons }}{% else %}0{% endif %}">
       </div>
       <div class="form-field">
         <label class="field-label">Fille(s)</label>
-        <input type="number" name="nombre_filles" class="field-ul" value="0" min="0">
+        <input type="number" name="nombre_filles" class="field-ul" min="0"
+               value="{% if naissance %}{{ naissance.nombre_filles }}{% else %}0{% endif %}">
       </div>
     </div>
 
     <div>
       <div class="form-field">
         <label class="field-label">Remarques</label>
-        <textarea name="remarques" class="field-ul" rows="6"></textarea>
+        <textarea name="remarques" class="field-ul" rows="6">{{ naissance.remarques|default:'' }}</textarea>
       </div>
     </div>
 
@@ -191,4 +260,25 @@
 </div>
 
 </form>
+
+<script>
+(function () {
+  /* Dossier terminé : « Enregistrer » ne s'active qu'après une modification.
+     On écoute le formulaire entier (les événements input/change remontent), donc
+     un champ ajouté demain sera couvert sans rien changer ici. */
+  var form = document.getElementById('naissance-form');
+  if (!form || form.dataset.termine !== '1') return;
+  var bouton = form.querySelector('.btn-save');
+  if (!bouton) return;
+
+  function reveiller() {
+    bouton.disabled = false;
+    bouton.removeAttribute('title');
+    form.removeEventListener('input', reveiller);
+    form.removeEventListener('change', reveiller);
+  }
+  form.addEventListener('input', reveiller);
+  form.addEventListener('change', reveiller);
+})();
+</script>
 {% endblock %}

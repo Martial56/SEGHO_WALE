@@ -5,6 +5,20 @@ import unicodedata
 
 from django.http import HttpResponse
 
+
+def annees_avant(d, n):
+    """Recule la date `d` de `n` années, sans planter un 29 février.
+
+    `d.replace(year=...)` lève ValueError quand `d` est un 29 février et que
+    l'année d'arrivée n'est pas bissextile (ex. 2028-02-29 moins 18 ans →
+    2010-02-29 qui n'existe pas). On retombe alors sur le 28 février. Sert au
+    calcul des bornes de tranche d'âge des patients (majorité, senior)."""
+    try:
+        return d.replace(year=d.year - n)
+    except ValueError:
+        return d.replace(year=d.year - n, day=28)
+
+
 # Préfixes d'URL utilisés pour savoir "dans quel module" se trouve l'utilisateur,
 # afin de n'afficher dans la cloche de notifications que les alertes pertinentes
 # pour ce module (pas de mélange, rien sur la page d'accueil des modules).

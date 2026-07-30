@@ -1,0 +1,87 @@
+{% comment %}
+Menu « Filtres » généré depuis la déclaration de la liste — plus aucun menu à
+écrire à la main dans les modules.
+
+Une famille à valeur unique devient une simple ligne à cocher ; les autres se
+replient dans un sous-menu latéral, ce qui garde le menu court quel que soit le
+nombre de valeurs. La ligne parente porte `active` dès qu'une valeur est retenue
+à l'intérieur, sinon un filtre actif serait invisible tant qu'on ne survole pas.
+
+Les familles déclarées `exclusive` se comportent comme des boutons radio
+(setPeriode) ; les autres cumulent (toggleParam).
+
+La dernière entrée déplie le constructeur de conditions, à la manière d'Odoo :
+un panneau latéral avec ses listes déroulantes, et non une fenêtre modale, pour
+garder le menu des filtres visible pendant la saisie.
+
+Attend : listing_filtres (cf. core.listing.menu_filtres), date_from, date_to.
+{% endcomment %}
+{% for famille in listing_filtres %}
+
+  {% if famille.unique %}
+    {% for v in famille.valeurs %}
+    <a class="o-dd-item {% if v.active %}active{% endif %}" href="#"
+       onclick="toggleParam('filter','{{ v.code }}'); return false;">{{ v.libelle }}</a>
+    {% endfor %}
+
+  {% else %}
+    <div class="o-dd-item {% if famille.active %}active{% endif %}">
+      {{ famille.libelle }}
+      {% if famille.dates and periode_libelle %}<span class="o-dd-hint">{{ periode_libelle }}</span>{% endif %}
+      <span class="o-dd-arr">›</span>
+      <div class="o-dd-sub">
+        {% for v in famille.valeurs %}
+        <a class="o-dd-item {% if v.active %}active{% endif %}" href="#"
+           onclick="{% if famille.exclusive %}setPeriode('{{ v.code }}'){% else %}toggleParam('filter','{{ v.code }}'){% endif %}; return false;">{{ v.libelle }}</a>
+        {% endfor %}
+
+        {% if famille.dates %}
+        <hr class="o-dd-sep">
+        <div class="o-dd-date-block">
+          <div class="o-dd-date-row">
+            <label>De</label>
+            <input type="date" id="filter-date-from" class="o-dd-date-input" value="{{ date_from }}">
+          </div>
+          <div class="o-dd-date-row">
+            <label>À</label>
+            <input type="date" id="filter-date-to" class="o-dd-date-input" value="{{ date_to }}">
+          </div>
+          <div class="o-dd-date-actions">
+            <button type="button" class="o-dd-apply-btn" onclick="applyDateFilter()">Appliquer</button>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+
+{% endfor %}
+
+{% if listing_filtre_perso %}
+{% comment %}
+Le panneau s'ouvre au survol et reste épinglé (classe lstf-ouvert) : sans cet
+épinglage, un déplacement de souris le refermerait au milieu de la saisie.
+{% endcomment %}
+<div class="o-dd-item lstf-entree {% if conditions %}active{% endif %}" id="lstf-entree"
+     onclick="lstfBasculer(this); return false;">
+  Ajouter un filtre personnalisé{% if conditions %} ({{ conditions|length }}){% endif %}
+  <span class="o-dd-arr">›</span>
+
+  <div class="o-dd-sub lstf-panneau" onclick="event.stopPropagation();">
+    <div class="lstf-mode" id="lstf-mode">
+      Conditions à vérifier :
+      <select id="lstf-mode-select">
+        <option value="et">toutes</option>
+        <option value="ou">au moins une</option>
+      </select>
+    </div>
+    <div id="lstf-lignes"></div>
+    <div class="lstf-pied">
+      <button type="button" class="lstf-appliquer" onclick="lstfAppliquer()">APPLIQUER</button>
+      <button type="button" class="lstf-plus" onclick="lstfAjouterLigne()">
+        <i class="bi bi-plus-circle-fill"></i> AJOUTER UNE CONDITION
+      </button>
+    </div>
+  </div>
+</div>
+{% endif %}

@@ -1,0 +1,38 @@
+{% comment %}
+Une ligne du registre des naissances. `parent` est le chemin du groupe contenant,
+lu par listing_groupes.js pour le repliage.
+
+Les attributs data-* ne sont pas décoratifs : les vues Grille et Calendrier sont
+construites depuis ces lignes. Elles lisaient auparavant le texte des cellules
+par leur position — décalée d'un cran depuis la disparition d'une colonne — si
+bien que la grille annonçait le numéro à la place de la mère et perdait l'état de
+l'enfant. Lire des attributs nommés ne se décale pas.
+
+Le clic est branché par un écouteur délégué de la page, et non par un attribut
+onclick : les lignes sont remplacées à chaque rafraîchissement AJAX.
+{% endcomment %}
+<tr class="nai-row"{% if parent %} data-parent="{{ parent }}" style="display:none;"{% endif %}
+    data-url="{% url 'gynecologie_naissance_detail' objet.pk %}"
+    data-numero="{{ objet.numero }}"
+    data-mere="{{ objet.mere.nom|upper }} {{ objet.mere.prenoms }}"
+    data-jour="{{ objet.date_accouchement|date:'Y-m-d' }}"
+    data-date="{{ objet.date_accouchement|date:'d/m/Y H:i' }}"
+    data-medecin="{% if objet.medecin %}{{ objet.medecin }}{% endif %}"
+    data-mode="{{ objet.get_mode_accouchement_display }}"
+    data-enfant="{{ objet.nom_enfant }} {{ objet.prenoms_enfant }}"
+    data-sexe="{{ objet.get_sexe_enfant_display }}"
+    data-statut="{{ objet.statut }}"
+    data-statut-libelle="{{ objet.get_statut_display }}">
+  <td class="td-code">{{ objet.numero }}</td>
+  <td class="td-name">{{ objet.mere.nom|upper }} {{ objet.mere.prenoms }}</td>
+  <td>{{ objet.date_accouchement|date:"d/m/Y H:i" }}</td>
+  <td class="td-doctor">{% if objet.medecin %}{{ objet.medecin }}{% else %}—{% endif %}</td>
+  <td>{{ objet.get_mode_accouchement_display }}</td>
+  <td>{% if objet.nom_enfant %}{{ objet.nom_enfant }} {{ objet.prenoms_enfant }}{% else %}—{% endif %}</td>
+  <td class="td-center">{% if objet.sexe_enfant %}{{ objet.get_sexe_enfant_display }}{% else %}—{% endif %}</td>
+  <td class="td-center">{% if objet.poids_naissance %}{{ objet.poids_naissance }}{% else %}—{% endif %}</td>
+  <td class="td-center">{% if objet.taille_naissance %}{{ objet.taille_naissance }}{% else %}—{% endif %}</td>
+  <td class="td-center">{% if objet.apgar_1min is not None %}{{ objet.apgar_1min }}{% else %}—{% endif %}</td>
+  <td class="td-center">{% if objet.apgar_5min is not None %}{{ objet.apgar_5min }}{% else %}—{% endif %}</td>
+  <td><span class="o-badge badge-{{ objet.statut }}">{{ objet.get_statut_display }}</span></td>
+</tr>

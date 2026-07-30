@@ -92,13 +92,13 @@ html[data-theme="dark"] .o-ctrl-btn:hover {
 
 .o-nav-grid:hover {
     background: rgba(0, 0, 0, 0.06);
-    color: var(--teal-700);
+    color: var(--accent-text);
 }
 
 .o-nav-brand {
     font-size: 14px;
     font-weight: 600;
-    color: var(--teal-700);
+    color: var(--accent-text);
     padding: 0 12px 0 4px;
     margin-right: 2px;
     border-right: 1px solid rgba(0, 0, 0, 0.12);
@@ -125,40 +125,51 @@ html[data-theme="dark"] .o-ctrl-btn:hover {
 
 .o-nav-link:hover,
 .o-nav-link.active {
-    color: var(--teal-700);
-    background: rgba(21, 87, 112, 0.06);
+    color: var(--accent-text);
+    background: rgba(var(--teal-600-rgb), 0.07);
     border-bottom-color: var(--teal-600);
 }
 
+/* ── Barre de navigation en mode sombre ──
+   Le texte suit la logique du mode clair, qui pose ses neutres ici même (#ffffff,
+   #e0e0e0, du noir translucide) plutôt que via les variables partagées : d'où le
+   blanc translucide aux mêmes pourcentages — 45 % pour l'icône d'accueil, 58 %
+   pour les onglets.
+   Le fond reprend celui de la page (--surface-muted) : la barre se fond dans le
+   contenu au lieu de ressortir en bande plus claire.
+   Les nuances 300/400 de la rampe sont les versions claires de l'accent : sur
+   fond sombre, l'accent brut (nuance 600) peut être trop foncé pour se lire. */
 html[data-theme="dark"] .o-nav {
-    background: #141b22;
-    border-bottom-color: #1f2933;
+    background: var(--surface-muted);
+    border-bottom-color: var(--border);
     box-shadow: none;
 }
 
 html[data-theme="dark"] .o-nav-grid {
-    color: #6b7884;
+    color: rgba(255, 255, 255, 0.45);
 }
 
 html[data-theme="dark"] .o-nav-grid:hover {
-    background: rgba(24, 95, 165, 0.12);
-    color: #85b7eb;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--teal-300);
 }
 
 html[data-theme="dark"] .o-nav-brand {
-    color: #85b7eb;
-    border-right-color: #1f2933;
+    color: var(--teal-300);
+    border-right-color: rgba(255, 255, 255, 0.12);
 }
 
 html[data-theme="dark"] .o-nav-link {
-    color: #6b7884;
+    color: rgba(255, 255, 255, 0.58);
 }
 
+/* Comme en clair, l'onglet actif porte la couleur du logiciel sur son texte
+   comme sur son soulignement. */
 html[data-theme="dark"] .o-nav-link:hover,
 html[data-theme="dark"] .o-nav-link.active {
-    color: #eef3f8;
-    background: rgba(24, 95, 165, 0.12);
-    border-bottom-color: #378add;
+    color: var(--teal-300);
+    background: rgba(var(--teal-600-rgb), 0.14);
+    border-bottom-color: var(--teal-400);
 }
 
 @media (max-width: 680px) {
@@ -225,7 +236,7 @@ html[data-theme="dark"] .o-subheader {
     border-radius: 7px;
     font-size: 12.5px;
     font-weight: 600;
-    color: var(--teal-700);
+    color: var(--accent-text);
     text-decoration: none;
     background: transparent;
     transition: background 0.15s, color 0.15s;
@@ -236,17 +247,17 @@ html[data-theme="dark"] .o-subheader {
 }
 
 .o-back-btn:hover {
-    background: rgba(21, 87, 112, 0.08);
-    color: var(--teal-700);
+    background: rgba(var(--teal-700-rgb), 0.08);
+    color: var(--accent-text);
 }
 
 html[data-theme="dark"] .o-back-btn {
-    color: #85b7eb;
+    color: var(--teal-300);
 }
 
 html[data-theme="dark"] .o-back-btn:hover {
-    background: rgba(24, 95, 165, 0.14);
-    color: #a9cdf2;
+    background: rgba(var(--teal-500-rgb), 0.14);
+    color: var(--teal-200);
 }
 
 html {
@@ -291,6 +302,11 @@ html[data-theme="dark"] ::-webkit-scrollbar-thumb {
 /* ══════════════════════════════════════
    TOPBAR
 ══════════════════════════════════════ */
+/* Pas d'ombre portée : le bandeau du haut descend jusque sous la barre de
+   navigation du module (qu'il contient) et passe au-dessus de tout, si bien que
+   son ombre se lisait comme une bande sombre juste sous les menus. La bordure
+   basse suffit à détacher le bandeau. Le mode clair n'en avait déjà plus, la
+   règle de base.html la neutralisant — les deux thèmes sont maintenant alignés. */
 .topbar {
     display: flex;
     align-items: center;
@@ -301,11 +317,7 @@ html[data-theme="dark"] ::-webkit-scrollbar-thumb {
     position: sticky;
     top: 0;
     z-index: var(--z-topbar);
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
-}
-
-html[data-theme="dark"] .topbar {
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+    box-shadow: none;
 }
 
 .brand {
@@ -344,7 +356,7 @@ html[data-theme="dark"] .topbar {
 }
 
 html[data-theme="dark"] .brand-text h1 {
-    color: #cce8f4;
+    color: var(--teal-100);
 }
 
 html[data-theme="dark"] .brand-text p {
@@ -373,7 +385,7 @@ html[data-theme="dark"] .brand-text p {
     display: flex;
     align-items: center;
     gap: 6px;
-    color: var(--teal-700);
+    color: var(--accent-text);
     text-decoration: none;
     transition: all 0.15s;
     box-shadow: var(--shadow-sm);
@@ -433,8 +445,8 @@ html[data-theme="dark"] .top-alert-badge {
 }
 
 .icon-btn:hover {
-    background: rgba(33, 136, 171, 0.08);
-    color: var(--teal-700);
+    background: rgba(var(--teal-500-rgb), 0.08);
+    color: var(--accent-text);
 }
 
 .icon-btn .notif-dot {
@@ -450,12 +462,12 @@ html[data-theme="dark"] .top-alert-badge {
 }
 
 html[data-theme="dark"] .icon-btn {
-    color: #4a7a90;
+    color: var(--text-muted);
 }
 
 html[data-theme="dark"] .icon-btn:hover {
-    background: rgba(33, 136, 171, 0.12);
-    color: #cce8f4;
+    background: rgba(var(--teal-500-rgb), 0.12);
+    color: var(--teal-100);
 }
 
 html[data-theme="dark"] .icon-btn .notif-dot {
@@ -490,7 +502,7 @@ html[data-theme="dark"] .icon-btn .icon-moon {
 .top-clock .time {
     font-size: 18px;
     font-weight: 700;
-    color: var(--teal-700);
+    color: var(--accent-text);
     font-variant-numeric: tabular-nums;
 }
 
@@ -502,58 +514,15 @@ html[data-theme="dark"] .top-clock .time {
     color: var(--teal-300);
 }
 
-/* User chip */
-.user-chip {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    background: #f7fcff;
-    border: 1px solid rgba(33, 136, 171, 0.12);
-    border-radius: 30px;
-    padding: 6px 14px 6px 7px;
-}
-
-.user-avatar {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    background: linear-gradient(135deg, var(--teal-600), var(--teal-400));
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 13px;
-    font-weight: 800;
-    color: #fff;
-}
-
-.user-info .uname {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--teal-900);
-}
-
-.user-info .urole {
-    font-size: 10px;
-    color: var(--text-muted);
-}
-
-html[data-theme="dark"] .user-chip {
-    background: rgba(33, 136, 171, 0.12);
-    border-color: rgba(33, 136, 171, 0.2);
-}
-
-html[data-theme="dark"] .user-info .uname {
-    color: #cce8f4;
-}
-
-html[data-theme="dark"] .user-info .urole {
-    color: rgba(255, 255, 255, 0.35);
-}
+/* User chip : rien ici.
+   Tout le bandeau utilisateur (.user-chip, .user-avatar, .user-info) est habillé
+   dans le <style> de base.html, chargé après cette feuille — les règles écrites
+   ici seraient systématiquement écrasées, en clair comme en sombre. C'est
+   base.html qu'il faut modifier. */
 
 /* Logout */
 .btn-logout {
-    background: rgba(33, 136, 171, 0.08);
+    background: rgba(var(--teal-500-rgb), 0.08);
     border: none;
     border-radius: 10px;
     color: var(--teal-800);
@@ -574,8 +543,8 @@ html[data-theme="dark"] .user-info .urole {
 }
 
 html[data-theme="dark"] .btn-logout {
-    background: rgba(33, 136, 171, 0.12);
-    color: #7aaec7;
+    background: rgba(var(--teal-500-rgb), 0.12);
+    color: var(--teal-300);
 }
 
 html[data-theme="dark"] .btn-logout:hover {
@@ -623,8 +592,8 @@ html[data-theme="dark"] .btn-logout:hover {
 }
 
 .breadcrumb a:hover {
-    background: rgba(33, 136, 171, .08);
-    color: var(--teal-600);
+    background: rgba(var(--teal-500-rgb), .08);
+    color: var(--accent-text-soft);
 }
 
 .breadcrumb span,
@@ -642,7 +611,7 @@ html[data-theme="dark"] .breadcrumb a {
 }
 
 html[data-theme="dark"] .breadcrumb a:hover {
-    background: rgba(33, 136, 171, .15);
+    background: rgba(var(--teal-500-rgb), .15);
     color: var(--teal-200);
 }
 
@@ -681,7 +650,7 @@ html[data-theme="dark"] .breadcrumb-sep {
 }
 
 html[data-theme="dark"] .page-header-left h1 {
-    color: #cce8f4;
+    color: var(--teal-100);
 }
 
 html[data-theme="dark"] .page-header-left p {
@@ -745,13 +714,11 @@ html[data-theme="dark"] .page-header-left p {
     font-size: 13px;
 }
 
-html[data-theme="dark"] .btn-primary {
-    background: #185fa5;
-    color: #e6f1fb;
-}
-html[data-theme="dark"] .btn-primary:hover {
-    background: #1a6dbf;
-}
+/* Pas de variante sombre pour .btn-primary : la règle claire est déjà écrite en
+   var(--teal-500) sur texte blanc, donc elle suit la couleur d'accent choisie et
+   se comporte pareil dans les deux thèmes. L'ancienne surcharge décalait d'un
+   palier (600 au lieu de 500) et le bouton n'avait pas la même teinte ici que
+   sur les pages qui, comme la liste des rendez-vous, ne la subissaient pas. */
 
 html[data-theme="dark"] .btn-secondary {
     background: rgba(255, 255, 255, 0.06);
@@ -823,7 +790,7 @@ html[data-theme="dark"] .btn-warning {
 .card-stat {
     font-size: 28px;
     font-weight: 800;
-    color: var(--teal-600);
+    color: var(--accent-text-soft);
     margin-top: 12px;
 }
 
@@ -899,7 +866,7 @@ html[data-theme="dark"] thead {
 }
 
 html[data-theme="dark"] th {
-    color: #85b7eb;
+    color: var(--teal-300);
 }
 
 html[data-theme="dark"] td {
@@ -908,7 +875,7 @@ html[data-theme="dark"] td {
 }
 
 html[data-theme="dark"] tbody tr:hover {
-    background: rgba(24, 95, 165, 0.08);
+    background: rgba(var(--teal-500-rgb), 0.08);
 }
 
 /* ══════════════════════════════════════
@@ -983,7 +950,7 @@ html[data-theme="dark"] .alert-info {
 
 .badge-primary {
     background: rgba(var(--teal-600-rgb), 0.15);
-    color: var(--teal-600);
+    color: var(--accent-text-soft);
 }
 
 .badge-success {
@@ -1002,7 +969,7 @@ html[data-theme="dark"] .alert-info {
 }
 
 /* Badges statut stock/pharmacie (partagés — mêmes valeurs dans les deux modules) */
-.badge-ok, .badge-ph-ok           { background:rgba(var(--teal-600-rgb),.1); color:var(--teal-600); border:1px solid rgba(var(--teal-600-rgb),.25); padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
+.badge-ok, .badge-ph-ok           { background:rgba(var(--teal-600-rgb),.1); color:var(--accent-text-soft); border:1px solid rgba(var(--teal-600-rgb),.25); padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
 .badge-alerte, .badge-ph-alerte   { background:rgba(var(--amber-rgb),.1); color:var(--amber-text); border:1px solid rgba(var(--amber-rgb),.25); padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
 .badge-rupture, .badge-ph-rupture { background:rgba(var(--rose-rgb),.1); color:var(--rose-text); border:1px solid rgba(var(--rose-rgb),.25); padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
 html[data-theme="dark"] .badge-ok, html[data-theme="dark"] .badge-ph-ok           { background:rgba(var(--teal-600-rgb),.22); color:var(--teal-300); border-color:rgba(var(--teal-600-rgb),.35); }
@@ -1043,7 +1010,7 @@ html[data-theme="dark"] .badge-rupture, html[data-theme="dark"] .badge-ph-ruptur
 .form-group select:focus {
     outline: none;
     border-color: var(--teal-500);
-    box-shadow: 0 0 0 3px rgba(33, 136, 171, 0.1);
+    box-shadow: 0 0 0 3px rgba(var(--teal-500-rgb), 0.1);
 }
 
 html[data-theme="dark"] .form-group label {
@@ -1062,8 +1029,8 @@ html[data-theme="dark"] .form-group select {
 html[data-theme="dark"] .form-group input:focus,
 html[data-theme="dark"] .form-group textarea:focus,
 html[data-theme="dark"] .form-group select:focus {
-    border-color: #378add;
-    box-shadow: 0 0 0 3px rgba(55, 138, 221, 0.15);
+    border-color: var(--teal-400);
+    box-shadow: 0 0 0 3px rgba(var(--teal-400-rgb), 0.15);
 }
 
 /* ══════════════════════════════════════
@@ -1085,8 +1052,8 @@ html[data-theme="dark"] .form-group select:focus {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: rgba(33, 136, 171, 0.12);
-    color: var(--teal-600);
+    background: rgba(var(--teal-500-rgb), 0.12);
+    color: var(--accent-text-soft);
     border-radius: 20px;
     padding: 0 8px;
     min-width: 22px;
@@ -1097,8 +1064,8 @@ html[data-theme="dark"] .form-group select:focus {
 }
 
 html[data-theme="dark"] .o-page-count {
-    background: #0c447c;
-    color: #85b7eb;
+    background: var(--teal-700);
+    color: var(--teal-300);
 }
 
 .o-btn-create {
@@ -1125,14 +1092,9 @@ html[data-theme="dark"] .o-page-count {
     color: #fff;
 }
 
-html[data-theme="dark"] .o-btn-create {
-    background: #185fa5;
-    color: #e6f1fb;
-}
-
-html[data-theme="dark"] .o-btn-create:hover {
-    background: #1a6dbf;
-}
+/* Même raison que pour .btn-primary : aucune variante sombre. La règle claire
+   suit déjà l'accent, et la surcharge donnait au bouton « Créer » une teinte
+   différente selon les modules. */
 
 .o-search-bar {
     display: flex;
@@ -1185,7 +1147,7 @@ html[data-theme="dark"] .o-search-bar {
 }
 
 html[data-theme="dark"] .o-search-bar:focus-within {
-    border-bottom-color: #378add;
+    border-bottom-color: var(--teal-400);
 }
 
 .o-ctrl-sep {
@@ -1204,9 +1166,9 @@ html[data-theme="dark"] .o-ctrl-sep {
     display: inline-flex;
     align-items: center;
     gap: 3px;
-    background: rgba(33, 136, 171, 0.08);
-    color: var(--teal-700);
-    border: 1px solid rgba(33, 136, 171, 0.2);
+    background: rgba(var(--teal-500-rgb), 0.08);
+    color: var(--accent-text);
+    border: 1px solid rgba(var(--teal-500-rgb), 0.2);
     border-radius: 4px;
     padding: 2px 8px;
     font-size: 11.5px;
@@ -1227,9 +1189,9 @@ html[data-theme="dark"] .o-ctrl-sep {
 }
 
 html[data-theme="dark"] .o-filter-tag {
-    background: rgba(33, 136, 171, 0.15);
+    background: rgba(var(--teal-500-rgb), 0.15);
     color: var(--teal-300);
-    border-color: rgba(33, 136, 171, 0.3);
+    border-color: rgba(var(--teal-500-rgb), 0.3);
 }
 
 .o-pag-btn {

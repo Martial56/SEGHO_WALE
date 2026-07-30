@@ -1,0 +1,65 @@
+{% comment %}
+Menu « Regrouper par » généré depuis les dimensions déclarées.
+
+Les dimensions portant un `sous_menu` (les découpages de date) sont rassemblées
+sous une entrée dépliable. Les regroupements se cumulent : cliquer Sexe puis État
+produit des groupes imbriqués, dans l'ordre des clics.
+
+La dernière entrée donne accès aux champs non déclarés — ceux des formulaires,
+plusieurs centaines. Une liste déroulante et non des lignes de menu : trois cents
+lignes déborderaient de l'écran sans qu'on puisse les parcourir, alors que le
+navigateur sait faire défiler une liste déroulante et y chercher au clavier. Les
+groupements déjà retenus la précèdent sous forme de lignes cochées, seul moyen de
+les retirer.
+
+Attend : listing_groupes (cf. core.listing.menu_groupes).
+{% endcomment %}
+{% for entree in listing_groupes %}
+
+  {% if entree.perso %}
+    {% for a in entree.actives %}
+    <a class="o-dd-item active" href="#"
+       onclick="toggleParam('group','{{ a.cle }}'); return false;"
+       >{% if a.groupe %}{{ a.groupe }} · {% endif %}{{ a.libelle }}</a>
+    {% endfor %}
+
+    {% comment %}
+    Le clic bascule `lstg-ouvert` : sans lui l'entrée resterait inatteignable au
+    tactile, où il n'y a pas de survol. Le gestionnaire est écrit en attribut car
+    la barre de contrôles est réinjectée par innerHTML après chaque rafraîchissement
+    AJAX — un <script> ne s'y exécuterait pas, un attribut reste actif.
+    {% endcomment %}
+    <div class="o-dd-item lstg-perso"
+         onclick="this.classList.toggle('lstg-ouvert'); return false;">
+      {{ entree.libelle }}
+      <span class="o-dd-arr">›</span>
+      <div class="o-dd-sub lstg-panneau" onclick="event.stopPropagation();">
+        <select class="lstg-select" aria-label="{{ entree.libelle }}"
+                onchange="if (this.value) toggleParam('group', this.value);">
+          <option value="">Choisir un champ…</option>
+          {% for g in entree.groupes %}
+            {% if g.libelle %}<optgroup label="{{ g.libelle }}">{% endif %}
+            {% for v in g.valeurs %}<option value="{{ v.cle }}">{{ v.libelle }}</option>{% endfor %}
+            {% if g.libelle %}</optgroup>{% endif %}
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+  {% elif entree.valeurs %}
+    <div class="o-dd-item {% if entree.active %}active{% endif %}">
+      {{ entree.libelle }} <span class="o-dd-arr">›</span>
+      <div class="o-dd-sub">
+        {% for v in entree.valeurs %}
+        <a class="o-dd-item {% if v.active %}active{% endif %}" href="#"
+           onclick="toggleParam('group','{{ v.cle }}'); return false;">{{ v.libelle }}</a>
+        {% endfor %}
+      </div>
+    </div>
+
+  {% else %}
+    <a class="o-dd-item {% if entree.active %}active{% endif %}" href="#"
+       onclick="toggleParam('group','{{ entree.cle }}'); return false;">{{ entree.libelle }}</a>
+  {% endif %}
+
+{% endfor %}
