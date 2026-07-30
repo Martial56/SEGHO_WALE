@@ -658,8 +658,10 @@ def laboratoire_list(request):
     from laboratoire.models import DemandeExamen
     from django.core.paginator import Paginator
 
-    q      = request.GET.get('q', '').strip()
-    statut = request.GET.get('statut', '')
+    q          = request.GET.get('q', '').strip()
+    statut     = request.GET.get('statut', '')
+    date_debut = request.GET.get('date_debut', '')
+    date_fin   = request.GET.get('date_fin', '')
 
     statut_choices = DemandeExamen.STATUT
     statut_label   = dict(statut_choices).get(statut, statut)
@@ -679,6 +681,14 @@ def laboratoire_list(request):
 
     if statut:
         demandes = demandes.filter(statut=statut)
+
+    if date_debut or date_fin:
+        if date_debut:
+            demandes = demandes.filter(date_creation__date__gte=date_debut)
+        if date_fin:
+            demandes = demandes.filter(date_creation__date__lte=date_fin)
+    else:
+        demandes = demandes.filter(date_creation__date=timezone.now().date())
 
     now = timezone.now()
     stats = {
@@ -700,6 +710,9 @@ def laboratoire_list(request):
         'statut':         statut,
         'statut_label':   statut_label,
         'statut_choices': statut_choices,
+        'date_debut':     date_debut,
+        'date_fin':       date_fin,
+        'today':          timezone.now().date(),
         'total':          page_obj.paginator.count,
         'breadcrumb':     breadcrumb,
     })
@@ -1041,9 +1054,10 @@ def laboratoire_create(request):
 
 @login_required(login_url='login')
 def laboratoire_detail(request, pk):
-    from laboratoire.models import DemandeExamen
+    from laboratoire.models import DemandeExamen, LigneDemandeExamen
 
     demande = get_object_or_404(DemandeExamen, pk=pk)
+    peut_modifier_lignes = demande.statut == 'brouillon' and not demande.facture
 
     if request.method == 'POST':
         action = request.POST.get('action')
@@ -1059,12 +1073,52 @@ def laboratoire_detail(request, pk):
                     messages.error(request, f'Échec de l\'envoi : {echange.message_log}')
             except RuntimeError as exc:
                 messages.error(request, str(exc))
+        elif action == 'maj_lignes' and peut_modifier_lignes:
+            ids_conserves = set()
+            total = 0
+            i = 0
+            while True:
+                nom = request.POST.get(f'ligne_examen_{i}')
+                if nom is None:
+                    break
+                nom = nom.strip()
+                if nom:
+                    try:
+                        prix = float(request.POST.get(f'ligne_prix_{i}', 0) or 0)
+                    except ValueError:
+                        prix = 0
+                    instructions = request.POST.get(f'ligne_instructions_{i}', '').strip()
+                    ligne_id = request.POST.get(f'ligne_id_{i}', '').strip()
+                    if ligne_id:
+                        LigneDemandeExamen.objects.filter(pk=ligne_id, demande=demande).update(
+                            libelle=nom, prix=prix, instructions=instructions,
+                        )
+                        ids_conserves.add(int(ligne_id))
+                    else:
+                        nouvelle = LigneDemandeExamen.objects.create(
+                            demande=demande, libelle=nom, prix=prix, instructions=instructions,
+                        )
+                        ids_conserves.add(nouvelle.pk)
+                    total += prix
+                i += 1
+            demande.lignes.exclude(pk__in=ids_conserves).delete()
+            demande.montant_total = total
+            demande.save(update_fields=['montant_total'])
+            messages.success(request, 'Tests mis à jour avec succès.')
         return redirect('laboratoire_detail', pk=pk)
 
     lignes = demande.lignes.select_related('type_examen').all()
+    services_examens = []
+    if peut_modifier_lignes:
+        from services.models import Articleservice
+        services_examens = Articleservice.objects.filter(
+            categorie__code='EX', actif=True
+        ).order_by('nom')
     return render(request, 'laboratoire/detail_demande.html', {
         'demande': demande,
         'lignes': lignes,
+        'peut_modifier_lignes': peut_modifier_lignes,
+        'services_examens': services_examens,
         'facture_url': f'/facturation/nouvelle/?patient={demande.patient_id}&demande={demande.pk}&back=/laboratoire/{demande.pk}/',
         'breadcrumb': [
             {'title': 'Accueil', 'url': '/'},

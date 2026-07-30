@@ -139,6 +139,8 @@ def soins_list(request):
     q = request.GET.get('q', '').strip()
     statut = request.GET.get('statut', '').strip()
     date_filtre = request.GET.get('date', '').strip()
+    date_debut = request.GET.get('date_debut', '').strip()
+    date_fin = request.GET.get('date_fin', '').strip()
     patient_id = request.GET.get('patient_id', '').strip()
     hospitalisation_id = request.GET.get('hospitalisation_id', '').strip()
 
@@ -173,8 +175,15 @@ def soins_list(request):
     if statut:
         soins = soins.filter(statut=statut)
 
-    if date_filtre:
+    if date_debut or date_fin:
+        if date_debut:
+            soins = soins.filter(date_creation__date__gte=date_debut)
+        if date_fin:
+            soins = soins.filter(date_creation__date__lte=date_fin)
+    elif date_filtre:
         soins = soins.filter(date_creation__date=date_filtre)
+    elif not (hospitalisation_id or patient_id):
+        soins = soins.filter(date_creation__date=timezone.now().date())
 
     total = soins.count()
     paginator = Paginator(soins, 25)
@@ -211,6 +220,9 @@ def soins_list(request):
         'q': q,
         'statut': statut,
         'date_filtre': date_filtre,
+        'date_debut': date_debut,
+        'date_fin': date_fin,
+        'today': today,
         'patient_id': patient_id,
         'patient_filtre': patient_filtre,
         'hospitalisation_id': hospitalisation_id,

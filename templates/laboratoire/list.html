@@ -546,6 +546,73 @@
     color: var(--text);
   }
 
+  /* ── Dropdown période ── */
+  .o-dd-period {
+    padding: 4px 14px 8px;
+  }
+
+  .o-dd-period-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+
+  .o-dd-period-row label {
+    font-size: 11px;
+    color: var(--text-muted);
+    width: 34px;
+    flex-shrink: 0;
+  }
+
+  .o-dd-period-row input[type="date"] {
+    flex: 1;
+    font-size: 12px;
+    padding: 3px 6px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--surface);
+    color: var(--text);
+  }
+
+  .o-dd-period-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+  }
+
+  .o-dd-period-apply {
+    flex: 1;
+    background: var(--teal-500, var(--teal-500));
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-size: 12px;
+    padding: 5px 0;
+    cursor: pointer;
+    font-weight: 500;
+  }
+
+  .o-dd-period-apply:hover {
+    background: var(--teal-600, var(--teal-600));
+  }
+
+  .o-dd-period-reset {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    border-radius: 4px;
+    font-size: 12px;
+    padding: 5px 10px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .o-dd-period-reset:hover {
+    border-color: var(--teal-400, var(--teal-400));
+    color: var(--teal-600, var(--teal-600));
+  }
+
   /* ── Table ── */
   .o-list-wrap {
     overflow-x: auto;
@@ -724,9 +791,18 @@
     <!-- Ligne 1 : titre + recherche -->
     <div class="o-subheader-row">
       <span class="o-page-title">Demandes <span class="o-page-count">{{ total }}</span></span>
+      <span style="font-size:12px;color:var(--text-muted);">
+        {% if date_debut or date_fin %}
+          Période&nbsp;: {{ date_debut|default:"…" }} → {{ date_fin|default:"…" }}
+        {% else %}
+          Aujourd'hui ({{ today|date:"d/m/Y" }})
+        {% endif %}
+      </span>
       <div class="o-subheader-row-right">
         <form method="get" id="filter-form" style="display:flex;align-items:center;">
           <input type="hidden" name="statut" id="fi-statut" value="{{ statut }}">
+          <input type="hidden" name="date_debut" id="fi-date-debut" value="{{ date_debut }}">
+          <input type="hidden" name="date_fin" id="fi-date-fin" value="{{ date_fin }}">
           <div class="o-search-bar">
             <input class="o-search-input" id="search-input" type="text" name="q" value="{{ q }}"
               placeholder="Rechercher patient, numéro…" autocomplete="off">
@@ -748,13 +824,15 @@
         {% if q %}<span class="o-filter-tag">{{ q }} <a onclick="clearQ()" title="Supprimer">×</a></span>{% endif %}
         {% if statut %}<span class="o-filter-tag">{{ statut_label }} <a onclick="setFiltre('')"
             title="Supprimer">×</a></span>{% endif %}
+        {% if date_debut or date_fin %}<span class="o-filter-tag">{{ date_debut|default:"…" }} → {{ date_fin|default:"…" }} <a onclick="clearPeriode()"
+            title="Supprimer">×</a></span>{% endif %}
 
         <!-- Dropdown Filtres -->
         <div class="o-dd-wrap">
-          <button class="o-ctrl-btn {% if statut %}active{% endif %}" id="btn-filtres"
+          <button class="o-ctrl-btn {% if statut or date_debut or date_fin %}active{% endif %}" id="btn-filtres"
             onclick="toggleDd('dd-filtres', this)">
-            <i class="bi bi-funnel{% if statut %}-fill{% endif %}"></i>
-            Filtres{% if statut %}&nbsp;<span style="background:var(--teal-500,var(--teal-500));color:#fff;border-radius:10px;font-size:10px;padding:0 5px;vertical-align:middle;">1</span>{% endif %}
+            <i class="bi bi-funnel{% if statut or date_debut or date_fin %}-fill{% endif %}"></i>
+            Filtres{% if statut or date_debut or date_fin %}&nbsp;<span style="background:var(--teal-500,var(--teal-500));color:#fff;border-radius:10px;font-size:10px;padding:0 5px;vertical-align:middle;">{{ statut|yesno:"1," }}{% if date_debut or date_fin %}•{% endif %}</span>{% endif %}
           </button>
           <div class="o-dd-panel" id="dd-filtres">
             <div class="o-dd-section">Filtrer par statut</div>
@@ -767,6 +845,24 @@
               <i class="bi bi-x-circle" style="font-size:11px;margin-right:6px;"></i> Effacer
             </a>
             {% endif %}
+            <hr class="o-dd-sep">
+            <div class="o-dd-section">Période</div>
+            <div class="o-dd-period">
+              <div class="o-dd-period-row">
+                <label for="date-debut-input">Du</label>
+                <input type="date" id="date-debut-input" value="{{ date_debut }}">
+              </div>
+              <div class="o-dd-period-row">
+                <label for="date-fin-input">Au</label>
+                <input type="date" id="date-fin-input" value="{{ date_fin }}">
+              </div>
+              <div class="o-dd-period-actions">
+                <button type="button" class="o-dd-period-apply" onclick="applyPeriode()">Appliquer</button>
+                {% if date_debut or date_fin %}
+                <button type="button" class="o-dd-period-reset" onclick="clearPeriode()">Aujourd'hui</button>
+                {% endif %}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -775,11 +871,11 @@
         <!-- Pagination -->
         <span class="o-pag-label">{% if page_obj.paginator.count > 0 %}{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}{% else %}0{% endif %}</span>
         <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
-          href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}&q={{ q }}&statut={{ statut }}{% else %}#{% endif %}">
+          href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}&q={{ q }}&statut={{ statut }}{% if date_debut %}&date_debut={{ date_debut }}{% endif %}{% if date_fin %}&date_fin={{ date_fin }}{% endif %}{% else %}#{% endif %}">
           <i class="bi bi-chevron-left"></i>
         </a>
         <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
-          href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}&q={{ q }}&statut={{ statut }}{% else %}#{% endif %}">
+          href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}&q={{ q }}&statut={{ statut }}{% if date_debut %}&date_debut={{ date_debut }}{% endif %}{% if date_fin %}&date_fin={{ date_fin }}{% endif %}{% else %}#{% endif %}">
           <i class="bi bi-chevron-right"></i>
         </a>
 
@@ -920,6 +1016,16 @@
   }
   function clearQ() {
     document.getElementById('search-input').value = '';
+    document.getElementById('filter-form').submit();
+  }
+  function applyPeriode() {
+    document.getElementById('fi-date-debut').value = document.getElementById('date-debut-input').value;
+    document.getElementById('fi-date-fin').value = document.getElementById('date-fin-input').value;
+    document.getElementById('filter-form').submit();
+  }
+  function clearPeriode() {
+    document.getElementById('fi-date-debut').value = '';
+    document.getElementById('fi-date-fin').value = '';
     document.getElementById('filter-form').submit();
   }
 

@@ -210,7 +210,7 @@ def pharmacie_ordonnances(request, pharmacie):
         date_emission__date=selected_date
     ).select_related(
         'consultation__patient', 'consultation__medecin', 'patient', 'medecin', 'dispensation'
-    ).prefetch_related('lignes__medicament').order_by('-date_emission')
+    ).prefetch_related('lignes__produit', 'lignes__medicament').order_by('-date_emission')
 
     if statut_filtre:
         qs = qs.filter(statut=statut_filtre)
@@ -388,61 +388,17 @@ def pharmacie_dispenser(request, pharmacie, pk):
                     # en écrase une autre après une lecture obsolète).
                     sp = StockPharmacie.objects.select_for_update().get(pk=item['stock_item'].pk)
 
-                    # Vérifier si le stock a déjà été réservé, et dans quelle
-                    # pharmacie, au moment de la création de l'ordonnance
-                    # (signal LigneOrdonnance) — la réservation peut avoir eu
-                    # lieu dans une AUTRE pharmacie que celle qui dispense
-                    # réellement (stock choisi à la prescription = "la mieux
-                    # fournie", pas forcément celle où le patient se présente).
-                    pre_ref = f'ORD:{ordonnance.numero}'
-                    reservation = MouvementPharmacie.objects.filter(
-                        produit=sp.produit, type='dispensation', reference=pre_ref,
-                    ).first()
-
-                    if reservation and reservation.pharmacie == pharmacie:
-                        # Réservation faite dans CETTE pharmacie : on
-                        # confirme sans re-déduire (déjà fait à la réservation).
-                        reservation.reference = ordonnance.numero
-                        reservation.notes = 'Dispensation confirmée (réservation ordonnance)'
-                        reservation.cree_par = request.user
-                        reservation.save(update_fields=['reference', 'notes', 'cree_par'])
-                    else:
-                        if reservation:
-                            # Réservation faite dans une AUTRE pharmacie que
-                            # celle qui dispense réellement : on l'annule et
-                            # on restitue le stock qui y avait été réservé à
-                            # tort, pour ne pas fausser durablement ce site.
-                            autre_sp = StockPharmacie.objects.select_for_update().filter(
-                                pharmacie=reservation.pharmacie, produit=sp.produit,
-                            ).first()
-                            if autre_sp:
-                                avant_autre = float(autre_sp.quantite)
-                                apres_autre = avant_autre + float(reservation.quantite)
-                                autre_sp.quantite = apres_autre
-                                autre_sp.save(update_fields=['quantite'])
-                                MouvementPharmacie.objects.create(
-                                    pharmacie=reservation.pharmacie, produit=sp.produit,
-                                    type='ajustement', quantite=reservation.quantite,
-                                    stock_avant=avant_autre, stock_apres=apres_autre,
-                                    reference=ordonnance.numero,
-                                    notes=f'Annulation réservation erronée '
-                                          f'(finalement dispensé à {label})',
-                                    cree_par=request.user,
-                                )
-                            reservation.delete()
-
-                        # Déduction normale dans la pharmacie qui dispense réellement.
-                        avant = float(sp.quantite)
-                        apres = max(0, avant - qte)
-                        MouvementPharmacie.objects.create(
-                            pharmacie=pharmacie, produit=sp.produit,
-                            type='dispensation', quantite=qte,
-                            stock_avant=avant, stock_apres=apres,
-                            reference=ordonnance.numero,
-                            cree_par=request.user,
-                        )
-                        sp.quantite = apres
-                        sp.save(update_fields=['quantite'])
+                    avant = float(sp.quantite)
+                    apres = max(0, avant - qte)
+                    MouvementPharmacie.objects.create(
+                        pharmacie=pharmacie, produit=sp.produit,
+                        type='dispensation', quantite=qte,
+                        stock_avant=avant, stock_apres=apres,
+                        reference=ordonnance.numero,
+                        cree_par=request.user,
+                    )
+                    sp.quantite = apres
+                    sp.save(update_fields=['quantite'])
 
             dispensation.statut = statut_global
             dispensation.save(update_fields=['statut'])

@@ -458,6 +458,98 @@
         text-decoration: underline;
     }
 
+    /* ── Bouton Modifier (subheader) ── */
+    .btn-modifier {
+        background: none;
+        color: var(--teal-600);
+        border: 1.5px solid var(--teal-300);
+        border-radius: 6px;
+        padding: 7px 16px;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        font-family: inherit;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        transition: background .15s;
+        letter-spacing: .03em;
+    }
+
+    .btn-modifier:hover {
+        background: var(--teal-50, rgba(0, 0, 0, .03));
+    }
+
+    /* ── Édition des tests ── */
+    .edit-tests-table input,
+    .edit-tests-table select {
+        width: 100%;
+        padding: 5px 6px;
+        border: none;
+        border-bottom: 1.5px solid var(--border-strong);
+        border-radius: 0;
+        font-size: 12px;
+        font-family: inherit;
+        background: transparent;
+        outline: none;
+        color: var(--teal-900);
+    }
+
+    .edit-tests-table input:focus {
+        border-bottom-color: var(--teal-500);
+    }
+
+    .edit-tests-table .col-del {
+        width: 36px;
+        text-align: center;
+    }
+
+    .btn-del-ligne {
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: rgba(0, 0, 0, 0.25);
+        padding: 4px;
+        border-radius: 4px;
+        font-size: 18px;
+        line-height: 1;
+        transition: all .15s;
+    }
+
+    .btn-del-ligne:hover {
+        color: var(--rose);
+        background: rgba(var(--rose-rgb), .12);
+    }
+
+    .btn-add-ligne {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 10px;
+        background: none;
+        border: 1.5px dashed var(--border-strong);
+        border-radius: 8px;
+        padding: 7px 16px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--teal-600);
+        cursor: pointer;
+        font-family: inherit;
+        transition: all .15s;
+    }
+
+    .btn-add-ligne:hover {
+        border-color: var(--teal-400);
+        background: var(--teal-50);
+    }
+
+    .edit-tests-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 16px;
+    }
+
     @media (max-width: 860px) {
         .info-grid {
             grid-template-columns: 1fr;
@@ -494,6 +586,12 @@
                 </svg>
                 Bulletin d'examens
             </a>
+            {% if peut_modifier_lignes %}
+            <button type="button" class="btn-modifier" id="btn-toggle-edit" onclick="toggleEditionTests()">
+                <i class="bi bi-pencil"></i>
+                Modifier
+            </button>
+            {% endif %}
             {% if demande.statut == 'brouillon' %}
             {% if not demande.facture %}
             <a href="{{ facture_url }}" class="btn-facturation">
@@ -645,53 +743,121 @@
             <!-- Tests -->
             <div class="section-title">Tests demandés</div>
 
-            <div style="overflow-x:auto;">
-                <table class="tests-table">
-                    <thead>
-                        <tr>
-                            <th>Test</th>
-                            <th style="width:140px;">Délai d'exécution</th>
-                            <th style="width:130px;">Prix (CFA)</th>
-                            <th>Instructions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for ligne in lignes %}
-                        <tr>
-                            <td style="font-weight:600;color:var(--teal-900);">
-                                {{ ligne.libelle|default:ligne.type_examen }}
-                                {% if ligne.type_examen.code %}
-                                <span style="font-size:11px;color:rgba(0,0,0,0.4);font-family: var(--font-mono);">[{{ ligne.type_examen.code }}]</span>
-                                {% endif %}
-                            </td>
-                            <td style="color:rgba(0,0,0,0.5);">
-                                {% if ligne.type_examen %}
-                                {% if ligne.type_examen.delai_resultat_heures >= 24 %}
-                                {{ ligne.type_examen.delai_resultat_heures|divisibleby:24|yesno:"," }}
-                                {% widthratio ligne.type_examen.delai_resultat_heures 24 1 %} jour(s)
-                                {% else %}
-                                {{ ligne.type_examen.delai_resultat_heures }} h
-                                {% endif %}
-                                {% else %}—{% endif %}
-                            </td>
-                            <td style="font-weight:600;color:var(--accent-text);">{{ ligne.prix|floatformat:0 }}</td>
-                            <td style="color:rgba(0,0,0,0.6);">{{ ligne.instructions|default:"—" }}</td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="4" style="text-align:center;color:rgba(0,0,0,0.35);padding:20px;">
-                                Aucun test enregistré.
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+            <!-- ── Vue lecture seule ── -->
+            <div id="lignes-view">
+                <div style="overflow-x:auto;">
+                    <table class="tests-table">
+                        <thead>
+                            <tr>
+                                <th>Test</th>
+                                <th style="width:140px;">Délai d'exécution</th>
+                                <th style="width:130px;">Prix (CFA)</th>
+                                <th>Instructions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ligne in lignes %}
+                            <tr>
+                                <td style="font-weight:600;color:var(--teal-900);">
+                                    {{ ligne.libelle|default:ligne.type_examen }}
+                                    {% if ligne.type_examen.code %}
+                                    <span style="font-size:11px;color:rgba(0,0,0,0.4);font-family: var(--font-mono);">[{{ ligne.type_examen.code }}]</span>
+                                    {% endif %}
+                                </td>
+                                <td style="color:rgba(0,0,0,0.5);">
+                                    {% if ligne.type_examen %}
+                                    {% if ligne.type_examen.delai_resultat_heures >= 24 %}
+                                    {{ ligne.type_examen.delai_resultat_heures|divisibleby:24|yesno:"," }}
+                                    {% widthratio ligne.type_examen.delai_resultat_heures 24 1 %} jour(s)
+                                    {% else %}
+                                    {{ ligne.type_examen.delai_resultat_heures }} h
+                                    {% endif %}
+                                    {% else %}—{% endif %}
+                                </td>
+                                <td style="font-weight:600;color:var(--teal-700);">{{ ligne.prix|floatformat:0 }}</td>
+                                <td style="color:rgba(0,0,0,0.6);">{{ ligne.instructions|default:"—" }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" style="text-align:center;color:rgba(0,0,0,0.35);padding:20px;">
+                                    Aucun test enregistré.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
+
+            {% if peut_modifier_lignes %}
+            <!-- ── Vue édition (masquée par défaut) ── -->
+            <div id="lignes-edit" style="display:none;">
+                <form method="post" id="form-lignes">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="maj_lignes">
+                    <div style="overflow-x:auto;">
+                        <table class="tests-table edit-tests-table">
+                            <thead>
+                                <tr>
+                                    <th>Test</th>
+                                    <th style="width:130px;">Prix (CFA)</th>
+                                    <th>Instructions</th>
+                                    <th class="col-del"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="edit-lignes-body">
+                                {% for ligne in lignes %}
+                                <tr class="edit-ligne-row">
+                                    <td>
+                                        <input type="hidden" name="ligne_id_{{ forloop.counter0 }}" value="{{ ligne.pk }}">
+                                        <input type="text" name="ligne_examen_{{ forloop.counter0 }}" list="examens-datalist"
+                                            autocomplete="off" oninput="onLigneTestInput(this)"
+                                            value="{{ ligne.libelle|default:ligne.type_examen }}">
+                                    </td>
+                                    <td>
+                                        <input type="number" name="ligne_prix_{{ forloop.counter0 }}" min="0" step="1"
+                                            value="{{ ligne.prix|floatformat:0 }}" oninput="recalcTotalEdition()">
+                                    </td>
+                                    <td>
+                                        <input type="text" name="ligne_instructions_{{ forloop.counter0 }}"
+                                            value="{{ ligne.instructions }}" placeholder="Précisions…">
+                                    </td>
+                                    <td class="col-del">
+                                        <button type="button" class="btn-del-ligne" onclick="supprimerLigneEdition(this)" title="Supprimer">×</button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <datalist id="examens-datalist">
+                        {% for svc in services_examens %}
+                        <option value="{{ svc.nom|escapejs }}">
+                        {% endfor %}
+                    </datalist>
+
+                    <button type="button" class="btn-add-ligne" onclick="ajouterLigneEdition()">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor" stroke-width="2.5">
+                            <line x1="12" y1="5" x2="12" y2="19" />
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                        </svg>
+                        Ajouter un test
+                    </button>
+
+                    <div class="edit-tests-actions">
+                        <button type="button" class="btn-back" onclick="annulerEditionTests()">Annuler</button>
+                        <button type="submit" class="btn-facturation">Enregistrer les modifications</button>
+                    </div>
+                </form>
+            </div>
+            {% endif %}
 
             <div class="total-wrap">
                 <div class="total-box">
                     <span class="total-label">Total :</span>
-                    <span class="total-value">{{ demande.montant_total|floatformat:0 }} CFA</span>
+                    <span class="total-value" id="total-affiche">{{ demande.montant_total|floatformat:0 }} CFA</span>
                 </div>
             </div>
 
@@ -701,4 +867,65 @@
     {% load core_tags %}
     {% historique_sidebar demande %}
 </div>
+
+{% if peut_modifier_lignes %}
+<script>
+    var _EXAMENS_PRIX = {};
+    {% for svc in services_examens %}
+    _EXAMENS_PRIX["{{ svc.nom|escapejs }}"] = {{ svc.prix_vente }};
+    {% endfor %}
+    var _ligneEditCount = {{ lignes|length }};
+
+    function toggleEditionTests() {
+        document.getElementById('lignes-view').style.display = 'none';
+        document.getElementById('lignes-edit').style.display = 'block';
+        document.getElementById('btn-toggle-edit').style.display = 'none';
+        recalcTotalEdition();
+    }
+
+    function annulerEditionTests() {
+        location.reload();
+    }
+
+    function onLigneTestInput(input) {
+        var row = input.closest('tr');
+        var prixInput = row.querySelector('input[name^="ligne_prix_"]');
+        if (prixInput && Object.prototype.hasOwnProperty.call(_EXAMENS_PRIX, input.value)) {
+            prixInput.value = _EXAMENS_PRIX[input.value];
+            recalcTotalEdition();
+        }
+    }
+
+    function supprimerLigneEdition(btn) {
+        btn.closest('tr').remove();
+        recalcTotalEdition();
+    }
+
+    function ajouterLigneEdition() {
+        var idx = _ligneEditCount++;
+        var body = document.getElementById('edit-lignes-body');
+        var tr = document.createElement('tr');
+        tr.className = 'edit-ligne-row';
+        tr.innerHTML =
+            '<td>' +
+            '<input type="hidden" name="ligne_id_' + idx + '" value="">' +
+            '<input type="text" name="ligne_examen_' + idx + '" list="examens-datalist" autocomplete="off" oninput="onLigneTestInput(this)">' +
+            '</td>' +
+            '<td><input type="number" name="ligne_prix_' + idx + '" min="0" step="1" value="0" oninput="recalcTotalEdition()"></td>' +
+            '<td><input type="text" name="ligne_instructions_' + idx + '" placeholder="Précisions…"></td>' +
+            '<td class="col-del"><button type="button" class="btn-del-ligne" onclick="supprimerLigneEdition(this)" title="Supprimer">×</button></td>';
+        body.appendChild(tr);
+        tr.querySelector('input[name^="ligne_examen_"]').focus();
+    }
+
+    function recalcTotalEdition() {
+        var total = 0;
+        document.querySelectorAll('#edit-lignes-body input[name^="ligne_prix_"]').forEach(function (el) {
+            total += parseFloat(el.value) || 0;
+        });
+        document.getElementById('total-affiche').textContent =
+            Number(total).toLocaleString('fr-FR') + ' CFA';
+    }
+</script>
+{% endif %}
 {% endblock %}

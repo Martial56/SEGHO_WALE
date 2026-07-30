@@ -189,10 +189,23 @@
   <!-- Ligne 1 : titre + recherche -->
   <div class="o-subheader-row">
     <span class="o-page-title">Soins infirmiers <span class="o-page-count">{{ total }}</span></span>
+    {% if not patient_id and not hospitalisation_id %}
+    <span style="font-size:12px;color:var(--text-muted);">
+      {% if date_debut or date_fin %}
+        Période&nbsp;: {{ date_debut|default:"…" }} → {{ date_fin|default:"…" }}
+      {% elif date_filtre %}
+        Le {{ date_filtre }}
+      {% else %}
+        Aujourd'hui ({{ today|date:"d/m/Y" }})
+      {% endif %}
+    </span>
+    {% endif %}
     <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
       <form method="get" id="filter-form" style="display:flex;align-items:center;">
         <input type="hidden" name="statut" id="fi-statut" value="{{ statut }}">
         <input type="hidden" name="date" id="fi-date" value="{{ date_filtre }}">
+        <input type="hidden" name="date_debut" id="fi-date-debut" value="{{ date_debut }}">
+        <input type="hidden" name="date_fin" id="fi-date-fin" value="{{ date_fin }}">
         <input type="hidden" name="hospitalisation_id" id="fi-hosp" value="{{ hospitalisation_id }}">
         <div class="o-search-bar">
           <input class="o-search-input" id="search-input" type="text" name="q" value="{{ q }}"
@@ -214,10 +227,10 @@
       <!-- ── Filtres dropdown ── -->
       {% with nb_filtres=0|add:statut|add:date_filtre|add:hospitalisation_id %}
       <div class="o-dd-wrap">
-        <button class="o-ctrl-btn {% if statut or date_filtre or hospitalisation_id %}active{% endif %}"
+        <button class="o-ctrl-btn {% if statut or date_filtre or date_debut or date_fin or hospitalisation_id %}active{% endif %}"
                 id="btn-filtres" onclick="toggleDd('dd-filtres', this)">
-          <i class="bi bi-funnel{% if statut or date_filtre or hospitalisation_id %}-fill{% endif %}"></i>
-          Filtres{% if statut or date_filtre or hospitalisation_id %} <span style="background:var(--accent);color:#fff;border-radius:10px;font-size:10px;padding:0 5px;">{% if statut %}1{% endif %}{% if date_filtre %}1{% endif %}{% if hospitalisation_id %}1{% endif %}</span>{% endif %}
+          <i class="bi bi-funnel{% if statut or date_filtre or date_debut or date_fin or hospitalisation_id %}-fill{% endif %}"></i>
+          Filtres{% if statut or date_filtre or date_debut or date_fin or hospitalisation_id %} <span style="background:var(--accent);color:#fff;border-radius:10px;font-size:10px;padding:0 5px;">{% if statut %}1{% endif %}{% if date_filtre or date_debut or date_fin %}1{% endif %}{% if hospitalisation_id %}1{% endif %}</span>{% endif %}
         </button>
         <div class="o-dd-panel" id="dd-filtres">
           <div class="o-dd-section">Statut</div>
@@ -237,18 +250,33 @@
             <i class="bi bi-x-circle" style="font-size:11px;"></i> Supprimer le filtre statut
           </a>
           {% endif %}
-          <hr class="o-dd-sep">
-          <div class="o-dd-section">Date</div>
-          <div style="padding:4px 14px 6px;">
-            <input type="date" id="dd-date-input" value="{{ date_filtre }}"
-                   class="filter-select" style="width:100%;font-size:12px;"
-                   onchange="setFiltreDate(this.value)">
-          </div>
+          
           {% if date_filtre %}
           <a class="o-dd-item" onclick="setFiltreDate('')" style="color:var(--rose-text);">
             <i class="bi bi-x-circle" style="font-size:11px;"></i> Effacer la date
           </a>
           {% endif %}
+          <hr class="o-dd-sep">
+          <div class="o-dd-section">Période</div>
+          <div style="padding:4px 14px 8px;">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+              <label style="font-size:11px;color:var(--text-muted);width:24px;flex-shrink:0;">Du</label>
+              <input type="date" id="dd-date-debut-input" value="{{ date_debut }}"
+                     class="filter-select" style="width:100%;font-size:12px;">
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+              <label style="font-size:11px;color:var(--text-muted);width:24px;flex-shrink:0;">Au</label>
+              <input type="date" id="dd-date-fin-input" value="{{ date_fin }}"
+                     class="filter-select" style="width:100%;font-size:12px;">
+            </div>
+            <div style="display:flex;gap:6px;">
+              <button type="button" class="o-ctrl-btn" style="flex:1;justify-content:center;background:var(--accent);color:#fff;border-color:var(--accent);"
+                      onclick="applyPeriode()">Appliquer</button>
+              {% if date_debut or date_fin %}
+              <button type="button" class="o-ctrl-btn" onclick="clearPeriode()">Aujourd'hui</button>
+              {% endif %}
+            </div>
+          </div>
           <hr class="o-dd-sep">
           <div class="o-dd-section">Hospitalisation</div>
           <div style="padding:4px 14px 6px;">
@@ -271,8 +299,9 @@
       {% if q %}<span class="o-filter-tag">{{ q }} <a onclick="clearQ()" style="cursor:pointer;">×</a></span>{% endif %}
       {% if statut %}<span class="o-filter-tag">{% if statut == 'brouillon' %}Brouillon{% elif statut == 'en_attente_de_paiement' %}Att. paiement{% elif statut == 'en_cours' %}En cours{% elif statut == 'termine' %}Terminé{% else %}Annulé{% endif %} <a onclick="setFiltreStatut('')" style="cursor:pointer;">×</a></span>{% endif %}
       {% if date_filtre %}<span class="o-filter-tag">{{ date_filtre }} <a onclick="setFiltreDate('')" style="cursor:pointer;">×</a></span>{% endif %}
+      {% if date_debut or date_fin %}<span class="o-filter-tag">{{ date_debut|default:"…" }} → {{ date_fin|default:"…" }} <a onclick="clearPeriode()" style="cursor:pointer;">×</a></span>{% endif %}
       {% if hospitalisation_filtre %}<span class="o-filter-tag"><i class="bi bi-hospital" style="font-size:10px;"></i> {{ hospitalisation_filtre.numero }} — {{ hospitalisation_filtre.patient.nom }} <a onclick="setFiltreHosp('',''); document.getElementById('dd-hosp-input').value=''" style="cursor:pointer;">×</a></span>{% endif %}
-      {% if q or statut or date_filtre or hospitalisation_id %}
+      {% if q or statut or date_filtre or date_debut or date_fin or hospitalisation_id %}
       <a onclick="clearAll()" class="o-ctrl-btn" style="cursor:pointer;"><i class="bi bi-x"></i> Effacer</a>
       {% endif %}
 
@@ -282,11 +311,11 @@
       <div class="o-pagination-top">
         <span id="pag-info-top">{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
         <a id="pag-prev-top" class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
-           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}&q={{ q }}&statut={{ statut }}&date={{ date_filtre }}&hospitalisation_id={{ hospitalisation_id }}{% else %}#{% endif %}">
+           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}&q={{ q }}&statut={{ statut }}&date={{ date_filtre }}&date_debut={{ date_debut }}&date_fin={{ date_fin }}&hospitalisation_id={{ hospitalisation_id }}{% else %}#{% endif %}">
           <i class="bi bi-chevron-left"></i>
         </a>
         <a id="pag-next-top" class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
-           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}&q={{ q }}&statut={{ statut }}&date={{ date_filtre }}&hospitalisation_id={{ hospitalisation_id }}{% else %}#{% endif %}">
+           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}&q={{ q }}&statut={{ statut }}&date={{ date_filtre }}&date_debut={{ date_debut }}&date_fin={{ date_fin }}&hospitalisation_id={{ hospitalisation_id }}{% else %}#{% endif %}">
           <i class="bi bi-chevron-right"></i>
         </a>
       </div>
@@ -445,11 +474,11 @@
   <div class="o-pagination-bottom">
     <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
     <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
-      href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}&q={{ q }}&statut={{ statut }}&date={{ date_filtre }}{% else %}#{% endif %}">
+      href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}&q={{ q }}&statut={{ statut }}&date={{ date_filtre }}&date_debut={{ date_debut }}&date_fin={{ date_fin }}{% else %}#{% endif %}">
       <i class="bi bi-chevron-left"></i>
     </a>
     <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
-      href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}&q={{ q }}&statut={{ statut }}&date={{ date_filtre }}{% else %}#{% endif %}">
+      href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}&q={{ q }}&statut={{ statut }}&date={{ date_filtre }}&date_debut={{ date_debut }}&date_fin={{ date_fin }}{% else %}#{% endif %}">
       <i class="bi bi-chevron-right"></i>
     </a>
   </div>
@@ -506,6 +535,34 @@
     if (el) el.value = val;
     var ddInput = document.getElementById('dd-date-input');
     if (ddInput) ddInput.value = val;
+    if (val) {
+      var debEl = document.getElementById('fi-date-debut');
+      var finEl = document.getElementById('fi-date-fin');
+      if (debEl) debEl.value = '';
+      if (finEl) finEl.value = '';
+    }
+    document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
+    window.liveLoad();
+  }
+
+  function applyPeriode() {
+    var deb = document.getElementById('dd-date-debut-input').value;
+    var fin = document.getElementById('dd-date-fin-input').value;
+    document.getElementById('fi-date-debut').value = deb;
+    document.getElementById('fi-date-fin').value = fin;
+    var dateEl = document.getElementById('fi-date');
+    var ddDateInput = document.getElementById('dd-date-input');
+    if (dateEl) dateEl.value = '';
+    if (ddDateInput) ddDateInput.value = '';
+    document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
+    window.liveLoad();
+  }
+
+  function clearPeriode() {
+    document.getElementById('fi-date-debut').value = '';
+    document.getElementById('fi-date-fin').value = '';
+    document.getElementById('dd-date-debut-input').value = '';
+    document.getElementById('dd-date-fin-input').value = '';
     document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
     window.liveLoad();
   }
@@ -523,6 +580,10 @@
     if (statEl) statEl.value = '';
     var dateEl = document.getElementById('fi-date');
     if (dateEl) dateEl.value = '';
+    var debEl = document.getElementById('fi-date-debut');
+    if (debEl) debEl.value = '';
+    var finEl = document.getElementById('fi-date-fin');
+    if (finEl) finEl.value = '';
     var hospEl = document.getElementById('fi-hosp');
     if (hospEl) hospEl.value = '';
     window.liveLoad();

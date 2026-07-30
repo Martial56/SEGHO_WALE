@@ -148,6 +148,26 @@
   .o-filter-sep { border: none; border-top: 1px solid var(--border); margin: 6px 0; }
   html[data-theme="dark"] .o-filter-panel { background: var(--surface); border-color: var(--border-strong); }
   html[data-theme="dark"] .o-filter-option:hover { background: rgba(var(--teal-500-rgb), 0.15); }
+
+  .o-filter-period { padding: 4px 16px 8px; }
+  .o-filter-period-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+  .o-filter-period-row label { font-size: 11px; color: var(--text-muted); width: 34px; flex-shrink: 0; }
+  .o-filter-period-row input[type="date"] {
+    flex: 1; font-size: 12px; padding: 3px 6px; border: 1px solid var(--border);
+    border-radius: 4px; background: var(--surface); color: var(--text);
+  }
+  .o-filter-period-actions { display: flex; gap: 6px; margin-top: 4px; }
+  .o-filter-period-apply {
+    flex: 1; background: var(--teal-500); color: #fff; border: none; border-radius: 4px;
+    font-size: 12px; padding: 5px 0; cursor: pointer; font-weight: 500;
+  }
+  .o-filter-period-apply:hover { background: var(--teal-600); }
+  .o-filter-period-reset {
+    background: none; border: 1px solid var(--border); color: var(--text-muted);
+    border-radius: 4px; font-size: 12px; padding: 5px 10px; cursor: pointer; text-decoration: none;
+    display: inline-flex; align-items: center;
+  }
+  .o-filter-period-reset:hover { border-color: var(--teal-400); color: var(--accent-text-soft); }
   .o-btn-create {
     background: var(--teal-500); color: #fff; border: none; padding: 5px 14px; border-radius: 4px;
     font-size: 12.5px; font-weight: 500; cursor: pointer; text-decoration: none;
@@ -165,6 +185,13 @@
 <div class="o-subheader">
   <div class="o-subheader-row">
     <span class="o-page-title">Ordonnances <span style="font-size:13px;color:var(--text-muted);font-weight:400;">({{ page_obj.paginator.count }})</span></span>
+    <span style="font-size:12px;color:var(--text-muted);">
+      {% if date_debut or date_fin %}
+        Période&nbsp;: {{ date_debut|default:"…" }} → {{ date_fin|default:"…" }}
+      {% else %}
+        Aujourd'hui ({{ today|date:"d/m/Y" }})
+      {% endif %}
+    </span>
     <div class="o-subheader-row-right">
       <form method="get" id="search-form">
         <div class="o-search-bar">
@@ -174,7 +201,8 @@
         </div>
         {% if statut_filtre %}<input type="hidden" name="statut" value="{{ statut_filtre }}">{% endif %}
         {% if type_filtre %}<input type="hidden" name="type" value="{{ type_filtre }}">{% endif %}
-
+        {% if date_debut %}<input type="hidden" name="date_debut" value="{{ date_debut }}">{% endif %}
+        {% if date_fin %}<input type="hidden" name="date_fin" value="{{ date_fin }}">{% endif %}
       </form>
     </div>
   </div>
@@ -182,42 +210,66 @@
     <a href="{% url 'ordonnance_create_libre' %}" class="o-btn-create">+ CRÉER</a>
     <div class="o-subheader-row-right">
       <div class="o-filter-dd" id="filter-dd">
-        <button type="button" class="o-filter-btn {% if statut_filtre or type_filtre %}active{% endif %}"
+        <button type="button" class="o-filter-btn {% if statut_filtre or type_filtre or date_debut or date_fin %}active{% endif %}"
                 onclick="document.getElementById('filter-panel').classList.toggle('open')">
           <i class="bi bi-funnel"></i> Filtres
-          {% if statut_filtre or type_filtre %}<span class="o-filter-dot"></span>{% endif %}
+          {% if statut_filtre or type_filtre or date_debut or date_fin %}<span class="o-filter-dot"></span>{% endif %}
         </button>
         <div class="o-filter-panel" id="filter-panel">
           <span class="o-filter-section-label">Statut</span>
           <a class="o-filter-option {% if not statut_filtre %}active{% endif %}"
-             href="?{% if q %}q={{ q }}&{% endif %}{% if type_filtre %}type={{ type_filtre }}{% endif %}">Tous</a>
+             href="?{% if q %}q={{ q }}&{% endif %}{% if type_filtre %}type={{ type_filtre }}{% endif %}{% if date_debut %}&date_debut={{ date_debut }}{% endif %}{% if date_fin %}&date_fin={{ date_fin }}{% endif %}">Tous</a>
           <a class="o-filter-option {% if statut_filtre == 'emise' %}active{% endif %}"
-             href="?{% if q %}q={{ q }}&{% endif %}statut=emise{% if type_filtre %}&type={{ type_filtre }}{% endif %}">Émise</a>
+             href="?{% if q %}q={{ q }}&{% endif %}statut=emise{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% if date_debut %}&date_debut={{ date_debut }}{% endif %}{% if date_fin %}&date_fin={{ date_fin }}{% endif %}">Émise</a>
           <a class="o-filter-option {% if statut_filtre == 'delivree' %}active{% endif %}"
-             href="?{% if q %}q={{ q }}&{% endif %}statut=delivree{% if type_filtre %}&type={{ type_filtre }}{% endif %}">Délivrée</a>
+             href="?{% if q %}q={{ q }}&{% endif %}statut=delivree{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% if date_debut %}&date_debut={{ date_debut }}{% endif %}{% if date_fin %}&date_fin={{ date_fin }}{% endif %}">Délivrée</a>
           <a class="o-filter-option {% if statut_filtre == 'partielle' %}active{% endif %}"
-             href="?{% if q %}q={{ q }}&{% endif %}statut=partielle{% if type_filtre %}&type={{ type_filtre }}{% endif %}">Partielle</a>
+             href="?{% if q %}q={{ q }}&{% endif %}statut=partielle{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% if date_debut %}&date_debut={{ date_debut }}{% endif %}{% if date_fin %}&date_fin={{ date_fin }}{% endif %}">Partielle</a>
           <a class="o-filter-option {% if statut_filtre == 'expiree' %}active{% endif %}"
-             href="?{% if q %}q={{ q }}&{% endif %}statut=expiree{% if type_filtre %}&type={{ type_filtre }}{% endif %}">Expirée</a>
+             href="?{% if q %}q={{ q }}&{% endif %}statut=expiree{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% if date_debut %}&date_debut={{ date_debut }}{% endif %}{% if date_fin %}&date_fin={{ date_fin }}{% endif %}">Expirée</a>
           <hr class="o-filter-sep">
           <span class="o-filter-section-label">Type</span>
           <a class="o-filter-option {% if not type_filtre %}active{% endif %}"
-             href="?{% if q %}q={{ q }}&{% endif %}{% if statut_filtre %}statut={{ statut_filtre }}{% endif %}">Tous</a>
+             href="?{% if q %}q={{ q }}&{% endif %}{% if statut_filtre %}statut={{ statut_filtre }}{% endif %}{% if date_debut %}&date_debut={{ date_debut }}{% endif %}{% if date_fin %}&date_fin={{ date_fin }}{% endif %}">Tous</a>
           <a class="o-filter-option {% if type_filtre == 'interne' %}active{% endif %}"
-             href="?{% if q %}q={{ q }}&{% endif %}{% if statut_filtre %}statut={{ statut_filtre }}&{% endif %}type=interne">Interne</a>
+             href="?{% if q %}q={{ q }}&{% endif %}{% if statut_filtre %}statut={{ statut_filtre }}&{% endif %}type=interne{% if date_debut %}&date_debut={{ date_debut }}{% endif %}{% if date_fin %}&date_fin={{ date_fin }}{% endif %}">Interne</a>
           <a class="o-filter-option {% if type_filtre == 'externe' %}active{% endif %}"
-             href="?{% if q %}q={{ q }}&{% endif %}{% if statut_filtre %}statut={{ statut_filtre }}&{% endif %}type=externe">Externe</a>
+             href="?{% if q %}q={{ q }}&{% endif %}{% if statut_filtre %}statut={{ statut_filtre }}&{% endif %}type=externe{% if date_debut %}&date_debut={{ date_debut }}{% endif %}{% if date_fin %}&date_fin={{ date_fin }}{% endif %}">Externe</a>
+          <hr class="o-filter-sep">
+          <span class="o-filter-section-label">Période</span>
+          <div class="o-filter-period">
+            <form method="get" id="period-form">
+              {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
+              {% if statut_filtre %}<input type="hidden" name="statut" value="{{ statut_filtre }}">{% endif %}
+              {% if type_filtre %}<input type="hidden" name="type" value="{{ type_filtre }}">{% endif %}
+              <div class="o-filter-period-row">
+                <label for="date_debut">Du</label>
+                <input type="date" id="date_debut" name="date_debut" value="{{ date_debut }}">
+              </div>
+              <div class="o-filter-period-row">
+                <label for="date_fin">Au</label>
+                <input type="date" id="date_fin" name="date_fin" value="{{ date_fin }}">
+              </div>
+              <div class="o-filter-period-actions">
+                <button type="submit" class="o-filter-period-apply">Appliquer</button>
+                {% if date_debut or date_fin %}
+                <a class="o-filter-period-reset"
+                   href="?{% if q %}q={{ q }}&{% endif %}{% if statut_filtre %}statut={{ statut_filtre }}&{% endif %}{% if type_filtre %}type={{ type_filtre }}{% endif %}">Aujourd'hui</a>
+                {% endif %}
+              </div>
+            </form>
+          </div>
         </div>
       </div>
       <div class="o-ctrl-sep"></div>
       <div class="o-pagination">
         <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
-           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if statut_filtre %}&statut={{ statut_filtre }}{% endif %}{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% else %}#{% endif %}">
+           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if statut_filtre %}&statut={{ statut_filtre }}{% endif %}{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% if date_debut %}&date_debut={{ date_debut }}{% endif %}{% if date_fin %}&date_fin={{ date_fin }}{% endif %}{% else %}#{% endif %}">
           <i class="bi bi-chevron-left"></i>
         </a>
         <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
         <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
-           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if statut_filtre %}&statut={{ statut_filtre }}{% endif %}{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% else %}#{% endif %}">
+           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if statut_filtre %}&statut={{ statut_filtre }}{% endif %}{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% if date_debut %}&date_debut={{ date_debut }}{% endif %}{% if date_fin %}&date_fin={{ date_fin }}{% endif %}{% else %}#{% endif %}">
           <i class="bi bi-chevron-right"></i>
         </a>
       </div>

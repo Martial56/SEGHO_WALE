@@ -7,6 +7,8 @@ None pour une recherche « jusqu'à une date ») ; le moteur d'export (voir
 export.py) se charge ensuite de produire le fichier Excel/CSV.
 """
 
+from django.core.exceptions import ObjectDoesNotExist
+
 
 def _minutes(secondes):
     """Nombre brut de minutes (arrondi), pour une colonne de rapport triable/sommable."""
@@ -462,6 +464,126 @@ def _presences(periode_debut, periode_fin):
     return columns, rows
 
 
+def _facturation(periode_debut, periode_fin):
+    from facturation.models import Facture
+    qs = Facture.objects.select_related('patient')
+    if periode_debut:
+        qs = qs.filter(date_emission__date__gte=periode_debut)
+    qs = qs.filter(date_emission__date__lte=periode_fin).order_by('date_emission')
+    columns = ['N° Facture', 'Code patient', 'Nom', 'Prénoms', 'Type', 'Date',
+               'Total (FCFA)', 'Payé (FCFA)', 'Reste (FCFA)', 'Statut']
+    rows = [[
+        f.numero, f.patient.code_patient, f.patient.nom, f.patient.prenoms,
+        f.get_type_facture_display(), f.date_emission.strftime('%d/%m/%Y'),
+        float(f.montant_total), float(f.montant_paye), float(f.solde_restant),
+        f.get_statut_display(),
+    ] for f in qs]
+    return columns, rows
+
+
+def _diagnostic_retenu_rdv(rdv):
+    """Diagnostic retenu / autres pathologies associées (registre curatif, sinon
+    champ libre « maladies »), même logique que la liste des rendez-vous."""
+    diag = ''
+    try:
+        diag = rdv.registre_curatif.diagnostic_display
+    except ObjectDoesNotExist:
+        diag = ''
+    return diag or rdv.maladies or 'Non renseigné'
+
+
+RDV_COLUMNS = ['Code RDV', 'Code patient', 'Nom', 'Prénoms', 'Sexe', 'Âge', 'Date et heure',
+               'Médecin', 'Type de consultation', 'Diagnostics retenus', 'Statut']
+
+
+def _rdv_row(rdv):
+    return [
+        rdv.code_rdv, rdv.patient.code_patient, rdv.patient.nom, rdv.patient.prenoms,
+        rdv.patient.sexe, rdv.patient.age, rdv.date_heure.strftime('%d/%m/%Y %H:%M'),
+        str(rdv.medecin) if rdv.medecin_id else 'Non renseigné',
+        rdv.type_consultation.nom if rdv.type_consultation_id else 'Non renseigné',
+        _diagnostic_retenu_rdv(rdv),
+        rdv.get_statut_display(),
+    ]
+
+
+def _rendez_vous_periode_qs(periode_debut, periode_fin):
+    from patients.models import RendezVous
+    qs = RendezVous.objects.select_related('patient', 'medecin', 'type_consultation').prefetch_related('registre_curatif')
+    if periode_debut:
+        qs = qs.filter(date_heure__date__gte=periode_debut)
+    return qs.filter(date_heure__date__lte=periode_fin).order_by('date_heure')
+
+
+def _rendez_vous(periode_debut, periode_fin):
+    qs = _rendez_vous_periode_qs(periode_debut, periode_fin)
+    return RDV_COLUMNS, [_rdv_row(rdv) for rdv in qs]
+
+
+def _rendez_vous_sans_doublon(periode_debut, periode_fin):
+    """Un seul rendez-vous par patient sur la période (le plus récent),
+    pour un listing patients sans doublon."""
+    qs = _rendez_vous_periode_qs(periode_debut, periode_fin)
+    par_patient = {}
+    for rdv in qs:
+        par_patient[rdv.patient_id] = rdv
+    rdvs = sorted(par_patient.values(), key=lambda r: r.date_heure)
+    return RDV_COLUMNS, [_rdv_row(rdv) for rdv in rdvs]
+
+
+def _examens_labo(periode_debut, periode_fin):
+    from laboratoire.models import DemandeExamen
+    qs = DemandeExamen.objects.select_related('patient', 'medecin_prescripteur').prefetch_related('lignes')
+    if periode_debut:
+        qs = qs.filter(date_creation__date__gte=periode_debut)
+    qs = qs.filter(date_creation__date__lte=periode_fin).order_by('date_creation')
+    columns = ['Numéro', 'Code patient', 'Nom', 'Prénoms', 'Sexe', 'Âge', 'Médecin prescripteur',
+               'Tests demandés', 'Urgent', 'Date de création', 'Montant (FCFA)', 'Statut']
+    rows = [[
+        d.numero, d.patient.code_patient, d.patient.nom, d.patient.prenoms, d.patient.sexe, d.patient.age,
+        str(d.medecin_prescripteur) if d.medecin_prescripteur_id else 'Non renseigné',
+        ', '.join(l.libelle for l in d.lignes.all()) or 'Non renseigné',
+        'Oui' if d.urgent else 'Non',
+        d.date_creation.strftime('%d/%m/%Y %H:%M'),
+        float(d.montant_total),
+        d.get_statut_display(),
+    ] for d in qs]
+    return columns, rows
+
+
+def _ordonnances_prescrites(periode_debut, periode_fin):
+    from consultations.models import Ordonnance
+    qs = Ordonnance.objects.select_related(
+        'consultation__patient', 'patient', 'medecin', 'consultation__medecin'
+    ).prefetch_related('lignes')
+    if periode_debut:
+        qs = qs.filter(date_emission__date__gte=periode_debut)
+    qs = qs.filter(date_emission__date__lte=periode_fin).order_by('date_emission')
+    columns = ['Numéro', 'Code patient', 'Nom', 'Prénoms', 'Médecin prescripteur', 'Médicaments',
+               'Type', "Date d'émission", "Date d'expiration", 'Statut']
+    rows = []
+    for o in qs:
+        patient = o.consultation.patient if o.consultation_id and o.consultation.patient_id else o.patient
+        medecin = o.medecin if o.medecin_id else (o.consultation.medecin if o.consultation_id else None)
+        medicaments = ', '.join(
+            l.medicament_libre or (str(l.produit) if l.produit_id else None) or (str(l.medicament) if l.medicament_id else 'Non renseigné')
+            for l in o.lignes.all()
+        ) or 'Non renseigné'
+        rows.append([
+            o.numero,
+            patient.code_patient if patient else 'Non renseigné',
+            patient.nom if patient else 'Non renseigné',
+            patient.prenoms if patient else '',
+            str(medecin) if medecin else 'Non renseigné',
+            medicaments,
+            o.get_type_ordonnance_display(),
+            o.date_emission.strftime('%d/%m/%Y %H:%M'),
+            o.date_expiration.strftime('%d/%m/%Y') if o.date_expiration else 'Non applicable',
+            o.get_statut_display(),
+        ])
+    return columns, rows
+
+
 REPORT_CATALOGUE = [
     {
         'nom': 'Patients',
@@ -469,6 +591,17 @@ REPORT_CATALOGUE = [
         'rapports': [
             {'slug': 'patients_inscrits', 'nom': 'Patients inscrits', 'icone': 'bi-person-plus-fill',
              'description': 'Liste des patients enregistrés sur la période.', 'fn': _patients_inscrits},
+        ],
+    },
+    {
+        'nom': 'Rendez-vous',
+        'icone': 'bi-calendar-check-fill',
+        'rapports': [
+            {'slug': 'rendez_vous', 'nom': 'Rendez-vous', 'icone': 'bi-calendar-check-fill',
+             'description': 'Liste des rendez-vous pris sur la période.', 'fn': _rendez_vous},
+            {'slug': 'rendez_vous_sans_doublon', 'nom': 'Rendez-vous sans doublon', 'icone': 'bi-calendar2-check',
+             'description': 'Liste des rendez-vous sur la période, un seul par patient (le plus récent).',
+             'fn': _rendez_vous_sans_doublon},
         ],
     },
     {
@@ -487,6 +620,30 @@ REPORT_CATALOGUE = [
             {'slug': 'listing_activite_soins_sn', 'nom': 'Listing des soins infirmiers', 'icone': 'bi-bandaid-fill',
              'description': "Soins et procédures infirmiers effectués sur la période.",
              'fn': _listing_activite_soins_sn, 'build_xlsx_fn': build_listing_activite_soins_sn_xlsx},
+        ],
+    },
+    {
+        'nom': 'Laboratoire',
+        'icone': 'bi-eyedropper',
+        'rapports': [
+            {'slug': 'examens_labo', 'nom': 'Examens labo', 'icone': 'bi-eyedropper',
+             'description': "Demandes d'examens de laboratoire créées sur la période.", 'fn': _examens_labo},
+        ],
+    },
+    {
+        'nom': 'Pharmacie',
+        'icone': 'bi-file-earmark-medical-fill',
+        'rapports': [
+            {'slug': 'ordonnances_prescrites', 'nom': 'Ordonnances prescrites', 'icone': 'bi-file-earmark-medical-fill',
+             'description': 'Ordonnances émises sur la période.', 'fn': _ordonnances_prescrites},
+        ],
+    },
+    {
+        'nom': 'Facturation',
+        'icone': 'bi-receipt-cutoff',
+        'rapports': [
+            {'slug': 'facturation', 'nom': 'Facturation', 'icone': 'bi-receipt-cutoff',
+             'description': 'Liste des factures émises sur la période.', 'fn': _facturation},
         ],
     },
 ]
