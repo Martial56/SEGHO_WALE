@@ -449,13 +449,20 @@ html.novembre-bleu { background: #050e1f; }
       </button>
     </div>
 
-    <!-- Biométrie (placeholder) -->
+    <!-- Biométrie -->
     <div id="bio-section">
+      {% if bio_actif and bio_url %}
+      <div class="bio-placeholder" id="bio-scan-box">
+        <i class="bi bi-fingerprint" id="bio-scan-icon"></i>
+        <p id="bio-scan-msg">Posez votre doigt sur le lecteur biométrique</p>
+      </div>
+      {% else %}
       <div class="bio-placeholder">
         <i class="bi bi-fingerprint"></i>
-        <p>Posez votre doigt sur le lecteur biométrique<br>
-           <small style="color:rgba(0,0,0,.3);">Nécessite un lecteur d'empreinte USB dédié</small></p>
+        <p>Lecteur d'empreinte non configuré<br>
+           <small style="color:rgba(0,0,0,.3);">Contactez la RH pour l'activer dans les réglages</small></p>
       </div>
+      {% endif %}
     </div>
 
     <!-- Erreur -->
@@ -505,9 +512,14 @@ html.novembre-bleu { background: #050e1f; }
 
 <!-- Lien admin discret — visible seulement pour RH/Admin/Directeur/Médecin Chef déjà connectés -->
 {% if can_access_admin %}
-<a href="{% url 'presence_registre' %}" style="margin-top:20px;font-size:11px;color:rgba(255,255,255,.35);text-decoration:none;">
-  <i class="bi bi-shield-lock"></i> Accès administration
-</a>
+<div style="display:flex;gap:16px;margin-top:20px;">
+  <a href="{% url 'presence_registre' %}" style="font-size:11px;color:rgba(255,255,255,.35);text-decoration:none;">
+    <i class="bi bi-shield-lock"></i> Accès administration
+  </a>
+  <a href="{% url 'presence_biometrie_reglages' %}" style="font-size:11px;color:rgba(255,255,255,.35);text-decoration:none;">
+    <i class="bi bi-fingerprint"></i> Réglages du lecteur d'empreinte
+  </a>
+</div>
 {% endif %}
 
 <!-- html5-qrcode -->
@@ -562,6 +574,7 @@ async function chercherEmploye(matricule) {
 
 function afficherEmploye(data) {
   stopQR();
+  stopBio();
   empData   = data.emp;
   actionKey = data.action;
 
@@ -665,6 +678,7 @@ function annuler()    { resetKiosque(); }
 function resetKiosque() {
   clearIdleTimer();
   stopQR();
+  stopBio();
   empData = null; actionKey = null;
   document.getElementById('matricule-inp').value = '';
   document.getElementById('saisie-section').style.display = 'block';
@@ -687,8 +701,7 @@ function toggleQR() {
   const sec = document.getElementById('qr-section');
   const btn = document.getElementById('btn-qr');
   if (sec.style.display === 'block') { stopQR(); return; }
-  document.getElementById('bio-section').style.display = 'none';
-  document.getElementById('btn-bio').classList.remove('active');
+  stopBio();
   sec.style.display = 'block';
   btn.classList.add('active');
   html5QrCode = new Html5Qrcode('qr-reader');
@@ -717,13 +730,48 @@ function stopQR() {
 }
 
 // ── Biométrie ─────────────────────────────────────────────────────────────────
+// ── Biométrie ─────────────────────────────────────────────────────────────────
+var BIO_ACTIF   = {{ bio_actif|yesno:"true,false" }};
+var BIO_URL     = "{{ bio_url|escapejs }}";
+var bioPollTimer = null;
+
 function toggleBio() {
   const sec = document.getElementById('bio-section');
   const btn = document.getElementById('btn-bio');
   stopQR();
-  if (sec.style.display === 'block') { sec.style.display='none'; btn.classList.remove('active'); return; }
+  if (sec.style.display === 'block') { stopBio(); sec.style.display='none'; btn.classList.remove('active'); return; }
   sec.style.display = 'block';
   btn.classList.add('active');
+  if (BIO_ACTIF && BIO_URL) pollBio();
+}
+
+// Interroge le service local du lecteur (fourni par son SDK, tourne sur la
+// machine du kiosque en 127.0.0.1) jusqu'à ce qu'une empreinte soit lue, ou
+// jusqu'à annulation. Contrat générique attendu : réponse JSON
+// { ok: true, code: "<identifiant biométrique>" } une fois un doigt reconnu,
+// sinon { ok: false } tant qu'on attend — à adapter selon le SDK réel une
+// fois le matériel choisi.
+function pollBio() {
+  const msg = document.getElementById('bio-scan-msg');
+  fetch(BIO_URL, { method: 'GET' })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (data && data.ok && data.code) {
+        stopBio();
+        chercherEmploye(String(data.code).trim().toUpperCase());
+      } else {
+        if (msg) msg.textContent = 'Posez votre doigt sur le lecteur biométrique…';
+        bioPollTimer = setTimeout(pollBio, 1500);
+      }
+    })
+    .catch(function () {
+      if (msg) msg.innerHTML = 'Lecteur introuvable.<br><small style="color:rgba(0,0,0,.3);">Vérifiez qu\'il est branché et que son service tourne sur ce poste.</small>';
+      bioPollTimer = setTimeout(pollBio, 3000);
+    });
+}
+
+function stopBio() {
+  if (bioPollTimer) { clearTimeout(bioPollTimer); bioPollTimer = null; }
 }
 
 // Focus auto sur l'input

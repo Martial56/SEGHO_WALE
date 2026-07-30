@@ -1115,6 +1115,31 @@ def _date_reference(emp, now=None):
     return today
 
 
+@login_required(login_url='login')
+def presence_biometrie_reglages(request):
+    """Réglages (RH) du lecteur d'empreinte digitale du kiosque de pointage.
+
+    Aucune correspondance/lecture réelle n'est faite ici : ce lecteur est un
+    périphérique branché sur le poste du kiosque, le navigateur y accède
+    directement via une URL locale (127.0.0.1) fournie par son SDK — cette
+    page ne fait qu'enregistrer cette URL et activer/désactiver la fonctionnalité."""
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
+
+    from presence.models import ConfigurationBiometrique
+    config = ConfigurationBiometrique.actuelle()
+
+    if request.method == 'POST':
+        config.actif = request.POST.get('actif') == '1'
+        config.url_agent = request.POST.get('url_agent', '').strip()
+        config.modifie_par = request.user
+        config.save()
+        messages.success(request, "Réglages du lecteur d'empreinte enregistrés.")
+        return redirect('presence_biometrie_reglages')
+
+    return render(request, 'presence/biometrie_reglages.html', {'config': config})
+
+
 def presence_pointage(request):
     """Page kiosque publique — l'employé pointe lui-même."""
     today = date.today()
@@ -1138,6 +1163,8 @@ def presence_pointage(request):
         texte_novembre = "Novembre Bleu et Journée mondiale du diabète"
     else:
         texte_novembre = "Novembre Bleu — Ensemble contre le cancer de la prostate"
+    from presence.models import ConfigurationBiometrique
+    config_bio = ConfigurationBiometrique.actuelle()
     return render(request, 'presence/pointage.html', {
         'today':        today,
         'ouvre':        ouvre,
@@ -1152,6 +1179,8 @@ def presence_pointage(request):
         'est_octobre_rose':  today.month == 10,
         'est_novembre_bleu': today.month == 11,
         'texte_novembre':    texte_novembre,
+        'bio_actif':    config_bio.actif,
+        'bio_url':      config_bio.url_agent,
         # Lien "Accès administration" — visible seulement si un RH/Admin/
         # Directeur/Médecin Chef est déjà connecté sur ce poste (can_manage_rh
         # couvre exactement ces rôles), pas au grand public du kiosk.
