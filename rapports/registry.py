@@ -584,6 +584,70 @@ def _ordonnances_prescrites(periode_debut, periode_fin):
     return columns, rows
 
 
+CDIP_PROPOSE_LABELS = {'oui': 'Oui', 'na': 'NA'}
+CDIP_REALISE_LABELS = {'oui': 'Oui', 'non': 'Non', 'na': 'NA'}
+
+CDIP_COLUMNS = ['Code patient', 'Nom', 'Prénoms', 'Sexe', 'Âge', 'Date de consultation',
+                'CDIP proposé', 'CDIP réalisé']
+
+
+def _cdip_row(reg):
+    rdv, patient = reg.rdv, reg.rdv.patient
+    return [
+        patient.code_patient, patient.nom, patient.prenoms, patient.sexe, patient.age,
+        rdv.date_heure.strftime('%d/%m/%Y %H:%M'),
+        CDIP_PROPOSE_LABELS.get(reg.donnees.get('cur_cdip_propose'), 'Non renseigné'),
+        CDIP_REALISE_LABELS.get(reg.donnees.get('cur_cdip_realise'), 'Non renseigné'),
+    ]
+
+
+def _cdip_med_generale(periode_debut, periode_fin):
+    from patients.models import RegistreCuratif
+    qs = RegistreCuratif.objects.filter(rdv__departement__code='medg').select_related('rdv', 'rdv__patient')
+    if periode_debut:
+        qs = qs.filter(rdv__date_heure__date__gte=periode_debut)
+    qs = qs.filter(rdv__date_heure__date__lte=periode_fin).order_by('rdv__date_heure')
+    return CDIP_COLUMNS, [_cdip_row(reg) for reg in qs]
+
+
+def _cdip_gynecologie(periode_debut, periode_fin):
+    from django.db.models import Q
+    from patients.models import RegistreCuratif
+    qs = RegistreCuratif.objects.filter(
+        Q(rdv__departement__code='GYN') | Q(rdv__medecin__specialite__nom__icontains='gyn')
+    ).select_related('rdv', 'rdv__patient')
+    if periode_debut:
+        qs = qs.filter(rdv__date_heure__date__gte=periode_debut)
+    qs = qs.filter(rdv__date_heure__date__lte=periode_fin).order_by('rdv__date_heure')
+    return CDIP_COLUMNS, [_cdip_row(reg) for reg in qs]
+
+
+VIH_STATUT_ACCUEIL_LABELS = {'inconnu': 'Inconnu', 'negatif': 'Négatif', 'positif': 'Positif'}
+VIH_PROPOSITION_LABELS = {'propose': 'Proposé', 'accepte': 'Accepté', 'refuse': 'Refusé'}
+VIH_RESULTAT_LABELS = {'negatif': 'Négatif', 'positif': 'Positif', 'na': 'NA'}
+
+
+def _depistage_vih_cpn(periode_debut, periode_fin):
+    from patients.models import RegistreCPN
+    qs = RegistreCPN.objects.select_related('rdv', 'rdv__patient')
+    if periode_debut:
+        qs = qs.filter(rdv__date_heure__date__gte=periode_debut)
+    qs = qs.filter(rdv__date_heure__date__lte=periode_fin).order_by('rdv__date_heure')
+    columns = ['Code patient', 'Nom', 'Prénoms', 'Âge', 'Date de consultation',
+               "Statut VIH à l'accueil", 'Proposition de test VIH', 'Résultat du test VIH']
+    rows = []
+    for reg in qs:
+        rdv, patient, d = reg.rdv, reg.rdv.patient, reg.donnees
+        rows.append([
+            patient.code_patient, patient.nom, patient.prenoms, patient.age,
+            rdv.date_heure.strftime('%d/%m/%Y %H:%M'),
+            VIH_STATUT_ACCUEIL_LABELS.get(d.get('cpn_statut_vih_accueil'), 'Non renseigné'),
+            VIH_PROPOSITION_LABELS.get(d.get('cpn_proposition_test_vih'), 'Non renseigné'),
+            VIH_RESULTAT_LABELS.get(d.get('cpn_resultat_vih'), 'Non renseigné'),
+        ])
+    return columns, rows
+
+
 REPORT_CATALOGUE = [
     {
         'nom': 'Patients',
@@ -602,6 +666,23 @@ REPORT_CATALOGUE = [
             {'slug': 'rendez_vous_sans_doublon', 'nom': 'Rendez-vous sans doublon', 'icone': 'bi-calendar2-check',
              'description': 'Liste des rendez-vous sur la période, un seul par patient (le plus récent).',
              'fn': _rendez_vous_sans_doublon},
+        ],
+    },
+    {
+        'nom': 'Consultations',
+        'icone': 'bi-clipboard2-pulse-fill',
+        'rapports': [
+            {'slug': 'cdip_med_generale', 'nom': 'CDIP proposé et réalisé - Consultation générale',
+             'icone': 'bi-clipboard2-pulse-fill',
+             'description': "CDIP proposé et CDIP réalisé pour les consultations du département médecine générale.",
+             'fn': _cdip_med_generale},
+            {'slug': 'cdip_gynecologie', 'nom': 'CDIP proposé et réalisé - Consultation gynécologie',
+             'icone': 'bi-gender-female',
+             'description': "CDIP proposé et CDIP réalisé pour les consultations du département gynécologie.",
+             'fn': _cdip_gynecologie},
+            {'slug': 'depistage_vih_cpn', 'nom': 'Dépistage VIH en CPN', 'icone': 'bi-virus2',
+             'description': "Statut VIH à l'accueil, proposition et résultat du test VIH pour les consultations prénatales.",
+             'fn': _depistage_vih_cpn},
         ],
     },
     {
