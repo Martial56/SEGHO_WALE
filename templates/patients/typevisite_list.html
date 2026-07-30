@@ -11,7 +11,7 @@
   html[data-theme="dark"] .o-list tbody tr:hover { background: rgba(var(--teal-500-rgb),0.2); }
   html[data-theme="dark"] .o-list thead th { background: var(--surface); }
   html[data-theme="dark"] .o-search-input { color: var(--text); }
-  html[data-theme="dark"] .o-search-bar { border-bottom-color: #3a4a62; }
+  html[data-theme="dark"] .o-search-bar { border-bottom-color: var(--border-strong); }
   html[data-theme="dark"] .o-pag-btn { background: var(--surface); border-color: var(--border); color: var(--text-muted); }
   html[data-theme="dark"] .o-empty-state { background: var(--bg); }
 
@@ -46,7 +46,7 @@
     display: inline-flex; align-items: center; padding: 0 2px;
     transition: color 0.15s;
   }
-  .o-pag-btn:hover { color: var(--teal-600); }
+  .o-pag-btn:hover { color: var(--accent-text-soft); }
   .o-pag-btn.disabled { opacity: 0.3; pointer-events: none; }
 
   .o-list-wrap { overflow-x: auto; overflow-y: auto; background: var(--surface); margin: 0 -32px; }
@@ -62,7 +62,7 @@
   .o-list tbody tr:hover { background: var(--teal-50); }
   .o-list tbody td { padding: 6px 10px; color: var(--text); vertical-align: middle; }
   .o-list tbody td.td-nom { white-space: normal; font-weight: 500; }
-  .o-list tbody td.td-code { color: var(--teal-600); font-weight: 500; font-size: 12px; }
+  .o-list tbody td.td-code { color: var(--accent-text-soft); font-weight: 500; font-size: 12px; }
   .o-list tbody td.td-desc { color: var(--text-muted); white-space: normal; max-width: 300px; }
   .o-list tbody td.td-actions { text-align: center; white-space: nowrap; width: 80px; }
 
@@ -105,8 +105,8 @@
     display: inline-flex; align-items: center; gap: 6px;
     transition: color 0.15s, border-color 0.15s; white-space: nowrap;
   }
-  .gyn-nav-link:hover { color: var(--teal-600); }
-  .gyn-nav-link.active { color: var(--teal-600); border-bottom-color: var(--teal-500); font-weight: 600; }
+  .gyn-nav-link:hover { color: var(--accent-text-soft); }
+  .gyn-nav-link.active { color: var(--accent-text-soft); border-bottom-color: var(--teal-500); font-weight: 600; }
   html[data-theme="dark"] .gyn-nav { background: #091d2e; border-bottom-color: rgba(255,255,255,0.06); }
   html[data-theme="dark"] .gyn-nav-link { color: rgba(255,255,255,0.4); }
   html[data-theme="dark"] .gyn-nav-link.active { color: var(--teal-300); border-bottom-color: var(--teal-400); }
@@ -125,10 +125,10 @@
     padding: 8px 16px; font-size: 12.5px; color: var(--text);
     text-decoration: none; transition: background 0.1s; white-space: nowrap;
   }
-  .gyn-nav-dd-item:hover { background: var(--teal-50); color: var(--teal-600); }
-  .gyn-nav-dd-item.active { background: rgba(var(--teal-500-rgb),.12); color: var(--teal-600); font-weight: 500; }
+  .gyn-nav-dd-item:hover { background: var(--teal-50); color: var(--accent-text-soft); }
+  .gyn-nav-dd-item.active { background: rgba(var(--teal-500-rgb),.12); color: var(--accent-text-soft); font-weight: 500; }
   html[data-theme="dark"] .gyn-nav-dd-item.active { background: rgba(var(--teal-500-rgb),.22); color: var(--teal-300); }
-  html[data-theme="dark"] .gyn-nav-dd-panel { background: #1a2535; border-color: #2e3f58; }
+  html[data-theme="dark"] .gyn-nav-dd-panel { background: var(--surface); border-color: var(--border-strong); }
   html[data-theme="dark"] .gyn-nav-dd-item { color: var(--text); }
   html[data-theme="dark"] .gyn-nav-dd-item:hover { background: rgba(var(--teal-500-rgb),0.2); color: var(--teal-300); }
 
@@ -157,7 +157,14 @@
     </div>
   </div>
   <div class="o-subheader-row">
-    <a href="{% url 'gynecologie_typevisite_create' %}" class="o-btn-create">CRÉER</a>
+    {% comment %}
+    La création et la modification passent par une modale, comme les pathologies :
+    la liste reste à l'écran, on ne perd ni sa page ni sa recherche pour saisir
+    deux champs. Le href reste vrai — ouvrir dans un nouvel onglet donne la page
+    complète — et c'est le clic simple qui est détourné.
+    {% endcomment %}
+    <a href="{% url 'gynecologie_typevisite_create' %}" class="o-btn-create"
+       onclick="return mdOpenConfigModal(event, this.href, 'Nouveau type de visite', 'bi-calendar2-week');">CRÉER</a>
     <div class="io-page-wrap" id="io-page-wrap">
       <button type="button" class="o-ctrl-btn io-toggle-btn" onclick="toggleIOPage(event)">
         <i class="bi bi-arrow-left-right"></i> Export / Import
@@ -203,7 +210,7 @@
     </thead>
     <tbody>
       {% for tv in page_obj %}
-      <tr onclick="window.location='{% url 'gynecologie_typevisite_edit' tv.pk %}'">
+      <tr onclick="mdOpenConfigModal(event, '{% url 'gynecologie_typevisite_edit' tv.pk %}', 'Modifier — {{ tv.nom|escapejs }}', 'bi-calendar2-week')">
         <td class="td-nom">{{ tv.nom }}</td>
         <td class="td-code">{{ tv.code }}</td>
         <td class="td-desc">{{ tv.description|truncatechars:80|default:"—" }}</td>
@@ -215,12 +222,14 @@
           {% endif %}
         </td>
         <td class="td-actions" onclick="event.stopPropagation()">
-          <a href="{% url 'gynecologie_typevisite_edit' tv.pk %}" class="btn-icon" title="Modifier"><i class="bi bi-pencil"></i></a>
-          <form method="post" action="{% url 'gynecologie_typevisite_delete' tv.pk %}" style="display:inline;"
-                onsubmit="return confirm('Supprimer « {{ tv.nom|escapejs }} » ?')">
-            {% csrf_token %}
-            <button type="submit" class="btn-icon btn-danger" title="Supprimer"><i class="bi bi-trash"></i></button>
-          </form>
+          <a href="{% url 'gynecologie_typevisite_edit' tv.pk %}" class="btn-icon" title="Modifier"
+             onclick="return mdOpenConfigModal(event, this.href, 'Modifier — {{ tv.nom|escapejs }}', 'bi-calendar2-week');">
+            <i class="bi bi-pencil"></i>
+          </a>
+          <button type="button" class="btn-icon btn-danger" title="Supprimer"
+                  onclick="openDeleteModal('{% url 'gynecologie_typevisite_delete' tv.pk %}', '{{ tv.nom|escapejs }}')">
+            <i class="bi bi-trash"></i>
+          </button>
         </td>
       </tr>
       {% endfor %}
@@ -236,7 +245,8 @@
     <div class="o-empty-title">Aucun type de visite{% if q %} pour "{{ q }}"{% endif %}</div>
     <div class="o-empty-sub">{% if q %}Essayez avec un autre terme.{% else %}Créez le premier type de visite.{% endif %}</div>
     {% if not q %}
-    <a href="{% url 'gynecologie_typevisite_create' %}" class="o-empty-btn">
+    <a href="{% url 'gynecologie_typevisite_create' %}" class="o-empty-btn"
+       onclick="return mdOpenConfigModal(event, this.href, 'Nouveau type de visite', 'bi-calendar2-week');">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       CRÉER UN TYPE DE VISITE
     </a>
@@ -244,6 +254,82 @@
   </div>
   {% endif %}
 </div>
+
+{% comment %}
+Modale partagée « Créer / Modifier » de la configuration : elle charge le
+formulaire, l'envoie et recharge la liste. Les pathologies et les types de visite
+curative s'en servent déjà.
+{% endcomment %}
+{% include 'medecins/config/includes/_config_modal.html' %}
+
+<!-- ── Modale de confirmation de suppression ── -->
+{% comment %}
+Remplace le confirm() du navigateur, qui n'était ni traduit ni au thème, et dont
+le formulaire cachait un envoi classique de page.
+{% endcomment %}
+<div class="mdcfg-modal-overlay" id="delete-modal-overlay" onclick="if (event.target === this) closeDeleteModal();">
+  <div class="mdcfg-modal-box" style="max-width:420px;">
+    <div class="mdcfg-modal-header">
+      <div class="mdcfg-modal-icon" style="background:linear-gradient(135deg,#e84545,#c62828);">
+        <i class="bi bi-trash"></i>
+      </div>
+      <div class="mdcfg-modal-title-wrap">
+        <div class="mdcfg-modal-title">Supprimer le type de visite</div>
+      </div>
+      <button type="button" class="mdcfg-modal-close" onclick="closeDeleteModal()">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div class="mdcfg-modal-body">
+      <p style="font-size:13px;color:var(--text-muted);line-height:1.55;margin:0;">
+        Supprimer « <strong id="delete-modal-nom" style="color:var(--text);"></strong> » ?
+        Cette action est irréversible.
+      </p>
+    </div>
+    <div class="mdcfg-modal-footer">
+      <button type="button" class="btn-form-cancel" onclick="closeDeleteModal()">Annuler</button>
+      <button type="button" class="btn-form-submit" style="background:#e84545;" onclick="confirmDelete()">
+        <i class="bi bi-trash"></i> Supprimer
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  var deleteModalUrl = null;
+
+  function openDeleteModal(url, nom) {
+    deleteModalUrl = url;
+    document.getElementById('delete-modal-nom').textContent = nom;
+    document.getElementById('delete-modal-overlay').classList.add('open');
+  }
+
+  function closeDeleteModal() {
+    document.getElementById('delete-modal-overlay').classList.remove('open');
+    deleteModalUrl = null;
+  }
+
+  function confirmDelete() {
+    if (!deleteModalUrl) return;
+    var jeton = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1];
+    var donnees = new FormData();
+    donnees.append('csrfmiddlewaretoken', jeton);
+    fetch(deleteModalUrl, {
+      method: 'POST',
+      headers: {'X-Requested-With': 'XMLHttpRequest'},
+      body: donnees,
+    })
+      .then(function (r) { return r.json(); })
+      .then(function () { window.location.reload(); })
+      .catch(function () { closeDeleteModal(); });
+  }
+
+  // Échap referme la confirmation ; celle du formulaire est gérée par la modale
+  // partagée.
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeDeleteModal();
+  });
+</script>
 
 <script>
   (function() {

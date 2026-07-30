@@ -1,0 +1,66 @@
+{% comment %}
+Tableau des rendez-vous, partagé par la liste patients et la liste gynécologie
+(structure identique, seuls l'URL de la ligne et le texte d'état vide changent).
+
+Deux rendus possibles :
+* sans regroupement — les lignes de `page_obj` à la suite ;
+* avec regroupement — un en-tête repliable par groupe, les lignes masquées au
+  départ. Le compteur affiche « sur page / total » quand le groupe déborde de la
+  page courante, sinon le total seul.
+{% endcomment %}
+<div class="o-list-wrap">
+  {% if page_obj %}
+  <table class="o-list">
+    <thead>
+      <tr>
+        <th>Rendez-vous</th>
+        <th>Patient</th>
+        <th>Date</th>
+        <th>Docteur</th>
+        <th>Type de consultation</th>
+        <th>Diagnostic retenu / Autres pathologies associées</th>
+        <th>Âge</th>
+        <th>Genre</th>
+        <th>État</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% if arbre %}
+        {% include 'includes/listing/groupes.html' with noeuds=arbre listing_colonnes=9 listing_ligne_tpl='includes/rdv_row.html' %}
+      {% else %}
+        {% for rdv in page_obj %}
+          {% include 'includes/rdv_row.html' with objet=rdv parent=None %}
+        {% endfor %}
+      {% endif %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="o-empty-state">
+    <div class="o-empty-illo">
+      <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+        <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+        <line x1="3" y1="10" x2="21" y2="10"/>
+        <line x1="9" y1="15" x2="15" y2="15"/>
+      </svg>
+    </div>
+    <div class="o-empty-title">Aucun rendez-vous{% if q %} pour « {{ q }} »{% endif %}{% if periode_libelle and not selection_active %} {{ periode_libelle }}{% endif %}</div>
+    {% comment %}
+    `selection_active` et non `filters` : la période par défaut ne compte pas
+    comme une sélection, il ne faut donc pas proposer de l'effacer.
+    {% endcomment %}
+    <div class="o-empty-sub">
+      {% if selection_active %}Essayez d'élargir la recherche ou d'effacer les filtres.
+      {% else %}{{ rdv_empty_sub|default:"Créez le premier rendez-vous." }}{% endif %}
+    </div>
+    {% if selection_active %}
+    <a href="#" class="o-empty-btn" onclick="resetAll(); return false;">TOUT EFFACER</a>
+    {% elif subheader_create_url %}
+    <a href="{{ subheader_create_url }}" class="o-empty-btn">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      CRÉER UN RENDEZ-VOUS
+    </a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>

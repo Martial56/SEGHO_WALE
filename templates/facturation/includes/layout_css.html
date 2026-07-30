@@ -4,7 +4,7 @@
    ══════════════════════════════════════════════════════════════ */
 
   :root {
-    --primary: #145770;
+    --primary: var(--teal-700);
     --primary-dark: var(--teal-700);
     --nav-bg: #ffffff;
     --accent: var(--teal-500);
@@ -15,12 +15,16 @@
     --text-muted: #6c757d;
   }
 
+  {% comment %}
+  Le module ne redéfinit plus les surfaces ni les textes du thème sombre : ce
+  bloc arrivant après celui de base.html, ses valeurs l'emportaient et le module
+  apparaissait dans un bleu-violet (#21283a) différent du reste de l'application.
+  En les laissant tomber, base.html reprend la main et le module porte la même
+  palette que partout ailleurs. Seul --bg, propre au module, est déclaré ici, et
+  il vise la même valeur que le fond des autres pages.
+  {% endcomment %}
   html[data-theme="dark"] {
-    --bg: #181c28;
-    --surface: #21283a;
-    --border: #2d3550;
-    --text: #c5d4e2;
-    --text-muted: #6c85a0;
+    --bg: var(--surface-muted);
   }
 
   body { font-family: 'Sora', sans-serif; background: var(--bg) !important; color: var(--text); }
@@ -52,9 +56,9 @@
     color: rgba(0,0,0,0.45); font-size: 17px; cursor: pointer; border-radius: 4px;
     margin-right: 4px; transition: background 0.15s; text-decoration: none;
   }
-  .o-nav-grid:hover { background: rgba(0,0,0,0.06); color: var(--primary); }
+  .o-nav-grid:hover { background: rgba(0,0,0,0.06); color: var(--accent-text); }
   .o-nav-brand {
-    font-size: 14px; font-weight: 600; color: var(--primary);
+    font-size: 14px; font-weight: 600; color: var(--accent-text);
     padding: 0 12px 0 4px; margin-right: 2px;
     border-right: 1px solid rgba(0,0,0,0.12);
     white-space: nowrap; display: flex; align-items: center; gap: 6px;
@@ -67,15 +71,19 @@
     white-space: nowrap;
   }
   .o-nav-link:hover,
-  .o-nav-link.active { color: var(--primary); background: rgba(20,87,112,0.06); border-bottom-color: var(--primary); }
+  /* Accent du logiciel, pas le --primary fixe du module : sinon la barre de
+     menus reste bleue quand on change la couleur dans « Mon compte ». */
+  .o-nav-link.active { color: var(--accent-text); background: rgba(var(--teal-600-rgb),0.07); border-bottom-color: var(--teal-600); }
 
-  html[data-theme="dark"] .o-nav            { background: #0a1e2e; border-bottom-color: rgba(255,255,255,0.06); box-shadow: none; }
+    {# Fond de page et bordure du thème : la barre restait sur un bleu marine #}
+  {# (#0a1e2e) qui ne correspondait à aucune autre page. #}
+html[data-theme="dark"] .o-nav            { background: var(--surface-muted); border-bottom-color: var(--border); box-shadow: none; }
   html[data-theme="dark"] .o-nav-grid       { color: rgba(255,255,255,0.5); }
-  html[data-theme="dark"] .o-nav-grid:hover { background: rgba(255,255,255,0.08); color: #7aaec7; }
-  html[data-theme="dark"] .o-nav-brand      { color: #7aaec7; border-right-color: rgba(255,255,255,0.1); }
+  html[data-theme="dark"] .o-nav-grid:hover { background: rgba(var(--teal-600-rgb),0.14); color: var(--teal-300); }
+  html[data-theme="dark"] .o-nav-brand      { color: var(--teal-300); border-right-color: rgba(255,255,255,0.1); }
   html[data-theme="dark"] .o-nav-link       { color: rgba(255,255,255,0.6); }
   html[data-theme="dark"] .o-nav-link:hover,
-  html[data-theme="dark"] .o-nav-link.active { color: #cce8f4; background: rgba(var(--teal-500-rgb),0.1); border-bottom-color: #4a8aaa; }
+  html[data-theme="dark"] .o-nav-link.active { color: var(--text-strong); background: rgba(var(--teal-600-rgb),0.14); border-bottom-color: var(--teal-400); }
 
   /* ── SUBHEADER ── */
   .o-subheader {
@@ -108,7 +116,7 @@
     font-size: 12px; font-weight: 700; color: var(--text-muted);
     text-transform: uppercase; letter-spacing: .05em;
   }
-  .chatter-header i { font-size: 13px; color: var(--accent); }
+  .chatter-header i { font-size: 13px; color: var(--accent-text-soft); }
   .chatter-compose { padding: 12px 14px; border-bottom: 1px solid var(--border); }
   .chatter-input {
     width: 100%; border: 1px solid var(--border); border-radius: 6px;
@@ -116,7 +124,7 @@
     background: var(--bg); resize: vertical; min-height: 56px; outline: none;
     transition: border-color .2s;
   }
-  .chatter-input:focus { border-color: var(--accent); }
+  .chatter-input:focus { border-color: var(--teal-600); }
   .chatter-input::placeholder { color: var(--text-muted); opacity: .6; }
   .chatter-send {
     margin-top: 8px; background: var(--accent); color: #fff; border: none;
@@ -141,8 +149,8 @@
   .log-meta { font-size: 11px; color: var(--text-muted); margin-bottom: 2px; }
   .log-meta strong { color: var(--text); font-weight: 600; }
   .log-msg { font-size: 12.5px; color: var(--text); line-height: 1.45; }
-  .log-type-statut .log-avatar { background: linear-gradient(135deg,#0f6e8e,#1588ab); }
-  .log-type-statut .log-msg { color: var(--accent); font-style: italic; }
+  .log-type-statut .log-avatar { background: linear-gradient(135deg,var(--teal-600),var(--teal-500)); }
+  .log-type-statut .log-msg { color: var(--accent-text-soft); font-style: italic; }
   .log-type-modif  .log-msg { color: var(--text-muted); font-style: italic; }
   .log-empty { padding: 24px 14px; text-align: center; color: var(--text-muted); font-size: 13px; }
   html[data-theme="dark"] .chatter-input { background: rgba(255,255,255,.04); border-color: var(--border); }

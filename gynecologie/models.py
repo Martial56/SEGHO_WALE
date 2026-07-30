@@ -9,6 +9,13 @@ class TypeVisite(models.Model):
     date_creation = models.DateTimeField(auto_now_add=True)
 
     def __str__(self): return self.nom
+
+    @property
+    def filtre_code(self):
+        """Valeur utilisée dans l'URL pour filtrer sur ce type de visite."""
+        from patients.rdv_listing import PREFIXE_VISITE_CPN
+        return f'{PREFIXE_VISITE_CPN}{self.code}'
+
     class Meta:
         verbose_name = "Type de visite"
         ordering = ['nom']

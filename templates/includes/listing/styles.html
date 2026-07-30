@@ -1,0 +1,118 @@
+{% comment %}
+Styles des groupes imbriqués des listes et des menus générés. À inclure une fois
+dans le bloc CSS de la page qui utilise la brique.
+{% endcomment %}
+<style>
+  /* ── Sous-menus des menus générés ──
+     Indispensable dès qu'une page utilise menu_filtres/menu_groupes : sans ces
+     règles, les sous-menus s'affichent dépliés en ligne dans le menu au lieu de
+     se replier sur le côté. Elles vivent donc ici, avec la brique, et non dans
+     le gabarit d'une page particulière. */
+  /* La ligne doit être positionnée, sinon le sous-menu se cale non pas sur elle
+     mais sur le menu entier : il apparaît alors bien au-dessus de l'entrée qui
+     l'ouvre. Cette règle vit ici, avec le sous-menu qu'elle sert, plutôt que dans
+     la feuille de chaque page — l'une l'avait, l'autre pas. */
+  .o-dd-item { position: relative; }
+  .o-dd-sub {
+    display: none; position: absolute; left: 100%; top: 0; z-index: 10000;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; box-shadow: 0 8px 28px rgba(0,0,0,0.16);
+    min-width: 160px; padding: 5px 0;
+  }
+  .o-dd-item:hover > .o-dd-sub { display: block; }
+  /* Un champ du sous-menu a le focus (liste déroulante ouverte, date en cours de
+     saisie) : le sous-menu reste déplié même si la souris est partie ailleurs,
+     sinon il disparaîtrait en pleine saisie. Le constructeur de conditions est
+     du lot depuis qu'il n'est plus épinglé au survol — c'est cette règle, et non
+     un épinglage, qui protège désormais sa saisie. Échap le referme en rendant
+     le focus (cf. listing_filtre_perso.js). */
+  .o-dd-item:focus-within > .o-dd-sub { display: block; }
+  .o-dd-sub .o-dd-item { font-size: 12px; }
+  .o-dd-item .o-dd-arr { font-size: 10px; color: var(--text-muted); flex-shrink: 0; }
+  /* Rappel de la valeur retenue sur la ligne repliée : information, pas contrôle. */
+  .o-dd-hint {
+    margin-left: auto; font-size: 11px; color: var(--text-muted);
+    font-weight: 400; white-space: nowrap;
+  }
+  .o-dd-item.active .o-dd-hint { color: inherit; opacity: .75; }
+  /* Menu collé au bord droit : ses sous-menus se déplient vers la gauche. */
+  .o-dd-panel.vers-gauche .o-dd-sub { left: auto; right: 100%; }
+
+  /* ── Menus générés (Filtres, Regrouper par) ──
+     Une coche marque les entrées retenues, comme dans Odoo : le fond coloré seul
+     se confond avec le survol et ne dit pas si l'entrée est cochée ou pointée.
+     La gouttière est réservée sur toutes les lignes, sinon cocher décalerait le
+     texte. Restreint à .lst-menu : les modules qui ont encore leur menu écrit à
+     la main gardent leur apparence. */
+  .lst-menu .o-dd-item::before {
+    content: '\2713'; flex: 0 0 11px; width: 11px;
+    font-size: 11px; line-height: 1; color: var(--accent-text-soft);
+    visibility: hidden;
+  }
+  .lst-menu .o-dd-item.active::before { visibility: visible; }
+  .lst-menu .o-dd-item { justify-content: flex-start; padding-left: 11px; }
+  .lst-menu .o-dd-item.active { background: none; color: var(--accent-text-soft); font-weight: 500; }
+  .lst-menu .o-dd-item.active:hover { background: var(--teal-50); }
+  .lst-menu .o-dd-item .o-dd-arr { margin-left: auto; }
+  html[data-theme="dark"] .lst-menu .o-dd-item::before { color: var(--teal-300); }
+  html[data-theme="dark"] .lst-menu .o-dd-item.active { background: none; color: var(--teal-300); }
+  html[data-theme="dark"] .lst-menu .o-dd-item.active:hover { background: rgba(var(--teal-500-rgb), 0.2); }
+
+  /* ── Groupement personnalisé (liste déroulante des champs) ──
+     Le maintien au focus vient de la règle générale ci-dessus. Reste
+     l'épinglage au clic, seul recours au tactile où il n'y a pas de survol. */
+  .lstg-perso.lstg-ouvert > .lstg-panneau { display: block; }
+  /* Centré sur sa ligne plutôt qu'aligné par le haut : le panneau ne contient
+     qu'un champ, et c'est lui qu'on veut voir en face de l'entrée qui l'ouvre. */
+  .lstg-panneau {
+    width: 250px; min-width: 250px; padding: 10px;
+    top: 50%; transform: translateY(-50%);
+    cursor: default; white-space: normal;
+  }
+  .lstg-select {
+    width: 100%; padding: 5px 6px; font-size: 12px; font-family: inherit;
+    border: 1px solid var(--border); border-radius: 3px;
+    background: var(--surface); color: var(--text);
+  }
+  .lstg-select option, .lstg-select optgroup { background: var(--surface); color: var(--text); }
+  /* Couleurs du déroulé écrites en dur pour le thème sombre : les variables
+     viennent d'un fichier statique que le navigateur garde en cache ; périmé, il
+     laisse `var(--surface)` sans valeur, la déclaration devient invalide et le
+     navigateur rouvre la liste avec sa propre couleur — blanche. Ces valeurs-ci
+     partent avec le HTML de la page. Mêmes teintes que la palette. */
+  html[data-theme="dark"] .lstg-select {
+    background-color: #141b22; color: #dce3ea; border-color: #1f2933;
+  }
+  html[data-theme="dark"] .lstg-select option,
+  html[data-theme="dark"] .lstg-select optgroup {
+    background-color: #141b22; color: #dce3ea;
+  }
+
+  /* Pas de display:flex sur la cellule : elle sortirait de la mise en page du
+     tableau et son colspan serait ignoré, la bande ne couvrant alors qu'une
+     colonne. Le chevron doit être inline-block, sinon son transform de rotation
+     ne s'applique pas (un élément inline n'est pas transformable). */
+  tr.lst-groupe { cursor: pointer; }
+  tr.lst-groupe td {
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+    color: var(--accent-text); background: rgba(0,0,0,.03);
+    padding: 8px 14px; vertical-align: middle;
+  }
+  tr.lst-groupe:hover td { background: var(--teal-50); }
+  /* Les sous-groupes s'éclaircissent avec la profondeur, pour lire la hiérarchie
+     d'un coup d'œil sans compter les retraits. */
+  tr.lst-groupe.lst-groupe-fils td {
+    background: rgba(0,0,0,.015); font-size: 10.5px; letter-spacing: .3px;
+  }
+  tr.lst-groupe .lst-chevron {
+    display: inline-block; margin-right: 8px; font-size: 10px; transition: transform .15s;
+  }
+  tr.lst-groupe.open .lst-chevron { transform: rotate(90deg); }
+  tr.lst-groupe .lst-compte {
+    margin-left: 8px; font-size: 10.5px; font-weight: 600;
+    color: var(--text-muted); text-transform: none; letter-spacing: normal;
+  }
+  html[data-theme="dark"] tr.lst-groupe td { color: var(--teal-300); background: rgba(255,255,255,.04); }
+  html[data-theme="dark"] tr.lst-groupe.lst-groupe-fils td { background: rgba(255,255,255,.02); }
+  html[data-theme="dark"] tr.lst-groupe:hover td { background: rgba(var(--teal-500-rgb), .14); }
+</style>

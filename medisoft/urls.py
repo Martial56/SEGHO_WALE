@@ -10,10 +10,12 @@ admin.site.index_title = "Tableau de bord"
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('core.urls')),
-    path('__reload__/', include('django_browser_reload.urls')),
 ]
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+    # Rechargement automatique du navigateur : outil de développement, à ne pas
+    # exposer en production. Il était aussi inclus sans condition plus haut, d'où
+    # l'avertissement urls.W005 sur un espace de noms enregistré deux fois.
     urlpatterns += [path('__reload__/', include('django_browser_reload.urls'))]

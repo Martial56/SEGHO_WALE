@@ -1,0 +1,99 @@
+{% comment %}
+Résultats de la liste patients : vue kanban, vue tableau et pagination basse.
+Extrait de list.html pour pouvoir être renvoyé seul en AJAX.
+
+Deux rendus par vue :
+* sans regroupement — les lignes de `page_obj` à la suite ;
+* avec regroupement — l'arbre de groupes imbriqués, replié au départ. Le compteur
+  d'un en-tête est le total réel du groupe, calculé en base ; la pagination
+  portant sur les groupes, toutes les lignes des groupes affichés sont déjà là et
+  déplier n'appelle jamais le serveur.
+{% endcomment %}
+<!-- ── Vue Kanban ──────────────────────────────── -->
+<div id="kanban-view">
+    {% if page_obj %}
+        {% if arbre %}
+            {% include 'patients/includes/groupes_kanban.html' with noeuds=arbre %}
+        {% else %}
+            {% for patient in page_obj %}
+                {% include 'patients/includes/pk_card.html' with objet=patient parent=None %}
+            {% endfor %}
+        {% endif %}
+    {% else %}
+    <div class="pk-vide">
+        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1" style="margin-bottom:12px;opacity:.4"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        <p style="font-size:15px">Aucun patient trouvé{% if q %} pour « {{ q }} »{% endif %}</p>
+        {% if selection_active %}
+        <a href="#" class="o-ctrl-btn" style="margin-top:12px;color:var(--rose-text);"
+           onclick="resetAll(); return false;">Tout effacer</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- ── Vue Liste ───────────────────────────────── -->
+<div id="list-view">
+    <table>
+        <thead>
+            <tr>
+                <th>Code d'identification</th>
+                <th>Nom et prénoms</th>
+                <th>Âge</th>
+                <th>Genre</th>
+                <th>Téléphone</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if page_obj %}
+                {% if arbre %}
+                    {% include 'includes/listing/groupes.html' with noeuds=arbre listing_colonnes=5 listing_ligne_tpl='patients/includes/lv_row.html' %}
+                {% else %}
+                    {% for patient in page_obj %}
+                        {% include 'patients/includes/lv_row.html' with objet=patient parent=None %}
+                    {% endfor %}
+                {% endif %}
+            {% else %}
+            <tr>
+                <td colspan="5" style="text-align:center;padding:48px;color:var(--text-muted);">
+                    Aucun patient trouvé
+                </td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<!-- ── Pagination ──────────────────────────────── -->
+{% if page_obj.has_other_pages %}
+<div class="pagination">
+    <span>
+        Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+        &nbsp;·&nbsp; {{ page_obj.paginator.count }} {% if groups %}groupe{{ page_obj.paginator.count|pluralize }}{% else %}résultat{{ page_obj.paginator.count|pluralize }}{% endif %}
+    </span>
+    <div class="pagination-pages">
+        {% if page_obj.has_previous %}
+            <a href="{% querystring page=1 %}" title="Première">«</a>
+            <a href="{% querystring page=page_obj.previous_page_number %}">‹</a>
+        {% else %}
+            <span class="disabled">«</span>
+            <span class="disabled">‹</span>
+        {% endif %}
+
+        {% for num in page_obj.paginator.page_range %}
+            {% if num == page_obj.number %}
+                <span class="current">{{ num }}</span>
+            {% elif num >= page_obj.number|add:"-2" and num <= page_obj.number|add:"2" %}
+                <a href="{% querystring page=num %}">{{ num }}</a>
+            {% endif %}
+        {% endfor %}
+
+        {% if page_obj.has_next %}
+            <a href="{% querystring page=page_obj.next_page_number %}">›</a>
+            <a href="{% querystring page=page_obj.paginator.num_pages %}" title="Dernière">»</a>
+        {% else %}
+            <span class="disabled">›</span>
+            <span class="disabled">»</span>
+        {% endif %}
+    </div>
+</div>
+{% endif %}

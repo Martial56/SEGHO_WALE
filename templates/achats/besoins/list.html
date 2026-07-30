@@ -12,7 +12,7 @@
 .ba-head h1 { font-size:16px; font-weight:700; color:var(--teal-800); margin:0; }
 .ba-kpis { display:flex; gap:10px; padding:10px 28px; background:#f8fafb; border-bottom:1px solid rgba(0,0,0,.06); flex-shrink:0; }
 .ba-kpi { padding:7px 16px; background:#fff; border-radius:8px; border:1px solid rgba(0,0,0,.08); font-size:13px; cursor:pointer; text-decoration:none; color:rgba(0,0,0,.7); display:flex; align-items:center; gap:8px; }
-.ba-kpi .val { font-weight:800; color:var(--teal-700); }
+.ba-kpi .val { font-weight:800; color:var(--accent-text); }
 .ba-filters { display:flex; align-items:center; gap:10px; padding:10px 28px; background:#fff; border-bottom:1px solid rgba(0,0,0,.07); flex-shrink:0; }
 .ba-body { flex:1; overflow:auto; min-height:0; }
 .ba-table { width:100%; border-collapse:collapse; font-size:13px; }
@@ -23,7 +23,7 @@
 .s-brouillon { background:#f3f4f6; color:#6b7280; }
 .s-soumis { background:#dbeafe; color:#1d4ed8; }
 .s-en_cours { background:#fef3c7; color:#92400e; }
-.s-satisfait { background:#c0d8e8; color:var(--teal-700); }
+.s-satisfait { background:#c0d8e8; color:var(--accent-text); }
 .s-annule { background:#fee2e2; color:#991b1b; }
 .ba-kpi-alert { background:#fef3c7; border-color:#fcd34d; color:#92400e; }
 .ba-kpi-alert-val { color:#92400e; }
@@ -47,7 +47,7 @@ html[data-theme="dark"] .ba-filters { background:var(--surface); border-bottom-c
 html[data-theme="dark"] .ba-table th { background:var(--surface-muted); color:var(--text-faint); border-bottom-color:var(--border); }
 html[data-theme="dark"] .ba-table td { border-bottom-color:var(--border); color:var(--text); }
 html[data-theme="dark"] .ba-table tr:hover td { background:var(--surface-muted); }
-html[data-theme="dark"] .s-brouillon { background:rgba(107,114,128,.25); color:#d1d5db; }
+html[data-theme="dark"] .s-brouillon { background:rgba(107,114,128,.25); color: var(--text-strong); }
 html[data-theme="dark"] .s-soumis { background:rgba(29,78,216,.25); color:#93c5fd; }
 html[data-theme="dark"] .s-en_cours { background:rgba(146,64,14,.3); color:#fcd34d; }
 html[data-theme="dark"] .s-satisfait { background:rgba(var(--teal-700-rgb),.4); color:#7dd3fc; }
@@ -60,7 +60,7 @@ html[data-theme="dark"] .s-annule { background:rgba(153,27,27,.3); color:#fca5a5
   <div class="ba-head">
     <a href="{% url 'achats:dashboard' %}" class="o-ctrl-btn" style="padding:3px 7px;"><i class="bi bi-arrow-left"></i></a>
     <span style="font-size:13px;color:var(--text-muted);">
-      <a href="{% url 'achats:dashboard' %}" style="color:var(--teal-700);text-decoration:none;font-weight:500;">Achats</a>
+      <a href="{% url 'achats:dashboard' %}" style="color:var(--accent-text);text-decoration:none;font-weight:500;">Achats</a>
       <span style="margin:0 5px;opacity:.4;">/</span>
       <span style="color:var(--text);font-weight:500;">Besoins d'achat</span>
     </span>
@@ -120,7 +120,7 @@ html[data-theme="dark"] .s-annule { background:rgba(153,27,27,.3); color:#fca5a5
         <tbody>
         {% for fiche in fiches_a_importer %}
         <tr>
-          <td style="font-weight:700;color:var(--teal-700);">
+          <td style="font-weight:700;color:var(--accent-text);">
             <a href="{% url 'stock_fiche_detail' fiche.pk %}" style="color:inherit;text-decoration:none;">{{ fiche.numero }}</a>
           </td>
           <td style="font-size:12px;">{{ fiche.get_pharmacie_display|default:"—" }}</td>
@@ -160,13 +160,13 @@ html[data-theme="dark"] .s-annule { background:rgba(153,27,27,.3); color:#fca5a5
       <tbody>
       {% for b in besoins %}
       <tr>
-        <td style="font-weight:700;color:var(--teal-700);">
+        <td style="font-weight:700;color:var(--accent-text);">
           <a href="{% url 'achats:besoin_detail' b.pk %}" style="color:inherit;text-decoration:none;">{{ b.numero }}</a>
         </td>
         <td><a href="{% url 'achats:besoin_detail' b.pk %}" style="color:var(--text);text-decoration:none;font-weight:500;">{{ b.titre }}</a></td>
         <td>
           {% if b.fiche_besoins %}
-            <a href="{% url 'stock_fiche_detail' b.fiche_besoins.pk %}" style="font-size:12px;color:var(--teal-700);text-decoration:none;display:inline-flex;align-items:center;gap:4px;background:rgba(var(--teal-700-rgb),.08);padding:2px 8px;border-radius:10px;">
+            <a href="{% url 'stock_fiche_detail' b.fiche_besoins.pk %}" style="font-size:12px;color:var(--accent-text);text-decoration:none;display:inline-flex;align-items:center;gap:4px;background:rgba(var(--teal-700-rgb),.08);padding:2px 8px;border-radius:10px;">
               <i class="bi bi-box-seam" style="font-size:10px;"></i> {{ b.fiche_besoins.numero }}
             </a>
           {% else %}
@@ -177,7 +177,7 @@ html[data-theme="dark"] .s-annule { background:rgba(153,27,27,.3); color:#fca5a5
         <td style="color:var(--text-muted);">{{ b.lignes.count }}</td>
         <td style="color:#888;white-space:nowrap;">{{ b.date_creation|date:"d/m/Y" }}</td>
         <td>
-          <a href="{% url 'achats:besoin_detail' b.pk %}" style="color:var(--teal-600);font-size:13px;"><i class="bi bi-eye"></i></a>
+          <a href="{% url 'achats:besoin_detail' b.pk %}" style="color:var(--accent-text-soft);font-size:13px;"><i class="bi bi-eye"></i></a>
         </td>
       </tr>
       {% endfor %}

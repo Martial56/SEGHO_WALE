@@ -8,10 +8,12 @@ from django.http import JsonResponse
 from django.utils import timezone
 from datetime import date, timedelta
 
-from .models import Patient, RendezVous, Pathologie
-from .forms import PatientForm, RendezVousForm, PathologieForm, TypeVisiteForm
+from .models import Patient, RendezVous, Pathologie, TypeVisiteCurative
+from .forms import (PatientForm, RendezVousForm, PathologieForm, TypeVisiteForm,
+                    TypeVisiteCurativeForm)
 from medecins.models import Medecin
 from core.views import log_event
+from core.utils import annees_avant
 from gynecologie.models import TypeVisite
 
 
@@ -21,125 +23,97 @@ def _render_related_list(request, context):
     return render(request, template, context)
 
 
-def _age_bracket_label(patient, today):
-    if patient.date_naissance > today.replace(year=today.year - 18):
-        return 'Mineurs (< 18 ans)'
-    if patient.date_naissance > today.replace(year=today.year - 60):
-        return 'Adultes (18–60 ans)'
-    return 'Seniors (> 60 ans)'
-
-
 @login_required
 def patient_list(request):
-    from datetime import date
-    qs = Patient.objects.all()
-    stats = {
-        'total':        qs.count(),
-        'nouveaux_30j': qs.filter(date_creation__gte=timezone.now() - timedelta(days=30)).count(),
-        'femmes':       qs.filter(sexe='F').count(),
-        'hommes':       qs.filter(sexe='M').count(),
-    }
+    """Liste des patients : filtres cumulables, regroupements imbriqués, filtre et
+    groupement personnalisés.
 
+    Tout vient de core.listing, comme la liste des patientes de gynécologie qui
+    porte le même modèle : cette vue ne fait que déclarer le jeu de départ et
+    assembler le contexte. Elle avait auparavant sa propre mécanique — un seul
+    niveau de groupes, des en-têtes posés sur les objets de la page, deux critères
+    de filtre écrits en dur — et n'offrait ni condition personnalisée ni
+    regroupement sur un champ non prévu.
+    """
+    from datetime import date as _date
+
+    from core.listing import (Listing, appliquer_conditions, champs_pour_navigateur,
+                              conditions_demandees, menu_filtres, menu_groupes,
+                              paginer_groupes)
+    from .patient_listing import (CHAMPS_RECHERCHE, champs_patients,
+                                  construire_dimensions, dimensions_personnalisees,
+                                  familles_patients)
+
+    today   = _date.today()
     q       = request.GET.get('q', '').strip()
-    filters = request.GET.getlist('filter')
-    groups  = request.GET.getlist('group')
+    groupes = request.GET.getlist('group')
 
-    if q:
-        qs = qs.filter(
-            Q(nom__icontains=q) | Q(prenoms__icontains=q) |
-            Q(code_patient__icontains=q) | Q(telephone__icontains=q)
-        )
+    base_qs = Patient.objects.all()
 
-    if 'nouveau' in filters:
-        qs = qs.filter(date_creation__gte=timezone.now() - timedelta(days=30))
+    # En AJAX on ne renvoie que le fragment de liste : le titre « Patient N » n'en
+    # fait pas partie, ce comptage est donc inutile.
+    is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
 
-    sexe_map = {'femme': 'F', 'homme': 'M'}
-    sexes_selectionnes = [sexe_map[f] for f in filters if f in sexe_map]
-    if sexes_selectionnes:
-        qs = qs.filter(sexe__in=sexes_selectionnes)
+    # Champs établis une fois et partagés : ils servent au regroupement
+    # personnalisé comme au constructeur de conditions.
+    champs     = champs_patients()
+    dims_perso = dimensions_personnalisees(champs)
+    declarees  = construire_dimensions(today)
+    listing = Listing(
+        recherche=CHAMPS_RECHERCHE,
+        familles=familles_patients(),
+        dimensions=list(declarees.values()) + dims_perso,
+        par_page=40,
+        tri_defaut=('nom', 'prenoms'),
+    )
 
-    today = date.today()
-    tranches_selectionnees = [f for f in filters if f in ('mineur', 'adulte', 'senior')]
-    if tranches_selectionnees:
-        age_q = Q()
-        if 'mineur' in tranches_selectionnees:
-            age_q |= Q(date_naissance__gt=today.replace(year=today.year - 18))
-        if 'adulte' in tranches_selectionnees:
-            age_q |= Q(
-                date_naissance__lte=today.replace(year=today.year - 18),
-                date_naissance__gt=today.replace(year=today.year - 60),
-            )
-        if 'senior' in tranches_selectionnees:
-            age_q |= Q(date_naissance__lte=today.replace(year=today.year - 60))
-        qs = qs.filter(age_q)
+    filtres = listing.filtres_demandes(request)
+    qs = listing.appliquer_recherche(base_qs, q)
+    qs = listing.appliquer_filtres(qs, filtres, {'aujourdhui': today})
 
-    # ── Regroupement (cumulable : Genre + Âge) ──────────────────────────────
-    # Pas de vraie structure imbriquée : on trie pour que les groupes soient
-    # contigus, puis on marque le premier élément de chaque nouveau groupe
-    # d'un en-tête de section combiné (ex. "Féminin — Adultes (18–60 ans)"),
-    # avec le total réel du groupe (toutes pages confondues, pas juste la page
-    # courante) — calculé côté base via une agrégation groupée.
-    group_counts = {}
-    if groups:
-        from django.db.models import Case, When, Value, CharField, Count
-        annotations = {}
-        values_fields = []
-        if 'sexe' in groups:
-            values_fields.append('sexe')
-        if 'age' in groups:
-            annotations['age_bracket'] = Case(
-                When(date_naissance__gt=today.replace(year=today.year - 18), then=Value('Mineurs (< 18 ans)')),
-                When(date_naissance__gt=today.replace(year=today.year - 60), then=Value('Adultes (18–60 ans)')),
-                default=Value('Seniors (> 60 ans)'),
-                output_field=CharField(),
-            )
-            values_fields.append('age_bracket')
-        rows = qs.annotate(**annotations).order_by().values(*values_fields).annotate(n=Count('id'))
-        sexe_labels = dict(Patient.SEXE)
-        for row in rows:
-            parts = []
-            if 'sexe' in groups:
-                parts.append(sexe_labels.get(row['sexe'], row['sexe']))
-            if 'age' in groups:
-                parts.append(row['age_bracket'])
-            group_counts[' — '.join(parts)] = row['n']
+    # Conditions personnalisées (champ + opérateur + valeur), validées contre les
+    # champs découverts sur le modèle : une condition inconnue est ignorée.
+    conditions = conditions_demandees(request, champs)
+    mode_conditions = 'ou' if request.GET.get('cm') == 'ou' else 'et'
+    qs = appliquer_conditions(qs, conditions, mode_conditions)
+    qs = listing.trier(qs, groupes)
 
-    ordering = []
-    if 'sexe' in groups:
-        ordering.append('sexe')
-    if 'age' in groups:
-        ordering.append('-date_naissance')
-    if ordering:
-        qs = qs.order_by(*ordering)
+    # Avec un regroupement, on pagine les **groupes** et non les lignes : toutes
+    # les lignes des groupes affichés sont chargées, si bien qu'un groupe visible
+    # s'ouvre toujours et que déplier n'appelle jamais le serveur.
+    toutes = dict(declarees)
+    toutes.update({d.cle: d for d in dims_perso})
+    dims = [toutes[g] for g in groupes if g in toutes]
+    arbre = []
+    if dims:
+        arbre, page_obj, nb_groupes = paginer_groupes(qs, dims, request.GET.get('page'))
+    else:
+        nb_groupes = 0
+        page_obj = Paginator(qs, listing.par_page).get_page(request.GET.get('page'))
 
-    paginator = Paginator(qs, 40)
-    page_obj = paginator.get_page(request.GET.get('page'))
-
-    if groups:
-        prev_key = None
-        group_index = -1
-        for p in page_obj:
-            parts = []
-            if 'sexe' in groups:
-                parts.append(p.get_sexe_display())
-            if 'age' in groups:
-                parts.append(_age_bracket_label(p, today))
-            key = ' — '.join(parts)
-            if key != prev_key:
-                group_index += 1
-                p.group_header = key
-                p.group_count = group_counts.get(key, 0)
-            p.group_id = group_index
-            prev_key = key
-
-    return render(request, 'patients/list.html', {
-        'page_obj':     page_obj,
-        'stats':        stats,
-        'q':            q,
-        'filters':      filters,
-        'groups':       groups,
-        'total_filtre': qs.count(),
-        'breadcrumb':   [{'title': 'Patients'}],
+    template = 'patients/includes/list_body.html' if is_ajax else 'patients/list.html'
+    return render(request, template, {
+        'page_obj':   page_obj,
+        # `arbre` porte les groupes imbriqués ; vide sans regroupement, la liste
+        # est alors rendue à plat depuis page_obj.
+        'arbre':      arbre,
+        'nb_groupes': nb_groupes,
+        'stats':      {} if is_ajax else {'total': base_qs.count()},
+        'q':          q,
+        'filters':    filtres,
+        'groups':     groupes,
+        'filtre_pose':      bool(filtres),
+        'selection_active': bool(filtres or groupes or q or conditions),
+        # Menus générés depuis la déclaration : le gabarit ne fait que parcourir.
+        'listing_filtres': menu_filtres(listing.familles, filtres),
+        'listing_groupes': menu_groupes(list(declarees.values()) + dims_perso, groupes),
+        'conditions':      conditions,
+        'mode_conditions': mode_conditions,
+        # L'entrée de menu doit survivre au rafraîchissement AJAX : elle dépend de
+        # ce drapeau, pas des données JSON qui n'accompagnent que la page complète.
+        'listing_filtre_perso': True,
+        'listing_champs_json':  None if is_ajax else champs_pour_navigateur(champs),
+        'breadcrumb': [{'title': 'Patients'}],
     })
 
 
@@ -267,10 +241,7 @@ def _parse_age_to_date(v, today):
             return None
         if years < 0:
             return None
-        try:
-            return today.replace(year=today.year - years)
-        except ValueError:
-            return today.replace(year=today.year - years, day=28)
+        return annees_avant(today, years)
 
     m_y = re.search(r'(\d+)\s*Ans?', s, re.IGNORECASE)
     m_m = re.search(r'(\d+)\s*Mois', s, re.IGNORECASE)
@@ -477,77 +448,150 @@ def patient_edit(request, pk):
     })
 
 
+def _feuilles(noeuds):
+    """Parcourt l'arbre de groupes et renvoie les nœuds qui portent des lignes."""
+    for n in noeuds:
+        if n['enfants']:
+            yield from _feuilles(n['enfants'])
+        else:
+            yield n
+
+
+def _rdv_listing(request, base_qs, template_page, rdv_url_name,
+                 create_url=None, empty_sub=None, contexte_gyneco=False):
+    """Filtrage, regroupement et pagination communs aux deux listes de rendez-vous.
+
+    Les pages « Rendez-vous » (patients) et « Rendez-vous » (gynécologie) offrent
+    les mêmes menus : seule leur requête de départ diffère. La logique vit dans
+    patients/rdv_listing.py pour que les deux ne divergent pas.
+    """
+    from datetime import date
+    from core.listing import (Listing, appliquer_conditions, champs_pour_navigateur,
+                              conditions_demandees, menu_filtres, menu_groupes)
+    from .rdv_listing import (FILTRES_PAR_DEFAUT, annoter_diagnostics, champs_rdv,
+                              construire_dimensions, dimensions_menu,
+                              dimensions_personnalisees, familles_rdv, libelle_periode,
+                              trier_pour_groupes)
+
+    today     = date.today()
+    q         = request.GET.get('q', '').strip()
+    date_from = request.GET.get('date_from', '')
+    date_to   = request.GET.get('date_to', '')
+    groupes   = request.GET.getlist('group')
+
+    # Déclaration de la liste : la brique en tire l'application des filtres et la
+    # génération des menus. Les modules n'écrivent plus que cette déclaration.
+    # Dimensions déclarées, complétées par celles générées depuis les champs des
+    # formulaires : l'utilisateur peut regrouper sur n'importe lequel sans qu'on
+    # l'ait prévu. La liste des champs est établie une fois et partagée entre le
+    # regroupement et le constructeur de conditions.
+    champs = champs_rdv()
+    dims_perso = dimensions_personnalisees(champs)
+    listing = Listing(
+        recherche=('patient__nom', 'patient__prenoms', 'patient__code_patient'),
+        familles=familles_rdv(contexte_gyneco),
+        dimensions=list(construire_dimensions(today).values()) + dims_perso,
+        par_page=25,
+        filtres_defaut=FILTRES_PAR_DEFAUT,
+        tri_defaut=('-date_heure',),
+    )
+    filtres = listing.filtres_demandes(request)   # défaut : la journée en cours
+
+    qs = listing.appliquer_recherche(base_qs, q)
+    qs = listing.appliquer_filtres(qs, filtres, {
+        'user': request.user, 'aujourdhui': today,
+        'date_from': date_from, 'date_to': date_to,
+    })
+    # Conditions personnalisées (champ + opérateur + valeur), validées contre la
+    # liste des champs découverts : une condition inconnue est ignorée.
+    conditions = conditions_demandees(request, champs)
+    mode_conditions = 'ou' if request.GET.get('cm') == 'ou' else 'et'
+    qs = appliquer_conditions(qs, conditions, mode_conditions)
+    qs = trier_pour_groupes(qs, groupes, today)
+
+    # Avec un regroupement actif, on pagine les **groupes** et non les lignes :
+    # toutes les lignes des groupes affichés sont chargées, si bien qu'un groupe
+    # visible s'ouvre toujours et que déplier n'appelle jamais le serveur.
+    from core.listing import paginer_groupes
+    declarees = dict(construire_dimensions(today))
+    declarees.update({d.cle: d for d in dims_perso})
+    dims = [declarees[g] for g in groupes if g in declarees]
+    arbre = []
+    if dims:
+        arbre, page_obj, nb_groupes = paginer_groupes(qs, dims, request.GET.get('page'))
+        annoter_diagnostics([o for n in _feuilles(arbre) for o in n['lignes']])
+    else:
+        nb_groupes = 0
+        page_obj = Paginator(qs, 25).get_page(request.GET.get('page'))
+        annoter_diagnostics(list(page_obj))
+
+    # En AJAX on ne renvoie que les zones rafraîchies, pas la page entière.
+    is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
+
+    # La période appliquée d'office n'est pas un filtre posé par l'utilisateur :
+    # elle ne doit ni allumer le bouton « Filtres » ni faire apparaître
+    # « Effacer », sinon on invite à effacer quelque chose qui revient aussitôt.
+    # Elle reste visible sous forme d'une mention discrète à côté du titre.
+    filtre_pose = not listing.est_selection_par_defaut(filtres) or bool(date_from or date_to)
+
+    return render(request, 'includes/rdv_body.html' if is_ajax else template_page, {
+        'page_obj':  page_obj,
+        # `arbre` porte les groupes imbriqués ; vide sans regroupement, la liste
+        # est alors rendue à plat depuis page_obj.
+        'arbre':      arbre,
+        'nb_groupes': nb_groupes,
+        'today':     today.isoformat(),
+        'q':         q,
+        'filters':   filtres,
+        'groups':    groupes,
+        'date_from': date_from,
+        'date_to':   date_to,
+        'filtre_pose':      filtre_pose,
+        'selection_active': filtre_pose or bool(groupes) or bool(q),
+        'periode_libelle':  libelle_periode(filtres, date_from, date_to),
+        # Menus générés depuis la déclaration : les gabarits n'ont plus qu'à
+        # parcourir ces structures.
+        'listing_filtres':  menu_filtres(listing.familles, filtres, date_from, date_to),
+        'listing_groupes':  menu_groupes(dimensions_menu(contexte_gyneco, today) + dims_perso, groupes),
+        'conditions':       conditions,
+        'mode_conditions':  mode_conditions,
+        # L'entrée de menu doit rester présente après un rafraîchissement AJAX :
+        # elle est donc conditionnée à ce drapeau, et non aux données JSON — qui,
+        # elles, n'accompagnent que la page complète.
+        'listing_filtre_perso': True,
+        'listing_champs_json': None if is_ajax else champs_pour_navigateur(champs),
+
+        # Fournis par la vue (et non par un {% include with %}) pour que la page
+        # complète et le fragment AJAX rendent exactement les mêmes contrôles.
+        'subheader_title':       'Rendez-vous',
+        'subheader_placeholder': 'Rechercher un patient…',
+        'subheader_create_url':  create_url,
+        'rdv_url_name':          rdv_url_name,
+        'rdv_empty_sub':         empty_sub,
+        # Les types de visite ne sont pas les mêmes des deux côtés : les CPN
+        # configurés en gynécologie, le curatif pour les consultations.
+        'contexte_gyneco':       contexte_gyneco,
+        # Listes de configuration : le menu Filtres les affiche telles quelles,
+        # donc un type ajouté en configuration devient filtrable aussitôt.
+        'types_visite_cpn':      (TypeVisite.objects.filter(actif=True).order_by('nom')
+                                  if contexte_gyneco else None),
+        'types_visite_curative': (None if contexte_gyneco else
+                                  TypeVisiteCurative.objects.filter(actif=True).order_by('nom')),
+    })
+
+
 @login_required
 def rdv_global_list(request):
-    from datetime import date, datetime as dt
-
-    today = date.today()
-    q           = request.GET.get('q', '').strip()
-    filter_val  = request.GET.get('filter', 'today')
-    date_from_s = request.GET.get('date_from', '')
-    date_to_s   = request.GET.get('date_to', '')
-
-    base_qs = RendezVous.objects.select_related('patient', 'medecin', 'type_consultation')
-
-    # Stats du jour (toujours calculées sur aujourd'hui)
-    today_qs = base_qs.filter(date_heure__date=today)
-    stats = {
-        'aujourd_hui': today_qs.count(),
-        'planifie':    today_qs.filter(statut='planifie').count(),
-        'confirme':    today_qs.filter(statut='confirme').count(),
-        'termine':     today_qs.filter(statut='termine').count(),
-        'annule':      today_qs.filter(statut__in=['annule', 'absent']).count(),
-        'total':       base_qs.count(),
-    }
-
-    qs = base_qs.prefetch_related('registre_curatif').order_by('-date_heure')
-
-    if q:
-        qs = qs.filter(
-            Q(patient__nom__icontains=q) |
-            Q(patient__prenoms__icontains=q) |
-            Q(patient__code_patient__icontains=q)
-        )
-
-    if date_from_s or date_to_s:
-        try:
-            if date_from_s:
-                qs = qs.filter(date_heure__date__gte=dt.strptime(date_from_s, '%Y-%m-%d').date())
-            if date_to_s:
-                qs = qs.filter(date_heure__date__lte=dt.strptime(date_to_s, '%Y-%m-%d').date())
-        except ValueError:
-            pass
-    elif filter_val == 'all':
-        pass  # pas de filtre date
-    elif filter_val == 'mine':
-        qs = qs.filter(medecin__user=request.user)
-    elif filter_val == 'urgent':
-        qs = qs.filter(niveau_urgence='urgent')
-    elif filter_val == 'urgence_medicale':
-        qs = qs.filter(type_rdv='urgence')
-    elif filter_val == 'consultation':
-        qs = qs.filter(type_rdv='consultation')
-    elif filter_val == 'suivi':
-        qs = qs.filter(type_rdv='controle')
-    elif filter_val in ('planifie', 'confirme', 'termine', 'annule', 'absent'):
-        qs = qs.filter(statut=filter_val)
-    elif filter_val == 'not_done':
-        qs = qs.filter(statut__in=['planifie', 'confirme'])
-    else:
-        qs = qs.filter(date_heure__date=today).exclude(statut='termine')
-
-    paginator = Paginator(qs, 25)
-    page_obj  = paginator.get_page(request.GET.get('page'))
-
-    return render(request, 'patients/rendez_vous.html', {
-        'page_obj':    page_obj,
-        'today':       today.isoformat(),
-        'stats':       stats,
-        'filter_val':  filter_val,
-        'q':           q,
-        'date_from':   date_from_s,
-        'date_to':     date_to_s,
-    })
+    base_qs = (RendezVous.objects
+               .select_related('patient', 'medecin', 'departement', 'type_consultation',
+                               'cur_type_visite', 'patient__assurance', 'medecin__employe')
+               .prefetch_related('registre_curatif')
+               .order_by('-date_heure'))
+    from django.urls import reverse
+    return _rdv_listing(request, base_qs, 'patients/rendez_vous.html',
+                        rdv_url_name='patients:rdv_edit',
+                        create_url=reverse('patients:rdv_create'),
+                        empty_sub='Créez le premier rendez-vous.')
 
 
 @login_required
@@ -631,6 +675,9 @@ def rdv_create(request):
         'consultation':    None,
         'constante':       None,
         'pathologies':     Pathologie.objects.filter(actif=True, departement__code__in=('medg', 'MEDGEN')).order_by('nom'),
+        # Types de visite curative, configurables depuis le menu Configurations
+        # des rendez-vous (remplace trois valeurs autrefois écrites en dur).
+        'types_visite_curative': TypeVisiteCurative.objects.filter(actif=True).order_by('nom'),
         'medecins':        Medecin.objects.filter(actif=True).select_related('employe').order_by('employe__nom', 'employe__prenoms'),
     })
 
@@ -860,6 +907,7 @@ def rdv_edit(request, pk):
         'is_new':        False,
         'consultation':  consultation,
         'constante':     constante,
+        'types_visite_curative': TypeVisiteCurative.objects.filter(actif=True).order_by('nom'),
         'pathologies':   Pathologie.objects.filter(actif=True, departement__code__in=('medg', 'MEDGEN')).order_by('nom'),
         'medecins':      Medecin.objects.filter(actif=True).select_related('employe').order_by('employe__nom', 'employe__prenoms'),
         'registre_cpn':          _get_reg(RegistreCPN),
@@ -871,97 +919,13 @@ def rdv_edit(request, pk):
 
 
 
-@login_required
-def gynecologie_rdv_list(request):
-    from datetime import date as _date
-
-    q          = request.GET.get('q', '').strip()
-    filter_val = request.GET.get('filter', '')
-    group_val  = request.GET.get('group', '')
-    date_from  = request.GET.get('date_from', '')
-    date_to    = request.GET.get('date_to', '')
-
-    qs = RendezVous.objects.select_related('patient', 'medecin', 'type_consultation').prefetch_related('registre_curatif').filter(
-        departement__code='GYN'
-    ).order_by('-date_heure')
-
-    if q:
-        qs = qs.filter(
-            Q(patient__nom__icontains=q) |
-            Q(patient__prenoms__icontains=q) |
-            Q(patient__code_patient__icontains=q)
-        )
-
-    if filter_val == 'today':
-        qs = qs.filter(date_heure__date=_date.today())
-    elif filter_val == 'mine':
-        qs = qs.filter(medecin__user=request.user)
-    elif filter_val == 'urgent':
-        qs = qs.filter(niveau_urgence='urgent')
-    elif filter_val == 'urgence_medicale':
-        qs = qs.filter(type_rdv='urgence')
-    elif filter_val == 'consultation':
-        qs = qs.filter(type_rdv='consultation')
-    elif filter_val == 'suivi':
-        qs = qs.filter(type_rdv='controle')
-    elif filter_val == 'not_done':
-        qs = qs.exclude(statut__in=['termine', 'annule', 'absent'])
-
-    if date_from:
-        try:
-            qs = qs.filter(date_heure__date__gte=date_from)
-        except (ValueError, TypeError):
-            pass
-    if date_to:
-        try:
-            qs = qs.filter(date_heure__date__lte=date_to)
-        except (ValueError, TypeError):
-            pass
-
-    if group_val in ('date_jour', 'date_semaine', 'date_mois', 'date_annee'):
-        qs = qs.order_by('date_heure')
-    elif group_val == 'statut':
-        qs = qs.order_by('statut', '-date_heure')
-    elif group_val in ('medecin', 'referent'):
-        qs = qs.order_by('medecin', '-date_heure')
-    elif group_val == 'patient':
-        qs = qs.order_by('patient__nom', 'patient__prenoms')
-
-    paginator = Paginator(qs, 25)
-    page_obj  = paginator.get_page(request.GET.get('page'))
-    return render(request, 'gynecologie/rdv.html', {'page_obj': page_obj})
-
-
-@login_required
-def gynecologie_patient_list(request):
-    gyne_ids = RendezVous.objects.filter(
-        departement__code='GYN'
-    ).values_list('patient_id', flat=True).distinct()
-
-    qs = Patient.objects.filter(pk__in=gyne_ids).order_by('nom', 'prenoms')
-
-    q          = request.GET.get('q', '').strip()
-    filter_val = request.GET.get('filter', '')
-    group_val  = request.GET.get('group', '')
-
-    if q:
-        qs = qs.filter(
-            Q(nom__icontains=q) | Q(prenoms__icontains=q) |
-            Q(code_patient__icontains=q) | Q(telephone__icontains=q)
-        )
-    if filter_val == 'femme':
-        qs = qs.filter(sexe='F')
-    elif filter_val == 'homme':
-        qs = qs.filter(sexe='M')
-
-    if group_val == 'sexe':
-        qs = qs.order_by('sexe', 'nom', 'prenoms')
-    elif group_val == 'age':
-        qs = qs.order_by('date_naissance')
-
-    paginator = Paginator(qs, 25)
-    page_obj  = paginator.get_page(request.GET.get('page'))
-    return render(request, 'gynecologie/list.html', {'page_obj': page_obj})
+# Les deux listes de gynécologie qui vivaient ici ont été retirées : le module a
+# été refait dans core/views.py (`gynecologie_rdv` et `gynecologie_list`), qui en
+# fait davantage — sélection élargie aux médecins de spécialité gynécologique,
+# export Excel, et les menus générés depuis la déclaration de la liste. Leurs
+# anciennes adresses renvoient désormais vers ces pages (cf. patients/urls.py) :
+# ce fichier n'a plus à en garder une seconde version, qui divergeait déjà (ses
+# menus Filtres et Regrouper par s'ouvraient sur du vide).
 
 
 @login_required
@@ -1176,6 +1140,82 @@ def ordonnance_create(request, pk):
         'statuts': [('emise', 'Émise'), ('delivree', 'Délivrée'), ('partielle', 'Partielle'), ('expiree', 'Expirée')],
         'types': [('interne', 'Interne'), ('externe', 'Externe')],
     })
+
+
+# ── Types de visite curative (configuration des rendez-vous) ────────────────
+# Pendant de la configuration des types de visite gynécologiques (les CPN), mais
+# rattaché au module Rendez-vous : ces types décrivent les consultations
+# curatives (Consultant / Contrôle / Soins à l'origine).
+
+@login_required
+def typevisitecurative_list(request):
+    qs = TypeVisiteCurative.objects.all()
+    q  = request.GET.get('q', '').strip()
+    if q:
+        qs = qs.filter(Q(nom__icontains=q) | Q(code__icontains=q))
+
+    paginator = Paginator(qs, 20)
+    page_obj  = paginator.get_page(request.GET.get('page'))
+    return render(request, 'patients/typevisitecurative_list.html', {
+        'page_obj': page_obj,
+        'q':        q,
+        'total':    qs.count(),
+    })
+
+
+@login_required
+def typevisitecurative_create(request):
+    is_ajax = _is_ajax(request)
+    if request.method == 'POST':
+        form = TypeVisiteCurativeForm(request.POST)
+        if form.is_valid():
+            t = form.save()
+            if is_ajax:
+                return JsonResponse({'ok': True, 'message': f'Type de visite "{t.nom}" enregistré.'})
+            messages.success(request, f'Type de visite "{t.nom}" enregistré.')
+            return redirect('patients:typevisitecurative_list')
+    else:
+        form = TypeVisiteCurativeForm()
+    template = ('patients/typevisitecurative_form_modal.html' if is_ajax
+                else 'patients/typevisitecurative_form.html')
+    return render(request, template, {
+        'form': form, 'titre': 'Nouveau type de visite curative', 'edit': False,
+    })
+
+
+@login_required
+def typevisitecurative_edit(request, pk):
+    tvc = get_object_or_404(TypeVisiteCurative, pk=pk)
+    is_ajax = _is_ajax(request)
+    if request.method == 'POST':
+        form = TypeVisiteCurativeForm(request.POST, instance=tvc)
+        if form.is_valid():
+            form.save()
+            if is_ajax:
+                return JsonResponse({'ok': True, 'message': 'Type de visite mis à jour.'})
+            messages.success(request, 'Type de visite mis à jour.')
+            return redirect('patients:typevisitecurative_list')
+    else:
+        form = TypeVisiteCurativeForm(instance=tvc)
+    template = ('patients/typevisitecurative_form_modal.html' if is_ajax
+                else 'patients/typevisitecurative_form.html')
+    return render(request, template, {
+        'form': form, 'titre': 'Modifier le type de visite', 'edit': True, 'object': tvc,
+    })
+
+
+@login_required
+def typevisitecurative_delete(request, pk):
+    tvc = get_object_or_404(TypeVisiteCurative, pk=pk)
+    if request.method == 'POST':
+        nom = tvc.nom
+        # Les rendez-vous qui l'utilisent voient simplement leur type se vider
+        # (SET_NULL) ; la valeur déjà écrite dans le registre curatif, elle, reste.
+        tvc.delete()
+        if _is_ajax(request):
+            return JsonResponse({'ok': True, 'message': f'Type de visite "{nom}" supprimé.'})
+        messages.success(request, f'Type de visite "{nom}" supprimé.')
+    return redirect('patients:typevisitecurative_list')
 
 
 @login_required
@@ -1415,17 +1455,29 @@ def typevisite_list(request):
     })
 
 
+# Créer et modifier se font dans une modale, comme les pathologies et les types
+# de visite curative : la liste reste à l'écran, on ne perd ni sa page ni sa
+# recherche pour saisir deux champs. En AJAX la vue renvoie le seul fragment du
+# formulaire, et du JSON quand l'enregistrement a réussi ; sans AJAX (lien ouvert
+# dans un nouvel onglet, JavaScript indisponible) elle rend la page entière comme
+# avant, si bien que les deux chemins restent praticables.
+
 @login_required
 def typevisite_create(request):
+    is_ajax = _is_ajax(request)
     if request.method == 'POST':
         form = TypeVisiteForm(request.POST)
         if form.is_valid():
             tv = form.save()
+            if is_ajax:
+                return JsonResponse({'ok': True, 'message': f'Type de visite "{tv.nom}" enregistré.'})
             messages.success(request, f'Type de visite "{tv.nom}" enregistré.')
             return redirect('gynecologie_typevisite_list')
     else:
         form = TypeVisiteForm()
-    return render(request, 'patients/typevisite_form.html', {
+    template = ('patients/typevisite_form_modal.html' if is_ajax
+                else 'patients/typevisite_form.html')
+    return render(request, template, {
         'form': form, 'titre': 'Nouveau type de visite', 'edit': False,
     })
 
@@ -1433,15 +1485,20 @@ def typevisite_create(request):
 @login_required
 def typevisite_edit(request, pk):
     tv = get_object_or_404(TypeVisite, pk=pk)
+    is_ajax = _is_ajax(request)
     if request.method == 'POST':
         form = TypeVisiteForm(request.POST, instance=tv)
         if form.is_valid():
             form.save()
+            if is_ajax:
+                return JsonResponse({'ok': True, 'message': 'Type de visite mis à jour.'})
             messages.success(request, 'Type de visite mis à jour.')
             return redirect('gynecologie_typevisite_list')
     else:
         form = TypeVisiteForm(instance=tv)
-    return render(request, 'patients/typevisite_form.html', {
+    template = ('patients/typevisite_form_modal.html' if is_ajax
+                else 'patients/typevisite_form.html')
+    return render(request, template, {
         'form': form, 'titre': 'Modifier le type de visite', 'edit': True, 'object': tv,
     })
 
@@ -1452,6 +1509,8 @@ def typevisite_delete(request, pk):
     if request.method == 'POST':
         nom = tv.nom
         tv.delete()
+        if _is_ajax(request):
+            return JsonResponse({'ok': True, 'message': f'Type de visite "{nom}" supprimé.'})
         messages.success(request, f'Type de visite "{nom}" supprimé.')
     return redirect('gynecologie_typevisite_list')
 

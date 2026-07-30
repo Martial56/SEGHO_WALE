@@ -1,0 +1,106 @@
+{% load static %}
+{% comment %}
+Constructeur de filtre personnalisé : champ + opérateur + valeur, plusieurs
+conditions combinées en « toutes » ou « au moins une ».
+
+Le panneau lui-même est rendu par menu_filtres.html, à l'intérieur du menu
+Filtres. Cet inclus n'apporte que ce qui doit rester hors du fragment AJAX : la
+description des champs (une vingtaine de kilo-octets, inutile de la renvoyer à
+chaque rafraîchissement), les styles et le script.
+{% endcomment %}
+{{ listing_champs_json|json_script:"lstf-champs" }}
+
+<style>
+  /* Le panneau suit la règle générale des sous-menus : il sort au survol de son
+     entrée et rentre quand on la quitte, comme celui de « Ajouter un groupement
+     personnalisé ». Il restait auparavant épinglé pour survivre aux fenêtres du
+     système qu'ouvrent ses listes déroulantes — mais l'épinglage ne se levait
+     jamais, si bien qu'il demeurait ouvert alors qu'on n'était plus dessus. Le
+     `:focus-within` de la brique suffit à protéger la saisie : une liste
+     déroulante déployée ou une date en cours de saisie gardent le focus.
+     `lstf-ouvert` ne sert plus qu'à l'épinglage au clic, seul recours au tactile
+     où il n'y a pas de survol. */
+  .o-dd-item.lstf-entree.lstf-ouvert > .lstf-panneau { display: block; }
+  .o-dd-item.lstf-entree.lstf-ouvert > .o-dd-arr { color: var(--accent-text-soft); }
+
+  .lstf-panneau {
+    width: 330px; min-width: 330px; padding: 12px 14px 10px;
+    cursor: default; white-space: normal; max-height: 78vh; overflow-y: auto;
+  }
+  .lstf-mode { display: none; font-size: 11.5px; color: var(--text-muted); margin-bottom: 10px; }
+  .lstf-mode.lstf-visible { display: block; }
+  .lstf-mode select {
+    font-size: 11.5px; font-family: inherit; padding: 1px 4px;
+    border: 1px solid var(--border); border-radius: 3px;
+    background: var(--surface); color: var(--text);
+  }
+
+  .lstf-ligne + .lstf-ligne { border-top: 1px dashed var(--border); padding-top: 8px; }
+  .lstf-ligne { margin-bottom: 8px; }
+  .lstf-tete-ligne { display: flex; gap: 5px; align-items: center; }
+  /* Fond identique à celui du panneau : aucun rectangle d'une autre teinte
+     derrière le texte, et surtout une couleur déclarée. Une liste déroulante
+     laissée transparente s'ouvre avec la couleur choisie par le navigateur —
+     blanche sur un poste, sombre sur un autre. */
+  .lstf-ligne select, .lstf-ligne input {
+    width: 100%; padding: 4px 6px; margin-bottom: 5px; font-size: 12px;
+    border: 1px solid var(--border); border-radius: 3px;
+    background: var(--surface); color: var(--text); font-family: inherit;
+  }
+  /* Les entrées du menu ouvert, pour les navigateurs qui ne les déduisent pas du
+     select : c'est ce qui rend le déroulé lisible partout. */
+  .lstf-ligne select option, .lstf-mode select option {
+    background: var(--surface); color: var(--text);
+  }
+
+  /* ── Couleurs du déroulé en thème sombre, écrites en dur ──
+     Volontairement littérales et non var(--surface) : les variables viennent de
+     variables.css, un fichier statique que le navigateur garde en cache. S'il est
+     périmé sur un poste, var(--surface) ne résout pas, la déclaration devient
+     invalide, le fond retombe à transparent — et le navigateur rouvre le menu
+     avec sa propre couleur, blanche. Ces valeurs-ci partent avec le HTML de la
+     page, il n'y a rien à mettre à jour.
+     Ce sont les mêmes teintes que la palette : #141b22 = --surface,
+     #dce3ea = --text, #1f2933 = --border. */
+  html[data-theme="dark"] .lstf-ligne select,
+  html[data-theme="dark"] .lstf-mode select {
+    background-color: #141b22;
+    color: #dce3ea;
+    border-color: #1f2933;
+  }
+  html[data-theme="dark"] .lstf-ligne select option,
+  html[data-theme="dark"] .lstf-mode select option {
+    background-color: #141b22;
+    color: #dce3ea;
+  }
+  html[data-theme="dark"] .lstf-ligne input {
+    color: #dce3ea;
+    border-color: #1f2933;
+  }
+  .lstf-tete-ligne select { margin-bottom: 5px; flex: 1; min-width: 0; }
+  .lstf-retirer {
+    flex: 0 0 auto; width: 22px; height: 24px; margin-bottom: 5px;
+    border: 1px solid var(--border); border-radius: 3px;
+    background: transparent; color: var(--text-muted);
+    cursor: pointer; font-size: 13px; line-height: 1;
+  }
+  .lstf-retirer:hover { background: var(--rose-text); color: #fff; border-color: var(--rose-text); }
+  .lstf-vide { font-size: 11.5px; color: var(--text-muted); padding: 2px 0 8px; }
+
+  .lstf-pied { display: flex; align-items: center; gap: 10px; padding-top: 4px; }
+  .lstf-appliquer {
+    background: var(--teal-600); color: #fff; border: none; border-radius: 3px;
+    padding: 6px 14px; font-size: 11.5px; font-weight: 600; letter-spacing: .4px;
+    cursor: pointer; font-family: inherit; transition: background .15s;
+  }
+  .lstf-appliquer:hover { background: var(--teal-700); }
+  .lstf-plus {
+    background: none; border: none; color: var(--accent-text-soft); cursor: pointer;
+    font-size: 11.5px; font-weight: 600; letter-spacing: .3px; font-family: inherit;
+    display: inline-flex; align-items: center; gap: 4px; padding: 0;
+  }
+  .lstf-plus:hover { text-decoration: underline; }
+
+</style>
+
+<script src="{% static 'js/listing_filtre_perso.js' %}"></script>

@@ -1,0 +1,89 @@
+{% comment %}
+Barre de contrôles de la liste patients (créer, export/import, effacer,
+filtres, regroupement, pagination haute, bascule kanban/liste). Extrait de
+list.html pour pouvoir être renvoyé seul en AJAX.
+{% endcomment %}
+  {% comment %}
+  data-filters / data-groups exposent l'état réellement appliqué par la vue :
+  toggleParam s'en sert comme point de départ.
+  {% endcomment %}
+  <div id="subheader-controls" data-filters="{{ filters|join:"," }}" data-groups="{{ groups|join:"," }}">
+  <div class="o-subheader-row">
+    <a href="{% url 'patients:create' %}" class="o-btn-create">
+      <i class="bi bi-plus" style="font-size:14px;margin-right:4px;"></i> Créer
+    </a>
+    {% if request.user.is_superuser %}
+    <div class="io-page-wrap" id="io-page-wrap">
+      <button type="button" class="o-ctrl-btn io-toggle-btn" onclick="toggleIOPage(event)">
+        <i class="bi bi-arrow-left-right"></i> Export / Import
+        <i class="bi bi-chevron-down" style="font-size:9px;margin-left:2px;"></i>
+      </button>
+      <div class="io-page-menu" id="io-page-menu">
+        <div class="io-pm-section">Exporter les patients</div>
+        <a class="io-pm-item" href="{% url 'patients:export_patients' %}?format=json"><i class="bi bi-filetype-json" style="color:#c97a00;"></i> JSON</a>
+        <a class="io-pm-item" href="{% url 'patients:export_patients' %}?format=csv"><i class="bi bi-filetype-csv" style="color:#1a7a4a;"></i> CSV</a>
+        <a class="io-pm-item" href="{% url 'patients:export_patients' %}?format=xlsx"><i class="bi bi-file-earmark-excel" style="color:#217346;"></i> Excel</a>
+        <div class="io-pm-sep"></div>
+        <div class="io-pm-section">Importer</div>
+        <a class="io-pm-item" href="{% url 'patients:patients_modele' %}"><i class="bi bi-download" style="color:var(--teal-500);"></i> Télécharger le modèle</a>
+        <button type="button" class="io-pm-item" onclick="openImportModal()"><i class="bi bi-upload" style="color:var(--teal-500);"></i> Importer un fichier…</button>
+      </div>
+    </div>
+    {% endif %}
+    <div class="o-subheader-row-right">
+
+      <!-- ── Effacer tout (filtres + regroupement + recherche) ── -->
+      {% if selection_active %}
+      <a href="#" class="o-ctrl-btn" style="color:var(--rose-text);" onclick="resetAll(); return false;" title="Effacer les filtres, le regroupement et la recherche">
+        <i class="bi bi-x-circle"></i> Effacer
+      </a>
+      {% endif %}
+
+      {% comment %}
+      Filtres et Regrouper par sont générés depuis la déclaration de la liste
+      (patients/patient_listing.py) par les partiels de la brique, qui apportent
+      aussi « Ajouter un filtre personnalisé » et « Ajouter un groupement
+      personnalisé ». Ils étaient auparavant écrits à la main ici, ce qui limitait
+      le filtrage au genre et à l'âge et le regroupement à deux critères.
+      {% endcomment %}
+      <div class="o-dd-wrap">
+        <button class="o-ctrl-btn {% if filtre_pose or conditions %}active{% endif %}"
+                id="btn-filtres" onclick="toggleDd('dd-filtres',this)">
+          <i class="bi bi-funnel{% if filtre_pose or conditions %}-fill{% endif %}"></i> Filtres
+        </button>
+        <div class="o-dd-panel lst-menu" id="dd-filtres">
+          {% include 'includes/listing/menu_filtres.html' %}
+        </div>
+      </div>
+
+      <div class="o-dd-wrap">
+        <button class="o-ctrl-btn {% if groups %}active{% endif %}"
+                id="btn-group" onclick="toggleDd('dd-group',this)">
+          <i class="bi bi-list-ul"></i> Regrouper par
+        </button>
+        <div class="o-dd-panel lst-menu" id="dd-group">
+          <div class="o-dd-section">Regrouper par</div>
+          {% include 'includes/listing/menu_groupes.html' %}
+        </div>
+      </div>
+
+      <div class="o-ctrl-sep"></div>
+      <div class="o-pagination">
+        <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}{% if groups %} groupe{{ page_obj.paginator.count|pluralize }}{% endif %}</span>
+        <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
+           href="{% if page_obj.has_previous %}{% querystring page=page_obj.previous_page_number %}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-left"></i>
+        </a>
+        <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
+           href="{% if page_obj.has_next %}{% querystring page=page_obj.next_page_number %}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-right"></i>
+        </a>
+      </div>
+      <div class="o-ctrl-sep"></div>
+      <div class="o-view-btns">
+        <button class="o-view-btn active" id="btn-kanban" onclick="setView('kanban')"><i class="bi bi-grid"></i></button>
+        <button class="o-view-btn" id="btn-list" onclick="setView('list')"><i class="bi bi-list-ul"></i></button>
+      </div>
+    </div>
+  </div>
+  </div><!-- /#subheader-controls -->

@@ -18,7 +18,7 @@
     .rl-patient-strip .ph-code {
         display: inline-flex; align-items: center; gap: 6px;
         background: var(--teal-50); border: 1px solid var(--teal-200);
-        color: var(--teal-700); padding: 3px 10px; border-radius: 20px;
+        color: var(--accent-text); padding: 3px 10px; border-radius: 20px;
         font-size: 12px; font-weight: 700; font-family: var(--font-mono);
     }
     .rl-patient-name {
@@ -34,7 +34,7 @@
         white-space: nowrap; transition: all 0.15s;
     }
     .rl-tab:hover { color: var(--teal-800); }
-    .rl-tab.active { color: var(--teal-600); border-bottom-color: var(--teal-500); }
+    .rl-tab.active { color: var(--accent-text-soft); border-bottom-color: var(--teal-500); }
 
     .rl-body {
         background: var(--surface);
@@ -54,7 +54,7 @@
         display: flex; align-items: center; gap: 6px;
     }
     .rl-count strong {
-        font-size: 18px; font-weight: 800; color: var(--teal-700); line-height: 1;
+        font-size: 18px; font-weight: 800; color: var(--accent-text); line-height: 1;
     }
     .rl-count-label { font-size: 12px; color: var(--text-muted); }
     .rl-btn-create {
@@ -91,7 +91,7 @@
     }
     .badge-planifie, .badge-emise, .badge-en-consultation, .badge-resultat  { background: rgba(var(--sky-rgb),.12); color: var(--sky); }
     .badge-confirme, .badge-delivree, .badge-valide  { background: rgba(var(--green-rgb),.12); color: var(--green); }
-    .badge-termine, .badge-decharge, .badge-envoye   { background: rgba(var(--teal-600-rgb),.12); color: var(--teal-600); }
+    .badge-termine, .badge-decharge, .badge-envoye   { background: rgba(var(--teal-600-rgb),.12); color: var(--accent-text-soft); }
     .badge-annule, .badge-expiree, .badge-urgent    { background: rgba(var(--rose-rgb),.12); color: var(--rose); }
     .badge-absent, .badge-encours, .badge-partielle, .badge-hospitalise, .badge-en-attente, .badge-enanalyse, .badge-en_cours { background: rgba(var(--amber-rgb),.12); color: var(--amber); }
     .badge-brouillon         { background: rgba(0,0,0,0.06); color: var(--text-muted); }
@@ -99,6 +99,28 @@
     .badge-recu      { background: var(--surface-muted); color: var(--text-muted); }
     .badge-demande   { background: rgba(var(--sky-rgb),.12); color: var(--sky); }
     .badge-accepte   { background: rgba(var(--green-rgb),.12); color: var(--green); }
+    {% comment %}
+    Le code du patient s'affichait sur --teal-50 et --teal-200 : deux nuances qui
+    restent pâles en thème sombre (seules 800/900/950 sont renversées). C'était une
+    pastille claire en haut de chacune de ces huit pages.
+    {% endcomment %}
+    /* Le lien vers la fiche portait sa couleur en attribut style : --teal-700
+       reste sombre en thème sombre (seules 800/900/950 sont renversées), le nom du
+       patient y tombait à 1,4 de contraste. Même valeur qu'avant en thème clair. */
+    .rl-lien-patient { color: var(--accent-text); text-decoration: none; font-weight: 500; }
+    html[data-theme="dark"] .rl-lien-patient { color: var(--teal-300); }
+    /* L'onglet courant : même cas, la couleur d'accent servait de texte. */
+    html[data-theme="dark"] .rl-tab.active { color: var(--teal-300); border-bottom-color: var(--teal-400); }
+    html[data-theme="dark"] .rl-tab:hover { color: var(--teal-200); }
+    /* Le message d'un onglet vide est le seul texte de l'écran : --text-faint y
+       tombait à 2,3 de contraste. */
+    html[data-theme="dark"] .empty-state { color: rgba(255,255,255,0.55); }
+    html[data-theme="dark"] .rl-patient-name { color: var(--text-strong); }
+    html[data-theme="dark"] .rl-patient-strip .ph-code {
+        background: rgba(var(--teal-500-rgb),0.20);
+        border-color: rgba(var(--teal-500-rgb),0.45);
+        color: var(--teal-300);
+    }
     html[data-theme="dark"] .badge-planifie, html[data-theme="dark"] .badge-emise, html[data-theme="dark"] .badge-en-consultation, html[data-theme="dark"] .badge-resultat, html[data-theme="dark"] .badge-demande { background: rgba(var(--sky-rgb),.2); color: #7ec4ec; }
     html[data-theme="dark"] .badge-confirme, html[data-theme="dark"] .badge-delivree, html[data-theme="dark"] .badge-valide, html[data-theme="dark"] .badge-accepte { background: rgba(var(--green-rgb),.2); color: #8fd98a; }
     html[data-theme="dark"] .badge-termine, html[data-theme="dark"] .badge-decharge, html[data-theme="dark"] .badge-envoye { background: rgba(var(--teal-600-rgb),.22); color: var(--teal-300); }
@@ -135,7 +157,7 @@
       <i class="bi bi-arrow-left"></i>
     </a>
     <span style="font-size:13px;color:var(--text-muted);">
-      <a href="{% url 'patients:detail' patient.pk %}" style="color:var(--teal-700);text-decoration:none;font-weight:500;">{{ patient.nom }} {{ patient.prenoms }}</a>
+      <a href="{% url 'patients:detail' patient.pk %}" class="rl-lien-patient">{{ patient.nom }} {{ patient.prenoms }}</a>
       <span style="margin:0 5px;opacity:.4;">/</span>
       <span id="rl-breadcrumb-title" style="color:var(--text);">{{ titre }}</span>
     </span>

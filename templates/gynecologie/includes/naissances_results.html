@@ -1,0 +1,60 @@
+{% comment %}
+Résultats du registre : tableau, calendrier et grille.
+
+Deux rendus du tableau :
+* sans regroupement — les lignes de `page_obj` à la suite ;
+* avec regroupement — l'arbre de groupes imbriqués, replié au départ. Le compteur
+  d'un en-tête est le total réel du groupe, calculé en base ; la pagination
+  portant sur les groupes, toutes les lignes des groupes affichés sont déjà là et
+  déplier n'appelle jamais le serveur.
+
+Les vues Calendrier et Grille sont construites en JavaScript depuis les lignes du
+tableau (leurs attributs data-*), et donc toujours d'accord avec lui.
+{% endcomment %}
+<div id="naissances-results">
+{% if page_obj.paginator.count %}
+<div id="o-grid-view" class="o-grid-view"></div>
+<div id="o-cal-view"  class="o-cal-view"></div>
+<div class="o-list-wrap" id="o-list-wrap">
+  <table class="o-list">
+    <thead>
+      <tr>
+        <th>Numéro</th>
+        <th>Mère</th>
+        <th>Date d'accouchement</th>
+        <th>Médecin</th>
+        <th>Mode</th>
+        <th>Nom de l'enfant</th>
+        <th class="td-center">Sexe enfant</th>
+        <th class="td-center">Poids (g)</th>
+        <th class="td-center">Taille (cm)</th>
+        <th class="td-center">Apgar 1'</th>
+        <th class="td-center">Apgar 5'</th>
+        <th>Statut</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% if arbre %}
+        {% include 'includes/listing/groupes.html' with noeuds=arbre listing_colonnes=12 listing_ligne_tpl='gynecologie/includes/naissances_row.html' %}
+      {% else %}
+        {% for n in page_obj %}
+          {% include 'gynecologie/includes/naissances_row.html' with objet=n parent=None %}
+        {% endfor %}
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="o-empty-state">
+  <div class="o-empty-illustration"></div>
+  <div class="o-empty-title">Aucun enregistrement trouvé{% if q %} pour « {{ q }} »{% endif %}</div>
+  {% if selection_active %}
+  <div class="o-empty-sub">Aucune naissance ne correspond à la sélection.</div>
+  <a href="#" class="o-ctrl-btn" style="margin-top:12px;color:var(--rose-text);"
+     onclick="resetAll(); return false;"><i class="bi bi-x-circle"></i> Tout effacer</a>
+  {% else %}
+  <div class="o-empty-sub">Cliquez sur CRÉER pour ajouter un nouvel enregistrement.</div>
+  {% endif %}
+</div>
+{% endif %}
+</div>

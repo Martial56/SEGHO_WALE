@@ -1,0 +1,82 @@
+{% comment %}
+Barre de contrôles du registre des naissances : créer, exporter, effacer,
+filtres, regroupement, pagination, bascule liste / calendrier / grille.
+
+Extraite pour pouvoir être renvoyée seule en AJAX par refreshList(). Le contenu
+des menus Filtres et Regrouper par n'est pas écrit ici : il est généré depuis la
+déclaration de la liste (patients/naissance_listing.py) par les partiels de la
+brique, qui apportent aussi « Ajouter un filtre personnalisé » et « Ajouter un
+groupement personnalisé ».
+
+data-filters / data-groups exposent l'état réellement appliqué par la vue :
+toggleParam s'en sert comme point de départ.
+{% endcomment %}
+<div id="subheader-controls" data-filters="{{ filters|join:"," }}" data-groups="{{ groups|join:"," }}">
+  <div class="o-subheader-row">
+    <a href="{% url 'gynecologie_naissance_create' %}" class="o-btn-create">CRÉER</a>
+    {% comment %}
+    L'export reprend la sélection à l'écran : {% querystring %} conserve
+    recherche, filtres, conditions et regroupement, et retire la page — un
+    classeur n'a pas de pagination.
+    {% endcomment %}
+    <a href="{% querystring export='excel' page=None %}" class="o-btn-excel"
+       title="Exporter la sélection en Excel"><i class="bi bi-download"></i></a>
+
+    <div class="o-subheader-row-right">
+
+      {% comment %} Un seul bouton pour tout remettre à zéro, comme sur les autres listes. {% endcomment %}
+      {% if selection_active %}
+      <a href="#" class="o-ctrl-btn" style="color:var(--rose-text);"
+         onclick="resetAll(); return false;"
+         title="Effacer les filtres, le regroupement et la recherche">
+        <i class="bi bi-x-circle"></i> Effacer
+      </a>
+      {% endif %}
+
+      <div class="o-dd-wrap">
+        <button class="o-ctrl-btn {% if filtre_pose or conditions %}active{% endif %}"
+                id="btn-filtres" onclick="toggleDd('dd-filtres',this)">
+          <i class="bi bi-funnel{% if filtre_pose or conditions %}-fill{% endif %}"></i> Filtres
+        </button>
+        <div class="o-dd-panel lst-menu" id="dd-filtres">
+          {% include 'includes/listing/menu_filtres.html' %}
+        </div>
+      </div>
+
+      <div class="o-dd-wrap">
+        <button class="o-ctrl-btn {% if groups %}active{% endif %}"
+                id="btn-group" onclick="toggleDd('dd-group',this)">
+          <i class="bi bi-list-ul"></i> Regrouper par
+        </button>
+        <div class="o-dd-panel lst-menu" id="dd-group">
+          <div class="o-dd-section">Regrouper par</div>
+          {% include 'includes/listing/menu_groupes.html' %}
+        </div>
+      </div>
+
+      <div class="o-ctrl-sep"></div>
+      {% comment %}
+      Avec un regroupement, la pagination porte sur les groupes : toutes les
+      lignes des groupes affichés sont chargées, un groupe visible s'ouvre donc
+      toujours.
+      {% endcomment %}
+      <div class="o-pagination">
+        <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}{% if groups %} groupe{{ page_obj.paginator.count|pluralize }}{% endif %}</span>
+        <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
+           href="{% if page_obj.has_previous %}{% querystring page=page_obj.previous_page_number %}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-left"></i>
+        </a>
+        <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
+           href="{% if page_obj.has_next %}{% querystring page=page_obj.next_page_number %}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-right"></i>
+        </a>
+      </div>
+      <div class="o-ctrl-sep"></div>
+      <div class="o-view-btns">
+        <button class="o-view-btn" data-v="list"     onclick="setView('list')"     title="Liste"><i class="bi bi-list-task"></i></button>
+        <button class="o-view-btn" data-v="calendar" onclick="setView('calendar')" title="Calendrier"><i class="bi bi-calendar3"></i></button>
+        <button class="o-view-btn" data-v="grid"     onclick="setView('grid')"     title="Grille"><i class="bi bi-grid"></i></button>
+      </div>
+    </div>
+  </div>
+</div>

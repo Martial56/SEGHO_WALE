@@ -1,0 +1,68 @@
+{% comment %}
+Barre de contrôles de la liste des patientes : effacer, filtres, regroupement,
+pagination, bascule kanban/tableau. Extraite pour pouvoir être renvoyée seule en
+AJAX par refreshList().
+
+Les menus Filtres et Regrouper par ne sont pas écrits ici : ils sont générés
+depuis la déclaration de la liste (patients/patient_listing.py) par les partiels
+de la brique, qui apportent aussi « Ajouter un filtre personnalisé » et
+« Ajouter un groupement personnalisé ».
+{% endcomment %}
+{% comment %}
+data-filters / data-groups exposent l'état réellement appliqué par la vue :
+toggleParam s'en sert comme point de départ.
+{% endcomment %}
+<div id="subheader-controls" data-filters="{{ filters|join:"," }}" data-groups="{{ groups|join:"," }}">
+  <div class="o-subheader-row">
+    <div class="o-subheader-row-right">
+
+      {% comment %} Un seul bouton pour tout remettre à zéro, comme sur la liste patients. {% endcomment %}
+      {% if selection_active %}
+      <a href="#" class="o-ctrl-btn" style="color:var(--rose-text);"
+         onclick="resetAll(); return false;"
+         title="Effacer les filtres, le regroupement et la recherche">
+        <i class="bi bi-x-circle"></i> Effacer
+      </a>
+      {% endif %}
+
+      <div class="o-dd-wrap">
+        <button class="o-ctrl-btn {% if filtre_pose or conditions %}active{% endif %}"
+                id="btn-filtres" onclick="toggleDd('dd-filtres',this)">
+          <i class="bi bi-funnel{% if filtre_pose or conditions %}-fill{% endif %}"></i> Filtres
+        </button>
+        <div class="o-dd-panel lst-menu" id="dd-filtres">
+          {% include 'includes/listing/menu_filtres.html' %}
+        </div>
+      </div>
+
+      <div class="o-dd-wrap">
+        <button class="o-ctrl-btn {% if groups %}active{% endif %}"
+                id="btn-group" onclick="toggleDd('dd-group',this)">
+          <i class="bi bi-list-ul"></i> Regrouper par
+        </button>
+        <div class="o-dd-panel lst-menu" id="dd-group">
+          <div class="o-dd-section">Regrouper par</div>
+          {% include 'includes/listing/menu_groupes.html' %}
+        </div>
+      </div>
+
+      <div class="o-ctrl-sep"></div>
+      <div class="o-pagination">
+        <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
+        <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
+           href="{% if page_obj.has_previous %}{% querystring page=page_obj.previous_page_number %}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-left"></i>
+        </a>
+        <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
+           href="{% if page_obj.has_next %}{% querystring page=page_obj.next_page_number %}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-right"></i>
+        </a>
+      </div>
+      <div class="o-ctrl-sep"></div>
+      <div class="o-view-btns">
+        <button class="o-view-btn active" id="btn-kanban" onclick="setView('kanban')"><i class="bi bi-grid"></i></button>
+        <button class="o-view-btn" id="btn-list" onclick="setView('list')"><i class="bi bi-list-ul"></i></button>
+      </div>
+    </div>
+  </div>
+</div>

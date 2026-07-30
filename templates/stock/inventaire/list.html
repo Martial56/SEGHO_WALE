@@ -6,14 +6,14 @@
 .st-page-head { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 32px;margin:0 -32px;background:var(--st-surface);border-bottom:1px solid var(--st-border);box-shadow:0 2px 8px rgba(0,0,0,.04);position:sticky;top:var(--topbar-h);z-index:100; }
 .badge-brouillon { background:rgba(0,0,0,.06);     color:var(--st-muted);  border:1px solid rgba(0,0,0,.12);           padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
 html[data-theme="dark"] .badge-brouillon { background:rgba(255,255,255,.08); }
-.badge-valide    { background:rgba(var(--st-600-rgb),.1);  color:var(--st-600);         border:1px solid rgba(var(--st-600-rgb),.25);       padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
+.badge-valide    { background:rgba(var(--st-600-rgb),.1);  color:var(--accent-text-soft);         border:1px solid rgba(var(--st-600-rgb),.25);       padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
 .badge-annule    { background:rgba(var(--rose-rgb),.1);   color:var(--rose-text);         border:1px solid rgba(var(--rose-rgb),.25);        padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
 </style>{% endblock %}
 
 {% block content %}
 <div class="st-page-head">
   <div>
-    <div style="font-size:15px;font-weight:800;color:var(--st-900);"><i class="bi bi-clipboard2-check" style="color:var(--st-600);"></i> Inventaires physiques</div>
+    <div style="font-size:15px;font-weight:800;color:var(--st-900);"><i class="bi bi-clipboard2-check" style="color:var(--accent-text-soft);"></i> Inventaires physiques</div>
     <div style="font-size:11.5px;color:var(--st-muted);">Comptages physiques et ajustements de stock</div>
   </div>
   <a href="{% url 'stock_inventaire_create' %}" class="btn-st"><i class="bi bi-plus-lg"></i> Nouvel inventaire</a>
@@ -36,16 +36,16 @@ html[data-theme="dark"] .badge-brouillon { background:rgba(255,255,255,.08); }
     <tbody>
     {% for inv in inventaires %}
     <tr style="cursor:pointer;" onclick="window.location='{% url 'stock_inventaire_detail' inv.pk %}'">
-      <td style="font-family: var(--font-mono);font-size:12px;color:var(--st-600);font-weight:700;">{{ inv.numero }}</td>
+      <td style="font-family: var(--font-mono);font-size:12px;color:var(--accent-text-soft);font-weight:700;">{{ inv.numero }}</td>
       <td style="font-size:12.5px;">{{ inv.date_inventaire|date:"d/m/Y" }}</td>
-      <td style="text-align:center;font-weight:700;color:var(--st-700);">{{ inv.nb_lignes }}</td>
+      <td style="text-align:center;font-weight:700;color:var(--accent-text);">{{ inv.nb_lignes }}</td>
       <td>
         {% if inv.statut == 'brouillon' %}<span class="badge-brouillon"><i class="bi bi-file-earmark"></i> En cours</span>
         {% elif inv.statut == 'valide' %}<span class="badge-valide"><i class="bi bi-check2-circle"></i> Validé</span>
         {% else %}<span class="badge-annule"><i class="bi bi-x-circle"></i> Annulé</span>{% endif %}
       </td>
       <td style="font-size:12px;color:var(--st-muted);">{{ inv.cree_par.get_full_name|default:inv.cree_par.username|default:"—" }}</td>
-      <td style="text-align:right;font-size:12px;color:var(--st-600);">
+      <td style="text-align:right;font-size:12px;color:var(--accent-text-soft);">
         {% if inv.date_validation %}{{ inv.date_validation|date:"d/m/Y" }}{% else %}<span style="color:var(--st-muted);">—</span>{% endif %}
       </td>
       <td style="text-align:center;">

@@ -82,9 +82,21 @@ input::placeholder { color:rgba(255,255,255,0.25); }
   cursor:pointer; transition: transform 0.15s, box-shadow 0.15s;
   box-shadow: 0 4px 20px rgba(79,155,75,0.45);
   margin-top:8px;
+  display:flex; align-items:center; justify-content:center; gap:10px;
 }
 .btn-login:hover { transform:translateY(-2px); box-shadow:0 8px 30px rgba(79,155,75,0.6); }
 .btn-login:active { transform:translateY(0); }
+/* Vérifier un mot de passe prend un instant : sans ce retour, on croit que le
+   clic n'a pas pris et on reclique. Même bouton que la page de connexion. */
+.btn-login.is-loading { cursor:default; opacity:0.85; transform:none; }
+.btn-login.is-loading:hover { transform:none; box-shadow:0 4px 20px rgba(79,155,75,0.45); }
+.btn-spinner {
+  display:none; width:16px; height:16px; flex-shrink:0;
+  border:2px solid rgba(255,255,255,0.35); border-top-color:#fff;
+  border-radius:50%; animation: btn-spin 0.7s linear infinite;
+}
+.btn-login.is-loading .btn-spinner { display:inline-block; }
+@keyframes btn-spin { to { transform: rotate(360deg); } }
 .error-box {
   background:rgba(232,69,69,0.12);
   border:1px solid rgba(232,69,69,0.3);
@@ -119,14 +131,17 @@ input::placeholder { color:rgba(255,255,255,0.25); }
   <div class="error-box">⚠️ {{ error }}</div>
   {% endif %}
 
-  <form method="post" action="{% url 'unlock_session' %}">
+  <form method="post" action="{% url 'unlock_session' %}" id="unlock-form">
     {% csrf_token %}
     {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
     <div class="form-group">
       <label>Mot de passe</label>
       <input type="password" name="password" placeholder="••••••••" autofocus autocomplete="current-password">
     </div>
-    <button type="submit" class="btn-login">Déverrouiller →</button>
+    <button type="submit" class="btn-login" id="unlock-btn">
+      <span class="btn-spinner"></span>
+      <span class="btn-label">Déverrouiller →</span>
+    </button>
   </form>
 
   <div class="footer-note">
@@ -138,5 +153,15 @@ input::placeholder { color:rgba(255,255,255,0.25); }
   </div>
 </div>
 {% django_browser_reload_script %}
+<script>
+  // Le garde-fou évite le double envoi : la page ne changera qu'au retour du
+  // serveur, et sans lui un second clic relancerait la vérification.
+  document.getElementById('unlock-form').addEventListener('submit', function () {
+    var btn = document.getElementById('unlock-btn');
+    if (btn.classList.contains('is-loading')) return;
+    btn.classList.add('is-loading');
+    btn.querySelector('.btn-label').textContent = 'Vérification…';
+  });
+</script>
 </body>
 </html>

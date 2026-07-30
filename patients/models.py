@@ -158,7 +158,10 @@ class RendezVous(models.Model):
     ]
     cur_mode_entree = models.CharField(max_length=30, choices=CUR_MODE_ENTREE, blank=True, default='', verbose_name="Mode d'entrée curatif")
     cur_mode_entree_autre = models.CharField(max_length=200, blank=True, default='', verbose_name="Mode d'entrée curatif (préciser)")
-    cur_type_visite = models.ForeignKey('gynecologie.TypeVisite', on_delete=models.SET_NULL, null=True, blank=True, related_name='rendez_vous_curatifs', verbose_name='Type de visite curative')
+    # Pointait auparavant vers gynecologie.TypeVisite (les CPN), ce qui était une
+    # erreur : les visites curatives ont leurs propres types, configurables depuis
+    # le menu Configurations des rendez-vous.
+    cur_type_visite = models.ForeignKey('patients.TypeVisiteCurative', on_delete=models.SET_NULL, null=True, blank=True, related_name='rendez_vous_curatifs', verbose_name='Type de visite curative')
 
     def save(self, *args, **kwargs):
         if not self.code_rdv:
@@ -333,3 +336,33 @@ class Naissance(models.Model):
     class Meta:
         verbose_name = "Naissance"
         ordering = ['-date_accouchement']
+
+
+class TypeVisiteCurative(models.Model):
+    """Types de visite des consultations curatives, configurables.
+
+    Remplace trois valeurs qui étaient écrites en dur dans le formulaire de
+    rendez-vous (Consultant / Contrôle / Soins). Le `code` est la valeur
+    historiquement enregistrée dans le registre curatif (`donnees` →
+    `cur_type_visite`) et lue par les rapports : il doit rester stable.
+
+    Le pendant gynécologique est `gynecologie.TypeVisite` (les CPN).
+    """
+    nom           = models.CharField(max_length=200, verbose_name='Nom')
+    code          = models.CharField(max_length=50, unique=True, verbose_name='Code')
+    description   = models.TextField(blank=True, verbose_name='Description')
+    actif         = models.BooleanField(default=True)
+    date_creation = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self): return self.nom
+
+    @property
+    def filtre_code(self):
+        """Valeur utilisée dans l'URL pour filtrer sur ce type de visite."""
+        from .rdv_listing import PREFIXE_VISITE_CURATIVE
+        return f'{PREFIXE_VISITE_CURATIVE}{self.code}'
+
+    class Meta:
+        verbose_name = "Type de visite curative"
+        verbose_name_plural = "Types de visite curative"
+        ordering = ['nom']

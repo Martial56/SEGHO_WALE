@@ -27,13 +27,13 @@
   font-size: 13px; color: var(--text); cursor: pointer;
   text-decoration: none; transition: background .1s; white-space: nowrap;
 }
-.o-dd-item:hover  { background: rgba(20,87,112,.06); color: var(--primary); }
-.o-dd-item.active { background: rgba(20,87,112,.08); color: var(--primary); font-weight: 600; }
+.o-dd-item:hover  { background: rgba(var(--teal-700-rgb), .06); color: var(--accent-text); }
+.o-dd-item.active { background: rgba(var(--teal-700-rgb), .08); color: var(--accent-text); font-weight: 600; }
 .o-dd-sep         { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
-html[data-theme="dark"] .o-dd-panel   { background: #1a2535; border-color: #2e3f58; }
+html[data-theme="dark"] .o-dd-panel   { background: var(--surface); border-color: var(--border-strong); }
 html[data-theme="dark"] .o-dd-item    { color: var(--text); }
-html[data-theme="dark"] .o-dd-item:hover  { background: rgba(var(--teal-500-rgb),.15); color: #7aaec7; }
-html[data-theme="dark"] .o-dd-item.active { background: rgba(var(--teal-500-rgb),.2);  color: #7aaec7; }
+html[data-theme="dark"] .o-dd-item:hover  { background: rgba(var(--teal-500-rgb),.15); color: var(--text); }
+html[data-theme="dark"] .o-dd-item.active { background: rgba(var(--teal-500-rgb),.2);  color: var(--text); }
 
 /* ── Table ────────────────────────────────────── */
 .ch-table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--surface); }
@@ -57,9 +57,8 @@ html[data-theme="dark"] .o-dd-item.active { background: rgba(var(--teal-500-rgb)
 .ch-table tbody td.col-check { text-align: center; }
 .ch-table tbody td.col-phone { text-align: center; }
 
-.ch-check { width: 15px; height: 15px; cursor: pointer; accent-color: var(--accent); }
 
-.ch-nom   { font-weight: 600; color: var(--accent); }
+.ch-nom   { font-weight: 600; color: var(--accent-text-soft); }
 .ch-type  { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 
 .badge-dispo  { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; background: #d1fae5; color: #065f46; }
@@ -119,7 +118,7 @@ html[data-theme="dark"] .badge-occupe { background: rgba(185,28,28,.2);  color: 
         <a class="io-pm-item" href="{% url 'hospitalisation:chambres_export' %}?format=xlsx"><i class="bi bi-file-earmark-excel" style="color:#217346;"></i> Excel</a>
         <div class="io-pm-sep"></div>
         <div class="io-pm-section">Importer</div>
-        <button type="button" class="io-pm-item" onclick="openImportModal()"><i class="bi bi-upload" style="color:var(--accent);"></i> Importer un fichier…</button>
+        <button type="button" class="io-pm-item" onclick="openImportModal()"><i class="bi bi-upload" style="color:var(--accent-text-soft);"></i> Importer un fichier…</button>
       </div>
     </div>
     <div class="o-subheader-row-right">
@@ -208,9 +207,6 @@ html[data-theme="dark"] .badge-occupe { background: rgba(185,28,28,.2);  color: 
   <table class="ch-table" id="ch-table">
     <thead>
       <tr>
-        <th class="col-check">
-          <input type="checkbox" class="ch-check" id="chk-all" onchange="toggleAll(this)">
-        </th>
         <th>Nom</th>
         <th>Type</th>
         <th>Genre</th>
@@ -221,9 +217,6 @@ html[data-theme="dark"] .badge-occupe { background: rgba(185,28,28,.2);  color: 
     <tbody>
       {% for chambre in page_obj %}
       <tr onclick="window.location='{% url 'hospitalisation:chambre_detail' chambre.id %}'">
-        <td class="col-check" onclick="event.stopPropagation()">
-          <input type="checkbox" class="ch-check row-check">
-        </td>
         <td>
           <div class="ch-nom">{{ chambre.nom|default:chambre.salle_no }}</div>
         </td>
@@ -276,10 +269,6 @@ document.addEventListener('click', function(e) {
     document.querySelectorAll('.o-dd-panel').forEach(p => p.classList.remove('open'));
   }
 });
-function toggleAll(master) {
-  document.querySelectorAll('.row-check').forEach(c => c.checked = master.checked);
-}
-
 function toggleIOPage(e){e.stopPropagation();document.getElementById('io-page-wrap').classList.toggle('open');}
 document.addEventListener('click',function(){var w=document.getElementById('io-page-wrap');if(w)w.classList.remove('open');});
 function openImportModal(){document.getElementById('io-modal-backdrop').classList.add('active');document.getElementById('io-modal').classList.add('active');var w=document.getElementById('io-page-wrap');if(w)w.classList.remove('open');}
@@ -298,7 +287,7 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')closeImportM
     {% csrf_token %}
     <div class="io-modal-body">
       <label class="io-file-label" for="io-file-input">
-        <i class="bi bi-cloud-upload" style="font-size:28px;color:var(--accent);display:block;margin-bottom:6px;"></i>
+        <i class="bi bi-cloud-upload" style="font-size:28px;color:var(--accent-text-soft);display:block;margin-bottom:6px;"></i>
         <strong>Choisir un fichier</strong>
         <span style="font-size:11px;color:var(--text-muted);display:block;margin-top:3px;">JSON, CSV ou Excel (.xlsx)</span>
         <input type="file" id="io-file-input" name="fichier" accept=".json,.csv,.xlsx,.xls" required onchange="updateFileName(this)">

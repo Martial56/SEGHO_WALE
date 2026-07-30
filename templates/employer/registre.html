@@ -50,13 +50,20 @@ html[data-theme="dark"] .reg-filter select{color:var(--rh-text);}
 .reg-table tbody td.obs{white-space:normal;font-size:11px;color:var(--rh-muted);}
 
 .reg-num{font-size:10.5px;color:var(--rh-muted);text-align:center;}
-.reg-mat{font-weight:700;font-family: var(--font-mono);font-size:11px;color:var(--rh-600);}
+.reg-mat{font-weight:700;font-family: var(--font-mono);font-size:11px;color:var(--accent-text-soft);}
 .reg-nom{font-weight:600;}
 .reg-date{font-variant-numeric:tabular-nums;font-size:12px;}
 
-html[data-theme="dark"] .reg-table thead tr{background:var(--rh-800);}
+{% comment %}
+--rh-800 servait de fond à la ligne d'en-tête. Or base.html inverse les paliers
+800/900/950 en thème sombre (ils n'y sont censés servir qu'au texte) : le fond
+devenait donc clair, sous un texte lui aussi clair — en-tête illisible. Le palier
+700, qui n'est pas inversé, reste sombre et garde le texte blanc lisible.
+Le survol reprend l'accent au lieu d'un vert écrit en dur.
+{% endcomment %}
+html[data-theme="dark"] .reg-table thead tr{background:var(--teal-700);color:#fff;}
 html[data-theme="dark"] .reg-table tbody tr:nth-child(even){background:var(--rh-100);}
-html[data-theme="dark"] .reg-table tbody tr:hover{background:rgba(122,170,98,0.1);}
+html[data-theme="dark"] .reg-table tbody tr:hover{background:rgba(var(--teal-500-rgb),0.10);}
 
 /* ── Stats ── */
 .reg-stats{display:flex;gap:12px;flex-wrap:wrap;margin-top:16px;}
@@ -65,16 +72,16 @@ html[data-theme="dark"] .reg-table tbody tr:hover{background:rgba(122,170,98,0.1
   border-radius:10px;padding:10px 18px;display:flex;flex-direction:column;gap:2px;
   box-shadow:0 1px 4px rgba(27,67,50,0.06);
 }
-.reg-stat-val{font-size:22px;font-weight:800;color:var(--rh-700);}
+.reg-stat-val{font-size:22px;font-weight:800;color:var(--accent-text);}
 .reg-stat-lbl{font-size:11px;color:var(--rh-muted);text-transform:uppercase;letter-spacing:0.3px;}
 html[data-theme="dark"] .reg-stat{background:var(--rh-surface);border-color:var(--rh-border);}
 html[data-theme="dark"] .reg-stat-val{color:var(--rh-300);}
 
 /* ── Pagination ── */
 .rh-pagination { display:flex; justify-content:center; align-items:center; gap:6px; padding:20px 32px; flex-wrap:wrap; }
-.rh-page-link { display:inline-flex;align-items:center;justify-content:center; min-width:32px;height:32px;padding:0 8px; border-radius:6px; font-size:13px;font-weight:600; text-decoration:none; color:var(--rh-700); background:#fff; border:1px solid var(--rh-200); transition:all .15s; }
+.rh-page-link { display:inline-flex;align-items:center;justify-content:center; min-width:32px;height:32px;padding:0 8px; border-radius:6px; font-size:13px;font-weight:600; text-decoration:none; color:var(--accent-text); background:#fff; border:1px solid var(--rh-200); transition:all .15s; }
 .rh-page-link:hover { background:var(--rh-50); border-color:var(--rh-400); }
-.rh-page-link.active { background:var(--rh-600); color:#fff; border-color:var(--rh-600); }
+.rh-page-link.active { background:var(--rh-600); color:#fff; border-color:var(--teal-600); }
 .rh-page-link.disabled { opacity:.35; pointer-events:none; }
 html[data-theme="dark"] .rh-page-link { background:var(--rh-surface); border-color:var(--rh-border); color:var(--rh-300); }
 html[data-theme="dark"] .rh-page-link.active { background:var(--rh-600); color:#fff; border-color:var(--rh-600); }
@@ -96,7 +103,7 @@ html[data-theme="dark"] .rh-page-link.active { background:var(--rh-600); color:#
 .print-header-logo{height:56px;width:auto;flex-shrink:0;}
 .print-header-org{font-size:15px;font-weight:800;color:#071e28;text-transform:uppercase;letter-spacing:.06em;line-height:1.2;}
 .print-header-subtitle{font-size:9.5px;color:#666;margin-top:1px;letter-spacing:.03em;}
-.print-header-doc{font-size:12px;font-weight:700;color:var(--rh-700);margin-top:5px;text-transform:uppercase;letter-spacing:.05em;}
+.print-header-doc{font-size:12px;font-weight:700;color:var(--accent-text);margin-top:5px;text-transform:uppercase;letter-spacing:.05em;}
 </style>
 {% endblock %}
 
@@ -104,7 +111,7 @@ html[data-theme="dark"] .rh-page-link.active { background:var(--rh-600); color:#
 
 <div class="reg-head" id="subheader">
   <div>
-    <div class="reg-title"><i class="bi bi-journal-bookmark-fill" style="color:var(--rh-600);"></i> Registre unique du personnel</div>
+    <div class="reg-title"><i class="bi bi-journal-bookmark-fill" style="color:var(--accent-text-soft);"></i> Registre unique du personnel</div>
     <div style="font-size:12px;color:var(--rh-muted);margin-top:2px;">
       Conformément au Code du Travail ivoirien — {% now "d/m/Y" %}
     </div>
@@ -113,7 +120,7 @@ html[data-theme="dark"] .rh-page-link.active { background:var(--rh-600); color:#
     <!-- Filtre statut -->
     <form method="get" style="display:contents;">
       <div class="reg-filter">
-        <i class="bi bi-funnel" style="color:var(--rh-600);font-size:13px;"></i>
+        <i class="bi bi-funnel" style="color:var(--accent-text-soft);font-size:13px;"></i>
         <select name="statut" onchange="this.form.submit()">
           <option value="" {% if not statut_filtre %}selected{% endif %}>Tous les statuts</option>
           <option value="actif"    {% if statut_filtre == 'actif' %}selected{% endif %}>Actifs</option>
@@ -125,7 +132,7 @@ html[data-theme="dark"] .rh-page-link.active { background:var(--rh-600); color:#
     <!-- Export Excel -->
     <a href="{% url 'rh_registre_export' %}{% if statut_filtre %}?statut={{ statut_filtre }}{% endif %}"
        class="btn-rh-outline print-hide">
-      <i class="bi bi-file-earmark-excel-fill" style="color:var(--rh-700);"></i> Export Excel
+      <i class="bi bi-file-earmark-excel-fill" style="color:var(--accent-text);"></i> Export Excel
     </a>
     <!-- Imprimer -->
     <button onclick="window.print()" class="btn-rh print-hide">

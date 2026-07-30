@@ -1,0 +1,31 @@
+{% comment %}
+Rendu récursif des groupes imbriqués.
+
+S'inclut lui-même pour chaque niveau. Chaque ligne — en-tête de groupe comme
+ligne de données — porte `data-parent`, le chemin de son groupe parent : c'est ce
+qui permet de replier en cascade **sans aucun appel au serveur**, toutes les
+lignes des groupes affichés étant déjà chargées.
+
+Attend : noeuds, listing_colonnes (nombre de colonnes du tableau) et
+listing_ligne_tpl (gabarit d'une ligne de données).
+{% endcomment %}
+{% for n in noeuds %}
+<tr class="lst-groupe{% if n.niveau %} lst-groupe-fils{% endif %}"
+    data-chemin="{{ n.chemin }}" data-parent="{{ n.parent }}"
+    {% if n.niveau %}style="display:none;"{% endif %}
+    onclick="lstBasculerGroupe(this)">
+  <td colspan="{{ listing_colonnes }}" style="padding-left:{{ n.indent }}px;">
+    <i class="bi bi-chevron-right lst-chevron"></i>
+    {{ n.libelle }}
+    <span class="lst-compte">{{ n.total }}</span>
+  </td>
+</tr>
+
+{% if n.enfants %}
+  {% include 'includes/listing/groupes.html' with noeuds=n.enfants %}
+{% else %}
+  {% for objet in n.lignes %}
+    {% include listing_ligne_tpl with objet=objet parent=n.chemin %}
+  {% endfor %}
+{% endif %}
+{% endfor %}
