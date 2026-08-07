@@ -90,3 +90,37 @@ class AffectationPermanence(models.Model):
         verbose_name = "Affectation permanence"
         verbose_name_plural = "Affectations permanence"
         ordering = ['date', 'employe__nom']
+
+
+class ConfigurationBiometrique(models.Model):
+    """Réglage (singleton) du lecteur d'empreinte digitale du kiosque de
+    pointage. Aucun matériel n'existe encore au moment de l'implémentation :
+    ce réglage prépare le branchement — la plupart des lecteurs biométriques
+    pour kiosque web fournissent un petit service tournant sur la machine du
+    kiosque (127.0.0.1) exposant une URL locale que le navigateur peut
+    appeler directement, sans jamais transiter par le serveur Django."""
+    actif = models.BooleanField(
+        default=False,
+        verbose_name="Lecteur d'empreinte activé",
+        help_text="Tant que désactivé, le kiosque affiche le message générique « lecteur non configuré ».",
+    )
+    url_agent = models.URLField(
+        blank=True,
+        verbose_name="URL du service local du lecteur",
+        help_text="Fournie par le SDK du lecteur une fois installé sur le poste du kiosque, ex. http://127.0.0.1:8734/scan",
+    )
+    modifie_par = models.ForeignKey(User, null=True, blank=True,
+                                     on_delete=models.SET_NULL, related_name='+')
+    modifie_le = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Configuration biométrique"
+        verbose_name_plural = "Configuration biométrique"
+
+    def __str__(self):
+        return "Lecteur d'empreinte digitale"
+
+    @classmethod
+    def actuelle(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
