@@ -304,3 +304,20 @@ class LigneInventairePharmacie(models.Model):
     def __str__(self): return f"{self.produit.nom} — écart {self.ecart}"
     class Meta:
         verbose_name = "Ligne inventaire pharmacie"
+
+
+class PharmaciePermissions(models.Model):
+    """Modèle technique sans table, uniquement porteur de permissions Django
+    personnalisées : elles apparaissent dans l'onglet « Permissions de
+    l'utilisateur » de la fiche utilisateur de l'admin et peuvent y être
+    cochées directement, sans devoir créer au préalable un groupe portant un
+    nom précis attendu par le code (voir pharmacie/views.py)."""
+
+    class Meta:
+        managed = False
+        default_permissions = ()
+        permissions = [
+            ('gerer_stock_pharmacie', "Peut gérer le stock d'une pharmacie (dispensation, dotation, inventaire, retours, livraisons)"),
+            ('valider_vente_pharmacie', 'Peut valider ou annuler une vente en pharmacie'),
+            ('voir_rapport_financier_pharmacie', 'Peut voir les rapports financiers de la pharmacie (recettes, chiffre d\'affaires)'),
+        ]

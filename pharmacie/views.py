@@ -19,26 +19,23 @@ from stock.models import Produit, DemandePharmacie, LigneDemande
 
 PHARMACIES_DICT = dict(PHARMACIES_WALE)
 
-# Rôles autorisés à consulter les rapports de recettes (chiffre d'affaires,
-# répartition par mode de paiement) — même logique que le groupe "Caisse"
-# défini pour l'hospitalisation et la facturation.
-CAISSE_MANAGE_GROUPS = {'Caisse', 'Pharmacien', 'Administrateur', 'Directeur'}
-
-# Rôles autorisés à opérer sur le stock d'une pharmacie (dispensation,
-# livraisons, retours, inventaire) — toute action qui modifie StockPharmacie.
-PHARMACIE_MANAGE_GROUPS = {'Pharmacien', 'Administrateur', 'Directeur'}
+# Ces trois vérifications s'appuient sur les permissions Django standard
+# (voir pharmacie.models.PharmaciePermissions) : assignables directement à un
+# utilisateur via l'onglet « Permissions de l'utilisateur » de l'admin, ou à
+# un groupe si on préfère grouper — User.has_perm() couvre les deux et
+# autorise déjà automatiquement le superuser.
 
 
 def can_view_rapport_financier(user):
-    return user.is_superuser or user.groups.filter(name__in=CAISSE_MANAGE_GROUPS).exists()
+    return user.has_perm('pharmacie.voir_rapport_financier_pharmacie')
 
 
 def can_valider_vente(user):
-    return user.is_superuser or user.groups.filter(name__in=CAISSE_MANAGE_GROUPS).exists()
+    return user.has_perm('pharmacie.valider_vente_pharmacie')
 
 
 def can_manage_pharmacie(user):
-    return user.is_superuser or user.groups.filter(name__in=PHARMACIE_MANAGE_GROUPS).exists()
+    return user.has_perm('pharmacie.gerer_stock_pharmacie')
 
 
 def _stock_entierement_perime(produit):
