@@ -208,7 +208,13 @@ html[data-theme="dark"] .badge-ord-expiree   { background: rgba(var(--rose-rgb),
     </thead>
     <tbody>
       {% for ord in page_obj %}
-      {% with pat=ord.patient|default:ord.consultation.patient med=ord.medecin|default:ord.consultation.medecin %}
+      {% comment %}
+      patient_effectif / medecin_effectif : voir consultations.models.Ordonnance.
+      Le filtre `default` résolvait ord.consultation.patient même quand
+      ord.patient était renseigné, ce qui faisait planter la page entière
+      dès qu'une ordonnance n'avait pas de consultation.
+      {% endcomment %}
+      {% with pat=ord.patient_effectif med=ord.medecin_effectif %}
       <tr onclick="window.location='{% if ord.statut == 'emise' %}{% url 'pharmacie_dispenser' pharmacie ord.pk %}{% else %}{% url 'ordonnance_detail' ord.pk %}{% endif %}'">
         <td style="font-family:var(--font-mono);font-weight:700;color:var(--accent-text);">{{ ord.numero }}</td>
         <td>

@@ -99,6 +99,30 @@ class Ordonnance(models.Model):
             self.numero = f"{prefix}{count:06d}"
         super().save(*args, **kwargs)
 
+    @property
+    def patient_effectif(self):
+        """Patient concerné, quelle que soit l'origine de l'ordonnance.
+
+        Une ordonnance issue d'une consultation ne renseigne pas `patient` (le
+        lien passe par la consultation) ; une ordonnance saisie sans
+        consultation renseigne `patient` et laisse `consultation` à None — voir
+        ordonnance.views, qui écrit `patient=patient if not consultation else None`.
+        Les gabarits doivent passer par ici : le filtre `default` ne convient
+        pas, car il résout son argument même lorsqu'il n'en a pas besoin et
+        lève donc VariableDoesNotExist sur `consultation.patient` quand la
+        consultation est absente."""
+        if self.patient_id:
+            return self.patient
+        return self.consultation.patient if self.consultation_id else None
+
+    @property
+    def medecin_effectif(self):
+        """Prescripteur : celui porté par l'ordonnance, sinon celui de la
+        consultation d'origine. Même précaution que patient_effectif."""
+        if self.medecin_id:
+            return self.medecin
+        return self.consultation.medecin if self.consultation_id else None
+
     def __str__(self): return f"Ordonnance {self.numero}"
     class Meta: verbose_name = "Ordonnance"
 
