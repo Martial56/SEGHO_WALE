@@ -119,6 +119,13 @@ PHARMACIES_WALE = [
     ('wale_yamoussoukro', 'Walé Yamoussoukro'),
 ]
 
+# Rattache chaque pharmacie au centre (app centres) dont elle dépend, pour
+# cloisonner l'accès et les ordonnances par centre — voir pharmacie/views.py.
+PHARMACIE_CENTRE_CODE = {
+    'wale_toumbokro':    'TOUMBOKRO',
+    'wale_yamoussoukro': 'WALE',
+}
+
 
 class StockPharmacie(models.Model):
     """Stock disponible dans chaque pharmacie (alimenté par les dotations)."""

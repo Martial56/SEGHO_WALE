@@ -32,7 +32,7 @@ STATUT_DECLENCHEUR = "demande"   # « Demandé »
 def _memoriser_statut_precedent(sender, instance, **kwargs):
     """Mémorise le statut actuellement en base avant la sauvegarde."""
     if instance.pk:
-        ancien = (DemandeExamen.objects
+        ancien = (DemandeExamen.all_objects
                   .filter(pk=instance.pk)
                   .values_list("statut", flat=True)
                   .first())
@@ -57,7 +57,7 @@ def _envoyer_si_demande(sender, instance, created, **kwargs):
         return
 
     # Anti-doublon : ne pas réémettre si un envoi a déjà abouti.
-    deja_envoye = EchangeHPRIM.objects.filter(
+    deja_envoye = EchangeHPRIM.all_objects.filter(
         demande=instance, sens="envoi",
         statut__in=("transmis", "en_attente"),
     ).exists()
@@ -69,9 +69,16 @@ def _envoyer_si_demande(sender, instance, created, **kwargs):
     def _faire_envoi():
         # Import tardif pour éviter tout import circulaire au chargement.
         from .hprim.services import envoyer_demande
+        from .models import ConfigurationHPRIM
         try:
-            demande = DemandeExamen.objects.get(pk=demande_id)
+            demande = DemandeExamen.all_objects.get(pk=demande_id)
         except DemandeExamen.DoesNotExist:
+            return
+
+        # Centre sans configuration HPRIM active (ex. CMS WALE Toumbokro, qui
+        # n'a pas de SYSLAM) : on sort silencieusement, sans log ni ligne
+        # d'échange — ce n'est pas une erreur, c'est la normale pour ce centre.
+        if ConfigurationHPRIM.active(demande.centre) is None:
             return
 
         # Filet de sécurité : refuser l'envoi d'une demande sans aucune ligne
@@ -81,7 +88,7 @@ def _envoyer_si_demande(sender, instance, created, **kwargs):
             EchangeHPRIM.objects.create(
                 sens="envoi", contexte="ORM",
                 nom_fichier="(non généré)", demande=demande,
-                statut="erreur",
+                statut="erreur", centre=demande.centre,
                 message_log=("Envoi automatique annulé : la demande ne contient "
                              "aucune ligne d'examen. Ajoutez au moins un examen "
                              "puis relancez l'envoi (action « Envoyer au "

@@ -124,6 +124,18 @@ thème sombre : le dégradé démarrait donc en clair sous un texte blanc. Le pa
   background: var(--ph-50);
 }
 .ph-card-footer span { font-size: 12.5px; font-weight: 600; color: var(--accent-text-soft); }
+
+.ph-select-card.is-locked {
+  cursor: not-allowed;
+  opacity: .55;
+  filter: grayscale(.4);
+}
+.ph-select-card.is-locked:hover {
+  transform: none;
+  box-shadow: 0 8px 32px rgba(var(--ph-700-rgb),.12);
+  border-color: transparent;
+}
+.ph-select-card.is-locked .ph-card-footer span { color: var(--ph-muted); }
 </style>{% endblock %}
 
 {% block content %}
@@ -138,7 +150,9 @@ thème sombre : le dégradé démarrait donc en clair sous un texte blanc. Le pa
 <!-- Cartes -->
 <div class="ph-select-grid">
   {% for ph in pharmacies_data %}
-  <a href="{% url 'pharmacie_dashboard' ph.code %}" class="ph-select-card">
+  <a href="{% if ph.accessible %}{% url 'pharmacie_dashboard' ph.code %}{% else %}#{% endif %}"
+     class="ph-select-card{% if not ph.accessible %} is-locked{% endif %}"
+     {% if not ph.accessible %}onclick="return false;" tabindex="-1" aria-disabled="true"{% endif %}>
 
     <div class="ph-card-banner {% if forloop.counter == 2 %}banner-2{% endif %}"></div>
 
@@ -175,8 +189,12 @@ thème sombre : le dégradé démarrait donc en clair sous un texte blanc. Le pa
     {% endif %}
 
     <div class="ph-card-footer">
+      {% if ph.accessible %}
       <span><i class="bi bi-box-arrow-in-right"></i> Accéder à la pharmacie</span>
       <i class="bi bi-chevron-right" style="color:var(--ph-400);font-size:14px;"></i>
+      {% else %}
+      <span><i class="bi bi-lock-fill"></i> Accès réservé à ce centre</span>
+      {% endif %}
     </div>
 
   </a>

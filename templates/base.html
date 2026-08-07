@@ -1051,6 +1051,28 @@
                 <svg class="user-chip-chevron" width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><polyline points="1,1 5,5 9,1"/></svg>
               </button>
               <div class="user-dropdown" id="user-dropdown">
+                {% with mes_centres=user_profile.centres.all %}
+                {% if mes_centres|length > 1 %}
+                <div style="padding:10px 16px 4px; font-size:11px; font-weight:700; color:var(--teal-600); text-transform:uppercase; letter-spacing:.04em;">Centre actif</div>
+                {% for c in mes_centres %}
+                  {% if c == request.centre %}
+                  <div class="udrop-item" style="font-weight:700; cursor:default;">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                    {{ c.nom }}
+                  </div>
+                  {% else %}
+                  <form method="post" action="{% url 'changer_centre' c.id %}" style="margin:0;">
+                    {% csrf_token %}
+                    <button type="submit" class="udrop-item">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>
+                      {{ c.nom }}
+                    </button>
+                  </form>
+                  {% endif %}
+                {% endfor %}
+                <div class="udrop-sep"></div>
+                {% endif %}
+                {% endwith %}
                 <a href="{% url 'mon_compte' %}">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
                   Mon compte

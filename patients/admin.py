@@ -1,5 +1,6 @@
 from django.contrib import admin
 from .models import Patient, Assurance, RendezVous, Naissance
+from centres.admin import ModeleCentreAdmin
 
 
 @admin.register(Assurance)
@@ -10,7 +11,7 @@ class AssuranceAdmin(admin.ModelAdmin):
 
 
 @admin.register(Patient)
-class PatientAdmin(admin.ModelAdmin):
+class PatientAdmin(ModeleCentreAdmin):
     list_display = ['code_patient', 'nom', 'prenoms', 'sexe', 'age', 'telephone', 'assurance', 'date_creation']
     search_fields = ['nom', 'prenoms', 'code_patient', 'telephone']
     list_filter = ['sexe', 'assurance', 'ville']

@@ -28,6 +28,7 @@ urlpatterns = [
     path('compte/couleur-accent/', views.accent_color_set, name='accent_color_set'),
 
     # URLs des modules
+    path('centres/', include('centres.urls')),
     path('patients/', include('patients.urls')),
     path('medecins/',                        views.medecins_list,          name='medecins_list'),
     path('medecins/dashboard/',              _medecin_dashboard_view,      name='medecin_dashboard'),

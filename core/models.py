@@ -40,6 +40,20 @@ class UserProfile(models.Model):
         default=30,
         help_text="Délai d'inactivité avant déconnexion automatique, en minutes. 0 = désactivé.",
     )
+    centres = models.ManyToManyField(
+        'centres.Centre', blank=True, related_name='profils',
+        help_text="Centres auxquels cet utilisateur a accès. Le personnel fixe n'en a qu'un ; "
+                  "un médecin intervenant dans plusieurs centres peut en avoir plusieurs.",
+    )
+    centre_actif = models.ForeignKey(
+        'centres.Centre', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='profils_actifs', help_text="Centre actuellement sélectionné par l'utilisateur.",
+    )
+
+    def peut_acceder(self, centre):
+        if self.user.is_superuser:
+            return True
+        return self.centres.filter(pk=centre.pk).exists()
 
     def __str__(self):
         return f"Profil de {self.user.username}"

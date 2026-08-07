@@ -11,7 +11,7 @@ import datetime
 
 from .models import (
     StockPharmacie, MouvementPharmacie,
-    DispensationOrdonnance, LigneDispensation, PHARMACIES_WALE,
+    DispensationOrdonnance, LigneDispensation, PHARMACIES_WALE, PHARMACIE_CENTRE_CODE,
     VentePharmacie, LigneVente,
     InventairePharmacie, LigneInventairePharmacie,
 )
@@ -53,31 +53,72 @@ def _stock_entierement_perime(produit):
     return not any(l.quantite_actuelle > 0 and l.date_peremption >= today for l in lots)
 
 
-def get_pharmacie_or_404(pharmacie):
+def _centre_de_pharmacie(pharmacie):
+    """Centre (app centres) dont dépend cette pharmacie, ou None si la
+    pharmacie n'est rattachée à aucun centre connu."""
+    from centres.models import Centre
+    centre_code = PHARMACIE_CENTRE_CODE.get(pharmacie)
+    return Centre.objects.filter(code=centre_code).first() if centre_code else None
+
+
+def peut_acceder_pharmacie(request, pharmacie):
+    """Un utilisateur ne peut accéder qu'à la pharmacie de son centre
+    actuellement ACTIF (le superuser voit tout).
+
+    On se base sur `request.centre` (centre_actif — voir core.middleware) et
+    non sur l'ensemble des centres autorisés (UserProfile.peut_acceder) : un
+    membre de plusieurs centres (ex. médecin intervenant dans les deux) doit
+    changer son centre actif (centres.views.changer_centre) pour basculer
+    d'une pharmacie à l'autre, exactement comme pour les autres données
+    cloisonnées par centre (voir centres.models.CentreManager)."""
+    if request.user.is_superuser:
+        return True
+    centre = _centre_de_pharmacie(pharmacie)
+    if centre is None:
+        return True
+    return getattr(request, 'centre', None) == centre
+
+
+def get_pharmacie_or_404(request, pharmacie):
     if pharmacie not in PHARMACIES_DICT:
         from django.http import Http404
         raise Http404
+    if not peut_acceder_pharmacie(request, pharmacie):
+        raise PermissionDenied("Vous n'avez pas accès à cette pharmacie.")
     return pharmacie
+
+
+def _ordonnances_du_centre(pharmacie):
+    """Ordonnances dont le patient dépend du centre de cette pharmacie —
+    évite qu'une ordonnance prescrite dans un centre n'apparaisse dans la
+    liste à dispenser d'une pharmacie d'un autre centre."""
+    from consultations.models import Ordonnance
+    centre = _centre_de_pharmacie(pharmacie)
+    if centre is None:
+        return Ordonnance.objects.all()
+    return Ordonnance.objects.filter(
+        Q(consultation__patient__centre=centre) | Q(patient__centre=centre)
+    )
 
 
 @login_required(login_url='login')
 def pharmacie_accueil(request):
-    from consultations.models import Ordonnance
-    attente = Ordonnance.objects.filter(statut='emise').count()
     pharmacies_data = []
     for code, label in PHARMACIES_WALE:
         ruptures = StockPharmacie.objects.filter(pharmacie=code, quantite__lte=0).count()
         alertes  = StockPharmacie.objects.filter(
             pharmacie=code, quantite__gt=0, quantite__lte=F('produit__stock_alerte')
         ).count()
-        total = StockPharmacie.objects.filter(pharmacie=code).count()
+        total   = StockPharmacie.objects.filter(pharmacie=code).count()
+        attente = _ordonnances_du_centre(code).filter(statut='emise').count()
         pharmacies_data.append({
-            'code':     code,
-            'label':    label,
-            'total':    total,
-            'ruptures': ruptures,
-            'alertes':  alertes,
-            'attente':  attente,
+            'code':        code,
+            'label':       label,
+            'total':       total,
+            'ruptures':    ruptures,
+            'alertes':     alertes,
+            'attente':     attente,
+            'accessible':  peut_acceder_pharmacie(request, code),
         })
     return render(request, 'pharmacie/accueil.html', {
         'pharmacies_data': pharmacies_data,
@@ -86,7 +127,7 @@ def pharmacie_accueil(request):
 
 @login_required(login_url='login')
 def pharmacie_dashboard(request, pharmacie):
-    get_pharmacie_or_404(pharmacie)
+    get_pharmacie_or_404(request, pharmacie)
     label = PHARMACIES_DICT[pharmacie]
     today = timezone.now().date()
 
@@ -118,8 +159,7 @@ def pharmacie_dashboard(request, pharmacie):
         qte=Sum('quantite'), ca=Sum('montant')
     ).order_by('-qte')[:5])
 
-    from consultations.models import Ordonnance
-    ordonnances_attente = Ordonnance.objects.filter(
+    ordonnances_attente = _ordonnances_du_centre(pharmacie).filter(
         statut='emise'
     ).select_related('consultation__patient', 'consultation__medecin').order_by('-date_emission')[:8]
 
@@ -154,7 +194,7 @@ def pharmacie_dashboard(request, pharmacie):
 
 @login_required(login_url='login')
 def pharmacie_stock(request, pharmacie):
-    get_pharmacie_or_404(pharmacie)
+    get_pharmacie_or_404(request, pharmacie)
     label = PHARMACIES_DICT[pharmacie]
 
     qs          = StockPharmacie.objects.filter(pharmacie=pharmacie).select_related('produit', 'produit__categorie').prefetch_related('produit__lots')
@@ -192,10 +232,9 @@ def pharmacie_stock(request, pharmacie):
 
 @login_required(login_url='login')
 def pharmacie_ordonnances(request, pharmacie):
-    get_pharmacie_or_404(pharmacie)
+    get_pharmacie_or_404(request, pharmacie)
     label = PHARMACIES_DICT[pharmacie]
 
-    from consultations.models import Ordonnance
     today = timezone.now().date()
     date_str = request.GET.get('date', str(today))
     try:
@@ -206,7 +245,7 @@ def pharmacie_ordonnances(request, pharmacie):
     statut_filtre = request.GET.get('statut', '')
     q             = request.GET.get('q', '').strip()
 
-    qs = Ordonnance.objects.filter(
+    qs = _ordonnances_du_centre(pharmacie).filter(
         date_emission__date=selected_date
     ).select_related(
         'consultation__patient', 'consultation__medecin', 'patient', 'medecin', 'dispensation'
@@ -224,7 +263,7 @@ def pharmacie_ordonnances(request, pharmacie):
     paginator = Paginator(qs, 25)
     page_obj  = paginator.get_page(request.GET.get('page'))
 
-    ords_jour = Ordonnance.objects.filter(date_emission__date=selected_date)
+    ords_jour = _ordonnances_du_centre(pharmacie).filter(date_emission__date=selected_date)
     stats = ords_jour.aggregate(
         total=Count('id'),
         en_attente=Count('id', filter=Q(statut='emise')),
@@ -268,11 +307,10 @@ def pharmacie_ordonnances(request, pharmacie):
 def pharmacie_dispenser(request, pharmacie, pk):
     if not can_manage_pharmacie(request.user):
         raise PermissionDenied
-    get_pharmacie_or_404(pharmacie)
+    get_pharmacie_or_404(request, pharmacie)
     label = PHARMACIES_DICT[pharmacie]
 
-    from consultations.models import Ordonnance
-    ordonnance = get_object_or_404(Ordonnance, pk=pk)
+    ordonnance = get_object_or_404(_ordonnances_du_centre(pharmacie), pk=pk)
 
     if hasattr(ordonnance, 'dispensation'):
         messages.info(request, 'Cette ordonnance a déjà été dispensée.')
@@ -430,7 +468,7 @@ def pharmacie_dispenser(request, pharmacie, pk):
 def pharmacie_demande(request, pharmacie):
     if not can_manage_pharmacie(request.user):
         raise PermissionDenied
-    get_pharmacie_or_404(pharmacie)
+    get_pharmacie_or_404(request, pharmacie)
     label    = PHARMACIES_DICT[pharmacie]
     from .models import StockPharmacie
     produits = Produit.objects.filter(actif=True).order_by('type', 'nom')
@@ -477,7 +515,7 @@ def pharmacie_demande(request, pharmacie):
 
 @login_required(login_url='login')
 def pharmacie_journal(request, pharmacie):
-    get_pharmacie_or_404(pharmacie)
+    get_pharmacie_or_404(request, pharmacie)
     label = PHARMACIES_DICT[pharmacie]
     qs    = MouvementPharmacie.objects.filter(pharmacie=pharmacie).select_related('produit').order_by('-date')
     paginator = Paginator(qs, 30)
@@ -490,7 +528,7 @@ def pharmacie_journal(request, pharmacie):
 @login_required(login_url='login')
 def pharmacie_livraisons(request, pharmacie):
     """Liste des livraisons en attente de confirmation par la pharmacie."""
-    get_pharmacie_or_404(pharmacie)
+    get_pharmacie_or_404(request, pharmacie)
     label = PHARMACIES_DICT[pharmacie]
 
     en_attente  = DemandePharmacie.objects.filter(pharmacie=pharmacie, statut='en_livraison').order_by('-date_traitement')
@@ -510,7 +548,7 @@ def pharmacie_confirmer_livraison(request, pharmacie, pk):
     from django.views.decorators.http import require_POST as _rp
     if not can_manage_pharmacie(request.user):
         raise PermissionDenied
-    get_pharmacie_or_404(pharmacie)
+    get_pharmacie_or_404(request, pharmacie)
     label   = PHARMACIES_DICT[pharmacie]
     demande = get_object_or_404(DemandePharmacie, pk=pk, pharmacie=pharmacie)
 
@@ -594,7 +632,7 @@ def pharmacie_caisse(request, pharmacie):
     from django.db.models import Sum, Count
     if not can_valider_vente(request.user):
         raise PermissionDenied
-    get_pharmacie_or_404(pharmacie)
+    get_pharmacie_or_404(request, pharmacie)
     label = PHARMACIES_DICT[pharmacie]
     today = timezone.now().date()
 
@@ -733,7 +771,7 @@ def pharmacie_caisse(request, pharmacie):
 
 @login_required(login_url='login')
 def pharmacie_ticket(request, pharmacie, pk):
-    get_pharmacie_or_404(pharmacie)
+    get_pharmacie_or_404(request, pharmacie)
     label = PHARMACIES_DICT[pharmacie]
     vente = get_object_or_404(VentePharmacie, pk=pk, pharmacie=pharmacie)
     return render(request, 'pharmacie/ticket.html', {
@@ -752,7 +790,7 @@ def pharmacie_annuler_vente(request, pharmacie, pk):
     from decimal import Decimal
     if not can_valider_vente(request.user):
         raise PermissionDenied
-    get_pharmacie_or_404(pharmacie)
+    get_pharmacie_or_404(request, pharmacie)
     vente = get_object_or_404(VentePharmacie, pk=pk, pharmacie=pharmacie)
 
     if vente.statut != 'payee':
@@ -809,7 +847,7 @@ def pharmacie_recette(request, pharmacie):
     from datetime import datetime
     if not can_view_rapport_financier(request.user):
         raise PermissionDenied
-    get_pharmacie_or_404(pharmacie)
+    get_pharmacie_or_404(request, pharmacie)
     label = PHARMACIES_DICT[pharmacie]
     today = timezone.now().date()
 
@@ -851,7 +889,7 @@ def pharmacie_rapport_journalier(request, pharmacie):
     from decimal import Decimal
     from django.db.models import Sum, Count
     from datetime import datetime
-    get_pharmacie_or_404(pharmacie)
+    get_pharmacie_or_404(request, pharmacie)
     label = PHARMACIES_DICT[pharmacie]
     today = timezone.now().date()
 
@@ -911,7 +949,7 @@ def pharmacie_rapport_journalier(request, pharmacie):
 
 @login_required(login_url='login')
 def pharmacie_fiche_dispensation(request, pharmacie, pk):
-    get_pharmacie_or_404(pharmacie)
+    get_pharmacie_or_404(request, pharmacie)
     label = PHARMACIES_DICT[pharmacie]
     dispensation = get_object_or_404(DispensationOrdonnance, pk=pk, pharmacie=pharmacie)
     return render(request, 'pharmacie/fiche_dispensation.html', {
@@ -927,7 +965,7 @@ def pharmacie_alertes_reappro(request, pharmacie):
     from decimal import Decimal
     if not can_manage_pharmacie(request.user):
         raise PermissionDenied
-    get_pharmacie_or_404(pharmacie)
+    get_pharmacie_or_404(request, pharmacie)
     label = PHARMACIES_DICT[pharmacie]
 
     ruptures = StockPharmacie.objects.filter(
@@ -980,7 +1018,7 @@ def pharmacie_alertes_reappro(request, pharmacie):
 @login_required(login_url='login')
 def pharmacie_peremptions(request, pharmacie):
     from datetime import timedelta
-    get_pharmacie_or_404(pharmacie)
+    get_pharmacie_or_404(request, pharmacie)
     label = PHARMACIES_DICT[pharmacie]
     today = timezone.now().date()
 
@@ -1029,7 +1067,7 @@ def pharmacie_retours(request, pharmacie):
     from decimal import Decimal
     if not can_manage_pharmacie(request.user):
         raise PermissionDenied
-    get_pharmacie_or_404(pharmacie)
+    get_pharmacie_or_404(request, pharmacie)
     label = PHARMACIES_DICT[pharmacie]
 
     stock_items = StockPharmacie.objects.filter(
@@ -1106,7 +1144,7 @@ def pharmacie_retours(request, pharmacie):
 
 @login_required(login_url='login')
 def pharmacie_inventaire_list(request, pharmacie):
-    get_pharmacie_or_404(pharmacie)
+    get_pharmacie_or_404(request, pharmacie)
     label = PHARMACIES_DICT[pharmacie]
     inventaires = InventairePharmacie.objects.filter(
         pharmacie=pharmacie
@@ -1122,7 +1160,7 @@ def pharmacie_inventaire_nouveau(request, pharmacie):
     from decimal import Decimal
     if not can_manage_pharmacie(request.user):
         raise PermissionDenied
-    get_pharmacie_or_404(pharmacie)
+    get_pharmacie_or_404(request, pharmacie)
     label = PHARMACIES_DICT[pharmacie]
 
     stock_items = StockPharmacie.objects.filter(
@@ -1173,7 +1211,7 @@ def pharmacie_inventaire_detail(request, pharmacie, pk):
     from decimal import Decimal
     if not can_manage_pharmacie(request.user):
         raise PermissionDenied
-    get_pharmacie_or_404(pharmacie)
+    get_pharmacie_or_404(request, pharmacie)
     label = PHARMACIES_DICT[pharmacie]
     inv = get_object_or_404(InventairePharmacie, pk=pk, pharmacie=pharmacie)
     lignes = list(inv.lignes.select_related('produit').prefetch_related('produit__lots').order_by('produit__type', 'produit__nom'))
@@ -1257,7 +1295,7 @@ def pharmacie_inventaire_detail(request, pharmacie, pk):
 def pharmacie_inventaire_supprimer(request, pharmacie, pk):
     if not can_manage_pharmacie(request.user):
         raise PermissionDenied
-    get_pharmacie_or_404(pharmacie)
+    get_pharmacie_or_404(request, pharmacie)
     inv = get_object_or_404(InventairePharmacie, pk=pk, pharmacie=pharmacie)
     if inv.statut != 'brouillon':
         messages.error(request, "Seuls les inventaires en brouillon peuvent être supprimés.")
@@ -1275,7 +1313,7 @@ def pharmacie_rapport_mensuel(request, pharmacie):
     from decimal import Decimal
     from django.db.models import Sum, Count
     from datetime import date as date_type
-    get_pharmacie_or_404(pharmacie)
+    get_pharmacie_or_404(request, pharmacie)
     label = PHARMACIES_DICT[pharmacie]
     today = timezone.now().date()
 
@@ -1347,7 +1385,7 @@ def pharmacie_rapport_dispensation(request, pharmacie):
     if not can_view_rapport_financier(request.user):
         raise PermissionDenied
     from django.db.models import Count
-    get_pharmacie_or_404(pharmacie)
+    get_pharmacie_or_404(request, pharmacie)
     label = PHARMACIES_DICT[pharmacie]
     today = timezone.now().date()
 
@@ -1380,7 +1418,7 @@ def pharmacie_rapport_dispensation(request, pharmacie):
 
 @login_required(login_url='login')
 def pharmacie_comparaison(request, pharmacie):
-    get_pharmacie_or_404(pharmacie)
+    get_pharmacie_or_404(request, pharmacie)
     label = PHARMACIES_DICT[pharmacie]
 
     all_produits = Produit.objects.filter(actif=True).order_by('type', 'nom')

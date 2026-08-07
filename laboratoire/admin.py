@@ -5,6 +5,7 @@ from .models import (
     DemandeExamen, LigneDemandeExamen, ConfigurationHPRIM, EchangeHPRIM,
     ErreurHPRIM,
 )
+from centres.admin import ModeleCentreAdmin
 
 
 @admin.register(TypeExamen)
@@ -106,7 +107,7 @@ def action_envoyer_hprim(modeladmin, request, queryset):
 
 
 @admin.register(DemandeExamen)
-class DemandeExamenAdmin(admin.ModelAdmin):
+class DemandeExamenAdmin(ModeleCentreAdmin):
     list_display = ['numero', 'patient', 'type_test', 'statut', 'urgent', 'date_creation']
     list_filter = ['statut', 'type_test', 'urgent']
     search_fields = ['numero', 'patient__nom', 'patient__prenoms']
@@ -116,10 +117,10 @@ class DemandeExamenAdmin(admin.ModelAdmin):
 
 
 @admin.register(ConfigurationHPRIM)
-class ConfigurationHPRIMAdmin(admin.ModelAdmin):
-    list_display = ['nom', 'actif', 'emetteur_code', 'recepteur_code',
+class ConfigurationHPRIMAdmin(ModeleCentreAdmin):
+    list_display = ['nom', 'centre', 'actif', 'emetteur_code', 'recepteur_code',
                     'ftp_host', 'date_modification']
-    list_filter = ['actif']
+    list_filter = ['actif', 'centre']
     fieldsets = (
         ("Général", {'fields': ('nom', 'actif')}),
         ("Identités HPRIM (segment H)", {
@@ -162,10 +163,10 @@ class ErreurHPRIMInline(admin.TabularInline):
 
 
 @admin.register(EchangeHPRIM)
-class EchangeHPRIMAdmin(admin.ModelAdmin):
-    list_display = ['nom_fichier', 'sens', 'contexte', 'statut',
+class EchangeHPRIMAdmin(ModeleCentreAdmin):
+    list_display = ['nom_fichier', 'centre', 'sens', 'contexte', 'statut',
                     'demande', 'date_creation', 'date_traitement']
-    list_filter = ['sens', 'contexte', 'statut']
+    list_filter = ['sens', 'contexte', 'statut', 'centre']
     search_fields = ['nom_fichier', 'demande__numero']
     readonly_fields = ['date_creation', 'date_traitement']
     actions = [action_reintegrer_oru]
@@ -173,7 +174,7 @@ class EchangeHPRIMAdmin(admin.ModelAdmin):
 
 
 @admin.register(ErreurHPRIM)
-class ErreurHPRIMAdmin(admin.ModelAdmin):
+class ErreurHPRIMAdmin(ModeleCentreAdmin):
     list_display = ['date_creation', 'gravite', 'type_erreur',
                     'nom_fichier_errone', 'demande', 'designation']
     list_filter = ['gravite', 'type_erreur']

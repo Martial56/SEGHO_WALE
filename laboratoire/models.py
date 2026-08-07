@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import User
 
+from centres.models import ModeleCentre
+
 
 class TypeExamen(models.Model):
     code = models.CharField(max_length=50, unique=True)
@@ -54,7 +56,7 @@ class ResultatAnalyse(models.Model):
     class Meta: verbose_name = "Résultat d'analyse"
 
 
-class DemandeExamen(models.Model):
+class DemandeExamen(ModeleCentre):
     STATUT = [
         ('brouillon', 'Brouillon'),
         ('demande', 'Demandé'),
@@ -91,12 +93,13 @@ class DemandeExamen(models.Model):
         if not self.numero:
             from django.utils import timezone
             annee = timezone.now().year
-            count = DemandeExamen.objects.filter(date_creation__year=annee).count() + 1
+            # all_objects : numero est unique tous centres confondus.
+            count = DemandeExamen.all_objects.filter(date_creation__year=annee).count() + 1
             self.numero = f"DEM{annee}{count:06d}"
         super().save(*args, **kwargs)
 
     def __str__(self): return f"Demande {self.numero} - {self.patient}"
-    class Meta:
+    class Meta(ModeleCentre.Meta):
         verbose_name = "Demande d'examen"
         ordering = ['-date_creation']
 
@@ -144,9 +147,11 @@ class ExamenImagerie(models.Model):
 # =========================================================================== #
 # Interopérabilité HPRIM Santé v2.4 (échange avec un logiciel de laboratoire)
 # =========================================================================== #
-class ConfigurationHPRIM(models.Model):
+class ConfigurationHPRIM(ModeleCentre):
     """Paramètres de connexion FTP et identités émetteur/récepteur.
-    Un seul enregistrement actif suffit (le plus récent actif est utilisé)."""
+    Une configuration appartient à UN centre ; seul WALE Yakro utilise
+    aujourd'hui le laboratoire SYSLAM via HPRIM (un seul enregistrement actif
+    par centre suffit — le plus récent actif de ce centre est utilisé)."""
     nom = models.CharField(max_length=100, default="Configuration HPRIM",
                            help_text="Libellé de cette configuration")
     actif = models.BooleanField(default=True)
@@ -187,16 +192,22 @@ class ConfigurationHPRIM(models.Model):
     def __str__(self):
         return f"{self.nom} ({'actif' if self.actif else 'inactif'})"
 
-    class Meta:
+    class Meta(ModeleCentre.Meta):
         verbose_name = "Configuration HPRIM"
         verbose_name_plural = "Configurations HPRIM"
 
     @classmethod
-    def active(cls):
-        return cls.objects.filter(actif=True).order_by('-date_modification').first()
+    def active(cls, centre):
+        """Config HPRIM active du CENTRE donné, ou None (ex. un centre sans
+        SYSLAM). Interroge `all_objects` : cette résolution ne doit jamais
+        dépendre du centre actif ambiant de la requête en cours, seulement du
+        centre explicitement demandé (celui de la DemandeExamen)."""
+        if centre is None:
+            return None
+        return cls.all_objects.filter(actif=True, centre=centre).order_by('-date_modification').first()
 
 
-class EchangeHPRIM(models.Model):
+class EchangeHPRIM(ModeleCentre):
     """Journal de chaque message HPRIM émis ou reçu (traçabilité)."""
     SENS = [("envoi", "Envoi (ORM)"), ("reception", "Réception (ORU)")]
     STATUT = [
@@ -222,13 +233,13 @@ class EchangeHPRIM(models.Model):
     def __str__(self):
         return f"{self.get_sens_display()} {self.nom_fichier} [{self.statut}]"
 
-    class Meta:
+    class Meta(ModeleCentre.Meta):
         verbose_name = "Échange HPRIM"
         verbose_name_plural = "Échanges HPRIM"
         ordering = ['-date_creation']
 
 
-class ErreurHPRIM(models.Model):
+class ErreurHPRIM(ModeleCentre):
     """Erreur signalée par un message ERR reçu (§5.14), rattachée si possible
     à l'échange et à la demande d'origine."""
     GRAVITE = [
@@ -262,7 +273,7 @@ class ErreurHPRIM(models.Model):
     def __str__(self):
         return f"[{self.get_gravite_display()}] {self.designation[:60]}"
 
-    class Meta:
+    class Meta(ModeleCentre.Meta):
         verbose_name = "Erreur HPRIM"
         verbose_name_plural = "Erreurs HPRIM"
         ordering = ['-date_creation']

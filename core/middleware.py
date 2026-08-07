@@ -1,26 +1,83 @@
 import threading
+from contextlib import contextmanager
 
 _locals = threading.local()
 
 
 class CurrentUserMiddleware:
-    """Store the current request user in thread-local so signals can read it."""
+    """Store the current request user (and son centre actif) in thread-local
+    so les signaux et les managers cloisonnés (voir centres.models.ModeleCentre)
+    peuvent les lire."""
 
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
-        _locals.current_user = getattr(request, 'user', None)
+        user = getattr(request, 'user', None)
+        _locals.current_user = user
+        _locals.current_centre = None
+        request.centre = None
         try:
+            if user is not None and getattr(user, 'is_authenticated', False):
+                centre = _resoudre_centre_actif(user)
+                _locals.current_centre = centre
+                request.centre = centre
             response = self.get_response(request)
         finally:
             _locals.current_user = None
+            _locals.current_centre = None
         return response
+
+
+def _resoudre_centre_actif(user):
+    """Détermine le centre actif d'un utilisateur authentifié : celui déjà
+    sélectionné (profile.centre_actif), ou — à défaut — le seul centre auquel
+    il a accès (auto-sélection persistée)."""
+    from django.core.exceptions import ObjectDoesNotExist
+    try:
+        profile = user.profile
+    except ObjectDoesNotExist:
+        return None
+
+    centre = profile.centre_actif
+    if centre is None:
+        centres_autorises = list(profile.centres.all()[:2])
+        if len(centres_autorises) == 1:
+            centre = centres_autorises[0]
+            profile.centre_actif = centre
+            profile.save(update_fields=['centre_actif'])
+    return centre
 
 
 def get_current_user():
     """Return the user for the current request, or None outside request context."""
     return getattr(_locals, 'current_user', None)
+
+
+def get_current_centre():
+    """Return le centre actif de la requête en cours, ou None hors requête."""
+    return getattr(_locals, 'current_centre', None)
+
+
+def set_current_centre(centre):
+    _locals.current_centre = centre
+
+
+def clear_current_centre():
+    _locals.current_centre = None
+
+
+@contextmanager
+def centre_actif(centre):
+    """Gestionnaire de contexte pour le code hors requête (management commands,
+    cron, scripts) : rend `centre` actif pour la durée du bloc, puis restaure
+    le centre précédent (imbrication sûre)."""
+    precedent = get_current_centre()
+    set_current_centre(centre)
+    try:
+        yield centre
+    finally:
+        set_current_centre(precedent)
 
 
 class SessionTimeoutMiddleware:

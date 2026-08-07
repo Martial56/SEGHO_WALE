@@ -1,6 +1,8 @@
 from django.db import models
 from django.utils import timezone
 
+from centres.models import ModeleCentre
+
 
 class Assurance(models.Model):
     nom = models.CharField(max_length=200)
@@ -14,7 +16,7 @@ class Assurance(models.Model):
         verbose_name = "Assurance"
 
 
-class Patient(models.Model):
+class Patient(ModeleCentre):
     SEXE = [('M', 'Masculin'), ('F', 'Féminin')]
     GROUPE_SANGUIN = [('A+','A+'),('A-','A-'),('B+','B+'),('B-','B-'),('AB+','AB+'),('AB-','AB-'),('O+','O+'),('O-','O-')]
 
@@ -50,7 +52,9 @@ class Patient(models.Model):
     def save(self, *args, **kwargs):
         if not self.code_patient:
             annee = timezone.now().year
-            count = Patient.objects.filter(date_creation__year=annee).count() + 1
+            # all_objects : code_patient est unique tous centres confondus, la
+            # numérotation ne doit donc jamais être filtrée par centre actif.
+            count = Patient.all_objects.filter(date_creation__year=annee).count() + 1
             self.code_patient = f"PAT{annee}{count:05d}"
         super().save(*args, **kwargs)
 
@@ -85,7 +89,7 @@ class Patient(models.Model):
         return f'{years}Ans{months}Mois{days}Jours'
 
     def __str__(self): return f"{self.nom} {self.prenoms} ({self.code_patient})"
-    class Meta:
+    class Meta(ModeleCentre.Meta):
         verbose_name = "Patient"
         ordering = ['-date_creation']
 
