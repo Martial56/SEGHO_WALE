@@ -243,16 +243,6 @@ def service_detail(request, pk):
     })
 
 
-@login_required
-def regles_prix(request, pk):
-    article = get_object_or_404(Articleservice, pk=pk)
-    regles = article.regles_prix.all()
-    return render(request, 'services/regles_prix.html', {
-        'article': article,
-        'regles': regles,
-    })
-
-
 # ── Vues AJAX pour les lignes dynamiques ─────────────────────
 
 @login_required

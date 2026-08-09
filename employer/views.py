@@ -1268,6 +1268,7 @@ def alertes_tout_lire(request):
 def alerte_doc_lue(request, alerte_id):
     if request.method == 'POST':
         AlerteDocument.objects.filter(pk=alerte_id).update(lue=True)
+    return JsonResponse({'ok': True})
 
 
 # ── Présence — historique par employé ─────────────────────────────────────────

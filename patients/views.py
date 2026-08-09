@@ -1132,10 +1132,15 @@ def ordonnance_create(request, pk):
     except Exception:
         medicaments_dispo = []
 
-    return render(request, 'pharmacie/ordonnance_create.html', {
+    medecins = Medecin.objects.select_related('specialite', 'employe').order_by('employe__nom')
+    medecin_preselect = consultation.medecin if consultation else None
+
+    return render(request, 'pharmacie/ordonnance/ordonnance_create.html', {
         'patient': patient,
         'consultation': consultation,
         'medicaments_dispo': medicaments_dispo,
+        'medecins': medecins,
+        'medecin_preselect': medecin_preselect,
         'titre': 'Créer une ordonnance',
         'statuts': [('emise', 'Émise'), ('delivree', 'Délivrée'), ('partielle', 'Partielle'), ('expiree', 'Expirée')],
         'types': [('interne', 'Interne'), ('externe', 'Externe')],

@@ -284,7 +284,7 @@ def ordonnance_create_libre(request):
         patient = consultation.patient
         medecin_preselect = consultation.medecin
     elif patient_id_get:
-        patient = get_object_or_404(Patient, pk=patient_id_get)
+        patient = get_object_or_404(Patient.all_objects, pk=patient_id_get)
     if medecin_id_get and medecin_preselect is None:
         try:
             medecin_preselect = Medecin.objects.get(pk=int(medecin_id_get))
@@ -321,7 +321,7 @@ def ordonnance_create_libre(request):
             consultation = get_object_or_404(Consultation.objects.select_related('patient', 'medecin'), pk=consultation_id)
             patient = consultation.patient
         elif patient_id:
-            patient = get_object_or_404(Patient, pk=patient_id)
+            patient = get_object_or_404(Patient.all_objects, pk=patient_id)
             consultation = None
         else:
             messages.error(request, 'Veuillez sélectionner un patient.')

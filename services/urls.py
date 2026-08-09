@@ -8,7 +8,6 @@ urlpatterns = [
     path('nouveau/', views.service_form, name='create'),
     path('<int:pk>/', views.service_detail, name='detail'),
     path('<int:pk>/modifier/', views.service_form, name='edit'),
-    path('<int:pk>/regles-prix/', views.regles_prix, name='regles_prix'),
 
     # Catégories de service
     path('categories/', views.categories_list, name='categories'),

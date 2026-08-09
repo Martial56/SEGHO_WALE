@@ -108,7 +108,7 @@ def facture_create(request):
     from services.models import Articleservice
 
     patient_pk = request.GET.get('patient') or request.POST.get('patient_id')
-    patient    = get_object_or_404(Patient, pk=patient_pk) if patient_pk else None
+    patient    = get_object_or_404(Patient.all_objects, pk=patient_pk) if patient_pk else None
     actes      = Acte.objects.filter(actif=True).order_by('categorie', 'libelle')
     caisses    = Caisse.objects.filter(actif=True).order_by('nom')
     services   = Articleservice.objects.select_related('categorie').filter(actif=True).order_by('nom')
@@ -135,7 +135,7 @@ def facture_create(request):
     if demande_pk:
         try:
             from laboratoire.models import DemandeExamen
-            demande_obj = DemandeExamen.objects.prefetch_related('lignes__type_examen').get(pk=demande_pk)
+            demande_obj = DemandeExamen.all_objects.prefetch_related('lignes__type_examen').get(pk=demande_pk)
         except Exception:
             pass
 

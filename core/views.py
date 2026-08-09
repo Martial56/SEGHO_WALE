@@ -782,7 +782,7 @@ def facture_create(request):
     from django.urls import reverse
 
     patient_pk = request.GET.get('patient') or request.POST.get('patient_id')
-    patient = get_object_or_404(Patient, pk=patient_pk) if patient_pk else None
+    patient = get_object_or_404(Patient.all_objects, pk=patient_pk) if patient_pk else None
     actes = Acte.objects.filter(actif=True).order_by('categorie', 'libelle')
     caisses = Caisse.objects.filter(actif=True).order_by('nom')
     from services.models import Articleservice
@@ -793,7 +793,7 @@ def facture_create(request):
     if demande_pk:
         from laboratoire.models import DemandeExamen
         try:
-            demande_obj = DemandeExamen.objects.get(pk=demande_pk)
+            demande_obj = DemandeExamen.all_objects.get(pk=demande_pk)
         except DemandeExamen.DoesNotExist:
             pass
 
@@ -971,7 +971,7 @@ def laboratoire_create(request):
     from django.utils.dateparse import parse_datetime
 
     patient_pk = request.GET.get('patient') or request.POST.get('patient_id')
-    patient = get_object_or_404(Patient, pk=patient_pk) if patient_pk else None
+    patient = get_object_or_404(Patient.all_objects, pk=patient_pk) if patient_pk else None
 
     from medecins.models import Medecin
     medecins = Medecin.objects.filter(actif=True).select_related('employe', 'user').order_by('employe__nom')
