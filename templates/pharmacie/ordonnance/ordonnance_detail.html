@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <style>
     .ord-panel {
-        background: #fff; border-bottom: 1px solid rgba(0,0,0,0.08);
+        background: var(--surface); border-bottom: 1px solid var(--border);
         position: sticky; top: 0; z-index: 190; margin: 0 -32px 0;
     }
     .ord-top {
@@ -17,7 +17,7 @@
     .ord-breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 13.5px; }
     .ord-breadcrumb a { color: var(--accent-text-soft); text-decoration: none; font-weight: 500; }
     .ord-breadcrumb a:hover { color: var(--teal-500); }
-    .ord-breadcrumb .sep { color: #bbb; opacity: .4; margin: 0 3px; }
+    .ord-breadcrumb .sep { color: var(--text-faint); opacity: .4; margin: 0 3px; }
     .ord-breadcrumb .current { color: var(--text); }
 
     .btn-action {
@@ -32,27 +32,30 @@
         background: var(--surface); color: var(--text-muted);
         border: 1px solid var(--border);
     }
-    .btn-ghost:hover { border-color: #999; color: var(--text); }
+    .btn-ghost:hover { border-color: var(--border-strong); color: var(--text); }
     .btn-disabled {
-        background: #e9ecef; color: #adb5bd;
-        border: 1px solid #dee2e6; cursor: not-allowed; pointer-events: none;
+        background: var(--surface-muted); color: var(--text-faint);
+        border: 1px solid var(--border); cursor: not-allowed; pointer-events: none;
     }
 
-    .ord-body { background: #f6f8fa; min-height: calc(100vh - 60px); padding: 24px; }
-    .ord-card { background: #fff; border: 1px solid rgba(0,0,0,0.08); border-radius: 8px; margin-bottom: 20px; }
+    .ord-body { background: var(--surface-muted); min-height: calc(100vh - 60px); padding: 24px; }
+    .ord-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 20px; }
     .ord-card-head {
         padding: 12px 20px; font-size: 12px; font-weight: 700; text-transform: uppercase;
-        letter-spacing: 0.06em; color: rgba(0,0,0,0.45);
-        border-bottom: 1px solid rgba(0,0,0,0.07); background: #fafbfc;
+        letter-spacing: 0.06em; color: var(--text-muted);
+        border-bottom: 1px solid var(--border); background: var(--surface-muted);
         border-radius: 8px 8px 0 0; display: flex; align-items: center; justify-content: space-between;
     }
     .ord-card-body { padding: 20px; }
 
     /* Patient banner */
+    /* Fond et filet exprimés en teinte transparente de l'accent plutôt qu'en
+       bleu clair opaque : la même règle tient alors sur les deux thèmes, la
+       surface sous-jacente transparaissant au lieu d'être recouverte. */
     .patient-banner {
         display: flex; align-items: center; gap: 14px;
-        padding: 10px; background: #f0f5fa; border-radius: 6px;
-        border: 1px solid #a8c8d8;
+        padding: 10px; background: rgba(var(--teal-500-rgb), .08); border-radius: 6px;
+        border: 1px solid rgba(var(--teal-500-rgb), .28);
     }
     .patient-banner-av {
         width: 40px; height: 40px; border-radius: 50%;
@@ -61,12 +64,12 @@
         font-size: 15px; font-weight: 700; flex-shrink: 0;
     }
     .patient-banner-name { font-size: 13px; font-weight: 700; color: var(--teal-900); }
-    .patient-banner-meta { font-size: 11.5px; color: rgba(0,0,0,0.45); margin-top: 2px; }
+    .patient-banner-meta { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
 
     /* Info grid */
     .info-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px 32px; }
     .info-item { display: flex; flex-direction: column; gap: 3px; }
-    .info-label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(0,0,0,0.38); }
+    .info-label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
     .info-value { font-size: 13px; font-weight: 500; color: var(--teal-900); }
 
     /* Badges */
@@ -79,28 +82,32 @@
     html[data-theme="dark"] .badge-ord-delivree  { background: rgba(var(--teal-600-rgb),.22); color: var(--teal-300); }
     html[data-theme="dark"] .badge-ord-partielle { background: rgba(var(--amber-rgb),.18); color: #f0c060; }
     html[data-theme="dark"] .badge-ord-expiree   { background: rgba(var(--rose-rgb),.18); color: #f09090; }
-    .badge-interne   { background: #e2eef5; color: var(--teal-700,var(--accent-text-soft)); }
-    .badge-externe   { background: #f3e5f5; color: #7b1fa2; }
+    .badge-interne   { background: rgba(var(--teal-500-rgb),.14); color: var(--accent-text); }
+    .badge-externe   { background: rgba(var(--violet-rgb),.14); color: var(--violet); }
+    html[data-theme="dark"] .badge-externe { background: rgba(var(--violet-rgb),.22); color: #c4a9f0; }
 
     /* Médicaments table */
     .lines-table { width: 100%; border-collapse: collapse; font-size: 13px; }
     .lines-table thead th {
         font-size: 10.5px; font-weight: 700; text-transform: uppercase;
-        letter-spacing: 0.05em; color: rgba(0,0,0,0.38);
-        padding: 8px 12px; border-bottom: 2px solid rgba(0,0,0,0.07); text-align: left;
-        background: #fafbfc;
+        letter-spacing: 0.05em; color: var(--text-muted);
+        padding: 8px 12px; border-bottom: 2px solid var(--border); text-align: left;
+        background: var(--surface-muted);
     }
-    .lines-table tbody td { padding: 9px 12px; border-bottom: 1px solid #f3f3f3; vertical-align: middle; }
+    .lines-table tbody td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
     .lines-table tbody tr:last-child td { border-bottom: none; }
-    .lines-table tbody tr:hover td { background: var(--teal-50); }
+    /* --teal-50 reste une teinte très claire en thème sombre (seuls les paliers
+       800/900/950 sont inversés) : le survol virait au blanc. Une teinte
+       transparente de l'accent se pose correctement sur les deux fonds. */
+    .lines-table tbody tr:hover td { background: rgba(var(--teal-500-rgb),.10); }
     .med-name { font-weight: 600; color: var(--teal-900); }
-    .med-posologie { font-size: 12.5px; color: rgba(0,0,0,0.65); }
+    .med-posologie { font-size: 12.5px; color: var(--text); }
     .col-qty { text-align: center; font-weight: 700; color: var(--accent-text-soft); }
     .col-stock { text-align: center; }
 
     .notes-box {
-        background: #fafbfc; border: 1px solid rgba(0,0,0,0.07); border-radius: 6px;
-        padding: 12px 16px; font-size: 13px; color: rgba(0,0,0,0.65); line-height: 1.6;
+        background: var(--surface-muted); border: 1px solid var(--border); border-radius: 6px;
+        padding: 12px 16px; font-size: 13px; color: var(--text); line-height: 1.6;
     }
 
     /* Stock badge */
@@ -108,10 +115,25 @@
         display: inline-block; border-radius: 4px; padding: 2px 8px;
         font-size: 11.5px; font-weight: 700; min-width: 28px; text-align: center;
     }
-    .stock-ok      { background: #e8f2f7; color: var(--accent-text-soft); }
-    .stock-low     { background: #fffbeb; color: #b45309; }
-    .stock-empty   { background: #fff0f0; color: #b91c1c; }
-    .stock-unknown { color: rgba(0,0,0,0.25); font-size: 12px; }
+    .stock-ok      { background: rgba(var(--teal-500-rgb),.12); color: var(--accent-text); }
+    .stock-low     { background: rgba(var(--amber-rgb),.12);    color: var(--amber-text); }
+    .stock-empty   { background: rgba(var(--rose-rgb),.12);     color: var(--rose-text); }
+    .stock-unknown { color: var(--text-faint); font-size: 12px; }
+    /* --amber-text et --rose-text sont calculés pour un fond clair et ne sont
+       pas réajustés en thème sombre (voir base.html) : sans ces deux règles,
+       le chiffre du stock devenait illisible sur la pastille teintée. */
+    html[data-theme="dark"] .stock-low   { background: rgba(var(--amber-rgb),.18); color: #f0c060; }
+    html[data-theme="dark"] .stock-empty { background: rgba(var(--rose-rgb),.18);  color: #f09090; }
+
+    /* Bandeaux de message — sortis des styles en ligne du corps du gabarit :
+       une couleur écrite dans un attribut style ne peut pas être reprise par
+       une règle de thème sombre. */
+    .ord-msg {
+        margin: 0 0 12px; padding: 10px 16px; border-radius: 6px; font-size: 13px;
+    }
+    .ord-msg-error { background: rgba(var(--rose-rgb),.10);  border: 1px solid rgba(var(--rose-rgb),.35);  color: var(--rose-text); }
+    .ord-msg-info  { background: rgba(var(--teal-500-rgb),.10); border: 1px solid rgba(var(--teal-500-rgb),.35); color: var(--accent-text); }
+    html[data-theme="dark"] .ord-msg-error { background: rgba(var(--rose-rgb),.16); color: #f09090; }
 
     @media (max-width: 700px) { .info-grid { grid-template-columns: 1fr 1fr; } }
 </style>
@@ -156,7 +178,7 @@
 
 {% if messages %}
 {% for msg in messages %}
-<div style="margin:0 0 12px;padding:10px 16px;border-radius:6px;font-size:13px;{% if msg.tags == 'error' %}background:#fff0f0;border:1px solid #fca5a5;color:#b91c1c{% else %}background:#e8f2f7;border:1px solid #86d0ef;color:var(--accent-text-soft){% endif %}">{{ msg }}</div>
+<div class="ord-msg {% if msg.tags == 'error' %}ord-msg-error{% else %}ord-msg-info{% endif %}">{{ msg }}</div>
 {% endfor %}
 {% endif %}
 
@@ -179,7 +201,7 @@
                 </div>
             </div>
             {% else %}
-            <span style="color:rgba(0,0,0,0.3);font-size:13px;">Patient introuvable</span>
+            <span style="color:var(--text-faint);font-size:13px;">Patient introuvable</span>
             {% endif %}
         </div>
     </div>
@@ -235,7 +257,7 @@
 
     <!-- Médicaments -->
     <div class="ord-card">
-        <div class="ord-card-head">Médicaments prescrits <span style="font-weight:400;font-size:11px;color:rgba(0,0,0,0.3);margin-left:6px;">({{ ordonnance.lignes.count }})</span></div>
+        <div class="ord-card-head">Médicaments prescrits <span style="font-weight:400;font-size:11px;color:var(--text-faint);margin-left:6px;">({{ ordonnance.lignes.count }})</span></div>
         <div class="ord-card-body" style="padding:0;">
             {% with lignes=ordonnance.lignes.all %}
             {% if lignes %}
@@ -255,23 +277,23 @@
                         <td>
                             {% if ligne.produit %}
                             <div class="med-name">{{ ligne.produit.nom }}</div>
-                            <div style="font-size:11px;color:rgba(0,0,0,0.4);margin-top:2px;">
+                            <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">
                                 {{ ligne.produit.dosage|default:"" }} {{ ligne.produit.get_forme_display|default:"" }}
                             </div>
                             {% elif ligne.medicament %}
                             <div class="med-name">{{ ligne.medicament.designation }}</div>
-                            <div style="font-size:11px;color:rgba(0,0,0,0.4);margin-top:2px;">
+                            <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">
                                 {{ ligne.medicament.dosage|default:"" }} {{ ligne.medicament.forme|default:"" }}
                             </div>
                             {% elif ligne.medicament_libre %}
                             <div class="med-name">{{ ligne.medicament_libre }}</div>
-                            <div style="font-size:11px;color:rgba(0,0,0,0.35);font-style:italic;margin-top:2px;">Saisie libre</div>
+                            <div style="font-size:11px;color:var(--text-faint);font-style:italic;margin-top:2px;">Saisie libre</div>
                             {% else %}
-                            <span style="color:rgba(0,0,0,0.3);">—</span>
+                            <span style="color:var(--text-faint);">—</span>
                             {% endif %}
                         </td>
                         <td class="med-posologie">{{ ligne.posologie|default:"—" }}</td>
-                        <td style="font-size:12.5px;color:rgba(0,0,0,0.55);">{{ ligne.duree|default:"—" }}</td>
+                        <td style="font-size:12.5px;color:var(--text);">{{ ligne.duree|default:"—" }}</td>
                         <td class="col-qty">{{ ligne.quantite }}</td>
                         <td class="col-stock">
                             {% if ligne.produit %}
@@ -303,7 +325,7 @@
                 </tbody>
             </table>
             {% else %}
-            <div style="padding:40px;text-align:center;color:rgba(0,0,0,0.35);font-size:13px;">
+            <div style="padding:40px;text-align:center;color:var(--text-faint);font-size:13px;">
                 Aucun médicament enregistré sur cette ordonnance.
             </div>
             {% endif %}

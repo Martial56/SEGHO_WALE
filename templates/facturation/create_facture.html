@@ -35,7 +35,8 @@
 .svc-opt { padding: 7px 12px; cursor: pointer; color: var(--teal-900, #1a3a4a); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .svc-opt:hover, .svc-opt.focused { background: #daeaf5; color: var(--teal-700, var(--accent-text)); }
 .svc-opt.is-selected { background: #f0f5fa; font-weight: 600; }
-.svc-empty { padding: 10px 12px; color: rgba(0,0,0,0.35); font-style: italic; }
+{# Jeton et non noir transparent : le « aucun résultat » disparaissait sur fond sombre. #}
+.svc-empty { padding: 10px 12px; color: var(--text-faint); font-style: italic; }
 
 /* ── Control panel ── */
 .control-panel {
@@ -394,7 +395,7 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
       </div>
 
       <div style="position:relative;">
-        <div class="pat-search-wrap" style="display:flex;align-items:center;border:1.5px solid #d1dde3;border-radius:10px;padding:10px 14px;gap:10px;transition:border-color .2s;" id="pat-search-wrap">
+        <div class="pat-search-wrap" style="display:flex;align-items:center;border:1.5px solid var(--border-strong);border-radius:10px;padding:10px 14px;gap:10px;transition:border-color .2s;" id="pat-search-wrap">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:.4;">
             <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
           </svg>
@@ -603,7 +604,13 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
                                 <div class="svc-dropdown"></div>
                             </div>
                         </td>
-                        <td class="col-qte"><input type="number" name="ligne_qte_{{ forloop.counter0 }}" value="{{ ligne.qte|default:1|unlocalize }}" min="0.01" step="0.01" oninput="recalcRow({{ forloop.counter0 }})"></td>
+                        {% comment %}
+                        Pas de 1, comme les cinq autres champs quantité du module : les
+                        flèches avançaient ici de 0,01 en 0,01. Seule cette ligne, qui rend
+                        les lignes pré-remplies (facture issue d'une ordonnance), avait
+                        gardé l'ancien pas.
+                        {% endcomment %}
+                        <td class="col-qte"><input type="number" name="ligne_qte_{{ forloop.counter0 }}" value="{{ ligne.qte|default:1|unlocalize }}" min="1" step="1" oninput="recalcRow({{ forloop.counter0 }})"></td>
                         <td class="col-prix"><input type="number" name="ligne_prix_{{ forloop.counter0 }}" value="{{ ligne.prix|unlocalize }}" min="0" step="1" readonly tabindex="-1" style="pointer-events:none;cursor:default;" oninput="recalcRow({{ forloop.counter0 }})"></td>
                         <td class="col-remise"><input type="number" name="ligne_remise_{{ forloop.counter0 }}" value="{{ ligne.remise|default:0|unlocalize }}" min="0" max="100" step="0.01" oninput="recalcRow({{ forloop.counter0 }})"></td>
                         <td class="col-total" id="total-{{ forloop.counter0 }}">0</td>
@@ -675,16 +682,16 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
 <div id="payment-modal-overlay"
      style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45);
             z-index:9999; align-items:center; justify-content:center;">
-    <div style="background:#fff; border-radius:12px; padding:28px 32px;
+    <div style="background:var(--surface); border-radius:12px; padding:28px 32px;
                 width:600px; max-width:95vw; box-shadow:0 24px 64px rgba(0,0,0,0.22);">
 
         <!-- En-tête -->
         <div style="display:flex; justify-content:space-between; align-items:center;
-                    padding-bottom:16px; border-bottom:1px solid rgba(0,0,0,0.08); margin-bottom:22px;">
-            <span style="font-size:15px; font-weight:700; color:#1a1a1a;">Enregistrer un paiement</span>
+                    padding-bottom:16px; border-bottom:1px solid var(--border); margin-bottom:22px;">
+            <span style="font-size:15px; font-weight:700; color:var(--text);">Enregistrer un paiement</span>
             <button type="button" onclick="closePaymentModal()"
                     style="background:none; border:none; font-size:22px; line-height:1;
-                           color:#999; cursor:pointer; padding:0 4px;">&times;</button>
+                           color:var(--text-muted); cursor:pointer; padding:0 4px;">&times;</button>
         </div>
 
         <!-- Grille champs -->
@@ -692,11 +699,11 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
 
             <div>
                 <label style="font-size:11px; font-weight:700; text-transform:uppercase;
-                               letter-spacing:.06em; color:rgba(0,0,0,0.4); display:block; margin-bottom:6px;">Journal</label>
+                               letter-spacing:.06em; color:var(--text-muted); display:block; margin-bottom:6px;">Journal</label>
                 <select id="pay-journal"
                         style="width:100%; background:transparent; border:none;
-                               border-bottom:1.5px solid #d1dde3; padding:5px 2px;
-                               font-size:13px; font-family:inherit; outline:none; color:#1a3a4a;">
+                               border-bottom:1.5px solid var(--border-strong); padding:5px 2px;
+                               font-size:13px; font-family:inherit; outline:none; color:var(--text);">
                     {% for caisse in caisses %}
                     <option value="{{ caisse.pk }}">{{ caisse.nom|upper }}</option>
                     {% empty %}
@@ -707,43 +714,43 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
 
             <div>
                 <label style="font-size:11px; font-weight:700; text-transform:uppercase;
-                               letter-spacing:.06em; color:rgba(0,0,0,0.4); display:block; margin-bottom:6px;">Montant</label>
+                               letter-spacing:.06em; color:var(--text-muted); display:block; margin-bottom:6px;">Montant</label>
                 <div style="display:flex; align-items:center; gap:8px;">
                     <input type="number" id="pay-montant" min="0" step="1"
                            style="flex:1; background:transparent; border:none;
-                                  border-bottom:1.5px solid #d1dde3; padding:5px 2px;
-                                  font-size:13px; font-family:inherit; outline:none; color:#1a3a4a;">
-                    <span style="font-size:12px; color:#999; flex-shrink:0;">CFA</span>
+                                  border-bottom:1.5px solid var(--border-strong); padding:5px 2px;
+                                  font-size:13px; font-family:inherit; outline:none; color:var(--text);">
+                    <span style="font-size:12px; color:var(--text-muted); flex-shrink:0;">CFA</span>
                 </div>
             </div>
 
             <div>
                 <label style="font-size:11px; font-weight:700; text-transform:uppercase;
-                               letter-spacing:.06em; color:rgba(0,0,0,0.4); display:block; margin-bottom:6px;">Compte bancaire du bénéficiaire</label>
+                               letter-spacing:.06em; color:var(--text-muted); display:block; margin-bottom:6px;">Compte bancaire du bénéficiaire</label>
                 <select id="pay-compte"
                         style="width:100%; background:transparent; border:none;
-                               border-bottom:1.5px solid #d1dde3; padding:5px 2px;
-                               font-size:13px; font-family:inherit; outline:none; color:#1a3a4a;">
+                               border-bottom:1.5px solid var(--border-strong); padding:5px 2px;
+                               font-size:13px; font-family:inherit; outline:none; color:var(--text);">
                     <option value=""></option>
                 </select>
             </div>
 
             <div>
                 <label style="font-size:11px; font-weight:700; text-transform:uppercase;
-                               letter-spacing:.06em; color:rgba(0,0,0,0.4); display:block; margin-bottom:6px;">Date de règlement</label>
+                               letter-spacing:.06em; color:var(--text-muted); display:block; margin-bottom:6px;">Date de règlement</label>
                 <input type="date" id="pay-date"
                        style="width:100%; background:transparent; border:none;
-                              border-bottom:1.5px solid #d1dde3; padding:5px 2px;
-                              font-size:13px; font-family:inherit; outline:none; color:#1a3a4a;">
+                              border-bottom:1.5px solid var(--border-strong); padding:5px 2px;
+                              font-size:13px; font-family:inherit; outline:none; color:var(--text);">
             </div>
 
             <div>
                 <label style="font-size:11px; font-weight:700; text-transform:uppercase;
-                               letter-spacing:.06em; color:rgba(0,0,0,0.4); display:block; margin-bottom:6px;">Mode de paiement</label>
+                               letter-spacing:.06em; color:var(--text-muted); display:block; margin-bottom:6px;">Mode de paiement</label>
                 <select id="pay-mode"
                         style="width:100%; background:transparent; border:none;
-                               border-bottom:1.5px solid #d1dde3; padding:5px 2px;
-                               font-size:13px; font-family:inherit; outline:none; color:#1a3a4a;">
+                               border-bottom:1.5px solid var(--border-strong); padding:5px 2px;
+                               font-size:13px; font-family:inherit; outline:none; color:var(--text);">
                     <option value="especes">Espèces</option>
                     <option value="mobile_money">Mobile Money</option>
                     <option value="cheque">Chèque</option>
@@ -754,11 +761,11 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
 
             <div>
                 <label style="font-size:11px; font-weight:700; text-transform:uppercase;
-                               letter-spacing:.06em; color:rgba(0,0,0,0.4); display:block; margin-bottom:6px;">Mémo</label>
+                               letter-spacing:.06em; color:var(--text-muted); display:block; margin-bottom:6px;">Mémo</label>
                 <input type="text" id="pay-memo"
                        style="width:100%; background:transparent; border:none;
-                              border-bottom:1.5px solid #d1dde3; padding:5px 2px;
-                              font-size:13px; font-family:inherit; outline:none; color:#1a3a4a;">
+                              border-bottom:1.5px solid var(--border-strong); padding:5px 2px;
+                              font-size:13px; font-family:inherit; outline:none; color:var(--text);">
             </div>
 
         </div>
@@ -772,8 +779,8 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
                 CRÉER UN PAIEMENT
             </button>
             <button type="button" onclick="closePaymentModal()"
-                    style="background:transparent; color:rgba(0,0,0,0.55);
-                           border:1px solid rgba(0,0,0,0.15); border-radius:6px;
+                    style="background:transparent; color:var(--text);
+                           border:1px solid var(--border-strong); border-radius:6px;
                            padding:10px 20px; font-size:13px; font-weight:600;
                            cursor:pointer; font-family:inherit;">
                 ANNULER
