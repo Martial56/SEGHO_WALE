@@ -22,12 +22,34 @@ def _is_ajax(request):
 @login_required(login_url='login')
 def hospitalisation_list(request):
     from django.utils import timezone as tz
-    q = request.GET.get('q', '').strip()
-    statut = request.GET.get('statut', '').strip()
+    aujourd_hui = tz.now()
+    today = aujourd_hui.date()
+
+    q          = request.GET.get('q', '').strip()
+    statut     = request.GET.get('statut', '').strip()
+    date_debut = request.GET.get('date_debut', '').strip()
+    date_fin   = request.GET.get('date_fin', '').strip()
 
     qs = Hospitalisation.objects.select_related(
         'patient', 'medecin_traitant', 'chambre'
     ).order_by('-date_admission')
+
+    # Cloisonnement par centre : un dossier d'hospitalisation n'a pas de
+    # centre propre, mais son patient en a un (patients.Patient est un
+    # ModeleCentre) — on filtre donc sur le centre actif de l'utilisateur,
+    # avec la même convention que centres.models.CentreManager : un
+    # superuser sans centre actif voit tout, un utilisateur normal sans
+    # centre actif ne voit rien.
+    centre = getattr(request, 'centre', None)
+    if centre is not None:
+        qs = qs.filter(patient__centre=centre)
+    elif not request.user.is_superuser:
+        qs = qs.none()
+
+    # Base du centre actif, avant les filtres de recherche/statut de la
+    # liste : sert aux statistiques, qui ne doivent pas varier avec la
+    # recherche en cours.
+    qs_centre = qs
 
     if q:
         qs = qs.filter(
@@ -38,16 +60,26 @@ def hospitalisation_list(request):
     if statut:
         qs = qs.filter(statut=statut)
 
-    aujourd_hui = tz.now()
+    # Période (par date de la demande d'hospitalisation) : par défaut, la
+    # liste ne montre que les hospitalisations du jour — comme pour les
+    # ordonnances (voir ordonnance.views.ordonnance_list) — sauf si une
+    # période explicite a été choisie via le filtre.
+    if date_debut or date_fin:
+        if date_debut:
+            qs = qs.filter(date_admission__date__gte=date_debut)
+        if date_fin:
+            qs = qs.filter(date_admission__date__lte=date_fin)
+    else:
+        qs = qs.filter(date_admission__date=today)
 
     total_chambres    = Chambre.objects.count()
     chambres_occupees = Chambre.objects.filter(statut=False).count()
     chambres_dispos   = Chambre.objects.filter(statut=True).count()
     taux_occupation   = round(chambres_occupees * 100 / total_chambres) if total_chambres else 0
 
-    # Durée moyenne en jours des hospitalisations en cours
+    # Durée moyenne en jours des hospitalisations en cours (du centre actif)
     from django.db.models import Avg, ExpressionWrapper, DurationField, F
-    duree_moy_result = Hospitalisation.objects.filter(
+    duree_moy_result = qs_centre.filter(
         statut='hospitalise', heure_entree__isnull=False
     ).annotate(
         duree=ExpressionWrapper(aujourd_hui - F('heure_entree'), output_field=DurationField())
@@ -56,7 +88,7 @@ def hospitalisation_list(request):
     duree_moyenne = round(duree_moy.total_seconds() / 86400, 1) if duree_moy else 0
 
     stats = {
-        'patients_hospitalises': Hospitalisation.objects.filter(statut='hospitalise').count(),
+        'patients_hospitalises': qs_centre.filter(statut='hospitalise').count(),
         'chambres_disponibles':  chambres_dispos,
         'taux_occupation':       taux_occupation,
         'duree_moyenne':         duree_moyenne,
@@ -77,6 +109,9 @@ def hospitalisation_list(request):
         'statut':        statut,
         'statut_choices': Hospitalisation.STATUT,
         'vue':           vue,
+        'date_debut':    date_debut,
+        'date_fin':      date_fin,
+        'today':         today,
     }
 
     if _is_ajax(request):

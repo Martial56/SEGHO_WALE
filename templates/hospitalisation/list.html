@@ -152,6 +152,28 @@ html[data-theme="dark"] .o-dd-item.active { background: rgba(var(--teal-500-rgb)
 /* ── Pagination label ── */
 .o-pag-label { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
 
+/* ── Filtre période ── */
+.h-period-label { font-size: 12px; color: var(--text-muted); white-space: nowrap; margin-right: 4px; }
+.o-dd-period { padding: 4px 14px 8px; }
+.o-dd-period-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.o-dd-period-row label { font-size: 11px; color: var(--text-muted); width: 26px; flex-shrink: 0; }
+.o-dd-period-row input[type="date"] {
+  flex: 1; font-size: 12px; padding: 3px 6px; border: 1px solid var(--border);
+  border-radius: 4px; background: var(--surface); color: var(--text);
+}
+.o-dd-period-actions { display: flex; gap: 6px; margin-top: 4px; }
+.o-dd-period-apply {
+  flex: 1; background: var(--teal-500); color: #fff; border: none; border-radius: 4px;
+  font-size: 12px; padding: 5px 0; cursor: pointer; font-weight: 500;
+}
+.o-dd-period-apply:hover { background: var(--teal-600); }
+.o-dd-period-reset {
+  background: none; border: 1px solid var(--border); color: var(--text-muted);
+  border-radius: 4px; font-size: 12px; padding: 5px 10px; cursor: pointer;
+  white-space: nowrap;
+}
+.o-dd-period-reset:hover { border-color: var(--teal-400); color: var(--accent-text-soft); }
+
 @media (max-width: 800px) {
   .h-stats { grid-template-columns: repeat(2,1fr); }
   .h-stat:nth-child(2) { border-right: none; }
@@ -173,6 +195,8 @@ html[data-theme="dark"] .o-dd-item.active { background: rgba(var(--teal-500-rgb)
       <form method="get" id="filter-form" style="display:flex;align-items:center;">
         <input type="hidden" name="statut" id="fi-statut" value="{{ statut }}">
         <input type="hidden" name="vue"    id="vue-input" value="{{ vue }}">
+        <input type="hidden" name="date_debut" id="fi-date-debut" value="{{ date_debut }}">
+        <input type="hidden" name="date_fin"   id="fi-date-fin"   value="{{ date_fin }}">
         <div class="o-search-bar">
           <input class="o-search-input" id="search-input" type="text" name="q" value="{{ q }}"
                  placeholder="Rechercher patient, numéro…">
@@ -245,9 +269,11 @@ function refreshList(params) {
 
 function currentParams(overrides) {
   var params = {
-    q:      document.getElementById('search-input').value,
-    statut: document.getElementById('fi-statut').value,
-    vue:    document.getElementById('vue-input').value,
+    q:          document.getElementById('search-input').value,
+    statut:     document.getElementById('fi-statut').value,
+    vue:        document.getElementById('vue-input').value,
+    date_debut: document.getElementById('fi-date-debut').value,
+    date_fin:   document.getElementById('fi-date-fin').value,
   };
   Object.assign(params, overrides || {});
   Object.keys(params).forEach(function (k) { if (!params[k]) delete params[k]; });
@@ -262,6 +288,14 @@ function setFiltre(val) {
   document.getElementById('fi-statut').value = val;
   refreshList(currentParams({ statut: val }));
 }
+function setPeriode(debut, fin) {
+  document.getElementById('fi-date-debut').value = debut || '';
+  document.getElementById('fi-date-fin').value   = fin || '';
+  refreshList(currentParams({ date_debut: debut || '', date_fin: fin || '' }));
+}
+function clearPeriode() {
+  setPeriode('', '');
+}
 function clearQ() {
   document.getElementById('search-input').value = '';
   refreshList(currentParams({ q: '' }));
@@ -269,7 +303,9 @@ function clearQ() {
 function clearAll() {
   document.getElementById('search-input').value = '';
   document.getElementById('fi-statut').value = '';
-  refreshList(currentParams({ q: '', statut: '' }));
+  document.getElementById('fi-date-debut').value = '';
+  document.getElementById('fi-date-fin').value = '';
+  refreshList(currentParams({ q: '', statut: '', date_debut: '', date_fin: '' }));
 }
 
 document.getElementById('filter-form').addEventListener('submit', function (e) {
@@ -300,6 +336,8 @@ window.addEventListener('popstate', function () {
       document.getElementById('search-input').value = params.q || '';
       document.getElementById('fi-statut').value = params.statut || '';
       document.getElementById('vue-input').value = params.vue || 'liste';
+      document.getElementById('fi-date-debut').value = params.date_debut || '';
+      document.getElementById('fi-date-fin').value = params.date_fin || '';
     });
 });
 </script>

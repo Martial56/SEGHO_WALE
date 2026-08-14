@@ -1,15 +1,21 @@
 {# Contrôles dynamiques du sous-en-tête — réutilisé au rendu initial et en AJAX. #}
 
+<!-- Période active -->
+<span class="h-period-label">
+  {% if date_debut or date_fin %}Période : {{ date_debut|default:"…" }} → {{ date_fin|default:"…" }}
+  {% else %}Aujourd'hui ({{ today|date:"d/m/Y" }}){% endif %}
+</span>
+
 <!-- Tags filtres actifs -->
 {% if q %}<span class="o-filter-tag">{{ q }} <a onclick="clearQ()" style="cursor:pointer;" title="Supprimer">×</a></span>{% endif %}
 {% if statut %}<span class="o-filter-tag">{{ statut }} <a onclick="setFiltre('')" style="cursor:pointer;" title="Supprimer">×</a></span>{% endif %}
 
 <!-- Filtres dropdown -->
 <div class="o-dd-wrap">
-  <button class="o-ctrl-btn {% if statut %}active{% endif %}"
+  <button class="o-ctrl-btn {% if statut or date_debut or date_fin %}active{% endif %}"
           id="btn-filtres" onclick="toggleDd('dd-filtres', this)">
-    <i class="bi bi-funnel{% if statut %}-fill{% endif %}"></i>
-    Filtres{% if statut %}&nbsp;<span style="background:var(--accent);color:#fff;border-radius:10px;font-size:10px;padding:0 5px;vertical-align:middle;">1</span>{% endif %}
+    <i class="bi bi-funnel{% if statut or date_debut or date_fin %}-fill{% endif %}"></i>
+    Filtres{% if statut or date_debut or date_fin %}&nbsp;<span style="background:var(--accent);color:#fff;border-radius:10px;font-size:10px;padding:0 5px;vertical-align:middle;">•</span>{% endif %}
   </button>
   <div class="o-dd-panel" id="dd-filtres">
     <div class="o-dd-section">Filtrer par statut</div>
@@ -23,6 +29,27 @@
       <i class="bi bi-x-circle" style="font-size:11px;margin-right:6px;"></i> Effacer
     </a>
     {% endif %}
+    <hr class="o-dd-sep">
+    <div class="o-dd-section">Période</div>
+    <div class="o-dd-period">
+      <div class="o-dd-period-row">
+        <label for="dd-date-debut">Du</label>
+        <input type="date" id="dd-date-debut" value="{{ date_debut }}">
+      </div>
+      <div class="o-dd-period-row">
+        <label for="dd-date-fin">Au</label>
+        <input type="date" id="dd-date-fin" value="{{ date_fin }}">
+      </div>
+      <div class="o-dd-period-actions">
+        <button type="button" class="o-dd-period-apply"
+                onclick="setPeriode(document.getElementById('dd-date-debut').value, document.getElementById('dd-date-fin').value)">
+          Appliquer
+        </button>
+        {% if date_debut or date_fin %}
+        <button type="button" class="o-dd-period-reset" onclick="clearPeriode()">Aujourd'hui</button>
+        {% endif %}
+      </div>
+    </div>
   </div>
 </div>
 
@@ -33,12 +60,12 @@
   <span>{% if page_obj.paginator.count > 0 %}{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}{% else %}0{% endif %}</span>
   <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
      data-page="{% if page_obj.has_previous %}{{ page_obj.previous_page_number }}{% endif %}"
-     href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}&q={{ q }}&statut={{ statut }}&vue={{ vue }}{% else %}#{% endif %}">
+     href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}&q={{ q }}&statut={{ statut }}&vue={{ vue }}&date_debut={{ date_debut }}&date_fin={{ date_fin }}{% else %}#{% endif %}">
     <i class="bi bi-chevron-left"></i>
   </a>
   <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
      data-page="{% if page_obj.has_next %}{{ page_obj.next_page_number }}{% endif %}"
-     href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}&q={{ q }}&statut={{ statut }}&vue={{ vue }}{% else %}#{% endif %}">
+     href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}&q={{ q }}&statut={{ statut }}&vue={{ vue }}&date_debut={{ date_debut }}&date_fin={{ date_fin }}{% else %}#{% endif %}">
     <i class="bi bi-chevron-right"></i>
   </a>
 </div>

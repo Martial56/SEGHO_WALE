@@ -1,5 +1,6 @@
 from django.contrib import admin
 from .models import Batiment, Chambre, Hospitalisation, FicheVisite
+from centres.admin import ModeleCentreAdmin
 
 
 @admin.register(Batiment)
@@ -9,9 +10,9 @@ class BatimentAdmin(admin.ModelAdmin):
 
 
 @admin.register(Chambre)
-class ChambreAdmin(admin.ModelAdmin):
-    list_display  = ['nom', 'salle_no', 'type_chambre', 'nombre_lits', 'statut']
-    list_filter   = ['type_chambre', 'statut', 'prive', 'genre']
+class ChambreAdmin(ModeleCentreAdmin):
+    list_display  = ['nom', 'salle_no', 'centre', 'type_chambre', 'nombre_lits', 'statut']
+    list_filter   = ['centre', 'type_chambre', 'statut', 'prive', 'genre']
     search_fields = ['nom', 'salle_no']
     readonly_fields = ['salle_no']
 

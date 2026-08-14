@@ -12,7 +12,7 @@ from django.core.paginator import Paginator
 import json
 
 from consultations.models import Ordonnance, LigneOrdonnance, Consultation
-from pharmacie.models import Medicament
+from pharmacie.models import Medicament, PHARMACIE_CENTRE_CODE
 from stock.models import Produit
 from patients.models import Patient
 from medecins.models import Medecin
@@ -159,6 +159,33 @@ def medicament_search(request):
     return JsonResponse({'results': data})
 
 
+def _pharmacie_du_medecin(medecin):
+    """Pharmacie (code `PHARMACIES_WALE`) dont dépend ce médecin prescripteur,
+    déterminée par le(s) centre(s) rattachés à son compte utilisateur — ou
+    None si indéterminable (médecin sans compte, ou affecté aux deux centres
+    sans centre actif choisi). Dans ce cas les appelants retombent sur le
+    stock cumulé des deux pharmacies plutôt que d'en exclure une."""
+    if medecin is None or medecin.user_id is None:
+        return None
+    try:
+        profile = medecin.user.profile
+    except AttributeError:
+        return None
+
+    centre = profile.centre_actif
+    if centre is None:
+        centres = list(profile.centres.all()[:2])
+        if len(centres) == 1:
+            centre = centres[0]
+    if centre is None:
+        return None
+
+    for pharmacie, centre_code in PHARMACIE_CENTRE_CODE.items():
+        if centre_code == centre.code:
+            return pharmacie
+    return None
+
+
 @login_required(login_url='login')
 def ordonnance_create(request, consultation_pk):
     consultation = get_object_or_404(
@@ -228,31 +255,35 @@ def ordonnance_create(request, consultation_pk):
         messages.success(request, f'Ordonnance {ordonnance.numero} créée avec succès.')
         return redirect('ordonnance_detail', pk=ordonnance.pk)
 
+    medecin_preselect = consultation.medecin
     return render(request, 'pharmacie/ordonnance/ordonnance_create.html', {
         'consultation':      consultation,
         'patient':           consultation.patient,
-        'medecin_preselect': consultation.medecin,
+        'medecin_preselect': medecin_preselect,
         'medecins':          medecins,
         'types':             types,
-        'medicaments_dispo': _medicaments_dispo_json(),
+        'medicaments_dispo': _medicaments_dispo_json(_pharmacie_du_medecin(medecin_preselect)),
     })
 
 
-def _medicaments_dispo_json():
-    """Retourne le stock disponible = somme des StockPharmacie (= ce qu'affiche la page pharmacie)."""
+def _medicaments_dispo_data(pharmacie=None):
+    """Stock disponible pour la pharmacie donnée (code `PHARMACIES_WALE`) —
+    ou, si `pharmacie` est None (centre du prescripteur indéterminable), la
+    somme des StockPharmacie des deux pharmacies."""
+    stock_filter = Q(stocks_pharmacie__pharmacie=pharmacie) if pharmacie else Q()
     produits = (
         Produit.objects
         .filter(type='medicament', actif=True)
         .annotate(
             stock_pharma=Coalesce(
-                Sum('stocks_pharmacie__quantite'),
+                Sum('stocks_pharmacie__quantite', filter=stock_filter),
                 Decimal('0'),
                 output_field=DecimalField(max_digits=12, decimal_places=2),
             )
         )
         .order_by('nom')
     )
-    return json.dumps([
+    return [
         {
             'pk': p.pk,
             'designation': p.nom,
@@ -264,7 +295,28 @@ def _medicaments_dispo_json():
             'stock_minimum': float(p.stock_minimum),
         }
         for p in produits
-    ])
+    ]
+
+
+def _medicaments_dispo_json(pharmacie=None):
+    return json.dumps(_medicaments_dispo_data(pharmacie))
+
+
+@login_required(login_url='login')
+def medicaments_dispo_par_medecin(request):
+    """Endpoint AJAX : liste des médicaments dispo (avec stock) pour la
+    pharmacie du médecin passé en paramètre — appelé quand l'utilisateur
+    change le médecin prescripteur sur le formulaire d'ordonnance, pour que
+    la liste et le stock affichés restent ceux de la bonne pharmacie."""
+    medecin_id = request.GET.get('medecin_id', '').strip()
+    medecin = None
+    if medecin_id:
+        try:
+            medecin = Medecin.objects.select_related('user__profile').get(pk=int(medecin_id))
+        except (Medecin.DoesNotExist, ValueError):
+            pass
+    pharmacie = _pharmacie_du_medecin(medecin)
+    return JsonResponse({'medicaments': _medicaments_dispo_data(pharmacie), 'pharmacie': pharmacie})
 
 
 @login_required(login_url='login')
@@ -328,7 +380,7 @@ def ordonnance_create_libre(request):
             return render(request, 'pharmacie/ordonnance/ordonnance_create.html', {
                 'types': types,
                 'medecins': medecins,
-                'medicaments_dispo': _medicaments_dispo_json(),
+                'medicaments_dispo': _medicaments_dispo_json(_pharmacie_du_medecin(medecin_preselect)),
             })
 
         if not medecin_id_post:
@@ -339,7 +391,7 @@ def ordonnance_create_libre(request):
                 'patient': patient,
                 'consultation': consultation,
                 'medecin_preselect': medecin_preselect,
-                'medicaments_dispo': _medicaments_dispo_json(),
+                'medicaments_dispo': _medicaments_dispo_json(_pharmacie_du_medecin(medecin_preselect)),
             })
 
         medecin = None
@@ -398,7 +450,7 @@ def ordonnance_create_libre(request):
         'medecin_preselect': medecin_preselect,
         'medecins':          medecins,
         'types':             types,
-        'medicaments_dispo': _medicaments_dispo_json(),
+        'medicaments_dispo': _medicaments_dispo_json(_pharmacie_du_medecin(medecin_preselect)),
         'initial_lignes':    initial_lignes,
     })
 

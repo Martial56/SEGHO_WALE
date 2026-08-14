@@ -1,6 +1,8 @@
 from django.db import models, transaction, IntegrityError
 from django.contrib.auth.models import User
 
+from centres.models import ModeleCentre
+
 
 class Batiment(models.Model):
     nom         = models.CharField(max_length=100, verbose_name="Nom")
@@ -13,7 +15,7 @@ class Batiment(models.Model):
         ordering = ['nom']
 
 
-class Chambre(models.Model):
+class Chambre(ModeleCentre):
     TYPE  = [
         ('general',        'Général'),
         ('semi_special',   'Semi-spécial'),
@@ -63,7 +65,11 @@ class Chambre(models.Model):
             for _ in range(3):
                 try:
                     with transaction.atomic():
-                        last = Chambre.objects.select_for_update().filter(
+                        # all_objects : le numéro de salle reste unique tous
+                        # centres confondus (Yamoussoukro et Toumbokro
+                        # partagent la même numérotation), la génération ne
+                        # doit donc jamais être filtrée par centre actif.
+                        last = Chambre.all_objects.select_for_update().filter(
                             salle_no__regex=r'^\d+$'
                         ).order_by('salle_no').last()
                         self.salle_no = f"{int(last.salle_no) + 1:02d}" if last else "00"
@@ -76,7 +82,7 @@ class Chambre(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self): return self.nom or f"Chambre {self.salle_no}"
-    class Meta:
+    class Meta(ModeleCentre.Meta):
         verbose_name = "Chambre"
         ordering = ['salle_no']
 
