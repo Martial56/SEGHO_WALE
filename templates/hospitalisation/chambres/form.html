@@ -1,13 +1,16 @@
 {% extends 'hospitalisation/base.html' %}
-{% load i18n %}
+{% load i18n static %}
 
 {% block extra_css %}
 {{ block.super }}
 <style>
-/* ── Form card ── */
+/* ── Form card ──
+   La carte collait aux deux bords de la fenêtre et à la barre de retour : ses
+   coins arrondis ne se voyaient donc pas et elle se lisait comme une suite de
+   la barre. Une marge sur les côtés et un peu plus d'air en haut la détachent. */
 .form-card {
   background:var(--surface); border:1px solid var(--border);
-  border-radius:8px; margin-top:8px; overflow:hidden;
+  border-radius:8px; margin:16px 20px 20px; overflow:hidden;
 }
 
 /* ── Identity (en-tête) ── */
@@ -103,35 +106,6 @@
 /* ── Notes ── */
 .fc-notes { padding:16px 24px; }
 
-/* ── TomSelect underline ── */
-.ts-wrapper { padding:0 !important; }
-.ts-wrapper .ts-control {
-  background:transparent !important; border:none !important;
-  border-bottom:1.5px solid #d1dde3 !important; border-radius:0 !important;
-  box-shadow:none !important; padding:7px 24px 7px 2px !important;
-  font-size:13px !important; font-family:inherit !important; min-height:unset !important; cursor:pointer;
-}
-.ts-wrapper.focus .ts-control { border-bottom-color:var(--teal-500) !important; box-shadow:none !important; }
-.ts-wrapper .ts-control .item { font-size:13px !important; font-family:inherit !important; color:var(--text) !important; padding:0 !important; margin:0 !important; }
-.ts-wrapper .ts-control input { font-size:13px !important; font-family:inherit !important; color:var(--text) !important; padding:0 !important; margin:0 !important; }
-.ts-wrapper .ts-control input::placeholder { color:#bfcdd4; }
-.ts-wrapper.single .ts-control::after {
-  content:'' !important; width:12px !important; height:8px !important;
-  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23839aaa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat !important;
-  border:none !important; position:absolute !important; right:4px !important;
-  top:50% !important; transform:translateY(-50%) !important; margin:0 !important;
-}
-.ts-wrapper.single.input-active .ts-control::after { transform:translateY(-50%) rotate(180deg) !important; }
-.ts-dropdown {
-  font-size:13px !important; font-family:inherit !important;
-  border:1px solid #dde3ec !important; border-radius:6px !important;
-  box-shadow:0 8px 24px rgba(0,0,0,.14) !important; margin-top:3px !important; background:#fff !important;
-}
-.ts-dropdown .ts-dropdown-content { max-height:200px; }
-.ts-dropdown .option { padding:7px 14px !important; font-size:13px !important; color:var(--text) !important; cursor:pointer; }
-.ts-dropdown .option:hover, .ts-dropdown .option.selected, .ts-dropdown .option.active { background:#e8f4f8 !important; color:var(--accent-text-soft) !important; }
-.ts-dropdown .no-results { padding:8px 14px; color:#999; font-size:12px; }
-
 /* Dark */
 html[data-theme="dark"] .form-card   { background:var(--surface); border-color:var(--border); }
 html[data-theme="dark"] .salle-badge { background:var(--surface); border-color: var(--border); color: var(--text-muted); }
@@ -146,13 +120,6 @@ html[data-theme="dark"] .equip-card.active { background:var(--surface); border-c
 html[data-theme="dark"] .equip-card.active .equip-icon { background:rgba(var(--teal-500-rgb), .2); color:var(--teal-300); }
 html[data-theme="dark"] .equip-card.active .equip-label { color:var(--teal-300); }
 html[data-theme="dark"] .o-ctrl-btn:hover { background:rgba(255,255,255,.05); }
-html[data-theme="dark"] .ts-wrapper .ts-control { border-bottom-color:rgba(255,255,255,.15) !important; }
-html[data-theme="dark"] .ts-wrapper.focus .ts-control { border-bottom-color:var(--teal-400) !important; }
-html[data-theme="dark"] .ts-dropdown { background: var(--surface) !important; border-color: var(--border-strong) !important; }
-html[data-theme="dark"] .ts-dropdown .option { color: var(--text-strong) !important; }
-html[data-theme="dark"] .ts-dropdown .option:hover,
-html[data-theme="dark"] .ts-dropdown .option.active,
-html[data-theme="dark"] .ts-dropdown .option.selected { background:rgba(var(--teal-500-rgb),.2) !important; }
 html[data-theme="dark"] .toggle-row-label { color:var(--text); }
 </style>
 {% endblock %}
@@ -160,17 +127,21 @@ html[data-theme="dark"] .toggle-row-label { color:var(--text); }
 {% block content %}
 <div id="page-wrap">
 
-<div class="action-bar">
-  <div class="action-bar-breadcrumb">
-    <a href="{% url 'hospitalisation:chambres_list' %}"><i class="bi bi-arrow-left"></i> Salles/Chambres</a>
+{% comment %}Même barre que les fiches du module (.det-subhdr), à la place de la carte flottante .action-bar qui était la seule de son espèce ici.{% endcomment %}
+<div class="det-subhdr" data-fixed="1">
+  <a href="{% url 'hospitalisation:chambres_list' %}" class="det-back" title="Retour">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <div class="det-crumb">
+    <a href="{% url 'hospitalisation:chambres_list' %}">Salles/Chambres</a>
     <span class="sep">/</span>
     <span class="current">{% if edit %}{{ chambre.nom|default:chambre.salle_no }}{% else %}Nouveau{% endif %}</span>
   </div>
-  <div class="action-bar-buttons">
-    <a href="{% url 'hospitalisation:chambres_list' %}" class="btn-form-cancel">Ignorer</a>
+  <div class="det-subhdr-actions">
     <button type="submit" form="chambre-form" class="btn-form-submit">
       <i class="bi bi-check2"></i> Enregistrer
     </button>
+    <a href="{% url 'hospitalisation:chambres_list' %}" class="btn-form-cancel">Ignorer</a>
   </div>
 </div>
 
@@ -385,21 +356,7 @@ document.querySelectorAll('.equip-card').forEach(function (card) {
   });
 });
 
-/* ── TomSelect (type_chambre, genre seulement) ── */
-document.querySelectorAll('select.field-ul').forEach(function (el) {
-  if (el.name === 'statut') return; // géré manuellement
-  var emptyOpt   = el.querySelector('option[value=""]');
-  var placeholder = emptyOpt ? emptyOpt.textContent.trim() : 'Sélectionner…';
-  new TomSelect(el, {
-    allowEmptyOption: false,
-    placeholder: placeholder,
-    maxOptions: 200,
-    render: {
-      no_results: function () {
-        return '<div class="no-results" style="padding:8px 12px;color:#999;font-size:12px;">Aucun résultat</div>';
-      }
-    }
-  });
-});
+{# Listes déroulantes : fragment partagé, plus bas #}
 </script>
+{% include 'includes/_tomselect.html' %}
 {% endblock %}

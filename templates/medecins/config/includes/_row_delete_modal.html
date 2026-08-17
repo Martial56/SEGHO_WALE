@@ -1,0 +1,77 @@
+{% comment %}
+Confirmation de suppression d'une seule ligne, dans la même modale que le reste
+de la configuration (_config_modal.html fournit les classes mdcfg-*).
+
+Les listes n'avaient que la suppression en lot : il fallait cocher la case puis
+passer par la barre jaune, alors que la corbeille au bout de la ligne est le
+geste attendu — c'est celui des listes de contrôle du module hospitalisation.
+La suppression réutilise l'endpoint bulk avec un seul identifiant, il n'y a donc
+pas de nouvelle vue.
+
+Paramètres attendus : `libelle` (« la spécialité », « le département »).
+La page hôte doit définir BULK_URL, CSRF_TOKEN et fetchList().
+{% endcomment %}
+<style>
+/* La cellule d'actions ne contenait qu'un bouton et n'avait aucune mise en
+   page : la corbeille passait à la ligne sous le crayon. */
+.row-actions { white-space: nowrap; text-align: right; }
+.row-actions .o-ctrl-btn { display: inline-flex; align-items: center; }
+</style>
+
+<div class="mdcfg-modal-overlay" id="row-delete-overlay" onclick="if (event.target === this) closeRowDelete();">
+  <div class="mdcfg-modal-box" style="max-width:420px;">
+    <div class="mdcfg-modal-header">
+      <div class="mdcfg-modal-icon" style="background:linear-gradient(135deg,#e84545,#c62828);">
+        <i class="bi bi-trash"></i>
+      </div>
+      <div class="mdcfg-modal-title-wrap">
+        <div class="mdcfg-modal-title">Supprimer {{ libelle }}</div>
+      </div>
+      <button type="button" class="mdcfg-modal-close" onclick="closeRowDelete()">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div class="mdcfg-modal-body">
+      <p style="font-size:13px;color:var(--text-muted);line-height:1.55;margin:0;">
+        Supprimer « <strong id="row-delete-nom" style="color:var(--text);"></strong> » ? Cette action est irréversible.
+      </p>
+    </div>
+    <div class="mdcfg-modal-footer">
+      <button type="button" class="btn-form-cancel" onclick="closeRowDelete()">Annuler</button>
+      <button type="button" class="btn-form-submit" style="background:#e84545;" onclick="confirmRowDelete()">
+        <i class="bi bi-trash"></i> Supprimer
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+var rowDeleteId = null;
+function openRowDelete(id, nom) {
+  rowDeleteId = id;
+  document.getElementById('row-delete-nom').textContent = nom;
+  document.getElementById('row-delete-overlay').classList.add('open');
+}
+function closeRowDelete() {
+  document.getElementById('row-delete-overlay').classList.remove('open');
+  rowDeleteId = null;
+}
+function confirmRowDelete() {
+  if (!rowDeleteId) return;
+  var fd = new FormData();
+  fd.append('csrfmiddlewaretoken', CSRF_TOKEN);
+  fd.append('ids[]', rowDeleteId);
+  fetch(BULK_URL, {method: 'POST', body: fd})
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      closeRowDelete();
+      // Le point d'entrée signale les médecins qui se retrouvent détachés.
+      if (d.message) alert(d.message);
+      fetchList();
+    })
+    .catch(closeRowDelete);
+}
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape' && document.getElementById('row-delete-overlay').classList.contains('open')) closeRowDelete();
+});
+</script>

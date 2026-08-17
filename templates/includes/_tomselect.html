@@ -1,0 +1,102 @@
+{% load static %}
+{% comment %}
+════════════════════════════════════════════════════════════════════════════
+Listes déroulantes soulignées — TomSelect
+════════════════════════════════════════════════════════════════════════════
+Un seul endroit pour la feuille, la bibliothèque et l'initialisation. Les
+formulaires du module hospitalisation (hospitalisation, chambre, décès) en
+avaient chacun leur copie, avec des valeurs qui commençaient à diverger ;
+partout ailleurs les listes restaient natives, donc sans mise en forme.
+
+Utilisation — une seule ligne, dans le bloc de scripts du gabarit :
+    {% include 'includes/_tomselect.html' %}
+
+Portée : tous les `select.field-ul` de la page. Pour en exclure un, lui poser
+`data-no-tomselect` (widget dont le JS ajoute ou retire des <option> après
+coup : TomSelect recopie les options à l'initialisation et ne verrait pas le
+changement).
+
+Lignes ajoutées après coup (formulaires à lignes dynamiques) : rappeler
+`window.initFieldUlSelects(racine)` une fois la ligne insérée.
+{% endcomment %}
+
+<link rel="stylesheet" href="{% static 'vendor/tom-select/tom-select.css' %}">
+<style>
+.ts-wrapper { padding: 0 !important; }
+.ts-wrapper .ts-control {
+  background: transparent !important; border: none !important;
+  border-bottom: 1.5px solid #d1dde3 !important; border-radius: 0 !important;
+  box-shadow: none !important; padding: 7px 24px 7px 2px !important;
+  font-size: 13px !important; font-family: inherit !important;
+  min-height: unset !important; cursor: pointer;
+}
+.ts-wrapper.focus .ts-control { border-bottom-color: var(--teal-500) !important; box-shadow: none !important; }
+.ts-wrapper .ts-control .item,
+.ts-wrapper .ts-control input {
+  font-size: 13px !important; font-family: inherit !important;
+  color: var(--text) !important; padding: 0 !important; margin: 0 !important;
+}
+.ts-wrapper .ts-control input::placeholder { color: #bfcdd4; }
+.ts-wrapper.disabled .ts-control { opacity: .6; cursor: not-allowed; }
+.ts-control .item[data-value=""] { color: #bfcdd4 !important; font-style: italic; }
+.ts-dropdown .option[data-value=""] { display: none !important; }
+.ts-wrapper.single .ts-control::after {
+  content: '' !important; width: 12px !important; height: 8px !important;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23839aaa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat !important;
+  border: none !important; position: absolute !important; right: 4px !important;
+  top: 50% !important; transform: translateY(-50%) !important; margin: 0 !important;
+}
+.ts-wrapper.single.input-active .ts-control::after { transform: translateY(-50%) rotate(180deg) !important; }
+.ts-dropdown {
+  font-size: 13px !important; font-family: inherit !important;
+  border: 1px solid #dde3ec !important; border-radius: 6px !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,.14) !important; margin-top: 3px !important;
+  background: #fff !important;
+}
+.ts-dropdown .ts-dropdown-content { max-height: 220px; }
+.ts-dropdown .option { padding: 7px 14px !important; font-size: 13px !important; color: var(--text) !important; cursor: pointer; }
+.ts-dropdown .option:hover,
+.ts-dropdown .option.selected,
+.ts-dropdown .option.active { background: #e8f4f8 !important; color: var(--accent-text-soft) !important; }
+.ts-dropdown .no-results { padding: 8px 14px; color: var(--text-muted); font-size: 12px; }
+
+html[data-theme="dark"] .ts-wrapper .ts-control { border-bottom-color: rgba(255,255,255,.15) !important; }
+html[data-theme="dark"] .ts-wrapper.focus .ts-control { border-bottom-color: var(--teal-400) !important; }
+html[data-theme="dark"] .ts-dropdown { background: var(--surface) !important; border-color: var(--border-strong) !important; }
+html[data-theme="dark"] .ts-dropdown .option { color: var(--text-strong) !important; }
+html[data-theme="dark"] .ts-dropdown .option:hover,
+html[data-theme="dark"] .ts-dropdown .option.active,
+html[data-theme="dark"] .ts-dropdown .option.selected { background: rgba(var(--teal-500-rgb),.2) !important; }
+{% comment %}Le surlignage du terme cherché vient de tom-select.css, en clair : sur fond sombre il ressort en pavé gris.{% endcomment %}
+html[data-theme="dark"] .ts-dropdown .highlight { background: rgba(var(--teal-500-rgb),.32); color: var(--text-strong); }
+</style>
+
+<script src="{% static 'vendor/tom-select/tom-select.base.min.js' %}"></script>
+<script>
+(function () {
+  window.initFieldUlSelects = function (racine) {
+    if (typeof TomSelect === 'undefined') return;
+    (racine || document).querySelectorAll('select.field-ul').forEach(function (el) {
+      if (el.tomselect || el.multiple || el.hasAttribute('data-no-tomselect')) return;
+      var vide = el.querySelector('option[value=""]');
+      var invite = vide ? vide.textContent.trim() : '';
+      // Le choix vide d'un champ « blank=True » s'appelle « --------- » :
+      // on n'en fait pas un texte d'invite.
+      if (!invite || /^-+$/.test(invite)) invite = 'Sélectionner…';
+      new TomSelect(el, {
+        allowEmptyOption: false,
+        placeholder: invite,
+        maxOptions: 500,
+        render: {
+          no_results: function () { return '<div class="no-results">Aucun résultat</div>'; }
+        }
+      });
+    });
+  };
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { window.initFieldUlSelects(); });
+  } else {
+    window.initFieldUlSelects();
+  }
+})();
+</script>

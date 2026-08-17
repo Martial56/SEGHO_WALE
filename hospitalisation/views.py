@@ -1937,17 +1937,28 @@ def config_liste_admission(request):
     })
 
 
+# Les deux listes de contrôle se créent et se modifient dans une modale, comme
+# « Diagnostic retenu » côté patients : en requête AJAX, la vue renvoie le
+# fragment de formulaire, puis du JSON une fois l'enregistrement fait. Les
+# gabarits pleine page restent le repli quand on ouvre l'URL directement.
+_ADMISSION_TPL_PAGE  = 'hospitalisation/configuration/liste_admission/form.html'
+_ADMISSION_TPL_MODAL = 'hospitalisation/configuration/liste_admission/form_modal.html'
+
+
 @login_required(login_url='login')
 def liste_admission_create(request):
+    is_ajax = _is_ajax(request)
     if request.method == 'POST':
         form = ListeControleAdmissionForm(request.POST)
         if form.is_valid():
             obj = form.save()
+            if is_ajax:
+                return JsonResponse({'ok': True, 'message': f'Élément « {obj.item} » créé.'})
             messages.success(request, f'Élément « {obj.item} » créé.')
             return redirect('hospitalisation:config_liste_admission')
     else:
         form = ListeControleAdmissionForm()
-    return render(request, 'hospitalisation/configuration/liste_admission/form.html', {
+    return render(request, _ADMISSION_TPL_MODAL if is_ajax else _ADMISSION_TPL_PAGE, {
         'form':  form,
         'titre': 'Nouveau',
         'edit':  False,
@@ -1957,15 +1968,18 @@ def liste_admission_create(request):
 @login_required(login_url='login')
 def liste_admission_edit(request, pk):
     obj = get_object_or_404(ListeControleAdmission, pk=pk)
+    is_ajax = _is_ajax(request)
     if request.method == 'POST':
         form = ListeControleAdmissionForm(request.POST, instance=obj)
         if form.is_valid():
             obj = form.save()
+            if is_ajax:
+                return JsonResponse({'ok': True, 'message': f'Élément « {obj.item} » modifié.'})
             messages.success(request, f'Élément « {obj.item} » modifié.')
             return redirect('hospitalisation:config_liste_admission')
     else:
         form = ListeControleAdmissionForm(instance=obj)
-    return render(request, 'hospitalisation/configuration/liste_admission/form.html', {
+    return render(request, _ADMISSION_TPL_MODAL if is_ajax else _ADMISSION_TPL_PAGE, {
         'form':  form,
         'obj':   obj,
         'titre': obj.item,
@@ -1979,6 +1993,8 @@ def liste_admission_delete(request, pk):
     if request.method == 'POST':
         nom = obj.item
         obj.delete()
+        if _is_ajax(request):
+            return JsonResponse({'ok': True, 'message': f'Élément « {nom} » supprimé.'})
         messages.success(request, f'Élément « {nom} » supprimé.')
     return redirect('hospitalisation:config_liste_admission')
 
@@ -2053,17 +2069,24 @@ def config_liste_service(request):
     })
 
 
+_SERVICE_TPL_PAGE  = 'hospitalisation/configuration/liste_service/form.html'
+_SERVICE_TPL_MODAL = 'hospitalisation/configuration/liste_service/form_modal.html'
+
+
 @login_required(login_url='login')
 def liste_service_create(request):
+    is_ajax = _is_ajax(request)
     if request.method == 'POST':
         form = ListeVerificationServiceForm(request.POST)
         if form.is_valid():
             obj = form.save()
+            if is_ajax:
+                return JsonResponse({'ok': True, 'message': f'Élément « {obj.item} » créé.'})
             messages.success(request, f'Élément « {obj.item} » créé.')
             return redirect('hospitalisation:config_liste_service')
     else:
         form = ListeVerificationServiceForm()
-    return render(request, 'hospitalisation/configuration/liste_service/form.html', {
+    return render(request, _SERVICE_TPL_MODAL if is_ajax else _SERVICE_TPL_PAGE, {
         'form':  form,
         'titre': 'Nouveau',
         'edit':  False,
@@ -2073,15 +2096,18 @@ def liste_service_create(request):
 @login_required(login_url='login')
 def liste_service_edit(request, pk):
     obj = get_object_or_404(ListeVerificationService, pk=pk)
+    is_ajax = _is_ajax(request)
     if request.method == 'POST':
         form = ListeVerificationServiceForm(request.POST, instance=obj)
         if form.is_valid():
             obj = form.save()
+            if is_ajax:
+                return JsonResponse({'ok': True, 'message': f'Élément « {obj.item} » modifié.'})
             messages.success(request, f'Élément « {obj.item} » modifié.')
             return redirect('hospitalisation:config_liste_service')
     else:
         form = ListeVerificationServiceForm(instance=obj)
-    return render(request, 'hospitalisation/configuration/liste_service/form.html', {
+    return render(request, _SERVICE_TPL_MODAL if is_ajax else _SERVICE_TPL_PAGE, {
         'form':  form,
         'obj':   obj,
         'titre': obj.item,
@@ -2095,6 +2121,8 @@ def liste_service_delete(request, pk):
     if request.method == 'POST':
         nom = obj.item
         obj.delete()
+        if _is_ajax(request):
+            return JsonResponse({'ok': True, 'message': f'Élément « {nom} » supprimé.'})
         messages.success(request, f'Élément « {nom} » supprimé.')
     return redirect('hospitalisation:config_liste_service')
 

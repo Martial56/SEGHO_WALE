@@ -1,5 +1,5 @@
 {% extends 'hospitalisation/base.html' %}
-{% load i18n %}
+{% load i18n static %}
 
 {% block extra_css %}
 {{ block.super }}
@@ -14,10 +14,20 @@ valeurs posées ici n'en différaient que d'une nuance imperceptible. Les
 redéclarer par gabarit faisait dériver les pages de la palette centrale.
 {% endcomment %}
 
-/* ── Workflow row ── */
-.workflow-row {
-  display:flex; align-items:center; gap:10px;
-  padding:8px 0 0; margin-top:8px; border-top:1px solid var(--border);
+/* ── Workflow row ──
+   Le liseré du haut séparait le workflow du fil d'Ariane quand les deux
+   vivaient dans la même carte ; le fil d'Ariane est parti dans .det-subhdr, il
+   ne restait qu'un trait en travers de la page. */
+.workflow-row { display:flex; align-items:center; gap:10px; }
+/* Le workflow et le formulaire ne font qu'un seul cadre : la barre ferme en bas
+   sur le formulaire (pas de bordure basse, pas d'arrondi de ce côté), et c'est
+   la bordure haute de .form-card qui sert de séparateur entre les deux.
+   Impossible de fusionner les deux balises : la barre contient son propre
+   <form> pour le bouton « Terminer », qui ne peut pas être imbriqué dans celui
+   du formulaire. */
+.wf-bar {
+  background:var(--surface); border:1px solid var(--border); border-bottom:none;
+  border-radius:8px 8px 0 0; margin:16px 20px 0; padding:10px 18px;
 }
 .wf-btn {
   border:none; padding:5px 16px; border-radius:4px; font-size:12px;
@@ -55,7 +65,7 @@ redéclarer par gabarit faisait dériver les pages de la palette centrale.
 /* ── Form card ── */
 .form-card {
   background:var(--surface); border:1px solid var(--border);
-  border-radius:8px; margin-top:10px; overflow:hidden;
+  border-radius:0 0 8px 8px; margin:0 20px 20px; overflow:hidden;
 }
 
 /* ── En-tête patient ── */
@@ -106,37 +116,6 @@ redéclarer par gabarit faisait dériver les pages de la palette centrale.
 .fc-auto-item { display:flex; flex-direction:column; gap:4px; }
 .fc-auto-lbl  { font-size:10.5px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; }
 
-/* ── TomSelect underline ── */
-.ts-wrapper { padding:0 !important; }
-.ts-wrapper .ts-control {
-  background:transparent !important; border:none !important;
-  border-bottom:1.5px solid #d1dde3 !important; border-radius:0 !important;
-  box-shadow:none !important; padding:7px 24px 7px 2px !important;
-  font-size:13px !important; font-family:inherit !important; min-height:unset !important; cursor:pointer;
-}
-.ts-wrapper.focus .ts-control { border-bottom-color:var(--teal-500) !important; box-shadow:none !important; }
-.ts-wrapper .ts-control .item { font-size:13px !important; font-family:inherit !important; color:var(--text) !important; padding:0 !important; margin:0 !important; }
-.ts-wrapper .ts-control input { font-size:13px !important; font-family:inherit !important; color:var(--text) !important; padding:0 !important; margin:0 !important; }
-.ts-wrapper .ts-control input::placeholder { color:#bfcdd4; }
-.ts-control .item[data-value=""] { color:#bfcdd4 !important; font-style:italic; }
-.ts-dropdown .option[data-value=""] { display:none !important; }
-.ts-wrapper.single .ts-control::after {
-  content:'' !important; width:12px !important; height:8px !important;
-  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23839aaa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat !important;
-  border:none !important; position:absolute !important; right:4px !important;
-  top:50% !important; transform:translateY(-50%) !important; margin:0 !important;
-}
-.ts-wrapper.single.input-active .ts-control::after { transform:translateY(-50%) rotate(180deg) !important; }
-.ts-dropdown {
-  font-size:13px !important; font-family:inherit !important;
-  border:1px solid #dde3ec !important; border-radius:6px !important;
-  box-shadow:0 8px 24px rgba(0,0,0,.14) !important; margin-top:3px !important; background:#fff !important;
-}
-.ts-dropdown .ts-dropdown-content { max-height:220px; }
-.ts-dropdown .option { padding:7px 14px !important; font-size:13px !important; color:var(--text) !important; cursor:pointer; }
-.ts-dropdown .option:hover, .ts-dropdown .option.selected, .ts-dropdown .option.active { background:#e8f4f8 !important; color:var(--accent-text-soft) !important; }
-.ts-dropdown .no-results { padding:8px 14px; color:#999; font-size:12px; }
-
 /* Dark */
 html[data-theme="dark"] .form-card   { background:var(--surface); border-color:var(--border); }
 html[data-theme="dark"] .fc-auto-info { background:var(--surface); }
@@ -147,33 +126,31 @@ html[data-theme="dark"] .fc-code-badge { background:rgba(153,27,27,.15); border-
 html[data-theme="dark"] .pip-step  { background: var(--surface); color:rgba(255,255,255,.3); }
 html[data-theme="dark"] .pip-step.active { background: var(--surface); color:#fff; }
 html[data-theme="dark"] .pip-step.done   { background:rgba(var(--teal-500-rgb), 0.14); color:var(--teal-300); }
-html[data-theme="dark"] .ts-wrapper .ts-control { border-bottom-color:rgba(255,255,255,.15) !important; }
-html[data-theme="dark"] .ts-wrapper.focus .ts-control { border-bottom-color:var(--teal-400) !important; }
-html[data-theme="dark"] .ts-dropdown { background: var(--surface) !important; border-color: var(--border-strong) !important; }
-html[data-theme="dark"] .ts-dropdown .option { color: var(--text-strong) !important; }
-html[data-theme="dark"] .ts-dropdown .option:hover,
-html[data-theme="dark"] .ts-dropdown .option.active,
-html[data-theme="dark"] .ts-dropdown .option.selected { background:rgba(var(--teal-500-rgb),.2) !important; }
 </style>
 {% endblock %}
 
 {% block content %}
 <div id="page-wrap">
 
-<div class="action-bar" style="flex-direction:column;align-items:stretch;">
-  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
-    <div class="action-bar-breadcrumb">
-      <a href="{% url 'hospitalisation:deces_list' %}"><i class="bi bi-arrow-left"></i> Registre des décès</a>
-      <span class="sep">/</span>
-      <span class="current">{{ titre }}</span>
-    </div>
-    <div class="action-bar-buttons">
-      <a href="{% url 'hospitalisation:deces_list' %}" class="btn-form-cancel">Ignorer</a>
-      <button type="submit" form="deces-form" class="btn-form-submit">
-        <i class="bi bi-check2"></i> Sauvegarder
-      </button>
-    </div>
+{% comment %}Barre de retour commune au module (.det-subhdr). Le workflow qui suivait dans la même carte reste juste en dessous, dans le flux de la page.{% endcomment %}
+<div class="det-subhdr" data-fixed="1">
+  <a href="{% url 'hospitalisation:deces_list' %}" class="det-back" title="Retour">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <div class="det-crumb">
+    <a href="{% url 'hospitalisation:deces_list' %}">Registre des décès</a>
+    <span class="sep">/</span>
+    <span class="current">{{ titre }}</span>
   </div>
+  <div class="det-subhdr-actions">
+    <button type="submit" form="deces-form" class="btn-form-submit">
+      <i class="bi bi-check2"></i> Sauvegarder
+    </button>
+    <a href="{% url 'hospitalisation:deces_list' %}" class="btn-form-cancel">Ignorer</a>
+  </div>
+</div>
+
+<div class="wf-bar">
 
   <!-- Workflow -->
   <div class="workflow-row">
@@ -299,18 +276,10 @@ html[data-theme="dark"] .ts-dropdown .option.selected { background:rgba(var(--te
 
 {% block extra_js %}
 {{ block.super }}
+{# Avant le script ci-dessous : il lit patEl.tomselect pour brancher l'auto-remplissage. #}
+{% include 'includes/_tomselect.html' %}
 <script>
-/* TomSelect */
-document.querySelectorAll('select.field-ul').forEach(function(el) {
-  var emptyOpt = el.querySelector('option[value=""]');
-  var placeholder = emptyOpt ? emptyOpt.textContent.trim() : 'Sélectionner…';
-  new TomSelect(el, {
-    allowEmptyOption: false,
-    placeholder: placeholder,
-    maxOptions: 300,
-    render: { no_results: function() { return '<div class="no-results" style="padding:8px 14px;color:#999;font-size:12px;">Aucun résultat</div>'; } }
-  });
-});
+/* Listes déroulantes : fragment partagé, inclus plus bas */
 
 /* Auto-remplissage genre/âge depuis le patient sélectionné */
 (function () {

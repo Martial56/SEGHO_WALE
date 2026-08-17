@@ -122,7 +122,10 @@ class ChambreForm(forms.ModelForm):
             }),
             'type_chambre':        forms.Select(attrs={'class': _ul}),
             'nombre_lits':         forms.NumberInput(attrs={'class': _ul, 'min': 1}),
-            'statut':              forms.Select(attrs={'class': _ul},
+            # Champ piloté par les deux boutons Disponible / Occupée du
+            # gabarit, qui écrivent directement dans `.value` : TomSelect ne
+            # verrait pas ces écritures, on l'exclut.
+            'statut':              forms.Select(attrs={'class': _ul, 'data-no-tomselect': ''},
                                                 choices=[(True, 'Disponible'), (False, 'Occupée')]),
             'prive':               forms.CheckboxInput(attrs={'class': 'field-check'}),
             'genre':               forms.Select(attrs={'class': _ul}),
@@ -164,12 +167,31 @@ class ListeControleAdmissionForm(forms.ModelForm):
 class RegistreDecesForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
+        from django.db.models import Q
         from medecins.models import Medecin
+        from patients.models import Patient
         super().__init__(*args, **kwargs)
         self.fields['patient'].empty_label        = 'Rechercher un patient…'
         self.fields['hospitalisation'].empty_label = 'Rechercher une hospitalisation…'
         self.fields['medecin'].empty_label         = 'Rechercher un médecin…'
         self.fields['medecin'].queryset = Medecin.objects.select_related('employe').order_by('employe__nom')
+
+        # Le queryset par défaut d'un ModelChoiceField est construit à l'import
+        # du module, donc hors requête : CentreManager n'y voit aucun centre
+        # actif et fige la liste sur « centre_id IS NULL ». Le champ patient
+        # était donc systématiquement vide — impossible d'en choisir un, et en
+        # modification la fiche affichait « Rechercher un patient… » à la place
+        # du patient enregistré. Reconstruit ici, à chaque requête, le manager
+        # voit le centre actif. Même raison que pour le champ médecin ci-dessus.
+        patients = Patient.objects.all()
+        patient_id = self.instance.patient_id if self.instance and self.instance.pk else None
+        if patient_id:
+            # Une fiche d'un autre centre garde son patient dans la liste,
+            # sinon l'enregistrer le remplacerait par du vide.
+            patients = Patient.all_objects.filter(
+                Q(pk__in=patients.values('pk')) | Q(pk=patient_id)
+            )
+        self.fields['patient'].queryset = patients.order_by('nom', 'prenoms')
 
     class Meta:
         model = RegistreDeces

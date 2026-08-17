@@ -6,7 +6,6 @@
   :root {
     --primary: var(--teal-700);
     --primary-dark: var(--teal-700);
-    --nav-bg: #ffffff;
     --accent: var(--teal-500);
     --bg: #f9f9f9;
     --surface: #ffffff;
@@ -35,44 +34,48 @@
   .content { padding: 0; }
 
   /* ── O-NAV ── */
-  .o-nav {
-    background: var(--nav-bg);
-    display: flex; align-items: center;
-    height: 38px; padding: 0 16px;
-    border-bottom: 1px solid #e0e0e0;
-    position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+  {% comment %}
+  La barre de navigation n'a plus de styles propres : c'était une copie de
+  static/css/global.css, à un détail près — en thème sombre, l'onglet actif y
+  était peint en --text-strong (blanc) au lieu de l'accent. Le module était donc
+  le seul où l'onglet courant ne prenait pas la couleur du logiciel, alors que
+  la marque, elle, la prenait. En laissant la feuille globale s'appliquer,
+  .o-nav, .o-nav-grid, .o-nav-brand et .o-nav-link sont identiques à ceux des
+  autres modules.
+  {% endcomment %}
+
+  /* ── SOUS-EN-TÊTE DE FICHE (retour + fil d'Ariane) ──
+     Un seul endroit pour toute la barre : les formulaires chambre, décès et
+     listes de contrôle utilisaient .action-bar (carte flottante arrondie de
+     form-ul.css) pendant que les fiches et le formulaire d'hospitalisation
+     utilisaient celle-ci. Deux barres de retour différentes dans le même
+     module ; les gabarits de fiche gardent encore leur copie locale, aux
+     mêmes valeurs. */
+  .det-subhdr {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 6px 16px; display: flex; align-items: center; gap: 8px;
+    position: fixed; left: 0; right: 0;
+    top: calc(var(--topbar-h, 62px) + 38px); z-index: 190;
   }
-  .o-nav-grid {
-    width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
-    color: rgba(0,0,0,0.45); font-size: 17px; cursor: pointer; border-radius: 4px;
-    margin-right: 4px; transition: background 0.15s; text-decoration: none;
+  .det-back {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px; border-radius: 4px;
+    border: 1px solid var(--border); color: var(--text-muted);
+    text-decoration: none; transition: color .15s, background .15s, border-color .15s;
   }
-  .o-nav-grid:hover { background: rgba(0,0,0,0.06); color: var(--accent-text); }
-  .o-nav-brand {
-    font-size: 14px; font-weight: 600; color: var(--accent-text);
-    padding: 0 12px 0 4px; margin-right: 2px;
-    border-right: 1px solid rgba(0,0,0,0.12);
-    white-space: nowrap; display: flex; align-items: center; gap: 6px;
+  .det-back:hover {
+    background: var(--teal-50); color: var(--accent-text-soft);
+    border-color: var(--teal-300);
   }
-  .o-nav-link {
-    color: rgba(0,0,0,0.58); text-decoration: none; font-size: 13px;
-    padding: 0 12px; height: 38px; display: flex; align-items: center;
-    border-bottom: 2px solid transparent;
-    transition: color 0.15s, background 0.15s, border-color 0.15s; white-space: nowrap;
+  html[data-theme="dark"] .det-back:hover {
+    background: rgba(var(--teal-500-rgb), .12);
   }
-  .o-nav-link:hover,
-  /* Accent du logiciel, pas le --primary fixe du module : sinon la barre de
-     menus reste bleue quand on change la couleur dans « Mon compte ». */
-  .o-nav-link.active { color: var(--accent-text); background: rgba(var(--teal-600-rgb),0.07); border-bottom-color: var(--teal-600); }
-    {# Fond de page et bordure du thème : la barre restait sur un bleu marine #}
-  {# (#0a1e2e) qui ne correspondait à aucune autre page. #}
-html[data-theme="dark"] .o-nav            { background: var(--surface-muted); border-bottom-color: var(--border); box-shadow: none; }
-  html[data-theme="dark"] .o-nav-grid       { color: rgba(255,255,255,0.5); }
-  html[data-theme="dark"] .o-nav-grid:hover { background: rgba(var(--teal-600-rgb),0.14); color: var(--teal-300); }
-  html[data-theme="dark"] .o-nav-brand      { color: var(--teal-300); border-right-color: rgba(255,255,255,0.1); }
-  html[data-theme="dark"] .o-nav-link       { color: rgba(255,255,255,0.6); }
-  html[data-theme="dark"] .o-nav-link:hover,
-  html[data-theme="dark"] .o-nav-link.active { color: var(--text-strong); background: rgba(var(--teal-600-rgb),0.14); border-bottom-color: var(--teal-400); }
+  .det-crumb { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+  .det-crumb a { color: var(--accent-text-soft); text-decoration: none; }
+  .det-crumb a:hover { text-decoration: underline; }
+  .det-crumb .sep { color: var(--text-faint); }
+  .det-crumb .current { color: var(--text-muted); }
+  .det-subhdr-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 
   /* ── SUBHEADER ──*/
   .o-subheader {

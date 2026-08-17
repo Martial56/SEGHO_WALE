@@ -9,12 +9,30 @@
 <link href="{% static 'vendor/fonts/fonts.css' %}" rel="stylesheet">
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
-html { background:#2e592b; }
+
+/* ── Couleurs de l'écran d'accueil ──
+   Cette page est autonome (elle n'étend pas base.html) : elle ne recevait donc
+   ni les jetons du thème ni la couleur choisie par l'utilisateur, et restait
+   verte pendant que le reste de l'application prenait sa teinte. Les quatre
+   valeurs ci-dessous sont celles qui étaient écrites en dur dans la page ; elles
+   servent maintenant de repli, et `accent_css` les remplace par la rampe dérivée
+   de la couleur du profil. Sans couleur personnalisée, le rendu est donc
+   exactement celui d'avant. */
+:root {
+  --teal-950: #071e28;
+  --teal-700: #2e592b;
+  --teal-600: #4f9b4b;
+  --teal-200: #bfe8bb;
+  --teal-200-rgb: 191,232,187;
+}
+{% if accent_css %}:root { {{ accent_css|safe }} }{% endif %}
+
+html { background:var(--teal-700); }
 body {
   font-family:'Sora',sans-serif;
   min-height:100vh;
-  background-color:#2e592b;
-  background-image:linear-gradient(135deg, #071e28 0%, #2e592b 50%, #4f9b4b 100%);
+  background-color:var(--teal-700);
+  background-image:linear-gradient(135deg, var(--teal-950) 0%, var(--teal-700) 50%, var(--teal-600) 100%);
   background-size:180% 180%;
   animation:driftBg 12s ease-in-out infinite;
   display:flex; align-items:center; justify-content:center;
@@ -35,7 +53,7 @@ body.leaving { opacity:0; }
 .logo-glow {
   position:absolute; top:-40px; left:50%; width:220px; height:220px;
   transform:translateX(-50%); border-radius:50%;
-  background:radial-gradient(circle, rgba(191,232,187,0.35) 0%, rgba(191,232,187,0) 70%);
+  background:radial-gradient(circle, rgba(var(--teal-200-rgb),0.35) 0%, rgba(var(--teal-200-rgb),0) 70%);
   opacity:0;
   animation:glowIn 1.8s ease 0.15s forwards, breathe 3.2s ease-in-out 1.95s infinite;
 }
@@ -74,7 +92,7 @@ body.leaving { opacity:0; }
 }
 .progress-bar {
   height:100%; width:0%; border-radius:3px;
-  background:linear-gradient(90deg, #4f9b4b, #bfe8bb);
+  background:linear-gradient(90deg, var(--teal-600), var(--teal-200));
   animation:fillBar 1.7s ease 2.1s forwards;
 }
 .skip-hint {

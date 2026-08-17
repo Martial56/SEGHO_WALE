@@ -9,11 +9,16 @@ _ul_prenom = 'field-ul field-ul-prenom'
 
 class DepartementFiltreSelect(forms.Select):
     """Select dont chaque <option> porte data-departement-id, utilisé côté JS
-    pour ne montrer que les prestations liées au département choisi."""
+    pour ne montrer que les prestations liées au département choisi.
+
+    Exclu de TomSelect (`data-no-tomselect`) : la bibliothèque recopie les
+    options à l'initialisation, elle ne verrait pas le masquage que ce JS
+    applique ensuite sur les <option>."""
 
     def __init__(self, *args, departement_map=None, **kwargs):
         self.departement_map = departement_map or {}
         super().__init__(*args, **kwargs)
+        self.attrs.setdefault('data-no-tomselect', '')
 
     def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
         option = super().create_option(name, value, label, selected, index, subindex, attrs)

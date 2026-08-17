@@ -20,7 +20,10 @@
 .cfg-table thead th.col-check { width: 36px; text-align: center; }
 .cfg-table thead th.col-actions { width: 36px; }
 .cfg-table tbody tr { border-bottom: 1px solid var(--border); cursor: pointer; transition: background .1s; }
-.cfg-table tbody tr:hover { background: #f0f7fb; }
+{# Survol : teinte dérivée de l'accent, comme les modules pharmacie et #}
+{# présence. Le bleu clair codé en dur ne suivait pas la couleur choisie #}
+{# dans « Mon compte ». #}
+.cfg-table tbody tr:hover { background: var(--teal-50); }
 .cfg-table tbody tr:last-child td { border-bottom: none; }
 .cfg-table tbody td { padding: 10px 14px; color: var(--text); font-size: 13px; vertical-align: middle; }
 .cfg-table tbody td.col-check { text-align: center; }
@@ -31,7 +34,7 @@
 
 html[data-theme="dark"] .cfg-table thead th  { background: var(--surface); border-bottom-color: var(--border); }
 html[data-theme="dark"] .cfg-table tbody tr  { border-bottom-color: var(--border); }
-html[data-theme="dark"] .cfg-table tbody tr:hover { background: rgba(255,255,255,.04); }
+html[data-theme="dark"] .cfg-table tbody tr:hover { background: rgba(var(--teal-500-rgb), .10); }
 
 {% include 'services/includes/io_styles.html' %}
 </style>
@@ -55,7 +58,8 @@ html[data-theme="dark"] .cfg-table tbody tr:hover { background: rgba(255,255,255
   </div>
 
   <div class="o-subheader-row">
-    <a href="{% url 'hospitalisation:liste_service_create' %}" class="o-btn-create">
+    <a href="{% url 'hospitalisation:liste_service_create' %}" class="o-btn-create"
+       onclick="return mdOpenConfigModal(event, this.href, 'Nouvel élément', 'bi-clipboard2-check');">
       <i class="bi bi-plus-lg"></i> Créer
     </a>
     <div class="io-page-wrap" id="io-page-wrap">
@@ -103,17 +107,14 @@ html[data-theme="dark"] .cfg-table tbody tr:hover { background: rgba(255,255,255
     </thead>
     <tbody>
       {% for obj in page_obj %}
-      <tr onclick="window.location='{% url 'hospitalisation:liste_service_edit' obj.pk %}'">
+      <tr onclick="mdOpenConfigModal(event, '{% url 'hospitalisation:liste_service_edit' obj.pk %}', 'Modifier — {{ obj.item|escapejs }}', 'bi-clipboard2-check')">
         <td class="col-check" onclick="event.stopPropagation()">
           <input type="checkbox" class="ch-check row-check">
         </td>
         <td>{{ obj.item }}</td>
         <td onclick="event.stopPropagation()" style="text-align:right;padding-right:10px;">
-          <form method="post" action="{% url 'hospitalisation:liste_service_delete' obj.pk %}" style="display:inline;" id="del-{{ obj.pk }}">
-            {% csrf_token %}
-          </form>
           <button type="button" class="o-ctrl-btn" style="padding:3px 7px;"
-                  onclick="if(confirm('Supprimer cet élément ?')) document.getElementById('del-{{ obj.pk }}').submit()">
+                  onclick="openDeleteModal('{% url 'hospitalisation:liste_service_delete' obj.pk %}', '{{ obj.item|escapejs }}')">
             <i class="bi bi-trash3" style="font-size:12px;color:#c62828;"></i>
           </button>
         </td>
@@ -124,7 +125,8 @@ html[data-theme="dark"] .cfg-table tbody tr:hover { background: rgba(255,255,255
           <div class="cfg-empty">
             <i class="bi bi-clipboard2-check"></i>
             Aucun élément{% if q %} pour « {{ q }} »{% endif %}.
-            {% if not q %}<br><a href="{% url 'hospitalisation:liste_service_create' %}" style="color:var(--accent-text-soft);text-decoration:none;font-size:13px;">Créer le premier élément</a>{% endif %}
+            {% if not q %}<br><a href="{% url 'hospitalisation:liste_service_create' %}" style="color:var(--accent-text-soft);text-decoration:none;font-size:13px;"
+               onclick="return mdOpenConfigModal(event, this.href, 'Nouvel élément', 'bi-clipboard2-check');">Créer le premier élément</a>{% endif %}
           </div>
         </td>
       </tr>
@@ -133,12 +135,66 @@ html[data-theme="dark"] .cfg-table tbody tr:hover { background: rgba(255,255,255
   </table>
 </div>
 
+{% include 'medecins/config/includes/_config_modal.html' %}
+
+{% comment %}Confirmation de suppression dans la même modale que le reste de la configuration, à la place du confirm() du navigateur.{% endcomment %}
+<div class="mdcfg-modal-overlay" id="delete-modal-overlay" onclick="if (event.target === this) closeDeleteModal();">
+  <div class="mdcfg-modal-box" style="max-width:420px;">
+    <div class="mdcfg-modal-header">
+      <div class="mdcfg-modal-icon" style="background:linear-gradient(135deg,#e84545,#c62828);">
+        <i class="bi bi-trash"></i>
+      </div>
+      <div class="mdcfg-modal-title-wrap">
+        <div class="mdcfg-modal-title">Supprimer l'élément</div>
+      </div>
+      <button type="button" class="mdcfg-modal-close" onclick="closeDeleteModal()">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div class="mdcfg-modal-body">
+      <p style="font-size:13px;color:var(--text-muted);line-height:1.55;margin:0;">
+        Supprimer « <strong id="delete-modal-nom" style="color:var(--text);"></strong> » ? Cette action est irréversible.
+      </p>
+    </div>
+    <div class="mdcfg-modal-footer">
+      <button type="button" class="btn-form-cancel" onclick="closeDeleteModal()">Annuler</button>
+      <button type="button" class="btn-form-submit" style="background:#e84545;" onclick="confirmDelete()">
+        <i class="bi bi-trash"></i> Supprimer
+      </button>
+    </div>
+  </div>
+</div>
+
 </div><!-- /page-wrap -->
 {% endblock %}
 
 {% block extra_js %}
 {{ block.super }}
 <script>
+var deleteModalUrl = null;
+function openDeleteModal(url, nom) {
+  deleteModalUrl = url;
+  document.getElementById('delete-modal-nom').textContent = nom;
+  document.getElementById('delete-modal-overlay').classList.add('open');
+}
+function closeDeleteModal() {
+  document.getElementById('delete-modal-overlay').classList.remove('open');
+  deleteModalUrl = null;
+}
+function confirmDelete() {
+  if (!deleteModalUrl) return;
+  var fd = new FormData();
+  fd.append('csrfmiddlewaretoken', (document.cookie.match(/csrftoken=([^;]+)/) || [])[1]);
+  fetch(deleteModalUrl, {
+    method: 'POST',
+    headers: {'X-Requested-With': 'XMLHttpRequest'},
+    body: fd,
+  }).then(function () { window.location.reload(); });
+}
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') closeDeleteModal();
+});
+
 function toggleIOPage(e){e.stopPropagation();document.getElementById('io-page-wrap').classList.toggle('open');}
 document.addEventListener('click',function(){var w=document.getElementById('io-page-wrap');if(w)w.classList.remove('open');});
 function openImportModal(){document.getElementById('io-modal-backdrop').classList.add('active');document.getElementById('io-modal').classList.add('active');var w=document.getElementById('io-page-wrap');if(w)w.classList.remove('open');}

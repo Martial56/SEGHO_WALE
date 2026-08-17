@@ -193,7 +193,9 @@
 
         <div class="form-field">
           <label class="field-label" for="service">Service</label>
-          <select name="service" id="service" class="field-ul">
+          {# Options masquées par le JS de cascade département → service : #}
+          {# TomSelect recopie les options à l'initialisation et ne verrait pas le filtre. #}
+          <select name="service" id="service" class="field-ul" data-no-tomselect>
             <option value="">— Aucun service —</option>
             {% for svc in services %}
             <option value="{{ svc.pk }}" data-departement="{{ svc.departement_id|default:'' }}"
@@ -379,4 +381,7 @@
   }
 })();
 </script>
+{# Listes déroulantes du module (spécialité, département…) : fragment partagé. #}
+{% include 'includes/_tomselect.html' %}
+
 {% endblock %}

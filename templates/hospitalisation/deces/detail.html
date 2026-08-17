@@ -33,10 +33,30 @@ redéclarer par gabarit faisait dériver les pages de la palette centrale.
 .det-crumb a:hover { text-decoration: underline; }
 .det-crumb .sep { color: var(--text-muted); }
 
+/* ── Historique : même traitement que la fiche chambre ──
+   Les deux colonnes vivent dans #page-wrap, donc elles partent du même point et
+   s'alignent en haut ; le panneau était 29px plus bas que l'en-tête, collé au
+   bord droit, pendant que le contenu de gauche touchait le bord gauche. */
+.hist-main { flex: 0 1 1350px; padding-left: 20px; }
+.hist-aside {
+  position: static; max-height: none;
+  width: 320px; margin: 18px 20px 24px 14px;
+}
+
+/* ── Bloc unique : en-tête + toutes les sections, comme .det-block de la fiche
+   chambre — plus de petites cartes séparées flottant les unes sous les
+   autres, un seul cadre avec des séparateurs à l'intérieur. ── */
+.det-block {
+  background: var(--surface);
+  border-radius: var(--radius, 12px);
+  overflow: hidden;
+  margin: 18px 0 24px;
+}
+
 /* ── En-tête ── */
 .det-hdr {
   display: flex; align-items: center; gap: 16px;
-  padding: 18px 0 14px; border-bottom: 1px solid var(--border);
+  padding: 20px 24px 16px; border-bottom: 1px solid var(--border);
 }
 .det-hdr-icon {
   width: 48px; height: 48px; border-radius: 10px;
@@ -53,21 +73,19 @@ redéclarer par gabarit faisait dériver les pages de la palette centrale.
 .badge-brouillon { background: #fff3cd; color: #5c4a1e; }
 .badge-termine   { background: #d4edda; color: #1a6b3c; }
 
-/* ── Sections ── */
-.det-card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 8px; margin-top: 20px; overflow: hidden;
-}
+/* ── Sections (imbriquées dans .det-block) ── */
+.det-card { overflow: hidden; }
+.det-card + .det-card { border-top: 1px solid var(--border); }
 .det-card-title {
   display: flex; align-items: center; gap: 8px;
-  padding: 12px 16px; border-bottom: 1px solid var(--border);
+  padding: 12px 24px; border-bottom: 1px solid var(--border);
   font-size: 12px; font-weight: 700; text-transform: uppercase;
   letter-spacing: .07em; color: var(--accent-text); background: #f8fafb;
 }
 html[data-theme="dark"] .det-card-title { background: var(--surface); color: var(--teal-300); }
 .det-grid { display: grid; grid-template-columns: repeat(3, 1fr); }
 .det-field {
-  padding: 12px 16px; border-bottom: 1px solid var(--border);
+  padding: 12px 24px; border-bottom: 1px solid var(--border);
   border-right: 1px solid var(--border);
 }
 .det-field:nth-child(3n) { border-right: none; }
@@ -92,7 +110,8 @@ html[data-theme="dark"] .det-card-title { background: var(--surface); color: var
 .abtn-neutral:hover { background: #e0e8ef; }
 
 /* Dark */
-html[data-theme="dark"] .det-card { background: var(--surface); border-color: var(--border); }
+html[data-theme="dark"] .det-block { background: var(--surface); }
+html[data-theme="dark"] .det-card + .det-card { border-top-color: var(--border); }
 html[data-theme="dark"] .det-field { border-color: var(--border); }
 html[data-theme="dark"] .abtn-neutral { background: var(--surface); color: var(--text); border-color: var(--border); }
 html[data-theme="dark"] .abtn-neutral:hover { background: var(--surface); }
@@ -100,7 +119,7 @@ html[data-theme="dark"] .abtn-neutral:hover { background: var(--surface); }
 {% endblock %}
 
 {% block content %}
-<div class="hist-wrapper"><div class="hist-main">
+{% load core_tags %}
 <div id="page-wrap">
 
 {# BREADCRUMB #}
@@ -122,6 +141,12 @@ html[data-theme="dark"] .abtn-neutral:hover { background: var(--surface); }
     {% endif %}
   </div>
 </div>
+
+{% comment %}Les deux colonnes (fiche + historique) sont dans #page-wrap, pour partager le décalage sous la barre fixe et donc s'aligner en haut.{% endcomment %}
+<div class="hist-wrapper"><div class="hist-main">
+
+{# Bloc unique : en-tête + toutes les sections, comme la fiche chambre #}
+<div class="det-block">
 
 {# EN-TÊTE #}
 <div class="det-hdr">
@@ -209,6 +234,8 @@ html[data-theme="dark"] .abtn-neutral:hover { background: var(--surface); }
 </div>
 {% endif %}
 
+</div><!-- /det-block -->
+
 {# ACTIONS #}
 <div class="det-actions">
   {% if peut_modifier %}
@@ -218,9 +245,9 @@ html[data-theme="dark"] .abtn-neutral:hover { background: var(--surface); }
   {% endif %}
 </div>
 
-</div><!-- /page-wrap -->
-</div>
-{% load core_tags %}
+</div>{# /hist-main #}
 {% historique_sidebar deces %}
-</div>
+</div>{# /hist-wrapper #}
+
+</div><!-- /page-wrap -->
 {% endblock %}

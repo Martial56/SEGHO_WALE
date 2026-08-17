@@ -126,21 +126,26 @@ html[data-theme="dark"] .equip-non  { background: rgba(107,114,128,.1); color: v
 html[data-theme="dark"] .abtn-neutral { background: var(--surface); color: var(--text); border-color: var(--border); }
 html[data-theme="dark"] .abtn-neutral:hover { background: var(--surface); }
 
-/* ── Historique : sans bordure/ombre, colonne un peu plus large, même
-   hauteur que le bloc de gauche (propre à cette page) ── */
-.hist-wrapper { align-items: stretch; }
+/* ── Historique : sans bordure/ombre, colonne un peu plus large ──
+   Les deux colonnes vivent dans #page-wrap, donc elles partent du même point :
+   le décalage du haut se règle avec la même marge que .det-block (18px), au
+   lieu du margin-top:65px qui approximait la hauteur de la barre fixe et
+   laissait le panneau 6px trop bas.
+   Le panneau n'est pas étiré à la hauteur de la fiche : il fait la hauteur de
+   son contenu, sinon un historique vide dessinait une colonne aussi haute que
+   la fiche pour une seule ligne de texte. */
 .hist-main { flex: 0 1 1350px; padding-left: 20px; }
 .hist-aside {
   position: static; max-height: none;
-  width: 320px; margin-top: 65px;
+  width: 320px; margin: 18px 20px 24px 14px;
 }
-.hist-panel { height: 100%; border: none; box-shadow: none; }
+.hist-panel { border: none; box-shadow: none; }
 html[data-theme="dark"] .hist-panel { border: none; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="hist-wrapper"><div class="hist-main">
+{% load core_tags %}
 <div id="page-wrap">
 
 {# BREADCRUMB #}
@@ -160,6 +165,9 @@ html[data-theme="dark"] .hist-panel { border: none; }
     </a>
   </div>
 </div>
+
+{% comment %}Les deux colonnes (fiche + historique) sont dans #page-wrap, pour partager le décalage sous la barre fixe et donc s'aligner en haut comme en bas.{% endcomment %}
+<div class="hist-wrapper"><div class="hist-main">
 
 {# Bloc unique : en-tête + toutes les sections, comme .det-block de hospitalisation/detail.html #}
 <div class="det-block">
@@ -263,10 +271,9 @@ html[data-theme="dark"] .hist-panel { border: none; }
 
 </div><!-- /det-block -->
 
+</div>{# /hist-main #}
+{% historique_sidebar chambre %}
+</div>{# /hist-wrapper #}
 
 </div><!-- /page-wrap -->
-</div>
-{% load core_tags %}
-{% historique_sidebar chambre %}
-</div>
 {% endblock %}

@@ -6,7 +6,26 @@
 {% block extra_css %}
 {{ block.super }}
 <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
+<style>
+  /* L'historique est ici une carte de la colonne de gauche, sous « Informations »,
+     et non le panneau latéral collant de .hist-wrapper : on annule la largeur
+     fixe, la marge et le positionnement collant qu'il porte par défaut, et on
+     reprend l'habillage des .md-card pour qu'il s'aligne avec elles. */
+  .md-layout aside .hist-aside {
+    width: auto;
+    margin-left: 0;
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
 
+  .md-layout aside .hist-panel {
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+    background: var(--surface);
+  }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -133,6 +152,9 @@
         </div>
       </div>
     </div>
+
+    {% load core_tags %}
+    {% historique_sidebar med %}
 
   </aside>
 
@@ -284,6 +306,4 @@
 
   </div>
 </div>
-{% load core_tags %}
-{% historique_sidebar med %}
 {% endblock %}

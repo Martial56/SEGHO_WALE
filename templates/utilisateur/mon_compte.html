@@ -155,6 +155,19 @@ html[data-theme="dark"] .cpt-card { box-shadow:0 1px 4px rgba(0,0,0,.25); }
   border:1px solid rgba(var(--teal-600-rgb),.18); border-radius:20px;
   padding:2px 10px; font-size:11px; font-weight:700;
 }
+
+.cpt-swatches {
+  display:flex; flex-wrap:wrap; gap:8px; margin-top:14px;
+}
+.cpt-swatch {
+  width:26px; height:26px; border-radius:50%; cursor:pointer; padding:0;
+  background:var(--sw); border:2px solid transparent;
+  box-shadow:0 0 0 1px var(--border) inset;
+  transition:transform .12s, border-color .12s;
+}
+.cpt-swatch:hover { transform:scale(1.12); }
+.cpt-swatch.active { border-color:var(--text); }
+
 /* --teal-700 reste une teinte sombre en mode sombre (seuls 800/900/950 sont
    renversés) : le texte du badge y devenait presque noir sur presque noir. */
 html[data-theme="dark"] .cpt-badge {
@@ -403,6 +416,30 @@ html[data-theme="dark"] .cpt-badge {
           Couleur par défaut (logo)
         </button>
       </div>
+
+      {% comment %}
+      Le nuancier natif du navigateur ne garde pas d'échantillons d'une session à
+      l'autre : ces pastilles donnent un aller-retour en un clic entre le vert du
+      logo et les autres teintes, sans repasser par le sélecteur système.
+      {% endcomment %}
+      <div class="cpt-swatches" role="group" aria-label="Couleurs prédéfinies">
+        <button type="button" class="cpt-swatch" data-color="#4f9b4b"
+                style="--sw:#4f9b4b" title="Vert logo (couleur d'origine)"></button>
+        <button type="button" class="cpt-swatch" data-color="#1a6d8c"
+                style="--sw:#1a6d8c" title="Bleu pétrole"></button>
+        <button type="button" class="cpt-swatch" data-color="#2d99db"
+                style="--sw:#2d99db" title="Bleu ciel"></button>
+        <button type="button" class="cpt-swatch" data-color="#d64c00"
+                style="--sw:#d64c00" title="Orange"></button>
+        <button type="button" class="cpt-swatch" data-color="#c0392b"
+                style="--sw:#c0392b" title="Rouge brique"></button>
+        <button type="button" class="cpt-swatch" data-color="#7b57c2"
+                style="--sw:#7b57c2" title="Violet"></button>
+        <button type="button" class="cpt-swatch" data-color="#0f7b6c"
+                style="--sw:#0f7b6c" title="Vert sapin"></button>
+        <button type="button" class="cpt-swatch" data-color="#8a5a2b"
+                style="--sw:#8a5a2b" title="Brun"></button>
+      </div>
     </div>
   </div>
 
@@ -560,11 +597,30 @@ function togglePw(inputId, btn) {
         });
     }
 
+    var swatches = document.querySelectorAll('.cpt-swatch');
+    function marquerActive(hex) {
+        swatches.forEach(function(b) {
+            b.classList.toggle('active',
+                b.dataset.color.toLowerCase() === (hex || '').toLowerCase());
+        });
+    }
+    marquerActive(input.value);
+
     input.addEventListener('input', function() {
         applyAccent(input.value);
+        marquerActive(input.value);
     });
     input.addEventListener('change', function() {
         save(input.value);
+    });
+    swatches.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var hex = btn.dataset.color;
+            input.value = hex;
+            applyAccent(hex);
+            marquerActive(hex);
+            save(hex);
+        });
     });
     if (resetBtn) {
         resetBtn.addEventListener('click', function() {
