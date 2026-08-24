@@ -59,8 +59,8 @@
   {% empty %}
   <div class="h-empty" style="grid-column:1/-1;">
     <i class="bi bi-hospital"></i>
-    Aucune hospitalisation trouvée
-    {% if q or statut %}<p>Modifiez vos filtres de recherche.</p>{% endif %}
+    {% if selection_active %}Aucune hospitalisation ne correspond à ces critères.
+    {% else %}Aucune hospitalisation {{ periode_libelle }}.<p>Élargissez la période depuis <strong>Filtres</strong>.</p>{% endif %}
   </div>
   {% endfor %}
 </div>
@@ -80,39 +80,23 @@
       </tr>
     </thead>
     <tbody>
-      {% for hosp in page_obj %}
-      <tr onclick="window.location='{% url 'hospitalisation:detail' hosp.pk %}'">
-        <td><span class="h-num">{{ hosp.numero }}</span></td>
-        <td>
-          <div class="h-patient-name">{{ hosp.patient.nom }} {{ hosp.patient.prenoms }}</div>
-        </td>
-        <td>
-          {% if hosp.chambre %}
-          <div class="h-chambre-nom">{{ hosp.chambre.nom }}{% if hosp.numero_lit %} — Lit {{ hosp.numero_lit }}{% endif %}</div>
-          <div class="h-chambre-type">{{ hosp.chambre.get_type_chambre_display }}</div>
-          {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
-        </td>
-        <td>
-          {% if hosp.medecin_traitant %}{{ hosp.medecin_traitant.nom }} {{ hosp.medecin_traitant.prenoms }}
-          {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
-        </td>
-        <td>
-          {{ hosp.date_admission|date:"d/m/Y" }}<br>
-          <span style="font-size:10.5px;color:var(--text-muted);">{{ hosp.date_admission|date:"H:i" }}</span>
-        </td>
-        <td><span class="h-badge h-badge-{{ hosp.statut }}">{{ hosp.get_statut_display }}</span></td>
-      </tr>
-      {% empty %}
+      {% if arbre %}
+        {% include 'includes/listing/groupes.html' with noeuds=arbre listing_colonnes=6 listing_ligne_tpl='hospitalisation/includes/_row.html' %}
+      {% else %}
+        {% for hosp in page_obj %}
+          {% include 'hospitalisation/includes/_row.html' with objet=hosp parent='' %}
+        {% empty %}
       <tr>
         <td colspan="6">
           <div class="h-empty">
             <i class="bi bi-hospital"></i>
-            Aucune hospitalisation trouvée
-            {% if q or statut %}<p>Modifiez vos filtres de recherche.</p>{% endif %}
+            {% if selection_active %}Aucune hospitalisation ne correspond à ces critères.
+            {% else %}Aucune hospitalisation {{ periode_libelle }}.<p>Élargissez la période depuis <strong>Filtres</strong>.</p>{% endif %}
           </div>
         </td>
       </tr>
-      {% endfor %}
+        {% endfor %}
+      {% endif %}
     </tbody>
   </table>
 </div>

@@ -629,10 +629,11 @@ def patient_search_json(request):
     elif len(q) < 2:
         return JsonResponse({'results': []})
     else:
-        qs = base_qs.filter(
-            Q(nom__icontains=q) | Q(prenoms__icontains=q) |
-            Q(code_patient__icontains=q) | Q(telephone__icontains=q)
-        )[:20]
+        # Même découpage en mots que la liste : « anoh josiane » doit trouver
+        # la fiche, alors que le nom et les prénoms sont deux colonnes.
+        from core.listing import condition_recherche
+        qs = base_qs.filter(condition_recherche(
+            ('nom', 'prenoms', 'code_patient', 'telephone'), q))[:20]
     return JsonResponse({'results': [_to_dict(p) for p in qs]})
 
 

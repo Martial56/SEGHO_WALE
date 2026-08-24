@@ -2,8 +2,10 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 
+from centres.models import ModeleCentre
 
-class Soin(models.Model):
+
+class Soin(ModeleCentre):
     STATUT = [
         ('brouillon', 'Brouillon'),
         ('en_attente_de_paiement', 'En attente de paiement'),
@@ -81,12 +83,15 @@ class Soin(models.Model):
         if not self.numero:
             annee = timezone.now().year
             prefix = f"SN{str(annee)[2:]}"
-            last = Soin.objects.filter(numero__startswith=prefix).order_by('-pk').first()
+            # all_objects : le numéro est unique tous centres confondus. Compter
+            # sur `objects`, cloisonné, redonnerait un numéro déjà pris dans
+            # l'autre centre.
+            last = Soin.all_objects.filter(numero__startswith=prefix).order_by('-pk').first()
             if last:
                 try:
                     count = int(last.numero[len(prefix):]) + 1
                 except (ValueError, IndexError):
-                    count = Soin.objects.filter(numero__startswith=prefix).count() + 1
+                    count = Soin.all_objects.filter(numero__startswith=prefix).count() + 1
             else:
                 count = 1
             self.numero = f"{prefix}{count:05d}"
@@ -95,7 +100,7 @@ class Soin(models.Model):
     def __str__(self):
         return f"{self.numero or 'Soin'} — {self.patient}"
 
-    class Meta:
+    class Meta(ModeleCentre.Meta):
         verbose_name = "Soin"
         verbose_name_plural = "Soins"
         ordering = ['-date_creation']
@@ -111,7 +116,7 @@ class Soin(models.Model):
 
 
 
-class ProcedureSoin(models.Model):
+class ProcedureSoin(ModeleCentre):
     STATUT = [
         ('brouillon', 'Brouillon'),
         ('en_cours', 'En cours'),
@@ -170,12 +175,14 @@ class ProcedureSoin(models.Model):
         if not self.numero:
             annee = timezone.now().year
             prefix = f"DP{str(annee)[2:]}"
-            last = ProcedureSoin.objects.filter(numero__startswith=prefix).order_by('-pk').first()
+            # all_objects : voir Soin.save — le numéro est unique tous centres
+            # confondus.
+            last = ProcedureSoin.all_objects.filter(numero__startswith=prefix).order_by('-pk').first()
             if last:
                 try:
                     count = int(last.numero[len(prefix):]) + 1
                 except (ValueError, IndexError):
-                    count = ProcedureSoin.objects.filter(numero__startswith=prefix).count() + 1
+                    count = ProcedureSoin.all_objects.filter(numero__startswith=prefix).count() + 1
             else:
                 count = 1
             self.numero = f"{prefix}{count:05d}"
@@ -184,7 +191,7 @@ class ProcedureSoin(models.Model):
     def __str__(self):
         return f"{self.numero} — {self.patient}"
 
-    class Meta:
+    class Meta(ModeleCentre.Meta):
         verbose_name = "Procédure de soin"
         verbose_name_plural = "Liste des soins"
         ordering = ['-date']

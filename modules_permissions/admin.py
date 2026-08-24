@@ -9,6 +9,8 @@ from django.utils.safestring import mark_safe
 from django.urls import path, reverse
 from django.http import JsonResponse
 
+from core.models import UserProfile
+
 from .models import (
     Module, GroupModule, UserModuleOverride,
     NavItem, GroupNavItemRestriction, UserNavItemOverride,
@@ -159,6 +161,49 @@ class UserModuleOverrideInline(admin.TabularInline):
     verbose_name_plural = "Overrides de modules individuels"
 
 
+class ProfilCentresForm(forms.ModelForm):
+    """Affectation d'un utilisateur à un ou plusieurs centres.
+
+    Le profil porte deux notions distinctes : `centres` est le droit d'accès —
+    ce que l'utilisateur a le droit de voir — et `centre_actif` le centre sur
+    lequel il travaille en ce moment, qu'il change lui-même depuis l'en-tête
+    quand il en a plusieurs. Laisser `centre_actif` vide est le cas normal :
+    avec un seul centre autorisé, il est choisi automatiquement à la première
+    connexion (voir core.middleware._resoudre_centre_actif).
+    """
+
+    class Meta:
+        model = UserProfile
+        fields = ('centres', 'centre_actif')
+        widgets = {'centres': forms.CheckboxSelectMultiple}
+
+    def clean(self):
+        donnees = super().clean()
+        centres = donnees.get('centres')
+        actif = donnees.get('centre_actif')
+        # Un centre actif hors des centres autorisés donnerait un utilisateur
+        # qui voit des données auxquelles il n'a pas droit : on le refuse ici
+        # plutôt que de le découvrir en production.
+        if actif and centres is not None and actif not in centres:
+            self.add_error('centre_actif',
+                           "Ce centre ne fait pas partie des centres autorisés ci-dessus.")
+        return donnees
+
+
+class UserProfileInline(admin.StackedInline):
+    """Le rattachement aux centres, directement sur la fiche utilisateur.
+
+    Il reste consultable en liste sur /admin/core/userprofile/, mais c'est ici
+    qu'on le cherche : on crée un utilisateur, on lui donne son centre.
+    """
+    model = UserProfile
+    form = ProfilCentresForm
+    can_delete = False
+    max_num = 1
+    verbose_name = "Centres d'affectation"
+    verbose_name_plural = "Centres d'affectation"
+
+
 class CustomUserAdmin(BaseUserAdmin):
     """
     UserAdmin étendu :
@@ -166,11 +211,34 @@ class CustomUserAdmin(BaseUserAdmin):
     - Permet des overrides individuels via une inline
     - Ajoute un widget JS qui filtre les modules selon le groupe sélectionné
     """
-    inlines = [UserModuleOverrideInline]
+    inlines = [UserProfileInline, UserModuleOverrideInline]
     readonly_fields = ('navitems_link',)
+    list_display = tuple(BaseUserAdmin.list_display) + ('centres_affectes',)
+    list_filter = tuple(BaseUserAdmin.list_filter) + ('profile__centres',)
 
     # Ajouter la liste des modules en lecture seule dans le fieldset Permissions
     fieldsets = list(BaseUserAdmin.fieldsets)  # copie
+
+    def get_inline_instances(self, request, obj=None):
+        # À la création, le profil n'existe pas encore : il est posé par le
+        # signal post_save de core.models. Afficher l'inline ici tenterait d'en
+        # créer un second et casserait le OneToOne. On l'affiche donc une fois
+        # l'utilisateur enregistré.
+        instances = super().get_inline_instances(request, obj)
+        if obj is None:
+            instances = [i for i in instances if not isinstance(i, UserProfileInline)]
+        return instances
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).prefetch_related('profile__centres')
+
+    @admin.display(description='Centres')
+    def centres_affectes(self, obj):
+        profil = getattr(obj, 'profile', None)
+        if profil is None:
+            return '\u2014'
+        noms = [c.nom for c in profil.centres.all()]
+        return ', '.join(noms) if noms else '\u2014'
 
     def get_fieldsets(self, request, obj=None):
         fieldsets = super().get_fieldsets(request, obj)

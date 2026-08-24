@@ -102,16 +102,47 @@
   .det-main-name { font-size:20px;font-weight:700;color:var(--text);margin-bottom:4px; }
   .det-main-sub  { font-size:13px;color:var(--text-muted); }
 
-  /* Grille de champs */
-  .det-fields { border-top:1px solid var(--border);padding:16px 22px; }
-  .det-fields-grid {
-    display:grid;grid-template-columns:repeat(3,1fr);gap:16px 24px;
+  /* ── Sections de champs : même dessin que la fiche chambre — un seul bloc,
+     des sections titrées séparées par un filet, et des cellules bordées plutôt
+     qu'une grille flottante. ── */
+  .det-card + .det-card { border-top:1px solid var(--border); }
+  .det-card-title {
+    display:flex;align-items:center;gap:8px;
+    padding:12px 22px;border-top:1px solid var(--border);
+    font-size:12px;font-weight:700;text-transform:uppercase;
+    letter-spacing:.07em;color:var(--accent-text);background:#f8fafb;
   }
-  @media(max-width:900px){ .det-fields-grid{grid-template-columns:repeat(2,1fr);} }
-  @media(max-width:600px){ .det-fields-grid{grid-template-columns:1fr;} }
+  html[data-theme="dark"] .det-card-title { background:var(--surface);color:var(--teal-300); }
+
+  .det-fields-grid { display:grid;grid-template-columns:repeat(3,1fr); }
+  .det-field {
+    padding:12px 22px;
+    border-top:1px solid var(--border);border-right:1px solid var(--border);
+  }
+  /* Bordure haute portée par les cellules et non basse : la dernière rangée
+     n'a ainsi jamais de filet en trop sous elle, quel que soit le nombre de
+     champs — c'est ce qui cassait l'alignement quand une cellule occupait
+     toute la largeur. */
+  .det-field:nth-child(-n+3) { border-top:none; }
+  .det-field:nth-child(3n)   { border-right:none; }
+  .det-field.full { grid-column:1 / -1;border-right:none; }
+  @media(max-width:900px){
+    .det-fields-grid{grid-template-columns:repeat(2,1fr);}
+    .det-field:nth-child(-n+3){border-top:1px solid var(--border);}
+    .det-field:nth-child(-n+2){border-top:none;}
+    .det-field:nth-child(3n){border-right:1px solid var(--border);}
+    .det-field:nth-child(2n){border-right:none;}
+  }
+  @media(max-width:600px){
+    .det-fields-grid{grid-template-columns:1fr;}
+    .det-field{border-right:none;border-top:1px solid var(--border);}
+    .det-field:first-child{border-top:none;}
+  }
   .det-field-label { font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px; }
   .det-field-value { font-size:14px;color:var(--text);font-weight:500; }
   .det-field-empty { color:var(--text-muted);font-style:italic;font-weight:400; }
+  .det-field-value a { color:var(--accent-text-soft);text-decoration:none;font-weight:600; }
+  .det-field-value a:hover { text-decoration:underline; }
 </style>
 {% endblock %}
 
@@ -195,9 +226,15 @@
 
       <!-- Actions droite -->
       <div class="det-action-btns">
+        {% comment %}Une procédure terminée ou annulée n'est plus modifiable par
+        le personnel courant — le formulaire fige ses champs et la vue refuse
+        l'écriture. L'administration garde la main, comme pour un soin hors
+        brouillon (voir soins_edit).{% endcomment %}
+        {% if proc.statut != 'termine' and proc.statut != 'annule' or request.user.is_superuser %}
         <a href="{% url 'soins:procedure_edit' proc.pk %}" class="det-btn det-btn-edit">
           <i class="bi bi-pencil"></i> Modifier
         </a>
+        {% endif %}
 
         {% if proc.statut == 'en_cours' %}
           <form method="post" action="{% url 'soins:procedure_terminer' proc.pk %}" style="display:inline;">
@@ -221,9 +258,9 @@
           </form>
         {% endif %}
 
-        {% if request.user.is_staff and not proc.facture %}
+        {% if request.user.is_staff and not proc.facture and proc.statut != 'annule' %}
         <a href="{% url 'soins:procedure_facturer' proc.pk %}" class="det-btn det-btn-invoice" style="text-decoration:none;">
-          <i class="bi bi-receipt"></i> Facturer <small style="opacity:.6;font-size:9px;">(ad)</small>
+          <i class="bi bi-receipt"></i> Facturer
         </a>
         {% endif %}
       </div>
@@ -244,19 +281,20 @@
       </div>
     </div>
 
-    <!-- Champs -->
-    <div class="det-fields">
+    <!-- ══ SOIN RÉALISÉ ══ -->
+    <div class="det-card">
+      <div class="det-card-title"><i class="bi bi-bandaid"></i> Soin réalisé</div>
       <div class="det-fields-grid">
 
-        <div>
-          <div class="det-field-label">Infirmier</div>
+        <div class="det-field">
+          <div class="det-field-label">Date &amp; heure</div>
           <div class="det-field-value">
-            {% if proc.infirmier %}{{ proc.infirmier.nom }} {{ proc.infirmier.prenoms }}
+            {% if proc.date %}{{ proc.date|date:"d/m/Y" }} à {{ proc.date|date:"H:i" }}
             {% else %}<span class="det-field-empty">—</span>{% endif %}
           </div>
         </div>
 
-        <div>
+        <div class="det-field">
           <div class="det-field-label">Soin</div>
           <div class="det-field-value">
             {% if proc.soin_type %}{{ proc.soin_type.nom }}
@@ -264,7 +302,7 @@
           </div>
         </div>
 
-        <div>
+        <div class="det-field">
           <div class="det-field-label">Prix</div>
           <div class="det-field-value">
             {% if proc.prix %}{{ proc.prix|floatformat:0 }} CFA
@@ -272,8 +310,15 @@
           </div>
         </div>
 
-        {% comment %}
-        <div>
+        <div class="det-field">
+          <div class="det-field-label">Infirmier</div>
+          <div class="det-field-value">
+            {% if proc.infirmier %}{{ proc.infirmier.nom }} {{ proc.infirmier.prenoms }}
+            {% else %}<span class="det-field-empty">—</span>{% endif %}
+          </div>
+        </div>
+
+        <div class="det-field">
           <div class="det-field-label">Département</div>
           <div class="det-field-value">
             {% if proc.departement %}{{ proc.departement.nom }}
@@ -281,7 +326,15 @@
           </div>
         </div>
 
-        <div>
+        <div class="det-field">
+          <div class="det-field-label">Enregistré par</div>
+          <div class="det-field-value">
+            {% if proc.cree_par %}{{ proc.cree_par.get_full_name|default:proc.cree_par.username }}
+            {% else %}<span class="det-field-empty">—</span>{% endif %}
+          </div>
+        </div>
+
+        <div class="det-field full">
           <div class="det-field-label">Maladie</div>
           <div class="det-field-value">
             {% if proc.maladie %}{{ proc.maladie }}
@@ -289,24 +342,40 @@
           </div>
         </div>
 
-        {# <div>
-          <div class="det-field-label">Rendez-vous</div>
-          <div class="det-field-value">
-            {% if proc.rendez_vous %}{{ proc.rendez_vous }}
-            {% else %}<span class="det-field-empty">—</span>{% endif %}
-          </div>
-        </div> #}
+      </div>
+    </div>
 
-        <div>
-          <div class="det-field-label">Facture</div>
+    <!-- ══ RATTACHEMENT ══ -->
+    <div class="det-card">
+      <div class="det-card-title"><i class="bi bi-link-45deg"></i> Rattachement</div>
+      <div class="det-fields-grid">
+
+        <div class="det-field">
+          <div class="det-field-label">Fiche de soin</div>
           <div class="det-field-value">
-            {% if proc.facture %}{{ proc.facture.numero }}
+            {% if proc.soin %}
+            <a href="{% url 'soins:detail' proc.soin.pk %}">
+              <i class="bi bi-box-arrow-up-right" style="font-size:11px;"></i> {{ proc.soin.numero }}
+            </a>
             {% else %}<span class="det-field-empty">—</span>{% endif %}
           </div>
         </div>
-        {% endcomment %}
 
-        {# Enregistré le déplacé dans l'en-tête identité (coin droit) #}
+        <div class="det-field">
+          <div class="det-field-label">Facture</div>
+          <div class="det-field-value">
+            {% if proc.facture %}
+            <a href="{% url 'facturation:detail' proc.facture.pk %}">
+              <i class="bi bi-receipt" style="font-size:11px;"></i> {{ proc.facture.numero }}
+            </a>
+            {% else %}<span class="det-field-empty">Pas encore facturé</span>{% endif %}
+          </div>
+        </div>
+
+        <div class="det-field">
+          <div class="det-field-label">Statut</div>
+          <div class="det-field-value">{{ proc.get_statut_display }}</div>
+        </div>
 
       </div>
     </div>

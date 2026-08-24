@@ -1,5 +1,5 @@
 {% extends 'hospitalisation/base.html' %}
-{% load i18n %}
+{% load i18n static %}
 
 {% block extra_css %}
 {{ block.super }}
@@ -75,15 +75,13 @@ html[data-theme="dark"] .badge-termine   { background: rgba(6,95,70,.2);  color:
 
 <div class="o-subheader" data-fixed="1">
   <div class="o-subheader-row">
-    <span class="o-page-title">Registre des décès de patients</span>
+    <span class="o-page-title">Registre des décès de patients <span class="o-page-count">{{ total }}</span></span>
+    <span class="o-page-scope" style="font-size:12px;color:var(--text-muted);">· {{ periode_libelle }}</span>
     <div class="o-subheader-row-right">
-      <form method="get" style="display:flex;align-items:center;">
-        {% if statut %}<input type="hidden" name="statut" value="{{ statut }}">{% endif %}
-        <div class="o-search-bar">
-          <input class="o-search-input" type="text" name="q" value="{{ q }}" placeholder="Rechercher…">
-          <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
-        </div>
-      </form>
+      <div class="o-search-bar">
+        <input class="o-search-input" type="text" id="search-input" value="{{ q }}" placeholder="Rechercher…">
+        <button type="button" class="o-search-btn" onclick="lancerRecherche()"><i class="bi bi-search"></i></button>
+      </div>
     </div>
   </div>
 
@@ -106,61 +104,61 @@ html[data-theme="dark"] .badge-termine   { background: rgba(6,95,70,.2);  color:
         <button type="button" class="io-pm-item" onclick="openImportModal()"><i class="bi bi-upload" style="color:var(--accent-text-soft);"></i> Importer un fichier…</button>
       </div>
     </div>
-    <div class="o-subheader-row-right">
+    <div class="o-subheader-row-right" id="subheader-controls"
+         data-filters="{{ filters|join:"," }}" data-groups="{{ groups|join:"," }}">
+
+      {% if selection_active %}
+      <a href="#" class="o-ctrl-btn" style="color:var(--rose-text);"
+         onclick="resetAll(); return false;"
+         title="Effacer les filtres, le regroupement et la recherche">
+        <i class="bi bi-x-circle"></i> Effacer
+      </a>
+      {% endif %}
+
       <div class="o-dd-wrap">
-        <button class="o-ctrl-btn {% if statut %}active{% endif %}" onclick="toggleDd('dd-filtres', this)">
-          <i class="bi bi-funnel{% if statut %}-fill{% endif %}"></i> Filtres
+        <button class="o-ctrl-btn {% if filtre_pose %}active{% endif %}"
+                id="btn-filtres" onclick="toggleDd('dd-filtres', this)">
+          <i class="bi bi-funnel{% if filtre_pose %}-fill{% endif %}"></i> Filtres
         </button>
-        <div class="o-dd-panel" id="dd-filtres">
-          <div class="o-dd-section">Statut</div>
-          <a class="o-dd-item {% if statut == 'brouillon' %}active{% endif %}"
-             href="?statut=brouillon{% if q %}&q={{ q }}{% endif %}">Brouillon</a>
-          <a class="o-dd-item {% if statut == 'termine' %}active{% endif %}"
-             href="?statut=termine{% if q %}&q={{ q }}{% endif %}">Terminé</a>
-          {% if statut %}
-          <hr class="o-dd-sep">
-          <a class="o-dd-item" href="?{% if q %}q={{ q }}{% endif %}" style="color:var(--rose-text);">
-            <i class="bi bi-x-circle" style="font-size:11px;margin-right:4px;"></i> Supprimer le filtre
-          </a>
-          {% endif %}
+        <div class="o-dd-panel lst-menu" id="dd-filtres">
+          {% include 'includes/listing/menu_filtres.html' %}
         </div>
       </div>
+
+      <div class="o-dd-wrap">
+        <button class="o-ctrl-btn {% if groups %}active{% endif %}"
+                id="btn-group" onclick="toggleDd('dd-group', this)">
+          <i class="bi bi-list-ul"></i> Regrouper par
+        </button>
+        <div class="o-dd-panel lst-menu" id="dd-group">
+          <div class="o-dd-section">Regrouper par</div>
+          {% include 'includes/listing/menu_groupes.html' %}
+        </div>
+      </div>
+
       <div class="o-ctrl-sep"></div>
       <div class="o-pagination">
         {% if page_obj.paginator.count > 0 %}
         <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
         {% else %}<span>0</span>{% endif %}
         <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
-           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if statut %}&statut={{ statut }}{% endif %}{% else %}#{% endif %}">
+           href="{% if page_obj.has_previous %}{% querystring page=page_obj.previous_page_number %}{% else %}#{% endif %}">
           <i class="bi bi-chevron-left"></i>
         </a>
         <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
-           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if statut %}&statut={{ statut }}{% endif %}{% else %}#{% endif %}">
+           href="{% if page_obj.has_next %}{% querystring page=page_obj.next_page_number %}{% else %}#{% endif %}">
           <i class="bi bi-chevron-right"></i>
         </a>
       </div>
     </div>
   </div>
 
-  {% if q or statut %}
-  <div class="o-subheader-row" style="gap:6px;flex-wrap:wrap;padding-top:0;">
-    {% if q %}
-    <span style="font-size:11px;color:var(--text-muted);">Recherche :</span>
-    <span class="o-filter-tag">{{ q }}
-      <a href="?{% if statut %}statut={{ statut }}{% endif %}" title="Supprimer">×</a>
-    </span>
-    {% endif %}
-    {% if statut %}
-    <span style="font-size:11px;color:var(--text-muted);">Statut :</span>
-    <span class="o-filter-tag">
-      {% if statut == 'brouillon' %}Brouillon{% else %}Terminé{% endif %}
-      <a href="?{% if q %}q={{ q }}{% endif %}" title="Supprimer">×</a>
-    </span>
-    {% endif %}
-  </div>
-  {% endif %}
 </div>
 
+{% comment %}Styles de la brique : menus à sous-menus, bandes de groupe.{% endcomment %}
+{% include 'includes/listing/styles.html' %}
+
+<div id="list-result">
 <div style="overflow-x:auto;">
   <table class="dc-table">
     <thead>
@@ -178,62 +176,38 @@ html[data-theme="dark"] .badge-termine   { background: rgba(6,95,70,.2);  color:
       </tr>
     </thead>
     <tbody>
-      {% for d in page_obj %}
-      <tr onclick="window.location='{% url 'hospitalisation:deces_detail' d.pk %}'">
-        <td class="col-check" onclick="event.stopPropagation()">
-          <input type="checkbox" class="dc-check row-check">
-        </td>
-        <td class="col-code">{{ d.code }}</td>
-        <td class="col-name">{{ d.patient.nom }} {{ d.patient.prenoms }}</td>
-        <td>{{ d.patient.get_sexe_display }}</td>
-        <td>{{ d.patient.age }} ans</td>
-        <td>{{ d.date_deces|date:"d/m/Y" }}</td>
-        <td>{% if d.medecin %}Dr. {{ d.medecin.nom }} {{ d.medecin.prenoms }}{% endif %}</td>
-        <td>
-          {% if d.statut == 'termine' %}
-          <span class="badge-termine">Terminé</span>
-          {% else %}
-          <span class="badge-brouillon">Brouillon</span>
-          {% endif %}
-        </td>
-      </tr>
-      {% empty %}
+      {% if arbre %}
+        {% include 'includes/listing/groupes.html' with noeuds=arbre listing_colonnes=8 listing_ligne_tpl='hospitalisation/deces/_row.html' %}
+      {% else %}
+        {% for d in page_obj %}
+          {% include 'hospitalisation/deces/_row.html' with objet=d parent='' %}
+        {% empty %}
       <tr>
         <td colspan="8">
           <div class="h-empty">
             <i class="bi bi-journal-x"></i>
-            Aucun enregistrement{% if q %} pour « {{ q }} »{% endif %}
+            {% if selection_active %}Aucun enregistrement ne correspond à ces critères.
+            {% else %}Aucun décès enregistré.{% endif %}
           </div>
         </td>
       </tr>
-      {% endfor %}
+        {% endfor %}
+      {% endif %}
     </tbody>
   </table>
 </div>
+</div><!-- /#list-result -->
 
 </div><!-- /page-wrap -->
 {% endblock %}
 
 {% block extra_js %}
 {{ block.super }}
-<script>
-function toggleDd(id, btn) {
-  const panel = document.getElementById(id);
-  document.querySelectorAll('.o-dd-panel').forEach(p => { if (p.id !== id) p.classList.remove('open'); });
-  if (!panel) return;
-  const open = panel.classList.toggle('open');
-  if (open) {
-    const r = btn.getBoundingClientRect();
-    panel.style.top  = (r.bottom + window.scrollY + 4) + 'px';
-    panel.style.left = r.left + 'px';
-  }
-}
-document.addEventListener('click', function(e) {
-  if (!e.target.closest('.o-dd-wrap') && !e.target.closest('.o-dd-panel'))
-    document.querySelectorAll('.o-dd-panel').forEach(p => p.classList.remove('open'));
-});
-function toggleAll(m) { document.querySelectorAll('.row-check').forEach(c => c.checked = m.checked); }
+{% comment %}Dépliage des groupes, puis le pilotage commun des listes.{% endcomment %}
+<script src="{% static 'js/listing_groupes.js' %}"></script>
+{% include 'includes/listing/page_js.html' %}
 
+<script>
 function toggleIOPage(e){e.stopPropagation();document.getElementById('io-page-wrap').classList.toggle('open');}
 document.addEventListener('click',function(){var w=document.getElementById('io-page-wrap');if(w)w.classList.remove('open');});
 function openImportModal(){document.getElementById('io-modal-backdrop').classList.add('active');document.getElementById('io-modal').classList.add('active');var w=document.getElementById('io-page-wrap');if(w)w.classList.remove('open');}

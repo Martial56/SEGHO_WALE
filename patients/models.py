@@ -94,7 +94,7 @@ class Patient(ModeleCentre):
         ordering = ['-date_creation']
 
 
-class RendezVous(models.Model):
+class RendezVous(ModeleCentre):
 
     STATUT = [('planifie','Planifié'),('confirme','Confirmé'),('en_attente','En attente'),('en_consultation','En consultation'),('termine','Terminé'),('annule','Annulé'),('absent','Absent')]
     TYPE = [('consultation','Consultation'),('controle','Contrôle'),('urgence','Urgence'),('examen','Examen'),('vaccination','Vaccination')]
@@ -169,9 +169,12 @@ class RendezVous(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.code_rdv:
-            count = RendezVous.objects.count() + 1
+            # all_objects : le code reste unique tous centres confondus. Le
+            # compter sur `objects`, cloisonné, redonnerait un code déjà pris
+            # dans l'autre centre.
+            count = RendezVous.all_objects.count() + 1
             candidate = f"AP{count:05d}"
-            while RendezVous.objects.filter(code_rdv=candidate).exists():
+            while RendezVous.all_objects.filter(code_rdv=candidate).exists():
                 count += 1
                 candidate = f"AP{count:05d}"
             self.code_rdv = candidate
@@ -218,7 +221,7 @@ class RendezVous(models.Model):
         return self._fmt_sec(self.temps_consultation_minutes * 60)
 
     def __str__(self): return f"RDV {self.patient} - {self.date_heure.strftime('%d/%m/%Y %H:%M')}"
-    class Meta:
+    class Meta(ModeleCentre.Meta):
         verbose_name = "Rendez-vous"
         ordering = ['date_heure']
 

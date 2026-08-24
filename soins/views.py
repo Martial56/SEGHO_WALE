@@ -18,6 +18,7 @@ from laboratoire.models import AnalyseLaboratoire, ExamenImagerie
 from employer.models import Employe
 from services.models import Articleservice
 from core.views import log_event, get_logs
+from patients.selecteur import patient_affiche
 
 
 _STATUT_PROCEDURE_MAP = {
@@ -108,11 +109,12 @@ def _form_extras():
         categorie__code='SN'
     ).values('pk', 'nom', 'prix_vente'))
     employes = list(Employe.objects.order_by('nom', 'prenoms').values('pk', 'nom', 'prenoms'))
-    patients = list(Patient.objects.order_by('nom', 'prenoms').values('pk', 'nom', 'prenoms', 'code_patient'))
+    # Plus de liste de patients sérialisée : le sélecteur du formulaire
+    # (includes/_patient_picker.html) interroge /patients/recherche/ à la
+    # frappe. Sur ce centre cela retirait 383 dossiers du HTML de chaque page.
     return {
         'services_json': json.dumps(services, default=str),
         'employes_json': json.dumps(employes),
-        'patients_json': json.dumps(patients),
     }
 
 
@@ -136,16 +138,31 @@ def soins_patient_counts(request):
 
 @login_required(login_url='login')
 def soins_list(request):
+    """Liste des soins infirmiers.
+
+    Filtres cumulables et regroupements imbriqués viennent de core.listing,
+    comme les listes de rendez-vous, du registre des naissances et de la
+    gynécologie : cette vue ne fait que déclarer le jeu de départ et assembler
+    le contexte. Auparavant chaque critère écrasait le précédent — un seul
+    statut, une seule période — et la recherche restait prisonnière du repli sur
+    la journée en cours.
+    """
+    from django.core.paginator import Paginator
+
+    from core.listing import Listing, menu_filtres, menu_groupes, paginer_groupes
+    from .soin_listing import (CHAMPS_RECHERCHE, FILTRES_DEFAUT, TRIS,
+                               construire_dimensions, familles_soins, libelle_periode)
+
+    today = timezone.now().date()
     q = request.GET.get('q', '').strip()
-    statut = request.GET.get('statut', '').strip()
-    date_filtre = request.GET.get('date', '').strip()
-    date_debut = request.GET.get('date_debut', '').strip()
-    date_fin = request.GET.get('date_fin', '').strip()
+    groupes = request.GET.getlist('group')
+    date_from = request.GET.get('date_from', '').strip()
+    date_to = request.GET.get('date_to', '').strip()
     patient_id = request.GET.get('patient_id', '').strip()
     hospitalisation_id = request.GET.get('hospitalisation_id', '').strip()
 
-    soins = Soin.objects.select_related(
-        'patient', 'hospitalisation'
+    base_qs = Soin.objects.select_related(
+        'patient', 'hospitalisation', 'infirmier', 'departement'
     ).prefetch_related(
         Prefetch(
             'procedures',
@@ -159,37 +176,51 @@ def soins_list(request):
                 facture__statut__in=['payee']
             )
         )
-    ).order_by('-date_creation')
+    )
 
+    # Deux entrées ciblées, conservées telles quelles : on arrive ici depuis une
+    # fiche patient ou une hospitalisation, la période par défaut n'a alors plus
+    # de sens et le filtre est imposé en amont de la brique.
+    cible = bool(hospitalisation_id or patient_id)
     if hospitalisation_id:
-        soins = soins.filter(hospitalisation_id=hospitalisation_id)
+        base_qs = base_qs.filter(hospitalisation_id=hospitalisation_id)
     elif patient_id:
-        soins = soins.filter(patient_id=patient_id)
-    elif q:
-        soins = soins.filter(
-            Q(patient__nom__icontains=q) |
-            Q(patient__prenoms__icontains=q) |
-            Q(motif__icontains=q)
-        )
+        base_qs = base_qs.filter(patient_id=patient_id)
 
-    if statut:
-        soins = soins.filter(statut=statut)
+    declarees = construire_dimensions()
+    listing = Listing(
+        recherche=CHAMPS_RECHERCHE,
+        familles=familles_soins(),
+        dimensions=list(declarees.values()),
+        par_page=25,
+        filtres_defaut=() if cible else FILTRES_DEFAUT,
+        tri_defaut=('-date_creation',),
+        tris=TRIS,
+    )
 
-    if date_debut or date_fin:
-        if date_debut:
-            soins = soins.filter(date_creation__date__gte=date_debut)
-        if date_fin:
-            soins = soins.filter(date_creation__date__lte=date_fin)
-    elif date_filtre:
-        soins = soins.filter(date_creation__date=date_filtre)
-    elif not (hospitalisation_id or patient_id):
-        soins = soins.filter(date_creation__date=timezone.now().date())
+    filtres = listing.filtres_demandes(request)
+    qs = listing.appliquer_recherche(base_qs, q)
+    qs = listing.appliquer_filtres(qs, filtres, {
+        'aujourdhui': today, 'date_from': date_from, 'date_to': date_to,
+    })
+    tri, tri_sens = listing.tri_demande(request)
+    qs = listing.trier(qs, groupes, tri, tri_sens)
 
-    total = soins.count()
-    paginator = Paginator(soins, 25)
-    page_obj = paginator.get_page(request.GET.get('page'))
+    # Avec un regroupement on pagine les **groupes** : toutes les lignes des
+    # groupes affichés sont chargées, si bien que déplier n'appelle jamais le
+    # serveur.
+    dims = [declarees[g] for g in groupes if g in declarees]
+    arbre = []
+    if dims:
+        arbre, page_obj, nb_groupes = paginer_groupes(qs, dims, request.GET.get('page'))
+        # Avec un regroupement, la pagination porte sur les groupes : le compteur
+        # du titre doit rester celui des soins, pas celui des bandes.
+        total = qs.count()
+    else:
+        nb_groupes = 0
+        page_obj = Paginator(qs, listing.par_page).get_page(request.GET.get('page'))
+        total = page_obj.paginator.count
 
-    today = timezone.now().date()
     stats = {
         'aujourdhui': Soin.objects.filter(date_creation__date=today).count(),
         'ce_mois': Soin.objects.filter(date_creation__month=today.month, date_creation__year=today.year).count(),
@@ -215,13 +246,23 @@ def soins_list(request):
 
     return render(request, 'soins/list.html', {
         'page_obj': page_obj,
+        'arbre': arbre,
+        'nb_groupes': nb_groupes,
         'total': total,
         'stats': stats,
         'q': q,
-        'statut': statut,
-        'date_filtre': date_filtre,
-        'date_debut': date_debut,
-        'date_fin': date_fin,
+        'tri': tri,
+        'tri_sens': tri_sens,
+        'filters': filtres,
+        'groups': groupes,
+        'date_from': date_from,
+        'date_to': date_to,
+        'filtre_pose': bool(filtres),
+        'selection_active': bool(q or groupes or not listing.est_selection_par_defaut(filtres)),
+        'periode_libelle': libelle_periode(filtres, date_from, date_to),
+        # Menus générés depuis la déclaration : le gabarit ne fait que parcourir.
+        'listing_filtres': menu_filtres(listing.familles, filtres, date_from, date_to),
+        'listing_groupes': menu_groupes(list(declarees.values()), groupes),
         'today': today,
         'patient_id': patient_id,
         'patient_filtre': patient_filtre,
@@ -529,64 +570,91 @@ def soins_terminer(request, pk):
 # ─── LISTE DES SOINS (ProcedureSoin) ───────────────────────────────────────
 
 def _procedure_extras():
-    from facturation.models import Facture as FactureModel
     services = list(Articleservice.objects.filter(
         type_article__in=['service', 'prestation']
     ).values('pk', 'nom', 'prix_vente'))
     employes = list(Employe.objects.order_by('nom', 'prenoms').values('pk', 'nom', 'prenoms'))
-    patients = list(Patient.objects.order_by('nom', 'prenoms').values('pk', 'nom', 'prenoms', 'code_patient'))
-    rdvs = list(RendezVous.objects.select_related('patient').values(
-        'pk', 'patient_id', 'date_heure', 'type_rdv', 'statut'
-    ).order_by('-date_heure')[:500])
-    factures = list(FactureModel.objects.values('pk', 'numero', 'patient_id', 'montant_total').order_by('-date_emission')[:300])
+    # Ni rendez-vous ni factures sérialisés : le champ rendez-vous est commenté
+    # dans le gabarit et la liste des factures se construit depuis le queryset du
+    # formulaire. Les deux JSON pesaient 90 Ko par ouverture de page sans que
+    # rien ne les lise — comme la liste de patients retirée avant eux.
     return {
         'services_json': json.dumps(services, default=str),
         'employes_json': json.dumps(employes),
-        'patients_json': json.dumps(patients),
-        'rdvs_json': json.dumps(rdvs, default=str),
-        'factures_json': json.dumps(factures, default=str),
         'maladies': Pathologie.objects.filter(actif=True),
     }
 
 
 @login_required(login_url='login')
 def procedure_list(request):
-    q = request.GET.get('q', '').strip()
-    statut = request.GET.get('statut', '').strip()
-    date_filtre = request.GET.get('date', '').strip()
-    patient_id = request.GET.get('patient_id', '').strip()
+    """Liste des soins (procédures).
 
-    qs = ProcedureSoin.objects.select_related(
-        'patient', 'infirmier', 'departement', 'soin_type'
-    ).order_by('-date')
+    Même brique que les soins infirmiers et les listes de rendez-vous : les
+    filtres se cumulent, les regroupements s'imbriquent, les compteurs sont
+    calculés en base. Auparavant un seul statut et une seule date à la fois,
+    et la recherche annulait le filtre patient.
+    """
+    from django.core.paginator import Paginator
 
-    if patient_id:
-        qs = qs.filter(patient_id=patient_id)
-    elif q:
-        qs = qs.filter(
-            Q(numero__icontains=q) |
-            Q(patient__nom__icontains=q) |
-            Q(patient__prenoms__icontains=q) |
-            Q(infirmier__nom__icontains=q) |
-            Q(soin_type__nom__icontains=q) |
-            Q(maladie__nom__icontains=q)
-        )
-
-    if statut:
-        qs = qs.filter(statut=statut)
-    if date_filtre:
-        qs = qs.filter(date__date=date_filtre)
+    from core.listing import Listing, menu_filtres, menu_groupes, paginer_groupes
+    from .procedure_listing import (CHAMPS_RECHERCHE, FILTRES_DEFAUT,
+                                    TRIS as TRIS_PROCEDURE,
+                                    construire_dimensions, familles_procedures,
+                                    libelle_periode)
 
     today = timezone.now().date()
+    q = request.GET.get('q', '').strip()
+    groupes = request.GET.getlist('group')
+    date_from = request.GET.get('date_from', '').strip()
+    date_to = request.GET.get('date_to', '').strip()
+    patient_id = request.GET.get('patient_id', '').strip()
+
+    base_qs = ProcedureSoin.objects.select_related(
+        'patient', 'infirmier', 'departement', 'soin_type', 'maladie', 'facture'
+    )
+    # Entrée ciblée depuis une fiche patient : le filtre est imposé en amont de
+    # la brique, et la recherche s'applique alors *à l'intérieur* de ce patient
+    # au lieu de l'écraser comme avant.
+    if patient_id:
+        base_qs = base_qs.filter(patient_id=patient_id)
+
+    declarees = construire_dimensions()
+    listing = Listing(
+        recherche=CHAMPS_RECHERCHE,
+        familles=familles_procedures(),
+        dimensions=list(declarees.values()),
+        par_page=25,
+        filtres_defaut=FILTRES_DEFAUT,
+        tri_defaut=('-date',),
+        tris=TRIS_PROCEDURE,
+    )
+
+    filtres = listing.filtres_demandes(request)
+    qs = listing.appliquer_recherche(base_qs, q)
+    qs = listing.appliquer_filtres(qs, filtres, {
+        'aujourdhui': today, 'date_from': date_from, 'date_to': date_to,
+    })
+    tri, tri_sens = listing.tri_demande(request)
+    qs = listing.trier(qs, groupes, tri, tri_sens)
+
+    dims = [declarees[g] for g in groupes if g in declarees]
+    arbre = []
+    if dims:
+        arbre, page_obj, nb_groupes = paginer_groupes(qs, dims, request.GET.get('page'))
+        # La pagination porte sur les groupes : le compteur du titre doit rester
+        # celui des procédures.
+        total = qs.count()
+    else:
+        nb_groupes = 0
+        page_obj = Paginator(qs, listing.par_page).get_page(request.GET.get('page'))
+        total = page_obj.paginator.count
+
     stats = {
         'aujourdhui': ProcedureSoin.objects.filter(date__date=today).count(),
         'ce_mois': ProcedureSoin.objects.filter(date__month=today.month, date__year=today.year).count(),
         'en_cours': ProcedureSoin.objects.filter(statut='en_cours').count(),
         'termines': ProcedureSoin.objects.filter(statut='termine').count(),
     }
-
-    paginator = Paginator(qs, 25)
-    page_obj = paginator.get_page(request.GET.get('page'))
 
     patient_filtre = None
     if patient_id:
@@ -597,11 +665,23 @@ def procedure_list(request):
 
     return render(request, 'soins/procedure/list.html', {
         'page_obj': page_obj,
-        'total': qs.count(),
+        'arbre': arbre,
+        'nb_groupes': nb_groupes,
+        'total': total,
         'stats': stats,
         'q': q,
-        'statut': statut,
-        'date_filtre': date_filtre,
+        'tri': tri,
+        'tri_sens': tri_sens,
+        'filters': filtres,
+        'groups': groupes,
+        'date_from': date_from,
+        'date_to': date_to,
+        'filtre_pose': bool(filtres),
+        'selection_active': bool(q or groupes or filtres),
+        'periode_libelle': libelle_periode(filtres, date_from, date_to),
+        'listing_filtres': menu_filtres(listing.familles, filtres, date_from, date_to),
+        'listing_groupes': menu_groupes(list(declarees.values()), groupes),
+        'today': today,
         'patient_id': patient_id,
         'patient_filtre': patient_filtre,
     })
@@ -659,6 +739,7 @@ def procedure_create(request):
     return render(request, 'soins/procedure/form.html', {
         'form': form,
         'is_new': True,
+        'patient_affiche': patient_affiche(form),
         **_procedure_extras(),
     })
 
@@ -686,8 +767,19 @@ def procedure_detail(request, pk):
 @login_required(login_url='login')
 def procedure_edit(request, pk):
     proc = get_object_or_404(ProcedureSoin, pk=pk)
+    # Même règle que soins_edit : une fiche close reste ouverte à l'administration.
+    peut_tout_modifier = request.user.is_superuser
+
+    if (request.method == 'POST' and not peut_tout_modifier
+            and proc.statut in ProcedureSoinForm.STATUTS_CLOS):
+        # Le formulaire fige déjà tous les champs d'une procédure close, mais il
+        # ne couvre pas les boutons de transition (`action`) qui court-circuitent
+        # les champs. On refuse donc l'écriture en amont.
+        messages.warning(request, "Cette procédure est clôturée : elle n'est plus modifiable.")
+        return redirect('soins:procedure_detail', pk=proc.pk)
     if request.method == 'POST':
-        form = ProcedureSoinForm(request.POST, instance=proc)
+        form = ProcedureSoinForm(request.POST, instance=proc,
+                                 peut_tout_modifier=peut_tout_modifier)
         if form.is_valid():
             proc = form.save(commit=False)
             proc.modifie_par = request.user
@@ -715,12 +807,14 @@ def procedure_edit(request, pk):
                     proc.save()
             return redirect('soins:procedure_detail', pk=proc.pk)
     else:
-        form = ProcedureSoinForm(instance=proc)
+        form = ProcedureSoinForm(instance=proc, peut_tout_modifier=peut_tout_modifier)
 
     return render(request, 'soins/procedure/form.html', {
         'form': form,
         'proc': proc,
         'is_new': False,
+        'peut_tout_modifier': peut_tout_modifier,
+        'patient_affiche': patient_affiche(form),
         **_procedure_extras(),
     })
 
@@ -886,6 +980,13 @@ def procedure_facturer(request, pk):
 
     if proc.facture_id:
         messages.warning(request, "Cette procédure est déjà associée à la facture.")
+        return redirect('soins:procedure_detail', pk=pk)
+
+    # Une procédure annulée ne se facture pas : l'acte n'a pas eu lieu. Le
+    # bouton est masqué dans le gabarit, mais l'URL restait atteignable et
+    # créait la facture sans rien vérifier.
+    if proc.statut == 'annule':
+        messages.error(request, "Une procédure annulée ne peut pas être facturée.")
         return redirect('soins:procedure_detail', pk=pk)
 
     soin_label = proc.soin_type.nom if proc.soin_type else "Soin"

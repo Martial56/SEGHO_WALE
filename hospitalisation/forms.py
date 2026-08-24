@@ -193,6 +193,18 @@ class RegistreDecesForm(forms.ModelForm):
             )
         self.fields['patient'].queryset = patients.order_by('nom', 'prenoms')
 
+        # Hospitalisation est cloisonné depuis la migration
+        # centres.0003_rattacher_soins_et_hospitalisations : son champ souffrait
+        # dès lors du même gel que le patient ci-dessus, et la liste des
+        # hospitalisations à rattacher restait vide.
+        hospitalisations = Hospitalisation.objects.all()
+        hosp_id = self.instance.hospitalisation_id if self.instance and self.instance.pk else None
+        if hosp_id:
+            hospitalisations = Hospitalisation.all_objects.filter(
+                Q(pk__in=hospitalisations.values('pk')) | Q(pk=hosp_id)
+            )
+        self.fields['hospitalisation'].queryset = hospitalisations.order_by('-date_admission')
+
     class Meta:
         model = RegistreDeces
         exclude = ['code', 'statut', 'cree_le']

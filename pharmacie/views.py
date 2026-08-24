@@ -46,8 +46,7 @@ def _stock_entierement_perime(produit):
     lots = list(produit.lots.all())
     if not lots:
         return False
-    today = timezone.now().date()
-    return not any(l.quantite_actuelle > 0 and l.date_peremption >= today for l in lots)
+    return not any(l.quantite_actuelle > 0 and not l.est_perime for l in lots)
 
 
 def _centre_de_pharmacie(pharmacie):
