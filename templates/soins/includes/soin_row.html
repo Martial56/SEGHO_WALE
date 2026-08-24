@@ -1,0 +1,63 @@
+{% comment %}
+Une ligne de la liste des soins infirmiers.
+
+Extraite pour que la brique de regroupement (includes/listing/groupes.html)
+puisse l'imbriquer sous un en-tête de groupe. `parent` porte le chemin du groupe
+qui la contient : c'est lui qui permet de replier sans appel au serveur, et il
+est vide quand la liste n'est pas regroupée.
+{% endcomment %}
+      {% with t=objet.patient.tranche_age %}
+      <tr data-url="{% url 'soins:detail' objet.pk %}" data-parent="{{ parent|default:'' }}"
+    {% if parent %}style="display:none;"{% endif %}
+    onclick="window.location=this.dataset.url">
+        {% comment %}Une seule colonne d'identité : « Nom » mélangeait le libellé
+        libre du soin et, à défaut, son numéro — on lisait « pansement » sur une ligne
+        et « SN2600081 » sur la suivante, dans la même colonne. Le libellé libre reste
+        consultable sur la fiche.{% endcomment %}
+        <td data-col="2">
+          <span style="font-family: var(--font-mono);font-size:11.5px;font-weight:500;color:var(--accent-text-soft);">{{ objet.numero }}</span>
+        </td>
+        <td data-col="1" style="font-weight:500;">{{ objet.patient.nom }} {{ objet.patient.prenoms }}</td>
+
+        <td data-col="4" style="color:var(--text-muted);font-size:12px;">
+          {% with p=objet.procedures_list|first %}
+            {% if p and p.infirmier %}{{ p.infirmier.nom }} {{ p.infirmier.prenoms }}{% else %}<span style="opacity:.4;">—</span>{% endif %}
+          {% endwith %}
+        </td>
+        <td data-col="6" style="font-size:12px;white-space:nowrap;">
+          {% with p=objet.procedures_list|first %}
+            {% if p %}{{ p.date|date:"d/m/Y H:i" }}{% else %}{{ objet.date_creation|date:"d/m/Y" }}{% endif %}
+          {% endwith %}
+        </td>
+        <td data-col="7" style="text-align:center;font-size:12px;color:var(--text-muted);">{{ objet.patient.sexe }}</td>
+        {% comment %}age_display n'existe pas sur Patient : la colonne restait vide.
+        Le projet écrit partout ailleurs « {{ patient.age }} ans ».{% endcomment %}
+        <td data-col="8" style="text-align:center;font-size:12px;white-space:nowrap;">
+          {% if objet.patient.date_naissance %}{{ objet.patient.age }} ans{% else %}<span style="opacity:.4;">—</span>{% endif %}
+        </td>
+        {% comment %}
+        <td data-col="9"  class="col-age-group">{% if t == 'mois_0_11' %}<span class="age-flag-1">1</span>{% else %}<span class="age-flag-0">0</span>{% endif %}</td>
+        <td data-col="10" class="col-age-group">{% if t == 'ans_1_4'   %}<span class="age-flag-1">1</span>{% else %}<span class="age-flag-0">0</span>{% endif %}</td>
+        <td data-col="11" class="col-age-group">{% if t == 'ans_5_9'   %}<span class="age-flag-1">1</span>{% else %}<span class="age-flag-0">0</span>{% endif %}</td>
+        <td data-col="12" class="col-age-group">{% if t == 'ans_10_14' %}<span class="age-flag-1">1</span>{% else %}<span class="age-flag-0">0</span>{% endif %}</td>
+        <td data-col="13" class="col-age-group">{% if t == 'ans_15_19' %}<span class="age-flag-1">1</span>{% else %}<span class="age-flag-0">0</span>{% endif %}</td>
+        <td data-col="14" class="col-age-group">{% if t == 'ans_20_24' %}<span class="age-flag-1">1</span>{% else %}<span class="age-flag-0">0</span>{% endif %}</td>
+        <td data-col="15" class="col-age-group">{% if t == 'ans_25_49' %}<span class="age-flag-1">1</span>{% else %}<span class="age-flag-0">0</span>{% endif %}</td>
+        <td data-col="16" class="col-age-group">{% if t == 'ans_50_plus' %}<span class="age-flag-1">1</span>{% else %}<span class="age-flag-0">0</span>{% endif %}</td>
+        {% endcomment %}
+        <td data-col="17">
+          {% if objet.statut == 'brouillon' %}
+            <span class="badge-statut badge-brouillon">Brouillon</span>
+          {% elif objet.statut == 'en_attente_de_paiement' %}
+            <span class="badge-statut badge-en-attente">Att. paiement</span>
+          {% elif objet.statut == 'en_cours' %}
+            <span class="badge-statut badge-en-cours">En cours</span>
+          {% elif objet.statut == 'termine' %}
+            <span class="badge-statut badge-termine">Terminé</span>
+          {% elif objet.statut == 'annule' %}
+            <span class="badge-statut badge-annule">Annulé</span>
+          {% endif %}
+        </td>
+        <td></td>
+      </tr>
+      {% endwith %}

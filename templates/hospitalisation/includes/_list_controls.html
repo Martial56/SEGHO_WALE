@@ -1,55 +1,37 @@
-{# Contrôles dynamiques du sous-en-tête — réutilisé au rendu initial et en AJAX. #}
+{% comment %}
+Contrôles du sous-en-tête de la liste des hospitalisations.
 
-<!-- Période active -->
-<span class="h-period-label">
-  {% if date_debut or date_fin %}Période : {{ date_debut|default:"…" }} → {{ date_fin|default:"…" }}
-  {% else %}Aujourd'hui ({{ today|date:"d/m/Y" }}){% endif %}
-</span>
+Les menus « Filtres » et « Regrouper par » sont générés par core.listing depuis
+hospitalisation/hospitalisation_listing.py — ce gabarit ne fait que les
+parcourir. Ils remplacent l'ancien menu maison, qui ne portait qu'un statut à la
+fois et un intervalle de dates.
+{% endcomment %}
+{% if selection_active %}
+<a href="#" class="o-ctrl-btn" style="color:var(--rose-text);"
+   onclick="resetAll(); return false;"
+   title="Effacer les filtres, le regroupement et la recherche">
+  <i class="bi bi-x-circle"></i> Effacer
+</a>
+{% endif %}
 
-<!-- Tags filtres actifs -->
-{% if q %}<span class="o-filter-tag">{{ q }} <a onclick="clearQ()" style="cursor:pointer;" title="Supprimer">×</a></span>{% endif %}
-{% if statut %}<span class="o-filter-tag">{{ statut }} <a onclick="setFiltre('')" style="cursor:pointer;" title="Supprimer">×</a></span>{% endif %}
-
-<!-- Filtres dropdown -->
 <div class="o-dd-wrap">
-  <button class="o-ctrl-btn {% if statut or date_debut or date_fin %}active{% endif %}"
+  <button class="o-ctrl-btn {% if filtre_pose %}active{% endif %}"
           id="btn-filtres" onclick="toggleDd('dd-filtres', this)">
-    <i class="bi bi-funnel{% if statut or date_debut or date_fin %}-fill{% endif %}"></i>
-    Filtres{% if statut or date_debut or date_fin %}&nbsp;<span style="background:var(--accent);color:#fff;border-radius:10px;font-size:10px;padding:0 5px;vertical-align:middle;">•</span>{% endif %}
+    <i class="bi bi-funnel{% if filtre_pose %}-fill{% endif %}"></i> Filtres
   </button>
-  <div class="o-dd-panel" id="dd-filtres">
-    <div class="o-dd-section">Filtrer par statut</div>
-    {% for val, label in statut_choices %}
-    <a class="o-dd-item {% if statut == val %}active{% endif %}"
-       onclick="setFiltre('{{ val }}')">{{ label }}</a>
-    {% endfor %}
-    {% if statut %}
-    <hr class="o-dd-sep">
-    <a class="o-dd-item" onclick="setFiltre('')" style="color:var(--rose-text);">
-      <i class="bi bi-x-circle" style="font-size:11px;margin-right:6px;"></i> Effacer
-    </a>
-    {% endif %}
-    <hr class="o-dd-sep">
-    <div class="o-dd-section">Période</div>
-    <div class="o-dd-period">
-      <div class="o-dd-period-row">
-        <label for="dd-date-debut">Du</label>
-        <input type="date" id="dd-date-debut" value="{{ date_debut }}">
-      </div>
-      <div class="o-dd-period-row">
-        <label for="dd-date-fin">Au</label>
-        <input type="date" id="dd-date-fin" value="{{ date_fin }}">
-      </div>
-      <div class="o-dd-period-actions">
-        <button type="button" class="o-dd-period-apply"
-                onclick="setPeriode(document.getElementById('dd-date-debut').value, document.getElementById('dd-date-fin').value)">
-          Appliquer
-        </button>
-        {% if date_debut or date_fin %}
-        <button type="button" class="o-dd-period-reset" onclick="clearPeriode()">Aujourd'hui</button>
-        {% endif %}
-      </div>
-    </div>
+  <div class="o-dd-panel lst-menu" id="dd-filtres">
+    {% include 'includes/listing/menu_filtres.html' %}
+  </div>
+</div>
+
+<div class="o-dd-wrap">
+  <button class="o-ctrl-btn {% if groups %}active{% endif %}"
+          id="btn-group" onclick="toggleDd('dd-group', this)">
+    <i class="bi bi-list-ul"></i> Regrouper par
+  </button>
+  <div class="o-dd-panel lst-menu" id="dd-group">
+    <div class="o-dd-section">Regrouper par</div>
+    {% include 'includes/listing/menu_groupes.html' %}
   </div>
 </div>
 
@@ -59,25 +41,26 @@
 <div class="o-pagination-top">
   <span>{% if page_obj.paginator.count > 0 %}{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}{% else %}0{% endif %}</span>
   <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
-     data-page="{% if page_obj.has_previous %}{{ page_obj.previous_page_number }}{% endif %}"
-     href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}&q={{ q }}&statut={{ statut }}&vue={{ vue }}&date_debut={{ date_debut }}&date_fin={{ date_fin }}{% else %}#{% endif %}">
+     href="{% if page_obj.has_previous %}{% querystring page=page_obj.previous_page_number %}{% else %}#{% endif %}">
     <i class="bi bi-chevron-left"></i>
   </a>
   <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
-     data-page="{% if page_obj.has_next %}{{ page_obj.next_page_number }}{% endif %}"
-     href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}&q={{ q }}&statut={{ statut }}&vue={{ vue }}&date_debut={{ date_debut }}&date_fin={{ date_fin }}{% else %}#{% endif %}">
+     href="{% if page_obj.has_next %}{% querystring page=page_obj.next_page_number %}{% else %}#{% endif %}">
     <i class="bi bi-chevron-right"></i>
   </a>
 </div>
 
 <div class="o-ctrl-sep"></div>
 
-<!-- Vue -->
+{% comment %}Bascule liste/kanban : elle passe par le même rafraîchissement que
+les filtres, `vue` étant un paramètre d'URL comme les autres.{% endcomment %}
 <div class="o-view-btns">
-  <button type="button" class="o-view-btn {% if vue == 'liste' %}active{% endif %}" onclick="setVue('liste')" title="Vue liste">
+  <button type="button" class="o-view-btn {% if vue == 'liste' %}active{% endif %}"
+          onclick="setVue('liste')" title="Vue liste">
     <i class="bi bi-list-ul"></i>
   </button>
-  <button type="button" class="o-view-btn {% if vue == 'kanban' %}active{% endif %}" onclick="setVue('kanban')" title="Vue kanban">
+  <button type="button" class="o-view-btn {% if vue == 'kanban' %}active{% endif %}"
+          onclick="setVue('kanban')" title="Vue kanban">
     <i class="bi bi-grid"></i>
   </button>
 </div>

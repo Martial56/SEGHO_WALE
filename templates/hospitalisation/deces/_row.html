@@ -1,0 +1,26 @@
+{% comment %}
+Une ligne du registre des décès.
+
+Extraite pour que la brique de regroupement (includes/listing/groupes.html)
+puisse l'imbriquer sous un en-tête de groupe. `parent` porte le chemin du groupe
+qui la contient, vide quand la liste n'est pas regroupée.
+{% endcomment %}
+      <tr data-parent="{{ parent|default:'' }}"{% if parent %} style="display:none;"{% endif %}
+          onclick="window.location='{% url 'hospitalisation:deces_detail' objet.pk %}'">
+        <td class="col-check" onclick="event.stopPropagation()">
+          <input type="checkbox" class="dc-check row-check">
+        </td>
+        <td class="col-code">{{ objet.code }}</td>
+        <td class="col-name">{{ objet.patient.nom }} {{ objet.patient.prenoms }}</td>
+        <td>{{ objet.patient.get_sexe_display }}</td>
+        <td>{% if objet.patient.date_naissance %}{{ objet.patient.age }} ans{% else %}<span style="opacity:.4;">—</span>{% endif %}</td>
+        <td>{{ objet.date_deces|date:"d/m/Y" }}</td>
+        <td>{% if objet.medecin %}Dr. {{ objet.medecin.nom }} {{ objet.medecin.prenoms }}{% else %}<span style="opacity:.4;">—</span>{% endif %}</td>
+        <td>
+          {% if objet.statut == 'termine' %}
+          <span class="badge-termine">Terminé</span>
+          {% else %}
+          <span class="badge-brouillon">Brouillon</span>
+          {% endif %}
+        </td>
+      </tr>

@@ -22,7 +22,18 @@ Lignes ajoutées après coup (formulaires à lignes dynamiques) : rappeler
 
 <link rel="stylesheet" href="{% static 'vendor/tom-select/tom-select.css' %}">
 <style>
-.ts-wrapper { padding: 0 !important; }
+/* TomSelect recopie les classes du <select> sur son enveloppe. Les styles de
+   champ souligné du gabarit (bordure, chevron de fond, couleur) s'y
+   réappliquaient donc et venaient doubler ceux du contrôle interne : deux
+   traits sous le champ, et deux flèches quand la règle du module n'était pas
+   restreinte à `select` (colonnes Soin et Infirmier du tableau des soins).
+   L'enveloppe ne porte plus aucune décoration : tout vient de .ts-control. */
+.ts-wrapper {
+  padding: 0 !important;
+  border: none !important;
+  background-image: none !important;
+  background-color: transparent !important;
+}
 .ts-wrapper .ts-control {
   background: transparent !important; border: none !important;
   border-bottom: 1.5px solid #d1dde3 !important; border-radius: 0 !important;
@@ -83,14 +94,25 @@ html[data-theme="dark"] .ts-dropdown .highlight { background: rgba(var(--teal-50
       // Le choix vide d'un champ « blank=True » s'appelle « --------- » :
       // on n'en fait pas un texte d'invite.
       if (!invite || /^-+$/.test(invite)) invite = 'Sélectionner…';
-      new TomSelect(el, {
+      // `data-ts-body` : la liste est rendue dans <body> au lieu du champ.
+      // Indispensable dans un conteneur à `overflow` (tableau défilant), qui
+      // rognerait la liste — aucun z-index ne rattrape un débordement masqué.
+      // Les classes du <select> sont recopiées sur la liste pour que le
+      // gabarit puisse encore la cibler une fois déplacée.
+      var horsFlux = el.hasAttribute('data-ts-body');
+      var reglages = {
         allowEmptyOption: false,
         placeholder: invite,
         maxOptions: 500,
         render: {
           no_results: function () { return '<div class="no-results">Aucun résultat</div>'; }
         }
-      });
+      };
+      if (horsFlux) {
+        reglages.dropdownParent = 'body';
+        reglages.dropdownClass = 'ts-dropdown ' + el.className.replace('field-ul', '').trim();
+      }
+      new TomSelect(el, reglages);
     });
   };
   if (document.readyState === 'loading') {

@@ -24,6 +24,43 @@
 }
 html[data-theme="dark"] .prix-display { border-bottom-color: rgba(255,255,255,.15); }
 
+/* ── Champs figés ──
+   Le verrou lui-même vit dans ProcedureSoinForm (`disabled`), qui fait ignorer
+   à Django toute valeur reçue. Ce qui suit n'en est que le reflet visuel :
+   la valeur reste lisible en clair, mais le sélecteur ne s'ouvre plus et perd
+   son chevron, pour qu'on voie tout de suite qu'il n'y a rien à cliquer. */
+.svc-select.svc-fige { pointer-events: none; }
+.svc-select.svc-fige .svc-chevron { display: none; }
+.svc-select.svc-fige .svc-display {
+  cursor: default; color: var(--text-muted);
+  border-bottom-style: dashed; border-bottom-color: var(--border);
+}
+.art-date-input[readonly] {
+  pointer-events: none; color: var(--text-muted);
+  border-bottom-style: dashed;
+}
+.champ-fige-valeur {
+  display: block; padding: 7px 2px; font-size: 13px;
+  border-bottom: 1.5px dashed var(--border);
+}
+.champ-fige-valeur a { color: var(--accent-text-soft); font-weight: 600; text-decoration: none; }
+.champ-fige-valeur a:hover { text-decoration: underline; }
+.champ-fige-vide { color: var(--text-faint); font-style: italic; }
+.f-avert-admin {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 0 12px; padding: 9px 14px; border-radius: 6px;
+  font-size: 12.5px; font-weight: 500;
+  background: #fff8e6; color: #8a6100; border: 1px solid #f0d9a0;
+}
+html[data-theme="dark"] .f-avert-admin {
+  background: rgba(217,119,6,.12); color: #f3c471; border-color: rgba(217,119,6,.35);
+}
+.sh-fige-note {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12px; font-weight: 600; color: var(--text-muted);
+  padding: 5px 10px; border: 1px solid var(--border); border-radius: 4px;
+}
+
 /* Patient dans l'en-tête : taille réduite (pas le 17px/700 du grand select) */
 #pat-display { font-size: 14px; font-weight: 600; min-height: 36px; }
 
@@ -111,7 +148,8 @@ html[data-theme="dark"] .proc-annule-badge  { background: rgba(220,38,38,.15); b
 {% block content %}
 <div id="page-wrap" data-fixed-subheader="1">
 
-{% with current_statut=form.statut.value|default:'brouillon' %}
+{% comment %}Le statut se lit sur l'enregistrement, pas sur le formulaire : `statut` ne fait pas partie de Meta.fields, donc form.statut.value ne renvoyait jamais rien et le filtre default retombait systématiquement sur « brouillon » — le fil affichait donc toujours la première étape, même pour une procédure terminée. En création `proc` n'existe pas, et brouillon est alors la bonne valeur.{% endcomment %}
+{% with current_statut=proc.statut|default:'brouillon' %}
 
 <!-- ══ SUBHEADER ══ -->
 <div class="o-subheader" data-fixed="1" id="subheader">
@@ -130,10 +168,17 @@ html[data-theme="dark"] .proc-annule-badge  { background: rgba(220,38,38,.15); b
       <span style="color:var(--text);">{% if is_new %}Nouveau{% else %}Modifier{% endif %}</span>
     </span>
     <div class="sh-actions">
+      {% comment %}Procédure close : pour le personnel courant tous les champs sont
+      figés côté serveur, laisser le bouton laisserait croire au contraire.
+      L'administration, elle, conserve le droit d'enregistrer.{% endcomment %}
+      {% if is_new or current_statut != 'termine' and current_statut != 'annule' or peut_tout_modifier %}
       <button type="submit" form="proc-form" name="action" value="save" class="sh-btn-save">
         <i class="bi bi-floppy"></i>
         {% if is_new %}Sauvegarder{% else %}Modifier{% endif %}
       </button>
+      {% else %}
+      <span class="sh-fige-note"><i class="bi bi-lock-fill"></i> Procédure clôturée</span>
+      {% endif %}
       <a href="{% if is_new %}{% url 'soins:procedure_list' %}{% else %}{% url 'soins:procedure_detail' proc.pk %}{% endif %}"
         class="sh-btn-ignore">
         <i class="bi bi-x"></i> Ignorer
@@ -143,6 +188,14 @@ html[data-theme="dark"] .proc-annule-badge  { background: rgba(220,38,38,.15); b
 </div>
 
 <div class="f-page-body">
+
+{% if not is_new and peut_tout_modifier and current_statut == 'termine' or not is_new and peut_tout_modifier and current_statut == 'annule' %}
+<div class="f-avert-admin">
+  <i class="bi bi-shield-exclamation"></i>
+  Cette procédure est clôturée. Vous la modifiez au titre de l'administration —
+  le patient reste néanmoins non modifiable.
+</div>
+{% endif %}
 
 {% if form.errors %}
 <div class="f-errors-summary">
@@ -262,7 +315,7 @@ html[data-theme="dark"] .proc-annule-badge  { background: rgba(220,38,38,.15); b
       <div class="proc-side-actions">
         {% if not is_new and current_statut != 'annule' and request.user.is_staff %}
           <a href="{% url 'soins:procedure_facturer' proc.pk %}" class="ab-btn ab-btn-invoice">
-            <i class="bi bi-receipt"></i> Facturer <small style="opacity:.6;font-size:9px;">(ad)</small>
+            <i class="bi bi-receipt"></i> Facturer
           </a>
         {% endif %}
         {% if not is_new and current_statut != 'termine' and current_statut != 'annule' %}
@@ -281,51 +334,26 @@ html[data-theme="dark"] .proc-annule-badge  { background: rgba(220,38,38,.15); b
       <!-- Patient : svc-select searchable (taille normale, pas le grand 17px) -->
       <div style="flex:1; min-width:0; overflow:visible;">
         <div style="margin-bottom:4px;">
-          <span class="art-field-label">Patient <span class="f-required">*</span></span>
+          <span class="art-field-label">Patient {% if not form.patient.field.disabled %}<span class="f-required">*</span>{% endif %}</span>
         </div>
-        <input type="hidden" name="patient" id="pat-hidden" value="{{ form.patient.value|default:'' }}">
-        <div class="svc-select" id="pat-select" style="z-index:185;">
-          <div class="svc-display" id="pat-display" tabindex="0">
-            {% if form.patient.value %}
-              {% for p in form.patient.field.queryset %}{% if form.patient.value|stringformat:"s" == p.pk|stringformat:"s" %}<span>{{ p.nom }} {{ p.prenoms }}</span>{% endif %}{% endfor %}
-            {% else %}
-              <span class="svc-placeholder">— Sélectionner un patient —</span>
-            {% endif %}
-            <i class="bi bi-chevron-down svc-chevron"></i>
-          </div>
-          <div class="svc-dropdown" id="pat-dropdown">
-            <div class="svc-search-wrap">
-              <i class="bi bi-search"></i>
-              <input type="text" class="svc-search" id="pat-search" placeholder="Rechercher un patient…" autocomplete="off">
-            </div>
-            <ul class="svc-list" id="pat-list">
-              <li class="svc-option" data-value="">— Aucun —</li>
-              {% for p in form.patient.field.queryset %}
-              <li class="svc-option {% if form.patient.value|stringformat:"s" == p.pk|stringformat:"s" %}selected{% endif %}"
-                  data-value="{{ p.pk }}" data-code="{{ p.code_patient }}">
-                {{ p.nom }} {{ p.prenoms }}{% if p.code_patient %} <small style="color:var(--text-muted);">({{ p.code_patient }})</small>{% endif %}
-              </li>
-              {% endfor %}
-            </ul>
-            {% if request.user.is_staff %}
-            <div id="pat-create-hint" class="svc-create-hint" style="display:none;">
-              <a id="pat-create-link" href="/patients/nouveau/" class="svc-create-link">
-                <i class="bi bi-plus-circle"></i>
-                Nouveau patient <strong id="pat-create-term"></strong>
-              </a>
-            </div>
-            {% endif %}
-          </div>
-        </div>
+        {% comment %}Sélecteur commun au projet (recherche AJAX + carte patient), le
+        même que sur les soins et l'hospitalisation. En modification le patient est
+        figé — même règle que la fiche de soin infirmier : plus de champ de
+        recherche ni de croix de désélection, seulement la carte.{% endcomment %}
+        {% if is_new %}
+        {% include 'includes/_patient_picker.html' with valeur=form.patient.value patient=patient_affiche %}
+        {% else %}
+        {% include 'includes/_patient_picker.html' with valeur=form.patient.value patient=patient_affiche lecture_seule=True %}
+        {% endif %}
         {% if form.patient.errors %}<div class="f-error" style="font-size:10px;">{{ form.patient.errors.0 }}</div>{% endif %}
       </div>
 
       <!-- Date & Numéro -->
       <div class="art-date-block">
-        <div class="art-date-label">Date &amp; Heure <span class="f-required">*</span></div>
+        <div class="art-date-label">Date &amp; Heure {% if not form.date.field.disabled %}<span class="f-required">*</span>{% endif %}</div>
         <input type="datetime-local" name="date" class="art-date-input" id="date-inp"
           value="{% if form.date.value %}{{ form.date.value|date:'Y-m-d' }}T{{ form.date.value|date:'H:i' }}{% endif %}"
-          required>
+          {% if form.date.field.disabled %}readonly tabindex="-1"{% endif %} required>
         {% if form.date.errors %}
         <div class="f-error" style="text-align:right;font-size:11px;">{{ form.date.errors.0 }}</div>
         {% endif %}
@@ -352,7 +380,7 @@ html[data-theme="dark"] .proc-annule-badge  { background: rgba(220,38,38,.15); b
         <div class="f-field">
           <label class="field-label">Infirmier / Agent</label>
           <input type="hidden" name="infirmier" id="inf-hidden" value="{{ form.infirmier.value|default:'' }}">
-          <div class="svc-select" id="inf-select" style="z-index:180;">
+          <div class="svc-select{% if form.infirmier.field.disabled %} svc-fige{% endif %}" id="inf-select" style="z-index:180;">
             <div class="svc-display" id="inf-display" tabindex="0">
               {% if form.infirmier.value %}
                 {% for e in form.infirmier.field.queryset %}{% if form.infirmier.value|stringformat:"s" == e.pk|stringformat:"s" %}<span>{{ e.nom }} {{ e.prenoms }}</span>{% endif %}{% endfor %}
@@ -389,7 +417,7 @@ html[data-theme="dark"] .proc-annule-badge  { background: rgba(220,38,38,.15); b
         <div class="f-field">
           <label class="field-label">Département</label>
           <input type="hidden" name="departement" id="dep-hidden" value="{{ form.departement.value|default:'' }}">
-          <div class="svc-select" id="dep-select" style="z-index:180;">
+          <div class="svc-select{% if form.departement.field.disabled %} svc-fige{% endif %}" id="dep-select" style="z-index:180;">
             <div class="svc-display" id="dep-display" tabindex="0">
               {% if form.departement.value %}
                 {% for d in form.departement.field.queryset %}{% if form.departement.value|stringformat:"s" == d.pk|stringformat:"s" %}<span>{{ d.nom }}</span>{% endif %}{% endfor %}
@@ -421,7 +449,7 @@ html[data-theme="dark"] .proc-annule-badge  { background: rgba(220,38,38,.15); b
         <div class="f-field">
           <label class="field-label">Type de soin</label>
           <input type="hidden" name="soin_type" id="soin-hidden" value="{{ form.soin_type.value|default:'' }}">
-          <div class="svc-select" id="soin-select" style="z-index:170;">
+          <div class="svc-select{% if form.soin_type.field.disabled %} svc-fige{% endif %}" id="soin-select" style="z-index:170;">
             <div class="svc-display" id="soin-display" tabindex="0">
               {% if form.soin_type.value %}
                 {% for s in form.soin_type.field.queryset %}{% if form.soin_type.value|stringformat:"s" == s.pk|stringformat:"s" %}<span>{{ s.nom }}</span>{% endif %}{% endfor %}
@@ -470,7 +498,7 @@ html[data-theme="dark"] .proc-annule-badge  { background: rgba(220,38,38,.15); b
         <div class="f-field">
           <label class="field-label">Maladie</label>
           <input type="hidden" name="maladie" id="mal-hidden" value="{{ form.maladie.value|default:'' }}">
-          <div class="svc-select" id="mal-select" style="z-index:110;">
+          <div class="svc-select{% if form.maladie.field.disabled %} svc-fige{% endif %}" id="mal-select" style="z-index:110;">
             <div class="svc-display" id="mal-display" tabindex="0">
               {% if form.maladie.value %}
                 {% for m in maladies %}{% if form.maladie.value|stringformat:"s" == m.pk|stringformat:"s" %}<span>{{ m.nom }}</span>{% endif %}{% endfor %}
@@ -516,6 +544,21 @@ html[data-theme="dark"] .proc-annule-badge  { background: rgba(220,38,38,.15); b
       <div class="f-field" style="margin-top:18px;">
         <label class="field-label">Facture liée</label>
         <input type="hidden" name="facture" id="fac-hidden" value="{{ form.facture.value|default:'' }}">
+        {% comment %}La facture est créée par le système au passage « en cours » :
+        en modification on n'affiche plus qu'un lien vers elle. Le sélecteur ne
+        subsiste que pour la création, où rien n'a encore été facturé.{% endcomment %}
+        {% if form.facture.field.disabled %}
+        <span class="champ-fige-valeur">
+          {% if proc.facture %}
+          <a href="{% url 'facturation:detail' proc.facture.pk %}">
+            <i class="bi bi-receipt" style="font-size:11px;"></i>
+            {{ proc.facture.numero }} — {{ proc.facture.montant_total|floatformat:0 }} CFA
+          </a>
+          {% else %}
+          <span class="champ-fige-vide">Aucune facture liée</span>
+          {% endif %}
+        </span>
+        {% else %}
         <div class="svc-select" id="fac-select" style="z-index:90;">
           <div class="svc-display" id="fac-display" tabindex="0">
             {% if form.facture.value %}
@@ -542,6 +585,7 @@ html[data-theme="dark"] .proc-annule-badge  { background: rgba(220,38,38,.15); b
           </div>
         </div>
         <div class="f-hint">La facture filtre aussi les rendez-vous du patient concerné.</div>
+        {% endif %}
       </div>
 
     </div>
@@ -702,14 +746,12 @@ function majPrix(li) {
 
 /* ══ INITIALISATION DES DROPDOWNS ══ */
 
-makeDrop({
-  prefix: 'pat',
-  placeholder: '— Sélectionner un patient —',
-  createBase: '/patients/nouveau/',
-  onPick: function(li) {
-    filterByPatient(li.dataset.value);
-  }
-});
+/* Le sélecteur de patient partagé émet un `change` sur son champ caché ;
+   c'est là qu'on rebranche le filtrage des rendez-vous et factures. */
+(function () {
+  var champ = document.getElementById('pat-hidden');
+  if (champ) champ.addEventListener('change', function () { filterByPatient(champ.value); });
+})();
 
 makeDrop({
   prefix: 'inf',

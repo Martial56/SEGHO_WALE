@@ -1,0 +1,267 @@
+{% comment %}
+════════════════════════════════════════════════════════════════════════════
+Sélecteur de patient — recherche AJAX + carte patient
+════════════════════════════════════════════════════════════════════════════
+Repris du formulaire d'hospitalisation, qui en est l'origine. Au lieu de
+déverser tous les patients du centre dans un <select>, on interroge
+/patients/recherche/ à la frappe : la page reste légère quel que soit le
+nombre de dossiers, et la recherche porte sur le nom, le code et le téléphone.
+
+Paramètres :
+  nom            nom du champ soumis            (défaut « patient »)
+  id             id du champ caché              (défaut « pat-hidden »)
+  valeur         identifiant présélectionné     (optionnel)
+  lecture_seule  affiche la carte sans permettre d'en changer
+  patient        objet Patient : remplit la carte côté serveur, sans appel AJAX
+                 — indispensable quand le dossier n'appartient pas au centre
+                 actif, car /patients/recherche/ ne le renverrait pas
+  libelle        texte affiché en lecture seule quand aucune carte n'est chargée
+
+Intégration : le champ caché émet un événement `change` à chaque sélection ou
+désélection. C'est le point d'accroche — pas besoin de rappel nommé.
+
+    document.getElementById('pat-hidden')
+            .addEventListener('change', function () { ... this.value ... });
+{% endcomment %}
+
+<style>
+.pat-search-dd {
+  display:none; position:fixed;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:8px; box-shadow:0 6px 24px rgba(0,0,0,.13);
+  z-index:99999; max-height:280px; overflow-y:auto;
+}
+.pat-dd-item {
+  display:flex; align-items:center; gap:10px;
+  padding:9px 14px; font-size:13px; cursor:pointer;
+  border-bottom:1px solid var(--border); transition:background .1s;
+}
+.pat-dd-item:last-child { border-bottom:none; }
+.pat-dd-item:hover { background:var(--teal-50); }
+.pat-dd-av {
+  width:32px; height:32px; border-radius:50%; flex-shrink:0;
+  background:linear-gradient(135deg,var(--teal-500),var(--teal-400));
+  display:flex; align-items:center; justify-content:center;
+  font-size:11px; font-weight:700; color:#fff;
+}
+.pat-dd-name { font-weight:600; color:var(--text); display:block; }
+.pat-dd-sub  { font-size:11px; color:var(--text-muted); margin-top:1px; display:block; }
+.pat-dd-empty { padding:12px 14px; font-size:12px; color:var(--text-faint); font-style:italic; }
+
+.patient-card {
+  background:linear-gradient(135deg,#f0faff,#e6f7ff);
+  border:1px solid rgba(var(--teal-500-rgb),.2); border-radius:14px;
+  padding:20px 24px; margin-top:4px; position:relative;
+  display:grid; grid-template-columns:auto 1fr; gap:16px; align-items:center;
+}
+.patient-avatar {
+  width:64px; height:64px; border-radius:50%;
+  background:linear-gradient(135deg,var(--teal-600),var(--teal-400));
+  display:flex; align-items:center; justify-content:center;
+  font-size:22px; font-weight:800; color:#fff; flex-shrink:0; overflow:hidden;
+}
+.patient-card-nom { font-size:16px; font-weight:800; color:var(--teal-900); margin-bottom:10px; }
+.patient-info-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px 24px; }
+.pi-item { display:flex; flex-direction:column; gap:2px; }
+.pi-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); }
+.pi-value { font-size:13px; font-weight:600; color:var(--teal-900); }
+.pi-code  { font-family:var(--font-mono); font-size:12px; color:var(--accent-text-soft); }
+.pp-desel-btn {
+  position:absolute; top:10px; right:10px;
+  background:none; border:none; cursor:pointer;
+  color:var(--text-muted); font-size:17px; padding:2px 4px;
+  border-radius:4px; line-height:1; display:flex; align-items:center;
+  transition:color .12s, background .12s;
+}
+.pp-desel-btn:hover { color:#dc3545; background:rgba(220,53,69,.1); }
+
+html[data-theme="dark"] .pat-dd-item:hover { background:rgba(var(--teal-500-rgb),.18); }
+html[data-theme="dark"] .patient-card { background:rgba(var(--teal-500-rgb),.1); border-color:rgba(var(--teal-500-rgb),.3); }
+html[data-theme="dark"] .patient-avatar { background:linear-gradient(135deg,rgba(var(--teal-500-rgb),.6),rgba(43,188,223,.4)); }
+html[data-theme="dark"] .patient-card-nom,
+html[data-theme="dark"] .pi-value { color:var(--text); }
+html[data-theme="dark"] .pi-code  { color:var(--teal-400); }
+</style>
+
+<div id="pp-patient">
+  <input type="hidden" name="{{ nom|default:'patient' }}" id="{{ id|default:'pat-hidden' }}" value="{{ valeur|default:'' }}">
+
+  {% if not lecture_seule %}
+  {% comment %}Carte déjà remplie par le gabarit : la zone de recherche part
+  masquée, exactement comme après une sélection — le bouton de désélection la
+  fait réapparaître.{% endcomment %}
+  <div id="pat-search-wrap"{% if patient %} style="display:none;"{% endif %}>
+    <input type="text" id="pat-search-input" class="field-ul"
+           placeholder="Rechercher un patient…" autocomplete="off">
+    <div id="pat-search-dd" class="pat-search-dd"></div>
+  </div>
+  {% endif %}
+
+  <div class="patient-card" id="patient-banner"
+       {% if patient %}data-prerempli="1" style="display:grid;"{% else %}style="display:none;"{% endif %}>
+    <div class="patient-avatar" id="pat-av">{{ patient.nom|first|upper }}{{ patient.prenoms|first|upper }}</div>
+    <div>
+      <div class="patient-card-nom" id="pat-name">{% if patient %}{{ patient.nom }} {{ patient.prenoms }}{% endif %}</div>
+      <div class="patient-info-grid">
+        <div class="pi-item"><span class="pi-label">Code patient</span><span class="pi-value pi-code" id="pat-code">{{ patient.code_patient|default:"—" }}</span></div>
+        <div class="pi-item"><span class="pi-label">Âge</span><span class="pi-value" id="pat-age">{% if patient.age != None %}{{ patient.age }} ans{% else %}—{% endif %}</span></div>
+        <div class="pi-item"><span class="pi-label">Sexe</span><span class="pi-value" id="pat-sexe">{{ patient.get_sexe_display|default:"—" }}</span></div>
+        <div class="pi-item"><span class="pi-label">Téléphone</span><span class="pi-value" id="pat-tel">{{ patient.telephone|default:"—" }}</span></div>
+        <div class="pi-item"><span class="pi-label">Adresse</span><span class="pi-value" id="pat-addr">{{ patient.adresse|default:"—" }}</span></div>
+        <div class="pi-item"><span class="pi-label">Assurance</span><span class="pi-value" id="pat-ass">{{ patient.assurance.nom|default:"—" }}</span></div>
+      </div>
+    </div>
+    {% if not lecture_seule %}
+    <button type="button" class="pp-desel-btn" onclick="patDeselect()" title="Changer de patient">
+      <i class="bi bi-x"></i>
+    </button>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+(function () {
+  var champ       = document.getElementById('{{ id|default:"pat-hidden" }}');
+  var saisie      = document.getElementById('pat-search-input');
+  var liste       = document.getElementById('pat-search-dd');
+  var zoneSaisie  = document.getElementById('pat-search-wrap');
+  var carte       = document.getElementById('patient-banner');
+  if (!champ) return;
+
+  var minuteur;
+  var URL_RECHERCHE = '{% url "patients:patient_search" %}';
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function initiales(nom) {
+    return (nom || '').trim().split(/\s+/).slice(0, 2)
+      .map(function (m) { return m[0] || ''; }).join('').toUpperCase();
+  }
+
+  // La liste est en `position: fixed` pour échapper aux conteneurs à
+  // `overflow` qui la rogneraient ; il faut donc la placer à la main.
+  function placerListe() {
+    if (!saisie || !liste) return;
+    var r = saisie.getBoundingClientRect();
+    liste.style.top   = (r.bottom + 4) + 'px';
+    liste.style.left  = r.left + 'px';
+    liste.style.width = r.width + 'px';
+  }
+
+  function remplirCarte(p) {
+    document.getElementById('pat-av').textContent   = initiales(p.nom_complet);
+    document.getElementById('pat-name').textContent = p.nom_complet || '—';
+    document.getElementById('pat-code').textContent = p.code || '—';
+    document.getElementById('pat-age').textContent  = p.age != null && p.age !== '' ? p.age + ' ans' : '—';
+    document.getElementById('pat-sexe').textContent = p.sexe_display || '—';
+    document.getElementById('pat-tel').textContent  = p.telephone || '—';
+    document.getElementById('pat-addr').textContent = p.adresse || '—';
+    document.getElementById('pat-ass').textContent  = p.assurance_nom || '—';
+  }
+
+  function choisir(p) {
+    champ.value = p.id;
+    remplirCarte(p);
+    carte.style.display = 'grid';
+    if (zoneSaisie) zoneSaisie.style.display = 'none';
+    if (saisie) saisie.value = '';
+    if (liste) liste.style.display = 'none';
+    champ.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  window.patDeselect = function () {
+    champ.value = '';
+    carte.style.display = 'none';
+    if (zoneSaisie) zoneSaisie.style.display = '';
+    if (saisie) { saisie.value = ''; setTimeout(function () { saisie.focus(); }, 0); }
+    if (liste) liste.style.display = 'none';
+    champ.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+
+  if (saisie && liste && zoneSaisie) {
+    saisie.addEventListener('input', function () {
+      clearTimeout(minuteur);
+      champ.value = '';
+      var q = this.value.trim();
+      if (!q) { liste.style.display = 'none'; return; }
+      minuteur = setTimeout(function () {
+        fetch(URL_RECHERCHE + '?q=' + encodeURIComponent(q))
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            var res = data.results || [];
+            if (!res.length) {
+              liste.innerHTML = '<div class="pat-dd-empty">Aucun patient trouvé</div>';
+            } else {
+              liste.innerHTML = res.map(function (p) {
+                return '<div class="pat-dd-item"'
+                  + ' data-id="'   + esc(p.id)            + '"'
+                  + ' data-nom="'  + esc(p.nom_complet)   + '"'
+                  + ' data-code="' + esc(p.code)          + '"'
+                  + ' data-age="'  + esc(p.age)           + '"'
+                  + ' data-sexe="' + esc(p.sexe_display)  + '"'
+                  + ' data-tel="'  + esc(p.telephone)     + '"'
+                  + ' data-addr="' + esc(p.adresse)       + '"'
+                  + ' data-ass="'  + esc(p.assurance_nom) + '">'
+                  + '<div class="pat-dd-av">' + esc(initiales(p.nom_complet)) + '</div>'
+                  + '<div style="flex:1;min-width:0;">'
+                  +   '<span class="pat-dd-name">' + esc(p.nom_complet) + '</span>'
+                  +   '<span class="pat-dd-sub">' + esc(p.code)
+                  +     (p.telephone ? ' · ' + esc(p.telephone) : '') + '</span>'
+                  + '</div></div>';
+              }).join('');
+              liste.querySelectorAll('.pat-dd-item').forEach(function (el) {
+                // mousedown plutôt que click : le `blur` du champ ferme la
+                // liste avant qu'un `click` n'ait le temps de se produire.
+                el.addEventListener('mousedown', function (e) {
+                  e.preventDefault();
+                  choisir({
+                    id: el.dataset.id, nom_complet: el.dataset.nom, code: el.dataset.code,
+                    age: el.dataset.age, sexe_display: el.dataset.sexe,
+                    telephone: el.dataset.tel, adresse: el.dataset.addr,
+                    assurance_nom: el.dataset.ass,
+                  });
+                });
+              });
+            }
+            placerListe();
+            liste.style.display = 'block';
+          })
+          .catch(function () {});
+      }, 280);
+    });
+
+    saisie.addEventListener('blur', function () {
+      setTimeout(function () { liste.style.display = 'none'; }, 180);
+    });
+    document.addEventListener('click', function (e) {
+      if (!e.target.closest('#pp-patient')) liste.style.display = 'none';
+    });
+    window.addEventListener('scroll', placerListe, true);
+    window.addEventListener('resize', placerListe);
+  }
+
+  function chargerParId(pk) {
+    fetch(URL_RECHERCHE + '?id=' + encodeURIComponent(pk))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var p = (data.results || [])[0];
+        if (p) choisir(p);
+      })
+      .catch(function () {});
+  }
+
+  if (carte && carte.dataset.prerempli) {
+    // Carte écrite par le gabarit : rien à charger. C'est aussi le seul cas qui
+    // marche pour un dossier hors du centre actif, que la recherche ignore.
+  } else if (champ.value) {
+    chargerParId(champ.value);
+  } else {
+    var pk = new URLSearchParams(window.location.search).get('patient_id')
+          || new URLSearchParams(window.location.search).get('patient');
+    if (pk) chargerParId(pk);
+  }
+})();
+</script>

@@ -112,31 +112,7 @@
   }
   */
 
-  /* ── COL PICKER ── */
-  .col-picker-th { width: 28px; text-align: center; padding: 0 2px; position: relative; }
-  .col-picker-btn {
-    background: none; border: none; cursor: pointer;
-    color: var(--text-muted); font-size: 15px; padding: 2px 5px;
-    border-radius: 3px; line-height: 1; font-weight: 700; letter-spacing: -1px;
-  }
-  .col-picker-btn:hover { background: rgba(0,0,0,.06); color: var(--text); }
-  .col-picker-menu {
-    display: none; position: fixed;
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,.12);
-    z-index: 1000; min-width: 180px; padding: 6px 0;
-    max-height: 380px; overflow-y: auto;
-  }
-  .col-picker-menu.open { display: block; }
-  .col-picker-menu label {
-    display: flex; align-items: center; gap: 8px;
-    padding: 6px 14px; font-size: 13px; color: var(--text);
-    cursor: pointer; white-space: nowrap;
-  }
-  .col-picker-menu label:hover { background: rgba(0,0,0,.03); }
-  html[data-theme="dark"] .col-picker-menu { background: var(--surface); border-color: var(--border); }
-  html[data-theme="dark"] .col-picker-menu label { color: var(--text); }
-  html[data-theme="dark"] .col-picker-menu label:hover { background: rgba(255,255,255,.04); }
+  {# Tri, redimensionnement et sélecteur de colonnes : includes/listing/styles.html #}
 
   /* ── STATS ── */
   .stats-row {
@@ -183,126 +159,82 @@
 {% block content %}
 <div id="page-wrap">
 
+{% comment %}Styles de la brique : menus à sous-menus, bandes de groupe,
+chevrons de dépliage. Inclus ici, après le bloc CSS de la page, pour que les
+règles sombres de la page l'emportent à spécificité égale.{% endcomment %}
+{% include 'includes/listing/styles.html' %}
+
 <!-- ══ SUBHEADER ══ -->
+{% comment %}
+Filtres et regroupements viennent de core.listing, comme les listes de
+rendez-vous, le registre des naissances et la gynécologie : les menus sont
+générés depuis soins/soin_listing.py, ce gabarit ne fait que les parcourir.
+Les valeurs d'une même famille se cumulent, les familles se croisent.
+{% endcomment %}
 <div class="o-subheader" data-fixed="1" id="subheader">
 
   <!-- Ligne 1 : titre + recherche -->
   <div class="o-subheader-row">
     <span class="o-page-title">Soins infirmiers <span class="o-page-count">{{ total }}</span></span>
     {% if not patient_id and not hospitalisation_id %}
-    <span style="font-size:12px;color:var(--text-muted);">
-      {% if date_debut or date_fin %}
-        Période&nbsp;: {{ date_debut|default:"…" }} → {{ date_fin|default:"…" }}
-      {% elif date_filtre %}
-        Le {{ date_filtre }}
-      {% else %}
-        Aujourd'hui ({{ today|date:"d/m/Y" }})
-      {% endif %}
-    </span>
+    <span class="o-page-scope" style="font-size:12px;color:var(--text-muted);">· {{ periode_libelle }}</span>
     {% endif %}
     <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
-      <form method="get" id="filter-form" style="display:flex;align-items:center;">
-        <input type="hidden" name="statut" id="fi-statut" value="{{ statut }}">
-        <input type="hidden" name="date" id="fi-date" value="{{ date_filtre }}">
-        <input type="hidden" name="date_debut" id="fi-date-debut" value="{{ date_debut }}">
-        <input type="hidden" name="date_fin" id="fi-date-fin" value="{{ date_fin }}">
-        <input type="hidden" name="hospitalisation_id" id="fi-hosp" value="{{ hospitalisation_id }}">
-        <div class="o-search-bar">
-          <input class="o-search-input" id="search-input" type="text" name="q" value="{{ q }}"
-            placeholder="Rechercher patient, agent, numéro…">
-          <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
-        </div>
-      </form>
+      <div class="o-search-bar">
+        <input class="o-search-input" id="search-input" type="text" value="{{ q }}"
+          placeholder="Rechercher patient, agent, numéro…">
+        <button type="button" class="o-search-btn" onclick="lancerRecherche()"><i class="bi bi-search"></i></button>
+      </div>
     </div>
   </div>
 
   <!-- Ligne 2 : créer + contrôles -->
-  <div class="o-subheader-row">
+  <div class="o-subheader-row" id="subheader-controls"
+       data-filters="{{ filters|join:"," }}" data-groups="{{ groups|join:"," }}">
     <a href="{% url 'soins:create' %}" class="o-btn-create">
       <i class="bi bi-plus-lg"></i> Nouveau soin
     </a>
 
     <div style="margin-left:auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
 
-      <!-- ── Filtres dropdown ── -->
-      {% with nb_filtres=0|add:statut|add:date_filtre|add:hospitalisation_id %}
+      {% if selection_active %}
+      <a href="#" class="o-ctrl-btn" style="color:var(--rose-text);"
+         onclick="resetAll(); return false;"
+         title="Effacer les filtres, le regroupement et la recherche">
+        <i class="bi bi-x-circle"></i> Effacer
+      </a>
+      {% endif %}
+
       <div class="o-dd-wrap">
-        <button class="o-ctrl-btn {% if statut or date_filtre or date_debut or date_fin or hospitalisation_id %}active{% endif %}"
+        <button class="o-ctrl-btn {% if filtre_pose %}active{% endif %}"
                 id="btn-filtres" onclick="toggleDd('dd-filtres', this)">
-          <i class="bi bi-funnel{% if statut or date_filtre or date_debut or date_fin or hospitalisation_id %}-fill{% endif %}"></i>
-          Filtres{% if statut or date_filtre or date_debut or date_fin or hospitalisation_id %} <span style="background:var(--accent);color:#fff;border-radius:10px;font-size:10px;padding:0 5px;">{% if statut %}1{% endif %}{% if date_filtre or date_debut or date_fin %}1{% endif %}{% if hospitalisation_id %}1{% endif %}</span>{% endif %}
+          <i class="bi bi-funnel{% if filtre_pose %}-fill{% endif %}"></i> Filtres
         </button>
-        <div class="o-dd-panel" id="dd-filtres">
-          <div class="o-dd-section">Statut</div>
-          <a class="o-dd-item {% if statut == 'brouillon' %}active{% endif %}"
-             onclick="setFiltreStatut('brouillon')">Brouillon</a>
-          <a class="o-dd-item {% if statut == 'en_attente_de_paiement' %}active{% endif %}"
-             onclick="setFiltreStatut('en_attente_de_paiement')">En attente de paiement</a>
-          <a class="o-dd-item {% if statut == 'en_cours' %}active{% endif %}"
-             onclick="setFiltreStatut('en_cours')">En cours</a>
-          <a class="o-dd-item {% if statut == 'termine' %}active{% endif %}"
-             onclick="setFiltreStatut('termine')">Terminé</a>
-          <a class="o-dd-item {% if statut == 'annule' %}active{% endif %}"
-             onclick="setFiltreStatut('annule')">Annulé</a>
-          {% if statut %}
-          <hr class="o-dd-sep">
-          <a class="o-dd-item" onclick="setFiltreStatut('')" style="color:var(--rose-text);">
-            <i class="bi bi-x-circle" style="font-size:11px;"></i> Supprimer le filtre statut
-          </a>
-          {% endif %}
-          
-          {% if date_filtre %}
-          <a class="o-dd-item" onclick="setFiltreDate('')" style="color:var(--rose-text);">
-            <i class="bi bi-x-circle" style="font-size:11px;"></i> Effacer la date
-          </a>
-          {% endif %}
-          <hr class="o-dd-sep">
-          <div class="o-dd-section">Période</div>
-          <div style="padding:4px 14px 8px;">
-            <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
-              <label style="font-size:11px;color:var(--text-muted);width:24px;flex-shrink:0;">Du</label>
-              <input type="date" id="dd-date-debut-input" value="{{ date_debut }}"
-                     class="filter-select" style="width:100%;font-size:12px;">
-            </div>
-            <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
-              <label style="font-size:11px;color:var(--text-muted);width:24px;flex-shrink:0;">Au</label>
-              <input type="date" id="dd-date-fin-input" value="{{ date_fin }}"
-                     class="filter-select" style="width:100%;font-size:12px;">
-            </div>
-            <div style="display:flex;gap:6px;">
-              <button type="button" class="o-ctrl-btn" style="flex:1;justify-content:center;background:var(--accent);color:#fff;border-color:var(--accent);"
-                      onclick="applyPeriode()">Appliquer</button>
-              {% if date_debut or date_fin %}
-              <button type="button" class="o-ctrl-btn" onclick="clearPeriode()">Aujourd'hui</button>
-              {% endif %}
-            </div>
-          </div>
-          <hr class="o-dd-sep">
-          <div class="o-dd-section">Hospitalisation</div>
-          <div style="padding:4px 14px 6px;">
-            <input type="text" id="dd-hosp-input" placeholder="N° hospitalisation…"
-                   value="{% if hospitalisation_filtre %}{{ hospitalisation_filtre.numero }}{% endif %}"
-                   class="filter-select" style="width:100%;font-size:12px;"
-                   oninput="searchHosp(this.value)">
-            <div id="dd-hosp-results" style="margin-top:4px;"></div>
-          </div>
-          {% if hospitalisation_id %}
-          <a class="o-dd-item" onclick="setFiltreHosp('',''); document.getElementById('dd-hosp-input').value=''" style="color:var(--rose-text);">
-            <i class="bi bi-x-circle" style="font-size:11px;"></i> Effacer le filtre hospitalisation
-          </a>
-          {% endif %}
+        <div class="o-dd-panel lst-menu" id="dd-filtres">
+          {% include 'includes/listing/menu_filtres.html' %}
         </div>
       </div>
-      {% endwith %}
 
-      <!-- Tags filtres actifs -->
-      {% if q %}<span class="o-filter-tag">{{ q }} <a onclick="clearQ()" style="cursor:pointer;">×</a></span>{% endif %}
-      {% if statut %}<span class="o-filter-tag">{% if statut == 'brouillon' %}Brouillon{% elif statut == 'en_attente_de_paiement' %}Att. paiement{% elif statut == 'en_cours' %}En cours{% elif statut == 'termine' %}Terminé{% else %}Annulé{% endif %} <a onclick="setFiltreStatut('')" style="cursor:pointer;">×</a></span>{% endif %}
-      {% if date_filtre %}<span class="o-filter-tag">{{ date_filtre }} <a onclick="setFiltreDate('')" style="cursor:pointer;">×</a></span>{% endif %}
-      {% if date_debut or date_fin %}<span class="o-filter-tag">{{ date_debut|default:"…" }} → {{ date_fin|default:"…" }} <a onclick="clearPeriode()" style="cursor:pointer;">×</a></span>{% endif %}
-      {% if hospitalisation_filtre %}<span class="o-filter-tag"><i class="bi bi-hospital" style="font-size:10px;"></i> {{ hospitalisation_filtre.numero }} — {{ hospitalisation_filtre.patient.nom }} <a onclick="setFiltreHosp('',''); document.getElementById('dd-hosp-input').value=''" style="cursor:pointer;">×</a></span>{% endif %}
-      {% if q or statut or date_filtre or date_debut or date_fin or hospitalisation_id %}
-      <a onclick="clearAll()" class="o-ctrl-btn" style="cursor:pointer;"><i class="bi bi-x"></i> Effacer</a>
+      <div class="o-dd-wrap">
+        <button class="o-ctrl-btn {% if groups %}active{% endif %}"
+                id="btn-group" onclick="toggleDd('dd-group', this)">
+          <i class="bi bi-list-ul"></i> Regrouper par
+        </button>
+        <div class="o-dd-panel lst-menu" id="dd-group">
+          <div class="o-dd-section">Regrouper par</div>
+          {% include 'includes/listing/menu_groupes.html' %}
+        </div>
+      </div>
+
+      {% if hospitalisation_filtre %}
+      <span class="o-filter-tag"><i class="bi bi-hospital" style="font-size:10px;"></i>
+        {{ hospitalisation_filtre.numero }} — {{ hospitalisation_filtre.patient.nom }}
+        <a href="{% url 'soins:list' %}" style="cursor:pointer;">×</a></span>
+      {% endif %}
+      {% if patient_filtre %}
+      <span class="o-filter-tag"><i class="bi bi-person" style="font-size:10px;"></i>
+        {{ patient_filtre.nom }} {{ patient_filtre.prenoms }}
+        <a href="{% url 'soins:list' %}" style="cursor:pointer;">×</a></span>
       {% endif %}
 
       <div class="o-ctrl-sep"></div>
@@ -311,18 +243,17 @@
       <div class="o-pagination-top">
         <span id="pag-info-top">{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
         <a id="pag-prev-top" class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
-           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}&q={{ q }}&statut={{ statut }}&date={{ date_filtre }}&date_debut={{ date_debut }}&date_fin={{ date_fin }}&hospitalisation_id={{ hospitalisation_id }}{% else %}#{% endif %}">
+           href="{% if page_obj.has_previous %}{% querystring page=page_obj.previous_page_number %}{% else %}#{% endif %}">
           <i class="bi bi-chevron-left"></i>
         </a>
         <a id="pag-next-top" class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
-           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}&q={{ q }}&statut={{ statut }}&date={{ date_filtre }}&date_debut={{ date_debut }}&date_fin={{ date_fin }}&hospitalisation_id={{ hospitalisation_id }}{% else %}#{% endif %}">
+           href="{% if page_obj.has_next %}{% querystring page=page_obj.next_page_number %}{% else %}#{% endif %}">
           <i class="bi bi-chevron-right"></i>
         </a>
       </div>
 
       <div class="o-ctrl-sep"></div>
 
-      <!-- Vue toggle -->
       <div class="o-view-btns">
         <button class="o-view-btn active" title="Vue liste"><i class="bi bi-list-ul"></i></button>
       </div>
@@ -378,28 +309,28 @@
   <table class="o-list-table">
     <thead>
       <tr id="col-header-row">
-        <th class="sortable-col" data-col="0" style="width:85px"><span class="col-label">Nom</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
-        <th class="sortable-col" data-col="1" style="width:130px"><span class="col-label">Patient</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
+        <th class="sortable-col" data-col="2" data-tri="numero" style="width:12%"><span class="col-label">N°</span>{% include "includes/listing/tri_icone.html" with cle="numero" %}<div class="col-resizer"></div></th>
+        <th class="sortable-col" data-col="1" data-tri="patient" style="width:26%"><span class="col-label">Patient</span>{% include "includes/listing/tri_icone.html" with cle="patient" %}<div class="col-resizer"></div></th>
 
-        <th class="sortable-col" data-col="4" style="width:130px"><span class="col-label">Infirmier</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
-        <th class="sortable-col" data-col="6" style="width:105px"><span class="col-label">Date</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
-        <th class="sortable-col" data-col="7" style="width:36px;text-align:center;"><span class="col-label">Sexe</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
-        <th class="sortable-col" data-col="8" style="width:42px;text-align:center;"><span class="col-label">Âge</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
+        <th class="sortable-col" data-col="4" data-tri="infirmier" style="width:24%"><span class="col-label">Infirmier</span>{% include "includes/listing/tri_icone.html" with cle="infirmier" %}<div class="col-resizer"></div></th>
+        <th class="sortable-col" data-col="6" data-tri="date" style="width:15%"><span class="col-label">Date</span>{% include "includes/listing/tri_icone.html" with cle="date" %}<div class="col-resizer"></div></th>
+        <th class="sortable-col" data-col="7" data-tri="sexe" style="width:6%;text-align:center;"><span class="col-label">Sexe</span>{% include "includes/listing/tri_icone.html" with cle="sexe" %}<div class="col-resizer"></div></th>
+        <th class="sortable-col" data-col="8" data-tri="age" style="width:7%;text-align:center;"><span class="col-label">Âge</span>{% include "includes/listing/tri_icone.html" with cle="age" %}<div class="col-resizer"></div></th>
         <!--
-        <th class="col-age-group sortable-col" data-col="9" style="width:40px"><span class="col-label">0-11 Mois</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
-        <th class="col-age-group sortable-col" data-col="10" style="width:40px"><span class="col-label">1-4 Ans</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
-        <th class="col-age-group sortable-col" data-col="11" style="width:40px"><span class="col-label">5-9 Ans</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
-        <th class="col-age-group sortable-col" data-col="12" style="width:40px"><span class="col-label">10-14 Ans</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
-        <th class="col-age-group sortable-col" data-col="13" style="width:40px"><span class="col-label">15-19 Ans</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
-        <th class="col-age-group sortable-col" data-col="14" style="width:40px"><span class="col-label">20-24 Ans</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
-        <th class="col-age-group sortable-col" data-col="15" style="width:40px"><span class="col-label">25-49 Ans</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
-        <th class="col-age-group sortable-col" data-col="16" style="width:40px"><span class="col-label">50+ Ans</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
+        <th class="col-age-group sortable-col" data-col="9" style="width:40px"><span class="col-label">0-11 Mois</span><div class="col-resizer"></div></th>
+        <th class="col-age-group sortable-col" data-col="10" style="width:40px"><span class="col-label">1-4 Ans</span><div class="col-resizer"></div></th>
+        <th class="col-age-group sortable-col" data-col="11" style="width:40px"><span class="col-label">5-9 Ans</span><div class="col-resizer"></div></th>
+        <th class="col-age-group sortable-col" data-col="12" style="width:40px"><span class="col-label">10-14 Ans</span><div class="col-resizer"></div></th>
+        <th class="col-age-group sortable-col" data-col="13" style="width:40px"><span class="col-label">15-19 Ans</span><div class="col-resizer"></div></th>
+        <th class="col-age-group sortable-col" data-col="14" style="width:40px"><span class="col-label">20-24 Ans</span><div class="col-resizer"></div></th>
+        <th class="col-age-group sortable-col" data-col="15" style="width:40px"><span class="col-label">25-49 Ans</span><div class="col-resizer"></div></th>
+        <th class="col-age-group sortable-col" data-col="16" style="width:40px"><span class="col-label">50+ Ans</span><div class="col-resizer"></div></th>
         -->
-        <th class="sortable-col" data-col="17" style="width:72px"><span class="col-label">État</span><span class="sort-icon"></span><div class="col-resizer"></div></th>
+        <th class="sortable-col" data-col="17" data-tri="statut" style="width:10%"><span class="col-label">État</span>{% include "includes/listing/tri_icone.html" with cle="statut" %}<div class="col-resizer"></div></th>
         <th class="col-picker-th">
           <button class="col-picker-btn" id="col-picker-btn" title="Colonnes visibles"><i class="bi bi-three-dots-vertical"></i></button>
           <div class="col-picker-menu" id="col-picker-menu">
-            <label><input type="checkbox" data-col-idx="0" checked> Nom</label>
+            <label><input type="checkbox" data-col-idx="2" checked> N°</label>
             <label><input type="checkbox" data-col-idx="1" checked> Patient</label>
 
             <label><input type="checkbox" data-col-idx="4" checked> Infirmier</label>
@@ -422,266 +353,57 @@
       </tr>
     </thead>
     <tbody>
-      {% for soin in page_obj %}
-      {% with t=soin.patient.tranche_age %}
-      <tr data-url="{% url 'soins:detail' soin.pk %}" onclick="window.location=this.dataset.url">
-        <td data-col="0">
-          <span style="font-family: var(--font-mono);font-size:11.5px;font-weight:500;color:var(--accent-text-soft);">{{ soin.nom|default:soin.numero }}</span>
-        </td>
-        <td data-col="1" style="font-weight:500;">{{ soin.patient.nom }} {{ soin.patient.prenoms }}</td>
-
-        <td data-col="4" style="color:var(--text-muted);font-size:12px;">
-          {% with p=soin.procedures_list|first %}
-            {% if p and p.infirmier %}{{ p.infirmier.nom }} {{ p.infirmier.prenoms }}{% else %}<span style="opacity:.4;">—</span>{% endif %}
-          {% endwith %}
-        </td>
-        <td data-col="6" style="font-size:12px;white-space:nowrap;">
-          {% with p=soin.procedures_list|first %}
-            {% if p %}{{ p.date|date:"d/m/Y H:i" }}{% else %}{{ soin.date_creation|date:"d/m/Y" }}{% endif %}
-          {% endwith %}
-        </td>
-        <td data-col="7" style="text-align:center;font-size:12px;color:var(--text-muted);">{{ soin.patient.sexe }}</td>
-        <td data-col="8" style="text-align:center;font-size:12px;white-space:nowrap;">{{ soin.patient.age_display }}</td>
-        {% comment %}
-        <td data-col="9"  class="col-age-group">{% if t == 'mois_0_11' %}<span class="age-flag-1">1</span>{% else %}<span class="age-flag-0">0</span>{% endif %}</td>
-        <td data-col="10" class="col-age-group">{% if t == 'ans_1_4'   %}<span class="age-flag-1">1</span>{% else %}<span class="age-flag-0">0</span>{% endif %}</td>
-        <td data-col="11" class="col-age-group">{% if t == 'ans_5_9'   %}<span class="age-flag-1">1</span>{% else %}<span class="age-flag-0">0</span>{% endif %}</td>
-        <td data-col="12" class="col-age-group">{% if t == 'ans_10_14' %}<span class="age-flag-1">1</span>{% else %}<span class="age-flag-0">0</span>{% endif %}</td>
-        <td data-col="13" class="col-age-group">{% if t == 'ans_15_19' %}<span class="age-flag-1">1</span>{% else %}<span class="age-flag-0">0</span>{% endif %}</td>
-        <td data-col="14" class="col-age-group">{% if t == 'ans_20_24' %}<span class="age-flag-1">1</span>{% else %}<span class="age-flag-0">0</span>{% endif %}</td>
-        <td data-col="15" class="col-age-group">{% if t == 'ans_25_49' %}<span class="age-flag-1">1</span>{% else %}<span class="age-flag-0">0</span>{% endif %}</td>
-        <td data-col="16" class="col-age-group">{% if t == 'ans_50_plus' %}<span class="age-flag-1">1</span>{% else %}<span class="age-flag-0">0</span>{% endif %}</td>
-        {% endcomment %}
-        <td data-col="17">
-          {% if soin.statut == 'brouillon' %}
-            <span class="badge-statut badge-brouillon">Brouillon</span>
-          {% elif soin.statut == 'en_attente_de_paiement' %}
-            <span class="badge-statut badge-en-attente">Att. paiement</span>
-          {% elif soin.statut == 'en_cours' %}
-            <span class="badge-statut badge-en-cours">En cours</span>
-          {% elif soin.statut == 'termine' %}
-            <span class="badge-statut badge-termine">Terminé</span>
-          {% elif soin.statut == 'annule' %}
-            <span class="badge-statut badge-annule">Annulé</span>
-          {% endif %}
-        </td>
-        <td></td>
-      </tr>
-      {% endwith %}
-      {% endfor %}
+      {% if arbre %}
+        {% include 'includes/listing/groupes.html' with noeuds=arbre listing_colonnes=8 listing_ligne_tpl='soins/includes/soin_row.html' %}
+      {% else %}
+        {% for soin in page_obj %}
+          {% include 'soins/includes/soin_row.html' with objet=soin parent='' %}
+        {% endfor %}
+      {% endif %}
     </tbody>
   </table>
   <div class="o-pagination-bottom">
     <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
     <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
-      href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}&q={{ q }}&statut={{ statut }}&date={{ date_filtre }}&date_debut={{ date_debut }}&date_fin={{ date_fin }}{% else %}#{% endif %}">
+      href="{% if page_obj.has_previous %}{% querystring page=page_obj.previous_page_number %}{% else %}#{% endif %}">
       <i class="bi bi-chevron-left"></i>
     </a>
     <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
-      href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}&q={{ q }}&statut={{ statut }}&date={{ date_filtre }}&date_debut={{ date_debut }}&date_fin={{ date_fin }}{% else %}#{% endif %}">
+      href="{% if page_obj.has_next %}{% querystring page=page_obj.next_page_number %}{% else %}#{% endif %}">
       <i class="bi bi-chevron-right"></i>
     </a>
   </div>
   {% else %}
+  {% comment %}Sans filtre la liste se limite à la journée en cours : dire
+  « aucun soin trouvé » et proposer d'en enregistrer un premier laissait croire
+  que le module était vide, alors qu'il ne l'est presque jamais.{% endcomment %}
   <div class="o-empty">
     <i class="bi bi-bandaid"></i>
-    Aucun soin trouvé.<br>
-    <a href="{% url 'soins:create' %}"
-      style="color:var(--accent-text-soft);font-weight:600;margin-top:8px;display:inline-block;">Enregistrer un premier soin</a>
+    {% if q or statut or date_filtre or date_debut or date_fin or hospitalisation_id %}
+      Aucun soin ne correspond à ces critères.<br>
+      <a onclick="clearAll()" style="color:var(--accent-text-soft);font-weight:600;margin-top:8px;display:inline-block;cursor:pointer;">Effacer les filtres</a>
+    {% else %}
+      Aucun soin enregistré aujourd'hui ({{ today|date:"d/m/Y" }}).<br>
+      <span style="font-size:12px;color:var(--text-muted);">Élargissez la période depuis <strong>Filtres</strong> pour consulter les jours précédents.</span><br>
+      <a href="{% url 'soins:create' %}"
+        style="color:var(--accent-text-soft);font-weight:600;margin-top:8px;display:inline-block;">Enregistrer un soin</a>
+    {% endif %}
   </div>
   {% endif %}
 </div>
 </div><!-- /#list-result -->
 
+{% comment %}Dépliage des groupes : commun à toutes les listes de la brique.{% endcomment %}
+<script src="{% static 'js/listing_groupes.js' %}"></script>
+{% include 'includes/listing/page_js.html' %}
 {% include 'soins/includes/list_live_js.html' %}
 
-<script>
-// @ts-nocheck
-
-  /* ── Dropdown ── */
-  function toggleDd(id, btn) {
-    var panel = document.getElementById(id);
-    var isOpen = panel.classList.contains('open');
-    document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
-    if (!isOpen) {
-      var rect = btn.getBoundingClientRect();
-      panel.style.top = (rect.bottom + 4) + 'px';
-      panel.style.left = rect.left + 'px';
-      panel.style.right = 'auto';
-      panel.classList.add('open');
-      var pr = panel.getBoundingClientRect();
-      if (pr.right > window.innerWidth - 8) {
-        panel.style.left = 'auto';
-        panel.style.right = (window.innerWidth - rect.right) + 'px';
-      }
-    }
-  }
-  document.addEventListener('click', function(e) {
-    if (!e.target.closest('.o-dd-wrap')) {
-      document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
-    }
-  });
-
-  /* ── Filtres ── */
-  function setFiltreStatut(val) {
-    var el = document.getElementById('fi-statut');
-    if (el) el.value = val;
-    document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
-    window.liveLoad();
-  }
-
-  function setFiltreDate(val) {
-    var el = document.getElementById('fi-date');
-    if (el) el.value = val;
-    var ddInput = document.getElementById('dd-date-input');
-    if (ddInput) ddInput.value = val;
-    if (val) {
-      var debEl = document.getElementById('fi-date-debut');
-      var finEl = document.getElementById('fi-date-fin');
-      if (debEl) debEl.value = '';
-      if (finEl) finEl.value = '';
-    }
-    document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
-    window.liveLoad();
-  }
-
-  function applyPeriode() {
-    var deb = document.getElementById('dd-date-debut-input').value;
-    var fin = document.getElementById('dd-date-fin-input').value;
-    document.getElementById('fi-date-debut').value = deb;
-    document.getElementById('fi-date-fin').value = fin;
-    var dateEl = document.getElementById('fi-date');
-    var ddDateInput = document.getElementById('dd-date-input');
-    if (dateEl) dateEl.value = '';
-    if (ddDateInput) ddDateInput.value = '';
-    document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
-    window.liveLoad();
-  }
-
-  function clearPeriode() {
-    document.getElementById('fi-date-debut').value = '';
-    document.getElementById('fi-date-fin').value = '';
-    document.getElementById('dd-date-debut-input').value = '';
-    document.getElementById('dd-date-fin-input').value = '';
-    document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
-    window.liveLoad();
-  }
-
-  function clearQ() {
-    var inp = document.getElementById('search-input');
-    if (inp) inp.value = '';
-    window.liveLoad();
-  }
-
-  function clearAll() {
-    var inp = document.getElementById('search-input');
-    if (inp) inp.value = '';
-    var statEl = document.getElementById('fi-statut');
-    if (statEl) statEl.value = '';
-    var dateEl = document.getElementById('fi-date');
-    if (dateEl) dateEl.value = '';
-    var debEl = document.getElementById('fi-date-debut');
-    if (debEl) debEl.value = '';
-    var finEl = document.getElementById('fi-date-fin');
-    if (finEl) finEl.value = '';
-    var hospEl = document.getElementById('fi-hosp');
-    if (hospEl) hospEl.value = '';
-    window.liveLoad();
-  }
-
-  function setFiltreHosp(id, label) {
-    var el = document.getElementById('fi-hosp');
-    if (el) el.value = id;
-    document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
-    window.liveLoad();
-  }
-
-  var hospSearchTimer = null;
-  function searchHosp(val) {
-    var resultsEl = document.getElementById('dd-hosp-results');
-    if (!val || val.length < 2) { resultsEl.innerHTML = ''; return; }
-    clearTimeout(hospSearchTimer);
-    hospSearchTimer = setTimeout(function() {
-      fetch('/hospitalisation/?q=' + encodeURIComponent(val) + '&format=json', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-        .then(function(r) { return r.json(); })
-        .catch(function() { return { results: [] }; })
-        .then(function(data) {
-          if (!data.results || !data.results.length) {
-            resultsEl.innerHTML = '<div style="padding:4px 14px;font-size:12px;color:var(--text-muted);">Aucun résultat</div>';
-            return;
-          }
-          resultsEl.innerHTML = data.results.map(function(h) {
-            return '<a class="o-dd-item" onclick="setFiltreHosp(\'' + h.id + '\',\'' + h.numero + '\'); document.getElementById(\'dd-hosp-input\').value=\'' + h.numero + ' — ' + h.patient + '\'">' +
-              '<i class="bi bi-hospital" style="font-size:11px;color:var(--accent-text-soft);"></i> ' + h.numero + ' — ' + h.patient +
-              '</a>';
-          }).join('');
-        });
-    }, 300);
-  }
-
-  /* ── Sync pagination top depuis le bas après liveLoad ── */
-  document.addEventListener('liveload:complete', function() {
-    var srcSpan = document.querySelector('.o-pagination-bottom span');
-    var tgtSpan = document.getElementById('pag-info-top');
-    if (srcSpan && tgtSpan) tgtSpan.textContent = srcSpan.textContent;
-
-    var bottomBtns = document.querySelectorAll('.o-pagination-bottom .o-pag-btn');
-    var prevSrc = bottomBtns[0], nextSrc = bottomBtns[1];
-    var prevTgt = document.getElementById('pag-prev-top');
-    var nextTgt = document.getElementById('pag-next-top');
-    if (prevTgt && prevSrc) { prevTgt.className = prevSrc.className; prevTgt.href = prevSrc.href; }
-    if (nextTgt && nextSrc) { nextTgt.className = nextSrc.className; nextTgt.href = nextSrc.href; }
-  });
-
-  /* ── Pagination top → liveLoad ── */
-  document.addEventListener('click', function(e) {
-    var a = e.target.closest('#pag-prev-top, #pag-next-top');
-    if (!a || a.classList.contains('disabled')) return;
-    var href = a.getAttribute('href');
-    if (!href || href === '#') return;
-    e.preventDefault();
-    var qs = href.includes('?') ? href.split('?')[1] : '';
-    var p = new URLSearchParams(qs);
-    window.liveLoad({ page: p.get('page') || '1' });
-  });
-
-  /* Recherche auto (debounce 400ms) */
-  (function () {
-    var inp = document.getElementById('search-input');
-    if (!inp) return;
-    var timer;
-    inp.addEventListener('input', function () {
-      clearTimeout(timer);
-      timer = setTimeout(window.liveLoad, 400);
-    });
-  })();
-
-  /* Redimensionnement colonnes */
-  (function () {
-    var table = document.querySelector('.o-list-table');
-    if (!table) return;
-    var dragging = null, startX, startW;
-    table.querySelectorAll('th .col-resizer').forEach(function (handle) {
-      handle.addEventListener('mousedown', function (e) {
-        dragging = handle.parentElement;
-        startX = e.clientX;
-        startW = dragging.offsetWidth;
-        handle.classList.add('resizing');
-        e.preventDefault();
-      });
-    });
-    document.addEventListener('mousemove', function (e) {
-      if (!dragging) return;
-      dragging.style.width = Math.max(60, startW + (e.clientX - startX)) + 'px';
-    });
-    document.addEventListener('mouseup', function () {
-      if (dragging) {
-        dragging.querySelector('.col-resizer').classList.remove('resizing');
-        dragging = null;
-      }
-    });
-  })();
-</script>
+{% comment %}Filtres, regroupement, rafraîchissement, tri des colonnes,
+sélecteur de colonnes et redimensionnement : tout vient des partiels
+inclus ci-dessus (includes/listing/page_js.html et
+soins/includes/list_live_js.html). Le tri est calculé par le serveur —
+celui qui vivait ici ne réordonnait que les 25 lignes affichées.
+{% endcomment %}
 
 </div><!-- /#page-wrap -->
 {% endblock %}

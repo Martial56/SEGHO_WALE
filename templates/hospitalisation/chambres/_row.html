@@ -1,0 +1,25 @@
+{% comment %}
+Une ligne de la liste des chambres.
+
+Extraite pour que la brique de regroupement (includes/listing/groupes.html)
+puisse l'imbriquer sous un en-tête de groupe. `parent` porte le chemin du groupe
+qui la contient, vide quand la liste n'est pas regroupée.
+{% endcomment %}
+      <tr data-parent="{{ parent|default:'' }}"{% if parent %} style="display:none;"{% endif %}
+          onclick="window.location='{% url 'hospitalisation:chambre_detail' objet.id %}'">
+        <td>
+          <div class="ch-nom">{{ objet.nom|default:objet.salle_no }}</div>
+        </td>
+        <td>{{ objet.get_type_chambre_display }}</td>
+        <td>{{ objet.get_genre_display }}</td>
+        <td class="col-phone" style="color:{% if objet.telephone_chambre %}#1a6b3c{% else %}var(--text-muted){% endif %};">
+          <i class="bi bi-telephone{% if not objet.telephone_chambre %}-x{% endif %}" style="font-size:14px;"></i>
+        </td>
+        <td>
+          {% if objet.statut %}
+          <span class="badge-dispo"><i class="bi bi-circle-fill" style="font-size:7px;"></i> Disponible</span>
+          {% else %}
+          <span class="badge-occupe"><i class="bi bi-circle-fill" style="font-size:7px;"></i> Occupée</span>
+          {% endif %}
+        </td>
+      </tr>

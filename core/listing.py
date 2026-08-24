@@ -27,6 +27,28 @@ from django.db.models import Count, Q
 
 # ── Déclarations ────────────────────────────────────────────────────────────
 
+def condition_recherche(champs, q, mots_max=6):
+    """Condition de recherche libre sur plusieurs champs.
+
+    Le texte saisi est découpé en mots : chaque mot doit se retrouver dans au
+    moins un des champs — ET entre les mots, OU entre les champs. Sans ce
+    découpage, « anoh josiane » était cherché tel quel dans `nom`, puis tel
+    quel dans `prenoms`, et ne trouvait rien : le nom et les prénoms vivent
+    dans deux colonnes distinctes. L'ordre de saisie n'a plus d'importance,
+    « josiane anoh » trouve la même fiche.
+
+    Le nombre de mots est borné : une saisie collée par erreur ne doit pas
+    fabriquer une requête à cinquante conditions.
+    """
+    condition = Q()
+    for mot in (q or '').split()[:mots_max]:
+        par_champ = Q()
+        for champ in champs:
+            par_champ |= Q(**{f'{champ}__icontains': mot})
+        condition &= par_champ
+    return condition
+
+
 class Famille:
     """Une famille de filtres. Ses valeurs se combinent en OU.
 
@@ -155,13 +177,18 @@ class Listing:
     """Déclaration complète d'une liste."""
 
     def __init__(self, recherche=(), familles=(), dimensions=(),
-                 par_page=25, filtres_defaut=(), tri_defaut=()):
+                 par_page=25, filtres_defaut=(), tri_defaut=(), tris=None):
         self.recherche = tuple(recherche)
         self.familles = list(familles)
         self.dimensions = OrderedDict((d.cle, d) for d in dimensions)
         self.par_page = par_page
         self.filtres_defaut = tuple(filtres_defaut)
         self.tri_defaut = tuple(tri_defaut)
+        #: Colonnes triables : clé lisible dans l'URL -> champs du modèle.
+        #: Le tri se fait en base, sur la totalité du résultat filtré. Trier en
+        #: JavaScript ne réordonnait que les 25 lignes de la page affichée : on
+        #: croyait voir le plus ancien, on voyait le plus ancien *de la page*.
+        self.tris = dict(tris or {})
 
     # ── Filtres ─────────────────────────────────────────────────────────────
 
@@ -177,10 +204,7 @@ class Listing:
     def appliquer_recherche(self, qs, q):
         if not q or not self.recherche:
             return qs
-        condition = Q()
-        for champ in self.recherche:
-            condition |= Q(**{f'{champ}__icontains': q})
-        return qs.filter(condition)
+        return qs.filter(condition_recherche(self.recherche, q))
 
     def appliquer_filtres(self, qs, filtres, contexte=None):
         """Applique chaque famille en ET ; les valeurs d'une famille en OU."""
@@ -217,18 +241,39 @@ class Listing:
         """Dimensions demandées, dans l'ordre où l'utilisateur les a choisies."""
         return [self.dimensions[g] for g in groupes if g in self.dimensions]
 
-    def trier(self, qs, groupes):
-        """Trie pour que les groupes soient cohérents avec leur imbrication."""
+    def tri_demande(self, request):
+        """Colonne de tri demandée, ou ('', 'asc') si aucune n'est valable.
+
+        Une clé inconnue est ignorée plutôt que refusée : `order_by` sur un
+        champ arbitraire venu de l'URL planterait la page.
+        """
+        cle = (request.GET.get('tri') or '').strip()
+        sens = 'desc' if request.GET.get('sens') == 'desc' else 'asc'
+        return (cle if cle in self.tris else ''), sens
+
+    def trier(self, qs, groupes, tri='', sens='asc'):
+        """Ordonne le résultat.
+
+        L'ordre est celui-ci, et il compte : d'abord les champs des dimensions
+        de regroupement — sans quoi les groupes se mélangeraient —, puis le tri
+        demandé par l'utilisateur, qui joue donc *à l'intérieur* de chaque
+        groupe, et enfin le tri par défaut de la liste.
+        """
         dims = self.dimensions_retenues(groupes)
-        tri = []
+        ordre = []
+
+        def ajouter(champ):
+            if champ and champ not in ordre:
+                ordre.append(champ)
+
         for dim in dims:
             for champ in dim.order:
-                if champ not in tri:
-                    tri.append(champ)
+                ajouter(champ)
+        for champ in self.tris.get(tri, ()):
+            ajouter(f'-{champ}' if sens == 'desc' else champ)
         for champ in self.tri_defaut:
-            if champ not in tri:
-                tri.append(champ)
-        return qs.order_by(*tri) if tri else qs
+            ajouter(champ)
+        return qs.order_by(*ordre) if ordre else qs
 
 
 # ── Comptage ────────────────────────────────────────────────────────────────

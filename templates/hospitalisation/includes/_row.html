@@ -1,0 +1,29 @@
+{% comment %}
+Une ligne de la liste des hospitalisations.
+
+Extraite pour que la brique de regroupement (includes/listing/groupes.html)
+puisse l'imbriquer sous un en-tête de groupe. `parent` porte le chemin du groupe
+qui la contient, vide quand la liste n'est pas regroupée.
+{% endcomment %}
+      <tr data-parent="{{ parent|default:'' }}"{% if parent %} style="display:none;"{% endif %}
+          onclick="window.location='{% url 'hospitalisation:detail' objet.pk %}'">
+        <td><span class="h-num">{{ objet.numero }}</span></td>
+        <td>
+          <div class="h-patient-name">{{ objet.patient.nom }} {{ objet.patient.prenoms }}</div>
+        </td>
+        <td>
+          {% if objet.chambre %}
+          <div class="h-chambre-nom">{{ objet.chambre.nom }}{% if objet.numero_lit %} — Lit {{ objet.numero_lit }}{% endif %}</div>
+          <div class="h-chambre-type">{{ objet.chambre.get_type_chambre_display }}</div>
+          {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
+        </td>
+        <td>
+          {% if objet.medecin_traitant %}{{ objet.medecin_traitant.nom }} {{ objet.medecin_traitant.prenoms }}
+          {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
+        </td>
+        <td>
+          {{ objet.date_admission|date:"d/m/Y" }}<br>
+          <span style="font-size:10.5px;color:var(--text-muted);">{{ objet.date_admission|date:"H:i" }}</span>
+        </td>
+        <td><span class="h-badge h-badge-{{ objet.statut }}">{{ objet.get_statut_display }}</span></td>
+      </tr>
