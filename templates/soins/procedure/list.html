@@ -106,83 +106,82 @@
 {% block content %}
 <div id="page-wrap">
 
+{% comment %}Styles de la brique : menus à sous-menus, bandes de groupe,
+chevrons de dépliage.{% endcomment %}
+{% include 'includes/listing/styles.html' %}
+
 <!-- ══ SUBHEADER ══ -->
+{% comment %}
+Filtres et regroupements viennent de core.listing, comme les soins infirmiers et
+les listes de rendez-vous : les menus sont générés depuis
+soins/procedure_listing.py, ce gabarit ne fait que les parcourir.
+{% endcomment %}
 <div class="o-subheader" data-fixed="1" id="subheader">
   <div class="o-subheader-row">
     <span class="o-page-title">Liste des soins <span class="o-page-count">{{ total }}</span></span>
+    <span class="o-page-scope" style="font-size:12px;color:var(--text-muted);">· {{ periode_libelle }}</span>
     <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
-      <form method="get" id="filter-form" style="display:flex;align-items:center;">
-        <input type="hidden" name="statut" id="fi-statut" value="{{ statut }}">
-        <input type="hidden" name="date"   id="fi-date"   value="{{ date_filtre }}">
-        <div class="o-search-bar">
-          <input class="o-search-input" id="search-input" type="text" name="q" value="{{ q }}"
-            placeholder="Rechercher patient, infirmier, soin, numéro…">
-          <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
-        </div>
-      </form>
+      <div class="o-search-bar">
+        <input class="o-search-input" id="search-input" type="text" value="{{ q }}"
+          placeholder="Rechercher patient, infirmier, soin, numéro…">
+        <button type="button" class="o-search-btn" onclick="lancerRecherche()"><i class="bi bi-search"></i></button>
+      </div>
     </div>
   </div>
 
-  <div class="o-subheader-row">
+  <div class="o-subheader-row" id="subheader-controls"
+       data-filters="{{ filters|join:"," }}" data-groups="{{ groups|join:"," }}">
     <a href="{% url 'soins:procedure_create' %}" class="o-btn-create">
       <i class="bi bi-plus-lg"></i> Créer
     </a>
 
     <div style="margin-left:auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
 
-      <!-- Filtres dropdown -->
+      {% if selection_active %}
+      <a href="#" class="o-ctrl-btn" style="color:var(--rose-text);"
+         onclick="resetAll(); return false;"
+         title="Effacer les filtres, le regroupement et la recherche">
+        <i class="bi bi-x-circle"></i> Effacer
+      </a>
+      {% endif %}
+
       <div class="o-dd-wrap">
-        <button class="o-ctrl-btn {% if statut or date_filtre %}active{% endif %}"
+        <button class="o-ctrl-btn {% if filtre_pose %}active{% endif %}"
                 id="btn-filtres" onclick="toggleDd('dd-filtres', this)">
-          <i class="bi bi-funnel{% if statut or date_filtre %}-fill{% endif %}"></i>
-          Filtres{% if statut or date_filtre %} <span style="background:var(--accent);color:#fff;border-radius:10px;font-size:10px;padding:0 5px;">{% if statut %}1{% endif %}{% if date_filtre %}1{% endif %}</span>{% endif %}
+          <i class="bi bi-funnel{% if filtre_pose %}-fill{% endif %}"></i> Filtres
         </button>
-        <div class="o-dd-panel" id="dd-filtres">
-          <div class="o-dd-section">Statut</div>
-          <a class="o-dd-item {% if statut == 'brouillon' %}active{% endif %}" onclick="setFiltreStatut('brouillon')">Brouillon</a>
-          <a class="o-dd-item {% if statut == 'en_cours' %}active{% endif %}"  onclick="setFiltreStatut('en_cours')">En cours</a>
-          <a class="o-dd-item {% if statut == 'termine' %}active{% endif %}"   onclick="setFiltreStatut('termine')">Terminé</a>
-          <a class="o-dd-item {% if statut == 'annule' %}active{% endif %}"    onclick="setFiltreStatut('annule')">Annulé</a>
-          {% if statut %}
-          <hr class="o-dd-sep">
-          <a class="o-dd-item" onclick="setFiltreStatut('')" style="color:var(--rose-text);">
-            <i class="bi bi-x-circle" style="font-size:11px;"></i> Effacer le filtre
-          </a>
-          {% endif %}
-          <hr class="o-dd-sep">
-          <div class="o-dd-section">Date</div>
-          <div style="padding:4px 14px 6px;">
-            <input type="date" id="dd-date-input" value="{{ date_filtre }}"
-                   class="filter-select" style="width:100%;font-size:12px;"
-                   onchange="setFiltreDate(this.value)">
-          </div>
-          {% if date_filtre %}
-          <a class="o-dd-item" onclick="setFiltreDate('')" style="color:var(--rose-text);">
-            <i class="bi bi-x-circle" style="font-size:11px;"></i> Effacer la date
-          </a>
-          {% endif %}
+        <div class="o-dd-panel lst-menu" id="dd-filtres">
+          {% include 'includes/listing/menu_filtres.html' %}
         </div>
       </div>
 
-      <!-- Tags filtres actifs -->
-      {% if q %}<span class="o-filter-tag">{{ q }} <a onclick="clearQ()" style="cursor:pointer;">×</a></span>{% endif %}
-      {% if statut %}<span class="o-filter-tag">{% if statut == 'brouillon' %}Brouillon{% elif statut == 'en_cours' %}En cours{% elif statut == 'termine' %}Terminé{% elif statut == 'annule' %}Annulé{% endif %} <a onclick="setFiltreStatut('')" style="cursor:pointer;">×</a></span>{% endif %}
-      {% if date_filtre %}<span class="o-filter-tag">{{ date_filtre }} <a onclick="setFiltreDate('')" style="cursor:pointer;">×</a></span>{% endif %}
-      {% if q or statut or date_filtre %}
-      <a onclick="clearAll()" class="o-ctrl-btn" style="cursor:pointer;"><i class="bi bi-x"></i> Effacer</a>
+      <div class="o-dd-wrap">
+        <button class="o-ctrl-btn {% if groups %}active{% endif %}"
+                id="btn-group" onclick="toggleDd('dd-group', this)">
+          <i class="bi bi-list-ul"></i> Regrouper par
+        </button>
+        <div class="o-dd-panel lst-menu" id="dd-group">
+          <div class="o-dd-section">Regrouper par</div>
+          {% include 'includes/listing/menu_groupes.html' %}
+        </div>
+      </div>
+
+      {% if patient_filtre %}
+      <span class="o-filter-tag"><i class="bi bi-person" style="font-size:10px;"></i>
+        {{ patient_filtre.nom }} {{ patient_filtre.prenoms }}
+        <a href="{% url 'soins:procedure_list' %}" style="cursor:pointer;">×</a></span>
       {% endif %}
 
       <div class="o-ctrl-sep"></div>
 
-      <!-- Pagination inline -->
       <div class="o-pagination-top">
         <span id="pag-info-top">{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
-        <a id="pag-prev-top" class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
-           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}&q={{ q }}&statut={{ statut }}&date={{ date_filtre }}{% else %}#{% endif %}">
+        <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
+           href="{% if page_obj.has_previous %}{% querystring page=page_obj.previous_page_number %}{% else %}#{% endif %}">
           <i class="bi bi-chevron-left"></i>
         </a>
-        <a id="pag-next-top" class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
-           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}&q={{ q }}&statut={{ statut }}&date={{ date_filtre }}{% else %}#{% endif %}">
+        <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
+           href="{% if page_obj.has_next %}{% querystring page=page_obj.next_page_number %}{% else %}#{% endif %}">
           <i class="bi bi-chevron-right"></i>
         </a>
       </div>
@@ -222,51 +221,48 @@
   {% if page_obj.object_list %}
   <table class="o-list-table">
     <thead>
-      <tr>
-        <th>Nom</th>
-        <th>Patient</th>
-        <th>Soin</th>
-        <th>Prix</th>
-        <th>Infirmier</th>
-        {# <th>Département</th> #}
-        <th>Date</th>
-        <th>État</th>
+      <tr id="col-header-row">
+        {# Cette colonne porte le numéro de la procédure, pas un nom. #}
+        <th class="sortable-col" data-col="2" data-tri="numero" style="width:12%"><span class="col-label">N°</span>{% include "includes/listing/tri_icone.html" with cle="numero" %}<div class="col-resizer"></div></th>
+        <th class="sortable-col" data-col="1" data-tri="patient" style="width:24%"><span class="col-label">Patient</span>{% include "includes/listing/tri_icone.html" with cle="patient" %}<div class="col-resizer"></div></th>
+        <th class="sortable-col" data-col="3" data-tri="soin_type" style="width:20%"><span class="col-label">Soin</span>{% include "includes/listing/tri_icone.html" with cle="soin_type" %}<div class="col-resizer"></div></th>
+        <th class="sortable-col" data-col="4" data-tri="prix" style="width:10%;text-align:right;"><span class="col-label">Prix</span>{% include "includes/listing/tri_icone.html" with cle="prix" %}<div class="col-resizer"></div></th>
+        <th class="sortable-col" data-col="5" data-tri="infirmier" style="width:18%"><span class="col-label">Infirmier</span>{% include "includes/listing/tri_icone.html" with cle="infirmier" %}<div class="col-resizer"></div></th>
+        <th class="sortable-col" data-col="6" data-tri="date" style="width:14%"><span class="col-label">Date</span>{% include "includes/listing/tri_icone.html" with cle="date" %}<div class="col-resizer"></div></th>
+        <th class="sortable-col" data-col="7" data-tri="statut" style="width:12%"><span class="col-label">État</span>{% include "includes/listing/tri_icone.html" with cle="statut" %}<div class="col-resizer"></div></th>
+        <th class="col-picker-th">
+          <button class="col-picker-btn" id="col-picker-btn" title="Colonnes visibles"><i class="bi bi-three-dots-vertical"></i></button>
+          <div class="col-picker-menu" id="col-picker-menu">
+            <label><input type="checkbox" data-col-idx="2" checked> N°</label>
+            <label><input type="checkbox" data-col-idx="1" checked> Patient</label>
+            <label><input type="checkbox" data-col-idx="3" checked> Soin</label>
+            <label><input type="checkbox" data-col-idx="4" checked> Prix</label>
+            <label><input type="checkbox" data-col-idx="5" checked> Infirmier</label>
+            <label><input type="checkbox" data-col-idx="6" checked> Date</label>
+            <label><input type="checkbox" data-col-idx="7" checked> État</label>
+          </div>
+        </th>
       </tr>
     </thead>
     <tbody>
-      {% for proc in page_obj %}
-      <tr onclick="window.location='{% url 'soins:procedure_detail' proc.pk %}'">
-        <td><span style="font-family: var(--font-mono);font-size:11.5px;font-weight:500;color:var(--accent-text-soft);">{{ proc.numero }}</span></td>
-        <td style="font-weight:500;">{{ proc.patient.nom }} {{ proc.patient.prenoms }}</td>
-        <td style="font-size:12px;color:var(--text-muted);">{{ proc.soin_type.nom|default:"—" }}</td>
-        <td style="font-size:12px;white-space:nowrap;">
-          {% if proc.prix %}{{ proc.prix|floatformat:0 }} CFA{% else %}<span style="opacity:.4;">—</span>{% endif %}
-        </td>
-        <td style="color:var(--text-muted);font-size:12px;">
-          {% if proc.infirmier %}{{ proc.infirmier.nom }} {{ proc.infirmier.prenoms }}{% else %}<span style="opacity:.4;">—</span>{% endif %}
-        </td>
-        {# <td style="font-size:12px;color:var(--text-muted);">{{ proc.departement.nom|default:"—" }}</td> #}
-        <td style="font-size:12px;white-space:nowrap;">{{ proc.date|date:"d/m/Y H:i" }}</td>
-        <td>
-          {% if proc.statut == 'brouillon' %}<span class="badge-brouillon">Brouillon</span>
-          {% elif proc.statut == 'en_cours' %}<span class="badge-courant">En cours</span>
-          {% elif proc.statut == 'termine'  %}<span class="badge-termine">Terminé</span>
-          {% elif proc.statut == 'annule'   %}<span class="badge-annule">Annulé</span>
-          {% endif %}
-        </td>
-      </tr>
-      {% endfor %}
+      {% if arbre %}
+        {% include 'includes/listing/groupes.html' with noeuds=arbre listing_colonnes=8 listing_ligne_tpl='soins/procedure/_row.html' %}
+      {% else %}
+        {% for proc in page_obj %}
+          {% include 'soins/procedure/_row.html' with objet=proc parent='' %}
+        {% endfor %}
+      {% endif %}
     </tbody>
   </table>
 
   <div class="o-pagination-bottom">
     <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
     <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
-      href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}&q={{ q }}&statut={{ statut }}&date={{ date_filtre }}{% else %}#{% endif %}">
+      href="{% if page_obj.has_previous %}{% querystring page=page_obj.previous_page_number %}{% else %}#{% endif %}">
       <i class="bi bi-chevron-left"></i>
     </a>
     <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
-      href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}&q={{ q }}&statut={{ statut }}&date={{ date_filtre }}{% else %}#{% endif %}">
+      href="{% if page_obj.has_next %}{% querystring page=page_obj.next_page_number %}{% else %}#{% endif %}">
       <i class="bi bi-chevron-right"></i>
     </a>
   </div>
@@ -282,92 +278,10 @@
 </div>
 </div>
 
+{% comment %}Dépliage des groupes, puis le pilotage commun aux deux listes.{% endcomment %}
+<script src="{% static 'js/listing_groupes.js' %}"></script>
+{% include 'includes/listing/page_js.html' %}
 {% include 'soins/includes/list_live_js.html' %}
-
-<script>
-/* ── Dropdown filtres ── */
-function toggleDd(id, btn) {
-  var panel = document.getElementById(id);
-  var isOpen = panel.classList.contains('open');
-  document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
-  if (!isOpen) {
-    var rect = btn.getBoundingClientRect();
-    panel.style.top = (rect.bottom + 4) + 'px';
-    panel.style.left = rect.left + 'px';
-    panel.style.right = 'auto';
-    panel.classList.add('open');
-    var pr = panel.getBoundingClientRect();
-    if (pr.right > window.innerWidth - 8) {
-      panel.style.left = 'auto';
-      panel.style.right = (window.innerWidth - rect.right) + 'px';
-    }
-  }
-}
-document.addEventListener('click', function(e) {
-  if (!e.target.closest('.o-dd-wrap')) {
-    document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
-  }
-});
-
-function setFiltreStatut(val) {
-  var el = document.getElementById('fi-statut');
-  if (el) el.value = val;
-  document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
-  window.liveLoad();
-}
-function setFiltreDate(val) {
-  var el = document.getElementById('fi-date');
-  if (el) el.value = val;
-  var ddInput = document.getElementById('dd-date-input');
-  if (ddInput) ddInput.value = val;
-  document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
-  window.liveLoad();
-}
-function clearQ() {
-  var inp = document.getElementById('search-input');
-  if (inp) inp.value = '';
-  window.liveLoad();
-}
-function clearAll() {
-  var inp = document.getElementById('search-input');
-  if (inp) inp.value = '';
-  var el = document.getElementById('fi-statut'); if (el) el.value = '';
-  var el2 = document.getElementById('fi-date');   if (el2) el2.value = '';
-  window.liveLoad();
-}
-
-/* ── Sync pagination top après liveLoad ── */
-document.addEventListener('liveload:complete', function() {
-  var srcSpan = document.querySelector('.o-pagination-bottom span');
-  var tgtSpan = document.getElementById('pag-info-top');
-  if (srcSpan && tgtSpan) tgtSpan.textContent = srcSpan.textContent;
-  var bottomBtns = document.querySelectorAll('.o-pagination-bottom .o-pag-btn');
-  var prevSrc = bottomBtns[0], nextSrc = bottomBtns[1];
-  var prevTgt = document.getElementById('pag-prev-top');
-  var nextTgt = document.getElementById('pag-next-top');
-  if (prevTgt && prevSrc) { prevTgt.className = prevSrc.className; prevTgt.href = prevSrc.href; }
-  if (nextTgt && nextSrc) { nextTgt.className = nextSrc.className; nextTgt.href = nextSrc.href; }
-});
-
-/* ── Pagination top → liveLoad ── */
-document.addEventListener('click', function(e) {
-  var a = e.target.closest('#pag-prev-top, #pag-next-top');
-  if (!a || a.classList.contains('disabled')) return;
-  var href = a.getAttribute('href');
-  if (!href || href === '#') return;
-  e.preventDefault();
-  var qs = href.includes('?') ? href.split('?')[1] : '';
-  var p = new URLSearchParams(qs);
-  window.liveLoad({ page: p.get('page') || '1' });
-});
-
-(function(){
-  var inp=document.getElementById('search-input');
-  if(!inp) return;
-  var timer;
-  inp.addEventListener('input',function(){ clearTimeout(timer); timer=setTimeout(window.liveLoad,400); });
-})();
-</script>
 
 </div>
 {% endblock %}

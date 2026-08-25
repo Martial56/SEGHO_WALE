@@ -26,7 +26,7 @@ class PatientAdmin(ModeleCentreAdmin):
 
 
 @admin.register(RendezVous)
-class RendezVousAdmin(admin.ModelAdmin):
+class RendezVousAdmin(ModeleCentreAdmin):
     list_display = ['patient', 'medecin', 'date_heure', 'departement', 'statut', 'type_rdv']
     list_filter = ['statut', 'departement', 'type_rdv']
     search_fields = ['patient__nom', 'patient__prenoms', 'code_rdv']

@@ -10,6 +10,7 @@ from .models import (Hospitalisation, Chambre, RegistreDeces,
                       ChecklistAdmission, ChecklistVerification, EvaluationClinique,
                       VisiteInfirmiere, VisiteDocteur, ResumeDecharge)
 from core.views import log_event, get_logs
+from patients.selecteur import patient_affiche
 from .forms import ChambreForm, RegistreDecesForm, ListeControleAdmissionForm, ListeVerificationServiceForm
 from services.views import _export_file, _parse_upload, _s, _b
 
@@ -21,56 +22,79 @@ def _is_ajax(request):
 
 @login_required(login_url='login')
 def hospitalisation_list(request):
+    """Liste des hospitalisations.
+
+    Filtres cumulables et regroupements imbriqués viennent de core.listing,
+    comme les listes de soins, de rendez-vous et de gynécologie. Auparavant un
+    seul état à la fois, et la période se limitait à un intervalle de dates.
+    """
+    from django.core.paginator import Paginator
     from django.utils import timezone as tz
+
+    from core.listing import Listing, menu_filtres, menu_groupes, paginer_groupes
+    from .hospitalisation_listing import (CHAMPS_RECHERCHE, FILTRES_DEFAUT,
+                                          construire_dimensions,
+                                          familles_hospitalisations, libelle_periode)
+
     aujourd_hui = tz.now()
     today = aujourd_hui.date()
+    q = request.GET.get('q', '').strip()
+    groupes = request.GET.getlist('group')
+    date_from = request.GET.get('date_from', '').strip()
+    date_to = request.GET.get('date_to', '').strip()
 
-    q          = request.GET.get('q', '').strip()
-    statut     = request.GET.get('statut', '').strip()
-    date_debut = request.GET.get('date_debut', '').strip()
-    date_fin   = request.GET.get('date_fin', '').strip()
+    base_qs = Hospitalisation.objects.select_related(
+        'patient', 'medecin_traitant', 'medecin_traitant__employe', 'chambre', 'maladie'
+    )
 
-    qs = Hospitalisation.objects.select_related(
-        'patient', 'medecin_traitant', 'chambre'
-    ).order_by('-date_admission')
+    # Plus de filtre de centre écrit ici : Hospitalisation est désormais un
+    # ModeleCentre, son gestionnaire s'en charge pour toutes les requêtes — la
+    # liste comme la fiche. Le filtre manuel qui vivait là ne protégeait que
+    # cette vue, si bien qu'un dossier absent de la liste restait consultable
+    # par son URL.
 
-    # Cloisonnement par centre : un dossier d'hospitalisation n'a pas de
-    # centre propre, mais son patient en a un (patients.Patient est un
-    # ModeleCentre) — on filtre donc sur le centre actif de l'utilisateur,
-    # avec la même convention que centres.models.CentreManager : un
-    # superuser sans centre actif voit tout, un utilisateur normal sans
-    # centre actif ne voit rien.
-    centre = getattr(request, 'centre', None)
-    if centre is not None:
-        qs = qs.filter(patient__centre=centre)
-    elif not request.user.is_superuser:
-        qs = qs.none()
+    # Base du centre actif, avant filtres : les statistiques ne doivent pas
+    # varier avec la sélection en cours.
+    qs_centre = base_qs
 
-    # Base du centre actif, avant les filtres de recherche/statut de la
-    # liste : sert aux statistiques, qui ne doivent pas varier avec la
-    # recherche en cours.
-    qs_centre = qs
+    declarees = construire_dimensions()
+    listing = Listing(
+        recherche=CHAMPS_RECHERCHE,
+        familles=familles_hospitalisations(),
+        dimensions=list(declarees.values()),
+        par_page=25,
+        filtres_defaut=FILTRES_DEFAUT,
+        tri_defaut=('-date_admission',),
+    )
 
-    if q:
-        qs = qs.filter(
-            Q(patient__nom__icontains=q) |
-            Q(patient__prenoms__icontains=q) |
-            Q(numero__icontains=q)
-        )
-    if statut:
-        qs = qs.filter(statut=statut)
+    filtres = listing.filtres_demandes(request)
+    qs = listing.appliquer_recherche(base_qs, q)
+    qs = listing.appliquer_filtres(qs, filtres, {
+        'aujourdhui': today, 'date_from': date_from, 'date_to': date_to,
+    })
+    qs = listing.trier(qs, groupes)
 
-    # Période (par date de la demande d'hospitalisation) : par défaut, la
-    # liste ne montre que les hospitalisations du jour — comme pour les
-    # ordonnances (voir ordonnance.views.ordonnance_list) — sauf si une
-    # période explicite a été choisie via le filtre.
-    if date_debut or date_fin:
-        if date_debut:
-            qs = qs.filter(date_admission__date__gte=date_debut)
-        if date_fin:
-            qs = qs.filter(date_admission__date__lte=date_fin)
+    vue = request.GET.get('vue', 'liste')
+    if vue not in ('liste', 'kanban'):
+        vue = 'liste'
+
+    # Le regroupement ne vaut que pour la vue liste : paginer_groupes renvoie une
+    # page de *libellés de groupe*, sur laquelle le kanban itérerait à tort. En
+    # vue kanban on l'ignore donc, plutôt que d'afficher des cartes vides.
+    if vue == 'kanban':
+        groupes = []
+
+    dims = [declarees[g] for g in groupes if g in declarees]
+    arbre = []
+    if dims:
+        arbre, page_obj, nb_groupes = paginer_groupes(qs, dims, request.GET.get('page'))
+        # La pagination porte sur les groupes : le compteur du titre doit rester
+        # celui des dossiers.
+        total = qs.count()
     else:
-        qs = qs.filter(date_admission__date=today)
+        nb_groupes = 0
+        page_obj = Paginator(qs, listing.par_page).get_page(request.GET.get('page'))
+        total = page_obj.paginator.count
 
     total_chambres    = Chambre.objects.count()
     chambres_occupees = Chambre.objects.filter(statut=False).count()
@@ -94,35 +118,26 @@ def hospitalisation_list(request):
         'duree_moyenne':         duree_moyenne,
     }
 
-    paginator = Paginator(qs, 25)
-    page_obj = paginator.get_page(request.GET.get('page'))
-
-    vue = request.GET.get('vue', 'liste')
-    if vue not in ('liste', 'kanban'):
-        vue = 'liste'
-
-    context = {
+    return render(request, 'hospitalisation/list.html', {
         'page_obj':      page_obj,
-        'total':         qs.count(),
+        'arbre':         arbre,
+        'nb_groupes':    nb_groupes,
+        'total':         total,
         'stats':         stats,
         'q':             q,
-        'statut':        statut,
-        'statut_choices': Hospitalisation.STATUT,
+        'filters':       filtres,
+        'groups':        groupes,
+        'date_from':     date_from,
+        'date_to':       date_to,
+        'filtre_pose':   bool(filtres),
+        'selection_active': bool(q or groupes or not listing.est_selection_par_defaut(filtres)),
+        'periode_libelle': libelle_periode(filtres, date_from, date_to),
+        'listing_filtres': menu_filtres(listing.familles, filtres, date_from, date_to),
+        'listing_groupes': menu_groupes(list(declarees.values()), groupes),
+        'listing_resultats': 'list-results',
         'vue':           vue,
-        'date_debut':    date_debut,
-        'date_fin':      date_fin,
         'today':         today,
-    }
-
-    if _is_ajax(request):
-        from django.template.loader import render_to_string
-        return JsonResponse({
-            'controls_html': render_to_string('hospitalisation/includes/_list_controls.html', context, request=request),
-            'results_html':  render_to_string('hospitalisation/includes/_list_results.html', context, request=request),
-            'total':         context['total'],
-        })
-
-    return render(request, 'hospitalisation/list.html', context)
+    })
 
 
 def _constante_to_eval_prefill(constante):
@@ -276,6 +291,7 @@ def hospitalisation_create(request):
         'form':          form,
         'titre':         'Nouveau',
         'edit':          False,
+        'patient_affiche': patient_affiche(form),
         'medecins_list': list(Medecin.objects.filter(actif=True).select_related('employe').order_by('employe__nom')),
         'unites_list':   list(UniteMesure.objects.filter(actif=True).order_by('nom')),
         'services_list': list(Articleservice.objects.filter(actif=True, categorie__code='SN').order_by('nom')),
@@ -1203,6 +1219,7 @@ def hospitalisation_edit(request, pk):
         'hosp':               hosp,
         'titre':              hosp.numero,
         'edit':               True,
+        'patient_affiche':    patient_affiche(form),
         'is_admin':           is_admin,
         'a_facture':          a_facture,
         'peut_creer_facture': peut_creer_facture,
@@ -1554,20 +1571,45 @@ def hospitalisation_detail(request, pk):
 
 @login_required(login_url='login')
 def chambres_list(request):
+    """Liste des chambres.
+
+    Même brique que les autres listes du projet. Pas de famille « Période » :
+    une chambre n'a pas de date, la liste s'ouvre donc sur le parc entier.
+    Chambre étant un ModeleCentre, le cloisonnement vient de son manager.
+    """
+    from django.core.paginator import Paginator
+
+    from core.listing import Listing, menu_filtres, menu_groupes, paginer_groupes
+    from .chambre_listing import (CHAMPS_RECHERCHE, FILTRES_DEFAUT,
+                                  construire_dimensions, familles_chambres)
+
     q = request.GET.get('q', '').strip()
-    type_chambre = request.GET.get('type', '').strip()
-    dispo = request.GET.get('dispo', '').strip()
+    groupes = request.GET.getlist('group')
 
-    qs = Chambre.objects.order_by('salle_no')
+    declarees = construire_dimensions()
+    listing = Listing(
+        recherche=CHAMPS_RECHERCHE,
+        familles=familles_chambres(),
+        dimensions=list(declarees.values()),
+        par_page=25,
+        filtres_defaut=FILTRES_DEFAUT,
+        tri_defaut=('salle_no',),
+    )
 
-    if q:
-        qs = qs.filter(Q(nom__icontains=q) | Q(salle_no__icontains=q))
-    if type_chambre:
-        qs = qs.filter(type_chambre=type_chambre)
-    if dispo == '1':
-        qs = qs.filter(statut=True)
-    elif dispo == '0':
-        qs = qs.filter(statut=False)
+    filtres = listing.filtres_demandes(request)
+    qs = listing.appliquer_recherche(Chambre.objects.all(), q)
+    qs = listing.appliquer_filtres(qs, filtres)
+    qs = listing.trier(qs, groupes)
+
+    dims = [declarees[g] for g in groupes if g in declarees]
+    arbre = []
+    if dims:
+        arbre, page_obj, nb_groupes = paginer_groupes(qs, dims, request.GET.get('page'))
+        total = qs.count()
+    else:
+        nb_groupes = 0
+        page_obj = Paginator(qs, listing.par_page).get_page(request.GET.get('page'))
+        total = page_obj.paginator.count
 
     stats = {
         'total':       Chambre.objects.count(),
@@ -1575,16 +1617,19 @@ def chambres_list(request):
         'occupees':    Chambre.objects.filter(statut=False).count(),
     }
 
-    paginator = Paginator(qs, 25)
-    page_obj = paginator.get_page(request.GET.get('page'))
-
     return render(request, 'hospitalisation/chambres/list.html', {
         'page_obj': page_obj,
-        'total': qs.count(),
+        'arbre': arbre,
+        'nb_groupes': nb_groupes,
+        'total': total,
         'stats': stats,
         'q': q,
-        'type_chambre': type_chambre,
-        'dispo': dispo,
+        'filters': filtres,
+        'groups': groupes,
+        'filtre_pose': bool(filtres),
+        'selection_active': bool(q or groupes or filtres),
+        'listing_filtres': menu_filtres(listing.familles, filtres),
+        'listing_groupes': menu_groupes(list(declarees.values()), groupes),
         'types': Chambre.TYPE,
     })
 
@@ -1719,32 +1764,72 @@ def chambres_import(request):
 
 @login_required(login_url='login')
 def registre_deces(request):
-    q      = request.GET.get('q', '').strip()
-    statut = request.GET.get('statut', '').strip()
+    """Registre des décès.
 
-    qs = RegistreDeces.objects.select_related(
-        'patient', 'medecin', 'hospitalisation'
-    ).order_by('-date_deces')
+    Même brique que les autres listes. La période porte sur la date de décès —
+    le fait constaté — et non sur la date de saisie de la fiche.
+    """
+    from django.core.paginator import Paginator
 
-    if q:
-        qs = qs.filter(
-            Q(patient__nom__icontains=q) |
-            Q(patient__prenoms__icontains=q) |
-            Q(code__icontains=q)
-        )
-    if statut:
-        qs = qs.filter(statut=statut)
+    from core.listing import Listing, menu_filtres, menu_groupes, paginer_groupes
+    from .deces_listing import (CHAMPS_RECHERCHE, FILTRES_DEFAUT,
+                                construire_dimensions, familles_deces, libelle_periode)
 
-    paginator = Paginator(qs, 25)
-    page_obj  = paginator.get_page(request.GET.get('page'))
+    from django.utils import timezone as tz
+    today = tz.now().date()
+    q = request.GET.get('q', '').strip()
+    groupes = request.GET.getlist('group')
+    date_from = request.GET.get('date_from', '').strip()
+    date_to = request.GET.get('date_to', '').strip()
+
+    base_qs = RegistreDeces.objects.select_related(
+        'patient', 'medecin', 'medecin__employe', 'hospitalisation'
+    )
+
+    declarees = construire_dimensions()
+    listing = Listing(
+        recherche=CHAMPS_RECHERCHE,
+        familles=familles_deces(),
+        dimensions=list(declarees.values()),
+        par_page=25,
+        filtres_defaut=FILTRES_DEFAUT,
+        tri_defaut=('-date_deces',),
+    )
+
+    filtres = listing.filtres_demandes(request)
+    qs = listing.appliquer_recherche(base_qs, q)
+    qs = listing.appliquer_filtres(qs, filtres, {
+        'aujourdhui': today, 'date_from': date_from, 'date_to': date_to,
+    })
+    qs = listing.trier(qs, groupes)
+
+    dims = [declarees[g] for g in groupes if g in declarees]
+    arbre = []
+    if dims:
+        arbre, page_obj, nb_groupes = paginer_groupes(qs, dims, request.GET.get('page'))
+        total = qs.count()
+    else:
+        nb_groupes = 0
+        page_obj = Paginator(qs, listing.par_page).get_page(request.GET.get('page'))
+        total = page_obj.paginator.count
 
     return render(request, 'hospitalisation/deces/list.html', {
         'page_obj': page_obj,
-        'total':    qs.count(),
-        'q':        q,
-        'statut':   statut,
+        'arbre': arbre,
+        'nb_groupes': nb_groupes,
+        'total': total,
+        'q': q,
+        'filters': filtres,
+        'groups': groupes,
+        'date_from': date_from,
+        'date_to': date_to,
+        'filtre_pose': bool(filtres),
+        'selection_active': bool(q or groupes or filtres),
+        'periode_libelle': libelle_periode(filtres, date_from, date_to),
+        'listing_filtres': menu_filtres(listing.familles, filtres, date_from, date_to),
+        'listing_groupes': menu_groupes(list(declarees.values()), groupes),
+        'today': today,
     })
-
 
 @login_required(login_url='login')
 def deces_detail(request, pk):

@@ -94,19 +94,6 @@ html[data-theme="dark"] .proc-annule-badge { background:rgba(220,38,38,.15);bord
 .soin-frm-main   { flex: 1; min-width: 0; }
 @media (max-width: 900px) { .soin-frm-layout { flex-direction: column; } }
 
-/* ── Patient lecture seule (mode édition) ── */
-.pat-readonly {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 6px 2px 8px; border-bottom: 1.5px solid var(--border);
-  opacity: 0.65; cursor: not-allowed;
-}
-.pat-readonly-name { font-size: 13px; color: var(--text); }
-.pat-readonly-badge {
-  font-size: 10px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: 0.05em; color: var(--text-muted);
-  display: inline-flex; align-items: center; gap: 3px;
-}
-
 
 </style>
 {% endblock %}
@@ -255,47 +242,17 @@ html[data-theme="dark"] .proc-annule-badge { background:rgba(220,38,38,.15);bord
 
         <label class="art-field-label" style="margin-bottom:6px;display:block;">Patient{% if is_new %} <span class="f-required">*</span>{% endif %}</label>
 
+        {% comment %}Sélecteur commun au projet (recherche AJAX + carte patient),
+        celui du formulaire d'hospitalisation. Il remplace la liste qui déversait
+        les 383 patients du centre dans le HTML de la page.
+        En modification le patient n'est pas changeable : `lecture_seule` affiche
+        la même carte, sans champ de recherche ni bouton de désélection — au lieu
+        de la ligne de texte grisée d'avant, qui n'avait plus rien à voir avec le
+        reste des formulaires du projet.{% endcomment %}
         {% if not is_new %}
-        {# Mode édition : patient non modifiable #}
-        <input type="hidden" name="patient" id="pat-hidden" value="{{ soin.patient.pk }}">
-        <div class="pat-readonly">
-          <span class="pat-readonly-name">{{ soin.patient.nom }} {{ soin.patient.prenoms }}{% if soin.patient.code_patient %} <small style="color:var(--text-muted);">({{ soin.patient.code_patient }})</small>{% endif %}</span>
-          <span class="pat-readonly-badge"><i class="bi bi-lock-fill" style="font-size:9px;"></i> Non modifiable</span>
-        </div>
+        {% include 'includes/_patient_picker.html' with valeur=soin.patient.pk patient=soin.patient lecture_seule=True %}
         {% else %}
-        {# Mode création : sélecteur interactif #}
-        <input type="hidden" name="patient" id="pat-hidden" value="{{ form.patient.value|default:'' }}">
-        <div class="svc-select" id="pat-select" style="z-index:200;">
-          <div class="svc-display" id="pat-display" tabindex="0">
-            {% if form.patient.value %}
-              {% for p in form.patient.field.queryset %}{% if form.patient.value|stringformat:"s" == p.pk|stringformat:"s" %}<span>{{ p.nom }} {{ p.prenoms }}</span>{% endif %}{% endfor %}
-            {% else %}
-              <span class="svc-placeholder">— Sélectionner un patient —</span>
-            {% endif %}
-            <i class="bi bi-chevron-down svc-chevron"></i>
-          </div>
-          <div class="svc-dropdown" id="pat-dropdown">
-            <div class="svc-search-wrap">
-              <i class="bi bi-search"></i>
-              <input type="text" class="svc-search" id="pat-search" placeholder="Rechercher un patient…" autocomplete="off">
-            </div>
-            <ul class="svc-list" id="pat-list">
-              <li class="svc-option" data-value="">— Aucun —</li>
-              {% for p in form.patient.field.queryset %}
-              <li class="svc-option {% if form.patient.value|stringformat:"s" == p.pk|stringformat:"s" %}selected{% endif %}"
-                  data-value="{{ p.pk }}" data-code="{{ p.code_patient }}">
-                {{ p.nom }} {{ p.prenoms }}{% if p.code_patient %} <small style="color:var(--text-muted);">({{ p.code_patient }})</small>{% endif %}
-              </li>
-              {% endfor %}
-            </ul>
-            <div id="pat-create-hint" class="svc-create-hint" style="display:none;">
-              <a id="pat-create-link" href="{% url 'patients:create' %}" class="svc-create-link">
-                <i class="bi bi-plus-circle"></i>
-                Nouveau patient <strong id="pat-create-term"></strong>
-              </a>
-            </div>
-          </div>
-        </div>
+        {% include 'includes/_patient_picker.html' with valeur=form.patient.value %}
         {% if form.patient.errors %}
         <div class="f-error">{{ form.patient.errors.0 }}</div>
         {% endif %}
@@ -351,15 +308,28 @@ html[data-theme="dark"] .proc-annule-badge { background:rgba(220,38,38,.15);bord
         <i class="bi bi-plus-lg"></i> Ajouter une ligne
       </button>
 
-      <!-- Observations -->
-      <!-- <div class="f-field" style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border);">
+      {# Motif et observations : déclarés dans SoinForm.Meta.fields. Tant qu'ils
+         n'étaient pas rendus ici, le navigateur ne les postait pas et Django
+         les remplaçait par du vide à chaque enregistrement — la fiche les
+         affiche pourtant tous les deux. #}
+      <div class="f-field" style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border);">
         <div class="section-title" style="margin-bottom:10px;">
           <i class="bi bi-chat-left-text" style="font-size:13px;color:var(--accent-text-soft);"></i>
+          Motif
+        </div>
+        <input type="text" name="motif" class="field-ul"
+          value="{{ form.motif.value|default:'' }}"
+          placeholder="Motif du soin…">
+      </div>
+
+      <div class="f-field" style="margin-top:20px;">
+        <div class="section-title" style="margin-bottom:10px;">
+          <i class="bi bi-card-text" style="font-size:13px;color:var(--accent-text-soft);"></i>
           Observations
         </div>
         <textarea name="observations" class="field-ul" rows="4"
           placeholder="Observations cliniques, soins effectués…">{{ form.observations.value|default:'' }}</textarea>
-      </div> -->
+      </div>
 
       {% if is_new or current_statut == 'brouillon' %}
       <!-- Bouton enregistrer & envoyer (en bas de l'onglet) -->
@@ -472,11 +442,13 @@ html[data-theme="dark"] .proc-annule-badge { background:rgba(220,38,38,.15);bord
 {% endwith %}
 
 <!-- ════ DONNÉES POUR JS ════ -->
+{# Avant le script de la page : il ajoute des lignes au chargement et appelle window.initFieldUlSelects. #}
+{% include 'includes/_tomselect.html' %}
+
 <script type="application/json" id="soins-form-data">
 {
   "services":   {{ services_json|safe }},
   "employes":   {{ employes_json|safe }},
-  "patients":   {{ patients_json|safe }},
   "procedures": {{ procedures_json|safe }},
   "isNew":      {% if is_new %}true{% else %}false{% endif %},
   "soinsListUrl":     "{% url 'soins:list' %}",
@@ -488,7 +460,6 @@ html[data-theme="dark"] .proc-annule-badge { background:rgba(220,38,38,.15);bord
 var _d       = JSON.parse(document.getElementById('soins-form-data').textContent);
 var SERVICES = _d.services;
 var EMPLOYES = _d.employes;
-var PATIENTS = _d.patients;
 var lignesCount = 0;
 
 /* ── Fonctions utilitaires ── */
@@ -500,7 +471,7 @@ function todayVal(){
 function formatPrix(n){ return n ? parseInt(n).toLocaleString('fr-FR') + ' CFA' : '—'; }
 
 function buildSelect(name, items, labelFn, valKey, placeholder){
-  var s = '<select name="'+name+'" class="ligne-select">';
+  var s = '<select name="'+name+'" class="ligne-select field-ul" data-ts-body>';
   s += '<option value="">'+placeholder+'</option>';
   items.forEach(function(it){
     s += '<option value="'+it[valKey]+'">'+labelFn(it)+'</option>';
@@ -562,10 +533,15 @@ function ajouterLigne(initial){
   }
   if(patId){
     tr.querySelector('.ligne-pat-hidden').value = patId;
-    var p = PATIENTS.find(function(x){ return String(x.pk) === String(patId); });
-    if(p){
+    /* Le nom est lu sur la carte du sélecteur : la page n'embarque plus la
+       liste complète des patients. En modification la carte se remplit par
+       AJAX, donc elle peut être encore vide ici — l'écouteur `change` plus bas
+       repasse sur les lignes dès qu'elle arrive. */
+    var src = document.getElementById('pat-name');
+    var nom = src ? src.textContent.trim() : '';
+    if(nom){
       var nameEl = tr.querySelector('.ligne-pat-name');
-      nameEl.textContent = p.nom + ' ' + p.prenoms;
+      nameEl.textContent = nom;
       nameEl.style.color = 'var(--text)';
     }
   }
@@ -590,6 +566,12 @@ function ajouterLigne(initial){
     inp.value = srv ? parseInt(srv.prix_vente).toLocaleString('fr-FR') + ' CFA' : '';
     inp.dataset.raw = srv ? srv.prix_vente : 0;
   });
+
+  /* Listes déroulantes de la ligne : le composant partagé ne voit que le DOM
+     présent au chargement, une ligne ajoutée après coup doit être signalée.
+     Appelé ici, donc après l'affectation des valeurs initiales ci-dessus :
+     TomSelect lit la valeur du <select> au moment où il s'installe. */
+  if (window.initFieldUlSelects) window.initFieldUlSelects(tr);
 
   majBtnFacture();
   majBtnConfirmer();
@@ -747,39 +729,43 @@ function makeDrop(cfg) {
 }
 
 /* ── Init des dropdowns ── */
-makeDrop({
-  prefix: 'pat',
-  placeholder: '— Sélectionner un patient —',
-  createBase: '{% url "patients:create" %}',
-  onPick: function(li) {
-    var patId = li.dataset.value;
-    var p = PATIENTS.find(function(x){ return String(x.pk) === String(patId); });
-    var patName = p ? p.nom + ' ' + p.prenoms : '';
+/* ── Réaction au choix du patient ──
+   Le sélecteur partagé (includes/_patient_picker.html) émet un `change` sur
+   son champ caché ; on y raccroche ce que faisait l'ancien rappel onPick. */
+(function () {
+  var champ = document.getElementById('pat-hidden');
+  if (!champ) return;
 
-    /* Mettre à jour toutes les lignes existantes */
-    document.querySelectorAll('#lignes-body tr.ligne-row').forEach(function(row){
-      row.querySelector('.ligne-pat-hidden').value = patId || '';
-      var nameEl = row.querySelector('.ligne-pat-name');
-      if(nameEl){
-        nameEl.textContent = patName || '—';
-        nameEl.style.color = patId ? 'var(--text)' : 'var(--text-muted)';
+  champ.addEventListener('change', function () {
+    var patId = champ.value || '';
+    /* Le nom vient de la carte que le sélecteur vient de remplir. */
+    var nomEl = document.getElementById('pat-name');
+    var patName = patId && nomEl ? nomEl.textContent.trim() : '';
+
+    /* Répercuter sur les lignes déjà saisies */
+    document.querySelectorAll('#lignes-body tr.ligne-row').forEach(function (row) {
+      row.querySelector('.ligne-pat-hidden').value = patId;
+      var el = row.querySelector('.ligne-pat-name');
+      if (el) {
+        el.textContent = patName || '—';
+        el.style.color = patId ? 'var(--text)' : 'var(--text-muted)';
       }
     });
 
-    /* Activer / désactiver le bouton Ajouter */
     var addBtn = document.getElementById('btn-add-ligne');
-    if(addBtn){
+    if (addBtn) {
       addBtn.disabled = !patId;
-      addBtn.title = patId ? '' : 'Sélectionnez d\'abord un patient';
+      addBtn.title = patId ? '' : "Sélectionnez d'abord un patient";
     }
 
     var qnav = document.querySelector('.art-quick-nav--incard');
     if (qnav) qnav.classList.toggle('has-patient', !!patId);
+
     majBtnFacture();
     majBtnConfirmer();
     if (window.majQnavLinks) window.majQnavLinks(patId);
-  }
-});
+  });
+})();
 
 makeDrop({ prefix: 'stm', placeholder: '— Sélectionner —' });
 makeDrop({ prefix: 'sev', placeholder: '— Sélectionner —' });

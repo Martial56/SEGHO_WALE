@@ -96,7 +96,7 @@ class Chambre(ModeleCentre):
 #   termine     : clôture ADMINISTRATIVE — bloquée tant qu'il reste des services à facturer
 #                 non facturés ou des factures impayées sur ce dossier
 #   annule      : possible uniquement depuis brouillon ou confirme
-class Hospitalisation(models.Model):
+class Hospitalisation(ModeleCentre):
     STATUT = [
         ('brouillon',   'Brouillon'),
         ('confirme',    'Confirmé'),
@@ -194,7 +194,9 @@ class Hospitalisation(models.Model):
                     with transaction.atomic():
                         annee = timezone.now().year
                         prefix = f"HOSP{annee}"
-                        last = Hospitalisation.objects.select_for_update().filter(
+                        # all_objects : le numéro reste unique tous centres
+                        # confondus, comme pour Chambre.salle_no.
+                        last = Hospitalisation.all_objects.select_for_update().filter(
                             numero__startswith=prefix
                         ).order_by('-pk').first()
                         count = (int(last.numero[len(prefix):]) + 1) if last else 1
@@ -239,7 +241,7 @@ class Hospitalisation(models.Model):
         return int((self.heure_entree - confirme).total_seconds())
 
     def __str__(self): return f"Hosp. {self.numero} - {self.patient}"
-    class Meta:
+    class Meta(ModeleCentre.Meta):
         verbose_name = "Hospitalisation"
         ordering = ['-date_admission']
         permissions = [
@@ -453,7 +455,7 @@ class ListeControleAdmission(models.Model):
         ordering = ['id']
 
 
-class RegistreDeces(models.Model):
+class RegistreDeces(ModeleCentre):
     STATUT = [('brouillon', 'Brouillon'), ('termine', 'Terminé')]
 
     code          = models.CharField(max_length=20, unique=True, editable=False)
@@ -475,7 +477,8 @@ class RegistreDeces(models.Model):
             for _ in range(3):
                 try:
                     with transaction.atomic():
-                        last = RegistreDeces.objects.select_for_update().order_by('id').last()
+                        # all_objects : le code reste unique tous centres confondus.
+                        last = RegistreDeces.all_objects.select_for_update().order_by('id').last()
                         count = (last.id + 1) if last else 1
                         self.code = f"DEC{count:04d}"
                         super().save(*args, **kwargs)
@@ -487,7 +490,7 @@ class RegistreDeces(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self): return f"Décès {self.code} – {self.patient}"
-    class Meta:
+    class Meta(ModeleCentre.Meta):
         verbose_name = "Registre des décès"
         verbose_name_plural = "Registre des décès"
         ordering = ['-date_deces']

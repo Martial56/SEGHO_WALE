@@ -680,12 +680,22 @@
 
     function applyMaxLength(input, iti) {
         if (!window.intlTelInputUtils) return;
+
         var iso2 = iti.getSelectedCountryData().iso2;
+
         try {
             var example = intlTelInputUtils.getExampleNumber(
-                iso2, true, intlTelInputUtils.numberType.MOBILE
+                iso2,
+                true,
+                intlTelInputUtils.numberType.MOBILE
             );
-            input.maxLength = example.replace(/\D/g, '').length;
+
+            var length = example.replace(/\D/g, '').length;
+
+            input.maxLength = length;
+            input.minLength = length;
+            input.setAttribute('minlength', length);
+
         } catch(e) {}
     }
 
@@ -707,16 +717,69 @@
     var itiTel2 = initPhone('{{ form.telephone2.id_for_label }}');
 
     /* Avant soumission : enregistrer le numéro complet au format E.164 */
+    /* Validation avant soumission et conversion au format E.164 */
     var theForm = document.querySelector('form[method="post"]');
+
     if (theForm) {
-        theForm.addEventListener('submit', function () {
+        theForm.addEventListener('submit', function (e) {
+
+            /* =========================
+            TELEPHONE PRINCIPAL
+            Obligatoire
+            ========================= */
             if (itiTel1) {
+                var input1 = document.getElementById(
+                    '{{ form.telephone.id_for_label }}'
+                );
+
+                if (!itiTel1.isValidNumber()) {
+                    e.preventDefault();
+
+                    alert(
+                        'Veuillez saisir un numéro de téléphone valide pour le téléphone principal.'
+                    );
+
+                    input1.focus();
+                    return;
+                }
+
                 var n1 = itiTel1.getNumber();
-                if (n1) document.getElementById('{{ form.telephone.id_for_label }}').value = n1;
+
+                if (n1) {
+                    input1.value = n1;
+                }
             }
+
+
+            /* =========================
+            TELEPHONE 2
+            Facultatif
+            ========================= */
             if (itiTel2) {
-                var n2 = itiTel2.getNumber();
-                if (n2) document.getElementById('{{ form.telephone2.id_for_label }}').value = n2;
+                var input2 = document.getElementById(
+                    '{{ form.telephone2.id_for_label }}'
+                );
+
+                /* On vérifie seulement si l'utilisateur a saisi quelque chose */
+                if (input2.value.trim() !== '') {
+
+                    if (!itiTel2.isValidNumber()) {
+                        e.preventDefault();
+
+                        alert(
+                            'Veuillez saisir un deuxième numéro de téléphone valide.'
+                        );
+
+                        input2.focus();
+                        return;
+                    }
+
+                    var n2 = itiTel2.getNumber();
+
+                    if (n2) {
+                        input2.value = n2;
+                    }
+                }
             }
         });
     }

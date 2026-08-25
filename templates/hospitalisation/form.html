@@ -7,15 +7,11 @@
 <style>
 /* ── Sous-en-tête (une seule rangée : retour, fil d'Ariane, actions à droite)
    Style calqué sur .det-subhdr de hospitalisation/detail.html. ── */
-.det-subhdr {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  padding: 6px 16px;
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  position: fixed; left: 0; right: 0;
-  top: var(--topbar-h, 92px);
-  z-index: 190;
-}
+{% comment %}Barre de retour : seules les deux différences avec la version
+partagée (includes/layout_css.html) restent ici — le retour à la ligne des
+actions, et la position, cette page n'ayant pas la rangée de navigation
+au-dessus.{% endcomment %}
+.det-subhdr { flex-wrap: wrap; top: var(--topbar-h, 92px); }
 /* .o-ctrl-btn : pas de redéfinition locale — on utilise la classe globale
    (static/css/global.css), exactement comme detail.html. */
 .det-crumb { font-size: 13.5px; color: var(--text-muted); display: flex; align-items: center; gap: 0; }
@@ -186,66 +182,7 @@ select.field-ul {
 .hosp-card .hist-aside { margin-right: 24px; margin-bottom: 24px; }
 @media(max-width:960px){ .hosp-page-layout { flex-direction:column; } }
 
-/* ── Patient Picker (AJAX) ── */
-.pat-search-dd {
-  display:none; position:fixed;
-  background:#fff; border:1px solid rgba(0,0,0,.12);
-  border-radius:8px; box-shadow:0 6px 24px rgba(0,0,0,.13);
-  z-index:99999; max-height:280px; overflow-y:auto;
-}
-.pat-dd-item {
-  display:flex; align-items:center; gap:10px;
-  padding:9px 14px; font-size:13px; cursor:pointer;
-  border-bottom:1px solid rgba(0,0,0,.05); transition:background .1s;
-}
-.pat-dd-item:last-child { border-bottom:none; }
-.pat-dd-item:hover { background:#ddeef7; }
-.pat-dd-av {
-  width:32px; height:32px; border-radius:50%; flex-shrink:0;
-  background:linear-gradient(135deg,var(--teal-500),var(--teal-400));
-  display:flex; align-items:center; justify-content:center;
-  font-size:11px; font-weight:700; color:#fff;
-}
-.pat-dd-name { font-weight:600; color:var(--text,var(--teal-900)); display:block; }
-.pat-dd-sub  { font-size:11px; color:rgba(0,0,0,.4); margin-top:1px; display:block; }
-.pat-dd-empty { padding:12px 14px; font-size:12px; color:rgba(0,0,0,.35); font-style:italic; }
-/* ── Carte patient (identique à facturation) ── */
-.patient-card {
-  background:linear-gradient(135deg,#f0faff,#e6f7ff);
-  border:1px solid rgba(var(--teal-500-rgb),.2); border-radius:14px;
-  padding:20px 24px; margin-top:4px; position:relative;
-  display:grid; grid-template-columns:auto 1fr; gap:16px; align-items:center;
-}
-.patient-avatar {
-  width:64px; height:64px; border-radius:50%;
-  background:linear-gradient(135deg,var(--teal-600,#157a9c),var(--teal-400,#2bbcdf));
-  display:flex; align-items:center; justify-content:center;
-  font-size:22px; font-weight:800; color:#fff; flex-shrink:0; overflow:hidden;
-}
-.patient-info-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px 24px; }
-.pi-item { display:flex; flex-direction:column; gap:2px; }
-.pi-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); }
-.pi-value { font-size:13px; font-weight:600; color:var(--teal-900); }
-.pi-code  { font-family: var(--font-mono); font-size:12px; color:var(--accent-text-soft); }
-.pp-desel-btn {
-  position:absolute; top:10px; right:10px;
-  background:none; border:none; cursor:pointer;
-  color:var(--text-muted); font-size:17px; padding:2px 4px;
-  border-radius:4px; line-height:1; display:flex; align-items:center;
-  transition:color .12s, background .12s;
-}
-.pp-desel-btn:hover { color:#dc3545; background:rgba(220,53,69,.1); }
-html[data-theme="dark"] .pat-search-dd { background: var(--surface); border-color: var(--border-strong); }
-html[data-theme="dark"] .pat-dd-item { border-bottom-color: var(--border); }
-html[data-theme="dark"] .pat-dd-item:hover { background:rgba(var(--teal-500-rgb),.18); }
-html[data-theme="dark"] .pat-dd-name { color:var(--text); }
-{% comment %}La ligne du dessous (code patient · téléphone) et le message « aucun patient » étaient restés en noir translucide, sans variante sombre — illisibles sur le panneau sombre.{% endcomment %}
-html[data-theme="dark"] .pat-dd-sub   { color:var(--text-muted); }
-html[data-theme="dark"] .pat-dd-empty { color:var(--text-faint); }
-html[data-theme="dark"] .patient-card { background:rgba(var(--teal-500-rgb),.1); border-color:rgba(var(--teal-500-rgb),.3); }
-html[data-theme="dark"] .patient-avatar { background:linear-gradient(135deg,rgba(var(--teal-500-rgb),.6),rgba(43,188,223,.4)); }
-html[data-theme="dark"] .pi-value { color:var(--text); }
-html[data-theme="dark"] .pi-code  { color:var(--teal-400,#2bbcdf); }
+{% comment %}Styles du sélecteur de patient : ils vivent dans includes/_patient_picker.html.{% endcomment %}
 
 /* Tom Select */
 .ts-wrapper { padding:0 !important; }
@@ -417,54 +354,16 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
               </div>
               <input type="hidden" name="patient" value="{{ hosp.patient_id }}">
             {% else %}
-              <div id="pp-patient">
-                <input type="hidden" name="patient" id="id_patient"
-                       value="{{ form.patient.value|default:'' }}">
-                {% if not is_mo and not mode_chambre_seule and not mode_soins_seuls and not mode_decharge_seule %}
-                <div id="pat-search-wrap">
-                  <input type="text" id="pat-search-input" class="field-ul"
-                         placeholder="Rechercher un patient…" autocomplete="off">
-                  <div id="pat-search-dd" class="pat-search-dd"></div>
-                </div>
-                {% endif %}
-                <div class="patient-card" id="patient-banner" style="display:none;">
-                  <div class="patient-avatar" id="pat-av"></div>
-                  <div>
-                    <div style="font-size:16px;font-weight:800;color:var(--teal-900,var(--teal-900));margin-bottom:10px;" id="pat-name"></div>
-                    <div class="patient-info-grid">
-                      <div class="pi-item">
-                        <span class="pi-label">Code patient</span>
-                        <span class="pi-value pi-code" id="pat-code">—</span>
-                      </div>
-                      <div class="pi-item">
-                        <span class="pi-label">Âge</span>
-                        <span class="pi-value" id="pat-age">—</span>
-                      </div>
-                      <div class="pi-item">
-                        <span class="pi-label">Sexe</span>
-                        <span class="pi-value" id="pat-sexe">—</span>
-                      </div>
-                      <div class="pi-item">
-                        <span class="pi-label">Téléphone</span>
-                        <span class="pi-value" id="pat-tel">—</span>
-                      </div>
-                      <div class="pi-item">
-                        <span class="pi-label">Adresse</span>
-                        <span class="pi-value" id="pat-addr">—</span>
-                      </div>
-                      <div class="pi-item">
-                        <span class="pi-label">Assurance</span>
-                        <span class="pi-value" id="pat-ass">—</span>
-                      </div>
-                    </div>
-                  </div>
-                  {% if not is_mo and not mode_chambre_seule and not mode_soins_seuls and not mode_decharge_seule %}
-                  <button type="button" class="pp-desel-btn" onclick="patDeselect()">
-                    <i class="bi bi-x"></i>
-                  </button>
-                  {% endif %}
-                </div>
-              </div>
+              {% comment %}Sélecteur commun au projet, extrait d'ici même vers
+              includes/_patient_picker.html pour servir aussi aux soins et aux
+              procédures. Les quatre modes réduits (M.O, chambre seule, soins
+              seuls, décharge seule) n'affichent que la carte : c'est ce que
+              fait `lecture_seule`.{% endcomment %}
+              {% if is_mo or mode_chambre_seule or mode_soins_seuls or mode_decharge_seule %}
+                {% include 'includes/_patient_picker.html' with id='id_patient' valeur=form.patient.value patient=patient_affiche lecture_seule=True %}
+              {% else %}
+                {% include 'includes/_patient_picker.html' with id='id_patient' valeur=form.patient.value patient=patient_affiche %}
+              {% endif %}
               {% if form.patient.errors %}<div class="field-error">{{ form.patient.errors|join:", " }}</div>{% endif %}
             {% endif %}
           </div>
@@ -1110,8 +1009,14 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
           tr.querySelector('input').focus();
         }
 
-        // Init TomSelect sur les lignes existantes
-        document.querySelectorAll('.vs-table .vs-select').forEach(initVsSelect);
+        // Init TomSelect sur les lignes existantes.
+        // Différé : ce bloc est écrit avant le <script src> de la bibliothèque,
+        // plus bas dans la page. Exécuté ici tel quel, il levait
+        // « TomSelect is not defined » et les listes du tableau des visites
+        // restaient des <select> bruts sur la page de modification.
+        document.addEventListener('DOMContentLoaded', function () {
+          document.querySelectorAll('.vs-table .vs-select').forEach(initVsSelect);
+        });
         </script>
       </div>
       <!-- Onglet 5 — Services à facturer -->
@@ -1690,145 +1595,7 @@ document.getElementById('hosp-form').addEventListener('submit', function() {
 </script>
 
 <script>
-// ── Patient Picker (AJAX) ────────────────────────────────────────────────────
-(function() {
-  var selectEl    = document.getElementById('id_patient');
-  var searchInput = document.getElementById('pat-search-input');
-  var dropdown    = document.getElementById('pat-search-dd');
-  var searchWrap  = document.getElementById('pat-search-wrap');
-  var banner      = document.getElementById('patient-banner');
-  if (!selectEl) return;
-
-  var timer;
-
-  function esc(s) {
-    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  }
-
-  function positionDropdown() {
-    if (!searchInput) return;
-    var rect = searchInput.getBoundingClientRect();
-    dropdown.style.top   = (rect.bottom + 4) + 'px';
-    dropdown.style.left  = rect.left + 'px';
-    dropdown.style.width = rect.width + 'px';
-  }
-
-  function fillCard(p) {
-    var mots = (p.nom_complet || '').trim().split(/\s+/);
-    document.getElementById('pat-av').textContent =
-      ((mots[0]||'')[0] + (mots[1]||'')[0]).toUpperCase();
-    document.getElementById('pat-name').textContent  = p.nom_complet   || '—';
-    document.getElementById('pat-code').textContent  = p.code          || '—';
-    document.getElementById('pat-age').textContent   = p.age != null   ? p.age + ' ans' : '—';
-    document.getElementById('pat-sexe').textContent  = p.sexe_display  || '—';
-    document.getElementById('pat-tel').textContent   = p.telephone     || '—';
-    document.getElementById('pat-addr').textContent  = p.adresse       || '—';
-    document.getElementById('pat-ass').textContent   = p.assurance_nom || '—';
-  }
-
-  function showBanner(p) {
-    selectEl.value = p.id;
-    selectEl.dispatchEvent(new Event('change', {bubbles: true}));
-    fillCard(p);
-    banner.style.display = 'grid';
-    if (searchWrap) searchWrap.style.display = 'none';
-    if (searchInput) searchInput.value = '';
-    if (dropdown) dropdown.style.display = 'none';
-    if (window._updateConfirmerBtn) window._updateConfirmerBtn();
-  }
-
-  window.patDeselect = function() {
-    selectEl.value = '';
-    selectEl.dispatchEvent(new Event('change', {bubbles: true}));
-    banner.style.display = 'none';
-    if (searchWrap) searchWrap.style.display = '';
-    if (searchInput) { searchInput.value = ''; setTimeout(function() { searchInput.focus(); }, 0); }
-    if (dropdown) dropdown.style.display = 'none';
-    if (window._updateConfirmerBtn) window._updateConfirmerBtn();
-  };
-
-  if (searchInput && dropdown && searchWrap) {
-    searchInput.addEventListener('input', function() {
-      clearTimeout(timer);
-      selectEl.value = '';
-      var q = this.value.trim();
-      if (q.length < 1) { dropdown.style.display = 'none'; return; }
-      timer = setTimeout(function() {
-        fetch('{% url "patients:patient_search" %}?q=' + encodeURIComponent(q))
-          .then(function(r) { return r.json(); })
-          .then(function(data) {
-            var list = data.results || [];
-            if (!list.length) {
-              dropdown.innerHTML = '<div class="pat-dd-empty">Aucun patient trouvé</div>';
-            } else {
-              dropdown.innerHTML = list.map(function(p) {
-                var initials = (p.nom_complet || '').trim().split(/\s+/).slice(0,2).map(function(w){ return w[0]||''; }).join('').toUpperCase();
-                return '<div class="pat-dd-item"'
-                  + ' data-id="'    + esc(p.id)            + '"'
-                  + ' data-nom="'   + esc(p.nom_complet)   + '"'
-                  + ' data-code="'  + esc(p.code)          + '"'
-                  + ' data-age="'   + esc(p.age)           + '"'
-                  + ' data-sexe="'  + esc(p.sexe_display)  + '"'
-                  + ' data-tel="'   + esc(p.telephone)     + '"'
-                  + ' data-addr="'  + esc(p.adresse)       + '"'
-                  + ' data-ass="'   + esc(p.assurance_nom) + '">'
-                  + '<div class="pat-dd-av">' + esc(initials) + '</div>'
-                  + '<div style="flex:1;min-width:0;">'
-                  + '<span class="pat-dd-name">' + esc(p.nom_complet) + '</span>'
-                  + '<span class="pat-dd-sub">'  + esc(p.code) + (p.telephone ? ' · ' + esc(p.telephone) : '') + '</span>'
-                  + '</div>'
-                  + '</div>';
-              }).join('');
-              dropdown.querySelectorAll('.pat-dd-item').forEach(function(item) {
-                item.addEventListener('mousedown', function(e) {
-                  e.preventDefault();
-                  showBanner({
-                    id:           item.dataset.id,
-                    nom_complet:  item.dataset.nom,
-                    code:         item.dataset.code,
-                  age:          item.dataset.age,
-                  sexe_display: item.dataset.sexe,
-                  telephone:    item.dataset.tel,
-                  adresse:      item.dataset.addr,
-                  assurance_nom:item.dataset.ass,
-                });
-              });
-            });
-          }
-          positionDropdown();
-          dropdown.style.display = 'block';
-        }).catch(function() {});
-    }, 280);
-  });
-
-    searchInput.addEventListener('blur', function() {
-      setTimeout(function() { dropdown.style.display = 'none'; }, 180);
-    });
-
-    document.addEventListener('click', function(e) {
-      if (!e.target.closest('#pp-patient')) dropdown.style.display = 'none';
-    });
-
-    window.addEventListener('scroll', positionDropdown, true);
-    window.addEventListener('resize', positionDropdown);
-  } // fin if (searchInput && dropdown && searchWrap)
-
-  function prefillById(pk) {
-    fetch('{% url "patients:patient_search" %}?id=' + encodeURIComponent(pk))
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        var p = (data.results || [])[0];
-        if (p) showBanner(p);
-      }).catch(function() {});
-  }
-
-  if (selectEl.value) {
-    prefillById(selectEl.value);
-  } else {
-    var urlPk = new URLSearchParams(window.location.search).get('patient');
-    if (urlPk) prefillById(urlPk);
-  }
-})();
+// Sélecteur de patient : le code vit dans includes/_patient_picker.html.
 
 {% if is_mo %}
 // ── Mode M.O ─────────────────────────────────────────────────────────────────

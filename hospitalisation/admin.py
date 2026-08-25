@@ -47,7 +47,7 @@ class FicheVisiteInline(admin.TabularInline):
 
 
 @admin.register(Hospitalisation)
-class HospitalisationAdmin(admin.ModelAdmin):
+class HospitalisationAdmin(ModeleCentreAdmin):
     list_display    = ['numero', 'patient', 'medecin_traitant', 'chambre', 'date_admission', 'statut', 'duree_observation']
     search_fields   = ['numero', 'patient__nom', 'patient__prenoms']
     list_filter     = ['statut', 'medecin_traitant']

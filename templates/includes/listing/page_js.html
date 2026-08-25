@@ -1,0 +1,252 @@
+{% comment %}
+Pilotage commun aux listes bâties sur core.listing.
+
+Les menus « Filtres » et « Regrouper par » sont générés par core.listing : ils
+appellent toggleParam, setPeriode et applyDateFilter, exactement comme les
+listes de rendez-vous et de gynécologie. Ce partiel fournit ces fonctions, plus
+le rafraîchissement AJAX qui échange la barre de contrôles et les résultats.
+
+Le jeu de fonctions maison qu'il remplace (setFiltreStatut, applyPeriode,
+setFiltreHosp…) ne savait porter qu'une valeur par critère et écrasait la
+précédente ; les paramètres `filter` et `group` sont ici multivalués, ce qui est
+tout l'intérêt des filtres cumulables.
+
+La page qui l'inclut peut exposer `window.initListe` : il est rappelé après
+chaque échange pour rebrancher ce qui dépend du DOM (visibilité des colonnes,
+glisser-déposer du kanban…).
+
+Le conteneur des résultats s'appelle `list-result` par défaut ; une page qui
+nomme le sien autrement le déclare avec la variable `listing_resultats`.
+{% endcomment %}
+<script>
+// @ts-nocheck
+(function () {
+  /* ── Dropdown ── */
+  function toggleDd(id, btn) {
+    var panel = document.getElementById(id);
+    var isOpen = panel.classList.contains('open');
+    document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
+    if (!isOpen) {
+      var rect = btn.getBoundingClientRect();
+      panel.style.top = (rect.bottom + 4) + 'px';
+      panel.style.left = rect.left + 'px';
+      panel.style.right = 'auto';
+      panel.classList.add('open');
+      var pr = panel.getBoundingClientRect();
+      if (pr.right > window.innerWidth - 8) {
+        panel.style.left = 'auto';
+        panel.style.right = (window.innerWidth - rect.right) + 'px';
+      }
+      // Place les sous-menus du bon côté : vers la gauche s'il ne reste pas la
+      // largeur d'un sous-menu à droite du panneau. Sans cela le sous-menu
+      // « Période » sortait de l'écran, champs de dates et bouton Appliquer
+      // compris — inatteignables.
+      var restant = window.innerWidth - panel.getBoundingClientRect().right;
+      var besoin = panel.querySelector('.lstg-panneau') ? 265 : 180;
+      panel.classList.toggle('vers-gauche', restant < besoin);
+    }
+  }
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.o-dd-wrap')) {
+      document.querySelectorAll('.o-dd-panel.open').forEach(function(p){ p.classList.remove('open'); });
+    }
+  });
+
+/* ══ Filtres, regroupement et rafraîchissement ══
+   Les menus sont générés par core.listing : ils appellent toggleParam,
+   setPeriode et applyDateFilter, exactement comme les listes de rendez-vous et
+   de gynécologie. L'ancien jeu de fonctions maison (setFiltreStatut,
+   applyPeriode, setFiltreHosp…) ne savait porter qu'une valeur par critère et
+   écrasait la précédente ; ici les paramètres `filter` et `group` sont
+   multivalués, ce qui est tout l'intérêt des filtres cumulables. */
+  var _enVol = null;
+
+  function rafraichir(url, pousserHistorique) {
+    var ouvert = document.querySelector('#subheader-controls .o-dd-panel.open');
+    var idOuvert = ouvert ? ouvert.id : null;
+
+    if (_enVol) _enVol.abort();
+    var ctrl = new AbortController();
+    _enVol = ctrl;
+
+    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' }, signal: ctrl.signal })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+      .then(function (html) {
+        var doc = new DOMParser().parseFromString(html, 'text/html');
+        ['subheader-controls', '{{ listing_resultats|default:"list-result" }}'].forEach(function (id) {
+          var neuf = doc.getElementById(id), actuel = document.getElementById(id);
+          if (neuf && actuel) actuel.innerHTML = neuf.innerHTML;
+        });
+        // Le titre porte le compte et la mention de période : hors des zones
+        // échangées, il faut le rafraîchir à part.
+        ['.o-page-count', '.o-page-scope'].forEach(function (sel) {
+          var neuf = doc.querySelector(sel), actuel = document.querySelector(sel);
+          if (neuf && actuel) actuel.innerHTML = neuf.innerHTML;
+        });
+        if (pousserHistorique) history.pushState({}, '', url);
+        if (window.initListe) window.initListe();
+      })
+      .catch(function (err) {
+        if (err.name === 'AbortError') return;   // remplacée par une requête plus récente
+        if (window.showToast) showToast('Impossible de rafraîchir la liste.', 'error');
+      })
+      .finally(function () { if (_enVol === ctrl) _enVol = null; });
+  }
+
+  /* L'état réellement appliqué par la vue — défauts compris — est exposé sur
+     #subheader-controls : l'URL nue ne le reflète pas au premier affichage. */
+  function valeursActuelles(cle, params) {
+    // Les vides sont écartés : « filter= » sans valeur est le marqueur d'une
+    // sélection explicitement nulle, pas une valeur de filtre.
+    if (params.has(cle)) return params.getAll(cle).filter(Boolean);
+    var socle = document.getElementById('subheader-controls');
+    var brut = socle ? (socle.dataset[cle === 'filter' ? 'filters' : 'groups'] || '') : '';
+    return brut ? brut.split(',').filter(Boolean) : [];
+  }
+
+  function appliquer(params) {
+    params.delete('page');
+    // Aucun filtre retenu : on émet « filter= » vide plutôt que rien du tout,
+    // sinon la vue considère que l'utilisateur n'a rien demandé et réapplique
+    // la période par défaut.
+    if (!params.getAll('filter').filter(Boolean).length) {
+      params.delete('filter');
+      params.append('filter', '');
+    }
+    rafraichir(window.location.pathname + '?' + params.toString(), true);
+  }
+
+  /* Les filtres et regroupements réellement appliqués, y compris ceux que la
+     vue a posés par défaut sans qu'ils figurent dans l'URL. Toute action qui
+     n'y touche pas (le tri) doit les reconduire tels quels, sinon cliquer sur
+     une colonne effacerait la période par défaut. */
+  function paramsCourants() {
+    var params = new URLSearchParams(window.location.search);
+    ['filter', 'group'].forEach(function (cle) {
+      var valeurs = valeursActuelles(cle, params);
+      params.delete(cle);
+      valeurs.forEach(function (v) { params.append(cle, v); });
+    });
+    return params;
+  }
+
+  /* Tri : porté par le serveur, sur la totalité du résultat filtré. Un tri en
+     JavaScript ne réordonnait que les lignes de la page affichée. */
+  document.addEventListener('click', function (e) {
+    var th = e.target.closest('th[data-tri]');
+    if (!th) return;
+    if (e.target.closest('.col-resizer') || e.target.closest('#col-picker-btn')) return;
+    var cle = th.dataset.tri;
+    if (!cle) return;
+    var params = paramsCourants();
+    var sens = (params.get('tri') === cle && params.get('sens') !== 'desc') ? 'desc' : 'asc';
+    params.set('tri', cle);
+    params.set('sens', sens);
+    appliquer(params);
+  });
+
+  function toggleParam(cle, valeur) {
+    var params = new URLSearchParams(window.location.search);
+    var valeurs = valeursActuelles(cle, params);
+    var presente = valeurs.indexOf(valeur) !== -1;
+    params.delete(cle);
+    valeurs.forEach(function (v) { if (!presente || v !== valeur) params.append(cle, v); });
+    if (!presente) params.append(cle, valeur);
+    if (cle === 'group' && !params.getAll('group').length) params.delete('group');
+    appliquer(params);
+  }
+
+  /* La période est exclusive : la valeur choisie remplace la précédente au lieu
+     de s'y ajouter, et un second clic la retire. */
+  function setPeriode(code) {
+    var PERIODES = ['today', 'semaine', 'mois', 'annee'];
+    var params = new URLSearchParams(window.location.search);
+    var valeurs = valeursActuelles('filter', params);
+    var deja = valeurs.indexOf(code) !== -1;
+    params.delete('filter');
+    valeurs.forEach(function (v) { if (PERIODES.indexOf(v) === -1) params.append('filter', v); });
+    if (!deja) params.append('filter', code);
+    params.delete('date_from');
+    params.delete('date_to');
+    appliquer(params);
+  }
+
+  /* Un intervalle explicite l'emporte sur les raccourcis : on retire la période
+     retenue, sinon les deux se contrediraient. */
+  function applyDateFilter() {
+    var de = document.getElementById('filter-date-from');
+    var a  = document.getElementById('filter-date-to');
+    var PERIODES = ['today', 'semaine', 'mois', 'annee'];
+    var params = new URLSearchParams(window.location.search);
+    var valeurs = valeursActuelles('filter', params);
+    params.delete('filter');
+    valeurs.forEach(function (v) { if (PERIODES.indexOf(v) === -1) params.append('filter', v); });
+    if (de && de.value) params.set('date_from', de.value); else params.delete('date_from');
+    if (a && a.value) params.set('date_to', a.value); else params.delete('date_to');
+    appliquer(params);
+  }
+
+  function resetAll() {
+    var params = new URLSearchParams(window.location.search);
+    ['filter', 'group', 'q', 'date_from', 'date_to', 'page', 'tri', 'sens']
+      .forEach(function (c) { params.delete(c); });
+    var champ = document.getElementById('search-input');
+    if (champ) champ.value = '';
+    // Tous les paramètres retirés, sans marqueur « filter= » : la vue réapplique
+    // alors sa sélection par défaut. « Effacer » ramène à l'état d'arrivée sur la
+    // page — la journée en cours pour les soins infirmiers, aucune restriction
+    // pour les procédures — et non à une absence totale de filtre, que
+    // l'utilisateur n'a pas demandée.
+    var qs = params.toString();
+    rafraichir(window.location.pathname + (qs ? '?' + qs : ''), true);
+  }
+
+  function lancerRecherche() {
+    var champ = document.getElementById('search-input');
+    var params = new URLSearchParams(window.location.search);
+    if (champ && champ.value.trim()) params.set('q', champ.value.trim());
+    else params.delete('q');
+    appliquer(params);
+  }
+
+  /* Recherche auto (debounce 400ms) */
+  (function () {
+    var champ = document.getElementById('search-input');
+    if (!champ) return;
+    var minuteur;
+    champ.addEventListener('input', function () {
+      clearTimeout(minuteur);
+      minuteur = setTimeout(lancerRecherche, 400);
+    });
+  })();
+
+  /* Pagination : interceptée pour rester en AJAX. */
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest('.o-pag-btn');
+    if (!a || a.classList.contains('disabled')) return;
+    var href = a.getAttribute('href');
+    if (!href || href === '#') return;
+    e.preventDefault();
+    rafraichir(href, true);
+  });
+
+  window.addEventListener('popstate', function () {
+    rafraichir(window.location.href, false);
+  });
+
+  
+
+  // Les menus générés appellent ces fonctions depuis des attributs onclick :
+  // elles doivent vivre sur window, pas dans la portée de la fermeture.
+  window.toggleDd = toggleDd;
+  window.toggleParam = toggleParam;
+  window.setPeriode = setPeriode;
+  window.applyDateFilter = applyDateFilter;
+  window.resetAll = resetAll;
+  window.lancerRecherche = lancerRecherche;
+  // Exposé pour les actions propres à une page (bascule liste/kanban…) : elles
+  // passent ainsi par le même échange que les filtres.
+  window.listeRafraichir = rafraichir;
+  window.listeAppliquer = appliquer;
+})();
+</script>

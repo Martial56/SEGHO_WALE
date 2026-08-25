@@ -115,4 +115,68 @@ dans le bloc CSS de la page qui utilise la brique.
   html[data-theme="dark"] tr.lst-groupe td { color: var(--teal-300); background: rgba(255,255,255,.04); }
   html[data-theme="dark"] tr.lst-groupe.lst-groupe-fils td { background: rgba(255,255,255,.02); }
   html[data-theme="dark"] tr.lst-groupe:hover td { background: rgba(var(--teal-500-rgb), .14); }
+
+  /* ── Intervalle de dates du sous-menu « Période » ──
+     Ces règles habillent le balisage émis par menu_filtres.html : leur place est
+     donc ici, avec le reste de la brique. Elles vivaient auparavant dans
+     includes/subheader.html et étaient recopiées ailleurs — toute liste qui
+     déclarait une famille `dates` sans embarquer l'une de ces copies affichait
+     des champs de date entièrement nus. */
+  .o-dd-date-block { padding: 8px 14px 10px; }
+  .o-dd-date-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .o-dd-date-row label { font-size: 11.5px; color: var(--text-muted); min-width: 18px; }
+  .o-dd-date-input {
+    flex: 1; min-width: 0; border: none; border-bottom: 1px solid var(--border-strong);
+    background: transparent; font-family: inherit;
+    font-size: 12px; color: var(--text); padding: 3px 2px; outline: none;
+  }
+  .o-dd-date-input:focus { border-bottom-color: var(--teal-600); }
+  .o-dd-date-actions { display: flex; gap: 6px; margin-top: 10px; }
+  .o-dd-apply-btn {
+    flex: 1; background: var(--teal-600); color: #fff; border: none; border-radius: 3px;
+    padding: 5px 0; font-size: 12px; font-weight: 500; font-family: inherit;
+    cursor: pointer; transition: background 0.15s;
+  }
+  .o-dd-apply-btn:hover { background: var(--teal-700); }
+  html[data-theme="dark"] .o-dd-date-input { border-bottom-color: var(--border-strong); color: var(--text); }
+  /* Sans cela l'icône du sélecteur natif reste noire, donc invisible, sur fond sombre. */
+  html[data-theme="dark"] .o-dd-date-input::-webkit-calendar-picker-indicator { filter: invert(1) opacity(.7); }
+
+  /* ── Tri, redimensionnement et sélecteur de colonnes ──
+     Vivait en double dans soins/list.html et soins/includes/layout_css.html.
+     Toute liste bâtie sur core.listing peut poser un <th data-tri="…"> ; le
+     clic est capté par includes/listing/page_js.html. */
+  .o-list-table th { position: relative; user-select: none; }
+  .sortable-col { cursor: pointer; }
+  .sortable-col:hover { background: rgba(0,0,0,.025) !important; }
+  html[data-theme="dark"] .sortable-col:hover { background: rgba(255,255,255,.04) !important; }
+  .sort-icon { font-size: 10px; color: var(--accent-text-soft); margin-left: 4px; vertical-align: middle; opacity: .85; }
+
+  .col-resizer { position: absolute; right: 0; top: 0; height: 100%; width: 5px; cursor: col-resize; z-index: 2; }
+  .col-resizer:hover, .col-resizer.resizing { background: var(--accent); opacity: .45; }
+
+  .col-picker-th { width: 28px; text-align: center; padding: 0 2px; position: relative; }
+  .col-picker-btn {
+    background: none; border: none; cursor: pointer;
+    color: var(--text-muted); font-size: 15px; padding: 2px 5px;
+    border-radius: 3px; line-height: 1; font-weight: 700; letter-spacing: -1px;
+  }
+  .col-picker-btn:hover { background: rgba(0,0,0,.06); color: var(--text); }
+  .col-picker-menu {
+    display: none; position: fixed;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,.12);
+    z-index: 1000; min-width: 180px; padding: 6px 0;
+    max-height: 380px; overflow-y: auto;
+  }
+  .col-picker-menu.open { display: block; }
+  .col-picker-menu label {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 14px; font-size: 13px; color: var(--text);
+    cursor: pointer; white-space: nowrap;
+  }
+  .col-picker-menu label:hover { background: rgba(0,0,0,.03); }
+  html[data-theme="dark"] .col-picker-menu { background: var(--surface); border-color: var(--border); }
+  html[data-theme="dark"] .col-picker-menu label { color: var(--text); }
+  html[data-theme="dark"] .col-picker-menu label:hover { background: rgba(255,255,255,.04); }
 </style>

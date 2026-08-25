@@ -194,18 +194,16 @@ html[data-theme="dark"] .o-dd-item.active { background: rgba(var(--teal-500-rgb)
   <!-- Ligne 1 : titre + recherche -->
   <div class="o-subheader-row">
     <span class="o-page-title">Hospitalisations <span class="o-page-count" id="page-count">{{ total }}</span></span>
+    <span class="o-page-scope" style="font-size:12px;color:var(--text-muted);">· {{ periode_libelle }}</span>
+    {% comment %}Plus de formulaire ni de champs cachés : les critères vivent
+    dans l'URL, en paramètres multivalués, et le pilotage commun les compose.
+    {% endcomment %}
     <div class="o-subheader-row-right">
-      <form method="get" id="filter-form" style="display:flex;align-items:center;">
-        <input type="hidden" name="statut" id="fi-statut" value="{{ statut }}">
-        <input type="hidden" name="vue"    id="vue-input" value="{{ vue }}">
-        <input type="hidden" name="date_debut" id="fi-date-debut" value="{{ date_debut }}">
-        <input type="hidden" name="date_fin"   id="fi-date-fin"   value="{{ date_fin }}">
-        <div class="o-search-bar">
-          <input class="o-search-input" id="search-input" type="text" name="q" value="{{ q }}"
-                 placeholder="Rechercher patient, numéro…">
-          <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
-        </div>
-      </form>
+      <div class="o-search-bar">
+        <input class="o-search-input" id="search-input" type="text" value="{{ q }}"
+               placeholder="Rechercher patient, numéro…">
+        <button type="button" class="o-search-btn" onclick="lancerRecherche()"><i class="bi bi-search"></i></button>
+      </div>
     </div>
   </div>
 
@@ -225,6 +223,8 @@ html[data-theme="dark"] .o-dd-item.active { background: rgba(var(--teal-500-rgb)
 </div><!-- /o-subheader -->
 
 <div id="list-results">
+  {% comment %}Styles de la brique : menus à sous-menus, bandes de groupe.{% endcomment %}
+  {% include 'includes/listing/styles.html' %}
   {% include 'hospitalisation/includes/_list_results.html' %}
 </div>
 
@@ -233,115 +233,21 @@ html[data-theme="dark"] .o-dd-item.active { background: rgba(var(--teal-500-rgb)
 
 {% block extra_js %}
 {{ block.super }}
+{% comment %}Dépliage des groupes, puis le pilotage commun des listes : il
+apporte toggleDd, toggleParam, setPeriode, applyDateFilter et resetAll, qu'appellent
+les menus générés. Il remplace le rafraîchissement maison, qui échangeait deux
+fragments JSON et ne savait porter qu'une valeur par critère.{% endcomment %}
+<script src="{% static 'js/listing_groupes.js' %}"></script>
+{% include 'includes/listing/page_js.html' %}
+
 <script>
-function toggleDd(id, btn) {
-  const panel = document.getElementById(id);
-  document.querySelectorAll('.o-dd-panel').forEach(p => { if (p.id !== id) p.classList.remove('open'); });
-  if (!panel) return;
-  const open = panel.classList.toggle('open');
-  if (open) {
-    const r = btn.getBoundingClientRect();
-    panel.style.top  = (r.bottom + window.scrollY + 4) + 'px';
-    panel.style.left = r.left + 'px';
-  }
-}
-document.addEventListener('click', function(e) {
-  if (!e.target.closest('.o-dd-wrap') && !e.target.closest('.o-dd-panel'))
-    document.querySelectorAll('.o-dd-panel').forEach(p => p.classList.remove('open'));
-});
-
-/* ══ Rafraîchissement AJAX de la liste (sans rechargement de page) ═════════════ */
-var LIST_URL = '{% url "hospitalisation:list" %}';
-
-function refreshList(params) {
-  var url = LIST_URL + '?' + new URLSearchParams(params).toString();
-  fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-    .then(function (r) { return r.json(); })
-    .then(function (data) {
-      document.getElementById('subheader-controls').innerHTML = data.controls_html;
-      document.getElementById('list-results').innerHTML = data.results_html;
-      document.getElementById('page-count').textContent = data.total;
-      document.querySelectorAll('.o-dd-panel').forEach(function (p) { p.classList.remove('open'); });
-      history.pushState(null, '', url);
-    })
-    .catch(function () {
-      // Repli : navigation classique si l'AJAX échoue
-      window.location = url;
-    });
-}
-
-function currentParams(overrides) {
-  var params = {
-    q:          document.getElementById('search-input').value,
-    statut:     document.getElementById('fi-statut').value,
-    vue:        document.getElementById('vue-input').value,
-    date_debut: document.getElementById('fi-date-debut').value,
-    date_fin:   document.getElementById('fi-date-fin').value,
-  };
-  Object.assign(params, overrides || {});
-  Object.keys(params).forEach(function (k) { if (!params[k]) delete params[k]; });
-  return params;
-}
-
+// @ts-nocheck
+/* Bascule liste/kanban : `vue` est un paramètre d'URL comme les autres, elle
+   emprunte donc le même rafraîchissement que les filtres. */
 function setVue(v) {
-  document.getElementById('vue-input').value = v;
-  refreshList(currentParams({ vue: v }));
+  var params = new URLSearchParams(window.location.search);
+  params.set('vue', v);
+  if (window.listeAppliquer) window.listeAppliquer(params);
 }
-function setFiltre(val) {
-  document.getElementById('fi-statut').value = val;
-  refreshList(currentParams({ statut: val }));
-}
-function setPeriode(debut, fin) {
-  document.getElementById('fi-date-debut').value = debut || '';
-  document.getElementById('fi-date-fin').value   = fin || '';
-  refreshList(currentParams({ date_debut: debut || '', date_fin: fin || '' }));
-}
-function clearPeriode() {
-  setPeriode('', '');
-}
-function clearQ() {
-  document.getElementById('search-input').value = '';
-  refreshList(currentParams({ q: '' }));
-}
-function clearAll() {
-  document.getElementById('search-input').value = '';
-  document.getElementById('fi-statut').value = '';
-  document.getElementById('fi-date-debut').value = '';
-  document.getElementById('fi-date-fin').value = '';
-  refreshList(currentParams({ q: '', statut: '', date_debut: '', date_fin: '' }));
-}
-
-document.getElementById('filter-form').addEventListener('submit', function (e) {
-  e.preventDefault();
-  refreshList(currentParams());
-});
-
-/* Pagination — délégation d'événement car les liens sont remplacés à chaque rafraîchissement */
-document.addEventListener('click', function (e) {
-  var link = e.target.closest('.o-pag-btn');
-  if (!link || link.classList.contains('disabled')) return;
-  e.preventDefault();
-  var page = link.dataset.page;
-  if (!page) return;
-  refreshList(currentParams({ page: page }));
-});
-
-/* Navigation précédent/suivant du navigateur */
-window.addEventListener('popstate', function () {
-  var params = {};
-  new URLSearchParams(window.location.search).forEach(function (v, k) { params[k] = v; });
-  fetch(LIST_URL + '?' + new URLSearchParams(params).toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-    .then(function (r) { return r.json(); })
-    .then(function (data) {
-      document.getElementById('subheader-controls').innerHTML = data.controls_html;
-      document.getElementById('list-results').innerHTML = data.results_html;
-      document.getElementById('page-count').textContent = data.total;
-      document.getElementById('search-input').value = params.q || '';
-      document.getElementById('fi-statut').value = params.statut || '';
-      document.getElementById('vue-input').value = params.vue || 'liste';
-      document.getElementById('fi-date-debut').value = params.date_debut || '';
-      document.getElementById('fi-date-fin').value = params.date_fin || '';
-    });
-});
 </script>
 {% endblock %}
