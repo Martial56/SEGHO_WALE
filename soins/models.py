@@ -97,6 +97,24 @@ class Soin(ModeleCentre):
             self.numero = f"{prefix}{count:05d}"
         super().save(*args, **kwargs)
 
+    def demarrer_procedures(self):
+        """Passe en cours les procédures encore en brouillon.
+
+        Appelée quand la facture du soin est réglée. Sans elle les procédures
+        restaient en brouillon jusqu'à basculer d'un coup en « terminé » à
+        l'administration, sans jamais passer par « en cours ».
+
+        Seuls les brouillons bougent : une procédure annulée à la main n'a pas à
+        revivre parce que la facture a été payée.
+
+        all_objects et non objects : la mise à jour est bornée par le soin, qui
+        porte déjà son centre. Passer par le manager cloisonné rendrait le geste
+        dépendant du centre actif du thread — nul hors requête.
+        """
+        return ProcedureSoin.all_objects.filter(
+            soin=self, statut='brouillon'
+        ).update(statut='en_cours')
+
     def __str__(self):
         return f"{self.numero or 'Soin'} — {self.patient}"
 

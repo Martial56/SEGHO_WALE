@@ -90,6 +90,19 @@ def _chambres():
             for pk, nom, salle in lignes]
 
 
+def _condition_a_facturer():
+    """Dossiers portant au moins un service rendu qui n'a pas encore de facture.
+
+    Même définition que `hospitalisation.services` (nb_saf_nf). Sous-requête et
+    non jointure : un dossier avec trois services non facturés ne doit pas
+    apparaître trois fois dans la liste.
+    """
+    from .models import ServiceAFacturer
+    return Q(pk__in=ServiceAFacturer.objects
+             .filter(facture__isnull=True, service__isnull=False)
+             .values('hospitalisation_id'))
+
+
 def familles_hospitalisations():
     """Familles de filtres de la liste des hospitalisations."""
     from core.listing import Famille
@@ -111,6 +124,12 @@ def familles_hospitalisations():
             ('chambre_non', 'Sans chambre',      Q(chambre__isnull=True)),
         ]),
         Famille('chambre', 'Chambre', source=_chambres),
+        # Critères des pastilles de la page d'accueil : le clic doit ouvrir
+        # cette liste sur exactement ce que la pastille annonçait.
+        Famille('a_faire', 'À traiter', valeurs=[
+            ('a_installer', "En attente d'installation", Q(statut='confirme')),
+            ('a_facturer',  'Services à facturer',       _condition_a_facturer()),
+        ]),
         Famille('genre', 'Genre du patient', valeurs=[
             ('genre_M', 'Masculin', Q(patient__sexe='M')),
             ('genre_F', 'Féminin',  Q(patient__sexe='F')),

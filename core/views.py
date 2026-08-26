@@ -230,7 +230,12 @@ def _get_dashboard_stats():
 
 @login_required(login_url='login')
 def dashboard_stats_json(request):
-    return JsonResponse(_get_dashboard_stats())
+    from core.pastilles import compteurs
+    donnees = _get_dashboard_stats()
+    # Les pastilles dépendent de l'utilisateur, pas seulement de la base : elles
+    # voyagent à part des statistiques, qui sont les mêmes pour tout le monde.
+    donnees['pastilles'] = compteurs(request.user)
+    return JsonResponse(donnees)
 
 
 @login_required(login_url='login')
@@ -266,8 +271,11 @@ def dashboard(request):
         vus_par__user=request.user
     ).count()
 
+    from core.pastilles import pastilles as _pastilles
+
     response = render(request, 'core/dashboard.html', {
         'stats': stats,
+        'pastilles': _pastilles(request.user),
         'rdv_auj': rdv_auj,
         'last_cons': last_cons,
         'today': today,

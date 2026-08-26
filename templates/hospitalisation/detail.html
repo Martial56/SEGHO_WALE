@@ -770,6 +770,11 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
           Soins &amp; services
           <span class="tab-bdg" id="bdg-soins">{{ services_a_facturer|length }}</span>
         </button>
+        <button class="tab-btn" data-tab="evaluation" role="tab" aria-selected="false">
+          <i class="bi bi-heart-pulse" style="font-size:13px;"></i>
+          Évaluation clinique
+          {% if evaluations %}<span class="tab-bdg">{{ evaluations|length }}</span>{% endif %}
+        </button>
         <button class="tab-btn" data-tab="visites" role="tab" aria-selected="false">
           <i class="bi bi-person-badge" style="font-size:13px;"></i>
           Visites
@@ -854,6 +859,71 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
         {% endif %}
 
         {# Les services à facturer s'ajoutent depuis le formulaire de modification. #}
+
+      </div>
+
+      {# ──────────────────── ONGLET : ÉVALUATION CLINIQUE ───────────────────────── #}
+      {% comment %}La vue chargeait déjà `eval_clin` et le passait au gabarit,
+      mais aucun onglet ne l'affichait : les constantes se saisissaient sans
+      jamais pouvoir se relire depuis la fiche. Les relevés sont listés du plus
+      récent au plus ancien — c'est l'évolution qui se lit, pas une valeur
+      isolée.{% endcomment %}
+      <div class="tab-pane" id="tab-evaluation">
+
+        <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+          <a href="{% url 'hospitalisation:edit' hosp.pk %}?tab=evaluation&amp;nouvelle=1" class="abtn abtn-ghost">
+            <i class="bi bi-plus-lg"></i> Nouvelle évaluation
+          </a>
+        </div>
+
+        {% if evaluations %}
+        <div class="saf-wrap">
+          <table class="saf-tbl">
+            <thead>
+              <tr>
+                <th>Relevé</th>
+                <th>Poids</th>
+                <th>Taille</th>
+                <th>IMC</th>
+                <th>Temp.</th>
+                <th>FR</th>
+                <th>Tension</th>
+                <th>SpO₂</th>
+                <th>Glycémie</th>
+                <th>Douleur</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for e in evaluations %}
+              <tr>
+                <td style="white-space:nowrap;">
+                  {{ e.date_saisie|date:"d/m/Y à H:i" }}
+                  {% if forloop.last %}<span style="font-size:11px;color:var(--text-muted);"> — admission</span>{% endif %}
+                </td>
+                <td>{% if e.poids %}{{ e.poids|floatformat:2 }} kg{% else %}<span style="opacity:.4;">—</span>{% endif %}</td>
+                <td>{% if e.taille %}{{ e.taille|floatformat:2 }} m{% else %}<span style="opacity:.4;">—</span>{% endif %}</td>
+                <td>
+                  {% if e.imc %}{{ e.imc }}
+                    {% if e.imc_statut %}<span style="font-size:11px;color:var(--text-muted);"> ({{ e.imc_statut }})</span>{% endif %}
+                  {% else %}<span style="opacity:.4;">—</span>{% endif %}
+                </td>
+                <td>{% if e.temperature %}{{ e.temperature|floatformat:1 }} °C{% else %}<span style="opacity:.4;">—</span>{% endif %}</td>
+                <td>{% if e.frequence_respiratoire %}{{ e.frequence_respiratoire }}/min{% else %}<span style="opacity:.4;">—</span>{% endif %}</td>
+                <td>{% if e.tension_systolique or e.tension_diastolique %}{{ e.tension_systolique|default:'—' }}/{{ e.tension_diastolique|default:'—' }}{% else %}<span style="opacity:.4;">—</span>{% endif %}</td>
+                <td>{% if e.saturation_o2 %}{{ e.saturation_o2|floatformat:0 }} %{% else %}<span style="opacity:.4;">—</span>{% endif %}</td>
+                <td>{% if e.glycemie %}{{ e.glycemie|floatformat:2 }} g/L{% else %}<span style="opacity:.4;">—</span>{% endif %}</td>
+                <td>{% if e.niveau_douleur is not None %}{{ e.niveau_douleur }}/10{% else %}<span style="opacity:.4;">—</span>{% endif %}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="saf-empty">
+          <i class="bi bi-heart-pulse"></i>
+          Aucune évaluation clinique enregistrée pour ce séjour.
+        </div>
+        {% endif %}
 
       </div>
 
@@ -1539,6 +1609,13 @@ window.switchTab       = switchTab;
 window.openAnnulModal  = openAnnulModal;
 window.closeAnnulModal = closeAnnulModal;
 window.confirmAnnul    = confirmAnnul;
+// La modale de décharge avait été oubliée ici. Tout ce script vit dans une
+// fonction anonyme : sans export, les attributs onclick du HTML ne voient rien
+// et le bouton « Décharger » ne faisait strictement rien, pour tout le monde.
+window.openDechargeModal      = openDechargeModal;
+window.closeDechargeModal     = closeDechargeModal;
+window.confirmDecharge        = confirmDecharge;
+window.toggleDechargeTransfert = toggleDechargeTransfert;
 
 })();
 </script>

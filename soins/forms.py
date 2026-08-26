@@ -103,7 +103,10 @@ class ProcedureSoinForm(forms.ModelForm):
         empty_label="— Aucun rendez-vous lié —",
     )
     facture = forms.ModelChoiceField(
-        queryset=Facture.objects.order_by('-date_emission'),
+        # Liste réelle posée dans __init__ : Facture est cloisonnée, un queryset
+        # écrit ici serait évalué à l'import, hors requête, et resterait vide
+        # (voir _patients_du_centre).
+        queryset=Facture.objects.none(),
         required=False,
         empty_label="— Aucune facture liée —",
     )
@@ -173,11 +176,14 @@ class ProcedureSoinForm(forms.ModelForm):
         réenregistrer la fiche l'effacerait.
         """
         proc = self.instance
-        if not (proc and proc.pk and proc.patient_id):
-            return
-        qs = Facture.objects.filter(patient_id=proc.patient_id)
-        if proc.facture_id:
-            qs = Facture.objects.filter(Q(patient_id=proc.patient_id) | Q(pk=proc.facture_id))
+        if proc and proc.pk and proc.patient_id:
+            condition = Q(patient_id=proc.patient_id)
+            if proc.facture_id:
+                condition |= Q(pk=proc.facture_id)
+            qs = Facture.all_objects.filter(condition)
+        else:
+            # En création, faute de patient connu : les factures du centre actif.
+            qs = Facture.objects.all()
         self.fields['facture'].queryset = qs.order_by('-date_emission')
 
     def _figer_champs(self):
