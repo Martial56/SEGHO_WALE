@@ -246,6 +246,12 @@ def hospitalisation_create(request):
                 is_mo = True
                 mo_patient = rdv.patient
                 mo_medecin = rdv.medecin
+                # Le patient doit passer par `initial` : c'est lui qui alimente
+                # la carte du sélecteur et son champ caché. Sans cette ligne le
+                # formulaire M.O s'affichait sans patient et le postait vide —
+                # « Ce champ est obligatoire » au premier enregistrement.
+                initial['patient'] = rdv.patient_id
+                initial['medecin_traitant'] = rdv.medecin_id
                 try:
                     mo_consultation_id = rdv.consultation.pk
                 except AttributeError:
@@ -556,17 +562,46 @@ def _parse_int(val, default=None):
 
 
 def _save_evaluation_clinique(hosp, POST):
-    eval_clin, _ = EvaluationClinique.objects.get_or_create(hospitalisation=hosp)
-    eval_clin.poids                = _parse_decimal(POST.get('eval_poids', ''))
-    eval_clin.taille               = _parse_decimal(POST.get('eval_taille', ''))
-    eval_clin.temperature          = _parse_decimal(POST.get('eval_temperature', ''))
-    eval_clin.frequence_respiratoire = _parse_int(POST.get('eval_freq_resp', ''))
-    eval_clin.tension_systolique   = _parse_int(POST.get('eval_tension_sys', ''))
-    eval_clin.tension_diastolique  = _parse_int(POST.get('eval_tension_dia', ''))
-    eval_clin.saturation_o2        = _parse_decimal(POST.get('eval_sat_o2', ''))
-    eval_clin.glycemie             = _parse_decimal(POST.get('eval_glycemie', ''))
-    eval_clin.niveau_douleur       = _parse_int(POST.get('eval_douleur', ''))
-    eval_clin.save()
+    """Enregistre un relevé de constantes.
+
+    Deux gestes différents partagent ce formulaire :
+
+    * **corriger** le dernier relevé — le cas courant, une faute de frappe ;
+    * **ajouter** un relevé, quand on remesure le patient. Le formulaire pose
+      alors `eval_nouvelle=1` et l'ancien reste intact.
+
+    Ne rien enregistrer quand tout est vide : sans ce garde-fou, chaque
+    enregistrement du dossier — pour tout autre motif — créerait un relevé
+    fantôme rempli de néant.
+    """
+    champs = {
+        'poids':                  _parse_decimal(POST.get('eval_poids', '')),
+        'taille':                 _parse_decimal(POST.get('eval_taille', '')),
+        'temperature':            _parse_decimal(POST.get('eval_temperature', '')),
+        'frequence_respiratoire': _parse_int(POST.get('eval_freq_resp', '')),
+        'tension_systolique':     _parse_int(POST.get('eval_tension_sys', '')),
+        'tension_diastolique':    _parse_int(POST.get('eval_tension_dia', '')),
+        'saturation_o2':          _parse_decimal(POST.get('eval_sat_o2', '')),
+        'glycemie':               _parse_decimal(POST.get('eval_glycemie', '')),
+        'niveau_douleur':         _parse_int(POST.get('eval_douleur', '')),
+    }
+    renseigne = any(v not in (None, '') for v in champs.values())
+    nouvelle = POST.get('eval_nouvelle') == '1'
+    dernier = hosp.evaluations.first()          # ordering : le plus récent
+
+    if nouvelle:
+        if renseigne:
+            EvaluationClinique.objects.create(hospitalisation=hosp, **champs)
+        return
+
+    if dernier is None:
+        if renseigne:
+            EvaluationClinique.objects.create(hospitalisation=hosp, **champs)
+        return
+
+    for nom, valeur in champs.items():
+        setattr(dernier, nom, valeur)
+    dernier.save()
 
 
 def _save_services_a_facturer(hosp, POST):
@@ -1014,6 +1049,9 @@ def hospitalisation_edit(request, pk):
     facture_payee   = Facture.objects.filter(hospitalisation=hosp, statut='payee').exists()
     factures_impayees = Facture.objects.filter(hospitalisation=hosp).exclude(statut__in=['payee', 'annulee']).count()
     tab_param = request.GET.get('tab', '')
+    # Relevé supplémentaire demandé depuis la fiche : l'URL le déclare à
+    # l'affichage, un champ caché au retour du formulaire.
+    eval_nouvelle = request.GET.get('nouvelle') == '1' or request.POST.get('eval_nouvelle') == '1'
 
     # Mode attribution chambre : confirme + facture payée — seul chambre_lit est modifiable.
     mode_chambre_seule = hosp.statut == 'confirme' and facture_payee
@@ -1070,6 +1108,18 @@ def hospitalisation_edit(request, pk):
                 messages.error(request, err)
             else:
                 messages.success(request, 'Patient déchargé — sortie médicale enregistrée.')
+            return redirect('hospitalisation:detail', pk=hosp.pk)
+        if eval_nouvelle:
+            # Un seul geste : ajouter le relevé. Les modes restreints plus bas
+            # ne sauvegardent pas l'évaluation — sans cette branche, le relevé
+            # serait silencieusement perdu sur un dossier confirmé ou en cours.
+            avant = hosp.evaluations.count()
+            _save_evaluation_clinique(hosp, request.POST)
+            if hosp.evaluations.count() > avant:
+                log_event(hosp, request.user, 'Nouvelle évaluation clinique enregistrée.', type='modif')
+                messages.success(request, 'Nouvelle évaluation enregistrée.')
+            else:
+                messages.warning(request, "Aucune mesure saisie : rien n'a été enregistré.")
             return redirect('hospitalisation:detail', pk=hosp.pk)
         if mode_soins_seuls:
             # Seuls les soins/visites sont sauvegardés
@@ -1151,7 +1201,10 @@ def hospitalisation_edit(request, pk):
     from laboratoire.models import AnalyseLaboratoire
     from consultations.models import Ordonnance
 
-    eval_clin, _  = EvaluationClinique.objects.get_or_create(hospitalisation=hosp)
+    # Le dernier relevé alimente le formulaire ; `first()` suit l'ordre du
+    # modèle (du plus récent au plus ancien). Plus de get_or_create : créer un
+    # relevé vide au simple affichage de la page polluait l'historique.
+    eval_clin     = hosp.evaluations.first()
     resume, _     = ResumeDecharge.objects.get_or_create(hospitalisation=hosp)
     checklist_adm = list(hosp.checklist_admission.all())
     checklist_ver = list(hosp.checklist_verification.all())
@@ -1242,7 +1295,8 @@ def hospitalisation_edit(request, pk):
         'pct_adm':            round(nb_adm_ok * 100 / nb_adm) if nb_adm else 0,
         'pct_ver':            round(nb_ver_ok * 100 / nb_ver) if nb_ver else 0,
         # Tab 3 - Évaluation clinique
-        'eval_clin':          eval_clin,
+        'eval_clin':          None if eval_nouvelle else eval_clin,
+        'eval_nouvelle':      eval_nouvelle,
         # Tab 4 - Soins
         'visites_inf':        list(hosp.visites_infirmieres.select_related('soin','unite_mesure','infirmiere').all()),
         'visites_doc':        list(hosp.visites_docteur.select_related('soin','docteur').all()),
@@ -1513,7 +1567,8 @@ def hospitalisation_detail(request, pk):
     hosp     = get_object_or_404(Hospitalisation, pk=pk)
     is_admin = request.user.is_superuser
 
-    eval_clin, _ = EvaluationClinique.objects.get_or_create(hospitalisation=hosp)
+    evaluations = list(hosp.evaluations.all())
+    eval_clin   = evaluations[0] if evaluations else None
     resume, _    = ResumeDecharge.objects.get_or_create(hospitalisation=hosp)
 
     nb_factures      = Facture.objects.filter(hospitalisation=hosp).count()
@@ -1546,6 +1601,7 @@ def hospitalisation_detail(request, pk):
         'nb_factures':         nb_factures,
         'logs':                get_logs(hosp),
         'eval_clin':           eval_clin,
+        'evaluations':         evaluations,
         'resume':              resume,
         'visites_inf':         list(hosp.visites_infirmieres.select_related(
                                    'soin', 'unite_mesure', 'infirmiere').all()),

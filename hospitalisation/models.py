@@ -353,9 +353,18 @@ class ResumeDecharge(models.Model):
 
 
 class EvaluationClinique(models.Model):
-    hospitalisation     = models.OneToOneField(
+    """Un relevé de constantes daté, pris pendant le séjour.
+
+    Clé étrangère et non OneToOne : les constantes d'un patient se reprennent
+    plusieurs fois pendant une hospitalisation, et c'est leur **évolution** qui
+    intéresse le soignant. Tant que le lien était unique, remesurer écrasait la
+    mesure d'entrée — on perdait le point de comparaison.
+
+    Le premier relevé est celui de l'admission ; les suivants s'y ajoutent.
+    """
+    hospitalisation     = models.ForeignKey(
         'Hospitalisation', on_delete=models.CASCADE,
-        related_name='evaluation_clinique'
+        related_name='evaluations'
     )
     poids               = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, verbose_name="Poids (kg)")
     taille              = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, verbose_name="Taille (m)")
@@ -366,7 +375,10 @@ class EvaluationClinique(models.Model):
     saturation_o2       = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, verbose_name="Saturation O2 (%)")
     glycemie            = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True, verbose_name="Glycémie aléatoire")
     niveau_douleur      = models.IntegerField(null=True, blank=True, verbose_name="Niveau de douleur (0-10)")
-    date_saisie         = models.DateTimeField(auto_now=True)
+    # auto_now_add et non auto_now : la date est celle de la **mesure**. Avec
+    # auto_now, corriger une faute de frappe six heures plus tard déplaçait le
+    # relevé dans le temps et faussait la chronologie.
+    date_saisie         = models.DateTimeField(auto_now_add=True)
 
     @property
     def imc(self):
@@ -385,6 +397,8 @@ class EvaluationClinique(models.Model):
 
     class Meta:
         verbose_name = "Évaluation clinique"
+        # Du plus récent au plus ancien : c'est le dernier relevé qu'on cherche.
+        ordering = ['-date_saisie']
 
 
 class ChecklistAdmission(models.Model):

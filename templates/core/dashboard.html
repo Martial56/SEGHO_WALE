@@ -11,33 +11,8 @@ body { height: 100vh; overflow: hidden; }
 .content { padding-top: 0; min-height: 0; scrollbar-width: none; }
 .content::-webkit-scrollbar { display: none; }
 
-/* ══ STATS RAPIDES ══ */
-.dash-alerts {
-  display:flex; gap:8px; flex-wrap:wrap;
-  padding:14px 32px; margin:0 -32px;
-  background:#fff; border-bottom:1px solid rgba(0,0,0,.06);
-}
-html[data-theme="dark"] .dash-alerts { background:var(--surface); border-bottom-color: var(--border); }
-.dash-alert-badge {
-  display:flex; align-items:center; gap:7px;
-  background:#fff; border:1px solid rgba(0,0,0,.08); border-radius:30px;
-  padding:5px 14px; font-size:11.5px; font-weight:600;
-  color:var(--accent-text); text-decoration:none;
-  box-shadow:0 2px 6px rgba(0,0,0,.04); transition:all .15s;
-}
-.dash-alert-badge:hover { transform:translateY(-1px); box-shadow:0 4px 14px rgba(0,0,0,.08); }
-html[data-theme="dark"] .dash-alert-badge { background: var(--surface); border-color: var(--border); color:#7ab8d0; }
-
 /* dark mode — titre topbar dashboard */
 html[data-theme="dark"] .dash-topbar-title { color:rgba(255,255,255,.35) !important; }
-.dal-dot {
-  width:18px; height:18px; border-radius:50%;
-  display:flex; align-items:center; justify-content:center;
-  font-size:9px; font-weight:800; color:#fff; flex-shrink:0;
-}
-.dot-amber { background:var(--amber); }
-.dot-rose  { background:var(--rose); }
-.dot-teal  { background:#2d99db; }
 
 /* ══ GRILLE MODULES ══ */
 .dash-wrap {
@@ -62,6 +37,21 @@ html[data-theme="dark"] .dash-topbar-title { color:rgba(255,255,255,.35) !import
   box-shadow:0 14px 36px rgba(0,0,0,.11);
 }
 html[data-theme="dark"] .module-card:hover { background: var(--surface); box-shadow:0 14px 36px rgba(0,0,0,.4); }
+
+/* ══ PASTILLE « À TRAITER » ══
+   Un compteur de travail en attente pour la personne connectée — jamais une
+   statistique. Elle n'apparaît que si le nombre est supérieur à zéro : c'est le
+   silence des autres cartes qui lui donne son sens. Voir core/pastilles.py. */
+.module-pastille {
+  position:absolute; top:12px; right:12px;
+  min-width:22px; height:22px; padding:0 6px;
+  border-radius:11px;
+  background:var(--rose); color:#fff;
+  font-size:11px; font-weight:800; line-height:22px;
+  text-align:center;
+  box-shadow:0 2px 8px rgba(var(--rose-rgb),.45);
+  z-index:2;
+}
 .module-icon-box {
   width:80px; height:80px; border-radius:50%;
   display:flex; align-items:center; justify-content:center;
@@ -96,7 +86,7 @@ html[data-theme="dark"] .module-sub { color: var(--text-muted); }
 
 @media(max-width:1280px){ .modules-grid{ grid-template-columns:repeat(4,1fr); } }
 @media(max-width:1024px){ .modules-grid{ grid-template-columns:repeat(3,1fr); } .dash-wrap{ padding:24px 20px; } }
-@media(max-width:768px) { .modules-grid{ grid-template-columns:repeat(2,1fr); } .dash-alerts{ display:none; } }
+@media(max-width:768px) { .modules-grid{ grid-template-columns:repeat(2,1fr); } }
 @media(max-width:480px) { .modules-grid{ grid-template-columns:repeat(2,1fr); } }
 </style>
 {% endblock %}
@@ -167,7 +157,8 @@ html[data-theme="dark"] .module-sub { color: var(--text-muted); }
     {% endif %}
 
     {% if 'hospitalisation' in accessible_codes %}
-    <a href="{% url 'hospitalisation:list' %}" class="module-card">
+    <a href="{% if pastilles.hospitalisation %}{{ pastilles.hospitalisation.url }}{% else %}{% url 'hospitalisation:list' %}{% endif %}" class="module-card">
+      {% if pastilles.hospitalisation %}<span class="module-pastille" data-pastille="hospitalisation" title="{{ pastilles.hospitalisation.total }} {{ pastilles.hospitalisation.libelle }}">{{ pastilles.hospitalisation.total }}</span>{% endif %}
       <div class="module-icon-box ic-coral" style="padding:0;overflow:hidden;">
         <img src="{% static 'img/hosp.png' %}" alt="Hospitalisation" style="width:105%;height:105%;object-fit:cover;border-radius:50%;">
       </div>
@@ -177,7 +168,8 @@ html[data-theme="dark"] .module-sub { color: var(--text-muted); }
     {% endif %}
 
     {% if 'consultations' in accessible_codes %}
-    <a href="{% url 'soins:list' %}" class="module-card">
+    <a href="{% if pastilles.consultations %}{{ pastilles.consultations.url }}{% else %}{% url 'soins:list' %}{% endif %}" class="module-card">
+      {% if pastilles.consultations %}<span class="module-pastille" data-pastille="consultations" title="{{ pastilles.consultations.total }} {{ pastilles.consultations.libelle }}">{{ pastilles.consultations.total }}</span>{% endif %}
       <div class="module-icon-box ic-amber" style="padding:0;overflow:hidden;/* border-radius:50%; */border-radius:0;">
         <img src="{% static 'img/soin.png' %}" alt="Soins" style="width:90%;height:90%;object-fit:cover;/* border-radius:50%; */border-radius:0;">
       </div>
@@ -217,7 +209,8 @@ html[data-theme="dark"] .module-sub { color: var(--text-muted); }
     {% endif %}
 
     {% if 'facturation' in accessible_codes %}
-    <a href="{% url 'facturation_list' %}" class="module-card">
+    <a href="{% if pastilles.facturation %}{{ pastilles.facturation.url }}{% else %}{% url 'facturation_list' %}{% endif %}" class="module-card">
+      {% if pastilles.facturation %}<span class="module-pastille" data-pastille="facturation" title="{{ pastilles.facturation.total }} {{ pastilles.facturation.libelle }}">{{ pastilles.facturation.total }}</span>{% endif %}
       <div class="module-icon-box ic-teal" style="padding:0;overflow:hidden;">
         <img src="{% static 'img/compp.png' %}" alt="Comptabilité" style="width:105%;height:105%;object-fit:cover;border-radius:50%;">
       </div>
@@ -373,15 +366,15 @@ html[data-theme="dark"] .module-sub { color: var(--text-muted); }
             : 'À jour';
         }
 
-        // Barre d'alertes
-        const bar  = document.getElementById('dash-alerts-bar');
-        const bMed = document.getElementById('badge-medicaments');
-        const bFac = document.getElementById('badge-factures');
-        const bAna = document.getElementById('badge-analyses');
-        if (bMed) { document.getElementById('badge-medicaments-count').textContent = data.medicaments_alerte; bMed.style.display = data.medicaments_alerte > 0 ? '' : 'none'; }
-        if (bFac) { document.getElementById('badge-factures-count').textContent   = data.factures_impayees;   bFac.style.display = data.factures_impayees  > 0 ? '' : 'none'; }
-        if (bAna) { document.getElementById('badge-analyses-count').textContent   = data.analyses_pending;    bAna.style.display = data.analyses_pending   > 0 ? '' : 'none'; }
-        if (bar)  { bar.style.display = (data.medicaments_alerte > 0 || data.factures_impayees > 0 || data.analyses_pending > 0) ? '' : 'none'; }
+        // Pastilles « à traiter » des cartes : le serveur ne renvoie que les
+        // modules où il reste du travail, une carte absente de la réponse doit
+        // donc perdre la sienne.
+        const recus = data.pastilles || {};
+        document.querySelectorAll('[data-pastille]').forEach(function (p) {
+          const n = recus[p.dataset.pastille];
+          if (n) { p.textContent = n; p.style.display = ''; }
+          else   { p.style.display = 'none'; }
+        });
       })
       .catch(() => {});
   }
