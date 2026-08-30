@@ -9,6 +9,7 @@ from facturation.models import Facture
 from patients.models import Patient
 
 from .models import ProcedureSoin, Soin
+from .regles import demarrer_soin_de_facture
 from .views import _has_at_least_one_ligne, _parse_prix, _sync_procedures
 
 
@@ -343,3 +344,76 @@ class TestSoinsEditLocking(TestCase):
         client.login(username='u_se', password='x')
         resp = client.get(reverse('soins:edit', kwargs={'pk': soin.pk}))
         self.assertEqual(resp.status_code, 200)
+
+
+# ─── Le paiement démarre le soin ET ses procédures ─────────────────────────────
+
+class TestPaiementDemarreLesProcedures(TestCase):
+    """Une facture réglée doit sortir le soin et ses lignes de l'attente.
+
+    Avant, seul le soin passait « en cours » et seulement par l'encaissement de
+    la caisse : les procédures restaient en brouillon jusqu'à sauter d'un coup à
+    « terminé » à l'administration, sans jamais passer par « en cours ».
+    """
+
+    def setUp(self):
+        self.patient = _patient('Pay')
+        self.caissier = User.objects.create_superuser('su_pay', password='x')
+        self.client = Client()
+        self.client.login(username='su_pay', password='x')
+
+    def _soin_facture(self, montant=Decimal('3000'), nb_lignes=2):
+        facture = _facture(self.patient, statut='emise', montant_total=montant)
+        soin = _soin(self.patient, statut='en_attente_de_paiement', facture=facture)
+        procedures = [_procedure(soin=soin, statut='brouillon') for _ in range(nb_lignes)]
+        return soin, facture, procedures
+
+    def _statuts(self, soin):
+        soin.refresh_from_db()
+        return soin.statut, sorted(
+            ProcedureSoin.objects.filter(soin=soin).values_list('statut', flat=True))
+
+    def test_encaissement_met_le_soin_et_ses_procedures_en_cours(self):
+        soin, facture, _ = self._soin_facture()
+        self.client.post(reverse('facturation:payer', kwargs={'pk': facture.pk}),
+                         {'pay_montant': '3000', 'pay_mode': 'especes'})
+        self.assertEqual(self._statuts(soin), ('en_cours', ['en_cours', 'en_cours']))
+
+    def test_paiement_partiel_ne_demarre_rien(self):
+        soin, facture, _ = self._soin_facture()
+        self.client.post(reverse('facturation:payer', kwargs={'pk': facture.pk}),
+                         {'pay_montant': '1000', 'pay_mode': 'especes'})
+        self.assertEqual(self._statuts(soin),
+                         ('en_attente_de_paiement', ['brouillon', 'brouillon']))
+
+    def test_bouton_marquer_payee_demarre_aussi(self):
+        """Le second chemin : la fiche facture, sans encaissement saisi."""
+        soin, facture, _ = self._soin_facture()
+        self.client.post(reverse('facturation:edit', kwargs={'pk': facture.pk}),
+                         {'action_payer': '1'})
+        self.assertEqual(self._statuts(soin), ('en_cours', ['en_cours', 'en_cours']))
+
+    def test_une_procedure_annulee_ne_revit_pas(self):
+        soin, facture, procedures = self._soin_facture(nb_lignes=2)
+        procedures[0].statut = 'annule'
+        procedures[0].save(update_fields=['statut'])
+        self.client.post(reverse('facturation:payer', kwargs={'pk': facture.pk}),
+                         {'pay_montant': '3000', 'pay_mode': 'especes'})
+        self.assertEqual(self._statuts(soin), ('en_cours', ['annule', 'en_cours']))
+
+    def test_un_soin_deja_termine_nest_pas_rouvert(self):
+        facture = _facture(self.patient, statut='payee')
+        soin = _soin(self.patient, statut='termine', facture=facture)
+        self.assertIsNone(demarrer_soin_de_facture(facture))
+
+    def test_facture_sans_soin_ne_casse_rien(self):
+        facture = _facture(self.patient, statut='payee')
+        self.assertIsNone(demarrer_soin_de_facture(facture))
+
+    def test_parcours_complet_jusqua_ladministration(self):
+        soin, facture, _ = self._soin_facture()
+        self.client.post(reverse('facturation:payer', kwargs={'pk': facture.pk}),
+                         {'pay_montant': '3000', 'pay_mode': 'especes'})
+        self.assertEqual(self._statuts(soin), ('en_cours', ['en_cours', 'en_cours']))
+        self.client.post(reverse('soins:administrer', kwargs={'pk': soin.pk}))
+        self.assertEqual(self._statuts(soin), ('termine', ['termine', 'termine']))

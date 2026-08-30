@@ -70,7 +70,10 @@
     font-family: var(--font-main); cursor: pointer;
     display: inline-flex; align-items: center; gap: 5px; transition: background .15s;
   }
-  .sh-btn-save:hover { filter: brightness(1.1); }
+  .sh-btn-save:hover:not(:disabled) { filter: brightness(1.1); }
+  /* Désactivé tant qu'aucune ligne de soin n'est saisie : le serveur refuse
+     déjà l'enregistrement, le bouton doit le dire avant le clic. */
+  .sh-btn-save:disabled { opacity: .45; cursor: not-allowed; }
   .sh-btn-ignore {
     background: none; border: 1px solid var(--border); color: var(--text-muted);
     padding: 6px 14px; border-radius: 4px; font-size: 12.5px; font-weight: 500;
@@ -166,7 +169,7 @@
   .svc-search::placeholder { color: #bfcdd4; }
   .svc-list {
     list-style: none; margin: 0; padding: 4px 0;
-    max-height: 200px; overflow-y: auto; scrollbar-width: thin;
+    max-height: 200px; overflow-y: auto;
   }
   .svc-option {
     padding: 8px 14px; font-size: 12.5px; color: var(--text);
@@ -426,7 +429,15 @@
   /* La liste reprend la largeur de la colonne, trop étroite pour des
      libellés comme « AMBULANCE EVACUATION CHR-MOSCATI » qui s'y
      pliaient sur trois lignes. */
-  .ts-dropdown.ligne-select { font-size: 12px !important; min-width: 340px; }
+  /* padding remis à zéro : le composant recopie les classes du <select> sur la
+     liste, et le rembourrage de .ligne-select — 18px à droite, réservés au
+     chevron du champ fermé — se retrouvait sur le panneau ouvert. La barre de
+     défilement se dessinait dans ce vide, en retrait du bord au lieu de longer
+     la bordure, et les libellés se repliaient 18px trop tôt. */
+  .ts-dropdown.ligne-select {
+    font-size: 12px !important; min-width: 340px; padding: 0 !important;
+  }
+
   .ts-dropdown.ligne-select .option { padding: 6px 12px !important; font-size: 12px !important; }
 
   .ligne-del {

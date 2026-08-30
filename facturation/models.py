@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import User
 
+from centres.models import ModeleCentre
+
 
 class Acte(models.Model):
     code = models.CharField(max_length=50, unique=True)
@@ -13,7 +15,7 @@ class Acte(models.Model):
     class Meta: verbose_name = "Acte médical"
 
 
-class Facture(models.Model):
+class Facture(ModeleCentre):
     STATUT = [('brouillon','Brouillon'),('emise','Émise'),('payee','Payée'),('annulee','Annulée')]
     TYPE = [('consultation','Consultation'),('soins','Soins'),('hospitalisation','Hospitalisation'),('pharmacie','Pharmacie'),('laboratoire','Laboratoire'),('imagerie','Imagerie'),('autre','Autre')]
 
@@ -46,9 +48,12 @@ class Facture(models.Model):
             now = timezone.now()
             annee = now.year
             date_part = now.strftime('%y%m%d')
-            count = Facture.objects.count() + 1
+            # all_objects : le numéro est unique tous centres confondus. Le
+            # compter sur `objects`, cloisonné, redonnerait un numéro déjà pris
+            # dans l'autre centre.
+            count = Facture.all_objects.count() + 1
             numero = f"VTES/{annee}/{date_part}{count:04d}"
-            while Facture.objects.filter(numero=numero).exists():
+            while Facture.all_objects.filter(numero=numero).exists():
                 count += 1
                 numero = f"VTES/{annee}/{date_part}{count:04d}"
             self.numero = numero
@@ -68,7 +73,7 @@ class Facture(models.Model):
         return self.montant_total
 
     def __str__(self): return f"Facture {self.numero}"
-    class Meta:
+    class Meta(ModeleCentre.Meta):
         verbose_name = "Facture"
         ordering = ['-date_emission']
         permissions = [

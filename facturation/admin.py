@@ -1,4 +1,7 @@
 from django.contrib import admin
+
+from centres.admin import ModeleCentreAdmin
+
 from .models import Acte, Facture, LigneFacture, Paiement
 
 
@@ -21,7 +24,7 @@ class PaiementInline(admin.TabularInline):
 
 
 @admin.register(Facture)
-class FactureAdmin(admin.ModelAdmin):
+class FactureAdmin(ModeleCentreAdmin):
     list_display = ['numero', 'patient', 'type_facture', 'montant_total', 'montant_paye', 'solde_restant', 'statut', 'date_emission']
     search_fields = ['numero', 'patient__nom', 'patient__prenoms']
     list_filter = ['statut', 'type_facture']

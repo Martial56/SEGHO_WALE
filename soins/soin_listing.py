@@ -22,6 +22,7 @@ from django.db.models.functions import (TruncDay, TruncMonth, TruncQuarter,
 
 from patients.rdv_listing import (_debut_semaine, _lib_jour, _lib_mois,
                                   _lib_semaine, _lib_trimestre, _local)
+from .regles import condition_a_facturer, condition_administrable
 
 
 #: Champs interrogés par la barre de recherche.
@@ -137,6 +138,14 @@ def familles_soins():
         Famille('facturation', 'Facturation', valeurs=[
             ('facture_oui', 'Facturé',     Q(facture__isnull=False)),
             ('facture_non', 'Non facturé', Q(facture__isnull=True)),
+        ]),
+        # Ces deux critères sont ceux des pastilles de la page d'accueil : le
+        # clic sur une pastille ouvre cette liste avec le filtre correspondant,
+        # et doit donc y retrouver exactement le même nombre de lignes. La
+        # définition est partagée (soins.regles).
+        Famille('a_faire', 'À traiter', valeurs=[
+            ('a_facturer',    'À facturer',           condition_a_facturer()),
+            ('a_administrer', 'Prêt à administrer',   condition_administrable()),
         ]),
         Famille('origine', 'Origine', valeurs=[
             ('hosp_oui', "Issu d'une hospitalisation", Q(hospitalisation__isnull=False)),
