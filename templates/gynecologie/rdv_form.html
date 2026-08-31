@@ -127,6 +127,7 @@
     .field-ul:focus { border-bottom-color: var(--teal-500); }
     .field-ul::placeholder { color: #bfcdd4; }
     .field-ul[readonly] { color: rgba(0,0,0,0.45); cursor: default; }
+    .field-ul:disabled { color: rgba(0,0,0,0.45); cursor: not-allowed; opacity: 1; }
     select.field-ul {
         appearance: none; -webkit-appearance: none;
         background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23839aaa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
@@ -453,6 +454,7 @@
     html[data-theme="dark"] .ac-empty,
     html[data-theme="dark"] .ac-item-sub,
     html[data-theme="dark"] .field-ul[readonly],
+    html[data-theme="dark"] .field-ul:disabled,
     html[data-theme="dark"] .field-display { color: rgba(255,255,255,0.55); }
     html[data-theme="dark"] .status-sep,
     html[data-theme="dark"] .status-step,
@@ -739,12 +741,6 @@
                 <div class="f-hint">
                     Sera repris comme désignation dans la facture
                 </div>
-            </div>
-
-            <!-- Statut -->
-            <div class="field-row">
-                <label for="{{ form.statut.id_for_label }}">Statut</label>
-                {{ form.statut }}
             </div>
 
         </div>
@@ -1523,10 +1519,13 @@
 
 <script>
 (function () {
-    /* ── Statut → barre de workflow ── */
-    var statut  = document.getElementById('{{ form.statut.id_for_label }}');
-    var bar     = document.getElementById('status-bar');
-    var steps   = ['planifie', 'confirme', 'en_attente', 'en_consultation', 'termine'];
+    /* ── Statut → barre de workflow ──
+       Le statut n'est plus modifiable via un champ brut : il n'évolue que par
+       les boutons d'action (Confirmer, En Attente, …), chacun rechargeant la
+       page. La valeur courante vient donc directement de l'attribut du
+       formulaire, pas d'un <select>. */
+    var bar   = document.getElementById('status-bar');
+    var steps = ['planifie', 'confirme', 'en_attente', 'en_consultation', 'termine'];
 
     function highlightStatus(val) {
         bar.querySelectorAll('.status-step').forEach(function (el) {
@@ -1540,10 +1539,8 @@
             if (i === idx) el.classList.add('active');
         });
     }
-    if (statut) {
-        highlightStatus(statut.value);
-        statut.addEventListener('change', function () { highlightStatus(this.value); });
-    }
+    var _rdvFormEl = document.getElementById('rdv-form');
+    if (_rdvFormEl) highlightStatus(_rdvFormEl.dataset.statut || 'planifie');
 
     {% include "patients/includes/_autocomplete_patient_script.html" %}
 
