@@ -379,7 +379,15 @@ html[data-theme="dark"] .fac-ro-field.grey-field { background: rgba(255,255,255,
         </a>
         {% endif %}
         {% endif %}
-        {% if is_admin and facture.statut != 'brouillon' and facture.statut != 'emise' %}
+        {% comment %}Facture payée ou annulée : la retoucher est un geste
+        d'administration, et la vue ne l'autorise qu'au superutilisateur (voir
+        facture_edit). Le bouton s'appuyait sur `is_admin`, qui vaut
+        « is_staff or is_superuser » : un infirmier marqué membre de l'équipe le
+        voyait sans avoir le droit de modifier, et tombait sur un refus ; à
+        l'inverse un caissier non-staff ne le voyait pas alors qu'il a la
+        permission. On s'aligne sur ce que la vue accepte réellement.
+        {% endcomment %}
+        {% if request.user.is_superuser and facture.statut != 'brouillon' and facture.statut != 'emise' %}
         <a href="{% url 'facturation:edit' facture.pk %}?next={{ back_url }}" class="fac-btn fac-btn-edit" style="text-decoration:none;" title="Modification administrateur">
           <i class="bi bi-pencil"></i> Modifier
         </a>

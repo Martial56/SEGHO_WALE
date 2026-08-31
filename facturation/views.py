@@ -11,6 +11,7 @@ from django.urls import reverse
 from .models import Facture, LigneFacture, Acte, Paiement
 from .forms import FactureForm
 from core.views import log_event, get_logs
+from soins.regles import demarrer_soin_de_facture
 
 # Rôles autorisés à enregistrer un encaissement (voir aussi hospitalisation
 # management/commands/init_groupes_hospitalisation.py qui définit "Caisse").
@@ -335,7 +336,6 @@ def facture_valider(request, pk):
 def facture_payer(request, pk):
     if not can_manage_paiement(request.user):
         raise PermissionDenied
-    from soins.models import Soin
     facture  = get_object_or_404(Facture, pk=pk)
     if request.method != 'POST':
         return redirect('facturation:detail', pk=pk)
@@ -360,10 +360,7 @@ def facture_payer(request, pk):
             facture.statut = 'payee'
             facture.save(update_fields=['montant_paye', 'statut'])
             log_event(facture, request.user, 'Statut changé : payée', type='statut')
-            soin = Soin.objects.filter(facture=facture).first()
-            if soin:
-                soin.statut = 'en_cours'
-                soin.save(update_fields=['statut'])
+            demarrer_soin_de_facture(facture)
         else:
             facture.save(update_fields=['montant_paye'])
 
@@ -402,9 +399,18 @@ def facture_edit(request, pk):
     from services.models import Articleservice
 
     facture  = get_object_or_404(Facture, pk=pk)
+    retour = f"{reverse('facturation:detail', kwargs={'pk': pk})}?next={request.GET.get('next') or reverse('facturation:list')}"
     if not request.user.has_perm('facturation.change_facture'):
         messages.error(request, "Vous n'avez pas la permission de modifier une facture.")
-        return redirect(f"{reverse('facturation:detail', kwargs={'pk': pk})}?next={request.GET.get('next') or reverse('facturation:list')}")
+        return redirect(retour)
+    # Une facture payée ou annulée est close : les actions de workflow plus bas
+    # ne l'acceptent déjà que pour un superutilisateur, mais la sauvegarde du
+    # formulaire, elle, ne vérifiait rien — on pouvait en réécrire les lignes en
+    # postant directement sur cette URL. La règle vaut maintenant pour toute la
+    # vue.
+    if facture.statut in ('payee', 'annulee') and not request.user.is_superuser:
+        messages.error(request, "Une facture payée ou annulée ne peut être modifiée que par un administrateur.")
+        return redirect(retour)
     actes    = Acte.objects.filter(actif=True).order_by('categorie', 'libelle')
     caisses  = Caisse.objects.filter(actif=True).order_by('nom')
     services = Articleservice.objects.select_related('categorie').filter(actif=True).order_by('nom')
@@ -433,6 +439,7 @@ def facture_edit(request, pk):
                 facture.statut = 'payee'
                 facture.save()
                 log_event(facture, request.user, 'Statut changé : Payée', type='statut')
+                demarrer_soin_de_facture(facture)
                 messages.success(request, 'Facture marquée comme payée.')
             return redirect(f'{detail_url}?next={back_url}')
 
@@ -563,4 +570,5 @@ def _handle_paiement(facture, POST, user, total):
         facture.statut = 'emise'
     facture.save()
     log_event(facture, user, f'Paiement de {int(pay_montant):,} FCFA enregistré.', type='modif')
+    demarrer_soin_de_facture(facture)
     return facture

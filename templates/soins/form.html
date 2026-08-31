@@ -54,7 +54,9 @@ html[data-theme="dark"] .btn-add-ligne { border-color: rgba(255,255,255,.18) !im
   font-family: var(--font-main); cursor: pointer;
   display: inline-flex; align-items: center; gap: 7px; transition: background .15s;
 }
-.btn-enreg-bottom:hover { background: var(--primary-dark); }
+.btn-enreg-bottom:hover:not(:disabled) { background: var(--primary-dark); }
+.btn-enreg-bottom:disabled { opacity: .45; cursor: not-allowed; }
+
 
 /* ── Stepper statuts (dans art-header) ── */
 .sfh-stepper {
@@ -92,6 +94,8 @@ html[data-theme="dark"] .proc-annule-badge { background:rgba(220,38,38,.15);bord
 .f-page-body { padding-top: 16px; }
 .soin-frm-layout { display: flex; align-items: flex-start; gap: 14px; }
 .soin-frm-main   { flex: 1; min-width: 0; }
+/* Voir soins/detail.html : le `top: 70px` global décalait aussi le panneau ici. */
+.hist-aside { top: 0 !important; }
 @media (max-width: 900px) { .soin-frm-layout { flex-direction: column; } }
 
 
@@ -251,6 +255,16 @@ html[data-theme="dark"] .proc-annule-badge { background:rgba(220,38,38,.15);bord
         reste des formulaires du projet.{% endcomment %}
         {% if not is_new %}
         {% include 'includes/_patient_picker.html' with valeur=soin.patient.pk patient=soin.patient lecture_seule=True %}
+        {% elif patient_impose %}
+        {% comment %}
+          Venu d'un rendez-vous ou d'une fiche patient : le soin est celui de ce
+          patient-là. La croix de désélection n'avait rien à faire ici — elle
+          proposait de casser un lien que l'écran d'origine venait d'établir.
+          Le marqueur ci-dessous fait tenir le verrou si le formulaire revient
+          en erreur, la chaîne de requête ayant alors disparu.
+        {% endcomment %}
+        {% include 'includes/_patient_picker.html' with valeur=patient_impose.pk patient=patient_impose lecture_seule=True %}
+        <input type="hidden" name="patient_verrouille" value="1">
         {% else %}
         {% include 'includes/_patient_picker.html' with valeur=form.patient.value %}
         {% if form.patient.errors %}
@@ -308,10 +322,10 @@ html[data-theme="dark"] .proc-annule-badge { background:rgba(220,38,38,.15);bord
         <i class="bi bi-plus-lg"></i> Ajouter une ligne
       </button>
 
-      {# Motif et observations : déclarés dans SoinForm.Meta.fields. Tant qu'ils
+      <!-- Motif et observations : déclarés dans SoinForm.Meta.fields. Tant qu'ils
          n'étaient pas rendus ici, le navigateur ne les postait pas et Django
          les remplaçait par du vide à chaque enregistrement — la fiche les
-         affiche pourtant tous les deux. #}
+         affiche pourtant tous les deux.  -->
       <div class="f-field" style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border);">
         <div class="section-title" style="margin-bottom:10px;">
           <i class="bi bi-chat-left-text" style="font-size:13px;color:var(--accent-text-soft);"></i>
@@ -480,14 +494,18 @@ function buildSelect(name, items, labelFn, valKey, placeholder){
   return s;
 }
 
-/* ── Mise à jour bouton Enregistrer (activation si lignes présentes) ── */
-function majBtnFacture(){
-  var rows = document.querySelectorAll('#lignes-body tr.ligne-row');
-  var btn  = document.getElementById('btn-facture-comb');
-  if(btn){
-    btn.disabled = rows.length === 0;
-    btn.classList.toggle('btn-facture-comb--disabled', rows.length === 0);
-  }
+/* ── Boutons d'enregistrement : actifs seulement s'il y a une ligne ──
+   Le serveur refuse déjà un soin sans ligne (soins.views._has_at_least_one_ligne),
+   mais les deux boutons annonçaient le contraire : on cliquait, on repartait
+   avec un message d'erreur. Ils visaient un id « btn-facture-comb » absent de
+   ce gabarit — le garde `if (btn)` avalait l'appel sans rien dire. */
+function majBoutonsEnregistrer(){
+  var vide  = document.querySelectorAll('#lignes-body tr.ligne-row').length === 0;
+  var titre = vide ? "Ajoutez au moins une ligne de soin" : '';
+  document.querySelectorAll('.sh-btn-save, #btn-enregistrer').forEach(function(btn){
+    btn.disabled = vide;
+    btn.title = titre;
+  });
 }
 
 function majBtnConfirmer(){
@@ -573,7 +591,7 @@ function ajouterLigne(initial){
      TomSelect lit la valeur du <select> au moment où il s'installe. */
   if (window.initFieldUlSelects) window.initFieldUlSelects(tr);
 
-  majBtnFacture();
+  majBoutonsEnregistrer();
   majBtnConfirmer();
 }
 
@@ -581,7 +599,7 @@ function supprimerLigne(btn){
   var tr = btn.closest('tr');
   tr.remove();
   lignesCount = Math.max(0, lignesCount - 1);
-  majBtnFacture();
+  majBoutonsEnregistrer();
   majBtnConfirmer();
 }
 
@@ -761,7 +779,7 @@ function makeDrop(cfg) {
     var qnav = document.querySelector('.art-quick-nav--incard');
     if (qnav) qnav.classList.toggle('has-patient', !!patId);
 
-    majBtnFacture();
+    majBoutonsEnregistrer();
     majBtnConfirmer();
     if (window.majQnavLinks) window.majQnavLinks(patId);
   });
@@ -785,7 +803,7 @@ document.querySelectorAll('.art-tab-btn').forEach(function(btn){
 
 
 /* ── Init ── */
-majBtnFacture();
+majBoutonsEnregistrer();
 majBtnConfirmer();
 
 /* ── Pré-remplissage des lignes en mode édition ── */

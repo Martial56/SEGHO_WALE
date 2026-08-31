@@ -8,8 +8,14 @@
 <style>
   .det-page { width: 100%; padding: 12px 20px 48px; display: flex; align-items: flex-start; gap: 14px; }
   .det-main  { flex: 1; min-width: 0; }
-  /* Historique (.hist-aside) : styles globaux dans base.html — s'aligne
-     naturellement avec .det-main (tous deux enfants flex de .det-page). */
+  /* Historique (.hist-aside) : styles globaux dans base.html. Le `top: 70px`
+     par défaut y est calibré pour un défilement de fenêtre ; ici le conteneur
+     défilant est .content, qui commence déjà sous l'en-tête fixe. La contrainte
+     collante s'appliquait donc dès le premier affichage et poussait le panneau
+     22 px plus bas que la colonne de gauche. Ramené à 0 : aligné au repos, et
+     au défilement il s'arrête 12 px sous le sous-en-tête. Même correctif que
+     soins/procedure/detail.html et soins/procedure/form.html. */
+  .hist-aside { top: 0 !important; }
   @media (max-width: 900px) { .det-page { flex-direction: column; } }
 
   /* ── CARTE HEADER ── */
@@ -479,7 +485,14 @@
             </td>
             <td style="white-space:nowrap;font-size:12px;">{{ proc.date|date:"d/m/Y" }}</td>
             <td>
-              <span class="badge-statut {% if soin.statut == 'brouillon' %}badge-brouillon{% elif soin.statut == 'en_attente_de_paiement' %}badge-en-attente{% elif soin.statut == 'en_cours' %}badge-en-cours{% elif soin.statut == 'termine' %}badge-termine{% elif soin.statut == 'annule' %}badge-annule{% endif %}">{{ soin.get_statut_display }}</span>
+              {% comment %}
+                L'état de la LIGNE, pas celui du dossier : la colonne lisait
+                soin.statut, si bien que les trois lignes affichaient la même
+                valeur et qu'administrer une seule procédure ne changeait rien
+                ici. ProcedureSoin n'a pas d'état « en attente de paiement » —
+                quatre états contre cinq — d'où l'absence de cette branche.
+              {% endcomment %}
+              <span class="badge-statut {% if proc.statut == 'brouillon' %}badge-brouillon{% elif proc.statut == 'en_cours' %}badge-en-cours{% elif proc.statut == 'termine' %}badge-termine{% elif proc.statut == 'annule' %}badge-annule{% endif %}">{{ proc.get_statut_display }}</span>
             </td>
             <td style="white-space:nowrap;">
               {% if proc.facture %}

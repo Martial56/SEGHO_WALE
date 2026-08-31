@@ -27,7 +27,13 @@ def get_actions_disponibles(hosp, user):
     """
     from facturation.models import Facture
 
-    su = user.is_superuser or user.is_staff
+    # is_superuser seul. `is_staff` ne dit qu'une chose — « peut ouvrir
+    # /admin/ » — et n'a rien d'un droit métier : huit comptes le portaient sans
+    # aucune permission d'hospitalisation, et cette branche leur ouvrait toutes
+    # les transitions. Ce n'était pas qu'un bouton mal affiché : check_action
+    # passe ici, donc le serveur acceptait réellement la décharge, la
+    # confirmation, l'installation et l'annulation.
+    su = user.is_superuser
     # Calculée avant la branche superuser : la facture MEO payée avant de
     # confirmer est une règle financière qui s'applique à tout le monde, y
     # compris aux superusers (contrairement aux autres règles métier).

@@ -1,6 +1,8 @@
 from django.contrib import admin
-from .models import Acte, Facture, LigneFacture, Paiement
+
 from centres.admin import ModeleCentreAdmin
+
+from .models import Acte, Facture, LigneFacture, Paiement
 
 
 @admin.register(Acte)

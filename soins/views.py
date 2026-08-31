@@ -21,14 +21,6 @@ from core.views import log_event, get_logs
 from patients.selecteur import patient_affiche
 
 
-_STATUT_PROCEDURE_MAP = {
-    'brouillon': 'brouillon',
-    'en_cours':  'en_cours',
-    'termine':   'termine',
-    'annule':    'annule',
-}
-
-
 def _has_at_least_one_ligne(post_data):
     """Retourne True si au moins une ligne de soin valide (patient + service) existe."""
     for key, value in post_data.items():
@@ -94,6 +86,24 @@ def _save_procedures_from_lignes(soin, post_data, user=None):
             statut='brouillon',
             cree_par=user,
         )
+
+
+def _patient_impose(request):
+    """Patient imposé par l'écran d'origine — fiche patient, rendez-vous…
+
+    Arrivé par `?patient_id=`, il n'y a rien à choisir : le soin appartient à ce
+    dossier-là. Le formulaire reposte alors `patient_verrouille`, ce qui fait
+    survivre le verrou à un renvoi — la chaîne de requête, elle, a disparu.
+    """
+    pk = request.GET.get('patient_id') or ''
+    if not pk and request.POST.get('patient_verrouille') == '1':
+        pk = request.POST.get('patient') or ''
+    if not pk:
+        return None
+    try:
+        return Patient.objects.get(pk=pk)
+    except (Patient.DoesNotExist, ValueError, TypeError):
+        return None
 
 
 def _patient_counts(patient):
@@ -342,7 +352,9 @@ def soins_create(request):
                     return render(request, 'soins/form.html', {
                         'form': form, 'is_new': True,
                         'counts': {'rdv': 0, 'examens': 0, 'analyses': 0},
-                        'procedures_json': '[]', **extras,
+                        'procedures_json': '[]',
+                        'patient_impose': _patient_impose(request),
+                        **extras,
                     })
                 soin.statut = 'en_attente_de_paiement'
             else:
@@ -355,17 +367,13 @@ def soins_create(request):
         form = SoinForm()
 
     extras = _form_extras()
-    patient_id = request.GET.get('patient_id', '')
     initial = {}
     counts = {'rdv': 0, 'examens': 0, 'analyses': 0}
-    if patient_id:
-        try:
-            pat = Patient.objects.get(pk=patient_id)
-            initial['patient'] = pat
-            c = _patient_counts(pat)
-            counts = {'rdv': c['rdv'], 'examens': c['analyses'] + c['imageries'], 'analyses': c['analyses']}
-        except Patient.DoesNotExist:
-            pass
+    patient_impose = _patient_impose(request)
+    if patient_impose:
+        initial['patient'] = patient_impose
+        c = _patient_counts(patient_impose)
+        counts = {'rdv': c['rdv'], 'examens': c['analyses'] + c['imageries'], 'analyses': c['analyses']}
     if initial and request.method == 'GET':
         form = SoinForm(initial=initial)
     return render(request, 'soins/form.html', {
@@ -373,6 +381,7 @@ def soins_create(request):
         'is_new': True,
         'counts': counts,
         'procedures_json': '[]',
+        'patient_impose': patient_impose,
         **extras,
     })
 
@@ -924,6 +933,14 @@ def soin_facturer(request, pk):
     from facturation.models import Facture, LigneFacture
     from django.urls import reverse
 
+    # Même garde que soins_creer_facture : les deux routes créent une facture,
+    # les deux doivent exiger la permission. Sans cela, la restreindre sur un
+    # groupe ne servait à rien — l'autre URL restait ouverte à tout compte
+    # connecté, et créait la facture sur un simple GET.
+    if not request.user.has_perm('soins.can_creer_facture'):
+        messages.error(request, "Vous n'avez pas la permission de créer une facture.")
+        return redirect('soins:detail', pk=pk)
+
     soin = get_object_or_404(
         Soin.objects.select_related('patient'), pk=pk
     )
@@ -973,6 +990,12 @@ def soin_facturer(request, pk):
 def procedure_facturer(request, pk):
     from facturation.models import Facture, LigneFacture
     from django.urls import reverse
+
+    # Voir soin_facturer : la permission doit valoir sur toutes les routes qui
+    # créent une facture, pas seulement sur celle du soin.
+    if not request.user.has_perm('soins.can_creer_facture'):
+        messages.error(request, "Vous n'avez pas la permission de créer une facture.")
+        return redirect('soins:procedure_detail', pk=pk)
 
     proc = get_object_or_404(
         ProcedureSoin.objects.select_related('patient', 'soin_type', 'facture'), pk=pk
