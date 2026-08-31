@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import User
 
+from centres.models import ModeleCentre
+
 
 class Acte(models.Model):
     code = models.CharField(max_length=50, unique=True)
@@ -13,7 +15,7 @@ class Acte(models.Model):
     class Meta: verbose_name = "Acte médical"
 
 
-class Facture(models.Model):
+class Facture(ModeleCentre):
     STATUT = [('brouillon','Brouillon'),('emise','Émise'),('payee','Payée'),('annulee','Annulée')]
     TYPE = [('consultation','Consultation'),('soins','Soins'),('hospitalisation','Hospitalisation'),('pharmacie','Pharmacie'),('laboratoire','Laboratoire'),('imagerie','Imagerie'),('autre','Autre')]
 
@@ -46,9 +48,12 @@ class Facture(models.Model):
             now = timezone.now()
             annee = now.year
             date_part = now.strftime('%y%m%d')
-            count = Facture.objects.count() + 1
+            # all_objects : le numéro reste unique tous centres confondus. Le
+            # compter sur `objects`, cloisonné, redonnerait un numéro déjà pris
+            # dans l'autre centre.
+            count = Facture.all_objects.count() + 1
             numero = f"VTES/{annee}/{date_part}{count:04d}"
-            while Facture.objects.filter(numero=numero).exists():
+            while Facture.all_objects.filter(numero=numero).exists():
                 count += 1
                 numero = f"VTES/{annee}/{date_part}{count:04d}"
             self.numero = numero
@@ -68,7 +73,7 @@ class Facture(models.Model):
         return self.montant_total
 
     def __str__(self): return f"Facture {self.numero}"
-    class Meta:
+    class Meta(ModeleCentre.Meta):
         verbose_name = "Facture"
         ordering = ['-date_emission']
         permissions = [
@@ -90,7 +95,7 @@ class LigneFacture(models.Model):
         return self.quantite * self.prix_unitaire * (1 - self.remise / 100)
 
 
-class Paiement(models.Model):
+class Paiement(ModeleCentre):
     MODE = [('especes','Espèces'),('cheque','Chèque'),('mobile_money','Mobile Money'),('virement','Virement'),('assurance','Assurance'),('bon','Bon')]
 
     numero = models.CharField(max_length=20, unique=True, editable=False)
@@ -107,12 +112,14 @@ class Paiement(models.Model):
             from django.utils import timezone
             annee = timezone.now().year
             prefix = f"PAI{annee}"
-            last = Paiement.objects.filter(numero__startswith=prefix).order_by('-pk').first()
+            # all_objects : voir Facture.save — le numéro est unique tous
+            # centres confondus.
+            last = Paiement.all_objects.filter(numero__startswith=prefix).order_by('-pk').first()
             count = (int(last.numero[len(prefix):]) + 1) if last else 1
             self.numero = f"{prefix}{count:07d}"
         super().save(*args, **kwargs)
 
     def __str__(self): return f"Paiement {self.numero} - {self.montant} F"
-    class Meta:
+    class Meta(ModeleCentre.Meta):
         verbose_name = "Paiement"
         ordering = ['-date_paiement']
