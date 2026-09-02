@@ -1562,6 +1562,10 @@ def gynecologie_rdv_detail(request, pk):
         import logging; logging.getLogger(__name__).warning('facture_payee check failed: %s', _e)
         facture_payee = False
 
+    # Une fois confirmé et facturé, le département et le type de consultation
+    # ne doivent plus pouvoir être modifiés (la facture est déjà émise dessus).
+    locked_billing = facture_payee and rdv.statut != 'planifie'
+
     consultation = None
     constante = None
     try:
@@ -1675,7 +1679,7 @@ def gynecologie_rdv_detail(request, pk):
             return redirect('gynecologie_rdv')
 
         # Sauvegarde normale du formulaire
-        form = RendezVousForm(request.POST, instance=rdv)
+        form = RendezVousForm(request.POST, instance=rdv, locked_billing=locked_billing)
         if form.is_valid():
             rdv = form.save(commit=False)
             code = request.POST.get('code_confirmation', '').strip()
@@ -1713,7 +1717,7 @@ def gynecologie_rdv_detail(request, pk):
                 return redirect(reverse('facture_create') + f'?patient={rdv.patient.pk}&rdv={rdv.pk}')
             return redirect('gynecologie_rdv_detail', pk=rdv.pk)
     else:
-        form = RendezVousForm(instance=rdv)
+        form = RendezVousForm(instance=rdv, locked_billing=locked_billing)
 
     # Navigation précédent/suivant dans la liste gynécologie
     qs_pks = list(_rdv_gyn_qs().values_list('pk', flat=True))

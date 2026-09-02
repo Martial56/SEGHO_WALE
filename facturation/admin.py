@@ -25,15 +25,15 @@ class PaiementInline(admin.TabularInline):
 
 @admin.register(Facture)
 class FactureAdmin(ModeleCentreAdmin):
-    list_display = ['numero', 'patient', 'type_facture', 'montant_total', 'montant_paye', 'solde_restant', 'statut', 'date_emission']
+    list_display = ['numero', 'patient', 'centre', 'type_facture', 'montant_total', 'montant_paye', 'solde_restant', 'statut', 'date_emission']
     search_fields = ['numero', 'patient__nom', 'patient__prenoms']
-    list_filter = ['statut', 'type_facture']
+    list_filter = ['statut', 'type_facture', 'centre']
     readonly_fields = ['numero', 'date_emission']
     inlines = [LigneFactureInline, PaiementInline]
 
 
 @admin.register(Paiement)
-class PaiementAdmin(admin.ModelAdmin):
-    list_display = ['numero', 'facture', 'montant', 'mode_paiement', 'date_paiement']
-    list_filter = ['mode_paiement']
+class PaiementAdmin(ModeleCentreAdmin):
+    list_display = ['numero', 'facture', 'centre', 'montant', 'mode_paiement', 'date_paiement']
+    list_filter = ['mode_paiement', 'centre']
     readonly_fields = ['numero', 'date_paiement']

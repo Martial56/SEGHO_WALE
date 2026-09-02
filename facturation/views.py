@@ -34,7 +34,7 @@ def facturation_list(request):
     date_from_s = request.GET.get('date_from', '').strip()
     date_to_s   = request.GET.get('date_to', '').strip()
 
-    qs = Facture.objects.select_related('patient').order_by('-date_emission')
+    qs = Facture.objects.select_related('patient', 'centre').order_by('-date_emission')
 
     if q:
         qs = qs.filter(
@@ -289,7 +289,7 @@ def facture_create(request):
 
 @login_required(login_url='login')
 def facture_detail(request, pk):
-    facture   = get_object_or_404(Facture, pk=pk)
+    facture   = get_object_or_404(Facture.objects.select_related('centre'), pk=pk)
     lignes    = facture.lignes.all()
     paiements = facture.paiements.order_by('date_paiement') if hasattr(facture, 'paiements') else []
     logs      = get_logs(facture)

@@ -437,6 +437,7 @@
       <tr>
         <th>N° Facture</th>
         <th>Patient</th>
+        {% if request.user.is_superuser %}<th>Centre</th>{% endif %}
         <th>Type</th>
         <th>Date</th>
         <th style="text-align:right;">Total</th>
@@ -450,6 +451,7 @@
       <tr onclick="window.location='{% url 'facturation:detail' facture.pk %}'" style="cursor:pointer;">
         <td class="td-num">{{ facture.numero }}</td>
         <td class="td-patient">{{ facture.patient.nom }} {{ facture.patient.prenoms }}</td>
+        {% if request.user.is_superuser %}<td><span class="badge-type">{{ facture.centre.nom|default:"—" }}</span></td>{% endif %}
         <td><span class="badge-type">{{ facture.get_type_facture_display }}</span></td>
         <td style="color:var(--text-muted);white-space:nowrap;font-size:12px;">{{ facture.date_emission|date:"d/m/Y" }}</td>
         <td class="td-montant">{{ facture.montant_total|floatformat:0|intcomma }} F</td>
@@ -460,7 +462,7 @@
         <td><span class="badge-statut badge-{{ facture.statut }}">{{ facture.get_statut_display }}</span></td>
       </tr>
       {% empty %}
-      <tr><td colspan="8" style="text-align:center;padding:48px 20px;color:var(--text-muted);font-size:13px;">
+      <tr><td colspan="{% if request.user.is_superuser %}9{% else %}8{% endif %}" style="text-align:center;padding:48px 20px;color:var(--text-muted);font-size:13px;">
         {% if q or filters or dates_explicites %}Aucune facture pour ces critères.
         {% else %}Aucune facture pour aujourd'hui — <a href="#" onclick="showAllDates(); return false;" style="color:var(--accent-text-soft);">voir toutes les dates</a>.{% endif %}
       </td></tr>
