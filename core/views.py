@@ -2047,8 +2047,9 @@ def post_note(request):
     return redirect(next_url)
 
 
-def log_event(instance, user, message, type='note'):
+def log_event(instance, user, message, type='note', duree_secondes=None, module=None):
     from django.contrib.contenttypes.models import ContentType
+    from core.middleware import get_current_ip
     from core.models import LogActivite
     ct = ContentType.objects.get_for_model(instance)
     LogActivite.objects.create(
@@ -2057,6 +2058,9 @@ def log_event(instance, user, message, type='note'):
         user=user if user and user.is_authenticated else None,
         message=message,
         type=type,
+        ip_address=get_current_ip(),
+        duree_secondes=duree_secondes,
+        module=module if module else ct.app_label,
     )
 
 

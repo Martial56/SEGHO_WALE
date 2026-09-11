@@ -1,0 +1,78 @@
+{% extends 'guide/base.html' %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'guide/includes/book_css.html' %}
+<style>
+.gd-cover-titre { font-size: 27px; font-weight: 700; text-align: center; letter-spacing: .4px; margin-bottom: 4px; }
+.gd-cover-sub { font-size: 13px; text-align: center; color: var(--gd-ink-soft); font-style: italic; margin-bottom: 8px; }
+.gd-cover-rule { width: 70px; height: 2px; background: var(--gd-accent); margin: 18px auto 28px; opacity: .55; }
+
+.gd-toc-section { margin-bottom: 22px; }
+.gd-toc-section-titre {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; font-weight: 700;
+  color: var(--gd-accent); margin-bottom: 8px;
+}
+.gd-toc-row {
+  display: flex; align-items: baseline; gap: 6px; text-decoration: none; color: var(--gd-ink);
+  padding: 5px 2px; font-size: 14.5px;
+}
+.gd-toc-row:hover { color: var(--gd-accent); }
+.gd-toc-icon { color: var(--gd-accent); font-size: 12px; width: 18px; text-align: center; flex-shrink: 0; }
+.gd-toc-nom { white-space: nowrap; }
+.gd-toc-leader { flex: 1; border-bottom: 1px dotted var(--gd-paper-line); position: relative; top: -4px; margin: 0 4px; }
+.gd-toc-page { font-variant-numeric: tabular-nums; color: var(--gd-ink-soft); font-size: 12.5px; }
+
+.gd-toc-footer {
+  text-align: center; margin-top: 26px; padding-top: 14px;
+  border-top: 1px solid var(--gd-paper-line); font-size: 11.5px; color: var(--gd-ink-soft);
+}
+
+.gd-page-num {
+  position: absolute; bottom: 16px; right: 44px;
+  font-size: 10.5px; color: var(--gd-ink-soft); font-variant-numeric: tabular-nums;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+{% if toc_precedent %}{% url 'guide:hub' toc_precedent as href_precedent %}{% else %}{% url 'guide:couverture' as href_precedent %}{% endif %}
+{% if toc_suivant %}{% url 'guide:hub' toc_suivant as href_suivant %}{% else %}{% url 'guide:page' 1 as href_suivant %}{% endif %}
+{% include 'guide/includes/zoom_nav.html' %}
+
+<div class="gd-book-wrap">
+  <div class="gd-page gd-zoomable">
+    {% if toc_numero == 1 %}
+    <div class="gd-cover-titre">Guide d'utilisation</div>
+    <div class="gd-cover-sub">SEGHO-WALE — Centre Médico-Social WALÉ</div>
+    <div class="gd-cover-rule"></div>
+    {% else %}
+    <div class="gd-cover-titre" style="font-size:16px;">Sommaire (suite)</div>
+    <div class="gd-cover-rule"></div>
+    {% endif %}
+
+    {% for section in sections %}
+    <div class="gd-toc-section">
+      {% if section.nom %}<div class="gd-toc-section-titre">{{ section.nom }}</div>{% endif %}
+      {% for entry in section.categories %}
+      <a href="{% url 'guide:page' entry.page %}" class="gd-toc-row">
+        <span class="gd-toc-icon"><i class="bi {{ entry.obj.icone }}"></i></span>
+        <span class="gd-toc-nom">{{ entry.obj.nom }}</span>
+        <span class="gd-toc-leader"></span>
+        <span class="gd-toc-page">{{ entry.page }}</span>
+      </a>
+      {% endfor %}
+    </div>
+    {% endfor %}
+
+    <div class="gd-toc-footer">
+      {{ total_pages }} pages
+      {% if toc_total > 1 %} — Sommaire {{ toc_numero }}/{{ toc_total }}{% endif %}
+    </div>
+
+    <div class="gd-page-num">{{ toc_numero_romain }}</div>
+  </div>
+</div>
+
+{% include 'guide/includes/keynav.html' %}
+{% endblock %}
