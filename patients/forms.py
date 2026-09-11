@@ -154,7 +154,7 @@ class PatientForm(forms.ModelForm):
 class RendezVousForm(forms.ModelForm):
     class Meta:
         model = RendezVous
-        fields = ['patient', 'departement', 'medecin', 'type_consultation', 'date_heure', 'motif', 'statut', 'notes']
+        fields = ['patient', 'departement', 'medecin', 'type_consultation', 'date_heure', 'motif', 'notes']
         widgets = {
             'patient': forms.Select(attrs={'class': _ul, 'id': 'id_patient'}),
             'departement': forms.Select(attrs={'class': _ul}),
@@ -164,7 +164,6 @@ class RendezVousForm(forms.ModelForm):
                 attrs={'class': _ul, 'type': 'datetime-local'},
                 format='%Y-%m-%dT%H:%M',
             ),
-            'statut': forms.Select(attrs={'class': _ul}),
             'motif': forms.Textarea(attrs={
                 'class': _ul, 'rows': 3, 'placeholder': 'Motif de la visite...',
             }),
@@ -173,7 +172,7 @@ class RendezVousForm(forms.ModelForm):
             }),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, locked_billing=False, **kwargs):
         from services.models import Articleservice
         from medecins.models import Departement, Medecin
         super().__init__(*args, **kwargs)
@@ -182,6 +181,12 @@ class RendezVousForm(forms.ModelForm):
         self.fields['departement'].queryset = Departement.objects.filter(actif=True).order_by('nom')
         self.fields['departement'].empty_label = '— Choisir un département —'
         self.fields['departement'].required = False
+        if locked_billing:
+            # Une fois le rendez-vous confirmé et facturé, le département et le
+            # type de consultation ne doivent plus changer : la facture a déjà
+            # été émise sur cette base.
+            self.fields['departement'].disabled = True
+            self.fields['type_consultation'].disabled = True
 
         medecin_qs = Medecin.objects.filter(actif=True).select_related('employe').order_by('employe__nom', 'employe__prenoms')
         self.fields['medecin'].queryset = medecin_qs

@@ -695,6 +695,10 @@ def rdv_edit(request, pk):
     except Exception:
         facture_payee = False
 
+    # Une fois confirmé et facturé, le département et le type de consultation
+    # ne doivent plus pouvoir être modifiés (la facture est déjà émise dessus).
+    locked_billing = facture_payee and rdv.statut != 'planifie'
+
     # Consultation + constante liées à ce RDV
     consultation = None
     constante = None
@@ -833,7 +837,7 @@ def rdv_edit(request, pk):
             messages.success(request, 'Rendez-vous annulé.')
             return redirect('patients:rdv_global')
 
-        form = RendezVousForm(request.POST, instance=rdv)
+        form = RendezVousForm(request.POST, instance=rdv, locked_billing=locked_billing)
         if form.is_valid():
             rdv = form.save(commit=False)
             code = request.POST.get('code_confirmation', '').strip()
@@ -890,7 +894,7 @@ def rdv_edit(request, pk):
             from django.urls import reverse
             return redirect(reverse('patients:rdv_edit', kwargs={'pk': rdv.pk}))
     else:
-        form = RendezVousForm(instance=rdv)
+        form = RendezVousForm(instance=rdv, locked_billing=locked_billing)
 
     from patients.models import RegistreCPN, RegistreAccouchement, RegistrePostnatale, RegistreCuratif
     def _get_reg(Model):

@@ -48,7 +48,7 @@ class Facture(ModeleCentre):
             now = timezone.now()
             annee = now.year
             date_part = now.strftime('%y%m%d')
-            # all_objects : le numéro est unique tous centres confondus. Le
+            # all_objects : le numéro reste unique tous centres confondus. Le
             # compter sur `objects`, cloisonné, redonnerait un numéro déjà pris
             # dans l'autre centre.
             count = Facture.all_objects.count() + 1
@@ -95,7 +95,7 @@ class LigneFacture(models.Model):
         return self.quantite * self.prix_unitaire * (1 - self.remise / 100)
 
 
-class Paiement(models.Model):
+class Paiement(ModeleCentre):
     MODE = [('especes','Espèces'),('cheque','Chèque'),('mobile_money','Mobile Money'),('virement','Virement'),('assurance','Assurance'),('bon','Bon')]
 
     numero = models.CharField(max_length=20, unique=True, editable=False)
@@ -112,12 +112,14 @@ class Paiement(models.Model):
             from django.utils import timezone
             annee = timezone.now().year
             prefix = f"PAI{annee}"
-            last = Paiement.objects.filter(numero__startswith=prefix).order_by('-pk').first()
+            # all_objects : voir Facture.save — le numéro est unique tous
+            # centres confondus.
+            last = Paiement.all_objects.filter(numero__startswith=prefix).order_by('-pk').first()
             count = (int(last.numero[len(prefix):]) + 1) if last else 1
             self.numero = f"{prefix}{count:07d}"
         super().save(*args, **kwargs)
 
     def __str__(self): return f"Paiement {self.numero} - {self.montant} F"
-    class Meta:
+    class Meta(ModeleCentre.Meta):
         verbose_name = "Paiement"
         ordering = ['-date_paiement']
