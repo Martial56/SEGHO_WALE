@@ -1,7 +1,9 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
 from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, permission_required
+
+from modules_permissions.decorateurs import module_requis
 from django.views.decorators.http import require_POST
 from django.contrib import messages
 from patients.models import TypeVisiteCurative as _TypeVisiteCurative
@@ -1149,11 +1151,13 @@ def laboratoire_bulletin(request, pk):
 
 
 @login_required(login_url='login')
+@module_requis('gynecologie')
 def gynecologie_naissance_create(request):
     return _gynecologie_naissance_fiche(request, None)
 
 
 @login_required(login_url='login')
+@module_requis('gynecologie')
 def gynecologie_naissance_detail(request, pk):
     """Fiche d'une naissance déjà enregistrée.
 
@@ -1245,6 +1249,7 @@ def _gynecologie_naissance_fiche(request, naissance):
 
 
 @login_required(login_url='login')
+@module_requis('gynecologie')
 def gynecologie_registre_naissance(request):
     """Registre des naissances.
 
@@ -1486,6 +1491,8 @@ def _rdv_form_post(request, rdv):
 
 
 @login_required(login_url='login')
+@permission_required('patients.add_rendezvous', raise_exception=True)
+@module_requis('gynecologie')
 def gynecologie_rdv_create(request):
     from patients.forms import RendezVousForm
     from medecins.models import Medecin
@@ -1545,6 +1552,7 @@ def gynecologie_rdv_create(request):
 
 
 @login_required(login_url='login')
+@module_requis('gynecologie')
 def gynecologie_rdv_detail(request, pk):
     from patients.forms import RendezVousForm
     from patients.models import RendezVous
@@ -1770,6 +1778,7 @@ def gynecologie_rdv_detail(request, pk):
 
 
 @login_required(login_url='login')
+@module_requis('gynecologie')
 def gynecologie_demarrer_consultation(request, pk):
     from patients.models import RendezVous
     from consultations.models import Consultation
@@ -1802,6 +1811,7 @@ def gynecologie_demarrer_consultation(request, pk):
 
 
 @login_required(login_url='login')
+@module_requis('gynecologie')
 def gynecologie_rdv(request):
     """Liste des rendez-vous de gynécologie.
 
@@ -1897,6 +1907,7 @@ def gynecologie_rdv(request):
                         empty_sub='Aucun rendez-vous gynécologique enregistré.')
 
 @login_required(login_url='login')
+@module_requis('gynecologie')
 def gynecologie_rdv_set_statut(request, pk):
     from patients.models import RendezVous
     STATUTS = ('planifie', 'confirme', 'en_attente', 'en_consultation', 'termine', 'annule', 'absent')
@@ -1911,6 +1922,7 @@ def gynecologie_rdv_set_statut(request, pk):
 
 
 @login_required(login_url='login')
+@module_requis('gynecologie')
 def gynecologie_rdv_bulk(request):
     from patients.models import RendezVous
     if request.method == 'POST':
@@ -1924,6 +1936,7 @@ def gynecologie_rdv_bulk(request):
 
 
 @login_required(login_url='login')
+@module_requis('gynecologie')
 def gynecologie_list(request):
     """Liste des patientes suivies en gynécologie.
 

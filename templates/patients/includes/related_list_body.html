@@ -26,7 +26,12 @@
         </thead>
         <tbody>
         {% for rdv in items %}
-            <tr data-url="{% url 'patients:rdv_edit' rdv.pk %}">
+            {% comment %}
+            url_fiche est posée par patients.views._render_related_list : elle
+            mène en gynécologie ou dans le module Rendez-vous selon le
+            département de la ligne et les accès du lecteur.
+            {% endcomment %}
+            <tr data-url="{{ rdv.url_fiche }}">
                 <td>{{ rdv.date_heure|date:"d/m/Y à H:i" }}</td>
                 <td>{{ rdv.departement.nom|default:"—" }}</td>
                 <td>{{ rdv.motif|truncatechars:60 }}</td>
@@ -77,6 +82,40 @@
                 </td>
             </tr>
             {% endwith %}
+        {% endfor %}
+        </tbody>
+    </table>
+    {% comment %}
+    Onglet Consultations. Il n'existe pas de page de détail par consultation
+    (seule /consultations/ liste l'ensemble), donc les lignes ne portent pas de
+    data-url et ne sont pas cliquables.
+    {% endcomment %}
+    {% elif view_type == 'consultation' %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>N°</th>
+                <th>Date / heure</th>
+                <th>Motif</th>
+                <th>Médecin</th>
+                <th>Statut</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for cons in items %}
+            <tr>
+                <td><code style="font-size:12px; color:var(--accent-text-soft);">{{ cons.numero }}</code></td>
+                <td>{{ cons.date_heure|date:"d/m/Y à H:i:s" }}</td>
+                <td>{{ cons.motif|truncatechars:60|default:"—" }}</td>
+                <td>{% if cons.medecin %}{{ cons.medecin.nom }}{% else %}<span style="color:var(--text-faint)">—</span>{% endif %}</td>
+                <td>
+                    <span class="badge
+                        {% if cons.statut == 'en_cours' %}badge-encours
+                        {% elif cons.statut == 'termine' %}badge-termine
+                        {% elif cons.statut == 'annule' %}badge-annule
+                        {% endif %}">{{ cons.get_statut_display }}</span>
+                </td>
+            </tr>
         {% endfor %}
         </tbody>
     </table>
