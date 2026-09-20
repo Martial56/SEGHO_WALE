@@ -28,11 +28,20 @@ def _render_related_list(request, context):
     # l'utilisatrice dans le module Patients.
     ctx_origine = origines_patient.contexte(request)
 
+    # Un dossier ancien porte des centaines de lignes — rendez-vous,
+    # consultations, actes. Les sept onglets rendaient le jeu entier d'un bloc :
+    # tout en mémoire, tout dans la page. Une coupe sèche aux N derniers aurait
+    # rendu le reste invisible sans le dire, ce qui ne va pas sur un dossier
+    # médical — on pagine donc, et rien n'est perdu.
+    page = Paginator(context.get('items') or [], 10).get_page(request.GET.get('page'))
+    context = {**context, 'items': page, 'page_obj': page}
+
     # Chaque ligne de rendez-vous porte sa propre destination : gynécologie ou
     # module Rendez-vous, selon son département et les accès du lecteur. Calculé
     # ici, une fois, plutôt que dans le gabarit (voir patients.rdv_destination).
+    # Sur la page affichée seulement, et non sur tout le jeu.
     if context.get('view_type') == 'rdv':
-        for rdv in context.get('items') or []:
+        for rdv in page:
             rdv.url_fiche = url_fiche_rdv(request.user, rdv, ctx_origine['origine_qs'])
 
     return render(request, template, {**context, **ctx_origine})

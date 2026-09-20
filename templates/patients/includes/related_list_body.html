@@ -1,10 +1,10 @@
 <div class="rl-body">
     <div class="rl-toolbar">
         <span class="rl-count">
-            <strong>{{ items|length }}</strong>
+            <strong>{{ page_obj.paginator.count }}</strong>
             <span class="rl-count-label">{{ titre|lower }}</span>
         </span>
-        {% if view_type == 'rdv' %}
+        {% if view_type == 'rdv' and perms.patients.add_rendezvous %}
         <a href="{% url 'patients:rdv_create' %}?patient={{ patient.pk }}" class="rl-btn-create">
             <i class="bi bi-plus-lg"></i> Nouveau rendez-vous
         </a>
@@ -275,6 +275,46 @@
     <div class="empty-state">
         <div class="es-icon">📋</div>
         <div class="es-msg">Aucun enregistrement trouvé</div>
+    </div>
+    {% endif %}
+
+    {% comment %}
+      Les liens portent `{% templatetag openblock %} querystring {% templatetag closeblock %}`,
+      qui reconduit la chaîne de requête en cours : la provenance (`?origine=`)
+      survit donc au changement de page.
+
+      Ce bloc vit dans le fragment et non dans la page : les onglets le
+      remplacent par AJAX, et une pagination restée à l'extérieur annoncerait
+      les pages de l'onglet précédent.
+    {% endcomment %}
+    {% if page_obj.has_other_pages %}
+    <div class="rl-pagination">
+        <span>Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}</span>
+        <div class="rl-pagination-pages">
+            {% if page_obj.has_previous %}
+                <a class="rl-page-link" href="{% querystring page=1 %}" title="Première">«</a>
+                <a class="rl-page-link" href="{% querystring page=page_obj.previous_page_number %}" title="Précédente">‹</a>
+            {% else %}
+                <span class="disabled">«</span>
+                <span class="disabled">‹</span>
+            {% endif %}
+
+            {% for num in page_obj.paginator.page_range %}
+                {% if num == page_obj.number %}
+                    <span class="current">{{ num }}</span>
+                {% elif num >= page_obj.number|add:"-2" and num <= page_obj.number|add:"2" %}
+                    <a class="rl-page-link" href="{% querystring page=num %}">{{ num }}</a>
+                {% endif %}
+            {% endfor %}
+
+            {% if page_obj.has_next %}
+                <a class="rl-page-link" href="{% querystring page=page_obj.next_page_number %}" title="Suivante">›</a>
+                <a class="rl-page-link" href="{% querystring page=page_obj.paginator.num_pages %}" title="Dernière">»</a>
+            {% else %}
+                <span class="disabled">›</span>
+                <span class="disabled">»</span>
+            {% endif %}
+        </div>
     </div>
     {% endif %}
 
