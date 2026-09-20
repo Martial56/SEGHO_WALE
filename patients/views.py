@@ -713,7 +713,9 @@ def rdv_create(request):
             from django.urls import reverse
             return redirect(reverse('facture_create') + f'?patient={rdv.patient.pk}&rdv={rdv.pk}')
     else:
-        initial = {'date_heure': timezone.now().strftime('%Y-%m-%dT%H:%M')}
+        # Avec les secondes : le champ les accepte depuis qu'il porte `step=1`,
+        # et une valeur initiale tronquée les remettrait à zéro.
+        initial = {'date_heure': timezone.now().strftime('%Y-%m-%dT%H:%M:%S')}
         patient_pk = request.GET.get('patient')
         patient_obj = None
         if patient_pk:

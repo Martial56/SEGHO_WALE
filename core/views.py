@@ -1518,7 +1518,9 @@ def gynecologie_rdv_create(request):
         from medecins.models import Departement
         gyn_departement = Departement.objects.filter(code='GYN').first()
         form = RendezVousForm(initial={
-            'date_heure': timezone.now().strftime('%Y-%m-%dT%H:%M'),
+            # Avec les secondes, comme patients.views.rdv_create : le champ
+            # les accepte depuis qu'il porte `step=1`.
+            'date_heure': timezone.now().strftime('%Y-%m-%dT%H:%M:%S'),
             'departement': gyn_departement.pk if gyn_departement else None,
         })
 

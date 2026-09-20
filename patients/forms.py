@@ -160,9 +160,13 @@ class RendezVousForm(forms.ModelForm):
             'departement': forms.Select(attrs={'class': _ul}),
             'medecin': DepartementFiltreSelect(attrs={'class': _ul}),
             'type_consultation': DepartementFiltreSelect(attrs={'class': _ul}),
+            # `step=1` ouvre les secondes : sans lui le sélecteur du
+            # navigateur s'arrête à la minute et enregistre toujours « :00 ».
+            # La lecture n'a pas besoin d'être élargie — forms.DateTimeField
+            # passe d'abord par parse_datetime, qui lit l'ISO 8601 complet.
             'date_heure': forms.DateTimeInput(
-                attrs={'class': _ul, 'type': 'datetime-local'},
-                format='%Y-%m-%dT%H:%M',
+                attrs={'class': _ul, 'type': 'datetime-local', 'step': '1'},
+                format='%Y-%m-%dT%H:%M:%S',
             ),
             'motif': forms.Textarea(attrs={
                 'class': _ul, 'rows': 3, 'placeholder': 'Motif de la visite...',

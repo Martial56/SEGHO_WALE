@@ -54,7 +54,11 @@ def _parse_date_ligne(date_str):
     """Date d'une ligne du tableau, à défaut l'instant présent."""
     if not date_str:
         return timezone.now()
-    for fmt in ('%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M', '%Y-%m-%d'):
+    # Les secondes d'abord : le champ les poste depuis qu'il porte `step=1`.
+    # Les formats sans seconde restent en second rang pour les valeurs déjà
+    # enregistrées et les navigateurs qui ignoreraient `step`.
+    for fmt in ('%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M',
+                '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M', '%Y-%m-%d'):
         try:
             return timezone.make_aware(datetime.strptime(date_str, fmt))
         except ValueError:
@@ -536,7 +540,7 @@ def soins_edit(request, pk):
             'service':      p.soin_type_id,
             'prix':         float(p.prix),
             'infirmier':    p.infirmier_id,
-            'date':         p.date.strftime('%Y-%m-%dT%H:%M') if p.date else '',
+            'date':         p.date.strftime('%Y-%m-%dT%H:%M:%S') if p.date else '',
             'statut':       p.statut,
         }
         for p in procedures_qs
