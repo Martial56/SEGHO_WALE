@@ -34,7 +34,7 @@ REGISTRES = {
 }
 
 
-#: Onglet « CPN » → registre_cpn.donnees (96 champs)
+#: Onglet « CPN » → registre_cpn.donnees (97 champs)
 CHAMPS_CPN = [
     # Antécédents
     ('cpn_avortements', 'Avortements', 'nombre_json', ()),
@@ -92,6 +92,7 @@ CHAMPS_CPN = [
     ('cpn_date_prochain_rdv', 'Date du prochain RDV', 'date_json', ()),
     ('cpn_etat_nutritionnel', 'Etat nutritionnel', 'choix', (('bon', 'Bon'), ('moyen', 'Moyen'), ('mauvais', 'Mauvais'))),
     ('cpn_examens_echo', 'Examens échographiques ou radiologiques', 'texte', ()),
+    ('cpn_gestion_risque', 'Gestion du risque', 'choix', (('revoir', 'À revoir'), ('referer', 'À référer'), ('hospitaliser', 'À hospitaliser'))),
     ('cpn_hu', 'H.U.', 'texte', ()),
     ('cpn_methode_souhaitee', 'Méthode souhaitée', 'choix', (('condom', 'Condom'), ('pilule', 'Pilule'), ('diu', 'DIU'), ('injectable', 'Injectable'), ('implant', 'Implant'), ('sterilisation', 'Stérilisation'))),
     ('cpn_po', 'P.O.', 'texte', ()),

@@ -1019,6 +1019,7 @@
             <div class="cpn-row"><span class="cpn-lbl">Conseil PF</span><input type="checkbox" name="cpn_conseil_pf" value="1" class="editable" style="width:15px;height:15px;accent-color:var(--teal-600);"></div>
             <div class="cpn-row"><span class="cpn-lbl">Méthode souhaitée</span><select name="cpn_methode_souhaitee" class="cpn-sel editable"><option value=""></option><option value="condom">Condom</option><option value="pilule">Pilule</option><option value="diu">DIU</option><option value="injectable">Injectable</option><option value="implant">Implant</option><option value="sterilisation">Stérilisation</option></select></div>
             <div class="cpn-row"><span class="cpn-lbl">Résultat consultation</span><div class="cpn-radios"><label><input type="radio" name="cpn_resultat_consultation" value="normale" class="editable"> Gross. normale</label><label><input type="radio" name="cpn_resultat_consultation" value="risque" class="editable"> Gross. à risque</label></div></div>
+            <div class="cpn-row" id="cpn_gestion_risque_row" style="display:none;"><span class="cpn-lbl">Gestion du risque</span><select name="cpn_gestion_risque" class="cpn-sel editable"><option value=""></option><option value="revoir">À revoir</option><option value="referer">À référer</option><option value="hospitaliser">À hospitaliser</option></select></div>
             <div class="cpn-row"><span class="cpn-lbl">Conseil santé sexuelle et reproductive</span><select name="cpn_conseil_sante_sexuelle" class="cpn-sel editable"><option value=""></option><option value="oui">Oui</option><option value="non">Non</option></select></div>
             <div class="cpn-row"><span class="cpn-lbl">Examens échographiques ou radiologiques</span><input type="text" name="cpn_examens_echo" class="cpn-inp editable"></div>
             <div class="cpn-row"><span class="cpn-lbl">Conseil nutritionnel</span><div class="cpn-radios"><label><input type="radio" name="cpn_conseil_nutritionnel" value="oui" class="editable"> Oui</label><label><input type="radio" name="cpn_conseil_nutritionnel" value="non" class="editable"> Non</label></div></div>
@@ -1682,6 +1683,22 @@
         if (row) row.style.display = (val === 'autre') ? '' : 'none';
     }
 
+    /* ── Résultat consultation CPN : afficher/masquer « Gestion du risque » ── */
+    document.querySelectorAll('input[name="cpn_resultat_consultation"]').forEach(function (radio) {
+        radio.addEventListener('change', function () {
+            var row = document.getElementById('cpn_gestion_risque_row');
+            if (!row) return;
+            var arisque = this.checked && this.value === 'risque';
+            row.style.display = arisque ? '' : 'none';
+            /* Une conduite ne doit pas survivre au retour en grossesse normale :
+               sinon le JSON garderait « À hospitaliser » sur une CPN sans risque. */
+            if (!arisque) {
+                var sel = row.querySelector('select');
+                if (sel) sel.value = '';
+            }
+        });
+    });
+
     /* ── Onglets ── */
     document.querySelectorAll('.tab-btn').forEach(function (btn) {
         btn.addEventListener('click', function () {
@@ -2232,6 +2249,14 @@ html[data-theme="dark"] .em-btn-link{color:var(--teal-300);}
   preremplir('_reg_acc');
   preremplir('_reg_post');
   preremplir('_reg_cur');
+
+  /* Afficher « Gestion du risque » si la grossesse chargée est à risque */
+  (function () {
+    var row = document.getElementById('cpn_gestion_risque_row');
+    if (!row) return;
+    var coche = document.querySelector('input[name="cpn_resultat_consultation"]:checked');
+    row.style.display = (coche && coche.value === 'risque') ? '' : 'none';
+  })();
 })();
 </script>
 
