@@ -2,7 +2,7 @@ import json
 import re
 from datetime import datetime
 from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth.decorators import login_required, permission_required, user_passes_test
 
 _staff_required = user_passes_test(lambda u: u.is_staff, login_url='login')
 from django.contrib import messages
@@ -12,6 +12,7 @@ from django.utils import timezone
 from django.contrib.auth.models import User
 from .models import Soin, ProcedureSoin
 from .forms import SoinForm, ProcedureSoinForm
+from .regles import cloturer_si_procedures_terminees
 from patients.models import RendezVous, Patient
 from patients.models import Pathologie
 from laboratoire.models import AnalyseLaboratoire, ExamenImagerie
@@ -30,8 +31,12 @@ def _has_at_least_one_ligne(post_data):
 
 
 def _sync_procedures(soin, statut):
-    """Synchronise le statut de toutes les procédures du soin."""
-    soin.procedures.all().update(statut=statut)
+    """Aligne les lignes du soin sur ce statut.
+
+    Les lignes annulées sont laissées de côté : une annulation est une décision
+    prise ligne par ligne, terminer le dossier n'a pas à l'effacer.
+    """
+    soin.procedures.exclude(statut='annule').update(statut=statut)
 
 
 def _parse_prix(val):
@@ -45,9 +50,44 @@ def _parse_prix(val):
         return 0
 
 
+def _parse_date_ligne(date_str):
+    """Date d'une ligne du tableau, à défaut l'instant présent."""
+    if not date_str:
+        return timezone.now()
+    for fmt in ('%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M', '%Y-%m-%d'):
+        try:
+            return timezone.make_aware(datetime.strptime(date_str, fmt))
+        except ValueError:
+            pass
+    return timezone.now()
+
+
+def _statut_apres_enregistrement(statut_initial, action):
+    """Le formulaire ne fait jamais redescendre un dossier.
+
+    Le statut ne bouge qu'au départ, depuis le brouillon : « Enregistrer »
+    l'envoie à la caisse, une sauvegarde simple le laisse en brouillon. Au-delà
+    il est rendu tel quel.
+
+    Sans ce garde-fou, rouvrir le formulaire — ne serait-ce que pour désigner un
+    infirmier oublié — renvoyait un soin déjà facturé ET payé en « en attente de
+    paiement ». La facture existant déjà, aucune autre ne pouvait être créée et
+    le bouton « Administrer » avait disparu : le dossier restait bloqué.
+    """
+    if statut_initial != 'brouillon':
+        return statut_initial
+    return 'en_attente_de_paiement' if action == 'enregistrer' else 'brouillon'
+
+
 def _save_procedures_from_lignes(soin, post_data, user=None):
-    """Supprime les anciennes procédures liées à ce soin puis recrée depuis les lignes du POST."""
-    ProcedureSoin.objects.filter(soin=soin).delete()
+    """Aligne les lignes du soin sur ce que poste le formulaire.
+
+    Mise à jour en place, et non suppression puis recréation : une ligne porte
+    son statut, sa facture et son numéro `DP`. Tout effacer pour tout recréer
+    ramenait chaque ligne en brouillon, coupait le lien vers la facture déjà
+    réglée et brûlait une série de numéros à chaque enregistrement. Le gabarit
+    reposte donc le `pk` de chaque ligne existante.
+    """
     lignes = {}
     for key, value in post_data.items():
         m = re.match(r'^lignes\[(\d+)\]\[(\w+)\]$', key)
@@ -56,36 +96,48 @@ def _save_procedures_from_lignes(soin, post_data, user=None):
             if idx not in lignes:
                 lignes[idx] = {}
             lignes[idx][field] = value
+
+    existantes = {p.pk: p for p in ProcedureSoin.objects.filter(soin=soin)}
+    conservees = set()
+
     for ligne in lignes.values():
         patient_id = ligne.get('patient') or None
         if not patient_id:
             continue
-        service_id  = ligne.get('service')   or None
+        service_id = ligne.get('service') or None
         if not service_id:
             continue
-        infirmier_id = ligne.get('infirmier') or None
-        date_str    = ligne.get('date')       or None
-        prix_raw    = ligne.get('prix', '0')
-        prix = _parse_prix(prix_raw)
-        date = timezone.now()
-        if date_str:
-            for fmt in ('%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M', '%Y-%m-%d'):
-                try:
-                    date = timezone.make_aware(datetime.strptime(date_str, fmt))
-                    break
-                except ValueError:
-                    pass
-        ProcedureSoin.objects.create(
-            soin=soin,
-            patient_id=patient_id,
-            infirmier_id=infirmier_id,
-            soin_type_id=service_id,
-            departement=soin.departement,
-            prix=prix,
-            date=date,
-            statut='brouillon',
-            cree_par=user,
-        )
+        champs = {
+            'patient_id': patient_id,
+            'infirmier_id': ligne.get('infirmier') or None,
+            'soin_type_id': service_id,
+            'departement': soin.departement,
+            'prix': _parse_prix(ligne.get('prix', '0')),
+            'date': _parse_date_ligne(ligne.get('date') or None),
+        }
+        try:
+            pk = int(ligne.get('pk') or 0)
+        except (TypeError, ValueError):
+            pk = 0
+        proc = existantes.get(pk)
+        if proc is None:
+            ProcedureSoin.objects.create(
+                soin=soin, statut='brouillon', cree_par=user, **champs)
+            continue
+        for nom, valeur in champs.items():
+            setattr(proc, nom, valeur)
+        proc.modifie_par = user
+        proc.date_modification = timezone.now()
+        proc.save()
+        conservees.add(proc.pk)
+
+    # Une ligne retirée du tableau disparaît — sauf si elle est déjà engagée.
+    # Facturée ou sortie du brouillon, elle a une contrepartie ailleurs (une
+    # ligne de facture, un acte tracé) que le formulaire n'a pas à effacer.
+    for pk, proc in existantes.items():
+        if pk in conservees or proc.facture_id or proc.statut != 'brouillon':
+            continue
+        proc.delete()
 
 
 def _patient_impose(request):
@@ -129,6 +181,7 @@ def _form_extras():
 
 
 @login_required(login_url='login')
+@permission_required('soins.view_soin', raise_exception=True)
 def soins_patient_counts(request):
     from django.http import JsonResponse
     patient_id = request.GET.get('patient_id', '').strip()
@@ -147,6 +200,7 @@ def soins_patient_counts(request):
 
 
 @login_required(login_url='login')
+@permission_required('soins.view_soin', raise_exception=True)
 def soins_list(request):
     """Liste des soins infirmiers.
 
@@ -283,6 +337,7 @@ def soins_list(request):
 
 
 @login_required(login_url='login')
+@permission_required('soins.view_soin', raise_exception=True)
 def soins_detail(request, pk):
     soin = get_object_or_404(
         Soin.objects.select_related(
@@ -324,6 +379,17 @@ def soins_detail(request, pk):
             request.user.has_perm('soins.can_creer_facture')
         )
     )
+    peut_modifier = (
+        request.user.has_perm('soins.change_soin') and
+        (soin.statut == 'brouillon' or request.user.is_superuser)
+    )
+    # Une fois la facture réglée, l'annulation relève de l'administration :
+    # il y a un encaissement en face que ce bouton ne rembourse pas.
+    peut_annuler = (
+        soin.statut not in ('termine', 'annule') and
+        request.user.has_perm('soins.change_soin') and
+        (soin.statut != 'en_cours' or request.user.is_superuser)
+    )
     return render(request, 'soins/detail.html', {
         'soin': soin,
         'counts': counts,
@@ -333,11 +399,16 @@ def soins_detail(request, pk):
         'peut_administrer': peut_administrer,
         'peut_creer_facture': peut_creer_facture,
         'peut_voir_facture': peut_voir_facture,
+        'peut_modifier': peut_modifier,
+        'peut_annuler': peut_annuler,
+        # Sélecteurs d'infirmier de la colonne, ouverts par « Administrer ».
+        'employes': Employe.objects.order_by('nom', 'prenoms'),
         'logs': get_logs(soin),
     })
 
 
 @login_required(login_url='login')
+@permission_required('soins.add_soin', raise_exception=True)
 def soins_create(request):
     if request.method == 'POST':
         form = SoinForm(request.POST, request.FILES)
@@ -387,8 +458,13 @@ def soins_create(request):
 
 
 @login_required(login_url='login')
+@permission_required('soins.change_soin', raise_exception=True)
 def soins_edit(request, pk):
     soin = get_object_or_404(Soin, pk=pk)
+    # Relevé avant que le formulaire ne réinjecte le champ caché `statut` :
+    # c'est l'état réellement enregistré qui décide de ce qu'on a le droit
+    # d'écrire ensuite (voir _statut_apres_enregistrement).
+    statut_initial = soin.statut
 
     # Dossier auto-géré par une hospitalisation
     hosp_warning = None
@@ -416,17 +492,15 @@ def soins_edit(request, pk):
             soin.modifie_par = request.user
             soin.date_modification = timezone.now()
             action = request.POST.get('action', 'save')
+            soin.statut = _statut_apres_enregistrement(statut_initial, action)
             if action == 'enregistrer':
                 if not _has_at_least_one_ligne(request.POST):
                     messages.error(request, "Ajoutez au moins une ligne de soin avant d'enregistrer.")
                 else:
-                    soin.statut = 'en_attente_de_paiement'
                     soin.save()
                     log_event(soin, request.user, 'Soin modifié.', type='modif')
                     _save_procedures_from_lignes(soin, request.POST, user=request.user)
                     return redirect('soins:detail', pk=soin.pk)
-            else:
-                soin.statut = 'brouillon'
             soin.save()
             log_event(soin, request.user, 'Soin modifié.', type='modif')
             _save_procedures_from_lignes(soin, request.POST, user=request.user)
@@ -453,6 +527,10 @@ def soins_edit(request, pk):
 
     procedures_json = json.dumps([
         {
+            # Reposté par le gabarit en champ caché : c'est lui qui permet de
+            # retrouver la ligne et de la modifier en place plutôt que de la
+            # recréer (voir _save_procedures_from_lignes).
+            'pk':           p.pk,
             'patient':      p.patient_id,
             'patient_code': p.patient.code_patient if p.patient else '',
             'service':      p.soin_type_id,
@@ -477,7 +555,12 @@ def soins_edit(request, pk):
 
 @login_required(login_url='login')
 def soins_administrer(request, pk):
-    """Marque le soin comme terminé (dispensé). Réservé au groupe Soins."""
+    """Termine le soin et consigne qui a réalisé chaque ligne.
+
+    Réservé à `soins.can_administrer_soin`. La désignation des infirmiers se
+    fait ici parce que c'est le seul moment où l'information est certaine —
+    voir le bloc « Qui a réalisé chaque ligne » plus bas.
+    """
     if not request.user.has_perm('soins.can_administrer_soin'):
         messages.error(request, "Vous n'avez pas la permission d'administrer un soin.")
         return redirect('soins:detail', pk=pk)
@@ -500,13 +583,73 @@ def soins_administrer(request, pk):
     elif not soin.facture or soin.facture.statut != 'payee':
         messages.error(request, "La facture doit être payée avant d'administrer le soin.")
         return redirect('soins:detail', pk=pk)
+    # ── Qui a réalisé chaque ligne ──
+    # L'infirmier se désigne ici, au moment de l'acte : c'est le seul instant où
+    # l'information est certaine. Le faire passer par « Modifier » obligeait à
+    # rouvrir un dossier déjà facturé — patient, prix et lignes compris — pour
+    # renseigner une seule colonne, et renvoyait le soin en attente de paiement.
+    a_renseigner = list(soin.procedures.exclude(statut__in=('termine', 'annule')))
+    choix = {}
+    for proc in a_renseigner:
+        try:
+            choix[proc.pk] = int((request.POST.get('infirmier_%s' % proc.pk) or '').strip())
+        except (TypeError, ValueError):
+            messages.error(request, "Désignez l'infirmier de chaque ligne avant d'administrer le soin.")
+            return redirect('soins:detail', pk=pk)
+    connus = set(Employe.objects.filter(pk__in=set(choix.values())).values_list('pk', flat=True))
+    if set(choix.values()) - connus:
+        messages.error(request, "Infirmier inconnu sur l'une des lignes.")
+        return redirect('soins:detail', pk=pk)
+
+    for proc in a_renseigner:
+        proc.infirmier_id = choix[proc.pk]
+        proc.modifie_par = request.user
+        proc.date_modification = timezone.now()
+        proc.save(update_fields=['infirmier', 'modifie_par', 'date_modification'])
+
+    champs = ['statut', 'termine_par', 'date_termine']
+    # L'infirmier responsable du dossier, s'il n'a jamais été désigné.
+    if soin.infirmier_id is None and a_renseigner:
+        soin.infirmier_id = choix[a_renseigner[0].pk]
+        champs.append('infirmier')
     soin.statut = 'termine'
     soin.termine_par = request.user
     soin.date_termine = timezone.now()
-    soin.save(update_fields=['statut', 'termine_par', 'date_termine'])
+    soin.save(update_fields=champs)
     log_event(soin, request.user, 'Soin administré — statut : Terminé.', type='statut')
     _sync_procedures(soin, 'termine')
     messages.success(request, f"Soin de {soin.patient} marqué comme terminé.")
+    return redirect('soins:detail', pk=pk)
+
+
+@login_required(login_url='login')
+def soins_annuler(request, pk):
+    """Annule un dossier de soins et ses lignes encore ouvertes.
+
+    Le statut « Annulé » existait dans le modèle sans qu'aucun écran ne
+    l'écrive : un dossier ouvert par erreur restait là indéfiniment.
+    """
+    if not request.user.has_perm('soins.change_soin'):
+        messages.error(request, "Vous n'avez pas la permission d'annuler un soin.")
+        return redirect('soins:detail', pk=pk)
+    if request.method != 'POST':
+        return redirect('soins:detail', pk=pk)
+    soin = get_object_or_404(Soin, pk=pk)
+    if soin.statut in ('termine', 'annule'):
+        messages.error(request, "Ce soin ne peut plus être annulé.")
+        return redirect('soins:detail', pk=pk)
+    # Passé « en cours », il y a un encaissement en face qu'annuler le dossier
+    # ne rembourse pas : la décision remonte à l'administration.
+    if soin.statut == 'en_cours' and not request.user.is_superuser:
+        messages.error(request, "Ce soin est déjà payé : son annulation relève de l'administration.")
+        return redirect('soins:detail', pk=pk)
+    soin.statut = 'annule'
+    soin.modifie_par = request.user
+    soin.date_modification = timezone.now()
+    soin.save(update_fields=['statut', 'modifie_par', 'date_modification'])
+    log_event(soin, request.user, 'Soin annulé.', type='statut')
+    soin.procedures.exclude(statut__in=('termine', 'annule')).update(statut='annule')
+    messages.success(request, f"Soin de {soin.patient} annulé.")
     return redirect('soins:detail', pk=pk)
 
 
@@ -595,6 +738,7 @@ def _procedure_extras():
 
 
 @login_required(login_url='login')
+@permission_required('soins.view_proceduresoin', raise_exception=True)
 def procedure_list(request):
     """Liste des soins (procédures).
 
@@ -722,6 +866,7 @@ def _auto_creer_facture(proc, user):
 
 
 @login_required(login_url='login')
+@permission_required('soins.add_proceduresoin', raise_exception=True)
 def procedure_create(request):
     if request.method == 'POST':
         form = ProcedureSoinForm(request.POST)
@@ -754,6 +899,7 @@ def procedure_create(request):
 
 
 @login_required(login_url='login')
+@permission_required('soins.view_proceduresoin', raise_exception=True)
 def procedure_detail(request, pk):
     proc = get_object_or_404(
         ProcedureSoin.objects.select_related(
@@ -769,11 +915,17 @@ def procedure_detail(request, pk):
     return render(request, 'soins/procedure/detail.html', {
         'proc': proc,
         'facture_payee': facture_payee,
+        'peut_terminer': request.user.has_perm('soins.can_administrer_soin'),
+        'peut_annuler': request.user.has_perm('soins.change_proceduresoin'),
+        'peut_modifier': request.user.has_perm('soins.change_proceduresoin'),
+        # Sélecteur d'infirmier ouvert par « Terminer ».
+        'employes': Employe.objects.order_by('nom', 'prenoms'),
         'logs': get_logs(proc),
     })
 
 
 @login_required(login_url='login')
+@permission_required('soins.change_proceduresoin', raise_exception=True)
 def procedure_edit(request, pk):
     proc = get_object_or_404(ProcedureSoin, pk=pk)
     # Même règle que soins_edit : une fiche close reste ouverte à l'administration.
@@ -814,6 +966,7 @@ def procedure_edit(request, pk):
                     _auto_creer_facture(proc, request.user)
                 else:
                     proc.save()
+            cloturer_si_procedures_terminees(proc.soin, request.user)
             return redirect('soins:procedure_detail', pk=proc.pk)
     else:
         form = ProcedureSoinForm(instance=proc, peut_tout_modifier=peut_tout_modifier)
@@ -830,21 +983,41 @@ def procedure_edit(request, pk):
 
 @login_required(login_url='login')
 def procedure_terminer(request, pk):
+    if not request.user.has_perm('soins.can_administrer_soin'):
+        messages.error(request, "Vous n'avez pas la permission d'administrer un soin.")
+        return redirect('soins:procedure_detail', pk=pk)
     proc = get_object_or_404(ProcedureSoin, pk=pk)
     if request.method == 'POST' and proc.statut == 'en_cours':
+        # Même règle que sur la fiche soin : on consigne qui a réalisé l'acte au
+        # moment de le terminer, sans repasser par le formulaire complet.
+        try:
+            emp_id = int((request.POST.get('infirmier') or '').strip())
+        except (TypeError, ValueError):
+            emp_id = None
+        if emp_id is None or not Employe.objects.filter(pk=emp_id).exists():
+            messages.error(request, "Désignez l'infirmier avant de terminer cette procédure.")
+            return redirect('soins:procedure_detail', pk=pk)
+        proc.infirmier_id = emp_id
         proc.statut = 'termine'
+        proc.modifie_par = request.user
+        proc.date_modification = timezone.now()
         proc.save()
         log_event(proc, request.user, 'Procédure terminée.', type='statut')
+        cloturer_si_procedures_terminees(proc.soin, request.user)
     return redirect('soins:procedure_detail', pk=pk)
 
 
 @login_required(login_url='login')
 def procedure_annuler(request, pk):
+    if not request.user.has_perm('soins.change_proceduresoin'):
+        messages.error(request, "Vous n'avez pas la permission d'annuler une procédure.")
+        return redirect('soins:procedure_detail', pk=pk)
     proc = get_object_or_404(ProcedureSoin, pk=pk)
     if request.method == 'POST' and proc.statut not in ('termine', 'annule'):
         proc.statut = 'annule'
         proc.save()
         log_event(proc, request.user, 'Procédure annulée.', type='statut')
+        cloturer_si_procedures_terminees(proc.soin, request.user)
     return redirect('soins:procedure_detail', pk=pk)
 
 

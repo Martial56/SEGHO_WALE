@@ -150,6 +150,8 @@
 
   /* Tableau soins */
   .det-table-wrap { overflow-x: auto; }
+  /* Repliée au départ : c'est « Administrer » qui l'ouvre. */
+  .adm-saisie { display: none; min-width: 170px; }
   .det-table {
     width: 100%; border-collapse: collapse; font-size: 12.5px;
   }
@@ -293,7 +295,7 @@
 
       <!-- Actions droite -->
       <div class="det-action-btns">
-        {% if soin.statut == 'brouillon' or request.user.is_superuser %}
+        {% if peut_modifier %}
         <a href="{% url 'soins:edit' soin.pk %}" class="det-btn det-btn-edit" style="text-decoration:none;">
           <i class="bi bi-pencil"></i> Modifier
         </a>
@@ -315,10 +317,24 @@
         </a>
         {% endif %}
         {% if peut_administrer %}
-        <form method="post" action="{% url 'soins:administrer' soin.pk %}" style="display:inline;">
+        {% comment %}
+          Le bouton n'envoie plus directement : il ouvre la colonne « Infirmier »
+          du tableau des soins apportés, où l'on désigne qui a réalisé chaque
+          ligne. C'est la validation de ce tableau qui termine le soin.
+          Avant, désigner un infirmier obligeait à rouvrir « Modifier » — donc
+          tout le dossier, prix compris — sur un soin déjà facturé et payé.
+        {% endcomment %}
+        <button type="button" class="det-btn" id="btn-administrer"
+                style="background:var(--primary);color:#fff;">
+          <i class="bi bi-check-circle-fill"></i> Administrer
+        </button>
+        {% endif %}
+        {% if peut_annuler %}
+        <form method="post" action="{% url 'soins:annuler' soin.pk %}" style="display:inline;"
+              onsubmit="return confirm('Annuler ce soin ? Ses lignes encore ouvertes seront annulées.');">
           {% csrf_token %}
-          <button type="submit" class="det-btn" style="background:var(--primary);color:#fff;">
-            <i class="bi bi-check-circle-fill"></i> Administrer
+          <button type="submit" class="det-btn det-btn-delete">
+            <i class="bi bi-x-circle"></i> Annuler le soin
           </button>
         </form>
         {% endif %}
@@ -461,6 +477,12 @@
       </span>
       {% endif %}
     </div>
+    {% comment %}
+      Le tableau est lui-même le formulaire d'administration : « Administrer »
+      ouvre la colonne « Infirmier » ici plutôt que d'ouvrir un autre écran.
+    {% endcomment %}
+    <form method="post" action="{% url 'soins:administrer' soin.pk %}" id="form-administration">
+    {% csrf_token %}
     <div class="det-table-wrap">
       <table class="det-table">
         <thead>
@@ -481,9 +503,37 @@
             <td style="font-size:12px;color:var(--text-muted);">{{ proc.soin_type.nom|default:"—" }}</td>
             <td style="white-space:nowrap;font-size:12px;">{{ proc.prix|floatformat:0 }} CFA</td>
             <td style="font-size:12px;color:var(--text-muted);">
-              {% if proc.infirmier %}{{ proc.infirmier.nom }} {{ proc.infirmier.prenoms }}{% else %}—{% endif %}
+              <span class="adm-lecture">{% if proc.infirmier %}{{ proc.infirmier.nom }} {{ proc.infirmier.prenoms }}{% else %}—{% endif %}</span>
+              {% if peut_administrer and proc.statut != 'termine' and proc.statut != 'annule' %}
+              {% comment %}
+                `field-ul` : la liste passe par le composant partagé
+                (includes/_tomselect.html), comme celles du formulaire de soin.
+                Une liste native ouverte est dessinée par le navigateur, pas par
+                la page — elle ignore le thème de l'application et n'offre
+                aucune recherche, ce qui est intenable sur 400 employés.
+
+                `data-ts-body` : le tableau défile (`overflow-x:auto`), qui
+                rognerait une liste rendue à l'intérieur.
+
+                Pas de `required` : TomSelect masque le select d'origine sans
+                lui retirer l'attribut, et le navigateur refuse alors l'envoi
+                d'un formulaire dont il ne peut pas cibler le champ fautif. Le
+                contrôle est fait plus bas en JS, et de nouveau côté serveur.
+
+                `disabled` tant que la colonne est repliée : un champ désactivé
+                n'est pas posté.
+              {% endcomment %}
+              <span class="adm-saisie">
+                <select name="infirmier_{{ proc.pk }}" class="adm-select field-ul" data-ts-body disabled>
+                  <option value="">— Infirmier —</option>
+                  {% for e in employes %}
+                  <option value="{{ e.pk }}" {% if proc.infirmier_id == e.pk %}selected{% endif %}>{{ e.nom }} {{ e.prenoms }}</option>
+                  {% endfor %}
+                </select>
+              </span>
+              {% endif %}
             </td>
-            <td style="white-space:nowrap;font-size:12px;">{{ proc.date|date:"d/m/Y" }}</td>
+            <td style="white-space:nowrap;font-size:12px;">{{ proc.date|date:"d/m/Y H:i" }}</td>
             <td>
               {% comment %}
                 L'état de la LIGNE, pas celui du dossier : la colonne lisait
@@ -518,6 +568,24 @@
         </tbody>
       </table>
     </div>
+    {% if peut_administrer %}
+    <div id="barre-administration"
+         style="display:none;align-items:center;gap:12px;flex-wrap:wrap;
+                margin-top:14px;padding:12px 16px;border:1px solid var(--border-strong);
+                border-radius:8px;background:var(--surface-muted);">
+      <span style="font-size:12.5px;color:var(--text-muted);flex:1;min-width:200px;">
+        <i class="bi bi-info-circle"></i>
+        Désignez l'infirmier de chaque ligne, puis validez : le soin passera à « Terminé ».
+      </span>
+      <button type="button" id="btn-annuler-administration" class="det-btn det-btn-retour">
+        <i class="bi bi-x"></i> Annuler
+      </button>
+      <button type="submit" class="det-btn" style="background:var(--primary);color:#fff;">
+        <i class="bi bi-check-circle-fill"></i> Valider et terminer le soin
+      </button>
+    </div>
+    {% endif %}
+    </form>
   </div>
 
 </div><!-- /.det-main -->
@@ -530,4 +598,76 @@
 </div><!-- /#page-wrap -->
 </div>
 </div>
+
+{% if peut_administrer %}
+{# Avant le script ci-dessous : il réveille les listes déroulantes à l'ouverture. #}
+{% include 'includes/_tomselect.html' %}
+<script>
+/* « Administrer » ouvre la colonne « Infirmier » du tableau des soins apportés
+   au lieu d'envoyer tout de suite : on désigne qui a réalisé chaque ligne, et
+   c'est cette validation qui termine le soin. Une seule action, un seul écran,
+   et plus aucune raison de rouvrir un dossier déjà facturé. */
+(function(){
+  var btn = document.getElementById('btn-administrer');
+  var form = document.getElementById('form-administration');
+  if(!btn || !form) return;
+  var barre = document.getElementById('barre-administration');
+
+  /* `select.adm-select` et non `.adm-select` : TomSelect recopie les classes du
+     <select> sur son enveloppe (voir includes/_tomselect.html), si bien que le
+     sélecteur ramenait aussi un <div>, sans `.value` ni `.disabled`. Le contrôle
+     d'envoi le prenait pour une ligne non renseignée et refusait de valider
+     alors que l'infirmier était bien choisi.
+
+     TomSelect a par ailleurs remplacé le select par son propre contrôle : lui
+     poser `disabled` directement ne ferait plus rien. */
+  function activer(sel, actif){
+    if(sel.tomselect){ actif ? sel.tomselect.enable() : sel.tomselect.disable(); }
+    else { sel.disabled = !actif; }
+  }
+
+  function basculer(ouvert){
+    form.querySelectorAll('.adm-saisie').forEach(function(zone){
+      zone.style.display = ouvert ? 'block' : 'none';
+      var sel = zone.querySelector('select.adm-select');
+      if(sel) activer(sel, ouvert);
+    });
+    form.querySelectorAll('.adm-lecture').forEach(function(txt){
+      /* Seules les lignes qui portent un sélecteur passent en saisie : une
+         ligne déjà terminée ou annulée garde son texte. */
+      if(txt.parentNode.querySelector('.adm-saisie')) txt.style.display = ouvert ? 'none' : '';
+    });
+    if(barre) barre.style.display = ouvert ? 'flex' : 'none';
+    btn.style.display = ouvert ? 'none' : '';
+  }
+
+  btn.addEventListener('click', function(){
+    basculer(true);
+    /* Les lignes étaient repliées au chargement : on installe les listes
+       maintenant qu'elles ont une largeur. L'appel est sans effet sur celles
+       déjà en place. */
+    if(window.initFieldUlSelects) window.initFieldUlSelects(form);
+    form.querySelectorAll('select.adm-select').forEach(function(sel){ activer(sel, true); });
+    var premier = form.querySelector('.adm-saisie');
+    if(premier) premier.scrollIntoView({behavior: 'smooth', block: 'center'});
+  });
+
+  var retour = document.getElementById('btn-annuler-administration');
+  if(retour) retour.addEventListener('click', function(){ basculer(false); });
+
+  /* Le contrôle que `required` aurait fait : voir le commentaire du gabarit. */
+  form.addEventListener('submit', function(evt){
+    var manquant = null;
+    form.querySelectorAll('select.adm-select').forEach(function(sel){
+      if(!sel.disabled && !sel.value && !manquant) manquant = sel;
+    });
+    if(manquant){
+      evt.preventDefault();
+      if(manquant.tomselect) manquant.tomselect.focus();
+      window.alert("Désignez l'infirmier de chaque ligne avant de terminer le soin.");
+    }
+  });
+})();
+</script>
+{% endif %}
 {% endblock %}

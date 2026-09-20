@@ -24,6 +24,7 @@ urlpatterns = [
     # Actions sur un soin
     path('<int:pk>/enregistrer/', views.soins_creer_facture, name='creer_facture'),
     path('<int:pk>/administrer/', views.soins_administrer, name='administrer'),
+    path('<int:pk>/annuler/', views.soins_annuler, name='annuler'),
 
     # Facturation depuis soins infirmiers (admin / ancien flux)
     path('<int:pk>/facturer/', views.soin_facturer, name='soin_facturer'),
