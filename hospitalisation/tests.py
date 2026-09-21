@@ -615,3 +615,247 @@ class TestLibellesDePermissionEnFrancais(TestCase):
                         content_type__app_label='hospitalisation',
                         codename=f'{action}_{modele}',
                     ).exists())
+
+
+# ─── Résumé de décharge ────────────────────────────────────────────────────────
+
+class TestResumeDecharge(TestCase):
+    """Garde sur _save_resume_decharge, via l'endpoint /decharger/.
+
+    Cet endpoint n'est plus appelé par l'écran (voir TestParcoursDecharge),
+    mais l'URL vit toujours et la garde qu'elle éprouve protège les trois
+    appelants de la fonction.
+
+    Trois formulaires enregistraient le résumé, et aucun ne portait les mêmes champs.
+
+    L'onglet « Résumé de décharge » les a tous, la modale de la fiche n'a que le
+    transfert, celle du formulaire n'a qu'une date. Écraser sans condition
+    vidait le résumé dès qu'on déchargeait depuis la fiche : diagnostic, plan de
+    sortie et instructions disparaissaient au clic sur « Confirmer la décharge ».
+    """
+
+    def setUp(self):
+        self.superuser = User.objects.create_superuser('su_resume', password='x')
+        self.client.force_login(self.superuser)
+        self.hosp = _hosp(_patient('Res'), _medecin('Res'), statut='hospitalise',
+                          chambre=_chambre())
+        self.resume = ResumeDecharge.objects.create(
+            hospitalisation=self.hosp,
+            diagnostic_decharge='Paludisme simple guéri',
+            plan_sortie='Repos 3 jours',
+            instructions='Paracétamol si fièvre',
+        )
+
+    def _recharger(self):
+        self.resume.refresh_from_db()
+        return self.resume
+
+    def _decharger(self, **donnees):
+        return self.client.post(
+            reverse('hospitalisation:decharger', kwargs={'pk': self.hosp.pk}),
+            donnees, HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+
+    def test_decharge_rapide_conserve_le_resume(self):
+        reponse = self._decharger(rd_transfert_present='1')
+        self.assertEqual(reponse.status_code, 200)
+        self.assertTrue(reponse.json()['ok'])
+        resume = self._recharger()
+        self.assertEqual(resume.diagnostic_decharge, 'Paludisme simple guéri')
+        self.assertEqual(resume.plan_sortie, 'Repos 3 jours')
+        self.assertEqual(resume.instructions, 'Paracétamol si fièvre')
+
+    def test_decharge_rapide_avec_transfert_conserve_le_resume(self):
+        self._decharger(
+            rd_transfert_present='1', rd_transfert='1',
+            rd_etablissement_destination='CHU Yamoussoukro',
+            rd_motif_reference='Plateau technique',
+        )
+        resume = self._recharger()
+        self.assertTrue(resume.transfert)
+        self.assertEqual(resume.diagnostic_decharge, 'Paludisme simple guéri')
+        self.hosp.refresh_from_db()
+        self.assertEqual(self.hosp.etablissement_destination, 'CHU Yamoussoukro')
+
+    def test_un_formulaire_sans_la_case_transfert_ne_l_efface_pas(self):
+        """La modale du formulaire n'a qu'une date : elle ne doit rien décider
+        du transfert, sinon elle annule ce que l'onglet 6 a enregistré."""
+        self.resume.transfert = True
+        self.resume.save()
+        self.hosp.etablissement_destination = 'CHU Yamoussoukro'
+        self.hosp.save(update_fields=['etablissement_destination'])
+
+        _save_resume_decharge(self.hosp, {'date_sortie_decharge': '2026-09-21'})
+
+        resume = self._recharger()
+        self.assertTrue(resume.transfert)
+        self.hosp.refresh_from_db()
+        self.assertEqual(self.hosp.etablissement_destination, 'CHU Yamoussoukro')
+
+    def test_l_onglet_resume_peut_vider_un_champ_expres(self):
+        """Un <textarea> effacé est envoyé vide : sa clé est présente, la valeur
+        doit bien être écrasée. La garde ne doit pas figer le résumé."""
+        _save_resume_decharge(self.hosp, {
+            'rd_transfert_present': '1',
+            'rd_diagnostic': '', 'rd_plan_sortie': 'Repos', 'rd_note_preop': '',
+            'rd_cours_post_op': '', 'rd_instructions': '', 'rd_registre_deces': '',
+        })
+        resume = self._recharger()
+        self.assertEqual(resume.diagnostic_decharge, '')
+        self.assertEqual(resume.plan_sortie, 'Repos')
+        self.assertEqual(resume.instructions, '')
+
+    def test_decocher_le_transfert_efface_bien_l_etablissement(self):
+        self.resume.transfert = True
+        self.resume.save()
+        self.hosp.etablissement_destination = 'CHU Yamoussoukro'
+        self.hosp.save(update_fields=['etablissement_destination'])
+
+        _save_resume_decharge(self.hosp, {'rd_transfert_present': '1'})
+
+        self.assertFalse(self._recharger().transfert)
+        self.hosp.refresh_from_db()
+        self.assertEqual(self.hosp.etablissement_destination, '')
+
+    def test_appels_repetes_donnent_le_meme_etat(self):
+        """Idempotence : hospitalisation_edit appelle la fonction deux fois."""
+        donnees = {
+            'rd_transfert_present': '1',
+            'rd_diagnostic': 'Guéri', 'rd_plan_sortie': 'Repos',
+            'rd_note_preop': '', 'rd_cours_post_op': '', 'rd_instructions': '',
+            'rd_registre_deces': '',
+        }
+        _save_resume_decharge(self.hosp, donnees)
+        premier = (self._recharger().diagnostic_decharge, self.resume.plan_sortie)
+        _save_resume_decharge(self.hosp, donnees)
+        self.assertEqual((self._recharger().diagnostic_decharge, self.resume.plan_sortie),
+                         premier)
+
+    def test_le_gabarit_declare_bien_le_temoin(self):
+        """Sans `rd_transfert_present`, la case redevient muette et le correctif
+        ne tient plus. Un seul écran porte désormais la case : l'onglet
+        « Résumé de décharge »."""
+        self.hosp.statut = 'hospitalise'
+        self.hosp.save(update_fields=['statut'])
+        page = self.client.get(
+            reverse('hospitalisation:edit', kwargs={'pk': self.hosp.pk})
+        ).content.decode()
+        self.assertIn('name="rd_transfert_present"', page)
+
+
+class TestParcoursDecharge(TestCase):
+    """« Décharger » mène à l'onglet du résumé, plus à une modale.
+
+    Trois formulaires écrivaient le même résumé et deux d'entre eux n'en
+    portaient pas les champs : ils le vidaient à chaque décharge. Il n'en reste
+    qu'un, l'onglet « Résumé de décharge », dont le bouton « Valider la
+    décharge » enregistre et décharge d'un seul geste.
+    """
+
+    def setUp(self):
+        self.hosp = _hosp(_patient('Parc'), _medecin('Parc'), statut='hospitalise',
+                          chambre=_chambre())
+
+    @staticmethod
+    def _perm(codename):
+        return Permission.objects.get(
+            codename=codename, content_type__app_label='hospitalisation')
+
+    def _utilisateur(self, nom, *codes):
+        user = User.objects.create_user(nom, password='x')
+        for code in codes:
+            user.user_permissions.add(self._perm(code))
+        self.client.force_login(user)
+        return user
+
+    def _url_edit(self):
+        return reverse('hospitalisation:edit', kwargs={'pk': self.hosp.pk})
+
+    CHAMPS = {
+        'rd_transfert_present': '1',
+        'rd_diagnostic': 'Paludisme simple guéri',
+        'rd_plan_sortie': 'Repos 3 jours',
+        'rd_instructions': 'Paracétamol si fièvre',
+        'rd_note_preop': '', 'rd_cours_post_op': '', 'rd_registre_deces': '',
+    }
+
+    def test_la_fiche_pointe_vers_l_onglet_du_resume(self):
+        self._utilisateur('u_lien', 'view_hospitalisation', 'can_decharger_patient')
+        fiche = self.client.get(
+            reverse('hospitalisation:detail', kwargs={'pk': self.hosp.pk})
+        ).content.decode()
+        self.assertIn('%s?tab=resume' % self._url_edit(), fiche)
+
+    def test_plus_aucune_modale_de_decharge(self):
+        """Elle réapparaîtrait avec le bug qu'elle portait : le résumé vidé."""
+        self._utilisateur('u_modale', 'view_hospitalisation',
+                          'change_hospitalisation', 'can_decharger_patient')
+        fiche = self.client.get(
+            reverse('hospitalisation:detail', kwargs={'pk': self.hosp.pk})
+        ).content.decode()
+        self.assertNotIn('modal-decharge', fiche)
+        self.assertNotIn('confirmDecharge', fiche)
+
+        formulaire = self.client.get(self._url_edit()).content.decode()
+        self.assertNotIn('openDechargeModal', formulaire)
+        # La modale imposait une date de sortie que le serveur n'a jamais lue :
+        # heure_sortie vient de timezone.now() dans _transition_decharger.
+        self.assertNotIn('date_sortie_decharge', formulaire)
+
+    def test_tab_resume_ouvre_le_mode_decharge_pour_les_deux_profils(self):
+        """Le paramètre valait auparavant pour le seul admin : un utilisateur
+        portant change_hospitalisation arrivait en édition normale, sans le
+        bouton de validation, et le lien de la fiche ne menait nulle part."""
+        profils = [
+            ('u_inf', ('view_hospitalisation', 'can_decharger_patient')),
+            ('u_maj', ('view_hospitalisation', 'change_hospitalisation',
+                       'can_decharger_patient')),
+        ]
+        for nom, codes in profils:
+            with self.subTest(profil=nom):
+                self._utilisateur(nom, *codes)
+                page = self.client.get(self._url_edit(), {'tab': 'resume'})
+                self.assertEqual(page.status_code, 200)
+                self.assertIn('Valider la décharge', page.content.decode())
+
+    def test_valider_enregistre_le_resume_et_decharge(self):
+        self._utilisateur('u_valide', 'view_hospitalisation', 'can_decharger_patient')
+        reponse = self.client.post(self._url_edit() + '?tab=resume', self.CHAMPS)
+        self.assertEqual(reponse.status_code, 302)
+
+        self.hosp.refresh_from_db()
+        self.assertEqual(self.hosp.statut, 'decharge')
+        self.assertIsNotNone(self.hosp.heure_sortie)
+
+        resume = ResumeDecharge.objects.get(hospitalisation=self.hosp)
+        self.assertEqual(resume.diagnostic_decharge, 'Paludisme simple guéri')
+        self.assertEqual(resume.plan_sortie, 'Repos 3 jours')
+
+    def test_aucun_champ_du_resume_n_est_obligatoire(self):
+        """Tout laisser vide décharge quand même — sauf transfert coché."""
+        self._utilisateur('u_vide2', 'view_hospitalisation', 'can_decharger_patient')
+        reponse = self.client.post(self._url_edit() + '?tab=resume',
+                                   {'rd_transfert_present': '1'})
+        self.assertEqual(reponse.status_code, 302)
+        self.hosp.refresh_from_db()
+        self.assertEqual(self.hosp.statut, 'decharge')
+
+    def test_transfert_coche_exige_etablissement_et_motif(self):
+        self._utilisateur('u_transf', 'view_hospitalisation', 'can_decharger_patient')
+        self.client.post(self._url_edit() + '?tab=resume', {
+            'rd_transfert_present': '1', 'rd_transfert': '1',
+            'rd_etablissement_destination': '', 'rd_motif_reference': '',
+        })
+        self.hosp.refresh_from_db()
+        self.assertEqual(self.hosp.statut, 'hospitalise')
+
+    def test_transfert_complet_decharge_et_enregistre_la_destination(self):
+        self._utilisateur('u_transf2', 'view_hospitalisation', 'can_decharger_patient')
+        self.client.post(self._url_edit() + '?tab=resume', {
+            'rd_transfert_present': '1', 'rd_transfert': '1',
+            'rd_etablissement_destination': 'CHU Yamoussoukro',
+            'rd_motif_reference': 'Plateau technique',
+        })
+        self.hosp.refresh_from_db()
+        self.assertEqual(self.hosp.statut, 'decharge')
+        self.assertEqual(self.hosp.etablissement_destination, 'CHU Yamoussoukro')

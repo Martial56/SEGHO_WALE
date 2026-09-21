@@ -649,36 +649,69 @@ def _save_services_a_facturer(hosp, POST):
     hosp.services_a_facturer.filter(source='manuel', facture__isnull=True).exclude(pk__in=seen).delete()
 
 
+#: Champs texte du résumé de décharge : nom du champ POST -> attribut du modèle.
+_CHAMPS_RESUME = {
+    'rd_diagnostic':    'diagnostic_decharge',
+    'rd_note_preop':    'note_preoperatoire',
+    'rd_cours_post_op': 'cours_post_operatoire',
+    'rd_plan_sortie':   'plan_sortie',
+    'rd_instructions':  'instructions',
+}
+
+
 def _save_resume_decharge(hosp, POST):
-    # Fonction idempotente : plusieurs appels avec les mêmes données POST produisent
-    # exactement le même état. get_or_create garantit l'unicité du résumé ;
-    # chaque champ est simplement écrasé avec la valeur du POST.
-    # IMPORTANT : ne pas retirer le `return` de la branche `action_decharger` dans
-    # hospitalisation_edit sans revoir ce point — le double appel est voulu.
+    """Enregistre le résumé de décharge à partir d'un POST.
+
+    Fonction idempotente : plusieurs appels avec les mêmes données POST
+    produisent exactement le même état. get_or_create garantit l'unicité du
+    résumé. IMPORTANT : ne pas retirer le `return` de la branche
+    `action_decharger` dans hospitalisation_edit sans revoir ce point — le
+    double appel est voulu.
+
+    **Seuls les champs réellement postés sont réécrits.** Trois formulaires
+    appellent cette fonction et aucun ne porte les mêmes champs : l'onglet
+    « Résumé de décharge » les a tous, la modale de la fiche n'a que le
+    transfert, celle du formulaire n'a qu'une date. Écraser sans condition
+    revenait à vider le résumé dès qu'on déchargeait depuis la fiche — un
+    diagnostic, un plan de sortie et des instructions déjà saisis
+    disparaissaient au clic sur « Confirmer la décharge ».
+
+    Un champ vidé exprès reste bien vidé : un <textarea> effacé est envoyé avec
+    une valeur vide, sa clé est donc présente. Pour la case à cocher
+    « Transfert », dont l'absence ne distingue pas « décochée » de « pas dans ce
+    formulaire », les gabarits qui la portent envoient `rd_transfert_present`.
+    """
     resume, _ = ResumeDecharge.objects.get_or_create(hospitalisation=hosp)
-    resume.transfert             = 'rd_transfert' in POST
-    resume.diagnostic_decharge   = POST.get('rd_diagnostic', '').strip()
-    resume.note_preoperatoire    = POST.get('rd_note_preop', '').strip()
-    resume.cours_post_operatoire = POST.get('rd_cours_post_op', '').strip()
-    resume.plan_sortie           = POST.get('rd_plan_sortie', '').strip()
-    resume.instructions          = POST.get('rd_instructions', '').strip()
-    rd_deces_pk = POST.get('rd_registre_deces', '').strip()
-    if rd_deces_pk:
-        try:
-            resume.registre_deces = RegistreDeces.objects.get(pk=int(rd_deces_pk))
-        except (RegistreDeces.DoesNotExist, ValueError):
-            resume.registre_deces = None
-    else:
+
+    for champ_post, attribut in _CHAMPS_RESUME.items():
+        if champ_post in POST:
+            setattr(resume, attribut, POST.get(champ_post, '').strip())
+
+    if 'rd_registre_deces' in POST:
+        rd_deces_pk = POST.get('rd_registre_deces', '').strip()
         resume.registre_deces = None
+        if rd_deces_pk:
+            try:
+                resume.registre_deces = RegistreDeces.objects.get(pk=int(rd_deces_pk))
+            except (RegistreDeces.DoesNotExist, ValueError):
+                resume.registre_deces = None
+
+    transfert_poste = 'rd_transfert_present' in POST
+    if transfert_poste:
+        resume.transfert = 'rd_transfert' in POST
     resume.save()
-    # Synchronise les champs de transfert sur l'hospitalisation elle-même
-    if resume.transfert:
-        hosp.etablissement_destination = POST.get('rd_etablissement_destination', '').strip()
-        hosp.motif_reference = POST.get('rd_motif_reference', '').strip()
-    else:
-        hosp.etablissement_destination = ''
-        hosp.motif_reference = ''
-    hosp.save(update_fields=['etablissement_destination', 'motif_reference'])
+
+    # Synchronise les champs de transfert sur l'hospitalisation elle-même.
+    # Rien à synchroniser si le formulaire ne portait pas la case : les valeurs
+    # déjà enregistrées restent en place.
+    if transfert_poste:
+        if resume.transfert:
+            hosp.etablissement_destination = POST.get('rd_etablissement_destination', '').strip()
+            hosp.motif_reference = POST.get('rd_motif_reference', '').strip()
+        else:
+            hosp.etablissement_destination = ''
+            hosp.motif_reference = ''
+        hosp.save(update_fields=['etablissement_destination', 'motif_reference'])
 
 
 def _sync_saf_from_visite(hosp, article, quantite, date_obj, source, visite_pk):
@@ -1079,10 +1112,15 @@ def hospitalisation_edit(request, pk):
     mode_soins_seuls = hosp.statut == 'hospitalise' and peut_soins and (
         tab_param == 'soins' if is_admin else (not peut_changer and not peut_decharger)
     )
-    # Mode décharge : toutes factures payées — seul l'onglet résumé de décharge est modifiable.
-    # Même logique : admin narrowé seulement via le lien "Décharger" (?tab=resume).
+    # Mode décharge : toutes factures payées — seul l'onglet résumé de décharge
+    # est modifiable. On y entre de deux façons : par le lien « Décharger » de la
+    # fiche, qui pose ?tab=resume, ou d'office pour qui n'a que le droit de
+    # décharger. Le paramètre vaut pour tout le monde et plus seulement pour
+    # l'admin : sans cela, un utilisateur portant `change_hospitalisation`
+    # arrivait en édition normale, sans le bouton « Valider la décharge », et le
+    # lien de la fiche ne menait nulle part.
     mode_decharge_seule = hosp.statut == 'hospitalise' and peut_decharger and factures_impayees == 0 and (
-        tab_param == 'resume' if is_admin else not peut_changer
+        tab_param == 'resume' or not peut_changer
     )
 
     # Vérification d'accès
@@ -1524,7 +1562,14 @@ def hospitalisation_installer(request, pk):
 
 @login_required(login_url='login')
 def hospitalisation_decharger(request, pk):
-    """hospitalise → decharge."""
+    """hospitalise → decharge.
+
+    Plus appelée par l'écran depuis que « Décharger » mène à l'onglet
+    « Résumé de décharge » : la décharge passe par hospitalisation_edit, en
+    mode_decharge_seule. Conservée comme point d'entrée serveur — elle porte le
+    même check_action et reste testée — mais ne lui ajoutez pas de logique
+    métier sans la reporter dans l'autre chemin.
+    """
     if request.method != 'POST':
         return redirect('hospitalisation:detail', pk=pk)
     hosp = get_object_or_404(Hospitalisation, pk=pk)
