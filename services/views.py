@@ -6,6 +6,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.paginator import Paginator
+from django.utils import timezone
 from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.http import require_POST
@@ -26,63 +27,93 @@ from django.contrib.auth.models import User
 
 @login_required
 def services_list(request):
-    qs = Articleservice.objects.select_related('categorie', 'famille').all()
+    """Liste des prestations.
 
-    # Filtres
+    Filtres cumulables, regroupements imbriqués et tri serveur viennent de
+    core.listing, comme les listes de soins, d'hospitalisations et de chambres.
+    Auparavant un seul `filtre` à la fois, parcouru par une chaîne de `elif` :
+    demander « Services » puis « Favoris » effaçait le premier critère, et
+    « Archivé » faisait doublon avec « Inactif ».
+    """
+    from core.listing import Listing, menu_filtres, menu_groupes, paginer_groupes
+    from .article_listing import (CHAMPS_RECHERCHE, CODES_PERIODE, FILTRES_DEFAUT,
+                                  TRIS, construire_dimensions, familles_articles,
+                                  libelle_periode)
+
+    today = timezone.now().date()
     q = request.GET.get('q', '').strip()
-    categorie_id = request.GET.get('categorie', '')
-    type_produit = request.GET.get('type_produit', '')
-    statut = request.GET.get('statut', '')
-    filtre = request.GET.get('filtre', '')
-    vue = request.GET.get('vue', 'liste')  # kanban ou liste
+    groupes = request.GET.getlist('group')
+    date_from = request.GET.get('date_from', '').strip()
+    date_to = request.GET.get('date_to', '').strip()
 
-    if q:
-        qs = qs.filter(
-            Q(nom__icontains=q) |
-            Q(reference_interne__icontains=q) |
-            Q(code_barres__icontains=q)
-        )
-    if categorie_id:
-        qs = qs.filter(categorie_id=categorie_id)
-    if type_produit:
-        qs = qs.filter(type_produit_hospitalier=type_produit)
-    if statut == 'actif':
-        qs = qs.filter(actif=True)
-    elif statut == 'inactif':
-        qs = qs.filter(actif=False)
-    if filtre == 'services':
-        qs = qs.filter(type_produit_hospitalier='service')
-    elif filtre == 'articles':
-        qs = qs.exclude(type_produit_hospitalier='service')
-    elif filtre == 'peut_etre_vendu':
-        qs = qs.filter(peut_etre_vendu=True)
-    elif filtre == 'peut_etre_achete':
-        qs = qs.filter(peut_etre_achete=True)
-    elif filtre == 'favori':
-        qs = qs.filter(favori=True)
-    elif filtre == 'avertissement':
-        qs = qs.filter(Q(avertissement_grossesse=True) | Q(avertissement_lactation=True))
-    elif filtre == 'archive':
-        qs = qs.filter(actif=False)
+    vue = request.GET.get('vue', 'liste')
+    if vue not in ('liste', 'kanban'):
+        vue = 'liste'
 
-    total = qs.count()
-    paginator = Paginator(qs, 24 if vue == 'kanban' else 40)
-    page_obj = paginator.get_page(request.GET.get('page'))
+    base_qs = Articleservice.objects.select_related(
+        'categorie', 'famille', 'compagnie_pharmaceutique', 'unite_mesure', 'departement'
+    )
 
-    categories = CategorieArticle.objects.all()
-    type_produit_choices = Articleservice.TYPE_PRODUIT_CHOICES
+    declarees = construire_dimensions()
+    listing = Listing(
+        recherche=CHAMPS_RECHERCHE,
+        familles=familles_articles(),
+        dimensions=list(declarees.values()),
+        par_page=24 if vue == 'kanban' else 40,
+        filtres_defaut=FILTRES_DEFAUT,
+        tri_defaut=('nom',),
+        tris=TRIS,
+    )
+
+    filtres = listing.filtres_demandes(request)
+    qs = listing.appliquer_recherche(base_qs, q)
+    qs = listing.appliquer_filtres(qs, filtres, {
+        'aujourdhui': today, 'date_from': date_from, 'date_to': date_to,
+    })
+    tri, tri_sens = listing.tri_demande(request)
+    qs = listing.trier(qs, groupes, tri, tri_sens)
+
+    # Le regroupement ne vaut que pour la vue liste : paginer_groupes renvoie
+    # une page de *libellés de groupe*, sur laquelle le kanban itérerait à tort.
+    if vue == 'kanban':
+        groupes = []
+
+    dims = [declarees[g] for g in groupes if g in declarees]
+    arbre = []
+    if dims:
+        arbre, page_obj, nb_groupes = paginer_groupes(qs, dims, request.GET.get('page'))
+        # La pagination porte sur les groupes : le compteur du titre doit rester
+        # celui des prestations.
+        total = qs.count()
+    else:
+        nb_groupes = 0
+        page_obj = Paginator(qs, listing.par_page).get_page(request.GET.get('page'))
+        total = page_obj.paginator.count
 
     return render(request, 'services/list.html', {
         'page_obj': page_obj,
-        'categories': categories,
-        'type_produit_choices': type_produit_choices,
-        'q': q,
-        'categorie_id': categorie_id,
-        'type_produit': type_produit,
-        'statut': statut,
-        'filtre': filtre,
-        'vue': vue,
+        'arbre': arbre,
+        'nb_groupes': nb_groupes,
         'total': total,
+        'q': q,
+        'tri': tri,
+        'tri_sens': tri_sens,
+        'filters': filtres,
+        'groups': groupes,
+        'date_from': date_from,
+        'date_to': date_to,
+        'filtre_pose': bool(filtres),
+        'selection_active': bool(q or groupes or not listing.est_selection_par_defaut(filtres)),
+        'periode_libelle': libelle_periode(filtres, date_from, date_to),
+        # Un catalogue s'ouvre entier : la mention de période n'a de sens que
+        # lorsqu'une période est réellement demandée, sinon le titre répète
+        # « tout le catalogue » en permanence.
+        'periode_active': bool(date_from or date_to or set(filtres) & set(CODES_PERIODE)),
+        # Menus générés depuis la déclaration : le gabarit ne fait que parcourir.
+        'listing_filtres': menu_filtres(listing.familles, filtres, date_from, date_to),
+        'listing_groupes': menu_groupes(list(declarees.values()), groupes),
+        'vue': vue,
+        'today': today,
     })
 
 
