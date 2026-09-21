@@ -243,7 +243,14 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
   <div id="action-bar">
     {% if edit %}
       {% if mode_decharge_seule %}
-      <button type="submit" form="hosp-form" class="abtn abtn-dark" title="Enregistrer le résumé et décharger le patient">
+      {% comment %}Un garde-fou, parce que la décharge ne se reprend pas : au
+      statut Déchargé, get_actions_disponibles cache confirmer, installer,
+      décharger et annuler — pour le superuser compris. La transition fige
+      heure_sortie, libère la chambre et synchronise le dossier de soins.
+      La modale qui jouait ce rôle a disparu avec l'ancien parcours.{% endcomment %}
+      <button type="submit" form="hosp-form" class="abtn abtn-dark"
+              title="Enregistrer le résumé et décharger le patient"
+              onclick="return confirm('Décharger le patient ? La sortie médicale sera enregistrée et ne pourra plus être annulée depuis cet écran.');">
         <i class="bi bi-door-open"></i> Valider la décharge
       </button>
       {% endif %}
