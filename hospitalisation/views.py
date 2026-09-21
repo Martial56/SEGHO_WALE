@@ -1,7 +1,8 @@
 from decimal import Decimal
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, permission_required
+from django.core.exceptions import PermissionDenied
 from django.db.models import Q
 from django.core.paginator import Paginator
 from django.http import JsonResponse
@@ -21,6 +22,7 @@ def _is_ajax(request):
 
 
 @login_required(login_url='login')
+@permission_required('hospitalisation.view_hospitalisation', raise_exception=True)
 def hospitalisation_list(request):
     """Liste des hospitalisations.
 
@@ -172,6 +174,7 @@ def _constante_to_eval_prefill(constante):
 
 
 @login_required(login_url='login')
+@permission_required('hospitalisation.add_hospitalisation', raise_exception=True)
 def hospitalisation_create(request):
     from django.utils import timezone
     from .forms import HospitalisationForm
@@ -1026,6 +1029,16 @@ def hospitalisation_creer_facture(request, pk):
     return redirect(f'{detail_url}?next={back_url}')
 
 
+#: Permissions qui ouvrent le formulaire de modification, chacune sur une partie
+#: du dossier : tout modifier, attribuer une chambre, ajouter un soin, décharger.
+#: Un `permission_required` les exigerait toutes à la fois — la vérification est
+#: donc faite dans la vue, qui narrowe ensuite ce qui est réellement modifiable.
+PERMISSIONS_EDITION = (
+    'change_hospitalisation', 'can_installer_patient',
+    'can_ajouter_soin', 'can_decharger_patient',
+)
+
+
 @login_required(login_url='login')
 def hospitalisation_edit(request, pk):
     from .forms import HospitalisationForm
@@ -1038,6 +1051,10 @@ def hospitalisation_edit(request, pk):
     from .services import get_actions_disponibles
     hosp = get_object_or_404(Hospitalisation, pk=pk)
     is_admin = request.user.is_superuser
+
+    if not (is_admin or any(request.user.has_perm('hospitalisation.%s' % code)
+                            for code in PERMISSIONS_EDITION)):
+        raise PermissionDenied
 
     # Permission de modification
     peut_changer   = is_admin or request.user.has_perm('hospitalisation.change_hospitalisation')
@@ -1412,6 +1429,7 @@ def _etat_payload(hosp, user):
 
 
 @login_required(login_url='login')
+@permission_required('hospitalisation.view_hospitalisation', raise_exception=True)
 def hospitalisation_etat(request, pk):
     """GET → JSON état courant (badge, pipeline, boutons, durée)."""
     hosp = get_object_or_404(Hospitalisation, pk=pk)
@@ -1429,6 +1447,17 @@ def hospitalisation_ajouter_soin(request, pk):
 
     if hosp.statut not in ('confirme', 'hospitalise'):
         return JsonResponse({'ok': False, 'error': "Statut incompatible."}, status=400)
+
+    # Le bouton « Ajouter un soin » est déjà masqué sans cette permission
+    # (_boutons_extra), mais l'endpoint est un POST JSON : sans ce contrôle,
+    # n'importe quel compte connecté pouvait ajouter un acte facturable au
+    # dossier en forgeant la requête.
+    if not (request.user.is_superuser
+            or request.user.has_perm('hospitalisation.can_ajouter_soin')):
+        return JsonResponse(
+            {'ok': False, 'error': "Vous n'avez pas le droit d'ajouter un soin."},
+            status=403,
+        )
 
     soin_pk = request.POST.get('soin_pk', '').strip()
     if not soin_pk:
@@ -1558,6 +1587,7 @@ def hospitalisation_annuler(request, pk):
 # ─── VUE DÉTAIL (lecture + transitions fetch) ─────────────────────────────────
 
 @login_required(login_url='login')
+@permission_required('hospitalisation.view_hospitalisation', raise_exception=True)
 def hospitalisation_detail(request, pk):
     """Détail enrichi : pipeline, actions, onglets, SAF, visites, factures, décharge (lecture seule)."""
     from facturation.models import Facture
@@ -1626,6 +1656,7 @@ def hospitalisation_detail(request, pk):
 
 
 @login_required(login_url='login')
+@permission_required('hospitalisation.view_chambre', raise_exception=True)
 def chambres_list(request):
     """Liste des chambres.
 
@@ -1691,12 +1722,14 @@ def chambres_list(request):
 
 
 @login_required(login_url='login')
+@permission_required('hospitalisation.view_chambre', raise_exception=True)
 def chambre_detail(request, pk):
     chambre = get_object_or_404(Chambre, pk=pk)
     return render(request, 'hospitalisation/chambres/detail.html', {'chambre': chambre})
 
 
 @login_required(login_url='login')
+@permission_required('hospitalisation.add_chambre', raise_exception=True)
 def chambre_create(request):
     if request.method == 'POST':
         form = ChambreForm(request.POST)
@@ -1714,6 +1747,7 @@ def chambre_create(request):
 
 
 @login_required(login_url='login')
+@permission_required('hospitalisation.change_chambre', raise_exception=True)
 def chambre_edit(request, pk):
     chambre = get_object_or_404(Chambre, pk=pk)
     if request.method == 'POST':
@@ -1758,6 +1792,7 @@ def _chambre_row(c):
 
 
 @login_required(login_url='login')
+@permission_required('hospitalisation.view_chambre', raise_exception=True)
 def chambres_export(request):
     fmt = request.GET.get('format', 'json')
     qs = Chambre.objects.order_by('salle_no')
@@ -1766,6 +1801,7 @@ def chambres_export(request):
 
 
 @login_required(login_url='login')
+@permission_required(['hospitalisation.add_chambre', 'hospitalisation.change_chambre'], raise_exception=True)
 def chambres_import(request):
     upload = request.FILES.get('fichier')
     if not upload:
@@ -1819,6 +1855,7 @@ def chambres_import(request):
 
 
 @login_required(login_url='login')
+@permission_required('hospitalisation.view_registredeces', raise_exception=True)
 def registre_deces(request):
     """Registre des décès.
 
@@ -1888,15 +1925,22 @@ def registre_deces(request):
     })
 
 @login_required(login_url='login')
+@permission_required('hospitalisation.view_registredeces', raise_exception=True)
 def deces_detail(request, pk):
     deces = get_object_or_404(RegistreDeces, pk=pk)
     return render(request, 'hospitalisation/deces/detail.html', {
         'deces':        deces,
-        'peut_modifier': request.user.is_superuser or deces.statut != 'termine',
+        # Clôturé = figé pour tout le monde sauf l'admin ; au-delà, il faut
+        # aussi le droit de modifier le registre.
+        'peut_modifier': request.user.is_superuser or (
+            deces.statut != 'termine'
+            and request.user.has_perm('hospitalisation.change_registredeces')
+        ),
     })
 
 
 @login_required(login_url='login')
+@permission_required('hospitalisation.add_registredeces', raise_exception=True)
 def deces_create(request):
     if request.method == 'POST':
         form = RegistreDecesForm(request.POST)
@@ -1914,6 +1958,7 @@ def deces_create(request):
 
 
 @login_required(login_url='login')
+@permission_required('hospitalisation.change_registredeces', raise_exception=True)
 def deces_edit(request, pk):
     deces = get_object_or_404(RegistreDeces, pk=pk)
     if deces.statut == 'termine' and not request.user.is_superuser:
@@ -1957,6 +2002,7 @@ def _rdeces_row(d):
 
 
 @login_required(login_url='login')
+@permission_required('hospitalisation.view_registredeces', raise_exception=True)
 def deces_export(request):
     fmt = request.GET.get('format', 'json')
     qs = RegistreDeces.objects.select_related('patient', 'hospitalisation', 'medecin__employe').order_by('-date_deces')
@@ -1965,6 +2011,7 @@ def deces_export(request):
 
 
 @login_required(login_url='login')
+@permission_required(['hospitalisation.add_registredeces', 'hospitalisation.change_registredeces'], raise_exception=True)
 def deces_import(request):
     from datetime import datetime as _dt
     from patients.models import Patient
@@ -2052,19 +2099,18 @@ def deces_import(request):
 
 
 @login_required(login_url='login')
-
-
-@login_required(login_url='login')
 def configuration(request):
     return render(request, 'hospitalisation/configuration/index.html', {})
 
 
 @login_required(login_url='login')
+@permission_required('hospitalisation.view_batiment', raise_exception=True)
 def config_batiments(request):
     return render(request, 'hospitalisation/configuration/batiments.html', {})
 
 
 @login_required(login_url='login')
+@permission_required('hospitalisation.view_listecontroleadmission', raise_exception=True)
 def config_liste_admission(request):
     q = request.GET.get('q', '').strip()
     qs = ListeControleAdmission.objects.all()
@@ -2087,6 +2133,7 @@ _ADMISSION_TPL_MODAL = 'hospitalisation/configuration/liste_admission/form_modal
 
 
 @login_required(login_url='login')
+@permission_required('hospitalisation.add_listecontroleadmission', raise_exception=True)
 def liste_admission_create(request):
     is_ajax = _is_ajax(request)
     if request.method == 'POST':
@@ -2107,6 +2154,7 @@ def liste_admission_create(request):
 
 
 @login_required(login_url='login')
+@permission_required('hospitalisation.change_listecontroleadmission', raise_exception=True)
 def liste_admission_edit(request, pk):
     obj = get_object_or_404(ListeControleAdmission, pk=pk)
     is_ajax = _is_ajax(request)
@@ -2129,6 +2177,7 @@ def liste_admission_edit(request, pk):
 
 
 @login_required(login_url='login')
+@permission_required('hospitalisation.delete_listecontroleadmission', raise_exception=True)
 def liste_admission_delete(request, pk):
     obj = get_object_or_404(ListeControleAdmission, pk=pk)
     if request.method == 'POST':
@@ -2146,6 +2195,7 @@ _LISTE_ADMISSION_HDR = ['item', 'remarques']
 
 
 @login_required(login_url='login')
+@permission_required('hospitalisation.view_listecontroleadmission', raise_exception=True)
 def liste_admission_export(request):
     fmt = request.GET.get('format', 'json')
     qs = ListeControleAdmission.objects.all()
@@ -2155,6 +2205,7 @@ def liste_admission_export(request):
 
 
 @login_required(login_url='login')
+@permission_required(['hospitalisation.add_listecontroleadmission', 'hospitalisation.change_listecontroleadmission'], raise_exception=True)
 def liste_admission_import(request):
     upload = request.FILES.get('fichier')
     if not upload:
@@ -2197,6 +2248,7 @@ def liste_admission_import(request):
 
 
 @login_required(login_url='login')
+@permission_required('hospitalisation.view_listeverificationservice', raise_exception=True)
 def config_liste_service(request):
     q = request.GET.get('q', '').strip()
     qs = ListeVerificationService.objects.all()
@@ -2215,6 +2267,7 @@ _SERVICE_TPL_MODAL = 'hospitalisation/configuration/liste_service/form_modal.htm
 
 
 @login_required(login_url='login')
+@permission_required('hospitalisation.add_listeverificationservice', raise_exception=True)
 def liste_service_create(request):
     is_ajax = _is_ajax(request)
     if request.method == 'POST':
@@ -2235,6 +2288,7 @@ def liste_service_create(request):
 
 
 @login_required(login_url='login')
+@permission_required('hospitalisation.change_listeverificationservice', raise_exception=True)
 def liste_service_edit(request, pk):
     obj = get_object_or_404(ListeVerificationService, pk=pk)
     is_ajax = _is_ajax(request)
@@ -2257,6 +2311,7 @@ def liste_service_edit(request, pk):
 
 
 @login_required(login_url='login')
+@permission_required('hospitalisation.delete_listeverificationservice', raise_exception=True)
 def liste_service_delete(request, pk):
     obj = get_object_or_404(ListeVerificationService, pk=pk)
     if request.method == 'POST':
@@ -2274,6 +2329,7 @@ _LISTE_SERVICE_HDR = ['item']
 
 
 @login_required(login_url='login')
+@permission_required('hospitalisation.view_listeverificationservice', raise_exception=True)
 def liste_service_export(request):
     fmt = request.GET.get('format', 'json')
     qs = ListeVerificationService.objects.all()
@@ -2283,6 +2339,7 @@ def liste_service_export(request):
 
 
 @login_required(login_url='login')
+@permission_required(['hospitalisation.add_listeverificationservice', 'hospitalisation.change_listeverificationservice'], raise_exception=True)
 def liste_service_import(request):
     upload = request.FILES.get('fichier')
     if not upload:
