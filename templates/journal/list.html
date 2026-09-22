@@ -1,0 +1,249 @@
+{% extends 'journal/base.html' %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+:root { --jr-surface:#fff; --jr-border:#e8edf2; --jr-text:var(--teal-900); --jr-muted:rgba(0,0,0,.5); }
+html[data-theme="dark"] { --jr-surface:var(--border); --jr-border: var(--border); --jr-text:var(--teal-100); --jr-muted:rgba(255,255,255,.45); }
+
+body { height: 100vh; overflow: hidden; }
+.content { min-height: 0; scrollbar-width: thin; }
+.jr-wrap { width: 100%; height: 100%; padding: 24px 32px 60px; box-sizing: border-box; }
+
+.jr-filters {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: end;
+  background: var(--jr-surface); border: 1px solid var(--jr-border); border-radius: 10px;
+  padding: 14px 16px; margin-bottom: 14px;
+  position: sticky; top: 0; z-index: 150;
+  box-shadow: 0 4px 10px rgba(0,0,0,.05);
+}
+.jr-filters .f-field { display: flex; flex-direction: column; gap: 4px; }
+.jr-filters label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--jr-muted); }
+.jr-filters select, .jr-filters input {
+  border: 1.5px solid var(--jr-border); border-radius: 6px; padding: 6px 9px;
+  font-size: 12.5px; color: var(--jr-text); background: transparent; font-family: inherit;
+}
+.jr-filters input[name="q"] { min-width: 180px; }
+.jr-filters button {
+  background: var(--teal-500); color: #fff; border: none; border-radius: 6px;
+  padding: 7px 16px; font-size: 12.5px; font-weight: 600; cursor: pointer; height: 32px;
+}
+.jr-filters button:hover { background: var(--teal-600); }
+.jr-filters .jr-reset { color: var(--jr-muted); font-size: 11.5px; text-decoration: none; align-self: center; }
+.jr-filters .jr-reset:hover { text-decoration: underline; }
+
+.jr-toolbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-bottom: 10px; font-size: 12px; color: var(--jr-muted);
+}
+.jr-toolbar-actions { display: flex; gap: 8px; }
+.jr-btn-danger {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: transparent; border: 1.5px solid var(--rose-text); color: var(--rose-text);
+  border-radius: 6px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.jr-btn-danger:hover { background: rgba(var(--rose-rgb),.1); }
+.jr-btn-danger:disabled { opacity: .4; cursor: not-allowed; }
+.jr-btn-danger-solid {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--rose); border: none; color: #fff;
+  border-radius: 6px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.jr-btn-danger-solid:hover { filter: brightness(.94); }
+
+.jr-table-wrap {
+  background: var(--jr-surface); border: 1px solid var(--jr-border); border-radius: 10px;
+  overflow-x: auto;
+}
+.jr-table-footer {
+  border-top: 1px solid var(--jr-border); padding: 10px 0; border-radius: 0 0 10px 10px;
+}
+.jr-table-footer > div { margin-top: 0 !important; }
+.jr-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.jr-table thead th {
+  text-align: left; padding: 10px 14px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .4px;
+  color: var(--jr-muted); border-bottom: 1px solid var(--jr-border); white-space: nowrap;
+}
+.jr-table thead th.jr-col-check { width: 34px; }
+.jr-table tbody td { padding: 9px 14px; border-bottom: 1px solid var(--jr-border); vertical-align: top; }
+.jr-table tbody tr:last-child td { border-bottom: none; }
+.jr-table tbody tr:hover { background: var(--teal-50); }
+html[data-theme="dark"] .jr-table tbody tr:hover { background: rgba(var(--teal-500-rgb), .1); }
+.jr-date { color: var(--jr-muted); white-space: nowrap; }
+.jr-user { font-weight: 600; color: var(--jr-text); white-space: nowrap; }
+.jr-module { color: var(--jr-muted); white-space: nowrap; }
+.jr-ip { color: var(--jr-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.jr-duree { color: var(--jr-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.jr-msg { color: var(--jr-text); }
+
+.jr-badge {
+  display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 20px;
+  font-size: 10.5px; font-weight: 600; white-space: nowrap;
+}
+.jr-badge-system     { background: rgba(var(--teal-600-rgb),.1);  color: var(--accent-text-soft); }
+.jr-badge-modif      { background: rgba(var(--sky-rgb),.12);  color: var(--sky); }
+.jr-badge-statut     { background: rgba(var(--amber-rgb),.1);  color: var(--amber-text); }
+.jr-badge-note       { background: rgba(0,0,0,.06); color: var(--jr-muted); }
+.jr-badge-suppression{ background: rgba(var(--rose-rgb),.1);   color: var(--rose-text); }
+.jr-badge-connexion  { background: rgba(var(--violet-rgb),.12); color: var(--violet); }
+.jr-badge-consultation { background: rgba(0,0,0,.05); color: var(--jr-muted); }
+
+.jr-empty { text-align: center; padding: 60px 20px; color: var(--jr-muted); font-size: 13px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="jr-wrap">
+
+  <form method="get" class="jr-filters">
+    <div class="f-field">
+      <label>Utilisateur</label>
+      <select name="utilisateur">
+        <option value="">Tous</option>
+        {% for u in utilisateurs %}
+        <option value="{{ u.id }}" {% if u.id|stringformat:"s" == utilisateur_id %}selected{% endif %}>{{ u.get_full_name|default:u.username }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="f-field">
+      <label>Module</label>
+      <select name="module">
+        <option value="">Tous</option>
+        {% for m in modules %}
+        <option value="{{ m }}" {% if m == module %}selected{% endif %}>{{ m|capfirst }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="f-field">
+      <label>Type</label>
+      <select name="type">
+        <option value="">Tous</option>
+        {% for val, lbl in type_choices %}
+        <option value="{{ val }}" {% if val == type_log %}selected{% endif %}>{{ lbl }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="f-field">
+      <label>Mois</label>
+      <select name="mois">
+        <option value="">Tous</option>
+        {% for val, lbl in mois_choices %}
+        <option value="{{ val }}" {% if val|stringformat:"s" == mois %}selected{% endif %}>{{ lbl }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="f-field">
+      <label>Année</label>
+      <select name="annee">
+        <option value="">Toutes</option>
+        {% for a in annees %}
+        <option value="{{ a }}" {% if a|stringformat:"s" == annee %}selected{% endif %}>{{ a }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="f-field">
+      <label>Depuis le</label>
+      <input type="date" name="date_debut" value="{{ date_debut }}">
+    </div>
+    <div class="f-field">
+      <label>Jusqu'au</label>
+      <input type="date" name="date_fin" value="{{ date_fin }}">
+    </div>
+    <div class="f-field">
+      <label>Recherche</label>
+      <input type="text" name="q" value="{{ q }}" placeholder="Mot dans le message…">
+    </div>
+    <button type="submit"><i class="bi bi-funnel"></i> Filtrer</button>
+    {% if utilisateur_id or module or type_log or q or date_debut or date_fin or mois or annee %}
+    <a href="{% url 'journal:list' %}" class="jr-reset">Réinitialiser</a>
+    {% endif %}
+  </form>
+
+  <div class="jr-toolbar">
+    <span>{{ page_obj.paginator.count }} entrée{{ page_obj.paginator.count|pluralize }} sur {{ total_count }} au total</span>
+    <div class="jr-toolbar-actions">
+      <button type="submit" form="jr-form-selection" id="jr-btn-selection" class="jr-btn-danger" disabled
+              onclick="return confirm('Supprimer les entrées sélectionnées ?');">
+        <i class="bi bi-trash3"></i> Supprimer la sélection
+      </button>
+      <button type="submit" form="jr-form-vider" class="jr-btn-danger-solid"
+              onclick="return confirm('Vider tout le journal ? Cette action est irréversible.');">
+        <i class="bi bi-x-octagon"></i> Vider le journal
+      </button>
+    </div>
+  </div>
+
+  <form id="jr-form-selection" method="post" action="{% url 'journal:supprimer_selection' %}">
+    {% csrf_token %}
+    <input type="hidden" name="querystring" value="{{ querystring }}">
+
+    <div class="jr-table-wrap">
+      {% if page_obj.object_list %}
+      <table class="jr-table">
+        <thead>
+          <tr>
+            <th class="jr-col-check"><input type="checkbox" id="jr-check-all"></th>
+            <th>Date</th>
+            <th>Utilisateur</th>
+            <th>Adresse IP</th>
+            <th>Module</th>
+            <th>Type</th>
+            <th>Durée</th>
+            <th>Message</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for entry in page_obj %}
+          <tr>
+            <td><input type="checkbox" name="selection" value="{{ entry.pk }}" class="jr-check-row"></td>
+            <td class="jr-date">{{ entry.date|date:"d/m/Y H:i" }}</td>
+            <td class="jr-user">{% if entry.user %}{{ entry.user.get_full_name|default:entry.user.username }}{% else %}—{% endif %}</td>
+            <td class="jr-ip">{{ entry.ip_address|default:"—" }}</td>
+            <td class="jr-module">{{ entry.module|default:"—"|capfirst }}</td>
+            <td><span class="jr-badge jr-badge-{{ entry.type }}">{{ entry.get_type_display }}</span></td>
+            <td class="jr-duree">{{ entry.duree_affichee|default:"—" }}</td>
+            <td class="jr-msg">{{ entry.message }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="jr-empty">Aucune entrée ne correspond à ces filtres.</div>
+      {% endif %}
+
+      <div class="jr-table-footer">
+        {% include 'includes/pagination.html' %}
+      </div>
+    </div>
+  </form>
+
+  <form id="jr-form-vider" method="post" action="{% url 'journal:vider' %}">
+    {% csrf_token %}
+  </form>
+
+</div>
+
+<script>
+(function () {
+  var checkAll = document.getElementById('jr-check-all');
+  var btnSelection = document.getElementById('jr-btn-selection');
+  if (!checkAll) return;
+
+  function rows() { return document.querySelectorAll('.jr-check-row'); }
+
+  function updateBtn() {
+    var any = Array.prototype.some.call(rows(), function (c) { return c.checked; });
+    btnSelection.disabled = !any;
+  }
+
+  checkAll.addEventListener('change', function () {
+    rows().forEach(function (c) { c.checked = checkAll.checked; });
+    updateBtn();
+  });
+
+  document.addEventListener('change', function (e) {
+    if (e.target.classList.contains('jr-check-row')) updateBtn();
+  });
+})();
+</script>
+{% endblock %}

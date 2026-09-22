@@ -2,8 +2,17 @@ from django.db import models
 
 
 class TypeConge(models.Model):
+    NATURE_CHOICES = [
+        ('conge', 'Congé'),
+        ('permission', 'Permission'),
+        ('absence', 'Absence'),
+    ]
     code = models.SlugField(max_length=20, unique=True, verbose_name="Code")
     nom = models.CharField(max_length=100, verbose_name="Nom")
+    nature = models.CharField(
+        max_length=12, choices=NATURE_CHOICES, default='conge', verbose_name="Nature",
+        help_text="Détermine le libellé affiché sur le bon et l'attestation (Congé, Permission ou Absence).",
+    )
     couleur = models.CharField(max_length=20, default='blue', verbose_name="Couleur (calendrier)")
     deductible = models.BooleanField(
         default=True,
@@ -24,8 +33,8 @@ class TypeConge(models.Model):
     class Meta:
         db_table = 'conges_typeconge'
         ordering = ['ordre', 'nom']
-        verbose_name = "Type de congé"
-        verbose_name_plural = "Types de congé"
+        verbose_name = "Type de demande"
+        verbose_name_plural = "Types de demande"
 
 
 def type_conge_choices():

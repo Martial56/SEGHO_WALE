@@ -293,6 +293,7 @@ def dashboard(request):
     ).count()
 
     from core.pastilles import pastilles as _pastilles
+    from employer.views import can_manage_rh
 
     response = render(request, 'core/dashboard.html', {
         'stats': stats,
@@ -304,6 +305,7 @@ def dashboard(request):
         'user_modules': user_modules,
         'accessible_codes': accessible_codes,
         'plannings_non_vus': plannings_non_vus,
+        'can_manage_rh_presence': can_manage_rh(request.user),
     })
     response['Cache-Control'] = 'no-store, no-cache, must-revalidate'
     response['Pragma'] = 'no-cache'
@@ -2085,8 +2087,9 @@ def post_note(request):
     return redirect(next_url)
 
 
-def log_event(instance, user, message, type='note'):
+def log_event(instance, user, message, type='note', duree_secondes=None, module=None):
     from django.contrib.contenttypes.models import ContentType
+    from core.middleware import get_current_ip
     from core.models import LogActivite
     ct = ContentType.objects.get_for_model(instance)
     LogActivite.objects.create(
@@ -2095,6 +2098,9 @@ def log_event(instance, user, message, type='note'):
         user=user if user and user.is_authenticated else None,
         message=message,
         type=type,
+        ip_address=get_current_ip(),
+        duree_secondes=duree_secondes,
+        module=module if module else ct.app_label,
     )
 
 

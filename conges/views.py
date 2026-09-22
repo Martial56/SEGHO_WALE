@@ -2037,7 +2037,7 @@ def _type_conge_form_class():
     class TypeCongeForm(forms.ModelForm):
         class Meta:
             model = TypeConge
-            fields = ['nom', 'code', 'couleur', 'deductible', 'duree_forfaitaire', 'actif']
+            fields = ['nom', 'code', 'nature', 'couleur', 'deductible', 'duree_forfaitaire', 'actif']
             widgets = {
                 'nom':  forms.TextInput(attrs={'placeholder': 'Ex : Congé annuel'}),
                 'code': forms.TextInput(attrs={'placeholder': 'Ex : annuel'}),
@@ -2081,11 +2081,11 @@ def conge_type_create(request):
     if request.method == 'POST' and form.is_valid():
         obj = form.save()
         if is_ajax:
-            return JsonResponse({'ok': True, 'message': f"Type de congé « {obj} » créé."})
-        messages.success(request, f"Type de congé « {obj} » créé.")
+            return JsonResponse({'ok': True, 'message': f"Type de demande « {obj} » créé."})
+        messages.success(request, f"Type de demande « {obj} » créé.")
         return redirect('conge_type_list')
     return render(request, 'conges/config/type_form_modal.html', {
-        'form': form, 'titre': 'Nouveau type de congé',
+        'form': form, 'titre': 'Nouveau type de demande',
     })
 
 
@@ -2100,8 +2100,8 @@ def conge_type_edit(request, pk):
     if request.method == 'POST' and form.is_valid():
         form.save()
         if is_ajax:
-            return JsonResponse({'ok': True, 'message': f"Type de congé « {obj} » mis à jour."})
-        messages.success(request, f"Type de congé « {obj} » mis à jour.")
+            return JsonResponse({'ok': True, 'message': f"Type de demande « {obj} » mis à jour."})
+        messages.success(request, f"Type de demande « {obj} » mis à jour.")
         return redirect('conge_type_list')
     return render(request, 'conges/config/type_form_modal.html', {
         'form': form, 'titre': f'Modifier — {obj.nom}', 'obj': obj,
@@ -2123,5 +2123,5 @@ def conge_type_delete(request, pk):
         return redirect('conge_type_list')
     nom = obj.nom
     obj.delete()
-    messages.success(request, f"Type de congé « {nom} » supprimé.")
+    messages.success(request, f"Type de demande « {nom} » supprimé.")
     return redirect('conge_type_list')

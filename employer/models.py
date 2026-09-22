@@ -427,6 +427,70 @@ class Conge(models.Model):
         return (self.date_fin - self.date_debut).days + 1
 
     @property
+    def type_conge_obj(self):
+        from conges.models import TypeConge
+        if not hasattr(self, '_type_conge_obj_cache'):
+            self._type_conge_obj_cache = TypeConge.objects.filter(code=self.type_conge).first()
+        return self._type_conge_obj_cache
+
+    @property
+    def nature(self):
+        obj = self.type_conge_obj
+        return obj.nature if obj else 'conge'
+
+    @property
+    def nature_nom(self):
+        return {'conge': 'Congé', 'permission': 'Permission', 'absence': 'Absence'}.get(self.nature, 'Congé')
+
+    @property
+    def bon_titre(self):
+        return {
+            'conge': 'Bon de Congé', 'permission': 'Bon de Permission', 'absence': "Bon d'Absence",
+        }.get(self.nature, 'Bon de Congé')
+
+    @property
+    def attestation_titre(self):
+        return {
+            'conge': 'Attestation de Congé', 'permission': 'Attestation de Permission', 'absence': "Attestation d'Absence",
+        }.get(self.nature, 'Attestation de Congé')
+
+    @property
+    def details_titre(self):
+        return {
+            'conge': 'Détails du congé', 'permission': 'Détails de la permission', 'absence': "Détails de l'absence",
+        }.get(self.nature, 'Détails du congé')
+
+    @property
+    def phrase_beneficie(self):
+        return {
+            'conge': "bénéficie d'un congé autorisé",
+            'permission': "bénéficie d'une permission autorisée",
+            'absence': "bénéficie d'une absence autorisée",
+        }.get(self.nature, "bénéficie d'un congé autorisé")
+
+    @property
+    def nature_annule(self):
+        return {
+            'conge': 'Congé annulé', 'permission': 'Permission annulée', 'absence': 'Absence annulée',
+        }.get(self.nature, 'Congé annulé')
+
+    @property
+    def piece_justificative(self):
+        return {
+            'conge': "pièce justificative de congé",
+            'permission': "pièce justificative de permission",
+            'absence': "pièce justificative d'absence",
+        }.get(self.nature, "pièce justificative de congé")
+
+    @property
+    def phrase_nature_intro(self):
+        return {
+            'conge': "Le congé accordé est de nature",
+            'permission': "La permission accordée est de nature",
+            'absence': "L'absence accordée est de nature",
+        }.get(self.nature, "Le congé accordé est de nature")
+
+    @property
     def statut_couleur(self):
         return {
             'demande':        'amber',

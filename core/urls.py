@@ -79,6 +79,8 @@ urlpatterns = [
     path('post-note/', views.post_note, name='post_note'),
     path('planning/', include('planning.urls')),
     path('rapports/', include('rapports.urls')),
+    path('guide/', include('guide.urls')),
+    path('journal/', include('journal.urls')),
     path('gynecologie/', views.gynecologie_list, name='gynecologie_list'),
     path('gynecologie/rdv/', views.gynecologie_rdv, name='gynecologie_rdv'),
     path('gynecologie/rdv/nouveau/', views.gynecologie_rdv_create, name='gynecologie_rdv_create'),

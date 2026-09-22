@@ -2253,7 +2253,7 @@ def rh_config_list(request, slug):
         direction = 'asc'
     order = sort if direction == 'asc' else f'-{sort}'
 
-    paginator = Paginator(qs.order_by(order), 12)
+    paginator = Paginator(qs.order_by(order), 100)
     page_obj = paginator.get_page(request.GET.get('page'))
     return render(request, 'employer/config/list.html', {
         'slug': slug, 'cfg': cfg, 'page_obj': page_obj, 'q': q,

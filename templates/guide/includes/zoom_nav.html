@@ -1,0 +1,85 @@
+{% if href_precedent %}
+<a href="{{ href_precedent }}" class="gd-side-arrow gd-side-arrow-left" title="Page précédente (←)"><i class="bi bi-chevron-left"></i></a>
+{% endif %}
+{% if href_suivant %}
+<a href="{{ href_suivant }}" class="gd-side-arrow gd-side-arrow-right" title="Page suivante (→)"><i class="bi bi-chevron-right"></i></a>
+{% endif %}
+
+<div class="gd-toolbar">
+  <div class="gd-toolbar-group">
+    {% if href_precedent %}
+    <a href="{{ href_precedent }}" class="gd-nav-btn" title="Raccourci clavier : ←"><i class="bi bi-chevron-left"></i> {% if droite %}Pages précédentes{% else %}Page précédente{% endif %}</a>
+    {% else %}
+    <span class="gd-nav-btn gd-nav-disabled"><i class="bi bi-chevron-left"></i> {% if droite %}Pages précédentes{% else %}Page précédente{% endif %}</span>
+    {% endif %}
+
+    {% if href_suivant %}
+    <a href="{{ href_suivant }}" class="gd-nav-btn" title="Raccourci clavier : →">{% if droite %}Pages suivantes{% else %}Page suivante{% endif %} <i class="bi bi-chevron-right"></i></a>
+    {% else %}
+    <span class="gd-nav-btn gd-nav-disabled">{% if droite %}Pages suivantes{% else %}Page suivante{% endif %} <i class="bi bi-chevron-right"></i></span>
+    {% endif %}
+  </div>
+
+  <div class="gd-toolbar-group">
+    <div class="gd-nav-mid">
+      <a href="{% url 'guide:hub' %}"><i class="bi bi-list-ul"></i> Sommaire</a>
+      {% if total %}<span>{% if droite %}Pages {{ numero_gauche }}–{{ numero_droite }}{% else %}Page {{ numero_gauche }}{% endif %} / {{ total }}</span>{% endif %}
+    </div>
+
+    {% if total_pages %}
+    <form class="gd-goto-form" id="gdGotoForm" title="Aller à la page…">
+      <input type="number" id="gdGotoInput" min="1" max="{{ total_pages }}" placeholder="N° page">
+      <button type="submit" title="Atteindre cette page"><i class="bi bi-arrow-return-right"></i></button>
+    </form>
+    {% endif %}
+
+    <div class="gd-zoom-bar">
+      <button type="button" class="gd-zoom-btn" id="gdZoomOut" title="Zoom arrière"><i class="bi bi-dash-lg"></i></button>
+      <span class="gd-zoom-pct" id="gdZoomPct">100%</span>
+      <button type="button" class="gd-zoom-btn" id="gdZoomIn" title="Zoom avant"><i class="bi bi-plus-lg"></i></button>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var target = document.querySelector('.gd-zoomable');
+  var pctEl = document.getElementById('gdZoomPct');
+  var btnIn = document.getElementById('gdZoomIn');
+  var btnOut = document.getElementById('gdZoomOut');
+  if (!target || !pctEl || !btnIn || !btnOut) return;
+
+  var zoom = 1;
+  var MIN = 0.6, MAX = 1.4, STEP = 0.1;
+
+  function apply() {
+    target.style.transform = 'scale(' + zoom.toFixed(2) + ')';
+    pctEl.textContent = Math.round(zoom * 100) + '%';
+    btnIn.disabled = zoom >= MAX;
+    btnOut.disabled = zoom <= MIN;
+  }
+
+  btnIn.addEventListener('click', function () {
+    zoom = Math.min(MAX, Math.round((zoom + STEP) * 100) / 100);
+    apply();
+  });
+  btnOut.addEventListener('click', function () {
+    zoom = Math.max(MIN, Math.round((zoom - STEP) * 100) / 100);
+    apply();
+  });
+
+  var gotoForm = document.getElementById('gdGotoForm');
+  var gotoInput = document.getElementById('gdGotoInput');
+  if (gotoForm) {
+    var urlTemplate = "{% url 'guide:page' 999999 %}";
+    gotoForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var n = parseInt(gotoInput.value, 10);
+      var max = parseInt(gotoInput.max, 10);
+      if (!n || n < 1) return;
+      if (max && n > max) n = max;
+      window.location.href = urlTemplate.replace('999999', n);
+    });
+  }
+});
+</script>

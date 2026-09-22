@@ -13,14 +13,24 @@ class LogActivite(models.Model):
         ('statut', 'Changement de statut'),
         ('modif', 'Modification'),
         ('system', 'Système'),
+        ('suppression', 'Suppression'),
+        ('connexion', 'Connexion'),
+        ('consultation', 'Consultation'),
     ]
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id    = models.PositiveIntegerField()
     objet        = GenericForeignKey('content_type', 'object_id')
-    type         = models.CharField(max_length=10, choices=TYPE_CHOICES, default='note')
+    type         = models.CharField(max_length=12, choices=TYPE_CHOICES, default='note')
     message      = models.TextField()
     user         = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL)
     date         = models.DateTimeField(auto_now_add=True)
+    ip_address   = models.GenericIPAddressField(null=True, blank=True, verbose_name="Adresse IP")
+    duree_secondes = models.PositiveIntegerField(null=True, blank=True, verbose_name="Durée (secondes)")
+    module       = models.CharField(
+        max_length=50, blank=True, verbose_name="Module",
+        help_text="Nom de l'app Django concernée — indépendant de l'objet lié, "
+                   "nécessaire pour les événements sans objet précis (consultation d'une page, connexion).",
+    )
 
     class Meta:
         verbose_name = "Log d'activité"
@@ -30,6 +40,18 @@ class LogActivite(models.Model):
 
     def __str__(self):
         return f"[{self.type}] {self.message[:50]}"
+
+    @property
+    def duree_affichee(self):
+        if self.duree_secondes is None:
+            return None
+        heures, reste = divmod(self.duree_secondes, 3600)
+        minutes, secondes = divmod(reste, 60)
+        if heures:
+            return f"{heures} h {minutes:02d} min"
+        if minutes:
+            return f"{minutes} min {secondes:02d} s"
+        return f"{secondes} s"
 
 
 class UserProfile(models.Model):

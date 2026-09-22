@@ -1,6 +1,6 @@
 {% extends 'conges/base.html' %}
 {% load static %}
-{% block topbar_title %}Enregistrer un congé{% endblock %}
+{% block topbar_title %}Enregistrer une demande{% endblock %}
 
 {% block extra_css %}
 {{ block.super }}
@@ -143,9 +143,9 @@ html[data-theme="dark"] .cf-legale-val { color:var(--cg-300); }
 
   <div class="action-bar" style="padding:10px 24px;margin-bottom:0;flex-shrink:0;">
     <div class="action-bar-breadcrumb">
-      <a href="{% url 'conge_list' %}"><i class="bi bi-arrow-left"></i> Congés</a>
+      <a href="{% url 'conge_list' %}"><i class="bi bi-arrow-left"></i> Demandes</a>
       <span class="sep">/</span>
-      <span class="current">Enregistrer un congé</span>
+      <span class="current">Enregistrer une demande</span>
     </div>
     <div class="action-bar-buttons">
       <a href="{% url 'conge_list' %}" class="btn-form-cancel"><i class="bi bi-x"></i> Annuler</a>
@@ -212,7 +212,7 @@ html[data-theme="dark"] .cf-legale-val { color:var(--cg-300); }
 
       <!-- 2. Type de congé -->
       <div class="cf-section">
-        <div class="cf-section-label"><i class="bi bi-tag-fill"></i> Type de congé</div>
+        <div class="cf-section-label"><i class="bi bi-tag-fill"></i> Type de demande</div>
         <select name="type_conge" id="id_type_conge" class="cg-input" required>
           <option value="">— Sélectionner un type —</option>
           {% for code,label in types %}
@@ -312,7 +312,7 @@ html[data-theme="dark"] .cf-legale-val { color:var(--cg-300); }
       <!-- Congés actifs de l'employé (si pré-sélectionné) -->
       {% if employe_pre %}
       <div class="cf-side-card">
-        <div class="cf-side-title"><i class="bi bi-calendar-check"></i> Congés en cours / à venir</div>
+        <div class="cf-side-title"><i class="bi bi-calendar-check"></i> Demandes en cours / à venir</div>
         {% with actifs=employe_pre.conges.filter %}
         {% with conges=employe_pre.conges.all %}
         {% with actifs=conges|dictsortreversed:"date_debut" %}
@@ -331,7 +331,7 @@ html[data-theme="dark"] .cf-legale-val { color:var(--cg-300); }
           {% endfor %}
         </div>
         {% else %}
-        <div style="text-align:center;padding:12px;color:var(--cg-muted);font-size:12px;">Aucun congé actif</div>
+        <div style="text-align:center;padding:12px;color:var(--cg-muted);font-size:12px;">Aucune demande active</div>
         {% endif %}
         {% endwith %}{% endwith %}{% endwith %}
       </div>
@@ -486,8 +486,8 @@ function updateDeduitDivergence() {
   var defautDeductible = TYPES_DEDUCTIBLES.includes(typeCode);
   if (deduitChk.checked !== defautDeductible) {
     document.getElementById('deduit-divergence-text').textContent = deduitChk.checked
-      ? "Ce congé sera déduit du solde alors que ce type ne l'est pas habituellement."
-      : "Ce congé ne sera pas déduit du solde alors que ce type l'est habituellement.";
+      ? "Cette demande sera déduite du solde alors que ce type ne l'est pas habituellement."
+      : "Cette demande ne sera pas déduite du solde alors que ce type l'est habituellement.";
     div.style.display = 'flex';
     div.style.alignItems = 'center';
   } else {

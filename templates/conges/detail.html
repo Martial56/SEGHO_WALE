@@ -1,7 +1,7 @@
 {% extends 'conges/base.html' %}
 {% load static %}
 
-{% block topbar_title %}Congé — {{ conge.employe.nom_complet }}{% endblock %}
+{% block topbar_title %}{{ conge.nature_nom }} — {{ conge.employe.nom_complet }}{% endblock %}
 
 {% block extra_css %}
 {{ block.super }}
@@ -209,7 +209,7 @@ html[data-theme="dark"] .motif-block{background:rgba(var(--teal-400-rgb), 0.1);}
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
     {% if conge.statut == 'approuve' or conge.statut == 'en_cours' or conge.statut == 'termine' %}
     <a href="{% url 'conge_bon' conge.pk %}" class="btn-cg-outline">
-      <i class="bi bi-printer"></i> Bon de congé
+      <i class="bi bi-printer"></i> Imprimer
     </a>
     {% if can_manage %}
     <a href="{% url 'conge_attestation' conge.pk %}" class="btn-cg-outline">
@@ -242,7 +242,7 @@ html[data-theme="dark"] .motif-block{background:rgba(var(--teal-400-rgb), 0.1);}
     {% endif %}
     <form method="post" action="{% url 'conge_terminer' conge.pk %}" style="display:inline;">
       {% csrf_token %}
-      <button type="submit" class="btn-cg" onclick="return confirm('Marquer ce congé comme terminé ?')">
+      <button type="submit" class="btn-cg" onclick="return confirm('Marquer cette demande comme terminée ?')">
         <i class="bi bi-check2-all"></i> Terminer
       </button>
     </form>
@@ -272,7 +272,7 @@ html[data-theme="dark"] .motif-block{background:rgba(var(--teal-400-rgb), 0.1);}
 <div style="margin-top:20px;padding:14px 18px;background:rgba(var(--rose-rgb),.07);border:1px solid rgba(var(--rose-rgb),.2);border-radius:10px;display:flex;gap:12px;align-items:center;">
   <i class="bi bi-x-circle-fill" style="color:var(--rose);font-size:22px;flex-shrink:0;"></i>
   <div>
-    <div style="font-size:14px;font-weight:700;color:var(--rose-deep);">Congé annulé</div>
+    <div style="font-size:14px;font-weight:700;color:var(--rose-deep);">{{ conge.nature_annule }}</div>
     <div style="font-size:12.5px;color:rgba(107,31,31,.7);margin-top:2px;">
       {% if conge.date_approbation %}Le {{ conge.date_approbation|date:"d/m/Y" }}{% endif %}
       {% if conge.approuve_par %} par {{ conge.approuve_par }}{% endif %}
@@ -291,7 +291,7 @@ html[data-theme="dark"] .motif-block{background:rgba(var(--teal-400-rgb), 0.1);}
     <!-- Détails du congé -->
     <div class="cg-card">
       <div class="cg-card-header">
-        <div class="cg-card-title"><i class="bi bi-calendar3"></i> Détails du congé</div>
+        <div class="cg-card-title"><i class="bi bi-calendar3"></i> {{ conge.details_titre }}</div>
         <span style="font-size:11.5px;color:var(--cg-muted);">Réf. #{{ conge.pk|stringformat:"06d" }}</span>
       </div>
       <div class="detail-grid">
@@ -312,7 +312,7 @@ html[data-theme="dark"] .motif-block{background:rgba(var(--teal-400-rgb), 0.1);}
           <div class="val big-green">{{ conge.nb_jours_ouvres }}<span style="font-size:13px;font-weight:600;"> j</span></div>
         </div>
         <div class="detail-field">
-          <div class="lbl">Type de congé</div>
+          <div class="lbl">Type de demande</div>
           <div class="val" style="font-weight:600;">{{ conge.get_type_conge_display }}</div>
         </div>
         <div class="detail-field">
@@ -435,7 +435,7 @@ html[data-theme="dark"] .motif-block{background:rgba(var(--teal-400-rgb), 0.1);}
           <input type="text" name="motif_annulation" class="cg-input"
                  placeholder="Raison…" style="margin-bottom:12px;">
           <button type="submit" class="btn-danger-sm" style="width:100%;padding:9px;justify-content:center;"
-                  onclick="return confirm('Annuler cette demande de congé ?')">
+                  onclick="return confirm('Annuler cette demande ?')">
             <i class="bi bi-trash3"></i> Annuler la demande
           </button>
         </form>
@@ -526,7 +526,7 @@ html[data-theme="dark"] .motif-block{background:rgba(var(--teal-400-rgb), 0.1);}
 
     <!-- Historique congés de cet employé -->
     <div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--accent-text-soft);
-                border-left:3px solid var(--cg-600);padding-left:8px;margin-bottom:10px;">Congés récents</div>
+                border-left:3px solid var(--cg-600);padding-left:8px;margin-bottom:10px;">Demandes récentes</div>
     <div style="background:var(--cg-50);border-radius:10px;padding:4px 14px;margin-bottom:24px;">
       {% for c in autres_conges %}
       <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;
@@ -538,7 +538,7 @@ html[data-theme="dark"] .motif-block{background:rgba(var(--teal-400-rgb), 0.1);}
         <span class="cg-badge cg-b-{{ c.statut }}" style="font-size:9.5px;">{{ c.get_statut_display }}</span>
       </div>
       {% empty %}
-      <div style="padding:14px 0;text-align:center;color:var(--cg-muted);font-size:12.5px;">Aucun congé précédent</div>
+      <div style="padding:14px 0;text-align:center;color:var(--cg-muted);font-size:12.5px;">Aucune demande précédente</div>
       {% endfor %}
     </div>
 
