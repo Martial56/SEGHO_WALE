@@ -1,6 +1,6 @@
 ﻿{% load static django_browser_reload %}
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr"{% if luminosite < 100 %} data-dim style="--ui-brightness:{{ luminosite }}%"{% endif %}>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -75,6 +75,33 @@
             --header-h: 101px;
         }
         {% if accent_css %}:root { {{ accent_css|safe }} }{% endif %}
+
+        /* ═══════════════════════════════════════
+           LUMINOSITÉ DE L'INTERFACE
+           ───────────────────────────────────────
+           Le filtre est posé sur <html>, et sur RIEN D'AUTRE.
+
+           Filter Effects Level 1 : « A value other than none for the filter
+           property results in the creation of a containing block for absolute
+           and fixed positioned descendants UNLESS the element it applies to is
+           a document root element. » L'élément racine est exempté de la règle.
+
+           Mesuré sous Chromium, après 900 px de défilement :
+             html{filter:brightness(.7)}  → .topbar reste à top=0
+             body{filter:brightness(.7)}  → .topbar tombe à top=-900
+             .main{filter:brightness(.7)} → .topbar tombe à top=-799
+
+           NE JAMAIS déplacer cette règle vers body, .main ou .content : elle
+           ferait dérailler .topbar (ligne 100), #page-loader, #lock-overlay et
+           toutes les superpositions fixes des modules, qui prendraient le
+           document pour référence au lieu de la fenêtre.
+
+           Déclencheur par attribut data-dim plutôt qu'une valeur par défaut de
+           100 % : un filter non-none, même brightness(100%), force la
+           composition GPU de tout le document à chaque défilement. Sans réglage
+           personnalisé, pas d'attribut, pas de filtre, aucun coût. */
+        :root { --ui-brightness: 100%; }
+        html[data-dim] { filter: brightness(var(--ui-brightness)); }
         html { font-size: 16px; min-height: 100vh; background: #f8f9fb; }
         body {
             margin: 0;
@@ -846,6 +873,120 @@
         html[data-theme="dark"] .theme-toggle .icon-moon { display:block; }
         html[data-theme="dark"] .theme-toggle { color: var(--teal-300); }
 
+        /* ── Curseur de luminosité, accroché au bouton de thème ────────────
+           Enveloppe : zone de survol commune au bouton et au panneau. Pas de
+           position:relative — le panneau est ancré à la fenêtre, pas au bouton. */
+        .theme-wrap { display: flex; align-items: center; }
+
+        /* Le panneau est en position:FIXED et non absolute.
+           le bloc module_navbar est DANS .topbar, juste après .topbar-inner :
+           un panneau ancré au bouton avec top:calc(100% + 8px) se mesurerait
+           depuis le bas du BOUTON et recouvrirait la barre de navigation du
+           module, clics compris. Sur 1024 px, où .topbar-inner passe à
+           padding:6px 16px, les derniers liens des modules à 7 entrées
+           deviendraient inatteignables.
+           --header-h est la hauteur du bandeau complet, tenue à jour par
+           syncTopbarH : le panneau se pose donc toujours SOUS tout le bandeau.
+           Un élément fixed reste descendant DOM — la chaîne de survol
+           bouton → panneau n'est pas rompue.
+           z-index 10000 : au-dessus de #toast-container (9999, déclaré hors de
+           .topbar donc toujours gagnant), en dessous de #page-loader et
+           #lock-overlay (99999). Sans ça, un simple toast de confirmation
+           rendrait le curseur inaccessible pendant toute sa durée. */
+        .lum-panneau {
+            position: fixed;
+            top: calc(var(--header-h) + 8px);
+            right: 16px;
+            z-index: 10000;
+            display: none;
+            width: 236px;
+            padding: 12px 14px 8px;
+            background: var(--surface);
+            /* Bordure explicite et non var(--border-strong) : ce jeton vaut
+               #2a3a4a en sombre, soit 1,49 de contraste avec la surface — le
+               panneau se poserait sur le contenu sans arête visible, et
+               d'autant moins à 70 %. */
+            border: 1px solid rgba(var(--teal-600-rgb), .35);
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.16);
+        }
+        html[data-theme="dark"] .lum-panneau { box-shadow: 0 8px 32px rgba(0,0,0,0.55); }
+        .lum-panneau.est-ouvert { display: block; }
+
+        .lum-entete {
+            display: flex; align-items: baseline; justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .lum-titre {
+            font-size: 10.5px; font-weight: 800; letter-spacing: .5px;
+            text-transform: uppercase; color: var(--text-muted);
+        }
+        .lum-valeur {
+            font-size: 12px; font-weight: 700; color: var(--accent-text);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .lum-rangee { display: flex; align-items: center; gap: 9px; }
+        .lum-ico { color: var(--text-muted); flex-shrink: 0; }
+        .lum-ico-grand { color: var(--accent-text-soft); }
+
+        /* Premier input type=range du projet. WebKit n'a pas d'équivalent de
+           ::-moz-range-progress, d'où la part remplie de la piste pilotée par
+           --lum-remplissage, que le script met à jour. */
+        .lum-curseur {
+            flex: 1; min-width: 0; height: 18px; margin: 0;
+            appearance: none; -webkit-appearance: none;
+            background: transparent; cursor: pointer;
+        }
+        .lum-curseur::-webkit-slider-runnable-track {
+            height: 5px; border-radius: 3px;
+            background: linear-gradient(to right,
+                var(--teal-600) 0 var(--lum-remplissage, 100%),
+                rgba(var(--teal-600-rgb), .18) var(--lum-remplissage, 100%) 100%);
+        }
+        .lum-curseur::-moz-range-track {
+            height: 5px; border-radius: 3px; background: rgba(var(--teal-600-rgb), .18);
+        }
+        .lum-curseur::-moz-range-progress {
+            height: 5px; border-radius: 3px; background: var(--teal-600);
+        }
+        .lum-curseur::-webkit-slider-thumb {
+            appearance: none; -webkit-appearance: none;
+            width: 14px; height: 14px; border-radius: 50%;
+            background: #fff; border: 2px solid var(--teal-600);
+            /* La piste fait 5px, la poignée 14 : recentrage manuel — WebKit ne
+               le fait pas, contrairement à Gecko. */
+            margin-top: -4.5px;
+            box-shadow: 0 1px 4px rgba(0,0,0,.25);
+        }
+        .lum-curseur::-moz-range-thumb {
+            width: 14px; height: 14px; border-radius: 50%;
+            background: #fff; border: 2px solid var(--teal-600);
+            box-shadow: 0 1px 4px rgba(0,0,0,.25);
+        }
+        .lum-curseur:focus { outline: none; }
+        .lum-curseur:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px rgba(var(--teal-600-rgb), .40); }
+        .lum-curseur:focus-visible::-moz-range-thumb     { box-shadow: 0 0 0 3px rgba(var(--teal-600-rgb), .40); }
+
+        .lum-reset {
+            display: block; width: 100%; margin-top: 8px;
+            background: none; border: none; font-family: inherit;
+            font-size: 11px; font-weight: 600; color: var(--text-muted);
+            padding: 5px; border-radius: 6px; cursor: pointer;
+            transition: background .12s, color .12s;
+        }
+        .lum-reset:hover { background: rgba(var(--teal-600-rgb),.08); color: var(--accent-text); }
+        .lum-reset[hidden] { display: none; }
+
+        /* Écran tactile : pas de survol, le panneau s'ouvre par appui long
+           (voir le script). La poignée doit alors être prenable au doigt. */
+        @media (hover: none) {
+            .lum-panneau { width: 264px; }
+            .lum-curseur { height: 28px; }
+            .lum-curseur::-webkit-slider-thumb { width: 20px; height: 20px; margin-top: -7.5px; }
+            .lum-curseur::-moz-range-thumb     { width: 20px; height: 20px; }
+        }
+
         /* ═══════════════════════════════════════
            IMPRESSION — filet de sécurité global :
            le bandeau applicatif (logo, notifs, thème, compte)
@@ -859,6 +1000,20 @@
                fixe (padding-top: var(--header-h)) — ce bandeau n'existe plus à
                l'impression, donc ce décalage doit disparaître lui aussi. */
             body { padding-top: 0 !important; }
+            /* La luminosité est un confort d'écran, elle n'a rien à faire sur le
+               papier. Sans cette ligne, Chrome ne peut plus rendre la page en
+               vectoriel et la rastérise : le PDF d'une facture perd toutes ses
+               polices embarquées — texte ni sélectionnable, ni cherchable, et
+               flou. Concerne les imprimables qui héritent de ce gabarit. */
+            html[data-dim] { filter: none !important; }
+            .lum-panneau { display: none !important; }
+        }
+
+        /* Mode contraste forcé de Windows : le système impose sa propre palette
+           pour un utilisateur malvoyant. Y superposer un filtre de luminosité
+           annulerait exactement l'accommodation demandée. */
+        @media (forced-colors: active) {
+            html[data-dim] { filter: none !important; }
         }
     </style>
     <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
@@ -1156,19 +1311,56 @@
               </div>
             </div>
 
-            <!-- Thème -->
-            <button class="theme-toggle" id="theme-toggle" title="Thème sombre / clair">
-                <svg class="icon-sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <!-- Thème + luminosité ──────────────────────────────────────
+                 Le clic garde son unique rôle : basculer clair/sombre.
+                 Le survol — ou le focus au clavier, ou l'appui long au doigt —
+                 fait descendre le curseur de luminosité sous le bandeau. Le
+                 panneau ne recouvre jamais le bouton : un clic destiné à la
+                 bascule reste une bascule.
+                 aria-label et non title : l'infobulle native du système
+                 s'afficherait après ~1 s de survol par-dessus le panneau qui
+                 vient de s'ouvrir, et elle n'est pas dans l'arbre filtré. -->
+            <div class="theme-wrap" id="theme-wrap">
+              <button class="theme-toggle" id="theme-toggle"
+                      aria-label="Thème sombre / clair — survolez pour régler la luminosité">
+                  <svg class="icon-sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="12" cy="12" r="5"/>
+                      <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+                      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                      <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+                      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                  </svg>
+                  <svg class="icon-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                  </svg>
+              </button>
+
+              <div class="lum-panneau" id="lum-panneau" role="group" aria-label="Luminosité de l'interface">
+                <div class="lum-entete">
+                  <span class="lum-titre">Luminosité</span>
+                  <span class="lum-valeur" id="lum-valeur">{{ luminosite|default:100 }}&nbsp;%</span>
+                </div>
+                <div class="lum-rangee">
+                  <svg class="lum-ico" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="4"/>
+                    <line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/>
+                    <line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/>
+                  </svg>
+                  <input type="range" class="lum-curseur" id="lum-curseur"
+                         min="70" max="100" step="5"
+                         value="{{ luminosite|default:100 }}"
+                         aria-label="Luminosité de l'interface, en pourcentage">
+                  <svg class="lum-ico lum-ico-grand" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <circle cx="12" cy="12" r="5"/>
                     <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
                     <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
                     <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
                     <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-                </svg>
-                <svg class="icon-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-                </svg>
-            </button>
+                  </svg>
+                </div>
+                <button type="button" class="lum-reset" id="lum-reset" {% if luminosite >= 100 %}hidden{% endif %}>Luminosité maximale</button>
+              </div>
+            </div>
 
             <!-- Utilisateur -->
             {% if user.is_authenticated %}
@@ -1254,18 +1446,192 @@
     });
     </script>
     <script>
-    // Thème
-    (function() {
+    // ── Bouton de thème : clic = clair/sombre, survol = luminosité ─────────
+    (function () {
         var btn = document.getElementById('theme-toggle');
         if (!btn) return;
-        btn.addEventListener('click', function() {
-            var html = document.documentElement;
-            var isDark = html.getAttribute('data-theme') === 'dark';
-            if (isDark) { html.removeAttribute('data-theme'); localStorage.setItem('segho-theme', 'light'); }
-            else { html.setAttribute('data-theme', 'dark'); localStorage.setItem('segho-theme', 'dark'); }
-        });
-    })();
 
+        var wrap    = document.getElementById('theme-wrap');
+        var panneau = document.getElementById('lum-panneau');
+        var curseur = document.getElementById('lum-curseur');
+        var valeur  = document.getElementById('lum-valeur');
+        var reset   = document.getElementById('lum-reset');
+        var racine  = document.documentElement;
+
+        // Un appui long vient-il d'ouvrir le panneau ? Le clic qui suit la
+        // levée du doigt doit alors être ignoré, sinon le thème basculerait à
+        // chaque tentative d'ouvrir le curseur au doigt.
+        var appuiLong = false;
+
+        // Échap ferme le panneau puis rend le focus au bouton — et ce focus
+        // redéclenche focusin, donc rouvrirait aussitôt ce qu'on vient de
+        // fermer. Ce drapeau neutralise cette seule réouverture ; il retombe
+        // dès que le focus quitte vraiment l'enveloppe ou que la souris y
+        // revient.
+        var fermeParEchap = false;
+
+        // ── Thème (comportement existant, inchangé) ───────────────────────
+        btn.addEventListener('click', function () {
+            if (appuiLong) { appuiLong = false; return; }
+            var isDark = racine.getAttribute('data-theme') === 'dark';
+            if (isDark) { racine.removeAttribute('data-theme'); localStorage.setItem('segho-theme', 'light'); }
+            else { racine.setAttribute('data-theme', 'dark'); localStorage.setItem('segho-theme', 'dark'); }
+        });
+
+        if (!wrap || !panneau || !curseur) return;
+
+        // ── Ouverture / fermeture ─────────────────────────────────────────
+        // 250 ms avant d'ouvrir : dans .topbar-right (gap 20px) le bouton de
+        //   thème est intercalé entre la cloche et la puce utilisateur, tout
+        //   trajet de l'une à l'autre le traverse. Sans délai, le panneau
+        //   clignoterait en permanence.
+        // 500 ms avant de fermer : le panneau est ancré sous le bandeau
+        //   complet, soit une soixantaine de pixels sous le bouton. Il faut le
+        //   temps d'y descendre, et tolérer un débordement du pointeur pendant
+        //   le glissement.
+        // 500 ms d'appui long : seuil habituel du tactile.
+        var DELAI_OUVERTURE = 250, DELAI_FERMETURE = 500, DELAI_APPUI = 500;
+        var tOuvre = null, tFerme = null, tAppui = null;
+
+        function ouvrir() {
+            clearTimeout(tFerme); tFerme = null;
+            clearTimeout(tOuvre); tOuvre = null;
+            panneau.classList.add('est-ouvert');
+        }
+        function fermer() {
+            clearTimeout(tOuvre); tOuvre = null;
+            clearTimeout(tFerme); tFerme = null;
+            panneau.classList.remove('est-ouvert');
+        }
+        function ouvrirApres(ms) {
+            clearTimeout(tFerme); tFerme = null;
+            if (panneau.classList.contains('est-ouvert')) return;
+            clearTimeout(tOuvre);
+            tOuvre = setTimeout(ouvrir, ms);
+        }
+        function fermerApres(ms) {
+            clearTimeout(tOuvre); tOuvre = null;
+            clearTimeout(tFerme);
+            tFerme = setTimeout(fermer, ms);
+        }
+
+        // Souris. Le panneau est en position:fixed mais reste ENFANT DOM de
+        // .theme-wrap : mouseenter/mouseleave sur l'enveloppe couvrent donc le
+        // bouton ET le panneau, la chaîne de survol n'est pas rompue.
+        wrap.addEventListener('mouseenter', function () { fermeParEchap = false; ouvrirApres(DELAI_OUVERTURE); });
+        wrap.addEventListener('mouseleave', function () { fermerApres(DELAI_FERMETURE); });
+
+        // Clavier. Sans ouverture au focus, le curseur serait inatteignable à
+        // la tabulation : un input dans un conteneur en display:none n'est pas
+        // focalisable. Pas de délai — un focus n'est jamais accidentel.
+        wrap.addEventListener('focusin', function () {
+            if (fermeParEchap) return;
+            ouvrir();
+        });
+        wrap.addEventListener('focusout', function (e) {
+            if (!wrap.contains(e.relatedTarget)) { fermeParEchap = false; fermer(); }
+        });
+        wrap.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && panneau.classList.contains('est-ouvert')) {
+                fermeParEchap = true; fermer(); btn.focus();
+            }
+        });
+
+        // Tactile : pas de survol, donc appui long sur le bouton.
+        btn.addEventListener('pointerdown', function (e) {
+            if (e.pointerType === 'mouse') return;
+            appuiLong = false;
+            tAppui = setTimeout(function () { appuiLong = true; ouvrir(); }, DELAI_APPUI);
+        });
+        ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) {
+            btn.addEventListener(ev, function () { clearTimeout(tAppui); });
+        });
+        // Appui hors de l'enveloppe : sur tactile, aucun mouseleave ne viendra.
+        // Même schéma que la fermeture du menu utilisateur, plus haut.
+        document.addEventListener('pointerdown', function (e) {
+            if (!wrap.contains(e.target)) fermer();
+        });
+
+        // ── Application et mémorisation ───────────────────────────────────
+        var MIN = parseInt(curseur.min, 10);
+        var MAX = parseInt(curseur.max, 10);
+        var tEnvoi = null;
+        var dernierEnregistre = parseInt(curseur.value, 10);
+
+        window.seghoAppliquerLuminosite = function (pct) {
+            pct = Math.min(MAX, Math.max(MIN, pct));
+            if (pct >= MAX) {
+                // 100 % = aucun filtre du tout, et non brightness(100%) :
+                // inutile de forcer la composition GPU de tout le document
+                // pour un filtre qui ne change rien.
+                racine.removeAttribute('data-dim');
+                racine.style.removeProperty('--ui-brightness');
+            } else {
+                racine.style.setProperty('--ui-brightness', pct + '%');
+                racine.setAttribute('data-dim', '');
+            }
+            if (parseInt(curseur.value, 10) !== pct) curseur.value = pct;
+            // WebKit n'a pas d'équivalent de ::-moz-range-progress : la part
+            // remplie de la piste est passée en variable au dégradé.
+            curseur.style.setProperty('--lum-remplissage',
+                (((pct - MIN) / (MAX - MIN)) * 100).toFixed(1) + '%');
+            if (valeur) valeur.textContent = pct + ' %';
+            if (reset)  reset.hidden = (pct >= MAX);
+            return pct;
+        };
+
+        function enregistrer(pct) {
+            clearTimeout(tEnvoi);
+            // Anti-rebond 400 ms. À la souris, un seul POST par glissement. Au
+            // clavier, une flèche maintenue auto-répète une trentaine de fois
+            // par seconde et déclenche autant de « change » — sans ça, autant
+            // d'écritures en base ET en session, le middleware réécrivant
+            // last_activity à chaque requête.
+            tEnvoi = setTimeout(function () {
+                if (pct === dernierEnregistre) return;
+                var corps = new URLSearchParams();
+                corps.set('luminosite', pct);
+                fetch("{% url 'luminosite_set' %}", {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': '{{ csrf_token }}',
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        // Sans cet en-tête, SessionTimeoutMiddleware renvoie la
+                        // PAGE HTML locked.html en 423 au lieu d'un JSON : la
+                        // requête « réussit », rien n'est enregistré, et
+                        // l'utilisateur ne l'apprend qu'en changeant de poste.
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: corps.toString(),
+                    // Survit à un clic sur un lien juste après le relâchement.
+                    keepalive: true
+                }).then(function (res) {
+                    if (res.ok) { dernierEnregistre = pct; }
+                }).catch(function () {
+                    // Réseau coupé : le réglage reste actif sur la page ouverte,
+                    // il sera simplement oublié au rechargement.
+                });
+            }, 400);
+        }
+
+        // « input » pendant le glissement : rendu immédiat, ZÉRO requête.
+        curseur.addEventListener('input', function () {
+            window.seghoAppliquerLuminosite(parseInt(curseur.value, 10));
+        });
+        // « change » au relâchement : une seule écriture, anti-rebondie.
+        curseur.addEventListener('change', function () {
+            enregistrer(window.seghoAppliquerLuminosite(parseInt(curseur.value, 10)));
+        });
+        if (reset) {
+            reset.addEventListener('click', function () {
+                enregistrer(window.seghoAppliquerLuminosite(MAX));
+            });
+        }
+
+        // Au chargement : le filtre est déjà posé par le serveur sur <html>.
+        // Cet appel ne fait qu'aligner l'étiquette et le remplissage de piste.
+        window.seghoAppliquerLuminosite(parseInt(curseur.value, 10));
+    })();
     </script>
     <script>
     (function () {

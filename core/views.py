@@ -205,6 +205,25 @@ def accent_color_set(request):
     return JsonResponse({'ok': True, 'color': color, 'css': build_accent_css(color)})
 
 
+@login_required(login_url='login')
+@require_POST
+def luminosite_set(request):
+    """Enregistre la luminosité choisie au curseur du bandeau.
+
+    Une différence assumée avec accent_color_set : pas de réponse 400. On borne
+    et on renvoie la valeur réellement écrite, pour que le client s'y recale si
+    elle a été rognée. Un curseur borné côté client ne peut pas produire une
+    faute que l'utilisateur pourrait corriger lui-même."""
+    from core.models import UserProfile
+    from core.utils import normaliser_luminosite
+
+    pourcent = normaliser_luminosite(request.POST.get('luminosite'))
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    profile.luminosite = pourcent
+    profile.save(update_fields=['luminosite'])
+    return JsonResponse({'ok': True, 'luminosite': pourcent})
+
+
 def _get_dashboard_stats():
     from patients.models import Patient, RendezVous
     from consultations.models import Consultation

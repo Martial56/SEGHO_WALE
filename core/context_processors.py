@@ -4,16 +4,25 @@ from django.db.models import F
 
 
 def user_profile(request):
+    from core.utils import LUMINOSITE_DEFAUT
     if not request.user.is_authenticated:
-        return {'user_profile': None, 'accent_css': None}
+        return {'user_profile': None, 'accent_css': None, 'luminosite': LUMINOSITE_DEFAUT}
     try:
         from core.models import UserProfile
-        from core.utils import build_accent_css, is_valid_hex_color
+        from core.utils import build_accent_css, is_valid_hex_color, normaliser_luminosite
         profile, _ = UserProfile.objects.get_or_create(user=request.user)
         accent_css = build_accent_css(profile.accent_color) if is_valid_hex_color(profile.accent_color) else None
-        return {'user_profile': profile, 'accent_css': accent_css}
+        # Re-bornage défensif : le champ a des validateurs, mais ils ne sont pas
+        # joués par un UPDATE en shell ni par un import de données. Le gabarit ne
+        # doit jamais pouvoir écrire une luminosité illisible, quelle que soit la
+        # valeur réellement en base.
+        return {
+            'user_profile': profile,
+            'accent_css': accent_css,
+            'luminosite': normaliser_luminosite(profile.luminosite),
+        }
     except Exception:
-        return {'user_profile': None, 'accent_css': None}
+        return {'user_profile': None, 'accent_css': None, 'luminosite': LUMINOSITE_DEFAUT}
 
 
 def header_stats(request):
