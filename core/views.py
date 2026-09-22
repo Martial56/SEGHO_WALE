@@ -272,6 +272,7 @@ def dashboard(request):
     ).count()
 
     from core.pastilles import pastilles as _pastilles
+    from employer.views import can_manage_rh
 
     response = render(request, 'core/dashboard.html', {
         'stats': stats,
@@ -283,6 +284,7 @@ def dashboard(request):
         'user_modules': user_modules,
         'accessible_codes': accessible_codes,
         'plannings_non_vus': plannings_non_vus,
+        'can_manage_rh_presence': can_manage_rh(request.user),
     })
     response['Cache-Control'] = 'no-store, no-cache, must-revalidate'
     response['Pragma'] = 'no-cache'
