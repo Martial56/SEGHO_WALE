@@ -2,6 +2,13 @@
 
 {% block topbar_title %}{{ titre }}{% endblock %}
 
+{% comment %}
+Un rendez-vous de médecine générale ouvert depuis la gynécologie reste sous
+le menu de la gynécologie : on n'a pas demandé à changer de module en
+cliquant sur une ligne. Voir patients/origines.py.
+{% endcomment %}
+{% block module_navbar %}{% if origine %}{% include origine.nav %}{% else %}{{ block.super }}{% endif %}{% endblock %}
+
 {% block extra_css %}
 {{ block.super }}
 <style>
@@ -623,18 +630,20 @@
 <!-- ══════════════ PANNEAU DE CONTRÔLE ══════════════ -->
 <div class="control-panel">
     <div class="cp-top">
-        <a href="{% url 'patients:rdv_global' %}" class="o-ctrl-btn" style="padding:3px 7px;" title="Retour aux rendez-vous">
+        <a href="{% if origine and rdv %}{% url 'patients:rdv_list' rdv.patient.pk %}{{ origine_qs }}{% else %}{% url 'patients:rdv_global' %}{% endif %}"
+           class="o-ctrl-btn" style="padding:3px 7px;" title="Retour aux rendez-vous">
             <i class="bi bi-arrow-left"></i>
         </a>
         <span style="font-size:13.5px;color:var(--text-muted);">
-            <a href="{% url 'patients:rdv_global' %}" style="color:var(--accent-text-soft);text-decoration:none;font-weight:500;">Rendez-vous</a>
+            <a href="{% if origine %}{% url origine.url %}{% else %}{% url 'patients:rdv_global' %}{% endif %}"
+               style="color:var(--accent-text-soft);text-decoration:none;font-weight:500;">{% if origine %}{{ origine.libelle }}{% else %}Rendez-vous{% endif %}</a>
             <span style="margin:0 5px;opacity:.4;">/</span>
             <span style="color:var(--text);">{% if rdv %}{{ rdv.patient.nom }} {{ rdv.patient.prenoms }}{% else %}Nouveau{% endif %}</span>
         </span>
         <div style="flex:1;"></div>
         <div class="cp-save-group">
             <button type="submit" class="btn-save">{% if rdv %}Enregistrer{% else %}Sauvegarder et facturer{% endif %}</button>
-            <a href="{% url 'patients:rdv_global' %}" class="btn-discard">Ignorer</a>
+            <a href="{% if origine and rdv %}{% url 'patients:rdv_list' rdv.patient.pk %}{{ origine_qs }}{% else %}{% url 'patients:rdv_global' %}{% endif %}" class="btn-discard">Ignorer</a>
         </div>
     </div>
 </div>
@@ -648,12 +657,17 @@
             {% if not rdv %}
                 {# Nouveau RDV — pas encore de boutons d'action #}
             {% elif rdv.statut == 'planifie' %}
+                {% if peut_modifier %}
                 <button type="submit" name="_action" value="confirmer" class="btn-action btn-teal"
                     {% if not facture_payee %}disabled title="Sauvegardez et créez d'abord une facture pour confirmer ce rendez-vous"{% endif %}>Confirmer</button>
+                {% endif %}
             {% elif rdv.statut == 'confirme' %}
                 {% if consultation and rdv.medecin %}
+                    {% if peut_modifier %}
                     <button type="submit" name="_action" value="en_attente" class="btn-action btn-waiting">En Attente</button>
+                    {% endif %}
                 {% else %}
+                    {% if peut_modifier %}
                     <button type="button" class="btn-action btn-teal" id="btn-modifier">
                         <i class="bi bi-pencil"></i> Modifier
                     </button>
@@ -664,17 +678,24 @@
                             <i class="bi bi-x-lg"></i> Annuler
                         </button>
                     </div>
+                    {% endif %}
                 {% endif %}
             {% elif rdv.statut == 'en_attente' %}
+                {% if peut_modifier %}
                 <button type="submit" name="_action" value="en_consultation" class="btn-action btn-teal">En consultation</button>
+                {% endif %}
             {% elif rdv.statut == 'en_consultation' %}
+                {% if peut_modifier %}
                 <button type="button" class="btn-action" id="btn-pause"><i class="bi bi-pause-fill"></i> Pause</button>
+                {% endif %}
                 <a href="{% url 'ordonnance_create_libre' %}?patient_id={{ rdv.patient.pk }}{% if consultation %}&consultation_id={{ consultation.pk }}{% endif %}{% if rdv.medecin %}&medecin_id={{ rdv.medecin.pk }}{% endif %}" class="btn-action btn-ghost"><i class="bi bi-file-earmark-medical"></i> Créer une ordonnance</a>
                 <a href="{% url 'laboratoire_create' %}?patient={{ rdv.patient.pk }}{% if rdv.medecin %}&medecin_id={{ rdv.medecin.pk }}{% endif %}" class="btn-action btn-ghost"><i class="bi bi-flask"></i> Demande de lab</a>
-                <a href="{% url 'soins:create' %}?patient_id={{ rdv.patient.pk }}" class="btn-action btn-ghost"><i class="bi bi-bandaid"></i> Soins</a>
+                {% if perms.soins.add_soin %}<a href="{% url 'soins:create' %}?patient_id={{ rdv.patient.pk }}" class="btn-action btn-ghost"><i class="bi bi-bandaid"></i> Soins</a>{% endif %}
                 <a href="{% url 'hospitalisation:create' %}?patient={{ rdv.patient.pk }}{% if rdv.medecin %}&medecin={{ rdv.medecin.pk }}{% endif %}&rdv={{ rdv.pk }}" class="btn-action btn-ghost"><i class="bi bi-clipboard2-pulse"></i> M.O</a>
+                {% if peut_modifier %}
                 <button type="submit" name="_action" value="terminer" class="btn-action btn-dark">Consultation terminée</button>
                 <button type="submit" name="_action" value="annuler" class="btn-action btn-danger-outline">Annuler</button>
+                {% endif %}
             {% endif %}
         </div>
 
@@ -902,7 +923,7 @@
         <!-- En-tête avec bouton modal -->
         <div class="eval-header">
           <span class="eval-status">
-            {% if consultation %}Évaluation du {{ consultation.date_heure|date:"d/m/Y à H:i" }}{% if consultation.medecin %} — Dr. {{ consultation.medecin.nom }}{% endif %}
+            {% if consultation %}Évaluation du {{ consultation.date_heure|date:"d/m/Y à H:i:s" }}{% if consultation.medecin %} — Dr. {{ consultation.medecin.nom }}{% endif %}
             {% elif rdv %}Aucune évaluation pour ce rendez-vous.
             {% else %}Sauvegardez d'abord le rendez-vous pour créer une évaluation.{% endif %}
           </span>
@@ -1019,6 +1040,7 @@
             <div class="cpn-row"><span class="cpn-lbl">Conseil PF</span><input type="checkbox" name="cpn_conseil_pf" value="1" class="editable" style="width:15px;height:15px;accent-color:var(--teal-600);"></div>
             <div class="cpn-row"><span class="cpn-lbl">Méthode souhaitée</span><select name="cpn_methode_souhaitee" class="cpn-sel editable"><option value=""></option><option value="condom">Condom</option><option value="pilule">Pilule</option><option value="diu">DIU</option><option value="injectable">Injectable</option><option value="implant">Implant</option><option value="sterilisation">Stérilisation</option></select></div>
             <div class="cpn-row"><span class="cpn-lbl">Résultat consultation</span><div class="cpn-radios"><label><input type="radio" name="cpn_resultat_consultation" value="normale" class="editable"> Gross. normale</label><label><input type="radio" name="cpn_resultat_consultation" value="risque" class="editable"> Gross. à risque</label></div></div>
+            <div class="cpn-row" id="cpn_gestion_risque_row" style="display:none;"><span class="cpn-lbl">Gestion du risque</span><select name="cpn_gestion_risque" class="cpn-sel editable"><option value=""></option><option value="revoir">À revoir</option><option value="referer">À référer</option><option value="hospitaliser">À hospitaliser</option></select></div>
             <div class="cpn-row"><span class="cpn-lbl">Conseil santé sexuelle et reproductive</span><select name="cpn_conseil_sante_sexuelle" class="cpn-sel editable"><option value=""></option><option value="oui">Oui</option><option value="non">Non</option></select></div>
             <div class="cpn-row"><span class="cpn-lbl">Examens échographiques ou radiologiques</span><input type="text" name="cpn_examens_echo" class="cpn-inp editable"></div>
             <div class="cpn-row"><span class="cpn-lbl">Conseil nutritionnel</span><div class="cpn-radios"><label><input type="radio" name="cpn_conseil_nutritionnel" value="oui" class="editable"> Oui</label><label><input type="radio" name="cpn_conseil_nutritionnel" value="non" class="editable"> Non</label></div></div>
@@ -1682,6 +1704,22 @@
         if (row) row.style.display = (val === 'autre') ? '' : 'none';
     }
 
+    /* ── Résultat consultation CPN : afficher/masquer « Gestion du risque » ── */
+    document.querySelectorAll('input[name="cpn_resultat_consultation"]').forEach(function (radio) {
+        radio.addEventListener('change', function () {
+            var row = document.getElementById('cpn_gestion_risque_row');
+            if (!row) return;
+            var arisque = this.checked && this.value === 'risque';
+            row.style.display = arisque ? '' : 'none';
+            /* Une conduite ne doit pas survivre au retour en grossesse normale :
+               sinon le JSON garderait « À hospitaliser » sur une CPN sans risque. */
+            if (!arisque) {
+                var sel = row.querySelector('select');
+                if (sel) sel.value = '';
+            }
+        });
+    });
+
     /* ── Onglets ── */
     document.querySelectorAll('.tab-btn').forEach(function (btn) {
         btn.addEventListener('click', function () {
@@ -1845,8 +1883,11 @@
         });
     });
 
-    // Mode édition : actif si création, confirmé+facturé, en attente, ou en consultation
-    var editMode = isNew || confirmeFacture || currentStatut === 'en_attente' || consultationStarted;
+    // Mode édition : actif si création, confirmé+facturé, en attente, ou en
+    // consultation — et seulement pour qui a le droit de modifier. Sans la
+    // permission la fiche reste consultable, mais entièrement figée.
+    var peutModifier = {{ peut_modifier|yesno:"true,false" }};
+    var editMode = peutModifier && (isNew || confirmeFacture || currentStatut === 'en_attente' || consultationStarted);
     function applyEditMode() {
     var editables = document.querySelectorAll('.editable');
     editables.forEach(function(el) {
@@ -2232,6 +2273,14 @@ html[data-theme="dark"] .em-btn-link{color:var(--teal-300);}
   preremplir('_reg_acc');
   preremplir('_reg_post');
   preremplir('_reg_cur');
+
+  /* Afficher « Gestion du risque » si la grossesse chargée est à risque */
+  (function () {
+    var row = document.getElementById('cpn_gestion_risque_row');
+    if (!row) return;
+    var coche = document.querySelector('input[name="cpn_resultat_consultation"]:checked');
+    row.style.display = (coche && coche.value === 'risque') ? '' : 'none';
+  })();
 })();
 </script>
 

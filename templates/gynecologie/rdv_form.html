@@ -606,7 +606,7 @@
                 <button type="button" class="btn-action" id="btn-pause"><i class="bi bi-pause-fill"></i> Pause</button>
                 <a href="{% url 'ordonnance_create_libre' %}?patient_id={{ rdv.patient.pk }}{% if consultation %}&consultation_id={{ consultation.pk }}{% endif %}{% if rdv.medecin %}&medecin_id={{ rdv.medecin.pk }}{% endif %}" class="btn-action btn-ghost"><i class="bi bi-file-earmark-medical"></i> Créer une ordonnance</a>
                 <a href="{% url 'laboratoire_create' %}?patient={{ rdv.patient.pk }}{% if rdv.medecin %}&medecin_id={{ rdv.medecin.pk }}{% endif %}" class="btn-action btn-ghost"><i class="bi bi-flask"></i> Demande de lab</a>
-                <a href="{% url 'soins:create' %}?patient_id={{ rdv.patient.pk }}" class="btn-action btn-ghost"><i class="bi bi-bandaid"></i> Soins</a>
+                {% if perms.soins.add_soin %}<a href="{% url 'soins:create' %}?patient_id={{ rdv.patient.pk }}" class="btn-action btn-ghost"><i class="bi bi-bandaid"></i> Soins</a>{% endif %}
                 <a href="{% url 'hospitalisation:create' %}?patient={{ rdv.patient.pk }}{% if rdv.medecin %}&medecin={{ rdv.medecin.pk }}{% endif %}&rdv={{ rdv.pk }}" class="btn-action btn-ghost"><i class="bi bi-clipboard2-pulse"></i> M.O</a>
                 <button type="submit" name="_action" value="terminer" class="btn-action btn-dark">Consultation terminée</button>
                 <button type="submit" name="_action" value="annuler" class="btn-action btn-danger-outline">Annuler</button>
@@ -842,7 +842,7 @@
         <!-- En-tête avec bouton modal -->
         <div class="eval-header">
           <span class="eval-status">
-            {% if consultation %}Évaluation du {{ consultation.date_heure|date:"d/m/Y à H:i" }}{% if consultation.medecin %} — Dr. {{ consultation.medecin.nom }}{% endif %}
+            {% if consultation %}Évaluation du {{ consultation.date_heure|date:"d/m/Y à H:i:s" }}{% if consultation.medecin %} — Dr. {{ consultation.medecin.nom }}{% endif %}
             {% elif rdv %}Aucune évaluation pour ce rendez-vous.
             {% else %}Sauvegardez d'abord le rendez-vous pour créer une évaluation.{% endif %}
           </span>
@@ -959,6 +959,7 @@
             <div class="cpn-row"><span class="cpn-lbl">Conseil PF</span><input type="checkbox" name="cpn_conseil_pf" value="1" class="editable" style="width:15px;height:15px;accent-color:var(--teal-600);"></div>
             <div class="cpn-row"><span class="cpn-lbl">Méthode souhaitée</span><select name="cpn_methode_souhaitee" class="cpn-sel editable"><option value=""></option><option value="condom">Condom</option><option value="pilule">Pilule</option><option value="diu">DIU</option><option value="injectable">Injectable</option><option value="implant">Implant</option><option value="sterilisation">Stérilisation</option></select></div>
             <div class="cpn-row"><span class="cpn-lbl">Résultat consultation</span><div class="cpn-radios"><label><input type="radio" name="cpn_resultat_consultation" value="normale" class="editable"> Gross. normale</label><label><input type="radio" name="cpn_resultat_consultation" value="risque" class="editable"> Gross. à risque</label></div></div>
+            <div class="cpn-row" id="cpn_gestion_risque_row" style="display:none;"><span class="cpn-lbl">Gestion du risque</span><select name="cpn_gestion_risque" class="cpn-sel editable"><option value=""></option><option value="revoir">À revoir</option><option value="referer">À référer</option><option value="hospitaliser">À hospitaliser</option></select></div>
             <div class="cpn-row"><span class="cpn-lbl">Conseil santé sexuelle et reproductive</span><select name="cpn_conseil_sante_sexuelle" class="cpn-sel editable"><option value=""></option><option value="oui">Oui</option><option value="non">Non</option></select></div>
             <div class="cpn-row"><span class="cpn-lbl">Examens échographiques ou radiologiques</span><input type="text" name="cpn_examens_echo" class="cpn-inp editable"></div>
             <div class="cpn-row"><span class="cpn-lbl">Conseil nutritionnel</span><div class="cpn-radios"><label><input type="radio" name="cpn_conseil_nutritionnel" value="oui" class="editable"> Oui</label><label><input type="radio" name="cpn_conseil_nutritionnel" value="non" class="editable"> Non</label></div></div>
@@ -1701,6 +1702,22 @@
         });
     }
 
+    /* ── Résultat consultation CPN : afficher/masquer « Gestion du risque » ── */
+    document.querySelectorAll('input[name="cpn_resultat_consultation"]').forEach(function (radio) {
+        radio.addEventListener('change', function () {
+            var row = document.getElementById('cpn_gestion_risque_row');
+            if (!row) return;
+            var arisque = this.checked && this.value === 'risque';
+            row.style.display = arisque ? '' : 'none';
+            /* Une conduite ne doit pas survivre au retour en grossesse normale :
+               sinon le JSON garderait « À hospitaliser » sur une CPN sans risque. */
+            if (!arisque) {
+                var sel = row.querySelector('select');
+                if (sel) sel.value = '';
+            }
+        });
+    });
+
     /* ── Multi-select pathologies ── */
     (function () {
         function msUpdateTags(ms) {
@@ -2128,6 +2145,14 @@ html[data-theme="dark"] .em-btn-link{color:var(--teal-300);}
     var row = document.getElementById(id + '_autre_row');
     if (row) row.style.display = (sel.value === 'autre') ? '' : 'none';
   });
+
+  /* Afficher « Gestion du risque » si la grossesse chargée est à risque */
+  (function () {
+    var row = document.getElementById('cpn_gestion_risque_row');
+    if (!row) return;
+    var coche = document.querySelector('input[name="cpn_resultat_consultation"]:checked');
+    row.style.display = (coche && coche.value === 'risque') ? '' : 'none';
+  })();
 })();
 </script>
 

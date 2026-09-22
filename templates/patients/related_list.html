@@ -2,6 +2,9 @@
 
 {% block topbar_title %}{{ patient.nom }} {{ patient.prenoms }} — {{ titre }}{% endblock %}
 
+{% comment %}Même raison que sur la fiche : on garde le menu du module d'où l'on vient.{% endcomment %}
+{% block module_navbar %}{% if origine %}{% include origine.nav %}{% else %}{{ block.super }}{% endif %}{% endblock %}
+
 {% block extra_css %}
 {{ block.super }}
 <style>
@@ -143,6 +146,35 @@
 
     .data-table tbody tr[data-url] { cursor: pointer; }
     .data-table tbody tr[data-url]:hover td { background: rgba(var(--teal-600-rgb),.06); }
+
+    /* ── Pagination des onglets ──
+       Même dessin que la liste des patients, mais sur jetons : celle-là fige
+       un fond blanc en dur, illisible en thème sombre. */
+    .rl-pagination {
+        display: flex; align-items: center; justify-content: space-between;
+        flex-wrap: wrap; gap: 10px;
+        margin-top: 20px; padding-top: 16px;
+        border-top: 1px solid var(--border);
+        font-size: 13px; color: var(--text-muted);
+    }
+    .rl-pagination-pages { display: flex; gap: 6px; }
+    .rl-pagination-pages a,
+    .rl-pagination-pages span {
+        min-width: 32px; height: 32px; padding: 0 6px; border-radius: 6px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 13px; text-decoration: none; transition: background .2s;
+    }
+    .rl-pagination-pages a {
+        background: var(--surface); color: var(--accent-text);
+        box-shadow: var(--shadow-sm); cursor: pointer;
+    }
+    .rl-pagination-pages a:hover { background: var(--teal-50); }
+    .rl-pagination-pages span.current { background: var(--teal-500); color: #fff; }
+    .rl-pagination-pages span.disabled {
+        color: var(--text-faint); background: var(--surface-muted); cursor: default;
+    }
+    html[data-theme="dark"] .rl-pagination-pages a { color: var(--text); }
+    html[data-theme="dark"] .rl-pagination-pages a:hover { background: rgba(var(--teal-500-rgb), .18); }
 </style>
 {% endblock %}
 
@@ -153,11 +185,11 @@
 <!-- ══ Subheader ══ -->
 <div class="o-subheader">
   <div class="o-subheader-row">
-    <a href="{% url 'patients:detail' patient.pk %}" class="o-ctrl-btn" style="padding:3px 7px;">
+    <a href="{% url 'patients:detail' patient.pk %}{{ origine_qs }}" class="o-ctrl-btn" style="padding:3px 7px;">
       <i class="bi bi-arrow-left"></i>
     </a>
     <span style="font-size:13px;color:var(--text-muted);">
-      <a href="{% url 'patients:detail' patient.pk %}" class="rl-lien-patient">{{ patient.nom }} {{ patient.prenoms }}</a>
+      <a href="{% url 'patients:detail' patient.pk %}{{ origine_qs }}" class="rl-lien-patient">{{ patient.nom }} {{ patient.prenoms }}</a>
       <span style="margin:0 5px;opacity:.4;">/</span>
       <span id="rl-breadcrumb-title" style="color:var(--text);">{{ titre }}</span>
     </span>
@@ -171,17 +203,19 @@
         <span class="ph-code">{{ patient.code_patient }}</span>
     </div>
     <div class="rl-tab-nav" id="rl-tab-nav">
-        <a href="{% url 'patients:rdv_list' patient.pk %}"
+        <a href="{% url 'patients:rdv_list' patient.pk %}{{ origine_qs }}"
            class="rl-tab {% if view_type == 'rdv' %}active{% endif %}">Rendez-vous</a>
-        <a href="{% url 'patients:soin_list' patient.pk %}"
+        <a href="{% url 'patients:soin_list' patient.pk %}{{ origine_qs }}"
            class="rl-tab {% if view_type == 'soin' %}active{% endif %}">Soins</a>
-        <a href="{% url 'patients:ordonnance_list' patient.pk %}"
+        <a href="{% url 'patients:consultation_list' patient.pk %}{{ origine_qs }}"
+           class="rl-tab {% if view_type == 'consultation' %}active{% endif %}">Consultations</a>
+        <a href="{% url 'patients:ordonnance_list' patient.pk %}{{ origine_qs }}"
            class="rl-tab {% if view_type == 'ordonnance' %}active{% endif %}">Ordonnances</a>
-        <a href="{% url 'patients:hospitalisation_list' patient.pk %}"
+        <a href="{% url 'patients:hospitalisation_list' patient.pk %}{{ origine_qs }}"
            class="rl-tab {% if view_type == 'hospitalisation' %}active{% endif %}">Hospitalisations</a>
-        <a href="{% url 'patients:demande_examens_list' patient.pk %}"
+        <a href="{% url 'patients:demande_examens_list' patient.pk %}{{ origine_qs }}"
            class="rl-tab {% if view_type == 'demande_examens' %}active{% endif %}">Demandes examens</a>
-        <a href="{% url 'patients:resultat_examens_list' patient.pk %}"
+        <a href="{% url 'patients:resultat_examens_list' patient.pk %}{{ origine_qs }}"
            class="rl-tab {% if view_type == 'resultat_examens' %}active{% endif %}">Résultats examens</a>
     </div>
 </div>
@@ -216,6 +250,7 @@ rlBindRowClicks();
                 wrap.innerHTML = html;
                 wrap.style.opacity = '';
                 rlBindRowClicks();
+                rlBindPageLinks();
                 tabNav.querySelectorAll('.rl-tab').forEach(function (t) { t.classList.remove('active'); });
                 if (tabEl) {
                     tabEl.classList.add('active');
@@ -228,6 +263,19 @@ rlBindRowClicks();
                 window.location.href = url;
             });
     }
+
+    /* Les liens de page vivent dans le fragment remplacé : il faut les relier à
+       chaque chargement, comme les lignes du tableau. L'onglet actif est repassé
+       à loadTab pour qu'il garde sa pastille et son fil d'Ariane. */
+    function rlBindPageLinks() {
+        wrap.querySelectorAll('.rl-page-link').forEach(function (lien) {
+            lien.addEventListener('click', function (e) {
+                e.preventDefault();
+                loadTab(lien.getAttribute('href'), tabNav.querySelector('.rl-tab.active'), true);
+            });
+        });
+    }
+    rlBindPageLinks();
 
     tabNav.querySelectorAll('.rl-tab').forEach(function (tab) {
         tab.addEventListener('click', function (e) {

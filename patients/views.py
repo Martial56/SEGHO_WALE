@@ -1,6 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
+from django.urls import reverse
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, permission_required
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db.models import Q
@@ -8,6 +9,8 @@ from django.http import JsonResponse
 from django.utils import timezone
 from datetime import date, timedelta
 
+from . import origines as origines_patient
+from .rdv_destination import url_fiche_rdv
 from .models import Patient, RendezVous, Pathologie, TypeVisiteCurative
 from .forms import (PatientForm, RendezVousForm, PathologieForm, TypeVisiteForm,
                     TypeVisiteCurativeForm)
@@ -20,7 +23,28 @@ from gynecologie.models import TypeVisite
 def _render_related_list(request, context):
     is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
     template = 'patients/includes/related_list_body.html' if is_ajax else 'patients/related_list.html'
-    return render(request, template, context)
+    # La provenance suit le patient jusque dans ses listes liées : sans ça, un
+    # clic sur « Soins » depuis une fiche ouverte en gynécologie rebasculerait
+    # l'utilisatrice dans le module Patients.
+    ctx_origine = origines_patient.contexte(request)
+
+    # Un dossier ancien porte des centaines de lignes — rendez-vous,
+    # consultations, actes. Les sept onglets rendaient le jeu entier d'un bloc :
+    # tout en mémoire, tout dans la page. Une coupe sèche aux N derniers aurait
+    # rendu le reste invisible sans le dire, ce qui ne va pas sur un dossier
+    # médical — on pagine donc, et rien n'est perdu.
+    page = Paginator(context.get('items') or [], 10).get_page(request.GET.get('page'))
+    context = {**context, 'items': page, 'page_obj': page}
+
+    # Chaque ligne de rendez-vous porte sa propre destination : gynécologie ou
+    # module Rendez-vous, selon son département et les accès du lecteur. Calculé
+    # ici, une fois, plutôt que dans le gabarit (voir patients.rdv_destination).
+    # Sur la page affichée seulement, et non sur tout le jeu.
+    if context.get('view_type') == 'rdv':
+        for rdv in page:
+            rdv.url_fiche = url_fiche_rdv(request.user, rdv, ctx_origine['origine_qs'])
+
+    return render(request, template, {**context, **ctx_origine})
 
 
 @login_required
@@ -367,6 +391,15 @@ def patient_detail(request, pk):
     consultation_count = patient.consultations.count()
     facture_count = patient.factures.count()
 
+    # Les soins (soins.Soin) et les consultations (consultations.Consultation)
+    # sont deux jeux distincts. La carte « Soins » comptait les secondes tout en
+    # renvoyant vers une page qui n'existait pas dans la barre d'onglets.
+    try:
+        from soins.models import Soin
+        soin_count = Soin.objects.filter(patient=patient).count()
+    except Exception:
+        soin_count = 0
+
     try:
         from consultations.models import Ordonnance
         ordonnance_count = Ordonnance.objects.filter(consultation__patient=patient).count()
@@ -389,8 +422,18 @@ def patient_detail(request, pk):
         demande_examens_count = 0
         resultat_examens_count = 0
 
-    # Navigation précédent/suivant dans la liste ordonnée
-    ids = list(Patient.objects.order_by('-date_creation').values_list('pk', flat=True))
+    # D'où vient-on ? Une fiche ouverte depuis « Les patients » de la
+    # gynécologie doit ramener à cette liste-là, pas à celle du module Patients.
+    ctx_origine = origines_patient.contexte(request)
+    origine = ctx_origine['origine']
+
+    # Navigation précédent/suivant dans la liste ordonnée. Les flèches restent
+    # dans la cohorte d'origine : depuis la gynécologie, on ne déroule pas
+    # l'ensemble du fichier patients.
+    liste = Patient.objects.order_by('-date_creation')
+    if origine and origine.get('cohorte'):
+        liste = origine['cohorte'](liste)
+    ids = list(liste.values_list('pk', flat=True))
     try:
         idx = ids.index(pk)
         prev_pk = ids[idx - 1] if idx > 0 else None
@@ -404,6 +447,7 @@ def patient_detail(request, pk):
         'patient': patient,
         'rdv_count': rdv_count,
         'consultation_count': consultation_count,
+        'soin_count': soin_count,
         'facture_count': facture_count,
         'ordonnance_count': ordonnance_count,
         'hospitalisation_count': hospitalisation_count,
@@ -413,10 +457,12 @@ def patient_detail(request, pk):
         'position': position,
         'prev_pk': prev_pk,
         'next_pk': next_pk,
+        **ctx_origine,
     })
 
 
 @login_required
+@permission_required('patients.add_patient', raise_exception=True)
 def patient_create(request):
     if request.method == 'POST':
         form = PatientForm(request.POST, request.FILES)
@@ -430,14 +476,18 @@ def patient_create(request):
 
 
 @login_required
+@permission_required('patients.change_patient', raise_exception=True)
 def patient_edit(request, pk):
     patient = get_object_or_404(Patient, pk=pk)
+    ctx_origine = origines_patient.contexte(request)
     if request.method == 'POST':
         form = PatientForm(request.POST, request.FILES, instance=patient)
         if form.is_valid():
             form.save()
             messages.success(request, 'Dossier patient mis à jour.')
-            return redirect('patients:detail', pk=patient.pk)
+            # Enregistrer ramène à la fiche d'où l'on venait, provenance comprise.
+            return redirect(reverse('patients:detail', args=[patient.pk])
+                            + ctx_origine['origine_qs'])
     else:
         form = PatientForm(instance=patient)
     return render(request, 'patients/form.html', {
@@ -445,6 +495,7 @@ def patient_edit(request, pk):
         'patient': patient,
         'titre': f'Modifier — {patient.nom} {patient.prenoms}',
         'edit': True,
+        **ctx_origine,
     })
 
 
@@ -638,6 +689,7 @@ def patient_search_json(request):
 
 
 @login_required
+@permission_required('patients.add_rendezvous', raise_exception=True)
 def rdv_create(request):
     if request.method == 'POST':
         form = RendezVousForm(request.POST)
@@ -661,7 +713,9 @@ def rdv_create(request):
             from django.urls import reverse
             return redirect(reverse('facture_create') + f'?patient={rdv.patient.pk}&rdv={rdv.pk}')
     else:
-        initial = {'date_heure': timezone.now().strftime('%Y-%m-%dT%H:%M')}
+        # Avec les secondes : le champ les accepte depuis qu'il porte `step=1`,
+        # et une valeur initiale tronquée les remettrait à zéro.
+        initial = {'date_heure': timezone.now().strftime('%Y-%m-%dT%H:%M:%S')}
         patient_pk = request.GET.get('patient')
         patient_obj = None
         if patient_pk:
@@ -685,7 +739,16 @@ def rdv_create(request):
 
 @login_required
 def rdv_edit(request, pk):
+    """Fiche d'un rendez-vous : consultable par tous, modifiable sur permission.
+
+    La page sert les deux usages. Le verrou porte sur le POST, pas sur l'accès :
+    un décorateur sur toute la vue renvoyait une erreur à qui voulait seulement
+    lire la ligne depuis la liste du patient. `peut_modifier` fige en plus les
+    champs à l'écran, pour ne pas proposer une saisie qui sera refusée.
+    """
     rdv = get_object_or_404(RendezVous, pk=pk)
+    peut_modifier = request.user.has_perm('patients.change_rendezvous')
+    ctx_origine = origines_patient.contexte(request)
 
     try:
         from facturation.models import Facture
@@ -712,6 +775,10 @@ def rdv_edit(request, pk):
         pass
 
     if request.method == 'POST':
+        # Le grisage des champs est une commodité d'affichage ; c'est ici que
+        # l'écriture est réellement refusée.
+        if not peut_modifier:
+            raise PermissionDenied
         action = request.POST.get('_action', '')
 
         if action == 'save_eval':
@@ -909,6 +976,8 @@ def rdv_edit(request, pk):
         'titre':         f'Rendez-vous — {rdv.patient.nom} {rdv.patient.prenoms}',
         'patient_prefill': rdv.patient,
         'facture_payee': facture_payee,
+        'peut_modifier': peut_modifier,
+        **ctx_origine,
         'is_new':        False,
         'consultation':  consultation,
         'constante':     constante,

@@ -480,7 +480,8 @@ var lignesCount = 0;
 function pad(n){ return n < 10 ? '0'+n : n; }
 function todayVal(){
   var d = new Date();
-  return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
+  return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'
+       + pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
 }
 function formatPrix(n){ return n ? parseInt(n).toLocaleString('fr-FR') + ' CFA' : '—'; }
 
@@ -529,12 +530,18 @@ function ajouterLigne(initial){
     '<td>',
       '<input type="checkbox" name="lignes_sel" value="'+idx+'">',
       '<input type="hidden" class="ligne-pat-hidden" name="lignes['+idx+'][patient]" value="">',
+      /* Identifiant de la ligne déjà enregistrée : sans lui le serveur ne peut
+         que recréer, ce qui perdrait son statut et sa facture. Vide sur une
+         ligne neuve. */
+      '<input type="hidden" name="lignes['+idx+'][pk]" value="'+(initial.pk || '')+'">',
     '</td>',
     '<td><span class="ligne-pat-name" style="font-size:12.5px;color:var(--text-muted);white-space:nowrap;">—</span></td>',
     '<td>'+serviceSel+'</td>',
     '<td><input type="text" class="ligne-inp ligne-prix" name="lignes['+idx+'][prix]" placeholder="0 CFA" readonly style="width:110px;"></td>',
     '<td>'+infirmierSel+'</td>',
-    '<td><input type="datetime-local" class="ligne-inp" name="lignes['+idx+'][date]" value="'+todayVal()+'" style="width:170px;"></td>',
+    /* `step=1` : sans lui le sélecteur s'arrête à la minute et la ligne
+        s'enregistre toujours avec « :00 » en secondes. */
+    '<td><input type="datetime-local" step="1" class="ligne-inp" name="lignes['+idx+'][date]" value="'+todayVal()+'" style="width:190px;"></td>',
     '<td><button type="button" class="ligne-del" onclick="supprimerLigne(this)" title="Supprimer"><i class="bi bi-trash3"></i></button></td>',
   ].join('');
 

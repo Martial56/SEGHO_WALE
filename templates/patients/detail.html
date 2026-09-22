@@ -2,6 +2,13 @@
 
 {% block topbar_title %}{{ patient.nom }} {{ patient.prenoms }}{% endblock %}
 
+{% comment %}
+Ouverte depuis un autre module (« Les patients » de la gynécologie), la fiche
+garde le menu de ce module : on n'a pas demandé à en changer en cliquant sur
+une patiente. Voir patients/origines.py.
+{% endcomment %}
+{% block module_navbar %}{% if origine %}{% include origine.nav %}{% else %}{{ block.super }}{% endif %}{% endblock %}
+
 {% block extra_css %}
 {{ block.super }}
 <style>
@@ -333,26 +340,30 @@
 <!-- ══ Subheader ══ -->
 <div class="o-subheader">
   <div class="o-subheader-row">
-    <a href="{% url 'patients:list' %}" class="o-ctrl-btn" style="padding:3px 7px;">
+    <a href="{% if origine %}{% url origine.url %}{% else %}{% url 'patients:list' %}{% endif %}"
+       class="o-ctrl-btn" style="padding:3px 7px;">
       <i class="bi bi-arrow-left"></i>
     </a>
     <span style="font-size:13px;color:var(--text-muted);">
-      <a href="{% url 'patients:list' %}" class="fil-lien">Patients</a>
+      <a href="{% if origine %}{% url origine.url %}{% else %}{% url 'patients:list' %}{% endif %}"
+         class="fil-lien">{% if origine %}{{ origine.libelle }}{% else %}Patients{% endif %}</a>
       <span style="margin:0 5px;opacity:.4;">/</span>
       <span style="color:var(--text);">{{ patient.nom }} {{ patient.prenoms }}</span>
     </span>
     <div style="flex:1;"></div>
-    <a href="{% url 'patients:edit' patient.pk %}" class="btn btn-primary" style="font-size:12.5px;padding:5px 14px;">Modifier</a>
+    {% if perms.patients.change_patient %}
+    <a href="{% url 'patients:edit' patient.pk %}{{ origine_qs }}" class="btn btn-primary" style="font-size:12.5px;padding:5px 14px;">Modifier</a>
+    {% endif %}
     {# <a href="{% url 'patients:create' %}" class="btn btn-secondary" style="font-size:12.5px;padding:5px 14px;">Nouveau patient</a> #}
     <div class="o-ctrl-sep"></div>
     <span class="nav-counter">{{ position }} / {{ total }}</span>
     {% if prev_pk %}
-        <a href="{% url 'patients:detail' prev_pk %}" class="nav-arrow" title="Précédent">&#8249;</a>
+        <a href="{% url 'patients:detail' prev_pk %}{{ origine_qs }}" class="nav-arrow" title="Précédent">&#8249;</a>
     {% else %}
         <span class="nav-arrow disabled">&#8249;</span>
     {% endif %}
     {% if next_pk %}
-        <a href="{% url 'patients:detail' next_pk %}" class="nav-arrow" title="Suivant">&#8250;</a>
+        <a href="{% url 'patients:detail' next_pk %}{{ origine_qs }}" class="nav-arrow" title="Suivant">&#8250;</a>
     {% else %}
         <span class="nav-arrow disabled">&#8250;</span>
     {% endif %}
@@ -362,27 +373,31 @@
 <div class="patient-layout">
 <!-- ══ Barre de stats ══ -->
 <div class="stats-bar">
-    <a href="{% url 'patients:rdv_list' patient.pk %}" class="stat-tab {% if rdv_count == 0 %}zero{% endif %}"><!-- patients:rdv_list -->
+    <a href="{% url 'patients:rdv_list' patient.pk %}{{ origine_qs }}" class="stat-tab {% if rdv_count == 0 %}zero{% endif %}"><!-- patients:rdv_list -->
         <span class="st-val">{{ rdv_count }}</span>
         <span class="st-lbl">Rendez-vous</span>
     </a>
-    <a href="{% url 'patients:consultation_list' patient.pk %}" class="stat-tab {% if consultation_count == 0 %}zero{% endif %}">
-        <span class="st-val">{{ consultation_count }}</span>
+    <a href="{% url 'patients:soin_list' patient.pk %}{{ origine_qs }}" class="stat-tab {% if soin_count == 0 %}zero{% endif %}">
+        <span class="st-val">{{ soin_count }}</span>
         <span class="st-lbl">Soins</span>
     </a>
-    <a href="{% url 'patients:ordonnance_list' patient.pk %}" class="stat-tab {% if ordonnance_count == 0 %}zero{% endif %}">
+    <a href="{% url 'patients:consultation_list' patient.pk %}{{ origine_qs }}" class="stat-tab {% if consultation_count == 0 %}zero{% endif %}">
+        <span class="st-val">{{ consultation_count }}</span>
+        <span class="st-lbl">Consultations</span>
+    </a>
+    <a href="{% url 'patients:ordonnance_list' patient.pk %}{{ origine_qs }}" class="stat-tab {% if ordonnance_count == 0 %}zero{% endif %}">
         <span class="st-val">{{ ordonnance_count }}</span>
         <span class="st-lbl">Ordonnances</span>
     </a>
-    <a href="{% url 'patients:hospitalisation_list' patient.pk %}" class="stat-tab {% if hospitalisation_count == 0 %}zero{% endif %}">
+    <a href="{% url 'patients:hospitalisation_list' patient.pk %}{{ origine_qs }}" class="stat-tab {% if hospitalisation_count == 0 %}zero{% endif %}">
         <span class="st-val">{{ hospitalisation_count }}</span>
         <span class="st-lbl">Hospitalisations</span>
     </a>
-    <a href="{% url 'patients:demande_examens_list' patient.pk %}" class="stat-tab {% if demande_examens_count == 0 %}zero{% endif %}">
+    <a href="{% url 'patients:demande_examens_list' patient.pk %}{{ origine_qs }}" class="stat-tab {% if demande_examens_count == 0 %}zero{% endif %}">
         <span class="st-val">{{ demande_examens_count }}</span>
         <span class="st-lbl">Demande d'examens labo</span>
     </a>
-    <a href="{% url 'patients:resultat_examens_list' patient.pk %}" class="stat-tab {% if resultat_examens_count == 0 %}zero{% endif %}">
+    <a href="{% url 'patients:resultat_examens_list' patient.pk %}{{ origine_qs }}" class="stat-tab {% if resultat_examens_count == 0 %}zero{% endif %}">
         <span class="st-val">{{ resultat_examens_count }}</span>
         <span class="st-lbl">Résultats d'examens labo</span>
     </a>
@@ -541,13 +556,13 @@
                         &nbsp;·&nbsp; Expire le {{ patient.date_expiration_assurance|date:"d/m/Y" }}
                     {% endif %}
                 </div>
-                <div style="margin-top:8px; font-size:13px; color:rgba(0,0,0,0.5);">
+                <div style="margin-top:8px; font-size:13px; color:var(--text-muted);">
                     Taux de prise en charge : <strong>{{ patient.assurance.taux_prise_en_charge }}%</strong>
                 </div>
             </div>
         </div>
         {% else %}
-        <div style="padding: 40px; text-align:center; color:rgba(0,0,0,0.35);">
+        <div style="padding: 40px; text-align:center; color:var(--text-faint);">
             <div style="font-size:40px; margin-bottom:12px;">🛡</div>
             <div style="font-weight:600;">Aucune assurance enregistrée</div>
         </div>

@@ -105,17 +105,22 @@ class GroupAdminWithModules(admin.ModelAdmin):
         granted_module_ids = set(
             GroupModule.objects.filter(group=group).values_list('module_id', flat=True)
         )
+        tous = get_navitems_grouped()
         grouped = {
             module: items
-            for module, items in get_navitems_grouped().items()
+            for module, items in tous.items()
             if module and module.id in granted_module_ids
         }
+        # Les menus sans module parent (« Vue d'ensemble » du tableau de bord)
+        # n'appartiennent à aucune carte : sans cette section, ils n'étaient
+        # proposés nulle part et restaient donc affichés pour tout le monde.
+        hors_module = tous.get(None, [])
         restricted_ids = set(
             GroupNavItemRestriction.objects.filter(group=group).values_list('nav_item_id', flat=True)
         )
 
         if request.method == 'POST':
-            for items in grouped.values():
+            for items in list(grouped.values()) + [hors_module]:
                 for item in items:
                     checked = request.POST.get(f'nav_{item.id}') == 'on'
                     is_restricted = item.id in restricted_ids
@@ -126,22 +131,24 @@ class GroupAdminWithModules(admin.ModelAdmin):
             messages.success(request, f"Menus mis à jour pour le groupe « {group.name} ».")
             return redirect(reverse('admin:modperm_group_navitems', args=[group.pk]))
 
+        def _entrees(items):
+            return [{'item': item, 'checked': item.id not in restricted_ids}
+                    for item in items]
+
         sections = [
-            {
-                'module': module,
-                'items': [
-                    {'item': item, 'checked': item.id not in restricted_ids}
-                    for item in items
-                ],
-            }
+            {'module': module, 'items': _entrees(items)}
             for module, items in grouped.items()
         ]
+        aucun_module = not sections
+        if hors_module:
+            sections.append({'module': None, 'items': _entrees(hors_module)})
 
         context = dict(
             self.admin_site.each_context(request),
             title=f"Menus visibles — groupe « {group.name} »",
             group=group,
             sections=sections,
+            aucun_module=aucun_module,
             opts=self.model._meta,
         )
         return render(request, 'modules_permissions/group_navitems.html', context)
@@ -285,11 +292,14 @@ class CustomUserAdmin(BaseUserAdmin):
         """
         target_user = get_object_or_404(User, pk=user_id)
         accessible_module_ids = set(get_user_modules(target_user).values_list('id', flat=True))
+        tous = get_navitems_grouped()
         grouped = {
             module: items
-            for module, items in get_navitems_grouped().items()
+            for module, items in tous.items()
             if module and module.id in accessible_module_ids
         }
+        # Voir la vue équivalente du groupe : les menus sans module parent.
+        hors_module = tous.get(None, [])
         group_hidden_ids = set(
             GroupNavItemRestriction.objects
             .filter(group__in=target_user.groups.all())
@@ -301,7 +311,7 @@ class CustomUserAdmin(BaseUserAdmin):
         }
 
         if request.method == 'POST':
-            for items in grouped.values():
+            for items in list(grouped.values()) + [hors_module]:
                 for item in items:
                     checked = request.POST.get(f'nav_{item.id}') == 'on'
                     default_visible = item.id not in group_hidden_ids
@@ -315,21 +325,29 @@ class CustomUserAdmin(BaseUserAdmin):
             messages.success(request, f"Menus mis à jour pour « {target_user.username} ».")
             return redirect(reverse('admin:modperm_user_navitems', args=[target_user.pk]))
 
-        sections = []
-        for module, items in grouped.items():
+        def _entrees(items):
             entries = []
             for item in items:
                 default_visible = item.id not in group_hidden_ids
                 override = overrides.get(item.id)
                 checked = {'show': True, 'hide': False}.get(override, default_visible)
                 entries.append({'item': item, 'checked': checked, 'is_override': override is not None})
-            sections.append({'module': module, 'items': entries})
+            return entries
+
+        sections = [
+            {'module': module, 'items': _entrees(items)}
+            for module, items in grouped.items()
+        ]
+        aucun_module = not sections
+        if hors_module:
+            sections.append({'module': None, 'items': _entrees(hors_module)})
 
         context = dict(
             self.admin_site.each_context(request),
             title=f"Menus visibles — {target_user.username}",
             target_user=target_user,
             sections=sections,
+            aucun_module=aucun_module,
             opts=self.model._meta,
         )
         return render(request, 'modules_permissions/user_navitems.html', context)

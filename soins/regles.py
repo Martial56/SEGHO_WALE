@@ -7,6 +7,7 @@ une liste qui en montre 5 n'est plus jamais regardée. Ils lisent donc tous ici.
 """
 
 from django.db.models import Q
+from django.utils import timezone
 
 
 def condition_administrable():
@@ -60,4 +61,47 @@ def demarrer_soin_de_facture(facture):
     soin.statut = 'en_cours'
     soin.save(update_fields=['statut'])
     soin.demarrer_procedures()
+    return soin
+
+
+def cloturer_si_procedures_terminees(soin, user=None):
+    """Un soin dont toutes les lignes sont terminées se termine de lui-même.
+
+    Le miroir de `soins_administrer`, qui fait déjà descendre « terminé » du
+    soin vers ses procédures. Dans l'autre sens rien ne remontait : un dossier
+    de dix lignes toutes terminées restait « en cours » indéfiniment, à moins
+    que quelqu'un ne reclique « Administrer » sur le soin — ce qui refermait
+    d'un bloc y compris les lignes qui ne l'étaient pas.
+
+    Renvoie le soin clôturé, ou None s'il n'y avait rien à faire.
+    """
+    from core.views import log_event
+    from soins.models import ProcedureSoin
+
+    if soin is None or soin.statut != 'en_cours':
+        return None
+    # Un dossier d'hospitalisation reçoit ses procédures visite après visite
+    # (hospitalisation.views._sync_procedure_soin). Le fermer parce que les
+    # premières sont faites gèlerait un séjour encore en cours, et la visite du
+    # lendemain viendrait se greffer sur un soin déjà « terminé ».
+    if soin.hospitalisation_id:
+        return None
+
+    # all_objects : le décompte est borné par le soin, qui porte déjà son
+    # centre — voir Soin.demarrer_procedures.
+    statuts = set(ProcedureSoin.all_objects.filter(soin=soin)
+                  .values_list('statut', flat=True))
+    # « Au moins une terminée » plutôt que le seul « aucune en attente » : sans
+    # cela un soin sans aucune ligne, ou dont tout a été annulé, se fermerait
+    # tout seul.
+    if 'termine' not in statuts:
+        return None
+    if statuts & {'brouillon', 'en_cours'}:
+        return None
+
+    soin.statut = 'termine'
+    soin.termine_par = user if user is not None and user.is_authenticated else None
+    soin.date_termine = timezone.now()
+    soin.save(update_fields=['statut', 'termine_par', 'date_termine'])
+    log_event(soin, user, 'Toutes les lignes terminées — statut : Terminé.', type='statut')
     return soin
