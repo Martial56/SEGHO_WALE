@@ -27,6 +27,20 @@ class PlageHoraire(models.Model):
         verbose_name_plural = "Plages horaires"
 
 
+class PermanenceCreneauModele(models.Model):
+    """Modèle de créneau de permanence (ex. « 18h-08h »), proposé par défaut
+    à la création d'un nouveau planning — reste librement modifiable ensuite,
+    semaine par semaine, sur le planning lui-même (PermanenceCreneau)."""
+    libelle = models.CharField(max_length=40, verbose_name="Créneau (ex. 18h-08h)")
+    ordre   = models.PositiveSmallIntegerField(default=0)
+
+    def __str__(self): return self.libelle
+    class Meta:
+        ordering = ['ordre', 'pk']
+        verbose_name = "Modèle de créneau de permanence"
+        verbose_name_plural = "Modèles de créneaux de permanence"
+
+
 class PlanningHebdomadaire(models.Model):
     semaine_debut = models.DateField(unique=True)
     cree_par = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='plannings_crees')
@@ -93,42 +107,36 @@ class Affectation(models.Model):
         verbose_name_plural = "Affectations"
 
 
-class PlanningGabarit(models.Model):
-    nom = models.CharField(max_length=100)
-    cree_par = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
-    cree_le = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self): return self.nom
-    class Meta:
-        ordering = ['nom']
-        verbose_name = "Gabarit de planning"
-        verbose_name_plural = "Gabarits de planning"
-
-
-class GabaritAffectation(models.Model):
-    gabarit = models.ForeignKey(PlanningGabarit, on_delete=models.CASCADE, related_name='affectations')
-    plage = models.ForeignKey(PlageHoraire, on_delete=models.CASCADE)
-    jour = models.PositiveSmallIntegerField(choices=JOURS)
-    personnel = models.CharField(max_length=200, blank=True)
-    note = models.CharField(max_length=300, blank=True)
+class PermanenceCreneau(models.Model):
+    """Un créneau de permanence, propre à un planning donné — les horaires ne
+    sont pas fixés une fois pour toutes (contrairement aux plages des
+    bureaux) : ils sont saisis librement à chaque édition du planning."""
+    planning = models.ForeignKey(PlanningHebdomadaire, on_delete=models.CASCADE, related_name='permanence_creneaux')
+    libelle  = models.CharField(max_length=40, verbose_name="Créneau (ex. 18h-08h)")
+    ordre    = models.PositiveSmallIntegerField(default=0)
 
     class Meta:
-        unique_together = ['gabarit', 'plage', 'jour']
-        verbose_name = "Affectation gabarit"
+        ordering = ['ordre', 'pk']
+        verbose_name = "Créneau de permanence"
+        verbose_name_plural = "Créneaux de permanence"
+
+    def __str__(self):
+        return self.libelle
 
 
 class LignePermanence(models.Model):
-    planning  = models.ForeignKey(PlanningHebdomadaire, on_delete=models.CASCADE, related_name='permanences')
+    creneau   = models.ForeignKey(PermanenceCreneau, on_delete=models.CASCADE, related_name='affectations')
     jour      = models.PositiveSmallIntegerField(choices=JOURS)
     personnel = models.CharField(max_length=200, blank=True)
+    note      = models.CharField(max_length=300, blank=True)
 
     class Meta:
-        unique_together = ['planning', 'jour']
+        unique_together = ['creneau', 'jour']
         verbose_name = "Ligne de permanence"
         verbose_name_plural = "Lignes de permanence"
 
     def __str__(self):
-        return f"Permanence {JOURS[self.jour][1]} — {self.planning}"
+        return f"Permanence {JOURS[self.jour][1]} — {self.creneau}"
 
 
 FONCTION_SIGNATAIRE_CHOICES = [
@@ -141,6 +149,11 @@ FONCTION_SIGNATAIRE_CHOICES = [
 
 class MedecinSignataire(models.Model):
     nom = models.CharField(max_length=200)
+    fonction = models.CharField(
+        max_length=40, choices=FONCTION_SIGNATAIRE_CHOICES, blank=True, default='',
+        verbose_name="Fonction",
+        help_text="Affichée au-dessus du nom sur les plannings imprimés/publiés signés par ce médecin.",
+    )
     actif = models.BooleanField(default=True)
     ordre = models.PositiveSmallIntegerField(default=0)
 
@@ -154,10 +167,6 @@ class MedecinSignataire(models.Model):
 
 
 class PlanningConfig(models.Model):
-    fonction_signataire = models.CharField(
-        max_length=40, choices=FONCTION_SIGNATAIRE_CHOICES,
-        default='directrice_medicale_adjointe',
-    )
     medecin_defaut = models.ForeignKey(
         MedecinSignataire, on_delete=models.SET_NULL, null=True, blank=True,
     )

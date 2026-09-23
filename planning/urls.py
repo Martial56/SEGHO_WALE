@@ -14,6 +14,8 @@ urlpatterns = [
     path('bureaux/bureau/<int:pk>/ordre/',     views.planning_bureau_ordre,  name='planning_bureau_ordre'),
     path('bureaux/plage/',          views.planning_plage_save,    name='planning_plage_save'),
     path('bureaux/plage/<int:pk>/supprimer/',  views.planning_plage_delete,  name='planning_plage_delete'),
+    path('bureaux/permanence-modele/',                  views.planning_permanence_modele_save,   name='planning_permanence_modele_save'),
+    path('bureaux/permanence-modele/<int:pk>/supprimer/', views.planning_permanence_modele_delete, name='planning_permanence_modele_delete'),
     path('stats/',                  views.planning_stats,         name='planning_stats'),
     path('configuration/',          views.planning_configuration, name='planning_configuration'),
     path('configuration/medecin/',  views.planning_medecin_save,  name='planning_medecin_save'),
@@ -24,7 +26,4 @@ urlpatterns = [
     path('<int:pk>/publier/',       views.planning_publier,       name='planning_publier'),
     path('<int:pk>/supprimer/',           views.planning_supprimer,          name='planning_supprimer'),
     path('<int:pk>/export-excel/',        views.planning_export_excel,         name='planning_export_excel'),
-    path('<int:pk>/sauvegarder-gabarit/', views.planning_gabarit_sauvegarder, name='planning_gabarit_sauvegarder'),
-    path('<int:pk>/appliquer-gabarit/',   views.planning_gabarit_appliquer,   name='planning_gabarit_appliquer'),
-    path('gabarit/<int:gabarit_pk>/supprimer/', views.planning_gabarit_supprimer, name='planning_gabarit_supprimer'),
 ]
