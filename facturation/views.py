@@ -228,6 +228,7 @@ def facture_create(request):
             if demande_obj:
                 demande_obj.facture = facture
                 demande_obj.save(update_fields=['facture'])
+                _sync_lignes_demande_examen(facture)
 
             if ordonnance_obj:
                 facture.ordonnance = ordonnance_obj
@@ -467,6 +468,7 @@ def facture_edit(request, pk):
             total = _save_lignes(facture, request.POST)
             facture.montant_total = total
             facture.save()
+            _sync_lignes_demande_examen(facture)
             log_event(facture, request.user, 'Facture mise à jour.', type='modif')
             messages.success(request, f'Facture {facture.numero} mise à jour.')
             return redirect(f'{detail_url}?next={back_url}')
@@ -536,6 +538,32 @@ def _save_lignes(facture, POST):
             total += qte * prix * (1 - remise / 100)
         i += 1
     return total
+
+
+def _sync_lignes_demande_examen(facture):
+    """Miroir les lignes de la facture vers la demande d'examen laboratoire liée :
+    le bulletin d'examens doit toujours afficher exactement la liste des examens
+    facturés (ajout/retrait d'un examen par la caissière -> bulletin mis à jour).
+    Ignoré si la facture n'est pas liée à une demande, ou à plusieurs."""
+    demandes = list(facture.demandes_examens.all())
+    if len(demandes) != 1:
+        return
+    demande = demandes[0]
+    from laboratoire.models import LigneDemandeExamen
+    anciennes_instructions = {l.libelle: l.instructions for l in demande.lignes.all()}
+    demande.lignes.all().delete()
+    total = 0
+    for ligne in facture.lignes.all():
+        montant = ligne.montant_ligne
+        LigneDemandeExamen.objects.create(
+            demande=demande,
+            libelle=ligne.libelle,
+            prix=montant,
+            instructions=anciennes_instructions.get(ligne.libelle, ''),
+        )
+        total += montant
+    demande.montant_total = total
+    demande.save(update_fields=['montant_total'])
 
 
 def _handle_paiement(facture, POST, user, total):

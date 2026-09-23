@@ -493,15 +493,18 @@
         </div>
     </div>
 
-    <!-- Contact d'urgence + Nationalité -->
+    <!-- Téléphone + Nationalité -->
     <div class="patient-extra-row">
         <div class="form-field">
-            <label class="field-label" for="{{ form.contact_urgence_nom.id_for_label }}">À contacter d'urgence</label>
-            {{ form.contact_urgence_nom }}
+            <label class="field-label" for="{{ form.telephone.id_for_label }}">
+                Téléphone <span class="required-star">*</span>
+            </label>
+            {{ form.telephone }}
+            {% if form.telephone.errors %}<div class="field-error">{{ form.telephone.errors.0 }}</div>{% endif %}
         </div>
         <div class="form-field">
-            <label class="field-label" for="{{ form.contact_urgence_telephone.id_for_label }}">Téléphone d'urgence</label>
-            {{ form.contact_urgence_telephone }}
+            <label class="field-label" for="{{ form.telephone2.id_for_label }}">Téléphone 2</label>
+            {{ form.telephone2 }}
         </div>
         <div class="form-field">
             <label class="field-label" for="{{ form.nationalite.id_for_label }}">Nationalité</label>
@@ -524,8 +527,11 @@
         <div class="tab-two-col">
             <div>
                 <div class="form-field">
-                    <label class="field-label" for="{{ form.adresse.id_for_label }}">Adresse</label>
+                    <label class="field-label" for="{{ form.adresse.id_for_label }}">
+                        Adresse <span class="required-star">*</span>
+                    </label>
                     {{ form.adresse }}
+                    {% if form.adresse.errors %}<div class="field-error">{{ form.adresse.errors.0 }}</div>{% endif %}
                 </div>
                 <div class="form-field">
                     <label class="field-label" for="{{ form.ville.id_for_label }}">Ville</label>
@@ -534,15 +540,12 @@
             </div>
             <div>
                 <div class="form-field">
-                    <label class="field-label" for="{{ form.telephone.id_for_label }}">
-                        Téléphone <span class="required-star">*</span>
-                    </label>
-                    {{ form.telephone }}
-                    {% if form.telephone.errors %}<div class="field-error">{{ form.telephone.errors.0 }}</div>{% endif %}
+                    <label class="field-label" for="{{ form.contact_urgence_nom.id_for_label }}">À contacter d'urgence</label>
+                    {{ form.contact_urgence_nom }}
                 </div>
                 <div class="form-field">
-                    <label class="field-label" for="{{ form.telephone2.id_for_label }}">Téléphone 2</label>
-                    {{ form.telephone2 }}
+                    <label class="field-label" for="{{ form.contact_urgence_telephone.id_for_label }}">Téléphone d'urgence</label>
+                    {{ form.contact_urgence_telephone }}
                 </div>
                 <div class="form-field">
                     <label class="field-label" for="{{ form.email.id_for_label }}">Courriel</label>
@@ -642,16 +645,15 @@
 
     function validateDateNaissance() {
         if (!dateInput || !dateInput.value) return true;
-        var year = new Date(dateInput.value).getFullYear();
         var errEl = dateInput.parentElement.querySelector('.date-range-error');
-        if (year < 1900 || year > new Date().getFullYear()) {
+        if (dateInput.value < '1900-01-01' || dateInput.value > dateInput.max) {
             if (!errEl) {
                 errEl = document.createElement('div');
                 errEl.className = 'field-error date-range-error';
                 dateInput.parentElement.appendChild(errEl);
             }
-            errEl.textContent = 'L\'année doit être comprise entre 1900 et ' + new Date().getFullYear() + '.';
-            dateInput.setCustomValidity('Année invalide');
+            errEl.textContent = 'La date de naissance ne peut pas être postérieure à aujourd\'hui, ni antérieure à 1900.';
+            dateInput.setCustomValidity('Date invalide');
             return false;
         }
         if (errEl) errEl.remove();
@@ -673,6 +675,20 @@
             : age + ' ans';
     }
     if (dateInput) { dateInput.addEventListener('change', updateAge); updateAge(); }
+
+    /* ── Nom / prénoms toujours saisis en majuscules ── */
+    function forceUppercase(id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('input', function () {
+            var start = el.selectionStart;
+            var end = el.selectionEnd;
+            el.value = el.value.toUpperCase();
+            el.setSelectionRange(start, end);
+        });
+    }
+    forceUppercase('{{ form.nom.id_for_label }}');
+    forceUppercase('{{ form.prenoms.id_for_label }}');
 })();
 </script>
 
@@ -720,6 +736,15 @@
     var itiTel1 = initPhone('{{ form.telephone.id_for_label }}');
     var itiTel2 = initPhone('{{ form.telephone2.id_for_label }}');
 
+    /* La lib intl-tel-input reste permissive sur les anciens formats à 8
+       chiffres : isValidNumber() seul laisse passer un numéro ivoirien trop
+       court. On impose donc explicitement les 10 chiffres du plan de
+       numérotation en vigueur depuis 2021. */
+    function hasValidCiLength(iti, input) {
+        if (iti.getSelectedCountryData().iso2 !== 'ci') return true;
+        return input.value.replace(/\D/g, '').length === 10;
+    }
+
     /* Avant soumission : enregistrer le numéro complet au format E.164 */
     /* Validation avant soumission et conversion au format E.164 */
     var theForm = document.querySelector('form[method="post"]');
@@ -736,11 +761,11 @@
                     '{{ form.telephone.id_for_label }}'
                 );
 
-                if (!itiTel1.isValidNumber()) {
+                if (!itiTel1.isValidNumber() || !hasValidCiLength(itiTel1, input1)) {
                     e.preventDefault();
 
                     alert(
-                        'Veuillez saisir un numéro de téléphone valide pour le téléphone principal.'
+                        'Veuillez saisir un numéro de téléphone valide pour le téléphone principal (10 chiffres pour un numéro ivoirien).'
                     );
 
                     input1.focus();
@@ -767,11 +792,11 @@
                 /* On vérifie seulement si l'utilisateur a saisi quelque chose */
                 if (input2.value.trim() !== '') {
 
-                    if (!itiTel2.isValidNumber()) {
+                    if (!itiTel2.isValidNumber() || !hasValidCiLength(itiTel2, input2)) {
                         e.preventDefault();
 
                         alert(
-                            'Veuillez saisir un deuxième numéro de téléphone valide.'
+                            'Veuillez saisir un deuxième numéro de téléphone valide (10 chiffres pour un numéro ivoirien).'
                         );
 
                         input2.focus();
