@@ -144,6 +144,7 @@ class StockPharmacie(models.Model):
 class MouvementPharmacie(models.Model):
     """Traçabilité des mouvements internes à chaque pharmacie."""
     TYPE_CHOICES = [
+        ('initial',     'Stock initial'),
         ('entree',      'Entrée (dotation)'),
         ('dispensation','Dispensation ordonnance'),
         ('vente',       'Vente caisse'),
