@@ -129,6 +129,17 @@ function mdBindConfigForm() {
     });
   }
 
+  // Aperçu en direct du code spécialité — seulement à la création (code
+  // encore vide) ; une fois créé le code reste figé, voir clean_code côté serveur.
+  var nomInput  = form.querySelector('input[name="nom"]');
+  var codeInput = form.querySelector('input[name="code"]');
+  if (nomInput && codeInput && !codeInput.value.trim()) {
+    nomInput.addEventListener('input', function () {
+      var sansAccents = nomInput.value.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
+      codeInput.value = sansAccents.replace(/[^A-Z0-9]/g, '').slice(0, 4) || '';
+    });
+  }
+
   form.addEventListener('submit', function (e) {
     e.preventDefault();
     var url = form.dataset.url;

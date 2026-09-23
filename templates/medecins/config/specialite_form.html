@@ -33,11 +33,12 @@
     </div>
 
     <div class="form-field">
-      <label class="field-label" for="{{ form.code.id_for_label }}">Code <span class="required-star">*</span></label>
-      <input type="text" name="code" id="{{ form.code.id_for_label }}" class="field-ul"
-        value="{{ form.code.value|default_if_none:'' }}" placeholder="Ex: CARD" autocomplete="off"
+      <label class="field-label" for="{{ form.code.id_for_label }}">Code</label>
+      <input type="text" name="code" id="{{ form.code.id_for_label }}" class="field-ul" readonly
+        value="{{ form.code.value|default_if_none:'' }}" placeholder="Généré automatiquement" autocomplete="off"
         style="font-family: var(--font-mono);text-transform:uppercase;">
       {% if form.code.errors %}<div class="field-error">{{ form.code.errors.0 }}</div>{% endif %}
+      <div class="f-hint">Généré automatiquement à partir du nom.</div>
     </div>
 
     <div class="form-field">
@@ -50,5 +51,19 @@
   </div>
 
 </form>
+
+{% if not obj %}
+<script>
+(function () {
+  var nomInput  = document.getElementById('{{ form.nom.id_for_label }}');
+  var codeInput = document.getElementById('{{ form.code.id_for_label }}');
+  if (!nomInput || !codeInput) return;
+  nomInput.addEventListener('input', function () {
+    var sansAccents = nomInput.value.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
+    codeInput.value = sansAccents.replace(/[^A-Z0-9]/g, '').slice(0, 4) || '';
+  });
+})();
+</script>
+{% endif %}
 
 {% endblock %}

@@ -96,9 +96,9 @@
       </div>
       <div class="md-card-body">
         <div class="form-field" style="margin-bottom:0;">
-          <label class="field-label" for="user">Lier à un compte</label>
-          <select name="user" id="user" class="field-ul">
-            <option value="">— Aucun compte —</option>
+          <label class="field-label" for="user">Lier à un compte <span class="required-star">*</span></label>
+          <select name="user" id="user" class="field-ul{% if errors.user %} error{% endif %}" data-ts-body required>
+            <option value="">— Sélectionner —</option>
             {% for u in users_disponibles %}
             <option value="{{ u.pk }}"
               {% if mode == 'edit' and med.user and med.user.pk == u.pk %}selected{% endif %}>
@@ -106,7 +106,8 @@
             </option>
             {% endfor %}
           </select>
-          <div class="f-hint">Optionnel — permet au médecin de se connecter.</div>
+          {% if errors.user %}<div class="field-error">{{ errors.user }}</div>{% endif %}
+          <div class="f-hint">Permet au médecin de se connecter.</div>
         </div>
       </div>
     </div>
@@ -178,7 +179,7 @@
         </div>
 
         <div class="form-field">
-          <label class="field-label" for="departement">Département <span class="required-star">*</span></label>
+          <label class="field-label" for="departement">Département</label>
           <select name="departement" id="departement" class="field-ul{% if errors.departement %} error{% endif %}">
             <option value="">— Aucun département —</option>
             {% for dept in departements %}
