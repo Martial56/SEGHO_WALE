@@ -63,7 +63,6 @@ urlpatterns = [
     path('pharmacie/', include('pharmacie.urls')),
     path('laboratoire/', views.laboratoire_list, name='laboratoire_list'),
     path('hospitalisation/', include('hospitalisation.urls')),
-    path('facture/nouveau/', views.facture_create, name='facture_create'),
     path('facturation/', _facturation_list_view, name='facturation_list'),
     path('facturation/', include('facturation.urls')),
     path('laboratoire/nouvelle/', views.laboratoire_create, name='laboratoire_create'),

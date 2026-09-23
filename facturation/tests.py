@@ -413,3 +413,74 @@ class TestPaiementNeDepassePasLeSolde(TestCase):
         facture.refresh_from_db()
         self.assertEqual(facture.montant_paye, Decimal('15000'))
         self.assertEqual(facture.statut, 'payee')
+
+
+# ─── Porte unique de création de facture ───────────────────────────────────────
+
+class TestPorteUniqueDeFacturation(TestCase):
+    """Il n'existe qu'une seule vue de création de facture.
+
+    Il y en avait deux : `facturation:create` et une copie dans `core`, atteinte
+    depuis la fiche d'ordonnance et depuis les rendez-vous. Elles avaient
+    divergé de 251 lignes, et la copie créait le paiement **sans vérifier
+    `can_manage_paiement`** : le même utilisateur était refusé par une porte et
+    accepté par l'autre. Ces tests interdisent le retour d'une seconde porte.
+    """
+
+    def setUp(self):
+        self.patient = _patient('PU')
+        self.plain = User.objects.create_user('u_pu_plain', password='x')
+        self.caisse = _caisse_user('u_pu_caisse')
+
+    #: Ce que poste le formulaire : une ligne, et un encaissement immédiat.
+    POST = {
+        'type_facture': 'consultation',
+        'montant_assurance': '0',
+        'ticket_moderateur': '0',
+        'notes': '',
+        'ligne_libelle_0': 'Consultation',
+        'ligne_qte_0': '1',
+        'ligne_prix_0': '5000',
+        'ligne_remise_0': '0',
+        'pay_montant': '5000',
+        'pay_mode': 'especes',
+    }
+
+    def _creer(self, username):
+        client = Client()
+        client.login(username=username, password='x')
+        return client.post(
+            reverse('facturation:create') + f'?patient={self.patient.pk}',
+            self.POST, follow=True,
+        )
+
+    def test_la_route_en_double_n_existe_plus(self):
+        from django.urls import NoReverseMatch
+        with self.assertRaises(NoReverseMatch):
+            reverse('facture_create')
+
+    def test_sans_groupe_caisse_la_facture_passe_mais_pas_le_paiement(self):
+        self._creer('u_pu_plain')
+        self.assertEqual(Facture.objects.count(), 1, "La facture doit être créée")
+        self.assertEqual(
+            Paiement.objects.count(), 0,
+            "Un compte hors Caisse ne doit pas pouvoir encaisser par cette porte",
+        )
+
+    def test_avec_le_groupe_caisse_le_paiement_passe(self):
+        # Sans ce test le précédent réussirait même si la vue refusait tout le
+        # monde, y compris la Caisse.
+        self._creer('u_pu_caisse')
+        self.assertEqual(Paiement.objects.count(), 1)
+        self.assertEqual(Paiement.objects.first().montant, Decimal('5000'))
+
+    def test_aucun_gabarit_ne_pointe_plus_sur_l_ancienne_route(self):
+        import subprocess
+        from django.conf import settings
+
+        racine = str(settings.BASE_DIR)
+        trouve = subprocess.run(
+            ['grep', '-rl', "url 'facture_create'", 'templates'],
+            cwd=racine, capture_output=True, text=True,
+        ).stdout.strip()
+        self.assertEqual(trouve, '', f"Gabarits pointant encore sur l'ancienne route : {trouve}")
