@@ -3,10 +3,20 @@ from datetime import date
 from django.db.models import F
 
 
+#: Curseur de luminosité mis en sommeil le 2026-09-23, à la demande — la
+#: fonctionnalité est conservée pour une mise à jour ultérieure, quand les
+#: utilisateurs la réclameront. Repasser à True suffit à tout rallumer : rien
+#: n'a été supprimé, ni le champ `UserProfile.luminosite`, ni la route
+#: `luminosite_set`, ni les réglages déjà enregistrés par chacun.
+LUMINOSITE_ACTIVE = False
+
+
 def user_profile(request):
     from core.utils import LUMINOSITE_DEFAUT
+    eteint = {'user_profile': None, 'accent_css': None,
+              'luminosite': LUMINOSITE_DEFAUT, 'luminosite_active': LUMINOSITE_ACTIVE}
     if not request.user.is_authenticated:
-        return {'user_profile': None, 'accent_css': None, 'luminosite': LUMINOSITE_DEFAUT}
+        return eteint
     try:
         from core.models import UserProfile
         from core.utils import build_accent_css, is_valid_hex_color, normaliser_luminosite
@@ -19,10 +29,15 @@ def user_profile(request):
         return {
             'user_profile': profile,
             'accent_css': accent_css,
-            'luminosite': normaliser_luminosite(profile.luminosite),
+            # En sommeil, on renvoie 100 % sans lire le profil : le filtre ne
+            # s'applique plus, et la valeur enregistrée par l'utilisateur reste
+            # intacte en base pour le jour où on rallume.
+            'luminosite': (normaliser_luminosite(profile.luminosite)
+                           if LUMINOSITE_ACTIVE else LUMINOSITE_DEFAUT),
+            'luminosite_active': LUMINOSITE_ACTIVE,
         }
     except Exception:
-        return {'user_profile': None, 'accent_css': None, 'luminosite': LUMINOSITE_DEFAUT}
+        return eteint
 
 
 def header_stats(request):
