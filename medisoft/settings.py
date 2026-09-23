@@ -24,7 +24,6 @@ INSTALLED_APPS = [
     'laboratoire.apps.LaboratoireConfig',
     'hospitalisation',
     'facturation',
-    'caisse',
     'employer',
     'conges',
     'presence',

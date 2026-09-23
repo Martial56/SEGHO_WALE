@@ -8,7 +8,7 @@ from django.db.models import Q, Sum
 from django.core.paginator import Paginator
 from django.urls import reverse
 
-from .models import Facture, LigneFacture, Acte, Paiement
+from .models import Facture, LigneFacture, Acte, Paiement, Caisse
 from .forms import FactureForm
 from core.views import log_event, get_logs
 from soins.regles import demarrer_soin_de_facture
@@ -105,7 +105,6 @@ def facturation_list(request):
 @login_required(login_url='login')
 def facture_create(request):
     from patients.models import Patient, RendezVous
-    from caisse.models import Caisse
     from services.models import Articleservice
 
     patient_pk = request.GET.get('patient') or request.POST.get('patient_id')
@@ -395,7 +394,6 @@ def facture_apercu(request, pk):
 
 @login_required(login_url='login')
 def facture_edit(request, pk):
-    from caisse.models import Caisse
     from services.models import Articleservice
 
     facture  = get_object_or_404(Facture, pk=pk)

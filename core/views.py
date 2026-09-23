@@ -770,25 +770,6 @@ def facturation_list(request):
 
 
 @login_required(login_url='login')
-def caisse_list(request):
-    from django.core.exceptions import PermissionDenied
-    from caisse.models import SessionCaisse
-    from django.core.paginator import Paginator
-    from facturation.views import can_manage_paiement
-
-    if not can_manage_paiement(request.user):
-        raise PermissionDenied
-
-    sessions = SessionCaisse.objects.all().order_by('-date_ouverture')
-    paginator = Paginator(sessions, 25)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    stats = {'solde_actuel': 0, 'entrees_jour': 0, 'sorties_jour': 0, 'transactions': 0}
-    breadcrumb = [{'title': 'Accueil', 'url': '/'}, {'title': 'Caisse'}]
-    return render(request, 'caisse/list.html', {'page_obj': page_obj, 'stats': stats, 'breadcrumb': breadcrumb})
-
-
-@login_required(login_url='login')
 def ressources_humaines_list(request):
     from employer.models import Employe
     from django.core.paginator import Paginator

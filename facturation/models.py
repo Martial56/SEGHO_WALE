@@ -123,3 +123,32 @@ class Paiement(ModeleCentre):
     class Meta(ModeleCentre.Meta):
         verbose_name = "Paiement"
         ordering = ['-date_paiement']
+
+
+class Caisse(models.Model):
+    """Journal d'encaissement — « où l'argent est entré ».
+
+    Venait de l'application `caisse`, supprimée : elle ne servait plus qu'à
+    fournir cette liste, ses deux autres tables (sessions et transactions)
+    n'ayant jamais reçu une seule ligne. Le modèle vit désormais là où il est
+    lu, à côté de `Facture` et `Paiement`.
+
+    Volontairement pas un `ModeleCentre` : une caisse n'appartient pas à un
+    centre, elle en désigne un (« Caisse Toumbokro »).
+    """
+
+    nom = models.CharField(max_length=100, verbose_name="Nom")
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    solde_actuel = models.DecimalField(
+        max_digits=15, decimal_places=2, default=0, verbose_name="Solde actuel")
+    responsable = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='caisses', verbose_name="Responsable")
+    actif = models.BooleanField(default=True, verbose_name="Active")
+
+    def __str__(self): return self.nom
+
+    class Meta:
+        verbose_name = "Caisse"
+        verbose_name_plural = "Caisses"
+        ordering = ['nom']
