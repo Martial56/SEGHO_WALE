@@ -31,6 +31,7 @@ urlpatterns = [
     # ── Soldes & Rapports ─────────────────────────────────────────────────────
     path('soldes/',                      views.conge_soldes,              name='conge_soldes'),
     path('soldes/recalcul/',             views.conge_solde_recalc,        name='conge_solde_recalc'),
+    path('soldes/<int:pk>/ajustement/',  views.conge_solde_ajustement,    name='conge_solde_ajustement'),
     path('soldes/report-annuel/',        views.conge_report_solde_annuel, name='conge_report_solde_annuel'),
     path('stats/services/',              views.conge_stats_service,       name='conge_stats_service'),
     path('rapport/',                     views.conge_rapport,             name='conge_rapport'),
@@ -46,4 +47,10 @@ urlpatterns = [
     path('config/types/nouveau/',            views.conge_type_create, name='conge_type_create'),
     path('config/types/<int:pk>/modifier/',  views.conge_type_edit,   name='conge_type_edit'),
     path('config/types/<int:pk>/supprimer/', views.conge_type_delete, name='conge_type_delete'),
+
+    # ── Configuration : Règles de calcul du quota ─────────────────────────────
+    path('config/regles/',                      views.conge_regles_calcul,       name='conge_regles_calcul'),
+    path('config/regles/palier/nouveau/',       views.conge_palier_create,       name='conge_palier_create'),
+    path('config/regles/palier/<int:pk>/modifier/', views.conge_palier_edit,     name='conge_palier_edit'),
+    path('config/regles/palier/<int:pk>/supprimer/', views.conge_palier_delete,  name='conge_palier_delete'),
 ]
