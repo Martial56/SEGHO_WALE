@@ -3,6 +3,12 @@ from django.contrib.auth.models import User
 
 from centres.models import ModeleCentre
 
+# Chaque Meta de ce module redéclare ses quatre permissions de base
+# (view/add/change/delete) avec un libellé français, au lieu de les laisser à
+# Django : il les nomme « Can add Chambre », et c'est ce libellé anglais que lit
+# la personne qui compose un groupe dans /admin/. Les codenames, eux, ne
+# bougent pas — has_perm('hospitalisation.add_chambre') reste valable.
+
 
 class Batiment(models.Model):
     nom         = models.CharField(max_length=100, verbose_name="Nom")
@@ -13,6 +19,13 @@ class Batiment(models.Model):
         verbose_name = "Bâtiment"
         verbose_name_plural = "Bâtiments"
         ordering = ['nom']
+        default_permissions = ()
+        permissions = [
+            ('view_batiment', 'Peut consulter les bâtiments'),
+            ('add_batiment', 'Peut créer un bâtiment'),
+            ('change_batiment', 'Peut modifier un bâtiment'),
+            ('delete_batiment', 'Peut supprimer un bâtiment'),
+        ]
 
 
 class Chambre(ModeleCentre):
@@ -85,6 +98,13 @@ class Chambre(ModeleCentre):
     class Meta(ModeleCentre.Meta):
         verbose_name = "Chambre"
         ordering = ['salle_no']
+        default_permissions = ()
+        permissions = [
+            ('view_chambre', 'Peut consulter les chambres'),
+            ('add_chambre', 'Peut créer une chambre'),
+            ('change_chambre', 'Peut modifier une chambre'),
+            ('delete_chambre', 'Peut supprimer une chambre'),
+        ]
 
 
 # Signification des statuts :
@@ -244,7 +264,12 @@ class Hospitalisation(ModeleCentre):
     class Meta(ModeleCentre.Meta):
         verbose_name = "Hospitalisation"
         ordering = ['-date_admission']
+        default_permissions = ()
         permissions = [
+            ('view_hospitalisation', 'Peut consulter les hospitalisations'),
+            ('add_hospitalisation', 'Peut créer une hospitalisation'),
+            ('change_hospitalisation', 'Peut modifier une hospitalisation'),
+            ('delete_hospitalisation', 'Peut supprimer une hospitalisation'),
             # Rôles typiques indiqués en commentaire — attribution via init_groupes_hospitalisation
             ('can_confirmer_demande', "Peut confirmer une demande d'hospitalisation"),   # Médecin, Major
             # Attention : codename dupliqué avec soins.Soin — toujours qualifier
@@ -272,6 +297,13 @@ class FicheVisite(models.Model):
     class Meta:
         verbose_name = "Fiche de visite"
         ordering = ['-date_visite']
+        default_permissions = ()
+        permissions = [
+            ('view_fichevisite', 'Peut consulter les fiches de visite'),
+            ('add_fichevisite', 'Peut créer une fiche de visite'),
+            ('change_fichevisite', 'Peut modifier une fiche de visite'),
+            ('delete_fichevisite', 'Peut supprimer une fiche de visite'),
+        ]
 
 
 
@@ -292,6 +324,13 @@ class VisiteInfirmiere(models.Model):
 
     class Meta:
         ordering = ['ordre', 'date']
+        default_permissions = ()
+        permissions = [
+            ('view_visiteinfirmiere', 'Peut consulter les visites infirmières'),
+            ('add_visiteinfirmiere', 'Peut créer une visite infirmière'),
+            ('change_visiteinfirmiere', 'Peut modifier une visite infirmière'),
+            ('delete_visiteinfirmiere', 'Peut supprimer une visite infirmière'),
+        ]
 
 
 class VisiteDocteur(models.Model):
@@ -308,6 +347,13 @@ class VisiteDocteur(models.Model):
 
     class Meta:
         ordering = ['ordre', 'date']
+        default_permissions = ()
+        permissions = [
+            ('view_visitedocteur', 'Peut consulter les visites du docteur'),
+            ('add_visitedocteur', 'Peut créer une visite du docteur'),
+            ('change_visitedocteur', 'Peut modifier une visite du docteur'),
+            ('delete_visitedocteur', 'Peut supprimer une visite du docteur'),
+        ]
 
 
 class ServiceAFacturer(models.Model):
@@ -334,6 +380,13 @@ class ServiceAFacturer(models.Model):
 
     class Meta:
         ordering = ['ordre', 'id']
+        default_permissions = ()
+        permissions = [
+            ('view_serviceafacturer', 'Peut consulter les services à facturer'),
+            ('add_serviceafacturer', 'Peut créer un service à facturer'),
+            ('change_serviceafacturer', 'Peut modifier un service à facturer'),
+            ('delete_serviceafacturer', 'Peut supprimer un service à facturer'),
+        ]
 
 
 class ResumeDecharge(models.Model):
@@ -350,6 +403,13 @@ class ResumeDecharge(models.Model):
 
     class Meta:
         verbose_name = "Résumé de décharge"
+        default_permissions = ()
+        permissions = [
+            ('view_resumedecharge', 'Peut consulter les résumés de décharge'),
+            ('add_resumedecharge', 'Peut créer un résumé de décharge'),
+            ('change_resumedecharge', 'Peut modifier un résumé de décharge'),
+            ('delete_resumedecharge', 'Peut supprimer un résumé de décharge'),
+        ]
 
 
 class EvaluationClinique(models.Model):
@@ -399,6 +459,13 @@ class EvaluationClinique(models.Model):
         verbose_name = "Évaluation clinique"
         # Du plus récent au plus ancien : c'est le dernier relevé qu'on cherche.
         ordering = ['-date_saisie']
+        default_permissions = ()
+        permissions = [
+            ('view_evaluationclinique', 'Peut consulter les évaluations cliniques'),
+            ('add_evaluationclinique', 'Peut créer une évaluation clinique'),
+            ('change_evaluationclinique', 'Peut modifier une évaluation clinique'),
+            ('delete_evaluationclinique', 'Peut supprimer une évaluation clinique'),
+        ]
 
 
 class ChecklistAdmission(models.Model):
@@ -413,6 +480,13 @@ class ChecklistAdmission(models.Model):
 
     class Meta:
         ordering = ['ordre', 'id']
+        default_permissions = ()
+        permissions = [
+            ('view_checklistadmission', "Peut consulter les lignes de contrôle d'admission"),
+            ('add_checklistadmission', "Peut créer une ligne de contrôle d'admission"),
+            ('change_checklistadmission', "Peut modifier une ligne de contrôle d'admission"),
+            ('delete_checklistadmission', "Peut supprimer une ligne de contrôle d'admission"),
+        ]
 
 
 class ChecklistVerification(models.Model):
@@ -427,6 +501,13 @@ class ChecklistVerification(models.Model):
 
     class Meta:
         ordering = ['ordre', 'id']
+        default_permissions = ()
+        permissions = [
+            ('view_checklistverification', 'Peut consulter les lignes de vérification avant service'),
+            ('add_checklistverification', 'Peut créer une ligne de vérification avant service'),
+            ('change_checklistverification', 'Peut modifier une ligne de vérification avant service'),
+            ('delete_checklistverification', 'Peut supprimer une ligne de vérification avant service'),
+        ]
 
 
 class LogActiviteHospitalisation(models.Model):
@@ -446,6 +527,13 @@ class LogActiviteHospitalisation(models.Model):
     class Meta:
         ordering = ['-date']
         verbose_name = "Log d'activité"
+        default_permissions = ()
+        permissions = [
+            ('view_logactivitehospitalisation', "Peut consulter les logs d'activité"),
+            ('add_logactivitehospitalisation', "Peut créer un log d'activité"),
+            ('change_logactivitehospitalisation', "Peut modifier un log d'activité"),
+            ('delete_logactivitehospitalisation', "Peut supprimer un log d'activité"),
+        ]
 
 
 class ListeVerificationService(models.Model):
@@ -456,6 +544,13 @@ class ListeVerificationService(models.Model):
         verbose_name = "Liste de vérification avant le service"
         verbose_name_plural = "Liste de vérification avant le service"
         ordering = ['id']
+        default_permissions = ()
+        permissions = [
+            ('view_listeverificationservice', 'Peut consulter la liste de vérification avant le service'),
+            ('add_listeverificationservice', 'Peut ajouter un élément à la liste de vérification avant le service'),
+            ('change_listeverificationservice', 'Peut modifier un élément de la liste de vérification avant le service'),
+            ('delete_listeverificationservice', 'Peut supprimer un élément de la liste de vérification avant le service'),
+        ]
 
 
 class ListeControleAdmission(models.Model):
@@ -467,6 +562,13 @@ class ListeControleAdmission(models.Model):
         verbose_name = "Liste de contrôle d'admission"
         verbose_name_plural = "Liste de contrôle d'admission"
         ordering = ['id']
+        default_permissions = ()
+        permissions = [
+            ('view_listecontroleadmission', "Peut consulter la liste de contrôle d'admission"),
+            ('add_listecontroleadmission', "Peut ajouter un élément à la liste de contrôle d'admission"),
+            ('change_listecontroleadmission', "Peut modifier un élément de la liste de contrôle d'admission"),
+            ('delete_listecontroleadmission', "Peut supprimer un élément de la liste de contrôle d'admission"),
+        ]
 
 
 class RegistreDeces(ModeleCentre):
@@ -508,3 +610,10 @@ class RegistreDeces(ModeleCentre):
         verbose_name = "Registre des décès"
         verbose_name_plural = "Registre des décès"
         ordering = ['-date_deces']
+        default_permissions = ()
+        permissions = [
+            ('view_registredeces', 'Peut consulter le registre des décès'),
+            ('add_registredeces', 'Peut créer un enregistrement de décès'),
+            ('change_registredeces', 'Peut modifier un enregistrement de décès'),
+            ('delete_registredeces', 'Peut supprimer un enregistrement de décès'),
+        ]

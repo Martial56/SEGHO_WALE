@@ -1,5 +1,6 @@
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.contrib.auth.models import User
 from django.db.models.signals import post_save
@@ -58,6 +59,14 @@ class UserProfile(models.Model):
     photo        = models.ImageField(upload_to='profiles/', blank=True, null=True)
     accent_color = models.CharField(max_length=7, blank=True, null=True,
                                      help_text="Couleur d'accent personnalisée (hex, ex: #3e6f3e). Vide = couleur par défaut du logo.")
+    luminosite = models.PositiveSmallIntegerField(
+        default=100,
+        validators=[MinValueValidator(70), MaxValueValidator(100)],
+        help_text="Luminosité de l'interface, en pourcentage (70 à 100). "
+                  "100 = aucun assombrissement, rendu d'origine. Les validateurs "
+                  "sont le seul rempart contre une valeur saisie ici qui rendrait "
+                  "l'interface illisible pour l'utilisateur, sans issue de son côté.",
+    )
     session_timeout_minutes = models.PositiveIntegerField(
         default=30,
         help_text="Délai d'inactivité avant déconnexion automatique, en minutes. 0 = désactivé.",

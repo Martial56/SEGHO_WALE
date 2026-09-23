@@ -341,12 +341,11 @@ def facture_payer(request, pk):
         return redirect('facturation:detail', pk=pk)
     back_url = request.POST.get('next', reverse('facturation:list'))
 
-    try:
-        montant = float(request.POST.get('pay_montant', 0))
-    except (TypeError, ValueError):
-        montant = 0
+    montant, erreur = _montant_paiement(request.POST.get('pay_montant'), facture)
+    if erreur:
+        messages.error(request, erreur)
 
-    if montant > 0 and facture.statut in ('brouillon', 'emise'):
+    if montant is not None and facture.statut in ('brouillon', 'emise'):
         Paiement.objects.create(
             facture=facture,
             montant=montant,
@@ -508,6 +507,42 @@ def _parse_float(value, default=0):
         return default
 
 
+def _montant_paiement(brut, facture):
+    """Le montant à encaisser, ou None s'il n'y a rien à créer.
+
+    Renvoie `(montant, erreur)` — l'un des deux vaut toujours None.
+
+    Un paiement de 0 F n'est accepté que si la facture ne réclame plus rien :
+    c'est le cas d'une prestation gratuite, qu'il faut malgré tout pouvoir
+    tracer — qui l'a traitée, quand, par quel mode. Ailleurs, 0 est presque
+    toujours un champ vidé par mégarde : l'accepter poserait une ligne de
+    paiement sans valeur sur une facture qui reste due, sans prévenir personne.
+
+    Le champ vide et le zéro délibéré doivent aussi être distingués : `float('')`
+    lève, et l'ancien code rabattait l'échec sur 0. Tant que 0 était refusé cela
+    ne se voyait pas ; en l'acceptant, un champ vide aurait créé un paiement.
+    """
+    brut = (brut or '').strip()
+    if not brut:
+        return None, None            # aucun paiement demandé, ce n'est pas une erreur
+    try:
+        montant = float(brut)
+    except (TypeError, ValueError):
+        return None, "Montant de paiement invalide."
+    if montant < 0:
+        return None, "Le montant d'un paiement ne peut pas être négatif."
+    if montant == 0 and facture.solde_restant > 0:
+        return None, ("Un paiement de 0 F n'est possible que sur une facture "
+                      "sans solde à régler.")
+    # Le gabarit pose déjà `max` sur le solde, mais c'est le navigateur qui
+    # l'applique : une requête envoyée hors de la page passait outre et la
+    # caisse enregistrait plus que ce qui était dû. La borne doit tenir ici.
+    if montant > float(facture.solde_restant):
+        return None, ("Le montant dépasse le solde restant de la facture "
+                      "(%s F)." % int(facture.solde_restant))
+    return montant, None
+
+
 def _save_lignes(facture, POST):
     total = 0
     i = 0
@@ -539,13 +574,10 @@ def _save_lignes(facture, POST):
 
 
 def _handle_paiement(facture, POST, user, total):
-    pay_montant_raw = POST.get('pay_montant', '').strip()
-    if not pay_montant_raw:
-        return facture
     if not can_manage_paiement(user):
         return facture
-    pay_montant = _parse_float(pay_montant_raw, 0)
-    if pay_montant <= 0:
+    pay_montant, _erreur = _montant_paiement(POST.get('pay_montant'), facture)
+    if pay_montant is None:
         return facture
 
     mode      = POST.get('pay_mode', 'especes')

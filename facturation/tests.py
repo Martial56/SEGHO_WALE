@@ -254,3 +254,162 @@ class TestVuesPermissions(TestCase):
         self.assertEqual(resp.status_code, 403)
         facture.refresh_from_db()
         self.assertEqual(facture.statut, 'emise')
+
+
+# ─── Prestations gratuites : encaisser 0 F pour garder la trace ────────────────
+
+class TestPaiementAZeroFranc(TestCase):
+    """Une prestation gratuite doit pouvoir être encaissée.
+
+    Le champ portait `min="1"` en dur : sur une facture à 0 F il s'affichait
+    `min="1" max="0"`, deux bornes qu'aucune valeur ne satisfait, et le
+    navigateur refusait l'envoi. Côté serveur, deux gardes écartaient en plus
+    tout montant nul — sans message. La facture ne passait donc jamais à
+    « payée », et un soin gratuit restait bloqué en attente de paiement.
+    """
+
+    def setUp(self):
+        self.patient = _patient('Z')
+        self.user = _caisse_user('u_zero')
+
+    def _gratuite(self):
+        return _facture(self.patient, statut='emise', montant_total=Decimal('0'))
+
+    def _due(self):
+        return _facture(self.patient, statut='emise', montant_total=Decimal('5000'))
+
+    # ── La règle ──
+
+    def test_zero_accepte_sur_facture_gratuite(self):
+        facture = self._gratuite()
+        _handle_paiement(facture, {'pay_montant': '0', 'pay_mode': 'especes'},
+                         self.user, Decimal('0'))
+        facture.refresh_from_db()
+        self.assertEqual(Paiement.objects.filter(facture=facture).count(), 1)
+        self.assertEqual(facture.statut, 'payee')
+
+    def test_zero_refuse_sur_facture_due(self):
+        """Un 0 sur une facture de 5 000 F est un champ vidé par mégarde."""
+        facture = self._due()
+        _handle_paiement(facture, {'pay_montant': '0'}, self.user, Decimal('5000'))
+        facture.refresh_from_db()
+        self.assertEqual(Paiement.objects.filter(facture=facture).count(), 0)
+        self.assertEqual(facture.statut, 'emise')
+
+    # ── Le piège ouvert par l'acceptation de 0 ──
+
+    def test_un_champ_vide_ne_cree_rien_meme_sur_facture_gratuite(self):
+        """`float('')` lève, et l'ancien code rabattait l'échec sur 0."""
+        facture = self._gratuite()
+        _handle_paiement(facture, {'pay_montant': ''}, self.user, Decimal('0'))
+        self.assertEqual(Paiement.objects.filter(facture=facture).count(), 0)
+
+    def test_un_champ_absent_ne_cree_rien(self):
+        facture = self._gratuite()
+        _handle_paiement(facture, {}, self.user, Decimal('0'))
+        self.assertEqual(Paiement.objects.filter(facture=facture).count(), 0)
+
+    def test_un_montant_illisible_ne_cree_rien(self):
+        facture = self._gratuite()
+        _handle_paiement(facture, {'pay_montant': 'abc'}, self.user, Decimal('0'))
+        self.assertEqual(Paiement.objects.filter(facture=facture).count(), 0)
+
+    def test_un_montant_negatif_ne_cree_rien(self):
+        facture = self._gratuite()
+        _handle_paiement(facture, {'pay_montant': '-1'}, self.user, Decimal('0'))
+        self.assertEqual(Paiement.objects.filter(facture=facture).count(), 0)
+
+    # ── Par la vue d'encaissement ──
+
+    def test_la_vue_encaisse_zero_sur_facture_gratuite(self):
+        facture = self._gratuite()
+        client = Client()
+        client.login(username='u_zero', password='x')
+        client.post(reverse('facturation:payer', kwargs={'pk': facture.pk}),
+                    {'pay_montant': '0', 'pay_mode': 'especes'})
+        facture.refresh_from_db()
+        self.assertEqual(Paiement.objects.filter(facture=facture).count(), 1)
+        self.assertEqual(facture.statut, 'payee')
+
+    def test_la_vue_refuse_zero_sur_facture_due_et_le_dit(self):
+        facture = self._due()
+        client = Client()
+        client.login(username='u_zero', password='x')
+        reponse = client.post(reverse('facturation:payer', kwargs={'pk': facture.pk}),
+                              {'pay_montant': '0'}, follow=True)
+        facture.refresh_from_db()
+        self.assertEqual(Paiement.objects.filter(facture=facture).count(), 0)
+        messages = [str(m) for m in reponse.context['messages']]
+        self.assertTrue(any('0 F' in m for m in messages), messages)
+
+    # ── Le champ du gabarit ──
+
+    def test_le_plancher_du_champ_suit_le_solde(self):
+        client = Client()
+        client.login(username='u_zero', password='x')
+        gratuite = client.get(reverse('facturation:detail', kwargs={'pk': self._gratuite().pk}))
+        self.assertContains(gratuite, 'min="0"')
+        due = client.get(reverse('facturation:detail', kwargs={'pk': self._due().pk}))
+        self.assertContains(due, 'min="1"')
+
+    # ── La conséquence en bout de chaîne ──
+
+    def test_un_soin_gratuit_demarre_une_fois_encaisse(self):
+        """C'est tout l'intérêt : sans encaissement, le soin restait bloqué."""
+        from soins.models import ProcedureSoin, Soin
+        facture = self._gratuite()
+        soin = Soin.objects.create(patient=self.patient, statut='en_attente_de_paiement',
+                                   facture=facture)
+        procedure = ProcedureSoin.objects.create(patient=self.patient, soin=soin,
+                                                 prix=Decimal('0'), statut='brouillon')
+        _handle_paiement(facture, {'pay_montant': '0', 'pay_mode': 'especes'},
+                         self.user, Decimal('0'))
+        soin.refresh_from_db()
+        procedure.refresh_from_db()
+        self.assertEqual(soin.statut, 'en_cours')
+        self.assertEqual(procedure.statut, 'en_cours')
+
+
+# ─── Le plafond du paiement tient côté serveur ────────────────────────────────
+
+class TestPaiementNeDepassePasLeSolde(TestCase):
+    """`max` est posé sur le champ, mais c'est le navigateur qui l'applique.
+
+    Une requête envoyée hors de la page passait outre, et la caisse
+    enregistrait plus que ce qui était dû.
+    """
+
+    def setUp(self):
+        self.patient = _patient('Plaf')
+        self.user = _caisse_user('u_plafond')
+
+    def test_un_montant_superieur_au_solde_est_refuse(self):
+        facture = _facture(self.patient, statut='emise', montant_total=Decimal('15000'))
+        _handle_paiement(facture, {'pay_montant': '50000'}, self.user, Decimal('15000'))
+        facture.refresh_from_db()
+        self.assertEqual(Paiement.objects.filter(facture=facture).count(), 0)
+        self.assertEqual(facture.montant_paye, Decimal('0'))
+
+    def test_un_montant_positif_sur_facture_gratuite_est_refuse(self):
+        facture = _facture(self.patient, statut='emise', montant_total=Decimal('0'))
+        _handle_paiement(facture, {'pay_montant': '5000'}, self.user, Decimal('0'))
+        self.assertEqual(Paiement.objects.filter(facture=facture).count(), 0)
+
+    def test_le_solde_exact_passe(self):
+        facture = _facture(self.patient, statut='emise', montant_total=Decimal('15000'))
+        _handle_paiement(facture, {'pay_montant': '15000'}, self.user, Decimal('15000'))
+        facture.refresh_from_db()
+        self.assertEqual(facture.statut, 'payee')
+
+    def test_le_plafond_suit_les_paiements_deja_recus(self):
+        """Après un acompte, la borne est le reste, pas le total."""
+        facture = _facture(self.patient, statut='emise', montant_total=Decimal('15000'))
+        _handle_paiement(facture, {'pay_montant': '10000'}, self.user, Decimal('15000'))
+        facture.refresh_from_db()
+        _handle_paiement(facture, {'pay_montant': '9000'}, self.user, Decimal('15000'))
+        facture.refresh_from_db()
+        self.assertEqual(facture.montant_paye, Decimal('10000'), "Le trop-perçu doit être refusé")
+        _handle_paiement(facture, {'pay_montant': '5000'}, self.user, Decimal('15000'))
+        facture.refresh_from_db()
+        self.assertEqual(facture.montant_paye, Decimal('15000'))
+        self.assertEqual(facture.statut, 'payee')

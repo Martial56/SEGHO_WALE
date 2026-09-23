@@ -243,7 +243,14 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
   <div id="action-bar">
     {% if edit %}
       {% if mode_decharge_seule %}
-      <button type="submit" form="hosp-form" class="abtn abtn-dark" title="Enregistrer le résumé et décharger le patient">
+      {% comment %}Un garde-fou, parce que la décharge ne se reprend pas : au
+      statut Déchargé, get_actions_disponibles cache confirmer, installer,
+      décharger et annuler — pour le superuser compris. La transition fige
+      heure_sortie, libère la chambre et synchronise le dossier de soins.
+      La modale qui jouait ce rôle a disparu avec l'ancien parcours.{% endcomment %}
+      <button type="submit" form="hosp-form" class="abtn abtn-dark"
+              title="Enregistrer le résumé et décharger le patient"
+              onclick="return confirm('Décharger le patient ? La sortie médicale sera enregistrée et ne pourra plus être annulée depuis cet écran.');">
         <i class="bi bi-door-open"></i> Valider la décharge
       </button>
       {% endif %}
@@ -266,17 +273,13 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
         </span>
         {% endif %}
       {% endif %}
-      {% if actions.decharger.visible and not mode_decharge_seule %}
-        {% if actions.decharger.enabled %}
-        <button type="button" class="abtn abtn-primary" onclick="openDechargeModal()" title="Décharger médicalement le patient">
-          <i class="bi bi-door-open"></i> Décharger
-        </button>
-        {% else %}
-        <button type="button" class="abtn abtn-primary off" disabled title="{{ actions.decharger.raison_blocage }}">
-          <i class="bi bi-door-open"></i> Décharger
-        </button>
-        {% endif %}
-      {% endif %}
+      {% comment %}Plus de bouton « Décharger » ici : on décharge depuis
+      l'onglet « Résumé de décharge », dont le bouton « Valider la décharge »
+      enregistre le résumé et décharge d'un seul geste. La modale qu'ouvrait ce
+      bouton ne portait aucun champ du résumé et le vidait donc à chaque
+      décharge ; elle imposait en prime une « Date de sortie » que le serveur
+      n'a jamais lue — _transition_decharger pose heure_sortie = now().
+      {% endcomment %}
       {% if hosp.statut == 'hospitalise' %}
       <a href="{{ url_labo }}" class="abtn abtn-neutral">
         <i class="bi bi-flask"></i> Demande de labo
@@ -1169,6 +1172,12 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
 
           <div style="grid-column:1/-1;">
             <div class="rd-check-row">
+              {% comment %}L'absence d'une case à cocher dans un POST ne dit pas
+              si elle était décochée ou simplement absente du formulaire. Ce
+              témoin le dit : _save_resume_decharge ne touche au transfert que
+              lorsqu'il le reçoit, si bien que décharger depuis une modale qui
+              n'a pas la case ne l'efface plus.{% endcomment %}
+              <input type="hidden" name="rd_transfert_present" value="1">
               <input type="checkbox" name="rd_transfert" id="rd_transfert" style="width:16px;height:16px;accent-color:var(--teal-500,var(--teal-500));" {% if r.transfert %}checked{% endif %}>
               <label for="rd_transfert" class="rd-label" style="cursor:pointer;">Transfert vers un autre établissement</label>
             </div>
@@ -1272,96 +1281,6 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
 
 
 <!-- ── Modale décharge ── -->
-{% if edit and actions.decharger.visible and not mode_decharge_seule %}
-<div id="modal-decharge" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:2000;align-items:center;justify-content:center;padding:16px;">
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;width:100%;max-width:480px;box-shadow:0 16px 48px rgba(0,0,0,.3);overflow:hidden;">
-
-    <div style="padding:16px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--bg);">
-      <div style="font-size:14px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px;">
-        <i class="bi bi-box-arrow-right" style="color:var(--accent-text-soft);font-size:16px;"></i>
-        Décharger le patient
-      </div>
-      <button type="button" onclick="closeDechargeModal()"
-        style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-muted);line-height:1;padding:0 4px;">&times;</button>
-    </div>
-
-    <form method="post" id="decharge-form">
-      {% csrf_token %}
-      <div style="padding:20px 22px;">
-
-        <div style="margin-bottom:18px;">
-          <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);display:block;margin-bottom:6px;">
-            Date de sortie <span style="color:#dc2626;">*</span>
-          </label>
-          <input type="date" name="date_sortie_decharge" id="decharge-date"
-            style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:5px;font-size:14px;font-weight:600;background:var(--bg);color:var(--text);"
-            required>
-        </div>
-
-        {% if hosp.chambre %}
-        <div id="decharge-preview" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:12px 16px;font-size:13px;color:#166534;">
-          <div style="font-weight:600;margin-bottom:4px;"><i class="bi bi-door-open"></i> Chambre : {{ hosp.chambre.nom }}{% if hosp.numero_lit %} — Lit {{ hosp.numero_lit }}{% endif %}</div>
-          <div id="decharge-calc" style="color:#166534;"></div>
-        </div>
-        {% endif %}
-
-      </div>
-
-      <div style="padding:14px 22px;border-top:1px solid var(--border);background:var(--bg);display:flex;align-items:center;gap:10px;">
-        <button type="submit" name="action_decharger"
-          style="padding:9px 22px;border-radius:5px;border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
-          <i class="bi bi-check-lg"></i> CONFIRMER LA DÉCHARGE
-        </button>
-        <button type="button" onclick="closeDechargeModal()"
-          style="padding:9px 18px;border-radius:5px;border:1.5px solid var(--border);background:none;cursor:pointer;font-size:13px;font-weight:600;color:var(--text-muted);">
-          ANNULER
-        </button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<script>
-(function() {
-  var admissionDate = new Date('{{ hosp.date_admission|date:"Y-m-d" }}');
-
-  function openDechargeModal() {
-    var today = new Date();
-    var y = today.getFullYear();
-    var m = String(today.getMonth()+1).padStart(2,'0');
-    var d = String(today.getDate()).padStart(2,'0');
-    document.getElementById('decharge-date').value = y+'-'+m+'-'+d;
-    updateDechargeCalc();
-    document.getElementById('modal-decharge').style.display = 'flex';
-  }
-  function closeDechargeModal() {
-    document.getElementById('modal-decharge').style.display = 'none';
-  }
-  function updateDechargeCalc() {
-    var calcEl = document.getElementById('decharge-calc');
-    if (!calcEl) return;
-    var sortieStr = document.getElementById('decharge-date').value;
-    if (!sortieStr) return;
-    var sortie = new Date(sortieStr);
-    var diff = Math.round((sortie - admissionDate) / (1000*60*60*24));
-    var jours = Math.max(1, diff);
-    calcEl.innerHTML = '<strong>' + jours + ' jour(s)</strong> d\'hospitalisation.';
-  }
-
-  window.openDechargeModal  = openDechargeModal;
-  window.closeDechargeModal = closeDechargeModal;
-
-  var dateInput = document.getElementById('decharge-date');
-  if (dateInput) dateInput.addEventListener('change', updateDechargeCalc);
-
-  // Fermer si clic en dehors
-  document.getElementById('modal-decharge').addEventListener('click', function(e) {
-    if (e.target === this) closeDechargeModal();
-  });
-})();
-</script>
-{% endif %}
-
 </div><!-- /#page-wrap -->
 {% endblock %}
 
@@ -1536,6 +1455,13 @@ document.getElementById('hosp-form').addEventListener('submit', function() {
     var ts = chambreEl.tomselect;
     var v  = ts ? ts.getValue() : chambreEl.value;
     btnHosp.disabled = !(v && v !== '');
+    // La classe `off` doit suivre l'attribut `disabled`, pas seulement le
+    // doubler : le serveur rend le bouton « off » tant qu'aucune chambre n'est
+    // attribuée, et `.abtn.off` porte `pointer-events: none`. Ne lever que
+    // `disabled` laissait donc le bouton gris et toujours incliquable après
+    // avoir choisi la chambre — le seul moyen d'en sortir était de sauvegarder
+    // puis de rouvrir la page.
+    btnHosp.classList.toggle('off', btnHosp.disabled);
     btnHosp.title    = btnHosp.disabled ? 'Sélectionnez une chambre / un lit' : 'Hospitaliser le patient';
   }
 

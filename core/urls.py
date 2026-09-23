@@ -26,6 +26,7 @@ urlpatterns = [
     path('deverrouiller/', views.unlock_session, name='unlock_session'),
     path('compte/', views.mon_compte, name='mon_compte'),
     path('compte/couleur-accent/', views.accent_color_set, name='accent_color_set'),
+    path('compte/luminosite/', views.luminosite_set, name='luminosite_set'),
 
     # URLs des modules
     path('centres/', include('centres.urls')),
