@@ -227,6 +227,15 @@ class Employe(models.Model):
         existants = set(self.documents.values_list('type_document', flat=True))
         return [d for d in DOCS_OBLIGATOIRES if d not in existants]
 
+    @property
+    def actes_naissance_manquants(self):
+        """Nombre d'actes de naissance qu'il reste à fournir, d'après le nombre
+        d'enfants déclaré. Ne prévient de rien si aucun enfant n'est déclaré."""
+        if not self.nombre_enfants:
+            return 0
+        fournis = self.documents.filter(type_document='acte_naissance').count()
+        return max(0, self.nombre_enfants - fournis)
+
     def __str__(self):
         return f"{self.nom} {self.prenoms} ({self.matricule})"
 
@@ -243,13 +252,14 @@ class Employe(models.Model):
 
 
 TYPE_DOC_CHOICES = [
-    ('cni',        "Carte Nationale d'Identité"),
-    ('passeport',  'Passeport'),
-    ('diplome',    'Diplôme / Attestation'),
-    ('contrat',    'Contrat de travail'),
-    ('certificat', 'Certificat médical'),
-    ('photo',      "Photo d'identité"),
-    ('autre',      'Autre document'),
+    ('cni',              "Carte Nationale d'Identité"),
+    ('passeport',        'Passeport'),
+    ('diplome',          'Diplôme / Attestation'),
+    ('contrat',          'Contrat de travail'),
+    ('certificat',       'Certificat médical'),
+    ('acte_naissance',   'Acte de naissance'),
+    ('photo',            "Photo d'identité"),
+    ('autre',            'Autre document'),
 ]
 
 
@@ -574,6 +584,11 @@ class SoldeConge(models.Model):
     quota          = models.DecimalField(max_digits=5, decimal_places=1, default=0)
     jours_pris     = models.DecimalField(max_digits=5, decimal_places=1, default=0)
     jours_reporter = models.DecimalField(max_digits=5, decimal_places=1, default=0)
+    jours_deja_pris_avant_saisie = models.DecimalField(
+        max_digits=5, decimal_places=1, default=0,
+        verbose_name="Jours déjà pris avant saisie",
+        help_text="Congé pris par l'employé avant son enregistrement dans l'application (non traçable via un congé enregistré) — déduit manuellement du solde.",
+    )
     report_effectue = models.BooleanField(
         default=False,
         verbose_name="Reporté vers l'année suivante",
@@ -584,7 +599,10 @@ class SoldeConge(models.Model):
 
     @property
     def solde(self):
-        return float(self.quota) + float(self.jours_reporter) - float(self.jours_pris)
+        return (
+            float(self.quota) + float(self.jours_reporter)
+            - float(self.jours_pris) - float(self.jours_deja_pris_avant_saisie)
+        )
 
     def __str__(self):
         return f"Solde {self.employe} — {self.annee}"
