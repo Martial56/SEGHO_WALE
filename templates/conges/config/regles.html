@@ -1,0 +1,137 @@
+{% extends 'conges/base.html' %}
+{% block topbar_title %}Règles de calcul{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+  .cgcfg-wrap { display:flex; flex-direction:column; height:calc(100vh - var(--topbar-h)); overflow:hidden; }
+  .cgcfg-head {
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    padding:8px 20px; flex-shrink:0;
+    background:var(--cg-surface); border-bottom:1px solid var(--cg-border);
+  }
+  .cgcfg-body { flex:1; overflow:auto; min-height:0; min-width:0; padding:20px; }
+  .cgcfg-tabs { display:flex; gap:4px; }
+  .cgcfg-tab {
+    padding:5px 12px; border-radius:16px; font-size:12px; font-weight:600;
+    text-decoration:none; color:var(--cg-muted); white-space:nowrap;
+  }
+  .cgcfg-tab:hover { background:var(--cg-50); }
+  .cgcfg-tab.active { background:var(--cg-700); color:#fff; }
+
+  .cfg-section { background:var(--cg-surface); border:1px solid var(--cg-border); border-radius:10px; padding:18px 20px; margin-bottom:20px; max-width:720px; }
+  .cfg-section h3 { font-size:14px; font-weight:700; color:var(--cg-text); margin:0 0 6px; display:flex; align-items:center; gap:8px; }
+  .cfg-hint { font-size:12px; color:var(--cg-muted); margin:0 0 14px; }
+  .form-row { display:flex; gap:14px; align-items:flex-end; flex-wrap:wrap; }
+  .form-field { display:flex; flex-direction:column; gap:4px; }
+  .form-field label { font-size:11.5px; font-weight:600; color:var(--cg-muted); text-transform:uppercase; letter-spacing:.3px; }
+  .form-field input, .form-field select {
+    padding:7px 10px; border:1px solid var(--cg-border); border-radius:6px;
+    font-size:13px; background:var(--cg-surface); color:var(--cg-text); width:180px;
+  }
+
+  .cg-cfg-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .cg-cfg-table thead th {
+    background:var(--cg-700); color:#fff;
+    padding:9px 14px; text-align:left; font-size:10.5px;
+    font-weight:700; text-transform:uppercase; letter-spacing:.3px;
+    white-space:nowrap;
+  }
+  .cg-cfg-table tbody tr { border-bottom:1px solid var(--cg-border); }
+  .cg-cfg-table tbody tr:hover { background:var(--cg-50); }
+  html[data-theme="dark"] .cg-cfg-table tbody tr:hover { background: var(--surface); }
+  .cg-cfg-table td { padding:9px 14px; color:var(--cg-text); vertical-align:middle; }
+  .palier-inline-form { display:flex; gap:6px; align-items:center; }
+  .palier-inline-form input { padding:5px 8px; border:1px solid var(--cg-border); border-radius:5px; font-size:12.5px; width:70px; background:var(--cg-surface); color:var(--cg-text); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cgcfg-wrap">
+
+<div class="cgcfg-head">
+  <a href="{% url 'conge_dashboard' %}" class="o-ctrl-btn" style="padding:3px 7px;">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <div class="cgcfg-tabs">
+    <a href="{% url 'conge_type_list' %}" class="cgcfg-tab">Types de demande</a>
+    <a href="{% url 'conge_regles_calcul' %}" class="cgcfg-tab active">Règles de calcul</a>
+  </div>
+</div>
+
+<div class="cgcfg-body">
+
+  <!-- ══ BASE MENSUELLE ══ -->
+  <div class="cfg-section">
+    <h3><i class="bi bi-calculator" style="color:var(--accent-text-soft);"></i> Base mensuelle</h3>
+    <p class="cfg-hint">Nombre de jours acquis par mois travaillé, utilisé pour calculer le quota annuel de chaque employé (référence légale ivoirienne : 2,2 jours/mois, soit 26,4 jours/an).</p>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="form" value="base">
+      <div class="form-row">
+        <div class="form-field">
+          <label for="jours_par_mois">Jours acquis / mois</label>
+          <input type="text" id="jours_par_mois" name="jours_par_mois" value="{{ regles.jours_par_mois }}" required>
+        </div>
+        <button type="submit" class="btn-primary" style="padding:7px 16px;border:none;border-radius:6px;background:var(--cg-600);color:#fff;font-size:13px;font-weight:600;cursor:pointer;">
+          <i class="bi bi-check-lg"></i> Enregistrer
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ══ PALIERS D'ANCIENNETÉ ══ -->
+  <div class="cfg-section" style="max-width:520px;">
+    <h3><i class="bi bi-graph-up-arrow" style="color:var(--accent-text-soft);"></i> Paliers de bonus d'ancienneté
+      <span style="font-size:12px;color:var(--cg-muted);font-weight:400;">({{ paliers|length }})</span>
+    </h3>
+    <p class="cfg-hint">Jours supplémentaires ajoutés au quota selon l'ancienneté de l'employé (le palier le plus élevé atteint s'applique).</p>
+
+    {% if paliers %}
+    <table class="cg-cfg-table" style="margin-bottom:14px;">
+      <thead>
+        <tr>
+          <th>Ancienneté minimale</th>
+          <th>Bonus</th>
+          <th style="text-align:right;">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in paliers %}
+        <tr>
+          <td>
+            <input type="number" name="annees_min" value="{{ p.annees_min }}" min="0" form="palier-edit-{{ p.pk }}" style="width:70px;padding:5px 8px;border:1px solid var(--cg-border);border-radius:5px;font-size:12.5px;background:var(--cg-surface);color:var(--cg-text);" required> ans
+          </td>
+          <td>
+            <input type="text" name="jours_bonus" value="{{ p.jours_bonus }}" form="palier-edit-{{ p.pk }}" style="width:70px;padding:5px 8px;border:1px solid var(--cg-border);border-radius:5px;font-size:12.5px;background:var(--cg-surface);color:var(--cg-text);" required> jours
+          </td>
+          <td style="text-align:right;white-space:nowrap;">
+            <form id="palier-edit-{{ p.pk }}" method="post" action="{% url 'conge_palier_edit' p.pk %}" style="display:inline;">
+              {% csrf_token %}
+            </form>
+            <button type="submit" form="palier-edit-{{ p.pk }}" class="o-ctrl-btn" title="Enregistrer"><i class="bi bi-check-lg"></i></button>
+            <form method="post" action="{% url 'conge_palier_delete' p.pk %}" style="display:inline;"
+              onsubmit="return confirm('Supprimer ce palier ({{ p.annees_min }} ans) ?');">
+              {% csrf_token %}
+              <button type="submit" class="o-ctrl-btn" title="Supprimer" style="color:var(--rose-btn);"><i class="bi bi-trash"></i></button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p style="font-size:13px;color:var(--cg-muted);font-style:italic;margin-bottom:14px;">Aucun palier configuré — seule la base mensuelle s'applique.</p>
+    {% endif %}
+
+    <form method="post" action="{% url 'conge_palier_create' %}" class="palier-inline-form" style="padding-top:12px;border-top:1px dashed var(--cg-border);">
+      <input type="number" name="annees_min" placeholder="Ex : 5" min="0" required> ans
+      <span style="flex:1;"></span>
+      <input type="text" name="jours_bonus" placeholder="Ex : 1" required> jours
+      <button type="submit" class="o-ctrl-btn" title="Ajouter"><i class="bi bi-plus-lg"></i></button>
+    </form>
+  </div>
+
+</div>
+</div><!-- /cgcfg-wrap -->
+{% endblock %}

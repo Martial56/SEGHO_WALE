@@ -37,6 +37,43 @@ class TypeConge(models.Model):
         verbose_name_plural = "Types de demande"
 
 
+class ReglesConge(models.Model):
+    """Réglages du calcul du quota annuel (Art. 25.10 CODI) — singleton, comme
+    PlanningConfig. Le taux de base légal est 2,2 jours ouvrés par mois."""
+    jours_par_mois = models.DecimalField(
+        max_digits=4, decimal_places=2, default=2.2,
+        verbose_name="Jours acquis par mois travaillé",
+        help_text="Base légale ivoirienne : 2,2 jours ouvrés par mois (soit 26,4 jours/an).",
+    )
+
+    class Meta:
+        verbose_name = "Règles de calcul du quota"
+
+    @classmethod
+    def get(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+
+class PalierAnciennete(models.Model):
+    """Un palier de bonus d'ancienneté : à partir de `annees_min` ans
+    d'ancienneté, `jours_bonus` jours s'ajoutent au quota annuel de base."""
+    annees_min = models.PositiveSmallIntegerField(
+        unique=True, verbose_name="Ancienneté minimale (années)",
+    )
+    jours_bonus = models.DecimalField(
+        max_digits=4, decimal_places=2, verbose_name="Jours bonus",
+    )
+
+    def __str__(self):
+        return f"{self.annees_min} ans → +{self.jours_bonus}j"
+
+    class Meta:
+        ordering = ['annees_min']
+        verbose_name = "Palier d'ancienneté"
+        verbose_name_plural = "Paliers d'ancienneté"
+
+
 def type_conge_choices():
     """Choix dynamiques pour Conge.type_conge (voir employer/models.py) — inclut les types inactifs
     pour que get_type_conge_display() reste correct sur les anciens congés déjà enregistrés.

@@ -10,11 +10,15 @@
   position: sticky; top: 0; z-index: 100;
   flex-wrap: wrap;
 }
-.inv-stats { display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px; }
-@media (max-width:720px) { .inv-stats { grid-template-columns:repeat(2,1fr); } }
-.inv-stat-box { background:var(--ph-surface);border:1px solid var(--ph-border);border-radius:12px;padding:16px;text-align:center; }
-.inv-stat-val { font-size:26px;font-weight:800;line-height:1; }
-.inv-stat-lbl { font-size:11px;color:var(--ph-muted);margin-top:5px; }
+.ph-stats-chips { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.ph-stat-chip {
+  padding: 3px 12px; border-radius: 20px; font-size: 11px; font-weight: 700;
+  border: 1px solid; display: inline-flex; align-items: center; gap: 5px;
+}
+.ph-stat-chip.total    { background: var(--ph-50); color: var(--accent-text); border-color: var(--ph-200); }
+.ph-stat-chip.ecart    { background: rgba(var(--amber-rgb),.08); color: var(--amber-text); border-color: rgba(var(--amber-rgb),.2); }
+.ph-stat-chip.manquant { background: rgba(220,53,69,.08); color: var(--rose-text); border-color: rgba(220,53,69,.2); }
+.ph-stat-chip.excedent { background: rgba(var(--green-rgb),.08); color: var(--green); border-color: rgba(var(--green-rgb),.2); }
 .ph-qte-field {
   border: none; border-bottom: 1.5px solid rgba(0,0,0,.15); background: transparent;
   padding: 5px 4px; font-size: 13px; text-align: right; width: 90px;
@@ -46,6 +50,12 @@
         {{ label }} &mdash; {{ inv.date_inventaire|date:"d/m/Y" }}
       </div>
     </div>
+    <div class="ph-stats-chips">
+      <span class="ph-stat-chip total"><i class="bi bi-list-check"></i> {{ stats.total }} ligne{{ stats.total|pluralize }}</span>
+      <span class="ph-stat-chip ecart"><i class="bi bi-exclamation-triangle-fill"></i> {{ stats.avec_ecart }} écart{{ stats.avec_ecart|pluralize }}</span>
+      <span class="ph-stat-chip manquant"><i class="bi bi-arrow-down-circle-fill"></i> {{ stats.manquants }} manquant{{ stats.manquants|pluralize }}</span>
+      <span class="ph-stat-chip excedent"><i class="bi bi-arrow-up-circle-fill"></i> {{ stats.excedents }} excédent{{ stats.excedents|pluralize }}</span>
+    </div>
     <div style="display:flex; gap:8px; flex-wrap:wrap;">
       <a href="{% url 'pharmacie_inventaire_list' pharmacie %}" class="btn-ph-outline" style="font-size:11.5px; padding:5px 12px;">
         <i class="bi bi-arrow-left"></i> Retour
@@ -72,37 +82,6 @@
 
   <div style="padding:0 32px 28px;">
 
-    {# ── Bandeau validation ── #}
-    {% if inv.statut == 'valide' %}
-    <div style="display:flex;align-items:center;gap:10px;background:rgba(var(--green-rgb),.12);border:1px solid rgba(var(--green-rgb),.25);border-radius:10px;padding:12px 16px;margin-bottom:20px;color:var(--green);font-size:13px;">
-      <i class="bi bi-patch-check-fill" style="font-size:18px;"></i>
-      <div>
-        Inventaire validé le <strong>{{ inv.date_validation|date:"d/m/Y à H:i" }}</strong>
-        par <strong>{{ inv.valide_par }}</strong>.
-      </div>
-    </div>
-    {% endif %}
-
-    {# ── 4 cartes statistiques ── #}
-    <div class="inv-stats">
-      <div class="inv-stat-box">
-        <div class="inv-stat-val" style="color:var(--accent-text);">{{ stats.total }}</div>
-        <div class="inv-stat-lbl">Lignes total</div>
-      </div>
-      <div class="inv-stat-box">
-        <div class="inv-stat-val" style="color:var(--amber-text);">{{ stats.avec_ecart }}</div>
-        <div class="inv-stat-lbl">Avec écart</div>
-      </div>
-      <div class="inv-stat-box">
-        <div class="inv-stat-val" style="color:var(--rose-text);">{{ stats.manquants }}</div>
-        <div class="inv-stat-lbl">Manquants</div>
-      </div>
-      <div class="inv-stat-box">
-        <div class="inv-stat-val" style="color:var(--green);">{{ stats.excedents }}</div>
-        <div class="inv-stat-lbl">Excédents</div>
-      </div>
-    </div>
-
     {# ── Tableau des lignes ── #}
     {% if inv.statut == 'brouillon' %}
     <form method="post" id="form-inventaire">
@@ -127,8 +106,7 @@
               <th>Péremption</th>
               <th style="text-align:right;width:140px;">Stock théorique</th>
               <th style="text-align:right;width:160px;">Stock réel</th>
-              <th style="text-align:right;width:100px;">Écart</th>
-              <th style="text-align:center;width:160px">Statut</th>
+              <th style="text-align:center;width:160px">Écart</th>
             </tr>
           </thead>
           <tbody>
@@ -152,10 +130,14 @@
               </td>
               <td style="max-width:150px;">
                 {% for lot in ligne.lots_disponibles %}
-                <span class="lot-badge {% if lot.est_perime %}lot-perime{% elif lot.jours_restants is not None and lot.jours_restants <= 90 %}lot-bientot{% else %}lot-ok{% endif %}"
-                  title="{% if lot.est_perime %}Périmé depuis {{ lot.date_peremption|date:'d/m/Y' }}{% elif lot.jours_restants is not None %}Expire dans {{ lot.jours_restants }} j{% endif %}">
-                  {{ lot.date_peremption|date:"d/m/Y"|default:"—" }}
-                </span>
+                  {% if lot.date_peremption %}
+                  <span class="lot-badge {% if lot.est_perime %}lot-perime{% elif lot.jours_restants is not None and lot.jours_restants <= 90 %}lot-bientot{% else %}lot-ok{% endif %}"
+                    title="{% if lot.est_perime %}Périmé depuis {{ lot.date_peremption|date:'d/m/Y' }}{% elif lot.jours_restants is not None %}Expire dans {{ lot.jours_restants }} j{% endif %}">
+                    {{ lot.date_peremption|date:"d/m/Y" }}
+                  </span>
+                  {% else %}
+                  <span style="font-size:11px;color:var(--ph-muted);">—</span>
+                  {% endif %}
                 {% empty %}
                 <span style="font-size:11px;color:var(--ph-muted);">—</span>
                 {% endfor %}
@@ -164,7 +146,7 @@
               <td style="text-align:right;">
                 {% if inv.statut == 'brouillon' %}
                   <input type="number"
-                         name="stock_reel_{{ ligne.pk }}"
+                         name="reel_{{ ligne.produit.pk }}"
                          value="{{ ligne.stock_reel|floatformat:"0" }}"
                          min="0"
                          step="1"
@@ -175,25 +157,19 @@
                   {{ ligne.stock_reel|floatformat:"0" }}
                 {% endif %}
               </td>
-              <td style="text-align:right;font-weight:700;color:{% if ligne.ecart > 0 %}var(--green){% elif ligne.ecart < 0 %}var(--rose-text){% else %}var(--green){% endif %};"
-                id="ecart-{{ ligne.pk }}">
-                {% if ligne.ecart > 0 %}+{{ ligne.ecart }}
-                {% elif ligne.ecart < 0 %}{{ ligne.ecart }}
-                {% else %}0{% endif %}
-              </td>
               <td style="text-align:center;" id="statut-{{ ligne.pk }}">
                 {% if ligne.ecart > 0 %}
-                  <span class="badge-ph-ok">+{{ ligne.ecart }} excédent</span>
+                  <span class="badge-ph-ok">+{{ ligne.ecart|floatformat:"0" }} excédent</span>
                 {% elif ligne.ecart < 0 %}
-                  <span class="badge-ph-rupture">{% widthratio ligne.ecart -1 1 %} manquant</span>
+                  <span class="badge-ph-rupture">{{ ligne.ecart|floatformat:"0" }} manquant</span>
                 {% else %}
-                  <span class="badge-ph-ok">&#10003; Conforme</span>
+                  <span class="badge-ph-ok">0 conforme</span>
                 {% endif %}
               </td>
             </tr>
             {% empty %}
             <tr>
-              <td colspan="8" style="text-align:center;color:var(--ph-muted);padding:16px;">Aucune ligne pour ce type.</td>
+              <td colspan="7" style="text-align:center;color:var(--ph-muted);padding:16px;">Aucune ligne pour ce type.</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -244,20 +220,15 @@
 
       var ecart = reel - theorique;
 
-      var ecartCell = document.getElementById("ecart-" + pk);
       var statutCell = document.getElementById("statut-" + pk);
 
-      // Mise à jour de la cellule écart
-      ecartCell.style.color = ecart > 0 ? "var(--green)" : ecart < 0 ? "var(--rose-text)" : "var(--green)";
-      ecartCell.textContent = ecart > 0 ? "+" + ecart : ecart;
-
-      // Mise à jour du badge statut
+      // Mise à jour du badge écart/statut (colonne fusionnée)
       if (ecart > 0) {
         statutCell.innerHTML = '<span class="badge-ph-ok">+' + ecart + ' excédent</span>';
       } else if (ecart < 0) {
-        statutCell.innerHTML = '<span class="badge-ph-rupture">' + Math.abs(ecart) + ' manquant</span>';
+        statutCell.innerHTML = '<span class="badge-ph-rupture">' + ecart + ' manquant</span>';
       } else {
-        statutCell.innerHTML = '<span class="badge-ph-ok">&#10003; Conforme</span>';
+        statutCell.innerHTML = '<span class="badge-ph-ok">0 conforme</span>';
       }
     });
   });

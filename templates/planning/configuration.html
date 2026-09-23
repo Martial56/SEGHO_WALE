@@ -66,22 +66,14 @@ html[data-theme="dark"] .badge-inactif { background: #3d2e00; color: #ffd666; }
 
 <div style="padding: 20px 32px 32px;">
 
-  <!-- ══ FONCTION DU SIGNATAIRE ══ -->
+  <!-- ══ SIGNATAIRE PAR DÉFAUT ══ -->
   <div class="cfg-section">
     <h3><i class="bi bi-patch-check" style="color:var(--accent-text-soft);"></i> Signataire</h3>
-    <p class="cfg-hint">Fonction affichée au-dessus du nom sur les plannings imprimés/publiés, et médecin proposé par défaut à la création d'un nouveau planning.</p>
+    <p class="cfg-hint">Médecin proposé par défaut à la création d'un nouveau planning. La fonction affichée sur les plannings imprimés/publiés dépend du médecin signataire choisi (voir ci-dessous).</p>
     <form method="post">
       {% csrf_token %}
       <input type="hidden" name="form" value="signataire">
       <div class="form-row">
-        <div class="form-field">
-          <label for="fonction_signataire">Fonction</label>
-          <select id="fonction_signataire" name="fonction_signataire">
-            {% for value, label in fonction_choices %}
-            <option value="{{ value }}" {% if value == config.fonction_signataire %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-          </select>
-        </div>
         <div class="form-field">
           <label for="medecin_defaut">Médecin par défaut</label>
           <select id="medecin_defaut" name="medecin_defaut">
@@ -111,6 +103,7 @@ html[data-theme="dark"] .badge-inactif { background: #3d2e00; color: #ffd666; }
         <thead>
           <tr>
             <th>Nom</th>
+            <th>Fonction</th>
             <th>État</th>
             <th>Plannings liés</th>
             <th>Actions</th>
@@ -120,6 +113,7 @@ html[data-theme="dark"] .badge-inactif { background: #3d2e00; color: #ffd666; }
           {% for m in medecins %}
           <tr>
             <td>{{ m.nom }}</td>
+            <td>{{ m.get_fonction_display|default:"—" }}</td>
             <td>
               {% if m.actif %}
                 <span class="badge-actif"><i class="bi bi-check-circle-fill"></i> Actif</span>
@@ -144,7 +138,7 @@ html[data-theme="dark"] .badge-inactif { background: #3d2e00; color: #ffd666; }
             </td>
           </tr>
           <tr id="medecin-edit-{{ m.pk }}" class="medecin-edit-row" style="display:none;">
-            <td colspan="4">
+            <td colspan="5">
               <form method="post" action="{% url 'planning_medecin_save' %}">
                 {% csrf_token %}
                 <input type="hidden" name="pk" value="{{ m.pk }}">
@@ -152,6 +146,15 @@ html[data-theme="dark"] .badge-inactif { background: #3d2e00; color: #ffd666; }
                   <div class="form-field">
                     <label for="nom-{{ m.pk }}">Nom</label>
                     <input type="text" id="nom-{{ m.pk }}" name="nom" value="{{ m.nom }}" required>
+                  </div>
+                  <div class="form-field">
+                    <label for="fonction-{{ m.pk }}">Fonction</label>
+                    <select id="fonction-{{ m.pk }}" name="fonction">
+                      <option value="">— Aucune —</option>
+                      {% for value, label in fonction_choices %}
+                      <option value="{{ value }}" {% if value == m.fonction %}selected{% endif %}>{{ label }}</option>
+                      {% endfor %}
+                    </select>
                   </div>
                   <div class="form-field" style="justify-content:flex-end;">
                     <div class="form-field-check">
@@ -183,6 +186,15 @@ html[data-theme="dark"] .badge-inactif { background: #3d2e00; color: #ffd666; }
       <div class="form-field">
         <label for="new-medecin-nom">Nom du médecin</label>
         <input type="text" id="new-medecin-nom" name="nom" placeholder="ex: Dr KOUAME Jean" required>
+      </div>
+      <div class="form-field">
+        <label for="new-medecin-fonction">Fonction</label>
+        <select id="new-medecin-fonction" name="fonction">
+          <option value="">— Aucune —</option>
+          {% for value, label in fonction_choices %}
+          <option value="{{ value }}">{{ label }}</option>
+          {% endfor %}
+        </select>
       </div>
       <div class="form-field" style="justify-content:flex-end;">
         <div class="form-field-check">

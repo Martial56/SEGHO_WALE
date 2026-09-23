@@ -455,12 +455,14 @@ def medecin_create(request):
             errors['specialite'] = 'La spécialité est obligatoire.'
         elif not Specialite.objects.filter(pk=specialite_pk).exists():
             errors['specialite'] = 'Spécialité invalide.'
-        if not departement_pk:
-            errors['departement'] = 'Le département est obligatoire.'
-        elif not Departement.objects.filter(pk=departement_pk).exists():
+        if departement_pk and not Departement.objects.filter(pk=departement_pk).exists():
             errors['departement'] = 'Département invalide.'
         if ordre_medecin and Medecin.objects.filter(ordre_medecin=ordre_medecin).exists():
             errors['ordre_medecin'] = 'Ce numéro d\'ordre est déjà utilisé par un autre médecin.'
+        if not user_pk:
+            errors['user'] = 'Le compte utilisateur est obligatoire.'
+        elif not users_disponibles.filter(pk=user_pk).exists():
+            errors['user'] = 'Compte utilisateur invalide.'
 
         if not errors:
             service_obj = Service.objects.filter(pk=service_pk).first() if service_pk else employe_trouve.service
@@ -478,9 +480,7 @@ def medecin_create(request):
                     pass
 
             med.departement = Departement.objects.filter(pk=departement_pk).first() if departement_pk else None
-
-            if user_pk:
-                med.user = users_disponibles.filter(pk=user_pk).first()
+            med.user = users_disponibles.filter(pk=user_pk).first()
 
             med.save()
             messages.success(request, f'Médecin {med} enregistré avec succès (matricule : {med.matricule}).')
@@ -534,12 +534,14 @@ def medecin_edit(request, pk):
             errors['specialite'] = 'La spécialité est obligatoire.'
         elif not Specialite.objects.filter(pk=specialite_pk).exists():
             errors['specialite'] = 'Spécialité invalide.'
-        if not departement_pk:
-            errors['departement'] = 'Le département est obligatoire.'
-        elif not Departement.objects.filter(pk=departement_pk).exists():
+        if departement_pk and not Departement.objects.filter(pk=departement_pk).exists():
             errors['departement'] = 'Département invalide.'
         if ordre_medecin and Medecin.objects.filter(ordre_medecin=ordre_medecin).exclude(pk=med.pk).exists():
             errors['ordre_medecin'] = 'Ce numéro d\'ordre est déjà utilisé par un autre médecin.'
+        if not user_pk:
+            errors['user'] = 'Le compte utilisateur est obligatoire.'
+        elif not users_disponibles.filter(pk=user_pk).exists():
+            errors['user'] = 'Compte utilisateur invalide.'
 
         if not errors:
             med.actif = actif
@@ -552,11 +554,7 @@ def medecin_edit(request, pk):
             med.specialite = Specialite.objects.filter(pk=specialite_pk).first() if specialite_pk else None
             med.departement = Departement.objects.filter(pk=departement_pk).first() if departement_pk else None
             med.service = Service.objects.filter(pk=service_pk).first() if service_pk else None
-
-            if user_pk:
-                med.user = users_disponibles.filter(pk=user_pk).first()
-            else:
-                med.user = None
+            med.user = users_disponibles.filter(pk=user_pk).first()
 
             med.save()
             messages.success(request, f'Médecin {med} mis à jour avec succès.')
@@ -895,10 +893,9 @@ def laboratoire_create(request):
 
 @login_required(login_url='login')
 def laboratoire_detail(request, pk):
-    from laboratoire.models import DemandeExamen, LigneDemandeExamen
+    from laboratoire.models import DemandeExamen
 
     demande = get_object_or_404(DemandeExamen, pk=pk)
-    peut_modifier_lignes = demande.statut == 'brouillon' and not demande.facture
 
     if request.method == 'POST':
         action = request.POST.get('action')
@@ -914,52 +911,12 @@ def laboratoire_detail(request, pk):
                     messages.error(request, f'Échec de l\'envoi : {echange.message_log}')
             except RuntimeError as exc:
                 messages.error(request, str(exc))
-        elif action == 'maj_lignes' and peut_modifier_lignes:
-            ids_conserves = set()
-            total = 0
-            i = 0
-            while True:
-                nom = request.POST.get(f'ligne_examen_{i}')
-                if nom is None:
-                    break
-                nom = nom.strip()
-                if nom:
-                    try:
-                        prix = float(request.POST.get(f'ligne_prix_{i}', 0) or 0)
-                    except ValueError:
-                        prix = 0
-                    instructions = request.POST.get(f'ligne_instructions_{i}', '').strip()
-                    ligne_id = request.POST.get(f'ligne_id_{i}', '').strip()
-                    if ligne_id:
-                        LigneDemandeExamen.objects.filter(pk=ligne_id, demande=demande).update(
-                            libelle=nom, prix=prix, instructions=instructions,
-                        )
-                        ids_conserves.add(int(ligne_id))
-                    else:
-                        nouvelle = LigneDemandeExamen.objects.create(
-                            demande=demande, libelle=nom, prix=prix, instructions=instructions,
-                        )
-                        ids_conserves.add(nouvelle.pk)
-                    total += prix
-                i += 1
-            demande.lignes.exclude(pk__in=ids_conserves).delete()
-            demande.montant_total = total
-            demande.save(update_fields=['montant_total'])
-            messages.success(request, 'Tests mis à jour avec succès.')
         return redirect('laboratoire_detail', pk=pk)
 
     lignes = demande.lignes.select_related('type_examen').all()
-    services_examens = []
-    if peut_modifier_lignes:
-        from services.models import Articleservice
-        services_examens = Articleservice.objects.filter(
-            categorie__code='EX', actif=True
-        ).order_by('nom')
     return render(request, 'laboratoire/detail_demande.html', {
         'demande': demande,
         'lignes': lignes,
-        'peut_modifier_lignes': peut_modifier_lignes,
-        'services_examens': services_examens,
         'facture_url': f'/facturation/nouvelle/?patient={demande.patient_id}&demande={demande.pk}&back=/laboratoire/{demande.pk}/',
         'breadcrumb': [
             {'title': 'Accueil', 'url': '/'},
@@ -1491,10 +1448,11 @@ def gynecologie_rdv_detail(request, pk):
             now = timezone.now()
             rdv.statut = 'en_consultation'
             rdv.date_en_consultation = now
+            rdv.demarre_par = request.user
             if rdv.date_en_attente:
                 rdv.temps_attente_minutes = int((now - rdv.date_en_attente).total_seconds() / 60)
             rdv._skip_auto_log = True
-            rdv.save(update_fields=['statut', 'date_en_consultation', 'temps_attente_minutes'])
+            rdv.save(update_fields=['statut', 'date_en_consultation', 'demarre_par', 'temps_attente_minutes'])
             log_event(rdv, request.user, 'État : En Attente → En Consultation', type='statut')
             messages.success(request, 'Consultation démarrée.')
             return redirect('gynecologie_rdv_detail', pk=rdv.pk)
@@ -1503,10 +1461,11 @@ def gynecologie_rdv_detail(request, pk):
             now = timezone.now()
             rdv.statut = 'termine'
             rdv.date_termine = now
+            rdv.termine_par = request.user
             if rdv.date_en_consultation:
                 rdv.temps_consultation_minutes = int((now - rdv.date_en_consultation).total_seconds() / 60)
             rdv._skip_auto_log = True
-            rdv.save(update_fields=['statut', 'date_termine', 'temps_consultation_minutes'])
+            rdv.save(update_fields=['statut', 'date_termine', 'termine_par', 'temps_consultation_minutes'])
             log_event(rdv, request.user, 'État : En Consultation → Terminé', type='statut')
             messages.success(request, 'Consultation terminée.')
             return redirect('gynecologie_rdv')
@@ -1638,7 +1597,8 @@ def gynecologie_demarrer_consultation(request, pk):
     # Passer le RDV en consultation si pas encore terminé
     if rdv.statut in ('planifie', 'confirme', 'en_attente'):
         rdv.statut = 'en_consultation'
-        rdv.save(update_fields=['statut'])
+        rdv.demarre_par = request.user
+        rdv.save(update_fields=['statut', 'demarre_par'])
 
     return redirect('gynecologie_rdv_detail', pk=rdv.pk)
 
@@ -2044,9 +2004,29 @@ def _specialite_form_class():
             fields = ['nom', 'code', 'description']
             widgets = {
                 'nom':         forms.TextInput(attrs={'class': 'f-input', 'placeholder': 'Ex : Cardiologie'}),
-                'code':        forms.TextInput(attrs={'class': 'f-input', 'placeholder': 'Ex : CARD'}),
+                'code':        forms.TextInput(attrs={'class': 'f-input', 'readonly': 'readonly'}),
                 'description': forms.Textarea(attrs={'class': 'f-input', 'rows': 3, 'placeholder': 'Description optionnelle'}),
             }
+
+        def clean_code(self):
+            # Conservé tel quel une fois créé — seul un nouveau code est généré,
+            # pour ne pas faire bouger un code déjà en usage/mémorisé si le nom
+            # est corrigé plus tard.
+            if self.instance.pk and self.instance.code:
+                return self.instance.code
+            import re
+            import unicodedata
+            nom = unicodedata.normalize('NFKD', self.cleaned_data.get('nom', ''))
+            nom = ''.join(c for c in nom if not unicodedata.combining(c)).upper()
+            base = re.sub(r'[^A-Z0-9]', '', nom)[:4] or 'SPEC'
+            code = base
+            n = 2
+            while Specialite.objects.filter(code=code).exclude(pk=self.instance.pk or 0).exists():
+                code = f'{base}{n}'
+                n += 1
+            return code
+    SpecialiteForm.base_fields['code'].required = False
+    SpecialiteForm.base_fields['code'].help_text = 'Généré automatiquement à partir du nom.'
     return SpecialiteForm
 
 

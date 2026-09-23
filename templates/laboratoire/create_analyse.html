@@ -640,12 +640,15 @@
         min-width: 220px;
     }
 
-    .col-delai {
-        width: 120px;
+    .col-type-test {
+        width: 140px;
     }
 
     .col-prix {
-        width: 110px;
+        /* Le prix n'est pas montré à la création : il reste géré par la
+           caissière au moment de la facturation. Le champ reste dans le DOM
+           (auto-rempli en JS depuis le catalogue) pour préremplir la facture. */
+        display: none;
     }
 
     .col-instr {
@@ -697,11 +700,9 @@
 
     /* ── Total ── */
     .total-wrap {
-        display: flex;
-        justify-content: flex-end;
-        margin-top: 18px;
-        padding-top: 14px;
-        border-top: 1px solid rgba(0, 0, 0, 0.07);
+        /* Idem : le montant global n'est pas affiché à la création de la
+           demande, seul le personnel de caisse voit les prix. */
+        display: none;
     }
 
     .total-box {
@@ -934,7 +935,7 @@
                 <thead>
                     <tr>
                         <th class="col-test">Test <span class="req">*</span></th>
-                        <th class="col-delai">Délai d'exécution</th>
+                        <th class="col-type-test">Type de test</th>
                         <th class="col-prix">Prix de vente (CFA)</th>
                         <th class="col-instr">Instructions spéciales</th>
                         <th class="col-del"></th>
@@ -953,8 +954,8 @@
                                 <div class="ex-dropdown"></div>
                             </div>
                         </td>
-                        <td class="col-delai">
-                            <input type="text" name="ligne_delai_0" id="delai-0" placeholder="—">
+                        <td class="col-type-test">
+                            <input type="text" id="type-test-0" placeholder="—" readonly>
                         </td>
                         <td class="col-prix">
                             <input type="number" name="ligne_prix_0" id="prix-0" min="0" step="1" value="0"
@@ -1000,9 +1001,29 @@
         /* ── Données examens (services catégorie EX) ── */
         var _EXAMENS = [
             {% for svc in services_examens %}
-        { nom: "{{ svc.nom|escapejs }}", prix: {{ svc.prix_vente }} },
+        { nom: "{{ svc.nom|escapejs }}", prix: {{ svc.prix_vente }}, typeTest: "{{ svc.type_test_labo|escapejs }}" },
     {% endfor %}
     ];
+
+    /* ── Type de test sélectionné (filtre la liste des examens) ── */
+    var typeTestSelect = document.getElementById('id_type_test');
+    function currentTypeTest() {
+        return typeTestSelect ? typeTestSelect.value : '';
+    }
+    function examensDisponibles() {
+        var tt = currentTypeTest();
+        return tt ? _EXAMENS.filter(function (s) { return s.typeTest === tt; }) : _EXAMENS;
+    }
+
+    /* ── Libellés des types de test (pour affichage en lecture seule) ── */
+    var TYPE_TEST_LABELS = {
+        {% for val, lbl in type_test_choices %}
+        "{{ val }}": "{{ lbl|escapejs }}",
+        {% endfor %}
+    };
+    function typeTestLabel(code) {
+        return code ? (TYPE_TEST_LABELS[code] || code) : '—';
+    }
 
     /* ── Recalc total ── */
     window.recalcTotal = function () {
@@ -1030,18 +1051,22 @@
 
         function render(q) {
             var current = hidden.value;
+            var base = examensDisponibles();
             var list = (q && q !== current)
-                ? _EXAMENS.filter(function (s) {
+                ? base.filter(function (s) {
                     return s.nom.toLowerCase().indexOf(q.toLowerCase()) !== -1;
                 })
-                : _EXAMENS;
+                : base;
             if (!list.length) {
-                dropdown.innerHTML = '<div class="ex-empty">Aucun résultat pour "' + q + '"</div>';
+                dropdown.innerHTML = q
+                    ? '<div class="ex-empty">Aucun résultat pour "' + q + '"</div>'
+                    : '<div class="ex-empty">Aucun examen pour ce type de test</div>';
             } else {
                 dropdown.innerHTML = list.map(function (s) {
                     var sel = s.nom === current ? ' is-selected' : '';
                     return '<div class="ex-opt' + sel + '" data-nom="' +
-                        s.nom.replace(/"/g, '&quot;') + '" data-prix="' + s.prix + '">' +
+                        s.nom.replace(/"/g, '&quot;') + '" data-prix="' + s.prix +
+                        '" data-typetest="' + s.typeTest + '">' +
                         s.nom + '</div>';
                 }).join('');
             }
@@ -1049,12 +1074,14 @@
             dropdown.style.display = 'block';
         }
 
-        function selectExamen(nom, prix) {
+        function selectExamen(nom, prix, typeTest) {
             hidden.value = nom;
             input.value = nom;
             wrapper.classList.add('ex-preloaded');
             var prixInput = document.querySelector('[name="ligne_prix_' + idx + '"]');
             if (prixInput) { prixInput.value = prix; recalcTotal(); }
+            var typeInput = document.getElementById('type-test-' + idx);
+            if (typeInput) { typeInput.value = typeTestLabel(typeTest); }
         }
 
         function close() { dropdown.style.display = 'none'; }
@@ -1073,7 +1100,7 @@
             e.preventDefault();
             var opt = e.target.closest('.ex-opt');
             if (!opt) return;
-            selectExamen(opt.dataset.nom, parseFloat(opt.dataset.prix) || 0);
+            selectExamen(opt.dataset.nom, parseFloat(opt.dataset.prix) || 0, opt.dataset.typetest);
             close();
         });
 
@@ -1101,7 +1128,7 @@
             '<div class="ex-dropdown"></div>' +
             '</div>' +
             '</td>' +
-            '<td class="col-delai"><input type="text" name="ligne_delai_' + idx + '" id="delai-' + idx + '" placeholder="—"></td>' +
+            '<td class="col-type-test"><input type="text" id="type-test-' + idx + '" placeholder="—" readonly></td>' +
             '<td class="col-prix"><input type="number" name="ligne_prix_' + idx + '" id="prix-' + idx +
             '" min="0" step="1" value="0" oninput="recalcTotal()"></td>' +
             '<td class="col-instr"><input type="text" name="ligne_instructions_' + idx + '" placeholder="Précisions…"></td>' +
@@ -1117,6 +1144,16 @@
             recalcTotal();
         }
     };
+
+    /* ── Changement de type de test : referme les listes d'examens ouvertes
+       pour qu'elles se reconstruisent filtrées à la prochaine ouverture ── */
+    if (typeTestSelect) {
+        typeTestSelect.addEventListener('change', function () {
+            document.querySelectorAll('.ex-dropdown').forEach(function (d) {
+                d.style.display = 'none';
+            });
+        });
+    }
 
     /* ── Toggle urgent ── */
     var urgChk = document.getElementById('id_urgent');

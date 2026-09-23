@@ -872,11 +872,12 @@ def rdv_edit(request, pk):
             now = tz.now()
             rdv.statut = 'en_consultation'
             rdv.date_en_consultation = now
+            rdv.demarre_par = request.user
             if rdv.date_en_attente:
                 rdv.temps_attente_minutes = int((now - rdv.date_en_attente).total_seconds() / 60)
             rdv.duree_minutes = rdv.temps_constante_minutes + rdv.temps_attente_minutes + rdv.temps_consultation_minutes
             rdv._skip_auto_log = True
-            rdv.save(update_fields=['statut', 'date_en_consultation', 'temps_attente_minutes', 'duree_minutes'])
+            rdv.save(update_fields=['statut', 'date_en_consultation', 'demarre_par', 'temps_attente_minutes', 'duree_minutes'])
             log_event(rdv, request.user, 'État : En Attente → En Consultation', type='statut')
             messages.success(request, 'Consultation démarrée.')
             from django.urls import reverse
@@ -887,11 +888,12 @@ def rdv_edit(request, pk):
             now = tz.now()
             rdv.statut = 'termine'
             rdv.date_termine = now
+            rdv.termine_par = request.user
             if rdv.date_en_consultation:
                 rdv.temps_consultation_minutes = int((now - rdv.date_en_consultation).total_seconds() / 60)
             rdv.duree_minutes = rdv.temps_constante_minutes + rdv.temps_attente_minutes + rdv.temps_consultation_minutes
             rdv._skip_auto_log = True
-            rdv.save(update_fields=['statut', 'date_termine', 'temps_consultation_minutes', 'duree_minutes'])
+            rdv.save(update_fields=['statut', 'date_termine', 'termine_par', 'temps_consultation_minutes', 'duree_minutes'])
             log_event(rdv, request.user, 'État : En Consultation → Terminé', type='statut')
             messages.success(request, 'Consultation terminée.')
             return redirect('patients:rdv_global')

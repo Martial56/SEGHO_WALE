@@ -113,6 +113,15 @@
               {% endfor %}
             </select>
           </div>
+          <div class="field-row" id="type-test-labo-row" style="display:none;">
+            <label>Type de test (laboratoire)</label>
+            <select name="type_test_labo" id="type-test-labo-select" class="field-ul">
+              <option value="">— Non applicable —</option>
+              {% for val, label in type_test_labo_choices %}
+              <option value="{{ val }}" {% if article and article.type_test_labo == val %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
         </div>
 
       </div>
@@ -293,6 +302,28 @@ document.querySelectorAll('.f-tab').forEach(function(btn) {
 
   typeSelect.addEventListener('change', toggleStock);
   toggleStock();
+})();
+
+/* ── Type de test (laboratoire) : visible seulement pour la catégorie EX ── */
+(function() {
+  var catSelect = document.getElementById('categorie-select');
+  var row       = document.getElementById('type-test-labo-row');
+  var select    = document.getElementById('type-test-labo-select');
+  if (!catSelect || !row) return;
+
+  var CAT_CODES = {};
+  try {
+    if (catSelect.dataset.catcodes) CAT_CODES = JSON.parse(catSelect.dataset.catcodes);
+  } catch(e) {}
+
+  function toggleTypeTestLabo() {
+    var isExamen = CAT_CODES[catSelect.value] === 'EX';
+    row.style.display = isExamen ? '' : 'none';
+    if (!isExamen && select) select.value = '';
+  }
+
+  catSelect.addEventListener('change', toggleTypeTestLabo);
+  toggleTypeTestLabo();
 })();
 
 /* ── Référence semi-automatique ── */

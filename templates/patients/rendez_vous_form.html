@@ -711,6 +711,17 @@ cliquant sur une ligne. Voir patients/origines.py.
             <div class="status-step" data-step="termine">Terminé</div>
         </div>
 
+        {% if rdv.demarre_par or rdv.termine_par %}
+        <div style="display:flex;gap:18px;flex-wrap:wrap;font-size:11.5px;color:var(--text-muted);margin-top:6px;">
+            {% if rdv.demarre_par %}
+            <span><i class="bi bi-play-circle"></i> Démarrée par <strong>{{ rdv.demarre_par.get_full_name|default:rdv.demarre_par.username }}</strong></span>
+            {% endif %}
+            {% if rdv.termine_par %}
+            <span><i class="bi bi-check-circle"></i> Terminée par <strong>{{ rdv.termine_par.get_full_name|default:rdv.termine_par.username }}</strong></span>
+            {% endif %}
+        </div>
+        {% endif %}
+
     </div>
 
     <!-- Deux colonnes principales -->
@@ -770,7 +781,9 @@ cliquant sur une ligne. Voir patients/origines.py.
 
             <!-- Département -->
             <div class="field-row">
-                <label for="{{ form.departement.id_for_label }}">Département</label>
+                <label for="{{ form.departement.id_for_label }}">
+                    Département <span class="required-star">*</span>
+                </label>
                 {{ form.departement }}
             </div>
 
@@ -1436,9 +1449,10 @@ cliquant sur une ligne. Voir patients/origines.py.
           <!-- ══ COLONNE GAUCHE ══ -->
           <div class="cpn-col">
             <div class="cpn-section">Données administratives</div>
-            <div class="cpn-row"><span class="cpn-lbl">Mode d'entrée</span><select name="cur_mode_entree" id="cur_mode_entree" class="cpn-sel editable" onchange="toggleCurAutreEntree(this.value)"><option value=""></option><option value="venu_lui_meme">Patient venu de lui même</option><option value="reference_centre">Référence d'un centre de santé</option><option value="refere_tradipraticien">Référé par un tradipraticien</option><option value="autre">Autre</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Mode d'entrée</span><select name="cur_mode_entree" id="cur_mode_entree" class="cpn-sel editable"><option value=""></option><option value="venu_lui_meme">Patient venu de lui même</option><option value="reference_centre">Référence d'un centre de santé</option><option value="refere_tradipraticien">Référé par un tradipraticien</option><option value="autre">Autre</option></select></div>
             <div class="cpn-row" id="cur_mode_entree_autre_row" style="display:none;"><span class="cpn-lbl">Préciser</span><input type="text" name="cur_mode_entree_autre" class="cpn-inp editable" placeholder="Préciser le mode d'entrée..."></div>
-            <div class="cpn-row"><span class="cpn-lbl">Type de population</span><select name="cur_type_population" class="cpn-sel editable"><option value=""></option><option value="pop_generale">Population générale</option><option value="ts">TS</option><option value="ud">UD</option><option value="hsh">HSH</option><option value="pc">PC</option><option value="autre_risque">Autre à risque</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Type de population</span><select name="cur_type_population" id="cur_type_population" class="cpn-sel editable"><option value=""></option><option value="pop_generale">Population générale</option><option value="ts">TS</option><option value="ud">UD</option><option value="hsh">HSH</option><option value="pc">PC</option><option value="autre_risque">Autre à risque</option></select></div>
+            <div class="cpn-row" id="cur_type_population_autre_row" style="display:none;"><span class="cpn-lbl">Préciser</span><input type="text" name="cur_type_population_autre" class="cpn-inp editable" placeholder="Préciser le type de population..."></div>
             <div class="cpn-row"><span class="cpn-lbl">Type de visite curative</span><select name="cur_type_visite" class="cpn-sel editable"><option value=""></option>{% for tvc in types_visite_curative %}<option value="{{ tvc.code }}" {% if rdv and rdv.cur_type_visite and rdv.cur_type_visite.code == tvc.code %}selected{% endif %}>{{ tvc.nom }}</option>{% endfor %}</select></div>
             <div class="cpn-sub">Examens cliniques et constantes <!--: <a href="#" style="color:var(--accent-text-soft);font-size:12.5px;text-decoration:none;margin-left:8px;">Créer</a>--></div>
             <div class="cpn-row" style="align-items:flex-start;"><span class="cpn-lbl" style="padding-top:4px;">Motif de consultation</span><textarea name="cur_motif_consultation" class="cpn-inp editable" rows="3" style="resize:vertical;padding:3px 0;"></textarea></div>
@@ -1498,13 +1512,14 @@ cliquant sur une ligne. Voir patients/origines.py.
           <!-- ══ COLONNE DROITE ══ -->
           <div class="cpn-col">
             <div class="cpn-section">Antécédents et autres informations</div>
-            <div class="cpn-row"><span class="cpn-lbl">Traitement antérieur/en cours</span><input type="text" name="cur_traitement_anterieur" class="cpn-inp editable"></div>
+            <div class="cpn-row" style="align-items:flex-start;"><span class="cpn-lbl" style="padding-top:4px;">Traitement antérieur/en cours</span><textarea name="cur_traitement_anterieur" class="cpn-inp editable" rows="2" style="resize:vertical;padding:3px 0;"></textarea></div>
             <div class="cpn-row"><span class="cpn-lbl">HTA</span><div class="cpn-radios"><label><input type="radio" name="cur_atcd_hta" value="oui" class="editable"> Oui</label><label><input type="radio" name="cur_atcd_hta" value="non" class="editable"> Non</label></div></div>
             <div class="cpn-row"><span class="cpn-lbl">Diabète</span><div class="cpn-radios"><label><input type="radio" name="cur_atcd_diabete" value="oui" class="editable"> Oui</label><label><input type="radio" name="cur_atcd_diabete" value="non" class="editable"> Non</label></div></div>
             <div class="cpn-row"><span class="cpn-lbl">Autres</span><input type="text" name="cur_atcd_autres" class="cpn-inp editable"></div>
-            <div class="cpn-row"><span class="cpn-lbl">Chirurgicaux</span><input type="text" name="cur_atcd_chirurgicaux" class="cpn-inp editable"></div>
-            <div class="cpn-row"><span class="cpn-lbl">Obstétricaux</span><input type="text" name="cur_atcd_obstetricaux" class="cpn-inp editable"></div>
-            <div class="cpn-row"><span class="cpn-lbl">D.D.R.</span><input type="date" name="cur_ddr" class="cpn-inp editable"></div>
+            <div class="cpn-row" style="align-items:flex-start;"><span class="cpn-lbl" style="padding-top:4px;">Chirurgicaux</span><textarea name="cur_atcd_chirurgicaux" class="cpn-inp editable" rows="2" style="resize:vertical;padding:3px 0;"></textarea></div>
+            <div class="cpn-row" style="align-items:flex-start;"><span class="cpn-lbl" style="padding-top:4px;">Obstétricaux</span><textarea name="cur_atcd_obstetricaux" class="cpn-inp editable" rows="2" style="resize:vertical;padding:3px 0;"></textarea></div>
+            <div class="cpn-row"><span class="cpn-lbl">Date D.D.R.</span><input type="date" name="cur_ddr" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">D.D.R. (préciser)</span><input type="text" name="cur_ddr_precision" class="cpn-inp editable"></div>
             <div class="cpn-row"><span class="cpn-lbl">Grossesse en cours</span><div class="cpn-radios"><label><input type="radio" name="cur_grossesse_en_cours" value="oui" class="editable"> Oui</label><label><input type="radio" name="cur_grossesse_en_cours" value="non" class="editable"> Non</label></div></div>
             <div class="cpn-row"><span class="cpn-lbl">Tabac</span><div class="cpn-radios"><label><input type="radio" name="cur_tabac" value="oui" class="editable"> Oui</label><label><input type="radio" name="cur_tabac" value="non" class="editable"> Non</label></div></div>
             <div class="cpn-row"><span class="cpn-lbl">Alcool</span><div class="cpn-radios"><label><input type="radio" name="cur_alcool" value="oui" class="editable"> Oui</label><label><input type="radio" name="cur_alcool" value="non" class="editable"> Non</label></div></div>
@@ -1518,7 +1533,7 @@ cliquant sur une ligne. Voir patients/origines.py.
             <div class="cpn-row"><span class="cpn-lbl">CDIP réalisé</span><div class="cpn-radios"><label><input type="radio" name="cur_cdip_realise" value="oui" class="editable"> Oui</label><label><input type="radio" name="cur_cdip_realise" value="non" class="editable"> Non</label><label><input type="radio" name="cur_cdip_realise" value="na" class="editable"> NA</label></div></div>
             <div class="cpn-row"><span class="cpn-lbl">Code dépistage client</span><input type="text" name="cur_code_depistage" class="cpn-inp editable"></div>
             <div class="cpn-row"><span class="cpn-lbl">Glycémie</span><input type="text" name="cur_glycemie" class="cpn-inp editable" value="{{ constante.glycemie|default:'' }}"></div>
-            <div class="cpn-row"><span class="cpn-lbl">Autres Examens</span><input type="text" name="cur_autres_examens" class="cpn-inp editable"></div>
+            <div class="cpn-row" style="align-items:flex-start;"><span class="cpn-lbl" style="padding-top:4px;">Autres Examens</span><textarea name="cur_autres_examens" class="cpn-inp editable" rows="2" style="resize:vertical;padding:3px 0;"></textarea></div>
 
             <hr class="cpn-sep" style="margin:16px 0;">
             <div class="cpn-row"><span class="cpn-lbl">Durée M.O</span><input type="time" name="cur_duree_mo" class="cpn-inp editable" value="00:00"></div>
@@ -1699,9 +1714,21 @@ cliquant sur une ligne. Voir patients/origines.py.
     }());
 
     /* ── Mode d'entrée curatif : afficher/masquer "Préciser" ── */
-    function toggleCurAutreEntree(val) {
-        var row = document.getElementById('cur_mode_entree_autre_row');
-        if (row) row.style.display = (val === 'autre') ? '' : 'none';
+    var _curModeEntree = document.getElementById('cur_mode_entree');
+    if (_curModeEntree) {
+        _curModeEntree.addEventListener('change', function() {
+            var row = document.getElementById('cur_mode_entree_autre_row');
+            if (row) row.style.display = (this.value === 'autre') ? '' : 'none';
+        });
+    }
+
+    /* ── Type de population curatif : afficher/masquer "Préciser" ── */
+    var _curTypePopulation = document.getElementById('cur_type_population');
+    if (_curTypePopulation) {
+        _curTypePopulation.addEventListener('change', function() {
+            var row = document.getElementById('cur_type_population_autre_row');
+            if (row) row.style.display = (this.value === 'autre_risque') ? '' : 'none';
+        });
     }
 
     /* ── Résultat consultation CPN : afficher/masquer « Gestion du risque » ── */
@@ -2273,6 +2300,17 @@ html[data-theme="dark"] .em-btn-link{color:var(--teal-300);}
   preremplir('_reg_acc');
   preremplir('_reg_post');
   preremplir('_reg_cur');
+
+  /* Afficher "Préciser" si la valeur chargée déclenche le champ */
+  [
+    ['cur_mode_entree', 'autre'],
+    ['cur_type_population', 'autre_risque'],
+  ].forEach(function (entry) {
+    var sel = document.getElementById(entry[0]);
+    if (!sel) return;
+    var row = document.getElementById(entry[0] + '_autre_row');
+    if (row) row.style.display = (sel.value === entry[1]) ? '' : 'none';
+  });
 
   /* Afficher « Gestion du risque » si la grossesse chargée est à risque */
   (function () {
