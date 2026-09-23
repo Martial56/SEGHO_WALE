@@ -704,8 +704,18 @@ html[data-theme="dark"] .fac-ro-field.grey-field { background: rgba(255,255,255,
               Montant <span style="color:#dc2626;">*</span>
             </label>
             <div style="display:flex;gap:0;align-items:stretch;">
+              {% comment %}
+                Le plancher suit le solde : 0 n'est saisissable que sur une
+                facture qui ne réclame plus rien — une prestation gratuite,
+                qu'on doit pouvoir encaisser pour la tracer. Ailleurs il reste à
+                1, parce qu'un 0 y serait un champ vidé par mégarde.
+                Avec `min="1"` posé en dur, une facture à 0 F affichait
+                min="1" max="0" : aucune valeur ne satisfaisait les deux et le
+                navigateur refusait l'envoi.
+              {% endcomment %}
               <input type="number" name="pay_montant" id="pay-montant"
-                min="1" max="{{ facture.solde_restant|floatformat:0 }}"
+                min="{% if facture.solde_restant %}1{% else %}0{% endif %}"
+                max="{{ facture.solde_restant|floatformat:0 }}"
                 value="{{ facture.solde_restant|floatformat:0 }}"
                 style="flex:1;padding:8px 10px;border:1.5px solid var(--border);border-right:none;border-radius:5px 0 0 5px;font-size:14px;font-weight:700;background:var(--bg);color:var(--text);"
                 required>

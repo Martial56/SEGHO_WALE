@@ -26,6 +26,7 @@ urlpatterns = [
     path('deverrouiller/', views.unlock_session, name='unlock_session'),
     path('compte/', views.mon_compte, name='mon_compte'),
     path('compte/couleur-accent/', views.accent_color_set, name='accent_color_set'),
+    path('compte/luminosite/', views.luminosite_set, name='luminosite_set'),
 
     # URLs des modules
     path('centres/', include('centres.urls')),
@@ -78,6 +79,8 @@ urlpatterns = [
     path('post-note/', views.post_note, name='post_note'),
     path('planning/', include('planning.urls')),
     path('rapports/', include('rapports.urls')),
+    path('guide/', include('guide.urls')),
+    path('journal/', include('journal.urls')),
     path('gynecologie/', views.gynecologie_list, name='gynecologie_list'),
     path('gynecologie/rdv/', views.gynecologie_rdv, name='gynecologie_rdv'),
     path('gynecologie/rdv/nouveau/', views.gynecologie_rdv_create, name='gynecologie_rdv_create'),

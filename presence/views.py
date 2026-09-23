@@ -1181,10 +1181,6 @@ def presence_pointage(request):
         'texte_novembre':    texte_novembre,
         'bio_actif':    config_bio.actif,
         'bio_url':      config_bio.url_agent,
-        # Lien "Accès administration" — visible seulement si un RH/Admin/
-        # Directeur/Médecin Chef est déjà connecté sur ce poste (can_manage_rh
-        # couvre exactement ces rôles), pas au grand public du kiosk.
-        'can_access_admin': request.user.is_authenticated and can_manage_rh(request.user),
     })
 
 

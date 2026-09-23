@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 from .models import (Bureau, PlageHoraire, PlanningHebdomadaire,
                      Affectation, PlanningVu, PlanningModification, PlanningConfig,
-                     PlanningGabarit, GabaritAffectation, LignePermanence,
+                     LignePermanence, PermanenceCreneau, PermanenceCreneauModele,
                      MedecinSignataire, FONCTION_SIGNATAIRE_CHOICES)
 from medecins.models import Medecin
 
@@ -86,6 +86,33 @@ def _base_ctx(request):
         'pl_can_manage':    can_manage,
         'pl_notifs_count':  notifs_count,
     }
+
+
+def _jours_feries_semaine(semaine_debut):
+    """{ jour_index (0-5) : désignation } pour les jours fériés tombant dans
+    la semaine du planning — même source (JourFerie, gérée par les RH) que
+    la vérification à la publication, pour rester cohérent.
+
+    La grille ne va que du lundi (0) au samedi (5) ; un jour férié tombant
+    un dimanche n'a donc pas de colonne où s'afficher — signalé séparément
+    via la clé 'dimanche' plutôt que silencieusement ignoré."""
+    from employer.models import JourFerie
+    semaine_fin = semaine_debut + timedelta(days=6)
+    feries = {
+        f.date: f.description
+        for f in JourFerie.objects.filter(date__range=(semaine_debut, semaine_fin))
+    }
+    if not feries:
+        return {}
+    resultat = {
+        j: {'date': semaine_debut + timedelta(days=j), 'description': feries[semaine_debut + timedelta(days=j)]}
+        for j in range(6)
+        if (semaine_debut + timedelta(days=j)) in feries
+    }
+    dimanche = semaine_debut + timedelta(days=6)
+    if dimanche in feries:
+        resultat['dimanche'] = {'date': dimanche, 'description': feries[dimanche]}
+    return resultat
 
 
 def _conges_semaine(semaine_debut, semaine_fin):
@@ -170,6 +197,24 @@ def build_grid_rows(bureaux, aff_map):
     return rows
 
 
+def permanence_rows(planning):
+    """Un « row » par créneau de permanence de ce planning, avec les 6 cases
+    (une par jour) pré-remplies — même forme que build_grid_rows (valeur +
+    note), pour la grille de permanence de l'édition et de l'impression."""
+    rows = []
+    for creneau in planning.permanence_creneaux.all().prefetch_related('affectations'):
+        aff_map = {a.jour: a for a in creneau.affectations.all()}
+        cells = []
+        for j in range(6):
+            aff = aff_map.get(j)
+            cells.append({
+                'value': aff.personnel if aff else '',
+                'note':  aff.note if aff else '',
+            })
+        rows.append({'creneau': creneau, 'cells': cells})
+    return rows
+
+
 def get_bureaux():
     return Bureau.objects.filter(actif=True).prefetch_related('plages')
 
@@ -177,6 +222,30 @@ def get_bureaux():
 def split_names(val):
     """Découpe 'Dr X / Dr Y' en ['Dr X', 'Dr Y']."""
     return [n.strip() for n in _re.split(r'[/,]', val) if n.strip()]
+
+
+_RE_PLAGE_HEURES = _re.compile(r'^(\d{1,2})h(?:\d{2})?\s*-\s*(\d{1,2})h(?:\d{2})?$')
+
+
+def heures_plage(code):
+    """Durée (en heures) d'un créneau, d'après son code.
+    - Une plage écrite explicitement en heures ("12h-15h") est lue telle quelle.
+    - "M"/"Matin" : 8h-12h (4h). "S"/"Soir" : 15h-18h (3h).
+    - Tout code sans heure indiquée (ex. "J") : journée standard complète,
+      matin + soir cumulés (8h-12h et 15h-18h), soit 7h.
+    """
+    code_norm = (code or '').strip().lower()
+    m = _RE_PLAGE_HEURES.match(code_norm.replace(' ', ''))
+    if m:
+        h1, h2 = int(m.group(1)), int(m.group(2))
+        # Créneau à cheval sur minuit (ex. permanence "18h-08h") : l'heure de
+        # fin est logiquement le lendemain.
+        return (h2 - h1) if h2 > h1 else (h2 + 24 - h1)
+    if code_norm == 'm' or 'matin' in code_norm:
+        return 4
+    if code_norm == 's' or 'soir' in code_norm:
+        return 3
+    return 7
 
 
 def validate_planning(posted, bureaux):
@@ -215,9 +284,9 @@ def validate_planning(posted, bureaux):
 
 def _posted_from_affectations(affectations):
     """Reconstruit un dict façon POST ({cell_<plage>_<jour>: personnel}) à partir
-    d'un queryset/liste d'Affectation ou GabaritAffectation — pour pouvoir repasser
-    par validate_planning() lors d'une application de gabarit ou d'une duplication,
-    qui sinon contournaient entièrement la détection de conflits."""
+    d'un queryset/liste d'Affectation — pour pouvoir repasser par
+    validate_planning() lors d'une duplication, qui sinon contournait
+    entièrement la détection de conflits."""
     return {f'cell_{a.plage_id}_{a.jour}': a.personnel for a in affectations}
 
 
@@ -309,6 +378,14 @@ def planning_nouveau(request):
             semaine_debut=monday,
             defaults={'cree_par': request.user, 'signataire': signataire}
         )
+        if created:
+            # Créneaux de permanence proposés d'office (modifiables ensuite
+            # librement sur le planning) — évite de retaper les mêmes heures
+            # chaque semaine, sans les figer pour autant.
+            PermanenceCreneau.objects.bulk_create([
+                PermanenceCreneau(planning=planning, libelle=modele.libelle, ordre=modele.ordre)
+                for modele in PermanenceCreneauModele.objects.all()
+            ])
         if not created and signataire and signataire.pk != planning.signataire_id:
             if planning.publie:
                 # Un planning publié ne doit être modifiable (y compris son signataire)
@@ -364,17 +441,18 @@ def planning_detail(request, pk):
     confirm_publish = request.GET.get('confirm_publish') == '1'
     pub_empty_days  = [d for d in request.GET.get('empty_days', '').split(',') if d] if confirm_publish else []
 
-    perm_map  = {p.jour: p.personnel for p in planning.permanences.all()}
-    perm_list = [perm_map.get(j, '') for j in range(6)]
+    perm_rows = permanence_rows(planning)
 
     absents          = _conges_semaine(planning.semaine_debut, planning.semaine_fin)
     conflits_conges  = _conges_conflicts(planning, absents)
+    jours_feries     = _jours_feries_semaine(planning.semaine_debut)
 
     return render(request, 'planning/hebdomadaire.html', {
         'planning':        planning,
         'rows':            rows,
         'jours_labels':    JOURS_LABELS,
-        'perm_list':       perm_list,
+        'jours_feries':    jours_feries,
+        'perm_rows':       perm_rows,
         'can_manage':      can_manage_planning(request.user),
         'can_delete_pub':  can_delete_published(request.user),
         'prev_planning':   prev_planning,
@@ -383,9 +461,7 @@ def planning_detail(request, pk):
         'confirm_publish': confirm_publish,
         'pub_empty_days':  pub_empty_days,
         'conflits_conges': conflits_conges,
-        'fonction_signataire': dict(FONCTION_SIGNATAIRE_CHOICES).get(
-            PlanningConfig.get().fonction_signataire, ''
-        ),
+        'fonction_signataire': planning.signataire.get_fonction_display() if planning.signataire else '',
         **_base_ctx(request),
     })
 
@@ -400,9 +476,10 @@ def planning_modifier(request, pk):
     if planning.publie:
         messages.error(request, 'Ce planning est publié et ne peut plus être modifié.')
         return redirect('planning_detail', pk=pk)
-    bureaux  = get_bureaux()
-    medecins = Medecin.objects.filter(actif=True).select_related('specialite', 'employe').order_by('employe__nom')
-    absents  = _conges_semaine(planning.semaine_debut, planning.semaine_fin)
+    bureaux      = get_bureaux()
+    medecins     = Medecin.objects.filter(actif=True).select_related('specialite', 'employe').order_by('employe__nom')
+    absents      = _conges_semaine(planning.semaine_debut, planning.semaine_fin)
+    jours_feries = _jours_feries_semaine(planning.semaine_debut)
 
     if request.method == 'POST':
         posted = {
@@ -417,7 +494,7 @@ def planning_modifier(request, pk):
             rows = build_grid_rows_from_posted(bureaux, posted)
             return render(request, 'planning/modifier.html', {
                 'planning': planning, 'rows': rows,
-                'jours_labels': JOURS_LABELS, 'medecins': medecins,
+                'jours_labels': JOURS_LABELS, 'jours_feries': jours_feries, 'medecins': medecins,
                 'medecins_json': _medecins_json(medecins),
                 'absents_json':  absents,
                 **_base_ctx(request),
@@ -435,10 +512,18 @@ def planning_modifier(request, pk):
         for bureau in bureaux:
             for plage in bureau.plages.all():
                 for j in range(6):
-                    val      = posted[f'cell_{plage.pk}_{j}']
-                    note_val = request.POST.get(f'note_{plage.pk}_{j}', '').strip()
                     old_aff  = old_aff_map.get((plage.pk, j))
                     old_val  = old_aff.personnel if old_aff else ''
+                    if j in jours_feries:
+                        # Jour férié : verrouillé — la valeur postée est ignorée
+                        # (le verrou JS empêche déjà la saisie côté client, mais
+                        # une requête forgée pourrait le contourner), ce qui
+                        # était déjà là reste inchangé.
+                        val      = old_val
+                        note_val = old_aff.note if old_aff else ''
+                    else:
+                        val      = posted[f'cell_{plage.pk}_{j}']
+                        note_val = request.POST.get(f'note_{plage.pk}_{j}', '').strip()
                     if val != old_val:
                         changes.append(
                             f"{bureau.nom}/{plage.code}/{JOURS_LABELS[j]}: «{old_val}»→«{val}»"
@@ -480,35 +565,49 @@ def planning_modifier(request, pk):
                     resume='; '.join(changes[:30]),
                 )
 
-        # Permanence
-        for j in range(6):
-            val = request.POST.get(f'perm_{j}', '').strip()
-            if val:
-                LignePermanence.objects.update_or_create(
-                    planning=planning, jour=j,
-                    defaults={'personnel': val}
-                )
-            else:
-                LignePermanence.objects.filter(planning=planning, jour=j).delete()
+        # Permanence : créneaux libres, redéfinis à chaque édition — pas de
+        # correspondance stable à préserver, on remplace tout à chaque enregistrement.
+        # Un jour férié reste verrouillé même ici : on garde un instantané de ce
+        # qui existait pour ces jours-là (par rang de créneau), au cas où la
+        # requête postée aurait contourné le verrou JS côté client.
+        old_perm = {
+            (ligne.creneau.ordre, ligne.jour): (ligne.personnel, ligne.note)
+            for ligne in LignePermanence.objects.filter(creneau__planning=planning).select_related('creneau')
+        }
+        planning.permanence_creneaux.all().delete()
+        i = 0
+        while f'perm_creneau_{i}' in request.POST:
+            libelle = request.POST.get(f'perm_creneau_{i}', '').strip()
+            if libelle:
+                creneau = PermanenceCreneau.objects.create(planning=planning, libelle=libelle, ordre=i)
+                lignes = []
+                for j in range(6):
+                    if j in jours_feries:
+                        personnel, note = old_perm.get((i, j), ('', ''))
+                    else:
+                        personnel = request.POST.get(f'perm_{i}_{j}', '').strip()
+                        note      = request.POST.get(f'perm_note_{i}_{j}', '').strip()
+                    if personnel or note:
+                        lignes.append(LignePermanence(creneau=creneau, jour=j, personnel=personnel, note=note))
+                LignePermanence.objects.bulk_create(lignes)
+            i += 1
 
         messages.success(request, 'Planning enregistré avec succès.')
         return redirect('planning_list')
 
     aff_map   = {(a.plage_id, a.jour): a for a in planning.affectations.all()}
     rows      = build_grid_rows(bureaux, aff_map)
-    gabarits  = PlanningGabarit.objects.all()
-    perm_map  = {p.jour: p.personnel for p in planning.permanences.all()}
-    perm_list = [perm_map.get(j, '') for j in range(6)]
+    perm_rows = permanence_rows(planning)
     return render(request, 'planning/modifier.html', {
         'planning':       planning,
         'rows':           rows,
         'jours_labels':   JOURS_LABELS,
-        'perm_list':      perm_list,
+        'jours_feries':   jours_feries,
+        'perm_rows':      perm_rows,
         'medecins':       medecins,
         'medecins_json':  _medecins_json(medecins),
         'medecins_signataires': MedecinSignataire.objects.filter(actif=True),
         'absents_json':   absents,
-        'gabarits':       gabarits,
         **_base_ctx(request),
     })
 
@@ -558,10 +657,14 @@ def planning_dupliquer(request, pk):
                     )
                     for aff in source.affectations.all()
                 ])
-                LignePermanence.objects.bulk_create([
-                    LignePermanence(planning=new_pl, jour=perm.jour, personnel=perm.personnel)
-                    for perm in source.permanences.all()
-                ])
+                for creneau in source.permanence_creneaux.all():
+                    new_creneau = PermanenceCreneau.objects.create(
+                        planning=new_pl, libelle=creneau.libelle, ordre=creneau.ordre,
+                    )
+                    LignePermanence.objects.bulk_create([
+                        LignePermanence(creneau=new_creneau, jour=perm.jour, personnel=perm.personnel, note=perm.note)
+                        for perm in creneau.affectations.all()
+                    ])
                 PlanningModification.objects.create(
                     planning=new_pl,
                     modifie_par=request.user,
@@ -877,8 +980,9 @@ def planning_bureaux(request):
         raise PermissionDenied
     bureaux = Bureau.objects.prefetch_related('plages').order_by('ordre')
     return render(request, 'planning/bureaux.html', {
-        'bureaux':    bureaux,
-        'can_manage': True,
+        'bureaux':            bureaux,
+        'permanence_modeles': PermanenceCreneauModele.objects.all(),
+        'can_manage':         True,
         **_base_ctx(request),
     })
 
@@ -991,6 +1095,42 @@ def planning_plage_delete(request, pk):
     return redirect('planning_bureaux')
 
 
+# ── Modèles de créneaux de permanence ─────────────────────────────────────────
+
+@login_required(login_url='login')
+def planning_permanence_modele_save(request):
+    if not can_manage_planning(request.user):
+        raise PermissionDenied
+    if request.method == 'POST':
+        pk      = request.POST.get('pk', '').strip()
+        libelle = request.POST.get('libelle', '').strip()
+        if not libelle:
+            messages.error(request, 'Le créneau est obligatoire.')
+            return redirect('planning_bureaux')
+        if pk:
+            modele = get_object_or_404(PermanenceCreneauModele, pk=pk)
+            modele.libelle = libelle
+            modele.save()
+            messages.success(request, f'Créneau « {libelle} » mis à jour.')
+        else:
+            max_ordre = PermanenceCreneauModele.objects.aggregate(m=models.Max('ordre'))['m'] or 0
+            PermanenceCreneauModele.objects.create(libelle=libelle, ordre=max_ordre + 1)
+            messages.success(request, f'Créneau « {libelle} » ajouté.')
+    return redirect('planning_bureaux')
+
+
+@login_required(login_url='login')
+def planning_permanence_modele_delete(request, pk):
+    if not can_manage_planning(request.user):
+        raise PermissionDenied
+    if request.method == 'POST':
+        modele = get_object_or_404(PermanenceCreneauModele, pk=pk)
+        libelle = modele.libelle
+        modele.delete()
+        messages.success(request, f'Créneau « {libelle} » supprimé.')
+    return redirect('planning_bureaux')
+
+
 # ── Configuration (signataire) ────────────────────────────────────────────────
 
 @login_required(login_url='login')
@@ -999,17 +1139,12 @@ def planning_configuration(request):
         raise PermissionDenied
     config = PlanningConfig.get()
     if request.method == 'POST' and request.POST.get('form') == 'signataire':
-        fonction = request.POST.get('fonction_signataire', '').strip()
         medecin_pk = request.POST.get('medecin_defaut', '').strip()
-        if fonction not in dict(FONCTION_SIGNATAIRE_CHOICES):
-            messages.error(request, 'Fonction de signataire invalide.')
-        else:
-            config.fonction_signataire = fonction
-            config.medecin_defaut = (
-                get_object_or_404(MedecinSignataire, pk=medecin_pk) if medecin_pk else None
-            )
-            config.save(update_fields=['fonction_signataire', 'medecin_defaut'])
-            messages.success(request, 'Configuration du signataire enregistrée.')
+        config.medecin_defaut = (
+            get_object_or_404(MedecinSignataire, pk=medecin_pk) if medecin_pk else None
+        )
+        config.save(update_fields=['medecin_defaut'])
+        messages.success(request, 'Configuration du signataire enregistrée.')
         return redirect('planning_configuration')
     return render(request, 'planning/configuration.html', {
         'config': config,
@@ -1025,21 +1160,26 @@ def planning_medecin_save(request):
     if not can_manage_planning(request.user):
         raise PermissionDenied
     if request.method == 'POST':
-        pk    = request.POST.get('pk', '').strip()
-        nom   = request.POST.get('nom', '').strip()
-        actif = request.POST.get('actif') == '1'
+        pk       = request.POST.get('pk', '').strip()
+        nom      = request.POST.get('nom', '').strip()
+        actif    = request.POST.get('actif') == '1'
+        fonction = request.POST.get('fonction', '').strip()
         if not nom:
             messages.error(request, 'Le nom du médecin signataire est obligatoire.')
             return redirect('planning_configuration')
+        if fonction and fonction not in dict(FONCTION_SIGNATAIRE_CHOICES):
+            messages.error(request, 'Fonction invalide.')
+            return redirect('planning_configuration')
         if pk:
             medecin = get_object_or_404(MedecinSignataire, pk=pk)
-            medecin.nom   = nom
-            medecin.actif = actif
+            medecin.nom      = nom
+            medecin.actif    = actif
+            medecin.fonction = fonction
             medecin.save()
             messages.success(request, f'Médecin signataire « {nom} » mis à jour.')
         else:
             max_ordre = MedecinSignataire.objects.aggregate(m=models.Max('ordre'))['m'] or 0
-            MedecinSignataire.objects.create(nom=nom, actif=actif, ordre=max_ordre + 1)
+            MedecinSignataire.objects.create(nom=nom, actif=actif, fonction=fonction, ordre=max_ordre + 1)
             messages.success(request, f'Médecin signataire « {nom} » ajouté.')
     return redirect('planning_configuration')
 
@@ -1069,12 +1209,36 @@ def planning_medecin_delete(request, pk):
 def planning_stats(request):
     from collections import defaultdict as _defaultdict
 
+    today = date.today()
+    try:
+        year = int(request.GET.get('year', today.year))
+    except (ValueError, TypeError):
+        year = today.year
+    if 'month' in request.GET:
+        month_raw = request.GET.get('month', '').strip()
+        month = int(month_raw) if month_raw.isdigit() and 1 <= int(month_raw) <= 12 else None
+    else:
+        # Première visite (aucun filtre dans l'URL) : mois en cours par défaut.
+        month = today.month
+
+    annees_disponibles = list(
+        PlanningHebdomadaire.objects.dates('semaine_debut', 'year', order='DESC')
+    )
+    annees_disponibles = [d.year for d in annees_disponibles] or [today.year]
+    if year not in annees_disponibles:
+        annees_disponibles = sorted(set(annees_disponibles + [year]), reverse=True)
+
     plannings_qs = (
         PlanningHebdomadaire.objects
-        .prefetch_related('affectations')
-        .order_by('-semaine_debut')[:12]
+        .prefetch_related('affectations__plage', 'permanence_creneaux__affectations')
+        .filter(semaine_debut__year=year)
     )
+    if month:
+        plannings_qs = plannings_qs.filter(semaine_debut__month=month)
+    plannings_qs = plannings_qs.order_by('-semaine_debut')
     plannings_list = list(plannings_qs)
+
+    periode_label = f"{MOIS_NOMS[month]} {year}" if month else f"année {year}"
 
     active_bureaux = list(Bureau.objects.filter(actif=True).prefetch_related('plages'))
     # Indépendant de `pl` — calculé une seule fois au lieu de 12 fois (et len() sur
@@ -1092,18 +1256,31 @@ def planning_stats(request):
             'pct':         pct,
         })
 
-    # Monthly averages
+    # Couverture mensuelle moyenne — toujours sur l'année entière choisie,
+    # indépendamment du filtre mois (sinon un mois précis ne donnerait qu'une
+    # seule barre au graphique).
+    if month:
+        plannings_annee = list(
+            PlanningHebdomadaire.objects
+            .prefetch_related('affectations__plage')
+            .filter(semaine_debut__year=year)
+        )
+    else:
+        plannings_annee = plannings_list
+
     monthly_raw = _defaultdict(list)
-    for s in stats:
-        key = (s['planning'].semaine_debut.year, s['planning'].semaine_debut.month)
-        monthly_raw[key].append(s['pct'])
+    for pl in plannings_annee:
+        filled = sum(1 for a in pl.affectations.all() if a.personnel)
+        pct    = round(filled * 100 / total_cells) if total_cells else 0
+        key    = (pl.semaine_debut.year, pl.semaine_debut.month)
+        monthly_raw[key].append(pct)
 
     monthly_stats = []
-    for (year, month), pcts in sorted(monthly_raw.items(), reverse=True):
+    for (m_year, m_month), pcts in sorted(monthly_raw.items(), reverse=True):
         monthly_stats.append({
-            'year':     year,
-            'month':    month,
-            'mois_nom': MOIS_NOMS[month],
+            'year':     m_year,
+            'month':    m_month,
+            'mois_nom': MOIS_NOMS[m_month],
             'avg_pct':  round(sum(pcts) / len(pcts)),
             'count':    len(pcts),
         })
@@ -1148,6 +1325,46 @@ def planning_stats(request):
                     medecin_counts[name.strip()] += 1
     top_medecins = sorted(medecin_counts.items(), key=lambda x: x[1], reverse=True)[:10]
 
+    # ── Heures par médecin actif, par mois ────────────────────────────────────
+    medecins_actifs = Medecin.objects.filter(actif=True).select_related('employe')
+    label_to_medecin = {
+        f"dr {m.nom} {m.prenoms}".strip().lower(): m for m in medecins_actifs
+    }
+
+    heures_par_mois = _defaultdict(lambda: _defaultdict(float))  # {(year, month): {medecin_pk: heures}}
+    for pl in plannings_list:
+        mois_key = (pl.semaine_debut.year, pl.semaine_debut.month)
+        for aff in pl.affectations.all():
+            if not aff.personnel:
+                continue
+            duree = heures_plage(aff.plage.code)
+            for name in split_names(aff.personnel):
+                medecin = label_to_medecin.get(name.strip().lower())
+                if medecin:
+                    heures_par_mois[mois_key][medecin.pk] += duree
+        for creneau in pl.permanence_creneaux.all():
+            duree = heures_plage(creneau.libelle)
+            for perm in creneau.affectations.all():
+                if not perm.personnel:
+                    continue
+                for name in split_names(perm.personnel):
+                    medecin = label_to_medecin.get(name.strip().lower())
+                    if medecin:
+                        heures_par_mois[mois_key][medecin.pk] += duree
+
+    heures_medecins_mois = []
+    for (m_year, m_month), par_medecin in sorted(heures_par_mois.items(), reverse=True):
+        lignes = [
+            {'medecin': m, 'heures': par_medecin[m.pk]}
+            for m in medecins_actifs if par_medecin.get(m.pk)
+        ]
+        lignes.sort(key=lambda x: x['heures'], reverse=True)
+        if lignes:
+            heures_medecins_mois.append({
+                'year': m_year, 'month': m_month, 'mois_nom': MOIS_NOMS[m_month],
+                'lignes': lignes,
+            })
+
     return render(request, 'planning/stats.html', {
         'stats':           stats,
         'monthly_stats':   monthly_stats,
@@ -1157,92 +1374,15 @@ def planning_stats(request):
         'total_plannings': len(plannings_list),
         'bureau_stats':    bureau_stats,
         'top_medecins':    top_medecins,
+        'heures_medecins_mois': heures_medecins_mois,
+        'periode_label':   periode_label,
+        'year':            year,
+        'month':           month,
+        'annees_disponibles': annees_disponibles,
+        'mois_choix':      list(enumerate(MOIS_NOMS))[1:],
         'can_manage':      can_manage_planning(request.user),
         **_base_ctx(request),
     })
-
-
-# ── Gabarits ───────────────────────────────────────────────────────────────────
-
-@login_required(login_url='login')
-def planning_gabarit_sauvegarder(request, pk):
-    if not can_manage_planning(request.user):
-        raise PermissionDenied
-    planning = get_object_or_404(PlanningHebdomadaire, pk=pk)
-    if request.method == 'POST':
-        nom = request.POST.get('nom', '').strip()
-        if not nom:
-            messages.error(request, 'Le nom du gabarit est obligatoire.')
-            return redirect('planning_detail', pk=pk)
-        gabarit = PlanningGabarit.objects.create(nom=nom, cree_par=request.user)
-        GabaritAffectation.objects.bulk_create([
-            GabaritAffectation(
-                gabarit=gabarit, plage=aff.plage, jour=aff.jour,
-                personnel=aff.personnel, note=aff.note,
-            )
-            for aff in planning.affectations.exclude(personnel='')
-        ])
-        messages.success(request, f'Gabarit « {nom} » enregistré.')
-    return redirect('planning_detail', pk=pk)
-
-
-@login_required(login_url='login')
-def planning_gabarit_appliquer(request, pk):
-    if not can_manage_planning(request.user):
-        raise PermissionDenied
-    planning = get_object_or_404(PlanningHebdomadaire, pk=pk)
-    if planning.publie:
-        messages.error(request, "Impossible d'appliquer un gabarit sur un planning publié.")
-        return redirect('planning_detail', pk=pk)
-    if request.method == 'POST':
-        gabarit_pk = request.POST.get('gabarit_pk', '').strip()
-        gabarit = get_object_or_404(PlanningGabarit, pk=gabarit_pk)
-
-        bureaux = get_bureaux()
-        posted  = _posted_from_affectations(gabarit.affectations.all())
-        errors  = validate_planning(posted, bureaux)
-        if errors:
-            for err in errors:
-                messages.error(request, err)
-            messages.error(
-                request,
-                f"Le gabarit « {gabarit.nom} » contient des conflits (ci-dessus) — "
-                f"il n'a pas été appliqué. Corrigez le gabarit avant de réessayer."
-            )
-            return redirect('planning_modifier', pk=pk)
-
-        try:
-            with transaction.atomic():
-                planning.affectations.all().delete()
-                Affectation.objects.bulk_create([
-                    Affectation(
-                        planning=planning, plage=ga.plage, jour=ga.jour,
-                        personnel=ga.personnel, note=ga.note,
-                    )
-                    for ga in gabarit.affectations.all()
-                ])
-                PlanningModification.objects.create(
-                    planning=planning,
-                    modifie_par=request.user,
-                    resume=f'Gabarit « {gabarit.nom} » appliqué (id={gabarit.pk}).',
-                )
-            messages.success(request, f'Gabarit « {gabarit.nom} » appliqué.')
-        except Exception as exc:
-            logger.error("Erreur application gabarit %s sur planning %s : %s", gabarit.pk, pk, exc)
-            messages.error(request, "Erreur lors de l'application du gabarit. Le planning n'a pas été modifié.")
-    return redirect('planning_modifier', pk=pk)
-
-
-@login_required(login_url='login')
-def planning_gabarit_supprimer(request, gabarit_pk):
-    if not can_manage_planning(request.user):
-        raise PermissionDenied
-    if request.method == 'POST':
-        gabarit = get_object_or_404(PlanningGabarit, pk=gabarit_pk)
-        nom = gabarit.nom
-        gabarit.delete()
-        messages.success(request, f'Gabarit « {nom} » supprimé.')
-    return redirect('planning_bureaux')
 
 
 # ── Export Excel ──────────────────────────────────────────────────────────────
@@ -1323,9 +1463,7 @@ def planning_export_excel(request, pk):
 
     if planning.signataire:
         sig_row = row_num + 2
-        fonction_label = dict(FONCTION_SIGNATAIRE_CHOICES).get(
-            PlanningConfig.get().fonction_signataire, ''
-        )
+        fonction_label = planning.signataire.get_fonction_display()
         ws.cell(row=sig_row, column=7, value=f'{fonction_label} :').font = Font(
             italic=True, color='888888'
         )

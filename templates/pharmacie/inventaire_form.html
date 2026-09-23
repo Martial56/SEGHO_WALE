@@ -15,6 +15,21 @@
   text-transform: uppercase; letter-spacing: .5px;
   border-bottom: 1px solid var(--ph-border);
 }
+/* En-tête d'action collée en haut, comme .ph-page-head (liste/détail) —
+   le formulaire est long, le bouton "Enregistrer" doit rester joignable
+   sans redescendre tout en haut. */
+.action-bar {
+  position: sticky; top: 0; z-index: 100;
+  background: var(--ph-surface);
+  border-radius: 0; box-shadow: none; margin: 0;
+  border-bottom: 1px solid var(--ph-border);
+  padding: 11px 32px;
+}
+.ph-qte-static {
+  display: inline-block; min-width: 60px; padding: 5px 10px;
+  background: var(--ph-50); border-radius: 6px;
+  font-size: 13px; text-align: center; color: var(--ph-muted);
+}
 .lot-badge { display:inline-flex; align-items:center; gap:4px; font-size:10.5px; font-weight:600; font-family: var(--font-mono); padding:2px 7px; border-radius:4px; border:1px solid; white-space:nowrap; }
 .lot-ok      { background:rgba(var(--teal-600-rgb), .08); color:var(--accent-text); border-color:rgba(var(--teal-600-rgb), .2); }
 .lot-bientot { background:rgba(var(--amber-rgb),.1); color:var(--amber-text); border-color:rgba(var(--amber-rgb),.3); }
@@ -25,7 +40,7 @@
 <form method="post" id="form-inventaire">
   {% csrf_token %}
 
-  <div class="action-bar" style="padding:0 32px;margin-top:11px;">
+  <div class="action-bar">
     <div class="action-bar-breadcrumb">
       <i class="bi bi-clipboard2-check"></i>
       <span class="current">Nouvel inventaire physique — {{ label }}</span>
@@ -50,7 +65,7 @@
     <!-- Date et notes -->
     <div class="ph-card" style="border:1px solid var(--ph-border);border-radius:12px;overflow:hidden;">
       <div class="ph-card-body">
-        <div style="display:grid;grid-template-columns:200px 1fr;gap:24px;">
+        <div style="display:grid;grid-template-columns:220px minmax(260px,480px);gap:24px;">
           <div class="form-field" style="margin-bottom:0;">
             <label for="date_inventaire" class="field-label">Date de l'inventaire</label>
             <input
@@ -68,7 +83,7 @@
               id="notes"
               name="notes"
               class="field-ul"
-              rows="2"
+              rows="3"
               placeholder="Observations, conditions de comptage…"
             ></textarea>
           </div>
@@ -121,24 +136,22 @@
                 </td>
                 <td style="max-width:150px;">
                   {% for lot in sp.lots_disponibles %}
-                  <span class="lot-badge {% if lot.est_perime %}lot-perime{% elif lot.jours_restants is not None and lot.jours_restants <= 90 %}lot-bientot{% else %}lot-ok{% endif %}"
-                    title="{% if lot.est_perime %}Périmé depuis {{ lot.date_peremption|date:'d/m/Y' }}{% elif lot.jours_restants is not None %}Expire dans {{ lot.jours_restants }} j{% endif %}">
-                    {{ lot.date_peremption|date:"d/m/Y"|default:"—" }}
-                  </span>
+                    {% if lot.date_peremption %}
+                    <span class="lot-badge {% if lot.est_perime %}lot-perime{% elif lot.jours_restants is not None and lot.jours_restants <= 90 %}lot-bientot{% else %}lot-ok{% endif %}"
+                      title="{% if lot.est_perime %}Périmé depuis {{ lot.date_peremption|date:'d/m/Y' }}{% elif lot.jours_restants is not None %}Expire dans {{ lot.jours_restants }} j{% endif %}">
+                      {{ lot.date_peremption|date:"d/m/Y" }}
+                    </span>
+                    {% else %}
+                    <span style="font-size:11px;color:var(--ph-muted);">—</span>
+                    {% endif %}
                   {% empty %}
                   <span style="font-size:11px;color:var(--ph-muted);">—</span>
                   {% endfor %}
                 </td>
                 <td style="text-align:center;">
-                  <input
-                    type="number"
-                    class="ph-qte-field"
-                    value="{{ sp.quantite|floatformat:0 }}"
-                    readonly
-                    tabindex="-1"
-                    aria-label="Stock théorique — lecture seule"
-                    style="pointer-events:none;color:var(--ph-muted);"
-                  >
+                  <span class="ph-qte-static" aria-label="Stock théorique — lecture seule" title="Lecture seule">
+                    {{ sp.quantite|floatformat:0 }}
+                  </span>
                 </td>
                 <td style="text-align:center;">
                   <input

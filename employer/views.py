@@ -473,6 +473,7 @@ def employe_detail(request, pk):
         'infos_supp':       employe.infos_supp.all(),
         'type_doc_choices': TYPE_DOC_CHOICES,
         'docs_manquants':   docs_manquants,
+        'actes_naissance_manquants': employe.actes_naissance_manquants,
         'historique':       employe.historique.all()[:30],
         'conges':           conges,
         'can_manage':       can_manage_rh(request.user),
@@ -2253,9 +2254,10 @@ def rh_config_list(request, slug):
         direction = 'asc'
     order = sort if direction == 'asc' else f'-{sort}'
 
-    paginator = Paginator(qs.order_by(order), 12)
+    paginator = Paginator(qs.order_by(order), 20)
     page_obj = paginator.get_page(request.GET.get('page'))
-    return render(request, 'employer/config/list.html', {
+    template = 'employer/config/includes/config_list_result.html' if _rh_config_is_ajax(request) else 'employer/config/list.html'
+    return render(request, template, {
         'slug': slug, 'cfg': cfg, 'page_obj': page_obj, 'q': q,
         'sort': sort, 'dir': direction,
         'total': cfg['model'].objects.count(),
@@ -2452,7 +2454,7 @@ def employer_services(request):
     if q:
         qs = qs.filter(Q(nom__icontains=q) | Q(code__icontains=q))
     total = Service.objects.count()
-    paginator = Paginator(qs, 25)
+    paginator = Paginator(qs, 10)
     page_obj  = paginator.get_page(request.GET.get('page'))
     return render(request, 'employer/config/services_list.html', {
         'page_obj': page_obj, 'total': total,

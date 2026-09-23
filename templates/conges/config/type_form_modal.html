@@ -21,6 +21,19 @@
   </div>
 
   <div class="form-field">
+    <label class="field-label" for="{{ form.nature.id_for_label }}">Nature <span class="required-star">*</span></label>
+    <select name="nature" id="{{ form.nature.id_for_label }}" class="field-ul">
+      {% for value, label in form.fields.nature.choices %}
+      <option value="{{ value }}" {% if form.nature.value|stringformat:"s" == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    {% if form.nature.errors %}<div class="field-error">{{ form.nature.errors.0 }}</div>{% endif %}
+    <div style="font-size:11px;color:var(--cg-muted);margin-top:4px;">
+      Détermine le libellé affiché sur le bon et l'attestation (Congé, Permission ou Absence).
+    </div>
+  </div>
+
+  <div class="form-field">
     <label class="field-label" for="{{ form.couleur.id_for_label }}">Couleur (calendrier)</label>
     <input type="text" name="couleur" id="{{ form.couleur.id_for_label }}" class="field-ul"
       value="{{ form.couleur.value|default_if_none:'' }}" placeholder="Ex : green, blue, amber, gray, pink…" autocomplete="off">

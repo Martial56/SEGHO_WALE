@@ -98,6 +98,35 @@ def build_accent_css(base_hex, var_prefix='teal'):
     return ' '.join(declarations)
 
 
+# ── Luminosité de l'interface ──────────────────────────────────────────────
+# Réglage propre à chaque utilisateur (UserProfile.luminosite), en pourcentage
+# entier. Ces trois constantes sont la SEULE source de bornes du projet : le
+# modèle, la vue, le context processor et le gabarit s'y réfèrent tous.
+#
+# Plancher à 70 % : en dessous, le contraste du texte principal sur la surface
+# se rapproche du seuil WCAG AA de 4,5:1.
+# Plafond à 100 % : au-delà, brightness() ne peut rien éclaircir puisque
+# --surface vaut déjà #ffffff (static/css/variables.css) — il ne ferait que
+# délaver les couleurs saturées et les photos d'identité.
+LUMINOSITE_DEFAUT = 100
+LUMINOSITE_MIN = 70
+LUMINOSITE_MAX = 100
+
+
+def normaliser_luminosite(valeur):
+    """Ramène une luminosité dans [LUMINOSITE_MIN, LUMINOSITE_MAX].
+
+    Même parti pris que session_timeout_minutes : on borne au lieu de refuser.
+    Le curseur ne peut de toute façon émettre que des valeurs de l'intervalle —
+    une valeur hors bornes signale un client cassé ou une édition manuelle en
+    base, pas une saisie que l'utilisateur pourrait corriger lui-même."""
+    try:
+        pourcent = int(valeur)
+    except (TypeError, ValueError):
+        return LUMINOSITE_DEFAUT
+    return max(LUMINOSITE_MIN, min(LUMINOSITE_MAX, pourcent))
+
+
 _FORMULA_LEAD_CHARS = ('=', '+', '-', '@', '\t', '\r')
 
 

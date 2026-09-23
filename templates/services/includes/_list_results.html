@@ -1,0 +1,124 @@
+{% comment %}
+Résultats de la liste des prestations — kanban ou tableau.
+
+Isolé de la page pour que le rafraîchissement AJAX de core.listing
+(includes/listing/page_js.html) n'échange que ce fragment et la barre de
+contrôles, sans recharger la feuille de styles ni la barre de navigation.
+{% endcomment %}
+{% if vue == 'kanban' %}
+<!-- ── VUE KANBAN ── -->
+<div class="o-kanban" id="main-content">
+  {% for art in page_obj %}
+  <div class="o-card-wrap">
+    <div class="o-card" data-url="{% url 'services:detail' art.pk %}" onclick="window.location=this.dataset.url"
+      style="cursor:pointer;">
+      <div class="o-avatar">
+        {% if art.photo %}
+        <img src="{{ art.photo.url }}" alt="{{ art.nom }}">
+        {% else %}
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path
+            d="M20 7h-4V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2H4a1 1 0 0 0-1 1v11a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8a1 1 0 0 0-1-1zM10 5h4v2h-4V5zm1 9v2H9v-2H7v-2h2v-2h2v2h2v2h-2z" />
+        </svg>
+        {% endif %}
+      </div>
+      <div class="o-card-body">
+        <div class="o-card-name">{{ art.nom }}</div>
+        <div class="o-card-meta">
+          {% if art.reference_interne %}<span style="font-family: var(--font-mono);font-size:10px;">{{ art.reference_interne }}</span><br>{% endif %}
+          {% if art.categorie %}<span class="val">{{ art.categorie.code }}</span><br>{% endif %}
+          <span class="val">{{ art.prix_vente|floatformat:0 }} CFA</span>
+          &nbsp;
+          {% if art.actif %}<span class="badge-actif">Actif</span>{% else %}<span
+            class="badge-inactif">Inactif</span>{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% empty %}
+  <div class="o-empty">
+    <i class="bi bi-box-seam"></i>
+    {% if selection_active %}Aucune prestation ne correspond à ces critères.
+    {% else %}Aucune prestation enregistrée.<br>
+    <a href="{% url 'services:create' %}"
+      style="color:var(--accent-text-soft);font-weight:600;margin-top:8px;display:inline-block;">Créer une première
+      prestation</a>{% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<!-- ── VUE LISTE ── -->
+<div class="o-list-wrap" id="main-content">
+  {% if page_obj.object_list %}
+  <table class="o-list-table">
+    <thead>
+      <tr id="col-header-row">
+        {% comment %}Le tri est calculé par le serveur, sur la totalité du
+        résultat filtré : l'ancien tri JavaScript ne réordonnait que les
+        quarante lignes affichées.{% endcomment %}
+        <th class="sortable-col" data-col="0" data-tri="nom"><span class="col-label">Désignation</span>{% include "includes/listing/tri_icone.html" with cle="nom" %}
+          <div class="col-resizer"></div>
+        </th>
+        <th class="sortable-col" data-col="1" data-tri="reference"><span class="col-label">Référence</span>{% include "includes/listing/tri_icone.html" with cle="reference" %}
+          <div class="col-resizer"></div>
+        </th>
+        <th class="sortable-col" data-col="2" data-tri="categorie"><span class="col-label">Catégorie</span>{% include "includes/listing/tri_icone.html" with cle="categorie" %}
+          <div class="col-resizer"></div>
+        </th>
+        <th class="sortable-col" data-col="3" data-tri="type"><span class="col-label">Type</span>{% include "includes/listing/tri_icone.html" with cle="type" %}
+          <div class="col-resizer"></div>
+        </th>
+        <th class="sortable-col" data-col="4" data-tri="prix" style="text-align:right;"><span class="col-label">Prix de vente</span>{% include "includes/listing/tri_icone.html" with cle="prix" %}
+          <div class="col-resizer"></div>
+        </th>
+        <th class="sortable-col" data-col="5" data-tri="statut"><span class="col-label">Statut</span>{% include "includes/listing/tri_icone.html" with cle="statut" %}
+          <div class="col-resizer"></div>
+        </th>
+        <th class="col-picker-th">
+          <button class="col-picker-btn" id="col-picker-btn" title="Colonnes visibles"><i
+              class="bi bi-three-dots-vertical"></i></button>
+          <div class="col-picker-menu" id="col-picker-menu">
+            <label><input type="checkbox" data-col-idx="0" checked> Désignation</label>
+            <label><input type="checkbox" data-col-idx="1" checked> Référence</label>
+            <label><input type="checkbox" data-col-idx="2" checked> Catégorie</label>
+            <label><input type="checkbox" data-col-idx="3" checked> Type</label>
+            <label><input type="checkbox" data-col-idx="4" checked> Prix de vente</label>
+            <label><input type="checkbox" data-col-idx="5" checked> Statut</label>
+          </div>
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      {% if arbre %}
+        {% include 'includes/listing/groupes.html' with noeuds=arbre listing_colonnes=7 listing_ligne_tpl='services/includes/_row.html' %}
+      {% else %}
+        {% for art in page_obj %}
+          {% include 'services/includes/_row.html' with objet=art parent='' %}
+        {% endfor %}
+      {% endif %}
+    </tbody>
+  </table>
+  <div class="o-pagination-bottom">
+    <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
+    <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
+      href="{% if page_obj.has_previous %}{% querystring page=page_obj.previous_page_number %}{% else %}#{% endif %}">
+      <i class="bi bi-chevron-left"></i>
+    </a>
+    <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
+      href="{% if page_obj.has_next %}{% querystring page=page_obj.next_page_number %}{% else %}#{% endif %}">
+      <i class="bi bi-chevron-right"></i>
+    </a>
+  </div>
+  {% else %}
+  <div class="o-empty" style="padding:60px 20px;">
+    <i class="bi bi-box-seam"></i>
+    {% if selection_active %}Aucune prestation ne correspond à ces critères.
+    {% else %}Aucune prestation enregistrée.<br>
+    <a href="{% url 'services:create' %}"
+      style="color:var(--accent-text-soft);font-weight:600;margin-top:8px;display:inline-block;">Créer une première
+      prestation</a>{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endif %}

@@ -32,6 +32,18 @@ def duree_hms(secondes):
     return f"{m:02d}:{s:02d}"
 
 
+@register.filter
+def get_item(mapping, key):
+    """Lookup par clé variable — le point Django ne résout que des clés
+    littérales, ceci permet un dict[variable] dans le gabarit."""
+    if mapping is None:
+        return None
+    try:
+        return mapping.get(key)
+    except AttributeError:
+        return None
+
+
 @register.inclusion_tag('includes/historique_sidebar.html')
 def historique_sidebar(obj):
     from core.models import LogActivite

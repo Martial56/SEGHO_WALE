@@ -56,6 +56,21 @@
   html[data-theme="dark"] .o-view-btn.active,
   html[data-theme="dark"] .o-view-btn:hover { background: var(--teal-600); color: #fff; }
 
+  /* ── Pagination (même système que templates/employer/config/list.html) ── */
+  .rh-pagination { display: flex; justify-content: center; align-items: center; gap: 6px; padding: 20px 0; flex-wrap: wrap; }
+  .rh-page-link {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 32px; height: 32px; padding: 0 8px;
+    border-radius: 6px; font-size: 13px; font-weight: 600; text-decoration: none;
+    color: var(--accent-text); background: #fff; border: 1px solid var(--rh-200); transition: all .15s;
+  }
+  .rh-page-link:hover { background: var(--rh-50); border-color: var(--rh-400); color: var(--accent-text-soft); }
+  .rh-page-link.active { background: var(--rh-600); color: #fff; border-color: var(--teal-600); }
+  .rh-page-link.disabled { opacity: 0.35; pointer-events: none; }
+  html[data-theme="dark"] .rh-page-link { background: var(--rh-surface); border-color: var(--rh-border); color: var(--rh-300); }
+  html[data-theme="dark"] .rh-page-link:hover  { background: rgba(var(--rh-600-rgb),0.15); border-color: var(--rh-400); color: var(--rh-200); }
+  html[data-theme="dark"] .rh-page-link.active { background: var(--rh-600); color: #fff; border-color: var(--rh-600); }
+
   .o-list-wrap { background: var(--bg); overflow-x: auto; margin: 0; }
   .o-list-table th:first-child, .o-list-table td:first-child { padding-left: 32px; }
   .o-list-table th:last-child, .o-list-table td:last-child { padding-right: 32px; }
@@ -264,13 +279,15 @@ document.querySelectorAll('.o-view-btn').forEach(function(btn){
   btn.addEventListener('click', function(){ setVue(this.dataset.vue); });
 });
 
-function fetchList() {
-  var q = document.getElementById('search-input').value;
-  var vue = document.getElementById('vue-input').value;
-  var params = new URLSearchParams();
-  if (q) params.set('q', q);
-  params.set('vue', vue);
-  var url = LIST_URL + '?' + params.toString();
+function fetchList(url) {
+  if (!url) {
+    var q = document.getElementById('search-input').value;
+    var vue = document.getElementById('vue-input').value;
+    var params = new URLSearchParams();
+    if (q) params.set('q', q);
+    params.set('vue', vue);
+    url = LIST_URL + '?' + params.toString();
+  }
   fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
     .then(function(r){ return r.text(); })
     .then(function(html){
@@ -285,6 +302,17 @@ function fetchList() {
       bindRowEvents();
     });
 }
+
+// Pagination (précédent/suivant) : interceptée via délégation sur un
+// ancêtre stable puisque #list-result est entièrement remplacé à chaque
+// requête (un écouteur posé directement dessus serait perdu après le
+// premier rafraîchissement).
+document.addEventListener('click', function (e) {
+  var link = e.target.closest('#list-result a.o-page-nav');
+  if (!link || link.classList.contains('disabled')) return;
+  e.preventDefault();
+  fetchList(link.getAttribute('href'));
+});
 
 (function(){
   var inp = document.getElementById('search-input'); if (!inp) return;

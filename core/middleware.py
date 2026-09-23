@@ -16,6 +16,7 @@ class CurrentUserMiddleware:
         user = getattr(request, 'user', None)
         _locals.current_user = user
         _locals.current_centre = None
+        _locals.current_ip = _get_client_ip(request)
         request.centre = None
         try:
             if user is not None and getattr(user, 'is_authenticated', False):
@@ -26,7 +27,18 @@ class CurrentUserMiddleware:
         finally:
             _locals.current_user = None
             _locals.current_centre = None
+            _locals.current_ip = None
         return response
+
+
+def _get_client_ip(request):
+    """Adresse IP du client, en tenant compte d'un éventuel proxy inverse
+    (en-tête X-Forwarded-For posé par celui-ci — le premier maillon de la
+    chaîne est l'adresse réelle du client)."""
+    forwarded = request.META.get('HTTP_X_FORWARDED_FOR')
+    if forwarded:
+        return forwarded.split(',')[0].strip()
+    return request.META.get('REMOTE_ADDR')
 
 
 def _resoudre_centre_actif(user):
@@ -52,6 +64,11 @@ def _resoudre_centre_actif(user):
 def get_current_user():
     """Return the user for the current request, or None outside request context."""
     return getattr(_locals, 'current_user', None)
+
+
+def get_current_ip():
+    """Return l'adresse IP de la requête en cours, ou None hors requête."""
+    return getattr(_locals, 'current_ip', None)
 
 
 def get_current_centre():
@@ -129,3 +146,67 @@ class SessionTimeoutMiddleware:
         if request.headers.get('x-requested-with') == 'XMLHttpRequest':
             return JsonResponse({'locked': True}, status=423)
         return render(request, 'registration/locked.html', {'next': request.get_full_path()}, status=423)
+
+
+class ActivityLogMiddleware:
+    """Trace au journal chaque page effectivement consultée (ou reçu/document
+    imprimé) par un utilisateur connecté — même quand l'action ne modifie
+    aucune donnée (les signaux post_save/post_delete ne voient que les
+    écritures en base). Complète, ne remplace pas, le suivi création/
+    modification/suppression de core.audit.
+
+    Doit être déclarée APRÈS CurrentUserMiddleware dans MIDDLEWARE : elle
+    s'appuie sur core.middleware.get_current_ip() pour l'adresse IP.
+    """
+
+    # Préfixes jamais tracés : fichiers, API interne, le journal lui-même
+    # (éviter le bruit et la boucle en consultant le journal), rechargement
+    # navigateur en développement.
+    CHEMINS_EXCLUS = (
+        '/static/', '/media/', '/api/', '/journal/', '/__reload__/',
+        '/admin/jsi18n/',
+    )
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        try:
+            self._log_si_pertinent(request, response)
+        except Exception:
+            pass
+        return response
+
+    def _log_si_pertinent(self, request, response):
+        if request.method != 'GET':
+            return
+        user = getattr(request, 'user', None)
+        if user is None or not user.is_authenticated:
+            return
+        if response.status_code != 200:
+            return
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return
+        content_type = response.get('Content-Type', '')
+        if 'application/json' in content_type:
+            return
+        path = request.path
+        if any(path.startswith(p) for p in self.CHEMINS_EXCLUS):
+            return
+
+        from core.views import log_event
+        module = _module_depuis_request(request)
+        log_event(user, user, f"Page consultée : {path}", type='consultation', module=module)
+
+
+def _module_depuis_request(request):
+    """Nom de l'app Django concernée par cette requête — via le namespace de
+    l'URL si elle en a un, sinon le premier segment du chemin (convention de
+    ce projet : chaque module préfixe ses routes par son propre nom)."""
+    resolver_match = getattr(request, 'resolver_match', None)
+    app_name = getattr(resolver_match, 'app_name', '') if resolver_match else ''
+    if app_name:
+        return app_name
+    segments = [s for s in request.path.split('/') if s]
+    return segments[0] if segments else 'core'

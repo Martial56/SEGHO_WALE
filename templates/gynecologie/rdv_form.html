@@ -607,7 +607,7 @@
                 <a href="{% url 'ordonnance_create_libre' %}?patient_id={{ rdv.patient.pk }}{% if consultation %}&consultation_id={{ consultation.pk }}{% endif %}{% if rdv.medecin %}&medecin_id={{ rdv.medecin.pk }}{% endif %}" class="btn-action btn-ghost"><i class="bi bi-file-earmark-medical"></i> Créer une ordonnance</a>
                 <a href="{% url 'laboratoire_create' %}?patient={{ rdv.patient.pk }}{% if rdv.medecin %}&medecin_id={{ rdv.medecin.pk }}{% endif %}" class="btn-action btn-ghost"><i class="bi bi-flask"></i> Demande de lab</a>
                 {% if perms.soins.add_soin %}<a href="{% url 'soins:create' %}?patient_id={{ rdv.patient.pk }}" class="btn-action btn-ghost"><i class="bi bi-bandaid"></i> Soins</a>{% endif %}
-                <a href="{% url 'hospitalisation:create' %}?patient={{ rdv.patient.pk }}{% if rdv.medecin %}&medecin={{ rdv.medecin.pk }}{% endif %}&rdv={{ rdv.pk }}" class="btn-action btn-ghost"><i class="bi bi-clipboard2-pulse"></i> M.O</a>
+                {% if perms.hospitalisation.add_hospitalisation %}<a href="{% url 'hospitalisation:create' %}?patient={{ rdv.patient.pk }}{% if rdv.medecin %}&medecin={{ rdv.medecin.pk }}{% endif %}&rdv={{ rdv.pk }}" class="btn-action btn-ghost"><i class="bi bi-clipboard2-pulse"></i> M.O</a>{% endif %}
                 <button type="submit" name="_action" value="terminer" class="btn-action btn-dark">Consultation terminée</button>
                 <button type="submit" name="_action" value="annuler" class="btn-action btn-danger-outline">Annuler</button>
             {% endif %}
@@ -624,6 +624,17 @@
             <span class="status-sep">›</span>
             <div class="status-step" data-step="termine">Terminé</div>
         </div>
+
+        {% if rdv.demarre_par or rdv.termine_par %}
+        <div style="display:flex;gap:18px;flex-wrap:wrap;font-size:11.5px;color:var(--text-muted);margin-top:6px;">
+            {% if rdv.demarre_par %}
+            <span><i class="bi bi-play-circle"></i> Démarrée par <strong>{{ rdv.demarre_par.get_full_name|default:rdv.demarre_par.username }}</strong></span>
+            {% endif %}
+            {% if rdv.termine_par %}
+            <span><i class="bi bi-check-circle"></i> Terminée par <strong>{{ rdv.termine_par.get_full_name|default:rdv.termine_par.username }}</strong></span>
+            {% endif %}
+        </div>
+        {% endif %}
 
     </div>
 

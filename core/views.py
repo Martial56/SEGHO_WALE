@@ -205,6 +205,25 @@ def accent_color_set(request):
     return JsonResponse({'ok': True, 'color': color, 'css': build_accent_css(color)})
 
 
+@login_required(login_url='login')
+@require_POST
+def luminosite_set(request):
+    """Enregistre la luminosité choisie au curseur du bandeau.
+
+    Une différence assumée avec accent_color_set : pas de réponse 400. On borne
+    et on renvoie la valeur réellement écrite, pour que le client s'y recale si
+    elle a été rognée. Un curseur borné côté client ne peut pas produire une
+    faute que l'utilisateur pourrait corriger lui-même."""
+    from core.models import UserProfile
+    from core.utils import normaliser_luminosite
+
+    pourcent = normaliser_luminosite(request.POST.get('luminosite'))
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    profile.luminosite = pourcent
+    profile.save(update_fields=['luminosite'])
+    return JsonResponse({'ok': True, 'luminosite': pourcent})
+
+
 def _get_dashboard_stats():
     from patients.models import Patient, RendezVous
     from consultations.models import Consultation
@@ -274,6 +293,7 @@ def dashboard(request):
     ).count()
 
     from core.pastilles import pastilles as _pastilles
+    from employer.views import can_manage_rh
 
     response = render(request, 'core/dashboard.html', {
         'stats': stats,
@@ -285,6 +305,7 @@ def dashboard(request):
         'user_modules': user_modules,
         'accessible_codes': accessible_codes,
         'plannings_non_vus': plannings_non_vus,
+        'can_manage_rh_presence': can_manage_rh(request.user),
     })
     response['Cache-Control'] = 'no-store, no-cache, must-revalidate'
     response['Pragma'] = 'no-cache'
@@ -434,12 +455,14 @@ def medecin_create(request):
             errors['specialite'] = 'La spécialité est obligatoire.'
         elif not Specialite.objects.filter(pk=specialite_pk).exists():
             errors['specialite'] = 'Spécialité invalide.'
-        if not departement_pk:
-            errors['departement'] = 'Le département est obligatoire.'
-        elif not Departement.objects.filter(pk=departement_pk).exists():
+        if departement_pk and not Departement.objects.filter(pk=departement_pk).exists():
             errors['departement'] = 'Département invalide.'
         if ordre_medecin and Medecin.objects.filter(ordre_medecin=ordre_medecin).exists():
             errors['ordre_medecin'] = 'Ce numéro d\'ordre est déjà utilisé par un autre médecin.'
+        if not user_pk:
+            errors['user'] = 'Le compte utilisateur est obligatoire.'
+        elif not users_disponibles.filter(pk=user_pk).exists():
+            errors['user'] = 'Compte utilisateur invalide.'
 
         if not errors:
             service_obj = Service.objects.filter(pk=service_pk).first() if service_pk else employe_trouve.service
@@ -457,9 +480,7 @@ def medecin_create(request):
                     pass
 
             med.departement = Departement.objects.filter(pk=departement_pk).first() if departement_pk else None
-
-            if user_pk:
-                med.user = users_disponibles.filter(pk=user_pk).first()
+            med.user = users_disponibles.filter(pk=user_pk).first()
 
             med.save()
             messages.success(request, f'Médecin {med} enregistré avec succès (matricule : {med.matricule}).')
@@ -513,12 +534,14 @@ def medecin_edit(request, pk):
             errors['specialite'] = 'La spécialité est obligatoire.'
         elif not Specialite.objects.filter(pk=specialite_pk).exists():
             errors['specialite'] = 'Spécialité invalide.'
-        if not departement_pk:
-            errors['departement'] = 'Le département est obligatoire.'
-        elif not Departement.objects.filter(pk=departement_pk).exists():
+        if departement_pk and not Departement.objects.filter(pk=departement_pk).exists():
             errors['departement'] = 'Département invalide.'
         if ordre_medecin and Medecin.objects.filter(ordre_medecin=ordre_medecin).exclude(pk=med.pk).exists():
             errors['ordre_medecin'] = 'Ce numéro d\'ordre est déjà utilisé par un autre médecin.'
+        if not user_pk:
+            errors['user'] = 'Le compte utilisateur est obligatoire.'
+        elif not users_disponibles.filter(pk=user_pk).exists():
+            errors['user'] = 'Compte utilisateur invalide.'
 
         if not errors:
             med.actif = actif
@@ -531,11 +554,7 @@ def medecin_edit(request, pk):
             med.specialite = Specialite.objects.filter(pk=specialite_pk).first() if specialite_pk else None
             med.departement = Departement.objects.filter(pk=departement_pk).first() if departement_pk else None
             med.service = Service.objects.filter(pk=service_pk).first() if service_pk else None
-
-            if user_pk:
-                med.user = users_disponibles.filter(pk=user_pk).first()
-            else:
-                med.user = None
+            med.user = users_disponibles.filter(pk=user_pk).first()
 
             med.save()
             messages.success(request, f'Médecin {med} mis à jour avec succès.')
@@ -1619,10 +1638,11 @@ def gynecologie_rdv_detail(request, pk):
             now = timezone.now()
             rdv.statut = 'en_consultation'
             rdv.date_en_consultation = now
+            rdv.demarre_par = request.user
             if rdv.date_en_attente:
                 rdv.temps_attente_minutes = int((now - rdv.date_en_attente).total_seconds() / 60)
             rdv._skip_auto_log = True
-            rdv.save(update_fields=['statut', 'date_en_consultation', 'temps_attente_minutes'])
+            rdv.save(update_fields=['statut', 'date_en_consultation', 'demarre_par', 'temps_attente_minutes'])
             log_event(rdv, request.user, 'État : En Attente → En Consultation', type='statut')
             messages.success(request, 'Consultation démarrée.')
             return redirect('gynecologie_rdv_detail', pk=rdv.pk)
@@ -1631,10 +1651,11 @@ def gynecologie_rdv_detail(request, pk):
             now = timezone.now()
             rdv.statut = 'termine'
             rdv.date_termine = now
+            rdv.termine_par = request.user
             if rdv.date_en_consultation:
                 rdv.temps_consultation_minutes = int((now - rdv.date_en_consultation).total_seconds() / 60)
             rdv._skip_auto_log = True
-            rdv.save(update_fields=['statut', 'date_termine', 'temps_consultation_minutes'])
+            rdv.save(update_fields=['statut', 'date_termine', 'termine_par', 'temps_consultation_minutes'])
             log_event(rdv, request.user, 'État : En Consultation → Terminé', type='statut')
             messages.success(request, 'Consultation terminée.')
             return redirect('gynecologie_rdv')
@@ -1766,7 +1787,8 @@ def gynecologie_demarrer_consultation(request, pk):
     # Passer le RDV en consultation si pas encore terminé
     if rdv.statut in ('planifie', 'confirme', 'en_attente'):
         rdv.statut = 'en_consultation'
-        rdv.save(update_fields=['statut'])
+        rdv.demarre_par = request.user
+        rdv.save(update_fields=['statut', 'demarre_par'])
 
     return redirect('gynecologie_rdv_detail', pk=rdv.pk)
 
@@ -2025,8 +2047,9 @@ def post_note(request):
     return redirect(next_url)
 
 
-def log_event(instance, user, message, type='note'):
+def log_event(instance, user, message, type='note', duree_secondes=None, module=None):
     from django.contrib.contenttypes.models import ContentType
+    from core.middleware import get_current_ip
     from core.models import LogActivite
     ct = ContentType.objects.get_for_model(instance)
     LogActivite.objects.create(
@@ -2035,6 +2058,9 @@ def log_event(instance, user, message, type='note'):
         user=user if user and user.is_authenticated else None,
         message=message,
         type=type,
+        ip_address=get_current_ip(),
+        duree_secondes=duree_secondes,
+        module=module if module else ct.app_label,
     )
 
 
@@ -2168,9 +2194,29 @@ def _specialite_form_class():
             fields = ['nom', 'code', 'description']
             widgets = {
                 'nom':         forms.TextInput(attrs={'class': 'f-input', 'placeholder': 'Ex : Cardiologie'}),
-                'code':        forms.TextInput(attrs={'class': 'f-input', 'placeholder': 'Ex : CARD'}),
+                'code':        forms.TextInput(attrs={'class': 'f-input', 'readonly': 'readonly'}),
                 'description': forms.Textarea(attrs={'class': 'f-input', 'rows': 3, 'placeholder': 'Description optionnelle'}),
             }
+
+        def clean_code(self):
+            # Conservé tel quel une fois créé — seul un nouveau code est généré,
+            # pour ne pas faire bouger un code déjà en usage/mémorisé si le nom
+            # est corrigé plus tard.
+            if self.instance.pk and self.instance.code:
+                return self.instance.code
+            import re
+            import unicodedata
+            nom = unicodedata.normalize('NFKD', self.cleaned_data.get('nom', ''))
+            nom = ''.join(c for c in nom if not unicodedata.combining(c)).upper()
+            base = re.sub(r'[^A-Z0-9]', '', nom)[:4] or 'SPEC'
+            code = base
+            n = 2
+            while Specialite.objects.filter(code=code).exclude(pk=self.instance.pk or 0).exists():
+                code = f'{base}{n}'
+                n += 1
+            return code
+    SpecialiteForm.base_fields['code'].required = False
+    SpecialiteForm.base_fields['code'].help_text = 'Généré automatiquement à partir du nom.'
     return SpecialiteForm
 
 

@@ -37,6 +37,8 @@ INSTALLED_APPS = [
     'stock',
     'achats',
     'rapports',
+    'guide',
+    'journal',
     'django_browser_reload',
 ]
 
@@ -50,6 +52,7 @@ MIDDLEWARE = [
     'core.middleware.CurrentUserMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'core.middleware.SessionTimeoutMiddleware',
+    'core.middleware.ActivityLogMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 

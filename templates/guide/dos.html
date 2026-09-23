@@ -1,0 +1,86 @@
+{% extends 'guide/base.html' %}
+{% load static %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'guide/includes/book_css.html' %}
+<style>
+.gd-cover-page {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; padding: 50px 40px;
+  background:
+    radial-gradient(120% 85% at 50% 0%, rgba(255,255,255,.55), transparent 62%),
+    radial-gradient(140% 100% at 50% 105%, rgba(0,0,0,.06), transparent 60%),
+    var(--gd-paper);
+}
+html[data-theme="dark"] .gd-cover-page {
+  background:
+    radial-gradient(120% 85% at 50% 0%, rgba(255,255,255,.05), transparent 62%),
+    radial-gradient(140% 100% at 50% 105%, rgba(0,0,0,.35), transparent 60%),
+    var(--gd-paper);
+}
+.gd-cover-page::before, .gd-cover-page::after { display: none; }
+
+.gd-cover-frame { position: absolute; inset: 18px; pointer-events: none; border: 1px solid rgba(var(--gd-accent-rgb),.32); }
+.gd-cover-frame::before { content: ''; position: absolute; inset: 5px; border: 1px solid rgba(var(--gd-accent-rgb),.16); }
+
+.gd-cover-logo-wrap {
+  width: 140px; height: 140px; border-radius: 50%; margin-bottom: 28px;
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(circle at 35% 30%, rgba(var(--gd-accent-rgb),.16), rgba(var(--gd-accent-rgb),.02) 70%);
+  box-shadow: inset 0 0 0 1px rgba(var(--gd-accent-rgb),.22), 0 6px 16px rgba(0,0,0,.06);
+}
+.gd-cover-logo { width: 84px; height: 84px; object-fit: contain; opacity: .92; }
+
+.gd-cover-eyebrow { font-size: 10.5px; text-transform: uppercase; letter-spacing: 2.5px; color: var(--gd-accent); margin-bottom: 14px; }
+.gd-cover-titre {
+  font-family: Georgia, 'Times New Roman', serif; font-weight: 400; font-size: 26px; line-height: 1.3;
+  letter-spacing: .3px; color: var(--gd-ink); margin-bottom: 18px;
+  text-shadow: 0 1px 0 rgba(255,255,255,.5);
+}
+html[data-theme="dark"] .gd-cover-titre { text-shadow: 0 1px 2px rgba(0,0,0,.4); }
+.gd-cover-rule { width: 46px; height: 1px; background: var(--gd-ink-soft); opacity: .4; margin-bottom: 18px; }
+.gd-cover-sub { font-size: 12.5px; font-style: italic; color: var(--gd-ink-soft); max-width: 280px; margin-bottom: 48px; }
+
+.gd-dos-actions { display: flex; flex-direction: column; gap: 14px; align-items: center; }
+.gd-cover-cta {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 12px; font-weight: 600; letter-spacing: .2px; text-decoration: none;
+  color: var(--gd-ink); padding-bottom: 2px; border-bottom: 1px solid var(--gd-ink-soft);
+}
+.gd-cover-cta:hover { color: var(--gd-accent); border-color: var(--gd-accent); }
+.gd-cover-cta i { font-size: 11px; transition: transform .15s; }
+.gd-cover-cta:hover i { transform: translateX(2px); }
+
+.gd-cover-foot { margin-top: 34px; font-size: 10px; letter-spacing: 1.5px; color: var(--gd-ink-soft); opacity: .55; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% url 'guide:page' total_pages as href_precedent %}
+{% include 'guide/includes/zoom_nav.html' %}
+
+<div class="gd-book-wrap">
+  <div class="gd-page gd-cover-page gd-zoomable">
+    <div class="gd-cover-frame"></div>
+
+    <div class="gd-cover-logo-wrap">
+      <img src="{% static 'img/logo.png' %}" alt="Logo WALÉ" class="gd-cover-logo">
+    </div>
+
+    <div class="gd-cover-eyebrow">Centre Médico-Social WALÉ</div>
+    <div class="gd-cover-titre">Fin du guide<br>d'utilisation</div>
+    <div class="gd-cover-rule"></div>
+    <div class="gd-cover-sub">Vous avez parcouru les {{ total_pages }} pages du guide SEGHO-WALE.</div>
+
+    <div class="gd-dos-actions">
+      <a href="{% url 'guide:hub' %}" class="gd-cover-cta"><i class="bi bi-list-ul"></i> Retour au sommaire</a>
+      <a href="{% url 'dashboard' %}" class="gd-cover-cta"><i class="bi bi-house"></i> Retour au tableau de bord</a>
+    </div>
+
+    <div class="gd-cover-foot">SEGHO-WALE</div>
+  </div>
+</div>
+
+{% include 'guide/includes/keynav.html' %}
+{% endblock %}
