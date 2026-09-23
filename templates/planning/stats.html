@@ -154,6 +154,21 @@ html[data-theme="dark"] .badge-brouillon-inline { background: #3d2e00; color: #f
 <div class="pl-subheader">
   <div class="pl-subheader-row">
     <h1><i class="bi bi-bar-chart-line" style="color:var(--accent-text-soft);margin-right:8px;"></i>Statistiques de couverture</h1>
+    <form method="get" style="display:flex;gap:8px;align-items:center;">
+      <select name="month" onchange="this.form.submit()"
+        style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12.5px;background:var(--surface);color:var(--text);">
+        <option value="">Toute l'année</option>
+        {% for num, nom in mois_choix %}
+        <option value="{{ num }}" {% if month == num %}selected{% endif %}>{{ nom }}</option>
+        {% endfor %}
+      </select>
+      <select name="year" onchange="this.form.submit()"
+        style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12.5px;background:var(--surface);color:var(--text);">
+        {% for y in annees_disponibles %}
+        <option value="{{ y }}" {% if year == y %}selected{% endif %}>{{ y }}</option>
+        {% endfor %}
+      </select>
+    </form>
   </div>
 </div>
 
@@ -164,7 +179,7 @@ html[data-theme="dark"] .badge-brouillon-inline { background: #3d2e00; color: #f
   <div class="stats-card">
     <span class="stats-card-label"><i class="bi bi-calendar3"></i> Plannings analysés</span>
     <span class="stats-card-value">{{ total_plannings }}</span>
-    <span class="stats-card-sub">12 derniers</span>
+    <span class="stats-card-sub">{{ periode_label|capfirst }}</span>
   </div>
   <div class="stats-card">
     <span class="stats-card-label"><i class="bi bi-percent"></i> Couverture moyenne</span>
@@ -306,72 +321,73 @@ html[data-theme="dark"] .badge-brouillon-inline { background: #3d2e00; color: #f
   </table>
 </div>
 
-<!-- ══ STATS PAR BUREAU + TOP MÉDECINS ══ -->
-{% if bureau_stats or top_medecins %}
-<div class="stats-grid-2">
-
-  {% if bureau_stats %}
-  <div class="stats-section">
-    <h2><i class="bi bi-building"></i> Couverture par bureau <small style="font-size:11px;color:var(--text-muted);font-weight:400;">(12 dernières semaines)</small></h2>
-    <div class="pl-table-wrap">
-      <table class="pl-stats-table" id="bureau-stats-table">
-        <thead>
-          <tr>
-            <th>Bureau / Service</th>
-            <th>Affectations</th>
-            <th>Couverture</th>
-          </tr>
-        </thead>
-        <tbody id="bureau-stats-tbody">
-          {% for b in bureau_stats %}
-          {% if b.pct >= 80 %}{% with color="green" %}
-          <tr>
-            <td><strong>{{ b.bureau.nom }}</strong></td>
-            <td>{{ b.filled }} / {{ b.total }}</td>
-            <td>
-              <div class="pct-bar-wrap">
-                <div class="pct-bar-track"><div class="pct-bar-fill {{ color }}" style="width:{{ b.pct }}%;"></div></div>
-                <span class="pct-label {{ color }}">{{ b.pct }}%</span>
-              </div>
-            </td>
-          </tr>
-          {% endwith %}{% elif b.pct >= 50 %}{% with color="orange" %}
-          <tr>
-            <td><strong>{{ b.bureau.nom }}</strong></td>
-            <td>{{ b.filled }} / {{ b.total }}</td>
-            <td>
-              <div class="pct-bar-wrap">
-                <div class="pct-bar-track"><div class="pct-bar-fill {{ color }}" style="width:{{ b.pct }}%;"></div></div>
-                <span class="pct-label {{ color }}">{{ b.pct }}%</span>
-              </div>
-            </td>
-          </tr>
-          {% endwith %}{% else %}{% with color="red" %}
-          <tr>
-            <td><strong>{{ b.bureau.nom }}</strong></td>
-            <td>{{ b.filled }} / {{ b.total }}</td>
-            <td>
-              <div class="pct-bar-wrap">
-                <div class="pct-bar-track"><div class="pct-bar-fill {{ color }}" style="width:{{ b.pct }}%;"></div></div>
-                <span class="pct-label {{ color }}">{{ b.pct }}%</span>
-              </div>
-            </td>
-          </tr>
-          {% endwith %}{% endif %}
-          {% endfor %}
-        </tbody>
-      </table>
-      <div class="bureau-pager" id="bureau-pager">
-        <span class="bureau-pager-info" id="bureau-pager-info"></span>
-        <div class="bureau-pager-btns" id="bureau-pager-btns"></div>
-      </div>
+<!-- ══ COUVERTURE PAR BUREAU (pleine largeur — tableau paginé) ══ -->
+{% if bureau_stats %}
+<div class="stats-section" style="margin-bottom:28px;">
+  <h2><i class="bi bi-building"></i> Couverture par bureau <small style="font-size:11px;color:var(--text-muted);font-weight:400;">({{ periode_label }})</small></h2>
+  <div class="pl-table-wrap">
+    <table class="pl-stats-table" id="bureau-stats-table">
+      <thead>
+        <tr>
+          <th>Bureau / Service</th>
+          <th>Affectations</th>
+          <th>Couverture</th>
+        </tr>
+      </thead>
+      <tbody id="bureau-stats-tbody">
+        {% for b in bureau_stats %}
+        {% if b.pct >= 80 %}{% with color="green" %}
+        <tr>
+          <td><strong>{{ b.bureau.nom }}</strong></td>
+          <td>{{ b.filled }} / {{ b.total }}</td>
+          <td>
+            <div class="pct-bar-wrap">
+              <div class="pct-bar-track"><div class="pct-bar-fill {{ color }}" style="width:{{ b.pct }}%;"></div></div>
+              <span class="pct-label {{ color }}">{{ b.pct }}%</span>
+            </div>
+          </td>
+        </tr>
+        {% endwith %}{% elif b.pct >= 50 %}{% with color="orange" %}
+        <tr>
+          <td><strong>{{ b.bureau.nom }}</strong></td>
+          <td>{{ b.filled }} / {{ b.total }}</td>
+          <td>
+            <div class="pct-bar-wrap">
+              <div class="pct-bar-track"><div class="pct-bar-fill {{ color }}" style="width:{{ b.pct }}%;"></div></div>
+              <span class="pct-label {{ color }}">{{ b.pct }}%</span>
+            </div>
+          </td>
+        </tr>
+        {% endwith %}{% else %}{% with color="red" %}
+        <tr>
+          <td><strong>{{ b.bureau.nom }}</strong></td>
+          <td>{{ b.filled }} / {{ b.total }}</td>
+          <td>
+            <div class="pct-bar-wrap">
+              <div class="pct-bar-track"><div class="pct-bar-fill {{ color }}" style="width:{{ b.pct }}%;"></div></div>
+              <span class="pct-label {{ color }}">{{ b.pct }}%</span>
+            </div>
+          </td>
+        </tr>
+        {% endwith %}{% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+    <div class="bureau-pager" id="bureau-pager">
+      <span class="bureau-pager-info" id="bureau-pager-info"></span>
+      <div class="bureau-pager-btns" id="bureau-pager-btns"></div>
     </div>
   </div>
-  {% endif %}
+</div>
+{% endif %}
+
+<!-- ══ TOP MÉDECINS + HEURES PAR MÉDECIN (paire de classements côte à côte) ══ -->
+{% if top_medecins or heures_medecins_mois %}
+<div class="stats-grid-2">
 
   {% if top_medecins %}
   <div class="stats-section">
-    <h2><i class="bi bi-person-badge"></i> Top médecins planifiés <small style="font-size:11px;color:var(--text-muted);font-weight:400;">(12 dernières semaines)</small></h2>
+    <h2><i class="bi bi-person-badge"></i> Top médecins planifiés <small style="font-size:11px;color:var(--text-muted);font-weight:400;">({{ periode_label }})</small></h2>
     <div class="top-med-list">
       {% for name, count in top_medecins %}
       <div class="top-med-item">
@@ -383,6 +399,28 @@ html[data-theme="dark"] .badge-brouillon-inline { background: #3d2e00; color: #f
       </div>
       {% endfor %}
     </div>
+  </div>
+  {% endif %}
+
+  {% if heures_medecins_mois %}
+  <div class="stats-section">
+    <h2><i class="bi bi-clock-history"></i> Heures par médecin actif <small style="font-size:11px;color:var(--text-muted);font-weight:400;">(par mois, d'après le planning)</small></h2>
+    {% for m in heures_medecins_mois %}
+    <div style="margin-bottom:18px;">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px;">{{ m.mois_nom }} {{ m.year }}</div>
+      <div class="top-med-list">
+        {% for l in m.lignes %}
+        <div class="top-med-item">
+          <span class="top-med-rank {% if forloop.counter == 1 %}rank-1{% elif forloop.counter == 2 %}rank-2{% elif forloop.counter == 3 %}rank-3{% endif %}">
+            {{ forloop.counter }}
+          </span>
+          <span class="top-med-name">Dr {{ l.medecin.nom }} {{ l.medecin.prenoms }}</span>
+          <span class="top-med-count">{{ l.heures|floatformat:0 }} h</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
   </div>
   {% endif %}
 
@@ -409,7 +447,8 @@ html[data-theme="dark"] .badge-brouillon-inline { background: #3d2e00; color: #f
   var raw = JSON.parse(dataEl.textContent);
   if (!raw || !raw.length) return;
   var reversed = raw.slice().reverse();
-  var labels = reversed.map(function(m) { return m.mois_nom.slice(0, 3) + ' ' + m.year; });
+  // 4 lettres (pas 3) pour ne pas confondre Juin/Juillet, tous deux "Jui" tronqués à 3.
+  var labels = reversed.map(function(m) { return m.mois_nom.slice(0, 4) + ' ' + m.year; });
   var values = reversed.map(function(m) { return m.avg_pct; });
   var bgColors = values.map(function(v) {
     return v >= 80 ? 'rgba(94,128,80,0.75)' : v >= 50 ? 'rgba(230,126,34,0.75)' : 'rgba(192,57,43,0.75)';

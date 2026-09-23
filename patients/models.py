@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils import timezone
+from django.contrib.auth.models import User
 
 from centres.models import ModeleCentre
 
@@ -143,6 +144,15 @@ class RendezVous(ModeleCentre):
     date_en_consultation = models.DateTimeField(null=True, blank=True)
     date_termine = models.DateTimeField(null=True, blank=True)
     date_creation = models.DateTimeField(auto_now_add=True)
+    demarre_par = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='rdv_demarres',
+        verbose_name='Consultation démarrée par',
+        help_text="Utilisateur connecté au moment du passage « En consultation » — peut différer du médecin assigné si un autre a pris le relais.",
+    )
+    termine_par = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='rdv_termines',
+        verbose_name='Consultation terminée par',
+    )
 
     MODE_ENTREE = [
         ('venu_lui_meme', 'Patient venu de lui-même'),

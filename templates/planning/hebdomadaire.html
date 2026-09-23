@@ -1,5 +1,5 @@
 {% extends 'planning/base.html' %}
-{% load i18n static %}
+{% load i18n static core_tags %}
 
 {% block extra_planning_css %}
 .pl-nav-week {
@@ -31,6 +31,25 @@
 .pl-table th {
   background: var(--pl-700); color: #fff; padding: 7px 10px;
   font-weight: 600; font-size: 11px; text-align: center;
+}
+.pl-table th.th-ferie { background: var(--amber, #b8860b); }
+.ferie-label {
+  font-size: 9px; font-weight: 700; text-transform: none; letter-spacing: 0;
+  margin-top: 2px; display: flex; align-items: center; justify-content: center; gap: 3px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ferie-dimanche-banner {
+  background: #fff3cd; color: #856404; border: 1px solid #ffc107;
+  border-radius: 6px; padding: 9px 14px; margin: 0 32px 12px;
+  font-size: 12.5px; display: flex; align-items: center; gap: 8px;
+}
+html[data-theme="dark"] .ferie-dimanche-banner { background: rgba(255,193,7,.15); color: #fcd34d; border-color: rgba(255,193,7,.3); }
+.td-cell-ferie {
+  background: repeating-linear-gradient(135deg, rgba(0,0,0,.05), rgba(0,0,0,.05) 6px, rgba(0,0,0,.02) 6px, rgba(0,0,0,.02) 12px) !important;
+  opacity: .7;
+}
+html[data-theme="dark"] .td-cell-ferie {
+  background: repeating-linear-gradient(135deg, rgba(255,255,255,.05), rgba(255,255,255,.05) 6px, rgba(255,255,255,.02) 6px, rgba(255,255,255,.02) 12px) !important;
 }
 .pl-table .td-bureau {
   background: var(--pl-100); color: var(--text); font-weight: 700;
@@ -244,7 +263,7 @@ html[data-theme="dark"] .pl-modal input[type="date"]:focus { border-bottom-color
       <div class="print-header-doc">Programme hebdomadaire des consultations</div>
     </div>
     <div class="print-header-right">
-      <div class="print-header-week-label">Semaine n°</div>
+      <div class="print-header-week-label">Semaine du :</div>
       <div class="print-header-week-dates">
         {{ planning.semaine_debut|date:"d/m/Y" }} – {{ planning.semaine_fin|date:"d/m/Y" }}
       </div>
@@ -269,6 +288,15 @@ html[data-theme="dark"] .pl-modal input[type="date"]:focus { border-bottom-color
     </a>
   </div>
 </div>
+
+{% with dim=jours_feries|get_item:"dimanche" %}
+{% if dim %}
+<div class="ferie-dimanche-banner">
+  <i class="bi bi-star-fill"></i>
+  Dimanche {{ dim.date|date:"d/m/Y" }} : <strong>Jour férié, {{ dim.description }} {{ dim.date|date:"Y" }}</strong> — hors planning (pas de colonne dans la grille).
+</div>
+{% endif %}
+{% endwith %}
 
 <div class="pl-actions">
   {% if can_manage and not planning.publie %}
@@ -339,7 +367,14 @@ html[data-theme="dark"] .pl-modal input[type="date"]:focus { border-bottom-color
       <tr>
         <th>BUREAU</th>
         <th></th>
-        {% for jour in jours_labels %}<th>{{ jour|upper }}</th>{% endfor %}
+        {% for jour in jours_labels %}
+        {% with ferie=jours_feries|get_item:forloop.counter0 %}
+        <th class="{% if ferie %}th-ferie{% endif %}" {% if ferie %}title="Jour férié, {{ ferie.description }} {{ ferie.date|date:'Y' }}"{% endif %}>
+          {{ jour|upper }}
+          {% if ferie %}<div class="ferie-label"><i class="bi bi-star-fill"></i> Jour férié, {{ ferie.description }} {{ ferie.date|date:"Y" }}</div>{% endif %}
+        </th>
+        {% endwith %}
+        {% endfor %}
       </tr>
     </thead>
     <tbody>
@@ -350,21 +385,44 @@ html[data-theme="dark"] .pl-modal input[type="date"]:focus { border-bottom-color
         {% endif %}
         <td class="td-shift">{{ row.plage.code }}</td>
         {% for cell in row.cells %}
-          <td class="td-cell">
+          {% with ferie=jours_feries|get_item:forloop.counter0 %}
+          <td class="td-cell{% if ferie %} td-cell-ferie{% endif %}">
             {{ cell.value }}
             {% if cell.note %}
               <span class="cell-note-ind" title="{{ cell.note }}"><i class="bi bi-sticky-fill"></i></span>
             {% endif %}
           </td>
+          {% endwith %}
         {% endfor %}
       </tr>
       {% endfor %}
+      {% for row in perm_rows %}
       <tr>
-        <td class="td-perm-label" colspan="2"><i class="bi bi-clock-history"></i> Permanence</td>
-        {% for val in perm_list %}
-        <td class="td-perm">{{ val }}</td>
+        {% if forloop.first %}
+        <td class="td-perm-label" rowspan="{{ perm_rows|length }}"><i class="bi bi-clock-history"></i> Permanence</td>
+        {% endif %}
+        <td class="td-shift">{{ row.creneau.libelle }}</td>
+        {% for cell in row.cells %}
+        {% with ferie=jours_feries|get_item:forloop.counter0 %}
+        <td class="td-perm{% if ferie %} td-cell-ferie{% endif %}">
+          {{ cell.value }}
+          {% if cell.note %}
+            <span class="cell-note-ind" title="{{ cell.note }}"><i class="bi bi-sticky-fill"></i></span>
+          {% endif %}
+        </td>
+        {% endwith %}
         {% endfor %}
       </tr>
+      {% empty %}
+      <tr>
+        <td class="td-perm-label" colspan="2"><i class="bi bi-clock-history"></i> Permanence</td>
+        {% for j in "012345" %}
+        {% with ferie=jours_feries|get_item:forloop.counter0 %}
+        <td class="td-perm{% if ferie %} td-cell-ferie{% endif %}"></td>
+        {% endwith %}
+        {% endfor %}
+      </tr>
+      {% endfor %}
     </tbody>
   </table>
 </div>

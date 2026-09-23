@@ -1,5 +1,5 @@
 {% extends 'planning/base.html' %}
-{% load i18n static %}
+{% load i18n static core_tags %}
 
 {% block extra_planning_css %}
 .print-header { display: none; }
@@ -16,6 +16,12 @@ text-align: center; padding: 10px 0 8px;
 .pl-table th {
 background: var(--pl-700); color: #fff; padding: 7px 10px;
 font-weight: 600; font-size: 11px; text-align: center;
+}
+.pl-table th.th-ferie { background: var(--amber, #b8860b); }
+.ferie-label {
+font-size: 9px; font-weight: 700; text-transform: none; letter-spacing: 0;
+margin-top: 2px; display: flex; align-items: center; justify-content: center; gap: 3px;
+white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .pl-table .td-bureau {
 background: var(--pl-100); color: var(--text); font-weight: 700;
@@ -35,6 +41,14 @@ min-width: 110px; vertical-align: middle; position: relative;
 .td-cell.conflict .grid-input { color: #856404; }
 .td-cell.too-many { background: #f8d7da !important; border-color: #f5c2c7 !important; }
 .td-cell.too-many .grid-input { color: #842029; }
+.td-cell-ferie {
+background: repeating-linear-gradient(135deg, rgba(0,0,0,.05), rgba(0,0,0,.05) 6px, rgba(0,0,0,.02) 6px, rgba(0,0,0,.02) 12px) !important;
+opacity: .7;
+pointer-events: none;
+}
+html[data-theme="dark"] .td-cell-ferie {
+background: repeating-linear-gradient(135deg, rgba(255,255,255,.05), rgba(255,255,255,.05) 6px, rgba(255,255,255,.02) 6px, rgba(255,255,255,.02) 12px) !important;
+}
 /* Ligne permanence */
 .td-perm-label {
 background: #1c371b; color: #fff; font-size: 10px; font-weight: 800;
@@ -44,17 +58,23 @@ text-align: center; vertical-align: middle;
 }
 .td-perm {
 background: var(--pl-50) !important; border: 1px solid var(--pl-200) !important;
-padding: 3px 4px; vertical-align: middle;
 }
-.perm-input {
-width: 100%; border: none; background: transparent; font-size: 12px;
-padding: 4px 6px; outline: none; font-family: inherit; color: var(--text);
-box-sizing: border-box;
-}
-.perm-input:focus { background: rgba(var(--pl-600-rgb),0.08); outline: 1px solid var(--pl-400); border-radius: 3px; }
 html[data-theme="dark"] .td-perm-label { background: #132612; }
 html[data-theme="dark"] .td-perm { background: var(--pl-100) !important; border-color: var(--pl-300) !important; }
-html[data-theme="dark"] .perm-input { color: var(--text); }
+.perm-row .td-shift { position: relative; padding-right: 20px; }
+.perm-creneau-input {
+width: 100%; border: none; background: transparent; font-size: 11px; font-weight: 600;
+text-align: center; padding: 4px 2px; outline: none; font-family: inherit; color: var(--text-muted);
+box-sizing: border-box;
+}
+.perm-creneau-input:focus { background: rgba(var(--pl-600-rgb),0.08); outline: 1px solid var(--pl-400); border-radius: 3px; }
+.perm-row-remove {
+position: absolute; top: 1px; right: 1px; border: none; background: transparent;
+color: var(--text-muted); cursor: pointer; font-size: 9px; padding: 2px; line-height: 1;
+opacity: 0.5;
+}
+.perm-row-remove:hover { opacity: 1; color: var(--rose-btn, #c0392b); }
+.perm-add-row td { border: none; background: transparent; padding: 6px 8px; }
 
 /* Input grille */
 .grid-input {
@@ -162,37 +182,6 @@ font-style: italic; box-sizing: border-box;
 }
 .note-input:focus { color: var(--text); background: rgba(var(--pl-600-rgb),0.04); }
 
-/* Gabarits */
-.btn-gabarit {
-border: 1px solid var(--pl-400); color: var(--accent-text); background: transparent;
-border-radius: 6px; padding: 8px 13px; font-size: 13px; font-weight: 500;
-cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
-transition: background 0.12s;
-}
-.btn-gabarit:hover { background: var(--pl-50); }
-
-/* Modales Gabarit (enregistrer / appliquer) */
-.pl-modal-overlay {
-display: none; position: fixed; inset: 0;
-background: rgba(0,0,0,0.45); z-index: 9000;
-align-items: center; justify-content: center; padding: 20px;
-}
-.pl-modal-overlay.open { display: flex; }
-.pl-modal {
-background: #fff; border-radius: 10px;
-box-shadow: 0 8px 40px rgba(0,0,0,0.22);
-width: 420px; max-width: 100%;
-padding: 22px;
-}
-html[data-theme="dark"] .pl-modal { background: var(--surface); }
-.pl-modal h3 {
-font-size: 15px; font-weight: 700; color: var(--text);
-margin: 0 0 16px;
-}
-.pl-modal-actions {
-display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px;
-}
-
 /* Menu contextuel copier-coller */
 .ctx-menu {
 position: fixed; background: #fff; border: 1px solid var(--border);
@@ -255,6 +244,12 @@ html[data-theme="dark"] .error-banner { background: rgba(220,53,69,.18); color: 
 rgba(220,53,69,.3); }
 html[data-theme="dark"] .conflict-banner { background: rgba(255,193,7,.15); color: #fcd34d; border-color:
 rgba(255,193,7,.3); }
+.ferie-dimanche-banner {
+background: #fff3cd; color: #856404; border: 1px solid #ffc107;
+border-radius: 6px; padding: 9px 14px; margin: 0 32px 12px;
+font-size: 12.5px; display: flex; align-items: center; gap: 8px;
+}
+html[data-theme="dark"] .ferie-dimanche-banner { background: rgba(255,193,7,.15); color: #fcd34d; border-color: rgba(255,193,7,.3); }
 
 @media print {
 .pl-nav, .pl-actions, .pl-title-block, nav, #top-bar, .topbar, .sidebar,
@@ -302,6 +297,15 @@ margin-top: 5px; text-transform: uppercase; letter-spacing: 0.05em;
   <div class="subtitle">Centre Médico-Social WALÉ</div>
 </div>
 
+{% with dim=jours_feries|get_item:"dimanche" %}
+{% if dim %}
+<div class="ferie-dimanche-banner">
+  <i class="bi bi-star-fill"></i>
+  Dimanche {{ dim.date|date:"d/m/Y" }} : <strong>Jour férié, {{ dim.description }} {{ dim.date|date:"Y" }}</strong> — hors planning (pas de colonne dans la grille).
+</div>
+{% endif %}
+{% endwith %}
+
 <!-- Bandeau erreurs bloquantes (JS) -->
 <div class="error-banner" id="errorBanner">
   <i class="bi bi-x-circle-fill" style="flex-shrink:0;margin-top:2px;"></i>
@@ -328,7 +332,14 @@ margin-top: 5px; text-transform: uppercase; letter-spacing: 0.05em;
           <th>BUREAU</th>
           <th></th>
           {% for jour in jours_labels %}
-          <th>{{ jour|upper }}</th>
+          {% with ferie=jours_feries|get_item:forloop.counter0 %}
+          <th class="{% if ferie %}th-ferie{% endif %}" {% if ferie %}title="Jour férié, {{ ferie.description }} {{ ferie.date|date:'Y' }}"{% endif %}>
+            {{ jour|upper }}
+            {% if ferie %}
+            <div class="ferie-label"><i class="bi bi-star-fill"></i> Jour férié, {{ ferie.description }} {{ ferie.date|date:"Y" }}</div>
+            {% endif %}
+          </th>
+          {% endwith %}
           {% endfor %}
         </tr>
       </thead>
@@ -340,7 +351,8 @@ margin-top: 5px; text-transform: uppercase; letter-spacing: 0.05em;
           {% endif %}
           <td class="td-shift">{{ row.plage.code }}</td>
           {% for cell in row.cells %}
-          <td class="td-cell" data-plage="{{ row.plage.pk }}" data-jour="{{ forloop.counter0 }}"
+          {% with ferie=jours_feries|get_item:forloop.counter0 %}
+          <td class="td-cell{% if ferie %} td-cell-ferie{% endif %}" data-plage="{{ row.plage.pk }}" data-jour="{{ forloop.counter0 }}"
             data-code="{{ row.plage.code }}">
             <div style="display:flex;align-items:flex-start;gap:2px;">
               <div class="chip-display" style="flex:1;min-width:0;"></div>
@@ -356,17 +368,74 @@ margin-top: 5px; text-transform: uppercase; letter-spacing: 0.05em;
                 value="{{ cell.note }}" placeholder="Note interne..." maxlength="300">
             </div>
           </td>
+          {% endwith %}
           {% endfor %}
         </tr>
         {% endfor %}
-        <tr>
-          <td class="td-perm-label" colspan="2"><i class="bi bi-clock-history"></i> Permanence</td>
-          {% for val in perm_list %}
-          <td class="td-perm">
-            <input type="text" name="perm_{{ forloop.counter0 }}" value="{{ val }}" class="perm-input"
-              autocomplete="off" placeholder="Nom…">
+        {% for row in perm_rows %}
+        <tr class="perm-row" data-index="{{ forloop.counter0 }}">
+          {% if forloop.first %}
+          <td class="td-perm-label" rowspan="{{ perm_rows|length }}"><i class="bi bi-clock-history"></i> Permanence</td>
+          {% endif %}
+          <td class="td-shift">
+            <input type="text" name="perm_creneau_{{ forloop.counter0 }}" value="{{ row.creneau.libelle }}"
+              class="perm-creneau-input" autocomplete="off" placeholder="Ex : 18h-08h">
+            <button type="button" class="perm-row-remove" title="Retirer ce créneau"><i class="bi bi-x-lg"></i></button>
           </td>
+          {% for cell in row.cells %}
+          {% with ferie=jours_feries|get_item:forloop.counter0 %}
+          <td class="td-cell td-perm{% if ferie %} td-cell-ferie{% endif %}" data-plage="perm-{{ forloop.parentloop.counter0 }}" data-jour="{{ forloop.counter0 }}" data-code="perm-{{ forloop.parentloop.counter0 }}">
+            <div style="display:flex;align-items:flex-start;gap:2px;">
+              <div class="chip-display" style="flex:1;min-width:0;"></div>
+              <button type="button" class="note-btn{% if cell.note %} note-btn-active{% endif %}"
+                title="{% if cell.note %}{{ cell.note }}{% else %}Ajouter une note{% endif %}">
+                <i class="bi bi-sticky{% if cell.note %}-fill{% endif %}"></i>
+              </button>
+            </div>
+            <input type="hidden" name="perm_{{ forloop.parentloop.counter0 }}_{{ forloop.counter0 }}" value="{{ cell.value }}" class="grid-input"
+              data-plage="perm-{{ forloop.parentloop.counter0 }}" data-jour="{{ forloop.counter0 }}" data-code="perm-{{ forloop.parentloop.counter0 }}">
+            <div class="note-wrap{% if cell.note %} note-wrap-open{% endif %}">
+              <input type="text" name="perm_note_{{ forloop.parentloop.counter0 }}_{{ forloop.counter0 }}" class="note-input"
+                value="{{ cell.note }}" placeholder="Note interne..." maxlength="300">
+            </div>
+          </td>
+          {% endwith %}
           {% endfor %}
+        </tr>
+        {% empty %}
+        <tr class="perm-row" data-index="0">
+          <td class="td-perm-label"><i class="bi bi-clock-history"></i> Permanence</td>
+          <td class="td-shift">
+            <input type="text" name="perm_creneau_0" value="" class="perm-creneau-input"
+              autocomplete="off" placeholder="Ex : 18h-08h">
+            <button type="button" class="perm-row-remove" title="Retirer ce créneau"><i class="bi bi-x-lg"></i></button>
+          </td>
+          {% for j in "012345" %}
+          {% with ferie=jours_feries|get_item:forloop.counter0 %}
+          <td class="td-cell td-perm{% if ferie %} td-cell-ferie{% endif %}" data-plage="perm-0" data-jour="{{ forloop.counter0 }}" data-code="perm-0">
+            <div style="display:flex;align-items:flex-start;gap:2px;">
+              <div class="chip-display" style="flex:1;min-width:0;"></div>
+              <button type="button" class="note-btn" title="Ajouter une note">
+                <i class="bi bi-sticky"></i>
+              </button>
+            </div>
+            <input type="hidden" name="perm_0_{{ forloop.counter0 }}" value="" class="grid-input"
+              data-plage="perm-0" data-jour="{{ forloop.counter0 }}" data-code="perm-0">
+            <div class="note-wrap">
+              <input type="text" name="perm_note_0_{{ forloop.counter0 }}" class="note-input"
+                value="" placeholder="Note interne..." maxlength="300">
+            </div>
+          </td>
+          {% endwith %}
+          {% endfor %}
+        </tr>
+        {% endfor %}
+        <tr class="perm-add-row">
+          <td colspan="8">
+            <button type="button" id="addPermRow" class="btn-outline-sm">
+              <i class="bi bi-plus-lg"></i> Ajouter un créneau de permanence
+            </button>
+          </td>
         </tr>
       </tbody>
     </table>
@@ -386,77 +455,12 @@ margin-top: 5px; text-transform: uppercase; letter-spacing: 0.05em;
       <button type="submit" class="btn-primary">
         <i class="bi bi-floppy"></i> Enregistrer
       </button>
-      <button type="button" class="btn-gabarit" onclick="openGabaritSave()">
-        <i class="bi bi-layout-text-window"></i> Enregistrer comme gabarit
-      </button>
-      {% if gabarits %}
-      <button type="button" class="btn-gabarit" onclick="openGabaritApply()">
-        <i class="bi bi-download"></i> Appliquer un gabarit
-      </button>
-      {% endif %}
       <a href="{% url 'planning_detail' planning.pk %}" class="btn-cancel">
         <i class="bi bi-x-lg"></i> Annuler
       </a>
     </div>
   </div>
 </form>
-
-<!-- Modal : Enregistrer comme gabarit -->
-<div class="pl-modal-overlay" id="gabaritSaveModal">
-  <div class="pl-modal">
-    <h3><i class="bi bi-layout-text-window" style="color:var(--accent-text-soft);margin-right:6px;"></i>Enregistrer comme gabarit
-    </h3>
-    <form method="post" action="{% url 'planning_gabarit_sauvegarder' planning.pk %}">
-      {% csrf_token %}
-      <label for="gabarit_nom">Nom du gabarit</label>
-      <input type="text" id="gabarit_nom" name="nom" required placeholder="Ex : Rotation standard, Planning été..."
-        style="width:100%;padding:8px 4px;border:none;border-bottom:1px solid rgba(0,0,0,0.18);border-radius:0;
-                    font-size:13px;background:transparent;color:var(--text);box-sizing:border-box;
-                    margin-bottom:18px;outline:none;">
-      <div class="pl-modal-actions">
-        <button type="button" onclick="closeModal('gabaritSaveModal')" style="border:1px solid var(--border);color:var(--text-muted);background:transparent;
-                       border-radius:6px;padding:8px 14px;font-size:13px;cursor:pointer;">
-          Annuler
-        </button>
-        <button type="submit" class="btn-primary">
-          <i class="bi bi-floppy"></i> Enregistrer
-        </button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- Modal : Appliquer un gabarit -->
-<div class="pl-modal-overlay" id="gabaritApplyModal">
-  <div class="pl-modal" style="max-width:440px;">
-    <h3><i class="bi bi-download" style="color:var(--accent-text-soft);margin-right:6px;"></i>Appliquer un gabarit</h3>
-    <p style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">
-      Le contenu actuel du planning sera remplacé par celui du gabarit.
-    </p>
-    <form method="post" action="{% url 'planning_gabarit_appliquer' planning.pk %}"
-      onsubmit="return confirm('Remplacer tout le contenu du planning par le gabarit sélectionné ?')">
-      {% csrf_token %}
-      <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;
-                    margin-bottom:5px;text-transform:uppercase;letter-spacing:0.04em;">Gabarit</label>
-      <select name="gabarit_pk" required style="width:100%;padding:8px 4px;border:none;border-bottom:1px solid rgba(0,0,0,0.18);border-radius:0;
-                     font-size:13px;background:transparent;color:var(--text);box-sizing:border-box;
-                     margin-bottom:18px;outline:none;">
-        {% for g in gabarits %}
-        <option value="{{ g.pk }}">{{ g.nom }} — {{ g.cree_le|date:"d/m/Y" }}</option>
-        {% endfor %}
-      </select>
-      <div class="pl-modal-actions">
-        <button type="button" onclick="closeModal('gabaritApplyModal')" style="border:1px solid var(--border);color:var(--text-muted);background:transparent;
-                       border-radius:6px;padding:8px 14px;font-size:13px;cursor:pointer;">
-          Annuler
-        </button>
-        <button type="submit" class="btn-primary">
-          <i class="bi bi-download"></i> Appliquer
-        </button>
-      </div>
-    </form>
-  </div>
-</div>
 
 <!-- Modale sélection médecin -->
 <div class="med-overlay" id="medOverlay">
@@ -706,48 +710,55 @@ margin-top: 5px; text-transform: uppercase; letter-spacing: 0.05em;
   function refreshAllChips(inputs) {
     inputs.forEach(function (i) { var td = i.closest('.td-cell'); if (td) renderChips(td); });
   }
+  // Un jour férié est verrouillé : jamais de cible pour un remplissage/vidage
+  // groupé, même déclenché depuis une case non verrouillée de la même ligne/colonne.
+  function excludeFerie(inputs) {
+    return inputs.filter(function (i) {
+      var td = i.closest('.td-cell');
+      return !td || !td.classList.contains('td-cell-ferie');
+    });
+  }
   function ctxFillRow() {
     if (!ctxTarget) return;
     const val = ctxTarget.value.trim();
-    const inputs = Array.from(document.querySelectorAll(`.grid-input[data-plage="${ctxTarget.dataset.plage}"]`));
+    const inputs = excludeFerie(Array.from(document.querySelectorAll(`.grid-input[data-plage="${ctxTarget.dataset.plage}"]`)));
     inputs.forEach(i => i.value = val);
     ctxMenu.classList.remove('open'); checkConflicts(); refreshAllChips(inputs);
   }
   function ctxFillCol() {
     if (!ctxTarget) return;
     const val = ctxTarget.value.trim();
-    const inputs = Array.from(document.querySelectorAll(`.grid-input[data-jour="${ctxTarget.dataset.jour}"][data-code="${ctxTarget.dataset.code}"]`));
+    const inputs = excludeFerie(Array.from(document.querySelectorAll(`.grid-input[data-jour="${ctxTarget.dataset.jour}"][data-code="${ctxTarget.dataset.code}"]`)));
     inputs.forEach(i => i.value = val);
     ctxMenu.classList.remove('open'); checkConflicts(); refreshAllChips(inputs);
   }
   function ctxClearRow() {
     if (!ctxTarget) return;
-    const inputs = Array.from(document.querySelectorAll(`.grid-input[data-plage="${ctxTarget.dataset.plage}"]`));
+    const inputs = excludeFerie(Array.from(document.querySelectorAll(`.grid-input[data-plage="${ctxTarget.dataset.plage}"]`)));
     inputs.forEach(i => i.value = '');
     ctxMenu.classList.remove('open'); checkConflicts(); refreshAllChips(inputs);
   }
   function ctxClearCol() {
     if (!ctxTarget) return;
-    const inputs = Array.from(document.querySelectorAll(`.grid-input[data-jour="${ctxTarget.dataset.jour}"][data-code="${ctxTarget.dataset.code}"]`));
+    const inputs = excludeFerie(Array.from(document.querySelectorAll(`.grid-input[data-jour="${ctxTarget.dataset.jour}"][data-code="${ctxTarget.dataset.code}"]`)));
     inputs.forEach(i => i.value = '');
     ctxMenu.classList.remove('open'); checkConflicts(); refreshAllChips(inputs);
   }
 
   // ── Notes par cellule ─────────────────────────────────────────────────────────
-  document.querySelectorAll('.note-btn').forEach(btn => {
+  function wireNoteCell(td) {
+    var btn = td.querySelector('.note-btn');
+    var inp = td.querySelector('.note-input');
+    if (!btn || !inp || btn.dataset.wired) return;
+    btn.dataset.wired = '1';
     btn.addEventListener('click', () => {
-      const td = btn.closest('.td-cell');
       const noteWrap = td.querySelector('.note-wrap');
       noteWrap.classList.toggle('note-wrap-open');
       if (noteWrap.classList.contains('note-wrap-open')) {
         noteWrap.querySelector('.note-input').focus();
       }
     });
-  });
-
-  document.querySelectorAll('.note-input').forEach(inp => {
     inp.addEventListener('input', () => {
-      const btn = inp.closest('.td-cell').querySelector('.note-btn');
       const icon = btn.querySelector('i');
       if (inp.value.trim()) {
         btn.classList.add('note-btn-active');
@@ -759,16 +770,103 @@ margin-top: 5px; text-transform: uppercase; letter-spacing: 0.05em;
         icon.className = 'bi bi-sticky';
       }
     });
-  });
+  }
+  document.querySelectorAll('.td-cell').forEach(wireNoteCell);
 
-  // ── Modales gabarits ──────────────────────────────────────────────────────────
-  function openGabaritSave() { document.getElementById('gabaritSaveModal').classList.add('open'); }
-  function openGabaritApply() { document.getElementById('gabaritApplyModal').classList.add('open'); }
-  function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+  // ── Créneaux de permanence : ajouter / retirer une ligne ──────────────────
+  (function () {
+    var tbody = document.querySelector('#planningTable tbody');
+    var addBtn = document.getElementById('addPermRow');
+    if (!tbody || !addBtn) return;
 
-  ['gabaritSaveModal', 'gabaritApplyModal'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.addEventListener('click', e => { if (e.target === el) closeModal(id); });
-  });
+    function permRows() {
+      return Array.from(tbody.querySelectorAll('.perm-row'));
+    }
+
+    // Sélection d'un médecin + note + clic droit copier/vider, comme la grille principale.
+    function wireCell(td) {
+      if (td.dataset.wired) return;
+      td.dataset.wired = '1';
+      renderChips(td);
+      wireNoteCell(td);
+      td.addEventListener('contextmenu', function (e) {
+        var inp = td.querySelector('.grid-input');
+        if (!inp) return;
+        e.preventDefault();
+        ctxTarget = inp;
+        ctxMenu.style.left = Math.min(e.clientX, window.innerWidth - 210) + 'px';
+        ctxMenu.style.top = Math.min(e.clientY, window.innerHeight - 160) + 'px';
+        ctxMenu.classList.add('open');
+      });
+    }
+
+    function renumber() {
+      var rows = permRows();
+      rows.forEach(function (row, idx) {
+        row.dataset.index = idx;
+        var creneauInput = row.querySelector('.perm-creneau-input');
+        creneauInput.name = 'perm_creneau_' + idx;
+        row.querySelectorAll('.td-cell').forEach(function (td, j) {
+          td.dataset.plage = 'perm-' + idx;
+          td.dataset.code  = 'perm-' + idx;
+          var inp = td.querySelector('.grid-input');
+          inp.name = 'perm_' + idx + '_' + j;
+          inp.dataset.plage = 'perm-' + idx;
+          inp.dataset.code  = 'perm-' + idx;
+          wireCell(td);
+        });
+        var label = row.querySelector('.td-perm-label');
+        if (label) label.remove();
+      });
+      // Une seule cellule « Permanence », fusionnée sur toutes les lignes.
+      var firstCell = rows[0].querySelector('.td-shift');
+      var label = document.createElement('td');
+      label.className = 'td-perm-label';
+      label.rowSpan = rows.length;
+      label.innerHTML = '<i class="bi bi-clock-history"></i> Permanence';
+      rows[0].insertBefore(label, firstCell);
+    }
+
+    addBtn.addEventListener('click', function () {
+      var rows = permRows();
+      var template = rows[rows.length - 1];
+      var newRow = template.cloneNode(true);
+      newRow.querySelectorAll('input').forEach(function (input) { input.value = ''; });
+      newRow.querySelectorAll('.chip-display').forEach(function (d) { d.innerHTML = ''; });
+      newRow.querySelectorAll('.td-cell').forEach(function (td) { delete td.dataset.wired; });
+      newRow.querySelectorAll('.note-wrap').forEach(function (w) { w.classList.remove('note-wrap-open'); });
+      newRow.querySelectorAll('.note-btn').forEach(function (b) {
+        delete b.dataset.wired;
+        b.classList.remove('note-btn-active');
+        b.title = 'Ajouter une note';
+        b.querySelector('i').className = 'bi bi-sticky';
+      });
+      var label = newRow.querySelector('.td-perm-label');
+      if (label) label.remove();
+      tbody.insertBefore(newRow, document.querySelector('.perm-add-row'));
+      wireRemoveButton(newRow.querySelector('.perm-row-remove'));
+      renumber();
+    });
+
+    function wireRemoveButton(btn) {
+      btn.addEventListener('click', function () {
+        var rows = permRows();
+        if (rows.length <= 1) {
+          // Dernière ligne : on la vide plutôt que de la retirer (il faut
+          // garder au moins une ligne pour la cellule « Permanence »).
+          rows[0].querySelectorAll('input').forEach(function (input) { input.value = ''; });
+          rows[0].querySelectorAll('.td-cell').forEach(function (td) { renderChips(td); });
+          return;
+        }
+        btn.closest('.perm-row').remove();
+        renumber();
+      });
+    }
+
+    permRows().forEach(function (row) {
+      wireRemoveButton(row.querySelector('.perm-row-remove'));
+      row.querySelectorAll('.td-cell').forEach(wireCell);
+    });
+  })();
 </script>
 {% endblock %}

@@ -59,7 +59,7 @@ class PlanningHebdomadaireAdmin(admin.ModelAdmin):
 
 @admin.register(PlanningConfig)
 class PlanningConfigAdmin(admin.ModelAdmin):
-    list_display = ['fonction_signataire', 'medecin_defaut']
+    list_display = ['medecin_defaut']
 
     def has_add_permission(self, request):
         # Singleton (PlanningConfig.get() ne crée que pk=1) — pas d'ajout d'une 2e ligne.
@@ -68,5 +68,5 @@ class PlanningConfigAdmin(admin.ModelAdmin):
 
 @admin.register(MedecinSignataire)
 class MedecinSignataireAdmin(admin.ModelAdmin):
-    list_display = ['nom', 'actif', 'ordre']
-    list_editable = ['actif', 'ordre']
+    list_display = ['nom', 'fonction', 'actif', 'ordre']
+    list_editable = ['fonction', 'actif', 'ordre']
