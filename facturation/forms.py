@@ -21,6 +21,12 @@ class FactureForm(forms.ModelForm):
         for field in self.fields.values():
             field.widget.attrs.setdefault('class', 'field-ul')
         self.fields['date_echeance'].widget.format = '%Y-%m-%d'
+        # Le type se déduit des lignes (Facture.appliquer_type_deduit) : le
+        # champ reste affiché, pour information, mais ce que poste le navigateur
+        # est ignoré. `disabled` est fait pour ça — Django reprend la valeur de
+        # l'instance et ne regarde pas le POST.
+        if 'type_facture' in self.fields:
+            self.fields['type_facture'].disabled = True
         if 'type_facture' in self.fields:
             self.fields['type_facture'].widget.attrs['autocomplete'] = 'off'
         if not is_admin:

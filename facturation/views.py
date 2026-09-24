@@ -223,6 +223,10 @@ def facture_create(request):
 
             total = _save_lignes(facture, request.POST)
             facture.montant_total = total
+            # Le type suit ce qu'on a mis dedans : une seule nature donne ce
+            # type, plusieurs donnent « Mixte ». Le caissier n'a plus à y
+            # toucher, et ne peut plus se tromper.
+            facture.appliquer_type_deduit(save=False)
             facture.save()
 
             if demande_obj:
@@ -263,6 +267,7 @@ def facture_create(request):
                 'prix':    request.POST.get(f'ligne_prix_{_i}', 0),
                 'qte':     request.POST.get(f'ligne_qte_{_i}', 1),
                 'remise':  request.POST.get(f'ligne_remise_{_i}', 0),
+                'article_id': request.POST.get(f'ligne_service_{_i}', ''),
             })
             _i += 1
         if _post_lignes:
@@ -474,6 +479,7 @@ def facture_edit(request, pk):
             facture.lignes.all().delete()
             total = _save_lignes(facture, request.POST)
             facture.montant_total = total
+            facture.appliquer_type_deduit(save=False)
             facture.save()
             _sync_lignes_demande_examen(facture)
             log_event(facture, request.user, 'Facture mise à jour.', type='modif')
@@ -488,6 +494,9 @@ def facture_edit(request, pk):
             'qte':     float(l.quantite),
             'prix':    float(l.prix_unitaire),
             'remise':  float(l.remise),
+            # Sans lui, rouvrir une facture puis l'enregistrer perdrait le lien
+            # vers l'article — et donc la nature de chaque ligne.
+            'article_id': l.article_id or '',
         }
         for l in facture.lignes.all()
     ]
@@ -614,6 +623,15 @@ def _save_lignes(facture, POST):
                 try:
                     ligne.acte_id = int(acte_id)
                 except ValueError:
+                    pass
+            # L'article du catalogue, d'où se déduira le type de la facture.
+            # Absent d'une ligne tapée à la main : elle ne comptera alors pour
+            # aucune nature, plutôt que d'en deviner une d'après son libellé.
+            article_id = POST.get(f'ligne_service_{i}')
+            if article_id:
+                try:
+                    ligne.article_id = int(article_id)
+                except (TypeError, ValueError):
                     pass
             ligne.save()
             total += qte * prix * (1 - remise / 100)

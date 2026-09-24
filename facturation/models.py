@@ -15,9 +15,33 @@ class Acte(models.Model):
     class Meta: verbose_name = "Acte médical"
 
 
+#: Catégorie d'article (services.CategorieArticle.code) → type de facture.
+#: Cette table vivait en JavaScript dans templates/facturation/create_facture.html,
+#: où elle servait à interdire les lignes d'une autre nature. Elle sert
+#: maintenant à l'inverse : toutes les lignes sont permises, et c'est le type de
+#: la facture qui se déduit de ce qu'on y a mis.
+#:
+#: `AE` (Autres examens) et `EG` (Électrocardiogramme) apparaissaient des deux
+#: côtés dans l'ancienne table ; il a fallu trancher — au laboratoire pour le
+#: premier, à l'imagerie pour le second.
+CATEGORIE_VERS_TYPE = {
+    'CS':   'consultation',
+    'SN':   'soins',
+    'VC':   'soins',
+    'MO':   'hospitalisation',
+    'MT':   'hospitalisation',
+    'MD':   'pharmacie',
+    'EX':   'laboratoire',
+    'AE':   'laboratoire',
+    'EG':   'imagerie',
+    'EC':   'imagerie',
+    'RD':   'imagerie',
+}
+
+
 class Facture(ModeleCentre):
     STATUT = [('brouillon','Brouillon'),('emise','Émise'),('payee','Payée'),('annulee','Annulée')]
-    TYPE = [('consultation','Consultation'),('soins','Soins'),('hospitalisation','Hospitalisation'),('pharmacie','Pharmacie'),('laboratoire','Laboratoire'),('imagerie','Imagerie'),('autre','Autre')]
+    TYPE = [('consultation','Consultation'),('soins','Soins'),('hospitalisation','Hospitalisation'),('pharmacie','Pharmacie'),('laboratoire','Laboratoire'),('imagerie','Imagerie'),('mixte','Mixte'),('autre','Autre')]
 
     numero = models.CharField(max_length=20, unique=True, editable=False)
     patient = models.ForeignKey('patients.Patient', on_delete=models.CASCADE, related_name='factures')
@@ -72,6 +96,45 @@ class Facture(ModeleCentre):
             self.save(update_fields=['montant_total'])
         return self.montant_total
 
+    def types_des_lignes(self):
+        """Natures distinctes présentes dans les lignes, dans l'ordre de `TYPE`.
+
+        Une ligne sans article — saisie à la main, ou enregistrée avant que le
+        lien soit posé — ne compte pour aucune nature : on ne sait pas ce
+        qu'elle est, et la deviner d'après son libellé serait un pari.
+        """
+        vus = set()
+        for ligne in self.lignes.select_related('article__categorie'):
+            article = ligne.article
+            code = article.categorie.code if article and article.categorie_id else None
+            type_ = CATEGORIE_VERS_TYPE.get(code)
+            if type_:
+                vus.add(type_)
+        ordre = [code for code, _ in self.TYPE]
+        return [t for t in ordre if t in vus]
+
+    def deduire_type(self):
+        """Type déduit du contenu, ou None s'il n'y a rien pour trancher.
+
+        Une seule nature donne ce type, plusieurs donnent « Mixte ». None quand
+        aucune ligne ne porte d'article : le type déjà posé est alors conservé
+        plutôt que remplacé par une valeur inventée.
+        """
+        types = self.types_des_lignes()
+        if not types:
+            return None
+        return types[0] if len(types) == 1 else 'mixte'
+
+    def appliquer_type_deduit(self, save=True):
+        """Aligne `type_facture` sur le contenu. Sans effet si rien ne le dit."""
+        type_ = self.deduire_type()
+        if type_ is None or type_ == self.type_facture:
+            return self.type_facture
+        self.type_facture = type_
+        if save:
+            self.save(update_fields=['type_facture'])
+        return type_
+
     def __str__(self): return f"Facture {self.numero}"
     class Meta(ModeleCentre.Meta):
         verbose_name = "Facture"
@@ -85,6 +148,14 @@ class LigneFacture(models.Model):
     facture = models.ForeignKey(Facture, on_delete=models.CASCADE, related_name='lignes')
     acte = models.ForeignKey(Acte, on_delete=models.SET_NULL, null=True, blank=True)
     medicament = models.ForeignKey('pharmacie.Medicament', on_delete=models.SET_NULL, null=True, blank=True)
+    # L'article du catalogue d'où vient la ligne. Le formulaire n'enregistrait
+    # que son nom : la catégorie, connue à l'écran et servant à filtrer, était
+    # jetée à la sauvegarde. Sans elle, impossible de dire de quelle nature est
+    # une ligne — donc impossible d'en déduire le type de la facture.
+    # Nul sur les lignes d'avant ce champ, et sur celles saisies à la main.
+    article = models.ForeignKey(
+        'services.Articleservice', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='lignes_facture', verbose_name="Article")
     libelle = models.CharField(max_length=300)
     quantite = models.DecimalField(max_digits=10, decimal_places=2, default=1)
     prix_unitaire = models.DecimalField(max_digits=12, decimal_places=2)

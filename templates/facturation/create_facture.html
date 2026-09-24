@@ -601,6 +601,10 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
                                 </div>
                                 <input type="hidden" name="ligne_libelle_{{ forloop.counter0 }}"
                                        class="svc-hidden" value="{{ ligne.libelle }}">
+                                {% comment %}L'article d'où vient la ligne : c'est lui qui
+                                donne sa nature, et donc le type de la facture.{% endcomment %}
+                                <input type="hidden" name="ligne_service_{{ forloop.counter0 }}"
+                                       class="svc-pk" value="{{ ligne.article_id|default:'' }}">
                                 <div class="svc-dropdown"></div>
                             </div>
                         </td>
@@ -631,6 +635,7 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
                             </div>
                             <input type="hidden" name="ligne_libelle_0"
                                    class="svc-hidden" value="{{ initial_ligne_libelle }}">
+                            <input type="hidden" name="ligne_service_0" class="svc-pk" value="">
                             <div class="svc-dropdown"></div>
                         </div>
                     </td>
@@ -813,33 +818,18 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
 
     /* ── Données services (sérialisées depuis Django) ── */
     var _SERVICES = [
-        {% for svc in services %}{ nom: "{{ svc.nom|escapejs }}", prix: {{ svc.prix_vente }}, cat: "{{ svc.categorie.code|default:'' }}" },
+        {% for svc in services %}{ pk: {{ svc.pk }}, nom: "{{ svc.nom|escapejs }}", prix: {{ svc.prix_vente }} },
         {% endfor %}
     ];
 
-    /* Mapping type_facture → codes catégories autorisés (null = tout afficher) */
-    var _TYPE_CATS = {
-        'consultation':    ['CS'],
-        'soins':           ['SN', 'AE', 'AP', 'VC'],
-        'hospitalisation': ['MO', 'MT', 'SN', 'AP'],
-        'pharmacie':       ['MD', 'AP'],
-        'laboratoire':     ['EX', 'AE', 'EG'],
-        'imagerie':        ['EC', 'RD', 'EG'],
-    };
-
-    function getActiveCategories() {
-        var sel = document.getElementById('id_type_facture');
-        var type = sel ? sel.value : '';
-        return _TYPE_CATS[type] || null; /* null = tout */
-    }
-
+    /* Le type de facture ne restreint plus les désignations. Il décidait avant
+       de ce qu'on avait le droit de mettre — une facture « Consultation » ne
+       proposait que les actes `CS` —, ce qui interdisait en pratique la moindre
+       facture mixte. C'est l'inverse maintenant : on met ce qu'on veut, et le
+       type se déduit du contenu à l'enregistrement (Facture.deduire_type). */
     function getFilteredServices(q, currentVal) {
-        var allowedCats = getActiveCategories();
-        var base = allowedCats
-            ? _SERVICES.filter(function(s) { return allowedCats.indexOf(s.cat) !== -1; })
-            : _SERVICES;
-        if (!q || q === currentVal) return base;
-        return base.filter(function(s) {
+        if (!q || q === currentVal) return _SERVICES;
+        return _SERVICES.filter(function(s) {
             return s.nom.toLowerCase().indexOf(q.toLowerCase()) !== -1;
         });
     }
@@ -895,6 +885,7 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
         var idx      = parseInt(wrapper.dataset.idx, 10);
         var input    = wrapper.querySelector('.svc-input');
         var hidden   = wrapper.querySelector('.svc-hidden');
+        var hiddenPk = wrapper.querySelector('.svc-pk');
         var dropdown = wrapper.querySelector('.svc-dropdown');
 
         function positionDropdown() {
@@ -914,7 +905,7 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
                 dropdown.innerHTML = list.map(function (s) {
                     var sel = s.nom === current ? ' is-selected' : '';
                     return '<div class="svc-opt' + sel + '" data-nom="' + s.nom.replace(/"/g, '&quot;') +
-                           '" data-prix="' + s.prix + '">' + s.nom + '</div>';
+                           '" data-prix="' + s.prix + '" data-pk="' + s.pk + '">' + s.nom + '</div>';
                 }).join('');
             }
             positionDropdown();
@@ -923,9 +914,10 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
 
         var _justSelected = false;
 
-        function selectService(nom, prix) {
+        function selectService(nom, prix, pk) {
             _justSelected = true;
             hidden.value = nom;
+            if (hiddenPk) hiddenPk.value = pk || '';
             input.value  = nom;
             wrapper.classList.add('svc-preloaded');
             var prixInput = document.querySelector('[name="ligne_prix_' + idx + '"]');
@@ -939,6 +931,9 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
         input.addEventListener('input', function () {
             wrapper.classList.remove('svc-preloaded');
             hidden.value = '';
+            /* Le caissier tape son propre libellé : la ligne n'est plus celle
+               d'un article du catalogue, et ne compte donc pour aucune nature. */
+            if (hiddenPk) hiddenPk.value = '';
             render(input.value);
             updateSaveButtonState();
         });
@@ -950,7 +945,7 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
             e.preventDefault();
             var opt = e.target.closest('.svc-opt');
             if (!opt) return;
-            selectService(opt.dataset.nom, opt.dataset.prix || 0);
+            selectService(opt.dataset.nom, opt.dataset.prix || 0, opt.dataset.pk || '');
             close();
         });
 
@@ -965,6 +960,7 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
         if (hidden.value) {
             var initSvc = _SERVICES.find(function (s) { return s.nom === hidden.value; });
             if (initSvc) {
+                if (hiddenPk && !hiddenPk.value) hiddenPk.value = initSvc.pk;
                 var prixInput = document.querySelector('[name="ligne_prix_' + idx + '"]');
                 if (prixInput && (parseFloat(prixInput.value) || 0) === 0) {
                     prixInput.value = initSvc.prix;
@@ -988,6 +984,7 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
                   '<span class="svc-arrow">▼</span>' +
                 '</div>' +
                 '<input type="hidden" name="ligne_libelle_' + idx + '" class="svc-hidden">' +
+                '<input type="hidden" name="ligne_service_' + idx + '" class="svc-pk">' +
                 '<div class="svc-dropdown"></div>' +
               '</div>' +
             '</td>' +
@@ -1009,26 +1006,11 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
         }
     };
 
-    /* Réinitialiser les combos quand le type de facture change */
-    var typeSelect = document.getElementById('id_type_facture');
-    if (typeSelect) {
-        typeSelect.addEventListener('change', function() {
-            document.querySelectorAll('.svc-combo').forEach(function(combo) {
-                var idx    = parseInt(combo.dataset.idx, 10);
-                var hidden = combo.querySelector('.svc-hidden');
-                var input  = combo.querySelector('.svc-input');
-                var dd     = combo.querySelector('.svc-dropdown');
-                if (hidden) hidden.value = '';
-                if (input)  input.value  = '';
-                if (dd)     dd.style.display = 'none';
-                combo.classList.remove('svc-preloaded');
-                /* Vider aussi le prix pour éviter l'incohérence désignation vide / prix rempli */
-                var prixEl = document.querySelector('[name="ligne_prix_' + idx + '"]');
-                if (prixEl) { prixEl.value = 0; recalcRow(idx); }
-            });
-            recalcTotaux();
-        });
-    }
+    /* Le changement de type ne vide plus les lignes. Il les effaçait toutes,
+       désignations et prix compris, pour rester cohérent avec le filtre par
+       catégorie qui vient de disparaître. Le champ Type est désormais en
+       lecture seule de toute façon : il reflète le contenu, il ne le commande
+       plus. */
 
     /* Recalc when assurance/ticket change */
     var assEl = document.getElementById('{{ form.montant_assurance.id_for_label }}');

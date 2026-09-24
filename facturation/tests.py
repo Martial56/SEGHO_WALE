@@ -958,3 +958,110 @@ class TestMonnaieARendre(TestCase):
         client.login(username='u_mon_caisse', password='x')
         contenu = client.get(reverse('facturation:detail', args=[facture.pk])).content.decode()
         self.assertIn('.ts-dropdown { z-index: 10000 !important; }', contenu)
+
+
+# ─── Le type de facture se déduit du contenu ───────────────────────────────────
+
+class TestTypeDeduitDesLignes(TestCase):
+    """Une facture peut mélanger les natures, et son type suit ce qu'on y met.
+
+    L'écran de création l'interdisait : le type filtrait les désignations
+    proposées, et changer de type vidait toutes les lignes déjà saisies. Il ne
+    reste plus rien de ce filtre — c'est le type qui suit le contenu, et non
+    l'inverse.
+    """
+
+    def setUp(self):
+        self.patient = _patient('TYP')
+        self.user = User.objects.create_superuser('su_typ', password='x')
+        self.consultation = self._article('CS', 'Consultations', 'CONSULTATION ADULTE', 5000)
+        self.soin = self._article('SN', 'Soins', 'PANSEMENT', 3000)
+        self.radio = self._article('RD', 'Radiologies', 'ASP FACE', 12000)
+
+    def _article(self, code, nom_cat, nom, prix):
+        from services.models import CategorieArticle, Articleservice
+        categorie, _ = CategorieArticle.objects.get_or_create(
+            code=code, defaults={'nom': nom_cat})
+        return Articleservice.objects.create(
+            nom=nom, categorie=categorie, prix_vente=Decimal(prix))
+
+    def _creer(self, articles):
+        donnees = {'type_facture': 'consultation', 'montant_assurance': '0',
+                   'ticket_moderateur': '0', 'notes': ''}
+        for i, article in enumerate(articles):
+            donnees.update({
+                'ligne_libelle_%d' % i: article.nom,
+                'ligne_service_%d' % i: str(article.pk),
+                'ligne_qte_%d' % i: '1',
+                'ligne_prix_%d' % i: str(int(article.prix_vente)),
+                'ligne_remise_%d' % i: '0',
+            })
+        client = Client()
+        client.force_login(self.user)
+        client.post(reverse('facturation:create') + '?patient=%s' % self.patient.pk,
+                    donnees, follow=True)
+        return Facture.objects.order_by('-pk').first()
+
+    def test_une_seule_nature_donne_ce_type(self):
+        self.assertEqual(self._creer([self.consultation]).type_facture, 'consultation')
+        self.assertEqual(self._creer([self.soin]).type_facture, 'soins')
+        self.assertEqual(self._creer([self.radio]).type_facture, 'imagerie')
+
+    def test_deux_natures_donnent_mixte(self):
+        facture = self._creer([self.consultation, self.soin])
+        self.assertEqual(facture.type_facture, 'mixte')
+        self.assertEqual(facture.types_des_lignes(), ['consultation', 'soins'])
+
+    def test_plusieurs_lignes_de_la_meme_nature_ne_donnent_pas_mixte(self):
+        autre_soin = self._article('SN', 'Soins', 'SUTURE', 4000)
+        self.assertEqual(self._creer([self.soin, autre_soin]).type_facture, 'soins')
+
+    def test_le_type_poste_par_le_navigateur_est_ignore(self):
+        # Le champ est `disabled` : ce que le navigateur enverrait ne compte pas.
+        facture = self._creer([self.radio])
+        self.assertEqual(facture.type_facture, 'imagerie')
+
+    def test_une_ligne_sans_article_ne_compte_pour_aucune_nature(self):
+        # Libellé tapé à la main : on ne sait pas ce que c'est, et le deviner
+        # d'après le texte serait un pari.
+        facture = _facture(self.patient, statut='brouillon', montant_total=Decimal('0'))
+        LigneFacture.objects.create(facture=facture, libelle='Divers',
+                                    quantite=1, prix_unitaire=Decimal('1000'))
+        self.assertEqual(facture.types_des_lignes(), [])
+        self.assertIsNone(facture.deduire_type())
+
+    def test_sans_rien_pour_trancher_le_type_existant_est_conserve(self):
+        facture = _facture(self.patient, statut='brouillon', montant_total=Decimal('0'))
+        facture.type_facture = 'hospitalisation'
+        facture.save(update_fields=['type_facture'])
+        facture.appliquer_type_deduit()
+        facture.refresh_from_db()
+        self.assertEqual(facture.type_facture, 'hospitalisation')
+
+    def test_mixte_fait_partie_des_types(self):
+        self.assertIn('mixte', dict(Facture.TYPE))
+
+    def test_l_ecran_ne_filtre_plus_les_designations(self):
+        # `_TYPE_CATS` interdisait les lignes d'une autre nature ; le vidage des
+        # lignes au changement de type allait avec.
+        client = Client()
+        client.force_login(self.user)
+        contenu = client.get(
+            reverse('facturation:create') + '?patient=%s' % self.patient.pk).content.decode()
+        self.assertNotIn('_TYPE_CATS', contenu)
+        self.assertNotIn('getActiveCategories', contenu)
+
+    def test_la_ligne_transmet_l_identifiant_de_l_article(self):
+        client = Client()
+        client.force_login(self.user)
+        contenu = client.get(
+            reverse('facturation:create') + '?patient=%s' % self.patient.pk).content.decode()
+        self.assertIn('name="ligne_service_0"', contenu)
+
+    def test_rouvrir_une_facture_ne_perd_pas_la_nature_des_lignes(self):
+        facture = self._creer([self.consultation, self.soin])
+        client = Client()
+        client.force_login(self.user)
+        contenu = client.get(reverse('facturation:edit', args=[facture.pk])).content.decode()
+        for article in (self.consultation, self.soin):
+            self.assertIn('value="%d"' % article.pk, contenu)
