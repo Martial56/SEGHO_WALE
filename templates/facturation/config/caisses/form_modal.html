@@ -1,0 +1,85 @@
+{% comment %}
+Fragment injecté dans la modale partagée de configuration
+(medecins/config/includes/_config_modal.html) : l'id du formulaire et les
+classes du corps et du pied sont ceux qu'attend mdBindConfigForm.
+{% endcomment %}
+<style>
+.cfg-modes {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 14px; margin-top: 4px;
+}
+.cfg-mode {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 12.5px; color: var(--text); cursor: pointer;
+  padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px;
+  transition: border-color .12s, background .12s;
+}
+.cfg-mode:hover { border-color: var(--teal-500); background: rgba(var(--teal-500-rgb),.05); }
+.cfg-mode input { accent-color: var(--teal-600); cursor: pointer; }
+</style>
+
+<form method="post" id="mdcfgConfigForm" data-url="{{ request.path }}" novalidate>
+{% csrf_token %}
+
+<div class="mdcfg-modal-body">
+
+  <div class="form-field">
+    <label class="field-label" for="{{ form.nom.id_for_label }}">
+      Nom de la caisse <span class="required-star">*</span>
+    </label>
+    {{ form.nom }}
+    {% if form.nom.errors %}<div class="field-error">{{ form.nom.errors.0 }}</div>{% endif %}
+  </div>
+
+  <div class="form-field">
+    <label class="field-label" for="{{ form.code.id_for_label }}">
+      Code <span class="required-star">*</span>
+    </label>
+    {{ form.code }}
+    <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">
+      Identifiant court et unique, par exemple CTB1. Mis en majuscules automatiquement.
+    </div>
+    {% if form.code.errors %}<div class="field-error">{{ form.code.errors.0 }}</div>{% endif %}
+  </div>
+
+  <div class="form-field">
+    <label class="field-label">Modes de paiement acceptés</label>
+    <div class="cfg-modes">
+      {% for choix in form.modes_paiement %}
+      <label class="cfg-mode">{{ choix.tag }} {{ choix.choice_label }}</label>
+      {% endfor %}
+    </div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">
+      Seuls ces modes seront proposés à l'encaissement sur cette caisse.
+      Rien de coché : tous les modes sont acceptés.
+    </div>
+    {% if form.modes_paiement.errors %}<div class="field-error">{{ form.modes_paiement.errors.0 }}</div>{% endif %}
+  </div>
+
+  <div class="form-field">
+    <label class="field-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+      {{ form.actif }} Caisse active
+    </label>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">
+      Une caisse inactive n'est plus proposée à l'encaissement, mais les
+      paiements déjà enregistrés la gardent.
+    </div>
+    {% if form.actif.errors %}<div class="field-error">{{ form.actif.errors.0 }}</div>{% endif %}
+  </div>
+
+  {% if edit and objet %}
+  <div style="font-size:11.5px;color:var(--text-muted);border-top:1px solid var(--border);padding-top:10px;margin-top:4px;">
+    Total encaissé : <strong style="color:var(--text);">{{ objet.total_encaisse|floatformat:0 }} F</strong>
+    {% comment %}Calculé à partir des paiements, donc ni saisissable ni
+    modifiable — voir Caisse.total_encaisse.{% endcomment %}
+  </div>
+  {% endif %}
+
+</div>
+
+<div class="mdcfg-modal-footer">
+  <button type="button" class="btn-form-cancel" onclick="mdCloseConfigModal()">Annuler</button>
+  <button type="submit" class="btn-form-submit">{% if edit %}Enregistrer{% else %}Créer{% endif %}</button>
+</div>
+
+</form>

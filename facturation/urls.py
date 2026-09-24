@@ -12,4 +12,10 @@ urlpatterns = [
     path('<int:pk>/payer/', views.facture_payer, name='payer'),
     path('<int:pk>/imprimer/', views.facture_print, name='print'),
     path('<int:pk>/apercu/', views.facture_apercu, name='apercu'),
+
+    # Configuration
+    path('configuration/caisses/', views.caisses_list, name='caisses_list'),
+    path('configuration/caisses/nouvelle/', views.caisse_create, name='caisse_create'),
+    path('configuration/caisses/<int:pk>/modifier/', views.caisse_edit, name='caisse_edit'),
+    path('configuration/caisses/<int:pk>/supprimer/', views.caisse_delete, name='caisse_delete'),
 ]

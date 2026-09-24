@@ -2,10 +2,11 @@ from datetime import date, datetime as dt
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, permission_required
 from django.core.exceptions import PermissionDenied
 from django.db.models import Q, Sum
 from django.core.paginator import Paginator
+from django.http import JsonResponse
 from django.urls import reverse
 
 from .models import Facture, LigneFacture, Acte, Paiement, Caisse
@@ -276,6 +277,7 @@ def facture_create(request):
         'actes':                actes,
         'services':             services,
         'caisses':              caisses,
+        'modes_paiement':       Paiement.MODE,
         'rdv':                  rdv_obj,
         'demande':              demande_obj,
         'ordonnance':           ordonnance_obj,
@@ -291,7 +293,7 @@ def facture_create(request):
 def facture_detail(request, pk):
     facture   = get_object_or_404(Facture.objects.select_related('centre'), pk=pk)
     lignes    = facture.lignes.all()
-    paiements = facture.paiements.order_by('date_paiement') if hasattr(facture, 'paiements') else []
+    paiements = facture.paiements.select_related('caisse').order_by('date_paiement') if hasattr(facture, 'paiements') else []
     logs      = get_logs(facture)
     back_url  = request.GET.get('next', reverse('facturation:list'))
 
@@ -313,6 +315,11 @@ def facture_detail(request, pk):
         'docteur':   docteur,
         'is_admin':  request.user.is_superuser or request.user.is_staff,
         'can_manage_paiement': can_manage_paiement(request.user),
+        # La modale d'encaissement de cet écran proposait cinq journaux écrits
+        # en dur — « CAISSE ACCUEIL », « BANQUE »… — dont aucun n'existait en
+        # base. Elle lit désormais les mêmes caisses que l'écran de création.
+        'caisses':   Caisse.objects.filter(actif=True).order_by('nom'),
+        'modes_paiement': Paiement.MODE,
         'back_url':  back_url,
     })
 
@@ -346,10 +353,13 @@ def facture_payer(request, pk):
         messages.error(request, erreur)
 
     if montant is not None and facture.statut in ('brouillon', 'emise'):
+        mode = request.POST.get('pay_mode', 'especes')
         Paiement.objects.create(
             facture=facture,
             montant=montant,
-            mode_paiement=request.POST.get('pay_mode', 'especes'),
+            mode_paiement=mode,
+            caisse=_caisse_choisie(request.POST),
+            montant_recu=_montant_recu(request.POST, mode),
             reference=request.POST.get('pay_reference', ''),
             recu_par=request.user,
         )
@@ -489,6 +499,7 @@ def facture_edit(request, pk):
         'actes':         actes,
         'services':      services,
         'caisses':       caisses,
+        'modes_paiement': Paiement.MODE,
         'initial_lignes': initial_lignes,
         'is_admin':      is_admin,
         'edit':          True,
@@ -505,6 +516,43 @@ def _parse_float(value, default=0):
         return float(value)
     except (TypeError, ValueError):
         return default
+
+
+def _caisse_choisie(POST):
+    """Caisse désignée par le champ « Journal » de l'écran d'encaissement.
+
+    Tolérante à dessein : un identifiant vide, illisible ou pointant sur une
+    caisse supprimée rend None, et le paiement s'enregistre quand même sans
+    caisse. Perdre un encaissement parce qu'un journal a été désactivé entre
+    l'affichage du formulaire et sa validation serait pire que de l'ignorer.
+    """
+    brut = (POST.get('pay_journal') or '').strip()
+    if not brut:
+        return None
+    try:
+        return Caisse.objects.filter(pk=int(brut)).first()
+    except (TypeError, ValueError):
+        return None
+
+
+def _montant_recu(POST, mode):
+    """Ce que le patient a tendu, pour en déduire la monnaie à rendre.
+
+    Seulement en espèces : ailleurs le compte est juste par construction, et un
+    champ resté rempli d'un mode précédent fausserait le reçu. Une saisie
+    illisible ou négative est ignorée plutôt que refusée — l'encaissement compte
+    plus que cette information d'appoint.
+    """
+    if mode != 'especes':
+        return None
+    brut = (POST.get('pay_recu') or '').strip()
+    if not brut:
+        return None
+    try:
+        valeur = float(brut)
+    except (TypeError, ValueError):
+        return None
+    return valeur if valeur >= 0 else None
 
 
 def _montant_paiement(brut, facture):
@@ -608,13 +656,17 @@ def _handle_paiement(facture, POST, user, total):
 
     mode      = POST.get('pay_mode', 'especes')
     memo      = POST.get('pay_memo', '')
-    compte    = POST.get('pay_compte', '')
-    reference = compte if compte else memo
+    # `pay_compte` (« compte bancaire du bénéficiaire ») a été retiré de l'écran :
+    # sa liste n'a jamais contenu la moindre option, donc la référence retombait
+    # déjà toujours sur le mémo.
+    reference = memo
 
     Paiement.objects.create(
         facture=facture,
         montant=pay_montant,
         mode_paiement=mode,
+        caisse=_caisse_choisie(POST),
+        montant_recu=_montant_recu(POST, mode),
         reference=reference,
         notes=memo,
         recu_par=user,
@@ -630,3 +682,92 @@ def _handle_paiement(facture, POST, user, total):
     log_event(facture, user, f'Paiement de {int(pay_montant):,} FCFA enregistré.', type='modif')
     demarrer_soin_de_facture(facture)
     return facture
+
+
+# ─── Configuration : les caisses (journaux d'encaissement) ────────────────────
+#
+# Venait de l'application `caisse`, supprimée : elle ne savait rien faire de
+# plus qu'afficher une liste figée. La création et la modification passent par
+# la modale partagée de configuration, comme dans hospitalisation et medecins —
+# les gabarits pleine page restent le repli quand on ouvre l'URL directement.
+
+_CAISSE_TPL_PAGE  = 'facturation/config/caisses/form.html'
+_CAISSE_TPL_MODAL = 'facturation/config/caisses/form_modal.html'
+
+
+def _est_ajax(request):
+    return request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
+
+@login_required(login_url='login')
+@permission_required('facturation.view_caisse', raise_exception=True)
+def caisses_list(request):
+    q = request.GET.get('q', '').strip()
+    # `total` annoté ici plutôt que via la propriété `Caisse.total_encaisse` :
+    # celle-ci ferait une requête par ligne du tableau.
+    # `order_by` explicite : le GROUP BY ajouté par l'annotation fait tomber
+    # l'ordre déclaré dans Meta, et la pagination avertit alors sur une liste
+    # non triée.
+    qs = Caisse.objects.annotate(total=Sum('paiements__montant')).order_by('nom')
+    if q:
+        qs = qs.filter(Q(nom__icontains=q) | Q(code__icontains=q))
+    page_obj = Paginator(qs, 25).get_page(request.GET.get('page', 1))
+    return render(request, 'facturation/config/caisses/list.html', {
+        'page_obj': page_obj,
+        'q': q,
+    })
+
+
+@login_required(login_url='login')
+@permission_required('facturation.add_caisse', raise_exception=True)
+def caisse_create(request):
+    from .forms import CaisseForm
+    ajax = _est_ajax(request)
+    if request.method == 'POST':
+        form = CaisseForm(request.POST)
+        if form.is_valid():
+            caisse = form.save()
+            if ajax:
+                return JsonResponse({'ok': True, 'message': 'Caisse « %s » créée.' % caisse.nom})
+            messages.success(request, 'Caisse « %s » créée.' % caisse.nom)
+            return redirect('facturation:caisses_list')
+    else:
+        form = CaisseForm()
+    return render(request, _CAISSE_TPL_MODAL if ajax else _CAISSE_TPL_PAGE, {
+        'form': form, 'titre': 'Nouvelle caisse', 'edit': False,
+    })
+
+
+@login_required(login_url='login')
+@permission_required('facturation.change_caisse', raise_exception=True)
+def caisse_edit(request, pk):
+    from .forms import CaisseForm
+    caisse = get_object_or_404(Caisse, pk=pk)
+    ajax = _est_ajax(request)
+    if request.method == 'POST':
+        form = CaisseForm(request.POST, instance=caisse)
+        if form.is_valid():
+            form.save()
+            if ajax:
+                return JsonResponse({'ok': True, 'message': 'Caisse « %s » modifiée.' % caisse.nom})
+            messages.success(request, 'Caisse « %s » modifiée.' % caisse.nom)
+            return redirect('facturation:caisses_list')
+    else:
+        form = CaisseForm(instance=caisse)
+    return render(request, _CAISSE_TPL_MODAL if ajax else _CAISSE_TPL_PAGE, {
+        'form': form, 'titre': 'Modifier la caisse', 'edit': True, 'objet': caisse,
+    })
+
+
+@login_required(login_url='login')
+@permission_required('facturation.delete_caisse', raise_exception=True)
+def caisse_delete(request, pk):
+    caisse = get_object_or_404(Caisse, pk=pk)
+    if request.method != 'POST':
+        return redirect('facturation:caisses_list')
+    nom = caisse.nom
+    caisse.delete()
+    if _est_ajax(request):
+        return JsonResponse({'ok': True, 'message': 'Caisse « %s » supprimée.' % nom})
+    messages.success(request, 'Caisse « %s » supprimée.' % nom)
+    return redirect('facturation:caisses_list')

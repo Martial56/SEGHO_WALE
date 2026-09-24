@@ -696,18 +696,32 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
 
         <!-- Grille champs -->
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:18px 32px;">
-
             <div>
                 <label style="font-size:11px; font-weight:700; text-transform:uppercase;
                                letter-spacing:.06em; color:var(--text-muted); display:block; margin-bottom:6px;">Journal</label>
-                <select id="pay-journal"
-                        style="width:100%; background:transparent; border:none;
-                               border-bottom:1.5px solid var(--border-strong); padding:5px 2px;
-                               font-size:13px; font-family:inherit; outline:none; color:var(--text);">
+                {% comment %}`field-ul` + `data-ts-body` : la liste native du
+                navigateur ne se met pas au thème de l'application, et rendue
+                dans la modale elle serait rognée. Le sélecteur commun du projet
+                (includes/_tomselect.html) règle les deux.{% endcomment %}
+                <select id="pay-journal" class="field-ul" data-ts-body data-ts-nosearch>
                     {% for caisse in caisses %}
-                    <option value="{{ caisse.pk }}">{{ caisse.nom|upper }}</option>
+                    <option value="{{ caisse.pk }}"
+                            data-modes="{{ caisse.modes|join:',' }}">{{ caisse.nom|upper }}</option>
                     {% empty %}
-                    <option value="">CAISSE ACCUEIL</option>
+                    <option value="">Aucune caisse configurée</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label style="font-size:11px; font-weight:700; text-transform:uppercase;
+                               letter-spacing:.06em; color:var(--text-muted); display:block; margin-bottom:6px;">Mode de paiement</label>
+                {% comment %}Les cinq modes étaient écrits ici, et « Bon »
+                manquait par rapport à Paiement.MODE. La liste vient désormais du
+                modèle, et se réduit à ce que la caisse choisie accepte.{% endcomment %}
+                <select id="pay-mode" class="field-ul" data-ts-body data-ts-nosearch>
+                    {% for code, libelle in modes_paiement %}
+                    <option value="{{ code }}">{{ libelle }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -724,15 +738,33 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
                 </div>
             </div>
 
-            <div>
+
+            {% comment %}Reçu et monnaie n'ont de sens qu'en espèces : par
+            mobile money ou virement, le compte est juste. Le script plus bas
+            masque les deux champs sur les autres modes.{% endcomment %}
+            <div id="pay-recu-wrap">
                 <label style="font-size:11px; font-weight:700; text-transform:uppercase;
-                               letter-spacing:.06em; color:var(--text-muted); display:block; margin-bottom:6px;">Compte bancaire du bénéficiaire</label>
-                <select id="pay-compte"
-                        style="width:100%; background:transparent; border:none;
-                               border-bottom:1.5px solid var(--border-strong); padding:5px 2px;
-                               font-size:13px; font-family:inherit; outline:none; color:var(--text);">
-                    <option value=""></option>
-                </select>
+                               letter-spacing:.06em; color:var(--text-muted); display:block; margin-bottom:6px;">Reçu du patient</label>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <input type="number" id="pay-recu" min="0" step="1"
+                       style="width:100%; background:transparent; border:none;
+                              border-bottom:1.5px solid var(--border-strong); padding:5px 2px;
+                              font-size:13px; font-family:inherit; outline:none; color:var(--text);">
+                    <span style="font-size:12px; color:var(--text-muted); flex-shrink:0;">CFA</span>
+                </div>
+            </div>
+
+            <div id="pay-monnaie-wrap">
+                <label style="font-size:11px; font-weight:700; text-transform:uppercase;
+                               letter-spacing:.06em; color:var(--text-muted); display:block; margin-bottom:6px;">Monnaie à rendre</label>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <input type="text" id="pay-monnaie" value="0" readonly
+                       style="width:100%; background:transparent; border:none;
+                              border-bottom:1.5px solid var(--border-strong); padding:5px 2px;
+                              font-size:13px; font-family:inherit; outline:none; color:var(--text);" readonly>
+                    <span style="font-size:12px; color:var(--text-muted); flex-shrink:0;">CFA</span>
+                </div>
+                <div id="pay-manque" style="display:none; font-size:11px; color:var(--rose-text); margin-top:4px;"></div>
             </div>
 
             <div>
@@ -746,28 +778,12 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
 
             <div>
                 <label style="font-size:11px; font-weight:700; text-transform:uppercase;
-                               letter-spacing:.06em; color:var(--text-muted); display:block; margin-bottom:6px;">Mode de paiement</label>
-                <select id="pay-mode"
-                        style="width:100%; background:transparent; border:none;
-                               border-bottom:1.5px solid var(--border-strong); padding:5px 2px;
-                               font-size:13px; font-family:inherit; outline:none; color:var(--text);">
-                    <option value="especes">Espèces</option>
-                    <option value="mobile_money">Mobile Money</option>
-                    <option value="cheque">Chèque</option>
-                    <option value="virement">Virement</option>
-                    <option value="assurance">Assurance</option>
-                </select>
-            </div>
-
-            <div>
-                <label style="font-size:11px; font-weight:700; text-transform:uppercase;
                                letter-spacing:.06em; color:var(--text-muted); display:block; margin-bottom:6px;">Mémo</label>
                 <input type="text" id="pay-memo"
                        style="width:100%; background:transparent; border:none;
                               border-bottom:1.5px solid var(--border-strong); padding:5px 2px;
                               font-size:13px; font-family:inherit; outline:none; color:var(--text);">
             </div>
-
         </div>
 
         <!-- Boutons -->
@@ -1058,10 +1074,14 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
             form.appendChild(inp);
         }
 
+        /* Le journal partait à la poubelle : le champ existait à l'écran mais
+           n'était jamais transmis, et le paiement ne savait pas de quelle caisse
+           il relevait. */
+        addHidden('pay_journal', document.getElementById('pay-journal').value);
         addHidden('pay_montant', document.getElementById('pay-montant').value);
+        addHidden('pay_recu',    document.getElementById('pay-recu').value);
         addHidden('pay_mode',    document.getElementById('pay-mode').value);
         addHidden('pay_memo',    document.getElementById('pay-memo').value);
-        addHidden('pay_compte',  document.getElementById('pay-compte').value);
 
         form.submit();
     };
@@ -1081,6 +1101,91 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
   sel.style.pointerEvents = 'none';
   sel.style.cursor = 'default';
 })();
+
+/* ── Modes de paiement, monnaie à rendre ──
+   Chaque caisse porte ses modes en `data-modes` ; le menu Mode de paiement s'y
+   réduit. Les deux menus passent par TomSelect : on détruit et on réinstalle
+   l'instance plutôt que de bricoler ses <option>, c'est le seul moyen fiable de
+   la garder cohérente avec le <select> d'origine. */
+(function () {
+  var journal = document.getElementById('pay-journal');
+  var mode    = document.getElementById('pay-mode');
+  var recu    = document.getElementById('pay-recu');
+  var monnaie = document.getElementById('pay-monnaie');
+  var manque  = document.getElementById('pay-manque');
+  var montant = document.getElementById('pay-montant');
+  if (!journal || !mode) return;
+
+  var TOUS = Array.prototype.map.call(mode.options, function (o) {
+    return { value: o.value, text: o.textContent.trim() };
+  });
+
+  function modesAutorises() {
+    var opt  = journal.options[journal.selectedIndex];
+    var brut = opt ? (opt.dataset.modes || '') : '';
+    if (!brut) return TOUS;
+    var codes = brut.split(',');
+    var filtres = TOUS.filter(function (m) { return codes.indexOf(m.value) !== -1; });
+    /* Réglage ne contenant aucun mode connu : tout proposer vaut mieux qu'un
+       menu vide où le caissier ne peut rien choisir. */
+    return filtres.length ? filtres : TOUS;
+  }
+
+  function majModes() {
+    var permis = modesAutorises();
+    var courant = mode.value;
+    var garde = permis.some(function (m) { return m.value === courant; });
+    if (mode.tomselect) mode.tomselect.destroy();
+    mode.innerHTML = permis.map(function (m) {
+      return '<option value="' + m.value + '">' + m.text + '</option>';
+    }).join('');
+    mode.value = garde ? courant : permis[0].value;
+    if (window.initFieldUlSelects) window.initFieldUlSelects(mode.parentNode);
+    majMonnaie();
+  }
+
+  function estEspeces() { return mode.value === 'especes'; }
+
+  function majMonnaie() {
+    if (!recu || !monnaie) return;
+    var especes = estEspeces();
+    document.getElementById('pay-recu-wrap').style.display    = especes ? '' : 'none';
+    document.getElementById('pay-monnaie-wrap').style.display = especes ? '' : 'none';
+    if (!especes) { recu.value = ''; return; }
+
+    var du = parseFloat(montant && montant.value) || 0;
+    var tendu = parseFloat(recu.value);
+    if (isNaN(tendu) || recu.value === '') {
+      monnaie.value = '0';
+      manque.style.display = 'none';
+      return;
+    }
+    var ecart = tendu - du;
+    monnaie.value = (ecart > 0 ? ecart : 0).toLocaleString('fr-FR');
+    /* Tendre moins que le dû n'est pas bloqué : un règlement partiel en
+       espèces est un cas courant. On le signale, c'est tout. */
+    if (ecart < 0) {
+      manque.textContent = 'Il manque ' + (-ecart).toLocaleString('fr-FR') + ' CFA sur le montant saisi.';
+      manque.style.display = '';
+    } else {
+      manque.style.display = 'none';
+    }
+  }
+
+  journal.addEventListener('change', majModes);
+  mode.addEventListener('change', majMonnaie);
+  if (recu)    recu.addEventListener('input', majMonnaie);
+  if (montant) montant.addEventListener('input', majMonnaie);
+  /* TomSelect s'installe au chargement du document ; on passe après lui. */
+  window.addEventListener('load', majModes);
+})();
 </script>
+
+{% include 'includes/_tomselect.html' %}
+<style>
+  /* Rendues dans le <body> (`data-ts-body`), les listes passaient derrière la
+     modale d'encaissement : on cliquait et rien n'apparaissait. */
+  .ts-dropdown { z-index: 10000 !important; }
+</style>
 
 {% endblock %}
