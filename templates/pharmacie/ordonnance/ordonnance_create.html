@@ -95,6 +95,11 @@
         border-radius: 3px; transition: color 0.15s;
     }
     .btn-remove-line:hover { color: var(--rose,#e11d48); }
+    /* Une ligne que la pharmacie ne peut pas servir. Elle reste lisible et
+       modifiable — on n'efface pas la saisie de quelqu'un — mais elle se voit,
+       et le bouton Enregistrer reste fermé tant qu'elle est là. */
+    .line-bloquee > td { background: rgba(var(--rose-rgb), .07); }
+    html[data-theme="dark"] .line-bloquee > td { background: rgba(var(--rose-rgb), .13); }
     .btn-add-line {
         display: inline-flex; align-items: center; gap: 6px;
         background: none; border: 1px dashed rgba(var(--teal-500-rgb),.4); border-radius: 5px;
@@ -141,12 +146,6 @@
 {% block breadcrumb %}{% endblock %}
 
 {% block content %}
-
-{% if messages %}
-{% for msg in messages %}
-<div style="margin:12px 24px 0;padding:10px 16px;border-radius:6px;font-size:13px;{% if msg.tags == 'error' %}background:rgba(var(--rose-rgb),.1);border:1px solid rgba(var(--rose-rgb),.3);color:var(--rose-text){% else %}background:rgba(var(--teal-600-rgb),.1);border:1px solid rgba(var(--teal-600-rgb),.3);color:var(--accent-text-soft){% endif %}">{{ msg }}</div>
-{% endfor %}
-{% endif %}
 
 <form method="post" id="ord-form">
 {% csrf_token %}
@@ -225,7 +224,7 @@
                 <div>
                     <div class="ord-field">
                         <label class="ord-label">Date d'expiration</label>
-                        <input type="date" name="date_expiration" class="ord-input" value="{% now 'Y-m-d' %}">
+                        <input type="date" name="date_expiration" class="ord-input" value="{{ date_expiration_defaut|date:'Y-m-d' }}">
                     </div>
                     <div class="ord-field" style="margin-top:8px;">
                         <label class="ord-label">Notes</label>
@@ -254,7 +253,7 @@
                 <tbody id="lines-body">
                     {% if initial_lignes %}
                         {% for ligne in initial_lignes %}
-                        <tr class="line-row">
+                        <tr class="line-row{% if ligne.indisponible %} line-bloquee{% endif %}">
                             <td>
                                 <div class="med-ac-wrap">
                                     <input type="text" class="line-input med-search" name="medicament_libre[]" placeholder="Rechercher…" autocomplete="off" value="{{ ligne.med_nom }}">
@@ -265,7 +264,13 @@
                             <td><input type="text" name="posologie[]" class="line-input" placeholder="Ex : 1cp matin et soir" value="{{ ligne.posologie }}"></td>
                             <td><input type="text" name="duree[]" class="line-input" placeholder="Ex : 7 jours" value="{{ ligne.duree }}"></td>
                             <td><input type="number" name="quantite[]" class="line-input qty" value="{{ ligne.quantite }}" min="1"></td>
-                            <td style="text-align:center;"><span class="stock-badge stock-unknown med-stock-display">—</span></td>
+                            <td style="text-align:center;">
+                                {% if ligne.indisponible %}
+                                <span class="stock-badge stock-empty med-stock-display">Indisponible</span>
+                                {% else %}
+                                <span class="stock-badge stock-unknown med-stock-display">—</span>
+                                {% endif %}
+                            </td>
                             <td><button type="button" class="btn-remove-line" title="Supprimer">✕</button></td>
                         </tr>
                         {% endfor %}
@@ -308,11 +313,28 @@ const medecinSel   = document.getElementById('medecin-select');
    l'identifiant tant qu'un patient est choisi, et se vide dès qu'on clique la
    croix. Se fier à un drapeau calculé au rendu laissait le bouton actif après
    une désélection. */
+/* Une ligne vide ne gêne personne : le serveur l'ignore, et la grille en
+   affiche toujours au moins une. Une ligne commencée, en revanche, doit porter
+   un produit choisi dans la liste, disponible, et en quantité suffisante. */
+function ligneEntamee(row) {
+    const nom = row.querySelector('.med-search');
+    const pos = row.querySelector('input[name="posologie[]"]');
+    return !!((nom && nom.value.trim()) || (pos && pos.value.trim()) ||
+              row.querySelector('.med-id-hidden').value);
+}
+
+function ligneBloquee(row) {
+    if (!ligneEntamee(row)) return false;
+    if (row.classList.contains('line-bloquee')) return true;
+    return !row.querySelector('.med-id-hidden').value;
+}
+
 function updateSaveBtn() {
     const champ = document.getElementById('patient-id-hidden');
     const medecinOk = medecinSel && medecinSel.value !== '';
     const patOk = !!(champ && champ.value);
-    btnSave.disabled = !(patOk && medecinOk);
+    const lignesOk = ![...document.querySelectorAll('.line-row')].some(ligneBloquee);
+    btnSave.disabled = !(patOk && medecinOk && lignesOk);
 }
 
 /* La liste est celle de la pharmacie du centre où l'on est connecté — et non
@@ -325,16 +347,15 @@ function refreshMedicamentsPourMedecin(medecinId) {
     fetch(url)
         .then(r => r.json())
         .then(data => {
+            /* On remplace la liste proposée, et rien d'autre. Ce bloc vidait
+               aussi toutes les lignes déjà saisies — hérité du temps où la
+               liste dépendait du médecin, où changer de prescripteur pouvait
+               invalider un choix. Elle n'en dépend plus. Sur un renouvellement,
+               choisir le prescripteur (obligatoire, et non prérempli) effaçait
+               donc les médicaments recopiés, et l'ordonnance partait vide. */
             MEDS = data.medicaments || [];
-            document.querySelectorAll('.line-row').forEach(row => {
-                const searchInput = row.querySelector('.med-search');
-                const hiddenId    = row.querySelector('.med-id-hidden');
-                const dropdown    = row.querySelector('.med-ac-dropdown');
-                const stockEl     = row.querySelector('.med-stock-display');
-                if (searchInput) searchInput.value = '';
-                if (hiddenId) hiddenId.value = '';
-                if (dropdown) { dropdown.innerHTML = ''; dropdown.style.display = 'none'; }
-                if (stockEl) { stockEl.className = 'stock-badge stock-unknown med-stock-display'; stockEl.textContent = '—'; }
+            document.querySelectorAll('.med-ac-dropdown').forEach(d => {
+                d.innerHTML = ''; d.style.display = 'none';
             });
         })
         .catch(() => {});
@@ -383,16 +404,29 @@ function setupLine(row) {
 
     function updateStockDisplay() {
         const origStock = parseInt(stockCell.dataset.originalStock, 10);
-        if (!isNaN(origStock) && stockCell) {
-            const qty = parseInt(qtyInput ? qtyInput.value : 1, 10) || 0;
-            const alerte  = parseInt(stockCell.dataset.alerte, 10)  || 10;
-            const minimum = parseInt(stockCell.dataset.minimum, 10) || 5;
-            stockCell.innerHTML = stockBadge(origStock - qty, alerte, minimum);
+        if (isNaN(origStock) || !stockCell) return;
+        const alerte  = parseInt(stockCell.dataset.alerte, 10)  || 10;
+        const minimum = parseInt(stockCell.dataset.minimum, 10) || 5;
+        /* Le rayon fait plafond : on ne prescrit pas ce que la pharmacie ne
+           pourra pas dispenser. La pastille montrait `stock − quantité` sans
+           jamais s'émouvoir d'un résultat négatif — on pouvait demander 999
+           d'un produit à 50, et ça n'était refusé qu'au paiement, patient
+           devant le guichet. Le serveur refait le calcul de son côté : un
+           champ `max` ne protège de rien. */
+        if (qtyInput) qtyInput.max = origStock;
+        let qty = parseInt(qtyInput ? qtyInput.value : 1, 10) || 0;
+        if (qtyInput && qty > origStock) {
+            qty = origStock;
+            qtyInput.value = origStock;
         }
+        row.classList.remove('line-bloquee');
+        stockCell.innerHTML = stockBadge(origStock - qty, alerte, minimum);
+        updateSaveBtn();
     }
 
     removeBtn.addEventListener('click', () => {
         if (document.querySelectorAll('.line-row').length > 1) row.remove();
+        updateSaveBtn();
     });
 
     if (qtyInput) {
@@ -403,6 +437,8 @@ function setupLine(row) {
         const q = this.value.trim().toLowerCase();
         hiddenId.value = '';
         resetStock();
+        row.classList.remove('line-bloquee');
+        updateSaveBtn();
         if (!q) { dropdown.style.display = 'none'; return; }
         const matches = MEDS.filter(m =>
             m.designation.toLowerCase().includes(q) || (m.dci || '').toLowerCase().includes(q)
@@ -431,6 +467,21 @@ function setupLine(row) {
         dropdown.querySelectorAll('.med-ac-item:not(.med-ac-rupture)').forEach(item => {
             item.addEventListener('mousedown', e => {
                 e.preventDefault();
+                /* Un produit ne tient que sur une ligne : deux lignes de 6 sur
+                   un produit qui en a 10 sont correctes prises séparément, et
+                   l'ordonnance en promet 12. Le serveur refuse aussi. */
+                const dejaPris = [...document.querySelectorAll('.line-row')]
+                    .some(r => r !== row &&
+                          r.querySelector('.med-id-hidden').value === item.dataset.id);
+                if (dejaPris) {
+                    dropdown.style.display = 'none';
+                    if (window.showToast) {
+                        showToast(item.dataset.name +
+                            ' est déjà sur une autre ligne : ajustez sa quantité.',
+                            'warning');
+                    }
+                    return;
+                }
                 searchInput.value = item.dataset.name;
                 hiddenId.value    = item.dataset.id;
                 dropdown.style.display = 'none';
@@ -439,8 +490,10 @@ function setupLine(row) {
                     stockCell.dataset.originalStock = s;
                     stockCell.dataset.alerte  = item.dataset.alerte;
                     stockCell.dataset.minimum = item.dataset.minimum;
-                    updateStockDisplay();
                 }
+                row.classList.remove('line-bloquee');
+                updateStockDisplay();
+                updateSaveBtn();
             });
         });
     });
@@ -459,12 +512,18 @@ function addLine() {
     tpl.querySelector('.line-input.qty').value = '1';
     const stockEl = tpl.querySelector('.med-stock-display');
     if (stockEl) { stockEl.className = 'stock-badge stock-unknown med-stock-display'; stockEl.textContent = '—'; }
+    tpl.classList.remove('line-bloquee');
     setupLine(tpl);
     tbody.appendChild(tpl);
+    updateSaveBtn();
 }
 
 document.querySelectorAll('.line-row').forEach(setupLine);
 document.getElementById('btn-add-line').addEventListener('click', addLine);
+document.querySelectorAll('.line-row input').forEach(champ => {
+    champ.addEventListener('input', updateSaveBtn);
+});
+updateSaveBtn();
 
 (function () {
   function alignControlPanel() {

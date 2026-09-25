@@ -115,6 +115,22 @@ def en_rayon(produit):
     return getattr(produit, 'stock_pharma', Decimal('0')) or Decimal('0')
 
 
+def quantite_en_rayon(produit_id, pharmacie):
+    """Ce que cette pharmacie a de ce produit, maintenant.
+
+    `est_disponible` répond par oui ou non ; il faut aussi le chiffre pour
+    écrire « demandé 5, en rayon 2 ». Un produit jamais stocké ici renvoie 0,
+    comme un produit épuisé : du point de vue du comptoir c'est la même chose.
+    """
+    from .models import StockPharmacie
+
+    if not produit_id or pharmacie is None:
+        return Decimal('0')
+    ligne = StockPharmacie.objects.filter(
+        pharmacie=pharmacie, produit_id=produit_id).first()
+    return ligne.quantite if ligne else Decimal('0')
+
+
 def est_disponible(produit_id, pharmacie, quantite=1):
     """Cette pharmacie peut-elle servir cette quantité de ce produit ?
 
