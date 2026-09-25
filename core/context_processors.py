@@ -59,8 +59,18 @@ def header_stats(request):
 
 
 def _medicaments_alerte_count():
-    from pharmacie.models import Medicament
-    return Medicament.objects.filter(stock_actuel__lte=F('stock_alerte')).count()
+    """Produits sous le seuil d'alerte dans la pharmacie du centre actif.
+
+    Comptait `pharmacie.Medicament`, la table d'avant les deux pharmacies : un
+    seul `stock_actuel` pour tout le déploiement, jamais réapprovisionné. Elle
+    est vide depuis, et l'alerte affichait donc zéro — rassurant et faux. Le
+    compte porte maintenant sur ce que la pharmacie du centre a réellement en
+    rayon, seuil d'alerte du produit à l'appui.
+    """
+    from pharmacie.disponibilite import pharmacie_active, produits_de_la_pharmacie
+
+    return (produits_de_la_pharmacie(pharmacie_active())
+            .filter(stock_pharma__lte=F('stock_alerte')).count())
 
 
 def _factures_impayees_count():

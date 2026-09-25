@@ -114,6 +114,10 @@
     }
     .med-ac-item { padding: 7px 12px; font-size: 12.5px; cursor: pointer; border-bottom: 1px solid var(--border); line-height: 1.4; color: var(--teal-900); }
     .med-ac-item:hover { background: var(--teal-50); }
+    {% comment %}Rupture dans la pharmacie du centre : visible pour qu'on sache
+    que le produit existe, éteint pour qu'on n'essaie pas de le choisir.{% endcomment %}
+    .med-ac-rupture { opacity: .45; cursor: not-allowed; }
+    .med-ac-rupture:hover { background: transparent; }
     .med-ac-name { font-weight: 500; }
     .med-ac-sub { font-size: 11px; color: var(--text-muted); }
 
@@ -311,10 +315,11 @@ function updateSaveBtn() {
     btnSave.disabled = !(patOk && medecinOk);
 }
 
-/* Le stock/la liste des médicaments dépend de la pharmacie du centre du
-   médecin prescripteur (Walé Yamoussoukro / Walé Toumbokro) : on la
-   recharge à chaque changement de médecin pour ne jamais afficher le stock
-   de l'autre pharmacie. */
+/* La liste est celle de la pharmacie du centre où l'on est connecté — et non
+   plus celle du médecin choisi ci-dessus, qui n'aboutissait jamais : aucun des
+   médecins du fichier n'a de compte utilisateur, et la liste retombait alors
+   sur la somme des deux pharmacies. Le rechargement au changement de médecin
+   est conservé mais ne change plus rien à ce qui s'affiche. */
 function refreshMedicamentsPourMedecin(medecinId) {
     const url = '{% url "medicaments_dispo_par_medecin" %}' + (medecinId ? ('?medecin_id=' + encodeURIComponent(medecinId)) : '');
     fetch(url)
@@ -403,22 +408,27 @@ function setupLine(row) {
             m.designation.toLowerCase().includes(q) || (m.dci || '').toLowerCase().includes(q)
         ).slice(0, 12);
         if (!matches.length) { dropdown.style.display = 'none'; return; }
+        /* Une rupture reste affichée — la cacher ferait croire que le produit
+           n'existe pas, et la désignation serait retapée à la main. Elle est
+           grisée et ne se clique pas : si le produit est indispensable, il part
+           sur une ordonnance physique, à acheter en externe. */
         dropdown.innerHTML = matches.map(m =>
-            `<div class="med-ac-item"
+            `<div class="med-ac-item${m.rupture ? ' med-ac-rupture' : ''}"
                   data-id="${m.pk}" data-name="${m.designation}"
+                  data-rupture="${m.rupture ? '1' : ''}"
                   data-stock="${m.stock_actuel ?? ''}"
                   data-alerte="${m.stock_alerte ?? 10}"
                   data-minimum="${m.stock_minimum ?? 5}">
                 <div class="med-ac-name">${m.designation}</div>
                 <div class="med-ac-sub">${m.dosage||''} ${m.forme||''}
-                    <span style="float:right;margin-left:8px;font-weight:600;color:${(m.stock_actuel||0) > (m.stock_alerte||10) ? 'var(--teal-600)' : (m.stock_actuel||0) > 0 ? 'var(--amber-text)' : 'var(--rose-text)'}">
-                        Stock : ${m.stock_actuel ?? '—'}
+                    <span style="float:right;margin-left:8px;font-weight:600;color:${m.rupture ? 'var(--rose-text)' : (m.stock_actuel||0) > (m.stock_alerte||10) ? 'var(--teal-600)' : 'var(--amber-text)'}">
+                        ${m.rupture ? 'Rupture ici' : 'Stock : ' + (m.stock_actuel ?? '—')}
                     </span>
                 </div>
             </div>`
         ).join('');
         dropdown.style.display = 'block';
-        dropdown.querySelectorAll('.med-ac-item').forEach(item => {
+        dropdown.querySelectorAll('.med-ac-item:not(.med-ac-rupture)').forEach(item => {
             item.addEventListener('mousedown', e => {
                 e.preventDefault();
                 searchInput.value = item.dataset.name;

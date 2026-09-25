@@ -422,7 +422,7 @@ def pharmacie_ordonnances(request, pharmacie):
         date_emission__date=selected_date
     ).select_related(
         'consultation__patient', 'consultation__medecin', 'patient', 'medecin', 'dispensation'
-    ).prefetch_related('lignes__produit', 'lignes__medicament').order_by('-date_emission')
+    ).prefetch_related('lignes__produit').order_by('-date_emission')
 
     if statut_filtre:
         qs = qs.filter(statut=statut_filtre)
@@ -501,11 +501,6 @@ def pharmacie_dispenser(request, pharmacie, pk):
             # ne pas le re-chercher par nom (recherche floue non fiable).
             produit = ligne.produit
             nom_med = produit.nom
-        elif ligne.medicament:
-            nom_med = ligne.medicament.designation
-            produit = Produit.objects.filter(
-                nom__icontains=nom_med[:20], type='medicament', actif=True
-            ).first()
         elif ligne.medicament_libre:
             nom_med = ligne.medicament_libre
             produit = Produit.objects.filter(

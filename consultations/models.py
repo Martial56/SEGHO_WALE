@@ -130,7 +130,6 @@ class Ordonnance(models.Model):
 class LigneOrdonnance(models.Model):
     ordonnance = models.ForeignKey(Ordonnance, on_delete=models.CASCADE, related_name='lignes')
     produit = models.ForeignKey('stock.Produit', on_delete=models.SET_NULL, null=True, blank=True, related_name='lignes_ordonnance')
-    medicament = models.ForeignKey('pharmacie.Medicament', on_delete=models.SET_NULL, null=True, blank=True)
     medicament_libre = models.CharField(max_length=200, blank=True)
     posologie = models.CharField(max_length=500)
     duree = models.CharField(max_length=100, blank=True)

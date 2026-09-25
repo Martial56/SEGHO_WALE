@@ -4,7 +4,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
 from django.core.exceptions import PermissionDenied
-from django.db.models import Q, Sum
+from django.db.models import Count, F, Q, Sum
 from django.core.paginator import Paginator
 from django.http import JsonResponse
 from django.urls import reverse
@@ -13,6 +13,9 @@ from .models import Facture, LigneFacture, Acte, Paiement, Caisse
 from .forms import FactureForm
 from core.views import log_event, get_logs
 from soins.regles import demarrer_soin_de_facture
+from pharmacie.disponibilite import pharmacie_active
+from pharmacie.sorties import (produits_indisponibles, rendre_les_produits,
+                               sortir_les_produits)
 
 # Rôles autorisés à enregistrer un encaissement (voir aussi hospitalisation
 # management/commands/init_groupes_hospitalisation.py qui définit "Caisse").
@@ -25,81 +28,111 @@ def can_manage_paiement(user):
 
 @login_required(login_url='login')
 def facturation_list(request):
-    q       = request.GET.get('q', '').strip()
-    filters = request.GET.getlist('filter')
+    """Liste des factures, bâtie sur core.listing comme les autres modules.
 
-    # Un paramètre présent (même vide) signifie que l'utilisateur a explicitement
-    # touché au filtre de date ; son absence totale signifie "pas encore touché",
-    # auquel cas on applique le filtre par défaut (factures du jour).
-    dates_explicites = 'date_from' in request.GET or 'date_to' in request.GET
-    date_from_s = request.GET.get('date_from', '').strip()
-    date_to_s   = request.GET.get('date_to', '').strip()
+    Le menu de filtres écrit à la main dans le gabarit ne portait qu'un statut,
+    un type et un intervalle de dates, sans regroupement ni compteurs. Il est
+    remplacé par la brique commune : les filtres se cumulent, les regroupements
+    s'imbriquent, et les comptes des en-têtes sont calculés en base sur toute la
+    sélection.
+    """
+    from core.listing import Listing, menu_filtres, menu_groupes, paginer_groupes
+    from .facture_listing import (CHAMPS_RECHERCHE, FILTRES_DEFAUT, TRIS,
+                                  construire_dimensions, familles_factures,
+                                  libelle_periode)
 
-    qs = Facture.objects.select_related('patient', 'centre').order_by('-date_emission')
+    today = date.today()
+    q = request.GET.get('q', '').strip()
+    groupes = request.GET.getlist('group')
+    date_from = request.GET.get('date_from', '').strip()
+    date_to = request.GET.get('date_to', '').strip()
 
-    if q:
-        qs = qs.filter(
-            Q(numero__icontains=q) |
-            Q(patient__nom__icontains=q) |
-            Q(patient__prenoms__icontains=q)
-        )
+    base_qs = (Facture.objects
+               .select_related('patient', 'centre')
+               # Le regroupement par caisse lit les paiements de chaque facture :
+               # sans ce préchargement, une requête par ligne affichée.
+               .prefetch_related('paiements__caisse')
+               # `solde_restant` est une propriété Python : la colonne « Reste »
+               # ne serait pas triable sans cette annotation.
+               .annotate(reste=F('montant_total') - F('montant_paye')))
 
-    statuts_sel = [f.split(':', 1)[1] for f in filters if f.startswith('statut:')]
-    if statuts_sel:
-        qs = qs.filter(statut__in=statuts_sel)
+    declarees = construire_dimensions()
+    listing = Listing(
+        recherche=CHAMPS_RECHERCHE,
+        familles=familles_factures(),
+        dimensions=list(declarees.values()),
+        par_page=25,
+        filtres_defaut=FILTRES_DEFAUT,
+        tri_defaut=('-date_emission',),
+        tris=TRIS,
+    )
 
-    types_sel = [f.split(':', 1)[1] for f in filters if f.startswith('type:')]
-    if types_sel:
-        qs = qs.filter(type_facture__in=types_sel)
+    filtres = listing.filtres_demandes(request)
+    qs = listing.appliquer_recherche(base_qs, q)
+    qs = listing.appliquer_filtres(qs, filtres, {
+        'aujourdhui': today, 'date_from': date_from, 'date_to': date_to,
+    })
+    tri, tri_sens = listing.tri_demande(request)
+    qs = listing.trier(qs, groupes, tri, tri_sens)
 
-    if date_from_s or date_to_s:
-        try:
-            if date_from_s:
-                qs = qs.filter(date_emission__date__gte=dt.strptime(date_from_s, '%Y-%m-%d').date())
-            if date_to_s:
-                qs = qs.filter(date_emission__date__lte=dt.strptime(date_to_s, '%Y-%m-%d').date())
-        except ValueError:
-            pass
-    elif not dates_explicites:
-        qs = qs.filter(date_emission__date=date.today())
+    dims = [declarees[g] for g in groupes if g in declarees]
+    arbre = []
+    if dims:
+        arbre, page_obj, nb_groupes = paginer_groupes(qs, dims, request.GET.get('page'))
+        # La pagination porte alors sur les groupes : le compteur du titre doit
+        # rester celui des factures.
+        total = qs.count()
+    else:
+        nb_groupes = 0
+        page_obj = Paginator(qs, listing.par_page).get_page(request.GET.get('page'))
+        total = page_obj.paginator.count
 
-    total = qs.count()
-
-    all_qs = Facture.objects.all()
-    montant_total     = all_qs.aggregate(s=Sum('montant_total'))['s'] or 0
-    montant_recu      = all_qs.aggregate(s=Sum('montant_paye'))['s']  or 0
-    montant_attente   = montant_total - montant_recu
-    taux_recouvrement = round(montant_recu * 100 / montant_total) if montant_total else 0
-    nb_factures       = all_qs.count()
-    nb_payees         = all_qs.filter(statut='payee').count()
-    nb_emises         = all_qs.filter(statut='emise').count()
+    # Les cartes du haut portent sur la sélection, et non sur tout le centre :
+    # une liste filtrée sur la journée affichait le total facturé depuis
+    # l'ouverture, ce qui ne se rapportait à rien de ce qu'on avait sous les yeux.
+    # `order_by()` vide l'ordre : il n'a pas de sens dans une agrégation, et
+    # laissé en place il ajouterait ses colonnes au GROUP BY.
+    sommes = qs.order_by().aggregate(
+        total=Sum('montant_total'),
+        paye=Sum('montant_paye'),
+        nb=Count('id'),
+        nb_payees=Count('id', filter=Q(statut='payee')),
+        nb_emises=Count('id', filter=Q(statut='emise')),
+    )
+    montant_total = sommes['total'] or 0
+    montant_recu  = sommes['paye'] or 0
 
     stats = {
-        'montant_total':     int(montant_total),
-        'montant_recu':      int(montant_recu),
-        'montant_attente':   int(montant_attente),
-        'taux_recouvrement': taux_recouvrement,
-        'nb_factures':       nb_factures,
-        'nb_payees':         nb_payees,
-        'nb_emises':         nb_emises,
+        'montant_total':   int(montant_total),
+        'montant_recu':    int(montant_recu),
+        'montant_attente': int(montant_total - montant_recu),
+        'nb_factures':     sommes['nb'],
+        'nb_payees':       sommes['nb_payees'],
+        'nb_emises':       sommes['nb_emises'],
     }
-
-    paginator = Paginator(qs, 25)
-    page_obj  = paginator.get_page(request.GET.get('page'))
 
     return render(request, 'facturation/list.html', {
         'page_obj':          page_obj,
+        'arbre':             arbre,
+        'nb_groupes':        nb_groupes,
+        'total':             total,
         'stats':             stats,
         'q':                 q,
-        'filters':           filters,
-        'statuts_sel':       statuts_sel,
-        'types_sel':         types_sel,
-        'date_from':         date_from_s,
-        'date_to':           date_to_s,
-        'dates_explicites':  dates_explicites,
-        'total':             total,
-        'statut_choices':    Facture.STATUT,
-        'type_choices':      Facture.TYPE,
+        'tri':               tri,
+        'tri_sens':          tri_sens,
+        'filters':           filtres,
+        'groups':            groupes,
+        'date_from':         date_from,
+        'date_to':           date_to,
+        'filtre_pose':       bool(filtres),
+        'selection_active':  bool(q or groupes or filtres),
+        'periode_libelle':   libelle_periode(filtres, date_from, date_to),
+        'listing_filtres':   menu_filtres(listing.familles, filtres, date_from, date_to),
+        'listing_groupes':   menu_groupes(list(declarees.values()), groupes),
+        'today':             today,
+        # Largeur des bandes de groupe : la colonne Centre n'existe
+        # que pour le superutilisateur.
+        'colonnes':          9 if request.user.is_superuser else 8,
     })
 
 
@@ -112,7 +145,7 @@ def facture_create(request):
     patient    = get_object_or_404(Patient.all_objects, pk=patient_pk) if patient_pk else None
     actes      = Acte.objects.filter(actif=True).order_by('categorie', 'libelle')
     caisses    = Caisse.objects.filter(actif=True).order_by('nom')
-    services   = Articleservice.objects.select_related('categorie').filter(actif=True).order_by('nom')
+    services   = _designations_proposees(request)
 
     hosp_obj = None
     hosp_pk  = request.GET.get('hospitalisation') or request.POST.get('hospitalisation_id')
@@ -146,7 +179,7 @@ def facture_create(request):
         try:
             from consultations.models import Ordonnance
             ordonnance_obj = Ordonnance.objects.prefetch_related(
-                'lignes__produit', 'lignes__medicament'
+                'lignes__produit'
             ).get(pk=ordonnance_pk)
         except Exception:
             pass
@@ -166,9 +199,6 @@ def facture_create(request):
             if ligne.produit:
                 libelle = ligne.produit.nom
                 prix    = float(ligne.produit.prix_vente)
-            elif ligne.medicament:
-                libelle = ligne.medicament.designation
-                prix    = float(ligne.medicament.prix_vente)
             elif ligne.medicament_libre:
                 libelle = ligne.medicament_libre
                 prix    = 0
@@ -221,7 +251,8 @@ def facture_create(request):
                 facture.rendez_vous = rdv_obj
             facture.save()
 
-            total = _save_lignes(facture, request.POST)
+            total = _save_lignes(facture, request.POST,
+                                 pharmacie_active(request))
             facture.montant_total = total
             # Le type suit ce qu'on a mis dedans : une seule nature donne ce
             # type, plusieurs donnent « Mixte ». Le caissier n'a plus à y
@@ -243,7 +274,8 @@ def facture_create(request):
             if request.POST.get('pay_montant', '').strip() and not can_manage_paiement(request.user):
                 messages.warning(request, "Facture créée, mais le paiement n'a pas été enregistré : cette action est réservée à la Caisse.")
             else:
-                facture = _handle_paiement(facture, request.POST, request.user, total)
+                facture = _handle_paiement(facture, request.POST, request.user,
+                                           total, request)
 
             messages.success(request, f'Facture {facture.numero} créée avec succès.')
             if hosp_pk:
@@ -267,7 +299,7 @@ def facture_create(request):
                 'prix':    request.POST.get(f'ligne_prix_{_i}', 0),
                 'qte':     request.POST.get(f'ligne_qte_{_i}', 1),
                 'remise':  request.POST.get(f'ligne_remise_{_i}', 0),
-                'article_id': request.POST.get(f'ligne_service_{_i}', ''),
+                'reference': request.POST.get(f'ligne_service_{_i}', ''),
             })
             _i += 1
         if _post_lignes:
@@ -353,30 +385,17 @@ def facture_payer(request, pk):
         return redirect('facturation:detail', pk=pk)
     back_url = request.POST.get('next', reverse('facturation:list'))
 
-    montant, erreur = _montant_paiement(request.POST.get('pay_montant'), facture)
+    _montant, erreur = _montant_paiement(request.POST.get('pay_montant'), facture)
     if erreur:
         messages.error(request, erreur)
-
-    if montant is not None and facture.statut in ('brouillon', 'emise'):
-        mode = request.POST.get('pay_mode', 'especes')
-        Paiement.objects.create(
-            facture=facture,
-            montant=montant,
-            mode_paiement=mode,
-            caisse=_caisse_choisie(request.POST),
-            montant_recu=_montant_recu(request.POST, mode),
-            reference=request.POST.get('pay_reference', ''),
-            recu_par=request.user,
-        )
-        total_paye = sum(p.montant for p in facture.paiements.all())
-        facture.montant_paye = total_paye
-        if total_paye >= facture.montant_total:
-            facture.statut = 'payee'
-            facture.save(update_fields=['montant_paye', 'statut'])
-            log_event(facture, request.user, 'Statut changé : payée', type='statut')
-            demarrer_soin_de_facture(facture)
-        else:
-            facture.save(update_fields=['montant_paye'])
+    elif facture.statut in ('brouillon', 'emise'):
+        # Cette vue refaisait mot pour mot le travail de `_handle_paiement`, à
+        # quelques différences près — pas de journal du paiement, une référence
+        # lue dans un autre champ. Deux portes vers le même geste, c'est deux
+        # endroits où brancher la sortie de stock et un qu'on oublie. Elle
+        # délègue désormais, et il n'y a plus qu'un seul encaissement.
+        _handle_paiement(facture, request.POST, request.user,
+                         facture.montant_total, request)
 
     return redirect(f"{reverse('facturation:detail', kwargs={'pk': pk})}?next={back_url}")
 
@@ -426,7 +445,7 @@ def facture_edit(request, pk):
         return redirect(retour)
     actes    = Acte.objects.filter(actif=True).order_by('categorie', 'libelle')
     caisses  = Caisse.objects.filter(actif=True).order_by('nom')
-    services = Articleservice.objects.select_related('categorie').filter(actif=True).order_by('nom')
+    services = _designations_proposees(request)
     is_admin = request.user.is_superuser
     back_url = request.GET.get('next', reverse('facturation:detail', kwargs={'pk': pk}))
 
@@ -448,10 +467,25 @@ def facture_edit(request, pk):
         if 'action_payer' in request.POST:
             if not can_manage_paiement(request.user):
                 raise PermissionDenied
-            if facture.statut in ('emise', 'brouillon') or is_admin:
+            pharmacie = pharmacie_active(request)
+            manquants = produits_indisponibles(facture, pharmacie)
+            if manquants:
+                # Seconde porte vers « payée », soumise à la même règle que
+                # l'encaissement : on ne solde pas une facture dont la pharmacie
+                # ne peut plus honorer les produits.
+                detail = ', '.join(f"{nom} (demandé {demande:g}, en rayon {dispo:g})"
+                                   for nom, demande, dispo in manquants)
+                messages.error(request, "Facture non soldée — la pharmacie ne peut "
+                                        f"plus servir : {detail}")
+            elif facture.statut in ('emise', 'brouillon') or is_admin:
                 facture.statut = 'payee'
                 facture.save()
                 log_event(facture, request.user, 'Statut changé : Payée', type='statut')
+                sortis = sortir_les_produits(facture, pharmacie, request.user)
+                if sortis:
+                    log_event(facture, request.user,
+                              f'{sortis} produit(s) sortis du stock de la pharmacie.',
+                              type='modif')
                 demarrer_soin_de_facture(facture)
                 messages.success(request, 'Facture marquée comme payée.')
             return redirect(f'{detail_url}?next={back_url}')
@@ -461,6 +495,13 @@ def facture_edit(request, pk):
                 facture.statut = 'annulee'
                 facture.save()
                 log_event(facture, request.user, 'Facture annulée', type='statut')
+                # Les produits déjà sortis retournent en rayon : la facture
+                # annulée ne les a finalement pas remis au patient.
+                rendus = rendre_les_produits(facture, pharmacie_active(request),
+                                             request.user)
+                if rendus:
+                    log_event(facture, request.user,
+                              f'{rendus} produit(s) remis en stock.', type='modif')
                 messages.success(request, 'Facture annulée.')
             return redirect(f'{detail_url}?next={back_url}')
 
@@ -477,7 +518,8 @@ def facture_edit(request, pk):
         if form.is_valid():
             facture = form.save(commit=False)
             facture.lignes.all().delete()
-            total = _save_lignes(facture, request.POST)
+            total = _save_lignes(facture, request.POST,
+                                 pharmacie_active(request))
             facture.montant_total = total
             facture.appliquer_type_deduit(save=False)
             facture.save()
@@ -496,7 +538,9 @@ def facture_edit(request, pk):
             'remise':  float(l.remise),
             # Sans lui, rouvrir une facture puis l'enregistrer perdrait le lien
             # vers l'article — et donc la nature de chaque ligne.
-            'article_id': l.article_id or '',
+            # Référence préfixée : l'article 12 et le produit 12 se ressemblent.
+            'reference': (f'a:{l.article_id}' if l.article_id
+                          else f'p:{l.produit_id}' if l.produit_id else ''),
         }
         for l in facture.lignes.all()
     ]
@@ -600,7 +644,70 @@ def _montant_paiement(brut, facture):
     return montant, None
 
 
-def _save_lignes(facture, POST):
+def _designations_proposees(request):
+    """Tout ce qu'on peut poser sur une ligne de facture, en une seule liste.
+
+    Deux catalogues s'y mêlent, et c'est voulu : `services.Articleservice` porte
+    les actes et les examens, `stock.Produit` les médicaments et les
+    consommables. Les seconds manquaient à l'écran — on ne pouvait pas facturer
+    les gants d'un examen, ni la boîte de paracétamol remise au comptoir.
+
+    Les produits sont ceux de la pharmacie du centre actif, avec leur stock
+    réel : facturer un produit que Yamoussoukro possède et que Toumbokro n'a pas
+    laisserait le patient repartir les mains vides. Les ruptures restent
+    affichées, grisées et non sélectionnables — cachées, elles seraient
+    ressaisies à la main.
+
+    `src` distingue les deux à l'enregistrement : `a` pour un article, `p` pour
+    un produit. Ils vivent dans deux tables, donc deux clés étrangères.
+    """
+    from services.models import Articleservice
+
+    from pharmacie.disponibilite import produits_pour_ecran
+
+    designations = [
+        {'src': 'a', 'pk': a.pk, 'nom': a.nom, 'prix': float(a.prix_vente or 0),
+         'stock': None, 'rupture': False}
+        for a in Articleservice.objects.select_related('categorie')
+                                       .filter(actif=True).order_by('nom')
+    ]
+    designations += [
+        {'src': 'p', 'pk': p['pk'], 'nom': p['designation'],
+         'prix': p['prix_vente'], 'stock': p['stock_actuel'],
+         'rupture': p['rupture']}
+        for p in produits_pour_ecran(request)
+    ]
+    return designations
+
+
+def _poser_origine(ligne, reference, pharmacie):
+    """Rattache la ligne à l'article ou au produit choisi dans la liste.
+
+    La référence est préfixée — `a:12` ou `p:7` — parce que les deux catalogues
+    numérotent chacun de leur côté : sans le préfixe, l'article 12 et le produit
+    12 seraient indiscernables.
+
+    Un produit que la pharmacie ne peut pas servir n'est pas rattaché : la ligne
+    reste, avec son libellé, mais elle cesse de prétendre sortir d'un stock qui
+    ne l'a pas. L'écran grise déjà ces produits ; ce contrôle-ci est celui qui
+    compte, puisqu'une liste déroulante ne protège de rien.
+    """
+    from pharmacie.disponibilite import est_disponible
+
+    if not reference or ':' not in reference:
+        return
+    source, _, brut = reference.partition(':')
+    try:
+        pk = int(brut)
+    except (TypeError, ValueError):
+        return
+    if source == 'a':
+        ligne.article_id = pk
+    elif source == 'p' and est_disponible(pk, pharmacie, ligne.quantite):
+        ligne.produit_id = pk
+
+
+def _save_lignes(facture, POST, pharmacie=None):
     total = 0
     i = 0
     while True:
@@ -624,15 +731,10 @@ def _save_lignes(facture, POST):
                     ligne.acte_id = int(acte_id)
                 except ValueError:
                     pass
-            # L'article du catalogue, d'où se déduira le type de la facture.
-            # Absent d'une ligne tapée à la main : elle ne comptera alors pour
+            # L'origine de la ligne, d'où se déduira le type de la facture.
+            # Absente d'une ligne tapée à la main : elle ne comptera alors pour
             # aucune nature, plutôt que d'en deviner une d'après son libellé.
-            article_id = POST.get(f'ligne_service_{i}')
-            if article_id:
-                try:
-                    ligne.article_id = int(article_id)
-                except (TypeError, ValueError):
-                    pass
+            _poser_origine(ligne, POST.get(f'ligne_service_{i}'), pharmacie)
             ligne.save()
             total += qte * prix * (1 - remise / 100)
         i += 1
@@ -665,15 +767,31 @@ def _sync_lignes_demande_examen(facture):
     demande.save(update_fields=['montant_total'])
 
 
-def _handle_paiement(facture, POST, user, total):
+def _handle_paiement(facture, POST, user, total, request=None):
     if not can_manage_paiement(user):
         return facture
     pay_montant, _erreur = _montant_paiement(POST.get('pay_montant'), facture)
     if pay_montant is None:
         return facture
 
+    # Facturer un produit, c'est le remettre au patient : on refuse d'encaisser
+    # ce que la pharmacie ne peut plus servir. La dernière boîte a pu partir
+    # entre la saisie de la ligne et l'encaissement — prendre l'argent quand
+    # même laisserait le stock mentir et le patient repartir les mains vides.
+    pharmacie = pharmacie_active(request)
+    manquants = produits_indisponibles(facture, pharmacie)
+    if manquants:
+        detail = ', '.join(f"{nom} (demandé {demande:g}, en rayon {dispo:g})"
+                           for nom, demande, dispo in manquants)
+        if request is not None:
+            messages.error(request, "Paiement refusé — la pharmacie ne peut plus "
+                                    f"servir : {detail}")
+        return facture
+
     mode      = POST.get('pay_mode', 'especes')
-    memo      = POST.get('pay_memo', '')
+    # Les deux écrans ne nomment pas ce champ pareil : « mémo » à la création,
+    # « référence » sur la fiche. Le premier renseigné fait foi.
+    memo      = POST.get('pay_memo') or POST.get('pay_reference', '')
     # `pay_compte` (« compte bancaire du bénéficiaire ») a été retiré de l'écran :
     # sa liste n'a jamais contenu la moindre option, donc la référence retombait
     # déjà toujours sur le mémo.
@@ -698,6 +816,15 @@ def _handle_paiement(facture, POST, user, total):
         facture.statut = 'emise'
     facture.save()
     log_event(facture, user, f'Paiement de {int(pay_montant):,} FCFA enregistré.', type='modif')
+    # Le stock bouge quand la facture est soldée, pas avant : un règlement
+    # partiel ne donne pas droit à la marchandise. L'opération se relance sans
+    # dommage — chaque mouvement porte le numéro de la facture.
+    if facture.statut == 'payee':
+        sortis = sortir_les_produits(facture, pharmacie, user)
+        if sortis:
+            log_event(facture, user,
+                      f'{sortis} produit(s) sortis du stock de la pharmacie.',
+                      type='modif')
     demarrer_soin_de_facture(facture)
     return facture
 

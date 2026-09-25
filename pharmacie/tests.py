@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from django.contrib.auth.models import Group, User
+from django.contrib.auth.models import Group, Permission, User
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.utils import timezone
@@ -34,10 +34,41 @@ def _stock_pharmacie(pharmacie='wale_toumbokro', produit=None, quantite=Decimal(
 
 
 def _groupe_user(username, groupe_nom):
+    """Utilisateur membre d'un groupe — qui ne lui accorde aucun droit en soi.
+
+    Le module s'appuyait sur des noms de groupes attendus en dur ; depuis la
+    migration 0009 il lit des permissions Django. Appartenir à un groupe nommé
+    « Caisse » ne suffit donc plus : c'est la permission qui ouvre la porte.
+    """
     user = User.objects.create_user(username, password='x')
     groupe, _ = Group.objects.get_or_create(name=groupe_nom)
     user.groups.add(groupe)
     return user
+
+
+def _user_avec_permissions(username, *codes, centre_code='TOUMBOKRO'):
+    """Utilisateur portant les permissions nommées, rattaché à un centre.
+
+    Les écrans de pharmacie posent deux verrous, et il faut les deux : la
+    permission Django, et le fait que le centre actif de la personne soit celui
+    dont dépend la pharmacie ouverte (`peut_acceder_pharmacie`). Un utilisateur
+    sans centre actif se voit refuser Toumbokro comme Yamoussoukro.
+    """
+    from centres.models import Centre
+
+    user = User.objects.create_user(username, password='x')
+    for code in codes:
+        user.user_permissions.add(Permission.objects.get(
+            codename=code, content_type__app_label='pharmacie'))
+    if centre_code:
+        centre = Centre.objects.get(code=centre_code)
+        profil = user.profile
+        profil.centres.add(centre)
+        profil.centre_actif = centre
+        profil.save(update_fields=['centre_actif'])
+    # `has_perm` mémorise ses résultats sur l'instance : sans cette relecture,
+    # un utilisateur interrogé avant l'ajout resterait refusé.
+    return User.objects.get(pk=user.pk)
 
 
 def _reset_current_user():
@@ -59,14 +90,23 @@ class TestCanViewRapportFinancier(TestCase):
         user = User.objects.create_user('u_cvrf', password='x')
         self.assertFalse(can_view_rapport_financier(user))
 
-    def test_groupes_autorises_ok(self):
-        for i, groupe in enumerate(['Caisse', 'Pharmacien', 'Administrateur', 'Directeur']):
-            user = _groupe_user(f'u_cvrf_{i}', groupe)
-            self.assertTrue(can_view_rapport_financier(user), f"{groupe} devrait être autorisé")
+    def test_la_permission_ouvre_le_rapport(self):
+        user = _user_avec_permissions('u_cvrf_perm', 'voir_rapport_financier_pharmacie')
+        self.assertTrue(can_view_rapport_financier(user))
 
-    def test_groupe_non_autorise_refuse(self):
-        user = _groupe_user('u_cvrf_accueil', 'Accueil')
-        self.assertFalse(can_view_rapport_financier(user))
+    def test_le_nom_du_groupe_ne_suffit_pas(self):
+        """Le test attendait l'inverse, et décrivait la règle d'avant 0009.
+
+        Le module exigeait l'appartenance à un groupe nommé « Caisse »,
+        « Pharmacien », « Administrateur » ou « Directeur » — quatre noms écrits
+        en dur, qu'il fallait créer à l'identique pour ouvrir quoi que ce soit.
+        Une permission Django se coche sur l'utilisateur ou sur le groupe de son
+        choix, et le nom du groupe n'a plus d'importance.
+        """
+        for i, groupe in enumerate(['Caisse', 'Pharmacien', 'Administrateur', 'Accueil']):
+            user = _groupe_user(f'u_cvrf_{i}', groupe)
+            self.assertFalse(can_view_rapport_financier(user),
+                             f"{groupe} ne devrait rien ouvrir sans la permission")
 
 
 # ─── Tests des vues de rapports : autorisations HTTP ───────────────────────────
@@ -85,14 +125,14 @@ class TestVuesRapportsPermissions(TestCase):
             self.assertEqual(resp.status_code, 403,
                              f"{name} devrait refuser un utilisateur sans groupe autorisé")
 
-    def test_rapports_autorises_pour_groupe_caisse(self):
-        _groupe_user('u_vrp_caisse', 'Caisse')
+    def test_rapports_autorises_par_la_permission(self):
+        _user_avec_permissions('u_vrp_perm', 'voir_rapport_financier_pharmacie')
         client = Client()
-        client.login(username='u_vrp_caisse', password='x')
+        client.login(username='u_vrp_perm', password='x')
         for name in RAPPORT_URLS:
             resp = client.get(reverse(name, kwargs={'pharmacie': 'wale_toumbokro'}))
             self.assertEqual(resp.status_code, 200,
-                             f"{name} devrait être accessible au groupe Caisse")
+                             f"{name} devrait s'ouvrir avec la permission")
 
 
 # ─── Tests calculs (montant_net, montant ligne, ecart) ─────────────────────────
@@ -153,7 +193,8 @@ class TestStockMovementViews(TestCase):
     def test_vente_diminue_stock_pharmacie_et_cree_mouvement(self):
         produit = _produit('VTE')
         sp = _stock_pharmacie('wale_toumbokro', produit, Decimal('10'))
-        _groupe_user('u_vte', 'Pharmacien')
+        _user_avec_permissions('u_vte', 'gerer_stock_pharmacie',
+                               'valider_vente_pharmacie')
         client = Client()
         client.login(username='u_vte', password='x')
         resp = client.post(reverse('pharmacie_caisse', kwargs={'pharmacie': 'wale_toumbokro'}), {
@@ -171,7 +212,7 @@ class TestStockMovementViews(TestCase):
             demande=demande, produit=produit,
             quantite_demandee=Decimal('10'), quantite_approuvee=Decimal('8'),
         )
-        User.objects.create_user('u_liv', password='x')
+        _user_avec_permissions('u_liv', 'gerer_stock_pharmacie')
         client = Client()
         client.login(username='u_liv', password='x')
         resp = client.post(
@@ -183,3 +224,204 @@ class TestStockMovementViews(TestCase):
         self.assertEqual(sp.quantite, Decimal('8'))
         demande.refresh_from_db()
         self.assertEqual(demande.statut, 'approuvee')
+
+
+# ─── La règle partagée : ce que la pharmacie du centre actif a en rayon ────────
+
+class TestDisponibiliteParCentre(TestCase):
+    """Un produit ne se propose que là où il y en a.
+
+    La prescription additionnait jusqu'ici le stock des deux pharmacies dès
+    qu'elle n'arrivait pas à rattacher le médecin à un centre — c'est-à-dire
+    toujours, aucun des 59 médecins n'ayant de compte utilisateur. Un
+    prescripteur de Toumbokro se voyait donc proposer ce qui dort à
+    Yamoussoukro, à quarante kilomètres.
+    """
+
+    def setUp(self):
+        from centres.models import Centre
+
+        self.toumbokro = Centre.objects.get_or_create(
+            code='TOUMBOKRO', defaults={'nom': 'CMS WALE Toumbokro'})[0]
+        self.yamoussoukro = Centre.objects.get_or_create(
+            code='WALE', defaults={'nom': 'CMS WALE Yamoussoukro'})[0]
+
+        self.sirop = Produit.objects.create(
+            nom='Sirop de test', type='medicament',
+            prix_achat=Decimal('100'), prix_vente=Decimal('500'))
+        self.gants = Produit.objects.create(
+            nom='Gants de test', type='consommable',
+            prix_achat=Decimal('50'), prix_vente=Decimal('200'))
+        self.tensiometre = Produit.objects.create(
+            nom='Tensiomètre de test', type='equipement',
+            prix_achat=Decimal('9000'), prix_vente=Decimal('15000'))
+
+        # Toumbokro a des gants mais plus de sirop ; Yamoussoukro a les deux.
+        _stock_pharmacie('wale_toumbokro', self.sirop, Decimal('0'))
+        _stock_pharmacie('wale_toumbokro', self.gants, Decimal('12'))
+        _stock_pharmacie('wale_yamoussoukro', self.sirop, Decimal('40'))
+        _stock_pharmacie('wale_yamoussoukro', self.gants, Decimal('5'))
+
+    # ── Rattachement ───────────────────────────────────────────────────────
+
+    def test_chaque_centre_a_sa_pharmacie(self):
+        from .disponibilite import pharmacie_du_centre
+
+        self.assertEqual(pharmacie_du_centre(self.toumbokro), 'wale_toumbokro')
+        self.assertEqual(pharmacie_du_centre(self.yamoussoukro), 'wale_yamoussoukro')
+
+    def test_un_centre_sans_pharmacie_ne_propose_rien(self):
+        """Mieux vaut une liste vide que celle d'un autre centre."""
+        from centres.models import Centre
+
+        from .disponibilite import pharmacie_du_centre, produits_de_la_pharmacie
+
+        ailleurs = Centre.objects.create(nom='CMS Ailleurs', code='AILLEURS')
+        self.assertIsNone(pharmacie_du_centre(ailleurs))
+        self.assertEqual(produits_de_la_pharmacie(None).count(), 0)
+
+    # ── Le stock proposé est celui de la pharmacie, pas du magasin ──────────
+
+    def test_le_stock_affiche_est_celui_de_la_pharmacie(self):
+        from .disponibilite import produits_de_la_pharmacie
+
+        par_nom = {p.nom: p.stock_pharma
+                   for p in produits_de_la_pharmacie('wale_toumbokro')}
+        self.assertEqual(par_nom['Sirop de test'], Decimal('0'))
+        self.assertEqual(par_nom['Gants de test'], Decimal('12'))
+
+        par_nom = {p.nom: p.stock_pharma
+                   for p in produits_de_la_pharmacie('wale_yamoussoukro')}
+        self.assertEqual(par_nom['Sirop de test'], Decimal('40'))
+        self.assertEqual(par_nom['Gants de test'], Decimal('5'))
+
+    def test_les_deux_pharmacies_ne_sont_jamais_additionnees(self):
+        """Le défaut d'avant : 0 + 40 donnait 40, et le sirop paraissait dispo."""
+        from .disponibilite import produits_de_la_pharmacie
+
+        toumbokro = {p.nom: p.stock_pharma
+                     for p in produits_de_la_pharmacie('wale_toumbokro')}
+        self.assertNotEqual(toumbokro['Sirop de test'], Decimal('40'))
+        self.assertEqual(toumbokro['Sirop de test'], Decimal('0'))
+
+    # ── Ce qui est proposé, et ce qui est grisé ─────────────────────────────
+
+    def test_les_consommables_sont_proposes_avec_les_medicaments(self):
+        """C'est leur absence qui a lancé ce chantier — les gants d'un examen."""
+        from .disponibilite import produits_de_la_pharmacie
+
+        noms = {p.nom for p in produits_de_la_pharmacie('wale_toumbokro')}
+        self.assertIn('Sirop de test', noms)
+        self.assertIn('Gants de test', noms)
+
+    def test_les_equipements_ne_sont_pas_proposes(self):
+        from .disponibilite import produits_de_la_pharmacie
+
+        noms = {p.nom for p in produits_de_la_pharmacie('wale_toumbokro')}
+        self.assertNotIn('Tensiomètre de test', noms)
+
+    def test_une_rupture_reste_visible_mais_sort_des_disponibles(self):
+        """Grisé et non effacé : cacher le produit ferait croire qu'il n'existe pas."""
+        from .disponibilite import produits_de_la_pharmacie
+
+        visibles = {p.nom for p in produits_de_la_pharmacie('wale_toumbokro')}
+        servables = {p.nom for p in produits_de_la_pharmacie(
+            'wale_toumbokro', disponibles_seulement=True)}
+
+        self.assertIn('Sirop de test', visibles)
+        self.assertNotIn('Sirop de test', servables)
+        self.assertIn('Gants de test', servables)
+
+    def test_un_produit_jamais_recu_se_presente_comme_une_rupture(self):
+        """Pour le patient, « jamais reçu » et « épuisé » veulent dire pareil."""
+        from .disponibilite import produits_de_la_pharmacie
+
+        inedit = Produit.objects.create(
+            nom='Produit jamais livré', type='medicament',
+            prix_achat=Decimal('10'), prix_vente=Decimal('30'))
+        StockPharmacie.objects.filter(produit=inedit).delete()
+
+        par_nom = {p.nom: p.stock_pharma
+                   for p in produits_de_la_pharmacie('wale_toumbokro')}
+        self.assertIn('Produit jamais livré', par_nom)
+        self.assertEqual(par_nom['Produit jamais livré'], Decimal('0'))
+
+    # ── Le garde-fou du serveur ─────────────────────────────────────────────
+
+    def test_le_serveur_refuse_ce_que_la_pharmacie_n_a_pas(self):
+        """L'écran grise, mais une liste déroulante ne protège de rien."""
+        from .disponibilite import est_disponible
+
+        self.assertFalse(est_disponible(self.sirop.pk, 'wale_toumbokro'))
+        self.assertTrue(est_disponible(self.sirop.pk, 'wale_yamoussoukro'))
+
+    def test_le_serveur_refuse_plus_que_le_rayon_ne_contient(self):
+        from .disponibilite import est_disponible
+
+        self.assertTrue(est_disponible(self.gants.pk, 'wale_toumbokro', 12))
+        self.assertFalse(est_disponible(self.gants.pk, 'wale_toumbokro', 13))
+
+    def test_le_serveur_refuse_les_demandes_absurdes(self):
+        from .disponibilite import est_disponible
+
+        self.assertFalse(est_disponible(self.gants.pk, 'wale_toumbokro', 0))
+        self.assertFalse(est_disponible(self.gants.pk, 'wale_toumbokro', -3))
+        self.assertFalse(est_disponible(self.gants.pk, 'wale_toumbokro', 'beaucoup'))
+        self.assertFalse(est_disponible(None, 'wale_toumbokro'))
+        self.assertFalse(est_disponible(self.gants.pk, None))
+
+
+class TestAncienneChaineSupprimee(TestCase):
+    """La chaîne du 9 mai 2026 n'existe plus.
+
+    `CategorieMedicament`, `Medicament`, `LotMedicament` et un `MouvementStock`
+    homonyme de celui de l'app `stock` avaient été écrits quand le déploiement
+    n'avait qu'une pharmacie : un seul `stock_actuel` par médicament, sans
+    notion de centre. La réécriture du 30 mai leur a substitué `stock.Produit`
+    et `StockPharmacie`, mais l'ancienne est restée branchée quatre mois sur les
+    ordonnances, avec des prix qui avaient divergé.
+    """
+
+    MODELES_SUPPRIMES = ('medicament', 'lotmedicament', 'mouvementstock',
+                         'categoriemedicament')
+
+    def test_les_modeles_n_existent_plus(self):
+        from django.apps import apps
+
+        restants = {m.__name__ for m in apps.get_app_config('pharmacie').get_models()}
+        for nom in ('Medicament', 'LotMedicament', 'CategorieMedicament'):
+            self.assertNotIn(nom, restants)
+
+    def test_le_doublon_de_nom_mouvementstock_est_leve(self):
+        """Deux classes portaient ce nom, une par app. Il n'en reste qu'une."""
+        from django.apps import apps
+
+        porteurs = [m._meta.label for m in apps.get_models()
+                    if m.__name__ == 'MouvementStock']
+        self.assertEqual(porteurs, ['stock.MouvementStock'])
+
+    def test_les_lignes_ne_pointent_plus_vers_la_table_morte(self):
+        from consultations.models import LigneOrdonnance
+
+        from facturation.models import LigneFacture
+
+        for modele in (LigneOrdonnance, LigneFacture):
+            champs = {f.name for f in modele._meta.get_fields()}
+            self.assertNotIn('medicament', champs, modele.__name__)
+
+        # La ligne d'ordonnance garde bien son lien vers le catalogue vivant.
+        self.assertIn('produit', {f.name for f in LigneOrdonnance._meta.get_fields()})
+
+    def test_les_permissions_orphelines_sont_parties(self):
+        """Sans ce nettoyage, deux « mouvement de stock » cohabiteraient dans l'admin."""
+        from django.contrib.auth.models import Permission
+        from django.contrib.contenttypes.models import ContentType
+
+        self.assertEqual(ContentType.objects.filter(
+            app_label='pharmacie', model__in=self.MODELES_SUPPRIMES).count(), 0)
+        self.assertEqual(Permission.objects.filter(
+            content_type__app_label='pharmacie',
+            content_type__model__in=self.MODELES_SUPPRIMES).count(), 0)
+        # Celles de l'app stock, elles, sont intactes.
+        self.assertTrue(ContentType.objects.filter(
+            app_label='stock', model='mouvementstock').exists())

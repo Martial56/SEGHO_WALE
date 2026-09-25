@@ -1,0 +1,30 @@
+{% load humanize %}
+{% comment %}
+Une ligne de la liste des factures.
+
+Extraite pour que la brique de regroupement (includes/listing/groupes.html)
+puisse l'imbriquer sous un en-tête de groupe. `parent` porte le chemin du groupe
+qui la contient, vide quand la liste n'est pas regroupée.
+
+La colonne Type a été retirée : depuis que le type se déduit du contenu, une
+facture qui mêle plusieurs natures s'affiche « Mixte », ce qui n'apprend rien
+dans un tableau. On la retrouve par les filtres et les regroupements, qui eux
+savent montrer le détail.
+{% endcomment %}
+      <tr data-parent="{{ parent|default:'' }}"{% if parent %} style="display:none;"{% endif %}
+          onclick="window.location='{% url 'facturation:detail' objet.pk %}'">
+        <td data-col="1" class="td-num">{{ objet.numero }}</td>
+        <td data-col="2" class="td-patient">{{ objet.patient.nom }} {{ objet.patient.prenoms }}</td>
+        {% if request.user.is_superuser %}
+        <td data-col="3"><span class="badge-type">{{ objet.centre.nom|default:"—" }}</span></td>
+        {% endif %}
+        <td data-col="4" style="color:var(--text-muted);white-space:nowrap;font-size:12px;">{{ objet.date_emission|date:"d/m/Y" }}</td>
+        <td data-col="5" class="td-montant">{{ objet.montant_total|floatformat:0|intcomma }} F</td>
+        <td data-col="6" class="td-montant" style="color:#16a96b;">{{ objet.montant_paye|floatformat:0|intcomma }} F</td>
+        <td data-col="7" class="td-montant" style="color:{% if objet.solde_restant > 0 %}var(--amber){% else %}var(--text-muted){% endif %};font-weight:{% if objet.solde_restant > 0 %}600{% else %}400{% endif %};">
+          {{ objet.solde_restant|floatformat:0|intcomma }} F
+        </td>
+        <td data-col="8"><span class="badge-statut badge-{{ objet.statut }}">{{ objet.get_statut_display }}</span></td>
+        {% comment %}En regard de la colonne du sélecteur de colonnes, dans l'en-tête.{% endcomment %}
+        <td></td>
+      </tr>

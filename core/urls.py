@@ -1,6 +1,5 @@
 from django.urls import path, include
 from . import views
-from facturation.views import facturation_list as _facturation_list_view
 from medecins.views import (
     medecin_dashboard as _medecin_dashboard_view,
     medecins_export_csv as _medecins_export_csv_view,
@@ -63,7 +62,6 @@ urlpatterns = [
     path('pharmacie/', include('pharmacie.urls')),
     path('laboratoire/', views.laboratoire_list, name='laboratoire_list'),
     path('hospitalisation/', include('hospitalisation.urls')),
-    path('facturation/', _facturation_list_view, name='facturation_list'),
     path('facturation/', include('facturation.urls')),
     path('laboratoire/nouvelle/', views.laboratoire_create, name='laboratoire_create'),
     path('laboratoire/<int:pk>/', views.laboratoire_detail, name='laboratoire_detail'),
