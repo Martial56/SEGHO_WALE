@@ -1322,7 +1322,7 @@
                  vient de s'ouvrir, et elle n'est pas dans l'arbre filtré. -->
             <div class="theme-wrap" id="theme-wrap">
               <button class="theme-toggle" id="theme-toggle"
-                      aria-label="Thème sombre / clair — survolez pour régler la luminosité">
+                      aria-label="Thème sombre / clair{% if luminosite_active %} — survolez pour régler la luminosité{% endif %}">
                   <svg class="icon-sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <circle cx="12" cy="12" r="5"/>
                       <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
@@ -1335,6 +1335,11 @@
                   </svg>
               </button>
 
+{% comment %}Curseur en sommeil : voir LUMINOSITE_ACTIVE dans
+              core/context_processors.py. Le panneau absent du DOM, le script
+              plus bas s'arrête de lui-même (`if (!wrap || !panneau ...) return`)
+              et la bascule clair/sombre continue de fonctionner.{% endcomment %}
+              {% if luminosite_active %}
               <div class="lum-panneau" id="lum-panneau" role="group" aria-label="Luminosité de l'interface">
                 <div class="lum-entete">
                   <span class="lum-titre">Luminosité</span>
@@ -1360,6 +1365,7 @@
                 </div>
                 <button type="button" class="lum-reset" id="lum-reset" {% if luminosite >= 100 %}hidden{% endif %}>Luminosité maximale</button>
               </div>
+              {% endif %}
             </div>
 
             <!-- Utilisateur -->

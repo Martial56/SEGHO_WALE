@@ -387,20 +387,6 @@ def build_listing_activite_soins_sn_xlsx(periode_debut, periode_fin, genere_le):
     return buffer.getvalue()
 
 
-def _transactions_caisse(periode_debut, periode_fin):
-    from caisse.models import TransactionCaisse
-    qs = TransactionCaisse.objects.filter(
-        date_transaction__date__range=[periode_debut, periode_fin]
-    ).select_related('session__caisse', 'cree_par').order_by('date_transaction')
-    columns = ['Numéro', 'Caisse', 'Type', 'Mode de paiement', 'Montant (FCFA)', 'Créé par', 'Date']
-    rows = [[
-        t.numero, str(t.session.caisse) if t.session_id else '—', t.get_type_transaction_display(),
-        t.get_mode_paiement_display(), float(t.montant), str(t.cree_par) if t.cree_par else '—',
-        t.date_transaction.strftime('%d/%m/%Y %H:%M'),
-    ] for t in qs]
-    return columns, rows
-
-
 def _mouvements_stock_pharmacie(periode_debut, periode_fin):
     # Les mouvements de stock pharmacie réels passent tous par
     # MouvementPharmacie (lié à stock.Produit) — MouvementStock (lié à

@@ -711,7 +711,7 @@ def rdv_create(request):
             if action == 'annuler':
                 return redirect('patients:rdv_global')
             from django.urls import reverse
-            return redirect(reverse('facture_create') + f'?patient={rdv.patient.pk}&rdv={rdv.pk}')
+            return redirect(reverse('facturation:create') + f'?patient={rdv.patient.pk}&rdv={rdv.pk}')
     else:
         # Avec les secondes : le champ les accepte depuis qu'il porte `step=1`,
         # et une valeur initiale tronquée les remettrait à zéro.
@@ -959,7 +959,7 @@ def rdv_edit(request, pk):
             messages.success(request, 'Rendez-vous modifié.')
             if action == 'créer une facture':
                 from django.urls import reverse
-                return redirect(reverse('facture_create') + f'?patient={rdv.patient.pk}&rdv={rdv.pk}')
+                return redirect(reverse('facturation:create') + f'?patient={rdv.patient.pk}&rdv={rdv.pk}')
             from django.urls import reverse
             return redirect(reverse('patients:rdv_edit', kwargs={'pk': rdv.pk}))
     else:
