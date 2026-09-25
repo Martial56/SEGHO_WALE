@@ -139,6 +139,16 @@ class Articleservice(models.Model):
         ('qtes_commandees', 'Sur les quantités commandées'),
         ('qtes_recues', 'Sur les quantités reçues'),
     ]
+    TYPE_TEST_LABO_CHOICES = [
+        ('hematologie', 'Hématologie'),
+        ('biochimie', 'Biochimie'),
+        ('bacteriologie', 'Bactériologie'),
+        ('serologie', 'Sérologie'),
+        ('parasitologie', 'Parasitologie'),
+        ('pathologie', 'Pathologie'),
+        ('imagerie', 'Imagerie'),
+        ('autre', 'Autre'),
+    ]
 
     # ── En-tête ───────────────────────────────────────────────
     nom = models.CharField(max_length=300, verbose_name="Nom de l'article")
@@ -193,6 +203,18 @@ class Articleservice(models.Model):
     departement = models.ForeignKey(
         'medecins.Departement', on_delete=models.SET_NULL, null=True, blank=True,
         verbose_name="Département"
+    )
+    type_test_labo = models.CharField(
+        max_length=20, choices=TYPE_TEST_LABO_CHOICES, blank=True,
+        verbose_name="Type de test (laboratoire)",
+        help_text="Pour un examen de laboratoire : sous-catégorie utilisée pour filtrer "
+                   "la liste des tests proposés selon le type de test choisi sur la demande."
+    )
+    code_hprim = models.CharField(
+        max_length=50, blank=True, verbose_name="Code HPRIM (laboratoire partenaire)",
+        help_text="Pour un examen de laboratoire : code attendu par le laboratoire "
+                   "partenaire pour reconnaître et router automatiquement l'analyse dans "
+                   "les échanges HPRIM. Laisser vide si le labo accepte le libellé seul."
     )
     code_barres = models.CharField(max_length=100, blank=True, verbose_name="Code-barres")
     famille = models.ForeignKey(

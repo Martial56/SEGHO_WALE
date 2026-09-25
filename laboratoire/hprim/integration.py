@@ -49,16 +49,25 @@ def _patient_data(patient, rang: int = 1) -> PatientData:
 
 
 def _analyses_de_demande(demande):
-    """Construit la liste des AnalyseData à partir des lignes de la demande."""
+    """Construit la liste des AnalyseData à partir des lignes de la demande.
+
+    Le code HPRIM (routage automatique côté labo partenaire) est cherché dans
+    cet ordre : Articleservice.code_hprim (catalogue utilisé par le formulaire
+    de création de demande), puis TypeExamen.code (catalogue historique, saisi
+    via l'admin) ; à défaut, seul le libellé est transmis (autorisé en ORM)."""
     analyses = []
     for ligne in demande.lignes.all():
-        te = ligne.type_examen
-        if te is not None:
-            analyses.append(AnalyseData(code=te.code,
-                                        libelle=te.nom or ligne.libelle, table="L"))
-        else:
-            # ligne libre : pas de code -> libellé seul (autorisé en ORA/ORM)
-            analyses.append(AnalyseData(code="", libelle=ligne.libelle, table="L"))
+        code = ""
+        libelle = ligne.libelle
+        article = ligne.article_service
+        if article is not None:
+            if article.code_hprim:
+                code = article.code_hprim
+            libelle = article.nom or libelle
+        if not code and ligne.type_examen is not None:
+            code = ligne.type_examen.code
+            libelle = ligne.type_examen.nom or libelle
+        analyses.append(AnalyseData(code=code, libelle=libelle, table="L"))
     if not analyses:
         # repli : utiliser le type_test global
         analyses.append(AnalyseData(code=demande.type_test or "",

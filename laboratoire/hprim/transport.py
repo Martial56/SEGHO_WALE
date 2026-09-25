@@ -41,16 +41,43 @@ class _FtpTls(FTP_TLS):
         return conn, size
 
     def storbinary(self, cmd, fp, blocksize=8192, callback=None, rest=None):
-        try:
-            return super().storbinary(cmd, fp, blocksize, callback, rest)
-        except ssl.SSLEOFError:
-            pass  # EOF sans close_notify = fin de transfert normale sur ces serveurs
+        """Réimplémentation de FTP.storbinary : n'avale le SSLEOFError que
+        sur le unwrap() final, APRÈS l'envoi complet des données. Un
+        SSLEOFError pendant l'envoi lui-même (ex. réseau coupé en cours de
+        transfert) doit remonter, sous peine d'envoyer un .HPR tronqué
+        (silencieusement privé de son <CR><LF> final) tout en le journalisant
+        comme transmis avec succès."""
+        self.voidcmd('TYPE I')
+        with self.transfercmd(cmd, rest) as conn:
+            while True:
+                buf = fp.read(blocksize)
+                if not buf:
+                    break
+                conn.sendall(buf)
+                if callback:
+                    callback(buf)
+            try:
+                conn.unwrap()
+            except ssl.SSLEOFError:
+                pass  # EOF sans close_notify = fin de transfert normale sur ces serveurs
+        return self.voidresp()
 
     def retrbinary(self, cmd, callback, blocksize=8192, rest=None):
-        try:
-            return super().retrbinary(cmd, callback, blocksize, rest)
-        except ssl.SSLEOFError:
-            pass
+        """Même principe que storbinary : le SSLEOFError n'est toléré qu'au
+        unwrap() final, pas pendant la réception des données (sinon un
+        fichier reçu tronqué serait accepté comme complet)."""
+        self.voidcmd('TYPE I')
+        with self.transfercmd(cmd, rest) as conn:
+            while True:
+                data = conn.recv(blocksize)
+                if not data:
+                    break
+                callback(data)
+            try:
+                conn.unwrap()
+            except ssl.SSLEOFError:
+                pass
+        return self.voidresp()
 
 
 def _connecter_ftp(host: str, port: int, user: str, password: str,

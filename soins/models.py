@@ -122,7 +122,16 @@ class Soin(ModeleCentre):
         verbose_name = "Soin"
         verbose_name_plural = "Soins"
         ordering = ['-date_creation']
+        # Les quatre permissions de base sont déclarées ici, en français, plutôt
+        # que laissées à Django : il les nomme « Can add Soin », et c'est ce
+        # libellé anglais que lit la personne qui compose un groupe dans
+        # /admin/. Les codes, eux, ne bougent pas.
+        default_permissions = ()
         permissions = [
+            ('view_soin', 'Peut consulter les soins'),
+            ('add_soin', 'Peut créer un soin'),
+            ('change_soin', 'Peut modifier un soin'),
+            ('delete_soin', 'Peut supprimer un soin'),
             # Attention : 'can_creer_facture' existe aussi sur hospitalisation.Hospitalisation
             # (codename dupliqué entre apps). Toujours qualifier par app_label :
             # user.has_perm('soins.can_creer_facture'), jamais un
@@ -213,5 +222,14 @@ class ProcedureSoin(ModeleCentre):
         verbose_name = "Procédure de soin"
         verbose_name_plural = "Liste des soins"
         ordering = ['-date']
+        # Même raison que sur Soin : les libellés doivent être lisibles dans
+        # l'écran des groupes.
+        default_permissions = ()
+        permissions = [
+            ('view_proceduresoin', 'Peut consulter les procédures de soin'),
+            ('add_proceduresoin', 'Peut créer une procédure de soin'),
+            ('change_proceduresoin', 'Peut modifier une procédure de soin'),
+            ('delete_proceduresoin', 'Peut supprimer une procédure de soin'),
+        ]
 
 

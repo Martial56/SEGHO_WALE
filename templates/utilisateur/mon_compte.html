@@ -443,6 +443,36 @@ html[data-theme="dark"] .cpt-badge {
     </div>
   </div>
 
+  {% comment %}Carte en sommeil : voir LUMINOSITE_ACTIVE dans
+  core/context_processors.py.{% endcomment %}
+  {% if luminosite_active %}
+  <!-- Luminosité de l'écran -->
+  <div class="cpt-card">
+    <div class="cpt-card-head">
+      <i class="bi bi-brightness-high" style="font-size:16px;color:var(--accent-text-soft);"></i>
+      <span class="cpt-titre">Luminosité de l'écran</span>
+    </div>
+    <div class="cpt-card-body">
+      <p class="cpt-desc">
+        Assombris l'interface pour les gardes de nuit ou les écrans trop lumineux.
+        Le réglage te suit d'un poste à l'autre. Raccourci : survole le bouton de
+        thème, en haut à droite.
+      </p>
+      <div style="display:flex;align-items:center;gap:14px;max-width:360px;">
+        <input type="range" class="lum-curseur" id="cpt-lum-curseur"
+               min="70" max="100" step="5" value="{{ luminosite|default:100 }}"
+               aria-label="Luminosité de l'interface, en pourcentage">
+        <span class="lum-valeur" id="cpt-lum-valeur"
+              style="min-width:48px;text-align:right;">{{ luminosite|default:100 }}&nbsp;%</span>
+      </div>
+      <button type="button" id="cpt-lum-reset" class="cpt-btn-neutre" style="margin-top:12px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 3 3 8 8 8"/></svg>
+        Luminosité maximale (100 %)
+      </button>
+    </div>
+  </div>
+  {% endif %}
+
   </div>
 </div>
 
@@ -454,6 +484,33 @@ html[data-theme="dark"] .cpt-badge {
 {% endblock %}
 
 {% block extra_js %}
+{% comment %}
+Le curseur du bandeau est présent sur cette page comme partout : plutôt que de
+dupliquer l'application du filtre et l'enregistrement, on lui répercute la
+valeur et c'est lui qui fait le travail.
+{% endcomment %}
+<script>
+(function () {
+    var ici  = document.getElementById('cpt-lum-curseur');
+    var etiq = document.getElementById('cpt-lum-valeur');
+    var rst  = document.getElementById('cpt-lum-reset');
+    var haut = document.getElementById('lum-curseur');
+    if (!ici || !haut) return;
+
+    function repercuter(v, avecChange) {
+        if (etiq) etiq.textContent = v + ' %';
+        haut.value = v;
+        haut.dispatchEvent(new Event('input', { bubbles: true }));
+        if (avecChange) haut.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    ici.addEventListener('input',  function () { repercuter(parseInt(ici.value, 10), false); });
+    ici.addEventListener('change', function () { repercuter(parseInt(ici.value, 10), true); });
+    if (rst) rst.addEventListener('click', function () {
+        ici.value = 100;
+        repercuter(100, true);
+    });
+})();
+</script>
 <script>
 function togglePw(inputId, btn) {
   var inp = document.getElementById(inputId);

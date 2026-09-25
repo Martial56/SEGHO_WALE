@@ -110,9 +110,16 @@ class ProcedureSoinForm(forms.ModelForm):
         required=False,
         empty_label="— Aucune facture liée —",
     )
+    #: `step=1` ouvre les secondes dans le sélecteur du navigateur, qui s'arrête
+    #: à la minute sans lui — et enregistrait donc systématiquement « :00 ».
+    #: Les formats sans seconde restent acceptés : les valeurs déjà saisies, et
+    #: un navigateur qui ignorerait `step`, ne doivent pas être refusés.
     date = forms.DateTimeField(
-        input_formats=['%Y-%m-%dT%H:%M', '%d/%m/%Y %H:%M', '%Y-%m-%d %H:%M'],
-        widget=forms.DateTimeInput(attrs={'type': 'datetime-local'}),
+        input_formats=['%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M',
+                       '%d/%m/%Y %H:%M:%S', '%d/%m/%Y %H:%M',
+                       '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M'],
+        widget=forms.DateTimeInput(attrs={'type': 'datetime-local', 'step': '1'},
+                                   format='%Y-%m-%dT%H:%M:%S'),
         error_messages={'required': "La date est obligatoire."},
     )
 

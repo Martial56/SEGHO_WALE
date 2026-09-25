@@ -1,3 +1,6 @@
+import re
+from datetime import date
+
 from django import forms
 from .models import Patient, Assurance, RendezVous, Pathologie, TypeVisiteCurative
 from gynecologie.models import TypeVisite
@@ -119,11 +122,42 @@ class PatientForm(forms.ModelForm):
         self.fields['assurance'].empty_label = '— Aucune assurance —'
         self.fields['nationalite'].initial = 'Ivoirienne'
         self.fields['ville'].initial = 'Yamoussoukro'
+        self.fields['adresse'].required = True
         for field in self.fields.values():
             field.error_messages = {
                 'required': 'Ce champ est obligatoire.',
                 'invalid': 'Valeur invalide.',
             }
+
+    def clean_date_naissance(self):
+        date_naissance = self.cleaned_data.get('date_naissance')
+        if date_naissance and date_naissance > date.today():
+            raise forms.ValidationError('La date de naissance ne peut pas être postérieure à aujourd\'hui.')
+        return date_naissance
+
+    @staticmethod
+    def _valider_numero_ivoirien(value):
+        """Le JS convertit déjà le numéro en E.164 (+225xxxxxxxxxx) avant la
+        soumission, mais reste contournable : on revalide ici les numéros
+        ivoiriens (sans indicatif d'un autre pays), qui comptent 10 chiffres
+        depuis la renumérotation de 2021."""
+        value = (value or '').strip()
+        if not value or value.startswith('+') and not value.startswith('+225'):
+            return value
+        digits = re.sub(r'\D', '', value)
+        if digits.startswith('225'):
+            digits = digits[3:]
+        if len(digits) != 10:
+            raise forms.ValidationError(
+                'Un numéro ivoirien doit contenir 10 chiffres.'
+            )
+        return value
+
+    def clean_telephone(self):
+        return self._valider_numero_ivoirien(self.cleaned_data.get('telephone'))
+
+    def clean_telephone2(self):
+        return self._valider_numero_ivoirien(self.cleaned_data.get('telephone2'))
 
     def clean(self):
         cleaned = super().clean()
@@ -160,9 +194,13 @@ class RendezVousForm(forms.ModelForm):
             'departement': forms.Select(attrs={'class': _ul}),
             'medecin': DepartementFiltreSelect(attrs={'class': _ul}),
             'type_consultation': DepartementFiltreSelect(attrs={'class': _ul}),
+            # `step=1` ouvre les secondes : sans lui le sélecteur du
+            # navigateur s'arrête à la minute et enregistre toujours « :00 ».
+            # La lecture n'a pas besoin d'être élargie — forms.DateTimeField
+            # passe d'abord par parse_datetime, qui lit l'ISO 8601 complet.
             'date_heure': forms.DateTimeInput(
-                attrs={'class': _ul, 'type': 'datetime-local'},
-                format='%Y-%m-%dT%H:%M',
+                attrs={'class': _ul, 'type': 'datetime-local', 'step': '1'},
+                format='%Y-%m-%dT%H:%M:%S',
             ),
             'motif': forms.Textarea(attrs={
                 'class': _ul, 'rows': 3, 'placeholder': 'Motif de la visite...',
@@ -180,7 +218,7 @@ class RendezVousForm(forms.ModelForm):
         self.fields['patient'].empty_label = '— Sélectionner un patient —'
         self.fields['departement'].queryset = Departement.objects.filter(actif=True).order_by('nom')
         self.fields['departement'].empty_label = '— Choisir un département —'
-        self.fields['departement'].required = False
+        self.fields['departement'].required = True
         if locked_billing:
             # Une fois le rendez-vous confirmé et facturé, le département et le
             # type de consultation ne doivent plus changer : la facture a déjà

@@ -15,7 +15,7 @@ from django.views.decorators.http import require_POST
 
 from django.db.models import Q as _Q
 from employer.models import Employe, Conge, SoldeConge, HistoriqueConge, NotificationConge, Presence
-from conges.models import TypeConge
+from conges.models import TypeConge, ReglesConge, PalierAnciennete
 from conges.utils import (
     compter_jours_ouvres, detecter_conflits, get_or_create_solde,
     jours_feries_ivoire, jours_feries_labels, quota_annuel,
@@ -1333,17 +1333,21 @@ def conge_soldes(request):
             date_debut__year=year,
             deduit_du_solde=True,
         ).aggregate(t=Sum('nb_jours_ouvres'))['t'] or 0
-        previsionnel = round(float(s.quota) + float(s.jours_reporter) - float(total_planifie), 1)
+        previsionnel = round(
+            float(s.quota) + float(s.jours_reporter)
+            - float(total_planifie) - float(s.jours_deja_pris_avant_saisie), 1
+        )
         soldes_data.append({'solde': s, 'previsionnel': previsionnel})
 
     # Totaux sur TOUS les employés filtrés (pas seulement la page affichée) — lus depuis
     # les SoldeConge déjà en base (rafraîchis via "Recalculer" si besoin), sans recalcul complet.
     totaux = SoldeConge.objects.filter(employe__in=employes, annee=year).aggregate(
-        tq=Sum('quota'), tp=Sum('jours_pris'), tr=Sum('jours_reporter'),
+        tq=Sum('quota'), tp=Sum('jours_pris'), tr=Sum('jours_reporter'), ta=Sum('jours_deja_pris_avant_saisie'),
     )
     total_quota = float(totaux['tq'] or 0)
     total_pris  = float(totaux['tp'] or 0)
-    total_solde = total_quota + float(totaux['tr'] or 0) - total_pris
+    total_ajust = float(totaux['ta'] or 0)
+    total_solde = total_quota + float(totaux['tr'] or 0) - total_pris - total_ajust
 
     page_obj = emp_page
     page_obj.object_list = soldes_data
@@ -1360,6 +1364,7 @@ def conge_soldes(request):
         'can_manage':   True,
         'total_quota':  total_quota,
         'total_pris':   total_pris,
+        'total_ajust':  total_ajust,
         'total_solde':  total_solde,
     })
 
@@ -1385,6 +1390,28 @@ def conge_solde_recalc(request):
         from django.urls import reverse
         return redirect(reverse('conge_soldes') + f'?year={year}')
     return redirect('conge_soldes')
+
+
+# ── Ajustement manuel (jours déjà pris avant saisie) ──────────────────────────
+@login_required(login_url='login')
+@require_POST
+def conge_solde_ajustement(request, pk):
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
+    solde = get_object_or_404(SoldeConge, pk=pk)
+    valeur = request.POST.get('jours_deja_pris_avant_saisie', '').strip().replace(',', '.')
+    try:
+        valeur = float(valeur) if valeur else 0
+        if valeur < 0:
+            raise ValueError
+    except ValueError:
+        messages.error(request, 'Valeur invalide.')
+    else:
+        solde.jours_deja_pris_avant_saisie = valeur
+        solde.save(update_fields=['jours_deja_pris_avant_saisie', 'mis_a_jour_le'])
+        messages.success(request, f"Ajustement enregistré pour {solde.employe.nom_complet}.")
+    from django.urls import reverse
+    return redirect(reverse('conge_soldes') + f'?year={solde.annee}')
 
 
 # ── Report annuel des soldes ──────────────────────────────────────────────────
@@ -2037,7 +2064,7 @@ def _type_conge_form_class():
     class TypeCongeForm(forms.ModelForm):
         class Meta:
             model = TypeConge
-            fields = ['nom', 'code', 'couleur', 'deductible', 'duree_forfaitaire', 'actif']
+            fields = ['nom', 'code', 'nature', 'couleur', 'deductible', 'duree_forfaitaire', 'actif']
             widgets = {
                 'nom':  forms.TextInput(attrs={'placeholder': 'Ex : Congé annuel'}),
                 'code': forms.TextInput(attrs={'placeholder': 'Ex : annuel'}),
@@ -2081,11 +2108,11 @@ def conge_type_create(request):
     if request.method == 'POST' and form.is_valid():
         obj = form.save()
         if is_ajax:
-            return JsonResponse({'ok': True, 'message': f"Type de congé « {obj} » créé."})
-        messages.success(request, f"Type de congé « {obj} » créé.")
+            return JsonResponse({'ok': True, 'message': f"Type de demande « {obj} » créé."})
+        messages.success(request, f"Type de demande « {obj} » créé.")
         return redirect('conge_type_list')
     return render(request, 'conges/config/type_form_modal.html', {
-        'form': form, 'titre': 'Nouveau type de congé',
+        'form': form, 'titre': 'Nouveau type de demande',
     })
 
 
@@ -2100,8 +2127,8 @@ def conge_type_edit(request, pk):
     if request.method == 'POST' and form.is_valid():
         form.save()
         if is_ajax:
-            return JsonResponse({'ok': True, 'message': f"Type de congé « {obj} » mis à jour."})
-        messages.success(request, f"Type de congé « {obj} » mis à jour.")
+            return JsonResponse({'ok': True, 'message': f"Type de demande « {obj} » mis à jour."})
+        messages.success(request, f"Type de demande « {obj} » mis à jour.")
         return redirect('conge_type_list')
     return render(request, 'conges/config/type_form_modal.html', {
         'form': form, 'titre': f'Modifier — {obj.nom}', 'obj': obj,
@@ -2123,5 +2150,91 @@ def conge_type_delete(request, pk):
         return redirect('conge_type_list')
     nom = obj.nom
     obj.delete()
-    messages.success(request, f"Type de congé « {nom} » supprimé.")
+    messages.success(request, f"Type de demande « {nom} » supprimé.")
     return redirect('conge_type_list')
+
+
+# ── Configuration : Règles de calcul du quota ──────────────────────────────────
+
+@login_required(login_url='login')
+def conge_regles_calcul(request):
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
+    regles = ReglesConge.get()
+    if request.method == 'POST' and request.POST.get('form') == 'base':
+        jours_par_mois = request.POST.get('jours_par_mois', '').strip().replace(',', '.')
+        try:
+            valeur = float(jours_par_mois)
+            if valeur <= 0:
+                raise ValueError
+        except ValueError:
+            messages.error(request, 'Valeur invalide pour les jours acquis par mois.')
+        else:
+            regles.jours_par_mois = valeur
+            regles.save(update_fields=['jours_par_mois'])
+            messages.success(request, 'Base de calcul enregistrée.')
+        return redirect('conge_regles_calcul')
+    return render(request, 'conges/config/regles.html', {
+        'regles': regles,
+        'paliers': PalierAnciennete.objects.all(),
+        'nav_active': 'config',
+    })
+
+
+def _palier_form_values(request):
+    annees_min = request.POST.get('annees_min', '').strip()
+    jours_bonus = request.POST.get('jours_bonus', '').strip().replace(',', '.')
+    try:
+        annees_min = int(annees_min)
+        jours_bonus = float(jours_bonus)
+        if annees_min < 0 or jours_bonus < 0:
+            raise ValueError
+    except ValueError:
+        return None, None
+    return annees_min, jours_bonus
+
+
+@login_required(login_url='login')
+@require_POST
+def conge_palier_create(request):
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
+    annees_min, jours_bonus = _palier_form_values(request)
+    if annees_min is None:
+        messages.error(request, 'Valeurs invalides.')
+    elif PalierAnciennete.objects.filter(annees_min=annees_min).exists():
+        messages.error(request, f'Un palier existe déjà pour {annees_min} ans d\'ancienneté.')
+    else:
+        PalierAnciennete.objects.create(annees_min=annees_min, jours_bonus=jours_bonus)
+        messages.success(request, 'Palier ajouté.')
+    return redirect('conge_regles_calcul')
+
+
+@login_required(login_url='login')
+@require_POST
+def conge_palier_edit(request, pk):
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
+    palier = get_object_or_404(PalierAnciennete, pk=pk)
+    annees_min, jours_bonus = _palier_form_values(request)
+    if annees_min is None:
+        messages.error(request, 'Valeurs invalides.')
+    elif PalierAnciennete.objects.filter(annees_min=annees_min).exclude(pk=pk).exists():
+        messages.error(request, f'Un palier existe déjà pour {annees_min} ans d\'ancienneté.')
+    else:
+        palier.annees_min = annees_min
+        palier.jours_bonus = jours_bonus
+        palier.save()
+        messages.success(request, 'Palier mis à jour.')
+    return redirect('conge_regles_calcul')
+
+
+@login_required(login_url='login')
+@require_POST
+def conge_palier_delete(request, pk):
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
+    palier = get_object_or_404(PalierAnciennete, pk=pk)
+    palier.delete()
+    messages.success(request, 'Palier supprimé.')
+    return redirect('conge_regles_calcul')

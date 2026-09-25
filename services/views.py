@@ -6,6 +6,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.paginator import Paginator
+from django.utils import timezone
 from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.http import require_POST
@@ -26,63 +27,93 @@ from django.contrib.auth.models import User
 
 @login_required
 def services_list(request):
-    qs = Articleservice.objects.select_related('categorie', 'famille').all()
+    """Liste des prestations.
 
-    # Filtres
+    Filtres cumulables, regroupements imbriqués et tri serveur viennent de
+    core.listing, comme les listes de soins, d'hospitalisations et de chambres.
+    Auparavant un seul `filtre` à la fois, parcouru par une chaîne de `elif` :
+    demander « Services » puis « Favoris » effaçait le premier critère, et
+    « Archivé » faisait doublon avec « Inactif ».
+    """
+    from core.listing import Listing, menu_filtres, menu_groupes, paginer_groupes
+    from .article_listing import (CHAMPS_RECHERCHE, CODES_PERIODE, FILTRES_DEFAUT,
+                                  TRIS, construire_dimensions, familles_articles,
+                                  libelle_periode)
+
+    today = timezone.now().date()
     q = request.GET.get('q', '').strip()
-    categorie_id = request.GET.get('categorie', '')
-    type_produit = request.GET.get('type_produit', '')
-    statut = request.GET.get('statut', '')
-    filtre = request.GET.get('filtre', '')
-    vue = request.GET.get('vue', 'liste')  # kanban ou liste
+    groupes = request.GET.getlist('group')
+    date_from = request.GET.get('date_from', '').strip()
+    date_to = request.GET.get('date_to', '').strip()
 
-    if q:
-        qs = qs.filter(
-            Q(nom__icontains=q) |
-            Q(reference_interne__icontains=q) |
-            Q(code_barres__icontains=q)
-        )
-    if categorie_id:
-        qs = qs.filter(categorie_id=categorie_id)
-    if type_produit:
-        qs = qs.filter(type_produit_hospitalier=type_produit)
-    if statut == 'actif':
-        qs = qs.filter(actif=True)
-    elif statut == 'inactif':
-        qs = qs.filter(actif=False)
-    if filtre == 'services':
-        qs = qs.filter(type_produit_hospitalier='service')
-    elif filtre == 'articles':
-        qs = qs.exclude(type_produit_hospitalier='service')
-    elif filtre == 'peut_etre_vendu':
-        qs = qs.filter(peut_etre_vendu=True)
-    elif filtre == 'peut_etre_achete':
-        qs = qs.filter(peut_etre_achete=True)
-    elif filtre == 'favori':
-        qs = qs.filter(favori=True)
-    elif filtre == 'avertissement':
-        qs = qs.filter(Q(avertissement_grossesse=True) | Q(avertissement_lactation=True))
-    elif filtre == 'archive':
-        qs = qs.filter(actif=False)
+    vue = request.GET.get('vue', 'liste')
+    if vue not in ('liste', 'kanban'):
+        vue = 'liste'
 
-    total = qs.count()
-    paginator = Paginator(qs, 24 if vue == 'kanban' else 40)
-    page_obj = paginator.get_page(request.GET.get('page'))
+    base_qs = Articleservice.objects.select_related(
+        'categorie', 'famille', 'compagnie_pharmaceutique', 'unite_mesure', 'departement'
+    )
 
-    categories = CategorieArticle.objects.all()
-    type_produit_choices = Articleservice.TYPE_PRODUIT_CHOICES
+    declarees = construire_dimensions()
+    listing = Listing(
+        recherche=CHAMPS_RECHERCHE,
+        familles=familles_articles(),
+        dimensions=list(declarees.values()),
+        par_page=24 if vue == 'kanban' else 40,
+        filtres_defaut=FILTRES_DEFAUT,
+        tri_defaut=('nom',),
+        tris=TRIS,
+    )
+
+    filtres = listing.filtres_demandes(request)
+    qs = listing.appliquer_recherche(base_qs, q)
+    qs = listing.appliquer_filtres(qs, filtres, {
+        'aujourdhui': today, 'date_from': date_from, 'date_to': date_to,
+    })
+    tri, tri_sens = listing.tri_demande(request)
+    qs = listing.trier(qs, groupes, tri, tri_sens)
+
+    # Le regroupement ne vaut que pour la vue liste : paginer_groupes renvoie
+    # une page de *libellés de groupe*, sur laquelle le kanban itérerait à tort.
+    if vue == 'kanban':
+        groupes = []
+
+    dims = [declarees[g] for g in groupes if g in declarees]
+    arbre = []
+    if dims:
+        arbre, page_obj, nb_groupes = paginer_groupes(qs, dims, request.GET.get('page'))
+        # La pagination porte sur les groupes : le compteur du titre doit rester
+        # celui des prestations.
+        total = qs.count()
+    else:
+        nb_groupes = 0
+        page_obj = Paginator(qs, listing.par_page).get_page(request.GET.get('page'))
+        total = page_obj.paginator.count
 
     return render(request, 'services/list.html', {
         'page_obj': page_obj,
-        'categories': categories,
-        'type_produit_choices': type_produit_choices,
-        'q': q,
-        'categorie_id': categorie_id,
-        'type_produit': type_produit,
-        'statut': statut,
-        'filtre': filtre,
-        'vue': vue,
+        'arbre': arbre,
+        'nb_groupes': nb_groupes,
         'total': total,
+        'q': q,
+        'tri': tri,
+        'tri_sens': tri_sens,
+        'filters': filtres,
+        'groups': groupes,
+        'date_from': date_from,
+        'date_to': date_to,
+        'filtre_pose': bool(filtres),
+        'selection_active': bool(q or groupes or not listing.est_selection_par_defaut(filtres)),
+        'periode_libelle': libelle_periode(filtres, date_from, date_to),
+        # Un catalogue s'ouvre entier : la mention de période n'a de sens que
+        # lorsqu'une période est réellement demandée, sinon le titre répète
+        # « tout le catalogue » en permanence.
+        'periode_active': bool(date_from or date_to or set(filtres) & set(CODES_PERIODE)),
+        # Menus générés depuis la déclaration : le gabarit ne fait que parcourir.
+        'listing_filtres': menu_filtres(listing.familles, filtres, date_from, date_to),
+        'listing_groupes': menu_groupes(list(declarees.values()), groupes),
+        'vue': vue,
+        'today': today,
     })
 
 
@@ -154,6 +185,8 @@ def service_form(request, pk=None):
         article.categorie_id = categorie_id if categorie_id else None
         departement_id = data.get('departement')
         article.departement_id = departement_id if departement_id else None
+        article.type_test_labo = data.get('type_test_labo', '')
+        article.code_hprim = data.get('code_hprim', '')
         article.code_barres = data.get('code_barres', '')
         famille_id = data.get('famille')
         article.famille_id = famille_id if famille_id else None
@@ -231,6 +264,7 @@ def service_form(request, pk=None):
         'politique_fact_choices': Articleservice.POLITIQUE_FACT_CHOICES,
         'refacturer_choices': Articleservice.REFACTURER_CHOICES,
         'politique_controle_choices': Articleservice.POLITIQUE_CONTROLE_CHOICES,
+        'type_test_labo_choices': Articleservice.TYPE_TEST_LABO_CHOICES,
         'cat_codes_json': cat_codes_json,
     })
 
@@ -541,7 +575,7 @@ _ART_HDR = [
     'reference_interne', 'nom', 'prix_vente', 'cout',
     'type_article', 'type_produit_hospitalier',
     'actif', 'peut_etre_vendu', 'peut_etre_achete',
-    'categorie', 'unite_mesure', 'unite_achat', 'code_barres',
+    'categorie', 'type_test_labo', 'code_hprim', 'unite_mesure', 'unite_achat', 'code_barres',
     'forme', 'voie_administration', 'dosage', 'dosage_unite',
     'composant_actif', 'effet_therapeutique', 'indications',
     'avertissement_grossesse', 'avertissement_lactation',
@@ -557,6 +591,8 @@ def _art_row(a):
         a.type_article, a.type_produit_hospitalier,
         int(a.actif), int(a.peut_etre_vendu), int(a.peut_etre_achete),
         a.categorie.code if a.categorie else '',
+        a.type_test_labo,
+        a.code_hprim,
         a.unite_mesure.code if a.unite_mesure else '',
         a.unite_achat.code if a.unite_achat else '',
         a.code_barres, a.forme, a.voie_administration,
@@ -660,6 +696,8 @@ def import_articles(request):
                 'peut_etre_vendu': _b(item.get('peut_etre_vendu', True)),
                 'peut_etre_achete': _b(item.get('peut_etre_achete', False)),
                 'categorie': cat, 'unite_mesure': um, 'unite_achat': ua,
+                'type_test_labo': _s(item.get('type_test_labo', '')),
+                'code_hprim': _s(item.get('code_hprim', '')),
                 'code_barres': _s(item.get('code_barres', '')),
                 'forme': _s(item.get('forme', '')),
                 'voie_administration': _s(item.get('voie_administration', '')),

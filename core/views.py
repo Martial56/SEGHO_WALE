@@ -1,7 +1,9 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
 from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, permission_required
+
+from modules_permissions.decorateurs import module_requis
 from django.views.decorators.http import require_POST
 from django.contrib import messages
 from patients.models import TypeVisiteCurative as _TypeVisiteCurative
@@ -203,11 +205,30 @@ def accent_color_set(request):
     return JsonResponse({'ok': True, 'color': color, 'css': build_accent_css(color)})
 
 
+@login_required(login_url='login')
+@require_POST
+def luminosite_set(request):
+    """Enregistre la luminosité choisie au curseur du bandeau.
+
+    Une différence assumée avec accent_color_set : pas de réponse 400. On borne
+    et on renvoie la valeur réellement écrite, pour que le client s'y recale si
+    elle a été rognée. Un curseur borné côté client ne peut pas produire une
+    faute que l'utilisateur pourrait corriger lui-même."""
+    from core.models import UserProfile
+    from core.utils import normaliser_luminosite
+
+    pourcent = normaliser_luminosite(request.POST.get('luminosite'))
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    profile.luminosite = pourcent
+    profile.save(update_fields=['luminosite'])
+    return JsonResponse({'ok': True, 'luminosite': pourcent})
+
+
 def _get_dashboard_stats():
     from patients.models import Patient, RendezVous
     from consultations.models import Consultation
     from hospitalisation.models import Hospitalisation
-    from pharmacie.models import Medicament
+    from core.context_processors import _medicaments_alerte_count
     from facturation.models import Facture
     from laboratoire.models import AnalyseLaboratoire
     from employer.models import Employe
@@ -223,7 +244,7 @@ def _get_dashboard_stats():
         'hospitalisations': Hospitalisation.objects.filter(statut__in=['confirme', 'hospitalise']).count(),
         'analyses_pending': AnalyseLaboratoire.objects.filter(statut__in=['recu', 'en_analyse']).count(),
         'factures_impayees': Facture.objects.filter(statut='emise').count(),
-        'medicaments_alerte': Medicament.objects.filter(stock_actuel__lte=F('stock_alerte')).count(),
+        'medicaments_alerte': _medicaments_alerte_count(),
         'employes_actifs': Employe.objects.filter(statut='actif').count(),
     }
 
@@ -272,6 +293,7 @@ def dashboard(request):
     ).count()
 
     from core.pastilles import pastilles as _pastilles
+    from employer.views import can_manage_rh
 
     response = render(request, 'core/dashboard.html', {
         'stats': stats,
@@ -283,6 +305,7 @@ def dashboard(request):
         'user_modules': user_modules,
         'accessible_codes': accessible_codes,
         'plannings_non_vus': plannings_non_vus,
+        'can_manage_rh_presence': can_manage_rh(request.user),
     })
     response['Cache-Control'] = 'no-store, no-cache, must-revalidate'
     response['Pragma'] = 'no-cache'
@@ -432,12 +455,14 @@ def medecin_create(request):
             errors['specialite'] = 'La spécialité est obligatoire.'
         elif not Specialite.objects.filter(pk=specialite_pk).exists():
             errors['specialite'] = 'Spécialité invalide.'
-        if not departement_pk:
-            errors['departement'] = 'Le département est obligatoire.'
-        elif not Departement.objects.filter(pk=departement_pk).exists():
+        if departement_pk and not Departement.objects.filter(pk=departement_pk).exists():
             errors['departement'] = 'Département invalide.'
         if ordre_medecin and Medecin.objects.filter(ordre_medecin=ordre_medecin).exists():
             errors['ordre_medecin'] = 'Ce numéro d\'ordre est déjà utilisé par un autre médecin.'
+        if not user_pk:
+            errors['user'] = 'Le compte utilisateur est obligatoire.'
+        elif not users_disponibles.filter(pk=user_pk).exists():
+            errors['user'] = 'Compte utilisateur invalide.'
 
         if not errors:
             service_obj = Service.objects.filter(pk=service_pk).first() if service_pk else employe_trouve.service
@@ -455,9 +480,7 @@ def medecin_create(request):
                     pass
 
             med.departement = Departement.objects.filter(pk=departement_pk).first() if departement_pk else None
-
-            if user_pk:
-                med.user = users_disponibles.filter(pk=user_pk).first()
+            med.user = users_disponibles.filter(pk=user_pk).first()
 
             med.save()
             messages.success(request, f'Médecin {med} enregistré avec succès (matricule : {med.matricule}).')
@@ -511,12 +534,14 @@ def medecin_edit(request, pk):
             errors['specialite'] = 'La spécialité est obligatoire.'
         elif not Specialite.objects.filter(pk=specialite_pk).exists():
             errors['specialite'] = 'Spécialité invalide.'
-        if not departement_pk:
-            errors['departement'] = 'Le département est obligatoire.'
-        elif not Departement.objects.filter(pk=departement_pk).exists():
+        if departement_pk and not Departement.objects.filter(pk=departement_pk).exists():
             errors['departement'] = 'Département invalide.'
         if ordre_medecin and Medecin.objects.filter(ordre_medecin=ordre_medecin).exclude(pk=med.pk).exists():
             errors['ordre_medecin'] = 'Ce numéro d\'ordre est déjà utilisé par un autre médecin.'
+        if not user_pk:
+            errors['user'] = 'Le compte utilisateur est obligatoire.'
+        elif not users_disponibles.filter(pk=user_pk).exists():
+            errors['user'] = 'Compte utilisateur invalide.'
 
         if not errors:
             med.actif = actif
@@ -529,11 +554,7 @@ def medecin_edit(request, pk):
             med.specialite = Specialite.objects.filter(pk=specialite_pk).first() if specialite_pk else None
             med.departement = Departement.objects.filter(pk=departement_pk).first() if departement_pk else None
             med.service = Service.objects.filter(pk=service_pk).first() if service_pk else None
-
-            if user_pk:
-                med.user = users_disponibles.filter(pk=user_pk).first()
-            else:
-                med.user = None
+            med.user = users_disponibles.filter(pk=user_pk).first()
 
             med.save()
             messages.success(request, f'Médecin {med} mis à jour avec succès.')
@@ -727,47 +748,6 @@ def laboratoire_list(request):
 
 
 @login_required(login_url='login')
-def facturation_list(request):
-    from facturation.models import Facture
-    from django.core.paginator import Paginator
-
-    q = request.GET.get('q', '').strip()
-    factures = Facture.objects.all().order_by('-date_emission')
-    if q:
-        factures = factures.filter(
-            Q(numero_facture__icontains=q) |
-            Q(patient__nom__icontains=q) |
-            Q(patient__prenoms__icontains=q)
-        )
-    total = factures.count()
-    paginator = Paginator(factures, 25)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    stats = {'montant_total': 0, 'montant_recu': 0, 'montant_attente': 0, 'taux_recouvrement': 0}
-    breadcrumb = [{'title': 'Accueil', 'url': '/'}, {'title': 'Facturation'}]
-    return render(request, 'facturation/list.html', {'page_obj': page_obj, 'stats': stats, 'q': q, 'total': total, 'breadcrumb': breadcrumb})
-
-
-@login_required(login_url='login')
-def caisse_list(request):
-    from django.core.exceptions import PermissionDenied
-    from caisse.models import SessionCaisse
-    from django.core.paginator import Paginator
-    from facturation.views import can_manage_paiement
-
-    if not can_manage_paiement(request.user):
-        raise PermissionDenied
-
-    sessions = SessionCaisse.objects.all().order_by('-date_ouverture')
-    paginator = Paginator(sessions, 25)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    stats = {'solde_actuel': 0, 'entrees_jour': 0, 'sorties_jour': 0, 'transactions': 0}
-    breadcrumb = [{'title': 'Accueil', 'url': '/'}, {'title': 'Caisse'}]
-    return render(request, 'caisse/list.html', {'page_obj': page_obj, 'stats': stats, 'breadcrumb': breadcrumb})
-
-
-@login_required(login_url='login')
 def ressources_humaines_list(request):
     from employer.models import Employe
     from django.core.paginator import Paginator
@@ -779,196 +759,6 @@ def ressources_humaines_list(request):
     stats = {'total_employes': Employe.objects.count(), 'employes_actifs': Employe.objects.filter(actif=True).count(), 'conges_attente': 0, 'taux_presence': 0}
     breadcrumb = [{'title': 'Accueil', 'url': '/'}, {'title': 'Ressources Humaines'}]
     return render(request, 'employer/list.html', {'page_obj': page_obj, 'stats': stats, 'breadcrumb': breadcrumb})
-
-
-@login_required(login_url='login')
-def facture_create(request):
-    from facturation.models import Facture, LigneFacture, Acte, Paiement
-    from facturation.forms import FactureForm
-    from patients.models import Patient, RendezVous
-    from caisse.models import Caisse
-    from django.urls import reverse
-
-    patient_pk = request.GET.get('patient') or request.POST.get('patient_id')
-    patient = get_object_or_404(Patient.all_objects, pk=patient_pk) if patient_pk else None
-    actes = Acte.objects.filter(actif=True).order_by('categorie', 'libelle')
-    caisses = Caisse.objects.filter(actif=True).order_by('nom')
-    from services.models import Articleservice
-    services = Articleservice.objects.all().order_by('nom')
-
-    demande_pk = request.GET.get('demande') or request.POST.get('demande_id')
-    demande_obj = None
-    if demande_pk:
-        from laboratoire.models import DemandeExamen
-        try:
-            demande_obj = DemandeExamen.all_objects.get(pk=demande_pk)
-        except DemandeExamen.DoesNotExist:
-            pass
-
-    rdv_obj = None
-    rdv_pk = request.GET.get('rdv') or request.POST.get('rdv_id')
-    if rdv_pk:
-        try:
-            rdv_obj = RendezVous.objects.get(pk=rdv_pk)
-        except RendezVous.DoesNotExist:
-            pass
-
-    ordonnance_pk = request.GET.get('ordonnance') or request.POST.get('ordonnance_id')
-    ordonnance_obj = None
-    if ordonnance_pk:
-        from consultations.models import Ordonnance
-        try:
-            ordonnance_obj = Ordonnance.objects.prefetch_related('lignes__produit', 'lignes__medicament').get(pk=ordonnance_pk)
-            if patient is None and ordonnance_obj.consultation:
-                patient = ordonnance_obj.consultation.patient
-            if patient is None and ordonnance_obj.patient_id:
-                patient = ordonnance_obj.patient
-        except Ordonnance.DoesNotExist:
-            pass
-
-    if ordonnance_obj:
-        initial_type_facture = 'pharmacie'
-        initial_ligne_libelle = ''
-        initial_lignes = []
-        for ligne in ordonnance_obj.lignes.select_related('produit', 'medicament').all():
-            if ligne.produit:
-                libelle = ligne.produit.nom
-                prix = float(ligne.produit.prix_vente)
-            elif ligne.medicament:
-                libelle = ligne.medicament.designation
-                prix = float(ligne.medicament.prix_vente)
-            elif ligne.medicament_libre:
-                libelle = ligne.medicament_libre
-                prix = 0
-            else:
-                continue
-            initial_lignes.append({'libelle': libelle, 'prix': prix, 'qte': int(ligne.quantite)})
-    elif rdv_obj:
-        initial_type_facture = 'consultation'
-        initial_ligne_libelle = rdv_obj.type_consultation.nom if rdv_obj.type_consultation else ''
-        initial_lignes = []
-    elif demande_obj:
-        initial_type_facture = 'laboratoire'
-        initial_ligne_libelle = ''
-        initial_lignes = [{'libelle': lg.libelle, 'prix': float(lg.prix), 'qte': 1} for lg in demande_obj.lignes.all()]
-    else:
-        initial_type_facture = ''
-        initial_ligne_libelle = ''
-        initial_lignes = []
-
-    if request.method == 'POST':
-        form = FactureForm(request.POST)
-        if not patient:
-            messages.error(request, 'Patient introuvable.')
-            return redirect('facturation_list')
-        if form.is_valid():
-            facture = form.save(commit=False)
-            facture.patient = patient
-            facture.cree_par = request.user
-            facture.rendez_vous = rdv_obj
-            facture.save()
-
-            total = 0
-            i = 0
-            while True:
-                libelle = request.POST.get(f'ligne_libelle_{i}')
-                if libelle is None:
-                    break
-                if libelle.strip():
-                    try:
-                        qte = float(request.POST.get(f'ligne_qte_{i}', 1) or 1)
-                        prix = float(request.POST.get(f'ligne_prix_{i}', 0) or 0)
-                        remise = float(request.POST.get(f'ligne_remise_{i}', 0) or 0)
-                    except ValueError:
-                        qte, prix, remise = 1, 0, 0
-                    ligne = LigneFacture(
-                        facture=facture,
-                        libelle=libelle.strip(),
-                        quantite=qte,
-                        prix_unitaire=prix,
-                        remise=remise,
-                    )
-                    acte_id = request.POST.get(f'ligne_acte_{i}')
-                    if acte_id:
-                        try:
-                            ligne.acte_id = int(acte_id)
-                        except ValueError:
-                            pass
-                    ligne.save()
-                    total += qte * prix * (1 - remise / 100)
-                i += 1
-
-            facture.montant_total = total
-            facture.save()
-
-            pay_montant_raw = request.POST.get('pay_montant', '').strip()
-            if pay_montant_raw:
-                try:
-                    pay_montant = float(pay_montant_raw)
-                except ValueError:
-                    pay_montant = 0
-                if pay_montant > 0:
-                    mode = request.POST.get('pay_mode', 'especes')
-                    memo = request.POST.get('pay_memo', '')
-                    compte = request.POST.get('pay_compte', '')
-                    reference = compte if compte else memo
-                    paiement = Paiement(
-                        facture=facture,
-                        montant=pay_montant,
-                        mode_paiement=mode,
-                        reference=reference,
-                        notes=memo,
-                        recu_par=request.user,
-                    )
-                    paiement.save()
-                    facture.montant_paye = pay_montant
-                    facture.statut = 'payee' if pay_montant >= total else 'partielle'
-                    facture.save()
-
-            if demande_obj:
-                demande_obj.facture = facture
-                demande_obj.save(update_fields=['facture'])
-
-            if ordonnance_obj:
-                facture.ordonnance = ordonnance_obj
-                facture.save(update_fields=['ordonnance'])
-
-            messages.success(request, f'Facture {facture.numero} créée avec succès.')
-            if demande_obj:
-                return redirect('laboratoire_detail', pk=demande_obj.pk)
-            if ordonnance_pk:
-                return redirect('ordonnance_detail', pk=ordonnance_pk)
-            if rdv_pk:
-                return redirect(reverse('patients:rdv_edit', kwargs={'pk': rdv_pk}))
-            return redirect('facturation_list')
-    else:
-        initial = {'type_facture': initial_type_facture} if initial_type_facture else {}
-        form = FactureForm(initial=initial)
-
-    back_url = (
-        reverse('ordonnance_detail', kwargs={'pk': ordonnance_pk}) if ordonnance_pk else
-        f'/laboratoire/{demande_pk}/' if demande_pk else
-        ''
-    )
-
-    return render(request, 'facturation/create_facture.html', {
-        'form': form,
-        'patient': patient,
-        'actes': actes,
-        'services': services,
-        'caisses': caisses,
-        'rdv': rdv_obj,
-        'demande': demande_obj,
-        'ordonnance': ordonnance_obj,
-        'initial_ligne_libelle': initial_ligne_libelle,
-        'initial_lignes': initial_lignes,
-        'back_url': back_url,
-        'breadcrumb': [
-            {'title': 'Accueil', 'url': '/'},
-            {'title': 'Facturation', 'url': '/facturation/'},
-            {'title': 'Nouvelle facture'},
-        ],
-    })
 
 
 @login_required(login_url='login')
@@ -1032,11 +822,17 @@ def laboratoire_create(request):
                     prix = float(request.POST.get(f'ligne_prix_{i}', 0) or 0)
                 except ValueError:
                     prix = 0
+                article_id = request.POST.get(f'ligne_article_id_{i}')
+                try:
+                    article_id = int(article_id) if article_id else None
+                except ValueError:
+                    article_id = None
                 LigneDemandeExamen.objects.create(
                     demande=demande,
                     libelle=svc_nom.strip(),
                     prix=prix,
                     instructions=request.POST.get(f'ligne_instructions_{i}', '').strip(),
+                    article_service_id=article_id,
                 )
                 total += prix
             i += 1
@@ -1062,10 +858,9 @@ def laboratoire_create(request):
 
 @login_required(login_url='login')
 def laboratoire_detail(request, pk):
-    from laboratoire.models import DemandeExamen, LigneDemandeExamen
+    from laboratoire.models import DemandeExamen
 
     demande = get_object_or_404(DemandeExamen, pk=pk)
-    peut_modifier_lignes = demande.statut == 'brouillon' and not demande.facture
 
     if request.method == 'POST':
         action = request.POST.get('action')
@@ -1081,52 +876,12 @@ def laboratoire_detail(request, pk):
                     messages.error(request, f'Échec de l\'envoi : {echange.message_log}')
             except RuntimeError as exc:
                 messages.error(request, str(exc))
-        elif action == 'maj_lignes' and peut_modifier_lignes:
-            ids_conserves = set()
-            total = 0
-            i = 0
-            while True:
-                nom = request.POST.get(f'ligne_examen_{i}')
-                if nom is None:
-                    break
-                nom = nom.strip()
-                if nom:
-                    try:
-                        prix = float(request.POST.get(f'ligne_prix_{i}', 0) or 0)
-                    except ValueError:
-                        prix = 0
-                    instructions = request.POST.get(f'ligne_instructions_{i}', '').strip()
-                    ligne_id = request.POST.get(f'ligne_id_{i}', '').strip()
-                    if ligne_id:
-                        LigneDemandeExamen.objects.filter(pk=ligne_id, demande=demande).update(
-                            libelle=nom, prix=prix, instructions=instructions,
-                        )
-                        ids_conserves.add(int(ligne_id))
-                    else:
-                        nouvelle = LigneDemandeExamen.objects.create(
-                            demande=demande, libelle=nom, prix=prix, instructions=instructions,
-                        )
-                        ids_conserves.add(nouvelle.pk)
-                    total += prix
-                i += 1
-            demande.lignes.exclude(pk__in=ids_conserves).delete()
-            demande.montant_total = total
-            demande.save(update_fields=['montant_total'])
-            messages.success(request, 'Tests mis à jour avec succès.')
         return redirect('laboratoire_detail', pk=pk)
 
     lignes = demande.lignes.select_related('type_examen').all()
-    services_examens = []
-    if peut_modifier_lignes:
-        from services.models import Articleservice
-        services_examens = Articleservice.objects.filter(
-            categorie__code='EX', actif=True
-        ).order_by('nom')
     return render(request, 'laboratoire/detail_demande.html', {
         'demande': demande,
         'lignes': lignes,
-        'peut_modifier_lignes': peut_modifier_lignes,
-        'services_examens': services_examens,
         'facture_url': f'/facturation/nouvelle/?patient={demande.patient_id}&demande={demande.pk}&back=/laboratoire/{demande.pk}/',
         'breadcrumb': [
             {'title': 'Accueil', 'url': '/'},
@@ -1149,11 +904,13 @@ def laboratoire_bulletin(request, pk):
 
 
 @login_required(login_url='login')
+@module_requis('gynecologie')
 def gynecologie_naissance_create(request):
     return _gynecologie_naissance_fiche(request, None)
 
 
 @login_required(login_url='login')
+@module_requis('gynecologie')
 def gynecologie_naissance_detail(request, pk):
     """Fiche d'une naissance déjà enregistrée.
 
@@ -1245,6 +1002,7 @@ def _gynecologie_naissance_fiche(request, naissance):
 
 
 @login_required(login_url='login')
+@module_requis('gynecologie')
 def gynecologie_registre_naissance(request):
     """Registre des naissances.
 
@@ -1486,6 +1244,8 @@ def _rdv_form_post(request, rdv):
 
 
 @login_required(login_url='login')
+@permission_required('patients.add_rendezvous', raise_exception=True)
+@module_requis('gynecologie')
 def gynecologie_rdv_create(request):
     from patients.forms import RendezVousForm
     from medecins.models import Medecin
@@ -1511,7 +1271,9 @@ def gynecologie_rdv_create(request):
         from medecins.models import Departement
         gyn_departement = Departement.objects.filter(code='GYN').first()
         form = RendezVousForm(initial={
-            'date_heure': timezone.now().strftime('%Y-%m-%dT%H:%M'),
+            # Avec les secondes, comme patients.views.rdv_create : le champ
+            # les accepte depuis qu'il porte `step=1`.
+            'date_heure': timezone.now().strftime('%Y-%m-%dT%H:%M:%S'),
             'departement': gyn_departement.pk if gyn_departement else None,
         })
 
@@ -1545,6 +1307,7 @@ def gynecologie_rdv_create(request):
 
 
 @login_required(login_url='login')
+@module_requis('gynecologie')
 def gynecologie_rdv_detail(request, pk):
     from patients.forms import RendezVousForm
     from patients.models import RendezVous
@@ -1650,10 +1413,11 @@ def gynecologie_rdv_detail(request, pk):
             now = timezone.now()
             rdv.statut = 'en_consultation'
             rdv.date_en_consultation = now
+            rdv.demarre_par = request.user
             if rdv.date_en_attente:
                 rdv.temps_attente_minutes = int((now - rdv.date_en_attente).total_seconds() / 60)
             rdv._skip_auto_log = True
-            rdv.save(update_fields=['statut', 'date_en_consultation', 'temps_attente_minutes'])
+            rdv.save(update_fields=['statut', 'date_en_consultation', 'demarre_par', 'temps_attente_minutes'])
             log_event(rdv, request.user, 'État : En Attente → En Consultation', type='statut')
             messages.success(request, 'Consultation démarrée.')
             return redirect('gynecologie_rdv_detail', pk=rdv.pk)
@@ -1662,10 +1426,11 @@ def gynecologie_rdv_detail(request, pk):
             now = timezone.now()
             rdv.statut = 'termine'
             rdv.date_termine = now
+            rdv.termine_par = request.user
             if rdv.date_en_consultation:
                 rdv.temps_consultation_minutes = int((now - rdv.date_en_consultation).total_seconds() / 60)
             rdv._skip_auto_log = True
-            rdv.save(update_fields=['statut', 'date_termine', 'temps_consultation_minutes'])
+            rdv.save(update_fields=['statut', 'date_termine', 'termine_par', 'temps_consultation_minutes'])
             log_event(rdv, request.user, 'État : En Consultation → Terminé', type='statut')
             messages.success(request, 'Consultation terminée.')
             return redirect('gynecologie_rdv')
@@ -1714,7 +1479,7 @@ def gynecologie_rdv_detail(request, pk):
             messages.success(request, 'Rendez-vous modifié.')
             if action == 'créer une facture':
                 from django.urls import reverse
-                return redirect(reverse('facture_create') + f'?patient={rdv.patient.pk}&rdv={rdv.pk}')
+                return redirect(reverse('facturation:create') + f'?patient={rdv.patient.pk}&rdv={rdv.pk}')
             return redirect('gynecologie_rdv_detail', pk=rdv.pk)
     else:
         form = RendezVousForm(instance=rdv, locked_billing=locked_billing)
@@ -1770,6 +1535,7 @@ def gynecologie_rdv_detail(request, pk):
 
 
 @login_required(login_url='login')
+@module_requis('gynecologie')
 def gynecologie_demarrer_consultation(request, pk):
     from patients.models import RendezVous
     from consultations.models import Consultation
@@ -1796,12 +1562,14 @@ def gynecologie_demarrer_consultation(request, pk):
     # Passer le RDV en consultation si pas encore terminé
     if rdv.statut in ('planifie', 'confirme', 'en_attente'):
         rdv.statut = 'en_consultation'
-        rdv.save(update_fields=['statut'])
+        rdv.demarre_par = request.user
+        rdv.save(update_fields=['statut', 'demarre_par'])
 
     return redirect('gynecologie_rdv_detail', pk=rdv.pk)
 
 
 @login_required(login_url='login')
+@module_requis('gynecologie')
 def gynecologie_rdv(request):
     """Liste des rendez-vous de gynécologie.
 
@@ -1897,6 +1665,7 @@ def gynecologie_rdv(request):
                         empty_sub='Aucun rendez-vous gynécologique enregistré.')
 
 @login_required(login_url='login')
+@module_requis('gynecologie')
 def gynecologie_rdv_set_statut(request, pk):
     from patients.models import RendezVous
     STATUTS = ('planifie', 'confirme', 'en_attente', 'en_consultation', 'termine', 'annule', 'absent')
@@ -1911,6 +1680,7 @@ def gynecologie_rdv_set_statut(request, pk):
 
 
 @login_required(login_url='login')
+@module_requis('gynecologie')
 def gynecologie_rdv_bulk(request):
     from patients.models import RendezVous
     if request.method == 'POST':
@@ -1924,6 +1694,7 @@ def gynecologie_rdv_bulk(request):
 
 
 @login_required(login_url='login')
+@module_requis('gynecologie')
 def gynecologie_list(request):
     """Liste des patientes suivies en gynécologie.
 
@@ -2051,8 +1822,9 @@ def post_note(request):
     return redirect(next_url)
 
 
-def log_event(instance, user, message, type='note'):
+def log_event(instance, user, message, type='note', duree_secondes=None, module=None):
     from django.contrib.contenttypes.models import ContentType
+    from core.middleware import get_current_ip
     from core.models import LogActivite
     ct = ContentType.objects.get_for_model(instance)
     LogActivite.objects.create(
@@ -2061,6 +1833,9 @@ def log_event(instance, user, message, type='note'):
         user=user if user and user.is_authenticated else None,
         message=message,
         type=type,
+        ip_address=get_current_ip(),
+        duree_secondes=duree_secondes,
+        module=module if module else ct.app_label,
     )
 
 
@@ -2075,7 +1850,7 @@ def kpi_dashboard(request):
     from patients.models import Patient, RendezVous
     from consultations.models import Consultation
     from hospitalisation.models import Hospitalisation
-    from pharmacie.models import Medicament
+    from core.context_processors import _medicaments_alerte_count
     from laboratoire.models import AnalyseLaboratoire
     from employer.models import Employe
     from soins.models import Soin
@@ -2111,7 +1886,7 @@ def kpi_dashboard(request):
         'rdv_periode': RendezVous.objects.filter(date_heure__date__range=[date_from, date_to]).count(),
         'hospitalisations': Hospitalisation.objects.filter(statut='hospitalise').count(),
         'analyses_pending': AnalyseLaboratoire.objects.filter(statut__in=['recu', 'en_analyse']).count(),
-        'medicaments_alerte': Medicament.objects.filter(stock_actuel__lte=F('stock_alerte')).count(),
+        'medicaments_alerte': _medicaments_alerte_count(),
         'employes_actifs': Employe.objects.filter(statut='actif').count(),
         'soins_periode': Soin.objects.filter(date_creation__date__range=[date_from, date_to]).count(),
         'medecins_actifs': Medecin.objects.filter(actif=True).count(),
@@ -2194,9 +1969,29 @@ def _specialite_form_class():
             fields = ['nom', 'code', 'description']
             widgets = {
                 'nom':         forms.TextInput(attrs={'class': 'f-input', 'placeholder': 'Ex : Cardiologie'}),
-                'code':        forms.TextInput(attrs={'class': 'f-input', 'placeholder': 'Ex : CARD'}),
+                'code':        forms.TextInput(attrs={'class': 'f-input', 'readonly': 'readonly'}),
                 'description': forms.Textarea(attrs={'class': 'f-input', 'rows': 3, 'placeholder': 'Description optionnelle'}),
             }
+
+        def clean_code(self):
+            # Conservé tel quel une fois créé — seul un nouveau code est généré,
+            # pour ne pas faire bouger un code déjà en usage/mémorisé si le nom
+            # est corrigé plus tard.
+            if self.instance.pk and self.instance.code:
+                return self.instance.code
+            import re
+            import unicodedata
+            nom = unicodedata.normalize('NFKD', self.cleaned_data.get('nom', ''))
+            nom = ''.join(c for c in nom if not unicodedata.combining(c)).upper()
+            base = re.sub(r'[^A-Z0-9]', '', nom)[:4] or 'SPEC'
+            code = base
+            n = 2
+            while Specialite.objects.filter(code=code).exclude(pk=self.instance.pk or 0).exists():
+                code = f'{base}{n}'
+                n += 1
+            return code
+    SpecialiteForm.base_fields['code'].required = False
+    SpecialiteForm.base_fields['code'].help_text = 'Généré automatiquement à partir du nom.'
     return SpecialiteForm
 
 

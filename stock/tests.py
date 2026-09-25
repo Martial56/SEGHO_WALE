@@ -157,12 +157,33 @@ class TestLigneFicheBesoins(TestCase):
             ligne.clean()
 
 
+def _gestionnaire(username):
+    """Utilisateur habilité à bouger le stock.
+
+    Ces trois écrans exigent `can_manage_stock`, qui interroge l'appartenance à
+    l'un des groupes nommés dans `STOCK_MANAGE_GROUPS` — « Gestionnaire stock »,
+    « Pharmacien », « Administrateur », « Directeur ». Les tests créaient un
+    utilisateur nu et attendaient une redirection : ils recevaient un 403, et
+    décrivaient donc une règle qui n'existe plus depuis que ce contrôle est là.
+
+    Le module pharmacie a depuis troqué ces noms de groupes contre des
+    permissions Django (migration pharmacie 0009) ; stock ne l'a pas encore
+    fait, et c'est un chantier à part.
+    """
+    from django.contrib.auth.models import Group
+
+    user = User.objects.create_user(username, password='x')
+    groupe, _ = Group.objects.get_or_create(name='Gestionnaire stock')
+    user.groups.add(groupe)
+    return user
+
+
 # ─── Tests vue mouvement_create (mouvements de stock) ──────────────────────────
 
 class TestMouvementStockView(TestCase):
 
     def setUp(self):
-        self.user = User.objects.create_user('u_mvt', password='x')
+        self.user = _gestionnaire('u_mvt')
         self.client = Client()
         self.client.login(username='u_mvt', password='x')
 
@@ -211,7 +232,7 @@ class TestCommandeReceptionnerView(TestCase):
             commande=commande, produit=produit,
             quantite_commandee=Decimal('10'), prix_unitaire=Decimal('500'),
         )
-        user = User.objects.create_user('u_cr', password='x')
+        user = _gestionnaire('u_cr')
         client = Client()
         client.login(username='u_cr', password='x')
         resp = client.post(
@@ -231,7 +252,7 @@ class TestCommandeReceptionnerView(TestCase):
 class TestDotationValiderView(TestCase):
 
     def setUp(self):
-        self.user = User.objects.create_user('u_dv', password='x')
+        self.user = _gestionnaire('u_dv')
         self.client = Client()
         self.client.login(username='u_dv', password='x')
 

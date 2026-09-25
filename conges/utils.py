@@ -145,12 +145,25 @@ def compter_jours_ouvres(date_debut, date_fin) -> int:
 
 def quota_annuel(employe, annee=None) -> float:
     """
-    Calcule le quota annuel de congés selon le Code du travail ivoirien Art. 25.10.
-    Base : 2,2 jours ouvrés par mois travaillé (min 26,4 jours/an).
-    Bonus d'ancienneté à partir de 5 ans, évalué au 31/12 de `annee`
-    (année en cours par défaut) — pour ne pas appliquer rétroactivement
-    un bonus d'ancienneté acquis après l'année du solde recalculé.
+    Calcule le quota annuel de congés selon les règles configurées dans
+    Configuration → Règles de calcul (ReglesConge, PalierAnciennete) —
+    par défaut celles du Code du travail ivoirien Art. 25.10 (2,2 jours
+    ouvrés par mois travaillé, soit 26,4 jours/an minimum).
+    Bonus d'ancienneté évalué au 31/12 de `annee` (année en cours par
+    défaut) — pour ne pas appliquer rétroactivement un bonus d'ancienneté
+    acquis après l'année du solde recalculé.
     """
+    from .models import ReglesConge, PalierAnciennete
+    from django.db.utils import Error as DBError
+
+    try:
+        jours_par_mois = float(ReglesConge.get().jours_par_mois)
+        paliers = list(PalierAnciennete.objects.order_by('-annees_min'))
+    except DBError:
+        # System checks tournent avant toute migration sur une base neuve.
+        jours_par_mois = 2.2
+        paliers = []
+
     ref_date = date(annee, 12, 31) if annee else date.today()
     anc = employe.anciennete_a(ref_date)
     annees = anc.get('annees', 0)
@@ -159,22 +172,16 @@ def quota_annuel(employe, annee=None) -> float:
 
     if total_mois < 12:
         # Moins d'un an : proratisation
-        base = 2.2 * max(total_mois, 0)
+        base = jours_par_mois * max(total_mois, 0)
     else:
-        base = 26.4  # minimum légal annuel
+        base = jours_par_mois * 12
 
-    # Bonus d'ancienneté
+    # Bonus d'ancienneté : le palier le plus élevé atteint
     bonus = 0
-    if annees >= 25:
-        bonus = 5
-    elif annees >= 20:
-        bonus = 4
-    elif annees >= 15:
-        bonus = 3
-    elif annees >= 10:
-        bonus = 2
-    elif annees >= 5:
-        bonus = 1
+    for palier in paliers:
+        if annees >= palier.annees_min:
+            bonus = float(palier.jours_bonus)
+            break
 
     return round(base + bonus, 1)
 

@@ -230,25 +230,29 @@
         le personnel courant — le formulaire fige ses champs et la vue refuse
         l'écriture. L'administration garde la main, comme pour un soin hors
         brouillon (voir soins_edit).{% endcomment %}
-        {% if proc.statut != 'termine' and proc.statut != 'annule' or request.user.is_superuser %}
+        {% if peut_modifier and proc.statut != 'termine' and proc.statut != 'annule' or peut_modifier and request.user.is_superuser %}
         <a href="{% url 'soins:procedure_edit' proc.pk %}" class="det-btn det-btn-edit">
           <i class="bi bi-pencil"></i> Modifier
         </a>
         {% endif %}
 
-        {% if proc.statut == 'en_cours' %}
-          <form method="post" action="{% url 'soins:procedure_terminer' proc.pk %}" style="display:inline;">
-            {% csrf_token %}
-            <button type="submit" class="det-btn {% if facture_payee %}det-btn-termine-ok{% else %}det-btn-termine-warn{% endif %}">
-              <i class="bi bi-check-circle-fill"></i> Terminer
-              {% if not facture_payee %}
-              <small style="opacity:.7;font-size:9px;">(non payé)</small>
-              {% endif %}
-            </button>
-          </form>
+        {% if peut_terminer and proc.statut == 'en_cours' %}
+          {% comment %}
+            Le bouton ouvre le champ « Infirmier » plus bas au lieu d'envoyer
+            tout de suite : on consigne qui a réalisé l'acte, et c'est cette
+            validation qui termine la procédure. Même geste que sur la fiche
+            soin, pour la même raison — ne plus avoir à rouvrir « Modifier ».
+          {% endcomment %}
+          <button type="button" id="btn-terminer"
+                  class="det-btn {% if facture_payee %}det-btn-termine-ok{% else %}det-btn-termine-warn{% endif %}">
+            <i class="bi bi-check-circle-fill"></i> Terminer
+            {% if not facture_payee %}
+            <small style="opacity:.7;font-size:9px;">(non payé)</small>
+            {% endif %}
+          </button>
         {% endif %}
 
-        {% if proc.statut != 'termine' and proc.statut != 'annule' %}
+        {% if peut_annuler and proc.statut != 'termine' and proc.statut != 'annule' %}
           <form method="post" action="{% url 'soins:procedure_annuler' proc.pk %}" style="display:inline;"
             onsubmit="return confirm('Annuler cette procédure ?')">
             {% csrf_token %}
@@ -277,7 +281,7 @@
       <div style="text-align:right;flex-shrink:0;">
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:3px;">Enregistré le</div>
         <div style="font-size:13px;font-weight:600;color:var(--text);">{{ proc.date_creation|date:"d/m/Y" }}</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:1px;">{{ proc.date_creation|date:"H:i" }}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:1px;">{{ proc.date_creation|date:"H:i:s" }}</div>
       </div>
     </div>
 
@@ -289,7 +293,7 @@
         <div class="det-field">
           <div class="det-field-label">Date &amp; heure</div>
           <div class="det-field-value">
-            {% if proc.date %}{{ proc.date|date:"d/m/Y" }} à {{ proc.date|date:"H:i" }}
+            {% if proc.date %}{{ proc.date|date:"d/m/Y" }} à {{ proc.date|date:"H:i:s" }}
             {% else %}<span class="det-field-empty">—</span>{% endif %}
           </div>
         </div>
@@ -310,11 +314,46 @@
           </div>
         </div>
 
-        <div class="det-field">
+        <div class="det-field" id="champ-infirmier">
           <div class="det-field-label">Infirmier</div>
           <div class="det-field-value">
-            {% if proc.infirmier %}{{ proc.infirmier.nom }} {{ proc.infirmier.prenoms }}
-            {% else %}<span class="det-field-empty">—</span>{% endif %}
+            <span class="adm-lecture">
+              {% if proc.infirmier %}{{ proc.infirmier.nom }} {{ proc.infirmier.prenoms }}
+              {% else %}<span class="det-field-empty">—</span>{% endif %}
+            </span>
+            {% if peut_terminer and proc.statut == 'en_cours' %}
+            <form method="post" action="{% url 'soins:procedure_terminer' proc.pk %}"
+                  id="form-terminer" style="display:none;">
+              {% csrf_token %}
+              {% comment %}
+                `field-ul` : la liste passe par le composant partagé
+                (includes/_tomselect.html). Une liste native ouverte est
+                dessinée par le navigateur, pas par la page : elle ignore le
+                thème de l'application et n'offre aucune recherche, ce qui est
+                intenable sur 400 employés.
+
+                Pas de `required` : TomSelect masque le select d'origine sans
+                lui retirer l'attribut, et le navigateur refuse alors l'envoi
+                d'un formulaire dont il ne peut pas cibler le champ fautif. Le
+                contrôle est fait en JS plus bas, et de nouveau côté serveur.
+              {% endcomment %}
+              <select name="infirmier" class="field-ul" data-ts-body
+                      style="max-width:280px;">
+                <option value="">— Infirmier —</option>
+                {% for e in employes %}
+                <option value="{{ e.pk }}" {% if proc.infirmier_id == e.pk %}selected{% endif %}>{{ e.nom }} {{ e.prenoms }}</option>
+                {% endfor %}
+              </select>
+              <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+                <button type="button" id="btn-annuler-terminer" class="det-btn det-btn-retour">
+                  <i class="bi bi-x"></i> Annuler
+                </button>
+                <button type="submit" class="det-btn det-btn-termine-ok">
+                  <i class="bi bi-check-circle-fill"></i> Valider et terminer
+                </button>
+              </div>
+            </form>
+            {% endif %}
           </div>
         </div>
 
@@ -391,4 +430,48 @@
 
 </div>
 </div>
+
+{% if peut_terminer and proc.statut == 'en_cours' %}
+{# Avant le script ci-dessous : il réveille la liste déroulante à l'ouverture. #}
+{% include 'includes/_tomselect.html' %}
+<script>
+/* « Terminer » ouvre le champ « Infirmier » au lieu d'envoyer tout de suite :
+   on désigne qui a réalisé l'acte, et c'est cette validation qui termine la
+   procédure. Voir soins/detail.html pour le même geste côté dossier. */
+(function(){
+  var btn  = document.getElementById('btn-terminer');
+  var form = document.getElementById('form-terminer');
+  var champ = document.getElementById('champ-infirmier');
+  if(!btn || !form || !champ) return;
+  var lecture = champ.querySelector('.adm-lecture');
+
+  function basculer(ouvert){
+    form.style.display = ouvert ? '' : 'none';
+    if(lecture) lecture.style.display = ouvert ? 'none' : '';
+    btn.style.display = ouvert ? 'none' : '';
+  }
+
+  btn.addEventListener('click', function(){
+    basculer(true);
+    /* Le champ était replié au chargement : on installe la liste maintenant
+       qu'elle a une largeur. L'appel est sans effet si elle est déjà en place. */
+    if(window.initFieldUlSelects) window.initFieldUlSelects(form);
+    champ.scrollIntoView({behavior: 'smooth', block: 'center'});
+  });
+
+  var retour = document.getElementById('btn-annuler-terminer');
+  if(retour) retour.addEventListener('click', function(){ basculer(false); });
+
+  /* Le contrôle que `required` aurait fait : voir le commentaire du gabarit. */
+  form.addEventListener('submit', function(evt){
+    var sel = form.querySelector('select[name="infirmier"]');
+    if(sel && !sel.value){
+      evt.preventDefault();
+      if(sel.tomselect) sel.tomselect.focus();
+      window.alert("Désignez l'infirmier avant de terminer cette procédure.");
+    }
+  });
+})();
+</script>
+{% endif %}
 {% endblock %}

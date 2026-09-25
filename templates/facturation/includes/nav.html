@@ -1,5 +1,6 @@
 {% load static %}
 <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
+{% with uname=request.resolver_match.url_name %}
 <nav class="o-nav">
   <a href="{% url 'dashboard' %}" class="o-nav-grid" title="Accueil">
     <i class="bi bi-grid-3x3-gap-fill"></i>
@@ -9,9 +10,55 @@
     Facturation
   </span>
   {% if 'facturation.list' not in hidden_navitem_codes %}
+  {% comment %}
+  Marqué actif sur tout ce qui n'est pas un écran de caisse, plutôt que sur une
+  liste de noms de routes. L'ancien test nommait `list`, `create` et `edit` : la
+  fiche d'une facture, son encaissement et son impression laissaient donc
+  l'onglet éteint. Écrit ainsi, toute route ajoutée au module l'allume d'office.
+  {% endcomment %}
   <a href="{% url 'facturation:list' %}"
-    class="o-nav-link {% if request.resolver_match.url_name == 'list' or request.resolver_match.url_name == 'create' or request.resolver_match.url_name == 'edit' %}active{% endif %}">
+    class="o-nav-link {% if uname|slice:':6' != 'caisse' %}active{% endif %}">
     Factures
   </a>
   {% endif %}
+
+  {% comment %}Menu Configuration, sur le modèle de l'hospitalisation : chaque
+  entrée suit la permission de consultation du modèle qu'elle ouvre, et le menu
+  disparaît entièrement quand aucune n'est accordée.{% endcomment %}
+  {% if perms.facturation.view_caisse %}
+  {% if 'facturation.config' not in hidden_navitem_codes %}
+  <div class="o-nav-dropdown" id="fac-config-wrap">
+    <button type="button"
+            class="o-nav-link {% if uname|slice:':6' == 'caisse' %}active{% endif %}"
+            style="background:none;border:none;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;"
+            onclick="toggleFacConfig(event)">
+      Configuration
+      <i class="bi bi-chevron-down" style="font-size:10px;"></i>
+    </button>
+    <div class="o-nav-dropdown-menu" id="fac-config-dropdown">
+      <div class="o-nav-dd-section">Encaissement</div>
+      <a href="{% url 'facturation:caisses_list' %}"
+         class="{% if uname|slice:':6' == 'caisse' %}active{% endif %}">
+        <i class="bi bi-cash-stack" style="font-size:12px;"></i> Caisses
+      </a>
+    </div>
+  </div>
+  {% endif %}
+  {% endif %}
 </nav>
+{% endwith %}
+
+<script>
+(function () {
+  var wrap     = document.getElementById('fac-config-wrap');
+  var dropdown = document.getElementById('fac-config-dropdown');
+  if (!wrap || !dropdown) return;
+  window.toggleFacConfig = function (e) {
+    e.stopPropagation();
+    dropdown.classList.toggle('open');
+  };
+  document.addEventListener('click', function (e) {
+    if (!wrap.contains(e.target)) dropdown.classList.remove('open');
+  });
+})();
+</script>

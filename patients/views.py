@@ -1,6 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
+from django.urls import reverse
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, permission_required
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db.models import Q
@@ -8,6 +9,8 @@ from django.http import JsonResponse
 from django.utils import timezone
 from datetime import date, timedelta
 
+from . import origines as origines_patient
+from .rdv_destination import url_fiche_rdv
 from .models import Patient, RendezVous, Pathologie, TypeVisiteCurative
 from .forms import (PatientForm, RendezVousForm, PathologieForm, TypeVisiteForm,
                     TypeVisiteCurativeForm)
@@ -20,7 +23,28 @@ from gynecologie.models import TypeVisite
 def _render_related_list(request, context):
     is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
     template = 'patients/includes/related_list_body.html' if is_ajax else 'patients/related_list.html'
-    return render(request, template, context)
+    # La provenance suit le patient jusque dans ses listes liées : sans ça, un
+    # clic sur « Soins » depuis une fiche ouverte en gynécologie rebasculerait
+    # l'utilisatrice dans le module Patients.
+    ctx_origine = origines_patient.contexte(request)
+
+    # Un dossier ancien porte des centaines de lignes — rendez-vous,
+    # consultations, actes. Les sept onglets rendaient le jeu entier d'un bloc :
+    # tout en mémoire, tout dans la page. Une coupe sèche aux N derniers aurait
+    # rendu le reste invisible sans le dire, ce qui ne va pas sur un dossier
+    # médical — on pagine donc, et rien n'est perdu.
+    page = Paginator(context.get('items') or [], 10).get_page(request.GET.get('page'))
+    context = {**context, 'items': page, 'page_obj': page}
+
+    # Chaque ligne de rendez-vous porte sa propre destination : gynécologie ou
+    # module Rendez-vous, selon son département et les accès du lecteur. Calculé
+    # ici, une fois, plutôt que dans le gabarit (voir patients.rdv_destination).
+    # Sur la page affichée seulement, et non sur tout le jeu.
+    if context.get('view_type') == 'rdv':
+        for rdv in page:
+            rdv.url_fiche = url_fiche_rdv(request.user, rdv, ctx_origine['origine_qs'])
+
+    return render(request, template, {**context, **ctx_origine})
 
 
 @login_required
@@ -367,6 +391,15 @@ def patient_detail(request, pk):
     consultation_count = patient.consultations.count()
     facture_count = patient.factures.count()
 
+    # Les soins (soins.Soin) et les consultations (consultations.Consultation)
+    # sont deux jeux distincts. La carte « Soins » comptait les secondes tout en
+    # renvoyant vers une page qui n'existait pas dans la barre d'onglets.
+    try:
+        from soins.models import Soin
+        soin_count = Soin.objects.filter(patient=patient).count()
+    except Exception:
+        soin_count = 0
+
     try:
         from consultations.models import Ordonnance
         ordonnance_count = Ordonnance.objects.filter(consultation__patient=patient).count()
@@ -389,8 +422,18 @@ def patient_detail(request, pk):
         demande_examens_count = 0
         resultat_examens_count = 0
 
-    # Navigation précédent/suivant dans la liste ordonnée
-    ids = list(Patient.objects.order_by('-date_creation').values_list('pk', flat=True))
+    # D'où vient-on ? Une fiche ouverte depuis « Les patients » de la
+    # gynécologie doit ramener à cette liste-là, pas à celle du module Patients.
+    ctx_origine = origines_patient.contexte(request)
+    origine = ctx_origine['origine']
+
+    # Navigation précédent/suivant dans la liste ordonnée. Les flèches restent
+    # dans la cohorte d'origine : depuis la gynécologie, on ne déroule pas
+    # l'ensemble du fichier patients.
+    liste = Patient.objects.order_by('-date_creation')
+    if origine and origine.get('cohorte'):
+        liste = origine['cohorte'](liste)
+    ids = list(liste.values_list('pk', flat=True))
     try:
         idx = ids.index(pk)
         prev_pk = ids[idx - 1] if idx > 0 else None
@@ -404,6 +447,7 @@ def patient_detail(request, pk):
         'patient': patient,
         'rdv_count': rdv_count,
         'consultation_count': consultation_count,
+        'soin_count': soin_count,
         'facture_count': facture_count,
         'ordonnance_count': ordonnance_count,
         'hospitalisation_count': hospitalisation_count,
@@ -413,10 +457,12 @@ def patient_detail(request, pk):
         'position': position,
         'prev_pk': prev_pk,
         'next_pk': next_pk,
+        **ctx_origine,
     })
 
 
 @login_required
+@permission_required('patients.add_patient', raise_exception=True)
 def patient_create(request):
     if request.method == 'POST':
         form = PatientForm(request.POST, request.FILES)
@@ -430,14 +476,18 @@ def patient_create(request):
 
 
 @login_required
+@permission_required('patients.change_patient', raise_exception=True)
 def patient_edit(request, pk):
     patient = get_object_or_404(Patient, pk=pk)
+    ctx_origine = origines_patient.contexte(request)
     if request.method == 'POST':
         form = PatientForm(request.POST, request.FILES, instance=patient)
         if form.is_valid():
             form.save()
             messages.success(request, 'Dossier patient mis à jour.')
-            return redirect('patients:detail', pk=patient.pk)
+            # Enregistrer ramène à la fiche d'où l'on venait, provenance comprise.
+            return redirect(reverse('patients:detail', args=[patient.pk])
+                            + ctx_origine['origine_qs'])
     else:
         form = PatientForm(instance=patient)
     return render(request, 'patients/form.html', {
@@ -445,6 +495,7 @@ def patient_edit(request, pk):
         'patient': patient,
         'titre': f'Modifier — {patient.nom} {patient.prenoms}',
         'edit': True,
+        **ctx_origine,
     })
 
 
@@ -638,6 +689,7 @@ def patient_search_json(request):
 
 
 @login_required
+@permission_required('patients.add_rendezvous', raise_exception=True)
 def rdv_create(request):
     if request.method == 'POST':
         form = RendezVousForm(request.POST)
@@ -659,9 +711,11 @@ def rdv_create(request):
             if action == 'annuler':
                 return redirect('patients:rdv_global')
             from django.urls import reverse
-            return redirect(reverse('facture_create') + f'?patient={rdv.patient.pk}&rdv={rdv.pk}')
+            return redirect(reverse('facturation:create') + f'?patient={rdv.patient.pk}&rdv={rdv.pk}')
     else:
-        initial = {'date_heure': timezone.now().strftime('%Y-%m-%dT%H:%M')}
+        # Avec les secondes : le champ les accepte depuis qu'il porte `step=1`,
+        # et une valeur initiale tronquée les remettrait à zéro.
+        initial = {'date_heure': timezone.now().strftime('%Y-%m-%dT%H:%M:%S')}
         patient_pk = request.GET.get('patient')
         patient_obj = None
         if patient_pk:
@@ -685,7 +739,16 @@ def rdv_create(request):
 
 @login_required
 def rdv_edit(request, pk):
+    """Fiche d'un rendez-vous : consultable par tous, modifiable sur permission.
+
+    La page sert les deux usages. Le verrou porte sur le POST, pas sur l'accès :
+    un décorateur sur toute la vue renvoyait une erreur à qui voulait seulement
+    lire la ligne depuis la liste du patient. `peut_modifier` fige en plus les
+    champs à l'écran, pour ne pas proposer une saisie qui sera refusée.
+    """
     rdv = get_object_or_404(RendezVous, pk=pk)
+    peut_modifier = request.user.has_perm('patients.change_rendezvous')
+    ctx_origine = origines_patient.contexte(request)
 
     try:
         from facturation.models import Facture
@@ -712,6 +775,10 @@ def rdv_edit(request, pk):
         pass
 
     if request.method == 'POST':
+        # Le grisage des champs est une commodité d'affichage ; c'est ici que
+        # l'écriture est réellement refusée.
+        if not peut_modifier:
+            raise PermissionDenied
         action = request.POST.get('_action', '')
 
         if action == 'save_eval':
@@ -805,11 +872,12 @@ def rdv_edit(request, pk):
             now = tz.now()
             rdv.statut = 'en_consultation'
             rdv.date_en_consultation = now
+            rdv.demarre_par = request.user
             if rdv.date_en_attente:
                 rdv.temps_attente_minutes = int((now - rdv.date_en_attente).total_seconds() / 60)
             rdv.duree_minutes = rdv.temps_constante_minutes + rdv.temps_attente_minutes + rdv.temps_consultation_minutes
             rdv._skip_auto_log = True
-            rdv.save(update_fields=['statut', 'date_en_consultation', 'temps_attente_minutes', 'duree_minutes'])
+            rdv.save(update_fields=['statut', 'date_en_consultation', 'demarre_par', 'temps_attente_minutes', 'duree_minutes'])
             log_event(rdv, request.user, 'État : En Attente → En Consultation', type='statut')
             messages.success(request, 'Consultation démarrée.')
             from django.urls import reverse
@@ -820,11 +888,12 @@ def rdv_edit(request, pk):
             now = tz.now()
             rdv.statut = 'termine'
             rdv.date_termine = now
+            rdv.termine_par = request.user
             if rdv.date_en_consultation:
                 rdv.temps_consultation_minutes = int((now - rdv.date_en_consultation).total_seconds() / 60)
             rdv.duree_minutes = rdv.temps_constante_minutes + rdv.temps_attente_minutes + rdv.temps_consultation_minutes
             rdv._skip_auto_log = True
-            rdv.save(update_fields=['statut', 'date_termine', 'temps_consultation_minutes', 'duree_minutes'])
+            rdv.save(update_fields=['statut', 'date_termine', 'termine_par', 'temps_consultation_minutes', 'duree_minutes'])
             log_event(rdv, request.user, 'État : En Consultation → Terminé', type='statut')
             messages.success(request, 'Consultation terminée.')
             return redirect('patients:rdv_global')
@@ -890,7 +959,7 @@ def rdv_edit(request, pk):
             messages.success(request, 'Rendez-vous modifié.')
             if action == 'créer une facture':
                 from django.urls import reverse
-                return redirect(reverse('facture_create') + f'?patient={rdv.patient.pk}&rdv={rdv.pk}')
+                return redirect(reverse('facturation:create') + f'?patient={rdv.patient.pk}&rdv={rdv.pk}')
             from django.urls import reverse
             return redirect(reverse('patients:rdv_edit', kwargs={'pk': rdv.pk}))
     else:
@@ -909,6 +978,8 @@ def rdv_edit(request, pk):
         'titre':         f'Rendez-vous — {rdv.patient.nom} {rdv.patient.prenoms}',
         'patient_prefill': rdv.patient,
         'facture_payee': facture_payee,
+        'peut_modifier': peut_modifier,
+        **ctx_origine,
         'is_new':        False,
         'consultation':  consultation,
         'constante':     constante,
@@ -1058,6 +1129,10 @@ def patient_resultat_examens_list(request, pk):
 def ordonnance_create(request, pk):
     patient = get_object_or_404(Patient, pk=pk)
     from consultations.models import Consultation as Consult, Ordonnance, LigneOrdonnance
+    # Mêmes aides que le formulaire d'ordonnance de l'app `ordonnance` : les deux
+    # écrans partagent déjà le gabarit, ils partagent maintenant la règle.
+    from ordonnance.views import (_avertir_refus, _medicaments_dispo_json,
+                                  _produit_prescrit)
 
     consultation = None
     consultation_pk = request.GET.get('consultation') or request.POST.get('consultation_id')
@@ -1102,6 +1177,7 @@ def ordonnance_create(request, pk):
         durees = request.POST.getlist('duree[]')
         quantites = request.POST.getlist('quantite[]')
 
+        refuses = []
         for i, posologie in enumerate(posologies):
             if not posologie.strip():
                 continue
@@ -1121,21 +1197,23 @@ def ordonnance_create(request, pk):
                 duree=duree,
                 quantite=quantite,
             )
-            if med_id:
-                try:
-                    ligne.medicament_id = int(med_id)
-                except (ValueError, TypeError):
-                    pass
+            produit = _produit_prescrit(med_id, request)
+            if produit is not None:
+                ligne.produit = produit
+                ligne.medicament_libre = ''
+            elif med_id:
+                refuses.append(med_libre.strip() or str(med_id))
             ligne.save()
 
+        _avertir_refus(request, refuses)
         messages.success(request, f"Ordonnance {ordonnance.numero} créée avec succès.")
         return redirect('patients:ordonnance_list', pk=pk)
 
-    try:
-        from pharmacie.models import Medicament
-        medicaments_dispo = list(Medicament.objects.filter(actif=True).values('pk', 'designation', 'dosage', 'forme'))
-    except Exception:
-        medicaments_dispo = []
+    # Ce second formulaire d'ordonnance partage le gabarit du premier mais lisait
+    # sa propre liste, restée sur la table `pharmacie.Medicament` — vidée depuis,
+    # donc plus rien à prescrire. Les deux passent désormais par la même règle :
+    # ce que la pharmacie du centre actif a en rayon.
+    medicaments_dispo = _medicaments_dispo_json(request)
 
     medecins = Medecin.objects.select_related('specialite', 'employe').order_by('employe__nom')
     medecin_preselect = consultation.medecin if consultation else None

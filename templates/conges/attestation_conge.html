@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Attestation de congé — {{ conge.employe.nom_complet }}</title>
+  <title>{{ conge.attestation_titre }} — {{ conge.employe.nom_complet }}</title>
   <style>
 :root { --font-print: 'Segoe UI', Arial, sans-serif; --font-mono: 'Courier New', monospace; --cg-700: #2e592b; }
 
@@ -198,7 +198,7 @@
 
 <!-- Barre d'action (masquée à l'impression) -->
 <div class="print-bar">
-  <span>Attestation de congé — {{ conge.employe.nom_complet }}</span>
+  <span>{{ conge.attestation_titre }} — {{ conge.employe.nom_complet }}</span>
   <div style="display:flex;gap:8px;">
     <a href="{% url 'conge_detail' conge.pk %}" style="font-size:12.5px;color:var(--cg-700);text-decoration:none;">← Retour</a>
     <button class="btn-print" onclick="window.print()">🖨 Imprimer</button>
@@ -225,7 +225,7 @@
 
 <!-- ── Titre ── -->
 <div class="att-title">
-  <h1>Attestation de Congé</h1>
+  <h1>{{ conge.attestation_titre }}</h1>
   <div class="att-objet">Objet : {{ conge.get_type_conge_display }}</div>
 </div>
 
@@ -236,7 +236,7 @@
     <strong>{{ conge.employe.nom_complet }}</strong>{% if conge.employe.fonction %},
     <strong>{{ conge.employe.fonction }}</strong>{% endif %}{% if conge.employe.service %},
     affecté(e) au service <strong>{{ conge.employe.service }}</strong>{% endif %},
-    bénéficie d'un congé autorisé dans les conditions ci-dessous.
+    {{ conge.phrase_beneficie }} dans les conditions ci-dessous.
   </p>
 </div>
 
@@ -279,7 +279,7 @@
 <!-- ── Nature du congé ── -->
 <div class="att-body">
   <p>
-    Le congé accordé est de nature <strong>{{ conge.get_type_conge_display }}</strong>
+    {{ conge.phrase_nature_intro }} <strong>{{ conge.get_type_conge_display }}</strong>
     et couvre la période suivante :
   </p>
 </div>

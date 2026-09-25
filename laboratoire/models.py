@@ -107,6 +107,14 @@ class DemandeExamen(ModeleCentre):
 class LigneDemandeExamen(models.Model):
     demande = models.ForeignKey(DemandeExamen, on_delete=models.CASCADE, related_name='lignes')
     type_examen = models.ForeignKey(TypeExamen, on_delete=models.SET_NULL, null=True, blank=True)
+    article_service = models.ForeignKey(
+        'services.Articleservice', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='lignes_demande_examen',
+        verbose_name="Article de service",
+        help_text="Article du catalogue Services (catégorie Examens biologiques) "
+                   "sélectionné à la création de la demande ; permet de retrouver le "
+                   "code HPRIM du laboratoire partenaire."
+    )
     libelle = models.CharField(max_length=300, blank=True)
     prix = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     instructions = models.TextField(blank=True)

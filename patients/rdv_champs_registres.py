@@ -34,7 +34,7 @@ REGISTRES = {
 }
 
 
-#: Onglet « CPN » → registre_cpn.donnees (96 champs)
+#: Onglet « CPN » → registre_cpn.donnees (97 champs)
 CHAMPS_CPN = [
     # Antécédents
     ('cpn_avortements', 'Avortements', 'nombre_json', ()),
@@ -92,6 +92,7 @@ CHAMPS_CPN = [
     ('cpn_date_prochain_rdv', 'Date du prochain RDV', 'date_json', ()),
     ('cpn_etat_nutritionnel', 'Etat nutritionnel', 'choix', (('bon', 'Bon'), ('moyen', 'Moyen'), ('mauvais', 'Mauvais'))),
     ('cpn_examens_echo', 'Examens échographiques ou radiologiques', 'texte', ()),
+    ('cpn_gestion_risque', 'Gestion du risque', 'choix', (('revoir', 'À revoir'), ('referer', 'À référer'), ('hospitaliser', 'À hospitaliser'))),
     ('cpn_hu', 'H.U.', 'texte', ()),
     ('cpn_methode_souhaitee', 'Méthode souhaitée', 'choix', (('condom', 'Condom'), ('pilule', 'Pilule'), ('diu', 'DIU'), ('injectable', 'Injectable'), ('implant', 'Implant'), ('sterilisation', 'Stérilisation'))),
     ('cpn_po', 'P.O.', 'texte', ()),
@@ -375,13 +376,14 @@ CHAMPS_POST_NATALE = [
     ('cposo_sucre', 'Sucre', 'choix', (('negatif', 'Négatif'), ('positif', 'Positif'))),
 ]
 
-#: Onglet « Curatif » → registre_curatif.donnees (31 champs)
+#: Onglet « Curatif » → registre_curatif.donnees (33 champs)
 CHAMPS_CURATIF = [
     # Antécédents et autres informations
     ('cur_alcool', 'Alcool', 'choix', (('oui', 'Oui'), ('non', 'Non'))),
     ('cur_atcd_autres', 'Autres', 'texte', ()),
     ('cur_atcd_chirurgicaux', 'Chirurgicaux', 'texte', ()),
     ('cur_ddr', 'D.D.R.', 'date_json', ()),
+    ('cur_ddr_precision', 'D.D.R. (préciser)', 'texte', ()),
     ('cur_atcd_diabete', 'Diabète', 'choix', (('oui', 'Oui'), ('non', 'Non'))),
     ('cur_grossesse_en_cours', 'Grossesse en cours', 'choix', (('oui', 'Oui'), ('non', 'Non'))),
     ('cur_atcd_hta', 'HTA', 'choix', (('oui', 'Oui'), ('non', 'Non'))),
@@ -395,6 +397,7 @@ CHAMPS_CURATIF = [
     ('cur_traitement', 'Traitement', 'texte', ()),
     # Données administratives
     ('cur_type_population', 'Type de population', 'choix', (('pop_generale', 'Population générale'), ('ts', 'TS'), ('ud', 'UD'), ('hsh', 'HSH'), ('pc', 'PC'), ('autre_risque', 'Autre à risque'))),
+    ('cur_type_population_autre', 'Type de population (préciser)', 'texte', ()),
     # Examens cliniques et constantes
     ('cur_examen_physique', 'Examen physique', 'texte', ()),
     ('cur_motif_consultation', 'Motif de consultation', 'texte', ()),

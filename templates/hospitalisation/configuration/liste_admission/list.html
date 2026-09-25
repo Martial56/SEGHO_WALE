@@ -58,10 +58,12 @@ html[data-theme="dark"] .cfg-table tbody tr:hover { background: rgba(var(--teal-
   </div>
 
   <div class="o-subheader-row">
+    {% if perms.hospitalisation.add_listecontroleadmission %}
     <a href="{% url 'hospitalisation:liste_admission_create' %}" class="o-btn-create"
        onclick="return mdOpenConfigModal(event, this.href, 'Nouvel élément', 'bi-clipboard-check');">
       <i class="bi bi-plus-lg"></i> Créer
     </a>
+    {% endif %}
     <div class="io-page-wrap" id="io-page-wrap">
       <button type="button" class="o-ctrl-btn io-toggle-btn" onclick="toggleIOPage(event)">
         <i class="bi bi-arrow-left-right"></i> Export / Import
@@ -72,9 +74,11 @@ html[data-theme="dark"] .cfg-table tbody tr:hover { background: rgba(var(--teal-
         <a class="io-pm-item" href="{% url 'hospitalisation:liste_admission_export' %}?format=json"><i class="bi bi-filetype-json" style="color:#c97a00;"></i> JSON</a>
         <a class="io-pm-item" href="{% url 'hospitalisation:liste_admission_export' %}?format=csv"><i class="bi bi-filetype-csv" style="color:#1a7a4a;"></i> CSV</a>
         <a class="io-pm-item" href="{% url 'hospitalisation:liste_admission_export' %}?format=xlsx"><i class="bi bi-file-earmark-excel" style="color:#217346;"></i> Excel</a>
+        {% if perms.hospitalisation.add_listecontroleadmission and perms.hospitalisation.change_listecontroleadmission %}
         <div class="io-pm-sep"></div>
         <div class="io-pm-section">Importer</div>
         <button type="button" class="io-pm-item" onclick="openImportModal()"><i class="bi bi-upload" style="color:var(--accent-text-soft);"></i> Importer un fichier…</button>
+        {% endif %}
       </div>
     </div>
     <div class="o-subheader-row-right">
@@ -108,7 +112,7 @@ html[data-theme="dark"] .cfg-table tbody tr:hover { background: rgba(var(--teal-
     </thead>
     <tbody>
       {% for obj in page_obj %}
-      <tr onclick="mdOpenConfigModal(event, '{% url 'hospitalisation:liste_admission_edit' obj.pk %}', 'Modifier — {{ obj.item|escapejs }}', 'bi-clipboard-check')">
+      <tr {% if perms.hospitalisation.change_listecontroleadmission %}onclick="mdOpenConfigModal(event, '{% url 'hospitalisation:liste_admission_edit' obj.pk %}', 'Modifier — {{ obj.item|escapejs }}', 'bi-clipboard-check')"{% else %}style="cursor:default;"{% endif %}>
         <td class="col-check" onclick="event.stopPropagation()">
           <input type="checkbox" class="ch-check row-check">
         </td>
@@ -117,10 +121,12 @@ html[data-theme="dark"] .cfg-table tbody tr:hover { background: rgba(var(--teal-
           {{ obj.remarques|default:"" }}
         </td>
         <td onclick="event.stopPropagation()" style="text-align:right;padding-right:10px;">
+          {% if perms.hospitalisation.delete_listecontroleadmission %}
           <button type="button" class="o-ctrl-btn" style="padding:3px 7px;"
                   onclick="openDeleteModal('{% url 'hospitalisation:liste_admission_delete' obj.pk %}', '{{ obj.item|escapejs }}')">
             <i class="bi bi-trash3" style="font-size:12px;color:#c62828;"></i>
           </button>
+          {% endif %}
         </td>
       </tr>
       {% empty %}
@@ -129,7 +135,7 @@ html[data-theme="dark"] .cfg-table tbody tr:hover { background: rgba(var(--teal-
           <div class="cfg-empty">
             <i class="bi bi-clipboard-check"></i>
             Aucun élément{% if q %} pour « {{ q }} »{% endif %}.
-            {% if not q %}<br><a href="{% url 'hospitalisation:liste_admission_create' %}" style="color:var(--accent-text-soft);text-decoration:none;font-size:13px;"
+            {% if not q and perms.hospitalisation.add_listecontroleadmission %}<br><a href="{% url 'hospitalisation:liste_admission_create' %}" style="color:var(--accent-text-soft);text-decoration:none;font-size:13px;"
                onclick="return mdOpenConfigModal(event, this.href, 'Nouvel élément', 'bi-clipboard-check');">Créer le premier élément</a>{% endif %}
           </div>
         </td>

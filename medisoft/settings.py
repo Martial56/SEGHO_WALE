@@ -24,7 +24,6 @@ INSTALLED_APPS = [
     'laboratoire.apps.LaboratoireConfig',
     'hospitalisation',
     'facturation',
-    'caisse',
     'employer',
     'conges',
     'presence',
@@ -38,6 +37,8 @@ INSTALLED_APPS = [
     'achats',
     'rapports',
     'blockchain_bridge',
+    'guide',
+    'journal',
     'django_browser_reload',
 ]
 
@@ -51,6 +52,7 @@ MIDDLEWARE = [
     'core.middleware.CurrentUserMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'core.middleware.SessionTimeoutMiddleware',
+    'core.middleware.ActivityLogMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 

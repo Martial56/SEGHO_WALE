@@ -65,43 +65,15 @@
     textarea.ord-input { resize: vertical; border: 1.5px solid var(--border-strong); border-radius: 6px; padding: 8px 10px; }
     textarea.ord-input:focus { border-color: var(--teal-500); }
 
-    /* Patient search */
-    .pat-search-wrap { position: relative; }
-    .pat-search-input {
-        width: 100%; border: none; border-bottom: 1.5px solid var(--border-strong);
-        padding: 5px 2px; font-size: 13px; color: var(--teal-900);
-        background: transparent; outline: none; font-family: 'Sora', sans-serif;
-        transition: border-color .2s;
+    /* Rappel de la consultation d'origine, sous la carte patient */
+    .ord-consultation-ref {
+        display: flex; align-items: center; gap: 7px;
+        margin-top: 10px; padding: 7px 14px;
+        background: rgba(var(--teal-500-rgb),.08);
+        border: 1px solid rgba(var(--teal-500-rgb),.25);
+        border-radius: 8px;
+        font-size: 12px; font-weight: 600; color: var(--accent-text-soft);
     }
-    .pat-search-input:focus { border-bottom-color: var(--teal-500); }
-    .pat-search-dd {
-        display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0;
-        background: var(--surface); border: 1px solid var(--border-strong);
-        border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,0.10);
-        z-index: 400; max-height: 230px; overflow-y: auto;
-    }
-    .pat-dd-item { padding: 9px 14px; font-size: 13px; cursor: pointer; border-bottom: 1px solid var(--border); }
-    .pat-dd-item:last-child { border-bottom: none; }
-    .pat-dd-item:hover { background: var(--teal-50); }
-    .pat-dd-name { font-weight: 600; color: var(--teal-900); }
-    .pat-dd-code { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); }
-    .pat-dd-empty { padding: 12px 14px; font-size: 12px; color: var(--text-faint); font-style: italic; }
-
-    /* Patient banner */
-    .patient-banner {
-        display: flex; align-items: center; gap: 14px;
-        padding: 10px 20px; background: rgba(var(--teal-500-rgb),.08); border-radius: 6px;
-        margin-top: 12px; border: 1px solid rgba(var(--teal-500-rgb),.3);
-    }
-    .patient-banner-av {
-        width: 36px; height: 36px; border-radius: 50%;
-        background: var(--teal-600); color: #fff;
-        display: flex; align-items: center; justify-content: center;
-        font-size: 14px; font-weight: 700; flex-shrink: 0;
-    }
-    .patient-banner-name { font-size: 13px; font-weight: 700; color: var(--teal-900); }
-    .patient-banner-meta { font-size: 11.5px; color: var(--text-muted); margin-top: 1px; }
-
     /* Médicaments */
     .lines-table { width: 100%; border-collapse: collapse; }
     .lines-table thead th {
@@ -142,6 +114,10 @@
     }
     .med-ac-item { padding: 7px 12px; font-size: 12.5px; cursor: pointer; border-bottom: 1px solid var(--border); line-height: 1.4; color: var(--teal-900); }
     .med-ac-item:hover { background: var(--teal-50); }
+    {% comment %}Rupture dans la pharmacie du centre : visible pour qu'on sache
+    que le produit existe, éteint pour qu'on n'essaie pas de le choisir.{% endcomment %}
+    .med-ac-rupture { opacity: .45; cursor: not-allowed; }
+    .med-ac-rupture:hover { background: transparent; }
     .med-ac-name { font-weight: 500; }
     .med-ac-sub { font-size: 11px; color: var(--text-muted); }
 
@@ -176,7 +152,6 @@
 {% csrf_token %}
 <input type="hidden" name="consultation_id" value="{{ consultation.pk|default:'' }}">
 <input type="hidden" name="rdv_id" value="">
-<input type="hidden" name="patient_id" id="patient-id-hidden" value="{{ patient.pk|default:'' }}">
 
 <!-- Panneau de contrôle -->
 <div class="ord-panel">
@@ -201,39 +176,24 @@
 
 <div class="ord-body">
 
-    <!-- Recherche patient -->
+    <!-- Patient -->
     <div class="ord-card" style="overflow:visible;">
         <div class="ord-card-head">Patient</div>
         <div class="ord-card-body" style="overflow:visible;">
-            {% if patient %}
-            {# Cas depuis rendez-vous — patient déjà connu #}
-            <div class="patient-banner" id="patient-banner">
-                <div class="patient-banner-av" id="pat-av">{{ patient.nom|first }}{{ patient.prenoms|first }}</div>
-                <div>
-                    <div class="patient-banner-name" id="pat-name">{{ patient.nom }} {{ patient.prenoms }}</div>
-                    <div class="patient-banner-meta" id="pat-meta">
-                        {{ patient.code }}{% if consultation %} · Consultation {{ consultation.numero }}{% endif %}{% if patient.date_naissance %} · {{ patient.date_naissance|date:"d/m/Y" }}{% endif %}
-                    </div>
-                </div>
+        {% comment %}Sélecteur commun au projet — le même que dans soins et
+        hospitalisation. Venu d'une consultation, le dossier est imposé :
+        `lecture_seule` retire la recherche et la croix de désélection. Sinon la
+        carte est pré-remplie mais reste changeable, cas du retour au formulaire
+        après un médecin oublié.{% endcomment %}
+        {% if consultation %}
+            {% include 'includes/_patient_picker.html' with nom='patient_id' id='patient-id-hidden' valeur=patient.pk patient=patient lecture_seule=True %}
+            <div class="ord-consultation-ref">
+                <i class="bi bi-clipboard2-pulse"></i>
+                Consultation n° {{ consultation.numero }}
             </div>
-            {% else %}
-            {# Cas depuis pharmacie — recherche patient #}
-            <div class="ord-field">
-                <label class="ord-label">Rechercher un patient <span style="color:var(--rose)">*</span></label>
-                <div class="pat-search-wrap">
-                    <input type="text" id="pat-search-input" class="pat-search-input"
-                           placeholder="Nom, prénom, code ou téléphone…" autocomplete="off">
-                    <div id="pat-search-dd" class="pat-search-dd"></div>
-                </div>
-            </div>
-            <div class="patient-banner" id="patient-banner" style="display:none;">
-                <div class="patient-banner-av" id="pat-av"></div>
-                <div>
-                    <div class="patient-banner-name" id="pat-name"></div>
-                    <div class="patient-banner-meta" id="pat-meta"></div>
-                </div>
-            </div>
-            {% endif %}
+        {% else %}
+            {% include 'includes/_patient_picker.html' with nom='patient_id' id='patient-id-hidden' valeur=patient.pk patient=patient %}
+        {% endif %}
         </div>
     </div>
 
@@ -339,22 +299,27 @@
 
 <script>
 let MEDS = {{ medicaments_dispo|default:"[]"|safe }};
-const patientPreselected = {{ patient|yesno:"true,false" }};
 const medecinPreselected = {{ medecin_preselect|yesno:"true,false" }};
 
 const btnSave      = document.getElementById('btn-save');
 const medecinSel   = document.getElementById('medecin-select');
 
-function updateSaveBtn(patientSelected) {
+/* Le champ caché du sélecteur de patient fait seul autorité : il porte
+   l'identifiant tant qu'un patient est choisi, et se vide dès qu'on clique la
+   croix. Se fier à un drapeau calculé au rendu laissait le bouton actif après
+   une désélection. */
+function updateSaveBtn() {
+    const champ = document.getElementById('patient-id-hidden');
     const medecinOk = medecinSel && medecinSel.value !== '';
-    const patOk = patientSelected !== undefined ? patientSelected : (patientPreselected || document.getElementById('patient-id-hidden').value !== '');
+    const patOk = !!(champ && champ.value);
     btnSave.disabled = !(patOk && medecinOk);
 }
 
-/* Le stock/la liste des médicaments dépend de la pharmacie du centre du
-   médecin prescripteur (Walé Yamoussoukro / Walé Toumbokro) : on la
-   recharge à chaque changement de médecin pour ne jamais afficher le stock
-   de l'autre pharmacie. */
+/* La liste est celle de la pharmacie du centre où l'on est connecté — et non
+   plus celle du médecin choisi ci-dessus, qui n'aboutissait jamais : aucun des
+   médecins du fichier n'a de compte utilisateur, et la liste retombait alors
+   sur la somme des deux pharmacies. Le rechargement au changement de médecin
+   est conservé mais ne change plus rien à ce qui s'affiche. */
 function refreshMedicamentsPourMedecin(medecinId) {
     const url = '{% url "medicaments_dispo_par_medecin" %}' + (medecinId ? ('?medecin_id=' + encodeURIComponent(medecinId)) : '');
     fetch(url)
@@ -383,66 +348,14 @@ if (medecinSel) {
     });
 }
 
-/* ── Recherche patient ── */
-if (!patientPreselected) {
-    const searchInput = document.getElementById('pat-search-input');
-    const dropdown    = document.getElementById('pat-search-dd');
-    const hiddenId    = document.getElementById('patient-id-hidden');
-    const banner      = document.getElementById('patient-banner');
-    const patAv       = document.getElementById('pat-av');
-    const patName     = document.getElementById('pat-name');
-    const patMeta     = document.getElementById('pat-meta');
-    let timer;
-
-    searchInput.addEventListener('input', function () {
-        clearTimeout(timer);
-        hiddenId.value = '';
-        updateSaveBtn(false);
-        banner.style.display = 'none';
-        const q = this.value.trim();
-        if (q.length < 2) { dropdown.style.display = 'none'; return; }
-        timer = setTimeout(() => {
-            fetch('/patients/recherche/?q=' + encodeURIComponent(q))
-                .then(r => r.json())
-                .then(data => {
-                    /* L'API retourne { results: [{id, nom_complet, code, telephone, actif}] } */
-                    const list = data.results || data.patients || (Array.isArray(data) ? data : []);
-                    if (!list.length) {
-                        dropdown.innerHTML = '<div class="pat-dd-empty">Aucun patient trouvé</div>';
-                    } else {
-                        dropdown.innerHTML = list.slice(0, 10).map(p => {
-                            const nom = p.nom_complet || ((p.nom||'') + ' ' + (p.prenoms||'')).trim();
-                            const code = p.code || '';
-                            const id = p.id || p.pk || '';
-                            return `<div class="pat-dd-item" data-id="${id}" data-nom="${nom}" data-code="${code}">
-                                <div class="pat-dd-name">${nom}</div>
-                                <div class="pat-dd-code">${code}</div>
-                            </div>`;
-                        }).join('');
-                        dropdown.querySelectorAll('.pat-dd-item').forEach(item => {
-                            item.addEventListener('mousedown', e => {
-                                e.preventDefault();
-                                searchInput.value = item.dataset.nom;
-                                hiddenId.value    = item.dataset.id;
-                                dropdown.style.display = 'none';
-                                /* Initiales pour l'avatar */
-                                const mots = item.dataset.nom.trim().split(' ');
-                                patAv.textContent   = ((mots[0]||'')[0] + (mots[1]||'')[0]).toUpperCase();
-                                patName.textContent = item.dataset.nom;
-                                patMeta.textContent = item.dataset.code;
-                                banner.style.display = 'flex';
-                                updateSaveBtn(true);
-                            });
-                        });
-                    }
-                    dropdown.style.display = 'block';
-                }).catch(() => {});
-        }, 260);
-    });
-
-    searchInput.addEventListener('blur', () => setTimeout(() => { dropdown.style.display = 'none'; }, 150));
+/* ── Réaction au choix du patient ──
+   Le sélecteur partagé (includes/_patient_picker.html) émet un `change` sur son
+   champ caché à chaque sélection et à chaque désélection. C'est le seul point
+   d'accroche nécessaire — la recherche, la liste et la carte sont à lui. */
+const champPatient = document.getElementById('patient-id-hidden');
+if (champPatient) {
+    champPatient.addEventListener('change', updateSaveBtn);
 }
-
 /* ── Autocomplete médicaments ── */
 function stockBadge(stock, alerte, minimum) {
     let cls = 'stock-ok';
@@ -495,22 +408,27 @@ function setupLine(row) {
             m.designation.toLowerCase().includes(q) || (m.dci || '').toLowerCase().includes(q)
         ).slice(0, 12);
         if (!matches.length) { dropdown.style.display = 'none'; return; }
+        /* Une rupture reste affichée — la cacher ferait croire que le produit
+           n'existe pas, et la désignation serait retapée à la main. Elle est
+           grisée et ne se clique pas : si le produit est indispensable, il part
+           sur une ordonnance physique, à acheter en externe. */
         dropdown.innerHTML = matches.map(m =>
-            `<div class="med-ac-item"
+            `<div class="med-ac-item${m.rupture ? ' med-ac-rupture' : ''}"
                   data-id="${m.pk}" data-name="${m.designation}"
+                  data-rupture="${m.rupture ? '1' : ''}"
                   data-stock="${m.stock_actuel ?? ''}"
                   data-alerte="${m.stock_alerte ?? 10}"
                   data-minimum="${m.stock_minimum ?? 5}">
                 <div class="med-ac-name">${m.designation}</div>
                 <div class="med-ac-sub">${m.dosage||''} ${m.forme||''}
-                    <span style="float:right;margin-left:8px;font-weight:600;color:${(m.stock_actuel||0) > (m.stock_alerte||10) ? 'var(--teal-600)' : (m.stock_actuel||0) > 0 ? 'var(--amber-text)' : 'var(--rose-text)'}">
-                        Stock : ${m.stock_actuel ?? '—'}
+                    <span style="float:right;margin-left:8px;font-weight:600;color:${m.rupture ? 'var(--rose-text)' : (m.stock_actuel||0) > (m.stock_alerte||10) ? 'var(--teal-600)' : 'var(--amber-text)'}">
+                        ${m.rupture ? 'Rupture ici' : 'Stock : ' + (m.stock_actuel ?? '—')}
                     </span>
                 </div>
             </div>`
         ).join('');
         dropdown.style.display = 'block';
-        dropdown.querySelectorAll('.med-ac-item').forEach(item => {
+        dropdown.querySelectorAll('.med-ac-item:not(.med-ac-rupture)').forEach(item => {
             item.addEventListener('mousedown', e => {
                 e.preventDefault();
                 searchInput.value = item.dataset.name;

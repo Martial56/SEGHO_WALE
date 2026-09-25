@@ -15,9 +15,33 @@ class Acte(models.Model):
     class Meta: verbose_name = "Acte médical"
 
 
+#: Catégorie d'article (services.CategorieArticle.code) → type de facture.
+#: Cette table vivait en JavaScript dans templates/facturation/create_facture.html,
+#: où elle servait à interdire les lignes d'une autre nature. Elle sert
+#: maintenant à l'inverse : toutes les lignes sont permises, et c'est le type de
+#: la facture qui se déduit de ce qu'on y a mis.
+#:
+#: `AE` (Autres examens) et `EG` (Électrocardiogramme) apparaissaient des deux
+#: côtés dans l'ancienne table ; il a fallu trancher — au laboratoire pour le
+#: premier, à l'imagerie pour le second.
+CATEGORIE_VERS_TYPE = {
+    'CS':   'consultation',
+    'SN':   'soins',
+    'VC':   'soins',
+    'MO':   'hospitalisation',
+    'MT':   'hospitalisation',
+    'MD':   'pharmacie',
+    'EX':   'laboratoire',
+    'AE':   'laboratoire',
+    'EG':   'imagerie',
+    'EC':   'imagerie',
+    'RD':   'imagerie',
+}
+
+
 class Facture(ModeleCentre):
     STATUT = [('brouillon','Brouillon'),('emise','Émise'),('payee','Payée'),('annulee','Annulée')]
-    TYPE = [('consultation','Consultation'),('soins','Soins'),('hospitalisation','Hospitalisation'),('pharmacie','Pharmacie'),('laboratoire','Laboratoire'),('imagerie','Imagerie'),('autre','Autre')]
+    TYPE = [('consultation','Consultation'),('soins','Soins'),('hospitalisation','Hospitalisation'),('pharmacie','Pharmacie'),('laboratoire','Laboratoire'),('imagerie','Imagerie'),('mixte','Mixte'),('autre','Autre')]
 
     numero = models.CharField(max_length=20, unique=True, editable=False)
     patient = models.ForeignKey('patients.Patient', on_delete=models.CASCADE, related_name='factures')
@@ -72,6 +96,50 @@ class Facture(ModeleCentre):
             self.save(update_fields=['montant_total'])
         return self.montant_total
 
+    def types_des_lignes(self):
+        """Natures distinctes présentes dans les lignes, dans l'ordre de `TYPE`.
+
+        Une ligne sans article ni produit — saisie à la main, ou enregistrée
+        avant que le lien soit posé — ne compte pour aucune nature : on ne sait
+        pas ce qu'elle est, et la deviner d'après son libellé serait un pari.
+        """
+        vus = set()
+        for ligne in self.lignes.select_related('article__categorie', 'produit'):
+            # Un produit du stock — médicament ou consommable — relève de la
+            # pharmacie, quelle que soit sa catégorie de rangement.
+            if ligne.produit_id:
+                vus.add('pharmacie')
+                continue
+            article = ligne.article
+            code = article.categorie.code if article and article.categorie_id else None
+            type_ = CATEGORIE_VERS_TYPE.get(code)
+            if type_:
+                vus.add(type_)
+        ordre = [code for code, _ in self.TYPE]
+        return [t for t in ordre if t in vus]
+
+    def deduire_type(self):
+        """Type déduit du contenu, ou None s'il n'y a rien pour trancher.
+
+        Une seule nature donne ce type, plusieurs donnent « Mixte ». None quand
+        aucune ligne ne porte d'article : le type déjà posé est alors conservé
+        plutôt que remplacé par une valeur inventée.
+        """
+        types = self.types_des_lignes()
+        if not types:
+            return None
+        return types[0] if len(types) == 1 else 'mixte'
+
+    def appliquer_type_deduit(self, save=True):
+        """Aligne `type_facture` sur le contenu. Sans effet si rien ne le dit."""
+        type_ = self.deduire_type()
+        if type_ is None or type_ == self.type_facture:
+            return self.type_facture
+        self.type_facture = type_
+        if save:
+            self.save(update_fields=['type_facture'])
+        return type_
+
     def __str__(self): return f"Facture {self.numero}"
     class Meta(ModeleCentre.Meta):
         verbose_name = "Facture"
@@ -84,7 +152,22 @@ class Facture(ModeleCentre):
 class LigneFacture(models.Model):
     facture = models.ForeignKey(Facture, on_delete=models.CASCADE, related_name='lignes')
     acte = models.ForeignKey(Acte, on_delete=models.SET_NULL, null=True, blank=True)
-    medicament = models.ForeignKey('pharmacie.Medicament', on_delete=models.SET_NULL, null=True, blank=True)
+    # L'article du catalogue d'où vient la ligne. Le formulaire n'enregistrait
+    # que son nom : la catégorie, connue à l'écran et servant à filtrer, était
+    # jetée à la sauvegarde. Sans elle, impossible de dire de quelle nature est
+    # une ligne — donc impossible d'en déduire le type de la facture.
+    # Nul sur les lignes d'avant ce champ, et sur celles saisies à la main.
+    article = models.ForeignKey(
+        'services.Articleservice', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='lignes_facture', verbose_name="Article")
+    # Le produit du stock, quand la ligne vient de la pharmacie plutôt que du
+    # catalogue de prestations. Les deux liens coexistent parce que les deux
+    # catalogues existent : `article` porte les actes et les examens,
+    # `produit` les médicaments et les consommables. Une facture peut mêler les
+    # deux — une consultation, une radio et une boîte de paracétamol.
+    produit = models.ForeignKey(
+        'stock.Produit', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='lignes_facture', verbose_name="Produit")
     libelle = models.CharField(max_length=300)
     quantite = models.DecimalField(max_digits=10, decimal_places=2, default=1)
     prix_unitaire = models.DecimalField(max_digits=12, decimal_places=2)
@@ -102,6 +185,20 @@ class Paiement(ModeleCentre):
     facture = models.ForeignKey(Facture, on_delete=models.CASCADE, related_name='paiements')
     montant = models.DecimalField(max_digits=15, decimal_places=2)
     mode_paiement = models.CharField(max_length=20, choices=MODE)
+    # Où l'argent est entré. Le champ « Journal » des écrans d'encaissement
+    # existait déjà, mais le navigateur ne l'envoyait pas et le serveur ne le
+    # lisait pas : le choix du caissier était perdu, et aucun paiement ne savait
+    # de quelle caisse il relevait. SET_NULL plutôt que CASCADE — supprimer une
+    # caisse ne doit pas effacer les encaissements passés par elle.
+    caisse = models.ForeignKey(
+        'facturation.Caisse', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='paiements', verbose_name="Caisse")
+    # Ce que le patient a tendu, quand il a payé en espèces. `montant` reste ce
+    # qui était dû : compter le billet entier gonflerait la caisse de la monnaie
+    # rendue. Nul sur les autres modes, où il n'y a pas de monnaie.
+    montant_recu = models.DecimalField(
+        max_digits=15, decimal_places=2, null=True, blank=True,
+        verbose_name="Montant reçu")
     reference = models.CharField(max_length=100, blank=True)
     date_paiement = models.DateTimeField(auto_now_add=True)
     recu_par = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
@@ -119,7 +216,106 @@ class Paiement(ModeleCentre):
             self.numero = f"{prefix}{count:07d}"
         super().save(*args, **kwargs)
 
+    @property
+    def monnaie_rendue(self):
+        """Différence entre ce qui a été tendu et ce qui était dû.
+
+        None quand rien n'a été saisi — les paiements antérieurs à ce champ, et
+        tous ceux qui ne sont pas en espèces. Jamais négatif : un patient qui
+        donne moins que le dû ne se voit pas rendre de monnaie, la facture
+        reste simplement partiellement réglée.
+        """
+        if self.montant_recu is None:
+            return None
+        return max(self.montant_recu - self.montant, 0)
+
     def __str__(self): return f"Paiement {self.numero} - {self.montant} F"
     class Meta(ModeleCentre.Meta):
         verbose_name = "Paiement"
         ordering = ['-date_paiement']
+
+
+class Caisse(models.Model):
+    """Journal d'encaissement — « où l'argent est entré ».
+
+    Venait de l'application `caisse`, supprimée : elle ne servait plus qu'à
+    fournir cette liste, ses deux autres tables (sessions et transactions)
+    n'ayant jamais reçu une seule ligne. Le modèle vit désormais là où il est
+    lu, à côté de `Facture` et `Paiement`.
+
+    Volontairement pas un `ModeleCentre` : une caisse n'appartient pas à un
+    centre, elle en désigne un (« Caisse Toumbokro »).
+    """
+
+    nom = models.CharField(max_length=100, verbose_name="Nom")
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code")
+    actif = models.BooleanField(default=True, verbose_name="Active")
+    # Codes séparés par des virgules, pris dans `Paiement.MODE`. Une liste
+    # plutôt qu'une table de liaison : les modes sont une énumération figée du
+    # code, pas une donnée que l'utilisateur ajoute.
+    modes_paiement = models.CharField(
+        max_length=200, blank=True, default='especes',
+        verbose_name="Modes de paiement acceptés")
+
+    def __str__(self): return self.nom
+
+    #: Mode retenu quand une caisse n'en déclare aucun. Une caisse qui
+    #: n'accepterait rien ne serait pas une caisse, et l'espèce est le cas
+    #: courant au guichet.
+    MODE_PAR_DEFAUT = 'especes'
+
+    @property
+    def modes(self):
+        """Codes des modes acceptés, dans l'ordre de `Paiement.MODE`.
+
+        Seuls les modes cochés sont proposés à l'encaissement. Les codes
+        inconnus — un mode retiré du modèle depuis — sont écartés au passage.
+        """
+        choisis = {m for m in self.modes_paiement.split(',') if m}
+        retenus = [code for code, _ in Paiement.MODE if code in choisis]
+        return retenus or [self.MODE_PAR_DEFAUT]
+
+    @property
+    def modes_libelles(self):
+        libelles = dict(Paiement.MODE)
+        return [libelles[code] for code in self.modes]
+
+    @property
+    def total_encaisse(self):
+        """Somme des paiements passés par cette caisse.
+
+        Calculé, et non stocké : le champ `solde_actuel` qu'il remplace n'était
+        écrit par aucun code. Ses quatre valeurs totalisaient 1 326 040 F quand
+        l'ensemble des paiements jamais enregistrés en pesait 79 701 — seize
+        fois moins. Un nombre que personne ne tient finit toujours par mentir.
+
+        « Total encaissé » et non « solde » : une caisse a aussi un fonds de
+        départ, des sorties, des versements en banque, dont l'application ne
+        sait rien. Promettre un solde serait promettre plus qu'on ne tient.
+
+        La vue de liste pose l'annotation `total` pour éviter une requête par
+        ligne ; cette propriété sert les appels isolés.
+        """
+        from django.db.models import Sum
+        # all_objects : `self.paiements` passe par le gestionnaire filtré par
+        # centre, qui ne rend rien hors d'une requête HTTP — le total serait 0
+        # dans un shell ou une commande. L'annotation de la vue de liste compte
+        # elle aussi tous les centres, les deux chiffres doivent concorder.
+        return Paiement.all_objects.filter(caisse=self).aggregate(
+            s=Sum('montant'))['s'] or 0
+
+    class Meta:
+        verbose_name = "Caisse"
+        verbose_name_plural = "Caisses"
+        ordering = ['nom']
+        # Libellés français : l'écran d'attribution des droits aux groupes
+        # affiche ces textes tels quels. Même parti pris que sur hospitalisation
+        # et soins — `default_permissions = ()` empêche Django d'ajouter en plus
+        # ses quatre entrées anglaises.
+        default_permissions = ()
+        permissions = [
+            ('view_caisse', 'Peut consulter les caisses'),
+            ('add_caisse', 'Peut créer une caisse'),
+            ('change_caisse', 'Peut modifier une caisse'),
+            ('delete_caisse', 'Peut supprimer une caisse'),
+        ]

@@ -1,6 +1,5 @@
 from django.urls import path, include
 from . import views
-from facturation.views import facturation_list as _facturation_list_view
 from medecins.views import (
     medecin_dashboard as _medecin_dashboard_view,
     medecins_export_csv as _medecins_export_csv_view,
@@ -26,6 +25,7 @@ urlpatterns = [
     path('deverrouiller/', views.unlock_session, name='unlock_session'),
     path('compte/', views.mon_compte, name='mon_compte'),
     path('compte/couleur-accent/', views.accent_color_set, name='accent_color_set'),
+    path('compte/luminosite/', views.luminosite_set, name='luminosite_set'),
 
     # URLs des modules
     path('centres/', include('centres.urls')),
@@ -62,13 +62,10 @@ urlpatterns = [
     path('pharmacie/', include('pharmacie.urls')),
     path('laboratoire/', views.laboratoire_list, name='laboratoire_list'),
     path('hospitalisation/', include('hospitalisation.urls')),
-    path('facture/nouveau/', views.facture_create, name='facture_create'),
-    path('facturation/', _facturation_list_view, name='facturation_list'),
     path('facturation/', include('facturation.urls')),
     path('laboratoire/nouvelle/', views.laboratoire_create, name='laboratoire_create'),
     path('laboratoire/<int:pk>/', views.laboratoire_detail, name='laboratoire_detail'),
     path('laboratoire/<int:pk>/bulletin/', views.laboratoire_bulletin, name='laboratoire_bulletin'),
-    path('caisse/', views.caisse_list, name='caisse_list'),
     path('employes/', include('employer.urls')),
     path('ordonnances/', include('ordonnance.urls')),
     path('conges/', include('conges.urls')),
@@ -78,6 +75,8 @@ urlpatterns = [
     path('post-note/', views.post_note, name='post_note'),
     path('planning/', include('planning.urls')),
     path('rapports/', include('rapports.urls')),
+    path('guide/', include('guide.urls')),
+    path('journal/', include('journal.urls')),
     path('gynecologie/', views.gynecologie_list, name='gynecologie_list'),
     path('gynecologie/rdv/', views.gynecologie_rdv, name='gynecologie_rdv'),
     path('gynecologie/rdv/nouveau/', views.gynecologie_rdv_create, name='gynecologie_rdv_create'),

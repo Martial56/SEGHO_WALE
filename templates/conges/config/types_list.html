@@ -1,5 +1,5 @@
 {% extends 'conges/base.html' %}
-{% block topbar_title %}Types de congé{% endblock %}
+{% block topbar_title %}Types de demande{% endblock %}
 
 {% block extra_css %}
 {{ block.super }}
@@ -36,6 +36,13 @@
   .cg-cfg-table tbody tr:hover { background:var(--cg-50); }
   html[data-theme="dark"] .cg-cfg-table tbody tr:hover { background: var(--surface); }
   .cg-cfg-table td { padding:10px 14px; color:var(--cg-text); vertical-align:middle; }
+  .cgcfg-tabs { display:flex; gap:4px; }
+  .cgcfg-tab {
+    padding:5px 12px; border-radius:16px; font-size:12px; font-weight:600;
+    text-decoration:none; color:var(--cg-muted); white-space:nowrap;
+  }
+  .cgcfg-tab:hover { background:var(--cg-50); }
+  .cgcfg-tab.active { background:var(--cg-700); color:#fff; }
 </style>
 {% endblock %}
 
@@ -46,7 +53,10 @@
   <a href="{% url 'conge_dashboard' %}" class="o-ctrl-btn" style="padding:3px 7px;">
     <i class="bi bi-arrow-left"></i>
   </a>
-  <span class="o-page-title">Types de congé</span>
+  <div class="cgcfg-tabs">
+    <a href="{% url 'conge_type_list' %}" class="cgcfg-tab active">Types de demande</a>
+    <a href="{% url 'conge_regles_calcul' %}" class="cgcfg-tab">Règles de calcul</a>
+  </div>
   <span class="o-page-count">{{ total_filtre }} / {{ total }}</span>
   <div style="flex:1;"></div>
   <form method="get" class="o-search-bar">
@@ -55,7 +65,7 @@
     <input type="hidden" name="page_size" value="{{ page_size }}">
   </form>
   <a href="{% url 'conge_type_create' %}" class="o-btn-create"
-    onclick="return cgOpenConfigModal(event, this.href, 'Nouveau type de congé', 'bi-tags');">
+    onclick="return cgOpenConfigModal(event, this.href, 'Nouveau type de demande', 'bi-tags');">
     <i class="bi bi-plus-lg"></i> Créer
   </a>
 </div>
@@ -63,17 +73,19 @@
 <div class="cgcfg-body">
   <table class="cg-cfg-table">
     <colgroup>
-      <col style="width:24%;">
       <col style="width:20%;">
+      <col style="width:16%;">
       <col style="width:14%;">
-      <col style="width:18%;">
-      <col style="width:14%;">
+      <col style="width:12%;">
+      <col style="width:16%;">
+      <col style="width:12%;">
       <col class="c-action">
     </colgroup>
     <thead>
       <tr>
         <th>Nom</th>
         <th>Code</th>
+        <th>Nature</th>
         <th>Déductible</th>
         <th>Durée forfaitaire</th>
         <th>Statut</th>
@@ -85,6 +97,7 @@
       <tr>
         <td style="font-weight:600;">{{ t.nom }}</td>
         <td style="color:var(--cg-muted);font-family:monospace;">{{ t.code }}</td>
+        <td><span class="cg-cfg-badge-actif">{{ t.get_nature_display }}</span></td>
         <td>{% if t.deductible %}<i class="bi bi-check-lg" style="color:var(--accent-text-soft);"></i>{% else %}<i class="bi bi-dash" style="color:var(--cg-muted);"></i>{% endif %}</td>
         <td>{{ t.duree_forfaitaire|default:"—" }}{% if t.duree_forfaitaire %}j{% endif %}</td>
         <td>
@@ -106,8 +119,8 @@
         </td>
       </tr>
       {% empty %}
-      <tr><td colspan="6" style="text-align:center;padding:30px;color:var(--cg-muted);font-style:italic;">
-        Aucun type de congé{% if q %} pour « {{ q }} »{% endif %}.
+      <tr><td colspan="7" style="text-align:center;padding:30px;color:var(--cg-muted);font-style:italic;">
+        Aucun type de demande{% if q %} pour « {{ q }} »{% endif %}.
       </td></tr>
       {% endfor %}
     </tbody>

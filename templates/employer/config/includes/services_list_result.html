@@ -55,20 +55,46 @@
       {% endfor %}
     </tbody>
   </table>
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 32px;border-top:1px solid var(--border);font-size:12.5px;color:var(--text-muted);">
-    <span>{{ page_obj.start_index }}–{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
-    <div style="display:flex;gap:4px;">
-      <a class="o-ctrl-btn {% if not page_obj.has_previous %}disabled{% endif %}"
-         href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}&q={{ q }}&vue={{ vue }}{% else %}#{% endif %}">
-        <i class="bi bi-chevron-left"></i>
-      </a>
-      <a class="o-ctrl-btn {% if not page_obj.has_next %}disabled{% endif %}"
-         href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}&q={{ q }}&vue={{ vue }}{% else %}#{% endif %}">
-        <i class="bi bi-chevron-right"></i>
-      </a>
-    </div>
+  <div style="padding:8px 32px 0;font-size:12.5px;color:var(--text-muted);">
+    {{ page_obj.start_index }}–{{ page_obj.end_index }} / {{ page_obj.paginator.count }}
   </div>
 </div>
+
+{% if page_obj.paginator.num_pages > 1 %}
+<div class="rh-pagination">
+  {% if page_obj.has_previous %}
+    <a href="?page=1&q={{ q }}&vue={{ vue }}" class="rh-page-link o-page-nav" title="Première page">
+      <i class="bi bi-chevron-double-left"></i>
+    </a>
+    <a href="?page={{ page_obj.previous_page_number }}&q={{ q }}&vue={{ vue }}" class="rh-page-link o-page-nav">
+      <i class="bi bi-chevron-left"></i>
+    </a>
+  {% else %}
+    <span class="rh-page-link disabled"><i class="bi bi-chevron-double-left"></i></span>
+    <span class="rh-page-link disabled"><i class="bi bi-chevron-left"></i></span>
+  {% endif %}
+
+  {% for num in page_obj.paginator.page_range %}
+    {% if num == page_obj.number %}
+      <span class="rh-page-link active">{{ num }}</span>
+    {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
+      <a href="?page={{ num }}&q={{ q }}&vue={{ vue }}" class="rh-page-link o-page-nav">{{ num }}</a>
+    {% endif %}
+  {% endfor %}
+
+  {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}&q={{ q }}&vue={{ vue }}" class="rh-page-link o-page-nav">
+      <i class="bi bi-chevron-right"></i>
+    </a>
+    <a href="?page={{ page_obj.paginator.num_pages }}&q={{ q }}&vue={{ vue }}" class="rh-page-link o-page-nav" title="Dernière page">
+      <i class="bi bi-chevron-double-right"></i>
+    </a>
+  {% else %}
+    <span class="rh-page-link disabled"><i class="bi bi-chevron-right"></i></span>
+    <span class="rh-page-link disabled"><i class="bi bi-chevron-double-right"></i></span>
+  {% endif %}
+</div>
+{% endif %}
 
 {% else %}
 <div class="o-empty">

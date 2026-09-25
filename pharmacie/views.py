@@ -15,7 +15,7 @@ from .models import (
     VentePharmacie, LigneVente,
     InventairePharmacie, LigneInventairePharmacie,
 )
-from stock.models import Produit, DemandePharmacie, LigneDemande
+from stock.models import Produit, DemandePharmacie, LigneDemande, UniteMesure
 
 PHARMACIES_DICT = dict(PHARMACIES_WALE)
 
@@ -223,7 +223,184 @@ def pharmacie_stock(request, pharmacie):
         'pharmacie': pharmacie, 'label': label,
         'page_obj':  page_obj, 'stats': stats,
         'q': q, 'statut': statut, 'type_filtre': type_filtre,
+        'can_manage': can_manage_pharmacie(request.user),
     })
+
+
+def _type_produit_import(val):
+    """Devine le type de produit (medicament/consommable/equipement) à partir
+    d'une valeur de fichier importé — accepte la valeur brute ('medicament')
+    ou le libellé affiché ('Médicament', 'Consommable médical'...)."""
+    v = (val or '').strip().lower()
+    if v in ('medicament', 'consommable', 'equipement'):
+        return v
+    if 'consommable' in v:
+        return 'consommable'
+    if 'quipement' in v or 'materiel' in v or 'matériel' in v:
+        return 'equipement'
+    return 'medicament'
+
+
+@login_required(login_url='login')
+def pharmacie_import_stock_initial(request, pharmacie):
+    """Import en masse du stock de départ d'une pharmacie (ouverture, ou
+    rattrapage d'un stock jamais saisi) — fichier CSV/XLSX/JSON. Une ligne
+    dont le produit existe déjà dans le catalogue (par code, ou par nom si
+    le fichier vient d'une autre nomenclature) alimente juste son stock ;
+    une ligne dont le produit n'existe pas encore CRÉE ce produit dans le
+    catalogue (en conservant son code d'origine s'il est libre) puis lui
+    donne son stock initial — pour ne pas obliger l'utilisateur à créer
+    chaque produit un par un avant de pouvoir importer. Chaque ligne
+    importée est tracée comme un mouvement « Stock initial », jamais une
+    écriture directe sur StockPharmacie, pour rester cohérent avec le reste
+    du module (dotations, ventes...) qui passe toujours par un
+    MouvementPharmacie."""
+    get_pharmacie_or_404(request, pharmacie)
+    label = PHARMACIES_DICT[pharmacie]
+    if not can_manage_pharmacie(request.user):
+        raise PermissionDenied
+
+    if request.method == 'POST':
+        from services.views import _parse_upload, _s
+        upload = request.FILES.get('fichier')
+        if not upload:
+            messages.error(request, 'Aucun fichier sélectionné.')
+            return redirect('pharmacie_import_stock_initial', pharmacie=pharmacie)
+
+        data, err = _parse_upload(upload)
+        if err:
+            messages.error(request, err)
+            return redirect('pharmacie_import_stock_initial', pharmacie=pharmacie)
+
+        importes, crees, ignores, erreurs = 0, 0, 0, []
+        with transaction.atomic():
+            for i, row in enumerate(data, start=2):  # ligne 1 = en-têtes
+                code = _s(row.get('code') or row.get('Code') or row.get('code_produit'))
+                nom  = _s(row.get('nom_produit') or row.get('nom') or row.get('Nom') or row.get('Nom produit'))
+                qte_brute = row.get('quantite') if row.get('quantite') is not None else row.get('Quantité')
+                if not code and not nom:
+                    continue
+                try:
+                    quantite = float(str(qte_brute).replace(',', '.').strip())
+                except (TypeError, ValueError):
+                    erreurs.append(f"Ligne {i} : quantité invalide pour « {code or nom} ».")
+                    continue
+                if quantite <= 0:
+                    ignores += 1
+                    continue
+
+                # Le code du fichier importé peut venir d'une nomenclature
+                # externe (ancien registre papier, etc.) qui ne correspond
+                # pas au code auto-généré par l'application : on retombe
+                # alors sur une recherche par nom exact (insensible à la
+                # casse) pour retrouver le produit du catalogue.
+                produit = Produit.objects.filter(code=code).first() if code else None
+                if not produit and nom:
+                    candidats = list(Produit.objects.filter(nom__iexact=nom)[:2])
+                    if len(candidats) == 1:
+                        produit = candidats[0]
+                    elif len(candidats) > 1:
+                        erreurs.append(f"Ligne {i} : plusieurs produits s'appellent « {nom} », impossible de choisir — utilisez le code.")
+                        continue
+
+                if not produit:
+                    # Produit inconnu du catalogue : import initial, donc on
+                    # le crée plutôt que de rejeter la ligne — l'utilisateur
+                    # ne doit pas avoir à créer chaque produit un par un
+                    # avant de pouvoir importer son stock de départ.
+                    if not nom:
+                        erreurs.append(f"Ligne {i} : nom du produit manquant pour créer « {code} ».")
+                        continue
+                    type_brut  = _s(row.get('type') or row.get('Type'))
+                    unite_brut = _s(row.get('unite') or row.get('Unité') or row.get('unite_mesure'))
+                    unite_obj = UniteMesure.objects.filter(nom__iexact=unite_brut).first() if unite_brut else None
+                    produit = Produit(
+                        code=code or '',  # vide -> code auto-généré par Produit.save()
+                        nom=nom,
+                        type=_type_produit_import(type_brut),
+                        unite_mesure=unite_obj,
+                    )
+                    produit.save()
+                    crees += 1
+
+                sp, _created = StockPharmacie.objects.select_for_update().get_or_create(
+                    pharmacie=pharmacie, produit=produit, defaults={'quantite': 0}
+                )
+                avant = float(sp.quantite)
+                apres = avant + quantite
+                MouvementPharmacie.objects.create(
+                    pharmacie=pharmacie, produit=produit,
+                    type='initial', quantite=quantite,
+                    stock_avant=avant, stock_apres=apres,
+                    reference=upload.name,
+                    notes='Import du stock initial',
+                    cree_par=request.user,
+                )
+                sp.quantite = apres
+                sp.save(update_fields=['quantite'])
+                importes += 1
+
+        if importes:
+            messages.success(request, f'{importes} produit(s) importé(s) dans le stock initial de {label}.')
+        if crees:
+            messages.info(request, f'{crees} nouveau(x) produit(s) créé(s) dans le catalogue au passage.')
+        if ignores:
+            messages.warning(request, f'{ignores} ligne(s) ignorée(s) (quantité nulle ou vide).')
+        for e in erreurs[:10]:
+            messages.error(request, e)
+        return redirect('pharmacie_stock', pharmacie=pharmacie)
+
+    return render(request, 'pharmacie/import_stock_initial.html', {
+        'pharmacie': pharmacie, 'label': label,
+    })
+
+
+@login_required(login_url='login')
+def pharmacie_import_stock_initial_modele(request, pharmacie):
+    """Modèle Excel téléchargeable pour l'import du stock initial — colonnes
+    dans l'ordre attendu, plus un rappel des codes produits existants."""
+    get_pharmacie_or_404(request, pharmacie)
+    if not can_manage_pharmacie(request.user):
+        raise PermissionDenied
+
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill
+    from django.http import HttpResponse
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Stock initial'
+    # Mêmes colonnes que le tableau "Produits en stock" (pharmacie/stock.html) :
+    # Code, Nom produit, Type, Qté en stock, Unité, N° Lot(s) — pré-rempli
+    # avec le catalogue actif pour qu'il ne reste plus qu'à saisir les
+    # quantités.
+    ws.append(['code', 'nom_produit', 'type', 'quantite', 'unite', 'numero_lot'])
+    for cell in ws[1]:
+        cell.font = Font(bold=True, color='FFFFFF')
+        cell.fill = PatternFill('solid', fgColor='2E7D32')
+    ws.column_dimensions['A'].width = 20
+    ws.column_dimensions['B'].width = 40
+    ws.column_dimensions['C'].width = 20
+    ws.column_dimensions['D'].width = 14
+    ws.column_dimensions['E'].width = 16
+    ws.column_dimensions['F'].width = 24
+    ws.freeze_panes = 'A2'
+
+    produits = (Produit.objects.filter(actif=True)
+                .select_related('unite_mesure')
+                .prefetch_related('lots')
+                .order_by('type', 'nom'))
+    for produit in produits:
+        lots = ', '.join(l.numero_lot for l in produit.lots.all())
+        ws.append([
+            produit.code, produit.nom, produit.get_type_display(),
+            0, produit.unite_mesure.nom if produit.unite_mesure else '', lots,
+        ])
+
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = 'attachment; filename="modele_stock_initial.xlsx"'
+    wb.save(response)
+    return response
 
 
 @login_required(login_url='login')
@@ -245,7 +422,7 @@ def pharmacie_ordonnances(request, pharmacie):
         date_emission__date=selected_date
     ).select_related(
         'consultation__patient', 'consultation__medecin', 'patient', 'medecin', 'dispensation'
-    ).prefetch_related('lignes__produit', 'lignes__medicament').order_by('-date_emission')
+    ).prefetch_related('lignes__produit').order_by('-date_emission')
 
     if statut_filtre:
         qs = qs.filter(statut=statut_filtre)
@@ -312,7 +489,7 @@ def pharmacie_dispenser(request, pharmacie, pk):
         messages.info(request, 'Cette ordonnance a déjà été dispensée.')
         return redirect('pharmacie_ordonnances', pharmacie=pharmacie)
 
-    lignes = ordonnance.lignes.select_related('produit', 'medicament').all()
+    lignes = ordonnance.lignes.select_related('produit').all()
 
     lignes_enrichies = []
     for ligne in lignes:
@@ -324,11 +501,6 @@ def pharmacie_dispenser(request, pharmacie, pk):
             # ne pas le re-chercher par nom (recherche floue non fiable).
             produit = ligne.produit
             nom_med = produit.nom
-        elif ligne.medicament:
-            nom_med = ligne.medicament.designation
-            produit = Produit.objects.filter(
-                nom__icontains=nom_med[:20], type='medicament', actif=True
-            ).first()
         elif ligne.medicament_libre:
             nom_med = ligne.medicament_libre
             produit = Produit.objects.filter(

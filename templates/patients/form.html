@@ -3,6 +3,9 @@
 
 {% block topbar_title %}{{ titre }}{% endblock %}
 
+{% comment %}Même raison que sur la fiche : on garde le menu du module d'où l'on vient.{% endcomment %}
+{% block module_navbar %}{% if origine %}{% include origine.nav %}{% else %}{{ block.super }}{% endif %}{% endblock %}
+
 {% block extra_css %}
 {{ block.super }}
 <link rel="stylesheet" href="{% static 'vendor/intl-tel-input/css/intlTelInput.css' %}">
@@ -403,12 +406,13 @@
 <!-- ── Subheader ── -->
 <div class="o-subheader">
   <div class="o-subheader-row">
-    <a href="{% if edit %}{% url 'patients:detail' patient.pk %}{% else %}{% url 'patients:list' %}{% endif %}"
+    <a href="{% if edit %}{% url 'patients:detail' patient.pk %}{{ origine_qs }}{% elif origine %}{% url origine.url %}{% else %}{% url 'patients:list' %}{% endif %}"
        class="o-ctrl-btn" style="padding:3px 7px;">
       <i class="bi bi-arrow-left"></i>
     </a>
     <span style="font-size:13px;color:var(--text-muted);">
-      <a href="{% url 'patients:list' %}" class="fil-lien">Patients</a>
+      <a href="{% if origine %}{% url origine.url %}{% else %}{% url 'patients:list' %}{% endif %}"
+         class="fil-lien">{% if origine %}{{ origine.libelle }}{% else %}Patients{% endif %}</a>
       <span style="margin:0 5px;opacity:.4;">/</span>
       <span style="color:var(--text);font-weight:500;">{% if edit %}{{ patient.nom }} {{ patient.prenoms }}{% else %}Nouveau{% endif %}</span>
     </span>
@@ -417,7 +421,7 @@
     {% endif %}
     <div style="flex:1;"></div>
     <div style="display:flex;gap:8px;align-items:center;">
-      <a href="{% if edit %}{% url 'patients:detail' patient.pk %}{% else %}{% url 'patients:list' %}{% endif %}"
+      <a href="{% if edit %}{% url 'patients:detail' patient.pk %}{{ origine_qs }}{% elif origine %}{% url origine.url %}{% else %}{% url 'patients:list' %}{% endif %}"
          style="display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border);border-radius:4px;
                 background:var(--surface);color:var(--text-muted);padding:5px 13px;font-size:12px;
                 font-weight:500;text-decoration:none;transition:border-color .15s,color .15s;">
@@ -489,15 +493,18 @@
         </div>
     </div>
 
-    <!-- Contact d'urgence + Nationalité -->
+    <!-- Téléphone + Nationalité -->
     <div class="patient-extra-row">
         <div class="form-field">
-            <label class="field-label" for="{{ form.contact_urgence_nom.id_for_label }}">À contacter d'urgence</label>
-            {{ form.contact_urgence_nom }}
+            <label class="field-label" for="{{ form.telephone.id_for_label }}">
+                Téléphone <span class="required-star">*</span>
+            </label>
+            {{ form.telephone }}
+            {% if form.telephone.errors %}<div class="field-error">{{ form.telephone.errors.0 }}</div>{% endif %}
         </div>
         <div class="form-field">
-            <label class="field-label" for="{{ form.contact_urgence_telephone.id_for_label }}">Téléphone d'urgence</label>
-            {{ form.contact_urgence_telephone }}
+            <label class="field-label" for="{{ form.telephone2.id_for_label }}">Téléphone 2</label>
+            {{ form.telephone2 }}
         </div>
         <div class="form-field">
             <label class="field-label" for="{{ form.nationalite.id_for_label }}">Nationalité</label>
@@ -520,8 +527,11 @@
         <div class="tab-two-col">
             <div>
                 <div class="form-field">
-                    <label class="field-label" for="{{ form.adresse.id_for_label }}">Adresse</label>
+                    <label class="field-label" for="{{ form.adresse.id_for_label }}">
+                        Adresse <span class="required-star">*</span>
+                    </label>
                     {{ form.adresse }}
+                    {% if form.adresse.errors %}<div class="field-error">{{ form.adresse.errors.0 }}</div>{% endif %}
                 </div>
                 <div class="form-field">
                     <label class="field-label" for="{{ form.ville.id_for_label }}">Ville</label>
@@ -530,15 +540,12 @@
             </div>
             <div>
                 <div class="form-field">
-                    <label class="field-label" for="{{ form.telephone.id_for_label }}">
-                        Téléphone <span class="required-star">*</span>
-                    </label>
-                    {{ form.telephone }}
-                    {% if form.telephone.errors %}<div class="field-error">{{ form.telephone.errors.0 }}</div>{% endif %}
+                    <label class="field-label" for="{{ form.contact_urgence_nom.id_for_label }}">À contacter d'urgence</label>
+                    {{ form.contact_urgence_nom }}
                 </div>
                 <div class="form-field">
-                    <label class="field-label" for="{{ form.telephone2.id_for_label }}">Téléphone 2</label>
-                    {{ form.telephone2 }}
+                    <label class="field-label" for="{{ form.contact_urgence_telephone.id_for_label }}">Téléphone d'urgence</label>
+                    {{ form.contact_urgence_telephone }}
                 </div>
                 <div class="form-field">
                     <label class="field-label" for="{{ form.email.id_for_label }}">Courriel</label>
@@ -600,9 +607,9 @@
 <!-- ── Bottom actions ── -->
 <div class="form-actions">
     {% if edit %}
-        <a href="{% url 'patients:detail' patient.pk %}" class="btn btn-secondary">Annuler</a>
+        <a href="{% url 'patients:detail' patient.pk %}{{ origine_qs }}" class="btn btn-secondary">Annuler</a>
     {% else %}
-        <a href="{% url 'patients:list' %}" class="btn btn-secondary">Annuler</a>
+        <a href="{% if origine %}{% url origine.url %}{% else %}{% url 'patients:list' %}{% endif %}" class="btn btn-secondary">Annuler</a>
     {% endif %}
     <button type="submit" class="btn btn-primary">
         {% if edit %}Enregistrer les modifications{% else %}Créer le dossier patient{% endif %}
@@ -638,16 +645,15 @@
 
     function validateDateNaissance() {
         if (!dateInput || !dateInput.value) return true;
-        var year = new Date(dateInput.value).getFullYear();
         var errEl = dateInput.parentElement.querySelector('.date-range-error');
-        if (year < 1900 || year > new Date().getFullYear()) {
+        if (dateInput.value < '1900-01-01' || dateInput.value > dateInput.max) {
             if (!errEl) {
                 errEl = document.createElement('div');
                 errEl.className = 'field-error date-range-error';
                 dateInput.parentElement.appendChild(errEl);
             }
-            errEl.textContent = 'L\'année doit être comprise entre 1900 et ' + new Date().getFullYear() + '.';
-            dateInput.setCustomValidity('Année invalide');
+            errEl.textContent = 'La date de naissance ne peut pas être postérieure à aujourd\'hui, ni antérieure à 1900.';
+            dateInput.setCustomValidity('Date invalide');
             return false;
         }
         if (errEl) errEl.remove();
@@ -669,6 +675,20 @@
             : age + ' ans';
     }
     if (dateInput) { dateInput.addEventListener('change', updateAge); updateAge(); }
+
+    /* ── Nom / prénoms toujours saisis en majuscules ── */
+    function forceUppercase(id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('input', function () {
+            var start = el.selectionStart;
+            var end = el.selectionEnd;
+            el.value = el.value.toUpperCase();
+            el.setSelectionRange(start, end);
+        });
+    }
+    forceUppercase('{{ form.nom.id_for_label }}');
+    forceUppercase('{{ form.prenoms.id_for_label }}');
 })();
 </script>
 
@@ -716,6 +736,15 @@
     var itiTel1 = initPhone('{{ form.telephone.id_for_label }}');
     var itiTel2 = initPhone('{{ form.telephone2.id_for_label }}');
 
+    /* La lib intl-tel-input reste permissive sur les anciens formats à 8
+       chiffres : isValidNumber() seul laisse passer un numéro ivoirien trop
+       court. On impose donc explicitement les 10 chiffres du plan de
+       numérotation en vigueur depuis 2021. */
+    function hasValidCiLength(iti, input) {
+        if (iti.getSelectedCountryData().iso2 !== 'ci') return true;
+        return input.value.replace(/\D/g, '').length === 10;
+    }
+
     /* Avant soumission : enregistrer le numéro complet au format E.164 */
     /* Validation avant soumission et conversion au format E.164 */
     var theForm = document.querySelector('form[method="post"]');
@@ -732,11 +761,11 @@
                     '{{ form.telephone.id_for_label }}'
                 );
 
-                if (!itiTel1.isValidNumber()) {
+                if (!itiTel1.isValidNumber() || !hasValidCiLength(itiTel1, input1)) {
                     e.preventDefault();
 
                     alert(
-                        'Veuillez saisir un numéro de téléphone valide pour le téléphone principal.'
+                        'Veuillez saisir un numéro de téléphone valide pour le téléphone principal (10 chiffres pour un numéro ivoirien).'
                     );
 
                     input1.focus();
@@ -763,11 +792,11 @@
                 /* On vérifie seulement si l'utilisateur a saisi quelque chose */
                 if (input2.value.trim() !== '') {
 
-                    if (!itiTel2.isValidNumber()) {
+                    if (!itiTel2.isValidNumber() || !hasValidCiLength(itiTel2, input2)) {
                         e.preventDefault();
 
                         alert(
-                            'Veuillez saisir un deuxième numéro de téléphone valide.'
+                            'Veuillez saisir un deuxième numéro de téléphone valide (10 chiffres pour un numéro ivoirien).'
                         );
 
                         input2.focus();

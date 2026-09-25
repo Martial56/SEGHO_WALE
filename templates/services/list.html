@@ -479,6 +479,42 @@
     }
   }
 
+  /* ── DROPDOWNS DE LA BRIQUE core.listing ──
+     Les menus « Filtres » et « Regrouper par » sont générés par core.listing ;
+     leur habillage vit ici, comme dans les listes de soins et d'hospitalisation
+     (chaque module porte son propre jeu de styles de sous-en-tête). */
+  .o-dd-wrap { position: relative; }
+  .o-dd-panel {
+    display: none; position: fixed; z-index: 9999;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; box-shadow: 0 8px 28px rgba(0,0,0,.16);
+    min-width: 210px; padding: 5px 0;
+  }
+  .o-dd-panel.open { display: block; }
+  .o-dd-section {
+    padding: 6px 14px 3px; font-size: 10px; font-weight: 600;
+    color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px;
+  }
+  .o-dd-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 14px; font-size: 12.5px; color: var(--text);
+    cursor: pointer; text-decoration: none; transition: background .1s;
+    white-space: nowrap; gap: 10px;
+  }
+  .o-dd-item:hover { background: rgba(var(--teal-700-rgb), .08); color: var(--accent-text-soft); }
+  .o-dd-item.active { background: rgba(var(--teal-700-rgb), .12); color: var(--accent-text); font-weight: 500; }
+  .o-dd-sep { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+  html[data-theme="dark"] .o-dd-panel { background: var(--surface); border-color: var(--border-strong); }
+  html[data-theme="dark"] .o-dd-item { color: var(--text); }
+  html[data-theme="dark"] .o-dd-item:hover { background: rgba(var(--teal-500-rgb), .18); color: var(--text); }
+  html[data-theme="dark"] .o-dd-item.active { background: rgba(var(--teal-500-rgb), .25); color: var(--text); }
+
+  /* ── PAGINATION EN HAUT ── */
+  .o-pagination-top {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 12px; color: var(--text-muted); white-space: nowrap;
+  }
+
 {% include 'services/includes/io_styles.html' %}
 </style>
 {% endblock %}
@@ -486,29 +522,39 @@
 {% block content %}
 <div id="page-wrap">
 
+{% comment %}Styles de la brique : menus à sous-menus, bandes de groupe,
+sélecteur de colonnes.{% endcomment %}
+{% include 'includes/listing/styles.html' %}
+
+  {% comment %}
+  Filtres, regroupements et tri viennent de core.listing, comme les listes de
+  soins, d'hospitalisations et de chambres : les menus sont générés depuis
+  services/article_listing.py, ce gabarit ne fait que les parcourir. Les valeurs
+  d'une même famille se cumulent, les familles se croisent. Le menu écrit à la
+  main qui vivait ici ne portait qu'un seul critère à la fois : demander
+  « Services » puis « Favoris » effaçait le premier.
+  {% endcomment %}
   <!-- ══ SUBHEADER ══ -->
   <div class="o-subheader" id="subheader">
 
     <!-- Ligne 1 : titre + recherche -->
     <div class="o-subheader-row">
       <span class="o-page-title">Prestations <span class="o-page-count">{{ total }}</span></span>
+      {% comment %}Toujours présent même vide : le rafraîchissement AJAX
+      remplace son contenu, il ne peut pas créer l'élément.{% endcomment %}
+      <span class="o-page-scope" style="font-size:12px;color:var(--text-muted);">{% if periode_active %}· {{ periode_libelle }}{% endif %}</span>
       <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
-        <form method="get" id="filter-form" style="display:flex;align-items:center;">
-          <input type="hidden" name="vue" id="vue-input" value="{{ vue }}">
-          <input type="hidden" name="categorie" id="fi-cat" value="{{ categorie_id }}">
-          <input type="hidden" name="type_produit" id="fi-type" value="{{ type_produit }}">
-          <input type="hidden" name="statut" id="fi-statut" value="{{ statut }}">
-          <div class="o-search-bar">
-            <input class="o-search-input" id="search-input" type="text" name="q" value="{{ q }}"
-              placeholder="Rechercher une prestation…">
-            <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
-          </div>
-        </form>
+        <div class="o-search-bar">
+          <input class="o-search-input" id="search-input" type="text" value="{{ q }}"
+            placeholder="Rechercher une prestation…">
+          <button type="button" class="o-search-btn" onclick="lancerRecherche()"><i class="bi bi-search"></i></button>
+        </div>
       </div>
     </div>
 
     <!-- Ligne 2 : créer + contrôles + pagination + vue -->
-    <div class="o-subheader-row">
+    <div class="o-subheader-row" id="subheader-controls"
+         data-filters="{{ filters|join:"," }}" data-groups="{{ groups|join:"," }}">
       <a href="{% url 'services:create' %}" class="o-btn-create">
         <i class="bi bi-plus-lg"></i> Créer
       </a>
@@ -538,264 +584,94 @@
         </div>
       </div>
 
-      <!-- Tags filtres actifs -->
-      {% if q or categorie_id or type_produit or statut %}
-      <a href="{% url 'services:list' %}" class="o-ctrl-btn">
-        <i class="bi bi-x"></i> Effacer
-      </a>
-      {% endif %}
-      {% if q %}<span class="o-filter-tag">{{ q }} <a
-          href="?{% if categorie_id %}categorie={{ categorie_id }}&{% endif %}{% if type_produit %}type_produit={{ type_produit }}&{% endif %}{% if statut %}statut={{ statut }}&{% endif %}vue={{ vue }}">×</a></span>{% endif %}
-      {% if categorie_id %}{% for cat in categories %}{% if cat.pk|stringformat:"s" == categorie_id %}<span
-        class="o-filter-tag">{{ cat.nom }} <a
-          href="?{% if q %}q={{ q }}&{% endif %}{% if type_produit %}type_produit={{ type_produit }}&{% endif %}{% if statut %}statut={{ statut }}&{% endif %}vue={{ vue }}">×</a></span>{% endif %}{% endfor %}{% endif %}
-      {% if type_produit %}<span class="o-filter-tag">{{ type_produit }} <a
-          href="?{% if q %}q={{ q }}&{% endif %}{% if categorie_id %}categorie={{ categorie_id }}&{% endif %}{% if statut %}statut={{ statut }}&{% endif %}vue={{ vue }}">×</a></span>{% endif %}
-      {% if statut %}<span class="o-filter-tag">{% if statut == 'actif' %}Actifs{% else %}Inactifs{% endif %} <a
-          href="?{% if q %}q={{ q }}&{% endif %}{% if categorie_id %}categorie={{ categorie_id }}&{% endif %}{% if type_produit %}type_produit={{ type_produit }}&{% endif %}vue={{ vue }}">×</a></span>{% endif %}
+      <div style="margin-left:auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
 
-      <div style="flex:1;"></div>
+        {% if selection_active %}
+        <a href="#" class="o-ctrl-btn" style="color:var(--rose-text);"
+           onclick="resetAll(); return false;"
+           title="Effacer les filtres, le regroupement et la recherche">
+          <i class="bi bi-x-circle"></i> Effacer
+        </a>
+        {% endif %}
 
-      <!-- Filtres dropdown -->
-      <div class="io-page-wrap" id="filters-dd-wrap">
-        <button type="button"
-          class="o-ctrl-btn io-toggle-btn {% if filtre or categorie_id or type_produit or statut %}active{% endif %}"
-          onclick="toggleFiltersMenu(event)">
-          <i class="bi bi-funnel"></i> Filtres
-        </button>
-        <div class="io-page-menu" style="right:0;left:auto;min-width:200px;">
-          <a class="io-pm-item{% if filtre == 'services' %} io-pm-active{% endif %}"
-            href="?{% if q %}q={{ q }}&{% endif %}{% if categorie_id %}categorie={{ categorie_id }}&{% endif %}filtre=services&vue={{ vue }}">Services</a>
-          <a class="io-pm-item{% if filtre == 'articles' %} io-pm-active{% endif %}"
-            href="?{% if q %}q={{ q }}&{% endif %}{% if categorie_id %}categorie={{ categorie_id }}&{% endif %}filtre=articles&vue={{ vue }}">Articles</a>
-          <div class="io-pm-sep"></div>
-          <a class="io-pm-item{% if filtre == 'peut_etre_vendu' %} io-pm-active{% endif %}"
-            href="?{% if q %}q={{ q }}&{% endif %}{% if categorie_id %}categorie={{ categorie_id }}&{% endif %}filtre=peut_etre_vendu&vue={{ vue }}">Peut
-            être vendu</a>
-          <a class="io-pm-item{% if filtre == 'peut_etre_achete' %} io-pm-active{% endif %}"
-            href="?{% if q %}q={{ q }}&{% endif %}{% if categorie_id %}categorie={{ categorie_id }}&{% endif %}filtre=peut_etre_achete&vue={{ vue }}">Peut
-            être acheté</a>
-          <div class="io-pm-sep"></div>
-          <a class="io-pm-item{% if filtre == 'favori' %} io-pm-active{% endif %}"
-            href="?{% if q %}q={{ q }}&{% endif %}{% if categorie_id %}categorie={{ categorie_id }}&{% endif %}filtre=favori&vue={{ vue }}">Favoris</a>
-          <div class="io-pm-sep"></div>
-          <a class="io-pm-item{% if filtre == 'avertissement' %} io-pm-active{% endif %}"
-            href="?{% if q %}q={{ q }}&{% endif %}{% if categorie_id %}categorie={{ categorie_id }}&{% endif %}filtre=avertissement&vue={{ vue }}">Avertissements</a>
-          <div class="io-pm-sep"></div>
-          <a class="io-pm-item{% if filtre == 'archive' %} io-pm-active{% endif %}"
-            href="?{% if q %}q={{ q }}&{% endif %}{% if categorie_id %}categorie={{ categorie_id }}&{% endif %}filtre=archive&vue={{ vue }}">Archivé</a>
-          {% if filtre or categorie_id %}
-          <div class="io-pm-sep"></div>
-          <a class="io-pm-item" href="?{% if q %}q={{ q }}&{% endif %}vue={{ vue }}" style="color:var(--rose-btn);">
-            <i class="bi bi-x-circle" style="font-size:11px;"></i> Effacer les filtres
-          </a>
-          {% endif %}
+        <div class="o-dd-wrap">
+          <button class="o-ctrl-btn {% if filtre_pose %}active{% endif %}"
+                  id="btn-filtres" onclick="toggleDd('dd-filtres', this)">
+            <i class="bi bi-funnel{% if filtre_pose %}-fill{% endif %}"></i> Filtres
+          </button>
+          <div class="o-dd-panel lst-menu" id="dd-filtres">
+            {% include 'includes/listing/menu_filtres.html' %}
+          </div>
         </div>
-      </div>
 
-      <div class="o-ctrl-sep"></div>
+        <div class="o-dd-wrap">
+          <button class="o-ctrl-btn {% if groups %}active{% endif %}"
+                  id="btn-group" onclick="toggleDd('dd-group', this)">
+            <i class="bi bi-list-ul"></i> Regrouper par
+          </button>
+          <div class="o-dd-panel lst-menu" id="dd-group">
+            <div class="o-dd-section">Regrouper par</div>
+            {% include 'includes/listing/menu_groupes.html' %}
+          </div>
+        </div>
 
-      <!-- Vue -->
-      <div class="o-view-btns">
-        <button type="button" class="o-view-btn {% if vue == 'liste' %}active{% endif %}" onclick="setVue('liste')"
-          title="Vue Liste">
-          <i class="bi bi-list-ul"></i>
-        </button>
-        <button type="button" class="o-view-btn {% if vue == 'kanban' %}active{% endif %}" onclick="setVue('kanban')"
-          title="Vue Kanban">
-          <i class="bi bi-grid"></i>
-        </button>
+        <div class="o-ctrl-sep"></div>
+
+        <!-- Pagination inline -->
+        <div class="o-pagination-top">
+          <span>{% if page_obj.paginator.count > 0 %}{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}{% else %}0{% endif %}</span>
+          <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
+             href="{% if page_obj.has_previous %}{% querystring page=page_obj.previous_page_number %}{% else %}#{% endif %}">
+            <i class="bi bi-chevron-left"></i>
+          </a>
+          <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
+             href="{% if page_obj.has_next %}{% querystring page=page_obj.next_page_number %}{% else %}#{% endif %}">
+            <i class="bi bi-chevron-right"></i>
+          </a>
+        </div>
+
+        <div class="o-ctrl-sep"></div>
+
+        {% comment %}Bascule liste/kanban : elle passe par le même
+        rafraîchissement que les filtres, `vue` étant un paramètre d'URL comme
+        les autres. Le regroupement est ignoré en kanban — la pagination porte
+        alors sur les groupes, et les cartes itéreraient sur des bandes.{% endcomment %}
+        <div class="o-view-btns">
+          <button type="button" class="o-view-btn {% if vue == 'liste' %}active{% endif %}" onclick="setVue('liste')"
+            title="Vue Liste">
+            <i class="bi bi-list-ul"></i>
+          </button>
+          <button type="button" class="o-view-btn {% if vue == 'kanban' %}active{% endif %}" onclick="setVue('kanban')"
+            title="Vue Kanban">
+            <i class="bi bi-grid"></i>
+          </button>
+        </div>
       </div>
     </div>
   </div>
 
-
-
   <div id="list-result">
-    <!-- ══ CONTENU ══ -->
-    {% if vue == 'kanban' %}
-    <!-- ── VUE KANBAN ── -->
-    <div class="o-kanban" id="main-content">
-      {% for art in page_obj %}
-      <div class="o-card-wrap">
-        <div class="o-card" data-url="{% url 'services:detail' art.pk %}" onclick="window.location=this.dataset.url"
-          style="cursor:pointer;">
-          <div class="o-avatar">
-            {% if art.photo %}
-            <img src="{{ art.photo.url }}" alt="{{ art.nom }}">
-            {% else %}
-            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M20 7h-4V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2H4a1 1 0 0 0-1 1v11a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8a1 1 0 0 0-1-1zM10 5h4v2h-4V5zm1 9v2H9v-2H7v-2h2v-2h2v2h2v2h-2z" />
-            </svg>
-            {% endif %}
-          </div>
-          <div class="o-card-body">
-            <div class="o-card-name">{{ art.nom }}</div>
-            <div class="o-card-meta">
-              {% if art.reference_interne %}<span style="font-family: var(--font-mono);font-size:10px;">{{ art.reference_interne }}</span><br>{% endif %}
-              {% if art.categorie %}<span class="val">{{ art.categorie.code }}</span><br>{% endif %}
-              <span class="val">{{ art.prix_vente|floatformat:0 }} CFA</span>
-              &nbsp;
-              {% if art.actif %}<span class="badge-actif">Actif</span>{% else %}<span
-                class="badge-inactif">Inactif</span>{% endif %}
-            </div>
-          </div>
-        </div>
-      </div>
-      {% empty %}
-      <div class="o-empty">
-        <i class="bi bi-box-seam"></i>
-        Aucune prestation trouvé.<br>
-        <a href="{% url 'services:create' %}"
-          style="color:var(--accent-text-soft);font-weight:600;margin-top:8px;display:inline-block;">Créer une première
-          prestation</a>
-      </div>
-      {% endfor %}
-    </div>
-
-    {% else %}
-    <!-- ── VUE LISTE ── -->
-    <div class="o-list-wrap" id="main-content">
-      {% if page_obj.object_list %}
-      <table class="o-list-table">
-        <thead>
-          <tr id="col-header-row">
-            <th class="sortable-col" data-col="0"><span class="col-label">Désignation</span><span
-                class="sort-icon"></span>
-              <div class="col-resizer"></div>
-            </th>
-            <th class="sortable-col" data-col="1"><span class="col-label">Référence</span><span
-                class="sort-icon"></span>
-              <div class="col-resizer"></div>
-            </th>
-            <th class="sortable-col" data-col="2"><span class="col-label">Catégorie</span><span
-                class="sort-icon"></span>
-              <div class="col-resizer"></div>
-            </th>
-            <th class="sortable-col" data-col="3"><span class="col-label">Type</span><span class="sort-icon"></span>
-              <div class="col-resizer"></div>
-            </th>
-            <th class="sortable-col" data-col="4" style="text-align:right;"><span class="col-label">Prix de
-                vente</span><span class="sort-icon"></span>
-              <div class="col-resizer"></div>
-            </th>
-            <th class="sortable-col" data-col="5"><span class="col-label">Statut</span><span class="sort-icon"></span>
-              <div class="col-resizer"></div>
-            </th>
-            <th class="col-picker-th">
-              <button class="col-picker-btn" id="col-picker-btn" title="Colonnes visibles"><i
-                  class="bi bi-three-dots-vertical"></i></button>
-              <div class="col-picker-menu" id="col-picker-menu">
-                <label><input type="checkbox" data-col-idx="0" checked> Désignation</label>
-                <label><input type="checkbox" data-col-idx="1" checked> Référence</label>
-                <label><input type="checkbox" data-col-idx="2" checked> Catégorie</label>
-                <label><input type="checkbox" data-col-idx="3" checked> Type</label>
-                <label><input type="checkbox" data-col-idx="4" checked> Prix de vente</label>
-                <label><input type="checkbox" data-col-idx="5" checked> Statut</label>
-              </div>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for art in page_obj %}
-          <tr data-url="{% url 'services:detail' art.pk %}" onclick="window.location=this.dataset.url"
-            style="cursor:pointer;">
-            <td style="font-weight:500;" data-col="0">{{ art.nom }}</td>
-            <td data-col="1"><span style="font-family: var(--font-mono);font-size:11px;color:var(--text-muted);">{{ art.reference_interne|default:"—" }}</span></td>
-            <td data-col="2">
-              {% if art.categorie %}<span class="badge-cat">{{ art.categorie.code }} — {{ art.categorie.nom }}</span>{% else %}—{% endif %}
-            </td>
-            <td style="font-size:12px;color:var(--text-muted);" data-col="3">{{ art.get_type_produit_hospitalier_display|default:"—" }}</td>
-            <td style="text-align:right;font-weight:700;color:var(--accent-text);" data-col="4">{{ art.prix_vente|floatformat:0 }} CFA</td>
-            <td data-col="5">
-              {% if art.actif %}<span class="badge-actif">Actif</span>{% else %}<span class="badge-inactif">Inactif</span>{% endif %}
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-      <div class="o-pagination-bottom">
-        <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
-        <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
-          href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}&q={{ q }}&categorie={{ categorie_id }}&type_produit={{ type_produit }}&statut={{ statut }}&vue={{ vue }}{% else %}#{% endif %}">
-          <i class="bi bi-chevron-left"></i>
-        </a>
-        <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
-          href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}&q={{ q }}&categorie={{ categorie_id }}&type_produit={{ type_produit }}&statut={{ statut }}&vue={{ vue }}{% else %}#{% endif %}">
-          <i class="bi bi-chevron-right"></i>
-        </a>
-      </div>
-      {% else %}
-      <div class="o-empty" style="padding:60px 20px;">
-        <i class="bi bi-box-seam"></i>
-        Aucun prestation trouvé.<br>
-        <a href="{% url 'services:create' %}"
-          style="color:var(--accent-text-soft);font-weight:600;margin-top:8px;display:inline-block;">Créer une première
-          prestation</a>
-      </div>
-      {% endif %}
-    </div>
-    {% endif %}
-  </div><!-- /.list-result -->
-
-  {% include 'services/includes/list_live_js.html' %}
-
-  <script>
-    /* ── Vue ── */
-    function setVue(v) {
-      document.getElementById('vue-input').value = v;
-      window.liveLoad();
-    }
-
-    /* ── Filtres ── */
-    function toggleFiltersMenu(e) {
-      e.stopPropagation();
-      document.getElementById('filters-dd-wrap').classList.toggle('open');
-    }
-
-    /* ── Recherche automatique (debounce 400ms) ── */
-    (function () {
-      var inp = document.getElementById('search-input');
-      if (!inp) return;
-      var timer;
-      inp.addEventListener('input', function () {
-        clearTimeout(timer);
-        timer = setTimeout(window.liveLoad, 400);
-      });
-    })();
-
-    /* ── Redimensionnement colonnes par glisser ── */
-    (function () {
-      var table = document.querySelector('.o-list-table');
-      if (!table) return;
-      var dragging = null, startX, startW;
-      table.querySelectorAll('th .col-resizer').forEach(function (handle) {
-        handle.addEventListener('mousedown', function (e) {
-          dragging = handle.parentElement;
-          startX = e.clientX;
-          startW = dragging.offsetWidth;
-          handle.classList.add('resizing');
-          e.preventDefault();
-        });
-      });
-      document.addEventListener('mousemove', function (e) {
-        if (!dragging) return;
-        dragging.style.width = Math.max(60, startW + (e.clientX - startX)) + 'px';
-      });
-      document.addEventListener('mouseup', function () {
-        if (dragging) {
-          dragging.querySelector('.col-resizer').classList.remove('resizing');
-          dragging = null;
-        }
-      });
-    })();
-  </script>
+    {% include 'services/includes/_list_results.html' %}
+  </div><!-- /#list-result -->
 
 </div><!-- /#page-wrap -->
 
+{% comment %}Dépliage des groupes, puis le pilotage commun des listes : il
+apporte toggleDd, toggleParam, setPeriode, applyDateFilter, resetAll,
+lancerRecherche et le tri serveur, qu'appellent les menus générés.{% endcomment %}
+<script src="{% static 'js/listing_groupes.js' %}"></script>
+{% include 'includes/listing/page_js.html' %}
+{% include 'includes/listing/colonnes_js.html' %}
+
 <script>
-  /* ── IO Dropdown ── */
+  /* ── Bascule liste / kanban ── */
+  function setVue(v) {
+    var params = new URLSearchParams(window.location.search);
+    params.set('vue', v);
+    if (window.listeAppliquer) window.listeAppliquer(params);
+  }
+
+  /* ── Export / Import ── */
   function toggleIOPage(e) {
     e.stopPropagation();
     document.getElementById('io-page-wrap').classList.toggle('open');
@@ -803,10 +679,7 @@
   document.addEventListener('click', function () {
     var w = document.getElementById('io-page-wrap');
     if (w) w.classList.remove('open');
-    var f = document.getElementById('filters-dd-wrap');
-    if (f) f.classList.remove('open');
   });
-  /* ── IO Modal ── */
   function openImportModal() {
     document.getElementById('io-modal-backdrop').classList.add('active');
     document.getElementById('io-modal').classList.add('active');

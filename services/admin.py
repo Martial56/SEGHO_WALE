@@ -56,14 +56,15 @@ class ReglePrixInline(admin.TabularInline):
 
 @admin.register(Articleservice)
 class ArticleserviceAdmin(admin.ModelAdmin):
-    list_display = ('reference_interne', 'nom', 'categorie', 'type_produit_hospitalier', 'prix_vente', 'actif')
-    list_filter = ('actif', 'categorie', 'type_produit_hospitalier', 'type_article')
-    search_fields = ('nom', 'reference_interne', 'code_barres')
+    list_display = ('reference_interne', 'nom', 'categorie', 'type_produit_hospitalier', 'type_test_labo', 'prix_vente', 'actif')
+    list_filter = ('actif', 'categorie', 'type_produit_hospitalier', 'type_article', 'type_test_labo')
+    search_fields = ('nom', 'reference_interne', 'code_barres', 'code_hprim')
     ordering = ('nom',)
     inlines = [LigneFournisseurInline, ConditionnementInline, VarianteInline, ReglePrixInline]
     fieldsets = (
         ('En-tête', {'fields': ('nom', 'reference_interne', 'photo', 'favori', 'peut_etre_vendu', 'peut_etre_achete', 'actif')}),
         ('Informations générales', {'fields': ('type_article', 'type_produit_hospitalier', 'categorie', 'famille', 'unite_mesure', 'unite_achat', 'prix_vente', 'cout', 'code_barres')}),
+        ('Laboratoire', {'fields': ('type_test_labo', 'code_hprim'), 'description': "À renseigner pour un examen (catégorie « Examens Biologiques ») afin de le rattacher à un type de test et, si le laboratoire partenaire l'exige, à un code HPRIM pour le routage automatique."}),
         ('Détails médicament', {'classes': ('collapse',), 'fields': ('forme', 'voie_administration', 'dosage', 'dosage_unite', 'composant_actif', 'compagnie_pharmaceutique')}),
         ('Notes', {'classes': ('collapse',), 'fields': ('notes_internes', 'indications', 'remarques')}),
     )

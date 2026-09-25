@@ -1,12 +1,6 @@
 from django.contrib import admin
-from .models import Medicament, StockPharmacie, MouvementPharmacie, DispensationOrdonnance, LigneDispensation, VentePharmacie, LigneVente, InventairePharmacie, LigneInventairePharmacie
+from .models import StockPharmacie, MouvementPharmacie, DispensationOrdonnance, LigneDispensation, VentePharmacie, LigneVente, InventairePharmacie, LigneInventairePharmacie
 
-
-@admin.register(Medicament)
-class MedicamentAdmin(admin.ModelAdmin):
-    list_display  = ['code', 'designation', 'forme', 'dosage', 'stock_actuel', 'actif']
-    search_fields = ['code', 'designation', 'dci']
-    list_filter   = ['forme', 'actif']
 
 @admin.register(StockPharmacie)
 class StockPharmacieAdmin(admin.ModelAdmin):

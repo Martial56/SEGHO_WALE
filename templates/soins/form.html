@@ -148,8 +148,8 @@ html[data-theme="dark"] .proc-annule-badge { background:rgba(220,38,38,.15);bord
   <span style="font-size:18px;flex-shrink:0;">⚠️</span>
   <span>
     <strong>Dossier piloté automatiquement par l'hospitalisation
-      <a href="{% url 'hospitalisation:detail' hosp_warning.pk %}"
-         style="color:#b45309;font-weight:700;text-decoration:underline;">N°{{ hosp_warning.numero }}</a>.
+      {% if perms.hospitalisation.view_hospitalisation %}<a href="{% url 'hospitalisation:detail' hosp_warning.pk %}"
+         style="color:#b45309;font-weight:700;text-decoration:underline;">N°{{ hosp_warning.numero }}</a>{% else %}N°{{ hosp_warning.numero }}{% endif %}.
     </strong><br>
     Toute modification manuelle peut casser la cohérence entre l'hospitalisation,
     la facturation et le module soins. Modifiez uniquement si vous savez ce que vous faites.
@@ -319,7 +319,7 @@ html[data-theme="dark"] .proc-annule-badge { background:rgba(220,38,38,.15);bord
       <!-- Bouton ajouter ligne (style labo — en dessous du tableau) -->
       <button type="button" class="btn-add-ligne" id="btn-add-ligne" onclick="ajouterLigne()"
         {% if is_new and not form.patient.value %}disabled title="Sélectionnez d'abord un patient"{% endif %}>
-        <i class="bi bi-plus-lg"></i> Ajouter une ligne
+        <i class="bi bi-plus-lg"></i> Ajouter un soin
       </button>
 
       <!-- Motif et observations : déclarés dans SoinForm.Meta.fields. Tant qu'ils
@@ -480,7 +480,8 @@ var lignesCount = 0;
 function pad(n){ return n < 10 ? '0'+n : n; }
 function todayVal(){
   var d = new Date();
-  return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
+  return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'
+       + pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
 }
 function formatPrix(n){ return n ? parseInt(n).toLocaleString('fr-FR') + ' CFA' : '—'; }
 
@@ -529,12 +530,18 @@ function ajouterLigne(initial){
     '<td>',
       '<input type="checkbox" name="lignes_sel" value="'+idx+'">',
       '<input type="hidden" class="ligne-pat-hidden" name="lignes['+idx+'][patient]" value="">',
+      /* Identifiant de la ligne déjà enregistrée : sans lui le serveur ne peut
+         que recréer, ce qui perdrait son statut et sa facture. Vide sur une
+         ligne neuve. */
+      '<input type="hidden" name="lignes['+idx+'][pk]" value="'+(initial.pk || '')+'">',
     '</td>',
     '<td><span class="ligne-pat-name" style="font-size:12.5px;color:var(--text-muted);white-space:nowrap;">—</span></td>',
     '<td>'+serviceSel+'</td>',
     '<td><input type="text" class="ligne-inp ligne-prix" name="lignes['+idx+'][prix]" placeholder="0 CFA" readonly style="width:110px;"></td>',
     '<td>'+infirmierSel+'</td>',
-    '<td><input type="datetime-local" class="ligne-inp" name="lignes['+idx+'][date]" value="'+todayVal()+'" style="width:170px;"></td>',
+    /* `step=1` : sans lui le sélecteur s'arrête à la minute et la ligne
+        s'enregistre toujours avec « :00 » en secondes. */
+    '<td><input type="datetime-local" step="1" class="ligne-inp" name="lignes['+idx+'][date]" value="'+todayVal()+'" style="width:190px;"></td>',
     '<td><button type="button" class="ligne-del" onclick="supprimerLigne(this)" title="Supprimer"><i class="bi bi-trash3"></i></button></td>',
   ].join('');
 

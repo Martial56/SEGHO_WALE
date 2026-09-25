@@ -35,6 +35,13 @@
 .svc-opt { padding: 7px 12px; cursor: pointer; color: var(--teal-900, #1a3a4a); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .svc-opt:hover, .svc-opt.focused { background: #daeaf5; color: var(--teal-700, var(--accent-text)); }
 .svc-opt.is-selected { background: #f0f5fa; font-weight: 600; }
+/* Produit que la pharmacie du centre n'a plus : visible pour qu'on sache qu'il
+   existe, éteint pour qu'on n'essaie pas de le facturer. */
+.svc-opt.svc-rupture { opacity: .45; cursor: not-allowed; }
+.svc-opt.svc-rupture:hover { background: transparent; color: var(--teal-900, #1a3a4a); }
+.svc-stock { float: right; margin-left: 12px; font-size: 11px; font-weight: 600; color: var(--teal-600); }
+.svc-stock-nul { color: var(--rose-text); }
+html[data-theme="dark"] .svc-stock { color: var(--teal-300); }
 {# Jeton et non noir transparent : le « aucun résultat » disparaissait sur fond sombre. #}
 .svc-empty { padding: 10px 12px; color: var(--text-faint); font-style: italic; }
 
@@ -601,6 +608,10 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
                                 </div>
                                 <input type="hidden" name="ligne_libelle_{{ forloop.counter0 }}"
                                        class="svc-hidden" value="{{ ligne.libelle }}">
+                                {% comment %}L'article d'où vient la ligne : c'est lui qui
+                                donne sa nature, et donc le type de la facture.{% endcomment %}
+                                <input type="hidden" name="ligne_service_{{ forloop.counter0 }}"
+                                       class="svc-pk" value="{{ ligne.reference|default:'' }}">
                                 <div class="svc-dropdown"></div>
                             </div>
                         </td>
@@ -631,6 +642,7 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
                             </div>
                             <input type="hidden" name="ligne_libelle_0"
                                    class="svc-hidden" value="{{ initial_ligne_libelle }}">
+                            <input type="hidden" name="ligne_service_0" class="svc-pk" value="">
                             <div class="svc-dropdown"></div>
                         </div>
                     </td>
@@ -648,7 +660,7 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
     <button type="button" class="btn-add-ligne" onclick="addLigne()">
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24"
              stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Ajouter une ligne
+        Ajouter un produit ou une prestation
     </button>
 
     <!-- ── Totaux ── -->
@@ -696,18 +708,32 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
 
         <!-- Grille champs -->
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:18px 32px;">
+            <div>
+                <label style="font-size:11px; font-weight:700; text-transform:uppercase;
+                               letter-spacing:.06em; color:var(--text-muted); display:block; margin-bottom:6px;">Caisses</label>
+                {% comment %}`field-ul` + `data-ts-body` : la liste native du
+                navigateur ne se met pas au thème de l'application, et rendue
+                dans la modale elle serait rognée. Le sélecteur commun du projet
+                (includes/_tomselect.html) règle les deux.{% endcomment %}
+                <select id="pay-journal" class="field-ul" data-ts-body data-ts-nosearch>
+                    {% for caisse in caisses %}
+                    <option value="{{ caisse.pk }}"
+                            data-modes="{{ caisse.modes|join:',' }}">{{ caisse.nom|upper }}</option>
+                    {% empty %}
+                    <option value="">Aucune caisse configurée</option>
+                    {% endfor %}
+                </select>
+            </div>
 
             <div>
                 <label style="font-size:11px; font-weight:700; text-transform:uppercase;
-                               letter-spacing:.06em; color:var(--text-muted); display:block; margin-bottom:6px;">Journal</label>
-                <select id="pay-journal"
-                        style="width:100%; background:transparent; border:none;
-                               border-bottom:1.5px solid var(--border-strong); padding:5px 2px;
-                               font-size:13px; font-family:inherit; outline:none; color:var(--text);">
-                    {% for caisse in caisses %}
-                    <option value="{{ caisse.pk }}">{{ caisse.nom|upper }}</option>
-                    {% empty %}
-                    <option value="">CAISSE ACCUEIL</option>
+                               letter-spacing:.06em; color:var(--text-muted); display:block; margin-bottom:6px;">Mode de paiement</label>
+                {% comment %}Les cinq modes étaient écrits ici, et « Bon »
+                manquait par rapport à Paiement.MODE. La liste vient désormais du
+                modèle, et se réduit à ce que la caisse choisie accepte.{% endcomment %}
+                <select id="pay-mode" class="field-ul" data-ts-body data-ts-nosearch>
+                    {% for code, libelle in modes_paiement %}
+                    <option value="{{ code }}">{{ libelle }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -724,15 +750,33 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
                 </div>
             </div>
 
-            <div>
+
+            {% comment %}Reçu et monnaie n'ont de sens qu'en espèces : par
+            mobile money ou virement, le compte est juste. Le script plus bas
+            masque les deux champs sur les autres modes.{% endcomment %}
+            <div id="pay-recu-wrap">
                 <label style="font-size:11px; font-weight:700; text-transform:uppercase;
-                               letter-spacing:.06em; color:var(--text-muted); display:block; margin-bottom:6px;">Compte bancaire du bénéficiaire</label>
-                <select id="pay-compte"
-                        style="width:100%; background:transparent; border:none;
-                               border-bottom:1.5px solid var(--border-strong); padding:5px 2px;
-                               font-size:13px; font-family:inherit; outline:none; color:var(--text);">
-                    <option value=""></option>
-                </select>
+                               letter-spacing:.06em; color:var(--text-muted); display:block; margin-bottom:6px;">Reçu du patient</label>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <input type="number" id="pay-recu" min="0" step="1"
+                       style="width:100%; background:transparent; border:none;
+                              border-bottom:1.5px solid var(--border-strong); padding:5px 2px;
+                              font-size:13px; font-family:inherit; outline:none; color:var(--text);">
+                    <span style="font-size:12px; color:var(--text-muted); flex-shrink:0;">CFA</span>
+                </div>
+            </div>
+
+            <div id="pay-monnaie-wrap">
+                <label style="font-size:11px; font-weight:700; text-transform:uppercase;
+                               letter-spacing:.06em; color:var(--text-muted); display:block; margin-bottom:6px;">Monnaie à rendre</label>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <input type="text" id="pay-monnaie" value="0" readonly
+                       style="width:100%; background:transparent; border:none;
+                              border-bottom:1.5px solid var(--border-strong); padding:5px 2px;
+                              font-size:13px; font-family:inherit; outline:none; color:var(--text);" readonly>
+                    <span style="font-size:12px; color:var(--text-muted); flex-shrink:0;">CFA</span>
+                </div>
+                <div id="pay-manque" style="display:none; font-size:11px; color:var(--rose-text); margin-top:4px;"></div>
             </div>
 
             <div>
@@ -746,28 +790,12 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
 
             <div>
                 <label style="font-size:11px; font-weight:700; text-transform:uppercase;
-                               letter-spacing:.06em; color:var(--text-muted); display:block; margin-bottom:6px;">Mode de paiement</label>
-                <select id="pay-mode"
-                        style="width:100%; background:transparent; border:none;
-                               border-bottom:1.5px solid var(--border-strong); padding:5px 2px;
-                               font-size:13px; font-family:inherit; outline:none; color:var(--text);">
-                    <option value="especes">Espèces</option>
-                    <option value="mobile_money">Mobile Money</option>
-                    <option value="cheque">Chèque</option>
-                    <option value="virement">Virement</option>
-                    <option value="assurance">Assurance</option>
-                </select>
-            </div>
-
-            <div>
-                <label style="font-size:11px; font-weight:700; text-transform:uppercase;
                                letter-spacing:.06em; color:var(--text-muted); display:block; margin-bottom:6px;">Mémo</label>
                 <input type="text" id="pay-memo"
                        style="width:100%; background:transparent; border:none;
                               border-bottom:1.5px solid var(--border-strong); padding:5px 2px;
                               font-size:13px; font-family:inherit; outline:none; color:var(--text);">
             </div>
-
         </div>
 
         <!-- Boutons -->
@@ -791,43 +819,38 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
 </div>
 <input type="hidden" id="raw-total" value="0">
 
+{{ services|json_script:"donnees-designations" }}
 <script>
 (function () {
     var lineCount = {{ initial_lignes|length|default:1 }};
 
     /* ── Données services (sérialisées depuis Django) ── */
-    var _SERVICES = [
-        {% for svc in services %}{ nom: "{{ svc.nom|escapejs }}", prix: {{ svc.prix_vente }}, cat: "{{ svc.categorie.code|default:'' }}" },
-        {% endfor %}
-    ];
+    {% comment %}
+    Deux catalogues dans une seule liste : `src: 'a'` pour un acte ou un examen
+    (services.Articleservice), `src: 'p'` pour un médicament ou un consommable
+    de la pharmacie du centre actif (stock.Produit). Ils numérotent chacun de
+    leur côté, d'où la référence préfixée « a:12 » / « p:7 » envoyée au serveur.
+    Un produit en rupture reste dans la liste, grisé : le cacher ferait croire
+    qu'il n'existe pas, et la désignation serait retapée à la main.
 
-    /* Mapping type_facture → codes catégories autorisés (null = tout afficher) */
-    var _TYPE_CATS = {
-        'consultation':    ['CS'],
-        'soins':           ['SN', 'AE', 'AP', 'VC'],
-        'hospitalisation': ['MO', 'MT', 'SN', 'AP'],
-        'pharmacie':       ['MD', 'AP'],
-        'laboratoire':     ['EX', 'AE', 'EG'],
-        'imagerie':        ['EC', 'RD', 'EG'],
-    };
+    Sérialisé par `json_script` et non écrit à la main dans le JavaScript : la
+    locale française rendait `15000.0` en « 15000,0 », virgule comprise, ce qui
+    coupait le littéral en deux et cassait toute la liste. Le filtre échappe
+    aussi les noms, qui viennent de la base.
+    {% endcomment %}
+    var _SERVICES = JSON.parse(document.getElementById('donnees-designations').textContent);
 
-    function getActiveCategories() {
-        var sel = document.getElementById('id_type_facture');
-        var type = sel ? sel.value : '';
-        return _TYPE_CATS[type] || null; /* null = tout */
-    }
-
+    /* Le type de facture ne restreint plus les désignations. Il décidait avant
+       de ce qu'on avait le droit de mettre — une facture « Consultation » ne
+       proposait que les actes `CS` —, ce qui interdisait en pratique la moindre
+       facture mixte. C'est l'inverse maintenant : on met ce qu'on veut, et le
+       type se déduit du contenu à l'enregistrement (Facture.deduire_type). */
     function getFilteredServices(q, currentVal) {
-        var allowedCats = getActiveCategories();
-        var base = allowedCats
-            ? _SERVICES.filter(function(s) { return allowedCats.indexOf(s.cat) !== -1; })
-            : _SERVICES;
-        if (!q || q === currentVal) return base;
-        return base.filter(function(s) {
+        if (!q || q === currentVal) return _SERVICES;
+        return _SERVICES.filter(function(s) {
             return s.nom.toLowerCase().indexOf(q.toLowerCase()) !== -1;
         });
     }
-    console.log('[Facturation] Services chargés :', _SERVICES.length, _SERVICES.slice(0,3));
 
     function fmt(n) {
         return Number(n).toLocaleString('fr-FR') + ' CFA';
@@ -879,6 +902,7 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
         var idx      = parseInt(wrapper.dataset.idx, 10);
         var input    = wrapper.querySelector('.svc-input');
         var hidden   = wrapper.querySelector('.svc-hidden');
+        var hiddenPk = wrapper.querySelector('.svc-pk');
         var dropdown = wrapper.querySelector('.svc-dropdown');
 
         function positionDropdown() {
@@ -897,8 +921,13 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
             } else {
                 dropdown.innerHTML = list.map(function (s) {
                     var sel = s.nom === current ? ' is-selected' : '';
+                    if (s.rupture) sel += ' svc-rupture';
+                    var mention = s.rupture ? '<span class="svc-stock svc-stock-nul">Rupture</span>'
+                               : (s.stock !== null && s.stock !== undefined)
+                                 ? '<span class="svc-stock">Stock : ' + s.stock + '</span>' : '';
                     return '<div class="svc-opt' + sel + '" data-nom="' + s.nom.replace(/"/g, '&quot;') +
-                           '" data-prix="' + s.prix + '">' + s.nom + '</div>';
+                           '" data-prix="' + s.prix + '" data-ref="' + s.src + ':' + s.pk + '">' +
+                           s.nom + mention + '</div>';
                 }).join('');
             }
             positionDropdown();
@@ -907,9 +936,10 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
 
         var _justSelected = false;
 
-        function selectService(nom, prix) {
+        function selectService(nom, prix, pk) {
             _justSelected = true;
             hidden.value = nom;
+            if (hiddenPk) hiddenPk.value = pk || '';
             input.value  = nom;
             wrapper.classList.add('svc-preloaded');
             var prixInput = document.querySelector('[name="ligne_prix_' + idx + '"]');
@@ -923,6 +953,9 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
         input.addEventListener('input', function () {
             wrapper.classList.remove('svc-preloaded');
             hidden.value = '';
+            /* Le caissier tape son propre libellé : la ligne n'est plus celle
+               d'un article du catalogue, et ne compte donc pour aucune nature. */
+            if (hiddenPk) hiddenPk.value = '';
             render(input.value);
             updateSaveButtonState();
         });
@@ -933,8 +966,8 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
         dropdown.addEventListener('mousedown', function (e) {
             e.preventDefault();
             var opt = e.target.closest('.svc-opt');
-            if (!opt) return;
-            selectService(opt.dataset.nom, opt.dataset.prix || 0);
+            if (!opt || opt.classList.contains('svc-rupture')) return;
+            selectService(opt.dataset.nom, opt.dataset.prix || 0, opt.dataset.ref || '');
             close();
         });
 
@@ -949,6 +982,7 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
         if (hidden.value) {
             var initSvc = _SERVICES.find(function (s) { return s.nom === hidden.value; });
             if (initSvc) {
+                if (hiddenPk && !hiddenPk.value) hiddenPk.value = initSvc.src + ':' + initSvc.pk;
                 var prixInput = document.querySelector('[name="ligne_prix_' + idx + '"]');
                 if (prixInput && (parseFloat(prixInput.value) || 0) === 0) {
                     prixInput.value = initSvc.prix;
@@ -972,6 +1006,7 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
                   '<span class="svc-arrow">▼</span>' +
                 '</div>' +
                 '<input type="hidden" name="ligne_libelle_' + idx + '" class="svc-hidden">' +
+                '<input type="hidden" name="ligne_service_' + idx + '" class="svc-pk">' +
                 '<div class="svc-dropdown"></div>' +
               '</div>' +
             '</td>' +
@@ -993,26 +1028,11 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
         }
     };
 
-    /* Réinitialiser les combos quand le type de facture change */
-    var typeSelect = document.getElementById('id_type_facture');
-    if (typeSelect) {
-        typeSelect.addEventListener('change', function() {
-            document.querySelectorAll('.svc-combo').forEach(function(combo) {
-                var idx    = parseInt(combo.dataset.idx, 10);
-                var hidden = combo.querySelector('.svc-hidden');
-                var input  = combo.querySelector('.svc-input');
-                var dd     = combo.querySelector('.svc-dropdown');
-                if (hidden) hidden.value = '';
-                if (input)  input.value  = '';
-                if (dd)     dd.style.display = 'none';
-                combo.classList.remove('svc-preloaded');
-                /* Vider aussi le prix pour éviter l'incohérence désignation vide / prix rempli */
-                var prixEl = document.querySelector('[name="ligne_prix_' + idx + '"]');
-                if (prixEl) { prixEl.value = 0; recalcRow(idx); }
-            });
-            recalcTotaux();
-        });
-    }
+    /* Le changement de type ne vide plus les lignes. Il les effaçait toutes,
+       désignations et prix compris, pour rester cohérent avec le filtre par
+       catégorie qui vient de disparaître. Le champ Type est désormais en
+       lecture seule de toute façon : il reflète le contenu, il ne le commande
+       plus. */
 
     /* Recalc when assurance/ticket change */
     var assEl = document.getElementById('{{ form.montant_assurance.id_for_label }}');
@@ -1058,10 +1078,14 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
             form.appendChild(inp);
         }
 
+        /* Le journal partait à la poubelle : le champ existait à l'écran mais
+           n'était jamais transmis, et le paiement ne savait pas de quelle caisse
+           il relevait. */
+        addHidden('pay_journal', document.getElementById('pay-journal').value);
         addHidden('pay_montant', document.getElementById('pay-montant').value);
+        addHidden('pay_recu',    document.getElementById('pay-recu').value);
         addHidden('pay_mode',    document.getElementById('pay-mode').value);
         addHidden('pay_memo',    document.getElementById('pay-memo').value);
-        addHidden('pay_compte',  document.getElementById('pay-compte').value);
 
         form.submit();
     };
@@ -1081,6 +1105,91 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
   sel.style.pointerEvents = 'none';
   sel.style.cursor = 'default';
 })();
+
+/* ── Modes de paiement, monnaie à rendre ──
+   Chaque caisse porte ses modes en `data-modes` ; le menu Mode de paiement s'y
+   réduit. Les deux menus passent par TomSelect : on détruit et on réinstalle
+   l'instance plutôt que de bricoler ses <option>, c'est le seul moyen fiable de
+   la garder cohérente avec le <select> d'origine. */
+(function () {
+  var journal = document.getElementById('pay-journal');
+  var mode    = document.getElementById('pay-mode');
+  var recu    = document.getElementById('pay-recu');
+  var monnaie = document.getElementById('pay-monnaie');
+  var manque  = document.getElementById('pay-manque');
+  var montant = document.getElementById('pay-montant');
+  if (!journal || !mode) return;
+
+  var TOUS = Array.prototype.map.call(mode.options, function (o) {
+    return { value: o.value, text: o.textContent.trim() };
+  });
+
+  function modesAutorises() {
+    var opt  = journal.options[journal.selectedIndex];
+    var brut = opt ? (opt.dataset.modes || '') : '';
+    if (!brut) return TOUS;
+    var codes = brut.split(',');
+    var filtres = TOUS.filter(function (m) { return codes.indexOf(m.value) !== -1; });
+    /* Réglage ne contenant aucun mode connu : tout proposer vaut mieux qu'un
+       menu vide où le caissier ne peut rien choisir. */
+    return filtres.length ? filtres : TOUS;
+  }
+
+  function majModes() {
+    var permis = modesAutorises();
+    var courant = mode.value;
+    var garde = permis.some(function (m) { return m.value === courant; });
+    if (mode.tomselect) mode.tomselect.destroy();
+    mode.innerHTML = permis.map(function (m) {
+      return '<option value="' + m.value + '">' + m.text + '</option>';
+    }).join('');
+    mode.value = garde ? courant : permis[0].value;
+    if (window.initFieldUlSelects) window.initFieldUlSelects(mode.parentNode);
+    majMonnaie();
+  }
+
+  function estEspeces() { return mode.value === 'especes'; }
+
+  function majMonnaie() {
+    if (!recu || !monnaie) return;
+    var especes = estEspeces();
+    document.getElementById('pay-recu-wrap').style.display    = especes ? '' : 'none';
+    document.getElementById('pay-monnaie-wrap').style.display = especes ? '' : 'none';
+    if (!especes) { recu.value = ''; return; }
+
+    var du = parseFloat(montant && montant.value) || 0;
+    var tendu = parseFloat(recu.value);
+    if (isNaN(tendu) || recu.value === '') {
+      monnaie.value = '0';
+      manque.style.display = 'none';
+      return;
+    }
+    var ecart = tendu - du;
+    monnaie.value = (ecart > 0 ? ecart : 0).toLocaleString('fr-FR');
+    /* Tendre moins que le dû n'est pas bloqué : un règlement partiel en
+       espèces est un cas courant. On le signale, c'est tout. */
+    if (ecart < 0) {
+      manque.textContent = 'Il manque ' + (-ecart).toLocaleString('fr-FR') + ' CFA sur le montant saisi.';
+      manque.style.display = '';
+    } else {
+      manque.style.display = 'none';
+    }
+  }
+
+  journal.addEventListener('change', majModes);
+  mode.addEventListener('change', majMonnaie);
+  if (recu)    recu.addEventListener('input', majMonnaie);
+  if (montant) montant.addEventListener('input', majMonnaie);
+  /* TomSelect s'installe au chargement du document ; on passe après lui. */
+  window.addEventListener('load', majModes);
+})();
 </script>
+
+{% include 'includes/_tomselect.html' %}
+<style>
+  /* Rendues dans le <body> (`data-ts-body`), les listes passaient derrière la
+     modale d'encaissement : on cliquait et rien n'apparaissait. */
+  .ts-dropdown { z-index: 10000 !important; }
+</style>
 
 {% endblock %}

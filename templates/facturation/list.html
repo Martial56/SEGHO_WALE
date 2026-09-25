@@ -1,5 +1,5 @@
 {% extends 'facturation/base.html' %}
-{% load humanize %}
+{% load humanize static %}
 
 {% block topbar_title %}Facturation{% endblock %}
 
@@ -19,9 +19,9 @@
   html[data-theme="dark"] .fac-stat-card.card-attente .fac-stat-value { color: #f6c05a; }
   html[data-theme="dark"] .o-subheader        { background: var(--surface); border-bottom-color: var(--border); }
   html[data-theme="dark"] .o-list-wrap        { background: var(--surface); }
-  html[data-theme="dark"] .o-list thead th    { background: var(--surface); color: var(--text-muted); border-bottom-color: var(--border); }
-  html[data-theme="dark"] .o-list tbody tr    { border-bottom-color: var(--border); }
-  html[data-theme="dark"] .o-list tbody tr:hover { background: rgba(var(--teal-500-rgb),.10); }
+  html[data-theme="dark"] .o-list-table thead th    { background: var(--surface); color: var(--text-muted); border-bottom-color: var(--border); }
+  html[data-theme="dark"] .o-list-table tbody tr    { border-bottom-color: var(--border); }
+  html[data-theme="dark"] .o-list-table tbody tr:hover { background: rgba(var(--teal-500-rgb),.10); }
   html[data-theme="dark"] .o-search-input     { color: var(--text); }
   html[data-theme="dark"] .o-search-bar       { border-bottom-color: rgba(255,255,255,.15); }
   html[data-theme="dark"] .o-ctrl-btn         { color: rgba(255,255,255,.4); }
@@ -32,9 +32,6 @@
   html[data-theme="dark"] .o-dd-panel         { background: var(--surface); border-color: var(--border); }
   html[data-theme="dark"] .o-dd-item:hover    { background: rgba(var(--teal-500-rgb),.15); color: var(--text); }
   html[data-theme="dark"] .o-dd-item.active   { color: var(--teal-300); }
-  html[data-theme="dark"] .o-dd-date-input    { border-bottom-color: var(--border-strong); color: var(--text); }
-  html[data-theme="dark"] .o-dd-clear-btn     { border-color: var(--border); color: var(--text-muted); }
-  html[data-theme="dark"] .o-dd-sub           { background: var(--surface); border-color: var(--border); }
   html[data-theme="dark"] .badge-brouillon    { background: rgba(150,150,150,.12); color: var(--text); border-color: rgba(150,150,150,.2); }
   html[data-theme="dark"] .badge-emise        { background: rgba(21,101,192,.18); color: #90caf9; border-color: rgba(21,101,192,.3); }
   html[data-theme="dark"] .badge-payee        { background: rgba(22,169,107,.15); color: #4cde9a; border-color: rgba(22,169,107,.25); }
@@ -159,42 +156,20 @@
   .o-dd-sep { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
   .o-dd-arr { font-size: 10px; color: var(--text-muted); flex-shrink: 0; }
 
-  /* Sous-menu déployé au survol (Statut, Type) */
-  .o-dd-sub {
-    display: none; position: absolute; left: 100%; top: -5px; z-index: 10000;
-    min-width: 170px; background: #fff; border: 1px solid #dde3ec;
-    border-radius: 7px; box-shadow: 0 8px 28px rgba(0,0,0,.16); padding: 5px 0;
-  }
-  .o-dd-item:hover > .o-dd-sub { display: block; }
-  .o-dd-sub .o-dd-item { font-size: 12px; }
-
-  /* Bloc date dans le dropdown Filtres */
-  .o-dd-date-block { padding: 8px 14px 10px; }
-  .o-dd-date-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-  .o-dd-date-row label { font-size: 11.5px; color: var(--text-muted); min-width: 18px; }
-  .o-dd-date-input {
-    flex: 1; border: none; border-bottom: 1px solid #bbb; background: transparent;
-    font-size: 12px; color: var(--text); padding: 2px 2px; outline: none;
-  }
-  .o-dd-date-input:focus { border-bottom-color: var(--teal-600); }
-  .o-dd-date-actions { display: flex; gap: 6px; margin-top: 10px; }
-  .o-dd-apply-btn {
-    flex: 1; background: var(--teal-600); color: #fff; border: none; border-radius: 3px;
-    padding: 5px 0; font-size: 12px; font-weight: 500; cursor: pointer; transition: background .15s;
-  }
-  .o-dd-apply-btn:hover { background: var(--teal-700); }
-  .o-dd-clear-btn {
-    background: none; border: 1px solid var(--border); border-radius: 3px;
-    padding: 5px 10px; font-size: 11.5px; color: var(--text-muted);
-    cursor: pointer; text-decoration: none; display: inline-flex; align-items: center;
-    transition: border-color .15s, color .15s; white-space: nowrap;
-  }
-  .o-dd-clear-btn:hover { border-color: #999; color: var(--text); }
 
   /* ══════════════════════════════════════════════════
      PAGINATION
   ══════════════════════════════════════════════════ */
   .o-pagination { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+  {% comment %}Second jeu de flèches sous le tableau, comme sur les listes de
+  soins et de prestations : la barre de contrôles sort de l'écran dès qu'on a
+  déroulé vingt-cinq lignes.{% endcomment %}
+  .o-pagination-bottom {
+    display: flex; align-items: center; gap: 6px;
+    justify-content: center; padding: 14px 0;
+    border-top: 1px solid var(--border);
+    font-size: 12px; color: var(--text-muted);
+  }
   .o-pag-btn { color: #888; text-decoration: none; font-size: 15px; display: inline-flex; align-items: center; padding: 0 2px; transition: color .15s; }
   .o-pag-btn:hover { color: var(--accent-text-soft); }
   .o-pag-btn.disabled { opacity: .3; pointer-events: none; }
@@ -203,24 +178,24 @@
      TABLE
   ══════════════════════════════════════════════════ */
   .o-list-wrap { overflow-x: auto; background: var(--surface); margin: 0 !important; }
-  .o-list { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .o-list-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 
-  .o-list thead th {
+  .o-list-table thead th {
     background: #f6f8fa;
     border-bottom: 1px solid var(--border);
     padding: 8px 12px; font-weight: 600; font-size: 10.5px; color: var(--text-muted);
     text-align: left; text-transform: uppercase; letter-spacing: .5px;
     position: sticky; top: 0; z-index: 2; white-space: nowrap; user-select: none;
   }
-  .o-list thead th:first-child { border-radius: 0; }
+  .o-list-table thead th:first-child { border-radius: 0; }
 
-  .o-list tbody tr {
+  .o-list-table tbody tr {
     border-bottom: 1px solid #f2f4f7;
     transition: background .1s; cursor: pointer;
   }
-  .o-list tbody tr:hover { background: #f0f9fd; }
-  .o-list tbody tr:last-child { border-bottom: none; }
-  .o-list tbody td { padding: 9px 12px; color: var(--text); vertical-align: middle; }
+  .o-list-table tbody tr:hover { background: #f0f9fd; }
+  .o-list-table tbody tr:last-child { border-bottom: none; }
+  .o-list-table tbody td { padding: 9px 12px; color: var(--text); vertical-align: middle; }
 
   .row-num {
     display: inline-flex; align-items: center; justify-content: center;
@@ -305,7 +280,14 @@
 
 {% block content %}
 
-<!-- ══ Stats ══ -->
+{% comment %}Styles de la brique : menus à sous-menus, bandes de groupe,
+chevrons de dépliage, tri et sélecteur de colonnes.{% endcomment %}
+{% include 'includes/listing/styles.html' %}
+
+{% comment %}`list-stats` est la zone que includes/listing/page_js.html
+échange avec les résultats : sans elle, les montants resteraient ceux de
+l'affichage précédent après un clic sur un filtre.{% endcomment %}
+<div id="list-stats">
 <div class="fac-stats">
   <div class="fac-stat-card card-total">
     <div class="fac-stat-icon"><i class="bi bi-receipt-cutoff"></i></div>
@@ -332,298 +314,164 @@
     </div>
   </div>
 </div>
+</div>
 
 <!-- ══ Subheader ══ -->
+{% comment %}
+Filtres et regroupements viennent de core.listing, comme les soins et les
+prestations : les menus sont générés depuis facturation/facture_listing.py, ce
+gabarit ne fait que les parcourir. Le menu écrit à la main qu'ils remplacent ne
+portait qu'un statut, un type et un intervalle de dates.
+{% endcomment %}
 <div class="o-subheader">
 
-  <!-- Ligne 1 : titre | recherche (jamais remplacée en AJAX pour ne pas perdre le focus) -->
+  {% comment %}Ligne 1 : titre et recherche, jamais remplacés en AJAX pour ne pas
+  perdre le focus de saisie.{% endcomment %}
   <div class="o-subheader-row">
-    <span class="o-page-title">Factures
-      <span id="page-count-wrap">({{ total }})</span>
-    </span>
+    <span class="o-page-title">Factures <span class="o-page-count">{{ total }}</span></span>
+    <span class="o-page-scope" style="font-size:12px;color:var(--text-muted);">· {{ periode_libelle }}</span>
     <div class="o-subheader-row-right">
       <div class="o-search-bar">
-        <input class="o-search-input" id="search-q" type="text"
+        <input class="o-search-input" id="search-input" type="text"
                value="{{ q }}" placeholder="N° facture, patient…" autocomplete="off">
-        <button type="button" class="o-search-btn" id="clear-search-btn" title="Effacer la recherche"
-                onclick="clearSearch()" style="{% if not q %}display:none;{% endif %}">
-          <i class="bi bi-x-lg"></i>
+        <button type="button" class="o-search-btn" onclick="lancerRecherche()" title="Rechercher">
+          <i class="bi bi-search"></i>
         </button>
-        <span class="o-search-btn" style="pointer-events:none;"><i class="bi bi-search"></i></span>
       </div>
     </div>
   </div>
 
-  <!-- Ligne 2+ : contrôles (remplacés en bloc en AJAX, cf. #subheader-controls) -->
-  <div id="subheader-controls">
-  <div class="o-subheader-row">
+  {% comment %}Ligne 2 : contrôles, échangés en bloc à chaque rafraîchissement.{% endcomment %}
+  <div class="o-subheader-row" id="subheader-controls"
+       data-filters="{{ filters|join:"," }}" data-groups="{{ groups|join:"," }}">
     <a href="{% url 'facturation:create' %}" class="o-btn-create">
       <i class="bi bi-plus-lg"></i> Nouvelle facture
     </a>
+
     <div class="o-subheader-row-right">
 
-      <!-- Effacer tout (filtres + date + recherche) -->
-      {% if filters or q or dates_explicites %}
-      <a href="#" class="o-ctrl-btn" style="color:var(--rose-text);" onclick="resetAll(); return false;" title="Effacer les filtres, la date et la recherche">
+      {% if selection_active %}
+      <a href="#" class="o-ctrl-btn" style="color:var(--rose-text);"
+         onclick="resetAll(); return false;"
+         title="Effacer les filtres, le regroupement et la recherche">
         <i class="bi bi-x-circle"></i> Effacer
       </a>
       {% endif %}
 
-      <!-- Filtres (cumulables : Statut + Type + Date) -->
       <div class="o-dd-wrap">
-        <button class="o-ctrl-btn {% if filters or dates_explicites %}active{% endif %}" id="btn-filtres" onclick="toggleDd('dd-filtres',this)" type="button">
-          <i class="bi bi-funnel{% if filters or dates_explicites %}-fill{% endif %}"></i> Filtres
+        <button type="button" class="o-ctrl-btn {% if filtre_pose %}active{% endif %}"
+                id="btn-filtres" onclick="toggleDd('dd-filtres', this)">
+          <i class="bi bi-funnel{% if filtre_pose %}-fill{% endif %}"></i> Filtres
         </button>
-        <div class="o-dd-panel" id="dd-filtres">
-          <div class="o-dd-item {% if statuts_sel %}active{% endif %}">
-            Statut <span class="o-dd-arr">›</span>
-            <div class="o-dd-sub">
-              {% for s, l in statut_choices %}
-              <a class="o-dd-item {% if s in statuts_sel %}active{% endif %}" href="#" onclick="toggleParam('filter','statut:{{ s }}'); return false;">{{ l }}</a>
-              {% endfor %}
-            </div>
-          </div>
-          <div class="o-dd-item {% if types_sel %}active{% endif %}">
-            Type <span class="o-dd-arr">›</span>
-            <div class="o-dd-sub">
-              {% for s, l in type_choices %}
-              <a class="o-dd-item {% if s in types_sel %}active{% endif %}" href="#" onclick="toggleParam('filter','type:{{ s }}'); return false;">{{ l }}</a>
-              {% endfor %}
-            </div>
-          </div>
-          <hr class="o-dd-sep">
-          <div class="o-dd-section">Par date</div>
-          <div class="o-dd-date-block">
-            <div class="o-dd-date-row">
-              <label>De</label>
-              <input type="date" id="filter-date-from" class="o-dd-date-input" value="{{ date_from }}">
-            </div>
-            <div class="o-dd-date-row">
-              <label>À</label>
-              <input type="date" id="filter-date-to" class="o-dd-date-input" value="{{ date_to }}">
-            </div>
-            <div class="o-dd-date-actions">
-              <button type="button" class="o-dd-apply-btn" onclick="applyDateFilter()">Appliquer</button>
-              <a class="o-dd-clear-btn" href="#" onclick="showAllDates(); return false;">Toutes les dates</a>
-            </div>
-          </div>
+        <div class="o-dd-panel lst-menu" id="dd-filtres">
+          {% include 'includes/listing/menu_filtres.html' %}
+        </div>
+      </div>
+
+      <div class="o-dd-wrap">
+        <button type="button" class="o-ctrl-btn {% if groups %}active{% endif %}"
+                id="btn-group" onclick="toggleDd('dd-group', this)">
+          <i class="bi bi-list-ul"></i> Regrouper par
+        </button>
+        <div class="o-dd-panel lst-menu" id="dd-group">
+          <div class="o-dd-section">Regrouper par</div>
+          {% include 'includes/listing/menu_groupes.html' %}
         </div>
       </div>
 
       <div class="o-ctrl-sep"></div>
 
-      <!-- Pagination -->
       <div class="o-pagination">
-        <a id="pag-prev" class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
-           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% for f in filters %}&filter={{ f }}{% endfor %}{% if dates_explicites %}&date_from={{ date_from }}&date_to={{ date_to }}{% endif %}{% else %}#{% endif %}">
+        <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
+           href="{% if page_obj.has_previous %}{% querystring page=page_obj.previous_page_number %}{% else %}#{% endif %}">
           <i class="bi bi-chevron-left"></i>
         </a>
-        <span id="pag-info">{{ page_obj.start_index }}–{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
-        <a id="pag-next" class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
-           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% for f in filters %}&filter={{ f }}{% endfor %}{% if dates_explicites %}&date_from={{ date_from }}&date_to={{ date_to }}{% endif %}{% else %}#{% endif %}">
+        <span>{{ page_obj.start_index }}–{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
+        <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
+           href="{% if page_obj.has_next %}{% querystring page=page_obj.next_page_number %}{% else %}#{% endif %}">
           <i class="bi bi-chevron-right"></i>
         </a>
       </div>
+
     </div>
   </div>
-
-  </div><!-- /#subheader-controls -->
 </div>
 
 <!-- ══ Table ══ -->
+<div id="list-result">
 <div class="o-list-wrap">
-  <table class="o-list">
+  {% if page_obj.object_list %}
+  <table class="o-list-table">
     <thead>
-      <tr>
-        <th>N° Facture</th>
-        <th>Patient</th>
-        {% if request.user.is_superuser %}<th>Centre</th>{% endif %}
-        <th>Type</th>
-        <th>Date</th>
-        <th style="text-align:right;">Total</th>
-        <th style="text-align:right;">Payé</th>
-        <th style="text-align:right;">Reste</th>
-        <th>Statut</th>
+      <tr id="col-header-row">
+        <th class="sortable-col" data-col="1" data-tri="numero"><span class="col-label">N° Facture</span>{% include "includes/listing/tri_icone.html" with cle="numero" %}<div class="col-resizer"></div></th>
+        <th class="sortable-col" data-col="2" data-tri="patient"><span class="col-label">Patient</span>{% include "includes/listing/tri_icone.html" with cle="patient" %}<div class="col-resizer"></div></th>
+        {% if request.user.is_superuser %}
+        <th data-col="3"><span class="col-label">Centre</span><div class="col-resizer"></div></th>
+        {% endif %}
+        <th class="sortable-col" data-col="4" data-tri="date"><span class="col-label">Date</span>{% include "includes/listing/tri_icone.html" with cle="date" %}<div class="col-resizer"></div></th>
+        <th class="sortable-col" data-col="5" data-tri="total" style="text-align:right;"><span class="col-label">Total</span>{% include "includes/listing/tri_icone.html" with cle="total" %}<div class="col-resizer"></div></th>
+        <th class="sortable-col" data-col="6" data-tri="paye" style="text-align:right;"><span class="col-label">Payé</span>{% include "includes/listing/tri_icone.html" with cle="paye" %}<div class="col-resizer"></div></th>
+        <th class="sortable-col" data-col="7" data-tri="reste" style="text-align:right;"><span class="col-label">Reste</span>{% include "includes/listing/tri_icone.html" with cle="reste" %}<div class="col-resizer"></div></th>
+        <th class="sortable-col" data-col="8" data-tri="statut"><span class="col-label">Statut</span>{% include "includes/listing/tri_icone.html" with cle="statut" %}<div class="col-resizer"></div></th>
+        <th class="col-picker-th">
+          <button class="col-picker-btn" id="col-picker-btn" title="Colonnes visibles"><i class="bi bi-three-dots-vertical"></i></button>
+          <div class="col-picker-menu" id="col-picker-menu">
+            <label><input type="checkbox" data-col-idx="1" checked> N° Facture</label>
+            <label><input type="checkbox" data-col-idx="2" checked> Patient</label>
+            {% if request.user.is_superuser %}<label><input type="checkbox" data-col-idx="3" checked> Centre</label>{% endif %}
+            <label><input type="checkbox" data-col-idx="4" checked> Date</label>
+            <label><input type="checkbox" data-col-idx="5" checked> Total</label>
+            <label><input type="checkbox" data-col-idx="6" checked> Payé</label>
+            <label><input type="checkbox" data-col-idx="7" checked> Reste</label>
+            <label><input type="checkbox" data-col-idx="8" checked> Statut</label>
+          </div>
+        </th>
       </tr>
     </thead>
-    <tbody id="fac-tbody">
-      {% for facture in page_obj %}
-      <tr onclick="window.location='{% url 'facturation:detail' facture.pk %}'" style="cursor:pointer;">
-        <td class="td-num">{{ facture.numero }}</td>
-        <td class="td-patient">{{ facture.patient.nom }} {{ facture.patient.prenoms }}</td>
-        {% if request.user.is_superuser %}<td><span class="badge-type">{{ facture.centre.nom|default:"—" }}</span></td>{% endif %}
-        <td><span class="badge-type">{{ facture.get_type_facture_display }}</span></td>
-        <td style="color:var(--text-muted);white-space:nowrap;font-size:12px;">{{ facture.date_emission|date:"d/m/Y" }}</td>
-        <td class="td-montant">{{ facture.montant_total|floatformat:0|intcomma }} F</td>
-        <td class="td-montant" style="color:#16a96b;">{{ facture.montant_paye|floatformat:0|intcomma }} F</td>
-        <td class="td-montant" style="color:{% if facture.solde_restant > 0 %}var(--amber){% else %}var(--text-muted){% endif %};font-weight:{% if facture.solde_restant > 0 %}600{% else %}400{% endif %};">
-          {{ facture.solde_restant|floatformat:0|intcomma }} F
-        </td>
-        <td><span class="badge-statut badge-{{ facture.statut }}">{{ facture.get_statut_display }}</span></td>
-      </tr>
-      {% empty %}
-      <tr><td colspan="{% if request.user.is_superuser %}9{% else %}8{% endif %}" style="text-align:center;padding:48px 20px;color:var(--text-muted);font-size:13px;">
-        {% if q or filters or dates_explicites %}Aucune facture pour ces critères.
-        {% else %}Aucune facture pour aujourd'hui — <a href="#" onclick="showAllDates(); return false;" style="color:var(--accent-text-soft);">voir toutes les dates</a>.{% endif %}
-      </td></tr>
-      {% endfor %}
+    <tbody>
+      {% if arbre %}
+        {% include 'includes/listing/groupes.html' with noeuds=arbre listing_colonnes=colonnes listing_ligne_tpl='facturation/_row.html' %}
+      {% else %}
+        {% for facture in page_obj %}
+          {% include 'facturation/_row.html' with objet=facture parent='' %}
+        {% endfor %}
+      {% endif %}
     </tbody>
   </table>
+
+  <div class="o-pagination-bottom">
+    <span>{{ page_obj.start_index }}–{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
+    <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
+       href="{% if page_obj.has_previous %}{% querystring page=page_obj.previous_page_number %}{% else %}#{% endif %}">
+      <i class="bi bi-chevron-left"></i>
+    </a>
+    <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
+       href="{% if page_obj.has_next %}{% querystring page=page_obj.next_page_number %}{% else %}#{% endif %}">
+      <i class="bi bi-chevron-right"></i>
+    </a>
+  </div>
+
+  {% else %}
+  <div class="o-empty-state">
+    <div class="o-empty-illo"><i class="bi bi-receipt"></i></div>
+    <div class="o-empty-title">Aucune facture</div>
+    <div class="o-empty-sub">
+      {% if selection_active %}Aucune facture ne répond à ces critères.
+      {% else %}Aucune facture émise {{ periode_libelle }}.{% endif %}
+    </div>
+    <a href="{% url 'facturation:create' %}" class="o-empty-btn">
+      <i class="bi bi-plus-lg"></i> Nouvelle facture
+    </a>
+  </div>
+  {% endif %}
+</div>
 </div>
 
-<script>
-(function () {
-  var searchInput   = document.getElementById('search-q');
-  var clearSearchBtn = document.getElementById('clear-search-btn');
-  var searchTimer;
+{% comment %}Dépliage des groupes, puis le pilotage commun aux listes bâties sur
+core.listing : filtres cumulables, regroupements, tri serveur et AJAX.{% endcomment %}
+<script src="{% static 'js/listing_groupes.js' %}"></script>
+{% include 'includes/listing/page_js.html' %}
+{% include 'includes/listing/colonnes_js.html' %}
 
-  /* ── Dropdowns (positionnement fixe, comme la page patients) ── */
-  window.toggleDd = function (id, btn) {
-    var panel = document.getElementById(id);
-    var isOpen = panel.classList.contains('open');
-    document.querySelectorAll('.o-dd-panel.open').forEach(function (p) { p.classList.remove('open'); });
-    if (!isOpen) {
-      var rect = btn.getBoundingClientRect();
-      panel.style.top = (rect.bottom + 4) + 'px';
-      panel.style.left = rect.left + 'px';
-      panel.style.right = 'auto';
-      panel.classList.add('open');
-      var pr = panel.getBoundingClientRect();
-      if (pr.right > window.innerWidth - 8) {
-        panel.style.left = 'auto';
-        panel.style.right = (window.innerWidth - rect.right) + 'px';
-      }
-    }
-  };
-  document.addEventListener('click', function (e) {
-    if (!e.target.closest('.o-dd-wrap')) {
-      document.querySelectorAll('.o-dd-panel.open').forEach(function (p) { p.classList.remove('open'); });
-    }
-  });
-  document.addEventListener('scroll', function () {
-    document.querySelectorAll('.o-dd-panel.open').forEach(function (p) { p.classList.remove('open'); });
-  }, true);
-
-  /* ── Fetch HTML complet + remplacement des blocs concernés (aucun rechargement) ── */
-  function refreshList(url, pushHistory) {
-    var openPanel = document.querySelector('#subheader-controls .o-dd-panel.open');
-    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-      .then(function (r) { return r.text(); })
-      .then(function (html) {
-        var doc = new DOMParser().parseFromString(html, 'text/html');
-
-        var newTbody = doc.getElementById('fac-tbody');
-        if (newTbody) document.getElementById('fac-tbody').innerHTML = newTbody.innerHTML;
-
-        var newControls = doc.getElementById('subheader-controls');
-        if (newControls) document.getElementById('subheader-controls').outerHTML = newControls.outerHTML;
-
-        var newCount = doc.getElementById('page-count-wrap');
-        if (newCount) document.getElementById('page-count-wrap').outerHTML = newCount.outerHTML;
-
-        if (pushHistory) history.pushState({}, '', url);
-
-        /* Ré-ouvre le dropdown Filtres s'il était ouvert, pour cumuler les clics */
-        if (openPanel) {
-          var btn = document.getElementById('btn-filtres');
-          if (btn) toggleDd('dd-filtres', btn);
-        }
-      });
-  }
-  window.refreshList = refreshList;
-
-  /* ── Filtres cumulables (Statut / Type) ── */
-  window.toggleParam = function (key, value) {
-    var params = new URLSearchParams(window.location.search);
-    var values = params.getAll(key);
-    params.delete(key);
-    if (values.includes(value)) {
-      values.filter(function (v) { return v !== value; }).forEach(function (v) { params.append(key, v); });
-    } else {
-      values.forEach(function (v) { params.append(key, v); });
-      params.append(key, value);
-    }
-    params.delete('page');
-    refreshList(window.location.pathname + '?' + params.toString(), true);
-  };
-
-  window.clearParam = function (key) {
-    var params = new URLSearchParams(window.location.search);
-    params.delete(key);
-    params.delete('page');
-    var url = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
-    refreshList(url, true);
-  };
-
-  /* ── Filtre par date ── */
-  window.applyDateFilter = function () {
-    var from = document.getElementById('filter-date-from').value;
-    var to   = document.getElementById('filter-date-to').value;
-    var params = new URLSearchParams(window.location.search);
-    params.set('date_from', from);
-    params.set('date_to', to);
-    params.delete('page');
-    refreshList(window.location.pathname + '?' + params.toString(), true);
-  };
-
-  window.showAllDates = function () {
-    var from = document.getElementById('filter-date-from');
-    var to   = document.getElementById('filter-date-to');
-    if (from) from.value = '';
-    if (to)   to.value   = '';
-    window.applyDateFilter();
-  };
-
-  /* ── Recherche (AJAX, debounce) ── */
-  function setIcons(val) {
-    if (clearSearchBtn) clearSearchBtn.style.display = val ? 'inline-flex' : 'none';
-  }
-  window.clearSearch = function () {
-    if (searchInput) { searchInput.value = ''; searchInput.focus(); }
-    setIcons('');
-    clearParam('q');
-  };
-  if (searchInput) {
-    searchInput.addEventListener('input', function () {
-      setIcons(searchInput.value);
-      clearTimeout(searchTimer);
-      searchTimer = setTimeout(function () {
-        var params = new URLSearchParams(window.location.search);
-        if (searchInput.value) params.set('q', searchInput.value); else params.delete('q');
-        params.delete('page');
-        var url = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
-        refreshList(url, true);
-      }, 300);
-    });
-    searchInput.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') { window.clearSearch(); }
-    });
-  }
-  /* Délégation (les champs date sont recréés à chaque swap de #subheader-controls) */
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' && (e.target.id === 'filter-date-from' || e.target.id === 'filter-date-to')) {
-      window.applyDateFilter();
-    }
-  });
-
-  /* ── Effacer tout ── */
-  window.resetAll = function () {
-    if (searchInput) searchInput.value = '';
-    setIcons('');
-    refreshList(window.location.pathname, true);
-  };
-
-  /* ── Interception des liens ?... (pagination) pour éviter le rechargement ── */
-  document.addEventListener('click', function (e) {
-    var a = e.target.closest('#subheader-controls a[href^="?"]');
-    if (!a) return;
-    e.preventDefault();
-    refreshList(a.getAttribute('href'), true);
-  });
-
-  window.addEventListener('popstate', function () {
-    refreshList(window.location.pathname + window.location.search, false);
-  });
-})();
-</script>
 {% endblock %}
