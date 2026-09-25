@@ -951,6 +951,7 @@
                                     <span class="ex-arrow">▼</span>
                                 </div>
                                 <input type="hidden" name="ligne_examen_0" class="ex-hidden">
+                                <input type="hidden" name="ligne_article_id_0" class="ex-article-id">
                                 <div class="ex-dropdown"></div>
                             </div>
                         </td>
@@ -1001,7 +1002,7 @@
         /* ── Données examens (services catégorie EX) ── */
         var _EXAMENS = [
             {% for svc in services_examens %}
-        { nom: "{{ svc.nom|escapejs }}", prix: {{ svc.prix_vente }}, typeTest: "{{ svc.type_test_labo|escapejs }}" },
+        { id: {{ svc.pk }}, nom: "{{ svc.nom|escapejs }}", prix: {{ svc.prix_vente }}, typeTest: "{{ svc.type_test_labo|escapejs }}" },
     {% endfor %}
     ];
 
@@ -1040,6 +1041,7 @@
         var idx = parseInt(wrapper.dataset.idx, 10);
         var input = wrapper.querySelector('.ex-input');
         var hidden = wrapper.querySelector('.ex-hidden');
+        var articleId = wrapper.querySelector('.ex-article-id');
         var dropdown = wrapper.querySelector('.ex-dropdown');
 
         function positionDropdown() {
@@ -1064,7 +1066,7 @@
             } else {
                 dropdown.innerHTML = list.map(function (s) {
                     var sel = s.nom === current ? ' is-selected' : '';
-                    return '<div class="ex-opt' + sel + '" data-nom="' +
+                    return '<div class="ex-opt' + sel + '" data-id="' + s.id + '" data-nom="' +
                         s.nom.replace(/"/g, '&quot;') + '" data-prix="' + s.prix +
                         '" data-typetest="' + s.typeTest + '">' +
                         s.nom + '</div>';
@@ -1074,9 +1076,10 @@
             dropdown.style.display = 'block';
         }
 
-        function selectExamen(nom, prix, typeTest) {
+        function selectExamen(id, nom, prix, typeTest) {
             hidden.value = nom;
             input.value = nom;
+            if (articleId) { articleId.value = id; }
             wrapper.classList.add('ex-preloaded');
             var prixInput = document.querySelector('[name="ligne_prix_' + idx + '"]');
             if (prixInput) { prixInput.value = prix; recalcTotal(); }
@@ -1090,6 +1093,7 @@
         input.addEventListener('input', function () {
             wrapper.classList.remove('ex-preloaded');
             hidden.value = '';
+            if (articleId) { articleId.value = ''; }
             render(input.value);
         });
         input.addEventListener('keydown', function (e) {
@@ -1100,7 +1104,7 @@
             e.preventDefault();
             var opt = e.target.closest('.ex-opt');
             if (!opt) return;
-            selectExamen(opt.dataset.nom, parseFloat(opt.dataset.prix) || 0, opt.dataset.typetest);
+            selectExamen(opt.dataset.id, opt.dataset.nom, parseFloat(opt.dataset.prix) || 0, opt.dataset.typetest);
             close();
         });
 
@@ -1125,6 +1129,7 @@
             '<span class="ex-arrow">▼</span>' +
             '</div>' +
             '<input type="hidden" name="ligne_examen_' + idx + '" class="ex-hidden">' +
+            '<input type="hidden" name="ligne_article_id_' + idx + '" class="ex-article-id">' +
             '<div class="ex-dropdown"></div>' +
             '</div>' +
             '</td>' +

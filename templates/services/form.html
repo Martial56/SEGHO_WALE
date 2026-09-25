@@ -122,6 +122,11 @@
               {% endfor %}
             </select>
           </div>
+          <div class="field-row" id="code-hprim-row" style="display:none;">
+            <label>Code HPRIM (labo partenaire)</label>
+            <input type="text" name="code_hprim" class="field-ul" placeholder="ex : GE01 (laisser vide si non exigé)"
+              value="{% if article %}{{ article.code_hprim }}{% endif %}">
+          </div>
         </div>
 
       </div>
@@ -306,9 +311,11 @@ document.querySelectorAll('.f-tab').forEach(function(btn) {
 
 /* ── Type de test (laboratoire) : visible seulement pour la catégorie EX ── */
 (function() {
-  var catSelect = document.getElementById('categorie-select');
-  var row       = document.getElementById('type-test-labo-row');
-  var select    = document.getElementById('type-test-labo-select');
+  var catSelect    = document.getElementById('categorie-select');
+  var row          = document.getElementById('type-test-labo-row');
+  var select       = document.getElementById('type-test-labo-select');
+  var codeRow      = document.getElementById('code-hprim-row');
+  var codeInput    = codeRow ? codeRow.querySelector('[name="code_hprim"]') : null;
   if (!catSelect || !row) return;
 
   var CAT_CODES = {};
@@ -320,6 +327,8 @@ document.querySelectorAll('.f-tab').forEach(function(btn) {
     var isExamen = CAT_CODES[catSelect.value] === 'EX';
     row.style.display = isExamen ? '' : 'none';
     if (!isExamen && select) select.value = '';
+    if (codeRow) codeRow.style.display = isExamen ? '' : 'none';
+    if (!isExamen && codeInput) codeInput.value = '';
   }
 
   catSelect.addEventListener('change', toggleTypeTestLabo);

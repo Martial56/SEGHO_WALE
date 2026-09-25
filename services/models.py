@@ -210,6 +210,12 @@ class Articleservice(models.Model):
         help_text="Pour un examen de laboratoire : sous-catégorie utilisée pour filtrer "
                    "la liste des tests proposés selon le type de test choisi sur la demande."
     )
+    code_hprim = models.CharField(
+        max_length=50, blank=True, verbose_name="Code HPRIM (laboratoire partenaire)",
+        help_text="Pour un examen de laboratoire : code attendu par le laboratoire "
+                   "partenaire pour reconnaître et router automatiquement l'analyse dans "
+                   "les échanges HPRIM. Laisser vide si le labo accepte le libellé seul."
+    )
     code_barres = models.CharField(max_length=100, blank=True, verbose_name="Code-barres")
     famille = models.ForeignKey(
         FamilleArticle, on_delete=models.SET_NULL, null=True, blank=True,

@@ -186,6 +186,7 @@ def service_form(request, pk=None):
         departement_id = data.get('departement')
         article.departement_id = departement_id if departement_id else None
         article.type_test_labo = data.get('type_test_labo', '')
+        article.code_hprim = data.get('code_hprim', '')
         article.code_barres = data.get('code_barres', '')
         famille_id = data.get('famille')
         article.famille_id = famille_id if famille_id else None
@@ -574,7 +575,7 @@ _ART_HDR = [
     'reference_interne', 'nom', 'prix_vente', 'cout',
     'type_article', 'type_produit_hospitalier',
     'actif', 'peut_etre_vendu', 'peut_etre_achete',
-    'categorie', 'type_test_labo', 'unite_mesure', 'unite_achat', 'code_barres',
+    'categorie', 'type_test_labo', 'code_hprim', 'unite_mesure', 'unite_achat', 'code_barres',
     'forme', 'voie_administration', 'dosage', 'dosage_unite',
     'composant_actif', 'effet_therapeutique', 'indications',
     'avertissement_grossesse', 'avertissement_lactation',
@@ -591,6 +592,7 @@ def _art_row(a):
         int(a.actif), int(a.peut_etre_vendu), int(a.peut_etre_achete),
         a.categorie.code if a.categorie else '',
         a.type_test_labo,
+        a.code_hprim,
         a.unite_mesure.code if a.unite_mesure else '',
         a.unite_achat.code if a.unite_achat else '',
         a.code_barres, a.forme, a.voie_administration,
@@ -695,6 +697,7 @@ def import_articles(request):
                 'peut_etre_achete': _b(item.get('peut_etre_achete', False)),
                 'categorie': cat, 'unite_mesure': um, 'unite_achat': ua,
                 'type_test_labo': _s(item.get('type_test_labo', '')),
+                'code_hprim': _s(item.get('code_hprim', '')),
                 'code_barres': _s(item.get('code_barres', '')),
                 'forme': _s(item.get('forme', '')),
                 'voie_administration': _s(item.get('voie_administration', '')),

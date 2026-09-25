@@ -1053,11 +1053,17 @@ def laboratoire_create(request):
                     prix = float(request.POST.get(f'ligne_prix_{i}', 0) or 0)
                 except ValueError:
                     prix = 0
+                article_id = request.POST.get(f'ligne_article_id_{i}')
+                try:
+                    article_id = int(article_id) if article_id else None
+                except ValueError:
+                    article_id = None
                 LigneDemandeExamen.objects.create(
                     demande=demande,
                     libelle=svc_nom.strip(),
                     prix=prix,
                     instructions=request.POST.get(f'ligne_instructions_{i}', '').strip(),
+                    article_service_id=article_id,
                 )
                 total += prix
             i += 1
