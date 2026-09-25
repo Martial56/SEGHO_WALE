@@ -637,9 +637,23 @@
                         <span class="lbl">Type de test</span>
                         <span class="val">{{ demande.get_type_test_display|default:"—" }}</span>
                     </div>
-                    <div class="info-row">
+                    <div class="info-row" id="date-prelevement-row">
                         <span class="lbl">Date du prélèvement</span>
-                        <span class="val">{{ demande.date_prelevement|date:"d/m/Y H:i"|default:"—" }}</span>
+                        <span class="val" id="date-prelevement-view" style="display:inline-flex;align-items:center;gap:6px;">
+                            {{ demande.date_prelevement|date:"d/m/Y H:i"|default:"—" }}
+                            <button type="button" class="o-ctrl-btn" style="padding:1px 5px;display:inline-flex;" onclick="toggleDatePrelevementEdit(true)" title="Modifier la date de prélèvement">
+                                <i class="bi bi-pencil"></i> Modifier
+                            </button>
+                        </span>
+                        <form method="post" id="date-prelevement-edit" style="display:none;align-items:center;gap:8px;grid-column:1 / -1;">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="modifier_date_prelevement">
+                            <input type="datetime-local" name="date_prelevement"
+                                value="{{ demande.date_prelevement|date:'Y-m-d\TH:i' }}"
+                                style="padding:4px 8px;font-size:13px;border:1px solid var(--border-strong);border-radius:4px;background:var(--surface);color:var(--text);">
+                            <button type="submit" class="o-ctrl-btn" style="padding:3px 8px;">Enregistrer</button>
+                            <button type="button" class="o-ctrl-btn" style="padding:3px 8px;" onclick="toggleDatePrelevementEdit(false)">Annuler</button>
+                        </form>
                     </div>
                 </div>
                 <div class="info-col">
@@ -654,8 +668,8 @@
                         </span>
                     </div>
                     <div class="info-row">
-                        <span class="lbl">Médecin demandeur</span>
-                        <span class="val">{% if demande.technicien %}{{ demande.technicien.get_full_name|default:demande.technicien.username }}{% else %}—{% endif %}</span>
+                        <span class="lbl">Médecin prescripteur</span>
+                        <span class="val">{% if demande.medecin_prescripteur %}{{ demande.medecin_prescripteur }}{% else %}—{% endif %}</span>
                     </div>
                     {% if demande.commentaire %}
                     <div class="info-row" style="align-items:flex-start;padding-top:4px;">
@@ -728,4 +742,13 @@
     {% load core_tags %}
     {% historique_sidebar demande %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function toggleDatePrelevementEdit(show) {
+        document.getElementById('date-prelevement-view').style.display = show ? 'none' : 'inline-flex';
+        document.getElementById('date-prelevement-edit').style.display = show ? 'inline-flex' : 'none';
+    }
+</script>
 {% endblock %}

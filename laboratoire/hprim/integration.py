@@ -104,6 +104,7 @@ def construire_orm(demande, config, numero_ordre: int):
         code_action="N",                       # nouvelle demande
         date_prelevement=_aware_to_naive(demande.date_prelevement),
         renseignements_cliniques=(demande.commentaire or "")[:300],
+        priorite="A" if demande.urgent else "R",   # 9.6 : table ASTM 12 (A=Urgent, R=Routine)
     )
 
     msg.ajouter_patient(patient_data, [demande_data])
@@ -163,11 +164,17 @@ def integrer_oru(contenu: bytes):
                 if premiere_ligne:
                     type_examen = premiere_ligne.type_examen
 
+            # 10.15 : date d'obtention du résultat, transmise par l'exécutant sur
+            # chaque OBX ; à défaut on retombe sur la date du message (7.14).
+            date_resultat = next(
+                (r.date_resultat for r in d.resultats if r.date_resultat), None
+            ) or parsed.date_message or timezone.now()
+
             analyse = AnalyseLaboratoire(
                 patient=patient_obj,
                 type_examen=type_examen,
                 statut="valide" if (d.statut or "F").upper() == "F" else "resultat",
-                date_resultat=parsed.date_message or timezone.now(),
+                date_resultat=date_resultat,
                 commentaire=f"Importé HPRIM (fichier {parsed.nom_fichier}, "
                             f"demande {d.id_demande}).",
             )

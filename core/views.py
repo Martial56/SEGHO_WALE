@@ -898,6 +898,18 @@ def laboratoire_detail(request, pk):
                     messages.error(request, f'Échec de l\'envoi : {echange.message_log}')
             except RuntimeError as exc:
                 messages.error(request, str(exc))
+        elif action == 'modifier_date_prelevement':
+            from django.utils.dateparse import parse_datetime
+            raw_date = request.POST.get('date_prelevement', '').strip()
+            nouvelle_date = parse_datetime(raw_date) if raw_date else None
+            if nouvelle_date and timezone.is_naive(nouvelle_date):
+                nouvelle_date = timezone.make_aware(nouvelle_date)
+            if raw_date and not nouvelle_date:
+                messages.error(request, 'Date de prélèvement invalide.')
+            else:
+                demande.date_prelevement = nouvelle_date
+                demande.save(update_fields=['date_prelevement'])
+                messages.success(request, 'Date de prélèvement mise à jour.')
         return redirect('laboratoire_detail', pk=pk)
 
     lignes = demande.lignes.select_related('type_examen').all()
