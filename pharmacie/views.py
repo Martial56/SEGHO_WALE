@@ -489,7 +489,7 @@ def pharmacie_dispenser(request, pharmacie, pk):
         messages.info(request, 'Cette ordonnance a déjà été dispensée.')
         return redirect('pharmacie_ordonnances', pharmacie=pharmacie)
 
-    lignes = ordonnance.lignes.select_related('produit', 'medicament').all()
+    lignes = ordonnance.lignes.select_related('produit').all()
 
     lignes_enrichies = []
     for ligne in lignes:

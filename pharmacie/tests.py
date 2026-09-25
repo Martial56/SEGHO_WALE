@@ -425,3 +425,127 @@ class TestAncienneChaineSupprimee(TestCase):
         # Celles de l'app stock, elles, sont intactes.
         self.assertTrue(ContentType.objects.filter(
             app_label='stock', model='mouvementstock').exists())
+
+
+class TestEcranDeDispensation(TestCase):
+    """L'écran « Dispenser » d'une ordonnance s'ouvre.
+
+    Il ne s'ouvrait plus : la vue demandait encore `select_related('medicament')`
+    sur les lignes d'ordonnance, un champ retiré en même temps que l'ancienne
+    table `pharmacie.Medicament`. Django lève alors un `FieldError` et la page
+    répond 500 — sans qu'aucun test ne s'en aperçoive, l'écran n'étant couvert
+    par rien. C'est ce que ce test garde désormais.
+    """
+
+    def setUp(self):
+        from centres.models import Centre
+        from consultations.models import LigneOrdonnance, Ordonnance
+        from patients.models import Patient
+
+        _reset_current_user()
+        centre = Centre.objects.get(code='TOUMBOKRO')
+        patient = Patient.objects.create(
+            nom='Dispense', prenoms='Patient', date_naissance='1990-06-01',
+            sexe='M', telephone='0700000000', centre=centre,
+        )
+        self.produit = _produit('_disp')
+        _stock_pharmacie('wale_toumbokro', self.produit, Decimal('10'))
+        self.ordonnance = Ordonnance.objects.create(patient=patient, statut='emise')
+        LigneOrdonnance.objects.create(
+            ordonnance=self.ordonnance, produit=self.produit,
+            posologie='1 matin et soir', quantite=2,
+        )
+        self.user = _user_avec_permissions(
+            'u_dispense', 'gerer_stock_pharmacie', centre_code='TOUMBOKRO')
+        self.client = Client()
+        self.client.force_login(self.user)
+
+    def tearDown(self):
+        _reset_current_user()
+
+    def _url(self):
+        return reverse('pharmacie_dispenser',
+                       args=['wale_toumbokro', self.ordonnance.pk])
+
+    def test_la_page_s_ouvre(self):
+        reponse = self.client.get(self._url())
+        self.assertEqual(reponse.status_code, 200)
+
+    def test_la_ligne_et_son_stock_sont_affiches(self):
+        reponse = self.client.get(self._url())
+        self.assertContains(reponse, self.produit.nom)
+        # Le stock de la pharmacie couvre les 2 unités prescrites.
+        self.assertEqual(
+            [l['suffisant'] for l in reponse.context['lignes_enrichies']], [True])
+
+    def test_la_validation_sort_le_stock_et_marque_l_ordonnance(self):
+        self.client.post(self._url(), {f'qte_{self.ordonnance.lignes.first().pk}': '2'})
+        self.ordonnance.refresh_from_db()
+        self.assertEqual(self.ordonnance.statut, 'delivree')
+        self.assertEqual(
+            StockPharmacie.objects.get(
+                pharmacie='wale_toumbokro', produit=self.produit).quantite,
+            Decimal('8'))
+
+
+class TestToutesLesPagesDeLaPharmacie(TestCase):
+    """Chaque écran de la pharmacie s'ouvre.
+
+    Trois pages ont cassé coup sur coup après le retrait de l'ancienne table —
+    la dispensation, la liste des ordonnances, puis la liste du jour — toutes
+    découvertes en s'en servant, faute d'un test qui les ouvre. Celui-ci ne
+    vérifie rien d'autre que « ça répond » : c'est peu, mais c'est ce qui
+    manquait.
+    """
+
+    PHARMACIE = 'wale_yamoussoukro'
+
+    def setUp(self):
+        from centres.models import Centre
+        from consultations.models import LigneOrdonnance, Ordonnance
+        from patients.models import Patient
+
+        _reset_current_user()
+        centre = Centre.objects.get(code='WALE')
+        self.user = User.objects.create_superuser('su_pharma_smoke', password='x')
+        profil = self.user.profile
+        profil.centres.add(centre)
+        profil.centre_actif = centre
+        profil.save(update_fields=['centre_actif'])
+
+        self.client = Client()
+        self.client.force_login(self.user)
+
+        patient = Patient.objects.create(
+            nom='TestPharma', prenoms='Patient', date_naissance='1988-05-05',
+            sexe='M', telephone='0700000005', centre=centre)
+        produit = _produit('_smoke')
+        _stock_pharmacie(self.PHARMACIE, produit, Decimal('20'))
+        self.ordonnance = Ordonnance.objects.create(patient=patient, statut='emise')
+        LigneOrdonnance.objects.create(
+            ordonnance=self.ordonnance, produit=produit,
+            posologie='1 par jour', quantite=3)
+
+    def tearDown(self):
+        _reset_current_user()
+
+    def test_chaque_ecran_repond(self):
+        sans_argument = ['pharmacie_accueil']
+        par_pharmacie = [
+            'pharmacie_dashboard', 'pharmacie_stock', 'pharmacie_ordonnances',
+            'pharmacie_demande', 'pharmacie_journal', 'pharmacie_caisse',
+            'pharmacie_recette', 'pharmacie_rapport_journalier',
+            'pharmacie_livraisons', 'pharmacie_alertes_reappro',
+            'pharmacie_peremptions', 'pharmacie_retours',
+            'pharmacie_inventaire_list', 'pharmacie_rapport_mensuel',
+            'pharmacie_rapport_dispensation', 'pharmacie_comparaison',
+            'pharmacie_import_stock_initial',
+        ]
+        urls = [reverse(nom) for nom in sans_argument]
+        urls += [reverse(nom, args=[self.PHARMACIE]) for nom in par_pharmacie]
+        urls.append(reverse('pharmacie_dispenser',
+                            args=[self.PHARMACIE, self.ordonnance.pk]))
+
+        for url in urls:
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 200)

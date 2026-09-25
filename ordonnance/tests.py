@@ -296,3 +296,118 @@ class TestOrdonnanceSansConsultation(TestCase):
         reponse = self.client.get('/admin/consultations/ordonnance/')
         self.assertEqual(reponse.status_code, 200)
         self.assertContains(reponse, 'TestLibre')
+
+
+class TestListeDesOrdonnances(TestCase):
+    """La liste `/ordonnances/` s'affiche et nomme les médicaments.
+
+    Elle tombait en `VariableDoesNotExist` : le gabarit terminait sa cascade par
+    `|default:l.medicament`, la table d'avant les deux pharmacies. Un argument de
+    filtre n'est pas résolu comme une variable ordinaire — l'échec n'est pas
+    silencieux, il remonte et la page entière casse, sur *toutes* les
+    ordonnances, pas seulement celles restées en texte libre.
+    """
+
+    def setUp(self):
+        from patients.models import Patient
+
+        self.centre = Centre.objects.get_or_create(
+            code='WALE', defaults={'nom': 'CMS WALE Yamoussoukro'})[0]
+        self.user = User.objects.create_superuser('su_liste', password='x')
+        profil = self.user.profile
+        profil.centres.add(self.centre)
+        profil.centre_actif = self.centre
+        profil.save(update_fields=['centre_actif'])
+
+        self.client = Client()
+        self.client.force_login(self.user)
+
+        patient = Patient.objects.create(
+            nom='TestListe', prenoms='Patient', date_naissance='1980-03-03',
+            sexe='M', telephone='0700000003', centre=self.centre)
+        produit = Produit.objects.create(
+            nom='Sirop répertorié', type='medicament',
+            prix_achat=Decimal('100'), prix_vente=Decimal('500'))
+        _en_rayon('wale_yamoussoukro', produit, '20')
+
+        # Une ligne rattachée au stock, une restée en texte libre : les deux
+        # branches de la cascade du gabarit.
+        ordonnance = Ordonnance.objects.create(patient=patient)
+        LigneOrdonnance.objects.create(
+            ordonnance=ordonnance, produit=produit, posologie='1 le soir', quantite=1)
+        LigneOrdonnance.objects.create(
+            ordonnance=ordonnance, medicament_libre='Pommade achetée dehors',
+            posologie='matin', quantite=1)
+
+    def test_la_page_s_affiche(self):
+        reponse = self.client.get(reverse('ordonnance_list'))
+        self.assertEqual(reponse.status_code, 200)
+
+    def test_les_deux_origines_sont_nommees(self):
+        page = self.client.get(reverse('ordonnance_list')).content.decode()
+        self.assertIn('Sirop répertorié', page)
+        self.assertIn('Pommade achetée dehors', page)
+
+
+class TestToutesLesPagesDuModule(TestCase):
+    """Chaque écran du module s'ouvre — le filet qui manquait.
+
+    Deux pages ont cassé coup sur coup après le retrait de l'ancienne table,
+    l'écran de dispensation puis la liste, chacune découverte en s'en servant
+    parce qu'aucun test ne les ouvrait. Ce test les ouvre toutes, sans rien
+    vérifier d'autre que « ça répond ». C'est peu, et c'est exactement ce qui
+    aurait suffi à les attraper.
+    """
+
+    def setUp(self):
+        from employer.models import Employe
+        from medecins.models import Medecin
+        from patients.models import Patient
+
+        self.centre = Centre.objects.get_or_create(
+            code='WALE', defaults={'nom': 'CMS WALE Yamoussoukro'})[0]
+        self.user = User.objects.create_superuser('su_smoke', password='x')
+        profil = self.user.profile
+        profil.centres.add(self.centre)
+        profil.centre_actif = self.centre
+        profil.save(update_fields=['centre_actif'])
+
+        self.client = Client()
+        self.client.force_login(self.user)
+
+        patient = Patient.objects.create(
+            nom='TestSmoke', prenoms='Patient', date_naissance='1975-04-04',
+            sexe='F', telephone='0700000004', centre=self.centre)
+        medecin = Medecin.objects.create(employe=Employe.objects.create(
+            nom='TESTSMOKE', prenoms='Prescripteur', date_embauche='2020-01-01'))
+        produit = Produit.objects.create(
+            nom='Gélule de test', type='medicament',
+            prix_achat=Decimal('100'), prix_vente=Decimal('500'))
+        _en_rayon('wale_yamoussoukro', produit, '15')
+
+        self.ordonnance = Ordonnance.objects.create(patient=patient, medecin=medecin)
+        LigneOrdonnance.objects.create(
+            ordonnance=self.ordonnance, produit=produit,
+            posologie='2 par jour', quantite=4)
+
+    def test_chaque_url_du_module_repond(self):
+        pages = [
+            reverse('ordonnance_list'),
+            reverse('ordonnance_create_libre'),
+            reverse('ordonnance_detail', args=[self.ordonnance.pk]),
+            reverse('ordonnance_print', args=[self.ordonnance.pk]),
+            reverse('consultation_search') + '?q=test',
+            reverse('medicament_search') + '?q=gel',
+            reverse('medicaments_dispo_par_medecin'),
+        ]
+        for url in pages:
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 200)
+
+    def test_le_changement_de_statut_repond(self):
+        reponse = self.client.post(
+            reverse('ordonnance_statut', args=[self.ordonnance.pk]),
+            {'statut': 'delivree'}, follow=True)
+        self.assertEqual(reponse.status_code, 200)
+        self.ordonnance.refresh_from_db()
+        self.assertEqual(self.ordonnance.statut, 'delivree')
