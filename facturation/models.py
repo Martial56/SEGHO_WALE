@@ -99,12 +99,17 @@ class Facture(ModeleCentre):
     def types_des_lignes(self):
         """Natures distinctes présentes dans les lignes, dans l'ordre de `TYPE`.
 
-        Une ligne sans article — saisie à la main, ou enregistrée avant que le
-        lien soit posé — ne compte pour aucune nature : on ne sait pas ce
-        qu'elle est, et la deviner d'après son libellé serait un pari.
+        Une ligne sans article ni produit — saisie à la main, ou enregistrée
+        avant que le lien soit posé — ne compte pour aucune nature : on ne sait
+        pas ce qu'elle est, et la deviner d'après son libellé serait un pari.
         """
         vus = set()
-        for ligne in self.lignes.select_related('article__categorie'):
+        for ligne in self.lignes.select_related('article__categorie', 'produit'):
+            # Un produit du stock — médicament ou consommable — relève de la
+            # pharmacie, quelle que soit sa catégorie de rangement.
+            if ligne.produit_id:
+                vus.add('pharmacie')
+                continue
             article = ligne.article
             code = article.categorie.code if article and article.categorie_id else None
             type_ = CATEGORIE_VERS_TYPE.get(code)
@@ -147,7 +152,6 @@ class Facture(ModeleCentre):
 class LigneFacture(models.Model):
     facture = models.ForeignKey(Facture, on_delete=models.CASCADE, related_name='lignes')
     acte = models.ForeignKey(Acte, on_delete=models.SET_NULL, null=True, blank=True)
-    medicament = models.ForeignKey('pharmacie.Medicament', on_delete=models.SET_NULL, null=True, blank=True)
     # L'article du catalogue d'où vient la ligne. Le formulaire n'enregistrait
     # que son nom : la catégorie, connue à l'écran et servant à filtrer, était
     # jetée à la sauvegarde. Sans elle, impossible de dire de quelle nature est
@@ -156,6 +160,14 @@ class LigneFacture(models.Model):
     article = models.ForeignKey(
         'services.Articleservice', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='lignes_facture', verbose_name="Article")
+    # Le produit du stock, quand la ligne vient de la pharmacie plutôt que du
+    # catalogue de prestations. Les deux liens coexistent parce que les deux
+    # catalogues existent : `article` porte les actes et les examens,
+    # `produit` les médicaments et les consommables. Une facture peut mêler les
+    # deux — une consultation, une radio et une boîte de paracétamol.
+    produit = models.ForeignKey(
+        'stock.Produit', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='lignes_facture', verbose_name="Produit")
     libelle = models.CharField(max_length=300)
     quantite = models.DecimalField(max_digits=10, decimal_places=2, default=1)
     prix_unitaire = models.DecimalField(max_digits=12, decimal_places=2)

@@ -5,8 +5,8 @@ from consultations.models import Ordonnance, LigneOrdonnance
 class LigneOrdonnanceInline(admin.TabularInline):
     model = LigneOrdonnance
     extra = 1
-    fields = ['medicament', 'medicament_libre', 'posologie', 'duree', 'quantite', 'notes']
-    autocomplete_fields = ['medicament']
+    fields = ['produit', 'medicament_libre', 'posologie', 'duree', 'quantite', 'notes']
+    autocomplete_fields = ['produit']
 
 
 @admin.register(Ordonnance)
@@ -18,13 +18,16 @@ class OrdonnanceAdmin(admin.ModelAdmin):
     inlines = [LigneOrdonnanceInline]
     actions = ['marquer_delivree', 'marquer_expiree']
 
+    # Une ordonnance libre n'a pas de consultation : elle porte le patient et le
+    # médecin directement. Ces deux colonnes ne lisaient que la consultation, et
+    # la liste de l'admin tombait en erreur dès la première ordonnance libre.
     @admin.display(description='Patient')
     def get_patient(self, obj):
-        return obj.consultation.patient
+        return obj.patient or (obj.consultation.patient if obj.consultation else None)
 
     @admin.display(description='Medecin')
     def get_medecin(self, obj):
-        return obj.consultation.medecin
+        return obj.medecin or (obj.consultation.medecin if obj.consultation else None)
 
     @admin.display(description='Lignes')
     def nb_lignes(self, obj):

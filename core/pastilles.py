@@ -126,7 +126,8 @@ def _facturation(user):
     total = Facture.objects.filter(statut='emise').count()
     return {
         'total': total,
-        # `date_from=` vide : la liste se limite sinon aux factures du jour.
-        'url': reverse('facturation:list') + '?filter=statut:emise&date_from=',
+        # Un paramètre `filter` présent suffit à lever la période par défaut :
+        # la liste ne se limite à la journée qu'en l'absence totale de filtre.
+        'url': reverse('facturation:list') + '?filter=statut_emise',
         'libelle': 'à encaisser',
     }

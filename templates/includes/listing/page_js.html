@@ -73,7 +73,9 @@ nomme le sien autrement le déclare avec la variable `listing_resultats`.
       .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
       .then(function (html) {
         var doc = new DOMParser().parseFromString(html, 'text/html');
-        ['subheader-controls', '{{ listing_resultats|default:"list-result" }}'].forEach(function (id) {
+        // `list-stats` est optionnel : une page dont les cartes du haut portent
+        // sur la sélection les y enferme, les autres n'ont rien à échanger.
+        ['subheader-controls', 'list-stats', '{{ listing_resultats|default:"list-result" }}'].forEach(function (id) {
           var neuf = doc.getElementById(id), actuel = document.getElementById(id);
           if (neuf && actuel) actuel.innerHTML = neuf.innerHTML;
         });

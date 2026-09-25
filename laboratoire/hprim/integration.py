@@ -198,6 +198,17 @@ def integrer_oru(contenu: bytes):
                 )
                 synthese["resultats"] += 1
 
+            # Ancrage blockchain de l'analyse validée (best-effort : ne doit
+            # jamais interrompre l'intégration HPRIM). Appelé explicitement
+            # ici, une fois les résultats attachés, plutôt que via un signal
+            # post_save générique sur AnalyseLaboratoire — voir
+            # blockchain_bridge.signals.ancrer_analyse_laboratoire_validee.
+            try:
+                from blockchain_bridge.signals import ancrer_analyse_laboratoire_validee
+                ancrer_analyse_laboratoire_validee(analyse)
+            except Exception:  # noqa: BLE001
+                pass
+
             # Avancer le statut de la demande d'origine
             if demande_obj is not None and (d.statut or "F").upper() == "F":
                 demande_obj.statut = "termine"

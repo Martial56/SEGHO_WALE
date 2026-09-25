@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     'stock',
     'achats',
     'rapports',
+    'blockchain_bridge',
     'guide',
     'journal',
     'django_browser_reload',
@@ -132,3 +133,9 @@ LOGOUT_REDIRECT_URL = '/login/'
 
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 DEFAULT_FROM_EMAIL = 'planning@cms-wale.ci'
+
+# Intégration blockchain (voir blockchain/README.md) : désactivée par défaut
+# tant que le réseau Fabric et sa passerelle REST ne sont pas démarrés — les
+# signaux de blockchain_bridge vérifient ce flag avant tout appel réseau.
+BLOCKCHAIN_ENABLED = config('BLOCKCHAIN_ENABLED', default=False, cast=bool)
+BLOCKCHAIN_GATEWAY_URL = config('BLOCKCHAIN_GATEWAY_URL', default='http://localhost:8090')

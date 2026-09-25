@@ -1129,6 +1129,10 @@ def patient_resultat_examens_list(request, pk):
 def ordonnance_create(request, pk):
     patient = get_object_or_404(Patient, pk=pk)
     from consultations.models import Consultation as Consult, Ordonnance, LigneOrdonnance
+    # Mêmes aides que le formulaire d'ordonnance de l'app `ordonnance` : les deux
+    # écrans partagent déjà le gabarit, ils partagent maintenant la règle.
+    from ordonnance.views import (_avertir_refus, _medicaments_dispo_json,
+                                  _produit_prescrit)
 
     consultation = None
     consultation_pk = request.GET.get('consultation') or request.POST.get('consultation_id')
@@ -1173,6 +1177,7 @@ def ordonnance_create(request, pk):
         durees = request.POST.getlist('duree[]')
         quantites = request.POST.getlist('quantite[]')
 
+        refuses = []
         for i, posologie in enumerate(posologies):
             if not posologie.strip():
                 continue
@@ -1192,21 +1197,23 @@ def ordonnance_create(request, pk):
                 duree=duree,
                 quantite=quantite,
             )
-            if med_id:
-                try:
-                    ligne.medicament_id = int(med_id)
-                except (ValueError, TypeError):
-                    pass
+            produit = _produit_prescrit(med_id, request)
+            if produit is not None:
+                ligne.produit = produit
+                ligne.medicament_libre = ''
+            elif med_id:
+                refuses.append(med_libre.strip() or str(med_id))
             ligne.save()
 
+        _avertir_refus(request, refuses)
         messages.success(request, f"Ordonnance {ordonnance.numero} créée avec succès.")
         return redirect('patients:ordonnance_list', pk=pk)
 
-    try:
-        from pharmacie.models import Medicament
-        medicaments_dispo = list(Medicament.objects.filter(actif=True).values('pk', 'designation', 'dosage', 'forme'))
-    except Exception:
-        medicaments_dispo = []
+    # Ce second formulaire d'ordonnance partage le gabarit du premier mais lisait
+    # sa propre liste, restée sur la table `pharmacie.Medicament` — vidée depuis,
+    # donc plus rien à prescrire. Les deux passent désormais par la même règle :
+    # ce que la pharmacie du centre actif a en rayon.
+    medicaments_dispo = _medicaments_dispo_json(request)
 
     medecins = Medecin.objects.select_related('specialite', 'employe').order_by('employe__nom')
     medecin_preselect = consultation.medecin if consultation else None

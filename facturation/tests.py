@@ -991,7 +991,11 @@ class TestTypeDeduitDesLignes(TestCase):
         for i, article in enumerate(articles):
             donnees.update({
                 'ligne_libelle_%d' % i: article.nom,
-                'ligne_service_%d' % i: str(article.pk),
+                # Référence préfixée depuis que les produits de la pharmacie
+                # partagent la liste : « a: » pour un article du catalogue,
+                # « p: » pour un produit du stock. Les deux numérotent chacun
+                # de leur côté.
+                'ligne_service_%d' % i: 'a:%s' % article.pk,
                 'ligne_qte_%d' % i: '1',
                 'ligne_prix_%d' % i: str(int(article.prix_vente)),
                 'ligne_remise_%d' % i: '0',
@@ -1064,4 +1068,621 @@ class TestTypeDeduitDesLignes(TestCase):
         client.force_login(self.user)
         contenu = client.get(reverse('facturation:edit', args=[facture.pk])).content.decode()
         for article in (self.consultation, self.soin):
-            self.assertIn('value="%d"' % article.pk, contenu)
+            # Préfixée « a: » : l'article 12 et le produit 12 se ressemblent
+            # trop depuis que les deux catalogues partagent la même liste.
+            self.assertIn('value="a:%d"' % article.pk, contenu)
+
+
+# ─── Liste des factures : filtres avancés et regroupements ──────────────────────
+
+class TestListeDesFactures(TestCase):
+    """La liste passe par core.listing, comme les autres modules.
+
+    Son menu était écrit à la main dans le gabarit : un statut, un type, un
+    intervalle de dates, aucun regroupement. Ce qui est vérifié ici, ce sont les
+    trois promesses de la brique — les valeurs d'une famille se cumulent en OU,
+    les familles se croisent en ET, et les comptes des bandes de groupe sont
+    ceux de la sélection entière.
+    """
+
+    def setUp(self):
+        from services.models import Articleservice, CategorieArticle
+
+        self.user = User.objects.create_superuser('su_liste', password='x')
+        self.client = Client()
+        self.client.force_login(self.user)
+
+        self.homme = _patient('LH')
+        self.femme = Patient.objects.create(
+            nom='TestLF', prenoms='Patiente', date_naissance='1992-03-04',
+            sexe='F', telephone='0700000001')
+
+        def article(code, nom_cat, nom):
+            categorie, _ = CategorieArticle.objects.get_or_create(
+                code=code, defaults={'nom': nom_cat})
+            return Articleservice.objects.create(
+                nom=nom, categorie=categorie, prix_vente=Decimal('5000'))
+
+        self.art_cs = article('CS', 'Consultations', 'CONSULTATION ADULTE')
+        self.art_rd = article('RD', 'Radiologies', 'ASP FACE')
+
+    # ── Fabriques ──────────────────────────────────────────────────────────
+
+    def _facture(self, patient=None, statut='emise', type_facture='consultation',
+                 total='10000', paye='0', articles=()):
+        facture = Facture.objects.create(
+            patient=patient or self.homme, type_facture=type_facture,
+            statut=statut, montant_total=Decimal(total),
+            montant_paye=Decimal(paye), cree_par=self.user)
+        for art in articles:
+            LigneFacture.objects.create(
+                facture=facture, article=art, libelle=art.nom,
+                quantite=1, prix_unitaire=art.prix_vente, remise=0)
+        return facture
+
+    def _page(self, requete=''):
+        reponse = self.client.get(reverse('facturation:list') + requete)
+        self.assertEqual(reponse.status_code, 200)
+        return reponse
+
+    def _numeros(self, requete=''):
+        """Numéros des factures affichées, quel que soit le regroupement."""
+        return set(re.findall(r'VTES/\d{4}/\d+',
+                              self._page(requete).content.decode()))
+
+    def _groupes(self, requete):
+        """Bandes de groupe rendues : {libellé: compte}."""
+        html = self._page(requete).content.decode()
+        motif = (r'<tr class="lst-groupe[^"]*"[^>]*>.*?</i>\s*(.+?)\s*'
+                 r'<span class="lst-compte">(\d+)</span>')
+        return {m.group(1): int(m.group(2))
+                for m in re.finditer(motif, html, re.S)}
+
+    # ── La colonne Type ────────────────────────────────────────────────────
+
+    def test_la_colonne_type_a_quitte_le_tableau(self):
+        """Cinq natures dans une cellule ne se lisent pas : on les voit ailleurs."""
+        self._facture(articles=[self.art_cs])
+        html = self._page('?filter=').content.decode()
+
+        self.assertIn('<span class="col-label">Statut</span>', html)
+        self.assertNotIn('<span class="col-label">Type</span>', html)
+        # Mais le type reste filtrable et regroupable.
+        self.assertIn('Type de facture', html)
+
+    # ── Cumul et croisement ────────────────────────────────────────────────
+
+    def test_deux_valeurs_d_une_meme_famille_se_cumulent(self):
+        emise = self._facture(statut='emise')
+        payee = self._facture(statut='payee')
+        annulee = self._facture(statut='annulee')
+
+        retenus = self._numeros('?filter=&filter=statut_emise&filter=statut_payee')
+        self.assertIn(emise.numero, retenus)
+        self.assertIn(payee.numero, retenus)
+        self.assertNotIn(annulee.numero, retenus)
+
+    def test_deux_familles_differentes_se_croisent(self):
+        cible = self._facture(patient=self.femme, statut='payee')
+        bon_genre = self._facture(patient=self.femme, statut='emise')
+        bon_statut = self._facture(patient=self.homme, statut='payee')
+
+        retenus = self._numeros('?filter=&filter=statut_payee&filter=genre_F')
+        self.assertEqual(retenus, {cible.numero})
+        self.assertNotIn(bon_genre.numero, retenus)
+        self.assertNotIn(bon_statut.numero, retenus)
+
+    # ── Le contenu, et non le seul type enregistré ──────────────────────────
+
+    def test_une_facture_mixte_se_retrouve_sous_chacune_de_ses_natures(self):
+        """« Contient des actes de » lit les lignes ; « Type de facture » lit le champ.
+
+        C'est ce qui rend la colonne Type superflue : une facture qui mêle une
+        consultation et une radio reste trouvable sous l'une comme sous l'autre.
+        """
+        mixte = self._facture(type_facture='mixte',
+                              articles=[self.art_cs, self.art_rd])
+
+        self.assertIn(mixte.numero, self._numeros('?filter=&filter=contient_consultation'))
+        self.assertIn(mixte.numero, self._numeros('?filter=&filter=contient_imagerie'))
+        # Le type enregistré, lui, ne répond qu'à « Mixte ».
+        self.assertIn(mixte.numero, self._numeros('?filter=&filter=type_mixte'))
+        self.assertNotIn(mixte.numero, self._numeros('?filter=&filter=type_consultation'))
+
+    def test_une_ligne_sans_article_ne_compte_pour_aucune_nature(self):
+        """Saisie libre : on ne sait pas ce que c'est, on ne le devine pas."""
+        facture = self._facture(type_facture='consultation')
+        LigneFacture.objects.create(facture=facture, libelle='Pansement spécial',
+                                    quantite=1, prix_unitaire=Decimal('2000'), remise=0)
+
+        for nature in ('consultation', 'soins', 'imagerie'):
+            self.assertNotIn(facture.numero,
+                             self._numeros(f'?filter=&filter=contient_{nature}'))
+
+    # ── Regroupements ──────────────────────────────────────────────────────
+
+    def test_le_regroupement_par_type_compte_toute_la_selection(self):
+        for _ in range(3):
+            self._facture(type_facture='soins')
+        self._facture(type_facture='mixte')
+
+        groupes = self._groupes('?filter=&group=type')
+        self.assertEqual(groupes.get('Soins'), 3)
+        self.assertEqual(groupes.get('Mixte'), 1)
+
+    def test_deux_versements_dans_la_meme_caisse_ne_comptent_qu_une_fois(self):
+        """Le piège de la jointure : core.listing n'appelle jamais `distinct()`.
+
+        Les familles et dimensions qui passent par les paiements sont donc
+        écrites en sous-requête. Sans cela, une facture réglée en deux fois
+        apparaîtrait deux fois sous sa caisse, et le compte de la bande aussi.
+        """
+        caisse = Caisse.objects.create(nom='Caisse centrale', code='CC')
+        facture = self._facture(total='10000', paye='10000')
+        for montant in ('6000', '4000'):
+            Paiement.objects.create(facture=facture, montant=Decimal(montant),
+                                    mode_paiement='especes', caisse=caisse)
+
+        self.assertEqual(self._groupes('?filter=&group=caisse').get('Caisse centrale'), 1)
+        # Et le filtre par cette caisse ne la sort qu'une fois non plus.
+        self.assertEqual(
+            self._page(f'?filter=&filter=caisse_{caisse.pk}').context['total'], 1)
+
+    def test_une_facture_reglee_dans_deux_caisses_apparait_sous_les_deux(self):
+        accueil = Caisse.objects.create(nom='Accueil', code='ACC')
+        centrale = Caisse.objects.create(nom='Centrale', code='CEN')
+        facture = self._facture(total='10000', paye='10000')
+        Paiement.objects.create(facture=facture, montant=Decimal('4000'),
+                                mode_paiement='especes', caisse=accueil)
+        Paiement.objects.create(facture=facture, montant=Decimal('6000'),
+                                mode_paiement='especes', caisse=centrale)
+
+        groupes = self._groupes('?filter=&group=caisse')
+        self.assertEqual(groupes.get('Accueil'), 1)
+        self.assertEqual(groupes.get('Centrale'), 1)
+
+    def test_une_facture_sans_encaissement_a_son_propre_groupe(self):
+        facture = self._facture()
+        self.assertEqual(self._groupes('?filter=&group=caisse').get('Non encaissée'), 1)
+        self.assertIn(facture.numero, self._numeros('?filter=&filter=caisse_aucune'))
+
+    # ── Période et tri ─────────────────────────────────────────────────────
+
+    def test_la_liste_s_ouvre_sur_les_factures_du_jour(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        aujourdhui = self._facture()
+        ancienne = self._facture()
+        # `date_emission` est en auto_now_add : seul un UPDATE la déplace.
+        Facture.objects.filter(pk=ancienne.pk).update(
+            date_emission=timezone.now() - timedelta(days=40))
+
+        sans_parametre = self._numeros()
+        self.assertIn(aujourdhui.numero, sans_parametre)
+        self.assertNotIn(ancienne.numero, sans_parametre)
+        # Le marqueur « filter= » vide lève la période par défaut.
+        self.assertIn(ancienne.numero, self._numeros('?filter='))
+
+    def test_la_colonne_reste_est_triable(self):
+        """`solde_restant` est une propriété : sans annotation, rien à trier."""
+        petit = self._facture(total='10000', paye='9000')     # reste 1 000
+        gros = self._facture(total='10000', paye='1000')      # reste 9 000
+
+        html = self._page('?filter=&tri=reste&sens=desc').content.decode()
+        self.assertLess(html.index(gros.numero), html.index(petit.numero))
+
+
+class TestCartesSuiventLaSelection(TestCase):
+    """Total facturé, Reçu et En attente portent sur ce qui est affiché.
+
+    Elles additionnaient tout le centre : la liste s'ouvrant sur la journée, on
+    lisait le total depuis l'ouverture au-dessus des deux factures du jour. Deux
+    nombres côte à côte qui ne parlaient pas de la même chose.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_superuser('su_cartes', password='x')
+        self.client = Client()
+        self.client.force_login(self.user)
+        self.patient = _patient('CAR')
+
+    def _facture(self, type_facture='consultation', total='10000', paye='0'):
+        return Facture.objects.create(
+            patient=self.patient, type_facture=type_facture, statut='emise',
+            montant_total=Decimal(total), montant_paye=Decimal(paye),
+            cree_par=self.user)
+
+    def _stats(self, requete):
+        reponse = self.client.get(reverse('facturation:list') + requete)
+        self.assertEqual(reponse.status_code, 200)
+        return reponse.context['stats']
+
+    def test_un_filtre_de_type_restreint_les_montants(self):
+        self._facture('consultation', '10000', '10000')
+        self._facture('soins', '4000', '1000')
+
+        tout = self._stats('?filter=')
+        self.assertEqual(tout['montant_total'], 14000)
+        self.assertEqual(tout['montant_recu'], 11000)
+        self.assertEqual(tout['montant_attente'], 3000)
+        self.assertEqual(tout['nb_factures'], 2)
+
+        soins = self._stats('?filter=&filter=type_soins')
+        self.assertEqual(soins['montant_total'], 4000)
+        self.assertEqual(soins['montant_recu'], 1000)
+        self.assertEqual(soins['montant_attente'], 3000)
+        self.assertEqual(soins['nb_factures'], 1)
+
+    def test_la_periode_restreint_les_montants(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        self._facture(total='10000', paye='10000')
+        ancienne = self._facture(total='7000', paye='7000')
+        Facture.objects.filter(pk=ancienne.pk).update(
+            date_emission=timezone.now() - timedelta(days=40))
+
+        self.assertEqual(self._stats('')['montant_total'], 10000)       # aujourd'hui
+        self.assertEqual(self._stats('?filter=')['montant_total'], 17000)
+
+    def test_une_recherche_sans_resultat_ramene_les_cartes_a_zero(self):
+        self._facture(total='10000', paye='10000')
+        vide = self._stats('?filter=&q=zzzzintrouvable')
+        self.assertEqual(vide['montant_total'], 0)
+        self.assertEqual(vide['montant_recu'], 0)
+        self.assertEqual(vide['montant_attente'], 0)
+        self.assertEqual(vide['nb_factures'], 0)
+
+    def test_les_cartes_sont_dans_la_zone_echangee_par_l_ajax(self):
+        """Sans cela les montants resteraient ceux de l'affichage précédent.
+
+        Le rafraîchissement n'échange que `subheader-controls`, `list-stats` et
+        `list-result` : des cartes laissées à l'extérieur seraient justes au
+        chargement de la page et fausses dès le premier clic sur un filtre.
+        """
+        self._facture(total='10000', paye='10000')
+        html = self.client.get(reverse('facturation:list') + '?filter=').content.decode()
+
+        debut = html.index('id="list-stats"')
+        fin = html.index('<!-- ══ Subheader ══ -->')
+        self.assertLess(debut, fin)
+        self.assertIn('Total facturé', html[debut:fin])
+        self.assertIn('En attente', html[debut:fin])
+
+        # Et la brique sait échanger cette zone.
+        from django.template.loader import render_to_string
+        self.assertIn("'list-stats'",
+                      render_to_string('includes/listing/page_js.html'))
+
+
+class TestOngletActifDuModule(TestCase):
+    """L'onglet du haut doit dire où l'on est.
+
+    Le test portait sur les seuls noms `list`, `create` et `edit` : la fiche
+    d'une facture, son encaissement et son impression laissaient l'onglet
+    éteint. Il portait de surcroît sur `list` alors que `/facturation/` était
+    servie par une route en double déclarée dans core, nommée `facturation_list`
+    — l'onglet restait donc éteint jusque sur la liste elle-même.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_superuser('su_nav', password='x')
+        self.client = Client()
+        self.client.force_login(self.user)
+
+    def _onglets(self, url):
+        """(Factures actif ?, Configuration actif ?) lus dans le balisage."""
+        html = self.client.get(url).content.decode()
+        nav = html[html.index('<nav class="o-nav">'):html.index('</nav>')]
+        etats = re.findall(r'class="(o-nav-link ?[a-z]*)"', nav)
+        self.assertEqual(len(etats), 2, nav)
+        return tuple('active' in e for e in etats)
+
+    def test_l_onglet_factures_est_allume_sur_la_liste(self):
+        self.assertEqual(self._onglets(reverse('facturation:list')), (True, False))
+
+    def test_l_onglet_factures_reste_allume_sur_les_ecrans_de_facture(self):
+        facture = Facture.objects.create(
+            patient=_patient('NAV'), type_facture='consultation',
+            statut='emise', montant_total=Decimal('1000'), cree_par=self.user)
+
+        for url in (reverse('facturation:create'),
+                    reverse('facturation:detail', args=[facture.pk]),
+                    reverse('facturation:edit', args=[facture.pk])):
+            self.assertEqual(self._onglets(url), (True, False), url)
+
+    def test_l_onglet_configuration_prend_le_relais_sur_les_caisses(self):
+        for url in (reverse('facturation:caisses_list'),
+                    reverse('facturation:caisse_create')):
+            self.assertEqual(self._onglets(url), (False, True), url)
+
+
+class TestLienDeLaPastille(TestCase):
+    """La pastille du tableau de bord doit tomber sur la bonne sélection.
+
+    Elle visait `filter=statut:emise`, le vocabulaire de l'ancien menu écrit à
+    la main. La liste refaite lit `statut_emise` : le lien s'ouvrait donc sans
+    aucun filtre, et affichait tout au lieu des seules factures à encaisser.
+    Rien ne l'aurait signalé — la page répondait 200.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_superuser('su_past', password='x')
+        self.client = Client()
+        self.client.force_login(self.user)
+        self.patient = _patient('PAS')
+
+    def _facture(self, statut):
+        return Facture.objects.create(
+            patient=self.patient, type_facture='consultation', statut=statut,
+            montant_total=Decimal('5000'), cree_par=self.user)
+
+    def test_le_lien_de_la_pastille_ne_montre_que_les_factures_a_encaisser(self):
+        from core.pastilles import _facturation
+
+        emise = self._facture('emise')
+        payee = self._facture('payee')
+
+        pastille = _facturation(self.user)
+        self.assertEqual(pastille['total'], 1)
+
+        reponse = self.client.get(pastille['url'])
+        self.assertEqual(reponse.status_code, 200)
+        numeros = {f.numero for f in reponse.context['page_obj']}
+        self.assertEqual(numeros, {emise.numero})
+        self.assertNotIn(payee.numero, numeros)
+        # Et sans restriction de période : une facture en attente depuis la
+        # semaine dernière est justement celle qu'on veut voir.
+        self.assertEqual(reponse.context['periode_libelle'], 'toutes périodes')
+
+    def test_la_liste_n_a_plus_qu_une_seule_route(self):
+        """`/facturation/` était déclarée deux fois dans core/urls.py.
+
+        La première, sans espace de noms, l'emportait : `resolver_match.url_name`
+        valait `facturation_list`, et tout ce qui raisonnait sur le nom de la
+        route — à commencer par l'onglet du menu — se trompait.
+        """
+        from django.urls import NoReverseMatch, resolve, reverse
+
+        correspondance = resolve('/facturation/')
+        self.assertEqual(correspondance.url_name, 'list')
+        self.assertEqual(correspondance.namespace, 'facturation')
+
+        with self.assertRaises(NoReverseMatch):
+            reverse('facturation_list')
+
+
+# ─── Les produits de la pharmacie sur la facture ───────────────────────────────
+
+class TestProduitsSurLaFacture(TestCase):
+    """On peut enfin facturer un médicament ou une paire de gants.
+
+    L'écran ne proposait que `services.Articleservice` — 50 prestations et 100
+    examens, aucun produit. Les médicaments et les consommables vivent dans
+    `stock.Produit`, et ce qu'on peut remettre au patient est ce que la
+    pharmacie du centre a en rayon, pas ce que dort la réserve centrale.
+    """
+
+    def setUp(self):
+        from centres.models import Centre
+        from pharmacie.models import StockPharmacie
+        from stock.models import Produit
+
+        self.toumbokro = Centre.objects.get_or_create(
+            code='TOUMBOKRO', defaults={'nom': 'CMS WALE Toumbokro'})[0]
+        self.yamoussoukro = Centre.objects.get_or_create(
+            code='WALE', defaults={'nom': 'CMS WALE Yamoussoukro'})[0]
+
+        self.user = User.objects.create_superuser('su_prod', password='x')
+        profil = self.user.profile
+        profil.centres.add(self.toumbokro, self.yamoussoukro)
+        profil.centre_actif = self.toumbokro
+        profil.save(update_fields=['centre_actif'])
+
+        self.client = Client()
+        self.client.force_login(self.user)
+        # Le patient doit relever du centre actif : les écrans le cherchent avec
+        # le gestionnaire cloisonné, et un patient sans centre sort en 404.
+        self.patient = Patient.objects.create(
+            nom='TestPrd', prenoms='Patient', date_naissance='1990-06-01',
+            sexe='M', telephone='0700000000', centre=self.toumbokro)
+
+        self.gants = Produit.objects.create(
+            nom='Gants de test', type='consommable',
+            prix_achat=Decimal('50'), prix_vente=Decimal('200'))
+        self.sirop = Produit.objects.create(
+            nom='Sirop de test', type='medicament',
+            prix_achat=Decimal('100'), prix_vente=Decimal('500'))
+
+        for pharmacie, produit, qte in (
+            ('wale_toumbokro', self.gants, '20'),
+            ('wale_toumbokro', self.sirop, '0'),
+            ('wale_yamoussoukro', self.gants, '3'),
+            ('wale_yamoussoukro', self.sirop, '40'),
+        ):
+            sp, _ = StockPharmacie.objects.get_or_create(
+                pharmacie=pharmacie, produit=produit)
+            sp.quantite = Decimal(qte)
+            sp.save(update_fields=['quantite'])
+
+    # ── Outils ─────────────────────────────────────────────────────────────
+
+    def _centre_actif(self, centre):
+        profil = self.user.profile
+        profil.centre_actif = centre
+        profil.save(update_fields=['centre_actif'])
+
+    def _designations(self):
+        reponse = self.client.get(reverse('facturation:create'))
+        self.assertEqual(reponse.status_code, 200)
+        brut = re.search(
+            r'id="donnees-designations" type="application/json">(.*?)</script>',
+            reponse.content.decode(), re.S)
+        self.assertIsNotNone(brut, "bloc de désignations introuvable")
+        import json
+        return {d['nom']: d for d in json.loads(brut.group(1))}
+
+    def _creer_facture(self, lignes, payer=None):
+        """`lignes` : liste de (référence, libellé, prix, quantité)."""
+        donnees = {'type_facture': 'consultation', 'montant_assurance': '0',
+                   'ticket_moderateur': '0', 'notes': ''}
+        for i, (ref, libelle, prix, qte) in enumerate(lignes):
+            donnees.update({
+                f'ligne_libelle_{i}': libelle,
+                f'ligne_service_{i}': ref,
+                f'ligne_qte_{i}': str(qte),
+                f'ligne_prix_{i}': str(prix),
+                f'ligne_remise_{i}': '0',
+            })
+        if payer is not None:
+            donnees.update({'pay_montant': str(payer), 'pay_mode': 'especes'})
+        self.client.post(
+            reverse('facturation:create') + f'?patient={self.patient.pk}',
+            donnees, follow=True)
+        # `all_objects` : hors requête, le gestionnaire cloisonné ne voit rien,
+        # la facture appartenant au centre actif de l'utilisateur du test.
+        return Facture.all_objects.order_by('-pk').first()
+
+    def _en_rayon(self, produit, pharmacie='wale_toumbokro'):
+        from pharmacie.models import StockPharmacie
+
+        return StockPharmacie.objects.get(
+            pharmacie=pharmacie, produit=produit).quantite
+
+    # ── La liste proposée ──────────────────────────────────────────────────
+
+    def test_les_produits_rejoignent_les_prestations(self):
+        propose = self._designations()
+        self.assertIn('Gants de test', propose)
+        self.assertEqual(propose['Gants de test']['src'], 'p')
+        self.assertEqual(propose['Gants de test']['stock'], 20)
+
+    def test_le_stock_affiche_suit_le_centre(self):
+        self.assertEqual(self._designations()['Gants de test']['stock'], 20)
+        self._centre_actif(self.yamoussoukro)
+        self.assertEqual(self._designations()['Gants de test']['stock'], 3)
+
+    def test_une_rupture_est_proposee_mais_grisee(self):
+        propose = self._designations()
+        self.assertTrue(propose['Sirop de test']['rupture'])
+        self.assertFalse(propose['Gants de test']['rupture'])
+
+    # ── L'enregistrement ───────────────────────────────────────────────────
+
+    def test_une_ligne_de_produit_retient_son_produit(self):
+        facture = self._creer_facture([(f'p:{self.gants.pk}', 'Gants de test', 200, 2)])
+        ligne = facture.lignes.first()
+        self.assertEqual(ligne.produit_id, self.gants.pk)
+        self.assertIsNone(ligne.article_id)
+
+    def test_un_produit_en_rupture_n_est_pas_rattache(self):
+        """L'écran grise, mais une liste déroulante ne protège de rien."""
+        facture = self._creer_facture([(f'p:{self.sirop.pk}', 'Sirop de test', 500, 1)])
+        self.assertIsNone(facture.lignes.first().produit_id)
+
+    def test_un_produit_devient_une_facture_pharmacie(self):
+        facture = self._creer_facture([(f'p:{self.gants.pk}', 'Gants de test', 200, 1)])
+        self.assertEqual(facture.type_facture, 'pharmacie')
+
+    def test_un_produit_et_une_consultation_donnent_mixte(self):
+        from services.models import Articleservice, CategorieArticle
+
+        categorie, _ = CategorieArticle.objects.get_or_create(
+            code='CS', defaults={'nom': 'Consultations'})
+        consultation = Articleservice.objects.create(
+            nom='CONSULTATION TEST', categorie=categorie, prix_vente=Decimal('5000'))
+
+        facture = self._creer_facture([
+            (f'a:{consultation.pk}', 'CONSULTATION TEST', 5000, 1),
+            (f'p:{self.gants.pk}', 'Gants de test', 200, 1),
+        ])
+        self.assertEqual(facture.type_facture, 'mixte')
+
+    # ── La sortie de stock ─────────────────────────────────────────────────
+
+    def test_le_stock_ne_bouge_pas_tant_que_la_facture_n_est_pas_soldee(self):
+        """Un brouillon n'immobilise rien : le produit reste à qui le paiera."""
+        self._creer_facture([(f'p:{self.gants.pk}', 'Gants de test', 200, 3)])
+        self.assertEqual(self._en_rayon(self.gants), Decimal('20'))
+
+    def test_le_paiement_sort_les_produits_du_stock(self):
+        from pharmacie.models import MouvementPharmacie
+
+        facture = self._creer_facture(
+            [(f'p:{self.gants.pk}', 'Gants de test', 200, 3)], payer=600)
+        self.assertEqual(facture.statut, 'payee')
+        self.assertEqual(self._en_rayon(self.gants), Decimal('17'))
+
+        mouvement = MouvementPharmacie.objects.get(
+            reference=facture.numero, type='facture')
+        self.assertEqual(mouvement.quantite, Decimal('3'))
+        self.assertEqual(mouvement.stock_avant, Decimal('20'))
+        self.assertEqual(mouvement.stock_apres, Decimal('17'))
+        self.assertEqual(mouvement.pharmacie, 'wale_toumbokro')
+
+    def test_un_reglement_partiel_ne_sort_rien(self):
+        facture = self._creer_facture(
+            [(f'p:{self.gants.pk}', 'Gants de test', 200, 3)], payer=200)
+        self.assertNotEqual(facture.statut, 'payee')
+        self.assertEqual(self._en_rayon(self.gants), Decimal('20'))
+
+    def test_une_prestation_ne_touche_pas_au_stock(self):
+        from pharmacie.models import MouvementPharmacie
+
+        facture = self._creer_facture([('', 'Acte saisi à la main', 1000, 1)], payer=1000)
+        self.assertEqual(facture.statut, 'payee')
+        self.assertFalse(MouvementPharmacie.objects.filter(
+            reference=facture.numero).exists())
+
+    def test_le_stock_ne_sort_jamais_deux_fois(self):
+        """Un double clic, un rejeu : le mouvement porte le numéro de facture."""
+        from pharmacie.disponibilite import pharmacie_active
+        from pharmacie.sorties import sortir_les_produits
+
+        facture = self._creer_facture(
+            [(f'p:{self.gants.pk}', 'Gants de test', 200, 3)], payer=600)
+        self.assertEqual(self._en_rayon(self.gants), Decimal('17'))
+
+        self.assertEqual(sortir_les_produits(facture, 'wale_toumbokro', self.user), 0)
+        self.assertEqual(self._en_rayon(self.gants), Decimal('17'))
+
+    def test_le_paiement_est_refuse_si_la_pharmacie_ne_peut_plus_servir(self):
+        """La dernière boîte est partie entre la saisie et l'encaissement."""
+        from pharmacie.models import StockPharmacie
+
+        facture = self._creer_facture([(f'p:{self.gants.pk}', 'Gants de test', 200, 5)])
+        StockPharmacie.objects.filter(
+            pharmacie='wale_toumbokro', produit=self.gants).update(quantite=Decimal('2'))
+
+        reponse = self.client.post(
+            reverse('facturation:payer', args=[facture.pk]),
+            {'pay_montant': '1000', 'pay_mode': 'especes'}, follow=True)
+
+        facture.refresh_from_db()
+        self.assertNotEqual(facture.statut, 'payee')
+        self.assertEqual(self._en_rayon(self.gants), Decimal('2'))
+        avertissements = [str(m) for m in reponse.context['messages']]
+        self.assertTrue(any('ne peut plus servir' in m for m in avertissements),
+                        avertissements)
+
+    def test_annuler_une_facture_payee_rend_les_produits(self):
+        facture = self._creer_facture(
+            [(f'p:{self.gants.pk}', 'Gants de test', 200, 3)], payer=600)
+        self.assertEqual(self._en_rayon(self.gants), Decimal('17'))
+
+        self.client.post(reverse('facturation:edit', args=[facture.pk]),
+                         {'action_annuler': '1'}, follow=True)
+
+        facture.refresh_from_db()
+        self.assertEqual(facture.statut, 'annulee')
+        self.assertEqual(self._en_rayon(self.gants), Decimal('20'))
+
+    def test_annuler_une_facture_jamais_payee_ne_rend_rien(self):
+        """Sinon l'annulation créditerait un stock qui n'a rien donné."""
+        facture = self._creer_facture([(f'p:{self.gants.pk}', 'Gants de test', 200, 3)])
+        self.client.post(reverse('facturation:edit', args=[facture.pk]),
+                         {'action_annuler': '1'}, follow=True)
+        self.assertEqual(self._en_rayon(self.gants), Decimal('20'))

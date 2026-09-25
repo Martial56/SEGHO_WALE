@@ -258,7 +258,6 @@
     <div class="ord-card">
         <div class="ord-card-head">Médicaments prescrits <span style="font-weight:400;font-size:11px;color:var(--text-faint);margin-left:6px;">({{ ordonnance.lignes.count }})</span></div>
         <div class="ord-card-body" style="padding:0;">
-            {% with lignes=ordonnance.lignes.all %}
             {% if lignes %}
             <table class="lines-table">
                 <thead>
@@ -279,11 +278,6 @@
                             <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">
                                 {{ ligne.produit.dosage|default:"" }} {{ ligne.produit.get_forme_display|default:"" }}
                             </div>
-                            {% elif ligne.medicament %}
-                            <div class="med-name">{{ ligne.medicament.designation }}</div>
-                            <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">
-                                {{ ligne.medicament.dosage|default:"" }} {{ ligne.medicament.forme|default:"" }}
-                            </div>
                             {% elif ligne.medicament_libre %}
                             <div class="med-name">{{ ligne.medicament_libre }}</div>
                             <div style="font-size:11px;color:var(--text-faint);font-style:italic;margin-top:2px;">Saisie libre</div>
@@ -295,24 +289,17 @@
                         <td style="font-size:12.5px;color:var(--text);">{{ ligne.duree|default:"—" }}</td>
                         <td class="col-qty">{{ ligne.quantite }}</td>
                         <td class="col-stock">
+                            {% comment %}`stock_pharma` est posé par la vue : c'est
+                            la quantité de la pharmacie du centre actif, et non
+                            `produit.stock_actuel`, qui est celle du magasin central.{% endcomment %}
                             {% if ligne.produit %}
-                                {% with s=ligne.produit.stock_actuel a=ligne.produit.stock_alerte m=ligne.produit.stock_minimum %}
+                                {% with s=ligne.stock_pharma|default:0 a=ligne.produit.stock_alerte m=ligne.produit.stock_minimum %}
                                 {% if s <= 0 or s <= m %}
                                     <span class="stock-badge stock-empty">{{ s|floatformat:0 }}</span>
                                 {% elif s <= a %}
                                     <span class="stock-badge stock-low">{{ s|floatformat:0 }}</span>
                                 {% else %}
                                     <span class="stock-badge stock-ok">{{ s|floatformat:0 }}</span>
-                                {% endif %}
-                                {% endwith %}
-                            {% elif ligne.medicament %}
-                                {% with s=ligne.medicament.stock_actuel a=ligne.medicament.stock_alerte m=ligne.medicament.stock_minimum %}
-                                {% if s <= 0 or s <= m %}
-                                    <span class="stock-badge stock-empty">{{ s }}</span>
-                                {% elif s <= a %}
-                                    <span class="stock-badge stock-low">{{ s }}</span>
-                                {% else %}
-                                    <span class="stock-badge stock-ok">{{ s }}</span>
                                 {% endif %}
                                 {% endwith %}
                             {% else %}
@@ -328,7 +315,6 @@
                 Aucun médicament enregistré sur cette ordonnance.
             </div>
             {% endif %}
-            {% endwith %}
         </div>
     </div>
 

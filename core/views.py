@@ -228,7 +228,7 @@ def _get_dashboard_stats():
     from patients.models import Patient, RendezVous
     from consultations.models import Consultation
     from hospitalisation.models import Hospitalisation
-    from pharmacie.models import Medicament
+    from core.context_processors import _medicaments_alerte_count
     from facturation.models import Facture
     from laboratoire.models import AnalyseLaboratoire
     from employer.models import Employe
@@ -244,7 +244,7 @@ def _get_dashboard_stats():
         'hospitalisations': Hospitalisation.objects.filter(statut__in=['confirme', 'hospitalise']).count(),
         'analyses_pending': AnalyseLaboratoire.objects.filter(statut__in=['recu', 'en_analyse']).count(),
         'factures_impayees': Facture.objects.filter(statut='emise').count(),
-        'medicaments_alerte': Medicament.objects.filter(stock_actuel__lte=F('stock_alerte')).count(),
+        'medicaments_alerte': _medicaments_alerte_count(),
         'employes_actifs': Employe.objects.filter(statut='actif').count(),
     }
 
@@ -745,28 +745,6 @@ def laboratoire_list(request):
         'total':          page_obj.paginator.count,
         'breadcrumb':     breadcrumb,
     })
-
-
-@login_required(login_url='login')
-def facturation_list(request):
-    from facturation.models import Facture
-    from django.core.paginator import Paginator
-
-    q = request.GET.get('q', '').strip()
-    factures = Facture.objects.all().order_by('-date_emission')
-    if q:
-        factures = factures.filter(
-            Q(numero_facture__icontains=q) |
-            Q(patient__nom__icontains=q) |
-            Q(patient__prenoms__icontains=q)
-        )
-    total = factures.count()
-    paginator = Paginator(factures, 25)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    stats = {'montant_total': 0, 'montant_recu': 0, 'montant_attente': 0, 'taux_recouvrement': 0}
-    breadcrumb = [{'title': 'Accueil', 'url': '/'}, {'title': 'Facturation'}]
-    return render(request, 'facturation/list.html', {'page_obj': page_obj, 'stats': stats, 'q': q, 'total': total, 'breadcrumb': breadcrumb})
 
 
 @login_required(login_url='login')
@@ -1884,7 +1862,7 @@ def kpi_dashboard(request):
     from patients.models import Patient, RendezVous
     from consultations.models import Consultation
     from hospitalisation.models import Hospitalisation
-    from pharmacie.models import Medicament
+    from core.context_processors import _medicaments_alerte_count
     from laboratoire.models import AnalyseLaboratoire
     from employer.models import Employe
     from soins.models import Soin
@@ -1920,7 +1898,7 @@ def kpi_dashboard(request):
         'rdv_periode': RendezVous.objects.filter(date_heure__date__range=[date_from, date_to]).count(),
         'hospitalisations': Hospitalisation.objects.filter(statut='hospitalise').count(),
         'analyses_pending': AnalyseLaboratoire.objects.filter(statut__in=['recu', 'en_analyse']).count(),
-        'medicaments_alerte': Medicament.objects.filter(stock_actuel__lte=F('stock_alerte')).count(),
+        'medicaments_alerte': _medicaments_alerte_count(),
         'employes_actifs': Employe.objects.filter(statut='actif').count(),
         'soins_periode': Soin.objects.filter(date_creation__date__range=[date_from, date_to]).count(),
         'medecins_actifs': Medecin.objects.filter(actif=True).count(),
