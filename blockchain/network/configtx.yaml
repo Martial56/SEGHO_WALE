@@ -1,0 +1,184 @@
+# Définit le consortium "ConsortiumSante" (3 organisations) et le canal
+# unique "canal-sante". Consommé par `configtxgen` (voir scripts/generate.sh
+# et scripts/network.sh) pour produire le bloc genesis de l'orderer et la
+# transaction de création du canal.
+
+Organizations:
+  - &OrdererOrg
+    Name: OrdererOrg
+    ID: OrdererMSP
+    MSPDir: crypto-config/ordererOrganizations/orderer.wale-sante.local/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('OrdererMSP.member')"
+      Writers:
+        Type: Signature
+        Rule: "OR('OrdererMSP.member')"
+      Admins:
+        Type: Signature
+        Rule: "OR('OrdererMSP.admin')"
+
+  - &CentreSante
+    Name: CentreSanteMSP
+    ID: CentreSanteMSP
+    MSPDir: crypto-config/peerOrganizations/centresante.wale-sante.local/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('CentreSanteMSP.admin', 'CentreSanteMSP.peer', 'CentreSanteMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('CentreSanteMSP.admin', 'CentreSanteMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('CentreSanteMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('CentreSanteMSP.peer')"
+    AnchorPeers:
+      - Host: peer0.centresante.wale-sante.local
+        Port: 7051
+
+  - &VerificationFacture
+    Name: VerificationFactureMSP
+    ID: VerificationFactureMSP
+    MSPDir: crypto-config/peerOrganizations/verificationfacture.wale-sante.local/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('VerificationFactureMSP.admin', 'VerificationFactureMSP.peer', 'VerificationFactureMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('VerificationFactureMSP.admin', 'VerificationFactureMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('VerificationFactureMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('VerificationFactureMSP.peer')"
+    AnchorPeers:
+      - Host: peer0.verificationfacture.wale-sante.local
+        Port: 8051
+
+  - &Regulateur
+    Name: RegulateurMSP
+    ID: RegulateurMSP
+    MSPDir: crypto-config/peerOrganizations/regulateur.wale-sante.local/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('RegulateurMSP.admin', 'RegulateurMSP.peer', 'RegulateurMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('RegulateurMSP.admin', 'RegulateurMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('RegulateurMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('RegulateurMSP.peer')"
+    AnchorPeers:
+      - Host: peer0.regulateur.wale-sante.local
+        Port: 9051
+
+Capabilities:
+  Channel: &ChannelCapabilities
+    V2_5: true
+  Orderer: &OrdererCapabilities
+    V2_5: true
+  Application: &ApplicationCapabilities
+    V2_5: true
+
+Application: &ApplicationDefaults
+  Organizations:
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    LifecycleEndorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+    Endorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+  Capabilities:
+    <<: *ApplicationCapabilities
+
+Orderer: &OrdererDefaults
+  OrdererType: etcdraft
+  EtcdRaft:
+    Consenters:
+      - Host: orderer0.orderer.wale-sante.local
+        Port: 7050
+        ClientTLSCert: crypto-config/ordererOrganizations/orderer.wale-sante.local/orderers/orderer0.orderer.wale-sante.local/tls/server.crt
+        ServerTLSCert: crypto-config/ordererOrganizations/orderer.wale-sante.local/orderers/orderer0.orderer.wale-sante.local/tls/server.crt
+  Addresses:
+    - orderer0.orderer.wale-sante.local:7050
+  BatchTimeout: 2s
+  BatchSize:
+    MaxMessageCount: 100
+    AbsoluteMaxBytes: 10 MB
+    PreferredMaxBytes: 2 MB
+  Organizations:
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    BlockValidation:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+
+Channel: &ChannelDefaults
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+  Capabilities:
+    <<: *ChannelCapabilities
+
+Profiles:
+  # Profil de genèse de l'orderer : déclare le consortium et ses membres.
+  ReseauSanteOrdererGenesis:
+    <<: *ChannelDefaults
+    Orderer:
+      <<: *OrdererDefaults
+      Organizations:
+        - *OrdererOrg
+      Capabilities:
+        <<: *OrdererCapabilities
+    Consortiums:
+      ConsortiumSante:
+        Organizations:
+          - *CentreSante
+          - *VerificationFacture
+          - *Regulateur
+
+  # Profil du canal applicatif unique, partagé par les 3 organisations.
+  CanalSante:
+    <<: *ChannelDefaults
+    Consortium: ConsortiumSante
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *CentreSante
+        - *VerificationFacture
+        - *Regulateur

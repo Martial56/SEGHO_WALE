@@ -1,0 +1,217 @@
+# Réseau Fabric de démonstration à 3 organisations (CentreSante, VerificationFacture,
+# Regulateur) + 1 orderer, chacune avec un état CouchDB (requêtes riches
+# utilisées par IntegriteContract.EvenementsParCentre). Nécessite Docker
+# Desktop + le matériel généré par scripts/generate.sh. Voir README.md pour
+# la procédure complète (cette machine n'a pas Docker : non testé ici).
+
+networks:
+  reseau-sante:
+    name: reseau-sante
+
+services:
+  orderer0.orderer.wale-sante.local:
+    container_name: orderer0.orderer.wale-sante.local
+    image: hyperledger/fabric-orderer:2.5
+    environment:
+      - FABRIC_LOGGING_SPEC=INFO
+      - ORDERER_GENERAL_LISTENADDRESS=0.0.0.0
+      - ORDERER_GENERAL_LISTENPORT=7050
+      - ORDERER_GENERAL_LOCALMSPID=OrdererMSP
+      - ORDERER_GENERAL_LOCALMSPDIR=/var/hyperledger/orderer/msp
+      - ORDERER_GENERAL_TLS_ENABLED=true
+      - ORDERER_GENERAL_TLS_PRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_GENERAL_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_GENERAL_TLS_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_ADMIN_TLS_ENABLED=true
+      - ORDERER_ADMIN_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_ADMIN_TLS_PRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_ADMIN_TLS_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_ADMIN_TLS_CLIENTROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_ADMIN_LISTENADDRESS=0.0.0.0:7053
+      - ORDERER_GENERAL_BOOTSTRAPMETHOD=file
+      - ORDERER_GENERAL_BOOTSTRAPFILE=/var/hyperledger/orderer/genesis.block
+      - ORDERER_CHANNELPARTICIPATION_ENABLED=true
+    working_dir: /root
+    command: orderer
+    volumes:
+      - ./channel-artifacts/genesis.block:/var/hyperledger/orderer/genesis.block
+      - ./crypto-config/ordererOrganizations/orderer.wale-sante.local/orderers/orderer0.orderer.wale-sante.local/msp:/var/hyperledger/orderer/msp
+      - ./crypto-config/ordererOrganizations/orderer.wale-sante.local/orderers/orderer0.orderer.wale-sante.local/tls:/var/hyperledger/orderer/tls
+      - orderer0-data:/var/hyperledger/production/orderer
+    ports:
+      - "7050:7050"
+      - "7053:7053"
+    networks:
+      - reseau-sante
+
+  couchdb.centresante:
+    container_name: couchdb.centresante
+    image: couchdb:3.3
+    environment:
+      - COUCHDB_USER=admin
+      - COUCHDB_PASSWORD=adminpw
+    ports:
+      - "5984:5984"
+    networks:
+      - reseau-sante
+
+  peer0.centresante.wale-sante.local:
+    container_name: peer0.centresante.wale-sante.local
+    image: hyperledger/fabric-peer:2.5
+    environment:
+      - FABRIC_LOGGING_SPEC=INFO
+      - CORE_PEER_ID=peer0.centresante.wale-sante.local
+      - CORE_PEER_ADDRESS=peer0.centresante.wale-sante.local:7051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:7051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.centresante.wale-sante.local:7052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.centresante.wale-sante.local:7051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.centresante.wale-sante.local:7051
+      - CORE_PEER_LOCALMSPID=CentreSanteMSP
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+      - CORE_PEER_TLS_ENABLED=true
+      - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
+      - CORE_LEDGER_STATE_STATEDATABASE=CouchDB
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS=couchdb.centresante:5984
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME=admin
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_PASSWORD=adminpw
+      - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=reseau-sante
+    volumes:
+      - /var/run/docker.sock:/host/var/run/docker.sock
+      - ./crypto-config/peerOrganizations/centresante.wale-sante.local/peers/peer0.centresante.wale-sante.local/msp:/etc/hyperledger/fabric/msp
+      - ./crypto-config/peerOrganizations/centresante.wale-sante.local/peers/peer0.centresante.wale-sante.local/tls:/etc/hyperledger/fabric/tls
+      - peer0-centresante-data:/var/hyperledger/production
+    ports:
+      - "7051:7051"
+    depends_on:
+      - orderer0.orderer.wale-sante.local
+      - couchdb.centresante
+    networks:
+      - reseau-sante
+
+  couchdb.verificationfacture:
+    container_name: couchdb.verificationfacture
+    image: couchdb:3.3
+    environment:
+      - COUCHDB_USER=admin
+      - COUCHDB_PASSWORD=adminpw
+    ports:
+      - "6984:5984"
+    networks:
+      - reseau-sante
+
+  peer0.verificationfacture.wale-sante.local:
+    container_name: peer0.verificationfacture.wale-sante.local
+    image: hyperledger/fabric-peer:2.5
+    environment:
+      - FABRIC_LOGGING_SPEC=INFO
+      - CORE_PEER_ID=peer0.verificationfacture.wale-sante.local
+      - CORE_PEER_ADDRESS=peer0.verificationfacture.wale-sante.local:8051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:8051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.verificationfacture.wale-sante.local:8052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:8052
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.verificationfacture.wale-sante.local:8051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.verificationfacture.wale-sante.local:8051
+      - CORE_PEER_LOCALMSPID=VerificationFactureMSP
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+      - CORE_PEER_TLS_ENABLED=true
+      - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
+      - CORE_LEDGER_STATE_STATEDATABASE=CouchDB
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS=couchdb.verificationfacture:5984
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME=admin
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_PASSWORD=adminpw
+      - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=reseau-sante
+    volumes:
+      - /var/run/docker.sock:/host/var/run/docker.sock
+      - ./crypto-config/peerOrganizations/verificationfacture.wale-sante.local/peers/peer0.verificationfacture.wale-sante.local/msp:/etc/hyperledger/fabric/msp
+      - ./crypto-config/peerOrganizations/verificationfacture.wale-sante.local/peers/peer0.verificationfacture.wale-sante.local/tls:/etc/hyperledger/fabric/tls
+      - peer0-verificationfacture-data:/var/hyperledger/production
+    ports:
+      - "8051:8051"
+    depends_on:
+      - orderer0.orderer.wale-sante.local
+      - couchdb.verificationfacture
+    networks:
+      - reseau-sante
+
+  couchdb.regulateur:
+    container_name: couchdb.regulateur
+    image: couchdb:3.3
+    environment:
+      - COUCHDB_USER=admin
+      - COUCHDB_PASSWORD=adminpw
+    ports:
+      - "7984:5984"
+    networks:
+      - reseau-sante
+
+  peer0.regulateur.wale-sante.local:
+    container_name: peer0.regulateur.wale-sante.local
+    image: hyperledger/fabric-peer:2.5
+    environment:
+      - FABRIC_LOGGING_SPEC=INFO
+      - CORE_PEER_ID=peer0.regulateur.wale-sante.local
+      - CORE_PEER_ADDRESS=peer0.regulateur.wale-sante.local:9051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:9051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.regulateur.wale-sante.local:9052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:9052
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.regulateur.wale-sante.local:9051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.regulateur.wale-sante.local:9051
+      - CORE_PEER_LOCALMSPID=RegulateurMSP
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+      - CORE_PEER_TLS_ENABLED=true
+      - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
+      - CORE_LEDGER_STATE_STATEDATABASE=CouchDB
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS=couchdb.regulateur:5984
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME=admin
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_PASSWORD=adminpw
+      - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=reseau-sante
+    volumes:
+      - /var/run/docker.sock:/host/var/run/docker.sock
+      - ./crypto-config/peerOrganizations/regulateur.wale-sante.local/peers/peer0.regulateur.wale-sante.local/msp:/etc/hyperledger/fabric/msp
+      - ./crypto-config/peerOrganizations/regulateur.wale-sante.local/peers/peer0.regulateur.wale-sante.local/tls:/etc/hyperledger/fabric/tls
+      - peer0-regulateur-data:/var/hyperledger/production
+    ports:
+      - "9051:9051"
+    depends_on:
+      - orderer0.orderer.wale-sante.local
+      - couchdb.regulateur
+    networks:
+      - reseau-sante
+
+  cli:
+    container_name: cli
+    image: hyperledger/fabric-tools:2.5
+    tty: true
+    stdin_open: true
+    environment:
+      - FABRIC_LOGGING_SPEC=INFO
+      - CORE_PEER_TLS_ENABLED=true
+      - CORE_PEER_LOCALMSPID=CentreSanteMSP
+      - CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/centresante.wale-sante.local/peers/peer0.centresante.wale-sante.local/tls/ca.crt
+      - CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/centresante.wale-sante.local/users/Admin@centresante.wale-sante.local/msp
+      - CORE_PEER_ADDRESS=peer0.centresante.wale-sante.local:7051
+    working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
+    command: /bin/bash
+    volumes:
+      - /var/run/docker.sock:/host/var/run/docker.sock
+      - ./crypto-config:/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto
+      - ./channel-artifacts:/opt/gopath/src/github.com/hyperledger/fabric/peer/channel-artifacts
+      - ../chaincode:/opt/gopath/src/github.com/hyperledger/fabric/peer/chaincode
+    networks:
+      - reseau-sante
+
+volumes:
+  orderer0-data:
+  peer0-centresante-data:
+  peer0-verificationfacture-data:
+  peer0-regulateur-data:
