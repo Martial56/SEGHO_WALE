@@ -204,7 +204,9 @@ def facture_create(request):
         for ligne in ordonnance_obj.lignes.all():
             if ligne.produit:
                 libelle = ligne.produit.nom
-                prix    = float(ligne.produit.prix_vente)
+                # `float()` rendait « 15000.0 » dans la case Prix. Le Decimal
+                # du catalogue s'y affiche tel qu'il est saisi.
+                prix    = ligne.produit.prix_vente
                 # La référence manquait : le gabarit la lit pour rattacher la
                 # ligne au produit du stock. Sans elle, une facture née d'une
                 # ordonnance encaissait le bon montant et ne décomptait rien.

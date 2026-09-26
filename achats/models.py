@@ -1,6 +1,8 @@
 from django.db import models, transaction
 from django.utils import timezone
 
+from facturation.models import arrondi_monetaire
+
 
 def _numero_auto(model, prefixe, field='numero'):
     """
@@ -147,7 +149,7 @@ class LigneProforma(models.Model):
 
     @property
     def montant(self):
-        return self.quantite * self.prix_unitaire
+        return arrondi_monetaire(self.quantite * self.prix_unitaire)
 
     def __str__(self): return f"{self.designation} × {self.quantite}"
 

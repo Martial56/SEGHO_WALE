@@ -1,3 +1,5 @@
+from decimal import Decimal, ROUND_HALF_UP
+
 from django.db import models
 from django.contrib.auth.models import User
 
@@ -24,6 +26,20 @@ class Acte(models.Model):
 #: `AE` (Autres examens) et `EG` (Électrocardiogramme) apparaissaient des deux
 #: côtés dans l'ancienne table ; il a fallu trancher — au laboratoire pour le
 #: premier, à l'imagerie pour le second.
+#: Les montants s'arrêtent au franc CFA près. Une multiplication de deux
+#: Decimal additionne leurs décimales : `quantite` (2) × `prix_unitaire` (2)
+#: donne un résultat à 4 décimales, et la remise le pousse à 6. Affiché tel
+#: quel dans un gabarit, ça donnait « 4 000,0000 » là où on attend « 4 000 ».
+#: On arrondit donc à la source, une fois, plutôt que de rattraper l'affichage
+#: à chaque endroit qui montre un montant.
+CENTIMES = Decimal('0.01')
+
+
+def arrondi_monetaire(valeur):
+    """Montant ramené à deux décimales, arrondi comptable (0,5 → 1)."""
+    return Decimal(valeur).quantize(CENTIMES, rounding=ROUND_HALF_UP)
+
+
 CATEGORIE_VERS_TYPE = {
     'CS':   'consultation',
     'SN':   'soins',
@@ -194,7 +210,8 @@ class LigneFacture(models.Model):
 
     @property
     def montant_ligne(self):
-        return self.quantite * self.prix_unitaire * (1 - self.remise / 100)
+        return arrondi_monetaire(
+            self.quantite * self.prix_unitaire * (1 - self.remise / 100))
 
 
 class Paiement(ModeleCentre):

@@ -1741,3 +1741,97 @@ class TestRetirerUneLigneNeFaitPasPerdreLesAutres(TestCase):
         self.assertEqual(
             [l.libelle for l in facture.lignes.order_by('pk')],
             ['Acte 0', 'Acte 2', 'Acte 10'])
+
+
+class TestLesMontantsNAffichentPasDeDecimalesInutiles(TestCase):
+    """4 000, pas 4 000,0000.
+
+    Multiplier deux Decimal additionne leurs décimales : `quantite` (2) ×
+    `prix_unitaire` (2) donne un montant à 4 décimales, et la remise le pousse
+    à 6. Le montant était arrondi au moment d'être enregistré dans la facture,
+    mais la propriété `montant_ligne`, elle, sortait brute — et c'est elle que
+    les écrans affichent.
+    """
+
+    def test_le_montant_d_une_ligne_s_arrete_au_centime(self):
+        from decimal import Decimal
+
+        from .models import LigneFacture
+
+        ligne = LigneFacture(quantite=Decimal('1.00'),
+                             prix_unitaire=Decimal('4000.00'),
+                             remise=Decimal('0.00'))
+        self.assertEqual(str(ligne.montant_ligne), '4000.00')
+
+    def test_une_remise_ne_fait_pas_trainer_six_decimales(self):
+        from decimal import Decimal
+
+        from .models import LigneFacture
+
+        ligne = LigneFacture(quantite=Decimal('3.00'),
+                             prix_unitaire=Decimal('1500.00'),
+                             remise=Decimal('12.50'))
+        self.assertEqual(str(ligne.montant_ligne), '3937.50')
+
+    def test_l_arrondi_ne_perd_pas_les_centimes(self):
+        from decimal import Decimal
+
+        from .models import LigneFacture
+
+        ligne = LigneFacture(quantite=Decimal('3.00'),
+                             prix_unitaire=Decimal('333.33'),
+                             remise=Decimal('0.00'))
+        self.assertEqual(str(ligne.montant_ligne), '999.99')
+
+
+class TestLesCasesDeMontantSontLisibles(TestCase):
+    """Un champ numérique HTML ne lit que le point décimal.
+
+    Rendu sous une langue française, un Decimal devient « 4 000,00 » et le
+    navigateur, ne sachant pas le lire, **affiche la case vide** : la quantité
+    d'une facture qu'on rouvrait pour la corriger disparaissait de l'écran, et
+    il suffisait d'enregistrer pour la perdre. `unlocalize` réglait le point
+    mais laissait « 4000.00 » et « 15000.0 » dans la case Prix.
+    """
+
+    def test_un_montant_rond_n_a_pas_de_decimales(self):
+        from decimal import Decimal
+
+        from core.templatetags.core_tags import valeur_champ
+
+        self.assertEqual(valeur_champ(Decimal('4000.0000')), '4000')
+        self.assertEqual(valeur_champ(Decimal('4000.00')), '4000')
+        self.assertEqual(valeur_champ(1.0), '1')
+
+    def test_les_centimes_reels_restent(self):
+        from decimal import Decimal
+
+        from core.templatetags.core_tags import valeur_champ
+
+        self.assertEqual(valeur_champ(Decimal('4000.25')), '4000.25')
+
+    def test_le_separateur_est_le_point(self):
+        """Une virgule vide la case du navigateur."""
+        from decimal import Decimal
+
+        from core.templatetags.core_tags import valeur_champ
+
+        self.assertNotIn(',', valeur_champ(Decimal('4000.25')))
+
+    def test_une_case_vide_le_reste(self):
+        from core.templatetags.core_tags import valeur_champ
+
+        self.assertEqual(valeur_champ(None), '')
+        self.assertEqual(valeur_champ(''), '')
+
+    def test_le_texte_affiche_suit_la_langue(self):
+        """Pour du texte, on garde la virgule française."""
+        from decimal import Decimal
+
+        from django.utils import translation
+
+        from core.templatetags.core_tags import nombre
+
+        with translation.override('fr-fr'):
+            self.assertEqual(nombre(Decimal('4000.0000')), '4000')
+            self.assertEqual(nombre(Decimal('4000.25')), '4000,25')
