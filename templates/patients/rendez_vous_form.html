@@ -636,8 +636,9 @@ cliquant sur une ligne. Voir patients/origines.py.
       data-rdv-id="{{ rdv.pk|default:'' }}"
       data-has-consultation="{% if consultation %}1{% else %}0{% endif %}">
 {% csrf_token %}
-{# Onglet ouvert au moment du clic : la vue le renvoie dans l'adresse de retour,
-   pour qu'on revienne là où on était et pas sur « Informations générales ». #}
+{% comment %}Onglet ouvert au moment du clic : la vue le renvoie dans
+l'adresse de retour, pour qu'on revienne là où on était et pas sur
+« Informations générales ».{% endcomment %}
 <input type="hidden" name="_onglet" id="onglet-actif" value="{{ onglet_actif|default:'infos' }}">
 
 <!-- ══════════════ PANNEAU DE CONTRÔLE ══════════════ -->
@@ -706,10 +707,10 @@ cliquant sur une ligne. Voir patients/origines.py.
                 {% if peut_modifier %}
                 <button type="button" class="btn-action" id="btn-pause"><i class="bi bi-pause-fill"></i> Pause</button>
                 {% endif %}
-                {# Ces quatre actions **soumettent** la fiche au lieu de la quitter :
-                   un simple lien perdait tout ce qui était saisi et pas encore
-                   enregistré. La vue enregistre, puis redirige vers `_apres` en
-                   lui passant l'adresse de retour, onglet compris. #}
+                {% comment %}Ces quatre actions soumettent la fiche au lieu de
+                la quitter : un simple lien perdait tout ce qui était saisi et pas
+                encore enregistré. La vue enregistre, puis redirige vers `_apres`
+                en lui passant l'adresse de retour, onglet compris.{% endcomment %}
                 <button type="submit" name="_apres" value="{% url 'ordonnance_create_libre' %}?patient_id={{ rdv.patient.pk }}{% if consultation %}&consultation_id={{ consultation.pk }}{% endif %}{% if rdv.medecin %}&medecin_id={{ rdv.medecin.pk }}{% endif %}" class="btn-action btn-ghost"><i class="bi bi-file-earmark-medical"></i> Créer une ordonnance</button>
                 <button type="submit" name="_apres" value="{% url 'laboratoire_create' %}?patient={{ rdv.patient.pk }}{% if rdv.medecin %}&medecin_id={{ rdv.medecin.pk }}{% endif %}" class="btn-action btn-ghost"><i class="bi bi-flask"></i> Demande de lab</button>
                 {% if perms.soins.add_soin %}<button type="submit" name="_apres" value="{% url 'soins:create' %}?patient_id={{ rdv.patient.pk }}" class="btn-action btn-ghost"><i class="bi bi-bandaid"></i> Soins</button>{% endif %}
