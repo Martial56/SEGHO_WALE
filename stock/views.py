@@ -704,6 +704,38 @@ def stock_categorie_edit(request, pk):
     })
 
 
+def _fournisseur_form_class():
+    from django import forms
+
+    class FournisseurForm(forms.ModelForm):
+        class Meta:
+            model = Fournisseur
+            fields = ['nom', 'telephone', 'email', 'adresse', 'actif']
+            widgets = {
+                'nom':       forms.TextInput(attrs={'placeholder': 'Ex : Laborex CI'}),
+                'telephone': forms.TextInput(attrs={'placeholder': 'Ex : 07 00 00 00 00'}),
+                'email':     forms.EmailInput(attrs={'placeholder': 'contact@fournisseur.com'}),
+                'adresse':   forms.Textarea(attrs={'rows': 3, 'placeholder': 'Adresse optionnelle'}),
+            }
+    return FournisseurForm
+
+
+@login_required(login_url='login')
+def stock_fournisseur_create_modal(request):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
+    is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
+    Form = _fournisseur_form_class()
+    form = Form(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        obj = form.save()
+        if is_ajax:
+            return JsonResponse({'ok': True, 'message': f'Fournisseur « {obj} » créé.'})
+        messages.success(request, 'Fournisseur créé.')
+        return redirect('stock_fournisseurs')
+    return render(request, 'stock/config/fournisseur_form_modal.html', {'form': form, 'titre': 'Nouveau fournisseur'})
+
+
 @login_required(login_url='login')
 @require_POST
 def stock_categorie_delete(request, pk):
@@ -1010,6 +1042,7 @@ def inventaire_create(request):
                 except ValueError:
                     stock_reel = float(p.stock_actuel)
                 peremption = request.POST.get(f'peremption_{p.pk}', '').strip() or None
+                commentaire = request.POST.get(f'commentaire_{p.pk}', '').strip()
                 # LigneInventaire.save() calcule normalement l'écart — bulk_create
                 # n'appelle pas save(), donc on le calcule ici explicitement.
                 ecart = Decimal(str(stock_reel)) - Decimal(str(p.stock_actuel))
@@ -1019,6 +1052,7 @@ def inventaire_create(request):
                     stock_reel=stock_reel,
                     ecart=ecart,
                     date_peremption=peremption,
+                    notes=commentaire,
                 ))
         if nouvelles_lignes:
             LigneInventaire.objects.bulk_create(nouvelles_lignes)
@@ -2644,6 +2678,83 @@ def integrer_reception(request, pk):
     else:
         messages.success(request, f'Réception {reception.numero} intégrée dans le stock.')
     return redirect('stock_receptions_a_integrer')
+
+
+# ──────────────────────────────────────────────────────────────
+# RÉCEPTION DIRECTE (manuelle, hors commande d'achat)
+# ──────────────────────────────────────────────────────────────
+
+@login_required(login_url='login')
+def reception_directe_create(request):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
+    from decimal import Decimal
+
+    produits = Produit.objects.filter(actif=True).order_by('type', 'nom')
+    fournisseurs = Fournisseur.objects.filter(actif=True).order_by('nom')
+
+    if request.method == 'POST':
+        reference = f"REC{timezone.now():%Y%m%d%H%M%S}"
+        fournisseur_id = request.POST.get('fournisseur', '').strip() or None
+        fournisseur = fournisseurs.filter(pk=fournisseur_id).first() if fournisseur_id else None
+        nb_lignes = 0
+        with transaction.atomic():
+            for p in produits:
+                val = request.POST.get(f'recu_{p.pk}', '').strip()
+                if val == '':
+                    continue
+                try:
+                    qte_recue = Decimal(str(val))
+                except Exception:
+                    continue
+                if qte_recue <= 0:
+                    continue
+
+                conditionnement = request.POST.get(f'conditionnement_{p.pk}', '').strip()
+                try:
+                    facteur_conditionnement = Decimal(str(conditionnement)) if conditionnement else Decimal('1')
+                    if facteur_conditionnement <= 0:
+                        facteur_conditionnement = Decimal('1')
+                except Exception:
+                    facteur_conditionnement = Decimal('1')
+                qte_unite_comptage = qte_recue * facteur_conditionnement
+
+                numero_lot = request.POST.get(f'lot_{p.pk}', '').strip() or f'{reference}-{p.code}'
+                date_peremption = request.POST.get(f'peremption_{p.pk}', '').strip() or None
+
+                produit = Produit.objects.select_for_update().get(pk=p.pk)
+
+                LotProduit.objects.create(
+                    produit=produit, numero_lot=numero_lot,
+                    conditionnement=conditionnement,
+                    quantite_initiale=qte_unite_comptage, quantite_actuelle=qte_unite_comptage,
+                    fournisseur=fournisseur, date_reception=timezone.now().date(),
+                    prix_achat_lot=produit.prix_achat,
+                    date_peremption=date_peremption,
+                )
+
+                stock_avant = float(produit.stock_actuel)
+                stock_apres = stock_avant + float(qte_unite_comptage)
+                MouvementStock.objects.create(
+                    produit=produit, type='entree', motif='achat',
+                    quantite=qte_unite_comptage, stock_avant=stock_avant, stock_apres=stock_apres,
+                    reference=reference, notes=f'Réception directe {reference}',
+                    cree_par=request.user,
+                )
+                produit.stock_actuel = stock_apres
+                produit.save(update_fields=['stock_actuel'])
+                nb_lignes += 1
+
+        if nb_lignes:
+            messages.success(request, f'Réception {reference} enregistrée : {nb_lignes} produit(s) ajouté(s) au stock.')
+        else:
+            messages.warning(request, "Aucune quantité reçue n'a été saisie.")
+        return redirect('stock_produits')
+
+    return render(request, 'stock/reception_directe_form.html', {
+        'produits': produits,
+        'fournisseurs': fournisseurs,
+    })
 
 
 # ── Unités de mesure ───────────────────────────────────────────────────────

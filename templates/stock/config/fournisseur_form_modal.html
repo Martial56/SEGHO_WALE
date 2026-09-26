@@ -1,0 +1,48 @@
+<form method="post" id="stcfgConfigForm" data-url="{{ request.path }}" novalidate>
+{% csrf_token %}
+
+<div class="stcfg-modal-body">
+
+  <div class="form-field">
+    <label class="field-label" for="{{ form.nom.id_for_label }}">Nom <span class="required-star">*</span></label>
+    <input type="text" name="nom" id="{{ form.nom.id_for_label }}" class="field-ul"
+      value="{{ form.nom.value|default_if_none:'' }}" placeholder="Ex : Laborex CI" autocomplete="off">
+    {% if form.nom.errors %}<div class="field-error">{{ form.nom.errors.0 }}</div>{% endif %}
+  </div>
+
+  <div class="form-field">
+    <label class="field-label" for="{{ form.telephone.id_for_label }}">Téléphone</label>
+    <input type="text" name="telephone" id="{{ form.telephone.id_for_label }}" class="field-ul"
+      value="{{ form.telephone.value|default_if_none:'' }}" placeholder="Ex : 07 00 00 00 00" autocomplete="off">
+    {% if form.telephone.errors %}<div class="field-error">{{ form.telephone.errors.0 }}</div>{% endif %}
+  </div>
+
+  <div class="form-field">
+    <label class="field-label" for="{{ form.email.id_for_label }}">Email</label>
+    <input type="email" name="email" id="{{ form.email.id_for_label }}" class="field-ul"
+      value="{{ form.email.value|default_if_none:'' }}" placeholder="contact@fournisseur.com" autocomplete="off">
+    {% if form.email.errors %}<div class="field-error">{{ form.email.errors.0 }}</div>{% endif %}
+  </div>
+
+  <div class="form-field">
+    <label class="field-label" for="{{ form.adresse.id_for_label }}">Adresse</label>
+    <textarea name="adresse" id="{{ form.adresse.id_for_label }}" class="field-ul"
+      rows="3" placeholder="Adresse optionnelle…">{{ form.adresse.value|default_if_none:'' }}</textarea>
+    {% if form.adresse.errors %}<div class="field-error">{{ form.adresse.errors.0 }}</div>{% endif %}
+  </div>
+
+  <div class="form-field">
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--st-text);cursor:pointer;">
+      <input type="checkbox" name="actif" {% if form.actif.value %}checked{% endif %} style="width:16px;height:16px;cursor:pointer;">
+      Fournisseur actif
+    </label>
+  </div>
+
+</div>
+
+<div class="stcfg-modal-footer">
+  <button type="button" class="btn-st-outline" onclick="stCloseConfigModal()">Annuler</button>
+  <button type="submit" class="btn-st">{% if obj %}Enregistrer{% else %}Créer{% endif %}</button>
+</div>
+
+</form>

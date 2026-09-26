@@ -398,6 +398,8 @@ def ordonnance_create_libre(request):
                 initial_lignes.append({
                     'med_id':    lg.produit_id or '',
                     'med_nom':   lg.produit.nom if lg.produit else (lg.medicament_libre or ''),
+                    'med_unite': lg.produit.unite_mesure.nom if lg.produit and lg.produit.unite_mesure else
+                                 (lg.produit.get_forme_display() if lg.produit and lg.produit.forme else ''),
                     'posologie': lg.posologie or '',
                     'duree':     lg.duree or '',
                     'quantite':  lg.quantite,

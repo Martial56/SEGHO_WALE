@@ -159,6 +159,7 @@ def produits_pour_ecran(request=None, types=TYPES_PROPOSES, pharmacie=None):
             'forme':         p.get_forme_display() if p.forme else '',
             'dosage':        p.dosage or '',
             'dci':           p.dci or '',
+            'unite':         p.unite_mesure.nom if p.unite_mesure else (p.get_forme_display() if p.forme else ''),
             'prix_vente':    float(p.prix_vente or 0),
             'stock_actuel':  float(en_rayon(p)),
             'stock_alerte':  float(p.stock_alerte),

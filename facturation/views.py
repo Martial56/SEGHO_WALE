@@ -761,6 +761,7 @@ def _sync_lignes_demande_examen(facture):
             libelle=ligne.libelle,
             prix=montant,
             instructions=anciennes_instructions.get(ligne.libelle, ''),
+            article_service=ligne.article,
         )
         total += montant
     demande.montant_total = total

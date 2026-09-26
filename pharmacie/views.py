@@ -1356,9 +1356,11 @@ def pharmacie_inventaire_nouveau(request, pharmacie):
                     reel = Decimal(str(val)) if val != '' else sp.quantite
                 except Exception:
                     reel = sp.quantite
+                commentaire = request.POST.get(f'commentaire_{sp.produit.pk}', '').strip()
                 lignes_inv.append(LigneInventairePharmacie(
                     inventaire=inv, produit=sp.produit,
                     stock_theorique=sp.quantite, stock_reel=reel,
+                    notes=commentaire,
                 ))
             LigneInventairePharmacie.objects.bulk_create(lignes_inv)
         messages.success(request, f'Inventaire {inv.numero} créé.')

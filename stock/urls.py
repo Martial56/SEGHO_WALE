@@ -65,6 +65,9 @@ urlpatterns = [
     path('fournisseurs/nouveau/',        views.fournisseur_create,   name='stock_fournisseur_create'),
     path('fournisseurs/<int:pk>/modifier/', views.fournisseur_edit, name='stock_fournisseur_edit'),
 
+    # Fournisseur : création rapide (modale, depuis Configuration)
+    path('config/fournisseurs/nouveau/', views.stock_fournisseur_create_modal, name='stock_fournisseur_create_modal'),
+
     # Catégories AJAX
     path('dotation/',                  views.dotation_list,    name='stock_dotation_list'),
     path('dotation/nouvelle/',         views.dotation_creer,   name='stock_dotation_creer'),
@@ -84,6 +87,9 @@ urlpatterns = [
     # Réceptions achats à intégrer dans le stock
     path('receptions-achats/',                   views.receptions_a_integrer, name='stock_receptions_a_integrer'),
     path('receptions-achats/<int:pk>/integrer/', views.integrer_reception,    name='stock_integrer_reception'),
+
+    # Réception directe (manuelle, hors commande d'achat)
+    path('receptions/nouvelle/', views.reception_directe_create, name='stock_reception_directe_create'),
 
     # Nouvelles fonctionnalités
     path('peremptions/eliminer/',                views.elimination_create,         name='stock_elimination_create'),

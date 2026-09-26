@@ -179,6 +179,7 @@ class Produit(models.Model):
 class LotProduit(models.Model):
     produit           = models.ForeignKey(Produit, on_delete=models.CASCADE, related_name='lots')
     numero_lot        = models.CharField(max_length=50)
+    conditionnement   = models.CharField(max_length=100, blank=True)
     date_fabrication  = models.DateField(null=True, blank=True)
     date_peremption   = models.DateField(null=True, blank=True)
     quantite_initiale = models.DecimalField(max_digits=12, decimal_places=2, default=0)

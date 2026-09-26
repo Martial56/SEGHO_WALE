@@ -48,6 +48,15 @@ cliquant sur une ligne. Voir patients/origines.py.
         text-decoration: none; transition: border-color 0.15s, color 0.15s, background 0.15s; white-space: nowrap;
     }
     .btn-discard:hover { border-color: #aaa; color: var(--text); background: rgba(0,0,0,.03); }
+    .btn-cancel-rdv {
+        display: inline-flex; align-items: center; gap: 5px;
+        background: var(--rose, #e53935); color: #fff;
+        border: none; border-radius: var(--radius-xs, 4px);
+        padding: 6px 14px; font-size: 12.5px; font-weight: 600;
+        cursor: pointer; font-family: 'Sora', sans-serif;
+        transition: background 0.15s; white-space: nowrap; flex-shrink: 0;
+    }
+    .btn-cancel-rdv:hover { background: #c62828; }
 
     /* ── Workflow row (action buttons + status bar) ── */
     .cp-workflow-row {
@@ -642,14 +651,19 @@ cliquant sur une ligne. Voir patients/origines.py.
         </span>
         <div style="flex:1;"></div>
         <div class="cp-save-group">
+            {% if not rdv or peut_modifier %}
             <button type="submit" class="btn-save">{% if rdv %}Enregistrer{% else %}Sauvegarder et facturer{% endif %}</button>
-            <a href="{% if origine and rdv %}{% url 'patients:rdv_list' rdv.patient.pk %}{{ origine_qs }}{% else %}{% url 'patients:rdv_global' %}{% endif %}" class="btn-discard">Ignorer</a>
+            {% endif %}
+            <a href="{% if origine and rdv %}{% url 'patients:rdv_list' rdv.patient.pk %}{{ origine_qs }}{% else %}{% url 'patients:rdv_global' %}{% endif %}" class="btn-discard">{% if rdv and not peut_modifier %}Retour{% else %}Ignorer{% endif %}</a>
+            {% if rdv.statut == 'confirme' and peut_modifier %}
+            <button type="button" class="btn-cancel-rdv" id="btn-annuler-rdv">Annuler RDV</button>
+            {% endif %}
         </div>
     </div>
 </div>
 
 <!-- ══════════════ CORPS DU FORMULAIRE ══════════════ -->
-<div class="form-body">
+<div class="form-body{% if rdv.statut == 'annule' %} rdv-locked{% endif %}">
 
     <div class="cp-workflow-row">
 
@@ -2052,6 +2066,69 @@ cliquant sur une ligne. Voir patients/origines.py.
 {% endif %}
 
 {% if rdv %}
+<!-- ══════════════ MODAL ANNULATION RDV ══════════════ -->
+<div class="am-overlay" id="annuler-rdv-modal" style="display:none;">
+  <div class="am-box">
+    <div class="am-hd">
+      <span class="am-title">Annuler le rendez-vous</span>
+      <button type="button" class="am-close" id="am-close">&#10005;</button>
+    </div>
+    <form method="post" action="{% url 'patients:rdv_edit' rdv.pk %}" id="annuler-rdv-form">
+      {% csrf_token %}
+      <input type="hidden" name="_action" value="annuler_confirme">
+      <div class="am-body">
+        <p class="am-hint">Cette action annule le rendez-vous ainsi que la facturation associée. Elle est irréversible.</p>
+        <label class="am-lbl" for="am-motif">Cause d'annulation <span class="required-star">*</span></label>
+        <textarea name="motif_annulation" id="am-motif" class="am-textarea" rows="3" required placeholder="Précisez la raison de l'annulation…"></textarea>
+      </div>
+      <div class="am-footer">
+        <button type="button" class="btn-discard" id="am-cancel">Fermer</button>
+        <button type="submit" class="btn-cancel-rdv">Confirmer</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<style>
+.am-overlay{position:fixed;inset:0;background:rgba(0,0,0,.38);z-index:9500;display:flex;align-items:center;justify-content:center;}
+.am-box{background:#fff;width:440px;max-width:92vw;border-radius:6px;box-shadow:0 8px 40px rgba(0,0,0,.28);}
+.am-hd{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #e0e0e0;}
+.am-title{font-size:14px;font-weight:700;color:#111;font-family:'Sora',sans-serif;}
+.am-close{background:none;border:none;font-size:18px;color:#888;cursor:pointer;padding:2px 6px;line-height:1;border-radius:3px;}
+.am-close:hover{background:#f0f0f0;color:#111;}
+.am-body{padding:16px;display:flex;flex-direction:column;gap:8px;}
+.am-hint{font-size:12px;color:rgba(0,0,0,.5);margin:0 0 4px;}
+.am-lbl{font-size:12.5px;font-weight:600;color:rgba(0,0,0,.6);}
+.am-textarea{width:100%;border:1.5px solid #d1dde3;border-radius:6px;padding:8px 10px;font-size:13px;font-family:'Sora',sans-serif;color:var(--teal-900);resize:vertical;outline:none;}
+.am-textarea:focus{border-color:var(--teal-500);}
+.am-footer{display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid #eee;}
+html[data-theme="dark"] .am-box{background:var(--surface);}
+html[data-theme="dark"] .am-hd{border-bottom-color:var(--border);}
+html[data-theme="dark"] .am-title{color:var(--text);}
+html[data-theme="dark"] .am-hint{color:rgba(255,255,255,.55);}
+html[data-theme="dark"] .am-lbl{color:var(--text);}
+html[data-theme="dark"] .am-textarea{background:var(--surface);border-color:var(--border-strong);color:var(--text);}
+html[data-theme="dark"] .am-footer{border-top-color:var(--border);}
+</style>
+
+<script>
+(function(){
+    var overlay = document.getElementById('annuler-rdv-modal');
+    var btnOpen = document.getElementById('btn-annuler-rdv');
+    if (!overlay || !btnOpen) return;
+
+    function openModal(){ overlay.style.display = 'flex'; document.body.style.overflow = 'hidden'; }
+    function closeModal(){ overlay.style.display = 'none'; document.body.style.overflow = ''; }
+
+    btnOpen.addEventListener('click', openModal);
+    var amClose  = document.getElementById('am-close');
+    var amCancel = document.getElementById('am-cancel');
+    if (amClose)  amClose.addEventListener('click', closeModal);
+    if (amCancel) amCancel.addEventListener('click', closeModal);
+    overlay.addEventListener('click', function(e){ if (e.target === this) closeModal(); });
+})();
+</script>
+
 <!-- ══════════════ MODAL ÉVALUATION CLINIQUE ══════════════ -->
 <div class="em-overlay" id="eval-modal" style="display:none;">
   <div class="em-box">
