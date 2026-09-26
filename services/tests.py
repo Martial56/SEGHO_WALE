@@ -203,3 +203,53 @@ class TestVueEtPagination(BaseListe):
 
     def test_page_hors_limites_ne_plante_pas(self):
         self.assertEqual(self.client.get(self.url, {'page': '999'}).status_code, 200)
+
+
+class TestFicheArticleMontreCeQuiEstSaisi(TestCase):
+    """La fiche d'un article affiche les champs que le formulaire remplit.
+
+    Elle en montrait 15 sur les 60 du modèle. La plupart des absents ne sont
+    remplis par aucun écran — les afficher n'aurait montré que des valeurs par
+    défaut. Mais trois l'étaient bel et bien par le formulaire et restaient
+    invisibles : le type de produit hospitalier, le type de test et le **code
+    HPRIM**, celui-là même qui part au laboratoire partenaire. Un examen
+    enregistré avec son code s'affichait comme n'en ayant aucun.
+    """
+
+    def setUp(self):
+        from decimal import Decimal
+
+        from django.contrib.auth.models import User
+        from django.test import Client
+
+        self.user = User.objects.create_superuser('su_fiche', password='x')
+        self.client = Client()
+        self.client.force_login(self.user)
+
+        self.examen = Articleservice.objects.create(
+            nom='NFS fiche', prix_vente=Decimal('4000'),
+            type_produit_hospitalier='examen',
+            type_test_labo='hematologie', code_hprim='NFS01')
+        self.acte = Articleservice.objects.create(
+            nom='Consultation fiche', prix_vente=Decimal('3000'),
+            type_produit_hospitalier='service')
+
+    def _page(self, article):
+        return self.client.get(
+            reverse('services:detail', args=[article.pk])).content.decode()
+
+    def test_le_code_hprim_s_affiche(self):
+        self.assertIn('NFS01', self._page(self.examen))
+
+    def test_le_type_de_test_s_affiche(self):
+        self.assertIn('Hématologie', self._page(self.examen))
+
+    def test_le_type_de_produit_hospitalier_s_affiche(self):
+        self.assertIn('Type de produit hospitalier', self._page(self.examen))
+        self.assertIn('Examen', self._page(self.examen))
+
+    def test_le_bloc_laboratoire_reste_muet_sur_un_acte(self):
+        """Une consultation n'a rien à dire du laboratoire."""
+        page = self._page(self.acte)
+        self.assertNotIn('>Laboratoire<', page)
+        self.assertNotIn('Code HPRIM', page)

@@ -157,6 +157,12 @@
                 <div class="field-static">{{ article.get_type_article_display }}</div>
               </div>
               <div class="field-row">
+                <label>Type de produit hospitalier</label>
+                <div class="field-static {% if not article.type_produit_hospitalier %}muted{% endif %}">
+                  {{ article.get_type_produit_hospitalier_display|default:"—" }}
+                </div>
+              </div>
+              <div class="field-row">
                 <label>Unité de mesure</label>
                 <div class="field-static {% if not article.unite_mesure %}muted{% endif %}">
                   {% if article.unite_mesure %}{{ article.unite_mesure.nom }} ({{ article.unite_mesure.code }}){% else %}—{% endif %}
@@ -183,6 +189,35 @@
               </div>
             </div>
           </div>
+
+          {% comment %}Le formulaire remplit ces deux champs, la fiche ne les
+          montrait pas : un examen enregistré avec son code HPRIM s'affichait
+          comme n'en ayant aucun. Le bloc reste muet pour une consultation ou un
+          acte, qui n'ont rien à en dire.{% endcomment %}
+          {% if article.type_test_labo or article.code_hprim %}
+          <div class="art-stock-section art-stock-section--visible">
+            <div class="f-tab-section-title">Laboratoire</div>
+            <div class="f-tab-grid">
+              <div class="field-group">
+                <div class="field-row">
+                  <label>Type de test</label>
+                  <div class="field-static {% if not article.type_test_labo %}muted{% endif %}">
+                    {{ article.get_type_test_labo_display|default:"—" }}
+                  </div>
+                </div>
+              </div>
+              <div class="field-group">
+                <div class="field-row">
+                  <label>Code HPRIM</label>
+                  <div class="field-static {% if not article.code_hprim %}muted{% endif %}"
+                       style="font-family:var(--font-mono);">
+                    {{ article.code_hprim|default:"—" }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          {% endif %}
 
           {% if article.type_article == 'consommable' or article.type_article == 'stockable' %}
           <div class="art-stock-section art-stock-section--visible">
