@@ -187,6 +187,11 @@ class CommandeAchat(models.Model):
         verbose_name = "Commande d'achat"
         verbose_name_plural = "Commandes d'achat"
         ordering = ['-date_creation']
+        # Remplace un nom de groupe écrit en dur : un groupe se renomme dans
+        # /admin/ et cassait le contrôle en silence, une permission non.
+        permissions = [
+            ('can_gerer_achats', 'Peut gérer les achats'),
+        ]
 
 
 class LigneCommandeAchat(models.Model):

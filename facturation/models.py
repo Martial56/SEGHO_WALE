@@ -269,6 +269,11 @@ class Paiement(ModeleCentre):
     class Meta(ModeleCentre.Meta):
         verbose_name = "Paiement"
         ordering = ['-date_paiement']
+        # Remplace un nom de groupe écrit en dur : un groupe se renomme dans
+        # /admin/ et cassait le contrôle en silence, une permission non.
+        permissions = [
+            ('can_encaisser', 'Peut enregistrer un encaissement'),
+        ]
 
 
 class Caisse(models.Model):

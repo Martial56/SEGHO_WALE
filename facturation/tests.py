@@ -40,9 +40,18 @@ def _acte(suffix=''):
 
 
 def _caisse_user(username):
+    """Utilisateur habilité à encaisser.
+
+    Le groupe porte volontairement un nom fantaisiste : c'est la permission qui
+    ouvre la caisse, jamais le nom du groupe. Si ce test passe avec « Guichet du
+    lundi », il passera avec n'importe quel nom choisi dans /admin/.
+    """
     user = User.objects.create_user(username, password='x')
-    caisse, _ = Group.objects.get_or_create(name='Caisse')
-    user.groups.add(caisse)
+    groupe, _ = Group.objects.get_or_create(name='Guichet du lundi')
+    groupe.permissions.add(
+        Permission.objects.get(content_type__app_label='facturation',
+                               codename='can_encaisser'))
+    user.groups.add(groupe)
     return user
 
 
@@ -58,15 +67,23 @@ class TestCanManagePaiement(TestCase):
         user = User.objects.create_user('u_cmp', password='x')
         self.assertFalse(can_manage_paiement(user))
 
-    def test_user_groupe_caisse_autorise(self):
+    def test_un_groupe_portant_la_permission_autorise(self):
         user = _caisse_user('u_cmp_caisse')
         self.assertTrue(can_manage_paiement(user))
 
-    def test_user_autre_groupe_refuse(self):
+    def test_un_groupe_sans_la_permission_refuse(self):
         user = User.objects.create_user('u_cmp_autre', password='x')
         autre, _ = Group.objects.get_or_create(name='Accueil')
         user.groups.add(autre)
         self.assertFalse(can_manage_paiement(user))
+
+    def test_la_permission_accordee_en_direct_autorise(self):
+        """Sans aucun groupe : l'onglet « Permissions de l'utilisateur » suffit."""
+        user = User.objects.create_user('u_cmp_direct', password='x')
+        user.user_permissions.add(
+            Permission.objects.get(content_type__app_label='facturation',
+                                   codename='can_encaisser'))
+        self.assertTrue(can_manage_paiement(User.objects.get(pk=user.pk)))
 
 
 # ─── Tests numéros uniques ──────────────────────────────────────────────────────
@@ -226,7 +243,7 @@ class TestVuesPermissions(TestCase):
         facture.refresh_from_db()
         self.assertEqual(facture.montant_paye, Decimal('0'))
 
-    def test_facture_payer_autorise_pour_groupe_caisse(self):
+    def test_facture_payer_autorise_avec_la_permission(self):
         facture = _facture(self.patient, statut='emise', montant_total=Decimal('5000'))
         client = Client()
         client.login(username='u_vp_caisse', password='x')
@@ -468,7 +485,7 @@ class TestPorteUniqueDeFacturation(TestCase):
             "Un compte hors Caisse ne doit pas pouvoir encaisser par cette porte",
         )
 
-    def test_avec_le_groupe_caisse_le_paiement_passe(self):
+    def test_avec_la_permission_le_paiement_passe(self):
         # Sans ce test le précédent réussirait même si la vue refusait tout le
         # monde, y compris la Caisse.
         self._creer('u_pu_caisse')

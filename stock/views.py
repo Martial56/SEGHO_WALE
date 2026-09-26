@@ -11,11 +11,8 @@ from django.views.decorators.http import require_POST
 from .models import Produit, CategorieStock, LotProduit, MouvementStock, CommandeStock, LigneCommande, Inventaire, LigneInventaire, DemandePharmacie, LigneDemande, PHARMACIES, FicheBesoins, LigneFicheBesoins, UniteMesure
 from achats.models import Fournisseur
 
-STOCK_MANAGE_GROUPS = {'Gestionnaire stock', 'Pharmacien', 'Administrateur', 'Directeur'}
-
-
 def can_manage_stock(user):
-    return user.is_superuser or user.is_staff or user.groups.filter(name__in=STOCK_MANAGE_GROUPS).exists()
+    return user.is_staff or user.has_perm('stock.can_gerer_stock')
 
 
 @login_required(login_url='login')

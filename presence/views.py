@@ -44,9 +44,7 @@ def _parse_time(val):
 def can_unlock_registre(user):
     """Seuls les administrateurs peuvent rouvrir un registre verrouillé —
     la RH qui l'a verrouillé (même par erreur) ne peut pas revenir en arrière."""
-    return user.is_authenticated and (
-        user.is_superuser or user.groups.filter(name='Administrateur').exists()
-    )
+    return user.is_authenticated and user.has_perm('presence.can_rouvrir_registre')
 
 
 def _nav_month(year, month):

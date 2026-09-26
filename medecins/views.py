@@ -8,15 +8,10 @@ from django.core.exceptions import PermissionDenied
 
 from .models import Medecin
 
-# Mêmes rôles que la RH (employer.views.RH_MANAGE_GROUPS) — un médecin est
-# avant tout un employé, et son annuaire (spécialités/départements/services,
-# taux d'honoraire) est une donnée de gestion RH/direction, pas une donnée
-# ouverte à tout utilisateur connecté.
-MEDECIN_MANAGE_GROUPS = {'Médecin Chef', 'Médecin Chef Adjoint', 'Administrateur', 'Directeur', 'RH'}
-
-
 def can_manage_medecins(user):
-    return user.is_superuser or user.groups.filter(name__in=MEDECIN_MANAGE_GROUPS).exists()
+    """L'annuaire des médecins est une donnée de gestion, pas une donnée
+    ouverte à tout utilisateur connecté."""
+    return user.has_perm('medecins.can_gerer_medecins')
 
 
 @login_required(login_url='login')

@@ -22,9 +22,6 @@ from medecins.models import Medecin
 
 JOURS_LABELS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi']
 
-PLANNING_WRITE_GROUPS          = {'Médecin Chef', 'Médecin Chef Adjoint', 'Administrateur', 'Directeur'}
-PLANNING_DELETE_PUBLISHED_GROUPS = {'Médecin Chef', 'Médecin Chef Adjoint', 'Administrateur'}
-
 MOIS_NOMS = ['', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
              'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre']
 
@@ -32,17 +29,13 @@ MOIS_NOMS = ['', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
 def can_manage_planning(user):
     if not user.is_authenticated:
         return False
-    if user.is_superuser or user.is_staff:
-        return True
-    return user.groups.filter(name__in=PLANNING_WRITE_GROUPS).exists()
+    return user.is_staff or user.has_perm('planning.can_gerer_planning')
 
 
 def can_delete_published(user):
     if not user.is_authenticated:
         return False
-    if user.is_superuser or user.is_staff:
-        return True
-    return user.groups.filter(name__in=PLANNING_DELETE_PUBLISHED_GROUPS).exists()
+    return user.is_staff or user.has_perm('planning.can_supprimer_planning_publie')
 
 
 def _medecins_json(medecins_qs):
@@ -891,15 +884,13 @@ def planning_medecins_json(request):
 
 def _send_publication_email(planning, published_by):
     from django.core.mail import send_mass_mail
-    from django.contrib.auth.models import User as AuthUser
-    from django.db.models import Q as DQ
-    # Collect emails: all active médecins + all users in write groups
+
+    from core.permissions import utilisateurs_avec
+    # Destinataires : les médecins actifs, plus ceux qui gèrent le planning.
     med_emails = set(Medecin.objects.filter(actif=True).exclude(employe__email='').values_list('employe__email', flat=True))
-    user_emails = set(AuthUser.objects.filter(
-        is_active=True, email__gt=''
-    ).filter(
-        DQ(is_superuser=True) | DQ(groups__name__in=PLANNING_WRITE_GROUPS)
-    ).values_list('email', flat=True))
+    user_emails = set(
+        utilisateurs_avec('planning.can_gerer_planning')
+        .exclude(email='').values_list('email', flat=True))
     all_emails = list(med_emails | user_emails)
     if not all_emails:
         return 0

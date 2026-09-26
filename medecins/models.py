@@ -49,6 +49,11 @@ class Medecin(models.Model):
     class Meta:
         verbose_name = "Médecin"
         ordering = ['employe__nom']
+        # Remplace un nom de groupe écrit en dur : un groupe se renomme dans
+        # /admin/ et cassait le contrôle en silence, une permission non.
+        permissions = [
+            ('can_gerer_medecins', "Peut gérer l'annuaire des médecins"),
+        ]
 
 
 class Service(models.Model):

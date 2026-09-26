@@ -17,13 +17,13 @@ from pharmacie.disponibilite import pharmacie_active
 from pharmacie.sorties import (produits_indisponibles, rendre_les_produits,
                                sortir_les_produits)
 
-# Rôles autorisés à enregistrer un encaissement (voir aussi hospitalisation
-# management/commands/init_groupes_hospitalisation.py qui définit "Caisse").
-CAISSE_MANAGE_GROUPS = {'Caisse', 'Administrateur', 'Directeur'}
-
-
 def can_manage_paiement(user):
-    return user.is_superuser or user.groups.filter(name__in=CAISSE_MANAGE_GROUPS).exists()
+    """Peut enregistrer un encaissement.
+
+    La permission s'attribue à un groupe dans /admin/ ; elle ne dépend plus du
+    nom que porte ce groupe.
+    """
+    return user.has_perm('facturation.can_encaisser')
 
 
 @login_required(login_url='login')

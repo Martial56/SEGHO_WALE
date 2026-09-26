@@ -21,11 +21,8 @@ from stock.models import Produit
 
 MOIS_FR = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc']
 
-ACHATS_MANAGE_GROUPS = {'Comptable', 'Directeur', 'Administrateur'}
-
-
 def can_manage_achats(user):
-    return user.is_superuser or user.groups.filter(name__in=ACHATS_MANAGE_GROUPS).exists()
+    return user.has_perm('achats.can_gerer_achats')
 
 
 # Transitions de statut valides — un POST direct ne peut pas sauter d'étape

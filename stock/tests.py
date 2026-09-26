@@ -160,21 +160,16 @@ class TestLigneFicheBesoins(TestCase):
 def _gestionnaire(username):
     """Utilisateur habilité à bouger le stock.
 
-    Ces trois écrans exigent `can_manage_stock`, qui interroge l'appartenance à
-    l'un des groupes nommés dans `STOCK_MANAGE_GROUPS` — « Gestionnaire stock »,
-    « Pharmacien », « Administrateur », « Directeur ». Les tests créaient un
-    utilisateur nu et attendaient une redirection : ils recevaient un 403, et
-    décrivaient donc une règle qui n'existe plus depuis que ce contrôle est là.
-
-    Le module pharmacie a depuis troqué ces noms de groupes contre des
-    permissions Django (migration pharmacie 0009) ; stock ne l'a pas encore
-    fait, et c'est un chantier à part.
+    Ces trois écrans exigent `can_manage_stock`, c'est-à-dire la permission
+    `stock.can_gerer_stock`. Le groupe qui la porte s'appelle comme on veut :
+    le test la donne en direct, pour ne dépendre d'aucun nom.
     """
-    from django.contrib.auth.models import Group
+    from django.contrib.auth.models import Permission
 
     user = User.objects.create_user(username, password='x')
-    groupe, _ = Group.objects.get_or_create(name='Gestionnaire stock')
-    user.groups.add(groupe)
+    user.user_permissions.add(
+        Permission.objects.get(content_type__app_label='stock',
+                               codename='can_gerer_stock'))
     return user
 
 

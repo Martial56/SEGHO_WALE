@@ -1,11 +1,9 @@
 from django.core.management.base import BaseCommand
 from datetime import date, timedelta
-from django.db.models import Q
 
 from employer.models import Conge, HistoriqueConge, NotificationConge
-from django.contrib.auth.models import User
 
-RH_GROUPS = ['RH', 'Directeur', 'Administrateur', 'Médecin Chef', 'Médecin Chef Adjoint']
+from core.permissions import utilisateurs_avec
 
 
 class Command(BaseCommand):
@@ -49,9 +47,7 @@ class Command(BaseCommand):
             statut='en_cours', date_fin=tomorrow,
         ).select_related('employe__user')
 
-        rh_users = User.objects.filter(
-            Q(is_superuser=True) | Q(groups__name__in=RH_GROUPS)
-        ).distinct()
+        rh_users = utilisateurs_avec('employer.can_gerer_conges')
 
         count_rappels = 0
         for c in retours:
