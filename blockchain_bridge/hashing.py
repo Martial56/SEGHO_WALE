@@ -25,8 +25,11 @@ def empreinte_patient(patient):
 
 
 def _libelle_ligne_ordonnance(ligne):
-    if ligne.medicament_id:
-        return str(ligne.medicament)
+    # Visait d'abord `ligne.medicament`, la table d'avant les deux pharmacies,
+    # retirée depuis. L'attribut n'existant plus, tout enregistrement
+    # d'ordonnance levait un AttributeError — et le signal court avant le
+    # garde-fou BLOCKCHAIN_ENABLED, donc même désactivée l'intégration cassait
+    # le changement de statut et la dispensation.
     if ligne.produit_id:
         return str(ligne.produit)
     return ligne.medicament_libre
