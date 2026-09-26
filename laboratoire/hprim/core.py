@@ -62,19 +62,32 @@ def fmt_ts(dt: Optional[datetime], with_time: bool = True) -> str:
     return dt.strftime("%Y%m%d%H%M" if with_time else "%Y%m%d")
 
 
+_TS_FORMATS = {14: "%Y%m%d%H%M%S", 12: "%Y%m%d%H%M", 8: "%Y%m%d"}
+
+
 def parse_ts(value: str) -> Optional[datetime]:
+    """Type TS (§5.1) : AAAAMMJJ, AAAAMMJJHHmm ou AAAAMMJJHHmmSS.
+
+    On choisit le format d'après la longueur exacte de la valeur plutôt que
+    d'essayer les formats dans l'ordre sur une valeur tronquée : les champs
+    HHMM/HHMMSS ont une largeur variable en regex, donc un tronquage
+    approximatif peut faire « réussir » strptime sur un découpage heure/
+    minute/seconde erroné (silencieux) au lieu d'échouer proprement."""
     value = (value or "").strip()
-    for fmt in ("%Y%m%d%H%M%S", "%Y%m%d%H%M", "%Y%m%d"):
+    fmt = _TS_FORMATS.get(len(value))
+    if fmt:
         try:
-            return datetime.strptime(value[: len(fmt.replace("%", "")) + 4], fmt)
-        except (ValueError, TypeError):
-            continue
-    # tentative tolérante
-    for length, fmt in ((12, "%Y%m%d%H%M"), (8, "%Y%m%d")):
-        try:
-            return datetime.strptime(value[:length], fmt)
-        except (ValueError, TypeError):
-            continue
+            return datetime.strptime(value, fmt)
+        except ValueError:
+            return None
+    # Longueur non standard (ex. caractères en trop) : tronquage tolérant,
+    # du format le plus long au plus court parmi ceux qui tiennent.
+    for length, fmt in sorted(_TS_FORMATS.items(), reverse=True):
+        if len(value) >= length:
+            try:
+                return datetime.strptime(value[:length], fmt)
+            except ValueError:
+                continue
     return None
 
 
@@ -128,6 +141,7 @@ class DemandeData:
     date_prelevement: Optional[datetime] = None
     renseignements_cliniques: str = ""
     prescripteur: str = ""
+    priorite: str = ""           # 9.6 : table ASTM 12 (S/A/R/C/P)
     statut: str = ""
     resultats: List[ResultatData] = field(default_factory=list)
 
@@ -175,8 +189,8 @@ class HprimMessage:
             "",
             "",
             comp(self.recepteur.code, self.recepteur.nom, sep=s),
-            "",
-            "",
+            "",                          # 7.11 : commentaire (facultatif)
+            "P",                         # 7.12 : mode de traitement (P = production, valeur par défaut de la norme)
             comp("H2.4", self.type_liaison, sep=s),
             fmt_ts(self.date_message),
         ]
@@ -213,7 +227,7 @@ class HprimMessage:
             comp(d.id_echantillon, d.id_demande, sep=s),
             "",
             analyses,
-            "",
+            d.priorite,          # 9.6 : priorité (table ASTM 12 : S/A/R/C/P)
             "",
             fmt_ts(d.date_prelevement),
             "",
@@ -238,20 +252,27 @@ class HprimMessage:
             str(r.rang),
             r.type_resultat,
             comp(r.test.code, r.test.libelle, r.test.table, sep=s),
-            "",
+            "",                  # 10.5 : sous-identifiant du test
             r.valeur,
             r.unite,
             r.normales,
             r.anormalite,
-            "",
-            "",
-            r.statut,
+            "",                  # 10.10 : probabilité
+            "",                  # 10.11 : nature des normales
+            r.statut,            # 10.12 : statut des résultats
+            "",                  # 10.13 : date dernier changement normales/unités
+            "",                  # 10.14 : droit d'accès
+            "",                  # 10.15 : date d'obtention du résultat
+            "",                  # 10.16 : secteur technique
+            "",                  # 10.17 : valideur
         ]
         return _join_trim(champs, s.field)
 
     def _seg_L(self, nb_patients: int, nb_segments: int) -> str:
         s = self.sep
-        champs = ["L", "1", "", str(nb_patients), str(nb_segments)]
+        # 14.6 (numéro de lot, facultatif) : on y reporte le nom du fichier,
+        # par convention utilisée par plusieurs logiciels de laboratoire.
+        champs = ["L", "1", "", str(nb_patients), str(nb_segments), self.nom_fichier]
         return _join_trim(champs, s.field)
 
     # ---- assemblage ------------------------------------------------------- #
@@ -292,6 +313,7 @@ class OruResultat:
     normales: str
     anormalite: str
     statut: str
+    date_resultat: Optional[datetime] = None   # 10.15 : date d'obtention du résultat
 
 
 @dataclass
@@ -531,6 +553,7 @@ def parse_message(raw: bytes) -> OruMessage:
                 normales=_get(c, 7),
                 anormalite=_get(c, 8),
                 statut=_get(c, 11),
+                date_resultat=parse_ts(_get(c, 14)),
             ))
         # C, A, L : ignorés / déjà traités
     return msg
@@ -636,8 +659,8 @@ def construire_err(
         ], sep.field)
         segments.append(seg_err)
 
-    segments.append(_join_trim(["L", "1", "", "0", str(len(segments) + 1)],
-                               sep.field))
+    segments.append(_join_trim(
+        ["L", "1", "", "0", str(len(segments) + 1), nom_fichier], sep.field))
 
     out: List[str] = []
     for seg in segments:
