@@ -38,11 +38,19 @@
     .btn-discard:hover { border-color: var(--border-strong); color: var(--text); }
 
     .ord-body { background: var(--surface-muted); min-height: calc(100vh - 60px); padding: 24px; }
-    .ord-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 20px; overflow: hidden; }
+    {% comment %}`overflow: hidden` servait uniquement à faire suivre les coins
+    arrondis à l'en-tête — mais il rognait aussi toute liste déroulante ouverte
+    depuis la carte : la liste des médicaments s'arrêtait net au bord du cadre,
+    ses dernières entrées invisibles. Deux cartes s'en étaient déjà sorties par
+    un `style="overflow:visible"` posé à la main, ce qui en disait long. Le
+    découpage est maintenant porté par l'en-tête lui-même, qui arrondit ses
+    deux coins hauts, et la carte laisse passer ce qui la dépasse.{% endcomment %}
+    .ord-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 20px; }
     .ord-card-head {
         padding: 12px 20px; font-size: 12px; font-weight: 700; text-transform: uppercase;
         letter-spacing: 0.06em; color: var(--text-muted);
         border-bottom: 1px solid var(--border); background: var(--surface-muted);
+        border-radius: 7px 7px 0 0;
     }
     .ord-card-body { padding: 20px; }
 
@@ -107,24 +115,57 @@
         padding: 7px 16px; cursor: pointer; margin-top: 12px;
         font-family: 'Sora', sans-serif; transition: background 0.15s;
     }
-    .btn-add-line:hover { background: var(--teal-50); }
+    .btn-add-line:hover { background: rgba(var(--teal-500-rgb), .12); }
 
     /* Autocomplete médicament */
     .med-ac-wrap { position: relative; }
+    {% comment %}La liste tenait sur 240 px fixes alors que la colonne en fait le
+    double : une désignation un peu longue poussait le stock, posé en `float`,
+    sur une seconde ligne où il chevauchait l'entrée suivante. Elle épouse
+    maintenant la largeur du champ, et chaque entrée est une rangée souple —
+    le nom à gauche, le stock à droite, qui ne peuvent plus se rencontrer.{% endcomment %}
     .med-ac-dropdown {
-        display: none; position: absolute; top: calc(100% + 2px); left: 0;
+        display: none; position: absolute; top: calc(100% + 3px); left: 0; right: 0;
         background: var(--surface); border: 1px solid var(--border-strong);
-        border-radius: 7px; box-shadow: 0 6px 18px rgba(0,0,0,0.10);
-        z-index: 500; min-width: 240px; max-height: 200px; overflow-y: auto;
+        border-radius: 7px; box-shadow: 0 10px 28px rgba(0,0,0,0.16);
+        z-index: 500; min-width: 280px; max-height: 260px; overflow-y: auto;
     }
-    .med-ac-item { padding: 7px 12px; font-size: 12.5px; cursor: pointer; border-bottom: 1px solid var(--border); line-height: 1.4; color: var(--teal-900); }
-    .med-ac-item:hover { background: var(--teal-50); }
+    html[data-theme="dark"] .med-ac-dropdown {
+        /* Sur fond sombre, une ombre portée ne détache rien : elle s'ajoute à
+           du noir. Le relief vient d'une surface plus claire que le panneau
+           (--surface y vaut #141b22, la même que la carte derrière) et d'un
+           filet net. */
+        background: #1c252f;
+        border-color: #3a4a5c;
+        box-shadow: 0 12px 32px rgba(0,0,0,0.55);
+    }
+    .med-ac-item {
+        display: flex; align-items: center; justify-content: space-between; gap: 14px;
+        padding: 8px 12px; font-size: 12.5px; cursor: pointer;
+        border-bottom: 1px solid var(--border); line-height: 1.4;
+        color: var(--text-strong);
+    }
+    .med-ac-item:last-child { border-bottom: none; }
+    /* Une teinte transparente de l'accent, et non --teal-50 : ce palier reste
+       très clair en thème sombre, le survol virait au blanc. */
+    .med-ac-item:hover { background: rgba(var(--teal-500-rgb), .12); }
     {% comment %}Rupture dans la pharmacie du centre : visible pour qu'on sache
     que le produit existe, éteint pour qu'on n'essaie pas de le choisir.{% endcomment %}
     .med-ac-rupture { opacity: .45; cursor: not-allowed; }
     .med-ac-rupture:hover { background: transparent; }
-    .med-ac-name { font-weight: 500; }
-    .med-ac-sub { font-size: 11px; color: var(--text-muted); }
+    .med-ac-texte { min-width: 0; }
+    .med-ac-name { font-weight: 600; }
+    .med-ac-sub { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+    .med-ac-stock {
+        flex-shrink: 0; white-space: nowrap; font-size: 11px; font-weight: 700;
+        padding: 2px 8px; border-radius: 9px;
+    }
+    .med-ac-stock.ok      { background: rgba(var(--teal-500-rgb), .14); color: var(--accent-text); }
+    .med-ac-stock.bas     { background: rgba(var(--amber-rgb), .14);    color: var(--amber-text); }
+    .med-ac-stock.rupture { background: rgba(var(--rose-rgb), .14);     color: var(--rose-text); }
+    html[data-theme="dark"] .med-ac-stock.bas     { background: rgba(var(--amber-rgb), .20); color: #f0c060; }
+    html[data-theme="dark"] .med-ac-stock.rupture { background: rgba(var(--rose-rgb), .20);  color: #f09090; }
+    html[data-theme="dark"] .med-ac-stock.ok      { background: rgba(var(--teal-500-rgb), .22); color: var(--teal-300); }
 
     /* Stock badge */
     .stock-badge {
@@ -176,9 +217,9 @@
 <div class="ord-body">
 
     <!-- Patient -->
-    <div class="ord-card" style="overflow:visible;">
+    <div class="ord-card">
         <div class="ord-card-head">Patient</div>
-        <div class="ord-card-body" style="overflow:visible;">
+        <div class="ord-card-body">
         {% comment %}Sélecteur commun au projet — le même que dans soins et
         hospitalisation. Venu d'une consultation, le dossier est imposé :
         `lecture_seule` retire la recherche et la croix de désélection. Sinon la
@@ -455,12 +496,15 @@ function setupLine(row) {
                   data-stock="${m.stock_actuel ?? ''}"
                   data-alerte="${m.stock_alerte ?? 10}"
                   data-minimum="${m.stock_minimum ?? 5}">
-                <div class="med-ac-name">${m.designation}</div>
-                <div class="med-ac-sub">${m.dosage||''} ${m.forme||''}
-                    <span style="float:right;margin-left:8px;font-weight:600;color:${m.rupture ? 'var(--rose-text)' : (m.stock_actuel||0) > (m.stock_alerte||10) ? 'var(--teal-600)' : 'var(--amber-text)'}">
-                        ${m.rupture ? 'Rupture ici' : 'Stock : ' + (m.stock_actuel ?? '—')}
-                    </span>
+                <div class="med-ac-texte">
+                    <div class="med-ac-name">${m.designation}</div>
+                    ${(m.dosage || m.forme)
+                        ? `<div class="med-ac-sub">${m.dosage||''} ${m.forme||''}</div>` : ''}
                 </div>
+                <span class="med-ac-stock ${m.rupture ? 'rupture'
+                    : (m.stock_actuel||0) > (m.stock_alerte||10) ? 'ok' : 'bas'}">
+                    ${m.rupture ? 'Rupture ici' : 'Stock : ' + (m.stock_actuel ?? '—')}
+                </span>
             </div>`
         ).join('');
         dropdown.style.display = 'block';

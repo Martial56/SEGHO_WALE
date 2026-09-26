@@ -1686,3 +1686,58 @@ class TestProduitsSurLaFacture(TestCase):
         self.client.post(reverse('facturation:edit', args=[facture.pk]),
                          {'action_annuler': '1'}, follow=True)
         self.assertEqual(self._en_rayon(self.gants), Decimal('20'))
+
+
+class TestRetirerUneLigneNeFaitPasPerdreLesAutres(TestCase):
+    """Retirer une ligne au milieu de la facture ne doit rien coûter.
+
+    Le bouton « × » retire la ligne du tableau **sans renuméroter** les
+    suivantes, et les indices viennent d'un compteur qui ne redescend jamais.
+    La lecture s'arrêtait au premier indice absent : retirer une ligne du
+    milieu de cinq n'en facturait plus que deux, et retirer la première
+    laissait une facture **vide, à zéro franc**.
+
+    C'est le geste le plus courant de la caisse — le patient annonce qu'il a
+    déjà tel médicament, on l'enlève — et il faisait perdre le reste de la
+    facture, sans un mot.
+    """
+
+    def test_un_trou_au_milieu_ne_perd_rien(self):
+        facture = _facture(_patient('Trou'))
+        total = _save_lignes(facture, {
+            'ligne_libelle_0': 'Acte 1', 'ligne_qte_0': '1',
+            'ligne_prix_0': '1000', 'ligne_remise_0': '0',
+            # indice 1 : la ligne retirée par la caissière
+            'ligne_libelle_2': 'Acte 3', 'ligne_qte_2': '1',
+            'ligne_prix_2': '3000', 'ligne_remise_2': '0',
+            'ligne_libelle_3': 'Acte 4', 'ligne_qte_3': '1',
+            'ligne_prix_3': '4000', 'ligne_remise_3': '0',
+        })
+        self.assertEqual(total, 8000)
+        self.assertEqual(facture.lignes.count(), 3)
+
+    def test_la_premiere_ligne_retiree_ne_vide_pas_la_facture(self):
+        facture = _facture(_patient('Prem'))
+        total = _save_lignes(facture, {
+            'ligne_libelle_1': 'Acte 2', 'ligne_qte_1': '1',
+            'ligne_prix_1': '2000', 'ligne_remise_1': '0',
+            'ligne_libelle_2': 'Acte 3', 'ligne_qte_2': '1',
+            'ligne_prix_2': '3000', 'ligne_remise_2': '0',
+        })
+        self.assertEqual(total, 5000)
+        self.assertEqual(facture.lignes.count(), 2)
+
+    def test_les_lignes_restent_dans_l_ordre_du_formulaire(self):
+        """Les indices se lisent en ordre numérique, pas alphabétique :
+        sans ça la ligne 10 passerait avant la ligne 2."""
+        facture = _facture(_patient('Ordre'))
+        donnees = {}
+        for i in (0, 2, 10):
+            donnees[f'ligne_libelle_{i}'] = f'Acte {i}'
+            donnees[f'ligne_qte_{i}'] = '1'
+            donnees[f'ligne_prix_{i}'] = '100'
+            donnees[f'ligne_remise_{i}'] = '0'
+        _save_lignes(facture, donnees)
+        self.assertEqual(
+            [l.libelle for l in facture.lignes.order_by('pk')],
+            ['Acte 0', 'Acte 2', 'Acte 10'])

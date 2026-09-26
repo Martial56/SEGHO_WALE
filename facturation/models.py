@@ -168,6 +168,25 @@ class LigneFacture(models.Model):
     produit = models.ForeignKey(
         'stock.Produit', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='lignes_facture', verbose_name="Produit")
+    # La ligne d'ordonnance dont vient cette ligne, quand la caisse a facturé
+    # une prescription. Nul sur une ligne ajoutée au comptoir — elle n'a pas été
+    # prescrite — et c'est cette absence qui la distingue.
+    #
+    # Sans ce lien, personne ne pouvait répondre à « cette ligne d'ordonnance
+    # a-t-elle été payée ? ». Le patient qui disait avoir déjà un médicament le
+    # voyait retirer de la facture, puis servi quand même au comptoir : la
+    # dispensation partait de l'ordonnance, qui ignore tout de la caisse.
+    ligne_ordonnance = models.ForeignKey(
+        'consultations.LigneOrdonnance', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='lignes_facture',
+        verbose_name="Ligne d'ordonnance")
+    # La ligne de demande d'examen que cette ligne facture. Même rôle que
+    # `ligne_ordonnance` du côté pharmacie : savoir, examen par examen, lequel
+    # a été payé.
+    ligne_demande_examen = models.ForeignKey(
+        'laboratoire.LigneDemandeExamen', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='lignes_facture',
+        verbose_name="Ligne de demande d'examen")
     libelle = models.CharField(max_length=300)
     quantite = models.DecimalField(max_digits=10, decimal_places=2, default=1)
     prix_unitaire = models.DecimalField(max_digits=12, decimal_places=2)

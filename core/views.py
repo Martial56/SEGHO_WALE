@@ -811,13 +811,19 @@ def laboratoire_create(request):
             demande.date_prelevement = parse_datetime(raw_date)
         demande.save()
 
+        # On s'arrêtait au premier indice absent. Le bouton « × » retire la
+        # ligne sans renuméroter les suivantes : retirer un examen du milieu
+        # faisait perdre tous ceux d'après, sans un mot, et la demande partait
+        # amputée avec un montant trop bas.
+        indices = sorted(
+            int(cle[len('ligne_examen_'):])
+            for cle in request.POST
+            if cle.startswith('ligne_examen_') and cle[len('ligne_examen_'):].isdigit()
+        )
         total = 0
-        i = 0
-        while True:
+        for i in indices:
             svc_nom = request.POST.get(f'ligne_examen_{i}')
-            if svc_nom is None:
-                break
-            if svc_nom.strip():
+            if svc_nom and svc_nom.strip():
                 try:
                     prix = float(request.POST.get(f'ligne_prix_{i}', 0) or 0)
                 except ValueError:
@@ -835,7 +841,6 @@ def laboratoire_create(request):
                     article_service_id=article_id,
                 )
                 total += prix
-            i += 1
 
         demande.montant_total = total
         demande.save()
@@ -878,7 +883,15 @@ def laboratoire_detail(request, pk):
                 messages.error(request, str(exc))
         return redirect('laboratoire_detail', pk=pk)
 
-    lignes = demande.lignes.select_related('type_examen').all()
+    # Trois états lisibles : demandé et payé (rien), demandé puis retiré à la
+    # caisse (« Non payé »), ajouté à la caisse sans avoir été demandé.
+    from facturation.views import _examens_non_payes
+
+    lignes = list(demande.lignes.select_related('type_examen').all())
+    non_payes = _examens_non_payes(demande)
+    for ligne in lignes:
+        ligne.non_payee = ligne.pk in non_payes
+
     return render(request, 'laboratoire/detail_demande.html', {
         'demande': demande,
         'lignes': lignes,

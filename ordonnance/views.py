@@ -101,7 +101,28 @@ def ordonnance_detail(request, pk):
         ligne.stock_pharma = quantites.get(ligne.produit_id)
 
     from facturation.models import Facture
-    facture_existante = Facture.objects.filter(ordonnance=ordonnance).exclude(statut='annulee').first()
+    # `all_objects` : la facture est retrouvée par la clé étrangère de cette
+    # ordonnance, qui porte déjà le cloisonnement par centre. Passer par le
+    # manager filtré ferait dire « pas encore facturée » à une ordonnance qui
+    # l'est, dès que le centre actif ne correspond pas.
+    facture_existante = (Facture.all_objects.filter(ordonnance=ordonnance)
+                         .exclude(statut='annulee').first())
+
+    # L'état de chaque ligne, déduit et non stocké — rien à resynchroniser.
+    #
+    # L'écran ne savait dire que « facturée » ou « pas facturée », en bloc.
+    # Or le patient qui annonce à la caisse avoir déjà tel médicament le voit
+    # retirer de la facture : quatre lignes payées sur cinq, et l'ordonnance
+    # entière s'affichait comme réglée. Le médecin ne pouvait pas voir ce que
+    # son patient avait réellement pris.
+    if facture_existante:
+        payees = set(
+            facture_existante.lignes
+            .filter(ligne_ordonnance__isnull=False)
+            .values_list('ligne_ordonnance_id', flat=True))
+        for ligne in lignes:
+            ligne.non_payee = ligne.pk not in payees
+
     return render(request, 'pharmacie/ordonnance/ordonnance_detail.html', {
         'ordonnance':       ordonnance,
         'lignes':           lignes,

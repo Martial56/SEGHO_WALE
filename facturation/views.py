@@ -186,29 +186,45 @@ def facture_create(request):
 
     initial_lignes = []
     if demande_obj:
-        for ligne in demande_obj.lignes.select_related('type_examen').all():
+        for ligne in demande_obj.lignes.select_related('type_examen', 'article_service').all():
             libelle = ligne.libelle or (str(ligne.type_examen) if ligne.type_examen else '')
             initial_lignes.append({
                 'libelle': libelle,
                 'prix': ligne.prix,
                 'qte': 1,
                 'remise': 0,
+                # L'article manquait : sans lui la ligne ne comptait pour
+                # aucune nature, et le type de la facture ne pouvait plus se
+                # déduire de son contenu.
+                'reference': f'a:{ligne.article_service_id}' if ligne.article_service_id else '',
+                # D'où vient la ligne : ce qui reste à la validation est payé.
+                'ligne_demande': ligne.pk,
             })
     elif ordonnance_obj:
         for ligne in ordonnance_obj.lignes.all():
             if ligne.produit:
                 libelle = ligne.produit.nom
                 prix    = float(ligne.produit.prix_vente)
+                # La référence manquait : le gabarit la lit pour rattacher la
+                # ligne au produit du stock. Sans elle, une facture née d'une
+                # ordonnance encaissait le bon montant et ne décomptait rien.
+                reference = f'p:{ligne.produit_id}'
             elif ligne.medicament_libre:
                 libelle = ligne.medicament_libre
                 prix    = 0
+                reference = ''
             else:
                 continue
             initial_lignes.append({
-                'libelle': libelle,
-                'prix':    prix,
-                'qte':     ligne.quantite,
-                'remise':  0,
+                'libelle':   libelle,
+                'prix':      prix,
+                'qte':       ligne.quantite,
+                'remise':    0,
+                'reference': reference,
+                # D'où vient la ligne. Ce qui reste à la validation est payé ;
+                # ce qui a disparu de la grille ne l'est pas, et la pharmacie
+                # ne le servira pas.
+                'ligne_ordonnance': ligne.pk,
             })
 
     initial_type_facture  = ('laboratoire' if demande_obj else
@@ -289,19 +305,18 @@ def facture_create(request):
                 return redirect(next_url)
             return redirect('facturation:list')
         # Form invalid: preserve submitted lignes so dynamically-added rows survive re-render
-        _i, _post_lignes = 0, []
-        while True:
-            _lib = request.POST.get(f'ligne_libelle_{_i}')
-            if _lib is None:
-                break
-            _post_lignes.append({
-                'libelle': _lib,
-                'prix':    request.POST.get(f'ligne_prix_{_i}', 0),
-                'qte':     request.POST.get(f'ligne_qte_{_i}', 1),
-                'remise':  request.POST.get(f'ligne_remise_{_i}', 0),
-                'reference': request.POST.get(f'ligne_service_{_i}', ''),
-            })
-            _i += 1
+        # Même piège que `_save_lignes` : s'arrêter au premier indice absent
+        # faisait disparaître, à la ré-affichage, toutes les lignes situées
+        # après celle que la caissière venait de retirer.
+        _post_lignes = [{
+            'libelle': request.POST.get(f'ligne_libelle_{_i}'),
+            'prix':    request.POST.get(f'ligne_prix_{_i}', 0),
+            'qte':     request.POST.get(f'ligne_qte_{_i}', 1),
+            'remise':  request.POST.get(f'ligne_remise_{_i}', 0),
+            'reference': request.POST.get(f'ligne_service_{_i}', ''),
+            'ligne_ordonnance': request.POST.get(f'ligne_ordonnance_{_i}', ''),
+            'ligne_demande': request.POST.get(f'ligne_demande_{_i}', ''),
+        } for _i in _indices_des_lignes(request.POST)]
         if _post_lignes:
             initial_lignes = _post_lignes
     else:
@@ -707,14 +722,59 @@ def _poser_origine(ligne, reference, pharmacie):
         ligne.produit_id = pk
 
 
+def _poser_ligne_ordonnance(ligne, brut):
+    """Rattache la ligne à la ligne d'ordonnance qu'elle facture.
+
+    Vide sur une ligne ajoutée au comptoir : la caissière peut ajouter ce que
+    le médecin n'a pas prescrit, et la pharmacie le servira quand même — c'est
+    la facture qui commande la dispensation, pas la prescription.
+    """
+    if not brut:
+        return
+    try:
+        ligne.ligne_ordonnance_id = int(brut)
+    except (TypeError, ValueError):
+        pass
+
+
+def _indices_des_lignes(POST):
+    """Les indices de lignes présents dans le formulaire, dans l'ordre.
+
+    On s'arrêtait au premier indice absent. Or le bouton « × » retire la ligne
+    du tableau sans renuméroter les suivantes, et les indices sont distribués
+    par un compteur qui ne redescend jamais : retirer une ligne creuse un trou.
+
+    Le résultat était silencieux et coûteux. Retirer une ligne du milieu de
+    cinq n'en facturait plus que deux ; retirer la première laissait une
+    facture **vide, à zéro franc**. C'est le geste le plus courant de la
+    caisse — le patient dit qu'il a déjà tel médicament, on l'enlève — et il
+    faisait perdre le reste de la facture.
+    """
+    indices = []
+    for cle in POST:
+        if cle.startswith('ligne_libelle_'):
+            try:
+                indices.append(int(cle[len('ligne_libelle_'):]))
+            except ValueError:
+                continue
+    return sorted(indices)
+
+
+def _poser_ligne_demande(ligne, brut):
+    """Rattache la ligne à la ligne de demande d'examen qu'elle facture."""
+    if not brut:
+        return
+    try:
+        ligne.ligne_demande_examen_id = int(brut)
+    except (TypeError, ValueError):
+        pass
+
+
 def _save_lignes(facture, POST, pharmacie=None):
     total = 0
-    i = 0
-    while True:
+    for i in _indices_des_lignes(POST):
         libelle = POST.get(f'ligne_libelle_{i}')
-        if libelle is None:
-            break
-        if libelle.strip():
+        if libelle and libelle.strip():
             qte    = _parse_float(POST.get(f'ligne_qte_{i}', 1), 1)
             prix   = _parse_float(POST.get(f'ligne_prix_{i}', 0), 0)
             remise = _parse_float(POST.get(f'ligne_remise_{i}', 0), 0)
@@ -735,36 +795,116 @@ def _save_lignes(facture, POST, pharmacie=None):
             # Absente d'une ligne tapée à la main : elle ne comptera alors pour
             # aucune nature, plutôt que d'en deviner une d'après son libellé.
             _poser_origine(ligne, POST.get(f'ligne_service_{i}'), pharmacie)
+            _poser_ligne_ordonnance(ligne, POST.get(f'ligne_ordonnance_{i}'))
+            _poser_ligne_demande(ligne, POST.get(f'ligne_demande_{i}'))
             ligne.save()
             total += qte * prix * (1 - remise / 100)
-        i += 1
     return total
 
 
 def _sync_lignes_demande_examen(facture):
-    """Miroir les lignes de la facture vers la demande d'examen laboratoire liée :
-    le bulletin d'examens doit toujours afficher exactement la liste des examens
-    facturés (ajout/retrait d'un examen par la caissière -> bulletin mis à jour).
-    Ignoré si la facture n'est pas liée à une demande, ou à plusieurs."""
+    """Reporte sur la demande d'examen ce que la caisse a fait de la facture.
+
+    La fonction **effaçait toutes les lignes de la demande** et les recréait
+    d'après la facture. Deux dégâts, l'un visible et l'autre pas :
+
+    * un examen retiré à la caisse disparaissait de la demande, sans trace.
+      Le médecin ne pouvait plus voir ce qu'il avait demandé, ni personne
+      pourquoi l'examen n'avait pas été fait ;
+    * la recréation ne reposait que le libellé, le prix et les instructions.
+      `article_service` et `type_examen` étaient perdus à chaque enregistrement
+      de la facture — or c'est `article_service` qui porte le **code HPRIM**
+      envoyé au laboratoire partenaire (voir laboratoire.hprim.integration).
+      La demande partait donc sans code dès qu'elle était facturée.
+
+    Désormais on ne supprime rien. Les lignes demandées restent ; celles que la
+    facture ne porte pas se liront « non payé » (voir `_examens_non_payes`).
+    Un examen ajouté au comptoir est ajouté à la demande — le laboratoire doit
+    le faire — et rattaché à sa ligne de facture.
+
+    Ignorée si la facture n'est pas liée à une demande, ou à plusieurs.
+    """
+    from laboratoire.models import LigneDemandeExamen
+
     demandes = list(facture.demandes_examens.all())
     if len(demandes) != 1:
         return
     demande = demandes[0]
-    from laboratoire.models import LigneDemandeExamen
-    anciennes_instructions = {l.libelle: l.instructions for l in demande.lignes.all()}
-    demande.lignes.all().delete()
-    total = 0
-    for ligne in facture.lignes.all():
-        montant = ligne.montant_ligne
-        LigneDemandeExamen.objects.create(
+
+    lignes_facture = list(facture.lignes.all())
+    deja_liees = {l.ligne_demande_examen_id for l in lignes_facture
+                  if l.ligne_demande_examen_id}
+
+    # Les examens ajoutés à la caisse, que le médecin n'avait pas demandés.
+    for ligne in lignes_facture:
+        if ligne.ligne_demande_examen_id or not _est_un_examen(ligne):
+            continue
+        nouvelle = LigneDemandeExamen.objects.create(
             demande=demande,
             libelle=ligne.libelle,
-            prix=montant,
-            instructions=anciennes_instructions.get(ligne.libelle, ''),
+            prix=ligne.montant_ligne,
+            article_service=ligne.article,
+            origine='caisse',
         )
+        ligne.ligne_demande_examen = nouvelle
+        ligne.save(update_fields=['ligne_demande_examen'])
+        deja_liees.add(nouvelle.pk)
+
+    # Le prix facturé fait foi sur celui qui avait été estimé à la demande.
+    montants = {l.ligne_demande_examen_id: l.montant_ligne
+                for l in facture.lignes.all() if l.ligne_demande_examen_id}
+    total = 0
+    for ligne in demande.lignes.all():
+        montant = montants.get(ligne.pk)
+        if montant is None:
+            continue        # retiré à la caisse : ne compte pas dans le total
+        if ligne.prix != montant:
+            ligne.prix = montant
+            ligne.save(update_fields=['prix'])
         total += montant
+
     demande.montant_total = total
     demande.save(update_fields=['montant_total'])
+
+
+def _est_un_examen(ligne):
+    """Cette ligne de facture est-elle un examen de laboratoire ?
+
+    Une facture d'examens n'est pas faite que d'examens : la caisse y ajoute
+    volontiers une boîte de gants ou une consultation. Sans ce tri, tout ce
+    qu'elle ajoutait partait sur la demande, et le laboratoire se voyait
+    réclamer d'« exécuter » un consommable.
+
+    On tranche par la **catégorie de l'article**, la même table qui donne son
+    type à la facture. Une ligne rattachée à un produit du stock n'est jamais
+    un examen. Une ligne tapée à la main n'a pas de catégorie : dans le doute
+    on ne l'envoie pas au laboratoire — un examen manquant se voit et se
+    rattrape, un consommable sur un bulletin d'analyses sème le doute.
+    """
+    from .models import CATEGORIE_VERS_TYPE
+
+    if ligne.produit_id or not ligne.article_id:
+        return False
+    code = getattr(getattr(ligne.article, 'categorie', None), 'code', None)
+    return CATEGORIE_VERS_TYPE.get(code) in ('laboratoire', 'imagerie')
+
+
+def _examens_non_payes(demande):
+    """Identifiants des lignes de la demande qu'aucune facture ne porte.
+
+    Déduit et non stocké, comme pour l'ordonnance : rien à resynchroniser, et
+    la réponse suit toute modification ultérieure de la facture.
+    """
+    from facturation.models import LigneFacture
+
+    facture = getattr(demande, 'facture', None)
+    if facture is None or facture.statut == 'annulee':
+        return set()
+    payees = set(
+        LigneFacture.objects
+        .filter(facture=facture, ligne_demande_examen__isnull=False)
+        .values_list('ligne_demande_examen_id', flat=True))
+    return {l.pk for l in demande.lignes.all() if l.pk not in payees}
 
 
 def _handle_paiement(facture, POST, user, total, request=None):

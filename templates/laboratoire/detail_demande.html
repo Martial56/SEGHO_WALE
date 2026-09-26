@@ -670,6 +670,18 @@
             <div class="section-title">Tests demandés</div>
 
             <!-- ── Vue lecture seule ── -->
+            <style>
+                .exam-non-paye > td { opacity: .55; }
+                .exam-mention {
+                    display: inline-block; margin-left: 6px; padding: 1px 8px;
+                    border-radius: 9px; font-size: 10.5px; font-weight: 700;
+                    vertical-align: middle; white-space: nowrap;
+                }
+                .mention-non-paye { background: rgba(var(--rose-rgb), .12); color: var(--rose-text); }
+                .mention-caisse   { background: rgba(var(--violet-rgb), .14); color: var(--violet); }
+                html[data-theme="dark"] .mention-non-paye { background: rgba(var(--rose-rgb), .20);   color: #f09090; }
+                html[data-theme="dark"] .mention-caisse   { background: rgba(var(--violet-rgb), .22); color: #c4a9f0; }
+            </style>
             <div id="lignes-view">
                 <div style="overflow-x:auto;">
                     <table class="tests-table">
@@ -683,11 +695,21 @@
                         </thead>
                         <tbody>
                             {% for ligne in lignes %}
-                            <tr>
+                            <tr{% if ligne.non_payee %} class="exam-non-paye"{% endif %}>
                                 <td style="font-weight:600;color:var(--teal-900);">
                                     {{ ligne.libelle|default:ligne.type_examen }}
                                     {% if ligne.type_examen.code %}
                                     <span style="font-size:11px;color:var(--text-muted);font-family: var(--font-mono);">[{{ ligne.type_examen.code }}]</span>
+                                    {% endif %}
+                                    {% comment %}Trois états, deux mentions : un examen demandé et
+                                    payé ne porte rien. « Non payé » dit qu'il a été retiré à la
+                                    caisse et ne sera pas fait ; « Ajouté à la caisse » dit qu'aucun
+                                    médecin ne l'a demandé, ce que le laboratoire et le prescripteur
+                                    doivent savoir quand le résultat reviendra.{% endcomment %}
+                                    {% if ligne.non_payee %}
+                                    <span class="exam-mention mention-non-paye" title="Retiré de la facture à la caisse : cet examen ne sera pas fait">Non payé</span>
+                                    {% elif ligne.origine == 'caisse' %}
+                                    <span class="exam-mention mention-caisse" title="Ajouté à la caisse — cet examen n'a été demandé par aucun médecin">Ajouté à la caisse</span>
                                     {% endif %}
                                 </td>
                                 <td style="color:var(--text);">

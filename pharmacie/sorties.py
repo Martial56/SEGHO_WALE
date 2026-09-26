@@ -33,14 +33,37 @@ TYPE_RETOUR = 'retour'
 
 
 def _lignes_de_produit(facture):
-    """Lignes de la facture qui portent un produit du stock."""
-    return [l for l in facture.lignes.select_related('produit') if l.produit_id]
+    """Lignes de la facture à sortir du stock au paiement.
+
+    Une ligne adossée à une **ordonnance** en est exclue : elle sortira au
+    comptoir, quand la pharmacie remettra la boîte au patient. Sans cette
+    exclusion le produit serait décompté deux fois — une au paiement, une à la
+    dispensation — et le rayon tomberait en rupture deux fois plus vite, sans
+    que rien ne le signale.
+
+    Restent donc ici les produits facturés sans passer par la pharmacie : les
+    gants d'un pansement, les consommables d'un examen. Ceux-là changent de
+    mains au moment où l'on paie.
+    """
+    return [l for l in facture.lignes.select_related('produit')
+            if l.produit_id and not l.ligne_ordonnance_id]
 
 
-def deja_traitee(facture, pharmacie, type_mouvement=TYPE_SORTIE):
-    """Cette facture a-t-elle déjà donné lieu à ce mouvement ?"""
-    return MouvementPharmacie.objects.filter(
-        pharmacie=pharmacie, type=type_mouvement, reference=facture.numero).exists()
+def deja_traitee(facture, pharmacie, type_mouvement=None):
+    """Cette facture a-t-elle déjà fait bouger le stock ?
+
+    Sans `type_mouvement`, la question porte sur **tout** mouvement portant ce
+    numéro de facture, quel qu'en soit le type. C'est volontaire : le garde-fou
+    ne regardait que son propre type, si bien qu'une sortie « facture » et une
+    sortie « dispensation » sur la même remise physique passaient toutes les
+    deux. Une remise, un mouvement — la référence commune suffit à le garantir,
+    la dispensation écrivant elle aussi le numéro de la facture.
+    """
+    mouvements = MouvementPharmacie.objects.filter(
+        pharmacie=pharmacie, reference=facture.numero)
+    if type_mouvement is not None:
+        mouvements = mouvements.filter(type=type_mouvement)
+    return mouvements.exists()
 
 
 def produits_indisponibles(facture, pharmacie):
@@ -113,7 +136,7 @@ def rendre_les_produits(facture, pharmacie, user=None):
     """Remet en rayon les produits d'une facture annulée après paiement."""
     lignes = _lignes_de_produit(facture)
     if (not lignes or pharmacie is None
-            or not deja_traitee(facture, pharmacie)
+            or not deja_traitee(facture, pharmacie, TYPE_SORTIE)
             or deja_traitee(facture, pharmacie, TYPE_RETOUR)):
         return 0
 
