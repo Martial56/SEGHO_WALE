@@ -3,6 +3,29 @@
 from django.db import migrations, models
 
 
+class AjouterChampSiAbsent(migrations.AddField):
+    """AddField qui n'ajoute la colonne que si elle n'existe pas déjà.
+
+    La colonne type_rdv est créée par 0001_initial ; 0003_replace_type_rdv_with_service_fk
+    ne l'a retirée que de l'état Django. Sur une base neuve elle est donc déjà
+    présente et l'ADD COLUMN échouait sous PostgreSQL. L'état Django, lui, évolue
+    exactement comme avec un AddField ordinaire.
+    """
+
+    def database_forwards(self, app_label, schema_editor, from_state, to_state):
+        modele = to_state.apps.get_model(app_label, self.model_name)
+        champ = modele._meta.get_field(self.name)
+        connection = schema_editor.connection
+        with connection.cursor() as cursor:
+            colonnes = {c.name for c in connection.introspection.get_table_description(cursor, modele._meta.db_table)}
+        if champ.column not in colonnes:
+            super().database_forwards(app_label, schema_editor, from_state, to_state)
+
+    def database_backwards(self, app_label, schema_editor, from_state, to_state):
+        # Sans effet : la colonne existe depuis 0001_initial.
+        pass
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -10,7 +33,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
+        AjouterChampSiAbsent(
             model_name='rendezvous',
             name='type_rdv',
             field=models.CharField(choices=[('consultation', 'Consultation'), ('controle', 'Contrôle'), ('urgence', 'Urgence'), ('examen', 'Examen'), ('vaccination', 'Vaccination')], default='consultation', max_length=20),

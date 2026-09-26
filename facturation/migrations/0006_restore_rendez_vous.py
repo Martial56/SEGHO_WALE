@@ -4,15 +4,22 @@ import django.db.models.deletion
 
 def restore_rendez_vous_column(apps, schema_editor):
     """Ajoute rendez_vous_id si la colonne a été supprimée par erreur."""
-    from django.db import connection
+    connection = schema_editor.connection
+    # SQLite : SQL historique inchangé. Ailleurs : type réel de la clé du
+    # rendez-vous (bigint) et contrainte différée, comme Django.
+    if connection.vendor == 'sqlite':
+        colonne = "integer REFERENCES patients_rendezvous (id)"
+    else:
+        pk = apps.get_model('patients', 'RendezVous')._meta.pk
+        colonne = (f"{pk.rel_db_type(connection)} "
+                   "REFERENCES patients_rendezvous (id) DEFERRABLE INITIALLY DEFERRED")
     with connection.cursor() as cursor:
         table_desc = connection.introspection.get_table_description(cursor, 'facturation_facture')
         columns = [col.name for col in table_desc]
         if 'rendez_vous_id' not in columns:
             cursor.execute(
                 "ALTER TABLE facturation_facture "
-                "ADD COLUMN rendez_vous_id integer "
-                "REFERENCES patients_rendezvous (id)"
+                f"ADD COLUMN rendez_vous_id {colonne}"
             )
 
 

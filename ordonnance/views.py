@@ -542,26 +542,6 @@ def ordonnance_create_libre(request):
         except (Medecin.DoesNotExist, ValueError):
             pass
 
-    initial_lignes = []
-    from_ordonnance_pk = request.GET.get('from_ordonnance')
-    if from_ordonnance_pk:
-        try:
-            src = Ordonnance.objects.prefetch_related('lignes__produit').get(pk=from_ordonnance_pk)
-            if patient is None:
-                patient = src.patient or (src.consultation.patient if src.consultation else None)
-            for lg in src.lignes.select_related('produit').all():
-                initial_lignes.append({
-                    'med_id':    lg.produit_id or '',
-                    'med_nom':   lg.produit.nom if lg.produit else (lg.medicament_libre or ''),
-                    'med_unite': lg.produit.unite_mesure.nom if lg.produit and lg.produit.unite_mesure else
-                                 (lg.produit.get_forme_display() if lg.produit and lg.produit.forme else ''),
-                    'posologie': lg.posologie or '',
-                    'duree':     lg.duree or '',
-                    'quantite':  lg.quantite,
-                })
-        except Ordonnance.DoesNotExist:
-            pass
-
     if request.method == 'POST':
         type_ord   = request.POST.get('type_ordonnance', 'interne')
         date_exp   = request.POST.get('date_expiration') or None
@@ -642,7 +622,6 @@ def ordonnance_create_libre(request):
         'types':             types,
         'medicaments_dispo': _medicaments_dispo_json(request),
         'date_expiration_defaut': date_expiration_par_defaut(),
-        'initial_lignes':    initial_lignes,
     })
 
 

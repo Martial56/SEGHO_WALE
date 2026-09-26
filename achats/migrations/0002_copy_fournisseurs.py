@@ -1,3 +1,4 @@
+from django.core.management.color import no_style
 from django.db import migrations
 from django.utils import timezone
 
@@ -23,6 +24,14 @@ def copy_fournisseurs_from_stock(apps, schema_editor):
                 adresse=adresse or '',
                 actif=bool(actif),
             )
+
+    # Les id recopiés explicitement ne font pas avancer la séquence PostgreSQL :
+    # sans cette remise à niveau, le prochain Fournisseur créé entrerait en
+    # conflit de clé primaire. SQLite n'en a pas besoin (rowid).
+    if rows and db.vendor != 'sqlite':
+        with db.cursor() as cursor:
+            for sql in db.ops.sequence_reset_sql(no_style(), [Fournisseur]):
+                cursor.execute(sql)
 
 
 def noop(apps, schema_editor):

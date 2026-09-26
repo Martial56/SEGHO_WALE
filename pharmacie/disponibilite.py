@@ -24,7 +24,7 @@ moment où l'écran s'affiche et celui où l'on enregistre.
 
 from decimal import Decimal
 
-from django.db.models import DecimalField, Q, Sum
+from django.db.models import DecimalField, Q, Sum, Value
 from django.db.models.functions import Coalesce
 
 from .models import PHARMACIE_CENTRE_CODE
@@ -84,7 +84,14 @@ def produits_de_la_pharmacie(pharmacie, types=TYPES_PROPOSES, disponibles_seulem
     from stock.models import Produit
 
     if pharmacie is None:
-        return Produit.objects.none()
+        # Aucune pharmacie active (ex. base neuve) : queryset vide mais annoté,
+        # pour que les filtres et tris sur stock_pharma restent valides.
+        return Produit.objects.none().annotate(
+            stock_pharma=Value(
+                Decimal('0'),
+                output_field=DecimalField(max_digits=12, decimal_places=2),
+            )
+        )
 
     qs = (
         Produit.objects
