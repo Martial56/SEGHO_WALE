@@ -18,6 +18,11 @@ Deux mécanismes coexistent dans l'application et ne font pas la même chose :
 
 Un groupe est donc décrit par les deux : ce qu'il voit, et ce qu'il peut.
 
+Les noms ci-dessous ne sont qu'une proposition de départ, pas un contrat : plus
+aucun contrôle d'accès ne compare un nom de groupe. Un groupe créé à la main
+dans /admin/, nommé comme on veut, fait le même travail dès qu'il détient les
+permissions. La commande reste là pour monter un jeu de groupes d'un coup.
+
 Le rattachement d'un utilisateur à un centre ne se règle pas ici : il vit sur sa
 fiche (bloc « Centres d'affectation »). Sans centre, un compte ne voit aucune
 donnée, ce qui se confond facilement avec un défaut de permission.
@@ -28,14 +33,6 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from modules_permissions.models import GroupModule, Module
-
-
-#: Groupes à renommer avant application. Le code de facturation reconnaît le
-#: groupe « Caisse » par son nom (facturation.views.CAISSE_MANAGE_GROUPS) : un
-#: groupe nommé « Caissier » ne peut ni ouvrir la caisse ni encaisser.
-RENOMMAGES = {
-    'Caissier': 'Caisse',
-}
 
 
 #: groupe -> permissions (app.codename) et modules visibles (Module.code).
@@ -127,12 +124,9 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         # L'essai à blanc écrit puis annule, au lieu de sauter les écritures :
-        # sinon le renommage ne prend pas et la suite de la simulation raisonne
-        # sur un groupe « Caisse » qu'elle croit devoir créer. Le compte rendu
-        # doit décrire ce qui se passerait vraiment.
+        # le compte rendu doit décrire ce qui se passerait vraiment.
         essai = options['dry_run']
         with transaction.atomic():
-            self._renommer()
             for nom, regles in MATRICE.items():
                 self._appliquer(nom, regles)
             if essai:
@@ -140,21 +134,6 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.WARNING('\nEssai à blanc : rien enregistré.'))
 
     # ── Étapes ──────────────────────────────────────────────────────────────
-
-    def _renommer(self):
-        for ancien, nouveau in RENOMMAGES.items():
-            g = Group.objects.filter(name=ancien).first()
-            if g is None:
-                continue
-            if Group.objects.filter(name=nouveau).exists():
-                self.stdout.write(self.style.WARNING(
-                    f'« {ancien} » et « {nouveau} » existent tous les deux : '
-                    f'fusion non automatique, à traiter à la main.'))
-                continue
-            self.stdout.write(f'Renommage : « {ancien} » → « {nouveau} » '
-                              f'({g.user_set.count()} utilisateur(s) conservé(s))')
-            g.name = nouveau
-            g.save(update_fields=['name'])
 
     def _appliquer(self, nom, regles):
         groupe, cree = Group.objects.get_or_create(name=nom)

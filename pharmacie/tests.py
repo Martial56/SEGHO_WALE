@@ -427,6 +427,32 @@ class TestAncienneChaineSupprimee(TestCase):
             app_label='stock', model='mouvementstock').exists())
 
 
+def _facture_payee(ordonnance, patient, lignes_produits, statut='payee'):
+    """Facture soldée couvrant une ordonnance, telle que la caisse la produit.
+
+    `lignes_produits` est une liste de (produit, quantité, ligne_ordonnance) —
+    la ligne d'ordonnance peut être None pour un produit ajouté au comptoir,
+    que le médecin n'avait pas prescrit.
+    """
+    from facturation.models import Facture, LigneFacture
+
+    total = sum(q * p.prix_vente for p, q, _ in lignes_produits)
+    facture = Facture.objects.create(
+        patient=patient, ordonnance=ordonnance, type_facture='pharmacie',
+        statut=statut, montant_total=total,
+        montant_paye=total if statut == 'payee' else Decimal('0'),
+        # Hors requête, le centre courant n'est pas posé : sans ce rattachement
+        # la facture serait invisible au manager filtré.
+        centre=patient.centre,
+    )
+    for produit, quantite, ligne_ord in lignes_produits:
+        LigneFacture.objects.create(
+            facture=facture, produit=produit, ligne_ordonnance=ligne_ord,
+            libelle=produit.nom, quantite=quantite,
+            prix_unitaire=produit.prix_vente)
+    return facture
+
+
 class TestEcranDeDispensation(TestCase):
     """L'écran « Dispenser » d'une ordonnance s'ouvre.
 
@@ -451,10 +477,15 @@ class TestEcranDeDispensation(TestCase):
         self.produit = _produit('_disp')
         _stock_pharmacie('wale_toumbokro', self.produit, Decimal('10'))
         self.ordonnance = Ordonnance.objects.create(patient=patient, statut='emise')
-        LigneOrdonnance.objects.create(
+        self.ligne_ord = LigneOrdonnance.objects.create(
             ordonnance=self.ordonnance, produit=self.produit,
             posologie='1 matin et soir', quantite=2,
         )
+        self.patient = patient
+        # On ne sert que ce qui a été payé : sans facture réglée, l'écran
+        # refuse désormais de s'ouvrir.
+        self.facture = _facture_payee(
+            self.ordonnance, patient, [(self.produit, 2, self.ligne_ord)])
         self.user = _user_avec_permissions(
             'u_dispense', 'gerer_stock_pharmacie', centre_code='TOUMBOKRO')
         self.client = Client()
@@ -522,9 +553,10 @@ class TestToutesLesPagesDeLaPharmacie(TestCase):
         produit = _produit('_smoke')
         _stock_pharmacie(self.PHARMACIE, produit, Decimal('20'))
         self.ordonnance = Ordonnance.objects.create(patient=patient, statut='emise')
-        LigneOrdonnance.objects.create(
+        ligne_ord = LigneOrdonnance.objects.create(
             ordonnance=self.ordonnance, produit=produit,
             posologie='1 par jour', quantite=3)
+        _facture_payee(self.ordonnance, patient, [(produit, 3, ligne_ord)])
 
     def tearDown(self):
         _reset_current_user()
@@ -549,3 +581,251 @@ class TestToutesLesPagesDeLaPharmacie(TestCase):
         for url in urls:
             with self.subTest(url=url):
                 self.assertEqual(self.client.get(url).status_code, 200)
+
+
+class TestOnSertCeQuiAEtePaye(TestCase):
+    """La pharmacie sert la facture, pas l'ordonnance.
+
+    L'écran de dispensation partait de `ordonnance.lignes` et ne regardait
+    jamais la facture. Le patient qui disait à la caisse avoir déjà tel
+    médicament le voyait retirer de sa facture, puis proposé ici quand même —
+    et servi sans avoir été payé. Dans l'autre sens, un produit ajouté au
+    comptoir n'apparaissait pas, bien qu'il ait été réglé.
+    """
+
+    def setUp(self):
+        from centres.models import Centre
+        from consultations.models import LigneOrdonnance, Ordonnance
+        from patients.models import Patient
+
+        _reset_current_user()
+        centre = Centre.objects.get(code='TOUMBOKRO')
+        self.patient = Patient.objects.create(
+            nom='Servi', prenoms='Patient', date_naissance='1990-06-01',
+            sexe='M', telephone='0700000020', centre=centre)
+
+        self.prescrit = _produit('_prescrit')
+        self.retire   = _produit('_retire')
+        self.ajoute   = _produit('_ajoute')
+        for produit in (self.prescrit, self.retire, self.ajoute):
+            _stock_pharmacie('wale_toumbokro', produit, Decimal('20'))
+
+        self.ordonnance = Ordonnance.objects.create(
+            patient=self.patient, statut='emise')
+        self.l_prescrit = LigneOrdonnance.objects.create(
+            ordonnance=self.ordonnance, produit=self.prescrit,
+            posologie='1 le matin', quantite=2)
+        self.l_retire = LigneOrdonnance.objects.create(
+            ordonnance=self.ordonnance, produit=self.retire,
+            posologie='1 le soir', quantite=3)
+
+        self.user = _user_avec_permissions(
+            'u_servi', 'gerer_stock_pharmacie', centre_code='TOUMBOKRO')
+        self.client = Client()
+        self.client.force_login(self.user)
+
+    def tearDown(self):
+        _reset_current_user()
+
+    def _url(self):
+        return reverse('pharmacie_dispenser',
+                       args=['wale_toumbokro', self.ordonnance.pk])
+
+    def _noms_proposes(self, reponse):
+        return sorted(l['nom_med'] for l in reponse.context['lignes_enrichies'])
+
+    # ── Ce qui a été retiré à la caisse ────────────────────────────────────
+
+    def test_un_produit_retire_de_la_facture_n_est_pas_servi(self):
+        """Le patient a dit qu'il l'avait déjà : la caisse l'a enlevé."""
+        _facture_payee(self.ordonnance, self.patient,
+                       [(self.prescrit, 2, self.l_prescrit)])
+        reponse = self.client.get(self._url())
+        self.assertEqual(self._noms_proposes(reponse), [self.prescrit.nom])
+
+    def test_un_produit_ajoute_au_comptoir_est_servi(self):
+        """La caissière a ajouté ce que le médecin n'avait pas prescrit."""
+        _facture_payee(self.ordonnance, self.patient, [
+            (self.prescrit, 2, self.l_prescrit),
+            (self.ajoute, 1, None),
+        ])
+        reponse = self.client.get(self._url())
+        self.assertEqual(self._noms_proposes(reponse),
+                         sorted([self.prescrit.nom, self.ajoute.nom]))
+
+    # ── Les deux verrous ───────────────────────────────────────────────────
+
+    def test_sans_facture_on_ne_sert_rien(self):
+        reponse = self.client.get(self._url(), follow=True)
+        refus = [str(m) for m in reponse.context['messages']]
+        self.assertTrue(any("pas encore été facturée" in m for m in refus), refus)
+
+    def test_facture_non_reglee_on_ne_sert_rien(self):
+        facture = _facture_payee(self.ordonnance, self.patient,
+                                 [(self.prescrit, 2, self.l_prescrit)],
+                                 statut='emise')
+        reponse = self.client.get(self._url(), follow=True)
+        refus = [str(m) for m in reponse.context['messages']]
+        self.assertTrue(any(f"La facture {facture.numero} n'est pas réglée" in m
+                            for m in refus), refus)
+
+    # ── L'ordonnance dit ce qui n'a pas été payé ───────────────────────────
+
+    def test_l_ordonnance_marque_la_ligne_non_payee(self):
+        _facture_payee(self.ordonnance, self.patient,
+                       [(self.prescrit, 2, self.l_prescrit)])
+        self.client.get(reverse('ordonnance_detail', args=[self.ordonnance.pk]))
+        reponse = self.client.get(
+            reverse('ordonnance_detail', args=[self.ordonnance.pk]))
+        etats = {l.pk: l.non_payee for l in reponse.context['lignes']}
+        self.assertFalse(etats[self.l_prescrit.pk])
+        self.assertTrue(etats[self.l_retire.pk])
+        self.assertContains(reponse, 'class="badge-non-paye"')
+
+    # ── Le stock ne bouge qu'une fois ──────────────────────────────────────
+
+    def test_le_stock_ne_sort_qu_une_fois(self):
+        """Payer puis dispenser ne doit pas décompter deux fois.
+
+        La sortie au paiement ignore les lignes adossées à une ordonnance —
+        elles quittent le rayon au comptoir — et la dispensation écrit son
+        mouvement sous le numéro de facture, la même référence.
+        """
+        from pharmacie.sorties import sortir_les_produits
+
+        facture = _facture_payee(self.ordonnance, self.patient,
+                                 [(self.prescrit, 2, self.l_prescrit)])
+        # 1. Le paiement : rien ne doit sortir, la ligne vient d'une ordonnance.
+        self.assertEqual(sortir_les_produits(facture, 'wale_toumbokro'), 0)
+        self.assertEqual(
+            StockPharmacie.objects.get(
+                pharmacie='wale_toumbokro', produit=self.prescrit).quantite,
+            Decimal('20'))
+
+        # 2. La dispensation : c'est elle qui sort le produit, une fois.
+        self.client.post(self._url(), {f'qte_{facture.lignes.first().pk}': '2'})
+        self.assertEqual(
+            StockPharmacie.objects.get(
+                pharmacie='wale_toumbokro', produit=self.prescrit).quantite,
+            Decimal('18'))
+
+        # 3. Le mouvement porte le numéro de facture, et il est unique.
+        mouvements = MouvementPharmacie.objects.filter(
+            pharmacie='wale_toumbokro', reference=facture.numero)
+        self.assertEqual(mouvements.count(), 1)
+
+    def test_un_produit_sans_ordonnance_sort_bien_au_paiement(self):
+        """Les gants d'un pansement ne passent par aucun comptoir."""
+        from facturation.models import Facture, LigneFacture
+        from pharmacie.sorties import sortir_les_produits
+
+        facture = Facture.objects.create(
+            patient=self.patient, type_facture='pharmacie', statut='payee',
+            montant_total=self.ajoute.prix_vente)
+        LigneFacture.objects.create(
+            facture=facture, produit=self.ajoute, libelle=self.ajoute.nom,
+            quantite=1, prix_unitaire=self.ajoute.prix_vente)
+
+        self.assertEqual(sortir_les_produits(facture, 'wale_toumbokro'), 1)
+        self.assertEqual(
+            StockPharmacie.objects.get(
+                pharmacie='wale_toumbokro', produit=self.ajoute).quantite,
+            Decimal('19'))
+
+
+class TestListeDesOrdonnancesDitCeQuiSeraServi(TestCase):
+    """La liste du jour annonce ce que le comptoir remettra vraiment.
+
+    Elle affichait les lignes prescrites, toutes. Le pharmacien y lisait trois
+    médicaments, cliquait « Servir », et n'en trouvait que deux — celui que le
+    patient avait fait retirer à la caisse ayant disparu en chemin. Et depuis
+    que la dispensation exige une facture réglée, le bouton pouvait rebondir
+    sans qu'on sache pourquoi avant d'avoir cliqué.
+    """
+
+    def setUp(self):
+        from centres.models import Centre
+        from consultations.models import LigneOrdonnance, Ordonnance
+        from patients.models import Patient
+
+        _reset_current_user()
+        centre = Centre.objects.get(code='TOUMBOKRO')
+        self.patient = Patient.objects.create(
+            nom='Liste', prenoms='Patient', date_naissance='1990-06-01',
+            sexe='M', telephone='0700000030', centre=centre)
+
+        self.paye  = _produit('_paye')
+        self.retire = _produit('_retire_liste')
+        for produit in (self.paye, self.retire):
+            _stock_pharmacie('wale_toumbokro', produit, Decimal('20'))
+
+        self.ordonnance = Ordonnance.objects.create(
+            patient=self.patient, statut='emise')
+        self.l_paye = LigneOrdonnance.objects.create(
+            ordonnance=self.ordonnance, produit=self.paye,
+            posologie='1 le matin', quantite=2)
+        self.l_retire = LigneOrdonnance.objects.create(
+            ordonnance=self.ordonnance, produit=self.retire,
+            posologie='1 le soir', quantite=1)
+
+        self.user = _user_avec_permissions(
+            'u_liste_ord', 'gerer_stock_pharmacie', centre_code='TOUMBOKRO')
+        self.client = Client()
+        self.client.force_login(self.user)
+
+    def tearDown(self):
+        _reset_current_user()
+
+    def _page(self):
+        return self.client.get(
+            reverse('pharmacie_ordonnances', args=['wale_toumbokro']))
+
+    def _ordonnance_affichee(self, reponse):
+        for o in reponse.context['page_obj'].object_list:
+            if o.pk == self.ordonnance.pk:
+                return o
+        self.fail("l'ordonnance n'est pas dans la liste")
+
+    def test_la_ligne_retiree_a_la_caisse_est_marquee(self):
+        _facture_payee(self.ordonnance, self.patient,
+                       [(self.paye, 2, self.l_paye)])
+        reponse = self._page()
+        etats = {l.pk: l.non_payee
+                 for l in self._ordonnance_affichee(reponse).lignes.all()}
+        self.assertFalse(etats[self.l_paye.pk])
+        self.assertTrue(etats[self.l_retire.pk])
+        self.assertContains(reponse, 'class="med-non-paye"')
+
+    def test_sans_facture_aucune_ligne_n_est_barree(self):
+        """Rien n'a été refusé : tout attend simplement la caisse."""
+        reponse = self._page()
+        etats = [l.non_payee
+                 for l in self._ordonnance_affichee(reponse).lignes.all()]
+        self.assertEqual(etats, [False, False])
+        self.assertNotContains(reponse, 'class="med-non-paye"')
+
+    # ── Le bouton dit la vérité avant le clic ──────────────────────────────
+
+    def test_sans_facture_le_bouton_annonce_a_facturer(self):
+        reponse = self._page()
+        ordonnance = self._ordonnance_affichee(reponse)
+        self.assertFalse(ordonnance.servable)
+        self.assertEqual(ordonnance.motif_blocage, 'À facturer')
+        self.assertContains(reponse, 'À facturer')
+
+    def test_facture_non_reglee_le_bouton_le_dit(self):
+        _facture_payee(self.ordonnance, self.patient,
+                       [(self.paye, 2, self.l_paye)], statut='emise')
+        ordonnance = self._ordonnance_affichee(self._page())
+        self.assertFalse(ordonnance.servable)
+        self.assertEqual(ordonnance.motif_blocage, 'Facture non réglée')
+
+    def test_facture_payee_le_bouton_sert(self):
+        _facture_payee(self.ordonnance, self.patient,
+                       [(self.paye, 2, self.l_paye)])
+        reponse = self._page()
+        self.assertTrue(self._ordonnance_affichee(reponse).servable)
+        self.assertContains(
+            reponse,
+            reverse('pharmacie_dispenser', args=['wale_toumbokro',
+                                                 self.ordonnance.pk]))

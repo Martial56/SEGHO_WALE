@@ -174,6 +174,11 @@ class Produit(models.Model):
         indexes = [
             models.Index(fields=['actif', 'type']),
         ]
+        # Remplace un nom de groupe écrit en dur : un groupe se renomme dans
+        # /admin/ et cassait le contrôle en silence, une permission non.
+        permissions = [
+            ('can_gerer_stock', 'Peut gérer le stock'),
+        ]
 
 
 class LotProduit(models.Model):

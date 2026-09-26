@@ -1663,7 +1663,11 @@
     <!-- ══ TOAST CONTAINER ══ -->
     <div id="toast-container"></div>
 
-    {% if messages %}
+    {% comment %}Le bloc est rendu sur toutes les pages, et non plus seulement
+    quand Django a un message en attente : `window.showToast` est exposé plus
+    bas pour les pages qui signalent une erreur sans passer par le cycle de
+    messages, et il n'existait justement pas sur celles-là. Seule la liste
+    ci-dessous se vide quand il n'y a rien à annoncer.{% endcomment %}
     <script>
     (function(){
         var icons = {
@@ -1713,7 +1717,6 @@
         messages.forEach(function(m){ showToast(m.text, m.tag); });
     })();
     </script>
-    {% endif %}
 
     <script src="{% static 'js/form-ul.js' %}"></script>
 

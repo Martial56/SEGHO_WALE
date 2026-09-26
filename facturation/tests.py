@@ -40,9 +40,18 @@ def _acte(suffix=''):
 
 
 def _caisse_user(username):
+    """Utilisateur habilité à encaisser.
+
+    Le groupe porte volontairement un nom fantaisiste : c'est la permission qui
+    ouvre la caisse, jamais le nom du groupe. Si ce test passe avec « Guichet du
+    lundi », il passera avec n'importe quel nom choisi dans /admin/.
+    """
     user = User.objects.create_user(username, password='x')
-    caisse, _ = Group.objects.get_or_create(name='Caisse')
-    user.groups.add(caisse)
+    groupe, _ = Group.objects.get_or_create(name='Guichet du lundi')
+    groupe.permissions.add(
+        Permission.objects.get(content_type__app_label='facturation',
+                               codename='can_encaisser'))
+    user.groups.add(groupe)
     return user
 
 
@@ -58,15 +67,23 @@ class TestCanManagePaiement(TestCase):
         user = User.objects.create_user('u_cmp', password='x')
         self.assertFalse(can_manage_paiement(user))
 
-    def test_user_groupe_caisse_autorise(self):
+    def test_un_groupe_portant_la_permission_autorise(self):
         user = _caisse_user('u_cmp_caisse')
         self.assertTrue(can_manage_paiement(user))
 
-    def test_user_autre_groupe_refuse(self):
+    def test_un_groupe_sans_la_permission_refuse(self):
         user = User.objects.create_user('u_cmp_autre', password='x')
         autre, _ = Group.objects.get_or_create(name='Accueil')
         user.groups.add(autre)
         self.assertFalse(can_manage_paiement(user))
+
+    def test_la_permission_accordee_en_direct_autorise(self):
+        """Sans aucun groupe : l'onglet « Permissions de l'utilisateur » suffit."""
+        user = User.objects.create_user('u_cmp_direct', password='x')
+        user.user_permissions.add(
+            Permission.objects.get(content_type__app_label='facturation',
+                                   codename='can_encaisser'))
+        self.assertTrue(can_manage_paiement(User.objects.get(pk=user.pk)))
 
 
 # ─── Tests numéros uniques ──────────────────────────────────────────────────────
@@ -226,7 +243,7 @@ class TestVuesPermissions(TestCase):
         facture.refresh_from_db()
         self.assertEqual(facture.montant_paye, Decimal('0'))
 
-    def test_facture_payer_autorise_pour_groupe_caisse(self):
+    def test_facture_payer_autorise_avec_la_permission(self):
         facture = _facture(self.patient, statut='emise', montant_total=Decimal('5000'))
         client = Client()
         client.login(username='u_vp_caisse', password='x')
@@ -468,7 +485,7 @@ class TestPorteUniqueDeFacturation(TestCase):
             "Un compte hors Caisse ne doit pas pouvoir encaisser par cette porte",
         )
 
-    def test_avec_le_groupe_caisse_le_paiement_passe(self):
+    def test_avec_la_permission_le_paiement_passe(self):
         # Sans ce test le précédent réussirait même si la vue refusait tout le
         # monde, y compris la Caisse.
         self._creer('u_pu_caisse')
@@ -1686,3 +1703,152 @@ class TestProduitsSurLaFacture(TestCase):
         self.client.post(reverse('facturation:edit', args=[facture.pk]),
                          {'action_annuler': '1'}, follow=True)
         self.assertEqual(self._en_rayon(self.gants), Decimal('20'))
+
+
+class TestRetirerUneLigneNeFaitPasPerdreLesAutres(TestCase):
+    """Retirer une ligne au milieu de la facture ne doit rien coûter.
+
+    Le bouton « × » retire la ligne du tableau **sans renuméroter** les
+    suivantes, et les indices viennent d'un compteur qui ne redescend jamais.
+    La lecture s'arrêtait au premier indice absent : retirer une ligne du
+    milieu de cinq n'en facturait plus que deux, et retirer la première
+    laissait une facture **vide, à zéro franc**.
+
+    C'est le geste le plus courant de la caisse — le patient annonce qu'il a
+    déjà tel médicament, on l'enlève — et il faisait perdre le reste de la
+    facture, sans un mot.
+    """
+
+    def test_un_trou_au_milieu_ne_perd_rien(self):
+        facture = _facture(_patient('Trou'))
+        total = _save_lignes(facture, {
+            'ligne_libelle_0': 'Acte 1', 'ligne_qte_0': '1',
+            'ligne_prix_0': '1000', 'ligne_remise_0': '0',
+            # indice 1 : la ligne retirée par la caissière
+            'ligne_libelle_2': 'Acte 3', 'ligne_qte_2': '1',
+            'ligne_prix_2': '3000', 'ligne_remise_2': '0',
+            'ligne_libelle_3': 'Acte 4', 'ligne_qte_3': '1',
+            'ligne_prix_3': '4000', 'ligne_remise_3': '0',
+        })
+        self.assertEqual(total, 8000)
+        self.assertEqual(facture.lignes.count(), 3)
+
+    def test_la_premiere_ligne_retiree_ne_vide_pas_la_facture(self):
+        facture = _facture(_patient('Prem'))
+        total = _save_lignes(facture, {
+            'ligne_libelle_1': 'Acte 2', 'ligne_qte_1': '1',
+            'ligne_prix_1': '2000', 'ligne_remise_1': '0',
+            'ligne_libelle_2': 'Acte 3', 'ligne_qte_2': '1',
+            'ligne_prix_2': '3000', 'ligne_remise_2': '0',
+        })
+        self.assertEqual(total, 5000)
+        self.assertEqual(facture.lignes.count(), 2)
+
+    def test_les_lignes_restent_dans_l_ordre_du_formulaire(self):
+        """Les indices se lisent en ordre numérique, pas alphabétique :
+        sans ça la ligne 10 passerait avant la ligne 2."""
+        facture = _facture(_patient('Ordre'))
+        donnees = {}
+        for i in (0, 2, 10):
+            donnees[f'ligne_libelle_{i}'] = f'Acte {i}'
+            donnees[f'ligne_qte_{i}'] = '1'
+            donnees[f'ligne_prix_{i}'] = '100'
+            donnees[f'ligne_remise_{i}'] = '0'
+        _save_lignes(facture, donnees)
+        self.assertEqual(
+            [l.libelle for l in facture.lignes.order_by('pk')],
+            ['Acte 0', 'Acte 2', 'Acte 10'])
+
+
+class TestLesMontantsNAffichentPasDeDecimalesInutiles(TestCase):
+    """4 000, pas 4 000,0000.
+
+    Multiplier deux Decimal additionne leurs décimales : `quantite` (2) ×
+    `prix_unitaire` (2) donne un montant à 4 décimales, et la remise le pousse
+    à 6. Le montant était arrondi au moment d'être enregistré dans la facture,
+    mais la propriété `montant_ligne`, elle, sortait brute — et c'est elle que
+    les écrans affichent.
+    """
+
+    def test_le_montant_d_une_ligne_s_arrete_au_centime(self):
+        from decimal import Decimal
+
+        from .models import LigneFacture
+
+        ligne = LigneFacture(quantite=Decimal('1.00'),
+                             prix_unitaire=Decimal('4000.00'),
+                             remise=Decimal('0.00'))
+        self.assertEqual(str(ligne.montant_ligne), '4000.00')
+
+    def test_une_remise_ne_fait_pas_trainer_six_decimales(self):
+        from decimal import Decimal
+
+        from .models import LigneFacture
+
+        ligne = LigneFacture(quantite=Decimal('3.00'),
+                             prix_unitaire=Decimal('1500.00'),
+                             remise=Decimal('12.50'))
+        self.assertEqual(str(ligne.montant_ligne), '3937.50')
+
+    def test_l_arrondi_ne_perd_pas_les_centimes(self):
+        from decimal import Decimal
+
+        from .models import LigneFacture
+
+        ligne = LigneFacture(quantite=Decimal('3.00'),
+                             prix_unitaire=Decimal('333.33'),
+                             remise=Decimal('0.00'))
+        self.assertEqual(str(ligne.montant_ligne), '999.99')
+
+
+class TestLesCasesDeMontantSontLisibles(TestCase):
+    """Un champ numérique HTML ne lit que le point décimal.
+
+    Rendu sous une langue française, un Decimal devient « 4 000,00 » et le
+    navigateur, ne sachant pas le lire, **affiche la case vide** : la quantité
+    d'une facture qu'on rouvrait pour la corriger disparaissait de l'écran, et
+    il suffisait d'enregistrer pour la perdre. `unlocalize` réglait le point
+    mais laissait « 4000.00 » et « 15000.0 » dans la case Prix.
+    """
+
+    def test_un_montant_rond_n_a_pas_de_decimales(self):
+        from decimal import Decimal
+
+        from core.templatetags.core_tags import valeur_champ
+
+        self.assertEqual(valeur_champ(Decimal('4000.0000')), '4000')
+        self.assertEqual(valeur_champ(Decimal('4000.00')), '4000')
+        self.assertEqual(valeur_champ(1.0), '1')
+
+    def test_les_centimes_reels_restent(self):
+        from decimal import Decimal
+
+        from core.templatetags.core_tags import valeur_champ
+
+        self.assertEqual(valeur_champ(Decimal('4000.25')), '4000.25')
+
+    def test_le_separateur_est_le_point(self):
+        """Une virgule vide la case du navigateur."""
+        from decimal import Decimal
+
+        from core.templatetags.core_tags import valeur_champ
+
+        self.assertNotIn(',', valeur_champ(Decimal('4000.25')))
+
+    def test_une_case_vide_le_reste(self):
+        from core.templatetags.core_tags import valeur_champ
+
+        self.assertEqual(valeur_champ(None), '')
+        self.assertEqual(valeur_champ(''), '')
+
+    def test_le_texte_affiche_suit_la_langue(self):
+        """Pour du texte, on garde la virgule française."""
+        from decimal import Decimal
+
+        from django.utils import translation
+
+        from core.templatetags.core_tags import nombre
+
+        with translation.override('fr-fr'):
+            self.assertEqual(nombre(Decimal('4000.0000')), '4000')
+            self.assertEqual(nombre(Decimal('4000.25')), '4000,25')

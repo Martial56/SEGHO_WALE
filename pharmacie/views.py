@@ -435,6 +435,7 @@ def pharmacie_ordonnances(request, pharmacie):
 
     paginator = Paginator(qs, 25)
     page_obj  = paginator.get_page(request.GET.get('page'))
+    _poser_etat_de_facturation(page_obj.object_list)
 
     ords_jour = _ordonnances_du_centre(pharmacie).filter(date_emission__date=selected_date)
     stats = ords_jour.aggregate(
@@ -476,6 +477,71 @@ def pharmacie_ordonnances(request, pharmacie):
     })
 
 
+def _poser_etat_de_facturation(ordonnances):
+    """Dit, pour chaque ordonnance affichée, ce qui sera réellement servi.
+
+    La liste montrait les lignes prescrites, toutes. Le pharmacien y lisait
+    trois médicaments, cliquait « Servir », et n'en trouvait que deux — celui
+    que le patient avait fait retirer à la caisse ayant disparu en chemin, sans
+    que rien ne l'annonce. Et depuis que la dispensation exige une facture
+    réglée, le bouton pouvait rebondir sans qu'on sache pourquoi avant d'avoir
+    cliqué.
+
+    On pose donc sur chaque ordonnance son état (`servable`, `motif_blocage`)
+    et sur chacune de ses lignes le drapeau `non_payee`. Deux requêtes pour
+    toute la page, quel que soit le nombre d'ordonnances.
+    """
+    from facturation.models import Facture, LigneFacture
+
+    ordonnances = list(ordonnances)
+    if not ordonnances:
+        return
+
+    factures = {}
+    for facture in (Facture.all_objects
+                    .filter(ordonnance__in=ordonnances)
+                    .exclude(statut='annulee').order_by('pk')):
+        factures[facture.ordonnance_id] = facture
+
+    payees = set(
+        LigneFacture.objects
+        .filter(facture__in=factures.values(), ligne_ordonnance__isnull=False)
+        .values_list('ligne_ordonnance_id', flat=True))
+
+    for ordonnance in ordonnances:
+        facture = factures.get(ordonnance.pk)
+        ordonnance.facture = facture
+        if facture is None:
+            ordonnance.servable = False
+            ordonnance.motif_blocage = 'À facturer'
+        elif facture.statut != 'payee':
+            ordonnance.servable = False
+            ordonnance.motif_blocage = 'Facture non réglée'
+        else:
+            ordonnance.servable = True
+            ordonnance.motif_blocage = ''
+        # Sans facture, aucune ligne n'est « non payée » : elles sont toutes
+        # simplement en attente de passage à la caisse. Les barrer toutes
+        # ferait croire à un refus qui n'a pas eu lieu.
+        for ligne in ordonnance.lignes.all():
+            ligne.non_payee = facture is not None and ligne.pk not in payees
+
+
+def _facture_de_l_ordonnance(ordonnance):
+    """La facture qui couvre cette ordonnance, ou None.
+
+    Une ordonnance ne porte qu'une facture — la caisse refuse d'en créer une
+    seconde. Le patient qui revient plus tard pour ce qu'il avait écarté passe
+    par la caisse de la pharmacie, et c'est une vente au comptoir, sans rapport
+    avec cette ordonnance.
+    """
+    from facturation.models import Facture
+
+    return (Facture.all_objects.filter(ordonnance=ordonnance)
+            .exclude(statut='annulee')
+            .order_by('-pk').first())
+
+
 @login_required(login_url='login')
 def pharmacie_dispenser(request, pharmacie, pk):
     if not can_manage_pharmacie(request.user):
@@ -489,37 +555,50 @@ def pharmacie_dispenser(request, pharmacie, pk):
         messages.info(request, 'Cette ordonnance a déjà été dispensée.')
         return redirect('pharmacie_ordonnances', pharmacie=pharmacie)
 
-    lignes = ordonnance.lignes.select_related('produit').all()
+    # On sert ce qui a été payé, plus ce qui a été prescrit.
+    #
+    # L'écran partait de `ordonnance.lignes` et ne regardait jamais la facture.
+    # Le patient qui disait à la caisse avoir déjà tel médicament le voyait
+    # retirer de sa facture — puis proposé ici quand même, et servi sans avoir
+    # été payé. Dans l'autre sens, un produit ajouté au comptoir n'apparaissait
+    # pas, alors qu'il avait été réglé.
+    #
+    # La facture tranche les deux cas d'un coup : ses lignes sont exactement ce
+    # qui a été encaissé.
+    facture = _facture_de_l_ordonnance(ordonnance)
+    if facture is None:
+        messages.error(request, "Cette ordonnance n'a pas encore été facturée : "
+                                "passez par la caisse avant de servir.")
+        return redirect('pharmacie_ordonnances', pharmacie=pharmacie)
+    if facture.statut != 'payee':
+        messages.error(request, f"La facture {facture.numero} n'est pas réglée : "
+                                "rien ne peut être servi tant qu'elle ne l'est pas.")
+        return redirect('pharmacie_ordonnances', pharmacie=pharmacie)
+
+    lignes = facture.lignes.select_related(
+        'produit', 'ligne_ordonnance').filter(produit__isnull=False)
 
     lignes_enrichies = []
     for ligne in lignes:
-        produit    = None
-        stock_item = None
-        nom_med    = ''
-        if ligne.produit:
-            # Le produit a déjà été identifié à la création de l'ordonnance —
-            # ne pas le re-chercher par nom (recherche floue non fiable).
-            produit = ligne.produit
-            nom_med = produit.nom
-        elif ligne.medicament_libre:
-            nom_med = ligne.medicament_libre
-            produit = Produit.objects.filter(
-                nom__icontains=nom_med[:20], type='medicament', actif=True
-            ).first()
-
-        if produit:
-            stock_item = StockPharmacie.objects.filter(pharmacie=pharmacie, produit=produit).first()
+        produit = ligne.produit
+        nom_med = produit.nom
+        quantite = int(ligne.quantite)
+        stock_item = StockPharmacie.objects.filter(
+            pharmacie=pharmacie, produit=produit).first()
 
         stock_dispo = float(stock_item.quantite) if stock_item else 0
         lignes_enrichies.append({
             'ligne':       ligne,
+            'quantite':    quantite,
+            'posologie':   (ligne.ligne_ordonnance.posologie
+                            if ligne.ligne_ordonnance else ''),
             'nom_med':     nom_med,
             'produit':     produit,
             'stock_item':  stock_item,
             'stock_dispo': stock_dispo,
-            'suffisant':   bool(stock_item and stock_dispo >= ligne.quantite),
-            'qte_defaut':  min(float(ligne.quantite), stock_dispo) if stock_item else 0,
-            'manque':      max(0, ligne.quantite - stock_dispo),
+            'suffisant':   bool(stock_item and stock_dispo >= quantite),
+            'qte_defaut':  min(quantite, stock_dispo) if stock_item else 0,
+            'manque':      max(0, quantite - stock_dispo),
         })
 
     nb_complets     = sum(1 for l in lignes_enrichies if l['suffisant'])
@@ -553,6 +632,17 @@ def pharmacie_dispenser(request, pharmacie, pk):
         )
 
     if request.method == 'POST':
+        # Ceinture et bretelles : la dispensation écrit ses mouvements sous le
+        # numéro de facture, celui-là même qu'utiliserait une sortie au
+        # paiement. Si quoi que ce soit a déjà fait bouger le stock sous cette
+        # référence, on ne le fait pas une seconde fois.
+        from pharmacie.sorties import deja_traitee
+
+        if deja_traitee(facture, pharmacie):
+            messages.info(request, f'Les produits de la facture {facture.numero} '
+                                   'sont déjà sortis du stock.')
+            return redirect('pharmacie_ordonnances', pharmacie=pharmacie)
+
         alertes_peremption = []
         with transaction.atomic():
             dispensation = DispensationOrdonnance.objects.create(
@@ -568,7 +658,7 @@ def pharmacie_dispenser(request, pharmacie, pk):
                     qte = int(request.POST.get(f'qte_{ligne.pk}', 0) or 0)
                 except ValueError:
                     qte = 0
-                qte = 0 if ailleurs else max(0, min(qte, ligne.quantite))
+                qte = 0 if ailleurs else max(0, min(qte, item['quantite']))
 
                 if qte > 0 and item['produit'] and _stock_entierement_perime(item['produit']):
                     # Le stock affiché n'est en réalité couvert par aucun lot
@@ -576,14 +666,14 @@ def pharmacie_dispenser(request, pharmacie, pk):
                     alertes_peremption.append(item['produit'].nom)
                     qte = 0
 
-                if qte < ligne.quantite:
+                if qte < item['quantite']:
                     statut_global = 'partielle'
 
                 LigneDispensation.objects.create(
                     dispensation=dispensation,
                     produit=item['produit'],
                     medicament_libre=item['nom_med'],
-                    quantite_prescrite=ligne.quantite,
+                    quantite_prescrite=item['quantite'],
                     quantite_dispensee=qte,
                     achete_ailleurs=ailleurs,
                 )
@@ -600,7 +690,7 @@ def pharmacie_dispenser(request, pharmacie, pk):
                         pharmacie=pharmacie, produit=sp.produit,
                         type='dispensation', quantite=qte,
                         stock_avant=avant, stock_apres=apres,
-                        reference=ordonnance.numero,
+                        reference=facture.numero,
                         cree_par=request.user,
                     )
                     sp.quantite = apres

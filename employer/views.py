@@ -19,7 +19,6 @@ from .models import (Employe, Fonction, Grade, TypeContrat, Nationalite,
 from medecins.models import Service
 from services.views import _export_file, _parse_upload, _s, _b
 
-RH_MANAGE_GROUPS = {'Médecin Chef', 'Médecin Chef Adjoint', 'Administrateur', 'Directeur', 'RH'}
 
 
 def _generate_service_code(nom):
@@ -113,9 +112,7 @@ def _employe_to_form(e):
 def can_manage_rh(user):
     if not user.is_authenticated:
         return False
-    if user.is_superuser or user.is_staff:
-        return True
-    return user.groups.filter(name__in=RH_MANAGE_GROUPS).exists()
+    return user.is_staff or user.has_perm('employer.can_gerer_personnel')
 
 
 def _rh_selects(user):

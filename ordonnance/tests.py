@@ -157,13 +157,18 @@ class TestPrescriptionParCentre(TestCase):
         self.assertEqual(ligne.medicament_libre, '')
 
     def test_un_produit_en_rupture_est_refuse_par_le_serveur(self):
-        """L'écran grise, mais une liste déroulante ne protège de rien."""
+        """L'écran grise, mais une liste déroulante ne protège de rien.
+
+        La ligne basculait auparavant en texte libre, « à acheter en externe »,
+        et l'ordonnance partait quand même — pour se bloquer plus tard à la
+        caisse. Une rupture n'est pas prescriptible : rien n'est enregistré.
+        """
+        avant = LigneOrdonnance.objects.count()
         reponse = self._prescrire(self.sirop.pk, libre='Sirop de test')
-        ligne = LigneOrdonnance.objects.latest('pk')
-        self.assertIsNone(ligne.produit_id)
-        self.assertEqual(ligne.medicament_libre, 'Sirop de test')
-        avertissements = [str(m) for m in reponse.context['messages']]
-        self.assertTrue(any('externe' in m for m in avertissements), avertissements)
+        self.assertEqual(LigneOrdonnance.objects.count(), avant)
+        refus = [str(m) for m in reponse.context['messages']]
+        self.assertTrue(any('rupture' in m for m in refus), refus)
+        self.assertTrue(any('Sirop de test' in m for m in refus), refus)
 
     def test_le_meme_produit_passe_dans_l_autre_centre(self):
         self._centre_actif(self.yamoussoukro)
@@ -175,10 +180,9 @@ class TestPrescriptionParCentre(TestCase):
         self._prescrire(self.gants.pk, libre='Gants de test', url=url)
         self.assertEqual(LigneOrdonnance.objects.latest('pk').produit_id, self.gants.pk)
 
+        avant = LigneOrdonnance.objects.count()
         self._prescrire(self.sirop.pk, libre='Sirop de test', url=url)
-        ligne = LigneOrdonnance.objects.latest('pk')
-        self.assertIsNone(ligne.produit_id)
-        self.assertEqual(ligne.medicament_libre, 'Sirop de test')
+        self.assertEqual(LigneOrdonnance.objects.count(), avant)
 
     # ── La pastille de l'en-tête ───────────────────────────────────────────
 
@@ -411,3 +415,387 @@ class TestToutesLesPagesDuModule(TestCase):
         self.assertEqual(reponse.status_code, 200)
         self.ordonnance.refresh_from_db()
         self.assertEqual(self.ordonnance.statut, 'delivree')
+
+
+class TestUnMessageNeSortQuUneFois(TestCase):
+    """Le même message ne s'affiche pas deux fois.
+
+    `base.html` lève déjà un toast pour chaque message Django. Les deux écrans
+    d'ordonnance les réaffichaient en plus dans un bandeau : un seul
+    `messages.success` arrivait donc en double, le toast qui s'efface et le
+    bandeau qui reste. Treize autres gabarits font encore ça ailleurs dans
+    l'application — ceux-ci sont réglés.
+    """
+
+    def setUp(self):
+        from patients.models import Patient
+
+        self.centre = Centre.objects.get_or_create(
+            code='WALE', defaults={'nom': 'CMS WALE Yamoussoukro'})[0]
+        self.user = User.objects.create_superuser('su_msg', password='x')
+        profil = self.user.profile
+        profil.centres.add(self.centre)
+        profil.centre_actif = self.centre
+        profil.save(update_fields=['centre_actif'])
+
+        self.client = Client()
+        self.client.force_login(self.user)
+
+        patient = Patient.objects.create(
+            nom='TestMessage', prenoms='Patient', date_naissance='1979-07-07',
+            sexe='M', telephone='0700000007', centre=self.centre)
+        self.ordonnance = Ordonnance.objects.create(patient=patient)
+
+    def test_le_message_de_changement_de_statut_n_apparait_qu_une_fois(self):
+        page = self.client.post(
+            reverse('ordonnance_statut', args=[self.ordonnance.pk]),
+            {'statut': 'delivree'}, follow=True).content.decode()
+        self.assertEqual(page.count('Statut mis a jour'), 1)
+
+    def test_la_fonction_de_toast_existe_meme_sans_message(self):
+        """`window.showToast` n'était défini que s'il y avait un message.
+
+        Sept pages l'appellent derrière un `if (window.showToast)` pour
+        signaler une erreur réseau après un rafraîchissement AJAX — c'est-à-dire
+        précisément sur des pages sans message Django en attente. L'erreur
+        passait donc à la trappe. Le bloc est maintenant rendu partout, seule
+        la liste des messages à annoncer se vide.
+        """
+        page = self.client.get(
+            reverse('ordonnance_list')).content.decode()
+        self.assertIn('window.showToast = showToast', page)
+
+    def test_le_gabarit_de_detail_ne_reaffiche_plus_les_messages(self):
+        from django.template.loader import get_template
+
+        for nom in ('pharmacie/ordonnance/ordonnance_detail.html',
+                    'pharmacie/ordonnance/ordonnance_create.html'):
+            source = get_template(nom).template.source
+            self.assertNotIn('for msg in messages', source, nom)
+
+
+class TestAucuneOrdonnanceVide(TestCase):
+    """Une ordonnance sans médicament n'est pas enregistrée.
+
+    Les trois écrans de prescription créaient l'ordonnance d'abord et
+    bouclaient sur les lignes ensuite : un envoi sans médicament laissait une
+    coquille en base, dont ni la pharmacie ni la facturation n'ont rien à
+    faire. Le cas arrivait tout seul au renouvellement — voir
+    [TestRenouvellement] : choisir le prescripteur vidait la grille.
+    """
+
+    def setUp(self):
+        from employer.models import Employe
+        from medecins.models import Medecin
+        from patients.models import Patient
+
+        self.centre = Centre.objects.get_or_create(
+            code='WALE', defaults={'nom': 'CMS WALE Yamoussoukro'})[0]
+        self.user = User.objects.create_superuser('su_vide', password='x')
+        profil = self.user.profile
+        profil.centres.add(self.centre)
+        profil.centre_actif = self.centre
+        profil.save(update_fields=['centre_actif'])
+
+        self.client = Client()
+        self.client.force_login(self.user)
+
+        self.patient = Patient.objects.create(
+            nom='TestVide', prenoms='Patient', date_naissance='1981-08-08',
+            sexe='F', telephone='0700000008', centre=self.centre)
+        self.medecin = Medecin.objects.create(employe=Employe.objects.create(
+            nom='TESTVIDE', prenoms='Prescripteur', date_embauche='2020-01-01'))
+        self.produit = Produit.objects.create(
+            nom='Sirop du vide', type='medicament',
+            prix_achat=Decimal('100'), prix_vente=Decimal('500'))
+        _en_rayon('wale_yamoussoukro', self.produit, '30')
+
+    def _post(self, **extra):
+        donnees = {
+            'patient_id': str(self.patient.pk),
+            'medecin_id': str(self.medecin.pk),
+            'type_ordonnance': 'interne',
+            'medicament[]': '', 'medicament_libre[]': '',
+            'posologie[]': '', 'duree[]': '', 'quantite[]': '1',
+        }
+        donnees.update(extra)
+        return self.client.post(
+            reverse('ordonnance_create_libre'), donnees, follow=True)
+
+    def test_un_envoi_sans_medicament_ne_cree_rien(self):
+        reponse = self._post()
+        self.assertEqual(Ordonnance.objects.count(), 0)
+        self.assertContains(reponse, "Aucun médicament saisi")
+
+    def test_un_envoi_avec_un_medicament_cree_bien_l_ordonnance(self):
+        self._post(**{'medicament[]': str(self.produit.pk),
+                      'medicament_libre[]': 'Sirop du vide',
+                      'posologie[]': '1 le matin'})
+        self.assertEqual(Ordonnance.objects.count(), 1)
+        self.assertEqual(Ordonnance.objects.first().lignes.count(), 1)
+
+    def test_un_medicament_sans_posologie_n_est_plus_perdu(self):
+        """Deux des trois écrans exigeaient une posologie et jetaient la ligne."""
+        self._post(**{'medicament[]': str(self.produit.pk),
+                      'medicament_libre[]': 'Sirop du vide'})
+        ordonnance = Ordonnance.objects.first()
+        self.assertIsNotNone(ordonnance)
+        self.assertEqual(ordonnance.lignes.count(), 1)
+        self.assertEqual(ordonnance.lignes.first().produit, self.produit)
+
+    def test_la_saisie_survit_a_un_refus(self):
+        """Un patient manquant ne doit plus faire perdre les médicaments tapés."""
+        reponse = self.client.post(reverse('ordonnance_create_libre'), {
+            'medecin_id': str(self.medecin.pk),
+            'type_ordonnance': 'interne',
+            'medicament[]': str(self.produit.pk),
+            'medicament_libre[]': 'Sirop du vide',
+            'posologie[]': '1 le matin', 'duree[]': '3 jours', 'quantite[]': '2',
+        })
+        self.assertContains(reponse, 'Sirop du vide')
+        self.assertContains(reponse, '1 le matin')
+
+
+class TestQuantiteEtDisponibilite(TestCase):
+    """On ne valide pas n'importe quoi : la quantité est confrontée au rayon.
+
+    Rien ne rapprochait la quantité demandée du stock. Prescrire 999 d'un
+    produit qui en a 50 passait sans un mot, et ne se heurtait à un refus qu'au
+    paiement de la facture — patient devant le guichet. La règle vit dans
+    `_probleme_de_la_ligne`, partagée par les trois formulaires.
+    """
+
+    def setUp(self):
+        from employer.models import Employe
+        from medecins.models import Medecin
+        from patients.models import Patient
+
+        self.centre = Centre.objects.get_or_create(
+            code='WALE', defaults={'nom': 'CMS WALE Yamoussoukro'})[0]
+        self.user = User.objects.create_superuser('su_qte', password='x')
+        profil = self.user.profile
+        profil.centres.add(self.centre)
+        profil.centre_actif = self.centre
+        profil.save(update_fields=['centre_actif'])
+
+        self.client = Client()
+        self.client.force_login(self.user)
+
+        self.patient = Patient.objects.create(
+            nom='TestQte', prenoms='Patient', date_naissance='1983-10-10',
+            sexe='M', telephone='0700000011', centre=self.centre)
+        self.medecin = Medecin.objects.create(employe=Employe.objects.create(
+            nom='TESTQTE', prenoms='Prescripteur', date_embauche='2020-01-01'))
+        self.produit = Produit.objects.create(
+            nom='Comprimé compté', type='medicament',
+            prix_achat=Decimal('100'), prix_vente=Decimal('500'))
+        _en_rayon('wale_yamoussoukro', self.produit, '10')
+
+    def _prescrire(self, quantite, produit_pk=None):
+        return self.client.post(reverse('ordonnance_create_libre'), {
+            'patient_id': str(self.patient.pk),
+            'medecin_id': str(self.medecin.pk),
+            'type_ordonnance': 'interne',
+            'medicament[]': str(self.produit.pk if produit_pk is None else produit_pk),
+            'medicament_libre[]': 'Comprimé compté',
+            'posologie[]': '1 le matin', 'duree[]': '', 'quantite[]': str(quantite),
+        }, follow=True)
+
+    def test_la_quantite_disponible_passe(self):
+        self._prescrire(10)
+        self.assertEqual(Ordonnance.objects.count(), 1)
+        self.assertEqual(Ordonnance.objects.first().lignes.first().quantite, 10)
+
+    def test_la_quantite_superieure_au_rayon_est_refusee(self):
+        reponse = self._prescrire(11)
+        self.assertEqual(Ordonnance.objects.count(), 0)
+        refus = [str(m) for m in reponse.context['messages']]
+        self.assertTrue(any('11 demandé(s), 10 en rayon' in m for m in refus), refus)
+
+    def test_le_produit_desactive_est_refuse(self):
+        self.produit.actif = False
+        self.produit.save(update_fields=['actif'])
+        reponse = self._prescrire(1)
+        self.assertEqual(Ordonnance.objects.count(), 0)
+        refus = [str(m) for m in reponse.context['messages']]
+        self.assertTrue(any("n'existe plus au catalogue" in m for m in refus), refus)
+
+    def test_un_produit_inexistant_est_refuse(self):
+        reponse = self._prescrire(1, produit_pk=999999)
+        self.assertEqual(Ordonnance.objects.count(), 0)
+        refus = [str(m) for m in reponse.context['messages']]
+        self.assertTrue(any("n'existe plus au catalogue" in m for m in refus), refus)
+
+    def test_une_designation_tapee_sans_selection_est_refusee(self):
+        """On sélectionne toujours dans la liste de la pharmacie."""
+        reponse = self.client.post(reverse('ordonnance_create_libre'), {
+            'patient_id': str(self.patient.pk),
+            'medecin_id': str(self.medecin.pk),
+            'type_ordonnance': 'interne',
+            'medicament[]': '', 'medicament_libre[]': 'Un truc tapé à la main',
+            'posologie[]': '1 le matin', 'duree[]': '', 'quantite[]': '1',
+        }, follow=True)
+        self.assertEqual(Ordonnance.objects.count(), 0)
+        refus = [str(m) for m in reponse.context['messages']]
+        self.assertTrue(any('choisi dans la liste' in m for m in refus), refus)
+
+    def test_la_saisie_revient_apres_le_refus(self):
+        reponse = self._prescrire(11)
+        self.assertContains(reponse, 'Comprimé compté')
+        self.assertContains(reponse, '1 le matin')
+
+    def test_le_refus_montre_quelle_ligne_coince(self):
+        """Le message dit quoi, la grille doit dire où.
+
+        Un toast nommant un produit laisse chercher la ligne fautive parmi
+        les autres. Elle revient marquée, et l'écran garde le bouton fermé
+        tant qu'elle est là.
+        """
+        reponse = self._prescrire(11)
+        self.assertTrue(reponse.context['initial_lignes'][0]['indisponible'])
+        # Le nom de classe vit aussi dans le CSS et le JS : c'est la balise
+        # de la ligne qu'on regarde, pas l'occurrence du mot dans la page.
+        self.assertContains(reponse, '<tr class="line-row line-bloquee">')
+
+    def test_une_ligne_correcte_ne_revient_pas_marquee(self):
+        """Refus dû au patient manquant : les lignes, elles, sont bonnes."""
+        reponse = self.client.post(reverse('ordonnance_create_libre'), {
+            'medecin_id': str(self.medecin.pk),
+            'type_ordonnance': 'interne',
+            'medicament[]': str(self.produit.pk),
+            'medicament_libre[]': 'Comprimé compté',
+            'posologie[]': '1 le matin', 'duree[]': '', 'quantite[]': '2',
+        })
+        self.assertFalse(reponse.context['initial_lignes'][0]['indisponible'])
+        self.assertNotContains(reponse, '<tr class="line-row line-bloquee">')
+
+
+class TestUnProduitUneSeuleLigne(TestCase):
+    """Le même produit ne tient que sur une ligne de l'ordonnance.
+
+    Chaque ligne était vérifiée seule : deux lignes de 6 sur un produit qui en
+    a 10 passaient toutes les deux, et l'ordonnance en promettait 12. La
+    facturation somme bien par produit au paiement — le refus tombait donc
+    plus tard, à la caisse.
+    """
+
+    def setUp(self):
+        from employer.models import Employe
+        from medecins.models import Medecin
+        from patients.models import Patient
+
+        self.centre = Centre.objects.get_or_create(
+            code='WALE', defaults={'nom': 'CMS WALE Yamoussoukro'})[0]
+        self.user = User.objects.create_superuser('su_double', password='x')
+        profil = self.user.profile
+        profil.centres.add(self.centre)
+        profil.centre_actif = self.centre
+        profil.save(update_fields=['centre_actif'])
+
+        self.client = Client()
+        self.client.force_login(self.user)
+
+        self.patient = Patient.objects.create(
+            nom='TestDouble', prenoms='Patient', date_naissance='1984-11-11',
+            sexe='F', telephone='0700000012', centre=self.centre)
+        self.medecin = Medecin.objects.create(employe=Employe.objects.create(
+            nom='TESTDOUBLE', prenoms='Prescripteur', date_embauche='2020-01-01'))
+        self.produit = Produit.objects.create(
+            nom='Comprimé unique', type='medicament',
+            prix_achat=Decimal('100'), prix_vente=Decimal('500'))
+        self.autre = Produit.objects.create(
+            nom='Sirop voisin', type='medicament',
+            prix_achat=Decimal('100'), prix_vente=Decimal('500'))
+        _en_rayon('wale_yamoussoukro', self.produit, '10')
+        _en_rayon('wale_yamoussoukro', self.autre, '10')
+
+    def _prescrire(self, produits, quantites):
+        return self.client.post(reverse('ordonnance_create_libre'), {
+            'patient_id': str(self.patient.pk),
+            'medecin_id': str(self.medecin.pk),
+            'type_ordonnance': 'interne',
+            'medicament[]': [str(p.pk) for p in produits],
+            'medicament_libre[]': [p.nom for p in produits],
+            'posologie[]': ['1 le matin'] * len(produits),
+            'duree[]': [''] * len(produits),
+            'quantite[]': [str(q) for q in quantites],
+        }, follow=True)
+
+    def test_deux_lignes_du_meme_produit_sont_refusees(self):
+        reponse = self._prescrire([self.produit, self.produit], [6, 6])
+        self.assertEqual(Ordonnance.objects.count(), 0)
+        refus = [str(m) for m in reponse.context['messages']]
+        self.assertTrue(any('est sur 2 lignes' in m for m in refus), refus)
+        self.assertTrue(any('12 demandé(s) au total, 10 en rayon' in m
+                            for m in refus), refus)
+
+    def test_le_refus_vaut_meme_si_le_total_tient_dans_le_rayon(self):
+        """Ce n'est pas une question de stock : c'est une ordonnance à corriger."""
+        reponse = self._prescrire([self.produit, self.produit], [2, 3])
+        self.assertEqual(Ordonnance.objects.count(), 0)
+        refus = [str(m) for m in reponse.context['messages']]
+        self.assertTrue(any('regroupez-les' in m for m in refus), refus)
+
+    def test_les_deux_lignes_reviennent_marquees(self):
+        reponse = self._prescrire([self.produit, self.produit], [2, 3])
+        self.assertEqual(
+            [l['indisponible'] for l in reponse.context['initial_lignes']],
+            [True, True])
+
+    def test_deux_produits_differents_passent(self):
+        self._prescrire([self.produit, self.autre], [2, 3])
+        self.assertEqual(Ordonnance.objects.count(), 1)
+        self.assertEqual(Ordonnance.objects.first().lignes.count(), 2)
+
+
+class TestValiditeDeLOrdonnance(TestCase):
+    """Une ordonnance naît valable cinq jours, pas le jour même.
+
+    Le formulaire préremplissait la date d'expiration avec la date du jour :
+    le bon imprimé annonçait « Validité : jusqu'au [aujourd'hui] », donc périmé
+    dès le lendemain. Personne ne s'en plaignait parce que le statut
+    « expirée » n'est appliqué nulle part automatiquement — l'écran de
+    dispensation ne regarde pas la date.
+    """
+
+    def setUp(self):
+        from patients.models import Patient
+
+        self.centre = Centre.objects.get_or_create(
+            code='WALE', defaults={'nom': 'CMS WALE Yamoussoukro'})[0]
+        self.user = User.objects.create_superuser('su_validite', password='x')
+        profil = self.user.profile
+        profil.centres.add(self.centre)
+        profil.centre_actif = self.centre
+        profil.save(update_fields=['centre_actif'])
+        self.client = Client()
+        self.client.force_login(self.user)
+
+        self.patient = Patient.objects.create(
+            nom='TestValid', prenoms='Patient', date_naissance='1986-12-12',
+            sexe='M', telephone='0700000013', centre=self.centre)
+
+    def test_le_formulaire_propose_cinq_jours(self):
+        from consultations.models import (VALIDITE_ORDONNANCE_JOURS,
+                                          date_expiration_par_defaut)
+
+        self.assertEqual(VALIDITE_ORDONNANCE_JOURS, 5)
+        reponse = self.client.get(reverse('ordonnance_create_libre'))
+        attendu = date_expiration_par_defaut().strftime('%Y-%m-%d')
+        self.assertContains(
+            reponse, f'name="date_expiration" class="ord-input" value="{attendu}"')
+
+    def test_la_date_proposee_est_bien_dans_cinq_jours(self):
+        from datetime import date, timedelta
+
+        from consultations.models import date_expiration_par_defaut
+
+        self.assertEqual(date_expiration_par_defaut(),
+                         date.today() + timedelta(days=5))
+
+    def test_une_ordonnance_creee_sans_date_prend_la_valeur_par_defaut(self):
+        """Le défaut du modèle couvre l'admin et toute création par le code."""
+        from consultations.models import date_expiration_par_defaut
+
+        ordonnance = Ordonnance.objects.create(patient=self.patient)
+        self.assertEqual(ordonnance.date_expiration, date_expiration_par_defaut())

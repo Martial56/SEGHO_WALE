@@ -1,5 +1,5 @@
 {% extends 'facturation/base.html' %}
-{% load l10n %}
+{% load l10n core_tags %}
 
 {% block topbar_title %}Nouvelle facture{% endblock %}
 
@@ -612,6 +612,13 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
                                 donne sa nature, et donc le type de la facture.{% endcomment %}
                                 <input type="hidden" name="ligne_service_{{ forloop.counter0 }}"
                                        class="svc-pk" value="{{ ligne.reference|default:'' }}">
+                                {% comment %}La ligne d'ordonnance facturée ici. Ce qui reste
+                                à la validation est payé, ce qui a été retiré de la grille ne
+                                l'est pas — et la pharmacie ne servira que le premier.{% endcomment %}
+                                <input type="hidden" name="ligne_ordonnance_{{ forloop.counter0 }}"
+                                       class="svc-ord" value="{{ ligne.ligne_ordonnance|default:'' }}">
+                                <input type="hidden" name="ligne_demande_{{ forloop.counter0 }}"
+                                       class="svc-dem" value="{{ ligne.ligne_demande|default:'' }}">
                                 <div class="svc-dropdown"></div>
                             </div>
                         </td>
@@ -621,9 +628,9 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
                         les lignes pré-remplies (facture issue d'une ordonnance), avait
                         gardé l'ancien pas.
                         {% endcomment %}
-                        <td class="col-qte"><input type="number" name="ligne_qte_{{ forloop.counter0 }}" value="{{ ligne.qte|default:1|unlocalize }}" min="1" step="1" oninput="recalcRow({{ forloop.counter0 }})"></td>
-                        <td class="col-prix"><input type="number" name="ligne_prix_{{ forloop.counter0 }}" value="{{ ligne.prix|unlocalize }}" min="0" step="1" readonly tabindex="-1" style="pointer-events:none;cursor:default;" oninput="recalcRow({{ forloop.counter0 }})"></td>
-                        <td class="col-remise"><input type="number" name="ligne_remise_{{ forloop.counter0 }}" value="{{ ligne.remise|default:0|unlocalize }}" min="0" max="100" step="0.01" oninput="recalcRow({{ forloop.counter0 }})"></td>
+                        <td class="col-qte"><input type="number" name="ligne_qte_{{ forloop.counter0 }}" value="{{ ligne.qte|default:1|valeur_champ }}" min="1" step="1" oninput="recalcRow({{ forloop.counter0 }})"></td>
+                        <td class="col-prix"><input type="number" name="ligne_prix_{{ forloop.counter0 }}" value="{{ ligne.prix|valeur_champ }}" min="0" step="1" readonly tabindex="-1" style="pointer-events:none;cursor:default;" oninput="recalcRow({{ forloop.counter0 }})"></td>
+                        <td class="col-remise"><input type="number" name="ligne_remise_{{ forloop.counter0 }}" value="{{ ligne.remise|default:0|valeur_champ }}" min="0" max="100" step="0.01" oninput="recalcRow({{ forloop.counter0 }})"></td>
                         <td class="col-total" id="total-{{ forloop.counter0 }}">0</td>
                         <td class="col-del"><button type="button" class="btn-del-ligne" onclick="removeLigne(this)">×</button></td>
                     </tr>
@@ -643,6 +650,8 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
                             <input type="hidden" name="ligne_libelle_0"
                                    class="svc-hidden" value="{{ initial_ligne_libelle }}">
                             <input type="hidden" name="ligne_service_0" class="svc-pk" value="">
+                            <input type="hidden" name="ligne_ordonnance_0" class="svc-ord" value="">
+                            <input type="hidden" name="ligne_demande_0" class="svc-dem" value="">
                             <div class="svc-dropdown"></div>
                         </div>
                     </td>
@@ -1007,6 +1016,8 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
                 '</div>' +
                 '<input type="hidden" name="ligne_libelle_' + idx + '" class="svc-hidden">' +
                 '<input type="hidden" name="ligne_service_' + idx + '" class="svc-pk">' +
+                '<input type="hidden" name="ligne_ordonnance_' + idx + '" class="svc-ord">' +
+                '<input type="hidden" name="ligne_demande_' + idx + '" class="svc-dem">' +
                 '<div class="svc-dropdown"></div>' +
               '</div>' +
             '</td>' +

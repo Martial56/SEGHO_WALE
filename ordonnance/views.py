@@ -11,7 +11,8 @@ from django.core.paginator import Paginator
 
 import json
 
-from consultations.models import Ordonnance, LigneOrdonnance, Consultation
+from consultations.models import (Consultation, LigneOrdonnance, Ordonnance,
+                                  date_expiration_par_defaut)
 from pharmacie.models import PHARMACIE_CENTRE_CODE
 from stock.models import Produit
 from patients.models import Patient
@@ -100,7 +101,28 @@ def ordonnance_detail(request, pk):
         ligne.stock_pharma = quantites.get(ligne.produit_id)
 
     from facturation.models import Facture
-    facture_existante = Facture.objects.filter(ordonnance=ordonnance).exclude(statut='annulee').first()
+    # `all_objects` : la facture est retrouvée par la clé étrangère de cette
+    # ordonnance, qui porte déjà le cloisonnement par centre. Passer par le
+    # manager filtré ferait dire « pas encore facturée » à une ordonnance qui
+    # l'est, dès que le centre actif ne correspond pas.
+    facture_existante = (Facture.all_objects.filter(ordonnance=ordonnance)
+                         .exclude(statut='annulee').first())
+
+    # L'état de chaque ligne, déduit et non stocké — rien à resynchroniser.
+    #
+    # L'écran ne savait dire que « facturée » ou « pas facturée », en bloc.
+    # Or le patient qui annonce à la caisse avoir déjà tel médicament le voit
+    # retirer de la facture : quatre lignes payées sur cinq, et l'ordonnance
+    # entière s'affichait comme réglée. Le médecin ne pouvait pas voir ce que
+    # son patient avait réellement pris.
+    if facture_existante:
+        payees = set(
+            facture_existante.lignes
+            .filter(ligne_ordonnance__isnull=False)
+            .values_list('ligne_ordonnance_id', flat=True))
+        for ligne in lignes:
+            ligne.non_payee = ligne.pk not in payees
+
     return render(request, 'pharmacie/ordonnance/ordonnance_detail.html', {
         'ordonnance':       ordonnance,
         'lignes':           lignes,
@@ -231,6 +253,22 @@ def ordonnance_create(request, consultation_pk):
         if medecin is None and consultation.medecin:
             medecin = consultation.medecin
 
+        lignes, problemes = _lignes_du_formulaire(request)
+        if problemes or not lignes:
+            _signaler_les_problemes(request, problemes)
+            if not problemes:
+                messages.error(request, MESSAGE_ORDONNANCE_VIDE)
+            return render(request, 'pharmacie/ordonnance/ordonnance_create.html', {
+                'consultation':      consultation,
+                'patient':           consultation.patient,
+                'medecin_preselect': medecin or consultation.medecin,
+                'medecins':          medecins,
+                'types':             types,
+                'medicaments_dispo': _medicaments_dispo_json(request),
+                'date_expiration_defaut': date_expiration_par_defaut(),
+                'initial_lignes':    _lignes_a_reafficher(request),
+            })
+
         ordonnance = Ordonnance.objects.create(
             consultation=consultation,
             medecin=medecin,
@@ -238,41 +276,7 @@ def ordonnance_create(request, consultation_pk):
             date_expiration=date_exp,
             notes=notes,
         )
-
-        med_ids    = request.POST.getlist('medicament[]')
-        med_libres = request.POST.getlist('medicament_libre[]')
-        posologies = request.POST.getlist('posologie[]')
-        durees     = request.POST.getlist('duree[]')
-        quantites  = request.POST.getlist('quantite[]')
-
-        refuses = []
-        for i, posologie in enumerate(posologies):
-            if not posologie.strip():
-                continue
-            med_id    = med_ids[i]    if i < len(med_ids)    else ''
-            med_libre = med_libres[i] if i < len(med_libres) else ''
-            qte_raw   = quantites[i]  if i < len(quantites)  else '1'
-            try:
-                qte = max(1, int(qte_raw))
-            except (ValueError, TypeError):
-                qte = 1
-
-            ligne = LigneOrdonnance(
-                ordonnance=ordonnance,
-                posologie=posologie.strip(),
-                duree=durees[i].strip() if i < len(durees) else '',
-                quantite=qte,
-                medicament_libre=med_libre.strip(),
-            )
-            produit = _produit_prescrit(med_id, request)
-            if produit is not None:
-                ligne.produit = produit
-                ligne.medicament_libre = ''
-            elif med_id:
-                refuses.append(med_libre.strip() or str(med_id))
-            ligne.save()
-
-        _avertir_refus(request, refuses)
+        _enregistrer_les_lignes(ordonnance, lignes)
 
         messages.success(request, f'Ordonnance {ordonnance.numero} créée avec succès.')
         return redirect('ordonnance_detail', pk=ordonnance.pk)
@@ -285,42 +289,193 @@ def ordonnance_create(request, consultation_pk):
         'medecins':          medecins,
         'types':             types,
         'medicaments_dispo': _medicaments_dispo_json(request),
+        'date_expiration_defaut': date_expiration_par_defaut(),
     })
 
 
-def _produit_prescrit(med_id, request):
-    """Produit retenu pour une ligne, ou None si la pharmacie ne peut le servir.
+def _lignes_du_formulaire(request):
+    """Les lignes exploitables du formulaire, lues avant toute écriture.
 
-    C'est ici que la règle s'applique vraiment. L'écran grise les ruptures, mais
-    une liste déroulante ne protège de rien : un onglet resté ouvert une heure,
-    une URL forgée, ou simplement la dernière boîte partie entre l'affichage et
-    l'enregistrement. Un produit refusé retombe sur la saisie libre — la ligne
-    n'est pas perdue, elle cesse seulement d'être rattachée à un stock qui ne
-    peut pas l'honorer, et le prescripteur en est averti.
+    Les trois écrans de prescription créaient l'ordonnance d'abord, puis
+    bouclaient sur les lignes. Un envoi sans médicament laissait donc une
+    ordonnance vide enregistrée, que rien ne rattrapait ensuite : ni la
+    pharmacie ni la facturation n'ont quoi que ce soit à en faire. On lit
+    maintenant le formulaire d'abord, et la vue décide ensuite s'il y a lieu
+    de créer quoi que ce soit.
 
-    Les deux formulaires ne retenaient que `type='medicament'` : une paire de
-    gants prescrite pour un pansement à domicile était silencieusement
-    dégradée en texte libre.
+    Une ligne est retenue dès qu'elle porte quelque chose — un produit, une
+    désignation libre ou une posologie. Deux des trois écrans exigeaient une
+    posologie : un médicament choisi dans la liste mais dont on avait oublié
+    la posologie disparaissait sans un mot.
+
+    Retourne `(lignes, problemes)` : les lignes prêtes à enregistrer, et un
+    message en clair par ligne refusée.
     """
-    from pharmacie.disponibilite import TYPES_PROPOSES, est_disponible, pharmacie_active
+    med_ids    = request.POST.getlist('medicament[]')
+    med_libres = request.POST.getlist('medicament_libre[]')
+    posologies = request.POST.getlist('posologie[]')
+    durees     = request.POST.getlist('duree[]')
+    quantites  = request.POST.getlist('quantite[]')
 
+    lignes, problemes = [], []
+    for i in range(max(len(posologies), len(med_ids), len(med_libres))):
+        med_id    = med_ids[i].strip()    if i < len(med_ids)    else ''
+        med_libre = med_libres[i].strip() if i < len(med_libres) else ''
+        posologie = posologies[i].strip() if i < len(posologies) else ''
+        if not (med_id or med_libre or posologie):
+            continue
+        try:
+            qte = max(1, int(quantites[i] if i < len(quantites) else 1))
+        except (ValueError, TypeError):
+            qte = 1
+
+        souci = _probleme_de_la_ligne(med_id, med_libre, qte, request)
+        if souci:
+            problemes.append(souci)
+            continue
+        lignes.append({
+            'produit_id': int(med_id),
+            'posologie':  posologie,
+            'duree':      durees[i].strip() if i < len(durees) else '',
+            'quantite':   qte,
+        })
+
+    doublons = _produits_en_double(lignes)
+    if doublons:
+        problemes.extend(_message_de_doublon(pid, infos, request)
+                         for pid, infos in doublons.items())
+        lignes = []
+    return lignes, problemes
+
+
+def _produits_en_double(lignes):
+    """Les produits qui reviennent sur plusieurs lignes, avec leur total.
+
+    Chaque ligne était vérifiée seule : deux lignes de 6 sur un produit qui en
+    a 10 passaient toutes les deux, alors que l'ordonnance en promettait 12.
+    La facturation, elle, somme bien par produit au moment du paiement — le
+    refus tombait donc plus tard, à la caisse.
+    """
+    compte = {}
+    for ligne in lignes:
+        pid = ligne['produit_id']
+        nb, total = compte.get(pid, (0, 0))
+        compte[pid] = (nb + 1, total + ligne['quantite'])
+    return {pid: infos for pid, infos in compte.items() if infos[0] > 1}
+
+
+def _message_de_doublon(produit_id, infos, request):
+    """Nommer le produit en double, et dire ce que ça ferait au total."""
+    from pharmacie.disponibilite import pharmacie_active, quantite_en_rayon
+
+    nb, total = infos
+    nom = Produit.objects.filter(pk=produit_id).values_list(
+        'nom', flat=True).first() or 'Ce produit'
+    dispo = quantite_en_rayon(produit_id, pharmacie_active(request))
+    return (f"« {nom} » est sur {nb} lignes : regroupez-les en une seule "
+            f"({total} demandé(s) au total, {dispo:.0f} en rayon)")
+
+
+def _probleme_de_la_ligne(med_id, med_libre, quantite, request):
+    """Ce qui empêche d'enregistrer cette ligne, en clair, ou None.
+
+    Le garde-fou du serveur. L'écran signale déjà ces trois cas, mais un écran
+    ne protège de rien : un onglet resté ouvert une heure, une URL forgée, ou
+    simplement la dernière boîte partie entre l'affichage et l'enregistrement.
+
+    Jusqu'ici une ligne que la pharmacie ne pouvait pas servir basculait
+    silencieusement en texte libre, « à acheter en externe ». C'était contraire
+    à la règle posée : une rupture n'est pas prescriptible, et l'ordonnance
+    partait quand même — pour se bloquer plus tard à la caisse, patient devant
+    le guichet.
+    """
+    from pharmacie.disponibilite import (TYPES_PROPOSES, pharmacie_active,
+                                         quantite_en_rayon)
+
+    designation = med_libre or 'ligne sans désignation'
     if not med_id:
-        return None
+        return (f"« {designation} » n'a pas été choisi dans la liste : "
+                "seuls les produits de la pharmacie peuvent être prescrits")
     try:
         produit = Produit.objects.get(
             pk=int(med_id), type__in=TYPES_PROPOSES, actif=True)
     except (Produit.DoesNotExist, ValueError, TypeError):
-        return None
-    if not est_disponible(produit.pk, pharmacie_active(request)):
-        return None
-    return produit
+        return f"« {designation} » n'existe plus au catalogue"
+
+    dispo = quantite_en_rayon(produit.pk, pharmacie_active(request))
+    if dispo <= 0:
+        return f"« {produit.nom} » est en rupture à la pharmacie"
+    if dispo < quantite:
+        return (f"« {produit.nom} » : {quantite} demandé(s), "
+                f"{dispo:.0f} en rayon")
+    return None
 
 
-def _avertir_refus(request, refuses):
-    """Prévenir que des lignes sont restées en texte libre, faute de stock."""
-    if refuses:
-        messages.warning(request, "Non rattaché au stock de la pharmacie, "
-                                  "à acheter en externe : " + ", ".join(refuses))
+def _lignes_a_reafficher(request):
+    """Ce qui était saisi, remis dans le formulaire après un refus.
+
+    Le gabarit relit ces clés pour préremplir ses lignes — les mêmes que celles
+    d'un renouvellement. Sans ça, un envoi refusé pour une autre raison (patient
+    ou prescripteur manquant) renvoyait une grille vide, et cinq médicaments
+    saisis étaient à retaper.
+    """
+    med_ids    = request.POST.getlist('medicament[]')
+    med_libres = request.POST.getlist('medicament_libre[]')
+    posologies = request.POST.getlist('posologie[]')
+    durees     = request.POST.getlist('duree[]')
+    quantites  = request.POST.getlist('quantite[]')
+
+    saisies = []
+    for i in range(max(len(posologies), len(med_ids), len(med_libres))):
+        med_id    = med_ids[i].strip()    if i < len(med_ids)    else ''
+        med_libre = med_libres[i].strip() if i < len(med_libres) else ''
+        posologie = posologies[i].strip() if i < len(posologies) else ''
+        if not (med_id or med_libre or posologie):
+            continue
+        try:
+            qte = max(1, int(quantites[i] if i < len(quantites) else 1))
+        except (ValueError, TypeError):
+            qte = 1
+        saisies.append({
+            'med_id':    med_id,
+            'med_nom':   med_libre,
+            'posologie': posologie,
+            'duree':     durees[i].strip() if i < len(durees) else '',
+            'quantite':  quantites[i] if i < len(quantites) else '1',
+            # Le message dit ce qui ne va pas, ce drapeau dit *où* : sans lui,
+            # un toast nommant un produit laisse chercher la ligne dans la
+            # grille.
+            'indisponible': bool(
+                _probleme_de_la_ligne(med_id, med_libre, qte, request)),
+        })
+
+    # Un doublon ne se voit pas ligne par ligne : les deux lignes sont
+    # correctes prises séparément, c'est leur rencontre qui pose problème. Les
+    # deux se marquent, pour qu'on voie laquelle garder.
+    vus = {}
+    for saisie in saisies:
+        vus.setdefault(saisie['med_id'], []).append(saisie)
+    for med_id, groupe in vus.items():
+        if med_id and len(groupe) > 1:
+            for saisie in groupe:
+                saisie['indisponible'] = True
+    return saisies
+
+
+MESSAGE_ORDONNANCE_VIDE = ("Aucun médicament saisi : l'ordonnance n'a pas été "
+                           "enregistrée.")
+
+
+def _enregistrer_les_lignes(ordonnance, lignes):
+    """Écrit les lignes déjà validées par `_lignes_du_formulaire`."""
+    LigneOrdonnance.objects.bulk_create([
+        LigneOrdonnance(ordonnance=ordonnance, **ligne) for ligne in lignes])
+
+
+def _signaler_les_problemes(request, problemes):
+    """Un message par ligne refusée — le cycle de messages fait le toast."""
+    for souci in problemes:
+        messages.error(request, souci)
 
 
 def _medicaments_dispo_data(request=None):
@@ -427,6 +582,8 @@ def ordonnance_create_libre(request):
                 'types': types,
                 'medecins': medecins,
                 'medicaments_dispo': _medicaments_dispo_json(request),
+                'date_expiration_defaut': date_expiration_par_defaut(),
+                'initial_lignes': _lignes_a_reafficher(request),
             })
 
         if not medecin_id_post:
@@ -438,6 +595,8 @@ def ordonnance_create_libre(request):
                 'consultation': consultation,
                 'medecin_preselect': medecin_preselect,
                 'medicaments_dispo': _medicaments_dispo_json(request),
+                'date_expiration_defaut': date_expiration_par_defaut(),
+                'initial_lignes': _lignes_a_reafficher(request),
             })
 
         medecin = None
@@ -445,6 +604,22 @@ def ordonnance_create_libre(request):
             medecin = Medecin.objects.get(pk=int(medecin_id_post))
         except (Medecin.DoesNotExist, ValueError):
             pass
+
+        lignes, problemes = _lignes_du_formulaire(request)
+        if problemes or not lignes:
+            _signaler_les_problemes(request, problemes)
+            if not problemes:
+                messages.error(request, MESSAGE_ORDONNANCE_VIDE)
+            return render(request, 'pharmacie/ordonnance/ordonnance_create.html', {
+                'consultation':      consultation,
+                'patient':           patient,
+                'medecin_preselect': medecin_preselect,
+                'medecins':          medecins,
+                'types':             types,
+                'medicaments_dispo': _medicaments_dispo_json(request),
+                'date_expiration_defaut': date_expiration_par_defaut(),
+                'initial_lignes':    _lignes_a_reafficher(request),
+            })
 
         ordonnance = Ordonnance.objects.create(
             consultation=consultation,
@@ -454,41 +629,7 @@ def ordonnance_create_libre(request):
             date_expiration=date_exp,
             notes=notes,
         )
-
-        med_ids     = request.POST.getlist('medicament[]')
-        med_libres  = request.POST.getlist('medicament_libre[]')
-        posologies  = request.POST.getlist('posologie[]')
-        durees      = request.POST.getlist('duree[]')
-        quantites   = request.POST.getlist('quantite[]')
-
-        refuses = []
-        for i, posologie in enumerate(posologies):
-            med_id    = med_ids[i] if i < len(med_ids) else ''
-            med_libre = med_libres[i].strip() if i < len(med_libres) else ''
-            if not posologie.strip() and not med_id and not med_libre:
-                continue
-            qte_raw   = quantites[i] if i < len(quantites) else '1'
-            try:
-                qte = max(1, int(qte_raw))
-            except (ValueError, TypeError):
-                qte = 1
-
-            ligne = LigneOrdonnance(
-                ordonnance=ordonnance,
-                posologie=posologie.strip(),
-                duree=durees[i].strip() if i < len(durees) else '',
-                quantite=qte,
-            )
-            produit = _produit_prescrit(med_id, request)
-            if produit is not None:
-                ligne.produit = produit
-            else:
-                ligne.medicament_libre = med_libre
-                if med_id:
-                    refuses.append(med_libre or str(med_id))
-            ligne.save()
-
-        _avertir_refus(request, refuses)
+        _enregistrer_les_lignes(ordonnance, lignes)
 
         messages.success(request, f'Ordonnance {ordonnance.numero} créée avec succès.')
         return redirect('ordonnance_detail', pk=ordonnance.pk)
@@ -500,6 +641,7 @@ def ordonnance_create_libre(request):
         'medecins':          medecins,
         'types':             types,
         'medicaments_dispo': _medicaments_dispo_json(request),
+        'date_expiration_defaut': date_expiration_par_defaut(),
         'initial_lignes':    initial_lignes,
     })
 
@@ -512,10 +654,7 @@ def ordonnance_changer_statut(request, pk):
     nouveau_statut = request.POST.get('statut', '')
     statuts_valides = [s[0] for s in Ordonnance.STATUT]
     if nouveau_statut in statuts_valides:
-        ancien_statut = ordonnance.statut
         ordonnance.statut = nouveau_statut
         ordonnance.save()
-
-
         messages.success(request, f'Statut mis a jour : {ordonnance.get_statut_display()}.')
     return redirect('ordonnance_detail', pk=pk)

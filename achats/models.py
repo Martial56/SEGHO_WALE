@@ -1,6 +1,8 @@
 from django.db import models, transaction
 from django.utils import timezone
 
+from facturation.models import arrondi_monetaire
+
 
 def _numero_auto(model, prefixe, field='numero'):
     """
@@ -147,7 +149,7 @@ class LigneProforma(models.Model):
 
     @property
     def montant(self):
-        return self.quantite * self.prix_unitaire
+        return arrondi_monetaire(self.quantite * self.prix_unitaire)
 
     def __str__(self): return f"{self.designation} × {self.quantite}"
 
@@ -185,6 +187,11 @@ class CommandeAchat(models.Model):
         verbose_name = "Commande d'achat"
         verbose_name_plural = "Commandes d'achat"
         ordering = ['-date_creation']
+        # Remplace un nom de groupe écrit en dur : un groupe se renomme dans
+        # /admin/ et cassait le contrôle en silence, une permission non.
+        permissions = [
+            ('can_gerer_achats', 'Peut gérer les achats'),
+        ]
 
 
 class LigneCommandeAchat(models.Model):

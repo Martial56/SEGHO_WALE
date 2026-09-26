@@ -1148,11 +1148,13 @@ def patient_resultat_examens_list(request, pk):
 @login_required
 def ordonnance_create(request, pk):
     patient = get_object_or_404(Patient, pk=pk)
-    from consultations.models import Consultation as Consult, Ordonnance, LigneOrdonnance
+    from consultations.models import (Consultation as Consult, Ordonnance,
+                                      date_expiration_par_defaut)
     # Mêmes aides que le formulaire d'ordonnance de l'app `ordonnance` : les deux
     # écrans partagent déjà le gabarit, ils partagent maintenant la règle.
-    from ordonnance.views import (_avertir_refus, _medicaments_dispo_json,
-                                  _produit_prescrit)
+    from ordonnance.views import (MESSAGE_ORDONNANCE_VIDE, _enregistrer_les_lignes,
+                                  _lignes_a_reafficher, _lignes_du_formulaire,
+                                  _medicaments_dispo_json, _signaler_les_problemes)
 
     consultation = None
     consultation_pk = request.GET.get('consultation') or request.POST.get('consultation_id')
@@ -1183,6 +1185,26 @@ def ordonnance_create(request, pk):
         statut = request.POST.get('statut', 'emise')
         type_ordonnance = request.POST.get('type_ordonnance', 'interne')
 
+        lignes, problemes = _lignes_du_formulaire(request)
+        if problemes or not lignes:
+            _signaler_les_problemes(request, problemes)
+            if not problemes:
+                messages.error(request, MESSAGE_ORDONNANCE_VIDE)
+            return render(request, 'pharmacie/ordonnance/ordonnance_create.html', {
+                'patient': patient,
+                'consultation': consultation,
+                'medicaments_dispo': _medicaments_dispo_json(request),
+                'date_expiration_defaut': date_expiration_par_defaut(),
+                'medecins': Medecin.objects.select_related(
+                    'specialite', 'employe').order_by('employe__nom'),
+                'medecin_preselect': consultation.medecin,
+                'titre': 'Créer une ordonnance',
+                'statuts': [('emise', 'Émise'), ('delivree', 'Délivrée'),
+                            ('partielle', 'Partielle'), ('expiree', 'Expirée')],
+                'types': [('interne', 'Interne'), ('externe', 'Externe')],
+                'initial_lignes': _lignes_a_reafficher(request),
+            })
+
         ordonnance = Ordonnance.objects.create(
             consultation=consultation,
             notes=notes,
@@ -1190,42 +1212,7 @@ def ordonnance_create(request, pk):
             statut=statut,
             type_ordonnance=type_ordonnance,
         )
-
-        medicaments = request.POST.getlist('medicament[]')
-        medicaments_libres = request.POST.getlist('medicament_libre[]')
-        posologies = request.POST.getlist('posologie[]')
-        durees = request.POST.getlist('duree[]')
-        quantites = request.POST.getlist('quantite[]')
-
-        refuses = []
-        for i, posologie in enumerate(posologies):
-            if not posologie.strip():
-                continue
-            med_id = medicaments[i] if i < len(medicaments) else ''
-            med_libre = medicaments_libres[i] if i < len(medicaments_libres) else ''
-            duree = durees[i] if i < len(durees) else ''
-            quantite_val = quantites[i] if i < len(quantites) else '1'
-            try:
-                quantite = int(quantite_val)
-            except (ValueError, TypeError):
-                quantite = 1
-
-            ligne = LigneOrdonnance(
-                ordonnance=ordonnance,
-                posologie=posologie,
-                medicament_libre=med_libre,
-                duree=duree,
-                quantite=quantite,
-            )
-            produit = _produit_prescrit(med_id, request)
-            if produit is not None:
-                ligne.produit = produit
-                ligne.medicament_libre = ''
-            elif med_id:
-                refuses.append(med_libre.strip() or str(med_id))
-            ligne.save()
-
-        _avertir_refus(request, refuses)
+        _enregistrer_les_lignes(ordonnance, lignes)
         messages.success(request, f"Ordonnance {ordonnance.numero} créée avec succès.")
         return redirect('patients:ordonnance_list', pk=pk)
 
@@ -1242,6 +1229,7 @@ def ordonnance_create(request, pk):
         'patient': patient,
         'consultation': consultation,
         'medicaments_dispo': medicaments_dispo,
+        'date_expiration_defaut': date_expiration_par_defaut(),
         'medecins': medecins,
         'medecin_preselect': medecin_preselect,
         'titre': 'Créer une ordonnance',

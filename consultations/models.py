@@ -1,3 +1,5 @@
+from datetime import date, timedelta
+
 from django.db import models
 from django.contrib.auth.models import User
 
@@ -76,6 +78,17 @@ class Diagnostic(models.Model):
     def __str__(self): return self.libelle_libre or str(self.cim)
 
 
+# Combien de jours une ordonnance reste servable. Le formulaire préremplissait
+# la date d'expiration avec la date du jour : toute ordonnance naissait valable
+# le jour même et périmée le lendemain, et le bon imprimé annonçait « Validité :
+# jusqu'au [aujourd'hui] ». Le prescripteur reste libre de changer la date.
+VALIDITE_ORDONNANCE_JOURS = 5
+
+
+def date_expiration_par_defaut():
+    return date.today() + timedelta(days=VALIDITE_ORDONNANCE_JOURS)
+
+
 class Ordonnance(models.Model):
     STATUT = [('emise','Émise'),('delivree','Délivrée'),('partielle','Partielle'),('expiree','Expirée')]
 
@@ -84,7 +97,7 @@ class Ordonnance(models.Model):
     patient = models.ForeignKey('patients.Patient', on_delete=models.SET_NULL, null=True, blank=True, related_name='ordonnances_directes')
     medecin = models.ForeignKey('medecins.Medecin', on_delete=models.SET_NULL, null=True, blank=True, related_name='ordonnances_prescrites', verbose_name="Médecin prescripteur")
     date_emission = models.DateTimeField(auto_now_add=True)
-    date_expiration = models.DateField(null=True, blank=True)
+    date_expiration = models.DateField(null=True, blank=True, default=date_expiration_par_defaut)
     statut = models.CharField(max_length=20, choices=STATUT, default='emise')
     notes = models.TextField(blank=True)
     type_ordonnance = models.CharField(max_length=20, choices=[('interne','Interne'),('externe','Externe')], default='interne')

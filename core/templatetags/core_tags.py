@@ -55,3 +55,55 @@ def historique_sidebar(obj):
         content_type=ct, object_id=obj.pk
     ).select_related('user').order_by('-date')[:50]
     return {'logs': logs}
+
+
+@register.filter
+def nombre(valeur):
+    """Un nombre sans décimales inutiles, pour du texte affiché.
+
+    `quantite` × `prix_unitaire` additionne les décimales des deux : un
+    montant sortait à quatre décimales, « 4 000,0000 » là où on attend
+    « 4 000 ». Et même sans multiplication, un `DecimalField(decimal_places=2)`
+    rend « 1,00 » pour une boîte.
+
+    Les décimales réellement significatives sont conservées : 4000,25 le reste.
+    Le séparateur suit la langue — virgule en français.
+    """
+    from decimal import Decimal, InvalidOperation
+
+    from django.utils.formats import number_format
+
+    if valeur in (None, ''):
+        return ''
+    try:
+        d = Decimal(str(valeur)).normalize()
+    except (InvalidOperation, TypeError, ValueError):
+        return valeur
+    # `normalize()` transforme 4000 en 4E+3 : on le ramène en notation simple.
+    if d == d.to_integral_value():
+        d = d.quantize(Decimal(1))
+    decimales = max(0, -d.as_tuple().exponent)
+    return number_format(d, decimal_pos=decimales, use_l10n=True)
+
+
+@register.filter
+def valeur_champ(valeur):
+    """Le même nombre, mais pour l'attribut `value` d'un `<input type=number>`.
+
+    Un champ numérique HTML n'accepte que le point décimal. Rendu par le
+    gabarit sous une langue française, un Decimal devient « 1,00 » — et le
+    navigateur, ne sachant pas le lire, **affiche le champ vide**. La quantité
+    d'une facture qu'on rouvrait pour la corriger disparaissait ainsi de
+    l'écran ; il suffisait d'enregistrer pour la perdre.
+    """
+    from decimal import Decimal, InvalidOperation
+
+    if valeur in (None, ''):
+        return ''
+    try:
+        d = Decimal(str(valeur)).normalize()
+    except (InvalidOperation, TypeError, ValueError):
+        return valeur
+    if d == d.to_integral_value():
+        d = d.quantize(Decimal(1))
+    return f'{d:f}'

@@ -14,6 +14,7 @@ import calendar
 from datetime import date
 from itertools import zip_longest
 
+from .periode import nom_du_mois
 from .registry import AGE_BRACKETS_MO, _age_bracket_mo, _facture_statut_hospitalisation
 
 
@@ -151,7 +152,7 @@ def calculer_rapport_soins(annee, mois):
     return {
         'annee': annee,
         'mois': mois,
-        'mois_nom': calendar.month_name[mois].capitalize(),
+        'mois_nom': nom_du_mois(annee, mois),
         'premier_jour': premier_jour,
         'dernier_jour': dernier_jour,
         'mo_colonnes': mo_colonnes,

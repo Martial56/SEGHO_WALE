@@ -16,6 +16,8 @@ from datetime import date
 
 from django.db.models import Min
 
+from .periode import nom_du_mois
+
 # Clés sans tiret (les templates Django ne peuvent pas faire de lookup
 # "dict.8-14" — le tiret n'est pas un caractère de variable valide).
 TRANCHES_AGE = [
@@ -298,7 +300,7 @@ def calculer_rapport_maternite(annee, mois):
     return {
         'annee': annee,
         'mois': mois,
-        'mois_nom': calendar.month_name[mois].capitalize(),
+        'mois_nom': nom_du_mois(annee, mois),
         'premier_jour': premier_jour,
         'dernier_jour': dernier_jour,
         'cpn': cpn,

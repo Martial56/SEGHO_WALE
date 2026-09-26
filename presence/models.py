@@ -72,6 +72,11 @@ class RegistreVerrou(models.Model):
         verbose_name = "Verrou registre"
         verbose_name_plural = "Verrous registre"
         ordering = ['-date']
+        # Remplace un nom de groupe écrit en dur : un groupe se renomme dans
+        # /admin/ et cassait le contrôle en silence, une permission non.
+        permissions = [
+            ('can_rouvrir_registre', 'Peut rouvrir un registre verrouillé'),
+        ]
 
 
 class AffectationPermanence(models.Model):

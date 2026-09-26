@@ -1,3 +1,5 @@
+from decimal import Decimal, ROUND_HALF_UP
+
 from django.db import models
 from django.contrib.auth.models import User
 
@@ -24,6 +26,20 @@ class Acte(models.Model):
 #: `AE` (Autres examens) et `EG` (Électrocardiogramme) apparaissaient des deux
 #: côtés dans l'ancienne table ; il a fallu trancher — au laboratoire pour le
 #: premier, à l'imagerie pour le second.
+#: Les montants s'arrêtent au franc CFA près. Une multiplication de deux
+#: Decimal additionne leurs décimales : `quantite` (2) × `prix_unitaire` (2)
+#: donne un résultat à 4 décimales, et la remise le pousse à 6. Affiché tel
+#: quel dans un gabarit, ça donnait « 4 000,0000 » là où on attend « 4 000 ».
+#: On arrondit donc à la source, une fois, plutôt que de rattraper l'affichage
+#: à chaque endroit qui montre un montant.
+CENTIMES = Decimal('0.01')
+
+
+def arrondi_monetaire(valeur):
+    """Montant ramené à deux décimales, arrondi comptable (0,5 → 1)."""
+    return Decimal(valeur).quantize(CENTIMES, rounding=ROUND_HALF_UP)
+
+
 CATEGORIE_VERS_TYPE = {
     'CS':   'consultation',
     'SN':   'soins',
@@ -168,6 +184,25 @@ class LigneFacture(models.Model):
     produit = models.ForeignKey(
         'stock.Produit', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='lignes_facture', verbose_name="Produit")
+    # La ligne d'ordonnance dont vient cette ligne, quand la caisse a facturé
+    # une prescription. Nul sur une ligne ajoutée au comptoir — elle n'a pas été
+    # prescrite — et c'est cette absence qui la distingue.
+    #
+    # Sans ce lien, personne ne pouvait répondre à « cette ligne d'ordonnance
+    # a-t-elle été payée ? ». Le patient qui disait avoir déjà un médicament le
+    # voyait retirer de la facture, puis servi quand même au comptoir : la
+    # dispensation partait de l'ordonnance, qui ignore tout de la caisse.
+    ligne_ordonnance = models.ForeignKey(
+        'consultations.LigneOrdonnance', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='lignes_facture',
+        verbose_name="Ligne d'ordonnance")
+    # La ligne de demande d'examen que cette ligne facture. Même rôle que
+    # `ligne_ordonnance` du côté pharmacie : savoir, examen par examen, lequel
+    # a été payé.
+    ligne_demande_examen = models.ForeignKey(
+        'laboratoire.LigneDemandeExamen', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='lignes_facture',
+        verbose_name="Ligne de demande d'examen")
     libelle = models.CharField(max_length=300)
     quantite = models.DecimalField(max_digits=10, decimal_places=2, default=1)
     prix_unitaire = models.DecimalField(max_digits=12, decimal_places=2)
@@ -175,7 +210,8 @@ class LigneFacture(models.Model):
 
     @property
     def montant_ligne(self):
-        return self.quantite * self.prix_unitaire * (1 - self.remise / 100)
+        return arrondi_monetaire(
+            self.quantite * self.prix_unitaire * (1 - self.remise / 100))
 
 
 class Paiement(ModeleCentre):
@@ -233,6 +269,11 @@ class Paiement(ModeleCentre):
     class Meta(ModeleCentre.Meta):
         verbose_name = "Paiement"
         ordering = ['-date_paiement']
+        # Remplace un nom de groupe écrit en dur : un groupe se renomme dans
+        # /admin/ et cassait le contrôle en silence, une permission non.
+        permissions = [
+            ('can_encaisser', 'Peut enregistrer un encaissement'),
+        ]
 
 
 class Caisse(models.Model):

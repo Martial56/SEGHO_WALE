@@ -16,13 +16,12 @@ from django.views.decorators.http import require_POST
 from django.db.models import Q as _Q
 from employer.models import Employe, Conge, SoldeConge, HistoriqueConge, NotificationConge, Presence
 from conges.models import TypeConge, ReglesConge, PalierAnciennete
+from core.permissions import utilisateurs_avec
 from conges.utils import (
     compter_jours_ouvres, detecter_conflits, get_or_create_solde,
     jours_feries_ivoire, jours_feries_labels, quota_annuel,
     types_deductibles, durees_exceptionnelles,
 )
-
-RH_MANAGE_GROUPS = {'Médecin Chef', 'Médecin Chef Adjoint', 'Administrateur', 'Directeur', 'RH'}
 
 _MOIS_FR = [
     '', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
@@ -31,7 +30,7 @@ _MOIS_FR = [
 
 
 def can_manage_rh(user):
-    return user.is_superuser or user.groups.filter(name__in=RH_MANAGE_GROUPS).exists()
+    return user.has_perm('employer.can_gerer_conges')
 
 
 def _can_view_conge(user, conge):
@@ -47,11 +46,8 @@ def _employes_eligibles():
 
 
 def _rh_users():
-    """Retourne les utilisateurs RH/direction pouvant gérer les congés."""
-    return User.objects.filter(
-        _Q(is_superuser=True) |
-        _Q(groups__name__in=list(RH_MANAGE_GROUPS))
-    ).distinct()
+    """Retourne les utilisateurs pouvant gérer les congés."""
+    return utilisateurs_avec('employer.can_gerer_conges')
 
 
 def _send_notif(destinataires, conge, type_notif, message):

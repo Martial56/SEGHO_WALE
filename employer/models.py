@@ -249,6 +249,11 @@ class Employe(models.Model):
             models.Index(fields=['code_ancien_badge']),
             models.Index(fields=['statut']),
         ]
+        # Remplace un nom de groupe écrit en dur : un groupe se renomme dans
+        # /admin/ et cassait le contrôle en silence, une permission non.
+        permissions = [
+            ('can_gerer_personnel', 'Peut gérer le personnel'),
+        ]
 
 
 TYPE_DOC_CHOICES = [
@@ -522,6 +527,11 @@ class Conge(models.Model):
             models.Index(fields=['statut', 'date_debut']),
             models.Index(fields=['statut', 'date_fin']),
             models.Index(fields=['type_conge']),
+        ]
+        # Remplace un nom de groupe écrit en dur : un groupe se renomme dans
+        # /admin/ et cassait le contrôle en silence, une permission non.
+        permissions = [
+            ('can_gerer_conges', 'Peut gérer les congés'),
         ]
 
 

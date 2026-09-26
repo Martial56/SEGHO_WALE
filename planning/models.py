@@ -64,6 +64,12 @@ class PlanningHebdomadaire(models.Model):
         ordering = ['-semaine_debut']
         verbose_name = "Planning hebdomadaire"
         verbose_name_plural = "Plannings hebdomadaires"
+        # Remplace un nom de groupe écrit en dur : un groupe se renomme dans
+        # /admin/ et cassait le contrôle en silence, une permission non.
+        permissions = [
+            ('can_gerer_planning', 'Peut gérer le planning'),
+            ('can_supprimer_planning_publie', 'Peut supprimer un planning publié'),
+        ]
 
 
 JOURS = [

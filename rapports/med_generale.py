@@ -39,6 +39,8 @@ sans mettre à jour ce module — vérifier `Departement.objects.values('code',
 import calendar
 from datetime import date
 
+from .periode import nom_du_mois
+
 DEPARTEMENT_CODE = 'medg'
 
 BRACKETS = [
@@ -193,7 +195,7 @@ def calculer_rapport_med_generale(annee, mois):
     return {
         'annee': annee,
         'mois': mois,
-        'mois_nom': calendar.month_name[mois].capitalize(),
+        'mois_nom': nom_du_mois(annee, mois),
         'brackets': BRACKETS,
         'activites_lignes': activites_lignes,
         'maladies_infectieuses': _lignes(pathos_infectieuses),

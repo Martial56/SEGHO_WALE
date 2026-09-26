@@ -118,6 +118,16 @@ class LigneDemandeExamen(models.Model):
     libelle = models.CharField(max_length=300, blank=True)
     prix = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     instructions = models.TextField(blank=True)
+    # Qui a voulu cet examen. Une ligne ajoutée à la caisse n'a été demandée
+    # par aucun médecin : quand le résultat reviendra, le laboratoire, le
+    # prescripteur et le patient doivent pouvoir savoir d'où elle sort.
+    #
+    # Stocké plutôt que déduit : l'origine est un fait au moment de la
+    # création et ne change jamais. La deviner à l'absence de `type_examen`
+    # ou d'un lien tiendrait le temps que ces champs gardent leur usage.
+    ORIGINE = [('medecin', 'Demandé par le médecin'),
+               ('caisse', 'Ajouté à la caisse')]
+    origine = models.CharField(max_length=10, choices=ORIGINE, default='medecin')
 
     def __str__(self): return f"{self.libelle or self.type_examen} — {self.demande.numero}"
     class Meta: verbose_name = "Ligne de demande d'examen"
