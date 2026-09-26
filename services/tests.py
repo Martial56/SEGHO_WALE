@@ -253,3 +253,81 @@ class TestFicheArticleMontreCeQuiEstSaisi(TestCase):
         page = self._page(self.acte)
         self.assertNotIn('>Laboratoire<', page)
         self.assertNotIn('Code HPRIM', page)
+
+
+# ─── Catégories : l'export ne porte plus que ce qui existe ─────────────────────
+
+class TestExportDesCategories(TestCase):
+    """La catégorie portait neuf champs de gestion de stock hérités d'un ERP —
+    stratégie FIFO/LIFO, méthode de coût, routes, comptes comptables. Vides sur
+    toutes les catégories, lus par personne, et sans objet pour une prestation :
+    on ne stocke pas une consultation. Retirés du modèle.
+    """
+
+    def setUp(self):
+        from django.contrib.auth.models import User
+        from services.models import CategorieArticle
+        self.client.force_login(User.objects.create_superuser('exp_cat', password='x'))
+        self.mere = CategorieArticle.objects.create(code='EXA', nom='Examens')
+        CategorieArticle.objects.create(code='ECHO', nom='Échographies',
+                                        description='Imagerie', parent=self.mere)
+
+    def test_l_export_ne_porte_que_quatre_colonnes(self):
+        from services.views import _CAT_HDR
+        self.assertEqual(_CAT_HDR, ['code', 'nom', 'description', 'parent'])
+
+    def test_le_csv_sort_avec_le_bon_entete(self):
+        reponse = self.client.get('/services/export/categories/', {'format': 'csv'})
+        self.assertEqual(reponse.status_code, 200)
+        entete = reponse.content.decode('utf-8-sig').splitlines()[0].strip()
+        self.assertEqual(entete, 'code,nom,description,parent')
+
+    def test_la_categorie_parente_sort_toujours(self):
+        """La seule colonne vide qu'on a gardée : elle est remplissable."""
+        import json
+        reponse = self.client.get('/services/export/categories/', {'format': 'json'})
+        lignes = {l['code']: l for l in json.loads(reponse.content)}
+        self.assertEqual(lignes['ECHO']['parent'], 'EXA')
+
+    def test_les_champs_de_stock_ont_disparu_du_modele(self):
+        from services.models import CategorieArticle
+        champs = {f.name for f in CategorieArticle._meta.get_fields()}
+        for parti in ('methode_cout', 'valorisation_inventaire', 'routes',
+                      'strategie_enlevement', 'reservation_conditionnement',
+                      'bloquer_serie_lot', 'sequence_code_barres',
+                      'compte_revenus', 'compte_charges'):
+            with self.subTest(champ=parti):
+                self.assertNotIn(parti, champs)
+
+    def test_l_article_garde_ses_comptes_comptables(self):
+        """Homonymes : `compte_revenus` existe aussi sur l'article, et lui sert."""
+        from services.models import Articleservice
+        champs = {f.name for f in Articleservice._meta.get_fields()}
+        self.assertIn('compte_revenus', champs)
+        self.assertIn('compte_charges', champs)
+
+    def test_un_ancien_fichier_a_treize_colonnes_passe_encore(self):
+        """Les colonnes disparues sont ignorées, la ligne est quand même créée."""
+        import json
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from services.models import CategorieArticle
+        ancien = json.dumps([{
+            'code': 'ZZT', 'nom': 'Ancienne', 'description': 'essai', 'parent': '',
+            'methode_cout': 'fifo', 'valorisation_inventaire': 'automatique',
+            'reservation_conditionnement': 'entiers', 'bloquer_serie_lot': 1,
+            'routes': 'Achats', 'strategie_enlevement': 'lifo',
+            'sequence_code_barres': 'SEQ1',
+            'compte_revenus': '70110000', 'compte_charges': '60110000',
+        }]).encode()
+        self.client.post('/services/importer/categories/', {
+            'fichier': SimpleUploadedFile('anciennes.json', ancien,
+                                          content_type='application/json')})
+        cree = CategorieArticle.objects.filter(code='ZZT').first()
+        self.assertIsNotNone(cree)
+        self.assertEqual(cree.nom, 'Ancienne')
+        self.assertEqual(cree.description, 'essai')
+
+    def test_le_formulaire_propose_exactement_les_champs_restants(self):
+        from services.forms import CategorieArticleForm
+        self.assertEqual(list(CategorieArticleForm().fields),
+                         ['nom', 'code', 'parent', 'description'])

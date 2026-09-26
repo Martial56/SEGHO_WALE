@@ -616,22 +616,14 @@ def export_articles(request):
 
 # ── Export Catégories articles ───────────────────────────────────────────────
 
-_CAT_HDR = [
-    'code', 'nom', 'description', 'parent',
-    'methode_cout', 'valorisation_inventaire', 'reservation_conditionnement',
-    'bloquer_serie_lot', 'routes', 'strategie_enlevement',
-    'sequence_code_barres', 'compte_revenus', 'compte_charges',
-]
+#: L'export portait neuf colonnes de gestion de stock héritées d'un ERP, vides
+#: sur toutes les catégories. Il ne reste que ce qu'une catégorie de prestation
+#: a vraiment : son code, son nom, sa description et sa catégorie parente.
+_CAT_HDR = ['code', 'nom', 'description', 'parent']
 
 
 def _cat_row(c):
-    return [
-        c.code, c.nom, c.description,
-        c.parent.code if c.parent else '',
-        c.methode_cout, c.valorisation_inventaire, c.reservation_conditionnement,
-        int(c.bloquer_serie_lot), c.routes, c.strategie_enlevement,
-        c.sequence_code_barres, c.compte_revenus, c.compte_charges,
-    ]
+    return [c.code, c.nom, c.description, c.parent.code if c.parent else '']
 
 
 @login_required
@@ -779,18 +771,11 @@ def import_categories(request):
             if not code:
                 errors += 1
                 continue
+            # Les colonnes de stock d'un ancien export sont simplement ignorées :
+            # le champ n'existe plus, la ligne passe quand même.
             defaults = {
                 'nom': _s(item.get('nom', code)),
                 'description': _s(item.get('description', '')),
-                'methode_cout': _s(item.get('methode_cout', 'prix_standard')),
-                'valorisation_inventaire': _s(item.get('valorisation_inventaire', 'manuelle')),
-                'reservation_conditionnement': _s(item.get('reservation_conditionnement', 'partiels')),
-                'bloquer_serie_lot': _b(item.get('bloquer_serie_lot', False)),
-                'routes': _s(item.get('routes', '')),
-                'strategie_enlevement': _s(item.get('strategie_enlevement', '')),
-                'sequence_code_barres': _s(item.get('sequence_code_barres', '')),
-                'compte_revenus': _s(item.get('compte_revenus', '')),
-                'compte_charges': _s(item.get('compte_charges', '')),
                 'parent': None,
             }
             obj, was_created = CategorieArticle.objects.get_or_create(code=code, defaults=defaults)
