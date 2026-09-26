@@ -178,6 +178,14 @@ def _constante_to_eval_prefill(constante):
 def hospitalisation_create(request):
     from django.utils import timezone
     from .forms import HospitalisationForm
+
+    # Adresse de retour quand on vient d'une fiche de rendez-vous. Lue dans le
+    # POST d'abord : le formulaire la reconduit, pour qu'un réaffichage après
+    # erreur ne fasse pas perdre le chemin du retour.
+    from core.retour import url_interne
+    retour = (url_interne(request, request.POST.get('next'))
+              or url_interne(request, request.GET.get('next')) or '')
+
     if request.method == 'POST':
         form = HospitalisationForm(request.POST, request.FILES)
         if form.is_valid():
@@ -220,6 +228,8 @@ def hospitalisation_create(request):
                     messages.warning(request, f'Hospitalisation {hosp.numero} créée mais non confirmée.')
             else:
                 messages.success(request, f'Hospitalisation {hosp.numero} créée.')
+            if retour:
+                return redirect(retour)
             return redirect('hospitalisation:detail', pk=hosp.pk)
     else:
         initial = {'date_admission': timezone.now()}
@@ -304,6 +314,7 @@ def hospitalisation_create(request):
         'medecins_list': list(Medecin.objects.filter(actif=True).select_related('employe').order_by('employe__nom')),
         'unites_list':   list(UniteMesure.objects.filter(actif=True).order_by('nom')),
         'services_list': list(Articleservice.objects.filter(actif=True, categorie__code='SN').order_by('nom')),
+        'next':          retour,
     }
     if request.method == 'GET':
         ctx['eval_clin'] = eval_prefill

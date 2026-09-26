@@ -960,6 +960,12 @@ def rdv_edit(request, pk):
             if action == 'créer une facture':
                 from django.urls import reverse
                 return redirect(reverse('facturation:create') + f'?patient={rdv.patient.pk}&rdv={rdv.pk}')
+            # « Demande de lab », « Soins »… : la fiche vient d'être enregistrée,
+            # on part faire l'action annexe qui saura revenir ici.
+            from core.retour import detour_demande
+            detour = detour_demande(request, request.path)
+            if detour:
+                return redirect(detour)
             from django.urls import reverse
             return redirect(reverse('patients:rdv_edit', kwargs={'pk': rdv.pk}))
     else:

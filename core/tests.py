@@ -150,3 +150,142 @@ class TestUtilisateursAvec(TestCase):
         User.objects.create_user('quidam', password='x')
         trouves = utilisateurs_avec('employer.permission_qui_n_existe_pas')
         self.assertEqual(list(trouves), [su])
+
+
+# ─── Revenir d'une action annexe sans perdre sa saisie ─────────────────────────
+
+class TestUrlDeRetour(TestCase):
+    """Le module qui fabrique et valide les adresses de retour.
+
+    L'adresse vient du navigateur : mal filtrée, elle renverrait l'utilisateur
+    sur un autre site en lui laissant croire qu'il est toujours chez lui.
+    """
+
+    def setUp(self):
+        from django.test import RequestFactory
+        self.rf = RequestFactory()
+
+    def _requete(self, **post):
+        return self.rf.post('/gynecologie/rdv/1/', post)
+
+    def test_une_adresse_du_site_est_acceptee(self):
+        from core.retour import url_interne
+        r = self._requete()
+        self.assertEqual(url_interne(r, '/gynecologie/rdv/1/'), '/gynecologie/rdv/1/')
+
+    def test_une_adresse_etrangere_est_refusee(self):
+        from core.retour import url_interne
+        r = self._requete()
+        for mechante in ('https://ailleurs.example/vol', '//ailleurs.example/vol'):
+            with self.subTest(url=mechante):
+                self.assertIsNone(url_interne(r, mechante))
+
+    def test_le_retour_s_accroche_sans_ecraser_les_parametres(self):
+        from core.retour import vers_avec_retour
+        self.assertEqual(
+            vers_avec_retour('/laboratoire/nouvelle/?patient=3', '/rdv/1/'),
+            '/laboratoire/nouvelle/?patient=3&next=%2Frdv%2F1%2F')
+        self.assertEqual(
+            vers_avec_retour('/soins/nouveau/', '/rdv/1/'),
+            '/soins/nouveau/?next=%2Frdv%2F1%2F')
+
+    def test_l_onglet_ouvert_est_reconduit(self):
+        from core.retour import retour_vers_le_rdv
+        r = self._requete(_onglet='curative')
+        self.assertEqual(retour_vers_le_rdv(r, '/rdv/1/'), '/rdv/1/?onglet=curative')
+
+    def test_un_onglet_inconnu_est_ignore(self):
+        """L'onglet vient du navigateur : on ne le recopie pas tel quel."""
+        from core.retour import retour_vers_le_rdv
+        r = self._requete(_onglet='"><script>')
+        self.assertEqual(retour_vers_le_rdv(r, '/rdv/1/'), '/rdv/1/')
+
+    def test_sans_bouton_d_action_on_reste_sur_place(self):
+        from core.retour import detour_demande
+        self.assertIsNone(detour_demande(self._requete(), '/rdv/1/'))
+
+    def test_une_destination_etrangere_ne_fait_pas_partir(self):
+        from core.retour import detour_demande
+        r = self._requete(_apres='https://ailleurs.example/vol')
+        self.assertIsNone(detour_demande(r, '/rdv/1/'))
+
+    def test_le_detour_emporte_l_adresse_de_retour(self):
+        from core.retour import detour_demande
+        r = self._requete(_apres='/laboratoire/nouvelle/?patient=3', _onglet='curative')
+        self.assertEqual(
+            detour_demande(r, '/gynecologie/rdv/1/'),
+            '/laboratoire/nouvelle/?patient=3&next=%2Fgynecologie%2Frdv%2F1%2F%3Fonglet%3Dcurative')
+
+
+class TestLaFicheRdvEnregistreAvantDePartir(TestCase):
+    """Le cœur du besoin : cliquer « Demande de lab » ne doit rien perdre.
+
+    Les quatre boutons étaient de simples liens posés dans le formulaire. Le
+    navigateur quittait la page, et les 376 champs saisis disparaissaient.
+    """
+
+    def setUp(self):
+        from django.contrib.auth.models import User
+        from django.utils import timezone
+        from patients.models import Patient, RendezVous
+        self.user = User.objects.create_superuser('medecin_rdv', password='x')
+        self.client.force_login(self.user)
+        self.patient = Patient.objects.create(
+            nom='Retour', prenoms='Test', date_naissance='1990-01-01',
+            sexe='F', telephone='0700000000')
+        from medecins.models import Departement
+        self.departement, _ = Departement.objects.get_or_create(
+            code='GYN', defaults={'nom': 'Gynécologie'})
+        self.rdv = RendezVous.objects.create(
+            patient=self.patient, date_heure=timezone.now(),
+            departement=self.departement,
+            statut='en_consultation', motif='Consultation')
+        from django.urls import reverse
+        self.url = reverse('patients:rdv_edit', kwargs={'pk': self.rdv.pk})
+
+    def _post(self, **extra):
+        donnees = {
+            'patient': self.patient.pk,
+            'departement': self.departement.pk,
+            'date_heure': self.rdv.date_heure.strftime('%Y-%m-%dT%H:%M'),
+            'motif': 'Consultation',
+            'cur_motif_consultation': 'douleurs abdominales',
+        }
+        donnees.update(extra)
+        return self.client.post(self.url, donnees)
+
+    def test_l_url_de_la_fiche_repond(self):
+        self.assertEqual(self.client.get(self.url).status_code, 200)
+
+    def test_le_clic_enregistre_la_saisie_avant_de_partir(self):
+        from patients.models import RegistreCuratif
+        self._post(_apres='/laboratoire/nouvelle/?patient=%d' % self.patient.pk,
+                   _onglet='curative')
+        registre = RegistreCuratif.objects.get(rdv=self.rdv)
+        self.assertEqual(registre.donnees['cur_motif_consultation'], 'douleurs abdominales')
+
+    def test_le_clic_emmene_vers_la_destination_avec_le_retour(self):
+        reponse = self._post(
+            _apres='/laboratoire/nouvelle/?patient=%d' % self.patient.pk,
+            _onglet='curative')
+        self.assertEqual(reponse.status_code, 302)
+        self.assertIn('/laboratoire/nouvelle/', reponse['Location'])
+        self.assertIn('next=', reponse['Location'])
+        self.assertIn('onglet%3Dcurative', reponse['Location'])
+
+    def test_sans_bouton_d_action_on_revient_sur_la_fiche(self):
+        reponse = self._post()
+        self.assertEqual(reponse.status_code, 302)
+        self.assertIn(str(self.rdv.pk), reponse['Location'])
+        self.assertNotIn('laboratoire', reponse['Location'])
+
+    def test_une_destination_etrangere_ne_fait_pas_quitter_le_site(self):
+        reponse = self._post(_apres='https://ailleurs.example/vol')
+        self.assertEqual(reponse.status_code, 302)
+        self.assertNotIn('ailleurs.example', reponse['Location'])
+
+    def test_les_quatre_boutons_soumettent_au_lieu_de_quitter(self):
+        """Un `<a href>` ne soumet rien : c'est ce qui perdait la saisie."""
+        page = self.client.get(self.url).content.decode()
+        self.assertEqual(page.count('name="_apres"'), 4)
+        self.assertEqual(page.count('name="_onglet"'), 1)

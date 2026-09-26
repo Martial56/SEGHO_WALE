@@ -542,6 +542,13 @@ def ordonnance_create_libre(request):
         except (Medecin.DoesNotExist, ValueError):
             pass
 
+    # Adresse de retour quand on vient d'une fiche de rendez-vous. Lue dans le
+    # POST d'abord : le formulaire la reconduit, pour qu'un refus de ligne ne
+    # fasse pas perdre le chemin du retour.
+    from core.retour import url_interne
+    retour = (url_interne(request, request.POST.get('next'))
+              or url_interne(request, request.GET.get('next')) or '')
+
     if request.method == 'POST':
         type_ord   = request.POST.get('type_ordonnance', 'interne')
         date_exp   = request.POST.get('date_expiration') or None
@@ -563,6 +570,7 @@ def ordonnance_create_libre(request):
                 'medecins': medecins,
                 'medicaments_dispo': _medicaments_dispo_json(request),
                 'date_expiration_defaut': date_expiration_par_defaut(),
+                'next':              retour,
                 'initial_lignes': _lignes_a_reafficher(request),
             })
 
@@ -576,6 +584,7 @@ def ordonnance_create_libre(request):
                 'medecin_preselect': medecin_preselect,
                 'medicaments_dispo': _medicaments_dispo_json(request),
                 'date_expiration_defaut': date_expiration_par_defaut(),
+                'next':              retour,
                 'initial_lignes': _lignes_a_reafficher(request),
             })
 
@@ -598,6 +607,7 @@ def ordonnance_create_libre(request):
                 'types':             types,
                 'medicaments_dispo': _medicaments_dispo_json(request),
                 'date_expiration_defaut': date_expiration_par_defaut(),
+                'next':              retour,
                 'initial_lignes':    _lignes_a_reafficher(request),
             })
 
@@ -612,6 +622,8 @@ def ordonnance_create_libre(request):
         _enregistrer_les_lignes(ordonnance, lignes)
 
         messages.success(request, f'Ordonnance {ordonnance.numero} créée avec succès.')
+        if retour:
+            return redirect(retour)
         return redirect('ordonnance_detail', pk=ordonnance.pk)
 
     return render(request, 'pharmacie/ordonnance/ordonnance_create.html', {
@@ -622,6 +634,7 @@ def ordonnance_create_libre(request):
         'types':             types,
         'medicaments_dispo': _medicaments_dispo_json(request),
         'date_expiration_defaut': date_expiration_par_defaut(),
+        'next':              retour,
     })
 
 

@@ -845,13 +845,18 @@ def laboratoire_create(request):
         demande.montant_total = total
         demande.save()
         messages.success(request, f'Demande {demande.numero} créée avec succès.')
-        return redirect('laboratoire_detail', pk=demande.pk)
+        # Venu d'une fiche de rendez-vous : on y retourne, à l'onglet quitté.
+        from core.retour import retour_ou
+        return redirect(retour_ou(
+            request, reverse('laboratoire_detail', kwargs={'pk': demande.pk})))
 
+    from core.retour import url_interne
     return render(request, 'laboratoire/create_analyse.html', {
         'patient': patient,
         'services_examens': services_examens,
         'medecins': medecins,
         'prefill_medecin': prefill_medecin,
+        'next': url_interne(request, request.GET.get('next')) or '',
         'type_test_choices': DemandeExamen.TYPE_TEST,
         'breadcrumb': [
             {'title': 'Accueil', 'url': '/'},
@@ -1505,6 +1510,12 @@ def gynecologie_rdv_detail(request, pk):
             if action == 'créer une facture':
                 from django.urls import reverse
                 return redirect(reverse('facturation:create') + f'?patient={rdv.patient.pk}&rdv={rdv.pk}')
+            # « Demande de lab », « Soins »… : la fiche vient d'être enregistrée,
+            # on part faire l'action annexe qui saura revenir ici.
+            from core.retour import detour_demande
+            detour = detour_demande(request, request.path)
+            if detour:
+                return redirect(detour)
             return redirect('gynecologie_rdv_detail', pk=rdv.pk)
     else:
         form = RendezVousForm(instance=rdv, locked_billing=locked_billing)

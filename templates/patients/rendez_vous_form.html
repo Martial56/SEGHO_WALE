@@ -627,6 +627,9 @@ cliquant sur une ligne. Voir patients/origines.py.
       data-rdv-id="{{ rdv.pk|default:'' }}"
       data-has-consultation="{% if consultation %}1{% else %}0{% endif %}">
 {% csrf_token %}
+{# Onglet ouvert au moment du clic : la vue le renvoie dans l'adresse de retour,
+   pour qu'on revienne là où on était et pas sur « Informations générales ». #}
+<input type="hidden" name="_onglet" id="onglet-actif" value="{{ onglet_actif|default:'infos' }}">
 
 <!-- ══════════════ PANNEAU DE CONTRÔLE ══════════════ -->
 <div class="control-panel">
@@ -689,10 +692,14 @@ cliquant sur une ligne. Voir patients/origines.py.
                 {% if peut_modifier %}
                 <button type="button" class="btn-action" id="btn-pause"><i class="bi bi-pause-fill"></i> Pause</button>
                 {% endif %}
-                <a href="{% url 'ordonnance_create_libre' %}?patient_id={{ rdv.patient.pk }}{% if consultation %}&consultation_id={{ consultation.pk }}{% endif %}{% if rdv.medecin %}&medecin_id={{ rdv.medecin.pk }}{% endif %}" class="btn-action btn-ghost"><i class="bi bi-file-earmark-medical"></i> Créer une ordonnance</a>
-                <a href="{% url 'laboratoire_create' %}?patient={{ rdv.patient.pk }}{% if rdv.medecin %}&medecin_id={{ rdv.medecin.pk }}{% endif %}" class="btn-action btn-ghost"><i class="bi bi-flask"></i> Demande de lab</a>
-                {% if perms.soins.add_soin %}<a href="{% url 'soins:create' %}?patient_id={{ rdv.patient.pk }}" class="btn-action btn-ghost"><i class="bi bi-bandaid"></i> Soins</a>{% endif %}
-                {% if perms.hospitalisation.add_hospitalisation %}<a href="{% url 'hospitalisation:create' %}?patient={{ rdv.patient.pk }}{% if rdv.medecin %}&medecin={{ rdv.medecin.pk }}{% endif %}&rdv={{ rdv.pk }}" class="btn-action btn-ghost"><i class="bi bi-clipboard2-pulse"></i> M.O</a>{% endif %}
+                {# Ces quatre actions **soumettent** la fiche au lieu de la quitter :
+                   un simple lien perdait tout ce qui était saisi et pas encore
+                   enregistré. La vue enregistre, puis redirige vers `_apres` en
+                   lui passant l'adresse de retour, onglet compris. #}
+                <button type="submit" name="_apres" value="{% url 'ordonnance_create_libre' %}?patient_id={{ rdv.patient.pk }}{% if consultation %}&consultation_id={{ consultation.pk }}{% endif %}{% if rdv.medecin %}&medecin_id={{ rdv.medecin.pk }}{% endif %}" class="btn-action btn-ghost"><i class="bi bi-file-earmark-medical"></i> Créer une ordonnance</button>
+                <button type="submit" name="_apres" value="{% url 'laboratoire_create' %}?patient={{ rdv.patient.pk }}{% if rdv.medecin %}&medecin_id={{ rdv.medecin.pk }}{% endif %}" class="btn-action btn-ghost"><i class="bi bi-flask"></i> Demande de lab</button>
+                {% if perms.soins.add_soin %}<button type="submit" name="_apres" value="{% url 'soins:create' %}?patient_id={{ rdv.patient.pk }}" class="btn-action btn-ghost"><i class="bi bi-bandaid"></i> Soins</button>{% endif %}
+                {% if perms.hospitalisation.add_hospitalisation %}<button type="submit" name="_apres" value="{% url 'hospitalisation:create' %}?patient={{ rdv.patient.pk }}{% if rdv.medecin %}&medecin={{ rdv.medecin.pk }}{% endif %}&rdv={{ rdv.pk }}" class="btn-action btn-ghost"><i class="bi bi-clipboard2-pulse"></i> M.O</button>{% endif %}
                 {% if peut_modifier %}
                 <button type="submit" name="_action" value="terminer" class="btn-action btn-dark">Consultation terminée</button>
                 <button type="submit" name="_action" value="annuler" class="btn-action btn-danger-outline">Annuler</button>
@@ -1908,8 +1915,21 @@ cliquant sur une ligne. Voir patients/origines.py.
             document.querySelectorAll('.f-tab-panel').forEach(p => p.classList.remove('active'));
             this.classList.add('active');
             document.getElementById('tab-' + id).classList.add('active');
+            var champOnglet = document.getElementById('onglet-actif');
+            if (champOnglet) champOnglet.value = id;
         });
     });
+
+    // Retour d'une action annexe : on rouvre l'onglet qu'on avait quitté.
+    // Un onglet verrouillé (évaluation non faite, consultation non démarrée)
+    // n'est pas forcé — on ne rouvre que ce que l'utilisateur pourrait cliquer.
+    (function rouvrirOngletDemande() {
+        var demande = new URLSearchParams(window.location.search).get('onglet');
+        if (!demande) return;
+        var onglet = document.querySelector('.f-tab[data-tab="' + demande + '"]');
+        if (!onglet || onglet.classList.contains('f-tab-disabled')) return;
+        onglet.click();
+    })();
 
     // Mode édition : actif si création, confirmé+facturé, en attente, ou en
     // consultation — et seulement pour qui a le droit de modifier. Sans la

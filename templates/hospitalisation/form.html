@@ -229,7 +229,9 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
      (une seule rangée, comme .det-subhdr de hospitalisation/detail.html) ── -->
 <div class="det-subhdr" data-fixed="1">
 
-  <a href="{% url 'hospitalisation:list' %}" class="o-ctrl-btn" style="padding:3px 7px;" title="Retour">
+  <a href="{% if next %}{{ next }}{% else %}{% url 'hospitalisation:list' %}{% endif %}"
+     class="o-ctrl-btn" style="padding:3px 7px;"
+     title="{% if next %}Retour au rendez-vous{% else %}Retour{% endif %}">
     <i class="bi bi-arrow-left"></i>
   </a>
   <div class="det-crumb">
@@ -314,7 +316,7 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
     Sauvegarder
   </button>
   {% endif %}
-  <a href="{% url 'hospitalisation:list' %}" class="abtn abtn-discard">Ignorer</a>
+  <a href="{% if next %}{{ next }}{% else %}{% url 'hospitalisation:list' %}{% endif %}" class="abtn abtn-discard">Ignorer</a>
 
 </div>
 
@@ -334,6 +336,9 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
 <!-- ── Carte principale ── -->
 <form method="post" id="hosp-form" enctype="multipart/form-data" novalidate>
   {% csrf_token %}
+  {# Adresse de retour quand on vient d'une fiche de rendez-vous. Reconduite
+     dans le POST pour survivre au réaffichage qui suit une erreur. #}
+  {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
   <div class="hosp-card">
 
     <!-- ── Pipeline (comme .det-pipe-row de hospitalisation/detail.html) ── -->

@@ -414,6 +414,13 @@ def soins_detail(request, pk):
 @login_required(login_url='login')
 @permission_required('soins.add_soin', raise_exception=True)
 def soins_create(request):
+    # Adresse de retour quand on vient d'une fiche de rendez-vous. Lue dans le
+    # POST d'abord : le formulaire la reconduit, pour qu'un réaffichage après
+    # erreur ne fasse pas perdre le chemin du retour.
+    from core.retour import url_interne
+    retour = (url_interne(request, request.POST.get('next'))
+              or url_interne(request, request.GET.get('next')) or '')
+
     if request.method == 'POST':
         form = SoinForm(request.POST, request.FILES)
         if form.is_valid():
@@ -429,6 +436,7 @@ def soins_create(request):
                         'counts': {'rdv': 0, 'examens': 0, 'analyses': 0},
                         'procedures_json': '[]',
                         'patient_impose': _patient_impose(request),
+                        'next': retour,
                         **extras,
                     })
                 soin.statut = 'en_attente_de_paiement'
@@ -437,6 +445,8 @@ def soins_create(request):
             soin.save()
             log_event(soin, request.user, 'Soin créé.', type='system')
             _save_procedures_from_lignes(soin, request.POST, user=request.user)
+            if retour:
+                return redirect(retour)
             return redirect('soins:detail', pk=soin.pk)
     else:
         form = SoinForm()
@@ -457,6 +467,7 @@ def soins_create(request):
         'counts': counts,
         'procedures_json': '[]',
         'patient_impose': patient_impose,
+        'next': retour,
         **extras,
     })
 
