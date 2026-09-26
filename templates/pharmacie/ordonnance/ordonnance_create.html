@@ -286,11 +286,12 @@
             <table class="lines-table" id="lines-table">
                 <thead>
                     <tr>
-                        <th style="width:30%">Médicament</th>
-                        <th style="width:25%">Posologie <span style="color:var(--rose)">*</span></th>
-                        <th style="width:18%">Durée</th>
-                        <th style="width:8%">Qté</th>
-                        <th style="width:14%;text-align:center;">Qté en stock</th>
+                        <th style="width:28%">Médicament</th>
+                        <th style="width:22%">Posologie <span style="color:var(--rose)">*</span></th>
+                        <th style="width:16%">Durée</th>
+                        <th style="width:7%">Qté</th>
+                        <th style="width:9%;text-align:center;">Unité</th>
+                        <th style="width:13%;text-align:center;">Qté en stock</th>
                         <th style="width:5%"></th>
                     </tr>
                 </thead>
@@ -308,6 +309,7 @@
                             <td><input type="text" name="posologie[]" class="line-input" placeholder="Ex : 1cp matin et soir" value="{{ ligne.posologie }}"></td>
                             <td><input type="text" name="duree[]" class="line-input" placeholder="Ex : 7 jours" value="{{ ligne.duree }}"></td>
                             <td><input type="number" name="quantite[]" class="line-input qty" value="{{ ligne.quantite }}" min="1"></td>
+                            <td><input type="text" name="unite[]" class="line-input med-unite-display" placeholder="Ex : cp, ml…" value="{{ ligne.med_unite|default:'' }}"></td>
                             <td style="text-align:center;">
                                 {% if ligne.indisponible %}
                                 <span class="stock-badge stock-empty med-stock-display">Indisponible</span>
@@ -330,6 +332,7 @@
                         <td><input type="text" name="posologie[]" class="line-input" placeholder="Ex : 1cp matin et soir"></td>
                         <td><input type="text" name="duree[]" class="line-input" placeholder="Ex : 7 jours"></td>
                         <td><input type="number" name="quantite[]" class="line-input qty" value="1" min="1"></td>
+                        <td><input type="text" name="unite[]" class="line-input med-unite-display" placeholder="Ex : cp, ml…"></td>
                         <td style="text-align:center;"><span class="stock-badge stock-unknown med-stock-display">—</span></td>
                         <td><button type="button" class="btn-remove-line" title="Supprimer">✕</button></td>
                     </tr>
@@ -438,12 +441,14 @@ function setupLine(row) {
     const qtyInput     = row.querySelector('.line-input.qty');
     const stockCell    = row.querySelector('td:has(.med-stock-display)') ||
                          [...row.querySelectorAll('td')].find(td => td.querySelector('.med-stock-display'));
+    const uniteDisplay = row.querySelector('.med-unite-display');
 
     function resetStock() {
         if (stockCell) {
             stockCell.innerHTML = '<span class="stock-badge stock-unknown med-stock-display">—</span>';
             delete stockCell.dataset.originalStock;
         }
+        if (uniteDisplay) uniteDisplay.value = '';
     }
 
     function updateStockDisplay() {
@@ -498,7 +503,8 @@ function setupLine(row) {
                   data-rupture="${m.rupture ? '1' : ''}"
                   data-stock="${m.stock_actuel ?? ''}"
                   data-alerte="${m.stock_alerte ?? 10}"
-                  data-minimum="${m.stock_minimum ?? 5}">
+                  data-minimum="${m.stock_minimum ?? 5}"
+                  data-unite="${m.unite || ''}">
                 <div class="med-ac-texte">
                     <div class="med-ac-name">${m.designation}</div>
                     ${(m.dosage || m.forme)
@@ -532,6 +538,7 @@ function setupLine(row) {
                 searchInput.value = item.dataset.name;
                 hiddenId.value    = item.dataset.id;
                 dropdown.style.display = 'none';
+                if (uniteDisplay) uniteDisplay.value = item.dataset.unite || '';
                 const s = parseInt(item.dataset.stock, 10);
                 if (!isNaN(s) && stockCell) {
                     stockCell.dataset.originalStock = s;

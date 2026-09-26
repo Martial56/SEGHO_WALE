@@ -8,6 +8,10 @@
 .inv-input { width:90px; border:none; border-bottom:1.5px solid rgba(0,0,0,.18); background:transparent; padding:5px 4px; font-size:13px; font-weight:700; color:var(--st-text); text-align:right; font-family:inherit; outline:none; transition:border-color .15s; }
 .inv-input:focus { border-bottom-color:var(--st-500); }
 .stock-sys { font-family: var(--font-mono); font-size:13px; font-weight:700; color:var(--accent-text-soft); }
+.inv-commentaire { width:100%; border:none; border-bottom:1.5px solid rgba(0,0,0,.15); background:transparent; padding:5px 4px; font-size:12px; font-family:inherit; color:var(--st-text); outline:none; transition:border-color .15s; }
+.inv-commentaire:focus { border-bottom-color:var(--st-500); }
+.badge-ph-ok      { background:rgba(var(--st-600-rgb),.1); color:var(--accent-text-soft); border:1px solid rgba(var(--st-600-rgb),.25); padding:2px 8px; border-radius:12px; font-size:11px; font-weight:600; white-space:nowrap; }
+.badge-ph-rupture { background:rgba(var(--rose-rgb),.1); color:var(--rose-text); border:1px solid rgba(var(--rose-rgb),.25); padding:2px 8px; border-radius:12px; font-size:11px; font-weight:600; white-space:nowrap; }
 </style>{% endblock %}
 
 {% block content %}
@@ -46,13 +50,15 @@
         <th>Type</th>
         <th style="text-align:right;">Stock système</th>
         <th style="text-align:right;">Stock réel compté</th>
+        <th style="text-align:center;">Écart inventaire</th>
         <th style="text-align:center;">Date de péremption</th>
+        <th>Commentaire</th>
       </tr>
     </thead>
     <tbody>
     {% regroup produits by type as produits_par_type %}
     {% for groupe in produits_par_type %}
-    <tr><td colspan="6" style="padding:0;">
+    <tr><td colspan="8" style="padding:0;">
       <div class="inv-section">
         {% if groupe.grouper == 'medicament' %}<i class="bi bi-capsule-pill"></i> Médicaments
         {% elif groupe.grouper == 'consommable' %}<i class="bi bi-bandaid"></i> Consommables médicaux
@@ -77,8 +83,12 @@
         <span style="font-size:10px;color:var(--st-muted);margin-left:3px;">{{ p.unite_mesure.nom }}</span>
       </td>
       <td style="text-align:right;">
-        <input type="number" name="reel_{{ p.pk }}" class="inv-input"
-          min="0" step="1" placeholder="—" title="{{ p.nom }}">
+        <input type="number" name="reel_{{ p.pk }}" class="inv-input ecart-input"
+          min="0" step="1" placeholder="—" title="{{ p.nom }}"
+          data-pk="{{ p.pk }}" data-theorique="{{ p.stock_actuel|floatformat:0 }}">
+      </td>
+      <td style="text-align:center;" id="ecart-{{ p.pk }}">
+        <span style="color:var(--st-muted);font-size:11px;">—</span>
       </td>
       <td style="text-align:center;">
         {% if p.type == 'medicament' or p.type == 'consommable' %}
@@ -88,11 +98,14 @@
         <span style="color:var(--st-muted);font-size:11px;">—</span>
         {% endif %}
       </td>
+      <td>
+        <input type="text" name="commentaire_{{ p.pk }}" class="inv-commentaire" placeholder="Observation…" title="{{ p.nom }}">
+      </td>
     </tr>
     {% endfor %}
     {% endfor %}
     {% if not produits %}
-    <tr><td colspan="6" style="text-align:center;padding:48px;color:var(--st-muted);">
+    <tr><td colspan="8" style="text-align:center;padding:48px;color:var(--st-muted);">
       <i class="bi bi-inbox" style="font-size:28px;display:block;margin-bottom:10px;opacity:.4;"></i>
       Aucun produit actif dans le stock central.
     </td></tr>
@@ -115,4 +128,37 @@
 </div>
 
 </form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  "use strict";
+
+  function majEcart(input) {
+    var pk = input.dataset.pk;
+    var theorique = parseFloat(input.dataset.theorique) || 0;
+    var cell = document.getElementById("ecart-" + pk);
+    if (!cell) { return; }
+
+    if (input.value === "" || isNaN(parseFloat(input.value))) {
+      cell.innerHTML = '<span style="color:var(--st-muted);font-size:11px;">—</span>';
+      return;
+    }
+
+    var ecart = parseFloat(input.value) - theorique;
+    if (ecart > 0) {
+      cell.innerHTML = '<span class="badge-ph-ok">+' + ecart + ' excédent</span>';
+    } else if (ecart < 0) {
+      cell.innerHTML = '<span class="badge-ph-rupture">' + ecart + ' manquant</span>';
+    } else {
+      cell.innerHTML = '<span class="badge-ph-ok">0 conforme</span>';
+    }
+  }
+
+  document.querySelectorAll(".ecart-input").forEach(function (input) {
+    input.addEventListener("input", function () { majEcart(this); });
+  });
+}());
+</script>
 {% endblock %}

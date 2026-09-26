@@ -1,0 +1,158 @@
+{% extends 'stock/base.html' %}
+{% load static %}
+{% block topbar_title %}Stock — Nouvelle réception{% endblock %}
+
+{% block extra_st_css %}<style>
+.content { padding-top: 0; }
+.rec-section { background:var(--st-100); padding:8px 20px; font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--accent-text); border-top:1px solid var(--st-200); border-bottom:1px solid var(--st-200); display:flex; align-items:center; gap:7px; }
+.rec-input { width:90px; border:none; border-bottom:1.5px solid rgba(0,0,0,.18); background:transparent; padding:5px 4px; font-size:13px; font-weight:700; color:var(--st-text); text-align:right; font-family:inherit; outline:none; transition:border-color .15s; }
+.rec-input:focus { border-bottom-color:var(--st-500); }
+.rec-text { width:100%; border:none; border-bottom:1.5px solid rgba(0,0,0,.15); background:transparent; padding:5px 4px; font-size:12px; font-family:inherit; color:var(--st-text); outline:none; transition:border-color .15s; }
+.rec-text:focus { border-bottom-color:var(--st-500); }
+.rec-qte-unite { font-family: var(--font-mono); font-size:13px; font-weight:700; color:var(--accent-text-soft); }
+</style>{% endblock %}
+
+{% block content %}
+<form id="rec-form" method="post" novalidate>
+{% csrf_token %}
+
+<div class="action-bar">
+  <div class="action-bar-breadcrumb">
+    <a href="{% url 'stock_receptions_a_integrer' %}"><i class="bi bi-arrow-left"></i> Réceptions</a>
+    <span class="sep">/</span>
+    <span class="current">Nouvelle réception directe</span>
+  </div>
+  <div class="action-bar-buttons">
+    <a href="{% url 'stock_receptions_a_integrer' %}" class="btn-form-cancel">Annuler</a>
+    <button type="submit" class="btn-form-submit"><i class="bi bi-box-arrow-in-down"></i> Valider la réception</button>
+  </div>
+</div>
+
+<!-- Notice -->
+<div style="background:var(--st-50);border:1px solid var(--st-200);border-radius:8px;padding:13px 16px;font-size:12.5px;color:var(--accent-text);line-height:1.7;margin-top:20px;">
+  <i class="bi bi-info-circle" style="color:var(--st-500);margin-right:6px;"></i>
+  Saisissez uniquement les quantités <strong>effectivement reçues</strong>. Laissez un champ vide pour exclure le produit de cette réception. Le <strong>conditionnement</strong> indique le nombre d'unités par colis reçu (ex. 10 boîtes par carton) ; la <strong>quantité en unité de comptage</strong> (quantité reçue × conditionnement) est ce qui sera ajouté au stock dès la validation.
+</div>
+
+<!-- Bordereau : fournisseur unique pour toute la réception -->
+<div class="st-card" style="margin-top:16px;">
+  <div class="st-card-header"><div class="st-card-title"><i class="bi bi-truck" style="color:var(--accent-text-soft);"></i> Fournisseur</div></div>
+  <div class="st-card-body">
+    <div class="form-field" style="margin-bottom:0;max-width:360px;">
+      <label for="fournisseur" class="field-label">Fournisseur du bordereau de livraison</label>
+      <select name="fournisseur" id="fournisseur" class="field-ul">
+        <option value="">—</option>
+        {% for f in fournisseurs %}
+        <option value="{{ f.pk }}">{{ f.nom }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+</div>
+
+<!-- Tableau produits -->
+<div style="margin-top:16px;margin-left:-32px;margin-right:-32px;background:var(--st-surface);box-shadow:0 2px 12px rgba(var(--st-700-rgb),.08);overflow:hidden;">
+  <div style="padding:12px 20px;border-bottom:1px solid var(--st-border);display:flex;align-items:center;justify-content:space-between;">
+    <div class="st-card-title"><i class="bi bi-box-arrow-in-down" style="color:var(--accent-text-soft);"></i> Saisie de la réception</div>
+    <span style="font-size:11.5px;color:var(--st-muted);">Laissez vide pour exclure un produit</span>
+  </div>
+  <table class="st-table">
+    <thead>
+      <tr>
+        <th>Code</th>
+        <th>Produit</th>
+        <th style="text-align:right;">Quantité reçue</th>
+        <th style="text-align:right;">Conditionnement</th>
+        <th style="text-align:right;">Quantité en unité de comptage</th>
+        <th>Lot</th>
+        <th style="text-align:center;">Date de péremption</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% regroup produits by type as produits_par_type %}
+    {% for groupe in produits_par_type %}
+    <tr><td colspan="7" style="padding:0;">
+      <div class="rec-section">
+        {% if groupe.grouper == 'medicament' %}<i class="bi bi-capsule-pill"></i> Médicaments
+        {% elif groupe.grouper == 'consommable' %}<i class="bi bi-bandaid"></i> Consommables médicaux
+        {% else %}<i class="bi bi-tools"></i> Équipements{% endif %}
+        <span style="font-size:10px;font-weight:400;color:var(--st-muted);">({{ groupe.list|length }} produit{{ groupe.list|length|pluralize }})</span>
+      </div>
+    </td></tr>
+    {% for p in groupe.list %}
+    <tr>
+      <td style="font-family: var(--font-mono);font-size:11px;color:var(--accent-text-soft);">{{ p.code }}</td>
+      <td>
+        <div style="font-weight:600;">{{ p.nom }}</div>
+        {% if p.dci %}<div style="font-size:10.5px;color:var(--st-muted);">{{ p.dci }}</div>{% endif %}
+      </td>
+      <td style="text-align:right;">
+        <input type="number" name="recu_{{ p.pk }}" class="rec-input qte-recue-input"
+          min="0" step="1" placeholder="—" title="{{ p.nom }}"
+          data-pk="{{ p.pk }}">
+      </td>
+      <td style="text-align:right;">
+        <input type="number" name="conditionnement_{{ p.pk }}" class="rec-input conditionnement-input"
+          min="1" step="1" placeholder="Ex. 10" title="Nombre d'unités par colis"
+          data-pk="{{ p.pk }}">
+      </td>
+      <td style="text-align:right;">
+        <span class="rec-qte-unite" id="qte-unite-{{ p.pk }}">—</span>
+      </td>
+      <td>
+        <input type="text" name="lot_{{ p.pk }}" class="rec-text" placeholder="N° lot">
+      </td>
+      <td style="text-align:center;">
+        <input type="date" name="peremption_{{ p.pk }}"
+          style="border:none;border-bottom:1.5px solid rgba(0,0,0,.15);background:transparent;font-size:12px;font-family:inherit;outline:none;color:var(--st-text);padding:4px 2px;width:130px;">
+      </td>
+    </tr>
+    {% endfor %}
+    {% endfor %}
+    {% if not produits %}
+    <tr><td colspan="7" style="text-align:center;padding:48px;color:var(--st-muted);">
+      <i class="bi bi-inbox" style="font-size:28px;display:block;margin-bottom:10px;opacity:.4;"></i>
+      Aucun produit actif dans le stock central.
+    </td></tr>
+    {% endif %}
+    </tbody>
+  </table>
+</div>
+
+<div class="form-actions">
+  <a href="{% url 'stock_receptions_a_integrer' %}" class="btn-form-cancel">Annuler</a>
+  <button type="submit" class="btn-form-submit"><i class="bi bi-box-arrow-in-down"></i> Valider la réception</button>
+</div>
+
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  "use strict";
+
+  function majQteUnite(pk) {
+    var recuInput = document.querySelector('.qte-recue-input[data-pk="' + pk + '"]');
+    var condInput = document.querySelector('.conditionnement-input[data-pk="' + pk + '"]');
+    var cell = document.getElementById("qte-unite-" + pk);
+    if (!cell) { return; }
+
+    var recu = parseFloat(recuInput.value);
+    if (isNaN(recu) || recu <= 0) {
+      cell.textContent = "—";
+      return;
+    }
+
+    var conditionnement = parseFloat(condInput.value);
+    if (isNaN(conditionnement) || conditionnement <= 0) { conditionnement = 1; }
+
+    cell.textContent = (recu * conditionnement).toString();
+  }
+
+  document.querySelectorAll(".qte-recue-input, .conditionnement-input").forEach(function (input) {
+    input.addEventListener("input", function () { majQteUnite(this.dataset.pk); });
+  });
+}());
+</script>
+{% endblock %}

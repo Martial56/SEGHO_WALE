@@ -747,7 +747,10 @@ def rdv_edit(request, pk):
     champs à l'écran, pour ne pas proposer une saisie qui sera refusée.
     """
     rdv = get_object_or_404(RendezVous, pk=pk)
-    peut_modifier = request.user.has_perm('patients.change_rendezvous')
+    # Un rendez-vous annulé est clos : sa fiche (et la facturation associée,
+    # verrouillée séparément côté `facturation`) reste consultable mais figée,
+    # même pour qui a la permission de modifier.
+    peut_modifier = request.user.has_perm('patients.change_rendezvous') and rdv.statut != 'annule'
     ctx_origine = origines_patient.contexte(request)
 
     try:
@@ -904,6 +907,23 @@ def rdv_edit(request, pk):
             rdv.save(update_fields=['statut'])
             log_event(rdv, request.user, 'Rendez-vous annulé.', type='statut')
             messages.success(request, 'Rendez-vous annulé.')
+            return redirect('patients:rdv_global')
+
+        if action == 'annuler_confirme':
+            if rdv.statut != 'confirme':
+                messages.error(request, 'Seul un rendez-vous confirmé peut être annulé de cette façon.')
+                return redirect('patients:rdv_edit', pk=rdv.pk)
+            motif = request.POST.get('motif_annulation', '').strip()
+            if not motif:
+                messages.error(request, "La cause d'annulation est requise.")
+                return redirect('patients:rdv_edit', pk=rdv.pk)
+            rdv.statut = 'annule'
+            rdv._skip_auto_log = True
+            rdv.save(update_fields=['statut'])
+            from facturation.models import Facture
+            Facture.objects.filter(rendez_vous=rdv).exclude(statut='annulee').update(statut='annulee')
+            log_event(rdv, request.user, f'Rendez-vous annulé. Cause : {motif}', type='statut')
+            messages.success(request, 'Rendez-vous annulé et facturation annulée.')
             return redirect('patients:rdv_global')
 
         form = RendezVousForm(request.POST, instance=rdv, locked_billing=locked_billing)

@@ -204,7 +204,7 @@ class TestUniteDeLaTaille(TestCase):
 
         fautifs = []
         for chemin in pathlib.Path('templates').rglob('*.html'):
-            for n, ligne in enumerate(chemin.read_text().split('\n'), 1):
+            for n, ligne in enumerate(chemin.read_text(encoding='utf-8').split('\n'), 1):
                 if 'constante.taille' in ligne and 'cm' in ligne:
                     fautifs.append(f'{chemin}:{n}')
         self.assertEqual(fautifs, [])
@@ -249,7 +249,7 @@ class TestLesConstantesSurviventAUnReAffichage(TestCase):
         for chemin in ('templates/gynecologie/rdv_form.html',
                        'templates/patients/rendez_vous_form.html',
                        'templates/hospitalisation/form.html'):
-            for n, ligne in enumerate(pathlib.Path(chemin).read_text().split('\n'), 1):
+            for n, ligne in enumerate(pathlib.Path(chemin).read_text(encoding='utf-8').split('\n'), 1):
                 for var in motif.findall(ligne):
                     if var.split('.')[-1] not in self.CHAMPS:
                         continue
