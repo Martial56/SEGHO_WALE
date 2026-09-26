@@ -177,3 +177,82 @@ class TestSignalSyncRdvStatut(TestCase):
             consultation.save()
         except Exception as e:
             self.fail(f"Une consultation sans rendez-vous ne devrait pas lever d'erreur : {e}")
+
+
+class TestUniteDeLaTaille(TestCase):
+    """La taille s'affiche en mètres, parce qu'elle est saisie en mètres.
+
+    Deux écrans sur treize annonçaient « cm » sous la ligne d'affichage, alors
+    que les onze cases de saisie disaient « m ». Une taille de 1,68 s'affichait
+    donc « 1,68 cm ».
+
+    L'arbitre n'est pas le libellé mais le calcul : l'IMC vaut `poids / taille²`,
+    ce qui n'a de sens qu'en mètres. En centimètres il tomberait à 0,002.
+    """
+
+    def test_l_imc_confirme_que_la_taille_est_en_metres(self):
+        from decimal import Decimal
+
+        from .models import Constante
+
+        constante = Constante(poids=Decimal('68.00'), taille=Decimal('1.68'))
+        # 68 / 1.68² = 24,09 — un IMC normal. En centimètres : 0,002.
+        self.assertEqual(constante.imc, 24.09)
+
+    def test_aucun_ecran_n_annonce_des_centimetres(self):
+        import pathlib
+
+        fautifs = []
+        for chemin in pathlib.Path('templates').rglob('*.html'):
+            for n, ligne in enumerate(chemin.read_text().split('\n'), 1):
+                if 'constante.taille' in ligne and 'cm' in ligne:
+                    fautifs.append(f'{chemin}:{n}')
+        self.assertEqual(fautifs, [])
+
+
+class TestLesConstantesSurviventAUnReAffichage(TestCase):
+    """Une taille saisie se retrouve dans la case quand on rouvre la fiche.
+
+    `LANGUAGE_CODE = 'fr-fr'` et `value="{{ constante.taille }}"` cohabitent
+    depuis le premier commit. Django localise : `1.68` devient **`1,68`**, et
+    un `<input type="number">` qui ne sait pas lire la virgule se vide, comme
+    la spécification HTML le lui demande.
+
+    Saisir n'a jamais posé de problème — c'est rouvrir qui effaçait. Une
+    infirmière corrigeait un détail, enregistrait, et la taille était perdue.
+    Les entiers comme le pouls n'ont jamais souffert : ils n'ont pas de
+    séparateur décimal.
+    """
+
+    CHAMPS = ('poids', 'taille', 'temperature', 'saturation_oxygene',
+              'glycemie', 'albumine', 'perimetre_brachial')
+
+    def test_une_valeur_decimale_garde_son_point(self):
+        from decimal import Decimal
+
+        from core.templatetags.core_tags import valeur_champ
+
+        for brut, attendu in (('1.68', '1.68'), ('72.50', '72.5'),
+                              ('37.20', '37.2'), ('80.00', '80')):
+            with self.subTest(valeur=brut):
+                rendu = valeur_champ(Decimal(brut))
+                self.assertEqual(rendu, attendu)
+                self.assertNotIn(',', rendu)
+
+    def test_aucune_case_de_constante_ne_rend_une_virgule(self):
+        """Le gabarit doit passer par le filtre, sinon la case revient vide."""
+        import pathlib
+        import re
+
+        motif = re.compile(r'type="number"[^>]*value="\{\{ *([a-zA-Z_0-9.]+)')
+        fautifs = []
+        for chemin in ('templates/gynecologie/rdv_form.html',
+                       'templates/patients/rendez_vous_form.html',
+                       'templates/hospitalisation/form.html'):
+            for n, ligne in enumerate(pathlib.Path(chemin).read_text().split('\n'), 1):
+                for var in motif.findall(ligne):
+                    if var.split('.')[-1] not in self.CHAMPS:
+                        continue
+                    if 'valeur_champ' not in ligne and 'unlocalize' not in ligne:
+                        fautifs.append(f'{chemin}:{n} {var}')
+        self.assertEqual(fautifs, [])
