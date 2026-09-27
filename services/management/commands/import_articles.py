@@ -87,7 +87,6 @@ class Command(BaseCommand):
             # ── Résolution des FK ────────────────────────────────────────────
             categorie          = _fk_or_none(CategorieArticle, item.get('categorie_id'))
             unite_mesure       = _fk_or_none(UniteMesure,      item.get('unite_mesure_id'))
-            unite_achat        = _fk_or_none(UniteMesure,      item.get('unite_achat_id'))
             famille            = _fk_or_none(FamilleArticle,   item.get('famille_id'))
             compagnie          = _fk_or_none(CompagniePharma,  item.get('compagnie_pharmaceutique_id'))
             responsable        = _fk_or_none(User,             item.get('responsable_id'))
@@ -103,23 +102,16 @@ class Command(BaseCommand):
                 'favori':                        _bool(item.get('favori', False)),
                 'peut_etre_vendu':               _bool(item.get('peut_etre_vendu', True)),
                 'peut_etre_achete':              _bool(item.get('peut_etre_achete', False)),
-                # Médicament
-                'forme':                         item.get('forme', ''),
-                'voie_administration':           item.get('voie_administration', ''),
-                'dosage':                        item.get('dosage', ''),
-                'dosage_unite':                  item.get('dosage_unite', ''),
+                # Médicament — les champs proprement pharmaceutiques ont été
+                # retirés du modèle ; un ancien fichier qui les porte encore
+                # passe quand même, ses colonnes sont ignorées.
                 'quantite_prescription_manuelle':_bool(item.get('quantite_prescription_manuelle', False)),
                 'frequence':                     item.get('frequence', ''),
-                'composant_actif':               item.get('composant_actif', ''),
-                'effet_therapeutique':           item.get('effet_therapeutique', ''),
                 'effets_indesirables':           item.get('effets_indesirables', ''),
                 'compagnie_pharmaceutique':      compagnie,
                 'code_produit':                  item.get('code_produit', ''),
                 'url_produit':                   item.get('url_produit', ''),
                 'nom_produit_fabricant':         item.get('nom_produit_fabricant', ''),
-                'avertissement_grossesse':       _bool(item.get('avertissement_grossesse', False)),
-                'avertissement_lactation':       _bool(item.get('avertissement_lactation', False)),
-                'indications':                   item.get('indications', ''),
                 'remarques':                     item.get('remarques', ''),
                 # Général
                 'type_article':                  type_article,
@@ -127,14 +119,11 @@ class Command(BaseCommand):
                 'politique_facturation':         item.get('politique_facturation', 'qtes_commandees'),
                 'refacturer_depenses':           item.get('refacturer_depenses', 'non'),
                 'unite_mesure':                  unite_mesure,
-                'unite_achat':                   unite_achat,
                 'prix_vente':                    item.get('prix_vente', 0),
                 'taxes_vente':                   item.get('taxes_vente', ''),
                 'cout':                          item.get('cout', 0),
                 'categorie':                     categorie,
-                'code_barres':                   item.get('code_barres', ''),
                 'famille':                       famille,
-                'notes_internes':                item.get('notes_internes', ''),
                 # Stock
                 'quantite_stock':                item.get('quantite_stock', 0),
                 'quantite_alerte':               item.get('quantite_alerte', 0),
@@ -151,10 +140,6 @@ class Command(BaseCommand):
                 'description_reception':         item.get('description_reception', ''),
                 'description_livraison':         item.get('description_livraison', ''),
                 'description_transfert':         item.get('description_transfert', ''),
-                # Comptabilité
-                'compte_revenus':                item.get('compte_revenus', ''),
-                'compte_charges':                item.get('compte_charges', ''),
-                'compte_ecart_prix':             item.get('compte_ecart_prix', ''),
                 # Meta
                 'cree_par':                      cree_par,
             }

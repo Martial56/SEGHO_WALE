@@ -68,17 +68,6 @@ class CompagniePharma(models.Model):
 
 class Articleservice(models.Model):
 
-    FORME_CHOICES = [
-        ('comprime', 'Comprimé'), ('sirop', 'Sirop'), ('injectable', 'Injectable'),
-        ('pommade', 'Pommade'), ('gelule', 'Gélule'), ('solution', 'Solution'),
-        ('suppositoire', 'Suppositoire'), ('patch', 'Patch'),
-        ('sachet', 'Sachet'), ('gouttes', 'Gouttes'), ('autre', 'Autre'),
-    ]
-    VOIE_CHOICES = [
-        ('orale', 'Orale'), ('injectable', 'Injectable / IV'),
-        ('topique', 'Topique / Cutanée'), ('rectale', 'Rectale'),
-        ('nasale', 'Nasale'), ('ophtalmique', 'Ophtalmique'), ('autre', 'Autre'),
-    ]
     TYPE_ARTICLE_CHOICES = [
         ('prestation', 'Prestation'), ('consommable', 'Consommable'),
         ('stockable', 'Peut être stocké'), ('autre', 'Autre'),
@@ -119,14 +108,13 @@ class Articleservice(models.Model):
     peut_etre_achete = models.BooleanField(default=True, verbose_name="Peut être acheté")
 
     # ── Onglet 1 : Détails du médicament ─────────────────────
-    forme = models.CharField(max_length=20, choices=FORME_CHOICES, blank=True, verbose_name="Forme")
-    voie_administration = models.CharField(max_length=20, choices=VOIE_CHOICES, blank=True, verbose_name="Voie d'administration")
-    dosage = models.CharField(max_length=100, blank=True, verbose_name="Dosage")
-    dosage_unite = models.CharField(max_length=50, blank=True, verbose_name="Unité de dosage")
+    # Le catalogue ne contient que des prestations — examens, consultations,
+    # soins. Les champs proprement pharmaceutiques (forme, voie, dosage,
+    # composant actif, avertissements grossesse/lactation) ont été retirés :
+    # vides sur les 150 articles, ils décrivent un médicament, et les
+    # médicaments vivent dans Pharmacie et Stock, qui ont les leurs.
     quantite_prescription_manuelle = models.BooleanField(default=False, verbose_name="Quantité de prescription manuelle")
     frequence = models.CharField(max_length=100, blank=True, verbose_name="Fréquence")
-    composant_actif = models.CharField(max_length=200, blank=True, verbose_name="Composant actif")
-    effet_therapeutique = models.CharField(max_length=200, blank=True, verbose_name="Effet thérapeutique")
     effets_indesirables = models.TextField(blank=True, verbose_name="Effets indésirables")
     compagnie_pharmaceutique = models.ForeignKey(
         CompagniePharma, on_delete=models.SET_NULL, null=True, blank=True,
@@ -135,9 +123,6 @@ class Articleservice(models.Model):
     code_produit = models.CharField(max_length=100, blank=True, verbose_name="Code produit")
     url_produit = models.URLField(blank=True, verbose_name="URL du produit")
     nom_produit_fabricant = models.CharField(max_length=200, blank=True, verbose_name="Nom du produit")
-    avertissement_grossesse = models.BooleanField(default=False, verbose_name="Avertissement de grossesse")
-    avertissement_lactation = models.BooleanField(default=False, verbose_name="Avertissement de lactation")
-    indications = models.TextField(blank=True, verbose_name="Indications")
     remarques = models.TextField(blank=True, verbose_name="Remarques")
 
     # ── Onglet 2 : Information Générale ──────────────────────
@@ -148,10 +133,6 @@ class Articleservice(models.Model):
     unite_mesure = models.ForeignKey(
         'stock.UniteMesure', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='articles_um', verbose_name="Unité de mesure"
-    )
-    unite_achat = models.ForeignKey(
-        'stock.UniteMesure', on_delete=models.SET_NULL, null=True, blank=True,
-        related_name='articles_ua', verbose_name="Unité d'achat"
     )
     prix_vente = models.DecimalField(max_digits=12, decimal_places=0, default=0, verbose_name="Prix de vente (CFA)")
     taxes_vente = models.CharField(max_length=100, blank=True, verbose_name="Taxes à la vente")
@@ -176,12 +157,10 @@ class Articleservice(models.Model):
                    "partenaire pour reconnaître et router automatiquement l'analyse dans "
                    "les échanges HPRIM. Laisser vide si le labo accepte le libellé seul."
     )
-    code_barres = models.CharField(max_length=100, blank=True, verbose_name="Code-barres")
     famille = models.ForeignKey(
         FamilleArticle, on_delete=models.SET_NULL, null=True, blank=True,
         verbose_name="Famille"
     )
-    notes_internes = models.TextField(blank=True, verbose_name="Notes internes")
 
     # ── Stock (affiché uniquement si type = consommable/stockable) ──
     quantite_stock = models.IntegerField(default=0, verbose_name="Quantité en stock")
@@ -207,10 +186,6 @@ class Articleservice(models.Model):
     description_livraison = models.TextField(blank=True, verbose_name="Description pour les bons de livraison")
     description_transfert = models.TextField(blank=True, verbose_name="Description pour les transferts internes")
 
-    # ── Onglet 7 : Comptabilité ──────────────────────────────
-    compte_revenus = models.CharField(max_length=100, blank=True, verbose_name="Compte de revenus")
-    compte_charges = models.CharField(max_length=100, blank=True, verbose_name="Compte de charges")
-    compte_ecart_prix = models.CharField(max_length=100, blank=True, verbose_name="Compte d'écart de prix")
 
     # ── Meta ─────────────────────────────────────────────────
     actif = models.BooleanField(default=True, verbose_name="Actif")
