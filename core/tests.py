@@ -289,3 +289,94 @@ class TestLaFicheRdvEnregistreAvantDePartir(TestCase):
         page = self.client.get(self.url).content.decode()
         self.assertEqual(page.count('name="_apres"'), 4)
         self.assertEqual(page.count('name="_onglet"'), 1)
+
+
+# ─── Modèles vierges des spécialités et des départements ───────────────────────
+
+class TestModelesDImportMedecins(TestCase):
+    """Mêmes colonnes que l'import, une ligne d'exemple, rien à deviner.
+
+    Le département est en tête de la chaîne : une prestation s'y rattache par
+    son code. S'il n'existe pas encore, le rattachement est ignoré — d'où
+    l'intérêt de pouvoir le créer en masse sans se tromper de colonnes.
+    """
+
+    def setUp(self):
+        from django.contrib.auth.models import User
+        self.client.force_login(User.objects.create_superuser('mod_med', password='x'))
+
+    def _classeur(self, url):
+        import io
+        import openpyxl
+        reponse = self.client.get(url)
+        self.assertEqual(reponse.status_code, 200)
+        return reponse, openpyxl.load_workbook(io.BytesIO(reponse.content))
+
+    def test_les_deux_modeles_se_telechargent(self):
+        for url, fichier in (
+            ('/medecins/config/specialites/export/modele/', 'modele_import_specialites.xlsx'),
+            ('/medecins/config/departements/export/modele/', 'modele_import_departements.xlsx'),
+        ):
+            with self.subTest(url=url):
+                reponse, _ = self._classeur(url)
+                self.assertIn(fichier, reponse['Content-Disposition'])
+
+    def test_les_colonnes_sont_celles_de_l_export(self):
+        from core.views import _DEPT_HDR, _SPEC_HDR
+        for url, entetes in (
+            ('/medecins/config/specialites/export/modele/', _SPEC_HDR),
+            ('/medecins/config/departements/export/modele/', _DEPT_HDR),
+        ):
+            with self.subTest(url=url):
+                _, wb = self._classeur(url)
+                self.assertEqual([c.value for c in wb.active[1]], entetes)
+
+    def test_la_colonne_actif_propose_un_et_zero(self):
+        """Sans la liste, Excel écrit « VRAI » et l'import ne le reconnaît pas."""
+        _, wb = self._classeur('/medecins/config/departements/export/modele/')
+        valeurs = {c.value for ligne in wb['Listes'].iter_rows() for c in ligne if c.value}
+        self.assertEqual(valeurs, {'1', '0'})
+
+    def test_un_modele_de_departement_rempli_s_importe(self):
+        import io
+        import openpyxl
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from medecins.models import Departement
+
+        _, wb = self._classeur('/medecins/config/departements/export/modele/')
+        ws = wb.active
+        ws.delete_rows(2)
+        ws.append(['ZZD', 'Département de test', 'essai', '1'])
+        tampon = io.BytesIO()
+        wb.save(tampon)
+        tampon.seek(0)
+        self.client.post('/medecins/config/departements/import/', {
+            'fichier': SimpleUploadedFile(
+                'm.xlsx', tampon.read(),
+                content_type='application/vnd.openxmlformats-officedocument.'
+                             'spreadsheetml.sheet')})
+
+        departement = Departement.objects.get(code='ZZD')
+        self.assertEqual(departement.nom, 'Département de test')
+        self.assertTrue(departement.actif)
+
+    def test_un_modele_de_specialite_rempli_s_importe(self):
+        import io
+        import openpyxl
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from medecins.models import Specialite
+
+        _, wb = self._classeur('/medecins/config/specialites/export/modele/')
+        ws = wb.active
+        ws.delete_rows(2)
+        ws.append(['ZZS', 'Spécialité de test', 'essai'])
+        tampon = io.BytesIO()
+        wb.save(tampon)
+        tampon.seek(0)
+        self.client.post('/medecins/config/specialites/import/', {
+            'fichier': SimpleUploadedFile(
+                'm.xlsx', tampon.read(),
+                content_type='application/vnd.openxmlformats-officedocument.'
+                             'spreadsheetml.sheet')})
+
+        self.assertEqual(Specialite.objects.get(code='ZZS').nom, 'Spécialité de test')

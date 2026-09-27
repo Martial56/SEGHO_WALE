@@ -2300,6 +2300,34 @@ def medecins_export_departements(request):
 
 
 @login_required(login_url='login')
+def medecins_export_specialites_modele(request):
+    """Classeur vierge aux colonnes de l'import des spécialités."""
+    from services.modeles_import import classeur_modele
+    return classeur_modele(
+        titre='Spécialités',
+        entetes=_SPEC_HDR,
+        exemple=['GYN', 'Gynécologie', 'Suivi gynécologique et obstétrical'],
+        listes={},
+        nom_fichier='modele_import_specialites.xlsx',
+    )
+
+
+@login_required(login_url='login')
+def medecins_export_departements_modele(request):
+    """Classeur vierge aux colonnes de l'import des départements."""
+    from services.modeles_import import classeur_modele
+    return classeur_modele(
+        titre='Départements',
+        entetes=_DEPT_HDR,
+        exemple=['GYN', 'Gynécologie', 'Consultations gynécologiques', '1'],
+        # `actif` s'écrit 1 ou 0 : la liste déroulante évite le « oui / non »
+        # ou le « VRAI » qu'Excel produit tout seul.
+        listes={'actif': ['1', '0']},
+        nom_fichier='modele_import_departements.xlsx',
+    )
+
+
+@login_required(login_url='login')
 @require_POST
 def medecins_import_departements(request):
     from medecins.models import Departement

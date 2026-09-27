@@ -26,6 +26,8 @@ urlpatterns = [
     path('export/articles/',          views.export_articles,          name='export_articles'),
     path('export/categories/',        views.export_categories,        name='export_categories'),
     # ── Import ────────────────────────────────────────────────────────────────
+    path('export/articles/modele/',     views.export_articles_modele,   name='export_articles_modele'),
+    path('export/categories/modele/',   views.export_categories_modele, name='export_categories_modele'),
     path('importer/articles/',          views.import_articles,          name='import_articles'),
     path('importer/categories/',        views.import_categories,        name='import_categories'),
 ]
