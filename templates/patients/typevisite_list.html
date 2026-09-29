@@ -162,8 +162,11 @@
     deux champs. Le href reste vrai — ouvrir dans un nouvel onglet donne la page
     complète — et c'est le clic simple qui est détourné.
     {% endcomment %}
+    {% if perms.gynecologie.add_typevisite %}
     <a href="{% url 'gynecologie_typevisite_create' %}" class="o-btn-create"
        onclick="return mdOpenConfigModal(event, this.href, 'Nouveau type de visite', 'bi-calendar2-week');">CRÉER</a>
+    {% endif %}
+    {% if request.user.is_superuser %}
     <div class="io-page-wrap" id="io-page-wrap">
       <button type="button" class="o-ctrl-btn io-toggle-btn" onclick="toggleIOPage(event)">
         <i class="bi bi-arrow-left-right"></i> Export / Import
@@ -179,6 +182,7 @@
         <button type="button" class="io-pm-item" onclick="openImportModal()"><i class="bi bi-upload" style="color:var(--teal-500);"></i> Importer un fichier…</button>
       </div>
     </div>
+    {% endif %}
     <div class="o-subheader-row-right">
       <div class="o-pagination">
         <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
@@ -209,7 +213,7 @@
     </thead>
     <tbody>
       {% for tv in page_obj %}
-      <tr onclick="mdOpenConfigModal(event, '{% url 'gynecologie_typevisite_edit' tv.pk %}', 'Modifier — {{ tv.nom|escapejs }}', 'bi-calendar2-week')">
+      <tr {% if perms.gynecologie.change_typevisite %}onclick="mdOpenConfigModal(event, '{% url 'gynecologie_typevisite_edit' tv.pk %}', 'Modifier — {{ tv.nom|escapejs }}', 'bi-calendar2-week')"{% endif %}>
         <td class="td-nom">{{ tv.nom }}</td>
         <td class="td-code">{{ tv.code }}</td>
         <td class="td-desc">{{ tv.description|truncatechars:80|default:"—" }}</td>
@@ -221,14 +225,18 @@
           {% endif %}
         </td>
         <td class="td-actions" onclick="event.stopPropagation()">
+          {% if perms.gynecologie.change_typevisite %}
           <a href="{% url 'gynecologie_typevisite_edit' tv.pk %}" class="btn-icon" title="Modifier"
              onclick="return mdOpenConfigModal(event, this.href, 'Modifier — {{ tv.nom|escapejs }}', 'bi-calendar2-week');">
             <i class="bi bi-pencil"></i>
           </a>
+          {% endif %}
+          {% if perms.gynecologie.delete_typevisite %}
           <button type="button" class="btn-icon btn-danger" title="Supprimer"
                   onclick="openDeleteModal('{% url 'gynecologie_typevisite_delete' tv.pk %}', '{{ tv.nom|escapejs }}')">
             <i class="bi bi-trash"></i>
           </button>
+          {% endif %}
         </td>
       </tr>
       {% endfor %}
@@ -244,11 +252,13 @@
     <div class="o-empty-title">Aucun type de visite{% if q %} pour "{{ q }}"{% endif %}</div>
     <div class="o-empty-sub">{% if q %}Essayez avec un autre terme.{% else %}Créez le premier type de visite.{% endif %}</div>
     {% if not q %}
+    {% if perms.gynecologie.add_typevisite %}
     <a href="{% url 'gynecologie_typevisite_create' %}" class="o-empty-btn"
        onclick="return mdOpenConfigModal(event, this.href, 'Nouveau type de visite', 'bi-calendar2-week');">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       CRÉER UN TYPE DE VISITE
     </a>
+    {% endif %}
     {% endif %}
   </div>
   {% endif %}
@@ -344,12 +354,18 @@ le formulaire cachait un envoi classique de page.
 
   function toggleIOPage(e){e.stopPropagation();document.getElementById('io-page-wrap').classList.toggle('open');}
   document.addEventListener('click',function(){var w=document.getElementById('io-page-wrap');if(w)w.classList.remove('open');});
-  function openImportModal(){document.getElementById('io-modal-backdrop').classList.add('active');document.getElementById('io-modal').classList.add('active');var w=document.getElementById('io-page-wrap');if(w)w.classList.remove('open');}
-  function closeImportModal(){document.getElementById('io-modal-backdrop').classList.remove('active');document.getElementById('io-modal').classList.remove('active');}
+  // La fenêtre d'import n'est posée que pour un administrateur : les deux
+  // fonctions doivent donc supporter son absence. `closeImportModal` est
+  // appelée à chaque touche Échap, y compris par qui ne la voit jamais.
+  function _ioModale(){return [document.getElementById('io-modal-backdrop'),
+                              document.getElementById('io-modal')];}
+  function openImportModal(){_ioModale().forEach(function(el){if(el)el.classList.add('active');});var w=document.getElementById('io-page-wrap');if(w)w.classList.remove('open');}
+  function closeImportModal(){_ioModale().forEach(function(el){if(el)el.classList.remove('active');});}
   function updateFileName(input){var el=document.getElementById('io-filename');if(input.files&&input.files[0]){el.textContent=input.files[0].name;el.style.display='block';}}
   document.addEventListener('keydown',function(e){if(e.key==='Escape')closeImportModal();});
 </script>
 
+{% if request.user.is_superuser %}
 <div class="io-modal-backdrop" id="io-modal-backdrop" onclick="closeImportModal()"></div>
 <div class="io-modal" id="io-modal">
   <div class="io-modal-header">
@@ -375,4 +391,5 @@ le formulaire cachait un envoi classique de page.
     </div>
   </form>
 </div>
+{% endif %}
 {% endblock %}

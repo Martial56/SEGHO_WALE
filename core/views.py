@@ -762,6 +762,7 @@ def ressources_humaines_list(request):
 
 
 @login_required(login_url='login')
+@permission_required('laboratoire.add_demandeexamen', raise_exception=True)
 def laboratoire_create(request):
     from laboratoire.models import DemandeExamen, LigneDemandeExamen, TypeExamen
     from patients.models import Patient
@@ -1337,6 +1338,7 @@ def gynecologie_rdv_create(request):
 
 
 @login_required(login_url='login')
+@permission_required('patients.view_rendezvous', raise_exception=True)
 @module_requis('gynecologie')
 def gynecologie_rdv_detail(request, pk):
     from patients.forms import RendezVousForm
@@ -1605,6 +1607,7 @@ def gynecologie_demarrer_consultation(request, pk):
 
 
 @login_required(login_url='login')
+@permission_required('patients.view_rendezvous', raise_exception=True)
 @module_requis('gynecologie')
 def gynecologie_rdv(request):
     """Liste des rendez-vous de gynécologie.

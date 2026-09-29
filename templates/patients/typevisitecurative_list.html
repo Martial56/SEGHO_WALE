@@ -157,8 +157,10 @@
     </div>
   </div>
   <div class="o-subheader-row">
+    {% if perms.patients.add_typevisitecurative %}
     <a href="{% url 'patients:typevisitecurative_create' %}" class="o-btn-create"
        onclick="return mdOpenConfigModal(event, this.href, 'Nouveau type de visite curative', 'bi-clipboard2-pulse');">CRÉER</a>
+    {% endif %}
     <div class="o-subheader-row-right">
       <div class="o-pagination" id="tvc-pagination">
         <span style="margin-right:6px;">{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
@@ -212,7 +214,7 @@
     </thead>
     <tbody>
       {% for t in page_obj %}
-      <tr onclick="mdOpenConfigModal(event, '{% url 'patients:typevisitecurative_edit' t.pk %}', 'Modifier — {{ t.nom|escapejs }}', 'bi-clipboard2-pulse')">
+      <tr {% if perms.patients.change_typevisitecurative %}onclick="mdOpenConfigModal(event, '{% url 'patients:typevisitecurative_edit' t.pk %}', 'Modifier — {{ t.nom|escapejs }}', 'bi-clipboard2-pulse')"{% endif %}>
         <td class="td-nom">{{ t.nom }}</td>
         <td style="color:var(--text-muted);font-size:12px;font-family:var(--font-mono);">{{ t.code }}</td>
         <td style="color:var(--text-muted);font-size:12px;">{{ t.description|default:"—" }}</td>
@@ -224,14 +226,18 @@
           {% endif %}
         </td>
         <td class="td-actions" onclick="event.stopPropagation()">
+          {% if perms.patients.change_typevisitecurative %}
           <a href="{% url 'patients:typevisitecurative_edit' t.pk %}" class="btn-icon" title="Modifier"
              onclick="return mdOpenConfigModal(event, this.href, 'Modifier — {{ t.nom|escapejs }}', 'bi-clipboard2-pulse');">
             <i class="bi bi-pencil"></i>
           </a>
+          {% endif %}
+          {% if perms.patients.delete_typevisitecurative %}
           <button type="button" class="btn-icon btn-danger" title="Supprimer"
                   onclick="openDeleteModal('{% url 'patients:typevisitecurative_delete' t.pk %}', '{{ t.nom|escapejs }}')">
             <i class="bi bi-trash"></i>
           </button>
+          {% endif %}
         </td>
       </tr>
       {% endfor %}
@@ -247,11 +253,13 @@
     <div class="o-empty-title">Aucun type de visite{% if q %} pour "{{ q }}"{% endif %}</div>
     <div class="o-empty-sub">{% if q %}Essayez avec un autre terme.{% else %}Créez le premier type de visite.{% endif %}</div>
     {% if not q %}
+    {% if perms.patients.add_typevisitecurative %}
     <a href="{% url 'patients:typevisitecurative_create' %}" class="o-empty-btn"
        onclick="return mdOpenConfigModal(event, this.href, 'Nouveau type de visite curative', 'bi-clipboard2-pulse');">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       CRÉER UN TYPE DE VISITE
     </a>
+    {% endif %}
     {% endif %}
   </div>
   {% endif %}

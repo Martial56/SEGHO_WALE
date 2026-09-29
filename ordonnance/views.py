@@ -2,7 +2,7 @@ from datetime import date
 from decimal import Decimal
 
 from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib import messages
 from django.http import JsonResponse
 from django.db.models import Q, Count, Sum, DecimalField
@@ -519,6 +519,7 @@ def medicaments_dispo_par_medecin(request):
 
 
 @login_required(login_url='login')
+@permission_required('consultations.add_ordonnance', raise_exception=True)
 def ordonnance_create_libre(request):
     """Create an ordonnance directly from the pharmacy list, without a pre-existing consultation."""
     types = Ordonnance._meta.get_field('type_ordonnance').choices

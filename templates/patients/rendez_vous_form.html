@@ -706,16 +706,14 @@ l'adresse de retour, pour qu'on revienne là où on était et pas sur
             {% elif rdv.statut == 'en_consultation' %}
                 {% if peut_modifier %}
                 <button type="button" class="btn-action" id="btn-pause"><i class="bi bi-pause-fill"></i> Pause</button>
-                {% endif %}
                 {% comment %}Ces quatre actions soumettent la fiche au lieu de
                 la quitter : un simple lien perdait tout ce qui était saisi et pas
                 encore enregistré. La vue enregistre, puis redirige vers `_apres`
                 en lui passant l'adresse de retour, onglet compris.{% endcomment %}
-                <button type="submit" name="_apres" value="{% url 'ordonnance_create_libre' %}?patient_id={{ rdv.patient.pk }}{% if consultation %}&consultation_id={{ consultation.pk }}{% endif %}{% if rdv.medecin %}&medecin_id={{ rdv.medecin.pk }}{% endif %}" class="btn-action btn-ghost"><i class="bi bi-file-earmark-medical"></i> Créer une ordonnance</button>
-                <button type="submit" name="_apres" value="{% url 'laboratoire_create' %}?patient={{ rdv.patient.pk }}{% if rdv.medecin %}&medecin_id={{ rdv.medecin.pk }}{% endif %}" class="btn-action btn-ghost"><i class="bi bi-flask"></i> Demande de lab</button>
+                {% if perms.consultations.add_ordonnance %}<button type="submit" name="_apres" value="{% url 'ordonnance_create_libre' %}?patient_id={{ rdv.patient.pk }}{% if consultation %}&consultation_id={{ consultation.pk }}{% endif %}{% if rdv.medecin %}&medecin_id={{ rdv.medecin.pk }}{% endif %}" class="btn-action btn-ghost"><i class="bi bi-file-earmark-medical"></i> Créer une ordonnance</button>{% endif %}
+                {% if perms.laboratoire.add_demandeexamen %}<button type="submit" name="_apres" value="{% url 'laboratoire_create' %}?patient={{ rdv.patient.pk }}{% if rdv.medecin %}&medecin_id={{ rdv.medecin.pk }}{% endif %}" class="btn-action btn-ghost"><i class="bi bi-flask"></i> Demande de lab</button>{% endif %}
                 {% if perms.soins.add_soin %}<button type="submit" name="_apres" value="{% url 'soins:create' %}?patient_id={{ rdv.patient.pk }}" class="btn-action btn-ghost"><i class="bi bi-bandaid"></i> Soins</button>{% endif %}
                 {% if perms.hospitalisation.add_hospitalisation %}<button type="submit" name="_apres" value="{% url 'hospitalisation:create' %}?patient={{ rdv.patient.pk }}{% if rdv.medecin %}&medecin={{ rdv.medecin.pk }}{% endif %}&rdv={{ rdv.pk }}" class="btn-action btn-ghost"><i class="bi bi-clipboard2-pulse"></i> M.O</button>{% endif %}
-                {% if peut_modifier %}
                 <button type="submit" name="_action" value="terminer" class="btn-action btn-dark">Consultation terminée</button>
                 <button type="submit" name="_action" value="annuler" class="btn-action btn-danger-outline">Annuler</button>
                 {% endif %}
