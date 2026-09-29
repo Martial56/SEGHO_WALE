@@ -1470,7 +1470,13 @@ def gynecologie_rdv_detail(request, pk):
 
         # Sauvegarde normale du formulaire
         form = RendezVousForm(request.POST, instance=rdv, locked_billing=locked_billing)
-        if form.is_valid():
+        # Registre curatif : le type de visite est obligatoire dès que la
+        # consultation a démarré (l'onglet n'est accessible qu'à partir de là).
+        cur_tv_manquant = (rdv.statut in ('en_consultation', 'termine')
+                           and not request.POST.get('cur_type_visite', '').strip())
+        if cur_tv_manquant:
+            messages.error(request, "Le champ « Type de visite curative » du registre de consultation curative est obligatoire.")
+        if not cur_tv_manquant and form.is_valid():
             rdv = form.save(commit=False)
             code = request.POST.get('code_confirmation', '').strip()
             if code:

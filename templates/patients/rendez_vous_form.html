@@ -1468,7 +1468,7 @@ cliquant sur une ligne. Voir patients/origines.py.
             <div class="cpn-row" id="cur_mode_entree_autre_row" style="display:none;"><span class="cpn-lbl">Préciser</span><input type="text" name="cur_mode_entree_autre" class="cpn-inp editable" placeholder="Préciser le mode d'entrée..."></div>
             <div class="cpn-row"><span class="cpn-lbl">Type de population</span><select name="cur_type_population" id="cur_type_population" class="cpn-sel editable"><option value=""></option><option value="pop_generale">Population générale</option><option value="ts">TS</option><option value="ud">UD</option><option value="hsh">HSH</option><option value="pc">PC</option><option value="autre_risque">Autre à risque</option></select></div>
             <div class="cpn-row" id="cur_type_population_autre_row" style="display:none;"><span class="cpn-lbl">Préciser</span><input type="text" name="cur_type_population_autre" class="cpn-inp editable" placeholder="Préciser le type de population..."></div>
-            <div class="cpn-row"><span class="cpn-lbl">Type de visite curative</span><select name="cur_type_visite" class="cpn-sel editable"><option value=""></option>{% for tvc in types_visite_curative %}<option value="{{ tvc.code }}" {% if rdv and rdv.cur_type_visite and rdv.cur_type_visite.code == tvc.code %}selected{% endif %}>{{ tvc.nom }}</option>{% endfor %}</select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Type de visite curative <span style="color:var(--rose);">*</span></span><select name="cur_type_visite" id="cur_type_visite" class="cpn-sel editable" required><option value=""></option>{% for tvc in types_visite_curative %}<option value="{{ tvc.code }}" {% if rdv and rdv.cur_type_visite and rdv.cur_type_visite.code == tvc.code %}selected{% endif %}>{{ tvc.nom }}</option>{% endfor %}</select></div>
             <div class="cpn-sub">Examens cliniques et constantes <!--: <a href="#" style="color:var(--accent-text-soft);font-size:12.5px;text-decoration:none;margin-left:8px;">Créer</a>--></div>
             <div class="cpn-row" style="align-items:flex-start;"><span class="cpn-lbl" style="padding-top:4px;">Motif de consultation</span><textarea name="cur_motif_consultation" class="cpn-inp editable" rows="3" style="resize:vertical;padding:3px 0;"></textarea></div>
             <div class="cpn-row"><span class="cpn-lbl">Poids</span><div class="cpn-val"><input type="text" class="cpn-inp-ro" readonly value="{{ constante.poids|default:'—' }}" style="max-width:90px;"><span class="cpn-unit">kg</span></div></div>
@@ -1923,6 +1923,24 @@ cliquant sur une ligne. Voir patients/origines.py.
             this.classList.add('active');
             document.getElementById('tab-' + id).classList.add('active');
         });
+    });
+
+    // Registre curatif : le type de visite est obligatoire dès que la
+    // consultation a démarré. Le formulaire étant en « novalidate », le contrôle
+    // se fait ici ; les boutons de changement d'état ne sont pas concernés.
+    var STATUT_ACTIONS = ['confirmer', 'en_attente', 'en_consultation', 'terminer', 'annuler'];
+    rdvForm.addEventListener('submit', function(e) {
+        if (!consultationStarted) return;
+        var sub = e.submitter;
+        if (sub && sub.name === '_action' && STATUT_ACTIONS.indexOf(sub.value) !== -1) return;
+        var sel = document.getElementById('cur_type_visite');
+        if (!sel || sel.disabled || sel.value) return;
+        e.preventDefault();
+        var tab = document.querySelector('.f-tab[data-tab="curative"]');
+        if (tab) tab.click();
+        sel.style.borderBottomColor = 'var(--rose)';
+        sel.focus();
+        alert('Le champ « Type de visite curative » du registre de consultation curative est obligatoire.');
     });
 
     // Mode édition : actif si création, confirmé+facturé, en attente, ou en
