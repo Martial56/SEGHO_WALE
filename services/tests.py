@@ -51,7 +51,7 @@ class BaseListe(TestCase):
         cls.perime = _article(
             'Sirop retiré', categorie=cls.cat_labo,
             type_produit_hospitalier='medicament', prix_vente=Decimal('2500'),
-            actif=False, forme='sirop', voie_administration='orale',
+            actif=False,
         )
 
         cls.url = reverse('services:list')
@@ -253,3 +253,301 @@ class TestFicheArticleMontreCeQuiEstSaisi(TestCase):
         page = self._page(self.acte)
         self.assertNotIn('>Laboratoire<', page)
         self.assertNotIn('Code HPRIM', page)
+
+
+# ─── Catégories : l'export ne porte plus que ce qui existe ─────────────────────
+
+class TestExportDesCategories(TestCase):
+    """La catégorie portait neuf champs de gestion de stock hérités d'un ERP —
+    stratégie FIFO/LIFO, méthode de coût, routes, comptes comptables. Vides sur
+    toutes les catégories, lus par personne, et sans objet pour une prestation :
+    on ne stocke pas une consultation. Retirés du modèle.
+    """
+
+    def setUp(self):
+        from django.contrib.auth.models import User
+        from services.models import CategorieArticle
+        self.client.force_login(User.objects.create_superuser('exp_cat', password='x'))
+        self.mere, _ = CategorieArticle.objects.get_or_create(
+            code='EXA', defaults={'nom': 'Examens'})
+        CategorieArticle.objects.update_or_create(
+            code='ECHO', defaults={'nom': 'Échographies',
+                                   'description': 'Imagerie', 'parent': self.mere})
+
+    def test_l_export_ne_porte_que_quatre_colonnes(self):
+        from services.views import _CAT_HDR
+        self.assertEqual(_CAT_HDR, ['code', 'nom', 'description', 'parent'])
+
+    def test_le_csv_sort_avec_le_bon_entete(self):
+        reponse = self.client.get('/services/export/categories/', {'format': 'csv'})
+        self.assertEqual(reponse.status_code, 200)
+        entete = reponse.content.decode('utf-8-sig').splitlines()[0].strip()
+        self.assertEqual(entete, 'code,nom,description,parent')
+
+    def test_la_categorie_parente_sort_toujours(self):
+        """La seule colonne vide qu'on a gardée : elle est remplissable."""
+        import json
+        reponse = self.client.get('/services/export/categories/', {'format': 'json'})
+        lignes = {l['code']: l for l in json.loads(reponse.content)}
+        self.assertEqual(lignes['ECHO']['parent'], 'EXA')
+
+    def test_les_champs_de_stock_ont_disparu_du_modele(self):
+        from services.models import CategorieArticle
+        champs = {f.name for f in CategorieArticle._meta.get_fields()}
+        for parti in ('methode_cout', 'valorisation_inventaire', 'routes',
+                      'strategie_enlevement', 'reservation_conditionnement',
+                      'bloquer_serie_lot', 'sequence_code_barres',
+                      'compte_revenus', 'compte_charges'):
+            with self.subTest(champ=parti):
+                self.assertNotIn(parti, champs)
+
+    def test_l_article_garde_ses_propres_champs(self):
+        """Garde-fou : retirer un champ de la catégorie ne touche pas l'article."""
+        from services.models import Articleservice
+        champs = {f.name for f in Articleservice._meta.get_fields()}
+        self.assertIn('reference_interne', champs)
+        self.assertIn('prix_vente', champs)
+
+    def test_un_ancien_fichier_a_treize_colonnes_passe_encore(self):
+        """Les colonnes disparues sont ignorées, la ligne est quand même créée."""
+        import json
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from services.models import CategorieArticle
+        ancien = json.dumps([{
+            'code': 'ZZT', 'nom': 'Ancienne', 'description': 'essai', 'parent': '',
+            'methode_cout': 'fifo', 'valorisation_inventaire': 'automatique',
+            'reservation_conditionnement': 'entiers', 'bloquer_serie_lot': 1,
+            'routes': 'Achats', 'strategie_enlevement': 'lifo',
+            'sequence_code_barres': 'SEQ1',
+            'compte_revenus': '70110000', 'compte_charges': '60110000',
+        }]).encode()
+        self.client.post('/services/importer/categories/', {
+            'fichier': SimpleUploadedFile('anciennes.json', ancien,
+                                          content_type='application/json')})
+        cree = CategorieArticle.objects.filter(code='ZZT').first()
+        self.assertIsNotNone(cree)
+        self.assertEqual(cree.nom, 'Ancienne')
+        self.assertEqual(cree.description, 'essai')
+
+    def test_le_formulaire_propose_exactement_les_champs_restants(self):
+        from services.forms import CategorieArticleForm
+        self.assertEqual(list(CategorieArticleForm().fields),
+                         ['nom', 'code', 'parent', 'description'])
+
+
+# ─── Prestations : l'export ne porte plus que ce qui sert ──────────────────────
+
+class TestExportDesPrestations(TestCase):
+    """L'export sortait 33 colonnes pour 7 qui portaient une information, et
+    oubliait la seule qui manquait vraiment : le département.
+
+    Les 26 autres décrivaient un médicament (forme, voie, dosage, composant
+    actif, avertissements) ou une comptabilité que rien ne renseigne. Le
+    catalogue ne contient que des prestations — examens, consultations, soins —
+    et les médicaments vivent dans Pharmacie et Stock.
+    """
+
+    def setUp(self):
+        from decimal import Decimal
+        from django.contrib.auth.models import User
+        from medecins.models import Departement
+        from services.models import Articleservice, CategorieArticle
+        self.client.force_login(User.objects.create_superuser('exp_art', password='x'))
+        # Des migrations de seed créent déjà certains codes : on les réutilise
+        # plutôt que de heurter la contrainte d'unicité.
+        self.cat, _ = CategorieArticle.objects.get_or_create(
+            code='CS', defaults={'nom': 'Consultations'})
+        self.dept, _ = Departement.objects.get_or_create(
+            code='GYN', defaults={'nom': 'Gynécologie'})
+        Articleservice.objects.create(
+            reference_interne='CS_GYNOBS', nom='Consultation gynéco-obstétrique',
+            categorie=self.cat, departement=self.dept, prix_vente=Decimal('3350'))
+        Articleservice.objects.create(
+            reference_interne='CS_SANS', nom='Consultation sans département',
+            categorie=self.cat, prix_vente=Decimal('1000'))
+
+    def test_l_export_porte_quatorze_colonnes(self):
+        from services.views import _ART_HDR
+        self.assertEqual(_ART_HDR, [
+            'reference_interne', 'nom', 'prix_vente', 'cout',
+            'type_article', 'type_produit_hospitalier',
+            'actif', 'peut_etre_vendu', 'peut_etre_achete',
+            'categorie', 'departement',
+            'type_test_labo', 'code_hprim', 'unite_mesure',
+        ])
+
+    def test_le_departement_sort_par_son_code(self):
+        """Pas l'identifiant — un « 6 » ne veut rien dire d'une base à l'autre —
+        ni le libellé, qui se renomme. Le code est celui sur lequel l'import des
+        départements déduplique."""
+        import json
+        reponse = self.client.get('/services/export/articles/', {'format': 'json'})
+        lignes = {l['reference_interne']: l for l in json.loads(reponse.content)}
+        self.assertEqual(lignes['CS_GYNOBS']['departement'], 'GYN')
+        self.assertEqual(lignes['CS_SANS']['departement'], '')
+
+    def test_le_csv_sort_avec_le_bon_entete(self):
+        reponse = self.client.get('/services/export/articles/', {'format': 'csv'})
+        entete = reponse.content.decode('utf-8-sig').splitlines()[0].strip()
+        self.assertTrue(entete.startswith('reference_interne,nom,prix_vente'))
+        self.assertIn('departement', entete.split(','))
+
+    def test_les_champs_de_medicament_ont_disparu_du_modele(self):
+        from services.models import Articleservice
+        champs = {f.name for f in Articleservice._meta.get_fields()}
+        for parti in ('forme', 'voie_administration', 'dosage', 'dosage_unite',
+                      'composant_actif', 'effet_therapeutique', 'indications',
+                      'avertissement_grossesse', 'avertissement_lactation',
+                      'notes_internes', 'code_barres', 'unite_achat',
+                      'compte_revenus', 'compte_charges', 'compte_ecart_prix'):
+            with self.subTest(champ=parti):
+                self.assertNotIn(parti, champs)
+
+    def test_la_categorie_garde_ses_champs_restants(self):
+        """Garde-fou contre une suppression trop large."""
+        from services.models import Articleservice
+        champs = {f.name for f in Articleservice._meta.get_fields()}
+        for garde in ('reference_interne', 'nom', 'prix_vente', 'cout',
+                      'categorie', 'departement', 'type_test_labo',
+                      'code_hprim', 'unite_mesure', 'quantite_stock'):
+            with self.subTest(champ=garde):
+                self.assertIn(garde, champs)
+
+
+class TestImportDesPrestations(TestCase):
+
+    def setUp(self):
+        from django.contrib.auth.models import User
+        from medecins.models import Departement
+        from services.models import CategorieArticle
+        self.client.force_login(User.objects.create_superuser('imp_art', password='x'))
+        CategorieArticle.objects.get_or_create(code='CS', defaults={'nom': 'Consultations'})
+        Departement.objects.get_or_create(code='GYN', defaults={'nom': 'Gynécologie'})
+
+    def _importer(self, lignes):
+        import json
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        return self.client.post('/services/importer/articles/', {
+            'fichier': SimpleUploadedFile(
+                'a.json', json.dumps(lignes).encode(),
+                content_type='application/json')})
+
+    def test_le_departement_est_rattache_par_son_code(self):
+        from services.models import Articleservice
+        self._importer([{'reference_interne': 'ZZ1', 'nom': 'Test',
+                         'categorie': 'CS', 'departement': 'GYN'}])
+        article = Articleservice.objects.get(reference_interne='ZZ1')
+        self.assertEqual(article.departement.code, 'GYN')
+
+    def test_un_departement_inconnu_est_signale_sans_bloquer(self):
+        """L'article passe, on complète après : c'est le choix retenu, plutôt
+        que de refuser tout le fichier."""
+        from django.contrib.messages import get_messages
+        from services.models import Articleservice
+        reponse = self._importer([{'reference_interne': 'ZZ2', 'nom': 'Test',
+                                   'categorie': 'CS', 'departement': 'INCONNU'}])
+        article = Articleservice.objects.get(reference_interne='ZZ2')
+        self.assertIsNone(article.departement)
+        messages = ' '.join(str(m) for m in get_messages(reponse.wsgi_request))
+        self.assertIn('Département(s) introuvable(s)', messages)
+        self.assertIn('INCONNU', messages)
+
+    def test_un_ancien_fichier_a_trente_trois_colonnes_passe_encore(self):
+        from services.models import Articleservice
+        self._importer([{
+            'reference_interne': 'ZZ3', 'nom': 'Ancien format', 'categorie': 'CS',
+            'forme': 'sirop', 'voie_administration': 'orale', 'code_barres': '123',
+            'dosage': '500', 'composant_actif': 'paracétamol',
+            'compte_revenus': '70110000', 'notes_internes': 'bla', 'unite_achat': 'U',
+        }])
+        article = Articleservice.objects.get(reference_interne='ZZ3')
+        self.assertEqual(article.nom, 'Ancien format')
+
+
+# ─── Modèles vierges à télécharger avant d'importer ────────────────────────────
+
+class TestModelesDImport(TestCase):
+    """Un import rate presque toujours pour deux raisons : les colonnes sont
+    inventées, ou on a tapé « Gynécologie » là où le fichier attend `GYN`. Le
+    modèle répond aux deux — mêmes colonnes que l'import, et les codes réels de
+    la base proposés en liste déroulante.
+    """
+
+    def setUp(self):
+        from django.contrib.auth.models import User
+        from medecins.models import Departement
+        from services.models import CategorieArticle
+        self.client.force_login(User.objects.create_superuser('modele', password='x'))
+        CategorieArticle.objects.get_or_create(code='CS', defaults={'nom': 'Consultations'})
+        Departement.objects.get_or_create(code='GYN', defaults={'nom': 'Gynécologie'})
+
+    def _classeur(self, url):
+        import io
+        import openpyxl
+        reponse = self.client.get(url)
+        self.assertEqual(reponse.status_code, 200)
+        return reponse, openpyxl.load_workbook(io.BytesIO(reponse.content))
+
+    def test_le_modele_des_prestations_se_telecharge(self):
+        reponse, _ = self._classeur('/services/export/articles/modele/')
+        self.assertIn('modele_import_prestations.xlsx', reponse['Content-Disposition'])
+
+    def test_le_modele_des_categories_se_telecharge(self):
+        reponse, _ = self._classeur('/services/export/categories/modele/')
+        self.assertIn('modele_import_categories.xlsx', reponse['Content-Disposition'])
+
+    def test_les_colonnes_du_modele_sont_celles_de_l_export(self):
+        """Le seul point qui compte : si les deux divergent, le modèle induit
+        en erreur au lieu d'aider."""
+        from services.views import _ART_HDR, _CAT_HDR
+        for url, entetes in (('/services/export/articles/modele/', _ART_HDR),
+                             ('/services/export/categories/modele/', _CAT_HDR)):
+            with self.subTest(url=url):
+                _, wb = self._classeur(url)
+                lues = [c.value for c in wb.active[1]]
+                self.assertEqual(lues, entetes)
+
+    def test_les_listes_proposent_les_codes_reels_de_la_base(self):
+        _, wb = self._classeur('/services/export/articles/modele/')
+        valeurs = {c.value for ligne in wb['Listes'].iter_rows() for c in ligne if c.value}
+        self.assertIn('CS', valeurs)        # une catégorie existante
+        self.assertIn('GYN', valeurs)       # un département existant
+        self.assertIn('prestation', valeurs)
+
+    def test_la_feuille_des_listes_est_cachee(self):
+        """Elle n'est qu'un support technique : la montrer inviterait à la remplir."""
+        _, wb = self._classeur('/services/export/articles/modele/')
+        self.assertEqual(wb['Listes'].sheet_state, 'hidden')
+
+    def test_un_modele_rempli_s_importe(self):
+        """Le bout du bout : télécharger, remplir, importer."""
+        import io
+        import openpyxl
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from services.models import Articleservice
+
+        _, wb = self._classeur('/services/export/articles/modele/')
+        ws = wb.active
+        ws.delete_rows(2)   # la ligne d'exemple
+        ws.append(['ZZ_MOD', 'Prestation par modèle', '2500', '0',
+                   'prestation', 'service', '1', '1', '0', 'CS', 'GYN', '', '', ''])
+        tampon = io.BytesIO()
+        wb.save(tampon)
+        tampon.seek(0)
+        self.client.post('/services/importer/articles/', {
+            'fichier': SimpleUploadedFile(
+                'm.xlsx', tampon.read(),
+                content_type='application/vnd.openxmlformats-officedocument.'
+                             'spreadsheetml.sheet')})
+
+        article = Articleservice.objects.get(reference_interne='ZZ_MOD')
+        self.assertEqual(article.nom, 'Prestation par modèle')
+        self.assertEqual(article.categorie.code, 'CS')
+        self.assertEqual(article.departement.code, 'GYN')
+
+    def test_la_ligne_d_exemple_se_distingue_de_la_saisie(self):
+        """En gris italique : elle se supprime sans hésiter et ne passe pas
+        pour une donnée."""
+        _, wb = self._classeur('/services/export/articles/modele/')
+        cellule = wb.active.cell(row=2, column=1)
+        self.assertTrue(cellule.font.italic)

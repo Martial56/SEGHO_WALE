@@ -553,6 +553,10 @@
       data-statut="{{ rdv.statut|default:'' }}"
       data-rdv-id="{{ rdv.pk|default:'' }}">
 {% csrf_token %}
+{% comment %}Onglet ouvert au moment du clic : la vue le renvoie dans
+l'adresse de retour, pour qu'on revienne là où on était et pas sur
+« Informations générales ».{% endcomment %}
+<input type="hidden" name="_onglet" id="onglet-actif" value="{{ onglet_actif|default:'infos' }}">
 
 <!-- ══════════════ PANNEAU DE CONTRÔLE ══════════════ -->
 <div class="control-panel">
@@ -605,10 +609,14 @@
                 <button type="submit" name="_action" value="en_consultation" class="btn-action btn-teal">En consultation</button>
             {% elif rdv.statut == 'en_consultation' %}
                 <button type="button" class="btn-action" id="btn-pause"><i class="bi bi-pause-fill"></i> Pause</button>
-                <a href="{% url 'ordonnance_create_libre' %}?patient_id={{ rdv.patient.pk }}{% if consultation %}&consultation_id={{ consultation.pk }}{% endif %}{% if rdv.medecin %}&medecin_id={{ rdv.medecin.pk }}{% endif %}" class="btn-action btn-ghost"><i class="bi bi-file-earmark-medical"></i> Créer une ordonnance</a>
-                <a href="{% url 'laboratoire_create' %}?patient={{ rdv.patient.pk }}{% if rdv.medecin %}&medecin_id={{ rdv.medecin.pk }}{% endif %}" class="btn-action btn-ghost"><i class="bi bi-flask"></i> Demande de lab</a>
-                {% if perms.soins.add_soin %}<a href="{% url 'soins:create' %}?patient_id={{ rdv.patient.pk }}" class="btn-action btn-ghost"><i class="bi bi-bandaid"></i> Soins</a>{% endif %}
-                {% if perms.hospitalisation.add_hospitalisation %}<a href="{% url 'hospitalisation:create' %}?patient={{ rdv.patient.pk }}{% if rdv.medecin %}&medecin={{ rdv.medecin.pk }}{% endif %}&rdv={{ rdv.pk }}" class="btn-action btn-ghost"><i class="bi bi-clipboard2-pulse"></i> M.O</a>{% endif %}
+                {% comment %}Ces quatre actions soumettent la fiche au lieu de
+                la quitter : un simple lien perdait tout ce qui était saisi et pas
+                encore enregistré. La vue enregistre, puis redirige vers `_apres`
+                en lui passant l'adresse de retour, onglet compris.{% endcomment %}
+                {% if perms.consultations.add_ordonnance %}<button type="submit" name="_apres" value="{% url 'ordonnance_create_libre' %}?patient_id={{ rdv.patient.pk }}{% if consultation %}&consultation_id={{ consultation.pk }}{% endif %}{% if rdv.medecin %}&medecin_id={{ rdv.medecin.pk }}{% endif %}" class="btn-action btn-ghost"><i class="bi bi-file-earmark-medical"></i> Créer une ordonnance</button>{% endif %}
+                {% if perms.laboratoire.add_demandeexamen %}<button type="submit" name="_apres" value="{% url 'laboratoire_create' %}?patient={{ rdv.patient.pk }}{% if rdv.medecin %}&medecin_id={{ rdv.medecin.pk }}{% endif %}" class="btn-action btn-ghost"><i class="bi bi-flask"></i> Demande de lab</button>{% endif %}
+                {% if perms.soins.add_soin %}<button type="submit" name="_apres" value="{% url 'soins:create' %}?patient_id={{ rdv.patient.pk }}" class="btn-action btn-ghost"><i class="bi bi-bandaid"></i> Soins</button>{% endif %}
+                {% if perms.hospitalisation.add_hospitalisation %}<button type="submit" name="_apres" value="{% url 'hospitalisation:create' %}?patient={{ rdv.patient.pk }}{% if rdv.medecin %}&medecin={{ rdv.medecin.pk }}{% endif %}&rdv={{ rdv.pk }}" class="btn-action btn-ghost"><i class="bi bi-clipboard2-pulse"></i> M.O</button>{% endif %}
                 <button type="submit" name="_action" value="terminer" class="btn-action btn-dark">Consultation terminée</button>
                 <button type="submit" name="_action" value="annuler" class="btn-action btn-danger-outline">Annuler</button>
             {% endif %}
@@ -1832,6 +1840,8 @@
             document.querySelectorAll('.f-tab-panel').forEach(function(p) { p.classList.remove('active'); });
             this.classList.add('active');
             document.getElementById('tab-' + id).classList.add('active');
+            var champOnglet = document.getElementById('onglet-actif');
+            if (champOnglet) champOnglet.value = id;
         });
     });
 
@@ -1852,6 +1862,17 @@
         sel.focus();
         alert('Le champ « Type de visite curative » du registre de consultation curative est obligatoire.');
     });
+
+    // Retour d'une action annexe : on rouvre l'onglet qu'on avait quitté.
+    // Un onglet verrouillé (évaluation non faite, consultation non démarrée)
+    // n'est pas forcé — on ne rouvre que ce que l'utilisateur pourrait cliquer.
+    (function rouvrirOngletDemande() {
+        var demande = new URLSearchParams(window.location.search).get('onglet');
+        if (!demande) return;
+        var onglet = document.querySelector('.f-tab[data-tab="' + demande + '"]');
+        if (!onglet || onglet.classList.contains('f-tab-disabled')) return;
+        onglet.click();
+    })();
 
     // Mode édition : actif si création, confirmé+facturé, en attente, ou en consultation
     var editMode = isNew || confirmeFacture || currentStatut === 'en_attente' || consultationStarted;

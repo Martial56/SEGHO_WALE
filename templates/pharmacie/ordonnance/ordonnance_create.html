@@ -190,13 +190,17 @@
 
 <form method="post" id="ord-form">
 {% csrf_token %}
+{% comment %}Adresse de retour quand on vient d'une fiche de rendez-vous.
+Reconduite dans le POST pour survivre au réaffichage qui suit un refus de
+ligne.{% endcomment %}
+{% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
 <input type="hidden" name="consultation_id" value="{{ consultation.pk|default:'' }}">
 <input type="hidden" name="rdv_id" value="">
 
 <!-- Panneau de contrôle -->
 <div class="ord-panel">
     <div class="ord-top">
-        <a href="{% url 'ordonnance_list' %}" class="o-ctrl-btn" style="padding:3px 7px;" title="Retour aux ordonnances">
+        <a href="{% if next %}{{ next }}{% else %}{% url 'ordonnance_list' %}{% endif %}" class="o-ctrl-btn" style="padding:3px 7px;" title="{% if next %}Retour au rendez-vous{% else %}Retour aux ordonnances{% endif %}">
             <i class="bi bi-arrow-left"></i>
         </a>
         <div class="ord-breadcrumb">
@@ -209,7 +213,7 @@
             <button type="submit" class="btn-save" id="btn-save" {% if not patient or not medecin_preselect %}disabled{% endif %}>
                 Sauvegarder
             </button>
-            <a href="{% url 'ordonnance_list' %}" class="btn-discard">Annuler</a>
+            <a href="{% if next %}{{ next }}{% else %}{% url 'ordonnance_list' %}{% endif %}" class="btn-discard">Annuler</a>
         </div>
     </div>
 </div>

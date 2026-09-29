@@ -7,7 +7,7 @@ Usage :
 
 Format JSON attendu (champs exportés depuis l'autre système) :
     [{"id": 1, "code": "AE", "nom": "AE", "description": "...",
-      "parent_id": null, "methode_cout": "prix_standard", ...}, ...]
+      "parent_id": null}, ...]
 """
 
 import json
@@ -46,19 +46,12 @@ class Command(BaseCommand):
         self.stdout.write(f'→ Import de {len(data)} catégorie(s)…')
 
         for item in data:
+            # Les colonnes de stock d'un ancien fichier sont ignorées : ces
+            # champs n'existent plus sur le modèle.
             defaults = {
-                'nom':                        item.get('nom', item['code']),
-                'description':                item.get('description', ''),
-                'methode_cout':               item.get('methode_cout', 'prix_standard'),
-                'valorisation_inventaire':    item.get('valorisation_inventaire', 'manuelle'),
-                'reservation_conditionnement':item.get('reservation_conditionnement', 'partiels'),
-                'bloquer_serie_lot':          bool(item.get('bloquer_serie_lot', False)),
-                'routes':                     item.get('routes', ''),
-                'strategie_enlevement':       item.get('strategie_enlevement', ''),
-                'sequence_code_barres':       item.get('sequence_code_barres', ''),
-                'compte_revenus':             item.get('compte_revenus', ''),
-                'compte_charges':             item.get('compte_charges', ''),
-                'parent':                     None,  # résolu en passe 2
+                'nom':         item.get('nom', item['code']),
+                'description': item.get('description', ''),
+                'parent':      None,  # résolu en passe 2
             }
 
             obj, was_created = CategorieArticle.objects.get_or_create(

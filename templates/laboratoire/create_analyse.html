@@ -773,12 +773,16 @@
 <form method="post" id="dem-form" novalidate>
     {% csrf_token %}
     <input type="hidden" name="patient_id" id="patient-id-input" value="{{ patient.pk|default:'' }}">
+    {% comment %}Adresse de retour quand on vient d'une fiche de rendez-vous.
+    Reconduite dans le POST pour survivre à un rechargement après erreur.{% endcomment %}
+    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
 
     <!-- ══ PANNEAU DE CONTRÔLE ══ -->
     <div class="control-panel">
         <div class="cp-top">
-            <a href="{% url 'laboratoire_list' %}" class="o-ctrl-btn" style="padding:3px 7px;"
-                title="Retour aux analyses">
+            <a href="{% if next %}{{ next }}{% else %}{% url 'laboratoire_list' %}{% endif %}"
+                class="o-ctrl-btn" style="padding:3px 7px;"
+                title="{% if next %}Retour au rendez-vous{% else %}Retour aux analyses{% endif %}">
                 <i class="bi bi-arrow-left"></i>
             </a>
             <span style="font-size:13.5px;color:var(--text-muted);">
@@ -790,7 +794,7 @@
             <div style="flex:1;"></div>
             <div class="cp-save-group">
                 <button type="submit" name="action" value="brouillon" class="btn-save">Sauvegarder la demande</button>
-                <a href="{% url 'laboratoire_list' %}" class="btn-discard">Ignorer</a>
+                <a href="{% if next %}{{ next }}{% else %}{% url 'laboratoire_list' %}{% endif %}" class="btn-discard">Ignorer</a>
             </div>
         </div>
     </div>

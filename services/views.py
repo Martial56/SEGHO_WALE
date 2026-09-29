@@ -152,23 +152,14 @@ def service_form(request, pk=None):
         article.actif = 'actif' in data
 
         # Onglet 1 — Détails médicament
-        article.forme = data.get('forme', '')
-        article.voie_administration = data.get('voie_administration', '')
-        article.dosage = data.get('dosage', '')
-        article.dosage_unite = data.get('dosage_unite', '')
         article.quantite_prescription_manuelle = 'quantite_prescription_manuelle' in data
         article.frequence = data.get('frequence', '')
-        article.composant_actif = data.get('composant_actif', '')
-        article.effet_therapeutique = data.get('effet_therapeutique', '')
         article.effets_indesirables = data.get('effets_indesirables', '')
         compagnie_id = data.get('compagnie_pharmaceutique')
         article.compagnie_pharmaceutique_id = compagnie_id if compagnie_id else None
         article.code_produit = data.get('code_produit', '')
         article.url_produit = data.get('url_produit', '')
         article.nom_produit_fabricant = data.get('nom_produit_fabricant', '')
-        article.avertissement_grossesse = 'avertissement_grossesse' in data
-        article.avertissement_lactation = 'avertissement_lactation' in data
-        article.indications = data.get('indications', '')
         article.remarques = data.get('remarques', '')
 
         # Onglet 2 — Information générale
@@ -177,7 +168,6 @@ def service_form(request, pk=None):
         article.politique_facturation = data.get('politique_facturation', 'qtes_commandees')
         article.refacturer_depenses = data.get('refacturer_depenses', 'non')
         article.unite_mesure_id = data.get('unite_mesure') or None
-        article.unite_achat_id = data.get('unite_achat') or None
         article.prix_vente = data.get('prix_vente') or 0
         article.taxes_vente = data.get('taxes_vente', '')
         article.cout = data.get('cout') or 0
@@ -187,10 +177,8 @@ def service_form(request, pk=None):
         article.departement_id = departement_id if departement_id else None
         article.type_test_labo = data.get('type_test_labo', '')
         article.code_hprim = data.get('code_hprim', '')
-        article.code_barres = data.get('code_barres', '')
         famille_id = data.get('famille')
         article.famille_id = famille_id if famille_id else None
-        article.notes_internes = data.get('notes_internes', '')
 
         # Onglet 4 — Vente
         article.description_vente = data.get('description_vente', '')
@@ -213,11 +201,6 @@ def service_form(request, pk=None):
         article.description_reception = data.get('description_reception', '')
         article.description_livraison = data.get('description_livraison', '')
         article.description_transfert = data.get('description_transfert', '')
-
-        # Onglet 7 — Comptabilité
-        article.compte_revenus = data.get('compte_revenus', '')
-        article.compte_charges = data.get('compte_charges', '')
-        article.compte_ecart_prix = data.get('compte_ecart_prix', '')
 
         # Photo
         if 'photo' in request.FILES:
@@ -257,8 +240,6 @@ def service_form(request, pk=None):
         'lignes_conditionnements': lignes_conditionnements,
         'lignes_variantes': lignes_variantes,
         'regles': regles,
-        'forme_choices': Articleservice.FORME_CHOICES,
-        'voie_choices': Articleservice.VOIE_CHOICES,
         'type_article_choices': Articleservice.TYPE_ARTICLE_CHOICES,
         'type_produit_choices': Articleservice.TYPE_PRODUIT_CHOICES,
         'politique_fact_choices': Articleservice.POLITIQUE_FACT_CHOICES,
@@ -571,17 +552,20 @@ _TYPE_ART_MAP = {
 
 # ── Export Articles ──────────────────────────────────────────────────────────
 
+#: L'export portait 33 colonnes pour 7 qui parlaient : le reste décrivait un
+#: médicament ou une comptabilité que rien ne renseigne. Il ne reste que ce
+#: qu'une prestation a vraiment.
+#:
+#: `categorie`, `departement` et `unite_mesure` pointent vers d'autres tables et
+#: voyagent par leur **code**, jamais par leur identifiant — un `6` ne veut rien
+#: dire d'une base à l'autre — ni par leur libellé, qui se renomme. C'est aussi
+#: la clé sur laquelle leurs propres imports dédupliquent.
 _ART_HDR = [
     'reference_interne', 'nom', 'prix_vente', 'cout',
     'type_article', 'type_produit_hospitalier',
     'actif', 'peut_etre_vendu', 'peut_etre_achete',
-    'categorie', 'type_test_labo', 'code_hprim', 'unite_mesure', 'unite_achat', 'code_barres',
-    'forme', 'voie_administration', 'dosage', 'dosage_unite',
-    'composant_actif', 'effet_therapeutique', 'indications',
-    'avertissement_grossesse', 'avertissement_lactation',
-    'quantite_stock', 'quantite_alerte',
-    'politique_facturation', 'refacturer_depenses', 'politique_controle',
-    'notes_internes', 'compte_revenus', 'compte_charges', 'compte_ecart_prix',
+    'categorie', 'departement',
+    'type_test_labo', 'code_hprim', 'unite_mesure',
 ]
 
 
@@ -591,24 +575,17 @@ def _art_row(a):
         a.type_article, a.type_produit_hospitalier,
         int(a.actif), int(a.peut_etre_vendu), int(a.peut_etre_achete),
         a.categorie.code if a.categorie else '',
+        a.departement.code if a.departement else '',
         a.type_test_labo,
         a.code_hprim,
         a.unite_mesure.code if a.unite_mesure else '',
-        a.unite_achat.code if a.unite_achat else '',
-        a.code_barres, a.forme, a.voie_administration,
-        a.dosage, a.dosage_unite, a.composant_actif,
-        a.effet_therapeutique, a.indications,
-        int(a.avertissement_grossesse), int(a.avertissement_lactation),
-        a.quantite_stock, a.quantite_alerte,
-        a.politique_facturation, a.refacturer_depenses, a.politique_controle,
-        a.notes_internes, a.compte_revenus, a.compte_charges, a.compte_ecart_prix,
     ]
 
 
 @login_required
 def export_articles(request):
     fmt = request.GET.get('format', 'json')
-    qs  = Articleservice.objects.select_related('categorie', 'unite_mesure', 'unite_achat')
+    qs  = Articleservice.objects.select_related('categorie', 'departement', 'unite_mesure')
     rows = [_art_row(a) for a in qs]
     return _export_file(fmt, 'prestations', _ART_HDR, rows,
                         [dict(zip(_ART_HDR, r)) for r in rows])
@@ -616,22 +593,14 @@ def export_articles(request):
 
 # ── Export Catégories articles ───────────────────────────────────────────────
 
-_CAT_HDR = [
-    'code', 'nom', 'description', 'parent',
-    'methode_cout', 'valorisation_inventaire', 'reservation_conditionnement',
-    'bloquer_serie_lot', 'routes', 'strategie_enlevement',
-    'sequence_code_barres', 'compte_revenus', 'compte_charges',
-]
+#: L'export portait neuf colonnes de gestion de stock héritées d'un ERP, vides
+#: sur toutes les catégories. Il ne reste que ce qu'une catégorie de prestation
+#: a vraiment : son code, son nom, sa description et sa catégorie parente.
+_CAT_HDR = ['code', 'nom', 'description', 'parent']
 
 
 def _cat_row(c):
-    return [
-        c.code, c.nom, c.description,
-        c.parent.code if c.parent else '',
-        c.methode_cout, c.valorisation_inventaire, c.reservation_conditionnement,
-        int(c.bloquer_serie_lot), c.routes, c.strategie_enlevement,
-        c.sequence_code_barres, c.compte_revenus, c.compte_charges,
-    ]
+    return [c.code, c.nom, c.description, c.parent.code if c.parent else '']
 
 
 @login_required
@@ -643,11 +612,64 @@ def export_categories(request):
                         [dict(zip(_CAT_HDR, r)) for r in rows])
 
 
+@login_required
+def export_articles_modele(request):
+    """Classeur vierge aux colonnes exactes de l'import des prestations."""
+    from medecins.models import Departement
+    from stock.models import UniteMesure
+    from .modeles_import import classeur_modele
+
+    def _codes(qs):
+        return list(qs.order_by('code').values_list('code', flat=True))
+
+    return classeur_modele(
+        titre='Prestations',
+        entetes=_ART_HDR,
+        exemple=[
+            'CS_GYNOBS', 'Consultation gynéco-obstétrique', '3350', '0',
+            'prestation', 'service', '1', '1', '0',
+            'CS', 'GYN', '', '', '',
+        ],
+        listes={
+            'type_article': [c for c, _ in Articleservice.TYPE_ARTICLE_CHOICES],
+            'type_produit_hospitalier': [c for c, _ in Articleservice.TYPE_PRODUIT_CHOICES],
+            'actif': ['0', '1'],
+            'peut_etre_vendu': ['0', '1'],
+            'peut_etre_achete': ['0', '1'],
+            'categorie': _codes(CategorieArticle.objects.all()),
+            'departement': _codes(Departement.objects.filter(actif=True)),
+            'type_test_labo': [c for c, _ in Articleservice._meta.get_field('type_test_labo').choices],
+            'unite_mesure': _codes(UniteMesure.objects.all()),
+        },
+        nom_fichier='modele_import_prestations.xlsx',
+    )
+
+
+@login_required
+def export_categories_modele(request):
+    """Classeur vierge aux colonnes exactes de l'import des catégories."""
+    from .modeles_import import classeur_modele
+
+    return classeur_modele(
+        titre='Catégories',
+        entetes=_CAT_HDR,
+        exemple=['CS', 'Consultations', 'Consultations médicales et spécialisées', ''],
+        # `parent` attend le code d'une catégorie déjà créée. Une catégorie du
+        # fichier lui-même fait aussi l'affaire : l'import résout les parents
+        # dans une seconde passe, une fois toutes les lignes enregistrées.
+        listes={'parent': list(
+            CategorieArticle.objects.order_by('code').values_list('code', flat=True))},
+        nom_fichier='modele_import_categories.xlsx',
+    )
+
+
 # ── Import Articles ──────────────────────────────────────────────────────────
 
 @login_required
 @require_POST
 def import_articles(request):
+    from medecins.models import Departement
+
     upload = request.FILES.get('fichier')
     if not upload:
         messages.error(request, 'Aucun fichier sélectionné.')
@@ -662,6 +684,7 @@ def import_articles(request):
     created = updated = skipped = errors = 0
     cat_manquantes = set()
     um_manquantes = set()
+    dept_manquants = set()
 
     for item in data:
         try:
@@ -681,10 +704,12 @@ def import_articles(request):
             if um_code and not um:
                 um_manquantes.add(um_code)
 
-            ua_code = _s(item.get('unite_achat', ''))
-            ua = UniteMesure.objects.filter(code=ua_code).first() if ua_code else None
-            if ua_code and not ua:
-                um_manquantes.add(ua_code)
+            # Le département vient du module Médecins et voyage par son code,
+            # celui-là même sur lequel son propre import déduplique.
+            dept_code = _s(item.get('departement', ''))
+            dept = Departement.objects.filter(code=dept_code).first() if dept_code else None
+            if dept_code and not dept:
+                dept_manquants.add(dept_code)
 
             defaults = {
                 'nom': nom,
@@ -695,28 +720,14 @@ def import_articles(request):
                 'actif': _b(item.get('actif', True)),
                 'peut_etre_vendu': _b(item.get('peut_etre_vendu', True)),
                 'peut_etre_achete': _b(item.get('peut_etre_achete', False)),
-                'categorie': cat, 'unite_mesure': um, 'unite_achat': ua,
+                'categorie': cat, 'departement': dept, 'unite_mesure': um,
                 'type_test_labo': _s(item.get('type_test_labo', '')),
                 'code_hprim': _s(item.get('code_hprim', '')),
-                'code_barres': _s(item.get('code_barres', '')),
-                'forme': _s(item.get('forme', '')),
-                'voie_administration': _s(item.get('voie_administration', '')),
-                'dosage': _s(item.get('dosage', '')),
-                'dosage_unite': _s(item.get('dosage_unite', '')),
-                'composant_actif': _s(item.get('composant_actif', '')),
-                'effet_therapeutique': _s(item.get('effet_therapeutique', '')),
-                'indications': _s(item.get('indications', '')),
-                'avertissement_grossesse': _b(item.get('avertissement_grossesse', False)),
-                'avertissement_lactation': _b(item.get('avertissement_lactation', False)),
                 'quantite_stock': int(item.get('quantite_stock') or 0),
                 'quantite_alerte': int(item.get('quantite_alerte') or 0),
                 'politique_facturation': _s(item.get('politique_facturation', 'qtes_commandees')),
                 'refacturer_depenses': _s(item.get('refacturer_depenses', 'non')),
                 'politique_controle': _s(item.get('politique_controle', 'qtes_recues')),
-                'notes_internes': _s(item.get('notes_internes', '')),
-                'compte_revenus': _s(item.get('compte_revenus', '')),
-                'compte_charges': _s(item.get('compte_charges', '')),
-                'compte_ecart_prix': _s(item.get('compte_ecart_prix', '')),
             }
 
             if ref:
@@ -745,7 +756,9 @@ def import_articles(request):
         except Exception:
             errors += 1
 
-    fk_msg = _fk_warning([('Catégorie(s)', cat_manquantes), ('Unité(s) de mesure', um_manquantes)])
+    fk_msg = _fk_warning([('Catégorie(s)', cat_manquantes),
+                          ('Département(s)', dept_manquants),
+                          ('Unité(s) de mesure', um_manquantes)])
     if errors or fk_msg:
         messages.warning(request, f'{created} créé(s), {updated} mis à jour, {skipped} ignoré(s)'
                           + (f', {errors} erreur(s)' if errors else '') + '.' + fk_msg)
@@ -779,18 +792,11 @@ def import_categories(request):
             if not code:
                 errors += 1
                 continue
+            # Les colonnes de stock d'un ancien export sont simplement ignorées :
+            # le champ n'existe plus, la ligne passe quand même.
             defaults = {
                 'nom': _s(item.get('nom', code)),
                 'description': _s(item.get('description', '')),
-                'methode_cout': _s(item.get('methode_cout', 'prix_standard')),
-                'valorisation_inventaire': _s(item.get('valorisation_inventaire', 'manuelle')),
-                'reservation_conditionnement': _s(item.get('reservation_conditionnement', 'partiels')),
-                'bloquer_serie_lot': _b(item.get('bloquer_serie_lot', False)),
-                'routes': _s(item.get('routes', '')),
-                'strategie_enlevement': _s(item.get('strategie_enlevement', '')),
-                'sequence_code_barres': _s(item.get('sequence_code_barres', '')),
-                'compte_revenus': _s(item.get('compte_revenus', '')),
-                'compte_charges': _s(item.get('compte_charges', '')),
                 'parent': None,
             }
             obj, was_created = CategorieArticle.objects.get_or_create(code=code, defaults=defaults)

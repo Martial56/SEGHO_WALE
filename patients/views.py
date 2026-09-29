@@ -48,6 +48,7 @@ def _render_related_list(request, context):
 
 
 @login_required
+@permission_required('patients.view_patient', raise_exception=True)
 def patient_list(request):
     """Liste des patients : filtres cumulables, regroupements imbriqués, filtre et
     groupement personnalisés.
@@ -384,6 +385,7 @@ def import_patients(request):
 
 
 @login_required
+@permission_required('patients.view_patient', raise_exception=True)
 def patient_detail(request, pk):
     patient = get_object_or_404(Patient, pk=pk)
 
@@ -632,6 +634,7 @@ def _rdv_listing(request, base_qs, template_page, rdv_url_name,
 
 
 @login_required
+@permission_required('patients.view_rendezvous', raise_exception=True)
 def rdv_global_list(request):
     base_qs = (RendezVous.objects
                .select_related('patient', 'medecin', 'departement', 'type_consultation',
@@ -646,12 +649,14 @@ def rdv_global_list(request):
 
 
 @login_required
+@permission_required('patients.view_patient', raise_exception=True)
 def patient_info_json(request, pk):
     patient = get_object_or_404(Patient, pk=pk)
     return JsonResponse({'age': patient.age, 'telephone': patient.telephone})
 
 
 @login_required
+@permission_required('patients.view_patient', raise_exception=True)
 def patient_search_json(request):
     def _to_dict(p):
         return {
@@ -738,6 +743,7 @@ def rdv_create(request):
 
 
 @login_required
+@permission_required('patients.view_rendezvous', raise_exception=True)
 def rdv_edit(request, pk):
     """Fiche d'un rendez-vous : consultable par tous, modifiable sur permission.
 
@@ -986,6 +992,12 @@ def rdv_edit(request, pk):
             if action == 'créer une facture':
                 from django.urls import reverse
                 return redirect(reverse('facturation:create') + f'?patient={rdv.patient.pk}&rdv={rdv.pk}')
+            # « Demande de lab », « Soins »… : la fiche vient d'être enregistrée,
+            # on part faire l'action annexe qui saura revenir ici.
+            from core.retour import detour_demande
+            detour = detour_demande(request, request.path)
+            if detour:
+                return redirect(detour)
             from django.urls import reverse
             return redirect(reverse('patients:rdv_edit', kwargs={'pk': rdv.pk}))
     else:
@@ -1031,6 +1043,7 @@ def rdv_edit(request, pk):
 
 
 @login_required
+@permission_required('patients.view_patient', raise_exception=True)
 def patient_rdv_list(request, pk):
     patient = get_object_or_404(Patient, pk=pk)
     items = patient.rendez_vous.select_related('medecin').order_by('-date_heure')
@@ -1043,6 +1056,7 @@ def patient_rdv_list(request, pk):
 
 
 @login_required
+@permission_required('patients.view_patient', raise_exception=True)
 def patient_consultation_list(request, pk):
     patient = get_object_or_404(Patient, pk=pk)
     try:
@@ -1059,6 +1073,7 @@ def patient_consultation_list(request, pk):
 
 
 @login_required
+@permission_required('patients.view_patient', raise_exception=True)
 def patient_soin_list(request, pk):
     patient = get_object_or_404(Patient, pk=pk)
     try:
@@ -1082,6 +1097,7 @@ def patient_soin_list(request, pk):
 
 
 @login_required
+@permission_required('patients.view_patient', raise_exception=True)
 def patient_ordonnance_list(request, pk):
     patient = get_object_or_404(Patient, pk=pk)
     try:
@@ -1100,6 +1116,7 @@ def patient_ordonnance_list(request, pk):
 
 
 @login_required
+@permission_required('patients.view_patient', raise_exception=True)
 def patient_hospitalisation_list(request, pk):
     patient = get_object_or_404(Patient, pk=pk)
     try:
@@ -1118,6 +1135,7 @@ def patient_hospitalisation_list(request, pk):
 
 
 @login_required
+@permission_required('patients.view_patient', raise_exception=True)
 def patient_demande_examens_list(request, pk):
     patient = get_object_or_404(Patient, pk=pk)
     try:
@@ -1134,6 +1152,7 @@ def patient_demande_examens_list(request, pk):
 
 
 @login_required
+@permission_required('patients.view_patient', raise_exception=True)
 def patient_resultat_examens_list(request, pk):
     patient = get_object_or_404(Patient, pk=pk)
     try:
@@ -1250,6 +1269,7 @@ def ordonnance_create(request, pk):
 # curatives (Consultant / Contrôle / Soins à l'origine).
 
 @login_required
+@permission_required('patients.view_typevisitecurative', raise_exception=True)
 def typevisitecurative_list(request):
     qs = TypeVisiteCurative.objects.all()
     q  = request.GET.get('q', '').strip()
@@ -1266,6 +1286,7 @@ def typevisitecurative_list(request):
 
 
 @login_required
+@permission_required('patients.add_typevisitecurative', raise_exception=True)
 def typevisitecurative_create(request):
     is_ajax = _is_ajax(request)
     if request.method == 'POST':
@@ -1286,6 +1307,7 @@ def typevisitecurative_create(request):
 
 
 @login_required
+@permission_required('patients.change_typevisitecurative', raise_exception=True)
 def typevisitecurative_edit(request, pk):
     tvc = get_object_or_404(TypeVisiteCurative, pk=pk)
     is_ajax = _is_ajax(request)
@@ -1307,6 +1329,7 @@ def typevisitecurative_edit(request, pk):
 
 
 @login_required
+@permission_required('patients.delete_typevisitecurative', raise_exception=True)
 def typevisitecurative_delete(request, pk):
     tvc = get_object_or_404(TypeVisiteCurative, pk=pk)
     if request.method == 'POST':
@@ -1321,6 +1344,7 @@ def typevisitecurative_delete(request, pk):
 
 
 @login_required
+@permission_required('patients.view_pathologie', raise_exception=True)
 def pathologie_list(request):
     qs = Pathologie.objects.all()
     q  = request.GET.get('q', '').strip()
@@ -1342,6 +1366,7 @@ def _is_ajax(request):
 
 
 @login_required
+@permission_required('patients.add_pathologie', raise_exception=True)
 def pathologie_create(request):
     is_ajax = _is_ajax(request)
     if request.method == 'POST':
@@ -1361,6 +1386,7 @@ def pathologie_create(request):
 
 
 @login_required
+@permission_required('patients.change_pathologie', raise_exception=True)
 def pathologie_edit(request, pk):
     pathologie = get_object_or_404(Pathologie, pk=pk)
     is_ajax = _is_ajax(request)
@@ -1381,6 +1407,7 @@ def pathologie_edit(request, pk):
 
 
 @login_required
+@permission_required('patients.delete_pathologie', raise_exception=True)
 def pathologie_delete(request, pk):
     pathologie = get_object_or_404(Pathologie, pk=pk)
     if request.method == 'POST':
@@ -1403,6 +1430,9 @@ def _pathologie_row(p):
 
 @login_required
 def export_pathologies(request):
+    # Réservé aux administrateurs, comme l'export/import des patients.
+    if not request.user.is_superuser:
+        raise PermissionDenied
     from core.utils import csv_response
     import json as _json
     from django.http import HttpResponse
@@ -1491,6 +1521,9 @@ def _b(v):
 
 @login_required
 def import_pathologies(request):
+    # Réservé aux administrateurs, comme l'export/import des patients.
+    if not request.user.is_superuser:
+        raise PermissionDenied
     from medecins.models import Departement
 
     upload = request.FILES.get('fichier')
@@ -1541,6 +1574,7 @@ def import_pathologies(request):
 
 
 @login_required
+@permission_required('gynecologie.view_typevisite', raise_exception=True)
 def typevisite_list(request):
     qs = TypeVisite.objects.all()
     q  = request.GET.get('q', '').strip()
@@ -1565,6 +1599,7 @@ def typevisite_list(request):
 # avant, si bien que les deux chemins restent praticables.
 
 @login_required
+@permission_required('gynecologie.add_typevisite', raise_exception=True)
 def typevisite_create(request):
     is_ajax = _is_ajax(request)
     if request.method == 'POST':
@@ -1585,6 +1620,7 @@ def typevisite_create(request):
 
 
 @login_required
+@permission_required('gynecologie.change_typevisite', raise_exception=True)
 def typevisite_edit(request, pk):
     tv = get_object_or_404(TypeVisite, pk=pk)
     is_ajax = _is_ajax(request)
@@ -1606,6 +1642,7 @@ def typevisite_edit(request, pk):
 
 
 @login_required
+@permission_required('gynecologie.delete_typevisite', raise_exception=True)
 def typevisite_delete(request, pk):
     tv = get_object_or_404(TypeVisite, pk=pk)
     if request.method == 'POST':
@@ -1628,6 +1665,9 @@ def _typevisite_row(tv):
 
 @login_required
 def export_typevisite(request):
+    # Réservé aux administrateurs, comme l'export/import des patients.
+    if not request.user.is_superuser:
+        raise PermissionDenied
     import json as _json
     from django.http import HttpResponse
 
@@ -1676,6 +1716,9 @@ def export_typevisite(request):
 
 @login_required
 def import_typevisite(request):
+    # Réservé aux administrateurs, comme l'export/import des patients.
+    if not request.user.is_superuser:
+        raise PermissionDenied
     upload = request.FILES.get('fichier')
     if not upload:
         messages.error(request, 'Aucun fichier sélectionné.')

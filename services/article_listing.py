@@ -23,7 +23,7 @@ from patients.rdv_listing import (_debut_semaine, _lib_jour, _lib_mois,
 
 
 #: Champs interrogés par la barre de recherche.
-CHAMPS_RECHERCHE = ('nom', 'reference_interne', 'code_barres', 'composant_actif',
+CHAMPS_RECHERCHE = ('nom', 'reference_interne',
                     'nom_produit_fabricant', 'code_produit',
                     'categorie__nom', 'categorie__code', 'famille__nom')
 
@@ -166,18 +166,6 @@ def familles_articles():
             ('alerte',   "Sous le seuil d'alerte",
              Q(quantite_alerte__gt=0, quantite_stock__lte=F('quantite_alerte'))),
         ]),
-        Famille('forme', 'Forme', valeurs=[
-            (f'forme_{code}', libelle, Q(forme=code))
-            for code, libelle in Articleservice.FORME_CHOICES
-        ]),
-        Famille('voie', "Voie d'administration", valeurs=[
-            (f'voie_{code}', libelle, Q(voie_administration=code))
-            for code, libelle in Articleservice.VOIE_CHOICES
-        ]),
-        Famille('avertissement', 'Avertissement', valeurs=[
-            ('av_grossesse', 'Grossesse', Q(avertissement_grossesse=True)),
-            ('av_lactation', 'Lactation', Q(avertissement_lactation=True)),
-        ]),
         Famille('laboratoire', 'Compagnie pharmaceutique', source=_compagnies),
     ]
 
@@ -199,8 +187,6 @@ def construire_dimensions():
 
     lib_type_produit = dict(Articleservice.TYPE_PRODUIT_CHOICES)
     lib_type_article = dict(Articleservice.TYPE_ARTICLE_CHOICES)
-    lib_forme = dict(Articleservice.FORME_CHOICES)
-    lib_voie = dict(Articleservice.VOIE_CHOICES)
 
     def booleen(champ, oui, non):
         """Dimension d'un champ oui/non : le libellé doit être identique des deux
@@ -243,18 +229,6 @@ def construire_dimensions():
             'label':  lambda r: 'Gratuit' if not r['prix_vente'] else 'Payant',
             'valeur': lambda o: 'Gratuit' if not o.prix_vente else 'Payant',
             'order':  ('prix_vente',),
-        }),
-        ('forme', 'Forme', None, {
-            'values': ('forme',),
-            'label':  lambda r: lib_forme.get(r['forme']) or 'Non précisée',
-            'valeur': lambda o: lib_forme.get(o.forme) or 'Non précisée',
-            'order':  ('forme',),
-        }),
-        ('voie', "Voie d'administration", None, {
-            'values': ('voie_administration',),
-            'label':  lambda r: lib_voie.get(r['voie_administration']) or 'Non précisée',
-            'valeur': lambda o: lib_voie.get(o.voie_administration) or 'Non précisée',
-            'order':  ('voie_administration',),
         }),
         ('laboratoire', 'Compagnie pharmaceutique', None, {
             'values': ('compagnie_pharmaceutique__nom',),

@@ -110,8 +110,9 @@ html[data-theme="dark"] .proc-annule-badge { background:rgba(220,38,38,.15);bord
 <!-- ══ SUBHEADER : breadcrumb ══ -->
 <div class="o-subheader" data-fixed="1" id="subheader">
   <div class="o-subheader-row">
-    <a href="{% if is_new %}{% url 'soins:list' %}{% else %}{% url 'soins:detail' soin.pk %}{% endif %}"
-       class="o-ctrl-btn" style="padding:3px 7px;">
+    <a href="{% if next %}{{ next }}{% elif is_new %}{% url 'soins:list' %}{% else %}{% url 'soins:detail' soin.pk %}{% endif %}"
+       class="o-ctrl-btn" style="padding:3px 7px;"
+       {% if next %}title="Retour au rendez-vous"{% endif %}>
       <i class="bi bi-arrow-left"></i>
     </a>
     <span style="font-size:13.5px;color:var(--text-muted);">
@@ -128,7 +129,7 @@ html[data-theme="dark"] .proc-annule-badge { background:rgba(220,38,38,.15);bord
         <i class="bi bi-floppy"></i>
         {% if is_new %}Sauvegarder{% else %}Modifier{% endif %}
       </button>
-      <a href="{% if is_new %}{% url 'soins:list' %}{% else %}{% url 'soins:detail' soin.pk %}{% endif %}"
+      <a href="{% if next %}{{ next }}{% elif is_new %}{% url 'soins:list' %}{% else %}{% url 'soins:detail' soin.pk %}{% endif %}"
         class="sh-btn-ignore">
         <i class="bi bi-x"></i> Ignorer
       </a>
@@ -172,6 +173,10 @@ html[data-theme="dark"] .proc-annule-badge { background:rgba(220,38,38,.15);bord
 
 <form method="post" id="soin-form" novalidate>
   {% csrf_token %}
+  {% comment %}Adresse de retour quand on vient d'une fiche de rendez-vous.
+  Reconduite dans le POST pour survivre au réaffichage qui suit une
+  erreur.{% endcomment %}
+  {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
   <input type="hidden" name="statut" value="{{ current_statut }}">
 
   <!-- ══ EN-TÊTE ══ -->

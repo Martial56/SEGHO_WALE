@@ -50,7 +50,11 @@ def _caisse_user(username):
     groupe, _ = Group.objects.get_or_create(name='Guichet du lundi')
     groupe.permissions.add(
         Permission.objects.get(content_type__app_label='facturation',
-                               codename='can_encaisser'))
+                               codename='can_encaisser'),
+        # Établir une facture et l'encaisser sont deux droits distincts ; la
+        # caisse a les deux, l'accueil n'aura que le premier.
+        Permission.objects.get(content_type__app_label='facturation',
+                               codename='add_facture'))
     user.groups.add(groupe)
     return user
 
@@ -448,6 +452,9 @@ class TestPorteUniqueDeFacturation(TestCase):
     def setUp(self):
         self.patient = _patient('PU')
         self.plain = User.objects.create_user('u_pu_plain', password='x')
+        self.plain.user_permissions.add(
+            Permission.objects.get(content_type__app_label='facturation',
+                                   codename='add_facture'))
         self.caisse = _caisse_user('u_pu_caisse')
 
     #: Ce que poste le formulaire : une ligne, et un encaissement immédiat.
@@ -477,7 +484,7 @@ class TestPorteUniqueDeFacturation(TestCase):
         with self.assertRaises(NoReverseMatch):
             reverse('facture_create')
 
-    def test_sans_groupe_caisse_la_facture_passe_mais_pas_le_paiement(self):
+    def test_sans_la_permission_d_encaisser_la_facture_passe_seule(self):
         self._creer('u_pu_plain')
         self.assertEqual(Facture.objects.count(), 1, "La facture doit être créée")
         self.assertEqual(
@@ -1852,3 +1859,67 @@ class TestLesCasesDeMontantSontLisibles(TestCase):
         with translation.override('fr-fr'):
             self.assertEqual(nombre(Decimal('4000.0000')), '4000')
             self.assertEqual(nombre(Decimal('4000.25')), '4000,25')
+
+
+# ─── Les boutons suivent la permission ─────────────────────────────────────────
+
+class TestLesBoutonsDeCreationSuiventLaPermission(TestCase):
+    """Un bouton qui mène à un 403 est pire que pas de bouton.
+
+    Depuis que `facture_create` exige `facturation.add_facture`, les trois
+    entrées vers la création devaient disparaître pour qui n'a pas le droit —
+    comme le font déjà « Nouveau patient » et « Nouveau soin ».
+    """
+
+    def setUp(self):
+        self.patient = _patient('BT')
+        self.sans = User.objects.create_user('u_bt_sans', password='x')
+        self.avec = User.objects.create_user('u_bt_avec', password='x')
+        self.avec.user_permissions.add(
+            Permission.objects.get(content_type__app_label='facturation',
+                                   codename='add_facture'))
+
+    def _page(self, username, url):
+        client = Client()
+        client.login(username=username, password='x')
+        reponse = client.get(url)
+        self.assertEqual(reponse.status_code, 200)
+        return reponse.content.decode()
+
+    # ── La liste des factures ──────────────────────────────────────────────
+
+    def test_le_bouton_de_la_liste_disparait_sans_la_permission(self):
+        html = self._page('u_bt_sans', reverse('facturation:list'))
+        self.assertNotIn('class="o-btn-create"', html)
+
+    def test_le_bouton_de_la_liste_reste_avec_la_permission(self):
+        html = self._page('u_bt_avec', reverse('facturation:list'))
+        self.assertIn('class="o-btn-create"', html)
+
+    # ── L'état vide de la liste ────────────────────────────────────────────
+
+    def test_le_bouton_de_l_etat_vide_suit_la_permission(self):
+        self.assertEqual(Facture.objects.count(), 0, "L'état vide doit s'afficher")
+        sans = self._page('u_bt_sans', reverse('facturation:list'))
+        avec = self._page('u_bt_avec', reverse('facturation:list'))
+        self.assertNotIn('class="o-empty-btn"', sans)
+        self.assertIn('class="o-empty-btn"', avec)
+
+    # ── La fiche d'ordonnance ──────────────────────────────────────────────
+
+    def _ordonnance(self):
+        from consultations.models import Ordonnance
+        return Ordonnance.objects.create(patient=self.patient)
+
+    def test_le_bouton_de_l_ordonnance_suit_la_permission(self):
+        url = reverse('ordonnance_detail', args=[self._ordonnance().pk])
+        sans = self._page('u_bt_sans', url)
+        avec = self._page('u_bt_avec', url)
+        self.assertNotIn("facturation/nouvelle/", sans)
+        self.assertIn("facturation/nouvelle/", avec)
+
+    def test_la_porte_reste_fermee_meme_sans_bouton(self):
+        """Cacher le bouton n'est pas la protection : la vue refuse toujours."""
+        client = Client()
+        client.login(username='u_bt_sans', password='x')
+        self.assertEqual(client.get(reverse('facturation:create')).status_code, 403)

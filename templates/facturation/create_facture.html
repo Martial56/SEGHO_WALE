@@ -373,7 +373,15 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
             {% if edit %}
             <button type="submit" form="facture-form" class="btn-save">Enregistrer les modifications</button>
             {% else %}
+{% comment %}Établir une facture et encaisser sont deux droits distincts.
+            Sans `can_encaisser`, le bouton enregistre directement : ouvrir une
+            modale de paiement à quelqu'un qui ne peut pas encaisser l'invitait à
+            saisir un règlement qui serait refusé après coup.{% endcomment %}
+            {% if perms.facturation.can_encaisser %}
             <button type="button" id="btn-save-facture" class="btn-save" onclick="openPaymentModal()" disabled title="Ajoutez au moins une ligne avec une désignation">Enregistrer la facture</button>
+            {% else %}
+            <button type="submit" form="facture-form" id="btn-save-facture" class="btn-save" disabled title="Ajoutez au moins une ligne avec une désignation">Enregistrer la facture</button>
+            {% endif %}
             {% endif %}
             {% endif %}
             {% if edit %}
@@ -700,6 +708,7 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
 </form>
 
 <!-- ══════════ MODALE PAIEMENT ══════════ -->
+{% if perms.facturation.can_encaisser %}
 <div id="payment-modal-overlay"
      style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45);
             z-index:9999; align-items:center; justify-content:center;">
@@ -826,6 +835,7 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
 
     </div>
 </div>
+{% endif %}
 <input type="hidden" id="raw-total" value="0">
 
 {{ services|json_script:"donnees-designations" }}
@@ -1101,9 +1111,12 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
         form.submit();
     };
 
-    document.getElementById('payment-modal-overlay').addEventListener('click', function (e) {
-        if (e.target === this) closePaymentModal();
-    });
+    var overlayPaiement = document.getElementById('payment-modal-overlay');
+    if (overlayPaiement) {
+        overlayPaiement.addEventListener('click', function (e) {
+            if (e.target === this) closePaymentModal();
+        });
+    }
 })();
 </script>
 

@@ -137,6 +137,7 @@ def facturation_list(request):
 
 
 @login_required(login_url='login')
+@permission_required('facturation.add_facture', raise_exception=True)
 def facture_create(request):
     from patients.models import Patient, RendezVous
     from services.models import Articleservice
@@ -912,7 +913,12 @@ def _examens_non_payes(demande):
 def _handle_paiement(facture, POST, user, total, request=None):
     if not can_manage_paiement(user):
         return facture
-    pay_montant, _erreur = _montant_paiement(POST.get('pay_montant'), facture)
+    # L'erreur était calculée puis jetée : un montant mal tapé laissait la
+    # facture créée et le seul message affiché disait « créée avec succès ».
+    # La caissière croyait avoir encaissé.
+    pay_montant, erreur = _montant_paiement(POST.get('pay_montant'), facture)
+    if erreur and request is not None:
+        messages.error(request, erreur)
     if pay_montant is None:
         return facture
 

@@ -3,27 +3,18 @@ from django.contrib.auth.models import User
 
 
 class CategorieArticle(models.Model):
-    METHODE_COUT_CHOICES = [
-        ('prix_standard', 'Prix standard'),
-        ('avco', 'Coût moyen (AVCO)'),
-        ('fifo', 'Premier entré, premier sorti (FIFO)'),
-    ]
-    VALORISATION_CHOICES = [
-        ('manuelle', 'Manuelle'),
-        ('automatique', 'Automatique'),
-    ]
-    RESERVATION_CHOICES = [
-        ('partiels', 'Réserver des conditionnements partiels'),
-        ('entiers', 'Réserver seulement des conditionnements entiers'),
-    ]
-    ENLEVEMENT_CHOICES = [
-        ('', '—'),
-        ('fifo', 'Premier entré, premier sorti (FIFO)'),
-        ('fefo', 'Premier périmé, premier sorti (FEFO)'),
-        ('lifo', 'Dernier entré, premier sorti (LIFO)'),
-    ]
+    """Une catégorie de prestation : consultations, échographies, analyses…
 
-    # Identité
+    Le modèle portait en plus neuf champs de gestion de stock recopiés d'un
+    ERP — stratégie d'enlèvement FIFO/LIFO, méthode de coût, valorisation
+    d'inventaire, routes logistiques, comptes comptables. Ils étaient vides sur
+    toutes les catégories et aucune logique métier ne les lisait : on ne stocke
+    pas une consultation, et on ne lui applique pas de FEFO. Retirés.
+
+    Les comptes comptables existent toujours sur `Articleservice`, où ils sont
+    réellement saisis : même nom, autre modèle.
+    """
+
     code = models.CharField(max_length=10, unique=True, blank=True, verbose_name="Code")
     nom = models.CharField(max_length=100, verbose_name="Nom")
     parent = models.ForeignKey(
@@ -31,37 +22,6 @@ class CategorieArticle(models.Model):
         related_name='sous_categories', verbose_name="Catégorie parente"
     )
     description = models.TextField(blank=True, verbose_name="Description")
-
-    # Code-barres
-    sequence_code_barres = models.CharField(max_length=100, blank=True, verbose_name="Séquence de code-barres")
-
-    # Numéro de série / lot
-    bloquer_serie_lot = models.BooleanField(default=False, verbose_name="Bloquer les nouveaux numéros de série/lots")
-
-    # Logistique
-    routes = models.CharField(max_length=200, blank=True, verbose_name="Routes")
-    strategie_enlevement = models.CharField(
-        max_length=10, choices=ENLEVEMENT_CHOICES, blank=True,
-        verbose_name="Forcer la stratégie d'enlèvement"
-    )
-    reservation_conditionnement = models.CharField(
-        max_length=10, choices=RESERVATION_CHOICES, default='partiels',
-        verbose_name="Réserver les conditionnements"
-    )
-
-    # Valorisation de l'inventaire
-    methode_cout = models.CharField(
-        max_length=20, choices=METHODE_COUT_CHOICES, default='prix_standard',
-        verbose_name="Méthode de coût"
-    )
-    valorisation_inventaire = models.CharField(
-        max_length=20, choices=VALORISATION_CHOICES, default='manuelle',
-        verbose_name="Valorisation de l'inventaire"
-    )
-
-    # Propriétés du compte
-    compte_revenus = models.CharField(max_length=200, blank=True, verbose_name="Compte de revenus")
-    compte_charges = models.CharField(max_length=200, blank=True, verbose_name="Compte de charges")
 
     def save(self, *args, **kwargs):
         if self.code:
@@ -108,17 +68,6 @@ class CompagniePharma(models.Model):
 
 class Articleservice(models.Model):
 
-    FORME_CHOICES = [
-        ('comprime', 'Comprimé'), ('sirop', 'Sirop'), ('injectable', 'Injectable'),
-        ('pommade', 'Pommade'), ('gelule', 'Gélule'), ('solution', 'Solution'),
-        ('suppositoire', 'Suppositoire'), ('patch', 'Patch'),
-        ('sachet', 'Sachet'), ('gouttes', 'Gouttes'), ('autre', 'Autre'),
-    ]
-    VOIE_CHOICES = [
-        ('orale', 'Orale'), ('injectable', 'Injectable / IV'),
-        ('topique', 'Topique / Cutanée'), ('rectale', 'Rectale'),
-        ('nasale', 'Nasale'), ('ophtalmique', 'Ophtalmique'), ('autre', 'Autre'),
-    ]
     TYPE_ARTICLE_CHOICES = [
         ('prestation', 'Prestation'), ('consommable', 'Consommable'),
         ('stockable', 'Peut être stocké'), ('autre', 'Autre'),
@@ -159,14 +108,13 @@ class Articleservice(models.Model):
     peut_etre_achete = models.BooleanField(default=True, verbose_name="Peut être acheté")
 
     # ── Onglet 1 : Détails du médicament ─────────────────────
-    forme = models.CharField(max_length=20, choices=FORME_CHOICES, blank=True, verbose_name="Forme")
-    voie_administration = models.CharField(max_length=20, choices=VOIE_CHOICES, blank=True, verbose_name="Voie d'administration")
-    dosage = models.CharField(max_length=100, blank=True, verbose_name="Dosage")
-    dosage_unite = models.CharField(max_length=50, blank=True, verbose_name="Unité de dosage")
+    # Le catalogue ne contient que des prestations — examens, consultations,
+    # soins. Les champs proprement pharmaceutiques (forme, voie, dosage,
+    # composant actif, avertissements grossesse/lactation) ont été retirés :
+    # vides sur les 150 articles, ils décrivent un médicament, et les
+    # médicaments vivent dans Pharmacie et Stock, qui ont les leurs.
     quantite_prescription_manuelle = models.BooleanField(default=False, verbose_name="Quantité de prescription manuelle")
     frequence = models.CharField(max_length=100, blank=True, verbose_name="Fréquence")
-    composant_actif = models.CharField(max_length=200, blank=True, verbose_name="Composant actif")
-    effet_therapeutique = models.CharField(max_length=200, blank=True, verbose_name="Effet thérapeutique")
     effets_indesirables = models.TextField(blank=True, verbose_name="Effets indésirables")
     compagnie_pharmaceutique = models.ForeignKey(
         CompagniePharma, on_delete=models.SET_NULL, null=True, blank=True,
@@ -175,9 +123,6 @@ class Articleservice(models.Model):
     code_produit = models.CharField(max_length=100, blank=True, verbose_name="Code produit")
     url_produit = models.URLField(blank=True, verbose_name="URL du produit")
     nom_produit_fabricant = models.CharField(max_length=200, blank=True, verbose_name="Nom du produit")
-    avertissement_grossesse = models.BooleanField(default=False, verbose_name="Avertissement de grossesse")
-    avertissement_lactation = models.BooleanField(default=False, verbose_name="Avertissement de lactation")
-    indications = models.TextField(blank=True, verbose_name="Indications")
     remarques = models.TextField(blank=True, verbose_name="Remarques")
 
     # ── Onglet 2 : Information Générale ──────────────────────
@@ -188,10 +133,6 @@ class Articleservice(models.Model):
     unite_mesure = models.ForeignKey(
         'stock.UniteMesure', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='articles_um', verbose_name="Unité de mesure"
-    )
-    unite_achat = models.ForeignKey(
-        'stock.UniteMesure', on_delete=models.SET_NULL, null=True, blank=True,
-        related_name='articles_ua', verbose_name="Unité d'achat"
     )
     prix_vente = models.DecimalField(max_digits=12, decimal_places=0, default=0, verbose_name="Prix de vente (CFA)")
     taxes_vente = models.CharField(max_length=100, blank=True, verbose_name="Taxes à la vente")
@@ -216,12 +157,10 @@ class Articleservice(models.Model):
                    "partenaire pour reconnaître et router automatiquement l'analyse dans "
                    "les échanges HPRIM. Laisser vide si le labo accepte le libellé seul."
     )
-    code_barres = models.CharField(max_length=100, blank=True, verbose_name="Code-barres")
     famille = models.ForeignKey(
         FamilleArticle, on_delete=models.SET_NULL, null=True, blank=True,
         verbose_name="Famille"
     )
-    notes_internes = models.TextField(blank=True, verbose_name="Notes internes")
 
     # ── Stock (affiché uniquement si type = consommable/stockable) ──
     quantite_stock = models.IntegerField(default=0, verbose_name="Quantité en stock")
@@ -247,10 +186,6 @@ class Articleservice(models.Model):
     description_livraison = models.TextField(blank=True, verbose_name="Description pour les bons de livraison")
     description_transfert = models.TextField(blank=True, verbose_name="Description pour les transferts internes")
 
-    # ── Onglet 7 : Comptabilité ──────────────────────────────
-    compte_revenus = models.CharField(max_length=100, blank=True, verbose_name="Compte de revenus")
-    compte_charges = models.CharField(max_length=100, blank=True, verbose_name="Compte de charges")
-    compte_ecart_prix = models.CharField(max_length=100, blank=True, verbose_name="Compte d'écart de prix")
 
     # ── Meta ─────────────────────────────────────────────────
     actif = models.BooleanField(default=True, verbose_name="Actif")
