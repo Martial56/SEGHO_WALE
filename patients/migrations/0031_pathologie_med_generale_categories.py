@@ -79,10 +79,10 @@ def recategoriser(apps, schema_editor):
         or Departement.objects.filter(code='MEDGEN').first()
     )
 
+    # Ne met à jour que les pathologies déjà présentes : sur une base neuve le
+    # catalogue est vide et doit le rester (saisie manuelle ou import).
     for nom, categorie in CATEGORIE_PAR_NOM:
-        Pathologie.objects.update_or_create(
-            nom=nom, defaults={'categorie': categorie, 'departement': medg},
-        )
+        Pathologie.objects.filter(nom=nom).update(categorie=categorie, departement=medg)
 
 
 def noop_reverse(apps, schema_editor):
