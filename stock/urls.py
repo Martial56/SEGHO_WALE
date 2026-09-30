@@ -107,17 +107,7 @@ urlpatterns = [
     path('unites/<int:pk>/supprimer/', views.unite_delete, name='stock_unite_delete'),
     path('unites/supprimer-selection/', views.unite_bulk_delete, name='stock_unite_bulk_delete'),
 
-    # Catégories d'unités de mesure
-    path('unites/categories/', views.categories_unites_list, name='stock_categories_unites'),
-    path('unites/categories/nouveau/', views.categorie_unite_create, name='stock_categorie_unite_create'),
-    path('unites/categories/<int:pk>/', views.categorie_unite_detail, name='stock_categorie_unite_detail'),
-    path('unites/categories/<int:pk>/modifier/', views.categorie_unite_edit, name='stock_categorie_unite_edit'),
-    path('unites/categories/<int:pk>/supprimer/', views.categorie_unite_delete, name='stock_categorie_unite_delete'),
-    path('unites/categories/supprimer-selection/', views.categorie_unite_bulk_delete, name='stock_categorie_unite_bulk_delete'),
-
     # Export / Import unités de mesure
-    path('export/unites/',            views.export_unites,            name='stock_export_unites'),
-    path('export/categories-unites/', views.export_categories_unites, name='stock_export_categories_unites'),
-    path('importer/unites/',            views.import_unites,            name='stock_import_unites'),
-    path('importer/categories-unites/', views.import_categories_unites, name='stock_import_categories_unites'),
+    path('export/unites/',   views.export_unites, name='stock_export_unites'),
+    path('importer/unites/', views.import_unites,  name='stock_import_unites'),
 ]

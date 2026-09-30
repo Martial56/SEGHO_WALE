@@ -219,7 +219,7 @@ def service_form(request, pk=None):
     familles = FamilleArticle.objects.all()
     compagnies = CompagniePharma.objects.all()
     users = User.objects.filter(is_active=True).order_by('last_name')
-    unites_mesure = UniteMesure.objects.filter(actif=True).select_related('categorie').order_by('nom')
+    unites_mesure = UniteMesure.objects.filter(actif=True).order_by('nom')
 
     lignes_fournisseurs = article.fournisseurs.select_related('fournisseur').all() if article else []
     lignes_conditionnements = article.conditionnements.all() if article else []

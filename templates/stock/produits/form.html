@@ -161,17 +161,12 @@ html[data-theme="dark"] .modal-categorie-box { background:var(--st-surface)!impo
             </label>
             <select name="unite_mesure" id="unite_mesure" class="st-input{% if errors.unite_mesure %} error{% endif %}" required>
               <option value="">— Sélectionner —</option>
-              {% regroup unites_mesure by categorie as unites_par_categorie %}
-              {% for groupe in unites_par_categorie %}
-              <optgroup label="{{ groupe.grouper|default:'Autres' }}" data-cat="{{ groupe.grouper.nom }}">
-                {% for u in groupe.list %}
-                <option value="{{ u.pk }}"
-                  {% if mode == 'edit' and produit.unite_mesure_id == u.pk %}selected
-                  {% elif post and post.unite_mesure == u.pk|stringformat:"s" %}selected{% endif %}>
-                  {{ u.nom }}
-                </option>
-                {% endfor %}
-              </optgroup>
+              {% for u in unites_mesure %}
+              <option value="{{ u.pk }}"
+                {% if mode == 'edit' and produit.unite_mesure_id == u.pk %}selected
+                {% elif post and post.unite_mesure == u.pk|stringformat:"s" %}selected{% endif %}>
+                {{ u.nom }}
+              </option>
               {% endfor %}
             </select>
             {% if errors.unite_mesure %}<div class="st-error">{{ errors.unite_mesure }}</div>{% endif %}
@@ -332,48 +327,6 @@ html[data-theme="dark"] .modal-categorie-box { background:var(--st-surface)!impo
 </div>
 
 <script>
-/* ── Unité de mesure filtrée selon le type de produit ── */
-var TYPE_TO_CATEGORIE_UM = {
-  'medicament':  'Médicaments',
-  'consommable': 'Consommables',
-  'equipement':  'Équipements',
-};
-
-function filtrerUnitesParType(type, reinitialiserSiCache){
-  var select = document.getElementById('unite_mesure');
-  if (!select) return;
-  var catCible = TYPE_TO_CATEGORIE_UM[type] || '';
-  var valeurActuelle = select.value;
-
-  // La valeur déjà sélectionnée reste visible même si son groupe ne correspond pas
-  // au type courant (évite d'effacer silencieusement une donnée existante à l'ouverture).
-  var valeurDansGroupeCible = false;
-  select.querySelectorAll('optgroup').forEach(function(og){
-    var cat = og.dataset.cat || '';
-    if (cat === '' || cat === catCible) {
-      Array.prototype.forEach.call(og.children, function(opt){
-        if (opt.value === valeurActuelle) valeurDansGroupeCible = true;
-      });
-    }
-  });
-
-  select.querySelectorAll('optgroup').forEach(function(og){
-    var cat = og.dataset.cat || '';
-    var correspond = (cat === '' || cat === catCible);
-    var contientValeurActuelle = !correspond && Array.prototype.some.call(og.children, function(opt){
-      return opt.value === valeurActuelle;
-    });
-    var afficher = correspond || (contientValeurActuelle && !valeurDansGroupeCible && !reinitialiserSiCache);
-    og.hidden = !afficher;
-    Array.prototype.forEach.call(og.children, function(opt){
-      opt.disabled = !afficher;
-      opt.hidden = !afficher;
-    });
-  });
-
-  if (reinitialiserSiCache && !valeurDansGroupeCible) select.value = '';
-}
-
 /* ── Filtrage du select Catégorie selon le type de produit choisi ──
    Chaque <option> porte data-type="medicament|consommable|equipement" (voir
    stock/models.py::CategorieStock.type, mêmes valeurs que Produit.type) —
@@ -410,7 +363,6 @@ document.querySelectorAll('.type-btn').forEach(function(btn){
     document.getElementById('section-medicament').style.display = (type === 'medicament') ? '' : 'none';
     // Synchroniser le type dans le modal catégorie
     document.getElementById('cat-type').value = type;
-    filtrerUnitesParType(type, true);
     filtrerCategoriesParType(type, true);
   });
 });
@@ -421,7 +373,6 @@ document.querySelectorAll('.type-btn').forEach(function(btn){
 (function(){
   var typeActif = document.querySelector('.type-btn.selected input');
   if (typeActif) {
-    filtrerUnitesParType(typeActif.value, false);
     filtrerCategoriesParType(typeActif.value, false);
   }
 })();
