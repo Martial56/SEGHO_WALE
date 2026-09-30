@@ -225,7 +225,7 @@ def produit_create(request):
         raise PermissionDenied
     categories  = CategorieStock.objects.filter(actif=True).order_by('nom')
     fournisseurs = Fournisseur.objects.filter(actif=True).order_by('nom')
-    unites_mesure = UniteMesure.objects.filter(actif=True).select_related('categorie').order_by('categorie__nom', 'nom')
+    unites_mesure = UniteMesure.objects.filter(actif=True).order_by('nom')
     errors = {}
 
     if request.method == 'POST':
@@ -289,7 +289,7 @@ def produit_edit(request, pk):
     produit = get_object_or_404(Produit, pk=pk)
     categories   = CategorieStock.objects.filter(actif=True).order_by('nom')
     fournisseurs = Fournisseur.objects.filter(actif=True).order_by('nom')
-    unites_mesure = UniteMesure.objects.filter(actif=True).select_related('categorie').order_by('categorie__nom', 'nom')
+    unites_mesure = UniteMesure.objects.filter(actif=True).order_by('nom')
     errors = {}
 
     if request.method == 'POST':
@@ -2756,29 +2756,23 @@ def reception_directe_create(request):
 
 # ── Unités de mesure ───────────────────────────────────────────────────────
 
-from .models import CategorieUniteMesure
-from .forms import UniteMesureForm, CategorieUniteMesureForm
+from .forms import UniteMesureForm
 from services.views import _export_file, _parse_upload, _s, _b, _fk_warning
 
 
 @login_required(login_url='login')
 def unites_list(request):
     q = request.GET.get('q', '').strip()
-    categorie_id = request.GET.get('categorie', '')
     vue = request.GET.get('vue', 'liste')
-    qs = UniteMesure.objects.select_related('categorie').all()
+    qs = UniteMesure.objects.all()
     if q:
         qs = qs.filter(Q(nom__icontains=q) | Q(code__icontains=q))
-    if categorie_id:
-        qs = qs.filter(categorie_id=categorie_id)
     total_all = UniteMesure.objects.count()
     paginator = Paginator(qs, 30)
     page_obj = paginator.get_page(request.GET.get('page'))
     return render(request, 'stock/unites/list.html', {
         'page_obj': page_obj,
-        'categories_um': CategorieUniteMesure.objects.all(),
         'q': q,
-        'categorie_id': categorie_id,
         'vue': vue,
         'total': total_all,
         'total_filtre': qs.count(),
@@ -2859,129 +2853,20 @@ def unite_bulk_delete(request):
     return JsonResponse({'ok': False}, status=400)
 
 
-@login_required(login_url='login')
-def categories_unites_list(request):
-    q = request.GET.get('q', '').strip()
-    vue = request.GET.get('vue', 'liste')
-    qs = CategorieUniteMesure.objects.all()
-    if q:
-        qs = qs.filter(nom__icontains=q)
-    total_all = CategorieUniteMesure.objects.count()
-    paginator = Paginator(qs, 30)
-    page_obj = paginator.get_page(request.GET.get('page'))
-    return render(request, 'stock/unites/categories/list.html', {
-        'page_obj': page_obj,
-        'q': q,
-        'vue': vue,
-        'total': total_all,
-        'total_filtre': qs.count(),
-    })
-
-
-@login_required(login_url='login')
-def categorie_unite_create(request):
-    if not can_manage_stock(request.user):
-        raise PermissionDenied
-    if request.method == 'POST':
-        form = CategorieUniteMesureForm(request.POST)
-        if form.is_valid():
-            obj = form.save()
-            messages.success(request, f'Catégorie « {obj.nom} » créée.')
-            return redirect('stock_categories_unites')
-        else:
-            messages.error(request, 'Veuillez corriger les erreurs du formulaire.')
-    else:
-        form = CategorieUniteMesureForm()
-    return render(request, 'stock/unites/categories/form.html', {
-        'form': form,
-        'titre': "Nouvelle catégorie d'unité",
-        'edit': False,
-    })
-
-
-@login_required(login_url='login')
-def categorie_unite_detail(request, pk):
-    obj = get_object_or_404(CategorieUniteMesure, pk=pk)
-    return render(request, 'stock/unites/categories/detail.html', {'obj': obj})
-
-
-@login_required(login_url='login')
-def categorie_unite_edit(request, pk):
-    if not can_manage_stock(request.user):
-        raise PermissionDenied
-    obj = get_object_or_404(CategorieUniteMesure, pk=pk)
-    if request.method == 'POST':
-        form = CategorieUniteMesureForm(request.POST, instance=obj)
-        if form.is_valid():
-            form.save()
-            messages.success(request, f'Catégorie « {obj.nom} » mise à jour.')
-            return redirect('stock_categorie_unite_detail', pk=obj.pk)
-        else:
-            messages.error(request, 'Veuillez corriger les erreurs du formulaire.')
-    else:
-        form = CategorieUniteMesureForm(instance=obj)
-    return render(request, 'stock/unites/categories/form.html', {
-        'form': form,
-        'obj': obj,
-        'titre': f'Modifier — {obj.nom}',
-        'edit': True,
-    })
-
-
-@login_required(login_url='login')
-def categorie_unite_delete(request, pk):
-    if not can_manage_stock(request.user):
-        raise PermissionDenied
-    obj = get_object_or_404(CategorieUniteMesure, pk=pk)
-    if request.method == 'POST':
-        nom = obj.nom
-        obj.delete()
-        messages.success(request, f'Catégorie « {nom} » supprimée.')
-    return redirect('stock_categories_unites')
-
-
-@login_required(login_url='login')
-@require_POST
-def categorie_unite_bulk_delete(request):
-    if not can_manage_stock(request.user):
-        return JsonResponse({'error': 'Permission refusée.'}, status=403)
-    ids = request.POST.getlist('ids[]')
-    if ids:
-        count, _ = CategorieUniteMesure.objects.filter(pk__in=ids).delete()
-        return JsonResponse({'ok': True, 'count': count})
-    return JsonResponse({'ok': False}, status=400)
-
-
-_UM_HDR = ['code', 'nom', 'categorie', 'type_unite', 'ratio', 'precision_arrondi', 'actif']
+_UM_HDR = ['code', 'nom', 'actif']
 
 
 def _um_row(u):
-    return [
-        u.code, u.nom,
-        u.categorie.nom if u.categorie else '',
-        u.type_unite, float(u.ratio), float(u.precision_arrondi), int(u.actif),
-    ]
+    return [u.code, u.nom, int(u.actif)]
 
 
 @login_required(login_url='login')
 def export_unites(request):
     fmt = request.GET.get('format', 'json')
-    qs = UniteMesure.objects.select_related('categorie')
+    qs = UniteMesure.objects.all()
     rows = [_um_row(u) for u in qs]
     return _export_file(fmt, 'unites_mesure', _UM_HDR, rows,
                         [dict(zip(_UM_HDR, r)) for r in rows])
-
-
-_CU_HDR = ['nom']
-
-
-@login_required(login_url='login')
-def export_categories_unites(request):
-    fmt = request.GET.get('format', 'json')
-    qs = CategorieUniteMesure.objects.all()
-    rows = [[c.nom] for c in qs]
-    return _export_file(fmt, 'categories_unites', _CU_HDR, rows,
-                        [{'nom': c.nom} for c in qs])
 
 
 @login_required(login_url='login')
@@ -3008,16 +2893,8 @@ def import_unites(request):
             if not code:
                 errors += 1
                 continue
-            cat_nom = _s(item.get('categorie', ''))
-            cat = None
-            if cat_nom:
-                cat, _ = CategorieUniteMesure.objects.get_or_create(nom=cat_nom)
             defaults = {
                 'nom': _s(item.get('nom', code)),
-                'categorie': cat,
-                'type_unite': _s(item.get('type_unite', 'umrc')),
-                'ratio': item.get('ratio') or 1,
-                'precision_arrondi': item.get('precision_arrondi') or 0.01,
                 'actif': _b(item.get('actif', True)),
             }
             obj, was_created = UniteMesure.objects.get_or_create(code=code, defaults=defaults)
@@ -3038,40 +2915,3 @@ def import_unites(request):
     else:
         messages.success(request, f'{created} unité(s) importée(s), {updated} mise(s) à jour, {skipped} ignorée(s).')
     return redirect('stock_unites')
-
-
-@login_required(login_url='login')
-@require_POST
-def import_categories_unites(request):
-    if not can_manage_stock(request.user):
-        raise PermissionDenied
-    upload = request.FILES.get('fichier')
-    if not upload:
-        messages.error(request, 'Aucun fichier sélectionné.')
-        return redirect('stock_categories_unites')
-
-    data, err = _parse_upload(upload)
-    if err:
-        messages.error(request, err)
-        return redirect('stock_categories_unites')
-
-    created = skipped = errors = 0
-    for item in data:
-        try:
-            nom = _s(item.get('nom', ''))
-            if not nom:
-                errors += 1
-                continue
-            _, was_created = CategorieUniteMesure.objects.get_or_create(nom=nom)
-            if was_created:
-                created += 1
-            else:
-                skipped += 1
-        except Exception:
-            errors += 1
-
-    if errors:
-        messages.warning(request, f'{created} créée(s), {skipped} ignorée(s), {errors} erreur(s).')
-    else:
-        messages.success(request, f'{created} catégorie(s) importée(s), {skipped} ignorée(s).')
-    return redirect('stock_categories_unites')

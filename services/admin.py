@@ -9,8 +9,8 @@ from .models import (
 
 @admin.register(UniteMesure)
 class UniteMesureAdmin(admin.ModelAdmin):
-    list_display = ('nom', 'code', 'categorie')
-    list_filter = ('categorie',)
+    list_display = ('nom', 'code', 'actif')
+    list_filter = ('actif',)
     search_fields = ('nom', 'code')
     ordering = ('nom',)
 
