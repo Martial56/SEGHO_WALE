@@ -337,7 +337,7 @@ def medecins_list(request):
     from medecins.views import can_manage_medecins
     from django.core.paginator import Paginator
 
-    qs = Medecin.objects.select_related('specialite', 'departement', 'employe').order_by('employe__nom')
+    qs = Medecin.objects.select_related('specialite', 'departement', 'employe__fonction').order_by('employe__nom')
 
     q          = request.GET.get('q', '').strip()
     specialite = request.GET.get('specialite', '')
@@ -411,6 +411,7 @@ def medecin_lookup_employe(request):
         'email': employe.email or '—',
         'service': employe.service.nom if employe.service else '—',
         'photo_url': employe.photo.url if employe.photo else '',
+        'titre': 'SF' if employe.fonction_id and employe.fonction.code == 'SAGE-F' else 'Dr',
     })
 
 
