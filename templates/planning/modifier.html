@@ -567,6 +567,19 @@ margin-top: 5px; text-transform: uppercase; letter-spacing: 0.05em;
     return val.split(/[\/,]/).map(function (s) { return s.trim(); }).filter(function (s) { return s.length > 0; });
   }
 
+  // ── Raccourci d'affichage d'un nom (chip) à 2 mots au plus — ex. "Dr YAPI
+  // ASSI RODOLPHE" -> "Dr YAPI R" (titre + premier mot + initiale du
+  // dernier). Affichage seulement : la valeur réellement stockée dans
+  // l'input (utilisée pour la sauvegarde et le rapprochement des congés)
+  // reste complète. Même règle que le filtre Python nom_court_planning. ──
+  function nomCourt(name) {
+    var mots = name.split(/\s+/).filter(Boolean);
+    if (mots.length <= 2 || (mots[0] !== 'Dr' && mots[0] !== 'SF')) return name;
+    var titre = mots[0];
+    var noms = mots.slice(1);
+    return titre + ' ' + noms[0] + ' ' + noms[noms.length - 1][0].toUpperCase();
+  }
+
   // ── Chips : affichage et suppression individuelle ─────────────────────────────
   function renderChips(td) {
     var inp = td.querySelector('.grid-input');
@@ -583,7 +596,7 @@ margin-top: 5px; text-transform: uppercase; letter-spacing: 0.05em;
       chip.className = 'chip';
 
       var textSpan = document.createElement('span');
-      textSpan.textContent = name;
+      textSpan.textContent = nomCourt(name);
       textSpan.title = name;
 
       var xBtn = document.createElement('button');

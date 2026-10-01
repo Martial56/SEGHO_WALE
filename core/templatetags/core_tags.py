@@ -87,6 +87,33 @@ def nombre(valeur):
 
 
 @register.filter
+def nom_court_planning(valeur):
+    """Raccourcit chaque nom d'une cellule de planning à 2 mots au plus — ex.
+    « Dr YAPI ASSI RODOLPHE » devient « Dr YAPI R » (titre + premier mot du
+    nom + initiale du dernier mot). Plusieurs médecins sur une même cellule
+    sont séparés par « / », chacun est raccourci indépendamment.
+
+    Purement un raccourci d'AFFICHAGE : n'altère jamais la valeur stockée en
+    base (le texte brut continue de servir au rapprochement avec les congés
+    et aux exports), seul le gabarit qui l'affiche applique ce filtre.
+    """
+    if not valeur:
+        return valeur
+    segments = [s.strip() for s in str(valeur).split('/')]
+    out = []
+    for seg in segments:
+        if not seg:
+            continue
+        mots = seg.split()
+        if len(mots) <= 2 or mots[0] not in ('Dr', 'SF'):
+            out.append(seg)
+            continue
+        titre, *noms = mots
+        out.append(f"{titre} {noms[0]} {noms[-1][0].upper()}")
+    return ' / '.join(out)
+
+
+@register.filter
 def valeur_champ(valeur):
     """Le même nombre, mais pour l'attribut `value` d'un `<input type=number>`.
 

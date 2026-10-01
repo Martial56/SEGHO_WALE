@@ -139,7 +139,7 @@ def medecin_dashboard(request):
         Consultation.objects.filter(
             date_heure__date__gte=six_mois_ago, medecin__isnull=False, medecin__actif=True,
         )
-        .values('medecin__pk', 'medecin__employe__nom', 'medecin__employe__prenoms')
+        .values('medecin__pk', 'medecin__employe__nom', 'medecin__employe__prenoms', 'medecin__employe__fonction__code')
         .annotate(n=Count('id'))
         .order_by('-n')[:8]
     )
