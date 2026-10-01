@@ -790,6 +790,16 @@ def rdv_edit(request, pk):
             raise PermissionDenied
         action = request.POST.get('_action', '')
 
+        if action == 'autosave_registres':
+            # Enregistrement automatique des registres (requête AJAX de la fiche) :
+            # rien n'est perdu si l'on quitte la page sans cliquer « Enregistrer ».
+            if rdv.statut not in ('en_consultation', 'termine'):
+                return JsonResponse({'ok': False}, status=403)
+            from patients.utils import save_registres
+            save_registres(request, rdv)
+            from django.utils import timezone as tz
+            return JsonResponse({'ok': True, 'heure': tz.localtime().strftime('%H:%M')})
+
         if action == 'save_eval':
             # Sauvegarder le médecin sélectionné dans le modal
             medecin_pk = request.POST.get('eval_medecin', '').strip()
@@ -893,6 +903,9 @@ def rdv_edit(request, pk):
             return redirect(reverse('patients:rdv_edit', kwargs={'pk': rdv.pk}))
 
         if action == 'terminer':
+            # Les registres saisis partent avec la fin de consultation.
+            from patients.utils import save_registres
+            save_registres(request, rdv)
             from django.utils import timezone as tz
             now = tz.now()
             rdv.statut = 'termine'
@@ -904,8 +917,11 @@ def rdv_edit(request, pk):
             rdv._skip_auto_log = True
             rdv.save(update_fields=['statut', 'date_termine', 'termine_par', 'temps_consultation_minutes', 'duree_minutes'])
             log_event(rdv, request.user, 'État : En Consultation → Terminé', type='statut')
-            messages.success(request, 'Consultation terminée.')
-            return redirect('patients:rdv_global')
+            messages.success(request, 'Consultation terminée. Les registres restent modifiables.')
+            # On reste sur la fiche, à l'onglet ouvert : les registres doivent
+            # pouvoir être complétés ou corrigés après la fin de la consultation.
+            from core.retour import retour_vers_le_rdv
+            return redirect(retour_vers_le_rdv(request, request.path))
 
         if action == 'annuler':
             rdv.statut = 'annule'

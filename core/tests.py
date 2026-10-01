@@ -298,6 +298,78 @@ class TestLaFicheRdvEnregistreAvantDePartir(TestCase):
         self.assertEqual(page.count('name="_apres"'), 4)
         self.assertEqual(page.count('name="_onglet"'), 1)
 
+    def test_consultation_terminee_enregistre_les_registres(self):
+        """« Consultation terminée » changeait l'état sans garder la saisie."""
+        from patients.models import RegistreCuratif
+        reponse = self._post(_action='terminer')
+        self.assertEqual(reponse.status_code, 302)
+        self.rdv.refresh_from_db()
+        self.assertEqual(self.rdv.statut, 'termine')
+        registre = RegistreCuratif.objects.get(rdv=self.rdv)
+        self.assertEqual(registre.donnees['cur_motif_consultation'], 'douleurs abdominales')
+
+    def test_apres_terminer_on_reste_sur_la_fiche_et_on_modifie_les_registres(self):
+        from patients.models import RegistreCuratif
+        reponse = self._post(_action='terminer', _onglet='curative')
+        # Retour sur la fiche, onglet du registre rouvert — pas sur la liste.
+        self.assertEqual(reponse['Location'], self.url + '?onglet=curative')
+        page = self.client.get(reponse['Location']).content.decode()
+        self.assertIn('autosave_registres', page)
+
+        # Correction du registre une fois la consultation terminée.
+        reponse = self._post(cur_motif_consultation='céphalées')
+        self.assertEqual(reponse.status_code, 302)
+        self.assertEqual(RegistreCuratif.objects.get(rdv=self.rdv)
+                         .donnees['cur_motif_consultation'], 'céphalées')
+        self.rdv.refresh_from_db()
+        self.assertEqual(self.rdv.statut, 'termine')
+
+    def test_l_enregistrement_automatique_garde_les_registres(self):
+        from patients.models import RegistreCuratif
+        # Ni le formulaire du rendez-vous ni le type de visite ne sont exigés.
+        reponse = self.client.post(self.url, {
+            '_action': 'autosave_registres',
+            'cur_motif_consultation': 'fièvre',
+        })
+        self.assertEqual(reponse.status_code, 200)
+        self.assertTrue(reponse.json()['ok'])
+        registre = RegistreCuratif.objects.get(rdv=self.rdv)
+        self.assertEqual(registre.donnees['cur_motif_consultation'], 'fièvre')
+        self.rdv.refresh_from_db()
+        self.assertEqual(self.rdv.statut, 'en_consultation')
+
+    def test_l_enregistrement_automatique_attend_la_consultation(self):
+        from patients.models import RegistreCuratif
+        self.rdv.statut = 'confirme'
+        self.rdv.save(update_fields=['statut'])
+        reponse = self.client.post(self.url, {
+            '_action': 'autosave_registres', 'cur_motif_consultation': 'x'})
+        self.assertEqual(reponse.status_code, 403)
+        self.assertFalse(RegistreCuratif.objects.filter(rdv=self.rdv).exists())
+
+    def test_la_fiche_charge_l_enregistrement_automatique(self):
+        page = self.client.get(self.url).content.decode()
+        self.assertIn('autosave_registres', page)
+
+    def test_gynecologie_terminer_et_enregistrement_automatique(self):
+        from django.urls import reverse
+        from patients.models import RegistreCPN
+        url = reverse('gynecologie_rdv_detail', kwargs={'pk': self.rdv.pk})
+        self.assertIn('autosave_registres', self.client.get(url).content.decode())
+
+        reponse = self.client.post(url, {
+            '_action': 'autosave_registres', 'cpn_mode_entree': 'nouvelle'})
+        self.assertEqual(reponse.status_code, 200)
+        self.assertEqual(RegistreCPN.objects.get(rdv=self.rdv).donnees['cpn_mode_entree'], 'nouvelle')
+
+        reponse = self.client.post(url, {
+            '_action': 'terminer', 'cpn_mode_entree': 'ancienne', '_onglet': 'cpn'})
+        self.assertEqual(reponse['Location'], url + '?onglet=cpn')
+        self.rdv.refresh_from_db()
+        self.assertEqual(self.rdv.statut, 'termine')
+        self.assertEqual(self.rdv.cpn_mode_entree, 'ancienne')
+        self.assertEqual(RegistreCPN.objects.get(rdv=self.rdv).donnees['cpn_mode_entree'], 'ancienne')
+
 
 # ─── Modèles vierges des spécialités et des départements ───────────────────────
 

@@ -4,8 +4,8 @@
 # principe que les sections A/B/C (voir 0031_pathologie_med_generale_categories).
 #
 # Ces 22 libellés sont ceux restés en catégorie 'generale' après 0031 (aucune
-# des sections A/B/C du formulaire papier ne les référençait) — voir
-# PATHOLOGIES_INITIALES / categorie='declaration' dans 0009_pathologie.py.
+# des sections A/B/C du formulaire papier ne les référençait). Sans effet sur
+# une base neuve, dont le catalogue est vide.
 from django.db import migrations
 
 NOMS_EPIDEMIOLOGIE = [
