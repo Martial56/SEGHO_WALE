@@ -1,0 +1,95 @@
+{% comment %}
+Enregistrement automatique des registres de consultation (CPN, accouchement,
+postnatale, curatif) pendant et après la consultation.
+
+La fiche est postée en arrière-plan avec `_action=autosave_registres` : la vue
+n'écrit que les registres, sans valider ni enregistrer le reste du formulaire.
+Envoi après une courte pause de saisie, contrôle périodique (les listes à choix
+multiples modifient des champs sans déclencher d'événement), et dernier envoi
+quand on quitte la page, pour ne rien perdre si l'on sort sans enregistrer.
+{% endcomment %}
+<script>
+(function () {
+  var form = document.getElementById('rdv-form');
+  if (!form) return;
+  var statut = form.dataset.statut || '';
+  if (statut !== 'en_consultation' && statut !== 'termine') return;
+
+  var PREFIXES = /^(cpn_|acc_|cposo_|cur_)/;
+  var url = form.action || window.location.href;
+  var soumission = false;
+  var enCours = false;
+  var minuteur = null;
+
+  var indicateur = document.createElement('span');
+  indicateur.className = 'autosave-etat';
+  indicateur.style.cssText = 'font-size:11.5px;color:var(--text-muted);margin-right:8px;white-space:nowrap;';
+  var groupe = document.querySelector('.cp-save-group');
+  if (groupe) groupe.insertBefore(indicateur, groupe.firstChild);
+
+  function donnees() {
+    var fd = new FormData(form);
+    fd.set('_action', 'autosave_registres');
+    return fd;
+  }
+
+  // Empreinte des seuls champs de registre : sert à n'envoyer que s'ils ont changé.
+  function empreinte() {
+    var morceaux = [];
+    new FormData(form).forEach(function (v, k) {
+      if (PREFIXES.test(k)) morceaux.push(k + '=' + v);
+    });
+    return morceaux.join('&');
+  }
+
+  var dernier = empreinte();
+
+  function modifie() { return empreinte() !== dernier; }
+
+  function enregistrer() {
+    if (soumission || enCours || !modifie()) return;
+    var courant = empreinte();
+    enCours = true;
+    indicateur.textContent = 'Enregistrement…';
+    fetch(url, {
+      method: 'POST',
+      body: donnees(),
+      credentials: 'same-origin',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    }).then(function (r) {
+      return r.ok ? r.json() : Promise.reject(r.status);
+    }).then(function (rep) {
+      if (!rep.ok) throw new Error();
+      dernier = courant;
+      indicateur.textContent = 'Registres enregistrés à ' + rep.heure;
+    }).catch(function () {
+      indicateur.textContent = 'Échec de l’enregistrement automatique';
+    }).then(function () {
+      enCours = false;
+    });
+  }
+
+  function planifier(e) {
+    if (e && e.target && e.target.name && !PREFIXES.test(e.target.name)) return;
+    clearTimeout(minuteur);
+    minuteur = setTimeout(enregistrer, 1500);
+  }
+
+  form.addEventListener('input', planifier);
+  form.addEventListener('change', planifier);
+  setInterval(enregistrer, 15000);
+
+  // Une soumission bloquée (champ obligatoire manquant) ne compte pas.
+  form.addEventListener('submit', function (e) { if (!e.defaultPrevented) soumission = true; });
+
+  // On quitte la page (lien, onglet fermé, appli en arrière-plan) : dernier envoi.
+  function auDepart() {
+    if (soumission || !modifie() || !navigator.sendBeacon) return;
+    if (navigator.sendBeacon(url, donnees())) dernier = empreinte();
+  }
+  window.addEventListener('pagehide', auDepart);
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') auDepart();
+  });
+})();
+</script>

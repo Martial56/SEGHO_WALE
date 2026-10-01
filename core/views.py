@@ -1337,6 +1337,52 @@ def gynecologie_rdv_create(request):
     })
 
 
+def _appliquer_champs_registres(request, rdv):
+    """Recopie sur le rendez-vous les champs des registres qui y ont une colonne.
+
+    Le reste des registres vit dans leur JSON (`save_registres`). Ne sauvegarde
+    pas : l'appelant choisit quand et quels champs écrire.
+    """
+    from gynecologie.models import TypeVisite
+    rdv.cpn_mode_entree = request.POST.get('cpn_mode_entree', '').strip()
+    rdv.cpn_mode_entree_autre = request.POST.get('cpn_mode_entree_autre', '').strip()
+    cpn_tv_pk = request.POST.get('cpn_type_visite', '').strip()
+    if cpn_tv_pk:
+        try:
+            rdv.cpn_type_visite = TypeVisite.objects.get(pk=int(cpn_tv_pk))
+        except (ValueError, TypeVisite.DoesNotExist):
+            rdv.cpn_type_visite = None
+    else:
+        rdv.cpn_type_visite = None
+    rdv.cur_mode_entree = request.POST.get('cur_mode_entree', '').strip()
+    rdv.cur_mode_entree_autre = request.POST.get('cur_mode_entree_autre', '').strip()
+    # Le formulaire poste le *code* du type de visite curative (et non son
+    # identifiant) : c'est cette valeur que le registre curatif enregistre
+    # dans son JSON et que lisent les rapports. On la résout ici vers la
+    # table de configuration pour renseigner aussi la clé étrangère.
+    from patients.models import TypeVisiteCurative
+    cur_tv_code = request.POST.get('cur_type_visite', '').strip()
+    rdv.cur_type_visite = (TypeVisiteCurative.objects.filter(code=cur_tv_code).first()
+                           if cur_tv_code else None)
+
+
+_CHAMPS_REGISTRES_RDV = ['cpn_mode_entree', 'cpn_mode_entree_autre', 'cpn_type_visite',
+                         'cur_mode_entree', 'cur_mode_entree_autre', 'cur_type_visite']
+
+
+def _enregistrer_registres(request, rdv):
+    """Enregistre les registres saisis, sans toucher au reste de la fiche.
+
+    Sert à « Consultation terminée » et à l'enregistrement automatique : ni l'un
+    ni l'autre ne doit dépendre de la validation du formulaire du rendez-vous.
+    """
+    from patients.utils import save_registres
+    _appliquer_champs_registres(request, rdv)
+    rdv._skip_auto_log = True
+    rdv.save(update_fields=_CHAMPS_REGISTRES_RDV)
+    save_registres(request, rdv)
+
+
 @login_required(login_url='login')
 @permission_required('patients.view_rendezvous', raise_exception=True)
 @module_requis('gynecologie')
@@ -1374,6 +1420,15 @@ def gynecologie_rdv_detail(request, pk):
 
     if request.method == 'POST':
         action = request.POST.get('_action', '')
+
+        if action == 'autosave_registres':
+            # Enregistrement automatique des registres (requête AJAX de la fiche) :
+            # rien n'est perdu si l'on quitte la page sans cliquer « Enregistrer ».
+            if (not request.user.has_perm('patients.change_rendezvous')
+                    or rdv.statut not in ('en_consultation', 'termine')):
+                return JsonResponse({'ok': False}, status=403)
+            _enregistrer_registres(request, rdv)
+            return JsonResponse({'ok': True, 'heure': timezone.localtime().strftime('%H:%M')})
 
         if action == 'save_eval':
             # Sauvegarder le médecin sélectionné dans le modal
@@ -1455,6 +1510,8 @@ def gynecologie_rdv_detail(request, pk):
             return redirect('gynecologie_rdv_detail', pk=rdv.pk)
 
         if action == 'terminer':
+            # Les registres saisis partent avec la fin de consultation.
+            _enregistrer_registres(request, rdv)
             now = timezone.now()
             rdv.statut = 'termine'
             rdv.date_termine = now
@@ -1464,8 +1521,11 @@ def gynecologie_rdv_detail(request, pk):
             rdv._skip_auto_log = True
             rdv.save(update_fields=['statut', 'date_termine', 'termine_par', 'temps_consultation_minutes'])
             log_event(rdv, request.user, 'État : En Consultation → Terminé', type='statut')
-            messages.success(request, 'Consultation terminée.')
-            return redirect('gynecologie_rdv')
+            messages.success(request, 'Consultation terminée. Les registres restent modifiables.')
+            # On reste sur la fiche, à l'onglet ouvert : les registres doivent
+            # pouvoir être complétés ou corrigés après la fin de la consultation.
+            from core.retour import retour_vers_le_rdv
+            return redirect(retour_vers_le_rdv(request, request.path))
 
         if action == 'annuler':
             rdv.statut = 'annule'
@@ -1488,27 +1548,7 @@ def gynecologie_rdv_detail(request, pk):
             code = request.POST.get('code_confirmation', '').strip()
             if code:
                 rdv.code_confirmation = code
-            from gynecologie.models import TypeVisite
-            rdv.cpn_mode_entree = request.POST.get('cpn_mode_entree', '').strip()
-            rdv.cpn_mode_entree_autre = request.POST.get('cpn_mode_entree_autre', '').strip()
-            cpn_tv_pk = request.POST.get('cpn_type_visite', '').strip()
-            if cpn_tv_pk:
-                try:
-                    rdv.cpn_type_visite = TypeVisite.objects.get(pk=int(cpn_tv_pk))
-                except (ValueError, TypeVisite.DoesNotExist):
-                    rdv.cpn_type_visite = None
-            else:
-                rdv.cpn_type_visite = None
-            rdv.cur_mode_entree = request.POST.get('cur_mode_entree', '').strip()
-            rdv.cur_mode_entree_autre = request.POST.get('cur_mode_entree_autre', '').strip()
-            # Le formulaire poste le *code* du type de visite curative (et non son
-            # identifiant) : c'est cette valeur que le registre curatif enregistre
-            # dans son JSON et que lisent les rapports. On la résout ici vers la
-            # table de configuration pour renseigner aussi la clé étrangère.
-            from patients.models import TypeVisiteCurative
-            cur_tv_code = request.POST.get('cur_type_visite', '').strip()
-            rdv.cur_type_visite = (TypeVisiteCurative.objects.filter(code=cur_tv_code).first()
-                                   if cur_tv_code else None)
+            _appliquer_champs_registres(request, rdv)
             rdv._skip_auto_log = True
             rdv.save()
             log_event(rdv, request.user, 'Rendez-vous modifié.', type='modif')
