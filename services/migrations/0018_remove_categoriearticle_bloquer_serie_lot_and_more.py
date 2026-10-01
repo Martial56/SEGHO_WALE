@@ -2,6 +2,48 @@
 
 from django.db import migrations
 
+# Le commit aa25539 a réécrit les migrations 0001 à 0009 en gardant leurs
+# noms : ces champs, autrefois ajoutés par 0005, sont passés dans 0001.
+# Une base déjà migrée avec l'ancienne chaîne (cas de la production) peut
+# donc ne jamais avoir reçu certaines de ces colonnes. On ne supprime en base
+# que celles qui existent réellement ; l'état Django, lui, les retire toutes.
+
+CHAMPS_RETIRES = [
+    'bloquer_serie_lot',
+    'compte_charges',
+    'compte_revenus',
+    'methode_cout',
+    'reservation_conditionnement',
+    'routes',
+    'sequence_code_barres',
+    'strategie_enlevement',
+    'valorisation_inventaire',
+]
+
+
+def _colonne_existe(schema_editor, model, field):
+    with schema_editor.connection.cursor() as cursor:
+        description = schema_editor.connection.introspection.get_table_description(
+            cursor, model._meta.db_table
+        )
+    return field.column in {col.name for col in description}
+
+
+class RemoveFieldSiPresent(migrations.RemoveField):
+    """RemoveField qui ne touche la base que si la colonne y est (et, en
+    retour arrière, ne la recrée que si elle manque). Un champ par opération,
+    pour que l'état intermédiaire reste juste quand SQLite reconstruit la table."""
+
+    def database_forwards(self, app_label, schema_editor, from_state, to_state):
+        model = from_state.apps.get_model(app_label, self.model_name)
+        if _colonne_existe(schema_editor, model, model._meta.get_field(self.name)):
+            super().database_forwards(app_label, schema_editor, from_state, to_state)
+
+    def database_backwards(self, app_label, schema_editor, from_state, to_state):
+        model = to_state.apps.get_model(app_label, self.model_name)
+        if not _colonne_existe(schema_editor, model, model._meta.get_field(self.name)):
+            super().database_backwards(app_label, schema_editor, from_state, to_state)
+
 
 class Migration(migrations.Migration):
 
@@ -10,40 +52,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RemoveField(
-            model_name='categoriearticle',
-            name='bloquer_serie_lot',
-        ),
-        migrations.RemoveField(
-            model_name='categoriearticle',
-            name='compte_charges',
-        ),
-        migrations.RemoveField(
-            model_name='categoriearticle',
-            name='compte_revenus',
-        ),
-        migrations.RemoveField(
-            model_name='categoriearticle',
-            name='methode_cout',
-        ),
-        migrations.RemoveField(
-            model_name='categoriearticle',
-            name='reservation_conditionnement',
-        ),
-        migrations.RemoveField(
-            model_name='categoriearticle',
-            name='routes',
-        ),
-        migrations.RemoveField(
-            model_name='categoriearticle',
-            name='sequence_code_barres',
-        ),
-        migrations.RemoveField(
-            model_name='categoriearticle',
-            name='strategie_enlevement',
-        ),
-        migrations.RemoveField(
-            model_name='categoriearticle',
-            name='valorisation_inventaire',
-        ),
+        RemoveFieldSiPresent(model_name='categoriearticle', name=nom)
+        for nom in CHAMPS_RETIRES
     ]

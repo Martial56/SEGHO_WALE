@@ -2,6 +2,54 @@
 
 from django.db import migrations
 
+# Même situation que 0018 : la réécriture des migrations 0001 à 0009
+# (commit aa25539) a déplacé ces champs dans 0001 en gardant les noms de
+# fichiers, si bien qu'une base migrée avec l'ancienne chaîne peut ne pas
+# avoir certaines colonnes. On ne supprime en base que celles qui existent ;
+# l'état Django, lui, les retire toutes.
+
+CHAMPS_RETIRES = [
+    'avertissement_grossesse',
+    'avertissement_lactation',
+    'code_barres',
+    'composant_actif',
+    'compte_charges',
+    'compte_ecart_prix',
+    'compte_revenus',
+    'dosage',
+    'dosage_unite',
+    'effet_therapeutique',
+    'forme',
+    'indications',
+    'notes_internes',
+    'unite_achat',
+    'voie_administration',
+]
+
+
+def _colonne_existe(schema_editor, model, field):
+    with schema_editor.connection.cursor() as cursor:
+        description = schema_editor.connection.introspection.get_table_description(
+            cursor, model._meta.db_table
+        )
+    return field.column in {col.name for col in description}
+
+
+class RemoveFieldSiPresent(migrations.RemoveField):
+    """RemoveField qui ne touche la base que si la colonne y est (et, en
+    retour arrière, ne la recrée que si elle manque). Un champ par opération,
+    pour que l'état intermédiaire reste juste quand SQLite reconstruit la table."""
+
+    def database_forwards(self, app_label, schema_editor, from_state, to_state):
+        model = from_state.apps.get_model(app_label, self.model_name)
+        if _colonne_existe(schema_editor, model, model._meta.get_field(self.name)):
+            super().database_forwards(app_label, schema_editor, from_state, to_state)
+
+    def database_backwards(self, app_label, schema_editor, from_state, to_state):
+        model = to_state.apps.get_model(app_label, self.model_name)
+        if not _colonne_existe(schema_editor, model, model._meta.get_field(self.name)):
+            super().database_backwards(app_label, schema_editor, from_state, to_state)
+
 
 class Migration(migrations.Migration):
 
@@ -10,64 +58,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RemoveField(
-            model_name='articleservice',
-            name='avertissement_grossesse',
-        ),
-        migrations.RemoveField(
-            model_name='articleservice',
-            name='avertissement_lactation',
-        ),
-        migrations.RemoveField(
-            model_name='articleservice',
-            name='code_barres',
-        ),
-        migrations.RemoveField(
-            model_name='articleservice',
-            name='composant_actif',
-        ),
-        migrations.RemoveField(
-            model_name='articleservice',
-            name='compte_charges',
-        ),
-        migrations.RemoveField(
-            model_name='articleservice',
-            name='compte_ecart_prix',
-        ),
-        migrations.RemoveField(
-            model_name='articleservice',
-            name='compte_revenus',
-        ),
-        migrations.RemoveField(
-            model_name='articleservice',
-            name='dosage',
-        ),
-        migrations.RemoveField(
-            model_name='articleservice',
-            name='dosage_unite',
-        ),
-        migrations.RemoveField(
-            model_name='articleservice',
-            name='effet_therapeutique',
-        ),
-        migrations.RemoveField(
-            model_name='articleservice',
-            name='forme',
-        ),
-        migrations.RemoveField(
-            model_name='articleservice',
-            name='indications',
-        ),
-        migrations.RemoveField(
-            model_name='articleservice',
-            name='notes_internes',
-        ),
-        migrations.RemoveField(
-            model_name='articleservice',
-            name='unite_achat',
-        ),
-        migrations.RemoveField(
-            model_name='articleservice',
-            name='voie_administration',
-        ),
+        RemoveFieldSiPresent(model_name='articleservice', name=nom)
+        for nom in CHAMPS_RETIRES
     ]

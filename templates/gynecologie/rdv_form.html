@@ -548,6 +548,7 @@
 {% endif %}
 
 <form method="post" novalidate id="rdv-form"
+      data-medg-departements="{{ departements_medg_ids|join:',' }}"
       data-is-new="{{ is_new|yesno:'1,0' }}"
       data-confirme-facture="{% if rdv and rdv.statut == 'confirme' and facture_payee %}1{% else %}0{% endif %}"
       data-statut="{{ rdv.statut|default:'' }}"
@@ -1382,7 +1383,7 @@ l'adresse de retour, pour qu'on revienne là où on était et pas sur
             <div class="cpn-row" id="cur_mode_entree_autre_row" {% if not rdv or rdv.cur_mode_entree != 'autre' %}style="display:none;"{% endif %}><span class="cpn-lbl">Préciser</span><input type="text" name="cur_mode_entree_autre" class="cpn-inp editable" value="{% if rdv %}{{ rdv.cur_mode_entree_autre|default:'' }}{% endif %}" placeholder="Préciser le mode d'entrée..."></div>
             <div class="cpn-row"><span class="cpn-lbl">Type de population</span><select name="cur_type_population" id="cur_type_population" class="cpn-sel editable"><option value=""></option><option value="pop_generale">Population générale</option><option value="ts">TS</option><option value="ud">UD</option><option value="hsh">HSH</option><option value="pc">PC</option><option value="autre_risque">Autre à risque</option></select></div>
             <div class="cpn-row" id="cur_type_population_autre_row" style="display:none;"><span class="cpn-lbl">Préciser</span><input type="text" name="cur_type_population_autre" class="cpn-inp editable" placeholder="Préciser le type de population..."></div>
-            <div class="cpn-row"><span class="cpn-lbl">Type de visite curative <span style="color:var(--rose);">*</span></span><select name="cur_type_visite" id="cur_type_visite" class="cpn-sel editable" required><option value=""></option>{% for tvc in types_visite_curative %}<option value="{{ tvc.code }}" {% if rdv and rdv.cur_type_visite and rdv.cur_type_visite.code == tvc.code %}selected{% endif %}>{{ tvc.nom }}</option>{% endfor %}</select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Type de visite curative <span id="cur_type_visite_requis" style="color:var(--rose);display:none;">*</span></span><select name="cur_type_visite" id="cur_type_visite" class="cpn-sel editable"><option value=""></option>{% for tvc in types_visite_curative %}<option value="{{ tvc.code }}" {% if rdv and rdv.cur_type_visite and rdv.cur_type_visite.code == tvc.code %}selected{% endif %}>{{ tvc.nom }}</option>{% endfor %}</select></div>
             <div class="cpn-section">Examens cliniques et constantes <!--: <a href="#" style="color:var(--accent-text-soft);font-size:12.5px;text-decoration:none;margin-left:8px;">Créer</a>--></div>
             <div class="cpn-row"><span class="cpn-lbl">Poids</span><div class="cpn-val"><input type="text" class="cpn-inp-ro" readonly value="{{ constante.poids|default:'—' }}" style="max-width:90px;"><span class="cpn-unit">kg</span></div></div>
             <div class="cpn-row"><span class="cpn-lbl">Taille</span><div class="cpn-val"><input type="text" class="cpn-inp-ro" readonly value="{{ constante.taille|default:'—' }}" style="max-width:90px;"><span class="cpn-unit">m</span></div></div>
@@ -1845,12 +1846,30 @@ l'adresse de retour, pour qu'on revienne là où on était et pas sur
         });
     });
 
-    // Registre curatif : le type de visite est obligatoire dès que la
-    // consultation a démarré. Le formulaire étant en « novalidate », le contrôle
-    // se fait ici ; les boutons de changement d'état ne sont pas concernés.
+    // Registre curatif : le type de visite est obligatoire une fois la
+    // consultation démarrée, pour un type de consultation du département
+    // « Médecine générale » (même règle que la vue, patients/utils.py). Le
+    // formulaire étant en « novalidate », le contrôle se fait ici ; les boutons
+    // de changement d'état ne sont pas concernés.
     var STATUT_ACTIONS = ['confirmer', 'en_attente', 'en_consultation', 'terminer', 'annuler'];
+    var deptsMedg = (rdvForm.dataset.medgDepartements || '').split(',').filter(Boolean);
+    var typeConsult = document.getElementById('id_type_consultation');
+    function typeVisiteObligatoire() {
+        if (!consultationStarted || !typeConsult) return false;
+        var opt = typeConsult.options[typeConsult.selectedIndex];
+        return !!(opt && opt.value && deptsMedg.indexOf(opt.dataset.departementId || '') !== -1);
+    }
+    function majTypeVisiteRequis() {
+        var oblig = typeVisiteObligatoire();
+        var etoile = document.getElementById('cur_type_visite_requis');
+        if (etoile) etoile.style.display = oblig ? '' : 'none';
+        var champ = document.getElementById('cur_type_visite');
+        if (champ) champ.required = oblig;
+    }
+    if (typeConsult) typeConsult.addEventListener('change', majTypeVisiteRequis);
+    majTypeVisiteRequis();
     rdvForm.addEventListener('submit', function(e) {
-        if (!consultationStarted) return;
+        if (!typeVisiteObligatoire()) return;
         var sub = e.submitter;
         if (sub && sub.name === '_action' && STATUT_ACTIONS.indexOf(sub.value) !== -1) return;
         var sel = document.getElementById('cur_type_visite');

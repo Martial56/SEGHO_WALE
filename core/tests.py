@@ -256,11 +256,39 @@ class TestLaFicheRdvEnregistreAvantDePartir(TestCase):
         donnees.update(extra)
         return self.client.post(self.url, donnees)
 
-    def test_sans_type_de_visite_curative_rien_n_est_enregistre(self):
+    def _type_consultation(self, code_departement):
+        from medecins.models import Departement
+        from services.models import Articleservice, CategorieArticle
+        departement, _ = Departement.objects.get_or_create(
+            code=code_departement, defaults={'nom': code_departement})
+        categorie, _ = CategorieArticle.objects.get_or_create(
+            code='CS', defaults={'nom': 'Consultations'})
+        return Articleservice.objects.create(
+            nom=f'CONSULTATION {code_departement}', categorie=categorie,
+            departement=departement)
+
+    def test_medecine_generale_sans_type_de_visite_curative_rien_n_est_enregistre(self):
         from patients.models import RegistreCuratif
-        reponse = self._post(cur_type_visite='')
+        tc = self._type_consultation('medg')
+        reponse = self._post(cur_type_visite='', type_consultation=tc.pk)
         self.assertEqual(reponse.status_code, 200)
         self.assertFalse(RegistreCuratif.objects.filter(rdv=self.rdv).exists())
+
+    def test_hors_medecine_generale_le_type_de_visite_curative_est_facultatif(self):
+        from patients.models import RegistreCuratif
+        tc = self._type_consultation('GYN')
+        reponse = self._post(cur_type_visite='', type_consultation=tc.pk)
+        self.assertEqual(reponse.status_code, 302)
+        self.assertEqual(RegistreCuratif.objects.get(rdv=self.rdv)
+                         .donnees['cur_motif_consultation'], 'douleurs abdominales')
+
+    def test_la_fiche_connait_les_departements_de_medecine_generale(self):
+        tc = self._type_consultation('medg')
+        page = self.client.get(self.url).content.decode()
+        # 'MEDGEN' (migration medecins/0015) peut s'y trouver aussi.
+        import re
+        ids = re.search(r'data-medg-departements="([^"]*)"', page).group(1).split(',')
+        self.assertIn(str(tc.departement_id), ids)
 
     def test_l_url_de_la_fiche_repond(self):
         self.assertEqual(self.client.get(self.url).status_code, 200)

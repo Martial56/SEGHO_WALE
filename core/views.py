@@ -7,6 +7,7 @@ from modules_permissions.decorateurs import module_requis
 from django.views.decorators.http import require_POST
 from django.contrib import messages
 from patients.models import TypeVisiteCurative as _TypeVisiteCurative
+from patients.utils import departements_medecine_generale_ids
 from django.core.exceptions import PermissionDenied
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme, urlencode
@@ -1537,13 +1538,16 @@ def gynecologie_rdv_detail(request, pk):
 
         # Sauvegarde normale du formulaire
         form = RendezVousForm(request.POST, instance=rdv, locked_billing=locked_billing)
-        # Registre curatif : le type de visite est obligatoire dès que la
-        # consultation a démarré (l'onglet n'est accessible qu'à partir de là).
-        cur_tv_manquant = (rdv.statut in ('en_consultation', 'termine')
+        form_valide = form.is_valid()
+        # Registre curatif : le type de visite est obligatoire une fois la
+        # consultation démarrée, pour un type de consultation de Médecine
+        # générale. La validation a recopié sur `rdv` le type de consultation posté.
+        from patients.utils import type_visite_curative_obligatoire
+        cur_tv_manquant = (type_visite_curative_obligatoire(rdv)
                            and not request.POST.get('cur_type_visite', '').strip())
         if cur_tv_manquant:
             messages.error(request, "Le champ « Type de visite curative » du registre de consultation curative est obligatoire.")
-        if not cur_tv_manquant and form.is_valid():
+        if not cur_tv_manquant and form_valide:
             rdv = form.save(commit=False)
             code = request.POST.get('code_confirmation', '').strip()
             if code:
@@ -1605,6 +1609,7 @@ def gynecologie_rdv_detail(request, pk):
         'types_visite': TypeVisite.objects.filter(actif=True).order_by('nom'),
         # Types de visite curative : configurables depuis le menu Configurations
         # des rendez-vous (patients.TypeVisiteCurative).
+        'departements_medg_ids': departements_medecine_generale_ids(),
         'types_visite_curative': _TypeVisiteCurative.objects.filter(actif=True).order_by('nom'),
         'breadcrumb': breadcrumb,
         'nav_total': total,

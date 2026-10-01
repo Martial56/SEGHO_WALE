@@ -12,6 +12,7 @@ from datetime import date, timedelta
 from . import origines as origines_patient
 from .rdv_destination import url_fiche_rdv
 from .models import Patient, RendezVous, Pathologie, TypeVisiteCurative
+from .utils import departements_medecine_generale_ids
 from .forms import (PatientForm, RendezVousForm, PathologieForm, TypeVisiteForm,
                     TypeVisiteCurativeForm)
 from medecins.models import Medecin
@@ -949,13 +950,16 @@ def rdv_edit(request, pk):
             return redirect('patients:rdv_global')
 
         form = RendezVousForm(request.POST, instance=rdv, locked_billing=locked_billing)
-        # Registre curatif : le type de visite est obligatoire dès que la
-        # consultation a démarré (l'onglet n'est accessible qu'à partir de là).
-        cur_tv_manquant = (rdv.statut in ('en_consultation', 'termine')
+        form_valide = form.is_valid()
+        # Registre curatif : le type de visite est obligatoire une fois la
+        # consultation démarrée, pour un type de consultation de Médecine
+        # générale. La validation a recopié sur `rdv` le type de consultation posté.
+        from patients.utils import type_visite_curative_obligatoire
+        cur_tv_manquant = (type_visite_curative_obligatoire(rdv)
                            and not request.POST.get('cur_type_visite', '').strip())
         if cur_tv_manquant:
             messages.error(request, "Le champ « Type de visite curative » du registre de consultation curative est obligatoire.")
-        if not cur_tv_manquant and form.is_valid():
+        if not cur_tv_manquant and form_valide:
             rdv = form.save(commit=False)
             code = request.POST.get('code_confirmation', '').strip()
             if code:
@@ -1037,6 +1041,7 @@ def rdv_edit(request, pk):
         'is_new':        False,
         'consultation':  consultation,
         'constante':     constante,
+        'departements_medg_ids': departements_medecine_generale_ids(),
         'types_visite_curative': TypeVisiteCurative.objects.filter(actif=True).order_by('nom'),
         'pathologies':   Pathologie.objects.filter(actif=True, departement__code__in=('medg', 'MEDGEN')).order_by('nom'),
         'medecins':      Medecin.objects.filter(actif=True).select_related('employe').order_by('employe__nom', 'employe__prenoms'),
