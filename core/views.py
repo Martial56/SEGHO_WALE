@@ -1253,7 +1253,6 @@ def _rdv_form_post(request, rdv):
         rdv.salle_consultation = request.POST.get('salle_consultation', '')
         rdv.date_heure = date_rdv
         rdv.date_suivi = date_suivi
-        rdv.duree_minutes = int(request.POST.get('duree_minutes') or 30)
         rdv.type_rdv = request.POST.get('type_rdv', rdv.type_rdv)
         rdv.type_visite_cpn = request.POST.get('cpn_type_visite', '')
         rdv.niveau_urgence = request.POST.get('niveau_urgence', 'normal')

@@ -198,10 +198,10 @@ def calculer_rapport_maternite(annee, mois):
                 lieu_refere[tranche] += 1
 
         statut_vat = d.get('acc_statut_vat')
-        mere_a_jour = statut_vat in ('2', '3', '4', '5')
+        mere_a_jour = statut_vat in ('2', '3', '4', '5', 'complet')
         if statut_vat == '0':
             vat['sans_vat'] += 1
-        elif statut_vat == '1':
+        elif statut_vat in ('1', 'incomplet'):
             vat['non_a_jour'] += 1
         elif mere_a_jour:
             vat['a_jour'] += 1
