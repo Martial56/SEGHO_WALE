@@ -45,7 +45,16 @@ class Medecin(models.Model):
     @property
     def photo(self): return self.employe.photo
 
-    def __str__(self): return f"Dr {self.nom} {self.prenoms}"
+    @property
+    def titre(self):
+        """« Dr » pour un médecin, « SF » pour une sage-femme — déterminé par
+        la fonction RH de l'employé lié (code SAGE-F), pas par la spécialité
+        médicale (qui ne concerne que les médecins)."""
+        if self.employe.fonction_id and self.employe.fonction.code == 'SAGE-F':
+            return 'SF'
+        return 'Dr'
+
+    def __str__(self): return f"{self.titre} {self.nom} {self.prenoms}"
     class Meta:
         verbose_name = "Médecin"
         ordering = ['employe__nom']

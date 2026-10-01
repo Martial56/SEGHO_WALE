@@ -41,7 +41,7 @@ def can_delete_published(user):
 def _medecins_json(medecins_qs):
     return [
         {
-            'label': f"Dr {m.nom} {m.prenoms}",
+            'label': f"{m.titre} {m.nom} {m.prenoms}",
             'spec':  m.specialite.nom if m.specialite else '',
         }
         for m in medecins_qs
@@ -470,7 +470,7 @@ def planning_modifier(request, pk):
         messages.error(request, 'Ce planning est publié et ne peut plus être modifié.')
         return redirect('planning_detail', pk=pk)
     bureaux      = get_bureaux()
-    medecins     = Medecin.objects.filter(actif=True).select_related('specialite', 'employe').order_by('employe__nom')
+    medecins     = Medecin.objects.filter(actif=True).select_related('specialite', 'employe__fonction').order_by('employe__nom')
     absents      = _conges_semaine(planning.semaine_debut, planning.semaine_fin)
     jours_feries = _jours_feries_semaine(planning.semaine_debut)
 
@@ -867,12 +867,12 @@ def planning_par_medecin(request):
 @login_required(login_url='login')
 def planning_medecins_json(request):
     q  = request.GET.get('q', '').strip()
-    qs = Medecin.objects.filter(actif=True).select_related('specialite', 'employe')
+    qs = Medecin.objects.filter(actif=True).select_related('specialite', 'employe__fonction')
     if q:
         qs = qs.filter(Q(employe__nom__icontains=q) | Q(employe__prenoms__icontains=q))
     data = [
         {
-            'label':      f"Dr {m.nom} {m.prenoms}",
+            'label':      f"{m.titre} {m.nom} {m.prenoms}",
             'specialite': m.specialite.nom if m.specialite else '',
         }
         for m in qs[:20]
@@ -1317,7 +1317,7 @@ def planning_stats(request):
     top_medecins = sorted(medecin_counts.items(), key=lambda x: x[1], reverse=True)[:10]
 
     # ── Heures par médecin actif, par mois ────────────────────────────────────
-    medecins_actifs = Medecin.objects.filter(actif=True).select_related('employe')
+    medecins_actifs = Medecin.objects.filter(actif=True).select_related('employe__fonction')
     label_to_medecin = {
         f"dr {m.nom} {m.prenoms}".strip().lower(): m for m in medecins_actifs
     }

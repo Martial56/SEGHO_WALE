@@ -338,7 +338,7 @@ def medecins_list(request):
     from medecins.views import can_manage_medecins
     from django.core.paginator import Paginator
 
-    qs = Medecin.objects.select_related('specialite', 'departement', 'employe').order_by('employe__nom')
+    qs = Medecin.objects.select_related('specialite', 'departement', 'employe__fonction').order_by('employe__nom')
 
     q          = request.GET.get('q', '').strip()
     specialite = request.GET.get('specialite', '')
@@ -412,6 +412,7 @@ def medecin_lookup_employe(request):
         'email': employe.email or '—',
         'service': employe.service.nom if employe.service else '—',
         'photo_url': employe.photo.url if employe.photo else '',
+        'titre': 'SF' if employe.fonction_id and employe.fonction.code == 'SAGE-F' else 'Dr',
     })
 
 
@@ -1253,7 +1254,6 @@ def _rdv_form_post(request, rdv):
         rdv.salle_consultation = request.POST.get('salle_consultation', '')
         rdv.date_heure = date_rdv
         rdv.date_suivi = date_suivi
-        rdv.duree_minutes = int(request.POST.get('duree_minutes') or 30)
         rdv.type_rdv = request.POST.get('type_rdv', rdv.type_rdv)
         rdv.type_visite_cpn = request.POST.get('cpn_type_visite', '')
         rdv.niveau_urgence = request.POST.get('niveau_urgence', 'normal')
